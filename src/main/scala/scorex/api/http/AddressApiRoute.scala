@@ -18,7 +18,6 @@ import scala.util.{Failure, Success, Try}
 @Path("/addresses")
 @Api(value = "/addresses/", description = "Info about wallet's accounts and other calls about addresses")
 case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: StateReader) extends ApiRoute {
-
   import AddressApiRoute._
 
   val MaxAddressesPerRequest = 1000
@@ -119,6 +118,15 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
   ))
   def balance: Route = (path("balance" / Segment) & get) { address =>
     complete(balanceJson(address, 0))
+  }
+
+  @Path("/balance/details/{address}")
+  @ApiOperation(value = "Details for balance", notes = "Account's balances", httpMethod = "GET")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
+  ))
+  def balanceDetails: Route = (path("balance" / "details" / Segment) & get) { address =>
+    complete(balancesDetailsJson(address))
   }
 
   @Path("/balance/{address}/{confirmations}")
@@ -224,8 +232,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
     Account.fromString(address).right.map(acc => ToResponseMarshallable(Balance(
       acc.address,
       confirmations,
-      state.accountPortfolio(acc).balance
-    )))
+      state.balanceWithConfirmations(acc, confirmations))))
       .getOrElse(InvalidAddress)
   }
 
@@ -246,7 +253,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
     Account.fromString(address).right.map(acc => ToResponseMarshallable(Balance(
       acc.address,
       confirmations,
-      state.effectiveBalanceAtHeightWithConfirmations(acc, state.height, confirmations))))
+      state.effectiveBalanceWithConfirmations(acc, confirmations, state.stateHeight))))
       .getOrElse(InvalidAddress)
   }
 
