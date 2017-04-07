@@ -1,5 +1,5 @@
 sealed abstract class Network(val suffix: String) {
-  val packageName = s"waves${if (suffix == "mainnet") "" else "-" + suffix}"
+  val name = s"waves${if (suffix == "mainnet") "" else "-" + suffix}"
   override val toString = suffix
 }
 

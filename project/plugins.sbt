@@ -1,8 +1,7 @@
-logLevel := Level.Warn
-
 resolvers ++= Seq(
   "Typesafe repository" at "http://repo.typesafe.com/typesafe/releases/",
-  "Artima Maven Repository" at "http://repo.artima.com/releases"
+  "Artima Maven Repository" at "http://repo.artima.com/releases",
+  "JBoss" at "https://repository.jboss.org"
 )
 
 addSbtPlugin("com.eed3si9n" % "sbt-assembly" % "0.14.3")
