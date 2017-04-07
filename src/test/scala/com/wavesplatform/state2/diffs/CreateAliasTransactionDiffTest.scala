@@ -5,10 +5,10 @@ import com.wavesplatform.state2.{EqByteArray, Portfolio, portfolioMonoid}
 import org.scalacheck.{Gen, Shrink}
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import org.scalatest.{Matchers, PropSpec}
-import scorex.account.{Account, Alias, PrivateKeyAccount}
+import scorex.account.PrivateKeyAccount
 import scorex.lagonaki.mocks.TestBlock
-import scorex.transaction.assets.{IssueTransaction, TransferTransaction}
-import scorex.transaction.{CreateAliasTransaction, GenesisTransaction, Transaction, TransactionGen}
+import scorex.transaction.assets.IssueTransaction
+import scorex.transaction.{CreateAliasTransaction, GenesisTransaction, TransactionGen}
 
 class CreateAliasTransactionDiffTest extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers with TransactionGen {
 
