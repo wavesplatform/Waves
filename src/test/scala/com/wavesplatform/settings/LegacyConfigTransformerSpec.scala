@@ -177,8 +177,8 @@ class LegacyConfigTransformerSpec extends FreeSpec with Matchers {
 
     val ws = WavesSettings.fromConfig(legacyConfigFromJson)
 
-    ws.walletSettings.file shouldBe s"${System.getProperty("user.home")}/waves/wallet/wallet.s.dat"
-    ws.directory shouldBe s"${System.getProperty("user.home")}/waves"
+    ws.walletSettings.file shouldBe s"${System.getProperty("user.home")}/wallet/wallet.dat"
+    ws.directory shouldBe s"${System.getProperty("user.home")}"
   }
 
   "properly parses custom values from legacy config file" in {
