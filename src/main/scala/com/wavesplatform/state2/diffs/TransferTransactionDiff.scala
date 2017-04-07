@@ -3,7 +3,7 @@ package com.wavesplatform.state2.diffs
 import cats.implicits._
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.reader.StateReader
-import com.wavesplatform.state2.{Diff, EqByteArray, Portfolio}
+import com.wavesplatform.state2._
 import scorex.account.{Account, Alias}
 import scorex.transaction.StateValidationError
 import scorex.transaction.ValidationError.TransactionValidationError
@@ -16,7 +16,7 @@ object TransferTransactionDiff {
     val sender = Account.fromPublicKey(tx.sender.publicKey)
 
     val isInvalidEi = for {
-      recipient <- state.resolveAliasEi(tx, tx.recipient)
+      recipient <- state.resolveAliasEi(tx.recipient)
       portfolios = (
         tx.assetId match {
           case None => Map(sender -> Portfolio(-tx.amount, -tx.amount, Map.empty)).combine(

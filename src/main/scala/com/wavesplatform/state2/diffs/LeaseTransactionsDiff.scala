@@ -1,7 +1,7 @@
 package com.wavesplatform.state2.diffs
 
 import com.wavesplatform.state2.reader.StateReader
-import com.wavesplatform.state2.{Diff, Portfolio}
+import com.wavesplatform.state2._
 import scorex.account.{Account, Alias}
 import scorex.transaction.StateValidationError
 import scorex.transaction.ValidationError.TransactionValidationError
@@ -13,14 +13,16 @@ object LeaseTransactionsDiff {
 
   def lease(s: StateReader, height: Int)(tx: LeaseTransaction): Either[StateValidationError, Diff] = {
     val sender = Account.fromPublicKey(tx.sender.publicKey)
-    s.resolveAliasEi(tx, tx.recipient).flatMap { recipient =>
+    s.resolveAliasEi(tx.recipient).flatMap { recipient =>
       if (recipient == sender)
         Left(TransactionValidationError(tx, "Cannot lease to self"))
-      val portfolioDiff: Map[Account, Portfolio] = Map(
-        sender -> Portfolio(-tx.fee, -tx.fee - tx.amount, Map.empty),
-        recipient -> Portfolio(0, tx.amount, Map.empty)
-      )
-      Right(Diff(height = height, tx = tx, portfolios = portfolioDiff))
+      else {
+        val portfolioDiff: Map[Account, Portfolio] = Map(
+          sender -> Portfolio(-tx.fee, -tx.fee - tx.amount, Map.empty),
+          recipient -> Portfolio(0, tx.amount, Map.empty)
+        )
+        Right(Diff(height = height, tx = tx, portfolios = portfolioDiff))
+      }
     }
   }
 
@@ -31,7 +33,7 @@ object LeaseTransactionsDiff {
       case None => Left(TransactionValidationError(tx, s"Related LeaseTransaction not found"))
       case Some(leaseTx) =>
         val sender = Account.fromPublicKey(tx.sender.publicKey)
-        s.resolveAliasEi(leaseTx, leaseTx.recipient).map { recipient =>
+        s.resolveAliasEi(leaseTx.recipient).map { recipient =>
           val portfolioDiff: Map[Account, Portfolio] = Map(
             sender -> Portfolio(-tx.fee, -tx.fee + leaseTx.amount, Map.empty),
             recipient -> Portfolio(0, -leaseTx.amount, Map.empty)

@@ -4,7 +4,7 @@ import com.google.common.base.Charsets
 import com.wavesplatform.state2._
 import scorex.account.{Account, AccountOrAlias, Alias}
 import scorex.crypto.hash.FastCryptographicHash
-import scorex.transaction.ValidationError.TransactionValidationError
+import scorex.transaction.ValidationError.{AliasNotExists, TransactionValidationError}
 import scorex.transaction._
 import scorex.transaction.assets.IssueTransaction
 import scorex.transaction.assets.exchange.{ExchangeTransaction, Order}
@@ -58,11 +58,11 @@ object StateReader {
         else None
       })
 
-    def resolveAliasEi[T <: Transaction](tx: T, aoa: AccountOrAlias): Either[StateValidationError, Account] = {
+    def resolveAliasEi[T <: Transaction](aoa: AccountOrAlias): Either[StateValidationError, Account] = {
       aoa match {
         case a: Account => Right(a)
         case a: Alias => s.resolveAlias(a) match {
-          case None => Left(TransactionValidationError(tx, s"Alias $a is not resolved"))
+          case None => Left(AliasNotExists(a))
           case Some(acc) => Right(acc)
         }
       }

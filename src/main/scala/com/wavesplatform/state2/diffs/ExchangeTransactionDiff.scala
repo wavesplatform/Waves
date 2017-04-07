@@ -1,66 +1,56 @@
 package com.wavesplatform.state2.diffs
 
-import javax.swing.SwingWorker.StateValue
-
 import cats._
-import cats.syntax.monoid._
 import cats.implicits._
 import com.wavesplatform.state2._
 import com.wavesplatform.state2.reader.StateReader
-import scorex.transaction.StateValidationError
+import scorex.transaction.{StateValidationError, ValidationError}
 import scorex.transaction.ValidationError.TransactionValidationError
 import scorex.transaction.assets.exchange.ExchangeTransaction
 
 import scala.util.Right
 
 object ExchangeTransactionDiff {
-  def apply(s: StateReader, height: Int)(tx: ExchangeTransaction): Either[StateValidationError, Diff] = {
-    val x = for {
-      t <- isValidAgainstPreviousTxs(tx, s.findPreviousExchangeTxs(tx.sellOrder) ++ s.findPreviousExchangeTxs(tx.buyOrder))
-      buyPriceAssetChange <- t.buyOrder.getSpendAmount(t.price, t.amount).map(-_)
-      buyAmountAssetChange <- t.buyOrder.getReceiveAmount(t.price, t.amount)
-      sellPriceAssetChange <- t.sellOrder.getReceiveAmount(t.price, t.amount)
-      sellAmountAssetChange <- t.sellOrder.getSpendAmount(t.price, t.amount).map(-_)
-    } yield {
-      val matcher = t.buyOrder.matcherPublicKey.toAccount
-      val buyer = t.buyOrder.senderPublicKey.toAccount
-      val seller = t.sellOrder.senderPublicKey.toAccount
 
-      def wavesPortfolio(amt: Long) = Portfolio(amt, amt, Map.empty)
+  def apply(s: StateReader, height: Int)(tx: ExchangeTransaction): Either[StateValidationError, Diff] = for {
+    t <- isValidAgainstPreviousTxs(tx, s.findPreviousExchangeTxs(tx.sellOrder) ++ s.findPreviousExchangeTxs(tx.buyOrder))
+    buyPriceAssetChange <- t.buyOrder.getSpendAmount(t.price, t.amount).liftValidationError(tx).map(-_)
+    buyAmountAssetChange <- t.buyOrder.getReceiveAmount(t.price, t.amount).liftValidationError(tx)
+    sellPriceAssetChange <- t.sellOrder.getReceiveAmount(t.price, t.amount).liftValidationError(tx)
+    sellAmountAssetChange <- t.sellOrder.getSpendAmount(t.price, t.amount).liftValidationError(tx).map(-_)
+  } yield {
+    val matcher = t.buyOrder.matcherPublicKey.toAccount
+    val buyer = t.buyOrder.senderPublicKey.toAccount
+    val seller = t.sellOrder.senderPublicKey.toAccount
 
-      val feeDiff = Monoid.combineAll(Seq(
-        Map(matcher -> wavesPortfolio(t.buyMatcherFee + t.sellMatcherFee - t.fee)),
-        Map(buyer -> wavesPortfolio(-t.buyMatcherFee)),
-        Map(seller -> wavesPortfolio(-t.sellMatcherFee))))
+    def wavesPortfolio(amt: Long) = Portfolio(amt, amt, Map.empty)
 
-      val priceDiff = t.buyOrder.assetPair.priceAsset.map(EqByteArray) match {
-        case Some(assetId) => Monoid.combine(
-          Map(buyer -> Portfolio(0, 0, Map(assetId -> buyPriceAssetChange))),
-          Map(seller -> Portfolio(0, 0, Map(assetId -> sellPriceAssetChange))))
-        case None => Monoid.combine(
-          Map(buyer -> Portfolio(buyPriceAssetChange, buyPriceAssetChange, Map.empty)),
-          Map(seller -> Portfolio(sellPriceAssetChange, sellPriceAssetChange, Map.empty)))
-      }
+    val feeDiff = Monoid.combineAll(Seq(
+      Map(matcher -> wavesPortfolio(t.buyMatcherFee + t.sellMatcherFee - t.fee)),
+      Map(buyer -> wavesPortfolio(-t.buyMatcherFee)),
+      Map(seller -> wavesPortfolio(-t.sellMatcherFee))))
 
-      val amountDiff = t.buyOrder.assetPair.amountAsset.map(EqByteArray) match {
-        case Some(assetId) => Monoid.combine(
-          Map(buyer -> Portfolio(0, 0, Map(assetId -> buyAmountAssetChange))),
-          Map(seller -> Portfolio(0, 0, Map(assetId -> sellAmountAssetChange))))
-        case None => Monoid.combine(
-          Map(buyer -> Portfolio(buyAmountAssetChange, buyAmountAssetChange, Map.empty)),
-          Map(seller -> Portfolio(sellAmountAssetChange, sellAmountAssetChange, Map.empty)))
-      }
-
-      val result = Monoid.combineAll(Seq(feeDiff, priceDiff, amountDiff))
-
-      Diff(height, tx, result)
+    val priceDiff = t.buyOrder.assetPair.priceAsset.map(EqByteArray) match {
+      case Some(assetId) => Monoid.combine(
+        Map(buyer -> Portfolio(0, 0, Map(assetId -> buyPriceAssetChange))),
+        Map(seller -> Portfolio(0, 0, Map(assetId -> sellPriceAssetChange))))
+      case None => Monoid.combine(
+        Map(buyer -> Portfolio(buyPriceAssetChange, buyPriceAssetChange, Map.empty)),
+        Map(seller -> Portfolio(sellPriceAssetChange, sellPriceAssetChange, Map.empty)))
     }
 
-    x match {
-      case Right(d) => Right(d)
-      case Left(e: StateValidationError) => Left(e)
-      case Left(e: Throwable) => Left(TransactionValidationError(tx, e.getMessage))
+    val amountDiff = t.buyOrder.assetPair.amountAsset.map(EqByteArray) match {
+      case Some(assetId) => Monoid.combine(
+        Map(buyer -> Portfolio(0, 0, Map(assetId -> buyAmountAssetChange))),
+        Map(seller -> Portfolio(0, 0, Map(assetId -> sellAmountAssetChange))))
+      case None => Monoid.combine(
+        Map(buyer -> Portfolio(buyAmountAssetChange, buyAmountAssetChange, Map.empty)),
+        Map(seller -> Portfolio(sellAmountAssetChange, sellAmountAssetChange, Map.empty)))
     }
+
+    val result = Monoid.combineAll(Seq(feeDiff, priceDiff, amountDiff))
+
+    Diff(height, tx, result)
   }
 
 

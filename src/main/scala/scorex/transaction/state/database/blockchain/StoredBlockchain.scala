@@ -8,7 +8,8 @@ import scorex.block.Block
 import scorex.block.Block.BlockId
 import scorex.network.Checkpoint
 import scorex.transaction.History.BlockchainScore
-import scorex.transaction.{History, TheError, ValidationError}
+import scorex.transaction.ValidationError.CustomError
+import scorex.transaction.{History, ValidationError}
 import scorex.utils.{LogMVMapBuilder, ScorexLogging}
 
 import scala.collection.JavaConverters._
@@ -92,7 +93,7 @@ class StoredBlockchain(db: MVStore) extends History with ScorexLogging {
       blockStorage.writeBlock(h, block)
       Right(())
     } else {
-      Left(TheError(s"Appending block ${block.json} which parent is not last block in blockchain"))
+      Left(CustomError(s"Appending block ${block.json} which parent is not last block in blockchain"))
     }
   }
 

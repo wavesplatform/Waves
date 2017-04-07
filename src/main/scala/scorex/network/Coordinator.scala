@@ -1,8 +1,5 @@
 package scorex.network
 
-import cats._
-import cats.syntax.all._
-
 import akka.pattern.{ask, pipe}
 import akka.util.Timeout
 import scorex.app.Application
@@ -18,14 +15,13 @@ import scorex.network.ScoreObserver.{CurrentScore, GetScore}
 import scorex.network.message.{Message, MessageSpec}
 import scorex.network.peer.PeerManager.{ConnectedPeers, GetConnectedPeersTyped}
 import scorex.transaction.History.BlockchainScore
-import scorex.transaction.{TheError, ValidationError}
+import scorex.transaction.ValidationError
+import scorex.transaction.ValidationError.CustomError
 import scorex.utils.ScorexLogging
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.language.postfixOps
-import scala.util.{Failure, Success, Try}
-
 
 class Coordinator(application: Application) extends ViewSynchronizer with ScorexLogging {
 
@@ -258,7 +254,7 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
     if (isValidWithRespectToCheckpoint(candidate, estimatedHeight))
       Right(())
     else
-      Left(TheError(s"Block ${str(candidate)} [h = $estimatedHeight] is not valid with respect to checkpoint"))
+      Left(CustomError(s"Block ${str(candidate)} [h = $estimatedHeight] is not valid with respect to checkpoint"))
   }
 
   def isBlockValid(b: Block): Either[ValidationError, Unit] = {
@@ -271,9 +267,9 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
 
       def consensus = application.consensusModule.isValid(b)
 
-      if (!history) Left(TheError(s"Invalid block ${b.encodedId}: no parent block in history"))
-      else if (!signature) Left(TheError(s"Invalid block ${b.encodedId}: signature is not valid"))
-      else if (!consensus) Left(TheError(s"Invalid block ${b.encodedId}: consensus data is not valid"))
+      if (!history) Left(CustomError(s"Invalid block ${b.encodedId}: no parent block in history"))
+      else if (!signature) Left(CustomError(s"Invalid block ${b.encodedId}: signature is not valid"))
+      else if (!consensus) Left(CustomError(s"Invalid block ${b.encodedId}: consensus data is not valid"))
       else Right(())
     }
   }

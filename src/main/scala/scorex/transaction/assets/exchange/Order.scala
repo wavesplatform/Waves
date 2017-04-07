@@ -9,6 +9,7 @@ import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash
 import scorex.serialization.{BytesSerializable, Deser, JsonSerializable}
 import scorex.transaction.TransactionParser._
+import scorex.transaction.ValidationError.CustomError
 import scorex.transaction._
 import scorex.transaction.assets.exchange.Validation.booleanOperators
 
@@ -118,7 +119,7 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
   }
 
   @ApiModelProperty(hidden = true)
-  def getSpendAmount(matchPrice: Long, matchAmount: Long): Either[Throwable, Long] = Try {
+  def getSpendAmount(matchPrice: Long, matchAmount: Long): Either[ValidationError, Long] = Try {
     if (orderType == OrderType.SELL) matchAmount
     else {
       val spend = BigInt(matchAmount) * matchPrice / PriceConstant
@@ -126,15 +127,15 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
         throw new ArithmeticException("BigInteger out of long range")
       } else spend.bigInteger.longValueExact()
     }
-  }.toEither
+  }.toEither.left.map(x => CustomError(x.getMessage))
 
   @ApiModelProperty(hidden = true)
-  def getReceiveAmount(matchPrice: Long, matchAmount: Long): Either[Throwable, Long] = Try {
+  def getReceiveAmount(matchPrice: Long, matchAmount: Long): Either[ValidationError, Long] = Try {
     if (orderType == OrderType.BUY) matchAmount
     else {
       (BigInt(matchAmount) * matchPrice / PriceConstant).bigInteger.longValueExact()
     }
-  }.toEither
+  }.toEither.left.map(x => CustomError(x.getMessage))
 
   override def json: JsObject = Json.obj(
     "id" -> Base58.encode(id),

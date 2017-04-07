@@ -4,6 +4,8 @@ import cats._
 import cats.implicits._
 import cats.Monoid
 import scorex.crypto.encode.Base58
+import scorex.transaction.ValidationError.TransactionValidationError
+import scorex.transaction.{StateValidationError, Transaction, ValidationError}
 
 import scala.util.Try
 
@@ -62,4 +64,12 @@ package object state2 {
       heightDiff = older.heightDiff + newer.heightDiff,
       effectiveBalanceSnapshots = older.effectiveBalanceSnapshots ++ newer.effectiveBalanceSnapshots)
   }
+
+
+  implicit class EitherExt[L <: ValidationError, R](ei: Either[L, R]) {
+    def liftValidationError[T <: Transaction](t: T): Either[StateValidationError, R] = {
+      ei.left.map(e => TransactionValidationError(t, e.toString))
+    }
+  }
+
 }
