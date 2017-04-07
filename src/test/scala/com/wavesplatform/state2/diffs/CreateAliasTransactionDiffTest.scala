@@ -19,7 +19,7 @@ class CreateAliasTransactionDiffTest extends PropSpec with PropertyChecks with G
     ts <- positiveLongGen
     genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
     alias <- aliasGen
-    alias2 <- aliasGen
+    alias2 <- aliasGen suchThat (_.name != alias.name)
     fee <- smallFeeGen
     other: PrivateKeyAccount <- accountGen
     aliasTx = CreateAliasTransaction.create(master, alias, fee, ts).right.get

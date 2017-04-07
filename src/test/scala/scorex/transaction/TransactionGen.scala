@@ -238,13 +238,11 @@ trait TransactionGen {
     matcherFee: Long <- Arbitrary.arbitrary[Long]
   } yield Order(sender, matcher, pair, orderType, price, amount, timestamp, expiration, matcherFee)
 
-  val orderMatchGenerator: Gen[(ExchangeTransaction, PrivateKeyAccount)] = for {
-    sender1: PrivateKeyAccount <- accountGen
-    sender2: PrivateKeyAccount <- accountGen
+
+  def exchangeGeneratorP(buyer: PrivateKeyAccount, seller: PrivateKeyAccount, amountAssetId: Option[Array[Byte]],
+                         priceAssetId: Option[Array[Byte]]): Gen[(ExchangeTransaction, PrivateKeyAccount)] = for {
+
     matcher: PrivateKeyAccount <- accountGen
-    assetPair <- assetPairGen
-    spendAssetID: Array[Byte] <- bytes32gen
-    receiveAssetID: Array[Byte] <- bytes32gen
     price: Long <- priceGen
     amount1: Long <- amountGen
     amount2: Long <- amountGen
@@ -252,19 +250,28 @@ trait TransactionGen {
     timestamp: Long <- timestampGen
     expiration: Long <- maxTimeGen
     matcherFee: Long <- feeAmountGen
+    assetPair = AssetPair(amountAssetId, priceAssetId)
   } yield {
-    val o1 = Order.buy(sender1, matcher, assetPair, price, amount1, timestamp, expiration, matcherFee)
-    val o2 = Order.sell(sender2, matcher, assetPair, price, amount2, timestamp, expiration, matcherFee)
+    val o1 = Order.buy(buyer, matcher, assetPair, price, amount1, timestamp, expiration, matcherFee)
+    val o2 = Order.sell(seller, matcher, assetPair, price, amount2, timestamp, expiration, matcherFee)
     val buyFee = (BigInt(matcherFee) * BigInt(matchedAmount) / BigInt(amount1)).longValue()
     val sellFee = (BigInt(matcherFee) * BigInt(matchedAmount) / BigInt(amount2)).longValue()
+    import com.wavesplatform.state2.diffs._
     val trans = ExchangeTransaction.create(matcher, o1, o2, price, matchedAmount,
-      buyFee, sellFee, (buyFee + sellFee) / 2, expiration - 100).right.get
+      buyFee, sellFee, (buyFee + sellFee) / 2, expiration - 100).explicitGet()
 
     (trans, matcher)
   }
 
+  val exchangeGenerator: Gen[(ExchangeTransaction, PrivateKeyAccount)] = for {
+    sender1: PrivateKeyAccount <- accountGen
+    sender2: PrivateKeyAccount <- accountGen
+    assetPair <- assetPairGen
+    r <- exchangeGeneratorP(sender1, sender2, assetPair.amountAsset, assetPair.priceAsset)
+  } yield r
+
   implicit val orderMatchArb: Arbitrary[(ExchangeTransaction, PrivateKeyAccount)] = Arbitrary {
-    orderMatchGenerator
+    exchangeGenerator
   }
   implicit val orderArb: Arbitrary[(Order, PrivateKeyAccount)] = Arbitrary {
     orderGenerator
