@@ -1,1 +1,2 @@
-JAVA_OPTS="-Dwaves.directory=/var/lib/${{app_name}}/"
+# Waves node environment file
+#JAVA_OPTS=""

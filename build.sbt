@@ -3,12 +3,9 @@ import sbt.Keys._
 
 val appConf = ConfigFactory.parseFile(new File("src/main/resources/reference.conf")).resolve().getConfig("app")
 
-inThisBuild(Seq(
-  organization in ThisBuild := "com.wavesplatform",
-  name := "waves",
-  version := appConf.getString("version"),
-  scalaVersion := "2.12.1"
-))
+organization in ThisBuild := "com.wavesplatform"
+version := appConf.getString("version")
+scalaVersion := "2.12.1"
 
 scalacOptions ++= Seq("-feature", "-deprecation", "-Xmax-classfile-name", "128")
 
@@ -40,13 +37,20 @@ inConfig(Test)(Seq(
   testOptions += Tests.Argument("-oIDOF", "-u", "target/test-reports")
 ))
 
-Defaults.itSettings
-
-configs(IntegrationTest)
-
 concurrentRestrictions in Global += Tags.limit(Tags.Test, 1)
 
-test in assembly := {}
+Defaults.itSettings
+configs(IntegrationTest)
+inConfig(IntegrationTest)(Seq(
+  fork := true,
+  parallelExecution := false,
+  javaOptions ++= Seq(
+    s"-Ddocker.imageId=${docker.value.id}",
+    "-Dlogback.configurationFile=logback-it.xml"
+  ),
+  test <<= test.dependsOn(docker),
+  testOptions += Tests.Filter(_.endsWith("Suite"))
+))
 
 dockerfile in docker := {
   val configTemplate = (resourceDirectory in IntegrationTest).value / "template.conf"
@@ -60,17 +64,6 @@ dockerfile in docker := {
     entryPoint("/opt/waves/start-waves.sh")
   }
 }
-
-inConfig(IntegrationTest)(Seq(
-  fork := true,
-  parallelExecution := false,
-  javaOptions ++= Seq(
-    s"-Ddocker.imageId=${docker.value.id}",
-    "-Dlogback.configurationFile=logback-it.xml"
-  ),
-  test <<= test.dependsOn(docker),
-  testOptions += Tests.Filter(_.endsWith("Suite"))
-))
 
 crossPaths := false
 
