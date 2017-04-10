@@ -31,9 +31,6 @@ localsettings.json
 *.csv
 *.dat
 
-# Packages
-package/
-
 # standalone docker
 Dockerfile
 

@@ -1,0 +1,12 @@
+${{header}}
+${{loader-functions}}
+
+if [ "$1" = remove ]; then
+    if initctl --version >/dev/null 2>&1 ; then
+        service ${{app_name}} stop || true
+    elif systemctl --version >/dev/null 2>&1 ; then
+        stopService ${{app_name}} || true
+    fi
+fi
+
+exit 0
