@@ -4,6 +4,7 @@ import java.util
 
 import com.wavesplatform.state2.reader.{CompositeStateReader, StateReader}
 import org.h2.mvstore.MVStore
+import org.scalatest.matchers.{MatchResult, Matcher}
 import scorex.account.Account
 import scorex.block.Block
 import scorex.settings.TestFunctionalitySettings
@@ -85,4 +86,15 @@ package object diffs {
     override def commit(): Unit = ()
   }
 
+  class ProduceError(errorMessage: String) extends Matcher[Either[_, _]] {
+    override def apply(ei: Either[_, _]): MatchResult = {
+      ei match {
+        case r@Right(_) => MatchResult(matches = false, "expecting Left(...{0}...) but got {1}", "got expected error", IndexedSeq(errorMessage, r))
+        case l@Left(_) => MatchResult(matches = l.toString contains errorMessage,
+          "expecting Left(...{0}...) but got {1}", "got expected error", IndexedSeq(errorMessage, l))
+      }
+    }
+  }
+
+  def produce(errorMessage: String): ProduceError = new ProduceError(errorMessage)
 }

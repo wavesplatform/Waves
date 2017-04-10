@@ -62,7 +62,7 @@ class LeaseTransactionsDiffTest extends PropSpec with PropertyChecks with Genera
 
     forAll(setup) { case ((genesis, payment, lease, leaseCancel, leaseCancel2)) =>
       assertDiffEi(Seq(TestBlock(Seq(genesis, payment, lease, leaseCancel))), TestBlock(Seq(leaseCancel2))) { totalDiffEi =>
-        totalDiffEi shouldBe 'left
+        totalDiffEi should produce ("Cannot cancel cancelled lease")
       }
     }
   }
@@ -79,7 +79,7 @@ class LeaseTransactionsDiffTest extends PropSpec with PropertyChecks with Genera
 
     forAll(setup) { case ((genesis, lease)) =>
       assertDiffEi(Seq(TestBlock(Seq(genesis))), TestBlock(Seq(lease))) { totalDiffEi =>
-        totalDiffEi shouldBe 'left
+        totalDiffEi should produce ("negative balance/effectiveBalance/assetBalance")
       }
     }
   }
@@ -97,7 +97,7 @@ class LeaseTransactionsDiffTest extends PropSpec with PropertyChecks with Genera
 
     forAll(setup) { case ((genesis, lease)) =>
       assertDiffEi(Seq(TestBlock(Seq(genesis))), TestBlock(Seq(lease))) { totalDiffEi =>
-        totalDiffEi shouldBe 'left
+        totalDiffEi should produce ("negative balance/effectiveBalance/assetBalance")
       }
     }
   }
@@ -117,7 +117,7 @@ class LeaseTransactionsDiffTest extends PropSpec with PropertyChecks with Genera
 
     forAll(setup) { case ((genesis, genesis2, lease, unleaseOther)) =>
       assertDiffEi(Seq(TestBlock(Seq(genesis, genesis2, lease))), TestBlock(Seq(unleaseOther))) { totalDiffEi =>
-        totalDiffEi shouldBe 'left
+        totalDiffEi should produce ("LeaseTransaction was leased by other sender")
       }
     }
   }

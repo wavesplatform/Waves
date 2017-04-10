@@ -25,3 +25,6 @@ trait ApiErrorMatchers { this: RouteTest =>
 
   def produce(error: ApiError) = new ProduceError(error)
 }
+
+
+

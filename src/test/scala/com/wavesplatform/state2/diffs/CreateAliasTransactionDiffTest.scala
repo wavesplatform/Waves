@@ -48,11 +48,11 @@ class CreateAliasTransactionDiffTest extends PropSpec with PropertyChecks with G
   property("cannot recreate existing alias") {
     forAll(preconditionsAndAliasCreations) { case (gen, aliasTx, sameAliasTx, sameAliasOtherSenderTx, _) =>
       assertDiffEi(Seq(TestBlock(Seq(gen, aliasTx))), TestBlock(Seq(sameAliasTx))) { blockDiffEi =>
-        blockDiffEi shouldBe 'left
+        blockDiffEi should produce ("Tx with such id aready present")
       }
 
       assertDiffEi(Seq(TestBlock(Seq(gen, aliasTx))), TestBlock(Seq(sameAliasOtherSenderTx))) { blockDiffEi =>
-        blockDiffEi shouldBe 'left
+        blockDiffEi should produce ("Tx with such id aready present")
       }
     }
   }
@@ -98,7 +98,7 @@ class CreateAliasTransactionDiffTest extends PropSpec with PropertyChecks with G
           recipientPortfolioDiff shouldBe Portfolio(0, lease.amount, Map.empty)
         }
         else {
-          blockDiffEi shouldBe 'left
+          blockDiffEi should produce ("Cannot lease to self")
         }
       }
     }

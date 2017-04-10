@@ -50,10 +50,10 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Genera
 
     forAll(setup) { case ((gen, reissue, burn)) =>
       assertDiffEi(Seq(TestBlock(Seq(gen))), TestBlock(Seq(reissue))) { blockDiffEi =>
-        blockDiffEi shouldBe 'left
+        blockDiffEi should produce ("Referenced assetId not found")
       }
       assertDiffEi(Seq(TestBlock(Seq(gen))), TestBlock(Seq(burn))) { blockDiffEi =>
-        blockDiffEi shouldBe 'left
+        blockDiffEi should produce("Referenced assetId not found")
       }
     }
   }
@@ -72,10 +72,10 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Genera
 
     forAll(setup) { case ((gen, issue), reissue, burn) =>
       assertDiffEi(Seq(TestBlock(Seq(gen, issue))), TestBlock(Seq(reissue))) { blockDiffEi =>
-        blockDiffEi shouldBe 'left
+        blockDiffEi should produce("Asset was issued by other address")
       }
       assertDiffEi(Seq(TestBlock(Seq(gen, issue))), TestBlock(Seq(burn))) { blockDiffEi =>
-        blockDiffEi shouldBe 'left
+        blockDiffEi should produce("Asset was issued by other address")
       }
     }
   }
@@ -83,7 +83,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Genera
   property("Cannot reissue non-reissuable alias") {
     forAll(issueReissueBurnTxs(isReissuable = false)) { case ((gen, issue), (reissue, _)) =>
       assertDiffEi(Seq(TestBlock(Seq(gen, issue))), TestBlock(Seq(reissue))) { blockDiffEi =>
-        blockDiffEi shouldBe 'left
+        blockDiffEi should produce("Asset is not reissuable")
       }
     }
   }
