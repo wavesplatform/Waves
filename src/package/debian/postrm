@@ -1,0 +1,20 @@
+${{header}}
+${{detect-loader}}
+
+if [ "$1" = purge ]; then
+    rm -rf /var/lib/${{app_name}}/journal
+    rm -rf /var/lib/${{app_name}}/snapshots
+    rm -rf /var/lib/${{app_name}}/data
+    rm -rf /etc/${{app_name}}/application.ini
+    rm -rf /etc/${{app_name}}.conf
+    rm -rf /var/log/${{app_name}}
+
+    if is_upstart; then
+        rm -f /etc/init/${{app_name}}.conf
+    fi
+
+    userdel waves >/dev/null 2>&1 || true
+    groupdel waves >/dev/null 2>&1 || true
+fi
+
+exit 0
