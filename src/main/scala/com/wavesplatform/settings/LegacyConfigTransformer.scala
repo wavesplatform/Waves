@@ -27,7 +27,7 @@ object LegacyConfigTransformer {
 
   private def days(cfg: Config, path: String) = cv(Duration.ofDays(cfg.getLong(path)))
 
-  private def defaultDir = s"${System.getProperty("user.home")}/waves"
+  private def defaultDir = s"${System.getProperty("user.home")}"
 
   private val transformers: Seq[(String, (Config, String) => ConfigValue)] = Seq(
     "p2p.peersDataResidenceTimeDays" -> { (cfg, p) => cv(Duration.ofDays(cfg.getInt(p))) },
@@ -47,7 +47,7 @@ object LegacyConfigTransformer {
     "blockGenerationDelay" -> millis,
     "walletDir" -> { (cfg, p) =>
       val v = cfg.getString(p)
-      val r = if (v.isEmpty) s"$defaultDir/wallet/wallet.s.dat" else s"$v/wallet.s.dat"
+      val r = if (v.isEmpty) s"$defaultDir/wallet/wallet.dat" else s"$v/wallet.s.dat"
       cv(r)
     },
     "dataDir" -> { (cfg, p) =>

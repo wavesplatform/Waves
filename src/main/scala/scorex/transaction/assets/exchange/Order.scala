@@ -85,7 +85,6 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
       (matcherFee > 0) :| "matcherFee should be > 0" &&
       (matcherFee < MaxAmount) :| "matcherFee too large" &&
       (timestamp > 0) :| "timestamp should be > 0" &&
-      (timestamp <= atTime) :| "timestamp should be before created before execution" &&
       (expiration - atTime <= MaxLiveTime) :| "expiration should be earlier than 30 days" &&
       (expiration >= atTime) :| "expiration should be > currentTime" &&
       signatureValid :| "signature should be valid"
@@ -169,7 +168,7 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
     }
   }
 
-  override def hashCode(): Int = super.hashCode()
+  override def hashCode(): Int = idStr.hashCode()
 }
 
 object Order {

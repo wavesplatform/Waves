@@ -21,12 +21,13 @@ class Wallet(maybeFilename: Option[String], password: String, seedOpt: Option[Ar
   private val NonceFieldName = "nonce"
 
   private val database: MVStore = maybeFilename match {
-    case Some(walletFilename) => {
+    case Some(walletFilename) =>
+      log.info(s"Opening wallet from ${walletFilename}")
       val walletFile = new File(walletFilename)
       walletFile.getParentFile.mkdirs().ensuring(walletFile.getParentFile.exists())
 
       new MVStore.Builder().fileName(walletFile.getAbsolutePath).encryptionKey(password.toCharArray).compress().open()
-    }
+
     case None => new MVStore.Builder().open()
   }
 

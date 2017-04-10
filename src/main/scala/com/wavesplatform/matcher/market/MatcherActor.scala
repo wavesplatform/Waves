@@ -52,6 +52,8 @@ class MatcherActor(storedState: StateReader, wallet: Wallet, settings: MatcherSe
       else if (tradedPairs.contains(reversePair)) false
       else if (settings.priceAssets.contains(aPair.priceAssetStr) &&
         !settings.priceAssets.contains(aPair.amountAssetStr)) true
+      else if (settings.priceAssets.contains(reversePair.priceAssetStr) &&
+        !settings.priceAssets.contains(reversePair.amountAssetStr)) false
       else ByteArrayExtension.compare(aPair.priceAsset, aPair.amountAsset) < 0
 
     isCorrectOrder :|  s"Invalid AssetPair ordering, should be reversed: $reversePair"
