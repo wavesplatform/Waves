@@ -76,14 +76,14 @@ object MatcherSerializer {
   implicit val buyOrderTreeMapReads = new Reads[TreeMap[Price, Level[BuyLimitOrder]]] {
     override def reads(jv: JsValue): JsResult[TreeMap[Price, Level[BuyLimitOrder]]] = {
       val a = jv.as[Map[String, Level[BuyLimitOrder]]].map { case(k, v) => (k.toLong, v) }
-      JsSuccess(TreeMap.empty[Price, Level[BuyLimitOrder]] ++ a)
+      JsSuccess(TreeMap.empty[Price, Level[BuyLimitOrder]](OrderBook.bidsOrdering) ++ a)
     }
   }
 
   implicit val sellOrderTreeMapReads = new Reads[TreeMap[Price, Level[SellLimitOrder]]] {
     override def reads(jv: JsValue): JsResult[TreeMap[Price, Level[SellLimitOrder]]] = {
       val a = jv.as[Map[String, Level[SellLimitOrder]]].map { case(k, v) => (k.toLong, v) }
-      JsSuccess(TreeMap.empty[Price, Level[SellLimitOrder]] ++ a)
+      JsSuccess(TreeMap.empty[Price, Level[SellLimitOrder]](OrderBook.asksOrdering) ++ a)
     }
   }
 

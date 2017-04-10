@@ -226,8 +226,5 @@ object OrderBookActor {
   case object SaveSnapshot
 
   case class Snapshot(orderBook: OrderBook, history: Map[String, (Long, Long)])
-
-  val bidsOrdering: Ordering[Long] = (x: Long, y: Long) => -Ordering.Long.compare(x, y)
-  val asksOrdering: Ordering[Long] = (x: Long, y: Long) => Ordering.Long.compare(x, y)
 }
 
