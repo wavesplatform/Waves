@@ -77,7 +77,7 @@ val upstartScript = TaskKey[File]("upstartScript")
 val packageSource = SettingKey[File]("packageSource")
 val network = SettingKey[Network]("network")
 
-commands += Command.command("mkPkg") { state =>
+commands += Command.command("packageAll") { state =>
   "clean" ::
   "assembly" ::
   "debian:packageBin" ::
