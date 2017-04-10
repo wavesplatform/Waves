@@ -17,22 +17,6 @@ publishArtifact in (Compile, packageSrc) := false
 mainClass in Compile := Some("com.wavesplatform.Application")
 scalacOptions ++= Seq("-feature", "-deprecation", "-Xmax-classfile-name", "128")
 
-javaOptions ++= Seq(
-  "-server",
-  // JVM memory tuning for 1g ram
-  "-Xms128m",
-  "-Xmx4g",
-
-  // from https://groups.google.com/d/msg/akka-user/9s4Yl7aEz3E/zfxmdc0cGQAJ
-  "-XX:+UseG1GC",
-  "-XX:+UseNUMA",
-  "-XX:+AlwaysPreTouch",
-
-  // probably can't use these with jstack and others tools
-  "-XX:+PerfDisableSharedMem",
-  "-XX:+ParallelRefProcEnabled",
-  "-XX:+UseStringDeduplication")
-
 //assembly settings
 assemblyJarName in assembly := "waves.jar"
 test in assembly := {}
@@ -109,7 +93,22 @@ inConfig(Linux)(Seq(
 network := Network(sys.props.get("network"))
 normalizedName := network.value.name
 
-javaOptions in Universal ++= javaOptions.value.map(opt => s"-J$opt")
+javaOptions in Universal ++= Seq(
+  // -J prefix is required by the bash script
+  "-J-server",
+  // JVM memory tuning for 4g ram
+  "-J-Xms128m",
+  "-J-Xmx4g",
+
+  // from https://groups.google.com/d/msg/akka-user/9s4Yl7aEz3E/zfxmdc0cGQAJ
+  "-J-XX:+UseG1GC",
+  "-J-XX:+UseNUMA",
+  "-J-XX:+AlwaysPreTouch",
+
+  // probably can't use these with jstack and others tools
+  "-J-XX:+PerfDisableSharedMem",
+  "-J-XX:+ParallelRefProcEnabled",
+  "-J-XX:+UseStringDeduplication")
 
 mappings in Universal += (baseDirectory.value / s"waves-${network.value}.conf" -> "doc/waves.conf.sample")
 packageSource := sourceDirectory.value / "package"
