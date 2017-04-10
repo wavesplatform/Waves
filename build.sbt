@@ -93,6 +93,13 @@ val upstartScript = TaskKey[File]("upstartScript")
 val packageSource = SettingKey[File]("packageSource")
 val network = SettingKey[Network]("network")
 
+commands += Command.command("mkPkg") { state =>
+  "clean" ::
+  "assembly" ::
+  "debian:packageBin" ::
+  state
+}
+
 inConfig(Linux)(Seq(
   maintainer := "wavesplatform.com",
   packageSummary := "Waves node",
