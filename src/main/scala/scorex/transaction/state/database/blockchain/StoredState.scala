@@ -248,7 +248,7 @@ class StoredState(private val storage: StateStorageI with AssetsExtendedStateSto
             case Some(t: LeaseCancelTransaction) =>
               cancelLeaseCancel(t)
             case Some(t: CreateAliasTransaction) =>
-              storage.removeAlias(t.alias.name)
+              storage.removeAlias(t.alias.stringRepr)
             case _ =>
           }
           storage.removeTransaction(id)
@@ -338,14 +338,14 @@ class StoredState(private val storage: StateStorageI with AssetsExtendedStateSto
   }
 
   def resolveAlias(a: Alias): Option[Account] = storage
-    .addressByAlias(a.name)
+    .addressByAlias(a.stringRepr)
     .map(addr => Account.fromString(addr).right.get)
 
   def getAliases(a: Account): Seq[Alias] = storage
-    .aliasesByAddress(a.address)
+    .aliasesByAddress(a.stringRepr)
     .map(addr => Alias.fromString(addr).right.get)
 
-  private def persistAlias(ac: Account, al: Alias): Unit = storage.persistAlias(ac.address, al.name)
+  private def persistAlias(ac: Account, al: Alias): Unit = storage.persistAlias(ac.stringRepr, al.stringRepr)
 
   def calcNewBalances(trans: Seq[Transaction], fees: Map[AssetAcc, (AccState, Reasons)], allowTemporaryNegative: Boolean): Map[AssetAcc, (AccState, Reasons)] = {
 
