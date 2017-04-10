@@ -124,6 +124,15 @@ linuxPackageMappings ++= Seq(
 ).map(_.withConfig().withPerms("644").withUser(packageName.value).withGroup(packageName.value))
 
 linuxStartScriptTemplate in Debian := (packageSource.value / "systemd.service").toURI.toURL
+linuxScriptReplacements += "detect-loader" ->
+  """is_systemd() {
+    |    which systemctl >/dev/null 2>&1 && \
+    |    systemctl | grep -- -\.mount >/dev/null 2>&1
+    |}
+    |is_upstart() {
+    |    /sbin/init --version | grep upstart >/dev/null 2>&1
+    |}
+  """.stripMargin
 
 inConfig(Debian)(Seq(
   debianPackageDependencies += "java8-runtime-headless",

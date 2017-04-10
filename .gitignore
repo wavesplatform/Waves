@@ -2,7 +2,6 @@
 .idea
 .ensime
 .ensime_cache/
-scorex.yaml
 
 # scala build folders and files
 target
@@ -17,9 +16,6 @@ target
 .editorconfig
 
 # logs
-scorex.log
-scorex-errors.log
-scorex-*.log
 *.log
 
 # local settings

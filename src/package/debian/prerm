@@ -1,11 +1,12 @@
 ${{header}}
 ${{loader-functions}}
+${{detect-loader}}
 
 if [ "$1" = remove ]; then
-    if initctl --version >/dev/null 2>&1 ; then
-        service ${{app_name}} stop || true
-    elif systemctl --version >/dev/null 2>&1 ; then
+    if is_systemd; then
         stopService ${{app_name}} || true
+    elif is_upstart; then
+        service ${{app_name}} stop || true
     fi
 fi
 

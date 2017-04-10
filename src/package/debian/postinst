@@ -1,5 +1,6 @@
 ${{header}}
 ${{loader-functions}}
+${{detect-loader}}
 
 config_file=/etc/${{app_name}}/waves.conf
 
@@ -39,13 +40,13 @@ if [ "$1" = configure ]; then
         cp /usr/share/${{app_name}}/doc/waves.conf.sample "$config_file"
     fi
 
-    if initctl --version >/dev/null 2>&1 ; then
+    if is_systemd; then
+        echo Installing systemd service ...
+        addService ${{app_name}}
+    elif is_upstart; then
         echo Installing upstart service ...
         ln -s /usr/share/${{app_name}}/conf/upstart.conf /etc/init/${{app_name}}.conf
         initctl reload-configuration
-    elif systemctl --version >/dev/null 2>&1 ; then
-        echo Installing systemd service ...
-        addService ${{app_name}}
     fi
 fi
 
