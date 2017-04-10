@@ -15,7 +15,7 @@ class StateReaderImpl(p: JavaMapStorage) extends StateReader {
   }
 
   override def accountPortfolio(a: Account): Portfolio = {
-    Option(p.portfolios.get(a.bytes)).map { case (b, e, as) => Portfolio(b, e, as.map { case (k, v) => EqByteArray(k) -> v }) }.orEmpty
+    Option(p.portfolios.get(a.bytes)).map { case (b, (i, o), as) => Portfolio(b, LeaseInfo(i, o), as.map { case (k, v) => EqByteArray(k) -> v }) }.orEmpty
   }
 
   override def assetInfo(id: ByteArray): Option[AssetInfo] = Option(p.assets.get(id.arr)).map {
@@ -74,7 +74,7 @@ class StateReaderImpl(p: JavaMapStorage) extends StateReader {
   override def accountPortfolios: Map[Account, Portfolio] =
     p.portfolios.entrySet().asScala
       .map { entry => entry.getKey -> entry.getValue }
-      .map { case (acc, (b, e, as)) => Account.fromPublicKey(acc) -> Portfolio(b, e, as.map { case (k, v) => EqByteArray(k) -> v }) }
+      .map { case (acc, (b, (i, o), as)) => Account.fromPublicKey(acc) -> Portfolio(b, LeaseInfo(i, o), as.map { case (k, v) => EqByteArray(k) -> v }) }
       .toMap
 
 }

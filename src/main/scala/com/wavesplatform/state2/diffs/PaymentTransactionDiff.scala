@@ -5,7 +5,7 @@ import cats.implicits._
 import cats.Monoid
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.reader.StateReader
-import com.wavesplatform.state2.{ByteArray, Diff, EqByteArray, Portfolio}
+import com.wavesplatform.state2.{ByteArray, Diff, EqByteArray, LeaseInfo, Portfolio}
 import scorex.account.Account
 import scorex.transaction.ValidationError.TransactionValidationError
 import scorex.transaction.{PaymentTransaction, StateValidationError}
@@ -24,11 +24,11 @@ object PaymentTransactionDiff {
         portfolios = Map(
           tx.recipient -> Portfolio(
             balance = tx.amount,
-            effectiveBalance = tx.amount,
+            LeaseInfo.empty,
             assets = Map.empty)) combine Map(
           Account.fromPublicKey(tx.sender.publicKey) -> Portfolio(
             balance = -tx.amount - tx.fee,
-            effectiveBalance = -tx.amount - tx.fee,
+            LeaseInfo.empty,
             assets = Map.empty
           ))))
     }

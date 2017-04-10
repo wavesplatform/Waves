@@ -17,11 +17,17 @@ object LeaseTransactionsDiff {
       if (recipient == sender)
         Left(TransactionValidationError(tx, "Cannot lease to self"))
       else {
-        val portfolioDiff: Map[Account, Portfolio] = Map(
-          sender -> Portfolio(-tx.fee, -tx.fee - tx.amount, Map.empty),
-          recipient -> Portfolio(0, tx.amount, Map.empty)
-        )
-        Right(Diff(height = height, tx = tx, portfolios = portfolioDiff))
+        val ap = s.accountPortfolio(tx.sender)
+        if (ap.balance - ap.leaseInfo.leaseOut < tx.amount) {
+          Left(TransactionValidationError(tx, s"Cannot lease more than own: Balance:${ap.balance}, already leased: ${ap.leaseInfo.leaseOut}"))
+        }
+        else {
+          val portfolioDiff: Map[Account, Portfolio] = Map(
+            sender -> Portfolio(-tx.fee, LeaseInfo(0, tx.amount), Map.empty),
+            recipient -> Portfolio(0, LeaseInfo(tx.amount, 0), Map.empty)
+          )
+          Right(Diff(height = height, tx = tx, portfolios = portfolioDiff))
+        }
       }
     }
   }
@@ -35,8 +41,8 @@ object LeaseTransactionsDiff {
         val sender = Account.fromPublicKey(tx.sender.publicKey)
         s.resolveAliasEi(leaseTx.recipient).map { recipient =>
           val portfolioDiff: Map[Account, Portfolio] = Map(
-            sender -> Portfolio(-tx.fee, -tx.fee + leaseTx.amount, Map.empty),
-            recipient -> Portfolio(0, -leaseTx.amount, Map.empty)
+            sender -> Portfolio(-tx.fee, LeaseInfo(0, -leaseTx.amount), Map.empty),
+            recipient -> Portfolio(0, LeaseInfo(-leaseTx.amount, 0), Map.empty)
           )
           Diff(height = height, tx = tx, portfolios = portfolioDiff)
         }

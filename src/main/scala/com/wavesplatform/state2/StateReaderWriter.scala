@@ -40,7 +40,7 @@ class StateWriterImpl(p: JavaMapStorage) extends StateReaderImpl(p) with StateWr
       val updatedPortfolio = accountPortfolio(account).combine(portfolioDiff)
       p.portfolios.put(account.bytes,
         (updatedPortfolio.balance,
-          updatedPortfolio.effectiveBalance,
+          (updatedPortfolio.leaseInfo.leaseIn, updatedPortfolio.leaseInfo.leaseOut),
           updatedPortfolio.assets.map { case (k, v) => k.arr -> v }))
     }
 

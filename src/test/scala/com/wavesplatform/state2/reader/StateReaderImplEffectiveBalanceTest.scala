@@ -1,5 +1,6 @@
 package com.wavesplatform.state2.reader
 
+import com.wavesplatform.state2.LeaseInfo
 import com.wavesplatform.state2.diffs.TestStorage
 import org.scalatest.{FunSuite, Matchers}
 import scorex.account.Account
@@ -29,7 +30,7 @@ class StateReaderImplEffectiveBalanceTest extends FunSuite with Matchers {
 
     storage.setHeight(stateHeight)
     storage.effectiveBalanceSnapshots.put((acc.bytes, 20), (0, 1))
-    storage.portfolios.put(acc.bytes, (1, 1, Map.empty))
+    storage.portfolios.put(acc.bytes, (1, (0, 0), Map.empty))
     new StateReaderImpl(storage).effectiveBalanceAtHeightWithConfirmations(acc, 100, 50) shouldBe 1
   }
 

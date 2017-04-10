@@ -25,19 +25,27 @@ package object state2 {
 
   type ByteArray = EqByteArray
 
-  private def safeSum(x: Long, y: Long): Long = Try(Math.addExact(x, y)).getOrElse(Long.MinValue)
+  def safeSum(x: Long, y: Long): Long = Try(Math.addExact(x, y)).getOrElse(Long.MinValue)
+
+  implicit val leaseInfoMonoid = new Monoid[LeaseInfo] {
+    override def empty: LeaseInfo = LeaseInfo(0, 0)
+
+    override def combine(x: LeaseInfo, y: LeaseInfo): LeaseInfo = LeaseInfo(x.leaseIn + y.leaseIn, x.leaseOut + y.leaseOut)
+  }
+
 
   implicit val portfolioMonoid = new Monoid[Portfolio] {
-    override def empty: Portfolio = Portfolio(0L, 0L, Map.empty)
+    override def empty: Portfolio = Portfolio(0L, Monoid[LeaseInfo].empty, Map.empty)
 
     override def combine(older: Portfolio, newer: Portfolio): Portfolio
     = Portfolio(
       balance = safeSum(older.balance, newer.balance),
-      effectiveBalance = safeSum(older.effectiveBalance, newer.effectiveBalance),
+      leaseInfo = Monoid.combine(older.leaseInfo, newer.leaseInfo),
       assets = (older.assets.keys ++ newer.assets.keys)
         .map(ba => ba -> safeSum(older.assets.getOrElse(ba, 0), newer.assets.getOrElse(ba, 0)))
         .toMap)
   }
+
 
   implicit val assetInfoMonoid = new Monoid[AssetInfo] {
     override def empty: AssetInfo = AssetInfo(isReissuable = true, 0)

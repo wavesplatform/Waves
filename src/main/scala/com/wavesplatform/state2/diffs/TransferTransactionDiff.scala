@@ -19,19 +19,19 @@ object TransferTransactionDiff {
       recipient <- state.resolveAliasEi(tx.recipient)
       portfolios = (
         tx.assetId match {
-          case None => Map(sender -> Portfolio(-tx.amount, -tx.amount, Map.empty)).combine(
-            Map(recipient -> Portfolio(tx.amount, tx.amount, Map.empty))
+          case None => Map(sender -> Portfolio(-tx.amount, LeaseInfo.empty, Map.empty)).combine(
+            Map(recipient -> Portfolio(tx.amount, LeaseInfo.empty, Map.empty))
           )
           case Some(aid) =>
             val assetId = EqByteArray(aid)
-            Map(sender -> Portfolio(0, 0, Map(assetId -> -tx.amount))).combine(
-              Map(recipient -> Portfolio(0, 0, Map(assetId -> tx.amount)))
+            Map(sender -> Portfolio(0, LeaseInfo.empty, Map(assetId -> -tx.amount))).combine(
+              Map(recipient -> Portfolio(0, LeaseInfo.empty, Map(assetId -> tx.amount)))
             )
         }).combine(
         tx.feeAssetId match {
-          case None => Map(sender -> Portfolio(-tx.fee, -tx.fee, Map.empty))
+          case None => Map(sender -> Portfolio(-tx.fee, LeaseInfo.empty, Map.empty))
           case Some(aid) =>
-            Map(sender -> Portfolio(0, 0, Map(EqByteArray(aid) -> -tx.fee)))
+            Map(sender -> Portfolio(0, LeaseInfo.empty, Map(EqByteArray(aid) -> -tx.fee)))
         }
       )
       assetIssued = tx.assetId match {

@@ -1,7 +1,7 @@
 package com.wavesplatform.http
 
 import com.wavesplatform.http.ApiMarshallers._
-import com.wavesplatform.state2.Portfolio
+import com.wavesplatform.state2.{LeaseInfo, Portfolio}
 import com.wavesplatform.state2.reader.StateReader
 import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
@@ -29,7 +29,7 @@ class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with
 
   private val state = {
     val m = mock[StateReader]
-    (m.accountPortfolio _).expects(*).returning(Portfolio(0L, 0L, Map.empty)).anyNumberOfTimes()
+    (m.accountPortfolio _).expects(*).returning(Portfolio(0L, LeaseInfo.empty, Map.empty)).anyNumberOfTimes()
     m
   }
 

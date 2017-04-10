@@ -30,12 +30,12 @@ object CommonValidation {
           val sender: Account = ttx.sender
 
           val amountDiff = ttx.assetId match {
-            case Some(aid) => Portfolio(0, 0, Map(EqByteArray(aid) -> -ttx.amount))
-            case None => Portfolio(-ttx.amount, -ttx.amount, Map.empty)
+            case Some(aid) => Portfolio(0, LeaseInfo.empty, Map(EqByteArray(aid) -> -ttx.amount))
+            case None => Portfolio(-ttx.amount, LeaseInfo.empty, Map.empty)
           }
           val feeDiff = ttx.feeAssetId match {
-            case Some(aid) => Portfolio(0, 0, Map(EqByteArray(aid) -> -ttx.fee))
-            case None => Portfolio(-ttx.fee, -ttx.fee, Map.empty)
+            case Some(aid) => Portfolio(0, LeaseInfo.empty, Map(EqByteArray(aid) -> -ttx.fee))
+            case None => Portfolio(-ttx.fee, LeaseInfo.empty, Map.empty)
           }
 
           val temporaryStateWhileTransfer = Monoid[Portfolio].combineAll(Seq(s.accountPortfolio(sender), amountDiff, feeDiff))

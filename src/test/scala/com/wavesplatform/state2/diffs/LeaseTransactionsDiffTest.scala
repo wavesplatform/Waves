@@ -62,42 +62,25 @@ class LeaseTransactionsDiffTest extends PropSpec with PropertyChecks with Genera
 
     forAll(setup) { case ((genesis, payment, lease, leaseCancel, leaseCancel2)) =>
       assertDiffEi(Seq(TestBlock(Seq(genesis, payment, lease, leaseCancel))), TestBlock(Seq(leaseCancel2))) { totalDiffEi =>
-        totalDiffEi should produce ("Cannot cancel cancelled lease")
-      }
-    }
-  }
-
-  property("cannot lease more than effective balance") {
-    val setup: Gen[(GenesisTransaction, LeaseTransaction)] = for {
-      master <- accountGen
-      recepient <- accountGen suchThat (_ != master)
-      amt <- positiveLongGen
-      ts <- positiveIntGen
-      genesis: GenesisTransaction = GenesisTransaction.create(master, amt, ts).right.get
-      (lease, _) <- leaseAndCancelGeneratorP(master, recepient, master) suchThat (_._1.amount > amt)
-    } yield (genesis, lease)
-
-    forAll(setup) { case ((genesis, lease)) =>
-      assertDiffEi(Seq(TestBlock(Seq(genesis))), TestBlock(Seq(lease))) { totalDiffEi =>
-        totalDiffEi should produce ("negative balance/effectiveBalance/assetBalance")
+        totalDiffEi should produce("Cannot cancel cancelled lease")
       }
     }
   }
 
   property("cannot lease more than actual balance(cannot lease forward)") {
-    val setup: Gen[(GenesisTransaction, LeaseTransaction)] = for {
+    val setup: Gen[(GenesisTransaction, LeaseTransaction, LeaseTransaction)] = for {
       master <- accountGen
-      recepient <- accountGen suchThat (_ != master)
-      forward <- accountGen suchThat (_ != recepient)
+      recipient <- accountGen suchThat (_ != master)
+      forward <- accountGen suchThat (_ != recipient)
       ts <- positiveIntGen
       genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
-      (lease, _) <- leaseAndCancelGeneratorP(master, recepient, master)
-      (leaseForward, _) <- leaseAndCancelGeneratorP(recepient, forward, recepient)
-    } yield (genesis, lease)
+      (lease, _) <- leaseAndCancelGeneratorP(master, recipient, master)
+      (leaseForward, _) <- leaseAndCancelGeneratorP(recipient, forward, recipient)
+    } yield (genesis, lease, leaseForward)
 
-    forAll(setup) { case ((genesis, lease)) =>
-      assertDiffEi(Seq(TestBlock(Seq(genesis))), TestBlock(Seq(lease))) { totalDiffEi =>
-        totalDiffEi should produce ("negative balance/effectiveBalance/assetBalance")
+    forAll(setup) { case ((genesis, lease, leaseForward)) =>
+      assertDiffEi(Seq(TestBlock(Seq(genesis, lease))), TestBlock(Seq(leaseForward))) { totalDiffEi =>
+        totalDiffEi should produce("Cannot lease more than own")
       }
     }
   }
@@ -117,7 +100,7 @@ class LeaseTransactionsDiffTest extends PropSpec with PropertyChecks with Genera
 
     forAll(setup) { case ((genesis, genesis2, lease, unleaseOther)) =>
       assertDiffEi(Seq(TestBlock(Seq(genesis, genesis2, lease))), TestBlock(Seq(unleaseOther))) { totalDiffEi =>
-        totalDiffEi should produce ("LeaseTransaction was leased by other sender")
+        totalDiffEi should produce("LeaseTransaction was leased by other sender")
       }
     }
   }

@@ -15,7 +15,7 @@ import scala.util.{Left, Right}
 package object diffs {
   def ensureSenderHasEnoughBalance(s: StateWriter)(sender: Account, assets: List[ByteArray]): Unit = {
     s.applyBlockDiff(new Diff(Map.empty,
-      Map(sender -> Portfolio(Long.MaxValue - 1, Long.MaxValue - 1, assets.map(a => a -> (Long.MaxValue - 1)).toMap)),
+      Map(sender -> Portfolio(Long.MaxValue - 1, LeaseInfo.empty, assets.map(a => a -> (Long.MaxValue - 1)).toMap)),
       assets.map(a => a -> AssetInfo(isReissuable = true, Long.MaxValue - 1)).toMap,
       Map.empty
     ).asBlockDiff)
@@ -66,7 +66,7 @@ package object diffs {
 
   class TestStorage extends JavaMapStorage {
     override val transactions = new util.HashMap[Array[Byte], (Int, Array[Byte])]
-    override val portfolios = new util.HashMap[Array[Byte], (Long, Long, Map[Array[Byte], Long])]
+    override val portfolios = new util.HashMap[Array[Byte], (Long, (Long, Long), Map[Array[Byte], Long])]
     override val assets = new util.HashMap[Array[Byte], (Boolean, Long)]
     override val accountTransactionIds = new util.HashMap[Array[Byte], List[Array[Byte]]]
     override val effectiveBalanceSnapshots = new util.HashMap[(Array[Byte], Int), (Long, Long)]

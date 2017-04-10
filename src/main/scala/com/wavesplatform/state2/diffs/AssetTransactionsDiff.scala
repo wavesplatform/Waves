@@ -2,7 +2,7 @@ package com.wavesplatform.state2.diffs
 
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.reader.StateReader
-import com.wavesplatform.state2.{AssetInfo, Diff, EqByteArray, Portfolio}
+import com.wavesplatform.state2.{AssetInfo, Diff, EqByteArray, LeaseInfo, Portfolio}
 import scorex.account.Account
 import scorex.transaction.StateValidationError
 import scorex.transaction.ValidationError.TransactionValidationError
@@ -21,7 +21,7 @@ object AssetTransactionsDiff {
       tx = tx,
       portfolios = Map(Account.fromPublicKey(tx.sender.publicKey) -> Portfolio(
         balance = -tx.fee,
-        effectiveBalance = -tx.fee,
+        leaseInfo = LeaseInfo.empty,
         assets = Map(assetId -> tx.quantity))),
       assetInfos = Map(assetId -> info)))
   }
@@ -40,7 +40,7 @@ object AssetTransactionsDiff {
           tx = tx,
           portfolios = Map(Account.fromPublicKey(tx.sender.publicKey) -> Portfolio(
             balance = -tx.fee,
-            effectiveBalance = -tx.fee,
+            leaseInfo = LeaseInfo.empty,
             assets = Map(assetId -> tx.quantity))),
           assetInfos = Map(assetId -> AssetInfo(
             volume = tx.quantity,
@@ -64,7 +64,7 @@ object AssetTransactionsDiff {
         tx = tx,
         portfolios = Map(Account.fromPublicKey(tx.sender.publicKey) -> Portfolio(
           balance = -tx.fee,
-          effectiveBalance = -tx.fee,
+          leaseInfo = LeaseInfo.empty,
           assets = Map(assetId -> -tx.amount))),
               assetInfos = Map(assetId -> AssetInfo(isReissuable = true, volume = -tx.amount)))
     })

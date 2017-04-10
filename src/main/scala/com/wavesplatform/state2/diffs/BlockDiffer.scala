@@ -5,7 +5,7 @@ import cats.Monoid
 import cats.implicits._
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.reader.{CompositeStateReader, StateReader}
-import com.wavesplatform.state2.{BlockDiff, Diff, EffectiveBalanceSnapshot, EqByteArray, Portfolio}
+import com.wavesplatform.state2.{BlockDiff, Diff, EffectiveBalanceSnapshot, EqByteArray, LeaseInfo, Portfolio}
 import scorex.account.Account
 import scorex.block.Block
 import scorex.transaction.{AssetAcc, ValidationError}
@@ -31,8 +31,8 @@ object BlockDiffer {
     lazy val accountPortfolioFeesMap: List[(Account, Portfolio)] = block.feesDistribution.toList.map {
       case (AssetAcc(account, maybeAssetId), feeVolume) =>
         account -> (maybeAssetId match {
-          case None => Portfolio(feeVolume, feeVolume, Map.empty)
-          case Some(assetId) => Portfolio(0L, 0L, Map(EqByteArray(assetId) -> feeVolume))
+          case None => Portfolio(feeVolume, LeaseInfo.empty, Map.empty)
+          case Some(assetId) => Portfolio(0L, LeaseInfo.empty, Map(EqByteArray(assetId) -> feeVolume))
         })
     }
     lazy val feeDiff = Monoid[Diff].combineAll(accountPortfolioFeesMap.map { case (acc, p) =>

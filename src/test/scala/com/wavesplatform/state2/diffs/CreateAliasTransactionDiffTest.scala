@@ -1,7 +1,7 @@
 package com.wavesplatform.state2.diffs
 
 import cats._
-import com.wavesplatform.state2.{EqByteArray, Portfolio, portfolioMonoid}
+import com.wavesplatform.state2.{EqByteArray, LeaseInfo, Portfolio, portfolioMonoid}
 import org.scalacheck.{Gen, Shrink}
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import org.scalatest.{Matchers, PropSpec}
@@ -48,11 +48,11 @@ class CreateAliasTransactionDiffTest extends PropSpec with PropertyChecks with G
   property("cannot recreate existing alias") {
     forAll(preconditionsAndAliasCreations) { case (gen, aliasTx, sameAliasTx, sameAliasOtherSenderTx, _) =>
       assertDiffEi(Seq(TestBlock(Seq(gen, aliasTx))), TestBlock(Seq(sameAliasTx))) { blockDiffEi =>
-        blockDiffEi should produce ("Tx with such id aready present")
+        blockDiffEi should produce("Tx with such id aready present")
       }
 
       assertDiffEi(Seq(TestBlock(Seq(gen, aliasTx))), TestBlock(Seq(sameAliasOtherSenderTx))) { blockDiffEi =>
-        blockDiffEi should produce ("Tx with such id aready present")
+        blockDiffEi should produce("Tx with such id aready present")
       }
     }
   }
@@ -82,8 +82,8 @@ class CreateAliasTransactionDiffTest extends PropSpec with PropertyChecks with G
         if (transfer.sender.toAccount != aliasTx.sender.toAccount) {
           val recipientPortfolioDiff = blockDiff.txsDiff.portfolios(aliasTx.sender)
           transfer.assetId match {
-            case Some(aid) => recipientPortfolioDiff shouldBe Portfolio(0, 0, Map(EqByteArray(aid) -> transfer.amount))
-            case None => recipientPortfolioDiff shouldBe Portfolio(transfer.amount, transfer.amount, Map.empty)
+            case Some(aid) => recipientPortfolioDiff shouldBe Portfolio(0, LeaseInfo.empty, Map(EqByteArray(aid) -> transfer.amount))
+            case None => recipientPortfolioDiff shouldBe Portfolio(transfer.amount, LeaseInfo.empty, Map.empty)
           }
         }
       }
@@ -95,10 +95,10 @@ class CreateAliasTransactionDiffTest extends PropSpec with PropertyChecks with G
       assertDiffEi(Seq(TestBlock(Seq(gen, gen2, issue1, issue2, aliasTx))), TestBlock(Seq(lease))) { blockDiffEi =>
         if (lease.sender.toAccount != aliasTx.sender.toAccount) {
           val recipientPortfolioDiff = blockDiffEi.explicitGet().txsDiff.portfolios(aliasTx.sender)
-          recipientPortfolioDiff shouldBe Portfolio(0, lease.amount, Map.empty)
+          recipientPortfolioDiff shouldBe Portfolio(0, LeaseInfo(lease.amount, 0), Map.empty)
         }
         else {
-          blockDiffEi should produce ("Cannot lease to self")
+          blockDiffEi should produce("Cannot lease to self")
         }
       }
     }

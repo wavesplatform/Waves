@@ -58,6 +58,14 @@ object Diff {
 
 case class EffectiveBalanceSnapshot(acc: Account, height: Int, prevEffectiveBalance: Long, effectiveBalance: Long)
 
-case class Portfolio(balance: Long, effectiveBalance: Long, assets: Map[ByteArray, Long])
+case class Portfolio(balance: Long, leaseInfo: LeaseInfo, assets: Map[ByteArray, Long]) {
+  lazy val effectiveBalance: Long = safeSum(balance, leaseInfo.leaseIn) - leaseInfo.leaseOut
+}
+
+case class LeaseInfo(leaseIn: Long, leaseOut: Long)
+
+object LeaseInfo {
+  val empty = LeaseInfo(0, 0)
+}
 
 case class AssetInfo(isReissuable: Boolean, volume: Long)

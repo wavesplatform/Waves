@@ -10,7 +10,7 @@ import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.model.Events.Event
 import com.wavesplatform.matcher.model.{BuyLimitOrder, LimitOrder, SellLimitOrder}
 import com.wavesplatform.state2.reader.StateReader
-import com.wavesplatform.state2.{EqByteArray, Portfolio}
+import com.wavesplatform.state2.{EqByteArray, LeaseInfo, Portfolio}
 import org.h2.mvstore.MVStore
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest._
@@ -41,7 +41,7 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
   val db = new MVStore.Builder().compress().open()
   val storedState: StateReader = stub[StateReader]
   val hugeAmount = Long.MaxValue / 2
-  (storedState.accountPortfolio _).when(*).returns(Portfolio(hugeAmount, hugeAmount, Map(
+  (storedState.accountPortfolio _).when(*).returns(Portfolio(hugeAmount, LeaseInfo.empty, Map(
     EqByteArray("BTC".getBytes) -> hugeAmount,
     EqByteArray("WAVES".getBytes) -> hugeAmount
   )))

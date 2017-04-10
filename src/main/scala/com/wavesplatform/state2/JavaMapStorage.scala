@@ -11,7 +11,7 @@ trait JavaMapStorage {
   def setHeight(i: Int): Unit
 
   val transactions: java.util.Map[Array[Byte], (Int, Array[Byte])]
-  val portfolios: java.util.Map[Array[Byte], (Long, Long, Map[Array[Byte], Long])]
+  val portfolios: java.util.Map[Array[Byte], (Long, (Long, Long), Map[Array[Byte], Long])]
   val assets: java.util.Map[Array[Byte], (Boolean, Long)]
   val accountTransactionIds: java.util.Map[Array[Byte], List[Array[Byte]]]
   val effectiveBalanceSnapshots: util.Map[(Array[Byte], Int), (Long, Long)]
@@ -36,7 +36,7 @@ class MVStorePrimitiveImpl(db: MVStore) extends JavaMapStorage {
 
   val transactions: MVMap[Array[Byte], (Int, Array[Byte])] = db.openMap("txs")
 
-  val portfolios: MVMap[Array[Byte], (Long, Long, Map[Array[Byte], Long])] = db.openMap("portfolios")
+  val portfolios: MVMap[Array[Byte], (Long, (Long, Long), Map[Array[Byte], Long])] = db.openMap("portfolios")
 
   val assets: MVMap[Array[Byte], (Boolean, Long)] = db.openMap("assets")
 
