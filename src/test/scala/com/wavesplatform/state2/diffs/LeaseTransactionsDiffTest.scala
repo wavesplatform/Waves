@@ -62,7 +62,7 @@ class LeaseTransactionsDiffTest extends PropSpec with PropertyChecks with Genera
 
     forAll(setup) { case ((genesis, payment, lease, leaseCancel, leaseCancel2)) =>
       assertDiffEi(Seq(TestBlock(Seq(genesis, payment, lease, leaseCancel))), TestBlock(Seq(leaseCancel2))) { totalDiffEi =>
-        totalDiffEi should produce("Cannot cancel cancelled lease")
+        totalDiffEi should produce("Cannot cancel already cancelled lease")
       }
     }
   }

@@ -6,6 +6,7 @@ import com.wavesplatform.state2._
 import scorex.account.{Account, Alias}
 import scorex.transaction.Transaction
 import scorex.transaction.assets.exchange.ExchangeTransaction
+import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 
 class CompositeStateReader(inner: StateReader, blockDiff: BlockDiff) extends StateReader {
   private val txDiff = blockDiff.txsDiff
@@ -86,6 +87,17 @@ class CompositeStateReader(inner: StateReader, blockDiff: BlockDiff) extends Sta
   }
 
   override def accountPortfolios: Map[Account, Portfolio] = Monoid.combine(inner.accountPortfolios, txDiff.portfolios)
+
+  override def isLeaseActive(leaseTx: LeaseTransaction): Boolean = {
+    val innerActive = inner.isLeaseActive(leaseTx)
+    val diffActive = blockDiff.txsDiff.transactions.keys.exists(_ == EqByteArray(leaseTx.id))
+    val diffCancelExists = blockDiff.txsDiff.transactions.values.map(_._2)
+      .filter(_.isInstanceOf[LeaseCancelTransaction])
+      .map(_.asInstanceOf[LeaseCancelTransaction])
+      .exists(_.leaseId sameElements leaseTx.id)
+
+    (innerActive || diffActive) && !diffCancelExists
+  }
 }
 
 object CompositeStateReader {
@@ -129,5 +141,8 @@ object CompositeStateReader {
 
     override def maxPaymentTransactionTimestampInPreviousBlocks(a: Account): Option[Long] =
       new CompositeStateReader(inner, blockDiff()).maxPaymentTransactionTimestampInPreviousBlocks(a)
+
+    override def isLeaseActive(leaseTx: LeaseTransaction): Boolean =
+      new CompositeStateReader(inner, blockDiff()).isLeaseActive(leaseTx)
   }
 }

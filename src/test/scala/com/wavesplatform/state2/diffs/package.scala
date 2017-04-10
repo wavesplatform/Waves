@@ -74,6 +74,7 @@ package object diffs {
     override val maxPaymentTransactionTimestampInPreviousBlocks = new util.HashMap[Array[Byte], Long]
     override val aliasToAddress = new util.HashMap[String, Array[Byte]]
     override val exchangeTransactionsByOrder = new util.HashMap[Array[Byte], List[Array[Byte]]]
+    override val leaseState = new util.HashMap[Array[Byte], Boolean]
 
     var height: Int = 0
 

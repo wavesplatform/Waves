@@ -8,6 +8,7 @@ import scorex.transaction.ValidationError.{AliasNotExists, TransactionValidation
 import scorex.transaction._
 import scorex.transaction.assets.IssueTransaction
 import scorex.transaction.assets.exchange.{ExchangeTransaction, Order}
+import scorex.transaction.lease.LeaseTransaction
 import scorex.transaction.state.database.state.AddressString
 
 import scala.reflect.ClassTag
@@ -40,6 +41,8 @@ trait StateReader {
   def resolveAlias(a: Alias): Option[Account]
 
   def findPreviousExchangeTxs(orderId: EqByteArray): Set[ExchangeTransaction]
+
+  def isLeaseActive(leaseTx: LeaseTransaction): Boolean
 }
 
 object StateReader {

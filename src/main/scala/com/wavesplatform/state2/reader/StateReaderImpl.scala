@@ -4,6 +4,7 @@ import cats.implicits._
 import com.wavesplatform.state2._
 import scorex.account.{Account, Alias}
 import scorex.transaction.assets.exchange.ExchangeTransaction
+import scorex.transaction.lease.LeaseTransaction
 import scorex.transaction.{Transaction, TransactionParser}
 
 import scala.collection.JavaConverters.iterableAsScalaIterableConverter
@@ -77,4 +78,5 @@ class StateReaderImpl(p: JavaMapStorage) extends StateReader {
       .map { case (acc, (b, (i, o), as)) => Account.fromPublicKey(acc) -> Portfolio(b, LeaseInfo(i, o), as.map { case (k, v) => EqByteArray(k) -> v }) }
       .toMap
 
+  override def isLeaseActive(leaseTx: LeaseTransaction): Boolean = p.leaseState.getOrDefault(leaseTx.id, false)
 }

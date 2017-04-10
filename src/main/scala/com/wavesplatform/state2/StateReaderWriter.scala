@@ -4,6 +4,7 @@ import cats.Monoid
 import cats.implicits._
 import com.wavesplatform.state2.reader.StateReaderImpl
 import scorex.transaction.assets.exchange.ExchangeTransaction
+import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 
 
 trait StateWriter {
@@ -81,6 +82,29 @@ class StateWriterImpl(p: JavaMapStorage) extends StateReaderImpl(p) with StateWr
     blockDiff.txsDiff.aliases.foreach { case (alias, acc) =>
       p.aliasToAddress.put(alias.name, acc.bytes)
     }
+
+    val canceledLeaseIds: Set[EqByteArray] = blockDiff.txsDiff.transactions.values.map(_._2)
+      .filter(_.isInstanceOf[LeaseCancelTransaction])
+      .map(_.asInstanceOf[LeaseCancelTransaction])
+      .map(_.leaseId)
+      .map(EqByteArray)
+      .toSet
+
+
+    val newLeaseIds = blockDiff.txsDiff.transactions.values.map(_._2)
+      .filter(_.isInstanceOf[LeaseTransaction])
+      .map(_.asInstanceOf[LeaseTransaction])
+      .map(_.id)
+      .map(EqByteArray)
+      .toSet
+
+
+    val effectiveNewCancels = canceledLeaseIds.diff(newLeaseIds)
+    val effectiveNewLeases = newLeaseIds.diff(canceledLeaseIds)
+
+    effectiveNewCancels.foreach(id => p.leaseState.put(id.arr, false))
+    effectiveNewLeases.foreach(id => p.leaseState.put(id.arr, true))
+
 
     p.setHeight(p.getHeight + blockDiff.heightDiff)
 

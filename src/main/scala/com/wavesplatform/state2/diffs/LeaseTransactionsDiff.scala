@@ -37,6 +37,7 @@ object LeaseTransactionsDiff {
     leaseOpt match {
       case Some(leaseTx) if tx.sender != leaseTx.sender => Left(TransactionValidationError(tx, s"LeaseTransaction was leased by other sender"))
       case None => Left(TransactionValidationError(tx, s"Related LeaseTransaction not found"))
+      case Some(leaseTx) if !s.isLeaseActive(leaseTx)=> Left(TransactionValidationError(tx, s"Cannot cancel already cancelled lease"))
       case Some(leaseTx) =>
         val sender = Account.fromPublicKey(tx.sender.publicKey)
         s.resolveAliasEi(leaseTx.recipient).map { recipient =>

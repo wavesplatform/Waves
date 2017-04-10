@@ -18,9 +18,8 @@ trait JavaMapStorage {
   val paymentTransactionHashes: util.Map[Array[Byte], Array[Byte]]
   val maxPaymentTransactionTimestampInPreviousBlocks: util.Map[Array[Byte], Long]
   val exchangeTransactionsByOrder: util.Map[Array[Byte], List[Array[Byte]]]
-
   val aliasToAddress: util.Map[String, Array[Byte]]
-
+  val leaseState: util.Map[Array[Byte], Boolean]
 
   def commit(): Unit
 }
@@ -51,6 +50,8 @@ class MVStorePrimitiveImpl(db: MVStore) extends JavaMapStorage {
   val aliasToAddress: MVMap[String, Array[Byte]] = db.openMap("aliasToAddress")
 
   val exchangeTransactionsByOrder: MVMap[Array[Byte], List[Array[Byte]]] = db.openMap("exchangeTransactionsByOrder")
+
+  val leaseState: MVMap[Array[Byte], Boolean] =  db.openMap("leaseState")
 
   override def commit(): Unit = db.commit()
 }
