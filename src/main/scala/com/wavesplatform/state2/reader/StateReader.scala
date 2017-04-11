@@ -101,11 +101,6 @@ object StateReader {
 
     def effectiveBalance(account: Account): Long = s.accountPortfolio(account).effectiveBalance
 
-    def getLeasedSum(address: AddressString): Long = {
-      val portfolio = s.accountPortfolio(Account.fromString(address).right.get)
-      portfolio.effectiveBalance - portfolio.balance
-    }
-
     def isReissuable(id: Array[Byte]): Boolean =
       s.assetInfo(EqByteArray(id)).get.isReissuable
 
