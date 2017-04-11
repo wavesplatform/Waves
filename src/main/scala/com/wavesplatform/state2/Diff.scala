@@ -1,11 +1,8 @@
 package com.wavesplatform.state2
 
-import cats._
 import cats.implicits._
 import scorex.account.{Account, Alias}
-import scorex.transaction.assets.{IssueTransaction, ReissueTransaction, TransferTransaction}
-import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import scorex.transaction.{GenesisTransaction, PaymentTransaction, SignedTransaction, Transaction}
+import scorex.transaction.{PaymentTransaction, Transaction}
 
 case class BlockDiff(txsDiff: Diff, heightDiff: Int, effectiveBalanceSnapshots: Seq[EffectiveBalanceSnapshot])
 
@@ -15,7 +12,7 @@ object BlockDiff {
     lazy val maxPaymentTransactionTimestamp: Map[Account, Long] = bd.txsDiff.transactions.toList
       .collect({ case (_, (_, ptx: PaymentTransaction, _)) => ptx.sender.toAccount -> ptx.timestamp })
       .groupBy(_._1)
-      .map { case (acc, list) => acc -> list.map(_._2).max }
+      .mapValues(_.map(_._2).max)
   }
 
 }
