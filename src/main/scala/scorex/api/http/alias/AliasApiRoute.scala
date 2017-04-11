@@ -48,7 +48,7 @@ case class AliasApiRoute(settings: RestAPISettings, wallet: Wallet, transactionO
     val result = Alias.buildWithCurrentNetworkByte(aliasString) match {
       case Right(alias) =>
         state.resolveAlias(alias) match {
-          case Some(addr) => Right(addr.stringRepr)
+          case Some(addr) => Right(Address(addr.stringRepr))
           case None => Left(AliasNotExists(alias))
         }
       case Left(err) => Left(ApiError.fromValidationError(err))
@@ -62,9 +62,12 @@ case class AliasApiRoute(settings: RestAPISettings, wallet: Wallet, transactionO
     new ApiImplicitParam(name = "address", value = "3Mx2afTZ2KbRrLNbytyzTtXukZvqEB8SkW7", required = true, dataType = "string", paramType = "path")
   ))
   def aliasOfAddress: Route = (get & path("by-address" / Segment)) { addressString =>
-    val result = Account.fromString(addressString)
+    val result: Either[ApiError, Seq[String]] = Account.fromString(addressString)
       .map(acc => state.getAliases(acc).map(_.stringRepr))
       .left.map(ApiError.fromValidationError)
     complete(result)
   }
+
+  case class Address(address: String)
+  implicit val addressFormat: Format[Address] = Json.format
 }
