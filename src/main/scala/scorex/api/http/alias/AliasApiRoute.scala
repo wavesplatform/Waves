@@ -31,7 +31,7 @@ case class AliasApiRoute(settings: RestAPISettings, wallet: Wallet, transactionO
       value = "Json with data",
       required = true,
       paramType = "body",
-      dataType = "scorex.api.http.alias.AliasRequest",
+      dataType = "scorex.api.http.alias.CreateAliasRequest",
       defaultValue = "{\n\t\"alias\": \"aliasalias\",\n\t\"sender\": \"3Mx2afTZ2KbRrLNbytyzTtXukZvqEB8SkW7\",\n\t\"fee\": 100000\n}"
     )
   ))
@@ -48,7 +48,7 @@ case class AliasApiRoute(settings: RestAPISettings, wallet: Wallet, transactionO
     val result = Alias.buildWithCurrentNetworkByte(aliasString) match {
       case Right(alias) =>
         state.resolveAlias(alias) match {
-          case Some(addr) => Right(AliasInfo(addr.address, aliasString))
+          case Some(addr) => Right(addr.stringRepr)
           case None => Left(AliasNotExists(alias))
         }
       case Left(err) => Left(ApiError.fromValidationError(err))
@@ -62,21 +62,9 @@ case class AliasApiRoute(settings: RestAPISettings, wallet: Wallet, transactionO
     new ApiImplicitParam(name = "address", value = "3Mx2afTZ2KbRrLNbytyzTtXukZvqEB8SkW7", required = true, dataType = "string", paramType = "path")
   ))
   def aliasOfAddress: Route = (get & path("by-address" / Segment)) { addressString =>
-    val result: Either[ApiError, Seq[AliasInfo]] = Account.fromString(addressString) match {
-      case Right(address) =>
-        val aliases = state.getAliases(address)
-        if (aliases.isEmpty)
-          Left(AliasNotExists(address))
-        else Right(aliases.map(al => AliasInfo(address.stringRepr, al.stringRepr)))
-
-      case Left(err)
-      => Left(ApiError.fromValidationError(err))
-    }
-
+    val result = Account.fromString(addressString)
+      .map(acc => state.getAliases(acc).map(_.stringRepr))
+      .left.map(ApiError.fromValidationError)
     complete(result)
   }
-
-  case class AliasInfo(address: String, alias: String)
-
-  implicit val aliasInfoFormat: Format[AliasInfo] = Json.format
 }
