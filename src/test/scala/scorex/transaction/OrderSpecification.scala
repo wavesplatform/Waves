@@ -97,7 +97,7 @@ class OrderSpecification extends PropSpec with PropertyChecks with Matchers with
   }
 
   property("Buy and Sell orders") {
-    forAll(accountGen, accountGen, assetPairGen, positiveLongGen, positiveLongGen, timestampGen) {
+    forAll(accountGen, accountGen, assetPairGen, positiveLongGen, positiveLongGen, ntpTimestampGen) {
       (sender: PrivateKeyAccount, matcher: PrivateKeyAccount, pair: AssetPair,
        price: Long, amount: Long, timestamp: Long) =>
         val expiration = timestamp + Order.MaxLiveTime - 1000

@@ -20,7 +20,7 @@ class TransactionSpecification extends PropSpec with PropertyChecks with Matcher
   }
 
   property("transaction fields should be constructed in a right way") {
-    forAll(bytes32gen, bytes32gen, positiveLongGen, positiveLongGen, positiveLongGen) {
+    forAll(bytes32gen, bytes32gen, timestampGen, positiveLongGen, positiveLongGen) {
       (senderSeed: Array[Byte], recipientSeed: Array[Byte], time: Long, amount: Long, fee: Long) =>
 
         val sender = PrivateKeyAccount(senderSeed)
@@ -37,7 +37,7 @@ class TransactionSpecification extends PropSpec with PropertyChecks with Matcher
   }
 
   property("bytes()/parse() roundtrip should preserve a transaction") {
-    forAll(bytes32gen, bytes32gen, positiveLongGen, positiveLongGen, positiveLongGen) {
+    forAll(bytes32gen, bytes32gen, timestampGen, positiveLongGen, positiveLongGen) {
       (senderSeed: Array[Byte], recipientSeed: Array[Byte], time: Long, amount: Long, fee: Long) =>
 
         val sender = PrivateKeyAccount(senderSeed)
@@ -57,7 +57,7 @@ class TransactionSpecification extends PropSpec with PropertyChecks with Matcher
   }
 
   property("PaymentTransaction should deserialize to LagonakiTransaction") {
-    forAll(bytes32gen, bytes32gen, positiveLongGen, positiveLongGen, positiveLongGen) {
+    forAll(bytes32gen, bytes32gen, timestampGen, positiveLongGen, positiveLongGen) {
       (senderSeed: Array[Byte], recipientSeed: Array[Byte], time: Long, amount: Long, fee: Long) =>
 
         val sender = PrivateKeyAccount(senderSeed)

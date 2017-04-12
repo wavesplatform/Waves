@@ -14,7 +14,7 @@ object TestFunctionalitySettings {
     allowBurnTransactionAfterTimestamp = 0L, allowLeaseTransactionAfterTimestamp = 0L,
     requirePaymentUniqueId = 0L, allowExchangeTransactionAfterTimestamp = 0L,
     allowInvalidReissueInSameBlockUntilTimestamp = 0L, allowCreateAliasTransactionAfterTimestamp = 0L,
-    allowMultipleLeaseCancelTransactionUntilTimestamp = 0L, resetEffectiveBalancesAtHeight = Long.MaxValue
+    allowMultipleLeaseCancelTransactionUntilTimestamp = Long.MaxValue / 2, resetEffectiveBalancesAtHeight = Long.MaxValue
   )
 }
 

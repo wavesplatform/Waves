@@ -15,7 +15,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Genera
 
   def issueReissueBurnTxs(isReissuable: Boolean): Gen[((GenesisTransaction, IssueTransaction), (ReissueTransaction, BurnTransaction))] = for {
     master <- accountGen
-    ts <- positiveLongGen
+    ts <- timestampGen
     genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
     ia <- positiveLongGen
     ra <- positiveLongGen
@@ -42,7 +42,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Genera
   property("Cannot reissue/burn non-existing alias") {
     val setup: Gen[(GenesisTransaction, ReissueTransaction, BurnTransaction)] = for {
       master <- accountGen
-      ts <- positiveLongGen
+      ts <- timestampGen
       genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
       reissue <- reissueGenerator
       burn <- burnGenerator
@@ -65,7 +65,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Genera
       quantity <- positiveLongGen
       reissuable2 <- Arbitrary.arbitrary[Boolean]
       fee <- Gen.choose(1L, 2000000L)
-      timestamp <- positiveLongGen
+      timestamp <- timestampGen
       reissue = ReissueTransaction.create(other, issue.assetId, quantity, reissuable2, fee, timestamp).right.get
       burn = BurnTransaction.create(other, issue.assetId, quantity, fee, timestamp).right.get
     } yield ((gen, issue), reissue, burn)

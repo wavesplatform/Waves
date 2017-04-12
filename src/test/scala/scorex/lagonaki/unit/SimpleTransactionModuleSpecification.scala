@@ -6,8 +6,9 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.{FunSuite, Matchers}
 import scorex.app.Application
 import scorex.block.Block
+import scorex.consensus.nxt.WavesConsensusModule
 import scorex.crypto.encode.Base58
-import scorex.lagonaki.mocks.{ConsensusMock, TestBlock}
+import scorex.lagonaki.mocks.TestBlock
 import scorex.settings.TestBlockchainSettings
 import scorex.transaction.assets.TransferTransaction
 import scorex.transaction.{PaymentTransaction, SimpleTransactionModule, Transaction}
@@ -37,7 +38,7 @@ class SimpleTransactionModuleSpecification extends FunSuite with MockFactory wit
 
   trait MyApp extends Application {
     override val settings: WavesSettings = wavesSettings
-    override implicit val consensusModule = new ConsensusMock
+    override implicit val consensusModule = new WavesConsensusModule(TestBlockchainSettings.Disabled)
   }
 
   implicit val app = stub[MyApp]

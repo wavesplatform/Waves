@@ -26,7 +26,7 @@ object AssetTransactionsDiff {
       assetInfos = Map(assetId -> info)))
   }
 
-  def reissue(state: StateReader, settings: FunctionalitySettings, height: Int, blockTime: Long)(tx: ReissueTransaction): Either[StateValidationError, Diff] = {
+  def reissue(state: StateReader, settings: FunctionalitySettings, blockTime: Long, height: Int)(tx: ReissueTransaction): Either[StateValidationError, Diff] = {
     val issueTxEi = state.findTransaction[IssueTransaction](tx.assetId) match {
       case None => Left(TransactionValidationError(tx, "Referenced assetId not found"))
       case Some(itx) if !(itx.sender equals tx.sender) => Left(TransactionValidationError(tx, "Asset was issued by other address"))

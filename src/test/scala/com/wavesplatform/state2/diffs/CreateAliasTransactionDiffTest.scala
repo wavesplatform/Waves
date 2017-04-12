@@ -16,7 +16,7 @@ class CreateAliasTransactionDiffTest extends PropSpec with PropertyChecks with G
 
   val preconditionsAndAliasCreations: Gen[(GenesisTransaction, CreateAliasTransaction, CreateAliasTransaction, CreateAliasTransaction, CreateAliasTransaction)] = for {
     master <- accountGen
-    ts <- positiveLongGen
+    ts <- timestampGen
     genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
     alias <- aliasGen
     alias2 <- aliasGen suchThat (_.name != alias.name)
