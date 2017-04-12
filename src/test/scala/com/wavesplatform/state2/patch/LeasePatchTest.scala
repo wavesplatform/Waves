@@ -17,7 +17,7 @@ class LeasePatchTest extends PropSpec with PropertyChecks with GeneratorDrivenPr
 
   private val allowMultipleLeaseCancelTransactionUntilTimestamp = TestFunctionalitySettings.Enabled.allowMultipleLeaseCancelTransactionUntilTimestamp
 
-  ignore("LeasePatch cancels all active leases and its effects including those in the block") {
+  property("LeasePatch cancels all active leases and its effects including those in the block") {
     val setupAndLeaseInResetBlock: Gen[(GenesisTransaction, GenesisTransaction, LeaseTransaction, LeaseCancelTransaction, LeaseTransaction)] = for {
       master <- accountGen
       recipient <- accountGen suchThat (_ != master)

@@ -65,7 +65,7 @@ class StateReaderImpl(p: JavaMapStorage) extends StateReader {
   override def accountPortfolios: Map[Account, Portfolio] =
     p.portfolios.entrySet().asScala
       .map { entry => entry.getKey -> entry.getValue }
-      .map { case (acc, (b, (i, o), as)) => Account.fromPublicKey(acc) -> Portfolio(b, LeaseInfo(i, o), as.map { case (k, v) => EqByteArray(k) -> v }) }
+      .map { case (acc, (b, (i, o), as)) => Account.fromBytes(acc).right.get -> Portfolio(b, LeaseInfo(i, o), as.map { case (k, v) => EqByteArray(k) -> v }) }
       .toMap
 
   override def isLeaseActive(leaseTx: LeaseTransaction): Boolean = p.leaseState.getOrDefault(leaseTx.id, false)
