@@ -74,8 +74,8 @@ object Diff {
         .map(EqByteArray)
         .toSet
 
-      val effectiveNewCancels = canceledLeaseIds.diff(newLeaseIds)
-      val effectiveNewLeases = newLeaseIds.diff(canceledLeaseIds)
+      val effectiveNewCancels = (canceledLeaseIds ++ d.__patch_extraLeaseIdsToCancel).diff(newLeaseIds)
+      val effectiveNewLeases = newLeaseIds.diff(canceledLeaseIds ++ d.__patch_extraLeaseIdsToCancel)
       (effectiveNewLeases, effectiveNewCancels)
     }
 

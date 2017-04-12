@@ -20,7 +20,7 @@ object BalanceDiffValidation {
       val newPortfolio = oldPortfolio.combine(portfolioDiff)
 
       val allBalancesAndAssetsForAccountArePositive = newPortfolio.balance >= 0 &&
-        newPortfolio.effectiveBalance >= 0 &&
+        newPortfolio.balance >= newPortfolio.leaseInfo.leaseOut &&
         newPortfolio.assets.values.forall(_ >= 0)
       if (!allBalancesAndAssetsForAccountArePositive) {
         Some(s"$acc, old: $oldPortfolio, new: $newPortfolio")
@@ -30,8 +30,8 @@ object BalanceDiffValidation {
     if (positiveBalanceErrors.isEmpty) {
       Right(d)
     } else {
-      Left(TransactionValidationError(tx, s"Transaction application leads to (temporary) negative" +
-        s" balance/effectiveBalance/assetBalance : $positiveBalanceErrors"))
+      Left(TransactionValidationError(tx, s"Transaction application leads to negative" +
+        s" balance/assetBalance or leased being more than own: $positiveBalanceErrors"))
     }
   }
 }
