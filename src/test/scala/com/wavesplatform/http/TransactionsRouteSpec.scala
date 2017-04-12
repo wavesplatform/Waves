@@ -1,12 +1,13 @@
 package com.wavesplatform.http
 
+import com.wavesplatform.TransactionGen
 import com.wavesplatform.http.ApiMarshallers._
-import org.scalacheck.Gen
+import org.scalacheck.{Gen, Shrink}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json._
-import scorex.api.http.TransactionsApiRoute
+import scorex.api.http.{InvalidSignature, TransactionsApiRoute}
 import scorex.crypto.encode.Base58
 import scorex.transaction._
 
@@ -18,29 +19,40 @@ class TransactionsRouteSpec extends RouteSpec("/transactions")
   private val stm = mock[TransactionModule]
   private val route = TransactionsApiRoute(restAPISettings, state, history, stm).route
 
-  private val txGen = for {
-    tr <- transferGenerator
-    is <- issueGenerator
-    al <- createAliasGenerator
-    le <- leaseGenerator
-    cl <- leaseCancelGenerator
-    tx <- Gen.oneOf(tr, is, al, le, cl)
-  } yield tx
+  private implicit def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)
 
   routePath("/address/{address}/limit/{limit}") in {
     // todo: check invalid address
     // todo: check invalid limit
-  }
-  routePath("/info/{signature}") in {
-    // todo: check invalid signature
-    // todo: check empty signature
 
+  }
+
+  routePath("/info/{signature}") in {
+    forAll(Gen.alphaNumStr.map(_ + "O")) { invalidBase58 =>
+      Get(routePath(s"/info/$invalidBase58")) ~> route should produce(InvalidSignature)
+    }
+
+    Get(routePath("/info/")) ~> route should produce(InvalidSignature)
+
+    val txAvailability = for {
+      tx <- randomTransactionGen
+      height <- Gen.option(Gen.posNum[Int])
+    } yield (tx, height)
+
+    def sameSignature(target: Array[Byte])(actual: Array[Byte]): Boolean = target sameElements actual
+
+    forAll(txAvailability) {
+      case (tx, height) =>
+        (state.included _).expects(where(sameSignature(tx.signature) _)).returning(height).once()
+        height.foreach { h => (history.blockAt _).expects(h).returning(None).once() }
+        val result = Get(routePath(s"/info/${Base58.encode(tx.signature)}")) ~> route ~> runRoute
+    }
   }
 
   routePath("/unconfirmed") in {
     val g = for {
       i <- Gen.chooseNum(0, 20)
-      t <- Gen.listOfN(i, txGen)
+      t <- Gen.listOfN(i, randomTransactionGen)
     } yield t
 
     forAll(g) { txs =>
