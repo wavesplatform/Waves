@@ -84,8 +84,10 @@ trait TestingCommons extends Suite with BeforeAndAfterAll with Eventually {
       |        allow-lease-transaction-after: 0
       |        require-payment-unique-id-after: 0
       |        allow-exchange-transaction-after: 0
-      |        allow-createalias-transaction-after: 0
       |        allow-invalid-reissue-in-same-block-until-timestamp: 0
+      |        allow-createalias-transaction-after: 0
+      |        allow-multiple-lease-cancel-transaction-until-timestamp: 0
+      |        reset-effective-balances-at-height: -1
       |      }
       |      genesis {
       |        timestamp: 1478000000000
@@ -196,6 +198,8 @@ trait TestingCommons extends Suite with BeforeAndAfterAll with Eventually {
       |        allow-exchange-transaction-after: 0
       |        allow-invalid-reissue-in-same-block-until-timestamp: 0
       |        allow-createalias-transaction-after: 0
+      |        allow-multiple-lease-cancel-transaction-until-timestamp: 0
+      |        reset-effective-balances-at-height: -1
       |      }
       |      genesis {
       |        timestamp: 1478000000000
@@ -279,8 +283,10 @@ trait TestingCommons extends Suite with BeforeAndAfterAll with Eventually {
       |        allow-lease-transaction-after: 0
       |        require-payment-unique-id-after: 0
       |        allow-exchange-transaction-after: 0
-      |        allow-createalias-transaction-after: 0
       |        allow-invalid-reissue-in-same-block-until-timestamp: 0
+      |        allow-createalias-transaction-after: 0
+      |        allow-multiple-lease-cancel-transaction-until-timestamp: 0
+      |        reset-effective-balances-at-height: -1
       |      }
       |      genesis {
       |        timestamp: 1478000000000

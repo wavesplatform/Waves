@@ -30,6 +30,8 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
         |        allow-exchange-transaction-after: 11
         |        allow-invalid-reissue-in-same-block-until-timestamp: 12
         |        allow-createalias-transaction-after: 13
+        |        allow-multiple-lease-cancel-transaction-until-timestamp: 14
+        |        reset-effective-balances-at-height: 15
         |      }
         |      genesis {
         |        timestamp: 1460678400000
@@ -63,6 +65,8 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
     settings.functionalitySettings.allowExchangeTransactionAfterTimestamp should be(11)
     settings.functionalitySettings.allowInvalidReissueInSameBlockUntilTimestamp should be(12)
     settings.functionalitySettings.allowCreateAliasTransactionAfterTimestamp should be(13)
+    settings.functionalitySettings.allowMultipleLeaseCancelTransactionUntilTimestamp should be(14)
+    settings.functionalitySettings.resetEffectiveBalancesAtHeight should be(15)
     settings.genesisSettings.blockTimestamp should be(1460678400000L)
     settings.genesisSettings.transactionsTimestamp should be(1460678400000L)
     settings.genesisSettings.signature should be("BASE58BLOCKSIGNATURE")

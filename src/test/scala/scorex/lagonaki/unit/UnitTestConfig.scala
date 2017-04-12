@@ -27,6 +27,8 @@ trait UnitTestConfig {
       |        allow-exchange-transaction-after: 11
       |        allow-invalid-reissue-in-same-block-until-timestamp: 12
       |        allow-createalias-transaction-after: 13
+      |        allow-multiple-lease-cancel-transaction-until-timestamp: 14
+      |        reset-effective-balances-at-height: 15
       |      }
       |      genesis {
       |        timestamp: 1460678400000

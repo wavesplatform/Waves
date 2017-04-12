@@ -42,7 +42,8 @@ object BlockDiffer {
 
     txsDiffEi
       .map(_.combine(feeDiff))
-     // .map(d => Monoid.combine(d, LeasePatch(new CompositeStateReader(s, d.asBlockDiff)))) if block id==???
+      .map(d => if (s.height + 1 == settings.resetEffectiveBalancesAtHeight)
+        Monoid.combine(d, LeasePatch(new CompositeStateReader(s, d.asBlockDiff))) else d)
       .map(diff => {
         val effectiveBalanceSnapshots = diff.portfolios
           .filter { case (acc, portfolio) => portfolio.effectiveBalance != 0 }
