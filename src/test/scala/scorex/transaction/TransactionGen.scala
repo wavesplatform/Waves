@@ -36,7 +36,7 @@ trait TransactionGen {
     .suchThat(s => s.trim == s)
     .map(Alias.buildWithCurrentNetworkByte(_).right.get)
 
-  def recipientGen(candidate: PrivateKeyAccount): Gen[PrivateKeyAccount] = accountGen.flatMap(Gen.oneOf(candidate, _))
+  def otherAccountGen(candidate: PrivateKeyAccount): Gen[PrivateKeyAccount] = accountGen.flatMap(Gen.oneOf(candidate, _))
 
   val accountOrAliasGen: Gen[AccountOrAlias] = Gen.oneOf(aliasGen, accountGen.map(PublicKeyAccount.toAccount(_)))
 
@@ -244,10 +244,10 @@ trait TransactionGen {
                          priceAssetId: Option[Array[Byte]]): Gen[(ExchangeTransaction, PrivateKeyAccount)] = for {
 
     matcher: PrivateKeyAccount <- accountGen
-    price: Long <- priceGen
     amount1: Long <- amountGen
     amount2: Long <- amountGen
-    matchedAmount: Long <- Gen.choose(Math.min(amount1, amount2) / 2, Math.min(amount1, amount2))
+    price: Long <- priceGen
+    matchedAmount: Long <- Gen.choose(Math.min(amount1, amount2) / 2000, Math.min(amount1, amount2) / 1000)
     timestamp: Long <- ntpTimestampGen
     expiration: Long <- maxTimeGen
     matcherFee: Long <- feeAmountGen

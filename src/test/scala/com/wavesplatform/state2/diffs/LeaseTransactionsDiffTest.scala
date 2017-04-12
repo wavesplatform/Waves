@@ -105,32 +105,44 @@ class LeaseTransactionsDiffTest extends PropSpec with PropertyChecks with Genera
 
   val cancelLeaseOfAnotherSender: Gen[(GenesisTransaction, GenesisTransaction, LeaseTransaction, LeaseCancelTransaction)] = for {
     master <- accountGen
-    recpient <- accountGen suchThat (_ != master)
-    other <- accountGen suchThat (_ != master)
+    recipient <- accountGen suchThat (_ != master)
+    otherOrRecipient <- otherAccountGen(candidate = recipient)
     ts <- timestampGen
     genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
-    genesis2: GenesisTransaction = GenesisTransaction.create(other, ENOUGH_AMT, ts).right.get
-    (lease, _) <- leaseAndCancelGeneratorP(master, recpient, master)
+    genesis2: GenesisTransaction = GenesisTransaction.create(otherOrRecipient, ENOUGH_AMT, ts).right.get
+    (lease, _) <- leaseAndCancelGeneratorP(master, recipient, master)
     fee2 <- smallFeeGen
-    unleaseOther = LeaseCancelTransaction.create(other, lease.id, fee2, ts + 1).right.get
-  } yield (genesis, genesis2, lease, unleaseOther)
+    unleaseOtherOrRecipient = LeaseCancelTransaction.create(otherOrRecipient, lease.id, fee2, ts + 1).right.get
+  } yield (genesis, genesis2, lease, unleaseOtherOrRecipient)
 
   property("cannot cancel lease of another sender after allowMultipleLeaseCancelTransactionUntilTimestamp") {
     forAll(cancelLeaseOfAnotherSender, timestampGen suchThat (_ > allowMultipleLeaseCancelTransactionUntilTimestamp)) {
-      case ((genesis, genesis2, lease, unleaseOther), blockTime) =>
-        assertDiffEi(Seq(TestBlock(Seq(genesis, genesis2, lease))), TestBlock.create(blockTime, Seq(unleaseOther))) { totalDiffEi =>
+      case ((genesis, genesis2, lease, unleaseOtherOrRecipient), blockTime) =>
+        assertDiffEi(Seq(TestBlock(Seq(genesis, genesis2, lease))), TestBlock.create(blockTime, Seq(unleaseOtherOrRecipient))) { totalDiffEi =>
           totalDiffEi should produce("LeaseTransaction was leased by other sender")
         }
     }
   }
 
   property("can cancel lease of another sender and acquire leasing power before allowMultipleLeaseCancelTransactionUntilTimestamp") {
-    forAll(cancelLeaseOfAnotherSender, timestampGen suchThat (_ < allowMultipleLeaseCancelTransactionUntilTimestamp)) {
+    forAll(cancelLeaseOfAnotherSender suchThat { case (_, _, lease, unlease) => lease.recipient.asInstanceOf[Account] != unlease.sender.toAccount },
+      timestampGen suchThat (_ < allowMultipleLeaseCancelTransactionUntilTimestamp)) {
       case ((genesis, genesis2, lease, unleaseOther), blockTime) =>
         assertDiffAndState(Seq(TestBlock(Seq(genesis, genesis2, lease))), TestBlock.create(blockTime, Seq(unleaseOther))) { case (totalDiff, newState) =>
           totalDiff.txsDiff.portfolios.get(lease.sender) shouldBe None
           totalDiff.txsDiff.portfolios.get(lease.recipient.asInstanceOf[Account]) shouldBe Some(Portfolio(0, LeaseInfo(-lease.amount, 0), Map.empty))
           totalDiff.txsDiff.portfolios.get(unleaseOther.sender) shouldBe Some(Portfolio(-unleaseOther.fee, LeaseInfo(lease.amount, 0), Map.empty))
+        }
+    }
+  }
+
+  property("if recipient cancels lease, nothing changes before allowMultipleLeaseCancelTransactionUntilTimestamp") {
+    forAll(cancelLeaseOfAnotherSender suchThat { case (_, _, lease, unlease) => lease.recipient.asInstanceOf[Account] == unlease.sender.toAccount }
+      , timestampGen suchThat (_ < allowMultipleLeaseCancelTransactionUntilTimestamp)) {
+      case ((genesis, genesis2, lease, unleaseRecipient), blockTime) =>
+        assertDiffAndState(Seq(TestBlock(Seq(genesis, genesis2, lease))), TestBlock.create(blockTime, Seq(unleaseRecipient))) { case (totalDiff, newState) =>
+          totalDiff.txsDiff.portfolios.get(lease.sender) shouldBe None
+          totalDiff.txsDiff.portfolios.get(unleaseRecipient.sender) shouldBe Some(Portfolio(-unleaseRecipient.fee, LeaseInfo(0, 0), Map.empty))
         }
     }
   }

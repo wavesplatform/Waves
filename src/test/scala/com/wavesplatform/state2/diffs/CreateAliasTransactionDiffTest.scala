@@ -59,7 +59,7 @@ class CreateAliasTransactionDiffTest extends PropSpec with PropertyChecks with G
 
   val preconditionsTransferLease = for {
     master <- accountGen
-    aliasedRecipient <- recipientGen(candidate = master)
+    aliasedRecipient <- otherAccountGen(candidate = master)
     ts <- positiveIntGen
     gen: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
     gen2: GenesisTransaction = GenesisTransaction.create(aliasedRecipient, ENOUGH_AMT + 1, ts).right.get

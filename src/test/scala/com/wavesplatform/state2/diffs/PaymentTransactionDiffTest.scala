@@ -14,7 +14,7 @@ class PaymentTransactionDiffTest extends PropSpec with PropertyChecks with Gener
 
   val preconditionsAndPayment: Gen[(Seq[Transaction], PaymentTransaction)] = for {
     master <- accountGen
-    recipient <- recipientGen(candidate = master)
+    recipient <- otherAccountGen(candidate = master)
     ts <- positiveIntGen
     genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
     preconditions: Seq[Transaction] = Seq(genesis)
