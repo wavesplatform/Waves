@@ -43,6 +43,8 @@ trait StateReader {
   def findPreviousExchangeTxs(orderId: EqByteArray): Set[ExchangeTransaction]
 
   def isLeaseActive(leaseTx: LeaseTransaction): Boolean
+
+  def activeLeases(): Seq[ByteArray]
 }
 
 object StateReader {

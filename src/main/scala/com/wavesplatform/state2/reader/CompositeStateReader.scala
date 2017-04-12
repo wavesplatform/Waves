@@ -98,6 +98,8 @@ class CompositeStateReader(inner: StateReader, blockDiff: BlockDiff) extends Sta
 
     (innerActive || diffActive) && !diffCancelExists
   }
+
+  override def activeLeases(): Seq[ByteArray] = ???
 }
 
 object CompositeStateReader {
@@ -144,5 +146,8 @@ object CompositeStateReader {
 
     override def isLeaseActive(leaseTx: LeaseTransaction): Boolean =
       new CompositeStateReader(inner, blockDiff()).isLeaseActive(leaseTx)
+
+    override def activeLeases(): Seq[ByteArray] =
+      new CompositeStateReader(inner, blockDiff()).activeLeases()
   }
 }

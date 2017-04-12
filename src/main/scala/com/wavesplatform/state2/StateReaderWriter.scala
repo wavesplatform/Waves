@@ -20,15 +20,7 @@ class StateWriterImpl(p: JavaMapStorage) extends StateReaderImpl(p) with StateWr
       p.transactions.put(id.arr, (h, tx.bytes))
     }
 
-    val newOrderEtxs: Map[EqByteArray, Set[Array[Byte]]] = Monoid.combineAll(
-      txsDiff.transactions
-        .collect { case (_, (_, etx: ExchangeTransaction, _)) => etx }
-        .map(etx => Map(
-          EqByteArray(etx.buyOrder.id) -> Set(etx.id),
-          EqByteArray(etx.sellOrder.id) -> Set(etx.id)
-        )))
-
-    newOrderEtxs.foreach { case (oid, txIds) =>
+    blockDiff.orderExchangeTxsMap.foreach { case (oid, txIds) =>
       Option(p.exchangeTransactionsByOrder.get(oid.arr)) match {
         case Some(ll) =>
           p.exchangeTransactionsByOrder.put(oid.arr, ll ++ txIds)
@@ -83,24 +75,7 @@ class StateWriterImpl(p: JavaMapStorage) extends StateReaderImpl(p) with StateWr
       p.aliasToAddress.put(alias.name, acc.bytes)
     }
 
-    val canceledLeaseIds: Set[EqByteArray] = blockDiff.txsDiff.transactions.values.map(_._2)
-      .filter(_.isInstanceOf[LeaseCancelTransaction])
-      .map(_.asInstanceOf[LeaseCancelTransaction])
-      .map(_.leaseId)
-      .map(EqByteArray)
-      .toSet
-
-
-    val newLeaseIds = blockDiff.txsDiff.transactions.values.map(_._2)
-      .filter(_.isInstanceOf[LeaseTransaction])
-      .map(_.asInstanceOf[LeaseTransaction])
-      .map(_.id)
-      .map(EqByteArray)
-      .toSet
-
-
-    val effectiveNewCancels = canceledLeaseIds.diff(newLeaseIds)
-    val effectiveNewLeases = newLeaseIds.diff(canceledLeaseIds)
+    val (effectiveNewLeases, effectiveNewCancels) = blockDiff.effectiveLeaseTxUpdates
 
     effectiveNewCancels.foreach(id => p.leaseState.put(id.arr, false))
     effectiveNewLeases.foreach(id => p.leaseState.put(id.arr, true))

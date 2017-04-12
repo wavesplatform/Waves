@@ -79,4 +79,11 @@ class StateReaderImpl(p: JavaMapStorage) extends StateReader {
       .toMap
 
   override def isLeaseActive(leaseTx: LeaseTransaction): Boolean = p.leaseState.getOrDefault(leaseTx.id, false)
+
+  override def activeLeases(): Seq[ByteArray] = p.leaseState.entrySet()
+    .asScala
+    .filter(_.getValue)
+    .map(_.getKey)
+    .map(EqByteArray)
+    .toSeq
 }
