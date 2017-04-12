@@ -71,7 +71,6 @@ package object diffs {
     override val accountTransactionIds = new util.HashMap[Array[Byte], List[Array[Byte]]]
     override val effectiveBalanceSnapshots = new util.HashMap[(Array[Byte], Int), (Long, Long)]
     override val paymentTransactionHashes = new util.HashMap[Array[Byte], Array[Byte]]
-    override val maxPaymentTransactionTimestampInPreviousBlocks = new util.HashMap[Array[Byte], Long]
     override val aliasToAddress = new util.HashMap[String, Array[Byte]]
     override val exchangeTransactionsByOrder = new util.HashMap[Array[Byte], List[Array[Byte]]]
     override val leaseState = new util.HashMap[Array[Byte], Boolean]

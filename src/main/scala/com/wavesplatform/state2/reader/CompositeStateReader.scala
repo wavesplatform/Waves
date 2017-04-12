@@ -68,10 +68,6 @@ class CompositeStateReader(inner: StateReader, blockDiff: BlockDiff) extends Sta
   = blockDiff.txsDiff.paymentTransactionIdsByHashes.get(hash)
     .orElse(inner.paymentTransactionIdByHash(hash))
 
-  override def maxPaymentTransactionTimestampInPreviousBlocks(a: Account): Option[Long] = {
-    blockDiff.txsDiff.maxPaymentTransactionTimestamp.get(a)
-      .orElse(inner.maxPaymentTransactionTimestampInPreviousBlocks(a))
-  }
 
   override def aliasesOfAddress(a: Account): Seq[Alias] =
     txDiff.aliases.filter(_._2 == a).keys.toSeq ++ inner.aliasesOfAddress(a)
@@ -140,9 +136,6 @@ object CompositeStateReader {
 
     override def height: Int =
       new CompositeStateReader(inner, blockDiff()).height
-
-    override def maxPaymentTransactionTimestampInPreviousBlocks(a: Account): Option[Long] =
-      new CompositeStateReader(inner, blockDiff()).maxPaymentTransactionTimestampInPreviousBlocks(a)
 
     override def isLeaseActive(leaseTx: LeaseTransaction): Boolean =
       new CompositeStateReader(inner, blockDiff()).isLeaseActive(leaseTx)

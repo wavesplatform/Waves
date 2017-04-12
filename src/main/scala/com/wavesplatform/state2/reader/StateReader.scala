@@ -34,8 +34,6 @@ trait StateReader {
 
   def paymentTransactionIdByHash(hash: ByteArray): Option[ByteArray]
 
-  def maxPaymentTransactionTimestampInPreviousBlocks(a: Account): Option[Long]
-
   def aliasesOfAddress(a: Account): Seq[Alias]
 
   def resolveAlias(a: Alias): Option[Account]

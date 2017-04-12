@@ -16,7 +16,6 @@ trait JavaMapStorage {
   val accountTransactionIds: java.util.Map[Array[Byte], List[Array[Byte]]]
   val effectiveBalanceSnapshots: util.Map[(Array[Byte], Int), (Long, Long)]
   val paymentTransactionHashes: util.Map[Array[Byte], Array[Byte]]
-  val maxPaymentTransactionTimestampInPreviousBlocks: util.Map[Array[Byte], Long]
   val exchangeTransactionsByOrder: util.Map[Array[Byte], List[Array[Byte]]]
   val aliasToAddress: util.Map[String, Array[Byte]]
   val leaseState: util.Map[Array[Byte], Boolean]
@@ -44,8 +43,6 @@ class MVStorePrimitiveImpl(db: MVStore) extends JavaMapStorage {
   val effectiveBalanceSnapshots: util.Map[(Array[Byte], Int), (Long, Long)] = db.openMap("effectiveBalanceUpdates")
 
   val paymentTransactionHashes: MVMap[Array[Byte], Array[Byte]] = db.openMap("paymentTransactionHashes")
-
-  val maxPaymentTransactionTimestampInPreviousBlocks: MVMap[Array[Byte], Long] = db.openMap("maxPaymentTransactionTimestampInPreviousBlocks")
 
   val aliasToAddress: MVMap[String, Array[Byte]] = db.openMap("aliasToAddress")
 

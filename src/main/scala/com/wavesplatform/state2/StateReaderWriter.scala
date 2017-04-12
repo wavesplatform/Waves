@@ -65,11 +65,6 @@ class StateWriterImpl(p: JavaMapStorage) extends StateReaderImpl(p) with StateWr
       p.effectiveBalanceSnapshots.put((ebs.acc.bytes, ebs.height), (ebs.prevEffectiveBalance, ebs.effectiveBalance))
     }
 
-    blockDiff.txsDiff.maxPaymentTransactionTimestamp.foreach { case (acc, ts) =>
-      val old = maxPaymentTransactionTimestampInPreviousBlocks(acc)
-      if (ts > old.getOrElse(0L))
-        p.maxPaymentTransactionTimestampInPreviousBlocks.put(acc.bytes, ts)
-    }
 
     blockDiff.txsDiff.aliases.foreach { case (alias, acc) =>
       p.aliasToAddress.put(alias.name, acc.bytes)
