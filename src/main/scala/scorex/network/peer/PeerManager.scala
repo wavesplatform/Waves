@@ -234,8 +234,7 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
 
       case Some(connection@PeerConnection(_, None, inbound)) =>
         log.debug(s"Comparing remote application name '${handshake.applicationName}' to local '${application.applicationName}'")
-        if (application.applicationName != handshake.applicationName &&
-          application.applicationName.dropRight(1) != handshake.applicationName) {
+        if (application.applicationName != handshake.applicationName) {
           log.debug(s"Different application name: ${handshake.applicationName} from $address")
           self ! AddToBlacklist(address)
         } else if (settings.nonce == handshake.nodeNonce) {
