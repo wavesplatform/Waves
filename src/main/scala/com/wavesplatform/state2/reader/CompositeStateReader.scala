@@ -26,9 +26,6 @@ class CompositeStateReader(inner: StateReader, blockDiff: BlockDiff) extends Sta
 
   override def height: Int = inner.height + blockDiff.heightDiff
 
-  override def nonEmptyAccounts: Seq[Account] =
-    inner.nonEmptyAccounts ++ txDiff.portfolios.keySet
-
   override def accountTransactionIds(a: Account): Seq[ByteArray] = {
     val fromDiff = txDiff.accountTransactionIds.get(a).orEmpty
     fromDiff ++ inner.accountTransactionIds(a) // fresh head ++ stale tail
@@ -95,7 +92,9 @@ class CompositeStateReader(inner: StateReader, blockDiff: BlockDiff) extends Sta
     (innerActive || diffActive) && !diffCancelExists
   }
 
-  override def activeLeases(): Seq[ByteArray] = ???
+  override def activeLeases(): Seq[ByteArray] = {
+    blockDiff.txsDiff.effectiveLeaseTxUpdates._1.toSeq ++ inner.activeLeases()
+  }
 }
 
 object CompositeStateReader {
@@ -121,9 +120,6 @@ object CompositeStateReader {
 
     override def effectiveBalanceAtHeightWithConfirmations(acc: Account, height: Int, confs: Int): Long =
       new CompositeStateReader(inner, blockDiff()).effectiveBalanceAtHeightWithConfirmations(acc, height, confs)
-
-    override def nonEmptyAccounts: Seq[Account] =
-      new CompositeStateReader(inner, blockDiff()).nonEmptyAccounts
 
     override def findPreviousExchangeTxs(orderId: EqByteArray): Set[ExchangeTransaction] =
       new CompositeStateReader(inner, blockDiff()).findPreviousExchangeTxs(orderId)

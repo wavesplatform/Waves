@@ -14,8 +14,9 @@ import scala.util.{Left, Right}
 
 package object diffs {
   def ensureSenderHasEnoughBalance(s: StateWriter)(sender: Account, assets: List[ByteArray]): Unit = {
-    s.applyBlockDiff(new Diff(Map.empty,
-      Map(sender -> Portfolio(Long.MaxValue - 1, LeaseInfo.empty, assets.map(a => a -> (Long.MaxValue - 1)).toMap)),
+    s.applyBlockDiff(Diff(
+      transactions = Map.empty,
+      portfolios = Map(sender -> Portfolio(Long.MaxValue - 1, LeaseInfo.empty, assets.map(a => a -> (Long.MaxValue - 1)).toMap)),
       assets.map(a => a -> AssetInfo(isReissuable = true, Long.MaxValue - 1)).toMap,
       Map.empty
     ).asBlockDiff)

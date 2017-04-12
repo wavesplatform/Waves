@@ -11,13 +11,20 @@ case class BlockDiff(txsDiff: Diff,
                      heightDiff: Int,
                      effectiveBalanceSnapshots: Seq[EffectiveBalanceSnapshot])
 
-
 case class Diff(transactions: Map[ByteArray, (Int, Transaction, Set[Account])],
                 portfolios: Map[Account, Portfolio],
                 issuedAssets: Map[ByteArray, AssetInfo],
-                aliases: Map[Alias, Account])
+                aliases: Map[Alias, Account],
+                __patch_extraLeaseIdsToCancel: Seq[ByteArray])
 
 object Diff {
+
+  def apply(transactions: Map[ByteArray, (Int, Transaction, Set[Account])],
+            portfolios: Map[Account, Portfolio],
+            issuedAssets: Map[ByteArray, AssetInfo],
+            aliases: Map[Alias, Account]): Diff = new Diff(transactions, portfolios, issuedAssets,aliases, Seq.empty)
+
+
   def apply(height: Int, tx: Transaction,
             portfolios: Map[Account, Portfolio],
             assetInfos: Map[ByteArray, AssetInfo] = Map.empty,
@@ -26,7 +33,8 @@ object Diff {
     transactions = Map(EqByteArray(tx.id) -> (height, tx, portfolios.keys.toSet)),
     portfolios = portfolios,
     issuedAssets = assetInfos,
-    aliases = aliases)
+    aliases = aliases,
+    __patch_extraLeaseIdsToCancel = Seq.empty)
 
   implicit class DiffExt(d: Diff) {
     def asBlockDiff: BlockDiff = BlockDiff(d, 0, Seq.empty)

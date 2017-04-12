@@ -32,13 +32,6 @@ class StateReaderImpl(p: JavaMapStorage) extends StateReader {
       .map(EqByteArray)
   }
 
-  override def nonEmptyAccounts: Seq[Account] =
-    p.portfolios
-      .keySet()
-      .asScala
-      .map(b => Account.fromBytes(b).right.get)
-      .toSeq
-
   override def effectiveBalanceAtHeightWithConfirmations(acc: Account, atHeight: Int, confs: Int): Long = {
     val bockNumberThatIsConfsOld = Math.max(1, atHeight - confs)
     val confsOldMinimum: Seq[(Long, Long)] = Range(bockNumberThatIsConfsOld + 1, atHeight + 1)

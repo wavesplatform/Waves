@@ -72,9 +72,8 @@ class StateWriterImpl(p: JavaMapStorage) extends StateReaderImpl(p) with StateWr
 
     val (effectiveNewLeases, effectiveNewCancels) = blockDiff.txsDiff.effectiveLeaseTxUpdates
 
-    effectiveNewCancels.foreach(id => p.leaseState.put(id.arr, false))
     effectiveNewLeases.foreach(id => p.leaseState.put(id.arr, true))
-
+    (effectiveNewCancels ++ blockDiff.txsDiff.__patch_extraLeaseIdsToCancel).foreach(id => p.leaseState.put(id.arr, false))
 
     p.setHeight(p.getHeight + blockDiff.heightDiff)
 

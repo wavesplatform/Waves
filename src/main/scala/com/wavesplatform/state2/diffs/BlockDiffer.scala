@@ -4,6 +4,7 @@ import cats._
 import cats.Monoid
 import cats.implicits._
 import com.wavesplatform.settings.FunctionalitySettings
+import com.wavesplatform.state2.patch.LeasePatch
 import com.wavesplatform.state2.reader.{CompositeStateReader, StateReader}
 import com.wavesplatform.state2.{BlockDiff, Diff, EffectiveBalanceSnapshot, EqByteArray, LeaseInfo, Portfolio}
 import scorex.account.Account
@@ -36,11 +37,12 @@ object BlockDiffer {
         })
     }
     lazy val feeDiff = Monoid[Diff].combineAll(accountPortfolioFeesMap.map { case (acc, p) =>
-      new Diff(Map.empty, portfolios = Map(acc -> p), Map.empty, Map.empty)
+      Diff(Map.empty, portfolios = Map(acc -> p), Map.empty, Map.empty)
     })
 
     txsDiffEi
       .map(_.combine(feeDiff))
+     // .map(d => Monoid.combine(d, LeasePatch(new CompositeStateReader(s, d.asBlockDiff)))) if block id==???
       .map(diff => {
         val effectiveBalanceSnapshots = diff.portfolios
           .filter { case (acc, portfolio) => portfolio.effectiveBalance != 0 }
