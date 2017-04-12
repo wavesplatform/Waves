@@ -1,5 +1,6 @@
 package scorex.transaction.state.database.blockchain
 
+import com.wavesplatform.TransactionGen
 import com.wavesplatform.settings.FunctionalitySettings
 import org.h2.mvstore.MVStore
 import org.scalacheck.Gen
@@ -8,7 +9,7 @@ import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import scorex.account.{Account, PrivateKeyAccount}
 import scorex.transaction._
 import scorex.transaction.assets._
-import scorex.transaction.assets.exchange.{ExchangeTransaction, Order}
+import scorex.transaction.assets.exchange.Order
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction.state.database.state._
 import scorex.utils.{NTP, ScorexLogging}
@@ -59,7 +60,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
   }
 
   property("Burn assets") {
-    forAll(issueReissueGenerator) { pair =>
+    forAll(issueReissueGen) { pair =>
       withRollbackTest {
         val issueTx: IssueTransaction = pair._1
         val burnTx: BurnTransaction = pair._4
@@ -139,7 +140,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
 
   property("Transfer unissued asset to yourself is not allowed") {
     withRollbackTest {
-      forAll(selfTransferWithWavesFeeGenerator suchThat (t => t.assetId.isDefined)) { tx: TransferTransaction =>
+      forAll(selfTransferWithWavesFeeGen suchThat (t => t.assetId.isDefined)) { tx: TransferTransaction =>
         val senderAccount = AssetAcc(tx.sender, None)
         val txFee = tx.fee
         state.applyChanges(Map(senderAccount -> (AccState(txFee, txFee), List(FeesStateChange(txFee)))))
@@ -149,7 +150,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
   }
 
   property("Transfer asset") {
-    forAll(transferGenerator suchThat (t => t.recipient.isInstanceOf[Account])) { tx: TransferTransaction =>
+    forAll(transferGen suchThat (t => t.recipient.isInstanceOf[Account])) { tx: TransferTransaction =>
       withRollbackTest {
         val senderAmountAcc = AssetAcc(tx.sender, tx.assetId)
         val senderFeeAcc = AssetAcc(tx.sender, tx.feeAssetId)
@@ -198,7 +199,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
   }
 
   property("Lease transaction") {
-    forAll(leaseGenerator suchThat (t => t.recipient.isInstanceOf[Account])) { tx: LeaseTransaction =>
+    forAll(leaseGen suchThat (t => t.recipient.isInstanceOf[Account])) { tx: LeaseTransaction =>
       withRollbackTest {
 
         //set some balance
@@ -232,7 +233,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
   }
 
   property("Lease transaction without your own effective balance") {
-    forAll(twoLeasesGenerator suchThat (p => p._2.amount + p._2.fee < p._1.amount + p._1.fee)) { case (first: LeaseTransaction, second: LeaseTransaction) =>
+    forAll(twoLeasesGen suchThat (p => p._2.amount + p._2.fee < p._1.amount + p._1.fee)) { case (first: LeaseTransaction, second: LeaseTransaction) =>
       withRollbackTest {
         //set some balance
         val balance = first.amount + first.fee
@@ -258,7 +259,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
   }
 
   property("Lease transaction without fee") {
-    forAll(leaseGenerator) { tx: LeaseTransaction =>
+    forAll(leaseGen) { tx: LeaseTransaction =>
       withRollbackTest {
 
 
@@ -277,7 +278,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
   }
 
   property("Lease transaction without amount") {
-    forAll(leaseGenerator) { tx: LeaseTransaction =>
+    forAll(leaseGen) { tx: LeaseTransaction =>
       withRollbackTest {
 
         //set some balance
@@ -295,7 +296,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
   }
 
   property("Lease cancel transaction") {
-    forAll(leaseAndCancelGenerator suchThat (t => t._1.recipient.isInstanceOf[Account])) { case (lease: LeaseTransaction, cancel: LeaseCancelTransaction) =>
+    forAll(leaseAndCancelGen suchThat (t => t._1.recipient.isInstanceOf[Account])) { case (lease: LeaseTransaction, cancel: LeaseCancelTransaction) =>
       withRollbackTest {
         val balance = lease.amount + lease.fee + cancel.fee
 
@@ -336,7 +337,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
   }
 
   property("Lease cancel transaction with other sender") {
-    forAll(leaseAndCancelWithOtherSenderGenerator suchThat (_._1.recipient.isInstanceOf[Account])) { case (lease: LeaseTransaction, cancel: LeaseCancelTransaction) =>
+    forAll(leaseAndCancelWithOtherSenderGen suchThat (_._1.recipient.isInstanceOf[Account])) { case (lease: LeaseTransaction, cancel: LeaseCancelTransaction) =>
       withRollbackTest {
 
         //set some balance
@@ -353,7 +354,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
   }
 
   property("Lease cancel transaction without lease") {
-    forAll(leaseCancelGenerator) { cancel: LeaseCancelTransaction =>
+    forAll(leaseCancelGen) { cancel: LeaseCancelTransaction =>
       withRollbackTest {
         validator.isValid(cancel, Int.MaxValue) shouldBe false
       }
@@ -362,7 +363,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
 
   property("Transfer asset without balance should fails") {
     withRollbackTest {
-      forAll(transferGenerator suchThat (t => t.recipient.isInstanceOf[Account])) { tx: TransferTransaction =>
+      forAll(transferGen suchThat (t => t.recipient.isInstanceOf[Account])) { tx: TransferTransaction =>
         val senderAmountAcc = AssetAcc(tx.sender, tx.assetId)
         val senderFeeAcc = AssetAcc(tx.sender, tx.feeAssetId)
         val recipientAmountAcc = AssetAcc(tx.recipient.asInstanceOf[Account], tx.assetId)
@@ -380,7 +381,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
   }
 
   property("AccountAssetsBalances") {
-    forAll(issueGenerator) { tx: IssueTransaction =>
+    forAll(issueGen) { tx: IssueTransaction =>
       withRollbackTest {
         state.applyChanges(state.calcNewBalances(Seq(tx), Map(), allowTemporaryNegative = true))
 
@@ -400,7 +401,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
   }
 
   property("Assets quantity with rollback") {
-    forAll(issueGenerator) { tx: IssueTransaction =>
+    forAll(issueGen) { tx: IssueTransaction =>
       withRollbackTest {
         state.applyChanges(state.calcNewBalances(Seq(tx), Map(), allowTemporaryNegative = true))
         state.totalAssetQuantity(tx.assetId) shouldBe tx.quantity
@@ -419,7 +420,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
   }
 
   property("Alias by Address with rollback") {
-    forAll(createAliasGenerator) { at: CreateAliasTransaction =>
+    forAll(createAliasGen) { at: CreateAliasTransaction =>
       withRollbackTest {
         val initialBalance = state.balance(at.sender)
         state.applyChanges(state.calcNewBalances(Seq(at), Map(), allowTemporaryNegative = true))
@@ -435,7 +436,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
   }
 
   property("Old style reissue asset") {
-    forAll(issueReissueGenerator) { pair =>
+    forAll(issueReissueGen) { pair =>
       val issueTx: IssueTransaction = pair._1
       val issueTx2: IssueTransaction = pair._2
       val assetAcc = AssetAcc(issueTx.sender, Some(issueTx.assetId))
@@ -447,7 +448,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
   }
 
   property("Reissue asset") {
-    forAll(issueReissueGenerator) { pair =>
+    forAll(issueReissueGen) { pair =>
       withRollbackTest {
         val issueTx: IssueTransaction = pair._1
         val reissueTx: ReissueTransaction = pair._3
@@ -475,7 +476,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
 
 
   property("Incorrect issue and reissue asset") {
-    forAll(issueWithInvalidReissuesGenerator) { case (issueTx, reissueTx, invalidReissueTx) =>
+    forAll(issueWithInvalidReissuesGen) { case (issueTx, reissueTx, invalidReissueTx) =>
       withRollbackTest {
 
         val genes0 = GenesisTransaction.create(issueTx.sender, issueTx.fee + Random.nextInt(1000), issueTx.timestamp - 1).right.get
@@ -500,7 +501,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
   }
 
   property("Issue asset") {
-    forAll(issueGenerator) { issueTx: IssueTransaction =>
+    forAll(issueGen) { issueTx: IssueTransaction =>
       withRollbackTest {
         val assetAcc = AssetAcc(issueTx.sender, Some(issueTx.assetId))
         val networkAcc = AssetAcc(issueTx.sender, None)
@@ -523,7 +524,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
   }
 
   property("accountTransactions returns IssueTransactions") {
-    forAll(issueGenerator) { issueTx: IssueTransaction =>
+    forAll(issueGen) { issueTx: IssueTransaction =>
       val assetAcc = AssetAcc(issueTx.sender, Some(issueTx.assetId))
       val networkAcc = AssetAcc(issueTx.sender, None)
       //set some balance
@@ -537,7 +538,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
   }
 
   property("accountTransactions returns TransferTransactions if fee in base token") {
-    forAll(transferGeneratorWithNoneFeeAssetId suchThat (t => t.recipient.isInstanceOf[Account])) { t: TransferTransaction =>
+    forAll(transferWithWavesFeeGen suchThat (t => t.recipient.isInstanceOf[Account])) { t: TransferTransaction =>
       val senderAmountAcc = AssetAcc(t.sender, t.assetId)
       val senderFeeAcc = AssetAcc(t.sender, t.feeAssetId)
       val recipientAmountAcc = AssetAcc(t.recipient.asInstanceOf[Account], t.assetId)
@@ -549,8 +550,8 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
 
   property("Applying payment transactions") {
     val testAssetAcc = AssetAcc(testAcc, None)
-    forAll(paymentGenerator, Gen.posNum[Long]) { (tx: PaymentTransaction,
-                                                  balance: Long) =>
+    forAll(paymentGen, Gen.posNum[Long]) { (tx: PaymentTransaction,
+                                            balance: Long) =>
       withRollbackTest {
         state.balance(testAcc) shouldBe 0
         state.assetBalance(testAssetAcc) shouldBe 0
@@ -564,7 +565,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
   }
 
   property("Validate payment transactions to yourself") {
-    forAll(selfPaymentGenerator) { (tx: PaymentTransaction) =>
+    forAll(selfPaymentGen) { (tx: PaymentTransaction) =>
       withRollbackTest {
         val account = tx.sender
         val assetAccount = AssetAcc(account, None)
@@ -579,7 +580,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
   }
 
   property("Validate transfer transactions to yourself") {
-    forAll(selfTransferGenerator) { (tx: TransferTransaction) =>
+    forAll(selfTransferGen) { (tx: TransferTransaction) =>
       withRollbackTest {
         val account = tx.sender
         val assetAccount = AssetAcc(account, tx.feeAssetId)
@@ -594,7 +595,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
   }
 
   property("Order matching") {
-    forAll { x: (ExchangeTransaction, PrivateKeyAccount) =>
+    forAll(exchangeTransactionGen) { om =>
       withRollbackTest {
         def feeInAsset(amount: Long, assetId: Option[AssetId]): Long = {
           if (assetId.isEmpty) amount else 0L
@@ -605,8 +606,6 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
           else if (order.getReceiveAssetId.isEmpty) order.getReceiveAmount(price, amount).get
           else 0L
         }
-
-        val (om, matcher) = x
 
         val pair = om.buyOrder.assetPair
         val buyer = om.buyOrder.senderPublicKey

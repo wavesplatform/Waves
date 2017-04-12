@@ -1,5 +1,6 @@
 package scorex.transaction
 
+import com.wavesplatform.TransactionGen
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 import scorex.transaction.TransactionParser.TransactionType
@@ -16,7 +17,7 @@ class LeaseCancelTransactionSpecification extends PropSpec with PropertyChecks w
   }
 
   property("Lease cancel serialization roundtrip") {
-    forAll(leaseCancelGenerator) { tx: LeaseCancelTransaction =>
+    forAll(leaseCancelGen) { tx: LeaseCancelTransaction =>
       val recovered = parseBytes(tx.bytes).get
 
       assertTxs(recovered, tx)
@@ -24,7 +25,7 @@ class LeaseCancelTransactionSpecification extends PropSpec with PropertyChecks w
   }
 
   property("Lease cancel serialization from TypedTransaction") {
-    forAll(leaseCancelGenerator) { tx: LeaseCancelTransaction =>
+    forAll(leaseCancelGen) { tx: LeaseCancelTransaction =>
       val recovered = TransactionParser.parseBytes(tx.bytes).get
 
       assertTxs(recovered.asInstanceOf[LeaseCancelTransaction], tx)

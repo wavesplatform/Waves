@@ -66,8 +66,7 @@ case class TransactionsApiRoute(
           case None =>
             complete(StatusCodes.NotFound -> Json.obj("status" -> "error", "details" -> "Transaction is not in blockchain"))
         }
-      case _ =>
-        complete(StatusCodes.UnprocessableEntity -> Json.obj("status" -> "error", "details" -> "Incorrect signature"))
+      case _ => complete(InvalidSignature)
     }
   }
 

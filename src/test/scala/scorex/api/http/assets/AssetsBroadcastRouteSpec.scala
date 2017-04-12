@@ -31,13 +31,13 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
 
     val vt = Table[String, G[_ <: Transaction], (JsValue) => JsValue](
       ("url", "generator", "transform"),
-      ("issue", issueGenerator, identity),
-      ("reissue", reissueGenerator, identity),
-      ("burn", burnGenerator, {
+      ("issue", issueGen, identity),
+      ("reissue", reissueGen, identity),
+      ("burn", burnGen, {
         case o: JsObject => o ++ Json.obj("quantity" -> o.value("amount"))
         case other => other
       }),
-      ("transfer", transferGenerator, {
+      ("transfer", transferGen, {
         case o: JsObject if o.value.contains("feeAsset") =>
           o ++ Json.obj("feeAssetId" -> o.value("feeAsset"), "quantity" -> o.value("amount"))
         case other => other

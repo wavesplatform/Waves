@@ -1,11 +1,11 @@
 package scorex.transaction.assets.exchange
 
+import com.wavesplatform.TransactionGen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import play.api.libs.json._
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.encode.Base58
-import scorex.transaction.TransactionGen
 import scorex.transaction.assets.exchange.OrderJson._
 
 class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
@@ -17,7 +17,7 @@ class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers 
     val json = Json.parse(
       s"""
         {
-          "senderPublicKey": "${pubKeyStr}",
+          "senderPublicKey": "$pubKeyStr",
           "matcherPublicKey": "DZUxn4pC7QdYrRqacmaAJghatvnn1Kh1mkE2scZoLuGJ",
           "assetPair": {
             "amountAsset": "29ot86P3HoUZXH1FCoyvff7aeZ3Kt7GqPwBWXncjRF2b",
@@ -79,10 +79,10 @@ class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers 
   val json: JsValue = Json.parse(
     s"""
     {
-      "sender": "${base58Str}",
+      "sender": "$base58Str",
       "wrong_sender": "0abcd",
       "wrong_long": "12e",
-      "publicKey": "${base58Str}",
+      "publicKey": "$base58Str",
       "wrong_publicKey": "0abcd"
     }
     """)
@@ -106,8 +106,7 @@ class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers 
   }
 
   property("Parse signed Order") {
-    forAll { x: (Order, PrivateKeyAccount) =>
-      val (order, pk) = x
+    forAll(orderGen) { order =>
       val json = order.json
       json.validate[Order] match {
         case e: JsError =>
@@ -127,7 +126,7 @@ class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers 
     val json = Json.parse(
       s"""
         {
-          "senderPublicKey": "${pubKeyStr}",
+          "senderPublicKey": "$pubKeyStr",
           "matcherPublicKey": "DZUxn4pC7QdYrRqacmaAJghatvnn1Kh1mkE2scZoLuGJ",
            "assetPair": {
              "amountAsset": "",
