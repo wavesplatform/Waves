@@ -9,50 +9,8 @@ import scorex.transaction.{PaymentTransaction, Transaction}
 
 case class BlockDiff(txsDiff: Diff,
                      heightDiff: Int,
-                     effectiveBalanceSnapshots: Seq[EffectiveBalanceSnapshot]
-                    )
+                     effectiveBalanceSnapshots: Seq[EffectiveBalanceSnapshot])
 
-object BlockDiff {
-
-  implicit class BlockDiffExt(bd: BlockDiff) {
-    lazy val maxPaymentTransactionTimestamp: Map[Account, Long] = bd.txsDiff.transactions.toList
-      .collect({ case (_, (_, ptx: PaymentTransaction, _)) => ptx.sender.toAccount -> ptx.timestamp })
-      .groupBy(_._1)
-      .mapValues(_.map(_._2).max)
-
-    lazy val effectiveLeaseTxUpdates: (Set[EqByteArray], Set[EqByteArray]) = {
-      val canceledLeaseIds: Set[EqByteArray] = bd.txsDiff.transactions.values.map(_._2)
-        .filter(_.isInstanceOf[LeaseCancelTransaction])
-        .map(_.asInstanceOf[LeaseCancelTransaction])
-        .map(_.leaseId)
-        .map(EqByteArray)
-        .toSet
-
-
-      val newLeaseIds = bd.txsDiff.transactions.values.map(_._2)
-        .filter(_.isInstanceOf[LeaseTransaction])
-        .map(_.asInstanceOf[LeaseTransaction])
-        .map(_.id)
-        .map(EqByteArray)
-        .toSet
-
-      val effectiveNewCancels = canceledLeaseIds.diff(newLeaseIds)
-      val effectiveNewLeases = newLeaseIds.diff(canceledLeaseIds)
-      (effectiveNewLeases, effectiveNewCancels)
-    }
-
-    lazy val orderExchangeTxsMap: Map[EqByteArray, Set[Array[Byte]]] = {
-      Monoid.combineAll(
-        bd.txsDiff.transactions
-          .collect { case (_, (_, etx: ExchangeTransaction, _)) => etx }
-          .map(etx => Map(
-            EqByteArray(etx.buyOrder.id) -> Set(etx.id),
-            EqByteArray(etx.sellOrder.id) -> Set(etx.id)
-          )))
-    }
-  }
-
-}
 
 case class Diff(transactions: Map[ByteArray, (Int, Transaction, Set[Account])],
                 portfolios: Map[Account, Portfolio],
@@ -86,6 +44,42 @@ object Diff {
 
     lazy val paymentTransactionIdsByHashes: Map[ByteArray, ByteArray] = d.transactions
       .collect { case (_, (_, ptx: PaymentTransaction, _)) => EqByteArray(ptx.hash) -> EqByteArray(ptx.id) }
+
+    lazy val maxPaymentTransactionTimestamp: Map[Account, Long] = d.transactions.toList
+      .collect({ case (_, (_, ptx: PaymentTransaction, _)) => ptx.sender.toAccount -> ptx.timestamp })
+      .groupBy(_._1)
+      .mapValues(_.map(_._2).max)
+
+    lazy val effectiveLeaseTxUpdates: (Set[EqByteArray], Set[EqByteArray]) = {
+      val canceledLeaseIds: Set[EqByteArray] = d.transactions.values.map(_._2)
+        .filter(_.isInstanceOf[LeaseCancelTransaction])
+        .map(_.asInstanceOf[LeaseCancelTransaction])
+        .map(_.leaseId)
+        .map(EqByteArray)
+        .toSet
+
+
+      val newLeaseIds = d.transactions.values.map(_._2)
+        .filter(_.isInstanceOf[LeaseTransaction])
+        .map(_.asInstanceOf[LeaseTransaction])
+        .map(_.id)
+        .map(EqByteArray)
+        .toSet
+
+      val effectiveNewCancels = canceledLeaseIds.diff(newLeaseIds)
+      val effectiveNewLeases = newLeaseIds.diff(canceledLeaseIds)
+      (effectiveNewLeases, effectiveNewCancels)
+    }
+
+    lazy val orderExchangeTxsMap: Map[EqByteArray, Set[Array[Byte]]] = {
+      Monoid.combineAll(
+        d.transactions
+          .collect { case (_, (_, etx: ExchangeTransaction, _)) => etx }
+          .map(etx => Map(
+            EqByteArray(etx.buyOrder.id) -> Set(etx.id),
+            EqByteArray(etx.sellOrder.id) -> Set(etx.id)
+          )))
+    }
   }
 
 }

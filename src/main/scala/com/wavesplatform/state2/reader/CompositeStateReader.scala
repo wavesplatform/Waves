@@ -69,7 +69,7 @@ class CompositeStateReader(inner: StateReader, blockDiff: BlockDiff) extends Sta
     .orElse(inner.paymentTransactionIdByHash(hash))
 
   override def maxPaymentTransactionTimestampInPreviousBlocks(a: Account): Option[Long] = {
-    blockDiff.maxPaymentTransactionTimestamp.get(a)
+    blockDiff.txsDiff.maxPaymentTransactionTimestamp.get(a)
       .orElse(inner.maxPaymentTransactionTimestampInPreviousBlocks(a))
   }
 

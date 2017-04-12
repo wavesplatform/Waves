@@ -20,7 +20,7 @@ class StateWriterImpl(p: JavaMapStorage) extends StateReaderImpl(p) with StateWr
       p.transactions.put(id.arr, (h, tx.bytes))
     }
 
-    blockDiff.orderExchangeTxsMap.foreach { case (oid, txIds) =>
+    blockDiff.txsDiff.orderExchangeTxsMap.foreach { case (oid, txIds) =>
       Option(p.exchangeTransactionsByOrder.get(oid.arr)) match {
         case Some(ll) =>
           p.exchangeTransactionsByOrder.put(oid.arr, ll ++ txIds)
@@ -65,7 +65,7 @@ class StateWriterImpl(p: JavaMapStorage) extends StateReaderImpl(p) with StateWr
       p.effectiveBalanceSnapshots.put((ebs.acc.bytes, ebs.height), (ebs.prevEffectiveBalance, ebs.effectiveBalance))
     }
 
-    blockDiff.maxPaymentTransactionTimestamp.foreach { case (acc, ts) =>
+    blockDiff.txsDiff.maxPaymentTransactionTimestamp.foreach { case (acc, ts) =>
       val old = maxPaymentTransactionTimestampInPreviousBlocks(acc)
       if (ts > old.getOrElse(0L))
         p.maxPaymentTransactionTimestampInPreviousBlocks.put(acc.bytes, ts)
@@ -75,7 +75,7 @@ class StateWriterImpl(p: JavaMapStorage) extends StateReaderImpl(p) with StateWr
       p.aliasToAddress.put(alias.name, acc.bytes)
     }
 
-    val (effectiveNewLeases, effectiveNewCancels) = blockDiff.effectiveLeaseTxUpdates
+    val (effectiveNewLeases, effectiveNewCancels) = blockDiff.txsDiff.effectiveLeaseTxUpdates
 
     effectiveNewCancels.foreach(id => p.leaseState.put(id.arr, false))
     effectiveNewLeases.foreach(id => p.leaseState.put(id.arr, true))
