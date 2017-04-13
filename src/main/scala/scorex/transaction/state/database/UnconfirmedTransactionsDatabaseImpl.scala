@@ -29,7 +29,7 @@ class UnconfirmedTransactionsDatabaseImpl(settings: UTXSettings) extends Unconfi
           transactions.update(txKey, tx)
           Right(t)
         case Left(err) =>
-          log.error(err.toString)
+          log.debug(err.toString)
           Left(err)
       }
     } else {

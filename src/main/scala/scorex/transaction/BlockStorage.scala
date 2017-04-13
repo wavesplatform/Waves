@@ -13,16 +13,4 @@ trait BlockStorage extends ScorexLogging {
 
   def blockchainUpdater: BlockchainUpdater
 
-  def removeAfter(blockId: BlockId): Unit = try {
-    history.heightOf(blockId) match {
-      case Some(height) =>
-        blockchainUpdater.rollbackTo(height)
-      case None =>
-        log.warn(s"RemoveAfter non-existing block ${Base58.encode(blockId)}")
-    }
-  } catch {
-    case e: UnsupportedOperationException =>
-      log.debug(s"DB can't find last block because of unexpected modification")
-      None
-  }
 }

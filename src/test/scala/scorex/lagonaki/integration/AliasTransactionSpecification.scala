@@ -120,7 +120,7 @@ class AliasTransactionSpecification extends FunSuite with Matchers with Transact
     val tx = CreateAliasTransaction.create(aliasCreator, theAlias.right.get, 100000L, 1L).right.get
     val block = TestBlock(Seq(tx))
     updater.processBlock(block) shouldBe a[Right[_, _]]
-    updater.rollbackTo(state.height - 1)
+    updater.rollbackTo(state.height - 1).right.get
 
     updater.processBlock(block) shouldBe a[Right[_, _]]
   }

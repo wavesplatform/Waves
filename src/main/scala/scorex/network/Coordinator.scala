@@ -152,7 +152,7 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
       history.blockAt(hh(fork.size)).foreach {
         lastValidBlock =>
           log.warn(s"Fork detected (length = ${fork.size}), rollback to last valid block id [${lastValidBlock.encodedId}]")
-          application.blockStorage.removeAfter(lastValidBlock.uniqueId)
+          application.blockStorage.blockchainUpdater.removeAfter(lastValidBlock.uniqueId)
       }
     }
   }
@@ -218,7 +218,7 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
     }
 
     if (application.history.heightOf(lastCommonBlockId).exists(isForkValidWithCheckpoint)) {
-      application.blockStorage.removeAfter(lastCommonBlockId)
+      application.blockStorage.blockchainUpdater.removeAfter(lastCommonBlockId)
 
       newBlocks.find(processNewBlock(_).isLeft).foreach { failedBlock =>
         log.warn(s"Can't apply block: ${failedBlock.json}")

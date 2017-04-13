@@ -93,7 +93,7 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
   }
 
   def before(): Unit = {
-    app.blockStorage.removeAfter(app.history.genesis.uniqueId)
+    app.blockStorage.blockchainUpdater.removeAfter(app.history.genesis.uniqueId)
     actorRef ! ClearCheckpoint
     networkController.ignoreMsg {
       case SendToNetwork(m, _) => m.spec == repo.ScoreMessageSpec
@@ -146,7 +146,7 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
     sendCheckpoint(Seq(9, 7, 5, 3))
 
     val parentId = app.history.blockAt(8).get.uniqueId
-    app.blockStorage.removeAfter(parentId)
+    app.blockStorage.blockchainUpdater.removeAfter(parentId)
     val difBloc = createBlock(parentId)
     val badPeer = stub[ConnectedPeer]
 

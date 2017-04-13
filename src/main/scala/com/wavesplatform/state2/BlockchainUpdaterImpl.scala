@@ -5,6 +5,9 @@ import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.diffs.BlockDiffer
 import com.wavesplatform.state2.reader.{CompositeStateReader, StateReader}
 import scorex.block.Block
+import scorex.block.Block.BlockId
+import scorex.crypto.encode.Base58
+import scorex.transaction.ValidationError.CustomError
 import scorex.transaction._
 import scorex.utils.ScorexLogging
 
@@ -60,17 +63,30 @@ class BlockchainUpdaterImpl(persisted: StateWriter with StateReader, settings: F
     }
   }
 
-  override def rollbackTo(height: Int): Unit = {
+  override def rollbackTo(height: Int): Either[ValidationError, Unit] = {
     if (height < persisted.height) {
-      throw new IllegalArgumentException(s"cannot rollback to a block with height=$height, which is older than persisted height=${persisted.height}")
+      Left(CustomError(s"cannot rollback to a block with height=$height, which is older than persisted height=${persisted.height}"))
     } else {
       while (bc.height > height) {
         bc.discardBlock()
       }
-      if (currentState.height == height) {
-      } else {
+      if (currentState.height != height) {
         inMemoryDiff = unsafeDiffer(persisted, Range(persisted.height + 1, height + 1).map(h => bc.blockAt(h).get))
       }
+      Right(())
     }
+  }
+
+  override def removeAfter(blockId: BlockId): Unit = try {
+    bc.heightOf(blockId) match {
+      case Some(height) =>
+        rollbackTo(height)
+      case None =>
+        log.warn(s"RemoveAfter non-existing block ${Base58.encode(blockId)}")
+    }
+  } catch {
+    case e: UnsupportedOperationException =>
+      log.debug(s"DB can't find last block because of unexpected modification")
+      None
   }
 }
