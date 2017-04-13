@@ -35,7 +35,7 @@ case class MatcherApiRoute(application: Application, matcher: ActorRef, settings
 
   override lazy val route: Route =
     pathPrefix("matcher") {
-      matcherPublicKey ~ orderBook ~ place ~ orderStatus ~ cancel ~ orderbooks
+      matcherPublicKey ~ orderBook ~ place ~ orderStatus ~ cancel ~ orderbooks ~ orderBookDelete
     }
 
   def withAssetPair(a1: String, a2: String): Directive1[AssetPair] = {
@@ -152,4 +152,20 @@ case class MatcherApiRoute(application: Application, matcher: ActorRef, settings
         .map(r => r.json))
     }
   }
+
+  @Path("/orderbook/{amountAsset}/{priceAsset}")
+  @ApiOperation(value = "Remove Order Book for a given Asset Pair",
+    notes = "Remove Order Book for a given Asset Pair", httpMethod = "DELETE")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(name = "amountAsset", value = "Amount Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
+    new ApiImplicitParam(name = "priceAsset", value = "Price Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path")
+  ))
+  def orderBookDelete: Route = (path("orderbook" / Segment / Segment) & delete & withAuth) { (a1, a2) =>
+    withAssetPair(a1, a2) { pair =>
+      complete((matcher ? DeleteOrderBookRequest(pair))
+        .mapTo[MatcherResponse]
+        .map(r => r.code -> r.json))
+    }
+  }
+
 }

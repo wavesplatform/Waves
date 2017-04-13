@@ -58,6 +58,11 @@ class OrderBookActor(assetPair: AssetPair, val storedState: StoredState,
       handleOrderStatus(id)
     case cancel: CancelOrder =>
       handleCancelOrder(cancel)
+    case DeleteOrderBookRequest(pair) =>
+      deleteMessages(lastSequenceNr)
+      deleteSnapshots(SnapshotSelectionCriteria.Latest)
+      context.stop(self)
+      sender() ! GetOrderBookResponse(pair, Seq(), Seq())
   }
 
   def handleOrderStatus(id: String): Unit = {
@@ -177,6 +182,8 @@ object OrderBookActor {
   }
 
   case class GetOrderBookRequest(assetPair: AssetPair, depth: Option[Int]) extends OrderBookRequest
+
+  case class DeleteOrderBookRequest(assetPair: AssetPair) extends OrderBookRequest
 
   case class GetOrderStatus(assetPair: AssetPair, id: String) extends OrderBookRequest
 
