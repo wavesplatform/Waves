@@ -1,5 +1,10 @@
 package scorex.network
 
+import cats._
+import cats.data._
+import cats.implicits._
+import cats.syntax.all._
+
 import akka.pattern.{ask, pipe}
 import akka.util.Timeout
 import scorex.app.Application
@@ -220,18 +225,15 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
     if (application.history.heightOf(lastCommonBlockId).exists(isForkValidWithCheckpoint)) {
       application.blockStorage.blockchainUpdater.removeAfter(lastCommonBlockId)
 
-      newBlocks.find(processNewBlock(_).isLeft).foreach { failedBlock =>
-        log.warn(s"Can't apply block: ${failedBlock.json}")
-        if (try {
-          history.lastBlock.uniqueId.sameElements(failedBlock.referenceField.value)
-        } catch {
-          case e: UnsupportedOperationException =>
-            log.debug(s"DB can't find last block because of unexpected modification")
-            false
-        }) {
-          from.foreach(_.blacklist())
-        }
-      }
+      foldM[({type l[α] = Either[(ValidationError, BlockId), α]})#l, List, Block, Unit](newBlocks.toList, ())
+        { case ((), block: Block) => processNewBlock(block).left.map((_, block.uniqueId)) } match {
+        case Right(_) =>
+        case Left(err) =>
+          log.error(s"Can't processFork(lastBlockCommonId: ${Base58.encode(lastCommonBlockId)} because: ${err._1}")
+              if (history.lastBlock.uniqueId.sameElements(err._2)) {
+                from.foreach(_.blacklist())
+              }
+            }
 
       self ! BroadcastCurrentScore
 
@@ -323,4 +325,6 @@ object Coordinator {
 
   case object ClearCheckpoint
 
+  def foldM[G[_], F[_], A, B](fa: F[A], z: B)(f: (B, A) => G[B])(implicit G: Monad[G], F: Traverse[F]): G[B] =
+    F.foldLeft(fa, G.pure(z))((gb, a) => G.flatMap(gb)(f(_, a)))
 }

@@ -28,7 +28,7 @@ package object state2 {
   def safeSum(x: Long, y: Long): Long = Try(Math.addExact(x, y)).getOrElse(Long.MinValue)
 
   implicit val leaseInfoMonoid = new Monoid[LeaseInfo] {
-    override def empty: LeaseInfo = LeaseInfo(0, 0)
+    override def empty: LeaseInfo = LeaseInfo.empty
 
     override def combine(x: LeaseInfo, y: LeaseInfo): LeaseInfo = LeaseInfo(x.leaseIn + y.leaseIn, x.leaseOut + y.leaseOut)
   }

@@ -13,7 +13,6 @@ import scorex.transaction.assets.exchange.AssetPair
 
 import scala.collection.immutable.TreeMap
 
-@DoNotDiscover
 class EventJsonSpecification extends PropSpec
   with PropertyChecks
   with Matchers

@@ -53,9 +53,9 @@ object LeaseTransactionsDiff {
         Right(Monoid.combine(
           Map(canceller -> Portfolio(-tx.fee, LeaseInfo(0, -lease.amount), Map.empty)),
           Map(recipient -> Portfolio(0, LeaseInfo(-lease.amount, 0), Map.empty))))
-      } else if (time < settings.allowMultipleLeaseCancelTransactionUntilTimestamp) {
+      } else if (time < settings.allowMultipleLeaseCancelTransactionUntilTimestamp) {  // cancel of another acc
         Right(Monoid.combine(
-          Map(canceller -> Portfolio(-tx.fee, LeaseInfo(lease.amount, 0), Map.empty)),
+          Map(canceller -> Portfolio(-tx.fee, LeaseInfo(0, -lease.amount), Map.empty)),
           Map(recipient -> Portfolio(0, LeaseInfo(-lease.amount, 0), Map.empty))))
       } else Left(TransactionValidationError(tx, s"LeaseTransaction was leased by other sender " +
         s"and time=$time > allowMultipleLeaseCancelTransactionUntilTimestamp=${settings.allowMultipleLeaseCancelTransactionUntilTimestamp}"))
