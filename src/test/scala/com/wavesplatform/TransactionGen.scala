@@ -7,7 +7,7 @@ import scorex.transaction.assets._
 import scorex.transaction.assets.exchange._
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction.{CreateAliasTransaction, PaymentTransaction}
-import scorex.utils.{ByteArrayExtension, NTP}
+import scorex.utils.NTP
 
 trait TransactionGen {
 
@@ -43,11 +43,12 @@ trait TransactionGen {
   val wavesAssetGen: Gen[Option[Array[Byte]]] = Gen.const(None)
   val assetIdGen: Gen[Option[Array[Byte]]] = Gen.frequency((1, wavesAssetGen), (10, Gen.option(bytes32gen)))
 
-  val assetPairGen = for {
-    a1 <- assetIdGen
-    a2 <- assetIdGen
-    if !ByteArrayExtension.sameOption(a1, a2)
-  } yield AssetPair(a1, a2)
+  val assetPairGen = assetIdGen.flatMap {
+    case None => bytes32gen.map(b => AssetPair(None, Some(b)))
+    case a1@Some(a1bytes) =>
+      val a2bytesGen = byteArrayGen(31).map(a2bytes => Option((~a1bytes(0)).toByte +: a2bytes))
+      Gen.oneOf(Gen.const(None), a2bytesGen).map(a2 => AssetPair(a1, a2))
+  }
 
   private val paymentParamGen: Gen[(PrivateKeyAccount, PublicKeyAccount, Long, Long, Long)] = for {
     sender: PrivateKeyAccount <- accountGen
