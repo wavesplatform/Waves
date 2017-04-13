@@ -70,7 +70,7 @@ trait TransactionGen {
     amount <- positiveLongGen
     fee <- smallFeeGen
     timestamp <- positiveLongGen
-    recipient <- accountOrAliasGen
+    recipient <- accountGen
   } yield (sender, amount, fee, timestamp, recipient)
 
   val leaseAndCancelGen: Gen[(LeaseTransaction, LeaseCancelTransaction)] = for {
@@ -222,9 +222,9 @@ trait TransactionGen {
 
   val randomTransactionGen = (for {
     tr <- transferGen
-//    (is, _, ri, bu) <- issueReissueGen
-//    ca <- createAliasGen
-//    xt <- exchangeTransactionGen
-//    tx <- Gen.oneOf(tr, is, ri, ca, bu, xt)
-  } yield tr).label("random transaction")
+    (is, _, ri, bu) <- issueReissueGen
+    ca <- createAliasGen
+    xt <- exchangeTransactionGen
+    tx <- Gen.oneOf(tr, is, ri, ca, bu, xt)
+  } yield tx).label("random transaction")
 }
