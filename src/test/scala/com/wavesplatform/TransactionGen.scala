@@ -26,11 +26,10 @@ trait TransactionGen {
   }
 
   val accountGen: Gen[PrivateKeyAccount] = bytes32gen.map(seed => PrivateKeyAccount(seed))
-  val aliasGen: Gen[Alias] = genBoundedString(Alias.MinLength, Alias.MaxLength)
-    .map(ar => new String(ar))
-    .suchThat(!_.contains("\n"))
-    .suchThat(s => s.trim == s)
-    .map(Alias.buildWithCurrentNetworkByte(_).right.get)
+  val aliasGen: Gen[Alias] = for {
+    l <- Gen.chooseNum(Alias.MinLength, Alias.MaxLength)
+    alias <- Gen.listOfN(l, Gen.alphaNumChar)
+  } yield Alias.buildWithCurrentNetworkByte(alias.mkString).right.get
 
   val accountOrAliasGen: Gen[AccountOrAlias] = Gen.oneOf(aliasGen, accountGen.map(PublicKeyAccount.toAddress(_)))
 
@@ -100,19 +99,20 @@ trait TransactionGen {
   val leaseCancelGen: Gen[LeaseCancelTransaction] = leaseAndCancelGen.map(_._2)
 
   private val transferParamGen = for {
-    amount: Long <- Gen.choose(0, Long.MaxValue)
-    feeAmount: Long <- Gen.choose(0, Long.MaxValue - amount - 1)
-    assetId: Option[Array[Byte]] <- Gen.option(bytes32gen)
+    amount <- Gen.posNum[Long]
+    feeAmount <- Gen.chooseNum(1, Long.MaxValue - amount - 1)
+    assetId <- Gen.option(bytes32gen)
     feeAssetId <- Gen.option(bytes32gen)
-    timestamp <- positiveLongGen
+    timestamp <- Gen.posNum[Long]
     sender <- accountGen
     attachment <- genBoundedBytes(0, TransferTransaction.MaxAttachmentSize)
     recipient <- accountOrAliasGen
   } yield (assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment)
 
-  val transferGen = for {
+  val transferGen = (for {
     (assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment) <- transferParamGen
-  } yield TransferTransaction.create(assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment).right.get
+  } yield TransferTransaction.create(assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment).right.get)
+    .label("transferTransaction")
 
   val transferWithWavesFeeGen = for {
     (assetId, sender, recipient, amount, timestamp, _, feeAmount, attachment) <- transferParamGen
@@ -220,11 +220,11 @@ trait TransactionGen {
     trans
   }
 
-  val randomTransactionGen = for {
+  val randomTransactionGen = (for {
     tr <- transferGen
-    (is, _, ri, bu) <- issueReissueGen
-    ca <- createAliasGen
-    xt <- exchangeTransactionGen
-    tx <- Gen.oneOf(tr, is, ri, ca, bu, xt)
-  } yield tx
+//    (is, _, ri, bu) <- issueReissueGen
+//    ca <- createAliasGen
+//    xt <- exchangeTransactionGen
+//    tx <- Gen.oneOf(tr, is, ri, ca, bu, xt)
+  } yield tr).label("random transaction")
 }

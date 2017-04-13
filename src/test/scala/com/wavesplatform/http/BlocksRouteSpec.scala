@@ -109,10 +109,10 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with MockFactory with BlockGe
     }
   }
 
-  private def sameSignature(block: Block)(s: Array[Byte]): Boolean = sameSignature(block.signerData.signature)(s)
-  private def sameSignature(signature: Block.BlockId)(s: Array[Byte]): Boolean = s.sameElements(signature)
   private def withBlock(block: Block): Unit =
-    (history.blockById(_: Block.BlockId)).expects(where(sameSignature(block) _)).returning(Some(block)).once()
+    (history.blockById(_: Block.BlockId))
+      .expects(where(sameSignature(block.signerData.signature) _))
+      .returning(Some(block)).once()
 
   routePath("/height/{signature}") in {
     // todo: check invalid signature
