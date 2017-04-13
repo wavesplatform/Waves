@@ -63,7 +63,7 @@ class BlockchainUpdaterImpl(persisted: StateWriter with StateReader, settings: F
     }
   }
 
-  override def rollbackTo(height: Int): Either[ValidationError, Unit] = {
+  def rollbackTo(height: Int): Either[ValidationError, Unit] = {
     if (height < persisted.height) {
       Left(CustomError(s"cannot rollback to a block with height=$height, which is older than persisted height=${persisted.height}"))
     } else {
@@ -77,16 +77,13 @@ class BlockchainUpdaterImpl(persisted: StateWriter with StateReader, settings: F
     }
   }
 
-  override def removeAfter(blockId: BlockId): Unit = try {
+  override def removeAfter(blockId: BlockId): Either[ValidationError, Unit] = {
     bc.heightOf(blockId) match {
       case Some(height) =>
         rollbackTo(height)
       case None =>
         log.warn(s"RemoveAfter non-existing block ${Base58.encode(blockId)}")
+        Right(())
     }
-  } catch {
-    case e: UnsupportedOperationException =>
-      log.debug(s"DB can't find last block because of unexpected modification")
-      None
   }
 }
