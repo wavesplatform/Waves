@@ -53,11 +53,6 @@ object Diff {
     lazy val paymentTransactionIdsByHashes: Map[ByteArray, ByteArray] = d.transactions
       .collect { case (_, (_, ptx: PaymentTransaction, _)) => EqByteArray(ptx.hash) -> EqByteArray(ptx.id) }
 
-    lazy val maxPaymentTransactionTimestamp: Map[Account, Long] = d.transactions.toList
-      .collect({ case (_, (_, ptx: PaymentTransaction, _)) => ptx.sender.toAccount -> ptx.timestamp })
-      .groupBy(_._1)
-      .mapValues(_.map(_._2).max)
-
     lazy val effectiveLeaseTxUpdates: (Set[EqByteArray], Set[EqByteArray]) = {
       val canceledLeaseIds: Set[EqByteArray] = d.transactions.values.map(_._2)
         .filter(_.isInstanceOf[LeaseCancelTransaction])

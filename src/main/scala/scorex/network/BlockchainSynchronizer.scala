@@ -60,7 +60,7 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
     state(GettingExtension, acceptSignaturesSpecOnlyFrom(peers.keySet)) {
       case SignaturesFromPeer(blockIds, connectedPeer) =>
 
-        log.info(s"Got blockIds(count= ${blockIds.size}: ${blockIds.take(2)}, ...}")
+        log.debug(s"Got blockIds(count= ${blockIds.size}: ${blockIds.take(2)}, ...}")
 
         blockIdsToStartDownload(blockIds, history) match {
           case None =>
@@ -143,7 +143,7 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
                     lastCommonBlockId: BlockId,
                     peers: PeerSet): Receive = {
 
-    log.info(s"Going to request blocks: ${blockIds.mkString(",")}, peer: ${peers.active}")
+    log.debug(s"Going to request blocks amt=${blockIds.size}: ${blockIds.take(2)}, ...}, peer: ${peers.active}")
 
     blockIds.foreach { blockId =>
       val msg = Message(GetBlockSpec, Right(blockId.blockId), None)

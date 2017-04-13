@@ -42,7 +42,7 @@ object CommonValidation {
 
           if (temporaryStateWhileTransfer.balance < 0 || temporaryStateWhileTransfer.assets.values.exists(_ < 0))
             Left(TransactionValidationError(ttx, s"Attempt to transfer unavailable funds:" +
-              s" TransactionApplication leads from ${s.accountPortfolio(sender)} to temporary negative state: $temporaryStateWhileTransfer"))
+              s" Transaction application leads from ${s.accountPortfolio(sender)} to (at least) temporary negative state: $temporaryStateWhileTransfer"))
           else Right(tx)
         case _ => Right(tx)
       } else Right(tx)
