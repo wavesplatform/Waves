@@ -39,7 +39,6 @@ class OrderSpecification extends PropSpec with PropertyChecks with Matchers with
       val (order, pk) = x
       val time = NTP.correctedTime()
       order.copy(timestamp = -1).isValid(time) shouldBe not(valid)
-      order.copy(timestamp = time + 1000).isValid(time) should contain("timestamp should be before created before execution")
     }
   }
 
