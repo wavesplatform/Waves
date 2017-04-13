@@ -39,7 +39,8 @@ class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with
 
   private val generatedMessages = for {
     account <- Gen.oneOf(allAccounts).label("account")
-    message <- Gen.alphaNumStr.label("message").suchThat(_.length > 10)
+    length <- Gen.chooseNum(10, 1000)
+    message <- Gen.listOfN(length, Gen.alphaNumChar).map(_.mkString).label("message")
   } yield (account, message)
 
   routePath("/seq/{from}/{to}") in {
