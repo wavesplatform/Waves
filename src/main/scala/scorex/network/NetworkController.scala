@@ -47,7 +47,7 @@ class NetworkController(application: RunnableApplication) extends Actor with Sco
   private val messageHandlers = mutable.Map[Seq[Message.MessageCode], ActorRef]()
 
   private var listeningStopped: Boolean = false
-  private var conncetionClosed: Boolean = false
+  private var connectionClosed: Boolean = false
   private var maybeRequester: Option[ActorRef] = None
 
   //check own declared address for validity
@@ -136,7 +136,7 @@ class NetworkController(application: RunnableApplication) extends Actor with Sco
       listener ! NetworkListener.StopListen
 
     case CloseAllConnectionsComplete =>
-      conncetionClosed = true
+      connectionClosed = true
       sendShutdownComplete()
 
     case ListeningStopped =>
@@ -145,7 +145,7 @@ class NetworkController(application: RunnableApplication) extends Actor with Sco
   }
 
   private def sendShutdownComplete(): Unit = {
-    if (conncetionClosed && listeningStopped) maybeRequester.foreach(_ ! NetworkShutdownComplete)
+    if (connectionClosed && listeningStopped) maybeRequester.foreach(_ ! NetworkShutdownComplete)
   }
 
   override def receive: Receive = bindingLogic orElse businessLogic orElse peerLogic orElse interfaceCalls orElse {
