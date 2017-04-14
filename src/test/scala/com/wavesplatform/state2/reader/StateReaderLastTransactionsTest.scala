@@ -1,11 +1,12 @@
 package com.wavesplatform.state2.reader
 
+import com.wavesplatform.TransactionGen
 import com.wavesplatform.state2.diffs._
 import org.scalacheck.{Gen, Shrink}
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import org.scalatest.{Matchers, PropSpec}
 import scorex.lagonaki.mocks.TestBlock
-import scorex.transaction.{GenesisTransaction, PaymentTransaction, Transaction, TransactionGen}
+import scorex.transaction.{GenesisTransaction, PaymentTransaction, Transaction}
 
 class StateReaderLastTransactionsTest extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers with TransactionGen {
 
@@ -14,7 +15,7 @@ class StateReaderLastTransactionsTest extends PropSpec with PropertyChecks with 
   val preconditionsAndPayment: Gen[(Seq[Transaction], PaymentTransaction)] = for {
     master <- accountGen
     recipient <- otherAccountGen(candidate = master)
-    ts <- positiveIntGen
+    ts <- timestampGen
     genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
     time0 <- timestampGen
     transfer1: PaymentTransaction <- paymentGeneratorP(time0, master, recipient)

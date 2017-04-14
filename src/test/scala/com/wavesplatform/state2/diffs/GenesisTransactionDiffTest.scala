@@ -1,22 +1,25 @@
 package com.wavesplatform.state2.diffs
 
 import cats._
+import com.wavesplatform.TransactionGen
 import com.wavesplatform.state2.{EffectiveBalanceSnapshot, Portfolio, portfolioMonoid}
+import org.scalacheck.Gen
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import org.scalatest.{Matchers, PropSpec}
 import scorex.lagonaki.mocks.TestBlock
-import scorex.transaction.TransactionGen
 
 class GenesisTransactionDiffTest extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers with TransactionGen {
 
+  def nelMax[T](g: Gen[T], max: Int = 10): Gen[List[T]] = Gen.choose(1, max).flatMap(Gen.listOfN(_, g))
+
   property("fails if height != 1") {
-    forAll(genesisGenerator, positiveIntGen suchThat (_ > 1)) { (gtx, h) =>
-      GenesisTransactionDiff(h)(gtx) should produce ("GenesisTranaction cannot appear in non-initial block")
+    forAll(genesisGen, positiveIntGen suchThat (_ > 1)) { (gtx, h) =>
+      GenesisTransactionDiff(h)(gtx) should produce("GenesisTranaction cannot appear in non-initial block")
     }
   }
 
   property("Diff establishes Waves invariant") {
-    forAll(nelMax(genesisGenerator), accountGen) { (gtxs, miner) =>
+    forAll(nelMax(genesisGen), accountGen) { (gtxs, miner) =>
       assertDiffAndState(Seq.empty, TestBlock(gtxs, miner)) { (blockDiff, state) =>
         val totalPortfolioDiff: Portfolio = Monoid.combineAll(blockDiff.txsDiff.portfolios.values)
         totalPortfolioDiff.balance shouldBe gtxs.map(_.amount).sum

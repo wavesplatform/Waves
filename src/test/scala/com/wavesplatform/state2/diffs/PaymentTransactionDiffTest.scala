@@ -1,12 +1,13 @@
 package com.wavesplatform.state2.diffs
 
 import cats.Monoid
+import com.wavesplatform.TransactionGen
 import com.wavesplatform.state2._
 import org.scalacheck.{Gen, Shrink}
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import org.scalatest.{Matchers, PropSpec}
 import scorex.lagonaki.mocks.TestBlock
-import scorex.transaction.{GenesisTransaction, PaymentTransaction, Transaction, TransactionGen}
+import scorex.transaction.{GenesisTransaction, PaymentTransaction, Transaction}
 
 class PaymentTransactionDiffTest extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers with TransactionGen {
 

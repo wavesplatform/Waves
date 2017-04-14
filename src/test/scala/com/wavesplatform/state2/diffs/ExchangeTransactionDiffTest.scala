@@ -1,6 +1,7 @@
 package com.wavesplatform.state2.diffs
 
 import cats._
+import com.wavesplatform.TransactionGen
 import com.wavesplatform.state2.{Portfolio, portfolioMonoid}
 import org.scalacheck.{Gen, Shrink}
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
@@ -8,7 +9,7 @@ import org.scalatest.{Matchers, PropSpec}
 import scorex.lagonaki.mocks.TestBlock
 import scorex.transaction.assets.IssueTransaction
 import scorex.transaction.assets.exchange.ExchangeTransaction
-import scorex.transaction.{GenesisTransaction, TransactionGen}
+import scorex.transaction.GenesisTransaction
 import scorex.utils.ByteArrayExtension
 
 class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers with TransactionGen {
@@ -25,7 +26,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Gene
     issue2: IssueTransaction <- issueReissueGeneratorP(ENOUGH_AMT, buyer).map(_._1)
     maybeAsset1 <- Gen.option(issue1.id)
     maybeAsset2 <- Gen.option(issue2.id) suchThat (x => !ByteArrayExtension.sameOption(x, maybeAsset1))
-    exchange <- exchangeGeneratorP(buyer, seller, maybeAsset1, maybeAsset2).map(_._1)
+    exchange <- exchangeGeneratorP(buyer, seller, maybeAsset1, maybeAsset2)
   } yield (gen1, gen2, issue1, issue2, exchange)
 
 

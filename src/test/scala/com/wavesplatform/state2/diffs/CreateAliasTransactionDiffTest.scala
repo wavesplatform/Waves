@@ -1,6 +1,7 @@
 package com.wavesplatform.state2.diffs
 
 import cats._
+import com.wavesplatform.TransactionGen
 import com.wavesplatform.state2.{EqByteArray, LeaseInfo, Portfolio, portfolioMonoid}
 import org.scalacheck.{Gen, Shrink}
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
@@ -8,7 +9,7 @@ import org.scalatest.{Matchers, PropSpec}
 import scorex.account.PrivateKeyAccount
 import scorex.lagonaki.mocks.TestBlock
 import scorex.transaction.assets.IssueTransaction
-import scorex.transaction.{CreateAliasTransaction, GenesisTransaction, TransactionGen}
+import scorex.transaction.{CreateAliasTransaction, GenesisTransaction}
 
 class CreateAliasTransactionDiffTest extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers with TransactionGen {
 

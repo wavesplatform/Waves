@@ -1,5 +1,6 @@
 package com.wavesplatform.state2.patch
 
+import com.wavesplatform.TransactionGen
 import com.wavesplatform.state2.LeaseInfo
 import com.wavesplatform.state2.diffs.{ENOUGH_AMT, assertDiffAndState}
 import org.scalacheck.{Gen, Shrink}
@@ -8,7 +9,7 @@ import org.scalatest.{Matchers, PropSpec}
 import scorex.lagonaki.mocks.TestBlock
 import scorex.settings.TestFunctionalitySettings
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import scorex.transaction.{GenesisTransaction, TransactionGen}
+import scorex.transaction.{GenesisTransaction}
 
 
 class LeasePatchTest extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers with TransactionGen {

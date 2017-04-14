@@ -1,8 +1,8 @@
 package scorex.account
 
+import com.wavesplatform.TransactionGen
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
-import scorex.transaction.TransactionGen
 
 class AccountOrAliasSpecification extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers with TransactionGen {
 

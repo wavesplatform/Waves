@@ -39,8 +39,7 @@ libraryDependencies ++=
   )
 
 inConfig(Test)(Seq(
-  javaOptions += "-Dlogback.configurationFile=logback-sbt.xml",
-  fork := true,
+  logBuffered := false,
   parallelExecution := false,
   testOptions += Tests.Argument("-oIDOF", "-u", "target/test-reports")
 ))

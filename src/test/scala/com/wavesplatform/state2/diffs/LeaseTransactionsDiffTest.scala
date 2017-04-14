@@ -1,6 +1,7 @@
 package com.wavesplatform.state2.diffs
 
 import cats._
+import com.wavesplatform.TransactionGen
 import com.wavesplatform.state2._
 import org.scalacheck.{Gen, Shrink}
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
@@ -10,7 +11,7 @@ import scorex.lagonaki.mocks.TestBlock
 import scorex.settings.TestFunctionalitySettings
 import scorex.transaction.assets.TransferTransaction
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import scorex.transaction.{GenesisTransaction, PaymentTransaction, TransactionGen}
+import scorex.transaction.{GenesisTransaction, PaymentTransaction}
 
 class LeaseTransactionsDiffTest extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers with TransactionGen {
 
@@ -67,7 +68,7 @@ class LeaseTransactionsDiffTest extends PropSpec with PropertyChecks with Genera
     fee2 <- smallFeeGen
     unlease2 = LeaseCancelTransaction.create(master, lease.id, fee2, ts + 1).right.get
     // ensure recipient has enough effective balance
-    payment <- paymentGeneratorP(ts, master, recpient) suchThat (_.amount > lease.amount)
+    payment <- paymentGeneratorP( master, recpient) suchThat (_.amount > lease.amount)
   } yield (genesis, payment, lease, unlease, unlease2)
 
   property("cannot cancel lease twice after allowMultipleLeaseCancelTransactionUntilTimestamp") {

@@ -1,5 +1,6 @@
 package scorex.transaction
 
+import com.wavesplatform.TransactionGen
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 import scorex.account.PrivateKeyAccount
@@ -9,8 +10,7 @@ import scorex.utils._
 class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 
   property("ExchangeTransaction transaction serialization roundtrip") {
-    forAll { x: (ExchangeTransaction, PrivateKeyAccount) =>
-      val (om, matcher) = x
+    forAll(exchangeTransactionGen) { om =>
       val recovered = ExchangeTransaction.parseBytes(om.bytes).get
       om.id shouldBe recovered.id
       om.buyOrder.id shouldBe recovered.buyOrder.id

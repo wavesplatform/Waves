@@ -1,13 +1,14 @@
 package com.wavesplatform.state2.diffs
 
 import cats._
+import com.wavesplatform.TransactionGen
 import com.wavesplatform.state2.{AssetInfo, EqByteArray, portfolioMonoid}
 import org.scalacheck.{Arbitrary, Gen, Shrink}
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import org.scalatest.{Matchers, PropSpec}
 import scorex.lagonaki.mocks.TestBlock
 import scorex.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction}
-import scorex.transaction.{GenesisTransaction, TransactionGen}
+import scorex.transaction.GenesisTransaction
 
 class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers with TransactionGen {
 
@@ -44,8 +45,8 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Genera
       master <- accountGen
       ts <- timestampGen
       genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
-      reissue <- reissueGenerator
-      burn <- burnGenerator
+      reissue <- reissueGen
+      burn <- burnGen
     } yield (genesis, reissue, burn)
 
     forAll(setup) { case ((gen, reissue, burn)) =>

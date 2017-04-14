@@ -27,6 +27,7 @@ import scorex.utils.ScorexLogging
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.language.postfixOps
+import scala.language.higherKinds
 
 class Coordinator(application: Application) extends ViewSynchronizer with ScorexLogging {
 
