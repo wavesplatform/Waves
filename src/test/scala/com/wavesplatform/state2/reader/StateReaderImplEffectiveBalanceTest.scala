@@ -1,12 +1,15 @@
 package com.wavesplatform.state2.reader
 
-import com.wavesplatform.state2.LeaseInfo
-import com.wavesplatform.state2.diffs.TestStorage
+import java.util
+
+import com.wavesplatform.state2.JavaMapStorage
 import org.scalatest.{FunSuite, Matchers}
 import scorex.account.Account
 
 
 class StateReaderImplEffectiveBalanceTest extends FunSuite with Matchers {
+
+  import StateReaderImplEffectiveBalanceTest._
 
   val acc: Account = Account.fromPublicKey(Array.emptyByteArray)
   val stateHeight = 100
@@ -55,4 +58,30 @@ class StateReaderImplEffectiveBalanceTest extends FunSuite with Matchers {
 
     new StateReaderImpl(storage).effectiveBalanceAtHeightWithConfirmations(acc, 100, 50) shouldBe 1
   }
+}
+
+object StateReaderImplEffectiveBalanceTest {
+
+  class TestStorage extends JavaMapStorage {
+    override val transactions = new util.HashMap[Array[Byte], (Int, Array[Byte])]
+    override val portfolios = new util.HashMap[Array[Byte], (Long, (Long, Long), Map[Array[Byte], Long])]
+    override val assets = new util.HashMap[Array[Byte], (Boolean, Long)]
+    override val accountTransactionIds = new util.HashMap[Array[Byte], List[Array[Byte]]]
+    override val effectiveBalanceSnapshots = new util.HashMap[(Array[Byte], Int), (Long, Long)]
+    override val paymentTransactionHashes = new util.HashMap[Array[Byte], Array[Byte]]
+    override val aliasToAddress = new util.HashMap[String, Array[Byte]]
+    override val exchangeTransactionsByOrder = new util.HashMap[Array[Byte], List[Array[Byte]]]
+    override val leaseState = new util.HashMap[Array[Byte], Boolean]
+
+    var height: Int = 0
+
+    override def getHeight: Int = height
+
+    override def setHeight(i: Int): Unit = {
+      height = i
+    }
+
+    override def commit(): Unit = ()
+  }
+
 }

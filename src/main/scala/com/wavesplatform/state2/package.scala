@@ -7,7 +7,7 @@ import scorex.crypto.encode.Base58
 import scorex.transaction.ValidationError.TransactionValidationError
 import scorex.transaction.{StateValidationError, Transaction, ValidationError}
 
-import scala.util.Try
+import scala.util.{Left, Right, Try}
 
 package object state2 {
 
@@ -79,6 +79,13 @@ package object state2 {
   implicit class EitherExt[L <: ValidationError, R](ei: Either[L, R]) {
     def liftValidationError[T <: Transaction](t: T): Either[StateValidationError, R] = {
       ei.left.map(e => TransactionValidationError(t, e.toString))
+    }
+  }
+
+  implicit class EitherExt2[A, B](ei: Either[A, B]) {
+    def explicitGet(): B = ei match {
+      case Left(value) => throw new Exception(value.toString)
+      case Right(value) => value
     }
   }
 

@@ -8,6 +8,7 @@ import scorex.transaction.assets.exchange._
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction._
 import scorex.utils.NTP
+import com.wavesplatform.state2._
 
 trait TransactionGen {
 

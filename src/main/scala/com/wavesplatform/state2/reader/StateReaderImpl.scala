@@ -2,6 +2,7 @@ package com.wavesplatform.state2.reader
 
 import cats.implicits._
 import com.wavesplatform.state2._
+import com.wavesplatform.state2.diffs._
 import scorex.account.{Account, Alias}
 import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.transaction.lease.LeaseTransaction
@@ -49,13 +50,13 @@ class StateReaderImpl(p: JavaMapStorage) extends StateReader {
     p.aliasToAddress.entrySet().asScala
       .filter(_.getValue sameElements a.bytes)
       .map(_.getKey)
-      .map(aliasStr => Alias.buildWithCurrentNetworkByte(aliasStr).right.get)
+      .map(aliasStr => Alias.buildWithCurrentNetworkByte(aliasStr).explicitGet())
       .toSeq
 
 
   override def resolveAlias(a: Alias): Option[Account] =
     Option(p.aliasToAddress.get(a.name))
-      .map(b => Account.fromBytes(b).right.get)
+      .map(b => Account.fromBytes(b).explicitGet())
 
   override def findPreviousExchangeTxs(orderId: EqByteArray): Set[ExchangeTransaction] =
     Option(p.exchangeTransactionsByOrder.get(orderId.arr))
@@ -65,7 +66,7 @@ class StateReaderImpl(p: JavaMapStorage) extends StateReader {
   override def accountPortfolios: Map[Account, Portfolio] =
     p.portfolios.entrySet().asScala
       .map { entry => entry.getKey -> entry.getValue }
-      .map { case (acc, (b, (i, o), as)) => Account.fromBytes(acc).right.get -> Portfolio(b, LeaseInfo(i, o), as.map { case (k, v) => EqByteArray(k) -> v }) }
+      .map { case (acc, (b, (i, o), as)) => Account.fromBytes(acc).explicitGet() -> Portfolio(b, LeaseInfo(i, o), as.map { case (k, v) => EqByteArray(k) -> v }) }
       .toMap
 
   override def isLeaseActive(leaseTx: LeaseTransaction): Boolean = p.leaseState.getOrDefault(leaseTx.id, false)

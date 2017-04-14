@@ -35,7 +35,7 @@ class LeaseTransactionsDiffTest extends PropSpec with PropertyChecks with Genera
       assertDiffAndState(Seq(TestBlock(Seq(genesis))), TestBlock(Seq(lease), miner)) { case (totalDiff, newState) =>
         val totalPortfolioDiff = Monoid.combineAll(totalDiff.txsDiff.portfolios.values)
         totalPortfolioDiff.balance shouldBe 0
-        totalPortfolioDiff.leaseInfo.leaseIn - totalPortfolioDiff.leaseInfo.leaseOut shouldBe 0
+        total(totalPortfolioDiff.leaseInfo) shouldBe 0
         totalPortfolioDiff.effectiveBalance shouldBe 0
         totalPortfolioDiff.assets.values.foreach(_ shouldBe 0)
 
@@ -46,7 +46,7 @@ class LeaseTransactionsDiffTest extends PropSpec with PropertyChecks with Genera
       assertDiffAndState(Seq(TestBlock(Seq(genesis, lease))), TestBlock(Seq(leaseCancel), miner)) { case (totalDiff, newState) =>
         val totalPortfolioDiff = Monoid.combineAll(totalDiff.txsDiff.portfolios.values)
         totalPortfolioDiff.balance shouldBe 0
-        totalPortfolioDiff.leaseInfo.leaseIn - totalPortfolioDiff.leaseInfo.leaseOut shouldBe 0
+        total(totalPortfolioDiff.leaseInfo) shouldBe 0
         totalPortfolioDiff.effectiveBalance shouldBe 0
         totalPortfolioDiff.assets.values.foreach(_ shouldBe 0)
 
@@ -68,7 +68,7 @@ class LeaseTransactionsDiffTest extends PropSpec with PropertyChecks with Genera
     fee2 <- smallFeeGen
     unlease2 = LeaseCancelTransaction.create(master, lease.id, fee2, ts + 1).right.get
     // ensure recipient has enough effective balance
-    payment <- paymentGeneratorP( master, recpient) suchThat (_.amount > lease.amount)
+    payment <- paymentGeneratorP(master, recpient) suchThat (_.amount > lease.amount)
   } yield (genesis, payment, lease, unlease, unlease2)
 
   property("cannot cancel lease twice after allowMultipleLeaseCancelTransactionUntilTimestamp") {
@@ -180,8 +180,11 @@ class LeaseTransactionsDiffTest extends PropSpec with PropertyChecks with Genera
       assertDiffAndState(Seq(
         TestBlock(Seq(genesis, initialPayment, initialPayment2, lease3PE3PB)),
         TestBlock(Seq(l1, l1c1, l1c2, l2, l3, l2c1, l2c2, l2c3))
-      ), TestBlock(Seq(transfer))) { case (_, newState) =>
-        // it's valid
+      ), TestBlock(Seq(transfer))) { case (totalDiff, _) =>
+        val totalPortfolioDiff = Monoid.combineAll(totalDiff.txsDiff.portfolios.values)
+        totalPortfolioDiff.balance shouldBe 0
+        total(totalPortfolioDiff.leaseInfo) shouldBe 0
+        totalPortfolioDiff.effectiveBalance shouldBe 0
       }
     }
     }

@@ -1,12 +1,12 @@
 package com.wavesplatform.state2.diffs
 
-import cats._
 import cats.Monoid
 import cats.implicits._
 import com.wavesplatform.settings.FunctionalitySettings
+import com.wavesplatform.state2._
+import com.wavesplatform.state2.diffs._
 import com.wavesplatform.state2.patch.LeasePatch
 import com.wavesplatform.state2.reader.{CompositeStateReader, StateReader}
-import com.wavesplatform.state2.{BlockDiff, Diff, EffectiveBalanceSnapshot, EqByteArray, LeaseInfo, Portfolio}
 import scorex.account.Account
 import scorex.block.Block
 import scorex.transaction.{AssetAcc, ValidationError}
@@ -64,7 +64,7 @@ object BlockDiffer {
 
   def unsafeDiffMany(settings: FunctionalitySettings)(s: StateReader, blocks: Seq[Block]): BlockDiff =
     blocks.foldLeft(Monoid[BlockDiff].empty) { (diff, block) =>
-      val blockDiff = apply(settings)(new CompositeStateReader(s, diff), block).right.get
+      val blockDiff = apply(settings)(new CompositeStateReader(s, diff), block).explicitGet()
       Monoid[BlockDiff].combine(diff, blockDiff)
     }
 }

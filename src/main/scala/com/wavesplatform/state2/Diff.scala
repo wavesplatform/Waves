@@ -22,7 +22,7 @@ object Diff {
   def apply(transactions: Map[ByteArray, (Int, Transaction, Set[Account])],
             portfolios: Map[Account, Portfolio],
             issuedAssets: Map[ByteArray, AssetInfo],
-            aliases: Map[Alias, Account]): Diff = new Diff(transactions, portfolios, issuedAssets,aliases, Seq.empty)
+            aliases: Map[Alias, Account]): Diff = new Diff(transactions, portfolios, issuedAssets, aliases, Seq.empty)
 
 
   def apply(height: Int, tx: Transaction,
@@ -54,19 +54,14 @@ object Diff {
       .collect { case (_, (_, ptx: PaymentTransaction, _)) => EqByteArray(ptx.hash) -> EqByteArray(ptx.id) }
 
     lazy val effectiveLeaseTxUpdates: (Set[EqByteArray], Set[EqByteArray]) = {
-      val canceledLeaseIds: Set[EqByteArray] = d.transactions.values.map(_._2)
-        .filter(_.isInstanceOf[LeaseCancelTransaction])
-        .map(_.asInstanceOf[LeaseCancelTransaction])
-        .map(_.leaseId)
-        .map(EqByteArray)
+      val txs = d.transactions.values.map(_._2)
+
+      val canceledLeaseIds: Set[EqByteArray] = txs
+        .collect { case (lctx: LeaseCancelTransaction) => EqByteArray(lctx.leaseId) }
         .toSet
 
-
-      val newLeaseIds = d.transactions.values.map(_._2)
-        .filter(_.isInstanceOf[LeaseTransaction])
-        .map(_.asInstanceOf[LeaseTransaction])
-        .map(_.id)
-        .map(EqByteArray)
+      val newLeaseIds = txs
+        .collect { case (ltx: LeaseTransaction) => EqByteArray(ltx.id) }
         .toSet
 
       val effectiveNewCancels = (canceledLeaseIds ++ d.__patch_extraLeaseIdsToCancel).diff(newLeaseIds)
