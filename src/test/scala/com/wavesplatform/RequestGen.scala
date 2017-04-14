@@ -1,8 +1,7 @@
-package scorex.api.http
+package com.wavesplatform
 
-import com.wavesplatform.TransactionGen
-import org.scalacheck.{Arbitrary, Gen => G}
 import org.scalacheck.Gen.{alphaNumChar, choose, listOfN, oneOf}
+import org.scalacheck.{Arbitrary, Gen => G}
 import scorex.api.http.assets._
 import scorex.crypto.encode.Base58
 import scorex.transaction.TransactionParser

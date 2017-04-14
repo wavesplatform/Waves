@@ -1,6 +1,4 @@
-package scorex.api.http
-
-import com.wavesplatform.http.RouteSpec
+package com.wavesplatform.http
 
 class WalletRouteSpec extends RouteSpec("/wallet/") {
   routePath("seed") in pending
