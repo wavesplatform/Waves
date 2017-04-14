@@ -1,5 +1,6 @@
 package scorex.transaction
 
+import com.wavesplatform.TransactionGen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import scorex.account.PrivateKeyAccount

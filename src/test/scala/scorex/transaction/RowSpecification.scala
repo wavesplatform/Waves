@@ -2,6 +2,7 @@ package scorex.transaction
 
 import java.io.File
 
+import com.wavesplatform.TransactionGen
 import org.h2.mvstore.{MVMap, MVStore, WriteBuffer}
 import org.scalacheck.Gen
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
@@ -24,10 +25,10 @@ class RowSpecification extends PropSpec
   }
 
   property("Row serialize and deserialize") {
-    forAll(paymentGenerator, Gen.posNum[Long], Gen.posNum[Long], Gen.posNum[Int]) { (payment: PaymentTransaction,
-                                                                                     balance: Long,
-                                                                                     fee: Long,
-                                                                                     lastRowHeight: Int) =>
+    forAll(paymentGen, Gen.posNum[Long], Gen.posNum[Long], Gen.posNum[Int]) { (payment: PaymentTransaction,
+                                                                               balance: Long,
+                                                                               fee: Long,
+                                                                               lastRowHeight: Int) =>
 
       val txs = List(FeesStateChange(fee), payment)
       TransactionParser.parseBytes(payment.bytes).get shouldBe payment
@@ -40,10 +41,10 @@ class RowSpecification extends PropSpec
   }
 
   property("RowDataType serialize and deserialize") {
-    forAll(paymentGenerator, Gen.posNum[Long], Gen.posNum[Long], Gen.posNum[Int]) { (payment: PaymentTransaction,
-                                                                                     balance: Long,
-                                                                                     fee: Long,
-                                                                                     lastRowHeight: Int) =>
+    forAll(paymentGen, Gen.posNum[Long], Gen.posNum[Long], Gen.posNum[Int]) { (payment: PaymentTransaction,
+                                                                               balance: Long,
+                                                                               fee: Long,
+                                                                               lastRowHeight: Int) =>
 
       val txs = List(FeesStateChange(fee), payment)
       TransactionParser.parseBytes(payment.bytes).get shouldBe payment
@@ -61,10 +62,10 @@ class RowSpecification extends PropSpec
   }
 
   property("Row save restore should work") {
-    forAll(paymentGenerator, Gen.posNum[Long], Gen.posNum[Long], Gen.posNum[Int]) { (payment: PaymentTransaction,
-                                                                                     balance: Long,
-                                                                                     fee: Long,
-                                                                                     lastRowHeight: Int) =>
+    forAll(paymentGen, Gen.posNum[Long], Gen.posNum[Long], Gen.posNum[Int]) { (payment: PaymentTransaction,
+                                                                               balance: Long,
+                                                                               fee: Long,
+                                                                               lastRowHeight: Int) =>
 
       val db1 = new MVStore.Builder().fileName(Filename).compress().open()
       val table: MVMap[Int, Row] = db1.openMap("rows", new LogMVMapBuilder[Int, Row].valueType(RowDataType))

@@ -34,8 +34,13 @@ with Matchers {
   val validNumbers =
     for (n <- Gen.choose(Integer.MIN_VALUE + 1, Integer.MAX_VALUE)) yield n
 
+  val appNameGen = for {
+    l <- Gen.posNum[Int]
+    name <- Gen.listOfN(l, Gen.alphaChar)
+  } yield name.mkString
+
   property("handshake should remain the same after serialization/deserialization") {
-    forAll(Gen.alphaStr suchThat (_.nonEmpty), appVersionGen, Gen.alphaStr, isGen, Gen.posNum[Long], Gen.posNum[Long]) {
+    forAll(appNameGen, appVersionGen, Gen.alphaStr, isGen, Gen.posNum[Long], Gen.posNum[Long]) {
       (appName: String,
        av: ApplicationVersion,
        nodeName: String,

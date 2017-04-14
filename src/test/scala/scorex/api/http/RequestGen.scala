@@ -1,10 +1,11 @@
 package scorex.api.http
 
+import com.wavesplatform.TransactionGen
 import org.scalacheck.{Arbitrary, Gen => G}
 import org.scalacheck.Gen.{alphaNumChar, choose, listOfN, oneOf}
 import scorex.api.http.assets._
 import scorex.crypto.encode.Base58
-import scorex.transaction.{TransactionGen, TransactionParser}
+import scorex.transaction.TransactionParser
 import scorex.transaction.assets.{IssueTransaction, TransferTransaction}
 
 trait RequestGen extends TransactionGen {

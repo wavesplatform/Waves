@@ -1,13 +1,14 @@
 package scorex.transaction.state.database.blockchain
 
 import com.google.common.primitives.Longs
+import com.wavesplatform.TransactionGen
 import org.h2.mvstore.MVStore
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import org.scalatest.{Assertions, Matchers, PropSpec}
 import scorex.settings.TestFunctionalitySettings
 import scorex.transaction.state.database.state.storage._
-import scorex.transaction.{State, TransactionGen}
+import scorex.transaction.State
 
 class AssetsExtendedStateSpecification extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks
   with Matchers with TransactionGen with Assertions with MockFactory {

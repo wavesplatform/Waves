@@ -1,5 +1,6 @@
 package scorex.transaction
 
+import com.wavesplatform.TransactionGen
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 import scorex.transaction.TransactionParser.TransactionType
@@ -8,7 +9,7 @@ import scorex.transaction.assets.TransferTransaction
 class TransferTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 
   property("Transfer serialization roundtrip") {
-    forAll(transferGenerator) { transfer: TransferTransaction =>
+    forAll(transferGen) { transfer: TransferTransaction =>
       require(transfer.bytes.head == TransactionType.TransferTransaction.id)
       val recovered = TransferTransaction.parseTail(transfer.bytes.tail).get
 
@@ -25,7 +26,7 @@ class TransferTransactionSpecification extends PropSpec with PropertyChecks with
   }
 
   property("Transfer serialization from TypedTransaction") {
-    forAll(transferGenerator) { tx: TransferTransaction =>
+    forAll(transferGen) { tx: TransferTransaction =>
       val recovered = TransactionParser.parseBytes(tx.bytes).get
       recovered.bytes shouldEqual tx.bytes
     }

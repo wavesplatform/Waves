@@ -2,20 +2,20 @@ package com.wavesplatform.http
 
 import akka.testkit.TestProbe
 import com.typesafe.config.ConfigFactory
+import com.wavesplatform.BlockGen
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.settings.{CheckpointsSettings, RestAPISettings}
-import org.scalacheck.{Arbitrary, Gen, Shrink}
+import org.scalacheck.{Gen, Shrink}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json._
 import scorex.account.Account
 import scorex.api.http.{BlockNotExists, BlocksApiRoute, TooBigArrayAllocation, WrongJson}
 import scorex.block.Block
-import scorex.consensus.nxt.{NxtLikeConsensusBlockData, WavesConsensusModule}
 import scorex.crypto.encode.Base58
-import scorex.transaction.{History, TransactionGen}
+import scorex.transaction.History
 
-class BlocksRouteSpec extends RouteSpec("/blocks") with MockFactory with TransactionGen with PropertyChecks {
+class BlocksRouteSpec extends RouteSpec("/blocks") with MockFactory with BlockGen with PropertyChecks {
   import BlocksRouteSpec._
 
   private val config = ConfigFactory.load()
@@ -26,22 +26,6 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with MockFactory with Transac
   private val route = BlocksApiRoute(restSettings, checkpointSettings, history, probe.ref).route
 
   private implicit def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)
-
-  private def byteArrayGen(length: Int): Gen[Array[Byte]] = Gen.listOfN(length, Arbitrary.arbitrary[Byte]).map(_.toArray)
-
-  private val blockGen = for {
-    signer <- accountGen
-    tr <- transferGenerator
-    iss <- issueGenerator
-    ri <- reissueGenerator
-    ca <- createAliasGenerator
-    txCount <- Gen.choose(10, 50)
-    txs <- Gen.listOfN(txCount, Gen.oneOf(tr, iss, ri, ca))
-    ts = txs.map(_.timestamp).max
-    reference <- byteArrayGen(Block.BlockIdLength)
-    baseTarget <- Gen.posNum[Long]
-    generationSignature <- byteArrayGen(WavesConsensusModule.GeneratorSignatureLength)
-  } yield Block.buildAndSign(1, ts, reference, NxtLikeConsensusBlockData(baseTarget, generationSignature), txs, signer)
 
   private val blockSeqGen = for {
     start <- Gen.posNum[Int].label("from")
@@ -125,10 +109,10 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with MockFactory with Transac
     }
   }
 
-  private def sameSignature(block: Block)(s: Array[Byte]): Boolean = sameSignature(block.signerData.signature)(s)
-  private def sameSignature(signature: Block.BlockId)(s: Array[Byte]): Boolean = s.sameElements(signature)
   private def withBlock(block: Block): Unit =
-    (history.blockById(_: Block.BlockId)).expects(where(sameSignature(block) _)).returning(Some(block)).once()
+    (history.blockById(_: Block.BlockId))
+      .expects(where(sameSignature(block.signerData.signature) _))
+      .returning(Some(block)).once()
 
   routePath("/height/{signature}") in {
     // todo: check invalid signature
