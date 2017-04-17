@@ -65,7 +65,7 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
       storage.lastStatesKeys.filter(storage.getLastStates(_).getOrElse(0) == h).foreach { key =>
         deleteAtHeight(h, key)
       }
-      storage.setStateHeight(rollbackTo)
+      storage.setStateHeight(h)
 
     }
 
@@ -74,9 +74,9 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
         changes.reason.foreach(id => {
           storage.getTransaction(id) match {
             case Some(t: AssetIssuance) =>
-              assetsExtension.rollback(t, rollbackTo)
+              assetsExtension.rollback(t, height)
             case Some(t: BurnTransaction) =>
-              assetsExtension.rollback(t, rollbackTo)
+              assetsExtension.rollback(t, height)
             case Some(t: LeaseTransaction) =>
               leaseExtendedState.cancelLease(t)
             case Some(t: LeaseCancelTransaction) =>
