@@ -104,5 +104,4 @@ trait MVStoreStateStorage extends StateStorageI {
         (e.getKey, balance)
       }).toMap
   }
-
 }

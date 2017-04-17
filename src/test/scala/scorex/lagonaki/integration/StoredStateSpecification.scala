@@ -8,7 +8,8 @@ import scorex.api.http.leasing.LeaseRequest
 import scorex.crypto.encode.Base58
 import scorex.lagonaki.TransactionTestingCommons
 import scorex.lagonaki.mocks.TestBlock
-import scorex.transaction.assets.{IssueTransaction, ReissueTransaction}
+import scorex.transaction.assets.{IssueTransaction, ReissueTransaction, TransferTransaction}
+import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction.state.database.state.AccState
 import scorex.transaction.state.database.state.extension.IncrementingTimestampValidator
 import scorex.transaction.{AssetAcc, FeesStateChange, PaymentTransaction, Transaction}
@@ -249,6 +250,38 @@ class StoredStateSpecification extends FunSuite with Matchers with TransactionTe
     state.isValid(validReissueSeq, blockTime = validReissueSeq.map(_.timestamp).max) shouldBe true
     state.validate(validReissueSeq, blockTime = validReissueSeq.map(_.timestamp).max).size shouldBe 1
     state.processBlock(TestBlock(validReissueSeq)) should be('success)
+  }
+
+  test("double lease cancels in the same block") {
+    val senderBalance = state.balance(acc)
+
+    require(senderBalance > 4 * Constants.UnitsInWave)
+
+    val ts = System.currentTimeMillis()
+    val receiverBalanceTransfer = TransferTransaction.create(None, acc, recipient, 20000000L, ts, None, 100000L, Array.empty).right.get
+    val lease = LeaseTransaction.create(acc, 10000000L, 100000L, ts, recipient).right.get
+    val leaseCancel = LeaseCancelTransaction.create(acc, lease.id, 100000L, ts + 1).right.get
+    val invalidLeaseCancel = LeaseCancelTransaction.create(acc, lease.id, 100000L, ts + 2).right.get
+
+    val allInOneBlock = Seq(lease, leaseCancel, invalidLeaseCancel)
+
+    state.isValid(lease, lease.timestamp) shouldBe true
+
+    state.isValid(allInOneBlock, blockTime = allInOneBlock.map(_.timestamp).max) shouldBe false
+    state.validate(allInOneBlock, blockTime = allInOneBlock.map(_.timestamp).max).size shouldBe 1
+
+    state.processBlock(TestBlock(Seq(receiverBalanceTransfer, lease))) should be('success)
+
+    val cancelsSeq = Seq(leaseCancel, invalidLeaseCancel)
+
+    state.isValid(cancelsSeq, blockTime = cancelsSeq.map(_.timestamp).max) shouldBe false
+    state.validate(cancelsSeq, blockTime = cancelsSeq.map(_.timestamp).max).size shouldBe 1
+
+    val validCancelsSeq = Seq(leaseCancel)
+
+    state.isValid(validCancelsSeq, blockTime = validCancelsSeq.map(_.timestamp).max) shouldBe true
+    state.validate(validCancelsSeq, blockTime = validCancelsSeq.map(_.timestamp).max).size shouldBe 1
+    state.processBlock(TestBlock(validCancelsSeq)) should be('success)
   }
 
   test("many transactions") {

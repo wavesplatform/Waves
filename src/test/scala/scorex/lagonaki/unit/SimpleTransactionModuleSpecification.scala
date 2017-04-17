@@ -72,6 +72,10 @@ class SimpleTransactionModuleSpecification extends FunSuite with MockFactory wit
     override def allowExchangeTransactionAfterTimestamp: Long = 0L
 
     override def allowInvalidReissueInSameBlockUntilTimestamp: Long = 0L
+
+    override def allowMultipleLeaseCancelTransactionUntilTimestamp: Long = 0L
+
+    override def resetEffectiveBalancesAtHeight: Long = Long.MaxValue
   }
 
   implicit val app = stub[MyApp]

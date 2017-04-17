@@ -10,7 +10,7 @@ import scorex.settings.ChainParameters
 import scorex.transaction._
 import scorex.transaction.assets._
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import scorex.transaction.state.database.state._
+import scorex.transaction.state.database.state.{Reasons, _}
 import scorex.transaction.state.database.state.extension._
 import scorex.transaction.state.database.state.storage._
 import scorex.utils.{NTP, ScorexLogging}
@@ -59,11 +59,18 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
   }
 
   def rollbackTo(rollbackTo: Int): State = synchronized {
-    @tailrec
-    def deleteNewer(key: Address): Unit = {
-      val currentHeight = storage.getLastStates(key).getOrElse(0)
-      if (currentHeight > rollbackTo) {
-        val changes = storage.removeAccountChanges(key, currentHeight)
+    val startHeight = storage.stateHeight
+
+    for (h <- startHeight until rollbackTo by -1) {
+      storage.lastStatesKeys.filter(storage.getLastStates(_).getOrElse(0) == h).foreach { key =>
+        deleteAtHeight(h, key)
+      }
+      storage.setStateHeight(rollbackTo)
+
+    }
+
+    def deleteAtHeight(height: Int, key: Address): Unit = {
+      val changes = storage.removeAccountChanges(key, height)
         changes.reason.foreach(id => {
           storage.getTransaction(id) match {
             case Some(t: AssetIssuance) =>
@@ -80,14 +87,8 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
         })
         val prevHeight = changes.lastRowHeight
         storage.putLastStates(key, prevHeight)
-        deleteNewer(key)
       }
-    }
 
-    storage.lastStatesKeys.foreach { key =>
-      deleteNewer(key)
-    }
-    storage.setStateHeight(rollbackTo)
     this
   }
 
@@ -98,12 +99,31 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
 
     val newBalances: Map[AssetAcc, (AccState, Reasons)] =
       calcNewBalances(trans, fees, block.timestampField.value < settings.allowTemporaryNegativeUntil)
-    newBalances.foreach(nb => require(nb._2._1.balance >= 0))
 
-    applyChanges(newBalances, trans, block.timestampField.value)
+    val newBalancesWithMayBeEffectiveBalanceReset = if (storage.stateHeight + 1 == settings.resetEffectiveBalancesAtHeight) {
+      leaseExtendedState.storage.resetLeasesInfo()
+      createResetEffectiveStateChanges(newBalances)
+    } else newBalances
+
+    newBalancesWithMayBeEffectiveBalanceReset.foreach(nb => require(nb._2._1.balance >= 0))
+
+    applyChanges(newBalancesWithMayBeEffectiveBalanceReset, trans, block.timestampField.value)
     log.trace(s"New state height is ${storage.stateHeight}, hash: $hash, totalBalance: $totalBalance")
 
     this
+  }
+
+  private[blockchain] def createResetEffectiveStateChanges(updatedBalancesInBlock: Map[AssetAcc, (AccState, Reasons)]): Map[AssetAcc, (AccState, Reasons)] = {
+    val wavesAddressesUpdatedInBlock = updatedBalancesInBlock.filter(_._1.assetId.isEmpty).map(_._1.account.address)
+    (wavesAddressesUpdatedInBlock ++ storage.lastStatesKeys).flatMap(add => {
+      val assetAcc = AssetAcc(new Account(add), None)
+      val addressUpdateBalancesInBlock = updatedBalancesInBlock.get(assetAcc)
+      val wavesBalance = addressUpdateBalancesInBlock.map(_._1.balance).getOrElse(balanceByKey(add, _.balance))
+      val effectiveBalance = addressUpdateBalancesInBlock.map(_._1.effectiveBalance).getOrElse(balanceByKey(add, _.effectiveBalance))
+      if (wavesBalance != effectiveBalance) {
+        Some(assetAcc -> (AccState(wavesBalance, wavesBalance), List.empty))
+      } else None
+    }).toMap
   }
 
   override def balance(account: Account, atHeight: Option[Int] = None): Long =
@@ -200,6 +220,24 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
     }._2
   }
 
+  def validateCorrectLeaseCancelTxs(txs: Seq[Transaction]): Seq[Transaction] = {
+    type IssueId = String
+    txs.foldLeft((Set.empty[IssueId], Seq.empty[Transaction])) {
+      case ((canceledLeaseTxs, seq), tx) =>
+        tx match {
+          case leaseCancel: LeaseCancelTransaction =>
+            val leaseIdString = Base58.encode(leaseCancel.leaseId)
+            val isCanceledInCurrentBlock = canceledLeaseTxs(leaseIdString)
+            if (!isCanceledInCurrentBlock) {
+              (canceledLeaseTxs + leaseIdString, seq :+ tx)
+            } else {
+              (canceledLeaseTxs, seq)
+            }
+          case tx =>
+            (canceledLeaseTxs, seq :+ tx)
+        }
+    }._2
+  }
 
   /**
     * Returns sequence of valid transactions
@@ -287,7 +325,13 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
       filteredFromFuture
     }
 
-    val validWithBlockTxs = validateExchangeTxs(validatedCorrectIssueAndReissueTxs, height)
+    val validatedCorrectLeaseCancelTxs = if (blockTime >= settings.allowMultipleLeaseCancelTransactionUntilTimestamp) {
+      validateCorrectLeaseCancelTxs(validatedCorrectIssueAndReissueTxs)
+    } else {
+      validatedCorrectIssueAndReissueTxs
+    }
+
+    val validWithBlockTxs = validateExchangeTxs(validatedCorrectLeaseCancelTxs, height)
 
     filterValidTransactionsByState(validWithBlockTxs)
   }
@@ -515,7 +559,7 @@ object StoredState {
       }
     }
     val assetExtendedState = new AssetsExtendedState(storage)
-    val leaseExtendedState = new LeaseExtendedState(storage)
+    val leaseExtendedState = new LeaseExtendedState(storage, settings.allowMultipleLeaseCancelTransactionUntilTimestamp)
     val incrementingTimestampValidator = new IncrementingTimestampValidator(settings.allowInvalidPaymentTransactionsByTimestamp, storage)
     val validators = Seq(
       assetExtendedState,

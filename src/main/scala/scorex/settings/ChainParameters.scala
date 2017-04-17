@@ -13,7 +13,9 @@ trait ChainParameters {
   def allowUnissuedAssetsUntil: Long
   def allowBurnTransactionAfterTimestamp: Long
   def allowLeaseTransactionAfterTimestamp: Long
+  def allowMultipleLeaseCancelTransactionUntilTimestamp: Long
   def allowInvalidReissueInSameBlockUntilTimestamp: Long
+  def resetEffectiveBalancesAtHeight: Long
   def requirePaymentUniqueId: Long
 
   def initialBalance: Long
