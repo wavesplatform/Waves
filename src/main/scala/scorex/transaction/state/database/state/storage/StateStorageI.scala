@@ -14,27 +14,27 @@ trait StateStorageI {
   def getTransactionBytes(id: Array[Byte]): Option[Array[Byte]]
 
   def getTransaction(id: Array[Byte]): Option[Transaction] = getTransactionBytes(id)
-    .flatMap(b => TransactionParser.parseBytes(b).toOption)
+    .flatMap(b => TypedTransaction.parseBytes(b).toOption)
 
-  def getLastStates(a: AddressString): Option[Int]
+  def getLastStates(a: Address): Option[Int]
 
-  def putLastStates(a: AddressString, s: Int): Unit
+  def putLastStates(a: Address, s: Int): Unit
 
-  def lastStatesKeys: List[AddressString]
+  def lastStatesKeys: List[Address]
 
   def stateHeight: Int
 
   def setStateHeight(height: Int): Unit
 
-  def updateAccountAssets(address: AddressString, assetId: Option[AssetId]): Unit
+  def updateAccountAssets(address: Address, assetId: Option[AssetId]): Unit
 
-  def getAccountAssets(address: AddressString): Set[String]
+  def getAccountAssets(address: Address): Set[String]
 
-  def getAccountChanges(key: AddressString, height: Int): Option[Row]
+  def getAccountChanges(key: Address, height: Int): Option[Row]
 
-  def putAccountChanges(key: AddressString, height: Int, data: Row): Unit
+  def putAccountChanges(key: Address, height: Int, data: Row): Unit
 
-  def removeAccountChanges(key: AddressString, height: Int): Row
+  def removeAccountChanges(key: Address, height: Int): Row
 
   def assetDistribution(assetId: Array[Byte]): Map[String, Long]
 }

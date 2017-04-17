@@ -13,7 +13,7 @@ import com.wavesplatform.matcher.model.{BuyLimitOrder, LimitOrder, SellLimitOrde
 import org.h2.mvstore.MVStore
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest._
-import scorex.settings.TestBlockchainSettings
+import scorex.settings.TestChainParameters
 import scorex.transaction._
 import scorex.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
 import scorex.utils.ScorexLogging
@@ -37,7 +37,7 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
 
   val pair = AssetPair(Some("BTC".getBytes), Some("WAVES".getBytes))
   val db = new MVStore.Builder().compress().open()
-  val storedState = fromDBWithUnlimitedBalance(db, TestBlockchainSettings.Disabled.functionalitySettings)
+  val storedState = fromDBWithUnlimitedBalance(db, TestChainParameters.Disabled)
 
 
   val settings = matcherSettings.copy(account = MatcherAccount.address)
@@ -57,7 +57,7 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
     super.beforeEach()
 
     val transactionModule = stub[TransactionModule]
-    (transactionModule.validate(_: Transaction)).when(*).onCall((tr: Transaction) => Right[ValidationError, Transaction](tr)).anyNumberOfTimes()
+    (transactionModule.isValid(_: Transaction, _: Long)).when(*, *).returns(true).anyNumberOfTimes()
 
     actor = system.actorOf(Props(new OrderBookActor(pair, storedState,
       wallet, settings, transactionModule) with RestartableActor))
@@ -253,7 +253,7 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
       actor ! RestartActor
 
       actor ! GetBidOrdersRequest
-      expectMsg(GetOrdersResponse(Seq(BuyLimitOrder(100 * Order.PriceConstant, 10, ord1))))
+      expectMsg(GetOrdersResponse(Seq(BuyLimitOrder(100*Order.PriceConstant, 10, ord1))))
 
       actor ! GetAskOrdersRequest
       expectMsg(GetOrdersResponse(Seq.empty))

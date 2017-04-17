@@ -3,23 +3,24 @@ package com.wavesplatform.matcher
 import com.google.common.primitives.{Bytes, Ints}
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.matcher.model.{BuyLimitOrder, SellLimitOrder}
-import com.wavesplatform.settings.FunctionalitySettings
 import org.h2.mvstore.MVStore
 import org.scalacheck.{Arbitrary, Gen}
 import scorex.account.PrivateKeyAccount
 import scorex.crypto.hash.SecureCryptographicHash
+import scorex.settings.ChainParameters
 import scorex.transaction._
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
-import scorex.transaction.state.database.blockchain.StoredState
-import scorex.transaction.state.database.state.storage._
+import scorex.transaction.state.database.blockchain.{AssetsExtendedState, LeaseExtendedState, StoredState}
+import scorex.transaction.state.database.state.extension._
+import scorex.transaction.state.database.state.storage.{MVStoreAssetsExtendedStateStorage, MVStoreLeaseExtendedStateStorage, MVStoreOrderMatchStorage, MVStoreStateStorage}
 import scorex.utils.{ByteArrayExtension, NTP}
 
 trait MatcherTestData {
   val bytes32gen: Gen[Array[Byte]] = Gen.listOfN(32, Arbitrary.arbitrary[Byte]).map(_.toArray)
   val WalletSeed = "Matcher".getBytes
   val MatcherSeed = SecureCryptographicHash(Bytes.concat(Ints.toByteArray(0), WalletSeed))
-  val MatcherAccount = PrivateKeyAccount(MatcherSeed)
-  val accountGen: Gen[PrivateKeyAccount] = bytes32gen.map(seed => PrivateKeyAccount(seed))
+  val MatcherAccount = new PrivateKeyAccount(MatcherSeed)
+  val accountGen: Gen[PrivateKeyAccount] = bytes32gen.map(seed => new PrivateKeyAccount(seed))
   val positiveLongGen: Gen[Long] = Gen.choose(1, Long.MaxValue)
 
   val maxWavesAnountGen: Gen[Long] = Gen.choose(1, 100000000L * 100000000L)
@@ -81,9 +82,9 @@ trait MatcherTestData {
       matcherFee: Long <- maxWavesAnountGen
     } yield (Order.sell(sender, MatcherAccount, pair, price, amount, timestamp, expiration, matcherFee), sender)
 
-  def buy(pair: AssetPair, price: Long, amount: Long): Order = valueFromGen(buyGenerator(pair, price * Order.PriceConstant, amount))._1
+  def buy(pair: AssetPair, price: Long, amount: Long): Order = valueFromGen(buyGenerator(pair, price*Order.PriceConstant, amount))._1
 
-  def sell(pair: AssetPair, price: Long, amount: Long) = valueFromGen(sellGenerator(pair, price * Order.PriceConstant, amount))._1
+  def sell(pair: AssetPair, price: Long, amount: Long) = valueFromGen(sellGenerator(pair, price*Order.PriceConstant, amount))._1
 
   val orderTypeGenerator: Gen[OrderType] = Gen.oneOf(OrderType.BUY, OrderType.SELL)
 
@@ -118,18 +119,31 @@ trait MatcherTestData {
     matcherFee: Long <- maxWavesAnountGen
   } yield SellLimitOrder(price, amount, Order.sell(sender, MatcherAccount, pair, price, amount, timestamp, expiration, matcherFee))
 
-  def fromDBWithUnlimitedBalance(mvStore: MVStore, settings: FunctionalitySettings): State = {
+  def fromDBWithUnlimitedBalance(mvStore: MVStore, settings: ChainParameters): StoredState = {
     val storage = new MVStoreStateStorage with MVStoreOrderMatchStorage with MVStoreAssetsExtendedStateStorage
-      with MVStoreLeaseExtendedStateStorage with MVStoreAliasExtendedStorage {
+      with MVStoreLeaseExtendedStateStorage {
       override val db: MVStore = mvStore
       if (db.getStoreVersion > 0) db.rollback()
     }
 
-    new StoredState(storage, settings) {
-      override def assetBalance(account: AssetAcc): Long = Long.MaxValue
+    val extendedState = new AssetsExtendedState(storage) {
+      override def getAssetQuantity(assetId: AssetId): Long = Long.MaxValue
+    }
 
-      override def totalAssetQuantity(assetId: AssetId): Long = Long.MaxValue
-
+    val incrementingTimestampValidator = new IncrementingTimestampValidator(settings.allowInvalidPaymentTransactionsByTimestamp, storage)
+    val leaseExtendedState = new LeaseExtendedState(storage, settings.allowMultipleLeaseCancelTransactionUntilTimestamp)
+    val validators = Seq(
+      extendedState,
+      incrementingTimestampValidator,
+      new GenesisValidator,
+      new OrderMatchStoredState(storage),
+      new IncludedValidator(storage, settings.requirePaymentUniqueId),
+      new ActivatedValidator(settings.allowBurnTransactionAfterTimestamp,
+        settings.allowLeaseTransactionAfterTimestamp,
+        settings.allowExchangeTransactionAfterTimestamp)
+    )
+    new StoredState(storage, leaseExtendedState, extendedState, incrementingTimestampValidator, validators, settings) {
+      override def assetBalance(account: AssetAcc, atHeight: Option[Int]): Long = Long.MaxValue
     }
   }
 }

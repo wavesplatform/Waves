@@ -1,9 +1,8 @@
 package scorex.api.http
 
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
-import play.api.libs.json._
-import scorex.account.{Account, AccountOrAlias, Alias}
-import scorex.transaction.{Transaction, ValidationError}
+import play.api.libs.json.{JsError, JsPath, Json, JsonValidationError}
+import scorex.transaction.ValidationError
 
 case class ApiErrorResponse(error: Int, message: String)
 
@@ -21,16 +20,16 @@ object ApiError {
     case ValidationError.InvalidAddress => InvalidAddress
     case ValidationError.NegativeAmount => NegativeAmount
     case ValidationError.InsufficientFee => InsufficientFee
+    case ValidationError.NoBalance => NoBalance
     case ValidationError.InvalidName => InvalidName
     case ValidationError.InvalidSignature => InvalidSignature
     case ValidationError.TooBigArray => TooBigArrayAllocation
+    case ValidationError.StateCheckFailed => StateCheckFailed
     case ValidationError.OverflowError => OverflowError
     case ValidationError.ToSelf => ToSelfError
     case ValidationError.MissingSenderPrivateKey => MissingSenderPrivateKey
-    case ValidationError.AliasNotExists(tx) => AliasNotExists(tx)
-    case ValidationError.UnsupportedTransactionType => CustomValidationError("UnsupportedTransactionType")
-    case ValidationError.TransactionParameterValidationError(m) => CustomValidationError(m)
-    case ValidationError.TransactionValidationError(tx, err) => StateCheckFailed(tx, err)
+    case ValidationError.CustomValidationError(m) => CustomValidationError(m)
+    case ValidationError.StateValidationError(_) => StateCheckFailed
   }
 }
 
@@ -41,12 +40,12 @@ case object Unknown extends ApiError {
 }
 
 case class WrongJson(
-                        cause: Option[Throwable] = None,
-                        errors: Seq[(JsPath, Seq[JsonValidationError])] = Seq.empty) extends ApiError {
+    cause: Option[Throwable] = None,
+    errors: Seq[(JsPath, Seq[JsonValidationError])] = Seq.empty) extends ApiError {
   override val id = 1
   override val code = StatusCodes.BadRequest
   override lazy val message = "failed to parse json message"
-  override lazy val json: JsObject = Json.obj(
+  override lazy val json = Json.obj(
     "error" -> id,
     "message" -> message,
     "cause" -> cause.map(_.toString),
@@ -135,11 +134,10 @@ case object InvalidName extends ApiError {
   override val code: StatusCode = StatusCodes.BadRequest
 }
 
-case class StateCheckFailed(tx: Transaction, err: String) extends ApiError {
+case object StateCheckFailed extends ApiError {
   override val id: Int = 112
-  override val message: String = s"State check failed. Reason: $err"
+  override val message: String = "State check failed"
   override val code: StatusCode = StatusCodes.BadRequest
-  override lazy val json = Json.obj("error" -> id, "message" -> message, "tx" -> tx.json)
 }
 
 case object OverflowError extends ApiError {
@@ -166,18 +164,10 @@ case class CustomValidationError(errorMessage: String) extends ApiError {
   override val code: StatusCode = StatusCodes.BadRequest
 }
 
+//BLOCKS
 case object BlockNotExists extends ApiError {
   override val id: Int = 301
   override val code = StatusCodes.NotFound
   override val message: String = "block does not exist"
 }
 
-case class AliasNotExists(aoa: AccountOrAlias) extends ApiError {
-  override val id: Int = 301
-  override val code = StatusCodes.NotFound
-  private lazy val msgReason = aoa match {
-    case a: Account => s"for address '${a.stringRepr}'"
-    case a: Alias => s"'${a.stringRepr}'"
-  }
-  override val message: String = s"alias $msgReason doesn't exist"
-}

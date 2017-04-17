@@ -7,10 +7,11 @@ import akka.http.scaladsl.server.Route
 import akka.pattern.ask
 import akka.stream.ActorMaterializer
 import akka.util.Timeout
-import com.wavesplatform.Shutdownable
+import com.wavesplatform.settings.Constants
 import scorex.api.http.{ApiRoute, CompositeHttpService}
 import scorex.block.Block
 import scorex.consensus.mining.BlockGeneratorController
+import scorex.consensus.nxt.NxtLikeConsensusBlockData
 import scorex.crypto.encode.Base58
 import scorex.network._
 import scorex.network.message.{BasicMessagesRepo, MessageHandler, MessageSpec}
@@ -25,7 +26,7 @@ import scala.concurrent.duration._
 import scala.reflect.runtime.universe.Type
 import scala.util.Try
 
-trait RunnableApplication extends Application with Shutdownable with ScorexLogging {
+trait RunnableApplication extends Application with ScorexLogging {
 
   protected val apiRoutes: Seq[ApiRoute]
   protected val apiTypes: Seq[Type]
@@ -120,13 +121,15 @@ trait RunnableApplication extends Application with Shutdownable with ScorexLoggi
 
   private def checkGenesis(): Unit = {
     if (transactionModule.blockStorage.history.isEmpty) {
-
       val maybeGenesisSignature = Option(settings.blockchainSettings.genesisSettings.signature).filter(_.trim.nonEmpty)
-
-      transactionModule.blockStorage.appendBlock(Block.genesis(consensusModule.genesisData, transactionModule.genesisData,
-        settings.blockchainSettings.genesisSettings.blockTimestamp, maybeGenesisSignature))
-
+      transactionModule.blockStorage.appendBlock(Block.genesis(RunnableApplication.consensusGenesisBlockData,
+        transactionModule.genesisData, Constants.genesisTimestamp, maybeGenesisSignature))
       log.info("Genesis block has been added to the state")
     }
   }.ensuring(transactionModule.blockStorage.history.height() >= 1)
+}
+
+object RunnableApplication {
+  val InitialBaseTarget = 153722867L
+  val consensusGenesisBlockData = NxtLikeConsensusBlockData(InitialBaseTarget, Array.fill(32)(0: Byte))
 }

@@ -106,43 +106,6 @@ class SignedRequestsTest extends FunSuite with Matchers {
     Base58.encode(tx.signature) shouldBe "4dPRTW6XyRQUTQwwpuZDCNy1UDHYG9WGsEQnn5v49Lj5uyh4XGDdwtEq3t6ZottweAXHieK32UokHwiTxGFtz9bQ"
   }
 
-  test("AssetTransfer with a fee in an asset json parsing works") {
-    val json =
-      """
-        |{
-        |   "senderPublicKey":"FJuErRxhV9JaFUwcYLabFK5ENvDRfyJbRz8FeVfYpBLn",
-        |   "recipient":"3N9UuGeWuDt9NfWbC5oEACHyRoeEMApXAeq",
-        |   "timestamp":1489054107569,
-        |   "assetId":"6MPKrD5B7GrfbciHECg1MwdvRUhRETApgNZspreBJ8JL",
-        |   "amount":1000,
-        |   "fee":100,
-        |   "feeAssetId":"6MPKrD5B7GrfbciHECg1MwdvRUhRETApgNZspreBJ8JL",
-        |   "signature":"UAhYXYdkFAFBuwAuUFP3yw7E8aRTyx56ZL4UPbT4ufomBzVLMRpdW2dCtJmfpCuPPMhGTvdzhXwb7o4ER6HAUpJ",
-        |   "attachment":"2Kk7Zsr1e9jsqSBM5hpF"
-        |}
-      """.stripMargin
-    val req = Json.parse(json).validate[SignedTransferRequest].get
-    req.recipient shouldBe "3N9UuGeWuDt9NfWbC5oEACHyRoeEMApXAeq"
-    req.timestamp shouldBe 1489054107569L
-    req.assetId shouldBe Some("6MPKrD5B7GrfbciHECg1MwdvRUhRETApgNZspreBJ8JL")
-    req.feeAssetId shouldBe Some("6MPKrD5B7GrfbciHECg1MwdvRUhRETApgNZspreBJ8JL")
-    req.amount shouldBe 1000
-    req.fee shouldBe 100
-    req.senderPublicKey shouldBe "FJuErRxhV9JaFUwcYLabFK5ENvDRfyJbRz8FeVfYpBLn"
-    req.signature shouldBe "UAhYXYdkFAFBuwAuUFP3yw7E8aRTyx56ZL4UPbT4ufomBzVLMRpdW2dCtJmfpCuPPMhGTvdzhXwb7o4ER6HAUpJ"
-    req.attachment shouldBe Some("2Kk7Zsr1e9jsqSBM5hpF")
-
-    val tx = req.toTx.right.get
-    Base58.encode(tx.sender.publicKey) shouldBe "FJuErRxhV9JaFUwcYLabFK5ENvDRfyJbRz8FeVfYpBLn"
-    tx.timestamp shouldBe 1489054107569L
-    tx.attachment shouldBe Base58.decode("2Kk7Zsr1e9jsqSBM5hpF").get
-    Base58.encode(tx.assetId.get) shouldBe "6MPKrD5B7GrfbciHECg1MwdvRUhRETApgNZspreBJ8JL"
-    Base58.encode(tx.feeAssetId.get) shouldBe "6MPKrD5B7GrfbciHECg1MwdvRUhRETApgNZspreBJ8JL"
-    tx.amount shouldBe 1000
-    tx.fee shouldBe 100
-    Base58.encode(tx.signature) shouldBe "UAhYXYdkFAFBuwAuUFP3yw7E8aRTyx56ZL4UPbT4ufomBzVLMRpdW2dCtJmfpCuPPMhGTvdzhXwb7o4ER6HAUpJ"
-  }
-
   test("AssetBurnRequest json parsing works") {
     val json =
       """

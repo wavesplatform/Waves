@@ -2,8 +2,9 @@ package scorex.api.http
 
 import java.nio.charset.StandardCharsets
 import javax.ws.rs.Path
-
+import scala.util.{Failure, Success, Try}
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
+import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.settings.RestAPISettings
 import io.swagger.annotations._
@@ -11,16 +12,12 @@ import play.api.libs.json._
 import scorex.account.{Account, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
-import scorex.transaction.State
+import scorex.transaction.LagonakiState
 import scorex.wallet.Wallet
-
-import scala.util.{Failure, Success, Try}
 
 @Path("/addresses")
 @Api(value = "/addresses/", description = "Info about wallet's accounts and other calls about addresses")
-case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: State) extends ApiRoute {
-  import AddressApiRoute._
-
+case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: LagonakiState) extends ApiRoute {
   val MaxAddressesPerRequest = 1000
 
   override lazy val route =
@@ -36,10 +33,10 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
   ))
   def deleteAddress: Route = path(Segment) { address =>
     (delete & withAuth) {
-      if (Account.fromString(address).isLeft) {
+      if (!Account.isValidAddress(address)) {
         complete(InvalidAddress)
       } else {
-        val deleted = wallet.findWallet(address).exists(account =>
+        val deleted = wallet.privateKeyAccount(address).exists(account =>
           wallet.deleteAccount(account))
         complete(Json.obj("deleted" -> deleted))
       }
@@ -141,7 +138,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
   ))
   def effectiveBalance: Route = {
     path("effectiveBalance" / Segment) { address =>
-      complete(effectiveBalanceJson(address, 0))
+      complete (effectiveBalanceJson(address, 0))
     }
   }
 
@@ -153,7 +150,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
   ))
   def effectiveBalanceWithConfirmations: Route = {
     path("effectiveBalance" / Segment / IntNumber) { case (address, confirmations) =>
-      complete(
+      complete (
         effectiveBalanceJson(address, confirmations)
       )
     }
@@ -166,11 +163,18 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
   ))
   def seed: Route = {
     (path("seed" / Segment) & get & withAuth) { address =>
-      complete(for {
-        pk <- wallet.findWallet(address)
-        seed <- wallet.exportAccountSeed(pk)
-      } yield Json.obj("address" -> address, "seed" -> Base58.encode(seed))
-      )
+      if (!Account.isValidAddress(address)) {
+        complete(InvalidAddress)
+      } else {
+        wallet.privateKeyAccount(address) match {
+          case None => complete(WalletAddressNotExists)
+          case Some(account) =>
+            wallet.exportAccountSeed(account.address) match {
+              case None => complete(WalletSeedExportFailed)
+              case Some(seed) => complete(Json.obj("address" -> address, "seed" -> Base58.encode(seed)))
+            }
+        }
+      }
     }
   }
 
@@ -180,7 +184,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
     new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
   ))
   def validate: Route = (path("validate" / Segment) & get) { address =>
-    complete(Validity(address, Account.fromString(address).isRight))
+    complete(Json.obj("address" -> address, "valid" -> Account.isValidAddress(address)))
   }
 
   @Path("/")
@@ -221,36 +225,57 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
   }
 
   private def balanceJson(address: String, confirmations: Int): ToResponseMarshallable = {
-    Account.fromString(address).right.map(acc => ToResponseMarshallable(Balance(
-      acc.address,
-      confirmations,
-      state.balanceWithConfirmations(acc, confirmations))))
-      .getOrElse(InvalidAddress)
+    val account = new Account(address)
+    if (!Account.isValid(account)) {
+      InvalidAddress
+    } else {
+      Json.obj(
+        "address" -> account.address,
+        "confirmations" -> confirmations,
+        "balance" -> state.balanceWithConfirmations(account, confirmations))
+    }
   }
 
   private def effectiveBalanceJson(address: String, confirmations: Int): ToResponseMarshallable = {
-    Account.fromString(address).right.map(acc => ToResponseMarshallable(Balance(
-      acc.address,
-      confirmations,
-      state.effectiveBalanceWithConfirmations(acc, confirmations, state.stateHeight))))
-      .getOrElse(InvalidAddress)
+    val account = new Account(address)
+    if (!Account.isValid(account)) {
+      InvalidAddress
+    } else {
+      Json.obj(
+        "address" -> account.address,
+        "confirmations" -> confirmations,
+        "balance" -> state.effectiveBalanceWithConfirmations(account, confirmations))
+    }
   }
 
-  private def signPath(address: String, encode: Boolean) = (post & entity(as[String])) { message =>
-    withAuth {
-      val res = wallet.findWallet(address).map(pk => {
-        val messageBytes = message.getBytes(StandardCharsets.UTF_8)
-        val signature = EllipticCurveImpl.sign(pk, messageBytes)
-        val msg = if (encode) Base58.encode(messageBytes) else message
-        Signed(msg, Base58.encode(pk.publicKey), Base58.encode(signature))
-      })
-      complete(res)
+  private def signPath(address: String, encode: Boolean) = {
+    (post & entity(as[String])) { message =>
+      withAuth {
+        if (!Account.isValidAddress(address)) {
+          complete(InvalidAddress)
+        } else {
+          wallet.privateKeyAccount(address) match {
+            case None => complete(WalletAddressNotExists)
+            case Some(account) =>
+              val messageBytes = message.getBytes(StandardCharsets.UTF_8)
+              Try(EllipticCurveImpl.sign(account, messageBytes)) match {
+                case Success(signature) =>
+                  val msg = if (encode) Base58.encode(messageBytes) else message
+                  val json = Json.obj("message" -> msg,
+                    "publicKey" -> Base58.encode(account.publicKey),
+                    "signature" -> Base58.encode(signature))
+                  complete(json)
+                case Failure(t) => complete(StatusCodes.InternalServerError)
+              }
+          }
+        }
+      }
     }
   }
 
   private def verifyPath(address: String, decode: Boolean) = withAuth {
     json[SignedMessage] { m =>
-      if (Account.fromString(address).isLeft) {
+      if (!Account.isValidAddress(address)) {
         InvalidAddress
       } else {
         //DECODE SIGNATURE
@@ -263,7 +288,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
   private def verifySigned(msg: Try[Array[Byte]], signature: String, publicKey: String, address: String) = {
     (msg, Base58.decode(signature), Base58.decode(publicKey)) match {
       case (Success(msgBytes), Success(signatureBytes), Success(pubKeyBytes)) =>
-        val account = PublicKeyAccount(pubKeyBytes)
+        val account = new PublicKeyAccount(pubKeyBytes)
         val isValid = account.address == address && EllipticCurveImpl.verify(signatureBytes, msgBytes, pubKeyBytes)
         Right(Json.obj("valid" -> isValid))
       case _ => Left(InvalidMessage)
@@ -285,15 +310,4 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
       case Failure(e) => complete(InvalidPublicKey)
     }
   }
-}
-
-object AddressApiRoute {
-  case class Signed(message: String, publicKey: String, signature: String)
-  implicit val signedFormat: Format[Signed] = Json.format
-
-  case class Balance(address: String, confirmations: Int, balance: Long)
-  implicit val balanceFormat: Format[Balance] = Json.format
-
-  case class Validity(address: String, valid: Boolean)
-  implicit val validityFormat: Format[Validity] = Json.format
 }

@@ -8,7 +8,7 @@ import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash
 import scorex.serialization.{BytesSerializable, Deser, JsonSerializable}
-import scorex.transaction.TransactionParser._
+import scorex.transaction.TypedTransaction._
 import scorex.transaction._
 import scorex.transaction.assets.exchange.Validation.booleanOperators
 
@@ -51,6 +51,7 @@ object OrderType {
 /**
   * Order to matcher service for asset exchange
   */
+@SerialVersionUID(2455530529543215878L)
 case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKey: PublicKeyAccount,
                  @ApiModelProperty(dataType = "java.lang.String", example = "") matcherPublicKey: PublicKeyAccount,
                  assetPair: AssetPair,
@@ -82,6 +83,7 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
       (matcherFee > 0) :| "matcherFee should be > 0" &&
       (matcherFee < MaxAmount) :| "matcherFee too large" &&
       (timestamp > 0) :| "timestamp should be > 0" &&
+      (timestamp <= atTime) :| "timestamp should be before created before execution" &&
       (expiration - atTime <= MaxLiveTime) :| "expiration should be earlier than 30 days" &&
       (expiration >= atTime) :| "expiration should be > currentTime" &&
       signatureValid :| "signature should be valid"
@@ -165,10 +167,10 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
     }
   }
 
-  override def hashCode(): Int = idStr.hashCode()
+  override def hashCode(): Int = super.hashCode()
 }
 
-object Order {
+object Order extends Deser[Order] {
   val MaxLiveTime: Long = 30L * 24L * 60L * 60L * 1000L
   val PriceConstant = 100000000L
   val MaxAmount: Long = PriceConstant * PriceConstant
@@ -196,16 +198,16 @@ object Order {
     unsigned.copy(signature = sig)
   }
 
-  def parseBytes(bytes: Array[Byte]): Try[Order] = Try {
+  override def parseBytes(bytes: Array[Byte]): Try[Order] = Try {
     import EllipticCurveImpl._
     var from = 0
-    val sender = PublicKeyAccount(bytes.slice(from, from + KeyLength))
+    val sender = new PublicKeyAccount(bytes.slice(from, from + KeyLength))
     from += KeyLength
-    val matcher = PublicKeyAccount(bytes.slice(from, from + KeyLength))
+    val matcher = new PublicKeyAccount(bytes.slice(from, from + KeyLength))
     from += KeyLength
-    val (amountAssetId, s0) = Deser.parseOption(bytes, from, AssetIdLength)
+    val (amountAssetId, s0) = parseOption(bytes, from, AssetIdLength)
     from = s0
-    val (priceAssetId, s1) = Deser.parseOption(bytes, from, AssetIdLength)
+    val (priceAssetId, s1) = parseOption(bytes, from, AssetIdLength)
     from = s1
     val orderType = bytes(from)
     from += 1

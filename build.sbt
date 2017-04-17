@@ -23,14 +23,14 @@ libraryDependencies ++=
   Dependencies.akka ++
   Dependencies.serialization ++
   Dependencies.testKit ++
-  Dependencies.itKit ++
   Dependencies.logging ++
   Dependencies.matcher ++
   Dependencies.p2p ++
   Seq(
     "com.iheart" %% "ficus" % "1.4.0",
     "org.scorexfoundation" %% "scrypto" % "1.2.0",
-    "commons-net" % "commons-net" % "3.+"
+    "commons-net" % "commons-net" % "3.+",
+    "com.github.pathikrit" %% "better-files" % "2.17.+"
   )
 
 inConfig(Test)(Seq(
@@ -40,34 +40,6 @@ inConfig(Test)(Seq(
   testOptions += Tests.Argument("-oIDOF", "-u", "target/test-reports")
 ))
 
-Defaults.itSettings
-
-configs(IntegrationTest)
-
 concurrentRestrictions in Global += Tags.limit(Tags.Test, 1)
 
 test in assembly := {}
-
-dockerfile in docker := {
-  val configTemplate = (resourceDirectory in IntegrationTest).value / "template.conf"
-  val startWaves = (sourceDirectory in IntegrationTest).value / "container" / "start-waves.sh"
-
-  new Dockerfile {
-    from("anapsix/alpine-java:8_server-jre")
-    add(assembly.value, "/opt/waves/waves.jar")
-    add(Seq(configTemplate, startWaves), "/opt/waves/")
-    run("chmod", "+x", "/opt/waves/start-waves.sh")
-    entryPoint("/opt/waves/start-waves.sh")
-  }
-}
-
-inConfig(IntegrationTest)(Seq(
-  fork := true,
-  parallelExecution := false,
-  javaOptions ++= Seq(
-    s"-Ddocker.imageId=${docker.value.id}",
-    "-Dlogback.configurationFile=logback-it.xml"
-  ),
-  test <<= test.dependsOn(docker),
-  testOptions += Tests.Filter(_.endsWith("Suite"))
-))

@@ -15,7 +15,7 @@ class BurnTransactionSpecification extends PropSpec with PropertyChecks with Mat
 
   property("Burn serialization from TypedTransaction") {
     forAll(burnGenerator) { issue: BurnTransaction =>
-      val recovered = TransactionParser.parseBytes(issue.bytes).get
+      val recovered = TypedTransaction.parseBytes(issue.bytes).get
       recovered.bytes shouldEqual issue.bytes
     }
   }

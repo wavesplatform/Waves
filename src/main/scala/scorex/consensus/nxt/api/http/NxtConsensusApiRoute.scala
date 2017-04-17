@@ -7,7 +7,7 @@ import akka.http.scaladsl.server.Route
 import io.swagger.annotations._
 import play.api.libs.json.Json
 import scorex.account.Account
-import scorex.api.http.{ApiError, ApiRoute, CommonApiFunctions, InvalidAddress}
+import scorex.api.http.{ApiRoute, CommonApiFunctions, InvalidAddress}
 import scorex.app.RunnableApplication
 import scorex.consensus.nxt.WavesConsensusModule
 import scorex.crypto.encode.Base58
@@ -33,13 +33,13 @@ class NxtConsensusApiRoute(application: RunnableApplication) extends ApiRoute wi
     new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
   ))
   def generatingBalance: Route = (path("generatingbalance" / Segment) & get) { address =>
-    val account = Account.fromString(address)
-    if (account.isLeft) {
+    val account = new Account(address)
+    if (!Account.isValid(account)) {
       complete(InvalidAddress)
     } else {
       complete(Json.obj(
-        "address" -> account.right.get.address,
-        "balance" -> consensusModule.generatingBalance(account.right.get, blockStorage.state.stateHeight)(application.transactionModule)))
+        "address" -> account.address,
+        "balance" -> consensusModule.generatingBalance(account, Some(blockStorage.state.asInstanceOf[StoredState].stateHeight))(application.transactionModule)))
     }
   }
 

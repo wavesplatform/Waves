@@ -14,7 +14,7 @@ class OrderSpecification extends PropSpec with PropertyChecks with Matchers with
       val recovered = Order.parseBytes(order.bytes).get
       recovered.bytes shouldEqual order.bytes
       recovered.id shouldBe order.id
-      recovered.senderPublicKey.publicKey shouldBe order.senderPublicKey.publicKey
+      recovered.senderPublicKey shouldBe order.senderPublicKey
       recovered.matcherPublicKey shouldBe order.matcherPublicKey
       recovered.assetPair shouldBe order.assetPair
       recovered.orderType shouldBe order.orderType
@@ -39,6 +39,7 @@ class OrderSpecification extends PropSpec with PropertyChecks with Matchers with
       val (order, pk) = x
       val time = NTP.correctedTime()
       order.copy(timestamp = -1).isValid(time) shouldBe not(valid)
+      order.copy(timestamp = time + 1000).isValid(time) should contain("timestamp should be before created before execution")
     }
   }
 
@@ -80,8 +81,8 @@ class OrderSpecification extends PropSpec with PropertyChecks with Matchers with
     forAll { (x: (Order, PrivateKeyAccount), bytes: Array[Byte]) =>
       val (order, pk) = x
       order.isValid(NTP.correctedTime()) shouldBe valid
-      order.copy(senderPublicKey = PublicKeyAccount(bytes)).isValid(NTP.correctedTime()) should contain("signature should be valid")
-      order.copy(matcherPublicKey = PublicKeyAccount(bytes)).isValid(NTP.correctedTime()) should contain("signature should be valid")
+      order.copy(senderPublicKey = new PublicKeyAccount(bytes)).isValid(NTP.correctedTime()) should contain("signature should be valid")
+      order.copy(matcherPublicKey = new PublicKeyAccount(bytes)).isValid(NTP.correctedTime()) should contain("signature should be valid")
       val assetPair = order.assetPair
       order.copy(assetPair = assetPair.copy(amountAsset = assetPair.amountAsset.map(Array(0: Byte) ++ _).orElse(Some(Array(0: Byte))))).
         isValid(NTP.correctedTime()) should contain("signature should be valid")

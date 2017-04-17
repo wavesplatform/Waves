@@ -8,7 +8,7 @@ import scorex.crypto.encode.Base58
 import scorex.transaction.ValidationError
 import scorex.transaction.ValidationError.InvalidAddress
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import scorex.transaction.TransactionParser.SignatureStringLength
+import scorex.transaction.TypedTransaction.SignatureStringLength
 
 case class SignedLeaseCancelRequest(@ApiModelProperty(value = "Base58 encoded sender public key", required = true)
                                     senderPublicKey: String,

@@ -2,8 +2,8 @@ package scorex.api.http
 
 import java.security.SecureRandom
 import javax.ws.rs.Path
-
 import akka.http.scaladsl.server.Route
+import akka.http.scaladsl.unmarshalling.{FromEntityUnmarshaller, PredefinedFromEntityUnmarshallers}
 import com.wavesplatform.settings.RestAPISettings
 import io.swagger.annotations._
 import play.api.libs.json.Json
@@ -13,7 +13,8 @@ import scorex.crypto.hash.{FastCryptographicHash, SecureCryptographicHash}
 @Path("/utils")
 @Api(value = "/utils", description = "Useful functions", position = 3, produces = "application/json")
 case class UtilsApiRoute(settings: RestAPISettings) extends ApiRoute {
-  import UtilsApiRoute._
+  val MaxSeedSize = 1024
+  val DefaultSeedSize = 32
 
   private def seed(length: Int) = {
     val seed = new Array[Byte](length)
@@ -72,9 +73,4 @@ case class UtilsApiRoute(settings: RestAPISettings) extends ApiRoute {
       complete(Json.obj("message" -> message, "hash" -> Base58.encode(FastCryptographicHash(message))))
     }
   }
-}
-
-object UtilsApiRoute {
-  val MaxSeedSize = 1024
-  val DefaultSeedSize = 32
 }

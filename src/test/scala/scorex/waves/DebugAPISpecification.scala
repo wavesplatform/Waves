@@ -23,4 +23,12 @@ class DebugAPISpecification extends FunSuite with Matchers with scorex.waves.Tes
     (info \ "stateHeight").as[Int] shouldBe application.blockStorage.history.height()
     (info \ "stateHash").asOpt[Int].isDefined shouldBe true
   }
+
+  test("/debug/settings") {
+    val info = GET.requestJson("/debug/settings", headers = Map("api_key" -> "test"))
+    //    (info \ "p2p" \ "localOnly").as[Boolean] shouldBe true
+    //    (info \ "p2p" \ "bindAddress").as[String] shouldBe "127.0.0.1"
+    //    (info \ "p2p" \ "port").as[Int] shouldBe 9091
+    //    (info \ "rpcPort").as[Int] shouldBe 9092
+  }
 }

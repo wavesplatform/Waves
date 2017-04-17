@@ -1,28 +1,27 @@
 package scorex.account
 
-import java.util
-import java.util.Collections
-
 import com.wavesplatform.utils.base58Length
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.SecureCryptographicHash._
-import scorex.transaction.ValidationError
-import scorex.transaction.ValidationError.InvalidAddress
 import scorex.utils.ScorexLogging
 
-import scala.util.Success
+@SerialVersionUID(-5326597598126993189L)
+class Account(val address: String) extends Serializable {
 
+  lazy val bytes = Base58.decode(address).get
 
-sealed trait Account extends AccountOrAlias {
-  lazy val address: String = Base58.encode(bytes)
-  lazy val stringRepr: String = Account.Prefix + address
+  override def toString: String = address
 
-  val bytes: Array[Byte]
+  override def equals(b: Any): Boolean = b match {
+    case a: Account => a.address == address
+    case _ => false
+  }
+
+  override def hashCode(): Int = address.hashCode()
 }
 
-object Account extends ScorexLogging {
 
-  val Prefix: String = "address:"
+object Account extends ScorexLogging {
 
   val AddressVersion: Byte = 1
   val ChecksumLength = 4
@@ -32,65 +31,46 @@ object Account extends ScorexLogging {
 
   private def scheme = AddressScheme.current
 
-  private class AccountImpl(val bytes: Array[Byte]) extends Account {
-    override def equals(obj: Any) = obj match {
-      case that: AccountImpl => bytes sameElements that.bytes
-      case _ => false
-    }
-
-    override def hashCode() = util.Arrays.hashCode(bytes)
+  /**
+   * Create account from public key.
+   */
+  def fromPublicKey(publicKey: Array[Byte]): Account = {
+    new Account(addressFromPublicKey(publicKey))
   }
 
-  def fromPublicKey(publicKey: Array[Byte]): Account = {
+  def addressFromPublicKey(publicKey: Array[Byte]) : String = {
     val publicKeyHash = hash(publicKey).take(HashLength)
     val withoutChecksum = AddressVersion +: scheme.chainId +: publicKeyHash
-    val bytes = withoutChecksum ++ calcCheckSum(withoutChecksum)
-    new AccountImpl(bytes)
+    Base58.encode(withoutChecksum ++ calcCheckSum(withoutChecksum))
   }
 
-  def fromBytes(addressBytes: Array[Byte]): Either[ValidationError, Account] = {
-    if (isByteArrayValid(addressBytes)) Right(new AccountImpl(addressBytes))
-    else Left(InvalidAddress)
-  }
+  def isValid(account: Account): Boolean = isValidAddress(account.address)
 
-  private def fromBase58String(address: String): Either[ValidationError, Account] =
-    if (address.length > AddressStringLength) {
-      Left(InvalidAddress)
-    } else {
-      Base58.decode(address) match {
-        case Success(byteArray) if isByteArrayValid(byteArray) => Right(new AccountImpl(byteArray))
-        case _ => Left(InvalidAddress)
-      }
-    }
-
-  def fromString(address: String): Either[ValidationError, Account] = {
-    val base58String = if (address.startsWith(Prefix))
-      address.drop(Prefix.length)
-    else address
-    fromBase58String(base58String)
-  }
-
-
-  private def isByteArrayValid(addressBytes: Array[Byte]): Boolean = {
-    val version = addressBytes.head
-    val network = addressBytes.tail.head
-    if (version != AddressVersion) {
-      log.warn(s"Unknown address version: $version")
-      false
-    } else if (network != scheme.chainId) {
-      log.warn(s"~ Expected network: ${scheme.chainId}(${scheme.chainId.toChar}")
-      log.warn(s"~ Actual network: $network(${network.toChar}")
-      false
-    } else {
-      if (addressBytes.length != Account.AddressLength)
+  def isValidAddress(address: String): Boolean = (address.length <= AddressStringLength) &&
+    Base58.decode(address).map { addressBytes =>
+      val version = addressBytes.head
+      val network = addressBytes.tail.head
+      if (version != AddressVersion) {
+        log.warn(s"Unknown address version: $version")
         false
-      else {
-        val checkSum = addressBytes.takeRight(ChecksumLength)
-        val checkSumGenerated = calcCheckSum(addressBytes.dropRight(ChecksumLength))
-        checkSum.sameElements(checkSumGenerated)
+      } else if (network != scheme.chainId) {
+        log.warn(s"~ For address: $address")
+        log.warn(s"~ Expected network: ${scheme.chainId}(${scheme.chainId.toChar}")
+        log.warn(s"~ Actual network: $network(${network.toChar}")
+        false
+      } else {
+        if (addressBytes.length != Account.AddressLength)
+          false
+        else {
+          val checkSum = addressBytes.takeRight(ChecksumLength)
+
+          val checkSumGenerated = calcCheckSum(addressBytes.dropRight(ChecksumLength))
+
+          checkSum.sameElements(checkSumGenerated)
+
+        }
       }
-    }
-  }
+    }.getOrElse(false)
 
   private def calcCheckSum(withoutChecksum: Array[Byte]): Array[Byte] = hash(withoutChecksum).take(ChecksumLength)
 

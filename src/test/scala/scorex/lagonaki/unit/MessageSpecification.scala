@@ -4,7 +4,7 @@ import java.nio.ByteBuffer
 
 import org.scalatest.FunSuite
 import scorex.block.Block
-import scorex.transaction.TransactionParser._
+import scorex.transaction.TypedTransaction._
 import scorex.network.message.{BasicMessagesRepo, Message, MessageHandler, MessageSpec}
 import scorex.transaction.History
 

@@ -30,7 +30,7 @@ class RowSpecification extends PropSpec
                                                                                      lastRowHeight: Int) =>
 
       val txs = List(FeesStateChange(fee), payment)
-      TransactionParser.parseBytes(payment.bytes).get shouldBe payment
+      TypedTransaction.parseBytes(payment.bytes).get shouldBe payment
 
       val row = Row(AccState(balance, 0L), txs.map(_.id), lastRowHeight)
       val restored = Row.deserialize(row.bytes)
@@ -46,7 +46,7 @@ class RowSpecification extends PropSpec
                                                                                      lastRowHeight: Int) =>
 
       val txs = List(FeesStateChange(fee), payment)
-      TransactionParser.parseBytes(payment.bytes).get shouldBe payment
+      TypedTransaction.parseBytes(payment.bytes).get shouldBe payment
 
       val row = Row(AccState(balance, 0L), txs.map(_.id), lastRowHeight)
       val buffer = new WriteBuffer(0)

@@ -11,9 +11,9 @@ import com.wavesplatform.matcher.model.MatcherModel._
 import com.wavesplatform.matcher.model.{OrderValidator, _}
 import play.api.libs.json.Json
 import scorex.crypto.encode.Base58
+import scorex.transaction.TransactionModule
 import scorex.transaction.assets.exchange._
-import scorex.transaction.state.database.state.extension.ExchangeTransactionValidator
-import scorex.transaction.{State, TransactionModule}
+import scorex.transaction.state.database.blockchain.StoredState
 import scorex.utils.{NTP, ScorexLogging}
 import scorex.wallet.Wallet
 
@@ -21,7 +21,7 @@ import scala.annotation.tailrec
 import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class OrderBookActor(assetPair: AssetPair, val storedState: State,
+class OrderBookActor(assetPair: AssetPair, val storedState: StoredState,
                      val wallet: Wallet, val settings: MatcherSettings,
                      val transactionModule: TransactionModule)
   extends PersistentActor
@@ -163,7 +163,7 @@ class OrderBookActor(assetPair: AssetPair, val storedState: State,
 }
 
 object OrderBookActor {
-  def props(assetPair: AssetPair, storedState: State,
+  def props(assetPair: AssetPair, storedState: StoredState,
             wallet: Wallet, settings: MatcherSettings, transactionModule: TransactionModule): Props =
     Props(new OrderBookActor(assetPair, storedState, wallet, settings, transactionModule))
 

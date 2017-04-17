@@ -6,7 +6,7 @@ import scala.util.Try
 import com.google.common.base.CaseFormat
 import com.typesafe.config.ConfigException.BadValue
 import com.typesafe.config.{Config, ConfigValue}
-import scorex.transaction.TransactionParser.TransactionType
+import scorex.transaction.TypedTransaction.TransactionType
 
 case class FeeSettings(asset: String, fee: Long)
 

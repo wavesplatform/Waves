@@ -35,8 +35,8 @@ class WalletSpecification extends FunSuite with Matchers {
 
   test("reopening") {
 
-    val walletFilename = scorex.createTestTemporaryFile("wallet", ".dat").getAbsolutePath
-    val maybeWalletFilename = Some(walletFilename)
+    //todo read folder from settings
+    val maybeWalletFilename = Some(s"/tmp/wallet${Random.nextLong()}.dat")
 
     val w = new Wallet(maybeWalletFilename, "cookies", Base58.decode("FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz").toOption)
     w.generateNewAccounts(10)

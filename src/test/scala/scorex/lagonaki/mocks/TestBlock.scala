@@ -5,12 +5,12 @@ import scorex.block._
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
 import scorex.crypto.EllipticCurveImpl
 import scorex.transaction.Transaction
-import scorex.transaction.TransactionParser._
+import scorex.transaction.TypedTransaction._
 
 import scala.util.Try
 
 object TestBlock {
-  def apply(txs: Seq[Transaction], signer: PublicKeyAccount = PublicKeyAccount(Array.fill(32)(0))) = Block(
+  def apply(txs: Seq[Transaction], signer: PublicKeyAccount = new PublicKeyAccount(Array.fill(32)(0))) = Block(
     Try(txs.map(_.timestamp).max).getOrElse(0),
     0,
     Array.fill(SignatureLength)(0: Byte),

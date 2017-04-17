@@ -2,9 +2,9 @@ package scorex.api.http.assets
 
 import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import play.api.libs.json.{Format, Json}
-import scorex.account.{Account, AccountOrAlias, PublicKeyAccount}
+import scorex.account.{Account, PublicKeyAccount}
 import scorex.api.http.BroadcastRequest
-import scorex.transaction.TransactionParser.SignatureStringLength
+import scorex.transaction.TypedTransaction.SignatureStringLength
 import scorex.transaction.{AssetIdStringLength, ValidationError}
 import scorex.transaction.ValidationError.InvalidAddress
 import scorex.transaction.assets.TransferTransaction
@@ -38,7 +38,8 @@ case class SignedTransferRequest(@ApiModelProperty(value = "Base58 encoded sende
     _feeAssetId <- parseBase58ToOption(feeAssetId.filter(_.length > 0), "invalid.feeAssetId", AssetIdStringLength)
     _signature <- parseBase58(signature, "invalid.signature", SignatureStringLength)
     _attachment <- parseBase58(attachment.filter(_.length > 0), "invalid.attachment", TransferTransaction.MaxAttachmentStringSize)
-    _account <-  AccountOrAlias.fromString(recipient)
-    t <- TransferTransaction.create(_assetId, _sender, _account, amount, timestamp, _feeAssetId, fee, _attachment,  _signature)
-  } yield t
+    _account <- if (Account.isValidAddress(recipient)) Right(new Account(recipient)) else Left(InvalidAddress)
+    _t <- TransferTransaction.create(_assetId, _sender, _account, amount, timestamp, _feeAssetId, fee, _attachment,
+      _signature)
+  } yield _t
 }

@@ -5,10 +5,9 @@ import scorex.transaction.{Transaction, TransactionModule, ValidationError}
 
 trait BroadcastRoute {
   def transactionModule: TransactionModule
+  protected def doBroadcast[A <: Transaction](v: Either[ValidationError, A]) =
+    v.left.map(ApiError.fromValidationError).flatMap(broadcast)
 
-  protected def doBroadcast[A <: Transaction](v: Either[ValidationError, A]): Either[ApiError, A] =
-    (for {
-      tx <- v
-      r <- transactionModule.onNewOffchainTransaction(tx)
-    } yield r).left.map(ApiError.fromValidationError)
+  protected def broadcast[T <: Transaction](tx: T): Either[ApiError, T] =
+    if (transactionModule.onNewOffchainTransaction(tx)) Right(tx) else Left(StateCheckFailed)
 }

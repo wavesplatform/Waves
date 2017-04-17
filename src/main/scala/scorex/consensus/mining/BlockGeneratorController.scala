@@ -27,7 +27,7 @@ class BlockGeneratorController(application: Application) extends Actor with Scor
 
   def idle: Receive = state {
 
-    case GetStatus =>
+    case GetBlockGenerationStatus =>
       sender() ! Idle.name
 
     case StartGeneration =>
@@ -47,7 +47,7 @@ class BlockGeneratorController(application: Application) extends Actor with Scor
 
   def generating(active: Boolean = true): Receive = state {
 
-    case GetStatus =>
+    case GetBlockGenerationStatus =>
       sender() ! (if (active) Generating else Suspended).name
 
     case StartGeneration =>
@@ -177,7 +177,7 @@ object BlockGeneratorController {
 
   private[mining] case object SelfCheck
 
-  case object GetStatus
+  case object GetBlockGenerationStatus
 
   private val SelfCheckInterval = 5.seconds
 }

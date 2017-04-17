@@ -3,11 +3,11 @@ package com.wavesplatform.settings
 import com.typesafe.config.Config
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.EnumerationReader._
-import scorex.account.Account
+import scorex.account.{Account, AddressScheme}
+import scorex.settings.ChainParameters
 import scorex.transaction.GenesisTransaction
 
 import scala.collection.JavaConverters._
-import scala.concurrent.duration._
 
 case class FunctionalitySettings(allowTemporaryNegativeUntil: Long,
                                  allowInvalidPaymentTransactionsByTimestamp: Long,
@@ -21,7 +21,8 @@ case class FunctionalitySettings(allowTemporaryNegativeUntil: Long,
                                  requirePaymentUniqueId: Long,
                                  allowExchangeTransactionAfterTimestamp: Long,
                                  allowInvalidReissueInSameBlockUntilTimestamp: Long,
-allowCreateAliasTransactionAfterTimestamp: Long)
+                                 allowMultipleLeaseCancelTransactionUntilTimestamp: Long,
+                                 resetEffectiveBalancesAtHeight: Long)
 
 object FunctionalitySettings {
   val MAINNET = FunctionalitySettings(allowTemporaryNegativeUntil = 1479168000000L,
@@ -35,8 +36,9 @@ object FunctionalitySettings {
     allowLeaseTransactionAfterTimestamp = 1491192000000L,
     requirePaymentUniqueId = 1491192000000L,
     allowExchangeTransactionAfterTimestamp = 1491192000000L,
-    allowInvalidReissueInSameBlockUntilTimestamp = Long.MaxValue,
-    allowCreateAliasTransactionAfterTimestamp = Long.MaxValue)
+    allowInvalidReissueInSameBlockUntilTimestamp = 1492682400000L,
+    allowMultipleLeaseCancelTransactionUntilTimestamp = 1492682400000L,
+    resetEffectiveBalancesAtHeight = 460400)
 
   val TESTNET = FunctionalitySettings(
     allowTemporaryNegativeUntil = 1477958400000L,
@@ -50,8 +52,9 @@ object FunctionalitySettings {
     allowLeaseTransactionAfterTimestamp = Long.MinValue,
     requirePaymentUniqueId = 1485942685000L,
     allowExchangeTransactionAfterTimestamp = 1483228800000L,
-    allowInvalidReissueInSameBlockUntilTimestamp = Long.MinValue,
-    allowCreateAliasTransactionAfterTimestamp = Long.MinValue)
+    allowInvalidReissueInSameBlockUntilTimestamp = 1492387200000L,
+    allowMultipleLeaseCancelTransactionUntilTimestamp = 1492387200000L,
+    resetEffectiveBalancesAtHeight = 49500)
 
   val configPath = "waves.blockchain.custom.functionality"
 
@@ -68,24 +71,23 @@ object FunctionalitySettings {
     val requirePaymentUniqueId = config.as[Long](s"$configPath.require-payment-unique-id-after")
     val allowExchangeTransactionAfterTimestamp = config.as[Long](s"$configPath.allow-exchange-transaction-after")
     val allowInvalidReissueInSameBlockUntilTimestamp = config.as[Long](s"$configPath.allow-invalid-reissue-in-same-block-until-timestamp")
-    val allowCreateAliasTransactionAfterTimestamp = config.as[Long](s"$configPath.allow-createalias-transaction-after")
+    val allowMultipleLeaseCancelTransactionUntilTimestamp = config.as[Long](s"$configPath.allow-multiple-lease-cancel-transaction-until-timestamp")
+    val resetEffectiveBalancesAfterTimestamp = config.as[Long](s"$configPath.reset-effective-balances-at-height")
 
     FunctionalitySettings(allowTemporaryNegativeUntil, allowInvalidPaymentTransactionsByTimestamp,
       requireSortedTransactionsAfter, generatingBalanceDepthFrom50To1000AfterHeight,
       minimalGeneratingBalanceAfterTimestamp, allowTransactionsFromFutureUntil, allowUnissuedAssetsUntil,
-      allowBurnTransactionAfterTimestamp, allowLeaseTransactionAfterTimestamp, requirePaymentUniqueId, allowExchangeTransactionAfterTimestamp,
-      allowInvalidReissueInSameBlockUntilTimestamp, allowCreateAliasTransactionAfterTimestamp)
+      allowBurnTransactionAfterTimestamp, allowLeaseTransactionAfterTimestamp, requirePaymentUniqueId, allowExchangeTransactionAfterTimestamp,allowInvalidReissueInSameBlockUntilTimestamp,allowMultipleLeaseCancelTransactionUntilTimestamp, resetEffectiveBalancesAfterTimestamp)
   }
 }
 
 case class GenesisTransactionSettings(recipient: String, amount: Long)
 
-case class GenesisSettings(blockTimestamp: Long, transactionsTimestamp: Long, initialBalance: Long, signature: String,
-                           transactions: List[GenesisTransactionSettings], initialBaseTarget: Long,
-                           averageBlockDelay: FiniteDuration)
+case class GenesisSettings(timestamp: Long, initialBalance: Long, signature: String,
+                           transactions: List[GenesisTransactionSettings])
 
 object GenesisSettings {
-  val MAINNET = GenesisSettings(1460678400000L, 1465742577614L, Constants.UnitsInWave * Constants.TotalWaves,
+  val MAINNET = GenesisSettings(1465742577614L, Constants.UnitsInWave * Constants.TotalWaves,
     "FSH8eAAzZNqnG8xgTZtz5xuLqXySsXgAjmFEC25hXMbEufiGjqWPnGCZFt6gLiVLJny16ipxRNAkkzjjhqTjBE2",
     List(
       GenesisTransactionSettings("3PAWwWa6GbwcJaFzwqXQN5KQm7H96Y7SHTQ", Constants.UnitsInWave * Constants.TotalWaves - 5 * Constants.UnitsInWave),
@@ -93,18 +95,16 @@ object GenesisSettings {
       GenesisTransactionSettings("3PAGPDPqnGkyhcihyjMHe9v36Y4hkAh9yDy", Constants.UnitsInWave),
       GenesisTransactionSettings("3P9o3ZYwtHkaU1KxsKkFjJqJKS3dLHLC9oF", Constants.UnitsInWave),
       GenesisTransactionSettings("3PJaDyprvekvPXPuAtxrapacuDJopgJRaU3", Constants.UnitsInWave),
-      GenesisTransactionSettings("3PBWXDFUc86N2EQxKJmW8eFco65xTyMZx6J", Constants.UnitsInWave)),
-    153722867L, 60.seconds)
+      GenesisTransactionSettings("3PBWXDFUc86N2EQxKJmW8eFco65xTyMZx6J", Constants.UnitsInWave)))
 
-  val TESTNET = GenesisSettings(1460678400000L, 1478000000000L, Constants.UnitsInWave * Constants.TotalWaves,
+  val TESTNET = GenesisSettings(1478000000000L, Constants.UnitsInWave * Constants.TotalWaves,
     "5uqnLK3Z9eiot6FyYBfwUnbyid3abicQbAZjz38GQ1Q8XigQMxTK4C1zNkqS1SVw7FqSidbZKxWAKLVoEsp4nNqa",
     List(
       GenesisTransactionSettings("3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8", (Constants.UnitsInWave * Constants.TotalWaves * 0.04).toLong),
       GenesisTransactionSettings("3NBVqYXrapgJP9atQccdBPAgJPwHDKkh6A8", (Constants.UnitsInWave * Constants.TotalWaves * 0.02).toLong),
       GenesisTransactionSettings("3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh", (Constants.UnitsInWave * Constants.TotalWaves * 0.02).toLong),
       GenesisTransactionSettings("3NCBMxgdghg4tUhEEffSXy11L6hUi6fcBpd", (Constants.UnitsInWave * Constants.TotalWaves * 0.02).toLong),
-      GenesisTransactionSettings("3N18z4B8kyyQ96PhN5eyhCAbg4j49CgwZJx", (Constants.UnitsInWave * Constants.TotalWaves - Constants.UnitsInWave * Constants.TotalWaves * 0.1).toLong)),
-    153722867L, 60.seconds)
+      GenesisTransactionSettings("3N18z4B8kyyQ96PhN5eyhCAbg4j49CgwZJx", (Constants.UnitsInWave * Constants.TotalWaves - Constants.UnitsInWave * Constants.TotalWaves * 0.1).toLong)))
 
   val configPath: String = "waves.blockchain.custom.genesis"
 
@@ -115,10 +115,8 @@ object GenesisSettings {
     val transactions = config.getConfigList(s"$configPath.transactions").asScala.map { p: Config =>
       GenesisTransactionSettings(p.as[String]("recipient"), p.as[Long]("amount"))
     }.toList
-    val initialBaseTarget = config.as[Long](s"$configPath.initial-base-target")
-    val averageBlockDelay = config.as[FiniteDuration](s"$configPath.average-block-delay")
 
-    GenesisSettings(timestamp, timestamp, initialBalance, signature, transactions, initialBaseTarget, averageBlockDelay)
+    GenesisSettings(timestamp, initialBalance, signature, transactions)
   }
 }
 
@@ -154,5 +152,67 @@ object BlockchainSettings {
     }
 
     BlockchainSettings(file, addressSchemeCharacter, functionalitySettings, genesisSettings)
+  }
+}
+
+object BlockchainSettingsExtension {
+
+  implicit class BackwardCompatibleBlockchainSettings(val blockchainSettings: BlockchainSettings) extends AnyVal {
+    def asChainParameters: ChainParameters = {
+      new ChainParameters {
+        override def addressScheme = new AddressScheme {
+          override val chainId: Byte = blockchainSettings.addressSchemeCharacter.toByte
+        }
+
+        override def genesisTxs: Seq[GenesisTransaction] =
+          buildTransactions(blockchainSettings.genesisSettings.transactions)
+
+        override def genesisTimestamp: Long = blockchainSettings.genesisSettings.timestamp
+
+        override def initialBalance: Long = blockchainSettings.genesisSettings.initialBalance
+
+        override def allowTemporaryNegativeUntil: Long =
+          blockchainSettings.functionalitySettings.allowTemporaryNegativeUntil
+
+        override def requirePaymentUniqueId: Long = blockchainSettings.functionalitySettings.requirePaymentUniqueId
+
+        override def minimalGeneratingBalanceAfterTimestamp: Long =
+          blockchainSettings.functionalitySettings.minimalGeneratingBalanceAfterTimestamp
+
+        override def generatingBalanceDepthFrom50To1000AfterHeight: Long =
+          blockchainSettings.functionalitySettings.generatingBalanceDepthFrom50To1000AfterHeight
+
+        override def requireSortedTransactionsAfter: Long =
+          blockchainSettings.functionalitySettings.requireSortedTransactionsAfter
+
+        override def allowTransactionsFromFutureUntil: Long =
+          blockchainSettings.functionalitySettings.allowTransactionsFromFutureUntil
+
+        override def allowBurnTransactionAfterTimestamp: Long =
+          blockchainSettings.functionalitySettings.allowBurnTransactionAfterTimestamp
+
+        override def allowInvalidPaymentTransactionsByTimestamp: Long =
+          blockchainSettings.functionalitySettings.allowInvalidPaymentTransactionsByTimestamp
+
+        override def allowUnissuedAssetsUntil: Long = blockchainSettings.functionalitySettings.allowUnissuedAssetsUntil
+
+        override def allowLeaseTransactionAfterTimestamp: Long = blockchainSettings.functionalitySettings.allowLeaseTransactionAfterTimestamp
+
+        override def allowExchangeTransactionAfterTimestamp: Long = blockchainSettings.functionalitySettings.allowExchangeTransactionAfterTimestamp
+
+        override def allowInvalidReissueInSameBlockUntilTimestamp: Long = blockchainSettings.functionalitySettings.allowInvalidReissueInSameBlockUntilTimestamp
+
+        override def allowMultipleLeaseCancelTransactionUntilTimestamp: Long = blockchainSettings.functionalitySettings.allowMultipleLeaseCancelTransactionUntilTimestamp
+
+        override def resetEffectiveBalancesAtHeight: Long = blockchainSettings.functionalitySettings.resetEffectiveBalancesAtHeight
+      }
+    }
+
+    private def buildTransactions(transactionSettings: List[GenesisTransactionSettings]): Seq[GenesisTransaction] = {
+      transactionSettings.map { ts =>
+        GenesisTransaction.create(new Account(ts.recipient), ts.amount, blockchainSettings.genesisSettings.timestamp)
+          .right.get
+      }
+    }
   }
 }

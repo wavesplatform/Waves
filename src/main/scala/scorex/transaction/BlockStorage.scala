@@ -15,7 +15,7 @@ trait BlockStorage extends ScorexLogging {
 
   def history: History
 
-  def state: State
+  def state: LagonakiState
 
   //Append block to current state
   def appendBlock(block: Block): Try[Unit] = {

@@ -10,7 +10,6 @@ import scorex.network.NetworkController.DataFromPeer
 import scorex.network.TransactionalMessagesRepo.TransactionMessageSpec
 import scorex.network.message.Message
 import scorex.network.{NetworkController, _}
-import scorex.transaction.ValidationError.{TransactionParameterValidationError, TransactionValidationError}
 
 import scala.concurrent.duration._
 import scala.language.postfixOps
@@ -32,13 +31,13 @@ class UnconfirmedPoolSynchronizerSpecification extends TestKit(ActorSystem("Unco
       TestActorRef(new UnconfirmedPoolSynchronizer(transactionModule, UTXSettings(1000, broadcastInterval), testActor))
     }
 
-    val defaultRecipient = PublicKeyAccount(Array.fill(32)(0: Byte))
+    val defaultRecipient = new PublicKeyAccount(Array.fill(32)(0: Byte))
     val tx = GenesisTransaction.create(defaultRecipient, 149857264546L, 4598723454L).right.get
 
     "broadcast new transaction to network" in {
 
-      (transactionModule.validate(_: Transaction)) expects * never()
-      (transactionModule.putUnconfirmedIfNew(_: Transaction)).expects(*).onCall((t: Transaction) => Right[ValidationError, Transaction](t))
+      (transactionModule.isValid(_: Transaction, _: Long)) expects(*, *) never()
+      transactionModule.putUnconfirmedIfNew _ expects * returns true
 
       val actorRef = createPoolSynchronizer(100.seconds)
       val sender = stub[ConnectedPeer]
@@ -53,9 +52,7 @@ class UnconfirmedPoolSynchronizerSpecification extends TestKit(ActorSystem("Unco
 
     "not broadcast tx if it has been skipped" in {
 
-      (transactionModule.putUnconfirmedIfNew(_: Transaction))
-        .expects(*)
-        .onCall((t: Transaction) => Left[ValidationError, Transaction](TransactionValidationError(t,"")))
+      transactionModule.putUnconfirmedIfNew _ expects * returns false
 
       val actorRef = createPoolSynchronizer(100.seconds)
       val sender = stub[ConnectedPeer]

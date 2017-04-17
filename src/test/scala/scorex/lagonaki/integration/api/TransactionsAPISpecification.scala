@@ -1,13 +1,14 @@
 package scorex.lagonaki.integration.api
 
-import akka.http.scaladsl.model.HttpMethods
-import akka.http.scaladsl.model.headers.{`Access-Control-Allow-Methods`, _}
 import org.scalatest.{FunSuite, Matchers}
 import play.api.libs.json.JsValue
+import scorex.app.RunnableApplication
 import scorex.block.Block
 import scorex.crypto.encode.Base58
 import scorex.lagonaki.TransactionTestingCommons
 import scorex.transaction.{GenesisTransaction, TransactionsBlockField}
+import akka.http.scaladsl.model.HttpMethods
+import akka.http.scaladsl.model.headers.{`Access-Control-Allow-Methods`, _}
 
 class TransactionsAPISpecification extends FunSuite with Matchers with TransactionTestingCommons {
 
@@ -61,8 +62,7 @@ class TransactionsAPISpecification extends FunSuite with Matchers with Transacti
   }
 
   test("/transactions/info/{signature} API route") {
-    val genesisTx = Block.genesis(consensusModule.genesisData, transactionModule.genesisData)
-      .transactionDataField.asInstanceOf[TransactionsBlockField].value.head.asInstanceOf[GenesisTransaction]
+    val genesisTx = Block.genesis(RunnableApplication.consensusGenesisBlockData, transactionModule.genesisData).transactionDataField.asInstanceOf[TransactionsBlockField].value.head.asInstanceOf[GenesisTransaction]
     val tr = GET.requestJson(s"/transactions/info/${Base58.encode(genesisTx.signature)}")
     (tr \ "signature").as[String] shouldBe Base58.encode(genesisTx.signature)
     (tr \ "type").as[Int] shouldBe 1

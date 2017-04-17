@@ -2,12 +2,15 @@ package com.wavesplatform.settings
 
 import com.typesafe.config.ConfigFactory
 import scorex.utils.ScorexLogging
+import scala.concurrent.duration._
 
 /**
   * System constants here.
   */
 
 object Constants extends ScorexLogging {
+  val genesisTimestamp = 1460678400000L
+
   private val appConf = ConfigFactory.load().getConfig("app")
 
   val ApplicationName = "waves"
@@ -16,6 +19,7 @@ object Constants extends ScorexLogging {
   val VersionString = appConf.getString("version")
   val AgentName = s"$Product - $Release v$VersionString"
 
+  val AvgBlockDelay: Duration = 60.seconds
   val UnitsInWave = 100000000L
-  val TotalWaves = 100000000L
+  val TotalWaves  = 100000000L
 }

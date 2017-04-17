@@ -2,7 +2,7 @@ package scorex.transaction.state.database.state.storage
 
 import scorex.crypto.encode.Base58
 import scorex.transaction.lease.LeaseTransaction
-import scorex.transaction.state.database.state.{AddressString, Row}
+import scorex.transaction.state.database.state.{Address, Row}
 
 trait LeaseExtendedStateStorageI {
   self: StateStorageI =>
@@ -17,7 +17,13 @@ trait LeaseExtendedStateStorageI {
       .getOrElse(throw new RuntimeException(s"There are no lease tx with id ${Base58.encode(leaseId)}"))
   }
 
-  def getLeasedSum(address: AddressString): Long
+  def getLeasedSum(address: Address): Long
 
-  def updateLeasedSum(address: AddressString, value: Long): Unit
+  def updateLeasedSum(address: Address, value: Long): Unit
+
+  def setLeaseTransactionCanceled(leaseTxId: Array[Byte], canceled: Boolean): Unit
+
+  def isLeaseTransactionCanceled(leaseTxId: Array[Byte]): Boolean
+
+  def resetLeasesInfo(): Unit
 }

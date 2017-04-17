@@ -18,24 +18,24 @@ trait MVStoreStateStorage extends StateStorageI {
   private lazy val accountChanges: MVMap[String, Row] =
     db.openMap(AccountChanges, new LogMVMapBuilder[String, Row].valueType(RowDataType))
 
-  private def acKey(address: AddressString, height: Int): String = height + "-" + address
+  private def acKey(address: Address, height: Int): String = height + "-" + address
 
-  def getAccountChanges(key: AddressString, height: Int): Option[Row] = Option(accountChanges.get(acKey(key, height)))
+  def getAccountChanges(key: Address, height: Int): Option[Row] = Option(accountChanges.get(acKey(key, height)))
 
-  def putAccountChanges(key: AddressString, height: Int, data: Row): Unit = accountChanges.put(acKey(key, height), data)
+  def putAccountChanges(key: Address, height: Int, data: Row): Unit = accountChanges.put(acKey(key, height), data)
 
-  def removeAccountChanges(key: AddressString, height: Int): Row = accountChanges.remove(acKey(key, height))
+  def removeAccountChanges(key: Address, height: Int): Row = accountChanges.remove(acKey(key, height))
 
 
   // ============= Last States
   private lazy val LastStates = "lastStates"
-  private lazy val lastStates: MVMap[AddressString, Int] = db.openMap(LastStates, new LogMVMapBuilder[AddressString, Int])
+  private lazy val lastStates: MVMap[Address, Int] = db.openMap(LastStates, new LogMVMapBuilder[Address, Int])
 
-  def getLastStates(a: AddressString): Option[Int] = Option(lastStates.get(a))
+  def getLastStates(a: Address): Option[Int] = Option(lastStates.get(a))
 
-  def putLastStates(a: AddressString, s: Int): Unit = lastStates.put(a, s)
+  def putLastStates(a: Address, s: Int): Unit = lastStates.put(a, s)
 
-  def lastStatesKeys: List[AddressString] = lastStates.keySet().asScala.toList
+  def lastStatesKeys: List[Address] = lastStates.keySet().asScala.toList
 
 
   // ============= Last States
@@ -43,7 +43,7 @@ trait MVStoreStateStorage extends StateStorageI {
   private lazy val accountAssetsMap: MVMap[String, Set[String]] = db.openMap(AccountAssets,
     new LogMVMapBuilder[String, Set[String]])
 
-  def updateAccountAssets(address: AddressString, assetId: Option[AssetId]): Unit = {
+  def updateAccountAssets(address: Address, assetId: Option[AssetId]): Unit = {
     if (assetId.isDefined) {
       val asset = Base58.encode(assetId.get)
       val assets = Option(accountAssetsMap.get(address)).getOrElse(Set.empty[String])
@@ -51,7 +51,7 @@ trait MVStoreStateStorage extends StateStorageI {
     }
   }
 
-  def getAccountAssets(address: AddressString): Set[String] =
+  def getAccountAssets(address: Address): Set[String] =
     Option(accountAssetsMap.get(address)).getOrElse(Set.empty[String])
 
 
@@ -98,11 +98,10 @@ trait MVStoreStateStorage extends StateStorageI {
     accountAssetsMap.entrySet().asScala
       .filter(e => e.getValue.contains(encodedAssetId))
       .map(e => {
-        val assetAcc: AssetAcc = AssetAcc(Account.fromString(e.getKey).right.get, Some(assetId))
+        val assetAcc: AssetAcc = AssetAcc(new Account(e.getKey),Some(assetId))
         val key = assetAcc.key
         val balance = getAccountChanges(key, getLastStates(key).get).get.state.balance
         (e.getKey, balance)
       }).toMap
   }
-
 }

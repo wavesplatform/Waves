@@ -2,7 +2,7 @@ package scorex.serialization
 
 import com.google.common.primitives.Shorts
 
-trait BytesSerializable {
+trait BytesSerializable extends Serializable {
 
   def bytes: Array[Byte]
 }

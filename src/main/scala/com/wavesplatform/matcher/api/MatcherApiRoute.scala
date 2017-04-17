@@ -1,6 +1,7 @@
 package com.wavesplatform.matcher.api
 
 import javax.ws.rs.Path
+
 import akka.actor.ActorRef
 import akka.http.scaladsl.model.{StatusCodes, Uri}
 import akka.http.scaladsl.server.{Directive1, Route}
@@ -15,7 +16,6 @@ import play.api.libs.json._
 import scorex.api.http._
 import scorex.app.Application
 import scorex.crypto.encode.Base58
-import scorex.transaction.State
 import scorex.transaction.assets.exchange.OrderJson._
 import scorex.transaction.assets.exchange.{AssetPair, Order}
 import scorex.transaction.state.database.blockchain.StoredState
@@ -31,7 +31,7 @@ case class MatcherApiRoute(application: Application, matcher: ActorRef, settings
   private implicit val timeout: Timeout = 5.seconds
 
   val wallet: Wallet = application.wallet
-  val storedState: State = application.blockStorage.state
+  val storedState: StoredState = application.blockStorage.state.asInstanceOf[StoredState]
 
   override lazy val route: Route =
     pathPrefix("matcher") {
@@ -48,7 +48,7 @@ case class MatcherApiRoute(application: Application, matcher: ActorRef, settings
   @Path("/")
   @ApiOperation(value = "Matcher Public Key", notes = "Get matcher public key", httpMethod = "GET")
   def matcherPublicKey: Route = (pathEndOrSingleSlash & get) {
-    complete(wallet.findWallet(matcherSettings.account)
+    complete(wallet.privateKeyAccount(matcherSettings.account)
       .map(a => JsString(Base58.encode(a.publicKey)))
       .getOrElse[JsValue](JsString("")))
   }

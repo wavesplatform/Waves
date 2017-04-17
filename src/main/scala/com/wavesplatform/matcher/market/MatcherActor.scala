@@ -10,14 +10,15 @@ import play.api.libs.json.{JsArray, JsValue, Json}
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange.Validation.booleanOperators
 import scorex.transaction.assets.exchange.{AssetPair, Order, Validation}
-import scorex.transaction.{AssetId, State, TransactionModule}
+import scorex.transaction.state.database.blockchain.StoredState
+import scorex.transaction.{AssetId, TransactionModule}
 import scorex.utils.{ByteArrayExtension, NTP, ScorexLogging}
 import scorex.wallet.Wallet
 
 import scala.collection.mutable
 import scala.language.reflectiveCalls
 
-class MatcherActor(storedState: State, wallet: Wallet, settings: MatcherSettings,
+class MatcherActor(storedState: StoredState, wallet: Wallet, settings: MatcherSettings,
                    transactionModule: TransactionModule
                   ) extends PersistentActor with ScorexLogging {
 
@@ -27,7 +28,7 @@ class MatcherActor(storedState: State, wallet: Wallet, settings: MatcherSettings
   val tradedPairs: mutable.Buffer[AssetPair] = mutable.Buffer.empty[AssetPair]
 
   def createOrderBook(pair: AssetPair): ActorRef = {
-    def getAssetName(asset: Option[AssetId]): String = asset.map(storedState.getAssetName).getOrElse(AssetPair.WavesName)
+    def getAssetName(asset: Option[AssetId]) = asset.map(storedState.assetsExtension.getAssetName).getOrElse(AssetPair.WavesName)
 
     openMarkets += MarketData(pair, getAssetName(pair.amountAsset), getAssetName(pair.priceAsset), NTP.correctedTime())
     tradedPairs += pair
@@ -38,9 +39,9 @@ class MatcherActor(storedState: State, wallet: Wallet, settings: MatcherSettings
 
   def basicValidation(msg: {def assetPair: AssetPair}): Validation = {
     msg.assetPair.isValid :| "Invalid AssetPair" &&
-      msg.assetPair.priceAsset.map(storedState.totalAssetQuantity).forall(_ > 0) :|
+      msg.assetPair.priceAsset.map(storedState.assetsExtension.getAssetQuantity).forall(_ > 0) :|
         s"Unknown Asset ID: ${msg.assetPair.priceAssetStr}" &&
-      msg.assetPair.amountAsset.map(storedState.totalAssetQuantity).forall(_ > 0) :|
+      msg.assetPair.amountAsset.map(storedState.assetsExtension.getAssetQuantity).forall(_ > 0) :|
         s"Unknown Asset ID: ${msg.assetPair.amountAssetStr}"
   }
 
@@ -51,8 +52,6 @@ class MatcherActor(storedState: State, wallet: Wallet, settings: MatcherSettings
       else if (tradedPairs.contains(reversePair)) false
       else if (settings.priceAssets.contains(aPair.priceAssetStr) &&
         !settings.priceAssets.contains(aPair.amountAssetStr)) true
-      else if (settings.priceAssets.contains(reversePair.priceAssetStr) &&
-        !settings.priceAssets.contains(reversePair.amountAssetStr)) false
       else ByteArrayExtension.compare(aPair.priceAsset, aPair.amountAsset) < 0
 
     isCorrectOrder :|  s"Invalid AssetPair ordering, should be reversed: $reversePair"
@@ -86,7 +85,7 @@ class MatcherActor(storedState: State, wallet: Wallet, settings: MatcherSettings
   }
 
   def getMatcherPublicKey: Array[Byte] = {
-    wallet.findWallet(settings.account).map(_.publicKey).getOrElse(Array())
+    wallet.privateKeyAccount(settings.account).map(_.publicKey).getOrElse(Array())
   }
 
   def forwardToOrderBook: Receive = {
@@ -127,7 +126,7 @@ class MatcherActor(storedState: State, wallet: Wallet, settings: MatcherSettings
 object MatcherActor {
   def name = "matcher"
 
-  def props(storedState: State, wallet: Wallet, settings: MatcherSettings,
+  def props(storedState: StoredState, wallet: Wallet, settings: MatcherSettings,
             transactionModule: TransactionModule): Props =
     Props(new MatcherActor(storedState, wallet, settings, transactionModule))
 

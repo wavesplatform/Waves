@@ -2,7 +2,6 @@ package scorex.api.http
 
 import java.net.{InetAddress, InetSocketAddress}
 import javax.ws.rs.Path
-
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import akka.actor.ActorRef
@@ -11,7 +10,7 @@ import akka.pattern.ask
 import akka.util.Timeout
 import com.wavesplatform.settings.RestAPISettings
 import io.swagger.annotations._
-import play.api.libs.json._
+import play.api.libs.json.{JsArray, JsObject, JsString, Json}
 import scorex.network.Handshake
 import scorex.network.NetworkController.ConnectTo
 import scorex.network.peer.{PeerInfo, PeerManager}
@@ -19,8 +18,7 @@ import scorex.network.peer.{PeerInfo, PeerManager}
 @Path("/peers")
 @Api(value = "/peers", description = "Get info about peers", position = 2)
 case class PeersApiRoute(settings: RestAPISettings, peerManager: ActorRef, networkController: ActorRef) extends ApiRoute {
-  import PeersApiRoute._
-
+  val MaxPeersInResponse = 1000
   private implicit val timeout: Timeout = 5.seconds
 
   override lazy val route =
@@ -42,7 +40,7 @@ case class PeersApiRoute(settings: RestAPISettings, peerManager: ActorRef, netwo
             Json.obj(
               "address" -> address.toString,
               "nodeName" -> peerInfo.nodeName,
-              "nodeNonce" -> peerInfo.nonce,
+              "nodeNonce" -> peerInfo.nonce.toString,
               "lastSeen" -> peerInfo.timestamp
             )
           }.toList))
@@ -83,8 +81,10 @@ case class PeersApiRoute(settings: RestAPISettings, peerManager: ActorRef, netwo
     )
   ))
   def connect: Route = (path("connect") & post & withAuth) {
-    json[ConnectReq] { req =>
-      val add: InetSocketAddress = new InetSocketAddress(InetAddress.getByName(req.host), req.port)
+    json[JsObject] { js =>
+      val host = (js \ "host").as[String]
+      val port = (js \ "port").as[Int]
+      val add: InetSocketAddress = new InetSocketAddress(InetAddress.getByName(host), port)
       networkController ! ConnectTo(add)
 
       Json.obj("hostname" -> add.getHostName, "status" -> "Trying to connect")
@@ -101,11 +101,4 @@ case class PeersApiRoute(settings: RestAPISettings, peerManager: ActorRef, netwo
       .mapTo[Set[String]]
       .map { peers => JsArray(peers.take(MaxPeersInResponse).map(JsString).toSeq) })
   }
-}
-
-object PeersApiRoute {
-  val MaxPeersInResponse = 1000
-
-  case class ConnectReq(host: String, port: Int)
-  implicit val connectFormat: Format[ConnectReq] = Json.format
 }

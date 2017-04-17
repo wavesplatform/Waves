@@ -4,12 +4,9 @@ import java.io.File
 
 import com.google.common.primitives.{Bytes, Ints}
 import org.h2.mvstore.{MVMap, MVStore}
-import scorex.account.{Account, PrivateKeyAccount}
+import scorex.account.PrivateKeyAccount
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.SecureCryptographicHash
-import scorex.transaction.ValidationError
-import scorex.transaction.ValidationError.MissingSenderPrivateKey
-import scorex.transaction.state.database.state.AddressString
 import scorex.utils.{LogMVMapBuilder, ScorexLogging, randomBytes}
 
 import scala.collection.JavaConverters._
@@ -48,7 +45,7 @@ class Wallet(maybeFilename: Option[String], password: String, seedOpt: Option[Ar
   val seed: Array[Byte] = seedPersistence.get("seed")
 
   private val accountsCache: TrieMap[String, PrivateKeyAccount] = {
-    val accounts = accountsPersistence.asScala.keys.map(k => accountsPersistence.get(k)).map(seed => PrivateKeyAccount(seed))
+    val accounts = accountsPersistence.asScala.keys.map(k => accountsPersistence.get(k)).map(seed => new PrivateKeyAccount(seed))
     TrieMap(accounts.map(acc => acc.address -> acc).toSeq: _*)
   }
 
@@ -87,9 +84,9 @@ class Wallet(maybeFilename: Option[String], password: String, seedOpt: Option[Ar
     res.isDefined
   }
 
-  def privateKeyAccount(account: Account): Either[ValidationError, PrivateKeyAccount] =
-    accountsCache.get(account.address).toRight[ValidationError](MissingSenderPrivateKey)
+  def exportAccountSeed(address: String): Option[Array[Byte]] = privateKeyAccount(address).map(_.seed)
 
+  def privateKeyAccount(address: String): Option[PrivateKeyAccount] = accountsCache.get(address)
 
   def close(): Unit = if (!database.isClosed) {
     database.commit()
@@ -108,19 +105,9 @@ class Wallet(maybeFilename: Option[String], password: String, seedOpt: Option[Ar
 
 object Wallet {
 
-  implicit class WalletExtension(w: Wallet) {
-    def findWallet(a: AddressString): Either[ValidationError, PrivateKeyAccount] = for {
-      acc <- Account.fromString(a)
-      privKeyAcc <- w.privateKeyAccount(acc)
-    } yield privKeyAcc
-
-    def exportAccountSeed(account: Account): Either[ValidationError, Array[Byte]] = w.privateKeyAccount(account).map(_.seed)
-  }
-
-
   def generateNewAccount(seed: Array[Byte], nonce: Int): PrivateKeyAccount = {
     val accountSeed = generateAccountSeed(seed, nonce)
-    PrivateKeyAccount(accountSeed)
+    new PrivateKeyAccount(accountSeed)
   }
 
   def generateAccountSeed(seed: Array[Byte], nonce: Int): Array[Byte] =

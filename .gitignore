@@ -12,9 +12,14 @@ target
 # vim
 *.*~
 
+# scala build folders
+target
+
+
 # dotfiles
 .dockerignore
 .editorconfig
+
 
 # logs
 scorex.log

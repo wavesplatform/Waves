@@ -103,7 +103,7 @@ trait History {
     (block.timestampField.value - parent(block, blockNum).get.timestampField.value) / blockNum
   }
 
-  def genesis: Block
+  val genesis: Block
 
   def getCheckpoint: Option[Checkpoint]
 

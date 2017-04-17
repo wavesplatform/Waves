@@ -48,7 +48,7 @@ class OfflineDisabledBlockGeneratorControllerSpecification extends ActorTestingC
   override protected val actorRef = system.actorOf(Props(new TestBlockGeneratorController(stubApp)))
 
   private def assertStatusIs(status: BlockGeneratorController.Status) = {
-    actorRef ! GetStatus
+    actorRef ! GetBlockGenerationStatus
     expectMsg(status.name)
   }
 

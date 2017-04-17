@@ -3,14 +3,14 @@ package com.wavesplatform
 import java.io.File
 
 import akka.actor.{ActorSystem, Props}
-import com.typesafe.config.{Config, ConfigFactory}
+import com.typesafe.config.ConfigFactory
 import com.wavesplatform.actor.RootActorSystem
 import com.wavesplatform.http.NodeApiRoute
 import com.wavesplatform.matcher.{MatcherApplication, MatcherSettings}
+import com.wavesplatform.settings.BlockchainSettingsExtension._
 import com.wavesplatform.settings._
 import scorex.account.AddressScheme
 import scorex.api.http._
-import scorex.api.http.alias.{AliasApiRoute, AliasBroadcastApiRoute}
 import scorex.api.http.assets.{AssetsApiRoute, AssetsBroadcastApiRoute}
 import scorex.api.http.leasing.{LeaseApiRoute, LeaseBroadcastApiRoute}
 import scorex.app.ApplicationVersion
@@ -38,9 +38,9 @@ class Application(as: ActorSystem, wavesSettings: WavesSettings) extends {
 } with scorex.app.RunnableApplication
   with MatcherApplication {
 
-  override implicit lazy val consensusModule = new WavesConsensusModule(settings.blockchainSettings)
+  override implicit lazy val consensusModule = new WavesConsensusModule(settings.blockchainSettings.asChainParameters, Constants.AvgBlockDelay)
 
-  override implicit lazy val transactionModule = new SimpleTransactionModule(settings.blockchainSettings.genesisSettings)(settings, this)
+  override implicit lazy val transactionModule = new SimpleTransactionModule(settings.blockchainSettings.asChainParameters)(settings, this)
 
   override lazy val blockStorage = transactionModule.blockStorage
 
@@ -58,12 +58,10 @@ class Application(as: ActorSystem, wavesSettings: WavesSettings) extends {
     DebugApiRoute(settings.restAPISettings, wallet, blockStorage),
     WavesApiRoute(settings.restAPISettings, wallet, transactionModule),
     AssetsApiRoute(settings.restAPISettings, wallet, blockStorage.state, transactionModule),
-    NodeApiRoute(settings.restAPISettings, this, blockGenerator, coordinator),
+    NodeApiRoute(this),
     AssetsBroadcastApiRoute(settings.restAPISettings, transactionModule),
     LeaseApiRoute(settings.restAPISettings, wallet, blockStorage.state, transactionModule),
-    LeaseBroadcastApiRoute(settings.restAPISettings, transactionModule),
-    AliasApiRoute(settings.restAPISettings, wallet, transactionModule, blockStorage.state),
-    AliasBroadcastApiRoute(settings.restAPISettings, transactionModule)
+    LeaseBroadcastApiRoute(settings.restAPISettings, transactionModule)
   )
 
   override lazy val apiTypes = Seq(
@@ -81,9 +79,7 @@ class Application(as: ActorSystem, wavesSettings: WavesSettings) extends {
     typeOf[NodeApiRoute],
     typeOf[AssetsBroadcastApiRoute],
     typeOf[LeaseApiRoute],
-    typeOf[LeaseBroadcastApiRoute],
-    typeOf[AliasApiRoute],
-    typeOf[AliasBroadcastApiRoute]
+    typeOf[LeaseBroadcastApiRoute]
   )
 
   override lazy val additionalMessageSpecs = TransactionalMessagesRepo.specs
@@ -98,9 +94,11 @@ class Application(as: ActorSystem, wavesSettings: WavesSettings) extends {
 }
 
 object Application extends ScorexLogging {
-  def readConfig(userConfigPath: Option[String]): Config = {
+  def main(args: Array[String]): Unit = {
+    log.info("Starting...")
+
     val maybeConfigFile = for {
-      maybeFilename <- userConfigPath
+      maybeFilename <- args.headOption
       file = new File(maybeFilename)
       if file.exists
     } yield file
@@ -125,15 +123,9 @@ object Application extends ScorexLogging {
           .withFallback(ConfigFactory.defaultApplication())
           .withFallback(ConfigFactory.defaultReference())
           .resolve()
+
     }
 
-    config
-  }
-
-  def main(args: Array[String]): Unit = {
-    log.info("Starting...")
-
-    val config = readConfig(args.headOption)
     val settings = WavesSettings.fromConfig(config)
 
     RootActorSystem.start("wavesplatform", settings.matcherSettings) { actorSystem =>
