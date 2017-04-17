@@ -9,7 +9,7 @@ import org.scalacheck.{Gen, Shrink}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json._
-import scorex.account.Account
+import scorex.account.PublicKeyAccount
 import scorex.api.http.{BlockNotExists, BlocksApiRoute, TooBigArrayAllocation, WrongJson}
 import scorex.block.Block
 import scorex.crypto.encode.Base58
@@ -27,13 +27,6 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with MockFactory with BlockGe
 
   private implicit def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)
 
-  private val blockSeqGen = for {
-    start <- Gen.posNum[Int].label("from")
-    end <- Gen.chooseNum(start, start + 20).label("to")
-    blockCount <- Gen.choose(0, end - start + 1).label("actualBlockCount")
-    blocks <- Gen.listOfN(blockCount, blockGen).label("blocks")
-  } yield (start, end, blocks)
-
   private def checkBlock(response: JsValue, expected: Block): Unit = {
     (response \ "version").asOpt[Int].isDefined shouldBe true
     (response \ "timestamp").as[Long] should be >= 0L
@@ -49,7 +42,7 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with MockFactory with BlockGe
     // todo: check block not found (404?)
     val g = for {
       h <- Gen.posNum[Int]
-      b <- blockGen
+      b <- randomSignerBlockGen
     } yield (h, b)
 
     forAll(g) {
@@ -62,7 +55,7 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with MockFactory with BlockGe
     }
   }
 
-  routePath("/first") in forAll(blockGen) { block =>
+  routePath("/first") in forAll(randomSignerBlockGen) { block =>
     (history.genesis _).expects().returning(block).once()
 
     Get(routePath("/first")) ~> route ~> check {
@@ -73,7 +66,7 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with MockFactory with BlockGe
   routePath("/seq/{from}/{to}") in {
     // todo: check to <= from
     // todo: check invalid from/to (not numeric)
-    forAll(blockSeqGen) {
+    forAll(randomBlocksSeqGen) {
       case (start, end, blocks) =>
         inSequence {
           for (i <- start to end) {
@@ -90,7 +83,7 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with MockFactory with BlockGe
     }
   }
 
-  routePath("/last") in forAll(blockGen) { block =>
+  routePath("/last") in forAll(randomSignerBlockGen) { block =>
     inSequence {
       (history.lastBlock _).expects().returning(block).once()
       (history.heightOf(_: Block)).expects(block).returning(Some(1)).once()
@@ -117,7 +110,7 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with MockFactory with BlockGe
   routePath("/height/{signature}") in {
     // todo: check invalid signature
     // todo: check block not found (404?)
-    forAll(blockGen) { block =>
+    forAll(randomSignerBlockGen) { block =>
       inSequence {
         withBlock(block)
         (history.heightOf(_: Block)).expects(block).returning(Some(10)).once()
@@ -132,26 +125,29 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with MockFactory with BlockGe
     // todo: check incorrect address
     // todo: check if to <= from
     // todo: check empty block sequence
-    val g = for {
-      account <- accountGen
-      blockSeq <- blockSeqGen
-    } yield (account, blockSeq)
 
-    forAll(g) { case (address, (from, to, blocks)) =>
-      (history.generatedBy _).expects(Account.fromPublicKey(address.publicKey), from, to).returning(blocks).once()
-      Get(routePath(s"/address/${address.address}/$from/$to")) ~> route ~> check {
-        val response = responseAs[Seq[JsValue]]
-        response.length shouldBe blocks.length
+    forAll(mixedBlocksSeqGen) {
+      case (start, end, blocks) =>
+        inSequence {
+          for (i <- start to end) {
+            (history.blockAt _).expects(i).returning(if (i - start < blocks.length) Some(blocks(i - start)) else None).once()
+          }
+        }
 
-        response.zip(blocks).foreach((checkBlock _).tupled)
-      }
+        Get(routePath(s"/address/${BlockGen.predefinedSignerPrivateKey.address}/1/1000")) ~> route should produce(TooBigArrayAllocation)
+
+        Get(routePath(s"/address/${BlockGen.predefinedSignerPrivateKey.address}/$start/$end")) ~> route ~> check {
+          val responseBlocks = responseAs[Seq[JsValue]]
+          val zeroSignerBlocks = blocks.filter(_.signerData.generator == PublicKeyAccount(BlockGen.predefinedSignerPrivateKey.publicKey))
+          responseBlocks.length shouldBe zeroSignerBlocks.length
+        }
     }
   }
 
   routePath("/child/{signature}") in {
     // todo: check block not found (404?)
     // todo: check invalid signature
-    forAll(blockGen) { block =>
+    forAll(randomSignerBlockGen) { block =>
       inSequence {
         withBlock(block)
         (history.child _).expects(block).returning(Some(block)).once
@@ -164,7 +160,7 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with MockFactory with BlockGe
   }
 
   routePath("/delay/{signature}/{blockNum}") in {
-    forAll(blockGen) { block =>
+    forAll(randomSignerBlockGen) { block =>
       inSequence {
       }
     }
@@ -172,7 +168,7 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with MockFactory with BlockGe
 
   routePath("/signature/{signature}") in {
     val g = for {
-      block <- blockGen
+      block <- randomSignerBlockGen
       invalidSignature <- byteArrayGen(10)
     } yield (block, invalidSignature)
 

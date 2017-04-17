@@ -42,11 +42,8 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll {
 
     // Store initial balances of participants
     matcherBalance = getBalance(matcherNode)
-    println(s"MATCHER: ${matcherBalance._1} (${matcherBalance._2}) @ ${matcherNode.address}")
     aliceBalance = getBalance(aliceNode)
-    println(s"ALICE: ${aliceBalance._1} (${aliceBalance._2}) @ ${aliceNode.address}")
     bobBalance = getBalance(bobNode)
-    println(s"BOB: ${bobBalance._1} (${bobBalance._2}) @ ${bobNode.address}")
 
     // Alice issues new asset
     asset = issueAsset(aliceNode, AssetQuantity)

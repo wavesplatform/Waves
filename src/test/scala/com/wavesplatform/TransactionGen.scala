@@ -6,7 +6,7 @@ import scorex.account._
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange._
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import scorex.transaction._
+import scorex.transaction.{CreateAliasTransaction, PaymentTransaction, SignedTransaction}
 import scorex.utils.NTP
 import com.wavesplatform.state2._
 
@@ -265,11 +265,8 @@ trait TransactionGen {
     tx <- Gen.oneOf(tr, is, ri, ca, bu, xt)
   } yield tx).label("random transaction")
 
-  val genesisGen: Gen[GenesisTransaction] = accountGen.flatMap(genesisGeneratorP)
-
-  def genesisGeneratorP(recipient: PrivateKeyAccount): Gen[GenesisTransaction] = for {
-    amt <- positiveLongGen
-    ts <- positiveIntGen
-  } yield GenesisTransaction.create(recipient, amt, ts).right.get
+  def randomTransactionsGen(count: Int): Gen[Seq[SignedTransaction]] = for {
+    transactions <- Gen.listOfN(count, randomTransactionGen)
+  } yield transactions
 
 }
