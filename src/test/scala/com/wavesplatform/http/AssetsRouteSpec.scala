@@ -1,9 +1,9 @@
 package com.wavesplatform.http
 
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.RequestGen
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.settings.RestAPISettings
+import com.wavesplatform.{RequestGen, TestWallet}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.prop.PropertyChecks
@@ -14,16 +14,15 @@ import scorex.crypto.encode.Base58
 import scorex.crypto.hash.SecureCryptographicHash
 import scorex.transaction.TransactionParser.TransactionType
 import scorex.transaction._
-import scorex.wallet.Wallet
 
-class AssetsRouteSpec extends RouteSpec("/assets/") with RequestGen with PathMockFactory with PropertyChecks {
+class AssetsRouteSpec
+  extends RouteSpec("/assets/")
+    with RequestGen
+    with PathMockFactory
+    with PropertyChecks
+    with TestWallet {
 
   import AssetsRouteSpec._
-
-  private val wallet = {
-    val file = scorex.createTestTemporaryFile("wallet", ".dat")
-    new Wallet(Some(file.getCanonicalPath), "123", None)
-  }
 
   private def txsOperationsMock(expectedError: ValidationError) = {
     val m = mock[TransactionOperations]
@@ -70,7 +69,7 @@ class AssetsRouteSpec extends RouteSpec("/assets/") with RequestGen with PathMoc
     val currentPath = routePath(path)
     currentPath in {
       forAll(errorGen) { e =>
-        val route = AssetsApiRoute(settings, wallet, mock[State], txsOperationsMock(e)).route
+        val route = AssetsApiRoute(settings, testWallet, mock[State], txsOperationsMock(e)).route
 
         forAll(gen) { tr =>
           val p = Post(currentPath, tr)
