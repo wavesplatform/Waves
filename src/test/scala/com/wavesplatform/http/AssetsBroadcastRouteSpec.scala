@@ -1,8 +1,8 @@
-package scorex.api.http.assets
+package com.wavesplatform.http
 
 import com.typesafe.config.ConfigFactory
+import com.wavesplatform.RequestGen
 import com.wavesplatform.http.ApiMarshallers._
-import com.wavesplatform.http.RouteSpec
 import com.wavesplatform.settings.RestAPISettings
 import org.scalacheck.Gen._
 import org.scalacheck.{Gen => G}
@@ -10,6 +10,7 @@ import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json.{JsObject, JsValue, Json, Writes}
 import scorex.api.http._
+import scorex.api.http.assets.AssetsBroadcastApiRoute
 import scorex.transaction.{Transaction, TransactionModule, ValidationError}
 
 

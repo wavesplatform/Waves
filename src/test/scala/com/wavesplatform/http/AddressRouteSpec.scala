@@ -1,5 +1,6 @@
 package com.wavesplatform.http
 
+import com.wavesplatform.TestWallet
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.state2.{LeaseInfo, Portfolio}
 import com.wavesplatform.state2.reader.StateReader
@@ -12,19 +13,17 @@ import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.wallet.Wallet
 
-class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with PropertyChecks with RestAPISettingsHelper {
+class AddressRouteSpec
+  extends RouteSpec("/addresses")
+    with PathMockFactory
+    with PropertyChecks
+    with RestAPISettingsHelper
+    with TestWallet {
   import org.scalacheck.Shrink
 
   implicit val noShrink: Shrink[String] = Shrink.shrinkAny
 
-  private val wallet = {
-    val file = scorex.createTestTemporaryFile("wallet", ".dat")
-    val wallet = new Wallet(Some(file.getCanonicalPath), "123", None)
-    wallet.generateNewAccounts(10)
-    wallet
-  }
-
-  private val allAccounts = wallet.privateKeyAccounts()
+  private val allAccounts = testWallet.privateKeyAccounts()
   private val allAddresses = allAccounts.map(_.address)
 
   private val state = {
@@ -33,7 +32,7 @@ class AddressRouteSpec extends RouteSpec("/addresses") with PathMockFactory with
     m
   }
 
-  private val route = AddressApiRoute(restAPISettings, wallet, state).route
+  private val route = AddressApiRoute(restAPISettings, testWallet, state).route
 
   private val generatedMessages = for {
     account <- Gen.oneOf(allAccounts).label("account")

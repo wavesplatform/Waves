@@ -1,32 +1,29 @@
-package scorex.api.http
+package com.wavesplatform.http
 
-import java.io.File
-
-import akka.http.scaladsl.model.headers.RawHeader
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.http.ApiMarshallers._
-import com.wavesplatform.http.{RouteSpec, api_key}
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state2.reader.StateReader
+import com.wavesplatform.{RequestGen, TestWallet}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json.{JsObject, Json}
 import scorex.api.http.assets.AssetsApiRoute
+import scorex.api.http.{ApiError, ApiKeyNotValid}
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.SecureCryptographicHash
 import scorex.transaction.TransactionParser.TransactionType
 import scorex.transaction._
-import scorex.wallet.Wallet
 
-class AssetsRouteSpec extends RouteSpec("/assets/") with RequestGen with PathMockFactory with PropertyChecks {
+class AssetsRouteSpec
+  extends RouteSpec("/assets/")
+    with RequestGen
+    with PathMockFactory
+    with PropertyChecks
+    with TestWallet {
 
   import AssetsRouteSpec._
-
-  private val wallet = {
-    val file = scorex.createTestTemporaryFile("wallet", ".dat")
-    new Wallet(Some(file.getCanonicalPath), "123", None)
-  }
 
   private def txsOperationsMock(expectedError: ValidationError) = {
     val m = mock[TransactionOperations]
@@ -73,7 +70,7 @@ class AssetsRouteSpec extends RouteSpec("/assets/") with RequestGen with PathMoc
     val currentPath = routePath(path)
     currentPath in {
       forAll(errorGen) { e =>
-        val route = AssetsApiRoute(settings, wallet, mock[StateReader], txsOperationsMock(e)).route
+        val route = AssetsApiRoute(settings, testWallet, mock[StateReader], txsOperationsMock(e)).route
 
         forAll(gen) { tr =>
           val p = Post(currentPath, tr)
