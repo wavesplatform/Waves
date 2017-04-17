@@ -124,20 +124,12 @@ dependencyOverrides in ThisBuild ++= Set(
   "org.scalaz" % "scalaz-core_2.12" % "7.2.8",
   "org.scorexfoundation" % "scrypto_2.12" % "1.2.0",
   "org.slf4j" % "slf4j-api" % "1.7.25",
-  "org.typelevel" % "catalysts-macros_2.12" % "0.0.5",
-  "org.typelevel" % "catalysts-platform_2.12" % "0.0.5",
   "org.typelevel" % "cats-core_2.12" % "0.9.0",
-  "org.typelevel" % "cats-free_2.12" % "0.9.0",
-  "org.typelevel" % "cats-jvm_2.12" % "0.9.0",
-  "org.typelevel" % "cats-kernel-laws_2.12" % "0.9.0",
   "org.typelevel" % "cats-kernel_2.12" % "0.9.0",
-  "org.typelevel" % "cats-laws_2.12" % "0.9.0",
   "org.typelevel" % "cats-macros_2.12" % "0.9.0",
-  "org.typelevel" % "cats_2.12" % "0.9.0",
-  "org.typelevel" % "discipline_2.12" % "0.7.2",
   "org.typelevel" % "machinist_2.12" % "0.6.1",
   "org.typelevel" % "macro-compat_2.12" % "1.1.1",
   "org.whispersystems" % "curve25519-java" % "0.3.0",
   "org.yaml" % "snakeyaml" % "1.17"
 )
-// LIBRARY_DEPENDENCIES_HASH 55dc77e6398b9716f1f62dc818597bd0619894bd
+// LIBRARY_DEPENDENCIES_HASH 2e3e8ad089de96ce36c7fa624e1ffdcebfdd9548
