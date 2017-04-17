@@ -3,12 +3,12 @@ package com.wavesplatform.state2
 import cats.Monoid
 import cats.implicits._
 import com.wavesplatform.state2.reader.StateReaderImpl
-import scorex.transaction.assets.exchange.ExchangeTransaction
-import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 
 
 trait StateWriter {
   def applyBlockDiff(blockDiff: BlockDiff): Unit
+
+  def clear(): Unit
 }
 
 class StateWriterImpl(p: JavaMapStorage) extends StateReaderImpl(p) with StateWriter {
@@ -77,6 +77,21 @@ class StateWriterImpl(p: JavaMapStorage) extends StateReaderImpl(p) with StateWr
 
     p.setHeight(p.getHeight + blockDiff.heightDiff)
 
+    p.commit()
+  }
+
+  override def clear(): Unit = {
+    p.transactions.clear()
+    p.portfolios.clear()
+    p.assets.clear()
+    p.accountTransactionIds.clear()
+    p.effectiveBalanceSnapshots.clear()
+    p.paymentTransactionHashes.clear()
+    p.exchangeTransactionsByOrder.clear()
+    p.aliasToAddress.clear()
+    p.leaseState.clear()
+
+    p.setHeight(0)
     p.commit()
   }
 }
