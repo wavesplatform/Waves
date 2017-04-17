@@ -955,6 +955,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
     val h = state.hash
     var lastFinalStateHash: Option[Int] = None
     for {i <- 1 to retries} {
+      log.info(s"Iteration $i of test with rollback")
       try {
         test
       } catch {

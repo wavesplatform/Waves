@@ -58,6 +58,26 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
     }
   }
 
+  private def deleteAtHeight(height: Int, key: Address): Unit = {
+    val changes = storage.removeAccountChanges(key, height)
+    changes.reason.foreach(id => {
+      storage.getTransaction(id) match {
+        case Some(t: AssetIssuance) =>
+          assetsExtension.rollback(t, height)
+        case Some(t: BurnTransaction) =>
+          assetsExtension.rollback(t, height)
+        case Some(t: LeaseTransaction) =>
+          leaseExtendedState.cancelLease(t)
+        case Some(t: LeaseCancelTransaction) =>
+          leaseExtendedState.cancelLeaseCancel(t)
+        case _ =>
+      }
+      storage.removeTransaction(id)
+    })
+    val prevHeight = changes.lastRowHeight
+    storage.putLastStates(key, prevHeight)
+  }
+
   def rollbackTo(rollbackTo: Int): State = synchronized {
     val startHeight = storage.stateHeight
 
@@ -65,29 +85,8 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
       storage.lastStatesKeys.filter(storage.getLastStates(_).getOrElse(0) == h).foreach { key =>
         deleteAtHeight(h, key)
       }
-      storage.setStateHeight(h)
-
+      storage.setStateHeight(h - 1)
     }
-
-    def deleteAtHeight(height: Int, key: Address): Unit = {
-      val changes = storage.removeAccountChanges(key, height)
-        changes.reason.foreach(id => {
-          storage.getTransaction(id) match {
-            case Some(t: AssetIssuance) =>
-              assetsExtension.rollback(t, height)
-            case Some(t: BurnTransaction) =>
-              assetsExtension.rollback(t, height)
-            case Some(t: LeaseTransaction) =>
-              leaseExtendedState.cancelLease(t)
-            case Some(t: LeaseCancelTransaction) =>
-              leaseExtendedState.cancelLeaseCancel(t)
-            case _ =>
-          }
-          storage.removeTransaction(id)
-        })
-        val prevHeight = changes.lastRowHeight
-        storage.putLastStates(key, prevHeight)
-      }
 
     this
   }
