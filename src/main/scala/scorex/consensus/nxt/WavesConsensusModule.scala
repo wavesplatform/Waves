@@ -4,7 +4,6 @@ import com.wavesplatform.settings.BlockchainSettings
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.block.Block
 import scorex.consensus.TransactionsOrdering
-import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash._
 import scorex.transaction._
