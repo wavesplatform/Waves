@@ -29,11 +29,10 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Gene
     exchange <- exchangeGeneratorP(buyer, seller, maybeAsset1, maybeAsset2)
   } yield (gen1, gen2, issue1, issue2, exchange)
 
-
   // This might fail from time to time.
   // The logic defining max matched amount is a bit complex
   // so it's not easy to setup 100% correct pair of orders
-  property("preserves waves invariant") {
+  property("preserves waves invariant and stores new match info") {
     forAll(preconditionsAndExchange) { case (gen1, gen2, issue1, issue2, exchange) =>
       assertDiffAndState(Seq(TestBlock(Seq(gen1, gen2, issue1, issue2))), TestBlock(Seq(exchange))) { case (blockDiff, state) =>
         val totalPortfolioDiff: Portfolio = Monoid.combineAll(blockDiff.txsDiff.portfolios.values)
@@ -41,6 +40,8 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Gene
         totalPortfolioDiff.effectiveBalance shouldBe 0
         totalPortfolioDiff.assets.values.toSet shouldBe Set(0L)
 
+        state.findPreviousExchangeTxs(exchange.buyOrder) shouldBe Set(exchange)
+        state.findPreviousExchangeTxs(exchange.sellOrder) shouldBe Set(exchange)
       }
     }
   }

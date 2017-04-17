@@ -25,7 +25,7 @@ class StateWriterImpl(p: JavaMapStorage) extends StateReaderImpl(p) with StateWr
         case Some(ll) =>
           p.exchangeTransactionsByOrder.put(oid.arr, ll ++ txIds)
         case None =>
-          p.accountTransactionIds.put(oid.arr, txIds.toList)
+          p.exchangeTransactionsByOrder.put(oid.arr, txIds.toList)
       }
     }
 
