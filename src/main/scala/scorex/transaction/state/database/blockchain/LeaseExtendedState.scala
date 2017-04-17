@@ -3,27 +3,31 @@ package scorex.transaction.state.database.blockchain
 import scorex.account.Account
 import scorex.transaction.ValidationError.StateValidationError
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import scorex.transaction.state.database.state.{AccState, Reasons}
 import scorex.transaction.state.database.state.extension.Validator
 import scorex.transaction.state.database.state.storage.{LeaseExtendedStateStorageI, StateStorageI}
-import scorex.transaction.{AssetAcc, EffectiveBalanceChange, Transaction}
+import scorex.transaction.{EffectiveBalanceChange, Transaction}
 import scorex.utils.ScorexLogging
 
-class LeaseExtendedState(private[blockchain] val storage: StateStorageI with LeaseExtendedStateStorageI) extends ScorexLogging with Validator {
+class LeaseExtendedState(private[blockchain] val storage: StateStorageI with LeaseExtendedStateStorageI, allowMultipleLeaseCancelTransactionUntilTimestamp: Long) extends ScorexLogging with Validator {
 
   override def validate(storedState: StoredState, tx: Transaction, height: Int): Either[StateValidationError, Transaction] = tx match {
-    case tx: LeaseCancelTransaction =>
-      val leaseOpt = storage.getLeaseTx(tx.leaseId)
+    case leaseCancelTx: LeaseCancelTransaction =>
+      val leaseOpt = storage.getLeaseTx(leaseCancelTx.leaseId)
       leaseOpt match {
-        case Some(leaseTx) if leaseTx.sender.publicKey.sameElements(leaseTx.sender.publicKey) => Right(tx)
-        case Some(leaseTx) => Left(StateValidationError(s"LeaseTransaction was leased by other sender: $tx"))
-        case None => Left(StateValidationError(s"LeaseTransaction not found for $tx"))
+        case Some(leaseTx) if tx.timestamp < allowMultipleLeaseCancelTransactionUntilTimestamp ||
+          leaseCancelTx.sender.publicKey.sameElements(leaseTx.sender.publicKey) &&
+            !storage.isLeaseTransactionCanceled(leaseTx.id) => Right(leaseCancelTx)
+        case Some(leaseTx) if tx.timestamp >= allowMultipleLeaseCancelTransactionUntilTimestamp &&
+          storage.isLeaseTransactionCanceled(leaseTx.id) => Left(StateValidationError(s"LeaseTransaction is already cancelled: $leaseCancelTx"))
+        case Some(leaseTx) if tx.timestamp >= allowMultipleLeaseCancelTransactionUntilTimestamp &&
+          !leaseCancelTx.sender.publicKey.sameElements(leaseTx.sender.publicKey) => Left(StateValidationError(s"LeaseTransaction was leased by other sender: $leaseCancelTx"))
+        case None => Left(StateValidationError(s"LeaseTransaction not found for $leaseCancelTx"))
       }
-    case tx: LeaseTransaction =>
-      if (storedState.balance(tx.sender) - tx.fee - storage.getLeasedSum(tx.sender.address) >= tx.amount) {
-        Right(tx)
+    case leaseTx: LeaseTransaction =>
+      if (storedState.balance(leaseTx.sender) - leaseTx.fee - storage.getLeasedSum(leaseTx.sender.address) >= leaseTx.amount) {
+        Right(leaseTx)
       } else {
-        Left(StateValidationError(s"Not enough effective balance to lease for tx $tx"))
+        Left(StateValidationError(s"Not enough effective balance to lease for tx $leaseTx"))
       }
     case _ => Right(tx)
   }
@@ -52,10 +56,12 @@ class LeaseExtendedState(private[blockchain] val storage: StateStorageI with Lea
   }
 
   def applyLease(tx: LeaseTransaction): Unit = {
+    storage.setLeaseTransactionCanceled(tx.id, canceled = false)
     updateLeasedSum(tx.sender, _ + tx.amount)
   }
 
   def cancelLease(tx: LeaseTransaction): Unit = {
+    storage.setLeaseTransactionCanceled(tx.id, canceled = true)
     updateLeasedSum(tx.sender, _ - tx.amount)
   }
 

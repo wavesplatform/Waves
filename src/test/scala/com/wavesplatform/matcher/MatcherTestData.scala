@@ -131,7 +131,7 @@ trait MatcherTestData {
     }
 
     val incrementingTimestampValidator = new IncrementingTimestampValidator(settings.allowInvalidPaymentTransactionsByTimestamp, storage)
-    val leaseExtendedState = new LeaseExtendedState(storage)
+    val leaseExtendedState = new LeaseExtendedState(storage, settings.allowMultipleLeaseCancelTransactionUntilTimestamp)
     val validators = Seq(
       extendedState,
       incrementingTimestampValidator,

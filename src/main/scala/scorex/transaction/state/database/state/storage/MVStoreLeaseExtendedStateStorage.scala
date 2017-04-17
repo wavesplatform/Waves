@@ -7,8 +7,8 @@ import scorex.transaction.state.database.state.{Address, Row}
 import scorex.utils.LogMVMapBuilder
 
 object MVStoreLeaseExtendedStateStorage {
-  private val ExpiredTableName = "ExpiredLease"
   private val LeasedSum = "LeasedSum"
+  private val CanceledLease = "CanceledLease"
 }
 
 trait MVStoreLeaseExtendedStateStorage extends LeaseExtendedStateStorageI {
@@ -19,6 +19,7 @@ trait MVStoreLeaseExtendedStateStorage extends LeaseExtendedStateStorageI {
   def db: MVStore
 
   private lazy val leasedSumTable: MVMap[String, Long] = db.openMap(LeasedSum, new LogMVMapBuilder[String, Long])
+  private lazy val canceledLease: MVMap[String, Boolean] = db.openMap(CanceledLease, new LogMVMapBuilder[String, Boolean])
 
   override def getLeasedSum(address: Address): Long = {
     Option(leasedSumTable.get(address)).getOrElse(0L)
@@ -26,5 +27,22 @@ trait MVStoreLeaseExtendedStateStorage extends LeaseExtendedStateStorageI {
 
   override def updateLeasedSum(address: Address, value: Long): Unit = {
     leasedSumTable.put(address, value)
+  }
+
+  override def setLeaseTransactionCanceled(leaseTxId: Array[Byte], value: Boolean): Unit = {
+    if (value) {
+      canceledLease.remove(Base58.encode(leaseTxId))
+    } else {
+      canceledLease.put(Base58.encode(leaseTxId), false)
+    }
+  }
+
+  override def isLeaseTransactionCanceled(leaseTxId: Array[Byte]): Boolean = {
+    !canceledLease.containsKey(Base58.encode(leaseTxId))
+  }
+
+  override def resetLeasesInfo(): Unit = {
+    canceledLease.clear()
+    leasedSumTable.clear()
   }
 }

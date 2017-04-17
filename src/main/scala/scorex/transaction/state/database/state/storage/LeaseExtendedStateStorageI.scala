@@ -20,4 +20,10 @@ trait LeaseExtendedStateStorageI {
   def getLeasedSum(address: Address): Long
 
   def updateLeasedSum(address: Address, value: Long): Unit
+
+  def setLeaseTransactionCanceled(leaseTxId: Array[Byte], canceled: Boolean): Unit
+
+  def isLeaseTransactionCanceled(leaseTxId: Array[Byte]): Boolean
+
+  def resetLeasesInfo(): Unit
 }

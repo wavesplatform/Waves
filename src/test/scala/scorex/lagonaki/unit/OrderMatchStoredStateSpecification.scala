@@ -27,8 +27,15 @@ class OrderMatchStoredStateSpecification extends FunSuite with Matchers with Bef
 
   val db = new MVStore.Builder().open()
   val state = StoredState.fromDB(db, TestChainParameters.Enabled)
-  state.processBlock(TestBlock(Seq(GenesisTransaction.create(acc1, 1000 * ASSET_UNITS, 0).right.get,
-    GenesisTransaction.create(acc2, 100 * ASSET_UNITS, 0).right.get)))
+
+  override protected def beforeAll(): Unit = {
+    super.beforeAll()
+    state.processBlock(TestBlock(Seq(GenesisTransaction.create(acc1, 1000 * ASSET_UNITS, 0).right.get,
+      GenesisTransaction.create(acc2, 100 * ASSET_UNITS, 0).right.get))) should be('success)
+    state.stateHeight should be(1)
+    state.balance(acc1) should be(1000 * ASSET_UNITS)
+    state.balance(acc2) should be(100 * ASSET_UNITS)
+  }
 
   override protected def afterAll(): Unit = {
     db.close()

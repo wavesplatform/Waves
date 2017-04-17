@@ -85,12 +85,23 @@ class BalancesSpecification extends FunSuite with Matchers with scorex.waves.Tes
     assertBalances(second, 100 * Constants.UnitsInWave, 200 * Constants.UnitsInWave)
   }
 
+  test("Can not make cancel leasing from another sender") {
+    assertBalances(first, 190 * Constants.UnitsInWave, 90 * Constants.UnitsInWave)
+    assertBalances(second, 100 * Constants.UnitsInWave, 200 * Constants.UnitsInWave)
 
-  test("leasing cancel is works correctly") {
+    cancelLease(third, createdLeaseTxId, fee = 10 * Constants.UnitsInWave, assertSuccess = false)
+
+    assertBalances(first, 190 * Constants.UnitsInWave, 90 * Constants.UnitsInWave)
+    assertBalances(second, 100 * Constants.UnitsInWave, 200 * Constants.UnitsInWave)
+  }
+
+  test("Can not make leasing cancel from another account") {
     assertBalances(first, 190 * Constants.UnitsInWave, 90 * Constants.UnitsInWave)
     assertBalances(second, 100 * Constants.UnitsInWave, 200 * Constants.UnitsInWave)
 
     cancelLease(first, createdLeaseTxId, fee = 10 * Constants.UnitsInWave)
+
+    cancelLease(first, createdLeaseTxId, fee = 10 * Constants.UnitsInWave, assertSuccess = false)
 
     assertBalances(first, 180 * Constants.UnitsInWave, 180 * Constants.UnitsInWave)
     assertBalances(second, 100 * Constants.UnitsInWave, 100 * Constants.UnitsInWave)
