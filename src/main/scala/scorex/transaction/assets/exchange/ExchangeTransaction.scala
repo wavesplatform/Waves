@@ -68,7 +68,7 @@ object ExchangeTransaction {
     } else if (price > Order.MaxAmount) {
       Left(TransactionParameterValidationError("price too large"))
     } else if (amount > Order.MaxAmount) {
-      Left(TransactionParameterValidationError("price too large"))
+      Left(TransactionParameterValidationError("amount too large"))
     } else if (sellMatcherFee > Order.MaxAmount) {
       Left(TransactionParameterValidationError("sellMatcherFee too large"))
     } else if (buyMatcherFee > Order.MaxAmount) {
