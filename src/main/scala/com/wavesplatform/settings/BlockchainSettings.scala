@@ -52,8 +52,8 @@ object FunctionalitySettings {
     allowLeaseTransactionAfterTimestamp = Long.MinValue,
     requirePaymentUniqueId = 1485942685000L,
     allowExchangeTransactionAfterTimestamp = 1483228800000L,
-    allowInvalidReissueInSameBlockUntilTimestamp = 1492387200000L,
-    allowMultipleLeaseCancelTransactionUntilTimestamp = 1492387200000L,
+    allowInvalidReissueInSameBlockUntilTimestamp = 1524009600000L,
+    allowMultipleLeaseCancelTransactionUntilTimestamp = 1524009600000L,
     resetEffectiveBalancesAtHeight = 49500)
 
   val configPath = "waves.blockchain.custom.functionality"
