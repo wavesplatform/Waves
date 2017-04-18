@@ -55,7 +55,7 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
 
         networkControllerRef ! NetworkController.SendToNetwork(msg, SendToChosen(maxPeers.keys.toSeq))
 
-        gettingExtension(lastIds.map(InnerId), maxPeers.map(peer => peer._1 -> Peer(peer._2)))
+        gettingExtension(lastIds.map(InnerId), peerScores.map(peer => peer._1 -> Peer(peer._2)))
       }
   }
 
@@ -241,7 +241,7 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
         val sortedByScore = updatedPeers.toSeq.sortBy(_._2.score).map(_._1)
 
         sortedByScore.filterNot(_ == active).lastOption
-          .orElse(sortedByScore.headOption)
+          .orElse(sortedByScore.lastOption)
           .map(newActive => ps.copy(active = newActive, peers = updatedPeers))
     }
 
