@@ -140,7 +140,7 @@ class LeaseTransactionsDiffTest extends PropSpec with PropertyChecks with Genera
     }
   }
 
-  property("if recipient cancels lease, it doesn't change leaseing component of mining power before allowMultipleLeaseCancelTransactionUntilTimestamp") {
+  property("if recipient cancels lease, it doesn't change leasing component of mining power before allowMultipleLeaseCancelTransactionUntilTimestamp") {
     forAll(cancelLeaseOfAnotherSender(unleaseByRecipient = true), timestampGen retryUntil (_ < allowMultipleLeaseCancelTransactionUntilTimestamp)) {
       case ((genesis, genesis2, lease, unleaseRecipient), blockTime) =>
         assertDiffAndState(Seq(TestBlock(Seq(genesis, genesis2, lease))), TestBlock.create(blockTime, Seq(unleaseRecipient))) { case (totalDiff, newState) =>

@@ -30,7 +30,7 @@ package object state2 {
   implicit val leaseInfoMonoid = new Monoid[LeaseInfo] {
     override def empty: LeaseInfo = LeaseInfo.empty
 
-    override def combine(x: LeaseInfo, y: LeaseInfo): LeaseInfo = LeaseInfo(x.leaseIn + y.leaseIn, x.leaseOut + y.leaseOut)
+    override def combine(x: LeaseInfo, y: LeaseInfo): LeaseInfo = LeaseInfo(safeSum(x.leaseIn, y.leaseIn), safeSum(x.leaseOut, y.leaseOut))
   }
 
 
@@ -62,7 +62,7 @@ package object state2 {
       portfolios = older.portfolios.combine(newer.portfolios),
       issuedAssets = newer.issuedAssets.combine(older.issuedAssets),
       aliases = newer.aliases ++ older.aliases,
-      __patch_extraLeaseIdsToCancel = newer.__patch_extraLeaseIdsToCancel ++ older.__patch_extraLeaseIdsToCancel
+      patchExtraLeaseIdsToCancel = newer.patchExtraLeaseIdsToCancel ++ older.patchExtraLeaseIdsToCancel
     )
   }
 

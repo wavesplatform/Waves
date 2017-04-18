@@ -15,7 +15,7 @@ case class Diff(transactions: Map[ByteArray, (Int, Transaction, Set[Account])],
                 portfolios: Map[Account, Portfolio],
                 issuedAssets: Map[ByteArray, AssetInfo],
                 aliases: Map[Alias, Account],
-                __patch_extraLeaseIdsToCancel: Seq[ByteArray])
+                patchExtraLeaseIdsToCancel: Seq[ByteArray])
 
 object Diff {
 
@@ -34,7 +34,7 @@ object Diff {
     portfolios = portfolios,
     issuedAssets = assetInfos,
     aliases = aliases,
-    __patch_extraLeaseIdsToCancel = Seq.empty)
+    patchExtraLeaseIdsToCancel = Seq.empty)
 
   implicit class DiffExt(d: Diff) {
     def asBlockDiff: BlockDiff = BlockDiff(d, 0, Seq.empty)
@@ -64,8 +64,8 @@ object Diff {
         .collect { case (ltx: LeaseTransaction) => EqByteArray(ltx.id) }
         .toSet
 
-      val effectiveNewCancels = (canceledLeaseIds ++ d.__patch_extraLeaseIdsToCancel).diff(newLeaseIds)
-      val effectiveNewLeases = newLeaseIds.diff(canceledLeaseIds ++ d.__patch_extraLeaseIdsToCancel)
+      val effectiveNewCancels = (canceledLeaseIds ++ d.patchExtraLeaseIdsToCancel).diff(newLeaseIds)
+      val effectiveNewLeases = newLeaseIds.diff(canceledLeaseIds ++ d.patchExtraLeaseIdsToCancel)
       (effectiveNewLeases, effectiveNewCancels)
     }
 

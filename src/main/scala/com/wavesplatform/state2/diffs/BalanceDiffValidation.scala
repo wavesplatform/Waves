@@ -1,9 +1,8 @@
 package com.wavesplatform.state2.diffs
 
 import cats.implicits._
-import com.wavesplatform.settings.FunctionalitySettings
+import com.wavesplatform.state2.Diff
 import com.wavesplatform.state2.reader.StateReader
-import com.wavesplatform.state2.{Diff}
 import scorex.transaction.Transaction
 import scorex.transaction.ValidationError.TransactionValidationError
 
@@ -21,6 +20,7 @@ object BalanceDiffValidation {
 
       val allBalancesAndAssetsForAccountArePositive = newPortfolio.balance >= 0 &&
         newPortfolio.balance >= newPortfolio.leaseInfo.leaseOut &&
+        newPortfolio.effectiveBalance >= 0 &&
         newPortfolio.assets.values.forall(_ >= 0)
       if (!allBalancesAndAssetsForAccountArePositive) {
         Some(s"$acc, old: $oldPortfolio, new: $newPortfolio")
