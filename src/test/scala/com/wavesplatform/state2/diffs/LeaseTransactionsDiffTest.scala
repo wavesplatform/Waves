@@ -140,7 +140,7 @@ class LeaseTransactionsDiffTest extends PropSpec with PropertyChecks with Genera
     }
   }
 
-  property("if recipient cancels lease, it doesn't change leaseing component of mining power before allowMultipleLeaseCancelTransactionUntilTimestamp") {
+  property("if recipient cancels lease, it doesn't change leasing component of mining power before allowMultipleLeaseCancelTransactionUntilTimestamp") {
     forAll(cancelLeaseOfAnotherSender(unleaseByRecipient = true), timestampGen retryUntil (_ < allowMultipleLeaseCancelTransactionUntilTimestamp)) {
       case ((genesis, genesis2, lease, unleaseRecipient), blockTime) =>
         assertDiffAndState(Seq(TestBlock(Seq(genesis, genesis2, lease))), TestBlock.create(blockTime, Seq(unleaseRecipient))) { case (totalDiff, newState) =>
@@ -149,45 +149,5 @@ class LeaseTransactionsDiffTest extends PropSpec with PropertyChecks with Genera
         }
     }
   }
-
-  property("validation of 9QqKxGT8s8AYQfh2UBwT3s9Y87nuZwfcJpLxJJ823DgP") {
-    val setup = for {
-      master <- accountGen
-      ts <- timestampGen retryUntil (_ < allowMultipleLeaseCancelTransactionUntilTimestamp)
-      genesis = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
-      aW3P9g9 <- accountGen
-      aW3PE4T <- accountGen
-      aW3PBXV <- accountGen
-      amt = 576100000000L
-      amtOther = 500000000000L
-      fee = 1000000L
-      initialPayment = PaymentTransaction.create(master, aW3P9g9, amt + (fee * 9), fee, ts).right.get
-      initialPayment2 = PaymentTransaction.create(master, aW3PE4T, amt + (fee * 9), fee, ts).right.get
-      lease3PE3PB = LeaseTransaction.create(aW3PE4T, amtOther, fee, ts, aW3PBXV).right.get
-      l1 = LeaseTransaction.create(aW3P9g9, amt, fee, ts, aW3PE4T).right.get
-      l1c1 = LeaseCancelTransaction.create(aW3P9g9, l1.id, fee, ts).right.get
-      l1c2 = LeaseCancelTransaction.create(aW3P9g9, l1.id, fee, ts + 1).right.get
-      l2 = LeaseTransaction.create(aW3P9g9, amt, fee, ts + 2, aW3PE4T).right.get
-      l3 = LeaseTransaction.create(aW3P9g9, amt, fee, ts + 3, aW3PBXV).right.get
-      l2c1 = LeaseCancelTransaction.create(aW3P9g9, lease3PE3PB.id, fee, ts + 4).right.get
-      l2c2 = LeaseCancelTransaction.create(aW3P9g9, lease3PE3PB.id, fee, ts + 5).right.get
-      l2c3 = LeaseCancelTransaction.create(aW3P9g9, lease3PE3PB.id, fee, ts + 6).right.get
-      transfer = TransferTransaction.create(None, aW3P9g9, aW3PE4T, amt, ts, None, fee, Array.empty).right.get
-    } yield (aW3P9g9, aW3PE4T, aW3PBXV, genesis, initialPayment, initialPayment2, lease3PE3PB, l1, l1c1, l1c2, l2, l3, l2c1, l2c2, l2c3, transfer)
-
-    forAll(setup) { case (aW3P9g9, aW3PE4T, aW3PBXV, genesis, initialPayment, initialPayment2, lease3PE3PB, l1, l1c1, l1c2, l2, l3, l2c1, l2c2, l2c3, transfer) => {
-      assertDiffAndState(Seq(
-        TestBlock(Seq(genesis, initialPayment, initialPayment2, lease3PE3PB)),
-        TestBlock(Seq(l1, l1c1, l1c2, l2, l3, l2c1, l2c2, l2c3))
-      ), TestBlock(Seq(transfer))) { case (totalDiff, _) =>
-        val totalPortfolioDiff = Monoid.combineAll(totalDiff.txsDiff.portfolios.values)
-        totalPortfolioDiff.balance shouldBe 0
-        total(totalPortfolioDiff.leaseInfo) shouldBe 0
-        totalPortfolioDiff.effectiveBalance shouldBe 0
-      }
-    }
-    }
-  }
-
 }
 

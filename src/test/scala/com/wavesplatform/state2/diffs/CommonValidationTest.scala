@@ -22,6 +22,10 @@ class CommonValidationTest extends PropSpec with PropertyChecks with GeneratorDr
       assertDiffEi(Seq(TestBlock(Seq(genesis, transfer))), TestBlock(Seq(transfer))) { blockDiffEi =>
         blockDiffEi should produce("Tx with such id aready present")
       }
+
+      assertDiffEi(Seq(TestBlock(Seq(genesis))), TestBlock(Seq(transfer, transfer))) { blockDiffEi =>
+        blockDiffEi should produce("Tx with such id aready present")
+      }
     }
   }
 }

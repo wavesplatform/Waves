@@ -16,7 +16,7 @@ object LeasePatch {
       portfolios = portfolioUpd,
       issuedAssets = Map.empty,
       aliases = Map.empty,
-      __patch_extraLeaseIdsToCancel = s.activeLeases())
+      patchExtraLeaseIdsToCancel = s.activeLeases())
   }
 
 }
