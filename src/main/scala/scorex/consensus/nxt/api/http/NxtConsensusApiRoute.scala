@@ -2,16 +2,14 @@ package scorex.consensus.nxt.api.http
 
 import javax.ws.rs.Path
 
-import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import io.swagger.annotations._
 import play.api.libs.json.Json
 import scorex.account.Account
-import scorex.api.http.{ApiError, ApiRoute, CommonApiFunctions, InvalidAddress}
+import scorex.api.http.{ApiRoute, CommonApiFunctions, InvalidAddress}
 import scorex.app.RunnableApplication
 import scorex.consensus.nxt.WavesConsensusModule
 import scorex.crypto.encode.Base58
-import scorex.transaction.state.database.blockchain.StoredState
 
 
 @Path("/consensus")
@@ -19,7 +17,7 @@ import scorex.transaction.state.database.blockchain.StoredState
 class NxtConsensusApiRoute(application: RunnableApplication) extends ApiRoute with CommonApiFunctions {
 
   val settings = application.settings.restAPISettings
-  private val consensusModule = application.consensusModule.asInstanceOf[WavesConsensusModule]
+  private val consensusModule = application.consensusModule
   private val blockStorage = application.blockStorage
 
   override val route: Route =
@@ -39,7 +37,7 @@ class NxtConsensusApiRoute(application: RunnableApplication) extends ApiRoute wi
     } else {
       complete(Json.obj(
         "address" -> account.right.get.address,
-        "balance" -> consensusModule.generatingBalance(account.right.get, blockStorage.state.stateHeight)(application.transactionModule)))
+        "balance" -> consensusModule.generatingBalance(account.right.get, blockStorage.stateReader.height)(application.transactionModule)))
     }
   }
 

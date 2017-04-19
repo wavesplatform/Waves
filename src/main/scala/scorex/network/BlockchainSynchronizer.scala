@@ -48,9 +48,12 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
       start(GettingExtension) { _ =>
 
         val lastIds = history.lastBlockIds(application.settings.synchronizationSettings.maxRollback)
-
         val msg = Message(GetSignaturesSpec, Right(lastIds), None)
-        networkControllerRef ! NetworkController.SendToNetwork(msg, SendToChosen(peerScores.keys.toSeq))
+
+        val max = peerScores.maxBy(_._2)
+        val maxPeers = peerScores.filter(_._2 == max._2)
+
+        networkControllerRef ! NetworkController.SendToNetwork(msg, SendToChosen(maxPeers.keys.toSeq))
 
         gettingExtension(lastIds.map(InnerId), peerScores.map(peer => peer._1 -> Peer(peer._2)))
       }
@@ -60,7 +63,7 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
     state(GettingExtension, acceptSignaturesSpecOnlyFrom(peers.keySet)) {
       case SignaturesFromPeer(blockIds, connectedPeer) =>
 
-        log.info(s"Got blockIds: $blockIds")
+        log.debug(s"Got blockIds(count= ${blockIds.size}: ${blockIds.take(2)}, ...}")
 
         blockIdsToStartDownload(blockIds, history) match {
           case None =>
@@ -143,7 +146,7 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
                     lastCommonBlockId: BlockId,
                     peers: PeerSet): Receive = {
 
-    log.info(s"Going to request blocks: ${blockIds.mkString(",")}, peer: ${peers.active}")
+    log.debug(s"Going to request blocks amt=${blockIds.size}: ${blockIds.take(2)}, ...}, peer: ${peers.active}")
 
     blockIds.foreach { blockId =>
       val msg = Message(GetBlockSpec, Right(blockId.blockId), None)
@@ -151,14 +154,13 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
     }
     val initialScore = history.scoreOf(lastCommonBlockId)
     val forkStorage = new InMemoryBlockSeq(blockIds)
-    val consensusModule = application.consensusModule
 
     state(GettingBlocks) {
       case BlockFromPeer(block, connectedPeer)
         if peers.active == connectedPeer && forkStorage.containsBlockId(block.uniqueId) =>
 
         if (forkStorage.addIfNotContained(block)) {
-          log.info("Got block: " + block.encodedId)
+          log.debug("Got block: " + block.encodedId)
 
           val author = Some(connectedPeer).filter(_ => !peers.activeChanged)
           val allBlocksAreLoaded = forkStorage.noIdsWithoutBlock
@@ -237,8 +239,8 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
 
         val sortedByScore = updatedPeers.toSeq.sortBy(_._2.score).map(_._1)
 
-        sortedByScore.filterNot(_ == active).headOption
-          .orElse(sortedByScore.headOption)
+        sortedByScore.filterNot(_ == active).lastOption
+          .orElse(sortedByScore.lastOption)
           .map(newActive => ps.copy(active = newActive, peers = updatedPeers))
     }
 

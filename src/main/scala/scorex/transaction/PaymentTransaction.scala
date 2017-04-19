@@ -9,6 +9,7 @@ import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.transaction.TransactionParser._
 import scorex.account.PublicKeyAccount._
+import scorex.crypto.hash.FastCryptographicHash
 
 import scala.util.{Failure, Success, Try}
 
@@ -22,6 +23,8 @@ sealed trait PaymentTransaction extends Transaction {
   def fee: Long
 
   def signature: Array[Byte]
+
+  def hash: Array[Byte]
 }
 
 object PaymentTransaction {
@@ -48,13 +51,17 @@ object PaymentTransaction {
         "recipient" -> recipient.address,
         "amount" -> amount)
 
-    override lazy val bytes: Array[Byte] = {
+    lazy val hashBytes: Array[Byte] = {
       val timestampBytes = Longs.toByteArray(timestamp)
       val amountBytes = Longs.toByteArray(amount)
       val feeBytes = Longs.toByteArray(fee)
-
-      Bytes.concat(Array(transactionType.id.toByte), timestampBytes, sender.publicKey, recipient.bytes, amountBytes, feeBytes, signature)
+      Bytes.concat(Array(transactionType.id.toByte), timestampBytes, sender.publicKey, recipient.bytes, amountBytes, feeBytes)
     }
+
+    override lazy val hash = FastCryptographicHash(hashBytes)
+
+    override lazy val bytes: Array[Byte] = Bytes.concat(hashBytes, signature)
+
   }
 
   val RecipientLength = Account.AddressLength
@@ -100,43 +107,43 @@ object PaymentTransaction {
   }
 
 
-  def parseTail(data: Array[Byte]): Try[PaymentTransaction] =    Try {
-      require(data.length >= BaseLength, "Data does not match base length")
+  def parseTail(data: Array[Byte]): Try[PaymentTransaction] = Try {
+    require(data.length >= BaseLength, "Data does not match base length")
 
-      var position = 0
+    var position = 0
 
-      //READ TIMESTAMP
-      val timestampBytes = data.take(TimestampLength)
-      val timestamp = Longs.fromByteArray(timestampBytes)
-      position += TimestampLength
+    //READ TIMESTAMP
+    val timestampBytes = data.take(TimestampLength)
+    val timestamp = Longs.fromByteArray(timestampBytes)
+    position += TimestampLength
 
-      //READ SENDER
-      val senderBytes = util.Arrays.copyOfRange(data, position, position + SenderLength)
-      val sender = PublicKeyAccount(senderBytes)
-      position += SenderLength
+    //READ SENDER
+    val senderBytes = util.Arrays.copyOfRange(data, position, position + SenderLength)
+    val sender = PublicKeyAccount(senderBytes)
+    position += SenderLength
 
-      //READ RECIPIENT
-      val recipientBytes = util.Arrays.copyOfRange(data, position, position + RecipientLength)
-      val recipient = Account.fromBytes(recipientBytes).right.get
-      position += RecipientLength
+    //READ RECIPIENT
+    val recipientBytes = util.Arrays.copyOfRange(data, position, position + RecipientLength)
+    val recipient = Account.fromBytes(recipientBytes).right.get
+    position += RecipientLength
 
-      //READ AMOUNT
-      val amountBytes = util.Arrays.copyOfRange(data, position, position + AmountLength)
-      val amount = Longs.fromByteArray(amountBytes)
-      position += AmountLength
+    //READ AMOUNT
+    val amountBytes = util.Arrays.copyOfRange(data, position, position + AmountLength)
+    val amount = Longs.fromByteArray(amountBytes)
+    position += AmountLength
 
-      //READ FEE
-      val feeBytes = util.Arrays.copyOfRange(data, position, position + FeeLength)
-      val fee = Longs.fromByteArray(feeBytes)
-      position += FeeLength
+    //READ FEE
+    val feeBytes = util.Arrays.copyOfRange(data, position, position + FeeLength)
+    val fee = Longs.fromByteArray(feeBytes)
+    position += FeeLength
 
-      //READ SIGNATURE
-      val signatureBytes = util.Arrays.copyOfRange(data, position, position + SignatureLength)
+    //READ SIGNATURE
+    val signatureBytes = util.Arrays.copyOfRange(data, position, position + SignatureLength)
 
-      PaymentTransaction
-        .create(sender, recipient, amount, fee, timestamp, signatureBytes)
-        .fold(left => Failure(new Exception(left.toString)), right => Success(right))
-    }.flatten
+    PaymentTransaction
+      .create(sender, recipient, amount, fee, timestamp, signatureBytes)
+      .fold(left => Failure(new Exception(left.toString)), right => Success(right))
+  }.flatten
 
   private def signatureData(sender: PublicKeyAccount, recipient: Account, amount: Long, fee: Long, timestamp: Long): Array[Byte] = {
     val typeBytes = Ints.toByteArray(TransactionType.PaymentTransaction.id)

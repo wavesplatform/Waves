@@ -2,6 +2,8 @@ package com.wavesplatform.http
 
 import com.wavesplatform.TestWallet
 import com.wavesplatform.http.ApiMarshallers._
+import com.wavesplatform.state2.{LeaseInfo, Portfolio}
+import com.wavesplatform.state2.reader.StateReader
 import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.prop.PropertyChecks
@@ -9,7 +11,7 @@ import play.api.libs.json._
 import scorex.api.http.{AddressApiRoute, ApiKeyNotValid, InvalidMessage}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
-import scorex.transaction.State
+import scorex.wallet.Wallet
 
 class AddressRouteSpec
   extends RouteSpec("/addresses")
@@ -18,15 +20,15 @@ class AddressRouteSpec
     with RestAPISettingsHelper
     with TestWallet {
   import org.scalacheck.Shrink
+
   implicit val noShrink: Shrink[String] = Shrink.shrinkAny
 
   private val allAccounts = testWallet.privateKeyAccounts()
   private val allAddresses = allAccounts.map(_.address)
 
   private val state = {
-    val m = mock[State]
-    (m.balance _).expects(*).returning(0L).anyNumberOfTimes()
-    (m.balanceWithConfirmations _).expects(*, *).returning(0L).anyNumberOfTimes()
+    val m = mock[StateReader]
+    (m.accountPortfolio _).expects(*).returning(Portfolio(0L, LeaseInfo.empty, Map.empty)).anyNumberOfTimes()
     m
   }
 
@@ -91,8 +93,8 @@ class AddressRouteSpec
 
   private def testSign(path: String, encode: Boolean): Unit =
     forAll(generatedMessages) { case (account, message) =>
-      val uri = routePath(s"/$path/${account.address }")
-      Post(uri, message) ~> route should produce (ApiKeyNotValid)
+      val uri = routePath(s"/$path/${account.address}")
+      Post(uri, message) ~> route should produce(ApiKeyNotValid)
       Post(uri, message) ~> api_key(apiKey) ~> route ~> check {
         val resp = responseAs[JsObject]
         val signature = Base58.decode((resp \ "signature").as[String]).get
@@ -110,7 +112,7 @@ class AddressRouteSpec
   private def testVerify(path: String, encode: Boolean): Unit = {
 
     forAll(generatedMessages) { case (account, message) =>
-      val uri = routePath(s"/$path/${account.address }")
+      val uri = routePath(s"/$path/${account.address}")
       val messageBytes = message.getBytes()
       val signature = EllipticCurveImpl.sign(account, messageBytes)
       val validBody = Json.obj("message" -> JsString(if (encode) Base58.encode(messageBytes) else message),
@@ -132,31 +134,8 @@ class AddressRouteSpec
   routePath("/verifyText/{address}") in testVerify("verifyText", false)
   routePath("/verify/{address}") in testVerify("verify", true)
 
-  routePath("/balance/{address}/{confirmations}") in {
-    val gen = for {
-      address <- Gen.oneOf(allAddresses).label("address")
-      confirmations <- Gen.choose(1, Int.MaxValue).label("confirmations")
-      balances <- Gen.choose(1L, Long.MaxValue).label("balance")
-    } yield (address, confirmations, balances)
-
-    forAll(gen) {
-      case (address, confirmations, balances) =>
-        allAddresses should contain (address)
-
-        val m = mock[State]
-        (m.balanceWithConfirmations _).expects(*, confirmations).returning(balances).once()
-        val r = AddressApiRoute(restAPISettings, testWallet, m).route
-
-        Get(routePath(s"/balance/$address/$confirmations")) ~> r ~> check {
-          val b = responseAs[AddressApiRoute.Balance]
-          b.balance shouldEqual balances
-          b.confirmations shouldEqual confirmations
-        }
-    }
-  }
-
   routePath("") in {
-    Post(routePath("")) ~> route should produce (ApiKeyNotValid)
+    Post(routePath("")) ~> route should produce(ApiKeyNotValid)
     Post(routePath("")) ~> api_key(apiKey) ~> route ~> check {
       allAddresses should not contain (responseAs[JsObject] \ "address").as[String]
     }

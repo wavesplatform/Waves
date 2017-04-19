@@ -1,5 +1,10 @@
 package scorex.network
 
+import cats._
+import cats.data._
+import cats.implicits._
+import cats.syntax.all._
+
 import akka.pattern.{ask, pipe}
 import akka.util.Timeout
 import scorex.app.Application
@@ -15,18 +20,21 @@ import scorex.network.ScoreObserver.{CurrentScore, GetScore}
 import scorex.network.message.{Message, MessageSpec}
 import scorex.network.peer.PeerManager.{ConnectedPeers, GetConnectedPeersTyped}
 import scorex.transaction.History.BlockchainScore
+import scorex.transaction.ValidationError
+import scorex.transaction.ValidationError.CustomError
 import scorex.utils.ScorexLogging
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.language.postfixOps
-import scala.util.{Failure, Success, Try}
-
+import scala.language.higherKinds
 
 class Coordinator(application: Application) extends ViewSynchronizer with ScorexLogging {
 
   import Coordinator._
+
   private val basicMessagesSpecsRepo = application.basicMessagesSpecsRepo
+
   import basicMessagesSpecsRepo._
 
   override val messageSpecs = Seq[MessageSpec[_]](CheckpointMessageSpec)
@@ -94,7 +102,8 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
             if (syncStatus == BlockchainSynchronizer.Idle && status == CIdle)
               CIdle.name
             else
-              s"${status.name} (${syncStatus.name})" }
+              s"${status.name} (${syncStatus.name})"
+          }
           .pipeTo(sender())
 
       case AddBlock(block, from) => processSingleBlock(block, from)
@@ -149,7 +158,7 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
       history.blockAt(hh(fork.size)).foreach {
         lastValidBlock =>
           log.warn(s"Fork detected (length = ${fork.size}), rollback to last valid block id [${lastValidBlock.encodedId}]")
-          application.blockStorage.removeAfter(lastValidBlock.uniqueId)
+          application.blockStorage.blockchainUpdater.removeAfter(lastValidBlock.uniqueId)
       }
     }
   }
@@ -192,41 +201,40 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
 
     if (isBlockToBeAdded) {
       log.info(s"New block(local: $local): ${newBlock.json}")
-      if (processNewBlock(newBlock)) {
-        application.blockGenerator ! LastBlockChanged
-        if (local) {
-          networkControllerRef ! SendToNetwork(Message(BlockMessageSpec, Right(newBlock), None), Broadcast)
-        } else {
-          self ! BroadcastCurrentScore
-        }
-      } else {
-        from.foreach(_.blacklist())
-        log.warn(s"Can't apply single block, local=$local: ${newBlock.json}")
+      processNewBlock(newBlock) match {
+        case Right(_) =>
+          application.blockGenerator ! LastBlockChanged
+          if (local) {
+            networkControllerRef ! SendToNetwork(Message(BlockMessageSpec, Right(newBlock), None), Broadcast)
+          } else {
+            self ! BroadcastCurrentScore
+          }
+        case Left(err) =>
+          from.foreach(_.blacklist())
+          log.warn(s"Can't apply single block, local=$local: ${newBlock.json}")
       }
     }
   }
 
   private def processFork(lastCommonBlockId: BlockId, blocks: Iterator[Block], from: Option[ConnectedPeer]): Unit = {
     val newBlocks = blocks.toSeq
+
     def isForkValidWithCheckpoint(lastCommonHeight: Int): Boolean = {
       newBlocks.zipWithIndex.forall(p => isValidWithRespectToCheckpoint(p._1, lastCommonHeight + 1 + p._2))
     }
 
     if (application.history.heightOf(lastCommonBlockId).exists(isForkValidWithCheckpoint)) {
-      application.blockStorage.removeAfter(lastCommonBlockId)
+      application.blockStorage.blockchainUpdater.removeAfter(lastCommonBlockId)
 
-      newBlocks.find(!processNewBlock(_)).foreach { failedBlock =>
-        log.warn(s"Can't apply block: ${failedBlock.json}")
-        if (try {
-          history.lastBlock.uniqueId.sameElements(failedBlock.referenceField.value)
-        } catch {
-          case e: UnsupportedOperationException =>
-            log.debug(s"DB can't find last block because of unexpected modification")
-            false
-        }) {
-          from.foreach(_.blacklist())
-        }
-      }
+      foldM[({type l[α] = Either[(ValidationError, BlockId), α]})#l, List, Block, Unit](newBlocks.toList, ())
+        { case ((), block: Block) => processNewBlock(block).left.map((_, block.uniqueId)) } match {
+        case Right(_) =>
+        case Left(err) =>
+          log.error(s"Can't processFork(lastBlockCommonId: ${Base58.encode(lastCommonBlockId)} because: ${err._1}")
+              if (history.lastBlock.uniqueId.sameElements(err._2)) {
+                from.foreach(_.blacklist())
+              }
+            }
 
       self ! BroadcastCurrentScore
 
@@ -245,8 +253,15 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
         }
     }
 
-  def isBlockValid(b: Block) : Boolean = {
-    if (application.transactionModule.blockStorage.history.contains(b)) true //applied blocks are valid
+  private def validateWithRespectToCheckpoint(candidate: Block, estimatedHeight: Int): Either[ValidationError, Unit] = {
+    if (isValidWithRespectToCheckpoint(candidate, estimatedHeight))
+      Right(())
+    else
+      Left(CustomError(s"Block ${str(candidate)} [h = $estimatedHeight] is not valid with respect to checkpoint"))
+  }
+
+  def isBlockValid(b: Block): Either[ValidationError, Unit] = {
+    if (application.transactionModule.blockStorage.history.contains(b)) Right(())
     else {
       def history = application.transactionModule.blockStorage.history.contains(b.reference)
 
@@ -255,51 +270,25 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
 
       def consensus = application.consensusModule.isValid(b)
 
-      def transaction = application.transactionModule.isValid(b)
-
-      if (!history) log.debug(s"Invalid block ${b.encodedId}: no parent block in history")
-      else if (!signature) log.debug(s"Invalid block ${b.encodedId}: signature is not valid")
-      else if (!consensus) log.debug(s"Invalid block ${b.encodedId}: consensus data is not valid")
-      else if (!transaction) log.debug(s"Invalid block ${b.encodedId}: transaction data is not valid")
-
-      history && signature && consensus && transaction
+      if (!history) Left(CustomError(s"Invalid block ${b.encodedId}: no parent block in history"))
+      else if (!signature) Left(CustomError(s"Invalid block ${b.encodedId}: signature is not valid"))
+      else if (!consensus) Left(CustomError(s"Invalid block ${b.encodedId}: consensus data is not valid"))
+      else Right(())
     }
   }
 
 
-  private def processNewBlock(block: Block): Boolean = Try {
-    val oldHeight = history.height()
-    val estimatedHeight = oldHeight + 1
-    if (!isValidWithRespectToCheckpoint(block, estimatedHeight)) {
-      log.warn(s"Block ${str(block)} [h = $estimatedHeight] is not valid with respect to checkpoint")
-      false
-    } else if (isBlockValid(block)) {
+  private def processNewBlock(block: Block): Either[ValidationError, Unit] = for {
+    _ <- validateWithRespectToCheckpoint(block, history.height() + 1)
+    _ <- application.blockStorage.blockchainUpdater.processBlock(block)
+  } yield {
+    application.transactionModule.clearFromUnconfirmed(block.transactionData)
+  }
 
-      val oldScore = history.score()
-
-      application.blockStorage.appendBlock(block) match {
-        case Success(_) =>
-          log.info(
-            s"""Block ${block.encodedId} appended:
-            (height, score) = ($oldHeight, $oldScore) vs (${history.height()}, ${history.score()})""")
-
-          application.transactionModule.clearFromUnconfirmed(block.transactionDataField.value)
-          true
-        case Failure(e) => throw e
-      }
-    } else {
-      log.warn(s"Invalid new block: ${str(block)}")
-      false
-    }
-  } recoverWith { case e =>
-    e.printStackTrace()
-    log.warn(s"Failed to append new block ${str(block)}: $e")
-    Failure(e)
-  } getOrElse false
 
   private def str(block: Block) = {
     if (log.logger.isDebugEnabled) block.json
-    else encode(block.uniqueId) + ", parent " + encode(block.referenceField.value)
+    else encode(block.uniqueId) + ", parent " + encode(block.reference)
   }
 }
 
@@ -325,6 +314,7 @@ object Coordinator {
 
   object SyncFinished {
     def unsuccessfully: SyncFinished = SyncFinished(success = false, None)
+
     def withEmptyResult: SyncFinished = SyncFinished(success = true, None)
   }
 
@@ -335,4 +325,7 @@ object Coordinator {
   case class BroadcastCheckpoint(checkpoint: Checkpoint)
 
   case object ClearCheckpoint
+
+  def foldM[G[_], F[_], A, B](fa: F[A], z: B)(f: (B, A) => G[B])(implicit G: Monad[G], F: Traverse[F]): G[B] =
+    F.foldLeft(fa, G.pure(z))((gb, a) => G.flatMap(gb)(f(_, a)))
 }

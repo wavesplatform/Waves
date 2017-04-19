@@ -7,6 +7,7 @@ import com.ning.http.client.Response
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.Application
 import com.wavesplatform.settings.WavesSettings
+import com.wavesplatform.state2.reader.StateReader
 import dispatch.{Http, Req, url}
 import org.scalatest.concurrent.Eventually
 import org.scalatest.{BeforeAndAfterAll, Suite}
@@ -17,7 +18,7 @@ import scorex.api.http.assets._
 import scorex.api.http.leasing.{LeaseCancelRequest, LeaseRequest}
 import scorex.consensus.mining.BlockGeneratorController.{GetStatus, Idle, StartGeneration, StopGeneration}
 import scorex.crypto.encode.Base58
-import scorex.transaction.{AssetAcc, State}
+import scorex.transaction.AssetAcc
 import scorex.utils._
 
 import scala.concurrent.Await
@@ -83,8 +84,10 @@ trait TestingCommons extends Suite with BeforeAndAfterAll with Eventually {
       |        allow-lease-transaction-after: 0
       |        require-payment-unique-id-after: 0
       |        allow-exchange-transaction-after: 0
-      |        allow-createalias-transaction-after: 0
       |        allow-invalid-reissue-in-same-block-until-timestamp: 0
+      |        allow-createalias-transaction-after: 0
+      |        allow-multiple-lease-cancel-transaction-until-timestamp: 0
+      |        reset-effective-balances-at-height: -1
       |      }
       |      genesis {
       |        timestamp: 1478000000000
@@ -195,6 +198,8 @@ trait TestingCommons extends Suite with BeforeAndAfterAll with Eventually {
       |        allow-exchange-transaction-after: 0
       |        allow-invalid-reissue-in-same-block-until-timestamp: 0
       |        allow-createalias-transaction-after: 0
+      |        allow-multiple-lease-cancel-transaction-until-timestamp: 0
+      |        reset-effective-balances-at-height: -1
       |      }
       |      genesis {
       |        timestamp: 1478000000000
@@ -278,8 +283,10 @@ trait TestingCommons extends Suite with BeforeAndAfterAll with Eventually {
       |        allow-lease-transaction-after: 0
       |        require-payment-unique-id-after: 0
       |        allow-exchange-transaction-after: 0
-      |        allow-createalias-transaction-after: 0
       |        allow-invalid-reissue-in-same-block-until-timestamp: 0
+      |        allow-createalias-transaction-after: 0
+      |        allow-multiple-lease-cancel-transaction-until-timestamp: 0
+      |        reset-effective-balances-at-height: -1
       |      }
       |      genesis {
       |        timestamp: 1478000000000
@@ -419,7 +426,7 @@ trait TestingCommons extends Suite with BeforeAndAfterAll with Eventually {
     }
   }
 
-  def waitForBalance(balance: Long, acc: Account, asset: Option[String] = None)(implicit storedState: State): Unit = {
+  def waitForBalance(balance: Long, acc: Account, asset: Option[String] = None)(implicit storedState: StateReader): Unit = {
     val assetId = asset.flatMap(Base58.decode(_).toOption)
     eventually(timeout(5.seconds), interval(500.millis)) {
       Thread.sleep(100)
@@ -427,7 +434,7 @@ trait TestingCommons extends Suite with BeforeAndAfterAll with Eventually {
     }
   }
 
-  def waitForEffectiveBalance(balance: Long, acc: Account)(implicit storedState: State): Unit = {
+  def waitForEffectiveBalance(balance: Long, acc: Account)(implicit storedState: StateReader): Unit = {
      eventually(timeout(5.seconds), interval(500.millis)) {
       Thread.sleep(100)
        require(storedState.effectiveBalance(acc) == balance)

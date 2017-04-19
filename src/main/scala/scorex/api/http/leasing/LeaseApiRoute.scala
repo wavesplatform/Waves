@@ -4,17 +4,17 @@ import javax.ws.rs.Path
 
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.settings.RestAPISettings
+import com.wavesplatform.state2.reader.StateReader
 import io.swagger.annotations._
 import scorex.api.http._
 import scorex.api.http.leasing.LeaseCancelRequest.leaseCancelRequestFormat
 import scorex.api.http.leasing.LeaseRequest.leaseCancelRequestFormat
 import scorex.transaction._
-import scorex.transaction.state.database.blockchain.StoredState
 import scorex.wallet.Wallet
 
 @Path("/leasing")
 @Api(value = "/leasing")
-case class LeaseApiRoute(settings: RestAPISettings, wallet: Wallet, state: State, transactionModule: TransactionOperations)
+case class LeaseApiRoute(settings: RestAPISettings, wallet: Wallet, state: StateReader, transactionModule: TransactionOperations)
   extends ApiRoute {
 
   override val route = pathPrefix("leasing") {

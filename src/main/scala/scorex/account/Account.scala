@@ -18,6 +18,15 @@ sealed trait Account extends AccountOrAlias {
   lazy val stringRepr: String = Account.Prefix + address
 
   val bytes: Array[Byte]
+
+  override def toString: String = stringRepr
+
+  override def equals(obj: scala.Any): Boolean = obj match {
+    case a: Account => bytes sameElements a.bytes
+    case _ => false
+  }
+
+  override def hashCode(): Int = java.util.Arrays.hashCode(bytes)
 }
 
 object Account extends ScorexLogging {

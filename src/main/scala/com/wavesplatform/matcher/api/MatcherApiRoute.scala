@@ -1,6 +1,7 @@
 package com.wavesplatform.matcher.api
 
 import javax.ws.rs.Path
+
 import akka.actor.ActorRef
 import akka.http.scaladsl.model.{StatusCodes, Uri}
 import akka.http.scaladsl.server.{Directive1, Route}
@@ -10,15 +11,13 @@ import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.market.MatcherActor.{GetMarkets, GetMarketsResponse}
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.settings.RestAPISettings
+import com.wavesplatform.state2.reader.StateReader
 import io.swagger.annotations._
 import play.api.libs.json._
 import scorex.api.http._
-import scorex.app.Application
 import scorex.crypto.encode.Base58
-import scorex.transaction.State
 import scorex.transaction.assets.exchange.OrderJson._
 import scorex.transaction.assets.exchange.{AssetPair, Order}
-import scorex.transaction.state.database.blockchain.StoredState
 import scorex.wallet.Wallet
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -27,21 +26,19 @@ import scala.util.{Failure, Success}
 
 @Path("/matcher")
 @Api(value = "/matcher/")
-case class MatcherApiRoute(application: Application, matcher: ActorRef, settings: RestAPISettings, matcherSettings: MatcherSettings) extends ApiRoute {
+case class MatcherApiRoute(wallet: Wallet,storedState: StateReader, matcher: ActorRef,
+                           settings: RestAPISettings, matcherSettings: MatcherSettings) extends ApiRoute {
   private implicit val timeout: Timeout = 5.seconds
-
-  val wallet: Wallet = application.wallet
-  val storedState: State = application.blockStorage.state
 
   override lazy val route: Route =
     pathPrefix("matcher") {
-      matcherPublicKey ~ orderBook ~ place ~ orderStatus ~ cancel ~ orderbooks
+      matcherPublicKey ~ orderBook ~ place ~ orderStatus ~ cancel ~ orderbooks ~ orderBookDelete
     }
 
   def withAssetPair(a1: String, a2: String): Directive1[AssetPair] = {
     AssetPair.createAssetPair(a1, a2) match {
       case Success(p) => provide(p)
-      case Failure(e) => complete(StatusCodes.BadRequest -> Json.obj("message" -> "Invalid asset pair"))
+      case Failure( e) => complete(StatusCodes.BadRequest -> Json.obj("message" -> "Invalid asset pair"))
     }
   }
 
@@ -152,4 +149,20 @@ case class MatcherApiRoute(application: Application, matcher: ActorRef, settings
         .map(r => r.json))
     }
   }
+
+  @Path("/orderbook/{amountAsset}/{priceAsset}")
+  @ApiOperation(value = "Remove Order Book for a given Asset Pair",
+    notes = "Remove Order Book for a given Asset Pair", httpMethod = "DELETE")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(name = "amountAsset", value = "Amount Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
+    new ApiImplicitParam(name = "priceAsset", value = "Price Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path")
+  ))
+  def orderBookDelete: Route = (path("orderbook" / Segment / Segment) & delete & withAuth) { (a1, a2) =>
+    withAssetPair(a1, a2) { pair =>
+      complete((matcher ? DeleteOrderBookRequest(pair))
+        .mapTo[MatcherResponse]
+        .map(r => r.code -> r.json))
+    }
+  }
+
 }

@@ -30,6 +30,8 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
         |        allow-exchange-transaction-after: 11
         |        allow-invalid-reissue-in-same-block-until-timestamp: 12
         |        allow-createalias-transaction-after: 13
+        |        allow-multiple-lease-cancel-transaction-until-timestamp: 14
+        |        reset-effective-balances-at-height: 15
         |      }
         |      genesis {
         |        timestamp: 1460678400000
@@ -63,6 +65,8 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
     settings.functionalitySettings.allowExchangeTransactionAfterTimestamp should be(11)
     settings.functionalitySettings.allowInvalidReissueInSameBlockUntilTimestamp should be(12)
     settings.functionalitySettings.allowCreateAliasTransactionAfterTimestamp should be(13)
+    settings.functionalitySettings.allowMultipleLeaseCancelTransactionUntilTimestamp should be(14)
+    settings.functionalitySettings.resetEffectiveBalancesAtHeight should be(15)
     settings.genesisSettings.blockTimestamp should be(1460678400000L)
     settings.genesisSettings.transactionsTimestamp should be(1460678400000L)
     settings.genesisSettings.signature should be("BASE58BLOCKSIGNATURE")
@@ -97,8 +101,11 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
     settings.functionalitySettings.allowTransactionsFromFutureUntil should be(Long.MinValue)
     settings.functionalitySettings.allowUnissuedAssetsUntil should be(1479416400000L)
     settings.functionalitySettings.allowBurnTransactionAfterTimestamp should be(1481110521000L)
-    settings.functionalitySettings.allowInvalidReissueInSameBlockUntilTimestamp should be(Long.MinValue)
     settings.functionalitySettings.requirePaymentUniqueId should be(1485942685000L)
+    settings.functionalitySettings.allowInvalidReissueInSameBlockUntilTimestamp should be(1492560000000L)
+    settings.functionalitySettings.allowMultipleLeaseCancelTransactionUntilTimestamp should be(1492560000000L)
+    settings.functionalitySettings.allowExchangeTransactionAfterTimestamp should be(1483228800000L)
+    settings.functionalitySettings.resetEffectiveBalancesAtHeight should be(51500)
     settings.genesisSettings.blockTimestamp should be(1460678400000L)
     settings.genesisSettings.transactionsTimestamp should be(1478000000000L)
     settings.genesisSettings.signature should be("5uqnLK3Z9eiot6FyYBfwUnbyid3abicQbAZjz38GQ1Q8XigQMxTK4C1zNkqS1SVw7FqSidbZKxWAKLVoEsp4nNqa")
@@ -134,8 +141,11 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
     settings.functionalitySettings.allowTransactionsFromFutureUntil should be(1479168000000L)
     settings.functionalitySettings.allowUnissuedAssetsUntil should be(1479416400000L)
     settings.functionalitySettings.allowBurnTransactionAfterTimestamp should be(1491192000000L)
-    settings.functionalitySettings.allowInvalidReissueInSameBlockUntilTimestamp should be(Long.MaxValue)
+    settings.functionalitySettings.allowInvalidReissueInSameBlockUntilTimestamp should be(1492768800000L)
+    settings.functionalitySettings.allowMultipleLeaseCancelTransactionUntilTimestamp should be(1492768800000L)
+    settings.functionalitySettings.resetEffectiveBalancesAtHeight should be(462000)
     settings.functionalitySettings.requirePaymentUniqueId should be(1491192000000L)
+    settings.functionalitySettings.allowExchangeTransactionAfterTimestamp should be(1491192000000L)
     settings.genesisSettings.blockTimestamp should be(1460678400000L)
     settings.genesisSettings.transactionsTimestamp should be(1465742577614L)
     settings.genesisSettings.signature should be("FSH8eAAzZNqnG8xgTZtz5xuLqXySsXgAjmFEC25hXMbEufiGjqWPnGCZFt6gLiVLJny16ipxRNAkkzjjhqTjBE2")

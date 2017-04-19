@@ -6,25 +6,16 @@ import org.h2.mvstore.{MVMap, MVStore}
 import scorex.account.Account
 import scorex.block.Block
 import scorex.block.Block.BlockId
-import scorex.consensus.nxt.WavesConsensusModule
 import scorex.network.Checkpoint
-import scorex.transaction.BlockStorage._
 import scorex.transaction.History.BlockchainScore
-import scorex.transaction.{BlockChain, TransactionModule}
+import scorex.transaction.ValidationError.CustomError
+import scorex.transaction.{History, ValidationError}
 import scorex.utils.{LogMVMapBuilder, ScorexLogging}
 
 import scala.collection.JavaConverters._
-import scala.util.{Failure, Success, Try}
+import scala.util.{Failure, Try}
 
-/**
-  * If no datafolder provided, blockchain lives in RAM (useful for tests)
-  */
-class StoredBlockchain(db: MVStore)
-                      (implicit consensusModule: WavesConsensusModule,
-                       transactionModule: TransactionModule)
-  extends BlockChain with ScorexLogging {
-
-  require(consensusModule != null)
+class StoredBlockchain(db: MVStore) extends History with ScorexLogging {
 
   case class BlockchainPersistence(database: MVStore) {
     val blocks: MVMap[Int, Array[Byte]] = database.openMap("blocks", new LogMVMapBuilder[Int, Array[Byte]])
@@ -59,7 +50,7 @@ class StoredBlockchain(db: MVStore)
     //if there are some uncommitted changes from last run, discard'em
     if (signatures.size() > 0) database.rollback()
 
-    def writeBlock(height: Int, block: Block): Try[Unit] = Try {
+    def writeBlock(height: Int, block: Block): Unit = {
       blocks.put(height, block.bytes)
       scoreMap.put(height, score() + block.blockScore)
       signatures.put(height, block.uniqueId)
@@ -96,22 +87,17 @@ class StoredBlockchain(db: MVStore)
 
   private val blockStorage: BlockchainPersistence = BlockchainPersistence(db)
 
-  override def appendBlock(block: Block): Try[BlocksToProcess] = synchronized {
-    Try {
-      val parent = block.referenceField
-      if ((height() == 0) || (lastBlock.uniqueId sameElements parent.value)) {
-        val h = height() + 1
-        blockStorage.writeBlock(h, block) match {
-          case Success(_) => Seq(block)
-          case Failure(e) => throw new Error("Error while storing blockchain a change: " + e, e)
-        }
-      } else {
-        throw new Error(s"Appending block ${block.json} which parent is not last block in blockchain")
-      }
+  override def appendBlock(block: Block): Either[ValidationError, Unit] = synchronized {
+    if ((height() == 0) || (lastBlock.uniqueId sameElements block.reference)) {
+      val h = height() + 1
+      blockStorage.writeBlock(h, block)
+      Right(())
+    } else {
+      Left(CustomError(s"Appending block ${block.json} which parent is not last block in blockchain"))
     }
   }
 
-  override private[transaction] def discardBlock(): BlockChain = synchronized {
+  override def discardBlock(): History = synchronized {
     require(height() > 1, "Chain is empty or contains genesis block only, can't make rollback")
     val h = height()
     blockStorage.deleteBlock(h)

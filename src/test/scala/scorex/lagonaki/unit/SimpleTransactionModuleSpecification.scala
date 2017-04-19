@@ -6,8 +6,9 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.{FunSuite, Matchers}
 import scorex.app.Application
 import scorex.block.Block
+import scorex.consensus.nxt.WavesConsensusModule
 import scorex.crypto.encode.Base58
-import scorex.lagonaki.mocks.{ConsensusMock, TestBlock}
+import scorex.lagonaki.mocks.TestBlock
 import scorex.settings.TestBlockchainSettings
 import scorex.transaction.assets.TransferTransaction
 import scorex.transaction.{PaymentTransaction, SimpleTransactionModule, Transaction}
@@ -17,7 +18,6 @@ import scala.concurrent.duration._
 import scala.language.postfixOps
 import scala.util.Random
 
-//TODO: gagarin55 - Can't move it to appropriate module due to dependancy on some ConsesusModule impl
 class SimpleTransactionModuleSpecification extends FunSuite with MockFactory with Matchers {
 
   private val config = ConfigFactory.parseString(
@@ -38,7 +38,7 @@ class SimpleTransactionModuleSpecification extends FunSuite with MockFactory wit
 
   trait MyApp extends Application {
     override val settings: WavesSettings = wavesSettings
-    override implicit val consensusModule = new ConsensusMock
+    override implicit val consensusModule = new WavesConsensusModule(TestBlockchainSettings.Disabled)
   }
 
   implicit val app = stub[MyApp]
@@ -47,17 +47,17 @@ class SimpleTransactionModuleSpecification extends FunSuite with MockFactory wit
   implicit val transactionModule = new SimpleTransactionModule(TestBlockchainSettings.Enabled.genesisSettings)
   val genesisTimestamp = System.currentTimeMillis()
   if (transactionModule.blockStorage.history.isEmpty) {
-    transactionModule.blockStorage.appendBlock(Block.genesis(consensusModule.genesisData, transactionModule.genesisData, genesisTimestamp))
+    transactionModule.blockStorage.blockchainUpdater.processBlock(Block.genesis(consensusModule.genesisData, transactionModule.genesisData, genesisTimestamp))
   }
   assert(!transactionModule.blockStorage.history.isEmpty)
 
   // account with money
   val walletSeed = Base58.decode("FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz").get
   val privateKeyAccount = Wallet.generateNewAccount(walletSeed, -1)
-  assert(transactionModule.blockStorage.state.balance(privateKeyAccount) > 0L)
+  assert(transactionModule.blockStorage.stateReader.balance(privateKeyAccount) > 0L)
   // account without money
   val noBalanceAccount = Wallet.generateNewAccount(walletSeed, 5)
-  assert(transactionModule.blockStorage.state.balance(noBalanceAccount) == 0L)
+  assert(transactionModule.blockStorage.stateReader.balance(noBalanceAccount) == 0L)
 
 
   test("isValid() checks that tx not too old") {
@@ -80,10 +80,8 @@ class SimpleTransactionModuleSpecification extends FunSuite with MockFactory wit
     transactionModule.utxStorage.putIfNew(oldValidTx, validDelegate)
     assert(transactionModule.utxStorage.all().size == 2)
 
-    // do
     transactionModule.clearIncorrectTransactions()
 
-    // assert
     assert(transactionModule.utxStorage.all().size == 1)
     assert(!transactionModule.utxStorage.all().contains(oldValidTx))
   }
@@ -97,19 +95,10 @@ class SimpleTransactionModuleSpecification extends FunSuite with MockFactory wit
     transactionModule.utxStorage.putIfNew(invalidTx, validDelegate)
     assert(transactionModule.utxStorage.all().size == 2)
 
-    // do
     transactionModule.clearIncorrectTransactions()
 
-    // assert
     assert(transactionModule.utxStorage.all().size == 1)
     assert(!transactionModule.utxStorage.all().contains(invalidTx))
-  }
-
-  test("unique txs by id in one block") {
-    val tx = TransferTransaction.create(None, privateKeyAccount, privateKeyAccount, 1L, genesisTimestamp + 1000, None, 100000L, Array.empty).right.get
-    transactionModule.isValid(TestBlock(Seq(tx))) shouldBe true
-    val replaySeq = Seq(tx, tx)
-    transactionModule.isValid(TestBlock(replaySeq)) shouldBe false
   }
 
   test("packUnconfirmed() packs txs in correct order") {

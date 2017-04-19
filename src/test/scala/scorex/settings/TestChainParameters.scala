@@ -5,8 +5,17 @@ import scala.concurrent.duration._
 
 object TestFunctionalitySettings {
   val Disabled = FunctionalitySettings(Long.MaxValue, Long.MaxValue, Long.MaxValue, Long.MaxValue, Long.MaxValue,
-    Long.MaxValue, Long.MaxValue, Long.MaxValue, Long.MaxValue, Long.MaxValue, Long.MaxValue, Long.MaxValue, Long.MaxValue)
-  val Enabled = FunctionalitySettings(0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L, 0L)
+    Long.MaxValue, Long.MaxValue, Long.MaxValue, Long.MaxValue, Long.MaxValue, Long.MaxValue, Long.MaxValue, Long.MaxValue, Long.MaxValue, Long.MaxValue)
+  val Enabled = FunctionalitySettings(
+    allowTemporaryNegativeUntil = 0L, allowInvalidPaymentTransactionsByTimestamp = 0L,
+    requireSortedTransactionsAfter = 0L, generatingBalanceDepthFrom50To1000AfterHeight = 0L,
+    minimalGeneratingBalanceAfterTimestamp = 0L,
+    allowTransactionsFromFutureUntil = Long.MaxValue, allowUnissuedAssetsUntil = 0L,
+    allowBurnTransactionAfterTimestamp = 0L, allowLeaseTransactionAfterTimestamp = 0L,
+    requirePaymentUniqueId = 0L, allowExchangeTransactionAfterTimestamp = 0L,
+    allowInvalidReissueInSameBlockUntilTimestamp = 0L, allowCreateAliasTransactionAfterTimestamp = 0L,
+    allowMultipleLeaseCancelTransactionUntilTimestamp = Long.MaxValue / 2, resetEffectiveBalancesAtHeight = 5
+  )
 }
 
 object TestBlockchainSettings {

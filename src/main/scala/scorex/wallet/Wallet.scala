@@ -37,7 +37,6 @@ class Wallet(maybeFilename: Option[String], password: String, seedOpt: Option[Ar
 
   if (Option(seedPersistence.get("seed")).isEmpty) {
     val seed = seedOpt.getOrElse {
-      val Attempts = 10
       val SeedSize = 64
       lazy val randomSeed = randomBytes(SeedSize)
       lazy val encodedSeed = Base58.encode(randomSeed)

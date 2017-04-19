@@ -3,6 +3,7 @@ package com.wavesplatform.http
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.settings.RestAPISettings
+import com.wavesplatform.state2.reader.StateReader
 import com.wavesplatform.{RequestGen, TestWallet}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
@@ -69,7 +70,7 @@ class AssetsRouteSpec
     val currentPath = routePath(path)
     currentPath in {
       forAll(errorGen) { e =>
-        val route = AssetsApiRoute(settings, testWallet, mock[State], txsOperationsMock(e)).route
+        val route = AssetsApiRoute(settings, testWallet, mock[StateReader], txsOperationsMock(e)).route
 
         forAll(gen) { tr =>
           val p = Post(currentPath, tr)

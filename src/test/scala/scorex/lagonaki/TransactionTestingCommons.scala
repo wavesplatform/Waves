@@ -3,6 +3,7 @@ package scorex.lagonaki
 import scorex.account.PrivateKeyAccount
 import scorex.app.RunnableApplication
 import scorex.block.Block
+import scorex.transaction.state.database.blockchain.Validator
 import scorex.transaction.{History, Transaction, TransactionsBlockField}
 import scorex.utils.ScorexLogging
 
@@ -13,25 +14,25 @@ trait TransactionTestingCommons extends scorex.waves.TestingCommons with ScorexL
   implicit lazy val transactionModule = application.transactionModule
 
   if (application.transactionModule.blockStorage.history.isEmpty) {
-    application.transactionModule.blockStorage.appendBlock(Block.genesis(consensusModule.genesisData, transactionModule.genesisData))
+    application.transactionModule.blockStorage.blockchainUpdater.processBlock(Block.genesis(consensusModule.genesisData, transactionModule.genesisData))
   }
 
   if (application.wallet.privateKeyAccounts().size < 3) {
     application.wallet.generateNewAccounts(3)
   }
 
-  val ab = applicationNonEmptyAccounts.map(application.consensusModule.generatingBalance(_, transactionModule.blockStorage.state.stateHeight)).sum
+  val ab = applicationNonEmptyAccounts.map(application.consensusModule.generatingBalance(_, transactionModule.blockStorage.stateReader.height)).sum
   require(ab > 2)
 
   def applicationNonEmptyAccounts: Seq[PrivateKeyAccount] =
-    application.wallet.privateKeyAccounts().filter(application.consensusModule.generatingBalance(_, transactionModule.blockStorage.state.stateHeight) > 0)
+    application.wallet.privateKeyAccounts().filter(application.consensusModule.generatingBalance(_, transactionModule.blockStorage.stateReader.height) > 0)
 
   def applicationEmptyAccounts: Seq[PrivateKeyAccount] =
-    application.wallet.privateKeyAccounts().filter(application.consensusModule.generatingBalance(_, transactionModule.blockStorage.state.stateHeight) == 0)
+    application.wallet.privateKeyAccounts().filter(application.consensusModule.generatingBalance(_, transactionModule.blockStorage.stateReader.height) == 0)
 
   def genValidBlock(): Block = {
     application.consensusModule.generateNextBlocks(applicationNonEmptyAccounts)(application.transactionModule).headOption match {
-        // TODO: isBlockValid is a method of actor, need to refactor that?
+      // TODO: isBlockValid is a method of actor, need to refactor that?
       case Some(block: Block) => block // if application.coordinator.isBlockValid(block) => block
       case None =>
         Thread.sleep(500)
@@ -44,7 +45,7 @@ trait TransactionTestingCommons extends scorex.waves.TestingCommons with ScorexL
                           senderOpt: Option[PrivateKeyAccount] = None
                          ): Transaction = {
     val senderAcc = senderOpt.getOrElse(randomFrom(applicationNonEmptyAccounts))
-    val senderBalance = application.consensusModule.generatingBalance(senderAcc, transactionModule.blockStorage.state.stateHeight) / 1000
+    val senderBalance = application.consensusModule.generatingBalance(senderAcc, transactionModule.blockStorage.stateReader.height) / 1000
     require(senderBalance > 0)
     val fee = Random.nextInt(5).toLong + 1
     if (senderBalance <= fee) {
@@ -54,7 +55,7 @@ trait TransactionTestingCommons extends scorex.waves.TestingCommons with ScorexL
       else senderBalance - fee
       val recipient = recipientOpt.getOrElse(randomFrom(applicationNonEmptyAccounts))
       val tx = application.transactionModule.createPayment(senderAcc, recipient, amt, fee).right.get
-      if (application.transactionModule.validator.isValid(tx, tx.timestamp)) tx
+      if (Validator.validate(application.settings.blockchainSettings.functionalitySettings, application.transactionModule.blockStorage.stateReader, tx).isRight) tx
       else genValidTransaction(randomAmnt, recipientOpt, senderOpt)
     }
   }

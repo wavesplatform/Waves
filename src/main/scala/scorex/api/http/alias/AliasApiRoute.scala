@@ -4,6 +4,7 @@ import javax.ws.rs.Path
 
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.settings.RestAPISettings
+import com.wavesplatform.state2.reader.StateReader
 import io.swagger.annotations._
 import play.api.libs.json.{Format, Json}
 import scorex.account.{Account, Alias}
@@ -13,7 +14,7 @@ import scorex.wallet.Wallet
 
 @Path("/alias")
 @Api(value = "/alias")
-case class AliasApiRoute(settings: RestAPISettings, wallet: Wallet, transactionOperations: TransactionOperations, state: State)
+case class AliasApiRoute(settings: RestAPISettings, wallet: Wallet, transactionOperations: TransactionOperations, state: StateReader)
   extends ApiRoute {
 
   override val route = pathPrefix("alias") {
@@ -63,7 +64,7 @@ case class AliasApiRoute(settings: RestAPISettings, wallet: Wallet, transactionO
   ))
   def aliasOfAddress: Route = (get & path("by-address" / Segment)) { addressString =>
     val result: Either[ApiError, Seq[String]] = Account.fromString(addressString)
-      .map(acc => state.getAliases(acc).map(_.stringRepr))
+      .map(acc => state.aliasesOfAddress(acc).map(_.stringRepr))
       .left.map(ApiError.fromValidationError)
     complete(result)
   }

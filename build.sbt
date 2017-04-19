@@ -34,7 +34,8 @@ libraryDependencies ++=
   Seq(
     "com.iheart" %% "ficus" % "1.4.0",
     "org.scorexfoundation" %% "scrypto" % "1.2.0",
-    "commons-net" % "commons-net" % "3.+"
+    "commons-net" % "commons-net" % "3.+",
+    "org.typelevel" %% "cats-core" % "0.9.0"
   )
 
 inConfig(Test)(Seq(

@@ -4,7 +4,7 @@ import com.wavesplatform.matcher.api.CancelOrderRequest
 import com.wavesplatform.settings.Constants
 import org.scalatest.concurrent.Eventually
 import org.scalatest.time.SpanSugar._
-import org.scalatest.{FunSuite, Matchers}
+import org.scalatest.{DoNotDiscover, FunSuite, Matchers}
 import play.api.libs.json.{JsArray, JsValue, Json}
 import scorex.account.{Account, PrivateKeyAccount}
 import scorex.api.http.assets.{IssueRequest, TransferRequest}
@@ -18,6 +18,7 @@ import scorex.utils.NTP
   * !!! Tests should work only as whole TestSuite in sequence one by one, not separately,
   * as the state depends on the previous test
   */
+@DoNotDiscover
 class MatcherAPISpecification extends FunSuite with Matchers with Eventually with scorex.waves.TestingCommons {
   private val wallet = application.wallet
   private val AccountM = wallet.privateKeyAccounts()(2)

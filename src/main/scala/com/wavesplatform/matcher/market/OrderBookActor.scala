@@ -9,11 +9,11 @@ import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.model.Events.{Event, OrderAdded, OrderExecuted}
 import com.wavesplatform.matcher.model.MatcherModel._
 import com.wavesplatform.matcher.model.{OrderValidator, _}
+import com.wavesplatform.state2.reader.StateReader
 import play.api.libs.json.Json
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange._
-import scorex.transaction.state.database.state.extension.ExchangeTransactionValidator
-import scorex.transaction.{State, TransactionModule}
+import scorex.transaction.TransactionModule
 import scorex.utils.{NTP, ScorexLogging}
 import scorex.wallet.Wallet
 
@@ -21,7 +21,7 @@ import scala.annotation.tailrec
 import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class OrderBookActor(assetPair: AssetPair, val storedState: State,
+class OrderBookActor(assetPair: AssetPair, val storedState: StateReader,
                      val wallet: Wallet, val settings: MatcherSettings,
                      val transactionModule: TransactionModule)
   extends PersistentActor
@@ -58,6 +58,11 @@ class OrderBookActor(assetPair: AssetPair, val storedState: State,
       handleOrderStatus(id)
     case cancel: CancelOrder =>
       handleCancelOrder(cancel)
+    case DeleteOrderBookRequest(pair) =>
+      deleteMessages(lastSequenceNr)
+      deleteSnapshots(SnapshotSelectionCriteria.Latest)
+      context.stop(self)
+      sender() ! GetOrderBookResponse(pair, Seq(), Seq())
   }
 
   def handleOrderStatus(id: String): Unit = {
@@ -163,7 +168,7 @@ class OrderBookActor(assetPair: AssetPair, val storedState: State,
 }
 
 object OrderBookActor {
-  def props(assetPair: AssetPair, storedState: State,
+  def props(assetPair: AssetPair, storedState: StateReader,
             wallet: Wallet, settings: MatcherSettings, transactionModule: TransactionModule): Props =
     Props(new OrderBookActor(assetPair, storedState, wallet, settings, transactionModule))
 
@@ -177,6 +182,8 @@ object OrderBookActor {
   }
 
   case class GetOrderBookRequest(assetPair: AssetPair, depth: Option[Int]) extends OrderBookRequest
+
+  case class DeleteOrderBookRequest(assetPair: AssetPair) extends OrderBookRequest
 
   case class GetOrderStatus(assetPair: AssetPair, id: String) extends OrderBookRequest
 
@@ -226,8 +233,5 @@ object OrderBookActor {
   case object SaveSnapshot
 
   case class Snapshot(orderBook: OrderBook, history: Map[String, (Long, Long)])
-
-  val bidsOrdering: Ordering[Long] = (x: Long, y: Long) => -Ordering.Long.compare(x, y)
-  val asksOrdering: Ordering[Long] = (x: Long, y: Long) => Ordering.Long.compare(x, y)
 }
 

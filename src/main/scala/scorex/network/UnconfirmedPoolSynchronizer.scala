@@ -11,10 +11,6 @@ import scorex.utils.ScorexLogging
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-
-/**
-  * Synchronizing transactions that are not in blockchain yet
-  */
 class UnconfirmedPoolSynchronizer(private val transactionModule: TransactionModule, settings: UTXSettings,
                                   networkController: ActorRef)
   extends ViewSynchronizer with ScorexLogging {
@@ -42,9 +38,6 @@ class UnconfirmedPoolSynchronizer(private val transactionModule: TransactionModu
       }
   }
 
-  /**
-    * Broadcast unconfirmed tx to other connected peers
-    */
   private def broadcast(tx: Transaction): Unit = {
     val spec = TransactionalMessagesRepo.TransactionMessageSpec
     val ntwMsg = Message(spec, Right(tx), None)

@@ -49,7 +49,7 @@ trait RequestGen extends TransactionGen {
 
   val broadcastIssueReq: G[SignedIssueRequest] = for {
     _signature <- signatureGen
-    _timestamp <- timestampGen
+    _timestamp <- ntpTimestampGen
     _ir <- issueReq
   } yield SignedIssueRequest(_ir.sender, _ir.name, _ir.description, _ir.quantity, _ir.decimals, _ir.reissuable, _ir.fee,
     _timestamp, _signature)
@@ -67,7 +67,7 @@ trait RequestGen extends TransactionGen {
 
   val broadcastReissueReq: G[SignedReissueRequest] = for {
     _signature <- signatureGen
-    _timestamp <- timestampGen
+    _timestamp <- ntpTimestampGen
     _rr <- reissueReq
   } yield SignedReissueRequest(_rr.sender, _rr.assetId, _rr.quantity, _rr.reissuable, _rr.fee, _timestamp, _signature)
 
@@ -78,7 +78,7 @@ trait RequestGen extends TransactionGen {
 
   val broadcastBurnReq: G[SignedBurnRequest] = for {
     _signature <- signatureGen
-    _timestamp <- timestampGen
+    _timestamp <- ntpTimestampGen
     _br <- burnReq
   } yield SignedBurnRequest(_br.sender, _br.assetId, _br.quantity, _br.fee, _timestamp, _signature)
 
@@ -93,7 +93,7 @@ trait RequestGen extends TransactionGen {
 
   val broadcastTransferReq: G[SignedTransferRequest] = for {
     _signature <- signatureGen
-    _timestamp <- timestampGen
+    _timestamp <- ntpTimestampGen
     _tr <- transferReq
   } yield SignedTransferRequest(_tr.sender, _tr.assetId, _tr.recipient, _tr.amount, _tr.fee, _tr.feeAssetId, _timestamp,
     _tr.attachment, _signature)

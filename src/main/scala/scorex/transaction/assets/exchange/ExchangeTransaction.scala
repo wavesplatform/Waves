@@ -56,7 +56,7 @@ object ExchangeTransaction {
   }
 
   private def createUnverified(buyOrder: Order, sellOrder: Order, price: Long, amount: Long,
-      buyMatcherFee: Long, sellMatcherFee: Long, fee: Long, timestamp: Long, signature: Option[Array[Byte]] = None) = {
+                               buyMatcherFee: Long, sellMatcherFee: Long, fee: Long, timestamp: Long, signature: Option[Array[Byte]] = None) = {
     lazy val priceIsValid: Boolean = price <= buyOrder.price && price >= sellOrder.price
 
     if (fee <= 0) {
@@ -68,7 +68,7 @@ object ExchangeTransaction {
     } else if (price > Order.MaxAmount) {
       Left(TransactionParameterValidationError("price too large"))
     } else if (amount > Order.MaxAmount) {
-      Left(TransactionParameterValidationError("price too large"))
+      Left(TransactionParameterValidationError("amount too large"))
     } else if (sellMatcherFee > Order.MaxAmount) {
       Left(TransactionParameterValidationError("sellMatcherFee too large"))
     } else if (buyMatcherFee > Order.MaxAmount) {
@@ -84,9 +84,9 @@ object ExchangeTransaction {
     } else if (buyOrder.assetPair != sellOrder.assetPair) {
       Left(TransactionParameterValidationError("Both orders should have same AssetPair"))
     } else if (!buyOrder.isValid(timestamp)) {
-      Left(TransactionParameterValidationError("buyOrder"))
+      Left(TransactionParameterValidationError(buyOrder.isValid(timestamp).labels.mkString("\n")))
     } else if (!sellOrder.isValid(timestamp)) {
-      Left(TransactionParameterValidationError("sellOrder"))
+      Left(TransactionParameterValidationError(sellOrder.isValid(timestamp).labels.mkString("\n")))
     } else if (!priceIsValid) {
       Left(TransactionParameterValidationError("priceIsValid"))
     } else {

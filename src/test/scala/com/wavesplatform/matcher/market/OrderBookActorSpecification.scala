@@ -1,6 +1,5 @@
 package com.wavesplatform.matcher.market
 
-import scala.concurrent.duration._
 import akka.actor.{ActorSystem, Props}
 import akka.persistence.inmemory.extension.{InMemoryJournalStorage, InMemorySnapshotStorage, StorageExtension}
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
@@ -10,14 +9,17 @@ import com.wavesplatform.matcher.fixtures.RestartableActor.RestartActor
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.model.Events.Event
 import com.wavesplatform.matcher.model.{BuyLimitOrder, LimitOrder, SellLimitOrder}
+import com.wavesplatform.state2.reader.StateReader
+import com.wavesplatform.state2.{EqByteArray, LeaseInfo, Portfolio}
 import org.h2.mvstore.MVStore
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest._
-import scorex.settings.TestBlockchainSettings
 import scorex.transaction._
 import scorex.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
 import scorex.utils.ScorexLogging
 import scorex.wallet.Wallet
+
+import scala.concurrent.duration._
 
 class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
   with WordSpecLike
@@ -37,7 +39,12 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
 
   val pair = AssetPair(Some("BTC".getBytes), Some("WAVES".getBytes))
   val db = new MVStore.Builder().compress().open()
-  val storedState = fromDBWithUnlimitedBalance(db, TestBlockchainSettings.Disabled.functionalitySettings)
+  val storedState: StateReader = stub[StateReader]
+  val hugeAmount = Long.MaxValue / 2
+  (storedState.accountPortfolio _).when(*).returns(Portfolio(hugeAmount, LeaseInfo.empty, Map(
+    EqByteArray("BTC".getBytes) -> hugeAmount,
+    EqByteArray("WAVES".getBytes) -> hugeAmount
+  )))
 
 
   val settings = matcherSettings.copy(account = MatcherAccount.address)
@@ -102,14 +109,20 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
 
     "sell market" in {
       val ord1 = buy(pair, 100, 10)
-      val ord2 = sell(pair, 100, 10)
+      val ord2 = buy(pair, 105, 10)
 
       actor ! ord1
       actor ! ord2
       receiveN(2)
+      actor ! GetOrdersRequest
+      expectMsg(GetOrdersResponse(Seq(BuyLimitOrder(ord2.price, ord2.amount, ord2), BuyLimitOrder(ord1.price, ord1.amount, ord1))))
+
+      val ord3 = sell(pair, 100, 10)
+      actor ! ord3
+      receiveN(1)
 
       actor ! GetOrdersRequest
-      expectMsg(GetOrdersResponse(Seq.empty))
+      expectMsg(GetOrdersResponse(Seq(BuyLimitOrder(ord1.price, ord1.amount, ord1))))
     }
 
     "place buy and sell order to the order book and preserve it after restart" in {
