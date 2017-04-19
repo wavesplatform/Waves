@@ -3,6 +3,7 @@ package com.wavesplatform.http
 import com.wavesplatform.BlockGen
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.settings.{BlockchainSettings, FunctionalitySettings, GenesisSettings}
+import com.wavesplatform.state2.reader.StateReader
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.prop.PropertyChecks
@@ -13,15 +14,23 @@ import scorex.consensus.nxt.WavesConsensusModule
 import scorex.consensus.nxt.api.http.NxtConsensusApiRoute
 import scorex.createTestTemporaryFile
 import scorex.crypto.encode.Base58
-import scorex.transaction.{History, State, TransactionModule}
+import scorex.transaction.{BlockStorage, History, TransactionModule}
 
 class ConsensusRouteSpec extends RouteSpec("/consensus") with RestAPISettingsHelper with PropertyChecks with MockFactory with BlockGen {
-  val bcFile = createTestTemporaryFile("blockchain", ".dat")
-  val wcm = new WavesConsensusModule(BlockchainSettings(bcFile.getAbsolutePath, 'T', FunctionalitySettings.TESTNET, GenesisSettings.TESTNET))
-  val state = mock[State]
-  val history = mock[History]
-  val tm = mock[TransactionModule]
-  val route = NxtConsensusApiRoute(restAPISettings, wcm, state, history, tm).route
+  private val bcFile = createTestTemporaryFile("blockchain", ".dat")
+  private val wcm = new WavesConsensusModule(BlockchainSettings(bcFile.getAbsolutePath, 'T', FunctionalitySettings.TESTNET, GenesisSettings.TESTNET))
+  private val state = mock[StateReader]
+  private val history = mock[History]
+
+  private val bs: BlockStorage = new BlockStorage {
+    override def history = ConsensusRouteSpec.this.history
+    override def blockchainUpdater = ???
+    override def stateReader = state
+  }
+  private val tm = mock[TransactionModule]
+  (tm.blockStorage _).expects().returning(bs).anyNumberOfTimes()
+
+  private val route = NxtConsensusApiRoute(restAPISettings, wcm, state, history, tm).route
 
   routePath("/generationsignature") - {
     "for last block" in {
@@ -73,10 +82,14 @@ class ConsensusRouteSpec extends RouteSpec("/consensus") with RestAPISettingsHel
   }
 
   routePath("/generatingbalance/{address}") - {
-    forAll(accountGen) { account =>
-      (state.effectiveBalanceWithConfirmations _).expects(*,*,*).returning(0).once()
+    forAll(accountGen, Gen.posNum[Int]) { case (account, balance) =>
+      (state.height _).expects().returning(10).once()
+      (state.effectiveBalanceAtHeightWithConfirmations _).expects(*,*,*).returning(balance).once()
       Get(routePath(s"/generatingbalance/${account.address}")) ~> route ~> check {
+        val resp = responseAs[JsObject]
 
+        (resp \ "address").as[String] shouldEqual account.address
+        (resp \ "balance").as[Int] shouldEqual balance
       }
     }
   }
