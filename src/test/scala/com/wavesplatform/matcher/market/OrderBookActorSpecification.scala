@@ -109,14 +109,20 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
 
     "sell market" in {
       val ord1 = buy(pair, 100, 10)
-      val ord2 = sell(pair, 100, 10)
+      val ord2 = buy(pair, 105, 10)
 
       actor ! ord1
       actor ! ord2
       receiveN(2)
+      actor ! GetOrdersRequest
+      expectMsg(GetOrdersResponse(Seq(BuyLimitOrder(ord2.price, ord2.amount, ord2), BuyLimitOrder(ord1.price, ord1.amount, ord1))))
+
+      val ord3 = sell(pair, 100, 10)
+      actor ! ord3
+      receiveN(1)
 
       actor ! GetOrdersRequest
-      expectMsg(GetOrdersResponse(Seq.empty))
+      expectMsg(GetOrdersResponse(Seq(BuyLimitOrder(ord1.price, ord1.amount, ord1))))
     }
 
     "place buy and sell order to the order book and preserve it after restart" in {

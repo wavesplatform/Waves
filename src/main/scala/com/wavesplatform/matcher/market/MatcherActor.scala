@@ -5,7 +5,7 @@ import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import akka.persistence.{PersistentActor, RecoveryCompleted}
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.api.{MatcherResponse, StatusCodeMatcherResponse}
-import com.wavesplatform.matcher.market.OrderBookActor.{GetOrderBookResponse, OrderBookRequest}
+import com.wavesplatform.matcher.market.OrderBookActor.{DeleteOrderBookRequest, GetOrderBookResponse, OrderBookRequest}
 import com.wavesplatform.state2.reader.StateReader
 import play.api.libs.json.{JsArray, JsValue, Json}
 import scorex.crypto.encode.Base58
@@ -15,7 +15,7 @@ import scorex.transaction.{AssetId, TransactionModule}
 import scorex.utils.{ByteArrayExtension, NTP, ScorexLogging}
 import scorex.wallet.Wallet
 
-import scala.collection.mutable
+import scala.collection.{immutable, mutable}
 import scala.language.reflectiveCalls
 
 class MatcherActor(storedState: StateReader, wallet: Wallet, settings: MatcherSettings,
@@ -98,6 +98,12 @@ class MatcherActor(storedState: StateReader, wallet: Wallet, settings: MatcherSe
         context.child(OrderBookActor.name(order.assetPair))
           .fold(createAndForward(order))(forwardReq(order))
       }
+    case ob: DeleteOrderBookRequest =>
+      checkAssetPair(ob) {
+        context.child(OrderBookActor.name(ob.assetPair))
+          .fold(returnEmptyOrderBook(ob.assetPair))(forwardReq(ob))
+        removeOrderBook(ob.assetPair)
+      }
     case ob: OrderBookRequest =>
       checkAssetPair(ob) {
         context.child(OrderBookActor.name(ob.assetPair))
@@ -109,6 +115,16 @@ class MatcherActor(storedState: StateReader, wallet: Wallet, settings: MatcherSe
     settings.predefinedPairs.diff(tradedPairs).foreach(pair =>
       createOrderBook(pair)
     )
+  }
+
+  private def removeOrderBook(pair: AssetPair): Unit = {
+    val i = tradedPairs.indexOf(pair)
+    if (i >= 0) {
+      openMarkets.remove(i)
+      tradedPairs.remove(i)
+      deleteMessages(lastSequenceNr)
+      persistAll(tradedPairs.map(OrderBookCreated).to[immutable.Seq]) {_ => }
+    }
   }
 
   override def receiveRecover: Receive = {

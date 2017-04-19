@@ -32,7 +32,7 @@ class BlockchainUpdaterImpl(persisted: StateWriter with StateReader, settings: F
   @volatile var inMemoryDiff: BlockDiff = Monoid[BlockDiff].empty
 
   private def logHeights(prefix: String = ""): Unit =
-    log.debug(s"$prefix Total blocks: ${bc.height()}, persisted: ${persisted.height}, imMemDiff: ${inMemoryDiff.heightDiff}")
+    log.info(s"$prefix Total blocks: ${bc.height()}, persisted: ${persisted.height}, imMemDiff: ${inMemoryDiff.heightDiff}")
 
   {
     logHeights("Start:")

@@ -85,12 +85,10 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest")
 
     "AssetPair with predefined price assets" in {
       def priceAsset = AssetPair(Base58.decode("ABC").toOption, Base58.decode("BASE1").toOption)
-
       actor ! GetOrderBookRequest(priceAsset, None)
       expectMsg(GetOrderBookResponse(priceAsset, Seq(), Seq()))
 
       def wrongPriceAsset = AssetPair(Base58.decode("BASE2").toOption, Base58.decode("CDE").toOption)
-
       actor ! GetOrderBookRequest(wrongPriceAsset, None)
       expectMsg(StatusCodeMatcherResponse(StatusCodes.Found, "Invalid AssetPair ordering, should be reversed: CDE-BASE2"))
     }

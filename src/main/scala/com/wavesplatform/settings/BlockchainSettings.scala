@@ -3,9 +3,6 @@ package com.wavesplatform.settings
 import com.typesafe.config.Config
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.EnumerationReader._
-import scorex.account.Account
-import scorex.transaction.GenesisTransaction
-
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 
@@ -37,10 +34,10 @@ object FunctionalitySettings {
     allowLeaseTransactionAfterTimestamp = 1491192000000L,
     requirePaymentUniqueId = 1491192000000L,
     allowExchangeTransactionAfterTimestamp = 1491192000000L,
-    allowInvalidReissueInSameBlockUntilTimestamp = Long.MaxValue,
+    allowInvalidReissueInSameBlockUntilTimestamp = 1492768800000L,
     allowCreateAliasTransactionAfterTimestamp = Long.MaxValue,
-    allowMultipleLeaseCancelTransactionUntilTimestamp = Long.MaxValue,
-    resetEffectiveBalancesAtHeight = Long.MaxValue)
+    allowMultipleLeaseCancelTransactionUntilTimestamp = 1492768800000L,
+    resetEffectiveBalancesAtHeight = 462000)
 
   val TESTNET = FunctionalitySettings(
     allowTemporaryNegativeUntil = 1477958400000L,
@@ -54,10 +51,10 @@ object FunctionalitySettings {
     allowLeaseTransactionAfterTimestamp = Long.MinValue,
     requirePaymentUniqueId = 1485942685000L,
     allowExchangeTransactionAfterTimestamp = 1483228800000L,
-    allowInvalidReissueInSameBlockUntilTimestamp = Long.MinValue,
+    allowInvalidReissueInSameBlockUntilTimestamp = 1492560000000L,
     allowCreateAliasTransactionAfterTimestamp = Long.MinValue,
-    allowMultipleLeaseCancelTransactionUntilTimestamp = Long.MinValue,
-    resetEffectiveBalancesAtHeight = Long.MaxValue)
+    allowMultipleLeaseCancelTransactionUntilTimestamp = 1492560000000L,
+    resetEffectiveBalancesAtHeight = 51500)
 
   val configPath = "waves.blockchain.custom.functionality"
 

@@ -26,14 +26,26 @@ class EventJsonSpecification extends PropSpec
   val sellLevelGen: Gen[Vector[SellLimitOrder]] =
     Gen.containerOf[Vector, SellLimitOrder](sellLimitOrderGenerator)
 
-  property("Write/Read TreeMap") {
+  property("Write/Read Bids TreeMap") {
     forAll(buyLevelGen) {xs: Vector[BuyLimitOrder] =>
-      val q = TreeMap.empty[Price, Level[BuyLimitOrder]] ++ xs.groupBy(_.price)
+      val q = TreeMap.empty[Price, Level[BuyLimitOrder]](OrderBook.bidsOrdering) ++ xs.groupBy(_.price)
       val j = Json.toJson(q)
       val res = j.validate[TreeMap[Price, Level[BuyLimitOrder]]]
       res.get should === (q)
+      res.get.ordering shouldBe q.ordering
     }
   }
+
+  property("Write/Read Asks TreeMap") {
+    forAll(sellLevelGen) {xs: Vector[SellLimitOrder] =>
+      val q = TreeMap.empty[Price, Level[SellLimitOrder]](OrderBook.asksOrdering) ++ xs.groupBy(_.price)
+      val j = Json.toJson(q)
+      val res = j.validate[TreeMap[Price, Level[SellLimitOrder]]]
+      res.get should === (q)
+      res.get.ordering shouldBe q.ordering
+    }
+  }
+
 
   property("Write/Read OrderBook and Snapshot") {
     forAll(buyLevelGen, sellLevelGen) {(bs: Vector[BuyLimitOrder], ss: Vector[SellLimitOrder]) =>
