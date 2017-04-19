@@ -3,6 +3,7 @@ package scorex.network
 import akka.actor.Props
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.settings.WavesSettings
+import org.scalatest.DoNotDiscover
 import scorex.ActorTestingCommons
 import scorex.block.Block._
 import scorex.network.BlockchainSynchronizer.{InnerId, InnerIds}
@@ -10,16 +11,17 @@ import scorex.transaction.History
 
 import scala.language.implicitConversions
 
+@DoNotDiscover
 class HistoryReplierSpecification extends ActorTestingCommons {
 
   private implicit def toInnerIds(ids: Seq[Int]): InnerIds = ids.map { i => InnerId(toBlockId(i)) }
 
   private def mockHistory(blockIds: InnerIds): History = {
     val history = mock[History]
-    history.lookForward _ expects(*, *) onCall {
-      (parentSignature, howMany) =>
-        blockIds.dropWhile(_ != InnerId(parentSignature)).slice(1, howMany + 1).map(_.blockId)
-    } anyNumberOfTimes()
+//    history.lookForward _ expects(*, *) onCall {
+//      (parentSignature, howMany) =>
+//        blockIds.dropWhile(_ != InnerId(parentSignature)).slice(1, howMany + 1).map(_.blockId)
+//    } anyNumberOfTimes()
     history
   }
 

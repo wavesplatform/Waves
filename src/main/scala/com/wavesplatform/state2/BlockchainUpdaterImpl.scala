@@ -4,7 +4,6 @@ import cats.kernel.Monoid
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.diffs.BlockDiffer
 import com.wavesplatform.state2.reader.{CompositeStateReader, StateReader}
-import org.h2.mvstore.MVStore
 import scorex.block.Block
 import scorex.block.Block.BlockId
 import scorex.crypto.encode.Base58

@@ -36,7 +36,7 @@ class OfflineDisabledBlockGeneratorControllerSpecification extends ActorTestingC
 
   private def historyWithLastBlock(block: Block, desiredHeight: Int): History = {
     val stubHistory = stub[History]
-    (stubHistory.lastBlock _).when().returns(block).anyNumberOfTimes()
+    (stubHistory.blockAt _).when(desiredHeight).returns(Some(block)).anyNumberOfTimes()
     (stubHistory.height _).when().returns(desiredHeight).anyNumberOfTimes()
     stubHistory
   }

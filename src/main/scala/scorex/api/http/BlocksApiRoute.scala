@@ -5,6 +5,7 @@ import javax.ws.rs.Path
 import akka.actor.ActorRef
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.settings.{CheckpointsSettings, RestAPISettings}
+import com.wavesplatform.state2.EqByteArray
 import io.swagger.annotations._
 import play.api.libs.json._
 import scorex.account.Account

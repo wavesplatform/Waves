@@ -88,7 +88,7 @@ class StoredBlockchain(db: MVStore) extends History with ScorexLogging {
   private val blockStorage: BlockchainPersistence = BlockchainPersistence(db)
 
   override def appendBlock(block: Block): Either[ValidationError, Unit] = synchronized {
-    if ((height() == 0) || (lastBlock.uniqueId sameElements block.reference)) {
+    if ((height() == 0) || (this.lastBlock.uniqueId sameElements block.reference)) {
       val h = height() + 1
       blockStorage.writeBlock(h, block)
       Right(())
@@ -108,7 +108,7 @@ class StoredBlockchain(db: MVStore) extends History with ScorexLogging {
     blockStorage.readBlock(height)
   }
 
-  override def lastBlockIds(howMany: Int): Seq[BlockId] =
+  def lastBlockIds(howMany: Int): Seq[BlockId] =
     (Math.max(1, height() - howMany + 1) to height()).flatMap(i => Option(blockStorage.signatures.get(i)))
       .reverse
 
