@@ -45,12 +45,10 @@ class Application(as: ActorSystem, wavesSettings: WavesSettings) extends {
 
   override lazy val blockStorage = transactionModule.blockStorage
 
-  lazy val consensusApiRoute = new NxtConsensusApiRoute(this)
-
   override lazy val apiRoutes = Seq(
     BlocksApiRoute(settings.restAPISettings, settings.checkpointsSettings, history, coordinator),
     TransactionsApiRoute(settings.restAPISettings, blockStorage.stateReader, history, transactionModule),
-    consensusApiRoute,
+    NxtConsensusApiRoute(settings.restAPISettings, consensusModule, blockStorage.stateReader, history, transactionModule),
     WalletApiRoute(settings.restAPISettings, wallet),
     PaymentApiRoute(settings.restAPISettings, wallet, transactionModule),
     UtilsApiRoute(settings.restAPISettings),

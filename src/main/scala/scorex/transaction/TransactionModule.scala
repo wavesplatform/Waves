@@ -1,12 +1,10 @@
 package scorex.transaction
 
-import scorex.block.Block
-
 trait TransactionModule {
 
   def genesisData: Seq[Transaction]
 
-  val blockStorage: BlockStorage
+  def blockStorage: BlockStorage
 
   def validate[T <: Transaction](tx: T): Either[ValidationError, T]
 
