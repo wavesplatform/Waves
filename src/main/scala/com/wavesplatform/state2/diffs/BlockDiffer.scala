@@ -10,9 +10,10 @@ import com.wavesplatform.state2.reader.{CompositeStateReader, StateReader}
 import scorex.account.Account
 import scorex.block.Block
 import scorex.transaction.{AssetAcc, ValidationError}
+import scorex.utils.ScorexLogging
 
 
-object BlockDiffer {
+object BlockDiffer extends ScorexLogging {
 
   val emptyDiff: Diff = Monoid[Diff].empty
   val rightEmptyDiff: Either[ValidationError, Diff] = Right(emptyDiff)
@@ -37,7 +38,7 @@ object BlockDiffer {
         })
     }
     lazy val feeDiff = Monoid[Diff].combineAll(accountPortfolioFeesMap.map { case (acc, p) =>
-      Diff(Map.empty, portfolios = Map(acc -> p), Map.empty, Map.empty)
+      Diff(portfolios = Map(acc -> p))
     })
 
     txsDiffEi
@@ -62,9 +63,10 @@ object BlockDiffer {
       )
   }
 
+
   def unsafeDiffMany(settings: FunctionalitySettings)(s: StateReader, blocks: Seq[Block]): BlockDiff =
-    blocks.foldLeft(Monoid[BlockDiff].empty) { (diff, block) =>
+    blocks.foldLeft(Monoid[BlockDiff].empty) { case (diff, block) =>
       val blockDiff = apply(settings)(new CompositeStateReader(s, diff), block).explicitGet()
       Monoid[BlockDiff].combine(diff, blockDiff)
-    }
+  }
 }

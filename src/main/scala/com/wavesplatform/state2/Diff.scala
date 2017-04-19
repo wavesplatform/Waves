@@ -3,37 +3,57 @@ package com.wavesplatform.state2
 import cats.Monoid
 import cats.implicits._
 import scorex.account.{Account, Alias}
+import scorex.transaction.Transaction
 import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import scorex.transaction.{PaymentTransaction, Transaction}
 
-case class BlockDiff(txsDiff: Diff,
-                     heightDiff: Int,
-                     effectiveBalanceSnapshots: Seq[EffectiveBalanceSnapshot])
+case class EffectiveBalanceSnapshot(acc: Account, height: Int, prevEffectiveBalance: Long, effectiveBalance: Long)
+
+case class LeaseInfo(leaseIn: Long, leaseOut: Long)
+
+object LeaseInfo {
+  val empty = LeaseInfo(0, 0)
+
+  implicit val leaseInfoMonoid = new Monoid[LeaseInfo] {
+    override def empty: LeaseInfo = LeaseInfo.empty
+
+    override def combine(x: LeaseInfo, y: LeaseInfo): LeaseInfo = LeaseInfo(safeSum(x.leaseIn, y.leaseIn), safeSum(x.leaseOut, y.leaseOut))
+  }
+}
+
+case class AssetInfo(isReissuable: Boolean, volume: Long)
+
+object AssetInfo {
+  implicit val assetInfoMonoid = new Monoid[AssetInfo] {
+    override def empty: AssetInfo = AssetInfo(isReissuable = true, 0)
+
+    override def combine(x: AssetInfo, y: AssetInfo): AssetInfo
+    = AssetInfo(x.isReissuable && y.isReissuable, x.volume + y.volume)
+  }
+}
 
 case class Diff(transactions: Map[ByteArray, (Int, Transaction, Set[Account])],
                 portfolios: Map[Account, Portfolio],
                 issuedAssets: Map[ByteArray, AssetInfo],
                 aliases: Map[Alias, Account],
+                paymentTransactionIdsByHashes: Map[ByteArray, ByteArray],
                 patchExtraLeaseIdsToCancel: Seq[ByteArray])
 
 object Diff {
 
-  def apply(transactions: Map[ByteArray, (Int, Transaction, Set[Account])],
-            portfolios: Map[Account, Portfolio],
-            issuedAssets: Map[ByteArray, AssetInfo],
-            aliases: Map[Alias, Account]): Diff = new Diff(transactions, portfolios, issuedAssets, aliases, Seq.empty)
-
+  def apply(portfolios: Map[Account, Portfolio]): Diff = new Diff(Map.empty, portfolios, Map.empty, Map.empty, Map.empty, Seq.empty)
 
   def apply(height: Int, tx: Transaction,
             portfolios: Map[Account, Portfolio],
             assetInfos: Map[ByteArray, AssetInfo] = Map.empty,
-            aliases: Map[Alias, Account] = Map.empty
+            aliases: Map[Alias, Account] = Map.empty,
+            paymentTransactionIdsByHashes: Map[ByteArray, ByteArray] = Map.empty
            ): Diff = Diff(
     transactions = Map(EqByteArray(tx.id) -> (height, tx, portfolios.keys.toSet)),
     portfolios = portfolios,
     issuedAssets = assetInfos,
     aliases = aliases,
+    paymentTransactionIdsByHashes = paymentTransactionIdsByHashes,
     patchExtraLeaseIdsToCancel = Seq.empty)
 
   implicit class DiffExt(d: Diff) {
@@ -49,9 +69,6 @@ object Diff {
         .mapValues(l => l.sortBy { case ((h, t, id)) => (-h, -t) }) // fresh head ([h=2, h=1, h=0])
         .mapValues(_.map(_._3))
     }
-
-    lazy val paymentTransactionIdsByHashes: Map[ByteArray, ByteArray] = d.transactions
-      .collect { case (_, (_, ptx: PaymentTransaction, _)) => EqByteArray(ptx.hash) -> EqByteArray(ptx.id) }
 
     lazy val effectiveLeaseTxUpdates: (Set[EqByteArray], Set[EqByteArray]) = {
       val txs = d.transactions.values.map(_._2)
@@ -80,18 +97,17 @@ object Diff {
     }
   }
 
+  implicit val diffMonoid = new Monoid[Diff] {
+    override def empty: Diff = Diff(transactions = Map.empty, portfolios = Map.empty, issuedAssets = Map.empty, Map.empty, Map.empty, Seq.empty)
+
+    override def combine(older: Diff, newer: Diff): Diff = Diff(
+      transactions = older.transactions ++ newer.transactions,
+      portfolios = older.portfolios.combine(newer.portfolios),
+      issuedAssets = older.issuedAssets.combine(newer.issuedAssets),
+      aliases = older.aliases ++ newer.aliases,
+      paymentTransactionIdsByHashes = older.paymentTransactionIdsByHashes ++ newer.paymentTransactionIdsByHashes,
+      patchExtraLeaseIdsToCancel = newer.patchExtraLeaseIdsToCancel ++ older.patchExtraLeaseIdsToCancel
+    )
+  }
+
 }
-
-case class EffectiveBalanceSnapshot(acc: Account, height: Int, prevEffectiveBalance: Long, effectiveBalance: Long)
-
-case class Portfolio(balance: Long, leaseInfo: LeaseInfo, assets: Map[ByteArray, Long]) {
-  lazy val effectiveBalance: Long = safeSum(balance, leaseInfo.leaseIn) - leaseInfo.leaseOut
-}
-
-case class LeaseInfo(leaseIn: Long, leaseOut: Long)
-
-object LeaseInfo {
-  val empty = LeaseInfo(0, 0)
-}
-
-case class AssetInfo(isReissuable: Boolean, volume: Long)

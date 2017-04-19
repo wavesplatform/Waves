@@ -16,6 +16,7 @@ object LeasePatch {
       portfolios = portfolioUpd,
       issuedAssets = Map.empty,
       aliases = Map.empty,
+      paymentTransactionIdsByHashes = Map.empty,
       patchExtraLeaseIdsToCancel = s.activeLeases())
   }
 

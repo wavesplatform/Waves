@@ -30,7 +30,9 @@ object PaymentTransactionDiff {
             balance = -tx.amount - tx.fee,
             LeaseInfo.empty,
             assets = Map.empty
-          ))))
+          )),
+      paymentTransactionIdsByHashes = Map(EqByteArray(tx.hash) -> EqByteArray(tx.id))
+      ))
     }
   }
 }
