@@ -5,10 +5,10 @@ import scorex.utils.ScorexLogging
 
 import scala.collection.JavaConverters._
 import scala.collection.immutable.IndexedSeq
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.util.Random
-import scala.concurrent.duration._
-import scala.concurrent.ExecutionContext.Implicits.global
 
 class TestFiveNodesSuite extends FreeSpec with BeforeAndAfterAll with ScorexLogging with Matchers {
   private val docker = new Docker()

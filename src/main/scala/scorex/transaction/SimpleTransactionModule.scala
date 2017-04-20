@@ -90,7 +90,6 @@ class SimpleTransactionModule(genesisSettings: GenesisSettings)(implicit val set
     txs.diff(valid).foreach(utxStorage.remove)
   }
 
-  override def onNewOffchainTransaction[T <: Transaction](transaction: T): Either[ValidationError, T] =
     for {
       tx <- putUnconfirmedIfNew(transaction)
     } yield {

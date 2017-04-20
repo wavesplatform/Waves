@@ -21,7 +21,8 @@ case class NodeInfo(
                      hostNetworkPort: Int,
                      containerNetworkPort: Int,
                      ipAddress: String,
-                     containerId: String)
+                     containerId: String,
+                     hostMatcherApiPort: Int)
 
 class Docker(suiteConfig: Config = ConfigFactory.empty) extends AutoCloseable with ScorexLogging {
 
@@ -48,10 +49,12 @@ class Docker(suiteConfig: Config = ConfigFactory.empty) extends AutoCloseable wi
 
     val restApiPort = actualConfig.getString("waves.rest-api.port")
     val networkPort = actualConfig.getString("waves.network.port")
+    val matcherApiPort = actualConfig.getString("waves.matcher.port")
 
     val portBindings = new ImmutableMap.Builder[String, java.util.List[PortBinding]]()
       .put(restApiPort, Collections.singletonList(PortBinding.randomPort("0.0.0.0")))
       .put(networkPort, Collections.singletonList(PortBinding.randomPort("0.0.0.0")))
+      .put(matcherApiPort, Collections.singletonList(PortBinding.randomPort("0.0.0.0")))
       .build()
 
     val hostConfig = HostConfig.builder()
@@ -63,7 +66,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty) extends AutoCloseable wi
 
     val containerConfig = ContainerConfig.builder()
       .image(imageId)
-      .exposedPorts(restApiPort, networkPort)
+      .exposedPorts(restApiPort, networkPort, matcherApiPort)
       .hostConfig(hostConfig)
       .env(s"WAVES_OPTS=$configOverrides", s"WAVES_PORT=$networkPort")
       .build()
@@ -79,7 +82,8 @@ class Docker(suiteConfig: Config = ConfigFactory.empty) extends AutoCloseable wi
       extractHostPort(ports, networkPort),
       networkPort.toInt,
       containerInfo.networkSettings().ipAddress(),
-      containerId)
+      containerId,
+      extractHostPort(ports, matcherApiPort))
     nodes += containerId -> nodeInfo
 
     new Node(actualConfig, nodeInfo, http, timer)

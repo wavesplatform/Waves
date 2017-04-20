@@ -4,10 +4,10 @@ import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.state2.reader.StateReader
 import scorex.transaction.assets.exchange.{ExchangeTransaction, Order}
 import scorex.transaction.{SignedTransaction, TransactionModule, ValidationError}
-import scorex.utils.NTP
+import scorex.utils.{NTP, ScorexLogging}
 import scorex.wallet.Wallet
 
-trait ExchangeTransactionCreator {
+trait ExchangeTransactionCreator extends ScorexLogging {
   val transactionModule: TransactionModule
   val storedState: StateReader
   val wallet: Wallet
@@ -37,11 +37,10 @@ trait ExchangeTransactionCreator {
     (calcFee(buy, amount), calcFee(sell, amount))
   }
 
-  def isValid(orderMatch: ExchangeTransaction): Boolean = {
-    transactionModule.validate(orderMatch).isRight
-  }
+  def validate(orderMatch: ExchangeTransaction): Either[ValidationError, SignedTransaction] =
+    transactionModule.validate(orderMatch)
 
-  def sendToNetwork(tx: SignedTransaction): Unit = {
+  def sendToNetwork(tx: SignedTransaction): Either[ValidationError, SignedTransaction] = {
     transactionModule.onNewOffchainTransaction(tx)
   }
 }

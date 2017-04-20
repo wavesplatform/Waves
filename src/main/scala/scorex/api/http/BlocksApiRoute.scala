@@ -35,7 +35,15 @@ case class BlocksApiRoute(settings: RestAPISettings, checkpointsSettings: Checkp
   ))
   def address: Route = (path("address" / Segment / IntNumber / IntNumber) & get) { case (address, start, end) =>
     if (end >= 0 && start >= 0 && end - start >= 0 && end - start < MaxBlocksPerRequest) {
-      complete(JsArray(history.generatedBy(Account.fromString(address).right.get, start, end).map(_.json)))
+      val blocks = JsArray(
+        (start to end).map { height =>
+          (history.blockAt(height), height)
+        }.filter(_._1.isDefined)
+          .map { pair => (pair._1.get, pair._2) }
+          .filter(_._1.signerData.generator.address == address).map { pair =>
+          pair._1.json + ("height" -> Json.toJson(pair._2))
+        })
+      complete(blocks)
     } else complete(TooBigArrayAllocation)
   }
 

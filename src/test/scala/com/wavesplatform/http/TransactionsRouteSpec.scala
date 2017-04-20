@@ -80,7 +80,8 @@ class TransactionsRouteSpec extends RouteSpec("/transactions")
       val txAvailability = for {
         tx <- randomTransactionGen
         txList <- listOfN(99, tx)
-        blk <- blockGen(Random.shuffle(tx :: txList))
+        signer <- accountGen
+        blk <- blockGen(Random.shuffle(tx :: txList), signer)
         height <- option(posNum[Int])
       } yield (tx, height, blk)
 
