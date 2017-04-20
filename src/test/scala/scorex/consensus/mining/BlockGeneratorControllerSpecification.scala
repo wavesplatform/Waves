@@ -20,9 +20,9 @@ class BlockGeneratorControllerSpecification extends ActorTestingCommons {
     override lazy val settings: WavesSettings = WavesSettings.fromConfig(baseTestConfig)
     override val peerManager: ActorRef = testPeerManager.ref
     @volatile
-    var history: History = _
+    var historyOverride: History = _
 
-    private[BlockGeneratorControllerSpecification] def setHistory(history: History) = this.history = history
+    private[BlockGeneratorControllerSpecification] def setHistory(history: History) = this.historyOverride = history
   }
 
   val stubApp: App = stub[App]

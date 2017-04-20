@@ -31,7 +31,7 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
   protected override lazy val networkControllerRef = application.networkController
 
   private lazy val coordinator = application.coordinator
-  private lazy val history = application.history
+  private lazy val history = application.blockStorage.history
 
   private lazy val timeout = application.settings.synchronizationSettings.synchronizationTimeout
   private lazy val maxChainLength = application.settings.synchronizationSettings.maxChainLength

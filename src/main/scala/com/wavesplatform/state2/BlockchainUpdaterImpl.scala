@@ -10,7 +10,7 @@ import scorex.crypto.encode.Base58
 import scorex.transaction._
 import scorex.utils.ScorexLogging
 
-class BlockchainUpdaterImpl(persisted: StateWriter with StateReader, settings: FunctionalitySettings, bc: History)
+class BlockchainUpdaterImpl(persisted: StateWriter with StateReader, settings: FunctionalitySettings, bc: HistoryWriter with History)
   extends BlockchainUpdater with ScorexLogging {
 
   private val MinInMemDiff = 100

@@ -41,7 +41,7 @@ class HistoryReplierSpecification extends ActorTestingCommons {
 
   private trait App extends ApplicationMock {
     override lazy val settings = wavesSettings
-    override lazy val history: History = h
+    override lazy val historyOverride: History = h
   }
 
   private val app = stub[App]

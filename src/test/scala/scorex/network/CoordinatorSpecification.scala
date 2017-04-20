@@ -29,7 +29,7 @@ class CoordinatorSpecification extends ActorTestingCommons {
     override lazy val blockGenerator: ActorRef = testblockGenerator.ref
     override lazy val blockchainSynchronizer: ActorRef = testBlockchainSynchronizer.ref
     override lazy val peerManager: ActorRef = testPeerManager.ref
-    override lazy val history: History = testHistory
+    override lazy val historyOverride: History = testHistory
   }
 
   override protected val actorRef = system.actorOf(Props(classOf[Coordinator], stub[App]))

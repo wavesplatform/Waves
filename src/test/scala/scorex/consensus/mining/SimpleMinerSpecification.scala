@@ -13,9 +13,7 @@ import scorex.wallet.Wallet
 
 import scala.concurrent.duration.Duration
 
-/**
-  * Created by ilyas on 19-Apr-17.
-  */
+
 class SimpleMinerSpecification extends ActorTestingCommons {
 
   import System.currentTimeMillis
@@ -69,7 +67,7 @@ class SimpleMinerSpecification extends ActorTestingCommons {
     override val settings = wavesSettings
     override val wallet: Wallet = testWallet
     override val coordinator = testCoordinator.ref
-    override val history: History = testHistory
+    override val historyOverride: History = testHistory
     override implicit val consensusModule: WavesConsensusModule = testConsensusModule
   }
 

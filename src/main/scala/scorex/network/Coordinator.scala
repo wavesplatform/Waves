@@ -43,9 +43,10 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
 
   private lazy val blockchainSynchronizer = application.blockchainSynchronizer
 
-  private lazy val history = application.history
+  private lazy val history = application.blockStorage.history
+  private lazy val checkpoints = application.blockStorage.checkpoints
 
-  private def currentCheckpoint(): Option[Checkpoint] = history.getCheckpoint
+  private def currentCheckpoint(): Option[Checkpoint] = checkpoints.getCheckpoint
 
   context.system.scheduler.schedule(1.second, application.settings.synchronizationSettings.scoreBroadcastInterval, self, BroadcastCurrentScore)
 
@@ -109,7 +110,7 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
       case AddBlock(block, from) => processSingleBlock(block, from)
 
       case BroadcastCurrentScore =>
-        val msg = Message(ScoreMessageSpec, Right(application.history.score()), None)
+        val msg = Message(ScoreMessageSpec, Right(application.blockStorage.history.score()), None)
         networkControllerRef ! NetworkController.SendToNetwork(msg, Broadcast)
 
       case DataFromPeer(msgId, checkpoint: Checkpoint@unchecked, remote) if msgId == CheckpointMessageSpec.messageCode =>
@@ -120,7 +121,7 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
 
       case ConnectedPeers(_) =>
 
-      case ClearCheckpoint => history.setCheckpoint(None)
+      case ClearCheckpoint => checkpoints.setCheckpoint(None)
     }
   }
 
@@ -131,7 +132,7 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
       maybePublicKeyBytes foreach {
         publicKey =>
           if (EllipticCurveImpl.verify(checkpoint.signature, checkpoint.toSign, publicKey)) {
-            history.setCheckpoint(Some(checkpoint))
+            checkpoints.setCheckpoint(Some(checkpoint))
             networkControllerRef ! SendToNetwork(Message(CheckpointMessageSpec, Right(checkpoint), None),
               from.map(BroadcastExceptOf).getOrElse(Broadcast))
             makeBlockchainCompliantWith(checkpoint)
@@ -223,7 +224,7 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
       newBlocks.zipWithIndex.forall(p => isValidWithRespectToCheckpoint(p._1, lastCommonHeight + 1 + p._2))
     }
 
-    if (application.history.heightOf(lastCommonBlockId).exists(isForkValidWithCheckpoint)) {
+    if (application.blockStorage.history.heightOf(lastCommonBlockId).exists(isForkValidWithCheckpoint)) {
       application.blockStorage.blockchainUpdater.removeAfter(lastCommonBlockId)
 
       foldM[({type l[α] = Either[(ValidationError, BlockId), α]})#l, List, Block, Unit](newBlocks.toList, ())

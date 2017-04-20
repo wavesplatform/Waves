@@ -22,8 +22,6 @@ trait Application {
 
   def basicMessagesSpecsRepo: BasicMessagesRepo
 
-  def history: History
-
   def blockStorage: BlockStorage
 
   def peerManager: ActorRef

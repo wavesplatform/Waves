@@ -69,12 +69,9 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
 
   private trait App extends ApplicationMock {
 
-    private val testBlockStorage = mock[BlockStorage]
-
     override lazy val settings = wavesSettings
     override lazy val coordinator: ActorRef = testCoordinator.ref
-    override lazy val history: History = testHistory
-    override val blockStorage: BlockStorage = testBlockStorage
+    override lazy val historyOverride: History = testHistory
   }
 
   private val app = stub[App]

@@ -14,7 +14,7 @@ class BlockStorageImpl(settings: BlockchainSettings) extends BlockStorage {
   import BlockStorageImpl._
 
   val database: MVStore = createMVStore(settings.file)
-  val h: History = new StoredBlockchain(database)
+  val h: History with HistoryWriter with CheckpointService = new StoredBlockchain(database)
   val mVStorePrimitiveImpl = new MVStorePrimitiveImpl(database)
   val rw = new StateWriterImpl(mVStorePrimitiveImpl)
   val updater = new BlockchainUpdaterImpl(rw, settings.functionalitySettings, h)
@@ -24,6 +24,8 @@ class BlockStorageImpl(settings: BlockchainSettings) extends BlockStorage {
   override def stateReader: StateReader = updater.currentState
 
   override def blockchainUpdater: BlockchainUpdater = updater
+
+  override def checkpoints: CheckpointService = h
 }
 
 object BlockStorageImpl {

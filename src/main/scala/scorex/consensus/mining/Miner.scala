@@ -60,7 +60,7 @@ class Miner(application: Application) extends Actor with ScorexLogging {
 
   private def scheduleBlockGeneration(): Unit = try {
     val schedule = if (application.settings.minerSettings.tfLikeScheduling) {
-      val lastBlock = application.history.lastBlock
+      val lastBlock = application.blockStorage.history.lastBlock
       val currentTime = preciseTime
 
       accounts

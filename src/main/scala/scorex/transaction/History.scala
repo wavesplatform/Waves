@@ -7,10 +7,9 @@ import scorex.crypto.encode.Base58
 import scorex.network.Checkpoint
 
 import scala.util.Try
+import scorex.transaction.History.BlockchainScore
 
 trait History {
-
-  import scorex.transaction.History.BlockchainScore
 
   def height(): Int
 
@@ -24,20 +23,26 @@ trait History {
 
   def heightOf(blockId: BlockId): Option[Int]
 
-  def appendBlock(block: Block): Either[ValidationError, Unit]
-
   def generatedBy(account: Account, from: Int, to: Int): Seq[Block]
-
-  def getCheckpoint: Option[Checkpoint]
-
-  def setCheckpoint(checkpoint: Option[Checkpoint])
-
-  def discardBlock(): History
 
   def contains(id: BlockId): Boolean
 
   def lastBlockIds(howMany: Int): Seq[BlockId]
 }
+
+trait HistoryWriter {
+  def appendBlock(block: Block): Either[ValidationError, Unit]
+
+  def discardBlock(): History
+}
+
+trait CheckpointService {
+
+  def setCheckpoint(checkpoint: Option[Checkpoint])
+
+  def getCheckpoint: Option[Checkpoint]
+}
+
 
 object History {
   type BlockchainScore = BigInt
@@ -71,10 +76,11 @@ object History {
       (Math.max(1, history.height() - howMany + 1) to history.height()).flatMap(history.blockAt).reverse
 
     def lookForward(parentSignature: BlockId, howMany: Int): Seq[BlockId] =
-          history.heightOf(parentSignature).map { h =>
+      history.heightOf(parentSignature).map { h =>
         (h + 1).to(Math.min(history.height(), h + howMany: Int)).flatMap(history.blockAt).map(_.uniqueId)
       }.getOrElse(Seq())
 
     def genesis: Block = history.blockAt(1).get
   }
+
 }

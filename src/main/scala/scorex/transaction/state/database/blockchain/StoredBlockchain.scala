@@ -9,13 +9,13 @@ import scorex.block.Block.BlockId
 import scorex.network.Checkpoint
 import scorex.transaction.History.BlockchainScore
 import scorex.transaction.ValidationError.CustomError
-import scorex.transaction.{History, ValidationError}
+import scorex.transaction.{CheckpointService, History, HistoryWriter, ValidationError}
 import scorex.utils.{LogMVMapBuilder, ScorexLogging}
 
 import scala.collection.JavaConverters._
 import scala.util.{Failure, Try}
 
-class StoredBlockchain(db: MVStore) extends History with ScorexLogging {
+class StoredBlockchain(db: MVStore) extends History with HistoryWriter with CheckpointService with ScorexLogging {
 
   case class BlockchainPersistence(database: MVStore) {
     val blocks: MVMap[Int, Array[Byte]] = database.openMap("blocks", new LogMVMapBuilder[Int, Array[Byte]])

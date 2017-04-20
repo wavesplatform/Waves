@@ -55,7 +55,7 @@ trait RunnableApplication extends Application with Shutdownable with ScorexLoggi
   //interface to append log and state
   lazy override val blockStorage: BlockStorage = transactionModule.blockStorage
 
-  lazy override val history: History = blockStorage.history
+  lazy val history: History = blockStorage.history
 
   lazy override val networkController = actorSystem.actorOf(Props(classOf[NetworkController], this),
     "NetworkController")
