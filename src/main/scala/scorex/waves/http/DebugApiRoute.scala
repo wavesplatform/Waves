@@ -5,13 +5,12 @@ import javax.ws.rs.Path
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state2.reader.StateReader
-import com.wavesplatform.state2.{ByteArray, EqByteArray, Portfolio}
 import io.swagger.annotations._
-import play.api.libs.json.{Format, JsNumber, JsObject, Json}
+import play.api.libs.json.Json
 import scorex.api.http._
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash
-import scorex.transaction.{BlockStorage, History}
+import scorex.transaction.History
 import scorex.wallet.Wallet
 
 @Path("/debug")
@@ -58,9 +57,11 @@ case class DebugApiRoute(settings: RestAPISettings, wallet: Wallet, stateReader:
     new ApiResponse(code = 200, message = "Json state")
   ))
   def info: Route = (path("info") & get) {
+    val stateHash = (BigInt(FastCryptographicHash(stateReader.accountPortfolios.toString().getBytes)) % Int.MaxValue).toInt
+
     complete(Json.obj(
       "stateHeight" -> stateReader.height,
-      "stateHash" -> stateReader.stateHash
+      "stateHash" -> stateHash
     ))
   }
 }
