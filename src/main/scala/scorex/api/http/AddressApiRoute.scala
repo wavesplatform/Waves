@@ -122,6 +122,18 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
     complete(balanceJson(address, 0))
   }
 
+  @Path("/balance/{address}/{confirmations}")
+  @ApiOperation(value = "Confirmed balance", notes = "Balance of {address} after {confirmations}", httpMethod = "GET")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path"),
+    new ApiImplicitParam(name = "confirmations", value = "0", required = true, dataType = "integer", paramType = "path")
+  ))
+  def balanceWithConfirmations: Route = {
+    (path("balance" / Segment / IntNumber) & get) { case (address, confirmations) =>
+      complete(balanceJson(address, confirmations))
+    }
+  }
+
   @Path("/effectiveBalance/{address}")
   @ApiOperation(value = "Balance", notes = "Account's balance", httpMethod = "GET")
   @ApiImplicitParams(Array(
