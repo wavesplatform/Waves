@@ -13,9 +13,9 @@ class BlockStorageImpl(settings: BlockchainSettings) extends BlockStorage {
 
   import BlockStorageImpl._
 
-  val hdatabase: MVStore = createMVStore("history-" + settings.file)
-  val sdatabase: MVStore = createMVStore("state-" + settings.file)
-  val cdatabase: MVStore = createMVStore("checkpoint-" + settings.file)
+  val hdatabase: MVStore = createMVStore(settings.file + "-history")
+  val sdatabase: MVStore = createMVStore(settings.file + "-state" )
+  val cdatabase: MVStore = createMVStore(settings.file + "-checkpoint" )
   val h = new HistoryWriterImpl(new MVStoreHistoryStorage(hdatabase))
   val s = new StateWriterImpl(new MVStoreStateStorage(sdatabase))
   val c = new CheckpointServiceImpl(new MVStoreCheckpointStorage(cdatabase))
