@@ -6,25 +6,28 @@ import javax.ws.rs.Path
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.settings.RestAPISettings
+import com.wavesplatform.state2.reader.StateReader
 import io.swagger.annotations._
 import play.api.libs.json._
 import scorex.account.{Account, PublicKeyAccount}
+import scorex.consensus.nxt.WavesConsensusModule
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
+import scorex.transaction.TransactionModule
 import scorex.wallet.Wallet
 
 import scala.util.{Failure, Success, Try}
 
 @Path("/addresses")
 @Api(value = "/addresses/", description = "Info about wallet's accounts and other calls about addresses")
-case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: StateReader) extends ApiRoute {
+case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: StateReader, consensusModule: WavesConsensusModule, transactionModule: TransactionModule) extends ApiRoute {
   import AddressApiRoute._
 
   val MaxAddressesPerRequest = 1000
 
   override lazy val route =
     pathPrefix("addresses") {
-      validate ~ seed ~ balanceWithConfirmations ~ balance ~ verify ~ sign ~ deleteAddress ~ verifyText ~
+      validate ~ seed ~ balanceWithConfirmations ~ balanceDetails ~ balance ~ verify ~ sign ~ deleteAddress ~ verifyText ~
         signText ~ seq ~ publicKey ~ effectiveBalance ~ effectiveBalanceWithConfirmations
     } ~ root ~ create
 
@@ -126,7 +129,9 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
     new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
   ))
   def balanceDetails: Route = (path("balance" / "details" / Segment) & get) { address =>
-    complete(balancesDetailsJson(address))
+    complete(Account.fromString(address).right.map(acc => {
+      ToResponseMarshallable(balancesDetailsJson(acc))
+    }).getOrElse(InvalidAddress))
   }
 
   @Path("/balance/{address}/{confirmations}")
@@ -232,28 +237,25 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
     Account.fromString(address).right.map(acc => ToResponseMarshallable(Balance(
       acc.address,
       confirmations,
-      state.balanceWithConfirmations(acc, confirmations))))
-      .getOrElse(InvalidAddress)
+      state.accountPortfolio(acc).balance
+    ))).getOrElse(InvalidAddress)
   }
 
-  private def balancesDetailsJson(address: String): ToResponseMarshallable = {
-    Account.fromString(address).right.map(acc => {
-      val wavesBalance = state.balance(acc)
-      ToResponseMarshallable(BalanceDetails(
-        acc.address,
-        wavesBalance,
-        consensusModule.generatingBalance(acc, state.stateHeight),
-        wavesBalance - state.getLeasedSum(address),
-        state.effectiveBalance(acc)
-      ))
-    }).getOrElse(InvalidAddress)
+  private def balancesDetailsJson(account: Account): BalanceDetails = {
+    val portfolio = state.accountPortfolio(account)
+    BalanceDetails(
+      account.address,
+      portfolio.balance,
+      consensusModule.generatingBalance(account, state.height)(transactionModule),
+      portfolio.balance - portfolio.leaseInfo.leaseOut,
+      state.effectiveBalance(account))
   }
 
   private def effectiveBalanceJson(address: String, confirmations: Int): ToResponseMarshallable = {
     Account.fromString(address).right.map(acc => ToResponseMarshallable(Balance(
       acc.address,
       confirmations,
-      state.effectiveBalanceWithConfirmations(acc, confirmations, state.stateHeight))))
+      state.effectiveBalanceAtHeightWithConfirmations(acc, state.height, confirmations))))
       .getOrElse(InvalidAddress)
   }
 
