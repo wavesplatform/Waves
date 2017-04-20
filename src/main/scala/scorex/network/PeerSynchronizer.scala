@@ -13,15 +13,12 @@ import scorex.network.peer.PeerManager
 import scorex.network.peer.PeerManager.GetRandomPeersToBroadcast
 import scorex.utils.ScorexLogging
 import shapeless.syntax.typeable._
-
+import scorex.network.message.BasicMessagesRepo._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 
 
 class PeerSynchronizer(application: Application) extends ViewSynchronizer with ScorexLogging {
-
-  private val basicMessagesSpecsRepo = application.basicMessagesSpecsRepo
-  import basicMessagesSpecsRepo._
 
   protected lazy override val networkControllerRef = application.networkController
   override val messageSpecs = Seq(GetPeersSpec, PeersSpec)

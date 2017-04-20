@@ -155,7 +155,6 @@ abstract class ActorTestingCommons extends TestKitBase
   trait ApplicationMock extends Application {
     implicit val transactionModule = stub[TransactionModule]
     implicit val consensusModule = new WavesConsensusModule(TestBlockchainSettings.Enabled)
-    final override val basicMessagesSpecsRepo: BasicMessagesRepo = new BasicMessagesRepo()
     final override lazy val networkController: ActorRef = networkControllerMock
 
     def historyOverride: History

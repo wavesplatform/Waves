@@ -6,16 +6,12 @@ import scorex.network.message.MessageSpec
 import scorex.transaction.History
 import scorex.transaction.History._
 import scorex.utils.ScorexLogging
-
+import scorex.network.message.BasicMessagesRepo._
 import scala.language.postfixOps
-
-//todo: break a connection if no score message from remote for some time?
 
 class ScoreObserver(application: Application) extends ViewSynchronizer with ScorexLogging {
 
   import ScoreObserver._
-  private val basicMessagesSpecsRepo = application.basicMessagesSpecsRepo
-  import basicMessagesSpecsRepo._
 
   override val messageSpecs: Seq[MessageSpec[_]] = Seq(ScoreMessageSpec)
 

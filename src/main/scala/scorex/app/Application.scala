@@ -20,8 +20,6 @@ trait Application {
 
   def appVersion: ApplicationVersion
 
-  def basicMessagesSpecsRepo: BasicMessagesRepo
-
   def blockStorage: BlockStorage
 
   def peerManager: ActorRef

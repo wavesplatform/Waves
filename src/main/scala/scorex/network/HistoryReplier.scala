@@ -5,11 +5,9 @@ import scorex.block.Block
 import scorex.network.NetworkController.{DataFromPeer, SendToNetwork}
 import scorex.network.message.Message
 import scorex.utils.ScorexLogging
+import scorex.network.message.BasicMessagesRepo._
 
 class HistoryReplier(application: Application) extends ViewSynchronizer with ScorexLogging {
-
-  private val basicMessagesSpecsRepo = application.basicMessagesSpecsRepo
-  import basicMessagesSpecsRepo._
 
   override val messageSpecs = Seq(GetSignaturesSpec, GetBlockSpec)
   protected override lazy val networkControllerRef = application.networkController

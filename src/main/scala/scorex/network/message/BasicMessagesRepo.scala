@@ -17,8 +17,7 @@ import scorex.transaction.TransactionParser._
 import scala.util.Try
 
 
-class BasicMessagesRepo()(implicit val transactionalModule: TransactionModule,
-                          consensusModule: WavesConsensusModule) {
+object BasicMessagesRepo {
 
   object GetPeersSpec extends MessageSpec[Unit] {
     override val messageCode: Message.MessageCode = 1: Byte
@@ -44,7 +43,7 @@ class BasicMessagesRepo()(implicit val transactionalModule: TransactionModule,
       val lengthBytes = util.Arrays.copyOfRange(bytes, 0, DataLength)
       val length = Ints.fromByteArray(lengthBytes)
 
-      assert (bytes.length == DataLength + (length * (AddressLength + PortLength)), "Data does not match length")
+      assert(bytes.length == DataLength + (length * (AddressLength + PortLength)), "Data does not match length")
 
       (0 until length).map { i =>
         val position = lengthBytes.length + (i * (AddressLength + PortLength))

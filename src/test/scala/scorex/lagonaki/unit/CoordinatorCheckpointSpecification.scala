@@ -58,7 +58,6 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
       override def isValid(block: Block)(implicit transactionModule: TransactionModule): Boolean = true
     }
     lazy implicit val transactionModule: TransactionModule = new SimpleTransactionModule(TestBlockchainSettings.Disabled.genesisSettings)(wavesSettings, this)
-    lazy val basicMessagesSpecsRepo: BasicMessagesRepo = new BasicMessagesRepo()
     lazy val networkController: ActorRef = networkControllerMock
     lazy val settings = wavesSettings
     lazy val blockGenerator: ActorRef = testBlockGenerator.ref
@@ -86,7 +85,6 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
 
   implicit val consensusModule: WavesConsensusModule = app.consensusModule
   implicit val transactionModule: TransactionModule = app.transactionModule
-  private lazy val repo = app.basicMessagesSpecsRepo
   val genesisTimestamp: Long = System.currentTimeMillis()
   if (transactionModule.blockStorage.history.isEmpty) {
     transactionModule.blockStorage.blockchainUpdater.processBlock(Block.genesis(consensusModule.genesisData, transactionModule.genesisData, genesisTimestamp))
@@ -96,7 +94,7 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
     app.blockStorage.blockchainUpdater.removeAfter(app.history.genesis.uniqueId)
     actorRef ! ClearCheckpoint
     networkController.ignoreMsg {
-      case SendToNetwork(m, _) => m.spec == repo.ScoreMessageSpec
+      case SendToNetwork(m, _) => m.spec == BasicMessagesRepo.ScoreMessageSpec
       case m => true
     }
   }
@@ -134,7 +132,7 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
 
     val checkpoint = Checkpoint(p +: firstChp.items, Array()).signedBy(pk.privateKey)
 
-    actorRef ! DataFromPeer(repo.CheckpointMessageSpec.messageCode, checkpoint: Checkpoint, connectedPeer)
+    actorRef ! DataFromPeer(BasicMessagesRepo.CheckpointMessageSpec.messageCode, checkpoint: Checkpoint, connectedPeer)
 
     networkController.awaitCond(app.history.height() == 7)
   }
@@ -161,10 +159,10 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
   def sendCheckpoint(historyPoints: Seq[Int]): Unit = {
     val checkpoint = genCheckpoint(historyPoints)
 
-    actorRef ! DataFromPeer(repo.CheckpointMessageSpec.messageCode, checkpoint, connectedPeer)
+    actorRef ! DataFromPeer(BasicMessagesRepo.CheckpointMessageSpec.messageCode, checkpoint, connectedPeer)
 
     networkController.expectMsgPF() {
-      case SendToNetwork(Message(spec, _, _), _) => spec should be(repo.CheckpointMessageSpec)
+      case SendToNetwork(Message(spec, _, _), _) => spec should be(BasicMessagesRepo.CheckpointMessageSpec)
       case _ => fail("Checkpoint hasn't been sent")
     }
   }

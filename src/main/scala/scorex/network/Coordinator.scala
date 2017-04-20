@@ -4,7 +4,6 @@ import cats._
 import cats.data._
 import cats.implicits._
 import cats.syntax.all._
-
 import akka.pattern.{ask, pipe}
 import akka.util.Timeout
 import scorex.app.Application
@@ -17,10 +16,11 @@ import scorex.crypto.encode.Base58.encode
 import scorex.network.BlockchainSynchronizer.{GetExtension, GetSyncStatus, Status}
 import scorex.network.NetworkController.{DataFromPeer, SendToNetwork}
 import scorex.network.ScoreObserver.{CurrentScore, GetScore}
+import scorex.network.message.BasicMessagesRepo._
 import scorex.network.message.{Message, MessageSpec}
 import scorex.network.peer.PeerManager.{ConnectedPeers, GetConnectedPeersTyped}
 import scorex.transaction.History.BlockchainScore
-import scorex.transaction.ValidationError
+import scorex.transaction.{TransactionModule, ValidationError}
 import scorex.transaction.ValidationError.CustomError
 import scorex.utils.ScorexLogging
 
@@ -32,10 +32,6 @@ import scala.language.higherKinds
 class Coordinator(application: Application) extends ViewSynchronizer with ScorexLogging {
 
   import Coordinator._
-
-  private val basicMessagesSpecsRepo = application.basicMessagesSpecsRepo
-
-  import basicMessagesSpecsRepo._
 
   override val messageSpecs = Seq[MessageSpec[_]](CheckpointMessageSpec)
 
@@ -49,6 +45,8 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
   context.system.scheduler.schedule(1.second, application.settings.synchronizationSettings.scoreBroadcastInterval, self, BroadcastCurrentScore)
 
   application.blockGenerator ! StartGeneration
+
+  implicit val transactionModule: TransactionModule = application.transactionModule
 
   override def receive: Receive = idle()
 

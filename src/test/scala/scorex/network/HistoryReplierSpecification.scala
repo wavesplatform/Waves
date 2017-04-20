@@ -10,7 +10,7 @@ import scorex.network.BlockchainSynchronizer.{InnerId, InnerIds}
 import scorex.transaction.History
 
 import scala.language.implicitConversions
-
+import scorex.network.message.BasicMessagesRepo._
 @DoNotDiscover
 class HistoryReplierSpecification extends ActorTestingCommons {
 
@@ -45,8 +45,6 @@ class HistoryReplierSpecification extends ActorTestingCommons {
   }
 
   private val app = stub[App]
-
-  import app.basicMessagesSpecsRepo._
 
   // according to the protocol ids come in reverse order!
   private def sendSignatures(lastBlockId: Int, blockId: Int): Unit =

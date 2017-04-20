@@ -34,8 +34,6 @@ trait RunnableApplication extends Application with Shutdownable with ScorexLoggi
 
   protected val additionalMessageSpecs: Seq[MessageSpec[_]]
 
-  lazy override val basicMessagesSpecsRepo: BasicMessagesRepo = new BasicMessagesRepo()
-
   // wallet, needs strict evaluation
   override val wallet: Wallet = {
     val maybeWalletFilename = Option(settings.walletSettings.file).filter(_.trim.nonEmpty)
@@ -48,7 +46,7 @@ trait RunnableApplication extends Application with Shutdownable with ScorexLoggi
 
   if (settings.networkSettings.uPnPSettings.enable) upnp.addPort(settings.networkSettings.port)
 
-  lazy val messagesHandler: MessageHandler = MessageHandler(basicMessagesSpecsRepo.specs ++ additionalMessageSpecs)
+  lazy val messagesHandler: MessageHandler = MessageHandler(BasicMessagesRepo.specs ++ additionalMessageSpecs)
 
   lazy override val peerManager = actorSystem.actorOf(Props(classOf[PeerManager], this))
 

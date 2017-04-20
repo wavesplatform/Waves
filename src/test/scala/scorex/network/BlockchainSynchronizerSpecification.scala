@@ -8,6 +8,7 @@ import scorex.ActorTestingCommons
 import scorex.block.Block
 import scorex.block.Block._
 import scorex.network.NetworkController.DataFromPeer
+import scorex.network.message.BasicMessagesRepo._
 import scorex.transaction.{BlockStorage, History}
 
 import scala.concurrent.duration._
@@ -75,8 +76,6 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
   }
 
   private val app = stub[App]
-
-  import app.basicMessagesSpecsRepo._
 
   private def reasonableTimeInterval = wavesSettings.synchronizationSettings.synchronizationTimeout / 2
 
