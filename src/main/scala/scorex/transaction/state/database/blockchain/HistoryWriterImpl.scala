@@ -67,8 +67,6 @@ class HistoryWriterImpl(storage: HistoryStorage) extends History with HistoryWri
     (Math.max(1, height() - howMany + 1) to height()).flatMap(i => Option(storage.blockIdByHeight.get(i)))
       .reverse
 
-  override def contains(signature: Array[Byte]): Boolean = Option(storage.heightByBlockId.get(signature)).isDefined
-
   override def height(): Int = storage.blockIdByHeight.size()
 
   override def score(): BlockchainScore = if (height() > 0) storage.scoreByHeight.get(height()) else 0

@@ -25,8 +25,6 @@ trait History {
 
   def generatedBy(account: Account, from: Int, to: Int): Seq[Block]
 
-  def contains(id: BlockId): Boolean
-
   def lastBlockIds(howMany: Int): Seq[BlockId]
 }
 
@@ -51,6 +49,8 @@ object History {
     def isEmpty: Boolean = history.height() == 0
 
     def contains(block: Block): Boolean = history.contains(block.uniqueId)
+
+    def contains(signature: Array[Byte]): Boolean = history.heightOf(signature).isDefined
 
     def blockById(blockId: String): Option[Block] = Base58.decode(blockId).toOption.flatMap(history.blockById)
 

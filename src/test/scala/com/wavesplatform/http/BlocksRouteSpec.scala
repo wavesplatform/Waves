@@ -156,9 +156,6 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with MockFactory with BlockGe
     // todo: check invalid signature
     forAll(blockGen, blockGen, positiveIntGen) { case (block1, block2, h) =>
 
-      // fails because when arrByte != Base58.decode(Base58.encode(arrByte).get
-      // probably ignored until EqByteArray used in History
-
       (history.blockById _).expects(where(sameSignature(block1.uniqueId)(_))).returns(Some(block1)).anyNumberOfTimes()
       (history.blockById _).expects(where(sameSignature(block2.uniqueId)(_))).returns(Some(block2)).anyNumberOfTimes()
       (history.heightOf _).expects(where(sameSignature(block1.uniqueId)(_))).returns(Some(h)).anyNumberOfTimes()
