@@ -19,6 +19,7 @@ class UnconfirmedTransactionsDatabaseImpl(settings: UTXSettings) extends Unconfi
 
   private def key(tx: Transaction): TxKey = key(tx.id)
 
+  override def putIfNew[T <: Transaction](tx: T, txValidator: T => Either[ValidationError, T]): Either[ValidationError, T] =
     if (transactions.size < settings.size) {
       val txKey = key(tx)
       if (transactions.contains(txKey)) {
