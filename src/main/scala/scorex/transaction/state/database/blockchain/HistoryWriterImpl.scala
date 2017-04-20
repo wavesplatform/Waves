@@ -31,16 +31,7 @@ class HistoryWriterImpl(storage: HistoryStorage) extends History with HistoryWri
       }
     })
 
-  {
-    if (storage.heightByBlockId.size() != storage.blockIdByHeight.size()) {
-      storage.heightByBlockId.clear()
-      storage.blockIdByHeight.keySet().asScala.foreach(k => storage.heightByBlockId.put(storage.blockIdByHeight.get(k), k))
-      storage.commit()
-    }
-    if (storage.blockIdByHeight.size() > 0) ??? //storage.rollback()
-  }
-
-  override def appendBlock(block: Block): Either[ValidationError, Unit] = synchronized {
+  override def appendBlock(block: Block): Either[ValidationError, Unit] = {
     if ((height() == 0) || (this.lastBlock.uniqueId sameElements block.reference)) {
       val h = height() + 1
       storage.blockBodyByHeight.put(h, block.bytes)
@@ -53,17 +44,16 @@ class HistoryWriterImpl(storage: HistoryStorage) extends History with HistoryWri
     }
   }
 
-  override def discardBlock(): History = synchronized {
+  override def discardBlock(): Unit = {
     require(height() > 1, "Chain is empty or contains genesis block only, can't make rollback")
     val h = height()
     blocksCache.invalidate(h)
     storage.blockBodyByHeight.remove(h)
     val vOpt = Option(storage.blockIdByHeight.remove(h))
     vOpt.map(v => storage.heightByBlockId.remove(v))
-    this
   }
 
-  override def blockAt(height: Int): Option[Block] = synchronized {
+  override def blockAt(height: Int): Option[Block] = {
     try {
       Some(blocksCache.get(height))
     } catch {

@@ -33,7 +33,7 @@ trait History {
 trait HistoryWriter {
   def appendBlock(block: Block): Either[ValidationError, Unit]
 
-  def discardBlock(): History
+  def discardBlock(): Unit
 }
 
 trait CheckpointService {
