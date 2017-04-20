@@ -11,7 +11,7 @@ import scorex.ActorTestingCommons
 import scorex.app.{Application, ApplicationVersion}
 import scorex.network.NetworkController.DataFromPeer
 import scorex.network.PeerSynchronizer.RequestDataFromPeer
-import scorex.network.message.BasicMessagesRepo.PeersSpec
+import scorex.network.message.PeersSpec
 import scorex.network.peer.PeerManager
 
 import scala.language.postfixOps

@@ -6,7 +6,7 @@ import scorex.network.message.MessageSpec
 import scorex.transaction.History
 import scorex.transaction.History._
 import scorex.utils.ScorexLogging
-import scorex.network.message.BasicMessagesRepo._
+import scorex.network.message._
 import scala.language.postfixOps
 
 class ScoreObserver(application: Application) extends ViewSynchronizer with ScorexLogging {

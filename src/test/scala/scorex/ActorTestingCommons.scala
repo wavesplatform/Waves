@@ -14,7 +14,7 @@ import scorex.block.Block._
 import scorex.block.{Block, SignerData}
 import scorex.consensus.nxt.{NxtLikeConsensusBlockData, WavesConsensusModule}
 import scorex.network.NetworkController.{DataFromPeer, RegisterMessagesHandler, SendToNetwork}
-import scorex.network.message.{BasicMessagesRepo, Message, MessageSpec}
+import scorex.network.message._
 import scorex.network.{ConnectedPeer, SendToChosen, SendingStrategy}
 import scorex.settings.TestBlockchainSettings
 import scorex.transaction._

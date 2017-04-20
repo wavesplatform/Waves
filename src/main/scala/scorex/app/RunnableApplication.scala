@@ -13,7 +13,7 @@ import scorex.block.Block
 import scorex.consensus.mining.BlockGeneratorController
 import scorex.crypto.encode.Base58
 import scorex.network._
-import scorex.network.message.{BasicMessagesRepo, MessageHandler, MessageSpec}
+import scorex.network.message._
 import scorex.network.peer.PeerManager
 import scorex.transaction.{BlockStorage, History}
 import scorex.utils.ScorexLogging

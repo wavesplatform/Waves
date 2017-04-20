@@ -2,7 +2,7 @@ package scorex.network
 
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{FreeSpec, Matchers, OneInstancePerTest}
-import scorex.network.message.BasicMessagesRepo
+import scorex.network.message._
 import scorex.transaction.TransactionParser._
 
 class CheckpointSpecification extends FreeSpec
@@ -27,13 +27,11 @@ class CheckpointSpecification extends FreeSpec
   }
 
   "serialization" in {
-    val spec = BasicMessagesRepo.CheckpointMessageSpec
-
     def sig(b: Byte) = Array.fill[Byte](SignatureLength)(b)
 
     val c = Checkpoint(Seq(BlockCheckpoint(1, sig(1)), BlockCheckpoint(2, sig(2))), sig(3))
 
-    val c2 = spec.deserializeData(spec.serializeData(c)).get
+    val c2 = CheckpointMessageSpec.deserializeData(CheckpointMessageSpec.serializeData(c)).get
 
     c2.items should have size 2
     (c2.signature sameElements c.signature) shouldBe true

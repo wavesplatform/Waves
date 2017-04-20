@@ -10,7 +10,7 @@ import scorex.network.BlockchainSynchronizer.{InnerId, InnerIds}
 import scorex.transaction.History
 
 import scala.language.implicitConversions
-import scorex.network.message.BasicMessagesRepo._
+import scorex.network.message._
 @DoNotDiscover
 class HistoryReplierSpecification extends ActorTestingCommons {
 

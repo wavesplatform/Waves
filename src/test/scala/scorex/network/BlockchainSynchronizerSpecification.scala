@@ -8,7 +8,7 @@ import scorex.ActorTestingCommons
 import scorex.block.Block
 import scorex.block.Block._
 import scorex.network.NetworkController.DataFromPeer
-import scorex.network.message.BasicMessagesRepo._
+import scorex.network.message._
 import scorex.transaction.{BlockStorage, History}
 
 import scala.concurrent.duration._

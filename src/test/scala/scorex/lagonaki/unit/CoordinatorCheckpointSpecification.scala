@@ -16,7 +16,7 @@ import scorex.network.Coordinator.{AddBlock, ClearCheckpoint, SyncFinished}
 import scorex.network.NetworkController.{DataFromPeer, SendToNetwork}
 import scorex.network.ScoreObserver.CurrentScore
 import scorex.network._
-import scorex.network.message.{BasicMessagesRepo, Message}
+import scorex.network.message._
 import scorex.network.peer.PeerManager.{ConnectedPeers, GetConnectedPeersTyped}
 import scorex.settings.TestBlockchainSettings
 import scorex.transaction._
@@ -94,7 +94,7 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
     app.blockStorage.blockchainUpdater.removeAfter(app.history.genesis.uniqueId)
     actorRef ! ClearCheckpoint
     networkController.ignoreMsg {
-      case SendToNetwork(m, _) => m.spec == BasicMessagesRepo.ScoreMessageSpec
+      case SendToNetwork(m, _) => m.spec == ScoreMessageSpec
       case m => true
     }
   }
@@ -132,7 +132,7 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
 
     val checkpoint = Checkpoint(p +: firstChp.items, Array()).signedBy(pk.privateKey)
 
-    actorRef ! DataFromPeer(BasicMessagesRepo.CheckpointMessageSpec.messageCode, checkpoint: Checkpoint, connectedPeer)
+    actorRef ! DataFromPeer(CheckpointMessageSpec.messageCode, checkpoint: Checkpoint, connectedPeer)
 
     networkController.awaitCond(app.history.height() == 7)
   }
@@ -159,10 +159,10 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
   def sendCheckpoint(historyPoints: Seq[Int]): Unit = {
     val checkpoint = genCheckpoint(historyPoints)
 
-    actorRef ! DataFromPeer(BasicMessagesRepo.CheckpointMessageSpec.messageCode, checkpoint, connectedPeer)
+    actorRef ! DataFromPeer(CheckpointMessageSpec.messageCode, checkpoint, connectedPeer)
 
     networkController.expectMsgPF() {
-      case SendToNetwork(Message(spec, _, _), _) => spec should be(BasicMessagesRepo.CheckpointMessageSpec)
+      case SendToNetwork(Message(spec, _, _), _) => spec should be(CheckpointMessageSpec)
       case _ => fail("Checkpoint hasn't been sent")
     }
   }

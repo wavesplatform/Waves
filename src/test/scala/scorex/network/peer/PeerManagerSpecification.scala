@@ -12,7 +12,7 @@ import scorex.app.ApplicationVersion
 import scorex.network.NetworkController.SendToNetwork
 import scorex.network.PeerConnectionHandler.CloseConnection
 import scorex.network._
-import scorex.network.message.BasicMessagesRepo._
+import scorex.network.message._
 import scorex.network.message.Message
 import scorex.network.message.MessageHandler.RawNetworkData
 

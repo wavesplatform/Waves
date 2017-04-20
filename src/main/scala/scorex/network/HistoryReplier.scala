@@ -5,7 +5,7 @@ import scorex.block.Block
 import scorex.network.NetworkController.{DataFromPeer, SendToNetwork}
 import scorex.network.message.Message
 import scorex.utils.ScorexLogging
-import scorex.network.message.BasicMessagesRepo._
+import scorex.network.message._
 
 class HistoryReplier(application: Application) extends ViewSynchronizer with ScorexLogging {
 

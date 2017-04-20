@@ -5,8 +5,8 @@ import java.nio.ByteBuffer
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.FunSuite
 import scorex.consensus.nxt.WavesConsensusModule
-import scorex.network.message.{BasicMessagesRepo, Message, MessageHandler}
-import scorex.transaction.{SimpleTransactionModule, TransactionModule}
+import scorex.network.message._
+import scorex.transaction.TransactionModule
 
 class MessageHandlerSpec extends FunSuite with MockFactory with UnitTestConfig {
 
@@ -20,7 +20,7 @@ class MessageHandlerSpec extends FunSuite with MockFactory with UnitTestConfig {
   test("parseBytes have to verify Length field in parsing packet") {
     val s1 = BigInt(Long.MaxValue) * 1000000000L
 
-    val msg = Message(BasicMessagesRepo.ScoreMessageSpec, Right(s1), None).bytes
+    val msg = Message(ScoreMessageSpec, Right(s1), None).bytes
     // patch length field from 12 bytes to 13
     msg.update(MagicLength + MessageCodeLength + 3, 13)
 
@@ -29,7 +29,7 @@ class MessageHandlerSpec extends FunSuite with MockFactory with UnitTestConfig {
   }
 
   test("parseBytes work for GetPeers message") {
-    val msg = Message(BasicMessagesRepo.GetPeersSpec, Right(()), None).bytes
+    val msg = Message(GetPeersSpec, Right(()), None).bytes
     val result = handler.parseBytes(ByteBuffer.wrap(msg))
     assert(result.isSuccess)
   }
