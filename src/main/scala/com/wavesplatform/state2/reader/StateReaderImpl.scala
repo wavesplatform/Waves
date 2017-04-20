@@ -10,7 +10,7 @@ import scorex.transaction.{Transaction, TransactionParser}
 
 import scala.collection.JavaConverters.iterableAsScalaIterableConverter
 
-class StateReaderImpl(p: JavaMapStorage) extends StateReader {
+class StateReaderImpl(p: StateStorage) extends StateReader {
 
   override def transactionInfo(id: ByteArray): Option[(Int, Transaction)] = Option(p.transactions.get(id.arr)).map {
     case (h, bytes) => (h, TransactionParser.parseBytes(bytes).get)

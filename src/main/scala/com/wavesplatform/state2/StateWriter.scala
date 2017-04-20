@@ -11,7 +11,7 @@ trait StateWriter {
   def clear(): Unit
 }
 
-class StateWriterImpl(p: JavaMapStorage) extends StateReaderImpl(p) with StateWriter {
+class StateWriterImpl(p: StateStorage) extends StateReaderImpl(p) with StateWriter {
 
   override def applyBlockDiff(blockDiff: BlockDiff): Unit = {
     val txsDiff = blockDiff.txsDiff

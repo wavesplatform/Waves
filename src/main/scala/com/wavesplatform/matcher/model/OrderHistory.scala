@@ -5,12 +5,13 @@ import com.wavesplatform.matcher.model.LimitOrder.OrderStatus
 import com.wavesplatform.matcher.util.{Cache, TTLCache}
 import scorex.transaction.AssetAcc
 import scorex.transaction.assets.exchange.Order
-import scorex.transaction.state.database.state._
 
 import scala.collection.mutable
 import scala.concurrent.duration._
 
 trait OrderHistory {
+  type AddressString = String
+
   val assetsToSpend = mutable.Map.empty[AddressString, Long]
   val ordersRemainingAmount: Cache[String, (Long, Long)] =
     TTLCache[String, (Long, Long)]((Order.MaxLiveTime + 3600*1000).millis)

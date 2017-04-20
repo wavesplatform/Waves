@@ -9,7 +9,6 @@ import scorex.transaction._
 import scorex.transaction.assets.IssueTransaction
 import scorex.transaction.assets.exchange.{ExchangeTransaction, Order}
 import scorex.transaction.lease.LeaseTransaction
-import scorex.transaction.state.database.state.AddressString
 
 import scala.reflect.ClassTag
 import scala.util.Right

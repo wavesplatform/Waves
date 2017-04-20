@@ -5,7 +5,7 @@ import java.util
 import org.h2.mvstore.{MVMap, MVStore}
 
 
-trait JavaMapStorage {
+trait StateStorage {
   def getHeight: Int
 
   def setHeight(i: Int): Unit
@@ -23,7 +23,7 @@ trait JavaMapStorage {
   def commit(): Unit
 }
 
-class MVStorePrimitiveImpl(db: MVStore) extends JavaMapStorage {
+class MVStoreStateStorage(db: MVStore) extends StateStorage {
 
   private val variables: MVMap[String, Int] = db.openMap("variables")
   private val heightKey = "height"

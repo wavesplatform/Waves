@@ -46,8 +46,6 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
   private lazy val history = application.blockStorage.history
   private lazy val checkpoints = application.blockStorage.checkpoints
 
-  private def currentCheckpoint(): Option[Checkpoint] = checkpoints.getCheckpoint
-
   context.system.scheduler.schedule(1.second, application.settings.synchronizationSettings.scoreBroadcastInterval, self, BroadcastCurrentScore)
 
   application.blockGenerator ! StartGeneration
@@ -126,7 +124,7 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
   }
 
   private def handleCheckpoint(checkpoint: Checkpoint, from: Option[ConnectedPeer]): Unit =
-    if (currentCheckpoint.forall(c => !(c.signature sameElements checkpoint.signature))) {
+    if (checkpoints.getCheckpoint.forall(c => !(c.signature sameElements checkpoint.signature))) {
       val maybePublicKeyBytes = Base58.decode(application.settings.checkpointsSettings.publicKey).toOption
 
       maybePublicKeyBytes foreach {
@@ -246,7 +244,7 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
   }
 
   private def isValidWithRespectToCheckpoint(candidate: Block, estimatedHeight: Int): Boolean =
-    !currentCheckpoint.exists {
+    !checkpoints.getCheckpoint.exists {
       case Checkpoint(items, _) =>
         val blockSignature = candidate.signerDataField.value.signature
         items.exists { case BlockCheckpoint(h, sig) =>

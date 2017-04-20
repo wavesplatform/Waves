@@ -2,7 +2,7 @@ package com.wavesplatform.state2.reader
 
 import java.util
 
-import com.wavesplatform.state2.JavaMapStorage
+import com.wavesplatform.state2.StateStorage
 import org.scalatest.{FunSuite, Matchers}
 import scorex.account.Account
 
@@ -62,7 +62,7 @@ class StateReaderImplEffectiveBalanceTest extends FunSuite with Matchers {
 
 object StateReaderImplEffectiveBalanceTest {
 
-  class TestStorage extends JavaMapStorage {
+  class TestStorage extends StateStorage {
     override val transactions = new util.HashMap[Array[Byte], (Int, Array[Byte])]
     override val portfolios = new util.HashMap[Array[Byte], (Long, (Long, Long), Map[Array[Byte], Long])]
     override val assets = new util.HashMap[Array[Byte], (Boolean, Long)]

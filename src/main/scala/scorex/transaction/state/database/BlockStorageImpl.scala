@@ -4,22 +4,23 @@ import java.io.File
 
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state2.reader.StateReader
-import com.wavesplatform.state2.{BlockchainUpdaterImpl, MVStorePrimitiveImpl, StateWriterImpl}
+import com.wavesplatform.state2.{BlockchainUpdaterImpl, MVStoreStateStorage, StateWriterImpl}
 import org.h2.mvstore.MVStore
 import scorex.transaction._
-import scorex.transaction.state.database.blockchain.StoredBlockchain
+import scorex.transaction.state.database.blockchain.{HistoryWriterImpl, MVStoreHistoryStorage}
 
 class BlockStorageImpl(settings: BlockchainSettings) extends BlockStorage {
 
   import BlockStorageImpl._
 
   val database: MVStore = createMVStore(settings.file)
-  val h: History with HistoryWriter with CheckpointService = new StoredBlockchain(database)
-  val mVStorePrimitiveImpl = new MVStorePrimitiveImpl(database)
-  val rw = new StateWriterImpl(mVStorePrimitiveImpl)
-  val updater = new BlockchainUpdaterImpl(rw, settings.functionalitySettings, h)
+  val h = new HistoryWriterImpl(new MVStoreHistoryStorage(database))
+  val s = new StateWriterImpl(new MVStoreStateStorage(database))
+  val updater = new BlockchainUpdaterImpl(s, settings.functionalitySettings, h)
 
-  override val history: History = h
+
+
+  override def history: History = h
 
   override def stateReader: StateReader = updater.currentState
 
