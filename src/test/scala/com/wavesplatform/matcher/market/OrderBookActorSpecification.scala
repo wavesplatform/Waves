@@ -65,6 +65,7 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
 
     val transactionModule = stub[TransactionModule]
     (transactionModule.validate(_: Transaction)).when(*).onCall((tr: Transaction) => Right[ValidationError, Transaction](tr)).anyNumberOfTimes()
+    (transactionModule.onNewOffchainTransaction(_: Transaction)).when(*).onCall((tr: Transaction) => Right[ValidationError, Transaction](tr)).anyNumberOfTimes()
 
     actor = system.actorOf(Props(new OrderBookActor(pair, storedState,
       wallet, settings, transactionModule) with RestartableActor))
@@ -119,7 +120,7 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
 
       val ord3 = sell(pair, 100, 10)
       actor ! ord3
-      receiveN(1)
+      expectMsg(OrderAccepted(ord3))
 
       actor ! GetOrdersRequest
       expectMsg(GetOrdersResponse(Seq(BuyLimitOrder(ord1.price, ord1.amount, ord1))))
@@ -248,10 +249,12 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
 
       actor = system.actorOf(Props(new OrderBookActor(pair, storedState,
         wallet, settings, transactionModule) with RestartableActor {
-        override def isValid(orderMatch: ExchangeTransaction): Boolean = {
-          if (orderMatch.buyOrder == ord2) false
-          else true
+        override def validate(orderMatch: ExchangeTransaction): Either[ValidationError, SignedTransaction] = {
+          if (orderMatch.buyOrder == ord2) Left(ValidationError.CustomError("test"))
+          else Right(orderMatch)
         }
+
+        override def sendToNetwork(tx: SignedTransaction): Either[ValidationError, SignedTransaction] = Right(tx)
       }))
 
       ignoreNoMsg()

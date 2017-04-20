@@ -241,7 +241,7 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll {
   private def waitForAssetBalance(node: Node, asset: String, expectedBalance: Long): Unit =
     Await.result(
       node.waitFor[AssetBalance](node.assetBalance(node.address, asset), _.balance >= expectedBalance, 5.seconds),
-      1.minute
+      3.minute
     )
 
   private def getBalance(node: Node): (Long, Long) = {
@@ -320,16 +320,17 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll {
 object MatcherTestSuite {
   private val dockerConfigs = Docker.NodeConfigs.getConfigList("nodes").asScala
 
-  private val configWithMatcher = ConfigFactory.parseString(
+  private val generatingMatcherConfig = ConfigFactory.parseString(
     """
       |waves.matcher {
       |  enable=yes
       |  account="3HevUqdcHuiLvpeVLo4sGVqxSsZczJuCYHo"
       |  bind-address="0.0.0.0"
+      |  order-match-tx-fee = 300000
       |}
     """.stripMargin)
 
-  private val configPeers = ConfigFactory.parseString(
+  private val nonGeneratingPeersConfig = ConfigFactory.parseString(
     """
       |waves.miner.enable=no
     """.stripMargin
@@ -337,11 +338,11 @@ object MatcherTestSuite {
 
   val AssetQuantity: Long = 1000
 
-  val MatcherFee: Long = 100000
-  val TransactionFee: Long = 100000
+  val MatcherFee: Long = 300000
+  val TransactionFee: Long = 300000
 
   val Waves: Long = 100000000L
 
-  val Configs: Seq[Config] = Seq(configWithMatcher.withFallback(dockerConfigs.head)) ++
-    Random.shuffle(dockerConfigs.tail).take(2).map(configPeers.withFallback(_))
+  val Configs: Seq[Config] = Seq(generatingMatcherConfig.withFallback(dockerConfigs.head)) ++
+    Random.shuffle(dockerConfigs.tail).take(2).map(nonGeneratingPeersConfig.withFallback(_))
 }

@@ -6,7 +6,7 @@ import scorex.account._
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange._
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import scorex.transaction.{CreateAliasTransaction, PaymentTransaction, SignedTransaction}
+import scorex.transaction._
 import scorex.utils.NTP
 import com.wavesplatform.state2._
 
@@ -250,7 +250,6 @@ trait TransactionGen {
     val o2 = Order.sell(seller, matcher, assetPair, price, amount2, timestamp, expiration, matcherFee)
     val buyFee = (BigInt(matcherFee) * BigInt(matchedAmount) / BigInt(amount1)).longValue()
     val sellFee = (BigInt(matcherFee) * BigInt(matchedAmount) / BigInt(amount2)).longValue()
-    import com.wavesplatform.state2.diffs._
     val trans = ExchangeTransaction.create(matcher, o1, o2, price, matchedAmount,
       buyFee, sellFee, (buyFee + sellFee) / 2, expiration - 100).explicitGet()
 
@@ -268,5 +267,12 @@ trait TransactionGen {
   def randomTransactionsGen(count: Int): Gen[Seq[SignedTransaction]] = for {
     transactions <- Gen.listOfN(count, randomTransactionGen)
   } yield transactions
+
+  val genesisGen: Gen[GenesisTransaction] = accountGen.flatMap(genesisGeneratorP)
+
+  def genesisGeneratorP(recipient: PrivateKeyAccount): Gen[GenesisTransaction] = for {
+    amt <- positiveLongGen
+    ts <- positiveIntGen
+  } yield GenesisTransaction.create(recipient, amt, ts).right.get
 
 }

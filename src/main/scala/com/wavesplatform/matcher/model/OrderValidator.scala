@@ -21,11 +21,11 @@ trait OrderValidator {
   def isBalanceWithOpenOrdersEnough(order: Order): Boolean = {
     val (acc, feeAcc) = (AssetAcc(order.senderPublicKey, order.getSpendAssetId), AssetAcc(order.senderPublicKey, None))
 
-    val (assBal, feeBal) = (storedState.assetBalance(acc) - assetsToSpend.getOrElse(acc.key, 0L),
+    val (accBal, feeBal) = (storedState.assetBalance(acc) - assetsToSpend.getOrElse(acc.key, 0L),
       storedState.assetBalance(feeAcc) - assetsToSpend.getOrElse(feeAcc.key, 0L))
 
-    if (acc != feeAcc) assBal >= order.getSpendAmount(order.price, order.amount).right.get && feeBal >= order.matcherFee
-    else assBal >= order.getSpendAmount(order.price, order.amount).right.get + order.matcherFee
+    if (acc != feeAcc) accBal >= order.getSpendAmount(order.price, order.amount).right.get && feeBal >= order.matcherFee
+    else accBal >= order.getSpendAmount(order.price, order.amount).right.get + order.matcherFee
   }
 
   def validateNewOrder(order: Order): Validation = {
