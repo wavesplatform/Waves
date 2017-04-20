@@ -28,6 +28,13 @@ class Docker(suiteConfig: Config = ConfigFactory.empty) extends AutoCloseable wi
 
   import Docker._
 
+  private val http = asyncHttpClient(config()
+    .setMaxConnections(50)
+    .setMaxConnectionsPerHost(10)
+    .setMaxRequestRetry(1)
+    .setReadTimeout(5000)
+    .setRequestTimeout(5000))
+
   private val client = DefaultDockerClient.fromEnv().build()
   private val timer = new HashedWheelTimer()
   private var nodes = Map.empty[String, NodeInfo]
@@ -109,12 +116,6 @@ object Docker {
   private val jsonMapper = new ObjectMapper
   private val propsMapper = new JavaPropsMapper
   private val imageId = System.getProperty("docker.imageId")
-  private val http = asyncHttpClient(config()
-    .setMaxConnections(50)
-    .setMaxConnectionsPerHost(10)
-    .setMaxRequestRetry(1)
-    .setReadTimeout(5000)
-    .setRequestTimeout(5000))
 
   private def asProperties(config: Config): Properties = {
     val jsonConfig = config.root().render(ConfigRenderOptions.concise())

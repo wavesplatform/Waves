@@ -8,6 +8,7 @@ import com.wavesplatform.matcher.api.CancelOrderRequest
 import com.wavesplatform.settings.WavesSettings
 import io.netty.util.Timer
 import org.asynchttpclient.Dsl.{get => _get, post => _post}
+import org.asynchttpclient.exception.RemotelyClosedException
 import org.asynchttpclient.util.HttpConstants
 import org.asynchttpclient.{Response, _}
 import org.slf4j.LoggerFactory
@@ -48,9 +49,7 @@ class Node(config: Config, nodeInfo: NodeInfo, client: AsyncHttpClient, timer: T
       log.trace(s"$r")
       client.executeRequest(r).toCompletableFuture.toScala
         .recoverWith {
-          case t: Throwable =>
-            log.debug("Retrying request", t)
-            executeRequest
+          case _: RemotelyClosedException => timer.schedule(executeRequest, interval)
         }
     }
 
@@ -205,7 +204,7 @@ object Node extends ScorexLogging {
 
   case class UnexpectedStatusCodeException(r: Response) extends IOException(s"Unexpected status code: ${r.getStatusCode}")
 
-  case class Status(blockGeneratorStatus: String, historySynchronizationStatus: String)
+  case class Status(blockGeneratorStatus: Option[String], historySynchronizationStatus: Option[String])
 
   implicit val statusFormat: Format[Status] = Json.format
 
