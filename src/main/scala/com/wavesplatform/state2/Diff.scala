@@ -7,7 +7,7 @@ import scorex.transaction.Transaction
 import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 
-case class EffectiveBalanceSnapshot(acc: Account, height: Int, prevEffectiveBalance: Long, effectiveBalance: Long)
+case class EffectiveBalanceSnapshot(acc: Account, height: Int, prevEffectiveBalance: Long, effectiveBalance: Long, balance: Long)
 
 case class LeaseInfo(leaseIn: Long, leaseOut: Long)
 

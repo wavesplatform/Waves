@@ -48,16 +48,16 @@ object BlockDiffer extends ScorexLogging {
       else d)
       .map(diff => {
         val effectiveBalanceSnapshots = diff.portfolios
-          .filter { case (acc, portfolio) => portfolio.effectiveBalance != 0 }
-          .map { case (acc, portfolio) => (acc, s.accountPortfolio(acc).effectiveBalance, portfolio.effectiveBalance) }
-          .map { case (acc, oldEffBalance, effBalanceDiff) =>
+          .filter { case (acc, portfolioDiff) => portfolioDiff.effectiveBalance != 0 || portfolioDiff.balance != 0 }
+          .map { case (acc, portfolioDiff) =>
+            val oldEffBalance = s.accountPortfolio(acc).effectiveBalance
+            val oldBalance = s.accountPortfolio(acc).balance
             EffectiveBalanceSnapshot(acc = acc,
               height = s.height + 1,
-              prevEffectiveBalance = if (s.height == 0) (oldEffBalance + effBalanceDiff) else oldEffBalance,
-              effectiveBalance = oldEffBalance + effBalanceDiff)
-          }
-          .toSeq
-
+              prevEffectiveBalance = if (s.height == 0) oldEffBalance + portfolioDiff.effectiveBalance else oldEffBalance,
+              effectiveBalance = oldEffBalance + portfolioDiff.effectiveBalance,
+              balance = oldBalance + portfolioDiff.balance)
+          }.toSeq
         BlockDiff(diff, 1, effectiveBalanceSnapshots)
       }
       )
@@ -68,5 +68,5 @@ object BlockDiffer extends ScorexLogging {
     blocks.foldLeft(Monoid[BlockDiff].empty) { case (diff, block) =>
       val blockDiff = apply(settings)(new CompositeStateReader(s, diff), block).explicitGet()
       Monoid[BlockDiff].combine(diff, blockDiff)
-  }
+    }
 }

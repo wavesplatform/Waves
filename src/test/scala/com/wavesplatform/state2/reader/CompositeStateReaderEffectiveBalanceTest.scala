@@ -35,7 +35,7 @@ class CompositeStateReaderEffectiveBalanceTest extends FreeSpec with MockFactory
           txsDiff = Monoid[Diff].empty,
           heightDiff = heightDiff,
           effectiveBalanceSnapshots = Seq(
-            EffectiveBalanceSnapshot(acc, innerHeight + 80, 10000, 50000)))
+            EffectiveBalanceSnapshot(acc, innerHeight + 80, 10000, 50000, 0)))
 
         val inner = stub[StateReader]
         (inner.height _).when().returns(innerHeight)
@@ -50,9 +50,9 @@ class CompositeStateReaderEffectiveBalanceTest extends FreeSpec with MockFactory
           txsDiff = Monoid[Diff].empty,
           heightDiff = heightDiff,
           effectiveBalanceSnapshots = Seq(
-            EffectiveBalanceSnapshot(acc, innerHeight + 80, 20000, 4000),
-            EffectiveBalanceSnapshot(acc, innerHeight + 50, 50000, 20000),
-            EffectiveBalanceSnapshot(acc, innerHeight + 90, 4000, 10000)))
+            EffectiveBalanceSnapshot(acc, innerHeight + 80, 20000, 4000, 0),
+            EffectiveBalanceSnapshot(acc, innerHeight + 50, 50000, 20000, 0),
+            EffectiveBalanceSnapshot(acc, innerHeight + 90, 4000, 10000, 0)))
 
         val inner = stub[StateReader]
         (inner.height _).when().returns(innerHeight)
@@ -71,8 +71,8 @@ class CompositeStateReaderEffectiveBalanceTest extends FreeSpec with MockFactory
           txsDiff = Monoid[Diff].empty,
           heightDiff = heightDiff,
           effectiveBalanceSnapshots = Seq(
-            EffectiveBalanceSnapshot(acc, 80, 2000, 10000),
-            EffectiveBalanceSnapshot(acc, 90, 10000, 50000)))
+            EffectiveBalanceSnapshot(acc, 80, 2000, 10000, 0),
+            EffectiveBalanceSnapshot(acc, 90, 10000, 50000, 0)))
 
         val inner = stub[StateReader]
         (inner.height _).when().returns(0)
@@ -87,8 +87,8 @@ class CompositeStateReaderEffectiveBalanceTest extends FreeSpec with MockFactory
           txsDiff = Monoid[Diff].empty,
           heightDiff = heightDiff,
           effectiveBalanceSnapshots = Seq(
-            EffectiveBalanceSnapshot(acc, 80, 2000, 10000),
-            EffectiveBalanceSnapshot(acc, 90, 10000, 50000)))
+            EffectiveBalanceSnapshot(acc, 80, 2000, 10000, 0),
+            EffectiveBalanceSnapshot(acc, 90, 10000, 50000, 0)))
 
         val inner = stub[StateReader]
         (inner.height _).when().returns(innerHeight)
