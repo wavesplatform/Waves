@@ -19,8 +19,6 @@ trait History {
 
   def scoreOf(id: BlockId): BlockchainScore
 
-  def blockById(blockId: BlockId): Option[Block]
-
   def heightOf(blockId: BlockId): Option[Int]
 
   def generatedBy(account: Account, from: Int, to: Int): Seq[Block]
@@ -51,6 +49,8 @@ object History {
     def contains(block: Block): Boolean = history.contains(block.uniqueId)
 
     def contains(signature: Array[Byte]): Boolean = history.heightOf(signature).isDefined
+
+    def blockById(blockId: BlockId): Option[Block] = history.heightOf(blockId).flatMap(history.blockAt)
 
     def blockById(blockId: String): Option[Block] = Base58.decode(blockId).toOption.flatMap(history.blockById)
 

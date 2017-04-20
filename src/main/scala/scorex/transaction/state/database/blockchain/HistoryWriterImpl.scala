@@ -75,8 +75,6 @@ class HistoryWriterImpl(storage: HistoryStorage) extends History with HistoryWri
 
   override def heightOf(blockSignature: Array[Byte]): Option[Int] = Option(storage.heightByBlockId.get(blockSignature))
 
-  override def blockById(blockId: BlockId): Option[Block] = heightOf(blockId).flatMap(blockAt)
-
   override def generatedBy(account: Account, from: Int, to: Int): Seq[Block] = {
     (from to to).toStream.flatMap { h =>
       for {
