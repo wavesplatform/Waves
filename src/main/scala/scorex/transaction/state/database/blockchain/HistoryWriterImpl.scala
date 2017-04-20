@@ -14,7 +14,7 @@ import scorex.utils.ScorexLogging
 import scala.collection.JavaConverters._
 import scala.util.{Failure, Try}
 
-class HistoryWriterImpl(storage: HistoryStorage) extends History with HistoryWriter with CheckpointService with ScorexLogging {
+class HistoryWriterImpl(storage: HistoryStorage) extends History with HistoryWriter with ScorexLogging {
 
   private val BlocksCacheSizeLimit: Int = 1000
   private val blocksCache = CacheBuilder.newBuilder()
@@ -88,11 +88,4 @@ class HistoryWriterImpl(storage: HistoryStorage) extends History with HistoryWri
     val bl = blockAt(h).get
     s"$h -- ${bl.uniqueId.mkString} -- ${bl.referenceField.value.mkString}"
   }).mkString("\n")
-
-  override def getCheckpoint: Option[Checkpoint] = Option(storage.checkpoint.get(0))
-
-  override def setCheckpoint(c: Option[Checkpoint]): Unit = {
-    if (c.isDefined) storage.checkpoint.put(0, c.get)
-    else storage.checkpoint.remove(0)
-  }
 }
