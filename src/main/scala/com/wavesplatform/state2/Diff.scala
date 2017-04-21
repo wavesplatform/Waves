@@ -37,16 +37,15 @@ case class Diff(transactions: Map[ByteArray, (Int, Transaction, Set[Account])],
                 issuedAssets: Map[ByteArray, AssetInfo],
                 aliases: Map[Alias, Account],
                 paymentTransactionIdsByHashes: Map[ByteArray, ByteArray],
+                previousExchangeTxs: Map[ByteArray, Set[ExchangeTransaction]],
                 patchExtraLeaseIdsToCancel: Seq[ByteArray])
 
 object Diff {
-
-  def apply(portfolios: Map[Account, Portfolio]): Diff = new Diff(Map.empty, portfolios, Map.empty, Map.empty, Map.empty, Seq.empty)
-
   def apply(height: Int, tx: Transaction,
             portfolios: Map[Account, Portfolio],
             assetInfos: Map[ByteArray, AssetInfo] = Map.empty,
             aliases: Map[Alias, Account] = Map.empty,
+            previousExchangeTxs: Map[ByteArray, Set[ExchangeTransaction]] = Map.empty,
             paymentTransactionIdsByHashes: Map[ByteArray, ByteArray] = Map.empty
            ): Diff = Diff(
     transactions = Map(EqByteArray(tx.id) -> (height, tx, portfolios.keys.toSet)),
@@ -54,6 +53,7 @@ object Diff {
     issuedAssets = assetInfos,
     aliases = aliases,
     paymentTransactionIdsByHashes = paymentTransactionIdsByHashes,
+    previousExchangeTxs = previousExchangeTxs,
     patchExtraLeaseIdsToCancel = Seq.empty)
 
   implicit class DiffExt(d: Diff) {
@@ -86,19 +86,10 @@ object Diff {
       (effectiveNewLeases, effectiveNewCancels)
     }
 
-    lazy val orderExchangeTxsMap: Map[EqByteArray, Set[Array[Byte]]] = {
-      Monoid.combineAll(
-        d.transactions
-          .collect { case (_, (_, etx: ExchangeTransaction, _)) => etx }
-          .map(etx => Map(
-            EqByteArray(etx.buyOrder.id) -> Set(etx.id),
-            EqByteArray(etx.sellOrder.id) -> Set(etx.id)
-          )))
-    }
   }
 
   implicit val diffMonoid = new Monoid[Diff] {
-    override def empty: Diff = Diff(transactions = Map.empty, portfolios = Map.empty, issuedAssets = Map.empty, Map.empty, Map.empty, Seq.empty)
+    override def empty: Diff = Diff(transactions = Map.empty, portfolios = Map.empty, issuedAssets = Map.empty, Map.empty, Map.empty, Map.empty, Seq.empty)
 
     override def combine(older: Diff, newer: Diff): Diff = Diff(
       transactions = older.transactions ++ newer.transactions,
@@ -106,6 +97,7 @@ object Diff {
       issuedAssets = older.issuedAssets.combine(newer.issuedAssets),
       aliases = older.aliases ++ newer.aliases,
       paymentTransactionIdsByHashes = older.paymentTransactionIdsByHashes ++ newer.paymentTransactionIdsByHashes,
+      previousExchangeTxs = older.previousExchangeTxs ++ newer.previousExchangeTxs,
       patchExtraLeaseIdsToCancel = newer.patchExtraLeaseIdsToCancel ++ older.patchExtraLeaseIdsToCancel
     )
   }

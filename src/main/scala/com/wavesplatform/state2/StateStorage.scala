@@ -16,7 +16,7 @@ trait StateStorage {
   val accountTransactionIds: java.util.Map[Array[Byte], List[Array[Byte]]]
   val effectiveBalanceSnapshots: util.Map[(Array[Byte], Int), (Long, Long)]
   val paymentTransactionHashes: util.Map[Array[Byte], Array[Byte]]
-  val exchangeTransactionsByOrder: util.Map[Array[Byte], List[Array[Byte]]]
+  val exchangeTransactionsByOrder: util.Map[Array[Byte], Set[Array[Byte]]]
   val aliasToAddress: util.Map[String, Array[Byte]]
   val leaseState: util.Map[Array[Byte], Boolean]
 
@@ -46,7 +46,7 @@ class MVStoreStateStorage(db: MVStore) extends StateStorage {
 
   val aliasToAddress: MVMap[String, Array[Byte]] = db.openMap("aliasToAddress")
 
-  val exchangeTransactionsByOrder: MVMap[Array[Byte], List[Array[Byte]]] = db.openMap("exchangeTransactionsByOrder")
+  val exchangeTransactionsByOrder: MVMap[Array[Byte], Set[Array[Byte]]] = db.openMap("exchangeTransactionsByOrder")
 
   val leaseState: MVMap[Array[Byte], Boolean] =  db.openMap("leaseState")
 

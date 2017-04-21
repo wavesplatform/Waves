@@ -83,8 +83,4 @@ class HistoryWriterImpl(storage: HistoryStorage) extends History with HistoryWri
       val bl = blockAt(h).get
       s"$h -- ${bl.uniqueId.mkString} -- ${bl.referenceField.value.mkString}"
   }).mkString("\n")
-
-  override def all(): Seq[Block] = storage.blockBodyByHeight.asScala.toSeq
-    .sortBy(_._1).map(_._2)
-    .map(bytes => Block.parseBytes(bytes).get)
 }
