@@ -38,7 +38,36 @@ case class Diff(transactions: Map[ByteArray, (Int, Transaction, Set[Account])],
                 aliases: Map[Alias, Account],
                 paymentTransactionIdsByHashes: Map[ByteArray, ByteArray],
                 previousExchangeTxs: Map[ByteArray, Set[ExchangeTransaction]],
-                patchExtraLeaseIdsToCancel: Seq[ByteArray])
+                patchExtraLeaseIdsToCancel: Seq[ByteArray]) {
+
+  lazy val accountTransactionIds: Map[Account, List[ByteArray]] = {
+    val map: List[(Account, List[(Int, Long, ByteArray)])] = transactions.toList
+      .flatMap { case (id, (h, tx, accs)) => accs.map(acc => acc -> List((h, tx.timestamp, id))) }
+    val groupedByAcc = map.foldLeft(Map.empty[Account, List[(Int, Long, ByteArray)]]) { case (m, (acc, list)) =>
+      m.combine(Map(acc -> list))
+    }
+    groupedByAcc
+      .mapValues(l => l.sortBy { case ((h, t, id)) => (-h, -t) }) // fresh head ([h=2, h=1, h=0])
+      .mapValues(_.map(_._3))
+  }
+
+  lazy val effectiveLeaseTxUpdates: (Set[EqByteArray], Set[EqByteArray]) = {
+    val txs = transactions.values.map(_._2)
+
+    val canceledLeaseIds: Set[EqByteArray] = txs
+      .collect { case (lctx: LeaseCancelTransaction) => EqByteArray(lctx.leaseId) }
+      .toSet
+
+    val newLeaseIds = txs
+      .collect { case (ltx: LeaseTransaction) => EqByteArray(ltx.id) }
+      .toSet
+
+    val effectiveNewCancels = (canceledLeaseIds ++ patchExtraLeaseIdsToCancel).diff(newLeaseIds)
+    val effectiveNewLeases = newLeaseIds.diff(canceledLeaseIds ++ patchExtraLeaseIdsToCancel)
+    (effectiveNewLeases, effectiveNewCancels)
+  }
+
+}
 
 object Diff {
   def apply(height: Int, tx: Transaction,
@@ -58,34 +87,6 @@ object Diff {
 
   implicit class DiffExt(d: Diff) {
     def asBlockDiff: BlockDiff = BlockDiff(d, 0, Set.empty)
-
-    lazy val accountTransactionIds: Map[Account, List[ByteArray]] = {
-      val map: List[(Account, List[(Int, Long, ByteArray)])] = d.transactions.toList
-        .flatMap { case (id, (h, tx, accs)) => accs.map(acc => acc -> List((h, tx.timestamp, id))) }
-      val groupedByAcc = map.foldLeft(Map.empty[Account, List[(Int, Long, ByteArray)]]) { case (m, (acc, list)) =>
-        m.combine(Map(acc -> list))
-      }
-      groupedByAcc
-        .mapValues(l => l.sortBy { case ((h, t, id)) => (-h, -t) }) // fresh head ([h=2, h=1, h=0])
-        .mapValues(_.map(_._3))
-    }
-
-    lazy val effectiveLeaseTxUpdates: (Set[EqByteArray], Set[EqByteArray]) = {
-      val txs = d.transactions.values.map(_._2)
-
-      val canceledLeaseIds: Set[EqByteArray] = txs
-        .collect { case (lctx: LeaseCancelTransaction) => EqByteArray(lctx.leaseId) }
-        .toSet
-
-      val newLeaseIds = txs
-        .collect { case (ltx: LeaseTransaction) => EqByteArray(ltx.id) }
-        .toSet
-
-      val effectiveNewCancels = (canceledLeaseIds ++ d.patchExtraLeaseIdsToCancel).diff(newLeaseIds)
-      val effectiveNewLeases = newLeaseIds.diff(canceledLeaseIds ++ d.patchExtraLeaseIdsToCancel)
-      (effectiveNewLeases, effectiveNewCancels)
-    }
-
   }
 
   implicit val diffMonoid = new Monoid[Diff] {
