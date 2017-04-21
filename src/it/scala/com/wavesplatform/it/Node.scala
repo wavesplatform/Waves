@@ -8,7 +8,6 @@ import com.wavesplatform.matcher.api.CancelOrderRequest
 import com.wavesplatform.settings.WavesSettings
 import io.netty.util.Timer
 import org.asynchttpclient.Dsl.{get => _get, post => _post}
-import org.asynchttpclient.exception.RemotelyClosedException
 import org.asynchttpclient.util.HttpConstants
 import org.asynchttpclient.{Response, _}
 import org.slf4j.LoggerFactory
@@ -24,7 +23,7 @@ import scorex.utils.{LoggerFacade, ScorexLogging}
 import scala.compat.java8.FutureConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.{ExecutionContext, Future, TimeoutException}
 import scala.util.{Failure, Success, Try}
 
 
@@ -46,10 +45,12 @@ class Node(config: Config, nodeInfo: NodeInfo, client: AsyncHttpClient, timer: T
 
   private def retrying(r: Request, interval: FiniteDuration = 1.second): Future[Response] = {
     def executeRequest: Future[Response] = {
-      log.trace(s"$r")
+      log.trace(s"Executing request '$r'")
       client.executeRequest(r).toCompletableFuture.toScala
         .recoverWith {
-          case _: RemotelyClosedException => timer.schedule(executeRequest, interval)
+          case e@(_: IOException | _: TimeoutException) =>
+            log.debug(s"Failed to execute request '$r' with error: ${e.getMessage}")
+            timer.schedule(executeRequest, interval)
         }
     }
 

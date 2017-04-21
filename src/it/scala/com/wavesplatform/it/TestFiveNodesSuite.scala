@@ -12,7 +12,7 @@ import scala.util.Random
 
 class TestFiveNodesSuite extends FreeSpec with BeforeAndAfterAll with ScorexLogging with Matchers {
   private val docker = new Docker()
-  private val nodeConfigs = Random.shuffle(Docker.NodeConfigs.getConfigList("nodes").asScala).take(5)
+  private val nodeConfigs = Random.shuffle(Docker.NodeConfigs.getConfigList("nodes").asScala).take(4)
   private val allNodes = nodeConfigs.map(docker.startNode)
 
   override protected def beforeAll() = {
@@ -22,13 +22,13 @@ class TestFiveNodesSuite extends FreeSpec with BeforeAndAfterAll with ScorexLogg
     log.debug("Waiting for nodes to connect")
     val peersCounts = Await.result(
       for {
-        count <- Future.traverse(allNodes)(_.waitForPeers(4))
+        count <- Future.traverse(allNodes)(_.waitForPeers(3))
       } yield count, 1.minute
     )
 
     peersCounts.foreach(c => log.info(s"Connected peers: $c"))
 
-    all(peersCounts) shouldEqual 4
+    all(peersCounts) shouldEqual 3
 
     log.debug("Starting tests")
   }

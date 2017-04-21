@@ -22,12 +22,16 @@ class BalancesSpecification(allNodes: Seq[Node]) extends FunSuite with Matchers 
     case _ => Failure[Assertion](new RuntimeException("Unexpected state"))
   }
 
-  private val firstAddress: String = Await.result(sender.createAddress, 1.minute)
-  private val secondAddress: String = Await.result(sender.createAddress, 1.minute)
-  private val thirdAddress: String = Await.result(sender.createAddress, 1.minute)
+  private var firstAddress: String = ""
+  private var secondAddress: String = ""
+  private var thirdAddress: String = ""
 
   override def beforeAll(): Unit = {
     super.beforeAll()
+
+    firstAddress = Await.result(sender.createAddress, 1.minute)
+    secondAddress = Await.result(sender.createAddress, 1.minute)
+    thirdAddress = Await.result(sender.createAddress, 1.minute)
 
     def waitForTxsToReachAllNodes(txIds: Seq[String]): Future[_] = {
       val txNodePairs = for {
@@ -66,7 +70,7 @@ class BalancesSpecification(allNodes: Seq[Node]) extends FunSuite with Matchers 
   }
 
   private def assertAssetBalance(acc: String, assetIdString: String, balance: Long): Future[Unit] = {
-    sender.assetBalance(acc, assetIdString).map(_ shouldBe balance)
+    sender.assetBalance(acc, assetIdString).map(_.balance shouldBe balance)
   }
 
     test("leasing waves decreases lessor's eff.b. and increases lessee's eff.b.; lessor pays fee") {
