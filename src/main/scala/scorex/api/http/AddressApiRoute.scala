@@ -26,7 +26,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
 
   override lazy val route =
     pathPrefix("addresses") {
-      validate ~ seed ~ balance ~ verify ~ sign ~ deleteAddress ~ verifyText ~
+      validate ~ seed ~ balance ~ balanceWithConfirmations ~ verify ~ sign ~ deleteAddress ~ verifyText ~
         signText ~ seq ~ publicKey ~ effectiveBalance ~ effectiveBalanceWithConfirmations
     } ~ root ~ create
 
@@ -224,7 +224,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
     Account.fromString(address).right.map(acc => ToResponseMarshallable(Balance(
       acc.address,
       confirmations,
-      state.accountPortfolio(acc).balance
+      state.balanceWithConfirmations(acc, confirmations)
     )))
       .getOrElse(InvalidAddress)
   }

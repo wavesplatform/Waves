@@ -30,6 +30,8 @@ trait StateReader {
 
   def effectiveBalanceAtHeightWithConfirmations(acc: Account, height: Int, confs: Int): Long
 
+  def balanceWithConfirmations(acc: Account, confirmations: Int): Long
+
   def paymentTransactionIdByHash(hash: ByteArray): Option[ByteArray]
 
   def aliasesOfAddress(a: Account): Seq[Alias]

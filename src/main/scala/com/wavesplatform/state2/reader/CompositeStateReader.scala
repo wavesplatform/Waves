@@ -31,32 +31,35 @@ class CompositeStateReader(inner: StateReader, blockDiff: BlockDiff) extends Sta
     fromDiff ++ inner.accountTransactionIds(a) // fresh head ++ stale tail
   }
 
-  override def effectiveBalanceAtHeightWithConfirmations(acc: Account, height: Int, confs: Int): Long = {
-    val localEffectiveBalanceSnapshotsOfAccount = blockDiff.effectiveBalanceSnapshots
-      .filter(ebs => ebs.acc == acc)
+  override def effectiveBalanceAtHeightWithConfirmations(acc: Account, atHeight: Int, confs: Int): Long =
+    withConfirmations(acc, atHeight, confs)(_.effectiveBalance, _.prevEffectiveBalance,
+      inner.effectiveBalanceAtHeightWithConfirmations(acc, inner.height, confs - blockDiff.heightDiff))
 
-    lazy val relatedUpdates = localEffectiveBalanceSnapshotsOfAccount.filter(_.height > height - confs)
-    lazy val storedEffectiveBalance = inner.effectiveBalanceAtHeightWithConfirmations(acc, height - blockDiff.heightDiff, confs - blockDiff.heightDiff)
+  override def balanceWithConfirmations(acc: Account, confirmations: Int): Long =
+    withConfirmations(acc, height, confirmations)(_.balance, _.prevBalance,
+      inner.balanceWithConfirmations(acc, confirmations - blockDiff.heightDiff))
 
-    if (localEffectiveBalanceSnapshotsOfAccount.isEmpty)
-      storedEffectiveBalance
+  private def withConfirmations(acc: Account, height: Int, confs: Int)
+                               (current: EffectiveBalanceSnapshot => Long, prev: EffectiveBalanceSnapshot => Long, stored: => Long): Long = {
+    val localSnapshotsOfAccount = blockDiff.effectiveBalanceSnapshots.filter(ebs => ebs.acc == acc)
+    lazy val relatedUpdates = localSnapshotsOfAccount.filter(_.height > height - confs)
+    if (localSnapshotsOfAccount.isEmpty)
+      stored
     else {
       if (confs < blockDiff.heightDiff) {
         relatedUpdates.headOption match {
           case None =>
-            localEffectiveBalanceSnapshotsOfAccount.maxBy(_.height).effectiveBalance
+            current(localSnapshotsOfAccount.maxBy(_.height))
           case Some(relatedUpdate) =>
-            Math.min(relatedUpdate.prevEffectiveBalance, relatedUpdates.map(_.effectiveBalance).min)
+            Math.min(prev(relatedUpdate), relatedUpdates.map(current).min)
         }
-      }
-      else {
-        val localMin = localEffectiveBalanceSnapshotsOfAccount.map(_.effectiveBalance).min
+      } else {
+        val localMin = localSnapshotsOfAccount.map(current).min
         val prevEffBalance = if (inner.height == 0)
-          localEffectiveBalanceSnapshotsOfAccount.minBy(_.height).prevEffectiveBalance
+          prev(localSnapshotsOfAccount.minBy(_.height))
         else
-          storedEffectiveBalance
+          stored
         Math.min(prevEffBalance, localMin)
-
       }
     }
   }
@@ -138,5 +141,8 @@ object CompositeStateReader {
 
     override def activeLeases(): Seq[ByteArray] =
       new CompositeStateReader(inner, blockDiff()).activeLeases()
+
+    override def balanceWithConfirmations(acc: Account, confirmations: Int): Long =
+      new CompositeStateReader(inner, blockDiff()).balanceWithConfirmations(acc, confirmations)
   }
 }

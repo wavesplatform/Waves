@@ -52,11 +52,14 @@ object BlockDiffer extends ScorexLogging {
           .map { case (acc, portfolioDiff) =>
             val oldEffBalance = s.accountPortfolio(acc).effectiveBalance
             val oldBalance = s.accountPortfolio(acc).balance
+            val newEffectiveBalance = oldEffBalance + portfolioDiff.effectiveBalance
+            val newBalance = oldBalance + portfolioDiff.balance
             EffectiveBalanceSnapshot(acc = acc,
               height = s.height + 1,
-              prevEffectiveBalance = if (s.height == 0) oldEffBalance + portfolioDiff.effectiveBalance else oldEffBalance,
-              effectiveBalance = oldEffBalance + portfolioDiff.effectiveBalance,
-              balance = oldBalance + portfolioDiff.balance)
+              prevEffectiveBalance = if (s.height == 0) newEffectiveBalance else oldEffBalance,
+              effectiveBalance = newEffectiveBalance,
+              prevBalance = if (s.height == 0) newBalance else oldBalance,
+              balance = newBalance)
           }.toSeq
         BlockDiff(diff, 1, effectiveBalanceSnapshots)
       }

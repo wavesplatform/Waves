@@ -9,6 +9,7 @@ import scorex.transaction.lease.LeaseTransaction
 import scorex.transaction.{Transaction, TransactionParser}
 
 import scala.collection.JavaConverters.iterableAsScalaIterableConverter
+import scala.collection.immutable
 
 class StateReaderImpl(p: JavaMapStorage) extends StateReader {
 
@@ -33,13 +34,25 @@ class StateReaderImpl(p: JavaMapStorage) extends StateReader {
       .map(EqByteArray)
   }
 
-  override def effectiveBalanceAtHeightWithConfirmations(acc: Account, atHeight: Int, confs: Int): Long = {
-    val bockNumberThatIsConfsOld = Math.max(1, atHeight - confs)
-    val confsOldMinimum: Seq[(Long, Long, Long)] = Range(bockNumberThatIsConfsOld + 1, atHeight + 1)
+  private def snapshotsOfRange(acc: Account, atHeight: Int, confirmations: Int): Seq[(Long, Long, Long, Long)] = {
+    val bockNumberThatIsConfsOld = Math.max(1, atHeight - confirmations)
+    Range(bockNumberThatIsConfsOld + 1, atHeight + 1)
       .flatMap { height => Option(p.effectiveBalanceSnapshots.get((acc.bytes, height))) }
-    confsOldMinimum.headOption match {
+  }
+
+  override def effectiveBalanceAtHeightWithConfirmations(acc: Account, atHeight: Int, confirmations: Int): Long = {
+    val snapshots = snapshotsOfRange(acc, atHeight, confirmations)
+    snapshots.headOption match {
       case None => accountPortfolio(acc).effectiveBalance
-      case Some((oldest, _, _)) => Math.min(oldest, confsOldMinimum.map(_._2).min)
+      case Some((oldest, _, _, _)) => Math.min(oldest, snapshots.map(_._2).min)
+    }
+  }
+
+  override def balanceWithConfirmations(acc: Account, confirmations: Int): Long = {
+    val snapshots = snapshotsOfRange(acc, height, confirmations)
+    snapshots.headOption match {
+      case None => accountPortfolio(acc).balance
+      case Some((_, _, oldest, _)) => Math.min(oldest, snapshots.map(_._4).min)
     }
   }
 

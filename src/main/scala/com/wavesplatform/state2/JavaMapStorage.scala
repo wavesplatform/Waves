@@ -14,7 +14,7 @@ trait JavaMapStorage {
   val portfolios: java.util.Map[Array[Byte], (Long, (Long, Long), Map[Array[Byte], Long])]
   val assets: java.util.Map[Array[Byte], (Boolean, Long)]
   val accountTransactionIds: java.util.Map[Array[Byte], List[Array[Byte]]]
-  val effectiveBalanceSnapshots: util.Map[(Array[Byte], Int), (Long, Long, Long)]
+  val effectiveBalanceSnapshots: util.Map[(Array[Byte], Int), (Long, Long, Long, Long)]
   val paymentTransactionHashes: util.Map[Array[Byte], Array[Byte]]
   val exchangeTransactionsByOrder: util.Map[Array[Byte], List[Array[Byte]]]
   val aliasToAddress: util.Map[String, Array[Byte]]
@@ -40,7 +40,7 @@ class MVStorePrimitiveImpl(db: MVStore) extends JavaMapStorage {
 
   val accountTransactionIds: MVMap[Array[Byte], List[Array[Byte]]] = db.openMap("accountTransactionIds")
 
-  val effectiveBalanceSnapshots: util.Map[(Array[Byte], Int), (Long, Long,Long)] = db.openMap("effectiveBalanceUpdates")
+  val effectiveBalanceSnapshots: util.Map[(Array[Byte], Int), (Long, Long, Long, Long)] = db.openMap("effectiveBalanceUpdates")
 
   val paymentTransactionHashes: MVMap[Array[Byte], Array[Byte]] = db.openMap("paymentTransactionHashes")
 
@@ -48,7 +48,7 @@ class MVStorePrimitiveImpl(db: MVStore) extends JavaMapStorage {
 
   val exchangeTransactionsByOrder: MVMap[Array[Byte], List[Array[Byte]]] = db.openMap("exchangeTransactionsByOrder")
 
-  val leaseState: MVMap[Array[Byte], Boolean] =  db.openMap("leaseState")
+  val leaseState: MVMap[Array[Byte], Boolean] = db.openMap("leaseState")
 
   override def commit(): Unit = db.commit()
 }

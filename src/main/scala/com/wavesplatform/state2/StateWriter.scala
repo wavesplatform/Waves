@@ -62,7 +62,7 @@ class StateWriterImpl(p: JavaMapStorage) extends StateReaderImpl(p) with StateWr
     }
 
     blockDiff.effectiveBalanceSnapshots.foreach { ebs =>
-      p.effectiveBalanceSnapshots.put((ebs.acc.bytes, ebs.height), (ebs.prevEffectiveBalance, ebs.effectiveBalance,ebs.balance))
+      p.effectiveBalanceSnapshots.put((ebs.acc.bytes, ebs.height), (ebs.prevEffectiveBalance, ebs.effectiveBalance, ebs.prevBalance, ebs.balance))
     }
 
 
