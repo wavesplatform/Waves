@@ -21,11 +21,19 @@ case class NodeInfo(
                      hostNetworkPort: Int,
                      containerNetworkPort: Int,
                      ipAddress: String,
-                     containerId: String)
+                     containerId: String,
+                     hostMatcherApiPort: Int)
 
 class Docker(suiteConfig: Config = ConfigFactory.empty) extends AutoCloseable with ScorexLogging {
 
   import Docker._
+
+  private val http = asyncHttpClient(config()
+    .setMaxConnections(50)
+    .setMaxConnectionsPerHost(10)
+    .setMaxRequestRetry(1)
+    .setReadTimeout(5000)
+    .setRequestTimeout(5000))
 
   private val client = DefaultDockerClient.fromEnv().build()
   private val timer = new HashedWheelTimer()
@@ -48,10 +56,12 @@ class Docker(suiteConfig: Config = ConfigFactory.empty) extends AutoCloseable wi
 
     val restApiPort = actualConfig.getString("waves.rest-api.port")
     val networkPort = actualConfig.getString("waves.network.port")
+    val matcherApiPort = actualConfig.getString("waves.matcher.port")
 
     val portBindings = new ImmutableMap.Builder[String, java.util.List[PortBinding]]()
       .put(restApiPort, Collections.singletonList(PortBinding.randomPort("0.0.0.0")))
       .put(networkPort, Collections.singletonList(PortBinding.randomPort("0.0.0.0")))
+      .put(matcherApiPort, Collections.singletonList(PortBinding.randomPort("0.0.0.0")))
       .build()
 
     val hostConfig = HostConfig.builder()
@@ -63,7 +73,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty) extends AutoCloseable wi
 
     val containerConfig = ContainerConfig.builder()
       .image(imageId)
-      .exposedPorts(restApiPort, networkPort)
+      .exposedPorts(restApiPort, networkPort, matcherApiPort)
       .hostConfig(hostConfig)
       .env(s"WAVES_OPTS=$configOverrides", s"WAVES_PORT=$networkPort")
       .build()
@@ -79,7 +89,8 @@ class Docker(suiteConfig: Config = ConfigFactory.empty) extends AutoCloseable wi
       extractHostPort(ports, networkPort),
       networkPort.toInt,
       containerInfo.networkSettings().ipAddress(),
-      containerId)
+      containerId,
+      extractHostPort(ports, matcherApiPort))
     nodes += containerId -> nodeInfo
 
     new Node(actualConfig, nodeInfo, http, timer)
@@ -105,12 +116,6 @@ object Docker {
   private val jsonMapper = new ObjectMapper
   private val propsMapper = new JavaPropsMapper
   private val imageId = System.getProperty("docker.imageId")
-  private val http = asyncHttpClient(config()
-    .setMaxConnections(50)
-    .setMaxConnectionsPerHost(10)
-    .setMaxRequestRetry(1)
-    .setReadTimeout(5000)
-    .setRequestTimeout(5000))
 
   private def asProperties(config: Config): Properties = {
     val jsonConfig = config.root().render(ConfigRenderOptions.concise())
