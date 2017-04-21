@@ -11,6 +11,8 @@ import scorex.transaction.History.BlockchainScore
 
 trait History {
 
+  def all() : Seq[Block]
+
   def height(): Int
 
   def blockAt(height: Int): Option[Block]

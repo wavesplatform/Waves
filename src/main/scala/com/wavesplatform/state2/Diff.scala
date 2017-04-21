@@ -57,7 +57,7 @@ object Diff {
     patchExtraLeaseIdsToCancel = Seq.empty)
 
   implicit class DiffExt(d: Diff) {
-    def asBlockDiff: BlockDiff = BlockDiff(d, 0, Seq.empty)
+    def asBlockDiff: BlockDiff = BlockDiff(d, 0, Set.empty)
 
     lazy val accountTransactionIds: Map[Account, List[ByteArray]] = {
       val map: List[(Account, List[(Int, Long, ByteArray)])] = d.transactions.toList

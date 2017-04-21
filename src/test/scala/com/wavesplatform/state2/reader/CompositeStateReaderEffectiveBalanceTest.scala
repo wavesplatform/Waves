@@ -16,7 +16,7 @@ class CompositeStateReaderEffectiveBalanceTest extends FreeSpec with MockFactory
     val blockDiff = BlockDiff(
       txsDiff = Monoid[Diff].empty,
       heightDiff = heightDiff,
-      effectiveBalanceSnapshots = Seq.empty)
+      effectiveBalanceSnapshots = Set.empty)
 
     val innerEffectiveBalance = 10000
 
@@ -34,7 +34,7 @@ class CompositeStateReaderEffectiveBalanceTest extends FreeSpec with MockFactory
         val blockDiff = BlockDiff(
           txsDiff = Monoid[Diff].empty,
           heightDiff = heightDiff,
-          effectiveBalanceSnapshots = Seq(
+          effectiveBalanceSnapshots = Set(
             EffectiveBalanceSnapshot(acc, innerHeight + 80, 10000, 50000)))
 
         val inner = stub[StateReader]
@@ -49,7 +49,7 @@ class CompositeStateReaderEffectiveBalanceTest extends FreeSpec with MockFactory
         val blockDiff = BlockDiff(
           txsDiff = Monoid[Diff].empty,
           heightDiff = heightDiff,
-          effectiveBalanceSnapshots = Seq(
+          effectiveBalanceSnapshots = Set(
             EffectiveBalanceSnapshot(acc, innerHeight + 80, 20000, 4000),
             EffectiveBalanceSnapshot(acc, innerHeight + 50, 50000, 20000),
             EffectiveBalanceSnapshot(acc, innerHeight + 90, 4000, 10000)))
@@ -70,7 +70,7 @@ class CompositeStateReaderEffectiveBalanceTest extends FreeSpec with MockFactory
         val blockDiff = BlockDiff(
           txsDiff = Monoid[Diff].empty,
           heightDiff = heightDiff,
-          effectiveBalanceSnapshots = Seq(
+          effectiveBalanceSnapshots = Set(
             EffectiveBalanceSnapshot(acc, 80, 2000, 10000),
             EffectiveBalanceSnapshot(acc, 90, 10000, 50000)))
 
@@ -86,7 +86,7 @@ class CompositeStateReaderEffectiveBalanceTest extends FreeSpec with MockFactory
         val blockDiff = BlockDiff(
           txsDiff = Monoid[Diff].empty,
           heightDiff = heightDiff,
-          effectiveBalanceSnapshots = Seq(
+          effectiveBalanceSnapshots = Set(
             EffectiveBalanceSnapshot(acc, 80, 2000, 10000),
             EffectiveBalanceSnapshot(acc, 90, 10000, 50000)))
 

@@ -19,17 +19,10 @@ class HistoryWriterImpl(storage: HistoryStorage) extends History with HistoryWri
   private val BlocksCacheSizeLimit: Int = 1000
   private val blocksCache = CacheBuilder.newBuilder()
     .maximumSize(BlocksCacheSizeLimit)
-    .build[Integer, Block](
-    new CacheLoader[Integer, Block]() {
-      def load(height: Integer): Block = {
-        val blockOpt = Try(Option(storage.blockBodyByHeight.get(height))).toOption.flatten.flatMap(b => Block.parseBytes(b).recoverWith {
-          case t: Throwable =>
-            log.error("Block.parseBytes error", t)
-            Failure(t)
-        }.toOption)
-        blockOpt.get
-      }
-    })
+    .build[Integer, Block](new CacheLoader[Integer, Block]() {
+    def load(height: Integer): Block = Block.parseBytes(storage.blockBodyByHeight.get(height)).get
+  }
+  )
 
   override def appendBlock(block: Block): Either[ValidationError, Unit] = {
     if ((height() == 0) || (this.lastBlock.uniqueId sameElements block.reference)) {
@@ -76,16 +69,22 @@ class HistoryWriterImpl(storage: HistoryStorage) extends History with HistoryWri
   override def heightOf(blockSignature: Array[Byte]): Option[Int] = Option(storage.heightByBlockId.get(blockSignature))
 
   override def generatedBy(account: Account, from: Int, to: Int): Seq[Block] = {
-    (from to to).toStream.flatMap { h =>
-      for {
-        block <- blockAt(h)
-        if block.signerData.generator.address.equals(account.address)
-      } yield block
+    (from to to).toStream.flatMap {
+      h =>
+        for {
+          block <- blockAt(h)
+          if block.signerData.generator.address.equals(account.address)
+        } yield block
     }
   }
 
-  override def toString: String = ((1 to height()) map { h =>
-    val bl = blockAt(h).get
-    s"$h -- ${bl.uniqueId.mkString} -- ${bl.referenceField.value.mkString}"
+  override def toString: String = ((1 to height()) map {
+    h =>
+      val bl = blockAt(h).get
+      s"$h -- ${bl.uniqueId.mkString} -- ${bl.referenceField.value.mkString}"
   }).mkString("\n")
+
+  override def all(): Seq[Block] = storage.blockBodyByHeight.asScala.toSeq
+    .sortBy(_._1).map(_._2)
+    .map(bytes => Block.parseBytes(bytes).get)
 }

@@ -56,7 +56,7 @@ object BlockDiffer extends ScorexLogging {
               prevEffectiveBalance = if (s.height == 0) (oldEffBalance + effBalanceDiff) else oldEffBalance,
               effectiveBalance = oldEffBalance + effBalanceDiff)
           }
-          .toSeq
+          .toSet
 
         BlockDiff(diff, 1, effectiveBalanceSnapshots)
       }
@@ -64,9 +64,12 @@ object BlockDiffer extends ScorexLogging {
   }
 
 
-  def unsafeDiffMany(settings: FunctionalitySettings)(s: StateReader, blocks: Seq[Block]): BlockDiff =
+  def unsafeDiffMany(settings: FunctionalitySettings, log: (String) => Unit = _ => ())(s: StateReader, blocks: Seq[Block]): BlockDiff =
     blocks.foldLeft(Monoid[BlockDiff].empty) { case (diff, block) =>
       val blockDiff = apply(settings)(new CompositeStateReader(s, diff), block).explicitGet()
+      if (diff.heightDiff % 1000 == 0) {
+        log(s"Rebuilt ${diff.heightDiff} blocks out of ${blocks.size}")
+      }
       Monoid[BlockDiff].combine(diff, blockDiff)
-  }
+    }
 }

@@ -19,9 +19,12 @@ class BlockchainUpdaterImpl(persisted: StateWriter with StateReader, settings: F
   private val unsafeDifferByRange: (StateReader, (Int, Int)) => BlockDiff = {
     case (sr, (from, to)) =>
       log.debug(s"Reading blocks from $from to $to")
-      val blocks = Range(from, to).map(bc.blockAt(_).get)
+      val blocks =  if(from ==1 && to == bc.height()+1) {
+        bc.all()
+      } else
+        Range(from, to).map(bc.blockAt(_).get)
       log.debug(s"Blocks read from $from to $to")
-      val r = BlockDiffer.unsafeDiffMany(settings)(sr, blocks)
+      val r = BlockDiffer.unsafeDiffMany(settings, m => log.info(m))(sr, blocks)
       log.debug(s"Diff for Range($from, $to) rebuilt")
       r
   }
@@ -45,13 +48,13 @@ class BlockchainUpdaterImpl(persisted: StateWriter with StateReader, settings: F
   def currentState: StateReader = CompositeStateReader.proxy(persisted, () => inMemoryDiff)
 
   private def updatePersistedAndInMemory(): Unit = {
-    logHeights("States rebuild started:")
+    logHeights("State rebuild started:")
     val persistFrom = persisted.height + 1
     val persistUpTo = bc.height - MinInMemDiff + 1
     val diffToBePersisted = unsafeDiffByRange(persistFrom, persistUpTo)
     persisted.applyBlockDiff(diffToBePersisted)
     inMemoryDiff = unsafeDiffNotPersisted()
-    logHeights("States rebuild finished:")
+    logHeights("State rebuild finished:")
   }
 
   override def processBlock(block: Block): Either[ValidationError, Unit] = {
