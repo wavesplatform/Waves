@@ -6,7 +6,7 @@ import akka.http.scaladsl.server.Route
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state2.reader.StateReader
 import io.swagger.annotations._
-import play.api.libs.json.Json
+import play.api.libs.json.{JsArray, Json}
 import scorex.api.http._
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash
@@ -33,7 +33,7 @@ case class DebugApiRoute(settings: RestAPISettings, wallet: Wallet, stateReader:
   ))
   def blocks: Route = {
     (path("blocks" / IntNumber) & get) { howMany =>
-      complete(Json.arr(history.lastBlocks(howMany).map { block =>
+      complete(JsArray(history.lastBlocks(howMany).map { block =>
         val bytes = block.bytes
         Json.obj(bytes.length.toString -> Base58.encode(FastCryptographicHash(bytes)))
       }))

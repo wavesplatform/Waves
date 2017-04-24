@@ -1,35 +1,64 @@
 package com.wavesplatform.http
 
-import com.wavesplatform.{TestWallet, TransactionGen}
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.state2.{LeaseInfo, Portfolio}
 import com.wavesplatform.state2.reader.StateReader
-import org.scalacheck.Gen
+import com.wavesplatform.{BlockGen, TestWallet, TransactionGen}
+import org.scalacheck.{Gen, Shrink}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json._
+import scorex.crypto.encode.Base58
+import scorex.crypto.hash.FastCryptographicHash
 import scorex.transaction.History
 import scorex.waves.http.DebugApiRoute
 
 class DebugRouteSpec
   extends RouteSpec("/debug")
-    with RestAPISettingsHelper with TestWallet with MockFactory with PropertyChecks with TransactionGen{
+    with RestAPISettingsHelper with TestWallet with MockFactory with PropertyChecks with TransactionGen with BlockGen {
 
   private val state = mock[StateReader]
   private val history = mock[History]
   private val route = DebugApiRoute(restAPISettings, testWallet, state, history).route
 
+  private implicit def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)
+
   routePath("blocks/{howMany}") in {
+    val gen = for {
+      n <- Gen.chooseNum(1, 5).label("requested count")
+      actualLength <- Gen.chooseNum(1, n)
+      blocks <- Gen.listOfN(actualLength, randomSignerBlockGen).label("blocks")
+    } yield (n, blocks)
+    forAll(gen) { case (n, blocks) =>
+      (history.lastBlocks _).expects(n).returning(blocks).once()
+
+      Get(routePath(s"/blocks/$n")) ~> route ~> check {
+        val resp = responseAs[Seq[JsObject]]
+        resp.length shouldEqual blocks.length
+
+        for ((b, json) <- blocks.zip(resp)) {
+          (json \ b.bytes.length.toString).as[String] shouldEqual Base58.encode(FastCryptographicHash(b.bytes))
+        }
+      }
+    }
 
   }
 
   routePath("/state") in {
     val portfolioGen = for {
-      account <- accountGen
-      balance <- Gen.posNum[Long]
-    } yield account -> Portfolio(balance, LeaseInfo.empty, Map.empty)
-    forAll(Gen.listOf()) { case (account, balance) =>
+      a <- accountGen
+      b <- Gen.posNum[Long]
+    } yield a.toAccount -> Portfolio(b, LeaseInfo.empty, Map.empty)
 
+    forAll(Gen.chooseNum(0, 20).flatMap(n => Gen.listOfN(n, portfolioGen))) { portfolios =>
+      val portfolioMap = portfolios.toMap
+      (state.accountPortfolios _).expects().returning(portfolioMap).once()
+
+      Get(routePath("/state")) ~> route ~> check {
+        responseAs[JsObject] shouldEqual JsObject(portfolios.map {
+          case (account, p) => account.address -> JsNumber(p.balance)
+        })
+      }
     }
   }
 
