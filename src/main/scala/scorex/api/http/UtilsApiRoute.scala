@@ -53,7 +53,7 @@ case class UtilsApiRoute(settings: RestAPISettings) extends ApiRoute {
   @ApiResponses(Array(
     new ApiResponse(code = 200, message = "Json with error or json like {\"message\": \"your message\",\"hash\": \"your message hash\"}")
   ))
-  def hashFast: Route = (path("hash" / "secure") & post) {
+  def hashSecure: Route = (path("hash" / "secure") & post) {
     entity(as[String]) { message =>
       complete(Json.obj("message" -> message, "hash" -> Base58.encode(SecureCryptographicHash(message))))
     }
@@ -67,7 +67,7 @@ case class UtilsApiRoute(settings: RestAPISettings) extends ApiRoute {
   @ApiResponses(Array(
     new ApiResponse(code = 200, message = "Json with error or json like {\"message\": \"your message\",\"hash\": \"your message hash\"}")
   ))
-  def hashSecure: Route = (path("hash" / "fast") & post) {
+  def hashFast: Route = (path("hash" / "fast") & post) {
     entity(as[String]) { message =>
       complete(Json.obj("message" -> message, "hash" -> Base58.encode(FastCryptographicHash(message))))
     }
