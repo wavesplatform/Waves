@@ -42,7 +42,7 @@ class ConsensusRouteSpec extends RouteSpec("/consensus") with RestAPISettingsHel
 
   routePath("/generationsignature") - {
     "for last block" in {
-      forAll(blockGen) { blk =>
+      forAll(randomSignerBlockGen) { blk =>
         (history.blockAt _).expects(10).returning(Some(blk)).once()
         Get(routePath("/generationsignature")) ~> route ~> check {
           (responseAs[JsObject] \ "generationSignature").as[String] shouldEqual Base58.encode(blk.consensusData.generationSignature)
@@ -51,7 +51,7 @@ class ConsensusRouteSpec extends RouteSpec("/consensus") with RestAPISettingsHel
     }
 
     "for a given block" in {
-      forAll(blockGen, Gen.oneOf(true, false)) { case (blk, isAvailable) =>
+      forAll(randomSignerBlockGen, Gen.oneOf(true, false)) { case (blk, isAvailable) =>
         val result = if (isAvailable) Option(blk) else None
         (history.heightOf(_: Block.BlockId)).expects(where(sameSignature(blk.uniqueId)(_))).returning(Some(10)).once()
         (history.blockAt _).expects(*).returning(result).once()
@@ -68,7 +68,7 @@ class ConsensusRouteSpec extends RouteSpec("/consensus") with RestAPISettingsHel
   routePath("/basetarget") - {
 
     "for a given block" in {
-      forAll(blockGen, Gen.oneOf(true, false)) { case (blk, isAvailable) =>
+      forAll(randomSignerBlockGen, Gen.oneOf(true, false)) { case (blk, isAvailable) =>
         val result = if (isAvailable) Option(blk) else None
         (history.heightOf(_: Block.BlockId)).expects(where(sameSignature(blk.uniqueId)(_))).returning(Some(10)).once()
         (history.blockAt _).expects(*).returning(result).once()

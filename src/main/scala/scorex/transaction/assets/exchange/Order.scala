@@ -174,7 +174,7 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
 object Order {
   val MaxLiveTime: Long = 30L * 24L * 60L * 60L * 1000L
   val PriceConstant = 100000000L
-  val MaxAmount: Long = PriceConstant * PriceConstant
+  val MaxAmount: Long = 100 * PriceConstant * PriceConstant
   private val AssetIdLength = 32
 
 

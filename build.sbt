@@ -16,6 +16,7 @@ publishArtifact in (Compile, packageDoc) := false
 publishArtifact in (Compile, packageSrc) := false
 mainClass in Compile := Some("com.wavesplatform.Application")
 scalacOptions ++= Seq("-feature", "-deprecation", "-Xmax-classfile-name", "128")
+logBuffered := false
 
 //assembly settings
 assemblyJarName in assembly := "waves.jar"

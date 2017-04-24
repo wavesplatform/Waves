@@ -7,7 +7,7 @@ import com.wavesplatform.settings.WavesSettings
 import org.h2.mvstore.MVStore
 import scorex.ActorTestingCommons
 import scorex.account.PrivateKeyAccount
-import scorex.app.Application
+import scorex.app.{Application, ApplicationVersion}
 import scorex.block.Block
 import scorex.consensus.nxt.{NxtLikeConsensusBlockData, WavesConsensusModule}
 import scorex.crypto.encode.Base58
@@ -20,6 +20,7 @@ import scorex.network.message._
 import scorex.network.peer.PeerManager.{ConnectedPeers, GetConnectedPeersTyped}
 import scorex.settings.TestBlockchainSettings
 import scorex.transaction._
+import scorex.wallet.Wallet
 
 import scala.concurrent.duration._
 import scala.language.postfixOps
@@ -53,7 +54,7 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
 
   val db: MVStore = new MVStore.Builder().open()
 
-  trait TestAppMock extends Application {
+  class TestAppMock extends Application {
     lazy implicit val consensusModule: WavesConsensusModule = new WavesConsensusModule(TestBlockchainSettings.Disabled) {
       override def isValid(block: Block)(implicit transactionModule: TransactionModule): Boolean = true
     }
@@ -67,6 +68,14 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
 
     lazy val blockStorage: BlockStorage = transactionModule.blockStorage
     lazy val scoreObserver: ActorRef = testScoreObserver.ref
+
+    override def applicationName: String = "mock-app"
+
+    override def appVersion: ApplicationVersion = ApplicationVersion(0, 0, 0)
+
+    override def coordinator: ActorRef = system.actorOf(Props(classOf[Coordinator], this), "Coordinator")
+
+    override def wallet: Wallet = new Wallet(None, "", None)
   }
 
   lazy val app = stub[TestAppMock]

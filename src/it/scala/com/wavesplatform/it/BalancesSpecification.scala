@@ -22,9 +22,9 @@ class BalancesSpecification(allNodes: Seq[Node]) extends FunSuite with Matchers 
     case _ => Failure[Assertion](new RuntimeException("Unexpected state"))
   }
 
-  private val firstAddress: String = Await.result(sender.createAddress, 1.minute)
-  private val secondAddress: String = Await.result(sender.createAddress, 1.minute)
-  private val thirdAddress: String = Await.result(sender.createAddress, 1.minute)
+  private val firstAddress: String = Await.result(sender.createAddress, 3.minutes)
+  private val secondAddress: String = Await.result(sender.createAddress, 3.minutes)
+  private val thirdAddress: String = Await.result(sender.createAddress, 3.minutes)
 
   override def beforeAll(): Unit = {
     super.beforeAll()
@@ -66,10 +66,10 @@ class BalancesSpecification(allNodes: Seq[Node]) extends FunSuite with Matchers 
   }
 
   private def assertAssetBalance(acc: String, assetIdString: String, balance: Long): Future[Unit] = {
-    sender.assetBalance(acc, assetIdString).map(_ shouldBe balance)
+    sender.assetBalance(acc, assetIdString).map(_.balance shouldBe balance)
   }
 
-    test("leasing waves decreases lessor's eff.b. and increases lessee's eff.b.; lessor pays fee") {
+  test("leasing waves decreases lessor's eff.b. and increases lessee's eff.b.; lessor pays fee") {
     val f = for {
       _ <- assertBalances(firstAddress, 200 waves, 200 waves)
       _ <- assertBalances(secondAddress, 100 waves, 100 waves)
@@ -288,6 +288,49 @@ class BalancesSpecification(allNodes: Seq[Node]) extends FunSuite with Matchers 
       _ <- assertBalances(firstAddress, 114 waves, 14 waves)
 
       _ <- assertAssetBalance(firstAddress, issuedAssetId, 50000)
+    } yield succeed
+
+    Await.result(f, 1 minute)
+  }
+
+  test("lease cancellation can be done only once") {
+    val f = for {
+      _ <- assertBalances(firstAddress, 114 waves, 14 waves)
+      _ <- assertBalances(secondAddress, 102 waves, 202 waves)
+
+      createdLeaseTxId <- sender.lease(firstAddress, secondAddress, 5 waves, fee = 1 waves).map(_.id)
+
+      _ <- Future.traverse(allNodes)(_.waitForTransaction(createdLeaseTxId))
+
+      _ <- assertBalances(firstAddress, 113 waves, 8 waves)
+      _ <- assertBalances(secondAddress, 102 waves, 207 waves)
+
+      createdCancelLeaseTxId <- sender.cancelLease(firstAddress, createdLeaseTxId, fee = 1 waves).map(_.id)
+
+      _ <- Future.traverse(allNodes)(_.waitForTransaction(createdCancelLeaseTxId))
+
+      _ <- assertRequestError(sender.cancelLease(firstAddress, createdLeaseTxId, fee = 1 waves).map(_.id))
+
+      _ <- assertBalances(firstAddress, 112 waves, 12 waves)
+      _ <- assertBalances(secondAddress, 102 waves, 202 waves)
+    } yield succeed
+
+    Await.result(f, 1 minute)
+  }
+
+  test("only sender can cancel lease transaction") {
+    val f = for {
+      _ <- assertBalances(firstAddress, 112 waves, 12 waves)
+      _ <- assertBalances(secondAddress, 102 waves, 202 waves)
+
+      createdLeaseTxId <- sender.lease(firstAddress, secondAddress, 5 waves, fee = 1 waves).map(_.id)
+
+      _ <- Future.traverse(allNodes)(_.waitForTransaction(createdLeaseTxId))
+
+      _ <- assertBalances(firstAddress, 111 waves, 6 waves)
+      _ <- assertBalances(secondAddress, 102 waves, 207 waves)
+
+      _ <- assertRequestError(sender.cancelLease(thirdAddress, createdLeaseTxId, fee = 1 waves))
     } yield succeed
 
     Await.result(f, 1 minute)
