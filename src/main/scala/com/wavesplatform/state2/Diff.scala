@@ -7,6 +7,16 @@ import scorex.transaction.Transaction
 import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 
+case class Snapshot(prevHeight: Int, balance: Long, effectiveBalance: Long)
+
+object Snapshot {
+  implicit val snapshotMonoid = new Monoid[Snapshot] {
+    override def empty: Snapshot = ???
+
+    override def combine(x: Snapshot, y: Snapshot): Snapshot = ???
+  }
+}
+
 case class EffectiveBalanceSnapshot(acc: Account, height: Int, prevEffectiveBalance: Long, effectiveBalance: Long, prevBalance: Long, balance: Long)
 
 case class LeaseInfo(leaseIn: Long, leaseOut: Long)
@@ -57,7 +67,7 @@ object Diff {
     patchExtraLeaseIdsToCancel = Seq.empty)
 
   implicit class DiffExt(d: Diff) {
-    def asBlockDiff: BlockDiff = BlockDiff(d, 0, Seq.empty)
+    def asBlockDiff: BlockDiff = BlockDiff(d, 0, Map.empty)
 
     lazy val accountTransactionIds: Map[Account, List[ByteArray]] = {
       val map: List[(Account, List[(Int, Long, ByteArray)])] = d.transactions.toList

@@ -20,7 +20,9 @@ object BlockDiffer extends ScorexLogging {
 
   def apply(settings: FunctionalitySettings)(s: StateReader, block: Block): Either[ValidationError, BlockDiff] = {
 
-    val txDiffer = TransactionDiffer(settings, block.timestamp, s.height + 1) _
+    val currentBlockHeight = s.height + 1
+
+    val txDiffer = TransactionDiffer(settings, block.timestamp, currentBlockHeight) _
 
     val txsDiffEi = block.transactionData.foldLeft(rightEmptyDiff) { case (ei, tx) => ei match {
       case Left(error) => Left(error)
@@ -43,25 +45,20 @@ object BlockDiffer extends ScorexLogging {
 
     txsDiffEi
       .map(_.combine(feeDiff))
-      .map(d => if (s.height + 1 == settings.resetEffectiveBalancesAtHeight)
+      .map(d => if (currentBlockHeight == settings.resetEffectiveBalancesAtHeight)
         Monoid.combine(d, LeasePatch(new CompositeStateReader(s, d.asBlockDiff)))
       else d)
       .map(diff => {
-        val effectiveBalanceSnapshots = diff.portfolios
-          .filter { case (acc, portfolioDiff) => portfolioDiff.effectiveBalance != 0 || portfolioDiff.balance != 0 }
+        val newSnapshots = diff.portfolios
+          .filter { case (acc, portfolioDiff) => portfolioDiff.balance != 0 || portfolioDiff.effectiveBalance != 0 }
           .map { case (acc, portfolioDiff) =>
-            val oldEffBalance = s.accountPortfolio(acc).effectiveBalance
-            val oldBalance = s.accountPortfolio(acc).balance
-            val newEffectiveBalance = oldEffBalance + portfolioDiff.effectiveBalance
-            val newBalance = oldBalance + portfolioDiff.balance
-            EffectiveBalanceSnapshot(acc = acc,
-              height = s.height + 1,
-              prevEffectiveBalance = if (s.height == 0) newEffectiveBalance else oldEffBalance,
-              effectiveBalance = newEffectiveBalance,
-              prevBalance = if (s.height == 0) newBalance else oldBalance,
-              balance = newBalance)
-          }.toSeq
-        BlockDiff(diff, 1, effectiveBalanceSnapshots)
+            val oldPortfolio = s.accountPortfolio(acc)
+            acc -> Map(currentBlockHeight -> Snapshot(
+              prevHeight = s.height,
+              balance = oldPortfolio.balance + portfolioDiff.balance,
+              effectiveBalance = oldPortfolio.effectiveBalance + portfolioDiff.effectiveBalance))
+          }
+        BlockDiff(diff, 1, newSnapshots)
       }
       )
   }

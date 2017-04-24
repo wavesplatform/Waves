@@ -11,6 +11,7 @@ import scorex.transaction.assets.exchange.{ExchangeTransaction, Order}
 import scorex.transaction.lease.LeaseTransaction
 import scorex.transaction.state.database.state.AddressString
 
+import scala.annotation.tailrec
 import scala.reflect.ClassTag
 import scala.util.Right
 
@@ -28,10 +29,6 @@ trait StateReader {
 
   def accountTransactionIds(a: Account): Seq[ByteArray]
 
-  def effectiveBalanceAtHeightWithConfirmations(acc: Account, height: Int, confs: Int): Long
-
-  def balanceWithConfirmations(acc: Account, confirmations: Int): Long
-
   def paymentTransactionIdByHash(hash: ByteArray): Option[ByteArray]
 
   def aliasesOfAddress(a: Account): Seq[Alias]
@@ -43,6 +40,10 @@ trait StateReader {
   def isLeaseActive(leaseTx: LeaseTransaction): Boolean
 
   def activeLeases(): Seq[ByteArray]
+
+  def lastUpdateHeight(acc: Account): Option[Int]
+
+  def snapshotAtHeight(acc: Account, h: Int): Option[Snapshot]
 }
 
 object StateReader {
@@ -114,6 +115,40 @@ object StateReader {
     }
 
     def stateHash(): Int = (BigInt(FastCryptographicHash(s.accountPortfolios.toString().getBytes)) % Int.MaxValue).toInt
+
+    private def minBySnapshot(acc: Account, atHeight: Int, confirmations: Int)(extractor: Snapshot => Long): Long = {
+      val bottom = atHeight - confirmations
+
+      @tailrec
+      def loop(deeperHeight: Int, list: Seq[Snapshot]): Seq[Snapshot] = {
+        if (deeperHeight == 0) list
+        else {
+          lazy val snapshot = s.snapshotAtHeight(acc, deeperHeight).get
+          if (deeperHeight < bottom)
+            snapshot +: list
+          else if (deeperHeight > atHeight && snapshot.prevHeight > atHeight) {
+            loop(snapshot.prevHeight, list)
+          } else
+            loop(snapshot.prevHeight, snapshot +: list)
+        }
+      }
+
+      val snapshots: Seq[Snapshot] = s.lastUpdateHeight(acc) match {
+        case None => Seq(Snapshot(0, 0, 0))
+        case Some(h) if h < atHeight - confirmations =>
+          val pf = s.accountPortfolio(acc)
+          Seq(Snapshot(h, pf.balance, pf.effectiveBalance))
+        case Some(h) => loop(h, Seq.empty)
+      }
+
+      snapshots.map(extractor).min
+    }
+
+    def effectiveBalanceAtHeightWithConfirmations(acc: Account, atHeight: Int, confirmations: Int): Long =
+      minBySnapshot(acc, atHeight, confirmations)(_.effectiveBalance)
+
+    def balanceWithConfirmations(acc: Account, confirmations: Int): Long =
+      minBySnapshot(acc, s.height, confirmations)(_.balance)
   }
 
 }

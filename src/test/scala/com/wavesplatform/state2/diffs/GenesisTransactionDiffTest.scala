@@ -27,7 +27,7 @@ class GenesisTransactionDiffTest extends PropSpec with PropertyChecks with Gener
         totalPortfolioDiff.assets shouldBe Map.empty
 
         gtxs.foreach { gtx =>
-          blockDiff.effectiveBalanceSnapshots should contain(EffectiveBalanceSnapshot(gtx.recipient, 1, gtx.amount, gtx.amount, gtx.amount, gtx.amount))
+          blockDiff.updates(gtx.recipient) shouldBe Map(1 -> Snapshot(0, gtx.amount, gtx.amount))
         }
       }
     }

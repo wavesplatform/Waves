@@ -2,14 +2,12 @@ package com.wavesplatform.state2.reader
 
 import cats.implicits._
 import com.wavesplatform.state2._
-import com.wavesplatform.state2.diffs._
 import scorex.account.{Account, Alias}
 import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.transaction.lease.LeaseTransaction
 import scorex.transaction.{Transaction, TransactionParser}
 
 import scala.collection.JavaConverters.iterableAsScalaIterableConverter
-import scala.collection.immutable
 
 class StateReaderImpl(p: JavaMapStorage) extends StateReader {
 
@@ -34,28 +32,6 @@ class StateReaderImpl(p: JavaMapStorage) extends StateReader {
       .map(EqByteArray)
   }
 
-  private def snapshotsOfRange(acc: Account, atHeight: Int, confirmations: Int): Seq[(Long, Long, Long, Long)] = {
-    val bockNumberThatIsConfsOld = Math.max(1, atHeight - confirmations)
-    Range(bockNumberThatIsConfsOld + 1, atHeight + 1)
-      .flatMap { height => Option(p.effectiveBalanceSnapshots.get((acc.bytes, height))) }
-  }
-
-  override def effectiveBalanceAtHeightWithConfirmations(acc: Account, atHeight: Int, confirmations: Int): Long = {
-    val snapshots = snapshotsOfRange(acc, atHeight, confirmations)
-    snapshots.headOption match {
-      case None => accountPortfolio(acc).effectiveBalance
-      case Some((oldest, _, _, _)) => Math.min(oldest, snapshots.map(_._2).min)
-    }
-  }
-
-  override def balanceWithConfirmations(acc: Account, confirmations: Int): Long = {
-    val snapshots = snapshotsOfRange(acc, height, confirmations)
-    snapshots.headOption match {
-      case None => accountPortfolio(acc).balance
-      case Some((_, _, oldest, _)) => Math.min(oldest, snapshots.map(_._4).min)
-    }
-  }
-
   override def paymentTransactionIdByHash(hash: ByteArray): Option[ByteArray]
   = Option(p.paymentTransactionHashes.get(hash)).map(EqByteArray)
 
@@ -78,8 +54,14 @@ class StateReaderImpl(p: JavaMapStorage) extends StateReader {
 
   override def accountPortfolios: Map[Account, Portfolio] =
     p.portfolios.entrySet().asScala
-      .map { entry => entry.getKey -> entry.getValue }
-      .map { case (acc, (b, (i, o), as)) => Account.fromBytes(acc).explicitGet() -> Portfolio(b, LeaseInfo(i, o), as.map { case (k, v) => EqByteArray(k) -> v }) }
+      .map {
+        entry => entry.getKey -> entry.getValue
+      }
+      .map {
+        case (acc, (b, (i, o), as)) => Account.fromBytes(acc).explicitGet() -> Portfolio(b, LeaseInfo(i, o), as.map {
+          case (k, v) => EqByteArray(k) -> v
+        })
+      }
       .toMap
 
   override def isLeaseActive(leaseTx: LeaseTransaction): Boolean = p.leaseState.getOrDefault(leaseTx.id, false)
@@ -90,4 +72,10 @@ class StateReaderImpl(p: JavaMapStorage) extends StateReader {
     .map(_.getKey)
     .map(EqByteArray)
     .toSeq
+
+  override def lastUpdateHeight(acc: Account): Option[Int] = Option(p.lastUpdateHeight.get(acc.bytes))
+
+  override def snapshotAtHeight(acc: Account, h: Int): Option[Snapshot] =
+    Option(p.effectiveBalanceSnapshots.get((acc.bytes, h)))
+      .map { case (ph, b, eb) => Snapshot(ph, b, eb) }
 }

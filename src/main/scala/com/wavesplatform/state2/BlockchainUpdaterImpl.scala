@@ -14,8 +14,8 @@ import scorex.utils.ScorexLogging
 class BlockchainUpdaterImpl(persisted: StateWriter with StateReader, settings: FunctionalitySettings, bc: History)
   extends BlockchainUpdater with ScorexLogging {
 
-  private val MinInMemDiff = 100
-  private val MaxInMemDiff = 200
+  private val MinInMemDiff = 1000
+  private val MaxInMemDiff = MinInMemDiff * 2
 
   private val unsafeDifferByRange: (StateReader, (Int, Int)) => BlockDiff = {
     case (sr, (from, to)) =>

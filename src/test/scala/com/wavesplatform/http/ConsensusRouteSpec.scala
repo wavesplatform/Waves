@@ -80,17 +80,4 @@ class ConsensusRouteSpec extends RouteSpec("/consensus") with RestAPISettingsHel
       }
     }
   }
-
-  routePath("/generatingbalance/{address}") - {
-    forAll(accountGen, Gen.posNum[Int]) { case (account, balance) =>
-      (state.height _).expects().returning(10).once()
-      (state.effectiveBalanceAtHeightWithConfirmations _).expects(*,*,*).returning(balance).once()
-      Get(routePath(s"/generatingbalance/${account.address}")) ~> route ~> check {
-        val resp = responseAs[JsObject]
-
-        (resp \ "address").as[String] shouldEqual account.address
-        (resp \ "balance").as[Int] shouldEqual balance
-      }
-    }
-  }
 }
