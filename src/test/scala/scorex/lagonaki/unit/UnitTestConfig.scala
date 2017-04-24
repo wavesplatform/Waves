@@ -9,7 +9,9 @@ trait UnitTestConfig {
       |waves {
       |  directory: "/waves"
       |  blockchain {
-      |    file: ${waves.directory}"/data/blockchain.dat"
+      |    blockchain-file: ${waves.directory}"/data/waves-blockchain.dat"
+      |    state-file: ${waves.directory}"/data/waves-state.dat"
+      |    checkpoint-file: ${waves.directory}"/data/waves-checkpoint.dat"
       |    type: CUSTOM
       |    custom {
       |      address-scheme-character: "C"

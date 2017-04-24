@@ -129,7 +129,9 @@ object GenesisSettings {
   }
 }
 
-case class BlockchainSettings(file: String,
+case class BlockchainSettings(blockchainFile: String,
+                              stateFile: String,
+                              checkpointFile: String,
                               addressSchemeCharacter: Char,
                               functionalitySettings: FunctionalitySettings,
                               genesisSettings: GenesisSettings)
@@ -144,8 +146,6 @@ object BlockchainSettings {
   val configPath: String = "waves.blockchain"
 
   def fromConfig(config: Config): BlockchainSettings = {
-    val file = config.as[String](s"$configPath.file")
-
     val blockchainType = config.as[BlockchainType.Value](s"$configPath.type")
     val (addressSchemeCharacter, functionalitySettings, genesisSettings) = blockchainType match {
       case BlockchainType.TESTNET =>
@@ -156,10 +156,15 @@ object BlockchainSettings {
         val addressSchemeCharacter = config.as[String](s"$configPath.custom.address-scheme-character").charAt(0)
         val functionalitySettings = FunctionalitySettings.fromConfig(config)
         val genesisSettings = GenesisSettings.fromConfig(config)
-
         (addressSchemeCharacter, functionalitySettings, genesisSettings)
     }
 
-    BlockchainSettings(file, addressSchemeCharacter, functionalitySettings, genesisSettings)
+    BlockchainSettings(
+      blockchainFile = config.as[String](s"$configPath.blockchain-file"),
+      stateFile = config.as[String](s"$configPath.state-file"),
+      checkpointFile = config.as[String](s"$configPath.checkpoint-file"),
+      addressSchemeCharacter = addressSchemeCharacter,
+      functionalitySettings = functionalitySettings,
+      genesisSettings = genesisSettings)
   }
 }

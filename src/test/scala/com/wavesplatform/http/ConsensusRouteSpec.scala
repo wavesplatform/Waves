@@ -18,8 +18,10 @@ import scorex.crypto.encode.Base58
 import scorex.transaction.{BlockStorage, CheckpointService, History, TransactionModule}
 
 class ConsensusRouteSpec extends RouteSpec("/consensus") with RestAPISettingsHelper with PropertyChecks with MockFactory with BlockGen {
-  private val bcFile = createTestTemporaryFile("blockchain", ".dat")
-  private val wcm = new WavesConsensusModule(BlockchainSettings(bcFile.getAbsolutePath, 'T', FunctionalitySettings.TESTNET, GenesisSettings.TESTNET))
+  private val bFile = createTestTemporaryFile("waves-blockchain", ".dat")
+  private val sFile = createTestTemporaryFile("waves-state", ".dat")
+  private val cFile = createTestTemporaryFile("waves-checkpoint", ".dat")
+  private val wcm = new WavesConsensusModule(BlockchainSettings(bFile.getAbsolutePath, sFile.getAbsolutePath, cFile.getAbsolutePath, 'T', FunctionalitySettings.TESTNET, GenesisSettings.TESTNET))
   private val state = mock[StateReader]
   private val history = mock[History]
   (history.height _).expects().returns(10).anyNumberOfTimes()

@@ -68,7 +68,9 @@ trait TestingCommons extends Suite with BeforeAndAfterAll with Eventually {
       |    seed: "FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz"
       |  }
       |  blockchain {
-      |    file: ""
+      |    blockchain-file: ""
+      |    state-file: ""
+      |    checkpoint-file: ""
       |    type: CUSTOM
       |    custom {
       |      address-scheme-character: "T"
@@ -180,7 +182,9 @@ trait TestingCommons extends Suite with BeforeAndAfterAll with Eventually {
       |    seed: "111"
       |  }
       |  blockchain {
-      |    file: ""
+      |    blockchain-file: ""
+      |    state-file: ""
+      |    checkpoint-file: ""
       |    type: CUSTOM
       |    custom {
       |      address-scheme-character: "T"
@@ -267,7 +271,9 @@ trait TestingCommons extends Suite with BeforeAndAfterAll with Eventually {
       |    seed: "222"
       |  }
       |  blockchain {
-      |    file: ""
+      |    blockchain-file: ""
+      |    state-file: ""
+      |    checkpoint-file: ""
       |    type: CUSTOM
       |    custom {
       |      address-scheme-character: "T"

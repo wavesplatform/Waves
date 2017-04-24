@@ -152,7 +152,11 @@ class LegacyConfigTransformerSpec extends FreeSpec with Matchers {
       .transform(ConfigFactory.parseString(defaultLegacyConfig))
       .withFallback(ConfigFactory.parseString(
         """waves {
-          |  blockchain.file = ""
+          |  blockchain {
+          |    blockchain-file = ""
+          |    state-file = ""
+          |    checkpoint-file = ""
+          |  }
           |  network {
           |    file = ""
           |    unrequested-packets-threshold = 100
@@ -186,7 +190,11 @@ class LegacyConfigTransformerSpec extends FreeSpec with Matchers {
       .transform(ConfigFactory.parseString(legacyConfig))
       .withFallback(ConfigFactory.parseString(
         """waves {
-          |  blockchain.file = ""
+          |  blockchain {
+          |    blockchain-file = ""
+          |    state-file = ""
+          |    checkpoint-file = ""
+          |  }
           |  network {
           |    file = ""
           |    unrequested-packets-threshold = 100

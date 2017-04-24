@@ -34,7 +34,9 @@ abstract class ActorTestingCommons extends TestKitBase
       |waves {
       |  directory: ""
       |  blockchain {
-      |    file: ""
+      |    blockchain-file: ""
+      |    state-file: ""
+      |    checkpoint-file: ""
       |  }
       |  network {
       |    file: ""
