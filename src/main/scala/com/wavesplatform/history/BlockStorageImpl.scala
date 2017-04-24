@@ -1,4 +1,4 @@
-package scorex.transaction.state.database
+package com.wavesplatform.history
 
 import java.io.File
 
@@ -7,7 +7,6 @@ import com.wavesplatform.state2.reader.StateReader
 import com.wavesplatform.state2.{BlockchainUpdaterImpl, MVStoreStateStorage, StateWriterImpl}
 import org.h2.mvstore.MVStore
 import scorex.transaction._
-import scorex.transaction.state.database.blockchain.{CheckpointServiceImpl, HistoryWriterImpl, MVStoreCheckpointStorage, MVStoreHistoryStorage}
 
 class BlockStorageImpl(settings: BlockchainSettings) extends BlockStorage {
 

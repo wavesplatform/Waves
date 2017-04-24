@@ -1,18 +1,14 @@
-package scorex.transaction.state.database.blockchain
+package com.wavesplatform.history
 
 import com.google.common.cache.{CacheBuilder, CacheLoader}
 import com.google.common.util.concurrent.UncheckedExecutionException
 import scorex.account.Account
 import scorex.block.Block
 import scorex.block.Block.BlockId
-import scorex.network.Checkpoint
 import scorex.transaction.History.BlockchainScore
 import scorex.transaction.ValidationError.CustomError
-import scorex.transaction.{CheckpointService, History, HistoryWriter, ValidationError}
+import scorex.transaction.{History, HistoryWriter, ValidationError}
 import scorex.utils.ScorexLogging
-
-import scala.collection.JavaConverters._
-import scala.util.{Failure, Try}
 
 class HistoryWriterImpl(storage: HistoryStorage) extends History with HistoryWriter with ScorexLogging {
 

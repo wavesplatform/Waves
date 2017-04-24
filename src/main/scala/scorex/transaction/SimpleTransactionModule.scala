@@ -1,14 +1,14 @@
 package scorex.transaction
 
 import com.google.common.base.Charsets
-import com.wavesplatform.settings.{GenesisSettings, GenesisTransactionSettings, WavesSettings}
-import com.wavesplatform.state2.diffs.BlockDiffer
+import com.wavesplatform.history.BlockStorageImpl
+import com.wavesplatform.settings.{GenesisSettings, WavesSettings}
+import com.wavesplatform.state2.Validator
 import scorex.account._
 import scorex.api.http.alias.CreateAliasRequest
 import scorex.api.http.assets._
 import scorex.api.http.leasing.{LeaseCancelRequest, LeaseRequest}
 import scorex.app.Application
-import scorex.block.Block
 import scorex.consensus.TransactionsOrdering
 import scorex.crypto.encode.Base58
 import scorex.network.message.Message
@@ -16,8 +16,7 @@ import scorex.network.{Broadcast, NetworkController, TransactionalMessagesRepo}
 import scorex.transaction.ValidationError.TransactionValidationError
 import scorex.transaction.assets.{BurnTransaction, _}
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import scorex.transaction.state.database.blockchain.Validator
-import scorex.transaction.state.database.{BlockStorageImpl, UnconfirmedTransactionsDatabaseImpl}
+import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
 import scorex.utils._
 import scorex.wallet.Wallet
 import scorex.waves.transaction.SignedPaymentRequest

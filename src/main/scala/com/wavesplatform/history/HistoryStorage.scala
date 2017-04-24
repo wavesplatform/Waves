@@ -1,4 +1,4 @@
-package scorex.transaction.state.database.blockchain
+package com.wavesplatform.history
 
 import org.h2.mvstore.{MVMap, MVStore}
 import scorex.block.Block.BlockId

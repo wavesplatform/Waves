@@ -1,15 +1,12 @@
-package scorex.transaction.state.database.blockchain
+package com.wavesplatform.state2
 
 import cats._
-import cats.implicits._
-import cats.syntax.all._
 import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state2.Diff
 import com.wavesplatform.state2.diffs.TransactionDiffer
 import com.wavesplatform.state2.reader.{CompositeStateReader, StateReader}
 import scorex.transaction._
 
-import scala.util.{Left, Right, Try}
+import scala.util.{Left, Right}
 
 object Validator {
 
