@@ -22,9 +22,10 @@ class BalancesSpecification(allNodes: Seq[Node]) extends FunSuite with Matchers 
     case _ => Failure[Assertion](new RuntimeException("Unexpected state"))
   }
 
-  private val firstAddress: String = Await.result(sender.createAddress, 3.minutes)
-  private val secondAddress: String = Await.result(sender.createAddress, 3.minutes)
-  private val thirdAddress: String = Await.result(sender.createAddress, 3.minutes)
+
+  private lazy val firstAddress: String = Await.result(sender.createAddress, 1.minutes)
+  private lazy val secondAddress: String = Await.result(sender.createAddress, 1.minutes)
+  private lazy val thirdAddress: String = Await.result(sender.createAddress, 1.minutes)
 
   override def beforeAll(): Unit = {
     super.beforeAll()
