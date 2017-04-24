@@ -10,6 +10,7 @@ import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.reader.StateReader
 import play.api.libs.json.{JsArray, JsValue, Json}
 import scorex.crypto.encode.Base58
+import scorex.transaction.assets.IssueTransaction
 import scorex.transaction.assets.exchange.Validation.booleanOperators
 import scorex.transaction.assets.exchange.{AssetPair, Order, Validation}
 import scorex.transaction.{AssetId, History, NewTransactionHandler}
@@ -32,7 +33,8 @@ class MatcherActor(storedState: StateReader, wallet: Wallet, settings: MatcherSe
   def createOrderBook(pair: AssetPair): ActorRef = {
     def getAssetName(asset: Option[AssetId]): String = asset.map(storedState.getAssetName).getOrElse(AssetPair.WavesName)
 
-    openMarkets += MarketData(pair, getAssetName(pair.amountAsset), getAssetName(pair.priceAsset), NTP.correctedTime())
+    openMarkets += MarketData(pair, getAssetName(pair.amountAsset), getAssetName(pair.priceAsset), NTP.correctedTime(),
+        pair.amountAsset.flatMap(storedState.getIssueTransaction), pair.priceAsset.flatMap(storedState.getIssueTransaction))
     tradedPairs += pair
 
     context.actorOf(OrderBookActor.props(pair, storedState, wallet, settings, transactionModule, history, functionalitySettings),
@@ -159,8 +161,10 @@ object MatcherActor {
     def getMarketsJs: JsValue = JsArray(markets.map(m => Json.obj(
       "amountAsset" -> m.pair.amountAssetStr,
       "amountAssetName" -> m.amountAssetName,
+      "amountAssetInfo" -> m.amountAssetInfo.map(_.json),
       "priceAsset" -> m.pair.priceAssetStr,
       "priceAssetName" -> m.priceAssetName,
+      "priceAssetInfo" -> m.priceAssetinfo.map(_.json),
       "created" -> m.created
     ))
     )
@@ -173,7 +177,8 @@ object MatcherActor {
     def code: StatusCode = StatusCodes.OK
   }
 
-  case class MarketData(pair: AssetPair, amountAssetName: String, priceAssetName: String, created: Long)
+  case class MarketData(pair: AssetPair, amountAssetName: String, priceAssetName: String, created: Long,
+                        amountAssetInfo: Option[IssueTransaction], priceAssetinfo: Option[IssueTransaction])
 
   def compare(buffer1: Option[Array[Byte]], buffer2: Option[Array[Byte]]): Int = {
     if (buffer1.isEmpty && buffer2.isEmpty) 0

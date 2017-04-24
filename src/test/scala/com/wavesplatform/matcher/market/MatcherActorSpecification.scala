@@ -146,8 +146,8 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest2"
 
       expectMsgPF() {
         case GetMarketsResponse(publicKey, Seq(
-        MarketData(`Predefined`, "Unknown", "Unknown", _),
-        MarketData(_, "Unknown", "Unknown", _))) =>
+        MarketData(`Predefined`, "Unknown", "Unknown", _, _, _),
+        MarketData(_, "Unknown", "Unknown", _, _, _))) =>
           publicKey shouldBe MatcherAccount.publicKey
       }
     }
@@ -166,8 +166,8 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest2"
       val pair2 = AssetPair(a1, a2)
 
       val now = NTP.correctedTime()
-      val json = GetMarketsResponse(Array(), Seq(MarketData(pair1, a1Name, waves, now),
-        MarketData(pair2, a1Name, a2Name, now))).json
+      val json = GetMarketsResponse(Array(), Seq(MarketData(pair1, a1Name, waves, now, None, None),
+        MarketData(pair2, a1Name, a2Name, now, None, None))).json
 
       ((json \ "markets") (0) \ "priceAsset").as[String] shouldBe AssetPair.WavesName
       ((json \ "markets") (0) \ "priceAssetName").as[String] shouldBe waves
