@@ -1,6 +1,6 @@
 package com.wavesplatform.settings
 
-import com.typesafe.config.ConfigFactory
+import com.wavesplatform.Version
 import scorex.utils.ScorexLogging
 
 /**
@@ -8,13 +8,8 @@ import scorex.utils.ScorexLogging
   */
 
 object Constants extends ScorexLogging {
-  private val appConf = ConfigFactory.load().getConfig("app")
-
   val ApplicationName = "waves"
-  val Product = appConf.getString("product")
-  val Release = appConf.getString("release")
-  val VersionString = appConf.getString("version")
-  val AgentName = s"$Product - $Release v$VersionString"
+  val AgentName = s"Waves v${Version.VersionString}"
 
   val UnitsInWave = 100000000L
   val TotalWaves = 100000000L

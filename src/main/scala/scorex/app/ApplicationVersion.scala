@@ -1,7 +1,7 @@
 package scorex.app
 
 import com.google.common.primitives.Ints
-import scorex.serialization.{BytesSerializable, Deser}
+import scorex.serialization.BytesSerializable
 
 import scala.util.Try
 

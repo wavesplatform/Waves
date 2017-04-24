@@ -32,8 +32,8 @@ class Application(as: ActorSystem, wavesSettings: WavesSettings) extends {
   override val applicationName = Constants.ApplicationName +
     wavesSettings.blockchainSettings.addressSchemeCharacter
   override val appVersion = {
-    val parts = Constants.VersionString.split("\\.")
-    ApplicationVersion(parts(0).toInt, parts(1).toInt, parts(2).split("-").head.toInt)
+    val (major, minor, bugfix) = Version.VersionTuple
+    ApplicationVersion(major, minor, bugfix)
   }
   override implicit val actorSystem = as
 } with scorex.app.RunnableApplication
