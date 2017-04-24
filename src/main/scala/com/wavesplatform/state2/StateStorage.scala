@@ -10,15 +10,15 @@ trait StateStorage {
 
   def setHeight(i: Int): Unit
 
-  val transactions: java.util.Map[Array[Byte], (Int, Array[Byte])]
-  val portfolios: java.util.Map[Array[Byte], (Long, (Long, Long), Map[Array[Byte], Long])]
-  val assets: java.util.Map[Array[Byte], (Boolean, Long)]
-  val accountTransactionIds: java.util.Map[Array[Byte], List[Array[Byte]]]
-  val effectiveBalanceSnapshots: util.Map[(Array[Byte], Int), (Long, Long)]
-  val paymentTransactionHashes: util.Map[Array[Byte], Array[Byte]]
-  val exchangeTransactionsByOrder: util.Map[Array[Byte], Set[Array[Byte]]]
-  val aliasToAddress: util.Map[String, Array[Byte]]
-  val leaseState: util.Map[Array[Byte], Boolean]
+  def transactions: java.util.Map[Array[Byte], (Int, Array[Byte])]
+  def portfolios: java.util.Map[Array[Byte], (Long, (Long, Long), Map[Array[Byte], Long])]
+  def assets: java.util.Map[Array[Byte], (Boolean, Long)]
+  def accountTransactionIds: java.util.Map[Array[Byte], List[Array[Byte]]]
+  def effectiveBalanceSnapshots: util.Map[(Array[Byte], Int), (Long, Long)]
+  def paymentTransactionHashes: util.Map[Array[Byte], Array[Byte]]
+  def exchangeTransactionsByOrder: util.Map[Array[Byte], Set[Array[Byte]]]
+  def aliasToAddress: util.Map[String, Array[Byte]]
+  def leaseState: util.Map[Array[Byte], Boolean]
 
   def commit(): Unit
 }

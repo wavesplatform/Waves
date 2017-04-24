@@ -6,7 +6,7 @@ import scorex.transaction.CheckpointService
 import scorex.utils.LogMVMapBuilder
 
 trait CheckpointStorage {
-  val checkpoint: java.util.Map[Int, (Seq[(Int, Array[Byte])], Array[Byte])]
+  def checkpoint: java.util.Map[Int, (Seq[(Int, Array[Byte])], Array[Byte])]
 
   def commit(): Unit
 }
