@@ -70,10 +70,6 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
     lazy val blockStorage: BlockStorage = transactionModule.blockStorage
     lazy val scoreObserver: ActorRef = testScoreObserver.ref
 
-    override def applicationName: String = "mock-app"
-
-    override def appVersion: ApplicationVersion = ApplicationVersion(0, 0, 0)
-
     override def coordinator: ActorRef = system.actorOf(Props(classOf[Coordinator], this), "Coordinator")
 
     override def wallet: Wallet = new Wallet(None, "", None)

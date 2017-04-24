@@ -7,14 +7,13 @@ import akka.actor.{ActorSystem, Props}
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.actor.RootActorSystem
 import com.wavesplatform.http.NodeApiRoute
-import com.wavesplatform.matcher.{MatcherApplication, MatcherSettings}
+import com.wavesplatform.matcher.MatcherApplication
 import com.wavesplatform.settings._
 import scorex.account.AddressScheme
 import scorex.api.http._
 import scorex.api.http.alias.{AliasApiRoute, AliasBroadcastApiRoute}
 import scorex.api.http.assets.{AssetsApiRoute, AssetsBroadcastApiRoute}
 import scorex.api.http.leasing.{LeaseApiRoute, LeaseBroadcastApiRoute}
-import scorex.app.ApplicationVersion
 import scorex.consensus.nxt.WavesConsensusModule
 import scorex.consensus.nxt.api.http.NxtConsensusApiRoute
 import scorex.network.{TransactionalMessagesRepo, UnconfirmedPoolSynchronizer}
@@ -24,20 +23,11 @@ import scorex.waves.http.{DebugApiRoute, WavesApiRoute}
 
 import scala.reflect.runtime.universe._
 
-class Application(as: ActorSystem, wavesSettings: WavesSettings) extends {
-  val matcherSettings: MatcherSettings = wavesSettings.matcherSettings
-  val restAPISettings: RestAPISettings = wavesSettings.restAPISettings
-  override implicit val settings = wavesSettings
-
-  override val applicationName = Constants.ApplicationName +
-    wavesSettings.blockchainSettings.addressSchemeCharacter
-  override val appVersion = {
-    val (major, minor, bugfix) = Version.VersionTuple
-    ApplicationVersion(major, minor, bugfix)
-  }
-  override implicit val actorSystem = as
-} with scorex.app.RunnableApplication
+class Application(val actorSystem: ActorSystem, val settings: WavesSettings) extends scorex.app.RunnableApplication
   with MatcherApplication {
+
+  override val matcherSettings = settings.matcherSettings
+  override val restAPISettings = settings.restAPISettings
 
   override implicit lazy val consensusModule = new WavesConsensusModule(settings.blockchainSettings)
 
