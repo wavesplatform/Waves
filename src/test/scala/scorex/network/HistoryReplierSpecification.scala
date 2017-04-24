@@ -11,6 +11,7 @@ import scorex.transaction.History
 
 import scala.language.implicitConversions
 import scorex.network.message._
+
 @DoNotDiscover
 class HistoryReplierSpecification extends ActorTestingCommons {
 
@@ -18,7 +19,7 @@ class HistoryReplierSpecification extends ActorTestingCommons {
 
   private def mockHistory(blockIds: InnerIds): History = {
     val history = mock[History]
-//    history.lookForward _ expects(*, *) onCall {
+//    history.blockIdsAfter _ expects(*, *) onCall {
 //      (parentSignature, howMany) =>
 //        blockIds.dropWhile(_ != InnerId(parentSignature)).slice(1, howMany + 1).map(_.blockId)
 //    } anyNumberOfTimes()

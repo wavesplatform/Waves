@@ -75,7 +75,7 @@ object History {
     def lastBlocks(howMany: Int): Seq[Block] =
       (Math.max(1, history.height() - howMany + 1) to history.height()).flatMap(history.blockAt).reverse
 
-    def lookForward(parentSignature: BlockId, howMany: Int): Seq[BlockId] =
+    def blockIdsAfter(parentSignature: BlockId, howMany: Int): Seq[BlockId] =
       history.heightOf(parentSignature).map { h =>
         (h + 1).to(Math.min(history.height(), h + howMany: Int)).flatMap(history.blockAt).map(_.uniqueId)
       }.getOrElse(Seq())
