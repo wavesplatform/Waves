@@ -487,7 +487,7 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
   }
 
 
-  private def getIssueTransaction(assetId: AssetId): Option[IssueTransaction] =
+  def getIssueTransaction(assetId: AssetId): Option[IssueTransaction] =
     storage.getTransactionBytes(assetId).flatMap(b => IssueTransaction.parseBytes(b).toOption)
 
 
