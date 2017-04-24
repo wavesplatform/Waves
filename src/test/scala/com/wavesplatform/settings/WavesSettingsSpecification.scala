@@ -37,9 +37,9 @@ class WavesSettingsSpecification extends FlatSpec with Matchers {
     settings.directory should be("/xxx")
     settings.networkSettings.file should be("/xxx/data/peers.dat")
     settings.walletSettings.file should be("/xxx/wallet/wallet.dat")
-    settings.blockchainSettings.blockchainFile should be("/xxx/data/waves-blockchain.dat")
-    settings.blockchainSettings.stateFile should be("/xxx/data/waves-state.dat")
-    settings.blockchainSettings.checkpointFile should be("/xxx/data/waves-checkpoint.dat")
+    settings.blockchainSettings.blockchainFile should be("/xxx/data/blockchain.dat")
+    settings.blockchainSettings.stateFile should be("/xxx/data/state.dat")
+    settings.blockchainSettings.checkpointFile should be("/xxx/data/checkpoint.dat")
     settings.matcherSettings.journalDataDir should be ("/xxx/journal")
     settings.matcherSettings.snapshotsDataDir should be ("/xxx/snapshots")
   }
