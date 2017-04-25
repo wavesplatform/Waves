@@ -4,7 +4,6 @@ import cats._
 import cats.data._
 import cats.implicits._
 import cats.syntax.all._
-
 import akka.pattern.{ask, pipe}
 import akka.util.Timeout
 import scorex.app.Application
@@ -17,10 +16,11 @@ import scorex.crypto.encode.Base58.encode
 import scorex.network.BlockchainSynchronizer.{GetExtension, GetSyncStatus, Status}
 import scorex.network.NetworkController.{DataFromPeer, SendToNetwork}
 import scorex.network.ScoreObserver.{CurrentScore, GetScore}
+import scorex.network.message._
 import scorex.network.message.{Message, MessageSpec}
 import scorex.network.peer.PeerManager.{ConnectedPeers, GetConnectedPeersTyped}
 import scorex.transaction.History.BlockchainScore
-import scorex.transaction.ValidationError
+import scorex.transaction.{TransactionModule, ValidationError}
 import scorex.transaction.ValidationError.CustomError
 import scorex.utils.ScorexLogging
 
@@ -33,23 +33,20 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
 
   import Coordinator._
 
-  private val basicMessagesSpecsRepo = application.basicMessagesSpecsRepo
-
-  import basicMessagesSpecsRepo._
-
   override val messageSpecs = Seq[MessageSpec[_]](CheckpointMessageSpec)
 
   protected override lazy val networkControllerRef = application.networkController
 
   private lazy val blockchainSynchronizer = application.blockchainSynchronizer
 
-  private lazy val history = application.history
-
-  private def currentCheckpoint(): Option[Checkpoint] = history.getCheckpoint
+  private lazy val history = application.blockStorage.history
+  private lazy val checkpoints = application.blockStorage.checkpoints
 
   context.system.scheduler.schedule(1.second, application.settings.synchronizationSettings.scoreBroadcastInterval, self, BroadcastCurrentScore)
 
   application.blockGenerator ! StartGeneration
+
+  implicit val transactionModule: TransactionModule = application.transactionModule
 
   override def receive: Receive = idle()
 
@@ -109,7 +106,7 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
       case AddBlock(block, from) => processSingleBlock(block, from)
 
       case BroadcastCurrentScore =>
-        val msg = Message(ScoreMessageSpec, Right(application.history.score()), None)
+        val msg = Message(ScoreMessageSpec, Right(application.blockStorage.history.score()), None)
         networkControllerRef ! NetworkController.SendToNetwork(msg, Broadcast)
 
       case DataFromPeer(msgId, checkpoint: Checkpoint@unchecked, remote) if msgId == CheckpointMessageSpec.messageCode =>
@@ -120,18 +117,18 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
 
       case ConnectedPeers(_) =>
 
-      case ClearCheckpoint => history.setCheckpoint(None)
+      case ClearCheckpoint => checkpoints.set(None)
     }
   }
 
   private def handleCheckpoint(checkpoint: Checkpoint, from: Option[ConnectedPeer]): Unit =
-    if (currentCheckpoint.forall(c => !(c.signature sameElements checkpoint.signature))) {
+    if (checkpoints.get.forall(c => !(c.signature sameElements checkpoint.signature))) {
       val maybePublicKeyBytes = Base58.decode(application.settings.checkpointsSettings.publicKey).toOption
 
       maybePublicKeyBytes foreach {
         publicKey =>
           if (EllipticCurveImpl.verify(checkpoint.signature, checkpoint.toSign, publicKey)) {
-            history.setCheckpoint(Some(checkpoint))
+            checkpoints.set(Some(checkpoint))
             networkControllerRef ! SendToNetwork(Message(CheckpointMessageSpec, Right(checkpoint), None),
               from.map(BroadcastExceptOf).getOrElse(Broadcast))
             makeBlockchainCompliantWith(checkpoint)
@@ -223,7 +220,7 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
       newBlocks.zipWithIndex.forall(p => isValidWithRespectToCheckpoint(p._1, lastCommonHeight + 1 + p._2))
     }
 
-    if (application.history.heightOf(lastCommonBlockId).exists(isForkValidWithCheckpoint)) {
+    if (application.blockStorage.history.heightOf(lastCommonBlockId).exists(isForkValidWithCheckpoint)) {
       application.blockStorage.blockchainUpdater.removeAfter(lastCommonBlockId)
 
       foldM[({type l[α] = Either[(ValidationError, BlockId), α]})#l, List, Block, Unit](newBlocks.toList, ())
@@ -245,7 +242,7 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
   }
 
   private def isValidWithRespectToCheckpoint(candidate: Block, estimatedHeight: Int): Boolean =
-    !currentCheckpoint.exists {
+    !checkpoints.get.exists {
       case Checkpoint(items, _) =>
         val blockSignature = candidate.signerDataField.value.signature
         items.exists { case BlockCheckpoint(h, sig) =>

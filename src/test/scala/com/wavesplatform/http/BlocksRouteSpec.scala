@@ -5,17 +5,20 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.BlockGen
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.settings.{CheckpointsSettings, RestAPISettings}
+import com.wavesplatform.state2.EqByteArray
 import org.scalacheck.{Gen, Shrink}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json._
 import scorex.account.PublicKeyAccount
-import scorex.api.http.{BlockNotExists, BlocksApiRoute, TooBigArrayAllocation, WrongJson}
+import scorex.api.http._
 import scorex.block.Block
+import scorex.block.Block.BlockId
 import scorex.crypto.encode.Base58
 import scorex.transaction.History
 
 class BlocksRouteSpec extends RouteSpec("/blocks") with MockFactory with BlockGen with PropertyChecks {
+
   import BlocksRouteSpec._
 
   private val config = ConfigFactory.load()
@@ -36,7 +39,6 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with MockFactory with BlockGe
     (response \ "signature").asOpt[String].isDefined shouldBe true
     (response \ "blocksize").as[Int] should be > 0
   }
-
   routePath("/at/{height}") in {
     // todo: check invalid height
     // todo: check block not found (404?)
@@ -56,7 +58,7 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with MockFactory with BlockGe
   }
 
   routePath("/first") in forAll(randomSignerBlockGen) { block =>
-    (history.genesis _).expects().returning(block).once()
+    (history.blockAt _).expects(1).returning(Some(block)).once()
 
     Get(routePath("/first")) ~> route ~> check {
       checkBlock(responseAs[JsObject], block)
@@ -74,7 +76,7 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with MockFactory with BlockGe
           }
         }
 
-        Get(routePath("/seq/1/1000")) ~> route should produce (TooBigArrayAllocation)
+        Get(routePath("/seq/1/1000")) ~> route should produce(TooBigArrayAllocation)
         Get(routePath(s"/seq/$start/$end")) ~> route ~> check {
           val responseBlocks = responseAs[Seq[JsValue]]
 
@@ -83,14 +85,14 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with MockFactory with BlockGe
     }
   }
 
-  routePath("/last") in forAll(randomSignerBlockGen) { block =>
-    inSequence {
-      (history.lastBlock _).expects().returning(block).once()
-      (history.heightOf(_: Block)).expects(block).returning(Some(1)).once()
-    }
+  routePath("/last") in forAll(randomSignerBlockGen, positiveIntGen) { case (block, h) =>
+    (history.height _).expects().returning(h).anyNumberOfTimes()
+    (history.blockAt _).expects(h).returning(Some(block)).anyNumberOfTimes()
+    (history.heightOf(_: BlockId)).expects(block.uniqueId).returning(Some(h)).anyNumberOfTimes()
 
     Get(routePath("/last")) ~> route ~> check {
-      checkBlock(responseAs[JsObject], block)
+      val response1: JsObject = responseAs[JsObject]
+      checkBlock(response1, block)
     }
   }
 
@@ -102,19 +104,12 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with MockFactory with BlockGe
     }
   }
 
-  private def withBlock(block: Block): Unit =
-    (history.blockById(_: Block.BlockId))
-      .expects(where(sameSignature(block.signerData.signature) _))
-      .returning(Some(block)).once()
-
   routePath("/height/{signature}") in {
     // todo: check invalid signature
     // todo: check block not found (404?)
     forAll(randomSignerBlockGen) { block =>
-      inSequence {
-        withBlock(block)
-        (history.heightOf(_: Block)).expects(block).returning(Some(10)).once()
-      }
+      (history.heightOf(_: BlockId)).expects(where(sameSignature(block.uniqueId)(_))).returning(Some(10)).anyNumberOfTimes()
+      (history.blockAt _).expects(10).returning(Some(block)).anyNumberOfTimes()
       Get(routePath(s"/height/${Base58.encode(block.signerData.signature)}")) ~> route ~> check {
         (responseAs[JsValue] \ "height").as[Int] shouldBe 10
       }
@@ -147,14 +142,17 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with MockFactory with BlockGe
   routePath("/child/{signature}") in {
     // todo: check block not found (404?)
     // todo: check invalid signature
-    forAll(randomSignerBlockGen) { block =>
-      inSequence {
-        withBlock(block)
-        (history.child _).expects(block).returning(Some(block)).once
-      }
+    forAll(randomSignerBlockGen, randomSignerBlockGen, positiveIntGen) { case (block1, block2, h1) =>
 
-      Get(routePath(s"/child/${Base58.encode(block.signerData.signature)}")) ~> route ~> check {
-        checkBlock(responseAs[JsValue], block)
+      (history.blockAt _).expects(h1).returns(Some(block1)).anyNumberOfTimes()
+      (history.heightOf _).expects(where(sameSignature(block1.uniqueId)(_))).returns(Some(h1)).anyNumberOfTimes()
+
+      (history.blockAt _).expects(h1 + 1).returns(Some(block2)).anyNumberOfTimes()
+      (history.heightOf _).expects(where(sameSignature(block2.uniqueId)(_))).returns(Some(h1 + 1)).anyNumberOfTimes()
+
+
+      Get(routePath(s"/child/${Base58.encode(block1.signerData.signature)}")) ~> route ~> check {
+        checkBlock(responseAs[JsValue], block2)
       }
     }
   }
@@ -166,27 +164,8 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with MockFactory with BlockGe
     }
   }
 
-  routePath("/signature/{signature}") in {
-    val g = for {
-      block <- randomSignerBlockGen
-      invalidSignature <- byteArrayGen(10)
-    } yield (block, invalidSignature)
-
-    forAll(g) { case (block, invalidSignature) =>
-      withBlock(block)
-      (history.blockById(_: Block.BlockId)).expects(where(sameSignature(invalidSignature) _)).returning(None).once()
-      (history.heightOf(_: Block.BlockId)).expects(*).returning(Some(1)).noMoreThanTwice()
-
-      Get(routePath(s"/signature/${Base58.encode(block.signerData.signature) }")) ~> route ~> check {
-        checkBlock(responseAs[JsValue], block)
-      }
-
-      Get(routePath(s"/signature/${Base58.encode(invalidSignature) }")) ~> route should produce (BlockNotExists)
-    }
-  }
-
   routePath("/checkpoint") in pendingUntilFixed {
-    Post(routePath("/checkpoint"), Checkpoint("", Seq.empty)) ~> route should produce (WrongJson())
+    Post(routePath("/checkpoint"), Checkpoint("", Seq.empty)) ~> route should produce(WrongJson())
 
     // todo: invalid json
     // todo: accepted checkpoint
@@ -194,7 +173,9 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with MockFactory with BlockGe
 }
 
 object BlocksRouteSpec {
+
   case class Item(height: Int, signature: String)
+
   case class Checkpoint(signature: String, items: Seq[Item])
 
   implicit val itemFormat: Format[Item] = Json.format

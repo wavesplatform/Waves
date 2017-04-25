@@ -12,7 +12,9 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
         |waves {
         |  directory: "/waves"
         |  blockchain {
-        |    file: ${waves.directory}"/data/blockchain.dat"
+        |    blockchain-file: ${waves.directory}"/data/blockchain.dat"
+        |    state-file: ${waves.directory}"/data/state.dat"
+        |    checkpoint-file: ${waves.directory}"/data/checkpoint.dat"
         |    type: CUSTOM
         |    custom {
         |      address-scheme-character: "C"
@@ -50,7 +52,9 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
       """.stripMargin).resolve()
     val settings = BlockchainSettings.fromConfig(config)
 
-    settings.file should be("/waves/data/blockchain.dat")
+    settings.blockchainFile should be("/waves/data/blockchain.dat")
+    settings.stateFile should be("/waves/data/state.dat")
+    settings.checkpointFile should be("/waves/data/checkpoint.dat")
     settings.addressSchemeCharacter should be('C')
     settings.functionalitySettings.allowTemporaryNegativeUntil should be(1)
     settings.functionalitySettings.allowInvalidPaymentTransactionsByTimestamp should be(2)
@@ -84,14 +88,18 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
         |waves {
         |  directory: "/waves"
         |  blockchain {
-        |    file: ${waves.directory}"/data/blockchain.dat"
+        |    blockchain-file: ${waves.directory}"/data/blockchain.dat"
+        |    state-file: ${waves.directory}"/data/state.dat"
+        |    checkpoint-file: ${waves.directory}"/data/checkpoint.dat"
         |    type: TESTNET
         |  }
         |}
       """.stripMargin).resolve()
     val settings = BlockchainSettings.fromConfig(config)
 
-    settings.file should be("/waves/data/blockchain.dat")
+    settings.blockchainFile should be("/waves/data/blockchain.dat")
+    settings.stateFile should be("/waves/data/state.dat")
+    settings.checkpointFile should be("/waves/data/checkpoint.dat")
     settings.addressSchemeCharacter should be('T')
     settings.functionalitySettings.allowTemporaryNegativeUntil should be(1477958400000L)
     settings.functionalitySettings.allowInvalidPaymentTransactionsByTimestamp should be(1477958400000L)
@@ -125,14 +133,18 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
         |waves {
         |  directory: "/waves"
         |  blockchain {
-        |    file: ${waves.directory}"/data/blockchain.dat"
+        |    blockchain-file: ${waves.directory}"/data/blockchain.dat"
+        |    state-file: ${waves.directory}"/data/state.dat"
+        |    checkpoint-file: ${waves.directory}"/data/checkpoint.dat"
         |    type: MAINNET
         |  }
         |}
       """.stripMargin).resolve()
     val settings = BlockchainSettings.fromConfig(config)
 
-    settings.file should be("/waves/data/blockchain.dat")
+    settings.blockchainFile should be("/waves/data/blockchain.dat")
+    settings.stateFile should be("/waves/data/state.dat")
+    settings.checkpointFile should be("/waves/data/checkpoint.dat")
     settings.addressSchemeCharacter should be('W')
     settings.functionalitySettings.allowTemporaryNegativeUntil should be(1479168000000L)
     settings.functionalitySettings.allowInvalidPaymentTransactionsByTimestamp should be(1479168000000L)

@@ -22,28 +22,7 @@ class DebugRouteSpec
   private val route = DebugApiRoute(restAPISettings, testWallet, state, history).route
 
   private implicit def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)
-
-  routePath("blocks/{howMany}") in {
-    val gen = for {
-      n <- Gen.chooseNum(1, 5).label("requested count")
-      actualLength <- Gen.chooseNum(1, n)
-      blocks <- Gen.listOfN(actualLength, randomSignerBlockGen).label("blocks")
-    } yield (n, blocks)
-    forAll(gen) { case (n, blocks) =>
-      (history.lastBlocks _).expects(n).returning(blocks).once()
-
-      Get(routePath(s"/blocks/$n")) ~> route ~> check {
-        val resp = responseAs[Seq[JsObject]]
-        resp.length shouldEqual blocks.length
-
-        for ((b, json) <- blocks.zip(resp)) {
-          (json \ b.bytes.length.toString).as[String] shouldEqual Base58.encode(FastCryptographicHash(b.bytes))
-        }
-      }
-    }
-
-  }
-
+  
   routePath("/state") in {
     val portfolioGen = for {
       a <- accountGen

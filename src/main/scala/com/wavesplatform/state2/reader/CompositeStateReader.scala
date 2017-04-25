@@ -72,11 +72,7 @@ class CompositeStateReader(inner: StateReader, blockDiff: BlockDiff) extends Sta
   override def resolveAlias(a: Alias): Option[Account] = txDiff.aliases.get(a).orElse(inner.resolveAlias(a))
 
   override def findPreviousExchangeTxs(orderId: EqByteArray): Set[ExchangeTransaction] = {
-    val newEtxs = txDiff.transactions
-      .collect { case (_, (_, ets: ExchangeTransaction, _)) => ets }
-      .filter(etx => (etx.buyOrder.id sameElements orderId.arr) || (etx.sellOrder.id sameElements orderId.arr))
-      .toSet
-    newEtxs ++ inner.findPreviousExchangeTxs(orderId)
+    txDiff.previousExchangeTxs.get(orderId).orEmpty ++ inner.findPreviousExchangeTxs(orderId)
   }
 
   override def accountPortfolios: Map[Account, Portfolio] = Monoid.combine(inner.accountPortfolios, txDiff.portfolios)

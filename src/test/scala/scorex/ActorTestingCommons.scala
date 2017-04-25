@@ -5,6 +5,7 @@ import akka.testkit.{ImplicitSender, TestKitBase, TestProbe}
 import akka.util.Timeout
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.settings.Constants
+import com.wavesplatform.state2.reader.StateReader
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.Matchers
 import scorex.account.PublicKeyAccount
@@ -13,10 +14,10 @@ import scorex.block.Block._
 import scorex.block.{Block, SignerData}
 import scorex.consensus.nxt.{NxtLikeConsensusBlockData, WavesConsensusModule}
 import scorex.network.NetworkController.{DataFromPeer, RegisterMessagesHandler, SendToNetwork}
-import scorex.network.message.{BasicMessagesRepo, Message, MessageSpec}
+import scorex.network.message._
 import scorex.network.{ConnectedPeer, SendToChosen, SendingStrategy}
 import scorex.settings.TestBlockchainSettings
-import scorex.transaction.TransactionModule
+import scorex.transaction._
 import scorex.transaction.TransactionParser.SignatureLength
 
 import scala.concurrent.duration._
@@ -33,7 +34,9 @@ abstract class ActorTestingCommons extends TestKitBase
       |waves {
       |  directory: ""
       |  blockchain {
-      |    file: ""
+      |    blockchain-file: ""
+      |    state-file: ""
+      |    checkpoint-file: ""
       |  }
       |  network {
       |    file: ""
@@ -154,8 +157,19 @@ abstract class ActorTestingCommons extends TestKitBase
   trait ApplicationMock extends Application {
     implicit val transactionModule = stub[TransactionModule]
     implicit val consensusModule = new WavesConsensusModule(TestBlockchainSettings.Enabled)
-    final override val basicMessagesSpecsRepo: BasicMessagesRepo = new BasicMessagesRepo()
     final override lazy val networkController: ActorRef = networkControllerMock
+
+    def historyOverride: History
+
+    override val blockStorage: BlockStorage = new BlockStorage {
+      override def checkpoints: CheckpointService = ???
+
+      override def history: History = historyOverride
+
+      override def blockchainUpdater: BlockchainUpdater = ???
+
+      override def stateReader: StateReader = ???
+    }
   }
 
 }

@@ -11,6 +11,7 @@ import scorex.app.ApplicationVersion
 import scorex.network.NetworkController.SendToNetwork
 import scorex.network.PeerConnectionHandler.CloseConnection
 import scorex.network._
+import scorex.network.message._
 import scorex.network.message.Message
 import scorex.network.message.MessageHandler.RawNetworkData
 
@@ -50,8 +51,6 @@ class PeerManagerSpecification extends ActorTestingCommons {
   }
 
   private val app = stub[App]
-
-  import app.basicMessagesSpecsRepo._
 
   protected override val actorRef = system.actorOf(PeerManager.props(
     wavesSettings.networkSettings, app.networkController, wavesSettings.blockchainSettings.addressSchemeCharacter))

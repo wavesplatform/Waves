@@ -3,22 +3,18 @@ package scorex.app
 import akka.actor.ActorRef
 import com.wavesplatform.settings.WavesSettings
 import scorex.consensus.nxt.WavesConsensusModule
-import scorex.network.message.BasicMessagesRepo
-import scorex.transaction.{BlockStorage, History, TransactionModule}
+import scorex.transaction.{BlockStorage, TransactionModule}
 import scorex.wallet.Wallet
 
-/**
-  * Pure interface to application
-  */
+
 trait Application {
 
-  //modules
   implicit def consensusModule: WavesConsensusModule
   implicit def transactionModule: TransactionModule
 
-  def basicMessagesSpecsRepo: BasicMessagesRepo
+  def applicationName: String
 
-  def history: History
+  def appVersion: ApplicationVersion
 
   def blockStorage: BlockStorage
 

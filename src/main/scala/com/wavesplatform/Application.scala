@@ -6,18 +6,20 @@ import java.security.Security
 import akka.actor.{ActorSystem, Props}
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.actor.RootActorSystem
+import com.wavesplatform.history.BlockStorageImpl
 import com.wavesplatform.http.NodeApiRoute
-import com.wavesplatform.matcher.MatcherApplication
+import com.wavesplatform.matcher.{MatcherApplication, MatcherSettings}
 import com.wavesplatform.settings._
 import scorex.account.AddressScheme
 import scorex.api.http._
 import scorex.api.http.alias.{AliasApiRoute, AliasBroadcastApiRoute}
 import scorex.api.http.assets.{AssetsApiRoute, AssetsBroadcastApiRoute}
 import scorex.api.http.leasing.{LeaseApiRoute, LeaseBroadcastApiRoute}
+import scorex.app.ApplicationVersion
 import scorex.consensus.nxt.WavesConsensusModule
 import scorex.consensus.nxt.api.http.NxtConsensusApiRoute
 import scorex.network.{TransactionalMessagesRepo, UnconfirmedPoolSynchronizer}
-import scorex.transaction.SimpleTransactionModule
+import scorex.transaction.{BlockStorage, SimpleTransactionModule}
 import scorex.utils.ScorexLogging
 import scorex.waves.http.{DebugApiRoute, WavesApiRoute}
 
@@ -26,14 +28,21 @@ import scala.reflect.runtime.universe._
 class Application(val actorSystem: ActorSystem, val settings: WavesSettings) extends scorex.app.RunnableApplication
   with MatcherApplication {
 
-  override val matcherSettings = settings.matcherSettings
-  override val restAPISettings = settings.restAPISettings
+  override val applicationName: String = Constants.ApplicationName +
+    settings.blockchainSettings.addressSchemeCharacter
+  override val appVersion: ApplicationVersion = {
+    val (major, minor, bugfix) = Version.VersionTuple
+    ApplicationVersion(major, minor, bugfix)
+  }
+
+  override val matcherSettings: MatcherSettings = settings.matcherSettings
+  override val restAPISettings: RestAPISettings = settings.restAPISettings
 
   override implicit lazy val consensusModule = new WavesConsensusModule(settings.blockchainSettings)
 
   override implicit lazy val transactionModule = new SimpleTransactionModule(settings.blockchainSettings.genesisSettings)(settings, this)
 
-  override lazy val blockStorage = transactionModule.blockStorage
+  override lazy val blockStorage: BlockStorage = transactionModule.blockStorage
 
   override lazy val apiRoutes = Seq(
     BlocksApiRoute(settings.restAPISettings, settings.checkpointsSettings, history, coordinator),
@@ -94,22 +103,22 @@ object Application extends ScorexLogging {
       if file.exists
     } yield file
 
-    if (maybeConfigFile.isEmpty) log.warn("NO CONFIGURATION FILE WAS PROVIDED. STARTING WITH DEFAULT SETTINGS FOR TESTNET!")
-
-    val maybeUserConfig = maybeConfigFile collect {
-      case file if file.getName.endsWith(".json") =>
-        log.warn("JSON configuration file is deprecated and will be removed in the future version. " +
-          s"The node will try to read settings from ${file.getAbsolutePath} for now.")
-        LegacyConfigTransformer.transform(ConfigFactory.parseFile(file))
-      case file => ConfigFactory.parseFile(file)
-    }
-
-    val config = maybeUserConfig match {
+    val config = maybeConfigFile match {
       // if no user config is supplied, the library will handle overrides/application/reference automatically
-      case None => ConfigFactory.load()
+      case None =>
+        log.warn("NO CONFIGURATION FILE WAS PROVIDED. STARTING WITH DEFAULT SETTINGS FOR TESTNET!")
+        ConfigFactory.load()
       // application config needs to be resolved wrt both system properties *and* user-supplied config.
-      case Some(cfg) =>
-        ConfigFactory.defaultOverrides()
+      case Some(file) =>
+        val cfg = ConfigFactory.parseFile(file)
+        if (!cfg.hasPath("waves")) {
+          log.error("Malformed configuration file was provided! Aborting!")
+          log.error("Please, read following article about configuration file format:")
+          log.error("https://github.com/wavesplatform/Waves/wiki/Waves-Node-configuration-file")
+          System.exit(1)
+        }
+        ConfigFactory
+          .defaultOverrides()
           .withFallback(cfg)
           .withFallback(ConfigFactory.defaultApplication())
           .withFallback(ConfigFactory.defaultReference())

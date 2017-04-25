@@ -85,7 +85,7 @@ class BlockGeneratorController(application: Application) extends Actor with Scor
   private def ifShouldGenerateNow: Boolean = isLastBlockTsInAllowedToGenerationInterval || isLastBlockIsGenesis
 
   private def isLastBlockTsInAllowedToGenerationInterval: Boolean = try {
-    val lastBlockTimestamp = application.history.lastBlock.timestampField.value
+    val lastBlockTimestamp = application.blockStorage.history.lastBlock.timestampField.value
     val currentTime = NTP.correctedTime()
     val doNotGenerateUntilLastBlockTs = currentTime - application.settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed.toMillis
     lastBlockTimestamp >= doNotGenerateUntilLastBlockTs
@@ -95,7 +95,7 @@ class BlockGeneratorController(application: Application) extends Actor with Scor
       false
   }
 
-  private def isLastBlockIsGenesis: Boolean = application.history.height() == 1
+  private def isLastBlockIsGenesis: Boolean = application.blockStorage.history.height() == 1
 
   private def changeStateAccordingTo(peersNumber: Int, active: Boolean): Unit = {
     def suspendGeneration(): Unit = {

@@ -1,12 +1,8 @@
 package scorex.network
 
-import com.wavesplatform.settings.Constants
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{FreeSpec, Matchers, OneInstancePerTest}
-import scorex.consensus.nxt.WavesConsensusModule
-import scorex.network.message.BasicMessagesRepo
-import scorex.settings.TestBlockchainSettings
-import scorex.transaction.TransactionModule
+import scorex.network.message._
 import scorex.transaction.TransactionParser._
 
 class CheckpointSpecification extends FreeSpec
@@ -31,14 +27,11 @@ class CheckpointSpecification extends FreeSpec
   }
 
   "serialization" in {
-    val spec = new BasicMessagesRepo()(stub[TransactionModule],
-      new WavesConsensusModule(TestBlockchainSettings.Enabled)).CheckpointMessageSpec
-
     def sig(b: Byte) = Array.fill[Byte](SignatureLength)(b)
 
     val c = Checkpoint(Seq(BlockCheckpoint(1, sig(1)), BlockCheckpoint(2, sig(2))), sig(3))
 
-    val c2 = spec.deserializeData(spec.serializeData(c)).get
+    val c2 = CheckpointMessageSpec.deserializeData(CheckpointMessageSpec.serializeData(c)).get
 
     c2.items should have size 2
     (c2.signature sameElements c.signature) shouldBe true

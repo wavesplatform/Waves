@@ -8,6 +8,7 @@ import scorex.block.Block._
 import scorex.crypto.encode.Base58.encode
 import scorex.network.Coordinator.{AddBlock, SyncFinished}
 import scorex.network.NetworkController.DataFromPeer
+import scorex.network.message._
 import scorex.network.message.Message
 import scorex.transaction.History
 import scorex.transaction.History._
@@ -22,16 +23,12 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
   import BlockchainSynchronizer._
   import Coordinator.SyncFinished._
 
-  private val basicMessagesSpecsRepo = application.basicMessagesSpecsRepo
-
-  import basicMessagesSpecsRepo._
-
   override val messageSpecs = Seq(SignaturesSpec, BlockMessageSpec)
 
   protected override lazy val networkControllerRef = application.networkController
 
   private lazy val coordinator = application.coordinator
-  private lazy val history = application.history
+  private lazy val history = application.blockStorage.history
 
   private lazy val timeout = application.settings.synchronizationSettings.synchronizationTimeout
   private lazy val maxChainLength = application.settings.synchronizationSettings.maxChainLength

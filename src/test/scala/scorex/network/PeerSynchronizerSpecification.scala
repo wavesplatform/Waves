@@ -11,6 +11,7 @@ import scorex.ActorTestingCommons
 import scorex.app.{Application, ApplicationVersion}
 import scorex.network.NetworkController.DataFromPeer
 import scorex.network.PeerSynchronizer.RequestDataFromPeer
+import scorex.network.message.PeersSpec
 import scorex.network.peer.PeerManager
 
 import scala.language.postfixOps
@@ -45,7 +46,6 @@ class PeerSynchronizerSpecification extends ActorTestingCommons
 
   private val app = stub[App]
 
-  import app.basicMessagesSpecsRepo._
 
   protected override val actorRef = system.actorOf(Props(classOf[TestPeerSynchronizer], app))
 
