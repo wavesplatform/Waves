@@ -15,9 +15,7 @@ import scorex.utils.ScorexLogging
 
 object BlockDiffer extends ScorexLogging {
 
-  val emptyDiff: Diff = Monoid[Diff].empty
-  val rightEmptyDiff: Either[ValidationError, Diff] = Right(emptyDiff)
-  def rightDiff(diff: Diff): Either[ValidationError, Diff] = Right(diff)
+  def right(diff: Diff): Either[ValidationError, Diff] = Right(diff)
 
   def apply(settings: FunctionalitySettings)(s: StateReader, block: Block): Either[ValidationError, BlockDiff] = {
 
@@ -34,7 +32,7 @@ object BlockDiffer extends ScorexLogging {
       Diff(portfolios = Map(acc -> p))
     })
 
-    val txsDiffEi = block.transactionData.foldLeft(rightDiff(feeDiff)) { case (ei, tx) => ei.flatMap(diff =>
+    val txsDiffEi = block.transactionData.foldLeft(right(feeDiff)) { case (ei, tx) => ei.flatMap(diff =>
       txDiffer(new CompositeStateReader(s, diff.asBlockDiff), tx)
         .map(newDiff => diff.combine(newDiff)))
     }
