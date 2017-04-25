@@ -6,7 +6,7 @@ import org.scalatest.{FunSuite, Matchers}
 import scorex.account.Account
 
 
-class StateReaderImplEffectiveBalanceTest extends FunSuite with Matchers {
+class StateReaderEffectiveBalanceTest extends FunSuite with Matchers {
 
   val acc: Account = Account.fromPublicKey(Array.emptyByteArray)
   val stateHeight = 100
