@@ -137,7 +137,6 @@ object Block extends ScorexLogging {
     new Block(timestamp, version, reference, SignerData(PublicKeyAccount(genPK), signature), consData, txBlockField)
   }.recoverWith { case t: Throwable =>
     log.error("Error when parsing block", t)
-    t.printStackTrace()
     Failure(t)
   }
 
