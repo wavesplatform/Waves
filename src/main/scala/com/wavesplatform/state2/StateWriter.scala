@@ -81,7 +81,7 @@ class StateWriterImpl(p: StateStorage) extends StateReaderImpl(p) with StateWrit
     measurePersist("effectiveBalanceSnapshots")(blockDiff.updates)(
       _.foreach { case (acc, snapshotsByHeight) =>
       snapshotsByHeight.foreach { case (h, snapshot) =>
-        p.effectiveBalanceSnapshots.put((acc.bytes, h), (snapshot.prevHeight, snapshot.balance, snapshot.effectiveBalance))
+        p.balanceSnapshots.put(StateStorage.snapshotKey(acc, h), (snapshot.prevHeight, snapshot.balance, snapshot.effectiveBalance))
       }
       p.lastUpdateHeight.put(acc.bytes,snapshotsByHeight.keys.max)
     })
@@ -106,7 +106,7 @@ class StateWriterImpl(p: StateStorage) extends StateReaderImpl(p) with StateWrit
     p.portfolios.clear()
     p.assets.clear()
     p.accountTransactionIds.clear()
-    p.effectiveBalanceSnapshots.clear()
+    p.balanceSnapshots.clear()
     p.paymentTransactionHashes.clear()
     p.exchangeTransactionsByOrder.clear()
     p.aliasToAddress.clear()

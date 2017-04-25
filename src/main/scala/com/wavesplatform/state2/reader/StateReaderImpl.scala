@@ -76,6 +76,6 @@ class StateReaderImpl(p: StateStorage) extends StateReader {
   override def lastUpdateHeight(acc: Account): Option[Int] = Option(p.lastUpdateHeight.get(acc.bytes))
 
   override def snapshotAtHeight(acc: Account, h: Int): Option[Snapshot] =
-    Option(p.effectiveBalanceSnapshots.get((acc.bytes, h)))
+    Option(p.balanceSnapshots.get(StateStorage.snapshotKey(acc, h)))
       .map { case (ph, b, eb) => Snapshot(ph, b, eb) }
 }

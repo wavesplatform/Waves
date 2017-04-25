@@ -2,7 +2,10 @@ package com.wavesplatform.state2
 
 import java.util
 
+import com.google.common.primitives.Ints
+import com.wavesplatform.state2.StateStorage.SnapshotKey
 import org.h2.mvstore.{MVMap, MVStore}
+import scorex.account.Account
 
 class StateStorage(db: MVStore) {
 
@@ -21,7 +24,7 @@ class StateStorage(db: MVStore) {
 
   val accountTransactionIds: util.Map[Array[Byte], List[Array[Byte]]] = db.openMap("accountTransactionIds")
 
-  val effectiveBalanceSnapshots: util.Map[(Array[Byte], Int), (Int, Long, Long)] = db.openMap("effectiveBalanceUpdates")
+  val balanceSnapshots: util.Map[SnapshotKey, (Int, Long, Long)] = db.openMap("balanceSnapshots")
 
   val paymentTransactionHashes: util.Map[Array[Byte], Array[Byte]] = db.openMap("paymentTransactionHashes")
 
@@ -34,4 +37,11 @@ class StateStorage(db: MVStore) {
   val lastUpdateHeight: MVMap[Array[Byte], Int] = db.openMap("lastUpdateHeight")
 
   def commit(): Unit = db.commit()
+
+}
+
+object StateStorage {
+  type SnapshotKey = Array[Byte]
+
+  def snapshotKey(acc: Account, height: Int): SnapshotKey = acc.bytes ++ Ints.toByteArray(height)
 }
