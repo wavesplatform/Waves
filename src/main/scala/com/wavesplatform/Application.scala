@@ -103,7 +103,9 @@ object Application extends ScorexLogging {
       case Some(file) =>
         val cfg = ConfigFactory.parseFile(file)
         if (!cfg.hasPath("waves")) {
-          log.warn("Malformed configuration file was provided! Aborting!")
+          log.error("Malformed configuration file was provided! Aborting!")
+          log.error("Please, read following article about configuration file format:")
+          log.error("https://github.com/wavesplatform/Waves/wiki/Waves-Node-configuration-file")
           System.exit(1)
         }
         ConfigFactory
