@@ -54,7 +54,7 @@ class TransactionsRouteSpec extends RouteSpec("/transactions")
       forAll(
         accountGen,
         choose(1, MaxTransactionsPerRequest),
-        listOfN(10, randomTransactionGen)) { case (account, limit, txs) =>
+        randomTransactionsGen(10)) { case (account, limit, txs) =>
         (state.accountTransactionIds _).expects(account: Account).returning(txs.map(_.id).map(EqByteArray)).once()
         txs.foreach { tx =>
           (state.transactionInfo _).expects(EqByteArray(tx.id)).returning(Some(1,tx)).once()
