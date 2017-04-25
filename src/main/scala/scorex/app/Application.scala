@@ -16,10 +16,6 @@ trait Application {
   implicit def consensusModule: WavesConsensusModule
   implicit def transactionModule: TransactionModule
 
-  def applicationName: String
-
-  def appVersion: ApplicationVersion
-
   def basicMessagesSpecsRepo: BasicMessagesRepo
 
   def history: History
