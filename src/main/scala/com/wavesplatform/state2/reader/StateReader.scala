@@ -41,6 +41,8 @@ trait StateReader {
 
   def isLeaseActive(leaseTx: LeaseTransaction): Boolean
 
+  def isAssetNameAvailable(assetName: ByteArray): Boolean
+
   def activeLeases(): Seq[ByteArray]
 
   def lastUpdateHeight(acc: Account): Option[Int]

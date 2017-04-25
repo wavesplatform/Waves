@@ -64,8 +64,8 @@ class CreateAliasTransactionDiffTest extends PropSpec with PropertyChecks with G
     ts <- positiveIntGen
     gen: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
     gen2: GenesisTransaction = GenesisTransaction.create(aliasedRecipient, ENOUGH_AMT + 1, ts).right.get
-    issue1: IssueTransaction <- issueReissueGeneratorP(ENOUGH_AMT, master).map(_._1)
-    issue2: IssueTransaction <- issueReissueGeneratorP(ENOUGH_AMT, master).map(_._1)
+    issue1: IssueTransaction <- issueReissueBurnMakeUniqueGeneratorP(ENOUGH_AMT, master).map(_._1)
+    issue2: IssueTransaction <- issueReissueBurnMakeUniqueGeneratorP(ENOUGH_AMT, master).map(_._1)
     maybeAsset <- Gen.option(issue1)
     maybeAsset2 <- Gen.option(issue2)
     maybeFeeAsset <- Gen.oneOf(maybeAsset, maybeAsset2)

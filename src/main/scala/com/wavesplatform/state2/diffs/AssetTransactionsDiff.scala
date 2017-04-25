@@ -6,7 +6,7 @@ import com.wavesplatform.state2.{AssetInfo, Diff, EqByteArray, LeaseInfo, Portfo
 import scorex.account.Account
 import scorex.transaction.StateValidationError
 import scorex.transaction.ValidationError.TransactionValidationError
-import scorex.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction}
+import scorex.transaction.assets.{BurnTransaction, IssueTransaction, MakeUniqueAssetTransaction, ReissueTransaction}
 
 import scala.util.{Left, Right}
 
@@ -17,13 +17,15 @@ object AssetTransactionsDiff {
     val info = AssetInfo(
       isReissuable = tx.reissuable,
       volume = tx.quantity)
-    Right(Diff(height = height,
-      tx = tx,
-      portfolios = Map(Account.fromPublicKey(tx.sender.publicKey) -> Portfolio(
-        balance = -tx.fee,
-        leaseInfo = LeaseInfo.empty,
-        assets = Map(assetId -> tx.quantity))),
-      assetInfos = Map(assetId -> info)))
+    if (state.isAssetNameAvailable(EqByteArray(tx.name))) {
+      Right(Diff(height = height,
+        tx = tx,
+        portfolios = Map(Account.fromPublicKey(tx.sender.publicKey) -> Portfolio(
+          balance = -tx.fee,
+          leaseInfo = LeaseInfo.empty,
+          assets = Map(assetId -> tx.quantity))),
+        assetInfos = Map(assetId -> info)))
+    } else Left(TransactionValidationError(tx, "Asset name is not available"))
   }
 
   def reissue(state: StateReader, settings: FunctionalitySettings, blockTime: Long, height: Int)(tx: ReissueTransaction): Either[StateValidationError, Diff] = {
@@ -67,6 +69,28 @@ object AssetTransactionsDiff {
           leaseInfo = LeaseInfo.empty,
           assets = Map(assetId -> -tx.amount))),
               assetInfos = Map(assetId -> AssetInfo(isReissuable = true, volume = -tx.amount)))
+    })
+  }
+
+  def makeUnique(state: StateReader, height: Int)(tx: MakeUniqueAssetTransaction): Either[StateValidationError, Diff] = {
+    val issueTxEi = state.findTransaction[IssueTransaction](tx.assetId) match {
+      case None => Left(TransactionValidationError(tx, "Referenced assetId not found"))
+      case Some(itx) if !(itx.sender equals tx.sender) => Left(TransactionValidationError(tx, "Asset was issued by other address"))
+      case Some(itx) => Right(itx)
+    }
+    issueTxEi.flatMap(itx => {
+      val assetName = EqByteArray(itx.name)
+      if (state.isAssetNameAvailable(assetName)) {
+        val assetId = EqByteArray(tx.assetId)
+        Right(Diff(height = height,
+          tx = tx,
+          portfolios = Map(Account.fromPublicKey(tx.sender.publicKey) -> Portfolio(
+            balance = -tx.fee,
+            leaseInfo = LeaseInfo.empty,
+            assets = Map.empty)),
+          assetsWithUniqueNames = Map(assetName -> assetId)
+        ))
+      } else Left(TransactionValidationError(tx, "Asset name is not available"))
     })
   }
 }

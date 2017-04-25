@@ -36,7 +36,8 @@ case class Diff(transactions: Map[ByteArray, (Int, Transaction, Set[Account])],
                 aliases: Map[Alias, Account],
                 paymentTransactionIdsByHashes: Map[ByteArray, ByteArray],
                 previousExchangeTxs: Map[ByteArray, Set[ExchangeTransaction]],
-                leaseState: Map[ByteArray, Boolean]) {
+                leaseState: Map[ByteArray, Boolean],
+                assetsWithUniqueNames: Map[ByteArray, ByteArray]) {
 
   lazy val accountTransactionIds: Map[Account, List[ByteArray]] = {
     val map: List[(Account, Set[(Int, Long, ByteArray)])] = transactions.toList
@@ -52,12 +53,13 @@ case class Diff(transactions: Map[ByteArray, (Int, Transaction, Set[Account])],
 
 object Diff {
   def apply(height: Int, tx: Transaction,
-            portfolios: Map[Account, Portfolio],
+            portfolios: Map[Account, Portfolio] = Map.empty,
             assetInfos: Map[ByteArray, AssetInfo] = Map.empty,
             aliases: Map[Alias, Account] = Map.empty,
             previousExchangeTxs: Map[ByteArray, Set[ExchangeTransaction]] = Map.empty,
             paymentTransactionIdsByHashes: Map[ByteArray, ByteArray] = Map.empty,
-            leaseState: Map[ByteArray, Boolean] = Map.empty
+            leaseState: Map[ByteArray, Boolean] = Map.empty,
+            assetsWithUniqueNames: Map[ByteArray, ByteArray] = Map.empty
            ): Diff = Diff(
     transactions = Map(EqByteArray(tx.id) -> (height, tx, portfolios.keys.toSet)),
     portfolios = portfolios,
@@ -65,14 +67,15 @@ object Diff {
     aliases = aliases,
     paymentTransactionIdsByHashes = paymentTransactionIdsByHashes,
     previousExchangeTxs = previousExchangeTxs,
-    leaseState = leaseState)
+    leaseState = leaseState,
+    assetsWithUniqueNames = assetsWithUniqueNames)
 
   implicit class DiffExt(d: Diff) {
-    def asBlockDiff: BlockDiff = BlockDiff(d, 0, Map.empty)
+    def asBlockDiff: BlockDiff = BlockDiff(d, 0, Seq.empty)
   }
 
   implicit val diffMonoid = new Monoid[Diff] {
-    override def empty: Diff = Diff(transactions = Map.empty, portfolios = Map.empty, issuedAssets = Map.empty, Map.empty, Map.empty, Map.empty, Map.empty)
+    override def empty: Diff = Diff(transactions = Map.empty, portfolios = Map.empty, issuedAssets = Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty)
 
     override def combine(older: Diff, newer: Diff): Diff = Diff(
       transactions = older.transactions ++ newer.transactions,
@@ -81,6 +84,7 @@ object Diff {
       aliases = older.aliases ++ newer.aliases,
       paymentTransactionIdsByHashes = older.paymentTransactionIdsByHashes ++ newer.paymentTransactionIdsByHashes,
       previousExchangeTxs = older.previousExchangeTxs ++ newer.previousExchangeTxs,
-      leaseState = older.leaseState ++ newer.leaseState)
+      leaseState = older.leaseState ++ newer.leaseState,
+      assetsWithUniqueNames = newer.assetsWithUniqueNames ++ older.assetsWithUniqueNames)
   }
 }

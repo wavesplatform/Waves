@@ -72,4 +72,8 @@ class StateReaderImpl(p: StateStorage) extends StateReader {
       .map { case (ph, b, eb) => Snapshot(ph, b, eb) }
 
   override def containsTransaction(id: ByteArray): Boolean = p.transactions.containsKey(id.arr)
+
+  override def isAssetNameAvailable(assetName: ByteArray): Boolean = {
+    !p.uniqueAssets.containsKey(assetName.arr)
+  }
 }

@@ -19,6 +19,7 @@ case class FunctionalitySettings(allowTemporaryNegativeUntil: Long,
                                  allowExchangeTransactionAfterTimestamp: Long,
                                  allowInvalidReissueInSameBlockUntilTimestamp: Long,
                                  allowCreateAliasTransactionAfterTimestamp: Long,
+                                 allowMakeUniqueAssetTransactionAfterTimestamp: Long,
                                  allowMultipleLeaseCancelTransactionUntilTimestamp: Long,
                                  resetEffectiveBalancesAtHeight: Long)
 
@@ -36,6 +37,7 @@ object FunctionalitySettings {
     allowExchangeTransactionAfterTimestamp = 1491192000000L,
     allowInvalidReissueInSameBlockUntilTimestamp = 1492768800000L,
     allowCreateAliasTransactionAfterTimestamp = Long.MaxValue,
+    allowMakeUniqueAssetTransactionAfterTimestamp = Long.MaxValue,
     allowMultipleLeaseCancelTransactionUntilTimestamp = 1492768800000L,
     resetEffectiveBalancesAtHeight = 462000)
 
@@ -53,6 +55,7 @@ object FunctionalitySettings {
     allowExchangeTransactionAfterTimestamp = 1483228800000L,
     allowInvalidReissueInSameBlockUntilTimestamp = 1492560000000L,
     allowCreateAliasTransactionAfterTimestamp = 1493596800000L,
+    allowMakeUniqueAssetTransactionAfterTimestamp = Long.MaxValue,
     allowMultipleLeaseCancelTransactionUntilTimestamp = 1492560000000L,
     resetEffectiveBalancesAtHeight = 51500)
 
@@ -72,6 +75,7 @@ object FunctionalitySettings {
     val allowExchangeTransactionAfterTimestamp = config.as[Long](s"$configPath.allow-exchange-transaction-after")
     val allowInvalidReissueInSameBlockUntilTimestamp = config.as[Long](s"$configPath.allow-invalid-reissue-in-same-block-until-timestamp")
     val allowCreateAliasTransactionAfterTimestamp = config.as[Long](s"$configPath.allow-createalias-transaction-after")
+    val allowMakeUniqueAssetTransactionAfterTimestamp = config.as[Long](s"$configPath.allow-make-unique-asset-transaction-after")
     val allowMultipleLeaseCancelTransactionUntilTimestamp = config.as[Long](s"$configPath.allow-multiple-lease-cancel-transaction-until-timestamp")
     val resetEffectiveBalancesAtHeight = config.as[Long](s"$configPath.reset-effective-balances-at-height")
 
@@ -80,7 +84,7 @@ object FunctionalitySettings {
       requireSortedTransactionsAfter, generatingBalanceDepthFrom50To1000AfterHeight,
       minimalGeneratingBalanceAfterTimestamp, allowTransactionsFromFutureUntil, allowUnissuedAssetsUntil,
       allowBurnTransactionAfterTimestamp, allowLeaseTransactionAfterTimestamp, requirePaymentUniqueId, allowExchangeTransactionAfterTimestamp,
-      allowInvalidReissueInSameBlockUntilTimestamp, allowCreateAliasTransactionAfterTimestamp,
+      allowInvalidReissueInSameBlockUntilTimestamp, allowCreateAliasTransactionAfterTimestamp, allowMakeUniqueAssetTransactionAfterTimestamp,
       allowMultipleLeaseCancelTransactionUntilTimestamp, resetEffectiveBalancesAtHeight)
   }
 }
