@@ -1,10 +1,10 @@
 package com.wavesplatform.history
 
 import com.google.common.cache.{CacheBuilder, CacheLoader}
-import com.google.common.util.concurrent.UncheckedExecutionException
 import scorex.account.Account
 import scorex.block.Block
 import scorex.block.Block.BlockId
+import scorex.crypto.encode.Base58
 import scorex.transaction.History.BlockchainScore
 import scorex.transaction.ValidationError.CustomError
 import scorex.transaction.{History, HistoryWriter, ValidationError}
@@ -15,9 +15,7 @@ class HistoryWriterImpl(storage: HistoryStorage) extends History with HistoryWri
   private val BlocksCacheSizeLimit: Int = 1000
   private val blocksCache = CacheBuilder.newBuilder()
     .maximumSize(BlocksCacheSizeLimit)
-    .build[Integer, Block](new CacheLoader[Integer, Block]() {
-    def load(height: Integer): Block = Block.parseBytes(storage.blockBodyByHeight.get(height)).get
-  }
+    .build[Integer, Block](CacheLoader.from { height => Block.parseBytes(storage.blockBodyByHeight.get(height)).get }
   )
 
   override def appendBlock(block: Block): Either[ValidationError, Unit] = {
@@ -29,7 +27,7 @@ class HistoryWriterImpl(storage: HistoryStorage) extends History with HistoryWri
       storage.heightByBlockId.put(block.uniqueId, h)
       Right(())
     } else {
-      Left(CustomError(s"Appending block ${block.json} which parent is not last block in blockchain"))
+      Left(CustomError(s"Failed to append block ${block.encodedId} which parent(${Base58.encode(block.reference)} is not last block in blockchain"))
     }
   }
 
@@ -42,15 +40,7 @@ class HistoryWriterImpl(storage: HistoryStorage) extends History with HistoryWri
     vOpt.map(v => storage.heightByBlockId.remove(v))
   }
 
-  override def blockAt(height: Int): Option[Block] = {
-    try {
-      Some(blocksCache.get(height))
-    } catch {
-      case e: UncheckedExecutionException =>
-        log.debug(s"There are no block at $height")
-        None
-    }
-  }
+  override def blockAt(height: Int): Option[Block] = scala.util.control.Exception.allCatch.opt(blocksCache.get(height))
 
   override def lastBlockIds(howMany: Int): Seq[BlockId] =
     (Math.max(1, height() - howMany + 1) to height()).flatMap(i => Option(storage.blockIdByHeight.get(i)))
@@ -64,19 +54,10 @@ class HistoryWriterImpl(storage: HistoryStorage) extends History with HistoryWri
 
   override def heightOf(blockSignature: Array[Byte]): Option[Int] = Option(storage.heightByBlockId.get(blockSignature))
 
-  override def generatedBy(account: Account, from: Int, to: Int): Seq[Block] = {
-    (from to to).toStream.flatMap {
-      h =>
-        for {
-          block <- blockAt(h)
-          if block.signerData.generator.address.equals(account.address)
-        } yield block
-    }
-  }
-
-  override def toString: String = ((1 to height()) map {
-    h =>
-      val bl = blockAt(h).get
-      s"$h -- ${bl.uniqueId.mkString} -- ${bl.referenceField.value.mkString}"
-  }).mkString("\n")
+  override def generatedBy(account: Account, from: Int, to: Int): Seq[Block] =
+    for {
+      h <- from to to
+      block <- blockAt(h)
+      if block.signerData.generator.address.equals(account.address)
+    } yield block
 }

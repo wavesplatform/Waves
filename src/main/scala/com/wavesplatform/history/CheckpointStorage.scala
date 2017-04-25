@@ -21,11 +21,11 @@ class CheckpointServiceImpl(storage: CheckpointStorage) extends CheckpointServic
 
   private val key = 0
 
-  override def getCheckpoint: Option[Checkpoint] =
+  override def get: Option[Checkpoint] =
     Option(storage.checkpoint.get(key))
       .map { case (seq, sig) => Checkpoint(seq.map(BlockCheckpoint.tupled), sig) }
 
-  override def setCheckpoint(c: Option[Checkpoint]): Unit = {
+  override def set(c: Option[Checkpoint]): Unit = {
     c match {
       case Some(cp) => storage.checkpoint.put(key, (cp.items.map(bcp => (bcp.height, bcp.signature)), cp.signature))
       case None => storage.checkpoint.remove(key)

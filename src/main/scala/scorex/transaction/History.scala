@@ -34,9 +34,9 @@ trait HistoryWriter {
 
 trait CheckpointService {
 
-  def setCheckpoint(checkpoint: Option[Checkpoint])
+  def set(checkpoint: Option[Checkpoint])
 
-  def getCheckpoint: Option[Checkpoint]
+  def get: Option[Checkpoint]
 }
 
 

@@ -117,18 +117,18 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
 
       case ConnectedPeers(_) =>
 
-      case ClearCheckpoint => checkpoints.setCheckpoint(None)
+      case ClearCheckpoint => checkpoints.set(None)
     }
   }
 
   private def handleCheckpoint(checkpoint: Checkpoint, from: Option[ConnectedPeer]): Unit =
-    if (checkpoints.getCheckpoint.forall(c => !(c.signature sameElements checkpoint.signature))) {
+    if (checkpoints.get.forall(c => !(c.signature sameElements checkpoint.signature))) {
       val maybePublicKeyBytes = Base58.decode(application.settings.checkpointsSettings.publicKey).toOption
 
       maybePublicKeyBytes foreach {
         publicKey =>
           if (EllipticCurveImpl.verify(checkpoint.signature, checkpoint.toSign, publicKey)) {
-            checkpoints.setCheckpoint(Some(checkpoint))
+            checkpoints.set(Some(checkpoint))
             networkControllerRef ! SendToNetwork(Message(CheckpointMessageSpec, Right(checkpoint), None),
               from.map(BroadcastExceptOf).getOrElse(Broadcast))
             makeBlockchainCompliantWith(checkpoint)
@@ -242,7 +242,7 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
   }
 
   private def isValidWithRespectToCheckpoint(candidate: Block, estimatedHeight: Int): Boolean =
-    !checkpoints.getCheckpoint.exists {
+    !checkpoints.get.exists {
       case Checkpoint(items, _) =>
         val blockSignature = candidate.signerDataField.value.signature
         items.exists { case BlockCheckpoint(h, sig) =>
