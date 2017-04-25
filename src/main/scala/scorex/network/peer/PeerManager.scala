@@ -2,8 +2,10 @@ package scorex.network.peer
 
 import java.net.{InetAddress, InetSocketAddress}
 
-import akka.actor.{Actor, ActorRef}
-import scorex.app.Application
+import akka.actor.{Actor, ActorRef, Props}
+import com.wavesplatform.Version
+import com.wavesplatform.settings.{Constants, NetworkSettings}
+import scorex.app.ApplicationVersion
 import scorex.network.NetworkController.SendToNetwork
 import scorex.network._
 import scorex.network.message.MessageHandler.RawNetworkData
@@ -14,19 +16,16 @@ import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Random, Try}
 
-/**
-  * Must be singleton
-  *
-  * @param application - Scorex-based application
-  */
-class PeerManager(application: Application) extends Actor with ScorexLogging {
-
-  private lazy val settings = application.settings.networkSettings
+/** Must be singleton */
+class PeerManager(
+    settings: NetworkSettings,
+    networkController: ActorRef,
+    applicationName: String,
+    appVersion: ApplicationVersion) extends Actor with ScorexLogging {
 
   import PeerConnectionHandler._
   import PeerManager._
 
-  private lazy val networkController = application.networkController
   val blacklistResendInterval = settings.blackListResidenceTime / 10
   private implicit val system = context.system
   private val connectedPeers = mutable.Map[InetSocketAddress, PeerConnection]()
@@ -161,7 +160,7 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
     } else {
       val connectionFromHostCount = connectedPeers.keys.count(_.getHostName == remote.getHostName)
       if (AllowedConnectionsFromOneHost > connectionFromHostCount) {
-        val handshake = Handshake(application.applicationName, application.appVersion, settings.nodeName,
+        val handshake = Handshake(applicationName, appVersion, settings.nodeName,
           settings.nonce, ownSocketAddress, System.currentTimeMillis() / 1000)
 
         handlerRef ! handshake
@@ -233,8 +232,8 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
         sender() ! CloseConnection
 
       case Some(connection@PeerConnection(_, None, inbound)) =>
-        log.debug(s"Comparing remote application name '${handshake.applicationName}' to local '${application.applicationName}'")
-        if (application.applicationName != handshake.applicationName) {
+        log.debug(s"Comparing remote application name '${handshake.applicationName}' to local '$applicationName'")
+        if (applicationName != handshake.applicationName) {
           log.debug(s"Different application name: ${handshake.applicationName} from $address")
           self ! AddToBlacklist(address)
         } else if (settings.nonce == handshake.nodeNonce) {
@@ -301,6 +300,8 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
 }
 
 object PeerManager {
+  def props(networkSettings: NetworkSettings, networkController: ActorRef, addressSchemeCharacter: Char) =
+    Props(new PeerManager(networkSettings, networkController, Constants.ApplicationName + addressSchemeCharacter, new ApplicationVersion(Version.VersionTuple)))
 
   case class AddPeer(address: InetSocketAddress)
 

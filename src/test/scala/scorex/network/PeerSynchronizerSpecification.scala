@@ -41,8 +41,6 @@ class PeerSynchronizerSpecification extends ActorTestingCommons
 
   trait App extends ApplicationMock {
     override lazy val settings = wavesSettings
-    override val applicationName: String = "test"
-    override val appVersion: ApplicationVersion = ApplicationVersion(7, 7, 7)
     override val peerManager: ActorRef = testPeerManager.ref
   }
 

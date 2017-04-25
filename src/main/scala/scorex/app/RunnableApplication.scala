@@ -30,7 +30,7 @@ trait RunnableApplication extends Application with Shutdownable with ScorexLoggi
   protected val apiRoutes: Seq[ApiRoute]
   protected val apiTypes: Seq[Type]
 
-  protected implicit val actorSystem: ActorSystem
+  protected def actorSystem: ActorSystem
 
   protected val additionalMessageSpecs: Seq[MessageSpec[_]]
 
@@ -48,15 +48,15 @@ trait RunnableApplication extends Application with Shutdownable with ScorexLoggi
 
   lazy val messagesHandler: MessageHandler = MessageHandler(BasicMessagesRepo.specs ++ additionalMessageSpecs)
 
-  lazy override val peerManager = actorSystem.actorOf(Props(classOf[PeerManager], this))
-
   //interface to append log and state
   lazy override val blockStorage: BlockStorage = transactionModule.blockStorage
 
   lazy val history: History = blockStorage.history
 
-  lazy override val networkController = actorSystem.actorOf(Props(classOf[NetworkController], this),
-    "NetworkController")
+  lazy override val networkController = actorSystem.actorOf(Props(new NetworkController(this)), "NetworkController")
+  lazy override val peerManager = actorSystem.actorOf(
+    PeerManager.props(settings.networkSettings, networkController, settings.blockchainSettings.addressSchemeCharacter), "PeerManager")
+
   lazy override val blockGenerator = actorSystem.actorOf(Props(classOf[BlockGeneratorController], this),
     "BlockGenerator")
   lazy override val scoreObserver = actorSystem.actorOf(Props(classOf[ScoreObserver], this), "ScoreObserver")
@@ -75,6 +75,7 @@ trait RunnableApplication extends Application with Shutdownable with ScorexLoggi
 
     checkGenesis()
 
+    implicit val as = actorSystem
     implicit val materializer = ActorMaterializer()
 
     if (settings.restAPISettings.enable) {

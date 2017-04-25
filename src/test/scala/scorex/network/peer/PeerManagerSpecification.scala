@@ -2,7 +2,6 @@ package scorex.network.peer
 
 import java.net.{InetAddress, InetSocketAddress}
 
-import akka.actor.Props
 import akka.pattern.ask
 import akka.testkit.TestProbe
 import com.typesafe.config.ConfigFactory
@@ -49,13 +48,12 @@ class PeerManagerSpecification extends ActorTestingCommons {
 
   trait App extends ApplicationMock {
     override lazy val settings = wavesSettings
-    override val applicationName: String = "test"
-    override val appVersion: ApplicationVersion = ApplicationVersion(7, 7, 7)
   }
 
   private val app = stub[App]
 
-  protected override val actorRef = system.actorOf(Props(classOf[PeerManager], app))
+  protected override val actorRef = system.actorOf(PeerManager.props(
+    wavesSettings.networkSettings, app.networkController, wavesSettings.blockchainSettings.addressSchemeCharacter))
 
   testSafely {
 
@@ -66,7 +64,7 @@ class PeerManagerSpecification extends ActorTestingCommons {
     def connect(address: InetSocketAddress, noneNonce: Long): Unit = {
       actorRef ! Connected(address, peerConnectionHandler.ref, None, inbound = true)
       peerConnectionHandler.expectMsgType[Handshake]
-      actorRef ! Handshaked(address, Handshake("test", ApplicationVersion(0, 0, 0), "", noneNonce, Some(address), 0))
+      actorRef ! Handshaked(address, Handshake("wavesT", ApplicationVersion(0, 0, 0), "", noneNonce, Some(address), 0))
     }
 
     def getConnectedPeers =
@@ -206,7 +204,7 @@ class PeerManagerSpecification extends ActorTestingCommons {
         val handler = TestProbe("connection-handler-" + id)
         actorRef ! Connected(address, handler.ref, None, inbound = true)
         handler.expectMsgType[Handshake](timeout)
-        actorRef ! Handshaked(address, Handshake("test", ApplicationVersion(0, 0, 0), "", nonce, None, 0))
+        actorRef ! Handshaked(address, Handshake("wavesT", ApplicationVersion(0, 0, 0), "", nonce, None, 0))
         handler
       }
 
@@ -230,7 +228,7 @@ class PeerManagerSpecification extends ActorTestingCommons {
         val handler = TestProbe("connection-handler-" + id)
         actorRef ! Connected(address, handler.ref, None, inbound = true)
         handler.expectMsgType[Handshake]
-        actorRef ! Handshaked(address, Handshake("test", ApplicationVersion(0, 0, 0), "", id, None, 0))
+        actorRef ! Handshaked(address, Handshake("wavesT", ApplicationVersion(0, 0, 0), "", id, None, 0))
         handler
       }
 
@@ -279,7 +277,7 @@ class PeerManagerSpecification extends ActorTestingCommons {
       assert(result2.nonEmpty)
       val (a, h) = result2.head
       assert(a == anAddress)
-      assert(h.applicationName == "test")
+      assert(h.applicationName == "wavesT")
     }
 
     "get random peers" in {
@@ -367,7 +365,7 @@ class PeerManagerSpecification extends ActorTestingCommons {
         val handler = TestProbe()
         actorRef ! Connected(address, handler.ref, None, inbound = true)
         handler.expectMsgType[Handshake]
-        actorRef ! Handshaked(address, Handshake("test", ApplicationVersion(0, 0, 0), "", nonce, None, 0))
+        actorRef ! Handshaked(address, Handshake("wavesT", ApplicationVersion(0, 0, 0), "", nonce, None, 0))
         handler
       }
 

@@ -3,8 +3,7 @@ package com.wavesplatform.state2.reader
 import com.google.common.base.Charsets
 import com.wavesplatform.state2._
 import scorex.account.{Account, AccountOrAlias, Alias}
-import scorex.crypto.hash.FastCryptographicHash
-import scorex.transaction.ValidationError.{AliasNotExists, TransactionValidationError}
+import scorex.transaction.ValidationError.AliasNotExists
 import scorex.transaction._
 import scorex.transaction.assets.IssueTransaction
 import scorex.transaction.assets.exchange.{ExchangeTransaction, Order}
@@ -109,8 +108,5 @@ object StateReader {
         .map(tx => new String(tx.name, Charsets.UTF_8))
         .getOrElse("Unknown")
     }
-
-    def stateHash(): Int = (BigInt(FastCryptographicHash(s.accountPortfolios.toString().getBytes)) % Int.MaxValue).toInt
   }
-
 }

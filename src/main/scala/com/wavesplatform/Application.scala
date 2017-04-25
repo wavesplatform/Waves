@@ -6,6 +6,7 @@ import java.security.Security
 import akka.actor.{ActorSystem, Props}
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.actor.RootActorSystem
+import com.wavesplatform.history.BlockStorageImpl
 import com.wavesplatform.http.NodeApiRoute
 import com.wavesplatform.matcher.{MatcherApplication, MatcherSettings}
 import com.wavesplatform.settings._
@@ -18,32 +19,30 @@ import scorex.app.ApplicationVersion
 import scorex.consensus.nxt.WavesConsensusModule
 import scorex.consensus.nxt.api.http.NxtConsensusApiRoute
 import scorex.network.{TransactionalMessagesRepo, UnconfirmedPoolSynchronizer}
-import scorex.transaction.SimpleTransactionModule
+import scorex.transaction.{BlockStorage, SimpleTransactionModule}
 import scorex.utils.ScorexLogging
 import scorex.waves.http.{DebugApiRoute, WavesApiRoute}
 
 import scala.reflect.runtime.universe._
 
-class Application(as: ActorSystem, wavesSettings: WavesSettings) extends {
-  val matcherSettings: MatcherSettings = wavesSettings.matcherSettings
-  val restAPISettings: RestAPISettings = wavesSettings.restAPISettings
-  override implicit val settings = wavesSettings
-
-  override val applicationName = Constants.ApplicationName +
-    wavesSettings.blockchainSettings.addressSchemeCharacter
-  override val appVersion = {
-    val parts = Constants.VersionString.split("\\.")
-    ApplicationVersion(parts(0).toInt, parts(1).toInt, parts(2).split("-").head.toInt)
-  }
-  override implicit val actorSystem = as
-} with scorex.app.RunnableApplication
+class Application(val actorSystem: ActorSystem, val settings: WavesSettings) extends scorex.app.RunnableApplication
   with MatcherApplication {
+
+  override val applicationName: String = Constants.ApplicationName +
+    settings.blockchainSettings.addressSchemeCharacter
+  override val appVersion: ApplicationVersion = {
+    val (major, minor, bugfix) = Version.VersionTuple
+    ApplicationVersion(major, minor, bugfix)
+  }
+
+  override val matcherSettings: MatcherSettings = settings.matcherSettings
+  override val restAPISettings: RestAPISettings = settings.restAPISettings
 
   override implicit lazy val consensusModule = new WavesConsensusModule(settings.blockchainSettings)
 
   override implicit lazy val transactionModule = new SimpleTransactionModule(settings.blockchainSettings.genesisSettings)(settings, this)
 
-  override lazy val blockStorage = transactionModule.blockStorage
+  override lazy val blockStorage: BlockStorage = transactionModule.blockStorage
 
   override lazy val apiRoutes = Seq(
     BlocksApiRoute(settings.restAPISettings, settings.checkpointsSettings, history, coordinator),
