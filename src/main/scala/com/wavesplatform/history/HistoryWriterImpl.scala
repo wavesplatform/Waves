@@ -15,10 +15,9 @@ class HistoryWriterImpl(storage: HistoryStorage) extends History with HistoryWri
   private val BlocksCacheSizeLimit: Int = 1000
   private val blocksCache = CacheBuilder.newBuilder()
     .maximumSize(BlocksCacheSizeLimit)
-    .build[Integer, Block](new CacheLoader[Integer, Block]() {
-    def load(height: Integer): Block = Block.parseBytes(storage.blockBodyByHeight.get(height)).get
-  }
-  )
+    .build(CacheLoader.from[Integer, Block] { height =>
+      Block.parseBytes(storage.blockBodyByHeight.get(height)).get
+    })
 
   override def appendBlock(block: Block): Either[ValidationError, Unit] = {
     if ((height() == 0) || (this.lastBlock.uniqueId sameElements block.reference)) {
