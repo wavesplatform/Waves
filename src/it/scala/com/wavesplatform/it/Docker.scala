@@ -72,7 +72,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty) extends AutoCloseable wi
       .build()
 
     val containerConfig = ContainerConfig.builder()
-      .image(imageId)
+      .image("com.wavesplatform/waves:latest")
       .exposedPorts(restApiPort, networkPort, matcherApiPort)
       .hostConfig(hostConfig)
       .env(s"WAVES_OPTS=$configOverrides", s"WAVES_PORT=$networkPort")
@@ -115,7 +115,6 @@ class Docker(suiteConfig: Config = ConfigFactory.empty) extends AutoCloseable wi
 object Docker {
   private val jsonMapper = new ObjectMapper
   private val propsMapper = new JavaPropsMapper
-  private val imageId = System.getProperty("docker.imageId")
 
   private def asProperties(config: Config): Properties = {
     val jsonConfig = config.root().render(ConfigRenderOptions.concise())

@@ -114,6 +114,7 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
     settings.functionalitySettings.allowMultipleLeaseCancelTransactionUntilTimestamp should be(1492560000000L)
     settings.functionalitySettings.allowExchangeTransactionAfterTimestamp should be(1483228800000L)
     settings.functionalitySettings.resetEffectiveBalancesAtHeight should be(51500)
+    settings.functionalitySettings.allowCreateAliasTransactionAfterTimestamp should be(1493596800000L)
     settings.genesisSettings.blockTimestamp should be(1460678400000L)
     settings.genesisSettings.transactionsTimestamp should be(1478000000000L)
     settings.genesisSettings.signature should be("5uqnLK3Z9eiot6FyYBfwUnbyid3abicQbAZjz38GQ1Q8XigQMxTK4C1zNkqS1SVw7FqSidbZKxWAKLVoEsp4nNqa")
