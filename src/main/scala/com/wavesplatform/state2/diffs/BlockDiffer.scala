@@ -54,7 +54,7 @@ object BlockDiffer extends ScorexLogging {
           .map { case (acc, portfolioDiff) =>
             val oldPortfolio = s.accountPortfolio(acc)
             acc -> Map(currentBlockHeight -> Snapshot(
-              prevHeight = s.height,
+              prevHeight = s.lastUpdateHeight(acc).getOrElse(0),
               balance = oldPortfolio.balance + portfolioDiff.balance,
               effectiveBalance = oldPortfolio.effectiveBalance + portfolioDiff.effectiveBalance))
           }

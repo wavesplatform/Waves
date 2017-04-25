@@ -117,14 +117,14 @@ object StateReader {
     def stateHash(): Int = (BigInt(FastCryptographicHash(s.accountPortfolios.toString().getBytes)) % Int.MaxValue).toInt
 
     private def minBySnapshot(acc: Account, atHeight: Int, confirmations: Int)(extractor: Snapshot => Long): Long = {
-      val bottom = atHeight - confirmations
+      val bottomNotIncluded = atHeight - confirmations
 
       @tailrec
       def loop(deeperHeight: Int, list: Seq[Snapshot]): Seq[Snapshot] = {
         if (deeperHeight == 0) list
         else {
           lazy val snapshot = s.snapshotAtHeight(acc, deeperHeight).get
-          if (deeperHeight < bottom)
+          if (deeperHeight <= bottomNotIncluded)
             snapshot +: list
           else if (deeperHeight > atHeight && snapshot.prevHeight > atHeight) {
             loop(snapshot.prevHeight, list)
