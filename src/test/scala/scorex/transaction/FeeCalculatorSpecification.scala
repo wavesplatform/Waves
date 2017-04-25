@@ -90,7 +90,7 @@ class FeeCalculatorSpecification extends PropSpec with PropertyChecks with Gener
   property("Payment transaction ") {
     val feeCalc = new FeeCalculator(mySettings)
     forAll(paymentGen) { tx: PaymentTransaction =>
-      feeCalc.enoughFee(tx) shouldBeRightIf (tx.fee >= 1000000)
+      feeCalc.enoughFee(tx) shouldBeRightIf (tx.fee >= 100000)
     }
   }
 
