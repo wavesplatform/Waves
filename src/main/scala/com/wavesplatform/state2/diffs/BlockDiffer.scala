@@ -12,6 +12,8 @@ import scorex.block.Block
 import scorex.transaction.{AssetAcc, ValidationError}
 import scorex.utils.ScorexLogging
 
+import scala.collection.SortedMap
+
 
 object BlockDiffer extends ScorexLogging {
 
@@ -48,7 +50,7 @@ object BlockDiffer extends ScorexLogging {
           .filter { case (acc, portfolioDiff) => portfolioDiff.balance != 0 || portfolioDiff.effectiveBalance != 0 }
           .map { case (acc, portfolioDiff) =>
             val oldPortfolio = s.accountPortfolio(acc)
-            acc -> Map(currentBlockHeight -> Snapshot(
+            acc -> SortedMap(currentBlockHeight -> Snapshot(
               prevHeight = s.lastUpdateHeight(acc).getOrElse(0),
               balance = oldPortfolio.balance + portfolioDiff.balance,
               effectiveBalance = oldPortfolio.effectiveBalance + portfolioDiff.effectiveBalance))
