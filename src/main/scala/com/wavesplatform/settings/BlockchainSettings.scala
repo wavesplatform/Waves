@@ -52,7 +52,7 @@ object FunctionalitySettings {
     requirePaymentUniqueId = 1485942685000L,
     allowExchangeTransactionAfterTimestamp = 1483228800000L,
     allowInvalidReissueInSameBlockUntilTimestamp = 1492560000000L,
-    allowCreateAliasTransactionAfterTimestamp = Long.MinValue,
+    allowCreateAliasTransactionAfterTimestamp = 1493596800000L,
     allowMultipleLeaseCancelTransactionUntilTimestamp = 1492560000000L,
     resetEffectiveBalancesAtHeight = 51500)
 
