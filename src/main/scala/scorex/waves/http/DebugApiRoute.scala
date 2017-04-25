@@ -59,7 +59,10 @@ case class DebugApiRoute(settings: RestAPISettings, wallet: Wallet, stateReader:
     new ApiImplicitParam(name = "height", value = "height", required = true, dataType = "integer", paramType = "path")
   ))
   def stateWaves: Route = (path("stateWaves" / IntNumber) & get) { height =>
-    val result = stateReader.accountPortfolios.keys.map(acc => acc.stringRepr -> stateReader.balanceAtHeight(acc, height)).toMap
+    val result = stateReader.accountPortfolios.keys
+      .map(acc => acc.stringRepr -> stateReader.balanceAtHeight(acc, height))
+      .filter(_._2 != 0)
+      .toMap
     complete(result)
   }
 

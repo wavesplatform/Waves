@@ -153,7 +153,7 @@ object StateReader {
     def balanceAtHeight(acc: Account, height: Int): Long = {
 
       @tailrec
-      def loop(lookupHeight: Int): Long = s.snapshotAtHeight(acc, height) match {
+      def loop(lookupHeight: Int): Long = s.snapshotAtHeight(acc, lookupHeight) match {
         case None if lookupHeight == 0 => 0
         case Some(snapshot) if lookupHeight <= height => snapshot.balance
         case Some(snapshot) => loop(snapshot.prevHeight)
