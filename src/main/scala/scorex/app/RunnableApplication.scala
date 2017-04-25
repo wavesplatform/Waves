@@ -25,6 +25,8 @@ import scala.concurrent.duration._
 import scala.reflect.runtime.universe.Type
 import scala.util.Try
 
+import com.wavesplatform.state2._
+
 trait RunnableApplication extends Application with Shutdownable with ScorexLogging {
 
   protected val apiRoutes: Seq[ApiRoute]
@@ -123,7 +125,7 @@ trait RunnableApplication extends Application with Shutdownable with ScorexLoggi
       val maybeGenesisSignature = Option(settings.blockchainSettings.genesisSettings.signature).filter(_.trim.nonEmpty)
 
       transactionModule.blockStorage.blockchainUpdater.processBlock(Block.genesis(consensusModule.genesisData, transactionModule.genesisData,
-        settings.blockchainSettings.genesisSettings.blockTimestamp, maybeGenesisSignature))
+        settings.blockchainSettings.genesisSettings.blockTimestamp, maybeGenesisSignature)).explicitGet()
 
       log.info("Genesis block has been added to the state")
     }
