@@ -16,7 +16,7 @@ scalacOptions ++= Seq("-feature", "-deprecation", "-Xmax-classfile-name", "128")
 logBuffered := false
 
 //assembly settings
-assemblyJarName in assembly := "waves.jar"
+assemblyJarName in assembly := s"waves-all-${version.value}.jar"
 test in assembly := {}
 
 libraryDependencies ++=
@@ -62,12 +62,7 @@ concurrentRestrictions in Global += Tags.limit(Tags.Test, 1)
 Defaults.itSettings
 configs(IntegrationTest)
 inConfig(IntegrationTest)(Seq(
-  fork := true,
   parallelExecution := false,
-  javaOptions ++= Seq(
-    s"-Ddocker.imageId=${docker.value.id}",
-    "-Dlogback.configurationFile=logback-it.xml"
-  ),
   test := (test dependsOn docker).value,
   testOptions += Tests.Filter(_.endsWith("Suite"))
 ))
@@ -145,7 +140,7 @@ linuxScriptReplacements += "detect-loader" ->
     |is_upstart() {
     |    /sbin/init --version | grep upstart >/dev/null 2>&1
     |}
-  """.stripMargin
+    |""".stripMargin
 
 inConfig(Debian)(Seq(
   debianPackageDependencies += "java8-runtime-headless",
