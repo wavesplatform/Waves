@@ -15,34 +15,29 @@ import scorex.utils.ScorexLogging
 
 object BlockDiffer extends ScorexLogging {
 
-  val emptyDiff: Diff = Monoid[Diff].empty
-  val rightEmptyDiff: Either[ValidationError, Diff] = Right(emptyDiff)
+  def right(diff: Diff): Either[ValidationError, Diff] = Right(diff)
 
   def apply(settings: FunctionalitySettings)(s: StateReader, block: Block): Either[ValidationError, BlockDiff] = {
 
     val txDiffer = TransactionDiffer(settings, block.timestamp, s.height + 1) _
 
-    val txsDiffEi = block.transactionData.foldLeft(rightEmptyDiff) { case (ei, tx) => ei match {
-      case Left(error) => Left(error)
-      case Right(diff) =>
-        txDiffer(new CompositeStateReader(s, diff.asBlockDiff), tx)
-          .map(newDiff => diff.combine(newDiff))
-    }
-    }
-
-    lazy val accountPortfolioFeesMap: List[(Account, Portfolio)] = block.feesDistribution.toList.map {
+    val accountPortfolioFeesMap: List[(Account, Portfolio)] = block.feesDistribution.toList.map {
       case (AssetAcc(account, maybeAssetId), feeVolume) =>
         account -> (maybeAssetId match {
           case None => Portfolio(feeVolume, LeaseInfo.empty, Map.empty)
           case Some(assetId) => Portfolio(0L, LeaseInfo.empty, Map(EqByteArray(assetId) -> feeVolume))
         })
     }
-    lazy val feeDiff = Monoid[Diff].combineAll(accountPortfolioFeesMap.map { case (acc, p) =>
+    val feeDiff = Monoid[Diff].combineAll(accountPortfolioFeesMap.map { case (acc, p) =>
       Diff(portfolios = Map(acc -> p))
     })
 
+    val txsDiffEi = block.transactionData.foldLeft(right(feeDiff)) { case (ei, tx) => ei.flatMap(diff =>
+      txDiffer(new CompositeStateReader(s, diff.asBlockDiff), tx)
+        .map(newDiff => diff.combine(newDiff)))
+    }
+
     txsDiffEi
-      .map(_.combine(feeDiff))
       .map(d => if (s.height + 1 == settings.resetEffectiveBalancesAtHeight)
         Monoid.combine(d, LeasePatch(new CompositeStateReader(s, d.asBlockDiff)))
       else d)
