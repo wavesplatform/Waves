@@ -1,22 +1,21 @@
 package com.wavesplatform.state2.reader
 
-import java.util
-
 import com.wavesplatform.state2.StateStorage
+import org.h2.mvstore.MVStore
 import org.scalatest.{FunSuite, Matchers}
 import scorex.account.Account
 
 
 class StateReaderImplEffectiveBalanceTest extends FunSuite with Matchers {
 
-  import StateReaderImplEffectiveBalanceTest._
-
   val acc: Account = Account.fromPublicKey(Array.emptyByteArray)
   val stateHeight = 100
 
+  private def mkStorage() = new StateStorage(new MVStore.Builder().open())
+
   test("exposes minimum of all 'current' and  one 'previous' of oldest record") {
 
-    val storage = new TestStorage
+    val storage = mkStorage()
 
     storage.setHeight(stateHeight)
 
@@ -29,7 +28,7 @@ class StateReaderImplEffectiveBalanceTest extends FunSuite with Matchers {
 
   test("exposes current effective balance if no records in past N blocks are made") {
 
-    val storage = new TestStorage
+    val storage = mkStorage()
 
     storage.setHeight(stateHeight)
     storage.effectiveBalanceSnapshots.put((acc.bytes, 20), (0, 1))
@@ -38,7 +37,7 @@ class StateReaderImplEffectiveBalanceTest extends FunSuite with Matchers {
   }
 
   test("doesn't include info older than N blocks") {
-    val storage = new TestStorage
+    val storage = mkStorage()
 
     storage.setHeight(stateHeight)
     storage.effectiveBalanceSnapshots.put((acc.bytes, 20), (0, 1000))
@@ -49,7 +48,7 @@ class StateReaderImplEffectiveBalanceTest extends FunSuite with Matchers {
   }
 
   test("includes most recent update") {
-    val storage = new TestStorage
+    val storage = mkStorage()
 
     storage.setHeight(stateHeight)
     storage.effectiveBalanceSnapshots.put((acc.bytes, 20), (0, 1000))
@@ -58,30 +57,4 @@ class StateReaderImplEffectiveBalanceTest extends FunSuite with Matchers {
 
     new StateReaderImpl(storage).effectiveBalanceAtHeightWithConfirmations(acc, 100, 50) shouldBe 1
   }
-}
-
-object StateReaderImplEffectiveBalanceTest {
-
-  class TestStorage extends StateStorage {
-    override val transactions = new util.HashMap[Array[Byte], (Int, Array[Byte])]
-    override val portfolios = new util.HashMap[Array[Byte], (Long, (Long, Long), Map[Array[Byte], Long])]
-    override val assets = new util.HashMap[Array[Byte], (Boolean, Long)]
-    override val accountTransactionIds = new util.HashMap[Array[Byte], List[Array[Byte]]]
-    override val effectiveBalanceSnapshots = new util.HashMap[(Array[Byte], Int), (Long, Long)]
-    override val paymentTransactionHashes = new util.HashMap[Array[Byte], Array[Byte]]
-    override val aliasToAddress = new util.HashMap[String, Array[Byte]]
-    override val exchangeTransactionsByOrder = new util.HashMap[Array[Byte], Set[Array[Byte]]]
-    override val leaseState = new util.HashMap[Array[Byte], Boolean]
-
-    var height: Int = 0
-
-    override def getHeight: Int = height
-
-    override def setHeight(i: Int): Unit = {
-      height = i
-    }
-
-    override def commit(): Unit = ()
-  }
-
 }
