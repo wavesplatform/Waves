@@ -69,7 +69,7 @@ class CompositeStateReader(inner: StateReader, blockDiff: BlockDiff) extends Sta
 }
 
 object CompositeStateReader {
-  def proxy(inner: StateReader, blockDiff: () => BlockDiff): StateReader = new StateReader {
+  class Proxy(val inner: StateReader, blockDiff: () => BlockDiff) extends StateReader {
 
     override def paymentTransactionIdByHash(hash: ByteArray): Option[ByteArray] =
       new CompositeStateReader(inner, blockDiff()).paymentTransactionIdByHash(hash)

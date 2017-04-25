@@ -9,6 +9,7 @@ import scorex.transaction._
 import scorex.transaction.assets.IssueTransaction
 import scorex.transaction.assets.exchange.{ExchangeTransaction, Order}
 import scorex.transaction.lease.LeaseTransaction
+import scorex.utils.ScorexLogging
 
 import scala.annotation.tailrec
 import scala.reflect.ClassTag
@@ -47,7 +48,7 @@ trait StateReader {
 
 object StateReader {
 
-  implicit class StateReaderExt(s: StateReader) {
+  implicit class StateReaderExt(s: StateReader) extends ScorexLogging {
     def assetDistribution(assetId: ByteArray): Map[Account, Long] =
       s.accountPortfolios
         .mapValues(portfolio => portfolio.assets.get(assetId))
@@ -148,5 +149,22 @@ object StateReader {
 
     def balanceWithConfirmations(acc: Account, confirmations: Int): Long =
       minBySnapshot(acc, s.height, confirmations)(_.balance)
+
+    def balanceAtHeight(acc: Account, height: Int): Long = {
+
+      @tailrec
+      def loop(lookupHeight: Int): Long = s.snapshotAtHeight(acc, height) match {
+        case None if lookupHeight == 0 => 0
+        case Some(snapshot) if lookupHeight <= height => snapshot.balance
+        case Some(snapshot) => loop(snapshot.prevHeight)
+        case None =>
+          throw new Exception(s"Cannot lookup account $acc for height $height(current=${s.height}). " +
+            s"No history found at requested lookupHeight=$lookupHeight")
+
+      }
+
+      loop(s.lastUpdateHeight(acc).getOrElse(0))
+    }
   }
+
 }
