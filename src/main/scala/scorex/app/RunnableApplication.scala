@@ -13,7 +13,7 @@ import scorex.block.Block
 import scorex.consensus.mining.BlockGeneratorController
 import scorex.crypto.encode.Base58
 import scorex.network._
-import scorex.network.message.{BasicMessagesRepo, MessageHandler, MessageSpec}
+import scorex.network.message._
 import scorex.network.peer.PeerManager
 import scorex.transaction.{BlockStorage, History}
 import scorex.utils.ScorexLogging
@@ -34,8 +34,6 @@ trait RunnableApplication extends Application with Shutdownable with ScorexLoggi
 
   protected val additionalMessageSpecs: Seq[MessageSpec[_]]
 
-  lazy override val basicMessagesSpecsRepo: BasicMessagesRepo = new BasicMessagesRepo()
-
   // wallet, needs strict evaluation
   override val wallet: Wallet = {
     val maybeWalletFilename = Option(settings.walletSettings.file).filter(_.trim.nonEmpty)
@@ -48,12 +46,12 @@ trait RunnableApplication extends Application with Shutdownable with ScorexLoggi
 
   if (settings.networkSettings.uPnPSettings.enable) upnp.addPort(settings.networkSettings.port)
 
-  lazy val messagesHandler: MessageHandler = MessageHandler(basicMessagesSpecsRepo.specs ++ additionalMessageSpecs)
+  lazy val messagesHandler: MessageHandler = MessageHandler(BasicMessagesRepo.specs ++ additionalMessageSpecs)
 
   //interface to append log and state
   lazy override val blockStorage: BlockStorage = transactionModule.blockStorage
 
-  lazy override val history: History = blockStorage.history
+  lazy val history: History = blockStorage.history
 
   lazy override val networkController = actorSystem.actorOf(Props(new NetworkController(this)), "NetworkController")
   lazy override val peerManager = actorSystem.actorOf(

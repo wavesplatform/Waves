@@ -29,7 +29,9 @@ class SimpleTransactionModuleSpecification extends FunSuite with MockFactory wit
       |    known-peers = []
       |  }
       |  blockchain {
-      |    file: ""
+      |    blockchain-file: ""
+      |    state-file: ""
+      |    checkpoint-file: ""
       |  }
       |}
     """.stripMargin).withFallback(ConfigFactory.load()).resolve()

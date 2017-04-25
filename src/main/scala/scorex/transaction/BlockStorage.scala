@@ -11,6 +11,8 @@ trait BlockStorage extends ScorexLogging {
 
   def stateReader: StateReader
 
+  def checkpoints : CheckpointService
+
   def blockchainUpdater: BlockchainUpdater
 
 }

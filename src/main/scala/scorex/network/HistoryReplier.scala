@@ -5,16 +5,14 @@ import scorex.block.Block
 import scorex.network.NetworkController.{DataFromPeer, SendToNetwork}
 import scorex.network.message.Message
 import scorex.utils.ScorexLogging
+import scorex.network.message._
 
 class HistoryReplier(application: Application) extends ViewSynchronizer with ScorexLogging {
-
-  private val basicMessagesSpecsRepo = application.basicMessagesSpecsRepo
-  import basicMessagesSpecsRepo._
 
   override val messageSpecs = Seq(GetSignaturesSpec, GetBlockSpec)
   protected override lazy val networkControllerRef = application.networkController
 
-  private def history = application.history
+  private def history = application.blockStorage.history
 
   override def receive: Receive = {
 
@@ -25,7 +23,7 @@ class HistoryReplier(application: Application) extends ViewSynchronizer with Sco
       log.info(s"Got GetSignaturesMessage with ${otherSigs.length} sigs within")
 
       otherSigs.exists { parent =>
-        val headers = history.lookForward(parent, application.settings.synchronizationSettings.maxChainLength)
+        val headers = history.blockIdsAfter(parent, application.settings.synchronizationSettings.maxChainLength)
 
         if (headers.nonEmpty) {
           val msg = Message(SignaturesSpec, Right(Seq(parent) ++ headers), None)

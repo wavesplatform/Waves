@@ -5,6 +5,7 @@ import javax.ws.rs.Path
 import akka.actor.ActorRef
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.settings.{CheckpointsSettings, RestAPISettings}
+import com.wavesplatform.state2.EqByteArray
 import io.swagger.annotations._
 import play.api.libs.json._
 import scorex.account.Account
@@ -12,7 +13,7 @@ import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.network.Checkpoint
 import scorex.network.Coordinator.BroadcastCheckpoint
-import scorex.transaction.History
+import scorex.transaction.{History, TransactionParser}
 
 @Path("/blocks")
 @Api(value = "/blocks")
@@ -79,8 +80,14 @@ case class BlocksApiRoute(settings: RestAPISettings, checkpointsSettings: Checkp
     new ApiImplicitParam(name = "signature", value = "Base58-encoded signature", required = true, dataType = "string", paramType = "path")
   ))
   def heightEncoded: Route = (path("height" / Segment) & get) { encodedSignature =>
-    withBlock(history, encodedSignature) { block =>
-      complete(Json.obj("height" -> history.heightOf(block)))
+    if (encodedSignature.length > TransactionParser.SignatureStringLength)
+      complete(InvalidSignature)
+    else {
+      Base58.decode(encodedSignature).toOption.toRight(InvalidSignature)
+        .flatMap(s => history.blockById(s).toRight(BlockNotExists)) match {
+        case Right(block) => complete(Json.obj("height" -> history.heightOf(block)))
+        case Left(e) => complete(e)
+      }
     }
   }
 
@@ -139,10 +146,12 @@ case class BlocksApiRoute(settings: RestAPISettings, checkpointsSettings: Checkp
     new ApiImplicitParam(name = "signature", value = "Base58-encoded signature", required = true, dataType = "string", paramType = "path")
   ))
   def signature: Route = (path("signature" / Segment) & get) { encodedSignature =>
-    withBlock(history, encodedSignature) { block =>
-      val height = history.heightOf(block.uniqueId).map(Json.toJson(_))
-        .getOrElse(JsNull)
-      complete(block.json + ("height" -> height))
+    if (encodedSignature.length > TransactionParser.SignatureStringLength) complete(InvalidSignature) else {
+      Base58.decode(encodedSignature).toOption.toRight(InvalidSignature)
+        .flatMap(s => history.blockById(s).toRight(BlockNotExists)) match {
+        case Right(block) => complete(block.json + ("height" -> history.heightOf(block.uniqueId).map(Json.toJson(_)).getOrElse(JsNull)))
+        case Left(e) => complete(e)
+      }
     }
   }
 
@@ -158,7 +167,7 @@ case class BlocksApiRoute(settings: RestAPISettings, checkpointsSettings: Checkp
   def checkpoint: Route = {
     def validateCheckpoint(checkpoint: Checkpoint): Option[ApiError] = {
       val maybePublicKeyBytes = Base58.decode(checkpointsSettings.publicKey)
-      maybePublicKeyBytes.map {publicKey =>
+      maybePublicKeyBytes.map { publicKey =>
         if (!EllipticCurveImpl.verify(checkpoint.signature, checkpoint.toSign, publicKey)) Some(InvalidSignature)
         else None
       }.getOrElse(Some(InvalidMessage))

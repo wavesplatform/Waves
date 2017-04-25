@@ -29,7 +29,7 @@ dependencyOverrides in ThisBuild ++= Set(
   "com.github.mpilquist" % "simulacrum_2.12" % "0.10.0",
   "com.github.swagger-akka-http" % "swagger-akka-http_2.12" % "0.9.1",
   "com.google.code.findbugs" % "annotations" % "2.0.1",
-  "com.google.guava" % "guava" % "20.0",
+  "com.google.guava" % "guava" % "21.0",
   "com.h2database" % "h2-mvstore" % "1.4.194",
   "com.iheart" % "ficus_2.12" % "1.4.0",
   "com.ning" % "async-http-client" % "1.9.11",
@@ -132,4 +132,4 @@ dependencyOverrides in ThisBuild ++= Set(
   "org.whispersystems" % "curve25519-java" % "0.3.0",
   "org.yaml" % "snakeyaml" % "1.17"
 )
-// LIBRARY_DEPENDENCIES_HASH c8b15e5b99ae5a5f03d0b60456a8bbe4a81062e3
+// LIBRARY_DEPENDENCIES_HASH 493197a166efa557a02754040535be47a126d1cd

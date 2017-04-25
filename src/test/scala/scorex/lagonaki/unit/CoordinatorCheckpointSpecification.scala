@@ -16,7 +16,7 @@ import scorex.network.Coordinator.{AddBlock, ClearCheckpoint, SyncFinished}
 import scorex.network.NetworkController.{DataFromPeer, SendToNetwork}
 import scorex.network.ScoreObserver.CurrentScore
 import scorex.network._
-import scorex.network.message.{BasicMessagesRepo, Message}
+import scorex.network.message._
 import scorex.network.peer.PeerManager.{ConnectedPeers, GetConnectedPeersTyped}
 import scorex.settings.TestBlockchainSettings
 import scorex.transaction._
@@ -59,7 +59,6 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
       override def isValid(block: Block)(implicit transactionModule: TransactionModule): Boolean = true
     }
     lazy implicit val transactionModule: TransactionModule = new SimpleTransactionModule(TestBlockchainSettings.Disabled.genesisSettings)(wavesSettings, this)
-    lazy val basicMessagesSpecsRepo: BasicMessagesRepo = new BasicMessagesRepo()
     lazy val networkController: ActorRef = networkControllerMock
     lazy val settings = wavesSettings
     lazy val blockGenerator: ActorRef = testBlockGenerator.ref
@@ -73,6 +72,10 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
     override def coordinator: ActorRef = system.actorOf(Props(classOf[Coordinator], this), "Coordinator")
 
     override def wallet: Wallet = new Wallet(None, "", None)
+
+    override def applicationName: String = ???
+
+    override def appVersion: ApplicationVersion = ???
   }
 
   lazy val app = stub[TestAppMock]
@@ -91,7 +94,6 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
 
   implicit val consensusModule: WavesConsensusModule = app.consensusModule
   implicit val transactionModule: TransactionModule = app.transactionModule
-  private lazy val repo = app.basicMessagesSpecsRepo
   val genesisTimestamp: Long = System.currentTimeMillis()
   if (transactionModule.blockStorage.history.isEmpty) {
     transactionModule.blockStorage.blockchainUpdater.processBlock(Block.genesis(consensusModule.genesisData, transactionModule.genesisData, genesisTimestamp))
@@ -101,7 +103,7 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
     app.blockStorage.blockchainUpdater.removeAfter(app.history.genesis.uniqueId)
     actorRef ! ClearCheckpoint
     networkController.ignoreMsg {
-      case SendToNetwork(m, _) => m.spec == repo.ScoreMessageSpec
+      case SendToNetwork(m, _) => m.spec == ScoreMessageSpec
       case m => true
     }
   }
@@ -139,7 +141,7 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
 
     val checkpoint = Checkpoint(p +: firstChp.items, Array()).signedBy(pk.privateKey)
 
-    actorRef ! DataFromPeer(repo.CheckpointMessageSpec.messageCode, checkpoint: Checkpoint, connectedPeer)
+    actorRef ! DataFromPeer(CheckpointMessageSpec.messageCode, checkpoint: Checkpoint, connectedPeer)
 
     networkController.awaitCond(app.history.height() == 7)
   }
@@ -166,10 +168,10 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
   def sendCheckpoint(historyPoints: Seq[Int]): Unit = {
     val checkpoint = genCheckpoint(historyPoints)
 
-    actorRef ! DataFromPeer(repo.CheckpointMessageSpec.messageCode, checkpoint, connectedPeer)
+    actorRef ! DataFromPeer(CheckpointMessageSpec.messageCode, checkpoint, connectedPeer)
 
     networkController.expectMsgPF() {
-      case SendToNetwork(Message(spec, _, _), _) => spec should be(repo.CheckpointMessageSpec)
+      case SendToNetwork(Message(spec, _, _), _) => spec should be(CheckpointMessageSpec)
       case _ => fail("Checkpoint hasn't been sent")
     }
   }

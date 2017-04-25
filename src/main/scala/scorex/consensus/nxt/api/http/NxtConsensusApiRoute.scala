@@ -49,14 +49,14 @@ case class NxtConsensusApiRoute(
   ))
   def generationSignatureId: Route = (path("generationsignature" / Segment) & get) { encodedSignature =>
     withBlock(history, encodedSignature) { block =>
-      complete(Json.obj("generationSignature" -> Base58.encode(block.consensusDataField.value.generationSignature)))
+      complete(Json.obj("generationSignature" -> Base58.encode(block.consensusData.generationSignature)))
     }
   }
 
   @Path("/generationsignature")
   @ApiOperation(value = "Generation signature last", notes = "Generation signature of a last block", httpMethod = "GET")
   def generationSignature: Route = (path("generationsignature") & get) {
-    complete(Json.obj("generationSignature" -> Base58.encode(history.lastBlock.consensusDataField.value.generationSignature)))
+    complete(Json.obj("generationSignature" -> Base58.encode(history.lastBlock.consensusData.generationSignature)))
   }
 
   @Path("/basetarget/{blockId}")
@@ -66,14 +66,14 @@ case class NxtConsensusApiRoute(
   ))
   def baseTargetId: Route = (path("basetarget" / Segment) & get) { encodedSignature =>
     withBlock(history, encodedSignature) { block =>
-      complete(Json.obj("baseTarget" -> block.consensusDataField.value.baseTarget))
+      complete(Json.obj("baseTarget" -> block.consensusData.baseTarget))
     }
   }
 
   @Path("/basetarget")
   @ApiOperation(value = "Base target last", notes = "Base target of a last block", httpMethod = "GET")
   def basetarget: Route = (path("basetarget") & get) {
-    complete(Json.obj("baseTarget" -> history.lastBlock.consensusDataField.value.baseTarget))
+    complete(Json.obj("baseTarget" -> history.lastBlock.consensusData.baseTarget))
   }
 
   @Path("/algo")

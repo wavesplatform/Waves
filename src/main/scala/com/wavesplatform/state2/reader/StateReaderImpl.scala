@@ -2,7 +2,6 @@ package com.wavesplatform.state2.reader
 
 import cats.implicits._
 import com.wavesplatform.state2._
-import com.wavesplatform.state2.diffs._
 import scorex.account.{Account, Alias}
 import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.transaction.lease.LeaseTransaction
@@ -10,7 +9,7 @@ import scorex.transaction.{Transaction, TransactionParser}
 
 import scala.collection.JavaConverters.iterableAsScalaIterableConverter
 
-class StateReaderImpl(p: JavaMapStorage) extends StateReader {
+class StateReaderImpl(p: StateStorage) extends StateReader {
 
   override def transactionInfo(id: ByteArray): Option[(Int, Transaction)] = Option(p.transactions.get(id.arr)).map {
     case (h, bytes) => (h, TransactionParser.parseBytes(bytes).get)
