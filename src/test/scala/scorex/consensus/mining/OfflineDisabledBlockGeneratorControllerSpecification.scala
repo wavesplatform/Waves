@@ -21,9 +21,9 @@ class OfflineDisabledBlockGeneratorControllerSpecification extends ActorTestingC
     override lazy val settings: WavesSettings = WavesSettings.fromConfig(testConfigOfflineGenerationOff)
     override val peerManager: ActorRef = testPeerManager.ref
     @volatile
-    var history: History = _
+    var historyOverride: History = _
 
-    private[OfflineDisabledBlockGeneratorControllerSpecification] def setHistory(history: History) = this.history = history
+    private[OfflineDisabledBlockGeneratorControllerSpecification] def setHistory(history: History) = this.historyOverride = history
   }
 
   val stubApp: App = stub[App]
@@ -36,7 +36,7 @@ class OfflineDisabledBlockGeneratorControllerSpecification extends ActorTestingC
 
   private def historyWithLastBlock(block: Block, desiredHeight: Int): History = {
     val stubHistory = stub[History]
-    (stubHistory.lastBlock _).when().returns(block).anyNumberOfTimes()
+    (stubHistory.blockAt _).when(desiredHeight).returns(Some(block)).anyNumberOfTimes()
     (stubHistory.height _).when().returns(desiredHeight).anyNumberOfTimes()
     stubHistory
   }

@@ -40,7 +40,7 @@ object BlockDiffer extends ScorexLogging {
         })
     }
     lazy val feeDiff = Monoid[Diff].combineAll(accountPortfolioFeesMap.map { case (acc, p) =>
-      Diff(portfolios = Map(acc -> p))
+      new Diff(Map.empty, Map(acc -> p), Map.empty, Map.empty, Map.empty, Map.empty, Seq.empty)
     })
 
     txsDiffEi
@@ -64,9 +64,15 @@ object BlockDiffer extends ScorexLogging {
   }
 
 
-  def unsafeDiffMany(settings: FunctionalitySettings)(s: StateReader, blocks: Seq[Block]): BlockDiff =
-    blocks.foldLeft(Monoid[BlockDiff].empty) { case (diff, block) =>
+  def unsafeDiffMany(settings: FunctionalitySettings, log: (String) => Unit = _ => ())(s: StateReader, blocks: Seq[Block]): BlockDiff = {
+    val r = blocks.foldLeft(Monoid[BlockDiff].empty) { case (diff, block) =>
       val blockDiff = apply(settings)(new CompositeStateReader(s, diff), block).explicitGet()
+      if (diff.heightDiff % 1000 == 0) {
+        log(s"Rebuilt ${diff.heightDiff} blocks out of ${blocks.size}")
+      }
       Monoid[BlockDiff].combine(diff, blockDiff)
     }
+    log(s"Rebuild of ${blocks.size} completed")
+    r
+  }
 }

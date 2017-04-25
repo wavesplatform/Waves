@@ -143,18 +143,23 @@ class OrderBookActor(assetPair: AssetPair, val storedState: StateReader,
         None
 
       case e@OrderExecuted(o, c) =>
-        val txVal = createTransaction(o, c)
-        txVal match {
-          case Right(tx) if isValid(tx) =>
-            sendToNetwork(tx)
+        val result = for {
+          transaction <- createTransaction(o, c)
+          validationResult <- validate(transaction)
+          sendResult <- sendToNetwork(validationResult)
+        } yield sendResult
+
+        result match {
+          case Left(ex) =>
+            log.debug(s"Failed to execute order: $ex")
+            val canceled = Events.OrderCanceled(c)
+            processEvent(canceled)
+            Some(o)
+          case Right(_) =>
             processEvent(e)
             if (e.submittedRemaining > 0)
               Some(o.partial(e.submittedRemaining))
             else None
-          case _ =>
-            val canceled = Events.OrderCanceled(c)
-            processEvent(canceled)
-            Some(o)
         }
       case _ => None
     }

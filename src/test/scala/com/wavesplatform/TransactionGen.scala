@@ -250,7 +250,6 @@ trait TransactionGen {
     val o2 = Order.sell(seller, matcher, assetPair, price, amount2, timestamp, expiration, matcherFee)
     val buyFee = (BigInt(matcherFee) * BigInt(matchedAmount) / BigInt(amount1)).longValue()
     val sellFee = (BigInt(matcherFee) * BigInt(matchedAmount) / BigInt(amount2)).longValue()
-    import com.wavesplatform.state2.diffs._
     val trans = ExchangeTransaction.create(matcher, o1, o2, price, matchedAmount,
       buyFee, sellFee, (buyFee + sellFee) / 2, expiration - 100).explicitGet()
 
@@ -264,6 +263,10 @@ trait TransactionGen {
     xt <- exchangeTransactionGen
     tx <- Gen.oneOf(tr, is, ri, ca, bu, xt)
   } yield tx).label("random transaction")
+
+  def randomTransactionsGen(count: Int): Gen[Seq[SignedTransaction]] = for {
+    transactions <- Gen.listOfN(count, randomTransactionGen)
+  } yield transactions
 
   val genesisGen: Gen[GenesisTransaction] = accountGen.flatMap(genesisGeneratorP)
 

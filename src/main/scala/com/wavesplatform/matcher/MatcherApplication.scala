@@ -19,11 +19,11 @@ import scala.concurrent.duration._
 import scala.reflect.runtime.universe._
 
 trait MatcherApplication extends ScorexLogging {
-  implicit def actorSystem: ActorSystem
+  def actorSystem: ActorSystem
 
-  implicit def matcherSettings: MatcherSettings
+  def matcherSettings: MatcherSettings
 
-  implicit def restAPISettings: RestAPISettings
+  def restAPISettings: RestAPISettings
 
   def transactionModule: TransactionModule
 
@@ -55,6 +55,7 @@ trait MatcherApplication extends ScorexLogging {
   def runMatcher() {
     log.info(s"Starting matcher on: ${matcherSettings.bindAddress}:${matcherSettings.port} ...")
 
+    implicit val as = actorSystem
     implicit val materializer = ActorMaterializer()
 
     val combinedRoute = CompositeHttpService(actorSystem, matcherApiTypes, matcherApiRoutes, restAPISettings).compositeRoute

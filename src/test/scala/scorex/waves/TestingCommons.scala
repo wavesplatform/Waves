@@ -68,7 +68,9 @@ trait TestingCommons extends Suite with BeforeAndAfterAll with Eventually {
       |    seed: "FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz"
       |  }
       |  blockchain {
-      |    file: ""
+      |    blockchain-file: ""
+      |    state-file: ""
+      |    checkpoint-file: ""
       |    type: CUSTOM
       |    custom {
       |      address-scheme-character: "T"
@@ -180,7 +182,9 @@ trait TestingCommons extends Suite with BeforeAndAfterAll with Eventually {
       |    seed: "111"
       |  }
       |  blockchain {
-      |    file: ""
+      |    blockchain-file: ""
+      |    state-file: ""
+      |    checkpoint-file: ""
       |    type: CUSTOM
       |    custom {
       |      address-scheme-character: "T"
@@ -267,7 +271,9 @@ trait TestingCommons extends Suite with BeforeAndAfterAll with Eventually {
       |    seed: "222"
       |  }
       |  blockchain {
-      |    file: ""
+      |    blockchain-file: ""
+      |    state-file: ""
+      |    checkpoint-file: ""
       |    type: CUSTOM
       |    custom {
       |      address-scheme-character: "T"
@@ -374,7 +380,7 @@ trait TestingCommons extends Suite with BeforeAndAfterAll with Eventually {
   }
 
   def waitForSingleConnection(application: Application): Unit = {
-    untilTimeout(30.seconds, 1.second) {
+    untilTimeout(60.seconds, 1.second) {
       require(getConnectedPeersCount(application) > 0)
     }
   }
@@ -458,7 +464,7 @@ trait TestingCommons extends Suite with BeforeAndAfterAll with Eventually {
 
   def stopGeneration(nodes: Seq[Application]): Unit = {
     nodes.foreach(_.blockGenerator ! StopGeneration)
-    untilTimeout(5.seconds) {
+    untilTimeout(10.seconds) {
       Thread.sleep(100)
       nodes.foreach { p =>
         require(Await.result(p.blockGenerator ? GetStatus, timeout.duration) == Idle.name)

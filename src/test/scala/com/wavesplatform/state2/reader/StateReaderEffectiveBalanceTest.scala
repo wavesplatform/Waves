@@ -1,6 +1,6 @@
 package com.wavesplatform.state2.reader
 
-import com.wavesplatform.state2.MVStorePrimitiveImpl
+import com.wavesplatform.state2.{MVStoreStateStorage}
 import org.h2.mvstore.MVStore
 import org.scalatest.{FunSuite, Matchers}
 import scorex.account.Account
@@ -13,7 +13,7 @@ class StateReaderEffectiveBalanceTest extends FunSuite with Matchers {
 
   test("exposes minimum of all 'current' and  one 'previous' of oldest record") {
 
-    val storage = new MVStorePrimitiveImpl(new MVStore.Builder().open())
+    val storage = new MVStoreStateStorage(new MVStore.Builder().open())
 
     storage.setHeight(stateHeight)
 
@@ -27,7 +27,7 @@ class StateReaderEffectiveBalanceTest extends FunSuite with Matchers {
 
   test("exposes current effective balance if no records in past N blocks are made") {
 
-    val storage = new MVStorePrimitiveImpl(new MVStore.Builder().open())
+    val storage = new MVStoreStateStorage(new MVStore.Builder().open())
 
     storage.setHeight(stateHeight)
     storage.effectiveBalanceSnapshots.put((acc.bytes, 20), (0, 0, 1))
@@ -38,7 +38,7 @@ class StateReaderEffectiveBalanceTest extends FunSuite with Matchers {
   }
 
   test("doesn't include info older than N blocks") {
-    val storage = new MVStorePrimitiveImpl(new MVStore.Builder().open())
+    val storage = new MVStoreStateStorage(new MVStore.Builder().open())
 
     storage.setHeight(stateHeight)
     storage.effectiveBalanceSnapshots.put((acc.bytes, 20), (0, 0, 1000))
@@ -51,7 +51,7 @@ class StateReaderEffectiveBalanceTest extends FunSuite with Matchers {
   }
 
   test("includes most recent update") {
-    val storage = new MVStorePrimitiveImpl(new MVStore.Builder().open())
+    val storage = new MVStoreStateStorage(new MVStore.Builder().open())
 
     storage.setHeight(stateHeight)
     storage.effectiveBalanceSnapshots.put((acc.bytes, 20), (0, 0, 1000))

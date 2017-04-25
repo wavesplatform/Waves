@@ -11,6 +11,7 @@ import scorex.ActorTestingCommons
 import scorex.app.{Application, ApplicationVersion}
 import scorex.network.NetworkController.DataFromPeer
 import scorex.network.PeerSynchronizer.RequestDataFromPeer
+import scorex.network.message.PeersSpec
 import scorex.network.peer.PeerManager
 
 import scala.language.postfixOps
@@ -40,14 +41,11 @@ class PeerSynchronizerSpecification extends ActorTestingCommons
 
   trait App extends ApplicationMock {
     override lazy val settings = wavesSettings
-    override val applicationName: String = "test"
-    override val appVersion: ApplicationVersion = ApplicationVersion(7, 7, 7)
     override val peerManager: ActorRef = testPeerManager.ref
   }
 
   private val app = stub[App]
 
-  import app.basicMessagesSpecsRepo._
 
   protected override val actorRef = system.actorOf(Props(classOf[TestPeerSynchronizer], app))
 

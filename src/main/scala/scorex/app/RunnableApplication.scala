@@ -13,7 +13,7 @@ import scorex.block.Block
 import scorex.consensus.mining.BlockGeneratorController
 import scorex.crypto.encode.Base58
 import scorex.network._
-import scorex.network.message.{BasicMessagesRepo, MessageHandler, MessageSpec}
+import scorex.network.message._
 import scorex.network.peer.PeerManager
 import scorex.transaction.{BlockStorage, History}
 import scorex.utils.ScorexLogging
@@ -30,11 +30,9 @@ trait RunnableApplication extends Application with Shutdownable with ScorexLoggi
   protected val apiRoutes: Seq[ApiRoute]
   protected val apiTypes: Seq[Type]
 
-  protected implicit val actorSystem: ActorSystem
+  protected def actorSystem: ActorSystem
 
   protected val additionalMessageSpecs: Seq[MessageSpec[_]]
-
-  lazy override val basicMessagesSpecsRepo: BasicMessagesRepo = new BasicMessagesRepo()
 
   // wallet, needs strict evaluation
   override val wallet: Wallet = {
@@ -48,17 +46,17 @@ trait RunnableApplication extends Application with Shutdownable with ScorexLoggi
 
   if (settings.networkSettings.uPnPSettings.enable) upnp.addPort(settings.networkSettings.port)
 
-  lazy val messagesHandler: MessageHandler = MessageHandler(basicMessagesSpecsRepo.specs ++ additionalMessageSpecs)
-
-  lazy override val peerManager = actorSystem.actorOf(Props(classOf[PeerManager], this))
+  lazy val messagesHandler: MessageHandler = MessageHandler(BasicMessagesRepo.specs ++ additionalMessageSpecs)
 
   //interface to append log and state
   lazy override val blockStorage: BlockStorage = transactionModule.blockStorage
 
-  lazy override val history: History = blockStorage.history
+  lazy val history: History = blockStorage.history
 
-  lazy override val networkController = actorSystem.actorOf(Props(classOf[NetworkController], this),
-    "NetworkController")
+  lazy override val networkController = actorSystem.actorOf(Props(new NetworkController(this)), "NetworkController")
+  lazy override val peerManager = actorSystem.actorOf(
+    PeerManager.props(settings.networkSettings, networkController, settings.blockchainSettings.addressSchemeCharacter), "PeerManager")
+
   lazy override val blockGenerator = actorSystem.actorOf(Props(classOf[BlockGeneratorController], this),
     "BlockGenerator")
   lazy override val scoreObserver = actorSystem.actorOf(Props(classOf[ScoreObserver], this), "ScoreObserver")
@@ -77,6 +75,7 @@ trait RunnableApplication extends Application with Shutdownable with ScorexLoggi
 
     checkGenesis()
 
+    implicit val as = actorSystem
     implicit val materializer = ActorMaterializer()
 
     if (settings.restAPISettings.enable) {

@@ -1,21 +1,19 @@
-import com.typesafe.config.ConfigFactory
 import com.typesafe.sbt.packager.archetypes.TemplateWriter
 import sbt.Keys._
 import sbt._
 
 enablePlugins(sbtdocker.DockerPlugin, JavaServerAppPackaging, JDebPackaging, SystemdPlugin)
 
-val appConf = ConfigFactory.parseFile(new File("src/main/resources/reference.conf")).resolve().getConfig("app")
-
 name := "waves"
 organization := "com.wavesplatform"
-version := appConf.getString("version")
+version := "0.7.0-SNAPSHOT"
 scalaVersion := "2.12.1"
 crossPaths := false
 publishArtifact in (Compile, packageDoc) := false
 publishArtifact in (Compile, packageSrc) := false
 mainClass in Compile := Some("com.wavesplatform.Application")
 scalacOptions ++= Seq("-feature", "-deprecation", "-Xmax-classfile-name", "128")
+logBuffered := false
 
 //assembly settings
 assemblyJarName in assembly := "waves.jar"
@@ -37,6 +35,21 @@ libraryDependencies ++=
     "commons-net" % "commons-net" % "3.+",
     "org.typelevel" %% "cats-core" % "0.9.0"
   )
+
+sourceGenerators in Compile += Def.task {
+  val versionFile = (sourceManaged in Compile).value / "com" / "wavesplatform" / "Version.scala"
+  val versionExtractor = """(\d+)\.(\d+).(\d).*""".r
+  val versionExtractor(major, minor, bugfix) = version.value
+  IO.write(versionFile,
+    s"""package com.wavesplatform
+      |
+      |object Version {
+      |  val VersionString = "${version.value}"
+      |  val VersionTuple = ($major, $minor, $bugfix)
+      |}
+      |""".stripMargin)
+  Seq(versionFile)
+}
 
 inConfig(Test)(Seq(
   logBuffered := false,

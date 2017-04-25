@@ -8,6 +8,7 @@ import scorex.ActorTestingCommons
 import scorex.block.Block
 import scorex.block.Block._
 import scorex.network.NetworkController.DataFromPeer
+import scorex.network.message._
 import scorex.transaction.{BlockStorage, History}
 
 import scala.concurrent.duration._
@@ -21,7 +22,7 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
 
   private def mockHistory(last: Int): History = {
     val history = mock[History]
-    (history.contains(_: BlockId)) expects * onCall { id: BlockId => id(0) <= last } anyNumberOfTimes()
+    (history.heightOf(_: BlockId)) expects * onCall { id: BlockId => if (id(0) <= last) Some(1) else None } anyNumberOfTimes()
     history
   }
 
@@ -69,17 +70,12 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
 
   private trait App extends ApplicationMock {
 
-    private val testBlockStorage = mock[BlockStorage]
-
     override lazy val settings = wavesSettings
     override lazy val coordinator: ActorRef = testCoordinator.ref
-    override lazy val history: History = testHistory
-    override val blockStorage: BlockStorage = testBlockStorage
+    override lazy val historyOverride: History = testHistory
   }
 
   private val app = stub[App]
-
-  import app.basicMessagesSpecsRepo._
 
   private def reasonableTimeInterval = wavesSettings.synchronizationSettings.synchronizationTimeout / 2
 
@@ -307,7 +303,7 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
 
       def historyContaining(blockIds: Int*): History = {
         val history = mock[History]
-        (history.contains(_: BlockId)) expects * onCall { id: BlockId => blockIds.contains(id.head.toInt) } anyNumberOfTimes()
+        (history.heightOf(_: BlockId)) expects * onCall { id: BlockId => if (blockIds.contains(id.head.toInt)) Some(1) else None } anyNumberOfTimes()
         history
       }
 

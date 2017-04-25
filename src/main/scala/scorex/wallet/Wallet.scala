@@ -9,7 +9,6 @@ import scorex.crypto.encode.Base58
 import scorex.crypto.hash.SecureCryptographicHash
 import scorex.transaction.ValidationError
 import scorex.transaction.ValidationError.MissingSenderPrivateKey
-import scorex.transaction.state.database.state.AddressString
 import scorex.utils.{LogMVMapBuilder, ScorexLogging, randomBytes}
 
 import scala.collection.JavaConverters._
@@ -109,8 +108,8 @@ class Wallet(maybeFilename: Option[String], password: String, seedOpt: Option[Ar
 object Wallet {
 
   implicit class WalletExtension(w: Wallet) {
-    def findWallet(a: AddressString): Either[ValidationError, PrivateKeyAccount] = for {
-      acc <- Account.fromString(a)
+    def findWallet(addressString: String): Either[ValidationError, PrivateKeyAccount] = for {
+      acc <- Account.fromString(addressString)
       privKeyAcc <- w.privateKeyAccount(acc)
     } yield privKeyAcc
 

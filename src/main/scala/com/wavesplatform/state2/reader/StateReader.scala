@@ -4,12 +4,11 @@ import com.google.common.base.Charsets
 import com.wavesplatform.state2._
 import scorex.account.{Account, AccountOrAlias, Alias}
 import scorex.crypto.hash.FastCryptographicHash
-import scorex.transaction.ValidationError.{AliasNotExists, TransactionValidationError}
+import scorex.transaction.ValidationError.AliasNotExists
 import scorex.transaction._
 import scorex.transaction.assets.IssueTransaction
 import scorex.transaction.assets.exchange.{ExchangeTransaction, Order}
 import scorex.transaction.lease.LeaseTransaction
-import scorex.transaction.state.database.state.AddressString
 
 import scala.annotation.tailrec
 import scala.reflect.ClassTag
@@ -150,5 +149,4 @@ object StateReader {
     def balanceWithConfirmations(acc: Account, confirmations: Int): Long =
       minBySnapshot(acc, s.height, confirmations)(_.balance)
   }
-
 }

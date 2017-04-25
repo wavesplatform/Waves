@@ -4,14 +4,13 @@ import cats.kernel.Monoid
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.diffs.BlockDiffer
 import com.wavesplatform.state2.reader.{CompositeStateReader, StateReader}
-import org.h2.mvstore.MVStore
 import scorex.block.Block
 import scorex.block.Block.BlockId
 import scorex.crypto.encode.Base58
 import scorex.transaction._
 import scorex.utils.ScorexLogging
 
-class BlockchainUpdaterImpl(persisted: StateWriter with StateReader, settings: FunctionalitySettings, bc: History)
+class BlockchainUpdaterImpl(persisted: StateWriter with StateReader, settings: FunctionalitySettings, bc: HistoryWriter with History)
   extends BlockchainUpdater with ScorexLogging {
 
   private val MinInMemDiff = 1000
@@ -22,7 +21,7 @@ class BlockchainUpdaterImpl(persisted: StateWriter with StateReader, settings: F
       log.debug(s"Reading blocks from $from to $to")
       val blocks = Range(from, to).map(bc.blockAt(_).get)
       log.debug(s"Blocks read from $from to $to")
-      val r = BlockDiffer.unsafeDiffMany(settings)(sr, blocks)
+      val r = BlockDiffer.unsafeDiffMany(settings, m => log.info(m))(sr, blocks)
       log.debug(s"Diff for Range($from, $to) rebuilt")
       r
   }
@@ -46,13 +45,13 @@ class BlockchainUpdaterImpl(persisted: StateWriter with StateReader, settings: F
   def currentState: StateReader = CompositeStateReader.proxy(persisted, () => inMemoryDiff)
 
   private def updatePersistedAndInMemory(): Unit = {
-    logHeights("States rebuild started:")
+    logHeights("State rebuild started:")
     val persistFrom = persisted.height + 1
     val persistUpTo = bc.height - MinInMemDiff + 1
     val diffToBePersisted = unsafeDiffByRange(persistFrom, persistUpTo)
     persisted.applyBlockDiff(diffToBePersisted)
     inMemoryDiff = unsafeDiffNotPersisted()
-    logHeights("States rebuild finished:")
+    logHeights("State rebuild finished:")
   }
 
   override def processBlock(block: Block): Either[ValidationError, Unit] = {
