@@ -34,12 +34,9 @@ object BlockDiffer extends ScorexLogging {
       Diff(portfolios = Map(acc -> p))
     })
 
-    val txsDiffEi = block.transactionData.foldLeft(rightDiff(feeDiff)) { case (ei, tx) => ei match {
-      case Left(error) => Left(error)
-      case Right(diff) =>
-        txDiffer(new CompositeStateReader(s, diff.asBlockDiff), tx)
-          .map(newDiff => diff.combine(newDiff))
-      }
+    val txsDiffEi = block.transactionData.foldLeft(rightDiff(feeDiff)) { case (ei, tx) => ei.flatMap(diff =>
+      txDiffer(new CompositeStateReader(s, diff.asBlockDiff), tx)
+        .map(newDiff => diff.combine(newDiff)))
     }
 
     txsDiffEi
