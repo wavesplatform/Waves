@@ -45,7 +45,7 @@ object FunctionalitySettings {
     requireSortedTransactionsAfter = 1477958400000L,
     generatingBalanceDepthFrom50To1000AfterHeight = Long.MinValue,
     minimalGeneratingBalanceAfterTimestamp = Long.MinValue,
-    allowTransactionsFromFutureUntil = Long.MinValue,
+    allowTransactionsFromFutureUntil = 1478100000000L,
     allowUnissuedAssetsUntil = 1479416400000L,
     allowBurnTransactionAfterTimestamp = 1481110521000L,
     allowLeaseTransactionAfterTimestamp = Long.MinValue,

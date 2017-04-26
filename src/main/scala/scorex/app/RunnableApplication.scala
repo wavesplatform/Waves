@@ -25,6 +25,7 @@ import scala.concurrent.duration._
 import scala.reflect.runtime.universe.Type
 import scala.util.{Left, Try}
 
+
 trait RunnableApplication extends Application with Shutdownable with ScorexLogging {
 
   protected val apiRoutes: Seq[ApiRoute]
