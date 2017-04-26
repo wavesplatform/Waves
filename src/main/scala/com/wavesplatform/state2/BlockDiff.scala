@@ -9,7 +9,7 @@ import scala.collection.SortedMap
 
 case class BlockDiff(txsDiff: Diff,
                      heightDiff: Int,
-                     updates: Map[Account, SortedMap[Int, Snapshot]])
+                     snapshots: Map[Account, SortedMap[Int, Snapshot]])
 
 object BlockDiff {
 
@@ -26,6 +26,6 @@ object BlockDiff {
     override def combine(older: BlockDiff, newer: BlockDiff): BlockDiff = BlockDiff(
       txsDiff = older.txsDiff.combine(newer.txsDiff),
       heightDiff = older.heightDiff + newer.heightDiff,
-      updates = newer.updates.combine(older.updates))
+      snapshots = newer.snapshots.combine(older.snapshots))
   }
 }

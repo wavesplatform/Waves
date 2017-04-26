@@ -30,7 +30,7 @@ object LeaseTransactionsDiff {
             sender -> Portfolio(-tx.fee, LeaseInfo(0, tx.amount), Map.empty),
             recipient -> Portfolio(0, LeaseInfo(tx.amount, 0), Map.empty)
           )
-          Right(Diff(height = height, tx = tx, portfolios = portfolioDiff))
+          Right(Diff(height = height, tx = tx, portfolios = portfolioDiff, leaseState = Map(EqByteArray(tx.id) -> true)))
         }
       }
     }
@@ -53,14 +53,14 @@ object LeaseTransactionsDiff {
         Right(Monoid.combine(
           Map(canceller -> Portfolio(-tx.fee, LeaseInfo(0, -lease.amount), Map.empty)),
           Map(recipient -> Portfolio(0, LeaseInfo(-lease.amount, 0), Map.empty))))
-      } else if (time < settings.allowMultipleLeaseCancelTransactionUntilTimestamp) {  // cancel of another acc
+      } else if (time < settings.allowMultipleLeaseCancelTransactionUntilTimestamp) { // cancel of another acc
         Right(Monoid.combine(
           Map(canceller -> Portfolio(-tx.fee, LeaseInfo(0, -lease.amount), Map.empty)),
           Map(recipient -> Portfolio(0, LeaseInfo(-lease.amount, 0), Map.empty))))
       } else Left(TransactionValidationError(tx, s"LeaseTransaction was leased by other sender " +
         s"and time=$time > allowMultipleLeaseCancelTransactionUntilTimestamp=${settings.allowMultipleLeaseCancelTransactionUntilTimestamp}"))
 
-    } yield Diff(height = height, tx = tx, portfolios = portfolioDiff)
+    } yield Diff(height = height, tx = tx, portfolios = portfolioDiff, leaseState = Map(EqByteArray(lease.id) -> false))
   }
 }
 

@@ -32,7 +32,7 @@ class CompositeStateReader(inner: StateReader, blockDiff: BlockDiff) extends Sta
   }
 
   override def snapshotAtHeight(acc: Account, h: Int): Option[Snapshot] =
-    blockDiff.updates.get(acc).flatMap(_.get(h)).orElse(inner.snapshotAtHeight(acc, h))
+    blockDiff.snapshots.get(acc).flatMap(_.get(h)).orElse(inner.snapshotAtHeight(acc, h))
 
   override def paymentTransactionIdByHash(hash: ByteArray): Option[ByteArray]
   = blockDiff.txsDiff.paymentTransactionIdsByHashes.get(hash)
@@ -62,10 +62,10 @@ class CompositeStateReader(inner: StateReader, blockDiff: BlockDiff) extends Sta
   }
 
   override def activeLeases(): Seq[ByteArray] = {
-    blockDiff.txsDiff.effectiveLeaseTxUpdates._1.toSeq ++ inner.activeLeases()
+    blockDiff.txsDiff.leaseState.collect { case (id, isActive) if isActive => id }.toSeq ++ inner.activeLeases()
   }
 
-  override def lastUpdateHeight(acc: Account): Option[Int] = blockDiff.updates.get(acc).map(_.keySet.max).orElse(inner.lastUpdateHeight(acc))
+  override def lastUpdateHeight(acc: Account): Option[Int] = blockDiff.snapshots.get(acc).map(_.keySet.max).orElse(inner.lastUpdateHeight(acc))
 }
 
 object CompositeStateReader {
@@ -113,4 +113,5 @@ object CompositeStateReader {
     override def snapshotAtHeight(acc: Account, h: Int): Option[Snapshot] =
       new CompositeStateReader(inner, blockDiff()).snapshotAtHeight(acc, h)
   }
+
 }

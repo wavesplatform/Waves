@@ -6,11 +6,11 @@ import com.wavesplatform.state2.{Diff, LeaseInfo, Portfolio}
 object LeasePatch {
   def apply(s: StateReader): Diff = {
 
-    def invertLeaseInfo(l: LeaseInfo): LeaseInfo = LeaseInfo(-l.leaseIn, -l.leaseOut )
+    def invertLeaseInfo(l: LeaseInfo): LeaseInfo = LeaseInfo(-l.leaseIn, -l.leaseOut)
 
     val portfolioUpd = s.accountPortfolios
-      .filter { case (_, pf) => pf.leaseInfo != LeaseInfo.empty }
-      .map { case (acc, pf) => acc -> Portfolio(0, invertLeaseInfo(pf.leaseInfo), Map.empty) }
+      .collect { case (acc, pf) if pf.leaseInfo != LeaseInfo.empty =>
+        acc -> Portfolio(0, invertLeaseInfo(pf.leaseInfo), Map.empty) }
 
     Diff(transactions = Map.empty,
       portfolios = portfolioUpd,
@@ -18,7 +18,7 @@ object LeasePatch {
       aliases = Map.empty,
       paymentTransactionIdsByHashes = Map.empty,
       previousExchangeTxs = Map.empty,
-      patchExtraLeaseIdsToCancel = s.activeLeases())
+      leaseState = s.activeLeases().map(_ -> false).toMap)
   }
 
 }

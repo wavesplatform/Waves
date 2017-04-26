@@ -78,13 +78,13 @@ class StateWriterImpl(p: StateStorage) extends StateReaderImpl(p) with StateWrit
       }
     }
 
-    measurePersist("effectiveBalanceSnapshots")(blockDiff.updates)(
+    measurePersist("effectiveBalanceSnapshots")(blockDiff.snapshots)(
       _.foreach { case (acc, snapshotsByHeight) =>
-      snapshotsByHeight.foreach { case (h, snapshot) =>
-        p.balanceSnapshots.put(StateStorage.snapshotKey(acc, h), (snapshot.prevHeight, snapshot.balance, snapshot.effectiveBalance))
-      }
-      p.lastUpdateHeight.put(acc.bytes,snapshotsByHeight.keys.max)
-    })
+        snapshotsByHeight.foreach { case (h, snapshot) =>
+          p.balanceSnapshots.put(StateStorage.snapshotKey(acc, h), (snapshot.prevHeight, snapshot.balance, snapshot.effectiveBalance))
+        }
+        p.lastUpdateHeight.put(acc.bytes, snapshotsByHeight.keys.max)
+      })
 
     measurePersist("aliases")(blockDiff.txsDiff.aliases) {
       _.foreach { case (alias, acc) =>
@@ -92,9 +92,8 @@ class StateWriterImpl(p: StateStorage) extends StateReaderImpl(p) with StateWrit
       }
     }
 
-    val (effectiveNewLeases, effectiveNewCancels) = blockDiff.txsDiff.effectiveLeaseTxUpdates
-    measurePersist("effectiveNewLeases")(effectiveNewLeases)(_.foreach(id => p.leaseState.put(id.arr, true)))
-    measurePersist("effectiveNewCancels")(effectiveNewCancels)(_.foreach(id => p.leaseState.put(id.arr, false)))
+    measurePersist("lease info")(blockDiff.txsDiff.leaseState)(
+      _.foreach { case (id, isActive) => p.leaseState.put(id.arr, isActive) })
 
     p.setHeight(p.getHeight + blockDiff.heightDiff)
     p.commit()
