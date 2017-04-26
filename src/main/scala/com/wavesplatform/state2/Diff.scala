@@ -8,14 +8,6 @@ import scorex.transaction.assets.exchange.ExchangeTransaction
 
 case class Snapshot(prevHeight: Int, balance: Long, effectiveBalance: Long)
 
-object Snapshot {
-  implicit val snapshotMonoid = new Monoid[Snapshot] {
-    override def empty: Snapshot = ???
-
-    override def combine(x: Snapshot, y: Snapshot): Snapshot = ???
-  }
-}
-
 case class LeaseInfo(leaseIn: Long, leaseOut: Long)
 
 object LeaseInfo {

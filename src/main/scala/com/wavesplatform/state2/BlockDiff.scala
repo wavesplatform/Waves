@@ -13,11 +13,9 @@ case class BlockDiff(txsDiff: Diff,
 
 object BlockDiff {
 
-  implicit def sortedMapMonoid[A: scala.Ordering, B: Semigroup]: Monoid[SortedMap[A, B]] = new Monoid[SortedMap[A, B]] {
-    def empty: SortedMap[A, B] = SortedMap.empty[A, B]
-
-    def combine(f1: SortedMap[A, B], f2: SortedMap[A, B]): SortedMap[A, B] =
-      Monoid[Map[A, B]].combine(f1.asInstanceOf[Map[A, B]], f2.asInstanceOf[Map[A, B]]).asInstanceOf[SortedMap[A, B]]
+  implicit def sortedMapForSnapshotsMonoid[Int, Snapshot]: Monoid[SortedMap[Int, Snapshot]] = new Monoid[SortedMap[Int, Snapshot]] {
+    def empty: SortedMap[Int, Snapshot] = SortedMap.empty[Int, Snapshot]
+    def combine(f1: SortedMap[Int, Snapshot], f2: SortedMap[Int, Snapshot]): SortedMap[Int, Snapshot] = f1 ++ f2
   }
 
   implicit val blockDiffMonoid = new Monoid[BlockDiff] {
@@ -26,6 +24,6 @@ object BlockDiff {
     override def combine(older: BlockDiff, newer: BlockDiff): BlockDiff = BlockDiff(
       txsDiff = older.txsDiff.combine(newer.txsDiff),
       heightDiff = older.heightDiff + newer.heightDiff,
-      snapshots = newer.snapshots.combine(older.snapshots))
+      snapshots = older.snapshots.combine(newer.snapshots))
   }
 }
