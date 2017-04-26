@@ -103,22 +103,22 @@ object Application extends ScorexLogging {
       if file.exists
     } yield file
 
-    if (maybeConfigFile.isEmpty) log.warn("NO CONFIGURATION FILE WAS PROVIDED. STARTING WITH DEFAULT SETTINGS FOR TESTNET!")
-
-    val maybeUserConfig = maybeConfigFile collect {
-      case file if file.getName.endsWith(".json") =>
-        log.warn("JSON configuration file is deprecated and will be removed in the future version. " +
-          s"The node will try to read settings from ${file.getAbsolutePath} for now.")
-        LegacyConfigTransformer.transform(ConfigFactory.parseFile(file))
-      case file => ConfigFactory.parseFile(file)
-    }
-
-    val config = maybeUserConfig match {
+    val config = maybeConfigFile match {
       // if no user config is supplied, the library will handle overrides/application/reference automatically
-      case None => ConfigFactory.load()
+      case None =>
+        log.warn("NO CONFIGURATION FILE WAS PROVIDED. STARTING WITH DEFAULT SETTINGS FOR TESTNET!")
+        ConfigFactory.load()
       // application config needs to be resolved wrt both system properties *and* user-supplied config.
-      case Some(cfg) =>
-        ConfigFactory.defaultOverrides()
+      case Some(file) =>
+        val cfg = ConfigFactory.parseFile(file)
+        if (!cfg.hasPath("waves")) {
+          log.error("Malformed configuration file was provided! Aborting!")
+          log.error("Please, read following article about configuration file format:")
+          log.error("https://github.com/wavesplatform/Waves/wiki/Waves-Node-configuration-file")
+          System.exit(1)
+        }
+        ConfigFactory
+          .defaultOverrides()
           .withFallback(cfg)
           .withFallback(ConfigFactory.defaultApplication())
           .withFallback(ConfigFactory.defaultReference())
