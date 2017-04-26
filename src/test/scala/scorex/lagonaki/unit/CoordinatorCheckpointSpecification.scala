@@ -9,7 +9,7 @@ import scorex.ActorTestingCommons
 import scorex.account.PrivateKeyAccount
 import scorex.app.{Application, ApplicationVersion}
 import scorex.block.Block
-import scorex.consensus.nxt.{NxtLikeConsensusBlockData}
+import scorex.consensus.nxt.NxtLikeConsensusBlockData
 import scorex.crypto.encode.Base58
 import scorex.network.BlockchainSynchronizer.GetExtension
 import scorex.network.Coordinator.{AddBlock, ClearCheckpoint, SyncFinished}
@@ -19,6 +19,7 @@ import scorex.network._
 import scorex.network.message._
 import scorex.network.peer.PeerManager.{ConnectedPeers, GetConnectedPeersTyped}
 import scorex.settings.TestBlockchainSettings
+import scorex.transaction.SimpleTransactionModule.EmptySignature
 import scorex.transaction._
 import scorex.wallet.Wallet
 
@@ -94,7 +95,10 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
   implicit val transactionModule: TransactionModule = app.transactionModule
   val genesisTimestamp: Long = System.currentTimeMillis()
   if (transactionModule.blockStorage.history.isEmpty) {
-    transactionModule.blockStorage.blockchainUpdater.processBlock(Block.genesis(transactionModule.consensusGenesisData, transactionModule.genesisData, genesisTimestamp))
+    transactionModule.blockStorage.blockchainUpdater.processBlock(
+      Block.genesis(
+        NxtLikeConsensusBlockData(app.settings.blockchainSettings.genesisSettings.initialBaseTarget, EmptySignature),
+        SimpleTransactionModule.buildTransactions(app.settings.blockchainSettings.genesisSettings), genesisTimestamp))
   }
 
   def before(): Unit = {

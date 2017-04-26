@@ -3,11 +3,13 @@ package scorex.lagonaki.unit
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.settings.WavesSettings
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.{FunSuite, Matchers}
+import org.scalatest.{DoNotDiscover, FunSuite, Matchers}
 import scorex.app.Application
 import scorex.block.Block
+import scorex.consensus.nxt.NxtLikeConsensusBlockData
 import scorex.crypto.encode.Base58
 import scorex.settings.TestBlockchainSettings
+import scorex.transaction.SimpleTransactionModule.EmptySignature
 import scorex.transaction.{PaymentTransaction, SimpleTransactionModule, Transaction}
 import scorex.wallet.Wallet
 
@@ -15,6 +17,7 @@ import scala.concurrent.duration._
 import scala.language.postfixOps
 import scala.util.Random
 
+@DoNotDiscover
 class SimpleTransactionModuleSpecification extends FunSuite with MockFactory with Matchers {
 
   private val config = ConfigFactory.parseString(
@@ -44,7 +47,9 @@ class SimpleTransactionModuleSpecification extends FunSuite with MockFactory wit
   implicit val transactionModule = new SimpleTransactionModule(wavesSettings, app.networkController)
   val genesisTimestamp = System.currentTimeMillis()
   if (transactionModule.blockStorage.history.isEmpty) {
-    transactionModule.blockStorage.blockchainUpdater.processBlock(Block.genesis(transactionModule.consensusGenesisData, transactionModule.genesisData, genesisTimestamp))
+    transactionModule.blockStorage.blockchainUpdater.processBlock(Block.genesis(
+      NxtLikeConsensusBlockData(settings.blockchainSettings.genesisSettings.initialBaseTarget, EmptySignature),
+      SimpleTransactionModule.buildTransactions(app.settings.blockchainSettings.genesisSettings), genesisTimestamp))
   }
   assert(!transactionModule.blockStorage.history.isEmpty)
 

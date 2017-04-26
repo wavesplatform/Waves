@@ -9,7 +9,6 @@ import scorex.account._
 import scorex.api.http.alias.CreateAliasRequest
 import scorex.api.http.assets._
 import scorex.api.http.leasing.{LeaseCancelRequest, LeaseRequest}
-import scorex.app.Application
 import scorex.block.Block
 import scorex.consensus.TransactionsOrdering
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
@@ -172,9 +171,6 @@ class SimpleTransactionModule(val settings: WavesSettings, networkController: Ac
       throw t
   }
 
-  def generateNextBlocks(accounts: Seq[PrivateKeyAccount]): Seq[Block] =
-    accounts.flatMap(generateNextBlock)
-
   def generateNextBlock(account: PrivateKeyAccount): Option[Block] = try {
 
     val lastBlock = blockStorage.history.lastBlock
@@ -245,12 +241,12 @@ class SimpleTransactionModule(val settings: WavesSettings, networkController: Ac
       .map(height => (height, generatingBalance(account, height))).filter(_._2 > 0)
       .flatMap {
         case (height, balance) =>
-          val cData = block.consensusDataField.value
+          val cData = block.consensusData
           val hit = calcHit(cData, account)
           val t = cData.baseTarget
 
           val result =
-            Some((hit * 1000) / (BigInt(t) * balance) + block.timestampField.value)
+            Some((hit * 1000) / (BigInt(t) * balance) + block.timestamp)
               .filter(_ > 0).filter(_ < Long.MaxValue)
               .map(_.toLong)
 
@@ -413,9 +409,6 @@ class SimpleTransactionModule(val settings: WavesSettings, networkController: Ac
   override def createPayment(sender: PrivateKeyAccount, recipient: Account, amount: Long, fee: Long): Either[ValidationError, PaymentTransaction] =
     PaymentTransaction.create(sender, recipient, amount, fee, getTimestamp)
       .flatMap(onNewOffchainTransaction)
-
-
-  override def genesisData: Seq[Transaction] = buildTransactions(settings.blockchainSettings.genesisSettings)
 
 
   /** Check whether tx is valid on current state and not expired yet

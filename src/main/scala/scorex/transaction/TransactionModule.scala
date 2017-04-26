@@ -6,10 +6,6 @@ import scorex.consensus.nxt.NxtLikeConsensusBlockData
 
 trait TransactionModule {
 
-  def genesisData: Seq[Transaction]
-
-  def consensusGenesisData: NxtLikeConsensusBlockData
-
   def blockStorage: BlockStorage
 
   def validate[T <: Transaction](tx: T): Either[ValidationError, T]
@@ -26,8 +22,6 @@ trait TransactionModule {
 
   def generatingBalance(account: Account, atHeight: Int): Long
 
-  def generateNextBlocks(accounts: Seq[PrivateKeyAccount]): Seq[Block]
-
   def generateNextBlock(account: PrivateKeyAccount): Option[Block]
 
   def nextBlockGenerationTime(block: Block, account: PublicKeyAccount): Option[Long]
@@ -35,4 +29,10 @@ trait TransactionModule {
   def blockOrdering: Ordering[(Block)]
 
   def isValid(block: Block): Boolean
+}
+object TransactionModule {
+  implicit class TransactionModuleExt(t:TransactionModule) {
+    def generateNextBlocks(accounts: Seq[PrivateKeyAccount]): Seq[Block] =
+      accounts.flatMap(t.generateNextBlock)
+  }
 }

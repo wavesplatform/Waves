@@ -11,11 +11,13 @@ import com.wavesplatform.Shutdownable
 import scorex.api.http.{ApiRoute, CompositeHttpService}
 import scorex.block.Block
 import scorex.consensus.mining.BlockGeneratorController
+import scorex.consensus.nxt.NxtLikeConsensusBlockData
 import scorex.crypto.encode.Base58
 import scorex.network._
 import scorex.network.message._
 import scorex.network.peer.PeerManager
-import scorex.transaction.{BlockStorage, History}
+import scorex.transaction.SimpleTransactionModule.EmptySignature
+import scorex.transaction.{BlockStorage, History, SimpleTransactionModule}
 import scorex.utils.ScorexLogging
 import scorex.wallet.Wallet
 
@@ -121,7 +123,9 @@ trait RunnableApplication extends Application with Shutdownable with ScorexLoggi
   private def checkGenesis(): Unit = {
     if (transactionModule.blockStorage.history.isEmpty) {
       val maybeGenesisSignature = Option(settings.blockchainSettings.genesisSettings.signature).filter(_.trim.nonEmpty)
-      transactionModule.blockStorage.blockchainUpdater.processBlock(Block.genesis(transactionModule.consensusGenesisData, transactionModule.genesisData,
+      transactionModule.blockStorage.blockchainUpdater.processBlock(Block.genesis(
+        NxtLikeConsensusBlockData(settings.blockchainSettings.genesisSettings.initialBaseTarget, EmptySignature),
+        SimpleTransactionModule.buildTransactions(settings.blockchainSettings.genesisSettings),
         settings.blockchainSettings.genesisSettings.blockTimestamp, maybeGenesisSignature)) match {
         case Left(value) =>
           log.error(value.toString)
