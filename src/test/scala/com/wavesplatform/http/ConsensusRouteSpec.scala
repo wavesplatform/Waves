@@ -2,16 +2,13 @@ package com.wavesplatform.http
 
 import com.wavesplatform.BlockGen
 import com.wavesplatform.http.ApiMarshallers._
-import com.wavesplatform.settings.{BlockchainSettings, FunctionalitySettings, GenesisSettings}
 import com.wavesplatform.state2.reader.StateReader
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.DoNotDiscover
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json.JsObject
 import scorex.api.http.BlockNotExists
 import scorex.block.Block
-import scorex.consensus.nxt.WavesConsensusModule
 import scorex.consensus.nxt.api.http.NxtConsensusApiRoute
 import scorex.createTestTemporaryFile
 import scorex.crypto.encode.Base58
@@ -21,7 +18,6 @@ class ConsensusRouteSpec extends RouteSpec("/consensus") with RestAPISettingsHel
   private val bFile = createTestTemporaryFile("waves-blockchain", ".dat")
   private val sFile = createTestTemporaryFile("waves-state", ".dat")
   private val cFile = createTestTemporaryFile("waves-checkpoint", ".dat")
-  private val wcm = new WavesConsensusModule(BlockchainSettings(bFile.getAbsolutePath, sFile.getAbsolutePath, cFile.getAbsolutePath, 'T', FunctionalitySettings.TESTNET, GenesisSettings.TESTNET))
   private val state = mock[StateReader]
   private val history = mock[History]
   (history.height _).expects().returns(10).anyNumberOfTimes()
@@ -38,7 +34,7 @@ class ConsensusRouteSpec extends RouteSpec("/consensus") with RestAPISettingsHel
   private val tm = mock[TransactionModule]
   (tm.blockStorage _).expects().returning(bs).anyNumberOfTimes()
 
-  private val route = NxtConsensusApiRoute(restAPISettings, wcm, state, history, tm).route
+  private val route = NxtConsensusApiRoute(restAPISettings, state, history, tm).route
 
   routePath("/generationsignature") - {
     "for last block" in {

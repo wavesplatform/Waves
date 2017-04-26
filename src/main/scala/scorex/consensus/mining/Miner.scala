@@ -16,8 +16,6 @@ class Miner(application: Application) extends Actor with ScorexLogging {
   private lazy val blockGenerationDelay =
     math.max(application.settings.minerSettings.generationDelay.toMillis, BlockGenerationTimeShift.toMillis) millis
 
-  private implicit lazy val transactionModule = application.transactionModule
-  private lazy val consensusModule = application.consensusModule
 
   private var currentState = Option.empty[Seq[Cancellable]]
 
@@ -45,9 +43,9 @@ class Miner(application: Application) extends Actor with ScorexLogging {
   private def tryToGenerateABlock(): Boolean = Try {
     log.debug("Trying to generate a new block")
 
-    val blocks = application.consensusModule.generateNextBlocks(accounts)
+    val blocks = application.transactionModule.generateNextBlocks(accounts)
     if (blocks.nonEmpty) {
-      val bestBlock = blocks.max(consensusModule.blockOrdering)
+      val bestBlock = blocks.max(application.transactionModule.blockOrdering)
       application.coordinator ! AddBlock(bestBlock, None)
       true
     } else false
@@ -64,7 +62,7 @@ class Miner(application: Application) extends Actor with ScorexLogging {
       val currentTime = preciseTime
 
       accounts
-        .flatMap(acc => consensusModule.nextBlockGenerationTime(lastBlock, acc).map(_ + BlockGenerationTimeShift.toMillis))
+        .flatMap(acc => application.transactionModule.nextBlockGenerationTime(lastBlock, acc).map(_ + BlockGenerationTimeShift.toMillis))
         .map(t => math.max(t - currentTime, blockGenerationDelay.toMillis))
         .filter(_ < MaxBlockGenerationDelay.toMillis)
         .map(_ millis)

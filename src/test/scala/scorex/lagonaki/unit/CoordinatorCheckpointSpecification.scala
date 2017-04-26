@@ -9,7 +9,7 @@ import scorex.ActorTestingCommons
 import scorex.account.PrivateKeyAccount
 import scorex.app.{Application, ApplicationVersion}
 import scorex.block.Block
-import scorex.consensus.nxt.{NxtLikeConsensusBlockData, WavesConsensusModule}
+import scorex.consensus.nxt.{NxtLikeConsensusBlockData}
 import scorex.crypto.encode.Base58
 import scorex.network.BlockchainSynchronizer.GetExtension
 import scorex.network.Coordinator.{AddBlock, ClearCheckpoint, SyncFinished}
@@ -55,10 +55,9 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
   val db: MVStore = new MVStore.Builder().open()
 
   class TestAppMock extends Application {
-    lazy implicit val consensusModule: WavesConsensusModule = new WavesConsensusModule(TestBlockchainSettings.Disabled) {
-      override def isValid(block: Block)(implicit transactionModule: TransactionModule): Boolean = true
+    lazy implicit val transactionModule: TransactionModule = new SimpleTransactionModule(wavesSettings, this) {
+      override def isValid(block: Block): Boolean = true
     }
-    lazy implicit val transactionModule: TransactionModule = new SimpleTransactionModule(TestBlockchainSettings.Disabled.genesisSettings)(wavesSettings, this)
     lazy val networkController: ActorRef = networkControllerMock
     lazy val settings = wavesSettings
     lazy val blockGenerator: ActorRef = testBlockGenerator.ref
@@ -88,15 +87,14 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
     val version = 1: Byte
     val timestamp = System.currentTimeMillis()
     //val reference = Array.fill(Block.BlockIdLength)(id.toByte)
-    val cbd = NxtLikeConsensusBlockData(score + 1, Array.fill(WavesConsensusModule.GeneratorSignatureLength)(Random.nextInt(100).toByte))
+    val cbd = NxtLikeConsensusBlockData(score + 1, Array.fill(SimpleTransactionModule.GeneratorSignatureLength)(Random.nextInt(100).toByte))
     Block.buildAndSign(version, timestamp, reference, cbd, Seq[Transaction](), gen)
   }
 
-  implicit val consensusModule: WavesConsensusModule = app.consensusModule
   implicit val transactionModule: TransactionModule = app.transactionModule
   val genesisTimestamp: Long = System.currentTimeMillis()
   if (transactionModule.blockStorage.history.isEmpty) {
-    transactionModule.blockStorage.blockchainUpdater.processBlock(Block.genesis(consensusModule.genesisData, transactionModule.genesisData, genesisTimestamp))
+    transactionModule.blockStorage.blockchainUpdater.processBlock(Block.genesis(transactionModule.consensusGenesisData, transactionModule.genesisData, genesisTimestamp))
   }
 
   def before(): Unit = {

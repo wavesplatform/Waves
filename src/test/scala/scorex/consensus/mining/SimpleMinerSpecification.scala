@@ -5,10 +5,10 @@ import akka.testkit.TestProbe
 import com.wavesplatform.settings.WavesSettings
 import scorex.ActorTestingCommons
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
+import scorex.app.Application
 import scorex.block.Block
-import scorex.consensus.nxt.WavesConsensusModule
 import scorex.network.Coordinator.AddBlock
-import scorex.transaction.{History, TransactionModule}
+import scorex.transaction.{History, SimpleTransactionModule, TransactionModule}
 import scorex.wallet.Wallet
 
 import scala.concurrent.duration.Duration
@@ -28,25 +28,25 @@ class SimpleMinerSpecification extends ActorTestingCommons {
   val wavesSettings: WavesSettings = WavesSettings.fromConfig(testConfigTFLikeOff)
   private val testHistory = mock[History]
 
-  class MockableConsensusModule extends WavesConsensusModule(wavesSettings.blockchainSettings)
+  class MockableConsensusModule extends SimpleTransactionModule(wavesSettings, mock[Application])
 
   private val testConsensusModule = mock[MockableConsensusModule]
 
   private val f = mockFunction[Block, String]
   f.expects(*).never()
-  (testConsensusModule.blockOrdering(_: TransactionModule)).expects(*).returns(Ordering.by(f)).anyNumberOfTimes
+  (testConsensusModule.blockOrdering _).expects().returns(Ordering.by(f)).anyNumberOfTimes
 
   private def mayBe(b: Boolean): Range = (if (b) 0 else 1) to 1
 
   private def setBlockGenExpectations(expected: Seq[Block], maybe: Boolean = false): Unit =
-    (testConsensusModule.generateNextBlocks(_: Seq[PrivateKeyAccount])(_: TransactionModule))
-      .expects(Seq(account), *)
+    (testConsensusModule.generateNextBlocks(_: Seq[PrivateKeyAccount]))
+      .expects(Seq(account))
       .returns(expected)
       .repeat(mayBe(maybe))
 
   private def setBlockGenTimeExpectations(block: Block, time: Option[Long], maybe: Boolean = false): Unit =
-    (testConsensusModule.nextBlockGenerationTime(_: Block, _: PublicKeyAccount)(_: TransactionModule))
-      .expects(block, account, *)
+    (testConsensusModule.nextBlockGenerationTime(_: Block, _: PublicKeyAccount))
+      .expects(block, account)
       .returns(time)
       .repeat(mayBe(maybe))
 
@@ -68,7 +68,6 @@ class SimpleMinerSpecification extends ActorTestingCommons {
     override val wallet: Wallet = testWallet
     override val coordinator = testCoordinator.ref
     override val historyOverride: History = testHistory
-    override implicit val consensusModule: WavesConsensusModule = testConsensusModule
   }
 
   private val genTimeShift = Miner.BlockGenerationTimeShift

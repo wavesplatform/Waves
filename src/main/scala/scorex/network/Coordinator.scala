@@ -176,7 +176,7 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
           // someone has happened to be faster and already added a block or blocks after the parent
           log.debug(s"A child for parent of the block already exists, local=$local: ${newBlock.json}")
 
-          val cmp = application.consensusModule.blockOrdering
+          val cmp = application.transactionModule.blockOrdering
           if (lastBlock.referenceField.value.sameElements(parentBlockId) && cmp.lt(lastBlock, newBlock)) {
             log.debug(s"New block ${newBlock.json} is better than last ${lastBlock.json}")
           }
@@ -265,7 +265,7 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
       def signature = EllipticCurveImpl.verify(b.signerDataField.value.signature, b.bytesWithoutSignature,
         b.signerDataField.value.generator.publicKey)
 
-      def consensus = application.consensusModule.isValid(b)
+      def consensus = application.transactionModule.isValid(b)
 
       if (!history) Left(CustomError(s"Invalid block ${b.encodedId}: no parent block in history"))
       else if (!signature) Left(CustomError(s"Invalid block ${b.encodedId}: signature is not valid"))

@@ -9,7 +9,6 @@ import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json._
 import scorex.api.http.{AddressApiRoute, ApiKeyNotValid, InvalidMessage}
-import scorex.consensus.nxt.WavesConsensusModule
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.settings.TestBlockchainSettings
@@ -28,8 +27,7 @@ class AddressRouteSpec
   private val allAccounts = testWallet.privateKeyAccounts()
   private val allAddresses = allAccounts.map(_.address)
 
-  private val consensusModule = new WavesConsensusModule(TestBlockchainSettings.Enabled)
-  private val route = AddressApiRoute(restAPISettings, testWallet, mock[StateReader], consensusModule, mock[TransactionModule]).route
+  private val route = AddressApiRoute(restAPISettings, testWallet, mock[StateReader], mock[TransactionModule]).route
 
   private val generatedMessages = for {
     account <- Gen.oneOf(allAccounts).label("account")
@@ -83,7 +81,7 @@ class AddressRouteSpec
   routePath("/balance/{address}") in {
     val state = stub[StateReader]
     (state.accountPortfolio _).when(*).returns(Portfolio(0, mock[LeaseInfo], Map.empty))
-    val route = AddressApiRoute(restAPISettings, testWallet, state, consensusModule, mock[TransactionModule]).route
+    val route = AddressApiRoute(restAPISettings, testWallet, state, mock[TransactionModule]).route
     Get(routePath(s"/balance/${allAddresses.head}")) ~> route ~> check {
       val r = responseAs[AddressApiRoute.Balance]
       r.balance shouldEqual 0

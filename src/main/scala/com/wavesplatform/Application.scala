@@ -16,7 +16,6 @@ import scorex.api.http.alias.{AliasApiRoute, AliasBroadcastApiRoute}
 import scorex.api.http.assets.{AssetsApiRoute, AssetsBroadcastApiRoute}
 import scorex.api.http.leasing.{LeaseApiRoute, LeaseBroadcastApiRoute}
 import scorex.app.ApplicationVersion
-import scorex.consensus.nxt.WavesConsensusModule
 import scorex.consensus.nxt.api.http.NxtConsensusApiRoute
 import scorex.network.{TransactionalMessagesRepo, UnconfirmedPoolSynchronizer}
 import scorex.transaction.{BlockStorage, SimpleTransactionModule}
@@ -38,21 +37,19 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
   override val matcherSettings: MatcherSettings = settings.matcherSettings
   override val restAPISettings: RestAPISettings = settings.restAPISettings
 
-  override implicit lazy val consensusModule = new WavesConsensusModule(settings.blockchainSettings)
-
-  override implicit lazy val transactionModule = new SimpleTransactionModule(settings.blockchainSettings.genesisSettings)(settings, this)
+  override implicit lazy val transactionModule = new SimpleTransactionModule(settings, this)
 
   override lazy val blockStorage: BlockStorage = transactionModule.blockStorage
 
   override lazy val apiRoutes = Seq(
     BlocksApiRoute(settings.restAPISettings, settings.checkpointsSettings, history, coordinator),
     TransactionsApiRoute(settings.restAPISettings, blockStorage.stateReader, history, transactionModule),
-    NxtConsensusApiRoute(settings.restAPISettings, consensusModule, blockStorage.stateReader, history, transactionModule),
+    NxtConsensusApiRoute(settings.restAPISettings, blockStorage.stateReader, history, transactionModule),
     WalletApiRoute(settings.restAPISettings, wallet),
     PaymentApiRoute(settings.restAPISettings, wallet, transactionModule),
     UtilsApiRoute(settings.restAPISettings),
     PeersApiRoute(settings.restAPISettings, peerManager, networkController),
-    AddressApiRoute(settings.restAPISettings, wallet, blockStorage.stateReader, consensusModule, transactionModule),
+    AddressApiRoute(settings.restAPISettings, wallet, blockStorage.stateReader, transactionModule),
     DebugApiRoute(settings.restAPISettings, wallet, blockStorage.stateReader, history),
     WavesApiRoute(settings.restAPISettings, wallet, transactionModule),
     AssetsApiRoute(settings.restAPISettings, wallet, blockStorage.stateReader, transactionModule),

@@ -4,7 +4,7 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.{FunSuite, Matchers}
 import scorex.account.PrivateKeyAccount
 import scorex.block.Block
-import scorex.consensus.nxt.{NxtLikeConsensusBlockData, WavesConsensusModule}
+import scorex.consensus.nxt.{NxtLikeConsensusBlockData}
 import scorex.transaction._
 import scorex.transaction.assets.TransferTransaction
 
@@ -13,14 +13,13 @@ import scala.util.Random
 class BlockSpecification extends FunSuite with Matchers with MockFactory with UnitTestConfig {
 
   test("Nxt block with txs bytes/parse roundtrip") {
-    implicit val consensusModule = new WavesConsensusModule(blockchainSettings)
     implicit val transactionModule = mock[TransactionModule]
 
     val reference = Array.fill(Block.BlockIdLength)(Random.nextInt(100).toByte)
     val gen = PrivateKeyAccount(reference)
 
     val bt = Random.nextLong()
-    val gs = Array.fill(WavesConsensusModule.GeneratorSignatureLength)(Random.nextInt(100).toByte)
+    val gs = Array.fill(SimpleTransactionModule.GeneratorSignatureLength)(Random.nextInt(100).toByte)
 
 
     val ts = System.currentTimeMillis() - 5000

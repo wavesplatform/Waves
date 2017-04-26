@@ -10,7 +10,6 @@ import com.wavesplatform.state2.reader.StateReader
 import io.swagger.annotations._
 import play.api.libs.json._
 import scorex.account.{Account, PublicKeyAccount}
-import scorex.consensus.nxt.WavesConsensusModule
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.transaction.TransactionModule
@@ -20,7 +19,7 @@ import scala.util.{Failure, Success, Try}
 
 @Path("/addresses")
 @Api(value = "/addresses/", description = "Info about wallet's accounts and other calls about addresses")
-case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: StateReader, consensusModule: WavesConsensusModule, transactionModule: TransactionModule) extends ApiRoute {
+case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: StateReader, transactionModule: TransactionModule) extends ApiRoute {
   import AddressApiRoute._
 
   val MaxAddressesPerRequest = 1000
@@ -254,7 +253,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
     BalanceDetails(
       account.address,
       portfolio.balance,
-      consensusModule.generatingBalance(account, state.height)(transactionModule),
+      transactionModule.generatingBalance(account, state.height),
       portfolio.balance - portfolio.leaseInfo.leaseOut,
       state.effectiveBalance(account))
   }

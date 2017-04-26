@@ -6,11 +6,8 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.{FunSuite, Matchers}
 import scorex.app.Application
 import scorex.block.Block
-import scorex.consensus.nxt.WavesConsensusModule
 import scorex.crypto.encode.Base58
-import scorex.lagonaki.mocks.TestBlock
 import scorex.settings.TestBlockchainSettings
-import scorex.transaction.assets.TransferTransaction
 import scorex.transaction.{PaymentTransaction, SimpleTransactionModule, Transaction}
 import scorex.wallet.Wallet
 
@@ -40,16 +37,14 @@ class SimpleTransactionModuleSpecification extends FunSuite with MockFactory wit
 
   trait MyApp extends Application {
     override val settings: WavesSettings = wavesSettings
-    override implicit val consensusModule = new WavesConsensusModule(TestBlockchainSettings.Disabled)
   }
 
   implicit val app = stub[MyApp]
   implicit val settings = wavesSettings
-  implicit val consensusModule = app.consensusModule
-  implicit val transactionModule = new SimpleTransactionModule(TestBlockchainSettings.Enabled.genesisSettings)
+  implicit val transactionModule = new SimpleTransactionModule(wavesSettings, app)
   val genesisTimestamp = System.currentTimeMillis()
   if (transactionModule.blockStorage.history.isEmpty) {
-    transactionModule.blockStorage.blockchainUpdater.processBlock(Block.genesis(consensusModule.genesisData, transactionModule.genesisData, genesisTimestamp))
+    transactionModule.blockStorage.blockchainUpdater.processBlock(Block.genesis(transactionModule.consensusGenesisData, transactionModule.genesisData, genesisTimestamp))
   }
   assert(!transactionModule.blockStorage.history.isEmpty)
 

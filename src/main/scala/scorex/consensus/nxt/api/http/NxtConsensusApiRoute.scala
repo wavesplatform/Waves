@@ -9,7 +9,6 @@ import io.swagger.annotations._
 import play.api.libs.json.Json
 import scorex.account.Account
 import scorex.api.http.{ApiRoute, CommonApiFunctions, InvalidAddress}
-import scorex.consensus.nxt.WavesConsensusModule
 import scorex.crypto.encode.Base58
 import scorex.transaction.{History, TransactionModule}
 
@@ -17,7 +16,6 @@ import scorex.transaction.{History, TransactionModule}
 @Api(value = "/consensus")
 case class NxtConsensusApiRoute(
     settings: RestAPISettings,
-    consensusModule: WavesConsensusModule,
     state: StateReader,
     history: History,
     transactionModule: TransactionModule) extends ApiRoute with CommonApiFunctions {
@@ -38,7 +36,7 @@ case class NxtConsensusApiRoute(
       case Right(account) =>
         complete(Json.obj(
           "address" -> account.address,
-          "balance" -> consensusModule.generatingBalance(account, state.height)(transactionModule)))
+          "balance" -> transactionModule.generatingBalance(account, state.height)))
     }
   }
 

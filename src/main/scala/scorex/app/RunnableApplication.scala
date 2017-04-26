@@ -121,7 +121,7 @@ trait RunnableApplication extends Application with Shutdownable with ScorexLoggi
   private def checkGenesis(): Unit = {
     if (transactionModule.blockStorage.history.isEmpty) {
       val maybeGenesisSignature = Option(settings.blockchainSettings.genesisSettings.signature).filter(_.trim.nonEmpty)
-      transactionModule.blockStorage.blockchainUpdater.processBlock(Block.genesis(consensusModule.genesisData, transactionModule.genesisData,
+      transactionModule.blockStorage.blockchainUpdater.processBlock(Block.genesis(transactionModule.consensusGenesisData, transactionModule.genesisData,
         settings.blockchainSettings.genesisSettings.blockTimestamp, maybeGenesisSignature)) match {
         case Left(value) =>
           log.error(value.toString)
