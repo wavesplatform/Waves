@@ -110,6 +110,7 @@ class StateWriterImpl(p: StateStorage) extends StateReaderImpl(p) with StateWrit
     p.exchangeTransactionsByOrder.clear()
     p.aliasToAddress.clear()
     p.leaseState.clear()
+    p.lastUpdateHeight.clear()
 
     p.setHeight(0)
     p.commit()
