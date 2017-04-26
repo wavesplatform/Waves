@@ -126,7 +126,7 @@ object StateWriterImpl extends ScorexLogging {
     (r, t1 - t0)
   }
 
-  def measurePersist[F[_] <: TraversableOnce[_], A](s: String)(fa: F[A])(f: F[A] => Unit): Unit = {
+  def measurePersist[F[_] <: TraversableOnce[_], A](s: String)(fa: => F[A])(f: F[A] => Unit): Unit = {
     val (_, time) = withTime(f(fa))
     log.debug(s"Persisting $s(size=${fa.size}) took ${time}ms")
   }
