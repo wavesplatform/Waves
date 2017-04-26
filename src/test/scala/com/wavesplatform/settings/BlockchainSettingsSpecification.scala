@@ -106,7 +106,7 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
     settings.functionalitySettings.requireSortedTransactionsAfter should be(1477958400000L)
     settings.functionalitySettings.generatingBalanceDepthFrom50To1000AfterHeight should be(Long.MinValue)
     settings.functionalitySettings.minimalGeneratingBalanceAfterTimestamp should be(Long.MinValue)
-    settings.functionalitySettings.allowTransactionsFromFutureUntil should be(Long.MinValue)
+    settings.functionalitySettings.allowTransactionsFromFutureUntil should be(1478100000000L)
     settings.functionalitySettings.allowUnissuedAssetsUntil should be(1479416400000L)
     settings.functionalitySettings.allowBurnTransactionAfterTimestamp should be(1481110521000L)
     settings.functionalitySettings.requirePaymentUniqueId should be(1485942685000L)
