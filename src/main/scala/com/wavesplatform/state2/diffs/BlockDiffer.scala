@@ -41,23 +41,20 @@ object BlockDiffer extends ScorexLogging {
         .map(newDiff => diff.combine(newDiff)))
     }
 
-    txsDiffEi
-      .map(d => if (currentBlockHeight == settings.resetEffectiveBalancesAtHeight)
+    txsDiffEi.map { d =>
+      val diff = if (currentBlockHeight == settings.resetEffectiveBalancesAtHeight)
         Monoid.combine(d, LeasePatch(new CompositeStateReader(s, d.asBlockDiff)))
-      else d)
-      .map(diff => {
-        val newSnapshots = diff.portfolios
-          .filter { case (acc, portfolioDiff) => portfolioDiff.balance != 0 || portfolioDiff.effectiveBalance != 0 }
-          .map { case (acc, portfolioDiff) =>
-            val oldPortfolio = s.accountPortfolio(acc)
-            acc -> SortedMap(currentBlockHeight -> Snapshot(
-              prevHeight = s.lastUpdateHeight(acc).getOrElse(0),
-              balance = oldPortfolio.balance + portfolioDiff.balance,
-              effectiveBalance = oldPortfolio.effectiveBalance + portfolioDiff.effectiveBalance))
-          }
-        BlockDiff(diff, 1, newSnapshots)
-      }
-      )
+      else d
+      val newSnapshots = diff.portfolios
+        .collect { case (acc, portfolioDiff) if (portfolioDiff.balance != 0 || portfolioDiff.effectiveBalance != 0) =>
+          val oldPortfolio = s.accountPortfolio(acc)
+          acc -> SortedMap(currentBlockHeight -> Snapshot(
+            prevHeight = s.lastUpdateHeight(acc).getOrElse(0),
+            balance = oldPortfolio.balance + portfolioDiff.balance,
+            effectiveBalance = oldPortfolio.effectiveBalance + portfolioDiff.effectiveBalance))
+        }
+      BlockDiff(diff, 1, newSnapshots)
+    }
   }
 
 
