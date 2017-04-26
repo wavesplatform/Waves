@@ -13,15 +13,20 @@ import scorex.utils.ScorexLogging
 class BlockchainUpdaterImpl(persisted: StateWriter with StateReader, settings: FunctionalitySettings, bc: HistoryWriter with History)
   extends BlockchainUpdater with ScorexLogging {
 
-  private val MinInMemDiff = 100
-  private val MaxInMemDiff = 200
+  private val MinInMemDiff = 200
+  private val MaxInMemDiff = MinInMemDiff * 2
 
   private val unsafeDifferByRange: (StateReader, (Int, Int)) => BlockDiff = {
     case (sr, (from, to)) =>
       log.debug(s"Reading blocks from $from to $to")
-      val blocks = Range(from, to).map(bc.blockAt(_).get)
+      val blocks = Range(from, to).foldLeft((List.empty[Block], 0)) { case ((acc, counter), i) =>
+        if (counter % 1000 == 0) {
+          log.debug(s"Read block $counter of Range($from, $to)")
+        }
+        (bc.blockAt(i).get +: acc, counter + 1)
+      }._1.reverse
       log.debug(s"Blocks read from $from to $to")
-      val r = BlockDiffer.unsafeDiffMany(settings, m => log.info(m))(sr, blocks)
+      val r = BlockDiffer.unsafeDiffMany(settings)(sr, blocks)
       log.debug(s"Diff for Range($from, $to) rebuilt")
       r
   }
@@ -42,7 +47,7 @@ class BlockchainUpdaterImpl(persisted: StateWriter with StateReader, settings: F
     }
   }
 
-  def currentState: StateReader = CompositeStateReader.proxy(persisted, () => inMemoryDiff)
+  def currentState: StateReader = new CompositeStateReader.Proxy(persisted, () => inMemoryDiff)
 
   private def updatePersistedAndInMemory(): Unit = {
     logHeights("State rebuild started:")

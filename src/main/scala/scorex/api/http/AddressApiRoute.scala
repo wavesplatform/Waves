@@ -27,7 +27,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
 
   override lazy val route =
     pathPrefix("addresses") {
-      validate ~ seed ~ balanceWithConfirmations ~ balanceDetails ~ balance ~ verify ~ sign ~ deleteAddress ~ verifyText ~
+      validate ~ seed ~ balanceWithConfirmations ~ balanceDetails ~ balance ~ balanceWithConfirmations ~ verify ~ sign ~ deleteAddress ~ verifyText ~
         signText ~ seq ~ publicKey ~ effectiveBalance ~ effectiveBalanceWithConfirmations
     } ~ root ~ create
 
@@ -120,7 +120,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
     new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
   ))
   def balance: Route = (path("balance" / Segment) & get) { address =>
-    complete(balanceJson(address, 0))
+    complete(balanceJson(address))
   }
 
   @Path("/balance/details/{address}")
@@ -237,7 +237,15 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
     Account.fromString(address).right.map(acc => ToResponseMarshallable(Balance(
       acc.address,
       confirmations,
-      state.accountPortfolio(acc).balance
+      state.balanceWithConfirmations(acc, confirmations)
+    ))).getOrElse(InvalidAddress)
+  }
+
+  private def balanceJson(address: String): ToResponseMarshallable = {
+    Account.fromString(address).right.map(acc => ToResponseMarshallable(Balance(
+      acc.address,
+      0,
+      state.balance(acc)
     ))).getOrElse(InvalidAddress)
   }
 

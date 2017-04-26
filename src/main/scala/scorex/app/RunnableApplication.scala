@@ -23,9 +23,8 @@ import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.reflect.runtime.universe.Type
-import scala.util.Try
+import scala.util.{Left, Try}
 
-import com.wavesplatform.state2._
 
 trait RunnableApplication extends Application with Shutdownable with ScorexLogging {
 
@@ -121,13 +120,16 @@ trait RunnableApplication extends Application with Shutdownable with ScorexLoggi
 
   private def checkGenesis(): Unit = {
     if (transactionModule.blockStorage.history.isEmpty) {
-
       val maybeGenesisSignature = Option(settings.blockchainSettings.genesisSettings.signature).filter(_.trim.nonEmpty)
-
       transactionModule.blockStorage.blockchainUpdater.processBlock(Block.genesis(consensusModule.genesisData, transactionModule.genesisData,
-        settings.blockchainSettings.genesisSettings.blockTimestamp, maybeGenesisSignature)).explicitGet()
+        settings.blockchainSettings.genesisSettings.blockTimestamp, maybeGenesisSignature)) match {
+        case Left(value) =>
+          log.error(value.toString)
+          System.exit(1)
+        case _ =>
+      }
 
       log.info("Genesis block has been added to the state")
     }
-  }.ensuring(transactionModule.blockStorage.history.height() >= 1)
+  }
 }

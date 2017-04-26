@@ -27,7 +27,7 @@ class UnconfirmedPoolSynchronizer(private val transactionModule: TransactionModu
       log.debug(s"Got tx: $tx")
       transactionModule.putUnconfirmedIfNew(tx) match {
         case Right(_) => broadcastExceptOf(tx, remote)
-        case Left(err) => log.error(s"transaction $tx has been rejected by UTX pool. Reason: $err")
+        case Left(err) => log.error(s"Transaction $tx has been rejected by UTX pool. Reason: $err")
       }
 
     case BroadcastRandom =>

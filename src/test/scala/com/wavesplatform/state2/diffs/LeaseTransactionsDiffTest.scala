@@ -39,8 +39,7 @@ class LeaseTransactionsDiffTest extends PropSpec with PropertyChecks with Genera
         totalPortfolioDiff.effectiveBalance shouldBe 0
         totalPortfolioDiff.assets.values.foreach(_ shouldBe 0)
 
-        val snapshot = EffectiveBalanceSnapshot(lease.recipient.asInstanceOf[Account], 2, 0, lease.amount)
-        totalDiff.effectiveBalanceSnapshots should contain(snapshot)
+        totalDiff.snapshots(lease.recipient.asInstanceOf[Account]) shouldBe Map(2 -> Snapshot(0, 0, lease.amount))
       }
 
       assertDiffAndState(Seq(TestBlock(Seq(genesis, lease))), TestBlock(Seq(leaseCancel), miner)) { case (totalDiff, newState) =>
@@ -50,8 +49,7 @@ class LeaseTransactionsDiffTest extends PropSpec with PropertyChecks with Genera
         totalPortfolioDiff.effectiveBalance shouldBe 0
         totalPortfolioDiff.assets.values.foreach(_ shouldBe 0)
 
-        val snapshot = EffectiveBalanceSnapshot(lease.recipient.asInstanceOf[Account], 2, lease.amount, 0)
-        totalDiff.effectiveBalanceSnapshots should contain(snapshot)
+        totalDiff.snapshots(lease.recipient.asInstanceOf[Account]) shouldBe Map(2 -> Snapshot(1, 0, 0))
 
         newState.accountPortfolio(lease.sender).leaseInfo shouldBe LeaseInfo.empty
         newState.accountPortfolio(lease.recipient.asInstanceOf[Account]).leaseInfo shouldBe LeaseInfo.empty

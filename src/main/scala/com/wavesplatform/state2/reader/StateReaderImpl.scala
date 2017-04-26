@@ -7,7 +7,7 @@ import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.transaction.lease.LeaseTransaction
 import scorex.transaction.{Transaction, TransactionParser}
 
-import scala.collection.JavaConverters.iterableAsScalaIterableConverter
+import scala.collection.JavaConverters._
 
 class StateReaderImpl(p: StateStorage) extends StateReader {
 
@@ -32,25 +32,14 @@ class StateReaderImpl(p: StateStorage) extends StateReader {
       .map(EqByteArray)
   }
 
-  override def effectiveBalanceAtHeightWithConfirmations(acc: Account, atHeight: Int, confs: Int): Long = {
-    val bockNumberThatIsConfsOld = Math.max(1, atHeight - confs)
-    val confsOldMinimum: Seq[(Long, Long)] = Range(bockNumberThatIsConfsOld + 1, atHeight + 1)
-      .flatMap { height => Option(p.effectiveBalanceSnapshots.get((acc.bytes, height))) }
-    confsOldMinimum.headOption match {
-      case None => accountPortfolio(acc).effectiveBalance
-      case Some((oldest, _)) => Math.min(oldest, confsOldMinimum.map(_._2).min)
-    }
-  }
-
   override def paymentTransactionIdByHash(hash: ByteArray): Option[ByteArray]
   = Option(p.paymentTransactionHashes.get(hash)).map(EqByteArray)
 
   override def aliasesOfAddress(a: Account): Seq[Alias] =
-    p.aliasToAddress.entrySet().asScala
-      .filter(_.getValue sameElements a.bytes)
-      .map(_.getKey)
-      .map(aliasStr => Alias.buildWithCurrentNetworkByte(aliasStr).explicitGet())
-      .toSeq
+    p.aliasToAddress.asScala
+      .collect { case (aliasStr, addressBytes) if addressBytes sameElements a.bytes =>
+        Alias.buildWithCurrentNetworkByte(aliasStr).explicitGet()
+      }.toSeq
 
 
   override def resolveAlias(a: Alias): Option[Account] =
@@ -63,17 +52,22 @@ class StateReaderImpl(p: StateStorage) extends StateReader {
       .flatMap(id => this.findTransaction[ExchangeTransaction](id))
 
   override def accountPortfolios: Map[Account, Portfolio] =
-    p.portfolios.entrySet().asScala
-      .map { entry => entry.getKey -> entry.getValue }
-      .map { case (acc, (b, (i, o), as)) => Account.fromBytes(acc).explicitGet() -> Portfolio(b, LeaseInfo(i, o), as.map { case (k, v) => EqByteArray(k) -> v }) }
-      .toMap
+    p.portfolios.asScala.map {
+      case (acc, (b, (i, o), as)) => Account.fromBytes(acc).explicitGet() -> Portfolio(b, LeaseInfo(i, o), as.map {
+        case (k, v) => EqByteArray(k) -> v
+      })
+    }.toMap
 
   override def isLeaseActive(leaseTx: LeaseTransaction): Boolean = p.leaseState.getOrDefault(leaseTx.id, false)
 
-  override def activeLeases(): Seq[ByteArray] = p.leaseState.entrySet()
+  override def activeLeases(): Seq[ByteArray] = p.leaseState
     .asScala
-    .filter(_.getValue)
-    .map(_.getKey)
-    .map(EqByteArray)
+    .collect { case (leaseId, isActive) if isActive => EqByteArray(leaseId) }
     .toSeq
+
+  override def lastUpdateHeight(acc: Account): Option[Int] = Option(p.lastUpdateHeight.get(acc.bytes))
+
+  override def snapshotAtHeight(acc: Account, h: Int): Option[Snapshot] =
+    Option(p.balanceSnapshots.get(StateStorage.snapshotKey(acc, h)))
+      .map { case (ph, b, eb) => Snapshot(ph, b, eb) }
 }

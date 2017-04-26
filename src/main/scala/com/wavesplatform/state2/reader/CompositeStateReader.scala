@@ -31,35 +31,8 @@ class CompositeStateReader(inner: StateReader, blockDiff: BlockDiff) extends Sta
     fromDiff ++ inner.accountTransactionIds(a) // fresh head ++ stale tail
   }
 
-  override def effectiveBalanceAtHeightWithConfirmations(acc: Account, height: Int, confs: Int): Long = {
-    val localEffectiveBalanceSnapshotsOfAccount = blockDiff.effectiveBalanceSnapshots
-      .filter(ebs => ebs.acc == acc)
-
-    lazy val relatedUpdates = localEffectiveBalanceSnapshotsOfAccount.filter(_.height > height - confs)
-    lazy val storedEffectiveBalance = inner.effectiveBalanceAtHeightWithConfirmations(acc, height - blockDiff.heightDiff, confs - blockDiff.heightDiff)
-
-    if (localEffectiveBalanceSnapshotsOfAccount.isEmpty)
-      storedEffectiveBalance
-    else {
-      if (confs < blockDiff.heightDiff) {
-        relatedUpdates.headOption match {
-          case None =>
-            localEffectiveBalanceSnapshotsOfAccount.maxBy(_.height).effectiveBalance
-          case Some(relatedUpdate) =>
-            Math.min(relatedUpdate.prevEffectiveBalance, relatedUpdates.map(_.effectiveBalance).min)
-        }
-      }
-      else {
-        val localMin = localEffectiveBalanceSnapshotsOfAccount.map(_.effectiveBalance).min
-        val prevEffBalance = if (inner.height == 0)
-          localEffectiveBalanceSnapshotsOfAccount.minBy(_.height).prevEffectiveBalance
-        else
-          storedEffectiveBalance
-        Math.min(prevEffBalance, localMin)
-
-      }
-    }
-  }
+  override def snapshotAtHeight(acc: Account, h: Int): Option[Snapshot] =
+    blockDiff.snapshots.get(acc).flatMap(_.get(h)).orElse(inner.snapshotAtHeight(acc, h))
 
   override def paymentTransactionIdByHash(hash: ByteArray): Option[ByteArray]
   = blockDiff.txsDiff.paymentTransactionIdsByHashes.get(hash)
@@ -89,12 +62,14 @@ class CompositeStateReader(inner: StateReader, blockDiff: BlockDiff) extends Sta
   }
 
   override def activeLeases(): Seq[ByteArray] = {
-    blockDiff.txsDiff.effectiveLeaseTxUpdates._1.toSeq ++ inner.activeLeases()
+    blockDiff.txsDiff.leaseState.collect { case (id, isActive) if isActive => id }.toSeq ++ inner.activeLeases()
   }
+
+  override def lastUpdateHeight(acc: Account): Option[Int] = blockDiff.snapshots.get(acc).map(_.keySet.max).orElse(inner.lastUpdateHeight(acc))
 }
 
 object CompositeStateReader {
-  def proxy(inner: StateReader, blockDiff: () => BlockDiff): StateReader = new StateReader {
+  class Proxy(val inner: StateReader, blockDiff: () => BlockDiff) extends StateReader {
 
     override def paymentTransactionIdByHash(hash: ByteArray): Option[ByteArray] =
       new CompositeStateReader(inner, blockDiff()).paymentTransactionIdByHash(hash)
@@ -114,9 +89,6 @@ object CompositeStateReader {
     override def transactionInfo(id: ByteArray): Option[(Int, Transaction)] =
       new CompositeStateReader(inner, blockDiff()).transactionInfo(id)
 
-    override def effectiveBalanceAtHeightWithConfirmations(acc: Account, height: Int, confs: Int): Long =
-      new CompositeStateReader(inner, blockDiff()).effectiveBalanceAtHeightWithConfirmations(acc, height, confs)
-
     override def findPreviousExchangeTxs(orderId: EqByteArray): Set[ExchangeTransaction] =
       new CompositeStateReader(inner, blockDiff()).findPreviousExchangeTxs(orderId)
 
@@ -134,5 +106,12 @@ object CompositeStateReader {
 
     override def activeLeases(): Seq[ByteArray] =
       new CompositeStateReader(inner, blockDiff()).activeLeases()
+
+    override def lastUpdateHeight(acc: Account): Option[Int] =
+      new CompositeStateReader(inner, blockDiff()).lastUpdateHeight(acc)
+
+    override def snapshotAtHeight(acc: Account, h: Int): Option[Snapshot] =
+      new CompositeStateReader(inner, blockDiff()).snapshotAtHeight(acc, h)
   }
+
 }

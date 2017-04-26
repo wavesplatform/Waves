@@ -82,5 +82,4 @@ class ConsensusRouteSpec extends RouteSpec("/consensus") with RestAPISettingsHel
       }
     }
   }
-
 }

@@ -78,20 +78,22 @@ class StateWriterImpl(p: StateStorage) extends StateReaderImpl(p) with StateWrit
       }
     }
 
-    measurePersist("effectiveBalanceSnapshots")(blockDiff.effectiveBalanceSnapshots) {
-      _.foreach { ebs =>
-        p.effectiveBalanceSnapshots.put((ebs.acc.bytes, ebs.height), (ebs.prevEffectiveBalance, ebs.effectiveBalance))
-      }
-    }
+    measurePersist("effectiveBalanceSnapshots")(blockDiff.snapshots)(
+      _.foreach { case (acc, snapshotsByHeight) =>
+        snapshotsByHeight.foreach { case (h, snapshot) =>
+          p.balanceSnapshots.put(StateStorage.snapshotKey(acc, h), (snapshot.prevHeight, snapshot.balance, snapshot.effectiveBalance))
+        }
+        p.lastUpdateHeight.put(acc.bytes, snapshotsByHeight.keys.max)
+      })
+
     measurePersist("aliases")(blockDiff.txsDiff.aliases) {
       _.foreach { case (alias, acc) =>
         p.aliasToAddress.put(alias.name, acc.bytes)
       }
     }
 
-    val (effectiveNewLeases, effectiveNewCancels) = blockDiff.txsDiff.effectiveLeaseTxUpdates
-    measurePersist("effectiveNewLeases")(effectiveNewLeases)(_.foreach(id => p.leaseState.put(id.arr, true)))
-    measurePersist("effectiveNewCancels")(effectiveNewCancels)(_.foreach(id => p.leaseState.put(id.arr, false)))
+    measurePersist("lease info")(blockDiff.txsDiff.leaseState)(
+      _.foreach { case (id, isActive) => p.leaseState.put(id.arr, isActive) })
 
     p.setHeight(p.getHeight + blockDiff.heightDiff)
     p.commit()
@@ -103,11 +105,12 @@ class StateWriterImpl(p: StateStorage) extends StateReaderImpl(p) with StateWrit
     p.portfolios.clear()
     p.assets.clear()
     p.accountTransactionIds.clear()
-    p.effectiveBalanceSnapshots.clear()
+    p.balanceSnapshots.clear()
     p.paymentTransactionHashes.clear()
     p.exchangeTransactionsByOrder.clear()
     p.aliasToAddress.clear()
     p.leaseState.clear()
+    p.lastUpdateHeight.clear()
 
     p.setHeight(0)
     p.commit()
@@ -123,7 +126,7 @@ object StateWriterImpl extends ScorexLogging {
     (r, t1 - t0)
   }
 
-  def measurePersist[F[_] <: TraversableOnce[_], A](s: String)(fa: F[A])(f: F[A] => Unit): Unit = {
+  def measurePersist[F[_] <: TraversableOnce[_], A](s: String)(fa: => F[A])(f: F[A] => Unit): Unit = {
     val (_, time) = withTime(f(fa))
     log.debug(s"Persisting $s(size=${fa.size}) took ${time}ms")
   }

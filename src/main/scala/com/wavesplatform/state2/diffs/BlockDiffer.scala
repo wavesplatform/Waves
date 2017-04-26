@@ -12,6 +12,8 @@ import scorex.block.Block
 import scorex.transaction.{AssetAcc, ValidationError}
 import scorex.utils.ScorexLogging
 
+import scala.collection.SortedMap
+
 
 object BlockDiffer extends ScorexLogging {
 
@@ -19,7 +21,9 @@ object BlockDiffer extends ScorexLogging {
 
   def apply(settings: FunctionalitySettings)(s: StateReader, block: Block): Either[ValidationError, BlockDiff] = {
 
-    val txDiffer = TransactionDiffer(settings, block.timestamp, s.height + 1) _
+    val currentBlockHeight = s.height + 1
+
+    val txDiffer = TransactionDiffer(settings, block.timestamp, currentBlockHeight) _
 
     val accountPortfolioFeesMap: List[(Account, Portfolio)] = block.feesDistribution.toList.map {
       case (AssetAcc(account, maybeAssetId), feeVolume) =>
@@ -29,7 +33,7 @@ object BlockDiffer extends ScorexLogging {
         })
     }
     val feeDiff = Monoid[Diff].combineAll(accountPortfolioFeesMap.map { case (acc, p) =>
-      new Diff(Map.empty, Map(acc -> p), Map.empty, Map.empty, Map.empty, Map.empty, Seq.empty)
+      new Diff(Map.empty, Map(acc -> p), Map.empty, Map.empty, Map.empty, Map.empty, Map.empty)
     })
 
     val txsDiffEi = block.transactionData.foldLeft(right(feeDiff)) { case (ei, tx) => ei.flatMap(diff =>
@@ -37,37 +41,32 @@ object BlockDiffer extends ScorexLogging {
         .map(newDiff => diff.combine(newDiff)))
     }
 
-    txsDiffEi
-      .map(d => if (s.height + 1 == settings.resetEffectiveBalancesAtHeight)
+    txsDiffEi.map { d =>
+      val diff = if (currentBlockHeight == settings.resetEffectiveBalancesAtHeight)
         Monoid.combine(d, LeasePatch(new CompositeStateReader(s, d.asBlockDiff)))
-      else d)
-      .map(diff => {
-        val effectiveBalanceSnapshots = diff.portfolios
-          .filter { case (acc, portfolio) => portfolio.effectiveBalance != 0 }
-          .map { case (acc, portfolio) => (acc, s.accountPortfolio(acc).effectiveBalance, portfolio.effectiveBalance) }
-          .map { case (acc, oldEffBalance, effBalanceDiff) =>
-            EffectiveBalanceSnapshot(acc = acc,
-              height = s.height + 1,
-              prevEffectiveBalance = if (s.height == 0) (oldEffBalance + effBalanceDiff) else oldEffBalance,
-              effectiveBalance = oldEffBalance + effBalanceDiff)
-          }
-          .toSet
-
-        BlockDiff(diff, 1, effectiveBalanceSnapshots)
-      }
-      )
+      else d
+      val newSnapshots = diff.portfolios
+        .collect { case (acc, portfolioDiff) if (portfolioDiff.balance != 0 || portfolioDiff.effectiveBalance != 0) =>
+          val oldPortfolio = s.accountPortfolio(acc)
+          acc -> SortedMap(currentBlockHeight -> Snapshot(
+            prevHeight = s.lastUpdateHeight(acc).getOrElse(0),
+            balance = oldPortfolio.balance + portfolioDiff.balance,
+            effectiveBalance = oldPortfolio.effectiveBalance + portfolioDiff.effectiveBalance))
+        }
+      BlockDiff(diff, 1, newSnapshots)
+    }
   }
 
 
-  def unsafeDiffMany(settings: FunctionalitySettings, log: (String) => Unit = _ => ())(s: StateReader, blocks: Seq[Block]): BlockDiff = {
+  def unsafeDiffMany(settings: FunctionalitySettings)(s: StateReader, blocks: Seq[Block]): BlockDiff = {
     val r = blocks.foldLeft(Monoid[BlockDiff].empty) { case (diff, block) =>
       val blockDiff = apply(settings)(new CompositeStateReader(s, diff), block).explicitGet()
       if (diff.heightDiff % 1000 == 0) {
-        log(s"Rebuilt ${diff.heightDiff} blocks out of ${blocks.size}")
+        log.info(s"Rebuilt ${diff.heightDiff} blocks out of ${blocks.size}")
       }
       Monoid[BlockDiff].combine(diff, blockDiff)
     }
-    log(s"Rebuild of ${blocks.size} completed")
+    log.info(s"Rebuild of ${blocks.size} blocks completed")
     r
   }
 }

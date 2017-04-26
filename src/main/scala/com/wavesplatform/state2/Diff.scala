@@ -5,15 +5,13 @@ import cats.implicits._
 import scorex.account.{Account, Alias}
 import scorex.transaction.Transaction
 import scorex.transaction.assets.exchange.ExchangeTransaction
-import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 
-case class EffectiveBalanceSnapshot(acc: Account, height: Int, prevEffectiveBalance: Long, effectiveBalance: Long)
+case class Snapshot(prevHeight: Int, balance: Long, effectiveBalance: Long)
 
 case class LeaseInfo(leaseIn: Long, leaseOut: Long)
 
 object LeaseInfo {
   val empty = LeaseInfo(0, 0)
-
   implicit val leaseInfoMonoid = new Monoid[LeaseInfo] {
     override def empty: LeaseInfo = LeaseInfo.empty
 
@@ -38,35 +36,18 @@ case class Diff(transactions: Map[ByteArray, (Int, Transaction, Set[Account])],
                 aliases: Map[Alias, Account],
                 paymentTransactionIdsByHashes: Map[ByteArray, ByteArray],
                 previousExchangeTxs: Map[ByteArray, Set[ExchangeTransaction]],
-                patchExtraLeaseIdsToCancel: Seq[ByteArray]) {
+                leaseState: Map[ByteArray, Boolean]) {
 
   lazy val accountTransactionIds: Map[Account, List[ByteArray]] = {
-    val map: List[(Account, List[(Int, Long, ByteArray)])] = transactions.toList
-      .flatMap { case (id, (h, tx, accs)) => accs.map(acc => acc -> List((h, tx.timestamp, id))) }
-    val groupedByAcc = map.foldLeft(Map.empty[Account, List[(Int, Long, ByteArray)]]) { case (m, (acc, list)) =>
-      m.combine(Map(acc -> list))
+    val map: List[(Account, Set[(Int, Long, ByteArray)])] = transactions.toList
+      .flatMap { case (id, (h, tx, accs)) => accs.map(acc => acc -> Set((h, tx.timestamp, id))) }
+    val groupedByAcc = map.foldLeft(Map.empty[Account, Set[(Int, Long, ByteArray)]]) { case (m, (acc, set)) =>
+      m.combine(Map(acc -> set))
     }
     groupedByAcc
-      .mapValues(l => l.sortBy { case ((h, t, id)) => (-h, -t) }) // fresh head ([h=2, h=1, h=0])
+      .mapValues(l => l.toList.sortBy { case ((h, t, id)) => (-h, -t) }) // fresh head ([h=2, h=1, h=0])
       .mapValues(_.map(_._3))
   }
-
-  lazy val effectiveLeaseTxUpdates: (Set[EqByteArray], Set[EqByteArray]) = {
-    val txs = transactions.values.map(_._2)
-
-    val canceledLeaseIds: Set[EqByteArray] = txs
-      .collect { case (lctx: LeaseCancelTransaction) => EqByteArray(lctx.leaseId) }
-      .toSet
-
-    val newLeaseIds = txs
-      .collect { case (ltx: LeaseTransaction) => EqByteArray(ltx.id) }
-      .toSet
-
-    val effectiveNewCancels = (canceledLeaseIds ++ patchExtraLeaseIdsToCancel).diff(newLeaseIds)
-    val effectiveNewLeases = newLeaseIds.diff(canceledLeaseIds ++ patchExtraLeaseIdsToCancel)
-    (effectiveNewLeases, effectiveNewCancels)
-  }
-
 }
 
 object Diff {
@@ -75,7 +56,8 @@ object Diff {
             assetInfos: Map[ByteArray, AssetInfo] = Map.empty,
             aliases: Map[Alias, Account] = Map.empty,
             previousExchangeTxs: Map[ByteArray, Set[ExchangeTransaction]] = Map.empty,
-            paymentTransactionIdsByHashes: Map[ByteArray, ByteArray] = Map.empty
+            paymentTransactionIdsByHashes: Map[ByteArray, ByteArray] = Map.empty,
+            leaseState: Map[ByteArray, Boolean] = Map.empty
            ): Diff = Diff(
     transactions = Map(EqByteArray(tx.id) -> (height, tx, portfolios.keys.toSet)),
     portfolios = portfolios,
@@ -83,14 +65,14 @@ object Diff {
     aliases = aliases,
     paymentTransactionIdsByHashes = paymentTransactionIdsByHashes,
     previousExchangeTxs = previousExchangeTxs,
-    patchExtraLeaseIdsToCancel = Seq.empty)
+    leaseState = leaseState)
 
   implicit class DiffExt(d: Diff) {
-    def asBlockDiff: BlockDiff = BlockDiff(d, 0, Set.empty)
+    def asBlockDiff: BlockDiff = BlockDiff(d, 0, Map.empty)
   }
 
   implicit val diffMonoid = new Monoid[Diff] {
-    override def empty: Diff = Diff(transactions = Map.empty, portfolios = Map.empty, issuedAssets = Map.empty, Map.empty, Map.empty, Map.empty, Seq.empty)
+    override def empty: Diff = Diff(transactions = Map.empty, portfolios = Map.empty, issuedAssets = Map.empty, Map.empty, Map.empty, Map.empty, Map.empty)
 
     override def combine(older: Diff, newer: Diff): Diff = Diff(
       transactions = older.transactions ++ newer.transactions,
@@ -99,8 +81,6 @@ object Diff {
       aliases = older.aliases ++ newer.aliases,
       paymentTransactionIdsByHashes = older.paymentTransactionIdsByHashes ++ newer.paymentTransactionIdsByHashes,
       previousExchangeTxs = older.previousExchangeTxs ++ newer.previousExchangeTxs,
-      patchExtraLeaseIdsToCancel = newer.patchExtraLeaseIdsToCancel ++ older.patchExtraLeaseIdsToCancel
-    )
+      leaseState = older.leaseState ++ newer.leaseState)
   }
-
 }
