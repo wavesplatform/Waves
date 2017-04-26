@@ -41,7 +41,7 @@ class SimpleTransactionModuleSpecification extends FunSuite with MockFactory wit
 
   implicit val app = stub[MyApp]
   implicit val settings = wavesSettings
-  implicit val transactionModule = new SimpleTransactionModule(wavesSettings, app)
+  implicit val transactionModule = new SimpleTransactionModule(wavesSettings, app.networkController)
   val genesisTimestamp = System.currentTimeMillis()
   if (transactionModule.blockStorage.history.isEmpty) {
     transactionModule.blockStorage.blockchainUpdater.processBlock(Block.genesis(transactionModule.consensusGenesisData, transactionModule.genesisData, genesisTimestamp))

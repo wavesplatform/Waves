@@ -37,7 +37,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
   override val matcherSettings: MatcherSettings = settings.matcherSettings
   override val restAPISettings: RestAPISettings = settings.restAPISettings
 
-  override implicit lazy val transactionModule = new SimpleTransactionModule(settings, this)
+  override implicit lazy val transactionModule = new SimpleTransactionModule(settings, networkController)
 
   override lazy val blockStorage: BlockStorage = transactionModule.blockStorage
 

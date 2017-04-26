@@ -55,7 +55,7 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
   val db: MVStore = new MVStore.Builder().open()
 
   class TestAppMock extends Application {
-    lazy implicit val transactionModule: TransactionModule = new SimpleTransactionModule(wavesSettings, this) {
+    lazy implicit val transactionModule: TransactionModule = new SimpleTransactionModule(wavesSettings, this.networkController) {
       override def isValid(block: Block): Boolean = true
     }
     lazy val networkController: ActorRef = networkControllerMock

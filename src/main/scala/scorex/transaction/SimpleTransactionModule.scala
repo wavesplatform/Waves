@@ -1,5 +1,6 @@
 package scorex.transaction
 
+import akka.actor.ActorRef
 import com.google.common.base.Charsets
 import com.wavesplatform.history.BlockStorageImpl
 import com.wavesplatform.settings.{GenesisSettings, WavesSettings}
@@ -29,12 +30,11 @@ import scala.util.control.NonFatal
 import scala.util.{Left, Right}
 
 
-class SimpleTransactionModule(val settings: WavesSettings, application: Application)
+class SimpleTransactionModule(val settings: WavesSettings, networkController: ActorRef)
   extends TransactionModule with TransactionOperations with ScorexLogging {
 
   import SimpleTransactionModule._
 
-  private val networkController = application.networkController
   private val feeCalculator = new FeeCalculator(settings.feesSettings)
   private val fs = settings.blockchainSettings.functionalitySettings
 

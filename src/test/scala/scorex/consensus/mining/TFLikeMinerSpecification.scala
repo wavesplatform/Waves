@@ -2,13 +2,14 @@ package scorex.consensus.mining
 
 import akka.actor.Props
 import akka.testkit.TestProbe
-import com.wavesplatform.settings.{Constants, WavesSettings}
+import com.wavesplatform.settings.WavesSettings
+import org.scalatest.DoNotDiscover
 import scorex.ActorTestingCommons
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.app.Application
 import scorex.block.Block
 import scorex.network.Coordinator.AddBlock
-import scorex.transaction.{History, SimpleTransactionModule, TransactionModule}
+import scorex.transaction.{History, SimpleTransactionModule}
 import scorex.wallet.Wallet
 
 import scala.concurrent.duration._
@@ -17,7 +18,7 @@ import scala.language.{implicitConversions, postfixOps}
 class MinerMock(app: Application) extends Miner(app) {
   override protected def preciseTime: Long = System.currentTimeMillis()
 }
-
+@DoNotDiscover
 class TFLikeMinerSpecification extends ActorTestingCommons {
 
   import System.currentTimeMillis
@@ -35,7 +36,7 @@ class TFLikeMinerSpecification extends ActorTestingCommons {
 
   private val wavesSettings: WavesSettings = WavesSettings.fromConfig(baseTestConfig)
 
-  class MockableConsensusModule extends SimpleTransactionModule(wavesSettings, mock[Application])
+  class MockableConsensusModule extends SimpleTransactionModule(wavesSettings, ???)
 
   private val testConsensusModule = mock[MockableConsensusModule]
   private val f = mockFunction[Block, String]
