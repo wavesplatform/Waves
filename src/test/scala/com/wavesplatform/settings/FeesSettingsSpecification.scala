@@ -137,6 +137,9 @@ class FeesSettingsSpecification extends FlatSpec with Matchers {
         |  create-alias {
         |    WAVES = 100000
         |  }
+        |  make-unique-asset {
+        |    WAVES = 100000
+        |  }
         |}
       """.stripMargin).withFallback(defaultConfig).resolve()
     val settings = FeesSettings.fromConfig(config)
@@ -150,5 +153,6 @@ class FeesSettingsSpecification extends FlatSpec with Matchers {
     settings.fees(8).toSet should equal(Set(FeeSettings("WAVES", 100000)))
     settings.fees(9).toSet should equal(Set(FeeSettings("WAVES", 100000)))
     settings.fees(10).toSet should equal(Set(FeeSettings("WAVES", 100000)))
+    settings.fees(11).toSet should equal(Set(FeeSettings("WAVES", 100000)))
   }
 }
