@@ -127,4 +127,20 @@ class LeasingTransactionsSpecification(override val allNodes: Seq[Node]) extends
 
     Await.result(f, 1 minute)
   }
+
+  test("can not make leasing without having enough your waves to self") {
+    val f = for {
+      fb <- Future.traverse(allNodes)(_.height).map(_.min)
+
+      _ <- assertBalances(firstAddress, 65 waves, 50 waves)
+
+      transferFailureAssertion <- assertRequestError(sender.lease(firstAddress, firstAddress, 89 waves, fee = 1 waves))
+
+      _ <- Future.traverse(allNodes)(_.waitForHeight(fb + 2))
+
+      _ <- assertBalances(firstAddress, 65 waves, 50 waves)
+    } yield transferFailureAssertion
+
+    Await.result(f, 1 minute)
+  }
 }

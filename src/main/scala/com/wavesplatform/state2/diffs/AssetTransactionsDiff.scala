@@ -17,15 +17,13 @@ object AssetTransactionsDiff {
     val info = AssetInfo(
       isReissuable = tx.reissuable,
       volume = tx.quantity)
-    if (state.isAssetNameAvailable(EqByteArray(tx.name))) {
-      Right(Diff(height = height,
-        tx = tx,
-        portfolios = Map(Account.fromPublicKey(tx.sender.publicKey) -> Portfolio(
-          balance = -tx.fee,
-          leaseInfo = LeaseInfo.empty,
-          assets = Map(assetId -> tx.quantity))),
-        assetInfos = Map(assetId -> info)))
-    } else Left(TransactionValidationError(tx, "Asset name is not available"))
+    Right(Diff(height = height,
+      tx = tx,
+      portfolios = Map(Account.fromPublicKey(tx.sender.publicKey) -> Portfolio(
+        balance = -tx.fee,
+        leaseInfo = LeaseInfo.empty,
+        assets = Map(assetId -> tx.quantity))),
+      assetInfos = Map(assetId -> info)))
   }
 
   def reissue(state: StateReader, settings: FunctionalitySettings, blockTime: Long, height: Int)(tx: ReissueTransaction): Either[StateValidationError, Diff] = {
