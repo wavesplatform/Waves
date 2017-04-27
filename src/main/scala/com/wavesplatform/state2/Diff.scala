@@ -71,7 +71,7 @@ object Diff {
     assetsWithUniqueNames = assetsWithUniqueNames)
 
   implicit class DiffExt(d: Diff) {
-    def asBlockDiff: BlockDiff = BlockDiff(d, 0, Seq.empty)
+    def asBlockDiff: BlockDiff = BlockDiff(d, 0, Map.empty)
   }
 
   implicit val diffMonoid = new Monoid[Diff] {
