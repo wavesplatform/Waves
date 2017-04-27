@@ -23,6 +23,8 @@ class TransactionsRouteSpec extends RouteSpec("/transactions")
 
   import TransactionsApiRoute.MaxTransactionsPerRequest
 
+  private val transactionsCount = 10
+
   private val history = mock[History]
   private val state = mock[StateReader]
   private val stm = mock[TransactionModule]
@@ -54,13 +56,13 @@ class TransactionsRouteSpec extends RouteSpec("/transactions")
       forAll(
         accountGen,
         choose(1, MaxTransactionsPerRequest),
-        randomTransactionsGen(10)) { case (account, limit, txs) =>
+        randomTransactionsGen(transactionsCount)) { case (account, limit, txs) =>
         (state.accountTransactionIds _).expects(account: Account).returning(txs.map(_.id).map(EqByteArray)).once()
         txs.foreach { tx =>
           (state.transactionInfo _).expects(EqByteArray(tx.id)).returning(Some(1,tx)).once()
         }
         Get(routePath(s"/address/${account.address}/limit/$limit")) ~> route ~> check {
-          responseAs[Seq[JsValue]].length shouldEqual txs.length
+          responseAs[Seq[JsValue]].length shouldEqual txs.length.min(limit)
         }
       }
     }
