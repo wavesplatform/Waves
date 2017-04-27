@@ -40,7 +40,7 @@ object Dependencies {
   )
 
   lazy val db = Seq(
-    "com.h2database" % "h2-mvstore" % "1.4.194"
+    "com.h2database" % "h2-mvstore" % "1.4.195"
   )
 
   lazy val logging = Seq(

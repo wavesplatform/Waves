@@ -10,6 +10,9 @@ import scorex.crypto.encode.Base58
 import scorex.transaction._
 import scorex.utils.ScorexLogging
 
+import StateWriterImpl._
+import BlockchainUpdaterImpl._
+
 class BlockchainUpdaterImpl(persisted: StateWriter with StateReader, settings: FunctionalitySettings, bc: HistoryWriter with History)
   extends BlockchainUpdater with ScorexLogging {
 
@@ -18,20 +21,14 @@ class BlockchainUpdaterImpl(persisted: StateWriter with StateReader, settings: F
 
   private val unsafeDifferByRange: (StateReader, (Int, Int)) => BlockDiff = {
     case (sr, (from, to)) =>
-      log.debug(s"Reading blocks from $from to $to")
-      val blocks = Range(from, to).foldLeft((List.empty[Block], 0)) { case ((acc, counter), i) =>
-        if (counter % 1000 == 0) {
-          log.debug(s"Read block $counter of Range($from, $to)")
-        }
-        (bc.blockAt(i).get +: acc, counter + 1)
-      }._1.reverse
-      log.debug(s"Blocks read from $from to $to")
-      val r = BlockDiffer.unsafeDiffMany(settings)(sr, blocks)
-      log.debug(s"Diff for Range($from, $to) rebuilt")
-      r
+      val blocks = measureLog(s"Reading blocks from $from up to $to") {
+        Range(from, to).map(bc.blockAt(_).get)
+      }
+      measureLog(s"Building diff from $from up to $to") {
+        BlockDiffer.unsafeDiffMany(settings)(sr, blocks)
+      }
   }
-  private val unsafeDiffByRange: ((Int, Int)) => BlockDiff = unsafeDifferByRange(persisted, _)
-  private val unsafeDiffNotPersisted: () => BlockDiff = () => unsafeDiffByRange(persisted.height + 1, bc.height() + 1)
+  private val unsafeDiffAgainstPersistedByRange: ((Int, Int)) => BlockDiff = unsafeDifferByRange(persisted, _)
 
   @volatile var inMemoryDiff: BlockDiff = Monoid[BlockDiff].empty
 
@@ -53,9 +50,12 @@ class BlockchainUpdaterImpl(persisted: StateWriter with StateReader, settings: F
     logHeights("State rebuild started:")
     val persistFrom = persisted.height + 1
     val persistUpTo = bc.height - MinInMemDiff + 1
-    val diffToBePersisted = unsafeDiffByRange(persistFrom, persistUpTo)
-    persisted.applyBlockDiff(diffToBePersisted)
-    inMemoryDiff = unsafeDiffNotPersisted()
+
+    ranges(persistFrom, persistUpTo, 200).foreach { case (head, last) =>
+      val diffToBePersisted = unsafeDiffAgainstPersistedByRange(head, last)
+      persisted.applyBlockDiff(diffToBePersisted)
+    }
+    inMemoryDiff = unsafeDiffAgainstPersistedByRange(persisted.height + 1, bc.height() + 1)
     logHeights("State rebuild finished:")
   }
 
@@ -85,11 +85,19 @@ class BlockchainUpdaterImpl(persisted: StateWriter with StateReader, settings: F
 
         } else {
           if (currentState.height != height) {
-            inMemoryDiff = unsafeDiffByRange(persisted.height + 1, height + 1)
+            inMemoryDiff = unsafeDiffAgainstPersistedByRange(persisted.height + 1, height + 1)
           }
         }
       case None =>
         log.warn(s"removeAfter non-existing block ${Base58.encode(blockId)}")
     }
   }
+}
+
+object BlockchainUpdaterImpl {
+  def ranges(from: Int, to: Int, by: Int): List[(Int, Int)] =
+    if (from + by < to)
+      (from, from + by) +: ranges(from + by, to, by)
+    else List((from, to))
+
 }

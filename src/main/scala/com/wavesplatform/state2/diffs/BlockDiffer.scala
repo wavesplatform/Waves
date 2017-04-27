@@ -57,16 +57,9 @@ object BlockDiffer extends ScorexLogging {
     }
   }
 
-
-  def unsafeDiffMany(settings: FunctionalitySettings)(s: StateReader, blocks: Seq[Block]): BlockDiff = {
-    val r = blocks.foldLeft(Monoid[BlockDiff].empty) { case (diff, block) =>
+  def unsafeDiffMany(settings: FunctionalitySettings)(s: StateReader, blocks: Seq[Block]): BlockDiff =
+    blocks.foldLeft(Monoid[BlockDiff].empty) { case (diff, block) =>
       val blockDiff = apply(settings)(new CompositeStateReader(s, diff), block).explicitGet()
-      if (diff.heightDiff % 1000 == 0) {
-        log.info(s"Rebuilt ${diff.heightDiff} blocks out of ${blocks.size}")
-      }
       Monoid[BlockDiff].combine(diff, blockDiff)
     }
-    log.info(s"Rebuild of ${blocks.size} blocks completed")
-    r
-  }
 }

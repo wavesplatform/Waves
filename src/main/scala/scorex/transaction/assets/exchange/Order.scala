@@ -103,7 +103,8 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
   @ApiModelProperty(hidden = true)
   lazy val idStr: String = Base58.encode(id)
 
-  override def bytes: Array[Byte] = toSign ++ signature
+  @ApiModelProperty(hidden = true)
+  lazy val bytes: Array[Byte] = toSign ++ signature
 
   @ApiModelProperty(hidden = true)
   def getReceiveAssetId: Option[AssetId] = orderType match {
