@@ -57,7 +57,7 @@ class CompositeStateReader(inner: StateReader, blockDiff: BlockDiff) extends Sta
     blockDiff.txsDiff.leaseState.collect { case (id, isActive) if isActive => id }.toSeq ++ inner.activeLeases()
   }
 
-  override def lastUpdateHeight(acc: Account): Option[Int] = blockDiff.snapshots.get(acc).map(_.keySet.max).orElse(inner.lastUpdateHeight(acc))
+  override def lastUpdateHeight(acc: Account): Option[Int] = blockDiff.snapshots.get(acc).map(_.lastKey).orElse(inner.lastUpdateHeight(acc))
 }
 
 object CompositeStateReader {
