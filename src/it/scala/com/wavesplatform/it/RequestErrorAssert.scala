@@ -11,6 +11,6 @@ import scala.concurrent.ExecutionContext.Implicits.global
 trait RequestErrorAssert extends Assertions {
   protected def assertRequestError(f: Future[_]): Future[Assertion] = f transform {
     case Failure(UnexpectedStatusCodeException(r)) => Success(Assertions.assert(r.getStatusCode == 400))
-    case _ => Failure[Assertion](new RuntimeException("Unexpected state"))
+    case Failure(e) => Failure[Assertion](new RuntimeException(s"Unexpected state: ${e.getMessage}", e))
   }
 }
