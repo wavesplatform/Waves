@@ -2,6 +2,7 @@ package com.wavesplatform.http
 
 import com.wavesplatform.BlockGen
 import com.wavesplatform.http.ApiMarshallers._
+import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.reader.StateReader
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
@@ -34,7 +35,7 @@ class ConsensusRouteSpec extends RouteSpec("/consensus") with RestAPISettingsHel
   private val tm = mock[TransactionModule]
   (tm.blockStorage _).expects().returning(bs).anyNumberOfTimes()
 
-  private val route = NxtConsensusApiRoute(restAPISettings, state, history, tm).route
+  private val route = NxtConsensusApiRoute(restAPISettings, state, history, mock[FunctionalitySettings]).route
 
   routePath("/generationsignature") - {
     "for last block" in {

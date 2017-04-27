@@ -1,9 +1,12 @@
 package scorex.consensus.mining
 
 import akka.actor.{Actor, Cancellable}
+import com.wavesplatform.settings.BlockchainSettings
+import com.wavesplatform.state2.reader.StateReader
 import scorex.app.Application
 import scorex.consensus.mining.Miner._
 import scorex.network.Coordinator.AddBlock
+import scorex.transaction.{History, TransactionModule, UnconfirmedTransactionsStorage}
 import scorex.utils.{NTP, ScorexLogging}
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -23,8 +26,12 @@ class Miner(application: Application) extends Actor with ScorexLogging {
 
   override def receive: Receive = {
     case GuessABlock(rescheduleImmediately) =>
-      if (rescheduleImmediately) { cancel() }
-      if (currentState.isEmpty) { scheduleBlockGeneration() }
+      if (rescheduleImmediately) {
+        cancel()
+      }
+      if (currentState.isEmpty) {
+        scheduleBlockGeneration()
+      }
 
     case GenerateBlock =>
       cancel()
@@ -38,31 +45,41 @@ class Miner(application: Application) extends Actor with ScorexLogging {
     case Stop => context stop self
   }
 
-  override def postStop(): Unit = { cancel() }
+  override def postStop(): Unit = {
+    cancel()
+  }
+
+  private val history = application.blockStorage.history
+
+  private val state = application.blockStorage.stateReader
+
+  private val bcs = application.settings.blockchainSettings
+
+  private val utx = application.transactionModule.utxStorage
 
   private def tryToGenerateABlock(): Boolean = Try {
     log.debug("Trying to generate a new block")
 
-    val blocks = application.transactionModule.generateNextBlocks(accounts)
+    val blocks = TransactionModule.generateNextBlocks(history, state, bcs, utx)(accounts)
     if (blocks.nonEmpty) {
-      val bestBlock = blocks.max(application.transactionModule.blockOrdering)
+      val bestBlock = blocks.max(TransactionModule.blockOrdering(history, state, bcs.functionalitySettings))
       application.coordinator ! AddBlock(bestBlock, None)
       true
     } else false
   } recoverWith { case e =>
-      log.warn(s"Failed to generate new block: ${e.getMessage}")
-      Failure(e)
+    log.warn(s"Failed to generate new block: ${e.getMessage}")
+    Failure(e)
   } getOrElse false
 
   protected def preciseTime: Long = NTP.correctedTime()
 
   private def scheduleBlockGeneration(): Unit = try {
     val schedule = if (application.settings.minerSettings.tfLikeScheduling) {
-      val lastBlock = application.blockStorage.history.lastBlock
+      val lastBlock = history.lastBlock
       val currentTime = preciseTime
 
       accounts
-        .flatMap(acc => application.transactionModule.nextBlockGenerationTime(lastBlock, acc).map(_ + BlockGenerationTimeShift.toMillis))
+        .flatMap(acc => TransactionModule.nextBlockGenerationTime(history, state, bcs.functionalitySettings)(lastBlock, acc).map(_ + BlockGenerationTimeShift.toMillis))
         .map(t => math.max(t - currentTime, blockGenerationDelay.toMillis))
         .filter(_ < MaxBlockGenerationDelay.toMillis)
         .map(_ millis)

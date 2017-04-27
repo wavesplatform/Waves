@@ -20,7 +20,7 @@ import scorex.network.message._
 import scorex.network.message.{Message, MessageSpec}
 import scorex.network.peer.PeerManager.{ConnectedPeers, GetConnectedPeersTyped}
 import scorex.transaction.History.BlockchainScore
-import scorex.transaction.{TransactionModule, ValidationError}
+import scorex.transaction.{SimpleTransactionModule, TransactionModule, ValidationError}
 import scorex.transaction.ValidationError.CustomError
 import scorex.utils.ScorexLogging
 
@@ -40,6 +40,7 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
   private lazy val blockchainSynchronizer = application.blockchainSynchronizer
 
   private lazy val history = application.blockStorage.history
+  private lazy val stateReader = application.blockStorage.stateReader
   private lazy val checkpoints = application.blockStorage.checkpoints
 
   context.system.scheduler.schedule(1.second, application.settings.synchronizationSettings.scoreBroadcastInterval, self, BroadcastCurrentScore)
@@ -176,7 +177,7 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
           // someone has happened to be faster and already added a block or blocks after the parent
           log.debug(s"A child for parent of the block already exists, local=$local: ${newBlock.json}")
 
-          val cmp = application.transactionModule.blockOrdering
+          val cmp = TransactionModule.blockOrdering(history, stateReader, application.settings.blockchainSettings.functionalitySettings)
           if (lastBlock.referenceField.value.sameElements(parentBlockId) && cmp.lt(lastBlock, newBlock)) {
             log.debug(s"New block ${newBlock.json} is better than last ${lastBlock.json}")
           }
@@ -223,15 +224,14 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
     if (application.blockStorage.history.heightOf(lastCommonBlockId).exists(isForkValidWithCheckpoint)) {
       application.blockStorage.blockchainUpdater.removeAfter(lastCommonBlockId)
 
-      foldM[({type l[α] = Either[(ValidationError, BlockId), α]})#l, List, Block, Unit](newBlocks.toList, ())
-        { case ((), block: Block) => processNewBlock(block).left.map((_, block.uniqueId)) } match {
+      foldM[({type l[α] = Either[(ValidationError, BlockId), α]})#l, List, Block, Unit](newBlocks.toList, ()) { case ((), block: Block) => processNewBlock(block).left.map((_, block.uniqueId)) } match {
         case Right(_) =>
         case Left(err) =>
           log.error(s"Can't processFork(lastBlockCommonId: ${Base58.encode(lastCommonBlockId)} because: ${err._1}")
-              if (history.lastBlock.uniqueId.sameElements(err._2)) {
-                from.foreach(_.blacklist())
-              }
-            }
+          if (history.lastBlock.uniqueId.sameElements(err._2)) {
+            from.foreach(_.blacklist())
+          }
+      }
 
       self ! BroadcastCurrentScore
 

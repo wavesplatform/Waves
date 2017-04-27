@@ -110,8 +110,7 @@ case class WavesApiRoute(settings: RestAPISettings, wallet: Wallet, transactionM
           _seed <- Base58.decode(payment.senderWalletSeed).toOption.toRight(InvalidSeed)
           senderAccount = Wallet.generateNewAccount(_seed, payment.senderAddressNonce)
           recipientAccount <- Account.fromString(payment.recipient).left.map(ApiError.fromValidationError)
-          _tx <- transactionModule
-            .createPayment(senderAccount, recipientAccount, payment.amount, payment.fee, payment.timestamp)
+          _tx <- PaymentTransaction.create(senderAccount, recipientAccount, payment.amount, payment.fee, payment.timestamp)
             .left.map(ApiError.fromValidationError)
         } yield SignedPaymentRequest(_tx.timestamp, _tx.amount, _tx.fee, _tx.recipient.address, Base58.encode(_tx.sender.publicKey),
           _tx.sender.address, Base58.encode(_tx.signature))

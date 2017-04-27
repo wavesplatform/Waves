@@ -50,7 +50,7 @@ class SimpleTransactionModule(val settings: WavesSettings, networkController: Ac
     } yield t2
   }
 
-  override def packUnconfirmed(heightOpt: Option[Int]): Seq[Transaction] = synchronized {
+  def packUnconfirmed(heightOpt: Option[Int]): Seq[Transaction] = synchronized {
     clearIncorrectTransactions()
 
     val txs = utxStorage.all()
@@ -97,16 +97,6 @@ class SimpleTransactionModule(val settings: WavesSettings, networkController: Ac
   private def avgDelayInSeconds: Long = settings.blockchainSettings.genesisSettings.averageBlockDelay.toSeconds
 
   private def normalize(value: Long): Double = value * avgDelayInSeconds / (60: Double)
-
-  def blockOrdering: Ordering[(Block)] =
-    Ordering.by {
-      block =>
-        val parent = blockStorage.history.blockById(block.reference).get
-        val blockCreationTime = nextBlockGenerationTime(parent, block.signerData.generator)
-          .getOrElse(block.timestamp)
-
-        (block.blockScore, -blockCreationTime)
-    }
 
   def isValid(block: Block): Boolean = try {
     val blockTime = block.timestampField.value
@@ -171,103 +161,6 @@ class SimpleTransactionModule(val settings: WavesSettings, networkController: Ac
       throw t
   }
 
-  def generateNextBlock(account: PrivateKeyAccount): Option[Block] = try {
-
-    val lastBlock = blockStorage.history.lastBlock
-    val height = blockStorage.history.heightOf(lastBlock).get
-    val balance = generatingBalance(account, height)
-
-    if (balance < MinimalEffectiveBalanceForGenerator) {
-      throw new IllegalStateException(s"Effective balance $balance is less that minimal ($MinimalEffectiveBalanceForGenerator)")
-    }
-
-    val lastBlockKernelData = lastBlock.consensusDataField.value
-
-    val lastBlockTime = lastBlock.timestampField.value
-
-    val currentTime = NTP.correctedTime()
-
-    val h = calcHit(lastBlockKernelData, account)
-    val t = calcTarget(lastBlock, currentTime, balance)
-
-    val eta = (currentTime - lastBlockTime) / 1000
-
-    log.debug(s"hit: $h, target: $t, generating ${
-      h < t
-    }, eta $eta, " +
-      s"account:  $account " +
-      s"account balance: $balance " +
-      s"last block id: ${
-        lastBlock.encodedId
-      }, " +
-      s"height: $height, " +
-      s"last block target: ${
-        lastBlockKernelData.baseTarget
-      }"
-    )
-
-    if (h < t) {
-
-      val btg = calcBaseTarget(lastBlock, currentTime)
-      val gs = calcGeneratorSignature(lastBlockKernelData, account)
-      val consensusData = NxtLikeConsensusBlockData(btg, gs)
-
-      val unconfirmed = packUnconfirmed(Some(height))
-      log.debug(s"Build block with ${
-        unconfirmed.size
-      } transactions")
-      log.debug(s"Block time interval is $eta seconds ")
-
-      Some(Block.buildAndSign(Version,
-        currentTime,
-        lastBlock.uniqueId,
-        consensusData,
-        unconfirmed,
-        account))
-    } else None
-  } catch {
-    case e: UnsupportedOperationException =>
-      log.debug(s"DB can't find last block because of unexpected modification")
-      None
-    case e: IllegalStateException =>
-      log.debug(s"Failed to generate new block: ${
-        e.getMessage
-      }")
-      None
-  }
-
-  def nextBlockGenerationTime(block: Block, account: PublicKeyAccount): Option[Long] = {
-    blockStorage.history.heightOf(block.uniqueId)
-      .map(height => (height, generatingBalance(account, height))).filter(_._2 > 0)
-      .flatMap {
-        case (height, balance) =>
-          val cData = block.consensusData
-          val hit = calcHit(cData, account)
-          val t = cData.baseTarget
-
-          val result =
-            Some((hit * 1000) / (BigInt(t) * balance) + block.timestamp)
-              .filter(_ > 0).filter(_ < Long.MaxValue)
-              .map(_.toLong)
-
-          log.debug({
-            val currentTime = NTP.correctedTime()
-            s"Next block gen time: $result " +
-              s"in ${
-                result.map(t => (t - currentTime) / 1000)
-              } seconds, " +
-              s"hit: $hit, target: $t, " +
-              s"account:  $account, account balance: $balance " +
-              s"last block id: ${
-                block.encodedId
-              }, " +
-              s"height: $height"
-          })
-
-          result
-      }
-  }
-
   private def calcGeneratorSignature(lastBlockData: NxtLikeConsensusBlockData, generator: PublicKeyAccount) =
     hash(lastBlockData.generationSignature ++ generator.publicKey)
 
@@ -277,7 +170,7 @@ class SimpleTransactionModule(val settings: WavesSettings, networkController: Ac
   /**
     * BaseTarget calculation algorithm fixing the blocktimes.
     */
-  private def calcBaseTarget[TT](prevBlock: Block, timestamp: Long): Long = {
+  private def calcBaseTarget(prevBlock: Block, timestamp: Long): Long = {
     val history = blockStorage.history
     val height = history.heightOf(prevBlock).get
     val prevBaseTarget = prevBlock.consensusDataField.value.baseTarget
@@ -429,10 +322,6 @@ class SimpleTransactionModule(val settings: WavesSettings, networkController: Ac
       log.error(s"Unexpected error during validation", t)
       throw t
   }
-
-  override def createPayment(sender: PrivateKeyAccount, recipient: Account,
-                             amount: Long, fee: Long, timestamp: Long): Either[ValidationError, PaymentTransaction] =
-    PaymentTransaction.create(sender, recipient, amount, fee, timestamp)
 
   override def broadcastPayment(payment: SignedPaymentRequest): Either[ValidationError, PaymentTransaction] =
     for {

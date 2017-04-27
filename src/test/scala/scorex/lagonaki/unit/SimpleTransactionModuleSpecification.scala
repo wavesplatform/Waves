@@ -114,6 +114,6 @@ class SimpleTransactionModuleSpecification extends FunSuite with MockFactory wit
 
     Random.shuffle(correctSeq).foreach(t => transactionModule.utxStorage.putIfNew(t, (t: Transaction) => Right(t)))
     assert(transactionModule.utxStorage.all().size == 3)
-    assert(transactionModule.packUnconfirmed() == correctSeq)
+    assert(transactionModule.packUnconfirmed(None) == correctSeq)
   }
 }

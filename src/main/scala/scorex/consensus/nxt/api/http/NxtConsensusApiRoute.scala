@@ -3,7 +3,7 @@ package scorex.consensus.nxt.api.http
 import javax.ws.rs.Path
 
 import akka.http.scaladsl.server.Route
-import com.wavesplatform.settings.RestAPISettings
+import com.wavesplatform.settings.{FunctionalitySettings, RestAPISettings}
 import com.wavesplatform.state2.reader.StateReader
 import io.swagger.annotations._
 import play.api.libs.json.Json
@@ -18,7 +18,7 @@ case class NxtConsensusApiRoute(
     settings: RestAPISettings,
     state: StateReader,
     history: History,
-    transactionModule: TransactionModule) extends ApiRoute with CommonApiFunctions {
+    fs:FunctionalitySettings) extends ApiRoute with CommonApiFunctions {
 
   override val route: Route =
     pathPrefix("consensus") {
@@ -36,7 +36,7 @@ case class NxtConsensusApiRoute(
       case Right(account) =>
         complete(Json.obj(
           "address" -> account.address,
-          "balance" -> transactionModule.generatingBalance(account, state.height)))
+          "balance" -> TransactionModule.generatingBalance(state,fs)(account, state.height)))
     }
   }
 
