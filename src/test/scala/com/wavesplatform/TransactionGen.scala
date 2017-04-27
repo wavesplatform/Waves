@@ -166,16 +166,16 @@ trait TransactionGen {
     timestamp <- positiveLongGen
   } yield (sender, assetName, description, quantity, decimals, reissuable, fee, timestamp)
 
-  val issueReissueBurnMakeUniqueGen: Gen[(IssueTransaction, ReissueTransaction, BurnTransaction, MakeUniqueAssetTransaction)] = for {
+  val issueReissueBurnMakeUniqueGen: Gen[(IssueTransaction, ReissueTransaction, BurnTransaction, MakeAssetNameUniqueTransaction)] = for {
     amount <- positiveLongGen
     sender: PrivateKeyAccount <- accountGen
     r <- issueReissueBurnMakeUniqueGeneratorP(amount, amount, amount, sender)
   } yield r
 
-  def issueReissueBurnMakeUniqueGeneratorP(issueQuantity: Long, sender: PrivateKeyAccount): Gen[(IssueTransaction, ReissueTransaction, BurnTransaction, MakeUniqueAssetTransaction)] =
+  def issueReissueBurnMakeUniqueGeneratorP(issueQuantity: Long, sender: PrivateKeyAccount): Gen[(IssueTransaction, ReissueTransaction, BurnTransaction, MakeAssetNameUniqueTransaction)] =
     issueReissueBurnMakeUniqueGeneratorP(issueQuantity, issueQuantity, issueQuantity, sender)
 
-  def issueReissueBurnMakeUniqueGeneratorP(issueQuantity: Long, reissueQuantity: Long, burnQuantity: Long, sender: PrivateKeyAccount): Gen[(IssueTransaction, ReissueTransaction, BurnTransaction, MakeUniqueAssetTransaction)] = for {
+  def issueReissueBurnMakeUniqueGeneratorP(issueQuantity: Long, reissueQuantity: Long, burnQuantity: Long, sender: PrivateKeyAccount): Gen[(IssueTransaction, ReissueTransaction, BurnTransaction, MakeAssetNameUniqueTransaction)] = for {
     (_, assetName, description, _, decimals, reissuable, iFee, timestamp) <- issueParamGen
     burnAmount <- Gen.choose(0L, burnQuantity)
     reissuable2 <- Arbitrary.arbitrary[Boolean]
@@ -184,7 +184,7 @@ trait TransactionGen {
     val issue = IssueTransaction.create(sender, assetName, description, issueQuantity, decimals, reissuable, iFee, timestamp).right.get
     val reissue = ReissueTransaction.create(sender, issue.assetId, reissueQuantity, reissuable2, fee, timestamp).right.get
     val burn = BurnTransaction.create(sender, issue.assetId, burnAmount, fee, timestamp).right.get
-    val makeUnique = MakeUniqueAssetTransaction.create(sender, issue.assetId, fee, timestamp).right.get
+    val makeUnique = MakeAssetNameUniqueTransaction.create(sender, issue.assetId, fee, timestamp).right.get
     (issue, reissue, burn, makeUnique)
   }
 
@@ -201,7 +201,7 @@ trait TransactionGen {
   val issueGen: Gen[IssueTransaction] = issueReissueBurnMakeUniqueGen.map(_._1)
   val reissueGen: Gen[ReissueTransaction] = issueReissueBurnMakeUniqueGen.map(_._2)
   val burnGen: Gen[BurnTransaction] = issueReissueBurnMakeUniqueGen.map(_._3)
-  val makeUniqueGen: Gen[MakeUniqueAssetTransaction] = issueReissueBurnMakeUniqueGen.map(_._4)
+  val makeAssetNameUniqueGen: Gen[MakeAssetNameUniqueTransaction] = issueReissueBurnMakeUniqueGen.map(_._4)
 
   val priceGen: Gen[Long] = Gen.choose(1, 3 * 100000L * 100000000L)
   val matcherAmountGen: Gen[Long] = Gen.choose(1, 3 * 100000L * 100000000L)

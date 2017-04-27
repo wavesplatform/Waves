@@ -85,6 +85,6 @@ object Diff {
       paymentTransactionIdsByHashes = older.paymentTransactionIdsByHashes ++ newer.paymentTransactionIdsByHashes,
       previousExchangeTxs = older.previousExchangeTxs ++ newer.previousExchangeTxs,
       leaseState = older.leaseState ++ newer.leaseState,
-      assetsWithUniqueNames = newer.assetsWithUniqueNames ++ older.assetsWithUniqueNames)
+      assetsWithUniqueNames = older.assetsWithUniqueNames ++ newer.assetsWithUniqueNames)
   }
 }

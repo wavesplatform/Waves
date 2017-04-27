@@ -8,7 +8,7 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.language.postfixOps
 
-class MakeUniqueAssetTransactionSpecification(override val allNodes: Seq[Node]) extends IntegrationSuiteWithThreeAddresses {
+class MakeAssetNameUniqueTransactionSpecification(override val allNodes: Seq[Node]) extends IntegrationSuiteWithThreeAddresses {
   test("make unique assets transaction makes asset name unique") {
     val f = for {
       _ <- assertBalances(firstAddress, 100 waves, 100 waves)
@@ -105,6 +105,7 @@ class MakeUniqueAssetTransactionSpecification(override val allNodes: Seq[Node]) 
 
       _ <- Future.traverse(allNodes)(_.waitForTransaction(secondIssueId))
 
+      _ <- assertBalances(firstAddress, 10 waves, 10 waves)
       _ <- assertAssetBalance(firstAddress, secondIssueId, 100000)
     } yield succeed
 

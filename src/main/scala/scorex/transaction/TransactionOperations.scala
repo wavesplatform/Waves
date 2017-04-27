@@ -14,7 +14,7 @@ trait TransactionOperations {
   def issueAsset(request: IssueRequest, wallet: Wallet): Either[ValidationError, IssueTransaction]
   def reissueAsset(request: ReissueRequest, wallet: Wallet): Either[ValidationError, ReissueTransaction]
   def burnAsset(request: BurnRequest, wallet: Wallet): Either[ValidationError, BurnTransaction]
-  def makeUniqueAsset(request: MakeUniqueAssetRequest, wallet: Wallet): Either[ValidationError, MakeUniqueAssetTransaction]
+  def makeAssetNameUnique(request: MakeAssetNameUniqueRequest, wallet: Wallet): Either[ValidationError, MakeAssetNameUniqueTransaction]
   def lease(request: LeaseRequest, wallet: Wallet): Either[ValidationError, LeaseTransaction]
   def alias(request: CreateAliasRequest, wallet: Wallet): Either[ValidationError, CreateAliasTransaction]
   def leaseCancel(request: LeaseCancelRequest, wallet: Wallet): Either[ValidationError, LeaseCancelTransaction]

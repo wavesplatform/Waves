@@ -66,8 +66,8 @@ object CommonValidation {
         Left(TransactionValidationError(tx, s"must not appear before time=${settings.allowExchangeTransactionAfterTimestamp}"))
       case tx: CreateAliasTransaction if tx.timestamp <= settings.allowCreateAliasTransactionAfterTimestamp =>
         Left(TransactionValidationError(tx, s"must not appear before time=${settings.allowCreateAliasTransactionAfterTimestamp}"))
-      case tx: MakeUniqueAssetTransaction if tx.timestamp <= settings.allowMakeUniqueAssetTransactionAfterTimestamp =>
-        Left(TransactionValidationError(tx, s"must not appear before time=${settings.allowMakeUniqueAssetTransactionAfterTimestamp}"))
+      case tx: MakeAssetNameUniqueTransaction if tx.timestamp <= settings.allowMakeAssetNameUniqueTransactionAfterTimestamp =>
+        Left(TransactionValidationError(tx, s"must not appear before time=${settings.allowMakeAssetNameUniqueTransactionAfterTimestamp}"))
       case _: BurnTransaction => Right(tx)
       case _: PaymentTransaction => Right(tx)
       case _: GenesisTransaction => Right(tx)
@@ -78,7 +78,7 @@ object CommonValidation {
       case _: LeaseTransaction => Right(tx)
       case _: LeaseCancelTransaction => Right(tx)
       case _: CreateAliasTransaction => Right(tx)
-      case _: MakeUniqueAssetTransaction => Right(tx)
+      case _: MakeAssetNameUniqueTransaction => Right(tx)
       case x => Left(TransactionValidationError(x, "Unknown transaction must be explicitly registered within ActivatedValidator"))
     }
 

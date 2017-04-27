@@ -31,7 +31,7 @@ trait UnitTestConfig {
       |        allow-createalias-transaction-after: 13
       |        allow-multiple-lease-cancel-transaction-until-timestamp: 14
       |        reset-effective-balances-at-height: 15
-      |        allow-make-unique-asset-transaction-after: 16
+      |        allow-make-asset-name-unique-transaction-after: 16
       |      }
       |      genesis {
       |        timestamp: 1460678400000

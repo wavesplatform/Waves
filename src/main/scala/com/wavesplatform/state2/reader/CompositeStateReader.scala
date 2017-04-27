@@ -44,8 +44,8 @@ class CompositeStateReader(inner: StateReader, blockDiff: BlockDiff) extends Sta
 
   override def resolveAlias(a: Alias): Option[Account] = txDiff.aliases.get(a).orElse(inner.resolveAlias(a))
 
-  override def isAssetNameAvailable(assetName: ByteArray): Boolean = {
-    !txDiff.assetsWithUniqueNames.contains(assetName) && inner.isAssetNameAvailable(assetName)
+  override def getAssetIdByUniqueName(assetName: ByteArray): Option[ByteArray] = {
+    txDiff.assetsWithUniqueNames.get(assetName).orElse(inner.getAssetIdByUniqueName(assetName))
   }
 
   override def findPreviousExchangeTxs(orderId: EqByteArray): Set[ExchangeTransaction] = {
@@ -106,8 +106,8 @@ object CompositeStateReader {
     override def activeLeases(): Seq[ByteArray] =
       new CompositeStateReader(inner, blockDiff()).activeLeases()
 
-    override def isAssetNameAvailable(assetName: ByteArray): Boolean =
-      new CompositeStateReader(inner, blockDiff()).isAssetNameAvailable(assetName)
+    override def getAssetIdByUniqueName(assetName: ByteArray): Option[ByteArray] =
+      new CompositeStateReader(inner, blockDiff()).getAssetIdByUniqueName(assetName)
 
     override def lastUpdateHeight(acc: Account): Option[Int] =
       new CompositeStateReader(inner, blockDiff()).lastUpdateHeight(acc)

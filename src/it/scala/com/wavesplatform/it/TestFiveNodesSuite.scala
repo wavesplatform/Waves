@@ -40,7 +40,7 @@ class TestFiveNodesSuite extends FreeSpec with BeforeAndAfterAll with ScorexLogg
     new BurnTransactionSpecification(allNodes),
     new IssueTransactionSpecification(allNodes),
     new LeasingTransactionsSpecification(allNodes),
-    new MakeUniqueAssetTransactionSpecification(allNodes),
+    new MakeAssetNameUniqueTransactionSpecification(allNodes),
     new PaymentTransactionSpecification(allNodes),
     new ReissueTransactionSpecification(allNodes),
     new TransferTransactionSpecification(allNodes)

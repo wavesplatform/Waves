@@ -167,9 +167,9 @@ class SimpleTransactionModule(genesisSettings: GenesisSettings)(implicit val set
     r <- onNewOffchainTransaction(tx)
   } yield r
 
-  override def makeUniqueAsset(request: MakeUniqueAssetRequest, wallet: Wallet): Either[ValidationError, MakeUniqueAssetTransaction] = for {
+  override def makeAssetNameUnique(request: MakeAssetNameUniqueRequest, wallet: Wallet): Either[ValidationError, MakeAssetNameUniqueTransaction] = for {
     pk <- wallet.findWallet(request.sender)
-    tx <- MakeUniqueAssetTransaction.create(pk, Base58.decode(request.assetId).get, request.fee, getTimestamp)
+    tx <- MakeAssetNameUniqueTransaction.create(pk, Base58.decode(request.assetId).get, request.fee, getTimestamp)
     r <- onNewOffchainTransaction(tx)
   } yield r
 

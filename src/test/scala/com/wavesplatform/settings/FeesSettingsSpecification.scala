@@ -137,7 +137,7 @@ class FeesSettingsSpecification extends FlatSpec with Matchers {
         |  create-alias {
         |    WAVES = 100000
         |  }
-        |  make-unique-asset {
+        |  make-asset-name-unique {
         |    WAVES = 100000
         |  }
         |}

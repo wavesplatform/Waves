@@ -31,7 +31,7 @@ class AssetsRouteSpec
     (m.issueAsset _).expects(*, *).onCall { (_, _) => Left(expectedError) }.anyNumberOfTimes()
     (m.reissueAsset _).expects(*, *).onCall { (_, _) => Left(expectedError) }.anyNumberOfTimes()
     (m.burnAsset _).expects(*, *).onCall { (_, _) => Left(expectedError) }.anyNumberOfTimes()
-    (m.makeUniqueAsset _).expects(*, *).onCall { (_, _) => Left(expectedError) }.anyNumberOfTimes()
+    (m.makeAssetNameUnique _).expects(*, *).onCall { (_, _) => Left(expectedError) }.anyNumberOfTimes()
     m
   }
 
@@ -67,7 +67,7 @@ class AssetsRouteSpec
     "issue" -> issueReq.map(v => Json.toJson(v)),
     "reissue" -> reissueReq.map(v => Json.toJson(v)),
     "burn" -> burnReq.map(v => Json.toJson(v)),
-    "makeUnique" -> makeUniqueGen.map(v => Json.toJson(v))
+    "make-unique-asset-name" -> makeAssetNameUniqueGen.map(v => Json.toJson(v))
   )) {
     val currentPath = routePath(path)
     currentPath in {

@@ -141,7 +141,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, state: Stat
     processRequest("burn", (b: BurnRequest) => transactionModule.burnAsset(b, wallet))
 
 
-  @Path("/makeUnique")
+  @Path("/make-unique-asset-name")
   @ApiOperation(value = "Make asset unique by name",
     notes = "Makes asset unique by name",
     httpMethod = "POST",
@@ -158,7 +158,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, state: Stat
     )
   ))
   def makeUniqueRoute: Route =
-    processRequest("makeUnique", (b: MakeUniqueAssetRequest) => transactionModule.makeUniqueAsset(b, wallet))
+    processRequest("make-unique-asset-name", (b: MakeAssetNameUniqueRequest) => transactionModule.makeAssetNameUnique(b, wallet))
 
 
   private def balanceJson(address: String, assetIdStr: String): Either[ApiError, JsObject] = {
