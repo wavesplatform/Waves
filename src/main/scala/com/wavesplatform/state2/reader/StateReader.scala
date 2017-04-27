@@ -21,6 +21,8 @@ trait StateReader {
 
   def transactionInfo(id: ByteArray): Option[(Int, Transaction)]
 
+  def containsTransaction(id: ByteArray): Boolean
+
   def accountPortfolio(a: Account): Portfolio
 
   def assetInfo(id: ByteArray): Option[AssetInfo]

@@ -58,6 +58,8 @@ class CompositeStateReader(inner: StateReader, blockDiff: BlockDiff) extends Sta
   }
 
   override def lastUpdateHeight(acc: Account): Option[Int] = blockDiff.snapshots.get(acc).map(_.lastKey).orElse(inner.lastUpdateHeight(acc))
+
+  override def containsTransaction(id: ByteArray): Boolean = blockDiff.txsDiff.transactions.contains(id) || inner.containsTransaction(id)
 }
 
 object CompositeStateReader {
@@ -105,6 +107,9 @@ object CompositeStateReader {
 
     override def snapshotAtHeight(acc: Account, h: Int): Option[Snapshot] =
       new CompositeStateReader(inner, blockDiff()).snapshotAtHeight(acc, h)
+
+    override def containsTransaction(id: ByteArray): Boolean =
+      new CompositeStateReader(inner, blockDiff()).containsTransaction(id)
   }
 
 }

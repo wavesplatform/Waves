@@ -20,13 +20,15 @@ class StateWriterImpl(p: StateStorage) extends StateReaderImpl(p) with StateWrit
   override def applyBlockDiff(blockDiff: BlockDiff): Unit = {
     val txsDiff = blockDiff.txsDiff
 
-    measurePersist("transactions")(txsDiff.transactions) {
+    log.debug(s"Starting persist from ${p.getHeight} to ${p.getHeight + blockDiff.heightDiff}")
+
+    measureSizeLog("transactions")(txsDiff.transactions) {
       _.foreach { case (id, (h, tx, _)) =>
         p.transactions.put(id.arr, (h, tx.bytes))
       }
     }
 
-    measurePersist("previousExchangeTxs")(blockDiff.txsDiff.previousExchangeTxs) {
+    measureSizeLog("previousExchangeTxs")(blockDiff.txsDiff.previousExchangeTxs) {
       _.foreach { case (oid, txs) =>
         Option(p.exchangeTransactionsByOrder.get(oid.arr)) match {
           case Some(ll) =>
@@ -37,7 +39,7 @@ class StateWriterImpl(p: StateStorage) extends StateReaderImpl(p) with StateWrit
       }
     }
 
-    measurePersist("portfolios")(txsDiff.portfolios) {
+    measureSizeLog("portfolios")(txsDiff.portfolios) {
       _.foreach { case (account, portfolioDiff) =>
         val updatedPortfolio = accountPortfolio(account).combine(portfolioDiff)
         p.portfolios.put(account.bytes,
@@ -48,7 +50,7 @@ class StateWriterImpl(p: StateStorage) extends StateReaderImpl(p) with StateWrit
     }
 
 
-    measurePersist("assets")(txsDiff.issuedAssets) {
+    measureSizeLog("assets")(txsDiff.issuedAssets) {
       _.foreach { case (id, assetInfo) =>
         val updated = (Option(p.assets.get(id.arr)) match {
           case None => Monoid[AssetInfo].empty
@@ -59,7 +61,7 @@ class StateWriterImpl(p: StateStorage) extends StateReaderImpl(p) with StateWrit
       }
     }
 
-    measurePersist("accountTransactionIds")(blockDiff.txsDiff.accountTransactionIds) {
+    measureSizeLog("accountTransactionIds")(blockDiff.txsDiff.accountTransactionIds) {
       _.foreach { case (acc, txIds) =>
         Option(p.accountTransactionIds.get(acc.bytes)) match {
           case Some(ll) =>
@@ -72,13 +74,13 @@ class StateWriterImpl(p: StateStorage) extends StateReaderImpl(p) with StateWrit
       }
     }
 
-    measurePersist("paymentTransactionIdsByHashes")(blockDiff.txsDiff.paymentTransactionIdsByHashes) {
+    measureSizeLog("paymentTransactionIdsByHashes")(blockDiff.txsDiff.paymentTransactionIdsByHashes) {
       _.foreach { case (EqByteArray(hash), EqByteArray(id)) =>
         p.paymentTransactionHashes.put(hash, id)
       }
     }
 
-    measurePersist("effectiveBalanceSnapshots")(blockDiff.snapshots)(
+    measureSizeLog("effectiveBalanceSnapshots")(blockDiff.snapshots)(
       _.foreach { case (acc, snapshotsByHeight) =>
         snapshotsByHeight.foreach { case (h, snapshot) =>
           p.balanceSnapshots.put(StateStorage.snapshotKey(acc, h), (snapshot.prevHeight, snapshot.balance, snapshot.effectiveBalance))
@@ -86,13 +88,13 @@ class StateWriterImpl(p: StateStorage) extends StateReaderImpl(p) with StateWrit
         p.lastUpdateHeight.put(acc.bytes, snapshotsByHeight.keys.max)
       })
 
-    measurePersist("aliases")(blockDiff.txsDiff.aliases) {
+    measureSizeLog("aliases")(blockDiff.txsDiff.aliases) {
       _.foreach { case (alias, acc) =>
         p.aliasToAddress.put(alias.name, acc.bytes)
       }
     }
 
-    measurePersist("lease info")(blockDiff.txsDiff.leaseState)(
+    measureSizeLog("lease info")(blockDiff.txsDiff.leaseState)(
       _.foreach { case (id, isActive) => p.leaseState.put(id.arr, isActive) })
 
     p.setHeight(p.getHeight + blockDiff.heightDiff)
@@ -126,9 +128,16 @@ object StateWriterImpl extends ScorexLogging {
     (r, t1 - t0)
   }
 
-  def measurePersist[F[_] <: TraversableOnce[_], A](s: String)(fa: => F[A])(f: F[A] => Unit): Unit = {
-    val (_, time) = withTime(f(fa))
-    log.debug(s"Persisting $s(size=${fa.size}) took ${time}ms")
+  def measureSizeLog[F[_] <: TraversableOnce[_], A, R](s: String)(fa: => F[A])(f: F[A] => R): R = {
+    val (r, time) = withTime(f(fa))
+    log.debug(s"$s processing $s(size=${fa.size}) took ${time}ms")
+    r
+  }
+
+  def measureLog[R](s: String)(f: => R): R = {
+    val (r, time) = withTime(f)
+    log.debug(s"$s processing took ${time}ms")
+    r
   }
 }
 

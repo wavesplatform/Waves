@@ -1,23 +1,18 @@
 package com.wavesplatform.state2.diffs
 
+import cats._
 import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state2.{EqByteArray, Portfolio}
 import com.wavesplatform.state2.reader.StateReader
-import scorex.account.{Account, Alias}
+import com.wavesplatform.state2.{EqByteArray, Portfolio, _}
+import scorex.account.Account
 import scorex.transaction.ValidationError.TransactionValidationError
 import scorex.transaction._
 import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction, TransferTransaction}
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import com.wavesplatform.state2._
 
-import cats._
-import cats.implicits._
-import cats.syntax.all._
-
-
-import scala.util.{Left, Right}
 import scala.concurrent.duration._
+import scala.util.{Left, Right}
 
 object CommonValidation {
   def disallowSendingGreaterThanBalance[T <: Transaction](s: StateReader, settings: FunctionalitySettings, blockTime: Long, tx: T): Either[ValidationError, T] =
@@ -55,11 +50,9 @@ object CommonValidation {
   def disallowDuplicateIds[T <: Transaction](state: StateReader, settings: FunctionalitySettings, height: Int, tx: T): Either[ValidationError, T] = tx match {
     case ptx: PaymentTransaction if ptx.timestamp < settings.requirePaymentUniqueId => Right(tx)
     case _ =>
-      state.transactionInfo(EqByteArray(tx.id)) match {
-        case None => Right(tx)
-        case Some((oldH, oldTx)) => Left(TransactionValidationError(tx, s"Tx id(exc. for some PaymentTransactions) cannot be duplicated." +
-          s" Current height is: $height. Tx with such id aready present at H=$oldH: $oldTx"))
-      }
+      if (state.containsTransaction(EqByteArray(tx.id)))
+        Left(TransactionValidationError(tx, s"Tx id(exc. for some PaymentTransactions) cannot be duplicated. Current height is: $height. Tx with such id aready present"))
+      else Right(tx)
   }
 
   def disallowBeforeActivationTime[T <: Transaction](state: StateReader, settings: FunctionalitySettings, tx: T): Either[ValidationError, T] =

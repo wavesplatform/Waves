@@ -70,4 +70,6 @@ class StateReaderImpl(p: StateStorage) extends StateReader {
   override def snapshotAtHeight(acc: Account, h: Int): Option[Snapshot] =
     Option(p.balanceSnapshots.get(StateStorage.snapshotKey(acc, h)))
       .map { case (ph, b, eb) => Snapshot(ph, b, eb) }
+
+  override def containsTransaction(id: ByteArray): Boolean = p.transactions.containsKey(id.arr)
 }
