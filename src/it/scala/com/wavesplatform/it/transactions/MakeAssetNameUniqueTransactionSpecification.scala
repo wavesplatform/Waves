@@ -33,7 +33,7 @@ class MakeAssetNameUniqueTransactionSpecification(override val allNodes: Seq[Nod
 
   test("can't make unique not existed asset") {
     val f = for {
-      _ <- assertRequestError(sender.makeUnique(firstAddress, "91MxUYbum9hrpJUcRwVe4no36ViqnQGAUaSmM8V8L8Jx", 10 waves).map(_.id))
+      _ <- assertBadRequest(sender.makeUnique(firstAddress, "91MxUYbum9hrpJUcRwVe4no36ViqnQGAUaSmM8V8L8Jx", 10 waves).map(_.id))
     } yield succeed
 
     Await.result(f, 1 minute)
@@ -50,7 +50,7 @@ class MakeAssetNameUniqueTransactionSpecification(override val allNodes: Seq[Nod
       _ <- assertBalances(firstAddress, 70 waves, 70 waves)
       _ <- assertAssetBalance(firstAddress, issuedAssetId, 100000)
 
-      _ <- assertRequestError(sender.makeUnique(thirdAddress, issuedAssetId, 10 waves))
+      _ <- assertBadRequest(sender.makeUnique(thirdAddress, issuedAssetId, 10 waves))
     } yield succeed
 
     Await.result(f, 1 minute)
@@ -76,8 +76,8 @@ class MakeAssetNameUniqueTransactionSpecification(override val allNodes: Seq[Nod
 
       _ <- assertBalances(firstAddress, 40 waves, 40 waves)
 
-      _ <- assertRequestError(sender.makeUnique(firstAddress, issuedAssetId, 10 waves))
-      _ <- assertRequestError(sender.makeUnique(firstAddress, secondIssuedAssetId, 10 waves))
+      _ <- assertBadRequest(sender.makeUnique(firstAddress, issuedAssetId, 10 waves))
+      _ <- assertBadRequest(sender.makeUnique(firstAddress, secondIssuedAssetId, 10 waves))
     } yield succeed
 
     Await.result(f, 1 minute)
