@@ -20,9 +20,9 @@ class MakeAssetNameUniqueTransactionSpecification(override val allNodes: Seq[Nod
       _ <- assertBalances(firstAddress, 90 waves, 90 waves)
       _ <- assertAssetBalance(firstAddress, issuedAssetId, 100000)
 
-      makeUnique <- sender.makeAssetNameUnique(firstAddress, issuedAssetId, 10 waves).map(_.id)
+      makeAssetNameUnique <- sender.makeAssetNameUnique(firstAddress, issuedAssetId, 10 waves).map(_.id)
 
-      _ <- Future.traverse(allNodes)(_.waitForTransaction(makeUnique))
+      _ <- Future.traverse(allNodes)(_.waitForTransaction(makeAssetNameUnique))
 
       _ <- assertBalances(firstAddress, 80 waves, 80 waves)
       _ <- assertAssetBalance(firstAddress, issuedAssetId, 100000)
@@ -70,9 +70,9 @@ class MakeAssetNameUniqueTransactionSpecification(override val allNodes: Seq[Nod
       _ <- assertAssetBalance(firstAddress, issuedAssetId, 100000)
       _ <- assertAssetBalance(firstAddress, secondIssuedAssetId, 100000)
 
-      makeUniqueId <- sender.makeAssetNameUnique(firstAddress, secondIssuedAssetId, 10 waves).map(_.id)
+      makeAssetNameUniqueId <- sender.makeAssetNameUnique(firstAddress, secondIssuedAssetId, 10 waves).map(_.id)
 
-      _ <- Future.traverse(allNodes)(_.waitForTransaction(makeUniqueId))
+      _ <- Future.traverse(allNodes)(_.waitForTransaction(makeAssetNameUniqueId))
 
       _ <- assertBalances(firstAddress, 40 waves, 40 waves)
 
@@ -94,9 +94,9 @@ class MakeAssetNameUniqueTransactionSpecification(override val allNodes: Seq[Nod
       _ <- assertBalances(firstAddress, 30 waves, 30 waves)
       _ <- assertAssetBalance(firstAddress, issuedAssetId, 100000)
 
-      makeUnique <- sender.makeAssetNameUnique(firstAddress, issuedAssetId, 10 waves).map(_.id)
+      makeAssetNameUnique <- sender.makeAssetNameUnique(firstAddress, issuedAssetId, 10 waves).map(_.id)
 
-      _ <- Future.traverse(allNodes)(_.waitForTransaction(makeUnique))
+      _ <- Future.traverse(allNodes)(_.waitForTransaction(makeAssetNameUnique))
 
       _ <- assertBalances(firstAddress, 20 waves, 20 waves)
       _ <- assertAssetBalance(firstAddress, issuedAssetId, 100000)

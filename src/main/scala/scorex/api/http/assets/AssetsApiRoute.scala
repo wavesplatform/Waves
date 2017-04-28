@@ -24,7 +24,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, state: Stat
 
   override lazy val route =
     pathPrefix("assets") {
-      balance ~ balances ~ issue ~ reissue ~ burnRoute ~ makeUniqueRoute ~ transfer ~ signOrder ~ balanceDistribution
+      balance ~ balances ~ issue ~ reissue ~ burnRoute ~ makeAssetNameUniqueRoute ~ transfer ~ signOrder ~ balanceDistribution
     }
 
   @Path("/balance/{address}/{assetId}")
@@ -157,7 +157,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, state: Stat
       defaultValue = "{\"sender\":\"string\",\"assetId\":\"Base58\",\"fee\":100000}"
     )
   ))
-  def makeUniqueRoute: Route =
+  def makeAssetNameUniqueRoute: Route =
     processRequest("make-asset-name-unique", (b: MakeAssetNameUniqueRequest) => transactionModule.makeAssetNameUnique(b, wallet))
 
 

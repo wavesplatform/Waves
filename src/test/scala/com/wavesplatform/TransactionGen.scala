@@ -166,16 +166,16 @@ trait TransactionGen {
     timestamp <- positiveLongGen
   } yield (sender, assetName, description, quantity, decimals, reissuable, fee, timestamp)
 
-  val issueReissueBurnMakeUniqueGen: Gen[(IssueTransaction, ReissueTransaction, BurnTransaction, MakeAssetNameUniqueTransaction)] = for {
+  val issueReissueBurnMakeAssetNameUniqueGen: Gen[(IssueTransaction, ReissueTransaction, BurnTransaction, MakeAssetNameUniqueTransaction)] = for {
     amount <- positiveLongGen
     sender: PrivateKeyAccount <- accountGen
-    r <- issueReissueBurnMakeUniqueGeneratorP(amount, amount, amount, sender)
+    r <- issueReissueBurnMakeAssetNameUniqueGeneratorP(amount, amount, amount, sender)
   } yield r
 
-  def issueReissueBurnMakeUniqueGeneratorP(issueQuantity: Long, sender: PrivateKeyAccount): Gen[(IssueTransaction, ReissueTransaction, BurnTransaction, MakeAssetNameUniqueTransaction)] =
-    issueReissueBurnMakeUniqueGeneratorP(issueQuantity, issueQuantity, issueQuantity, sender)
+  def issueReissueBurnMakeAssetNameUniqueGeneratorP(issueQuantity: Long, sender: PrivateKeyAccount): Gen[(IssueTransaction, ReissueTransaction, BurnTransaction, MakeAssetNameUniqueTransaction)] =
+    issueReissueBurnMakeAssetNameUniqueGeneratorP(issueQuantity, issueQuantity, issueQuantity, sender)
 
-  def issueReissueBurnMakeUniqueGeneratorP(issueQuantity: Long, reissueQuantity: Long, burnQuantity: Long, sender: PrivateKeyAccount): Gen[(IssueTransaction, ReissueTransaction, BurnTransaction, MakeAssetNameUniqueTransaction)] = for {
+  def issueReissueBurnMakeAssetNameUniqueGeneratorP(issueQuantity: Long, reissueQuantity: Long, burnQuantity: Long, sender: PrivateKeyAccount): Gen[(IssueTransaction, ReissueTransaction, BurnTransaction, MakeAssetNameUniqueTransaction)] = for {
     (_, assetName, description, _, decimals, reissuable, iFee, timestamp) <- issueParamGen
     burnAmount <- Gen.choose(0L, burnQuantity)
     reissuable2 <- Arbitrary.arbitrary[Boolean]
@@ -184,8 +184,8 @@ trait TransactionGen {
     val issue = IssueTransaction.create(sender, assetName, description, issueQuantity, decimals, reissuable, iFee, timestamp).right.get
     val reissue = ReissueTransaction.create(sender, issue.assetId, reissueQuantity, reissuable2, fee, timestamp).right.get
     val burn = BurnTransaction.create(sender, issue.assetId, burnAmount, fee, timestamp).right.get
-    val makeUnique = MakeAssetNameUniqueTransaction.create(sender, issue.assetId, fee, timestamp).right.get
-    (issue, reissue, burn, makeUnique)
+    val makeAssetNameUnique = MakeAssetNameUniqueTransaction.create(sender, issue.assetId, fee, timestamp).right.get
+    (issue, reissue, burn, makeAssetNameUnique)
   }
 
   val issueWithInvalidReissuesGen: Gen[(IssueTransaction, ReissueTransaction, ReissueTransaction)] = for {
@@ -198,10 +198,10 @@ trait TransactionGen {
     (issue, reissue1, reissue2)
   }
 
-  val issueGen: Gen[IssueTransaction] = issueReissueBurnMakeUniqueGen.map(_._1)
-  val reissueGen: Gen[ReissueTransaction] = issueReissueBurnMakeUniqueGen.map(_._2)
-  val burnGen: Gen[BurnTransaction] = issueReissueBurnMakeUniqueGen.map(_._3)
-  val makeAssetNameUniqueGen: Gen[MakeAssetNameUniqueTransaction] = issueReissueBurnMakeUniqueGen.map(_._4)
+  val issueGen: Gen[IssueTransaction] = issueReissueBurnMakeAssetNameUniqueGen.map(_._1)
+  val reissueGen: Gen[ReissueTransaction] = issueReissueBurnMakeAssetNameUniqueGen.map(_._2)
+  val burnGen: Gen[BurnTransaction] = issueReissueBurnMakeAssetNameUniqueGen.map(_._3)
+  val makeAssetNameUniqueGen: Gen[MakeAssetNameUniqueTransaction] = issueReissueBurnMakeAssetNameUniqueGen.map(_._4)
 
   val priceGen: Gen[Long] = Gen.choose(1, 3 * 100000L * 100000000L)
   val matcherAmountGen: Gen[Long] = Gen.choose(1, 3 * 100000L * 100000000L)
@@ -260,7 +260,7 @@ trait TransactionGen {
 
   val randomTransactionGen: Gen[SignedTransaction] = (for {
     tr <- transferGen
-    (is, ri, bu, mu) <- issueReissueBurnMakeUniqueGen
+    (is, ri, bu, mu) <- issueReissueBurnMakeAssetNameUniqueGen
     ca <- createAliasGen
     xt <- exchangeTransactionGen
     tx <- Gen.oneOf(tr, is, ri, ca, bu, xt, mu)

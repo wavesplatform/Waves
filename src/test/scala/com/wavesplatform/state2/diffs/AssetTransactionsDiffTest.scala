@@ -22,25 +22,25 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Genera
     ia <- positiveLongGen
     ra <- positiveLongGen
     ba <- positiveLongGen.suchThat(x => x < ia + ra)
-    (issue, reissue, burn, makeUnique) <- issueReissueBurnMakeUniqueGeneratorP(ia, ra, ba, master) suchThat (_._1.reissuable == isReissuable)
-  } yield ((genesis, issue), (reissue, burn, makeUnique))
+    (issue, reissue, burn, makeAssetNameUnique) <- issueReissueBurnMakeAssetNameUniqueGeneratorP(ia, ra, ba, master) suchThat (_._1.reissuable == isReissuable)
+  } yield ((genesis, issue), (reissue, burn, makeAssetNameUnique))
 
-  def issuesAndMakeUniquesWithSameName: Gen[((GenesisTransaction, IssueTransaction, MakeAssetNameUniqueTransaction, IssueTransaction, MakeAssetNameUniqueTransaction))] = for {
+  def issuesAndMakeAssetNameUniquesWithSameName: Gen[((GenesisTransaction, IssueTransaction, MakeAssetNameUniqueTransaction, IssueTransaction, MakeAssetNameUniqueTransaction))] = for {
     sender <- accountGen
     ts <- timestampGen
     genesis: GenesisTransaction = GenesisTransaction.create(sender, ENOUGH_AMT, ts).right.get
     (_, assetName, description, quantity, decimals, reissuable, iFee, timestamp) <- issueParamGen
   } yield {
     val issue = IssueTransaction.create(sender, assetName, description, quantity, decimals, reissuable, iFee, timestamp).right.get
-    val makeUnique = MakeAssetNameUniqueTransaction.create(sender, issue.assetId, iFee, timestamp).right.get
+    val makeAssetNameUnique = MakeAssetNameUniqueTransaction.create(sender, issue.assetId, iFee, timestamp).right.get
     val issue2 = IssueTransaction.create(sender, assetName, description, quantity, decimals, reissuable, iFee, timestamp + 1).right.get
-    val makeUnique2 = MakeAssetNameUniqueTransaction.create(sender, issue2.assetId, iFee, timestamp).right.get
-    (genesis, issue, makeUnique, issue2, makeUnique2)
+    val makeAssetNameUnique2 = MakeAssetNameUniqueTransaction.create(sender, issue2.assetId, iFee, timestamp).right.get
+    (genesis, issue, makeAssetNameUnique, issue2, makeAssetNameUnique2)
   }
 
-  property("Issue+Reissue+Burn+MakeUnique do not break waves invariant and updates state") {
-    forAll(issueReissueBurnTxs(isReissuable = true), accountGen) { case (((gen, issue), (reissue, burn, makeUnique)), miner) =>
-      assertDiffAndState(Seq(TestBlock(Seq(gen, issue))), TestBlock(Seq(reissue, burn, makeUnique), miner)) { case (blockDiff, newState) =>
+  property("Issue+Reissue+Burn+MakeAssetNameUnique do not break waves invariant and updates state") {
+    forAll(issueReissueBurnTxs(isReissuable = true), accountGen) { case (((gen, issue), (reissue, burn, makeAssetNameUnique)), miner) =>
+      assertDiffAndState(Seq(TestBlock(Seq(gen, issue))), TestBlock(Seq(reissue, burn, makeAssetNameUnique), miner)) { case (blockDiff, newState) =>
         val totalPortfolioDiff = Monoid.combineAll(blockDiff.txsDiff.portfolios.values)
 
         totalPortfolioDiff.balance shouldBe 0
@@ -62,17 +62,17 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Genera
       genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
       reissue <- reissueGen
       burn <- burnGen
-      makeUnique <- makeAssetNameUniqueGen
-    } yield (genesis, reissue, burn, makeUnique)
+      makeAssetNameUnique <- makeAssetNameUniqueGen
+    } yield (genesis, reissue, burn, makeAssetNameUnique)
 
-    forAll(setup) { case ((gen, reissue, burn, makeUnique)) =>
+    forAll(setup) { case ((gen, reissue, burn, makeAssetNameUnique)) =>
       assertDiffEi(Seq(TestBlock(Seq(gen))), TestBlock(Seq(reissue))) { blockDiffEi =>
         blockDiffEi should produce ("Referenced assetId not found")
       }
       assertDiffEi(Seq(TestBlock(Seq(gen))), TestBlock(Seq(burn))) { blockDiffEi =>
         blockDiffEi should produce("Referenced assetId not found")
       }
-      assertDiffEi(Seq(TestBlock(Seq(gen))), TestBlock(Seq(makeUnique))) { blockDiffEi =>
+      assertDiffEi(Seq(TestBlock(Seq(gen))), TestBlock(Seq(makeAssetNameUnique))) { blockDiffEi =>
         blockDiffEi should produce("Referenced assetId not found")
       }
     }
@@ -88,25 +88,25 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Genera
       timestamp <- timestampGen
       reissue = ReissueTransaction.create(other, issue.assetId, quantity, reissuable2, fee, timestamp).right.get
       burn = BurnTransaction.create(other, issue.assetId, quantity, fee, timestamp).right.get
-      makeUnique = MakeAssetNameUniqueTransaction.create(other, issue.assetId, fee, timestamp).right.get
-    } yield ((gen, issue), reissue, burn, makeUnique)
+      makeAssetNameUnique = MakeAssetNameUniqueTransaction.create(other, issue.assetId, fee, timestamp).right.get
+    } yield ((gen, issue), reissue, burn, makeAssetNameUnique)
 
-    forAll(setup) { case ((gen, issue), reissue, burn, makeUnique) =>
+    forAll(setup) { case ((gen, issue), reissue, burn, makeAssetNameUnique) =>
       assertDiffEi(Seq(TestBlock(Seq(gen, issue))), TestBlock(Seq(reissue))) { blockDiffEi =>
         blockDiffEi should produce("Asset was issued by other address")
       }
       assertDiffEi(Seq(TestBlock(Seq(gen, issue))), TestBlock(Seq(burn))) { blockDiffEi =>
         blockDiffEi should produce("Asset was issued by other address")
       }
-      assertDiffEi(Seq(TestBlock(Seq(gen, issue))), TestBlock(Seq(makeUnique))) { blockDiffEi =>
+      assertDiffEi(Seq(TestBlock(Seq(gen, issue))), TestBlock(Seq(makeAssetNameUnique))) { blockDiffEi =>
         blockDiffEi should produce("Asset was issued by other address")
       }
     }
   }
 
   property("Cannot make unique asset with already busy name") {
-    forAll(issuesAndMakeUniquesWithSameName) { case ((gen, issue, makeUnique, issue2, makeUnique2)) =>
-      assertDiffEi(Seq(TestBlock(Seq(gen, issue, issue2, makeUnique))), TestBlock(Seq(makeUnique2))) { blockDiffEi =>
+    forAll(issuesAndMakeAssetNameUniquesWithSameName) { case ((gen, issue, makeAssetNameUnique, issue2, makeAssetNameUnique2)) =>
+      assertDiffEi(Seq(TestBlock(Seq(gen, issue, issue2, makeAssetNameUnique))), TestBlock(Seq(makeAssetNameUnique2))) { blockDiffEi =>
         blockDiffEi should produce(s"Asset name has been verified for ${Base58.encode(issue.id)}")
       }
     }
