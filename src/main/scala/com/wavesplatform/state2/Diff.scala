@@ -30,14 +30,14 @@ object AssetInfo {
   }
 }
 
-case class Diff(transactions: Map[ByteArray, (Int, Transaction, Set[Account])] = Map.empty,
-                portfolios: Map[Account, Portfolio] = Map.empty,
-                issuedAssets: Map[ByteArray, AssetInfo] = Map.empty,
-                aliases: Map[Alias, Account] = Map.empty,
-                paymentTransactionIdsByHashes: Map[ByteArray, ByteArray] = Map.empty,
-                previousExchangeTxs: Map[ByteArray, Set[ExchangeTransaction]] = Map.empty,
-                leaseState: Map[ByteArray, Boolean] = Map.empty,
-                assetsWithUniqueNames: Map[ByteArray, ByteArray] = Map.empty) {
+case class Diff(transactions: Map[ByteArray, (Int, Transaction, Set[Account])],
+                portfolios: Map[Account, Portfolio],
+                issuedAssets: Map[ByteArray, AssetInfo],
+                aliases: Map[Alias, Account],
+                paymentTransactionIdsByHashes: Map[ByteArray, ByteArray],
+                previousExchangeTxs: Map[ByteArray, Set[ExchangeTransaction]],
+                leaseState: Map[ByteArray, Boolean],
+                assetsWithUniqueNames: Map[ByteArray, ByteArray]) {
 
   lazy val accountTransactionIds: Map[Account, List[ByteArray]] = {
     val map: List[(Account, Set[(Int, Long, ByteArray)])] = transactions.toList
@@ -70,12 +70,14 @@ object Diff {
     leaseState = leaseState,
     assetsWithUniqueNames = assetsWithUniqueNames)
 
+  val empty = new Diff(Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty)
+
   implicit class DiffExt(d: Diff) {
     def asBlockDiff: BlockDiff = BlockDiff(d, 0, Map.empty)
   }
 
   implicit val diffMonoid = new Monoid[Diff] {
-    override def empty: Diff = Diff()
+    override def empty: Diff = Diff.empty
 
     override def combine(older: Diff, newer: Diff): Diff = Diff(
       transactions = older.transactions ++ newer.transactions,
