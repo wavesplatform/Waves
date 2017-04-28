@@ -67,7 +67,7 @@ class AssetsRouteSpec
     "issue" -> issueReq.map(v => Json.toJson(v)),
     "reissue" -> reissueReq.map(v => Json.toJson(v)),
     "burn" -> burnReq.map(v => Json.toJson(v)),
-    "make-unique-asset-name" -> makeAssetNameUniqueGen.map(v => Json.toJson(v))
+    "make-asset-name-unique" -> makeAssetNameUniqueGen.map(v => Json.toJson(v))
   )) {
     val currentPath = routePath(path)
     currentPath in {

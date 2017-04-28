@@ -61,7 +61,7 @@ object AssetTransactionsDiff {
     })
   }
 
-  def makeUnique(state: StateReader, height: Int)(tx: MakeAssetNameUniqueTransaction): Either[StateValidationError, Diff] = {
+  def makeAssetNameUnique(state: StateReader, height: Int)(tx: MakeAssetNameUniqueTransaction): Either[StateValidationError, Diff] = {
     findReferencedAsset(tx, state, tx.assetId).flatMap(itx => {
       val assetName = EqByteArray(itx.name)
       state.getAssetIdByUniqueName(assetName) match {

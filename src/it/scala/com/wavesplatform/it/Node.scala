@@ -126,8 +126,8 @@ class Node(config: Config, nodeInfo: NodeInfo, client: AsyncHttpClient, timer: T
   def issue(sourceAddress: String, name: String, description: String, quantity: Long, decimals: Byte, reissuable: Boolean, fee: Long): Future[Transaction] =
     post("/assets/issue", IssueRequest(sourceAddress, name, description, quantity, decimals, reissuable, fee)).as[Transaction]
 
-  def makeUnique(sourceAddress: String, assetId: String, fee: Long): Future[Transaction] =
-    post("/assets/make-unique-asset-name", MakeAssetNameUniqueRequest(sourceAddress, assetId, fee)).as[Transaction]
+  def makeAssetNameUnique(sourceAddress: String, assetId: String, fee: Long): Future[Transaction] =
+    post("/assets/make-asset-name-unique", MakeAssetNameUniqueRequest(sourceAddress, assetId, fee)).as[Transaction]
 
   def reissue(sourceAddress: String, assetId: String, quantity: Long, reissuable: Boolean, fee: Long): Future[Transaction] =
     post("/assets/reissue", ReissueRequest(sourceAddress, assetId, quantity, reissuable, fee)).as[Transaction]

@@ -27,7 +27,7 @@ object TransactionDiffer {
         case ltx: LeaseCancelTransaction => LeaseTransactionsDiff.leaseCancel(s, settings, time, height)(ltx)
         case etx: ExchangeTransaction => ExchangeTransactionDiff(s, height)(etx)
         case atx: CreateAliasTransaction => CreateAliasTransactionDiff(height)(atx)
-        case atx: MakeAssetNameUniqueTransaction => AssetTransactionsDiff.makeUnique(s, height)(atx)
+        case atx: MakeAssetNameUniqueTransaction => AssetTransactionsDiff.makeAssetNameUnique(s, height)(atx)
         case t => Left(UnsupportedTransactionType(t))
       }
       positiveDiff <- BalanceDiffValidation(s, time)(tx, diff)
