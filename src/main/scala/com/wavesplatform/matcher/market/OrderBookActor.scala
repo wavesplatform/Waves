@@ -140,13 +140,13 @@ class OrderBookActor(assetPair: AssetPair, val storedState: StateReader,
     }
   }
 
-  def handleMatchEvent(e: Event): Option[LimitOrder] = {
-    def processEvent(e: Event) = {
-      persist(e)(_ => ())
-      applyEvent(e)
-      context.system.eventStream.publish(e)
-    }
+  private def processEvent(e: Event) = {
+    persist(e)(_ => ())
+    applyEvent(e)
+    context.system.eventStream.publish(e)
+  }
 
+  def handleMatchEvent(e: Event): Option[LimitOrder] = {
     e match {
       case e: OrderAdded =>
         processEvent(e)

@@ -8,6 +8,7 @@ import com.wavesplatform.matcher.fixtures.RestartableActor
 import com.wavesplatform.matcher.fixtures.RestartableActor.RestartActor
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.model.Events.Event
+import com.wavesplatform.matcher.model.LimitOrder.Filled
 import com.wavesplatform.matcher.model.{BuyLimitOrder, LimitOrder, SellLimitOrder}
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.reader.StateReader
@@ -324,6 +325,26 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
 
       actor ! GetOrderStatus(pair, ord3.idStr)
       expectMsg(GetOrderStatusResponse(LimitOrder.Cancelled((0.01 * Constants.UnitsInWave).toLong)))
+    }
+
+    "partially execute order with small remaining part" in {
+      val ord1 = sell(pair, 0.00041, 200000000)
+      val ord2 = sell(pair, 0.0004, 100000000)
+      val ord3 = buy(pair, 0.00045, 100000001)
+
+      actor ! ord1
+      actor ! ord2
+      actor ! ord3
+      receiveN(3)
+
+      actor ! GetAskOrdersRequest
+      expectMsg(GetOrdersResponse(Seq(SellLimitOrder((0.00041*Order.PriceConstant).toLong, 200000000, ord1))))
+
+      actor ! GetOrderStatus(pair, ord2.idStr)
+      expectMsg(GetOrderStatusResponse(LimitOrder.Filled))
+
+      actor ! GetOrderStatus(pair, ord3.idStr)
+      expectMsg(GetOrderStatusResponse(LimitOrder.Cancelled(100000000)))
     }
   }
 

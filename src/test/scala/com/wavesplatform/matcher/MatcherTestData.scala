@@ -77,9 +77,9 @@ trait MatcherTestData {
       matcherFee: Long <- maxWavesAmountGen
     } yield (Order.sell(sender, MatcherAccount, pair, price, amount, timestamp, expiration, matcherFee), sender)
 
-  def buy(pair: AssetPair, price: Long, amount: Long): Order = valueFromGen(buyGenerator(pair, price * Order.PriceConstant, amount))._1
+  def buy(pair: AssetPair, price: BigDecimal, amount: Long): Order = valueFromGen(buyGenerator(pair, (price * Order.PriceConstant).toLong, amount))._1
 
-  def sell(pair: AssetPair, price: Long, amount: Long) = valueFromGen(sellGenerator(pair, price * Order.PriceConstant, amount))._1
+  def sell(pair: AssetPair, price: BigDecimal, amount: Long) = valueFromGen(sellGenerator(pair, (price * Order.PriceConstant).toLong, amount))._1
 
   val orderTypeGenerator: Gen[OrderType] = Gen.oneOf(OrderType.BUY, OrderType.SELL)
 
