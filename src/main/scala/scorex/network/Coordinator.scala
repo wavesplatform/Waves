@@ -49,8 +49,6 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
 
   application.blockGenerator ! StartGeneration
 
-  implicit val transactionModule: TransactionModule = application.transactionModule
-
   override def receive: Receive = idle()
 
   private def idle(peerScores: Map[ConnectedPeer, BlockchainScore] = Map.empty): Receive = state(CIdle) {
