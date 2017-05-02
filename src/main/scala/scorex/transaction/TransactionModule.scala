@@ -94,16 +94,13 @@ object TransactionModule extends ScorexLogging {
       throw new IllegalStateException(s"Effective balance $balance is less that minimal ($MinimalEffectiveBalanceForGenerator)")
     }
 
-    val lastBlockKernelData = lastBlock.consensusDataField.value
-
-    val lastBlockTime = lastBlock.timestampField.value
-
+    val lastBlockKernelData = lastBlock.consensusData
     val currentTime = NTP.correctedTime()
 
     val h = calcHit(lastBlockKernelData, account)
     val t = calcTarget(lastBlock, currentTime, balance)
 
-    val eta = (currentTime - lastBlockTime) / 1000
+    val eta = (currentTime - lastBlock.timestamp) / 1000
 
     log.debug(s"hit: $h, target: $t, generating ${
       h < t
@@ -154,19 +151,11 @@ object TransactionModule extends ScorexLogging {
   def packUnconfirmed(fs: FunctionalitySettings, utx: UnconfirmedTransactionsStorage, state: StateReader)
                      (heightOpt: Option[Int]): Seq[Transaction] = synchronized {
     clearIncorrectTransactions(fs, state, utx)
-
     val txs = utx.all()
       .sorted(TransactionsOrdering.InUTXPool)
       .take(MaxTransactionsPerBlock)
       .sorted(TransactionsOrdering.InBlock)
-
-    val valid = Validator.validate(fs, state, txs, heightOpt, NTP.correctedTime())._2
-
-    if (valid.size != txs.size) {
-      log.debug(s"Txs for new block do not match: valid=${valid.size} vs all=${txs.size}")
-    }
-
-    valid
+    Validator.validate(fs, state, txs, heightOpt, NTP.correctedTime())._2
   }
 
   def clearIncorrectTransactions(fs: FunctionalitySettings, stateReader: StateReader, utx: UnconfirmedTransactionsStorage): Unit = {
@@ -181,7 +170,6 @@ object TransactionModule extends ScorexLogging {
 
 
   private def calcBaseTarget(history: History)(avgBlockDelay: FiniteDuration, prevBlock: Block, timestamp: Long): Long = {
-
     val avgDelayInSeconds = avgBlockDelay.toSeconds
 
     def normalize(value: Long): Double = value * avgDelayInSeconds / (60: Double)
