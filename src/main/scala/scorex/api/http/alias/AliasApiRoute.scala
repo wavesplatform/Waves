@@ -45,8 +45,8 @@ case class AliasApiRoute(settings: RestAPISettings, wallet: Wallet, transactionO
   @ApiImplicitParams(Array(
     new ApiImplicitParam(name = "alias", value = "Alias", required = true, dataType = "string", paramType = "path")
   ))
-  def addressOfAlias: Route = (get & path("by-alias" / Segment)) { aliasString =>
-    val result = Alias.buildWithCurrentNetworkByte(aliasString) match {
+  def addressOfAlias: Route = (get & path("by-alias" / Segment)) { aliasName =>
+    val result = Alias.buildWithCurrentNetworkByte(aliasName) match {
       case Right(alias) =>
         state.resolveAlias(alias) match {
           case Some(addr) => Right(Address(addr.stringRepr))

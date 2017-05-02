@@ -29,13 +29,12 @@ import scala.util.control.NonFatal
 import scala.util.{Left, Right}
 
 
-class SimpleTransactionModule(val settings: WavesSettings, networkController: ActorRef, time: Time)
+class SimpleTransactionModule(val settings: WavesSettings, networkController: ActorRef, time: Time, feeCalculator: FeeCalculator,
+                              val utxStorage: UnconfirmedTransactionsStorage)
   extends TransactionModule with TransactionOperations with ScorexLogging {
 
   import SimpleTransactionModule._
 
-  private val feeCalculator = new FeeCalculator(settings.feesSettings)
-  val utxStorage: UnconfirmedTransactionsStorage = new UnconfirmedTransactionsDatabaseImpl(settings.utxSettings)
   override val blockStorage = new BlockStorageImpl(settings.blockchainSettings)
 
   override def putUnconfirmedIfNew[T <: Transaction](tx: T): Either[ValidationError, T] = synchronized {

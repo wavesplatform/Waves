@@ -39,7 +39,7 @@ class StateReaderImpl(p: StateStorage) extends StateReader {
     p.aliasToAddress.entrySet().asScala
       .filter(_.getValue sameElements a.bytes)
       .map(_.getKey)
-      .map(aliasStr => Alias.buildWithCurrentNetworkByte(aliasStr).explicitGet())
+      .map(aliasName => Alias.buildWithCurrentNetworkByte(aliasName).explicitGet())
       .toSeq
 
 

@@ -32,7 +32,7 @@ trait TransactionGen {
   val aliasGen: Gen[Alias] = for {
     l <- Gen.chooseNum(Alias.MinLength, Alias.MaxLength)
     alias <- Gen.listOfN(l, Gen.alphaNumChar)
-  } yield Alias.buildWithCurrentNetworkByte(alias.mkString).right.get
+  } yield Alias.buildWithCurrentNetworkByte(alias.mkString).explicitGet()
 
   val accountOrAliasGen: Gen[AccountOrAlias] = Gen.oneOf(aliasGen, accountGen.map(PublicKeyAccount.toAccount(_)))
 

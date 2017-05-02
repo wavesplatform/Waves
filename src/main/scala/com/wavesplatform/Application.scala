@@ -18,7 +18,8 @@ import scorex.api.http.leasing.{LeaseApiRoute, LeaseBroadcastApiRoute}
 import scorex.app.ApplicationVersion
 import scorex.consensus.nxt.api.http.NxtConsensusApiRoute
 import scorex.network.{TransactionalMessagesRepo, UnconfirmedPoolSynchronizer}
-import scorex.transaction.{BlockStorage, SimpleTransactionModule}
+import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
+import scorex.transaction.{BlockStorage, FeeCalculator, SimpleTransactionModule, UnconfirmedTransactionsStorage}
 import scorex.utils.{ScorexLogging, Time, TimeImpl}
 import scorex.waves.http.{DebugApiRoute, WavesApiRoute}
 
@@ -36,8 +37,10 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
 
   override val matcherSettings: MatcherSettings = settings.matcherSettings
   override val restAPISettings: RestAPISettings = settings.restAPISettings
+  private val feeCalculator = new FeeCalculator(settings.feesSettings)
 
-  override implicit lazy val transactionModule = new SimpleTransactionModule(settings, networkController,time)
+  val utxStorage: UnconfirmedTransactionsStorage = new UnconfirmedTransactionsDatabaseImpl(settings.utxSettings)
+  override implicit lazy val transactionModule = new SimpleTransactionModule(settings, networkController,time,feeCalculator,utxStorage)
 
   override lazy val blockStorage: BlockStorage = transactionModule.blockStorage
 
