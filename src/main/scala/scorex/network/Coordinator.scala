@@ -260,16 +260,16 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
   }
 
   def isBlockValid(b: Block): Either[ValidationError, Unit] = {
-    if (application.transactionModule.blockStorage.history.contains(b)) Right(())
+    if (application.blockStorage.history.contains(b)) Right(())
     else {
-      def history = application.transactionModule.blockStorage.history.contains(b.reference)
+      def history = application.blockStorage.history.contains(b.reference)
 
       def signature = EllipticCurveImpl.verify(b.signerDataField.value.signature, b.bytesWithoutSignature,
         b.signerDataField.value.generator.publicKey)
 
       def consensus = TransactionModule.isValid(
-        application.transactionModule.blockStorage.history,
-        application.transactionModule.blockStorage.stateReader,
+        application.blockStorage.history,
+        application.blockStorage.stateReader,
         application.settings.blockchainSettings,
         application.time)(b)
 

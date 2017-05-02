@@ -51,9 +51,6 @@ trait RunnableApplication extends Application with Shutdownable with ScorexLoggi
 
   lazy val messagesHandler: MessageHandler = MessageHandler(BasicMessagesRepo.specs ++ additionalMessageSpecs)
 
-  //interface to append log and state
-  lazy override val blockStorage: BlockStorage = transactionModule.blockStorage
-
   lazy val history: History = blockStorage.history
 
   lazy override val networkController = actorSystem.actorOf(Props(new NetworkController(this)), "NetworkController")
@@ -121,9 +118,9 @@ trait RunnableApplication extends Application with Shutdownable with ScorexLoggi
   }
 
   private def checkGenesis(): Unit = {
-    if (transactionModule.blockStorage.history.isEmpty) {
+    if (blockStorage.history.isEmpty) {
       val maybeGenesisSignature = Option(settings.blockchainSettings.genesisSettings.signature).filter(_.trim.nonEmpty)
-      transactionModule.blockStorage.blockchainUpdater.processBlock(Block.genesis(
+      blockStorage.blockchainUpdater.processBlock(Block.genesis(
         NxtLikeConsensusBlockData(settings.blockchainSettings.genesisSettings.initialBaseTarget, EmptySignature),
         SimpleTransactionModule.buildTransactions(settings.blockchainSettings.genesisSettings),
         settings.blockchainSettings.genesisSettings.blockTimestamp, maybeGenesisSignature)) match {

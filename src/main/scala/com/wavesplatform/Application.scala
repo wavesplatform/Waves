@@ -39,10 +39,10 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
   override val restAPISettings: RestAPISettings = settings.restAPISettings
   private val feeCalculator = new FeeCalculator(settings.feesSettings)
 
-  val utxStorage: UnconfirmedTransactionsStorage = new UnconfirmedTransactionsDatabaseImpl(settings.utxSettings)
-  override implicit lazy val transactionModule = new SimpleTransactionModule(settings, networkController,time,feeCalculator,utxStorage)
+  override val blockStorage = new BlockStorageImpl(settings.blockchainSettings)
 
-  override lazy val blockStorage: BlockStorage = transactionModule.blockStorage
+  val utxStorage: UnconfirmedTransactionsStorage = new UnconfirmedTransactionsDatabaseImpl(settings.utxSettings)
+  override implicit lazy val transactionModule = new SimpleTransactionModule(settings, networkController, time, feeCalculator, utxStorage, blockStorage)
 
   override lazy val apiRoutes = Seq(
     BlocksApiRoute(settings.restAPISettings, settings.checkpointsSettings, history, coordinator),

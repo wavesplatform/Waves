@@ -3,6 +3,7 @@ package scorex.lagonaki.unit
 import akka.actor.{ActorRef, Props}
 import akka.testkit.TestProbe
 import com.typesafe.config.ConfigFactory
+import com.wavesplatform.history.BlockStorageImpl
 import com.wavesplatform.settings.WavesSettings
 import org.h2.mvstore.MVStore
 import scorex.ActorTestingCommons
@@ -59,7 +60,9 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
 
   class TestAppMock extends Application {
     lazy implicit val transactionModule: TransactionModule = new SimpleTransactionModule(wavesSettings, this.networkController, this.time,
-      new FeeCalculator(wavesSettings.feesSettings), new UnconfirmedTransactionsDatabaseImpl(settings.utxSettings))
+      new FeeCalculator(wavesSettings.feesSettings),
+      new UnconfirmedTransactionsDatabaseImpl(wavesSettings.utxSettings),
+      new BlockStorageImpl(wavesSettings.blockchainSettings))
     lazy val networkController: ActorRef = networkControllerMock
     lazy val settings = wavesSettings
     lazy val blockGenerator: ActorRef = testBlockGenerator.ref

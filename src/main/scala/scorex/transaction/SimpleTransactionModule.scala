@@ -30,12 +30,10 @@ import scala.util.{Left, Right}
 
 
 class SimpleTransactionModule(val settings: WavesSettings, networkController: ActorRef, time: Time, feeCalculator: FeeCalculator,
-                              val utxStorage: UnconfirmedTransactionsStorage)
+                              val utxStorage: UnconfirmedTransactionsStorage, val blockStorage: BlockStorage)
   extends TransactionModule with TransactionOperations with ScorexLogging {
 
   import SimpleTransactionModule._
-
-  override val blockStorage = new BlockStorageImpl(settings.blockchainSettings)
 
   override def putUnconfirmedIfNew[T <: Transaction](tx: T): Either[ValidationError, T] = synchronized {
     for {
