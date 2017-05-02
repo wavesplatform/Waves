@@ -22,6 +22,8 @@ class StateWriterImpl(p: StateStorage) extends StateReaderImpl(p) with StateWrit
 
     log.debug(s"Starting persist from ${p.getHeight} to ${p.getHeight + blockDiff.heightDiff}")
 
+    p.setHeight0(p.getHeight + blockDiff.heightDiff)
+
     measureSizeLog("transactions")(txsDiff.transactions) {
       _.foreach { case (id, (h, tx, _)) =>
         p.transactions.put(id.arr, (h, tx.bytes))
@@ -115,6 +117,7 @@ class StateWriterImpl(p: StateStorage) extends StateReaderImpl(p) with StateWrit
     p.lastUpdateHeight.clear()
 
     p.setHeight(0)
+    p.setHeight0(0)
     p.commit()
   }
 }

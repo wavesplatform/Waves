@@ -11,6 +11,11 @@ import scala.collection.JavaConverters._
 
 class StateReaderImpl(p: StateStorage) extends StateReader {
 
+  {
+    if (p.getHeight0 != p.getHeight)
+      throw new IllegalArgumentException(s"Persisted state is corrupt, height0=${p.getHeight0}, height=${p.getHeight}")
+  }
+
   override def transactionInfo(id: ByteArray): Option[(Int, Transaction)] = Option(p.transactions.get(id.arr)).map {
     case (h, bytes) => (h, TransactionParser.parseBytes(bytes).get)
   }

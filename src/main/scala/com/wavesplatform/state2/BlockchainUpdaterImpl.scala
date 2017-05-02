@@ -36,12 +36,11 @@ class BlockchainUpdaterImpl(persisted: StateWriter with StateReader, settings: F
     log.info(s"$prefix Total blocks: ${bc.height()}, persisted: ${persisted.height}, imMemDiff: ${inMemoryDiff.heightDiff}")
 
   {
-    logHeights("Start:")
-    if (persisted.height > bc.height()) {
+    if (persisted.height > bc.height())
       throw new IllegalArgumentException(s"storedBlocks = ${bc.height()}, statedBlocks=${persisted.height}")
-    } else {
-      updatePersistedAndInMemory()
-    }
+
+    logHeights("Start:")
+    updatePersistedAndInMemory()
   }
 
   def currentState: StateReader = new CompositeStateReader.Proxy(persisted, () => inMemoryDiff)

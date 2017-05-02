@@ -11,10 +11,13 @@ class StateStorage(db: MVStore) {
 
   private val variables: MVMap[String, Int] = db.openMap("variables")
   private val heightKey = "height"
+  private val height0Key = "height0"
 
   def getHeight: Int = variables.get(heightKey)
-
   def setHeight(i: Int): Unit = variables.put(heightKey, i)
+
+  def getHeight0: Int = variables.get(height0Key)
+  def setHeight0(i: Int): Unit = variables.put(height0Key, i)
 
   val transactions: util.Map[Array[Byte], (Int, Array[Byte])] = db.openMap("txs")
 

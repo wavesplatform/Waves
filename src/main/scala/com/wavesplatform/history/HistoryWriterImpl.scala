@@ -16,6 +16,12 @@ class HistoryWriterImpl(db: MVStore) extends History with HistoryWriter with Sco
   private val heightByBlockId = db.openMap("signaturesReverse", new LogMVMapBuilder[BlockId, Int])
   private val scoreByHeight = db.openMap("score", new LogMVMapBuilder[Int, BigInt])
 
+  {
+    if (Set(blockBodyByHeight.size(), blockIdByHeight.size(), heightByBlockId.size(), scoreByHeight.size()).size != 1) {
+      throw new IllegalArgumentException(s"Block storage is corrupt")
+    }
+  }
+
   override def appendBlock(block: Block): Either[ValidationError, Unit] = {
     if ((height() == 0) || (this.lastBlock.uniqueId sameElements block.reference)) {
       val h = height() + 1
