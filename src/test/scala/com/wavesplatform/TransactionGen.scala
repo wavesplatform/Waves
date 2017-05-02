@@ -30,7 +30,7 @@ trait TransactionGen {
 
   val accountGen: Gen[PrivateKeyAccount] = bytes32gen.map(seed => PrivateKeyAccount(seed))
   val aliasGen: Gen[Alias] = for {
-    l <- Gen.chooseNum(Alias.MinLength, Alias.MaxLength)
+    l <- Gen.chooseNum(Alias.MinLength, Alias.MaxLength - 8) // 8 length of alias prefix
     alias <- Gen.listOfN(l, Gen.alphaNumChar)
   } yield Alias.buildWithCurrentNetworkByte(alias.mkString).right.get
 

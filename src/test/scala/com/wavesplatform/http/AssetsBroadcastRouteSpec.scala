@@ -99,6 +99,7 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
 
       forAll(nonPositiveLong) { q => posting(tr.copy(amount = q)) should produce (NegativeAmount) }
       forAll(invalidBase58) { pk => posting(tr.copy(senderPublicKey = pk)) should produce (InvalidAddress) }
+      forAll(invalidBase58) { a => posting(tr.copy(recipient = a)) should produce (InvalidAddress) }
       forAll(invalidBase58) { a => posting(tr.copy(assetId = Some(a))) should produce (CustomValidationError("invalid.assetId")) }
       forAll(invalidBase58) { a => posting(tr.copy(feeAssetId = Some(a))) should produce (CustomValidationError("invalid.feeAssetId")) }
       forAll(longAttachment) { a => posting(tr.copy(attachment = Some(a))) should produce (CustomValidationError("invalid.attachment")) }
