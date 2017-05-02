@@ -18,7 +18,7 @@ class HistoryWriterImpl(db: MVStore) extends History with HistoryWriter with Sco
 
   {
     if (Set(blockBodyByHeight.size(), blockIdByHeight.size(), heightByBlockId.size(), scoreByHeight.size()).size != 1) {
-      throw new IllegalArgumentException(s"Block storage is corrupt. Please remove blockchain.dat and state.dat and restart the node")
+      throw new IllegalArgumentException(s"Block storage is corrupt. Please remove blockchain.dat and state.dat and restart the node.")
     }
   }
 
