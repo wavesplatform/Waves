@@ -10,14 +10,14 @@ import scorex.api.http._
 import scorex.api.http.assets.PaymentRequest
 import scorex.crypto.encode.Base58
 import scorex.transaction.{PaymentTransaction, TransactionOperations}
-import scorex.utils.NTP
+import scorex.utils.Time
 import scorex.wallet.Wallet
 import scorex.waves.transaction.SignedPaymentRequest
 
 @Path("/waves")
 @Api(value = "waves")
 @Deprecated
-case class WavesApiRoute(settings: RestAPISettings, wallet: Wallet, transactionModule: TransactionOperations) extends ApiRoute {
+case class WavesApiRoute(settings: RestAPISettings, wallet: Wallet, time: Time, transactionModule: TransactionOperations) extends ApiRoute {
 
   override lazy val route = pathPrefix("waves") {
     externalPayment ~ signPayment ~ broadcastSignedPayment ~ payment ~ createdSignedPayment
@@ -75,7 +75,7 @@ case class WavesApiRoute(settings: RestAPISettings, wallet: Wallet, transactionM
       (for {
         sender <- wallet.findWallet(payment.sender)
         recipient <- Account.fromString(payment.recipient)
-        pt <- PaymentTransaction.create(sender, recipient, payment.amount, payment.fee, NTP.correctedTime())
+        pt <- PaymentTransaction.create(sender, recipient, payment.amount, payment.fee, time.correctedTime())
       } yield pt)
         .left.map(ApiError.fromValidationError)
         .map { t =>

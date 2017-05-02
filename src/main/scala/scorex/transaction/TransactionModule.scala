@@ -7,11 +7,13 @@ import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.block.Block
 import scorex.consensus.TransactionsOrdering
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
+import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash.hash
 import scorex.transaction.SimpleTransactionModule._
-import scorex.utils.{NTP, ScorexLogging}
+import scorex.utils.{ScorexLogging, Time}
 
 import scala.concurrent.duration._
+import scala.util.control.NonFatal
 
 trait TransactionModule {
 
@@ -21,29 +23,23 @@ trait TransactionModule {
 
   def validate[T <: Transaction](tx: T): Either[ValidationError, T]
 
-  def unconfirmedTxs: Seq[Transaction]
-
   def putUnconfirmedIfNew[T <: Transaction](tx: T): Either[ValidationError, T]
-
-  def clearFromUnconfirmed(data: Seq[Transaction]): Unit
 
   def onNewOffchainTransaction[T <: Transaction](transaction: T): Either[ValidationError, T]
 
-  def isValid(block: Block): Boolean
 }
 
 object TransactionModule extends ScorexLogging {
 
-
-  def blockOrdering(history: History, state: StateReader, fs: FunctionalitySettings): Ordering[Block] = Ordering.by {
+  def blockOrdering(history: History, state: StateReader, fs: FunctionalitySettings, time: Time): Ordering[Block] = Ordering.by {
     block =>
       val parent = history.blockById(block.reference).get
-      val blockCreationTime = nextBlockGenerationTime(history, state, fs)(parent, block.signerData.generator)
+      val blockCreationTime = nextBlockGenerationTime(history, state, fs, time: Time)(parent, block.signerData.generator)
         .getOrElse(block.timestamp)
       (block.blockScore, -blockCreationTime)
   }
 
-  def nextBlockGenerationTime(history: History, state: StateReader, fs: FunctionalitySettings)(block: Block, account: PublicKeyAccount): Option[Long] = {
+  def nextBlockGenerationTime(history: History, state: StateReader, fs: FunctionalitySettings, time: Time)(block: Block, account: PublicKeyAccount): Option[Long] = {
     history.heightOf(block.uniqueId)
       .map(height => (height, generatingBalance(state, fs)(account, height))).filter(_._2 > 0)
       .flatMap {
@@ -58,7 +54,7 @@ object TransactionModule extends ScorexLogging {
               .map(_.toLong)
 
           log.debug({
-            val currentTime = NTP.correctedTime()
+            val currentTime = time.correctedTime()
             s"Next block gen time: $result " +
               s"in ${
                 result.map(t => (t - currentTime) / 1000)
@@ -80,10 +76,10 @@ object TransactionModule extends ScorexLogging {
     state.effectiveBalanceAtHeightWithConfirmations(account, atHeight, generatingBalanceDepth)
   }
 
-  def generateNextBlocks(history: History, state: StateReader, bcs: BlockchainSettings, utx: UnconfirmedTransactionsStorage)(accounts: Seq[PrivateKeyAccount]): Seq[Block] =
-    accounts.flatMap(generateNextBlock(history, state, bcs, utx) _)
+  def generateNextBlocks(history: History, state: StateReader, bcs: BlockchainSettings, utx: UnconfirmedTransactionsStorage, time: Time)(accounts: Seq[PrivateKeyAccount]): Seq[Block] =
+    accounts.flatMap(generateNextBlock(history, state, bcs, utx, time) _)
 
-  def generateNextBlock(history: History, state: StateReader, bcs: BlockchainSettings, utx: UnconfirmedTransactionsStorage)
+  def generateNextBlock(history: History, state: StateReader, bcs: BlockchainSettings, utx: UnconfirmedTransactionsStorage, time: Time)
                        (account: PrivateKeyAccount): Option[Block] = try {
 
     val lastBlock = history.lastBlock
@@ -95,7 +91,7 @@ object TransactionModule extends ScorexLogging {
     }
 
     val lastBlockKernelData = lastBlock.consensusData
-    val currentTime = NTP.correctedTime()
+    val currentTime = time.correctedTime()
 
     val h = calcHit(lastBlockKernelData, account)
     val t = calcTarget(lastBlock, currentTime, balance)
@@ -123,7 +119,7 @@ object TransactionModule extends ScorexLogging {
       val gs = calcGeneratorSignature(lastBlockKernelData, account)
       val consensusData = NxtLikeConsensusBlockData(btg, gs)
 
-      val unconfirmed = packUnconfirmed(bcs.functionalitySettings, utx, state)(Some(height))
+      val unconfirmed = packUnconfirmed(bcs.functionalitySettings, utx, state, time)(Some(height))
       log.debug(s"Build block with ${
         unconfirmed.size
       } transactions")
@@ -148,18 +144,18 @@ object TransactionModule extends ScorexLogging {
   }
 
 
-  def packUnconfirmed(fs: FunctionalitySettings, utx: UnconfirmedTransactionsStorage, state: StateReader)
+  def packUnconfirmed(fs: FunctionalitySettings, utx: UnconfirmedTransactionsStorage, state: StateReader, time: Time)
                      (heightOpt: Option[Int]): Seq[Transaction] = synchronized {
-    clearIncorrectTransactions(fs, state, utx)
+    clearIncorrectTransactions(fs, state, utx, time)
     val txs = utx.all()
       .sorted(TransactionsOrdering.InUTXPool)
       .take(MaxTransactionsPerBlock)
       .sorted(TransactionsOrdering.InBlock)
-    Validator.validate(fs, state, txs, heightOpt, NTP.correctedTime())._2
+    Validator.validate(fs, state, txs, heightOpt, time.correctedTime())._2
   }
 
-  def clearIncorrectTransactions(fs: FunctionalitySettings, stateReader: StateReader, utx: UnconfirmedTransactionsStorage): Unit = {
-    val currentTime = NTP.correctedTime()
+  def clearIncorrectTransactions(fs: FunctionalitySettings, stateReader: StateReader, utx: UnconfirmedTransactionsStorage, time: Time): Unit = {
+    val currentTime = time.correctedTime()
     val txs = utx.all()
     val notExpired = txs.filter { tx => (currentTime - tx.timestamp).millis <= MaxTimeUtxPast }
     val notFromFuture = notExpired.filter { tx => (tx.timestamp - currentTime).millis <= MaxTimeUtxFuture }
@@ -167,7 +163,6 @@ object TransactionModule extends ScorexLogging {
     val valid = Validator.validate(fs, stateReader, inOrder, None, currentTime)._2
     txs.diff(valid).foreach(utx.remove)
   }
-
 
   private def calcBaseTarget(history: History)(avgBlockDelay: FiniteDuration, prevBlock: Block, timestamp: Long): Long = {
     val avgDelayInSeconds = avgBlockDelay.toSeconds
@@ -209,5 +204,78 @@ object TransactionModule extends ScorexLogging {
 
   private def calcGeneratorSignature(lastBlockData: NxtLikeConsensusBlockData, generator: PublicKeyAccount) =
     hash(lastBlockData.generationSignature ++ generator.publicKey)
+
+  def clearFromUnconfirmed(fs: FunctionalitySettings, stateReader: StateReader, utx: UnconfirmedTransactionsStorage, time: Time)(data: Seq[Transaction]): Unit = {
+    data.foreach(tx => utx.getBySignature(tx.id) match {
+      case Some(unconfirmedTx) => utx.remove(unconfirmedTx)
+      case None =>
+    })
+
+    clearIncorrectTransactions(fs, stateReader, utx, time) // todo makes sence to remove expired only at this point
+  }
+
+  def isValid(history: History, state: StateReader, bcs: BlockchainSettings, time:Time)(block: Block): Boolean = try {
+
+    val fs = bcs.functionalitySettings
+
+    val blockTime = block.timestampField.value
+
+    require((blockTime - time.correctedTime()).millis < MaxTimeDrift, s"Block timestamp $blockTime is from future")
+
+
+    if (blockTime > fs.requireSortedTransactionsAfter) {
+      require(block.transactionDataField.asInstanceOf[TransactionsBlockField].value.sorted(TransactionsOrdering.InBlock) == block.transactionDataField.asInstanceOf[TransactionsBlockField].value, "Transactions must be sorted correctly")
+    }
+
+    val parentOpt = history.parent(block)
+    require(parentOpt.isDefined || history.height() == 1, s"Can't find parent block with id '${
+      Base58.encode(block.referenceField.value)
+    }' of block " +
+      s"'${
+        Base58.encode(block.uniqueId)
+      }'")
+
+    val parent = parentOpt.get
+    val parentHeightOpt = history.heightOf(parent.uniqueId)
+    require(parentHeightOpt.isDefined, s"Can't get parent block with id '${
+      Base58.encode(block.referenceField.value)
+    }' height")
+    val parentHeight = parentHeightOpt.get
+
+    val prevBlockData = parent.consensusDataField.value
+    val blockData = block.consensusDataField.value
+
+    val cbt = calcBaseTarget(history)(bcs.genesisSettings.averageBlockDelay, parent, blockTime)
+    val bbt = blockData.baseTarget
+    require(cbt == bbt, s"Block's basetarget is wrong, calculated: $cbt, block contains: $bbt")
+
+    val generator = block.signerDataField.value.generator
+
+    //check generation signature
+    val calcGs = calcGeneratorSignature(prevBlockData, generator)
+    val blockGs = blockData.generationSignature
+    require(calcGs.sameElements(blockGs),
+      s"Block's generation signature is wrong, calculated: ${
+        calcGs.mkString
+      }, block contains: ${
+        blockGs.mkString
+      }")
+
+    val effectiveBalance = generatingBalance(state,fs)(generator, parentHeight)
+
+    if (blockTime >= fs.minimalGeneratingBalanceAfterTimestamp) {
+      require(effectiveBalance >= MinimalEffectiveBalanceForGenerator, s"Effective balance $effectiveBalance is less that minimal ($MinimalEffectiveBalanceForGenerator)")
+    }
+
+    //check hit < target
+    calcHit(prevBlockData, generator) < calcTarget(parent, blockTime, effectiveBalance)
+  } catch {
+    case e: IllegalArgumentException =>
+      log.error("Error while checking a block", e)
+      false
+    case NonFatal(t) =>
+      log.error("Fatal error while checking a block", t)
+      throw t
+  }
 }
 

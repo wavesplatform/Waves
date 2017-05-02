@@ -99,7 +99,7 @@ case class TransactionsApiRoute(
   @Path("/unconfirmed")
   @ApiOperation(value = "Unconfirmed", notes = "Get list of unconfirmed transactions", httpMethod = "GET")
   def unconfirmed: Route = (path("unconfirmed") & get) {
-    complete(JsArray(transactionModule.unconfirmedTxs.map(txToExtendedJson)))
+    complete(JsArray(transactionModule.utxStorage.all.map(txToExtendedJson)))
   }
 
   private def txToExtendedJson(tx: Transaction): JsObject = {

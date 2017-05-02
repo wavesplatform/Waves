@@ -108,7 +108,8 @@ class TransactionsRouteSpec extends RouteSpec("/transactions")
       } yield t
 
       forAll(g) { txs =>
-        (stm.unconfirmedTxs _).expects().returning(txs).once()
+    //    (stm.unconfirmedTxs _).expects().returning(txs).once()
+        ???
         Get(routePath("/unconfirmed")) ~> route ~> check {
           val resp = responseAs[Seq[JsValue]]
           for ((r, t) <- resp.zip(txs)) {

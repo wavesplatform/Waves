@@ -29,188 +29,20 @@ import scala.util.control.NonFatal
 import scala.util.{Left, Right}
 
 
-class SimpleTransactionModule(val settings: WavesSettings, networkController: ActorRef)
+class SimpleTransactionModule(val settings: WavesSettings, networkController: ActorRef, time: Time)
   extends TransactionModule with TransactionOperations with ScorexLogging {
 
   import SimpleTransactionModule._
 
   private val feeCalculator = new FeeCalculator(settings.feesSettings)
-  private val fs = settings.blockchainSettings.functionalitySettings
-
   val utxStorage: UnconfirmedTransactionsStorage = new UnconfirmedTransactionsDatabaseImpl(settings.utxSettings)
-
   override val blockStorage = new BlockStorageImpl(settings.blockchainSettings)
-
-  override def unconfirmedTxs: Seq[Transaction] = utxStorage.all()
 
   override def putUnconfirmedIfNew[T <: Transaction](tx: T): Either[ValidationError, T] = synchronized {
     for {
       t1 <- feeCalculator.enoughFee(tx)
       t2 <- utxStorage.putIfNew(t1, (t: T) => validate(t))
     } yield t2
-  }
-
-  def packUnconfirmed(heightOpt: Option[Int]): Seq[Transaction] = synchronized {
-    clearIncorrectTransactions()
-
-    val txs = utxStorage.all()
-      .sorted(TransactionsOrdering.InUTXPool)
-      .take(MaxTransactionsPerBlock)
-      .sorted(TransactionsOrdering.InBlock)
-
-    val valid = Validator.validate(fs, blockStorage.stateReader, txs, heightOpt, NTP.correctedTime())._2
-
-    if (valid.size != txs.size) {
-      log.debug(s"Txs for new block do not match: valid=${valid.size} vs all=${txs.size}")
-    }
-
-    valid
-  }
-
-  override def clearFromUnconfirmed(data: Seq[Transaction]): Unit = synchronized {
-    data.foreach(tx => utxStorage.getBySignature(tx.id) match {
-      case Some(unconfirmedTx) => utxStorage.remove(unconfirmedTx)
-      case None =>
-    })
-
-    clearIncorrectTransactions() // todo makes sence to remove expired only at this point
-  }
-
-  def clearIncorrectTransactions(): Unit = {
-    val currentTime = NTP.correctedTime()
-    val txs = utxStorage.all()
-    val notExpired = txs.filter { tx => (currentTime - tx.timestamp).millis <= MaxTimeUtxPast }
-    val notFromFuture = notExpired.filter { tx => (tx.timestamp - currentTime).millis <= MaxTimeUtxFuture }
-    val inOrder = notFromFuture.sorted(TransactionsOrdering.InUTXPool)
-    val valid = Validator.validate(fs, blockStorage.stateReader, inOrder, None, currentTime)._2
-    // remove non valid or expired from storage
-    txs.diff(valid).foreach(utxStorage.remove)
-  }
-
-  val consensusGenesisData: NxtLikeConsensusBlockData = NxtLikeConsensusBlockData(settings.blockchainSettings.genesisSettings.initialBaseTarget, EmptySignature)
-
-  private val MinBlocktimeLimit = normalize(53)
-  private val MaxBlocktimeLimit = normalize(67)
-  private val BaseTargetGamma = normalize(64)
-  private val MaxBaseTarget = Long.MaxValue / avgDelayInSeconds
-
-  private def avgDelayInSeconds: Long = settings.blockchainSettings.genesisSettings.averageBlockDelay.toSeconds
-
-  private def normalize(value: Long): Double = value * avgDelayInSeconds / (60: Double)
-
-  def isValid(block: Block): Boolean = try {
-    val blockTime = block.timestampField.value
-
-    require((blockTime - NTP.correctedTime()).millis < MaxTimeDrift, s"Block timestamp $blockTime is from future")
-
-    val history = blockStorage.history
-
-    if (block.timestampField.value > settings.blockchainSettings.functionalitySettings.requireSortedTransactionsAfter) {
-      require(block.transactionDataField.asInstanceOf[TransactionsBlockField].value.sorted(TransactionsOrdering.InBlock) == block.transactionDataField.asInstanceOf[TransactionsBlockField].value, "Transactions must be sorted correctly")
-    }
-
-    val parentOpt = history.parent(block)
-    require(parentOpt.isDefined || history.height() == 1, s"Can't find parent block with id '${
-      Base58.encode(block.referenceField.value)
-    }' of block " +
-      s"'${
-        Base58.encode(block.uniqueId)
-      }'")
-
-    val parent = parentOpt.get
-    val parentHeightOpt = history.heightOf(parent.uniqueId)
-    require(parentHeightOpt.isDefined, s"Can't get parent block with id '${
-      Base58.encode(block.referenceField.value)
-    }' height")
-    val parentHeight = parentHeightOpt.get
-
-    val prevBlockData = parent.consensusDataField.value
-    val blockData = block.consensusDataField.value
-
-    //check baseTarget
-    val cbt = calcBaseTarget(parent, blockTime)
-    val bbt = blockData.baseTarget
-    require(cbt == bbt, s"Block's basetarget is wrong, calculated: $cbt, block contains: $bbt")
-
-    val generator = block.signerDataField.value.generator
-
-    //check generation signature
-    val calcGs = calcGeneratorSignature(prevBlockData, generator)
-    val blockGs = blockData.generationSignature
-    require(calcGs.sameElements(blockGs),
-      s"Block's generation signature is wrong, calculated: ${
-        calcGs.mkString
-      }, block contains: ${
-        blockGs.mkString
-      }")
-
-    val effectiveBalance = generatingBalance(generator, parentHeight)
-
-    if (block.timestampField.value >= settings.blockchainSettings.functionalitySettings.minimalGeneratingBalanceAfterTimestamp) {
-      require(effectiveBalance >= MinimalEffectiveBalanceForGenerator, s"Effective balance $effectiveBalance is less that minimal ($MinimalEffectiveBalanceForGenerator)")
-    }
-
-    //check hit < target
-    calcHit(prevBlockData, generator) < calcTarget(parent, blockTime, effectiveBalance)
-  } catch {
-    case e: IllegalArgumentException =>
-      log.error("Error while checking a block", e)
-      false
-    case NonFatal(t) =>
-      log.error("Fatal error while checking a block", t)
-      throw t
-  }
-
-  private def calcGeneratorSignature(lastBlockData: NxtLikeConsensusBlockData, generator: PublicKeyAccount) =
-    hash(lastBlockData.generationSignature ++ generator.publicKey)
-
-  private def calcHit(lastBlockData: NxtLikeConsensusBlockData, generator: PublicKeyAccount): BigInt =
-    BigInt(1, calcGeneratorSignature(lastBlockData, generator).take(8).reverse)
-
-  /**
-    * BaseTarget calculation algorithm fixing the blocktimes.
-    */
-  private def calcBaseTarget(prevBlock: Block, timestamp: Long): Long = {
-    val history = blockStorage.history
-    val height = history.heightOf(prevBlock).get
-    val prevBaseTarget = prevBlock.consensusDataField.value.baseTarget
-    if (height % 2 == 0) {
-      val blocktimeAverage = history.parent(prevBlock, AvgBlockTimeDepth - 1)
-        .map(b => (timestamp - b.timestampField.value) / AvgBlockTimeDepth)
-        .getOrElse(timestamp - prevBlock.timestampField.value) / 1000
-
-      val baseTarget = (if (blocktimeAverage > avgDelayInSeconds) {
-        prevBaseTarget * Math.min(blocktimeAverage, MaxBlocktimeLimit) / avgDelayInSeconds
-      } else {
-        prevBaseTarget - prevBaseTarget * BaseTargetGamma *
-          (avgDelayInSeconds - Math.max(blocktimeAverage, MinBlocktimeLimit)) / (avgDelayInSeconds * 100)
-      }).toLong
-
-      // TODO: think about MinBaseTarget like in Nxt
-      scala.math.min(baseTarget, MaxBaseTarget)
-    } else {
-      prevBaseTarget
-    }
-  }
-
-  protected def calcTarget(prevBlock: Block,
-                           timestamp: Long,
-                           balance: Long): BigInt = {
-
-    require(balance >= 0, s"Balance cannot be negative")
-
-    val prevBlockData = prevBlock.consensusDataField.value
-    val prevBlockTimestamp = prevBlock.timestampField.value
-
-    val eta = (timestamp - prevBlockTimestamp) / 1000 //in seconds
-
-    BigInt(prevBlockData.baseTarget) * eta * balance
-  }
-
-  def generatingBalance(account: Account, atHeight: Int): Long = {
-    val generatingBalanceDepth =
-      if (atHeight >= settings.blockchainSettings.functionalitySettings.generatingBalanceDepthFrom50To1000AfterHeight) 1000 else 50
-    blockStorage.stateReader.effectiveBalanceAtHeightWithConfirmations(account, atHeight, generatingBalanceDepth)
   }
 
   override def onNewOffchainTransaction[T <: Transaction](transaction: T): Either[ValidationError, T] =
@@ -239,7 +71,7 @@ class SimpleTransactionModule(val settings: WavesSettings, networkController: Ac
           senderPrivateKey,
           recipientAcc,
           request.amount,
-          getTimestamp,
+          time.getTimestamp,
           request.feeAssetId.map(s => Base58.decode(s).get),
           request.fee,
           request.attachment.filter(_.nonEmpty).map(Base58.decode(_).get).getOrElse(Array.emptyByteArray))
@@ -252,21 +84,21 @@ class SimpleTransactionModule(val settings: WavesSettings, networkController: Ac
       tx <- IssueTransaction.create(senderPrivateKey,
         request.name.getBytes(Charsets.UTF_8),
         request.description.getBytes(Charsets.UTF_8),
-        request.quantity, request.decimals, request.reissuable, request.fee, getTimestamp)
+        request.quantity, request.decimals, request.reissuable, request.fee, time.getTimestamp)
       r <- onNewOffchainTransaction(tx)
     } yield r
 
   def lease(request: LeaseRequest, wallet: Wallet): Either[ValidationError, LeaseTransaction] = for {
     senderPrivateKey <- wallet.findWallet(request.sender)
     recipientAcc <- AccountOrAlias.fromString(request.recipient)
-    tx <- LeaseTransaction.create(senderPrivateKey, request.amount, request.fee, getTimestamp, recipientAcc)
+    tx <- LeaseTransaction.create(senderPrivateKey, request.amount, request.fee, time.getTimestamp, recipientAcc)
     r <- onNewOffchainTransaction(tx)
   } yield r
 
   def leaseCancel(request: LeaseCancelRequest, wallet: Wallet): Either[ValidationError, LeaseCancelTransaction] =
     for {
       pk <- wallet.findWallet(request.sender)
-      lease <- LeaseCancelTransaction.create(pk, Base58.decode(request.txId).get, request.fee, getTimestamp)
+      lease <- LeaseCancelTransaction.create(pk, Base58.decode(request.txId).get, request.fee, time.getTimestamp)
       t <- onNewOffchainTransaction(lease)
     } yield t
 
@@ -274,53 +106,35 @@ class SimpleTransactionModule(val settings: WavesSettings, networkController: Ac
   override def alias(request: CreateAliasRequest, wallet: Wallet): Either[ValidationError, CreateAliasTransaction] = for {
     senderPrivateKey <- wallet.findWallet(request.sender)
     alias <- Alias.buildWithCurrentNetworkByte(request.alias)
-    tx <- CreateAliasTransaction.create(senderPrivateKey, alias, request.fee, getTimestamp)
+    tx <- CreateAliasTransaction.create(senderPrivateKey, alias, request.fee, time.getTimestamp)
     r <- onNewOffchainTransaction(tx)
   } yield r
 
   override def reissueAsset(request: ReissueRequest, wallet: Wallet): Either[ValidationError, ReissueTransaction] = for {
     pk <- wallet.findWallet(request.sender)
-    tx <- ReissueTransaction.create(pk, Base58.decode(request.assetId).get, request.quantity, request.reissuable, request.fee, getTimestamp)
+    tx <- ReissueTransaction.create(pk, Base58.decode(request.assetId).get, request.quantity, request.reissuable, request.fee, time.getTimestamp)
     r <- onNewOffchainTransaction(tx)
   } yield r
 
 
   override def burnAsset(request: BurnRequest, wallet: Wallet): Either[ValidationError, BurnTransaction] = for {
     pk <- wallet.findWallet(request.sender)
-    tx <- BurnTransaction.create(pk, Base58.decode(request.assetId).get, request.quantity, request.fee, getTimestamp)
+    tx <- BurnTransaction.create(pk, Base58.decode(request.assetId).get, request.quantity, request.fee, time.getTimestamp)
     r <- onNewOffchainTransaction(tx)
   } yield r
 
-
-  private var txTime: Long = 0
-
-  private def getTimestamp: Long = synchronized {
-    txTime = Math.max(NTP.correctedTime(), txTime + 1)
-    txTime
-  }
-
   override def createPayment(sender: PrivateKeyAccount, recipient: Account, amount: Long, fee: Long): Either[ValidationError, PaymentTransaction] =
-    PaymentTransaction.create(sender, recipient, amount, fee, getTimestamp)
+    PaymentTransaction.create(sender, recipient, amount, fee, time.getTimestamp)
       .flatMap(onNewOffchainTransaction)
 
-
-  /** Check whether tx is valid on current state and not expired yet
-    */
-  override def validate[T <: Transaction](tx: T): Either[ValidationError, T] = try {
+  override def validate[T <: Transaction](tx: T): Either[ValidationError, T] = {
     val lastBlockTimestamp = blockStorage.history.lastBlock.timestamp
     val notExpired = (lastBlockTimestamp - tx.timestamp).millis <= MaxTimePreviousBlockOverTransactionDiff
     if (notExpired) {
-      Validator.validate(fs, blockStorage.stateReader, tx)
+      Validator.validate(settings.blockchainSettings.functionalitySettings, blockStorage.stateReader, tx)
     } else {
       Left(TransactionValidationError(tx, s"Transaction is too old: Last block timestamp is $lastBlockTimestamp"))
     }
-  } catch {
-    case e: UnsupportedOperationException =>
-      log.debug(s"DB can't find last block because of unexpected modification")
-      Left(TransactionValidationError(tx, "DB can't find last block because of unexpected modification"))
-    case NonFatal(t) =>
-      log.error(s"Unexpected error during validation", t)
-      throw t
   }
 
   override def broadcastPayment(payment: SignedPaymentRequest): Either[ValidationError, PaymentTransaction] =

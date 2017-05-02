@@ -21,6 +21,7 @@ import scorex.network.peer.PeerManager.{ConnectedPeers, GetConnectedPeersTyped}
 import scorex.settings.TestBlockchainSettings
 import scorex.transaction.SimpleTransactionModule.EmptySignature
 import scorex.transaction._
+import scorex.utils.{Time, TimeImpl}
 import scorex.wallet.Wallet
 
 import scala.concurrent.duration._
@@ -56,9 +57,7 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
   val db: MVStore = new MVStore.Builder().open()
 
   class TestAppMock extends Application {
-    lazy implicit val transactionModule: TransactionModule = new SimpleTransactionModule(wavesSettings, this.networkController) {
-      override def isValid(block: Block): Boolean = true
-    }
+    lazy implicit val transactionModule: TransactionModule = new SimpleTransactionModule(wavesSettings, this.networkController, this.time)
     lazy val networkController: ActorRef = networkControllerMock
     lazy val settings = wavesSettings
     lazy val blockGenerator: ActorRef = testBlockGenerator.ref
@@ -76,6 +75,12 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
     override def applicationName: String = ???
 
     override def appVersion: ApplicationVersion = ???
+
+    override def time: Time = new Time {
+      override def correctedTime(): Long = 1
+
+      override def getTimestamp(): Long = 2
+    }
   }
 
   lazy val app = stub[TestAppMock]

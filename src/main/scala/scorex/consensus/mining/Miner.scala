@@ -1,13 +1,11 @@
 package scorex.consensus.mining
 
 import akka.actor.{Actor, Cancellable}
-import com.wavesplatform.settings.BlockchainSettings
-import com.wavesplatform.state2.reader.StateReader
 import scorex.app.Application
 import scorex.consensus.mining.Miner._
 import scorex.network.Coordinator.AddBlock
-import scorex.transaction.{History, TransactionModule, UnconfirmedTransactionsStorage}
-import scorex.utils.{NTP, ScorexLogging}
+import scorex.transaction.TransactionModule
+import scorex.utils.ScorexLogging
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
@@ -60,9 +58,9 @@ class Miner(application: Application) extends Actor with ScorexLogging {
   private def tryToGenerateABlock(): Boolean = Try {
     log.debug("Trying to generate a new block")
 
-    val blocks = TransactionModule.generateNextBlocks(history, state, bcs, utx)(accounts)
+    val blocks = TransactionModule.generateNextBlocks(history, state, bcs, utx, application.time)(accounts)
     if (blocks.nonEmpty) {
-      val bestBlock = blocks.max(TransactionModule.blockOrdering(history, state, bcs.functionalitySettings))
+      val bestBlock = blocks.max(TransactionModule.blockOrdering(history, state, bcs.functionalitySettings, application.time))
       application.coordinator ! AddBlock(bestBlock, None)
       true
     } else false
@@ -71,7 +69,7 @@ class Miner(application: Application) extends Actor with ScorexLogging {
     Failure(e)
   } getOrElse false
 
-  protected def preciseTime: Long = NTP.correctedTime()
+  protected def preciseTime: Long = application.time.correctedTime()
 
   private def scheduleBlockGeneration(): Unit = try {
     val schedule = if (application.settings.minerSettings.tfLikeScheduling) {
@@ -79,7 +77,7 @@ class Miner(application: Application) extends Actor with ScorexLogging {
       val currentTime = preciseTime
 
       accounts
-        .flatMap(acc => TransactionModule.nextBlockGenerationTime(history, state, bcs.functionalitySettings)(lastBlock, acc).map(_ + BlockGenerationTimeShift.toMillis))
+        .flatMap(acc => TransactionModule.nextBlockGenerationTime(history, state, bcs.functionalitySettings, application.time)(lastBlock, acc).map(_ + BlockGenerationTimeShift.toMillis))
         .map(t => math.max(t - currentTime, blockGenerationDelay.toMillis))
         .filter(_ < MaxBlockGenerationDelay.toMillis)
         .map(_ millis)

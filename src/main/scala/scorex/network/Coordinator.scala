@@ -6,6 +6,8 @@ import cats.implicits._
 import cats.syntax.all._
 import akka.pattern.{ask, pipe}
 import akka.util.Timeout
+import com.wavesplatform.settings.BlockchainSettings
+import com.wavesplatform.state2.reader.StateReader
 import scorex.app.Application
 import scorex.block.Block
 import scorex.block.Block.BlockId
@@ -20,9 +22,9 @@ import scorex.network.message._
 import scorex.network.message.{Message, MessageSpec}
 import scorex.network.peer.PeerManager.{ConnectedPeers, GetConnectedPeersTyped}
 import scorex.transaction.History.BlockchainScore
-import scorex.transaction.{SimpleTransactionModule, TransactionModule, ValidationError}
+import scorex.transaction.{History, SimpleTransactionModule, TransactionModule, ValidationError}
 import scorex.transaction.ValidationError.CustomError
-import scorex.utils.ScorexLogging
+import scorex.utils.{ScorexLogging, Time}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
@@ -177,7 +179,7 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
           // someone has happened to be faster and already added a block or blocks after the parent
           log.debug(s"A child for parent of the block already exists, local=$local: ${newBlock.json}")
 
-          val cmp = TransactionModule.blockOrdering(history, stateReader, application.settings.blockchainSettings.functionalitySettings)
+          val cmp = TransactionModule.blockOrdering(history, stateReader, application.settings.blockchainSettings.functionalitySettings, application.time)
           if (lastBlock.referenceField.value.sameElements(parentBlockId) && cmp.lt(lastBlock, newBlock)) {
             log.debug(s"New block ${newBlock.json} is better than last ${lastBlock.json}")
           }
@@ -265,7 +267,11 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
       def signature = EllipticCurveImpl.verify(b.signerDataField.value.signature, b.bytesWithoutSignature,
         b.signerDataField.value.generator.publicKey)
 
-      def consensus = application.transactionModule.isValid(b)
+      def consensus = TransactionModule.isValid(
+        application.transactionModule.blockStorage.history,
+        application.transactionModule.blockStorage.stateReader,
+        application.settings.blockchainSettings,
+        application.time)(b)
 
       if (!history) Left(CustomError(s"Invalid block ${b.encodedId}: no parent block in history"))
       else if (!signature) Left(CustomError(s"Invalid block ${b.encodedId}: signature is not valid"))
@@ -279,7 +285,8 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
     _ <- validateWithRespectToCheckpoint(block, history.height() + 1)
     _ <- application.blockStorage.blockchainUpdater.processBlock(block)
   } yield {
-    application.transactionModule.clearFromUnconfirmed(block.transactionData)
+    TransactionModule.clearFromUnconfirmed(application.settings.blockchainSettings.functionalitySettings,
+      application.blockStorage.stateReader, application.transactionModule.utxStorage, application.time)(block.transactionData)
   }
 
 

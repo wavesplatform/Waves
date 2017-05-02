@@ -19,7 +19,7 @@ import scorex.app.ApplicationVersion
 import scorex.consensus.nxt.api.http.NxtConsensusApiRoute
 import scorex.network.{TransactionalMessagesRepo, UnconfirmedPoolSynchronizer}
 import scorex.transaction.{BlockStorage, SimpleTransactionModule}
-import scorex.utils.ScorexLogging
+import scorex.utils.{ScorexLogging, Time, TimeImpl}
 import scorex.waves.http.{DebugApiRoute, WavesApiRoute}
 
 import scala.reflect.runtime.universe._
@@ -37,7 +37,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
   override val matcherSettings: MatcherSettings = settings.matcherSettings
   override val restAPISettings: RestAPISettings = settings.restAPISettings
 
-  override implicit lazy val transactionModule = new SimpleTransactionModule(settings, networkController)
+  override implicit lazy val transactionModule = new SimpleTransactionModule(settings, networkController,time)
 
   override lazy val blockStorage: BlockStorage = transactionModule.blockStorage
 
@@ -51,7 +51,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
     PeersApiRoute(settings.restAPISettings, peerManager, networkController),
     AddressApiRoute(settings.restAPISettings, wallet, blockStorage.stateReader, settings.blockchainSettings.functionalitySettings),
     DebugApiRoute(settings.restAPISettings, wallet, blockStorage.stateReader, history),
-    WavesApiRoute(settings.restAPISettings, wallet, transactionModule),
+    WavesApiRoute(settings.restAPISettings, wallet, time, transactionModule),
     AssetsApiRoute(settings.restAPISettings, wallet, blockStorage.stateReader, transactionModule),
     NodeApiRoute(settings.restAPISettings, () => this.shutdown(), blockGenerator, coordinator),
     AssetsBroadcastApiRoute(settings.restAPISettings, transactionModule),
@@ -90,6 +90,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
 
     if (matcherSettings.enable) runMatcher()
   }
+
+  override val time: Time = new TimeImpl()
 }
 
 object Application extends ScorexLogging {
@@ -128,7 +130,7 @@ object Application extends ScorexLogging {
   def main(args: Array[String]): Unit = {
     // prevents java from caching successful name resolutions, which is needed e.g. for proper NTP server rotation
     // http://stackoverflow.com/a/17219327
-    Security.setProperty("networkaddress.cache.ttl" , "0")
+    Security.setProperty("networkaddress.cache.ttl", "0")
 
     log.info("Starting...")
 

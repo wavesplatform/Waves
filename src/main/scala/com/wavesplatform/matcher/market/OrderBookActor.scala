@@ -14,7 +14,7 @@ import play.api.libs.json.Json
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange._
 import scorex.transaction.TransactionModule
-import scorex.utils.{NTP, ScorexLogging}
+import scorex.utils.{NTP, ScorexLogging, Time}
 import scorex.wallet.Wallet
 
 import scala.annotation.tailrec
@@ -62,7 +62,7 @@ class OrderBookActor(assetPair: AssetPair, val storedState: StateReader,
       deleteMessages(lastSequenceNr)
       deleteSnapshots(SnapshotSelectionCriteria.Latest)
       context.stop(self)
-      sender() ! GetOrderBookResponse(pair, Seq(), Seq())
+      sender() ! GetOrderBookResponse(pair, Seq(), Seq(), NTP.correctedTime())
   }
 
   def handleOrderStatus(id: String): Unit = {
@@ -91,8 +91,8 @@ class OrderBookActor(assetPair: AssetPair, val storedState: StateReader,
     if (pair == assetPair) {
       val d = Math.min(depth.getOrElse(MaxDepth), MaxDepth)
       sender() ! GetOrderBookResponse(pair, orderBook.bids.take(d).map(aggregateLevel).toSeq,
-        orderBook.asks.take(d).map(aggregateLevel).toSeq)
-    } else sender() ! GetOrderBookResponse(pair, Seq(), Seq())
+        orderBook.asks.take(d).map(aggregateLevel).toSeq, NTP.correctedTime())
+    } else sender() ! GetOrderBookResponse(pair, Seq(), Seq(), NTP.correctedTime())
   }
 
   override def receiveRecover: Receive = {
@@ -174,7 +174,7 @@ class OrderBookActor(assetPair: AssetPair, val storedState: StateReader,
 
 object OrderBookActor {
   def props(assetPair: AssetPair, storedState: StateReader,
-            wallet: Wallet, settings: MatcherSettings, transactionModule: TransactionModule): Props =
+            wallet: Wallet, settings: MatcherSettings, transactionModule: TransactionModule, time: Time): Props =
     Props(new OrderBookActor(assetPair, storedState, wallet, settings, transactionModule))
 
   def name(assetPair: AssetPair): String = assetPair.toString
@@ -221,8 +221,8 @@ object OrderBookActor {
     val code = StatusCodes.OK
   }
 
-  case class GetOrderBookResponse(pair: AssetPair, bids: Seq[LevelAgg], asks: Seq[LevelAgg]) extends MatcherResponse {
-    val json = Json.toJson(OrderBookResult(NTP.correctedTime(), pair, bids, asks))
+  case class GetOrderBookResponse(pair: AssetPair, bids: Seq[LevelAgg], asks: Seq[LevelAgg],time: Long) extends MatcherResponse {
+    val json = Json.toJson(OrderBookResult(time, pair, bids, asks))
     val code = StatusCodes.OK
   }
 

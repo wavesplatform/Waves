@@ -44,7 +44,7 @@ trait MatcherApplication extends ScorexLogging {
   )
 
   lazy val matcher: ActorRef = actorSystem.actorOf(MatcherActor.props(storedState, wallet, matcherSettings,
-    transactionModule), MatcherActor.name)
+    transactionModule, this.asInstanceOf[Application].time), MatcherActor.name)
 
   @volatile var matcherServerBinding: ServerBinding = _
 

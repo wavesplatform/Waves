@@ -55,7 +55,7 @@ class UnconfirmedPoolSynchronizerSpecification extends TestKit(ActorSystem("Unco
 
       (transactionModule.putUnconfirmedIfNew(_: Transaction))
         .expects(*)
-        .onCall((t: Transaction) => Left[ValidationError, Transaction](TransactionValidationError(t,"")))
+        .onCall((t: Transaction) => Left[ValidationError, Transaction](TransactionValidationError(t, "")))
 
       val actorRef = createPoolSynchronizer(100.seconds)
       val sender = stub[ConnectedPeer]
@@ -69,8 +69,8 @@ class UnconfirmedPoolSynchronizerSpecification extends TestKit(ActorSystem("Unco
     }
 
     "broadcast one tx periodically" in {
-      (transactionModule.unconfirmedTxs _).expects().returning(Seq(tx))
-
+      //      (transactionModule.unconfirmedTxs _).expects().returning(Seq(tx))
+      ???
       val actorRef = createPoolSynchronizer(1 second)
       val spec = TransactionalMessagesRepo.TransactionMessageSpec
       val ntwMsg = Message(spec, Right(tx), None)
