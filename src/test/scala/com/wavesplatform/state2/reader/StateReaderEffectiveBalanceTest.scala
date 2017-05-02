@@ -21,7 +21,6 @@ class StateReaderEffectiveBalanceTest extends fixture.FunSuite with Matchers {
   }
 
   test("exposes minimum of all 'current' and  one 'previous' of oldest record") { storage =>
-
     storage.balanceSnapshots.put(StateStorage.snapshotKey(acc, 20), (0, 0, 1))
     storage.balanceSnapshots.put(StateStorage.snapshotKey(acc, 75), (20, 0, 200))
     storage.balanceSnapshots.put(StateStorage.snapshotKey(acc, 90), (75, 0, 100))
