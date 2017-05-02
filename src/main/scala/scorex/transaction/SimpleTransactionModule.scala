@@ -2,7 +2,7 @@ package scorex.transaction
 
 import akka.actor.ActorRef
 import com.google.common.base.Charsets
-import com.wavesplatform.settings.{FunctionalitySettings, GenesisSettings, WavesSettings}
+import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.Validator
 import com.wavesplatform.state2.reader.StateReader
 import scorex.account._
@@ -10,7 +10,6 @@ import scorex.api.http.alias.CreateAliasRequest
 import scorex.api.http.assets._
 import scorex.api.http.leasing.{LeaseCancelRequest, LeaseRequest}
 import scorex.crypto.encode.Base58
-import scorex.crypto.hash.FastCryptographicHash.DigestSize
 import scorex.network._
 import scorex.network.message.Message
 import scorex.transaction.assets.{BurnTransaction, _}
@@ -19,9 +18,7 @@ import scorex.utils._
 import scorex.wallet.Wallet
 import scorex.waves.transaction.SignedPaymentRequest
 
-import scala.concurrent.duration._
 import scala.util.Right
-
 
 class SimpleTransactionModule(fs: FunctionalitySettings, networkController: ActorRef, time: Time, feeCalculator: FeeCalculator,
                               utxStorage: UnconfirmedTransactionsStorage, history: History, stateReader: StateReader)
@@ -40,8 +37,9 @@ class SimpleTransactionModule(fs: FunctionalitySettings, networkController: Acto
   override def createPayment(request: PaymentRequest, wallet: Wallet): Either[ValidationError, PaymentTransaction] = for {
     pk <- wallet.findWallet(request.sender)
     rec <- Account.fromString(request.recipient)
-    pmt <- createPayment(pk, rec, request.amount, request.fee)
-  } yield pmt
+    tx <- PaymentTransaction.create(pk, rec, request.amount, request.fee, time.getTimestamp)
+    r <- onNewOffchainTransaction(tx)
+  } yield r
 
 
   override def transferAsset(request: TransferRequest, wallet: Wallet): Either[ValidationError, TransferTransaction] =
@@ -105,10 +103,6 @@ class SimpleTransactionModule(fs: FunctionalitySettings, networkController: Acto
     r <- onNewOffchainTransaction(tx)
   } yield r
 
-  override def createPayment(sender: PrivateKeyAccount, recipient: Account, amount: Long, fee: Long): Either[ValidationError, PaymentTransaction] =
-    PaymentTransaction.create(sender, recipient, amount, fee, time.getTimestamp)
-      .flatMap(onNewOffchainTransaction(_, None))
-
   override def broadcastPayment(payment: SignedPaymentRequest): Either[ValidationError, PaymentTransaction] =
     for {
       _signature <- Base58.decode(payment.signature).toOption.toRight(ValidationError.InvalidSignature)
@@ -117,30 +111,4 @@ class SimpleTransactionModule(fs: FunctionalitySettings, networkController: Acto
       tx <- PaymentTransaction.create(_sender, _recipient, payment.amount, payment.fee, payment.timestamp, _signature)
       t <- onNewOffchainTransaction(tx)
     } yield t
-}
-
-object SimpleTransactionModule {
-
-  val MaxTimeUtxFuture: FiniteDuration = 15.seconds
-  val MaxTimeUtxPast: FiniteDuration = 90.minutes
-  val MaxTimeTransactionOverBlockDiff: FiniteDuration = 90.minutes
-  val MaxTimePreviousBlockOverTransactionDiff: FiniteDuration = 90.minutes
-  val MaxTimeCurrentBlockOverTransactionDiff: FiniteDuration = 2.hour
-  val MaxTransactionsPerBlock: Int = 100
-  val BaseTargetLength: Int = 8
-  val GeneratorSignatureLength: Int = 32
-  val MinimalEffectiveBalanceForGenerator: Long = 1000000000000L
-  val AvgBlockTimeDepth: Int = 3
-  val MaxTimeDrift: FiniteDuration = 15.seconds
-  val EmptySignature: Array[Byte] = Array.fill(DigestSize)(0: Byte)
-  val Version: Byte = 2
-
-
-  def buildTransactions(genesisSettings: GenesisSettings): Seq[GenesisTransaction] = {
-    genesisSettings.transactions.map { ts =>
-      val acc = Account.fromString(ts.recipient).right.get
-      GenesisTransaction.create(acc, ts.amount, genesisSettings.transactionsTimestamp).right.get
-    }
-  }
-
 }

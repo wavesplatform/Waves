@@ -17,8 +17,7 @@ trait TransactionOperations {
   def lease(request: LeaseRequest, wallet: Wallet): Either[ValidationError, LeaseTransaction]
   def alias(request: CreateAliasRequest, wallet: Wallet): Either[ValidationError, CreateAliasTransaction]
   def leaseCancel(request: LeaseCancelRequest, wallet: Wallet): Either[ValidationError, LeaseCancelTransaction]
-  def broadcastPayment(payment: SignedPaymentRequest): Either[ValidationError, PaymentTransaction]
-
   def createPayment(payment: PaymentRequest, wallet: Wallet): Either[ValidationError, PaymentTransaction]
-  def createPayment(sender: PrivateKeyAccount, recipient: Account, amount: Long, fee: Long): Either[ValidationError, PaymentTransaction]
+
+  def broadcastPayment(payment: SignedPaymentRequest): Either[ValidationError, PaymentTransaction]
 }

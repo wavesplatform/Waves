@@ -1,6 +1,6 @@
 package scorex.transaction
 
-import com.wavesplatform.settings.{BlockchainSettings, FunctionalitySettings}
+import com.wavesplatform.settings.{BlockchainSettings, FunctionalitySettings, GenesisSettings}
 import com.wavesplatform.state2.Validator
 import com.wavesplatform.state2.reader.StateReader
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
@@ -142,7 +142,7 @@ object TransactionModule extends ScorexLogging {
     clearIncorrectTransactions(fs, state, utx, time)
     val txs = utx.all()
       .sorted(TransactionsOrdering.InUTXPool)
-      .take(MaxTransactionsPerBlock)
+      .take(Block.MaxTransactionsPerBlock)
       .sorted(TransactionsOrdering.InBlock)
     Validator.validate(fs, state, txs, heightOpt, time.correctedTime())._2
   }
@@ -270,5 +270,19 @@ object TransactionModule extends ScorexLogging {
       log.error("Fatal error while checking a block", t)
       throw t
   }
+
+  def buildTransactions(genesisSettings: GenesisSettings): Seq[GenesisTransaction] = {
+    genesisSettings.transactions.map { ts =>
+      val acc = Account.fromString(ts.recipient).right.get
+      GenesisTransaction.create(acc, ts.amount, genesisSettings.transactionsTimestamp).right.get
+    }
+  }
+
+  val Version: Byte = 2
+  val MinimalEffectiveBalanceForGenerator: Long = 1000000000000L
+  val AvgBlockTimeDepth: Int = 3
+  val MaxTimeDrift: FiniteDuration = 15.seconds
+  val MaxTimeUtxFuture: FiniteDuration = 15.seconds
+  val MaxTimeUtxPast: FiniteDuration = 90.minutes
 }
 

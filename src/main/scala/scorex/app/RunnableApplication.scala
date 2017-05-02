@@ -13,6 +13,7 @@ import scorex.block.Block
 import scorex.consensus.mining.BlockGeneratorController
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
 import scorex.crypto.encode.Base58
+import scorex.crypto.hash.FastCryptographicHash.DigestSize
 import scorex.network._
 import scorex.network.message._
 import scorex.network.peer.PeerManager
@@ -121,7 +122,7 @@ trait RunnableApplication extends Application with Shutdownable with ScorexLoggi
     if (blockStorage.history.isEmpty) {
       val maybeGenesisSignature = Option(settings.blockchainSettings.genesisSettings.signature).filter(_.trim.nonEmpty)
       blockStorage.blockchainUpdater.processBlock(Block.genesis(
-        NxtLikeConsensusBlockData(settings.blockchainSettings.genesisSettings.initialBaseTarget, EmptySignature),
+        NxtLikeConsensusBlockData(settings.blockchainSettings.genesisSettings.initialBaseTarget, Array.fill(DigestSize)(0: Byte)),
         SimpleTransactionModule.buildTransactions(settings.blockchainSettings.genesisSettings),
         settings.blockchainSettings.genesisSettings.blockTimestamp, maybeGenesisSignature)) match {
         case Left(value) =>

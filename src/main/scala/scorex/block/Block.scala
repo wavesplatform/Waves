@@ -84,6 +84,10 @@ object Block extends ScorexLogging {
   type BlockId = Array[Byte]
   type BlockIds = Seq[BlockId]
 
+  val MaxTransactionsPerBlock: Int = 100
+  val BaseTargetLength: Int = 8
+  val GeneratorSignatureLength: Int = 32
+
   val BlockIdLength = SignatureLength
 
   val TransactionSizeLength = 4

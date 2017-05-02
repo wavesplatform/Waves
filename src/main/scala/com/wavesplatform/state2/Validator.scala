@@ -11,6 +11,8 @@ import scala.util.{Left, Right}
 
 object Validator {
 
+  val MaxTimePreviousBlockOverTransactionDiff: FiniteDuration = 90.minutes
+
   def validate(settings: FunctionalitySettings, s: StateReader,
                trans: Seq[Transaction], heightOpt: Option[Int], blockTime: Long): (Seq[ValidationError], Seq[Transaction]) = {
     val (errs, txs, _) = trans.foldLeft((Seq.empty[ValidationError], Seq.empty[Transaction], Monoid[Diff].empty)) {
@@ -25,7 +27,7 @@ object Validator {
 
   def validateWithHistory[T <: Transaction](history: History, fs: FunctionalitySettings, stateReader: StateReader)(tx: T): Either[ValidationError, T] = {
     val lastBlockTimestamp = history.lastBlock.timestamp
-    val notExpired = (lastBlockTimestamp - tx.timestamp).millis <= SimpleTransactionModule.MaxTimePreviousBlockOverTransactionDiff
+    val notExpired = (lastBlockTimestamp - tx.timestamp).millis <= MaxTimePreviousBlockOverTransactionDiff
     if (notExpired) {
       validate(fs, stateReader, Seq(tx), None, tx.timestamp) match {
         case (_, Seq(t)) => Right(t.asInstanceOf[T])
@@ -35,5 +37,6 @@ object Validator {
       Left(TransactionValidationError(tx, s"Transaction is too old: Last block timestamp is $lastBlockTimestamp"))
     }
   }
+
 
 }

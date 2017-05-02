@@ -13,6 +13,7 @@ import scorex.app.{Application, ApplicationVersion}
 import scorex.block.Block
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
 import scorex.crypto.encode.Base58
+import scorex.crypto.hash.FastCryptographicHash.DigestSize
 import scorex.network.BlockchainSynchronizer.GetExtension
 import scorex.network.Coordinator.{AddBlock, ClearCheckpoint, SyncFinished}
 import scorex.network.NetworkController.{DataFromPeer, SendToNetwork}
@@ -109,8 +110,8 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
   val genesisTimestamp: Long = System.currentTimeMillis()
   app.blockStorage.blockchainUpdater.processBlock(
     Block.genesis(
-      NxtLikeConsensusBlockData(app.settings.blockchainSettings.genesisSettings.initialBaseTarget, EmptySignature),
-      SimpleTransactionModule.buildTransactions(app.settings.blockchainSettings.genesisSettings), genesisTimestamp)).explicitGet()
+      NxtLikeConsensusBlockData(app.settings.blockchainSettings.genesisSettings.initialBaseTarget, Array.fill(DigestSize)(0: Byte)),
+      TransactionModule.buildTransactions(app.settings.blockchainSettings.genesisSettings), genesisTimestamp)).explicitGet()
 
   def before(): Unit = {
     app.blockStorage.blockchainUpdater.removeAfter(blockStorage1.history.genesis.uniqueId)
