@@ -11,10 +11,17 @@ class StateStorage(db: MVStore) {
 
   private val variables: MVMap[String, Int] = db.openMap("variables")
   private val heightKey = "height"
+  private val isDirtyFlag = "isDirty"
+
+  if (variables.get(isDirtyFlag) == 1)
+    throw new IllegalArgumentException(s"Persisted state is corrupt." +
+      s" Please remove state.dat and restart the node.")
 
   def getHeight: Int = variables.get(heightKey)
 
   def setHeight(i: Int): Unit = variables.put(heightKey, i)
+
+  def setDirty(isDirty: Boolean): Unit = variables.put(isDirtyFlag, if (isDirty) 1 else 0)
 
   val transactions: util.Map[Array[Byte], (Int, Array[Byte])] = db.openMap("txs")
 
@@ -44,4 +51,11 @@ object StateStorage {
   type SnapshotKey = Array[Byte]
 
   def snapshotKey(acc: Account, height: Int): SnapshotKey = acc.bytes ++ Ints.toByteArray(height)
+
+  def dirty[R](p: StateStorage)(f: => R): R = {
+    p.setDirty(true)
+    val r = f
+    p.setDirty(false)
+    r
+  }
 }
