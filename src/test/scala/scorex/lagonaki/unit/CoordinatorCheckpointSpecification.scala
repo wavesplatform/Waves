@@ -58,19 +58,20 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
 
   val db: MVStore = new MVStore.Builder().open()
 
+  private val utxStorage1 = new UnconfirmedTransactionsDatabaseImpl(wavesSettings.utxSettings)
+
   class TestAppMock extends Application {
-    lazy implicit val transactionModule: TransactionModule = new SimpleTransactionModule(wavesSettings, this.networkController, this.time,
+    lazy implicit val transactionModule: TransactionModule = new SimpleTransactionModule(wavesSettings.blockchainSettings.functionalitySettings,
+      this.networkController, this.time,
       new FeeCalculator(wavesSettings.feesSettings),
-      new UnconfirmedTransactionsDatabaseImpl(wavesSettings.utxSettings),
-      new BlockStorageImpl(wavesSettings.blockchainSettings))
+      utxStorage1,
+      ???, ???)
     lazy val networkController: ActorRef = networkControllerMock
     lazy val settings = wavesSettings
     lazy val blockGenerator: ActorRef = testBlockGenerator.ref
     lazy val blockchainSynchronizer: ActorRef = testBlockchainSynchronizer.ref
     lazy val peerManager: ActorRef = testPeerManager.ref
-    lazy val history: History = transactionModule.blockStorage.history
 
-    lazy val blockStorage: BlockStorage = transactionModule.blockStorage
     lazy val scoreObserver: ActorRef = testScoreObserver.ref
 
     override def coordinator: ActorRef = system.actorOf(Props(classOf[Coordinator], this), "Coordinator")
@@ -82,6 +83,12 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
     override def appVersion: ApplicationVersion = ???
 
     override def time: Time = NTP
+
+    override def blockStorage: BlockStorage = ???
+
+    override def utxStorage: UnconfirmedTransactionsStorage = utxStorage1
+
+    override def history: History = ???
   }
 
   lazy val app = stub[TestAppMock]
@@ -100,8 +107,8 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
 
   implicit val transactionModule: TransactionModule = app.transactionModule
   val genesisTimestamp: Long = System.currentTimeMillis()
-  if (transactionModule.blockStorage.history.isEmpty) {
-    transactionModule.blockStorage.blockchainUpdater.processBlock(
+  if (app.history.isEmpty) {
+    app.blockStorage.blockchainUpdater.processBlock(
       Block.genesis(
         NxtLikeConsensusBlockData(app.settings.blockchainSettings.genesisSettings.initialBaseTarget, EmptySignature),
         SimpleTransactionModule.buildTransactions(app.settings.blockchainSettings.genesisSettings), genesisTimestamp))

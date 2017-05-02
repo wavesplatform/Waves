@@ -42,11 +42,12 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
   override val blockStorage = new BlockStorageImpl(settings.blockchainSettings)
 
   val utxStorage: UnconfirmedTransactionsStorage = new UnconfirmedTransactionsDatabaseImpl(settings.utxSettings)
-  override implicit lazy val transactionModule = new SimpleTransactionModule(settings, networkController, time, feeCalculator, utxStorage, blockStorage)
+  override implicit lazy val transactionModule = new SimpleTransactionModule(settings.blockchainSettings.functionalitySettings,
+    networkController, time, feeCalculator, utxStorage, blockStorage.history, blockStorage.stateReader)
 
   override lazy val apiRoutes = Seq(
     BlocksApiRoute(settings.restAPISettings, settings.checkpointsSettings, history, coordinator),
-    TransactionsApiRoute(settings.restAPISettings, blockStorage.stateReader, history, transactionModule.utxStorage),
+    TransactionsApiRoute(settings.restAPISettings, blockStorage.stateReader, history, utxStorage),
     NxtConsensusApiRoute(settings.restAPISettings, blockStorage.stateReader, history, settings.blockchainSettings.functionalitySettings),
     WalletApiRoute(settings.restAPISettings, wallet),
     PaymentApiRoute(settings.restAPISettings, wallet, transactionModule),
@@ -86,7 +87,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
 
   override lazy val additionalMessageSpecs = TransactionalMessagesRepo.specs
 
-  actorSystem.actorOf(Props(classOf[UnconfirmedPoolSynchronizer], transactionModule, settings.utxSettings, networkController))
+  actorSystem.actorOf(Props(classOf[UnconfirmedPoolSynchronizer], transactionModule, settings.utxSettings, networkController, utxStorage))
 
   override def run(): Unit = {
     super.run()

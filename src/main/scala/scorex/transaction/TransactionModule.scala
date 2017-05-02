@@ -9,6 +9,7 @@ import scorex.consensus.TransactionsOrdering
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash.hash
+import scorex.network.ConnectedPeer
 import scorex.transaction.SimpleTransactionModule._
 import scorex.utils.{ScorexLogging, Time}
 
@@ -17,15 +18,7 @@ import scala.util.control.NonFatal
 
 trait TransactionModule {
 
-  def utxStorage: UnconfirmedTransactionsStorage
-
-  def blockStorage: BlockStorage
-
-  def validate[T <: Transaction](tx: T): Either[ValidationError, T]
-
-  def putUnconfirmedIfNew[T <: Transaction](tx: T): Either[ValidationError, T]
-
-  def onNewOffchainTransaction[T <: Transaction](transaction: T): Either[ValidationError, T]
+  def onNewOffchainTransaction[T <: Transaction](transaction: T, exceptOf: Option[ConnectedPeer] = None): Either[ValidationError, T]
 
 }
 
@@ -214,7 +207,7 @@ object TransactionModule extends ScorexLogging {
     clearIncorrectTransactions(fs, stateReader, utx, time) // todo makes sence to remove expired only at this point
   }
 
-  def isValid(history: History, state: StateReader, bcs: BlockchainSettings, time:Time)(block: Block): Boolean = try {
+  def isValid(history: History, state: StateReader, bcs: BlockchainSettings, time: Time)(block: Block): Boolean = try {
 
     val fs = bcs.functionalitySettings
 
@@ -261,7 +254,7 @@ object TransactionModule extends ScorexLogging {
         blockGs.mkString
       }")
 
-    val effectiveBalance = generatingBalance(state,fs)(generator, parentHeight)
+    val effectiveBalance = generatingBalance(state, fs)(generator, parentHeight)
 
     if (blockTime >= fs.minimalGeneratingBalanceAfterTimestamp) {
       require(effectiveBalance >= MinimalEffectiveBalanceForGenerator, s"Effective balance $effectiveBalance is less that minimal ($MinimalEffectiveBalanceForGenerator)")

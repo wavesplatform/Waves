@@ -53,7 +53,7 @@ class Miner(application: Application) extends Actor with ScorexLogging {
 
   private val bcs = application.settings.blockchainSettings
 
-  private val utx = application.transactionModule.utxStorage
+  private val utx = application.utxStorage
 
   private def tryToGenerateABlock(): Boolean = Try {
     log.debug("Trying to generate a new block")

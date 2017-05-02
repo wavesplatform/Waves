@@ -9,11 +9,12 @@ import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.model.Events.{Event, OrderAdded, OrderExecuted}
 import com.wavesplatform.matcher.model.MatcherModel._
 import com.wavesplatform.matcher.model.{OrderValidator, _}
+import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.reader.StateReader
 import play.api.libs.json.Json
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange._
-import scorex.transaction.TransactionModule
+import scorex.transaction.{History, TransactionModule}
 import scorex.utils.{NTP, ScorexLogging, Time}
 import scorex.wallet.Wallet
 
@@ -23,6 +24,8 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 class OrderBookActor(assetPair: AssetPair, val storedState: StateReader,
                      val wallet: Wallet, val settings: MatcherSettings,
+                     val history: History,
+                     val functionalitySettings: FunctionalitySettings,
                      val transactionModule: TransactionModule)
   extends PersistentActor
     with ScorexLogging with OrderValidator with OrderHistory with ExchangeTransactionCreator {
@@ -174,8 +177,9 @@ class OrderBookActor(assetPair: AssetPair, val storedState: StateReader,
 
 object OrderBookActor {
   def props(assetPair: AssetPair, storedState: StateReader,
-            wallet: Wallet, settings: MatcherSettings, transactionModule: TransactionModule): Props =
-    Props(new OrderBookActor(assetPair, storedState, wallet, settings, transactionModule))
+            wallet: Wallet, settings: MatcherSettings, transactionModule: TransactionModule, history: History,
+            functionalitySettings: FunctionalitySettings): Props =
+    Props(new OrderBookActor(assetPair, storedState, wallet, settings, history, functionalitySettings, transactionModule))
 
   def name(assetPair: AssetPair): String = assetPair.toString
 
@@ -238,5 +242,6 @@ object OrderBookActor {
   case object SaveSnapshot
 
   case class Snapshot(orderBook: OrderBook, history: Map[String, (Long, Long)])
+
 }
 

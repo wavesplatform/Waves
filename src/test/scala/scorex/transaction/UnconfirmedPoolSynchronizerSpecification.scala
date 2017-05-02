@@ -10,7 +10,7 @@ import scorex.network.NetworkController.DataFromPeer
 import scorex.network.TransactionalMessagesRepo.TransactionMessageSpec
 import scorex.network.message.Message
 import scorex.network.{NetworkController, _}
-import scorex.transaction.ValidationError.{TransactionParameterValidationError, TransactionValidationError}
+import scorex.transaction.ValidationError.TransactionValidationError
 
 import scala.concurrent.duration._
 import scala.language.postfixOps
@@ -27,9 +27,10 @@ class UnconfirmedPoolSynchronizerSpecification extends TestKit(ActorSystem("Unco
   "An UnconfirmedPoolSynchronizer actor" must {
 
     val transactionModule = mock[TransactionModule]
+    val utxStorage = mock[UnconfirmedTransactionsStorage]
 
     def createPoolSynchronizer(broadcastInterval: FiniteDuration) = {
-      TestActorRef(new UnconfirmedPoolSynchronizer(transactionModule, UTXSettings(1000, broadcastInterval), testActor))
+      TestActorRef(new UnconfirmedPoolSynchronizer(transactionModule, UTXSettings(1000, broadcastInterval), testActor, utxStorage))
     }
 
     val defaultRecipient = PublicKeyAccount(Array.fill(32)(0: Byte))
@@ -37,8 +38,7 @@ class UnconfirmedPoolSynchronizerSpecification extends TestKit(ActorSystem("Unco
 
     "broadcast new transaction to network" in {
 
-      (transactionModule.validate(_: Transaction)) expects * never()
-      (transactionModule.putUnconfirmedIfNew(_: Transaction)).expects(*).onCall((t: Transaction) => Right[ValidationError, Transaction](t))
+      (transactionModule.onNewOffchainTransaction(_: Transaction)).expects(*).onCall((t: Transaction) => Right[ValidationError, Transaction](t))
 
       val actorRef = createPoolSynchronizer(100.seconds)
       val sender = stub[ConnectedPeer]
@@ -53,7 +53,7 @@ class UnconfirmedPoolSynchronizerSpecification extends TestKit(ActorSystem("Unco
 
     "not broadcast tx if it has been skipped" in {
 
-      (transactionModule.putUnconfirmedIfNew(_: Transaction))
+      (transactionModule.onNewOffchainTransaction(_: Transaction))
         .expects(*)
         .onCall((t: Transaction) => Left[ValidationError, Transaction](TransactionValidationError(t, "")))
 

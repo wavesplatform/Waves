@@ -3,7 +3,7 @@ package scorex.app
 import akka.actor.ActorRef
 import com.wavesplatform.history.BlockStorageImpl
 import com.wavesplatform.settings.WavesSettings
-import scorex.transaction.{BlockStorage, TransactionModule}
+import scorex.transaction.{BlockStorage, History, TransactionModule, UnconfirmedTransactionsStorage}
 import scorex.utils.Time
 import scorex.wallet.Wallet
 
@@ -34,6 +34,10 @@ trait Application {
 
   def wallet: Wallet
 
-  def time : Time
+  def utxStorage: UnconfirmedTransactionsStorage
+
+  def history: History
+
+  def time: Time
 
 }

@@ -9,6 +9,7 @@ import com.wavesplatform.matcher.fixtures.RestartableActor.RestartActor
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.model.Events.Event
 import com.wavesplatform.matcher.model.{BuyLimitOrder, LimitOrder, SellLimitOrder}
+import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.reader.StateReader
 import com.wavesplatform.state2.{EqByteArray, LeaseInfo, Portfolio}
 import org.h2.mvstore.MVStore
@@ -51,8 +52,9 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
 
   val wallet = new Wallet(None, "matcher", Option(WalletSeed))
   wallet.generateNewAccount()
+
   var actor = system.actorOf(Props(new OrderBookActor(pair, storedState,
-    wallet, settings, stub[TransactionModule]) with RestartableActor))
+    wallet, settings, stub[History], stub[FunctionalitySettings], stub[TransactionModule]) with RestartableActor))
 
 
   override protected def beforeEach() = {
@@ -64,11 +66,11 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
     super.beforeEach()
 
     val transactionModule = stub[TransactionModule]
-    (transactionModule.validate(_: Transaction)).when(*).onCall((tr: Transaction) => Right[ValidationError, Transaction](tr)).anyNumberOfTimes()
-    (transactionModule.onNewOffchainTransaction(_: Transaction)).when(*).onCall((tr: Transaction) => Right[ValidationError, Transaction](tr)).anyNumberOfTimes()
+    val history = stub[History]
+    val functionalitySettings = stub[FunctionalitySettings]
 
     actor = system.actorOf(Props(new OrderBookActor(pair, storedState,
-      wallet, settings, transactionModule) with RestartableActor))
+      wallet, settings, history, functionalitySettings, transactionModule) with RestartableActor))
 
     eventsProbe = TestProbe()
     system.eventStream.subscribe(eventsProbe.ref, classOf[Event])
@@ -242,13 +244,15 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
 
     "order matched with invalid order should keep matching with others, invalid is removed" in {
       val transactionModule = stub[TransactionModule]
+      val history = stub[History]
+      val functionalitySettings = stub[FunctionalitySettings]
       val ord1 = buy(pair, 100, 20)
       val ord2 = buy(pair, 5000, 1000)
       // should be invalid
       val ord3 = sell(pair, 100, 10)
 
       actor = system.actorOf(Props(new OrderBookActor(pair, storedState,
-        wallet, settings, transactionModule) with RestartableActor {
+        wallet, settings, history, functionalitySettings, transactionModule) with RestartableActor {
         override def validate(orderMatch: ExchangeTransaction): Either[ValidationError, SignedTransaction] = {
           if (orderMatch.buyOrder == ord2) Left(ValidationError.CustomError("test"))
           else Right(orderMatch)

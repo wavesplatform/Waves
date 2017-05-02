@@ -12,7 +12,7 @@ import scorex.utils.ScorexLogging
 import scala.concurrent.ExecutionContext.Implicits.global
 
 class UnconfirmedPoolSynchronizer(private val transactionModule: TransactionModule, settings: UTXSettings,
-                                  networkController: ActorRef)
+                                  networkController: ActorRef, utxStorage: UnconfirmedTransactionsStorage)
   extends ViewSynchronizer with ScorexLogging {
 
   override val messageSpecs = Seq(TransactionMessageSpec)
@@ -25,13 +25,11 @@ class UnconfirmedPoolSynchronizer(private val transactionModule: TransactionModu
   override def receive: Receive = {
     case DataFromPeer(msgId, tx: Transaction, remote) if msgId == TransactionMessageSpec.messageCode =>
       log.debug(s"Got tx: $tx")
-      transactionModule.putUnconfirmedIfNew(tx) match {
-        case Right(_) => broadcastExceptOf(tx, remote)
-        case Left(err) => log.error(s"Transaction $tx has been rejected by UTX pool. Reason: $err")
-      }
+      transactionModule.onNewOffchainTransaction(tx, Some(remote))
+        .left.map(err => log.error(s"Transaction $tx has been rejected by UTX pool. Reason: $err"))
 
     case BroadcastRandom =>
-      val txs = transactionModule.utxStorage.all()
+      val txs = utxStorage.all()
       if (txs.nonEmpty) {
         val rndTx = txs.toList(scala.util.Random.nextInt(txs.size))
         broadcast(rndTx)
@@ -46,8 +44,7 @@ class UnconfirmedPoolSynchronizer(private val transactionModule: TransactionModu
   }
 
   private def broadcastExceptOf(tx: Transaction, sender: ConnectedPeer): Unit = {
-    val spec = TransactionalMessagesRepo.TransactionMessageSpec
-    val networkMessage = Message(spec, Right(tx), None)
+    val networkMessage = Message(TransactionalMessagesRepo.TransactionMessageSpec, Right(tx), None)
     networkControllerRef ! NetworkController.SendToNetwork(networkMessage, BroadcastExceptOf(sender))
     log.debug(s"Unconfirmed transaction has been broadcasted to network")
   }

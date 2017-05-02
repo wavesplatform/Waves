@@ -286,7 +286,7 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
     _ <- application.blockStorage.blockchainUpdater.processBlock(block)
   } yield {
     TransactionModule.clearFromUnconfirmed(application.settings.blockchainSettings.functionalitySettings,
-      application.blockStorage.stateReader, application.transactionModule.utxStorage, application.time)(block.transactionData)
+      application.blockStorage.stateReader, application.utxStorage, application.time)(block.transactionData)
   }
 
 

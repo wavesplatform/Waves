@@ -11,6 +11,7 @@ import com.wavesplatform.matcher.fixtures.RestartableActor.RestartActor
 import com.wavesplatform.matcher.market.MatcherActor.{GetMarkets, GetMarketsResponse, MarketData}
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.model.LevelAgg
+import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.reader.StateReader
 import com.wavesplatform.state2.{AssetInfo, EqByteArray, LeaseInfo, Portfolio}
 import org.h2.mvstore.MVStore
@@ -18,7 +19,7 @@ import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Matchers, WordSpecLike}
 import scorex.account.PrivateKeyAccount
 import scorex.crypto.encode.Base58
-import scorex.transaction.TransactionModule
+import scorex.transaction.{History, TransactionModule}
 import scorex.transaction.assets.IssueTransaction
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import scorex.utils.{NTP, ScorexLogging, Time, TimeImpl}
@@ -38,10 +39,11 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest")
   val storedState: StateReader = stub[StateReader] // fromDBWithUnlimitedBalance(db, TestBlockchainSettings.Disabled.functionalitySettings)
 
   val settings = matcherSettings.copy(account = MatcherAccount.address)
-
+  val history = stub[History]
+  val functionalitySettings = stub[FunctionalitySettings]
   val wallet = new Wallet(None, "matcher", Option(WalletSeed))
   wallet.generateNewAccount()
-  var actor: ActorRef = system.actorOf(Props(new MatcherActor(storedState, wallet, settings,
+  var actor: ActorRef = system.actorOf(Props(new MatcherActor(storedState, wallet, settings, history, functionalitySettings,
     stub[TransactionModule]) with RestartableActor))
 
   (storedState.assetInfo _).when(*).returns(Some(AssetInfo(true, 10000000000L)))
@@ -55,7 +57,7 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest")
     tp.expectMsg(akka.actor.Status.Success(""))
     super.beforeEach()
 
-    actor = system.actorOf(Props(new MatcherActor(storedState, wallet, settings,
+    actor = system.actorOf(Props(new MatcherActor(storedState, wallet, settings, history, functionalitySettings,
       stub[TransactionModule]) with RestartableActor))
   }
 
@@ -85,10 +87,12 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest")
 
     "AssetPair with predefined price assets" in {
       def priceAsset = AssetPair(Base58.decode("ABC").toOption, Base58.decode("BASE1").toOption)
+
       actor ! GetOrderBookRequest(priceAsset, None)
       expectMsg(GetOrderBookResponse(priceAsset, Seq(), Seq()))
 
       def wrongPriceAsset = AssetPair(Base58.decode("BASE2").toOption, Base58.decode("CDE").toOption)
+
       actor ! GetOrderBookRequest(wrongPriceAsset, None)
       expectMsg(StatusCodeMatcherResponse(StatusCodes.Found, "Invalid AssetPair ordering, should be reversed: CDE-BASE2"))
     }

@@ -4,8 +4,9 @@ import cats._
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.diffs.TransactionDiffer
 import com.wavesplatform.state2.reader.{CompositeStateReader, StateReader}
+import scorex.transaction.ValidationError.TransactionValidationError
 import scorex.transaction._
-
+import scala.concurrent.duration._
 import scala.util.{Left, Right}
 
 object Validator {
@@ -22,10 +23,17 @@ object Validator {
     (errs.reverse, txs.reverse)
   }
 
-  def validate[T <: Transaction](settings: FunctionalitySettings, s: StateReader, tx: T): Either[ValidationError, T] =
-    validate(settings, s, Seq(tx), None, tx.timestamp) match {
-      case (_, Seq(t)) => Right(t.asInstanceOf[T])
-      case (Seq(err), _) => Left(err)
+  def validateWithHistory[T <: Transaction](history: History, fs: FunctionalitySettings, stateReader: StateReader)(tx: T): Either[ValidationError, T] = {
+    val lastBlockTimestamp = history.lastBlock.timestamp
+    val notExpired = (lastBlockTimestamp - tx.timestamp).millis <= SimpleTransactionModule.MaxTimePreviousBlockOverTransactionDiff
+    if (notExpired) {
+      validate(fs, stateReader, Seq(tx), None, tx.timestamp) match {
+        case (_, Seq(t)) => Right(t.asInstanceOf[T])
+        case (Seq(err), _) => Left(err)
+      }
+    } else {
+      Left(TransactionValidationError(tx, s"Transaction is too old: Last block timestamp is $lastBlockTimestamp"))
     }
+  }
 
 }

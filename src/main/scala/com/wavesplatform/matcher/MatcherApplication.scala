@@ -33,9 +33,11 @@ trait MatcherApplication extends ScorexLogging {
 
   def storedState: StateReader = blockStorage.stateReader
 
+  private lazy val thisApplication = this.asInstanceOf[Application]
+
   lazy val matcherApiRoutes = Seq(
-    MatcherApiRoute(this.asInstanceOf[Application].wallet,
-      this.asInstanceOf[Application].blockStorage.stateReader,
+    MatcherApiRoute(thisApplication.wallet,
+      thisApplication.blockStorage.stateReader,
       matcher, restAPISettings, matcherSettings)
   )
 
@@ -44,7 +46,8 @@ trait MatcherApplication extends ScorexLogging {
   )
 
   lazy val matcher: ActorRef = actorSystem.actorOf(MatcherActor.props(storedState, wallet, matcherSettings,
-    transactionModule, this.asInstanceOf[Application].time), MatcherActor.name)
+    transactionModule, thisApplication.time, thisApplication.blockStorage.history,
+    thisApplication.settings.blockchainSettings.functionalitySettings), MatcherActor.name)
 
   @volatile var matcherServerBinding: ServerBinding = _
 

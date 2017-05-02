@@ -2,53 +2,38 @@ package scorex.transaction
 
 import akka.actor.ActorRef
 import com.google.common.base.Charsets
-import com.wavesplatform.history.BlockStorageImpl
-import com.wavesplatform.settings.{GenesisSettings, WavesSettings}
+import com.wavesplatform.settings.{FunctionalitySettings, GenesisSettings, WavesSettings}
 import com.wavesplatform.state2.Validator
+import com.wavesplatform.state2.reader.StateReader
 import scorex.account._
 import scorex.api.http.alias.CreateAliasRequest
 import scorex.api.http.assets._
 import scorex.api.http.leasing.{LeaseCancelRequest, LeaseRequest}
-import scorex.block.Block
-import scorex.consensus.TransactionsOrdering
-import scorex.consensus.nxt.NxtLikeConsensusBlockData
 import scorex.crypto.encode.Base58
-import scorex.crypto.hash.FastCryptographicHash.{DigestSize, hash}
+import scorex.crypto.hash.FastCryptographicHash.DigestSize
+import scorex.network._
 import scorex.network.message.Message
-import scorex.network.{Broadcast, NetworkController, TransactionalMessagesRepo}
-import scorex.transaction.ValidationError.TransactionValidationError
 import scorex.transaction.assets.{BurnTransaction, _}
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
 import scorex.utils._
 import scorex.wallet.Wallet
 import scorex.waves.transaction.SignedPaymentRequest
 
 import scala.concurrent.duration._
-import scala.util.control.NonFatal
-import scala.util.{Left, Right}
+import scala.util.Right
 
 
-class SimpleTransactionModule(val settings: WavesSettings, networkController: ActorRef, time: Time, feeCalculator: FeeCalculator,
-                              val utxStorage: UnconfirmedTransactionsStorage, val blockStorage: BlockStorage)
+class SimpleTransactionModule(fs: FunctionalitySettings, networkController: ActorRef, time: Time, feeCalculator: FeeCalculator,
+                              utxStorage: UnconfirmedTransactionsStorage, history: History, stateReader: StateReader)
   extends TransactionModule with TransactionOperations with ScorexLogging {
 
-  import SimpleTransactionModule._
-
-  override def putUnconfirmedIfNew[T <: Transaction](tx: T): Either[ValidationError, T] = synchronized {
+  override def onNewOffchainTransaction[T <: Transaction](transaction: T, exceptOf: Option[ConnectedPeer]): Either[ValidationError, T] =
     for {
-      t1 <- feeCalculator.enoughFee(tx)
-      t2 <- utxStorage.putIfNew(t1, (t: T) => validate(t))
-    } yield t2
-  }
-
-  override def onNewOffchainTransaction[T <: Transaction](transaction: T): Either[ValidationError, T] =
-    for {
-      tx <- putUnconfirmedIfNew(transaction)
+      validAgainstFee <- feeCalculator.enoughFee(transaction)
+      tx <- utxStorage.putIfNew(validAgainstFee, (t: T) => Validator.validateWithHistory(history, fs, stateReader)(t))
     } yield {
-      val spec = TransactionalMessagesRepo.TransactionMessageSpec
-      val ntwMsg = Message(spec, Right(transaction), None)
-      networkController ! NetworkController.SendToNetwork(ntwMsg, Broadcast)
+      val ntwMsg = Message(TransactionalMessagesRepo.TransactionMessageSpec, Right(transaction), None)
+      networkController ! NetworkController.SendToNetwork(ntwMsg, exceptOf.map(BroadcastExceptOf).getOrElse(Broadcast))
       tx
     }
 
@@ -95,8 +80,8 @@ class SimpleTransactionModule(val settings: WavesSettings, networkController: Ac
   def leaseCancel(request: LeaseCancelRequest, wallet: Wallet): Either[ValidationError, LeaseCancelTransaction] =
     for {
       pk <- wallet.findWallet(request.sender)
-      lease <- LeaseCancelTransaction.create(pk, Base58.decode(request.txId).get, request.fee, time.getTimestamp)
-      t <- onNewOffchainTransaction(lease)
+      tx <- LeaseCancelTransaction.create(pk, Base58.decode(request.txId).get, request.fee, time.getTimestamp)
+      t <- onNewOffchainTransaction(tx)
     } yield t
 
 
@@ -122,25 +107,15 @@ class SimpleTransactionModule(val settings: WavesSettings, networkController: Ac
 
   override def createPayment(sender: PrivateKeyAccount, recipient: Account, amount: Long, fee: Long): Either[ValidationError, PaymentTransaction] =
     PaymentTransaction.create(sender, recipient, amount, fee, time.getTimestamp)
-      .flatMap(onNewOffchainTransaction)
-
-  override def validate[T <: Transaction](tx: T): Either[ValidationError, T] = {
-    val lastBlockTimestamp = blockStorage.history.lastBlock.timestamp
-    val notExpired = (lastBlockTimestamp - tx.timestamp).millis <= MaxTimePreviousBlockOverTransactionDiff
-    if (notExpired) {
-      Validator.validate(settings.blockchainSettings.functionalitySettings, blockStorage.stateReader, tx)
-    } else {
-      Left(TransactionValidationError(tx, s"Transaction is too old: Last block timestamp is $lastBlockTimestamp"))
-    }
-  }
+      .flatMap(onNewOffchainTransaction(_, None))
 
   override def broadcastPayment(payment: SignedPaymentRequest): Either[ValidationError, PaymentTransaction] =
     for {
       _signature <- Base58.decode(payment.signature).toOption.toRight(ValidationError.InvalidSignature)
       _sender <- PublicKeyAccount.fromBase58String(payment.senderPublicKey)
       _recipient <- Account.fromString(payment.recipient)
-      _t <- PaymentTransaction.create(_sender, _recipient, payment.amount, payment.fee, payment.timestamp, _signature)
-      t <- onNewOffchainTransaction(_t)
+      tx <- PaymentTransaction.create(_sender, _recipient, payment.amount, payment.fee, payment.timestamp, _signature)
+      t <- onNewOffchainTransaction(tx)
     } yield t
 }
 

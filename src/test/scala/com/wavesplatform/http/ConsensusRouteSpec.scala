@@ -23,18 +23,6 @@ class ConsensusRouteSpec extends RouteSpec("/consensus") with RestAPISettingsHel
   private val history = mock[History]
   (history.height _).expects().returns(10).anyNumberOfTimes()
 
-  private val bs: BlockStorage = new BlockStorage {
-    override def history = ConsensusRouteSpec.this.history
-
-    override def blockchainUpdater = ???
-
-    override def stateReader = state
-
-    override def checkpoints: CheckpointService = ???
-  }
-  private val tm = mock[TransactionModule]
-  (tm.blockStorage _).expects().returning(bs).anyNumberOfTimes()
-
   private val route = NxtConsensusApiRoute(restAPISettings, state, history, mock[FunctionalitySettings]).route
 
   routePath("/generationsignature") - {
