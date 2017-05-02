@@ -21,7 +21,7 @@ import scorex.network.peer.PeerManager.{ConnectedPeers, GetConnectedPeersTyped}
 import scorex.settings.TestBlockchainSettings
 import scorex.transaction.SimpleTransactionModule.EmptySignature
 import scorex.transaction._
-import scorex.utils.{Time, TimeImpl}
+import scorex.utils.{NTP, Time, TimeImpl}
 import scorex.wallet.Wallet
 
 import scala.concurrent.duration._
@@ -76,11 +76,7 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
 
     override def appVersion: ApplicationVersion = ???
 
-    override def time: Time = new Time {
-      override def correctedTime(): Long = 1
-
-      override def getTimestamp(): Long = 2
-    }
+    override def time: Time = NTP
   }
 
   lazy val app = stub[TestAppMock]

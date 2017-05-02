@@ -8,6 +8,7 @@ import scorex.block.Block
 import scorex.consensus.mining.BlockGeneratorController._
 import scorex.network.peer.PeerManager.{ConnectedPeers, GetConnectedPeersTyped}
 import scorex.transaction.History
+import scorex.utils.NTP
 
 import scala.concurrent.duration._
 import scala.language.postfixOps
@@ -26,6 +27,7 @@ class BlockGeneratorControllerSpecification extends ActorTestingCommons {
   }
 
   val stubApp: App = stub[App]
+  (stubApp.time _).when().returns(NTP)
 
   setDefaultLastBlock()
 

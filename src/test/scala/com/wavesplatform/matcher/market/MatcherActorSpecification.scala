@@ -42,7 +42,7 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest")
   val wallet = new Wallet(None, "matcher", Option(WalletSeed))
   wallet.generateNewAccount()
   var actor: ActorRef = system.actorOf(Props(new MatcherActor(storedState, wallet, settings,
-    stub[TransactionModule], stub[Time]) with RestartableActor))
+    stub[TransactionModule]) with RestartableActor))
 
   (storedState.assetInfo _).when(*).returns(Some(AssetInfo(true, 10000000000L)))
   val i1 = IssueTransaction.create(PrivateKeyAccount(Array.empty), "Unknown".getBytes(), Array.empty, 10000000000L, 8.toByte, true, 100000L, 10000L).right.get
@@ -56,7 +56,7 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest")
     super.beforeEach()
 
     actor = system.actorOf(Props(new MatcherActor(storedState, wallet, settings,
-      stub[TransactionModule], stub[Time]) with RestartableActor))
+      stub[TransactionModule]) with RestartableActor))
   }
 
   "MatcherActor" should {
@@ -75,7 +75,7 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest")
       def predefinedPair = AssetPair(Base58.decode("BASE2").toOption, Base58.decode("BASE1").toOption)
 
       actor ! GetOrderBookRequest(predefinedPair, None)
-      expectMsg(GetOrderBookResponse(predefinedPair, Seq(), Seq(), new TimeImpl().correctedTime()))
+      expectMsg(GetOrderBookResponse(predefinedPair, Seq(), Seq()))
 
       def reversePredefinedPair = AssetPair(Base58.decode("BASE1").toOption, Base58.decode("BASE2").toOption)
 
@@ -86,7 +86,7 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest")
     "AssetPair with predefined price assets" in {
       def priceAsset = AssetPair(Base58.decode("ABC").toOption, Base58.decode("BASE1").toOption)
       actor ! GetOrderBookRequest(priceAsset, None)
-      expectMsg(GetOrderBookResponse(priceAsset, Seq(), Seq(), new TimeImpl().correctedTime()))
+      expectMsg(GetOrderBookResponse(priceAsset, Seq(), Seq()))
 
       def wrongPriceAsset = AssetPair(Base58.decode("BASE2").toOption, Base58.decode("CDE").toOption)
       actor ! GetOrderBookRequest(wrongPriceAsset, None)
@@ -97,7 +97,7 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest")
       def unknownAssets = AssetPair(Base58.decode("Some2").toOption, Base58.decode("Some1").toOption)
 
       actor ! GetOrderBookRequest(unknownAssets, None)
-      expectMsg(GetOrderBookResponse(unknownAssets, Seq(), Seq(), new TimeImpl().correctedTime()))
+      expectMsg(GetOrderBookResponse(unknownAssets, Seq(), Seq()))
 
       def wrongUnknownAssets = AssetPair(Base58.decode("Some1").toOption, Base58.decode("Some2").toOption)
 
@@ -124,7 +124,7 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest")
 
       actor ! RestartActor
       actor ! GetOrderBookRequest(pair, None)
-      expectMsg(GetOrderBookResponse(pair, Seq(LevelAgg(100000000, 2000)), Seq(), new TimeImpl().correctedTime()))
+      expectMsg(GetOrderBookResponse(pair, Seq(LevelAgg(100000000, 2000)), Seq()))
     }
 
     "return all open markets" in {

@@ -12,14 +12,14 @@ import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange.Validation.booleanOperators
 import scorex.transaction.assets.exchange.{AssetPair, Order, Validation}
 import scorex.transaction.{AssetId, TransactionModule}
-import scorex.utils.{ByteArrayExtension, ScorexLogging, Time}
+import scorex.utils.{ByteArrayExtension, NTP, ScorexLogging, Time}
 import scorex.wallet.Wallet
 
 import scala.collection.{immutable, mutable}
 import scala.language.reflectiveCalls
 
 class MatcherActor(storedState: StateReader, wallet: Wallet, settings: MatcherSettings,
-                   transactionModule: TransactionModule, time: Time
+                   transactionModule: TransactionModule
                   ) extends PersistentActor with ScorexLogging {
 
   import MatcherActor._
@@ -30,10 +30,10 @@ class MatcherActor(storedState: StateReader, wallet: Wallet, settings: MatcherSe
   def createOrderBook(pair: AssetPair): ActorRef = {
     def getAssetName(asset: Option[AssetId]): String = asset.map(storedState.getAssetName).getOrElse(AssetPair.WavesName)
 
-    openMarkets += MarketData(pair, getAssetName(pair.amountAsset), getAssetName(pair.priceAsset), time.correctedTime())
+    openMarkets += MarketData(pair, getAssetName(pair.amountAsset), getAssetName(pair.priceAsset), NTP.correctedTime())
     tradedPairs += pair
 
-    context.actorOf(OrderBookActor.props(pair, storedState, wallet, settings, transactionModule, time),
+    context.actorOf(OrderBookActor.props(pair, storedState, wallet, settings, transactionModule),
       OrderBookActor.name(pair))
   }
 
@@ -67,7 +67,7 @@ class MatcherActor(storedState: StateReader, wallet: Wallet, settings: MatcherSe
   }
 
   def returnEmptyOrderBook(pair: AssetPair): Unit = {
-    sender() ! GetOrderBookResponse(pair, Seq(), Seq(), time.correctedTime())
+    sender() ! GetOrderBookResponse(pair, Seq(), Seq())
   }
 
   def forwardReq(req: Any)(orderBook: ActorRef): Unit = orderBook forward req
@@ -146,7 +146,7 @@ object MatcherActor {
 
   def props(storedState: StateReader, wallet: Wallet, settings: MatcherSettings,
             transactionModule: TransactionModule, time: Time): Props =
-    Props(new MatcherActor(storedState, wallet, settings, transactionModule, time))
+    Props(new MatcherActor(storedState, wallet, settings, transactionModule))
 
   case class OrderBookCreated(pair: AssetPair)
 

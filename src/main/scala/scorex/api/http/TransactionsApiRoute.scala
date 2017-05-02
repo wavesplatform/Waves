@@ -11,7 +11,7 @@ import play.api.libs.json._
 import scorex.account.Account
 import scorex.crypto.encode.Base58
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import scorex.transaction.{History, Transaction, TransactionModule}
+import scorex.transaction.{History, Transaction, TransactionModule, UnconfirmedTransactionsStorage}
 
 import scala.util.Success
 import scala.util.control.Exception
@@ -22,7 +22,7 @@ case class TransactionsApiRoute(
                                  settings: RestAPISettings,
                                  state: StateReader,
                                  history: History,
-                                 transactionModule: TransactionModule) extends ApiRoute with CommonApiFunctions {
+                                 utxStorage: UnconfirmedTransactionsStorage) extends ApiRoute with CommonApiFunctions {
 
   import TransactionsApiRoute.MaxTransactionsPerRequest
 
@@ -99,7 +99,7 @@ case class TransactionsApiRoute(
   @Path("/unconfirmed")
   @ApiOperation(value = "Unconfirmed", notes = "Get list of unconfirmed transactions", httpMethod = "GET")
   def unconfirmed: Route = (path("unconfirmed") & get) {
-    complete(JsArray(transactionModule.utxStorage.all.map(txToExtendedJson)))
+    complete(JsArray(utxStorage.all.map(txToExtendedJson)))
   }
 
   private def txToExtendedJson(tx: Transaction): JsObject = {
