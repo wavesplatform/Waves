@@ -111,7 +111,7 @@ trait RequestGen extends TransactionGen {
     _signature <- signatureGen
     _timestamp <- ntpTimestampGen
     _alias <- createAliasGen
-  } yield SignedCreateAliasRequest(_alias.sender.toString, _alias.fee, _alias.alias.stringRepr, _timestamp, _signature)
+  } yield SignedCreateAliasRequest(_alias.sender.toString, _alias.fee, _alias.alias.name, _timestamp, _signature)
 
   val leaseReq: G[SignedLeaseRequest] = for {
     _signature <- signatureGen
