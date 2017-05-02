@@ -72,20 +72,24 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
   lazy val signatureValid = EllipticCurveImpl.verify(signature, toSign, senderPublicKey.publicKey)
 
   def isValid(atTime: Long): Validation = {
-    (amount > 0) :| "amount should be > 0" &&
-      (price > 0) :| "price should be > 0" &&
+    isValidAmount(price, amount) &&
       assetPair.isValid &&
-      (amount < MaxAmount) :| "amount too large" &&
-      getSpendAmount(price, amount).isSuccess :| "SpendAmount too large" &&
-      (getSpendAmount(price, amount).getOrElse(0L) > 0) :| "SpendAmount should be > 0" &&
-      getReceiveAmount(price, amount).isSuccess :| "ReceiveAmount too large" &&
-      (getReceiveAmount(price, amount).getOrElse(0L) > 0) :| "ReceiveAmount should be > 0" &&
       (matcherFee > 0) :| "matcherFee should be > 0" &&
       (matcherFee < MaxAmount) :| "matcherFee too large" &&
       (timestamp > 0) :| "timestamp should be > 0" &&
       (expiration - atTime <= MaxLiveTime) :| "expiration should be earlier than 30 days" &&
       (expiration >= atTime) :| "expiration should be > currentTime" &&
       signatureValid :| "signature should be valid"
+  }
+
+  def isValidAmount(matchPrice: Long, matchAmount: Long): Validation = {
+    (matchAmount > 0) :| "amount should be > 0" &&
+      (matchPrice > 0) :| "price should be > 0" &&
+      (matchAmount < MaxAmount) :| "amount too large" &&
+      getSpendAmount(matchPrice, matchAmount).isSuccess :| "SpendAmount too large" &&
+      (getSpendAmount(matchPrice, matchAmount).getOrElse(0L) > 0) :| "SpendAmount should be > 0" &&
+      getReceiveAmount(matchPrice, matchAmount).isSuccess :| "ReceiveAmount too large" &&
+      (getReceiveAmount(matchPrice, matchAmount).getOrElse(0L) > 0) :| "ReceiveAmount should be > 0"
   }
 
   @ApiModelProperty(hidden = true)
