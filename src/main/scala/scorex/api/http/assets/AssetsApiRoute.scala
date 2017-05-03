@@ -24,7 +24,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, state: Stat
 
   override lazy val route =
     pathPrefix("assets") {
-      balance ~ balances ~ issue ~ reissue ~ burnRoute ~ transfer ~ signOrder ~ balanceDistribution
+      balance ~ balances ~ issue ~ reissue ~ burnRoute ~ makeAssetNameUniqueRoute ~ transfer ~ signOrder ~ balanceDistribution
     }
 
   @Path("/balance/{address}/{assetId}")
@@ -139,6 +139,26 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, state: Stat
   ))
   def burnRoute: Route =
     processRequest("burn", (b: BurnRequest) => transactionModule.burnAsset(b, wallet))
+
+
+  @Path("/make-asset-name-unique")
+  @ApiOperation(value = "Make asset unique by name",
+    notes = "Makes asset unique by name",
+    httpMethod = "POST",
+    produces = "application/json",
+    consumes = "application/json")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(
+      name = "body",
+      value = "Json with data",
+      required = true,
+      paramType = "body",
+      dataType = "scorex.api.http.assets.MakeAssetUniqueRequest",
+      defaultValue = "{\"sender\":\"string\",\"assetId\":\"Base58\",\"fee\":100000}"
+    )
+  ))
+  def makeAssetNameUniqueRoute: Route =
+    processRequest("make-asset-name-unique", (b: MakeAssetNameUniqueRequest) => transactionModule.makeAssetNameUnique(b, wallet))
 
 
   private def balanceJson(address: String, assetIdStr: String): Either[ApiError, JsObject] = {

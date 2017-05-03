@@ -137,10 +137,13 @@ class FeesSettingsSpecification extends FlatSpec with Matchers {
         |  create-alias {
         |    WAVES = 100000
         |  }
+        |  make-asset-name-unique {
+        |    WAVES = 100000
+        |  }
         |}
       """.stripMargin).withFallback(defaultConfig).resolve()
     val settings = FeesSettings.fromConfig(config)
-    settings.fees.size should be(9)
+    settings.fees.size should be(10)
     settings.fees(2).toSet should equal(Set(FeeSettings("WAVES", 100000)))
     settings.fees(3).toSet should equal(Set(FeeSettings("WAVES", 100000000)))
     settings.fees(4).toSet should equal(Set(FeeSettings("WAVES", 100000), FeeSettings("6MPKrD5B7GrfbciHECg1MwdvRUhRETApgNZspreBJ8JL", 1)))
@@ -150,5 +153,6 @@ class FeesSettingsSpecification extends FlatSpec with Matchers {
     settings.fees(8).toSet should equal(Set(FeeSettings("WAVES", 100000)))
     settings.fees(9).toSet should equal(Set(FeeSettings("WAVES", 100000)))
     settings.fees(10).toSet should equal(Set(FeeSettings("WAVES", 100000)))
+    settings.fees(11).toSet should equal(Set(FeeSettings("WAVES", 100000)))
   }
 }

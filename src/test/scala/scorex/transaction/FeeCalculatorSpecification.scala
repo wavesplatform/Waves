@@ -43,6 +43,9 @@ class FeeCalculatorSpecification extends PropSpec with PropertyChecks with Gener
       |    create-alias {
       |      WAVES = 600000
       |    }
+      |    make-asset-name-unique {
+      |      WAVES = 700000
+      |    }
       |  }
       |}""".stripMargin
 
@@ -133,6 +136,13 @@ class FeeCalculatorSpecification extends PropSpec with PropertyChecks with Gener
     val feeCalc = new FeeCalculator(mySettings)
     forAll(createAliasGen) { tx: CreateAliasTransaction =>
       feeCalc.enoughFee(tx) shouldBeRightIf (tx.fee >= 600000)
+    }
+  }
+
+  property("Make unique asset transaction") {
+    val feeCalc = new FeeCalculator(mySettings)
+    forAll(makeAssetNameUniqueGen) { tx: MakeAssetNameUniqueTransaction =>
+      feeCalc.enoughFee(tx) shouldBeRightIf (tx.fee >= 700000)
     }
   }
 }

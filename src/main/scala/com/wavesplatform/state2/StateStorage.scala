@@ -43,6 +43,8 @@ class StateStorage(db: MVStore) {
 
   val lastUpdateHeight: MVMap[Array[Byte], Int] = db.openMap("lastUpdateHeight")
 
+  val uniqueAssets: MVMap[Array[Byte], Array[Byte]] = db.openMap("uniqueAssets")
+
   def commit(): Unit = db.commit()
 
 }
