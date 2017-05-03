@@ -50,25 +50,20 @@ class CompositeStateReader(inner: StateReader, blockDiff: BlockDiff) extends Sta
 
   override def accountPortfolios: Map[Account, Portfolio] = Monoid.combine(inner.accountPortfolios, txDiff.portfolios)
 
-  override def isLeaseActive(leaseTx: LeaseTransaction): Boolean = {
-    val innerActive = inner.isLeaseActive(leaseTx)
-    val diffActive = blockDiff.txsDiff.transactions.keys.exists(_ == EqByteArray(leaseTx.id))
-    val diffCancelExists = blockDiff.txsDiff.transactions.values.map(_._2)
-      .filter(_.isInstanceOf[LeaseCancelTransaction])
-      .map(_.asInstanceOf[LeaseCancelTransaction])
-      .exists(_.leaseId sameElements leaseTx.id)
-
-    (innerActive || diffActive) && !diffCancelExists
-  }
+  override def isLeaseActive(leaseTx: LeaseTransaction): Boolean =
+    blockDiff.txsDiff.leaseState.getOrElse(EqByteArray(leaseTx.id), inner.isLeaseActive(leaseTx))
 
   override def activeLeases(): Seq[ByteArray] = {
     blockDiff.txsDiff.leaseState.collect { case (id, isActive) if isActive => id }.toSeq ++ inner.activeLeases()
   }
 
-  override def lastUpdateHeight(acc: Account): Option[Int] = blockDiff.snapshots.get(acc).map(_.keySet.max).orElse(inner.lastUpdateHeight(acc))
+  override def lastUpdateHeight(acc: Account): Option[Int] = blockDiff.snapshots.get(acc).map(_.lastKey).orElse(inner.lastUpdateHeight(acc))
+
+  override def containsTransaction(id: ByteArray): Boolean = blockDiff.txsDiff.transactions.contains(id) || inner.containsTransaction(id)
 }
 
 object CompositeStateReader {
+
   class Proxy(val inner: StateReader, blockDiff: () => BlockDiff) extends StateReader {
 
     override def paymentTransactionIdByHash(hash: ByteArray): Option[ByteArray] =
@@ -112,6 +107,9 @@ object CompositeStateReader {
 
     override def snapshotAtHeight(acc: Account, h: Int): Option[Snapshot] =
       new CompositeStateReader(inner, blockDiff()).snapshotAtHeight(acc, h)
+
+    override def containsTransaction(id: ByteArray): Boolean =
+      new CompositeStateReader(inner, blockDiff()).containsTransaction(id)
   }
 
 }

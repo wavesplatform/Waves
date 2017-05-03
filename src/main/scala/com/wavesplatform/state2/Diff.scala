@@ -39,13 +39,13 @@ case class Diff(transactions: Map[ByteArray, (Int, Transaction, Set[Account])],
                 leaseState: Map[ByteArray, Boolean]) {
 
   lazy val accountTransactionIds: Map[Account, List[ByteArray]] = {
-    val map: List[(Account, List[(Int, Long, ByteArray)])] = transactions.toList
-      .flatMap { case (id, (h, tx, accs)) => accs.map(acc => acc -> List((h, tx.timestamp, id))) }
-    val groupedByAcc = map.foldLeft(Map.empty[Account, List[(Int, Long, ByteArray)]]) { case (m, (acc, list)) =>
-      m.combine(Map(acc -> list))
+    val map: List[(Account, Set[(Int, Long, ByteArray)])] = transactions.toList
+      .flatMap { case (id, (h, tx, accs)) => accs.map(acc => acc -> Set((h, tx.timestamp, id))) }
+    val groupedByAcc = map.foldLeft(Map.empty[Account, Set[(Int, Long, ByteArray)]]) { case (m, (acc, set)) =>
+      m.combine(Map(acc -> set))
     }
     groupedByAcc
-      .mapValues(l => l.sortBy { case ((h, t, id)) => (-h, -t) }) // fresh head ([h=2, h=1, h=0])
+      .mapValues(l => l.toList.sortBy { case ((h, t, id)) => (-h, -t) }) // fresh head ([h=2, h=1, h=0])
       .mapValues(_.map(_._3))
   }
 }

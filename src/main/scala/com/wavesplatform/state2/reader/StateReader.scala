@@ -21,6 +21,8 @@ trait StateReader {
 
   def transactionInfo(id: ByteArray): Option[(Int, Transaction)]
 
+  def containsTransaction(id: ByteArray): Boolean
+
   def accountPortfolio(a: Account): Portfolio
 
   def assetInfo(id: ByteArray): Option[AssetInfo]
@@ -123,7 +125,7 @@ object StateReader {
       def loop(deeperHeight: Int, list: Seq[Snapshot]): Seq[Snapshot] = {
         if (deeperHeight == 0) list
         else {
-          lazy val snapshot = s.snapshotAtHeight(acc, deeperHeight).get
+          val snapshot = s.snapshotAtHeight(acc, deeperHeight).get
           if (deeperHeight <= bottomNotIncluded)
             snapshot +: list
           else if (deeperHeight > atHeight && snapshot.prevHeight > atHeight) {

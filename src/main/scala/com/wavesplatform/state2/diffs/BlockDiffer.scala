@@ -41,35 +41,25 @@ object BlockDiffer extends ScorexLogging {
         .map(newDiff => diff.combine(newDiff)))
     }
 
-    txsDiffEi
-      .map(d => if (currentBlockHeight == settings.resetEffectiveBalancesAtHeight)
+    txsDiffEi.map { d =>
+      val diff = if (currentBlockHeight == settings.resetEffectiveBalancesAtHeight)
         Monoid.combine(d, LeasePatch(new CompositeStateReader(s, d.asBlockDiff)))
-      else d)
-      .map(diff => {
-        val newSnapshots = diff.portfolios
-          .filter { case (acc, portfolioDiff) => portfolioDiff.balance != 0 || portfolioDiff.effectiveBalance != 0 }
-          .map { case (acc, portfolioDiff) =>
-            val oldPortfolio = s.accountPortfolio(acc)
-            acc -> SortedMap(currentBlockHeight -> Snapshot(
-              prevHeight = s.lastUpdateHeight(acc).getOrElse(0),
-              balance = oldPortfolio.balance + portfolioDiff.balance,
-              effectiveBalance = oldPortfolio.effectiveBalance + portfolioDiff.effectiveBalance))
-          }
-        BlockDiff(diff, 1, newSnapshots)
-      }
-      )
+      else d
+      val newSnapshots = diff.portfolios
+        .collect { case (acc, portfolioDiff) if (portfolioDiff.balance != 0 || portfolioDiff.effectiveBalance != 0) =>
+          val oldPortfolio = s.accountPortfolio(acc)
+          acc -> SortedMap(currentBlockHeight -> Snapshot(
+            prevHeight = s.lastUpdateHeight(acc).getOrElse(0),
+            balance = oldPortfolio.balance + portfolioDiff.balance,
+            effectiveBalance = oldPortfolio.effectiveBalance + portfolioDiff.effectiveBalance))
+        }
+      BlockDiff(diff, 1, newSnapshots)
+    }
   }
 
-
-  def unsafeDiffMany(settings: FunctionalitySettings, log: (String) => Unit = _ => ())(s: StateReader, blocks: Seq[Block]): BlockDiff = {
-    val r = blocks.foldLeft(Monoid[BlockDiff].empty) { case (diff, block) =>
+  def unsafeDiffMany(settings: FunctionalitySettings)(s: StateReader, blocks: Seq[Block]): BlockDiff =
+    blocks.foldLeft(Monoid[BlockDiff].empty) { case (diff, block) =>
       val blockDiff = apply(settings)(new CompositeStateReader(s, diff), block).explicitGet()
-      if (diff.heightDiff % 1000 == 0) {
-        log(s"Rebuilt ${diff.heightDiff} blocks out of ${blocks.size}")
-      }
       Monoid[BlockDiff].combine(diff, blockDiff)
     }
-    log(s"Rebuild of ${blocks.size} completed")
-    r
-  }
 }

@@ -1,6 +1,5 @@
 package com.wavesplatform.history
 
-import com.google.common.cache.{CacheBuilder, CacheLoader}
 import org.h2.mvstore.MVStore
 import scorex.account.Account
 import scorex.block.Block
@@ -17,12 +16,11 @@ class HistoryWriterImpl(db: MVStore) extends History with HistoryWriter with Sco
   private val heightByBlockId = db.openMap("signaturesReverse", new LogMVMapBuilder[BlockId, Int])
   private val scoreByHeight = db.openMap("score", new LogMVMapBuilder[Int, BigInt])
 
-  private val BlocksCacheSizeLimit: Int = 1000
-  private val blocksCache = CacheBuilder.newBuilder()
-    .maximumSize(BlocksCacheSizeLimit)
-    .build(CacheLoader.from[Integer, Block] { height =>
-      Block.parseBytes(blockBodyByHeight.get(height)).get
-    })
+  {
+    if (Set(blockBodyByHeight.size(), blockIdByHeight.size(), heightByBlockId.size(), scoreByHeight.size()).size != 1) {
+      throw new IllegalArgumentException(s"Block storage is corrupt. Please remove blockchain.dat and state.dat and restart the node.")
+    }
+  }
 
   override def appendBlock(block: Block): Either[ValidationError, Unit] = {
     if ((height() == 0) || (this.lastBlock.uniqueId sameElements block.reference)) {
@@ -39,16 +37,14 @@ class HistoryWriterImpl(db: MVStore) extends History with HistoryWriter with Sco
   }
 
   override def discardBlock(): Unit = {
-    require(height() > 1, "Chain is empty or contains genesis block only, can't make rollback")
     val h = height()
-    blocksCache.invalidate(h)
     blockBodyByHeight.remove(h)
     val vOpt = Option(blockIdByHeight.remove(h))
     vOpt.map(v => heightByBlockId.remove(v))
     db.commit()
   }
 
-  override def blockAt(height: Int): Option[Block] = scala.util.control.Exception.allCatch.opt(blocksCache.get(height))
+  override def blockAt(height: Int): Option[Block] = Option(blockBodyByHeight.get(height)).map(Block.parseBytes(_).get)
 
   override def lastBlockIds(howMany: Int): Seq[BlockId] =
     (Math.max(1, height() - howMany + 1) to height()).flatMap(i => Option(blockIdByHeight.get(i)))

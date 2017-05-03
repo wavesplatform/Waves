@@ -9,6 +9,8 @@ case class Portfolio(balance: Long, leaseInfo: LeaseInfo, assets: Map[ByteArray,
 }
 
 object Portfolio {
+  implicit val longSemigroup: Semigroup[Long] = (x: Long, y: Long) => safeSum(x, y)
+
   implicit val portfolioMonoid = new Monoid[Portfolio] {
     override def empty: Portfolio = Portfolio(0L, Monoid[LeaseInfo].empty, Map.empty)
 
@@ -16,8 +18,6 @@ object Portfolio {
     = Portfolio(
       balance = safeSum(older.balance, newer.balance),
       leaseInfo = Monoid.combine(older.leaseInfo, newer.leaseInfo),
-      assets = (older.assets.keys ++ newer.assets.keys)
-        .map(ba => ba -> safeSum(older.assets.getOrElse(ba, 0), newer.assets.getOrElse(ba, 0)))
-        .toMap)
+      assets = older.assets.combine(newer.assets))
   }
 }
