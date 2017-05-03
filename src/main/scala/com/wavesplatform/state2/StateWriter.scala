@@ -104,6 +104,7 @@ class StateWriterImpl(p: StateStorage) extends StateReaderImpl(p) with StateWrit
         }
       }
 
+      p.setHeight(p.getHeight + blockDiff.heightDiff)
       p.commit()
     }
     log.debug("BlockDiff commit complete")
