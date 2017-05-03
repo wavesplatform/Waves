@@ -1,14 +1,11 @@
 package com.wavesplatform.state2
 
-import com.wavesplatform.state2.reader.StateReaderImpl
 import org.h2.mvstore.MVStore
 import org.scalacheck.Gen
 import org.scalatest.prop.GeneratorDrivenPropertyChecks
 import org.scalatest.{Matchers, Outcome, fixture}
-import scorex.account.Account
 
 class StateWriterSpec extends fixture.FunSuite with Matchers with GeneratorDrivenPropertyChecks {
-  val acc: Account = Account.fromPublicKey(Array.emptyByteArray)
   val stateHeight = 100
 
   override type FixtureParam = StateStorage
