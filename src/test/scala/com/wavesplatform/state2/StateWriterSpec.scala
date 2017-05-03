@@ -22,6 +22,7 @@ class StateWriterSpec extends fixture.FunSuite with Matchers with GeneratorDrive
       val h = writer.height
       writer.applyBlockDiff(BlockDiff(Diff.empty, heightDiff, Map.empty))
       writer.height shouldBe h + heightDiff
+      storage.getHeight shouldBe h + heightDiff
     }
   }
 }
