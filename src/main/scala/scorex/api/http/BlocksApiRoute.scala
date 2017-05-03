@@ -84,8 +84,8 @@ case class BlocksApiRoute(settings: RestAPISettings, checkpointsSettings: Checkp
       complete(InvalidSignature)
     else {
       Base58.decode(encodedSignature).toOption.toRight(InvalidSignature)
-        .flatMap(s => history.blockById(s).toRight(BlockNotExists)) match {
-        case Right(block) => complete(Json.obj("height" -> history.heightOf(block)))
+        .flatMap(s => history.heightOf(s).toRight(BlockNotExists)) match {
+        case Right(h) => complete(Json.obj("height" -> h))
         case Left(e) => complete(e)
       }
     }
@@ -129,9 +129,9 @@ case class BlocksApiRoute(settings: RestAPISettings, checkpointsSettings: Checkp
   @Path("/last")
   @ApiOperation(value = "Last", notes = "Get last block data", httpMethod = "GET")
   def last: Route = (path("last") & get) {
-    val lastBlock = history.lastBlock
-    val height = history.heightOf(lastBlock).fold[JsValue](JsNull)(Json.toJson(_))
-    complete(lastBlock.json + ("height" -> height))
+    val height = history.height()
+    val lastBlock = history.blockAt(height).get
+    complete(lastBlock.json + ("height" -> Json.toJson(height)))
   }
 
   @Path("/first")

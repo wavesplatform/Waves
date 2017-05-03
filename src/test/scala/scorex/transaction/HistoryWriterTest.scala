@@ -15,8 +15,9 @@ class HistoryWriterTest extends FunSuite with Matchers {
   test("concurrent access to lastBlock doesn't fail") {
     val history = new HistoryWriterImpl(new MVStore.Builder().open())
 
-    def appendBlock(): Unit = history.appendBlock(TestBlock.withReference(history.lastBlock.uniqueId)).explicitGet()
     history.appendBlock(TestBlock.withReference(Array.fill(SignatureLength)(0: Byte))).explicitGet()
+
+    def appendBlock(): Unit = history.appendBlock(TestBlock.withReference(history.lastBlock.uniqueId)).explicitGet()
     Range(1, 1000).foreach { _ =>
       appendBlock()
     }
