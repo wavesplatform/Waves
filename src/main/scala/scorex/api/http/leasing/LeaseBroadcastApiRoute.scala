@@ -10,7 +10,7 @@ import scorex.api.http._
 import scorex.transaction._
 
 @Path("/leasing/broadcast")
-@Api(value = "leasing")
+@Api(value = "/leasing")
 case class LeaseBroadcastApiRoute(settings: RestAPISettings, transactionModule: TransactionModule)
   extends ApiRoute with BroadcastRoute {
   override val route = pathPrefix("leasing" / "broadcast") {
@@ -33,8 +33,10 @@ case class LeaseBroadcastApiRoute(settings: RestAPISettings, transactionModule: 
     )
   ))
   @ApiResponses(Array(new ApiResponse(code = 200, message = "Json with response or error")))
-  def signedLease: Route =  json[SignedLeaseRequest] { leaseReq =>
-    doBroadcast(leaseReq.toTx)
+  def signedLease: Route = (path("lease") & post) {
+    json[SignedLeaseRequest] { leaseReq =>
+      doBroadcast(leaseReq.toTx)
+    }
   }
 
   @Path("/cancel")
@@ -52,7 +54,9 @@ case class LeaseBroadcastApiRoute(settings: RestAPISettings, transactionModule: 
       defaultValue = "{\n\t\"sender\": \"3Myss6gmMckKYtka3cKCM563TBJofnxvfD7\",\n\t\"txId\": \"ABMZDPY4MyQz7kKNAevw5P9eNmRErMutJoV9UNeCtqRV\",\n\t\"fee\": 10000000\n\t\"timestamp\": 12345678,\n\t\"signature\": \"asdasdasd\"\n}"
     )
   ))
-  def signedLeaseCancel: Route =  json[SignedLeaseCancelRequest] { leaseCancelReq =>
-    doBroadcast(leaseCancelReq.toTx)
+  def signedLeaseCancel: Route = (path("cancel") & post) {
+    json[SignedLeaseCancelRequest] { leaseCancelReq =>
+      doBroadcast(leaseCancelReq.toTx)
+    }
   }
 }
