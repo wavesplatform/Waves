@@ -17,6 +17,7 @@ import scorex.createTestTemporaryFile
 import scorex.crypto.encode.Base58
 import scorex.transaction.{BlockStorage, CheckpointService, History, TransactionModule}
 
+@DoNotDiscover
 class ConsensusRouteSpec extends RouteSpec("/consensus") with RestAPISettingsHelper with PropertyChecks with MockFactory with BlockGen {
   private val bFile = createTestTemporaryFile("waves-blockchain", ".dat")
   private val sFile = createTestTemporaryFile("waves-state", ".dat")
