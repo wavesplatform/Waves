@@ -1,6 +1,7 @@
 package com.wavesplatform.history
 
 import java.io.File
+import java.util.concurrent.locks.ReentrantReadWriteLock
 
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state2.reader.StateReader
@@ -12,11 +13,13 @@ class BlockStorageImpl(settings: BlockchainSettings) extends BlockStorage {
 
   import BlockStorageImpl._
 
+  val synchronizationToken: ReentrantReadWriteLock = new ReentrantReadWriteLock()
+
   val blockchainStore: MVStore = createMVStore(settings.blockchainFile)
   val stateStore: MVStore = createMVStore(settings.stateFile)
   val checkpointStore: MVStore = createMVStore(settings.checkpointFile)
-  val historyWriter = new HistoryWriterImpl(blockchainStore)
-  val stateWriter = new StateWriterImpl(new StateStorage(stateStore))
+  val historyWriter = new HistoryWriterImpl(blockchainStore, synchronizationToken)
+  val stateWriter = new StateWriterImpl(new StateStorage(stateStore), synchronizationToken)
   val checkpointService = new CheckpointServiceImpl(checkpointStore)
   val bcUpdater = new BlockchainUpdaterImpl(stateWriter, settings.functionalitySettings, historyWriter)
 

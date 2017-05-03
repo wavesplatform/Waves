@@ -1,5 +1,7 @@
 package com.wavesplatform.state2.reader
 
+import java.util.concurrent.locks.ReentrantReadWriteLock
+
 import cats.implicits._
 import cats.kernel.Monoid
 import com.wavesplatform.state2._
@@ -9,6 +11,9 @@ import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 
 class CompositeStateReader(inner: StateReader, blockDiff: BlockDiff) extends StateReader {
+
+  val synchronizationToken: ReentrantReadWriteLock = inner.synchronizationToken
+
   private val txDiff = blockDiff.txsDiff
 
   override def transactionInfo(id: ByteArray): Option[(Int, Transaction)] =
@@ -60,6 +65,7 @@ class CompositeStateReader(inner: StateReader, blockDiff: BlockDiff) extends Sta
   override def lastUpdateHeight(acc: Account): Option[Int] = blockDiff.snapshots.get(acc).map(_.lastKey).orElse(inner.lastUpdateHeight(acc))
 
   override def containsTransaction(id: ByteArray): Boolean = blockDiff.txsDiff.transactions.contains(id) || inner.containsTransaction(id)
+
 }
 
 object CompositeStateReader {

@@ -2,9 +2,11 @@ package scorex.utils
 
 import java.util.concurrent.locks.{Lock, ReentrantReadWriteLock}
 
+import scorex.utils.SynchronizedOver._
+
 // http://vlkan.com/blog/post/2015/09/09/enforce-locking/
 
-object SynchronizedAccess {
+object SynchronizedOver {
 
   sealed trait TypedLock {
 
@@ -28,28 +30,25 @@ object SynchronizedAccess {
 
 }
 
-trait SynchronizedAccess {
+trait SynchronizedOver {
 
-  import SynchronizedAccess._
+  val synchronizationToken: ReentrantReadWriteLock
 
-  protected val instanceLock: ReentrantReadWriteLock =
-    new ReentrantReadWriteLock()
+  protected val readLock: ReadLock =
+    new ReadLock(synchronizationToken.readLock())
 
-  protected val instanceReadLock: ReadLock =
-    new ReadLock(instanceLock.readLock())
+  protected val readWriteLock: ReadWriteLock =
+    new ReadWriteLock(synchronizationToken.readLock(), synchronizationToken.writeLock())
 
-  protected val instanceReadWriteLock: ReadWriteLock =
-    new ReadWriteLock(instanceLock.readLock(), instanceLock.writeLock())
-
-  protected case class SynchronizedAcrossInstance[T](private val value: T) {
+  protected case class Synchronized[T](private val value: T) {
 
     def apply()(implicit readLock: ReadLock): T = {
-      validateLock(readLock, instanceReadLock, instanceReadWriteLock)
+      validateLock(readLock, readLock, readWriteLock)
       value
     }
 
     def update[R](f: T => R)(implicit readWriteLock: ReadWriteLock): R = {
-      validateLock(readWriteLock, instanceReadWriteLock)
+      validateLock(readWriteLock, readWriteLock)
       f(value)
     }
 
@@ -61,11 +60,11 @@ trait SynchronizedAccess {
 
   }
 
-  protected def synchronizeRead[T](body: ReadLock => T): T =
-    synchronizeOperation(instanceReadLock)(body)
+  protected def read[T](body: ReadLock => T): T =
+    synchronizeOperation(readLock)(body)
 
-  protected def synchronizeReadWrite[T](body: ReadWriteLock => T): T =
-    synchronizeOperation(instanceReadWriteLock)(body)
+  protected def write[T](body: ReadWriteLock => T): T =
+    synchronizeOperation(readWriteLock)(body)
 
   protected def synchronizeOperation[T, L <: TypedLock](lock: L)(body: L => T): T = {
     lock.lock()
