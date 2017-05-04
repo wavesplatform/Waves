@@ -11,7 +11,7 @@ import play.api.libs.json._
 import scorex.account.Account
 import scorex.crypto.encode.Base58
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import scorex.transaction.{History, Transaction, TransactionModule, UnconfirmedTransactionsStorage}
+import scorex.transaction.{History, Transaction, NewTransactionHandler, UnconfirmedTransactionsStorage}
 
 import scala.util.Success
 import scala.util.control.Exception

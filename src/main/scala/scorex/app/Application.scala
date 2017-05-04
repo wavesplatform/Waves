@@ -3,14 +3,14 @@ package scorex.app
 import akka.actor.ActorRef
 import com.wavesplatform.history.BlockStorageImpl
 import com.wavesplatform.settings.WavesSettings
-import scorex.transaction.{BlockStorage, History, TransactionModule, UnconfirmedTransactionsStorage}
+import scorex.transaction.{BlockStorage, History, NewTransactionHandler, UnconfirmedTransactionsStorage}
 import scorex.utils.Time
 import scorex.wallet.Wallet
 
 
 trait Application {
 
-  implicit def transactionModule: TransactionModule
+  implicit def newTransactionHandler: NewTransactionHandler
 
   def applicationName: String
 

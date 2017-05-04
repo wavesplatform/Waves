@@ -12,7 +12,7 @@ import play.api.libs.json.{JsObject, JsValue, Json, Writes}
 import scorex.api.http._
 import scorex.api.http.assets.AssetsBroadcastApiRoute
 import scorex.network.ConnectedPeer
-import scorex.transaction.{Transaction, TransactionModule, ValidationError}
+import scorex.transaction.{Transaction, NewTransactionHandler, ValidationError}
 
 
 class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with RequestGen with PathMockFactory with PropertyChecks {
@@ -25,7 +25,7 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
       def alwaysError(t: Transaction, maybePeer: Option[ConnectedPeer]): Either[ValidationError, Transaction] =
         Left[ValidationError, Transaction](scorex.transaction.ValidationError.TransactionValidationError(t, "foo"))
 
-      val m = mock[TransactionModule]
+      val m = mock[NewTransactionHandler]
       (m.onNewOffchainTransaction(_: Transaction, _: Option[ConnectedPeer]))
         .expects(*, *)
         .onCall(alwaysError _)
@@ -62,7 +62,7 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
   }
 
   "returns appropriate error code when validation fails for" - {
-    val route = AssetsBroadcastApiRoute(settings, mock[TransactionModule]).route
+    val route = AssetsBroadcastApiRoute(settings, mock[NewTransactionHandler]).route
 
     "issue transaction" in forAll(broadcastIssueReq) { ir =>
       def posting[A: Writes](v: A) = Post(routePath("issue"), v) ~> route

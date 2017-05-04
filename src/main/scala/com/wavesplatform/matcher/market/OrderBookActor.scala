@@ -14,7 +14,7 @@ import com.wavesplatform.state2.reader.StateReader
 import play.api.libs.json.Json
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange._
-import scorex.transaction.{History, TransactionModule}
+import scorex.transaction.{History, NewTransactionHandler}
 import scorex.utils.{NTP, ScorexLogging, Time}
 import scorex.wallet.Wallet
 
@@ -26,7 +26,7 @@ class OrderBookActor(assetPair: AssetPair, val storedState: StateReader,
                      val wallet: Wallet, val settings: MatcherSettings,
                      val history: History,
                      val functionalitySettings: FunctionalitySettings,
-                     val transactionModule: TransactionModule)
+                     val transactionModule: NewTransactionHandler)
   extends PersistentActor
     with ScorexLogging with OrderValidator with OrderHistory with ExchangeTransactionCreator {
   override def persistenceId: String = OrderBookActor.name(assetPair)
@@ -177,7 +177,7 @@ class OrderBookActor(assetPair: AssetPair, val storedState: StateReader,
 
 object OrderBookActor {
   def props(assetPair: AssetPair, storedState: StateReader,
-            wallet: Wallet, settings: MatcherSettings, transactionModule: TransactionModule, history: History,
+            wallet: Wallet, settings: MatcherSettings, transactionModule: NewTransactionHandler, history: History,
             functionalitySettings: FunctionalitySettings): Props =
     Props(new OrderBookActor(assetPair, storedState, wallet, settings, history, functionalitySettings, transactionModule))
 

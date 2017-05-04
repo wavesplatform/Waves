@@ -13,7 +13,7 @@ import scala.util.Random
 class BlockSpecification extends FunSuite with Matchers with MockFactory with UnitTestConfig {
 
   test("Nxt block with txs bytes/parse roundtrip") {
-    implicit val transactionModule = mock[TransactionModule]
+    implicit val transactionModule = mock[NewTransactionHandler]
 
     val reference = Array.fill(Block.BlockIdLength)(Random.nextInt(100).toByte)
     val gen = PrivateKeyAccount(reference)

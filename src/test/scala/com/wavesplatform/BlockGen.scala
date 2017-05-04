@@ -4,7 +4,7 @@ import org.scalacheck.Gen
 import scorex.account.PrivateKeyAccount
 import scorex.block.Block
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
-import scorex.transaction.{SignedTransaction, SimpleTransactionModule, Transaction}
+import scorex.transaction.{SignedTransaction, NewTransactionHandlerImpl, Transaction}
 
 trait BlockGen extends TransactionGen {
 

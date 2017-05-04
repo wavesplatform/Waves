@@ -10,7 +10,7 @@ import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state2.reader.StateReader
 import scorex.api.http.CompositeHttpService
 import scorex.app.Application
-import scorex.transaction.{BlockStorage, TransactionModule}
+import scorex.transaction.{BlockStorage, NewTransactionHandler}
 import scorex.utils.ScorexLogging
 import scorex.wallet.Wallet
 
@@ -25,7 +25,7 @@ trait MatcherApplication extends ScorexLogging {
 
   def restAPISettings: RestAPISettings
 
-  def transactionModule: TransactionModule
+  def newTransactionHandler: NewTransactionHandler
 
   def blockStorage: BlockStorage
 
@@ -46,7 +46,7 @@ trait MatcherApplication extends ScorexLogging {
   )
 
   lazy val matcher: ActorRef = actorSystem.actorOf(MatcherActor.props(storedState, wallet, matcherSettings,
-    transactionModule, thisApplication.time, thisApplication.blockStorage.history,
+    newTransactionHandler, thisApplication.time, thisApplication.blockStorage.history,
     thisApplication.settings.blockchainSettings.functionalitySettings), MatcherActor.name)
 
   @volatile var matcherServerBinding: ServerBinding = _

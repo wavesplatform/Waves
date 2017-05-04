@@ -13,7 +13,7 @@ import scorex.api.http.{AddressApiRoute, ApiKeyNotValid, InvalidMessage}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.settings.TestBlockchainSettings
-import scorex.transaction.TransactionModule
+import scorex.transaction.NewTransactionHandler
 
 class AddressRouteSpec
   extends RouteSpec("/addresses")

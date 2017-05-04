@@ -61,7 +61,7 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
   val utxStorage1 = new UnconfirmedTransactionsDatabaseImpl(wavesSettings.utxSettings)
 
   class TestAppMock extends Application {
-    lazy implicit val transactionModule: TransactionModule = new SimpleTransactionModule(wavesSettings.blockchainSettings.functionalitySettings,
+    lazy implicit val newTransactionHandler: NewTransactionHandler = new NewTransactionHandlerImpl(wavesSettings.blockchainSettings.functionalitySettings,
       this.networkController, this.time,
       new FeeCalculator(wavesSettings.feesSettings),
       utxStorage1,

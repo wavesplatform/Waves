@@ -19,7 +19,7 @@ import scorex.app.ApplicationVersion
 import scorex.consensus.nxt.api.http.NxtConsensusApiRoute
 import scorex.network.{TransactionalMessagesRepo, UnconfirmedPoolSynchronizer}
 import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
-import scorex.transaction.{BlockStorage, FeeCalculator, SimpleTransactionModule, UnconfirmedTransactionsStorage}
+import scorex.transaction._
 import scorex.utils.{ScorexLogging, Time, TimeImpl}
 import scorex.waves.http.{DebugApiRoute, WavesApiRoute}
 
@@ -42,27 +42,29 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
   override val blockStorage = new BlockStorageImpl(settings.blockchainSettings)
 
   val utxStorage: UnconfirmedTransactionsStorage = new UnconfirmedTransactionsDatabaseImpl(settings.utxSettings)
-  override implicit lazy val transactionModule = new SimpleTransactionModule(settings.blockchainSettings.functionalitySettings,
+  override implicit lazy val newTransactionHandler = new NewTransactionHandlerImpl(settings.blockchainSettings.functionalitySettings,
     networkController, time, feeCalculator, utxStorage, blockStorage.history, blockStorage.stateReader)
+
+  lazy val txOps = new TransactionOperationsImpl(newTransactionHandler, time)
 
   override lazy val apiRoutes = Seq(
     BlocksApiRoute(settings.restAPISettings, settings.checkpointsSettings, history, coordinator),
     TransactionsApiRoute(settings.restAPISettings, blockStorage.stateReader, history, utxStorage),
     NxtConsensusApiRoute(settings.restAPISettings, blockStorage.stateReader, history, settings.blockchainSettings.functionalitySettings),
     WalletApiRoute(settings.restAPISettings, wallet),
-    PaymentApiRoute(settings.restAPISettings, wallet, transactionModule),
+    PaymentApiRoute(settings.restAPISettings, wallet, txOps),
     UtilsApiRoute(settings.restAPISettings),
     PeersApiRoute(settings.restAPISettings, peerManager, networkController),
     AddressApiRoute(settings.restAPISettings, wallet, blockStorage.stateReader, settings.blockchainSettings.functionalitySettings),
     DebugApiRoute(settings.restAPISettings, wallet, blockStorage.stateReader, history),
-    WavesApiRoute(settings.restAPISettings, wallet, time, transactionModule),
-    AssetsApiRoute(settings.restAPISettings, wallet, blockStorage.stateReader, transactionModule),
+    WavesApiRoute(settings.restAPISettings, wallet, time, txOps),
+    AssetsApiRoute(settings.restAPISettings, wallet, blockStorage.stateReader, txOps),
     NodeApiRoute(settings.restAPISettings, () => this.shutdown(), blockGenerator, coordinator),
-    AssetsBroadcastApiRoute(settings.restAPISettings, transactionModule),
-    LeaseApiRoute(settings.restAPISettings, wallet, blockStorage.stateReader, transactionModule),
-    LeaseBroadcastApiRoute(settings.restAPISettings, transactionModule),
-    AliasApiRoute(settings.restAPISettings, wallet, transactionModule, blockStorage.stateReader),
-    AliasBroadcastApiRoute(settings.restAPISettings, transactionModule)
+    AssetsBroadcastApiRoute(settings.restAPISettings, newTransactionHandler),
+    LeaseApiRoute(settings.restAPISettings, wallet, blockStorage.stateReader, txOps),
+    LeaseBroadcastApiRoute(settings.restAPISettings, newTransactionHandler),
+    AliasApiRoute(settings.restAPISettings, wallet, txOps, blockStorage.stateReader),
+    AliasBroadcastApiRoute(settings.restAPISettings, newTransactionHandler)
   )
 
   override lazy val apiTypes = Seq(
@@ -87,7 +89,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
 
   override lazy val additionalMessageSpecs = TransactionalMessagesRepo.specs
 
-  actorSystem.actorOf(Props(classOf[UnconfirmedPoolSynchronizer], transactionModule, settings.utxSettings, networkController, utxStorage))
+  actorSystem.actorOf(Props(classOf[UnconfirmedPoolSynchronizer], newTransactionHandler, settings.utxSettings, networkController, utxStorage))
 
   override def run(): Unit = {
     super.run()

@@ -5,11 +5,11 @@ import java.nio.ByteBuffer
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.FunSuite
 import scorex.network.message._
-import scorex.transaction.TransactionModule
+import scorex.transaction.NewTransactionHandler
 
 class MessageHandlerSpec extends FunSuite with MockFactory with UnitTestConfig {
 
-  implicit val transactionModule = mock[TransactionModule]
+  implicit val transactionModule = mock[NewTransactionHandler]
 
   private lazy val handler = new MessageHandler(BasicMessagesRepo.specs)
 

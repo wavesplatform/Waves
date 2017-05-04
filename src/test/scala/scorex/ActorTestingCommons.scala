@@ -153,7 +153,7 @@ abstract class ActorTestingCommons extends TestKitBase
     }
 
   trait ApplicationMock extends Application {
-    implicit val transactionModule = stub[TransactionModule]
+    implicit val newTransactionHandler = stub[NewTransactionHandler]
     final override lazy val networkController: ActorRef = networkControllerMock
 
     def historyOverride: History

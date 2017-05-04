@@ -13,7 +13,7 @@ import scorex.block.Block
 import scorex.consensus.nxt.api.http.NxtConsensusApiRoute
 import scorex.createTestTemporaryFile
 import scorex.crypto.encode.Base58
-import scorex.transaction.{BlockStorage, CheckpointService, History, TransactionModule}
+import scorex.transaction.{BlockStorage, CheckpointService, History, NewTransactionHandler}
 
 class ConsensusRouteSpec extends RouteSpec("/consensus") with RestAPISettingsHelper with PropertyChecks with MockFactory with BlockGen {
   private val bFile = createTestTemporaryFile("waves-blockchain", ".dat")

@@ -12,7 +12,7 @@ import play.api.libs.json.{JsArray, JsValue, Json}
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange.Validation.booleanOperators
 import scorex.transaction.assets.exchange.{AssetPair, Order, Validation}
-import scorex.transaction.{AssetId, History, TransactionModule}
+import scorex.transaction.{AssetId, History, NewTransactionHandler}
 import scorex.utils.{ByteArrayExtension, NTP, ScorexLogging, Time}
 import scorex.wallet.Wallet
 
@@ -21,7 +21,7 @@ import scala.language.reflectiveCalls
 
 class MatcherActor(storedState: StateReader, wallet: Wallet, settings: MatcherSettings, history: History,
                    functionalitySettings: FunctionalitySettings,
-                   transactionModule: TransactionModule
+                   transactionModule: NewTransactionHandler
                   ) extends PersistentActor with ScorexLogging {
 
   import MatcherActor._
@@ -147,7 +147,7 @@ object MatcherActor {
   def name = "matcher"
 
   def props(storedState: StateReader, wallet: Wallet, settings: MatcherSettings,
-            transactionModule: TransactionModule, time: Time, history: History,
+            transactionModule: NewTransactionHandler, time: Time, history: History,
             functionalitySettings: FunctionalitySettings): Props =
     Props(new MatcherActor(storedState, wallet, settings, history, functionalitySettings, transactionModule))
 

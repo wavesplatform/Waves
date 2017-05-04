@@ -1,0 +1,30 @@
+package scorex.transaction
+
+import akka.actor.ActorRef
+import com.wavesplatform.settings.FunctionalitySettings
+import com.wavesplatform.state2.Validator
+import com.wavesplatform.state2.reader.StateReader
+import scorex.network.message.Message
+import scorex.network._
+import scorex.utils.{ScorexLogging, Time}
+
+import scala.util.Right
+
+trait NewTransactionHandler {
+  def onNewOffchainTransaction[T <: Transaction](transaction: T, exceptOf: Option[ConnectedPeer] = None): Either[ValidationError, T]
+}
+
+class NewTransactionHandlerImpl(fs: FunctionalitySettings, networkController: ActorRef, time: Time, feeCalculator: FeeCalculator,
+                                utxStorage: UnconfirmedTransactionsStorage, history: History, stateReader: StateReader)
+  extends NewTransactionHandler with ScorexLogging {
+
+  override def onNewOffchainTransaction[T <: Transaction](transaction: T, exceptOf: Option[ConnectedPeer]): Either[ValidationError, T] =
+    for {
+      validAgainstFee <- feeCalculator.enoughFee(transaction)
+      tx <- utxStorage.putIfNew(validAgainstFee, (t: T) => Validator.validateWithHistory(history, fs, stateReader)(t))
+    } yield {
+      val ntwMsg = Message(TransactionalMessagesRepo.TransactionMessageSpec, Right(transaction), None)
+      networkController ! NetworkController.SendToNetwork(ntwMsg, exceptOf.map(BroadcastExceptOf).getOrElse(Broadcast))
+      tx
+    }
+}

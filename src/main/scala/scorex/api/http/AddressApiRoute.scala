@@ -12,7 +12,7 @@ import play.api.libs.json._
 import scorex.account.{Account, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
-import scorex.transaction.{PoSCalc, TransactionModule}
+import scorex.transaction.{PoSCalc, NewTransactionHandler}
 import scorex.wallet.Wallet
 
 import scala.util.{Failure, Success, Try}

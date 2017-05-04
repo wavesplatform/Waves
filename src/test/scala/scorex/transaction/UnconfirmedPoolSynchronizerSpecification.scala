@@ -26,7 +26,7 @@ class UnconfirmedPoolSynchronizerSpecification extends TestKit(ActorSystem("Unco
 
   "An UnconfirmedPoolSynchronizer actor" must {
 
-    val transactionModule = mock[TransactionModule]
+    val transactionModule = mock[NewTransactionHandler]
     val utxStorage = mock[UnconfirmedTransactionsStorage]
 
     def createPoolSynchronizer(broadcastInterval: FiniteDuration) = {

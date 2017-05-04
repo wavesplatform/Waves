@@ -11,7 +11,7 @@ import scorex.utils.ScorexLogging
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class UnconfirmedPoolSynchronizer(private val transactionModule: TransactionModule, settings: UTXSettings,
+class UnconfirmedPoolSynchronizer(private val transactionModule: NewTransactionHandler, settings: UTXSettings,
                                   networkController: ActorRef, utxStorage: UnconfirmedTransactionsStorage)
   extends ViewSynchronizer with ScorexLogging {
 

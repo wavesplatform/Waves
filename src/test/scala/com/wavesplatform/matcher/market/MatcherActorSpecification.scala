@@ -19,7 +19,7 @@ import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Matchers, WordSpecLike}
 import scorex.account.PrivateKeyAccount
 import scorex.crypto.encode.Base58
-import scorex.transaction.{History, TransactionModule}
+import scorex.transaction.{History, NewTransactionHandler}
 import scorex.transaction.assets.IssueTransaction
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import scorex.utils.{NTP, ScorexLogging, Time, TimeImpl}
@@ -44,7 +44,7 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest")
   val wallet = new Wallet(None, "matcher", Option(WalletSeed))
   wallet.generateNewAccount()
   var actor: ActorRef = system.actorOf(Props(new MatcherActor(storedState, wallet, settings, history, functionalitySettings,
-    stub[TransactionModule]) with RestartableActor))
+    stub[NewTransactionHandler]) with RestartableActor))
 
   (storedState.assetInfo _).when(*).returns(Some(AssetInfo(true, 10000000000L)))
   val i1 = IssueTransaction.create(PrivateKeyAccount(Array.empty), "Unknown".getBytes(), Array.empty, 10000000000L, 8.toByte, true, 100000L, 10000L).right.get
@@ -58,7 +58,7 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest")
     super.beforeEach()
 
     actor = system.actorOf(Props(new MatcherActor(storedState, wallet, settings, history, functionalitySettings,
-      stub[TransactionModule]) with RestartableActor))
+      stub[NewTransactionHandler]) with RestartableActor))
   }
 
   "MatcherActor" should {

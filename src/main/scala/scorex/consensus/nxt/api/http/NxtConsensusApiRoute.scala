@@ -10,7 +10,7 @@ import play.api.libs.json.Json
 import scorex.account.Account
 import scorex.api.http.{ApiRoute, CommonApiFunctions, InvalidAddress}
 import scorex.crypto.encode.Base58
-import scorex.transaction.{History, PoSCalc, TransactionModule}
+import scorex.transaction.{History, PoSCalc, NewTransactionHandler}
 
 @Path("/consensus")
 @Api(value = "/consensus")

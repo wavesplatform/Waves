@@ -1,10 +1,10 @@
 package scorex
 
 import scorex.api.http.{ApiError, StateCheckFailed}
-import scorex.transaction.{Transaction, TransactionModule, ValidationError}
+import scorex.transaction.{Transaction, NewTransactionHandler, ValidationError}
 
 trait BroadcastRoute {
-  def transactionModule: TransactionModule
+  def transactionModule: NewTransactionHandler
 
   protected def doBroadcast[A <: Transaction](v: Either[ValidationError, A]): Either[ApiError, A] =
     (for {
