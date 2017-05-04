@@ -70,7 +70,10 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
     val functionalitySettings = stub[FunctionalitySettings]
 
     actor = system.actorOf(Props(new OrderBookActor(pair, storedState,
-      wallet, settings, history, functionalitySettings, transactionModule) with RestartableActor))
+      wallet, settings, history, functionalitySettings, transactionModule) with RestartableActor {
+      override def validate(orderMatch: ExchangeTransaction): Either[ValidationError, SignedTransaction] = Right(orderMatch)
+      override def sendToNetwork(tx: SignedTransaction): Either[ValidationError, SignedTransaction] = Right(tx)
+    }))
 
     eventsProbe = TestProbe()
     system.eventStream.subscribe(eventsProbe.ref, classOf[Event])
