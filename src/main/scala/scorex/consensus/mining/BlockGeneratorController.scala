@@ -3,7 +3,7 @@ package scorex.consensus.mining
 import akka.actor._
 import scorex.app.Application
 import scorex.network.peer.PeerManager.{ConnectedPeers, GetConnectedPeersTyped}
-import scorex.utils.{NTP, ScorexLogging}
+import scorex.utils.{ScorexLogging}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.language.postfixOps
@@ -86,7 +86,7 @@ class BlockGeneratorController(application: Application) extends Actor with Scor
 
   private def isLastBlockTsInAllowedToGenerationInterval: Boolean = try {
     val lastBlockTimestamp = application.blockStorage.history.lastBlock.timestampField.value
-    val currentTime = NTP.correctedTime()
+    val currentTime = application.time.correctedTime()
     val doNotGenerateUntilLastBlockTs = currentTime - application.settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed.toMillis
     lastBlockTimestamp >= doNotGenerateUntilLastBlockTs
   } catch {

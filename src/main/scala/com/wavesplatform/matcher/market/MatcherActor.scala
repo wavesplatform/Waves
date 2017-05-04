@@ -6,20 +6,22 @@ import akka.persistence.{PersistentActor, RecoveryCompleted}
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.api.{MatcherResponse, StatusCodeMatcherResponse}
 import com.wavesplatform.matcher.market.OrderBookActor.{DeleteOrderBookRequest, GetOrderBookResponse, OrderBookRequest}
+import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.reader.StateReader
 import play.api.libs.json.{JsArray, JsValue, Json}
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange.Validation.booleanOperators
 import scorex.transaction.assets.exchange.{AssetPair, Order, Validation}
-import scorex.transaction.{AssetId, TransactionModule}
-import scorex.utils.{ByteArrayExtension, NTP, ScorexLogging}
+import scorex.transaction.{AssetId, History, NewTransactionHandler}
+import scorex.utils.{ByteArrayExtension, NTP, ScorexLogging, Time}
 import scorex.wallet.Wallet
 
 import scala.collection.{immutable, mutable}
 import scala.language.reflectiveCalls
 
-class MatcherActor(storedState: StateReader, wallet: Wallet, settings: MatcherSettings,
-                   transactionModule: TransactionModule
+class MatcherActor(storedState: StateReader, wallet: Wallet, settings: MatcherSettings, history: History,
+                   functionalitySettings: FunctionalitySettings,
+                   transactionModule: NewTransactionHandler
                   ) extends PersistentActor with ScorexLogging {
 
   import MatcherActor._
@@ -33,7 +35,7 @@ class MatcherActor(storedState: StateReader, wallet: Wallet, settings: MatcherSe
     openMarkets += MarketData(pair, getAssetName(pair.amountAsset), getAssetName(pair.priceAsset), NTP.correctedTime())
     tradedPairs += pair
 
-    context.actorOf(OrderBookActor.props(pair, storedState, wallet, settings, transactionModule),
+    context.actorOf(OrderBookActor.props(pair, storedState, wallet, settings, transactionModule, history, functionalitySettings),
       OrderBookActor.name(pair))
   }
 
@@ -49,14 +51,14 @@ class MatcherActor(storedState: StateReader, wallet: Wallet, settings: MatcherSe
     val reversePair = AssetPair(aPair.priceAsset, aPair.amountAsset)
 
     val isCorrectOrder = if (tradedPairs.contains(aPair)) true
-      else if (tradedPairs.contains(reversePair)) false
-      else if (settings.priceAssets.contains(aPair.priceAssetStr) &&
-        !settings.priceAssets.contains(aPair.amountAssetStr)) true
-      else if (settings.priceAssets.contains(reversePair.priceAssetStr) &&
-        !settings.priceAssets.contains(reversePair.amountAssetStr)) false
-      else ByteArrayExtension.compare(aPair.priceAsset, aPair.amountAsset) < 0
+    else if (tradedPairs.contains(reversePair)) false
+    else if (settings.priceAssets.contains(aPair.priceAssetStr) &&
+      !settings.priceAssets.contains(aPair.amountAssetStr)) true
+    else if (settings.priceAssets.contains(reversePair.priceAssetStr) &&
+      !settings.priceAssets.contains(reversePair.amountAssetStr)) false
+    else ByteArrayExtension.compare(aPair.priceAsset, aPair.amountAsset) < 0
 
-    isCorrectOrder :|  s"Invalid AssetPair ordering, should be reversed: $reversePair"
+    isCorrectOrder :| s"Invalid AssetPair ordering, should be reversed: $reversePair"
   }
 
   def createAndForward(order: Order): Unit = {
@@ -123,7 +125,7 @@ class MatcherActor(storedState: StateReader, wallet: Wallet, settings: MatcherSe
       openMarkets.remove(i)
       tradedPairs.remove(i)
       deleteMessages(lastSequenceNr)
-      persistAll(tradedPairs.map(OrderBookCreated).to[immutable.Seq]) {_ => }
+      persistAll(tradedPairs.map(OrderBookCreated).to[immutable.Seq]) { _ => }
     }
   }
 
@@ -145,8 +147,9 @@ object MatcherActor {
   def name = "matcher"
 
   def props(storedState: StateReader, wallet: Wallet, settings: MatcherSettings,
-            transactionModule: TransactionModule): Props =
-    Props(new MatcherActor(storedState, wallet, settings, transactionModule))
+            transactionModule: NewTransactionHandler, time: Time, history: History,
+            functionalitySettings: FunctionalitySettings): Props =
+    Props(new MatcherActor(storedState, wallet, settings, history, functionalitySettings, transactionModule))
 
   case class OrderBookCreated(pair: AssetPair)
 

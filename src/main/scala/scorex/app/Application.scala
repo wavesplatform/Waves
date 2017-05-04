@@ -1,16 +1,16 @@
 package scorex.app
 
 import akka.actor.ActorRef
+import com.wavesplatform.history.BlockStorageImpl
 import com.wavesplatform.settings.WavesSettings
-import scorex.consensus.nxt.WavesConsensusModule
-import scorex.transaction.{BlockStorage, TransactionModule}
+import scorex.transaction.{BlockStorage, History, NewTransactionHandler, UnconfirmedTransactionsStorage}
+import scorex.utils.Time
 import scorex.wallet.Wallet
 
 
 trait Application {
 
-  implicit def consensusModule: WavesConsensusModule
-  implicit def transactionModule: TransactionModule
+  implicit def newTransactionHandler: NewTransactionHandler
 
   def applicationName: String
 
@@ -33,4 +33,11 @@ trait Application {
   def settings: WavesSettings
 
   def wallet: Wallet
+
+  def utxStorage: UnconfirmedTransactionsStorage
+
+  def history: History
+
+  def time: Time
+
 }

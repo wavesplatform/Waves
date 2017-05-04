@@ -11,7 +11,7 @@ import scorex.transaction._
 
 @Path("/leasing/broadcast")
 @Api(value = "/leasing")
-case class LeaseBroadcastApiRoute(settings: RestAPISettings, transactionModule: TransactionModule)
+case class LeaseBroadcastApiRoute(settings: RestAPISettings, transactionModule: NewTransactionHandler)
   extends ApiRoute with BroadcastRoute {
   override val route = pathPrefix("leasing" / "broadcast") {
     signedLease ~ signedLeaseCancel

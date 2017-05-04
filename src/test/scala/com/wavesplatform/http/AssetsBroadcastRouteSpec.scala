@@ -11,7 +11,8 @@ import org.scalatest.prop.PropertyChecks
 import play.api.libs.json.{JsObject, JsValue, Json, Writes}
 import scorex.api.http._
 import scorex.api.http.assets.AssetsBroadcastApiRoute
-import scorex.transaction.{Transaction, TransactionModule, ValidationError}
+import scorex.network.ConnectedPeer
+import scorex.transaction.{Transaction, NewTransactionHandler, ValidationError}
 
 
 class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with RequestGen with PathMockFactory with PropertyChecks {
@@ -20,10 +21,14 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
   "returns StateCheckFiled" - {
 
     val stmMock = {
-      val m = mock[TransactionModule]
-      (m.onNewOffchainTransaction(_: Transaction))
-        .expects(*)
-        .onCall((t: Transaction) => Left[ValidationError, Transaction](scorex.transaction.ValidationError.TransactionValidationError(t, "foo")))
+
+      def alwaysError(t: Transaction, maybePeer: Option[ConnectedPeer]): Either[ValidationError, Transaction] =
+        Left[ValidationError, Transaction](scorex.transaction.ValidationError.TransactionValidationError(t, "foo"))
+
+      val m = mock[NewTransactionHandler]
+      (m.onNewOffchainTransactionExcept(_: Transaction, _: Option[ConnectedPeer]))
+        .expects(*, *)
+        .onCall(alwaysError _)
         .anyNumberOfTimes()
       m
     }
@@ -57,7 +62,7 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
   }
 
   "returns appropriate error code when validation fails for" - {
-    val route = AssetsBroadcastApiRoute(settings, mock[TransactionModule]).route
+    val route = AssetsBroadcastApiRoute(settings, mock[NewTransactionHandler]).route
 
     "issue transaction" in forAll(broadcastIssueReq) { ir =>
       def posting[A: Writes](v: A) = Post(routePath("issue"), v) ~> route
@@ -97,14 +102,14 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
       posting(tr.copy(feeAssetId = Some(""))) should produce(InvalidSignature)
       posting(tr.copy(feeAssetId = None)) should produce(InvalidSignature)
 
-      forAll(nonPositiveLong) { q => posting(tr.copy(amount = q)) should produce (NegativeAmount) }
-      forAll(invalidBase58) { pk => posting(tr.copy(senderPublicKey = pk)) should produce (InvalidAddress) }
+      forAll(nonPositiveLong) { q => posting(tr.copy(amount = q)) should produce(NegativeAmount) }
+      forAll(invalidBase58) { pk => posting(tr.copy(senderPublicKey = pk)) should produce(InvalidAddress) }
       forAll(invalidBase58) { a => posting(tr.copy(recipient = a)) should produce (InvalidAddress) }
-      forAll(invalidBase58) { a => posting(tr.copy(assetId = Some(a))) should produce (CustomValidationError("invalid.assetId")) }
-      forAll(invalidBase58) { a => posting(tr.copy(feeAssetId = Some(a))) should produce (CustomValidationError("invalid.feeAssetId")) }
-      forAll(longAttachment) { a => posting(tr.copy(attachment = Some(a))) should produce (CustomValidationError("invalid.attachment")) }
-      forAll(posNum[Long]) { quantity => posting(tr.copy(amount = quantity, fee = Long.MaxValue)) should produce (OverflowError) }
-      forAll(nonPositiveLong) { fee => posting(tr.copy(fee = fee)) should produce (InsufficientFee) }
+      forAll(invalidBase58) { a => posting(tr.copy(assetId = Some(a))) should produce(CustomValidationError("invalid.assetId")) }
+      forAll(invalidBase58) { a => posting(tr.copy(feeAssetId = Some(a))) should produce(CustomValidationError("invalid.feeAssetId")) }
+      forAll(longAttachment) { a => posting(tr.copy(attachment = Some(a))) should produce(CustomValidationError("invalid.attachment")) }
+      forAll(posNum[Long]) { quantity => posting(tr.copy(amount = quantity, fee = Long.MaxValue)) should produce(OverflowError) }
+      forAll(nonPositiveLong) { fee => posting(tr.copy(fee = fee)) should produce(InsufficientFee) }
     }
   }
 }

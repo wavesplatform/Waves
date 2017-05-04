@@ -4,7 +4,7 @@ import com.google.common.primitives.{Bytes, Ints, Longs}
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.block.Block.BlockId
-import scorex.consensus.nxt.{NxtConsensusBlockField, NxtLikeConsensusBlockData, WavesConsensusModule}
+import scorex.consensus.nxt.{NxtConsensusBlockField, NxtLikeConsensusBlockData}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.transaction.TransactionParser._
@@ -84,6 +84,10 @@ object Block extends ScorexLogging {
   type BlockId = Array[Byte]
   type BlockIds = Seq[BlockId]
 
+  val MaxTransactionsPerBlock: Int = 100
+  val BaseTargetLength: Int = 8
+  val GeneratorSignatureLength: Int = 32
+
   val BlockIdLength = SignatureLength
 
   val TransactionSizeLength = 4
@@ -120,7 +124,7 @@ object Block extends ScorexLogging {
     val cBytesLength = Ints.fromByteArray(bytes.slice(position, position + 4))
     position += 4
     val cBytes = bytes.slice(position, position + cBytesLength)
-    val consData = NxtLikeConsensusBlockData(Longs.fromByteArray(cBytes.take(WavesConsensusModule.BaseTargetLength)), cBytes.takeRight(WavesConsensusModule.GeneratorSignatureLength))
+    val consData = NxtLikeConsensusBlockData(Longs.fromByteArray(cBytes.take(Block.BaseTargetLength)), cBytes.takeRight(Block.GeneratorSignatureLength))
     position += cBytesLength
 
     val tBytesLength = Ints.fromByteArray(bytes.slice(position, position + 4))
