@@ -41,7 +41,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
 
   override val blockStorage = new BlockStorageImpl(settings.blockchainSettings)
 
-  val utxStorage: UnconfirmedTransactionsStorage = new UnconfirmedTransactionsDatabaseImpl(settings.utxSettings)
+  val utxStorage: UnconfirmedTransactionsStorage = new UnconfirmedTransactionsDatabaseImpl(settings.utxSettings.size)
   override implicit lazy val newTransactionHandler = new NewTransactionHandlerImpl(settings.blockchainSettings.functionalitySettings,
     networkController, time, feeCalculator, utxStorage, blockStorage.history, blockStorage.stateReader)
 

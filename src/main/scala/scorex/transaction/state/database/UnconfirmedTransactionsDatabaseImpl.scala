@@ -9,12 +9,12 @@ import scorex.utils.ScorexLogging
 import scala.collection.concurrent.TrieMap
 
 
-class UnconfirmedTransactionsDatabaseImpl(settings: UTXSettings) extends UnconfirmedTransactionsStorage with ScorexLogging {
+class UnconfirmedTransactionsDatabaseImpl(size: Int) extends UnconfirmedTransactionsStorage with ScorexLogging {
 
   private val transactions = TrieMap[ByteArray, Transaction]()
 
   override def putIfNew[T <: Transaction](tx: T, txValidator: T => Either[ValidationError, T]): Either[ValidationError, T] =
-    if (transactions.size < settings.size) {
+    if (transactions.size < size) {
       val txKey = EqByteArray(tx.id)
       if (transactions.contains(txKey)) {
         Left(TransactionValidationError(tx, "already in the pool"))

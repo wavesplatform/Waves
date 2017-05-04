@@ -58,7 +58,7 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
 
   val db: MVStore = new MVStore.Builder().open()
   val blockStorage1 = new BlockStorageImpl(wavesSettings.blockchainSettings)
-  val utxStorage1 = new UnconfirmedTransactionsDatabaseImpl(wavesSettings.utxSettings)
+  val utxStorage1 = new UnconfirmedTransactionsDatabaseImpl(wavesSettings.utxSettings.size)
 
   class TestAppMock extends Application {
     lazy implicit val newTransactionHandler: NewTransactionHandler = new NewTransactionHandlerImpl(wavesSettings.blockchainSettings.functionalitySettings,
