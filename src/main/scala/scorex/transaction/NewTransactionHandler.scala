@@ -11,14 +11,22 @@ import scorex.utils.{ScorexLogging, Time}
 import scala.util.Right
 
 trait NewTransactionHandler {
-  def onNewOffchainTransaction[T <: Transaction](transaction: T, exceptOf: Option[ConnectedPeer] = None): Either[ValidationError, T]
+  def onNewOffchainTransactionExcept[T <: Transaction](tx: T, exceptOf: Option[ConnectedPeer]): Either[ValidationError, T]
+}
+
+object NewTransactionHandler {
+
+  implicit class NewTransactionHandlerExt(nth: NewTransactionHandler) {
+    def onNewOffchainTransaction[T <: Transaction](tx: T): Either[ValidationError, T] = nth.onNewOffchainTransactionExcept(tx, None)
+  }
+
 }
 
 class NewTransactionHandlerImpl(fs: FunctionalitySettings, networkController: ActorRef, time: Time, feeCalculator: FeeCalculator,
                                 utxStorage: UnconfirmedTransactionsStorage, history: History, stateReader: StateReader)
   extends NewTransactionHandler with ScorexLogging {
 
-  override def onNewOffchainTransaction[T <: Transaction](transaction: T, exceptOf: Option[ConnectedPeer]): Either[ValidationError, T] =
+  override def onNewOffchainTransactionExcept[T <: Transaction](transaction: T, exceptOf: Option[ConnectedPeer]): Either[ValidationError, T] =
     for {
       validAgainstFee <- feeCalculator.enoughFee(transaction)
       tx <- utxStorage.putIfNew(validAgainstFee, (t: T) => Validator.validateWithHistory(history, fs, stateReader)(t))

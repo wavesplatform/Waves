@@ -36,26 +36,9 @@ class UnconfirmedPoolSynchronizerSpecification extends TestKit(ActorSystem("Unco
     val defaultRecipient = PublicKeyAccount(Array.fill(32)(0: Byte))
     val tx = GenesisTransaction.create(defaultRecipient, 149857264546L, 4598723454L).right.get
 
-    "broadcast new transaction to network" in {
+    "registers message handler" in {
 
-      (transactionModule.onNewOffchainTransaction(_: Transaction)).expects(*).onCall((t: Transaction) => Right[ValidationError, Transaction](t))
-
-      val actorRef = createPoolSynchronizer(100.seconds)
-      val sender = stub[ConnectedPeer]
-      actorRef ! DataFromPeer(TransactionMessageSpec.messageCode, tx, sender)
-
-      val spec = TransactionalMessagesRepo.TransactionMessageSpec
-      val ntwMsg = Message(spec, Right(tx), None)
-      expectMsg(NetworkController.RegisterMessagesHandler(Seq(spec), actorRef))
-      expectMsg(NetworkController.SendToNetwork(ntwMsg, BroadcastExceptOf(sender)))
-      actorRef.stop()
-    }
-
-    "not broadcast tx if it has been skipped" in {
-
-      (transactionModule.onNewOffchainTransaction(_: Transaction))
-        .expects(*)
-        .onCall((t: Transaction) => Left[ValidationError, Transaction](TransactionValidationError(t, "")))
+      (transactionModule.onNewOffchainTransactionExcept(_: Transaction, _: Option[ConnectedPeer])).expects(*, *).returns(Right[ValidationError, Transaction](tx))
 
       val actorRef = createPoolSynchronizer(100.seconds)
       val sender = stub[ConnectedPeer]
@@ -64,13 +47,12 @@ class UnconfirmedPoolSynchronizerSpecification extends TestKit(ActorSystem("Unco
       val spec = TransactionalMessagesRepo.TransactionMessageSpec
       val ntwMsg = Message(spec, Right(tx), None)
       expectMsg(NetworkController.RegisterMessagesHandler(Seq(spec), actorRef))
-      expectNoMsg()
       actorRef.stop()
     }
 
     "broadcast one tx periodically" in {
-      //      (transactionModule.unconfirmedTxs _).expects().returning(Seq(tx))
-      ???
+      (utxStorage.all _).expects().returns(Seq(tx))
+
       val actorRef = createPoolSynchronizer(1 second)
       val spec = TransactionalMessagesRepo.TransactionMessageSpec
       val ntwMsg = Message(spec, Right(tx), None)

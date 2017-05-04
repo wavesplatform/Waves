@@ -26,7 +26,7 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
         Left[ValidationError, Transaction](scorex.transaction.ValidationError.TransactionValidationError(t, "foo"))
 
       val m = mock[NewTransactionHandler]
-      (m.onNewOffchainTransaction(_: Transaction, _: Option[ConnectedPeer]))
+      (m.onNewOffchainTransactionExcept(_: Transaction, _: Option[ConnectedPeer]))
         .expects(*, *)
         .onCall(alwaysError _)
         .anyNumberOfTimes()
