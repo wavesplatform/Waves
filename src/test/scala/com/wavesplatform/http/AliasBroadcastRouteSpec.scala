@@ -11,7 +11,8 @@ import play.api.libs.json.Json._
 import play.api.libs.json._
 import scorex.api.http._
 import scorex.api.http.alias.AliasBroadcastApiRoute
-import scorex.transaction.{Transaction, TransactionModule, ValidationError}
+import scorex.network.ConnectedPeer
+import scorex.transaction.{NewTransactionHandler, Transaction, ValidationError}
 
 
 class AliasBroadcastRouteSpec extends RouteSpec("/alias/broadcast/") with RequestGen with PathMockFactory with PropertyChecks {
@@ -20,10 +21,14 @@ class AliasBroadcastRouteSpec extends RouteSpec("/alias/broadcast/") with Reques
   "returns StateCheckFiled" - {
 
     val stmMock = {
-      val m = mock[TransactionModule]
-      (m.onNewOffchainTransaction(_: Transaction))
-        .expects(*)
-        .onCall((t: Transaction) => Left[ValidationError, Transaction](scorex.transaction.ValidationError.TransactionValidationError(t, "foo")))
+
+      def alwaysError(t: Transaction, maybePeer: Option[ConnectedPeer]): Either[ValidationError, Transaction] =
+        Left[ValidationError, Transaction](scorex.transaction.ValidationError.TransactionValidationError(t, "foo"))
+
+      val m = mock[NewTransactionHandler]
+      (m.onNewOffchainTransactionExcept(_: Transaction, _: Option[ConnectedPeer]))
+        .expects(*, *)
+        .onCall(alwaysError _)
         .anyNumberOfTimes()
       m
     }
@@ -40,7 +45,7 @@ class AliasBroadcastRouteSpec extends RouteSpec("/alias/broadcast/") with Reques
   }
 
   "returns appropriate error code when validation fails for" - {
-    val route = AliasBroadcastApiRoute(settings, mock[TransactionModule]).route
+    val route = AliasBroadcastApiRoute(settings, mock[NewTransactionHandler]).route
 
     "create alias transaction" in forAll(createAliasReq) { req =>
       import scorex.api.http.alias.SignedCreateAliasRequest.broadcastAliasRequestReadsFormat

@@ -12,7 +12,8 @@ import play.api.libs.json.Json._
 import play.api.libs.json._
 import scorex.api.http._
 import scorex.api.http.leasing.LeaseBroadcastApiRoute
-import scorex.transaction.{Transaction, TransactionModule, ValidationError}
+import scorex.network.ConnectedPeer
+import scorex.transaction.{NewTransactionHandler, Transaction, ValidationError}
 
 
 class LeaseBroadcastRouteSpec extends RouteSpec("/leasing/broadcast/") with RequestGen with PathMockFactory with PropertyChecks {
@@ -21,10 +22,14 @@ class LeaseBroadcastRouteSpec extends RouteSpec("/leasing/broadcast/") with Requ
   "returns StateCheckFiled" - {
 
     val stmMock = {
-      val m = mock[TransactionModule]
-      (m.onNewOffchainTransaction(_: Transaction))
-        .expects(*)
-        .onCall((t: Transaction) => Left[ValidationError, Transaction](scorex.transaction.ValidationError.TransactionValidationError(t, "foo")))
+
+      def alwaysError(t: Transaction, maybePeer: Option[ConnectedPeer]): Either[ValidationError, Transaction] =
+        Left[ValidationError, Transaction](scorex.transaction.ValidationError.TransactionValidationError(t, "foo"))
+
+      val m = mock[NewTransactionHandler]
+      (m.onNewOffchainTransactionExcept(_: Transaction, _: Option[ConnectedPeer]))
+        .expects(*, *)
+        .onCall(alwaysError _)
         .anyNumberOfTimes()
       m
     }
@@ -52,24 +57,24 @@ class LeaseBroadcastRouteSpec extends RouteSpec("/leasing/broadcast/") with Requ
   }
 
   "returns appropriate error code when validation fails for" - {
-    val route = LeaseBroadcastApiRoute(settings, mock[TransactionModule]).route
+    val route = LeaseBroadcastApiRoute(settings, mock[NewTransactionHandler]).route
 
     "lease transaction" in forAll(leaseReq) { lease =>
       def posting[A: Writes](v: A) = Post(routePath("lease"), v) ~> route
 
-      forAll(nonPositiveLong) { q => posting(lease.copy(amount = q)) should produce (NegativeAmount) }
-      forAll(invalidBase58) { pk => posting(lease.copy(senderPublicKey = pk)) should produce (InvalidAddress) }
-      forAll(invalidBase58) { a => posting(lease.copy(recipient = a)) should produce (InvalidAddress) }
-      forAll(nonPositiveLong) { fee => posting(lease.copy(fee = fee)) should produce (InsufficientFee) }
-      forAll(posNum[Long]) { quantity => posting(lease.copy(amount = quantity, fee = Long.MaxValue)) should produce (OverflowError) }
+      forAll(nonPositiveLong) { q => posting(lease.copy(amount = q)) should produce(NegativeAmount) }
+      forAll(invalidBase58) { pk => posting(lease.copy(senderPublicKey = pk)) should produce(InvalidAddress) }
+      forAll(invalidBase58) { a => posting(lease.copy(recipient = a)) should produce(InvalidAddress) }
+      forAll(nonPositiveLong) { fee => posting(lease.copy(fee = fee)) should produce(InsufficientFee) }
+      forAll(posNum[Long]) { quantity => posting(lease.copy(amount = quantity, fee = Long.MaxValue)) should produce(OverflowError) }
     }
 
     "lease cancel transaction" in forAll(leaseCancelReq) { cancel =>
       def posting[A: Writes](v: A) = Post(routePath("cancel"), v) ~> route
 
-      forAll(invalidBase58) { pk => posting(cancel.copy(txId = pk)) should produce (CustomValidationError("invalid.leaseTx")) }
-      forAll(invalidBase58) { pk => posting(cancel.copy(senderPublicKey = pk)) should produce (InvalidAddress) }
-      forAll(nonPositiveLong) { fee => posting(cancel.copy(fee = fee)) should produce (InsufficientFee) }
+      forAll(invalidBase58) { pk => posting(cancel.copy(txId = pk)) should produce(CustomValidationError("invalid.leaseTx")) }
+      forAll(invalidBase58) { pk => posting(cancel.copy(senderPublicKey = pk)) should produce(InvalidAddress) }
+      forAll(nonPositiveLong) { fee => posting(cancel.copy(fee = fee)) should produce(InsufficientFee) }
     }
   }
 }
