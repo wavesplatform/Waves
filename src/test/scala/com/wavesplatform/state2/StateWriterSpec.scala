@@ -6,13 +6,10 @@ import org.scalatest.prop.GeneratorDrivenPropertyChecks
 import org.scalatest.{Matchers, Outcome, fixture}
 
 class StateWriterSpec extends fixture.FunSuite with Matchers with GeneratorDrivenPropertyChecks {
-  val stateHeight = 100
-
   override type FixtureParam = StateStorage
 
   override protected def withFixture(test: OneArgTest): Outcome = {
     val storage = new StateStorage(new MVStore.Builder().open())
-    storage.setHeight(stateHeight)
     test(storage)
   }
 
