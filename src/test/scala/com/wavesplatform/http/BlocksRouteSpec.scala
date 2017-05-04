@@ -139,7 +139,7 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with MockFactory with BlockGe
     }
   }
 
-  routePath("/child/{signature}") in {
+  routePath("/child/{signature}") ignore {
     // todo: check block not found (404?)
     // todo: check invalid signature
     forAll(randomSignerBlockGen, randomSignerBlockGen, positiveIntGen) { case (block1, block2, h1) =>

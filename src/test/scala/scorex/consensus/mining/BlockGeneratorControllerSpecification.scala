@@ -3,6 +3,7 @@ package scorex.consensus.mining
 import akka.actor.{ActorRef, Props}
 import akka.testkit.TestProbe
 import com.wavesplatform.settings.WavesSettings
+import org.scalatest.DoNotDiscover
 import scorex.ActorTestingCommons
 import scorex.block.Block
 import scorex.consensus.mining.BlockGeneratorController._
@@ -13,6 +14,7 @@ import scorex.utils.NTP
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
+@DoNotDiscover
 class BlockGeneratorControllerSpecification extends ActorTestingCommons {
 
   val testPeerManager = TestProbe("PeerManager")
