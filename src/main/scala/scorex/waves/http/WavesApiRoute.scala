@@ -9,7 +9,7 @@ import scorex.account.Account
 import scorex.api.http._
 import scorex.api.http.assets.PaymentRequest
 import scorex.crypto.encode.Base58
-import scorex.transaction.{PaymentTransaction, TransactionOperations}
+import scorex.transaction.{NewTransactionHandler, PaymentTransaction, TransactionFactory}
 import scorex.utils.Time
 import scorex.wallet.Wallet
 import scorex.waves.transaction.SignedPaymentRequest
@@ -17,7 +17,7 @@ import scorex.waves.transaction.SignedPaymentRequest
 @Path("/waves")
 @Api(value = "waves")
 @Deprecated
-case class WavesApiRoute(settings: RestAPISettings, wallet: Wallet, time: Time, transactionModule: TransactionOperations) extends ApiRoute {
+case class WavesApiRoute(settings: RestAPISettings, wallet: Wallet, newTxHandler: NewTransactionHandler, time: Time) extends ApiRoute {
 
   override lazy val route = pathPrefix("waves") {
     externalPayment ~ signPayment ~ broadcastSignedPayment ~ payment ~ createdSignedPayment
@@ -44,7 +44,7 @@ case class WavesApiRoute(settings: RestAPISettings, wallet: Wallet, time: Time, 
   def payment: Route = withAuth {
     (path("payment") & post) {
       json[PaymentRequest] { payment =>
-        transactionModule.createPayment(payment, wallet).map { tx =>
+        TransactionFactory.createPayment(payment, wallet, newTxHandler, time).map { tx =>
           SignedPaymentRequest(tx.timestamp, tx.amount, tx.fee, tx.recipient.address,
             Base58.encode(tx.sender.publicKey), tx.sender.address, Base58.encode(tx.signature))
         }
@@ -120,7 +120,7 @@ case class WavesApiRoute(settings: RestAPISettings, wallet: Wallet, time: Time, 
 
   private def broadcastPaymentRoute(suffix: String): Route = (path(suffix) & post) {
     json[SignedPaymentRequest] { payment =>
-      transactionModule.broadcastPayment(payment)
+      TransactionFactory.broadcastPayment(payment, newTxHandler)
     }
   }
 

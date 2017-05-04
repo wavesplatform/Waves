@@ -12,21 +12,9 @@ import scorex.utils.Time
 import scorex.wallet.Wallet
 import scorex.waves.transaction.SignedPaymentRequest
 
-trait TransactionOperations {
-  def transferAsset(request: TransferRequest, wallet: Wallet): Either[ValidationError, TransferTransaction]
-  def issueAsset(request: IssueRequest, wallet: Wallet): Either[ValidationError, IssueTransaction]
-  def reissueAsset(request: ReissueRequest, wallet: Wallet): Either[ValidationError, ReissueTransaction]
-  def burnAsset(request: BurnRequest, wallet: Wallet): Either[ValidationError, BurnTransaction]
-  def makeAssetNameUnique(request: MakeAssetNameUniqueRequest, wallet: Wallet): Either[ValidationError, MakeAssetNameUniqueTransaction]
-  def lease(request: LeaseRequest, wallet: Wallet): Either[ValidationError, LeaseTransaction]
-  def alias(request: CreateAliasRequest, wallet: Wallet): Either[ValidationError, CreateAliasTransaction]
-  def leaseCancel(request: LeaseCancelRequest, wallet: Wallet): Either[ValidationError, LeaseCancelTransaction]
-  def createPayment(payment: PaymentRequest, wallet: Wallet): Either[ValidationError, PaymentTransaction]
-  def broadcastPayment(payment: SignedPaymentRequest): Either[ValidationError, PaymentTransaction]
-}
+object TransactionFactory {
 
-class TransactionOperationsImpl(tm: NewTransactionHandler, time: Time) extends TransactionOperations {
-  override def createPayment(request: PaymentRequest, wallet: Wallet): Either[ValidationError, PaymentTransaction] = for {
+  def createPayment(request: PaymentRequest, wallet: Wallet, tm: NewTransactionHandler, time: Time): Either[ValidationError, PaymentTransaction] = for {
     pk <- wallet.findWallet(request.sender)
     rec <- Account.fromString(request.recipient)
     tx <- PaymentTransaction.create(pk, rec, request.amount, request.fee, time.getTimestamp)
@@ -34,7 +22,7 @@ class TransactionOperationsImpl(tm: NewTransactionHandler, time: Time) extends T
   } yield r
 
 
-  override def transferAsset(request: TransferRequest, wallet: Wallet): Either[ValidationError, TransferTransaction] =
+  def transferAsset(request: TransferRequest, wallet: Wallet, tm: NewTransactionHandler, time: Time): Either[ValidationError, TransferTransaction] =
     for {
       senderPrivateKey <- wallet.findWallet(request.sender)
       recipientAcc <- AccountOrAlias.fromString(request.recipient)
@@ -50,7 +38,7 @@ class TransactionOperationsImpl(tm: NewTransactionHandler, time: Time) extends T
       r <- tm.onNewOffchainTransaction(tx)
     } yield r
 
-  override def issueAsset(request: IssueRequest, wallet: Wallet): Either[ValidationError, IssueTransaction] =
+  def issueAsset(wallet: Wallet, tm: NewTransactionHandler, time: Time)(request: IssueRequest): Either[ValidationError, IssueTransaction] =
     for {
       senderPrivateKey <- wallet.findWallet(request.sender)
       tx <- IssueTransaction.create(senderPrivateKey,
@@ -60,14 +48,14 @@ class TransactionOperationsImpl(tm: NewTransactionHandler, time: Time) extends T
       r <- tm.onNewOffchainTransaction(tx)
     } yield r
 
-  def lease(request: LeaseRequest, wallet: Wallet): Either[ValidationError, LeaseTransaction] = for {
+  def lease(request: LeaseRequest, wallet: Wallet, tm: NewTransactionHandler, time: Time): Either[ValidationError, LeaseTransaction] = for {
     senderPrivateKey <- wallet.findWallet(request.sender)
     recipientAcc <- AccountOrAlias.fromString(request.recipient)
     tx <- LeaseTransaction.create(senderPrivateKey, request.amount, request.fee, time.getTimestamp, recipientAcc)
     r <- tm.onNewOffchainTransaction(tx)
   } yield r
 
-  def leaseCancel(request: LeaseCancelRequest, wallet: Wallet): Either[ValidationError, LeaseCancelTransaction] =
+  def leaseCancel(request: LeaseCancelRequest, wallet: Wallet, tm: NewTransactionHandler, time: Time): Either[ValidationError, LeaseCancelTransaction] =
     for {
       pk <- wallet.findWallet(request.sender)
       tx <- LeaseCancelTransaction.create(pk, Base58.decode(request.txId).get, request.fee, time.getTimestamp)
@@ -75,33 +63,33 @@ class TransactionOperationsImpl(tm: NewTransactionHandler, time: Time) extends T
     } yield t
 
 
-  override def alias(request: CreateAliasRequest, wallet: Wallet): Either[ValidationError, CreateAliasTransaction] = for {
+  def alias(request: CreateAliasRequest, wallet: Wallet, tm: NewTransactionHandler, time: Time): Either[ValidationError, CreateAliasTransaction] = for {
     senderPrivateKey <- wallet.findWallet(request.sender)
     alias <- Alias.buildWithCurrentNetworkByte(request.alias)
     tx <- CreateAliasTransaction.create(senderPrivateKey, alias, request.fee, time.getTimestamp)
     r <- tm.onNewOffchainTransaction(tx)
   } yield r
 
-  override def reissueAsset(request: ReissueRequest, wallet: Wallet): Either[ValidationError, ReissueTransaction] = for {
+  def reissueAsset(request: ReissueRequest, wallet: Wallet, tm: NewTransactionHandler, time: Time): Either[ValidationError, ReissueTransaction] = for {
     pk <- wallet.findWallet(request.sender)
     tx <- ReissueTransaction.create(pk, Base58.decode(request.assetId).get, request.quantity, request.reissuable, request.fee, time.getTimestamp)
     r <- tm.onNewOffchainTransaction(tx)
   } yield r
 
 
-  override def burnAsset(request: BurnRequest, wallet: Wallet): Either[ValidationError, BurnTransaction] = for {
+  def burnAsset(request: BurnRequest, wallet: Wallet, tm: NewTransactionHandler, time: Time): Either[ValidationError, BurnTransaction] = for {
     pk <- wallet.findWallet(request.sender)
     tx <- BurnTransaction.create(pk, Base58.decode(request.assetId).get, request.quantity, request.fee, time.getTimestamp)
     r <- tm.onNewOffchainTransaction(tx)
   } yield r
 
-  override def makeAssetNameUnique(request: MakeAssetNameUniqueRequest, wallet: Wallet): Either[ValidationError, MakeAssetNameUniqueTransaction] = for {
+  def makeAssetNameUnique(request: MakeAssetNameUniqueRequest, wallet: Wallet, tm: NewTransactionHandler, time: Time): Either[ValidationError, MakeAssetNameUniqueTransaction] = for {
     pk <- wallet.findWallet(request.sender)
     tx <- MakeAssetNameUniqueTransaction.create(pk, Base58.decode(request.assetId).get, request.fee, time.getTimestamp)
     r <- tm.onNewOffchainTransaction(tx)
   } yield r
 
-  override def broadcastPayment(payment: SignedPaymentRequest): Either[ValidationError, PaymentTransaction] =
+  def broadcastPayment(payment: SignedPaymentRequest, tm: NewTransactionHandler): Either[ValidationError, PaymentTransaction] =
     for {
       _signature <- Base58.decode(payment.signature).toOption.toRight(ValidationError.InvalidSignature)
       _sender <- PublicKeyAccount.fromBase58String(payment.senderPublicKey)

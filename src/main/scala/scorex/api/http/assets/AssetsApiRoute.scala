@@ -12,14 +12,15 @@ import scorex.api.http.{ApiError, ApiRoute, InvalidAddress}
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange.Order
 import scorex.transaction.assets.exchange.OrderJson._
-import scorex.transaction.{AssetAcc, AssetIdStringLength, TransactionOperations}
+import scorex.transaction.{AssetAcc, AssetIdStringLength, NewTransactionHandler, TransactionFactory}
+import scorex.utils.Time
 import scorex.wallet.Wallet
 
 import scala.util.{Failure, Success}
 
 @Path("/assets")
 @Api(value = "assets")
-case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, state: StateReader, transactionModule: TransactionOperations) extends ApiRoute {
+case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, state: StateReader, newTxHandler: NewTransactionHandler, time: Time) extends ApiRoute {
   val MaxAddressesPerRequest = 1000
 
   override lazy val route =
@@ -81,7 +82,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, state: Stat
     )
   ))
   def transfer: Route =
-    processRequest("transfer", (t: TransferRequest) => transactionModule.transferAsset(t, wallet))
+    processRequest("transfer", (t: TransferRequest) => TransactionFactory.transferAsset(t, wallet, newTxHandler, time))
 
   @Path("/issue")
   @ApiOperation(value = "Issue Asset",
@@ -99,8 +100,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, state: Stat
       defaultValue = "{\"sender\":\"string\",\"name\":\"str\",\"description\":\"string\",\"quantity\":100000,\"decimals\":7,\"reissuable\":false,\"fee\":100000000}"
     )
   ))
-  def issue: Route =
-    processRequest("issue", (i: IssueRequest) => transactionModule.issueAsset(i, wallet))
+  def issue: Route = processRequest("issue", TransactionFactory.issueAsset(wallet, newTxHandler, time) _)
 
   @Path("/reissue")
   @ApiOperation(value = "Issue Asset",
@@ -119,7 +119,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, state: Stat
     )
   ))
   def reissue: Route =
-    processRequest("reissue", (r: ReissueRequest) => transactionModule.reissueAsset(r, wallet))
+    processRequest("reissue", (r: ReissueRequest) => TransactionFactory.reissueAsset(r, wallet, newTxHandler, time))
 
   @Path("/burn")
   @ApiOperation(value = "Burn Asset",
@@ -138,7 +138,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, state: Stat
     )
   ))
   def burnRoute: Route =
-    processRequest("burn", (b: BurnRequest) => transactionModule.burnAsset(b, wallet))
+    processRequest("burn", (b: BurnRequest) => TransactionFactory.burnAsset(b, wallet, newTxHandler, time))
 
 
   @Path("/make-asset-name-unique")
@@ -158,7 +158,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, state: Stat
     )
   ))
   def makeAssetNameUniqueRoute: Route =
-    processRequest("make-asset-name-unique", (b: MakeAssetNameUniqueRequest) => transactionModule.makeAssetNameUnique(b, wallet))
+    processRequest("make-asset-name-unique", (b: MakeAssetNameUniqueRequest) => TransactionFactory.makeAssetNameUnique(b, wallet, newTxHandler, time))
 
 
   private def balanceJson(address: String, assetIdStr: String): Either[ApiError, JsObject] = {

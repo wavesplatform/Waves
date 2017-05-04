@@ -45,25 +45,23 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
   override implicit lazy val newTransactionHandler = new NewTransactionHandlerImpl(settings.blockchainSettings.functionalitySettings,
     networkController, time, feeCalculator, utxStorage, blockStorage.history, blockStorage.stateReader)
 
-  lazy val txOps = new TransactionOperationsImpl(newTransactionHandler, time)
-
   override lazy val apiRoutes = Seq(
     BlocksApiRoute(settings.restAPISettings, settings.checkpointsSettings, history, coordinator),
     TransactionsApiRoute(settings.restAPISettings, blockStorage.stateReader, history, utxStorage),
     NxtConsensusApiRoute(settings.restAPISettings, blockStorage.stateReader, history, settings.blockchainSettings.functionalitySettings),
     WalletApiRoute(settings.restAPISettings, wallet),
-    PaymentApiRoute(settings.restAPISettings, wallet, txOps),
+    PaymentApiRoute(settings.restAPISettings, wallet, newTransactionHandler, time),
     UtilsApiRoute(settings.restAPISettings),
     PeersApiRoute(settings.restAPISettings, peerManager, networkController),
     AddressApiRoute(settings.restAPISettings, wallet, blockStorage.stateReader, settings.blockchainSettings.functionalitySettings),
     DebugApiRoute(settings.restAPISettings, wallet, blockStorage.stateReader, history),
-    WavesApiRoute(settings.restAPISettings, wallet, time, txOps),
-    AssetsApiRoute(settings.restAPISettings, wallet, blockStorage.stateReader, txOps),
+    WavesApiRoute(settings.restAPISettings, wallet, newTransactionHandler, time),
+    AssetsApiRoute(settings.restAPISettings, wallet, blockStorage.stateReader, newTransactionHandler, time),
     NodeApiRoute(settings.restAPISettings, () => this.shutdown(), blockGenerator, coordinator),
     AssetsBroadcastApiRoute(settings.restAPISettings, newTransactionHandler),
-    LeaseApiRoute(settings.restAPISettings, wallet, blockStorage.stateReader, txOps),
+    LeaseApiRoute(settings.restAPISettings, wallet, blockStorage.stateReader, newTransactionHandler, time),
     LeaseBroadcastApiRoute(settings.restAPISettings, newTransactionHandler),
-    AliasApiRoute(settings.restAPISettings, wallet, txOps, blockStorage.stateReader),
+    AliasApiRoute(settings.restAPISettings, wallet, newTransactionHandler, time, blockStorage.stateReader),
     AliasBroadcastApiRoute(settings.restAPISettings, newTransactionHandler)
   )
 
