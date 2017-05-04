@@ -10,7 +10,7 @@ import play.api.libs.json.Json
 import scorex.account.Account
 import scorex.api.http.{ApiRoute, CommonApiFunctions, InvalidAddress}
 import scorex.crypto.encode.Base58
-import scorex.transaction.{History, TransactionModule}
+import scorex.transaction.{History, PoSCalc, TransactionModule}
 
 @Path("/consensus")
 @Api(value = "/consensus")
@@ -36,7 +36,7 @@ case class NxtConsensusApiRoute(
       case Right(account) =>
         complete(Json.obj(
           "address" -> account.address,
-          "balance" -> TransactionModule.generatingBalance(state,fs)(account, state.height)))
+          "balance" -> PoSCalc.generatingBalance(state,fs)(account, state.height)))
     }
   }
 

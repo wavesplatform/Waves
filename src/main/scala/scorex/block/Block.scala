@@ -124,7 +124,7 @@ object Block extends ScorexLogging {
     val cBytesLength = Ints.fromByteArray(bytes.slice(position, position + 4))
     position += 4
     val cBytes = bytes.slice(position, position + cBytesLength)
-    val consData = NxtLikeConsensusBlockData(Longs.fromByteArray(cBytes.take(SimpleTransactionModule.BaseTargetLength)), cBytes.takeRight(SimpleTransactionModule.GeneratorSignatureLength))
+    val consData = NxtLikeConsensusBlockData(Longs.fromByteArray(cBytes.take(Block.BaseTargetLength)), cBytes.takeRight(Block.GeneratorSignatureLength))
     position += cBytesLength
 
     val tBytesLength = Ints.fromByteArray(bytes.slice(position, position + 4))

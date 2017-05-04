@@ -19,7 +19,7 @@ trait BlockGen extends TransactionGen {
   def blockGen(txs: Seq[Transaction], signer: PrivateKeyAccount): Gen[Block] = for {
     reference <- byteArrayGen(Block.BlockIdLength)
     baseTarget <- Gen.posNum[Long]
-    generationSignature <- byteArrayGen(SimpleTransactionModule.GeneratorSignatureLength)
+    generationSignature <- byteArrayGen(Block.GeneratorSignatureLength)
   } yield Block.buildAndSign(1, txs.map(_.timestamp).max, reference, NxtLikeConsensusBlockData(baseTarget, generationSignature), txs, signer)
 
   val randomSignerBlockGen: Gen[Block] = for {

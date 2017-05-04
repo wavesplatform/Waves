@@ -9,7 +9,7 @@ import com.wavesplatform.state2._
 import org.h2.mvstore.MVStore
 import scorex.ActorTestingCommons
 import scorex.account.PrivateKeyAccount
-import scorex.app.{Application, ApplicationVersion}
+import scorex.app.{Application, ApplicationVersion, RunnableApplication}
 import scorex.block.Block
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
 import scorex.crypto.encode.Base58
@@ -21,7 +21,6 @@ import scorex.network.ScoreObserver.CurrentScore
 import scorex.network._
 import scorex.network.message._
 import scorex.network.peer.PeerManager.{ConnectedPeers, GetConnectedPeersTyped}
-import scorex.transaction.SimpleTransactionModule.EmptySignature
 import scorex.transaction._
 import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
 import scorex.utils.{NTP, Time}
@@ -103,7 +102,7 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
     val version = 1: Byte
     val timestamp = System.currentTimeMillis()
     //val reference = Array.fill(Block.BlockIdLength)(id.toByte)
-    val cbd = NxtLikeConsensusBlockData(score + 1, Array.fill(SimpleTransactionModule.GeneratorSignatureLength)(Random.nextInt(100).toByte))
+    val cbd = NxtLikeConsensusBlockData(score + 1, Array.fill(Block.GeneratorSignatureLength)(Random.nextInt(100).toByte))
     Block.buildAndSign(version, timestamp, reference, cbd, Seq[Transaction](), gen)
   }
 
@@ -111,7 +110,7 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
   app.blockStorage.blockchainUpdater.processBlock(
     Block.genesis(
       NxtLikeConsensusBlockData(app.settings.blockchainSettings.genesisSettings.initialBaseTarget, Array.fill(DigestSize)(0: Byte)),
-      TransactionModule.buildTransactions(app.settings.blockchainSettings.genesisSettings), genesisTimestamp)).explicitGet()
+      RunnableApplication.genesisTransactions(app.settings.blockchainSettings.genesisSettings), genesisTimestamp)).explicitGet()
 
   def before(): Unit = {
     app.blockStorage.blockchainUpdater.removeAfter(blockStorage1.history.genesis.uniqueId)

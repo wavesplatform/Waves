@@ -12,7 +12,7 @@ import play.api.libs.json._
 import scorex.account.{Account, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
-import scorex.transaction.TransactionModule
+import scorex.transaction.{PoSCalc, TransactionModule}
 import scorex.wallet.Wallet
 
 import scala.util.{Failure, Success, Try}
@@ -253,7 +253,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
     BalanceDetails(
       account.address,
       portfolio.balance,
-      TransactionModule.generatingBalance(state, functionalitySettings)(account, state.height),
+      PoSCalc.generatingBalance(state, functionalitySettings)(account, state.height),
       portfolio.balance - portfolio.leaseInfo.leaseOut,
       state.effectiveBalance(account))
   }

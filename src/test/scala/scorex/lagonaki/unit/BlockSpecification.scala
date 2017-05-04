@@ -19,7 +19,7 @@ class BlockSpecification extends FunSuite with Matchers with MockFactory with Un
     val gen = PrivateKeyAccount(reference)
 
     val bt = Random.nextLong()
-    val gs = Array.fill(SimpleTransactionModule.GeneratorSignatureLength)(Random.nextInt(100).toByte)
+    val gs = Array.fill(Block.GeneratorSignatureLength)(Random.nextInt(100).toByte)
 
 
     val ts = System.currentTimeMillis() - 5000

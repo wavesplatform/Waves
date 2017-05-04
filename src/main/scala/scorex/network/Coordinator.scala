@@ -11,6 +11,7 @@ import com.wavesplatform.state2.reader.StateReader
 import scorex.app.Application
 import scorex.block.Block
 import scorex.block.Block.BlockId
+import scorex.consensus.TransactionsOrdering
 import scorex.consensus.mining.BlockGeneratorController.{LastBlockChanged, StartGeneration}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
@@ -22,7 +23,7 @@ import scorex.network.message._
 import scorex.network.message.{Message, MessageSpec}
 import scorex.network.peer.PeerManager.{ConnectedPeers, GetConnectedPeersTyped}
 import scorex.transaction.History.BlockchainScore
-import scorex.transaction.{History, SimpleTransactionModule, TransactionModule, ValidationError}
+import scorex.transaction._
 import scorex.transaction.ValidationError.CustomError
 import scorex.utils.{ScorexLogging, Time}
 
@@ -30,6 +31,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.language.postfixOps
 import scala.language.higherKinds
+import scala.util.control.NonFatal
 
 class Coordinator(application: Application) extends ViewSynchronizer with ScorexLogging {
 
@@ -177,7 +179,7 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
           // someone has happened to be faster and already added a block or blocks after the parent
           log.debug(s"A child for parent of the block already exists, local=$local: ${newBlock.json}")
 
-          val cmp = TransactionModule.blockOrdering(history, stateReader, application.settings.blockchainSettings.functionalitySettings, application.time)
+          val cmp = PoSCalc.blockOrdering(history, stateReader, application.settings.blockchainSettings.functionalitySettings, application.time)
           if (lastBlock.referenceField.value.sameElements(parentBlockId) && cmp.lt(lastBlock, newBlock)) {
             log.debug(s"New block ${newBlock.json} is better than last ${lastBlock.json}")
           }
@@ -265,7 +267,7 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
       def signature = EllipticCurveImpl.verify(b.signerDataField.value.signature, b.bytesWithoutSignature,
         b.signerDataField.value.generator.publicKey)
 
-      def consensus = TransactionModule.isValid(
+      def consensus = blockConsensusValidation(
         application.blockStorage.history,
         application.blockStorage.stateReader,
         application.settings.blockchainSettings,
@@ -283,7 +285,7 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
     _ <- validateWithRespectToCheckpoint(block, history.height() + 1)
     _ <- application.blockStorage.blockchainUpdater.processBlock(block)
   } yield {
-    TransactionModule.clearFromUnconfirmed(application.settings.blockchainSettings.functionalitySettings,
+    UnconfirmedTransactionsStorage.clearFromUnconfirmed(application.settings.blockchainSettings.functionalitySettings,
       application.blockStorage.stateReader, application.utxStorage, application.time)(block.transactionData)
   }
 
@@ -294,7 +296,7 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
   }
 }
 
-object Coordinator {
+object Coordinator extends ScorexLogging {
 
   case object GetCoordinatorStatus
 
@@ -330,4 +332,72 @@ object Coordinator {
 
   def foldM[G[_], F[_], A, B](fa: F[A], z: B)(f: (B, A) => G[B])(implicit G: Monad[G], F: Traverse[F]): G[B] =
     F.foldLeft(fa, G.pure(z))((gb, a) => G.flatMap(gb)(f(_, a)))
+
+  val MaxTimeDrift: FiniteDuration = 15.seconds
+
+  def blockConsensusValidation(history: History, state: StateReader, bcs: BlockchainSettings, time: Time)(block: Block): Boolean = try {
+
+    import PoSCalc._
+
+    val fs = bcs.functionalitySettings
+
+    val blockTime = block.timestampField.value
+
+    require((blockTime - time.correctedTime()).millis < MaxTimeDrift, s"Block timestamp $blockTime is from future")
+
+    if (blockTime > fs.requireSortedTransactionsAfter) {
+      require(block.transactionDataField.asInstanceOf[TransactionsBlockField].value.sorted(TransactionsOrdering.InBlock) == block.transactionDataField.asInstanceOf[TransactionsBlockField].value, "Transactions must be sorted correctly")
+    }
+
+    val parentOpt = history.parent(block)
+    require(parentOpt.isDefined || history.height() == 1, s"Can't find parent block with id '${
+      Base58.encode(block.referenceField.value)
+    }' of block " +
+      s"'${
+        Base58.encode(block.uniqueId)
+      }'")
+
+    val parent = parentOpt.get
+    val parentHeightOpt = history.heightOf(parent.uniqueId)
+    require(parentHeightOpt.isDefined, s"Can't get parent block with id '${
+      Base58.encode(block.referenceField.value)
+    }' height")
+    val parentHeight = parentHeightOpt.get
+
+    val prevBlockData = parent.consensusDataField.value
+    val blockData = block.consensusDataField.value
+
+    val cbt = calcBaseTarget(history)(bcs.genesisSettings.averageBlockDelay, parent, blockTime)
+    val bbt = blockData.baseTarget
+    require(cbt == bbt, s"Block's basetarget is wrong, calculated: $cbt, block contains: $bbt")
+
+    val generator = block.signerDataField.value.generator
+
+    //check generation signature
+    val calcGs = calcGeneratorSignature(prevBlockData, generator)
+    val blockGs = blockData.generationSignature
+    require(calcGs.sameElements(blockGs),
+      s"Block's generation signature is wrong, calculated: ${
+        calcGs.mkString
+      }, block contains: ${
+        blockGs.mkString
+      }")
+
+    val effectiveBalance = generatingBalance(state, fs)(generator, parentHeight)
+
+    if (blockTime >= fs.minimalGeneratingBalanceAfterTimestamp) {
+      require(effectiveBalance >= MinimalEffectiveBalanceForGenerator, s"Effective balance $effectiveBalance is less that minimal ($MinimalEffectiveBalanceForGenerator)")
+    }
+
+    //check hit < target
+    calcHit(prevBlockData, generator) < calcTarget(parent, blockTime, effectiveBalance)
+  } catch {
+    case e: IllegalArgumentException =>
+      log.error("Error while checking a block", e)
+      false
+    case NonFatal(t) =>
+      log.error("Fatal error while checking a block", t)
+      throw t
+  }
+
 }

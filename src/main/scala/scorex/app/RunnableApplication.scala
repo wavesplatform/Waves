@@ -8,6 +8,8 @@ import akka.pattern.ask
 import akka.stream.ActorMaterializer
 import akka.util.Timeout
 import com.wavesplatform.Shutdownable
+import com.wavesplatform.settings.GenesisSettings
+import scorex.account.Account
 import scorex.api.http.{ApiRoute, CompositeHttpService}
 import scorex.block.Block
 import scorex.consensus.mining.BlockGeneratorController
@@ -17,8 +19,7 @@ import scorex.crypto.hash.FastCryptographicHash.DigestSize
 import scorex.network._
 import scorex.network.message._
 import scorex.network.peer.PeerManager
-import scorex.transaction.SimpleTransactionModule.EmptySignature
-import scorex.transaction.{BlockStorage, History, SimpleTransactionModule}
+import scorex.transaction._
 import scorex.utils.ScorexLogging
 import scorex.wallet.Wallet
 
@@ -123,7 +124,7 @@ trait RunnableApplication extends Application with Shutdownable with ScorexLoggi
       val maybeGenesisSignature = Option(settings.blockchainSettings.genesisSettings.signature).filter(_.trim.nonEmpty)
       blockStorage.blockchainUpdater.processBlock(Block.genesis(
         NxtLikeConsensusBlockData(settings.blockchainSettings.genesisSettings.initialBaseTarget, Array.fill(DigestSize)(0: Byte)),
-        SimpleTransactionModule.buildTransactions(settings.blockchainSettings.genesisSettings),
+        RunnableApplication.genesisTransactions(settings.blockchainSettings.genesisSettings),
         settings.blockchainSettings.genesisSettings.blockTimestamp, maybeGenesisSignature)) match {
         case Left(value) =>
           log.error(value.toString)
@@ -132,6 +133,15 @@ trait RunnableApplication extends Application with Shutdownable with ScorexLoggi
       }
 
       log.info("Genesis block has been added to the state")
+    }
+  }
+}
+
+object RunnableApplication {
+  def genesisTransactions(gs: GenesisSettings): Seq[GenesisTransaction] = {
+    gs.transactions.map { ts =>
+      val acc = Account.fromString(ts.recipient).right.get
+      GenesisTransaction.create(acc, ts.amount, gs.transactionsTimestamp).right.get
     }
   }
 }
