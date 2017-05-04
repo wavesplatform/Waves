@@ -7,11 +7,11 @@ import com.wavesplatform.settings.RestAPISettings
 import io.swagger.annotations._
 import scorex.BroadcastRoute
 import scorex.api.http._
-import scorex.transaction.TransactionModule
+import scorex.transaction.NewTransactionHandler
 
 @Path("/assets/broadcast")
 @Api(value = "assets")
-case class AssetsBroadcastApiRoute(settings: RestAPISettings, transactionModule: TransactionModule)
+case class AssetsBroadcastApiRoute(settings: RestAPISettings, transactionModule: NewTransactionHandler)
   extends ApiRoute with BroadcastRoute {
 
   override val route: Route = pathPrefix("assets" / "broadcast") {

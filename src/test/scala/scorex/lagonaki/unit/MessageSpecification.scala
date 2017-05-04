@@ -5,17 +5,15 @@ import java.nio.ByteBuffer
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.FunSuite
 import scorex.block.Block
-import scorex.consensus.nxt.WavesConsensusModule
 import scorex.network.message._
 import scorex.transaction.TransactionParser._
-import scorex.transaction.{History, TransactionModule}
+import scorex.transaction.{History, NewTransactionHandler}
 
 import scala.util.Try
 
 class MessageSpecification extends FunSuite with MockFactory with UnitTestConfig {
 
-  implicit val consensusModule = new WavesConsensusModule(blockchainSettings)
-  implicit val transactionModule = mock[TransactionModule]
+  implicit val transactionModule = mock[NewTransactionHandler]
 
   private lazy val handler = new MessageHandler(BasicMessagesRepo.specs)
 

@@ -3,8 +3,8 @@ package com.wavesplatform
 import org.scalacheck.Gen
 import scorex.account.PrivateKeyAccount
 import scorex.block.Block
-import scorex.consensus.nxt.{NxtLikeConsensusBlockData, WavesConsensusModule}
-import scorex.transaction.{SignedTransaction, Transaction}
+import scorex.consensus.nxt.NxtLikeConsensusBlockData
+import scorex.transaction.{SignedTransaction, NewTransactionHandlerImpl, Transaction}
 
 trait BlockGen extends TransactionGen {
 
@@ -19,7 +19,7 @@ trait BlockGen extends TransactionGen {
   def blockGen(txs: Seq[Transaction], signer: PrivateKeyAccount): Gen[Block] = for {
     reference <- byteArrayGen(Block.BlockIdLength)
     baseTarget <- Gen.posNum[Long]
-    generationSignature <- byteArrayGen(WavesConsensusModule.GeneratorSignatureLength)
+    generationSignature <- byteArrayGen(Block.GeneratorSignatureLength)
   } yield Block.buildAndSign(1, txs.map(_.timestamp).max, reference, NxtLikeConsensusBlockData(baseTarget, generationSignature), txs, signer)
 
   val randomSignerBlockGen: Gen[Block] = for {

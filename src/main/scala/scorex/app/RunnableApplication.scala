@@ -8,14 +8,18 @@ import akka.pattern.ask
 import akka.stream.ActorMaterializer
 import akka.util.Timeout
 import com.wavesplatform.Shutdownable
+import com.wavesplatform.settings.GenesisSettings
+import scorex.account.Account
 import scorex.api.http.{ApiRoute, CompositeHttpService}
 import scorex.block.Block
 import scorex.consensus.mining.BlockGeneratorController
+import scorex.consensus.nxt.NxtLikeConsensusBlockData
 import scorex.crypto.encode.Base58
+import scorex.crypto.hash.FastCryptographicHash.DigestSize
 import scorex.network._
 import scorex.network.message._
 import scorex.network.peer.PeerManager
-import scorex.transaction.{BlockStorage, History}
+import scorex.transaction._
 import scorex.utils.ScorexLogging
 import scorex.wallet.Wallet
 
@@ -48,9 +52,6 @@ trait RunnableApplication extends Application with Shutdownable with ScorexLoggi
   if (settings.networkSettings.uPnPSettings.enable) upnp.addPort(settings.networkSettings.port)
 
   lazy val messagesHandler: MessageHandler = MessageHandler(BasicMessagesRepo.specs ++ additionalMessageSpecs)
-
-  //interface to append log and state
-  lazy override val blockStorage: BlockStorage = transactionModule.blockStorage
 
   lazy val history: History = blockStorage.history
 
@@ -119,9 +120,11 @@ trait RunnableApplication extends Application with Shutdownable with ScorexLoggi
   }
 
   private def checkGenesis(): Unit = {
-    if (transactionModule.blockStorage.history.isEmpty) {
+    if (blockStorage.history.isEmpty) {
       val maybeGenesisSignature = Option(settings.blockchainSettings.genesisSettings.signature).filter(_.trim.nonEmpty)
-      transactionModule.blockStorage.blockchainUpdater.processBlock(Block.genesis(consensusModule.genesisData, transactionModule.genesisData,
+      blockStorage.blockchainUpdater.processBlock(Block.genesis(
+        NxtLikeConsensusBlockData(settings.blockchainSettings.genesisSettings.initialBaseTarget, Array.fill(DigestSize)(0: Byte)),
+        RunnableApplication.genesisTransactions(settings.blockchainSettings.genesisSettings),
         settings.blockchainSettings.genesisSettings.blockTimestamp, maybeGenesisSignature)) match {
         case Left(value) =>
           log.error(value.toString)
@@ -130,6 +133,15 @@ trait RunnableApplication extends Application with Shutdownable with ScorexLoggi
       }
 
       log.info("Genesis block has been added to the state")
+    }
+  }
+}
+
+object RunnableApplication {
+  def genesisTransactions(gs: GenesisSettings): Seq[GenesisTransaction] = {
+    gs.transactions.map { ts =>
+      val acc = Account.fromString(ts.recipient).right.get
+      GenesisTransaction.create(acc, ts.amount, gs.transactionsTimestamp).right.get
     }
   }
 }

@@ -30,7 +30,7 @@ trait ApiRoute extends Directives with CommonApiFunctions with ApiMarshallers {
     }
   }
 
-  def processRequest[A: Reads](pathMatcher: String, f: A => ToResponseMarshallable) =
+  def processRequest[A: Reads](pathMatcher: String, f: A => ToResponseMarshallable): Route =
     (path(pathMatcher) & post & withAuth) {
       json[A](f)
     }

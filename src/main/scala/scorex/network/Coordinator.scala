@@ -6,9 +6,12 @@ import cats.implicits._
 import cats.syntax.all._
 import akka.pattern.{ask, pipe}
 import akka.util.Timeout
+import com.wavesplatform.settings.BlockchainSettings
+import com.wavesplatform.state2.reader.StateReader
 import scorex.app.Application
 import scorex.block.Block
 import scorex.block.Block.BlockId
+import scorex.consensus.TransactionsOrdering
 import scorex.consensus.mining.BlockGeneratorController.{LastBlockChanged, StartGeneration}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
@@ -20,14 +23,15 @@ import scorex.network.message._
 import scorex.network.message.{Message, MessageSpec}
 import scorex.network.peer.PeerManager.{ConnectedPeers, GetConnectedPeersTyped}
 import scorex.transaction.History.BlockchainScore
-import scorex.transaction.{TransactionModule, ValidationError}
+import scorex.transaction._
 import scorex.transaction.ValidationError.CustomError
-import scorex.utils.ScorexLogging
+import scorex.utils.{ScorexLogging, Time}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.language.postfixOps
 import scala.language.higherKinds
+import scala.util.control.NonFatal
 
 class Coordinator(application: Application) extends ViewSynchronizer with ScorexLogging {
 
@@ -40,13 +44,12 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
   private lazy val blockchainSynchronizer = application.blockchainSynchronizer
 
   private lazy val history = application.blockStorage.history
+  private lazy val stateReader = application.blockStorage.stateReader
   private lazy val checkpoints = application.blockStorage.checkpoints
 
   context.system.scheduler.schedule(1.second, application.settings.synchronizationSettings.scoreBroadcastInterval, self, BroadcastCurrentScore)
 
   application.blockGenerator ! StartGeneration
-
-  implicit val transactionModule: TransactionModule = application.transactionModule
 
   override def receive: Receive = idle()
 
@@ -176,7 +179,7 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
           // someone has happened to be faster and already added a block or blocks after the parent
           log.debug(s"A child for parent of the block already exists, local=$local: ${newBlock.json}")
 
-          val cmp = application.consensusModule.blockOrdering
+          val cmp = PoSCalc.blockOrdering(history, stateReader, application.settings.blockchainSettings.functionalitySettings, application.time)
           if (lastBlock.referenceField.value.sameElements(parentBlockId) && cmp.lt(lastBlock, newBlock)) {
             log.debug(s"New block ${newBlock.json} is better than last ${lastBlock.json}")
           }
@@ -223,15 +226,14 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
     if (application.blockStorage.history.heightOf(lastCommonBlockId).exists(isForkValidWithCheckpoint)) {
       application.blockStorage.blockchainUpdater.removeAfter(lastCommonBlockId)
 
-      foldM[({type l[α] = Either[(ValidationError, BlockId), α]})#l, List, Block, Unit](newBlocks.toList, ())
-        { case ((), block: Block) => processNewBlock(block).left.map((_, block.uniqueId)) } match {
+      foldM[({type l[α] = Either[(ValidationError, BlockId), α]})#l, List, Block, Unit](newBlocks.toList, ()) { case ((), block: Block) => processNewBlock(block).left.map((_, block.uniqueId)) } match {
         case Right(_) =>
         case Left(err) =>
           log.error(s"Can't processFork(lastBlockCommonId: ${Base58.encode(lastCommonBlockId)} because: ${err._1}")
-              if (history.lastBlock.uniqueId.sameElements(err._2)) {
-                from.foreach(_.blacklist())
-              }
-            }
+          if (history.lastBlock.uniqueId.sameElements(err._2)) {
+            from.foreach(_.blacklist())
+          }
+      }
 
       self ! BroadcastCurrentScore
 
@@ -258,14 +260,18 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
   }
 
   def isBlockValid(b: Block): Either[ValidationError, Unit] = {
-    if (application.transactionModule.blockStorage.history.contains(b)) Right(())
+    if (application.blockStorage.history.contains(b)) Right(())
     else {
-      def history = application.transactionModule.blockStorage.history.contains(b.reference)
+      def history = application.blockStorage.history.contains(b.reference)
 
       def signature = EllipticCurveImpl.verify(b.signerDataField.value.signature, b.bytesWithoutSignature,
         b.signerDataField.value.generator.publicKey)
 
-      def consensus = application.consensusModule.isValid(b)
+      def consensus = blockConsensusValidation(
+        application.blockStorage.history,
+        application.blockStorage.stateReader,
+        application.settings.blockchainSettings,
+        application.time)(b)
 
       if (!history) Left(CustomError(s"Invalid block ${b.encodedId}: no parent block in history"))
       else if (!signature) Left(CustomError(s"Invalid block ${b.encodedId}: signature is not valid"))
@@ -279,7 +285,9 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
     _ <- validateWithRespectToCheckpoint(block, history.height() + 1)
     _ <- application.blockStorage.blockchainUpdater.processBlock(block)
   } yield {
-    application.transactionModule.clearFromUnconfirmed(block.transactionData)
+    block.transactionData.foreach(application.utxStorage.remove)
+    UnconfirmedTransactionsStorage.clearIncorrectTransactions(application.settings.blockchainSettings.functionalitySettings,
+      application.blockStorage.stateReader, application.utxStorage, application.time)
   }
 
 
@@ -289,7 +297,7 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
   }
 }
 
-object Coordinator {
+object Coordinator extends ScorexLogging {
 
   case object GetCoordinatorStatus
 
@@ -325,4 +333,72 @@ object Coordinator {
 
   def foldM[G[_], F[_], A, B](fa: F[A], z: B)(f: (B, A) => G[B])(implicit G: Monad[G], F: Traverse[F]): G[B] =
     F.foldLeft(fa, G.pure(z))((gb, a) => G.flatMap(gb)(f(_, a)))
+
+  val MaxTimeDrift: FiniteDuration = 15.seconds
+
+  def blockConsensusValidation(history: History, state: StateReader, bcs: BlockchainSettings, time: Time)(block: Block): Boolean = try {
+
+    import PoSCalc._
+
+    val fs = bcs.functionalitySettings
+
+    val blockTime = block.timestampField.value
+
+    require((blockTime - time.correctedTime()).millis < MaxTimeDrift, s"Block timestamp $blockTime is from future")
+
+    if (blockTime > fs.requireSortedTransactionsAfter) {
+      require(block.transactionDataField.asInstanceOf[TransactionsBlockField].value.sorted(TransactionsOrdering.InBlock) == block.transactionDataField.asInstanceOf[TransactionsBlockField].value, "Transactions must be sorted correctly")
+    }
+
+    val parentOpt = history.parent(block)
+    require(parentOpt.isDefined || history.height() == 1, s"Can't find parent block with id '${
+      Base58.encode(block.referenceField.value)
+    }' of block " +
+      s"'${
+        Base58.encode(block.uniqueId)
+      }'")
+
+    val parent = parentOpt.get
+    val parentHeightOpt = history.heightOf(parent.uniqueId)
+    require(parentHeightOpt.isDefined, s"Can't get parent block with id '${
+      Base58.encode(block.referenceField.value)
+    }' height")
+    val parentHeight = parentHeightOpt.get
+
+    val prevBlockData = parent.consensusDataField.value
+    val blockData = block.consensusDataField.value
+
+    val cbt = calcBaseTarget(history)(bcs.genesisSettings.averageBlockDelay, parent, blockTime)
+    val bbt = blockData.baseTarget
+    require(cbt == bbt, s"Block's basetarget is wrong, calculated: $cbt, block contains: $bbt")
+
+    val generator = block.signerDataField.value.generator
+
+    //check generation signature
+    val calcGs = calcGeneratorSignature(prevBlockData, generator)
+    val blockGs = blockData.generationSignature
+    require(calcGs.sameElements(blockGs),
+      s"Block's generation signature is wrong, calculated: ${
+        calcGs.mkString
+      }, block contains: ${
+        blockGs.mkString
+      }")
+
+    val effectiveBalance = generatingBalance(state, fs)(generator, parentHeight)
+
+    if (blockTime >= fs.minimalGeneratingBalanceAfterTimestamp) {
+      require(effectiveBalance >= MinimalEffectiveBalanceForGenerator, s"Effective balance $effectiveBalance is less that minimal ($MinimalEffectiveBalanceForGenerator)")
+    }
+
+    //check hit < target
+    calcHit(prevBlockData, generator) < calcTarget(parent, blockTime, effectiveBalance)
+  } catch {
+    case e: IllegalArgumentException =>
+      log.error("Error while checking a block", e)
+      false
+    case NonFatal(t) =>
+      log.error("Fatal error while checking a block", t)
+      throw t
+  }
+
 }

@@ -3,6 +3,9 @@ package com.wavesplatform.settings
 import com.typesafe.config.Config
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.EnumerationReader._
+import scorex.account.Account
+import scorex.transaction.GenesisTransaction
+
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 

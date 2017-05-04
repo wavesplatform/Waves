@@ -9,27 +9,40 @@ import play.api.libs.json.{JsObject, Json}
 import scorex.api.http.assets.TransferRequest
 import scorex.api.http.{ApiKeyNotValid, PaymentApiRoute}
 import scorex.crypto.encode.Base58
-import scorex.transaction.TransactionOperations
+import scorex.network.ConnectedPeer
 import scorex.transaction.assets.TransferTransaction
-import scorex.wallet.Wallet
+import scorex.transaction.{NewTransactionHandler, Transaction, ValidationError}
+import scorex.utils.NTP
 
 class PaymentRouteSpec extends RouteSpec("/payment")
   with MockFactory with PropertyChecks with RestAPISettingsHelper with TestWallet with TransactionGen {
-  private val txOps = mock[TransactionOperations]
-  private val route = PaymentApiRoute(restAPISettings, testWallet, txOps).route
+
 
   private implicit def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)
 
   "accepts payments" in {
-    forAll(accountGen.label("sender"), accountOrAliasGen.label("recipient"), positiveLongGen.label("amount"), smallFeeGen.label("fee")) {
-      case (sender, recipient, amount, fee) =>
-        val req =
-          Json.obj("sender" -> sender.address, "recipient" -> recipient.stringRepr, "amount" -> amount, "fee" -> fee)
+    forAll(accountOrAliasGen.label("recipient"), positiveLongGen.label("amount"), smallFeeGen.label("fee")) {
+      case (recipient, amount, fee) =>
 
-        val transferReq = TransferRequest(None, None, amount, fee, sender.address, None, recipient.stringRepr)
+        val sender = testWallet.privateKeyAccounts().head
         val tx = TransferTransaction.create(None, sender, recipient, amount, System.currentTimeMillis(), None, fee, Array())
+        val stmMock: NewTransactionHandler = {
 
-        (txOps.transferAsset(_: TransferRequest, _: Wallet)).expects(transferReq, testWallet).returning(tx).once()
+          def alwaysTx(t: Transaction, maybePeer: Option[ConnectedPeer]): Either[ValidationError, Transaction] = tx
+
+          val m = mock[NewTransactionHandler]
+          (m.onNewOffchainTransactionExcept(_: Transaction, _: Option[ConnectedPeer]))
+            .expects(*, *)
+            .onCall(alwaysTx _)
+            .anyNumberOfTimes()
+          m
+        }
+
+        val route = PaymentApiRoute(restAPISettings, testWallet, stmMock, NTP).route
+
+        val req = Json.obj("sender" -> sender.address, "recipient" -> recipient.stringRepr, "amount" -> amount, "fee" -> fee)
+        val transferReq = TransferRequest(None, None, amount, fee, sender.address, None, recipient.stringRepr)
+
         Post(routePath(""), req) ~> route should produce(ApiKeyNotValid)
         Post(routePath(""), req) ~> api_key(apiKey) ~> route ~> check {
           val resp = responseAs[JsObject]

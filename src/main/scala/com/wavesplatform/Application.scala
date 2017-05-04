@@ -16,11 +16,11 @@ import scorex.api.http.alias.{AliasApiRoute, AliasBroadcastApiRoute}
 import scorex.api.http.assets.{AssetsApiRoute, AssetsBroadcastApiRoute}
 import scorex.api.http.leasing.{LeaseApiRoute, LeaseBroadcastApiRoute}
 import scorex.app.ApplicationVersion
-import scorex.consensus.nxt.WavesConsensusModule
 import scorex.consensus.nxt.api.http.NxtConsensusApiRoute
 import scorex.network.{TransactionalMessagesRepo, UnconfirmedPoolSynchronizer}
-import scorex.transaction.{BlockStorage, SimpleTransactionModule}
-import scorex.utils.ScorexLogging
+import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
+import scorex.transaction._
+import scorex.utils.{ScorexLogging, Time, TimeImpl}
 import scorex.waves.http.{DebugApiRoute, WavesApiRoute}
 
 import scala.reflect.runtime.universe._
@@ -37,31 +37,32 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
 
   override val matcherSettings: MatcherSettings = settings.matcherSettings
   override val restAPISettings: RestAPISettings = settings.restAPISettings
+  private val feeCalculator = new FeeCalculator(settings.feesSettings)
 
-  override implicit lazy val consensusModule = new WavesConsensusModule(settings.blockchainSettings)
+  override val blockStorage = new BlockStorageImpl(settings.blockchainSettings)
 
-  override implicit lazy val transactionModule = new SimpleTransactionModule(settings.blockchainSettings.genesisSettings)(settings, this)
-
-  override lazy val blockStorage: BlockStorage = transactionModule.blockStorage
+  val utxStorage: UnconfirmedTransactionsStorage = new UnconfirmedTransactionsDatabaseImpl(settings.utxSettings.size)
+  override implicit lazy val newTransactionHandler = new NewTransactionHandlerImpl(settings.blockchainSettings.functionalitySettings,
+    networkController, time, feeCalculator, utxStorage, blockStorage.history, blockStorage.stateReader)
 
   override lazy val apiRoutes = Seq(
     BlocksApiRoute(settings.restAPISettings, settings.checkpointsSettings, history, coordinator),
-    TransactionsApiRoute(settings.restAPISettings, blockStorage.stateReader, history, transactionModule),
-    NxtConsensusApiRoute(settings.restAPISettings, consensusModule, blockStorage.stateReader, history, transactionModule),
+    TransactionsApiRoute(settings.restAPISettings, blockStorage.stateReader, history, utxStorage),
+    NxtConsensusApiRoute(settings.restAPISettings, blockStorage.stateReader, history, settings.blockchainSettings.functionalitySettings),
     WalletApiRoute(settings.restAPISettings, wallet),
-    PaymentApiRoute(settings.restAPISettings, wallet, transactionModule),
+    PaymentApiRoute(settings.restAPISettings, wallet, newTransactionHandler, time),
     UtilsApiRoute(settings.restAPISettings),
     PeersApiRoute(settings.restAPISettings, peerManager, networkController),
-    AddressApiRoute(settings.restAPISettings, wallet, blockStorage.stateReader, consensusModule, transactionModule),
+    AddressApiRoute(settings.restAPISettings, wallet, blockStorage.stateReader, settings.blockchainSettings.functionalitySettings),
     DebugApiRoute(settings.restAPISettings, wallet, blockStorage.stateReader, history),
-    WavesApiRoute(settings.restAPISettings, wallet, transactionModule),
-    AssetsApiRoute(settings.restAPISettings, wallet, blockStorage.stateReader, transactionModule),
+    WavesApiRoute(settings.restAPISettings, wallet, newTransactionHandler, time),
+    AssetsApiRoute(settings.restAPISettings, wallet, blockStorage.stateReader, newTransactionHandler, time),
     NodeApiRoute(settings.restAPISettings, () => this.shutdown(), blockGenerator, coordinator),
-    AssetsBroadcastApiRoute(settings.restAPISettings, transactionModule),
-    LeaseApiRoute(settings.restAPISettings, wallet, blockStorage.stateReader, transactionModule),
-    LeaseBroadcastApiRoute(settings.restAPISettings, transactionModule),
-    AliasApiRoute(settings.restAPISettings, wallet, transactionModule, blockStorage.stateReader),
-    AliasBroadcastApiRoute(settings.restAPISettings, transactionModule)
+    AssetsBroadcastApiRoute(settings.restAPISettings, newTransactionHandler),
+    LeaseApiRoute(settings.restAPISettings, wallet, blockStorage.stateReader, newTransactionHandler, time),
+    LeaseBroadcastApiRoute(settings.restAPISettings, newTransactionHandler),
+    AliasApiRoute(settings.restAPISettings, wallet, newTransactionHandler, time, blockStorage.stateReader),
+    AliasBroadcastApiRoute(settings.restAPISettings, newTransactionHandler)
   )
 
   override lazy val apiTypes = Seq(
@@ -86,13 +87,15 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
 
   override lazy val additionalMessageSpecs = TransactionalMessagesRepo.specs
 
-  actorSystem.actorOf(Props(classOf[UnconfirmedPoolSynchronizer], transactionModule, settings.utxSettings, networkController))
+  actorSystem.actorOf(Props(classOf[UnconfirmedPoolSynchronizer], newTransactionHandler, settings.utxSettings, networkController, utxStorage))
 
   override def run(): Unit = {
     super.run()
 
     if (matcherSettings.enable) runMatcher()
   }
+
+  override val time: Time = new TimeImpl()
 }
 
 object Application extends ScorexLogging {
@@ -131,7 +134,7 @@ object Application extends ScorexLogging {
   def main(args: Array[String]): Unit = {
     // prevents java from caching successful name resolutions, which is needed e.g. for proper NTP server rotation
     // http://stackoverflow.com/a/17219327
-    Security.setProperty("networkaddress.cache.ttl" , "0")
+    Security.setProperty("networkaddress.cache.ttl", "0")
 
     log.info("Starting...")
 
