@@ -6,7 +6,7 @@ import scorex.api.http.alias.CreateAliasRequest
 import scorex.api.http.assets._
 import scorex.api.http.leasing.{LeaseCancelRequest, LeaseRequest}
 import scorex.crypto.encode.Base58
-import scorex.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction, TransferTransaction}
+import scorex.transaction.assets._
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.utils.Time
 import scorex.wallet.Wallet
@@ -17,6 +17,7 @@ trait TransactionOperations {
   def issueAsset(request: IssueRequest, wallet: Wallet): Either[ValidationError, IssueTransaction]
   def reissueAsset(request: ReissueRequest, wallet: Wallet): Either[ValidationError, ReissueTransaction]
   def burnAsset(request: BurnRequest, wallet: Wallet): Either[ValidationError, BurnTransaction]
+  def makeAssetNameUnique(request: MakeAssetNameUniqueRequest, wallet: Wallet): Either[ValidationError, MakeAssetNameUniqueTransaction]
   def lease(request: LeaseRequest, wallet: Wallet): Either[ValidationError, LeaseTransaction]
   def alias(request: CreateAliasRequest, wallet: Wallet): Either[ValidationError, CreateAliasTransaction]
   def leaseCancel(request: LeaseCancelRequest, wallet: Wallet): Either[ValidationError, LeaseCancelTransaction]
@@ -91,6 +92,12 @@ class TransactionOperationsImpl(tm: NewTransactionHandler, time: Time) extends T
   override def burnAsset(request: BurnRequest, wallet: Wallet): Either[ValidationError, BurnTransaction] = for {
     pk <- wallet.findWallet(request.sender)
     tx <- BurnTransaction.create(pk, Base58.decode(request.assetId).get, request.quantity, request.fee, time.getTimestamp)
+    r <- tm.onNewOffchainTransaction(tx)
+  } yield r
+
+  override def makeAssetNameUnique(request: MakeAssetNameUniqueRequest, wallet: Wallet): Either[ValidationError, MakeAssetNameUniqueTransaction] = for {
+    pk <- wallet.findWallet(request.sender)
+    tx <- MakeAssetNameUniqueTransaction.create(pk, Base58.decode(request.assetId).get, request.fee, time.getTimestamp)
     r <- tm.onNewOffchainTransaction(tx)
   } yield r
 

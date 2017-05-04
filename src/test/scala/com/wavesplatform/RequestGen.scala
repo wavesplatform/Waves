@@ -2,9 +2,12 @@ package com.wavesplatform
 
 import org.scalacheck.Gen.{alphaNumChar, choose, listOfN, oneOf}
 import org.scalacheck.{Arbitrary, Gen => G}
+import scorex.account.Alias
+import scorex.api.http.alias.SignedCreateAliasRequest
 import scorex.api.http.assets._
+import scorex.api.http.leasing.{SignedLeaseCancelRequest, SignedLeaseRequest}
 import scorex.crypto.encode.Base58
-import scorex.transaction.TransactionParser
+import scorex.transaction.{CreateAliasTransaction, TransactionParser}
 import scorex.transaction.assets.{IssueTransaction, TransferTransaction}
 
 trait RequestGen extends TransactionGen {
@@ -24,6 +27,12 @@ trait RequestGen extends TransactionGen {
     genBoundedString(0, IssueTransaction.MinAssetNameLength - 1),
     genBoundedString(IssueTransaction.MaxAssetNameLength + 1, IssueTransaction.MaxAssetNameLength + 50)
   ).map(new String(_))
+
+  val invalidAliasStringByLength: G[String] = oneOf(
+    G.choose(0, Alias.MinLength - 1) flatMap { sz => G.listOfN(sz, G.alphaNumChar) },
+    G.choose(Alias.MaxLength + 1, Alias.MaxLength + 50) flatMap { sz => G.listOfN(sz, G.alphaNumChar) }
+  ).map(_.mkString)
+
   val longDescription: G[String] =
     genBoundedBytes(IssueTransaction.MaxDescriptionLength + 1, IssueTransaction.MaxDescriptionLength + 50)
       .map(Base58.encode)
@@ -97,4 +106,22 @@ trait RequestGen extends TransactionGen {
     _tr <- transferReq
   } yield SignedTransferRequest(_tr.sender, _tr.assetId, _tr.recipient, _tr.amount, _tr.fee, _tr.feeAssetId, _timestamp,
     _tr.attachment, _signature)
+
+  val createAliasReq: G[SignedCreateAliasRequest] = for {
+    _signature <- signatureGen
+    _timestamp <- ntpTimestampGen
+    _alias <- createAliasGen
+  } yield SignedCreateAliasRequest(_alias.sender.toString, _alias.fee, _alias.alias.name, _timestamp, _signature)
+
+  val leaseReq: G[SignedLeaseRequest] = for {
+    _signature <- signatureGen
+    _timestamp <- ntpTimestampGen
+    _alias <- leaseGen
+  } yield SignedLeaseRequest(_alias.sender.toString, _alias.amount, _alias.fee, _alias.recipient.toString, _timestamp, _signature)
+
+  val leaseCancelReq: G[SignedLeaseCancelRequest] = for {
+    _signature <- signatureGen
+    _timestamp <- ntpTimestampGen
+    _cancel <- leaseCancelGen
+  } yield SignedLeaseCancelRequest(_cancel.sender.toString, Base58.encode(_cancel.leaseId), _cancel.timestamp, _signature, _cancel.fee)
 }

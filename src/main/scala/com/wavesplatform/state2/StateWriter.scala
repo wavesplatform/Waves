@@ -98,6 +98,12 @@ class StateWriterImpl(p: StateStorage) extends StateReaderImpl(p) with StateWrit
       measureSizeLog("lease info")(blockDiff.txsDiff.leaseState)(
         _.foreach { case (id, isActive) => p.leaseState.put(id.arr, isActive) })
 
+      measureSizeLog("uniqueAssets")(blockDiff.txsDiff.assetsWithUniqueNames) {
+        _.foreach { case (name, id) =>
+          p.uniqueAssets.put(name.arr, id.arr)
+        }
+      }
+
       p.setHeight(p.getHeight + blockDiff.heightDiff)
       p.commit()
     }
@@ -116,9 +122,9 @@ class StateWriterImpl(p: StateStorage) extends StateReaderImpl(p) with StateWrit
       p.aliasToAddress.clear()
       p.leaseState.clear()
       p.lastUpdateHeight.clear()
+      p.uniqueAssets.clear()
       p.setHeight(0)
       p.commit()
-
     }
   }
 }

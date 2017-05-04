@@ -33,7 +33,7 @@ object BlockDiffer extends ScorexLogging {
         })
     }
     val feeDiff = Monoid[Diff].combineAll(accountPortfolioFeesMap.map { case (acc, p) =>
-      new Diff(Map.empty, Map(acc -> p), Map.empty, Map.empty, Map.empty, Map.empty, Map.empty)
+      Diff.empty.copy(portfolios = Map(acc -> p))
     })
 
     val txsDiffEi = block.transactionData.foldLeft(right(feeDiff)) { case (ei, tx) => ei.flatMap(diff =>
