@@ -175,7 +175,7 @@ object Miner extends ScorexLogging {
         val gs = calcGeneratorSignature(lastBlockKernelData, account)
         val consensusData = NxtLikeConsensusBlockData(btg, gs)
 
-        val unconfirmed = UnconfirmedTransactionsStorage.packUnconfirmed(history, state, bcs.functionalitySettings, utx, time)(Some(height))
+        val unconfirmed = UnconfirmedTransactionsStorage.packUnconfirmed(state, bcs.functionalitySettings, utx, time,height)
         log.debug(s"Build block with ${
           unconfirmed.size
         } transactions")

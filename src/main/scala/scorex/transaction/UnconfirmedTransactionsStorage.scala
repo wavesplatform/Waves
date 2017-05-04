@@ -27,21 +27,20 @@ object UnconfirmedTransactionsStorage {
   def clearIncorrectTransactions(fs: FunctionalitySettings, stateReader: StateReader, utx: UnconfirmedTransactionsStorage, time: Time): Unit = {
     val currentTime = time.correctedTime()
     val txs = utx.all()
-    val notExpired = txs.filter { tx => (currentTime - tx.timestamp).millis <= MaxTimeUtxPast }
-    val notFromFuture = notExpired.filter { tx => (tx.timestamp - currentTime).millis <= MaxTimeUtxFuture }
-    val inOrder = notFromFuture.sorted(TransactionsOrdering.InUTXPool)
-    val valid = Validator.validate(fs, stateReader, inOrder, None, currentTime)._2
+      .filter { tx => (currentTime - tx.timestamp).millis <= MaxTimeUtxPast }
+      .filter { tx => (tx.timestamp - currentTime).millis <= MaxTimeUtxFuture }
+      .sorted(TransactionsOrdering.InUTXPool)
+    val valid = Validator.validate(fs, stateReader, txs, None, currentTime)._2
     txs.diff(valid).foreach(utx.remove)
   }
 
-  def packUnconfirmed(history: History, state: StateReader, fs: FunctionalitySettings, utx: UnconfirmedTransactionsStorage, time: Time)
-                     (heightOpt: Option[Int]): Seq[Transaction] = {
+  def packUnconfirmed(state: StateReader, fs: FunctionalitySettings, utx: UnconfirmedTransactionsStorage, time: Time, height: Int): Seq[Transaction] = {
     clearIncorrectTransactions(fs, state, utx, time)
     val txs = utx.all()
       .sorted(TransactionsOrdering.InUTXPool)
       .take(Block.MaxTransactionsPerBlock)
       .sorted(TransactionsOrdering.InBlock)
-    Validator.validate(fs, state, txs, heightOpt, time.correctedTime())._2
+    Validator.validate(fs, state, txs, Some(height), time.correctedTime())._2
   }
 
 }
