@@ -13,6 +13,7 @@ import scala.util.{Failure, Success, Try}
 sealed trait MakeAssetNameUniqueTransaction extends SignedTransaction {
   def assetId: Array[Byte]
   def fee: Long
+  def networkByte: Byte
 }
 
 object MakeAssetNameUniqueTransaction {
@@ -36,7 +37,8 @@ object MakeAssetNameUniqueTransaction {
 
     override lazy val json: JsObject = jsonBase() ++ Json.obj(
       "assetId" -> Base58.encode(assetId),
-      "fee"     -> fee
+      "fee" -> fee,
+      "networkByte" -> networkByte
     )
 
     override val assetFee: (Option[AssetId], Long) = (None, fee)
