@@ -285,8 +285,9 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
     _ <- validateWithRespectToCheckpoint(block, history.height() + 1)
     _ <- application.blockStorage.blockchainUpdater.processBlock(block)
   } yield {
-    UnconfirmedTransactionsStorage.clearFromUnconfirmed(application.settings.blockchainSettings.functionalitySettings,
-      application.blockStorage.stateReader, application.utxStorage, application.time)(block.transactionData)
+    block.transactionData.foreach(application.utxStorage.remove)
+    UnconfirmedTransactionsStorage.clearIncorrectTransactions(application.settings.blockchainSettings.functionalitySettings,
+      application.blockStorage.stateReader, application.utxStorage, application.time)
   }
 
 

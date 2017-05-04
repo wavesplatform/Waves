@@ -34,15 +34,6 @@ object UnconfirmedTransactionsStorage {
     txs.diff(valid).foreach(utx.remove)
   }
 
-  def clearFromUnconfirmed(fs: FunctionalitySettings, stateReader: StateReader, utx: UnconfirmedTransactionsStorage, time: Time)
-                          (data: Seq[Transaction]): Unit = {
-    data.foreach(tx => utx.getBySignature(tx.id) match {
-      case Some(unconfirmedTx) => utx.remove(unconfirmedTx)
-      case None =>
-    })
-    clearIncorrectTransactions(fs, stateReader, utx, time)
-  }
-
   def packUnconfirmed(history: History, state: StateReader, fs: FunctionalitySettings, utx: UnconfirmedTransactionsStorage, time: Time)
                      (heightOpt: Option[Int]): Seq[Transaction] = {
     clearIncorrectTransactions(fs, state, utx, time)
