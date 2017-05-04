@@ -6,6 +6,7 @@ import com.wavesplatform.state2._
 import org.scalacheck.{Arbitrary, Gen, Shrink}
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import org.scalatest.{Matchers, PropSpec}
+import scorex.account.AddressScheme
 import scorex.crypto.encode.Base58
 import scorex.lagonaki.mocks.TestBlock
 import scorex.transaction.assets.{BurnTransaction, IssueTransaction, MakeAssetNameUniqueTransaction, ReissueTransaction}
@@ -32,9 +33,9 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Genera
     (_, assetName, description, quantity, decimals, reissuable, iFee, timestamp) <- issueParamGen
   } yield {
     val issue = IssueTransaction.create(sender, assetName, description, quantity, decimals, reissuable, iFee, timestamp).right.get
-    val makeAssetNameUnique = MakeAssetNameUniqueTransaction.create(sender, issue.assetId, iFee, timestamp).right.get
+    val makeAssetNameUnique = MakeAssetNameUniqueTransaction.create(sender, issue.assetId, iFee, AddressScheme.current.chainId, timestamp).right.get
     val issue2 = IssueTransaction.create(sender, assetName, description, quantity, decimals, reissuable, iFee, timestamp + 1).right.get
-    val makeAssetNameUnique2 = MakeAssetNameUniqueTransaction.create(sender, issue2.assetId, iFee, timestamp).right.get
+    val makeAssetNameUnique2 = MakeAssetNameUniqueTransaction.create(sender, issue2.assetId, iFee, AddressScheme.current.chainId, timestamp).right.get
     (genesis, issue, makeAssetNameUnique, issue2, makeAssetNameUnique2)
   }
 
@@ -88,7 +89,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Genera
       timestamp <- timestampGen
       reissue = ReissueTransaction.create(other, issue.assetId, quantity, reissuable2, fee, timestamp).right.get
       burn = BurnTransaction.create(other, issue.assetId, quantity, fee, timestamp).right.get
-      makeAssetNameUnique = MakeAssetNameUniqueTransaction.create(other, issue.assetId, fee, timestamp).right.get
+      makeAssetNameUnique = MakeAssetNameUniqueTransaction.create(other, issue.assetId, fee, AddressScheme.current.chainId, timestamp).right.get
     } yield ((gen, issue), reissue, burn, makeAssetNameUnique)
 
     forAll(setup) { case ((gen, issue), reissue, burn, makeAssetNameUnique) =>

@@ -21,16 +21,18 @@ object MakeAssetNameUniqueTransaction {
                                                         assetId: Array[Byte],
                                                         fee: Long,
                                                         timestamp: Long,
+                                                        networkByte: Byte,
                                                         signature: Array[Byte])
     extends MakeAssetNameUniqueTransaction {
 
     override val transactionType: TransactionType.Value = TransactionType.MakeAssetNameUniqueTransaction
 
-    lazy val toSign: Array[Byte] = Bytes.concat(Array(transactionType.id.toByte),
+    lazy val toSign: Array[Byte] = Bytes.concat(Array(transactionType.id.toByte, networkByte),
       sender.publicKey,
       assetId,
       Longs.toByteArray(fee),
-      Longs.toByteArray(timestamp))
+      Longs.toByteArray(timestamp)
+    )
 
     override lazy val json: JsObject = jsonBase() ++ Json.obj(
       "assetId" -> Base58.encode(assetId),
@@ -50,15 +52,16 @@ object MakeAssetNameUniqueTransaction {
 
   def parseTail(bytes: Array[Byte]): Try[MakeAssetNameUniqueTransaction] = Try {
     import EllipticCurveImpl._
-    val sender        = PublicKeyAccount(bytes.slice(0, KeyLength))
-    val assetId       = bytes.slice(KeyLength, KeyLength + AssetIdLength)
-    val quantityStart = KeyLength + AssetIdLength
+    val networkByte   = bytes.head
+    val sender        = PublicKeyAccount(bytes.slice(1, 1 + KeyLength))
+    val assetId       = bytes.slice(1 + KeyLength, 1 + KeyLength + AssetIdLength)
+    val quantityStart = 1 + KeyLength + AssetIdLength
 
     val fee       = Longs.fromByteArray(bytes.slice(quantityStart, quantityStart + 8))
     val timestamp = Longs.fromByteArray(bytes.slice(quantityStart + 8, quantityStart + 16))
     val signature = bytes.slice(quantityStart + 16, quantityStart + 16 + SignatureLength)
     MakeAssetNameUniqueTransaction
-      .create(sender, assetId, fee, timestamp, signature)
+      .create(sender, assetId, fee, timestamp, networkByte, signature)
       .fold(left => Failure(new Exception(left.toString)), right => Success(right))
   }.flatten
 
@@ -66,25 +69,28 @@ object MakeAssetNameUniqueTransaction {
                                assetId: Array[Byte],
                                fee: Long,
                                timestamp: Long,
+                               networkByte: Byte,
                                signature: Option[Array[Byte]] = None): Either[ValidationError, MakeAssetNameUniqueTransactionImpl] =
     if (fee <= 0) {
       Left(ValidationError.InsufficientFee)
     } else {
-      Right(MakeAssetNameUniqueTransactionImpl(sender, assetId, fee, timestamp, signature.orNull))
+      Right(MakeAssetNameUniqueTransactionImpl(sender, assetId, fee, timestamp, networkByte, signature.orNull))
     }
 
   def create(sender: PublicKeyAccount,
              assetId: Array[Byte],
              fee: Long,
              timestamp: Long,
+             networkByte: Byte,
              signature: Array[Byte]): Either[ValidationError, MakeAssetNameUniqueTransaction] =
-    createUnverified(sender, assetId, fee, timestamp, Some(signature)).right.flatMap(SignedTransaction.verify)
+    createUnverified(sender, assetId, fee, timestamp, networkByte, Some(signature)).right.flatMap(SignedTransaction.verify)
 
   def create(sender: PrivateKeyAccount,
              assetId: Array[Byte],
              fee: Long,
+             networkByte: Byte,
              timestamp: Long): Either[ValidationError, MakeAssetNameUniqueTransaction] =
-    createUnverified(sender, assetId, fee, timestamp).right.map { unverified =>
+    createUnverified(sender, assetId, fee, timestamp, networkByte).right.map { unverified =>
       unverified.copy(signature = EllipticCurveImpl.sign(sender, unverified.toSign))
     }
 }
