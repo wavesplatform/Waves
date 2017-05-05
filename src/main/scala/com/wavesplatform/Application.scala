@@ -132,7 +132,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
       log.info(s"REST API was bound on ${settings.restAPISettings.bindAddress}:${settings.restAPISettings.port}")
     }
 
-    Seq(scoreObserver, blockGenerator, blockchainSynchronizer, historyReplier, coordinator) foreach {
+    Seq(scoreObserver, blockGenerator, blockchainSynchronizer, historyReplier, coordinator, unconfirmedPoolSynchronizer) foreach {
       _ => // de-lazyning process :-)
     }
 
