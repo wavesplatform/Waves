@@ -8,7 +8,6 @@ import com.wavesplatform.state2.HistoryTest
 import com.wavesplatform.state2.reader.StateReader
 import org.h2.mvstore.MVStore
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.DoNotDiscover
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json.JsObject
 import scorex.api.http.BlockNotExists

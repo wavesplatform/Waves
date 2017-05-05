@@ -3,7 +3,7 @@ package com.wavesplatform
 import java.io.File
 import java.security.Security
 
-import akka.actor.{ActorSystem, Props}
+import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
 import akka.http.scaladsl.server.Route
@@ -109,7 +109,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
   lazy val scoreObserver = actorSystem.actorOf(Props(classOf[ScoreObserver], this), "ScoreObserver")
   lazy val blockchainSynchronizer = actorSystem.actorOf(Props(classOf[BlockchainSynchronizer], this), "BlockchainSynchronizer")
   lazy val coordinator = actorSystem.actorOf(Props(classOf[Coordinator], this), "Coordinator")
-  lazy val historyReplier = actorSystem.actorOf(Props(classOf[HistoryReplier], this), "HistoryReplier")
+  lazy val historyReplier = actorSystem.actorOf(Props(classOf[HistoryReplier], networkController, history: History, settings.synchronizationSettings.maxChainLength: Int), "HistoryReplier")
   lazy val blockGenerator = actorSystem.actorOf(Props(classOf[BlockGeneratorController], settings.minerSettings, history, time, peerManager,
     wallet, stateReader, settings.blockchainSettings, utxStorage, coordinator), "BlockGenerator")
 

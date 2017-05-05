@@ -1,6 +1,6 @@
 package scorex.network
 
-import akka.actor.Props
+import akka.actor.{ActorRef, Props}
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.settings.WavesSettings
 import org.scalatest.DoNotDiscover
@@ -40,20 +40,13 @@ class HistoryReplierSpecification extends ActorTestingCommons {
   private val lastHistoryBlockId = 20
   private val h = mockHistory(1 to lastHistoryBlockId)
 
-  private trait App extends ApplicationMock {
-    override lazy val settings = wavesSettings
-    override lazy val history: History = h
-  }
-
-  private val app = stub[App]
-
   // according to the protocol ids come in reverse order!
   private def sendSignatures(lastBlockId: Int, blockId: Int): Unit =
     dataFromNetwork(GetSignaturesSpec, (blockId to lastBlockId).reverse: BlockIds)
 
   private def expectedSignaturesSpec(blockIds: Seq[Int]): Unit = expectNetworkMessage(SignaturesSpec, blockIds)
 
-  override protected val actorRef = system.actorOf(Props(classOf[HistoryReplier], app))
+  override protected val actorRef = system.actorOf(Props(classOf[HistoryReplier], networkControllerMock, h, wavesSettings.synchronizationSettings.maxChainLength: Int))
 
   testSafely {
     "return block signatures" in {
