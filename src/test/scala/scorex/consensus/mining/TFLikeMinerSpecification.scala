@@ -3,6 +3,7 @@ package scorex.consensus.mining
 import akka.actor.Props
 import akka.testkit.TestProbe
 import com.wavesplatform.settings.{Constants, WavesSettings}
+import org.scalatest.DoNotDiscover
 import scorex.ActorTestingCommons
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.app.Application
@@ -19,6 +20,7 @@ class MinerMock(app: Application) extends Miner(app) {
   override protected def preciseTime: Long = System.currentTimeMillis()
 }
 
+@DoNotDiscover
 class TFLikeMinerSpecification extends ActorTestingCommons {
 
   import System.currentTimeMillis

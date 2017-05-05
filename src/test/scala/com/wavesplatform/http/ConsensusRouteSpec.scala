@@ -17,14 +17,15 @@ import scorex.createTestTemporaryFile
 import scorex.crypto.encode.Base58
 import scorex.transaction.{BlockStorage, CheckpointService, History, TransactionModule}
 
+@DoNotDiscover
 class ConsensusRouteSpec extends RouteSpec("/consensus") with RestAPISettingsHelper with PropertyChecks with MockFactory with BlockGen {
   private val bFile = createTestTemporaryFile("waves-blockchain", ".dat")
   private val sFile = createTestTemporaryFile("waves-state", ".dat")
   private val cFile = createTestTemporaryFile("waves-checkpoint", ".dat")
   private val wcm = new WavesConsensusModule(BlockchainSettings(bFile.getAbsolutePath, sFile.getAbsolutePath, cFile.getAbsolutePath, 'T', FunctionalitySettings.TESTNET, GenesisSettings.TESTNET))
   private val state = mock[StateReader]
-  private val history = mock[History]
-  (history.height _).expects().returns(10).anyNumberOfTimes()
+  private val history = stub[History]
+  (history.height _).when().returns(10)
 
   private val bs: BlockStorage = new BlockStorage {
     override def history = ConsensusRouteSpec.this.history
@@ -36,14 +37,15 @@ class ConsensusRouteSpec extends RouteSpec("/consensus") with RestAPISettingsHel
     override def checkpoints: CheckpointService = ???
   }
   private val tm = mock[TransactionModule]
-  (tm.blockStorage _).expects().returning(bs).anyNumberOfTimes()
+  (tm.blockStorage _).expects().returning(bs)
 
   private val route = NxtConsensusApiRoute(restAPISettings, wcm, state, history, tm).route
 
   routePath("/generationsignature") - {
     "for last block" in {
       forAll(randomSignerBlockGen) { blk =>
-        (history.blockAt _).expects(10).returning(Some(blk)).once()
+        (history.height _).when().returns(10)
+        (history.blockAt _).when(10).returns(Some(blk))
         Get(routePath("/generationsignature")) ~> route ~> check {
           (responseAs[JsObject] \ "generationSignature").as[String] shouldEqual Base58.encode(blk.consensusData.generationSignature)
         }
@@ -53,8 +55,8 @@ class ConsensusRouteSpec extends RouteSpec("/consensus") with RestAPISettingsHel
     "for a given block" in {
       forAll(randomSignerBlockGen, Gen.oneOf(true, false)) { case (blk, isAvailable) =>
         val result = if (isAvailable) Option(blk) else None
-        (history.heightOf(_: Block.BlockId)).expects(where(sameSignature(blk.uniqueId)(_))).returning(Some(10)).once()
-        (history.blockAt _).expects(*).returning(result).once()
+        (history.heightOf(_: Block.BlockId)).when(where(sameSignature(blk.uniqueId)(_))).returns(Some(10)).once()
+        (history.blockAt _).when(*).returns(result).once()
         if (isAvailable) {
           Get(routePath(s"/generationsignature/${blk.encodedId}")) ~> route ~> check {
             (responseAs[JsObject] \ "generationSignature").as[String] shouldEqual Base58.encode(blk.consensusData.generationSignature)
@@ -70,8 +72,8 @@ class ConsensusRouteSpec extends RouteSpec("/consensus") with RestAPISettingsHel
     "for a given block" in {
       forAll(randomSignerBlockGen, Gen.oneOf(true, false)) { case (blk, isAvailable) =>
         val result = if (isAvailable) Option(blk) else None
-        (history.heightOf(_: Block.BlockId)).expects(where(sameSignature(blk.uniqueId)(_))).returning(Some(10)).once()
-        (history.blockAt _).expects(*).returning(result).once()
+        (history.heightOf(_: Block.BlockId)).when(where(sameSignature(blk.uniqueId)(_))).returns(Some(10)).once()
+        (history.blockAt _).when(*).returns(result).once()
         if (isAvailable) {
           Get(routePath(s"/basetarget/${blk.encodedId}")) ~> route ~> check {
             (responseAs[JsObject] \ "baseTarget").as[Long] shouldEqual blk.consensusDataField.value.baseTarget
