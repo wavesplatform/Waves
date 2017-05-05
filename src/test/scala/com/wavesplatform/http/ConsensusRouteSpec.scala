@@ -1,74 +1,59 @@
 package com.wavesplatform.http
 
 import com.wavesplatform.BlockGen
+import com.wavesplatform.history.HistoryWriterImpl
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.settings.FunctionalitySettings
+import com.wavesplatform.state2.HistoryTest
 import com.wavesplatform.state2.reader.StateReader
-import org.scalacheck.Gen
+import org.h2.mvstore.MVStore
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.DoNotDiscover
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json.JsObject
 import scorex.api.http.BlockNotExists
-import scorex.block.Block
 import scorex.consensus.nxt.api.http.NxtConsensusApiRoute
-import scorex.createTestTemporaryFile
 import scorex.crypto.encode.Base58
-import scorex.transaction.{BlockStorage, CheckpointService, History, NewTransactionHandler}
 
 @DoNotDiscover
-class ConsensusRouteSpec extends RouteSpec("/consensus") with RestAPISettingsHelper with PropertyChecks with MockFactory with BlockGen {
-  private val bFile = createTestTemporaryFile("waves-blockchain", ".dat")
-  private val sFile = createTestTemporaryFile("waves-state", ".dat")
-  private val cFile = createTestTemporaryFile("waves-checkpoint", ".dat")
+class ConsensusRouteSpec extends RouteSpec("/consensus") with RestAPISettingsHelper with PropertyChecks with MockFactory with BlockGen with HistoryTest {
   private val state = mock[StateReader]
-  private val history = stub[History]
-  (history.height _).when().returns(10)
 
+  private val history = new HistoryWriterImpl(new MVStore.Builder().open())
+  appendGenesisBlock(history)
+  for (i <- 1 to 10) appendTestBlock(history)
 
   private val route = NxtConsensusApiRoute(restAPISettings, state, history, FunctionalitySettings.TESTNET).route
 
   routePath("/generationsignature") - {
     "for last block" in {
-      forAll(randomSignerBlockGen) { blk =>
-        (history.height _).when().returns(10)
-        (history.blockAt _).when(10).returns(Some(blk))
-        Get(routePath("/generationsignature")) ~> route ~> check {
-          (responseAs[JsObject] \ "generationSignature").as[String] shouldEqual Base58.encode(blk.consensusData.generationSignature)
-        }
+      Get(routePath("/generationsignature")) ~> route ~> check {
+        (responseAs[JsObject] \ "generationSignature").as[String] shouldEqual Base58.encode(history.lastBlock.consensusData.generationSignature)
       }
     }
 
-    "for a given block" in {
-      forAll(randomSignerBlockGen, Gen.oneOf(true, false)) { case (blk, isAvailable) =>
-        val result = if (isAvailable) Option(blk) else None
-        (history.heightOf(_: Block.BlockId)).when(where(sameSignature(blk.uniqueId)(_))).returns(Some(10)).once()
-        (history.blockAt _).when(*).returns(result).once()
-        if (isAvailable) {
-          Get(routePath(s"/generationsignature/${blk.encodedId}")) ~> route ~> check {
-            (responseAs[JsObject] \ "generationSignature").as[String] shouldEqual Base58.encode(blk.consensusData.generationSignature)
-          }
-        } else {
-          Get(routePath(s"/generationsignature/${blk.encodedId}")) ~> route should produce(BlockNotExists)
-        }
+    "for existed block" in {
+      val block = history.blockAt(3).get
+      Get(routePath(s"/generationsignature/${block.encodedId}")) ~> route ~> check {
+        (responseAs[JsObject] \ "generationSignature").as[String] shouldEqual Base58.encode(block.consensusData.generationSignature)
       }
+    }
+
+    "for not existed block" in {
+      Get(routePath(s"/generationsignature/brggwg4wg4g")) ~> route should produce(BlockNotExists)
     }
   }
-  routePath("/basetarget") - {
 
-    "for a given block" in {
-      forAll(randomSignerBlockGen, Gen.oneOf(true, false)) { case (blk, isAvailable) =>
-        val result = if (isAvailable) Option(blk) else None
-        (history.heightOf(_: Block.BlockId)).when(where(sameSignature(blk.uniqueId)(_))).returns(Some(10)).once()
-        (history.blockAt _).when(*).returns(result).once()
-        if (isAvailable) {
-          Get(routePath(s"/basetarget/${blk.encodedId}")) ~> route ~> check {
-            (responseAs[JsObject] \ "baseTarget").as[Long] shouldEqual blk.consensusDataField.value.baseTarget
-          }
-        } else {
-          Get(routePath(s"/basetarget/${blk.encodedId}")) ~> route should produce(BlockNotExists)
-        }
+  routePath("/basetarget") - {
+    "for existed block" in {
+      val block = history.blockAt(3).get
+      Get(routePath(s"/basetarget/${block.encodedId}")) ~> route ~> check {
+        (responseAs[JsObject] \ "baseTarget").as[Long] shouldEqual block.consensusDataField.value.baseTarget
       }
+    }
+
+    "for not existed block" in {
+      Get(routePath(s"/basetarget/brggwg4wg4g")) ~> route should produce(BlockNotExists)
     }
   }
 }
