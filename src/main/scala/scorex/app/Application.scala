@@ -2,21 +2,17 @@ package scorex.app
 
 import akka.actor.ActorRef
 import com.wavesplatform.settings.WavesSettings
-import scorex.consensus.nxt.WavesConsensusModule
-import scorex.transaction.{BlockStorage, TransactionModule}
+import com.wavesplatform.state2.reader.StateReader
+import scorex.network.UPnP
+import scorex.network.message.MessageHandler
+import scorex.transaction._
+import scorex.utils.Time
 import scorex.wallet.Wallet
 
 
 trait Application {
 
-  implicit def consensusModule: WavesConsensusModule
-  implicit def transactionModule: TransactionModule
-
-  def applicationName: String
-
-  def appVersion: ApplicationVersion
-
-  def blockStorage: BlockStorage
+  def messagesHandler: MessageHandler
 
   def peerManager: ActorRef
 
@@ -32,5 +28,20 @@ trait Application {
 
   def settings: WavesSettings
 
+  def upnp: UPnP
+
   def wallet: Wallet
+
+  def utxStorage: UnconfirmedTransactionsStorage
+
+  def history: History
+
+  def stateReader: StateReader
+
+  def blockchainUpdater: BlockchainUpdater
+
+  def checkpoints: CheckpointService
+
+  def time: Time
+
 }

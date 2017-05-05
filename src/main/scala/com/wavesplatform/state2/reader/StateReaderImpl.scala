@@ -37,8 +37,8 @@ class StateReaderImpl(p: StateStorage) extends StateReader {
 
   override def aliasesOfAddress(a: Account): Seq[Alias] =
     p.aliasToAddress.asScala
-      .collect { case (aliasStr, addressBytes) if addressBytes sameElements a.bytes =>
-        Alias.buildWithCurrentNetworkByte(aliasStr).explicitGet()
+      .collect { case (aliasName, addressBytes) if addressBytes sameElements a.bytes =>
+        Alias.buildWithCurrentNetworkByte(aliasName).explicitGet()
       }.toSeq
 
 

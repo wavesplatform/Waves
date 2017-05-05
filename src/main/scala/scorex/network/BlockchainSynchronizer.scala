@@ -1,15 +1,14 @@
 package scorex.network
 
 import akka.actor.Actor.Receive
-import akka.actor.Cancellable
-import scorex.app.Application
+import akka.actor.{ActorRef, Cancellable}
+import com.wavesplatform.settings.SynchronizationSettings
 import scorex.block.Block
 import scorex.block.Block._
 import scorex.crypto.encode.Base58.encode
 import scorex.network.Coordinator.{AddBlock, SyncFinished}
 import scorex.network.NetworkController.DataFromPeer
-import scorex.network.message._
-import scorex.network.message.Message
+import scorex.network.message.{Message, _}
 import scorex.transaction.History
 import scorex.transaction.History._
 import scorex.utils.ScorexLogging
@@ -17,24 +16,18 @@ import shapeless.syntax.typeable._
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-
-class BlockchainSynchronizer(application: Application) extends ViewSynchronizer with ScorexLogging {
+class BlockchainSynchronizer(protected val networkControllerRef: ActorRef, coordinator: ActorRef, history: History, synchronizationSettings: SynchronizationSettings) extends ViewSynchronizer with ScorexLogging {
 
   import BlockchainSynchronizer._
   import Coordinator.SyncFinished._
 
   override val messageSpecs = Seq(SignaturesSpec, BlockMessageSpec)
 
-  protected override lazy val networkControllerRef = application.networkController
-
-  private lazy val coordinator = application.coordinator
-  private lazy val history = application.blockStorage.history
-
-  private lazy val timeout = application.settings.synchronizationSettings.synchronizationTimeout
-  private lazy val maxChainLength = application.settings.synchronizationSettings.maxChainLength
-  private lazy val operationRetries = application.settings.synchronizationSettings.operationRetries
-  private lazy val pinToInitialPeer = application.settings.synchronizationSettings.pinToInitialPeer
-  private lazy val partialBlockLoading = !application.settings.synchronizationSettings.loadEntireChain
+  private lazy val timeout = synchronizationSettings.synchronizationTimeout
+  private lazy val maxChainLength = synchronizationSettings.maxChainLength
+  private lazy val operationRetries = synchronizationSettings.operationRetries
+  private lazy val pinToInitialPeer = synchronizationSettings.pinToInitialPeer
+  private lazy val partialBlockLoading = !synchronizationSettings.loadEntireChain
 
   private var timeoutData = Option.empty[Cancellable]
 
@@ -44,7 +37,7 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
     case GetExtension(peerScores) =>
       start(GettingExtension) { _ =>
 
-        val lastIds = history.lastBlockIds(application.settings.synchronizationSettings.maxRollback)
+        val lastIds = history.lastBlockIds(synchronizationSettings.maxRollback)
 
         val msg = Message(GetSignaturesSpec, Right(lastIds), None)
         networkControllerRef ! NetworkController.SendToNetwork(msg, SendToChosen(peerScores.keys.toSeq))
@@ -226,7 +219,7 @@ class BlockchainSynchronizer(application: Application) extends ViewSynchronizer 
         val peerData@Peer(score, retries) = peers(active)
         val updatedRetries = retries + 1
 
-        val updatedPeers = (if (updatedRetries > application.settings.synchronizationSettings.retriesBeforeBlacklisting) {
+        val updatedPeers = (if (updatedRetries > synchronizationSettings.retriesBeforeBlacklisting) {
           if (!ps.activeChanged) blacklistPeer("Timeout exceeded", active)
           peers - active
         } else peers + (active -> peerData.copy(retries = updatedRetries))).filterNot(_._2.score < score)

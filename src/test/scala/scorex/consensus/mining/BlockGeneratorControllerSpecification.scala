@@ -1,127 +1,136 @@
 package scorex.consensus.mining
 
-import akka.actor.{ActorRef, Props}
-import akka.testkit.TestProbe
-import com.wavesplatform.settings.WavesSettings
-import scorex.ActorTestingCommons
-import scorex.block.Block
+import akka.actor.{ActorRef, ActorSystem, Props}
+import akka.testkit.{ImplicitSender, TestKit, TestProbe}
+import com.wavesplatform.history.HistoryWriterImpl
+import com.wavesplatform.settings.{BlockchainSettings, MinerSettings}
+import com.wavesplatform.state2.reader.StateReader
+import org.h2.mvstore.MVStore
+import org.scalamock.scalatest.MockFactory
+import org.scalatest._
 import scorex.consensus.mining.BlockGeneratorController._
+import scorex.lagonaki.mocks.TestBlock
+import scorex.network.ConnectedPeer
 import scorex.network.peer.PeerManager.{ConnectedPeers, GetConnectedPeersTyped}
-import scorex.transaction.History
+import scorex.transaction.{HistoryWriter, UnconfirmedTransactionsStorage}
+import scorex.wallet.Wallet
 
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
-class BlockGeneratorControllerSpecification extends ActorTestingCommons {
+abstract class BlockGeneratorControllerSpecification extends TestKit(ActorSystem()) with ImplicitSender
+  with fixture.FunSuiteLike with Matchers with MockFactory {
 
-  val testPeerManager = TestProbe("PeerManager")
+  val settings: MinerSettings
 
-  trait App extends ApplicationMock {
-    override lazy val settings: WavesSettings = WavesSettings.fromConfig(baseTestConfig)
-    override val peerManager: ActorRef = testPeerManager.ref
-    @volatile
-    var historyOverride: History = _
+  case class F(blockGeneratorController: ActorRef, history: HistoryWriter, peerManager: TestProbe, time: TestTime)
 
-    private[BlockGeneratorControllerSpecification] def setHistory(history: History) = this.historyOverride = history
+  override type FixtureParam = F
+
+  override protected def withFixture(test: OneArgTest): Outcome = {
+
+    val history = new HistoryWriterImpl(new MVStore.Builder().open())
+    val testPeerManager: TestProbe = TestProbe("PeerManager")
+    val testTime = new TestTime
+    val blockGeneratorController: ActorRef = system.actorOf(Props(classOf[BlockGeneratorController],
+      settings,
+      history,
+      testTime,
+      testPeerManager.ref,
+      new Wallet(None, "", None),
+      stub[StateReader],
+      stub[BlockchainSettings],
+      stub[UnconfirmedTransactionsStorage],
+      null))
+    test(F(blockGeneratorController, history, testPeerManager, testTime))
   }
 
-  val stubApp: App = stub[App]
-
-  setDefaultLastBlock()
-
-  private def setDefaultLastBlock(): Unit = setLastBlock(testBlock(2))
-
-  private def setLastBlock(block: Block, desiredHeight: Int = 1): Unit = stubApp.setHistory(historyWithLastBlock(block, desiredHeight))
-
-  private def historyWithLastBlock(block: Block, desiredHeight: Int): History = {
-    val stubHistory = stub[History]
-    (stubHistory.blockAt _).when(desiredHeight).returns(Some(block)).anyNumberOfTimes()
-    (stubHistory.height _).when().returns(desiredHeight).anyNumberOfTimes()
-    stubHistory
-  }
-
-  private class TestBlockGeneratorController(app: App) extends BlockGeneratorController(app) {
-    override def preStart(): Unit = {}
-  }
-
-  override protected val actorRef = system.actorOf(Props(new TestBlockGeneratorController(stubApp)))
-
-  private def assertStatusIs(status: BlockGeneratorController.Status) = {
-    actorRef ! GetStatus
+  def assertStatus(blockGeneratorController: ActorRef, status: BlockGeneratorController.Status): Unit = {
+    blockGeneratorController ! GetStatus
     expectMsg(status.name)
   }
+}
 
-  testSafely {
 
-    "initial status is Idle" in {
-      assertStatusIs(Idle)
-    }
+class EnabledBlockGeneratorControllerSpecification extends BlockGeneratorControllerSpecification {
+  val settings = MinerSettings(
+    enable = true,
+    offline = true,
+    quorum = 1,
+    generationDelay = 1.second,
+    intervalAfterLastBlockThenGenerationIsAllowed = 1.second,
+    tfLikeScheduling = true)
 
-    "when Idle don't check peers number" in {
-      setLastBlock(testBlock(2, 0), 2)
-      assertStatusIs(Idle)
-      actorRef ! SelfCheck
-      testPeerManager.expectNoMsg(testDuration)
-      setDefaultLastBlock()
-    }
+  test("initial status is Idle") { f: F =>
+    assertStatus(f.blockGeneratorController, Idle)
+  }
 
-    "StopGeneration command change state to idle from generating" in {
-      actorRef ! StartGeneration
-      assertStatusIs(Generating)
-      actorRef ! StopGeneration
-      assertStatusIs(Idle)
-    }
+  test("StopGeneration command stops") { f: F =>
+    f.history.appendBlock(TestBlock.empty)
+    f.blockGeneratorController ! StartGeneration
+    f.blockGeneratorController ! StopGeneration
+    assertStatus(f.blockGeneratorController, Idle)
+    f.blockGeneratorController ! StopGeneration
+    assertStatus(f.blockGeneratorController, Idle)
+  }
 
-    "StopGeneration command don't change state from idle" in {
-      setLastBlock(testBlock(2, 0))
-      actorRef ! StartGeneration
-      actorRef ! StopGeneration
-      assertStatusIs(Idle)
-      actorRef ! StopGeneration
-      assertStatusIs(Idle)
-      setDefaultLastBlock()
-    }
+  test("StartGeneration command starts generation when should generate because of genesis block") { f: F =>
+    f.history.appendBlock(TestBlock.empty)
+    assertStatus(f.blockGeneratorController, Idle)
+    f.blockGeneratorController ! StartGeneration
+    assertStatus(f.blockGeneratorController, Generating)
+    f.blockGeneratorController ! StopGeneration
+    assertStatus(f.blockGeneratorController, Idle)
+  }
 
-    "StartGeneration command change state to generation when should generate because of genesis block" in {
-      setLastBlock(testBlock(1, System.currentTimeMillis() - 11.minutes.toMillis))
-      assertStatusIs(Idle)
-      actorRef ! StartGeneration
-      assertStatusIs(Generating)
-      actorRef ! StopGeneration
-      assertStatusIs(Idle)
-      setDefaultLastBlock()
-    }
+  test("StartGeneration command starts generation if intervalAfterLastBlockThenGenerationIsAllowed hasn't passed") { f: F =>
+    f.history.appendBlock(TestBlock.empty)
+    f.history.appendBlock(TestBlock.withReference(f.history.lastBlock.uniqueId))
+    assertStatus(f.blockGeneratorController, Idle)
+    f.time.setTime(500)
+    f.blockGeneratorController ! StartGeneration
+    assertStatus(f.blockGeneratorController, Generating)
+  }
 
-    "StartGeneration command change state to generation when should generate because of last block time" in {
-      setLastBlock(testBlock(5, System.currentTimeMillis() - 9.minutes.toMillis))
-      assertStatusIs(Idle)
-      actorRef ! StartGeneration
-      assertStatusIs(Generating)
-      actorRef ! StopGeneration
-      assertStatusIs(Idle)
-      setDefaultLastBlock()
-    }
+  test("StartGeneration command do not start generation if intervalAfterLastBlockThenGenerationIsAllowed has passed") { f: F =>
+    f.history.appendBlock(TestBlock.empty)
+    f.history.appendBlock(TestBlock.withReference(f.history.lastBlock.uniqueId))
+    f.time.setTime(1001)
+    f.blockGeneratorController ! StartGeneration
+    assertStatus(f.blockGeneratorController, Idle)
+  }
 
-    "StartGeneration command do not change state to generation when should't generate" in {
-      setLastBlock(testBlock(2, 0), 2)
-      assertStatusIs(Idle)
-      actorRef ! StartGeneration
-      assertStatusIs(Idle)
-      setDefaultLastBlock()
-    }
+  test("Generating on no peers connected") { f: F =>
+    f.history.appendBlock(TestBlock.empty)
+    f.blockGeneratorController ! StartGeneration
+    f.peerManager.expectMsg(GetConnectedPeersTyped)
+    f.peerManager.reply(ConnectedPeers(Set.empty))
+    assertStatus(f.blockGeneratorController, Generating)
+  }
+}
 
-    "suspended / resumed" - {
-      actorRef ! StartGeneration
+class DisabledBlockGeneratorControllerSpecification extends BlockGeneratorControllerSpecification {
+  val settings = MinerSettings(
+    enable = true,
+    offline = false,
+    quorum = 1,
+    generationDelay = 1.second,
+    intervalAfterLastBlockThenGenerationIsAllowed = 1.second,
+    tfLikeScheduling = true)
 
-      testPeerManager.expectMsg(GetConnectedPeersTyped)
+  test("Suspended on no peers connected") { f: F =>
+    f.history.appendBlock(TestBlock.empty)
+    f.blockGeneratorController ! StartGeneration
+    f.peerManager.expectMsg(GetConnectedPeersTyped)
+    f.peerManager.reply(ConnectedPeers(Set.empty))
+    assertStatus(f.blockGeneratorController, Suspended)
+  }
 
-      "offlineGeneration = true" - {
-
-        "gen allowed even if no peers" in {
-          testPeerManager.reply(ConnectedPeers(Set.empty))
-          assertStatusIs(Generating)
-        }
-      }
-    }
+  test("Generating on no peers connected") { f: F =>
+    f.history.appendBlock(TestBlock.empty)
+    f.blockGeneratorController ! StartGeneration
+    f.peerManager.expectMsg(GetConnectedPeersTyped)
+    f.peerManager.reply(ConnectedPeers(Set(stub[ConnectedPeer])))
+    assertStatus(f.blockGeneratorController, Generating)
   }
 }

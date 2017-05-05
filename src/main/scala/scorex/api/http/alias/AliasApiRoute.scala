@@ -10,11 +10,12 @@ import play.api.libs.json.{Format, Json}
 import scorex.account.{Account, Alias}
 import scorex.api.http._
 import scorex.transaction._
+import scorex.utils.Time
 import scorex.wallet.Wallet
 
 @Path("/alias")
 @Api(value = "/alias")
-case class AliasApiRoute(settings: RestAPISettings, wallet: Wallet, transactionOperations: TransactionOperations, state: StateReader)
+case class AliasApiRoute(settings: RestAPISettings, wallet: Wallet, newTxHandler: NewTransactionHandler, time: Time, state: StateReader)
   extends ApiRoute {
 
   override val route = pathPrefix("alias") {
@@ -37,7 +38,7 @@ case class AliasApiRoute(settings: RestAPISettings, wallet: Wallet, transactionO
     )
   ))
   @ApiResponses(Array(new ApiResponse(code = 200, message = "Json with response or error")))
-  def alias: Route = processRequest("create", (t: CreateAliasRequest) => transactionOperations.alias(t, wallet))
+  def alias: Route = processRequest("create", (t: CreateAliasRequest) => TransactionFactory.alias(t, wallet, newTxHandler, time))
 
 
   @Path("/by-alias/{alias}")
@@ -45,8 +46,8 @@ case class AliasApiRoute(settings: RestAPISettings, wallet: Wallet, transactionO
   @ApiImplicitParams(Array(
     new ApiImplicitParam(name = "alias", value = "Alias", required = true, dataType = "string", paramType = "path")
   ))
-  def addressOfAlias: Route = (get & path("by-alias" / Segment)) { aliasString =>
-    val result = Alias.buildWithCurrentNetworkByte(aliasString) match {
+  def addressOfAlias: Route = (get & path("by-alias" / Segment)) { aliasName =>
+    val result = Alias.buildWithCurrentNetworkByte(aliasName) match {
       case Right(alias) =>
         state.resolveAlias(alias) match {
           case Some(addr) => Right(Address(addr.stringRepr))
@@ -70,5 +71,6 @@ case class AliasApiRoute(settings: RestAPISettings, wallet: Wallet, transactionO
   }
 
   case class Address(address: String)
+
   implicit val addressFormat: Format[Address] = Json.format
 }

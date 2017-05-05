@@ -1,14 +1,26 @@
 package scorex.consensus.mining
 
 import akka.actor._
-import scorex.app.Application
+import com.wavesplatform.settings.{BlockchainSettings, MinerSettings}
+import com.wavesplatform.state2.reader.StateReader
 import scorex.network.peer.PeerManager.{ConnectedPeers, GetConnectedPeersTyped}
-import scorex.utils.{NTP, ScorexLogging}
+import scorex.transaction.{History, UnconfirmedTransactionsStorage}
+import scorex.utils.{ScorexLogging, Time}
+import scorex.wallet.Wallet
+
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
-class BlockGeneratorController(application: Application) extends Actor with ScorexLogging {
+class BlockGeneratorController(minerSettings: MinerSettings,
+                               history: History,
+                               time: Time,
+                               peerManager: ActorRef,
+                               wallet: Wallet,
+                               stateReader: StateReader,
+                               blockchainSettings: BlockchainSettings,
+                               utxStorage: UnconfirmedTransactionsStorage,
+                               coordinator: ActorRef) extends Actor with ScorexLogging {
 
   import BlockGeneratorController._
   import Miner.{GuessABlock, Stop}
@@ -16,14 +28,14 @@ class BlockGeneratorController(application: Application) extends Actor with Scor
   private var miner: Option[ActorRef] = None
 
   override def preStart(): Unit = {
-    if (application.settings.minerSettings.enable) {
+    if (minerSettings.enable) {
       context.system.scheduler.schedule(SelfCheckInterval, SelfCheckInterval, self, SelfCheck)
     }
   }
 
   override val supervisorStrategy = SupervisorStrategy.stoppingStrategy
 
-  override def receive: Receive = if (application.settings.minerSettings.enable) idle else Actor.ignoringBehavior
+  override def receive: Receive = if (minerSettings.enable) idle else Actor.ignoringBehavior
 
   def idle: Receive = state {
 
@@ -67,7 +79,9 @@ class BlockGeneratorController(application: Application) extends Actor with Scor
       if (active) {
         if (ifShouldGenerateNow) {
           log.info(s"Enforce miner to generate block")
-          miner.foreach { _ ! GuessABlock(rescheduleImmediately = true) }
+          miner.foreach {
+            _ ! GuessABlock(rescheduleImmediately = true)
+          }
         } else {
           self ! StopGeneration
         }
@@ -85,28 +99,28 @@ class BlockGeneratorController(application: Application) extends Actor with Scor
   private def ifShouldGenerateNow: Boolean = isLastBlockTsInAllowedToGenerationInterval || isLastBlockIsGenesis
 
   private def isLastBlockTsInAllowedToGenerationInterval: Boolean = try {
-    val lastBlockTimestamp = application.blockStorage.history.lastBlock.timestampField.value
-    val currentTime = NTP.correctedTime()
-    val doNotGenerateUntilLastBlockTs = currentTime - application.settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed.toMillis
-    lastBlockTimestamp >= doNotGenerateUntilLastBlockTs
+    val lastBlockTimestamp = history.lastBlock.timestamp
+    time.correctedTime() <= lastBlockTimestamp + minerSettings.intervalAfterLastBlockThenGenerationIsAllowed.toMillis
   } catch {
     case e: UnsupportedOperationException =>
       log.debug(s"DB can't find last block because of unexpected modification")
       false
   }
 
-  private def isLastBlockIsGenesis: Boolean = application.blockStorage.history.height() == 1
+  private def isLastBlockIsGenesis: Boolean = history.height() == 1
 
   private def changeStateAccordingTo(peersNumber: Int, active: Boolean): Unit = {
     def suspendGeneration(): Unit = {
       log.info(s"Suspend block generation")
       context become generating(active = false)
     }
+
     def resumeGeneration(): Unit = {
       log.info(s"Resume block generation")
       context become generating(active = true)
     }
-    if (peersNumber >= application.settings.minerSettings.quorum || application.settings.minerSettings.offline) {
+
+    if (peersNumber >= minerSettings.quorum || minerSettings.offline) {
       if (ifShouldGenerateNow) {
         startMiner()
         if (!active) {
@@ -126,7 +140,9 @@ class BlockGeneratorController(application: Application) extends Actor with Scor
   private def startMiner() = if (miner.isEmpty) {
     log.info(s"Check miner")
     miner = Some(createMiner)
-    miner.foreach { _ ! GuessABlock(false) }
+    miner.foreach {
+      _ ! GuessABlock(false)
+    }
   }
 
   private def stopMiner() = if (miner.nonEmpty) {
@@ -145,10 +161,17 @@ class BlockGeneratorController(application: Application) extends Actor with Scor
     }
 
   private def createMiner: ActorRef = {
-    context.watch(context.actorOf(Props(classOf[Miner], application), "miner"))
+    context.watch(context.actorOf(Props(classOf[Miner], minerSettings: MinerSettings,
+      wallet,
+      history,
+      stateReader,
+      blockchainSettings,
+      utxStorage,
+      time,
+      coordinator), "miner"))
   }
 
-  private def askForConnectedPeers() = application.peerManager ! GetConnectedPeersTyped
+  private def askForConnectedPeers() = peerManager ! GetConnectedPeersTyped
 }
 
 object BlockGeneratorController {

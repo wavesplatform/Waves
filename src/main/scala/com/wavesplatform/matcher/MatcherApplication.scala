@@ -10,7 +10,7 @@ import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state2.reader.StateReader
 import scorex.api.http.CompositeHttpService
 import scorex.app.Application
-import scorex.transaction.{BlockStorage, TransactionModule}
+import scorex.transaction.{BlockStorage, NewTransactionHandler}
 import scorex.utils.ScorexLogging
 import scorex.wallet.Wallet
 
@@ -21,30 +21,26 @@ import scala.reflect.runtime.universe._
 trait MatcherApplication extends ScorexLogging {
   def actorSystem: ActorSystem
 
-  def matcherSettings: MatcherSettings
-
-  def restAPISettings: RestAPISettings
-
-  def transactionModule: TransactionModule
-
-  def blockStorage: BlockStorage
+  def newTransactionHandler: NewTransactionHandler
 
   def wallet: Wallet
 
-  def storedState: StateReader = blockStorage.stateReader
+  private lazy val thisApplication = this.asInstanceOf[Application]
 
+  val matcherSettings = thisApplication.settings.matcherSettings
   lazy val matcherApiRoutes = Seq(
-    MatcherApiRoute(this.asInstanceOf[Application].wallet,
-      this.asInstanceOf[Application].blockStorage.stateReader,
-      matcher, restAPISettings, matcherSettings)
+    MatcherApiRoute(thisApplication.wallet,
+      thisApplication.stateReader,
+      matcher, thisApplication.settings.restAPISettings, matcherSettings)
   )
 
   lazy val matcherApiTypes = Seq(
     typeOf[MatcherApiRoute]
   )
 
-  lazy val matcher: ActorRef = actorSystem.actorOf(MatcherActor.props(storedState, wallet, matcherSettings,
-    transactionModule), MatcherActor.name)
+  lazy val matcher: ActorRef = actorSystem.actorOf(MatcherActor.props(thisApplication.stateReader, wallet, matcherSettings,
+    newTransactionHandler, thisApplication.time, thisApplication.history,
+    thisApplication.settings.blockchainSettings.functionalitySettings), MatcherActor.name)
 
   @volatile var matcherServerBinding: ServerBinding = _
 
@@ -58,7 +54,7 @@ trait MatcherApplication extends ScorexLogging {
     implicit val as = actorSystem
     implicit val materializer = ActorMaterializer()
 
-    val combinedRoute = CompositeHttpService(actorSystem, matcherApiTypes, matcherApiRoutes, restAPISettings).compositeRoute
+    val combinedRoute = CompositeHttpService(actorSystem, matcherApiTypes, matcherApiRoutes, thisApplication.settings.restAPISettings).compositeRoute
     matcherServerBinding = Await.result(Http().bindAndHandle(combinedRoute, matcherSettings.bindAddress,
       matcherSettings.port), 5.seconds)
 

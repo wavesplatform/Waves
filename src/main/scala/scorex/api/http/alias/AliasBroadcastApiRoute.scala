@@ -11,7 +11,7 @@ import scorex.transaction._
 
 @Path("/alias/broadcast")
 @Api(value = "/alias")
-case class AliasBroadcastApiRoute(settings: RestAPISettings, transactionModule: TransactionModule)
+case class AliasBroadcastApiRoute(settings: RestAPISettings, transactionModule: NewTransactionHandler)
   extends ApiRoute with BroadcastRoute {
   override val route = pathPrefix("alias" / "broadcast") {
     signedCreate

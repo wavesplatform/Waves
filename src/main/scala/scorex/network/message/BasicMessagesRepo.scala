@@ -5,13 +5,11 @@ import java.util
 
 import com.google.common.primitives.{Bytes, Ints}
 import scorex.block.Block
-import scorex.consensus.nxt.WavesConsensusModule
-import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.signatures.SigningFunctions
 import scorex.crypto.signatures.SigningFunctions.Signature
-import scorex.network.{BlockCheckpoint, Checkpoint}
 import scorex.network.message.Message._
-import scorex.transaction.{History, TransactionModule}
+import scorex.network.{BlockCheckpoint, Checkpoint}
+import scorex.transaction.History
 import scorex.transaction.TransactionParser._
 
 import scala.util.Try

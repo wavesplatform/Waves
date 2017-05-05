@@ -10,6 +10,8 @@ import scala.concurrent.{Await, Future}
 import scala.util.Random
 
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.language.postfixOps
+
 
 trait IntegrationSuiteWithThreeAddresses extends FunSuite with BeforeAndAfterAll with Matchers with ScalaFutures
   with IntegrationPatience with RecoverMethods with RequestErrorAssert {
