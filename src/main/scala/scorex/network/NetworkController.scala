@@ -5,7 +5,7 @@ import java.net.{InetAddress, InetSocketAddress, NetworkInterface, URI}
 import akka.actor._
 import akka.io.Tcp._
 import akka.io.{IO, Tcp}
-import scorex.app.RunnableApplication
+import scorex.app.{Application}
 import scorex.network.message.{Message, MessageSpec}
 import scorex.network.peer.PeerManager
 import scorex.network.peer.PeerManager.{CloseAllConnections, CloseAllConnectionsComplete}
@@ -21,7 +21,7 @@ import scala.util.{Failure, Random, Success, Try}
   * Control all network interaction
   * must be singleton
   */
-class NetworkController(application: RunnableApplication) extends Actor with ScorexLogging {
+class NetworkController(application: Application) extends Actor with ScorexLogging {
 
   import NetworkController._
 

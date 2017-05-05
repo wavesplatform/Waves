@@ -3,6 +3,7 @@ package scorex.lagonaki.unit
 import akka.actor.{ActorRef, Props}
 import akka.testkit.TestProbe
 import com.typesafe.config.ConfigFactory
+import com.wavesplatform.Application
 import com.wavesplatform.history.BlockStorageImpl
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state2._
@@ -10,7 +11,6 @@ import com.wavesplatform.state2.reader.StateReader
 import org.h2.mvstore.MVStore
 import scorex.ActorTestingCommons
 import scorex.account.PrivateKeyAccount
-import scorex.app.{Application, ApplicationVersion, RunnableApplication}
 import scorex.block.Block
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
 import scorex.crypto.encode.Base58
@@ -61,7 +61,7 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
   val blockStorage1 = new BlockStorageImpl(wavesSettings.blockchainSettings)
   val utxStorage1 = new UnconfirmedTransactionsDatabaseImpl(wavesSettings.utxSettings.size)
 
-  class TestAppMock extends Application {
+  class TestAppMock extends scorex.app.Application {
     lazy val networkController: ActorRef = networkControllerMock
     lazy val settings = wavesSettings
     lazy val blockGenerator: ActorRef = testBlockGenerator.ref
@@ -85,6 +85,10 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
     override def blockchainUpdater: BlockchainUpdater = blockStorage1.blockchainUpdater
 
     override def checkpoints: CheckpointService = blockStorage1.checkpointService
+
+    override def messagesHandler: MessageHandler = ???
+
+    override def upnp: UPnP = ???
   }
 
   val app = new TestAppMock()
@@ -105,7 +109,7 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
   app.blockchainUpdater.processBlock(
     Block.genesis(
       NxtLikeConsensusBlockData(app.settings.blockchainSettings.genesisSettings.initialBaseTarget, Array.fill(DigestSize)(0: Byte)),
-      RunnableApplication.genesisTransactions(app.settings.blockchainSettings.genesisSettings), genesisTimestamp)).explicitGet()
+      Application.genesisTransactions(app.settings.blockchainSettings.genesisSettings), genesisTimestamp)).explicitGet()
 
   def before(): Unit = {
     app.blockchainUpdater.removeAfter(blockStorage1.history.genesis.uniqueId)

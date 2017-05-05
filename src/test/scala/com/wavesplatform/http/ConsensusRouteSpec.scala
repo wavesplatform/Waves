@@ -15,7 +15,6 @@ import scorex.api.http.BlockNotExists
 import scorex.consensus.nxt.api.http.NxtConsensusApiRoute
 import scorex.crypto.encode.Base58
 
-@DoNotDiscover
 class ConsensusRouteSpec extends RouteSpec("/consensus") with RestAPISettingsHelper with PropertyChecks with MockFactory with BlockGen with HistoryTest {
   private val state = mock[StateReader]
 

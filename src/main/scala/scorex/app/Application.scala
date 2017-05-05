@@ -3,12 +3,16 @@ package scorex.app
 import akka.actor.ActorRef
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state2.reader.StateReader
+import scorex.network.UPnP
+import scorex.network.message.MessageHandler
 import scorex.transaction._
 import scorex.utils.Time
 import scorex.wallet.Wallet
 
 
 trait Application {
+
+  def messagesHandler: MessageHandler
 
   def peerManager: ActorRef
 
@@ -23,6 +27,8 @@ trait Application {
   def scoreObserver: ActorRef
 
   def settings: WavesSettings
+
+  def upnp: UPnP
 
   def wallet: Wallet
 

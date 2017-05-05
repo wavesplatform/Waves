@@ -21,31 +21,24 @@ import scala.reflect.runtime.universe._
 trait MatcherApplication extends ScorexLogging {
   def actorSystem: ActorSystem
 
-  def matcherSettings: MatcherSettings
-
-  def restAPISettings: RestAPISettings
-
   def newTransactionHandler: NewTransactionHandler
-
-  def blockStorage: BlockStorage
 
   def wallet: Wallet
 
-  def storedState: StateReader = blockStorage.stateReader
-
   private lazy val thisApplication = this.asInstanceOf[Application]
 
+  val matcherSettings = thisApplication.settings.matcherSettings
   lazy val matcherApiRoutes = Seq(
     MatcherApiRoute(thisApplication.wallet,
       thisApplication.stateReader,
-      matcher, restAPISettings, matcherSettings)
+      matcher, thisApplication.settings.restAPISettings, matcherSettings)
   )
 
   lazy val matcherApiTypes = Seq(
     typeOf[MatcherApiRoute]
   )
 
-  lazy val matcher: ActorRef = actorSystem.actorOf(MatcherActor.props(storedState, wallet, matcherSettings,
+  lazy val matcher: ActorRef = actorSystem.actorOf(MatcherActor.props(thisApplication.stateReader, wallet, matcherSettings,
     newTransactionHandler, thisApplication.time, thisApplication.history,
     thisApplication.settings.blockchainSettings.functionalitySettings), MatcherActor.name)
 
@@ -61,7 +54,7 @@ trait MatcherApplication extends ScorexLogging {
     implicit val as = actorSystem
     implicit val materializer = ActorMaterializer()
 
-    val combinedRoute = CompositeHttpService(actorSystem, matcherApiTypes, matcherApiRoutes, restAPISettings).compositeRoute
+    val combinedRoute = CompositeHttpService(actorSystem, matcherApiTypes, matcherApiRoutes, thisApplication.settings.restAPISettings).compositeRoute
     matcherServerBinding = Await.result(Http().bindAndHandle(combinedRoute, matcherSettings.bindAddress,
       matcherSettings.port), 5.seconds)
 

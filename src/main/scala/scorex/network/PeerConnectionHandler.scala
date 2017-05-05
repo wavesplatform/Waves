@@ -1,22 +1,24 @@
 package scorex.network
 
 import java.net.InetSocketAddress
+
 import akka.actor.{Actor, ActorRef, Status, Terminated}
 import akka.io.Tcp
 import akka.io.Tcp._
 import akka.util.{ByteString, CompactByteString}
 import com.google.common.primitives.Ints
-import scorex.app.RunnableApplication
+import scorex.app.Application
 import scorex.network.message.MessageHandler.RawNetworkData
 import scorex.network.peer.PeerManager
 import scorex.network.peer.PeerManager.Handshaked
 import scorex.utils.ScorexLogging
+
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.language.postfixOps
 import scala.util.{Failure, Success}
 
-case class PeerConnectionHandler(application: RunnableApplication,
+case class PeerConnectionHandler(application: Application,
                                  connection: ActorRef,
                                  remote: InetSocketAddress) extends Actor with Buffering with ScorexLogging {
 

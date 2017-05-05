@@ -4,45 +4,66 @@ import java.io.File
 import java.security.Security
 
 import akka.actor.{ActorSystem, Props}
+import akka.http.scaladsl.Http
+import akka.http.scaladsl.Http.ServerBinding
+import akka.http.scaladsl.server.Route
+import akka.pattern.ask
+import akka.stream.ActorMaterializer
+import akka.util.Timeout
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.actor.RootActorSystem
 import com.wavesplatform.history.BlockStorageImpl
 import com.wavesplatform.http.NodeApiRoute
-import com.wavesplatform.matcher.{MatcherApplication, MatcherSettings}
+import com.wavesplatform.matcher.MatcherApplication
 import com.wavesplatform.settings._
 import com.wavesplatform.state2.reader.StateReader
-import scorex.account.AddressScheme
+import scorex.account.{Account, AddressScheme}
 import scorex.api.http._
 import scorex.api.http.alias.{AliasApiRoute, AliasBroadcastApiRoute}
 import scorex.api.http.assets.{AssetsApiRoute, AssetsBroadcastApiRoute}
 import scorex.api.http.leasing.{LeaseApiRoute, LeaseBroadcastApiRoute}
-import scorex.app.ApplicationVersion
+import scorex.block.Block
+import scorex.consensus.mining.BlockGeneratorController
+import scorex.consensus.nxt.NxtLikeConsensusBlockData
 import scorex.consensus.nxt.api.http.NxtConsensusApiRoute
-import scorex.network.{TransactionalMessagesRepo, UnconfirmedPoolSynchronizer}
-import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
+import scorex.crypto.encode.Base58
+import scorex.crypto.hash.FastCryptographicHash.DigestSize
+import scorex.network._
+import scorex.network.message.{BasicMessagesRepo, MessageHandler}
+import scorex.network.peer.PeerManager
 import scorex.transaction._
+import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
 import scorex.utils.{ScorexLogging, Time, TimeImpl}
+import scorex.wallet.Wallet
 import scorex.waves.http.{DebugApiRoute, WavesApiRoute}
 
+import scala.concurrent.Await
+import scala.concurrent.duration._
 import scala.reflect.runtime.universe._
+import scala.util.{Left, Try}
 
-class Application(val actorSystem: ActorSystem, val settings: WavesSettings) extends scorex.app.RunnableApplication
-  with MatcherApplication {
+class Application(val actorSystem: ActorSystem, val settings: WavesSettings) extends scorex.app.Application with MatcherApplication {
 
-  override val matcherSettings: MatcherSettings = settings.matcherSettings
-  override val restAPISettings: RestAPISettings = settings.restAPISettings
-  private val feeCalculator = new FeeCalculator(settings.feesSettings)
+  lazy val upnp = new UPnP(settings.networkSettings.uPnPSettings)
+
+  val messagesHandler = MessageHandler(BasicMessagesRepo.specs ++ TransactionalMessagesRepo.specs)
+  val feeCalculator = new FeeCalculator(settings.feesSettings)
   val blockStorage = new BlockStorageImpl(settings.blockchainSettings)
   val history: History = blockStorage.history
   val stateReader: StateReader = blockStorage.stateReader
   val blockchainUpdater: BlockchainUpdater = blockStorage.blockchainUpdater
   val checkpoints: CheckpointService = blockStorage.checkpoints
-
+  val time: Time = new TimeImpl()
+  val wallet: Wallet = {
+    val maybeWalletFilename = Option(settings.walletSettings.file).filter(_.trim.nonEmpty)
+    val seed = Base58.decode(settings.walletSettings.seed).toOption
+    new Wallet(maybeWalletFilename, settings.walletSettings.password, seed)
+  }
   val utxStorage: UnconfirmedTransactionsStorage = new UnconfirmedTransactionsDatabaseImpl(settings.utxSettings.size)
-  override implicit lazy val newTransactionHandler = new NewTransactionHandlerImpl(settings.blockchainSettings.functionalitySettings,
+  val newTransactionHandler = new NewTransactionHandlerImpl(settings.blockchainSettings.functionalitySettings,
     networkController, time, feeCalculator, utxStorage, history, stateReader)
 
-  override lazy val apiRoutes = Seq(
+  lazy val apiRoutes = Seq(
     BlocksApiRoute(settings.restAPISettings, settings.checkpointsSettings, history, coordinator),
     TransactionsApiRoute(settings.restAPISettings, stateReader, history, utxStorage),
     NxtConsensusApiRoute(settings.restAPISettings, stateReader, history, settings.blockchainSettings.functionalitySettings),
@@ -62,7 +83,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
     AliasBroadcastApiRoute(settings.restAPISettings, newTransactionHandler)
   )
 
-  override lazy val apiTypes = Seq(
+  lazy val apiTypes = Seq(
     typeOf[BlocksApiRoute],
     typeOf[TransactionsApiRoute],
     typeOf[NxtConsensusApiRoute],
@@ -82,21 +103,108 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
     typeOf[AliasBroadcastApiRoute]
   )
 
-  override lazy val additionalMessageSpecs = TransactionalMessagesRepo.specs
+  lazy val unconfirmedPoolSynchronizer = actorSystem.actorOf(Props(classOf[UnconfirmedPoolSynchronizer], newTransactionHandler, settings.utxSettings, networkController, utxStorage))
+  lazy val networkController = actorSystem.actorOf(Props(new NetworkController(this)), "NetworkController")
+  lazy val peerManager = actorSystem.actorOf(PeerManager.props(settings.networkSettings, networkController, settings.blockchainSettings.addressSchemeCharacter), "PeerManager")
+  lazy val scoreObserver = actorSystem.actorOf(Props(classOf[ScoreObserver], this), "ScoreObserver")
+  lazy val blockchainSynchronizer = actorSystem.actorOf(Props(classOf[BlockchainSynchronizer], this), "BlockchainSynchronizer")
+  lazy val coordinator = actorSystem.actorOf(Props(classOf[Coordinator], this), "Coordinator")
+  lazy val historyReplier = actorSystem.actorOf(Props(classOf[HistoryReplier], this), "HistoryReplier")
+  lazy val blockGenerator = actorSystem.actorOf(Props(classOf[BlockGeneratorController], settings.minerSettings, history, time, peerManager,
+    wallet, stateReader, settings.blockchainSettings, utxStorage, coordinator), "BlockGenerator")
 
-  actorSystem.actorOf(Props(classOf[UnconfirmedPoolSynchronizer], newTransactionHandler, settings.utxSettings, networkController, utxStorage))
+  def run(): Unit = {
+    log.debug(s"Available processors: ${Runtime.getRuntime.availableProcessors}")
+    log.debug(s"Max memory available: ${Runtime.getRuntime.maxMemory}")
 
-  override def run(): Unit = {
-    super.run()
+    checkGenesis()
+
+    if (settings.networkSettings.uPnPSettings.enable) upnp.addPort(settings.networkSettings.port)
+
+
+    implicit val as = actorSystem
+    implicit val materializer = ActorMaterializer()
+
+    if (settings.restAPISettings.enable) {
+      val combinedRoute: Route = CompositeHttpService(actorSystem, apiTypes, apiRoutes, settings.restAPISettings).compositeRoute
+      val httpFuture = Http().bindAndHandle(combinedRoute, settings.restAPISettings.bindAddress, settings.restAPISettings.port)
+      serverBinding = Await.result(httpFuture, 10.seconds)
+      log.info(s"REST API was bound on ${settings.restAPISettings.bindAddress}:${settings.restAPISettings.port}")
+    }
+
+    Seq(scoreObserver, blockGenerator, blockchainSynchronizer, historyReplier, coordinator) foreach {
+      _ => // de-lazyning process :-)
+    }
+
+    actorSystem.actorOf(Props(classOf[PeerSynchronizer], this), "PeerSynchronizer")
+
+    //on unexpected shutdown
+    sys.addShutdownHook {
+      shutdown()
+    }
 
     if (matcherSettings.enable) runMatcher()
   }
 
-  override val time: Time = new TimeImpl()
+  def checkGenesis(): Unit = {
+    if (history.isEmpty) {
+      val maybeGenesisSignature = Option(settings.blockchainSettings.genesisSettings.signature).filter(_.trim.nonEmpty)
+      blockchainUpdater.processBlock(Block.genesis(
+        NxtLikeConsensusBlockData(settings.blockchainSettings.genesisSettings.initialBaseTarget, Array.fill(DigestSize)(0: Byte)),
+        Application.genesisTransactions(settings.blockchainSettings.genesisSettings),
+        settings.blockchainSettings.genesisSettings.blockTimestamp, maybeGenesisSignature)) match {
+        case Left(value) =>
+          log.error(value.toString)
+          System.exit(1)
+        case _ =>
+      }
+
+      log.info("Genesis block has been added to the state")
+    }
+  }
+
+  @volatile var shutdownInProgress = false
+  @volatile var serverBinding: ServerBinding = _
+
+  def shutdown(): Unit = {
+    if (!shutdownInProgress) {
+      log.info("Stopping network services")
+      shutdownInProgress = true
+      if (settings.restAPISettings.enable) {
+        Try(Await.ready(serverBinding.unbind(), 60.seconds)).failed.map(e => log.error("Failed to unbind REST API port: " + e.getMessage))
+      }
+      if (settings.networkSettings.uPnPSettings.enable) upnp.deletePort(settings.networkSettings.port)
+
+      implicit val askTimeout = Timeout(60.seconds)
+      Try(Await.result(networkController ? NetworkController.ShutdownNetwork, 60.seconds))
+        .failed.map(e => log.error("Failed to shutdown network: " + e.getMessage))
+      Try(Await.result(actorSystem.terminate(), 60.seconds))
+        .failed.map(e => log.error("Failed to terminate actor system: " + e.getMessage))
+      log.debug("Closing wallet")
+      wallet.close()
+      log.info("Shutdown complete")
+    }
+  }
+
 }
 
 object Application extends ScorexLogging {
-  def readConfig(userConfigPath: Option[String]): Config = {
+
+  private def configureLogging(settings: WavesSettings) = {
+    import ch.qos.logback.classic.{Level, LoggerContext}
+    import org.slf4j._
+
+    val lc = LoggerFactory.getILoggerFactory.asInstanceOf[LoggerContext]
+    val rootLogger = lc.getLogger(Logger.ROOT_LOGGER_NAME)
+    settings.loggingLevel match {
+      case LogLevel.DEBUG => rootLogger.setLevel(Level.DEBUG)
+      case LogLevel.INFO => rootLogger.setLevel(Level.INFO)
+      case LogLevel.WARN => rootLogger.setLevel(Level.WARN)
+      case LogLevel.ERROR => rootLogger.setLevel(Level.ERROR)
+    }
+  }
+
+  private def readConfig(userConfigPath: Option[String]): Config = {
     val maybeConfigFile = for {
       maybeFilename <- userConfigPath
       file = new File(maybeFilename)
@@ -156,20 +264,11 @@ object Application extends ScorexLogging {
     }
   }
 
-  /**
-    * Configure logback logging level according to settings
-    */
-  private def configureLogging(settings: WavesSettings) = {
-    import ch.qos.logback.classic.{Level, LoggerContext}
-    import org.slf4j._
-
-    val lc = LoggerFactory.getILoggerFactory.asInstanceOf[LoggerContext]
-    val rootLogger = lc.getLogger(Logger.ROOT_LOGGER_NAME)
-    settings.loggingLevel match {
-      case LogLevel.DEBUG => rootLogger.setLevel(Level.DEBUG)
-      case LogLevel.INFO => rootLogger.setLevel(Level.INFO)
-      case LogLevel.WARN => rootLogger.setLevel(Level.WARN)
-      case LogLevel.ERROR => rootLogger.setLevel(Level.ERROR)
+  def genesisTransactions(gs: GenesisSettings): Seq[GenesisTransaction] = {
+    gs.transactions.map { ts =>
+      val acc = Account.fromString(ts.recipient).right.get
+      GenesisTransaction.create(acc, ts.amount, gs.transactionsTimestamp).right.get
     }
   }
+
 }
