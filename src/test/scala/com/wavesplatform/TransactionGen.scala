@@ -184,7 +184,7 @@ trait TransactionGen {
     val issue = IssueTransaction.create(sender, assetName, description, issueQuantity, decimals, reissuable, iFee, timestamp).right.get
     val reissue = ReissueTransaction.create(sender, issue.assetId, reissueQuantity, reissuable2, fee, timestamp).right.get
     val burn = BurnTransaction.create(sender, issue.assetId, burnAmount, fee, timestamp).right.get
-    val makeAssetNameUnique = MakeAssetNameUniqueTransaction.create(sender, issue.assetId, fee, timestamp).right.get
+    val makeAssetNameUnique = MakeAssetNameUniqueTransaction.create(sender, issue.assetId, fee, AddressScheme.current.chainId, timestamp).right.get
     (issue, reissue, burn, makeAssetNameUnique)
   }
 
