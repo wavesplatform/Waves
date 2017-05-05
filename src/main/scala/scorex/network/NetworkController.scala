@@ -6,7 +6,6 @@ import akka.actor._
 import akka.io.Tcp._
 import akka.io.{IO, Tcp}
 import com.wavesplatform.settings.NetworkSettings
-import scorex.app.Application
 import scorex.network.message.{Message, MessageHandler, MessageSpec}
 import scorex.network.peer.PeerManager
 import scorex.network.peer.PeerManager.{CloseAllConnections, CloseAllConnectionsComplete}
@@ -16,34 +15,25 @@ import scala.collection.JavaConverters._
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.util.{Failure, Random, Success, Try}
+import scala.util.{Failure, Success, Try}
 
-/**
-  * Control all network interaction
-  * must be singleton
-  */
-class NetworkController(application: Application) extends Actor with ScorexLogging {
+class NetworkController(networkSettings: NetworkSettings, uPnP: UPnP, peerManager: ActorRef, messagesHandler: MessageHandler) extends Actor with ScorexLogging {
 
   import NetworkController._
 
-  lazy val localAddress = new InetSocketAddress(InetAddress.getByName(settings.bindAddress), settings.port)
+  lazy val localAddress = new InetSocketAddress(InetAddress.getByName(networkSettings.bindAddress), networkSettings.port)
 
   lazy val ownSocketAddress = getDeclaredHost.flatMap(host => Try(InetAddress.getByName(host)).toOption)
     .orElse {
-      if (settings.uPnPSettings.enable) application.upnp.externalAddress else None
-    }.map(inetAddress => new InetSocketAddress(inetAddress, getDeclaredPort.getOrElse(settings.port)))
+      if (networkSettings.uPnPSettings.enable) uPnP.externalAddress else None
+    }.map(inetAddress => new InetSocketAddress(inetAddress, getDeclaredPort.getOrElse(networkSettings.port)))
 
-  lazy val connTimeout = Some(settings.connectionTimeout)
-
-  private lazy val settings = application.settings.networkSettings
+  lazy val connTimeout = Some(networkSettings.connectionTimeout)
 
   // there is not recovery for broken connections
   override val supervisorStrategy = SupervisorStrategy.stoppingStrategy
 
   private implicit val system = context.system
-
-
-  private val peerManager = application.peerManager
 
   private val messageHandlers = mutable.Map[Seq[Message.MessageCode], ActorRef]()
 
@@ -52,7 +42,7 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
   private var maybeRequester: Option[ActorRef] = None
 
   //check own declared address for validity
-  if (!settings.localOnly) {
+  if (!networkSettings.localOnly) {
     getDeclaredHost.forall { myHost =>
       Try {
         val myAddress = InetAddress.getAllByName(myHost)
@@ -65,8 +55,8 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
         } match {
           case true => true
           case false =>
-            if (settings.uPnPSettings.enable) {
-              val externalAddress = application.upnp.externalAddress
+            if (networkSettings.uPnPSettings.enable) {
+              val externalAddress = uPnP.externalAddress
               myAddress.contains(externalAddress)
             } else false
         }
@@ -160,7 +150,7 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
       log.warn(s"NetworkController: got something strange $nonsense")
   }
 
-  private def getDeclaredUri: Option[URI] = Try(new URI(s"http://${settings.declaredAddress}")).toOption
+  private def getDeclaredUri: Option[URI] = Try(new URI(s"http://${networkSettings.declaredAddress}")).toOption
 
   private def getDeclaredHost: Option[String] = getDeclaredUri.map(_.getHost)
 
@@ -187,8 +177,8 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
     val handler = context.actorOf(Props(classOf[PeerConnectionHandler], peerManager,
       connection,
       remote,
-      application.messagesHandler,
-      application.settings.networkSettings))
+      messagesHandler,
+      networkSettings))
     peerManager ! PeerManager.Connected(remote, handler, ownSocketAddress, inbound)
   }
 }

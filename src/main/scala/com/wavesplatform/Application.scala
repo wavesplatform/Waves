@@ -103,15 +103,15 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
     typeOf[AliasBroadcastApiRoute]
   )
 
-  lazy val networkController = actorSystem.actorOf(Props(new NetworkController(this)), "NetworkController")
-  lazy val coordinator = actorSystem.actorOf(Props(classOf[Coordinator], this), "Coordinator")
-  lazy val blockchainSynchronizer = actorSystem.actorOf(Props(classOf[BlockchainSynchronizer], networkController, coordinator, history, settings.synchronizationSettings ), "BlockchainSynchronizer")
-  lazy val unconfirmedPoolSynchronizer = actorSystem.actorOf(Props(classOf[UnconfirmedPoolSynchronizer], newTransactionHandler, settings.utxSettings, networkController, utxStorage))
+  lazy val networkController = actorSystem.actorOf(Props(new NetworkController(settings.networkSettings, upnp, peerManager, messagesHandler)), "NetworkController")
   lazy val peerManager = actorSystem.actorOf(PeerManager.props(settings.networkSettings, networkController, settings.blockchainSettings.addressSchemeCharacter), "PeerManager")
+  lazy val unconfirmedPoolSynchronizer = actorSystem.actorOf(Props(classOf[UnconfirmedPoolSynchronizer], newTransactionHandler, settings.utxSettings, networkController, utxStorage))
+  lazy val coordinator = actorSystem.actorOf(Props(classOf[Coordinator], this), "Coordinator")
   lazy val scoreObserver = actorSystem.actorOf(Props(classOf[ScoreObserver], networkController, coordinator, settings.synchronizationSettings), "ScoreObserver")
   lazy val historyReplier = actorSystem.actorOf(Props(classOf[HistoryReplier], networkController, history: History, settings.synchronizationSettings.maxChainLength: Int), "HistoryReplier")
   lazy val blockGenerator = actorSystem.actorOf(Props(classOf[BlockGeneratorController], settings.minerSettings, history, time, peerManager,
     wallet, stateReader, settings.blockchainSettings, utxStorage, coordinator), "BlockGenerator")
+  lazy val blockchainSynchronizer = actorSystem.actorOf(Props(classOf[BlockchainSynchronizer], networkController, coordinator, history, settings.synchronizationSettings), "BlockchainSynchronizer")
 
   def run(): Unit = {
     log.debug(s"Available processors: ${Runtime.getRuntime.availableProcessors}")
