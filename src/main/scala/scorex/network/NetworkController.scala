@@ -17,7 +17,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 
-class NetworkController(networkSettings: NetworkSettings, uPnP: UPnP, peerManager: ActorRef, messagesHandler: MessageHandler) extends Actor with ScorexLogging {
+class NetworkController(networkSettings: NetworkSettings, uPnP: => UPnP, peerManager: ActorRef, messagesHandler: MessageHandler) extends Actor with ScorexLogging {
 
   import NetworkController._
 

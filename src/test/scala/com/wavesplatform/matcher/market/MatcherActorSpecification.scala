@@ -25,7 +25,7 @@ import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import scorex.utils.{NTP, ScorexLogging, Time, TimeImpl}
 import scorex.wallet.Wallet
 
-class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest"))
+class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest2"))
   with WordSpecLike
   with Matchers
   with BeforeAndAfterAll
@@ -36,7 +36,7 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest")
   with PathMockFactory {
 
   val db = new MVStore.Builder().compress().open()
-  val storedState: StateReader = stub[StateReader] // fromDBWithUnlimitedBalance(db, TestBlockchainSettings.Disabled.functionalitySettings)
+  val storedState: StateReader = stub[StateReader]
 
   val settings = matcherSettings.copy(account = MatcherAccount.address)
   val history = stub[History]
