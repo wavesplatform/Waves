@@ -149,7 +149,7 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
     val fork = existingItems.takeWhile {
       case BlockCheckpoint(h, sig) =>
         val block = history.blockAt(h).get
-        !(block.signerDataField.value.signature sameElements sig)
+        !(block.signerData.signature sameElements sig)
     }
 
     if (fork.nonEmpty) {
@@ -164,7 +164,7 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
   }
 
   private def processSingleBlock(newBlock: Block, from: Option[ConnectedPeer]): Unit = {
-    val parentBlockId = newBlock.referenceField.value
+    val parentBlockId = newBlock.reference
     val local = from.isEmpty
 
     val isBlockToBeAdded = try {
@@ -180,7 +180,7 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
           log.debug(s"A child for parent of the block already exists, local=$local: ${newBlock.json}")
 
           val cmp = PoSCalc.blockOrdering(history, stateReader, application.settings.blockchainSettings.functionalitySettings, application.time)
-          if (lastBlock.referenceField.value.sameElements(parentBlockId) && cmp.lt(lastBlock, newBlock)) {
+          if (lastBlock.reference.sameElements(parentBlockId) && cmp.lt(lastBlock, newBlock)) {
             log.debug(s"New block ${newBlock.json} is better than last ${lastBlock.json}")
           }
 
@@ -246,7 +246,7 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
   private def isValidWithRespectToCheckpoint(candidate: Block, estimatedHeight: Int): Boolean =
     !checkpoints.get.exists {
       case Checkpoint(items, _) =>
-        val blockSignature = candidate.signerDataField.value.signature
+        val blockSignature = candidate.signerData.signature
         items.exists { case BlockCheckpoint(h, sig) =>
           h == estimatedHeight && !(blockSignature sameElements sig)
         }
@@ -264,8 +264,8 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
     else {
       def history = application.blockStorage.history.contains(b.reference)
 
-      def signature = EllipticCurveImpl.verify(b.signerDataField.value.signature, b.bytesWithoutSignature,
-        b.signerDataField.value.generator.publicKey)
+      def signature = EllipticCurveImpl.verify(b.signerData.signature, b.bytesWithoutSignature,
+        b.signerData.generator.publicKey)
 
       def consensus = blockConsensusValidation(
         application.blockStorage.history,
@@ -342,17 +342,17 @@ object Coordinator extends ScorexLogging {
 
     val fs = bcs.functionalitySettings
 
-    val blockTime = block.timestampField.value
+    val blockTime = block.timestamp
 
     require((blockTime - time.correctedTime()).millis < MaxTimeDrift, s"Block timestamp $blockTime is from future")
 
     if (blockTime > fs.requireSortedTransactionsAfter) {
-      require(block.transactionDataField.asInstanceOf[TransactionsBlockField].value.sorted(TransactionsOrdering.InBlock) == block.transactionDataField.asInstanceOf[TransactionsBlockField].value, "Transactions must be sorted correctly")
+      require(block.transactionData.sorted(TransactionsOrdering.InBlock) == block.transactionData, "Transactions must be sorted correctly")
     }
 
     val parentOpt = history.parent(block)
     require(parentOpt.isDefined || history.height() == 1, s"Can't find parent block with id '${
-      Base58.encode(block.referenceField.value)
+      Base58.encode(block.reference)
     }' of block " +
       s"'${
         Base58.encode(block.uniqueId)
@@ -361,18 +361,18 @@ object Coordinator extends ScorexLogging {
     val parent = parentOpt.get
     val parentHeightOpt = history.heightOf(parent.uniqueId)
     require(parentHeightOpt.isDefined, s"Can't get parent block with id '${
-      Base58.encode(block.referenceField.value)
+      Base58.encode(block.reference)
     }' height")
     val parentHeight = parentHeightOpt.get
 
-    val prevBlockData = parent.consensusDataField.value
-    val blockData = block.consensusDataField.value
+    val prevBlockData = parent.consensusData
+    val blockData = block.consensusData
 
     val cbt = calcBaseTarget(history)(bcs.genesisSettings.averageBlockDelay, parent, blockTime)
     val bbt = blockData.baseTarget
     require(cbt == bbt, s"Block's basetarget is wrong, calculated: $cbt, block contains: $bbt")
 
-    val generator = block.signerDataField.value.generator
+    val generator = block.signerData.generator
 
     //check generation signature
     val calcGs = calcGeneratorSignature(prevBlockData, generator)

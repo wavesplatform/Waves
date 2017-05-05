@@ -138,7 +138,7 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
   }
 
   def genCheckpoint(historyPoints: Seq[Int]): Checkpoint = {
-    val items = historyPoints.map(h => BlockCheckpoint(h, blockStorage1.history.blockAt(h).get.signerDataField.value.signature))
+    val items = historyPoints.map(h => BlockCheckpoint(h, blockStorage1.history.blockAt(h).get.signerData.signature))
     val checkpoint = Checkpoint(items, Array()).signedBy(pk.privateKey)
     checkpoint
   }
@@ -149,7 +149,7 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
 
     val toRollback = 9
     val chpBlock = createBlock(blockStorage1.history.blockAt(toRollback - 1).get.uniqueId)
-    val p = BlockCheckpoint(toRollback, chpBlock.signerDataField.value.signature)
+    val p = BlockCheckpoint(toRollback, chpBlock.signerData.signature)
     val firstChp = genCheckpoint(Seq(7, 5, 3))
 
     val checkpoint = Checkpoint(p +: firstChp.items, Array()).signedBy(pk.privateKey)

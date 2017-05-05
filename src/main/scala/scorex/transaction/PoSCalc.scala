@@ -33,7 +33,7 @@ object PoSCalc extends ScorexLogging {
     def normalize(value: Long): Double = value * avgDelayInSeconds / (60: Double)
 
     val height = history.heightOf(prevBlock).get
-    val prevBaseTarget = prevBlock.consensusDataField.value.baseTarget
+    val prevBaseTarget = prevBlock.consensusData.baseTarget
     if (height % 2 == 0) {
       val blocktimeAverage = history.parent(prevBlock, AvgBlockTimeDepth - 1)
         .map(b => (timestamp - b.timestamp) / AvgBlockTimeDepth)

@@ -38,9 +38,9 @@ class BlockSpecification extends FunSuite with Matchers with MockFactory with Un
     val block = Block.buildAndSign(version, timestamp, reference, cbd, tbd, gen)
     val parsedBlock = Block.parseBytes(block.bytes).get
 
-    assert(parsedBlock.consensusDataField.value.asInstanceOf[NxtLikeConsensusBlockData].generationSignature.sameElements(gs))
-    assert(parsedBlock.versionField.value == version)
-    assert(parsedBlock.signerDataField.value.generator.publicKey.sameElements(gen.publicKey))
+    assert(parsedBlock.consensusData.generationSignature.sameElements(gs))
+    assert(parsedBlock.version == version)
+    assert(parsedBlock.signerData.generator.publicKey.sameElements(gen.publicKey))
   }
 
 }

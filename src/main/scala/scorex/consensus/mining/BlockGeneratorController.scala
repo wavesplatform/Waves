@@ -99,7 +99,7 @@ class BlockGeneratorController(minerSettings: MinerSettings,
   private def ifShouldGenerateNow: Boolean = isLastBlockTsInAllowedToGenerationInterval || isLastBlockIsGenesis
 
   private def isLastBlockTsInAllowedToGenerationInterval: Boolean = try {
-    val lastBlockTimestamp = history.lastBlock.timestampField.value
+    val lastBlockTimestamp = history.lastBlock.timestamp
     time.correctedTime() <= lastBlockTimestamp + minerSettings.intervalAfterLastBlockThenGenerationIsAllowed.toMillis
   } catch {
     case e: UnsupportedOperationException =>

@@ -63,7 +63,7 @@ class ConsensusRouteSpec extends RouteSpec("/consensus") with RestAPISettingsHel
         (history.blockAt _).when(*).returns(result).once()
         if (isAvailable) {
           Get(routePath(s"/basetarget/${blk.encodedId}")) ~> route ~> check {
-            (responseAs[JsObject] \ "baseTarget").as[Long] shouldEqual blk.consensusDataField.value.baseTarget
+            (responseAs[JsObject] \ "baseTarget").as[Long] shouldEqual blk.consensusData.baseTarget
           }
         } else {
           Get(routePath(s"/basetarget/${blk.encodedId}")) ~> route should produce(BlockNotExists)
