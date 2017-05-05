@@ -43,9 +43,9 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
 
   private lazy val blockchainSynchronizer = application.blockchainSynchronizer
 
-  private lazy val history = application.blockStorage.history
-  private lazy val stateReader = application.blockStorage.stateReader
-  private lazy val checkpoints = application.blockStorage.checkpoints
+  private lazy val history = application.history
+  private lazy val stateReader = application.stateReader
+  private lazy val checkpoints = application.checkpoints
 
   context.system.scheduler.schedule(1.second, application.settings.synchronizationSettings.scoreBroadcastInterval, self, BroadcastCurrentScore)
 
@@ -109,7 +109,7 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
       case AddBlock(block, from) => processSingleBlock(block, from)
 
       case BroadcastCurrentScore =>
-        val msg = Message(ScoreMessageSpec, Right(application.blockStorage.history.score()), None)
+        val msg = Message(ScoreMessageSpec, Right(application.history.score()), None)
         networkControllerRef ! NetworkController.SendToNetwork(msg, Broadcast)
 
       case DataFromPeer(msgId, checkpoint: Checkpoint@unchecked, remote) if msgId == CheckpointMessageSpec.messageCode =>
@@ -158,7 +158,7 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
       history.blockAt(hh(fork.size)).foreach {
         lastValidBlock =>
           log.warn(s"Fork detected (length = ${fork.size}), rollback to last valid block id [${lastValidBlock.encodedId}]")
-          application.blockStorage.blockchainUpdater.removeAfter(lastValidBlock.uniqueId)
+          application.blockchainUpdater.removeAfter(lastValidBlock.uniqueId)
       }
     }
   }
@@ -223,8 +223,8 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
       newBlocks.zipWithIndex.forall(p => isValidWithRespectToCheckpoint(p._1, lastCommonHeight + 1 + p._2))
     }
 
-    if (application.blockStorage.history.heightOf(lastCommonBlockId).exists(isForkValidWithCheckpoint)) {
-      application.blockStorage.blockchainUpdater.removeAfter(lastCommonBlockId)
+    if (application.history.heightOf(lastCommonBlockId).exists(isForkValidWithCheckpoint)) {
+      application.blockchainUpdater.removeAfter(lastCommonBlockId)
 
       foldM[({type l[α] = Either[(ValidationError, BlockId), α]})#l, List, Block, Unit](newBlocks.toList, ()) { case ((), block: Block) => processNewBlock(block).left.map((_, block.uniqueId)) } match {
         case Right(_) =>
@@ -260,16 +260,16 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
   }
 
   def isBlockValid(b: Block): Either[ValidationError, Unit] = {
-    if (application.blockStorage.history.contains(b)) Right(())
+    if (application.history.contains(b)) Right(())
     else {
-      def history = application.blockStorage.history.contains(b.reference)
+      def history = application.history.contains(b.reference)
 
       def signature = EllipticCurveImpl.verify(b.signerData.signature, b.bytesWithoutSignature,
         b.signerData.generator.publicKey)
 
       def consensus = blockConsensusValidation(
-        application.blockStorage.history,
-        application.blockStorage.stateReader,
+        application.history,
+        application.stateReader,
         application.settings.blockchainSettings,
         application.time)(b)
 
@@ -283,11 +283,11 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
 
   private def processNewBlock(block: Block): Either[ValidationError, Unit] = for {
     _ <- validateWithRespectToCheckpoint(block, history.height() + 1)
-    _ <- application.blockStorage.blockchainUpdater.processBlock(block)
+    _ <- application.blockchainUpdater.processBlock(block)
   } yield {
     block.transactionData.foreach(application.utxStorage.remove)
     UnconfirmedTransactionsStorage.clearIncorrectTransactions(application.settings.blockchainSettings.functionalitySettings,
-      application.blockStorage.stateReader, application.utxStorage, application.time)
+      application.stateReader, application.utxStorage, application.time)
   }
 
 

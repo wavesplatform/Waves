@@ -9,6 +9,7 @@ import akka.stream.ActorMaterializer
 import akka.util.Timeout
 import com.wavesplatform.Shutdownable
 import com.wavesplatform.settings.GenesisSettings
+import com.wavesplatform.state2.reader.StateReader
 import scorex.account.Account
 import scorex.api.http.{ApiRoute, CompositeHttpService}
 import scorex.block.Block
@@ -53,7 +54,7 @@ trait RunnableApplication extends Application with Shutdownable with ScorexLoggi
 
   lazy val messagesHandler: MessageHandler = MessageHandler(BasicMessagesRepo.specs ++ additionalMessageSpecs)
 
-  lazy val history: History = blockStorage.history
+
 
   lazy override val networkController = actorSystem.actorOf(Props(new NetworkController(this)), "NetworkController")
   lazy override val peerManager = actorSystem.actorOf(
@@ -61,7 +62,7 @@ trait RunnableApplication extends Application with Shutdownable with ScorexLoggi
 
   lazy override val blockGenerator = actorSystem.actorOf(Props(classOf[BlockGeneratorController], settings.minerSettings, history, time, peerManager,
     wallet,
-    blockStorage.stateReader,
+    stateReader,
     settings.blockchainSettings,
     utxStorage,
     coordinator
@@ -126,9 +127,9 @@ trait RunnableApplication extends Application with Shutdownable with ScorexLoggi
   }
 
   private def checkGenesis(): Unit = {
-    if (blockStorage.history.isEmpty) {
+    if (history.isEmpty) {
       val maybeGenesisSignature = Option(settings.blockchainSettings.genesisSettings.signature).filter(_.trim.nonEmpty)
-      blockStorage.blockchainUpdater.processBlock(Block.genesis(
+      blockchainUpdater.processBlock(Block.genesis(
         NxtLikeConsensusBlockData(settings.blockchainSettings.genesisSettings.initialBaseTarget, Array.fill(DigestSize)(0: Byte)),
         RunnableApplication.genesisTransactions(settings.blockchainSettings.genesisSettings),
         settings.blockchainSettings.genesisSettings.blockTimestamp, maybeGenesisSignature)) match {

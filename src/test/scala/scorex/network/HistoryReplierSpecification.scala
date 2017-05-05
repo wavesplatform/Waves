@@ -19,10 +19,10 @@ class HistoryReplierSpecification extends ActorTestingCommons {
 
   private def mockHistory(blockIds: InnerIds): History = {
     val history = mock[History]
-//    history.blockIdsAfter _ expects(*, *) onCall {
-//      (parentSignature, howMany) =>
-//        blockIds.dropWhile(_ != InnerId(parentSignature)).slice(1, howMany + 1).map(_.blockId)
-//    } anyNumberOfTimes()
+    //    history.blockIdsAfter _ expects(*, *) onCall {
+    //      (parentSignature, howMany) =>
+    //        blockIds.dropWhile(_ != InnerId(parentSignature)).slice(1, howMany + 1).map(_.blockId)
+    //    } anyNumberOfTimes()
     history
   }
 
@@ -42,7 +42,7 @@ class HistoryReplierSpecification extends ActorTestingCommons {
 
   private trait App extends ApplicationMock {
     override lazy val settings = wavesSettings
-    override lazy val historyOverride: History = h
+    override lazy val history: History = h
   }
 
   private val app = stub[App]

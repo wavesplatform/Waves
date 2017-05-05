@@ -72,7 +72,7 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
 
     override lazy val settings = wavesSettings
     override lazy val coordinator: ActorRef = testCoordinator.ref
-    override lazy val historyOverride: History = testHistory
+    override lazy val history: History = testHistory
   }
 
   private val app = stub[App]

@@ -153,20 +153,7 @@ abstract class ActorTestingCommons extends TestKitBase
     }
 
   trait ApplicationMock extends Application {
-    implicit val newTransactionHandler = stub[NewTransactionHandler]
     final override lazy val networkController: ActorRef = networkControllerMock
-
-    def historyOverride: History
-
-    override val blockStorage: BlockStorage = new BlockStorage {
-      override def checkpoints: CheckpointService = ???
-
-      override def history: History = historyOverride
-
-      override def blockchainUpdater: BlockchainUpdater = ???
-
-      override def stateReader: StateReader = ???
-    }
   }
 
 }

@@ -6,6 +6,7 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.history.BlockStorageImpl
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state2._
+import com.wavesplatform.state2.reader.StateReader
 import org.h2.mvstore.MVStore
 import scorex.ActorTestingCommons
 import scorex.account.PrivateKeyAccount
@@ -61,12 +62,6 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
   val utxStorage1 = new UnconfirmedTransactionsDatabaseImpl(wavesSettings.utxSettings.size)
 
   class TestAppMock extends Application {
-    lazy implicit val newTransactionHandler: NewTransactionHandler = new NewTransactionHandlerImpl(wavesSettings.blockchainSettings.functionalitySettings,
-      this.networkController, this.time,
-      new FeeCalculator(wavesSettings.feesSettings),
-      utxStorage1,
-      blockStorage1.history,
-      blockStorage1.stateReader)
     lazy val networkController: ActorRef = networkControllerMock
     lazy val settings = wavesSettings
     lazy val blockGenerator: ActorRef = testBlockGenerator.ref
@@ -79,17 +74,17 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
 
     override def wallet: Wallet = new Wallet(None, "", None)
 
-    override def applicationName: String = ???
-
-    override def appVersion: ApplicationVersion = ???
-
     override def time: Time = NTP
-
-    override val blockStorage: BlockStorage = blockStorage1
 
     override def utxStorage: UnconfirmedTransactionsStorage = utxStorage1
 
     override def history: History = blockStorage1.history
+
+    override def stateReader: StateReader = blockStorage1.stateReader
+
+    override def blockchainUpdater: BlockchainUpdater = blockStorage1.blockchainUpdater
+
+    override def checkpoints: CheckpointService = blockStorage1.checkpointService
   }
 
   val app = new TestAppMock()
@@ -107,13 +102,13 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
   }
 
   val genesisTimestamp: Long = System.currentTimeMillis()
-  app.blockStorage.blockchainUpdater.processBlock(
+  app.blockchainUpdater.processBlock(
     Block.genesis(
       NxtLikeConsensusBlockData(app.settings.blockchainSettings.genesisSettings.initialBaseTarget, Array.fill(DigestSize)(0: Byte)),
       RunnableApplication.genesisTransactions(app.settings.blockchainSettings.genesisSettings), genesisTimestamp)).explicitGet()
 
   def before(): Unit = {
-    app.blockStorage.blockchainUpdater.removeAfter(blockStorage1.history.genesis.uniqueId)
+    app.blockchainUpdater.removeAfter(blockStorage1.history.genesis.uniqueId)
     actorRef ! ClearCheckpoint
     networkController.ignoreMsg {
       case SendToNetwork(m, _) => m.spec == ScoreMessageSpec
@@ -166,7 +161,7 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
     sendCheckpoint(Seq(9, 7, 5, 3))
 
     val parentId = blockStorage1.history.blockAt(8).get.uniqueId
-    app.blockStorage.blockchainUpdater.removeAfter(parentId)
+    app.blockchainUpdater.removeAfter(parentId)
     val difBloc = createBlock(parentId)
     val badPeer = stub[ConnectedPeer]
 

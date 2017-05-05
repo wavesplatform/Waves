@@ -1,22 +1,14 @@
 package scorex.app
 
 import akka.actor.ActorRef
-import com.wavesplatform.history.BlockStorageImpl
 import com.wavesplatform.settings.WavesSettings
-import scorex.transaction.{BlockStorage, History, NewTransactionHandler, UnconfirmedTransactionsStorage}
+import com.wavesplatform.state2.reader.StateReader
+import scorex.transaction._
 import scorex.utils.Time
 import scorex.wallet.Wallet
 
 
 trait Application {
-
-  implicit def newTransactionHandler: NewTransactionHandler
-
-  def applicationName: String
-
-  def appVersion: ApplicationVersion
-
-  def blockStorage: BlockStorage
 
   def peerManager: ActorRef
 
@@ -37,6 +29,12 @@ trait Application {
   def utxStorage: UnconfirmedTransactionsStorage
 
   def history: History
+
+  def stateReader: StateReader
+
+  def blockchainUpdater: BlockchainUpdater
+
+  def checkpoints: CheckpointService
 
   def time: Time
 

@@ -12,7 +12,7 @@ class HistoryReplier(application: Application) extends ViewSynchronizer with Sco
   override val messageSpecs = Seq(GetSignaturesSpec, GetBlockSpec)
   protected override lazy val networkControllerRef = application.networkController
 
-  private def history = application.blockStorage.history
+  private def history = application.history
 
   override def receive: Receive = {
 
