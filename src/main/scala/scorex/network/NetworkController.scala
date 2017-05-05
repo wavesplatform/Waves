@@ -5,8 +5,9 @@ import java.net.{InetAddress, InetSocketAddress, NetworkInterface, URI}
 import akka.actor._
 import akka.io.Tcp._
 import akka.io.{IO, Tcp}
-import scorex.app.{Application}
-import scorex.network.message.{Message, MessageSpec}
+import com.wavesplatform.settings.NetworkSettings
+import scorex.app.Application
+import scorex.network.message.{Message, MessageHandler, MessageSpec}
 import scorex.network.peer.PeerManager
 import scorex.network.peer.PeerManager.{CloseAllConnections, CloseAllConnectionsComplete}
 import scorex.utils.ScorexLogging
@@ -183,7 +184,11 @@ class NetworkController(application: Application) extends Actor with ScorexLoggi
   }
 
   private def createPeerHandler(connection: ActorRef, remote: InetSocketAddress, inbound: Boolean): Unit = {
-    val handler = context.actorOf(Props(classOf[PeerConnectionHandler], application, connection, remote))
+    val handler = context.actorOf(Props(classOf[PeerConnectionHandler], peerManager,
+      connection,
+      remote,
+      application.messagesHandler,
+      application.settings.networkSettings))
     peerManager ! PeerManager.Connected(remote, handler, ownSocketAddress, inbound)
   }
 }
