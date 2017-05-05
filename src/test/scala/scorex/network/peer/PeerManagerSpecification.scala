@@ -46,14 +46,8 @@ class PeerManagerSpecification extends ActorTestingCommons {
 
   val wavesSettings = WavesSettings.fromConfig(localConfig)
 
-  trait App extends ApplicationMock {
-    override lazy val settings = wavesSettings
-  }
-
-  private val app = stub[App]
-
   protected override val actorRef = system.actorOf(PeerManager.props(
-    wavesSettings.networkSettings, app.networkController, wavesSettings.blockchainSettings.addressSchemeCharacter))
+    wavesSettings.networkSettings, networkControllerMock, wavesSettings.blockchainSettings.addressSchemeCharacter))
 
   testSafely {
 

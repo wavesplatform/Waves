@@ -3,7 +3,7 @@ package scorex.network
 import akka.actor.{ActorRef, Props}
 import akka.testkit.TestProbe
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.settings.WavesSettings
+import com.wavesplatform.settings.{SynchronizationSettings, WavesSettings}
 import scorex.ActorTestingCommons
 import scorex.block.Block
 import scorex.block.Block._
@@ -68,15 +68,6 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
 
   val wavesSettings = WavesSettings.fromConfig(localConfig)
 
-  private trait App extends ApplicationMock {
-
-    override lazy val settings = wavesSettings
-    override lazy val coordinator: ActorRef = testCoordinator.ref
-    override lazy val history: History = testHistory
-  }
-
-  private val app = stub[App]
-
   private def reasonableTimeInterval = wavesSettings.synchronizationSettings.synchronizationTimeout / 2
 
   private def validateStatus(status: Status): Unit = {
@@ -106,7 +97,7 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
 
   private def sendSignatures(blockIds: BlockId*): Unit = dataFromNetwork(SignaturesSpec, blockIds.toSeq)
 
-  protected override val actorRef = system.actorOf(Props(classOf[BlockchainSynchronizer], app))
+  protected override val actorRef = system.actorOf(Props(classOf[BlockchainSynchronizer], networkControllerMock, testCoordinator.ref, testHistory, wavesSettings.synchronizationSettings))
 
   testSafely {
 
