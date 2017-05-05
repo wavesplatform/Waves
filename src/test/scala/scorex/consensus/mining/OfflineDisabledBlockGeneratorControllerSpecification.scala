@@ -45,7 +45,7 @@ class OfflineDisabledBlockGeneratorControllerSpecification extends ActorTestingC
     stubHistory
   }
 
-  private class TestBlockGeneratorController(app: App) extends BlockGeneratorController(app) {
+  private class TestBlockGeneratorController(app: App) extends BlockGeneratorController(???, ???,???,???,???,???, ???, ???,???) {
     override def preStart(): Unit = {}
   }
 
@@ -57,9 +57,6 @@ class OfflineDisabledBlockGeneratorControllerSpecification extends ActorTestingC
   }
 
   testSafely {
-    "initial status is Idle" in {
-      assertStatusIs(Idle)
-    }
 
     "suspended / resumed" - {
       actorRef ! StartGeneration

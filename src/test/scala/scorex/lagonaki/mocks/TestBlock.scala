@@ -24,7 +24,8 @@ object TestBlock {
 
   def create(time: Long, txs: Seq[Transaction], signer: PublicKeyAccount = PublicKeyAccount(Array.fill(32)(0))): Block = apply(time, txs, signer)
 
-  def withReference(ref: BlockId) = Block(0, 1, ref, SignerData(PublicKeyAccount(Array.fill(32)(0)), Array.fill(SignatureLength)(0: Byte)),
+  def withReference(ref: BlockId, time: Long = 0) = Block(time, 1, ref, SignerData(PublicKeyAccount(Array.fill(32)(0)), Array.fill(SignatureLength)(0: Byte)),
     NxtLikeConsensusBlockData(1L, Array.fill(SignatureLength)(0: Byte)), Seq.empty)
 
+  def empty = withReference(Array.fill(SignatureLength)(0: Byte))
 }
