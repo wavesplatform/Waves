@@ -10,22 +10,20 @@ import scorex.transaction.TransactionParser.SignatureLength
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class HistoryWriterTest extends FunSuite with Matchers {
+class HistoryWriterTest extends FunSuite with Matchers with HistoryTest {
 
   test("concurrent access to lastBlock doesn't fail") {
     val history = new HistoryWriterImpl(new MVStore.Builder().open())
+    appendGenesisBlock(history)
 
-    history.appendBlock(TestBlock.withReference(Array.fill(SignatureLength)(0: Byte))).explicitGet()
-
-    def appendBlock(): Unit = history.appendBlock(TestBlock.withReference(history.lastBlock.uniqueId)).explicitGet()
-    Range(1, 1000).foreach { _ =>
-      appendBlock()
+    (1 to 1000).foreach { _ =>
+      appendTestBlock(history)
     }
 
     @volatile var failed = false
 
-    Range(1, 1000).foreach { _ =>
-      Future(appendBlock()).recover { case e => e.printStackTrace(); failed = true }
+    (1 to 1000).foreach { _ =>
+      Future(appendTestBlock(history)).recover { case e => e.printStackTrace(); failed = true }
       Future(history.discardBlock()).recover { case e => e.printStackTrace(); failed = true }
     }
     Thread.sleep(1000)
