@@ -3,7 +3,7 @@ package com.wavesplatform.state2.diffs
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.reader.StateReader
 import com.wavesplatform.state2.{AssetInfo, Diff, EqByteArray, LeaseInfo, Portfolio}
-import scorex.account.Account
+import scorex.account.{Account, AddressScheme}
 import scorex.crypto.encode.Base58
 import scorex.transaction.{SignedTransaction, StateValidationError, Transaction}
 import scorex.transaction.ValidationError.TransactionValidationError
@@ -62,23 +62,24 @@ object AssetTransactionsDiff {
   }
 
   def makeAssetNameUnique(state: StateReader, height: Int)(tx: MakeAssetNameUniqueTransaction): Either[StateValidationError, Diff] = {
-    findReferencedAsset(tx, state, tx.assetId).flatMap(itx => {
-      val assetName = EqByteArray(itx.name)
-      state.getAssetIdByUniqueName(assetName) match {
-        case Some(assetId) =>
-          Left(TransactionValidationError(tx, s"Asset name has been verified for ${Base58.encode(assetId.arr)}"))
-        case None =>
-          val assetId = EqByteArray(tx.assetId)
-          Right(Diff(height = height,
-            tx = tx,
-            portfolios = Map(tx.sender.toAccount -> Portfolio(
-              balance = -tx.fee,
-              leaseInfo = LeaseInfo.empty,
-              assets = Map.empty)),
-            assetsWithUniqueNames = Map(assetName -> assetId)
-          ))
-      }
-    })
+    checkNetworkByte(tx.networkByte, tx).flatMap(tx =>
+      findReferencedAsset(tx, state, tx.assetId).flatMap(itx => {
+        val assetName = EqByteArray(itx.name)
+        state.getAssetIdByUniqueName(assetName) match {
+          case Some(assetId) =>
+            Left(TransactionValidationError(tx, s"Asset name has been verified for ${Base58.encode(assetId.arr)}"))
+          case None =>
+            val assetId = EqByteArray(tx.assetId)
+            Right(Diff(height = height,
+              tx = tx,
+              portfolios = Map(tx.sender.toAccount -> Portfolio(
+                balance = -tx.fee,
+                leaseInfo = LeaseInfo.empty,
+                assets = Map.empty)),
+              assetsWithUniqueNames = Map(assetName -> assetId)
+            ))
+        }
+      }))
   }
 
   private def findReferencedAsset(tx: SignedTransaction, state: StateReader, assetId: Array[Byte]): Either[StateValidationError, IssueTransaction] = {
@@ -87,5 +88,11 @@ object AssetTransactionsDiff {
       case Some(itx) if !(itx.sender equals tx.sender) => Left(TransactionValidationError(tx, "Asset was issued by other address"))
       case Some(itx) => Right(itx)
     }
+  }
+
+  private def checkNetworkByte[T <: Transaction](chainIdFromTx: Byte, tx: T): Either[StateValidationError, T] = {
+    if (chainIdFromTx != AddressScheme.current.chainId) {
+      Left(TransactionValidationError(tx, s"Invalid network byte '$chainIdFromTx', current '${AddressScheme.current.chainId}'"))
+    } else Right(tx)
   }
 }
