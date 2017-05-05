@@ -1,31 +1,37 @@
 package scorex.consensus.mining
 
-import akka.actor.{Actor, Cancellable}
-import com.wavesplatform.settings.BlockchainSettings
+import akka.actor.{Actor, ActorRef, Cancellable}
+import com.wavesplatform.settings.{BlockchainSettings, MinerSettings}
 import com.wavesplatform.state2.reader.StateReader
 import scorex.account.PrivateKeyAccount
-import scorex.app.Application
 import scorex.block.Block
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
 import scorex.network.Coordinator.AddBlock
 import scorex.transaction._
 import scorex.utils.{ScorexLogging, Time}
+import scorex.wallet.Wallet
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.language.postfixOps
 import scala.util.{Failure, Try}
 
-class Miner(application: Application) extends Actor with ScorexLogging {
+class Miner(minerSettings: MinerSettings,
+            wallet: Wallet,
+            history: History,
+            stateReader: StateReader,
+            blockchainSettings: BlockchainSettings,
+            utxStorage: UnconfirmedTransactionsStorage,
+            time: Time,
+            coordinator: ActorRef) extends Actor with ScorexLogging {
 
   import scorex.consensus.mining.Miner._
 
-  private lazy val blockGenerationDelay =
-    math.max(application.settings.minerSettings.generationDelay.toMillis, BlockGenerationTimeShift.toMillis) millis
+  private lazy val blockGenerationDelay = math.max(minerSettings.generationDelay.toMillis, BlockGenerationTimeShift.toMillis) millis
 
   private var currentState = Option.empty[Seq[Cancellable]]
 
-  private def accounts = application.wallet.privateKeyAccounts()
+  private def accounts = wallet.privateKeyAccounts()
 
   override def receive: Receive = {
     case GuessABlock(rescheduleImmediately) =>
@@ -52,21 +58,14 @@ class Miner(application: Application) extends Actor with ScorexLogging {
     cancel()
   }
 
-  private val history = application.blockStorage.history
-
-  private val state = application.blockStorage.stateReader
-
-  private val bcs = application.settings.blockchainSettings
-
-  private val utx = application.utxStorage
 
   private def tryToGenerateABlock(): Boolean = Try {
     log.debug("Trying to generate a new block")
 
-    val blocks = generateNextBlocks(history, state, bcs, utx, application.time)(accounts)
+    val blocks = generateNextBlocks(history, stateReader, blockchainSettings, utxStorage, time)(accounts)
     if (blocks.nonEmpty) {
-      val bestBlock = blocks.max(PoSCalc.blockOrdering(history, state, bcs.functionalitySettings, application.time))
-      application.coordinator ! AddBlock(bestBlock, None)
+      val bestBlock = blocks.max(PoSCalc.blockOrdering(history, stateReader, blockchainSettings.functionalitySettings, time))
+      coordinator ! AddBlock(bestBlock, None)
       true
     } else false
   } recoverWith { case e =>
@@ -74,15 +73,15 @@ class Miner(application: Application) extends Actor with ScorexLogging {
     Failure(e)
   } getOrElse false
 
-  protected def preciseTime: Long = application.time.correctedTime()
+  protected def preciseTime: Long = time.correctedTime()
 
   private def scheduleBlockGeneration(): Unit = try {
-    val schedule = if (application.settings.minerSettings.tfLikeScheduling) {
+    val schedule = if (minerSettings.tfLikeScheduling) {
       val lastBlock = history.lastBlock
       val currentTime = preciseTime
 
       accounts
-        .flatMap(acc => PoSCalc.nextBlockGenerationTime(history, state, bcs.functionalitySettings, application.time)(lastBlock, acc).map(_ + BlockGenerationTimeShift.toMillis))
+        .flatMap(acc => PoSCalc.nextBlockGenerationTime(history, stateReader, blockchainSettings.functionalitySettings, time)(lastBlock, acc).map(_ + BlockGenerationTimeShift.toMillis))
         .map(t => math.max(t - currentTime, blockGenerationDelay.toMillis))
         .filter(_ < MaxBlockGenerationDelay.toMillis)
         .map(_ millis)
@@ -175,7 +174,7 @@ object Miner extends ScorexLogging {
         val gs = calcGeneratorSignature(lastBlockKernelData, account)
         val consensusData = NxtLikeConsensusBlockData(btg, gs)
 
-        val unconfirmed = UnconfirmedTransactionsStorage.packUnconfirmed(state, bcs.functionalitySettings, utx, time,height)
+        val unconfirmed = UnconfirmedTransactionsStorage.packUnconfirmed(state, bcs.functionalitySettings, utx, time, height)
         log.debug(s"Build block with ${
           unconfirmed.size
         } transactions")

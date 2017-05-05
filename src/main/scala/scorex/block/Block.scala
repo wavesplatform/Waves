@@ -16,13 +16,14 @@ import scala.util.{Failure, Try}
 case class Block(timestamp: Long, version: Byte, reference: Block.BlockId, signerData: SignerData,
                  consensusData: NxtLikeConsensusBlockData, transactionData: Seq[Transaction]) {
 
-  lazy val versionField: ByteBlockField = ByteBlockField("version", version)
-  lazy val timestampField: LongBlockField = LongBlockField("timestamp", timestamp)
-  lazy val referenceField: BlockIdField = BlockIdField("reference", reference)
-  lazy val signerDataField: SignerDataBlockField = SignerDataBlockField("signature", signerData)
+  private lazy val versionField: ByteBlockField = ByteBlockField("version", version)
+  private lazy val timestampField: LongBlockField = LongBlockField("timestamp", timestamp)
+  private lazy val referenceField: BlockIdField = BlockIdField("reference", reference)
+  private lazy val signerDataField: SignerDataBlockField = SignerDataBlockField("signature", signerData)
+  private lazy val consensusDataField = NxtConsensusBlockField(consensusData)
+  private lazy val transactionDataField = TransactionsBlockField(transactionData)
+
   lazy val uniqueId: BlockId = signerData.signature
-  lazy val consensusDataField = NxtConsensusBlockField(consensusData)
-  lazy val transactionDataField = TransactionsBlockField(transactionData)
   lazy val encodedId: String = Base58.encode(uniqueId)
 
   lazy val fee: Long =

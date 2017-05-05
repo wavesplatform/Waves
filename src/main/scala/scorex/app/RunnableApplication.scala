@@ -59,7 +59,13 @@ trait RunnableApplication extends Application with Shutdownable with ScorexLoggi
   lazy override val peerManager = actorSystem.actorOf(
     PeerManager.props(settings.networkSettings, networkController, settings.blockchainSettings.addressSchemeCharacter), "PeerManager")
 
-  lazy override val blockGenerator = actorSystem.actorOf(Props(classOf[BlockGeneratorController], this),
+  lazy override val blockGenerator = actorSystem.actorOf(Props(classOf[BlockGeneratorController], settings.minerSettings, history, time, peerManager,
+    wallet,
+    blockStorage.stateReader,
+    settings.blockchainSettings,
+    utxStorage,
+    coordinator
+  ),
     "BlockGenerator")
   lazy override val scoreObserver = actorSystem.actorOf(Props(classOf[ScoreObserver], this), "ScoreObserver")
   lazy override val blockchainSynchronizer = actorSystem.actorOf(Props(classOf[BlockchainSynchronizer], this),

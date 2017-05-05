@@ -48,7 +48,7 @@ class ConsensusRouteSpec extends RouteSpec("/consensus") with RestAPISettingsHel
     "for existed block" in {
       val block = history.blockAt(3).get
       Get(routePath(s"/basetarget/${block.encodedId}")) ~> route ~> check {
-        (responseAs[JsObject] \ "baseTarget").as[Long] shouldEqual block.consensusDataField.value.baseTarget
+        (responseAs[JsObject] \ "baseTarget").as[Long] shouldEqual block.consensusData.baseTarget
       }
     }
 

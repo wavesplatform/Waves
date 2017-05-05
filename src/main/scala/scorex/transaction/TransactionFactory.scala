@@ -83,9 +83,10 @@ object TransactionFactory {
     r <- tm.onNewOffchainTransaction(tx)
   } yield r
 
-  def makeAssetNameUnique(request: MakeAssetNameUniqueRequest, wallet: Wallet, tm: NewTransactionHandler, time: Time): Either[ValidationError, MakeAssetNameUniqueTransaction] = for {
+  def makeAssetNameUnique(request: MakeAssetNameUniqueRequest, wallet: Wallet, tm: NewTransactionHandler,
+                          time: Time): Either[ValidationError, MakeAssetNameUniqueTransaction] = for {
     pk <- wallet.findWallet(request.sender)
-    tx <- MakeAssetNameUniqueTransaction.create(pk, Base58.decode(request.assetId).get, request.fee, time.getTimestamp)
+    tx <- MakeAssetNameUniqueTransaction.create(pk, Base58.decode(request.assetId).get, request.fee, AddressScheme.current.chainId, time.getTimestamp)
     r <- tm.onNewOffchainTransaction(tx)
   } yield r
 
