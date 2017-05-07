@@ -6,11 +6,9 @@ import akka.http.scaladsl.Http.ServerBinding
 import akka.stream.ActorMaterializer
 import com.wavesplatform.matcher.api.MatcherApiRoute
 import com.wavesplatform.matcher.market.MatcherActor
-import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.state2.reader.StateReader
 import scorex.api.http.CompositeHttpService
 import scorex.app.Application
-import scorex.transaction.{BlockStorage, NewTransactionHandler}
+import scorex.transaction.NewTransactionHandler
 import scorex.utils.ScorexLogging
 import scorex.wallet.Wallet
 

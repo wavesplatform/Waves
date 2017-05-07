@@ -10,17 +10,11 @@ import scorex.transaction.ValidationError.CustomError
 import scorex.transaction.{History, HistoryWriter, ValidationError}
 import scorex.utils.{LogMVMapBuilder, ScorexLogging}
 
-class HistoryWriterImpl(db: MVStore) extends History with HistoryWriter with ScorexLogging {
+class HistoryWriterImpl(db: MVStore) extends HistoryWriter with ScorexLogging {
   private val blockBodyByHeight = SynchronizedAcrossInstance(db.openMap("blocks", new LogMVMapBuilder[Int, Array[Byte]]))
   private val blockIdByHeight = SynchronizedAcrossInstance(db.openMap("signatures", new LogMVMapBuilder[Int, BlockId]))
   private val heightByBlockId = SynchronizedAcrossInstance(db.openMap("signaturesReverse", new LogMVMapBuilder[BlockId, Int]))
   private val scoreByHeight = SynchronizedAcrossInstance(db.openMap("score", new LogMVMapBuilder[Int, BigInt]))
-
-  synchronizeRead { implicit lock =>
-    if (Set(blockBodyByHeight().size(), blockIdByHeight().size(), heightByBlockId().size(), scoreByHeight().size()).size != 1) {
-      throw new IllegalArgumentException(s"Block storage is corrupt. Please remove blockchain.dat and state.dat and restart the node.")
-    }
-  }
 
   override def appendBlock(block: Block): Either[ValidationError, Unit] = synchronizeReadWrite { implicit lock =>
     if ((height() == 0) || (this.lastBlock.uniqueId sameElements block.reference)) {
@@ -73,5 +67,17 @@ class HistoryWriterImpl(db: MVStore) extends History with HistoryWriter with Sco
       block <- blockAt(h)
       if block.signerData.generator.address.equals(account.address)
     } yield block
+  }
+}
+
+object HistoryWriterImpl {
+  def apply(db: MVStore): Either[String, HistoryWriterImpl] = {
+    val h = new HistoryWriterImpl(db)
+    h.synchronizeRead { implicit lock =>
+      if (Set(h.blockBodyByHeight().size(), h.blockIdByHeight().size(), h.heightByBlockId().size(), h.scoreByHeight().size()).size != 1)
+        Left("Block storage is inconsistent")
+      else
+        Right(h)
+    }
   }
 }
