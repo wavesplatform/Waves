@@ -13,11 +13,10 @@ import scorex.utils.ScorexLogging
 import StateWriterImpl._
 import BlockchainUpdaterImpl._
 
-class BlockchainUpdaterImpl(persisted: StateWriter with StateReader, settings: FunctionalitySettings, bc: HistoryWriter with History)
+class BlockchainUpdaterImpl(persisted: StateWriter with StateReader, settings: FunctionalitySettings, minimumInMemoryDiffSize: Int, bc: HistoryWriter with History)
   extends BlockchainUpdater with ScorexLogging {
 
-  private val MinInMemDiff = 200
-  private val MaxInMemDiff = MinInMemDiff * 2
+  private val MaxInMemDiff = minimumInMemoryDiffSize * 2
 
   private val unsafeDifferByRange: (StateReader, (Int, Int)) => BlockDiff = {
     case (sr, (from, to)) =>
@@ -48,7 +47,7 @@ class BlockchainUpdaterImpl(persisted: StateWriter with StateReader, settings: F
   private def updatePersistedAndInMemory(): Unit = {
     logHeights("State rebuild started:")
     val persistFrom = persisted.height + 1
-    val persistUpTo = bc.height - MinInMemDiff + 1
+    val persistUpTo = bc.height - minimumInMemoryDiffSize + 1
 
     ranges(persistFrom, persistUpTo, 200).foreach { case (head, last) =>
       val diffToBePersisted = unsafeDiffAgainstPersistedByRange(head, last)

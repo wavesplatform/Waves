@@ -18,7 +18,7 @@ class BlockStorageImpl(settings: BlockchainSettings) extends BlockStorage {
   val historyWriter = new HistoryWriterImpl(blockchainStore)
   val stateWriter = new StateWriterImpl(new StateStorage(stateStore))
   val checkpointService = new CheckpointServiceImpl(checkpointStore)
-  val bcUpdater = new BlockchainUpdaterImpl(stateWriter, settings.functionalitySettings, historyWriter)
+  val bcUpdater = new BlockchainUpdaterImpl(stateWriter, settings.functionalitySettings, settings.minimumInMemoryDiffSize, historyWriter)
 
 
   override def history: History = historyWriter

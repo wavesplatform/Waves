@@ -35,6 +35,7 @@ abstract class ActorTestingCommons extends TestKitBase
       |    blockchain-file: ""
       |    state-file: ""
       |    checkpoint-file: ""
+      |    minimum-in-memory-diff-blocks: 200
       |  }
       |  network {
       |    file: ""
