@@ -74,4 +74,7 @@ class HistoryWriterImpl(db: MVStore) extends History with HistoryWriter with Sco
       if block.signerData.generator.address.equals(account.address)
     } yield block
   }
+
+  override def blockBytes(height: Int): Option[Array[Byte]] = synchronizeRead { implicit lock =>
+    Option(blockBodyByHeight().get(height)) }
 }

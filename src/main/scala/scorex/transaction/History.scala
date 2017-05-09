@@ -16,6 +16,8 @@ trait History extends SynchronizedAccess {
 
   def blockAt(height: Int): Option[Block]
 
+  def blockBytes (height: Int): Option[Array[Byte]]
+
   def score(): BlockchainScore
 
   def scoreOf(id: BlockId): BlockchainScore
