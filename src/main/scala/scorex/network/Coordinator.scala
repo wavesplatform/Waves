@@ -283,6 +283,7 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
 
   private def processNewBlock(block: Block): Either[ValidationError, Unit] = for {
     _ <- validateWithRespectToCheckpoint(block, history.height() + 1)
+    _ <- isBlockValid(block)
     _ <- application.blockchainUpdater.processBlock(block)
   } yield {
     block.transactionData.foreach(application.utxStorage.remove)
