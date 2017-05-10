@@ -8,7 +8,7 @@ import scorex.crypto.EllipticCurveImpl
 import scorex.transaction.Transaction
 import scorex.transaction.TransactionParser._
 
-import scala.util.Try
+import scala.util.{Random, Try}
 
 object TestBlock {
   def apply(txs: Seq[Transaction], signer: PublicKeyAccount = PublicKeyAccount(Array.fill(32)(0))): Block = apply(
@@ -17,15 +17,18 @@ object TestBlock {
   def apply(time: Long, txs: Seq[Transaction], signer: PublicKeyAccount): Block = Block(
     time,
     0,
-    Array.fill(SignatureLength)(0: Byte),
+    randomSignature,
     SignerData(signer, Array.fill(EllipticCurveImpl.SignatureLength)(0)),
     NxtLikeConsensusBlockData(1L, Array.fill(SignatureLength)(0: Byte)),
     txs)
 
   def create(time: Long, txs: Seq[Transaction], signer: PublicKeyAccount = PublicKeyAccount(Array.fill(32)(0))): Block = apply(time, txs, signer)
 
-  def withReference(ref: BlockId, time: Long = 0) = Block(time, 1, ref, SignerData(PublicKeyAccount(Array.fill(32)(0)), Array.fill(SignatureLength)(0: Byte)),
-    NxtLikeConsensusBlockData(1L, Array.fill(SignatureLength)(0: Byte)), Seq.empty)
+
+  def randomSignature = Array.fill(SignatureLength)(random.nextInt().toByte)
+  private val random = new Random(10)
+  def withReference(ref: BlockId, time: Long = 0) = Block(time, 1, ref, SignerData(PublicKeyAccount(Array.fill(32)(0)), randomSignature),
+    NxtLikeConsensusBlockData(1L, randomSignature), Seq.empty)
 
   def empty = withReference(Array.fill(SignatureLength)(0: Byte))
 }
