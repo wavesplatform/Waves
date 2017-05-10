@@ -177,11 +177,11 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
 
         if (!lastBlock.uniqueId.sameElements(parentBlockId)) {
           // someone has happened to be faster and already added a block or blocks after the parent
-          log.debug(s"A child for parent of the block already exists, local=$local: ${newBlock.json}")
+          log.debug(s"A child for parent of the block already exists, local=$local: ${str(newBlock)}")
 
           val cmp = PoSCalc.blockOrdering(history, stateReader, application.settings.blockchainSettings.functionalitySettings, application.time)
           if (lastBlock.reference.sameElements(parentBlockId) && cmp.lt(lastBlock, newBlock)) {
-            log.debug(s"New block ${newBlock.json} is better than last ${lastBlock.json}")
+            log.debug(s"New block ${str(newBlock)} is better than last ${str(lastBlock)}")
           }
 
           false
@@ -190,7 +190,7 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
 
       } else {
         // the block either has come too early or, if local, too late (e.g. removeAfter() has come earlier)
-        log.debug(s"Parent of the block is not in the history, local=$local: ${newBlock.json}")
+        log.debug(s"Parent of the block is not in the history, local=$local: ${str(newBlock)}")
         false
       }
     } catch {
@@ -200,7 +200,7 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
     }
 
     if (isBlockToBeAdded) {
-      log.info(s"New block(local: $local): ${newBlock.json}")
+      log.info(s"New block(local: $local): ${str(newBlock)}")
       processNewBlock(newBlock) match {
         case Right(_) =>
           application.blockGenerator ! LastBlockChanged
@@ -211,7 +211,7 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
           }
         case Left(err) =>
           from.foreach(_.blacklist())
-          log.warn(s"Can't apply single block, local=$local: ${newBlock.json}")
+          log.warn(s"Can't apply single block, local=$local: ${str(newBlock)}")
       }
     }
   }
