@@ -60,6 +60,9 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
   val db: MVStore = new MVStore.Builder().open()
   val blockStorage1 = new BlockStorageImpl(wavesSettings.blockchainSettings)
   val utxStorage1 = new UnconfirmedTransactionsDatabaseImpl(wavesSettings.utxSettings.size)
+  class ValidBlockCoordinator(a: TestAppMock) extends Coordinator(a) {
+    override def isBlockValid(b: Block): Either[ValidationError, Unit] = Right(())
+  }
 
   class TestAppMock extends scorex.app.Application {
     lazy val networkController: ActorRef = networkControllerMock
@@ -70,7 +73,7 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
 
     lazy val scoreObserver: ActorRef = testScoreObserver.ref
 
-    override def coordinator: ActorRef = system.actorOf(Props(classOf[Coordinator], this), "Coordinator")
+    override def coordinator: ActorRef = system.actorOf(Props(classOf[ValidBlockCoordinator], this), "Coordinator")
 
     override def wallet: Wallet = new Wallet(None, "", None)
 
@@ -93,7 +96,7 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
 
   val app = new TestAppMock()
 
-  override lazy protected val actorRef: ActorRef = system.actorOf(Props(classOf[Coordinator], app))
+  override lazy protected val actorRef: ActorRef = system.actorOf(Props(new ValidBlockCoordinator(app)))
   val gen = PrivateKeyAccount(Array(0.toByte))
   var score: Int = 10000
 
