@@ -49,7 +49,7 @@ class BlockchainUpdaterImpl(persisted: StateWriter with StateReader, settings: F
     val persistFrom = persisted.height + 1
     val persistUpTo = bc.height - minimumInMemoryDiffSize + 1
 
-    ranges(persistFrom, persistUpTo, 200).foreach { case (head, last) =>
+    ranges(persistFrom, persistUpTo, minimumInMemoryDiffSize).foreach { case (head, last) =>
       val diffToBePersisted = unsafeDiffAgainstPersistedByRange(head, last)
       persisted.applyBlockDiff(diffToBePersisted)
     }
