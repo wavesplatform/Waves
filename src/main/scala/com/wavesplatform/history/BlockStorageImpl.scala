@@ -42,7 +42,7 @@ object BlockStorageImpl extends ScorexLogging {
 
     val bcUpdater = new BlockchainUpdaterImpl(stateWriter, settings.functionalitySettings, settings.minimumInMemoryDiffSize, historyWriter)
 
-    (checkpointService, historyWriter, stateWriter, bcUpdater)
+    (checkpointService, historyWriter, bcUpdater.currentState, bcUpdater)
   }
 
   private def delete(fileName: String) = {
