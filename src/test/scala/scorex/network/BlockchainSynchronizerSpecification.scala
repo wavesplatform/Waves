@@ -9,7 +9,7 @@ import scorex.block.Block
 import scorex.block.Block._
 import scorex.network.NetworkController.DataFromPeer
 import scorex.network.message._
-import scorex.transaction.{BlockStorage, History}
+import scorex.transaction.History
 
 import scala.concurrent.duration._
 import scala.language.{implicitConversions, postfixOps}

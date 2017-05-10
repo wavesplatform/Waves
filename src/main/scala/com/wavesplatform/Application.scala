@@ -48,11 +48,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
 
   val messagesHandler = MessageHandler(BasicMessagesRepo.specs ++ TransactionalMessagesRepo.specs)
   val feeCalculator = new FeeCalculator(settings.feesSettings)
-  val blockStorage = new BlockStorageImpl(settings.blockchainSettings)
-  val history: History = blockStorage.history
-  val stateReader: StateReader = blockStorage.stateReader
-  val blockchainUpdater: BlockchainUpdater = blockStorage.blockchainUpdater
-  val checkpoints: CheckpointService = blockStorage.checkpoints
+  val (checkpoints, history, stateReader, blockchainUpdater) = BlockStorageImpl(settings.blockchainSettings)
   val time: Time = new TimeImpl()
   val wallet: Wallet = {
     val maybeWalletFilename = Option(settings.walletSettings.file).filter(_.trim.nonEmpty)
@@ -112,6 +108,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
   lazy val blockGenerator = actorSystem.actorOf(Props(classOf[BlockGeneratorController], settings.minerSettings, history, time, peerManager,
     wallet, stateReader, settings.blockchainSettings, utxStorage, coordinator), "BlockGenerator")
   lazy val blockchainSynchronizer = actorSystem.actorOf(Props(classOf[BlockchainSynchronizer], networkController, coordinator, history, settings.synchronizationSettings), "BlockchainSynchronizer")
+  lazy val peerSynchronizer = actorSystem.actorOf(Props(classOf[PeerSynchronizer], this), "PeerSynchronizer")
 
   def run(): Unit = {
     log.debug(s"Available processors: ${Runtime.getRuntime.availableProcessors}")
@@ -132,11 +129,10 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
       log.info(s"REST API was bound on ${settings.restAPISettings.bindAddress}:${settings.restAPISettings.port}")
     }
 
-    Seq(scoreObserver, blockGenerator, blockchainSynchronizer, historyReplier, coordinator, unconfirmedPoolSynchronizer) foreach {
+    Seq(scoreObserver, blockGenerator, blockchainSynchronizer, historyReplier, coordinator, unconfirmedPoolSynchronizer, peerSynchronizer) foreach {
       _ => // de-lazyning process :-)
     }
 
-    actorSystem.actorOf(Props(classOf[PeerSynchronizer], this), "PeerSynchronizer")
 
     //on unexpected shutdown
     sys.addShutdownHook {

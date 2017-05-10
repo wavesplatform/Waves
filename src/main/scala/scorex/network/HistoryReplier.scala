@@ -15,7 +15,6 @@ class HistoryReplier(protected val networkControllerRef: ActorRef, history: Hist
 
   override def receive: Receive = {
 
-    //todo: check sender and otherSigs type
     case DataFromPeer(msgId, otherSigs: Seq[Block.BlockId]@unchecked, remote)
       if msgId == GetSignaturesSpec.messageCode =>
 
@@ -32,12 +31,11 @@ class HistoryReplier(protected val networkControllerRef: ActorRef, history: Hist
         } else false
       }
 
-    //todo: check sender?
     case DataFromPeer(msgId, sig: Block.BlockId@unchecked, remote)
       if msgId == GetBlockSpec.messageCode =>
 
-      history.blockById(sig).foreach { b =>
-        val msg = Message(BlockMessageSpec, Right(b), None)
+      history.heightOf(sig).flatMap(history.blockBytes).foreach { b =>
+        val msg = Message(BlockMessageSpec, Left(b), None)
         val ss = SendToChosen(remote)
         networkControllerRef ! SendToNetwork(msg, ss)
       }

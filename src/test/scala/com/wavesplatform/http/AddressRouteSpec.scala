@@ -3,8 +3,8 @@ package com.wavesplatform.http
 import com.wavesplatform.TestWallet
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state2.{LeaseInfo, Portfolio}
 import com.wavesplatform.state2.reader.StateReader
+import com.wavesplatform.state2.{LeaseInfo, Portfolio}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.prop.PropertyChecks
@@ -12,8 +12,6 @@ import play.api.libs.json._
 import scorex.api.http.{AddressApiRoute, ApiKeyNotValid, InvalidMessage}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
-import scorex.settings.TestBlockchainSettings
-import scorex.transaction.NewTransactionHandler
 
 class AddressRouteSpec
   extends RouteSpec("/addresses")
