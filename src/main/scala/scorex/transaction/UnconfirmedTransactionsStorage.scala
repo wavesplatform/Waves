@@ -26,12 +26,12 @@ object UnconfirmedTransactionsStorage {
 
   def clearIncorrectTransactions(fs: FunctionalitySettings, stateReader: StateReader, utx: UnconfirmedTransactionsStorage, time: Time): Unit = {
     val currentTime = time.correctedTime()
-    val txs = utx.all()
+    val possiblyValid = utx.all()
       .filter { tx => (currentTime - tx.timestamp).millis <= MaxTimeUtxPast }
       .filter { tx => (tx.timestamp - currentTime).millis <= MaxTimeUtxFuture }
       .sorted(TransactionsOrdering.InUTXPool)
-    val valid = Validator.validate(fs, stateReader, txs, None, currentTime)._2
-    txs.diff(valid).foreach(utx.remove)
+    val valid = Validator.validate(fs, stateReader, possiblyValid, None, currentTime)._2
+    utx.all().diff(valid).foreach(utx.remove)
   }
 
   def packUnconfirmed(state: StateReader, fs: FunctionalitySettings, utx: UnconfirmedTransactionsStorage, time: Time, height: Int): Seq[Transaction] = {
