@@ -290,7 +290,7 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
 
 
   private def str(block: Block) = {
-    if (log.logger.isDebugEnabled) block.json
+    if (log.logger.isTraceEnabled) block.json
     else encode(block.uniqueId) + ", parent " + encode(block.reference)
   }
 }
