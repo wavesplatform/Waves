@@ -3,6 +3,7 @@ package scorex.network
 import java.net.InetSocketAddress
 
 import akka.actor.{Actor, ActorRef, Terminated}
+import akka.event.LoggingReceive
 import akka.io.Tcp
 import akka.io.Tcp._
 import akka.util.{ByteString, CompactByteString}
@@ -143,12 +144,13 @@ case class PeerConnectionHandler(peerManager: ActorRef,
     case Received(data: ByteString) => processReceivedData(data)
   }
 
-  private def state(state: CommunicationState.Value)(logic: Receive): Receive =
+  private def state(state: CommunicationState.Value)(logic: Receive): Receive = LoggingReceive(
     logic orElse processErrors(state.toString) orElse {
       case HandshakeTimeout =>
 
       case nonsense: Any => log.warn(s"Strange input in state $state: $nonsense")
     }
+  )
 
   private def processErrors(stateName: String): Receive = {
     case CommandFailed(w: Write) =>
