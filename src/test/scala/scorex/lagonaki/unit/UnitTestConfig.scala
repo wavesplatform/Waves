@@ -12,6 +12,7 @@ trait UnitTestConfig {
       |    blockchain-file: ${waves.directory}"/data/blockchain.dat"
       |    state-file: ${waves.directory}"/data/state.dat"
       |    checkpoint-file: ${waves.directory}"/data/checkpoint.dat"
+      |    minimum-in-memory-diff-blocks: 200
       |    type: CUSTOM
       |    custom {
       |      address-scheme-character: "C"

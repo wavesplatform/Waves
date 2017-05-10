@@ -140,6 +140,7 @@ case class BlockchainSettings(blockchainFile: String,
                               stateFile: String,
                               checkpointFile: String,
                               addressSchemeCharacter: Char,
+                              minimumInMemoryDiffSize: Int,
                               functionalitySettings: FunctionalitySettings,
                               genesisSettings: GenesisSettings)
 
@@ -171,6 +172,7 @@ object BlockchainSettings {
       stateFile = config.as[String](s"$configPath.state-file"),
       checkpointFile = config.as[String](s"$configPath.checkpoint-file"),
       addressSchemeCharacter = addressSchemeCharacter,
+      minimumInMemoryDiffSize = config.as[Int](s"$configPath.minimum-in-memory-diff-blocks"),
       functionalitySettings = functionalitySettings,
       genesisSettings = genesisSettings)
   }

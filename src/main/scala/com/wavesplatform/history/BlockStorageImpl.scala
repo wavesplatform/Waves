@@ -40,7 +40,7 @@ object BlockStorageImpl extends ScorexLogging {
       }.explicitGet()
     })
 
-    val bcUpdater = new BlockchainUpdaterImpl(stateWriter, settings.functionalitySettings, historyWriter)
+    val bcUpdater = new BlockchainUpdaterImpl(stateWriter, settings.functionalitySettings, settings.minimumInMemoryDiffSize, historyWriter)
 
     (checkpointService, historyWriter, stateWriter, bcUpdater)
   }

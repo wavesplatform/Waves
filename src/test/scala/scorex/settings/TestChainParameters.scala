@@ -31,7 +31,7 @@ object TestBlockchainSettings {
       GenesisTransactionSettings("3N6dsnfD88j5yKgpnEavaaJDzAVSRBRVbMY", initialBalance / 3)
     ), initialBaseTarget, 5.seconds)
 
-  val Enabled = BlockchainSettings("", "", "", 'T', TestFunctionalitySettings.Enabled, testGenesisSettings)
+  val Enabled = BlockchainSettings("", "", "", 'T', 200, TestFunctionalitySettings.Enabled, testGenesisSettings)
 
-  val Disabled = BlockchainSettings("", "", "", 'T', TestFunctionalitySettings.Disabled, testGenesisSettings)
+  val Disabled = BlockchainSettings("", "", "", 'T', 200, TestFunctionalitySettings.Disabled, testGenesisSettings)
 }

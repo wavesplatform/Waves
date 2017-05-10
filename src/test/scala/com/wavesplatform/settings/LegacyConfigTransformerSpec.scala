@@ -156,6 +156,7 @@ class LegacyConfigTransformerSpec extends FreeSpec with Matchers {
           |    blockchain-file = ""
           |    state-file = ""
           |    checkpoint-file = ""
+          |    minimum-in-memory-diff-blocks = 200
           |  }
           |  network {
           |    file = ""
@@ -194,6 +195,7 @@ class LegacyConfigTransformerSpec extends FreeSpec with Matchers {
           |    blockchain-file = ""
           |    state-file = ""
           |    checkpoint-file = ""
+          |    minimum-in-memory-diff-blocks = 200
           |  }
           |  network {
           |    file = ""
