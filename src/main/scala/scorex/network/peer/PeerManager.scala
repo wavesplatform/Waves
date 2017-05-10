@@ -3,6 +3,7 @@ package scorex.network.peer
 import java.net.{InetAddress, InetSocketAddress}
 
 import akka.actor.{Actor, ActorRef, Props}
+import akka.event.LoggingReceive
 import com.wavesplatform.Version
 import com.wavesplatform.settings.{Constants, NetworkSettings}
 import scorex.app.ApplicationVersion
@@ -58,7 +59,7 @@ class PeerManager(
     }.getOrElse(Seq[InetSocketAddress]())
   }
 
-  override def receive: Receive = ({
+  override def receive: Receive = LoggingReceive(({
     case CheckPeers =>
       if (connectedPeers.size < settings.maxConnections && connectingPeer.isEmpty) {
         peerDatabase.getRandomPeer(connectedPeers.keySet.toSet).foreach { address =>
@@ -82,12 +83,13 @@ class PeerManager(
       disconnect(remote)
       if (connectedPeers.isEmpty) maybeShutdownRequester.foreach(_ ! CloseAllConnectionsComplete)
 
-  }: Receive) orElse blacklistOperations orElse peerListOperations orElse peerCycle
+  }: Receive) orElse blacklistOperations orElse peerListOperations orElse peerCycle)
 
   private def peerCycle: Receive = {
     case Connected(remote, handlerRef, ownSocketAddress, inbound) =>
 
       val connectionsCount = connectedPeers.count(p => p._2.handshake.isDefined && p._2.inbound == inbound)
+      log.debug(s"On new connection: connections (${connectedPeers.size}|${connectedPeers.count(_._2.inbound)}|${connectedPeers.count(!_._2.inbound)}): ${connectedPeers.keySet}")
 
       if (isBlacklisted(remote)) {
         log.warn(s"Got incoming connection from blacklisted $remote")
@@ -208,10 +210,12 @@ class PeerManager(
 
   private def disconnect(from: InetSocketAddress): Unit = {
     if (connectingPeer.contains(from)) {
+      log.debug(s"Disconnecting from peer in process of establishing connection $from")
       connectingPeer = None
     }
 
     connectedPeers.remove(from)
+    log.debug(s"After disconnect: connections (${connectedPeers.size}|${connectedPeers.count(_._2.inbound)}|${connectedPeers.count(!_._2.inbound)}): ${connectedPeers.keySet}")
   }
 
   private def peerNonces(): Set[(InetAddress, Long)] = {

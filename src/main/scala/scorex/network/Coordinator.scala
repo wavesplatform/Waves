@@ -1,11 +1,10 @@
 package scorex.network
 
-import cats._
-import cats.data._
-import cats.implicits._
-import cats.syntax.all._
+import akka.event.LoggingReceive
 import akka.pattern.{ask, pipe}
 import akka.util.Timeout
+import cats._
+import cats.implicits._
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state2.reader.StateReader
 import scorex.app.Application
@@ -19,18 +18,16 @@ import scorex.crypto.encode.Base58.encode
 import scorex.network.BlockchainSynchronizer.{GetExtension, GetSyncStatus, Status}
 import scorex.network.NetworkController.{DataFromPeer, SendToNetwork}
 import scorex.network.ScoreObserver.{CurrentScore, GetScore}
-import scorex.network.message._
-import scorex.network.message.{Message, MessageSpec}
+import scorex.network.message.{Message, MessageSpec, _}
 import scorex.network.peer.PeerManager.{ConnectedPeers, GetConnectedPeersTyped}
 import scorex.transaction.History.BlockchainScore
-import scorex.transaction._
 import scorex.transaction.ValidationError.CustomError
+import scorex.transaction._
 import scorex.utils.{ScorexLogging, Time}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.language.postfixOps
-import scala.language.higherKinds
+import scala.language.{higherKinds, postfixOps}
 import scala.util.control.NonFatal
 
 class Coordinator(application: Application) extends ViewSynchronizer with ScorexLogging {
@@ -91,7 +88,7 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
       }
   }
 
-  private def state(status: CoordinatorStatus)(logic: Receive): Receive = {
+  private def state(status: CoordinatorStatus)(logic: Receive): Receive = LoggingReceive ({
     logic orElse {
       case GetCoordinatorStatus => sender() ! status
 
@@ -122,7 +119,7 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
 
       case ClearCheckpoint => checkpoints.set(None)
     }
-  }
+  })
 
   private def handleCheckpoint(checkpoint: Checkpoint, from: Option[ConnectedPeer]): Unit =
     if (checkpoints.get.forall(c => !(c.signature sameElements checkpoint.signature))) {
