@@ -36,7 +36,7 @@ sbt packageAll
 .deb and .jar packages will be in /package folder. To build testnet packages use
 
 ```
-sbt packageAll -D=network=testnet
+sbt packageAll -Dnetwork=testnet
 ```
 
 # Running Tests
