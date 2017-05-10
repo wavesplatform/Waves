@@ -88,7 +88,7 @@ class PeerManager(application: Application) extends Actor with ScorexLogging {
   private def peerCycle: Receive = {
     case Connected(remote, handlerRef, ownSocketAddress, inbound) =>
 
-      val connectionsCount = connectedPeers.count(_._2.inbound == inbound)
+      val connectionsCount = connectedPeers.count(p => p._2.handshake.isDefined && p._2.inbound == inbound)
 
       if (isBlacklisted(remote)) {
         log.warn(s"Got incoming connection from blacklisted $remote")
