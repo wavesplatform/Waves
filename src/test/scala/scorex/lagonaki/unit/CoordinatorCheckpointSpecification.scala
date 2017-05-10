@@ -58,7 +58,7 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
   val connectedPeer: ConnectedPeer = stub[ConnectedPeer]
 
   val db: MVStore = new MVStore.Builder().open()
-  val blockStorage1 = new BlockStorageImpl(wavesSettings.blockchainSettings)
+  val (checkpoints1, history1, stateReader1, blockchainUpdater1) = BlockStorageImpl(wavesSettings.blockchainSettings)
   val utxStorage1 = new UnconfirmedTransactionsDatabaseImpl(wavesSettings.utxSettings.size)
 
   class TestAppMock extends scorex.app.Application {
@@ -78,13 +78,13 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
 
     override def utxStorage: UnconfirmedTransactionsStorage = utxStorage1
 
-    override def history: History = blockStorage1.history
+    override def history: History = history1
 
-    override def stateReader: StateReader = blockStorage1.stateReader
+    override def stateReader: StateReader = stateReader1
 
-    override def blockchainUpdater: BlockchainUpdater = blockStorage1.blockchainUpdater
+    override def blockchainUpdater: BlockchainUpdater = blockchainUpdater1
 
-    override def checkpoints: CheckpointService = blockStorage1.checkpointService
+    override def checkpoints: CheckpointService = checkpoints1
 
     override def messagesHandler: MessageHandler = ???
 
@@ -112,7 +112,7 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
       Application.genesisTransactions(app.settings.blockchainSettings.genesisSettings), genesisTimestamp)).explicitGet()
 
   def before(): Unit = {
-    app.blockchainUpdater.removeAfter(blockStorage1.history.genesis.uniqueId)
+    app.blockchainUpdater.removeAfter(history1.genesis.uniqueId)
     actorRef ! ClearCheckpoint
     networkController.ignoreMsg {
       case SendToNetwork(m, _) => m.spec == ScoreMessageSpec
@@ -125,7 +125,7 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
   }
 
   def genNBlocks(fromHeight: Int = 1, n: Int): Unit = {
-    var ref = blockStorage1.history.blockAt(fromHeight).get.uniqueId
+    var ref = history1.blockAt(fromHeight).get.uniqueId
 
     (2 to n).foreach { i =>
       val b = createBlock(ref)
@@ -133,11 +133,11 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
       ref = b.uniqueId
     }
 
-    awaitCond(blockStorage1.history.height() == n, max = 20.seconds)
+    awaitCond(history1.height() == n, max = 20.seconds)
   }
 
   def genCheckpoint(historyPoints: Seq[Int]): Checkpoint = {
-    val items = historyPoints.map(h => BlockCheckpoint(h, blockStorage1.history.blockAt(h).get.signerData.signature))
+    val items = historyPoints.map(h => BlockCheckpoint(h, history1.blockAt(h).get.signerData.signature))
     val checkpoint = Checkpoint(items, Array()).signedBy(pk.privateKey)
     checkpoint
   }
@@ -147,7 +147,7 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
     genNBlocks(9)
 
     val toRollback = 9
-    val chpBlock = createBlock(blockStorage1.history.blockAt(toRollback - 1).get.uniqueId)
+    val chpBlock = createBlock(history1.blockAt(toRollback - 1).get.uniqueId)
     val p = BlockCheckpoint(toRollback, chpBlock.signerData.signature)
     val firstChp = genCheckpoint(Seq(7, 5, 3))
 
@@ -164,7 +164,7 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
 
     sendCheckpoint(Seq(9, 7, 5, 3))
 
-    val parentId = blockStorage1.history.blockAt(8).get.uniqueId
+    val parentId = history1.blockAt(8).get.uniqueId
     app.blockchainUpdater.removeAfter(parentId)
     val difBloc = createBlock(parentId)
     val badPeer = stub[ConnectedPeer]
