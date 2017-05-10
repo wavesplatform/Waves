@@ -88,7 +88,7 @@ class PeerManager(
   private def peerCycle: Receive = {
     case Connected(remote, handlerRef, ownSocketAddress, inbound) =>
 
-      val connectionsCount = connectedPeers.count(_._2.inbound == inbound)
+      val connectionsCount = connectedPeers.count(p => p._2.handshake.isDefined && p._2.inbound == inbound)
       log.debug(s"On new connection: connections (${connectedPeers.size}|${connectedPeers.count(_._2.inbound)}|${connectedPeers.count(!_._2.inbound)}): ${connectedPeers.keySet}")
 
       if (isBlacklisted(remote)) {
