@@ -2,6 +2,7 @@ package scorex.network
 
 import akka.actor.Actor.Receive
 import akka.actor.{ActorRef, Cancellable}
+import akka.event.LoggingReceive
 import com.wavesplatform.settings.SynchronizationSettings
 import scorex.block.Block
 import scorex.block.Block._
@@ -166,7 +167,7 @@ class BlockchainSynchronizer(protected val networkControllerRef: ActorRef, coord
     }
   }
 
-  private def state(status: Status, stopFilter: StopFilter = noFilter)(logic: Receive): Receive = {
+  private def state(status: Status, stopFilter: StopFilter = noFilter)(logic: Receive): Receive = LoggingReceive({
     //combine specific logic with common for all the states
 
     ignoreFor(stopFilter) orElse logic orElse {
@@ -184,7 +185,7 @@ class BlockchainSynchronizer(protected val networkControllerRef: ActorRef, coord
       case nonsense: Any =>
         log.warn(s"Got something strange in ${status.name}: $nonsense")
     }
-  }
+  })
 
   private def handleTimeout(t: TimeoutExceeded): Unit = {
     val TimeoutExceeded(i, n, f, peerSet, runs) = t
