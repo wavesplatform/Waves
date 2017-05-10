@@ -68,6 +68,9 @@ class HistoryWriterImpl(db: MVStore) extends HistoryWriter with ScorexLogging {
       if block.signerData.generator.address.equals(account.address)
     } yield block
   }
+
+  override def blockBytes(height: Int): Option[Array[Byte]] = synchronizeRead { implicit lock =>
+    Option(blockBodyByHeight().get(height)) }
 }
 
 object HistoryWriterImpl {
