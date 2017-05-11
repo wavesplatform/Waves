@@ -12,7 +12,7 @@ import scorex.transaction.lease.LeaseTransaction
 
 class CompositeStateReader(inner: StateReader, blockDiff: BlockDiff) extends StateReader {
 
-  val synchronizationToken: ReentrantReadWriteLock = inner.synchronizationToken
+  def synchronizationToken: ReentrantReadWriteLock = inner.synchronizationToken
 
   private val txDiff = blockDiff.txsDiff
 
@@ -76,6 +76,8 @@ object CompositeStateReader {
 
   class Proxy(val inner: StateReader, blockDiff: () => BlockDiff) extends StateReader {
 
+    override def synchronizationToken: ReentrantReadWriteLock = inner.synchronizationToken
+
     override def paymentTransactionIdByHash(hash: ByteArray): Option[ByteArray] =
       new CompositeStateReader(inner, blockDiff()).paymentTransactionIdByHash(hash)
 
@@ -124,7 +126,6 @@ object CompositeStateReader {
     override def containsTransaction(id: ByteArray): Boolean =
       new CompositeStateReader(inner, blockDiff()).containsTransaction(id)
 
-    override val synchronizationToken: ReentrantReadWriteLock = inner.synchronizationToken
   }
 
 }

@@ -36,7 +36,7 @@ class BlockchainUpdaterImpl(persisted: StateWriter with StateReader, settings: F
     log.info(s"$prefix Total blocks: ${bc.height()}, persisted: ${persisted.height}, imMemDiff: ${inMemoryDiff().heightDiff}")
   }
 
-  read { implicit l =>
+  {
     if (persisted.height > bc.height())
       throw new IllegalArgumentException(s"storedBlocks = ${bc.height()}, statedBlocks=${persisted.height}")
 

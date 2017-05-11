@@ -113,7 +113,7 @@ class StateWriterImpl(p: StateStorage, synchronizationToken: ReentrantReadWriteL
     log.debug("BlockDiff commit complete")
   }
 
-  override def clear(): Unit =write { implicit l=>
+  override def clear(): Unit = write { implicit l =>
     StateStorage.dirty(p) {
       sp().transactions.clear()
       sp().portfolios.clear()

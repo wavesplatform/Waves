@@ -32,28 +32,28 @@ object SynchronizedOver {
 
 trait SynchronizedOver {
 
-  val synchronizationToken: ReentrantReadWriteLock
+  def synchronizationToken: ReentrantReadWriteLock
 
-  protected val readLock: ReadLock =
+  protected val instanceReadLock: ReadLock =
     new ReadLock(synchronizationToken.readLock())
 
-  protected val readWriteLock: ReadWriteLock =
+  protected val instanceReadWriteLock: ReadWriteLock =
     new ReadWriteLock(synchronizationToken.readLock(), synchronizationToken.writeLock())
 
   protected case class Synchronized[T](private var value: T) {
 
     def apply()(implicit readLock: ReadLock): T = {
-      validateLock(readLock, readLock, readWriteLock)
+      validateLock(readLock, instanceReadLock, instanceReadWriteLock)
       value
     }
 
     def update[R](f: T => R)(implicit readWriteLock: ReadWriteLock): R = {
-      validateLock(readWriteLock, readWriteLock)
+      validateLock(readWriteLock, instanceReadWriteLock)
       f(value)
     }
 
     def swap(newVal: => T)(implicit readWriteLock: ReadWriteLock): T = {
-      validateLock(readWriteLock, readWriteLock)
+      validateLock(readWriteLock, instanceReadWriteLock)
       val oldVal = value
       value = newVal
       oldVal
@@ -68,10 +68,10 @@ trait SynchronizedOver {
   }
 
   protected def read[T](body: ReadLock => T): T =
-    synchronizeOperation(readLock)(body)
+    synchronizeOperation(instanceReadLock)(body)
 
   protected def write[T](body: ReadWriteLock => T): T =
-    synchronizeOperation(readWriteLock)(body)
+    synchronizeOperation(instanceReadWriteLock)(body)
 
   protected def synchronizeOperation[T, L <: TypedLock](lock: L)(body: L => T): T = {
     lock.lock()
