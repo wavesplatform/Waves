@@ -14,8 +14,9 @@ import scorex.utils.ScorexLogging
 import StateWriterImpl._
 import BlockchainUpdaterImpl._
 
-class BlockchainUpdaterImpl(persisted: StateWriter with StateReader, settings: FunctionalitySettings, minimumInMemoryDiffSize: Int, bc: HistoryWriter with History,
-                            override val synchronizationToken: ReentrantReadWriteLock) extends BlockchainUpdater with ScorexLogging {
+class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader, settings: FunctionalitySettings,
+                                    minimumInMemoryDiffSize: Int, bc: HistoryWriter with History,
+                                    override val synchronizationToken: ReentrantReadWriteLock) extends BlockchainUpdater with ScorexLogging {
 
   private val MaxInMemDiff = minimumInMemoryDiffSize * 2
 
@@ -34,14 +35,6 @@ class BlockchainUpdaterImpl(persisted: StateWriter with StateReader, settings: F
 
   private def logHeights(prefix: String = ""): Unit = read { implicit l =>
     log.info(s"$prefix Total blocks: ${bc.height()}, persisted: ${persisted.height}, imMemDiff: ${inMemoryDiff().heightDiff}")
-  }
-
-  {
-    if (persisted.height > bc.height())
-      throw new IllegalArgumentException(s"storedBlocks = ${bc.height()}, statedBlocks=${persisted.height}")
-
-    logHeights("Start:")
-    updatePersistedAndInMemory()
   }
 
   def currentState: StateReader = read { implicit l => new CompositeStateReader.Proxy(persisted, () => inMemoryDiff()) }
@@ -95,6 +88,19 @@ class BlockchainUpdaterImpl(persisted: StateWriter with StateReader, settings: F
 }
 
 object BlockchainUpdaterImpl {
+
+  def apply(persisted: StateWriter with StateReader, settings: FunctionalitySettings, minimumInMemoryDiffSize: Int,
+            bc: HistoryWriter with History, synchronizationToken: ReentrantReadWriteLock): Either[String, BlockchainUpdaterImpl] = {
+    val blockchainUpdater = new BlockchainUpdaterImpl(persisted, settings, minimumInMemoryDiffSize, bc, synchronizationToken)
+    if (persisted.height > bc.height())
+      Left(s"storedBlocks = ${bc.height()}, statedBlocks=${persisted.height}")
+    else {
+      blockchainUpdater.logHeights("Start:")
+      blockchainUpdater.updatePersistedAndInMemory()
+      Right(blockchainUpdater)
+    }
+  }
+
   def ranges(from: Int, to: Int, by: Int): List[(Int, Int)] =
     if (from + by < to)
       (from, from + by) +: ranges(from + by, to, by)
