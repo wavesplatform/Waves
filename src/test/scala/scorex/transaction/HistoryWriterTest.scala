@@ -14,7 +14,7 @@ import scala.concurrent.Future
 class HistoryWriterTest extends FunSuite with Matchers with HistoryTest {
 
   test("concurrent access to lastBlock doesn't throw any exception") {
-    val history = new HistoryWriterImpl(new MVStore.Builder().open(), new ReentrantReadWriteLock())
+    val history = HistoryWriterImpl(new MVStore.Builder().open(), new ReentrantReadWriteLock()).explicitGet()
     appendGenesisBlock(history)
 
     (1 to 1000).foreach { _ =>

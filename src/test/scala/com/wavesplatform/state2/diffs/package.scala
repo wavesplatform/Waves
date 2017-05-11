@@ -14,7 +14,7 @@ import scala.util.{Left, Right}
 package object diffs {
 
 
-  def newState(): StateWriterImpl = new StateWriterImpl(new StateStorage(new MVStore.Builder().open()), new ReentrantReadWriteLock())
+  def newState(): StateWriterImpl = new StateWriterImpl(StateStorage(new MVStore.Builder().open()).explicitGet(), new ReentrantReadWriteLock())
 
   val differ: (StateReader, Block) => Either[ValidationError, BlockDiff] = BlockDiffer(TestFunctionalitySettings.Enabled)
   val ENOUGH_AMT: Long = Long.MaxValue / 3

@@ -16,7 +16,7 @@ class StateReaderEffectiveBalanceTest extends fixture.FunSuite with Matchers {
   override type FixtureParam = StateStorage
 
   override protected def withFixture(test: OneArgTest): Outcome = {
-    val storage = new StateStorage(new MVStore.Builder().open())
+    val storage = StateStorage(new MVStore.Builder().open()).explicitGet()
     storage.setHeight(stateHeight)
     test(storage)
   }
