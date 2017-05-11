@@ -2,7 +2,6 @@ package scorex.network
 
 import akka.actor.ActorRef
 import com.wavesplatform.settings.SynchronizationSettings
-import scorex.app.Application
 import scorex.network.NetworkController.DataFromPeer
 import scorex.network.message.MessageSpec
 import scorex.transaction.History

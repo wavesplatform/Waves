@@ -32,7 +32,7 @@ abstract class BlockGeneratorControllerSpecification extends TestKit(ActorSystem
     val history = new HistoryWriterImpl(new MVStore.Builder().open())
     val testPeerManager: TestProbe = TestProbe("PeerManager")
     val testTime = new TestTime
-    val blockGeneratorController: ActorRef = system.actorOf(Props(classOf[BlockGeneratorController],
+    val blockGeneratorController: ActorRef = system.actorOf(Props(new BlockGeneratorController(
       settings,
       history,
       testTime,
@@ -41,7 +41,7 @@ abstract class BlockGeneratorControllerSpecification extends TestKit(ActorSystem
       stub[StateReader],
       stub[BlockchainSettings],
       stub[UnconfirmedTransactionsStorage],
-      null))
+      null)))
     test(F(blockGeneratorController, history, testPeerManager, testTime))
   }
 

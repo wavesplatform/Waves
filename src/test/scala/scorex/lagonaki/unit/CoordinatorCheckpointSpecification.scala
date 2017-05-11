@@ -73,7 +73,7 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
 
     lazy val scoreObserver: ActorRef = testScoreObserver.ref
 
-    override def coordinator: ActorRef = system.actorOf(Props(classOf[ValidBlockCoordinator], this), "Coordinator")
+    override def coordinator: ActorRef = system.actorOf(Props(new ValidBlockCoordinator(this)), "Coordinator")
 
     override def wallet: Wallet = new Wallet(None, "", None)
 

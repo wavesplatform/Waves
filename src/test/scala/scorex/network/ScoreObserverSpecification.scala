@@ -28,7 +28,7 @@ class ScoreObserverSpecification extends ActorTestingCommons {
 
   val wavesSettings = WavesSettings.fromConfig(localConfig)
 
-  protected override val actorRef = system.actorOf(Props(classOf[ScoreObserver], networkControllerMock, testCoordinator.ref, wavesSettings.synchronizationSettings))
+  protected override val actorRef = system.actorOf(Props(new ScoreObserver(networkControllerMock, testCoordinator.ref, wavesSettings.synchronizationSettings)))
 
   testSafely {
     "no-score case" in {

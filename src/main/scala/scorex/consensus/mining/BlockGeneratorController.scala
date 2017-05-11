@@ -161,14 +161,14 @@ class BlockGeneratorController(minerSettings: MinerSettings,
     }
 
   private def createMiner: ActorRef = {
-    context.watch(context.actorOf(Props(classOf[Miner], minerSettings: MinerSettings,
+    context.watch(context.actorOf(Props(new Miner(minerSettings: MinerSettings,
       wallet,
       history,
       stateReader,
       blockchainSettings,
       utxStorage,
       time,
-      coordinator), "miner"))
+      coordinator)), "miner"))
   }
 
   private def askForConnectedPeers() = peerManager ! GetConnectedPeersTyped

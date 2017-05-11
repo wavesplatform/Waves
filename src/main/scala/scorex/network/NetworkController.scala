@@ -67,7 +67,7 @@ class NetworkController(networkSettings: NetworkSettings, uPnP: => UPnP, peerMan
     }
   }
 
-  private val listener = context.actorOf(Props(classOf[NetworkListener], self, peerManager, localAddress),
+  private val listener = context.actorOf(Props(new NetworkListener(self, peerManager, localAddress)),
     "network-listener")
 
   override def postRestart(thr: Throwable): Unit = {
@@ -174,11 +174,11 @@ class NetworkController(networkSettings: NetworkSettings, uPnP: => UPnP, peerMan
   }
 
   private def createPeerHandler(connection: ActorRef, remote: InetSocketAddress, inbound: Boolean): Unit = {
-    val handler = context.actorOf(Props(classOf[PeerConnectionHandler], peerManager,
+    val handler = context.actorOf(Props(new PeerConnectionHandler(peerManager,
       connection,
       remote,
       messagesHandler,
-      networkSettings))
+      networkSettings)))
     peerManager ! PeerManager.Connected(remote, handler, ownSocketAddress, inbound)
   }
 }

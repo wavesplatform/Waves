@@ -97,7 +97,7 @@ class BlockchainSynchronizerSpecification extends ActorTestingCommons {
 
   private def sendSignatures(blockIds: BlockId*): Unit = dataFromNetwork(SignaturesSpec, blockIds.toSeq)
 
-  protected override val actorRef = system.actorOf(Props(classOf[BlockchainSynchronizer], networkControllerMock, testCoordinator.ref, testHistory, wavesSettings.synchronizationSettings))
+  protected override val actorRef = system.actorOf(Props(new BlockchainSynchronizer(networkControllerMock, testCoordinator.ref, testHistory, wavesSettings.synchronizationSettings)))
 
   testSafely {
 

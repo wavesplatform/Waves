@@ -5,10 +5,9 @@ import java.net.InetSocketAddress
 import akka.actor.{ActorRef, Props, Scheduler}
 import akka.testkit.TestProbe
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.settings.WavesSettings
+import com.wavesplatform.settings.{NetworkSettings, WavesSettings}
 import org.scalatest.mockito.MockitoSugar
 import scorex.ActorTestingCommons
-import scorex.app.Application
 import scorex.network.NetworkController.DataFromPeer
 import scorex.network.PeerSynchronizer.RequestDataFromPeer
 import scorex.network.message.PeersSpec
@@ -16,7 +15,8 @@ import scorex.network.peer.PeerManager
 
 import scala.language.postfixOps
 
-class TestPeerSynchronizer(app: Application) extends PeerSynchronizer(app.networkController, app.peerManager, app.settings.networkSettings) {
+class TestPeerSynchronizer(networkControllerRef: ActorRef, peerManager: ActorRef,
+                           networkSettings: NetworkSettings) extends PeerSynchronizer(networkControllerRef, peerManager, networkSettings) {
   override def scheduler: Scheduler = MockitoSugar.mock[Scheduler]
 }
 
@@ -39,15 +39,7 @@ class PeerSynchronizerSpecification extends ActorTestingCommons
   val wavesSettings = WavesSettings.fromConfig(localConfig)
   val testPeerManager = TestProbe("peerManager")
 
-  trait App extends ApplicationMock {
-    override lazy val settings = wavesSettings
-    override val peerManager: ActorRef = testPeerManager.ref
-  }
-
-  private val app = stub[App]
-
-
-  protected override val actorRef = system.actorOf(Props(classOf[TestPeerSynchronizer], app))
+  protected override val actorRef = system.actorOf(Props(new TestPeerSynchronizer(networkControllerMock, testPeerManager.ref, wavesSettings.networkSettings)))
 
   testSafely {
     "PeerSynchronizer" - {
