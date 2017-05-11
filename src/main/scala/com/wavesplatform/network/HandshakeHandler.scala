@@ -12,6 +12,7 @@ import io.netty.handler.codec.ReplayingDecoder
 import io.netty.util.concurrent.ScheduledFuture
 import scorex.app.ApplicationVersion
 import scorex.network.Handshake
+import scorex.utils.ScorexLogging
 
 @Sharable
 object HandshakeDecoder extends ReplayingDecoder[Void] {
@@ -63,7 +64,7 @@ object HandshakeTimeoutHandler {
 }
 
 @Sharable
-class HandshakeHandler(hs: Handshake) extends ChannelInboundHandlerAdapter {
+class HandshakeHandler(hs: Handshake) extends ChannelInboundHandlerAdapter with ScorexLogging {
   override def channelActive(ctx: ChannelHandlerContext) = {
     ctx.writeAndFlush(ctx.alloc().buffer().writeBytes(hs.bytes))
     super.channelActive(ctx)
@@ -78,6 +79,8 @@ class HandshakeHandler(hs: Handshake) extends ChannelInboundHandlerAdapter {
       // todo: add actual codecs here
       ctx.pipeline().addLast("message-decoder", new MessageDecoder(???))
       super.channelRead(ctx, hs)
+    case other =>
+      log.debug(s"Unexpected message $other while waiting for handshake")
   }
 }
 
