@@ -18,22 +18,20 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader, set
                                     minimumInMemoryDiffSize: Int, bc: HistoryWriter with History,
                                     override val synchronizationToken: ReentrantReadWriteLock) extends BlockchainUpdater with ScorexLogging {
 
-  private val MaxInMemDiff = minimumInMemoryDiffSize * 2
+  private val MaxInMemDiffHeight = minimumInMemoryDiffSize * 2
 
-  private val unsafeDifferByRange: (StateReader, (Int, Int)) => BlockDiff = {
-    case (sr, (from, to)) =>
+  private val inMemoryDiff = Synchronized(Monoid[BlockDiff].empty)
+
+  private def unsafeDiffAgainstPersistedByRange(from: Int, to: Int): BlockDiff =  {
       val blocks = measureLog(s"Reading blocks from $from up to $to") {
         Range(from, to).map(bc.blockAt(_).get)
       }
       measureLog(s"Building diff from $from up to $to") {
-        BlockDiffer.unsafeDiffMany(settings)(sr, blocks)
+        BlockDiffer.unsafeDiffMany(settings)(persisted, blocks)
       }
   }
-  private val unsafeDiffAgainstPersistedByRange: ((Int, Int)) => BlockDiff = unsafeDifferByRange(persisted, _)
 
-  var inMemoryDiff = Synchronized(Monoid[BlockDiff].empty)
-
-  private def logHeights(prefix: String = ""): Unit = read { implicit l =>
+  private def logHeights(prefix: String): Unit = read { implicit l =>
     log.info(s"$prefix Total blocks: ${bc.height()}, persisted: ${persisted.height}, imMemDiff: ${inMemoryDiff().heightDiff}")
   }
 
@@ -53,7 +51,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader, set
   }
 
   override def processBlock(block: Block): Either[ValidationError, Unit] = write { implicit l =>
-    if (inMemoryDiff().heightDiff >= MaxInMemDiff) {
+    if (inMemoryDiff().heightDiff >= MaxInMemDiffHeight) {
       updatePersistedAndInMemory()
     }
     for {
@@ -95,7 +93,7 @@ object BlockchainUpdaterImpl {
     if (persisted.height > bc.height())
       Left(s"storedBlocks = ${bc.height()}, statedBlocks=${persisted.height}")
     else {
-      blockchainUpdater.logHeights("Start:")
+      blockchainUpdater.logHeights("Constructing BlockchainUpdaterImpl:")
       blockchainUpdater.updatePersistedAndInMemory()
       Right(blockchainUpdater)
     }
