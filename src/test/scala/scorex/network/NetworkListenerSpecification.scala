@@ -23,8 +23,8 @@ class NetworkListenerSpecification extends ActorTestingCommons {
   private val address2 = new InetSocketAddress(InetAddress.getByName("2.2.2.2"), 12302)
   private val address3 = new InetSocketAddress(InetAddress.getByName("3.3.3.3"), 12303)
 
-  protected override val actorRef = system.actorOf(Props(classOf[NetworkListener], networkController.ref,
-    testPeerManager.ref, testBindAddress))
+  protected override val actorRef = system.actorOf(Props(new NetworkListener(networkController.ref,
+    testPeerManager.ref, testBindAddress)))
 
   testSafely {
     "NetworkListener" - {

@@ -60,43 +60,12 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
   val db: MVStore = new MVStore.Builder().open()
   val (checkpoints1, history1, stateReader1, blockchainUpdater1) = BlockStorageImpl(wavesSettings.blockchainSettings)
   val utxStorage1 = new UnconfirmedTransactionsDatabaseImpl(wavesSettings.utxSettings.size)
-  class ValidBlockCoordinator(a: TestAppMock) extends Coordinator(a) {
+  class ValidBlockCoordinator extends Coordinator(networkControllerMock, testBlockchainSynchronizer.ref,
+    testBlockGenerator.ref, testPeerManager.ref, testScoreObserver.ref, blockchainUpdater1, NTP, utxStorage1, history1, stateReader1, checkpoints1, wavesSettings) {
     override def isBlockValid(b: Block): Either[ValidationError, Unit] = Right(())
   }
 
-  class TestAppMock extends scorex.app.Application {
-    lazy val networkController: ActorRef = networkControllerMock
-    lazy val settings = wavesSettings
-    lazy val blockGenerator: ActorRef = testBlockGenerator.ref
-    lazy val blockchainSynchronizer: ActorRef = testBlockchainSynchronizer.ref
-    lazy val peerManager: ActorRef = testPeerManager.ref
-
-    lazy val scoreObserver: ActorRef = testScoreObserver.ref
-
-    override def coordinator: ActorRef = system.actorOf(Props(classOf[ValidBlockCoordinator], this), "Coordinator")
-
-    override def wallet: Wallet = new Wallet(None, "", None)
-
-    override def time: Time = NTP
-
-    override def utxStorage: UnconfirmedTransactionsStorage = utxStorage1
-
-    override def history: History = history1
-
-    override def stateReader: StateReader = stateReader1
-
-    override def blockchainUpdater: BlockchainUpdater = blockchainUpdater1
-
-    override def checkpoints: CheckpointService = checkpoints1
-
-    override def messagesHandler: MessageHandler = ???
-
-    override def upnp: UPnP = ???
-  }
-
-  val app = new TestAppMock()
-
-  override lazy protected val actorRef: ActorRef = system.actorOf(Props(new ValidBlockCoordinator(app)))
+  override lazy protected val actorRef: ActorRef = system.actorOf(Props(new ValidBlockCoordinator))
   val gen = PrivateKeyAccount(Array(0.toByte))
   var score: Int = 10000
 
@@ -109,13 +78,13 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
   }
 
   val genesisTimestamp: Long = System.currentTimeMillis()
-  app.blockchainUpdater.processBlock(
+  blockchainUpdater1.processBlock(
     Block.genesis(
-      NxtLikeConsensusBlockData(app.settings.blockchainSettings.genesisSettings.initialBaseTarget, Array.fill(DigestSize)(0: Byte)),
-      Application.genesisTransactions(app.settings.blockchainSettings.genesisSettings), genesisTimestamp)).explicitGet()
+      NxtLikeConsensusBlockData(wavesSettings.blockchainSettings.genesisSettings.initialBaseTarget, Array.fill(DigestSize)(0: Byte)),
+      Application.genesisTransactions(wavesSettings.blockchainSettings.genesisSettings), genesisTimestamp)).explicitGet()
 
   def before(): Unit = {
-    app.blockchainUpdater.removeAfter(history1.genesis.uniqueId)
+    blockchainUpdater1.removeAfter(history1.genesis.uniqueId)
     actorRef ! ClearCheckpoint
     networkController.ignoreMsg {
       case SendToNetwork(m, _) => m.spec == ScoreMessageSpec
@@ -158,7 +127,7 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
 
     actorRef ! DataFromPeer(CheckpointMessageSpec.messageCode, checkpoint: Checkpoint, connectedPeer)
 
-    networkController.awaitCond(app.history.height() == 7)
+    networkController.awaitCond(history1.height() == 7)
   }
 
   "blacklist peer if it sends block that is different from checkPoint" in {
@@ -168,7 +137,7 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
     sendCheckpoint(Seq(9, 7, 5, 3))
 
     val parentId = history1.blockAt(8).get.uniqueId
-    app.blockchainUpdater.removeAfter(parentId)
+    blockchainUpdater1.removeAfter(parentId)
     val difBloc = createBlock(parentId)
     val badPeer = stub[ConnectedPeer]
 
@@ -203,7 +172,7 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
     genNBlocks(10)
     sendCheckpoint(Seq(7, 4, 3))
 
-    var parent = app.history.blockAt(5).get.uniqueId
+    var parent = history1.blockAt(5).get.uniqueId
     val lastCommonBlockId = parent
     val fork = Seq.fill(5) {
       val b = createBlock(parent)
@@ -227,7 +196,7 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
     genNBlocks(10)
     sendCheckpoint(Seq(7, 4, 3))
 
-    var parent = app.history.blockAt(7).get.uniqueId
+    var parent = history1.blockAt(7).get.uniqueId
     val lastCommonBlockId = parent
     val fork = Seq.fill(5) {
       val b = createBlock(parent)
@@ -243,8 +212,6 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
     actorRef ! SyncFinished(success = true, Some(lastCommonBlockId, fork.iterator, Some(goodPeer)))
 
     Thread.sleep(1000)
-    awaitCond(app.history.height() == 12)
-
+    awaitCond(history1.height() == 12)
   }
-
 }

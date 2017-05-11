@@ -49,7 +49,7 @@ class HistoryReplierSpecification extends ActorTestingCommons with HistoryTest {
 
   private def expectedSignaturesSpec(blockIds: Seq[Int]): Unit = expectNetworkMessage(SignaturesSpec, blocksHeightRangeToTestExtractedValues(blockIds))
 
-  override protected val actorRef = system.actorOf(Props(classOf[HistoryReplier], networkControllerMock, h, wavesSettings.synchronizationSettings.maxChainLength: Int))
+  override protected val actorRef = system.actorOf(Props(new HistoryReplier(networkControllerMock, h, wavesSettings.synchronizationSettings.maxChainLength: Int)))
 
   private def blocksHeightRangeToTestExtractedValues(s: Seq[Int]) =
     s.map(i => h.blockAt(i).get.uniqueId(0).toInt)

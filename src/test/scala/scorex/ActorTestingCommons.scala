@@ -4,11 +4,9 @@ import akka.actor.{ActorRef, ActorSystem}
 import akka.testkit.{ImplicitSender, TestKitBase, TestProbe}
 import akka.util.Timeout
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.state2.reader.StateReader
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.Matchers
 import scorex.account.PublicKeyAccount
-import scorex.app.Application
 import scorex.block.Block._
 import scorex.block.{Block, SignerData}
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
@@ -16,7 +14,6 @@ import scorex.network.NetworkController.{DataFromPeer, RegisterMessagesHandler, 
 import scorex.network.message._
 import scorex.network.{ConnectedPeer, SendToChosen, SendingStrategy}
 import scorex.transaction.TransactionParser.SignatureLength
-import scorex.transaction._
 
 import scala.concurrent.duration._
 import scala.language.{implicitConversions, postfixOps}
@@ -152,9 +149,5 @@ abstract class ActorTestingCommons extends TestKitBase
         spec shouldEqual expectedSpec
         implicitly[TestDataExtraction[Content]].extract(data) shouldEqual expectedData
     }
-
-  trait ApplicationMock extends Application {
-    final override lazy val networkController: ActorRef = networkControllerMock
-  }
 
 }
