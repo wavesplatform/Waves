@@ -1,6 +1,7 @@
 package scorex.app
 
 import com.google.common.primitives.Ints
+import io.netty.buffer.ByteBuf
 import scorex.serialization.BytesSerializable
 
 import scala.util.Try
@@ -18,6 +19,8 @@ case class ApplicationVersion(firstDigit: Int, secondDigit: Int, thirdDigit: Int
 
 object ApplicationVersion {
   val SerializedVersionLength: Int = 4 * 3
+
+  def parseByteBuf(bytes: ByteBuf) = ApplicationVersion(bytes.readInt(), bytes.readInt(), bytes.readInt())
 
   def parseBytes(bytes: Array[Byte]): Try[ApplicationVersion] = Try {
     require(bytes.length == SerializedVersionLength, "Wrong bytes for application version")
