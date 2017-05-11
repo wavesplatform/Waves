@@ -49,18 +49,18 @@ class NetworkController(networkSettings: NetworkSettings,
       Try {
         val myAddress = InetAddress.getAllByName(myHost)
 
-        NetworkInterface.getNetworkInterfaces.asScala.exists { networkInterface =>
+        if (NetworkInterface.getNetworkInterfaces.asScala.exists { networkInterface =>
           networkInterface.getInterfaceAddresses.asScala.exists { interfaceAddress =>
             val externalAddress = interfaceAddress.getAddress
             myAddress.contains(externalAddress)
           }
-        } match {
-          case true => true
-          case false =>
-            if (networkSettings.uPnPSettings.enable) {
-              val externalAddress = uPnP.externalAddress
-              myAddress.contains(externalAddress)
-            } else false
+        }) {
+          true
+        } else {
+          if (networkSettings.uPnPSettings.enable) {
+            val externalAddress = uPnP.externalAddress
+            myAddress.contains(externalAddress)
+          } else false
         }
       }.recover { case t: Throwable =>
         log.error("Declared address validation failed: ", t)

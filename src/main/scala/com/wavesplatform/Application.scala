@@ -14,6 +14,7 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.actor.RootActorSystem
 import com.wavesplatform.history.{BlockStorageImpl, CheckpointServiceImpl}
 import com.wavesplatform.http.NodeApiRoute
+import com.wavesplatform.network.Network
 import com.wavesplatform.matcher.Matcher
 import com.wavesplatform.settings._
 import scorex.account.{Account, AddressScheme}
@@ -111,6 +112,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
     log.debug(s"Max memory available: ${Runtime.getRuntime.maxMemory}")
 
     checkGenesis()
+
+    new Network().bind(???)
 
     if (settings.networkSettings.uPnPSettings.enable) upnp.addPort(settings.networkSettings.port)
 
