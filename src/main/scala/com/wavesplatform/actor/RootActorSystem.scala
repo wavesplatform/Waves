@@ -24,10 +24,12 @@ object RootActorSystem extends ScorexLogging {
 
   def start(id: String, settings: MatcherSettings)(init: ActorSystem => Unit): Unit = {
     val journalDir = new File(settings.journalDataDir)
-    journalDir.mkdirs().ensuring(journalDir.exists())
-
     val snapshotDir = new File(settings.snapshotsDataDir)
-    snapshotDir.mkdirs().ensuring(snapshotDir.exists())
+    journalDir.mkdirs()
+    snapshotDir.mkdirs()
+
+    checkDirectory(journalDir)
+    checkDirectory(snapshotDir)
 
     val system = ActorSystem(id, ConfigFactory.load().withValue("akka.actor.guardian-supervisor-strategy",
       ConfigValueFactory.fromAnyRef("com.wavesplatform.actor.RootActorSystem$EscalatingStrategy"))
@@ -48,5 +50,10 @@ object RootActorSystem extends ScorexLogging {
     } else {
       sys.exit(0)
     }
+  }
+
+  private def checkDirectory(directory: File): Unit = if (!directory.exists()) {
+    log.error(s"Failed to create directory '${directory.getPath}'")
+    sys.exit(1)
   }
 }
