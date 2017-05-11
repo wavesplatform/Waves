@@ -1,5 +1,7 @@
 package com.wavesplatform.state2
 
+import java.util.concurrent.locks.ReentrantReadWriteLock
+
 import cats.kernel.Monoid
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.diffs.BlockDiffer
@@ -9,15 +11,13 @@ import scorex.block.Block.BlockId
 import scorex.crypto.encode.Base58
 import scorex.transaction._
 import scorex.utils.ScorexLogging
-
 import StateWriterImpl._
 import BlockchainUpdaterImpl._
 
-class BlockchainUpdaterImpl(persisted: StateWriter with StateReader, settings: FunctionalitySettings, bc: HistoryWriter with History)
-  extends BlockchainUpdater with ScorexLogging {
+class BlockchainUpdaterImpl(persisted: StateWriter with StateReader, settings: FunctionalitySettings, minimumInMemoryDiffSize: Int, bc: HistoryWriter with History,
+                            override val synchronizationToken: ReentrantReadWriteLock) extends BlockchainUpdater with ScorexLogging {
 
-  private val MinInMemDiff = 200
-  private val MaxInMemDiff = MinInMemDiff * 2
+  private val MaxInMemDiff = minimumInMemoryDiffSize * 2
 
   private val unsafeDifferByRange: (StateReader, (Int, Int)) => BlockDiff = {
     case (sr, (from, to)) =>
@@ -30,12 +30,13 @@ class BlockchainUpdaterImpl(persisted: StateWriter with StateReader, settings: F
   }
   private val unsafeDiffAgainstPersistedByRange: ((Int, Int)) => BlockDiff = unsafeDifferByRange(persisted, _)
 
-  @volatile var inMemoryDiff: BlockDiff = Monoid[BlockDiff].empty
+  var inMemoryDiff = Synchronized(Monoid[BlockDiff].empty)
 
-  private def logHeights(prefix: String = ""): Unit =
-    log.info(s"$prefix Total blocks: ${bc.height()}, persisted: ${persisted.height}, imMemDiff: ${inMemoryDiff.heightDiff}")
+  private def logHeights(prefix: String = ""): Unit = read { implicit l =>
+    log.info(s"$prefix Total blocks: ${bc.height()}, persisted: ${persisted.height}, imMemDiff: ${inMemoryDiff().heightDiff}")
+  }
 
-  {
+  read { implicit l =>
     if (persisted.height > bc.height())
       throw new IllegalArgumentException(s"storedBlocks = ${bc.height()}, statedBlocks=${persisted.height}")
 
@@ -43,23 +44,23 @@ class BlockchainUpdaterImpl(persisted: StateWriter with StateReader, settings: F
     updatePersistedAndInMemory()
   }
 
-  def currentState: StateReader = new CompositeStateReader.Proxy(persisted, () => inMemoryDiff)
+  def currentState: StateReader = read { implicit l => new CompositeStateReader.Proxy(persisted, () => inMemoryDiff()) }
 
-  private def updatePersistedAndInMemory(): Unit = {
+  private def updatePersistedAndInMemory(): Unit = write { implicit l =>
     logHeights("State rebuild started:")
     val persistFrom = persisted.height + 1
-    val persistUpTo = bc.height - MinInMemDiff + 1
+    val persistUpTo = bc.height - minimumInMemoryDiffSize + 1
 
-    ranges(persistFrom, persistUpTo, 200).foreach { case (head, last) =>
+    ranges(persistFrom, persistUpTo, minimumInMemoryDiffSize).foreach { case (head, last) =>
       val diffToBePersisted = unsafeDiffAgainstPersistedByRange(head, last)
       persisted.applyBlockDiff(diffToBePersisted)
     }
-    inMemoryDiff = unsafeDiffAgainstPersistedByRange(persisted.height + 1, bc.height() + 1)
+    inMemoryDiff.swap(unsafeDiffAgainstPersistedByRange(persisted.height + 1, bc.height() + 1))
     logHeights("State rebuild finished:")
   }
 
-  override def processBlock(block: Block): Either[ValidationError, Unit] = {
-    if (inMemoryDiff.heightDiff >= MaxInMemDiff) {
+  override def processBlock(block: Block): Either[ValidationError, Unit] = write { implicit l =>
+    if (inMemoryDiff().heightDiff >= MaxInMemDiff) {
       updatePersistedAndInMemory()
     }
     for {
@@ -67,11 +68,11 @@ class BlockchainUpdaterImpl(persisted: StateWriter with StateReader, settings: F
       _ <- bc.appendBlock(block)
     } yield {
       log.info( s"""Block ${block.encodedId} appended. New height: ${bc.height()}, new score: ${bc.score()})""")
-      inMemoryDiff = Monoid[BlockDiff].combine(inMemoryDiff, blockDiff)
+      inMemoryDiff.swap(Monoid[BlockDiff].combine(inMemoryDiff(), blockDiff))
     }
   }
 
-  override def removeAfter(blockId: BlockId): Unit = {
+  override def removeAfter(blockId: BlockId): Unit = write { implicit l =>
     bc.heightOf(blockId) match {
       case Some(height) =>
         while (bc.height > height) {
@@ -84,7 +85,7 @@ class BlockchainUpdaterImpl(persisted: StateWriter with StateReader, settings: F
 
         } else {
           if (currentState.height != height) {
-            inMemoryDiff = unsafeDiffAgainstPersistedByRange(persisted.height + 1, height + 1)
+            inMemoryDiff.swap(unsafeDiffAgainstPersistedByRange(persisted.height + 1, height + 1))
           }
         }
       case None =>

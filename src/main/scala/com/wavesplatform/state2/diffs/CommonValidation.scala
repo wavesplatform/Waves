@@ -8,13 +8,15 @@ import scorex.account.Account
 import scorex.transaction.ValidationError.TransactionValidationError
 import scorex.transaction._
 import scorex.transaction.assets.exchange.ExchangeTransaction
-import scorex.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction, TransferTransaction}
+import scorex.transaction.assets._
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-
 import scala.concurrent.duration._
 import scala.util.{Left, Right}
 
 object CommonValidation {
+
+  val MaxTimeTransactionOverBlockDiff: FiniteDuration = 90.minutes
+
   def disallowSendingGreaterThanBalance[T <: Transaction](s: StateReader, settings: FunctionalitySettings, blockTime: Long, tx: T): Either[ValidationError, T] =
     if (blockTime >= settings.allowTemporaryNegativeUntil)
       tx match {
@@ -67,6 +69,8 @@ object CommonValidation {
         Left(TransactionValidationError(tx, s"must not appear before time=${settings.allowExchangeTransactionAfterTimestamp}"))
       case tx: CreateAliasTransaction if tx.timestamp <= settings.allowCreateAliasTransactionAfterTimestamp =>
         Left(TransactionValidationError(tx, s"must not appear before time=${settings.allowCreateAliasTransactionAfterTimestamp}"))
+      case tx: MakeAssetNameUniqueTransaction if tx.timestamp <= settings.allowMakeAssetNameUniqueTransactionAfterTimestamp =>
+        Left(TransactionValidationError(tx, s"must not appear before time=${settings.allowMakeAssetNameUniqueTransactionAfterTimestamp}"))
       case _: BurnTransaction => Right(tx)
       case _: PaymentTransaction => Right(tx)
       case _: GenesisTransaction => Right(tx)
@@ -77,15 +81,17 @@ object CommonValidation {
       case _: LeaseTransaction => Right(tx)
       case _: LeaseCancelTransaction => Right(tx)
       case _: CreateAliasTransaction => Right(tx)
+      case _: MakeAssetNameUniqueTransaction => Right(tx)
       case x => Left(TransactionValidationError(x, "Unknown transaction must be explicitly registered within ActivatedValidator"))
     }
 
   def disallowTxFromFuture[T <: Transaction](state: StateReader, settings: FunctionalitySettings, time: Long, tx: T): Either[ValidationError, T] = {
+
     val allowTransactionsFromFutureByTimestamp = tx.timestamp < settings.allowTransactionsFromFutureUntil
     if (allowTransactionsFromFutureByTimestamp) {
       Right(tx)
     } else {
-      if ((tx.timestamp - time).millis <= SimpleTransactionModule.MaxTimeTransactionOverBlockDiff)
+      if ((tx.timestamp - time).millis <= MaxTimeTransactionOverBlockDiff)
         Right(tx)
       else Left(TransactionValidationError(tx, s"Transaction is from far future. BlockTime: $time"))
     }

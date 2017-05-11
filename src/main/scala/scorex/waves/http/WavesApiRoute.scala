@@ -9,15 +9,15 @@ import scorex.account.Account
 import scorex.api.http._
 import scorex.api.http.assets.PaymentRequest
 import scorex.crypto.encode.Base58
-import scorex.transaction.{PaymentTransaction, TransactionOperations}
-import scorex.utils.NTP
+import scorex.transaction.{NewTransactionHandler, PaymentTransaction, TransactionFactory}
+import scorex.utils.Time
 import scorex.wallet.Wallet
 import scorex.waves.transaction.SignedPaymentRequest
 
 @Path("/waves")
 @Api(value = "waves")
 @Deprecated
-case class WavesApiRoute(settings: RestAPISettings, wallet: Wallet, transactionModule: TransactionOperations) extends ApiRoute {
+case class WavesApiRoute(settings: RestAPISettings, wallet: Wallet, newTxHandler: NewTransactionHandler, time: Time) extends ApiRoute {
 
   override lazy val route = pathPrefix("waves") {
     externalPayment ~ signPayment ~ broadcastSignedPayment ~ payment ~ createdSignedPayment
@@ -44,7 +44,7 @@ case class WavesApiRoute(settings: RestAPISettings, wallet: Wallet, transactionM
   def payment: Route = withAuth {
     (path("payment") & post) {
       json[PaymentRequest] { payment =>
-        transactionModule.createPayment(payment, wallet).map { tx =>
+        TransactionFactory.createPayment(payment, wallet, newTxHandler, time).map { tx =>
           SignedPaymentRequest(tx.timestamp, tx.amount, tx.fee, tx.recipient.address,
             Base58.encode(tx.sender.publicKey), tx.sender.address, Base58.encode(tx.signature))
         }
@@ -75,7 +75,7 @@ case class WavesApiRoute(settings: RestAPISettings, wallet: Wallet, transactionM
       (for {
         sender <- wallet.findWallet(payment.sender)
         recipient <- Account.fromString(payment.recipient)
-        pt <- PaymentTransaction.create(sender, recipient, payment.amount, payment.fee, NTP.correctedTime())
+        pt <- PaymentTransaction.create(sender, recipient, payment.amount, payment.fee, time.correctedTime())
       } yield pt)
         .left.map(ApiError.fromValidationError)
         .map { t =>
@@ -110,8 +110,7 @@ case class WavesApiRoute(settings: RestAPISettings, wallet: Wallet, transactionM
           _seed <- Base58.decode(payment.senderWalletSeed).toOption.toRight(InvalidSeed)
           senderAccount = Wallet.generateNewAccount(_seed, payment.senderAddressNonce)
           recipientAccount <- Account.fromString(payment.recipient).left.map(ApiError.fromValidationError)
-          _tx <- transactionModule
-            .createPayment(senderAccount, recipientAccount, payment.amount, payment.fee, payment.timestamp)
+          _tx <- PaymentTransaction.create(senderAccount, recipientAccount, payment.amount, payment.fee, payment.timestamp)
             .left.map(ApiError.fromValidationError)
         } yield SignedPaymentRequest(_tx.timestamp, _tx.amount, _tx.fee, _tx.recipient.address, Base58.encode(_tx.sender.publicKey),
           _tx.sender.address, Base58.encode(_tx.signature))
@@ -121,7 +120,7 @@ case class WavesApiRoute(settings: RestAPISettings, wallet: Wallet, transactionM
 
   private def broadcastPaymentRoute(suffix: String): Route = (path(suffix) & post) {
     json[SignedPaymentRequest] { payment =>
-      transactionModule.broadcastPayment(payment)
+      TransactionFactory.broadcastPayment(payment, newTxHandler)
     }
   }
 

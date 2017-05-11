@@ -6,13 +6,14 @@ import akka.http.scaladsl.server.Route
 import com.wavesplatform.settings.RestAPISettings
 import io.swagger.annotations._
 import scorex.api.http.assets.TransferRequest
-import scorex.transaction.TransactionOperations
+import scorex.transaction.{NewTransactionHandler, TransactionFactory}
+import scorex.utils.Time
 import scorex.wallet.Wallet
 
 @Path("/payment")
 @Api(value = "/payment")
 @Deprecated
-case class PaymentApiRoute(settings: RestAPISettings, wallet: Wallet, transactionModule: TransactionOperations) extends ApiRoute {
+case class PaymentApiRoute(settings: RestAPISettings, wallet: Wallet, newTxHandler: NewTransactionHandler, time: Time) extends ApiRoute {
 
   override lazy val route = payment
 
@@ -37,7 +38,7 @@ case class PaymentApiRoute(settings: RestAPISettings, wallet: Wallet, transactio
   ))
   def payment: Route = (path("payment") & post & withAuth) {
     json[TransferRequest] { p =>
-      transactionModule.transferAsset(p, wallet).map(_.json)
+      TransactionFactory.transferAsset(p, wallet, newTxHandler, time).map(_.json)
     }
   }
 }

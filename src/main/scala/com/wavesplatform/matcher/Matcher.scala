@@ -6,36 +6,28 @@ import akka.http.scaladsl.Http.ServerBinding
 import akka.stream.ActorMaterializer
 import com.wavesplatform.matcher.api.MatcherApiRoute
 import com.wavesplatform.matcher.market.MatcherActor
-import com.wavesplatform.settings.RestAPISettings
+import com.wavesplatform.settings.{BlockchainSettings, RestAPISettings}
 import com.wavesplatform.state2.reader.StateReader
 import scorex.api.http.CompositeHttpService
-import scorex.app.Application
-import scorex.transaction.{BlockStorage, TransactionModule}
-import scorex.utils.ScorexLogging
+import scorex.transaction.{History, NewTransactionHandler}
+import scorex.utils.{ScorexLogging, Time}
 import scorex.wallet.Wallet
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.reflect.runtime.universe._
 
-trait MatcherApplication extends ScorexLogging {
-  def actorSystem: ActorSystem
-
-  def matcherSettings: MatcherSettings
-
-  def restAPISettings: RestAPISettings
-
-  def transactionModule: TransactionModule
-
-  def blockStorage: BlockStorage
-
-  def wallet: Wallet
-
-  def storedState: StateReader = blockStorage.stateReader
-
+class Matcher(actorSystem: ActorSystem,
+              wallet: Wallet,
+              newTransactionHandler: NewTransactionHandler,
+              stateReader: StateReader,
+              time: Time,
+              history: History,
+              blockchainSettings: BlockchainSettings,
+              restAPISettings: RestAPISettings, matcherSettings: MatcherSettings) extends ScorexLogging {
   lazy val matcherApiRoutes = Seq(
-    MatcherApiRoute(this.asInstanceOf[Application].wallet,
-      this.asInstanceOf[Application].blockStorage.stateReader,
+    MatcherApiRoute(wallet,
+      stateReader,
       matcher, restAPISettings, matcherSettings)
   )
 
@@ -43,8 +35,9 @@ trait MatcherApplication extends ScorexLogging {
     typeOf[MatcherApiRoute]
   )
 
-  lazy val matcher: ActorRef = actorSystem.actorOf(MatcherActor.props(storedState, wallet, matcherSettings,
-    transactionModule), MatcherActor.name)
+  lazy val matcher: ActorRef = actorSystem.actorOf(MatcherActor.props(stateReader, wallet, matcherSettings,
+    newTransactionHandler, time, history,
+    blockchainSettings.functionalitySettings), MatcherActor.name)
 
   @volatile var matcherServerBinding: ServerBinding = _
 

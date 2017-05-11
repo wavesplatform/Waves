@@ -8,7 +8,7 @@ import com.wavesplatform.state2._
 import scorex.account.{Account, Alias}
 import scorex.transaction.Transaction
 import scorex.transaction.assets.exchange.ExchangeTransaction
-import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
+import scorex.transaction.lease.LeaseTransaction
 
 class CompositeStateReader(inner: StateReader, blockDiff: BlockDiff) extends StateReader {
 
@@ -48,6 +48,10 @@ class CompositeStateReader(inner: StateReader, blockDiff: BlockDiff) extends Sta
     txDiff.aliases.filter(_._2 == a).keys.toSeq ++ inner.aliasesOfAddress(a)
 
   override def resolveAlias(a: Alias): Option[Account] = txDiff.aliases.get(a).orElse(inner.resolveAlias(a))
+
+  override def getAssetIdByUniqueName(assetName: ByteArray): Option[ByteArray] = {
+    txDiff.assetsWithUniqueNames.get(assetName).orElse(inner.getAssetIdByUniqueName(assetName))
+  }
 
   override def findPreviousExchangeTxs(orderId: EqByteArray): Set[ExchangeTransaction] = {
     txDiff.previousExchangeTxs.get(orderId).orEmpty ++ inner.findPreviousExchangeTxs(orderId)
@@ -108,6 +112,9 @@ object CompositeStateReader {
     override def activeLeases(): Seq[ByteArray] =
       new CompositeStateReader(inner, blockDiff()).activeLeases()
 
+    override def getAssetIdByUniqueName(assetName: ByteArray): Option[ByteArray] =
+      new CompositeStateReader(inner, blockDiff()).getAssetIdByUniqueName(assetName)
+
     override def lastUpdateHeight(acc: Account): Option[Int] =
       new CompositeStateReader(inner, blockDiff()).lastUpdateHeight(acc)
 
@@ -116,6 +123,8 @@ object CompositeStateReader {
 
     override def containsTransaction(id: ByteArray): Boolean =
       new CompositeStateReader(inner, blockDiff()).containsTransaction(id)
+
+    override val synchronizationToken: ReentrantReadWriteLock = inner.synchronizationToken
   }
 
 }

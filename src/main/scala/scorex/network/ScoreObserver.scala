@@ -1,24 +1,24 @@
 package scorex.network
 
-import scorex.app.Application
+import akka.actor.ActorRef
+import com.wavesplatform.settings.SynchronizationSettings
 import scorex.network.NetworkController.DataFromPeer
 import scorex.network.message.MessageSpec
 import scorex.transaction.History
 import scorex.transaction.History._
 import scorex.utils.ScorexLogging
 import scorex.network.message._
+
 import scala.language.postfixOps
 
-class ScoreObserver(application: Application) extends ViewSynchronizer with ScorexLogging {
+class ScoreObserver(protected val networkControllerRef: ActorRef, coordinator: ActorRef, synchronizationSettings: SynchronizationSettings)
+  extends ViewSynchronizer with ScorexLogging {
 
   import ScoreObserver._
 
   override val messageSpecs: Seq[MessageSpec[_]] = Seq(ScoreMessageSpec)
 
-  protected lazy override val networkControllerRef = application.networkController
-  private val coordinator = application.coordinator
-
-  private val scoreTTL = application.settings.synchronizationSettings.scoreTTL
+  private val scoreTTL = synchronizationSettings.scoreTTL
 
   private var candidates: Candidates = Map.empty
 

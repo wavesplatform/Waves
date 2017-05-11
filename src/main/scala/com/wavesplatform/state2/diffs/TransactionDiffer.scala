@@ -6,7 +6,7 @@ import com.wavesplatform.state2.reader.StateReader
 import scorex.transaction.ValidationError.UnsupportedTransactionType
 import scorex.transaction._
 import scorex.transaction.assets.exchange.ExchangeTransaction
-import scorex.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction, TransferTransaction}
+import scorex.transaction.assets._
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 
 object TransactionDiffer {
@@ -27,6 +27,7 @@ object TransactionDiffer {
         case ltx: LeaseCancelTransaction => LeaseTransactionsDiff.leaseCancel(s, settings, time, height)(ltx)
         case etx: ExchangeTransaction => ExchangeTransactionDiff(s, height)(etx)
         case atx: CreateAliasTransaction => CreateAliasTransactionDiff(height)(atx)
+        case atx: MakeAssetNameUniqueTransaction => AssetTransactionsDiff.makeAssetNameUnique(s, height)(atx)
         case t => Left(UnsupportedTransactionType(t))
       }
       positiveDiff <- BalanceDiffValidation(s, time)(tx, diff)

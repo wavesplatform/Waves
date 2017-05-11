@@ -28,12 +28,7 @@ class ScoreObserverSpecification extends ActorTestingCommons {
 
   val wavesSettings = WavesSettings.fromConfig(localConfig)
 
-  trait App extends ApplicationMock {
-    override lazy val settings = wavesSettings
-    override lazy val coordinator: ActorRef = testCoordinator.ref
-  }
-
-  protected override val actorRef = system.actorOf(Props(classOf[ScoreObserver], stub[App]))
+  protected override val actorRef = system.actorOf(Props(new ScoreObserver(networkControllerMock, testCoordinator.ref, wavesSettings.synchronizationSettings)))
 
   testSafely {
     "no-score case" in {

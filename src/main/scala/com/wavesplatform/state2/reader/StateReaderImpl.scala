@@ -11,7 +11,7 @@ import scorex.transaction.{Transaction, TransactionParser}
 
 import scala.collection.JavaConverters._
 
-class StateReaderImpl(p: StateStorage, val synchronizationToken: ReentrantReadWriteLock = new ReentrantReadWriteLock()) extends StateReader {
+class StateReaderImpl(p: StateStorage, val synchronizationToken: ReentrantReadWriteLock) extends StateReader {
 
   val sp = Synchronized(p)
 
@@ -47,8 +47,8 @@ class StateReaderImpl(p: StateStorage, val synchronizationToken: ReentrantReadWr
 
   override def aliasesOfAddress(a: Account): Seq[Alias] = read { implicit l =>
     sp().aliasToAddress.asScala
-      .collect { case (aliasStr, addressBytes) if addressBytes sameElements a.bytes =>
-        Alias.buildWithCurrentNetworkByte(aliasStr).explicitGet()
+      .collect { case (aliasName, addressBytes) if addressBytes sameElements a.bytes =>
+        Alias.buildWithCurrentNetworkByte(aliasName).explicitGet()
       }.toSeq
   }
 
@@ -93,5 +93,8 @@ class StateReaderImpl(p: StateStorage, val synchronizationToken: ReentrantReadWr
 
   override def containsTransaction(id: ByteArray): Boolean = read { implicit l =>
     sp().transactions.containsKey(id.arr)
+  }
+  override def getAssetIdByUniqueName(assetName: ByteArray): Option[ByteArray] =read { implicit l =>
+    Option(p.uniqueAssets.get(assetName.arr)).map(EqByteArray)
   }
 }

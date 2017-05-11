@@ -13,10 +13,6 @@ class StateStorage(db: MVStore) {
   private val heightKey = "height"
   private val isDirtyFlag = "isDirty"
 
-  if (variables.get(isDirtyFlag) == 1)
-    throw new IllegalArgumentException(s"Persisted state is corrupt." +
-      s" Please remove state.dat and restart the node.")
-
   def getHeight: Int = variables.get(heightKey)
 
   def setHeight(i: Int): Unit = variables.put(heightKey, i)
@@ -43,11 +39,22 @@ class StateStorage(db: MVStore) {
 
   val lastUpdateHeight: MVMap[Array[Byte], Int] = db.openMap("lastUpdateHeight")
 
+  val uniqueAssets: MVMap[Array[Byte], Array[Byte]] = db.openMap("uniqueAssets")
+
   def commit(): Unit = db.commit()
 
 }
 
 object StateStorage {
+
+  def apply(db: MVStore): Either[String, StateStorage] = {
+    val s = new StateStorage(db)
+
+    if (s.variables.get(s.isDirtyFlag) == 1)
+      Left(s"Persisted state is corrupt")
+    else Right(s)
+  }
+
   type SnapshotKey = Array[Byte]
 
   def snapshotKey(acc: Account, height: Int): SnapshotKey = acc.bytes ++ Ints.toByteArray(height)

@@ -46,14 +46,8 @@ class PeerManagerSpecification extends ActorTestingCommons {
 
   val wavesSettings = WavesSettings.fromConfig(localConfig)
 
-  trait App extends ApplicationMock {
-    override lazy val settings = wavesSettings
-  }
-
-  private val app = stub[App]
-
   protected override val actorRef = system.actorOf(PeerManager.props(
-    wavesSettings.networkSettings, app.networkController, wavesSettings.blockchainSettings.addressSchemeCharacter))
+    wavesSettings.networkSettings, networkControllerMock, wavesSettings.blockchainSettings.addressSchemeCharacter))
 
   testSafely {
 
@@ -308,7 +302,7 @@ class PeerManagerSpecification extends ActorTestingCommons {
     "inbound connection limit exceeded but can make outbound connections" in {
       def connect(id: Int, inbound: Boolean): TestProbe = {
         val address = new InetSocketAddress(InetAddress.getByName(s"127.0.0.$id"), id)
-        val handler = TestProbe("connection-handler-" + id)
+        val handler = TestProbe("inbound-connection-handler-" + id)
         actorRef ! Connected(address, handler.ref, None, inbound)
 
         handler
@@ -319,9 +313,9 @@ class PeerManagerSpecification extends ActorTestingCommons {
         h.expectMsgType[Handshake](15.seconds)
       }
       (1 to wavesSettings.networkSettings.maxConnections).foreach { i =>
-        val h1 = connect(i, true)
+        val h1 = connect(100 + i, true)
         h1.expectMsg(timeout, CloseConnection)
-        val h2 = connect(100 + i, false)
+        val h2 = connect(200 + i, false)
         h2.expectMsgType[Handshake](15.seconds)
       }
     }

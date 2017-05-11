@@ -11,7 +11,7 @@ import scorex.transaction._
 
 @Path("/alias/broadcast")
 @Api(value = "/alias")
-case class AliasBroadcastApiRoute(settings: RestAPISettings, transactionModule: TransactionModule)
+case class AliasBroadcastApiRoute(settings: RestAPISettings, transactionModule: NewTransactionHandler)
   extends ApiRoute with BroadcastRoute {
   override val route = pathPrefix("alias" / "broadcast") {
     signedCreate
@@ -33,7 +33,9 @@ case class AliasBroadcastApiRoute(settings: RestAPISettings, transactionModule: 
     )
   ))
   @ApiResponses(Array(new ApiResponse(code = 200, message = "Json with response or error")))
-  def signedCreate: Route =  json[SignedCreateAliasRequest] { aliasReq =>
-    doBroadcast(aliasReq.toTx)
+  def signedCreate: Route = (path("create") & post) {
+    json[SignedCreateAliasRequest] { aliasReq =>
+      doBroadcast(aliasReq.toTx)
+    }
   }
 }

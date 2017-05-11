@@ -41,6 +41,8 @@ trait StateReader extends SynchronizedOver {
 
   def isLeaseActive(leaseTx: LeaseTransaction): Boolean
 
+  def getAssetIdByUniqueName(assetName: ByteArray): Option[ByteArray]
+
   def activeLeases(): Seq[ByteArray]
 
   def lastUpdateHeight(acc: Account): Option[Int]

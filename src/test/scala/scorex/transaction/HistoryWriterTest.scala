@@ -1,31 +1,33 @@
 package scorex.transaction
 
+import java.util.concurrent.locks.ReentrantReadWriteLock
+
 import com.wavesplatform.history.HistoryWriterImpl
+import com.wavesplatform.state2._
 import org.h2.mvstore.MVStore
 import org.scalatest.{FunSuite, Matchers}
 import scorex.lagonaki.mocks.TestBlock
-import com.wavesplatform.state2._
-import scorex.transaction.TransactionParser.SignatureLength
 
-import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 
-class HistoryWriterTest extends FunSuite with Matchers {
+class HistoryWriterTest extends FunSuite with Matchers with HistoryTest {
 
-  test("concurrent access to lastBlock doesn't fail") {
-    val history = new HistoryWriterImpl(new MVStore.Builder().open())
+  test("concurrent access to lastBlock doesn't throw any exception") {
+    val history = new HistoryWriterImpl(new MVStore.Builder().open(), new ReentrantReadWriteLock())
+    appendGenesisBlock(history)
 
-    history.appendBlock(TestBlock.withReference(Array.fill(SignatureLength)(0: Byte))).explicitGet()
-
-    def appendBlock(): Unit = history.appendBlock(TestBlock.withReference(history.lastBlock.uniqueId)).explicitGet()
-    Range(1, 1000).foreach { _ =>
-      appendBlock()
+    (1 to 1000).foreach { _ =>
+      appendTestBlock(history)
     }
 
     @volatile var failed = false
 
-    Range(1, 1000).foreach { _ =>
-      Future(appendBlock()).recover { case e => e.printStackTrace(); failed = true }
+    def tryAppendTestBlock(history: HistoryWriterImpl): Either[ValidationError, Unit] =
+      history.appendBlock(TestBlock.withReference(history.lastBlock.uniqueId))
+
+    (1 to 1000).foreach { _ =>
+      Future(tryAppendTestBlock(history)).recover { case e => e.printStackTrace(); failed = true }
       Future(history.discardBlock()).recover { case e => e.printStackTrace(); failed = true }
     }
     Thread.sleep(1000)

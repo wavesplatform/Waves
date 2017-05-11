@@ -25,7 +25,7 @@ class UnconfirmedTransactionsDatabaseImplSpecification extends FreeSpec
 
       val smallSizedUTXSettings = UTXSettings(1, 1.second)
 
-      val db = new UnconfirmedTransactionsDatabaseImpl(smallSizedUTXSettings)
+      val db = new UnconfirmedTransactionsDatabaseImpl(smallSizedUTXSettings.size)
 
 
       db.putIfNew(newTx(1), validDelegate) shouldBe an[Right[_, _]]
@@ -36,14 +36,14 @@ class UnconfirmedTransactionsDatabaseImplSpecification extends FreeSpec
     }
 
     "does not call validator if same tx comes again" in {
-      val db = new UnconfirmedTransactionsDatabaseImpl(defaultSizedUtxSettings)
+      val db = new UnconfirmedTransactionsDatabaseImpl(defaultSizedUtxSettings.size)
 
       db.putIfNew(newTx(1), validDelegate) shouldBe an[Right[_, _]]
       db.putIfNew(newTx(1), validDelegate) shouldBe an[Left[_, _]]
     }
 
     "validator returns false" in {
-      val db = new UnconfirmedTransactionsDatabaseImpl(defaultSizedUtxSettings)
+      val db = new UnconfirmedTransactionsDatabaseImpl(defaultSizedUtxSettings.size)
 
 
       db.all() shouldBe empty

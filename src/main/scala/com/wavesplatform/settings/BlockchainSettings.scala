@@ -3,6 +3,9 @@ package com.wavesplatform.settings
 import com.typesafe.config.Config
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.EnumerationReader._
+import scorex.account.Account
+import scorex.transaction.GenesisTransaction
+
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 
@@ -19,6 +22,7 @@ case class FunctionalitySettings(allowTemporaryNegativeUntil: Long,
                                  allowExchangeTransactionAfterTimestamp: Long,
                                  allowInvalidReissueInSameBlockUntilTimestamp: Long,
                                  allowCreateAliasTransactionAfterTimestamp: Long,
+                                 allowMakeAssetNameUniqueTransactionAfterTimestamp: Long,
                                  allowMultipleLeaseCancelTransactionUntilTimestamp: Long,
                                  resetEffectiveBalancesAtHeight: Long)
 
@@ -36,6 +40,7 @@ object FunctionalitySettings {
     allowExchangeTransactionAfterTimestamp = 1491192000000L,
     allowInvalidReissueInSameBlockUntilTimestamp = 1492768800000L,
     allowCreateAliasTransactionAfterTimestamp = Long.MaxValue,
+    allowMakeAssetNameUniqueTransactionAfterTimestamp = Long.MaxValue,
     allowMultipleLeaseCancelTransactionUntilTimestamp = 1492768800000L,
     resetEffectiveBalancesAtHeight = 462000)
 
@@ -53,6 +58,7 @@ object FunctionalitySettings {
     allowExchangeTransactionAfterTimestamp = 1483228800000L,
     allowInvalidReissueInSameBlockUntilTimestamp = 1492560000000L,
     allowCreateAliasTransactionAfterTimestamp = 1493596800000L,
+    allowMakeAssetNameUniqueTransactionAfterTimestamp = Long.MaxValue,
     allowMultipleLeaseCancelTransactionUntilTimestamp = 1492560000000L,
     resetEffectiveBalancesAtHeight = 51500)
 
@@ -72,6 +78,7 @@ object FunctionalitySettings {
     val allowExchangeTransactionAfterTimestamp = config.as[Long](s"$configPath.allow-exchange-transaction-after")
     val allowInvalidReissueInSameBlockUntilTimestamp = config.as[Long](s"$configPath.allow-invalid-reissue-in-same-block-until-timestamp")
     val allowCreateAliasTransactionAfterTimestamp = config.as[Long](s"$configPath.allow-createalias-transaction-after")
+    val allowMakeAssetNameUniqueTransactionAfterTimestamp = config.as[Long](s"$configPath.allow-make-asset-name-unique-transaction-after")
     val allowMultipleLeaseCancelTransactionUntilTimestamp = config.as[Long](s"$configPath.allow-multiple-lease-cancel-transaction-until-timestamp")
     val resetEffectiveBalancesAtHeight = config.as[Long](s"$configPath.reset-effective-balances-at-height")
 
@@ -80,7 +87,7 @@ object FunctionalitySettings {
       requireSortedTransactionsAfter, generatingBalanceDepthFrom50To1000AfterHeight,
       minimalGeneratingBalanceAfterTimestamp, allowTransactionsFromFutureUntil, allowUnissuedAssetsUntil,
       allowBurnTransactionAfterTimestamp, allowLeaseTransactionAfterTimestamp, requirePaymentUniqueId, allowExchangeTransactionAfterTimestamp,
-      allowInvalidReissueInSameBlockUntilTimestamp, allowCreateAliasTransactionAfterTimestamp,
+      allowInvalidReissueInSameBlockUntilTimestamp, allowCreateAliasTransactionAfterTimestamp, allowMakeAssetNameUniqueTransactionAfterTimestamp,
       allowMultipleLeaseCancelTransactionUntilTimestamp, resetEffectiveBalancesAtHeight)
   }
 }
@@ -133,6 +140,7 @@ case class BlockchainSettings(blockchainFile: String,
                               stateFile: String,
                               checkpointFile: String,
                               addressSchemeCharacter: Char,
+                              minimumInMemoryDiffSize: Int,
                               functionalitySettings: FunctionalitySettings,
                               genesisSettings: GenesisSettings)
 
@@ -164,6 +172,7 @@ object BlockchainSettings {
       stateFile = config.as[String](s"$configPath.state-file"),
       checkpointFile = config.as[String](s"$configPath.checkpoint-file"),
       addressSchemeCharacter = addressSchemeCharacter,
+      minimumInMemoryDiffSize = config.as[Int](s"$configPath.minimum-in-memory-diff-blocks"),
       functionalitySettings = functionalitySettings,
       genesisSettings = genesisSettings)
   }

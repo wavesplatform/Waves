@@ -6,7 +6,12 @@ import org.apache.commons.net.ntp.NTPUDPClient
 
 import scala.util.Try
 
-object NTP extends ScorexLogging {
+trait Time {
+  def correctedTime(): Long
+  def getTimestamp() : Long
+}
+
+class TimeImpl extends Time with ScorexLogging {
   private val TimeTillUpdate = 1000 * 60 * 10L
   private val NtpServer = "pool.ntp.org"
 
@@ -31,6 +36,14 @@ object NTP extends ScorexLogging {
     System.currentTimeMillis() + offset
   }
 
+
+  private var txTime: Long = 0
+
+  def getTimestamp: Long = {
+    txTime = Math.max(correctedTime(), txTime + 1)
+    txTime
+  }
+
   private def updateOffSet() {
     val client = new NTPUDPClient()
     client.setDefaultTimeout(10000)
@@ -48,3 +61,5 @@ object NTP extends ScorexLogging {
     }
   }
 }
+
+object NTP extends TimeImpl

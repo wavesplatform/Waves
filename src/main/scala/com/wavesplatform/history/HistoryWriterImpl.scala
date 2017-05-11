@@ -12,7 +12,7 @@ import scorex.transaction.ValidationError.CustomError
 import scorex.transaction.{History, HistoryWriter, ValidationError}
 import scorex.utils.{LogMVMapBuilder, ScorexLogging}
 
-class HistoryWriterImpl(db: MVStore, val synchronizationToken: ReentrantReadWriteLock = new ReentrantReadWriteLock()) extends History with HistoryWriter with ScorexLogging {
+class HistoryWriterImpl (db: MVStore, val synchronizationToken: ReentrantReadWriteLock) extends HistoryWriter with ScorexLogging {
   private val blockBodyByHeight = Synchronized(db.openMap("blocks", new LogMVMapBuilder[Int, Array[Byte]]))
   private val blockIdByHeight = Synchronized(db.openMap("signatures", new LogMVMapBuilder[Int, BlockId]))
   private val heightByBlockId = Synchronized(db.openMap("signaturesReverse", new LogMVMapBuilder[BlockId, Int]))
@@ -75,5 +75,21 @@ class HistoryWriterImpl(db: MVStore, val synchronizationToken: ReentrantReadWrit
       block <- blockAt(h)
       if block.signerData.generator.address.equals(account.address)
     } yield block
+  }
+
+  override def blockBytes(height: Int): Option[Array[Byte]] = read { implicit lock =>
+    Option(blockBodyByHeight().get(height))
+  }
+}
+
+object HistoryWriterImpl {
+  def apply(db: MVStore, synchronizationToken: ReentrantReadWriteLock): Either[String, HistoryWriterImpl] = {
+    val h = new HistoryWriterImpl(db, synchronizationToken)
+    h.read { implicit lock =>
+      if (Set(h.blockBodyByHeight().size(), h.blockIdByHeight().size(), h.heightByBlockId().size(), h.scoreByHeight().size()).size != 1)
+        Left("Block storage is inconsistent")
+      else
+        Right(h)
+    }
   }
 }

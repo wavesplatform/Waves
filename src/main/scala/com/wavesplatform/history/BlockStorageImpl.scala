@@ -7,37 +7,56 @@ import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state2.reader.StateReader
 import com.wavesplatform.state2.{BlockchainUpdaterImpl, StateStorage, StateWriterImpl}
 import org.h2.mvstore.MVStore
-import scorex.transaction._
+import scorex.transaction.{CheckpointService, History}
+import scorex.utils.ScorexLogging
+import com.wavesplatform.state2._
 
-class BlockStorageImpl(settings: BlockchainSettings) extends BlockStorage {
+object BlockStorageImpl extends ScorexLogging {
 
-  import BlockStorageImpl._
+  def apply(settings: BlockchainSettings): (CheckpointService, History, StateReader, BlockchainUpdaterImpl) = {
 
-  val synchronizationToken: ReentrantReadWriteLock = new ReentrantReadWriteLock()
+    val lock = new ReentrantReadWriteLock()
 
-  val blockchainStore: MVStore = createMVStore(settings.blockchainFile)
-  val stateStore: MVStore = createMVStore(settings.stateFile)
-  val checkpointStore: MVStore = createMVStore(settings.checkpointFile)
-  val historyWriter = new HistoryWriterImpl(blockchainStore, synchronizationToken)
-  val stateWriter = new StateWriterImpl(new StateStorage(stateStore), synchronizationToken)
-  val checkpointService = new CheckpointServiceImpl(checkpointStore)
-  val bcUpdater = new BlockchainUpdaterImpl(stateWriter, settings.functionalitySettings, historyWriter)
+    val checkpointService = {
+      val checkpointStore: MVStore = createMVStore(settings.checkpointFile)
+      new CheckpointServiceImpl(checkpointStore)
+    }
 
+    val historyWriter = {
+      val blockchainStore = createMVStore(settings.blockchainFile)
+      HistoryWriterImpl(blockchainStore, lock).left.flatMap { err =>
+        log.error(err + s", recreating ${settings.stateFile} and ${settings.blockchainFile}")
+        blockchainStore.closeImmediately()
+        delete(settings.stateFile)
+        delete(settings.blockchainFile)
+        HistoryWriterImpl(createMVStore(settings.blockchainFile), lock)
+      }.explicitGet()
+    }
 
-  override def history: History = historyWriter
+    val stateWriter = new StateWriterImpl({
+      val stateStore = createMVStore(settings.stateFile)
+      StateStorage(stateStore).left.flatMap { err =>
+        log.error(err + s", recreating ${settings.stateFile}")
+        stateStore.closeImmediately()
+        delete(settings.stateFile)
+        StateStorage(createMVStore(settings.stateFile))
+      }.explicitGet()
+    }, lock)
 
-  override def stateReader: StateReader = bcUpdater.currentState
+    val bcUpdater = new BlockchainUpdaterImpl(stateWriter, settings.functionalitySettings, settings.minimumInMemoryDiffSize, historyWriter, lock)
 
-  override def blockchainUpdater: BlockchainUpdater = bcUpdater
+    (checkpointService, historyWriter, bcUpdater.currentState, bcUpdater)
+  }
 
-  override def checkpoints: CheckpointService = checkpointService
-}
+  private def delete(fileName: String) = {
+    if (!new File(fileName).delete()) {
+      throw new Exception(s"Unable to delete $fileName")
+    }
+  }
 
-object BlockStorageImpl {
+  private def createMVStore(fileName: String): MVStore = {
+    def stringToOption(s: String) = Option(s).filter(_.trim.nonEmpty)
 
-  private def stringToOption(s: String) = Option(s).filter(_.trim.nonEmpty)
-
-  def createMVStore(fileName: String): MVStore = {
     stringToOption(fileName) match {
       case Some(s) =>
         val file = new File(s)

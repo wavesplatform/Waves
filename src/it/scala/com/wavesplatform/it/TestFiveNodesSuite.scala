@@ -1,5 +1,6 @@
 package com.wavesplatform.it
 
+import com.wavesplatform.it.transactions._
 import org.scalatest.{BeforeAndAfterAll, FreeSpec, Matchers, Suite}
 import scorex.utils.ScorexLogging
 
@@ -36,7 +37,13 @@ class TestFiveNodesSuite extends FreeSpec with BeforeAndAfterAll with ScorexLogg
   override def nestedSuites: IndexedSeq[Suite] = IndexedSeq(
     new ValidChainGenerationSpec(allNodes),
     new AliasTransactionSpec(allNodes),
-    new BalancesSpecification(allNodes)
+    new BurnTransactionSpecification(allNodes),
+    new IssueTransactionSpecification(allNodes),
+    new LeasingTransactionsSpecification(allNodes),
+    new MakeAssetNameUniqueTransactionSpecification(allNodes),
+    new PaymentTransactionSpecification(allNodes),
+    new ReissueTransactionSpecification(allNodes),
+    new TransferTransactionSpecification(allNodes)
   )
 
   override protected def afterAll() = docker.close()

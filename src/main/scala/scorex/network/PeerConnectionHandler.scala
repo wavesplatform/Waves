@@ -1,38 +1,40 @@
 package scorex.network
 
 import java.net.InetSocketAddress
-import akka.actor.{Actor, ActorRef, Status, Terminated}
+
+import akka.actor.{Actor, ActorRef, Terminated}
+import akka.event.LoggingReceive
 import akka.io.Tcp
 import akka.io.Tcp._
 import akka.util.{ByteString, CompactByteString}
 import com.google.common.primitives.Ints
-import scorex.app.RunnableApplication
+import com.wavesplatform.settings.NetworkSettings
+import scorex.network.message.MessageHandler
 import scorex.network.message.MessageHandler.RawNetworkData
 import scorex.network.peer.PeerManager
 import scorex.network.peer.PeerManager.Handshaked
 import scorex.utils.ScorexLogging
+
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration._
 import scala.language.postfixOps
 import scala.util.{Failure, Success}
 
-case class PeerConnectionHandler(application: RunnableApplication,
+case class PeerConnectionHandler(peerManager: ActorRef,
                                  connection: ActorRef,
-                                 remote: InetSocketAddress) extends Actor with Buffering with ScorexLogging {
+                                 remote: InetSocketAddress,
+                                 messagesHandler: MessageHandler,
+                                 networkSettings: NetworkSettings) extends Actor with Buffering with ScorexLogging {
 
   import PeerConnectionHandler._
 
-  private lazy val peerManager = application.peerManager
-
-  private lazy val outboundBufferSize = application.settings.networkSettings.outboundBufferSize
+  private val outboundBufferSize = networkSettings.outboundBufferSize
 
   private var outboundBuffer = Vector.empty[ByteString]
 
   private var handshakeGot = false
   private var handshakeSent = false
 
-  private val timeout = context.system.scheduler.scheduleOnce(
-    application.settings.networkSettings.connectionTimeout, self, HandshakeTimeout)
+  private val timeout = context.system.scheduler.scheduleOnce(networkSettings.connectionTimeout, self, HandshakeTimeout)
 
   connection ! Register(self, keepOpenOnPeerClosed = false, useResumeWriting = true)
 
@@ -142,12 +144,13 @@ case class PeerConnectionHandler(application: RunnableApplication,
     case Received(data: ByteString) => processReceivedData(data)
   }
 
-  private def state(state: CommunicationState.Value)(logic: Receive): Receive =
+  private def state(state: CommunicationState.Value)(logic: Receive): Receive = LoggingReceive(
     logic orElse processErrors(state.toString) orElse {
       case HandshakeTimeout =>
 
       case nonsense: Any => log.warn(s"Strange input in state $state: $nonsense")
     }
+  )
 
   private def processErrors(stateName: String): Receive = {
     case CommandFailed(w: Write) =>
@@ -180,7 +183,7 @@ case class PeerConnectionHandler(application: RunnableApplication,
     chunksBuffer = remainder
 
     pkt.find { packet =>
-      application.messagesHandler.parseBytes(packet.toByteBuffer) match {
+      messagesHandler.parseBytes(packet.toByteBuffer) match {
         case Success((spec, msgData)) =>
           log.trace("Received message " + spec + " from " + remote)
           peerManager ! RawNetworkData(spec, msgData, remote)
@@ -212,4 +215,5 @@ object PeerConnectionHandler {
   case object CloseConnection
 
   case class CloseConnectionCompleted(remote: InetSocketAddress)
+
 }

@@ -24,15 +24,19 @@ class CoordinatorSpecification extends ActorTestingCommons {
 
   val testHistory = stub[History]
 
-  trait App extends ApplicationMock {
-    override lazy val settings = WavesSettings.fromConfig(baseTestConfig)
-    override lazy val blockGenerator: ActorRef = testblockGenerator.ref
-    override lazy val blockchainSynchronizer: ActorRef = testBlockchainSynchronizer.ref
-    override lazy val peerManager: ActorRef = testPeerManager.ref
-    override lazy val historyOverride: History = testHistory
-  }
-
-  override protected val actorRef = system.actorOf(Props(classOf[Coordinator], stub[App]))
+  override protected val actorRef = system.actorOf(Props(new Coordinator(networkControllerMock,
+    testBlockchainSynchronizer.ref,
+    testblockGenerator.ref,
+    testPeerManager.ref,
+    null,
+    null,
+    null,
+    null,
+    testHistory,
+    null,
+    null,
+    WavesSettings.fromConfig(baseTestConfig)
+  )))
 
   private def getStatus = Await.result((actorRef ? GetCoordinatorStatus).mapTo[CoordinatorStatus], testDuration)
 

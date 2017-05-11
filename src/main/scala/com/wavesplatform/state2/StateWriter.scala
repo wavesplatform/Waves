@@ -15,7 +15,7 @@ trait StateWriter {
   def clear(): Unit
 }
 
-class StateWriterImpl(p: StateStorage, synchronizationToken: ReentrantReadWriteLock = new ReentrantReadWriteLock())
+class StateWriterImpl(p: StateStorage, synchronizationToken: ReentrantReadWriteLock)
   extends StateReaderImpl(p, synchronizationToken) with StateWriter with ScorexLogging {
 
   import StateWriterImpl._
@@ -101,6 +101,12 @@ class StateWriterImpl(p: StateStorage, synchronizationToken: ReentrantReadWriteL
       measureSizeLog("lease info")(blockDiff.txsDiff.leaseState)(
         _.foreach { case (id, isActive) => sp().leaseState.put(id.arr, isActive) })
 
+      measureSizeLog("uniqueAssets")(blockDiff.txsDiff.assetsWithUniqueNames) {
+        _.foreach { case (name, id) =>
+          p.uniqueAssets.put(name.arr, id.arr)
+        }
+      }
+
       sp().setHeight(sp().getHeight + blockDiff.heightDiff)
       sp().commit()
     }
@@ -119,6 +125,7 @@ class StateWriterImpl(p: StateStorage, synchronizationToken: ReentrantReadWriteL
       sp().aliasToAddress.clear()
       sp().leaseState.clear()
       sp().lastUpdateHeight.clear()
+      sp().uniqueAssets.clear()
       sp().setHeight(0)
       sp().commit()
 
