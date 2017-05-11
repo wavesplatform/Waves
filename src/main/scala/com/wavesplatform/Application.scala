@@ -41,7 +41,7 @@ import scala.concurrent.duration._
 import scala.reflect.runtime.universe._
 import scala.util.{Left, Try}
 
-class Application(val actorSystem: ActorSystem, val settings: WavesSettings) extends Matcher {
+class Application(val actorSystem: ActorSystem, val settings: WavesSettings) extends ScorexLogging {
 
   lazy val upnp = new UPnP(settings.networkSettings.uPnPSettings)
 
@@ -138,7 +138,10 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
       shutdown()
     }
 
-    if (matcherSettings.enable) runMatcher()
+    if (settings.matcherSettings.enable) {
+      val matcher = new Matcher(actorSystem, wallet, newTransactionHandler, stateReader, time, history, settings.blockchainSettings, settings.restAPISettings, settings.matcherSettings)
+      matcher.runMatcher()
+    }
   }
 
   def checkGenesis(): Unit = {
