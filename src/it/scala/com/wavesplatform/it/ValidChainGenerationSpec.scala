@@ -57,8 +57,9 @@ class ValidChainGenerationSpec(allNodes: Seq[Node]) extends FreeSpec with ScalaF
       _ <- processRequests(generateRequests(b))
       height <- traverse(allNodes)(_.height).map(_.max)
       _ <- traverse(allNodes)(_.waitForHeight(height + 40)) // wait a little longer to prevent rollbacks...
-      blocks <- traverse(allNodes)(_.waitForHeight(height + 35)) // ...before requesting actual blocks
-    } yield blocks, 5.minutes)
+      _ <- traverse(allNodes)(_.waitForHeight(height + 35)) // ...before requesting actual blocks
+      blocks <- traverse(allNodes)(_.blockAt(height + 35)) // ...before requesting actual blocks
+    } yield blocks.map(_.signature), 5.minutes)
 
     all(targetBlocks) shouldEqual targetBlocks.head
   }
