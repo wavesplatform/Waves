@@ -254,7 +254,7 @@ class Coordinator(protected override val networkControllerRef: ActorRef, blockch
   def isBlockValid(b: Block): Either[ValidationError, Unit] = {
     if (history.contains(b)) Right(())
     else {
-      def historyContainsParant = history.contains(b.reference)
+      def historyContainsParent = history.contains(b.reference)
 
       def signatureIsValid = EllipticCurveImpl.verify(b.signerData.signature, b.bytesWithoutSignature,
         b.signerData.generator.publicKey)
@@ -265,7 +265,7 @@ class Coordinator(protected override val networkControllerRef: ActorRef, blockch
         settings.blockchainSettings,
         time)(b)
 
-      if (!historyContainsParant) Left(CustomError(s"Invalid block ${b.encodedId}: no parent block in history"))
+      if (!historyContainsParent) Left(CustomError(s"Invalid block ${b.encodedId}: no parent block in history"))
       else if (!signatureIsValid) Left(CustomError(s"Invalid block ${b.encodedId}: signature is not valid"))
       else if (!consensusDataIsValid) Left(CustomError(s"Invalid block ${b.encodedId}: consensus data is not valid"))
       else Right(())

@@ -161,7 +161,7 @@ class BlockGeneratorController(minerSettings: MinerSettings,
     }
 
   private def createMiner: ActorRef = {
-    context.watch(context.actorOf(Props(new Miner(minerSettings: MinerSettings,
+    context.watch(context.actorOf(Props(new Miner(minerSettings,
       wallet,
       history,
       stateReader,
