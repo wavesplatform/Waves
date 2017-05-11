@@ -46,8 +46,12 @@ trait OrderValidator {
   }
 
   def validateIntegerAmount(lo: LimitOrder): Validation = {
-    val decimals = lo.order.assetPair.amountAsset.flatMap(storedState.getIssueTransaction).map(_.decimals.toInt).getOrElse(8)
-    val scaled = BigDecimal(lo.amount, decimals)
+    val asset = if (lo.price >= Order.PriceConstant) lo.order.assetPair.priceAsset else lo.order.assetPair.amountAsset
+    val amount =  if (lo.price >= Order.PriceConstant)
+      (BigInt(lo.amount) * lo.price / Order.PriceConstant).bigInteger.longValueExact()
+      else lo.amount
+    val decimals = asset.flatMap(storedState.getIssueTransaction).map(_.decimals.toInt).getOrElse(8)
+    val scaled = BigDecimal(amount, decimals)
     (scaled >= 1) :| "Order amount is too small"
   }
 
