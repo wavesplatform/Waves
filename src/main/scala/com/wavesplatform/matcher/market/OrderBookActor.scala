@@ -128,7 +128,7 @@ class OrderBookActor(assetPair: AssetPair, val storedState: StoredState,
   private def matchOrder(limitOrder: LimitOrder): Unit = {
     val remOrder = handleMatchEvent(OrderBook.matchOrder(orderBook, limitOrder))
     if (remOrder.isDefined) {
-      if (LimitOrder.validateAmount(remOrder.get)) {
+      if (LimitOrder.validateAmount(remOrder.get) && validateIntegerAmount(remOrder.get)) {
         matchOrder(remOrder.get)
       } else {
         val canceled = Events.OrderCanceled(remOrder.get)
