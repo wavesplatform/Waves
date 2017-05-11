@@ -8,7 +8,7 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.settings.WavesSettings
 import org.scalatest.mockito.MockitoSugar
 import scorex.ActorTestingCommons
-import scorex.app.{Application, ApplicationVersion}
+import scorex.app.Application
 import scorex.network.NetworkController.DataFromPeer
 import scorex.network.PeerSynchronizer.RequestDataFromPeer
 import scorex.network.message.PeersSpec
@@ -16,7 +16,7 @@ import scorex.network.peer.PeerManager
 
 import scala.language.postfixOps
 
-class TestPeerSynchronizer(app: Application) extends PeerSynchronizer(app) {
+class TestPeerSynchronizer(app: Application) extends PeerSynchronizer(app.networkController, app.peerManager, app.settings.networkSettings) {
   override def scheduler: Scheduler = MockitoSugar.mock[Scheduler]
 }
 

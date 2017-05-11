@@ -60,7 +60,7 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
   val db: MVStore = new MVStore.Builder().open()
   val (checkpoints1, history1, stateReader1, blockchainUpdater1) = BlockStorageImpl(wavesSettings.blockchainSettings)
   val utxStorage1 = new UnconfirmedTransactionsDatabaseImpl(wavesSettings.utxSettings.size)
-  class ValidBlockCoordinator(a: TestAppMock) extends Coordinator(a) {
+  class ValidBlockCoordinator(a: TestAppMock) extends Coordinator(a.networkController, a.blockchainSynchronizer, a.blockGenerator, a.peerManager, a.scoreObserver, a.blockchainUpdater, a.time, a.utxStorage, a.history, a.stateReader, a.checkpoints, a.settings) {
     override def isBlockValid(b: Block): Either[ValidationError, Unit] = Right(())
   }
 
