@@ -1,7 +1,6 @@
 package com.wavesplatform.history
 
 import java.io.File
-import java.util.concurrent.locks.ReentrantReadWriteLock
 
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state2.reader.StateReader
@@ -14,7 +13,7 @@ object BlockStorageImpl extends ScorexLogging {
 
   def apply(settings: BlockchainSettings): (CheckpointService, History, StateReader, BlockchainUpdaterImpl) = {
 
-    val lock = new ReentrantReadWriteLock()
+    val lock = new java.util.concurrent.locks.ReentrantReadWriteLock()
 
     val checkpointService = {
       val checkpointStore: MVStore = createMVStore(settings.checkpointFile)

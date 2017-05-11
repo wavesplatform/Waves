@@ -2,43 +2,47 @@ package scorex.utils
 
 import java.util.concurrent.locks.{Lock, ReentrantReadWriteLock}
 
-import scorex.utils.SynchronizedOver._
+import scorex.utils.Synchronized.{ReadLock, _}
 
 // http://vlkan.com/blog/post/2015/09/09/enforce-locking/
 
-object SynchronizedOver {
+object Synchronized {
 
   sealed trait TypedLock {
 
-    protected val instance: Lock
+    def lock(): Unit
 
-    def lock(): Unit = instance.lock()
+    def unlock(): Unit
 
-    def unlock(): Unit = instance.unlock()
-
-    def tryLock(): Boolean = instance.tryLock()
+    def tryLock(): Boolean
   }
 
-  sealed class ReadLock(readLock: ReentrantReadWriteLock.ReadLock) extends TypedLock {
-    override protected val instance: Lock = readLock
+  sealed class ReadLock(rwl: ReentrantReadWriteLock) extends TypedLock {
+
+    override def lock(): Unit = rwl.readLock().lock()
+
+    override def unlock(): Unit = rwl.readLock().unlock()
+
+    override def tryLock(): Boolean = rwl.readLock().tryLock()
   }
 
-  sealed class ReadWriteLock(readLock: ReentrantReadWriteLock.ReadLock, writeLock: ReentrantReadWriteLock.WriteLock)
-    extends ReadLock(readLock) {
-    override protected val instance: Lock = writeLock
+  sealed class WriteLock(rwl: ReentrantReadWriteLock) extends ReadLock(rwl) {
+    override def lock(): Unit = rwl.writeLock.lock()
+
+    override def unlock(): Unit = rwl.writeLock.unlock()
+
+    override def tryLock(): Boolean = rwl.writeLock.tryLock()
   }
 
 }
 
-trait SynchronizedOver {
+trait Synchronized {
 
   def synchronizationToken: ReentrantReadWriteLock
 
-  protected val instanceReadLock: ReadLock =
-    new ReadLock(synchronizationToken.readLock())
+  protected val instanceReadLock: ReadLock = new ReadLock(synchronizationToken)
 
-  protected val instanceReadWriteLock: ReadWriteLock =
-    new ReadWriteLock(synchronizationToken.readLock(), synchronizationToken.writeLock())
+  protected val instanceReadWriteLock: WriteLock = new WriteLock(synchronizationToken)
 
   protected case class Synchronized[T](private var value: T) {
 
@@ -47,12 +51,12 @@ trait SynchronizedOver {
       value
     }
 
-    def update[R](f: T => R)(implicit readWriteLock: ReadWriteLock): R = {
+    def update[R](f: T => R)(implicit readWriteLock: WriteLock): R = {
       validateLock(readWriteLock, instanceReadWriteLock)
       f(value)
     }
 
-    def swap(newVal: => T)(implicit readWriteLock: ReadWriteLock): T = {
+    def swap(newVal: => T)(implicit readWriteLock: WriteLock): T = {
       validateLock(readWriteLock, instanceReadWriteLock)
       val oldVal = value
       value = newVal
@@ -70,7 +74,7 @@ trait SynchronizedOver {
   protected def read[T](body: ReadLock => T): T =
     synchronizeOperation(instanceReadLock)(body)
 
-  protected def write[T](body: ReadWriteLock => T): T =
+  protected def write[T](body: WriteLock => T): T =
     synchronizeOperation(instanceReadWriteLock)(body)
 
   protected def synchronizeOperation[T, L <: TypedLock](lock: L)(body: L => T): T = {

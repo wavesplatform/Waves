@@ -9,13 +9,13 @@ import scorex.transaction._
 import scorex.transaction.assets.IssueTransaction
 import scorex.transaction.assets.exchange.{ExchangeTransaction, Order}
 import scorex.transaction.lease.LeaseTransaction
-import scorex.utils.{ScorexLogging, SynchronizedOver}
+import scorex.utils.{ScorexLogging, Synchronized}
 
 import scala.annotation.tailrec
 import scala.reflect.ClassTag
 import scala.util.Right
 
-trait StateReader extends SynchronizedOver {
+trait StateReader extends Synchronized {
 
   def accountPortfolios: Map[Account, Portfolio]
 

@@ -8,9 +8,9 @@ import scorex.network.Checkpoint
 
 import scala.util.Try
 import scorex.transaction.History.BlockchainScore
-import scorex.utils.{ SynchronizedOver}
+import scorex.utils.{ Synchronized}
 
-trait History extends SynchronizedOver {
+trait History extends Synchronized {
 
   def height(): Int
 

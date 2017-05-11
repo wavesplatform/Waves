@@ -18,12 +18,6 @@ class HistoryWriterImpl private(db: MVStore, val synchronizationToken: Reentrant
   private val heightByBlockId = Synchronized(db.openMap("signaturesReverse", new LogMVMapBuilder[BlockId, Int]))
   private val scoreByHeight = Synchronized(db.openMap("score", new LogMVMapBuilder[Int, BigInt]))
 
-  read { implicit lock =>
-    if (Set(blockBodyByHeight().size(), blockIdByHeight().size(), heightByBlockId().size(), scoreByHeight().size()).size != 1) {
-      throw new IllegalArgumentException(s"Block storage is corrupt. Please remove blockchain.dat and state.dat and restart the node.")
-    }
-  }
-
   override def appendBlock(block: Block): Either[ValidationError, Unit] = write { implicit lock =>
     if ((height() == 0) || (this.lastBlock.uniqueId sameElements block.reference)) {
       val h = height() + 1

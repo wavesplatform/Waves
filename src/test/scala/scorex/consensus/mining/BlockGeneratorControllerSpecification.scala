@@ -7,6 +7,7 @@ import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import com.wavesplatform.history.HistoryWriterImpl
 import com.wavesplatform.settings.{BlockchainSettings, MinerSettings}
 import com.wavesplatform.state2.reader.StateReader
+import com.wavesplatform.state2._
 import org.h2.mvstore.MVStore
 import org.scalamock.scalatest.MockFactory
 import org.scalatest._
@@ -31,7 +32,7 @@ abstract class BlockGeneratorControllerSpecification extends TestKit(ActorSystem
 
   override protected def withFixture(test: OneArgTest): Outcome = {
 
-    val history = new HistoryWriterImpl(new MVStore.Builder().open(), new ReentrantReadWriteLock())
+    val history = HistoryWriterImpl(new MVStore.Builder().open(), new ReentrantReadWriteLock()).explicitGet()
     val testPeerManager: TestProbe = TestProbe("PeerManager")
     val testTime = new TestTime
     val blockGeneratorController: ActorRef = system.actorOf(Props(new BlockGeneratorController(
