@@ -9,6 +9,11 @@ case class ApplicationVersion(firstDigit: Int, secondDigit: Int, thirdDigit: Int
   def this(v: (Int, Int, Int)) = this(v._1, v._2, v._3)
 
   lazy val bytes: Array[Byte] = Ints.toByteArray(firstDigit) ++ Ints.toByteArray(secondDigit) ++ Ints.toByteArray(thirdDigit)
+
+  def compatibleWith(other: ApplicationVersion): Boolean =
+    firstDigit == other.firstDigit && Math.abs(secondDigit - other.secondDigit) < 2
+
+  override def toString: String = s"$firstDigit.$secondDigit.$thirdDigit"
 }
 
 object ApplicationVersion {
