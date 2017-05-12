@@ -224,9 +224,9 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
   override def isValid(block: Block): Boolean = try {
     val lastBlockTs = blockStorage.history.lastBlock.timestampField.value
     val transactions = block.transactionDataField.asInstanceOf[TransactionsBlockField].value
-    def txsAreNew = transactions.forall { tx => (lastBlockTs - tx.timestamp).millis <= MaxTxAndBlockDiff }
-    def validTransactions = blockStorage.state.validate(transactions, blockStorage.history.heightOf(block),
+    lazy val validTransactions = blockStorage.state.validate(transactions, blockStorage.history.heightOf(block),
       block.timestampField.value)
+    def txsAreNew = transactions.forall { tx => (lastBlockTs - tx.timestamp).millis <= MaxTxAndBlockDiff }
     def txsAreValid = validTransactions.size == transactions.size
     def txsIdAreUniqueInBlock = transactions.map(tx => Base58.encode(tx.id)).toSet.size == transactions.size
     if (!txsAreNew) {
