@@ -38,7 +38,7 @@ class Node(config: Config, nodeInfo: NodeInfo, client: AsyncHttpClient, timer: T
   val settings: WavesSettings = WavesSettings.fromConfig(config)
 
   private val blockDelay = settings.blockchainSettings.genesisSettings.averageBlockDelay
-  private val log = LoggerFacade(LoggerFactory.getLogger(s"${getClass.getName}.${settings.networkSettings.nodeName}"))
+  private implicit val log = LoggerFacade(LoggerFactory.getLogger(s"${getClass.getName}.${settings.networkSettings.nodeName}"))
 
   def fee(txValue: TransactionType.Value, asset: String = "WAVES"): Long =
     settings.feesSettings.fees(txValue.id).find(_.asset == asset).get.fee
@@ -99,11 +99,14 @@ class Node(config: Config, nodeInfo: NodeInfo, client: AsyncHttpClient, timer: T
 
   def balance(address: String): Future[Balance] = get(s"/addresses/balance/$address").as[Balance]
 
-  def waitForTransaction(txId: String): Future[Transaction] = waitFor[Option[Transaction]](transactionInfo(txId).transform {
-    case Success(tx) => Success(Some(tx))
-    case Failure(UnexpectedStatusCodeException(r)) if r.getStatusCode == 404 => Success(None)
-    case Failure(ex) => Failure(ex)
-  }, tOpt => tOpt.exists(_.id == txId), 1.second).map(_.get)
+  def waitForTransaction(txId: String): Future[Transaction] = {
+    log.debug(s"waiting for tx=$txId")
+      waitFor[Option[Transaction]] (transactionInfo (txId).transform {
+      case Success (tx) => Success (Some (tx) )
+      case Failure (UnexpectedStatusCodeException (r) ) if r.getStatusCode == 404 => Success (None)
+      case Failure (ex) => Failure (ex)
+      }, tOpt => tOpt.exists(_.id == txId), 1.second).map(_.get)
+      }
 
   def waitForHeight(expectedHeight: Long): Future[Long] = waitFor[Long](height, h => h >= expectedHeight, 1.second)
 
@@ -192,7 +195,7 @@ class Node(config: Config, nodeInfo: NodeInfo, client: AsyncHttpClient, timer: T
         }
       case Success(r) => Failure(new RuntimeException(s"Unexpected matcher response: (${r.getStatusCode}) ${r.getResponseBody}"))
       case _ => Failure(new RuntimeException(s"Unexpected failure from matcher"))
-  }
+    }
 
   def getOrderStatus(asset: String, orderId: String): Future[MatcherStatusResponse] =
     matcherGet(s"/matcher/orderbook/$asset/WAVES/$orderId").as[MatcherStatusResponse]
@@ -204,7 +207,7 @@ class Node(config: Config, nodeInfo: NodeInfo, client: AsyncHttpClient, timer: T
     matcherPost(s"/matcher/orderbook/$amountAsset/$priceAsset/cancel", request.json).as[MatcherStatusResponse]
 }
 
-object Node extends ScorexLogging {
+object Node {
 
   case class UnexpectedStatusCodeException(r: Response) extends IOException(s"Unexpected status code: ${r.getStatusCode}")
 
@@ -258,7 +261,7 @@ object Node extends ScorexLogging {
   implicit val orderBookResponseFormat: Format[OrderBookResponse] = Json.format
 
   implicit class ResponseFutureExt(val f: Future[Response]) extends AnyVal {
-    def as[A: Format](implicit ec: ExecutionContext): Future[A] =
+    def as[A: Format](implicit ec: ExecutionContext, log: LoggerFacade): Future[A] =
       f.transform {
         case Success(r) if r.getStatusCode == HttpConstants.ResponseStatusCodes.OK_200 =>
           log.debug(s"Response: ${r.getResponseBody}")

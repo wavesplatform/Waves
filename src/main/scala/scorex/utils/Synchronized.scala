@@ -40,35 +40,25 @@ trait Synchronized {
 
   def synchronizationToken: ReentrantReadWriteLock
 
-  protected val instanceReadLock: ReadLock = new ReadLock(synchronizationToken)
+  protected def instanceReadLock: ReadLock = new ReadLock(synchronizationToken)
 
-  protected val instanceReadWriteLock: WriteLock = new WriteLock(synchronizationToken)
+  protected def instanceReadWriteLock: WriteLock = new WriteLock(synchronizationToken)
 
   protected case class Synchronized[T](private var value: T) {
 
     def apply()(implicit readLock: ReadLock): T = {
-      validateLock(readLock, instanceReadLock, instanceReadWriteLock)
       value
     }
 
-    def update[R](f: T => R)(implicit readWriteLock: WriteLock): R = {
-      validateLock(readWriteLock, instanceReadWriteLock)
+    def mutate[R](f: T => R)(implicit readWriteLock: WriteLock): R = {
       f(value)
     }
 
-    def swap(newVal: => T)(implicit readWriteLock: WriteLock): T = {
-      validateLock(readWriteLock, instanceReadWriteLock)
+    def set(newVal: => T)(implicit readWriteLock: WriteLock): T = {
       val oldVal = value
       value = newVal
       oldVal
     }
-
-    private def validateLock(lock: TypedLock, allowedLocks: TypedLock*): Unit = {
-      require(allowedLocks.contains(lock), "cannot be accessed from another synchronization scope")
-      require(lock.tryLock(), "cannot be accessed out of a synchronization scope")
-      lock.unlock()
-    }
-
   }
 
   protected def read[T](body: ReadLock => T): T =

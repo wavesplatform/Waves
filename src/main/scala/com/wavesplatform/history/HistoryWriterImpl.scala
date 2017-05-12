@@ -21,10 +21,10 @@ class HistoryWriterImpl private(db: MVStore, val synchronizationToken: Reentrant
   override def appendBlock(block: Block): Either[ValidationError, Unit] = write { implicit lock =>
     if ((height() == 0) || (this.lastBlock.uniqueId sameElements block.reference)) {
       val h = height() + 1
-      blockBodyByHeight.update(_.put(h, block.bytes))
-      scoreByHeight.update(_.put(h, score() + block.blockScore))
-      blockIdByHeight.update(_.put(h, block.uniqueId))
-      heightByBlockId.update(_.put(block.uniqueId, h))
+      blockBodyByHeight.mutate(_.put(h, block.bytes))
+      scoreByHeight.mutate(_.put(h, score() + block.blockScore))
+      blockIdByHeight.mutate(_.put(h, block.uniqueId))
+      heightByBlockId.mutate(_.put(block.uniqueId, h))
       db.commit()
       Right(())
     } else {
@@ -34,9 +34,9 @@ class HistoryWriterImpl private(db: MVStore, val synchronizationToken: Reentrant
 
   override def discardBlock(): Unit = write { implicit lock =>
     val h = height()
-    blockBodyByHeight.update(_.remove(h))
-    val vOpt = Option(blockIdByHeight.update(_.remove(h)))
-    vOpt.map(v => heightByBlockId.update(_.remove(v)))
+    blockBodyByHeight.mutate(_.remove(h))
+    val vOpt = Option(blockIdByHeight.mutate(_.remove(h)))
+    vOpt.map(v => heightByBlockId.mutate(_.remove(v)))
     db.commit()
   }
 

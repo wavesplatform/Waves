@@ -16,7 +16,7 @@ import BlockchainUpdaterImpl._
 
 class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader, settings: FunctionalitySettings,
                                     minimumInMemoryDiffSize: Int, bc: HistoryWriter with History,
-                                    override val synchronizationToken: ReentrantReadWriteLock) extends BlockchainUpdater with ScorexLogging {
+                                    val synchronizationToken: ReentrantReadWriteLock) extends BlockchainUpdater with ScorexLogging {
 
   private val MaxInMemDiffHeight = minimumInMemoryDiffSize * 2
 
@@ -46,7 +46,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader, set
       val diffToBePersisted = unsafeDiffAgainstPersistedByRange(head, last)
       persisted.applyBlockDiff(diffToBePersisted)
     }
-    inMemoryDiff.swap(unsafeDiffAgainstPersistedByRange(persisted.height + 1, bc.height() + 1))
+    inMemoryDiff.set(unsafeDiffAgainstPersistedByRange(persisted.height + 1, bc.height() + 1))
     logHeights("State rebuild finished:")
   }
 
@@ -59,7 +59,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader, set
       _ <- bc.appendBlock(block)
     } yield {
       log.info( s"""Block ${block.encodedId} appended. New height: ${bc.height()}, new score: ${bc.score()})""")
-      inMemoryDiff.swap(Monoid[BlockDiff].combine(inMemoryDiff(), blockDiff))
+      inMemoryDiff.set(Monoid[BlockDiff].combine(inMemoryDiff(), blockDiff))
     }
   }
 
@@ -76,7 +76,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader, set
 
         } else {
           if (currentState.height != height) {
-            inMemoryDiff.swap(unsafeDiffAgainstPersistedByRange(persisted.height + 1, height + 1))
+            inMemoryDiff.set(unsafeDiffAgainstPersistedByRange(persisted.height + 1, height + 1))
           }
         }
       case None =>

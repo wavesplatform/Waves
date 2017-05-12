@@ -26,22 +26,4 @@ class AliasTransactionSpec(allNodes: Seq[Node]) extends FreeSpec with Matchers {
 
     Await.result(transferResult, 1.minute)
   }
-
-  "Able to issue an alias and send money to an alias" in {
-    pending
-  }
-
-  "unable to send to non-issued alias" in {
-    pending
-  }
-
-  "unable to lease to non-issued alias" in {
-    pending
-  }
-
-  "unable to create the same alias in the next block" in {
-    pending
-  }
-
-  "able to recreate alias after rollback" in pending
 }
