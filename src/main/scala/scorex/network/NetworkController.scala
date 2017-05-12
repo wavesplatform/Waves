@@ -176,13 +176,6 @@ class NetworkController(networkSettings: NetworkSettings,
   }
 
   private def createPeerHandler(connection: ActorRef, remote: InetSocketAddress, inbound: Boolean): Unit = {
-    val handler = context.actorOf(Props(new PeerConnectionHandler(peerManager,
-      connection,
-      remote,
-      messagesHandler,
-      networkSettings)))
-    peerManager ! PeerManager.Connected(remote, handler, ownSocketAddress)
-    handler ! PeerConnectionHandler.Start
   }
 }
 
