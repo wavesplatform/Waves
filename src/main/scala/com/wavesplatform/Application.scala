@@ -14,8 +14,8 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.actor.RootActorSystem
 import com.wavesplatform.history.{BlockStorageImpl, CheckpointServiceImpl}
 import com.wavesplatform.http.NodeApiRoute
-import com.wavesplatform.network.Network
 import com.wavesplatform.matcher.Matcher
+import com.wavesplatform.network.Network
 import com.wavesplatform.settings._
 import scorex.account.{Account, AddressScheme}
 import scorex.api.http._
@@ -120,7 +120,9 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
 
     checkGenesis()
 
-    new Network().bind(???)
+    new Network(
+      settings.blockchainSettings.addressSchemeCharacter,
+      settings.networkSettings).bind()
 
     if (settings.networkSettings.uPnPSettings.enable) upnp.addPort(settings.networkSettings.port)
 
@@ -138,7 +140,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
     Seq(scoreObserver, blockGenerator, blockchainSynchronizer, historyReplier, coordinator, unconfirmedPoolSynchronizer, peerSynchronizer) foreach {
       _ => // de-lazyning process :-)
     }
-
 
     //on unexpected shutdown
     sys.addShutdownHook {
@@ -259,6 +260,7 @@ object Application extends ScorexLogging {
 
       log.info(s"${Constants.AgentName} Blockchain Id: ${settings.blockchainSettings.addressSchemeCharacter}")
 
+      log.debug("Application.run")
       val application = new Application(actorSystem, settings)
       application.run()
 
