@@ -81,7 +81,7 @@ class AssetsExtendedState(storage: StateStorageI with AssetsExtendedStateStorage
     val asset = Base58.encode(assetId)
 
     val heights = storage.getHeights(asset)
-    val heightsToRemove = heights.filter(h => h > height)
+    val heightsToRemove = heights.filter(h => h >= height)
     storage.setHeight(asset, heights -- heightsToRemove)
 
     val transactionsToRemove: Seq[String] = heightsToRemove.foldLeft(Seq.empty[String]) { (result, h) =>
