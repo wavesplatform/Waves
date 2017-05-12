@@ -40,9 +40,9 @@ trait Synchronized {
 
   def synchronizationToken: ReentrantReadWriteLock
 
-  protected def instanceReadLock: ReadLock = new ReadLock(synchronizationToken)
+  private def instanceReadLock: ReadLock = new ReadLock(synchronizationToken)
 
-  protected def instanceReadWriteLock: WriteLock = new WriteLock(synchronizationToken)
+  private def instanceReadWriteLock: WriteLock = new WriteLock(synchronizationToken)
 
   protected case class Synchronized[T](private var value: T) {
 
