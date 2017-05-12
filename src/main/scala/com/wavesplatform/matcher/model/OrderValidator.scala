@@ -4,7 +4,7 @@ import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.market.OrderBookActor.CancelOrder
 import com.wavesplatform.state2.reader.StateReader
 import scorex.account.PublicKeyAccount
-import scorex.transaction.AssetAcc
+import scorex.transaction.{AssetAcc, AssetId}
 import scorex.transaction.assets.exchange.Validation.booleanOperators
 import scorex.transaction.assets.exchange.{Order, Validation}
 import scorex.utils.NTP
@@ -21,20 +21,27 @@ trait OrderValidator {
   def isBalanceWithOpenOrdersEnough(order: Order): Boolean = {
     val (acc, feeAcc) = (AssetAcc(order.senderPublicKey, order.getSpendAssetId), AssetAcc(order.senderPublicKey, None))
 
-    val (accBal, feeBal) = (storedState.assetBalance(acc) - assetsToSpend.getOrElse(acc.key, 0L),
-      storedState.assetBalance(feeAcc) - assetsToSpend.getOrElse(feeAcc.key, 0L))
+    val (accBal, feeBal) = (storedState.tradableAssetBalance(acc) - assetsToSpend.getOrElse(acc.key, 0L),
+      storedState.tradableAssetBalance(feeAcc) - assetsToSpend.getOrElse(feeAcc.key, 0L))
 
     if (acc != feeAcc) accBal >= order.getSpendAmount(order.price, order.amount).right.get && feeBal >= order.matcherFee
     else accBal >= order.getSpendAmount(order.price, order.amount).right.get + order.matcherFee
   }
 
   def validateIntegerAmount(lo: LimitOrder): Validation = {
-    val asset = if (lo.price >= Order.PriceConstant) lo.order.assetPair.priceAsset else lo.order.assetPair.amountAsset
-    val amount =  if (lo.price >= Order.PriceConstant)
-      (BigInt(lo.amount) * lo.price / Order.PriceConstant).bigInteger.longValueExact()
-      else lo.amount
-    val decimals = asset.flatMap(storedState.getIssueTransaction).map(_.decimals.toInt).getOrElse(8)
-    val scaled = BigDecimal(amount, decimals)
+    def getDecimals(assetId: Option[AssetId]) = assetId.flatMap(storedState.getIssueTransaction).map(_.decimals.toInt).getOrElse(8)
+
+    val amountDecimals = getDecimals(lo.order.assetPair.amountAsset)
+    val priceDecimals = getDecimals(lo.order.assetPair.priceAsset)
+    val price = BigDecimal(lo.price)*math.pow(10, amountDecimals - priceDecimals)/Order.PriceConstant
+
+    val scaled = if (price >= 1) {
+        val amount = (BigInt(lo.amount) * lo.price / Order.PriceConstant).bigInteger.longValueExact()
+        BigDecimal(amount, priceDecimals)
+      } else {
+        BigDecimal(lo.amount, amountDecimals)
+      }
+
     (scaled >= 1) :| "Order amount is too small"
   }
 
