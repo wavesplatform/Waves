@@ -18,7 +18,7 @@ case class TransactionsApiRoute(
     state: LagonakiState,
     history: History,
     transactionModule: SimpleTransactionModule) extends ApiRoute with CommonApiFunctions {
-  val MaxTransactionsPerRequest = 1000
+  val MaxTransactionsPerRequest = 10000
 
   override lazy val route =
     pathPrefix("transactions") {

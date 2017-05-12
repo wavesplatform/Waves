@@ -2,7 +2,7 @@ package com.wavesplatform.matcher.model
 
 import com.wavesplatform.matcher.model.MatcherModel.Price
 import play.api.libs.json.{JsValue, Json}
-import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
+import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType, Validation}
 
 object MatcherModel {
   type Price = Long
@@ -65,6 +65,7 @@ object LimitOrder {
     case OrderType.SELL => SellLimitOrder(price, amount, o)
   }
 
+  def validateAmount(lo: LimitOrder): Validation = lo.order.isValidAmount(lo.price, lo.amount)
 }
 
 object Events {

@@ -3,7 +3,7 @@ package com.wavesplatform.matcher.model
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.market.OrderBookActor.CancelOrder
 import scorex.account.PublicKeyAccount
-import scorex.transaction.AssetAcc
+import scorex.transaction.{AssetAcc, AssetId}
 import scorex.transaction.assets.exchange.Validation.booleanOperators
 import scorex.transaction.assets.exchange.{Order, Validation}
 import scorex.transaction.state.database.blockchain.StoredState
@@ -21,17 +21,35 @@ trait OrderValidator {
   def isBalanceWithOpenOrdersEnough(order: Order): Boolean = {
     val (acc, feeAcc) = (AssetAcc(order.senderPublicKey, order.getSpendAssetId), AssetAcc(order.senderPublicKey, None))
 
-    val (assBal, feeBal) = (storedState.assetBalance(acc) - assetsToSpend.getOrElse(acc.key, 0L),
-      storedState.assetBalance(feeAcc) - assetsToSpend.getOrElse(feeAcc.key, 0L))
+    val (assBal, feeBal) = (storedState.tradableAssetBalance(acc) - assetsToSpend.getOrElse(acc.key, 0L),
+      storedState.tradableAssetBalance(feeAcc) - assetsToSpend.getOrElse(feeAcc.key, 0L))
 
     if (acc != feeAcc) assBal >= order.getSpendAmount(order.price, order.amount).get && feeBal >= order.matcherFee
     else assBal >= order.getSpendAmount(order.price, order.amount).get + order.matcherFee
+  }
+
+  def validateIntegerAmount(lo: LimitOrder): Validation = {
+    def getDecimals(assetId: Option[AssetId]) = assetId.flatMap(storedState.getIssueTransaction).map(_.decimals.toInt).getOrElse(8)
+
+    val amountDecimals = getDecimals(lo.order.assetPair.amountAsset)
+    val priceDecimals = getDecimals(lo.order.assetPair.priceAsset)
+    val price = BigDecimal(lo.price)*math.pow(10, amountDecimals - priceDecimals)/Order.PriceConstant
+
+    val scaled = if (price >= 1) {
+        val amount = (BigInt(lo.amount) * lo.price / Order.PriceConstant).bigInteger.longValueExact()
+        BigDecimal(amount, priceDecimals)
+      } else {
+        BigDecimal(lo.amount, amountDecimals)
+      }
+
+    (scaled >= 1) :| "Order amount is too small"
   }
 
   def validateNewOrder(order: Order): Validation = {
     (openOrdersCount.getOrElse(order.matcherPublicKey.address, 0) <= settings.maxOpenOrders) :|
       s"Open orders count limit exceeded (Max = ${settings.maxOpenOrders})" &&
       (order.matcherPublicKey == matcherPubKey) :| "Incorrect matcher public key" &&
+      validateIntegerAmount(LimitOrder(order)) &&
       order.isValid(NTP.correctedTime()) &&
       (order.matcherFee >= settings.minOrderFee) :| s"Order matcherFee should be >= ${settings.minOrderFee}" &&
       !ordersRemainingAmount.contains(order.idStr) :| "Order is already accepted" &&

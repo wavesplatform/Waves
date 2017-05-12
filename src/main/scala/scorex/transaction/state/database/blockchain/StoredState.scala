@@ -132,6 +132,14 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
     balanceByKey(account.key, _.balance, atHeight)
   }
 
+  def tradableAssetBalance(account: AssetAcc): Long = {
+    account.assetId match {
+      case None => balanceByKey(account.key, _.balance, None) -
+        storage.asInstanceOf[LeaseExtendedStateStorageI].getLeasedSum(account.account.address)
+      case _ => balanceByKey(account.key, _.balance, None)
+    }
+  }
+
   private def heightWithConfirmations(heightOpt: Option[Int], confirmations: Int): Int = {
     Math.max(1, heightOpt.getOrElse(storage.stateHeight) - confirmations)
   }
@@ -487,7 +495,7 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
   }
 
 
-  private def getIssueTransaction(assetId: AssetId): Option[IssueTransaction] =
+  def getIssueTransaction(assetId: AssetId): Option[IssueTransaction] =
     storage.getTransactionBytes(assetId).flatMap(b => IssueTransaction.parseBytes(b).toOption)
 
 
