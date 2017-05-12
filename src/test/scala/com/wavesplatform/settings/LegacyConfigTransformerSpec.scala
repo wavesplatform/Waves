@@ -161,6 +161,9 @@ class LegacyConfigTransformerSpec extends FreeSpec with Matchers {
           |  network {
           |    file = ""
           |    unrequested-packets-threshold = 100
+          |    max-inbound-connections = 30
+          |    max-outbound-connections = 30
+          |    max-single-host-connections = 3
           |  }
           |  matcher {
           |    enable = false
@@ -200,6 +203,7 @@ class LegacyConfigTransformerSpec extends FreeSpec with Matchers {
           |  network {
           |    file = ""
           |    unrequested-packets-threshold = 100
+          |    max-single-host-connections = 3
           |  }
           |  matcher {
           |    enable = false
@@ -229,7 +233,9 @@ class LegacyConfigTransformerSpec extends FreeSpec with Matchers {
       'localOnly (true),
       'peersDataResidenceTime (2.days),
       'blackListResidenceTime (45.seconds),
-      'maxConnections (10),
+      'maxInboundConnections (10),
+      'maxOutboundConnections (10),
+      'maxConnectionsFromSingleHost (3),
       'connectionTimeout (5.seconds),
       'outboundBufferSize (2 * 1024 * 1024),
       'minEphemeralPortNumber (30000),
