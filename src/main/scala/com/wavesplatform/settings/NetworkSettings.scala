@@ -1,5 +1,7 @@
 package com.wavesplatform.settings
 
+import java.net.{InetAddress, InetSocketAddress, URI}
+
 import java.io.File
 
 import com.typesafe.config.Config
@@ -26,7 +28,7 @@ case class NetworkSettings(file: Option[File],
                            bindAddress: String,
                            port: Int,
                            nodeName: String,
-                           declaredAddress: String,
+                           declaredAddress: Option[InetSocketAddress],
                            nonce: Long,
                            knownPeers: List[String],
                            localOnly: Boolean,
@@ -53,7 +55,12 @@ object NetworkSettings {
     val port = config.as[Int](s"$configPath.port")
     val nonce = if (config.hasPath(s"$configPath.nonce")) config.as[Long](s"$configPath.nonce") else randomNonce
     val nodeName = if (config.hasPath(s"$configPath.node-name")) config.as[String](s"$configPath.node-name") else s"Node-$nonce"
-    val declaredAddress = config.as[String](s"$configPath.declared-address")
+    val declaredAddress = config.as[String](s"$configPath.declared-address") match {
+      case "" => None
+      case address =>
+        val uri = new URI(s"my://$address")
+        Some(new InetSocketAddress(uri.getHost, uri.getPort))
+    }
     val knownPeers = config.as[List[String]](s"$configPath.known-peers")
     val localOnly = config.as[Boolean](s"$configPath.local-only")
     val peersDataResidenceTime = config.as[FiniteDuration](s"$configPath.peers-data-residence-time")

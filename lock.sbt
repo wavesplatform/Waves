@@ -57,12 +57,13 @@ dependencyOverrides in ThisBuild ++= Set(
   "commons-logging" % "commons-logging" % "1.2",
   "commons-net" % "commons-net" % "3.6",
   "io.netty" % "netty" % "3.10.0.Final",
-  "io.netty" % "netty-buffer" % "4.0.45.Final",
-  "io.netty" % "netty-codec" % "4.0.45.Final",
+  "io.netty" % "netty-buffer" % "4.1.10.Final",
+  "io.netty" % "netty-codec" % "4.1.10.Final",
   "io.netty" % "netty-codec-http" % "4.0.45.Final",
-  "io.netty" % "netty-common" % "4.0.45.Final",
-  "io.netty" % "netty-handler" % "4.0.45.Final",
-  "io.netty" % "netty-transport" % "4.0.45.Final",
+  "io.netty" % "netty-common" % "4.1.10.Final",
+  "io.netty" % "netty-handler" % "4.1.10.Final",
+  "io.netty" % "netty-resolver" % "4.1.10.Final",
+  "io.netty" % "netty-transport" % "4.1.10.Final",
   "io.netty" % "netty-transport-native-epoll" % "4.0.45.Final",
   "io.swagger" % "swagger-annotations" % "1.5.13",
   "io.swagger" % "swagger-core" % "1.5.13",
@@ -132,4 +133,4 @@ dependencyOverrides in ThisBuild ++= Set(
   "org.whispersystems" % "curve25519-java" % "0.3.0",
   "org.yaml" % "snakeyaml" % "1.17"
 )
-// LIBRARY_DEPENDENCIES_HASH a8bc8a963b2267fa77f6f01218cb9904464481e3
+// LIBRARY_DEPENDENCIES_HASH 908fd089b53f5137a5e11192db61981abaf313a8

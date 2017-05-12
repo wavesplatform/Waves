@@ -54,7 +54,7 @@ case class PeerConnectionHandler(peerManager: ActorRef,
 
   private def workingCycleAwaitingHandshake: Receive = state(CommunicationState.AwaitingHandshake) {
     case h: Handshake =>
-      connection ! Write(ByteString(h.bytes), Ack)
+//      connection ! Write(ByteString(h.bytes), Ack)
       log.debug(s"Handshake message has been sent to $remote")
 
     case Ack =>
@@ -63,16 +63,16 @@ case class PeerConnectionHandler(peerManager: ActorRef,
       checkHandshake()
 
     case Received(data) =>
-      Handshake.parseBytes(data.toArray) match {
-        case Success(handshake) =>
-          peerManager ! Handshaked(remote, handshake)
-          log.info(s"Got a Handshake from $remote")
-          handshakeGot = true
-          checkHandshake()
-        case Failure(e) =>
-          log.warn(s"Error during parsing a handshake from $remote: ${e.getMessage}")
-          context stop self
-      }
+//      Handshake.parseBytes(data.toArray) match {
+//        case Success(handshake) =>
+//          peerManager ! Handshaked(remote, handshake)
+//          log.info(s"Got a Handshake from $remote")
+//          handshakeGot = true
+//          checkHandshake()
+//        case Failure(e) =>
+//          log.warn(s"Error during parsing a handshake from $remote: ${e.getMessage}")
+//          context stop self
+//      }
 
     case HandshakeTimeout =>
       log.warn(s"Handshake timeout for $remote")

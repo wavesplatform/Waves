@@ -109,7 +109,7 @@ class NetworkController(networkSettings: NetworkSettings,
   def peerLogic: Receive = {
     case ConnectTo(remote) =>
       log.info(s"Connecting to: $remote")
-      IO(Tcp) ! Connect(remote, localAddress = None, timeout = connTimeout)
+//      IO(Tcp) ! Connect(remote, localAddress = None, timeout = connTimeout)
 
     case Connected(remote, local) =>
       val connection = sender()
