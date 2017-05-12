@@ -2,83 +2,54 @@ package scorex.network
 
 import java.net.{InetAddress, InetSocketAddress}
 
-import com.google.common.primitives.{Ints, Longs}
-import scorex.app.ApplicationVersion
-import scorex.serialization.BytesSerializable
-import scorex.utils.ScorexLogging
+import com.google.common.base.Charsets
+import io.netty.buffer.ByteBuf
 
-import scala.util.Try
+case class Handshake(
+    applicationName: String,
+    applicationVersion: (Int, Int, Int),
+    nodeName: String,
+    nodeNonce: Long,
+    declaredAddress: Option[InetSocketAddress]) {
+  def encode(out: ByteBuf): out.type = {
+    out.writeByte(applicationName.length)
+    out.writeBytes(applicationName.getBytes(Charsets.UTF_8))
+    out.writeInt(applicationVersion._1)
+    out.writeInt(applicationVersion._2)
+    out.writeInt(applicationVersion._3)
+    out.writeByte(nodeName.length)
+    out.writeBytes(nodeName.getBytes(Charsets.UTF_8))
+    out.writeLong(nodeNonce)
+    declaredAddress match {
+      case None => out.writeInt(0)
+      case Some(addr) =>
+        out.writeBytes(addr.getAddress.getAddress)
+        out.writeInt(addr.getPort)
+    }
+    out.writeLong(System.currentTimeMillis() / 1000)
 
-
-case class Handshake(applicationName: String,
-                     applicationVersion: ApplicationVersion,
-                     nodeName: String,
-                     nodeNonce: Long,
-                     declaredAddress: Option[InetSocketAddress],
-                     time: Long
-                    ) extends BytesSerializable {
-
-  require(Option(applicationName).isDefined)
-  require(Option(applicationVersion).isDefined)
-
-  lazy val bytes: Array[Byte] = {
-    val anb = applicationName.getBytes
-
-    val fab = declaredAddress.map { isa =>
-      isa.getAddress.getAddress ++ Ints.toByteArray(isa.getPort)
-    }.getOrElse(Array[Byte]())
-
-    val nodeNameBytes = nodeName.getBytes
-
-    Array(anb.size.toByte) ++ anb ++
-      applicationVersion.bytes ++
-      Array(nodeNameBytes.size.toByte) ++ nodeNameBytes ++
-      Longs.toByteArray(nodeNonce) ++
-      Ints.toByteArray(fab.length) ++ fab ++
-      Longs.toByteArray(time)
+    out
   }
 }
 
-object Handshake extends ScorexLogging {
-  def parseBytes(bytes: Array[Byte]): Try[Handshake] = Try {
-    var position = 0
-    val appNameSize = bytes.head
-    require(appNameSize > 0, s"Invalid Application name length in handshake: $appNameSize")
+object Handshake {
+  def decode(in: ByteBuf): Handshake = {
+    val appNameSize = in.readByte()
+    val appName = in.readSlice(appNameSize).toString(Charsets.UTF_8)
+    val appVersion = (in.readInt(), in.readInt(), in.readInt())
+    val nodeNameSize = in.readByte()
+    val nodeName = in.readSlice(nodeNameSize).toString(Charsets.UTF_8)
+    val nonce = in.readLong()
+    val fas = in.readInt()
+    val isa = if (fas <= 0) None else {
+      val addressBytes = new Array[Byte](4)
+      in.readBytes(addressBytes)
+      val address = InetAddress.getByAddress(addressBytes)
+      val port = in.readInt()
+      Some(new InetSocketAddress(address, port))
+    }
+    in.readLong() // time is ignored
 
-    position += 1
-
-    val an = new String(bytes.slice(position, position + appNameSize))
-    position += appNameSize
-
-    val av = ApplicationVersion.parseBytes(bytes.slice(position, position + ApplicationVersion.SerializedVersionLength)).get
-    position += ApplicationVersion.SerializedVersionLength
-
-    val nodeNameSize = bytes.slice(position, position + 1).head
-    position += 1
-
-    val nodeName = new String(bytes.slice(position, position + nodeNameSize))
-    position += nodeNameSize
-
-    val nonce = Longs.fromByteArray(bytes.slice(position, position + 8))
-    position += 8
-
-    log.trace(s"Incoming handshake: $an $av $nodeName $nonce")
-
-    val fas = Ints.fromByteArray(bytes.slice(position, position + 4))
-    position += 4
-
-    val isaOpt = if (fas > 0) {
-      val fa = bytes.slice(position, position + fas - 4)
-      position += fas - 4
-
-      val port = Ints.fromByteArray(bytes.slice(position, position + 4))
-      position += 4
-
-      Some(new InetSocketAddress(InetAddress.getByAddress(fa), port))
-    } else None
-
-    val time = Longs.fromByteArray(bytes.slice(position, position + 8))
-
-    Handshake(an, av, nodeName, nonce, isaOpt, time)
+    Handshake(appName, appVersion, nodeName, nonce, isa)
   }
 }

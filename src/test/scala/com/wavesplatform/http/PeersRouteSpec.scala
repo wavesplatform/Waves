@@ -8,7 +8,6 @@ import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json.{Format, JsObject, JsValue, Json}
 import scorex.api.http.{ApiKeyNotValid, PeersApiRoute}
-import scorex.app.ApplicationVersion
 import scorex.network.Handshake
 import scorex.network.NetworkController.ConnectTo
 import scorex.network.peer.PeerInfo
@@ -34,7 +33,7 @@ class PeersRouteSpec extends RouteSpec("/peers") with RestAPISettingsHelper with
       inetAddress <- inetSocketAddressGen
       ts <- Gen.posNum[Long]
       nonce <- Arbitrary.arbitrary[Int]
-    } yield inetAddress -> Handshake("", ApplicationVersion(0, 0, 0), "", nonce, None, ts)
+    } yield inetAddress -> Handshake("", (0, 0, 0), "", nonce, None)
 
     forAll(genListOf(20, gen)) { l =>
       val result = Get(routePath("/connected")) ~> route ~> runRoute
