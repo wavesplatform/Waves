@@ -29,7 +29,6 @@ import scorex.consensus.nxt.api.http.NxtConsensusApiRoute
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash.DigestSize
 import scorex.network._
-import scorex.network.message.{BasicMessagesRepo, MessageHandler}
 import scorex.network.peer.PeerManager
 import scorex.transaction._
 import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
@@ -46,7 +45,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
 
   lazy val upnp = new UPnP(settings.networkSettings.uPnPSettings)
 
-  val messagesHandler = MessageHandler(BasicMessagesRepo.specs ++ TransactionalMessagesRepo.specs)
   val feeCalculator = new FeeCalculator(settings.feesSettings)
   val checkpoints = new CheckpointServiceImpl(settings.blockchainSettings.checkpointFile)
   val (history, stateWriter, stateReader, blockchainUpdater) = BlockStorageImpl(settings.blockchainSettings).get
@@ -103,7 +101,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
     typeOf[AliasBroadcastApiRoute]
   )
 
-  lazy val networkController: ActorRef = actorSystem.actorOf(Props(new NetworkController(settings.networkSettings, upnp, peerManager, messagesHandler)), "NetworkController")
+  lazy val networkController = actorSystem.deadLetters
   lazy val peerManager: ActorRef = actorSystem.actorOf(PeerManager.props(settings.networkSettings, networkController, settings.blockchainSettings.addressSchemeCharacter), "PeerManager")
   lazy val unconfirmedPoolSynchronizer: ActorRef = actorSystem.actorOf(Props(new UnconfirmedPoolSynchronizer(newTransactionHandler, settings.utxSettings, networkController, utxStorage)))
   lazy val coordinator: ActorRef = actorSystem.actorOf(Props(new Coordinator(networkController, blockchainSynchronizer, blockGenerator, peerManager, scoreObserver, blockchainUpdater, time, utxStorage, history, stateReader, checkpoints, settings)), "Coordinator")

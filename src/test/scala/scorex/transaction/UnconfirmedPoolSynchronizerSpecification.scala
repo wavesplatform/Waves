@@ -8,9 +8,8 @@ import org.scalatest.{BeforeAndAfterAll, Matchers, OneInstancePerTest, WordSpecL
 import scorex.account.PublicKeyAccount
 import scorex.network.NetworkController.DataFromPeer
 import scorex.network.TransactionalMessagesRepo.TransactionMessageSpec
+import scorex.network._
 import scorex.network.message.Message
-import scorex.network.{NetworkController, _}
-import scorex.transaction.ValidationError.TransactionValidationError
 
 import scala.concurrent.duration._
 import scala.language.postfixOps
