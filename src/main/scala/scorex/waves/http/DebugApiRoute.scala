@@ -7,19 +7,19 @@ import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state2.reader.StateReader
 import io.swagger.annotations._
 import play.api.libs.json.{JsArray, Json}
-import scorex.account.Account
 import scorex.api.http._
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash
-import scorex.transaction.History
+import scorex.transaction.{BlockchainUpdater, History}
 import scorex.wallet.Wallet
 
 @Path("/debug")
 @Api(value = "/debug")
-case class DebugApiRoute(settings: RestAPISettings, wallet: Wallet, stateReader: StateReader, history: History) extends ApiRoute {
+case class DebugApiRoute(settings: RestAPISettings, wallet: Wallet, stateReader: StateReader, history: History,
+                         updater: BlockchainUpdater) extends ApiRoute {
 
-  override lazy val route = pathPrefix("debug") {
-    blocks ~ state ~ info ~ stateWaves
+  override lazy val route: Route = pathPrefix("debug") {
+    blocks ~ state ~ info ~ stateWaves ~ rollbackTo
   }
 
   @Path("/blocks/{howMany}")
@@ -80,4 +80,23 @@ case class DebugApiRoute(settings: RestAPISettings, wallet: Wallet, stateReader:
       "stateHash" -> stateHash
     ))
   }
+
+
+  @Path("/rollbackTo")
+  @ApiOperation(value = "Block signature", notes = "Rollback state to given block", httpMethod = "DELETE")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(name = "signature", value = "Base58-encoded block signature", required = true, dataType = "string", paramType = "path")
+  ))
+  def rollbackTo: Route = path("rollbackTo" / Segment) { signature =>
+    (delete & withAuth) {
+      val maybeBlockId = Base58.decode(signature).toOption
+      if (maybeBlockId.isEmpty) {
+        complete(InvalidSignature)
+      } else {
+        val result = updater.removeAfter(maybeBlockId.get)
+        complete(Json.obj("success" -> result))
+      }
+    }
+  }
+
 }
