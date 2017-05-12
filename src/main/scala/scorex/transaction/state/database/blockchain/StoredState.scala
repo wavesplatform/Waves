@@ -63,9 +63,9 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
     changes.reason.foreach(id => {
       storage.getTransaction(id) match {
         case Some(t: AssetIssuance) =>
-          assetsExtension.rollback(t, height)
+          assetsExtension.rollbackAtAndAfterHeight(t, height)
         case Some(t: BurnTransaction) =>
-          assetsExtension.rollback(t, height)
+          assetsExtension.rollbackAtAndAfterHeight(t, height)
         case Some(t: LeaseTransaction) =>
           leaseExtendedState.cancelLease(t)
         case Some(t: LeaseCancelTransaction) =>

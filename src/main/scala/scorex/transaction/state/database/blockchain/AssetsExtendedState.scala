@@ -68,16 +68,16 @@ class AssetsExtendedState(storage: StateStorageI with AssetsExtendedStateStorage
     storage.setQuantity(assetAtTransaction, quantity)
   }
 
-  def rollback(burn: BurnTransaction, height: Int): Unit = {
-    rollback(burn.assetId, height)
+  def rollbackAtAndAfterHeight(burn: BurnTransaction, height: Int): Unit = {
+    rollbackAtAndAfterHeight(burn.assetId, height)
   }
 
-  def rollback(issuance: AssetIssuance, height: Int): Unit = {
+  def rollbackAtAndAfterHeight(issuance: AssetIssuance, height: Int): Unit = {
     val asset = Base58.encode(issuance.assetId)
-    rollback(issuance.assetId, height, Some(true))
+    rollbackAtAndAfterHeight(issuance.assetId, height, Some(true))
   }
 
-  private[blockchain] def rollback(assetId: Array[Byte], height: Int, newReissuable: Option[Boolean] = None): Unit = {
+  private[blockchain] def rollbackAtAndAfterHeight(assetId: Array[Byte], height: Int, newReissuable: Option[Boolean] = None): Unit = {
     val asset = Base58.encode(assetId)
 
     val heights = storage.getHeights(asset)
