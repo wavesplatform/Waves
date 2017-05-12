@@ -224,16 +224,22 @@ class SimpleTransactionModule(hardForkParams: ChainParameters)(implicit val sett
   override def isValid(block: Block): Boolean = try {
     val lastBlockTs = blockStorage.history.lastBlock.timestampField.value
     val transactions = block.transactionDataField.asInstanceOf[TransactionsBlockField].value
-    lazy val txsAreNew = transactions.forall { tx => (lastBlockTs - tx.timestamp).millis <= MaxTxAndBlockDiff }
-    lazy val validTransactions = blockStorage.state.validate(transactions, blockStorage.history.heightOf(block),
+    def txsAreNew = transactions.forall { tx => (lastBlockTs - tx.timestamp).millis <= MaxTxAndBlockDiff }
+    def validTransactions = blockStorage.state.validate(transactions, blockStorage.history.heightOf(block),
       block.timestampField.value)
-    lazy val txsAreValid = validTransactions.size == transactions.size
-    lazy val txsIdAreUniqueInBlock = transactions.map(tx => Base58.encode(tx.id)).toSet.size == transactions.size
-    if (!txsAreNew) log.debug(s"Invalid txs in block ${block.encodedId}: txs from the past")
-    if (!txsIdAreUniqueInBlock) log.debug(s"Invalid txs in block ${block.encodedId}: there are not unique txs")
-    if (!txsAreValid) log.debug(s"Invalid txs in block ${block.encodedId}: not valid txs" +
-      s" ${transactions.filter(t1 => !validTransactions.exists(t2 => t2.id sameElements t1.id)).map(_.json)}")
-    txsAreNew && txsAreValid  && txsIdAreUniqueInBlock
+    def txsAreValid = validTransactions.size == transactions.size
+    def txsIdAreUniqueInBlock = transactions.map(tx => Base58.encode(tx.id)).toSet.size == transactions.size
+    if (!txsAreNew) {
+      log.debug(s"Invalid txs in block ${block.encodedId}: txs from the past")
+      false
+    } else if (!txsIdAreUniqueInBlock) {
+      log.debug(s"Invalid txs in block ${block.encodedId}: there are not unique txs")
+      false
+    } else if (!txsAreValid) {
+      log.debug(s"Invalid txs in block ${block.encodedId}: not valid txs" +
+        s" ${transactions.filter(t1 => !validTransactions.exists(t2 => t2.id sameElements t1.id)).map(_.json)}")
+      false
+    } else true
   } catch {
     case e: UnsupportedOperationException =>
       log.debug(s"DB can't find last block because of unexpected modification")
