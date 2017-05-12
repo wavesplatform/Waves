@@ -76,7 +76,7 @@ class AssetsExtendedStateSpecification extends PropSpec with PropertyChecks with
     state.getAssetQuantity(assetId) shouldBe 100
     state.isReissuable(assetId) shouldBe false
 
-    state.rollback(assetId, 2, Some(true))
+    state.rollbackAtAndAfterHeight(assetId, 2, Some(true))
 
     state.getAssetQuantity(assetId) shouldBe 30
     state.isReissuable(assetId) shouldBe true
@@ -105,10 +105,10 @@ class AssetsExtendedStateSpecification extends PropSpec with PropertyChecks with
     state.getAssetQuantity(assetId) shouldBe 50
     state.isReissuable(assetId) shouldBe true
 
-    state.rollback(assetId, 2, Some(false))
+    state.rollbackAtAndAfterHeight(assetId, 2, Some(true))
 
-    state.getAssetQuantity(assetId) shouldBe 30
-    state.isReissuable(assetId) shouldBe false
+    state.getAssetQuantity(assetId) shouldBe 10
+    state.isReissuable(assetId) shouldBe true
   }
 
   property("Rollback should work after simple sequence of updates") {
@@ -131,7 +131,7 @@ class AssetsExtendedStateSpecification extends PropSpec with PropertyChecks with
     state.getAssetQuantity(assetId) shouldBe 40
     state.isReissuable(assetId) shouldBe false
 
-    state.rollback(assetId, 2, Some(true))
+    state.rollbackAtAndAfterHeight(assetId, 3, Some(true))
 
     state.getAssetQuantity(assetId) shouldBe 20
     state.isReissuable(assetId) shouldBe true
@@ -157,7 +157,7 @@ class AssetsExtendedStateSpecification extends PropSpec with PropertyChecks with
     state.getAssetQuantity(assetId) shouldBe 40
     state.isReissuable(assetId) shouldBe false
 
-    state.rollback(assetId, 25, Some(true))
+    state.rollbackAtAndAfterHeight(assetId, 25, Some(true))
 
     state.getAssetQuantity(assetId) shouldBe 20
     state.isReissuable(assetId) shouldBe true
@@ -180,7 +180,7 @@ class AssetsExtendedStateSpecification extends PropSpec with PropertyChecks with
 
     state.addAsset(assetId, 20, getId(2), 20, reissuable = false)
 
-    state.rollback(assetId, 18, Some(true))
+    state.rollbackAtAndAfterHeight(assetId, 18, Some(true))
 
     state.getAssetQuantity(assetId) shouldBe 10
     state.isReissuable(assetId) shouldBe true
@@ -204,7 +204,7 @@ class AssetsExtendedStateSpecification extends PropSpec with PropertyChecks with
     state.getAssetQuantity(assetId) shouldBe 30
     state.isReissuable(assetId) shouldBe false
 
-    state.rollback(assetId, 18, Some(true))
+    state.rollbackAtAndAfterHeight(assetId, 18, Some(true))
 
     state.getAssetQuantity(assetId) shouldBe 10
     state.isReissuable(assetId) shouldBe true
@@ -235,7 +235,7 @@ class AssetsExtendedStateSpecification extends PropSpec with PropertyChecks with
     state.getAssetQuantity(assetId) shouldBe 50
     state.isReissuable(assetId) shouldBe false
 
-    state.rollback(assetId, 15, Some(true))
+    state.rollbackAtAndAfterHeight(assetId, 15, Some(true))
 
     state.getAssetQuantity(assetId) shouldBe 20
     state.isReissuable(assetId) shouldBe true
