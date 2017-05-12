@@ -98,4 +98,23 @@ case class DebugApiRoute(settings: RestAPISettings, wallet: Wallet, stateReader:
       "stateHash" -> stateHash
     ))
   }
+
+
+  @Path("/rollbackTo")
+  @ApiOperation(value = "Block signature", notes = "Rollback state to given block", httpMethod = "DELETE")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(name = "signature", value = "Base58-encoded block signature", required = true, dataType = "string", paramType = "path")
+  ))
+  def rollbackTo: Route = path("rollbackTo" / Segment) { signature =>
+    (delete & withAuth) {
+      val maybeBlockId = Base58.decode(signature).toOption
+      if (maybeBlockId.isEmpty) {
+        complete(InvalidSignature)
+      } else {
+        val result = updater.removeAfter(maybeBlockId.get)
+        complete(Json.obj("success" -> result))
+      }
+    }
+  }
+
 }
