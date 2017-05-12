@@ -69,15 +69,15 @@ class AssetsExtendedState(storage: StateStorageI with AssetsExtendedStateStorage
   }
 
   def deleteAtHeight(burn: BurnTransaction, height: Int): Unit = {
-    removeAtAndAfterHeight(burn.assetId, height)
+    deleteAtHeight(burn.assetId, height)
   }
 
   def deleteAtHeight(issuance: AssetIssuance, height: Int): Unit = {
     val asset = Base58.encode(issuance.assetId)
-    removeAtAndAfterHeight(issuance.assetId, height, Some(true))
+    deleteAtHeight(issuance.assetId, height, Some(true))
   }
 
-  private[blockchain] def removeAtAndAfterHeight(assetId: Array[Byte], height: Int, newReissuable: Option[Boolean] = None): Unit = {
+  private[blockchain] def deleteAtHeight(assetId: Array[Byte], height: Int, newReissuable: Option[Boolean] = None): Unit = {
     val asset = Base58.encode(assetId)
 
     val heights = storage.getHeights(asset)
