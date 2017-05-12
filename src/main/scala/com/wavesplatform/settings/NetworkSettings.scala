@@ -30,7 +30,9 @@ case class NetworkSettings(file: String,
                            localOnly: Boolean,
                            peersDataResidenceTime: FiniteDuration,
                            blackListResidenceTime: FiniteDuration,
-                           maxConnections: Int,
+                           maxInboundConnections: Int,
+                           maxOutboundConnections: Int,
+                           maxConnectionsFromSingleHost: Int,
                            connectionTimeout: FiniteDuration,
                            outboundBufferSize: Long,
                            minEphemeralPortNumber: Int,
@@ -54,7 +56,9 @@ object NetworkSettings {
     val localOnly = config.as[Boolean](s"$configPath.local-only")
     val peersDataResidenceTime = config.as[FiniteDuration](s"$configPath.peers-data-residence-time")
     val blackListResidenceTime = config.as[FiniteDuration](s"$configPath.black-list-residence-time")
-    val maxConnections = config.as[Int](s"$configPath.max-connections")
+    val maxInboundConnections = config.as[Int](s"$configPath.max-inbound-connections")
+    val maxOutboundConnections = config.as[Int](s"$configPath.max-outbound-connections")
+    val maxConnectionsFromSingleHost = config.as[Int](s"$configPath.max-single-host-connections")
     val connectionTimeout = config.as[FiniteDuration](s"$configPath.connection-timeout")
     val outboundBufferSize = config.getBytes(s"$configPath.outbound-buffer-size")
     val minEphemeralPortNumber = config.as[Int](s"$configPath.min-ephemeral-port-number")
@@ -65,9 +69,9 @@ object NetworkSettings {
     val uPnPSettings = UPnPSettings.fromConfig(config)
 
     NetworkSettings(file, bindAddress, port, nodeName, declaredAddress, nonce, knownPeers, localOnly,
-      peersDataResidenceTime, blackListResidenceTime, maxConnections, connectionTimeout, outboundBufferSize,
-      minEphemeralPortNumber, maxUnverifiedPeers, peersBroadcastInterval, blackListThreshold,
-      unrequestedPacketsThreshold, uPnPSettings)
+      peersDataResidenceTime, blackListResidenceTime, maxInboundConnections, maxOutboundConnections,
+      maxConnectionsFromSingleHost, connectionTimeout, outboundBufferSize, minEphemeralPortNumber, maxUnverifiedPeers,
+      peersBroadcastInterval, blackListThreshold, unrequestedPacketsThreshold, uPnPSettings)
   }
 
   private def randomNonce: Long = {

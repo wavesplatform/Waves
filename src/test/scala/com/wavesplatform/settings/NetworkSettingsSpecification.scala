@@ -51,7 +51,7 @@ class NetworkSettingsSpecification extends FlatSpec with Matchers {
     networkSettings.localOnly should be(false)
     networkSettings.peersDataResidenceTime should be(1.day)
     networkSettings.blackListResidenceTime should be(10.minutes)
-    networkSettings.maxConnections should be(30)
+    networkSettings.maxInboundConnections should be(30)
     networkSettings.connectionTimeout should be(30.seconds)
     networkSettings.outboundBufferSize should be(1024)
     networkSettings.minEphemeralPortNumber should be(35368)

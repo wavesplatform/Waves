@@ -308,11 +308,11 @@ class PeerManagerSpecification extends ActorTestingCommons {
         handler
       }
 
-      (1 to wavesSettings.networkSettings.maxConnections).foreach { i =>
+      (1 to wavesSettings.networkSettings.maxInboundConnections).foreach { i =>
         val h = connect(i, true)
         h.expectMsgType[Handshake](15.seconds)
       }
-      (1 to wavesSettings.networkSettings.maxConnections).foreach { i =>
+      (1 to wavesSettings.networkSettings.maxInboundConnections).foreach { i =>
         val h1 = connect(100 + i, true)
         h1.expectMsg(timeout, CloseConnection)
         val h2 = connect(200 + i, false)
