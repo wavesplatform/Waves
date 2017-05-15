@@ -4,7 +4,6 @@ import cats.Monoid
 import cats.implicits._
 import scorex.account.{Account, Alias}
 import scorex.transaction.Transaction
-import scorex.transaction.assets.exchange.ExchangeTransaction
 
 case class Snapshot(prevHeight: Int, balance: Long, effectiveBalance: Long)
 
@@ -16,6 +15,16 @@ object LeaseInfo {
     override def empty: LeaseInfo = LeaseInfo.empty
 
     override def combine(x: LeaseInfo, y: LeaseInfo): LeaseInfo = LeaseInfo(safeSum(x.leaseIn, y.leaseIn), safeSum(x.leaseOut, y.leaseOut))
+  }
+}
+
+case class OrderFillInfo(volume: Long, fee: Long)
+
+object OrderFillInfo {
+  implicit val orderFillInfoMonoid = new Monoid[OrderFillInfo] {
+    override def empty: OrderFillInfo = OrderFillInfo(0, 0)
+
+    override def combine(x: OrderFillInfo, y: OrderFillInfo): OrderFillInfo =OrderFillInfo(x.volume + y.volume, x.fee + y.fee)
   }
 }
 
@@ -35,7 +44,7 @@ case class Diff(transactions: Map[ByteArray, (Int, Transaction, Set[Account])],
                 issuedAssets: Map[ByteArray, AssetInfo],
                 aliases: Map[Alias, Account],
                 paymentTransactionIdsByHashes: Map[ByteArray, ByteArray],
-                previousExchangeTxs: Map[ByteArray, Set[ExchangeTransaction]],
+                orderFills: Map[ByteArray, OrderFillInfo],
                 leaseState: Map[ByteArray, Boolean],
                 assetsWithUniqueNames: Map[ByteArray, ByteArray]) {
 
@@ -56,7 +65,7 @@ object Diff {
             portfolios: Map[Account, Portfolio] = Map.empty,
             assetInfos: Map[ByteArray, AssetInfo] = Map.empty,
             aliases: Map[Alias, Account] = Map.empty,
-            previousExchangeTxs: Map[ByteArray, Set[ExchangeTransaction]] = Map.empty,
+            orderFills: Map[ByteArray, OrderFillInfo] = Map.empty,
             paymentTransactionIdsByHashes: Map[ByteArray, ByteArray] = Map.empty,
             leaseState: Map[ByteArray, Boolean] = Map.empty,
             assetsWithUniqueNames: Map[ByteArray, ByteArray] = Map.empty
@@ -66,7 +75,7 @@ object Diff {
     issuedAssets = assetInfos,
     aliases = aliases,
     paymentTransactionIdsByHashes = paymentTransactionIdsByHashes,
-    previousExchangeTxs = previousExchangeTxs,
+    orderFills = orderFills,
     leaseState = leaseState,
     assetsWithUniqueNames = assetsWithUniqueNames)
 
@@ -85,7 +94,7 @@ object Diff {
       issuedAssets = older.issuedAssets.combine(newer.issuedAssets),
       aliases = older.aliases ++ newer.aliases,
       paymentTransactionIdsByHashes = older.paymentTransactionIdsByHashes ++ newer.paymentTransactionIdsByHashes,
-      previousExchangeTxs = older.previousExchangeTxs ++ newer.previousExchangeTxs,
+      orderFills = older.orderFills.combine(newer.orderFills),
       leaseState = older.leaseState ++ newer.leaseState,
       assetsWithUniqueNames = older.assetsWithUniqueNames ++ newer.assetsWithUniqueNames)
   }

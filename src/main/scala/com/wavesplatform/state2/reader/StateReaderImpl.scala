@@ -46,11 +46,6 @@ class StateReaderImpl(p: StateStorage) extends StateReader {
     Option(p.aliasToAddress.get(a.name))
       .map(b => Account.fromBytes(b).explicitGet())
 
-  override def findPreviousExchangeTxs(orderId: EqByteArray): Set[ExchangeTransaction] =
-    Option(p.exchangeTransactionsByOrder.get(orderId.arr))
-      .map(_.toSet).orEmpty
-      .flatMap(id => this.findTransaction[ExchangeTransaction](id))
-
   override def accountPortfolios: Map[Account, Portfolio] =
     p.portfolios.asScala.map {
       case (acc, (b, (i, o), as)) => Account.fromBytes(acc).explicitGet() -> Portfolio(b, LeaseInfo(i, o), as.map {
@@ -73,7 +68,9 @@ class StateReaderImpl(p: StateStorage) extends StateReader {
 
   override def containsTransaction(id: ByteArray): Boolean = p.transactions.containsKey(id.arr)
 
-  override def getAssetIdByUniqueName(assetName: ByteArray): Option[ByteArray] = {
+  override def getAssetIdByUniqueName(assetName: ByteArray): Option[ByteArray] =
     Option(p.uniqueAssets.get(assetName.arr)).map(EqByteArray)
-  }
+
+  override def filledVolumeAndFee(orderId: ByteArray): OrderFillInfo =
+    Option(p.orderFills.get(orderId.arr)).map(oi => OrderFillInfo(oi._1, oi._2)).orEmpty
 }
