@@ -1,6 +1,6 @@
 package scorex.network
 
-import akka.actor.ActorRef
+import akka.actor.{Actor, ActorRef}
 import com.wavesplatform.settings.UTXSettings
 import scorex.network.NetworkController.DataFromPeer
 import scorex.network.TransactionalMessagesRepo.TransactionMessageSpec
@@ -11,12 +11,9 @@ import scorex.utils.ScorexLogging
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class UnconfirmedPoolSynchronizer(private val transactionModule: NewTransactionHandler, settings: UTXSettings,
+class UnconfirmedPoolSynchronizer(transactionModule: NewTransactionHandler, settings: UTXSettings,
                                   networkController: ActorRef, utxStorage: UnconfirmedTransactionsStorage)
-  extends ViewSynchronizer with ScorexLogging {
-
-  override val messageSpecs = Seq(TransactionMessageSpec)
-  protected override lazy val networkControllerRef = networkController
+  extends Actor with ScorexLogging {
 
   private val rndBroadcastInterval = settings.broadcastInterval
 
@@ -39,13 +36,13 @@ class UnconfirmedPoolSynchronizer(private val transactionModule: NewTransactionH
   private def broadcast(tx: Transaction): Unit = {
     val spec = TransactionalMessagesRepo.TransactionMessageSpec
     val ntwMsg = Message(spec, Right(tx), None)
-    networkControllerRef ! NetworkController.SendToNetwork(ntwMsg, Broadcast)
+    networkController ! NetworkController.SendToNetwork(ntwMsg, Broadcast)
     log.debug(s"Unconfirmed tx has been broadcast to network: $tx")
   }
 
   private def broadcastExceptOf(tx: Transaction, sender: ConnectedPeer): Unit = {
     val networkMessage = Message(TransactionalMessagesRepo.TransactionMessageSpec, Right(tx), None)
-    networkControllerRef ! NetworkController.SendToNetwork(networkMessage, BroadcastExceptOf(sender))
+    networkController ! NetworkController.SendToNetwork(networkMessage, BroadcastExceptOf(sender))
     log.debug(s"Unconfirmed transaction has been broadcasted to network")
   }
 }

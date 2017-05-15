@@ -33,7 +33,6 @@ class NetworkListener(networkController: ActorRef, peerManager: ActorRef, bindAd
     case PeerManager.ExistedBlacklist(hosts) =>
       log.info("Successfully registered to blacklist updates notifications")
       blocked ++= hosts
-      networkController ! NetworkController.ReadyToListen
 
       context become working
   }
@@ -47,26 +46,6 @@ class NetworkListener(networkController: ActorRef, peerManager: ActorRef, bindAd
     case PeerManager.BlackListUpdated(host) =>
       log.info(s"Blocking host: $host")
       blocked += host
-
-    case NetworkListener.StartListen =>
-      IO(Tcp) ! Bind(self, bindAddress)
-
-    case NetworkListener.StopListen =>
-      log.debug("Unbinding the port")
-      socketActor.foreach(_ ! Unbind)
-
-    case Bound(localAddress) =>
-      socketActor = Some(sender())
-      log.debug("Successfully bound to the port " + localAddress.getPort)
-      networkController ! NetworkController.ListeningStarted
-
-    case Unbound =>
-      log.debug("Successfully unbound the port")
-      networkController ! NetworkController.ListeningStopped
-
-    case CommandFailed(_: Bind) =>
-      log.error("Network port " + bindAddress.getPort + " already in use!")
-      networkController ! NetworkController.ListeningFailed
 
     case Connected(remote, local) =>
       if (blocked.contains(remote.getAddress.getHostName)) {
