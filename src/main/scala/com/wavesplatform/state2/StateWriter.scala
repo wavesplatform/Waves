@@ -29,13 +29,13 @@ class StateWriterImpl(p: StateStorage) extends StateReaderImpl(p) with StateWrit
         }
       }
 
-      measureSizeLog("previousExchangeTxs")(blockDiff.txsDiff.previousExchangeTxs) {
-        _.foreach { case (oid, txs) =>
-          Option(p.exchangeTransactionsByOrder.get(oid.arr)) match {
+      measureSizeLog("orderFills")(blockDiff.txsDiff.orderFills) {
+        _.foreach { case (oid, orderFillInfo) =>
+          Option(p.orderFills.get(oid.arr)) match {
             case Some(ll) =>
-              p.exchangeTransactionsByOrder.put(oid.arr, ll ++ txs.map(_.id))
+              p.orderFills.put(oid.arr, (ll._1 + orderFillInfo.volume, ll._2 + orderFillInfo.fee))
             case None =>
-              p.exchangeTransactionsByOrder.put(oid.arr, txs.map(_.id))
+              p.orderFills.put(oid.arr, (orderFillInfo.volume, orderFillInfo.fee))
           }
         }
       }
@@ -118,7 +118,7 @@ class StateWriterImpl(p: StateStorage) extends StateReaderImpl(p) with StateWrit
       p.accountTransactionIds.clear()
       p.balanceSnapshots.clear()
       p.paymentTransactionHashes.clear()
-      p.exchangeTransactionsByOrder.clear()
+      p.orderFills.clear()
       p.aliasToAddress.clear()
       p.leaseState.clear()
       p.lastUpdateHeight.clear()

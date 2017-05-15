@@ -37,8 +37,6 @@ trait StateReader {
 
   def resolveAlias(a: Alias): Option[Account]
 
-  def findPreviousExchangeTxs(orderId: EqByteArray): Set[ExchangeTransaction]
-
   def isLeaseActive(leaseTx: LeaseTransaction): Boolean
 
   def getAssetIdByUniqueName(assetName: ByteArray): Option[ByteArray]
@@ -48,6 +46,8 @@ trait StateReader {
   def lastUpdateHeight(acc: Account): Option[Int]
 
   def snapshotAtHeight(acc: Account, h: Int): Option[Snapshot]
+
+  def filledVolumeAndFee(orderId: ByteArray) : OrderFillInfo
 }
 
 object StateReader {
@@ -75,9 +75,6 @@ object StateReader {
         }
       }
     }
-
-    def findPreviousExchangeTxs(order: Order): Set[ExchangeTransaction] =
-      s.findPreviousExchangeTxs(EqByteArray(order.id))
 
     def included(signature: Array[Byte]): Option[Int] = s.transactionInfo(EqByteArray(signature)).map(_._1)
 
