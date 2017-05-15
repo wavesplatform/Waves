@@ -466,7 +466,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
     }
   }
 
-  property("Double lease cancel should work befor fork activation") {
+  property("Double lease cancel should work before fork activation") {
     val state2 = StoredState.fromDB(db, leasingForkParameters)
     forAll(leaseAndCancelsBeforeForkGen) { case (lease, cancel1, cancel2, otherCancel1, otherCancel2) =>
       withRollbackTest(state2) {
@@ -619,6 +619,46 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
 
         state.rollbackTo(state.stateHeight - 1)
         state.totalAssetQuantity(tx.assetId) shouldBe tx.quantity
+      }
+    }
+  }
+
+  property("Asset transactions rollback should works correctly") {
+    forAll(issueReissueGenerator) { case (issue, _, reissue, burn) =>
+      withRollbackTest(state) {
+        val genes = GenesisTransaction.create(issue.sender, issue.fee + reissue.fee + burn.fee + Random.nextInt(1000), issue.timestamp - 1).right.get
+        state.applyChanges(state.calcNewBalances(Seq(genes), Map(), allowTemporaryNegative = true), Seq(genes))
+        val h = state.stateHeight
+
+        def checkOperations = {
+          state.isValid(Seq(issue), blockTime = issue.timestamp) shouldBe true
+          state.isValid(Seq(reissue), blockTime = reissue.timestamp) shouldBe false
+          state.isValid(Seq(burn), blockTime = burn.timestamp) shouldBe false
+          state.isValid(Seq(reissue, burn), blockTime = Seq(reissue, burn).map(_.timestamp).max) shouldBe false
+
+          state.applyChanges(state.calcNewBalances(Seq(issue), Map(), allowTemporaryNegative = true), Seq(issue))
+
+          state.isValid(Seq(issue), blockTime = issue.timestamp) shouldBe false
+          state.isValid(Seq(reissue), blockTime = reissue.timestamp) shouldBe issue.reissuable
+          state.isValid(Seq(burn), blockTime = burn.timestamp) shouldBe true
+          state.isValid(Seq(reissue, burn), blockTime = Seq(reissue, burn).map(_.timestamp).max) shouldBe issue.reissuable
+
+          if (issue.reissuable) {
+            state.applyChanges(state.calcNewBalances(Seq(reissue, burn), Map(), allowTemporaryNegative = true), Seq(reissue, burn))
+          } else {
+            state.applyChanges(state.calcNewBalances(Seq(burn), Map(), allowTemporaryNegative = true), Seq(burn))
+          }
+
+          state.isValid(Seq(issue), blockTime = issue.timestamp) shouldBe false
+          state.isValid(Seq(reissue), blockTime = reissue.timestamp) shouldBe false
+          state.isValid(Seq(burn), blockTime = burn.timestamp) shouldBe false
+          state.isValid(Seq(reissue, burn), blockTime = Seq(reissue, burn).map(_.timestamp).max) shouldBe false
+        }
+
+        for {i <- 1 to 10} {
+          checkOperations
+          state.rollbackTo(h)
+        }
       }
     }
   }
