@@ -32,13 +32,13 @@ class StateWriterImpl(p: StateStorage, synchronizationToken: ReentrantReadWriteL
         }
       }
 
-      measureSizeLog("previousExchangeTxs")(blockDiff.txsDiff.previousExchangeTxs) {
-        _.foreach { case (oid, txs) =>
-          Option(sp().exchangeTransactionsByOrder.get(oid.arr)) match {
+      measureSizeLog("orderFills")(blockDiff.txsDiff.orderFills) {
+        _.foreach { case (oid, orderFillInfo) =>
+          Option(sp().orderFills.get(oid.arr)) match {
             case Some(ll) =>
-              sp().exchangeTransactionsByOrder.put(oid.arr, ll ++ txs.map(_.id))
+              sp().orderFills.put(oid.arr, (ll._1 + orderFillInfo.volume, ll._2 + orderFillInfo.fee))
             case None =>
-              sp().exchangeTransactionsByOrder.put(oid.arr, txs.map(_.id))
+              sp().orderFills.put(oid.arr, (orderFillInfo.volume, orderFillInfo.fee))
           }
         }
       }
@@ -121,14 +121,13 @@ class StateWriterImpl(p: StateStorage, synchronizationToken: ReentrantReadWriteL
       sp().accountTransactionIds.clear()
       sp().balanceSnapshots.clear()
       sp().paymentTransactionHashes.clear()
-      sp().exchangeTransactionsByOrder.clear()
+      sp().orderFills.clear()
       sp().aliasToAddress.clear()
       sp().leaseState.clear()
       sp().lastUpdateHeight.clear()
       sp().uniqueAssets.clear()
       sp().setHeight(0)
       sp().commit()
-
     }
   }
 }

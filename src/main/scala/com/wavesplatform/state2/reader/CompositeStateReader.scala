@@ -53,10 +53,6 @@ class CompositeStateReader(inner: StateReader, blockDiff: BlockDiff) extends Sta
     txDiff.assetsWithUniqueNames.get(assetName).orElse(inner.getAssetIdByUniqueName(assetName))
   }
 
-  override def findPreviousExchangeTxs(orderId: EqByteArray): Set[ExchangeTransaction] = {
-    txDiff.previousExchangeTxs.get(orderId).orEmpty ++ inner.findPreviousExchangeTxs(orderId)
-  }
-
   override def accountPortfolios: Map[Account, Portfolio] = Monoid.combine(inner.accountPortfolios, txDiff.portfolios)
 
   override def isLeaseActive(leaseTx: LeaseTransaction): Boolean =
@@ -70,6 +66,8 @@ class CompositeStateReader(inner: StateReader, blockDiff: BlockDiff) extends Sta
 
   override def containsTransaction(id: ByteArray): Boolean = blockDiff.txsDiff.transactions.contains(id) || inner.containsTransaction(id)
 
+  override def filledVolumeAndFee(orderId: ByteArray): OrderFillInfo =
+    blockDiff.txsDiff.orderFills.get(orderId).orEmpty.combine(inner.filledVolumeAndFee(orderId))
 }
 
 object CompositeStateReader {
@@ -95,9 +93,6 @@ object CompositeStateReader {
 
     override def transactionInfo(id: ByteArray): Option[(Int, Transaction)] =
       new CompositeStateReader(inner, blockDiff()).transactionInfo(id)
-
-    override def findPreviousExchangeTxs(orderId: EqByteArray): Set[ExchangeTransaction] =
-      new CompositeStateReader(inner, blockDiff()).findPreviousExchangeTxs(orderId)
 
     override def resolveAlias(a: Alias): Option[Account] =
       new CompositeStateReader(inner, blockDiff()).resolveAlias(a)
@@ -126,6 +121,8 @@ object CompositeStateReader {
     override def containsTransaction(id: ByteArray): Boolean =
       new CompositeStateReader(inner, blockDiff()).containsTransaction(id)
 
+    override def filledVolumeAndFee(orderId: ByteArray): OrderFillInfo =
+      new CompositeStateReader(inner, blockDiff()).filledVolumeAndFee(orderId)
   }
 
 }

@@ -57,12 +57,6 @@ class StateReaderImpl(p: StateStorage, val synchronizationToken: ReentrantReadWr
       .map(b => Account.fromBytes(b).explicitGet())
   }
 
-  override def findPreviousExchangeTxs(orderId: EqByteArray): Set[ExchangeTransaction] = read { implicit l =>
-    Option(sp().exchangeTransactionsByOrder.get(orderId.arr))
-      .map(_.toSet).orEmpty
-      .flatMap(id => this.findTransaction[ExchangeTransaction](id))
-  }
-
   override def accountPortfolios: Map[Account, Portfolio] = read { implicit l =>
     sp().portfolios.asScala.map {
       case (acc, (b, (i, o), as)) => Account.fromBytes(acc).explicitGet() -> Portfolio(b, LeaseInfo(i, o), as.map {
@@ -96,5 +90,9 @@ class StateReaderImpl(p: StateStorage, val synchronizationToken: ReentrantReadWr
   }
   override def getAssetIdByUniqueName(assetName: ByteArray): Option[ByteArray] =read { implicit l =>
     Option(p.uniqueAssets.get(assetName.arr)).map(EqByteArray)
+  }
+
+  override def filledVolumeAndFee(orderId: ByteArray): OrderFillInfo =read { implicit l =>
+    Option(p.orderFills.get(orderId.arr)).map(oi => OrderFillInfo(oi._1, oi._2)).orEmpty
   }
 }

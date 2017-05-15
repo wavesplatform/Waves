@@ -42,9 +42,6 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Gene
         totalPortfolioDiff.effectiveBalance shouldBe 0
         totalPortfolioDiff.assets.values.toSet shouldBe Set(0L)
 
-        state.findPreviousExchangeTxs(exchange.buyOrder) shouldBe Set(exchange)
-        state.findPreviousExchangeTxs(exchange.sellOrder) shouldBe Set(exchange)
-
         blockDiff.txsDiff.portfolios(exchange.sender).balance shouldBe exchange.buyMatcherFee + exchange.sellMatcherFee - exchange.fee
       }
     }
