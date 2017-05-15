@@ -34,7 +34,7 @@ class ClientChannelInitializer(
     connections: ConcurrentHashMap[PeerKey, Channel])
   extends ChannelInitializer[SocketChannel] {
 
-  private val specs: Map[Byte, MessageSpec[_]] = (BasicMessagesRepo.specs ++ TransactionalMessagesRepo.specs).map(s => s.messageCode -> s).toMap
+  private val specs: Map[Byte, MessageSpec[_ <: AnyRef]] = (BasicMessagesRepo.specs ++ TransactionalMessagesRepo.specs).map(s => s.messageCode -> s).toMap
 
   override def initChannel(ch: SocketChannel): Unit = {
     ch.pipeline()
