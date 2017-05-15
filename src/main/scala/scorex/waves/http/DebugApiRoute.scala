@@ -2,24 +2,24 @@ package scorex.waves.http
 
 import javax.ws.rs.Path
 
+import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state2.reader.StateReader
 import io.swagger.annotations._
 import play.api.libs.json.{JsArray, Json}
-import scorex.account.Account
 import scorex.api.http._
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash
-import scorex.transaction.History
+import scorex.transaction.{BlockchainUpdater, History}
 import scorex.wallet.Wallet
 
 @Path("/debug")
 @Api(value = "/debug")
-case class DebugApiRoute(settings: RestAPISettings, wallet: Wallet, stateReader: StateReader, history: History) extends ApiRoute {
+case class DebugApiRoute(settings: RestAPISettings, wallet: Wallet, stateReader: StateReader, blockchainUpdater: BlockchainUpdater, history: History) extends ApiRoute {
 
   override lazy val route = pathPrefix("debug") {
-    blocks ~ state ~ info ~ stateWaves
+    blocks ~ state ~ info ~ stateWaves ~ rollback
   }
 
   @Path("/blocks/{howMany}")
@@ -66,6 +66,26 @@ case class DebugApiRoute(settings: RestAPISettings, wallet: Wallet, stateReader:
     complete(result)
   }
 
+  @Path("/rollback")
+  @ApiOperation(value = "Rollback to block", notes = "Removes all blocks after height", httpMethod = "GET")
+  @ApiResponses(Array(
+    new ApiResponse(code = 200, message = "200 if success, 404 if there are no block at this height")
+  ))
+  def rollback: Route = withAuth {
+    (path("rollback") & post) {
+      decodeRequest {
+        entity(as[String]) { rollbackTo =>
+          history.blockAt(rollbackTo.toInt) match {
+            case Some(block) =>
+              blockchainUpdater.removeAfter(block.uniqueId)
+              complete(StatusCodes.OK)
+            case None =>
+              complete(StatusCodes.NotFound)
+          }
+        }
+      }
+    }
+  }
 
   @Path("/info")
   @ApiOperation(value = "State", notes = "All info you need to debug", httpMethod = "GET")
