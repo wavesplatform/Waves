@@ -13,7 +13,7 @@ import scala.util.Right
 object ExchangeTransactionDiff {
 
   def apply(s: StateReader, height: Int)(tx: ExchangeTransaction): Either[StateValidationError, Diff] = for {
-    t <- isValidAgainstPreviousTxs(tx, s.findPreviousExchangeTxs(tx.sellOrder) ++ s.findPreviousExchangeTxs(tx.buyOrder))
+    t <- enoughVolume(tx, s)
     buyPriceAssetChange <- t.buyOrder.getSpendAmount(t.price, t.amount).liftValidationError(tx).map(-_)
     buyAmountAssetChange <- t.buyOrder.getReceiveAmount(t.price, t.amount).liftValidationError(tx)
     sellPriceAssetChange <- t.sellOrder.getReceiveAmount(t.price, t.amount).liftValidationError(tx)
@@ -54,42 +54,41 @@ object ExchangeTransactionDiff {
       EqByteArray(tx.buyOrder.id) -> Set(tx),
       EqByteArray(tx.sellOrder.id) -> Set(tx))
 
-    Diff(height, tx, portfolios = portfolios, previousExchangeTxs = orderExchangeTxsMap)
+    Diff(height, tx, portfolios = portfolios, orderFills = Map(
+      EqByteArray(tx.buyOrder.id) -> OrderFillInfo(tx.amount, tx.buyMatcherFee),
+      EqByteArray(tx.sellOrder.id) -> OrderFillInfo(tx.amount, tx.sellMatcherFee)
+    ))
   }
 
 
-  private def isValidAgainstPreviousTxs(exTrans: ExchangeTransaction,
-                                        previousMatches: Set[ExchangeTransaction]): Either[StateValidationError, ExchangeTransaction] = {
+  private def enoughVolume(exTrans: ExchangeTransaction, s: StateReader): Either[StateValidationError, ExchangeTransaction] = {
+    val filledBuy = s.filledVolumeAndFee(EqByteArray(exTrans.buyOrder.id))
+    val filledSell = s.filledVolumeAndFee(EqByteArray(exTrans.sellOrder.id))
 
-    lazy val buyTransactions = previousMatches.filter { om =>
-      om.buyOrder.id sameElements exTrans.buyOrder.id
-    }
-    lazy val sellTransactions = previousMatches.filter { om =>
-      om.sellOrder.id sameElements exTrans.sellOrder.id
-    }
+    val buyTotal = filledBuy.volume + exTrans.amount
+    val sellTotal = filledSell.volume + exTrans.amount
+    lazy val buyAmountValid = exTrans.buyOrder.amount >= buyTotal
+    lazy val sellAmountValid = exTrans.sellOrder.amount >= sellTotal
 
-    lazy val buyTotal = buyTransactions.foldLeft(0L)(_ + _.amount) + exTrans.amount
-    lazy val sellTotal = sellTransactions.foldLeft(0L)(_ + _.amount) + exTrans.amount
+    def isFeeValid(fee: Long, feeTotal: Long, amountTotal: Long, maxfee: Long, maxAmount: Long): Boolean =
+      fee > 0 && feeTotal <= BigInt(maxfee) * BigInt(amountTotal) / BigInt(maxAmount)
 
-    lazy val buyFeeTotal = buyTransactions.map(_.buyMatcherFee).sum + exTrans.buyMatcherFee
-    lazy val sellFeeTotal = sellTransactions.map(_.sellMatcherFee).sum + exTrans.sellMatcherFee
+    lazy val buyFeeValid = isFeeValid(fee = exTrans.buyMatcherFee,
+      feeTotal = filledBuy.fee + exTrans.buyMatcherFee,
+      amountTotal = buyTotal,
+      maxfee = exTrans.buyOrder.matcherFee,
+      maxAmount = exTrans.buyOrder.amount)
 
-    lazy val amountIsValid: Boolean = {
-      val b = buyTotal <= exTrans.buyOrder.amount
-      val s = sellTotal <= exTrans.sellOrder.amount
-      b && s
-    }
+    lazy val sellFeeValid = isFeeValid(fee = exTrans.sellMatcherFee,
+      feeTotal = filledSell.fee + exTrans.sellMatcherFee,
+      amountTotal = sellTotal,
+      maxfee = exTrans.sellOrder.matcherFee,
+      maxAmount = exTrans.sellOrder.amount)
 
-    def isFeeValid(fee: Long, feeTotal: Long, amountTotal: Long, maxfee: Long, maxAmount: Long): Boolean = {
-      fee > 0 &&
-        feeTotal <= BigInt(maxfee) * BigInt(amountTotal) / BigInt(maxAmount)
-    }
-
-    if (!amountIsValid) {
-      Left(TransactionValidationError(exTrans, "Insufficient amount to buy or sell"))
-    } else if (!isFeeValid(exTrans.buyMatcherFee, buyFeeTotal, buyTotal, exTrans.buyOrder.matcherFee, exTrans.buyOrder.amount) ||
-      !isFeeValid(exTrans.sellMatcherFee, sellFeeTotal, sellTotal, exTrans.sellOrder.matcherFee, exTrans.sellOrder.amount)) {
-      Left(TransactionValidationError(exTrans, "Insufficient fee"))
-    } else Right(exTrans)
+    if (!buyAmountValid) Left(TransactionValidationError(exTrans, s"Too much buy. Already filled volume for the order: ${filledBuy.volume}"))
+    else if (!sellAmountValid) Left(TransactionValidationError(exTrans, s"Too much sell. Already filled volume for the order: ${filledSell.volume}"))
+    else if (!buyFeeValid) Left(TransactionValidationError(exTrans, s"Insufficient buy fee"))
+    else if (!sellFeeValid) Left(TransactionValidationError(exTrans, s"Insufficient sell fee"))
+    else Right(exTrans)
   }
 }

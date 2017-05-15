@@ -33,7 +33,7 @@ class StateStorage(db: MVStore) {
 
   val aliasToAddress: util.Map[String, Array[Byte]] = db.openMap("aliasToAddress")
 
-  val exchangeTransactionsByOrder: util.Map[Array[Byte], Set[Array[Byte]]] = db.openMap("exchangeTransactionsByOrder")
+  val orderFills: util.Map[Array[Byte], (Long,Long)] = db.openMap("orderFills")
 
   val leaseState: util.Map[Array[Byte], Boolean] = db.openMap("leaseState")
 
