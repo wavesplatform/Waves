@@ -58,7 +58,7 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
   val (history1, _, stateReader1, blockchainUpdater1) = BlockStorageImpl(wavesSettings.blockchainSettings).get
   val utxStorage1 = new UnconfirmedTransactionsDatabaseImpl(wavesSettings.utxSettings.size)
 
-  class ValidBlockCoordinator extends Coordinator(networkControllerMock, testBlockchainSynchronizer.ref,
+  class ValidBlockCoordinator extends Coordinator(???, testBlockchainSynchronizer.ref,
     testBlockGenerator.ref, testPeerManager.ref, testScoreObserver.ref, blockchainUpdater1, NTP, utxStorage1, history1, stateReader1, checkpoints1, wavesSettings) {
     override def isBlockValid(b: Block): Either[ValidationError, Unit] = Right(())
   }

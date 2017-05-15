@@ -2,7 +2,7 @@ package scorex.network
 
 import java.net.InetSocketAddress
 
-import akka.actor.{ActorRef, Scheduler}
+import akka.actor.{Actor, ActorRef, Scheduler}
 import akka.pattern.ask
 import akka.util.Timeout
 import com.wavesplatform.network.GetPeers
@@ -20,10 +20,9 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 
 
-class PeerSynchronizer(protected override val networkControllerRef: ActorRef, peerManager: ActorRef,
-                       networkSettings: NetworkSettings) extends ViewSynchronizer with ScorexLogging {
+class PeerSynchronizer(networkControllerRef: ActorRef, peerManager: ActorRef,
+                       networkSettings: NetworkSettings) extends Actor with ScorexLogging {
 
-  override val messageSpecs = Seq(GetPeersSpec, PeersSpec)
   private implicit val timeout = Timeout(5.seconds)
   private val maxPeersToBroadcast = 3
   private val peersDataBroadcastDelay = networkSettings.peersBroadcastInterval
