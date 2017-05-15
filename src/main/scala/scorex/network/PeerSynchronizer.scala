@@ -5,6 +5,7 @@ import java.net.InetSocketAddress
 import akka.actor.{ActorRef, Scheduler}
 import akka.pattern.ask
 import akka.util.Timeout
+import com.wavesplatform.network.GetPeers
 import com.wavesplatform.settings.NetworkSettings
 import scorex.network.NetworkController.{DataFromPeer, SendToNetwork}
 import scorex.network.PeerSynchronizer.RequestDataFromPeer
@@ -26,7 +27,7 @@ class PeerSynchronizer(protected override val networkControllerRef: ActorRef, pe
   private implicit val timeout = Timeout(5.seconds)
   private val maxPeersToBroadcast = 3
   private val peersDataBroadcastDelay = networkSettings.peersBroadcastInterval
-  private val stn = NetworkController.SendToNetwork(Message(GetPeersSpec, Right(()), None), SendToRandom)
+  private val stn = NetworkController.SendToNetwork(Message(GetPeersSpec, Right(GetPeers), None), SendToRandom)
   private var hasRequested = false
   private var unrequestedPacketsCount = 0
 

@@ -302,8 +302,6 @@ class PeerManager(
 }
 
 object PeerManager {
-  def props(networkSettings: NetworkSettings, networkController: ActorRef, addressSchemeCharacter: Char) =
-    Props(new PeerManager(networkSettings, networkController, Constants.ApplicationName + addressSchemeCharacter))
 
   case class AddPeer(address: InetSocketAddress)
 
