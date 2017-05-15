@@ -246,23 +246,31 @@ class Coordinator(application: Application) extends ViewSynchronizer with Scorex
     }
 
   def isBlockValid(b: Block) : Boolean = {
-    if (application.transactionModule.blockStorage.history.contains(b)) true //applied blocks are valid
-    else {
-      def history = application.transactionModule.blockStorage.history.contains(b.referenceField.value)
+    if (application.transactionModule.blockStorage.history.contains(b)) {
+      true //applied blocks are valid
+    } else {
+      def parentInStateValidation = application.transactionModule.blockStorage.history.contains(b.referenceField.value)
 
-      def signature = EllipticCurveImpl.verify(b.signerDataField.value.signature, b.bytesWithoutSignature,
+      def blockSignatureValidation = EllipticCurveImpl.verify(b.signerDataField.value.signature, b.bytesWithoutSignature,
         b.signerDataField.value.generator.publicKey)
 
-      def consensus = application.consensusModule.isValid(b)
+      def consensusModuleValidation = application.consensusModule.isValid(b)
 
-      def transaction = application.transactionModule.isValid(b)
+      def transactionModuleValidation = application.transactionModule.isValid(b)
 
-      if (!history) log.debug(s"Invalid block ${b.encodedId}: no parent block in history")
-      else if (!signature) log.debug(s"Invalid block ${b.encodedId}: signature is not valid")
-      else if (!consensus) log.debug(s"Invalid block ${b.encodedId}: consensus data is not valid")
-      else if (!transaction) log.debug(s"Invalid block ${b.encodedId}: transaction data is not valid")
-
-      history && signature && consensus && transaction
+      if (!parentInStateValidation) {
+        log.debug(s"Invalid block ${b.encodedId}: no parent block in history")
+        false
+      } else if (!blockSignatureValidation) {
+        log.debug(s"Invalid block ${b.encodedId}: signature is not valid")
+        false
+      } else if (!consensusModuleValidation) {
+        log.debug(s"Invalid block ${b.encodedId}: consensus data is not valid")
+        false
+      } else if (!transactionModuleValidation) {
+        log.debug(s"Invalid block ${b.encodedId}: transaction data is not valid")
+        false
+      } else true
     }
   }
 
