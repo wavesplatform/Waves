@@ -1,11 +1,12 @@
 package scorex.network
 
-import akka.actor.ActorRef
+import akka.actor.{Actor, ActorRef}
 import akka.event.LoggingReceive
 import akka.pattern.{ask, pipe}
 import akka.util.Timeout
 import cats._
 import cats.implicits._
+import com.wavesplatform.network.Network
 import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
 import com.wavesplatform.state2.ByteStr
 import com.wavesplatform.state2.reader.StateReader
@@ -16,9 +17,9 @@ import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.crypto.encode.Base58.encode
 import scorex.network.BlockchainSynchronizer.{GetExtension, GetSyncStatus, Status}
-import scorex.network.NetworkController.{DataFromPeer, SendToNetwork}
+import scorex.network.NetworkController.DataFromPeer
 import scorex.network.ScoreObserver.{CurrentScore, GetScore}
-import scorex.network.message.{Message, MessageSpec, _}
+import scorex.network.message._
 import scorex.network.peer.PeerManager.{ConnectedPeers, GetConnectedPeersTyped}
 import scorex.transaction.History.BlockchainScore
 import scorex.transaction.ValidationError.CustomError
@@ -30,16 +31,12 @@ import scala.concurrent.duration._
 import scala.language.{higherKinds, postfixOps}
 import scala.util.control.NonFatal
 
-class Coordinator(protected override val networkControllerRef: ActorRef, blockchainSynchronizer: ActorRef, blockGenerator: ActorRef,
+class Coordinator(network: Network, blockchainSynchronizer: ActorRef, blockGenerator: ActorRef,
                   peerManager: ActorRef, scoreObserver: ActorRef, blockchainUpdater: BlockchainUpdater, time: Time,
                   utxStorage: UnconfirmedTransactionsStorage,
-                  history: History, stateReader: StateReader, checkpoints: CheckpointService, settings: WavesSettings) extends ViewSynchronizer with ScorexLogging {
+                  history: History, stateReader: StateReader, checkpoints: CheckpointService, settings: WavesSettings) extends Actor with ScorexLogging {
 
   import Coordinator._
-
-  override val messageSpecs = Seq[MessageSpec[_]](CheckpointMessageSpec)
-
-  context.system.scheduler.schedule(1.second, settings.synchronizationSettings.scoreBroadcastInterval, self, BroadcastCurrentScore)
 
   blockGenerator ! StartGeneration
 
@@ -101,8 +98,7 @@ class Coordinator(protected override val networkControllerRef: ActorRef, blockch
       case AddBlock(block, from) => processSingleBlock(block, from)
 
       case BroadcastCurrentScore =>
-        val msg = Message(ScoreMessageSpec, Right(history.score()), None)
-        networkControllerRef ! NetworkController.SendToNetwork(msg, Broadcast)
+        network.broadcast(history.score())
 
       case DataFromPeer(msgId, checkpoint: Checkpoint@unchecked, remote) if msgId == CheckpointMessageSpec.messageCode =>
         handleCheckpoint(checkpoint, Some(remote))
@@ -124,8 +120,7 @@ class Coordinator(protected override val networkControllerRef: ActorRef, blockch
         publicKey =>
           if (EllipticCurveImpl.verify(checkpoint.signature, checkpoint.toSign, publicKey)) {
             checkpoints.set(Some(checkpoint))
-            networkControllerRef ! SendToNetwork(Message(CheckpointMessageSpec, Right(checkpoint), None),
-              from.map(BroadcastExceptOf).getOrElse(Broadcast))
+            network.broadcast(checkpoint, from.map(_ => ???)) // todo: don't broadcast to sender
             makeBlockchainCompliantWith(checkpoint)
           } else {
             from.foreach(_.blacklist())
@@ -197,7 +192,7 @@ class Coordinator(protected override val networkControllerRef: ActorRef, blockch
         case Right(_) =>
           blockGenerator ! LastBlockChanged
           if (local) {
-            networkControllerRef ! SendToNetwork(Message(BlockMessageSpec, Right(newBlock), None), Broadcast)
+            network.broadcast(newBlock)
           } else {
             self ! BroadcastCurrentScore
           }

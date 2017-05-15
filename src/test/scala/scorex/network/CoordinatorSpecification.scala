@@ -24,7 +24,7 @@ class CoordinatorSpecification extends ActorTestingCommons {
 
   val testHistory = stub[History]
 
-  override protected val actorRef = system.actorOf(Props(new Coordinator(networkControllerMock,
+  override protected val actorRef = system.actorOf(Props(new Coordinator(???,
     testBlockchainSynchronizer.ref,
     testblockGenerator.ref,
     testPeerManager.ref,

@@ -7,7 +7,6 @@ import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
 import akka.http.scaladsl.server.Route
-import akka.pattern.ask
 import akka.stream.ActorMaterializer
 import akka.util.Timeout
 import com.typesafe.config.{Config, ConfigFactory}
@@ -15,8 +14,11 @@ import com.wavesplatform.actor.RootActorSystem
 import com.wavesplatform.history.{BlockStorageImpl, CheckpointServiceImpl}
 import com.wavesplatform.http.NodeApiRoute
 import com.wavesplatform.matcher.Matcher
-import com.wavesplatform.network.Network
+import com.wavesplatform.network.{Network, NetworkServer}
 import com.wavesplatform.settings._
+import io.netty.channel.Channel
+import io.netty.channel.group.{ChannelMatchers, DefaultChannelGroup}
+import io.netty.util.concurrent.GlobalEventExecutor
 import scorex.account.{Account, AddressScheme}
 import scorex.api.http._
 import scorex.api.http.alias.{AliasApiRoute, AliasBroadcastApiRoute}
@@ -29,7 +31,6 @@ import scorex.consensus.nxt.api.http.NxtConsensusApiRoute
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash.DigestSize
 import scorex.network._
-import scorex.network.peer.PeerManager
 import scorex.transaction._
 import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
 import scorex.utils.{ScorexLogging, Time, TimeImpl}
@@ -39,7 +40,7 @@ import scorex.waves.http.{DebugApiRoute, WavesApiRoute}
 import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.reflect.runtime.universe._
-import scala.util.{Failure, Left, Success, Try}
+import scala.util.{Failure, Left, Success, Try, Random}
 
 class Application(val actorSystem: ActorSystem, val settings: WavesSettings) extends ScorexLogging {
 
@@ -101,13 +102,27 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
     typeOf[AliasBroadcastApiRoute]
   )
 
+  val allChannels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
+
+  val net: Network = new Network {
+    override def broadcast(message: AnyRef, except: Option[Channel]) = {
+      allChannels.writeAndFlush(message, except.fold(ChannelMatchers.all())(ChannelMatchers.isNot))
+    }
+
+    override def sendToRandom(message: AnyRef) = if (allChannels.size() > 0) {
+      val channels = allChannels.toArray(Array.empty[Channel])
+      val id = Random.nextInt(channels.length)
+      allChannels.writeAndFlush(message, ChannelMatchers.is(channels(id)))
+    }
+  }
+
   lazy val networkController = actorSystem.deadLetters
   lazy val peerManager: ActorRef = actorSystem.deadLetters
   lazy val unconfirmedPoolSynchronizer: ActorRef = actorSystem.actorOf(Props(new UnconfirmedPoolSynchronizer(newTransactionHandler, settings.utxSettings, networkController, utxStorage)))
-  lazy val coordinator: ActorRef = actorSystem.actorOf(Props(new Coordinator(networkController, blockchainSynchronizer, blockGenerator, peerManager, actorSystem.deadLetters, blockchainUpdater, time, utxStorage, history, stateReader, checkpoints, settings)), "Coordinator")
+  lazy val coordinator: ActorRef = actorSystem.actorOf(Props(new Coordinator(net, blockchainSynchronizer, blockGenerator, peerManager, actorSystem.deadLetters, blockchainUpdater, time, utxStorage, history, stateReader, checkpoints, settings)), "Coordinator")
   lazy val blockGenerator: ActorRef = actorSystem.actorOf(Props(new BlockGeneratorController(settings.minerSettings, history, time, peerManager,
-    wallet, stateReader, settings.blockchainSettings, utxStorage, coordinator)), "BlockGenerator")
-  lazy val blockchainSynchronizer: ActorRef = actorSystem.actorOf(Props(new BlockchainSynchronizer(networkController, coordinator, history, settings.synchronizationSettings)), "BlockchainSynchronizer")
+         wallet, stateReader, settings.blockchainSettings, utxStorage, coordinator)), "BlockGenerator")
+  lazy val blockchainSynchronizer: ActorRef = actorSystem.actorOf(Props(new BlockchainSynchronizer(coordinator, history, settings.synchronizationSettings)), "BlockchainSynchronizer")
   lazy val peerSynchronizer: ActorRef = actorSystem.actorOf(Props(new PeerSynchronizer(networkController, peerManager, settings.networkSettings)), "PeerSynchronizer")
 
   def run(): Unit = {
@@ -116,10 +131,9 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
 
     checkGenesis()
 
-    val network = new Network(settings.blockchainSettings.addressSchemeCharacter, settings)
+    val network = new NetworkServer(settings.blockchainSettings.addressSchemeCharacter, settings, history, allChannels)
 
     if (settings.networkSettings.uPnPSettings.enable) upnp.addPort(settings.networkSettings.port)
-
 
     implicit val as = actorSystem
     implicit val materializer = ActorMaterializer()
@@ -177,8 +191,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
       if (settings.networkSettings.uPnPSettings.enable) upnp.deletePort(settings.networkSettings.port)
 
       implicit val askTimeout = Timeout(60.seconds)
-      Try(Await.result(networkController ? NetworkController.ShutdownNetwork, 60.seconds))
-        .failed.map(e => log.error("Failed to shutdown network: " + e.getMessage))
       Try(Await.result(actorSystem.terminate(), 60.seconds))
         .failed.map(e => log.error("Failed to terminate actor system: " + e.getMessage))
       log.debug("Closing storage")
