@@ -7,7 +7,7 @@ import scorex.serialization.BytesSerializable
 
 import scala.util.{Success, Try}
 
-case class Message[Content](spec: MessageSpec[Content],
+case class Message[Content <: AnyRef](spec: MessageSpec[Content],
                             input: Either[Array[Byte], Content],
                             source: Option[ConnectedPeer]) extends BytesSerializable {
 

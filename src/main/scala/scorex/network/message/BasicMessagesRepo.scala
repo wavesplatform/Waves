@@ -4,7 +4,7 @@ import java.net.{InetAddress, InetSocketAddress}
 import java.util
 
 import com.google.common.primitives.{Bytes, Ints}
-import com.wavesplatform.network.{GetBlock, GetSignatures, Signatures}
+import com.wavesplatform.network.{GetBlock, GetSignatures, Signatures, GetPeers}
 import com.wavesplatform.state2.ByteStr
 import scorex.block.Block
 import scorex.crypto.signatures.SigningFunctions
@@ -17,15 +17,18 @@ import scorex.transaction.TransactionParser._
 import scala.util.Try
 
 
-object GetPeersSpec extends MessageSpec[Unit] {
+object GetPeersSpec extends MessageSpec[GetPeers.type] {
   override val messageCode: Message.MessageCode = 1: Byte
 
   override val messageName: String = "GetPeers message"
 
-  override def deserializeData(bytes: Array[Byte]): Try[Unit] =
-    Try(require(bytes.isEmpty, "Non-empty data for GetPeers"))
+  override def deserializeData(bytes: Array[Byte]): Try[GetPeers.type] =
+    Try {
+      require(bytes.isEmpty, "Non-empty data for GetPeers")
+      GetPeers
+    }
 
-  override def serializeData(data: Unit): Array[Byte] = Array()
+  override def serializeData(data: GetPeers.type): Array[Byte] = Array()
 }
 
 object PeersSpec extends MessageSpec[Seq[InetSocketAddress]] {
@@ -62,7 +65,7 @@ object PeersSpec extends MessageSpec[Seq[InetSocketAddress]] {
   }
 }
 
-trait SignaturesSeqSpec[A] extends MessageSpec[A] {
+trait SignaturesSeqSpec[A <: AnyRef] extends MessageSpec[A] {
 
   import scorex.transaction.TransactionParser.SignatureLength
 
@@ -180,6 +183,6 @@ object CheckpointMessageSpec extends MessageSpec[Checkpoint] {
 
 
 object BasicMessagesRepo {
-  val specs = Seq(GetPeersSpec, PeersSpec, GetSignaturesSpec, SignaturesSpec,
+  val specs: Seq[MessageSpec[_ <: AnyRef]] = Seq(GetPeersSpec, PeersSpec, GetSignaturesSpec, SignaturesSpec,
     GetBlockSpec, BlockMessageSpec, ScoreMessageSpec, CheckpointMessageSpec)
 }
