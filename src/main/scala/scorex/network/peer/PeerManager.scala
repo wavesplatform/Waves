@@ -59,12 +59,14 @@ class PeerManager(
   override def receive: Receive = LoggingReceive(({
     case CheckPeers =>
       if (register.outboundHandshakedConnectionsCount < settings.maxOutboundConnections) {
-        peerDatabase.getRandomPeer(register.handshakedAddresses).foreach { address =>
+        val maybeRandomPeerAddress = peerDatabase.getRandomPeer(register.handshakedAddresses.toSet)
+        if (maybeRandomPeerAddress.isDefined) {
+          val address = maybeRandomPeerAddress.get
           log.debug(s"Trying connect to random peer $address")
           register.initiateOutboundConnection(address)
           networkController ! NetworkController.ConnectTo(address)
-        }
-      }
+        } else log.debug("Unable to get random peer")
+      } else log.info(s"Outbound connections limit (${settings.maxOutboundConnections}) exceeded")
 
     case MarkConnectedPeersVisited => register.handshakedAddresses.foreach(peerDatabase.touch)
 
@@ -120,7 +122,9 @@ class PeerManager(
     case AddPeer(address) =>
       peerDatabase.addPeer(address, None, None)
 
-    case GetConnectedPeers => sender() ! register.handshakedPeers
+    case GetConnectedPeers =>
+      log.debug(s"Reporting connected peers: ${register.logConnections}")
+      sender() ! register.handshakedPeers
 
     case GetConnectedPeersTyped =>
       val peers = register.handshakedPeers.map {
@@ -132,7 +136,7 @@ class PeerManager(
 
     case GetRandomPeersToBroadcast(howMany) =>
       val dbPeers = peerDatabase.getKnownPeers.keySet
-      val intersection = dbPeers.intersect(register.handshakedAddresses)
+      val intersection = dbPeers.intersect(register.handshakedAddresses.toSet)
       sender() ! Random.shuffle(intersection.toSeq).take(howMany)
 
     case GetAllPeers => sender() ! peerDatabase.getKnownPeers
@@ -214,38 +218,26 @@ class PeerManager(
         sender() ! CloseConnection
 
       case ConnectedPeer =>
-        if (applicationName != handshake.applicationName) {
-          log.debug(s"Different application name: ${handshake.applicationName} from $remote")
-          self ! AddToBlacklist(remote)
-        } else if (!handshake.applicationVersion.compatibleWith(appVersion)) {
-          log.debug(s"Incompatible application version '${handshake.applicationVersion}' on node $remote")
+        if (!isHandshakeAcceptable(handshake)) {
+          log.warn(s"Unacceptable handshake (${handshake.applicationName}|${handshake.applicationVersion}) from '$remote': Move to blacklist")
           self ! AddToBlacklist(remote)
         } else if (settings.nonce == handshake.nodeNonce) {
           log.info("Drop connection to self")
-          val handler = register.getHandshakedHandler(remote)
           peerDatabase.removePeer(remote)
-          handler ! CloseConnection
+          register.getConnectedHandler(remote).foreach(_ ! CloseConnection)
         } else if (register.isNonceRegisteredForHost(remote.getAddress, handshake.nodeNonce)) {
           log.info(s"Duplicate connection from '$remote' with nonce '${handshake.nodeNonce}': Close connection")
-          val handler = register.getHandshakedHandler(remote)
-          handler ! CloseConnection
+          register.getConnectedHandler(remote).foreach(_ ! CloseConnection)
         } else {
-          val maybeDeclaredAddress = handshake.declaredAddress
-          if (register.isInbound(remote)) {
-            log.debug(s"Got handshake on inbound connection from '$remote' with declared address '${maybeDeclaredAddress.getOrElse("N/A")}'")
-            if (maybeDeclaredAddress.isDefined)
-              peerDatabase.addPeer(maybeDeclaredAddress.get, Some(handshake.nodeNonce), Some(handshake.nodeName))
-          } else {
-            log.debug(s"Got handshake on outbound connection to '$remote' with declared address '${maybeDeclaredAddress.getOrElse("N/A")}'")
-            peerDatabase.addPeer(remote, Some(handshake.nodeNonce), Some(handshake.nodeName))
+          register.isConnectionInbound(remote).foreach { inbound =>
+            val direction = if (inbound) "inbound" else "outbound"
+            val maybeRemoteAddress = if (inbound) handshake.declaredAddress else Some(remote)
+            log.debug(s"Got handshake on $direction with '$remote' with declared address '${handshake.declaredAddress.getOrElse("N/A")}'")
+            maybeRemoteAddress.foreach(peerDatabase.addPeer(_, Some(handshake.nodeNonce), Some(handshake.nodeName)))
+            register.registerHandshake(remote, handshake)
           }
-
-          register.registerHandshake(remote, handshake)
         }
     }
-
-  private def isHandshakeAcceptable(handshake: Handshake): Boolean =
-    applicationName == handshake.applicationName && handshake.applicationVersion.compatibleWith(appVersion)
 
   private def blacklistOperations: Receive = {
     case RegisterBlacklistListener(listener) =>
@@ -280,6 +272,9 @@ class PeerManager(
       listener ! BlackListUpdated(address.getHostName)
     }
   }
+
+  private def isHandshakeAcceptable(handshake: Handshake): Boolean =
+    applicationName == handshake.applicationName && handshake.applicationVersion.compatibleWith(appVersion)
 
 }
 
