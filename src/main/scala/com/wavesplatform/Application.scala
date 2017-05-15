@@ -104,9 +104,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
   lazy val networkController = actorSystem.deadLetters
   lazy val peerManager: ActorRef = actorSystem.actorOf(PeerManager.props(settings.networkSettings, networkController, settings.blockchainSettings.addressSchemeCharacter), "PeerManager")
   lazy val unconfirmedPoolSynchronizer: ActorRef = actorSystem.actorOf(Props(new UnconfirmedPoolSynchronizer(newTransactionHandler, settings.utxSettings, networkController, utxStorage)))
-  lazy val coordinator: ActorRef = actorSystem.actorOf(Props(new Coordinator(networkController, blockchainSynchronizer, blockGenerator, peerManager, scoreObserver, blockchainUpdater, time, utxStorage, history, stateReader, checkpoints, settings)), "Coordinator")
-  lazy val scoreObserver: ActorRef = actorSystem.actorOf(Props(new ScoreObserver(networkController, coordinator, settings.synchronizationSettings)), "ScoreObserver")
-  lazy val historyReplier: ActorRef = actorSystem.actorOf(Props(new HistoryReplier(networkController, history: History, settings.synchronizationSettings.maxChainLength: Int)), "HistoryReplier")
+  lazy val coordinator: ActorRef = actorSystem.actorOf(Props(new Coordinator(networkController, blockchainSynchronizer, blockGenerator, peerManager, actorSystem.deadLetters, blockchainUpdater, time, utxStorage, history, stateReader, checkpoints, settings)), "Coordinator")
   lazy val blockGenerator: ActorRef = actorSystem.actorOf(Props(new BlockGeneratorController(settings.minerSettings, history, time, peerManager,
     wallet, stateReader, settings.blockchainSettings, utxStorage, coordinator)), "BlockGenerator")
   lazy val blockchainSynchronizer: ActorRef = actorSystem.actorOf(Props(new BlockchainSynchronizer(networkController, coordinator, history, settings.synchronizationSettings)), "BlockchainSynchronizer")
@@ -118,9 +116,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
 
     checkGenesis()
 
-    new Network(
-      settings.blockchainSettings.addressSchemeCharacter,
-      settings.networkSettings).bind()
+    val network = new Network(settings.blockchainSettings.addressSchemeCharacter, settings)
 
     if (settings.networkSettings.uPnPSettings.enable) upnp.addPort(settings.networkSettings.port)
 
@@ -135,12 +131,13 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
       log.info(s"REST API was bound on ${settings.restAPISettings.bindAddress}:${settings.restAPISettings.port}")
     }
 
-    Seq(scoreObserver, blockGenerator, blockchainSynchronizer, historyReplier, coordinator, unconfirmedPoolSynchronizer, peerSynchronizer) foreach {
+    Seq(blockGenerator, blockchainSynchronizer, coordinator, unconfirmedPoolSynchronizer, peerSynchronizer) foreach {
       _ => // de-lazyning process :-)
     }
 
     //on unexpected shutdown
     sys.addShutdownHook {
+      network.shutdown()
       shutdown()
     }
 

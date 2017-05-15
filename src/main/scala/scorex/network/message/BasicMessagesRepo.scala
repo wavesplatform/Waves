@@ -4,6 +4,7 @@ import java.net.{InetAddress, InetSocketAddress}
 import java.util
 
 import com.google.common.primitives.{Bytes, Ints}
+import com.wavesplatform.network.{GetBlock, GetSignatures, Signatures}
 import com.wavesplatform.state2.ByteStr
 import scorex.block.Block
 import scorex.crypto.signatures.SigningFunctions
@@ -61,25 +62,29 @@ object PeersSpec extends MessageSpec[Seq[InetSocketAddress]] {
   }
 }
 
-trait SignaturesSeqSpec extends MessageSpec[Seq[SigningFunctions.Signature]] {
+trait SignaturesSeqSpec[A] extends MessageSpec[A] {
 
   import scorex.transaction.TransactionParser.SignatureLength
 
   private val DataLength = 4
 
-  override def deserializeData(bytes: Array[Byte]): Try[Seq[Signature]] = Try {
+  def wrap(signatures: Seq[SigningFunctions.Signature]): A
+  def unwrap(v: A): Seq[SigningFunctions.Signature]
+
+  override def deserializeData(bytes: Array[Byte]): Try[A] = Try {
     val lengthBytes = bytes.take(DataLength)
     val length = Ints.fromByteArray(lengthBytes)
 
     assert(bytes.length == DataLength + (length * SignatureLength), "Data does not match length")
 
-    (0 until length).map { i =>
+    wrap((0 until length).map { i =>
       val position = DataLength + (i * SignatureLength)
       bytes.slice(position, position + SignatureLength)
-    }
+    })
   }
 
-  override def serializeData(signatures: Seq[Signature]): Array[Byte] = {
+  override def serializeData(v: A): Array[Byte] = {
+    val signatures = unwrap(v)
     val length = signatures.size
     val lengthBytes = Ints.toByteArray(length)
 
@@ -88,25 +93,31 @@ trait SignaturesSeqSpec extends MessageSpec[Seq[SigningFunctions.Signature]] {
   }
 }
 
-object GetSignaturesSpec extends SignaturesSeqSpec {
+object GetSignaturesSpec extends SignaturesSeqSpec[GetSignatures] {
+  override def wrap(signatures: Seq[Signature]) = GetSignatures(signatures)
+  override def unwrap(v: GetSignatures) = v.signatures
+
   override val messageCode: MessageCode = 20: Byte
   override val messageName: String = "GetSignatures message"
 }
 
-object SignaturesSpec extends SignaturesSeqSpec {
+object SignaturesSpec extends SignaturesSeqSpec[Signatures] {
+  override def wrap(signatures: Seq[Signature]) = Signatures(signatures)
+  override def unwrap(v: Signatures) = v.signatures
+
   override val messageCode: MessageCode = 21: Byte
   override val messageName: String = "Signatures message"
 }
 
-object GetBlockSpec extends MessageSpec[Array[Byte]] {
+object GetBlockSpec extends MessageSpec[GetBlock] {
   override val messageCode: MessageCode = 22: Byte
   override val messageName: String = "GetBlock message"
 
-  override def serializeData(signature: Array[Byte]): Array[Byte] = signature
+  override def serializeData(signature: GetBlock): Array[Byte] = signature.signature
 
-  override def deserializeData(bytes: Array[Byte]): Try[Array[Byte]] = Try {
+  override def deserializeData(bytes: Array[Byte]): Try[GetBlock] = Try {
     require(bytes.length == scorex.transaction.TransactionParser.SignatureLength, "Data does not match length")
-    bytes
+    GetBlock(bytes)
   }
 }
 
