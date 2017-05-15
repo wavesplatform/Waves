@@ -285,7 +285,7 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
       expectMsg(GetOrderStatusResponse(LimitOrder.Filled))
 
       actor ! GetOrderStatus(pair, ord3.idStr)
-      expectMsg(GetOrderStatusResponse(LimitOrder.Cancelled(100000000)))
+      expectMsg(GetOrderStatusResponse(LimitOrder.Filled))
     }
 
     "partially execute order with zero fee remaining part" in {
@@ -306,7 +306,7 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
       expectMsg(GetOrderStatusResponse(LimitOrder.Filled))
 
       actor ! GetOrderStatus(pair, ord3.idStr)
-      expectMsg(GetOrderStatusResponse(LimitOrder.Cancelled(3075248828L)))
+      expectMsg(GetOrderStatusResponse(LimitOrder.Filled))
     }
 
     "partially execute order with price > 1 and zero fee remaining part " in {
@@ -321,13 +321,13 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
       receiveN(3)
 
       actor ! GetAskOrdersRequest
-      expectMsg(GetOrdersResponse(Seq(SellLimitOrder((1850*Order.PriceConstant).toLong, (0.1 * Constants.UnitsInWave).toLong, ord1))))
+      expectMsg(GetOrdersResponse(Seq(SellLimitOrder(1850 * Order.PriceConstant, (0.1 * Constants.UnitsInWave).toLong, ord1))))
 
       actor ! GetOrderStatus(pair, ord2.idStr)
       expectMsg(GetOrderStatusResponse(LimitOrder.Filled))
 
       actor ! GetOrderStatus(pair, ord3.idStr)
-      expectMsg(GetOrderStatusResponse(LimitOrder.Cancelled((0.01 * Constants.UnitsInWave).toLong)))
+      expectMsg(GetOrderStatusResponse(LimitOrder.Filled))
     }
   }
 

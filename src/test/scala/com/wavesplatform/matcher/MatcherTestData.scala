@@ -144,6 +144,8 @@ trait MatcherTestData {
     )
     new StoredState(storage, leaseExtendedState, extendedState, incrementingTimestampValidator, validators, settings) {
       override def assetBalance(account: AssetAcc, atHeight: Option[Int]): Long = Long.MaxValue
+
+      override def tradableAssetBalance(account: AssetAcc): Long = Long.MaxValue
     }
   }
 }

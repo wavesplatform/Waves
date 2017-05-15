@@ -107,14 +107,14 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest")
 
     "restore OrderBook after restart" in {
       val pair = AssetPair(Some("123".getBytes), None)
-      val order = buy(pair, 1, 2000)
+      val order = buy(pair, 1, 2 * Order.PriceConstant)
 
       actor ! order
       expectMsg(OrderAccepted(order))
 
       actor ! RestartActor
       actor ! GetOrderBookRequest(pair, None)
-      expectMsg(GetOrderBookResponse(pair, Seq(LevelAgg(100000000, 2000)), Seq()))
+      expectMsg(GetOrderBookResponse(pair, Seq(LevelAgg(100000000, 2 * Order.PriceConstant)), Seq()))
     }
 
     "return all open markets" in {
@@ -122,7 +122,7 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest")
       val a2 = Some("234".getBytes)
 
       val pair = AssetPair(a2, a1)
-      val order = buy(pair, 1, 2000)
+      val order = buy(pair, 1, 2 * Order.PriceConstant)
 
       actor ! order
       expectMsg(OrderAccepted(order))

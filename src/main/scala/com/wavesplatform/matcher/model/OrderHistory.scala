@@ -71,7 +71,7 @@ trait OrderHistory {
   def didOrderExecuted(e: OrderExecuted): Unit = {
     reduceSpendAssets(e.counterExecuted)
 
-    updateRemaining(e.submitted.order.idStr, (e.submitted.amount, e.executedAmount))
+    updateRemaining(e.submitted.order.idStr, (e.executedAmount, e.executedAmount))
     updateRemaining(e.counter.order.idStr, (0L, e.executedAmount))
 
     if (e.isCounterFilled) decCount(e.counterExecuted.order.senderPublicKey.address)
