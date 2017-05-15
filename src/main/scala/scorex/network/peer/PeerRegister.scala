@@ -8,6 +8,8 @@ import scorex.utils.ScorexLogging
 
 import scala.collection.mutable
 
+import scala.collection.JavaConverters._
+
 trait PeerState
 
 case object UnknownPeer extends PeerState
@@ -32,9 +34,9 @@ class PeerRegister extends ScorexLogging {
 
   // Established but not handshaked support
   def registerHandler(address: InetSocketAddress, handler: ActorRef): Boolean = {
-    val inbound = !outboundOngoingConnections.remove(address)
-    connectionHandlers.put(address, (inbound, handler))
-    inbound
+    val outbound = outboundOngoingConnections.remove(address)
+    connectionHandlers.put(address, (!outbound, handler))
+    !outbound
   }
 
   // Handshaked connections support
@@ -50,7 +52,7 @@ class PeerRegister extends ScorexLogging {
 
   def inboundHandshakedConnectionsCount: Int = handshakedConnections.count(_._2._1)
 
-  def handshakedAddresses: Set[InetSocketAddress] = handshakedConnections.keySet.toSet
+  def handshakedAddresses: Seq[InetSocketAddress] = handshakedConnections.keys.toSeq
 
   def handshakedPeers: List[(InetSocketAddress, Handshake)] = handshakedConnections.map(kv => (kv._1, kv._2._3)).toList
 
@@ -61,7 +63,7 @@ class PeerRegister extends ScorexLogging {
     connectionHandlers.values.map(_._2).toSeq ++ handshakedConnections.values.map(_._2).toSeq
 
   // Address
-  def isRegistered(address: InetSocketAddress): Boolean = outboundOngoingConnections.contains(address) ||
+  def isRegistered(address: InetSocketAddress): Boolean =
     connectionHandlers.contains(address) || handshakedConnections.contains(address)
 
   def getStageOfAddress(address: InetSocketAddress): PeerState =
@@ -93,9 +95,16 @@ class PeerRegister extends ScorexLogging {
     handshakedConnections.remove(address)
   }
 
-  def isInbound(address: InetSocketAddress): Boolean = handshakedConnections(address)._1
+  def isConnectionInbound(address: InetSocketAddress): Either[String, Boolean] = {
+    val maybeValue = connectionHandlers.get(address)
+    if (maybeValue.isDefined) Right(maybeValue.get._1) else Left(s"Unregistered address '$address'")
+  }
 
-  def getHandshakedHandler(address: InetSocketAddress): ActorRef = handshakedConnections(address)._2
+
+  def getConnectedHandler(address: InetSocketAddress): Either[String, ActorRef] = {
+    val maybeValue = connectionHandlers.get(address)
+    if (maybeValue.isDefined) Right(maybeValue.get._2) else Left(s"Not connected address '$address'")
+  }
 
   // Suspecting support
   def suspect(address: InetSocketAddress): Int = {
