@@ -5,14 +5,15 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.stream.Collectors
 
 import com.wavesplatform.Version
-import com.wavesplatform.settings.{Constants, WavesSettings}
+import com.wavesplatform.settings.{Constants, SynchronizationSettings, WavesSettings}
 import io.netty.bootstrap.{Bootstrap, ServerBootstrap}
 import io.netty.channel._
 import io.netty.channel.group.{ChannelGroup, ChannelMatchers}
 import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.channel.socket.SocketChannel
 import io.netty.channel.socket.nio.{NioServerSocketChannel, NioSocketChannel}
-import io.netty.handler.codec.LengthFieldBasedFrameDecoder
+import io.netty.handler.codec.{LengthFieldBasedFrameDecoder, LengthFieldPrepender}
+import io.netty.handler.logging.LoggingHandler
 import scorex.network.message.{BasicMessagesRepo, MessageSpec}
 import scorex.network.{Handshake, TransactionalMessagesRepo}
 import scorex.transaction.History
@@ -33,25 +34,32 @@ class ServerChannelInitializer(handshake: Handshake)
 class ClientChannelInitializer(
     handshake: Handshake,
     scoreObserver: ScoreObserver,
+    history: History,
+    syncSettings: SynchronizationSettings,
     connections: ConcurrentHashMap[PeerKey, Channel])
   extends ChannelInitializer[SocketChannel] {
 
   private val specs: Map[Byte, MessageSpec[_ <: AnyRef]] = (BasicMessagesRepo.specs ++ TransactionalMessagesRepo.specs).map(s => s.messageCode -> s).toMap
+  private val loggingHandler = new LoggingHandler()
 
   override def initChannel(ch: SocketChannel): Unit = {
     ch.pipeline()
+      .addLast(loggingHandler)
       .addLast(HandshakeDecoder.Name, new HandshakeDecoder)
       .addLast(HandshakeTimeoutHandler.Name, new HandshakeTimeoutHandler)
       .addLast(ClientHandshakeHandler.Name, new ClientHandshakeHandler(handshake, connections))
+      .addLast(new LengthFieldPrepender(4))
       .addLast(new LengthFieldBasedFrameDecoder(1024*1024, 0, 4, 0, 4))
       .addLast(new MessageCodec(specs))
       .addLast(scoreObserver)
+      .addLast(new ExtensionLoader(history, syncSettings))
   }
 }
 
 trait Network {
-  def broadcast(message: AnyRef, except: Option[Channel] = None)
-  def sendToRandom(message: AnyRef)
+  def broadcast(message: AnyRef, except: Option[Channel] = None): Unit
+  def sendTo(message: AnyRef, recipients: Channel*): Unit
+  def sendToRandom(message: AnyRef): Unit
 }
 
 class NetworkServer(chainId: Char, settings: WavesSettings, history: History, allChannels: ChannelGroup) extends ScorexLogging {
@@ -63,14 +71,14 @@ class NetworkServer(chainId: Char, settings: WavesSettings, history: History, al
 
   private val allConnectedPeers = new ConcurrentHashMap[PeerKey, Channel]
   private val knownPeers = settings.networkSettings.knownPeers.map(inetSocketAddress(_, 6863)).toSet
-  private val scoreObserver = new ScoreObserver(settings.synchronizationSettings.scoreTTL)
+  private val scoreObserver = new ScoreObserver(settings.synchronizationSettings, history)
 
   private def connectedPeerAddresses =
     allConnectedPeers.keySet.stream.map[InetAddress](pk => pk.host).collect(Collectors.toSet())
   private def randomKnownPeer: Option[InetSocketAddress] =
     knownPeers.filterNot(p => connectedPeerAddresses.contains(p.getAddress)).headOption
 
-  private val repeatedConnectionAttempt = workerGroup.scheduleWithFixedDelay(1.second, 5.seconds) {
+  workerGroup.scheduleWithFixedDelay(1.second, 5.seconds) {
     val inactiveConnections = allChannels.stream().filter(!_.isActive).collect(Collectors.toSet())
     inactiveConnections.forEach(allChannels.remove _)
 
@@ -79,15 +87,15 @@ class NetworkServer(chainId: Char, settings: WavesSettings, history: History, al
     }
   }
 
-  private val broadcastScrores =
-    workerGroup.scheduleWithFixedDelay(5.second, settings.synchronizationSettings.scoreBroadcastInterval) {
+  workerGroup.scheduleWithFixedDelay(settings.synchronizationSettings.scoreBroadcastInterval,
+    settings.synchronizationSettings.scoreBroadcastInterval) {
       broadcast(history.score())
     }
 
   private val bootstrap = new Bootstrap()
     .group(workerGroup)
     .channel(classOf[NioSocketChannel])
-    .handler(new ClientChannelInitializer(handshake, scoreObserver, allConnectedPeers))
+    .handler(new ClientChannelInitializer(handshake, scoreObserver, history, settings.synchronizationSettings, allConnectedPeers))
 
   private val serverChannel = new ServerBootstrap()
     .group(bossGroup, workerGroup)
@@ -111,8 +119,6 @@ class NetworkServer(chainId: Char, settings: WavesSettings, history: History, al
   def shutdown(): Unit = try {
     serverChannel.close().await()
     log.debug("Unbound server")
-
-    repeatedConnectionAttempt.cancel(true)
     allChannels.close().await()
     log.debug("Closed all channels")
   } finally {
