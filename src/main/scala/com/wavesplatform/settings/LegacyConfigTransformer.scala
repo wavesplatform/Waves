@@ -58,60 +58,60 @@ object LegacyConfigTransformer {
   )
 
   private val fieldMap = Map(
-    "dataDir" -> "directory",
-    "logLevel" -> "logging-level",
-    "feeMap" -> "fees",
-    "testnet" -> "blockchain.type",
+    "dataDir" -> Seq("directory"),
+    "logLevel" -> Seq("logging-level"),
+    "feeMap" -> Seq("fees"),
+    "testnet" -> Seq("blockchain.type"),
 
-    "blacklistThreshold" -> "network.black-list-threshold",
-    "p2p.localOnly" -> "network.local-only",
-    "p2p.bindAddress" -> "network.bind-address",
-    "p2p.upnp" -> "network.upnp.enable",
-    "p2p.upnpGatewayTimeout" -> "network.upnp.gateway-timeout",
-    "p2p.upnpDiscoverTimeout" -> "network.upnp.discover-timeout",
-    "p2p.knownPeers" -> "network.known-peers",
-    "p2p.port" -> "network.port",
-    "p2p.nodeName" -> "network.node-name",
-    "p2p.maxConnections" -> "network.max-connections",
-    "p2p.connectionTimeout" -> "network.connection-timeout",
-    "p2p.peersDataBroadcastDelay" -> "network.peers-broadcast-interval",
-    "p2p.peersDataResidenceTimeDays" -> "network.peers-data-residence-time",
-    "p2p.myAddress" -> "network.declared-address",
-    "p2p.blacklistResidenceTimeMilliseconds" -> "network.black-list-residence-time",
-    "p2p.outboundBufferSizeMb" -> "network.outbound-buffer-size",
-    "p2p.minEphemeralPortNumber" -> "network.min-ephemeral-port-number",
-    "p2p.maxUnverifiedPeers" -> "network.max-unverified-peers",
+    "blacklistThreshold" -> Seq("network.black-list-threshold"),
+    "p2p.localOnly" -> Seq("network.local-only"),
+    "p2p.bindAddress" -> Seq("network.bind-address"),
+    "p2p.upnp" -> Seq("network.upnp.enable"),
+    "p2p.upnpGatewayTimeout" -> Seq("network.upnp.gateway-timeout"),
+    "p2p.upnpDiscoverTimeout" -> Seq("network.upnp.discover-timeout"),
+    "p2p.knownPeers" -> Seq("network.known-peers"),
+    "p2p.port" -> Seq("network.port"),
+    "p2p.nodeName" -> Seq("network.node-name"),
+    "p2p.maxConnections" -> Seq("network.max-inbound-connections", "network.max-outbound-connections"),
+    "p2p.connectionTimeout" -> Seq("network.connection-timeout"),
+    "p2p.peersDataBroadcastDelay" -> Seq("network.peers-broadcast-interval"),
+    "p2p.peersDataResidenceTimeDays" -> Seq("network.peers-data-residence-time"),
+    "p2p.myAddress" -> Seq("network.declared-address"),
+    "p2p.blacklistResidenceTimeMilliseconds" -> Seq("network.black-list-residence-time"),
+    "p2p.outboundBufferSizeMb" -> Seq("network.outbound-buffer-size"),
+    "p2p.minEphemeralPortNumber" -> Seq("network.min-ephemeral-port-number"),
+    "p2p.maxUnverifiedPeers" -> Seq("network.max-unverified-peers"),
 
-    "walletPassword" -> "wallet.password",
-    "walletSeed" -> "wallet.seed",
-    "walletDir" -> "wallet.file",
+    "walletPassword" -> Seq("wallet.password"),
+    "walletSeed" -> Seq("wallet.seed"),
+    "walletDir" -> Seq("wallet.file"),
 
-    "rpcEnabled" -> "rest-api.enable",
-    "rpcPort" -> "rest-api.port",
-    "rpcAddress" -> "rest-api.bind-address",
-    "apiKeyHash" -> "rest-api.api-key-hash",
-    "cors" -> "rest-api.cors",
+    "rpcEnabled" -> Seq("rest-api.enable"),
+    "rpcPort" -> Seq("rest-api.port"),
+    "rpcAddress" -> Seq("rest-api.bind-address"),
+    "apiKeyHash" -> Seq("rest-api.api-key-hash"),
+    "cors" -> Seq("rest-api.cors"),
 
-    "minerEnabled" -> "miner.enable",
-    "quorum" -> "miner.quorum",
-    "offlineGeneration" -> "miner.offline",
-    "blockGenerationDelay" -> "miner.generation-delay",
-    "allowedGenerationTimeFromLastBlockInterval" -> "miner.interval-after-last-block-then-generation-is-allowed",
-    "tflikeScheduling" -> "miner.tf-like-scheduling",
+    "minerEnabled" -> Seq("miner.enable"),
+    "quorum" -> Seq("miner.quorum"),
+    "offlineGeneration" -> Seq("miner.offline"),
+    "blockGenerationDelay" -> Seq("miner.generation-delay"),
+    "allowedGenerationTimeFromLastBlockInterval" -> Seq("miner.interval-after-last-block-then-generation-is-allowed"),
+    "tflikeScheduling" -> Seq("miner.tf-like-scheduling"),
 
-    "scoreBroadcastDelay" -> "synchronization.score-broadcast-interval",
-    "historySynchronizerTimeout" -> "synchronization.synchronization-timeout",
-    "maxRollback" -> "synchronization.max-rollback",
-    "maxChain" -> "synchronization.max-chain-length",
-    "loadEntireChain" -> "synchronization.load-entire-chain",
-    "pinToInitialPeer" -> "synchronization.pin-to-initial-peer",
-    "retriesBeforeBlacklisted" -> "synchronization.retries-before-blacklisting",
-    "operationRetries" -> "synchronization.operation-retires",
+    "scoreBroadcastDelay" -> Seq("synchronization.score-broadcast-interval"),
+    "historySynchronizerTimeout" -> Seq("synchronization.synchronization-timeout"),
+    "maxRollback" -> Seq("synchronization.max-rollback"),
+    "maxChain" -> Seq("synchronization.max-chain-length"),
+    "loadEntireChain" -> Seq("synchronization.load-entire-chain"),
+    "pinToInitialPeer" -> Seq("synchronization.pin-to-initial-peer"),
+    "retriesBeforeBlacklisted" -> Seq("synchronization.retries-before-blacklisting"),
+    "operationRetries" -> Seq("synchronization.operation-retires"),
 
-    "utxSize" -> "utx.size",
-    "utxRebroadcastInterval" -> "utx.broadcast-interval",
+    "utxSize" -> Seq("utx.size"),
+    "utxRebroadcastInterval" -> Seq("utx.broadcast-interval"),
 
-    "checkpoints.publicKey" -> "checkpoints.public-key")
+    "checkpoints.publicKey" -> Seq("checkpoints.public-key"))
 
   val legacyDefaults = ConfigFactory.parseString(
     """feeMap = {}
@@ -154,9 +154,11 @@ object LegacyConfigTransformer {
     }
 
     val mappedValues = fieldMap.foldLeft(ConfigFactory.empty()) {
-      case (cfg, (sourceKey, destKey)) =>
+      case (cfg, (sourceKey, destKeys)) =>
         if (transformedLegacyConfig.hasPath(sourceKey))
-          cfg.withValue(destKey, transformedLegacyConfig.getValue(sourceKey))
+          destKeys.foldLeft(cfg) { case (c, destKey) =>
+            c.withValue(destKey, transformedLegacyConfig.getValue(sourceKey))
+          }
         else cfg
     }
 

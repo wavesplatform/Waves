@@ -70,7 +70,7 @@ class BlockchainUpdaterImpl(persisted: StateWriter with StateReader, settings: F
     }
   }
 
-  override def removeAfter(blockId: BlockId): Unit = {
+  override def removeAfter(blockId: BlockId): Boolean = {
     bc.heightOf(blockId) match {
       case Some(height) =>
         while (bc.height > height) {
@@ -80,14 +80,15 @@ class BlockchainUpdaterImpl(persisted: StateWriter with StateReader, settings: F
           log.warn(s"Rollback to h=$height requested. Persisted height=${persisted.height}, will drop state and reapply blockchain now")
           persisted.clear()
           updatePersistedAndInMemory()
-
         } else {
           if (currentState.height != height) {
             inMemoryDiff = unsafeDiffAgainstPersistedByRange(persisted.height + 1, height + 1)
           }
         }
+        true
       case None =>
         log.warn(s"removeAfter non-existing block ${Base58.encode(blockId)}")
+        false
     }
   }
 }

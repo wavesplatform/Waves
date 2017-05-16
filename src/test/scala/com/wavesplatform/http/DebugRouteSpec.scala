@@ -1,16 +1,14 @@
 package com.wavesplatform.http
 
 import com.wavesplatform.http.ApiMarshallers._
-import com.wavesplatform.state2.{LeaseInfo, Portfolio}
 import com.wavesplatform.state2.reader.StateReader
+import com.wavesplatform.state2.{LeaseInfo, Portfolio}
 import com.wavesplatform.{BlockGen, TestWallet, TransactionGen}
 import org.scalacheck.{Gen, Shrink}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json._
-import scorex.crypto.encode.Base58
-import scorex.crypto.hash.FastCryptographicHash
-import scorex.transaction.History
+import scorex.transaction.{BlockchainUpdater, History}
 import scorex.waves.http.DebugApiRoute
 
 class DebugRouteSpec
@@ -19,7 +17,8 @@ class DebugRouteSpec
 
   private val state = mock[StateReader]
   private val history = mock[History]
-  private val route = DebugApiRoute(restAPISettings, testWallet, state, history).route
+  private val updater = mock[BlockchainUpdater]
+  private val route = DebugApiRoute(restAPISettings, testWallet, state, history, updater).route
 
   private implicit def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)
   
