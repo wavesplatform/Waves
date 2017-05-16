@@ -44,7 +44,8 @@ class TestFiveNodesSuite extends FreeSpec with BeforeAndAfterAll with ScorexLogg
     new PaymentTransactionSpecification(allNodes),
     new ReissueTransactionSpecification(allNodes),
     new TransferTransactionSpecification(allNodes),
-    new AliasTransactionSpecification(allNodes)
+    new AliasTransactionSpecification(allNodes),
+    new RollbackSpec(allNodes)
   )
 
   override protected def afterAll(): Unit = docker.close()

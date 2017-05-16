@@ -245,6 +245,8 @@ trait NodeApi {
 
     executeRequest
   }
+
+  def waitForDebugInfoAt(height: Long): Future[DebugInfo] = waitFor[DebugInfo](get("/debug/info").as[DebugInfo], _.stateHeight >= height, 1.seconds)
 }
 
 object NodeApi extends ScorexLogging {
@@ -308,6 +310,10 @@ object NodeApi extends ScorexLogging {
   case class OrderBookResponse(timestamp: Long, pair: PairResponse, bids: List[LevelResponse], asks: List[LevelResponse])
 
   implicit val orderBookResponseFormat: Format[OrderBookResponse] = Json.format
+
+  case class DebugInfo(stateHeight: Long, stateHash: Long)
+
+  implicit val debugInfoFormat: Format[DebugInfo] = Json.format
 
   def create(_restAddress: String,
              _nodeRestPort: Int,
