@@ -7,7 +7,7 @@ import com.fasterxml.jackson.dataformat.javaprop.JavaPropsMapper
 import com.google.common.collect.ImmutableMap
 import com.spotify.docker.client.DefaultDockerClient
 import com.spotify.docker.client.DockerClient.RemoveContainerParam
-import com.spotify.docker.client.messages.{ContainerConfig, HostConfig, PortBinding}
+import com.spotify.docker.client.messages.{ContainerConfig, HostConfig, NetworkConfig, PortBinding}
 import com.typesafe.config.{Config, ConfigFactory, ConfigRenderOptions}
 import io.netty.util.HashedWheelTimer
 import org.asynchttpclient.Dsl._
@@ -20,7 +20,8 @@ case class NodeInfo(
                      hostRestApiPort: Int,
                      hostNetworkPort: Int,
                      containerNetworkPort: Int,
-                     ipAddress: String,
+                     apiIpAddress: String,
+                     networkIpAddress: String,
                      containerId: String,
                      hostMatcherApiPort: Int)
 
@@ -42,8 +43,10 @@ class Docker(suiteConfig: Config = ConfigFactory.empty) extends AutoCloseable wi
   timer.start()
 
   private def knownPeers = nodes.values.zipWithIndex.map {
-    case (ni, index) => s"-Dwaves.network.known-peers.$index=${ni.ipAddress}:${ni.containerNetworkPort}"
+    case (ni, index) => s"-Dwaves.network.known-peers.$index=${ni.apiIpAddress}:${ni.containerNetworkPort}"
   } mkString " "
+
+  val wavesNetwork = client.createNetwork(NetworkConfig.builder().driver("bridge").name("waves").build())
 
   def startNode(nodeConfig: Config): Node = {
     val configOverrides = s"$knownPeers ${renderProperties(asProperties(nodeConfig.withFallback(suiteConfig)))}"
@@ -80,6 +83,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty) extends AutoCloseable wi
 
     val containerId = client.createContainer(containerConfig).id()
     client.startContainer(containerId)
+    connectToNetwork(containerId)
     val containerInfo = client.inspectContainer(containerId)
 
     val ports = containerInfo.networkSettings().ports()
@@ -89,6 +93,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty) extends AutoCloseable wi
       extractHostPort(ports, networkPort),
       networkPort.toInt,
       containerInfo.networkSettings().ipAddress(),
+      containerInfo.networkSettings().networks().asScala("waves").ipAddress(),
       containerId,
       extractHostPort(ports, matcherApiPort))
     nodes += containerId -> nodeInfo
@@ -110,6 +115,12 @@ class Docker(suiteConfig: Config = ConfigFactory.empty) extends AutoCloseable wi
     client.close()
     http.close()
   }
+
+  def disconnectFromNetwork(containerId: String): Unit =  client.disconnectFromNetwork(containerId, wavesNetwork.id())
+  def disconnectFromNetwork(node: Node): Unit = disconnectFromNetwork(node.nodeInfo.containerId)
+
+  def connectToNetwork(containerId: String): Unit = client.connectToNetwork(containerId, wavesNetwork.id())
+  def connectToNetwork(node: Node): Unit = connectToNetwork(node.nodeInfo.containerId)
 }
 
 object Docker {

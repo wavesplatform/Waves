@@ -27,7 +27,7 @@ import scala.concurrent.{ExecutionContext, Future, TimeoutException}
 import scala.util.{Failure, Success, Try}
 
 
-class Node(config: Config, nodeInfo: NodeInfo, client: AsyncHttpClient, timer: Timer) {
+class Node (config: Config, val nodeInfo: NodeInfo, client: AsyncHttpClient, timer: Timer) {
 
   import Node._
 
@@ -81,11 +81,7 @@ class Node(config: Config, nodeInfo: NodeInfo, client: AsyncHttpClient, timer: T
     (Json.parse(r.getResponseBody) \ "peers").as[Seq[Peer]]
   }
 
-  def connectedPeersCount: Future[Int] = get("/peers/connected").map { r =>
-    (Json.parse(r.getResponseBody) \ "peers").as[Seq[Peer]]
-  }.map(_.length)
-
-  def waitForPeers(targetPeersCount: Int): Future[Int] = waitFor[Int](connectedPeersCount, _ >= targetPeersCount, 1.second)
+  def waitForPeers(targetPeersCount: Int): Future[Seq[Peer]] = waitFor[Seq[Peer]](connectedPeers, _.length >= targetPeersCount, 1.second)
 
   def height: Future[Long] = get("/blocks/height").as[JsValue].map(v => (v \ "height").as[Long])
 
