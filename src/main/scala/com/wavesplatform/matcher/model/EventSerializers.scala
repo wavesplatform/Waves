@@ -128,6 +128,7 @@ object MatcherSerializer {
 
   implicit val snapshotFormat: Format[Snapshot] = (
     (JsPath \ "o").format[OrderBook] and
-      (JsPath \ "h").format[Map[String, (Long, Long)]]
+      (JsPath \ "h").format[Map[String, (Long, Long)]] and
+        (JsPath \ "a").formatNullable[Map[String, Seq[String]]]
     )(Snapshot.apply, unlift(Snapshot.unapply))
 }

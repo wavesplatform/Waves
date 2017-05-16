@@ -59,7 +59,8 @@ class EventJsonSpecification extends PropSpec
       res.get should === (ob)
 
       val cache = Map[String, (Long, Long)]("account1" -> (100L, 0L), "account2" -> (105L, 30L))
-      val s = Snapshot(ob, cache)
+      val a = Map[String, Seq[String]]("account1" -> Seq("order1", "order5"), "account2" -> Seq("order3"))
+      val s = Snapshot(ob, cache, Some(a))
 
       val js = Json.toJson(s)
       val restored = js.validate[Snapshot]

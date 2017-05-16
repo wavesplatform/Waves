@@ -4,12 +4,13 @@ import akka.actor.Props
 import akka.http.scaladsl.model.StatusCodes
 import akka.persistence._
 import com.wavesplatform.matcher.MatcherSettings
-import com.wavesplatform.matcher.api.{CancelOrderRequest, MatcherResponse}
+import com.wavesplatform.matcher.api.{BadMatcherResponse, CancelOrderRequest, MatcherResponse, StatusCodeMatcherResponse}
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.model.Events.{Event, OrderAdded, OrderExecuted}
+import com.wavesplatform.matcher.model.LimitOrder.Filled
 import com.wavesplatform.matcher.model.MatcherModel._
 import com.wavesplatform.matcher.model.{OrderValidator, _}
-import play.api.libs.json.Json
+import play.api.libs.json._
 import scorex.crypto.encode.Base58
 import scorex.transaction.TransactionModule
 import scorex.transaction.assets.exchange._
@@ -49,13 +50,17 @@ class OrderBookActor(assetPair: AssetPair, val storedState: StoredState,
       handleGetOrderBook(pair, depth)
     case SaveSnapshot =>
       deleteSnapshots(SnapshotSelectionCriteria.Latest)
-      saveSnapshot(Snapshot(orderBook, ordersRemainingAmount.cache.asMap().asScala.toMap))
+      saveSnapshot(Snapshot(orderBook, ordersRemainingAmount.cache.asMap().asScala.toMap, Some(addressToOrders.toMap)))
     case SaveSnapshotSuccess(metadata) =>
       log.info(s"Snapshot saved with metadata $metadata")
     case SaveSnapshotFailure(metadata, reason) =>
       log.error(s"Failed to save snapshot: $metadata, $reason.")
     case GetOrderStatus(_, id) =>
       handleOrderStatus(id)
+    case GetOrderHistory(_, address) =>
+      handleOrderHistory(address)
+    case DeleteOrderFromHistory(_, publicKey, id) =>
+      handleOrderHistoryDelete(publicKey, id)
     case cancel: CancelOrder =>
       handleCancelOrder(cancel)
     case DeleteOrderBookRequest(pair) =>
@@ -67,6 +72,20 @@ class OrderBookActor(assetPair: AssetPair, val storedState: StoredState,
 
   def handleOrderStatus(id: String): Unit = {
     sender() ! GetOrderStatusResponse(getOrderStatus(id))
+  }
+
+  def handleOrderHistory(address: String): Unit = {
+    sender() ! GetOrderHistoryResponse(getOrderHistory(address))
+  }
+
+  def handleOrderHistoryDelete(publicKey: String, id: String): Unit = {
+    getOrderStatus(id) match {
+      case Filled | LimitOrder.Cancelled(_) =>
+        deleteOrder(publicKey, id)
+        sender() ! StatusCodeMatcherResponse(StatusCodes.OK, "Order deleted")
+      case _ =>
+        sender() ! BadMatcherResponse(StatusCodes.BadRequest, "Order couldn't be deleted")
+    }
   }
 
   private def handleCancelOrder(cancel: CancelOrder) = {
@@ -102,7 +121,7 @@ class OrderBookActor(assetPair: AssetPair, val storedState: StoredState,
       log.debug(s"Recovering OrderBook from snapshot: $snapshot for $persistenceId")
       orderBook = snapshot.orderBook
       recoverFromOrderBook(orderBook)
-      initOrdersCache(snapshot.history)
+      initOrdersCache(snapshot.history, snapshot.addressOrders.getOrElse(Map()))
   }
 
   def handleAddOrder(order: Order): Unit = {
@@ -194,6 +213,10 @@ object OrderBookActor {
 
   case class GetOrderStatus(assetPair: AssetPair, id: String) extends OrderBookRequest
 
+  case class GetOrderHistory(assetPair: AssetPair, address: String) extends OrderBookRequest
+
+  case class DeleteOrderFromHistory(assetPair: AssetPair, address: String, id: String) extends OrderBookRequest
+
   case class CancelOrder(assetPair: AssetPair, req: CancelOrderRequest) extends OrderBookRequest {
     def orderId: String = Base58.encode(req.orderId)
   }
@@ -223,6 +246,11 @@ object OrderBookActor {
     val code = StatusCodes.OK
   }
 
+  case class GetOrderHistoryResponse(history: Seq[(String, LimitOrder.OrderStatus, Long, Long)]) extends MatcherResponse {
+    val json = JsObject(history.map(h => h._1 -> Json.obj("amount" -> h._3, "filled" -> h._4, "status" -> h._2.json)))
+    val code = StatusCodes.OK
+  }
+
   case class GetOrderBookResponse(pair: AssetPair, bids: Seq[LevelAgg], asks: Seq[LevelAgg]) extends MatcherResponse {
     val json = Json.toJson(OrderBookResult(NTP.correctedTime(), pair, bids, asks))
     val code = StatusCodes.OK
@@ -239,6 +267,6 @@ object OrderBookActor {
 
   case object SaveSnapshot
 
-  case class Snapshot(orderBook: OrderBook, history: Map[String, (Long, Long)])
+  case class Snapshot(orderBook: OrderBook, history: Map[String, (Long, Long)], addressOrders: Option[Map[String, Seq[String]]])
 }
 
