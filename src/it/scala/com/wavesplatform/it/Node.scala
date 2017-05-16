@@ -46,7 +46,17 @@ class Node (config: Config, val nodeInfo: NodeInfo, client: AsyncHttpClient, tim
   private def retrying(r: Request, interval: FiniteDuration = 1.second): Future[Response] = {
     def executeRequest: Future[Response] = {
       log.trace(s"Executing request '$r'")
-      client.executeRequest(r).toCompletableFuture.toScala
+      client.executeRequest(r, new AsyncCompletionHandler[Response] {
+        override def onCompleted(response: Response): Response = {
+          if (response.getStatusCode == HttpConstants.ResponseStatusCodes.OK_200) {
+            log.debug(s"Request: ${r.getUrl} \n Response: ${response.getResponseBody}")
+            response
+          } else {
+            log.debug(s"Request:  ${r.getUrl} \n Unexpected status code(${response.getStatusCode}): ${response.getResponseBody}")
+            throw UnexpectedStatusCodeException(response)
+          }
+        }
+      }).toCompletableFuture.toScala
         .recoverWith {
           case e@(_: IOException | _: TimeoutException) =>
             log.debug(s"Failed to execute request '$r' with error: ${e.getMessage}")
@@ -188,7 +198,7 @@ class Node (config: Config, val nodeInfo: NodeInfo, client: AsyncHttpClient, tim
         }
       case Success(r) => Failure(new RuntimeException(s"Unexpected matcher response: (${r.getStatusCode}) ${r.getResponseBody}"))
       case _ => Failure(new RuntimeException(s"Unexpected failure from matcher"))
-  }
+    }
 
   def getOrderStatus(asset: String, orderId: String): Future[MatcherStatusResponse] =
     matcherGet(s"/matcher/orderbook/$asset/WAVES/$orderId").as[MatcherStatusResponse]
@@ -254,16 +264,7 @@ object Node extends ScorexLogging {
   implicit val orderBookResponseFormat: Format[OrderBookResponse] = Json.format
 
   implicit class ResponseFutureExt(val f: Future[Response]) extends AnyVal {
-    def as[A: Format](implicit ec: ExecutionContext): Future[A] =
-      f.transform {
-        case Success(r) if r.getStatusCode == HttpConstants.ResponseStatusCodes.OK_200 =>
-          log.debug(s"Response: ${r.getResponseBody}")
-          Try(parse(r.getResponseBody).as[A])
-        case Success(r) =>
-          log.debug(s"Error parsing response ${r.getResponseBody}")
-          Failure(UnexpectedStatusCodeException(r))
-        case Failure(t) => Failure[A](t)
-      }(ec)
+    def as[A: Format](implicit ec: ExecutionContext): Future[A] = f.map(r => parse(r.getResponseBody).as[A])(ec)
   }
 
 }
