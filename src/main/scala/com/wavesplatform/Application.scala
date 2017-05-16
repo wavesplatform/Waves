@@ -102,6 +102,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
       allChannels.writeAndFlush(message, except.fold(ChannelMatchers.all())(ChannelMatchers.isNot))
     }
 
+    override def sendTo(message: AnyRef, recipients: Channel*) = ???
+
     override def sendToRandom(message: AnyRef) = if (allChannels.size() > 0) {
       val channels = allChannels.toArray(Array.empty[Channel])
       val id = Random.nextInt(channels.length)
@@ -115,7 +117,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
   lazy val coordinator: ActorRef = actorSystem.actorOf(Props(new Coordinator(net, blockchainSynchronizer, blockGenerator, peerManager, actorSystem.deadLetters, blockchainUpdater, time, utxStorage, history, stateReader, checkpoints, settings)), "Coordinator")
   lazy val blockGenerator: ActorRef = actorSystem.actorOf(Props(new BlockGeneratorController(settings.minerSettings, history, time, peerManager,
          wallet, stateReader, settings.blockchainSettings, utxStorage, coordinator)), "BlockGenerator")
-  lazy val blockchainSynchronizer: ActorRef = actorSystem.actorOf(Props(new BlockchainSynchronizer(coordinator, history, settings.synchronizationSettings)), "BlockchainSynchronizer")
+  lazy val blockchainSynchronizer: ActorRef = actorSystem.actorOf(Props(new BlockchainSynchronizer(net, coordinator, history, settings.synchronizationSettings)), "BlockchainSynchronizer")
   lazy val peerSynchronizer: ActorRef = actorSystem.actorOf(Props(new PeerSynchronizer(networkController, peerManager, settings.networkSettings)), "PeerSynchronizer")
 
   def run(): Unit = {
