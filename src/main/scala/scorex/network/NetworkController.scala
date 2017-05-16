@@ -17,7 +17,9 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 
-class NetworkController(networkSettings: NetworkSettings, uPnP: => UPnP, peerManager: ActorRef, messagesHandler: MessageHandler) extends Actor with ScorexLogging {
+class NetworkController(networkSettings: NetworkSettings,
+                        uPnP: => UPnP, peerManager: ActorRef, messagesHandler: MessageHandler)
+  extends Actor with ScorexLogging {
 
   import NetworkController._
 
@@ -178,13 +180,8 @@ class NetworkController(networkSettings: NetworkSettings, uPnP: => UPnP, peerMan
       connection,
       remote,
       messagesHandler,
-<<<<<<< d95ba96910ebef973ae1318fa6511f02fdf54c4d
       networkSettings)))
-    peerManager ! PeerManager.Connected(remote, handler, ownSocketAddress, inbound)
-=======
-      networkSettings))
     peerManager ! PeerManager.Connected(remote, handler, ownSocketAddress)
->>>>>>> PeerManager tests were fixed.
   }
 }
 
