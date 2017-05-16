@@ -112,6 +112,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty) extends AutoCloseable wi
     timer.stop()
     log.info("Stopping containers")
     nodes.keys.foreach(id => client.removeContainer(id, RemoveContainerParam.forceKill()))
+    client.removeNetwork(wavesNetwork.id())
     client.close()
     http.close()
   }
