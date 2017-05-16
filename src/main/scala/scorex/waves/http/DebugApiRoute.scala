@@ -73,17 +73,15 @@ case class DebugApiRoute(settings: RestAPISettings, wallet: Wallet, stateReader:
   ))
   def rollback: Route = withAuth {
     (path("rollback") & post) {
-      decodeRequest {
-        entity(as[String]) { rollbackTo =>
-          history.blockAt(rollbackTo.toInt) match {
-            case Some(block) =>
-              blockchainUpdater.removeAfter(block.uniqueId)
-              complete(StatusCodes.OK)
-            case None =>
-              complete(StatusCodes.NotFound)
-          }
+      entity(as[Int]) { rollbackTo =>
+        history.blockAt(rollbackTo) match {
+          case Some(block) =>
+            blockchainUpdater.removeAfter(block.uniqueId)
+            complete(StatusCodes.OK)
+          case None =>
+            complete(StatusCodes.BadRequest, "Block at height not found")
         }
-      }
+      } ~ complete(StatusCodes.BadRequest)
     }
   }
 
