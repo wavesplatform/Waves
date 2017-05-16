@@ -38,7 +38,7 @@ class Node(config: Config, nodeInfo: NodeInfo, client: AsyncHttpClient, timer: T
   val settings: WavesSettings = WavesSettings.fromConfig(config)
 
   private val blockDelay = settings.blockchainSettings.genesisSettings.averageBlockDelay
-  private implicit val log = LoggerFacade(LoggerFactory.getLogger(s"${getClass.getName}.${settings.networkSettings.nodeName}"))
+  private val log = LoggerFacade(LoggerFactory.getLogger(s"${getClass.getName}.${settings.networkSettings.nodeName}"))
 
   def fee(txValue: TransactionType.Value, asset: String = "WAVES"): Long =
     settings.feesSettings.fees(txValue.id).find(_.asset == asset).get.fee
@@ -77,17 +77,6 @@ class Node(config: Config, nodeInfo: NodeInfo, client: AsyncHttpClient, timer: T
       (rb: RequestBuilder) => rb.setHeader("Content-type", "application/json").setBody(stringify(toJson(body))))
 
 
-  def getAs[B: Format](path: String, f: RequestBuilder => RequestBuilder = identity): Future[B] = get(path, f).asLog[B](path)
-
-  def matcherGetAs[B: Format](path: String, f: RequestBuilder => RequestBuilder = identity): Future[B] = matcherGet(path, f).asLog[B](path)
-
-  def postAs[B: Format](url: String, port: Int, path: String, f: RequestBuilder => RequestBuilder = identity) = post(url, port, path, f).asLog[B](path)
-
-  def postAs[A, B: Format](path: String, body: A)(implicit A: Writes[A]) = post(path, body).asLog[B](path)
-
-  def matcherPostAs[A, B: Format](path: String, body: A)(implicit A: Writes[A]) = matcherPost(path, body).asLog[B](path)
-
-
   def connectedPeers: Future[Seq[Peer]] = get("/peers/connected").map { r =>
     (Json.parse(r.getResponseBody) \ "peers").as[Seq[Peer]]
   }
@@ -100,30 +89,27 @@ class Node(config: Config, nodeInfo: NodeInfo, client: AsyncHttpClient, timer: T
 
   def height: Future[Long] = get("/blocks/height").as[JsValue].map(v => (v \ "height").as[Long])
 
-  def blockAt(height: Long) = getAs[Block](s"/blocks/at/$height")
+  def blockAt(height: Long) = get(s"/blocks/at/$height").as[Block]
 
-  def lastBlock: Future[Block] = getAs[Block]("/blocks/last")
+  def lastBlock: Future[Block] = get("/blocks/last").as[Block]
 
-  def blockSeq(from: Long, to: Long) = getAs[Seq[Block]](s"/blocks/seq/$from/$to")
+  def blockSeq(from: Long, to: Long) = get(s"/blocks/seq/$from/$to").as[Seq[Block]]
 
-  def status: Future[Status] = getAs[Status]("/node/status")
+  def status: Future[Status] = get("/node/status").as[Status]
 
-  def balance(address: String): Future[Balance] = getAs[Balance](s"/addresses/balance/$address")
+  def balance(address: String): Future[Balance] = get(s"/addresses/balance/$address").as[Balance]
 
-  def waitForTransaction(txId: String): Future[Transaction] = {
-    log.debug(s"waiting for tx=$txId")
-    waitFor[Option[Transaction]](transactionInfo(txId).transform {
-      case Success(tx) => Success(Some(tx))
-      case Failure(UnexpectedStatusCodeException(r)) if r.getStatusCode == 404 => Success(None)
-      case Failure(ex) => Failure(ex)
-    }, tOpt => tOpt.exists(_.id == txId), 1.second).map(_.get)
-  }
+  def waitForTransaction(txId: String): Future[Transaction] = waitFor[Option[Transaction]](transactionInfo(txId).transform {
+    case Success(tx) => Success(Some(tx))
+    case Failure(UnexpectedStatusCodeException(r)) if r.getStatusCode == 404 => Success(None)
+    case Failure(ex) => Failure(ex)
+  }, tOpt => tOpt.exists(_.id == txId), 1.second).map(_.get)
 
   def waitForHeight(expectedHeight: Long): Future[Long] = waitFor[Long](height, h => h >= expectedHeight, 1.second)
 
-  def transactionInfo(txId: String): Future[Transaction] = getAs[Transaction](s"/transactions/info/$txId")
+  def transactionInfo(txId: String): Future[Transaction] = get(s"/transactions/info/$txId").as[Transaction]
 
-  def effectiveBalance(address: String): Future[Balance] = getAs[Balance](s"/addresses/effectiveBalance/$address")
+  def effectiveBalance(address: String): Future[Balance] = get(s"/addresses/effectiveBalance/$address").as[Balance]
 
   def transfer(sourceAddress: String, recipient: String, amount: Long, fee: Long, assetId: Option[String] = None): Future[Transaction] =
     post("/assets/transfer", TransferRequest(assetId, None, amount, fee, sourceAddress, None, recipient)).as[Transaction]
@@ -150,7 +136,7 @@ class Node(config: Config, nodeInfo: NodeInfo, client: AsyncHttpClient, timer: T
     post("/assets/burn", BurnRequest(sourceAddress, assetId, quantity, fee)).as[Transaction]
 
   def assetBalance(address: String, asset: String): Future[AssetBalance] =
-    getAs[AssetBalance](s"/assets/balance/$address/$asset")
+    get(s"/assets/balance/$address/$asset").as[AssetBalance]
 
   def transfer(sourceAddress: String, recipient: String, amount: Long, fee: Long): Future[Transaction] =
     post("/assets/transfer", TransferRequest(None, None, amount, fee, sourceAddress, None, recipient)).as[Transaction]
@@ -188,7 +174,7 @@ class Node(config: Config, nodeInfo: NodeInfo, client: AsyncHttpClient, timer: T
   }
 
   def getGeneratedBlocks(address: String, from: Long, to: Long): Future[Seq[Block]] =
-    getAs[Seq[Block]](s"/blocks/address/$address/$from/$to")
+    get(s"/blocks/address/$address/$from/$to").as[Seq[Block]]
 
   def issueAsset(address: String, name: String, description: String, quantity: Long, decimals: Byte, fee: Long,
                  reissuable: Boolean): Future[Transaction] =
@@ -206,19 +192,19 @@ class Node(config: Config, nodeInfo: NodeInfo, client: AsyncHttpClient, timer: T
         }
       case Success(r) => Failure(new RuntimeException(s"Unexpected matcher response: (${r.getStatusCode}) ${r.getResponseBody}"))
       case _ => Failure(new RuntimeException(s"Unexpected failure from matcher"))
-    }
+  }
 
   def getOrderStatus(asset: String, orderId: String): Future[MatcherStatusResponse] =
-    matcherGetAs[MatcherStatusResponse](s"/matcher/orderbook/$asset/WAVES/$orderId")
+    matcherGet(s"/matcher/orderbook/$asset/WAVES/$orderId").as[MatcherStatusResponse]
 
   def getOrderBook(asset: String): Future[OrderBookResponse] =
-    matcherGetAs[OrderBookResponse](s"/matcher/orderbook/$asset/WAVES")
+    matcherGet(s"/matcher/orderbook/$asset/WAVES").as[OrderBookResponse]
 
   def cancelOrder(amountAsset: String, priceAsset: String, request: CancelOrderRequest): Future[MatcherStatusResponse] =
     matcherPost(s"/matcher/orderbook/$amountAsset/$priceAsset/cancel", request.json).as[MatcherStatusResponse]
 }
 
-object Node {
+object Node extends ScorexLogging {
 
   case class UnexpectedStatusCodeException(r: Response) extends IOException(s"Unexpected status code: ${r.getStatusCode}")
 
@@ -272,25 +258,13 @@ object Node {
   implicit val orderBookResponseFormat: Format[OrderBookResponse] = Json.format
 
   implicit class ResponseFutureExt(val f: Future[Response]) extends AnyVal {
-    def as[A: Format](implicit ec: ExecutionContext, log: LoggerFacade): Future[A] =
+    def as[A: Format](implicit ec: ExecutionContext): Future[A] =
       f.transform {
         case Success(r) if r.getStatusCode == HttpConstants.ResponseStatusCodes.OK_200 =>
           log.debug(s"Response: ${r.getResponseBody}")
           Try(parse(r.getResponseBody).as[A])
         case Success(r) =>
           log.debug(s"Error parsing response ${r.getResponseBody}")
-          Failure(UnexpectedStatusCodeException(r))
-        case Failure(t) => Failure[A](t)
-      }(ec)
-
-
-    def asLog[A: Format](logData: String)(implicit ec: ExecutionContext, log: LoggerFacade): Future[A] =
-      f.transform {
-        case Success(r) if r.getStatusCode == HttpConstants.ResponseStatusCodes.OK_200 =>
-          log.debug(s"Request: $logData. Response: ${r.getResponseBody}")
-          Try(parse(r.getResponseBody).as[A])
-        case Success(r) =>
-          log.debug(s"Request: $logData. Error parsing response ${r.getResponseBody}")
           Failure(UnexpectedStatusCodeException(r))
         case Failure(t) => Failure[A](t)
       }(ec)
