@@ -1,6 +1,7 @@
 package com.wavesplatform
 
 import java.net.{InetSocketAddress, URI}
+import java.util.concurrent.Callable
 
 import io.netty.util.concurrent.{EventExecutorGroup, ScheduledFuture}
 
@@ -16,5 +17,8 @@ package object network {
   implicit class EventExecutorGroupExt(val e: EventExecutorGroup) extends AnyVal {
     def scheduleWithFixedDelay(initialDelay: FiniteDuration, delay: FiniteDuration)(f: => Unit): ScheduledFuture[_] =
       e.scheduleWithFixedDelay((() => f): Runnable, initialDelay.toNanos, delay.toNanos, NANOSECONDS)
+
+    def schedule[A](delay: FiniteDuration)(f: => A): ScheduledFuture[A] =
+      e.schedule((() => f): Callable[A], delay.length, delay.unit)
   }
 }

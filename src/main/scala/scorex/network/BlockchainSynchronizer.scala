@@ -3,7 +3,7 @@ package scorex.network
 import akka.actor.Actor.Receive
 import akka.actor.{Actor, ActorRef, Cancellable}
 import akka.event.LoggingReceive
-import com.wavesplatform.network.GetSignatures
+import com.wavesplatform.network.{GetSignatures, Network}
 import com.wavesplatform.settings.SynchronizationSettings
 import com.wavesplatform.state2.ByteStr
 import scorex.block.Block
@@ -17,7 +17,7 @@ import shapeless.syntax.typeable._
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class BlockchainSynchronizer(coordinator: ActorRef, history: History, synchronizationSettings: SynchronizationSettings)
+class BlockchainSynchronizer(network: Network, coordinator: ActorRef, history: History, synchronizationSettings: SynchronizationSettings)
   extends Actor with ScorexLogging {
 
   import BlockchainSynchronizer._
@@ -39,6 +39,8 @@ class BlockchainSynchronizer(coordinator: ActorRef, history: History, synchroniz
 
         val lastIds = history.lastBlockIds(synchronizationSettings.maxRollback)
 
+//        network.broadcast(GetSignatures(lastIds))
+        log.debug(s"Getting extension $peerScores")
 //        val msg = Message(GetSignaturesSpec, Right(lastIds), None)
 //        networkControllerRef ! NetworkController.SendToNetwork(msg, SendToChosen(peerScores.keys.toSeq))
 

@@ -15,7 +15,6 @@ import scorex.utils.ScorexLogging
 class MessageCodec(specs: Map[MessageCode, MessageSpec[_ <: AnyRef]]) extends ByteToMessageCodec[Message] with ScorexLogging {
   import MessageCodec._
   override def decode(ctx: ChannelHandlerContext, in: ByteBuf, out: util.List[AnyRef]) = {
-    log.debug(s"Message: ${hexDump(in.copy())}")
     require(in.readInt() == Magic, "invalid magic number")
 
     val code = in.readByte()
