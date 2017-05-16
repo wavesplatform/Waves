@@ -27,7 +27,7 @@ import scala.concurrent.{ExecutionContext, Future, TimeoutException}
 import scala.util.{Failure, Success, Try}
 
 
-class Node(config: Config, nodeInfo: NodeInfo, client: AsyncHttpClient, timer: Timer, docker: Docker) {
+class Node (config: Config, val nodeInfo: NodeInfo, client: AsyncHttpClient, timer: Timer) {
 
   import Node._
 
@@ -198,9 +198,6 @@ class Node(config: Config, nodeInfo: NodeInfo, client: AsyncHttpClient, timer: T
 
   def cancelOrder(amountAsset: String, priceAsset: String, request: CancelOrderRequest): Future[MatcherStatusResponse] =
     matcherPost(s"/matcher/orderbook/$amountAsset/$priceAsset/cancel", request.json).as[MatcherStatusResponse]
-
-  def disconnectFromNetwork(): Unit = docker.disconnectFromNetwork(nodeInfo.containerId)
-  def connectToNetwork(): Unit = docker.connectToNetwork(nodeInfo.containerId)
 }
 
 object Node extends ScorexLogging {

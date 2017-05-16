@@ -98,21 +98,11 @@ class Docker(suiteConfig: Config = ConfigFactory.empty) extends AutoCloseable wi
       extractHostPort(ports, matcherApiPort))
     nodes += containerId -> nodeInfo
 
-    println(client.listNetworks().asScala.map(_.scope()))
-
-    new Node(actualConfig, nodeInfo, http, timer, this)
+    new Node(actualConfig, nodeInfo, http, timer)
   }
 
   def stopNode(containerId: String): Unit = {
     client.stopContainer(containerId, 10)
-  }
-
-  def connectToNetwork(containerId: String): Unit = {
-    client.connectToNetwork(containerId, wavesNetwork.id())
-  }
-
-  def disconnectFromNetwork(containerId: String): Unit = {
-    client.disconnectFromNetwork(containerId, wavesNetwork.id())
   }
 
   def scheduleOnce(initialDelay: FiniteDuration)(f: => Any) =
@@ -125,6 +115,12 @@ class Docker(suiteConfig: Config = ConfigFactory.empty) extends AutoCloseable wi
     client.close()
     http.close()
   }
+
+  def disconnectFromNetwork(containerId: String): Unit =  client.disconnectFromNetwork(containerId, wavesNetwork.id())
+  def disconnectFromNetwork(node: Node): Unit = disconnectFromNetwork(node.nodeInfo.containerId)
+
+  def connectToNetwork(containerId: String): Unit = client.connectToNetwork(containerId, wavesNetwork.id())
+  def connectToNetwork(node: Node): Unit = connectToNetwork(node.nodeInfo.containerId)
 }
 
 object Docker {
