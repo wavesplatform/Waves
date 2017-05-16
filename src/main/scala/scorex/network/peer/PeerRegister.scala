@@ -33,10 +33,9 @@ class PeerRegister extends ScorexLogging {
   def initiateOutboundConnection(address: InetSocketAddress): Unit = outboundOngoingConnections.add(address)
 
   // Established but not handshaked support
-  def registerHandler(address: InetSocketAddress, handler: ActorRef): Boolean = {
+  def registerHandler(address: InetSocketAddress, handler: ActorRef): Unit = {
     val outbound = outboundOngoingConnections.remove(address)
     connectionHandlers.put(address, (!outbound, handler))
-    !outbound
   }
 
   // Handshaked connections support
@@ -63,9 +62,6 @@ class PeerRegister extends ScorexLogging {
     connectionHandlers.values.map(_._2).toSeq ++ handshakedConnections.values.map(_._2).toSeq
 
   // Address
-  def isRegistered(address: InetSocketAddress): Boolean =
-    connectionHandlers.contains(address) || handshakedConnections.contains(address)
-
   def getStageOfAddress(address: InetSocketAddress): PeerState =
     if (outboundOngoingConnections.contains(address)) ConnectingPeer
     else if (connectionHandlers.contains(address)) ConnectedPeer

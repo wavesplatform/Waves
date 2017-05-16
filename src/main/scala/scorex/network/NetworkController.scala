@@ -67,7 +67,7 @@ class NetworkController(networkSettings: NetworkSettings, uPnP: => UPnP, peerMan
     }
   }
 
-  private val listener = context.actorOf(Props(new NetworkListener(self, peerManager, localAddress)),
+  private val listener = context.actorOf(Props(classOf[NetworkListener], self, peerManager, localAddress),
     "network-listener")
 
   override def postRestart(thr: Throwable): Unit = {
@@ -178,8 +178,13 @@ class NetworkController(networkSettings: NetworkSettings, uPnP: => UPnP, peerMan
       connection,
       remote,
       messagesHandler,
+<<<<<<< d95ba96910ebef973ae1318fa6511f02fdf54c4d
       networkSettings)))
     peerManager ! PeerManager.Connected(remote, handler, ownSocketAddress, inbound)
+=======
+      networkSettings))
+    peerManager ! PeerManager.Connected(remote, handler, ownSocketAddress)
+>>>>>>> PeerManager tests were fixed.
   }
 }
 
