@@ -235,7 +235,7 @@ class LegacyConfigTransformerSpec extends FreeSpec with Matchers {
       'blackListResidenceTime (45.seconds),
       'maxInboundConnections (10),
       'maxOutboundConnections (10),
-      'maxConnectionsFromSingleHost (3),
+      'maxConnectionsWithSingleHost (3),
       'connectionTimeout (5.seconds),
       'outboundBufferSize (2 * 1024 * 1024),
       'minEphemeralPortNumber (30000),
