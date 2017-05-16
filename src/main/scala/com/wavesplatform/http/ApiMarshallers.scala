@@ -47,6 +47,7 @@ trait ApiMarshallers {
 
   // preserve support for extracting plain strings from requests
   implicit val stringUnmarshaller: FromEntityUnmarshaller[String] = PredefinedFromEntityUnmarshallers.stringUnmarshaller
+  implicit val intUnmarshaller: FromEntityUnmarshaller[Int] = stringUnmarshaller.map(_.toInt)
 
   implicit def playJsonMarshaller[A](
       implicit writes: Writes[A],

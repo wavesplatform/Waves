@@ -33,6 +33,7 @@ class HistoryWriterImpl(db: MVStore) extends HistoryWriter with ScorexLogging {
   override def discardBlock(): Unit = synchronizeReadWrite { implicit lock =>
     val h = height()
     blockBodyByHeight.update(_.remove(h))
+    scoreByHeight.update(_.remove(h))
     val vOpt = Option(blockIdByHeight.update(_.remove(h)))
     vOpt.map(v => heightByBlockId.update(_.remove(v)))
     db.commit()
