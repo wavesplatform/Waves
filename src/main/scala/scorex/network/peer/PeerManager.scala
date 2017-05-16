@@ -85,19 +85,16 @@ class PeerManager(
   }: Receive) orElse blacklistOperations orElse peerListOperations orElse peerCycle)
 
   private def peerCycle: Receive = {
-    case Connected(remote, handlerRef, ownSocketAddress, inbound) =>
-
+    case Connected(remote, handlerRef, ownSocketAddress) =>
       log.debug(s"On new connection: ${register.logConnections}")
 
       if (isBlacklisted(remote)) {
-        log.warn(s"Inbound connection from blacklisted peer $remote: Close connection")
+        log.warn(s"New network connection with blacklisted peer '$remote': Close connection")
         handlerRef ! CloseConnection
-      } else if (register.inboundHandshakedConnectionsCount >= settings.maxInboundConnections) {
-        log.info(s"Number of inbound connections exceeded ${settings.maxInboundConnections}: Close connection from $remote")
+      } else if (register.hostConnectionsCount(remote.getAddress) >= settings.maxConnectionsWithSingleHost) {
+        log.warn(s"Number of network connections with host '${remote.getAddress}' exceed allowed ${settings.maxConnectionsWithSingleHost}: Close connection")
         handlerRef ! CloseConnection
-      } else {
-        handleNewConnection(remote, handlerRef, ownSocketAddress, inbound)
-      }
+      } else handleNewConnection(remote, handlerRef, ownSocketAddress)
 
     case Handshaked(address, handshake) =>
       if (isBlacklisted(address)) {
@@ -132,8 +129,6 @@ class PeerManager(
       }
       sender() ! ConnectedPeers(peers.toSet)
 
-    case GetConnections => sender() ! register.handshakedAddresses
-
     case GetRandomPeersToBroadcast(howMany) =>
       val dbPeers = peerDatabase.getKnownPeers.keySet
       val intersection = dbPeers.intersect(register.handshakedAddresses.toSet)
@@ -146,29 +141,42 @@ class PeerManager(
 
   private def handleNewConnection(remote: InetSocketAddress,
                                   handlerRef: ActorRef,
-                                  ownSocketAddress: Option[InetSocketAddress],
-                                  inbound: Boolean): Unit = {
-
-    if (register.isRegistered(remote)) {
-      log.debug(s"Second connection from the same address '$remote' is not allowed")
-      handlerRef ! CloseConnection
-    } else {
-      if (settings.maxConnectionsFromSingleHost > register.hostConnectionsCount(remote.getAddress)) {
-        val handshake = Handshake(applicationName, appVersion, settings.nodeName,
-          settings.nonce, ownSocketAddress, System.currentTimeMillis() / 1000)
-
-        handlerRef ! handshake
-
-        if (register.registerHandler(remote, handlerRef)) {
-          log.info(s"Got inbound connection from $remote")
+                                  maybeDeclaredAddress: Option[InetSocketAddress]): Unit = {
+    register.getStageOfAddress(remote) match {
+      case UnknownPeer =>
+        log.info(s"New inbound connection from '$remote'")
+        if (register.inboundHandshakedConnectionsCount >= settings.maxInboundConnections) {
+          log.warn(s"Number of inbound connections (${register.inboundHandshakedConnectionsCount}) " +
+            s"exceed allowed ${settings.maxInboundConnections}: Close connection")
+          handlerRef ! CloseConnection
         } else {
-          log.info(s"Outbound connection to $remote has been established")
+          register.registerHandler(remote, handlerRef)
+          replyWithHandshake(handlerRef, maybeDeclaredAddress)
         }
-      } else {
-        log.debug(s"Max connection from host '$remote' was exceeded: Close connection")
+      case ConnectingPeer =>
+        log.info(s"New outbound connection to '$remote'")
+        if (register.outboundHandshakedConnectionsCount >= settings.maxOutboundConnections) {
+          log.warn(s"Number of outbound connections (${register.outboundHandshakedConnectionsCount}) " +
+            s"exceed allowed ${settings.maxOutboundConnections}: Close connection")
+          handlerRef ! CloseConnection
+        } else {
+          register.registerHandler(remote, handlerRef)
+          replyWithHandshake(handlerRef, maybeDeclaredAddress)
+        }
+      case ConnectedPeer =>
+        log.warn(s"Duplicate connection with already connected peer '$remote': Close connection")
         handlerRef ! CloseConnection
-      }
+      case HandshakedPeer =>
+        log.warn(s"Duplicate connection with already handshaked peer '$remote': Close connection")
+        handlerRef ! CloseConnection
     }
+  }
+
+  private def replyWithHandshake(handler: ActorRef, maybeDeclaredAddress: Option[InetSocketAddress]): Unit = {
+    val handshake = Handshake(applicationName, appVersion, settings.nodeName, settings.nonce, maybeDeclaredAddress,
+      System.currentTimeMillis() / 1000)
+
+    handler ! handshake
   }
 
   private def sendDataToNetwork(message: Message[_], sendingStrategy: SendingStrategy): Unit = {
@@ -257,6 +265,9 @@ class PeerManager(
 
     case Suspect(address) =>
       val count = register.suspect(address)
+      log.debug(s"Peer '$address' is under suspicion with $count failures out of ${
+        settings.blackListThreshold
+      }")
       if (count >= settings.blackListThreshold) {
         register.removeSuspect(address)
         addPeerToBlacklist(address)
@@ -264,7 +275,9 @@ class PeerManager(
   }
 
   private def addPeerToBlacklist(address: InetSocketAddress): Unit = {
-    log.info(s"Blacklist peer $address")
+    log.info(s"Host '${
+      address.getHostName
+    }' was blacklisted because of peer '$address'")
     peerDatabase.blacklistHost(address.getHostName)
     register.getConnectionHandlersByHost(address.getAddress).foreach(_ ! CloseConnection)
 
@@ -284,8 +297,7 @@ object PeerManager {
 
   case class AddPeer(address: InetSocketAddress)
 
-  case class Connected(socketAddress: InetSocketAddress, handlerRef: ActorRef,
-                       ownSocketAddress: Option[InetSocketAddress], inbound: Boolean)
+  case class Connected(socketAddress: InetSocketAddress, handlerRef: ActorRef, maybeDeclaredAddress: Option[InetSocketAddress])
 
   case class Handshaked(address: InetSocketAddress, handshake: Handshake)
 
@@ -318,8 +330,6 @@ object PeerManager {
   case object GetConnectedPeers
 
   case object GetConnectedPeersTyped
-
-  case object GetConnections
 
   private case object MarkConnectedPeersVisited
 
