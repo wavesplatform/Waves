@@ -1,7 +1,7 @@
 package com.wavesplatform.state2
 
 import cats._
-import cats.implicits._
+import cats.kernel.instances.map._
 import cats.Monoid
 
 case class Portfolio(balance: Long, leaseInfo: LeaseInfo, assets: Map[ByteArray, Long]) {
@@ -18,6 +18,6 @@ object Portfolio {
     = Portfolio(
       balance = safeSum(older.balance, newer.balance),
       leaseInfo = Monoid.combine(older.leaseInfo, newer.leaseInfo),
-      assets = older.assets.combine(newer.assets))
+      assets = Monoid.combine(older.assets, newer.assets))
   }
 }
