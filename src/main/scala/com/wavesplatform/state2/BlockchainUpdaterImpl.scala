@@ -86,6 +86,7 @@ class BlockchainUpdaterImpl(persisted: StateWriter with StateReader, settings: F
             inMemoryDiff = unsafeDiffAgainstPersistedByRange(persisted.height + 1, height + 1)
           }
         }
+        logHeights(s"Rollback to height $height completed:")
         true
       case None =>
         log.warn(s"removeAfter non-existing block ${Base58.encode(blockId)}")
