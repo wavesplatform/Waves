@@ -48,6 +48,8 @@ object TestChainParameters {
     override def allowMultipleLeaseCancelTransactionUntilTimestamp: Long = Long.MaxValue
 
     override def resetEffectiveBalancesAtHeight: Long = Long.MaxValue
+
+    override def allowTransferLeasedBalanceUntil: Long = Long.MaxValue
   }
 
   val Enabled = new ChainParameters with GenesisData {
@@ -75,5 +77,7 @@ object TestChainParameters {
     override def allowMultipleLeaseCancelTransactionUntilTimestamp: Long = 0L
 
     override def resetEffectiveBalancesAtHeight: Long = 0L
+
+    override def allowTransferLeasedBalanceUntil: Long = 0L
   }
 }

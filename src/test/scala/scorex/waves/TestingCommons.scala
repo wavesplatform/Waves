@@ -87,6 +87,7 @@ trait TestingCommons extends Suite with BeforeAndAfterAll with Eventually {
       |        allow-invalid-reissue-in-same-block-until-timestamp: 0
       |        allow-multiple-lease-cancel-transaction-until-timestamp: 0
       |        reset-effective-balances-at-height: 0
+      |        allow-transfer-leased-balance-until: 1477958400000
       |      }
       |      genesis {
       |        timestamp: 1478000000000
@@ -196,6 +197,7 @@ trait TestingCommons extends Suite with BeforeAndAfterAll with Eventually {
       |        allow-invalid-reissue-in-same-block-until-timestamp: 0
       |        allow-multiple-lease-cancel-transaction-until-timestamp: 0
       |        reset-effective-balances-at-height: 0
+      |        allow-transfer-leased-balance-until: 1477958400000
       |      }
       |      genesis {
       |        timestamp: 1478000000000
@@ -280,6 +282,7 @@ trait TestingCommons extends Suite with BeforeAndAfterAll with Eventually {
       |        allow-invalid-reissue-in-same-block-until-timestamp: 0
       |        allow-multiple-lease-cancel-transaction-until-timestamp: 0
       |        reset-effective-balances-at-height: 0
+      |        allow-transfer-leased-balance-until: 1477958400000
       |      }
       |      genesis {
       |        timestamp: 1478000000000

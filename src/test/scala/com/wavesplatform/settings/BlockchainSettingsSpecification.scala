@@ -29,6 +29,7 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
         |        allow-invalid-reissue-in-same-block-until-timestamp: 12
         |        allow-multiple-lease-cancel-transaction-until-timestamp: 13
         |        reset-effective-balances-at-height: 14
+        |        allow-transfer-leased-balance-until: 15
         |      }
         |      genesis {
         |        timestamp: 1460678400000
@@ -61,6 +62,7 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
     settings.functionalitySettings.allowInvalidReissueInSameBlockUntilTimestamp should be(12)
     settings.functionalitySettings.allowMultipleLeaseCancelTransactionUntilTimestamp should be(13)
     settings.functionalitySettings.resetEffectiveBalancesAtHeight should be(14)
+    settings.functionalitySettings.allowTransferLeasedBalanceUntil should be(15)
     settings.genesisSettings.timestamp should be (1460678400000L)
     settings.genesisSettings.signature should be ("BASE58BLOCKSIGNATURE")
     settings.genesisSettings.initialBalance should be (100000000000000L)
@@ -97,6 +99,7 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
     settings.functionalitySettings.allowMultipleLeaseCancelTransactionUntilTimestamp should be(1492560000000L)
     settings.functionalitySettings.allowExchangeTransactionAfterTimestamp should be(1483228800000L)
     settings.functionalitySettings.resetEffectiveBalancesAtHeight should be(51500)
+    settings.functionalitySettings.allowTransferLeasedBalanceUntil should be(Long.MaxValue)
     settings.genesisSettings.timestamp should be (1478000000000L)
     settings.genesisSettings.signature should be ("5uqnLK3Z9eiot6FyYBfwUnbyid3abicQbAZjz38GQ1Q8XigQMxTK4C1zNkqS1SVw7FqSidbZKxWAKLVoEsp4nNqa")
     settings.genesisSettings.initialBalance should be (10000000000000000L)
@@ -136,6 +139,7 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
     settings.functionalitySettings.resetEffectiveBalancesAtHeight should be(462000)
     settings.functionalitySettings.requirePaymentUniqueId should be(1491192000000L)
     settings.functionalitySettings.allowExchangeTransactionAfterTimestamp should be(1491192000000L)
+    settings.functionalitySettings.allowTransferLeasedBalanceUntil should be(Long.MaxValue)
     settings.genesisSettings.timestamp should be (1465742577614L)
     settings.genesisSettings.signature should be ("FSH8eAAzZNqnG8xgTZtz5xuLqXySsXgAjmFEC25hXMbEufiGjqWPnGCZFt6gLiVLJny16ipxRNAkkzjjhqTjBE2")
     settings.genesisSettings.initialBalance should be (10000000000000000L)
