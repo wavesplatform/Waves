@@ -20,6 +20,7 @@ import scorex.transaction.History
 import scorex.utils.ScorexLogging
 
 import scala.concurrent.duration._
+import scala.util.Random
 
 class ServerChannelInitializer(handshake: Handshake)
   extends ChannelInitializer[SocketChannel] {
@@ -76,7 +77,7 @@ class NetworkServer(chainId: Char, settings: WavesSettings, history: History, al
   private def connectedPeerAddresses =
     allConnectedPeers.keySet.stream.map[InetAddress](pk => pk.host).collect(Collectors.toSet())
   private def randomKnownPeer: Option[InetSocketAddress] =
-    knownPeers.filterNot(p => connectedPeerAddresses.contains(p.getAddress)).headOption
+    Random.shuffle(knownPeers.filterNot(p => connectedPeerAddresses.contains(p.getAddress))).headOption
 
   workerGroup.scheduleWithFixedDelay(1.second, 5.seconds) {
     val inactiveConnections = allChannels.stream().filter(!_.isActive).collect(Collectors.toSet())
