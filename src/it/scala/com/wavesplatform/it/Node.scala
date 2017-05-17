@@ -191,7 +191,7 @@ class Node (config: Config, val nodeInfo: NodeInfo, client: AsyncHttpClient, tim
 
   def expectIncorrectOrderPlacement(order: Order, expectedStatusCode: Int, expectedStatus: String): Future[Boolean] =
     matcherPost("/matcher/orderbook", order.json) transform {
-      case Success(r) if r.getStatusCode == expectedStatusCode =>
+      case Failure(UnexpectedStatusCodeException(r)) if r.getStatusCode == expectedStatusCode =>
         Try(parse(r.getResponseBody).as[MatcherStatusResponse]) match {
           case Success(mr) if mr.status == expectedStatus => Success(true)
           case Failure(f) => Failure(new RuntimeException(s"Failed to parse response: $f"))
@@ -212,7 +212,7 @@ class Node (config: Config, val nodeInfo: NodeInfo, client: AsyncHttpClient, tim
 
 object Node extends ScorexLogging {
 
-  case class UnexpectedStatusCodeException(r: Response) extends IOException(s"Unexpected status code: ${r.getStatusCode}")
+  case class UnexpectedStatusCodeException(r: Response) extends Exception(s"Unexpected status code: ${r.getStatusCode}")
 
   case class Status(blockGeneratorStatus: Option[String], historySynchronizationStatus: Option[String])
 
