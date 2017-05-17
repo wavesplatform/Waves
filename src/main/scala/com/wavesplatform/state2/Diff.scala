@@ -70,7 +70,7 @@ object Diff {
             leaseState: Map[ByteArray, Boolean] = Map.empty,
             assetsWithUniqueNames: Map[ByteArray, ByteArray] = Map.empty
            ): Diff = Diff(
-    transactions = Map(EqByteArray(tx.id) -> (height, tx, portfolios.keys.toSet)),
+    transactions = Map(EqByteArray(tx.id) -> ((height, tx, portfolios.keys.toSet))),
     portfolios = portfolios,
     issuedAssets = assetInfos,
     aliases = aliases,

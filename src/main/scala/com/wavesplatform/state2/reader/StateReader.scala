@@ -93,7 +93,7 @@ object StateReader {
     def getAccountBalance(account: Account): Map[AssetId, (Long, Boolean, Long, IssueTransaction)] =
       s.accountPortfolio(account).assets.map { case (id, amt) =>
         val assetInfo = s.assetInfo(id).get
-        id.arr -> (amt, assetInfo.isReissuable, assetInfo.volume, findTransaction[IssueTransaction](id.arr).get)
+        id.arr -> ((amt, assetInfo.isReissuable, assetInfo.volume, findTransaction[IssueTransaction](id.arr).get))
       }
 
     def assetDistribution(assetId: Array[Byte]): Map[String, Long] =

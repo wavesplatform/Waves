@@ -110,7 +110,7 @@ class BlockchainSynchronizer(protected val networkControllerRef: ActorRef, coord
     }
   }
 
-  def gettingExtensionTail(downloadInfo: DownloadInfo, overlap: InnerIds, peers: PeerSet): Receive =
+  private def gettingExtensionTail(downloadInfo: DownloadInfo, overlap: InnerIds, peers: PeerSet): Receive =
     state(GettingExtensionTail, acceptSignaturesSpecOnlyFrom(peers.active)) {
       case SignaturesFromPeer(tail, connectedPeer) =>
 
@@ -130,7 +130,7 @@ class BlockchainSynchronizer(protected val networkControllerRef: ActorRef, coord
         }
     }
 
-  def gettingBlocks(blockIds: InnerIds,
+  private def gettingBlocks(blockIds: InnerIds,
                     lastCommonBlockId: BlockId,
                     peers: PeerSet): Receive = {
 
