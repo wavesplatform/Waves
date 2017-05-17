@@ -28,7 +28,6 @@ class PeerManager(
   import PeerManager._
 
   val blacklistResendInterval = settings.blackListResidenceTime / 10
-  private implicit val system = context.system
   private val connectedPeers = mutable.Map[InetSocketAddress, PeerConnection]()
   private val suspects = mutable.Map.empty[InetSocketAddress, Int]
   private val maybeFilename = Option(settings.file).filter(_.trim.nonEmpty)

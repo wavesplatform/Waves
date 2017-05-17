@@ -1,7 +1,6 @@
 package scorex.account
 
 import java.util
-import java.util.Collections
 
 import com.wavesplatform.utils.base58Length
 import scorex.crypto.encode.Base58

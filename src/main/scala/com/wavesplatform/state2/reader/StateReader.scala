@@ -7,7 +7,6 @@ import scorex.crypto.hash.FastCryptographicHash
 import scorex.transaction.ValidationError.AliasNotExists
 import scorex.transaction._
 import scorex.transaction.assets.IssueTransaction
-import scorex.transaction.assets.exchange.{ExchangeTransaction, Order}
 import scorex.transaction.lease.LeaseTransaction
 import scorex.utils.ScorexLogging
 

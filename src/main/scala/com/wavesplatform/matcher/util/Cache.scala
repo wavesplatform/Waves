@@ -1,7 +1,8 @@
 package com.wavesplatform.matcher.util
 
-import com.google.common.cache.{ Cache => GuavaCache, CacheBuilder}
-import java.util.concurrent.{ Callable, TimeUnit }
+import java.util.concurrent.Callable
+
+import com.google.common.cache.{Cache => GuavaCache}
 
 sealed trait Caching[K, V] {
   def get(k: K): Option[V]

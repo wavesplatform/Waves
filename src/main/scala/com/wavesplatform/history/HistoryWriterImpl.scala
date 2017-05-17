@@ -7,7 +7,7 @@ import scorex.block.Block.BlockId
 import scorex.crypto.encode.Base58
 import scorex.transaction.History.BlockchainScore
 import scorex.transaction.ValidationError.CustomError
-import scorex.transaction.{History, HistoryWriter, ValidationError}
+import scorex.transaction.{HistoryWriter, ValidationError}
 import scorex.utils.{LogMVMapBuilder, ScorexLogging}
 
 class HistoryWriterImpl(db: MVStore) extends HistoryWriter with ScorexLogging {

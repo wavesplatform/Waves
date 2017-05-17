@@ -99,7 +99,7 @@ class Miner(minerSettings: MinerSettings,
 
     currentState = Some(tasks)
   } catch {
-    case e: UnsupportedOperationException =>
+    case _: UnsupportedOperationException =>
       log.debug(s"DB can't find last block because of unexpected modification")
   }
 

@@ -2,7 +2,7 @@ package com.wavesplatform.matcher.model
 
 import com.wavesplatform.matcher.model.MatcherModel.Price
 import play.api.libs.json.{JsValue, Json}
-import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
+import scorex.transaction.assets.exchange.{Order, OrderType}
 
 object MatcherModel {
   type Price = Long

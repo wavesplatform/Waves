@@ -1,15 +1,16 @@
 package scorex.transaction.assets
 
-import scala.util.{Failure, Success, Try}
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.utils.base58Length
 import play.api.libs.json.{JsObject, Json}
-import scorex.account.{Account, AccountOrAlias, PrivateKeyAccount, PublicKeyAccount}
+import scorex.account.{AccountOrAlias, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.serialization.{BytesSerializable, Deser}
 import scorex.transaction.TransactionParser._
 import scorex.transaction.{ValidationError, _}
+
+import scala.util.{Failure, Success, Try}
 
 sealed trait TransferTransaction extends SignedTransaction {
   def assetId: Option[AssetId]

@@ -21,7 +21,6 @@ class Matcher(actorSystem: ActorSystem,
               wallet: Wallet,
               newTransactionHandler: NewTransactionHandler,
               stateReader: StateReader,
-              time: Time,
               history: History,
               blockchainSettings: BlockchainSettings,
               restAPISettings: RestAPISettings, matcherSettings: MatcherSettings) extends ScorexLogging {
@@ -36,7 +35,7 @@ class Matcher(actorSystem: ActorSystem,
   )
 
   lazy val matcher: ActorRef = actorSystem.actorOf(MatcherActor.props(stateReader, wallet, matcherSettings,
-    newTransactionHandler, time, history,
+    newTransactionHandler, history,
     blockchainSettings.functionalitySettings), MatcherActor.name)
 
   @volatile var matcherServerBinding: ServerBinding = _
@@ -45,7 +44,7 @@ class Matcher(actorSystem: ActorSystem,
     Await.result(matcherServerBinding.unbind(), 10.seconds)
   }
 
-  def runMatcher() {
+  def runMatcher(): Unit = {
     log.info(s"Starting matcher on: ${matcherSettings.bindAddress}:${matcherSettings.port} ...")
 
     implicit val as = actorSystem
@@ -55,7 +54,6 @@ class Matcher(actorSystem: ActorSystem,
     matcherServerBinding = Await.result(Http().bindAndHandle(combinedRoute, matcherSettings.bindAddress,
       matcherSettings.port), 5.seconds)
 
-    implicit val ec = actorSystem.dispatcher
     log.info(s"Matcher bound to ${matcherServerBinding.localAddress} ")
   }
 

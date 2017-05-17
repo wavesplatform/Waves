@@ -44,7 +44,7 @@ class TimeImpl extends Time with ScorexLogging {
     txTime
   }
 
-  private def updateOffSet() {
+  private def updateOffSet() : Unit = {
     val client = new NTPUDPClient()
     client.setDefaultTimeout(10000)
 

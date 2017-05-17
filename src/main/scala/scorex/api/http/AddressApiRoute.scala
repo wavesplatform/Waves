@@ -12,7 +12,7 @@ import play.api.libs.json._
 import scorex.account.{Account, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
-import scorex.transaction.{PoSCalc, NewTransactionHandler}
+import scorex.transaction.PoSCalc
 import scorex.wallet.Wallet
 
 import scala.util.{Failure, Success, Try}
@@ -312,7 +312,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
         val account = Account.fromPublicKey(pubKeyBytes)
         complete(Json.obj("address" -> account.address))
       }
-      case Failure(e) => complete(InvalidPublicKey)
+      case Failure(_) => complete(InvalidPublicKey)
     }
   }
 }

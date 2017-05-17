@@ -147,7 +147,7 @@ object MatcherActor {
   def name = "matcher"
 
   def props(storedState: StateReader, wallet: Wallet, settings: MatcherSettings,
-            transactionModule: NewTransactionHandler, time: Time, history: History,
+            transactionModule: NewTransactionHandler, history: History,
             functionalitySettings: FunctionalitySettings): Props =
     Props(new MatcherActor(storedState, wallet, settings, history, functionalitySettings, transactionModule))
 

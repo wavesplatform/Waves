@@ -1,6 +1,5 @@
 package scorex.transaction.state.database
 
-import com.wavesplatform.settings.UTXSettings
 import com.wavesplatform.state2.{ByteArray, EqByteArray}
 import scorex.transaction.ValidationError.TransactionValidationError
 import scorex.transaction.{Transaction, UnconfirmedTransactionsStorage, ValidationError}

@@ -6,13 +6,13 @@ case class PeerInfo(timestamp: Long, nonce: Long, nodeName: String = "")
 
 trait PeerDatabase {
 
-  def addPeer(socketAddress: InetSocketAddress, nonce: Option[Long], name: Option[String])
+  def addPeer(socketAddress: InetSocketAddress, nonce: Option[Long], name: Option[String]) : Unit
 
-  def removePeer(socketAddress: InetSocketAddress)
+  def removePeer(socketAddress: InetSocketAddress): Unit
 
-  def touch(socketAddress: InetSocketAddress)
+  def touch(socketAddress: InetSocketAddress): Unit
 
-  def blacklistHost(host: String)
+  def blacklistHost(host: String): Unit
 
   def getKnownPeers: Map[InetSocketAddress, PeerInfo]
 

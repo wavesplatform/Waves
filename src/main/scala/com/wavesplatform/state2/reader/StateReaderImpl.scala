@@ -3,7 +3,6 @@ package com.wavesplatform.state2.reader
 import cats.implicits._
 import com.wavesplatform.state2._
 import scorex.account.{Account, Alias}
-import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.transaction.lease.LeaseTransaction
 import scorex.transaction.{Transaction, TransactionParser}
 

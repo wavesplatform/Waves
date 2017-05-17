@@ -109,7 +109,7 @@ class NetworkController(networkSettings: NetworkSettings, uPnP: => UPnP, peerMan
       log.info(s"Connecting to: $remote")
       IO(Tcp) ! Connect(remote, localAddress = None, timeout = connTimeout)
 
-    case Connected(remote, local) =>
+    case Connected(remote, _) =>
       val connection = sender()
       createPeerHandler(connection, remote, inbound = false)
 

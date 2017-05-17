@@ -1,12 +1,9 @@
 package com.wavesplatform.matcher.model
 
 import play.api.libs.json.{Json, Writes}
-import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange.AssetPair
 
-case class OrderBookResult(timestamp: Long, pair: AssetPair, bids: Seq[LevelAgg], asks: Seq[LevelAgg]) {
-
-}
+case class OrderBookResult(timestamp: Long, pair: AssetPair, bids: Seq[LevelAgg], asks: Seq[LevelAgg])
 
 object OrderBookResult {
   implicit val assetPairWrites = new Writes[AssetPair] {

@@ -5,10 +5,8 @@ import javax.ws.rs.Path
 import akka.actor.ActorRef
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.settings.{CheckpointsSettings, RestAPISettings}
-import com.wavesplatform.state2.EqByteArray
 import io.swagger.annotations._
 import play.api.libs.json._
-import scorex.account.Account
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.network.Checkpoint
@@ -62,7 +60,7 @@ case class BlocksApiRoute(settings: RestAPISettings, checkpointsSettings: Checkp
 
   @Path("/delay/{signature}/{blockNum}")
   @ApiOperation(value = "Average delay",
-    notes = "Average delay in milliseconds between last $blockNum blocks starting from block with $signature", httpMethod = "GET")
+    notes = "Average delay in milliseconds between last %blockNum blocks starting from block with %signature", httpMethod = "GET")
   @ApiImplicitParams(Array(
     new ApiImplicitParam(name = "signature", value = "Base58-encoded signature", required = true, dataType = "string", paramType = "path"),
     new ApiImplicitParam(name = "blockNum", value = "Number of blocks to count delay", required = true, dataType = "string", paramType = "path")

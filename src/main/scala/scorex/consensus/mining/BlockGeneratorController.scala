@@ -102,7 +102,7 @@ class BlockGeneratorController(minerSettings: MinerSettings,
     val lastBlockTimestamp = history.lastBlock.timestamp
     time.correctedTime() <= lastBlockTimestamp + minerSettings.intervalAfterLastBlockThenGenerationIsAllowed.toMillis
   } catch {
-    case e: UnsupportedOperationException =>
+    case _: UnsupportedOperationException =>
       log.debug(s"DB can't find last block because of unexpected modification")
       false
   }

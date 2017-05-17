@@ -4,7 +4,6 @@ import cats.Monoid
 import cats.implicits._
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2._
-import com.wavesplatform.state2.diffs._
 import com.wavesplatform.state2.patch.LeasePatch
 import com.wavesplatform.state2.reader.{CompositeStateReader, StateReader}
 import scorex.account.Account

@@ -42,10 +42,10 @@ object OrderBook {
   }
 
   def cancelOrder(ob: OrderBook, orderId: String): Option[OrderCanceled] = {
-    ob.bids.find { case (p, v) => v.exists(_.order.idStr == orderId)}
-        .orElse(ob.asks.find { case (p, v) => v.exists(_.order.idStr == orderId)})
+    ob.bids.find { case (_, v) => v.exists(_.order.idStr == orderId)}
+        .orElse(ob.asks.find { case (_, v) => v.exists(_.order.idStr == orderId)})
       .fold(Option.empty[OrderCanceled]) {
-        case (p, v) =>
+        case (_, v) =>
           Some(OrderCanceled(v.find(_.order.idStr == orderId).get))
       }
   }
@@ -98,29 +98,4 @@ object OrderBook {
     case e@OrderExecuted(_, c: SellLimitOrder) => updateExecutedSell(ob, c, e.counterRemaining)
     case OrderCanceled(limitOrder) => updateCancelOrder(ob, limitOrder)
   }
-
-
-  private def executeBuy(ob: OrderBook, level: (Price, Level[SellLimitOrder]),
-                 o: BuyLimitOrder): (OrderBook, Option[SellLimitOrder], Long) = level._2 match {
-    case h +: t if h.amount > o.amount =>
-      (ob.copy(asks = ob.asks + (level._1 -> (h.copy(amount = h.amount - o.amount) +: t))),
-        Some(h.copy(amount = o.amount)), 0L)
-    case h +: t if t.nonEmpty =>
-      (ob.copy(asks = ob.asks + (level._1 -> t)), Some(h), o.amount - h.amount)
-    case h +: _ =>
-      (ob.copy(asks = ob.asks - level._1), Some(h), o.amount - h.amount)
-    }
-
-
-  private def executeSell(ob: OrderBook, level: (Price, Level[BuyLimitOrder]),
-                 o: SellLimitOrder): (OrderBook, Option[BuyLimitOrder], Long) = level._2 match {
-    case h +: t if h.amount > o.amount =>
-      (ob.copy(bids = ob.bids + (level._1 -> (h.copy(amount = h.amount - o.amount) +: t))),
-        Some(h.copy(amount = o.amount)), 0L)
-    case h +: t if t.nonEmpty =>
-      (ob.copy(bids = ob.bids + (level._1 -> t)), Some(h), o.amount - h.amount)
-    case h +: _ =>
-      (ob.copy(bids = ob.bids - level._1), Some(h), o.amount - h.amount)
-  }
-
 }

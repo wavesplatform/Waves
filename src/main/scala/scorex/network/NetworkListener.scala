@@ -68,7 +68,7 @@ class NetworkListener(networkController: ActorRef, peerManager: ActorRef, bindAd
       log.error("Network port " + bindAddress.getPort + " already in use!")
       networkController ! NetworkController.ListeningFailed
 
-    case Connected(remote, local) =>
+    case Connected(remote, _) =>
       if (blocked.contains(remote.getAddress.getHostName)) {
         sender() ! Close
       } else {

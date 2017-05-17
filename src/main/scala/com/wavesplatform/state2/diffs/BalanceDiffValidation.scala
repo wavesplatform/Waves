@@ -9,7 +9,7 @@ import scorex.transaction.ValidationError.TransactionValidationError
 import scala.util.{Left, Right}
 
 object BalanceDiffValidation {
-  def apply[T <: Transaction](s: StateReader, time: Long)(tx: T, d: Diff): Either[TransactionValidationError, Diff] = {
+  def apply[T <: Transaction](s: StateReader)(tx: T, d: Diff): Either[TransactionValidationError, Diff] = {
 
     val changedAccounts = d.portfolios.keySet
     val positiveBalanceErrors = changedAccounts.flatMap(acc => {

@@ -4,7 +4,7 @@ import cats._
 import cats.implicits._
 import com.wavesplatform.state2._
 import com.wavesplatform.state2.reader.StateReader
-import scorex.transaction.{StateValidationError, ValidationError}
+import scorex.transaction.StateValidationError
 import scorex.transaction.ValidationError.TransactionValidationError
 import scorex.transaction.assets.exchange.ExchangeTransaction
 
@@ -49,10 +49,6 @@ object ExchangeTransactionDiff {
     }
 
     val portfolios = Monoid.combineAll(Seq(feeDiff, priceDiff, amountDiff))
-
-    lazy val orderExchangeTxsMap: Map[EqByteArray, Set[ExchangeTransaction]] = Map(
-      EqByteArray(tx.buyOrder.id) -> Set(tx),
-      EqByteArray(tx.sellOrder.id) -> Set(tx))
 
     Diff(height, tx, portfolios = portfolios, orderFills = Map(
       EqByteArray(tx.buyOrder.id) -> OrderFillInfo(tx.amount, tx.buyMatcherFee),
