@@ -66,6 +66,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader, set
   override def removeAfter(blockId: BlockId): Unit = write { implicit l =>
     bc.heightOf(blockId) match {
       case Some(height) =>
+        logHeights(s"Rollback to height $height started:")
         while (bc.height > height) {
           bc.discardBlock()
         }
@@ -79,6 +80,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader, set
             inMemoryDiff.set(unsafeDiffAgainstPersistedByRange(persisted.height + 1, height + 1))
           }
         }
+        logHeights(s"Rollback to height $height finished:")
       case None =>
         log.warn(s"removeAfter non-existing block ${Base58.encode(blockId)}")
     }

@@ -29,7 +29,7 @@ class TestFiveNodesSuite extends FreeSpec with BeforeAndAfterAll with ScorexLogg
 
     peersCounts.foreach(c => log.info(s"Connected peers: $c"))
 
-    all(peersCounts) shouldEqual 3
+    all(peersCounts.map(_.length)) shouldEqual 3
 
     log.debug("Starting tests")
   }
@@ -43,7 +43,8 @@ class TestFiveNodesSuite extends FreeSpec with BeforeAndAfterAll with ScorexLogg
     new MakeAssetNameUniqueTransactionSpecification(allNodes),
     new PaymentTransactionSpecification(allNodes),
     new ReissueTransactionSpecification(allNodes),
-    new TransferTransactionSpecification(allNodes)
+    new TransferTransactionSpecification(allNodes),
+    new NetworkSeparationTest(allNodes, docker)
   )
 
   override protected def afterAll() = docker.close()

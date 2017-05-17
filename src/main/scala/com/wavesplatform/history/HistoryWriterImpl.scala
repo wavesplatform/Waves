@@ -9,7 +9,7 @@ import scorex.block.Block.BlockId
 import scorex.crypto.encode.Base58
 import scorex.transaction.History.BlockchainScore
 import scorex.transaction.ValidationError.CustomError
-import scorex.transaction.{History, HistoryWriter, ValidationError}
+import scorex.transaction.{HistoryWriter, ValidationError}
 import scorex.utils.{LogMVMapBuilder, ScorexLogging}
 
 class HistoryWriterImpl private(db: MVStore, val synchronizationToken: ReentrantReadWriteLock) extends HistoryWriter with ScorexLogging {
@@ -35,6 +35,7 @@ class HistoryWriterImpl private(db: MVStore, val synchronizationToken: Reentrant
   override def discardBlock(): Unit = write { implicit lock =>
     val h = height()
     blockBodyByHeight.mutate(_.remove(h))
+    scoreByHeight.mutate(_.remove(h))
     val vOpt = Option(blockIdByHeight.mutate(_.remove(h)))
     vOpt.map(v => heightByBlockId.mutate(_.remove(v)))
     db.commit()
