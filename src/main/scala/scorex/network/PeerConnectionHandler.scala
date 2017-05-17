@@ -16,7 +16,6 @@ import scorex.network.peer.PeerManager.Handshaked
 import scorex.utils.ScorexLogging
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.language.postfixOps
 import scala.util.{Failure, Success}
 
 case class PeerConnectionHandler(peerManager: ActorRef,
@@ -178,7 +177,7 @@ case class PeerConnectionHandler(peerManager: ActorRef,
 
   private var chunksBuffer: ByteString = CompactByteString()
 
-  private def processReceivedData(data: ByteString) = {
+  private def processReceivedData(data: ByteString): Unit = {
     val (pkt, remainder) = getPacket(chunksBuffer ++ data)
     chunksBuffer = remainder
 

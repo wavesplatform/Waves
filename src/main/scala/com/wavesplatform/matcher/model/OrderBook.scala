@@ -1,9 +1,7 @@
 package com.wavesplatform.matcher.model
 
-import com.wavesplatform.matcher.model.Events.Event
 import com.wavesplatform.matcher.model.MatcherModel.{Level, Price}
 
-import scala.collection.+:
 import scala.collection.immutable.TreeMap
 
 case class OrderBook(bids: TreeMap[Price, Level[BuyLimitOrder]],
@@ -16,12 +14,8 @@ case class OrderBook(bids: TreeMap[Price, Level[BuyLimitOrder]],
 
 
 object OrderBook {
-  val bidsOrdering: Ordering[Long] = new Ordering[Long] {
-    def compare(x: Long, y: Long): Int = - Ordering.Long.compare(x, y)
-  }
-  val asksOrdering: Ordering[Long] = new Ordering[Long] {
-    def compare(x: Long, y: Long): Int = Ordering.Long.compare(x, y)
-  }
+  val bidsOrdering: Ordering[Long] = (x: Long, y: Long) => -Ordering.Long.compare(x, y)
+  val asksOrdering: Ordering[Long] = (x: Long, y: Long) => Ordering.Long.compare(x, y)
 
   val empty: OrderBook = OrderBook(TreeMap.empty[Price, Level[BuyLimitOrder]](bidsOrdering),
     TreeMap.empty[Price, Level[SellLimitOrder]](asksOrdering))

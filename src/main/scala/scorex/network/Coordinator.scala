@@ -27,7 +27,7 @@ import scorex.utils.{ScorexLogging, Time}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.language.{higherKinds, postfixOps}
+import scala.language.{higherKinds}
 import scala.util.control.NonFatal
 
 class Coordinator(protected override val networkControllerRef: ActorRef, blockchainSynchronizer: ActorRef, blockGenerator: ActorRef,
@@ -89,7 +89,7 @@ class Coordinator(protected override val networkControllerRef: ActorRef, blockch
 
       case GetStatus =>
         implicit val timeout = Timeout(5.seconds)
-        (blockchainSynchronizer ? GetSyncStatus).mapTo[Status]
+        val _ = (blockchainSynchronizer ? GetSyncStatus).mapTo[Status]
           .map { syncStatus =>
             if (syncStatus == BlockchainSynchronizer.Idle && status == CIdle)
               CIdle.name

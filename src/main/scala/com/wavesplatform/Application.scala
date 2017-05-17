@@ -257,8 +257,9 @@ object Application extends ScorexLogging {
       val application = new Application(actorSystem, settings)
       application.run()
 
-      if (application.wallet.privateKeyAccounts().isEmpty)
-        application.wallet.generateNewAccounts(1)
+      if (application.wallet.privateKeyAccounts().isEmpty) {
+        val _ = application.wallet.generateNewAccounts(1)
+      }
     }
   }
 
@@ -268,5 +269,6 @@ object Application extends ScorexLogging {
       GenesisTransaction.create(acc, ts.amount, gs.transactionsTimestamp).right.get
     }
   }
+  def f00: Int = 4
 
 }

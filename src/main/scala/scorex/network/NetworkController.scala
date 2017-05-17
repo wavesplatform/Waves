@@ -99,7 +99,7 @@ class NetworkController(networkSettings: NetworkSettings, uPnP: => UPnP, peerMan
 
     case stn@SendToNetwork(_, _) =>
       val delay = 0
-      system.scheduler.scheduleOnce(delay.millis) {
+      val _ = system.scheduler.scheduleOnce(delay.millis) {
         peerManager ! stn
       }
   }

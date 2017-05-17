@@ -19,7 +19,7 @@ class HistoryReplier(protected val networkControllerRef: ActorRef, history: Hist
 
       log.info(s"Got GetSignaturesMessage with ${otherSigs.length} sigs within")
 
-      otherSigs.exists { parent =>
+      val _ = otherSigs.exists { parent =>
         val headers = history.blockIdsAfter(parent, maxChainLength)
 
         if (headers.nonEmpty) {

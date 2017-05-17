@@ -12,12 +12,12 @@ crossPaths := false
 publishArtifact in (Compile, packageDoc) := false
 publishArtifact in (Compile, packageSrc) := false
 mainClass in Compile := Some("com.wavesplatform.Application")
-scalacOptions ++= Seq("-feature", "-deprecation", "-Xmax-classfile-name", "128")
+scalacOptions ++= Seq("-Xmax-classfile-name", "128")
 scalacOptions ++= Seq(
-//  "-deprecation",                      // Emit warning and location for usages of deprecated APIs.
+  "-deprecation",                      // Emit warning and location for usages of deprecated APIs.
   "-encoding", "utf-8",                // Specify character encoding used by source files.
   "-explaintypes",                     // Explain type errors in more detail.
-//  "-feature",                          // Emit warning and location for usages of features that should be imported explicitly.
+  "-feature",                          // Emit warning and location for usages of features that should be imported explicitly.
 //  "-language:existentials",            // Existential types (besides wildcard types) can be written and inferred
 //  "-language:experimental.macros",     // Allow macro definition (besides implementation and application)
   "-language:higherKinds",             // Allow higher-kinded types
@@ -51,7 +51,7 @@ scalacOptions ++= Seq(
   "-Ywarn-infer-any",                  // Warn when a type argument is inferred to be `Any`.
   "-Ywarn-nullary-override",           // Warn when non-nullary `def f()' overrides nullary `def f'.
   "-Ywarn-nullary-unit",               // Warn when nullary methods return Unit.
-  "-Ywarn-numeric-widen",              // Warn when numerics are widened.
+//  "-Ywarn-numeric-widen",              // Warn when numerics are widened.
   "-Ywarn-unused:implicits",           // Warn if an implicit parameter is unused.
   "-Ywarn-unused:imports",             // Warn if an import selector is not referenced.
   "-Ywarn-unused:locals",              // Warn if a local definition is unused.

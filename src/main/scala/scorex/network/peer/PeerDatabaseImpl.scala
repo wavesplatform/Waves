@@ -29,7 +29,7 @@ class PeerDatabaseImpl(settings: NetworkSettings, filename: Option[String]) exte
     if (nonce.isDefined) {
       unverifiedPeers.remove(socketAddress)
       peersPersistence.put(socketAddress, PeerInfo(System.currentTimeMillis(), nonce.get, nodeName.getOrElse("N/A")))
-      database.commit()
+      val _ = database.commit()
     } else if (!getKnownPeers.contains(socketAddress)) unverifiedPeers += socketAddress
   }
 
@@ -37,7 +37,7 @@ class PeerDatabaseImpl(settings: NetworkSettings, filename: Option[String]) exte
     unverifiedPeers.remove(socketAddress)
     if (peersPersistence.asScala.contains(socketAddress)) {
       peersPersistence.remove(socketAddress)
-      database.commit()
+      val _ = database.commit()
     }
   }
 
@@ -46,14 +46,14 @@ class PeerDatabaseImpl(settings: NetworkSettings, filename: Option[String]) exte
       dbPeerInfo => dbPeerInfo.copy(timestamp = System.currentTimeMillis())
     } foreach { updated =>
       peersPersistence.put(socketAddress, updated)
-      database.commit()
+      val _ = database.commit()
     }
   }
 
   override def blacklistHost(host: String): Unit = {
     unverifiedPeers.drop(_.getHostName == host)
     blacklist.put(host, System.currentTimeMillis())
-    database.commit()
+    val _ = database.commit()
   }
 
   override def getKnownPeers: Map[InetSocketAddress, PeerInfo] = {

@@ -10,7 +10,6 @@ import scorex.wallet.Wallet
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.language.postfixOps
 
 class BlockGeneratorController(minerSettings: MinerSettings,
                                history: History,
@@ -29,7 +28,7 @@ class BlockGeneratorController(minerSettings: MinerSettings,
 
   override def preStart(): Unit = {
     if (minerSettings.enable) {
-      context.system.scheduler.schedule(SelfCheckInterval, SelfCheckInterval, self, SelfCheck)
+      val _ = context.system.scheduler.schedule(SelfCheckInterval, SelfCheckInterval, self, SelfCheck)
     }
   }
 

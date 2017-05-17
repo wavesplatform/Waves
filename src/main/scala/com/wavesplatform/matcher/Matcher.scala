@@ -10,7 +10,7 @@ import com.wavesplatform.settings.{BlockchainSettings, RestAPISettings}
 import com.wavesplatform.state2.reader.StateReader
 import scorex.api.http.CompositeHttpService
 import scorex.transaction.{History, NewTransactionHandler}
-import scorex.utils.{ScorexLogging, Time}
+import scorex.utils.ScorexLogging
 import scorex.wallet.Wallet
 
 import scala.concurrent.Await

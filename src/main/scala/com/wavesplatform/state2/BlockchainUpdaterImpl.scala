@@ -27,11 +27,13 @@ class BlockchainUpdaterImpl(persisted: StateWriter with StateReader, settings: F
         BlockDiffer.unsafeDiffMany(settings)(sr, blocks)
       }
   }
-  private val unsafeDiffAgainstPersistedByRange: ((Int, Int)) => BlockDiff = unsafeDifferByRange(persisted, _)
+  private def unsafeDiffAgainstPersistedByRange (from:Int, to: Int) :BlockDiff = {
+    unsafeDifferByRange(persisted, (from,to))
+  }
 
   @volatile var inMemoryDiff: BlockDiff = Monoid[BlockDiff].empty
 
-  private def logHeights(prefix: String = ""): Unit =
+  private def logHeights(prefix: String): Unit =
     log.info(s"$prefix Total blocks: ${bc.height()}, persisted: ${persisted.height}, imMemDiff: ${inMemoryDiff.heightDiff}")
 
   {

@@ -13,7 +13,7 @@ import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange.Validation.booleanOperators
 import scorex.transaction.assets.exchange.{AssetPair, Order, Validation}
 import scorex.transaction.{AssetId, History, NewTransactionHandler}
-import scorex.utils.{ByteArrayExtension, NTP, ScorexLogging, Time}
+import scorex.utils.{ByteArrayExtension, NTP, ScorexLogging}
 import scorex.wallet.Wallet
 
 import scala.collection.{immutable, mutable}
@@ -131,7 +131,7 @@ class MatcherActor(storedState: StateReader, wallet: Wallet, settings: MatcherSe
 
   override def receiveRecover: Receive = {
     case OrderBookCreated(pair) =>
-      context.child(OrderBookActor.name(pair))
+      val _ = context.child(OrderBookActor.name(pair))
         .getOrElse(createOrderBook(pair))
     case RecoveryCompleted =>
       log.info("MatcherActor - Recovery completed!")

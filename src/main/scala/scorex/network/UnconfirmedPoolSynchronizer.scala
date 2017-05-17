@@ -25,7 +25,7 @@ class UnconfirmedPoolSynchronizer(private val transactionModule: NewTransactionH
   override def receive: Receive = {
     case DataFromPeer(msgId, tx: Transaction, remote) if msgId == TransactionMessageSpec.messageCode =>
       log.debug(s"Got tx: $tx")
-      transactionModule.onNewOffchainTransactionExcept(tx, Some(remote))
+      val _ = transactionModule.onNewOffchainTransactionExcept(tx, Some(remote))
         .left.map(err => log.error(s"Transaction $tx has been rejected by UTX pool. Reason: $err"))
 
     case BroadcastRandom =>
