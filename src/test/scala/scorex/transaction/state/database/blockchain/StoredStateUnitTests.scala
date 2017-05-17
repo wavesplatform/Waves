@@ -157,7 +157,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
     val bts = trans.map(_.timestamp).max
     val (time, result) = profile(state.validate(trans, blockTime = bts))
     time should be < 1000L
-    result.size should be <= trans.size
+    result.size shouldBe 1
   }
 
   property("Burn assets") {
@@ -520,11 +520,11 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
 
   property("Double lease cancel should fail after fork activation") {
     val state2 = StoredState.fromDB(db, leasingForkParameters)
-    forAll(leaseAndCancelsAfterForkGen) { case (lease, cancel1, cancel2, otherCancel1, otherCancel2) =>
+    forAll(leaseAndCancelsAfterForkGen) { case (lease, cancel1, cancel2, _, _) =>
       withRollbackTest(state2) {
         val blockTimestamp = cancel2.timestamp
 
-        val genesisTransaction = GenesisTransaction.create(lease.sender, lease.amount + 10 * lease.fee, lease.timestamp - 10).right.get
+        val genesisTransaction = GenesisTransaction.create(lease.sender, lease.amount + lease.fee + cancel1.fee + cancel1.fee, lease.timestamp - 10).right.get
         state2.applyChanges(state2.calcNewBalances(Seq(genesisTransaction), Map(), allowTemporaryNegative = false), Seq(genesisTransaction))
 
         val balancesAfterLeasing = state2.calcNewBalances(Seq(lease), Map(), allowTemporaryNegative = false)
@@ -545,7 +545,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
     forAll(leaseAndCancelsAfterForkGen) { case (lease, cancel1, cancel2, otherCancel1, otherCancel2) =>
       withRollbackTest(state2) {
         val blockTimestamp = cancel2.timestamp
-        val genesisTransaction1 = GenesisTransaction.create(lease.sender, lease.amount + 10 * lease.fee, lease.timestamp - 10).right.get
+        val genesisTransaction1 = GenesisTransaction.create(lease.sender, lease.amount + lease.fee + cancel1.fee + cancel2.fee + otherCancel1.fee + otherCancel2.fee, lease.timestamp - 10).right.get
         val genesisTransaction2 = GenesisTransaction.create(lease.recipient, 3 * lease.amount, lease.timestamp - 10).right.get
         state2.applyChanges(state2.calcNewBalances(Seq(genesisTransaction1, genesisTransaction2), Map(),
           allowTemporaryNegative = false), Seq(genesisTransaction1, genesisTransaction2))

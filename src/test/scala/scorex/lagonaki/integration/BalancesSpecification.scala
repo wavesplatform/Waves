@@ -54,7 +54,7 @@ class BalancesSpecification extends FunSuite with Matchers with scorex.waves.Tes
     assertBalances(second, 100 * Constants.UnitsInWave, 200 * Constants.UnitsInWave)
   }
 
-  test("Can not make transfer without having enough of your own money") {
+  test("Can not make transfer without having enough of own money") {
     assertBalances(first, 190 * Constants.UnitsInWave, 90 * Constants.UnitsInWave)
     assertBalances(second, 100 * Constants.UnitsInWave, 200 * Constants.UnitsInWave)
 
@@ -175,5 +175,27 @@ class BalancesSpecification extends FunSuite with Matchers with scorex.waves.Tes
     assertBalances(second, 120 * Constants.UnitsInWave, 120 * Constants.UnitsInWave)
     assertAssetBalances(AssetAcc(first, Some(Base58.decode(issuedAssetId).get)), 0)
     assertAssetBalances(AssetAcc(second, Some(Base58.decode(issuedAssetId).get)), 100000)
+  }
+
+  test("Can not make transfer without having enough of your own available money") {
+    assertBalances(first, 100 * Constants.UnitsInWave, 100 * Constants.UnitsInWave)
+    assertBalances(second, 120 * Constants.UnitsInWave, 120 * Constants.UnitsInWave)
+    assertBalances(third, 100 * Constants.UnitsInWave, 100 * Constants.UnitsInWave)
+
+    val l1 = lease(first, second, 90 * Constants.UnitsInWave, fee = 1 * Constants.UnitsInWave).get
+    val l2 = lease(second, third, 90 * Constants.UnitsInWave, fee = 1 * Constants.UnitsInWave).get
+
+    assertBalances(first, 99 * Constants.UnitsInWave, 9 * Constants.UnitsInWave)  // first has 9 own waves
+    assertBalances(second, 119 * Constants.UnitsInWave, 119 * Constants.UnitsInWave) // second has 29 own waves
+    assertBalances(third, 100 * Constants.UnitsInWave, 190 * Constants.UnitsInWave)
+
+    assetTransfer(second, third, 30 * Constants.UnitsInWave, 1 * Constants.UnitsInWave, assertSuccess = false)
+
+    cancelLease(first, l1, 1 * Constants.UnitsInWave)
+    cancelLease(second, l2, 1 * Constants.UnitsInWave)
+
+    assertBalances(first, 98 * Constants.UnitsInWave, 98 * Constants.UnitsInWave)
+    assertBalances(second, 118 * Constants.UnitsInWave, 118 * Constants.UnitsInWave)
+    assertBalances(third, 100 * Constants.UnitsInWave, 100 * Constants.UnitsInWave)
   }
 }
