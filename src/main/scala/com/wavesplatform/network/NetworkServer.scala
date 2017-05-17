@@ -49,7 +49,7 @@ class ClientChannelInitializer(
       .addLast(HandshakeDecoder.Name, new HandshakeDecoder)
       .addLast(HandshakeTimeoutHandler.Name, new HandshakeTimeoutHandler)
       .addLast(ClientHandshakeHandler.Name, new ClientHandshakeHandler(handshake, connections))
-      .addLast(new LengthFieldPrepender(4, true))
+      .addLast(new LengthFieldPrepender(4))
       .addLast(new LengthFieldBasedFrameDecoder(1024*1024, 0, 4, 0, 4))
       .addLast(new MessageCodec(specs))
       .addLast(scoreObserver)
