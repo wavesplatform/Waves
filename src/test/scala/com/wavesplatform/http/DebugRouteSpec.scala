@@ -1,8 +1,8 @@
 package com.wavesplatform.http
 
 import com.wavesplatform.http.ApiMarshallers._
-import com.wavesplatform.state2.{LeaseInfo, Portfolio}
 import com.wavesplatform.state2.reader.StateReader
+import com.wavesplatform.state2.{LeaseInfo, Portfolio}
 import com.wavesplatform.{BlockGen, TestWallet, TransactionGen}
 import org.scalacheck.{Gen, Shrink}
 import org.scalamock.scalatest.MockFactory
