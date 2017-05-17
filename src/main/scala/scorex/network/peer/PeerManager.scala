@@ -1,20 +1,9 @@
 package scorex.network.peer
 
-import java.net.{InetAddress, InetSocketAddress}
+import java.net.InetSocketAddress
 
-import akka.actor.{Actor, ActorRef, Props}
-import akka.event.LoggingReceive
-import com.wavesplatform.Version
-import com.wavesplatform.settings.{Constants, NetworkSettings}
-import scorex.network.NetworkController.SendToNetwork
+import akka.actor.ActorRef
 import scorex.network._
-import scorex.network.message.MessageHandler.RawNetworkData
-import scorex.network.message.{Message, MessageSpec}
-import scorex.utils.ScorexLogging
-
-import scala.collection.mutable
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.util.{Random, Try}
 
 /** Must be singleton */
 class PeerManager(

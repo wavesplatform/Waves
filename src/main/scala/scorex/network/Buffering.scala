@@ -34,6 +34,7 @@ trait Buffering {
         (packets.reverse, current)
       } else {
         val len = current.iterator.getInt(ByteOrder.BIG_ENDIAN)
+        println(s"LEN=$len")
         if (len > MAX_PACKET_LEN || len < 0) throw new Exception(s"Invalid packet length: $len")
         if (current.length < len + headerSize) {
           (packets.reverse, current)
