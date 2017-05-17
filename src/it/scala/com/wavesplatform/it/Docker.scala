@@ -45,10 +45,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty) extends AutoCloseable wi
   timer.start()
 
   sys.addShutdownHook {
-    if (!isStopped.get()) {
-      close()
-      isStopped.set(true)
-    }
+    close()
   }
 
   private def knownPeers = nodes.values.zipWithIndex.map {
@@ -118,13 +115,15 @@ class Docker(suiteConfig: Config = ConfigFactory.empty) extends AutoCloseable wi
     timer.newTimeout(_ => f, initialDelay.toMillis, MILLISECONDS)
 
   override def close(): Unit = {
-    timer.stop()
-    log.info("Stopping containers")
-    nodes.keys.foreach(id => client.removeContainer(id, RemoveContainerParam.forceKill()))
-    client.removeNetwork(wavesNetwork.id())
-    client.close()
-    http.close()
-    isStopped.set(true)
+    if (isStopped.compareAndSet(false, true)) {
+      timer.stop()
+      log.info("Stopping containers")
+      nodes.keys.foreach(id => client.removeContainer(id, RemoveContainerParam.forceKill()))
+      client.removeNetwork(wavesNetwork.id())
+      client.close()
+      http.close()
+      isStopped.set(true)
+    }
   }
 
   def disconnectFromNetwork(containerId: String): Unit =  client.disconnectFromNetwork(containerId, wavesNetwork.id())
