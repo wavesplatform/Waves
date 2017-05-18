@@ -1,7 +1,7 @@
 package com.wavesplatform.state2.diffs
 
 import cats.implicits._
-import com.wavesplatform.state2.Diff
+import com.wavesplatform.state2.{Diff, LeaseInfo, Portfolio}
 import com.wavesplatform.state2.reader.StateReader
 import scorex.transaction.Transaction
 import scorex.transaction.ValidationError.TransactionValidationError
@@ -9,6 +9,8 @@ import scorex.transaction.ValidationError.TransactionValidationError
 import scala.util.{Left, Right}
 
 object BalanceDiffValidation {
+
+
   def apply[T <: Transaction](s: StateReader, time: Long)(tx: T, d: Diff): Either[TransactionValidationError, Diff] = {
 
     val changedAccounts = d.portfolios.keySet
@@ -18,20 +20,25 @@ object BalanceDiffValidation {
       val portfolioDiff = d.portfolios(acc)
       val newPortfolio = oldPortfolio.combine(portfolioDiff)
 
-      val allBalancesAndAssetsForAccountArePositive = newPortfolio.balance >= 0 &&
-        newPortfolio.balance >= newPortfolio.leaseInfo.leaseOut &&
-        newPortfolio.effectiveBalance >= 0 &&
-        newPortfolio.assets.values.forall(_ >= 0)
-      if (!allBalancesAndAssetsForAccountArePositive) {
-        Some(s"$acc, old: $oldPortfolio, new: $newPortfolio")
+
+      if (newPortfolio.balance < 0) {
+        Some(s"negative waves balance: $acc, old: ${oldPortfolio.balance}, new: ${newPortfolio.balance}")
+      } else if (newPortfolio.assets.values.exists(_ < 0)) {
+        Some(s"negative asset balance: $acc, old: $oldPortfolio, new: $newPortfolio")
+      } else if (newPortfolio.effectiveBalance < 0 ) {
+        Some(s"negative effective balance: $acc, old: ${leaseWavesInfo(oldPortfolio)}, new: ${leaseWavesInfo(oldPortfolio)}")
+      } else if (newPortfolio.balance < newPortfolio.leaseInfo.leaseOut) {
+        Some(s"leased being more than own: $acc, old: ${leaseWavesInfo(oldPortfolio)}, new: ${leaseWavesInfo(oldPortfolio)}")
       } else None
 
     })
     if (positiveBalanceErrors.isEmpty) {
       Right(d)
     } else {
-      Left(TransactionValidationError(tx, s"Transaction application leads to negative" +
-        s" balance/assetBalance or leased being more than own: $positiveBalanceErrors"))
+      Left(TransactionValidationError(tx, s"Transaction application leads to $positiveBalanceErrors"))
     }
   }
+
+  private def leaseWavesInfo(p: Portfolio): (Long, LeaseInfo) = (p.balance, p.leaseInfo)
+
 }

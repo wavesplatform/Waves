@@ -29,7 +29,7 @@ class BalanceDiffValidationTest extends PropSpec with PropertyChecks with Genera
 
     forAll(preconditionsAndPayment, accountGen) { case ((gen1, gen2, transfer1, transfer2), miner) =>
       assertDiffEi(Seq(TestBlock(Seq(gen1, gen2, transfer1))), TestBlock(Seq(transfer2), miner)) { blockDiffEi =>
-        blockDiffEi should produce("Transaction application leads to negative balance")
+        blockDiffEi should produce("negative waves balance")
       }
     }
   }
@@ -51,7 +51,7 @@ class BalanceDiffValidationTest extends PropSpec with PropertyChecks with Genera
 
     forAll(setup) { case (gen1, gen2, l1, l2) =>
       assertDiffEi(Seq(TestBlock(Seq(gen1, gen2, l1))), TestBlock(Seq(l2)))(totalDiffEi =>
-        totalDiffEi should produce("Transaction application leads to negative balance"))
+        totalDiffEi should produce("negative effective balance"))
     }
   }
 
@@ -67,7 +67,7 @@ class BalanceDiffValidationTest extends PropSpec with PropertyChecks with Genera
       genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
       masterTransfersToAlice: PaymentTransaction = PaymentTransaction.create(master, alice, amt, fee, ts).right.get
       (aliceLeasesToBob, _) <- leaseAndCancelGeneratorP(alice, bob, alice) suchThat (_._1.amount < amt)
-      (masterLeasesToAlice, _) <- leaseAndCancelGeneratorP(master, alice, master)
+      (masterLeasesToAlice, _) <- leaseAndCancelGeneratorP(master, alice, master) suchThat (_._1.amount > aliceLeasesToBob.amount)
       transferAmt <- Gen.choose(amt - aliceLeasesToBob.amount, amt)
       aliceTransfersMoreThanOwnsMinusLeaseOut = PaymentTransaction.create(alice, cooper, transferAmt, fee, ts).right.get
 
