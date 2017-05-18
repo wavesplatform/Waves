@@ -14,7 +14,8 @@ class ExtensionLoader(history: History, settings: SynchronizationSettings)
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef) = msg match {
     case ScoreObserver.NewHighScoreReceived if currentTimeout.isEmpty =>
       val lastBlockIds = history.lastBlockIds(settings.maxRollback)
-      log.debug(s"Loading extension from ${ctx.channel().id().asShortText()} [$lastBlockIds]")
+
+      log.debug(s"Loading extension from ${ctx.channel().id().asShortText()} ")
 
       ctx.writeAndFlush(GetSignatures(lastBlockIds))
 
