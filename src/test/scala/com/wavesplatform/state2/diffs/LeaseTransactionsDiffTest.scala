@@ -122,7 +122,7 @@ class LeaseTransactionsDiffTest extends PropSpec with PropertyChecks with Genera
   } yield (genesis, genesis2, lease, unleaseOtherOrRecipient)
 
   property("cannot cancel lease of another sender after allowMultipleLeaseCancelTransactionUntilTimestamp") {
-    forAll(Gen.oneOf(true, false).flatMap(cancelLeaseOfAnotherSender), timestampGen suchThat (_ > allowMultipleLeaseCancelTransactionUntilTimestamp)) {
+    forAll(Gen.oneOf(true, false).flatMap(cancelLeaseOfAnotherSender), timestampGen retryUntil (_ > allowMultipleLeaseCancelTransactionUntilTimestamp)) {
       case ((genesis, genesis2, lease, unleaseOtherOrRecipient), blockTime) =>
         assertDiffEi(Seq(TestBlock(Seq(genesis, genesis2, lease))), TestBlock.create(blockTime, Seq(unleaseOtherOrRecipient)), settings) { totalDiffEi =>
           totalDiffEi should produce("LeaseTransaction was leased by other sender")

@@ -35,7 +35,7 @@ class LeasePatchTest extends PropSpec with PropertyChecks with GeneratorDrivenPr
       (lease2, _) <- leaseAndCancelGeneratorP(master, otherAccount2, master)
     } yield (genesis, genesis2, lease, unleaseOther, lease2)
 
-    forAll(setupAndLeaseInResetBlock, timestampGen suchThat (_ < settings.allowMultipleLeaseCancelTransactionUntilTimestamp)) {
+    forAll(setupAndLeaseInResetBlock, timestampGen retryUntil (_ < settings.allowMultipleLeaseCancelTransactionUntilTimestamp)) {
       case ((genesis, genesis2, lease, unleaseOther, lease2), blockTime) =>
         assertDiffAndState(Seq(
           TestBlock.create(blockTime, Seq(genesis, genesis2, lease, unleaseOther)),
