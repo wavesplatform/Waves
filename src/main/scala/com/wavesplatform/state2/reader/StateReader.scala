@@ -9,13 +9,13 @@ import scorex.transaction._
 import scorex.transaction.assets.IssueTransaction
 import scorex.transaction.assets.exchange.{ExchangeTransaction, Order}
 import scorex.transaction.lease.LeaseTransaction
-import scorex.utils.ScorexLogging
+import scorex.utils.{ScorexLogging, Synchronized}
 
 import scala.annotation.tailrec
 import scala.reflect.ClassTag
 import scala.util.Right
 
-trait StateReader {
+trait StateReader extends Synchronized {
 
   def accountPortfolios: Map[Account, Portfolio]
 
@@ -78,8 +78,9 @@ object StateReader {
 
     def included(signature: Array[Byte]): Option[Int] = s.transactionInfo(EqByteArray(signature)).map(_._1)
 
-    def accountTransactions(account: Account, limit: Int): Seq[_ <: Transaction] =
+    def accountTransactions(account: Account, limit: Int): Seq[_ <: Transaction] = s.read { implicit l =>
       s.accountTransactionIds(account).take(limit).flatMap(s.transactionInfo).map(_._2)
+    }
 
     def balance(account: Account): Long = s.accountPortfolio(account).balance
 
@@ -91,11 +92,12 @@ object StateReader {
       }
     }
 
-    def getAccountBalance(account: Account): Map[AssetId, (Long, Boolean, Long, IssueTransaction)] =
+    def getAccountBalance(account: Account): Map[AssetId, (Long, Boolean, Long, IssueTransaction)] = s.read { implicit l =>
       s.accountPortfolio(account).assets.map { case (id, amt) =>
         val assetInfo = s.assetInfo(id).get
         id.arr -> (amt, assetInfo.isReissuable, assetInfo.volume, findTransaction[IssueTransaction](id.arr).get)
       }
+    }
 
     def assetDistribution(assetId: Array[Byte]): Map[String, Long] =
       s.assetDistribution(EqByteArray(assetId))
@@ -117,7 +119,7 @@ object StateReader {
 
     def stateHash(): Int = (BigInt(FastCryptographicHash(s.accountPortfolios.toString().getBytes)) % Int.MaxValue).toInt
 
-    private def minBySnapshot(acc: Account, atHeight: Int, confirmations: Int)(extractor: Snapshot => Long): Long = {
+    private def minBySnapshot(acc: Account, atHeight: Int, confirmations: Int)(extractor: Snapshot => Long): Long = s.read { implicit l =>
       val bottomNotIncluded = atHeight - confirmations
 
       @tailrec
@@ -151,7 +153,7 @@ object StateReader {
     def balanceWithConfirmations(acc: Account, confirmations: Int): Long =
       minBySnapshot(acc, s.height, confirmations)(_.balance)
 
-    def balanceAtHeight(acc: Account, height: Int): Long = {
+    def balanceAtHeight(acc: Account, height: Int): Long = s.read { implicit l =>
 
       @tailrec
       def loop(lookupHeight: Int): Long = s.snapshotAtHeight(acc, lookupHeight) match {
@@ -161,9 +163,7 @@ object StateReader {
         case None =>
           throw new Exception(s"Cannot lookup account $acc for height $height(current=${s.height}). " +
             s"No history found at requested lookupHeight=$lookupHeight")
-
       }
-
       loop(s.lastUpdateHeight(acc).getOrElse(0))
     }
   }

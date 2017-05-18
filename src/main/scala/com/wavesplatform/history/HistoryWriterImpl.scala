@@ -1,5 +1,7 @@
 package com.wavesplatform.history
 
+import java.util.concurrent.locks.ReentrantReadWriteLock
+
 import org.h2.mvstore.MVStore
 import scorex.account.Account
 import scorex.block.Block
@@ -7,22 +9,22 @@ import scorex.block.Block.BlockId
 import scorex.crypto.encode.Base58
 import scorex.transaction.History.BlockchainScore
 import scorex.transaction.ValidationError.CustomError
-import scorex.transaction.{History, HistoryWriter, ValidationError}
+import scorex.transaction.{HistoryWriter, ValidationError}
 import scorex.utils.{LogMVMapBuilder, ScorexLogging}
 
-class HistoryWriterImpl(db: MVStore) extends HistoryWriter with ScorexLogging {
-  private val blockBodyByHeight = SynchronizedAcrossInstance(db.openMap("blocks", new LogMVMapBuilder[Int, Array[Byte]]))
-  private val blockIdByHeight = SynchronizedAcrossInstance(db.openMap("signatures", new LogMVMapBuilder[Int, BlockId]))
-  private val heightByBlockId = SynchronizedAcrossInstance(db.openMap("signaturesReverse", new LogMVMapBuilder[BlockId, Int]))
-  private val scoreByHeight = SynchronizedAcrossInstance(db.openMap("score", new LogMVMapBuilder[Int, BigInt]))
+class HistoryWriterImpl private(db: MVStore, val synchronizationToken: ReentrantReadWriteLock) extends HistoryWriter with ScorexLogging {
+  private val blockBodyByHeight = Synchronized(db.openMap("blocks", new LogMVMapBuilder[Int, Array[Byte]]))
+  private val blockIdByHeight = Synchronized(db.openMap("signatures", new LogMVMapBuilder[Int, BlockId]))
+  private val heightByBlockId = Synchronized(db.openMap("signaturesReverse", new LogMVMapBuilder[BlockId, Int]))
+  private val scoreByHeight = Synchronized(db.openMap("score", new LogMVMapBuilder[Int, BigInt]))
 
-  override def appendBlock(block: Block): Either[ValidationError, Unit] = synchronizeReadWrite { implicit lock =>
+  override def appendBlock(block: Block): Either[ValidationError, Unit] = write { implicit lock =>
     if ((height() == 0) || (this.lastBlock.uniqueId sameElements block.reference)) {
       val h = height() + 1
-      blockBodyByHeight.update(_.put(h, block.bytes))
-      scoreByHeight.update(_.put(h, score() + block.blockScore))
-      blockIdByHeight.update(_.put(h, block.uniqueId))
-      heightByBlockId.update(_.put(block.uniqueId, h))
+      blockBodyByHeight.mutate(_.put(h, block.bytes))
+      scoreByHeight.mutate(_.put(h, score() + block.blockScore))
+      blockIdByHeight.mutate(_.put(h, block.uniqueId))
+      heightByBlockId.mutate(_.put(block.uniqueId, h))
       db.commit()
       Right(())
     } else {
@@ -30,39 +32,39 @@ class HistoryWriterImpl(db: MVStore) extends HistoryWriter with ScorexLogging {
     }
   }
 
-  override def discardBlock(): Unit = synchronizeReadWrite { implicit lock =>
+  override def discardBlock(): Unit = write { implicit lock =>
     val h = height()
-    blockBodyByHeight.update(_.remove(h))
-    scoreByHeight.update(_.remove(h))
-    val vOpt = Option(blockIdByHeight.update(_.remove(h)))
-    vOpt.map(v => heightByBlockId.update(_.remove(v)))
+    blockBodyByHeight.mutate(_.remove(h))
+    scoreByHeight.mutate(_.remove(h))
+    val vOpt = Option(blockIdByHeight.mutate(_.remove(h)))
+    vOpt.map(v => heightByBlockId.mutate(_.remove(v)))
     db.commit()
   }
 
-  override def blockAt(height: Int): Option[Block] = synchronizeRead { implicit lock =>
+  override def blockAt(height: Int): Option[Block] = read { implicit lock =>
     Option(blockBodyByHeight().get(height)).map(Block.parseBytes(_).get)
   }
 
-  override def lastBlockIds(howMany: Int): Seq[BlockId] = synchronizeRead { implicit lock =>
+  override def lastBlockIds(howMany: Int): Seq[BlockId] = read { implicit lock =>
     (Math.max(1, height() - howMany + 1) to height()).flatMap(i => Option(blockIdByHeight().get(i)))
       .reverse
   }
 
-  override def height(): Int = synchronizeRead { implicit lock => blockIdByHeight().size() }
+  override def height(): Int = read { implicit lock => blockIdByHeight().size() }
 
-  override def score(): BlockchainScore = synchronizeRead { implicit lock =>
+  override def score(): BlockchainScore = read { implicit lock =>
     if (height() > 0) scoreByHeight().get(height()) else 0
   }
 
-  override def scoreOf(id: BlockId): BlockchainScore = synchronizeRead { implicit lock =>
+  override def scoreOf(id: BlockId): BlockchainScore = read { implicit lock =>
     heightOf(id).map(scoreByHeight().get(_)).getOrElse(0)
   }
 
-  override def heightOf(blockSignature: Array[Byte]): Option[Int] = synchronizeRead { implicit lock =>
+  override def heightOf(blockSignature: Array[Byte]): Option[Int] = read { implicit lock =>
     Option(heightByBlockId().get(blockSignature))
   }
 
-  override def generatedBy(account: Account, from: Int, to: Int): Seq[Block] = synchronizeRead { implicit lock =>
+  override def generatedBy(account: Account, from: Int, to: Int): Seq[Block] = read { implicit lock =>
     for {
       h <- from to to
       block <- blockAt(h)
@@ -70,14 +72,15 @@ class HistoryWriterImpl(db: MVStore) extends HistoryWriter with ScorexLogging {
     } yield block
   }
 
-  override def blockBytes(height: Int): Option[Array[Byte]] = synchronizeRead { implicit lock =>
-    Option(blockBodyByHeight().get(height)) }
+  override def blockBytes(height: Int): Option[Array[Byte]] = read { implicit lock =>
+    Option(blockBodyByHeight().get(height))
+  }
 }
 
 object HistoryWriterImpl {
-  def apply(db: MVStore): Either[String, HistoryWriterImpl] = {
-    val h = new HistoryWriterImpl(db)
-    h.synchronizeRead { implicit lock =>
+  def apply(db: MVStore, synchronizationToken: ReentrantReadWriteLock): Either[String, HistoryWriterImpl] = {
+    val h = new HistoryWriterImpl(db, synchronizationToken)
+    h.read { implicit lock =>
       if (Set(h.blockBodyByHeight().size(), h.blockIdByHeight().size(), h.heightByBlockId().size(), h.scoreByHeight().size()).size != 1)
         Left("Block storage is inconsistent")
       else

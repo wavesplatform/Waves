@@ -7,7 +7,7 @@ import com.wavesplatform.state2.StateStorage.SnapshotKey
 import org.h2.mvstore.{MVMap, MVStore}
 import scorex.account.Account
 
-class StateStorage(db: MVStore) {
+class StateStorage private(db: MVStore) {
 
   private val variables: MVMap[String, Int] = db.openMap("variables")
   private val heightKey = "height"
