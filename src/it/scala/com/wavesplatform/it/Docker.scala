@@ -1,5 +1,6 @@
 package com.wavesplatform.it
 
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.{Collections, Properties, List => JList, Map => JMap}
 
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -39,14 +40,19 @@ class Docker(suiteConfig: Config = ConfigFactory.empty) extends AutoCloseable wi
   private val client = DefaultDockerClient.fromEnv().build()
   private val timer = new HashedWheelTimer()
   private var nodes = Map.empty[String, NodeInfo]
+  private val isStopped = new AtomicBoolean(false)
 
   timer.start()
+
+  sys.addShutdownHook {
+    close()
+  }
 
   private def knownPeers = nodes.values.zipWithIndex.map {
     case (ni, index) => s"-Dwaves.network.known-peers.$index=${ni.apiIpAddress}:${ni.containerNetworkPort}"
   } mkString " "
 
-  val wavesNetwork = client.createNetwork(NetworkConfig.builder().driver("bridge").name("waves").build())
+  private val wavesNetwork = client.createNetwork(NetworkConfig.builder().driver("bridge").name("waves").build())
 
   def startNode(nodeConfig: Config): Node = {
     val configOverrides = s"$knownPeers ${renderProperties(asProperties(nodeConfig.withFallback(suiteConfig)))}"
@@ -109,12 +115,15 @@ class Docker(suiteConfig: Config = ConfigFactory.empty) extends AutoCloseable wi
     timer.newTimeout(_ => f, initialDelay.toMillis, MILLISECONDS)
 
   override def close(): Unit = {
-    timer.stop()
-    log.info("Stopping containers")
-    nodes.keys.foreach(id => client.removeContainer(id, RemoveContainerParam.forceKill()))
-    client.removeNetwork(wavesNetwork.id())
-    client.close()
-    http.close()
+    if (isStopped.compareAndSet(false, true)) {
+      timer.stop()
+      log.info("Stopping containers")
+      nodes.keys.foreach(id => client.removeContainer(id, RemoveContainerParam.forceKill()))
+      client.removeNetwork(wavesNetwork.id())
+      client.close()
+      http.close()
+      isStopped.set(true)
+    }
   }
 
   def disconnectFromNetwork(containerId: String): Unit =  client.disconnectFromNetwork(containerId, wavesNetwork.id())
