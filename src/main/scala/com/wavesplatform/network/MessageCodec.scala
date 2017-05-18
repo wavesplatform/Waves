@@ -3,7 +3,6 @@ package com.wavesplatform.network
 import java.util
 
 import io.netty.buffer.ByteBuf
-import io.netty.buffer.ByteBufUtil.hexDump
 import io.netty.buffer.Unpooled._
 import io.netty.channel.ChannelHandlerContext
 import io.netty.handler.codec.ByteToMessageCodec
@@ -52,10 +51,12 @@ object MessageCodec {
   def writeData(code: Byte, data: Array[Byte], out: ByteBuf): Unit = {
     out.writeInt(Magic)
     out.writeByte(code)
-    out.writeInt(data.length)
     if (data.length > 0) {
-      out.writeBytes(FastCryptographicHash.hash(data))
+      out.writeInt(data.length)
+      out.writeBytes(FastCryptographicHash.hash(data), 0, ChecksumLength)
       out.writeBytes(data)
+    } else {
+      out.writeInt(0)
     }
   }
 }
