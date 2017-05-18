@@ -7,6 +7,6 @@ import scorex.utils.Synchronized
 trait BlockchainUpdater extends Synchronized {
   def processBlock(block: Block): Either[ValidationError, Unit]
 
-  def removeAfter(blockId: BlockId): Unit
+  def removeAfter(blockId: BlockId): Boolean
 }
 

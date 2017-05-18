@@ -19,7 +19,7 @@ import scorex.wallet.Wallet
 case class DebugApiRoute(settings: RestAPISettings, wallet: Wallet, stateReader: StateReader, blockchainUpdater: BlockchainUpdater, history: History) extends ApiRoute {
 
   override lazy val route = pathPrefix("debug") {
-    blocks ~ state ~ info ~ stateWaves ~ rollback
+    blocks ~ state ~ info ~ stateWaves ~ rollback ~ rollbackTo
   }
 
   @Path("/blocks/{howMany}")
@@ -56,7 +56,7 @@ case class DebugApiRoute(settings: RestAPISettings, wallet: Wallet, stateReader:
   @Path("/stateWaves/{height}")
   @ApiOperation(value = "State at block", notes = "Get state at specified height", httpMethod = "GET")
   @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "height", value = "height", required = true, dataType = "integer", paramType = "path")
+    new ApiImplicitParam(name = "height", value = "height", required = true, dataType = "integer", paramType = "body")
   ))
   def stateWaves: Route = (path("stateWaves" / IntNumber) & get) { height =>
     val result = stateReader.accountPortfolios.keys
@@ -67,7 +67,10 @@ case class DebugApiRoute(settings: RestAPISettings, wallet: Wallet, stateReader:
   }
 
   @Path("/rollback")
-  @ApiOperation(value = "Rollback to block", notes = "Removes all blocks after height", httpMethod = "GET")
+  @ApiOperation(value = "Rollback to height", notes = "Removes all blocks after given height", httpMethod = "POST")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(name = "height", value = "Height to rollback to", required = true, dataType = "integer", paramType = "path")
+  ))
   @ApiResponses(Array(
     new ApiResponse(code = 200, message = "200 if success, 404 if there are no block at this height")
   ))
@@ -98,4 +101,22 @@ case class DebugApiRoute(settings: RestAPISettings, wallet: Wallet, stateReader:
       "stateHash" -> stateHash
     ))
   }
+
+
+  @Path("/rollback-to/{signature}")
+  @ApiOperation(value = "Block signature", notes = "Rollback the state to the block with a given signature", httpMethod = "DELETE")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(name = "signature", value = "Base58-encoded block signature", required = true, dataType = "string", paramType = "path")
+  ))
+  def rollbackTo: Route = path("rollback-to" / Segment) { signature =>
+    (delete & withAuth) {
+      val maybeBlockId = Base58.decode(signature).toOption
+      if (maybeBlockId.isEmpty) {
+        complete(InvalidSignature)
+      } else {
+        if (blockchainUpdater.removeAfter(maybeBlockId.get)) complete(StatusCodes.OK) else complete(StatusCodes.BadRequest)
+      }
+    }
+  }
+
 }

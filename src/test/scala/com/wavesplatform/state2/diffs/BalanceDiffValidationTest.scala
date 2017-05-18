@@ -55,4 +55,30 @@ class BalanceDiffValidationTest extends PropSpec with PropertyChecks with Genera
     }
   }
 
+  property("cannot transfer more than own-leaseOut") {
+    val setup = for {
+      master <- accountGen
+      alice <- accountGen
+      bob <- accountGen
+      cooper <- accountGen
+      ts <- positiveIntGen
+      amt <- positiveLongGen
+      fee <- smallFeeGen
+      genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
+      masterTransfersToAlice: PaymentTransaction = PaymentTransaction.create(master, alice, amt, fee, ts).right.get
+      (aliceLeasesToBob, _) <- leaseAndCancelGeneratorP(alice, bob, alice) suchThat (_._1.amount < amt)
+      (masterLeasesToAlice, _) <- leaseAndCancelGeneratorP(master, alice, master)
+      transferAmt <- Gen.choose(amt - aliceLeasesToBob.amount, amt)
+      aliceTransfersMoreThanOwnsMinusLeaseOut = PaymentTransaction.create(alice, cooper, transferAmt, fee, ts).right.get
+
+    } yield (genesis, masterTransfersToAlice, aliceLeasesToBob, masterLeasesToAlice, aliceTransfersMoreThanOwnsMinusLeaseOut)
+
+    forAll(setup) { case ((genesis, masterTransfersToAlice, aliceLeasesToBob, masterLeasesToAlice, aliceTransfersMoreThanOwnsMinusLeaseOut)) =>
+      assertDiffEi(Seq(TestBlock(Seq(genesis, masterTransfersToAlice, aliceLeasesToBob, masterLeasesToAlice))),
+        TestBlock(Seq(aliceTransfersMoreThanOwnsMinusLeaseOut))) { totalDiffEi =>
+        totalDiffEi should produce("leased being more than own")
+      }
+    }
+  }
+
 }

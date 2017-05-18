@@ -17,7 +17,9 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 
-class NetworkController(networkSettings: NetworkSettings, uPnP: => UPnP, peerManager: ActorRef, messagesHandler: MessageHandler) extends Actor with ScorexLogging {
+class NetworkController(networkSettings: NetworkSettings,
+                        uPnP: => UPnP, peerManager: ActorRef, messagesHandler: MessageHandler)
+  extends Actor with ScorexLogging {
 
   import NetworkController._
 
@@ -67,7 +69,7 @@ class NetworkController(networkSettings: NetworkSettings, uPnP: => UPnP, peerMan
     }
   }
 
-  private val listener = context.actorOf(Props(new NetworkListener(self, peerManager, localAddress)),
+  private val listener = context.actorOf(Props(classOf[NetworkListener], self, peerManager, localAddress),
     "network-listener")
 
   override def postRestart(thr: Throwable): Unit = {
@@ -179,7 +181,7 @@ class NetworkController(networkSettings: NetworkSettings, uPnP: => UPnP, peerMan
       remote,
       messagesHandler,
       networkSettings)))
-    peerManager ! PeerManager.Connected(remote, handler, ownSocketAddress, inbound)
+    peerManager ! PeerManager.Connected(remote, handler, ownSocketAddress)
   }
 }
 
