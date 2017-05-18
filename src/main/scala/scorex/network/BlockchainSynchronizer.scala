@@ -108,7 +108,6 @@ class BlockchainSynchronizer(network: Network, coordinator: ActorRef, history: H
       val overlap = withTail.lastTwoBlockIds
 
       run(initial, GettingExtensionTail) { updatedPeersData =>
-        updatedPeersData.active
         GetSignatures(overlap.reverse.map(_.arr))
 //        networkControllerRef ! NetworkController.SendToNetwork(msg, SendToChosen(updatedPeersData.active))
 
