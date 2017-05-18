@@ -54,6 +54,7 @@ class ClientChannelInitializer(
       .addLast(new MessageCodec(specs))
       .addLast(scoreObserver)
       .addLast(new ExtensionLoader(history, syncSettings))
+      .addLast(new BlockLoader(syncSettings.synchronizationTimeout))
   }
 }
 
@@ -83,7 +84,7 @@ class NetworkServer(chainId: Char, settings: WavesSettings, history: History, al
     val inactiveConnections = allChannels.stream().filter(!_.isActive).collect(Collectors.toSet())
     inactiveConnections.forEach(allChannels.remove _)
 
-    if (allChannels.size() < settings.networkSettings.maxConnections) {
+    if (allChannels.size() < settings.networkSettings.maxOutboundConnections) {
       randomKnownPeer.foreach(connect)
     }
   }
