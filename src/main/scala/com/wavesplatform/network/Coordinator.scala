@@ -28,7 +28,8 @@ class Coordinator(
     time: Time,
     stateReader: StateReader,
     utxStorage: UnconfirmedTransactionsStorage,
-    settings: BlockchainSettings)
+    settings: BlockchainSettings,
+    network: Network)
   extends ChannelInboundHandlerAdapter with ScorexLogging {
   import Coordinator._
 
@@ -69,7 +70,6 @@ class Coordinator(
     }
   }
 
-
   private def processNewBlock(block: Block): Either[ValidationError, Unit] = for {
     _ <- validateWithRespectToCheckpoint(block, history.height() + 1)
     _ <- isBlockValid(block)
@@ -79,7 +79,6 @@ class Coordinator(
     UnconfirmedTransactionsStorage.clearIncorrectTransactions(settings.functionalitySettings,
       stateReader, utxStorage, time)
   }
-
 
   private def str(block: Block) = {
     if (log.logger.isTraceEnabled) block.json
@@ -105,11 +104,11 @@ class Coordinator(
           }
       }
 
-      //      self ! BroadcastCurrentScore
+      network.requestExtension(history.score())
 
     } else {
       from.foreach(_.blacklist())
-      log.info(s"Fork contains block that doesn't match checkpoint, refusing fork")
+      log.info(s"Fork contains block that doesn't match checkpoint, declining fork")
     }
   }
 
@@ -165,7 +164,6 @@ class Coordinator(
       }
     }
   }
-
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef) = msg match {
     case ExtensionBlocks(blocks) => processFork(blocks.head.reference, blocks.iterator, None)
