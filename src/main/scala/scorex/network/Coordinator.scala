@@ -1,9 +1,6 @@
 package scorex.network
 
 import akka.actor.{Actor, ActorRef}
-import akka.event.LoggingReceive
-import akka.pattern.{ask, pipe}
-import akka.util.Timeout
 import cats._
 import cats.implicits._
 import com.wavesplatform.network.Network
@@ -12,21 +9,14 @@ import com.wavesplatform.state2.ByteStr
 import com.wavesplatform.state2.reader.StateReader
 import scorex.block.Block
 import scorex.consensus.TransactionsOrdering
-import scorex.consensus.mining.BlockGeneratorController.{LastBlockChanged, StartGeneration}
+import scorex.consensus.mining.BlockGeneratorController.LastBlockChanged
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.crypto.encode.Base58.encode
-import scorex.network.BlockchainSynchronizer.{GetExtension, GetSyncStatus, Status}
-import scorex.network.NetworkController.DataFromPeer
-import scorex.network.ScoreObserver.{CurrentScore, GetScore}
-import scorex.network.message._
-import scorex.network.peer.PeerManager.{ConnectedPeers, GetConnectedPeersTyped}
-import scorex.transaction.History.BlockchainScore
 import scorex.transaction.ValidationError.CustomError
 import scorex.transaction._
 import scorex.utils.{ScorexLogging, Time}
 
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.language.{higherKinds, postfixOps}
 import scala.util.control.NonFatal
@@ -38,79 +28,11 @@ class Coordinator(network: Network, blockchainSynchronizer: ActorRef, blockGener
 
   import Coordinator._
 
-  blockGenerator ! StartGeneration
 
-  override def receive: Receive = idle()
 
-  private def idle(peerScores: Map[ConnectedPeer, BlockchainScore] = Map.empty): Receive = state(CIdle) {
-    case CurrentScore(candidates) =>
-      val localScore = history.score()
-
-      val betterScorePeers = candidates.filter(_._2 > localScore)
-
-      if (betterScorePeers.isEmpty) {
-        log.trace(s"No peers to sync with, local score: $localScore")
-      } else {
-        log.info(s"min networkScore=${betterScorePeers.minBy(_._2)} > localScore=$localScore")
-        peerManager ! GetConnectedPeersTyped
-        context become idle(betterScorePeers.toMap)
-      }
-
-    case ConnectedPeers(peers) =>
-      val quorumSize = settings.minerSettings.quorum
-      val actualSize = peers.intersect(peerScores.keySet).size
-      if (actualSize < quorumSize) {
-        log.debug(s"Quorum to download blocks is not reached: $actualSize peers but should be $quorumSize")
-        context become idle()
-      } else if (peerScores.nonEmpty) {
-        context become syncing
-        blockchainSynchronizer ! GetExtension(peerScores)
-      }
+  override def receive: Receive = {
+    case _=>
   }
-
-  private def syncing: Receive = state(CSyncing) {
-    case SyncFinished(_, result) =>
-      context become idle()
-      scoreObserver ! GetScore
-
-      result foreach {
-        case (lastCommonBlockId, blocks, from) =>
-          log.info(s"Going to process blocks")
-          processFork(lastCommonBlockId, blocks, from)
-      }
-  }
-
-  private def state(status: CoordinatorStatus)(logic: Receive): Receive = LoggingReceive({
-    logic orElse {
-      case GetCoordinatorStatus => sender() ! status
-
-      case GetStatus =>
-        implicit val timeout = Timeout(5.seconds)
-        (blockchainSynchronizer ? GetSyncStatus).mapTo[Status]
-          .map { syncStatus =>
-            if (syncStatus == BlockchainSynchronizer.Idle && status == CIdle)
-              CIdle.name
-            else
-              s"${status.name} (${syncStatus.name})"
-          }
-          .pipeTo(sender())
-
-      case AddBlock(block, from) => processSingleBlock(block, from)
-
-      case BroadcastCurrentScore =>
-        network.broadcast(history.score())
-
-      case DataFromPeer(msgId, checkpoint: Checkpoint@unchecked, remote) if msgId == CheckpointMessageSpec.messageCode =>
-        handleCheckpoint(checkpoint, Some(remote))
-
-      case BroadcastCheckpoint(checkpoint) =>
-        handleCheckpoint(checkpoint, None)
-
-      case ConnectedPeers(_) =>
-
-      case ClearCheckpoint => checkpoints.set(None)
-    }
-  })
 
   private def handleCheckpoint(checkpoint: Checkpoint, from: Option[ConnectedPeer]): Unit =
     if (checkpoints.get.forall(c => !(c.signature sameElements checkpoint.signature))) {
@@ -194,7 +116,7 @@ class Coordinator(network: Network, blockchainSynchronizer: ActorRef, blockGener
           if (local) {
             network.broadcast(newBlock)
           } else {
-            self ! BroadcastCurrentScore
+//            self ! BroadcastCurrentScore
           }
         case Left(err) =>
           from.foreach(_.blacklist())
@@ -222,7 +144,7 @@ class Coordinator(network: Network, blockchainSynchronizer: ActorRef, blockGener
           }
       }
 
-      self ! BroadcastCurrentScore
+//      self ! BroadcastCurrentScore
 
     } else {
       from.foreach(_.blacklist())
@@ -287,37 +209,9 @@ class Coordinator(network: Network, blockchainSynchronizer: ActorRef, blockGener
 
 object Coordinator extends ScorexLogging {
 
-  case object GetCoordinatorStatus
-
-  sealed trait CoordinatorStatus {
-    val name: String
-  }
-
-  case object CIdle extends CoordinatorStatus {
-    override val name = "idle"
-  }
-
-  case object CSyncing extends CoordinatorStatus {
-    override val name = "syncing"
-  }
-
   case class AddBlock(block: Block, generator: Option[ConnectedPeer])
 
-  case class SyncFinished(success: Boolean, result: Option[(ByteStr, Iterator[Block], Option[ConnectedPeer])])
-
-  object SyncFinished {
-    def unsuccessfully: SyncFinished = SyncFinished(success = false, None)
-
-    def withEmptyResult: SyncFinished = SyncFinished(success = true, None)
-  }
-
-  private case object BroadcastCurrentScore
-
-  case object GetStatus
-
   case class BroadcastCheckpoint(checkpoint: Checkpoint)
-
-  case object ClearCheckpoint
 
   def foldM[G[_], F[_], A, B](fa: F[A], z: B)(f: (B, A) => G[B])(implicit G: Monad[G], F: Traverse[F]): G[B] =
     F.foldLeft(fa, G.pure(z))((gb, a) => G.flatMap(gb)(f(_, a)))
