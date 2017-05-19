@@ -25,7 +25,7 @@ case class FunctionalitySettings(allowTemporaryNegativeUntil: Long,
                                  allowMakeAssetNameUniqueTransactionAfterTimestamp: Long,
                                  allowMultipleLeaseCancelTransactionUntilTimestamp: Long,
                                  resetEffectiveBalancesAtHeight: Long,
-                                 allowTransferLeasedBalanceUntil: Long)
+                                 allowLeasedBalanceTransferUntil: Long)
 
 object FunctionalitySettings {
   val MAINNET = FunctionalitySettings(allowTemporaryNegativeUntil = 1479168000000L,
@@ -44,7 +44,7 @@ object FunctionalitySettings {
     allowMakeAssetNameUniqueTransactionAfterTimestamp = Long.MaxValue,
     allowMultipleLeaseCancelTransactionUntilTimestamp = 1492768800000L,
     resetEffectiveBalancesAtHeight = 462000,
-    allowTransferLeasedBalanceUntil = Long.MaxValue)
+    allowLeasedBalanceTransferUntil = Long.MaxValue)
 
   val TESTNET = FunctionalitySettings(
     allowTemporaryNegativeUntil = 1477958400000L,
@@ -63,7 +63,7 @@ object FunctionalitySettings {
     allowMakeAssetNameUniqueTransactionAfterTimestamp = Long.MaxValue,
     allowMultipleLeaseCancelTransactionUntilTimestamp = 1492560000000L,
     resetEffectiveBalancesAtHeight = 51500,
-    allowTransferLeasedBalanceUntil = Long.MaxValue)
+    allowLeasedBalanceTransferUntil = Long.MaxValue)
 
   val configPath = "waves.blockchain.custom.functionality"
 
@@ -84,7 +84,7 @@ object FunctionalitySettings {
       allowMakeAssetNameUniqueTransactionAfterTimestamp = config.as[Long](s"$configPath.allow-make-asset-name-unique-transaction-after"),
       allowMultipleLeaseCancelTransactionUntilTimestamp = config.as[Long](s"$configPath.allow-multiple-lease-cancel-transaction-until-timestamp"),
       resetEffectiveBalancesAtHeight = config.as[Long](s"$configPath.reset-effective-balances-at-height"),
-      allowTransferLeasedBalanceUntil = config.as[Long](s"$configPath.allow-transfer-leased-balance-until"))
+      allowLeasedBalanceTransferUntil = config.as[Long](s"$configPath.allow-leased-balance-transfer-until"))
   }
 }
 
