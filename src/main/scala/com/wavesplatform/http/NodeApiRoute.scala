@@ -3,21 +3,17 @@ package com.wavesplatform.http
 import javax.ws.rs.Path
 
 import akka.actor.ActorRef
+import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
-import akka.pattern.ask
 import akka.util.Timeout
 import com.wavesplatform.Shutdownable
 import com.wavesplatform.settings.{Constants, RestAPISettings}
 import io.swagger.annotations._
 import play.api.libs.json.Json
 import scorex.api.http.{ApiRoute, CommonApiFunctions}
-import scorex.consensus.mining.{BlockGeneratorController => BGC}
-import scorex.network.{Coordinator => C}
 import scorex.utils.ScorexLogging
 
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.util.Try
 
 @Path("/node")
 @Api(value = "node")
@@ -50,11 +46,6 @@ case class NodeApiRoute(settings: RestAPISettings, application: Shutdownable, bl
   def status: Route = (get & path("status")) {
     implicit val timeout = Timeout(5.seconds)
 
-    complete(for {
-      bgf <- (blockGenerator ? BGC.GetStatus).mapTo[String].transform(f => Try(f.toEither))
-      hsf <- (coordinator ? C.GetStatus).mapTo[String].transform(f => Try(f.toEither))
-    } yield Json.obj(
-      "blockGeneratorStatus" -> bgf.getOrElse(s"Failure: ${bgf.left.get.getMessage}").toString,
-      "historySynchronizationStatus" -> hsf.getOrElse(s"Failure: ${hsf.left.get.getMessage}").toString))
+    complete(StatusCodes.BadRequest)
   }
 }
