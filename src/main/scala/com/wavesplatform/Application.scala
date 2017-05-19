@@ -126,7 +126,16 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
 
     checkGenesis()
 
-    val network = new NetworkServer(settings.blockchainSettings.addressSchemeCharacter, settings, history, allChannels)
+    val network = new NetworkServer(
+      settings.blockchainSettings.addressSchemeCharacter,
+      settings,
+      history,
+      checkpoints,
+      blockchainUpdater,
+      time,
+      stateReader,
+      utxStorage,
+      allChannels)
 
     if (settings.networkSettings.uPnPSettings.enable) upnp.addPort(settings.networkSettings.port)
 
