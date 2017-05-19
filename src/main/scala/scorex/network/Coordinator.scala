@@ -1,12 +1,10 @@
 package scorex.network
 
 import akka.actor.{Actor, ActorRef}
-
 import com.wavesplatform.network.Network
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state2.reader.StateReader
 import scorex.block.Block
-import scorex.consensus.mining.BlockGeneratorController.LastBlockChanged
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.transaction._
@@ -70,8 +68,4 @@ object Coordinator extends ScorexLogging {
   case class AddBlock(block: Block, generator: Option[ConnectedPeer])
 
   case class BroadcastCheckpoint(checkpoint: Checkpoint)
-
-
-
-
 }

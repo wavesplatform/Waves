@@ -44,12 +44,13 @@ class ClientChannelInitializer(
     utxStorage: UnconfirmedTransactionsStorage,
     blockchainSettings: BlockchainSettings,
     syncSettings: SynchronizationSettings,
+    network: Network,
     connections: ConcurrentHashMap[PeerKey, Channel])
   extends ChannelInitializer[SocketChannel] {
 
   private val specs: Map[Byte, MessageSpec[_ <: AnyRef]] = (BasicMessagesRepo.specs ++ TransactionalMessagesRepo.specs).map(s => s.messageCode -> s).toMap
   private val loggingHandler = new LoggingHandler()
-  private val coordinator = new Coordinator(checkpoints, history, blockchainUpdater, time, stateReader, utxStorage, blockchainSettings)
+  private val coordinator = new Coordinator(checkpoints, history, blockchainUpdater, time, stateReader, utxStorage, blockchainSettings, network)
 
   override def initChannel(ch: SocketChannel): Unit = {
     ch.pipeline()
@@ -68,9 +69,7 @@ class ClientChannelInitializer(
 }
 
 trait Network {
-  def broadcast(message: AnyRef, except: Option[Channel] = None): Unit
-  def sendTo(message: AnyRef, recipients: Channel*): Unit
-  def sendToRandom(message: AnyRef): Unit
+  def requestExtension(localScore: BigInt): Unit
 }
 
 class NetworkServer(
@@ -126,6 +125,7 @@ class NetworkServer(
       utxStorage,
       settings.blockchainSettings,
       settings.synchronizationSettings,
+      network,
       allConnectedPeers))
 
   private val serverChannel = new ServerBootstrap()

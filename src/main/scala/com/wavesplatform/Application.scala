@@ -121,7 +121,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
   lazy val networkController = actorSystem.deadLetters
   lazy val peerManager: ActorRef = actorSystem.deadLetters
   lazy val unconfirmedPoolSynchronizer: ActorRef = actorSystem.actorOf(Props(new UnconfirmedPoolSynchronizer(newTransactionHandler, settings.utxSettings, networkController, utxStorage)))
-  lazy val coordinator: ActorRef = actorSystem.actorOf(Props(new Coordinator(net, blockchainSynchronizer, blockGenerator, peerManager, actorSystem.deadLetters, blockchainUpdater, time, utxStorage, history, stateReader, checkpoints, settings)), "Coordinator")
+  lazy val coordinator: ActorRef = actorSystem.deadLetters
   lazy val blockGenerator: ActorRef = actorSystem.actorOf(Props(new BlockGeneratorController(settings.minerSettings, history, time, peerManager,
          wallet, stateReader, settings.blockchainSettings, utxStorage, coordinator)), "BlockGenerator")
   lazy val blockchainSynchronizer: ActorRef = actorSystem.deadLetters
