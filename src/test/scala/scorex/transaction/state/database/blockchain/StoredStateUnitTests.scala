@@ -59,7 +59,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
 
     override def resetEffectiveBalancesAtHeight: Long = Long.MaxValue
 
-    override def allowTransferLeasedBalanceUntil: Long = 0L
+    override def allowLeasedBalanceTransferUntil: Long = 0L
   }
 
   val leasingForkParameters = new ChainParameters with TestChainParameters.GenesisData {
@@ -97,7 +97,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
 
     override def resetEffectiveBalancesAtHeight: Long = Long.MaxValue
 
-    override def allowTransferLeasedBalanceUntil: Long = 0L
+    override def allowLeasedBalanceTransferUntil: Long = 0L
   }
 
   def resetForkParameters(_resetEffectiveBalancesAtHeight: Long) = new ChainParameters with TestChainParameters.GenesisData {
@@ -135,7 +135,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
 
     override def resetEffectiveBalancesAtHeight: Long = _resetEffectiveBalancesAtHeight
 
-    override def allowTransferLeasedBalanceUntil: Long = 0L
+    override def allowLeasedBalanceTransferUntil: Long = 0L
   }
 
   val folder = s"/tmp/scorex/test/${UUID.randomUUID().toString}/"

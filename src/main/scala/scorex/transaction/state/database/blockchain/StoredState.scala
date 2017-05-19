@@ -97,7 +97,7 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
       .map(m => m._1 -> (AccState(assetBalance(m._1) + m._2, effectiveBalance(m._1.account) + m._2), List(FeesStateChange(m._2))))
 
     val newBalances: Map[AssetAcc, (AccState, Reasons)] =
-      calcNewBalances(trans, fees, block.timestampField.value < settings.allowTemporaryNegativeUntil, block.timestampField.value < settings.allowTransferLeasedBalanceUntil)
+      calcNewBalances(trans, fees, block.timestampField.value < settings.allowTemporaryNegativeUntil, block.timestampField.value < settings.allowLeasedBalanceTransferUntil)
 
     val newBalancesWithMayBeEffectiveBalanceReset = if (storage.stateHeight + 1 == settings.resetEffectiveBalancesAtHeight) {
       leaseExtendedState.storage.resetLeasesInfo()
@@ -303,7 +303,7 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
               val availableBalanceIsEnough = safeSum(availableBalance, bc.delta) >= 0
 
               if ((tx.timestamp < settings.allowTemporaryNegativeUntil || newBalance >= 0) &&
-                (tx.timestamp < settings.allowTransferLeasedBalanceUntil || availableBalanceIsEnough)) {
+                (tx.timestamp < settings.allowLeasedBalanceTransferUntil || availableBalanceIsEnough)) {
                 iChanges.updated(bc.assetAcc, (AccState(newBalance, currentChange._1.effectiveBalance), tx.id +: currentChange._2, currentChange._3))
               } else {
                 throw new Error(s"Transaction leads to negative available state: ${currentChange._1.balance} + ${bc.delta} = ${currentChange._1.balance + bc.delta}")
@@ -329,7 +329,7 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
                         } else {
                           currentChange._3
                         }
-                      case None => if (tx.timestamp < settings.allowTransferLeasedBalanceUntil) {
+                      case None => if (tx.timestamp < settings.allowLeasedBalanceTransferUntil) {
                         Long.MinValue
                       } else {
                         throw new Error(s"LeaseTransaction not found for $lc")

@@ -77,7 +77,7 @@ class SimpleTransactionModuleSpecification extends FunSuite with MockFactory wit
 
     override def resetEffectiveBalancesAtHeight: Long = Long.MaxValue
 
-    override def allowTransferLeasedBalanceUntil: Long = 0L
+    override def allowLeasedBalanceTransferUntil: Long = 0L
   }
 
   implicit val app = stub[MyApp]
