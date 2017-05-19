@@ -10,7 +10,7 @@ import scorex.transaction.assets.TransferTransaction
 
 import scala.util.Random
 
-class BlockSpecification extends FunSuite with Matchers with MockFactory with UnitTestConfig {
+class BlockSpecification extends FunSuite with Matchers with MockFactory {
 
   test("Nxt block with txs bytes/parse roundtrip") {
     implicit val transactionModule = mock[NewTransactionHandler]

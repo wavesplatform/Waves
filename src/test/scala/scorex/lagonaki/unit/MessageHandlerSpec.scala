@@ -7,9 +7,7 @@ import org.scalatest.FunSuite
 import scorex.network.message._
 import scorex.transaction.NewTransactionHandler
 
-class MessageHandlerSpec extends FunSuite with MockFactory with UnitTestConfig {
-
-  implicit val transactionModule = mock[NewTransactionHandler]
+class MessageHandlerSpec extends FunSuite with MockFactory {
 
   private lazy val handler = new MessageHandler(BasicMessagesRepo.specs)
 

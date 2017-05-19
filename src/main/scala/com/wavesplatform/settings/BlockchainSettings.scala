@@ -24,7 +24,8 @@ case class FunctionalitySettings(allowTemporaryNegativeUntil: Long,
                                  allowCreateAliasTransactionAfterTimestamp: Long,
                                  allowMakeAssetNameUniqueTransactionAfterTimestamp: Long,
                                  allowMultipleLeaseCancelTransactionUntilTimestamp: Long,
-                                 resetEffectiveBalancesAtHeight: Long)
+                                 resetEffectiveBalancesAtHeight: Long,
+                                 allowLeasedBalanceTransferUntil: Long)
 
 object FunctionalitySettings {
   val MAINNET = FunctionalitySettings(allowTemporaryNegativeUntil = 1479168000000L,
@@ -42,7 +43,8 @@ object FunctionalitySettings {
     allowCreateAliasTransactionAfterTimestamp = Long.MaxValue,
     allowMakeAssetNameUniqueTransactionAfterTimestamp = Long.MaxValue,
     allowMultipleLeaseCancelTransactionUntilTimestamp = 1492768800000L,
-    resetEffectiveBalancesAtHeight = 462000)
+    resetEffectiveBalancesAtHeight = 462000,
+    allowLeasedBalanceTransferUntil = Long.MaxValue)
 
   val TESTNET = FunctionalitySettings(
     allowTemporaryNegativeUntil = 1477958400000L,
@@ -60,35 +62,29 @@ object FunctionalitySettings {
     allowCreateAliasTransactionAfterTimestamp = 1493596800000L,
     allowMakeAssetNameUniqueTransactionAfterTimestamp = Long.MaxValue,
     allowMultipleLeaseCancelTransactionUntilTimestamp = 1492560000000L,
-    resetEffectiveBalancesAtHeight = 51500)
+    resetEffectiveBalancesAtHeight = 51500,
+    allowLeasedBalanceTransferUntil = Long.MaxValue)
 
   val configPath = "waves.blockchain.custom.functionality"
 
   def fromConfig(config: Config): FunctionalitySettings = {
-    val allowTemporaryNegativeUntil = config.as[Long](s"$configPath.allow-temporary-negative-until")
-    val allowInvalidPaymentTransactionsByTimestamp = config.as[Long](s"$configPath.allow-invalid-payment-transactions-by-timestamp")
-    val requireSortedTransactionsAfter = config.as[Long](s"$configPath.require-sorted-transactions-after")
-    val generatingBalanceDepthFrom50To1000AfterHeight = config.as[Long](s"$configPath.generation-balance-depth-from-50-to-1000-after-height")
-    val minimalGeneratingBalanceAfterTimestamp = config.as[Long](s"$configPath.minimal-generating-balance-after")
-    val allowTransactionsFromFutureUntil = config.as[Long](s"$configPath.allow-transactions-from-future-until")
-    val allowUnissuedAssetsUntil = config.as[Long](s"$configPath.allow-unissued-assets-until")
-    val allowBurnTransactionAfterTimestamp = config.as[Long](s"$configPath.allow-burn-transaction-after")
-    val allowLeaseTransactionAfterTimestamp = config.as[Long](s"$configPath.allow-lease-transaction-after")
-    val requirePaymentUniqueId = config.as[Long](s"$configPath.require-payment-unique-id-after")
-    val allowExchangeTransactionAfterTimestamp = config.as[Long](s"$configPath.allow-exchange-transaction-after")
-    val allowInvalidReissueInSameBlockUntilTimestamp = config.as[Long](s"$configPath.allow-invalid-reissue-in-same-block-until-timestamp")
-    val allowCreateAliasTransactionAfterTimestamp = config.as[Long](s"$configPath.allow-createalias-transaction-after")
-    val allowMakeAssetNameUniqueTransactionAfterTimestamp = config.as[Long](s"$configPath.allow-make-asset-name-unique-transaction-after")
-    val allowMultipleLeaseCancelTransactionUntilTimestamp = config.as[Long](s"$configPath.allow-multiple-lease-cancel-transaction-until-timestamp")
-    val resetEffectiveBalancesAtHeight = config.as[Long](s"$configPath.reset-effective-balances-at-height")
-
-
-    FunctionalitySettings(allowTemporaryNegativeUntil, allowInvalidPaymentTransactionsByTimestamp,
-      requireSortedTransactionsAfter, generatingBalanceDepthFrom50To1000AfterHeight,
-      minimalGeneratingBalanceAfterTimestamp, allowTransactionsFromFutureUntil, allowUnissuedAssetsUntil,
-      allowBurnTransactionAfterTimestamp, allowLeaseTransactionAfterTimestamp, requirePaymentUniqueId, allowExchangeTransactionAfterTimestamp,
-      allowInvalidReissueInSameBlockUntilTimestamp, allowCreateAliasTransactionAfterTimestamp, allowMakeAssetNameUniqueTransactionAfterTimestamp,
-      allowMultipleLeaseCancelTransactionUntilTimestamp, resetEffectiveBalancesAtHeight)
+    FunctionalitySettings(allowTemporaryNegativeUntil = config.as[Long](s"$configPath.allow-temporary-negative-until"),
+      allowInvalidPaymentTransactionsByTimestamp = config.as[Long](s"$configPath.allow-invalid-payment-transactions-by-timestamp"),
+      requireSortedTransactionsAfter = config.as[Long](s"$configPath.require-sorted-transactions-after"),
+      generatingBalanceDepthFrom50To1000AfterHeight = config.as[Long](s"$configPath.generation-balance-depth-from-50-to-1000-after-height"),
+      minimalGeneratingBalanceAfterTimestamp = config.as[Long](s"$configPath.minimal-generating-balance-after"),
+      allowTransactionsFromFutureUntil = config.as[Long](s"$configPath.allow-transactions-from-future-until"),
+      allowUnissuedAssetsUntil = config.as[Long](s"$configPath.allow-unissued-assets-until"),
+      allowBurnTransactionAfterTimestamp = config.as[Long](s"$configPath.allow-burn-transaction-after"),
+      allowLeaseTransactionAfterTimestamp = config.as[Long](s"$configPath.allow-lease-transaction-after"),
+      requirePaymentUniqueId = config.as[Long](s"$configPath.require-payment-unique-id-after"),
+      allowExchangeTransactionAfterTimestamp = config.as[Long](s"$configPath.allow-exchange-transaction-after"),
+      allowInvalidReissueInSameBlockUntilTimestamp = config.as[Long](s"$configPath.allow-invalid-reissue-in-same-block-until-timestamp"),
+      allowCreateAliasTransactionAfterTimestamp = config.as[Long](s"$configPath.allow-createalias-transaction-after"),
+      allowMakeAssetNameUniqueTransactionAfterTimestamp = config.as[Long](s"$configPath.allow-make-asset-name-unique-transaction-after"),
+      allowMultipleLeaseCancelTransactionUntilTimestamp = config.as[Long](s"$configPath.allow-multiple-lease-cancel-transaction-until-timestamp"),
+      resetEffectiveBalancesAtHeight = config.as[Long](s"$configPath.reset-effective-balances-at-height"),
+      allowLeasedBalanceTransferUntil = config.as[Long](s"$configPath.allow-leased-balance-transfer-until"))
   }
 }
 

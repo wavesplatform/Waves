@@ -11,9 +11,7 @@ import scorex.transaction.{History, NewTransactionHandler}
 
 import scala.util.Try
 
-class MessageSpecification extends FunSuite with MockFactory with UnitTestConfig {
-
-  implicit val transactionModule = mock[NewTransactionHandler]
+class MessageSpecification extends FunSuite with MockFactory {
 
   private lazy val handler = new MessageHandler(BasicMessagesRepo.specs)
 
