@@ -24,6 +24,8 @@ object Synchronized {
     override def unlock(): Unit = rwl.readLock().unlock()
 
     override def tryLock(): Boolean = rwl.readLock().tryLock()
+
+    override def toString: String = "read of " + rwl.toString
   }
 
   sealed class WriteLock(rwl: ReentrantReadWriteLock) extends ReadLock(rwl) {
@@ -32,17 +34,19 @@ object Synchronized {
     override def unlock(): Unit = rwl.writeLock.unlock()
 
     override def tryLock(): Boolean = rwl.writeLock.tryLock()
+
+    override def toString: String = "write of " + rwl.toString
   }
 
 }
 
-trait Synchronized {
+trait Synchronized extends ScorexLogging {
 
   def synchronizationToken: ReentrantReadWriteLock
 
-  private def instanceReadLock: ReadLock = new ReadLock(synchronizationToken)
+  private lazy val instanceReadLock: ReadLock = new ReadLock(synchronizationToken)
 
-  private def instanceReadWriteLock: WriteLock = new WriteLock(synchronizationToken)
+  private lazy val instanceReadWriteLock: WriteLock = new WriteLock(synchronizationToken)
 
   protected case class Synchronized[T](private var value: T) {
 
@@ -69,11 +73,13 @@ trait Synchronized {
 
   protected def synchronizeOperation[T, L <: TypedLock](lock: L)(body: L => T): T = {
     lock.lock()
+    log.trace(s"locked $lock")
     try {
       body(lock)
     }
     finally {
       lock.unlock()
+      log.trace(s"unlocked $lock")
     }
   }
 }

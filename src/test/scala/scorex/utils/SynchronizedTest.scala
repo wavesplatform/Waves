@@ -11,10 +11,8 @@ import scala.concurrent.{Await, Future, TimeoutException}
 class SynchronizedTest extends FunSuite {
   val st = new ReentrantReadWriteLock()
 
-  class A extends Synchronized {
+  class A(val synchronizationToken: ReentrantReadWriteLock = st) extends Synchronized {
     val mut = Synchronized(0)
-
-    override def synchronizationToken: ReentrantReadWriteLock = st
 
     def read(): Int = read { implicit l =>
       mut()
@@ -25,8 +23,7 @@ class SynchronizedTest extends FunSuite {
     }
 
     def readWhileWrite(): Int = write { implicit l =>
-      write()
-      mut() + read()
+      read()
     }
 
     def longRead(): Unit = read { implicit l =>
@@ -39,6 +36,32 @@ class SynchronizedTest extends FunSuite {
       Thread.sleep(5000)
       mut.set(1)
     }
+
+    def nestedWirte(): Unit = write { implicit l =>
+      Thread.sleep(200)
+      write()
+      Thread.sleep(200)
+    }
+  }
+
+  test("nested writes hold write lock") {
+    val a = new A()
+    Future(a.nestedWirte())
+
+    intercept[TimeoutException] {
+      Await.result(Future(a.read()), 300.millis)
+    }
+  }
+
+  test("nested writes hold write lock across multiple instances") {
+    val token = new ReentrantReadWriteLock()
+
+    val a1 = new A(token)
+    val a2 = new A(token)
+    Future(a1.nestedWirte())
+    intercept[TimeoutException] {
+      Await.result(Future(a2.read()), 150.millis)
+    }
   }
 
   test("can read, write, read while write") {
@@ -46,6 +69,11 @@ class SynchronizedTest extends FunSuite {
     a.read()
     a.write()
     a.readWhileWrite()
+  }
+
+  test("nested writes work") {
+    val a = new A()
+    Await.result(Future(a.nestedWirte()), 500.millis)
   }
 
 
