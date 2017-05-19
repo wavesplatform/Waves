@@ -14,7 +14,7 @@ object BlockStorageImpl extends ScorexLogging {
 
   def apply(settings: BlockchainSettings): (CheckpointService, History, StateReader, BlockchainUpdaterImpl) = {
 
-    val lock = new ReentrantReadWriteLock()
+    val lock = new ReentrantReadWriteLock(true)
 
     val checkpointService = {
       val checkpointStore: MVStore = createMVStore(settings.checkpointFile)

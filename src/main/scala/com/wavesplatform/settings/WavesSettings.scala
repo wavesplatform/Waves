@@ -6,6 +6,7 @@ import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.EnumerationReader._
 
 object LogLevel extends Enumeration {
+  val TRACE = Value("TRACE")
   val DEBUG = Value("DEBUG")
   val INFO = Value("INFO")
   val WARN = Value("WARN")
