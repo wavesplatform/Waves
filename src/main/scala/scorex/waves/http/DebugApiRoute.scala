@@ -69,7 +69,7 @@ case class DebugApiRoute(settings: RestAPISettings, wallet: Wallet, stateReader:
   @Path("/rollback")
   @ApiOperation(value = "Rollback to height", notes = "Removes all blocks after given height", httpMethod = "POST")
   @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "height", value = "Height to rollback to", required = true, dataType = "integer", paramType = "path")
+    new ApiImplicitParam(name = "height", value = "Height to rollback to", required = true, dataType = "integer", paramType = "body")
   ))
   @ApiResponses(Array(
     new ApiResponse(code = 200, message = "200 if success, 404 if there are no block at this height")
