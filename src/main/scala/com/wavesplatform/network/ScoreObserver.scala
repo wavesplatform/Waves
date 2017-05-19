@@ -14,10 +14,10 @@ import scala.collection.JavaConverters._
 
 @Sharable
 class ScoreObserver(syncSettings: SynchronizationSettings, history: History)
-  extends ChannelInboundHandlerAdapter with ScorexLogging {
+  extends ChannelDuplexHandler with ScorexLogging {
   import ScoreObserver._
 
-  val scores = new ConcurrentHashMap[Channel, Score]()
+  val scores = new ConcurrentHashMap[Channel, RemoteScore]()
 
   def maxScore = scores.asScala.foldLeft(BigInt(0)) {
     case (prev, (_, s)) => prev.max(s.value)
@@ -30,13 +30,19 @@ class ScoreObserver(syncSettings: SynchronizationSettings, history: History)
 
     }
 
+  override def write(ctx: ChannelHandlerContext, msg: AnyRef, promise: ChannelPromise) = msg match {
+    case LocalScoreChanged(newLocalScore) => ctx.write(newLocalScore, promise)
+    case _ => ctx.write(msg, promise)
+  }
+
+
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef) = msg match {
     case _: Handshake =>
       log.debug(s"New channel opened, broadcasting local score ${history.score()}")
       ctx.write(history.score())
     case newScoreValue: History.BlockchainScore =>
       log.debug(s"Setting score for ${ctx.channel().id().asShortText()} to $newScoreValue")
-      val score = Score(newScoreValue, System.currentTimeMillis())
+      val score = RemoteScore(newScoreValue, System.currentTimeMillis())
 
       ctx.executor().schedule(syncSettings.scoreTTL) {
         scores.remove(ctx.channel().id(), score)
@@ -53,6 +59,8 @@ class ScoreObserver(syncSettings: SynchronizationSettings, history: History)
 }
 
 object ScoreObserver {
-  case class Score(value: History.BlockchainScore, ts: Long)
   case object NewHighScoreReceived
+
+  case class RemoteScore(value: History.BlockchainScore, ts: Long)
+  case class LocalScoreChanged(newScore: History.BlockchainScore)
 }
