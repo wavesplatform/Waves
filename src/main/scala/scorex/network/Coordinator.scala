@@ -1,14 +1,11 @@
 package scorex.network
 
 import akka.actor.{Actor, ActorRef}
-import cats._
-import cats.implicits._
+
 import com.wavesplatform.network.Network
-import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state2.reader.StateReader
 import scorex.block.Block
-import scorex.consensus.TransactionsOrdering
 import scorex.consensus.mining.BlockGeneratorController.LastBlockChanged
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
@@ -17,22 +14,16 @@ import scorex.transaction.ValidationError.GenericError
 import scorex.transaction._
 import scorex.utils.{ScorexLogging, Time}
 
-import scala.concurrent.duration._
 import scala.language.{higherKinds, postfixOps}
-import scala.util.control.NonFatal
 
 class Coordinator(network: Network, blockchainSynchronizer: ActorRef, blockGenerator: ActorRef,
                   peerManager: ActorRef, scoreObserver: ActorRef, blockchainUpdater: BlockchainUpdater, time: Time,
                   utxStorage: UnconfirmedTransactionsStorage,
                   history: History, stateReader: StateReader, checkpoints: CheckpointService, settings: WavesSettings) extends Actor with ScorexLogging {
 
-  import Coordinator._
 
 
-
-  override def receive: Receive = {
-    case _=>
-  }
+  override def receive: Receive = { case _ => }
 
   private def handleCheckpoint(checkpoint: Checkpoint, from: Option[ConnectedPeer]): Unit =
     if (checkpoints.get.forall(c => !(c.signature sameElements checkpoint.signature))) {
@@ -72,9 +63,6 @@ class Coordinator(network: Network, blockchainSynchronizer: ActorRef, blockGener
     }
   }
 
-  private def processSingleBlock(newBlock: Block, from: Option[ConnectedPeer]): Unit = {
-    val parentBlockId = newBlock.reference
-    val local = from.isEmpty
 
     val isBlockToBeAdded = try {
       if (history.contains(newBlock)) {
@@ -213,67 +201,7 @@ object Coordinator extends ScorexLogging {
 
   case class BroadcastCheckpoint(checkpoint: Checkpoint)
 
-  def foldM[G[_], F[_], A, B](fa: F[A], z: B)(f: (B, A) => G[B])(implicit G: Monad[G], F: Traverse[F]): G[B] =
-    F.foldLeft(fa, G.pure(z))((gb, a) => G.flatMap(gb)(f(_, a)))
 
-  val MaxTimeDrift: FiniteDuration = 15.seconds
 
-  def blockConsensusValidation(history: History, state: StateReader, bcs: BlockchainSettings, time: Time)(block: Block): Boolean = try {
-
-    import PoSCalc._
-
-    val fs = bcs.functionalitySettings
-
-    val blockTime = block.timestamp
-
-    require((blockTime - time.correctedTime()).millis < MaxTimeDrift, s"Block timestamp $blockTime is from future")
-
-    if (blockTime > fs.requireSortedTransactionsAfter) {
-      require(block.transactionData.sorted(TransactionsOrdering.InBlock) == block.transactionData, "Transactions must be sorted correctly")
-    }
-
-    val parentOpt = history.parent(block)
-    require(parentOpt.isDefined || history.height() == 1, s"Can't find parent block with id '${block.reference}' of block '${block.uniqueId}'")
-
-    val parent = parentOpt.get
-    val parentHeightOpt = history.heightOf(parent.uniqueId)
-    require(parentHeightOpt.isDefined, s"Can't get parent block with id '${block.reference}' height")
-    val parentHeight = parentHeightOpt.get
-
-    val prevBlockData = parent.consensusData
-    val blockData = block.consensusData
-
-    val cbt = calcBaseTarget(history)(bcs.genesisSettings.averageBlockDelay, parent, blockTime)
-    val bbt = blockData.baseTarget
-    require(cbt == bbt, s"Block's basetarget is wrong, calculated: $cbt, block contains: $bbt")
-
-    val generator = block.signerData.generator
-
-    //check generation signature
-    val calcGs = calcGeneratorSignature(prevBlockData, generator)
-    val blockGs = blockData.generationSignature
-    require(calcGs.sameElements(blockGs),
-      s"Block's generation signature is wrong, calculated: ${
-        calcGs.mkString
-      }, block contains: ${
-        blockGs.mkString
-      }")
-
-    val effectiveBalance = generatingBalance(state, fs)(generator, parentHeight)
-
-    if (blockTime >= fs.minimalGeneratingBalanceAfterTimestamp) {
-      require(effectiveBalance >= MinimalEffectiveBalanceForGenerator, s"Effective balance $effectiveBalance is less that minimal ($MinimalEffectiveBalanceForGenerator)")
-    }
-
-    //check hit < target
-    calcHit(prevBlockData, generator) < calcTarget(parent, blockTime, effectiveBalance)
-  } catch {
-    case e: IllegalArgumentException =>
-      log.error("Error while checking a block", e)
-      false
-    case NonFatal(t) =>
-      log.error("Fatal error while checking a block", t)
-      throw t
-  }
 
 }

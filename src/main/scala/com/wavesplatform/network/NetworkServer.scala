@@ -5,7 +5,8 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.stream.Collectors
 
 import com.wavesplatform.Version
-import com.wavesplatform.settings.{Constants, SynchronizationSettings, WavesSettings}
+import com.wavesplatform.settings.{BlockchainSettings, Constants, SynchronizationSettings, WavesSettings}
+import com.wavesplatform.state2.reader.StateReader
 import io.netty.bootstrap.{Bootstrap, ServerBootstrap}
 import io.netty.channel._
 import io.netty.channel.group.{ChannelGroup, ChannelMatchers}
@@ -16,8 +17,8 @@ import io.netty.handler.codec.{LengthFieldBasedFrameDecoder, LengthFieldPrepende
 import io.netty.handler.logging.LoggingHandler
 import scorex.network.message.{BasicMessagesRepo, MessageSpec}
 import scorex.network.{Handshake, TransactionalMessagesRepo}
-import scorex.transaction.History
-import scorex.utils.ScorexLogging
+import scorex.transaction.{BlockchainUpdater, CheckpointService, History, UnconfirmedTransactionsStorage}
+import scorex.utils.{ScorexLogging, Time}
 
 import scala.concurrent.duration._
 import scala.util.Random
@@ -36,12 +37,19 @@ class ClientChannelInitializer(
     handshake: Handshake,
     scoreObserver: ScoreObserver,
     history: History,
+    checkpoints: CheckpointService,
+    blockchainUpdater: BlockchainUpdater,
+    time: Time,
+    stateReader: StateReader,
+    utxStorage: UnconfirmedTransactionsStorage,
+    blockchainSettings: BlockchainSettings,
     syncSettings: SynchronizationSettings,
     connections: ConcurrentHashMap[PeerKey, Channel])
   extends ChannelInitializer[SocketChannel] {
 
   private val specs: Map[Byte, MessageSpec[_ <: AnyRef]] = (BasicMessagesRepo.specs ++ TransactionalMessagesRepo.specs).map(s => s.messageCode -> s).toMap
   private val loggingHandler = new LoggingHandler()
+  private val coordinator = new Coordinator(checkpoints, history, blockchainUpdater, time, stateReader, utxStorage, blockchainSettings)
 
   override def initChannel(ch: SocketChannel): Unit = {
     ch.pipeline()
@@ -55,6 +63,7 @@ class ClientChannelInitializer(
       .addLast(scoreObserver)
       .addLast(new ExtensionSignaturesLoader(history, syncSettings))
       .addLast(new ExtensionBlocksLoader(history, syncSettings.synchronizationTimeout))
+      .addLast(coordinator)
   }
 }
 
@@ -64,7 +73,16 @@ trait Network {
   def sendToRandom(message: AnyRef): Unit
 }
 
-class NetworkServer(chainId: Char, settings: WavesSettings, history: History, allChannels: ChannelGroup) extends ScorexLogging {
+class NetworkServer(
+    chainId: Char,
+    settings: WavesSettings,
+    history: History,
+    checkpoints: CheckpointService,
+    blockchainUpdater: BlockchainUpdater,
+    time: Time,
+    stateReader: StateReader,
+    utxStorage: UnconfirmedTransactionsStorage,
+    allChannels: ChannelGroup) extends ScorexLogging {
   private val bossGroup = new NioEventLoopGroup()
   private val workerGroup = new NioEventLoopGroup()
   private val handshake =
@@ -97,7 +115,18 @@ class NetworkServer(chainId: Char, settings: WavesSettings, history: History, al
   private val bootstrap = new Bootstrap()
     .group(workerGroup)
     .channel(classOf[NioSocketChannel])
-    .handler(new ClientChannelInitializer(handshake, scoreObserver, history, settings.synchronizationSettings, allConnectedPeers))
+    .handler(new ClientChannelInitializer(
+      handshake,
+      scoreObserver,
+      history,
+      checkpoints,
+      blockchainUpdater,
+      time,
+      stateReader,
+      utxStorage,
+      settings.blockchainSettings,
+      settings.synchronizationSettings,
+      allConnectedPeers))
 
   private val serverChannel = new ServerBootstrap()
     .group(bossGroup, workerGroup)

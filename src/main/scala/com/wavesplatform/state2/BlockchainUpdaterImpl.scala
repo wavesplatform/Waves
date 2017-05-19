@@ -56,7 +56,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader, set
       blockDiff <- BlockDiffer(settings)(currentState, block)
       _ <- bc.appendBlock(block)
     } yield {
-      log.info( s"""Block ${block.encodedId} appended. New height: ${bc.height()}, new score: ${bc.score()})""")
+      log.info(s"""Block ${block.encodedId} appended. New height: ${bc.height()}, new score: ${bc.score()})""")
       inMemoryDiff.set(Monoid[BlockDiff].combine(inMemoryDiff(), blockDiff))
     }
   }
