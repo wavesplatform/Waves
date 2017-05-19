@@ -53,8 +53,8 @@ class ClientChannelInitializer(
       .addLast(new LengthFieldBasedFrameDecoder(1024*1024, 0, 4, 0, 4))
       .addLast(new MessageCodec(specs))
       .addLast(scoreObserver)
-      .addLast(new ExtensionLoader(history, syncSettings))
-      .addLast(new BlockLoader(syncSettings.synchronizationTimeout))
+      .addLast(new ExtensionSignaturesLoader(history, syncSettings))
+      .addLast(new ExtensionBlocksLoader(history, syncSettings.synchronizationTimeout))
   }
 }
 

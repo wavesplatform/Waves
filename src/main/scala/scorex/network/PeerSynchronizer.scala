@@ -9,12 +9,9 @@ import com.wavesplatform.network.GetPeers
 import com.wavesplatform.settings.NetworkSettings
 import scorex.network.NetworkController.{DataFromPeer, SendToNetwork}
 import scorex.network.PeerSynchronizer.RequestDataFromPeer
-import scorex.network.message.Message
-import scorex.network.peer.PeerManager
+import scorex.network.message.{Message, _}
 import scorex.network.peer.PeerManager.GetRandomPeersToBroadcast
 import scorex.utils.ScorexLogging
-import shapeless.syntax.typeable._
-import scorex.network.message._
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
@@ -38,16 +35,6 @@ class PeerSynchronizer(networkControllerRef: ActorRef, peerManager: ActorRef,
     case RequestDataFromPeer =>
       hasRequested = true
       networkControllerRef ! stn
-
-    case DataFromPeer(msgId, peers: Seq[InetSocketAddress]@unchecked, remote)
-      if hasRequested && msgId == PeersSpec.messageCode && peers.cast[Seq[InetSocketAddress]].isDefined =>
-      hasRequested = false
-
-      if (peers.size <= maxPeersToBroadcast) {
-        peers
-          .filter(_.getPort < networkSettings.minEphemeralPortNumber)
-          .foreach(isa => peerManager ! PeerManager.AddPeer(isa))
-      }
 
     case DataFromPeer(msgId, _, remote)
       if !hasRequested && msgId == PeersSpec.messageCode =>
