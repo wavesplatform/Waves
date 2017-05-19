@@ -28,7 +28,7 @@ object BalanceDiffValidation {
         Some(s"negative asset balance: $acc, old: $oldPortfolio, new: $newPortfolio")
       } else if (newPortfolio.effectiveBalance < 0) {
         Some(s"negative effective balance: $acc, old: ${leaseWavesInfo(oldPortfolio)}, new: ${leaseWavesInfo(oldPortfolio)}")
-      } else if (newPortfolio.balance < newPortfolio.leaseInfo.leaseOut && time > fs.allowTransferLeasedBalanceUntil) {
+      } else if (newPortfolio.balance < newPortfolio.leaseInfo.leaseOut && time > fs.allowLeasedBalanceTransferUntil) {
         Some(s"leased being more than own: $acc, old: ${leaseWavesInfo(oldPortfolio)}, new: ${leaseWavesInfo(oldPortfolio)}")
       } else None
 
