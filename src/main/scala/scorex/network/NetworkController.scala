@@ -13,6 +13,4 @@ object NetworkController {
   case class SendToNetwork(message: Message[_ <: AnyRef], sendingStrategy: SendingStrategy)
 
   case class ConnectTo(address: InetSocketAddress)
-
-  case class InboundConnection(connection: ActorRef, remote: InetSocketAddress)
 }
