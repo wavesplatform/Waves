@@ -25,7 +25,7 @@ case class FunctionalitySettings(allowTemporaryNegativeUntil: Long,
                                  allowMakeAssetNameUniqueTransactionAfterTimestamp: Long,
                                  allowMultipleLeaseCancelTransactionUntilTimestamp: Long,
                                  resetEffectiveBalancesAtHeight: Long,
-                                 allowLeasedBalanceTransferUntil: Long)
+                                 allowTransferLeasedBalanceUntil: Long)
 
 object FunctionalitySettings {
   val MAINNET = FunctionalitySettings(allowTemporaryNegativeUntil = 1479168000000L,
@@ -44,7 +44,7 @@ object FunctionalitySettings {
     allowMakeAssetNameUniqueTransactionAfterTimestamp = Long.MaxValue,
     allowMultipleLeaseCancelTransactionUntilTimestamp = 1492768800000L,
     resetEffectiveBalancesAtHeight = 462000,
-    allowLeasedBalanceTransferUntil = Long.MaxValue)
+    allowTransferLeasedBalanceUntil = Long.MaxValue)
 
   val TESTNET = FunctionalitySettings(
     allowTemporaryNegativeUntil = 1477958400000L,
@@ -60,10 +60,10 @@ object FunctionalitySettings {
     allowExchangeTransactionAfterTimestamp = 1483228800000L,
     allowInvalidReissueInSameBlockUntilTimestamp = 1492560000000L,
     allowCreateAliasTransactionAfterTimestamp = 1493596800000L,
-    allowMakeAssetNameUniqueTransactionAfterTimestamp = Long.MaxValue,
+    allowMakeAssetNameUniqueTransactionAfterTimestamp = 1495238400000L,
     allowMultipleLeaseCancelTransactionUntilTimestamp = 1492560000000L,
     resetEffectiveBalancesAtHeight = 51500,
-    allowLeasedBalanceTransferUntil = Long.MaxValue)
+    allowTransferLeasedBalanceUntil = 1495238400000L)
 
   val configPath = "waves.blockchain.custom.functionality"
 
@@ -84,7 +84,7 @@ object FunctionalitySettings {
       allowMakeAssetNameUniqueTransactionAfterTimestamp = config.as[Long](s"$configPath.allow-make-asset-name-unique-transaction-after"),
       allowMultipleLeaseCancelTransactionUntilTimestamp = config.as[Long](s"$configPath.allow-multiple-lease-cancel-transaction-until-timestamp"),
       resetEffectiveBalancesAtHeight = config.as[Long](s"$configPath.reset-effective-balances-at-height"),
-      allowLeasedBalanceTransferUntil = config.as[Long](s"$configPath.allow-leased-balance-transfer-until"))
+      allowTransferLeasedBalanceUntil = config.as[Long](s"$configPath.allow-transfer-leased-balance-until"))
   }
 }
 
