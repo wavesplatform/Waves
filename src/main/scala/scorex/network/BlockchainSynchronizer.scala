@@ -341,8 +341,21 @@ object BlockchainSynchronizer {
 
   case class GetExtension(peerScores: Map[ConnectedPeer, BlockchainScore])
 
-  def blockIdsToStartDownload(blockIds: Seq[ByteStr], history: History): Option[(ByteStr, Seq[ByteStr])] = {
-    val (common, toDownload) = blockIds.span(id => history.contains(id))
+  case class InnerId(blockId: BlockId) {
+    override def equals(obj: Any): Boolean = obj match {
+      case InnerId(that) => blockId.sameElements(that)
+      case _ => false
+    }
+
+    override def hashCode(): Int = scala.util.hashing.MurmurHash3.seqHash(blockId)
+
+    override def toString: String = encode(blockId)
+  }
+
+  type InnerIds = Seq[InnerId]
+
+  def blockIdsToStartDownload(blockIds: InnerIds, history: History): Option[(InnerId, InnerIds)] = {
+    val (common, toDownload) = blockIds.span(id => history.contains(id.blockId))
     if (common.nonEmpty) Some((common.last, toDownload)) else None
   }
 
