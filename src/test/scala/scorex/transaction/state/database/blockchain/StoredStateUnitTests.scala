@@ -546,6 +546,47 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
     }
   }
 
+  property("Transfer leased waves should fail in same block") {
+    withRollbackTest(state) {
+      val acc = new PrivateKeyAccount(scorex.utils.randomBytes(64))
+
+      val genesisTransaction1 = GenesisTransaction.create(acc, 1005, System.currentTimeMillis()).right.get
+      val genesisTransaction2 = GenesisTransaction.create(testAcc, 2005, System.currentTimeMillis()).right.get
+
+      state.applyChanges(state.calcNewBalances(Seq(genesisTransaction1, genesisTransaction2), Map(),
+        allowTemporaryNegative = false, allowTransferLeasedBalance = false), Seq(genesisTransaction1, genesisTransaction2))
+
+      val lease1 = LeaseTransaction.create(acc, 500, 1, System.currentTimeMillis(), testAcc).right.get
+      val lease2 = LeaseTransaction.create(testAcc, 2000, 1, System.currentTimeMillis(), acc).right.get
+      val transfer1 = TransferTransaction.create(None, acc, testAcc, 900, System.currentTimeMillis(), None, 1, Array.emptyByteArray).right.get
+
+      state.isValid(Seq(lease1, lease2, transfer1), blockTime = System.currentTimeMillis()) shouldBe false
+    }
+  }
+
+  property("Transfer leased waves should fail in two blocks") {
+    withRollbackTest(state) {
+      val acc = new PrivateKeyAccount(scorex.utils.randomBytes(64))
+
+      val genesisTransaction1 = GenesisTransaction.create(acc, 1005, System.currentTimeMillis()).right.get
+      val genesisTransaction2 = GenesisTransaction.create(testAcc, 2005, System.currentTimeMillis()).right.get
+
+      state.applyChanges(state.calcNewBalances(Seq(genesisTransaction1, genesisTransaction2), Map(),
+        allowTemporaryNegative = false, allowTransferLeasedBalance = false), Seq(genesisTransaction1, genesisTransaction2))
+
+      val lease1 = LeaseTransaction.create(acc, 500, 1, System.currentTimeMillis(), testAcc).right.get
+      val lease2 = LeaseTransaction.create(testAcc, 2000, 1, System.currentTimeMillis(), acc).right.get
+      val transfer1 = TransferTransaction.create(None, acc, testAcc, 900, System.currentTimeMillis(), None, 1, Array.emptyByteArray).right.get
+
+      state.isValid(Seq(lease1, lease2), blockTime = System.currentTimeMillis()) shouldBe true
+
+      state.applyChanges(state.calcNewBalances(Seq(lease1, lease2), Map(),
+        allowTemporaryNegative = false, allowTransferLeasedBalance = false), Seq(lease1, lease2))
+
+      state.isValid(Seq(transfer1), blockTime = System.currentTimeMillis()) shouldBe false
+    }
+  }
+
   property("Lease cancel from different account should fail after fork activation") {
     val state2 = StoredState.fromDB(db, leasingForkParameters)
     forAll(leaseAndCancelsAfterForkGen) { case (lease, cancel1, cancel2, otherCancel1, otherCancel2) =>
