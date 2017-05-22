@@ -33,7 +33,7 @@ class OrderHistorySpecification extends PropSpec
 
     oh.didOrderAccepted(OrderAdded(LimitOrder(ord1)))
     oh.getOrderStatus(ord1.idStr) shouldBe LimitOrder.Accepted
-    oh.getOrderInfo(ord1.idStr) shouldBe OrderInfo(ord1.amount, ord1.timestamp, 0, false)
+    oh.getOrderInfo(ord1.idStr) shouldBe OrderInfo(ord1.amount, 0, false)
 
     oh.getOpenVolume(AssetAcc(ord1.senderPublicKey, pair.amountAsset)) shouldBe 0L
     oh.getOpenVolume(AssetAcc(ord1.senderPublicKey, pair.priceAsset)) shouldBe 7L

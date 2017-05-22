@@ -10,11 +10,11 @@ import scorex.utils.Booleans
 import scala.util.Try
 
 
-case class OrderInfo(amount: Long, timestamp: Long, filled: Long, canceled: Boolean) {
+case class OrderInfo(amount: Long, filled: Long, canceled: Boolean) {
   def remaining: Long = if (!canceled) amount - filled else 0L
 
   def status: LimitOrder.OrderStatus = {
-    if (timestamp == 0) LimitOrder.NotFound
+    if (amount == 0) LimitOrder.NotFound
     else if (canceled) LimitOrder.Cancelled(filled)
     else if (filled == 0) LimitOrder.Accepted
     else if (filled < amount) LimitOrder.PartiallyFilled(filled)
@@ -30,14 +30,13 @@ object OrderInfo {
   def limitSum(x: Long, y: Long): Long = Try(math.max(0L, Math.addExact(x, y))).getOrElse(Long.MaxValue)
   implicit val limitSemigroup: Semigroup[Long] = (x: Long, y: Long) => limitSum(x, y)
 
-  val empty = OrderInfo(0L, 0L, 0L, false)
+  val empty = OrderInfo(0L, 0L, false)
   implicit val orderInfoMonoid = new Monoid[OrderInfo] {
     override def empty: OrderInfo = OrderInfo.empty
 
     override def combine(older: OrderInfo, newer: OrderInfo): OrderInfo =
       OrderInfo(
         math.max(older.amount, newer.amount),
-        newer.timestamp,
         older.filled.combine(newer.filled),
         newer.canceled
       )
