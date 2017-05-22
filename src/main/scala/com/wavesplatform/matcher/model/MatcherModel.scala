@@ -109,7 +109,9 @@ object Events {
   sealed trait Event
   case class OrderExecuted(submitted: LimitOrder, counter: LimitOrder) extends Event {
     def counterRemaining: Long = math.max(counter.amount - submitted.amount, 0)
+    def counterRemainingOrder: LimitOrder = counter.partial(counterRemaining)
     def submittedRemaining: Long = math.max(submitted.amount - counter.amount, 0)
+    def submittedRemainingOrder: LimitOrder = submitted.partial(submittedRemaining)
     def executedAmount: Long = math.min(submitted.amount, counter.amount)
     def submittedExecuted = submitted.partial(amount = executedAmount)
     def counterExecuted = counter.partial(amount = executedAmount)
