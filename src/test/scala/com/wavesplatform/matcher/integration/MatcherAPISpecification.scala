@@ -28,7 +28,7 @@ class MatcherAPISpecification extends FunSuite with Matchers with Eventually wit
   private var MBalance1 = 0L
   private var ABalance = 0L
   private var ABalance1 = 0L
-  private val TxFee = 100000L
+  private val MatcherFee = 300000L
   private implicit val storedState = application.storedState
   private var orderIdToCancel = Option.empty[String]
 
@@ -83,7 +83,7 @@ class MatcherAPISpecification extends FunSuite with Matchers with Eventually wit
     val pubKeyStr = Base58.encode(acc.publicKey)
     val json =
       s"""{
-         |  "matcherFee": 100000,
+         |  "matcherFee": 300000,
          |  "price": ${(price * Order.PriceConstant).toLong},
          |  "assetPair": ${Json.stringify(assetPair.json)},
          |  "orderType": "$orderType",
@@ -161,7 +161,7 @@ class MatcherAPISpecification extends FunSuite with Matchers with Eventually wit
     val ob = getOrderBook(Asset1)
     ((ob \ "asks") (0) \ "amount").as[Long] shouldBe 300 * Constants.UnitsInWave
 
-    val executedFee = 100000L
+    val executedFee = MatcherFee
     MBalance += 2 * 200 * Constants.UnitsInWave + executedFee
     waitForBalance(MBalance, AccountM, None)
     ABalance -= 2 * 200 * Constants.UnitsInWave + executedFee
@@ -193,7 +193,7 @@ class MatcherAPISpecification extends FunSuite with Matchers with Eventually wit
     waitForOrderStatus(Asset1, id.get, "Filled")
 
     val wavesAmount = (1.5 * 500 + 2 * 200).toLong * Constants.UnitsInWave
-    val executedFee =  100000L * 500 / 700 + 100000L * 200 / 700
+    val executedFee =  MatcherFee * 500 / 700 + MatcherFee * 200 / 700
     MBalance += wavesAmount + executedFee
     waitForBalance(MBalance, AccountM, None)
     ABalance -= wavesAmount + executedFee
@@ -222,7 +222,7 @@ class MatcherAPISpecification extends FunSuite with Matchers with Eventually wit
     waitForBalance(MBalance1, AccountM, Asset1)
     ABalance1 = 1000 * Constants.UnitsInWave
     waitForBalance(ABalance1, AccountA, Asset1)
-    ABalance -= 500 * Constants.UnitsInWave + (TxFee * 100 / 250)
+    ABalance -= 500 * Constants.UnitsInWave + (MatcherFee * 100 / 250)
     waitForBalance(ABalance, AccountA, None)
 
     val ob = getOrderBook(Asset1)
