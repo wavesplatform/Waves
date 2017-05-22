@@ -22,7 +22,8 @@ case class FunctionalitySettings(allowTemporaryNegativeUntil: Long,
                                  allowExchangeTransactionAfterTimestamp: Long,
                                  allowInvalidReissueInSameBlockUntilTimestamp: Long,
                                  allowMultipleLeaseCancelTransactionUntilTimestamp: Long,
-                                 resetEffectiveBalancesAtHeight: Long)
+                                 resetEffectiveBalancesAtHeight: Long,
+                                 allowLeasedBalanceTransferUntil: Long)
 
 object FunctionalitySettings {
   val MAINNET = FunctionalitySettings(allowTemporaryNegativeUntil = 1479168000000L,
@@ -38,7 +39,8 @@ object FunctionalitySettings {
     allowExchangeTransactionAfterTimestamp = 1491192000000L,
     allowInvalidReissueInSameBlockUntilTimestamp = 1492768800000L,
     allowMultipleLeaseCancelTransactionUntilTimestamp = 1492768800000L,
-    resetEffectiveBalancesAtHeight = 462000)
+    resetEffectiveBalancesAtHeight = 462000,
+    allowLeasedBalanceTransferUntil = 1495497600000L)
 
   val TESTNET = FunctionalitySettings(
     allowTemporaryNegativeUntil = 1477958400000L,
@@ -54,7 +56,8 @@ object FunctionalitySettings {
     allowExchangeTransactionAfterTimestamp = 1483228800000L,
     allowInvalidReissueInSameBlockUntilTimestamp = 1492560000000L,
     allowMultipleLeaseCancelTransactionUntilTimestamp = 1492560000000L,
-    resetEffectiveBalancesAtHeight = 51500)
+    resetEffectiveBalancesAtHeight = 51500,
+    allowLeasedBalanceTransferUntil = 1495497600000L)
 
   val configPath = "waves.blockchain.custom.functionality"
 
@@ -73,11 +76,12 @@ object FunctionalitySettings {
     val allowInvalidReissueInSameBlockUntilTimestamp = config.as[Long](s"$configPath.allow-invalid-reissue-in-same-block-until-timestamp")
     val allowMultipleLeaseCancelTransactionUntilTimestamp = config.as[Long](s"$configPath.allow-multiple-lease-cancel-transaction-until-timestamp")
     val resetEffectiveBalancesAfterTimestamp = config.as[Long](s"$configPath.reset-effective-balances-at-height")
+    val allowLeasedBalanceTransferUntil = config.as[Long](s"$configPath.allow-leased-balance-transfer-until")
 
     FunctionalitySettings(allowTemporaryNegativeUntil, allowInvalidPaymentTransactionsByTimestamp,
       requireSortedTransactionsAfter, generatingBalanceDepthFrom50To1000AfterHeight,
       minimalGeneratingBalanceAfterTimestamp, allowTransactionsFromFutureUntil, allowUnissuedAssetsUntil,
-      allowBurnTransactionAfterTimestamp, allowLeaseTransactionAfterTimestamp, requirePaymentUniqueId, allowExchangeTransactionAfterTimestamp,allowInvalidReissueInSameBlockUntilTimestamp,allowMultipleLeaseCancelTransactionUntilTimestamp, resetEffectiveBalancesAfterTimestamp)
+      allowBurnTransactionAfterTimestamp, allowLeaseTransactionAfterTimestamp, requirePaymentUniqueId, allowExchangeTransactionAfterTimestamp,allowInvalidReissueInSameBlockUntilTimestamp,allowMultipleLeaseCancelTransactionUntilTimestamp, resetEffectiveBalancesAfterTimestamp, allowLeasedBalanceTransferUntil)
   }
 }
 
@@ -205,6 +209,8 @@ object BlockchainSettingsExtension {
         override def allowMultipleLeaseCancelTransactionUntilTimestamp: Long = blockchainSettings.functionalitySettings.allowMultipleLeaseCancelTransactionUntilTimestamp
 
         override def resetEffectiveBalancesAtHeight: Long = blockchainSettings.functionalitySettings.resetEffectiveBalancesAtHeight
+
+        override def allowLeasedBalanceTransferUntil: Long = blockchainSettings.functionalitySettings.allowLeasedBalanceTransferUntil
       }
     }
 

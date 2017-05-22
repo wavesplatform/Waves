@@ -17,6 +17,7 @@ trait ChainParameters {
   def allowInvalidReissueInSameBlockUntilTimestamp: Long
   def resetEffectiveBalancesAtHeight: Long
   def requirePaymentUniqueId: Long
+  def allowLeasedBalanceTransferUntil: Long
 
   def initialBalance: Long
   def genesisTimestamp: Long
