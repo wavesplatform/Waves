@@ -674,7 +674,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
     forAll(issueReissueGenerator) { case (issue, _, reissue, burn) =>
       withRollbackTest(state) {
         val genes = GenesisTransaction.create(issue.sender, issue.fee + reissue.fee + burn.fee + Random.nextInt(1000), issue.timestamp - 1).right.get
-        state.applyChanges(state.calcNewBalances(Seq(genes), Map(), allowTemporaryNegative = true), Seq(genes))
+        state.applyChanges(state.calcNewBalances(Seq(genes), Map(), allowTemporaryNegative = true, allowTransferLeasedBalance = true), Seq(genes))
         val h = state.stateHeight
 
         def checkOperations = {
@@ -683,7 +683,7 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
           state.isValid(Seq(burn), blockTime = burn.timestamp) shouldBe false
           state.isValid(Seq(reissue, burn), blockTime = Seq(reissue, burn).map(_.timestamp).max) shouldBe false
 
-          state.applyChanges(state.calcNewBalances(Seq(issue), Map(), allowTemporaryNegative = true), Seq(issue))
+          state.applyChanges(state.calcNewBalances(Seq(issue), Map(), allowTemporaryNegative = true, allowTransferLeasedBalance = true), Seq(issue))
 
           state.isValid(Seq(issue), blockTime = issue.timestamp) shouldBe false
           state.isValid(Seq(reissue), blockTime = reissue.timestamp) shouldBe issue.reissuable
@@ -691,9 +691,9 @@ class StoredStateUnitTests extends PropSpec with PropertyChecks with GeneratorDr
           state.isValid(Seq(reissue, burn), blockTime = Seq(reissue, burn).map(_.timestamp).max) shouldBe issue.reissuable
 
           if (issue.reissuable) {
-            state.applyChanges(state.calcNewBalances(Seq(reissue, burn), Map(), allowTemporaryNegative = true), Seq(reissue, burn))
+            state.applyChanges(state.calcNewBalances(Seq(reissue, burn), Map(), allowTemporaryNegative = true, allowTransferLeasedBalance = true), Seq(reissue, burn))
           } else {
-            state.applyChanges(state.calcNewBalances(Seq(burn), Map(), allowTemporaryNegative = true), Seq(burn))
+            state.applyChanges(state.calcNewBalances(Seq(burn), Map(), allowTemporaryNegative = true, allowTransferLeasedBalance = true), Seq(burn))
           }
 
           state.isValid(Seq(issue), blockTime = issue.timestamp) shouldBe false

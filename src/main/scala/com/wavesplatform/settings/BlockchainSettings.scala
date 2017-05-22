@@ -40,7 +40,7 @@ object FunctionalitySettings {
     allowInvalidReissueInSameBlockUntilTimestamp = 1492768800000L,
     allowMultipleLeaseCancelTransactionUntilTimestamp = 1492768800000L,
     resetEffectiveBalancesAtHeight = 462000,
-    allowLeasedBalanceTransferUntil = Long.MaxValue)
+    allowLeasedBalanceTransferUntil = 1495497600000L)
 
   val TESTNET = FunctionalitySettings(
     allowTemporaryNegativeUntil = 1477958400000L,
@@ -57,7 +57,7 @@ object FunctionalitySettings {
     allowInvalidReissueInSameBlockUntilTimestamp = 1492560000000L,
     allowMultipleLeaseCancelTransactionUntilTimestamp = 1492560000000L,
     resetEffectiveBalancesAtHeight = 51500,
-    allowLeasedBalanceTransferUntil = Long.MaxValue)
+    allowLeasedBalanceTransferUntil = 1495497600000L)
 
   val configPath = "waves.blockchain.custom.functionality"
 

@@ -300,10 +300,15 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
               val newBalance = safeSum(currentChange._1.balance, bc.delta)
 
               val availableBalance = currentChange._1.balance - currentChange._3
-              val availableBalanceIsEnough = bc.assetAcc.assetId.nonEmpty || safeSum(availableBalance, bc.delta) >= 0
+              val availableBalanceIsEnough = bc.delta > 0 || bc.assetAcc.assetId.nonEmpty || safeSum(availableBalance, bc.delta) >= 0
+              val isLeaseCancelFee = tx match {
+                case cancel: LeaseCancelTransaction =>
+                  -cancel.fee == bc.delta
+                case _ => false
+              }
 
               if ((tx.timestamp < settings.allowTemporaryNegativeUntil || newBalance >= 0) &&
-                (tx.timestamp < settings.allowLeasedBalanceTransferUntil || availableBalanceIsEnough)) {
+                (tx.timestamp < settings.allowLeasedBalanceTransferUntil || availableBalanceIsEnough || isLeaseCancelFee)) {
                 iChanges.updated(bc.assetAcc, (AccState(newBalance, currentChange._1.effectiveBalance), tx.id +: currentChange._2, currentChange._3))
               } else {
                 throw new Error(s"Transaction leads to negative available state: ${currentChange._1.balance} + ${bc.delta} = ${currentChange._1.balance + bc.delta}")
@@ -397,9 +402,14 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
         }
 
         val availableBalance = currentChange._1.balance - currentChange._3
-        val availableBalanceIsEnough = bc.assetAcc.assetId.nonEmpty || safeSum(availableBalance, bc.delta) >= 0
+        val availableBalanceIsEnough = bc.delta > 0 || bc.assetAcc.assetId.nonEmpty || safeSum(availableBalance, bc.delta) >= 0
+        val isLeaseCancelFee = tx match {
+          case cancel: LeaseCancelTransaction =>
+            -cancel.fee == bc.delta
+          case _ => false
+        }
 
-        if ((allowTemporaryNegative || newBalance >= 0) && (allowTransferLeasedBalance || availableBalanceIsEnough)) {
+        if ((allowTemporaryNegative || newBalance >= 0) && (allowTransferLeasedBalance || availableBalanceIsEnough || isLeaseCancelFee)) {
           iChanges.updated(bc.assetAcc, (AccState(newBalance, currentChange._1.effectiveBalance), tx +: currentChange._2, currentChange._3))
         } else {
           throw new Error(s"Transaction leads to negative available balance ($newBalance): ${tx.json}")
