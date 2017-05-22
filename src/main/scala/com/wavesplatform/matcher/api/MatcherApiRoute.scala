@@ -147,7 +147,7 @@ case class MatcherApiRoute(wallet: Wallet,storedState: StateReader, matcher: Act
     withAssetPair(a1, a2) { pair =>
       json[CancelOrderRequest] { req =>
         if (req.isSignatureValid) {
-          (orderHistory ? DeleteOrderFromHistory(pair, Base58.encode(req.senderPublicKey.publicKey), Base58.encode(req.orderId)))
+          (orderHistory ? DeleteOrderFromHistory(pair, req.senderPublicKey.address, Base58.encode(req.orderId)))
             .mapTo[MatcherResponse]
             .map(r => r.code -> r.json)
         } else {

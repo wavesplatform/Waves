@@ -5,7 +5,7 @@ import java.io.File
 import akka.actor.{Actor, Props}
 import akka.http.scaladsl.model.StatusCodes
 import com.wavesplatform.matcher.MatcherSettings
-import com.wavesplatform.matcher.api.{BadMatcherResponse, StatusCodeMatcherResponse}
+import com.wavesplatform.matcher.api.{BadMatcherResponse, MatcherResponse, StatusCodeMatcherResponse}
 import com.wavesplatform.matcher.market.OrderBookActor.{CancelOrder, GetOrderHistoryResponse, GetOrderStatusResponse}
 import com.wavesplatform.matcher.market.OrderHistoryActor._
 import com.wavesplatform.matcher.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
@@ -13,6 +13,7 @@ import com.wavesplatform.matcher.model.LimitOrder.Filled
 import com.wavesplatform.matcher.model._
 import com.wavesplatform.state2.reader.StateReader
 import org.h2.mvstore.MVStore
+import play.api.libs.json.Json
 import scorex.transaction.ValidationError.CustomError
 import scorex.transaction.assets.exchange.{AssetPair, Order}
 import scorex.wallet.Wallet
@@ -68,7 +69,7 @@ class OrderHistoryActor(val settings: MatcherSettings, val storedState: StateRea
     orderHistory.getOrderStatus(req.id) match {
       case Filled | LimitOrder.Cancelled(_) =>
         orderHistory.deleteOrder(req.assetPair, req.address, req.id)
-        sender() ! StatusCodeMatcherResponse(StatusCodes.OK, "Order deleted")
+        sender() ! OrderDeleted(req.id)
       case _ =>
         sender() ! BadMatcherResponse(StatusCodes.BadRequest, "Order couldn't be deleted")
     }
@@ -99,4 +100,10 @@ object OrderHistoryActor {
   case class ValidateCancelOrder(cancel: CancelOrder) extends OrderHistoryRequest
   case class ValidateCancelResult(result: Either[CustomError, CancelOrder])
   case class RecoverFromOrderBook(ob: OrderBook) extends OrderHistoryRequest
+
+  case class OrderDeleted(orderId: String) extends MatcherResponse {
+    val json = Json.obj("status" -> "OrderDeleted", "orderId" -> orderId)
+    val code = StatusCodes.OK
+  }
+
 }
