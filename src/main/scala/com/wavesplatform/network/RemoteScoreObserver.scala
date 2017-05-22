@@ -29,7 +29,6 @@ class RemoteScoreObserver(syncSettings: SynchronizationSettings)
       val newPinnedChannel = channelWithHighestScore.map(_._1)
       pinnedChannel.compareAndSet(Some(ch), newPinnedChannel)
       log.debug(s"Channel ${ch.id().asShortText()} closed, removing score${prevScore.fold("")(p => s" (was ${p.value})")}")
-
     }
 
   override def write(ctx: ChannelHandlerContext, msg: AnyRef, promise: ChannelPromise) = msg match {
