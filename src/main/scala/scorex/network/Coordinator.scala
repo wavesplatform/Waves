@@ -31,7 +31,7 @@ class Coordinator(network: Network, blockchainSynchronizer: ActorRef, blockGener
         publicKey =>
           if (EllipticCurveImpl.verify(checkpoint.signature, checkpoint.toSign, publicKey)) {
             checkpoints.set(Some(checkpoint))
-            network.broadcast(checkpoint, from.map(_ => ???)) // todo: don't broadcast to sender
+//            network.broadcast(checkpoint, from.map(_ => ???)) // todo: don't broadcast to sender
             makeBlockchainCompliantWith(checkpoint)
           } else {
             from.foreach(_.blacklist())

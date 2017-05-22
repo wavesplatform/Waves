@@ -14,10 +14,9 @@ import com.wavesplatform.actor.RootActorSystem
 import com.wavesplatform.history.{BlockStorageImpl, CheckpointServiceImpl}
 import com.wavesplatform.http.NodeApiRoute
 import com.wavesplatform.matcher.Matcher
-import com.wavesplatform.network.{Network, NetworkServer}
+import com.wavesplatform.network.NetworkServer
 import com.wavesplatform.settings._
-import io.netty.channel.Channel
-import io.netty.channel.group.{ChannelMatchers, DefaultChannelGroup}
+import io.netty.channel.group.DefaultChannelGroup
 import io.netty.util.concurrent.GlobalEventExecutor
 import scorex.account.{Account, AddressScheme}
 import scorex.api.http._
@@ -96,20 +95,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
   )
 
   val allChannels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
-
-  val net: Network = new Network {
-    override def broadcast(message: AnyRef, except: Option[Channel]) = {
-      allChannels.writeAndFlush(message, except.fold(ChannelMatchers.all())(ChannelMatchers.isNot))
-    }
-
-    override def sendTo(message: AnyRef, recipients: Channel*) = ???
-
-    override def sendToRandom(message: AnyRef) = if (allChannels.size() > 0) {
-      val channels = allChannels.toArray(Array.empty[Channel])
-      val id = Random.nextInt(channels.length)
-      allChannels.writeAndFlush(message, ChannelMatchers.is(channels(id)))
-    }
-  }
 
   lazy val networkController = actorSystem.deadLetters
   lazy val peerManager: ActorRef = actorSystem.deadLetters
