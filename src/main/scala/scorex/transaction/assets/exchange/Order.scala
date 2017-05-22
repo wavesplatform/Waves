@@ -161,6 +161,8 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
     "signature" -> Base58.encode(signature)
   )
 
+  def jsonStr: String = Json.stringify(json)
+
   override def canEqual(that: Any): Boolean = that.isInstanceOf[Order]
 
   override def equals(obj: Any): Boolean = {

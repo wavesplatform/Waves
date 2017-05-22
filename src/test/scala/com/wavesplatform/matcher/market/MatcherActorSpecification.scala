@@ -1,15 +1,16 @@
 package com.wavesplatform.matcher.market
 
-import akka.actor.{ActorRef, ActorSystem, Props}
+import akka.actor.{Actor, ActorRef, ActorSystem, Props}
 import akka.http.scaladsl.model.StatusCodes
 import akka.persistence.inmemory.extension.{InMemoryJournalStorage, StorageExtension}
-import akka.testkit.{ImplicitSender, TestKit, TestProbe}
+import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
 import com.wavesplatform.matcher.MatcherTestData
 import com.wavesplatform.matcher.api.StatusCodeMatcherResponse
 import com.wavesplatform.matcher.fixtures.RestartableActor
 import com.wavesplatform.matcher.fixtures.RestartableActor.RestartActor
 import com.wavesplatform.matcher.market.MatcherActor.{GetMarkets, GetMarketsResponse, MarketData}
 import com.wavesplatform.matcher.market.OrderBookActor._
+import com.wavesplatform.matcher.market.OrderHistoryActor.{ValidateOrder, ValidateOrderResult}
 import com.wavesplatform.matcher.model.LevelAgg
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.reader.StateReader
@@ -42,7 +43,14 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest2"
   val functionalitySettings = stub[FunctionalitySettings]
   val wallet = new Wallet(None, "matcher".toCharArray, Option(WalletSeed))
   wallet.generateNewAccount()
-  var actor: ActorRef = system.actorOf(Props(new MatcherActor(storedState, wallet, settings, history, functionalitySettings,
+
+  val orderHistoryRef = TestActorRef(new Actor {
+    def receive: Receive = {
+      case ValidateOrder(o) => sender() ! ValidateOrderResult(Right(o))
+      case _ =>
+    }
+  })
+  var actor: ActorRef = system.actorOf(Props(new MatcherActor(orderHistoryRef, storedState, wallet, settings, history, functionalitySettings,
     stub[NewTransactionHandler]) with RestartableActor))
 
   (storedState.assetInfo _).when(*).returns(Some(AssetInfo(true, 10000000000L)))
@@ -56,7 +64,7 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest2"
     tp.expectMsg(akka.actor.Status.Success(""))
     super.beforeEach()
 
-    actor = system.actorOf(Props(new MatcherActor(storedState, wallet, settings, history, functionalitySettings,
+    actor = system.actorOf(Props(new MatcherActor(orderHistoryRef, storedState, wallet, settings, history, functionalitySettings,
       stub[NewTransactionHandler]) with RestartableActor))
   }
 

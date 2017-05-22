@@ -20,7 +20,7 @@ import scorex.wallet.Wallet
 import scala.collection.{immutable, mutable}
 import scala.language.reflectiveCalls
 
-class MatcherActor(storedState: StateReader, wallet: Wallet, settings: MatcherSettings, history: History,
+class MatcherActor(orderHistory: ActorRef, storedState: StateReader, wallet: Wallet, settings: MatcherSettings, history: History,
                    functionalitySettings: FunctionalitySettings,
                    transactionModule: NewTransactionHandler
                   ) extends PersistentActor with ScorexLogging {
@@ -37,7 +37,7 @@ class MatcherActor(storedState: StateReader, wallet: Wallet, settings: MatcherSe
         pair.amountAsset.flatMap(storedState.getIssueTransaction), pair.priceAsset.flatMap(storedState.getIssueTransaction))
     tradedPairs += pair
 
-    context.actorOf(OrderBookActor.props(pair, storedState, wallet, settings, transactionModule, history, functionalitySettings),
+    context.actorOf(OrderBookActor.props(pair, orderHistory, storedState, settings, wallet, transactionModule, history, functionalitySettings),
       OrderBookActor.name(pair))
   }
 
@@ -148,10 +148,10 @@ class MatcherActor(storedState: StateReader, wallet: Wallet, settings: MatcherSe
 object MatcherActor {
   def name = "matcher"
 
-  def props(storedState: StateReader, wallet: Wallet, settings: MatcherSettings,
+  def props(orderHistoryActor: ActorRef, storedState: StateReader, wallet: Wallet, settings: MatcherSettings,
             transactionModule: NewTransactionHandler, time: Time, history: History,
             functionalitySettings: FunctionalitySettings): Props =
-    Props(new MatcherActor(storedState, wallet, settings, history, functionalitySettings, transactionModule))
+    Props(new MatcherActor(orderHistoryActor, storedState, wallet, settings, history, functionalitySettings, transactionModule))
 
   case class OrderBookCreated(pair: AssetPair)
 
