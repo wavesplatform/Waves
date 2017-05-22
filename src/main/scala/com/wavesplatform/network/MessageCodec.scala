@@ -8,7 +8,7 @@ import io.netty.channel.ChannelHandlerContext
 import io.netty.handler.codec.ByteToMessageCodec
 import scorex.crypto.hash.FastCryptographicHash
 import scorex.network.message.Message._
-import scorex.network.message.{GetBlockSpec, GetSignaturesSpec, MessageSpec, SignaturesSpec}
+import scorex.network.message._
 import scorex.utils.ScorexLogging
 
 class MessageCodec(specs: Map[MessageCode, MessageSpec[_ <: AnyRef]]) extends ByteToMessageCodec[Message] with ScorexLogging {

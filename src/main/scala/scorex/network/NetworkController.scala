@@ -2,12 +2,9 @@ package scorex.network
 
 import java.net.InetSocketAddress
 
-import akka.actor._
-import scorex.network.message.{Message, MessageSpec}
+import scorex.network.message.Message
 
 object NetworkController {
-  case class RegisterMessagesHandler(specs: Seq[MessageSpec[_]], handler: ActorRef)
-
   case class DataFromPeer[V](messageType: Message.MessageCode, data: V, source: ConnectedPeer)
 
   case class SendToNetwork(message: Message[_ <: AnyRef], sendingStrategy: SendingStrategy)
