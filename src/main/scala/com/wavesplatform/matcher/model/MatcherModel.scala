@@ -27,6 +27,8 @@ sealed trait  LimitOrder {
   def getSpendAmount: Long
   def getReceiveAmount: Long
   def feeAmount: Long = (BigInt(amount) * order.matcherFee  / order.amount).toLong
+  def remainingAmount: Long = order.amount - amount
+  val remainingFee: Long = order.matcherFee - (BigInt(remainingAmount) * order.matcherFee  / order.amount).toLong
 
   def spentAcc: AssetAcc = AssetAcc(order.senderPublicKey, order.getSpendAssetId)
   def rcvAcc: AssetAcc = AssetAcc(order.senderPublicKey, order.getReceiveAssetId)
@@ -160,10 +162,11 @@ object Events {
           ))
         )
       case OrderCanceled(lo) =>
+        val feeDiff = if (lo.feeAcc == lo.rcvAcc) math.max(lo.remainingFee - lo.getReceiveAmount, 0L) else lo.remainingFee
         Map(lo.order.senderPublicKey.address ->
           OpenPortfolio(Monoid.combine(
             Map(lo.spentAsset -> -lo.getSpendAmount),
-            Map(lo.feeAsset -> -overdraftFee(lo))
+            Map(lo.feeAsset -> -feeDiff)
           )))
     }
   }

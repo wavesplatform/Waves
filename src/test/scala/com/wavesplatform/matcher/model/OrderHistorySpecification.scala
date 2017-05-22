@@ -146,9 +146,9 @@ class OrderHistorySpecification extends PropSpec
 
   property("Buy WAVES order - filled with 2 steps, sell order - partial") {
     val pair = AssetPair(None, Some("BTC".getBytes))
-    val ord1 = buy(pair, 0.0008, 100000000)
-    val ord2 = sell(pair, 0.00075, 50000000)
-    val ord3 = sell(pair, 0.0008, 80000000)
+    val ord1 = buy(pair, 0.0008, 100000000, matcherFee = Some(300001L))
+    val ord2 = sell(pair, 0.00075, 50000000, matcherFee = Some(300001L))
+    val ord3 = sell(pair, 0.0008, 80000000, matcherFee = Some(300001L))
 
     oh.didOrderAccepted(OrderAdded(LimitOrder(ord1)))
     val exec1 = OrderExecuted(LimitOrder(ord2), LimitOrder(ord1))
@@ -165,7 +165,7 @@ class OrderHistorySpecification extends PropSpec
     oh.getOrderStatus(ord2.idStr) shouldBe LimitOrder.Filled
 
     oh.getOpenVolume(AssetAcc(ord1.senderPublicKey, pair.priceAsset)) shouldBe 0L
-    oh.getOpenVolume(AssetAcc(ord1.senderPublicKey, pair.amountAsset)) should be <= 1L
+    oh.getOpenVolume(AssetAcc(ord1.senderPublicKey, pair.amountAsset)) shouldBe 0L
     oh.getOrdersByPairAndAddress(pair, ord1.senderPublicKey.address) shouldBe Set(ord1.idStr)
 
 

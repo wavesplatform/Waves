@@ -1,9 +1,9 @@
 package com.wavesplatform.matcher.market
 
-import akka.actor.{ActorRef, Props, Stash, UnboundedStash}
+import akka.actor.{ActorRef, Cancellable, Props, Stash}
 import akka.http.scaladsl.model.StatusCodes
 import akka.persistence._
-import com.wavesplatform.matcher.{MatcherSettings, model}
+import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.api.{CancelOrderRequest, MatcherResponse}
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.market.OrderHistoryActor._
@@ -21,6 +21,7 @@ import scorex.wallet.Wallet
 
 import scala.annotation.tailrec
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration._
 
 class OrderBookActor(assetPair: AssetPair, val orderHistory: ActorRef,
                      val storedState: StoredState,
@@ -39,6 +40,7 @@ class OrderBookActor(assetPair: AssetPair, val orderHistory: ActorRef,
   }
 
   var apiSender = Option.empty[ActorRef]
+  var cancellable = Option.empty[Cancellable]
 
   override def receiveCommand: Receive = fullCommands
 
@@ -67,12 +69,17 @@ class OrderBookActor(assetPair: AssetPair, val orderHistory: ActorRef,
   }
 
   def waitingValidation: Receive = readOnlyCommands orElse {
+    case ValidationTimeoutExceeded =>
+      log.warn("Validation timeout exceeded, skip incoming request")
+      becomeFullCommands()
     case ValidateOrderResult(res) =>
-     handleValidateOrderResult(res)
+      cancellable.foreach(_.cancel())
+      handleValidateOrderResult(res)
     case ValidateCancelResult(res) =>
+      cancellable.foreach(_.cancel())
       handleValidateCancelResult(res)
     case ev =>
-      //log.debug("Received: " + ev)
+      log.info("Stashed: " + ev)
       stash()
   }
 
@@ -90,21 +97,26 @@ class OrderBookActor(assetPair: AssetPair, val orderHistory: ActorRef,
   def onCancelOrder(cancel: CancelOrder): Unit = {
     orderHistory ! ValidateCancelOrder(cancel)
     apiSender = Some(sender())
+    cancellable = Some(context.system.scheduler.scheduleOnce(ValidationTimeout, self, ValidationTimeoutExceeded))
     context.become(waitingValidation)
   }
 
-  def handleValidateCancelResult(res: Either[CustomValidationError, CancelOrder]): Unit = res match {
-    case Left(err) =>
-      apiSender.foreach(_ ! OrderCancelRejected(err.err))
-    case Right(cancel) =>
-      OrderBook.cancelOrder(orderBook, cancel.orderId) match {
-        case Some(oc) =>
-          persist(oc) { _ =>
-            handleCancelEvent(oc)
-            apiSender.foreach(_ ! OrderCanceled(cancel.orderId))
-          }
-        case _ => apiSender.foreach(_ ! OrderCancelRejected("Order not found"))
-      }
+  def handleValidateCancelResult(res: Either[CustomValidationError, CancelOrder]): Unit = {
+    res match {
+      case Left(err) =>
+        apiSender.foreach(_ ! OrderCancelRejected(err.err))
+      case Right(cancel) =>
+        OrderBook.cancelOrder(orderBook, cancel.orderId) match {
+          case Some(oc) =>
+            persist(oc) { _ =>
+              handleCancelEvent(oc)
+              apiSender.foreach(_ ! OrderCanceled(cancel.orderId))
+            }
+          case _ => apiSender.foreach(_ ! OrderCancelRejected("Order not found"))
+        }
+    }
+
+    becomeFullCommands()
   }
 
   def handleGetOrderBook(pair: AssetPair, depth: Option[Int]): Unit = {
@@ -136,6 +148,7 @@ class OrderBookActor(assetPair: AssetPair, val orderHistory: ActorRef,
   def onAddOrder(order: Order): Unit = {
     orderHistory ! ValidateOrder(order)
     apiSender = Some(sender())
+    cancellable = Some(context.system.scheduler.scheduleOnce(ValidationTimeout, self, ValidationTimeoutExceeded))
     context.become(waitingValidation)
   }
 
@@ -150,6 +163,10 @@ class OrderBookActor(assetPair: AssetPair, val orderHistory: ActorRef,
         matchOrder(LimitOrder(o))
     }
 
+    becomeFullCommands()
+  }
+
+  def becomeFullCommands(): Unit = {
     unstashAll()
     context.become(fullCommands)
   }
@@ -215,6 +232,7 @@ object OrderBookActor {
   def name(assetPair: AssetPair): String = assetPair.toString
 
   val MaxDepth = 50
+  val ValidationTimeout = 3.seconds
 
   //protocol
   sealed trait OrderBookRequest {
@@ -284,5 +302,7 @@ object OrderBookActor {
   case object SaveSnapshot
 
   case class Snapshot(orderBook: OrderBook)
+
+  case object ValidationTimeoutExceeded
 }
 
