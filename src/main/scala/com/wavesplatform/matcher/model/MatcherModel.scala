@@ -127,15 +127,15 @@ object Events {
     event match {
       case OrderAdded(lo) =>
         Map(lo.order.idStr->
-          OrderInfo(lo.order.amount, lo.order.timestamp, 0, false))
+          OrderInfo(lo.order.amount, lo.order.amount - lo.amount, false))
       case oe: OrderExecuted =>
         val (o1, o2) = (oe.submittedExecuted, oe.counterExecuted)
-        Map(o1.order.idStr -> OrderInfo(o1.order.amount, o1.order.timestamp, o1.amount, false),
-          o2.order.idStr -> OrderInfo(o2.order.amount, o1.order.timestamp, o2.amount, false)
+        Map(o1.order.idStr -> OrderInfo(o1.order.amount, o1.amount, false),
+          o2.order.idStr -> OrderInfo(o2.order.amount, o2.amount, false)
         )
       case OrderCanceled(lo) =>
         Map(lo.order.idStr->
-          OrderInfo(lo.order.amount, lo.order.timestamp, 0, true))
+          OrderInfo(lo.order.amount, 0, true))
     }
   }
 

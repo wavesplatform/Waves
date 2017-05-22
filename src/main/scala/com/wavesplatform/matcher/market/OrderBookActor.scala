@@ -279,7 +279,7 @@ object OrderBookActor {
       "amount" -> h._2.amount,
       "price" -> h._3.map(_.price),
       "timestamp" -> h._3.map(_.timestamp),
-      "filled" -> h._2.amount,
+      "filled" -> h._2.filled,
       "status" -> h._2.status.name
       )))
     val code = StatusCodes.OK
