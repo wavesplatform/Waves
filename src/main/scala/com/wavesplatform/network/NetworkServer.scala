@@ -5,7 +5,7 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.stream.Collectors
 
 import com.wavesplatform.Version
-import com.wavesplatform.settings.{BlockchainSettings, Constants, SynchronizationSettings, WavesSettings}
+import com.wavesplatform.settings._
 import com.wavesplatform.state2.reader.StateReader
 import io.netty.bootstrap.{Bootstrap, ServerBootstrap}
 import io.netty.channel._
@@ -22,11 +22,12 @@ import scorex.utils.{ScorexLogging, Time}
 import scala.concurrent.duration._
 import scala.util.Random
 
-class ServerChannelInitializer(handshake: Handshake)
+class ServerChannelInitializer(handshake: Handshake, settings: NetworkSettings)
   extends ChannelInitializer[SocketChannel] {
+  private val inboundFilter = new InboundConnectionFilter(settings.maxInboundConnections, settings.maxConnectionsWithSingleHost)
   override def initChannel(ch: SocketChannel): Unit = {
     ch.pipeline()
-      .addLast(new InboundConnectionFilter)
+      .addLast(inboundFilter)
       .addLast(HandshakeDecoder.Name, new HandshakeDecoder)
       .addLast(HandshakeTimeoutHandler.Name, new HandshakeTimeoutHandler)
   }
@@ -133,7 +134,7 @@ class NetworkServer(
   private val serverChannel = new ServerBootstrap()
     .group(bossGroup, workerGroup)
     .channel(classOf[NioServerSocketChannel])
-    .childHandler(new ServerChannelInitializer(handshake))
+    .childHandler(new ServerChannelInitializer(handshake, settings.networkSettings))
     .bind(settings.networkSettings.port)
     .channel()
 
