@@ -195,6 +195,7 @@ object Application extends ScorexLogging {
     val lc = LoggerFactory.getILoggerFactory.asInstanceOf[LoggerContext]
     val rootLogger = lc.getLogger(Logger.ROOT_LOGGER_NAME)
     settings.loggingLevel match {
+      case LogLevel.TRACE => rootLogger.setLevel(Level.TRACE)
       case LogLevel.DEBUG => rootLogger.setLevel(Level.DEBUG)
       case LogLevel.INFO => rootLogger.setLevel(Level.INFO)
       case LogLevel.WARN => rootLogger.setLevel(Level.WARN)

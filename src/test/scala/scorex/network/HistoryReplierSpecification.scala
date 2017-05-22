@@ -1,10 +1,12 @@
 package scorex.network
 
+import java.util.concurrent.locks.ReentrantReadWriteLock
+
 import akka.actor.{ActorRef, Props}
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.history.HistoryWriterImpl
 import com.wavesplatform.settings.WavesSettings
-import com.wavesplatform.state2.HistoryTest
+import com.wavesplatform.state2._
 import org.h2.mvstore.MVStore
 import scorex.ActorTestingCommons
 import scorex.block.Block._
@@ -20,7 +22,7 @@ class HistoryReplierSpecification extends ActorTestingCommons with HistoryTest {
   private implicit def toInnerIds(ids: Seq[Int]): InnerIds = ids.map { i => InnerId(toBlockId(i)) }
 
   private def mockHistory(blocks: Int): History = {
-    val history = new HistoryWriterImpl(new MVStore.Builder().open())
+    val history = HistoryWriterImpl(new MVStore.Builder().open(), new ReentrantReadWriteLock()).explicitGet()
     appendGenesisBlock(history)
     for (i <- 1 until blocks) appendTestBlock(history)
     history

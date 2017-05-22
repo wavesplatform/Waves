@@ -1,5 +1,8 @@
 package com.wavesplatform.state2
 
+import java.util.concurrent.locks.ReentrantReadWriteLock
+
+import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.reader.{CompositeStateReader, StateReader}
 import org.h2.mvstore.MVStore
 import org.scalatest.matchers.{MatchResult, Matcher}
@@ -11,14 +14,14 @@ import scala.util.{Left, Right}
 
 package object diffs {
 
+  def newState(): StateWriterImpl = new StateWriterImpl(StateStorage(new MVStore.Builder().open()).explicitGet(), new ReentrantReadWriteLock())
 
-  def newState(): StateWriterImpl = new StateWriterImpl(new StateStorage(new MVStore.Builder().open()))
-
-  val differ: (StateReader, Block) => Either[ValidationError, BlockDiff] = BlockDiffer(TestFunctionalitySettings.Enabled)
   val ENOUGH_AMT: Long = Long.MaxValue / 3
 
-  def assertDiffEi(preconditions: Seq[Block], block: Block)(assertion: Either[ValidationError, BlockDiff] => Unit): Unit = {
+  def assertDiffEi(preconditions: Seq[Block], block: Block, fs: FunctionalitySettings = TestFunctionalitySettings.Enabled)(assertion: Either[ValidationError, BlockDiff] => Unit): Unit = {
     val state = newState()
+    val differ: (StateReader, Block) => Either[ValidationError, BlockDiff] =  BlockDiffer(fs)
+
     preconditions.foreach { precondition =>
       val preconditionDiff = differ(state, precondition).explicitGet()
       state.applyBlockDiff(preconditionDiff)
@@ -26,14 +29,15 @@ package object diffs {
     val totalDiff1 = differ(state, block)
     assertion(totalDiff1)
 
-    val preconditionDiff = BlockDiffer.unsafeDiffMany(TestFunctionalitySettings.Enabled)(newState(), preconditions)
+    val preconditionDiff = BlockDiffer.unsafeDiffMany(fs)(newState(), preconditions)
     val compositeState = new CompositeStateReader(newState(), preconditionDiff)
     val totalDiff2 = differ(compositeState, block)
     assertion(totalDiff2)
   }
 
-  def assertDiffAndState(preconditions: Seq[Block], block: Block)(assertion: (BlockDiff, StateReader) => Unit): Unit = {
+  def assertDiffAndState(preconditions: Seq[Block], block: Block, fs: FunctionalitySettings = TestFunctionalitySettings.Enabled)(assertion: (BlockDiff, StateReader) => Unit): Unit = {
     val state = newState()
+    val differ: (StateReader, Block) => Either[ValidationError, BlockDiff] =  BlockDiffer(fs)
     preconditions.foreach { precondition =>
       val preconditionDiff = differ(state, precondition).explicitGet()
       state.applyBlockDiff(preconditionDiff)
@@ -42,7 +46,7 @@ package object diffs {
     state.applyBlockDiff(totalDiff1)
     assertion(totalDiff1, state)
 
-    val preconditionDiff = BlockDiffer.unsafeDiffMany(TestFunctionalitySettings.Enabled)(newState(), preconditions)
+    val preconditionDiff = BlockDiffer.unsafeDiffMany(fs)(newState(), preconditions)
     val compositeState = new CompositeStateReader(newState(), preconditionDiff)
     val totalDiff2 = differ(compositeState, block).explicitGet()
     assertion(totalDiff2, new CompositeStateReader(compositeState, totalDiff2))

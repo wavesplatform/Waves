@@ -23,7 +23,9 @@ class NetworkSettingsSpecification extends FlatSpec with Matchers {
         |    local-only: no
         |    peers-data-residence-time: 1d
         |    black-list-residence-time: 10m
-        |    max-connections: 30
+        |    max-inbound-connections: 30
+        |    max-outbound-connections = 20
+        |    max-single-host-connections = 2
         |    connection-timeout: 30s
         |    outbound-buffer-size: 1K
         |    min-ephemeral-port-number: 35368
@@ -51,7 +53,9 @@ class NetworkSettingsSpecification extends FlatSpec with Matchers {
     networkSettings.localOnly should be(false)
     networkSettings.peersDataResidenceTime should be(1.day)
     networkSettings.blackListResidenceTime should be(10.minutes)
-    networkSettings.maxConnections should be(30)
+    networkSettings.maxInboundConnections should be(30)
+    networkSettings.maxOutboundConnections should be(20)
+    networkSettings.maxConnectionsWithSingleHost should be(2)
     networkSettings.connectionTimeout should be(30.seconds)
     networkSettings.outboundBufferSize should be(1024)
     networkSettings.minEphemeralPortNumber should be(35368)
@@ -80,7 +84,9 @@ class NetworkSettingsSpecification extends FlatSpec with Matchers {
         |    local-only: no
         |    peers-data-residence-time: 1d
         |    black-list-residence-time: 10m
-        |    max-connections: 30
+        |    max-inbound-connections: 30
+        |    max-outbound-connections = 20
+        |    max-single-host-connections = 2
         |    connection-timeout: 30s
         |    outbound-buffer-size: 1K
         |    min-ephemeral-port-number: 35368
@@ -117,7 +123,9 @@ class NetworkSettingsSpecification extends FlatSpec with Matchers {
         |    local-only: no
         |    peers-data-residence-time: 1d
         |    black-list-residence-time: 10m
-        |    max-connections: 30
+        |    max-inbound-connections: 30
+        |    max-outbound-connections = 20
+        |    max-single-host-connections = 2
         |    connection-timeout: 30s
         |    outbound-buffer-size: 1K
         |    min-ephemeral-port-number: 35368
@@ -155,7 +163,9 @@ class NetworkSettingsSpecification extends FlatSpec with Matchers {
         |    local-only: no
         |    peers-data-residence-time: 1d
         |    black-list-residence-time: 10m
-        |    max-connections: 30
+        |    max-inbound-connections: 30
+        |    max-outbound-connections = 20
+        |    max-single-host-connections = 2
         |    connection-timeout: 30s
         |    outbound-buffer-size: 1K
         |    min-ephemeral-port-number: 35368

@@ -8,9 +8,9 @@ import scorex.network.Checkpoint
 
 import scala.util.Try
 import scorex.transaction.History.BlockchainScore
-import scorex.utils.SynchronizedAccess
+import scorex.utils.{ Synchronized}
 
-trait History extends SynchronizedAccess {
+trait History extends Synchronized {
 
   def height(): Int
 
@@ -53,7 +53,7 @@ object History {
 
     def contains(signature: Array[Byte]): Boolean = history.heightOf(signature).isDefined
 
-    def blockById(blockId: BlockId): Option[Block] = history.synchronizeRead { implicit lock =>
+    def blockById(blockId: BlockId): Option[Block] = history.read { implicit lock =>
       history.heightOf(blockId).flatMap(history.blockAt)
     }
 
@@ -61,11 +61,11 @@ object History {
 
     def heightOf(block: Block): Option[Int] = history.heightOf(block.uniqueId)
 
-    def confirmations(block: Block): Option[Int] = history.synchronizeRead { implicit lock =>
+    def confirmations(block: Block): Option[Int] = history.read { implicit lock =>
       heightOf(block).map(history.height() - _)
     }
 
-    def lastBlock: Block = history.synchronizeRead { implicit lock =>
+    def lastBlock: Block = history.read { implicit lock =>
       history.blockAt(history.height()).get
     }
 
@@ -73,20 +73,20 @@ object History {
       (block.timestamp - parent(block, blockNum).get.timestamp) / blockNum
     }
 
-    def parent(block: Block, back: Int = 1): Option[Block] = history.synchronizeRead { implicit lock =>
+    def parent(block: Block, back: Int = 1): Option[Block] = history.read { implicit lock =>
       require(back > 0)
       history.heightOf(block.reference).flatMap(referenceHeight => history.blockAt(referenceHeight - back + 1))
     }
 
-    def child(block: Block): Option[Block] = history.synchronizeRead { implicit lock =>
+    def child(block: Block): Option[Block] = history.read { implicit lock =>
       history.heightOf(block.uniqueId).flatMap(h => history.blockAt(h + 1))
     }
 
-    def lastBlocks(howMany: Int): Seq[Block] = history.synchronizeRead { implicit lock =>
+    def lastBlocks(howMany: Int): Seq[Block] = history.read { implicit lock =>
       (Math.max(1, history.height() - howMany + 1) to history.height()).flatMap(history.blockAt).reverse
     }
 
-    def blockIdsAfter(parentSignature: BlockId, howMany: Int): Seq[BlockId] = history.synchronizeRead { implicit lock =>
+    def blockIdsAfter(parentSignature: BlockId, howMany: Int): Seq[BlockId] = history.read { implicit lock =>
       history.heightOf(parentSignature).map { h =>
         (h + 1).to(Math.min(history.height(), h + howMany: Int)).flatMap(history.blockAt).map(_.uniqueId)
       }.getOrElse(Seq())

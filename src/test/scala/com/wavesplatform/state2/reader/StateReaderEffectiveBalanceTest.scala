@@ -1,5 +1,7 @@
 package com.wavesplatform.state2.reader
 
+import java.util.concurrent.locks.ReentrantReadWriteLock
+
 import com.wavesplatform.state2.StateStorage
 import org.h2.mvstore.MVStore
 import org.scalatest.{Matchers, Outcome, fixture}
@@ -14,7 +16,7 @@ class StateReaderEffectiveBalanceTest extends fixture.FunSuite with Matchers {
   override type FixtureParam = StateStorage
 
   override protected def withFixture(test: OneArgTest): Outcome = {
-    val storage = new StateStorage(new MVStore.Builder().open())
+    val storage = StateStorage(new MVStore.Builder().open()).explicitGet()
     storage.setHeight(stateHeight)
     test(storage)
   }
@@ -25,7 +27,7 @@ class StateReaderEffectiveBalanceTest extends fixture.FunSuite with Matchers {
     storage.balanceSnapshots.put(StateStorage.snapshotKey(acc, 90), (75, 0, 100))
     storage.lastUpdateHeight.put(acc.bytes, 90)
 
-    new StateReaderImpl(storage).effectiveBalanceAtHeightWithConfirmations(acc, stateHeight, 50) shouldBe 1
+    new StateReaderImpl(storage, new ReentrantReadWriteLock()).effectiveBalanceAtHeightWithConfirmations(acc, stateHeight, 50) shouldBe 1
   }
 
   test("exposes current effective balance if no records in past N blocks are made") { storage =>
@@ -33,7 +35,7 @@ class StateReaderEffectiveBalanceTest extends fixture.FunSuite with Matchers {
     storage.portfolios.put(acc.bytes, (1, (0, 0), Map.empty))
     storage.lastUpdateHeight.put(acc.bytes, 20)
 
-    new StateReaderImpl(storage).effectiveBalanceAtHeightWithConfirmations(acc, stateHeight, 50) shouldBe 1
+    new StateReaderImpl(storage, new ReentrantReadWriteLock()).effectiveBalanceAtHeightWithConfirmations(acc, stateHeight, 50) shouldBe 1
   }
 
   test("doesn't include info older than N blocks") { storage =>
@@ -42,7 +44,7 @@ class StateReaderEffectiveBalanceTest extends fixture.FunSuite with Matchers {
     storage.balanceSnapshots.put(StateStorage.snapshotKey(acc, 75), (50, 0, 100000))
     storage.lastUpdateHeight.put(acc.bytes, 75)
 
-    new StateReaderImpl(storage).effectiveBalanceAtHeightWithConfirmations(acc, stateHeight, 50) shouldBe 50000
+    new StateReaderImpl(storage, new ReentrantReadWriteLock()).effectiveBalanceAtHeightWithConfirmations(acc, stateHeight, 50) shouldBe 50000
   }
 
   test("includes most recent update") { storage =>
@@ -51,6 +53,6 @@ class StateReaderEffectiveBalanceTest extends fixture.FunSuite with Matchers {
     storage.balanceSnapshots.put(StateStorage.snapshotKey(acc, 100), (51, 0, 1))
     storage.lastUpdateHeight.put(acc.bytes, 100)
 
-    new StateReaderImpl(storage).effectiveBalanceAtHeightWithConfirmations(acc, stateHeight, 50) shouldBe 1
+    new StateReaderImpl(storage, new ReentrantReadWriteLock()).effectiveBalanceAtHeightWithConfirmations(acc, stateHeight, 50) shouldBe 1
   }
 }

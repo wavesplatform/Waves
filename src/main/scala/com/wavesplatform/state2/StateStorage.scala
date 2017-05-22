@@ -1,13 +1,11 @@
 package com.wavesplatform.state2
 
-import java.util
-
 import com.google.common.primitives.Ints
 import com.wavesplatform.state2.StateStorage.SnapshotKey
 import org.h2.mvstore.{MVMap, MVStore}
 import scorex.account.Account
 
-class StateStorage(db: MVStore) {
+class StateStorage private(db: MVStore) {
 
   private val variables: MVMap[String, Int] = db.openMap("variables")
   private val heightKey = "height"
@@ -23,23 +21,23 @@ class StateStorage(db: MVStore) {
     val _ = variables.put(isDirtyFlag, if (isDirty) 1 else 0)
   }
 
-  val transactions: util.Map[Array[Byte], (Int, Array[Byte])] = db.openMap("txs")
+  val transactions: MVMap[Array[Byte], (Int, Array[Byte])] = db.openMap("txs")
 
-  val portfolios: util.Map[Array[Byte], (Long, (Long, Long), Map[Array[Byte], Long])] = db.openMap("portfolios")
+  val portfolios: MVMap[Array[Byte], (Long, (Long, Long), Map[Array[Byte], Long])] = db.openMap("portfolios")
 
-  val assets: util.Map[Array[Byte], (Boolean, Long)] = db.openMap("assets")
+  val assets: MVMap[Array[Byte], (Boolean, Long)] = db.openMap("assets")
 
-  val accountTransactionIds: util.Map[Array[Byte], List[Array[Byte]]] = db.openMap("accountTransactionIds")
+  val accountTransactionIds: MVMap[Array[Byte], List[Array[Byte]]] = db.openMap("accountTransactionIds")
 
-  val balanceSnapshots: util.Map[SnapshotKey, (Int, Long, Long)] = db.openMap("balanceSnapshots")
+  val balanceSnapshots: MVMap[SnapshotKey, (Int, Long, Long)] = db.openMap("balanceSnapshots")
 
-  val paymentTransactionHashes: util.Map[Array[Byte], Array[Byte]] = db.openMap("paymentTransactionHashes")
+  val paymentTransactionHashes: MVMap[Array[Byte], Array[Byte]] = db.openMap("paymentTransactionHashes")
 
-  val aliasToAddress: util.Map[String, Array[Byte]] = db.openMap("aliasToAddress")
+  val aliasToAddress: MVMap[String, Array[Byte]] = db.openMap("aliasToAddress")
 
-  val orderFills: util.Map[Array[Byte], (Long, Long)] = db.openMap("orderFills")
+  val orderFills: MVMap[Array[Byte], (Long, Long)] = db.openMap("orderFills")
 
-  val leaseState: util.Map[Array[Byte], Boolean] = db.openMap("leaseState")
+  val leaseState: MVMap[Array[Byte], Boolean] = db.openMap("leaseState")
 
   val lastUpdateHeight: MVMap[Array[Byte], Int] = db.openMap("lastUpdateHeight")
 

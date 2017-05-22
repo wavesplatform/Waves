@@ -78,14 +78,14 @@ case class TransactionsApiRoute(
             state.included(sig) match {
               case Some(h) =>
                 val jsonOpt = for {
-                  b <- history.blockAt(h)
-                  tx <- b.transactionData.collectFirst { case t if t.id sameElements sig => t }
+                  b <- history.blockAt(h).toRight(s"Block height=$h not found")
+                  tx <- b.transactionData.collectFirst { case t if t.id sameElements sig => t }.toRight(s"Tx not found in block")
                 } yield txToExtendedJson(tx) + ("height" -> JsNumber(h))
 
                 jsonOpt match {
-                  case Some(json) => complete(json)
-                  case None =>
-                    complete(StatusCodes.InternalServerError -> Json.obj("status" -> "error", "details" -> "Internal error"))
+                  case Right(json) => complete(json)
+                  case Left(err) =>
+                    complete(StatusCodes.InternalServerError -> Json.obj("status" -> "error", "details" -> s"Internal error: $err"))
                 }
 
               case None =>

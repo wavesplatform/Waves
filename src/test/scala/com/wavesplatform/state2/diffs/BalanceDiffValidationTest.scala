@@ -5,6 +5,7 @@ import org.scalacheck.{Gen, Shrink}
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import org.scalatest.{Matchers, PropSpec}
 import scorex.lagonaki.mocks.TestBlock
+import scorex.settings.TestFunctionalitySettings
 import scorex.transaction.lease.LeaseTransaction
 import scorex.transaction.{GenesisTransaction, PaymentTransaction}
 
@@ -29,7 +30,7 @@ class BalanceDiffValidationTest extends PropSpec with PropertyChecks with Genera
 
     forAll(preconditionsAndPayment, accountGen) { case ((gen1, gen2, transfer1, transfer2), miner) =>
       assertDiffEi(Seq(TestBlock(Seq(gen1, gen2, transfer1))), TestBlock(Seq(transfer2), miner)) { blockDiffEi =>
-        blockDiffEi should produce("Transaction application leads to negative balance")
+        blockDiffEi should produce("negative waves balance")
       }
     }
   }
@@ -51,8 +52,54 @@ class BalanceDiffValidationTest extends PropSpec with PropertyChecks with Genera
 
     forAll(setup) { case (gen1, gen2, l1, l2) =>
       assertDiffEi(Seq(TestBlock(Seq(gen1, gen2, l1))), TestBlock(Seq(l2)))(totalDiffEi =>
-        totalDiffEi should produce("Transaction application leads to negative balance"))
+        totalDiffEi should produce("negative effective balance"))
     }
   }
 
+
+  val ownLessThatLeaseOut: Gen[(GenesisTransaction, PaymentTransaction, LeaseTransaction, LeaseTransaction, PaymentTransaction)] = for {
+    master <- accountGen
+    alice <- accountGen
+    bob <- accountGen
+    cooper <- accountGen
+    ts <- positiveIntGen
+    amt <- positiveLongGen
+    fee <- smallFeeGen
+    genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
+    masterTransfersToAlice: PaymentTransaction = PaymentTransaction.create(master, alice, amt, fee, ts).right.get
+    (aliceLeasesToBob, _) <- leaseAndCancelGeneratorP(alice, bob, alice) suchThat (_._1.amount < amt)
+    (masterLeasesToAlice, _) <- leaseAndCancelGeneratorP(master, alice, master) suchThat (_._1.amount > aliceLeasesToBob.amount)
+    transferAmt <- Gen.choose(amt - fee - aliceLeasesToBob.amount, amt - fee)
+    aliceTransfersMoreThanOwnsMinusLeaseOut = PaymentTransaction.create(alice, cooper, transferAmt, fee, ts).right.get
+
+  } yield (genesis, masterTransfersToAlice, aliceLeasesToBob, masterLeasesToAlice, aliceTransfersMoreThanOwnsMinusLeaseOut)
+
+
+  property("can transfer more than own-leaseOut before allow-leased-balance-transfer-until") {
+    val allowTransferLeasedBalanceUntil = Long.MaxValue / 2
+    val settings = TestFunctionalitySettings.Enabled.copy(allowLeasedBalanceTransferUntil = allowTransferLeasedBalanceUntil)
+
+    forAll(ownLessThatLeaseOut, timestampGen retryUntil (_ < allowTransferLeasedBalanceUntil)) {
+      case ((genesis, masterTransfersToAlice, aliceLeasesToBob, masterLeasesToAlice, aliceTransfersMoreThanOwnsMinusLeaseOut), blockTime) =>
+        assertDiffEi(Seq(TestBlock(Seq(genesis, masterTransfersToAlice, aliceLeasesToBob, masterLeasesToAlice))),
+          TestBlock.create(blockTime, Seq(aliceTransfersMoreThanOwnsMinusLeaseOut)),
+          settings) { totalDiffEi =>
+          totalDiffEi shouldBe 'right
+        }
+    }
+  }
+
+  property("cannot transfer more than own-leaseOut after allow-leased-balance-transfer-until") {
+    val allowTransferLeasedBalanceUntil = Long.MaxValue / 2
+    val settings = TestFunctionalitySettings.Enabled.copy(allowLeasedBalanceTransferUntil = allowTransferLeasedBalanceUntil)
+
+    forAll(ownLessThatLeaseOut, timestampGen retryUntil (_ > allowTransferLeasedBalanceUntil)) {
+      case ((genesis, masterTransfersToAlice, aliceLeasesToBob, masterLeasesToAlice, aliceTransfersMoreThanOwnsMinusLeaseOut), blockTime) =>
+        assertDiffEi(Seq(TestBlock(Seq(genesis, masterTransfersToAlice, aliceLeasesToBob, masterLeasesToAlice))),
+          TestBlock.create(blockTime, Seq(aliceTransfersMoreThanOwnsMinusLeaseOut)),
+          settings) { totalDiffEi =>
+          totalDiffEi should produce("leased being more than own")
+        }
+    }
+  }
 }

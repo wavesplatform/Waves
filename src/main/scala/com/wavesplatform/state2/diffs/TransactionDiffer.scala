@@ -20,7 +20,7 @@ object TransactionDiffer {
         case gtx: GenesisTransaction => GenesisTransactionDiff(height)(gtx)
         case ptx: PaymentTransaction => PaymentTransactionDiff(s, height, settings, time)(ptx)
         case itx: IssueTransaction => AssetTransactionsDiff.issue(height)(itx)
-        case rtx: ReissueTransaction => AssetTransactionsDiff.reissue(s, settings,time, height)(rtx)
+        case rtx: ReissueTransaction => AssetTransactionsDiff.reissue(s, settings, time, height)(rtx)
         case btx: BurnTransaction => AssetTransactionsDiff.burn(s, height)(btx)
         case ttx: TransferTransaction => TransferTransactionDiff(s, settings, time, height)(ttx)
         case ltx: LeaseTransaction => LeaseTransactionsDiff.lease(s, height)(ltx)
@@ -30,7 +30,7 @@ object TransactionDiffer {
         case atx: MakeAssetNameUniqueTransaction => AssetTransactionsDiff.makeAssetNameUnique(s, height)(atx)
         case t => Left(UnsupportedTransactionType(t))
       }
-      positiveDiff <- BalanceDiffValidation(s)(tx, diff)
+      positiveDiff <- BalanceDiffValidation(s, settings)(tx, diff)
     } yield positiveDiff
   }
 }

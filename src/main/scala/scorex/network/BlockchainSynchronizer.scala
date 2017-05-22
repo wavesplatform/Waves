@@ -39,11 +39,14 @@ class BlockchainSynchronizer(protected val networkControllerRef: ActorRef, coord
       start(GettingExtension) { _ =>
 
         val lastIds = history.lastBlockIds(synchronizationSettings.maxRollback)
-
         val msg = Message(GetSignaturesSpec, Right(lastIds), None)
-        networkControllerRef ! NetworkController.SendToNetwork(msg, SendToChosen(peerScores.keys.toSeq))
 
-        gettingExtension(lastIds.map(InnerId), peerScores.map(peer => peer._1 -> Peer(peer._2)))
+        val max = peerScores.maxBy(_._2)
+        val maxPeers = peerScores.filter(_._2 == max._2)
+
+        networkControllerRef ! NetworkController.SendToNetwork(msg, SendToChosen(maxPeers.keys.toSeq))
+
+        gettingExtension(lastIds.map(InnerId), maxPeers.map(peer => peer._1 -> Peer(peer._2)))
       }
   }
 

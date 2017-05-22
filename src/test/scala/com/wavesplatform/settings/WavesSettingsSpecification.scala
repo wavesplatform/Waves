@@ -28,6 +28,7 @@ class WavesSettingsSpecification extends FlatSpec with Matchers {
     val config = ConfigFactory.parseString(
       """
         |waves {
+        |  logging-level = TRACE
         |  directory = "/xxx"
         |}
       """.stripMargin).withFallback(ConfigFactory.defaultApplication().withFallback(ConfigFactory.load()))
@@ -37,6 +38,7 @@ class WavesSettingsSpecification extends FlatSpec with Matchers {
     settings.directory should be("/xxx")
     settings.networkSettings.file should be("/xxx/data/peers.dat")
     settings.walletSettings.file should be("/xxx/wallet/wallet.dat")
+    settings.loggingLevel should be(LogLevel.TRACE)
     settings.blockchainSettings.blockchainFile should be("/xxx/data/blockchain.dat")
     settings.blockchainSettings.stateFile should be("/xxx/data/state.dat")
     settings.blockchainSettings.checkpointFile should be("/xxx/data/checkpoint.dat")
