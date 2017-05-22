@@ -300,7 +300,7 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
               val newBalance = safeSum(currentChange._1.balance, bc.delta)
 
               val availableBalance = currentChange._1.balance - currentChange._3
-              val availableBalanceIsEnough = safeSum(availableBalance, bc.delta) >= 0
+              val availableBalanceIsEnough = bc.assetAcc.assetId.nonEmpty || safeSum(availableBalance, bc.delta) >= 0
 
               if ((tx.timestamp < settings.allowTemporaryNegativeUntil || newBalance >= 0) &&
                 (tx.timestamp < settings.allowLeasedBalanceTransferUntil || availableBalanceIsEnough)) {
@@ -397,7 +397,7 @@ class StoredState(protected[blockchain] val storage: StateStorageI with OrderMat
         }
 
         val availableBalance = currentChange._1.balance - currentChange._3
-        val availableBalanceIsEnough = safeSum(availableBalance, bc.delta) >= 0
+        val availableBalanceIsEnough = bc.assetAcc.assetId.nonEmpty || safeSum(availableBalance, bc.delta) >= 0
 
         if ((allowTemporaryNegative || newBalance >= 0) && (allowTransferLeasedBalance || availableBalanceIsEnough)) {
           iChanges.updated(bc.assetAcc, (AccState(newBalance, currentChange._1.effectiveBalance), tx +: currentChange._2, currentChange._3))
