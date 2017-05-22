@@ -38,7 +38,7 @@ class HistoryWriterImpl private(db: MVStore, val synchronizationToken: Reentrant
     scoreByHeight.mutate(_.remove(h))
     val vOpt = Option(blockIdByHeight.mutate(_.remove(h)))
     vOpt.map(v => heightByBlockId.mutate(_.remove(v)))
-    val _ = db.commit()
+    db.commit()
   }
 
   override def blockAt(height: Int): Option[Block] = read { implicit lock =>

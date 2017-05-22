@@ -89,7 +89,7 @@ class Coordinator(protected override val networkControllerRef: ActorRef, blockch
 
       case GetStatus =>
         implicit val timeout = Timeout(5.seconds)
-        val _ = (blockchainSynchronizer ? GetSyncStatus).mapTo[Status]
+        (blockchainSynchronizer ? GetSyncStatus).mapTo[Status]
           .map { syncStatus =>
             if (syncStatus == BlockchainSynchronizer.Idle && status == CIdle)
               CIdle.name

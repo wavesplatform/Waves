@@ -33,7 +33,7 @@ scalacOptions ++= Seq(
   "-Xlint:doc-detached",               // A Scaladoc comment appears to be detached from its element.
   "-Xlint:inaccessible",               // Warn about inaccessible types in method signatures.
   "-Xlint:infer-any",                  // Warn when a type argument is inferred to be `Any`.
-  "-Xlint:missing-interpolator",       // A string literal appears to be missing an interpolator id.
+//  "-Xlint:missing-interpolator",       // A string literal appears to be missing an interpolator id.
   "-Xlint:nullary-override",           // Warn when non-nullary `def f()' overrides nullary `def f'.
   "-Xlint:nullary-unit",               // Warn when nullary methods return Unit.
   "-Xlint:option-implicit",            // Option.apply used implicit view.
@@ -57,8 +57,8 @@ scalacOptions ++= Seq(
   "-Ywarn-unused:locals",              // Warn if a local definition is unused.
   "-Ywarn-unused:params",              // Warn if a value parameter is unused.
   "-Ywarn-unused:patvars",             // Warn if a variable bound in a pattern is unused.
-  "-Ywarn-unused:privates",            // Warn if a private member is unused.
-  "-Ywarn-value-discard"               // Warn when non-Unit expression results are unused.
+  "-Ywarn-unused:privates"            // Warn if a private member is unused.
+//  "-Ywarn-value-discard"               // Warn when non-Unit expression results are unused.
 )
 logBuffered := false
 

@@ -42,7 +42,7 @@ case class PeerConnectionHandler(peerManager: ActorRef,
   override def postStop(): Unit = {
     log.debug(s"Disconnected from $remote")
     peerManager ! PeerManager.Disconnected(remote)
-    val _ = timeout.cancel()
+    timeout.cancel()
   }
 
   override def receive: Receive = state(CommunicationState.AwaitingHandshake) {
@@ -181,7 +181,7 @@ case class PeerConnectionHandler(peerManager: ActorRef,
     val (pkt, remainder) = getPacket(chunksBuffer ++ data)
     chunksBuffer = remainder
 
-    val _ = pkt.find { packet =>
+    pkt.find { packet =>
       messagesHandler.parseBytes(packet.toByteBuffer) match {
         case Success((spec, msgData)) =>
           log.trace("Received message " + spec + " from " + remote)

@@ -30,7 +30,7 @@ object TransactionDiffer {
         case atx: MakeAssetNameUniqueTransaction => AssetTransactionsDiff.makeAssetNameUnique(s, height)(atx)
         case t => Left(UnsupportedTransactionType(t))
       }
-      positiveDiff <- BalanceDiffValidation(s, settings)(tx, diff)
+      positiveDiff <- BalanceDiffValidation(s, time, settings)(tx, diff)
     } yield positiveDiff
   }
 }

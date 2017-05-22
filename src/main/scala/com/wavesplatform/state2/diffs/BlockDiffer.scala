@@ -45,7 +45,7 @@ object BlockDiffer extends ScorexLogging {
         Monoid.combine(d, LeasePatch(new CompositeStateReader(s, d.asBlockDiff)))
       else d
       val newSnapshots = diff.portfolios
-        .collect { case (acc, portfolioDiff) if (portfolioDiff.balance != 0 || portfolioDiff.effectiveBalance != 0) =>
+        .collect { case (acc, portfolioDiff) if portfolioDiff.balance != 0 || portfolioDiff.effectiveBalance != 0 =>
           val oldPortfolio = s.accountPortfolio(acc)
           acc -> SortedMap(currentBlockHeight -> Snapshot(
             prevHeight = s.lastUpdateHeight(acc).getOrElse(0),

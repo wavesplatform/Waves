@@ -101,7 +101,7 @@ class NetworkController(networkSettings: NetworkSettings,
 
     case stn@SendToNetwork(_, _) =>
       val delay = 0
-      val _ = system.scheduler.scheduleOnce(delay.millis) {
+      system.scheduler.scheduleOnce(delay.millis) {
         peerManager ! stn
       }
   }
@@ -113,7 +113,7 @@ class NetworkController(networkSettings: NetworkSettings,
 
     case Connected(remote, _) =>
       val connection = sender()
-      createPeerHandler(connection, remote, inbound = false)
+      createPeerHandler(connection, remote)
 
     case CommandFailed(c: Connect) =>
       log.info("Failed to connect to : " + c.remoteAddress)
@@ -172,10 +172,10 @@ class NetworkController(networkSettings: NetworkSettings,
       throw new IllegalStateException("Failed to start listening!")
 
     case InboundConnection(connection, remote) =>
-      createPeerHandler(connection, remote, inbound = true)
+      createPeerHandler(connection, remote)
   }
 
-  private def createPeerHandler(connection: ActorRef, remote: InetSocketAddress, inbound: Boolean): Unit = {
+  private def createPeerHandler(connection: ActorRef, remote: InetSocketAddress): Unit = {
     val handler = context.actorOf(Props(new PeerConnectionHandler(peerManager,
       connection,
       remote,

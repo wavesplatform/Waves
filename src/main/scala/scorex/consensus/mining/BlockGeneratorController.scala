@@ -28,7 +28,7 @@ class BlockGeneratorController(minerSettings: MinerSettings,
 
   override def preStart(): Unit = {
     if (minerSettings.enable) {
-      val _ = context.system.scheduler.schedule(SelfCheckInterval, SelfCheckInterval, self, SelfCheck)
+      context.system.scheduler.schedule(SelfCheckInterval, SelfCheckInterval, self, SelfCheck)
     }
   }
 

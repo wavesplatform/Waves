@@ -18,6 +18,6 @@ class CheckpointServiceImpl(db: MVStore) extends CheckpointService {
       case Some(cp) => checkpoint.put(key, (cp.items.map(bcp => (bcp.height, bcp.signature)), cp.signature))
       case None => checkpoint.remove(key)
     }
-    val _ = db.commit()
+    db.commit()
   }
 }

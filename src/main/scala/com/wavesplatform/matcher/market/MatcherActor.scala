@@ -131,7 +131,7 @@ class MatcherActor(storedState: StateReader, wallet: Wallet, settings: MatcherSe
 
   override def receiveRecover: Receive = {
     case OrderBookCreated(pair) =>
-      val _ = context.child(OrderBookActor.name(pair))
+      context.child(OrderBookActor.name(pair))
         .getOrElse(createOrderBook(pair))
     case RecoveryCompleted =>
       log.info("MatcherActor - Recovery completed!")

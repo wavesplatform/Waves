@@ -259,7 +259,7 @@ object Application extends ScorexLogging {
       application.run()
 
       if (application.wallet.privateKeyAccounts().isEmpty) {
-        val _ = application.wallet.generateNewAccounts(1)
+        application.wallet.generateNewAccounts(1)
       }
     }
   }
