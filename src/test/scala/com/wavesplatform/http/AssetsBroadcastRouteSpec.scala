@@ -11,8 +11,7 @@ import org.scalatest.prop.PropertyChecks
 import play.api.libs.json.{JsObject, JsValue, Json, Writes}
 import scorex.api.http._
 import scorex.api.http.assets.AssetsBroadcastApiRoute
-import scorex.network.ConnectedPeer
-import scorex.transaction.{Transaction, NewTransactionHandler, ValidationError}
+import scorex.transaction.{NewTransactionHandler, Transaction, ValidationError}
 
 
 class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with RequestGen with PathMockFactory with PropertyChecks {
@@ -22,12 +21,12 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
 
     val stmMock = {
 
-      def alwaysError(t: Transaction, maybePeer: Option[ConnectedPeer]): Either[ValidationError, Transaction] =
+      def alwaysError(t: Transaction): Either[ValidationError, Transaction] =
         Left[ValidationError, Transaction](scorex.transaction.ValidationError.TransactionValidationError(t, "foo"))
 
       val m = mock[NewTransactionHandler]
-      (m.onNewOffchainTransactionExcept(_: Transaction, _: Option[ConnectedPeer]))
-        .expects(*, *)
+      (m.onNewTransaction(_: Transaction))
+        .expects(*)
         .onCall(alwaysError _)
         .anyNumberOfTimes()
       m

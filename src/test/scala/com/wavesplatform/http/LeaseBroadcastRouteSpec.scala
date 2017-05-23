@@ -12,7 +12,6 @@ import play.api.libs.json.Json._
 import play.api.libs.json._
 import scorex.api.http._
 import scorex.api.http.leasing.LeaseBroadcastApiRoute
-import scorex.network.ConnectedPeer
 import scorex.transaction.{NewTransactionHandler, Transaction, ValidationError}
 
 
@@ -23,12 +22,12 @@ class LeaseBroadcastRouteSpec extends RouteSpec("/leasing/broadcast/") with Requ
 
     val stmMock = {
 
-      def alwaysError(t: Transaction, maybePeer: Option[ConnectedPeer]): Either[ValidationError, Transaction] =
+      def alwaysError(t: Transaction): Either[ValidationError, Transaction] =
         Left[ValidationError, Transaction](scorex.transaction.ValidationError.TransactionValidationError(t, "foo"))
 
       val m = mock[NewTransactionHandler]
-      (m.onNewOffchainTransactionExcept(_: Transaction, _: Option[ConnectedPeer]))
-        .expects(*, *)
+      (m.onNewTransaction(_: Transaction))
+        .expects(*)
         .onCall(alwaysError _)
         .anyNumberOfTimes()
       m
