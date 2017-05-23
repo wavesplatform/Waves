@@ -14,6 +14,7 @@ import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.channel.socket.SocketChannel
 import io.netty.channel.socket.nio.{NioServerSocketChannel, NioSocketChannel}
 import io.netty.handler.codec.{LengthFieldBasedFrameDecoder, LengthFieldPrepender}
+import io.netty.util.concurrent.EventExecutorGroup
 import scorex.network.message.{BasicMessagesRepo, MessageSpec}
 import scorex.network.{Handshake, TransactionalMessagesRepo}
 import scorex.transaction.{BlockchainUpdater, CheckpointService, History, UnconfirmedTransactionsStorage}
@@ -42,14 +43,14 @@ class ClientChannelInitializer(
     time: Time,
     stateReader: StateReader,
     utxStorage: UnconfirmedTransactionsStorage,
-    blockchainSettings: BlockchainSettings,
     syncSettings: SynchronizationSettings,
     network: Network,
-    connections: ConcurrentHashMap[PeerKey, Channel])
+    connections: ConcurrentHashMap[PeerKey, Channel],
+    coordinatorEventLoop: EventExecutorGroup,
+    coordinator: Coordinator)
   extends ChannelInitializer[SocketChannel] {
 
   private val specs: Map[Byte, MessageSpec[_ <: AnyRef]] = (BasicMessagesRepo.specs ++ TransactionalMessagesRepo.specs).map(s => s.messageCode -> s).toMap
-  private val coordinator = new Coordinator(checkpoints, history, blockchainUpdater, time, stateReader, utxStorage, blockchainSettings, network)
 
   override def initChannel(ch: SocketChannel): Unit = {
     ch.pipeline()
@@ -62,7 +63,7 @@ class ClientChannelInitializer(
       .addLast(new ExtensionSignaturesLoader(history, syncSettings))
       .addLast(new ExtensionBlocksLoader(history, syncSettings.synchronizationTimeout))
       .addLast(scoreObserver)
-      .addLast(coordinator)
+      .addLast(coordinatorEventLoop, coordinator)
   }
 }
 
@@ -114,6 +115,9 @@ class NetworkServer(
       allChannels.writeAndFlush(LocalScoreChanged(localScore))
   }
 
+  private val coordinatorExecutor = new DefaultEventLoop
+  private val coordinator = new Coordinator(checkpoints, history, blockchainUpdater, time, stateReader, utxStorage, settings.blockchainSettings, network)
+
   private val bootstrap = new Bootstrap()
     .group(workerGroup)
     .channel(classOf[NioSocketChannel])
@@ -126,10 +130,11 @@ class NetworkServer(
       time,
       stateReader,
       utxStorage,
-      settings.blockchainSettings,
       settings.synchronizationSettings,
       network,
-      allConnectedPeers))
+      allConnectedPeers,
+      coordinatorExecutor,
+      coordinator))
 
   private val serverChannel = new ServerBootstrap()
     .group(bossGroup, workerGroup)
@@ -158,5 +163,6 @@ class NetworkServer(
   } finally {
     workerGroup.shutdownGracefully()
     bossGroup.shutdownGracefully()
+    coordinatorExecutor.shutdownGracefully()
   }
 }
