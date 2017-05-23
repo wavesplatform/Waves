@@ -21,9 +21,19 @@ import scorex.wallet.Wallet
 class OrderHistoryActor(val settings: MatcherSettings, val storedState: StoredState, val wallet: Wallet)
   extends Actor with OrderValidator {
 
-  val dbFile = new File(settings.orderHistoryFile)
-  dbFile.getParentFile.mkdirs().ensuring(dbFile.getParentFile.exists())
-  val db: MVStore = new MVStore.Builder().fileName(settings.orderHistoryFile).compress().open()
+  def createMVStore(fileName: String): MVStore = {
+    Option(fileName).filter(_.trim.nonEmpty) match {
+      case Some(s) =>
+        val file = new File(s)
+        file.getParentFile.mkdirs().ensuring(file.getParentFile.exists())
+
+        new MVStore.Builder().fileName(s).compress().open()
+      case None =>
+        new MVStore.Builder().open()
+    }
+  }
+
+  val db: MVStore = createMVStore(settings.orderHistoryFile)
   val storage = new OrderHistoryStorage(db)
   val orderHistory = OrderHistoryImpl(storage)
 
@@ -59,10 +69,6 @@ class OrderHistoryActor(val settings: MatcherSettings, val storedState: StoredSt
       orderHistory.getOrdersByPairAndAddress(req.assetPair, req.address)
         .map(id => (id, orderHistory.getOrderInfo(id), orderHistory.getOrder(id))).toSeq.sortBy(_._3.map(_.timestamp).getOrElse(-1L))
     sender() ! GetOrderHistoryResponse(res)
-  }
-
-  def validateOrder(): Unit = {
-
   }
 
   def deleteFromOrderHistory(req: DeleteOrderFromHistory): Unit = {
