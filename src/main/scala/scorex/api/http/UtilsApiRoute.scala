@@ -2,11 +2,13 @@ package scorex.api.http
 
 import java.security.SecureRandom
 import javax.ws.rs.Path
+
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.unmarshalling.{FromEntityUnmarshaller, PredefinedFromEntityUnmarshallers}
 import com.wavesplatform.settings.RestAPISettings
 import io.swagger.annotations._
 import play.api.libs.json.Json
+import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.{FastCryptographicHash, SecureCryptographicHash}
 
@@ -23,7 +25,7 @@ case class UtilsApiRoute(settings: RestAPISettings) extends ApiRoute {
   }
 
   override val route = pathPrefix("utils") {
-    seedRoute ~ length ~ hashFast ~ hashSecure
+    seedRoute ~ length ~ hashFast ~ hashSecure ~ sign
   }
 
   @Path("/seed")
@@ -71,6 +73,23 @@ case class UtilsApiRoute(settings: RestAPISettings) extends ApiRoute {
   def hashSecure: Route = (path("hash" / "fast") & post) {
     entity(as[String]) { message =>
       complete(Json.obj("message" -> message, "hash" -> Base58.encode(FastCryptographicHash(message))))
+    }
+  }
+
+
+  @Path("/sign/{privateKey}")
+  @ApiOperation(value = "Hash", notes = "Return FastCryptographicHash of specified message", httpMethod = "POST")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(name = "privateKey", value = "privateKey", required = true, paramType = "path", dataType = "string"),
+    new ApiImplicitParam(name = "message", value = "Message to hash", required = true, paramType = "body", dataType = "string")
+  ))
+  @ApiResponses(Array(
+    new ApiResponse(code = 200, message = "Json with error or json like {\"message\": \"your message\",\"hash\": \"your message hash\"}")
+  ))
+  def sign: Route = (path("sign" / Segment) & post) {pk =>
+    entity(as[String]) { message =>
+      complete(Json.obj("message" -> message, "signature" ->
+        Base58.encode(EllipticCurveImpl.sign(Base58.decode(pk).get, Base58.decode(message).get))))
     }
   }
 }

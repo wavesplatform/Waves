@@ -1,5 +1,7 @@
 package com.wavesplatform.matcher
 
+import java.io.File
+
 import com.typesafe.config.Config
 import net.ceedubs.ficus.Ficus._
 import scorex.transaction.assets.exchange.AssetPair
@@ -18,7 +20,10 @@ case class MatcherSettings(enable: Boolean,
                            snapshotsInterval: FiniteDuration,
                            maxOpenOrders: Int,
                            priceAssets: Seq[String],
-                           predefinedPairs: Seq[AssetPair]
+                           predefinedPairs: Seq[AssetPair],
+                           maxTimestampDiff: FiniteDuration,
+                           orderHistoryFile: String,
+                           isMigrateToNewOrderHistoryStorage: Boolean
                           )
 
 
@@ -40,8 +45,14 @@ object MatcherSettings {
     val basePairs: Seq[AssetPair] = config.getConfigList(s"$configPath.predefined-pairs").asScala.map { p: Config =>
       AssetPair.createAssetPair(p.as[String]("amountAsset"), p.as[String]("priceAsset")).get
     }
+    val maxTimestampDiff = config.as[FiniteDuration](s"$configPath.max-timestamp-diff")
+
+    val orderHistoryFile = config.as[String](s"$configPath.order-history-file")
+
+    val isMigrateToNewOrderHistoryStorage = config.as[Boolean](s"$configPath.is-migrate-to-new-order-history-storage")
 
     MatcherSettings(enabled, account, bindAddress, port, minOrderFee, orderMatchTxFee, journalDirectory,
-      snapshotsDirectory, snapshotsInterval, maxOpenOrders, baseAssets, basePairs)
+      snapshotsDirectory, snapshotsInterval, maxOpenOrders, baseAssets, basePairs, maxTimestampDiff,
+      orderHistoryFile, isMigrateToNewOrderHistoryStorage)
   }
 }

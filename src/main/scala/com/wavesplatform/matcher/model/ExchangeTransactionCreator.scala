@@ -12,12 +12,8 @@ import scorex.wallet.Wallet
 
 trait ExchangeTransactionCreator {
   val transactionModule: TransactionModule
-  val storedState: StoredState
   val wallet: Wallet
   val settings: MatcherSettings
-  //TODO ???
-  val omss = storedState.validators.filter(_.isInstanceOf[OrderMatchStoredState]).head
-    .asInstanceOf[OrderMatchStoredState]
 
   private var txTime: Long = 0
 
@@ -38,7 +34,6 @@ trait ExchangeTransactionCreator {
 
   def calculateMatcherFee(buy: Order, sell: Order, amount: Long): (Long, Long) = {
     def calcFee(o: Order, amount: Long): Long = {
-      omss.findPrevOrderMatchTxs(o)
       val p = BigInt(amount) * o.matcherFee / o.amount
       p.toLong
     }

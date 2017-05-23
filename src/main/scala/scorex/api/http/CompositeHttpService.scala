@@ -40,7 +40,7 @@ case class CompositeHttpService(system: ActorSystem, apiTypes: Seq[Type], routes
     } ~ options {
       respondWithDefaultHeaders(
         `Access-Control-Allow-Credentials`(true),
-        `Access-Control-Allow-Headers`("Authorization", "Content-Type", "X-Requested-With"),
+        `Access-Control-Allow-Headers`("Authorization", "Content-Type", "X-Requested-With", "Timestamp", "Signature"),
         `Access-Control-Allow-Methods`(OPTIONS, POST, PUT, GET, DELETE))(withCors(complete(StatusCodes.OK)))
     } ~ complete(StatusCodes.NotFound)
 }
