@@ -20,10 +20,5 @@ object OrderHistoryStorage {
   type AssetPairAddressKey = String
   type AssetPairAddressListKey = String
 
-  def assetPairAddressListKey(pairAddressKey: AssetPairAddressKey, index: Long): String = pairAddressKey + index
-
-  def assetPairAddressListKey(assetPair: AssetPair, address: String,  index: Long): AssetPairAddressListKey =
-    assetPair.toString + address + index.toString
-
-  def assetPairAddressKey(assetPair: AssetPair, address: String): AssetPairAddressKey = assetPair.toString + address
+  def assetPairAddressKey(assetPair: AssetPair, address: String): AssetPairAddressKey = assetPair.key + address
 }
