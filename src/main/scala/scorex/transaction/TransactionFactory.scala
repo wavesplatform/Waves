@@ -19,7 +19,7 @@ object TransactionFactory {
     pk <- wallet.findWallet(request.sender)
     rec <- Account.fromString(request.recipient)
     tx <- PaymentTransaction.create(pk, rec, request.amount, request.fee, time.getTimestamp)
-    r <- tm.onNewOffchainTransaction(tx)
+    r <- tm.onNewTransaction(tx)
   } yield r
 
 
@@ -36,7 +36,7 @@ object TransactionFactory {
           request.feeAssetId.map(s => ByteStr.decodeBase58(s).get),
           request.fee,
           request.attachment.filter(_.nonEmpty).map(Base58.decode(_).get).getOrElse(Array.emptyByteArray))
-      r <- tm.onNewOffchainTransaction(tx)
+      r <- tm.onNewTransaction(tx)
     } yield r
 
   def issueAsset(wallet: Wallet, tm: NewTransactionHandler, time: Time)(request: IssueRequest): Either[ValidationError, IssueTransaction] =
@@ -46,21 +46,21 @@ object TransactionFactory {
         request.name.getBytes(Charsets.UTF_8),
         request.description.getBytes(Charsets.UTF_8),
         request.quantity, request.decimals, request.reissuable, request.fee, time.getTimestamp)
-      r <- tm.onNewOffchainTransaction(tx)
+      r <- tm.onNewTransaction(tx)
     } yield r
 
   def lease(request: LeaseRequest, wallet: Wallet, tm: NewTransactionHandler, time: Time): Either[ValidationError, LeaseTransaction] = for {
     senderPrivateKey <- wallet.findWallet(request.sender)
     recipientAcc <- AccountOrAlias.fromString(request.recipient)
     tx <- LeaseTransaction.create(senderPrivateKey, request.amount, request.fee, time.getTimestamp, recipientAcc)
-    r <- tm.onNewOffchainTransaction(tx)
+    r <- tm.onNewTransaction(tx)
   } yield r
 
   def leaseCancel(request: LeaseCancelRequest, wallet: Wallet, tm: NewTransactionHandler, time: Time): Either[ValidationError, LeaseCancelTransaction] =
     for {
       pk <- wallet.findWallet(request.sender)
       tx <- LeaseCancelTransaction.create(pk, ByteStr.decodeBase58(request.txId).get, request.fee, time.getTimestamp)
-      t <- tm.onNewOffchainTransaction(tx)
+      t <- tm.onNewTransaction(tx)
     } yield t
 
 
@@ -68,27 +68,27 @@ object TransactionFactory {
     senderPrivateKey <- wallet.findWallet(request.sender)
     alias <- Alias.buildWithCurrentNetworkByte(request.alias)
     tx <- CreateAliasTransaction.create(senderPrivateKey, alias, request.fee, time.getTimestamp)
-    r <- tm.onNewOffchainTransaction(tx)
+    r <- tm.onNewTransaction(tx)
   } yield r
 
   def reissueAsset(request: ReissueRequest, wallet: Wallet, tm: NewTransactionHandler, time: Time): Either[ValidationError, ReissueTransaction] = for {
     pk <- wallet.findWallet(request.sender)
     tx <- ReissueTransaction.create(pk, ByteStr.decodeBase58(request.assetId).get, request.quantity, request.reissuable, request.fee, time.getTimestamp)
-    r <- tm.onNewOffchainTransaction(tx)
+    r <- tm.onNewTransaction(tx)
   } yield r
 
 
   def burnAsset(request: BurnRequest, wallet: Wallet, tm: NewTransactionHandler, time: Time): Either[ValidationError, BurnTransaction] = for {
     pk <- wallet.findWallet(request.sender)
     tx <- BurnTransaction.create(pk, ByteStr.decodeBase58(request.assetId).get, request.quantity, request.fee, time.getTimestamp)
-    r <- tm.onNewOffchainTransaction(tx)
+    r <- tm.onNewTransaction(tx)
   } yield r
 
   def makeAssetNameUnique(request: MakeAssetNameUniqueRequest, wallet: Wallet, tm: NewTransactionHandler,
                           time: Time): Either[ValidationError, MakeAssetNameUniqueTransaction] = for {
     pk <- wallet.findWallet(request.sender)
     tx <- MakeAssetNameUniqueTransaction.create(pk, ByteStr.decodeBase58(request.assetId).get, request.fee, AddressScheme.current.chainId, time.getTimestamp)
-    r <- tm.onNewOffchainTransaction(tx)
+    r <- tm.onNewTransaction(tx)
   } yield r
 
   def broadcastPayment(payment: SignedPaymentRequest, tm: NewTransactionHandler): Either[ValidationError, PaymentTransaction] =
@@ -97,6 +97,6 @@ object TransactionFactory {
       _sender <- PublicKeyAccount.fromBase58String(payment.senderPublicKey)
       _recipient <- Account.fromString(payment.recipient)
       tx <- PaymentTransaction.create(_sender, _recipient, payment.amount, payment.fee, payment.timestamp, _signature)
-      t <- tm.onNewOffchainTransaction(tx)
+      t <- tm.onNewTransaction(tx)
     } yield t
 }

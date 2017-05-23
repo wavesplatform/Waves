@@ -3,7 +3,7 @@ package com.wavesplatform
 import java.io.File
 import java.security.Security
 
-import akka.actor.{ActorRef, ActorSystem, Props}
+import akka.actor.{ActorSystem, Props}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
 import akka.http.scaladsl.server.Route
@@ -96,14 +96,14 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
 
   val allChannels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
 
-  lazy val networkController = actorSystem.deadLetters
-  lazy val peerManager: ActorRef = actorSystem.deadLetters
-  lazy val unconfirmedPoolSynchronizer: ActorRef = actorSystem.actorOf(Props(new UnconfirmedPoolSynchronizer(newTransactionHandler, settings.utxSettings, networkController, utxStorage)))
-  lazy val coordinator: ActorRef = actorSystem.deadLetters
-  lazy val blockGenerator: ActorRef = actorSystem.actorOf(Props(new BlockGeneratorController(settings.minerSettings, history, time, peerManager,
-         wallet, stateReader, settings.blockchainSettings, utxStorage, coordinator)), "BlockGenerator")
-  lazy val blockchainSynchronizer: ActorRef = actorSystem.deadLetters
-  lazy val peerSynchronizer: ActorRef = actorSystem.actorOf(Props(new PeerSynchronizer(networkController, peerManager, settings.networkSettings)), "PeerSynchronizer")
+  val networkController = actorSystem.deadLetters
+  val peerManager = actorSystem.deadLetters
+  val unconfirmedPoolSynchronizer = actorSystem.deadLetters
+  val coordinator = actorSystem.deadLetters
+  val blockGenerator = actorSystem.actorOf(Props(new BlockGeneratorController(settings.minerSettings, history, time, peerManager,
+    wallet, stateReader, settings.blockchainSettings, utxStorage, coordinator)), "BlockGenerator")
+  val blockchainSynchronizer = actorSystem.deadLetters
+  val peerSynchronizer = actorSystem.deadLetters
 
   def run(): Unit = {
     log.debug(s"Available processors: ${Runtime.getRuntime.availableProcessors}")
@@ -132,10 +132,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
       val httpFuture = Http().bindAndHandle(combinedRoute, settings.restAPISettings.bindAddress, settings.restAPISettings.port)
       serverBinding = Await.result(httpFuture, 10.seconds)
       log.info(s"REST API was bound on ${settings.restAPISettings.bindAddress}:${settings.restAPISettings.port}")
-    }
-
-    Seq(blockGenerator, blockchainSynchronizer, coordinator, unconfirmedPoolSynchronizer, peerSynchronizer) foreach {
-      _ => // de-lazyning process :-)
     }
 
     //on unexpected shutdown
