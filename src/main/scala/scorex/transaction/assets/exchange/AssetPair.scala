@@ -27,7 +27,9 @@ case class AssetPair(@ApiModelProperty(dataType = "java.lang.String") amountAsse
     }
   }
 
-  override def toString: String = amountAssetStr + "-" + priceAssetStr
+  override def toString: String = key
+
+  def key: String = amountAssetStr + "-" + priceAssetStr
 
   def isValid: Validation = {
     !ByteArrayExtension.sameOption(amountAsset, priceAsset) :| "Invalid AssetPair"
