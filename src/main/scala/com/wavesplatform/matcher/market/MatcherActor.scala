@@ -13,7 +13,7 @@ import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange.Validation.booleanOperators
 import scorex.transaction.assets.exchange.{AssetPair, Order, Validation}
 import scorex.transaction.{AssetId, History, NewTransactionHandler}
-import scorex.utils.{ByteArrayExtension, NTP, ScorexLogging, Time}
+import scorex.utils.{ByteArrayExtension, NTP, ScorexLogging}
 import scorex.wallet.Wallet
 
 import scala.collection.{immutable, mutable}
@@ -147,7 +147,7 @@ object MatcherActor {
   def name = "matcher"
 
   def props(storedState: StateReader, wallet: Wallet, settings: MatcherSettings,
-            transactionModule: NewTransactionHandler, time: Time, history: History,
+            transactionModule: NewTransactionHandler, history: History,
             functionalitySettings: FunctionalitySettings): Props =
     Props(new MatcherActor(storedState, wallet, settings, history, functionalitySettings, transactionModule))
 

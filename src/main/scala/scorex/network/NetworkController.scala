@@ -111,9 +111,9 @@ class NetworkController(networkSettings: NetworkSettings,
       log.info(s"Connecting to: $remote")
       IO(Tcp) ! Connect(remote, localAddress = None, timeout = connTimeout)
 
-    case Connected(remote, local) =>
+    case Connected(remote, _) =>
       val connection = sender()
-      createPeerHandler(connection, remote, inbound = false)
+      createPeerHandler(connection, remote)
 
     case CommandFailed(c: Connect) =>
       log.info("Failed to connect to : " + c.remoteAddress)
@@ -172,10 +172,10 @@ class NetworkController(networkSettings: NetworkSettings,
       throw new IllegalStateException("Failed to start listening!")
 
     case InboundConnection(connection, remote) =>
-      createPeerHandler(connection, remote, inbound = true)
+      createPeerHandler(connection, remote)
   }
 
-  private def createPeerHandler(connection: ActorRef, remote: InetSocketAddress, inbound: Boolean): Unit = {
+  private def createPeerHandler(connection: ActorRef, remote: InetSocketAddress): Unit = {
     val handler = context.actorOf(Props(new PeerConnectionHandler(peerManager,
       connection,
       remote,

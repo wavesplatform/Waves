@@ -2,11 +2,8 @@ package scorex.transaction
 
 import com.wavesplatform.settings.FeesSettings
 import scorex.crypto.encode.Base58
-import scorex.transaction.ValidationError.{InsufficientFee, TransactionValidationError}
+import scorex.transaction.ValidationError.TransactionValidationError
 
-/**
-  * Class to check, that transaction contains enough fee to put it to UTX pool
-  */
 class FeeCalculator(settings: FeesSettings) {
 
   private val map: Map[String, Long] = {

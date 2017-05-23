@@ -2,13 +2,11 @@ package scorex.transaction.assets
 
 import com.google.common.primitives.{Bytes, Longs}
 import play.api.libs.json.{JsObject, Json}
-import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
+import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
-import scorex.serialization.Deser
 import scorex.transaction.TransactionParser._
-import scorex.transaction.ValidationError
-import scorex.transaction._
+import scorex.transaction.{ValidationError, _}
 
 import scala.util.{Failure, Success, Try}
 

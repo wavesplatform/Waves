@@ -42,7 +42,7 @@ trait OrderHistory {
   }
 
   private def updateRemaining(orderId: String, d: (Long, Long)) = {
-    val prev = ordersRemainingAmount.get(orderId).getOrElse(0L, 0L)
+    val prev = ordersRemainingAmount.get(orderId).getOrElse((0L, 0L))
     ordersRemainingAmount.set(orderId, (prev._1 + d._1 , prev._2 + d._2))
   }
 

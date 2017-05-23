@@ -55,7 +55,7 @@ case class Diff(transactions: Map[ByteArray, (Int, Transaction, Set[Account])],
       m.combine(Map(acc -> set))
     }
     groupedByAcc
-      .mapValues(l => l.toList.sortBy { case ((h, t, id)) => (-h, -t) }) // fresh head ([h=2, h=1, h=0])
+      .mapValues(l => l.toList.sortBy { case ((h, t, _)) => (-h, -t) }) // fresh head ([h=2, h=1, h=0])
       .mapValues(_.map(_._3))
   }
 }
@@ -70,7 +70,7 @@ object Diff {
             leaseState: Map[ByteArray, Boolean] = Map.empty,
             assetsWithUniqueNames: Map[ByteArray, ByteArray] = Map.empty
            ): Diff = Diff(
-    transactions = Map(EqByteArray(tx.id) -> (height, tx, portfolios.keys.toSet)),
+    transactions = Map(EqByteArray(tx.id) -> ((height, tx, portfolios.keys.toSet))),
     portfolios = portfolios,
     issuedAssets = assetInfos,
     aliases = aliases,

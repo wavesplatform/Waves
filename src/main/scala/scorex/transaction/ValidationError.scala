@@ -1,6 +1,6 @@
 package scorex.transaction
 
-import scorex.account.{AccountOrAlias, Alias}
+import scorex.account.Alias
 
 sealed trait ValidationError
 

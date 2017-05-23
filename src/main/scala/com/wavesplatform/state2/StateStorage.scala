@@ -13,9 +13,13 @@ class StateStorage private(db: MVStore) {
 
   def getHeight: Int = variables.get(heightKey)
 
-  def setHeight(i: Int): Unit = variables.put(heightKey, i)
+  def setHeight(i: Int): Unit = {
+    variables.put(heightKey, i)
+  }
 
-  def setDirty(isDirty: Boolean): Unit = variables.put(isDirtyFlag, if (isDirty) 1 else 0)
+  def setDirty(isDirty: Boolean): Unit = {
+    variables.put(isDirtyFlag, if (isDirty) 1 else 0)
+  }
 
   val transactions: MVMap[Array[Byte], (Int, Array[Byte])] = db.openMap("txs")
 
@@ -31,7 +35,7 @@ class StateStorage private(db: MVStore) {
 
   val aliasToAddress: MVMap[String, Array[Byte]] = db.openMap("aliasToAddress")
 
-  val orderFills: MVMap[Array[Byte], (Long,Long)] = db.openMap("orderFills")
+  val orderFills: MVMap[Array[Byte], (Long, Long)] = db.openMap("orderFills")
 
   val leaseState: MVMap[Array[Byte], Boolean] = db.openMap("leaseState")
 
@@ -39,7 +43,9 @@ class StateStorage private(db: MVStore) {
 
   val uniqueAssets: MVMap[Array[Byte], Array[Byte]] = db.openMap("uniqueAssets")
 
-  def commit(): Unit = db.commit()
+  def commit(): Unit = {
+    db.commit()
+  }
 
 }
 

@@ -2,12 +2,11 @@ package scorex.api.http.assets
 
 import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import play.api.libs.json.{Format, Json}
-import scorex.account.{Account, AccountOrAlias, PublicKeyAccount}
+import scorex.account.{AccountOrAlias, PublicKeyAccount}
 import scorex.api.http.BroadcastRequest
 import scorex.transaction.TransactionParser.SignatureStringLength
-import scorex.transaction.{AssetIdStringLength, ValidationError}
-import scorex.transaction.ValidationError.InvalidAddress
 import scorex.transaction.assets.TransferTransaction
+import scorex.transaction.{AssetIdStringLength, ValidationError}
 
 object SignedTransferRequest {
   implicit val assetTransferRequestFormat: Format[SignedTransferRequest] = Json.format

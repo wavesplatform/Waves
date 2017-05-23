@@ -7,7 +7,6 @@ import scorex.crypto.hash.FastCryptographicHash
 import scorex.transaction.ValidationError.AliasNotExists
 import scorex.transaction._
 import scorex.transaction.assets.IssueTransaction
-import scorex.transaction.assets.exchange.{ExchangeTransaction, Order}
 import scorex.transaction.lease.LeaseTransaction
 import scorex.utils.{ScorexLogging, Synchronized}
 
@@ -95,7 +94,7 @@ object StateReader {
     def getAccountBalance(account: Account): Map[AssetId, (Long, Boolean, Long, IssueTransaction)] = s.read { implicit l =>
       s.accountPortfolio(account).assets.map { case (id, amt) =>
         val assetInfo = s.assetInfo(id).get
-        id.arr -> (amt, assetInfo.isReissuable, assetInfo.volume, findTransaction[IssueTransaction](id.arr).get)
+        id.arr -> ((amt, assetInfo.isReissuable, assetInfo.volume, findTransaction[IssueTransaction](id.arr).get))
       }
     }
 

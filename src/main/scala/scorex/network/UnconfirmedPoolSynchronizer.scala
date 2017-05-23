@@ -43,11 +43,6 @@ class UnconfirmedPoolSynchronizer(private val transactionModule: NewTransactionH
     log.debug(s"Unconfirmed tx has been broadcast to network: $tx")
   }
 
-  private def broadcastExceptOf(tx: Transaction, sender: ConnectedPeer): Unit = {
-    val networkMessage = Message(TransactionalMessagesRepo.TransactionMessageSpec, Right(tx), None)
-    networkControllerRef ! NetworkController.SendToNetwork(networkMessage, BroadcastExceptOf(sender))
-    log.debug(s"Unconfirmed transaction has been broadcasted to network")
-  }
 }
 
 object UnconfirmedPoolSynchronizer {

@@ -4,9 +4,9 @@ import akka.actor.ActorRef
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.Validator
 import com.wavesplatform.state2.reader.StateReader
-import scorex.network.message.Message
 import scorex.network._
-import scorex.utils.{ScorexLogging, Time}
+import scorex.network.message.Message
+import scorex.utils.ScorexLogging
 
 import scala.util.Right
 
@@ -22,7 +22,7 @@ object NewTransactionHandler {
 
 }
 
-class NewTransactionHandlerImpl(fs: FunctionalitySettings, networkController: ActorRef, time: Time, feeCalculator: FeeCalculator,
+class NewTransactionHandlerImpl(fs: FunctionalitySettings, networkController: ActorRef, feeCalculator: FeeCalculator,
                                 utxStorage: UnconfirmedTransactionsStorage, history: History, stateReader: StateReader)
   extends NewTransactionHandler with ScorexLogging {
 

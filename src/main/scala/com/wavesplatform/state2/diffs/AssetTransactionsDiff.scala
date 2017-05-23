@@ -3,17 +3,17 @@ package com.wavesplatform.state2.diffs
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.reader.StateReader
 import com.wavesplatform.state2.{AssetInfo, Diff, EqByteArray, LeaseInfo, Portfolio}
-import scorex.account.{Account, AddressScheme}
+import scorex.account.AddressScheme
 import scorex.crypto.encode.Base58
-import scorex.transaction.{SignedTransaction, StateValidationError, Transaction}
 import scorex.transaction.ValidationError.TransactionValidationError
 import scorex.transaction.assets.{BurnTransaction, IssueTransaction, MakeAssetNameUniqueTransaction, ReissueTransaction}
+import scorex.transaction.{SignedTransaction, StateValidationError, Transaction}
 
 import scala.util.{Left, Right}
 
 object AssetTransactionsDiff {
 
-  def issue(state: StateReader, height: Int)(tx: IssueTransaction): Either[StateValidationError, Diff] = {
+  def issue(height: Int)(tx: IssueTransaction): Either[StateValidationError, Diff] = {
     val assetId = EqByteArray(tx.assetId)
     val info = AssetInfo(
       isReissuable = tx.reissuable,

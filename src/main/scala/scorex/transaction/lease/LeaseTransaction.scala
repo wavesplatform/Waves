@@ -4,7 +4,6 @@ import com.google.common.primitives.{Bytes, Longs}
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.{Account, AccountOrAlias, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
-import scorex.crypto.encode.Base58
 import scorex.transaction.TransactionParser._
 import scorex.transaction._
 

@@ -4,7 +4,7 @@ import com.wavesplatform.settings.UTXSettings
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{FreeSpec, Matchers, OneInstancePerTest}
 import scorex.account.PublicKeyAccount
-import scorex.transaction.ValidationError.{TransactionParameterValidationError, TransactionValidationError}
+import scorex.transaction.ValidationError.TransactionValidationError
 import scorex.transaction.{GenesisTransaction, Transaction}
 
 import scala.concurrent.duration._

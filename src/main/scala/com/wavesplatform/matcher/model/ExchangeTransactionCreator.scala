@@ -5,8 +5,8 @@ import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.Validator
 import com.wavesplatform.state2.reader.StateReader
 import scorex.transaction.assets.exchange.{ExchangeTransaction, Order}
-import scorex.transaction.{History, SignedTransaction, NewTransactionHandler, ValidationError}
-import scorex.utils.{NTP, ScorexLogging, Time}
+import scorex.transaction.{History, NewTransactionHandler, SignedTransaction, ValidationError}
+import scorex.utils.{NTP, ScorexLogging}
 import scorex.wallet.Wallet
 
 trait ExchangeTransactionCreator extends ScorexLogging {

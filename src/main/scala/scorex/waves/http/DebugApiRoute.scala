@@ -82,7 +82,7 @@ case class DebugApiRoute(settings: RestAPISettings, wallet: Wallet, stateReader:
             blockchainUpdater.removeAfter(block.uniqueId)
             complete(StatusCodes.OK)
           case None =>
-            complete(StatusCodes.BadRequest, "Block at height not found")
+            complete((StatusCodes.BadRequest, "Block at height not found"))
         }
       } ~ complete(StatusCodes.BadRequest)
     }

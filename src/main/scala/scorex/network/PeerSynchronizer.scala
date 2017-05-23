@@ -39,7 +39,7 @@ class PeerSynchronizer(protected override val networkControllerRef: ActorRef, pe
       hasRequested = true
       networkControllerRef ! stn
 
-    case DataFromPeer(msgId, peers: Seq[InetSocketAddress]@unchecked, remote)
+    case DataFromPeer(msgId, peers: Seq[InetSocketAddress]@unchecked, _)
       if hasRequested && msgId == PeersSpec.messageCode && peers.cast[Seq[InetSocketAddress]].isDefined =>
       hasRequested = false
 

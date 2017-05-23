@@ -1,12 +1,11 @@
 package com.wavesplatform.state2.diffs
 
 import cats._
-import cats.syntax.all._
 import cats.implicits._
 import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state2.reader.StateReader
 import com.wavesplatform.state2._
-import scorex.account.{Account, Alias}
+import com.wavesplatform.state2.reader.StateReader
+import scorex.account.Account
 import scorex.transaction.StateValidationError
 import scorex.transaction.ValidationError.TransactionValidationError
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}

@@ -1,7 +1,7 @@
 package scorex
 
-import scorex.api.http.{ApiError, StateCheckFailed}
-import scorex.transaction.{Transaction, NewTransactionHandler, ValidationError}
+import scorex.api.http.ApiError
+import scorex.transaction.{NewTransactionHandler, Transaction, ValidationError}
 
 trait BroadcastRoute {
   def transactionModule: NewTransactionHandler

@@ -38,7 +38,7 @@ case class MatcherApiRoute(wallet: Wallet,storedState: StateReader, matcher: Act
   def withAssetPair(a1: String, a2: String): Directive1[AssetPair] = {
     AssetPair.createAssetPair(a1, a2) match {
       case Success(p) => provide(p)
-      case Failure( e) => complete(StatusCodes.BadRequest -> Json.obj("message" -> "Invalid asset pair"))
+      case Failure(_) => complete(StatusCodes.BadRequest -> Json.obj("message" -> "Invalid asset pair"))
     }
   }
 

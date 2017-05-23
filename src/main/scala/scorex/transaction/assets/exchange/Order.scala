@@ -1,6 +1,6 @@
 package scorex.transaction.assets.exchange
 
-import com.google.common.primitives.{Ints, Longs}
+import com.google.common.primitives.Longs
 import io.swagger.annotations.ApiModelProperty
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}

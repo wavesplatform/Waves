@@ -29,8 +29,6 @@ class PeerManager(
   private val blacklistResendInterval = settings.blackListResidenceTime / 10
   private val visitPeersInterval = settings.peersDataResidenceTime / 10
 
-  private implicit val system = context.system
-
   private val maybeFilename = Option(settings.file).filter(_.trim.nonEmpty)
   private val peerDatabase: PeerDatabase = new PeerDatabaseImpl(settings, maybeFilename)
 

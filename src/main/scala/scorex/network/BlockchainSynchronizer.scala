@@ -113,7 +113,7 @@ class BlockchainSynchronizer(protected val networkControllerRef: ActorRef, coord
     }
   }
 
-  def gettingExtensionTail(downloadInfo: DownloadInfo, overlap: InnerIds, peers: PeerSet): Receive =
+  private def gettingExtensionTail(downloadInfo: DownloadInfo, overlap: InnerIds, peers: PeerSet): Receive =
     state(GettingExtensionTail, acceptSignaturesSpecOnlyFrom(peers.active)) {
       case SignaturesFromPeer(tail, connectedPeer) =>
 
@@ -133,7 +133,7 @@ class BlockchainSynchronizer(protected val networkControllerRef: ActorRef, coord
         }
     }
 
-  def gettingBlocks(blockIds: InnerIds,
+  private def gettingBlocks(blockIds: InnerIds,
                     lastCommonBlockId: BlockId,
                     peers: PeerSet): Receive = {
 
@@ -159,7 +159,7 @@ class BlockchainSynchronizer(protected val networkControllerRef: ActorRef, coord
 
           if (forkScore > history.score()) {
             if (partialBlockLoading || allBlocksAreLoaded) {
-              finish(SyncFinished(success = true, Some(lastCommonBlockId, forkStorage.blocksInOrder, author)))
+              finish(SyncFinished(success = true, Some((lastCommonBlockId, forkStorage.blocksInOrder, author))))
             }
           } else if (allBlocksAreLoaded) {
             // blacklisting in case of lesser score can be false-positive due to race condition
@@ -288,7 +288,7 @@ class BlockchainSynchronizer(protected val networkControllerRef: ActorRef, coord
     def unapply(dataFromPeer: DataFromPeer[_]): Option[(Block, ConnectedPeer)] = {
       if (dataFromPeer.messageType == BlockMessageSpec.messageCode) {
         dataFromPeer match {
-          case DataFromPeer(msgId, block: Block, connectedPeer) if block.cast[Block].isDefined =>
+          case DataFromPeer(_, block: Block, connectedPeer) if block.cast[Block].isDefined =>
             Some((block, connectedPeer))
           case _ =>
             None
@@ -301,7 +301,7 @@ class BlockchainSynchronizer(protected val networkControllerRef: ActorRef, coord
     def unapply(dataFromPeer: DataFromPeer[_]): Option[(InnerIds, ConnectedPeer)] = {
       if (dataFromPeer.messageType == SignaturesSpec.messageCode) {
         dataFromPeer match {
-          case DataFromPeer(msgId, blockIds: Seq[Block.BlockId]@unchecked, connectedPeer) =>
+          case DataFromPeer(_, blockIds: Seq[Block.BlockId]@unchecked, connectedPeer) =>
             Some((blockIds.map(InnerId), connectedPeer))
           case _ =>
             None

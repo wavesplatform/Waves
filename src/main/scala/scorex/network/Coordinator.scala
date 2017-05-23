@@ -27,7 +27,7 @@ import scorex.utils.{ScorexLogging, Time}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.language.{higherKinds, postfixOps}
+import scala.language.{higherKinds}
 import scala.util.control.NonFatal
 
 class Coordinator(protected override val networkControllerRef: ActorRef, blockchainSynchronizer: ActorRef, blockGenerator: ActorRef,
@@ -186,7 +186,7 @@ class Coordinator(protected override val networkControllerRef: ActorRef, blockch
         false
       }
     } catch {
-      case e: UnsupportedOperationException =>
+      case _: UnsupportedOperationException =>
         log.debug(s"DB can't find last block because of unexpected modification")
         false
     }
@@ -201,7 +201,7 @@ class Coordinator(protected override val networkControllerRef: ActorRef, blockch
           } else {
             self ! BroadcastCurrentScore
           }
-        case Left(err) =>
+        case Left(_) =>
           from.foreach(_.blacklist())
           log.warn(s"Can't apply single block, local=$local: ${str(newBlock)}")
       }

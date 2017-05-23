@@ -22,13 +22,13 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader, set
 
   private val inMemoryDiff = Synchronized(Monoid[BlockDiff].empty)
 
-  private def unsafeDiffAgainstPersistedByRange(from: Int, to: Int): BlockDiff =  {
-      val blocks = measureLog(s"Reading blocks from $from up to $to") {
-        Range(from, to).map(bc.blockAt(_).get)
-      }
-      measureLog(s"Building diff from $from up to $to") {
-        BlockDiffer.unsafeDiffMany(settings)(persisted, blocks)
-      }
+  private def unsafeDiffAgainstPersistedByRange(from: Int, to: Int): BlockDiff = {
+    val blocks = measureLog(s"Reading blocks from $from up to $to") {
+      Range(from, to).map(bc.blockAt(_).get)
+    }
+    measureLog(s"Building diff from $from up to $to") {
+      BlockDiffer.unsafeDiffMany(settings)(persisted, blocks)
+    }
   }
 
   private def logHeights(prefix: String): Unit = read { implicit l =>

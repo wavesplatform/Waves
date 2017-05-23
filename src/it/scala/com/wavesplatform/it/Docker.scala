@@ -10,7 +10,7 @@ import com.spotify.docker.client.DefaultDockerClient
 import com.spotify.docker.client.DockerClient.RemoveContainerParam
 import com.spotify.docker.client.messages.{ContainerConfig, HostConfig, NetworkConfig, PortBinding}
 import com.typesafe.config.{Config, ConfigFactory, ConfigRenderOptions}
-import io.netty.util.HashedWheelTimer
+import io.netty.util.{HashedWheelTimer, Timeout}
 import org.asynchttpclient.Dsl._
 import scorex.utils.ScorexLogging
 
@@ -111,7 +111,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty) extends AutoCloseable wi
     client.stopContainer(containerId, 10)
   }
 
-  def scheduleOnce(initialDelay: FiniteDuration)(f: => Any) =
+  def scheduleOnce(initialDelay: FiniteDuration)(f: => Any): Timeout =
     timer.newTimeout(_ => f, initialDelay.toMillis, MILLISECONDS)
 
   override def close(): Unit = {

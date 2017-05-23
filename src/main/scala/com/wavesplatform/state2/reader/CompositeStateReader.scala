@@ -7,7 +7,6 @@ import cats.kernel.Monoid
 import com.wavesplatform.state2._
 import scorex.account.{Account, Alias}
 import scorex.transaction.Transaction
-import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.transaction.lease.LeaseTransaction
 
 class CompositeStateReader(inner: StateReader, blockDiff: BlockDiff) extends StateReader {

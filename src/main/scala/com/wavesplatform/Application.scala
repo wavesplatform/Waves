@@ -56,7 +56,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
   }
   val utxStorage: UnconfirmedTransactionsStorage = new UnconfirmedTransactionsDatabaseImpl(settings.utxSettings.size)
   val newTransactionHandler = new NewTransactionHandlerImpl(settings.blockchainSettings.functionalitySettings,
-    networkController, time, feeCalculator, utxStorage, history, stateReader)
+    networkController, feeCalculator, utxStorage, history, stateReader)
 
   lazy val apiRoutes = Seq(
     BlocksApiRoute(settings.restAPISettings, settings.checkpointsSettings, history, coordinator),
@@ -139,7 +139,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
     }
 
     if (settings.matcherSettings.enable) {
-      val matcher = new Matcher(actorSystem, wallet, newTransactionHandler, stateReader, time, history, settings.blockchainSettings, settings.restAPISettings, settings.matcherSettings)
+      val matcher = new Matcher(actorSystem, wallet, newTransactionHandler, stateReader, history, settings.blockchainSettings, settings.restAPISettings, settings.matcherSettings)
       matcher.runMatcher()
     }
   }
@@ -258,8 +258,9 @@ object Application extends ScorexLogging {
       val application = new Application(actorSystem, settings)
       application.run()
 
-      if (application.wallet.privateKeyAccounts().isEmpty)
+      if (application.wallet.privateKeyAccounts().isEmpty) {
         application.wallet.generateNewAccounts(1)
+      }
     }
   }
 
@@ -269,5 +270,6 @@ object Application extends ScorexLogging {
       GenesisTransaction.create(acc, ts.amount, gs.transactionsTimestamp).right.get
     }
   }
+  def f00: Int = 4
 
 }
