@@ -132,6 +132,9 @@ trait TestingCommons extends Suite with BeforeAndAfterAll with Eventually {
       |    port: 9093
       |    journal-directory: ${waves.directory}"/journal"
       |    snapshots-directory: ${waves.directory}"/snapshots"
+      |    order-history-file = ${waves.directory}"/matcher/orderhistory.dat"
+      |    max-timestamp-diff = 3h
+      |    is-migrate-to-new-order-history-storage = no
       |  }
       |  miner {
       |    enable: yes
