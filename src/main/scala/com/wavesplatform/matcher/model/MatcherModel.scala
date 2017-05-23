@@ -127,7 +127,7 @@ object Events {
     event match {
       case OrderAdded(lo) =>
         Map(lo.order.idStr->
-          OrderInfo(lo.order.amount, lo.order.amount - lo.amount, false))
+          OrderInfo(lo.order.amount, 0L, false))
       case oe: OrderExecuted =>
         val (o1, o2) = (oe.submittedExecuted, oe.counterExecuted)
         Map(o1.order.idStr -> OrderInfo(o1.order.amount, o1.amount, false),
