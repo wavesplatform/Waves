@@ -28,13 +28,13 @@ trait OrderValidator {
     val (feeTBal, feeOBal) = (storedState.tradableAssetBalance(feeAcc), orderHistory.getOpenVolume(feeAcc))
 
     if (acc != feeAcc) {
-      (assTBal - assOBal >= order.getSpendAmount(order.price, order.amount).get) :|
-        notEnoughError(assTBal, assOBal, order.getSpendAmount(order.price, order.amount).get) &&
+      (assTBal - assOBal >= order.getSpendAmount(order.price, order.amount).getOrElse(0L)) :|
+        notEnoughError(assTBal, assOBal, order.getSpendAmount(order.price, order.amount).getOrElse(0L)) &&
         (feeTBal - feeOBal >= order.matcherFee) :| notEnoughError(feeTBal, feeOBal, order.matcherFee)
     }
     else {
-      (assTBal - assOBal >= order.getSpendAmount(order.price, order.amount).get + order.matcherFee) :|
-        notEnoughError(assTBal, assOBal, order.getSpendAmount(order.price, order.amount).get + order.matcherFee)
+      (assTBal - assOBal >= order.getSpendAmount(order.price, order.amount).getOrElse(0L) + order.matcherFee) :|
+        notEnoughError(assTBal, assOBal, order.getSpendAmount(order.price, order.amount).getOrElse(0L) + order.matcherFee)
     }
   }
 
