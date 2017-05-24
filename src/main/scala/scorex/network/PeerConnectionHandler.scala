@@ -46,7 +46,13 @@ case class PeerConnectionHandler(peerManager: ActorRef,
     timeout.cancel()
   }
 
-  override def receive: Receive = state(CommunicationState.AwaitingHandshake) {
+  override def receive: Receive =state(CommunicationState.Inactive) {
+    case Start =>
+      log.debug(s"Network connection handler for $remote started")
+      context become workingCycleAwaitingHandshake
+  }
+
+  private def workingCycleAwaitingHandshake: Receive = state(CommunicationState.AwaitingHandshake) {
     case h: Handshake =>
       connection ! Write(ByteString(h.bytes), Ack)
       log.debug(s"Handshake message has been sent to $remote")
@@ -202,6 +208,7 @@ object PeerConnectionHandler {
   private object CommunicationState extends Enumeration {
     type CommunicationState = Value
 
+    val Inactive = Value("Inactive")
     val AwaitingHandshake = Value("AwaitingHandshake")
     val WorkingCycle = Value("WorkingCycle")
     val WorkingCycleWaitingAck = Value("WorkingCycleWaitingAck")
@@ -216,4 +223,5 @@ object PeerConnectionHandler {
 
   case class CloseConnectionCompleted(remote: InetSocketAddress)
 
+  case object Start
 }

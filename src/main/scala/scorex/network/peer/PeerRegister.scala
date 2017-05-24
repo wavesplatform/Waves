@@ -8,8 +8,6 @@ import scorex.utils.ScorexLogging
 
 import scala.collection.mutable
 
-import scala.collection.JavaConverters._
-
 trait PeerState
 
 case object UnknownPeer extends PeerState
