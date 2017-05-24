@@ -15,7 +15,7 @@ case class AssetsBroadcastApiRoute(settings: RestAPISettings, transactionModule:
   extends ApiRoute with BroadcastRoute {
 
   override val route: Route = pathPrefix("assets" / "broadcast") {
-    issue ~ reissue ~ transfer ~ burnRoute ~ batchTransfer
+    issue ~ reissue ~ transfer ~ burnRoute ~ batchTransfer ~ makeAssetNameUniqueRequest
   }
 
   @Path("/issue")
@@ -81,6 +81,28 @@ case class AssetsBroadcastApiRoute(settings: RestAPISettings, transactionModule:
   def burnRoute: Route = (path("burn") & post) {
     json[SignedBurnRequest] { burnReq =>
       doBroadcast(burnReq.toTx)
+    }
+  }
+
+  @Path("/make-asset-name-unique")
+  @ApiOperation(value = "Broadcast signed Make asset name unique transaction",
+    notes = "Publish signed Make asset name unique transaction to the Blockchain",
+    httpMethod = "POST",
+    consumes = "application/json",
+    produces = "application/json")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(
+      name = "body",
+      value = "Json with signed Make asset name unique transaction",
+      required = true,
+      paramType = "body",
+      dataType = "scorex.api.http.assets.SignedMakeAssetNameUniqueRequest")))
+  @ApiResponses(Array(
+    new ApiResponse(code = 200, message = "Json with signed Make asset name unique"),
+    new ApiResponse(code = 400, message = "Json with error description", response = classOf[ApiErrorResponse])))
+  def makeAssetNameUniqueRequest: Route = (path("make-asset-name-unique") & post) {
+    json[SignedMakeAssetNameUniqueRequest] { makeAssetNameUniqueReq =>
+      doBroadcast(makeAssetNameUniqueReq.toTx)
     }
   }
 
