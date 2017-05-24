@@ -1,6 +1,6 @@
 package com.wavesplatform
 
-import java.net.{InetSocketAddress, URI}
+import java.net.{InetSocketAddress, SocketAddress, URI}
 import java.util.concurrent.Callable
 
 import io.netty.util.concurrent.{EventExecutorGroup, ScheduledFuture}
@@ -13,6 +13,11 @@ package object network {
     if (uri.getPort < 0) new InetSocketAddress(addr, defaultPort)
     else new InetSocketAddress(uri.getHost, uri.getPort)
   }
+
+  def sameAddresses(a1: SocketAddress, a2: SocketAddress): Boolean = a1 == a2 ||
+    ((a1, a2) match {
+      case (isa1: InetSocketAddress, isa2: InetSocketAddress) => isa1.getAddress == isa2.getAddress
+    })
 
   implicit class EventExecutorGroupExt(val e: EventExecutorGroup) extends AnyVal {
     def scheduleWithFixedDelay(initialDelay: FiniteDuration, delay: FiniteDuration)(f: => Unit): ScheduledFuture[_] =

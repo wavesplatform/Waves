@@ -16,10 +16,10 @@ class ExtensionSignaturesLoader(history: History, settings: SynchronizationSetti
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef) = msg match {
     case s: Signatures =>
       val (known, unknown) = s.signatures.span(id => history.contains(id))
-      log.debug(s"Got extension with ${s.signatures.length} signatures")
+      log.debug(s"Got extension with ${known.length}/${s.signatures.length} known signatures from ${ctx.channel().id().asShortText()}")
       currentTimeout.foreach(_.cancel(false))
       currentTimeout = None
-      ctx.fireChannelRead(ExtensionIds(known.last, unknown))
+      known.lastOption.foreach(lastKnown => ctx.fireChannelRead(ExtensionIds(lastKnown, unknown)))
     case _ => super.channelRead(ctx, msg)
   }
 

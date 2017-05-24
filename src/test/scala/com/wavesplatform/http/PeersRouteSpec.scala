@@ -4,11 +4,11 @@ import java.net.{InetAddress, InetSocketAddress}
 
 import akka.testkit.TestProbe
 import com.wavesplatform.http.ApiMarshallers._
+import com.wavesplatform.network.Handshake
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json.{Format, JsObject, JsValue, Json}
 import scorex.api.http.{ApiKeyNotValid, PeersApiRoute}
-import scorex.network.Handshake
 import scorex.network.NetworkController.ConnectTo
 import scorex.network.peer.PeerInfo
 import scorex.network.peer.PeerManager.{GetAllPeers, GetBlacklistedPeers, GetConnectedPeers}

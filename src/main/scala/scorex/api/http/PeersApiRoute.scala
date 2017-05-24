@@ -9,10 +9,10 @@ import akka.actor.ActorRef
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
 import akka.util.Timeout
+import com.wavesplatform.network.Handshake
 import com.wavesplatform.settings.RestAPISettings
 import io.swagger.annotations._
 import play.api.libs.json._
-import scorex.network.Handshake
 import scorex.network.NetworkController.ConnectTo
 import scorex.network.peer.{PeerInfo, PeerManager}
 

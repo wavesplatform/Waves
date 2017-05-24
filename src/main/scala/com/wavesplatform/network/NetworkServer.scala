@@ -1,6 +1,6 @@
 package com.wavesplatform.network
 
-import java.net.{InetAddress, InetSocketAddress}
+import java.net.{InetAddress, InetSocketAddress, NetworkInterface}
 import java.util.concurrent.ConcurrentHashMap
 import java.util.stream.Collectors
 
@@ -15,17 +15,18 @@ import io.netty.channel.socket.SocketChannel
 import io.netty.channel.socket.nio.{NioServerSocketChannel, NioSocketChannel}
 import io.netty.handler.codec.{LengthFieldBasedFrameDecoder, LengthFieldPrepender}
 import io.netty.util.concurrent.EventExecutorGroup
+import scorex.network.TransactionalMessagesRepo
 import scorex.network.message.{BasicMessagesRepo, MessageSpec}
-import scorex.network.{Handshake, TransactionalMessagesRepo}
+import scorex.network.peer.{PeerDatabase, PeerDatabaseImpl}
 import scorex.transaction.{BlockchainUpdater, CheckpointService, History, UnconfirmedTransactionsStorage}
 import scorex.utils.{ScorexLogging, Time}
 
+import scala.collection.JavaConverters._
 import scala.concurrent.duration._
-import scala.util.Random
 
-class ServerChannelInitializer(handshake: Handshake, settings: NetworkSettings)
+class ServerChannelInitializer(handshake: Handshake, settings: NetworkSettings, peerDatabase: PeerDatabase)
   extends ChannelInitializer[SocketChannel] {
-  private val inboundFilter = new InboundConnectionFilter(settings.maxInboundConnections, settings.maxConnectionsWithSingleHost)
+  private val inboundFilter = new InboundConnectionFilter(peerDatabase, settings.maxInboundConnections, settings.maxConnectionsWithSingleHost)
   override def initChannel(ch: SocketChannel): Unit = {
     ch.pipeline()
       .addLast(inboundFilter)
@@ -36,7 +37,6 @@ class ServerChannelInitializer(handshake: Handshake, settings: NetworkSettings)
 
 class ClientChannelInitializer(
     handshake: Handshake,
-    scoreObserver: RemoteScoreObserver,
     history: History,
     checkpoints: CheckpointService,
     blockchainUpdater: BlockchainUpdater,
@@ -44,8 +44,11 @@ class ClientChannelInitializer(
     stateReader: StateReader,
     utxStorage: UnconfirmedTransactionsStorage,
     syncSettings: SynchronizationSettings,
+    networkSettings: NetworkSettings,
     network: Network,
+    peerDatabase: PeerDatabase,
     connections: ConcurrentHashMap[PeerKey, Channel],
+    scoreObserver: RemoteScoreObserver,
     coordinatorEventLoop: EventExecutorGroup,
     coordinator: Coordinator)
   extends ChannelInitializer[SocketChannel] {
@@ -60,6 +63,7 @@ class ClientChannelInitializer(
       .addLast(new LengthFieldPrepender(4))
       .addLast(new LengthFieldBasedFrameDecoder(1024*1024, 0, 4, 0, 4))
       .addLast(new MessageCodec(specs))
+      .addLast(new PeerSynchronizer(peerDatabase))
       .addLast(new ExtensionSignaturesLoader(history, syncSettings))
       .addLast(new ExtensionBlocksLoader(history, syncSettings.synchronizationTimeout))
       .addLast(scoreObserver)
@@ -93,22 +97,21 @@ class NetworkServer(
 
   private def connectedPeerAddresses =
     allConnectedPeers.keySet.stream.map[InetAddress](pk => pk.host).collect(Collectors.toSet())
-  private def randomKnownPeer: Option[InetSocketAddress] =
-    Random.shuffle(knownPeers.filterNot(p => connectedPeerAddresses.contains(p.getAddress))).headOption
 
-  workerGroup.scheduleWithFixedDelay(1.second, 5.seconds) {
-    val inactiveConnections = allChannels.stream().filter(!_.isActive).collect(Collectors.toSet())
-    inactiveConnections.forEach(allChannels.remove _)
+  private val allLocalInterfaces = (for {
+    ifc <-NetworkInterface.getNetworkInterfaces.asScala
+    ip <- ifc.getInterfaceAddresses.asScala
+  } yield new InetSocketAddress(ip.getAddress, settings.networkSettings.port)).toSet
 
-    if (allChannels.size() < settings.networkSettings.maxOutboundConnections) {
-      randomKnownPeer.foreach(connect)
+  private val peerDatabase = {
+    val db = new PeerDatabaseImpl(settings.networkSettings, Some(settings.networkSettings.file))
+
+    for (a <- settings.networkSettings.knownPeers.view.map(inetSocketAddress(_, 6863))) {
+      db.addPeer(a, None, None)
     }
+
+    db
   }
-
-  workerGroup.scheduleWithFixedDelay(settings.synchronizationSettings.scoreBroadcastInterval,
-    settings.synchronizationSettings.scoreBroadcastInterval) {
-      broadcast(history.score())
-    }
 
   private val network = new Network {
     override def requestExtension(localScore: BigInt) =
@@ -123,7 +126,6 @@ class NetworkServer(
     .channel(classOf[NioSocketChannel])
     .handler(new ClientChannelInitializer(
       handshake,
-      scoreObserver,
       history,
       checkpoints,
       blockchainUpdater,
@@ -131,17 +133,34 @@ class NetworkServer(
       stateReader,
       utxStorage,
       settings.synchronizationSettings,
+      settings.networkSettings,
       network,
+      peerDatabase,
       allConnectedPeers,
+      scoreObserver,
       coordinatorExecutor,
       coordinator))
 
   private val serverChannel = new ServerBootstrap()
     .group(bossGroup, workerGroup)
     .channel(classOf[NioServerSocketChannel])
-    .childHandler(new ServerChannelInitializer(handshake, settings.networkSettings))
+    .childHandler(new ServerChannelInitializer(handshake, settings.networkSettings, peerDatabase))
     .bind(settings.networkSettings.port)
     .channel()
+
+  workerGroup.scheduleWithFixedDelay(1.second, 5.seconds) {
+    val inactiveConnections = allChannels.stream().filter(!_.isActive).collect(Collectors.toSet())
+    inactiveConnections.forEach(allChannels.remove _)
+
+    if (allChannels.size() < settings.networkSettings.maxOutboundConnections) {
+      peerDatabase.getRandomPeer(allLocalInterfaces).foreach(connect)
+    }
+  }
+
+  workerGroup.scheduleWithFixedDelay(settings.synchronizationSettings.scoreBroadcastInterval,
+    settings.synchronizationSettings.scoreBroadcastInterval) {
+    broadcast(history.score())
+  }
 
   private def connect(remoteAddress: InetSocketAddress): ChannelFuture = {
     val f = bootstrap.connect(remoteAddress)
