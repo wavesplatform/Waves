@@ -153,7 +153,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, state: Stat
       value = "Json with data",
       required = true,
       paramType = "body",
-      dataType = "scorex.api.http.assets.MakeAssetUniqueRequest",
+      dataType = "scorex.api.http.assets.MakeAssetNameUniqueRequest",
       defaultValue = "{\"sender\":\"string\",\"assetId\":\"Base58\",\"fee\":100000}"
     )
   ))
