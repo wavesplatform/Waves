@@ -42,7 +42,7 @@ trait ExchangeTransactionCreator extends ScorexLogging {
   }
 
   def validate(orderMatch: ExchangeTransaction): Either[ValidationError, SignedTransaction] =
-    Validator.validateWithHistory(functionalitySettings, storedState, NTP)(orderMatch)
+    Validator.validateWithCurrentTime(functionalitySettings, storedState, NTP)(orderMatch)
 
   def sendToNetwork(tx: SignedTransaction): Either[ValidationError, SignedTransaction] = {
     transactionModule.onNewOffchainTransaction(tx)

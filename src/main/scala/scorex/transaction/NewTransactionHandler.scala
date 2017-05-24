@@ -29,7 +29,7 @@ class NewTransactionHandlerImpl(fs: FunctionalitySettings, networkController: Ac
   override def onNewOffchainTransactionExcept[T <: Transaction](transaction: T, exceptOf: Option[ConnectedPeer]): Either[ValidationError, T] =
     for {
       validAgainstFee <- feeCalculator.enoughFee(transaction)
-      tx <- utxStorage.putIfNew(validAgainstFee, (t: T) => Validator.validateWithHistory(fs, stateReader, time)(t))
+      tx <- utxStorage.putIfNew(validAgainstFee, (t: T) => Validator.validateWithCurrentTime(fs, stateReader, time)(t))
     } yield {
       val ntwMsg = Message(TransactionalMessagesRepo.TransactionMessageSpec, Right(transaction), None)
       networkController ! NetworkController.SendToNetwork(ntwMsg, exceptOf.map(BroadcastExceptOf).getOrElse(Broadcast))

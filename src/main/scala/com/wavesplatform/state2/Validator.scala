@@ -27,7 +27,7 @@ object Validator {
     (errs.reverse, txs.reverse)
   }
 
-  def validateWithHistory[T <: Transaction](fs: FunctionalitySettings, stateReader: StateReader, time: Time)(tx: T): Either[ValidationError, T] = {
+  def validateWithCurrentTime[T <: Transaction](fs: FunctionalitySettings, stateReader: StateReader, time: Time)(tx: T): Either[ValidationError, T] = {
     val correctedTime = time.correctedTime()
     val notExpired = (correctedTime - tx.timestamp).millis <= MaxTimePreviousBlockOverTransactionDiff
     if (notExpired) {
