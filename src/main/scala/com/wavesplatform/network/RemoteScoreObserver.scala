@@ -9,8 +9,6 @@ import io.netty.channel._
 import scorex.transaction.History
 import scorex.utils.ScorexLogging
 
-import scala.collection.JavaConverters._
-
 
 @Sharable
 class RemoteScoreObserver(syncSettings: SynchronizationSettings)
@@ -20,7 +18,9 @@ class RemoteScoreObserver(syncSettings: SynchronizationSettings)
   private val scores = new ConcurrentHashMap[Channel, RemoteScore]
   private val pinnedChannel = new AtomicReference[Option[Channel]](None)
 
-  private def channelWithHighestScore = if (scores.isEmpty) None else Some(scores.asScala.maxBy(_._2.value))
+  private def channelWithHighestScore =
+    Option(scores.reduceEntries(1000, (c1, c2) => if (c1.getValue.value > c2.getValue.value) c1 else c2))
+      .map(e => e.getKey -> e.getValue)
 
   override def handlerAdded(ctx: ChannelHandlerContext) =
     ctx.channel().closeFuture().addListener { f: ChannelFuture =>
@@ -42,16 +42,16 @@ class RemoteScoreObserver(syncSettings: SynchronizationSettings)
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef) = msg match {
     case newScoreValue: History.BlockchainScore =>
-      log.debug(s"Setting score for ${ctx.channel().id().asShortText()} to $newScoreValue")
+      val isNewHighScore = channelWithHighestScore.forall(_._2.value < newScoreValue)
+      log.debug(s"Setting score for ${ctx.channel().id().asShortText()} to $newScoreValue${if (isNewHighScore) " (new high score)" else ""}")
       val score = RemoteScore(newScoreValue, System.currentTimeMillis())
 
       ctx.executor().schedule(syncSettings.scoreTTL) {
         scores.remove(ctx.channel().id(), score)
       }
 
-      if (channelWithHighestScore.forall(_._2.value < newScoreValue)) {
-        pinnedChannel.set(Some(ctx.channel()))
-        log.debug(s"We have a new highest score $newScoreValue")
+      if (isNewHighScore && pinnedChannel.getAndSet(Some(ctx.channel())).isEmpty) {
+        log.debug("No previously pinned channel, requesting signatures")
         ctx.write(ExtensionSignaturesLoader.LoadSignatures)
       }
 

@@ -7,10 +7,11 @@ import java.util.concurrent.atomic.AtomicInteger
 import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel.{ChannelFuture, ChannelHandlerContext}
 import io.netty.handler.ipfilter.AbstractRemoteAddressFilter
+import scorex.network.peer.PeerDatabase
 import scorex.utils.ScorexLogging
 
 @Sharable
-class InboundConnectionFilter(maxInboundConnections: Int, maxConnectionsPerHost: Int)
+class InboundConnectionFilter(peerDatabase: PeerDatabase, maxInboundConnections: Int, maxConnectionsPerHost: Int)
   extends AbstractRemoteAddressFilter[InetSocketAddress] with ScorexLogging {
   private val inboundConnectionCount = new AtomicInteger(0)
   private val perHostConnectionCount = new ConcurrentHashMap[InetAddress, Int]
@@ -25,7 +26,9 @@ class InboundConnectionFilter(maxInboundConnections: Int, maxConnectionsPerHost:
     val newTotal = inboundConnectionCount.incrementAndGet()
     val newCount = perHostConnectionCount.compute(remoteAddress.getAddress, (_, cnt) => Option(cnt).fold(1)(_ + 1))
 
-    newTotal <= maxInboundConnections && newCount <= maxConnectionsPerHost
+    newTotal <= maxInboundConnections &&
+      newCount <= maxConnectionsPerHost &&
+      peerDatabase.getBlacklist.contains(remoteAddress.getHostName)
   }
 
   override def channelAccepted(ctx: ChannelHandlerContext, remoteAddress: InetSocketAddress) =
