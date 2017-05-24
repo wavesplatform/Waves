@@ -23,13 +23,13 @@ object NewTransactionHandler {
 }
 
 class NewTransactionHandlerImpl(fs: FunctionalitySettings, networkController: ActorRef, time: Time, feeCalculator: FeeCalculator,
-                                utxStorage: UnconfirmedTransactionsStorage, history: History, stateReader: StateReader)
+                                utxStorage: UnconfirmedTransactionsStorage, stateReader: StateReader)
   extends NewTransactionHandler with ScorexLogging {
 
   override def onNewOffchainTransactionExcept[T <: Transaction](transaction: T, exceptOf: Option[ConnectedPeer]): Either[ValidationError, T] =
     for {
       validAgainstFee <- feeCalculator.enoughFee(transaction)
-      tx <- utxStorage.putIfNew(validAgainstFee, (t: T) => Validator.validateWithHistory(history, fs, stateReader)(t))
+      tx <- utxStorage.putIfNew(validAgainstFee, (t: T) => Validator.validateWithHistory(fs, stateReader, time)(t))
     } yield {
       val ntwMsg = Message(TransactionalMessagesRepo.TransactionMessageSpec, Right(transaction), None)
       networkController ! NetworkController.SendToNetwork(ntwMsg, exceptOf.map(BroadcastExceptOf).getOrElse(Broadcast))

@@ -56,7 +56,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
   }
   val utxStorage: UnconfirmedTransactionsStorage = new UnconfirmedTransactionsDatabaseImpl(settings.utxSettings.size)
   val newTransactionHandler = new NewTransactionHandlerImpl(settings.blockchainSettings.functionalitySettings,
-    networkController, time, feeCalculator, utxStorage, history, stateReader)
+    networkController, time, feeCalculator, utxStorage, stateReader)
 
   lazy val apiRoutes = Seq(
     BlocksApiRoute(settings.restAPISettings, settings.checkpointsSettings, history, coordinator),
