@@ -5,12 +5,11 @@ import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.Validator
 import com.wavesplatform.state2.reader.StateReader
 import scorex.transaction.assets.exchange.{ExchangeTransaction, Order}
-import scorex.transaction.{History, SignedTransaction, NewTransactionHandler, ValidationError}
-import scorex.utils.{NTP, ScorexLogging, Time}
+import scorex.transaction.{NewTransactionHandler, SignedTransaction, ValidationError}
+import scorex.utils.{NTP, ScorexLogging}
 import scorex.wallet.Wallet
 
 trait ExchangeTransactionCreator extends ScorexLogging {
-  val history: History
   val functionalitySettings: FunctionalitySettings
   val transactionModule: NewTransactionHandler
   val storedState: StateReader
@@ -43,7 +42,7 @@ trait ExchangeTransactionCreator extends ScorexLogging {
   }
 
   def validate(orderMatch: ExchangeTransaction): Either[ValidationError, SignedTransaction] =
-    Validator.validateWithHistory(history, functionalitySettings, storedState)(orderMatch)
+    Validator.validateWithCurrentTime(functionalitySettings, storedState, NTP)(orderMatch)
 
   def sendToNetwork(tx: SignedTransaction): Either[ValidationError, SignedTransaction] = {
     transactionModule.onNewOffchainTransaction(tx)
