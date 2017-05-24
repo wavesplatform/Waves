@@ -53,7 +53,7 @@ class Node (config: Config, val nodeInfo: NodeInfo, client: AsyncHttpClient, tim
             response
           } else {
             log.debug(s"Request:  ${r.getUrl} \n Unexpected status code(${response.getStatusCode}): ${response.getResponseBody}")
-            throw UnexpectedStatusCodeException(response)
+            throw UnexpectedStatusCodeException(r, response)
           }
         }
       }).toCompletableFuture.toScala
@@ -78,9 +78,12 @@ class Node (config: Config, val nodeInfo: NodeInfo, client: AsyncHttpClient, tim
       _post(s"$url:$port$path").setHeader("api_key", "integration-test-rest-api")
     ).build())
 
-  def post[A: Writes](path: String, body: A): Future[Response] =
+  def postJson[A: Writes](path: String, body: A): Future[Response] =
+    post(path, stringify(toJson(body)))
+
+  def post(path: String, body: String): Future[Response] =
     post("http://localhost", nodeInfo.hostRestApiPort, path,
-      (rb: RequestBuilder) => rb.setHeader("Content-type", "application/json").setBody(stringify(toJson(body))))
+      (rb: RequestBuilder) => rb.setHeader("Content-type", "application/json").setBody(body))
 
   def matcherPost[A: Writes](path: String, body: A): Future[Response] =
     post("http://localhost", nodeInfo.hostMatcherApiPort, path,
@@ -107,7 +110,7 @@ class Node (config: Config, val nodeInfo: NodeInfo, client: AsyncHttpClient, tim
 
   def waitForTransaction(txId: String): Future[Transaction] = waitFor[Option[Transaction]](transactionInfo(txId).transform {
     case Success(tx) => Success(Some(tx))
-    case Failure(UnexpectedStatusCodeException(r)) if r.getStatusCode == 404 => Success(None)
+    case Failure(UnexpectedStatusCodeException(_, r)) if r.getStatusCode == 404 => Success(None)
     case Failure(ex) => Failure(ex)
   }, tOpt => tOpt.exists(_.id == txId), 1.second).map(_.get)
 
@@ -118,37 +121,40 @@ class Node (config: Config, val nodeInfo: NodeInfo, client: AsyncHttpClient, tim
   def effectiveBalance(address: String): Future[Balance] = get(s"/addresses/effectiveBalance/$address").as[Balance]
 
   def transfer(sourceAddress: String, recipient: String, amount: Long, fee: Long, assetId: Option[String] = None): Future[Transaction] =
-    post("/assets/transfer", TransferRequest(assetId, None, amount, fee, sourceAddress, None, recipient)).as[Transaction]
+    postJson("/assets/transfer", TransferRequest(assetId, None, amount, fee, sourceAddress, None, recipient)).as[Transaction]
 
   def payment(sourceAddress: String, recipient: String, amount: Long, fee: Long): Future[String] =
-    post("/waves/payment", PaymentRequest(amount, fee, sourceAddress, recipient)).as[JsValue].map(v => (v \ "signature").as[String])
+    postJson("/waves/payment", PaymentRequest(amount, fee, sourceAddress, recipient)).as[JsValue].map(v => (v \ "signature").as[String])
 
   def lease(sourceAddress: String, recipient: String, amount: Long, fee: Long): Future[Transaction] =
-    post("/leasing/lease", LeaseRequest(sourceAddress, amount, fee, recipient)).as[Transaction]
+    postJson("/leasing/lease", LeaseRequest(sourceAddress, amount, fee, recipient)).as[Transaction]
 
   def cancelLease(sourceAddress: String, leaseId: String, fee: Long): Future[Transaction] =
-    post("/leasing/cancel", LeaseCancelRequest(sourceAddress, leaseId, fee)).as[Transaction]
+    postJson("/leasing/cancel", LeaseCancelRequest(sourceAddress, leaseId, fee)).as[Transaction]
 
   def issue(sourceAddress: String, name: String, description: String, quantity: Long, decimals: Byte, reissuable: Boolean, fee: Long): Future[Transaction] =
-    post("/assets/issue", IssueRequest(sourceAddress, name, description, quantity, decimals, reissuable, fee)).as[Transaction]
+    postJson("/assets/issue", IssueRequest(sourceAddress, name, description, quantity, decimals, reissuable, fee)).as[Transaction]
 
   def makeAssetNameUnique(sourceAddress: String, assetId: String, fee: Long, networkByte: Byte): Future[Transaction] =
-    post("/assets/make-asset-name-unique", MakeAssetNameUniqueRequest(sourceAddress, assetId, fee, networkByte)).as[Transaction]
+    postJson("/assets/make-asset-name-unique", MakeAssetNameUniqueRequest(sourceAddress, assetId, fee, networkByte)).as[Transaction]
 
   def reissue(sourceAddress: String, assetId: String, quantity: Long, reissuable: Boolean, fee: Long): Future[Transaction] =
-    post("/assets/reissue", ReissueRequest(sourceAddress, assetId, quantity, reissuable, fee)).as[Transaction]
+    postJson("/assets/reissue", ReissueRequest(sourceAddress, assetId, quantity, reissuable, fee)).as[Transaction]
 
   def burn(sourceAddress: String, assetId: String, quantity: Long, fee: Long): Future[Transaction] =
-    post("/assets/burn", BurnRequest(sourceAddress, assetId, quantity, fee)).as[Transaction]
+    postJson("/assets/burn", BurnRequest(sourceAddress, assetId, quantity, fee)).as[Transaction]
 
   def assetBalance(address: String, asset: String): Future[AssetBalance] =
     get(s"/assets/balance/$address/$asset").as[AssetBalance]
 
   def transfer(sourceAddress: String, recipient: String, amount: Long, fee: Long): Future[Transaction] =
-    post("/assets/transfer", TransferRequest(None, None, amount, fee, sourceAddress, None, recipient)).as[Transaction]
+    postJson("/assets/transfer", TransferRequest(None, None, amount, fee, sourceAddress, None, recipient)).as[Transaction]
 
   def createAlias(targetAddress: String, alias: String, fee: Long): Future[Transaction] =
-    post("/alias/create", CreateAliasRequest(targetAddress, alias, fee)).as[Transaction]
+    postJson("/alias/create", CreateAliasRequest(targetAddress, alias, fee)).as[Transaction]
+
+  def rollback(to: Long): Future[Unit] =
+    post("/debug/rollback", to.toString).map(_ => ())
 
   def waitFor[A](f: => Future[A], cond: A => Boolean, retryInterval: FiniteDuration): Future[A] =
     timer.retryUntil(f, cond, retryInterval)
@@ -184,14 +190,14 @@ class Node (config: Config, val nodeInfo: NodeInfo, client: AsyncHttpClient, tim
 
   def issueAsset(address: String, name: String, description: String, quantity: Long, decimals: Byte, fee: Long,
                  reissuable: Boolean): Future[Transaction] =
-    post("/assets/issue", IssueRequest(address, name, description, quantity, decimals, reissuable, fee)).as[Transaction]
+    postJson("/assets/issue", IssueRequest(address, name, description, quantity, decimals, reissuable, fee)).as[Transaction]
 
   def placeOrder(order: Order): Future[MatcherResponse] =
     matcherPost("/matcher/orderbook", order.json).as[MatcherResponse]
 
   def expectIncorrectOrderPlacement(order: Order, expectedStatusCode: Int, expectedStatus: String): Future[Boolean] =
     matcherPost("/matcher/orderbook", order.json) transform {
-      case Failure(UnexpectedStatusCodeException(r)) if r.getStatusCode == expectedStatusCode =>
+      case Failure(UnexpectedStatusCodeException(_, r)) if r.getStatusCode == expectedStatusCode =>
         Try(parse(r.getResponseBody).as[MatcherStatusResponse]) match {
           case Success(mr) if mr.status == expectedStatus => Success(true)
           case Failure(f) => Failure(new RuntimeException(s"Failed to parse response: $f"))
@@ -212,7 +218,8 @@ class Node (config: Config, val nodeInfo: NodeInfo, client: AsyncHttpClient, tim
 
 object Node extends ScorexLogging {
 
-  case class UnexpectedStatusCodeException(r: Response) extends Exception(s"Unexpected status code: ${r.getStatusCode}")
+  case class UnexpectedStatusCodeException(request: Request, response: Response) extends Exception(s"Request: ${request.getUrl}\n" +
+    s"Unexpected status code (${response.getStatusCode}): ${response.getResponseBody}")
 
   case class Status(blockGeneratorStatus: Option[String], historySynchronizationStatus: Option[String])
 

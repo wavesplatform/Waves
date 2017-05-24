@@ -36,7 +36,6 @@ class TestFiveNodesSuite extends FreeSpec with BeforeAndAfterAll with ScorexLogg
 
   override def nestedSuites: IndexedSeq[Suite] = IndexedSeq(
     new ValidChainGenerationSpec(allNodes),
-    new AliasTransactionSpec(allNodes),
     new BurnTransactionSpecification(allNodes),
     new IssueTransactionSpecification(allNodes),
     new LeasingTransactionsSpecification(allNodes),
@@ -44,6 +43,7 @@ class TestFiveNodesSuite extends FreeSpec with BeforeAndAfterAll with ScorexLogg
     new PaymentTransactionSpecification(allNodes),
     new ReissueTransactionSpecification(allNodes),
     new TransferTransactionSpecification(allNodes),
+    new AliasTransactionSpecification(allNodes),
     new NetworkSeparationTest(allNodes, docker)
   )
 
