@@ -28,7 +28,7 @@ case class AliasBroadcastApiRoute(settings: RestAPISettings, transactionModule: 
       value = "Json with data",
       required = true,
       paramType = "body",
-      dataType = "scorex.api.http.alias.SignedAliasRequest",
+      dataType = "scorex.api.http.alias.SignedCreateAliasRequest",
       defaultValue = "{\n\t\"alias\": \"aliasalias\",\n\t\"senderPublicKey\": \"11111\",\n\t\"fee\": 100000\n\t\"timestamp\": 12345678,\n\t\"signature\": \"asdasdasd\"\n}"
     )
   ))
