@@ -27,13 +27,13 @@ class StateWriterImpl(p: StateStorage, synchronizationToken: ReentrantReadWriteL
 
     StateStorage.dirty(p) {
       measureSizeLog("transactions")(txsDiff.transactions) {
-        _.foreach { case (id, (h, tx, _)) =>
+        _.par.foreach { case (id, (h, tx, _)) =>
           sp().transactions.put(id.arr, (h, tx.bytes))
         }
       }
 
       measureSizeLog("orderFills")(blockDiff.txsDiff.orderFills) {
-        _.foreach { case (oid, orderFillInfo) =>
+        _.par.foreach { case (oid, orderFillInfo) =>
           Option(sp().orderFills.get(oid.arr)) match {
             case Some(ll) =>
               sp().orderFills.put(oid.arr, (ll._1 + orderFillInfo.volume, ll._2 + orderFillInfo.fee))

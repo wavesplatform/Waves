@@ -24,7 +24,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader, set
 
   private def unsafeDiffAgainstPersistedByRange(from: Int, to: Int): BlockDiff =  {
       val blocks = measureLog(s"Reading blocks from $from up to $to") {
-        Range(from, to).map(bc.blockAt(_).get)
+        Range(from, to).map(bc.blockBytes).par.map(b => Block.parseBytes(b.get).get).seq
       }
       measureLog(s"Building diff from $from up to $to") {
         BlockDiffer.unsafeDiffMany(settings)(persisted, blocks)
