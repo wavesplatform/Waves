@@ -4,5 +4,8 @@ import java.net.InetSocketAddress
 
 case class PeerInfo(
     remoteAddress: InetSocketAddress,
-    nonce: Long,
-    declaredAddress: Option[InetSocketAddress])
+    declaredAddress: Option[InetSocketAddress],
+    applicationName: String,
+    applicationVersion: (Int, Int, Int),
+    nodeName: String,
+    nodeNonce: Long)

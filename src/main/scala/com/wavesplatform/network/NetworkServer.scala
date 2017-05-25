@@ -16,7 +16,7 @@ import io.netty.channel.socket.nio.{NioServerSocketChannel, NioSocketChannel}
 import io.netty.handler.codec.{LengthFieldBasedFrameDecoder, LengthFieldPrepender}
 import scorex.network.TransactionalMessagesRepo
 import scorex.network.message.{BasicMessagesRepo, MessageSpec}
-import scorex.network.peer.{PeerDatabase, PeerDatabaseImpl}
+import scorex.network.peer.PeerDatabase
 import scorex.transaction._
 import scorex.utils.{ScorexLogging, Time}
 
@@ -44,22 +44,22 @@ class NetworkServer(
     stateReader: StateReader,
     utxStorage: UnconfirmedTransactionsStorage,
     txHandler: NewTransactionHandler,
-    allChannels: ChannelGroup) extends ScorexLogging {
+    peerDatabase: PeerDatabase,
+    allChannels: ChannelGroup,
+    peerInfo: ConcurrentHashMap[Channel, PeerInfo]) extends ScorexLogging {
+
   private val bossGroup = new NioEventLoopGroup()
   private val workerGroup = new NioEventLoopGroup()
   private val handshake =
     Handshake(Constants.ApplicationName + chainId, Version.VersionTuple, settings.networkSettings.nodeName,
       settings.networkSettings.nonce, settings.networkSettings.declaredAddress)
 
-  private val allConnectedPeers = new ConcurrentHashMap[PeerKey, Channel]
   private val scoreObserver = new RemoteScoreObserver(settings.synchronizationSettings)
 
   private val allLocalInterfaces = (for {
     ifc <-NetworkInterface.getNetworkInterfaces.asScala
     ip <- ifc.getInterfaceAddresses.asScala
   } yield new InetSocketAddress(ip.getAddress, settings.networkSettings.port)).toSet
-
-  private val peerDatabase = new PeerDatabaseImpl(settings.networkSettings)
 
   private val discardingHandler = new DiscardingHandler
   private val specs: Map[Byte, MessageSpec[_ <: AnyRef]] = (BasicMessagesRepo.specs ++ TransactionalMessagesRepo.specs).map(s => s.messageCode -> s).toMap
@@ -82,7 +82,7 @@ class NetworkServer(
           .addLast(
             new HandshakeDecoder,
             new HandshakeTimeoutHandler,
-            new ClientHandshakeHandler(handshake, allConnectedPeers),
+            new ClientHandshakeHandler(handshake, peerInfo),
             new LengthFieldPrepender(4),
             new LengthFieldBasedFrameDecoder(1024*1024, 0, 4, 0, 4),
             new LegacyFrameCodec,
@@ -118,7 +118,7 @@ class NetworkServer(
     }
   }
 
-  private def connect(remoteAddress: InetSocketAddress): Channel = {
+  def connect(remoteAddress: InetSocketAddress): Unit =
     channels.computeIfAbsent(remoteAddress, _ => {
       outgoingChannelCount.incrementAndGet()
       val chan = bootstrap.connect(remoteAddress).channel()
@@ -132,7 +132,6 @@ class NetworkServer(
       }
       chan
     })
-  }
 
   private def doBroadcast(message: AnyRef, except: Option[Channel] = None): Unit = {
     log.debug(s"Broadcasting $message to ${allChannels.size()} channels${except.fold("")(c => s" (except ${c.id().asShortText()})")}")
