@@ -2,61 +2,24 @@ package com.wavesplatform.network
 
 import java.util
 
-import io.netty.buffer.ByteBuf
-import io.netty.buffer.Unpooled._
+import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel.ChannelHandlerContext
-import io.netty.handler.codec.ByteToMessageCodec
-import scorex.crypto.hash.FastCryptographicHash
-import scorex.network.message.Message._
+import io.netty.handler.codec.MessageToMessageCodec
 import scorex.network.message._
 import scorex.utils.ScorexLogging
 
-class MessageCodec(specs: Map[MessageCode, MessageSpec[_ <: AnyRef]]) extends ByteToMessageCodec[Message] with ScorexLogging {
-  import MessageCodec._
-  override def decode(ctx: ChannelHandlerContext, in: ByteBuf, out: util.List[AnyRef]) = {
-    require(in.readInt() == Magic, "invalid magic number")
-
-    val code = in.readByte()
-    require(specs.contains(code), s"invalid message code $code")
-    val length = in.readInt()
-    val dataBytes = new Array[Byte](length)
-    if (length > 0) {
-      val declaredChecksum = in.readSlice(ChecksumLength)
-      in.readBytes(dataBytes)
-      val actualChecksum = wrappedBuffer(FastCryptographicHash.hash(dataBytes), 0, ChecksumLength)
-
-      require(declaredChecksum.equals(actualChecksum), "invalid checksum")
-      actualChecksum.release()
-
-    }
-
-    out.add(specs(code).deserializeData(dataBytes).get)
+@Sharable
+class MessageCodec(specs: Map[Byte, MessageSpec[_ <: AnyRef]])
+    extends MessageToMessageCodec[RawBytes, Message] with ScorexLogging {
+  override def encode(ctx: ChannelHandlerContext, msg: Message, out: util.List[AnyRef]) = msg match {
+    case GetPeers => out.add(RawBytes(GetPeersSpec.messageCode, Array[Byte]()))
+    case k: KnownPeers => out.add(RawBytes(PeersSpec.messageCode, PeersSpec.serializeData(k)))
+    case gs: GetSignatures => out.add(RawBytes(GetSignaturesSpec.messageCode, GetSignaturesSpec.serializeData(gs)))
+    case s: Signatures => out.add(RawBytes(SignaturesSpec.messageCode, SignaturesSpec.serializeData(s)))
+    case g: GetBlock => out.add(RawBytes(GetBlockSpec.messageCode, GetBlockSpec.serializeData(g)))
+    case r: RawBytes => out.add(r)
   }
 
-  override def encode(ctx: ChannelHandlerContext, msg: Message, out: ByteBuf) = {
-    val (code, data) = msg match {
-      case signatures: GetSignatures => (GetSignaturesSpec.messageCode, GetSignaturesSpec.serializeData(signatures))
-      case signatures: Signatures => (SignaturesSpec.messageCode, SignaturesSpec.serializeData(signatures))
-      case gb: GetBlock => (GetBlockSpec.messageCode, GetBlockSpec.serializeData(gb))
-      case RawBytes(c, d) => (c, d)
-    }
-
-    writeData(code, data, out)
-  }
-}
-
-object MessageCodec {
-  val Magic = 0x12345678
-
-  def writeData(code: Byte, data: Array[Byte], out: ByteBuf): Unit = {
-    out.writeInt(Magic)
-    out.writeByte(code)
-    if (data.length > 0) {
-      out.writeInt(data.length)
-      out.writeBytes(FastCryptographicHash.hash(data), 0, ChecksumLength)
-      out.writeBytes(data)
-    } else {
-      out.writeInt(0)
-    }
-  }
+  override def decode(ctx: ChannelHandlerContext, msg: RawBytes, out: util.List[AnyRef]) =
+    out.add(specs(msg.code).deserializeData(msg.data).get)
 }

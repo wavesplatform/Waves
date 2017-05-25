@@ -3,7 +3,7 @@ package com.wavesplatform
 import java.io.File
 import java.security.Security
 
-import akka.actor.{ActorSystem, Props}
+import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
 import akka.http.scaladsl.server.Route
@@ -24,7 +24,6 @@ import scorex.api.http.alias.{AliasApiRoute, AliasBroadcastApiRoute}
 import scorex.api.http.assets.{AssetsApiRoute, AssetsBroadcastApiRoute}
 import scorex.api.http.leasing.{LeaseApiRoute, LeaseBroadcastApiRoute}
 import scorex.block.Block
-import scorex.consensus.mining.BlockGeneratorController
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
 import scorex.consensus.nxt.api.http.NxtConsensusApiRoute
 import scorex.crypto.encode.Base58
@@ -52,21 +51,21 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
   val wallet: Wallet = Wallet(settings.walletSettings)
   val utxStorage: UnconfirmedTransactionsStorage = new UnconfirmedTransactionsDatabaseImpl(settings.utxSettings.size)
   val newTransactionHandler = new NewTransactionHandlerImpl(settings.blockchainSettings.functionalitySettings,
-    networkController, time, feeCalculator, utxStorage, stateReader)
+    time, feeCalculator, utxStorage, stateReader)
 
   lazy val apiRoutes = Seq(
-    BlocksApiRoute(settings.restAPISettings, settings.checkpointsSettings, history, coordinator),
+    BlocksApiRoute(settings.restAPISettings, settings.checkpointsSettings, history, actorSystem.deadLetters),
     TransactionsApiRoute(settings.restAPISettings, stateReader, history, utxStorage),
     NxtConsensusApiRoute(settings.restAPISettings, stateReader, history, settings.blockchainSettings.functionalitySettings),
     WalletApiRoute(settings.restAPISettings, wallet),
     PaymentApiRoute(settings.restAPISettings, wallet, newTransactionHandler, time),
     UtilsApiRoute(settings.restAPISettings),
-    PeersApiRoute(settings.restAPISettings, peerManager, networkController),
+    PeersApiRoute(settings.restAPISettings, actorSystem.deadLetters, actorSystem.deadLetters),
     AddressApiRoute(settings.restAPISettings, wallet, stateReader, settings.blockchainSettings.functionalitySettings),
     DebugApiRoute(settings.restAPISettings, wallet, stateReader, blockchainUpdater, history, peerManager),
     WavesApiRoute(settings.restAPISettings, wallet, newTransactionHandler, time),
     AssetsApiRoute(settings.restAPISettings, wallet, stateReader, newTransactionHandler, time),
-    NodeApiRoute(settings.restAPISettings, () => this.shutdown(), blockGenerator, coordinator),
+    NodeApiRoute(settings.restAPISettings, () => this.shutdown(), actorSystem.deadLetters, actorSystem.deadLetters),
     AssetsBroadcastApiRoute(settings.restAPISettings, newTransactionHandler),
     LeaseApiRoute(settings.restAPISettings, wallet, stateReader, newTransactionHandler, time),
     LeaseBroadcastApiRoute(settings.restAPISettings, newTransactionHandler),
@@ -96,15 +95,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
 
   val allChannels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
 
-  val networkController = actorSystem.deadLetters
-  val peerManager = actorSystem.deadLetters
-  val unconfirmedPoolSynchronizer = actorSystem.deadLetters
-  val coordinator = actorSystem.deadLetters
-  val blockGenerator = actorSystem.actorOf(Props(new BlockGeneratorController(settings.minerSettings, history, time, peerManager,
-    wallet, stateReader, settings.blockchainSettings, utxStorage, coordinator)), "BlockGenerator")
-  val blockchainSynchronizer = actorSystem.deadLetters
-  val peerSynchronizer = actorSystem.deadLetters
-
   def run(): Unit = {
     log.debug(s"Available processors: ${Runtime.getRuntime.availableProcessors}")
     log.debug(s"Max memory available: ${Runtime.getRuntime.maxMemory}")
@@ -120,6 +110,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
       time,
       stateReader,
       utxStorage,
+      newTransactionHandler,
       allChannels)
 
     if (settings.networkSettings.uPnPSettings.enable) upnp.addPort(settings.networkSettings.port)

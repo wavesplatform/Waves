@@ -14,7 +14,7 @@ class PeerDatabaseImplSpecification extends path.FreeSpecLike with Matchers {
     """
       |waves {
       |  network {
-      |    file: ""
+      |    file = ""
       |    known-peers = []
       |    peers-data-residence-time: 2s
       |  }
@@ -26,7 +26,7 @@ class PeerDatabaseImplSpecification extends path.FreeSpecLike with Matchers {
     """
       |waves {
       |  network {
-      |    file: ""
+      |    file = ""
       |    known-peers = []
       |    peers-data-residence-time: 10s
       |  }

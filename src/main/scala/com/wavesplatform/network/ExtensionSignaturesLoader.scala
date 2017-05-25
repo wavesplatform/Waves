@@ -16,10 +16,12 @@ class ExtensionSignaturesLoader(history: History, settings: SynchronizationSetti
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef) = msg match {
     case s: Signatures =>
       val (known, unknown) = s.signatures.span(id => history.contains(id))
-      log.debug(s"Got extension with ${known.length}/${s.signatures.length} known signatures from ${ctx.channel().id().asShortText()}")
-      currentTimeout.foreach(_.cancel(false))
+      currentTimeout.foreach(_.cancel(true))
       currentTimeout = None
-      known.lastOption.foreach(lastKnown => ctx.fireChannelRead(ExtensionIds(lastKnown, unknown)))
+      known.lastOption.foreach { lastKnown =>
+        log.debug(s"${ctx.channel().id().asShortText()}: got extension with ${known.length}/${s.signatures.length} known signatures")
+        ctx.fireChannelRead(ExtensionIds(lastKnown, unknown))
+      }
     case _ => super.channelRead(ctx, msg)
   }
 
@@ -29,14 +31,14 @@ class ExtensionSignaturesLoader(history: History, settings: SynchronizationSetti
 
       log.debug(s"Loading extension from ${ctx.channel().id().asShortText()}")
 
-      ctx.writeAndFlush(GetSignatures(lastBlockIds), promise)
-
       currentTimeout = Some(ctx.executor().schedule(settings.synchronizationTimeout) {
         if (currentTimeout.nonEmpty) {
           log.warn(s"Timeout expired while loading extension")
           // todo: blacklist peer
         }
       })
+
+      ctx.writeAndFlush(GetSignatures(lastBlockIds), promise)
 
     case LoadSignatures =>
       log.debug("Received request to load signatures while waiting for extension, ignoring for now")

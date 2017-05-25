@@ -14,6 +14,7 @@ class BlacklistSpecification extends FeatureSpec with GivenWhenThen {
       |  network {
       |    file = ""
       |    black-list-residence-time: 1s
+      |    file = ""
       |  }
       |}
     """.stripMargin).withFallback(ConfigFactory.load()).resolve()

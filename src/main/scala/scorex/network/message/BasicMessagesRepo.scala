@@ -31,7 +31,7 @@ object GetPeersSpec extends MessageSpec[GetPeers.type] {
   override def serializeData(data: GetPeers.type): Array[Byte] = Array()
 }
 
-object PeersSpec extends MessageSpec[Seq[InetSocketAddress]] {
+object PeersSpec extends MessageSpec[KnownPeers] {
   private val AddressLength = 4
   private val PortLength = 4
   private val DataLength = 4
@@ -40,26 +40,26 @@ object PeersSpec extends MessageSpec[Seq[InetSocketAddress]] {
 
   override val messageName: String = "Peers message"
 
-  override def deserializeData(bytes: Array[Byte]): Try[Seq[InetSocketAddress]] = Try {
+  override def deserializeData(bytes: Array[Byte]): Try[KnownPeers] = Try {
     val lengthBytes = util.Arrays.copyOfRange(bytes, 0, DataLength)
     val length = Ints.fromByteArray(lengthBytes)
 
     assert(bytes.length == DataLength + (length * (AddressLength + PortLength)), "Data does not match length")
 
-    (0 until length).map { i =>
+    KnownPeers((0 until length).map { i =>
       val position = lengthBytes.length + (i * (AddressLength + PortLength))
       val addressBytes = util.Arrays.copyOfRange(bytes, position, position + AddressLength)
       val address = InetAddress.getByAddress(addressBytes)
       val portBytes = util.Arrays.copyOfRange(bytes, position + AddressLength, position + AddressLength + PortLength)
       new InetSocketAddress(address, Ints.fromByteArray(portBytes))
-    }
+    })
   }
 
-  override def serializeData(peers: Seq[InetSocketAddress]): Array[Byte] = {
-    val length = peers.size
+  override def serializeData(peers: KnownPeers): Array[Byte] = {
+    val length = peers.peers.size
     val lengthBytes = Ints.toByteArray(length)
 
-    peers.foldLeft(lengthBytes) { case (bs, peer) =>
+    peers.peers.foldLeft(lengthBytes) { case (bs, peer) =>
       Bytes.concat(bs, peer.getAddress.getAddress, Ints.toByteArray(peer.getPort))
     }
   }
