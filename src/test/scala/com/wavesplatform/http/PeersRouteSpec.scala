@@ -18,7 +18,7 @@ class PeersRouteSpec extends RouteSpec("/peers") with RestAPISettingsHelper with
 
   private val peerManager = TestProbe()
   private val networkController = TestProbe()
-  private val route = PeersApiRoute(restAPISettings, peerManager.ref, networkController.ref).route
+  private val route = PeersApiRoute(restAPISettings, _ => {}, ???, ???).route
 
   private val inetAddressGen = Gen.listOfN(4, Arbitrary.arbitrary[Byte]).map(_.toArray).map(InetAddress.getByAddress)
   private val inetSocketAddressGen = for {

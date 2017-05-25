@@ -2,7 +2,7 @@ package com.wavesplatform.network
 
 import java.net.InetSocketAddress
 import java.util
-import java.util.concurrent.{ConcurrentHashMap, TimeUnit}
+import java.util.concurrent.{ConcurrentHashMap, ConcurrentMap, TimeUnit}
 
 import io.netty.buffer.ByteBuf
 import io.netty.channel.ChannelHandler.Sharable
@@ -57,13 +57,25 @@ object HandshakeTimeoutHandler {
 }
 
 @Sharable
-class ClientHandshakeHandler(handshake: Handshake, connections: ConcurrentHashMap[PeerKey, Channel])
-  extends ChannelInboundHandlerAdapter with ScorexLogging {
+class ClientHandshakeHandler(
+    handshake: Handshake,
+    establishedConnections: ConcurrentMap[Channel, PeerInfo]) extends ChannelInboundHandlerAdapter with ScorexLogging {
+
+  private val connections = new ConcurrentHashMap[PeerKey, Channel]
+
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef) = msg match {
     case HandshakeTimeoutExpired => ctx.channel().close()
     case incomingHandshake: Handshake =>
       log.debug(s"${ctx.channel().id().asShortText()}: Received handshake $incomingHandshake")
       val channelRemoteAddress = ctx.channel().remoteAddress().asInstanceOf[InetSocketAddress]
+      establishedConnections.put(ctx.channel(), PeerInfo(
+          channelRemoteAddress,
+          incomingHandshake.declaredAddress,
+          incomingHandshake.applicationName,
+          incomingHandshake.applicationVersion,
+          incomingHandshake.nodeName,
+          incomingHandshake.nodeNonce))
+
       val remoteAddress = incomingHandshake.declaredAddress.getOrElse(channelRemoteAddress).getAddress
       val key = PeerKey(remoteAddress, incomingHandshake.nodeNonce)
 
@@ -83,6 +95,8 @@ class ClientHandshakeHandler(handshake: Handshake, connections: ConcurrentHashMa
     case other =>
       log.debug(s"${ctx.channel().id().asShortText()}: Unexpected message $other while waiting for handshake")
   }
+
+  override def channelInactive(ctx: ChannelHandlerContext) = establishedConnections.remove(ctx.channel())
 }
 
 object ClientHandshakeHandler {

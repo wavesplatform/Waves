@@ -43,8 +43,13 @@ class RemoteScoreObserver(syncSettings: SynchronizationSettings)
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef) = msg match {
     case newScoreValue: History.BlockchainScore =>
       val isNewHighScore = channelWithHighestScore.forall(_._2.value < newScoreValue)
-      log.debug(s"Setting score for ${ctx.channel().id().asShortText()} to $newScoreValue${if (isNewHighScore) " (new high score)" else ""}")
       val score = RemoteScore(newScoreValue, System.currentTimeMillis())
+      scores.compute(ctx.channel(), { (_, prevScore) =>
+        if (prevScore == null || score.value > prevScore.value && score.ts >= prevScore.ts) {
+          log.debug(s"Setting score for ${ctx.channel().id().asShortText()} to $newScoreValue${if (isNewHighScore) " (new high score)" else ""}")
+        }
+        score
+      })
 
       ctx.executor().schedule(syncSettings.scoreTTL) {
         scores.remove(ctx.channel().id(), score)
