@@ -13,7 +13,4 @@ object PeerManager {
   case object GetBlacklistedPeers
 
   case object GetConnectedPeers
-
-  case object GetConnectedPeersTyped
-
 }

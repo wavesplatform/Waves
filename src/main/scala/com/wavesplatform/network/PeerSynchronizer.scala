@@ -24,7 +24,7 @@ class PeerSynchronizer(peerDatabase: PeerDatabase) extends ChannelInboundHandler
     case Handshake(_, _, nodeName, nonce, Some(declaredAddress)) =>
       if (sameAddresses(declaredAddress, ctx.channel().remoteAddress())) {
         peerDatabase.addPeer(declaredAddress, Some(nonce), Some(nodeName))
-        touchTask = Some(ctx.executor().scheduleWithFixedDelay(1.second, 1.second) {
+        touchTask = Some(ctx.executor().scheduleWithFixedDelay(20.seconds, 20.seconds) {
           if (ctx.channel().isActive) {
             peerDatabase.touch(ctx.channel().localAddress().asInstanceOf[InetSocketAddress])
           }
@@ -33,8 +33,8 @@ class PeerSynchronizer(peerDatabase: PeerDatabase) extends ChannelInboundHandler
         log.debug(s"Declared remote address $declaredAddress does not match actual remote address ${ctx.channel().remoteAddress()}")
       }
 
-    case GetPeers =>
-      ctx.writeAndFlush(peerDatabase.getKnownPeers.keys.toSeq)
+    case GetPeers => ctx.writeAndFlush(peerDatabase.getKnownPeers.keys.toSeq)
+    case KnownPeers(peers) => peers.foreach(peerDatabase.addPeer(_, None, None))
 
     case _ => super.channelRead(ctx, msg)
   }
