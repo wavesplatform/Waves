@@ -20,6 +20,7 @@ class MakeAssetNameUniqueTransactionSpecification(override val allNodes: Seq[Nod
 
       _ <- assertBalances(firstAddress, 90 waves, 90 waves)
       _ <- assertAssetBalance(firstAddress, issuedAssetId, 100000)
+      _ <- assertFullAssetInfo(firstAddress,issuedAssetId)(_.unique shouldBe false)
 
       makeAssetNameUnique <- sender.makeAssetNameUnique(firstAddress, issuedAssetId, 10 waves, 'I').map(_.id)
 
@@ -27,6 +28,7 @@ class MakeAssetNameUniqueTransactionSpecification(override val allNodes: Seq[Nod
 
       _ <- assertBalances(firstAddress, 80 waves, 80 waves)
       _ <- assertAssetBalance(firstAddress, issuedAssetId, 100000)
+      _ <- assertFullAssetInfo(firstAddress,issuedAssetId)(_.unique shouldBe true)
     } yield succeed
 
     Await.result(f, 1 minute)

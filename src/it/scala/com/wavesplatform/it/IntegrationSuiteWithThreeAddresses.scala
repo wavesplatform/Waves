@@ -1,5 +1,6 @@
 package com.wavesplatform.it
 
+import com.wavesplatform.it.Node.{AssetBalance, FullAssetInfo}
 import com.wavesplatform.it.util._
 import org.scalatest._
 import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
@@ -8,7 +9,6 @@ import scorex.transaction.TransactionParser.TransactionType
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.util.Random
-
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.language.postfixOps
 
@@ -38,7 +38,19 @@ trait IntegrationSuiteWithThreeAddresses extends FunSuite with BeforeAndAfterAll
   }
 
   protected def assertAssetBalance(acc: String, assetIdString: String, balance: Long): Future[Unit] = {
-    sender.assetBalance(acc, assetIdString).map(_.balance shouldBe balance)
+    assertAsset(acc, assetIdString)(_.balance shouldBe balance)
+  }
+
+  protected def assertAsset(acc: String, assetIdString: String)(assertion: AssetBalance => Unit): Future[Unit] = {
+    sender.assetBalance(acc, assetIdString).map(assertion)
+  }
+
+  protected def assertFullAssetInfo(acc: String, assetIdString: String)(assertion: FullAssetInfo => Unit): Future[Unit] = {
+    sender.assetsBalance(acc).map(fasi => {
+      val maybeAssetInfo = fasi.balances.find(_.assetId == assetIdString)
+      maybeAssetInfo.isEmpty shouldBe false
+      assertion(maybeAssetInfo.get)
+    })
   }
 
 

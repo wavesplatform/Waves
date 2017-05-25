@@ -16,6 +16,7 @@ import play.api.libs.json._
 import scorex.api.http.alias.CreateAliasRequest
 import scorex.api.http.assets._
 import scorex.api.http.leasing.{LeaseCancelRequest, LeaseRequest}
+import scorex.crypto.encode.Base58
 import scorex.transaction.TransactionParser.TransactionType
 import scorex.transaction.assets.exchange.Order
 import scorex.utils.{LoggerFacade, ScorexLogging}
@@ -144,6 +145,10 @@ class Node (config: Config, val nodeInfo: NodeInfo, client: AsyncHttpClient, tim
   def assetBalance(address: String, asset: String): Future[AssetBalance] =
     get(s"/assets/balance/$address/$asset").as[AssetBalance]
 
+  def assetsBalance(address: String): Future[FullAssetsInfo] =
+    get(s"/assets/balance/$address").as[FullAssetsInfo]
+
+
   def transfer(sourceAddress: String, recipient: String, amount: Long, fee: Long): Future[Transaction] =
     post("/assets/transfer", TransferRequest(None, None, amount, fee, sourceAddress, None, recipient)).as[Transaction]
 
@@ -229,6 +234,14 @@ object Node extends ScorexLogging {
   case class AssetBalance(address: String, assetId: String, balance: Long)
 
   implicit val assetBalanceFormat: Format[AssetBalance] = Json.format
+
+  case class FullAssetInfo(assetId: String, balance: Long, reissuable :Boolean, quantity: Long, unique: Boolean)
+
+  implicit val fullAssetInfoFormat: Format[FullAssetInfo] = Json.format
+
+  case class FullAssetsInfo(address: String, balances : List[FullAssetInfo])
+
+  implicit val fullAssetsInfoFormat: Format[FullAssetsInfo] = Json.format
 
   case class Transaction(`type`: Int, id: String, fee: Long, timestamp: Long)
 

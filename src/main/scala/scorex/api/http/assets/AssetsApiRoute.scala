@@ -4,6 +4,7 @@ import javax.ws.rs.Path
 
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.settings.RestAPISettings
+import com.wavesplatform.state2.EqByteArray
 import com.wavesplatform.state2.reader.StateReader
 import io.swagger.annotations._
 import play.api.libs.json._
@@ -25,7 +26,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, state: Stat
 
   override lazy val route =
     pathPrefix("assets") {
-      balance ~ balances ~ issue ~ reissue ~ burnRoute ~ makeAssetNameUniqueRoute ~ transfer ~ signOrder ~ balanceDistribution
+      balance ~ balances ~ issue ~ reissue ~ burnRoute ~ makeAssetNameUniqueRoute ~ transfer ~ signOrder ~ balanceDistribution ~ assetIdByUniqueName
     }
 
   @Path("/balance/{address}/{assetId}")
@@ -62,7 +63,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, state: Stat
   ))
   def balances: Route =
     (get & path("balance" / Segment)) { address =>
-      complete(balanceJson(address))
+      complete(fullAccountAssetsInfo(address))
     }
 
   @Path("/transfer")
@@ -160,6 +161,24 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, state: Stat
   def makeAssetNameUniqueRoute: Route =
     processRequest("make-asset-name-unique", (b: MakeAssetNameUniqueRequest) => TransactionFactory.makeAssetNameUnique(b, wallet, newTxHandler, time))
 
+  @Path("/asset-id-by-unique-name/{name}")
+  @ApiOperation(value = "Asset id by unique name, if registered", notes = "Asset id by unique name, if registered", httpMethod = "GET")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(name = "name", value = "Asset Name", required = true, dataType = "string", paramType = "path")
+  ))
+  def assetIdByUniqueName: Route =
+    (get & path("asset-id-by-unique-name" / Segment)) { base58EncodedAssetName =>
+      complete {
+        Base58.decode(base58EncodedAssetName) match {
+          case Success(assetName) => state.getAssetIdByUniqueName(EqByteArray(assetName)) match {
+            case Some(assetId) => JsString(Base58.encode(assetId.arr))
+            case None => JsNull
+          }
+          case Failure(e) => ApiError.fromValidationError(scorex.transaction.ValidationError.TransactionParameterValidationError("Must be base58-encoded assetId"))
+        }
+      }
+    }
+
 
   private def balanceJson(address: String, assetIdStr: String): Either[ApiError, JsObject] = {
     Base58.decode(assetIdStr) match {
@@ -175,7 +194,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, state: Stat
     }
   }
 
-  private def balanceJson(address: String): Either[ApiError, JsObject] = (for {
+  private def fullAccountAssetsInfo(address: String): Either[ApiError, JsObject] = (for {
     acc <- Account.fromString(address)
   } yield {
     val balances: Seq[JsObject] = state.getAccountBalance(acc).map { case ((assetId, (balance, reissuable, quantity, issueTx, unique))) =>
