@@ -47,7 +47,7 @@ trait StateReader extends Synchronized {
 
   def snapshotAtHeight(acc: Account, h: Int): Option[Snapshot]
 
-  def filledVolumeAndFee(orderId: ByteArray) : OrderFillInfo
+  def filledVolumeAndFee(orderId: ByteArray): OrderFillInfo
 }
 
 object StateReader {
@@ -92,10 +92,12 @@ object StateReader {
       }
     }
 
-    def getAccountBalance(account: Account): Map[AssetId, (Long, Boolean, Long, IssueTransaction)] = s.read { implicit l =>
+    def getAccountBalance(account: Account): Map[AssetId, (Long, Boolean, Long, IssueTransaction, Boolean)] = s.read { implicit l =>
       s.accountPortfolio(account).assets.map { case (id, amt) =>
         val assetInfo = s.assetInfo(id).get
-        id.arr -> (amt, assetInfo.isReissuable, assetInfo.volume, findTransaction[IssueTransaction](id.arr).get)
+        val issueTransaction = findTransaction[IssueTransaction](id.arr).get
+        val isUnique = s.getAssetIdByUniqueName(EqByteArray(issueTransaction.name)).contains(EqByteArray(issueTransaction.assetId))
+        id.arr -> (amt, assetInfo.isReissuable, assetInfo.volume, issueTransaction, isUnique)
       }
     }
 
@@ -164,6 +166,7 @@ object StateReader {
           throw new Exception(s"Cannot lookup account $acc for height $height(current=${s.height}). " +
             s"No history found at requested lookupHeight=$lookupHeight")
       }
+
       loop(s.lastUpdateHeight(acc).getOrElse(0))
     }
   }
