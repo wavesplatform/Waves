@@ -182,6 +182,7 @@ class NetworkController(networkSettings: NetworkSettings,
       messagesHandler,
       networkSettings)))
     peerManager ! PeerManager.Connected(remote, handler, ownSocketAddress)
+    handler ! PeerConnectionHandler.Start
   }
 }
 

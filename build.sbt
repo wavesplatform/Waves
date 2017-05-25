@@ -6,7 +6,7 @@ enablePlugins(sbtdocker.DockerPlugin, JavaServerAppPackaging, JDebPackaging, Sys
 
 name := "waves"
 organization := "com.wavesplatform"
-version := "0.7.1"
+version := "0.7.2-SNAPSHOT"
 scalaVersion := "2.12.1"
 crossPaths := false
 publishArtifact in (Compile, packageDoc) := false
@@ -38,7 +38,7 @@ libraryDependencies ++=
 
 sourceGenerators in Compile += Def.task {
   val versionFile = (sourceManaged in Compile).value / "com" / "wavesplatform" / "Version.scala"
-  val versionExtractor = """(\d+)\.(\d+).(\d).*""".r
+  val versionExtractor = """(\d+)\.(\d+)\.(\d+).*""".r
   val versionExtractor(major, minor, bugfix) = version.value
   IO.write(versionFile,
     s"""package com.wavesplatform
