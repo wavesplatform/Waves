@@ -2,6 +2,7 @@ package com.wavesplatform
 
 import java.io.File
 import java.security.Security
+import java.util.concurrent.ConcurrentHashMap
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
@@ -14,8 +15,9 @@ import com.wavesplatform.actor.RootActorSystem
 import com.wavesplatform.history.{BlockStorageImpl, CheckpointServiceImpl}
 import com.wavesplatform.http.NodeApiRoute
 import com.wavesplatform.matcher.Matcher
-import com.wavesplatform.network.NetworkServer
+import com.wavesplatform.network.{NetworkServer, PeerInfo}
 import com.wavesplatform.settings._
+import io.netty.channel.Channel
 import io.netty.channel.group.DefaultChannelGroup
 import io.netty.util.concurrent.GlobalEventExecutor
 import scorex.account.{Account, AddressScheme}
@@ -29,6 +31,7 @@ import scorex.consensus.nxt.api.http.NxtConsensusApiRoute
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash.DigestSize
 import scorex.network._
+import scorex.network.peer.PeerDatabaseImpl
 import scorex.transaction._
 import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
 import scorex.utils.{ScorexLogging, Time, TimeImpl}
@@ -42,13 +45,10 @@ import scala.util.{Failure, Left, Success, Try, Random}
 
 class Application(val actorSystem: ActorSystem, val settings: WavesSettings) extends ScorexLogging {
 
-  lazy val upnp = new UPnP(settings.networkSettings.uPnPSettings)
-
-  val feeCalculator = new FeeCalculator(settings.feesSettings)
-  val checkpoints = new CheckpointServiceImpl(settings.blockchainSettings.checkpointFile)
+  private val checkpoints = new CheckpointServiceImpl(settings.blockchainSettings.checkpointFile)
   val (history, stateWriter, stateReader, blockchainUpdater) = BlockStorageImpl(settings.blockchainSettings).get
-  val time: Time = new TimeImpl()
-  val wallet: Wallet = {
+  private val upnp = new UPnP(settings.networkSettings.uPnPSettings)
+  private val wallet: Wallet = {
     Base58.decode(settings.walletSettings.seed) match {
       case Success(seed) =>
         new Wallet(settings.walletSettings.file, settings.walletSettings.password.toCharArray, Some(seed))
@@ -56,57 +56,22 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
         throw new IllegalArgumentException("Invalid seed in config file, please, fix this",f)
     }
   }
-  val utxStorage: UnconfirmedTransactionsStorage = new UnconfirmedTransactionsDatabaseImpl(settings.utxSettings.size)
-  val newTransactionHandler = new NewTransactionHandlerImpl(settings.blockchainSettings.functionalitySettings,
-    time, feeCalculator, utxStorage, stateReader)
-
-  lazy val apiRoutes = Seq(
-    BlocksApiRoute(settings.restAPISettings, settings.checkpointsSettings, history, actorSystem.deadLetters),
-    TransactionsApiRoute(settings.restAPISettings, stateReader, history, utxStorage),
-    NxtConsensusApiRoute(settings.restAPISettings, stateReader, history, settings.blockchainSettings.functionalitySettings),
-    WalletApiRoute(settings.restAPISettings, wallet),
-    PaymentApiRoute(settings.restAPISettings, wallet, newTransactionHandler, time),
-    UtilsApiRoute(settings.restAPISettings),
-    PeersApiRoute(settings.restAPISettings, actorSystem.deadLetters, actorSystem.deadLetters),
-    AddressApiRoute(settings.restAPISettings, wallet, stateReader, settings.blockchainSettings.functionalitySettings),
-    DebugApiRoute(settings.restAPISettings, wallet, stateReader, blockchainUpdater, history, peerManager),
-    WavesApiRoute(settings.restAPISettings, wallet, newTransactionHandler, time),
-    AssetsApiRoute(settings.restAPISettings, wallet, stateReader, newTransactionHandler, time),
-    NodeApiRoute(settings.restAPISettings, () => this.shutdown(), actorSystem.deadLetters, actorSystem.deadLetters),
-    AssetsBroadcastApiRoute(settings.restAPISettings, newTransactionHandler),
-    LeaseApiRoute(settings.restAPISettings, wallet, stateReader, newTransactionHandler, time),
-    LeaseBroadcastApiRoute(settings.restAPISettings, newTransactionHandler),
-    AliasApiRoute(settings.restAPISettings, wallet, newTransactionHandler, time, stateReader),
-    AliasBroadcastApiRoute(settings.restAPISettings, newTransactionHandler)
-  )
-
-  lazy val apiTypes = Seq(
-    typeOf[BlocksApiRoute],
-    typeOf[TransactionsApiRoute],
-    typeOf[NxtConsensusApiRoute],
-    typeOf[WalletApiRoute],
-    typeOf[PaymentApiRoute],
-    typeOf[UtilsApiRoute],
-    typeOf[PeersApiRoute],
-    typeOf[AddressApiRoute],
-    typeOf[DebugApiRoute],
-    typeOf[WavesApiRoute],
-    typeOf[AssetsApiRoute],
-    typeOf[NodeApiRoute],
-    typeOf[AssetsBroadcastApiRoute],
-    typeOf[LeaseApiRoute],
-    typeOf[LeaseBroadcastApiRoute],
-    typeOf[AliasApiRoute],
-    typeOf[AliasBroadcastApiRoute]
-  )
-
-  val allChannels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
 
   def run(): Unit = {
     log.debug(s"Available processors: ${Runtime.getRuntime.availableProcessors}")
     log.debug(s"Max memory available: ${Runtime.getRuntime.maxMemory}")
 
     checkGenesis()
+
+    val feeCalculator = new FeeCalculator(settings.feesSettings)
+    val time: Time = new TimeImpl()
+    val utxStorage: UnconfirmedTransactionsStorage = new UnconfirmedTransactionsDatabaseImpl(settings.utxSettings.size)
+    val newTransactionHandler = new NewTransactionHandlerImpl(settings.blockchainSettings.functionalitySettings,
+      time, feeCalculator, utxStorage, stateReader)
+
+    val peerDatabase = new PeerDatabaseImpl(settings.networkSettings)
+    val establishedConnections = new ConcurrentHashMap[Channel, PeerInfo]
+    val allChannels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
 
     val network = new NetworkServer(
       settings.blockchainSettings.addressSchemeCharacter,
@@ -115,10 +80,52 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
       checkpoints,
       blockchainUpdater,
       time,
-      stateReader,
+      stateWriter,
       utxStorage,
       newTransactionHandler,
-      allChannels)
+      peerDatabase,
+      allChannels,
+      establishedConnections)
+
+    val apiRoutes = Seq(
+      BlocksApiRoute(settings.restAPISettings, settings.checkpointsSettings, history, actorSystem.deadLetters),
+      TransactionsApiRoute(settings.restAPISettings, stateReader, history, utxStorage),
+      NxtConsensusApiRoute(settings.restAPISettings, stateReader, history, settings.blockchainSettings.functionalitySettings),
+      WalletApiRoute(settings.restAPISettings, wallet),
+      PaymentApiRoute(settings.restAPISettings, wallet, newTransactionHandler, time),
+      UtilsApiRoute(settings.restAPISettings),
+      PeersApiRoute(settings.restAPISettings, network.connect, peerDatabase, establishedConnections),
+      AddressApiRoute(settings.restAPISettings, wallet, stateReader, settings.blockchainSettings.functionalitySettings),
+      DebugApiRoute(settings.restAPISettings, wallet, stateReader, blockchainUpdater, history),
+      WavesApiRoute(settings.restAPISettings, wallet, newTransactionHandler, time),
+      AssetsApiRoute(settings.restAPISettings, wallet, stateReader, newTransactionHandler, time),
+      NodeApiRoute(settings.restAPISettings, () => this.shutdown(), actorSystem.deadLetters, actorSystem.deadLetters),
+      AssetsBroadcastApiRoute(settings.restAPISettings, newTransactionHandler),
+      LeaseApiRoute(settings.restAPISettings, wallet, stateReader, newTransactionHandler, time),
+      LeaseBroadcastApiRoute(settings.restAPISettings, newTransactionHandler),
+      AliasApiRoute(settings.restAPISettings, wallet, newTransactionHandler, time, stateReader),
+      AliasBroadcastApiRoute(settings.restAPISettings, newTransactionHandler)
+    )
+
+    val apiTypes = Seq(
+      typeOf[BlocksApiRoute],
+      typeOf[TransactionsApiRoute],
+      typeOf[NxtConsensusApiRoute],
+      typeOf[WalletApiRoute],
+      typeOf[PaymentApiRoute],
+      typeOf[UtilsApiRoute],
+      typeOf[PeersApiRoute],
+      typeOf[AddressApiRoute],
+      typeOf[DebugApiRoute],
+      typeOf[WavesApiRoute],
+      typeOf[AssetsApiRoute],
+      typeOf[NodeApiRoute],
+      typeOf[AssetsBroadcastApiRoute],
+      typeOf[LeaseApiRoute],
+      typeOf[LeaseBroadcastApiRoute],
+      typeOf[AliasApiRoute],
+      typeOf[AliasBroadcastApiRoute]
+    )
 
     if (settings.networkSettings.uPnPSettings.enable) upnp.addPort(settings.networkSettings.port)
 
