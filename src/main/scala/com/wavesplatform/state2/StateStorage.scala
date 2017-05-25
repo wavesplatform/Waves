@@ -7,15 +7,21 @@ import scorex.account.Account
 
 class StateStorage private(db: MVStore) {
 
+  import StateStorage._
+
   private val variables: MVMap[String, Int] = db.openMap("variables")
-  private val heightKey = "height"
-  private val isDirtyFlag = "isDirty"
+
+  private def setPersistedVersion(version: Int) = variables.put(stateVersion, version)
+
+  private def persistedVersion: Option[Int] = Option(variables.get(stateVersion))
+
+  private def setDirty(isDirty: Boolean): Unit = variables.put(isDirtyFlag, if (isDirty) 1 else 0)
+
+  private def dirty(): Boolean = variables.get(isDirtyFlag) == 1
 
   def getHeight: Int = variables.get(heightKey)
 
   def setHeight(i: Int): Unit = variables.put(heightKey, i)
-
-  def setDirty(isDirty: Boolean): Unit = variables.put(isDirtyFlag, if (isDirty) 1 else 0)
 
   val transactions: MVMap[Array[Byte], (Int, Array[Byte])] = db.openMap("txs")
 
@@ -31,7 +37,7 @@ class StateStorage private(db: MVStore) {
 
   val aliasToAddress: MVMap[String, Array[Byte]] = db.openMap("aliasToAddress")
 
-  val orderFills: MVMap[Array[Byte], (Long,Long)] = db.openMap("orderFills")
+  val orderFills: MVMap[Array[Byte], (Long, Long)] = db.openMap("orderFills")
 
   val leaseState: MVMap[Array[Byte], Boolean] = db.openMap("leaseState")
 
@@ -45,12 +51,28 @@ class StateStorage private(db: MVStore) {
 
 object StateStorage {
 
+  private val VERSION = 1
+
+  private val heightKey = "height"
+  private val isDirtyFlag = "isDirty"
+  private val stateVersion = "stateVersion"
+
   def apply(db: MVStore): Either[String, StateStorage] = {
     val s = new StateStorage(db)
 
-    if (s.variables.get(s.isDirtyFlag) == 1)
-      Left(s"Persisted state is corrupt")
-    else Right(s)
+    if (s.dirty())
+      Left("Persisted state is corrupt")
+    else {
+      s.persistedVersion match {
+        case None =>
+          s.setPersistedVersion(VERSION)
+          s.commit()
+          Right(s)
+        case Some(`VERSION`) => Right(s)
+        case Some(pv) => Left(s"Persisted state has version $pv, current scheme version is $VERSION")
+
+      }
+    }
   }
 
   type SnapshotKey = Array[Byte]

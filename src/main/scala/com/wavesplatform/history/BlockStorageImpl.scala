@@ -58,7 +58,7 @@ object BlockStorageImpl extends ScorexLogging {
 
   private def delete(fileName: String) = {
     if (new File(fileName).delete()) {
-      log.info(s"recreating $fileName")
+      log.info(s"Recreating $fileName")
     } else {
       throw new Exception(s"Unable to delete $fileName")
     }
