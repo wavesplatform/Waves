@@ -21,3 +21,6 @@ case class RawBytes(code: Byte, data: Array[Byte]) extends Message
 case class ExtensionIds(lastCommonId: Block.BlockId, extensionIds: Block.BlockIds)
 case class ExtensionBlocks(extension: Seq[Block])
 case class LocalScoreChanged(newLocalScore: History.BlockchainScore)
+
+case object BlockchainExpired
+case object BlockchainUpdated

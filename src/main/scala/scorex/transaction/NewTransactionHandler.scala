@@ -1,6 +1,5 @@
 package scorex.transaction
 
-import akka.actor.ActorRef
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.Validator
 import com.wavesplatform.state2.reader.StateReader
@@ -10,7 +9,7 @@ trait NewTransactionHandler {
   def onNewTransaction[T <: Transaction](tx: T): Either[ValidationError, T]
 }
 
-class NewTransactionHandlerImpl(fs: FunctionalitySettings, networkController: ActorRef, time: Time, feeCalculator: FeeCalculator,
+class NewTransactionHandlerImpl(fs: FunctionalitySettings, time: Time, feeCalculator: FeeCalculator,
                                 utxStorage: UnconfirmedTransactionsStorage, stateReader: StateReader)
   extends NewTransactionHandler {
 

@@ -30,7 +30,7 @@ class ExtensionBlocksLoader(history: History, blockSyncTimeout: FiniteDuration)
       cancelTimeout()
       currentTimeout = Some(ctx.executor().schedule(blockSyncTimeout) {
         if (targetExtensionIds.contains(xid)) {
-          log.warn(s"Timeout loading signatures from ${ctx.channel().id().asShortText()}")
+          log.warn(s"${ctx.channel().id().asShortText()}: timeout loading blocks")
           // todo: blacklist?
         }
       })

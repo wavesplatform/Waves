@@ -3,7 +3,7 @@ package scorex.consensus.mining
 import akka.actor._
 import com.wavesplatform.settings.{BlockchainSettings, MinerSettings}
 import com.wavesplatform.state2.reader.StateReader
-import scorex.network.peer.PeerManager.{ConnectedPeers, GetConnectedPeersTyped}
+import scorex.network.peer.PeerManager.ConnectedPeers
 import scorex.transaction.{History, UnconfirmedTransactionsStorage}
 import scorex.utils.{ScorexLogging, Time}
 import scorex.wallet.Wallet
@@ -171,7 +171,7 @@ class BlockGeneratorController(minerSettings: MinerSettings,
       coordinator)), "miner"))
   }
 
-  private def askForConnectedPeers() = peerManager ! GetConnectedPeersTyped
+  private def askForConnectedPeers() = {}
 }
 
 object BlockGeneratorController {

@@ -6,7 +6,7 @@ import java.util.concurrent.{ConcurrentHashMap, TimeUnit}
 
 import io.netty.buffer.ByteBuf
 import io.netty.channel.ChannelHandler.Sharable
-import io.netty.channel.{Channel, ChannelHandlerContext, ChannelInboundHandlerAdapter}
+import io.netty.channel.{Channel, ChannelFuture, ChannelHandlerContext, ChannelInboundHandlerAdapter}
 import io.netty.handler.codec.ReplayingDecoder
 import io.netty.util.concurrent.ScheduledFuture
 import scorex.utils.ScorexLogging
@@ -38,7 +38,6 @@ class HandshakeTimeoutHandler extends ChannelInboundHandlerAdapter with ScorexLo
     super.channelActive(ctx)
   }
 
-
   override def channelInactive(ctx: ChannelHandlerContext) = {
     cancelTimeout()
     super.channelInactive(ctx)
@@ -63,20 +62,26 @@ class ClientHandshakeHandler(handshake: Handshake, connections: ConcurrentHashMa
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef) = msg match {
     case HandshakeTimeoutExpired => ctx.channel().close()
     case incomingHandshake: Handshake =>
-      log.debug(s"Received handshake $incomingHandshake")
+      log.debug(s"${ctx.channel().id().asShortText()}: Received handshake $incomingHandshake")
       val channelRemoteAddress = ctx.channel().remoteAddress().asInstanceOf[InetSocketAddress]
       val remoteAddress = incomingHandshake.declaredAddress.getOrElse(channelRemoteAddress).getAddress
-      if (connections.putIfAbsent(PeerKey(remoteAddress, incomingHandshake.nodeNonce), ctx.channel()) != null) {
-        log.debug(s"Already connected to peer, disconnecting")
+      val key = PeerKey(remoteAddress, incomingHandshake.nodeNonce)
+
+      ctx.channel().closeFuture().addListener { (chf: ChannelFuture) =>
+        connections.remove(key, chf.channel())
+      }
+
+      if (connections.putIfAbsent(key, ctx.channel()) != null) {
+        log.debug(s"${ctx.channel().id().asShortText()}: Already connected to peer, disconnecting")
         ctx.close()
       } else {
         ctx.writeAndFlush(handshake.encode(ctx.alloc().buffer()))
-        ctx.pipeline().remove(HandshakeDecoder.Name)
-        ctx.pipeline().remove(HandshakeTimeoutHandler.Name)
-        ctx.pipeline().remove(ClientHandshakeHandler.Name)
+        ctx.pipeline().remove(classOf[HandshakeDecoder])
+        ctx.pipeline().remove(classOf[HandshakeTimeoutHandler])
+        ctx.pipeline().remove(this)
       }
     case other =>
-      log.debug(s"Unexpected message $other while waiting for handshake")
+      log.debug(s"${ctx.channel().id().asShortText()}: Unexpected message $other while waiting for handshake")
   }
 }
 

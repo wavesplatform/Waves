@@ -2,10 +2,11 @@ package scorex.network.peer
 
 import java.net.InetSocketAddress
 
+import com.wavesplatform.network.inetSocketAddress
 import com.wavesplatform.settings.NetworkSettings
 import com.wavesplatform.utils.createMVStore
 import org.h2.mvstore.MVMap
-import scorex.utils.{CircularBuffer, LogMVMapBuilder}
+import scorex.utils.{CircularBuffer, LogMVMapBuilder, ScorexLogging}
 
 import scala.collection.JavaConverters._
 import scala.util.Random
@@ -17,6 +18,10 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Auto
   private val peersPersistence: MVMap[InetSocketAddress, PeerInfo] = database.openMap("peers", new LogMVMapBuilder[InetSocketAddress, PeerInfo])
   private val blacklist: MVMap[String, Long] = database.openMap("blacklist", new LogMVMapBuilder[String, Long])
   private val unverifiedPeers = new CircularBuffer[InetSocketAddress](settings.maxUnverifiedPeers)
+
+  for (a <- settings.knownPeers.view.map(inetSocketAddress(_, 6863))) {
+    addPeer(a, None, None)
+  }
 
   override def addPeer(socketAddress: InetSocketAddress, nonce: Option[Long], nodeName: Option[String]): Unit = {
     if (nonce.isDefined) {
