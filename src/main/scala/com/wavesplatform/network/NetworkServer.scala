@@ -7,6 +7,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import com.wavesplatform.Version
 import com.wavesplatform.settings._
 import com.wavesplatform.state2.reader.StateReader
+import com.wavesplatform.utils.ByteStr
 import io.netty.bootstrap.{Bootstrap, ServerBootstrap}
 import io.netty.channel._
 import io.netty.channel.group.{ChannelGroup, ChannelMatchers}
@@ -27,10 +28,7 @@ class ServerChannelInitializer(handshake: Handshake, settings: NetworkSettings, 
   extends ChannelInitializer[SocketChannel] {
   private val inboundFilter = new InboundConnectionFilter(peerDatabase, settings.maxInboundConnections, settings.maxConnectionsWithSingleHost)
   override def initChannel(ch: SocketChannel): Unit = {
-    ch.pipeline()
-      .addLast(inboundFilter)
-      .addLast(HandshakeDecoder.Name, new HandshakeDecoder)
-      .addLast(HandshakeTimeoutHandler.Name, new HandshakeTimeoutHandler)
+    ch.pipeline().addLast(inboundFilter, new HandshakeDecoder, new HandshakeTimeoutHandler)
   }
 }
 
@@ -54,7 +52,9 @@ class NetworkServer(
     Handshake(Constants.ApplicationName + chainId, Version.VersionTuple, settings.networkSettings.nodeName,
       settings.networkSettings.nonce, settings.networkSettings.declaredAddress)
 
-  private val scoreObserver = new RemoteScoreObserver(settings.synchronizationSettings)
+  private val scoreObserver = new RemoteScoreObserver(
+      settings.synchronizationSettings.scoreTTL,
+      history.lastBlockIds(settings.synchronizationSettings.maxRollback).map(ByteStr(_)))
 
   private val allLocalInterfaces = (for {
     ifc <-NetworkInterface.getNetworkInterfaces.asScala
@@ -82,14 +82,14 @@ class NetworkServer(
           .addLast(
             new HandshakeDecoder,
             new HandshakeTimeoutHandler,
-            new ClientHandshakeHandler(handshake, peerInfo),
+            new ClientHandshakeHandler(handshake, peerDatabase, peerInfo),
             new LengthFieldPrepender(4),
             new LengthFieldBasedFrameDecoder(1024*1024, 0, 4, 0, 4),
             new LegacyFrameCodec,
             discardingHandler,
             messageCodec,
             new PeerSynchronizer(peerDatabase),
-            new ExtensionSignaturesLoader(history, settings.synchronizationSettings),
+            new ExtensionSignaturesLoader(settings.synchronizationSettings.synchronizationTimeout),
             new ExtensionBlocksLoader(history, settings.synchronizationSettings.synchronizationTimeout),
             new UtxPoolSynchronizer(txHandler, network),
             scoreObserver)
