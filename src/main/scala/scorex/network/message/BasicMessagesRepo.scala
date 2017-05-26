@@ -4,7 +4,7 @@ import java.net.{InetAddress, InetSocketAddress}
 import java.util
 
 import com.google.common.primitives.{Bytes, Ints}
-import com.wavesplatform.network.{GetBlock, GetSignatures, Signatures, GetPeers}
+import com.wavesplatform.network.{GetBlock, GetSignatures, KnownPeers, Signatures, GetPeers}
 import com.wavesplatform.state2.ByteStr
 import scorex.block.Block
 import scorex.crypto.signatures.SigningFunctions
@@ -97,16 +97,16 @@ trait SignaturesSeqSpec[A <: AnyRef] extends MessageSpec[A] {
 }
 
 object GetSignaturesSpec extends SignaturesSeqSpec[GetSignatures] {
-  override def wrap(signatures: Seq[Signature]) = GetSignatures(signatures)
-  override def unwrap(v: GetSignatures) = v.signatures
+  override def wrap(signatures: Seq[Signature]) = GetSignatures(signatures.map(ByteStr(_)))
+  override def unwrap(v: GetSignatures) = v.signatures.map(_.bytes)
 
   override val messageCode: MessageCode = 20: Byte
   override val messageName: String = "GetSignatures message"
 }
 
 object SignaturesSpec extends SignaturesSeqSpec[Signatures] {
-  override def wrap(signatures: Seq[Signature]) = Signatures(signatures)
-  override def unwrap(v: Signatures) = v.signatures
+  override def wrap(signatures: Seq[Signature]) = Signatures(signatures.map(ByteStr(_)))
+  override def unwrap(v: Signatures) = v.signatures.map(_.bytes)
 
   override val messageCode: MessageCode = 21: Byte
   override val messageName: String = "Signatures message"
@@ -116,11 +116,11 @@ object GetBlockSpec extends MessageSpec[GetBlock] {
   override val messageCode: MessageCode = 22: Byte
   override val messageName: String = "GetBlock message"
 
-  override def serializeData(signature: GetBlock): Array[Byte] = signature.signature
+  override def serializeData(signature: GetBlock): Array[Byte] = signature.signature.bytes
 
   override def deserializeData(bytes: Array[Byte]): Try[GetBlock] = Try {
     require(bytes.length == scorex.transaction.TransactionParser.SignatureLength, "Data does not match length")
-    GetBlock(bytes)
+    GetBlock(ByteStr(bytes))
   }
 }
 

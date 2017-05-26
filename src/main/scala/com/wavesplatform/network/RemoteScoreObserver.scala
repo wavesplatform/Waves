@@ -3,15 +3,17 @@ package com.wavesplatform.network
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicReference
 
-import com.wavesplatform.settings.SynchronizationSettings
+import com.wavesplatform.utils.ByteStr
 import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel._
 import scorex.transaction.History
 import scorex.utils.ScorexLogging
 
+import scala.concurrent.duration.FiniteDuration
+
 
 @Sharable
-class RemoteScoreObserver(syncSettings: SynchronizationSettings)
+class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteStr])
   extends ChannelDuplexHandler with ScorexLogging {
   import RemoteScoreObserver._
 
@@ -28,14 +30,14 @@ class RemoteScoreObserver(syncSettings: SynchronizationSettings)
       val prevScore = Option(scores.remove(ch))
       val newPinnedChannel = channelWithHighestScore.map(_._1)
       pinnedChannel.compareAndSet(Some(ch), newPinnedChannel)
-      log.debug(s"Channel ${ch.id().asShortText()} closed, removing score${prevScore.fold("")(p => s" (was ${p.value})")}")
+      log.debug(s"${ch.id().asShortText()}: Closed, removing score${prevScore.fold("")(p => s" (was ${p.value})")}")
     }
 
   override def write(ctx: ChannelHandlerContext, msg: AnyRef, promise: ChannelPromise) = msg match {
     case LocalScoreChanged(newLocalScore) =>
       for ((chan, score) <- channelWithHighestScore if chan == ctx.channel() && score.value > newLocalScore) {
-        log.debug(s"Local score $newLocalScore is still lower than remote score ${score.value} from ${ctx.channel().id().asShortText()}, requesting extension")
-        ctx.write(ExtensionSignaturesLoader.LoadSignatures, promise)
+        log.debug(s"${ctx.channel().id().asShortText()}: Local score $newLocalScore is still lower than remote one ${score.value}, requesting extension")
+        ctx.write(ExtensionSignaturesLoader.LoadExtensionSignatures(lastSignatures), promise)
       }
     case _ => ctx.write(msg, promise)
   }
@@ -51,13 +53,13 @@ class RemoteScoreObserver(syncSettings: SynchronizationSettings)
         score
       })
 
-      ctx.executor().schedule(syncSettings.scoreTTL) {
+      ctx.executor().schedule(scoreTtl) {
         scores.remove(ctx.channel().id(), score)
       }
 
       if (isNewHighScore && pinnedChannel.getAndSet(Some(ctx.channel())).isEmpty) {
         log.debug("No previously pinned channel, requesting signatures")
-        ctx.write(ExtensionSignaturesLoader.LoadSignatures)
+        ctx.write(ExtensionSignaturesLoader.LoadExtensionSignatures(lastSignatures))
       }
 
       scores.put(ctx.channel(), score)
@@ -66,5 +68,5 @@ class RemoteScoreObserver(syncSettings: SynchronizationSettings)
 }
 
 object RemoteScoreObserver {
-  case class RemoteScore(value: History.BlockchainScore, ts: Long)
+  private[RemoteScoreObserver] case class RemoteScore(value: History.BlockchainScore, ts: Long)
 }

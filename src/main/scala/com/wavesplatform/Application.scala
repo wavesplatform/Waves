@@ -47,7 +47,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
 
   private val checkpoints = new CheckpointServiceImpl(settings.blockchainSettings.checkpointFile)
   val (history, stateWriter, stateReader, blockchainUpdater) = BlockStorageImpl(settings.blockchainSettings).get
-  private val upnp = new UPnP(settings.networkSettings.uPnPSettings)
+  private lazy val upnp = new UPnP(settings.networkSettings.uPnPSettings) // don't initialize unless enabled
   private val wallet: Wallet = Wallet(settings.walletSettings)
 
   def run(): Unit = {

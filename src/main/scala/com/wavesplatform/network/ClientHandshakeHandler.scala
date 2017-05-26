@@ -1,5 +1,6 @@
 package com.wavesplatform.network
 
+import java.io.IOException
 import java.net.InetSocketAddress
 import java.util
 import java.util.concurrent.{ConcurrentHashMap, ConcurrentMap, TimeUnit}
@@ -9,6 +10,7 @@ import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel.{Channel, ChannelFuture, ChannelHandlerContext, ChannelInboundHandlerAdapter}
 import io.netty.handler.codec.ReplayingDecoder
 import io.netty.util.concurrent.ScheduledFuture
+import scorex.network.peer.PeerDatabase
 import scorex.utils.ScorexLogging
 
 class HandshakeDecoder extends ReplayingDecoder[Void] with ScorexLogging {
@@ -52,13 +54,10 @@ class HandshakeTimeoutHandler extends ChannelInboundHandlerAdapter with ScorexLo
   }
 }
 
-object HandshakeTimeoutHandler {
-  val Name = "handshake-timeout-handler"
-}
-
 @Sharable
 class ClientHandshakeHandler(
     handshake: Handshake,
+    peerDatabase: PeerDatabase,
     establishedConnections: ConcurrentMap[Channel, PeerInfo]) extends ChannelInboundHandlerAdapter with ScorexLogging {
 
   private val connections = new ConcurrentHashMap[PeerKey, Channel]
@@ -94,6 +93,16 @@ class ClientHandshakeHandler(
       }
     case other =>
       log.debug(s"${ctx.channel().id().asShortText()}: Unexpected message $other while waiting for handshake")
+  }
+
+
+  override def exceptionCaught(ctx: ChannelHandlerContext, cause: Throwable) = cause match {
+    case ioe: IOException =>
+      val hostname = ctx.channel().remoteAddress().asInstanceOf[InetSocketAddress].getHostName
+      log.warn(s"${ctx.channel().id().asShortText()}: Unexpected error while waiting for handshake, blacklisting $hostname", ioe)
+      peerDatabase.blacklistHost(hostname)
+      ctx.close()
+    case _ => super.exceptionCaught(ctx, cause)
   }
 
   override def channelInactive(ctx: ChannelHandlerContext) = establishedConnections.remove(ctx.channel())
