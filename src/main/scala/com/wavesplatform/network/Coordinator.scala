@@ -54,9 +54,6 @@ class Coordinator(
     else {
       def historyContainsParent = history.contains(b.reference)
 
-      def signatureIsValid = EllipticCurveImpl.verify(b.signerData.signature, b.bytesWithoutSignature,
-        b.signerData.generator.publicKey)
-
       def consensusDataIsValid = blockConsensusValidation(
         history,
         stateReader,
@@ -64,7 +61,6 @@ class Coordinator(
         time)(b)
 
       if (!historyContainsParent) Left(CustomError(s"Invalid block ${b.encodedId}: no parent block in history"))
-      else if (!signatureIsValid) Left(CustomError(s"Invalid block ${b.encodedId}: signature is not valid"))
       else if (!consensusDataIsValid) Left(CustomError(s"Invalid block ${b.encodedId}: consensus data is not valid"))
       else Right(())
     }
