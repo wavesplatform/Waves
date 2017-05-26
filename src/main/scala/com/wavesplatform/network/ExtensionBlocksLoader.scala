@@ -4,6 +4,8 @@ import com.wavesplatform.state2.EqByteArray
 import io.netty.channel.{ChannelHandlerContext, ChannelInboundHandlerAdapter}
 import io.netty.util.concurrent.ScheduledFuture
 import scorex.block.Block
+import scorex.crypto.EllipticCurveImpl
+import scorex.crypto.encode.Base58
 import scorex.crypto.encode.Base58.encode
 import scorex.transaction.History
 import scorex.utils.ScorexLogging
@@ -43,29 +45,34 @@ class ExtensionBlocksLoader(history: History, blockSyncTimeout: FiniteDuration)
       pendingSignatures -= signature
       if (pendingSignatures.isEmpty) {
         cancelTimeout()
-        log.debug("Loaded all blocks, doing a pre-check")
+        log.debug(s"${ctx.channel().id().asShortText()}: Loaded all blocks, doing a pre-check")
 
         val newBlocks = blockBuffer.values.toSeq
 
         for (tids <- targetExtensionIds) {
           if (!tids.lastCommonId.sameElements(newBlocks.head.reference)) {
-            log.warn(s"Extension head reference ${encode(newBlocks.head.reference)} differs from last common block id ${encode(tids.lastCommonId)}")
+            log.warn(s"${ctx.channel().id().asShortText()}: Extension head reference ${encode(newBlocks.head.reference)} differs from last common block id ${encode(tids.lastCommonId)}")
             // todo: blacklist?
           } else if (!newBlocks.sliding(2).forall {
               case Seq(b1, b2) => b1.uniqueId.sameElements(b2.reference)
               case _ => true
             }) {
-            log.warn("Extension blocks are not contiguous, pre-check failed")
+            log.warn(s"${ctx.channel().id().asShortText()}: Extension blocks are not contiguous, pre-check failed")
             // todo: blacklist?
           } else {
             val localScore = history.score()
             val forkScore = newBlocks.view.map(_.blockScore).foldLeft(history.scoreOf(tids.lastCommonId))(_ + _)
 
             if (forkScore <= localScore) {
-              log.debug(s"Fork score $forkScore is not higher than local score $localScore, pre-check failed")
+              log.debug(s"${ctx.channel().id().asShortText()}: Fork score $forkScore is not higher than local score $localScore, pre-check failed")
             } else {
-              log.debug(s"Fork score $forkScore is higher than local score $localScore, pre-check passed")
-              ctx.fireChannelRead(ExtensionBlocks(newBlocks))
+              newBlocks.par.find(!blockIsValid(_)) match {
+                case Some(invalidBlock) =>
+                  log.warn(s"${ctx.channel().id().asShortText()}: Got block ${Base58.encode(invalidBlock.uniqueId)} with invalid signature")
+                case None =>
+                  log.debug(s"${ctx.channel().id().asShortText()}: Chain is valid, pre-check passed")
+                  ctx.fireChannelRead(ExtensionBlocks(newBlocks))
+              }
             }
           }
         }
@@ -75,7 +82,10 @@ class ExtensionBlocksLoader(history: History, blockSyncTimeout: FiniteDuration)
       }
 
     case Signatures(sigs) =>
-      log.warn(s"Received unexpected extension ids from ${ctx.channel().id().asShortText()} while loading blocks, ignoring")
+      log.warn(s"R${ctx.channel().id().asShortText()}: received unexpected extension ids while loading blocks, ignoring")
     case _ => super.channelRead(ctx, msg)
   }
+
+  private def blockIsValid(b: Block) =
+    EllipticCurveImpl.verify(b.signerData.signature, b.bytesWithoutSignature, b.signerData.generator.publicKey)
 }
