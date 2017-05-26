@@ -2,6 +2,7 @@ package com.wavesplatform.network
 
 import java.net.InetSocketAddress
 
+import com.wavesplatform.utils.ByteStr
 import scorex.block.Block
 import scorex.transaction.History
 
@@ -11,14 +12,14 @@ sealed trait Message
 case object GetPeers extends Message
 case class KnownPeers(peers: Seq[InetSocketAddress]) extends Message
 
-case class GetSignatures(signatures: Block.BlockIds) extends Message
-case class Signatures(signatures: Block.BlockIds) extends Message
+case class GetSignatures(signatures: Seq[ByteStr]) extends Message
+case class Signatures(signatures: Seq[ByteStr]) extends Message
 
-case class GetBlock(signature: Block.BlockId) extends Message
+case class GetBlock(signature: ByteStr) extends Message
 
 case class RawBytes(code: Byte, data: Array[Byte]) extends Message
 
-case class ExtensionIds(lastCommonId: Block.BlockId, extensionIds: Block.BlockIds)
+case class ExtensionIds(lastCommonId: ByteStr, extensionIds: Seq[ByteStr])
 case class ExtensionBlocks(extension: Seq[Block])
 case class LocalScoreChanged(newLocalScore: History.BlockchainScore)
 
