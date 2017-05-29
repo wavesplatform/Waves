@@ -7,7 +7,6 @@ import java.util.concurrent.atomic.AtomicInteger
 import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel.{ChannelFuture, ChannelHandlerContext}
 import io.netty.handler.ipfilter.AbstractRemoteAddressFilter
-import scorex.network.peer.PeerDatabase
 import scorex.utils.ScorexLogging
 
 @Sharable

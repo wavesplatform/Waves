@@ -4,7 +4,6 @@ import java.net.InetSocketAddress
 
 import io.netty.channel.{ChannelHandlerContext, ChannelInboundHandlerAdapter}
 import io.netty.util.concurrent.ScheduledFuture
-import scorex.network.peer.PeerDatabase
 import scorex.utils.ScorexLogging
 
 import scala.concurrent.duration._

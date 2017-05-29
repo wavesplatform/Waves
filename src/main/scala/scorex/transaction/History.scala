@@ -1,5 +1,6 @@
 package scorex.transaction
 
+import com.wavesplatform.network.Checkpoint
 import com.wavesplatform.state2.ByteStr
 import scorex.account.Account
 import scorex.block.Block

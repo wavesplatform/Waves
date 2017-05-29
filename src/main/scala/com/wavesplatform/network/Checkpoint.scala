@@ -1,4 +1,4 @@
-package scorex.network
+package com.wavesplatform.network
 
 import com.google.common.primitives.{Bytes, Ints}
 import io.swagger.annotations.ApiModelProperty
