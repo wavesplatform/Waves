@@ -10,7 +10,6 @@ import scala.concurrent.duration.FiniteDuration
 
 class ExtensionSignaturesLoader(syncTimeout: FiniteDuration)
   extends ChannelDuplexHandler with ScorexLogging {
-  import ExtensionSignaturesLoader._
 
   private var currentTimeout = Option.empty[ScheduledFuture[Unit]]
   private var lastKnownSignatures = Seq.empty[ByteStr]
@@ -28,28 +27,24 @@ class ExtensionSignaturesLoader(syncTimeout: FiniteDuration)
   }
 
   override def write(ctx: ChannelHandlerContext, msg: AnyRef, promise: ChannelPromise) = msg match {
-    case LoadExtensionSignatures(sigs) if currentTimeout.isEmpty =>
+    case LoadBlockchainExtension(sigs) if currentTimeout.isEmpty =>
       lastKnownSignatures = sigs
 
-      log.debug(s"${ctx.channel().id().asShortText()}: Loading extension")
+      log.debug(s"${ctx.channel().id().asShortText()}: Loading extension, last ${sigs.length} are [${sigs.head}..${sigs.last}]")
 
       currentTimeout = Some(ctx.executor().schedule(syncTimeout) {
         if (currentTimeout.nonEmpty) {
-          log.warn(s"Timeout expired while loading extension")
+          log.warn(s"${ctx.channel().id().asShortText()}: Timeout expired while loading extension")
           // todo: blacklist peer
         }
       })
 
       ctx.writeAndFlush(GetSignatures(sigs), promise)
 
-    case LoadExtensionSignatures(sigs) =>
+    case LoadBlockchainExtension(sigs) =>
       log.debug("Received request to load signatures while waiting for extension, ignoring for now")
       promise.setSuccess()
 
     case _ => super.write(ctx, msg, promise)
   }
-}
-
-object ExtensionSignaturesLoader {
-  case class LoadExtensionSignatures(lastKnownSignatures: Seq[ByteStr])
 }

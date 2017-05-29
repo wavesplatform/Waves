@@ -60,12 +60,12 @@ class ExtensionBlocksLoader(history: History, blockSyncTimeout: FiniteDuration)
             log.warn(s"${ctx.channel().id().asShortText()}: Extension blocks are not contiguous, pre-check failed")
             // todo: blacklist?
           } else {
-            val localScore = history.score()
-            val forkScore = newBlocks.view.map(_.blockScore).foldLeft(history.scoreOf(tids.lastCommonId.bytes))(_ + _)
-
-            if (forkScore <= localScore) {
-              log.debug(s"${ctx.channel().id().asShortText()}: Fork score $forkScore is not higher than local score $localScore, pre-check failed")
-            } else {
+//            val localScore = history.score()
+//            val forkScore = newBlocks.view.map(_.blockScore).foldLeft(history.scoreOf(tids.lastCommonId.bytes))(_ + _)
+//
+//            if (forkScore <= localScore) {
+//              log.debug(s"${ctx.channel().id().asShortText()}: Fork score $forkScore is not higher than local score $localScore, pre-check failed")
+//            } else {
               newBlocks.par.find(!blockIsValid(_)) match {
                 case Some(invalidBlock) =>
                   log.warn(s"${ctx.channel().id().asShortText()}: Got block ${Base58.encode(invalidBlock.uniqueId)} with invalid signature")
@@ -73,7 +73,7 @@ class ExtensionBlocksLoader(history: History, blockSyncTimeout: FiniteDuration)
                   log.debug(s"${ctx.channel().id().asShortText()}: Chain is valid, pre-check passed")
                   ctx.fireChannelRead(ExtensionBlocks(newBlocks))
               }
-            }
+//            }
           }
         }
 
