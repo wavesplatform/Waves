@@ -5,14 +5,13 @@ import cats.implicits._
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state2.reader.StateReader
 import io.netty.channel.ChannelHandler.Sharable
-import io.netty.channel.{ChannelHandlerContext, ChannelInboundHandlerAdapter}
+import io.netty.channel.{Channel, ChannelHandlerContext, ChannelInboundHandlerAdapter}
 import scorex.block.Block
 import scorex.block.Block.BlockId
 import scorex.consensus.TransactionsOrdering
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.crypto.encode.Base58.encode
-import scorex.network.{BlockCheckpoint, Checkpoint, ConnectedPeer}
 import scorex.transaction.ValidationError.CustomError
 import scorex.transaction._
 import scorex.utils.{ScorexLogging, Time}
@@ -29,6 +28,7 @@ class Coordinator(
     stateReader: StateReader,
     utxStorage: UnconfirmedTransactionsStorage,
     settings: BlockchainSettings,
+    checkpointPublicKey: String,
     network: Network)
   extends ChannelInboundHandlerAdapter with ScorexLogging {
   import Coordinator._
@@ -53,12 +53,7 @@ class Coordinator(
     if (history.contains(b)) Right(())
     else {
       def historyContainsParent = history.contains(b.reference)
-
-      def consensusDataIsValid = blockConsensusValidation(
-        history,
-        stateReader,
-        settings,
-        time)(b)
+      def consensusDataIsValid = blockConsensusValidation(history, stateReader, settings, time)(b)
 
       if (!historyContainsParent) Left(CustomError(s"Invalid block ${b.encodedId}: no parent block in history"))
       else if (!consensusDataIsValid) Left(CustomError(s"Invalid block ${b.encodedId}: consensus data is not valid"))
@@ -81,7 +76,7 @@ class Coordinator(
     else encode(block.uniqueId) + ", parent " + encode(block.reference)
   }
 
-  private def processFork(lastCommonBlockId: BlockId, blocks: Iterator[Block], from: Option[ConnectedPeer]): Unit = {
+  private def processFork(lastCommonBlockId: BlockId, blocks: Iterator[Block], from: Option[Channel]): Unit = {
     val newBlocks = blocks.toSeq
 
     def isForkValidWithCheckpoint(lastCommonHeight: Int): Boolean = {
@@ -96,19 +91,19 @@ class Coordinator(
         case Left(err) =>
           log.error(s"Can't processFork(lastBlockCommonId: ${Base58.encode(lastCommonBlockId)} because: ${err._1}")
           if (history.lastBlock.uniqueId.sameElements(err._2)) {
-            from.foreach(_.blacklist())
+//            from.foreach(_.blacklist())
           }
       }
 
       network.requestExtension(history.score())
 
     } else {
-      from.foreach(_.blacklist())
+//      from.foreach(_.blacklist())
       log.info(s"Fork contains block that doesn't match checkpoint, declining fork")
     }
   }
 
-  private def processSingleBlock(newBlock: Block, from: Option[ConnectedPeer]): Unit = {
+  private def processSingleBlock(newBlock: Block, from: Option[Channel]): Unit = {
     val parentBlockId = newBlock.reference
     val local = from.isEmpty
 
@@ -155,8 +150,46 @@ class Coordinator(
 //            self ! BroadcastCurrentScore
           }
         case Left(err) =>
-          from.foreach(_.blacklist())
+//          from.foreach(_.blacklist())
           log.warn(s"Can't apply single block, local=$local: ${str(newBlock)}")
+      }
+    }
+  }
+
+  private def handleCheckpoint(checkpoint: Checkpoint, from: Option[Channel]): Unit =
+    if (checkpoints.get.forall(c => !(c.signature sameElements checkpoint.signature))) {
+      val maybePublicKeyBytes = Base58.decode(checkpointPublicKey).toOption
+
+      maybePublicKeyBytes foreach {
+        publicKey =>
+          if (EllipticCurveImpl.verify(checkpoint.signature, checkpoint.toSign, publicKey)) {
+            checkpoints.set(Some(checkpoint))
+            //            network.broadcast(checkpoint, from.map(_ => ???)) // todo: don't broadcast to sender
+            makeBlockchainCompliantWith(checkpoint)
+          } else {
+//            from.foreach(_.blacklist())
+          }
+      }
+    }
+
+  private def makeBlockchainCompliantWith(checkpoint: Checkpoint): Unit = {
+    val existingItems = checkpoint.items.filter {
+      checkpoint => history.blockAt(checkpoint.height).isDefined
+    }
+
+    val fork = existingItems.takeWhile {
+      case BlockCheckpoint(h, sig) =>
+        val block = history.blockAt(h).get
+        !(block.signerData.signature sameElements sig)
+    }
+
+    if (fork.nonEmpty) {
+      val genesisBlockHeight = 1
+      val hh = existingItems.map(_.height) :+ genesisBlockHeight
+      history.blockAt(hh(fork.size)).foreach {
+        lastValidBlock =>
+          log.warn(s"Fork detected (length = ${fork.size}), rollback to last valid block id [${lastValidBlock.encodedId}]")
+          blockchainUpdater.removeAfter(lastValidBlock.uniqueId)
       }
     }
   }
@@ -165,6 +198,7 @@ class Coordinator(
     case ExtensionBlocks(blocks) =>
       log.debug("Processing fork")
       processFork(blocks.head.reference, blocks.iterator, None)
+    case b: Block => processSingleBlock(b, Some(ctx.channel()))
     case other => log.debug(other.getClass.getCanonicalName)
   }
 }

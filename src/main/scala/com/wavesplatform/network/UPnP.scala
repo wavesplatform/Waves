@@ -1,4 +1,4 @@
-package scorex.network
+package com.wavesplatform.network
 
 import java.net.InetAddress
 

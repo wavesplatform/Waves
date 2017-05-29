@@ -1,12 +1,11 @@
-package scorex.network.peer
+package com.wavesplatform.network
 
 import java.net.InetSocketAddress
 
-import com.wavesplatform.network.inetSocketAddress
 import com.wavesplatform.settings.NetworkSettings
 import com.wavesplatform.utils.createMVStore
 import org.h2.mvstore.MVMap
-import scorex.utils.{CircularBuffer, LogMVMapBuilder, ScorexLogging}
+import scorex.utils.{CircularBuffer, LogMVMapBuilder}
 
 import scala.collection.JavaConverters._
 import scala.util.Random
@@ -15,7 +14,8 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Auto
 
   private val database = createMVStore(settings.file)
 
-  private val peersPersistence: MVMap[InetSocketAddress, PeerInfo] = database.openMap("peers", new LogMVMapBuilder[InetSocketAddress, PeerInfo])
+  private val peersPersistence: MVMap[InetSocketAddress, PeerDatabase.PeerInfo] =
+    database.openMap("peers", new LogMVMapBuilder[InetSocketAddress, PeerDatabase.PeerInfo])
   private val blacklist: MVMap[String, Long] = database.openMap("blacklist", new LogMVMapBuilder[String, Long])
   private val unverifiedPeers = new CircularBuffer[InetSocketAddress](settings.maxUnverifiedPeers)
 
@@ -26,7 +26,7 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Auto
   override def addPeer(socketAddress: InetSocketAddress, nonce: Option[Long], nodeName: Option[String]): Unit = {
     if (nonce.isDefined) {
       unverifiedPeers.remove(socketAddress)
-      peersPersistence.put(socketAddress, PeerInfo(System.currentTimeMillis(), nonce.get, nodeName.getOrElse("N/A")))
+      peersPersistence.put(socketAddress, PeerDatabase.PeerInfo(System.currentTimeMillis(), nonce.get, nodeName.getOrElse("N/A")))
       database.commit()
     } else if (!getKnownPeers.contains(socketAddress)) unverifiedPeers += socketAddress
   }
@@ -54,9 +54,9 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Auto
     database.commit()
   }
 
-  override def getKnownPeers: Map[InetSocketAddress, PeerInfo] = {
+  override def getKnownPeers: Map[InetSocketAddress, PeerDatabase.PeerInfo] = {
     withoutObsoleteRecords(peersPersistence,
-      (peerData: PeerInfo) => peerData.timestamp, settings.peersDataResidenceTime.toMillis)
+      (peerData: PeerDatabase.PeerInfo) => peerData.timestamp, settings.peersDataResidenceTime.toMillis)
       .asScala.toMap.filterKeys(address => !getBlacklist.contains(address.getHostName))
   }
 

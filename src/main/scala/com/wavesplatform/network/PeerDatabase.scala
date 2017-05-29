@@ -1,8 +1,8 @@
-package scorex.network.peer
+package com.wavesplatform.network
 
 import java.net.InetSocketAddress
 
-case class PeerInfo(timestamp: Long, nonce: Long, nodeName: String = "")
+
 
 trait PeerDatabase {
 
@@ -14,7 +14,7 @@ trait PeerDatabase {
 
   def blacklistHost(host: String)
 
-  def getKnownPeers: Map[InetSocketAddress, PeerInfo]
+  def getKnownPeers: Map[InetSocketAddress, PeerDatabase.PeerInfo]
 
   def getBlacklist: Set[String]
 
@@ -22,3 +22,6 @@ trait PeerDatabase {
 
 }
 
+object PeerDatabase {
+  case class PeerInfo(timestamp: Long, nonce: Long, nodeName: String = "")
+}

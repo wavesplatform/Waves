@@ -3,9 +3,9 @@ package scorex.network
 import java.net.InetSocketAddress
 
 import com.typesafe.config.ConfigFactory
+import com.wavesplatform.network.PeerDatabaseImpl
 import com.wavesplatform.settings.{NetworkSettings, loadConfig}
 import org.scalatest.{FeatureSpec, GivenWhenThen, ParallelTestExecution}
-import scorex.network.peer.PeerDatabaseImpl
 
 class BlacklistParallelSpecification extends FeatureSpec with GivenWhenThen with ParallelTestExecution {
 

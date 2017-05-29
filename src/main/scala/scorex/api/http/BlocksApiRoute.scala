@@ -4,15 +4,13 @@ import javax.ws.rs.Path
 
 import akka.actor.ActorRef
 import akka.http.scaladsl.server.Route
+import com.wavesplatform.network.Checkpoint
 import com.wavesplatform.settings.{CheckpointsSettings, RestAPISettings}
 import com.wavesplatform.state2.ByteStr
 import io.swagger.annotations._
 import play.api.libs.json._
-import scorex.account.Account
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
-import scorex.network.Checkpoint
-import scorex.network.Coordinator.BroadcastCheckpoint
 import scorex.transaction.{History, TransactionParser}
 
 @Path("/blocks")
@@ -178,7 +176,7 @@ case class BlocksApiRoute(settings: RestAPISettings, checkpointsSettings: Checkp
         validateCheckpoint(checkpoint) match {
           case Some(apiError) => apiError
           case None =>
-            coordinator ! BroadcastCheckpoint(checkpoint)
+            //coordinator ! BroadcastCheckpoint(checkpoint)
             Json.obj("message" -> "Checkpoint broadcasted")
         }
       }

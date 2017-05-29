@@ -2,9 +2,9 @@ package com.wavesplatform.network
 
 import java.util.concurrent.atomic.AtomicBoolean
 
+import com.wavesplatform.network.TransactionalMessagesRepo.TransactionMessageSpec
 import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel.{ChannelHandlerContext, ChannelInboundHandlerAdapter}
-import scorex.network.TransactionalMessagesRepo.TransactionMessageSpec
 import scorex.utils.ScorexLogging
 
 @Sharable

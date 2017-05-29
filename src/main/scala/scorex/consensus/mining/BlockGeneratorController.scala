@@ -3,7 +3,6 @@ package scorex.consensus.mining
 import akka.actor._
 import com.wavesplatform.settings.{BlockchainSettings, MinerSettings}
 import com.wavesplatform.state2.reader.StateReader
-import scorex.network.peer.PeerManager.ConnectedPeers
 import scorex.transaction.{History, UnconfirmedTransactionsStorage}
 import scorex.utils.{ScorexLogging, Time}
 import scorex.wallet.Wallet
@@ -51,7 +50,6 @@ class BlockGeneratorController(minerSettings: MinerSettings,
       stopMiner()
       startGeneratingIfShould()
 
-    case ConnectedPeers(_) =>
 
     case LastBlockChanged =>
       self ! StartGeneration
@@ -72,8 +70,8 @@ class BlockGeneratorController(minerSettings: MinerSettings,
       context.become(idle)
       stopMiner()
 
-    case ConnectedPeers(peers) =>
-      changeStateAccordingTo(peers.size, active)
+//    case ConnectedPeers(peers) =>
+//      changeStateAccordingTo(peers.size, active)
 
     case LastBlockChanged =>
       if (active) {

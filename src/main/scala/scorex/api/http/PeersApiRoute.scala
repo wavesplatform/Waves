@@ -7,12 +7,11 @@ import javax.ws.rs.Path
 
 import akka.http.scaladsl.server.Route
 import akka.util.Timeout
-import com.wavesplatform.network.PeerInfo
+import com.wavesplatform.network.{PeerDatabase, PeerInfo}
 import com.wavesplatform.settings.RestAPISettings
 import io.netty.channel.Channel
 import io.swagger.annotations._
 import play.api.libs.json._
-import scorex.network.peer.PeerDatabase
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._

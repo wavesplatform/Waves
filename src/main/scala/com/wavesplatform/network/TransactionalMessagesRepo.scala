@@ -1,4 +1,4 @@
-package scorex.network
+package com.wavesplatform.network
 
 import scorex.network.message.Message.MessageCode
 import scorex.network.message.MessageSpec

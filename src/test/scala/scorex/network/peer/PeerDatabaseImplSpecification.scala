@@ -3,6 +3,7 @@ package scorex.network.peer
 import java.net.InetSocketAddress
 
 import com.typesafe.config.ConfigFactory
+import com.wavesplatform.network.PeerDatabaseImpl
 import com.wavesplatform.settings.NetworkSettings
 import org.scalatest.{Matchers, path}
 

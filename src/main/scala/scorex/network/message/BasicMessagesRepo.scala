@@ -4,13 +4,12 @@ import java.net.{InetAddress, InetSocketAddress}
 import java.util
 
 import com.google.common.primitives.{Bytes, Ints}
-import com.wavesplatform.network.{GetBlock, GetSignatures, KnownPeers, Signatures, GetPeers}
+import com.wavesplatform.network.{BlockCheckpoint, Checkpoint, GetBlock, GetSignatures, KnownPeers, Signatures, GetPeers}
 import com.wavesplatform.state2.ByteStr
 import scorex.block.Block
 import scorex.crypto.signatures.SigningFunctions
 import scorex.crypto.signatures.SigningFunctions.Signature
 import scorex.network.message.Message._
-import scorex.network.{BlockCheckpoint, Checkpoint}
 import scorex.transaction.History
 import scorex.transaction.TransactionParser._
 
