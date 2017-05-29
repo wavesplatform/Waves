@@ -6,7 +6,6 @@ import com.wavesplatform.state2.reader.StateReader
 import scorex.account.PrivateKeyAccount
 import scorex.block.Block
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
-import scorex.network.Coordinator.AddBlock
 import scorex.transaction._
 import scorex.utils.{ScorexLogging, Time}
 import scorex.wallet.Wallet
@@ -65,7 +64,7 @@ class Miner(minerSettings: MinerSettings,
     val blocks = generateNextBlocks(history, stateReader, blockchainSettings, utxStorage, time)(accounts)
     if (blocks.nonEmpty) {
       val bestBlock = blocks.max(PoSCalc.blockOrdering(history, stateReader, blockchainSettings.functionalitySettings, time))
-      coordinator ! AddBlock(bestBlock, None)
+      //coordinator ! AddBlock(bestBlock, None)
       true
     } else false
   } recoverWith { case e =>

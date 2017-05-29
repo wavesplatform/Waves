@@ -10,7 +10,6 @@ import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel.{Channel, ChannelFuture, ChannelHandlerContext, ChannelInboundHandlerAdapter}
 import io.netty.handler.codec.ReplayingDecoder
 import io.netty.util.concurrent.ScheduledFuture
-import scorex.network.peer.PeerDatabase
 import scorex.utils.ScorexLogging
 
 class HandshakeDecoder extends ReplayingDecoder[Void] with ScorexLogging {

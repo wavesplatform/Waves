@@ -3,9 +3,9 @@ package scorex.network
 import java.net.{InetAddress, InetSocketAddress}
 
 import com.typesafe.config.ConfigFactory
+import com.wavesplatform.network.PeerDatabaseImpl
 import com.wavesplatform.settings.NetworkSettings
 import org.scalatest.{FeatureSpec, GivenWhenThen}
-import scorex.network.peer.PeerDatabaseImpl
 
 class BlacklistSpecification extends FeatureSpec with GivenWhenThen {
   private val config = ConfigFactory.parseString(

@@ -15,9 +15,7 @@ import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.channel.socket.SocketChannel
 import io.netty.channel.socket.nio.{NioServerSocketChannel, NioSocketChannel}
 import io.netty.handler.codec.{LengthFieldBasedFrameDecoder, LengthFieldPrepender}
-import scorex.network.TransactionalMessagesRepo
 import scorex.network.message.{BasicMessagesRepo, MessageSpec}
-import scorex.network.peer.PeerDatabase
 import scorex.transaction._
 import scorex.utils.{ScorexLogging, Time}
 
@@ -71,7 +69,8 @@ class NetworkServer(
   }
 
   private val coordinatorExecutor = new DefaultEventLoop
-  private val coordinator = new Coordinator(checkpoints, history, blockchainUpdater, time, stateReader, utxStorage, settings.blockchainSettings, network)
+  private val coordinator = new Coordinator(checkpoints, history, blockchainUpdater, time, stateReader, utxStorage,
+    settings.blockchainSettings, settings.checkpointsSettings.publicKey, network)
 
   private val bootstrap = new Bootstrap()
     .group(workerGroup)
