@@ -91,6 +91,7 @@ class NetworkServer(
             new PeerSynchronizer(peerDatabase),
             new ExtensionSignaturesLoader(settings.synchronizationSettings.synchronizationTimeout),
             new ExtensionBlocksLoader(history, settings.synchronizationSettings.synchronizationTimeout),
+            new OptimisticExtensionLoader,
             new UtxPoolSynchronizer(txHandler, network),
             scoreObserver)
           .addLast(coordinatorExecutor, coordinator)
