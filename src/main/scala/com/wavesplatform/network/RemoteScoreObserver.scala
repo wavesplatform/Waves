@@ -37,7 +37,7 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
     case LocalScoreChanged(newLocalScore) =>
       for ((chan, score) <- channelWithHighestScore if chan == ctx.channel() && score.value > newLocalScore) {
         log.debug(s"${ctx.channel().id().asShortText()}: Local score $newLocalScore is still lower than remote one ${score.value}, requesting extension")
-        ctx.write(ExtensionSignaturesLoader.LoadExtensionSignatures(lastSignatures), promise)
+        ctx.write(LoadBlockchainExtension(lastSignatures), promise)
       }
     case _ => ctx.write(msg, promise)
   }
@@ -59,7 +59,7 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
 
       if (isNewHighScore && pinnedChannel.getAndSet(Some(ctx.channel())).isEmpty) {
         log.debug("No previously pinned channel, requesting signatures")
-        ctx.write(ExtensionSignaturesLoader.LoadExtensionSignatures(lastSignatures))
+        ctx.write(LoadBlockchainExtension(lastSignatures))
       }
 
       scores.put(ctx.channel(), score)
