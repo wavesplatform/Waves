@@ -62,7 +62,7 @@ class Miner(minerSettings: MinerSettings,
 
     val blocks = generateNextBlocks(history, stateReader, blockchainSettings, utxStorage, time)(accounts)
     if (blocks.nonEmpty) {
-      val bestBlock = blocks.max(PoSCalc.blockOrdering(history, stateReader, blockchainSettings.functionalitySettings, time))
+      val bestBlock = blocks.max(PoSCalc.blockOrdering(history, stateReader, blockchainSettings.functionalitySettings))
       //coordinator ! AddBlock(bestBlock, None)
       true
     } else false
@@ -76,10 +76,11 @@ class Miner(minerSettings: MinerSettings,
   private def scheduleBlockGeneration(): Unit = try {
     val schedule = if (minerSettings.tfLikeScheduling) {
       val lastBlock = history.lastBlock
+      val height = history.height()
       val currentTime = preciseTime
 
       accounts
-        .flatMap(acc => PoSCalc.nextBlockGenerationTime(history, stateReader, blockchainSettings.functionalitySettings, time)(lastBlock, acc).map(_ + BlockGenerationTimeShift.toMillis))
+        .flatMap(acc => PoSCalc.nextBlockGenerationTime(height, stateReader, blockchainSettings.functionalitySettings, lastBlock, acc).map(_ + BlockGenerationTimeShift.toMillis))
         .map(t => math.max(t - currentTime, blockGenerationDelay.toMillis))
         .filter(_ < MaxBlockGenerationDelay.toMillis)
         .map(_ millis)
