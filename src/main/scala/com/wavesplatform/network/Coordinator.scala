@@ -119,7 +119,7 @@ class Coordinator(
           // someone has happened to be faster and already added a block or blocks after the parent
           log.debug(s"A child for parent of the block already exists, local=$local: ${str(newBlock)}")
 
-          val cmp = PoSCalc.blockOrdering(history, stateReader, settings.functionalitySettings, time)
+          val cmp = PoSCalc.blockOrdering(history, stateReader, settings.functionalitySettings)
           if (lastBlock.reference.sameElements(parentBlockId) && cmp.lt(lastBlock, newBlock)) {
             log.debug(s"New block ${str(newBlock)} is better than last ${str(lastBlock)}")
           }
@@ -225,11 +225,11 @@ object Coordinator extends ScorexLogging {
 
     val parentOpt = history.parent(block)
     require(parentOpt.isDefined || history.height() == 1,
-      s"Can't find parent '${Base58.encode(block.reference)}' of block ${Base58.encode(block.uniqueId)}")
+      s"Can't find parent ${Base58.encode(block.reference)} of ${Base58.encode(block.uniqueId)}")
 
     val parent = parentOpt.get
     val parentHeightOpt = history.heightOf(parent.uniqueId)
-    require(parentHeightOpt.isDefined, s"Can't get height of block ${Base58.encode(block.reference)}")
+    require(parentHeightOpt.isDefined, s"Can't get height of ${Base58.encode(block.reference)}")
     val parentHeight = parentHeightOpt.get
 
     val prevBlockData = parent.consensusData
@@ -237,7 +237,7 @@ object Coordinator extends ScorexLogging {
 
     val cbt = calcBaseTarget(bcs.genesisSettings.averageBlockDelay, parentHeight, parent, history.parent(parent, 2), blockTime)
     val bbt = blockData.baseTarget
-    require(cbt == bbt, s"Block's basetarget is wrong, calculated: $cbt, block contains: $bbt")
+    require(cbt == bbt, s"Declared baseTarget $bbt of ${Base58.encode(block.uniqueId)} does not match calculated baseTarget $cbt")
 
     val generator = block.signerData.generator
 
@@ -245,7 +245,7 @@ object Coordinator extends ScorexLogging {
     val calcGs = calcGeneratorSignature(prevBlockData, generator)
     val blockGs = blockData.generationSignature
     require(calcGs.sameElements(blockGs),
-      s"Calculated block generation signature ${calcGs.mkString} differs from declared signature ${blockGs.mkString}")
+      s"Declared signature ${blockGs.mkString} of ${Base58.encode(block.uniqueId)} does not match calculated signature ${calcGs.mkString}")
 
     val effectiveBalance = generatingBalance(state, fs)(generator, parentHeight)
 

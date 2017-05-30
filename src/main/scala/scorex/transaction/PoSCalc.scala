@@ -7,11 +7,10 @@ import scorex.block.Block
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
 import scorex.crypto.hash.FastCryptographicHash
 import scorex.crypto.hash.FastCryptographicHash.hash
-import scorex.utils.{ScorexLogging, Time}
 
 import scala.concurrent.duration.FiniteDuration
 
-object PoSCalc extends ScorexLogging {
+object PoSCalc extends {
 
   val MinimalEffectiveBalanceForGenerator: Long = 1000000000000L
   val AvgBlockTimeDepth: Int = 3
@@ -56,10 +55,11 @@ object PoSCalc extends ScorexLogging {
     }
   }
 
-  def blockOrdering(history: History, state: StateReader, fs: FunctionalitySettings, time: Time): Ordering[Block] = Ordering.by {
+  def blockOrdering(history: History, state: StateReader, fs: FunctionalitySettings): Ordering[Block] = Ordering.by {
     block =>
       val parent = history.blockById(block.reference).get
-      val blockCreationTime = nextBlockGenerationTime(history, state, fs, time: Time)(parent, block.signerData.generator)
+      val height = history.heightOf(parent).get
+      val blockCreationTime = nextBlockGenerationTime(height, state, fs, parent, block.signerData.generator)
         .getOrElse(block.timestamp)
       (block.blockScore, -blockCreationTime)
   }
@@ -69,36 +69,19 @@ object PoSCalc extends ScorexLogging {
     state.effectiveBalanceAtHeightWithConfirmations(account, atHeight, generatingBalanceDepth)
   }
 
-  def nextBlockGenerationTime(history: History, state: StateReader, fs: FunctionalitySettings, time: Time)(block: Block, account: PublicKeyAccount): Option[Long] = {
-    history.heightOf(block.uniqueId)
-      .map(height => (height, generatingBalance(state, fs)(account, height))).filter(_._2 > 0)
-      .flatMap {
-        case (height, balance) =>
-          val cData = block.consensusData
-          val hit = calcHit(cData, account)
-          val t = cData.baseTarget
+  def nextBlockGenerationTime(height: Int, state: StateReader, fs: FunctionalitySettings, block: Block, account: PublicKeyAccount): Option[Long] = {
+    val balance = generatingBalance(state, fs)(account, height)
+    if (balance > MinimalEffectiveBalanceForGenerator) {
+      val cData = block.consensusData
+      val hit = calcHit(cData, account)
+      val t = cData.baseTarget
 
-          val result =
-            Some((hit * 1000) / (BigInt(t) * balance) + block.timestamp)
-              .filter(_ > 0).filter(_ < Long.MaxValue)
-              .map(_.toLong)
-
-          log.debug({
-            val currentTime = time.correctedTime()
-            s"Next block gen time: $result " +
-              s"in ${
-                result.map(t => (t - currentTime) / 1000)
-              } seconds, " +
-              s"hit: $hit, target: $t, " +
-              s"account:  $account, account balance: $balance " +
-              s"last block id: ${
-                block.encodedId
-              }, " +
-              s"height: $height"
-          })
-
-          result
+      val calculatedTs = (hit * 1000) / (BigInt(t) * balance) + block.timestamp
+      if (0 < calculatedTs && calculatedTs < Long.MaxValue) {
+        Some(calculatedTs.toLong)
+      } else {
+        None
       }
+    } else None
   }
-
 }
