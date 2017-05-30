@@ -11,6 +11,7 @@ import com.wavesplatform.utils.ByteStr
 import io.netty.bootstrap.{Bootstrap, ServerBootstrap}
 import io.netty.channel._
 import io.netty.channel.group.{ChannelGroup, ChannelMatchers}
+import io.netty.channel.local.{LocalAddress, LocalChannel, LocalServerChannel}
 import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.channel.socket.SocketChannel
 import io.netty.channel.socket.nio.{NioServerSocketChannel, NioSocketChannel}
@@ -43,6 +44,27 @@ class NetworkServer(
     peerDatabase: PeerDatabase,
     allChannels: ChannelGroup,
     peerInfo: ConcurrentHashMap[Channel, PeerInfo]) extends ScorexLogging {
+
+  private val address = new LocalAddress("local-events-channel")
+  private val localServerGroup = new DefaultEventLoopGroup()
+  private val localServer = new ServerBootstrap()
+    .group(localServerGroup)
+    .channel(classOf[LocalServerChannel])
+    .childHandler(new ChannelInitializer[LocalChannel] {
+      override def initChannel(ch: LocalChannel) = ch.pipeline().addLast(coordinatorExecutor, coordinator)
+    })
+
+  localServer.bind(address).sync()
+
+  private val localClientGroup = new DefaultEventLoopGroup()
+  private val localClientChannel = new Bootstrap()
+    .group(localClientGroup)
+    .channel(classOf[LocalChannel])
+    .handler(new ChannelInitializer[LocalChannel] {
+        override def initChannel(ch: LocalChannel) = {}
+      })
+    .connect(address)
+    .channel()
 
   private val bossGroup = new NioEventLoopGroup()
   private val workerGroup = new NioEventLoopGroup()
@@ -146,6 +168,8 @@ class NetworkServer(
   } finally {
     workerGroup.shutdownGracefully()
     bossGroup.shutdownGracefully()
+    localClientGroup.shutdownGracefully()
+    localServerGroup.shutdownGracefully()
     coordinatorExecutor.shutdownGracefully()
   }
 }

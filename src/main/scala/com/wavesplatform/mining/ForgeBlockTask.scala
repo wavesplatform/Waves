@@ -49,10 +49,7 @@ class ForgeBlockTask(
       val consensusData = NxtLikeConsensusBlockData(btg, gs)
 
       val unconfirmed = packUnconfirmed(state, bcs.functionalitySettings, utx, time, parentHeight)
-      log.debug(s"Build block with ${
-        unconfirmed.size
-      } transactions")
-      log.debug(s"Block time interval is $eta seconds ")
+      log.debug(s"Building block with ${unconfirmed.size} transactions approx. $eta seconds after previous block")
 
       Some(Block.buildAndSign(Version,
         currentTime,
