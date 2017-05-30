@@ -1,7 +1,9 @@
 package scorex.waves.http
 
+import java.net.{InetSocketAddress, URI}
 import javax.ws.rs.Path
 
+import akka.actor.ActorRef
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.settings.RestAPISettings
@@ -11,15 +13,19 @@ import play.api.libs.json.{JsArray, Json}
 import scorex.api.http._
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash
+import scorex.network.peer.PeerManager.AddToBlacklist
 import scorex.transaction.{BlockchainUpdater, History}
 import scorex.wallet.Wallet
 
+import scala.util.Try
+
 @Path("/debug")
 @Api(value = "/debug")
-case class DebugApiRoute(settings: RestAPISettings, wallet: Wallet, stateReader: StateReader, blockchainUpdater: BlockchainUpdater, history: History) extends ApiRoute {
+case class DebugApiRoute(settings: RestAPISettings, wallet: Wallet, stateReader: StateReader,
+                         blockchainUpdater: BlockchainUpdater, history: History, peerManager: ActorRef) extends ApiRoute {
 
   override lazy val route = pathPrefix("debug") {
-    blocks ~ state ~ info ~ stateWaves ~ rollback ~ rollbackTo
+    blocks ~ state ~ info ~ stateWaves ~ rollback ~ rollbackTo ~ blacklist
   }
 
   @Path("/blocks/{howMany}")
@@ -116,6 +122,28 @@ case class DebugApiRoute(settings: RestAPISettings, wallet: Wallet, stateReader:
       } else {
         if (blockchainUpdater.removeAfter(maybeBlockId.get)) complete(StatusCodes.OK) else complete(StatusCodes.BadRequest)
       }
+    }
+  }
+
+  @Path("/blacklist")
+  @ApiOperation(value = "Blacklits given peer", notes = "Moving peer to blacklist", httpMethod = "POST")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(name = "address", value = "IP:PORT address of node", required = true, dataType = "string", paramType = "body")
+  ))
+  @ApiResponses(Array(
+    new ApiResponse(code = 200, message = "200 if success, 404 if there are no peer with such address")
+  ))
+  def blacklist: Route = withAuth {
+    (path("blacklist") & post) {
+      entity(as[String]) { socketAddressString =>
+        val address = for {
+          u <- Try(new URI("node://" + socketAddressString)).toEither
+        } yield new InetSocketAddress(u.getHost, u.getPort)
+        if (address.isRight) {
+          peerManager ! AddToBlacklist(address.right.get)
+          complete(StatusCodes.OK)
+        } else complete(StatusCodes.BadRequest)
+      } ~ complete(StatusCodes.BadRequest)
     }
   }
 

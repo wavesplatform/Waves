@@ -110,18 +110,18 @@ class PeerRegister extends ScorexLogging {
   def removeSuspect(address: InetSocketAddress): Unit = suspectedConnections.remove(address)
 
   // Logging support
-  def logConnections: String = {
+  def logConnections(detailed: Boolean = log.logger.isTraceEnabled): String = {
     val inboundHandshakedAddresses = handshakedConnections.filter(_._2._1).keys
     val outboundHandshakedAddresses = handshakedConnections.filter(!_._2._1).keys
     val ongoingAddresses = outboundOngoingConnections
     val inboundConnectedAddresses = connectionHandlers.filter(_._2._1).keys
     val outboundConnectedAddresses = connectionHandlers.filter(!_._2._1).keys
 
-    val ongoingLog = if (log.logger.isTraceEnabled) s"[${ongoingAddresses.mkString(";")}]" else ""
-    val inboundHandshakedLog = if (log.logger.isTraceEnabled) s"[${inboundHandshakedAddresses.mkString(";")}]" else ""
-    val outboundHandshakedLog = if (log.logger.isTraceEnabled) s"[${outboundHandshakedAddresses.mkString(";")}]" else ""
-    val inboundConnectedLog = if (log.logger.isTraceEnabled) s"[${inboundConnectedAddresses.mkString(";")}]" else ""
-    val outboundConnectedLog = if (log.logger.isTraceEnabled) s"[${outboundConnectedAddresses.mkString(";")}]" else ""
+    val ongoingLog = if (detailed) s"[${ongoingAddresses.mkString(";")}]" else ""
+    val inboundHandshakedLog = if (detailed) s"[${inboundHandshakedAddresses.mkString(";")}]" else ""
+    val outboundHandshakedLog = if (detailed) s"[${outboundHandshakedAddresses.mkString(";")}]" else ""
+    val inboundConnectedLog = if (detailed) s"[${inboundConnectedAddresses.mkString(";")}]" else ""
+    val outboundConnectedLog = if (detailed) s"[${outboundConnectedAddresses.mkString(";")}]" else ""
 
     s"Connections: Ongoing: (${ongoingAddresses.size})$ongoingLog: " +
       s"Established: (i:${inboundConnectedAddresses.size}|o:${outboundConnectedAddresses.size})$inboundConnectedLog$outboundConnectedLog: " +

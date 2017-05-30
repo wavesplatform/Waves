@@ -16,7 +16,6 @@ import play.api.libs.json._
 import scorex.api.http.alias.CreateAliasRequest
 import scorex.api.http.assets._
 import scorex.api.http.leasing.{LeaseCancelRequest, LeaseRequest}
-import scorex.crypto.encode.Base58
 import scorex.transaction.TransactionParser.TransactionType
 import scorex.transaction.assets.exchange.Order
 import scorex.utils.{LoggerFacade, ScorexLogging}
@@ -93,6 +92,10 @@ class Node (config: Config, val nodeInfo: NodeInfo, client: AsyncHttpClient, tim
 
   def connectedPeers: Future[Seq[Peer]] = get("/peers/connected").map { r =>
     (Json.parse(r.getResponseBody) \ "peers").as[Seq[Peer]]
+  }
+
+  def blacklistedPeers: Future[Seq[String]] = get("/peers/blacklisted").map { r =>
+    Json.parse(r.getResponseBody).as[Seq[String]]
   }
 
   def waitForPeers(targetPeersCount: Int): Future[Seq[Peer]] = waitFor[Seq[Peer]](connectedPeers, _.length >= targetPeersCount, 1.second)
@@ -219,6 +222,9 @@ class Node (config: Config, val nodeInfo: NodeInfo, client: AsyncHttpClient, tim
 
   def cancelOrder(amountAsset: String, priceAsset: String, request: CancelOrderRequest): Future[MatcherStatusResponse] =
     matcherPost(s"/matcher/orderbook/$amountAsset/$priceAsset/cancel", request.json).as[MatcherStatusResponse]
+
+  def blacklist(node: Node): Future[Unit] =
+    post("/debug/blacklist", s"${node.nodeInfo.networkIpAddress}:${node.nodeInfo.hostNetworkPort}").map(_ => ())
 }
 
 object Node extends ScorexLogging {
