@@ -99,7 +99,7 @@ class Coordinator(
 
     } else {
 //      from.foreach(_.blacklist())
-      log.info(s"Fork contains block that doesn't match checkpoint, declining fork")
+      log.warn(s"Fork contains block that doesn't match checkpoint, declining fork")
     }
   }
 
@@ -224,24 +224,18 @@ object Coordinator extends ScorexLogging {
     }
 
     val parentOpt = history.parent(block)
-    require(parentOpt.isDefined || history.height() == 1, s"Can't find parent block with id '${
-      Base58.encode(block.reference)
-    }' of block " +
-      s"'${
-        Base58.encode(block.uniqueId)
-      }'")
+    require(parentOpt.isDefined || history.height() == 1,
+      s"Can't find parent '${Base58.encode(block.reference)}' of block ${Base58.encode(block.uniqueId)}")
 
     val parent = parentOpt.get
     val parentHeightOpt = history.heightOf(parent.uniqueId)
-    require(parentHeightOpt.isDefined, s"Can't get parent block with id '${
-      Base58.encode(block.reference)
-    }' height")
+    require(parentHeightOpt.isDefined, s"Can't get height of block ${Base58.encode(block.reference)}")
     val parentHeight = parentHeightOpt.get
 
     val prevBlockData = parent.consensusData
     val blockData = block.consensusData
 
-    val cbt = calcBaseTarget(history)(bcs.genesisSettings.averageBlockDelay, parent, blockTime)
+    val cbt = calcBaseTarget(bcs.genesisSettings.averageBlockDelay, parentHeight, parent, history.parent(parent, 2), blockTime)
     val bbt = blockData.baseTarget
     require(cbt == bbt, s"Block's basetarget is wrong, calculated: $cbt, block contains: $bbt")
 
@@ -251,11 +245,7 @@ object Coordinator extends ScorexLogging {
     val calcGs = calcGeneratorSignature(prevBlockData, generator)
     val blockGs = blockData.generationSignature
     require(calcGs.sameElements(blockGs),
-      s"Block's generation signature is wrong, calculated: ${
-        calcGs.mkString
-      }, block contains: ${
-        blockGs.mkString
-      }")
+      s"Calculated block generation signature ${calcGs.mkString} differs from declared signature ${blockGs.mkString}")
 
     val effectiveBalance = generatingBalance(state, fs)(generator, parentHeight)
 

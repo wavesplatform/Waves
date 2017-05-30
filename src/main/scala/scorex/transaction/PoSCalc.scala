@@ -27,17 +27,16 @@ object PoSCalc extends ScorexLogging {
   def calcGeneratorSignature(lastBlockData: NxtLikeConsensusBlockData, generator: PublicKeyAccount): FastCryptographicHash.Digest =
     hash(lastBlockData.generationSignature ++ generator.publicKey)
 
-  def calcBaseTarget(history: History)(avgBlockDelay: FiniteDuration, prevBlock: Block, timestamp: Long): Long = {
+  def calcBaseTarget(avgBlockDelay: FiniteDuration, parentHeight: Int, parent: Block, greatGrandParent: Option[Block], timestamp: Long): Long = {
     val avgDelayInSeconds = avgBlockDelay.toSeconds
 
     def normalize(value: Long): Double = value * avgDelayInSeconds / (60: Double)
 
-    val height = history.heightOf(prevBlock).get
-    val prevBaseTarget = prevBlock.consensusData.baseTarget
-    if (height % 2 == 0) {
-      val blocktimeAverage = history.parent(prevBlock, AvgBlockTimeDepth - 1)
-        .map(b => (timestamp - b.timestamp) / AvgBlockTimeDepth)
-        .getOrElse(timestamp - prevBlock.timestamp) / 1000
+    val prevBaseTarget = parent.consensusData.baseTarget
+    if (parentHeight % 2 == 0) {
+      val blocktimeAverage = greatGrandParent.fold(timestamp - parent.timestamp) {
+        b => (timestamp - b.timestamp) / AvgBlockTimeDepth
+      } / 1000
 
       val minBlocktimeLimit = normalize(53)
       val maxBlocktimeLimit = normalize(67)
