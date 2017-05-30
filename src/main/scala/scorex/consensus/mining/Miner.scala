@@ -5,7 +5,6 @@ import com.wavesplatform.settings.{BlockchainSettings, MinerSettings}
 import com.wavesplatform.state2.reader.StateReader
 import scorex.account.PrivateKeyAccount
 import scorex.block.Block
-import scorex.consensus.nxt.NxtLikeConsensusBlockData
 import scorex.transaction._
 import scorex.utils.{ScorexLogging, Time}
 import scorex.wallet.Wallet
@@ -130,73 +129,5 @@ object Miner extends ScorexLogging {
   val Version: Byte = 2
 
   def generateNextBlocks(history: History, state: StateReader, bcs: BlockchainSettings, utx: UnconfirmedTransactionsStorage, time: Time)
-                        (accounts: Seq[PrivateKeyAccount]): Seq[Block] = {
-
-    import scorex.transaction.PoSCalc._
-
-    def generateNextBlock(account: PrivateKeyAccount): Option[Block] = try {
-
-      val lastBlock = history.lastBlock
-      val height = history.heightOf(lastBlock).get
-      val balance = generatingBalance(state, bcs.functionalitySettings)(account, height)
-
-      if (balance < MinimalEffectiveBalanceForGenerator) {
-        throw new IllegalStateException(s"Effective balance $balance is less that minimal ($MinimalEffectiveBalanceForGenerator)")
-      }
-
-      val lastBlockKernelData = lastBlock.consensusData
-      val currentTime = time.correctedTime()
-
-      val h = calcHit(lastBlockKernelData, account)
-      val t = calcTarget(lastBlock, currentTime, balance)
-
-      val eta = (currentTime - lastBlock.timestamp) / 1000
-
-      log.debug(s"hit: $h, target: $t, generating ${
-        h < t
-      }, eta $eta, " +
-        s"account:  $account " +
-        s"account balance: $balance " +
-        s"last block id: ${
-          lastBlock.encodedId
-        }, " +
-        s"height: $height, " +
-        s"last block target: ${
-          lastBlockKernelData.baseTarget
-        }"
-      )
-
-      if (h < t) {
-
-        val avgBlockDelay = bcs.genesisSettings.averageBlockDelay
-        val btg = calcBaseTarget(history)(avgBlockDelay, lastBlock, currentTime)
-        val gs = calcGeneratorSignature(lastBlockKernelData, account)
-        val consensusData = NxtLikeConsensusBlockData(btg, gs)
-
-        val unconfirmed = UnconfirmedTransactionsStorage.packUnconfirmed(state, bcs.functionalitySettings, utx, time, height)
-        log.debug(s"Build block with ${
-          unconfirmed.size
-        } transactions")
-        log.debug(s"Block time interval is $eta seconds ")
-
-        Some(Block.buildAndSign(Version,
-          currentTime,
-          lastBlock.uniqueId,
-          consensusData,
-          unconfirmed,
-          account))
-      } else None
-    } catch {
-      case e: UnsupportedOperationException =>
-        log.debug(s"DB can't find last block because of unexpected modification")
-        None
-      case e: IllegalStateException =>
-        log.debug(s"Failed to generate new block: ${
-          e.getMessage
-        }")
-        None
-    }
-
-    accounts.flatMap(generateNextBlock)
-  }
+                        (accounts: Seq[PrivateKeyAccount]): Seq[Block] = Seq.empty
 }
