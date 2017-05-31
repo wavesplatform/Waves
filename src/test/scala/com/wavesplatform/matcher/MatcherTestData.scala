@@ -18,8 +18,6 @@ trait MatcherTestData {
   val accountGen: Gen[PrivateKeyAccount] = bytes32gen.map(seed => PrivateKeyAccount(seed))
   val positiveLongGen: Gen[Long] = Gen.choose(1, Long.MaxValue)
 
-  val maxWavesAmountGen: Gen[Long] = Gen.choose(1, 100000000L * 100000000L)
-
   val wavesAssetGen: Gen[Option[Array[Byte]]] = Gen.const(None)
   val assetIdGen: Gen[Option[Array[Byte]]] = Gen.frequency((1, wavesAssetGen), (10, bytes32gen.map(Some(_))))
 

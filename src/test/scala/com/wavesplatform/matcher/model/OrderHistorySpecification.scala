@@ -61,7 +61,7 @@ class OrderHistorySpecification extends PropSpec
     oh.didOrderAccepted(OrderAdded(LimitOrder(ord1)))
     oh.getOrderStatus(ord1.idStr) shouldBe LimitOrder.Accepted
     oh.getOpenVolume(AssetAcc(ord1.senderPublicKey, pair.amountAsset)) shouldBe
-      math.max(ord1.matcherFee - ord1.getReceiveAmount(ord1.price, ord1.amount).get, 0L)
+      math.max(ord1.matcherFee - ord1.getReceiveAmount(ord1.price, ord1.amount).right.get, 0L)
     oh.getOpenVolume(AssetAcc(ord1.senderPublicKey, pair.priceAsset)) shouldBe 8L
 
     oh.getOrdersByPairAndAddress(pair, ord1.senderPublicKey.address) shouldBe Set(ord1.idStr)
@@ -80,7 +80,7 @@ class OrderHistorySpecification extends PropSpec
   }
 
   property("New buy and sell WAVES order  added") {
-    val pk = new PrivateKeyAccount("private".getBytes("utf-8"))
+    val pk = PrivateKeyAccount("private".getBytes("utf-8"))
     val pair = AssetPair(None, Some("BTC".getBytes))
     val ord1 = buy(pair, 0.0008, 100000000, Some(pk))
     val ord2 = sell(pair, 0.0009, 210000000, Some(pk))
@@ -92,9 +92,9 @@ class OrderHistorySpecification extends PropSpec
     oh.getOrderStatus(ord2.idStr) shouldBe LimitOrder.Accepted
 
     oh.getOpenVolume(AssetAcc(ord1.senderPublicKey, pair.amountAsset)) shouldBe
-      math.max(ord1.matcherFee - ord1.getReceiveAmount(ord1.price, ord1.amount).get, 0L) + ord2.amount + ord2.matcherFee
+      math.max(ord1.matcherFee - ord1.getReceiveAmount(ord1.price, ord1.amount).right.get, 0L) + ord2.amount + ord2.matcherFee
     oh.getOpenVolume(AssetAcc(ord1.senderPublicKey, pair.priceAsset)) shouldBe
-      ord1.getSpendAmount(ord1.price, ord1.amount).get
+      ord1.getSpendAmount(ord1.price, ord1.amount).right.get
 
     oh.getOrdersByPairAndAddress(pair, ord1.senderPublicKey.address) shouldBe Set(ord1.idStr, ord2.idStr)
   }
@@ -180,7 +180,7 @@ class OrderHistorySpecification extends PropSpec
   }
 
   property("Partially will own order") {
-    val pk = new PrivateKeyAccount("private".getBytes("utf-8"))
+    val pk = PrivateKeyAccount("private".getBytes("utf-8"))
     val pair = AssetPair(None, Some("BTC".getBytes))
     val ord1 = buy(pair, 0.0008, 100000000, Some(pk), Some(300000L))
     val ord2 = sell(pair, 0.00079, 210000000, Some(pk), Some(300000L))
@@ -244,7 +244,7 @@ class OrderHistorySpecification extends PropSpec
   }
 
   property("Delete order") {
-    val pk = new PrivateKeyAccount("private".getBytes("utf-8"))
+    val pk = PrivateKeyAccount("private".getBytes("utf-8"))
     val pair = AssetPair(None, Some("BTC".getBytes))
     val ord1 = buy(pair, 0.0008, 210000000, Some(pk), Some(300000L))
     val ord2 = sell(pair, 0.00079, 100000000, Some(pk), Some(300000L))
