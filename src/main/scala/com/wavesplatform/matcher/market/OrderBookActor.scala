@@ -281,19 +281,6 @@ object OrderBookActor {
     val code = StatusCodes.OK
   }
 
-  case class GetOrderHistoryResponse(history: Seq[(String, OrderInfo, Option[Order])]) extends MatcherResponse {
-    val json = JsArray(history.map(h => Json.obj(
-      "id" -> h._1,
-      "type" -> h._3.map(_.orderType.toString),
-      "amount" -> h._2.amount,
-      "price" -> h._3.map(_.price),
-      "timestamp" -> h._3.map(_.timestamp),
-      "filled" -> h._2.filled,
-      "status" -> h._2.status.name
-      )))
-    val code = StatusCodes.OK
-  }
-
   case class GetOrderBookResponse(pair: AssetPair, bids: Seq[LevelAgg], asks: Seq[LevelAgg]) extends MatcherResponse {
     val json: JsValue = Json.toJson(OrderBookResult(NTP.correctedTime(), pair, bids, asks))
     val code = StatusCodes.OK

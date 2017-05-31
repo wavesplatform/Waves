@@ -38,24 +38,11 @@ trait OrderValidator {
     }
   }
 
-  def validateIntegerAmount(lo: LimitOrder): Validation = {
-    def getDecimals(assetId: Option[AssetId]) = assetId.flatMap(storedState.getIssueTransaction).map(_.decimals.toInt).getOrElse(8)
-
-    val amountDecimals = getDecimals(lo.order.assetPair.amountAsset)
-    val priceDecimals = getDecimals(lo.order.assetPair.priceAsset)
-    val price = BigDecimal(lo.price)*math.pow(10, amountDecimals - priceDecimals)/Order.PriceConstant
-
-    val scaled = if (price >= 1) {
-        val amount = (BigInt(lo.amount) * lo.price / Order.PriceConstant).bigInteger.longValueExact()
-        BigDecimal(amount, priceDecimals)
-      } else {
-        BigDecimal(lo.amount, amountDecimals)
-      }
-
-    (scaled >= 1) :| "Order amount is too small"
+  def getTradableBalance(acc: AssetAcc): Long = {
+    storedState.tradableAssetBalance(acc) - orderHistory.getOpenVolume(acc)
   }
 
-  def validateNewOrder(order: Order): Either[CustomError, Order] = {
+  def validateNewOrder(order: Order): Either[CustomValidationError, Order] = {
     //(openOrdersCount.getOrElse(order.matcherPublicKey.address, 0) <= settings.maxOpenOrders) :|
     //  s"Open orders count limit exceeded (Max = ${settings.maxOpenOrders})" &&
     val v =

@@ -5,15 +5,17 @@ import java.io.File
 import akka.actor.{Actor, Props}
 import akka.http.scaladsl.model.StatusCodes
 import com.wavesplatform.matcher.MatcherSettings
-import com.wavesplatform.matcher.api.{BadMatcherResponse, MatcherResponse, StatusCodeMatcherResponse}
-import com.wavesplatform.matcher.market.OrderBookActor.{CancelOrder, GetOrderHistoryResponse, GetOrderStatusResponse}
+import com.wavesplatform.matcher.api.{BadMatcherResponse, MatcherResponse}
+import com.wavesplatform.matcher.market.OrderBookActor.{CancelOrder, GetOrderStatusResponse}
 import com.wavesplatform.matcher.market.OrderHistoryActor._
 import com.wavesplatform.matcher.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
 import com.wavesplatform.matcher.model.LimitOrder.Filled
 import com.wavesplatform.matcher.model._
 import com.wavesplatform.state2.reader.StateReader
 import org.h2.mvstore.MVStore
-import play.api.libs.json.Json
+import play.api.libs.json._
+import scorex.account.Account
+import scorex.transaction.AssetAcc
 import scorex.transaction.ValidationError.CustomError
 import scorex.transaction.assets.exchange.{AssetPair, Order}
 import scorex.wallet.Wallet
@@ -62,6 +64,8 @@ class OrderHistoryActor(val settings: MatcherSettings, val storedState: StateRea
       sender() ! GetOrderStatusResponse(orderHistory.getOrderStatus(id))
     case RecoverFromOrderBook(ob) =>
       recoverFromOrderBook(ob)
+    case GetTradableBalance(assetPair, addr) =>
+      sender() ! getPairTradableBalance(assetPair, addr)
   }
 
   def fetchOrderHistory(req: GetOrderHistory): Unit = {
@@ -69,6 +73,13 @@ class OrderHistoryActor(val settings: MatcherSettings, val storedState: StateRea
       orderHistory.getOrdersByPairAndAddress(req.assetPair, req.address)
         .map(id => (id, orderHistory.getOrderInfo(id), orderHistory.getOrder(id))).toSeq.sortBy(_._3.map(_.timestamp).getOrElse(-1L))
     sender() ! GetOrderHistoryResponse(res)
+  }
+
+  def getPairTradableBalance(assetPair: AssetPair, address: String): GetTradableBalanceResponse = {
+    GetTradableBalanceResponse(Map(
+      assetPair.amountAssetStr -> getTradableBalance(AssetAcc(new Account(address), assetPair.amountAsset)),
+      assetPair.priceAssetStr -> getTradableBalance(AssetAcc(new Account(address), assetPair.priceAsset))
+    ))
   }
 
   def deleteFromOrderHistory(req: DeleteOrderFromHistory): Unit = {
@@ -109,6 +120,25 @@ object OrderHistoryActor {
 
   case class OrderDeleted(orderId: String) extends MatcherResponse {
     val json = Json.obj("status" -> "OrderDeleted", "orderId" -> orderId)
+    val code = StatusCodes.OK
+  }
+
+  case class GetOrderHistoryResponse(history: Seq[(String, OrderInfo, Option[Order])]) extends MatcherResponse {
+    val json = JsArray(history.map(h => Json.obj(
+      "id" -> h._1,
+      "type" -> h._3.map(_.orderType.toString),
+      "amount" -> h._2.amount,
+      "price" -> h._3.map(_.price),
+      "timestamp" -> h._3.map(_.timestamp),
+      "filled" -> h._2.filled,
+      "status" -> h._2.status.name
+    )))
+    val code = StatusCodes.OK
+  }
+
+  case class GetTradableBalance(assetPair: AssetPair, address: String) extends OrderHistoryRequest
+  case class GetTradableBalanceResponse(balances: Map[String, Long]) extends MatcherResponse {
+    val json: JsObject = JsObject(balances.map{ case (k, v) => (k, JsNumber(v)) })
     val code = StatusCodes.OK
   }
 

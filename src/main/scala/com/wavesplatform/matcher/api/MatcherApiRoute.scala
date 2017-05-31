@@ -11,7 +11,7 @@ import com.google.common.primitives.Longs
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.market.MatcherActor.{GetMarkets, GetMarketsResponse}
 import com.wavesplatform.matcher.market.OrderBookActor._
-import com.wavesplatform.matcher.market.OrderHistoryActor.{DeleteOrderFromHistory, GetOrderHistory, GetOrderStatus}
+import com.wavesplatform.matcher.market.OrderHistoryActor.{DeleteOrderFromHistory, GetOrderHistory, GetOrderStatus, GetTradableBalance}
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state2.reader.StateReader
 import io.swagger.annotations._
@@ -36,7 +36,8 @@ case class MatcherApiRoute(wallet: Wallet,storedState: StateReader, matcher: Act
 
   override lazy val route: Route =
     pathPrefix("matcher") {
-      matcherPublicKey ~ orderBook ~ place ~ getOrderHistory ~ orderStatus ~ historyDelete ~ cancel ~ orderbooks
+      matcherPublicKey ~ orderBook ~ place ~ getOrderHistory ~ getTradableBalance ~ orderStatus ~
+        historyDelete ~ cancel ~ orderbooks ~ orderBookDelete
     }
 
   def withAssetPair(a1: String, a2: String): Directive1[AssetPair] = {
@@ -193,6 +194,23 @@ case class MatcherApiRoute(wallet: Wallet,storedState: StateReader, matcher: Act
           complete(StatusCodes.BadRequest -> Json.obj("message" -> ex.getMessage))
 
       }
+    }
+  }
+
+  @Path("/orderbook/{amountAsset}/{priceAsset}/tradableBalance/{address}")
+  @ApiOperation(value = "Tradable balance for Asset Pair",
+    notes = "Get Tradable balance for the given Asset Pair",
+    httpMethod = "GET")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(name = "amountAsset", value = "Amount Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
+    new ApiImplicitParam(name = "priceAsset", value = "Price Asset Id in Pair, or 'WAVES'", dataType = "string", paramType = "path"),
+    new ApiImplicitParam(name = "address", value = "Account Address", required = true, dataType = "string", paramType = "path")
+  ))
+  def getTradableBalance: Route = (path("orderbook" / Segment / Segment / "tradableBalance" / Segment) & get) { (a1, a2, address) =>
+    withAssetPair(a1, a2) { pair =>
+      complete((orderHistory ? GetTradableBalance(pair, address))
+        .mapTo[MatcherResponse]
+        .map(r => r.code -> r.json))
     }
   }
 
