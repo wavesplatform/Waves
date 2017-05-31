@@ -94,9 +94,9 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
     (matchAmount > 0) :| "amount should be > 0" &&
       (matchPrice > 0) :| "price should be > 0" &&
       (matchAmount < MaxAmount) :| "amount too large" &&
-      getSpendAmount(matchPrice, matchAmount).isSuccess :| "SpendAmount too large" &&
+      getSpendAmount(matchPrice, matchAmount).isRight :| "SpendAmount too large" &&
       (getSpendAmount(matchPrice, matchAmount).getOrElse(0L) > 0) :| "SpendAmount should be > 0" &&
-      getReceiveAmount(matchPrice, matchAmount).isSuccess :| "ReceiveAmount too large" &&
+      getReceiveAmount(matchPrice, matchAmount).isRight :| "ReceiveAmount too large" &&
       (getReceiveAmount(matchPrice, matchAmount).getOrElse(0L) > 0) :| "ReceiveAmount should be > 0"
   }
 

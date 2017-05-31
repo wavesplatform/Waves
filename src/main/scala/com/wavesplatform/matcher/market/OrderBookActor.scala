@@ -28,7 +28,7 @@ class OrderBookActor(assetPair: AssetPair, val storedState: StateReader,
                      val functionalitySettings: FunctionalitySettings,
                      val transactionModule: NewTransactionHandler)
   extends PersistentActor
-    with ScorexLogging with OrderValidator with OrderHistory with ExchangeTransactionCreator {
+    with ScorexLogging with OrderValidator with OrderHistoryOld with ExchangeTransactionCreator {
   override def persistenceId: String = OrderBookActor.name(assetPair)
 
   private var orderBook = OrderBook.empty
@@ -131,7 +131,7 @@ class OrderBookActor(assetPair: AssetPair, val storedState: StateReader,
   private def matchOrder(limitOrder: LimitOrder): Unit = {
     val remOrder = handleMatchEvent(OrderBook.matchOrder(orderBook, limitOrder))
     if (remOrder.isDefined) {
-      if (LimitOrder.validateAmount(remOrder.get) && validateIntegerAmount(remOrder.get)) {
+      if (LimitOrder.validateAmount(remOrder.get) && LimitOrder.validateIntegerAmount(storedState, remOrder.get)) {
         matchOrder(remOrder.get)
       } else {
         val canceled = Events.OrderCanceled(remOrder.get)

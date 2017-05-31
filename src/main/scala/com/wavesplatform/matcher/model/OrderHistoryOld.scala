@@ -9,7 +9,7 @@ import scorex.transaction.assets.exchange.Order
 import scala.collection.mutable
 import scala.concurrent.duration._
 
-trait OrderHistory {
+trait OrderHistoryOld {
   type AddressString = String
 
   val assetsToSpend = mutable.Map.empty[AddressString, Long]
