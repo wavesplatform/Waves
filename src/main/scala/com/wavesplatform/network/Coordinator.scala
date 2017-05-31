@@ -2,6 +2,7 @@ package com.wavesplatform.network
 
 import cats._
 import cats.implicits._
+import com.wavesplatform.mining.Miner
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state2.reader.StateReader
 import io.netty.channel.ChannelHandler.Sharable
@@ -29,7 +30,8 @@ class Coordinator(
     utxStorage: UnconfirmedTransactionsStorage,
     settings: BlockchainSettings,
     checkpointPublicKey: String,
-    network: Network)
+    network: Network,
+    miner: Miner)
   extends ChannelInboundHandlerAdapter with ScorexLogging {
   import Coordinator._
 
