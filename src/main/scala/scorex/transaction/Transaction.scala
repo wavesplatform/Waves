@@ -20,6 +20,3 @@ trait Transaction extends StateChangeReason with JsonSerializable {
   override def hashCode(): Int = Ints.fromByteArray(id.takeRight(4))
 
 }
-
-case class BalanceChange(assetAcc: AssetAcc, delta: Long)
-case class EffectiveBalanceChange(account: Account, amount: Long)

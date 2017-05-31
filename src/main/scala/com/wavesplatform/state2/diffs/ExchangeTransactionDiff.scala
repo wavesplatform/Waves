@@ -50,7 +50,7 @@ object ExchangeTransactionDiff {
 
     val portfolios = Monoid.combineAll(Seq(feeDiff, priceDiff, amountDiff))
 
-    lazy val orderExchangeTxsMap: Map[EqByteArray, Set[ExchangeTransaction]] = Map(
+    lazy val orderExchangeTxsMap: Map[ByteArray, Set[ExchangeTransaction]] = Map(
       EqByteArray(tx.buyOrder.id) -> Set(tx),
       EqByteArray(tx.sellOrder.id) -> Set(tx))
 
