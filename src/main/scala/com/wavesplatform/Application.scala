@@ -15,7 +15,7 @@ import com.wavesplatform.actor.RootActorSystem
 import com.wavesplatform.history.{BlockStorageImpl, CheckpointServiceImpl}
 import com.wavesplatform.http.NodeApiRoute
 import com.wavesplatform.matcher.Matcher
-import com.wavesplatform.network.{NetworkServer, PeerDatabaseImpl, PeerInfo, UPnP}
+import com.wavesplatform.network.{NetworkServer, PeerDatabaseImpl, PeerInfo, RollbackTo, UPnP}
 import com.wavesplatform.settings._
 import io.netty.channel.Channel
 import io.netty.channel.group.DefaultChannelGroup
@@ -88,7 +88,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
       UtilsApiRoute(settings.restAPISettings),
       PeersApiRoute(settings.restAPISettings, network.connect, peerDatabase, establishedConnections),
       AddressApiRoute(settings.restAPISettings, wallet, stateReader, settings.blockchainSettings.functionalitySettings),
-      DebugApiRoute(settings.restAPISettings, wallet, stateReader, blockchainUpdater, history),
+      DebugApiRoute(settings.restAPISettings, wallet, stateReader, history, peerDatabase, blockId => network.writeToLocalChannel(RollbackTo(blockId))),
       WavesApiRoute(settings.restAPISettings, wallet, newTransactionHandler, time),
       AssetsApiRoute(settings.restAPISettings, wallet, stateReader, newTransactionHandler, time),
       NodeApiRoute(settings.restAPISettings, () => this.shutdown()),

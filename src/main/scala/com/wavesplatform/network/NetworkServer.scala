@@ -77,7 +77,7 @@ class NetworkServer(
 
   private val coordinatorExecutor = new DefaultEventLoop
   private val coordinator = new Coordinator(checkpoints, history, blockchainUpdater, time, stateReader, utxStorage,
-    settings.blockchainSettings, settings.checkpointsSettings.publicKey, network, miner)
+    settings.blockchainSettings, settings.checkpointsSettings.publicKey, miner)
 
   private val address = new LocalAddress("local-events-channel")
   private val localServerGroup = new DefaultEventLoopGroup()
@@ -85,7 +85,9 @@ class NetworkServer(
     .group(localServerGroup)
     .channel(classOf[LocalServerChannel])
     .childHandler(new ChannelInitializer[LocalChannel] {
-      override def initChannel(ch: LocalChannel) = ch.pipeline().addLast(coordinatorExecutor, coordinator)
+      override def initChannel(ch: LocalChannel) = ch.pipeline()
+        .addLast(scoreObserver)
+        .addLast(coordinatorExecutor, coordinator)
     })
 
   localServer.bind(address).sync()
@@ -137,7 +139,6 @@ class NetworkServer(
   }
 
   private val outgoingChannelCount = new AtomicInteger(0)
-
   private val channels = new ConcurrentHashMap[InetSocketAddress, Channel]
 
   workerGroup.scheduleWithFixedDelay(1.second, 5.seconds) {
@@ -161,7 +162,8 @@ class NetworkServer(
       chan
     })
 
-  private def writeToLocalChannel(message: AnyRef): Unit = localClientChannel.writeAndFlush(message)
+  def writeToLocalChannel(message: AnyRef): Unit = localClientChannel.writeAndFlush(message)
+
   private def doBroadcast(message: AnyRef, except: Option[Channel] = None): Unit = {
     log.debug(s"Broadcasting $message to ${allChannels.size()} channels${except.fold("")(c => s" (except ${c.id().asShortText()})")}")
     allChannels.writeAndFlush(message, except.fold(ChannelMatchers.all())(ChannelMatchers.isNot))

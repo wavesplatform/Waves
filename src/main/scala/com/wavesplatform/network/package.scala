@@ -3,7 +3,7 @@ package com.wavesplatform
 import java.net.{InetSocketAddress, SocketAddress, URI}
 import java.util.concurrent.Callable
 
-import io.netty.channel.ChannelHandlerContext
+import io.netty.channel.{Channel, ChannelHandlerContext}
 import io.netty.util.concurrent.{EventExecutorGroup, ScheduledFuture}
 
 import scala.concurrent.duration._
@@ -29,5 +29,6 @@ package object network {
       e.schedule((() => f): Callable[A], delay.length, delay.unit)
   }
 
-  def id(ctx: ChannelHandlerContext) = s"[${ctx.channel().id().asShortText()}]"
+  def id(ctx: ChannelHandlerContext): String = id(ctx.channel())
+  def id(chan: Channel): String = s"[${chan.id().asShortText()}]"
 }
