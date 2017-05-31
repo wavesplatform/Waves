@@ -5,6 +5,7 @@ import javax.ws.rs.Path
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.settings.RestAPISettings
+import com.wavesplatform.state2.EqByteArray
 import com.wavesplatform.state2.reader.StateReader
 import io.swagger.annotations._
 import play.api.libs.json.{JsArray, Json}
@@ -110,7 +111,7 @@ case class DebugApiRoute(settings: RestAPISettings, wallet: Wallet, stateReader:
   ))
   def rollbackTo: Route = path("rollback-to" / Segment) { signature =>
     (delete & withAuth) {
-      val maybeBlockId = Base58.decode(signature).toOption
+      val maybeBlockId = EqByteArray.decode(signature).toOption
       if (maybeBlockId.isEmpty) {
         complete(InvalidSignature)
       } else {

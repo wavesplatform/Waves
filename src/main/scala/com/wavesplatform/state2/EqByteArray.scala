@@ -1,12 +1,14 @@
 package com.wavesplatform.state2
 
 import java.nio.ByteBuffer
+
 import shapeless.syntax.typeable._
 import org.h2.mvstore.WriteBuffer
 import org.h2.mvstore.`type`.DataType
 import scorex.crypto.encode.Base58
-
 import org.h2.mvstore.DataUtils
+
+import scala.util.Try
 
 case class EqByteArray(arr: Array[Byte]) {
   override def equals(a: Any): Boolean = a match {
@@ -16,9 +18,13 @@ case class EqByteArray(arr: Array[Byte]) {
 
   override def hashCode(): Int = java.util.Arrays.hashCode(arr)
 
-  override lazy val toString: String = "ByteArray:" + Base58.encode(arr)
+  lazy val base58: String = Base58.encode(arr)
 
+  override lazy val toString: String = "ByteArray:" + base58
 }
 
+object EqByteArray {
+  def decode(s: String): Try[EqByteArray] = Base58.decode(s).map(EqByteArray(_))
+}
 
 

@@ -9,6 +9,7 @@ import org.h2.mvstore.{DataUtils, WriteBuffer}
     https://github.com/h2database/h2database/blob/master/h2/src/main/org/h2/mvstore/type/StringDataType.java
 */
 class EqByteArrayMVStoreDataType extends DataType {
+
   override def compare(a: scala.Any, b: scala.Any): Int = a.asInstanceOf[EqByteArray].hashCode() compareTo b.asInstanceOf[EqByteArray].hashCode()
 
   override def read(buff: ByteBuffer): AnyRef = {

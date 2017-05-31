@@ -1,5 +1,6 @@
 package scorex.lagonaki.mocks
 
+import com.wavesplatform.state2.EqByteArray
 import scorex.account.PublicKeyAccount
 import scorex.block.Block.BlockId
 import scorex.block._
@@ -18,17 +19,19 @@ object TestBlock {
     time,
     0,
     randomSignature,
-    SignerData(signer, Array.fill(EllipticCurveImpl.SignatureLength)(0)),
+    SignerData(signer, EqByteArray(Array.fill(EllipticCurveImpl.SignatureLength)(0))),
     NxtLikeConsensusBlockData(1L, Array.fill(SignatureLength)(0: Byte)),
     txs)
 
   def create(time: Long, txs: Seq[Transaction], signer: PublicKeyAccount = PublicKeyAccount(Array.fill(32)(0))): Block = apply(time, txs, signer)
 
 
-  def randomSignature = Array.fill(SignatureLength)(random.nextInt().toByte)
-  private val random = new Random(10)
-  def withReference(ref: BlockId, time: Long = 0) = Block(time, 1, ref, SignerData(PublicKeyAccount(Array.fill(32)(0)), randomSignature),
-    NxtLikeConsensusBlockData(1L, randomSignature), Seq.empty)
+  def randomSignature = EqByteArray(Array.fill(SignatureLength)(random.nextInt().toByte))
 
-  def empty = withReference(Array.fill(SignatureLength)(0: Byte))
+  private val random = new Random(10)
+
+  def withReference(ref: BlockId, time: Long = 0): Block = Block(time, 1, ref, SignerData(PublicKeyAccount(Array.fill(32)(0)), randomSignature),
+    NxtLikeConsensusBlockData(1L, randomSignature.arr), Seq.empty)
+
+  def empty: Block = withReference(EqByteArray(Array.fill(SignatureLength)(0: Byte)))
 }

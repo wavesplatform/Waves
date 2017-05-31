@@ -1,10 +1,11 @@
 package scorex.lagonaki.unit
 
+import com.wavesplatform.state2.EqByteArray
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{FunSuite, Matchers}
 import scorex.account.PrivateKeyAccount
 import scorex.block.Block
-import scorex.consensus.nxt.{NxtLikeConsensusBlockData}
+import scorex.consensus.nxt.NxtLikeConsensusBlockData
 import scorex.transaction._
 import scorex.transaction.assets.TransferTransaction
 
@@ -35,7 +36,7 @@ class BlockSpecification extends FunSuite with Matchers with MockFactory {
     val version = 1: Byte
     val timestamp = System.currentTimeMillis()
 
-    val block = Block.buildAndSign(version, timestamp, reference, cbd, tbd, gen)
+    val block = Block.buildAndSign(version, timestamp, EqByteArray(reference), cbd, tbd, gen)
     val parsedBlock = Block.parseBytes(block.bytes).get
 
     assert(parsedBlock.consensusData.generationSignature.sameElements(gs))

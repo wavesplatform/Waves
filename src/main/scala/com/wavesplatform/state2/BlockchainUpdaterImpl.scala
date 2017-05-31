@@ -82,7 +82,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader, set
         logHeights(s"Rollback to height $height completed:")
         true
       case None =>
-        log.warn(s"removeAfter non-existing block ${Base58.encode(blockId)}")
+        log.warn(s"removeAfter non-existing block $blockId")
         false
     }
   }

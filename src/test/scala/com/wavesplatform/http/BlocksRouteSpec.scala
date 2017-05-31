@@ -108,9 +108,9 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with MockFactory with BlockGe
     // todo: check invalid signature
     // todo: check block not found (404?)
     forAll(randomSignerBlockGen) { block =>
-      (history.heightOf(_: BlockId)).expects(where(sameSignature(block.uniqueId)(_))).returning(Some(10)).anyNumberOfTimes()
+      (history.heightOf(_: BlockId)).expects(block.uniqueId).returning(Some(10)).anyNumberOfTimes()
       (history.blockAt _).expects(10).returning(Some(block)).anyNumberOfTimes()
-      Get(routePath(s"/height/${Base58.encode(block.signerData.signature)}")) ~> route ~> check {
+      Get(routePath(s"/height/${block.uniqueId.base58}")) ~> route ~> check {
         (responseAs[JsValue] \ "height").as[Int] shouldBe 10
       }
     }
@@ -145,13 +145,13 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with MockFactory with BlockGe
     forAll(randomSignerBlockGen, randomSignerBlockGen, positiveIntGen) { case (block1, block2, h1) =>
 
       (history.blockAt _).expects(h1).returns(Some(block1)).anyNumberOfTimes()
-      (history.heightOf _).expects(where(sameSignature(block1.uniqueId)(_))).returns(Some(h1)).anyNumberOfTimes()
+      (history.heightOf _).expects(block1.uniqueId).returns(Some(h1)).anyNumberOfTimes()
 
       (history.blockAt _).expects(h1 + 1).returns(Some(block2)).anyNumberOfTimes()
-      (history.heightOf _).expects(where(sameSignature(block2.uniqueId)(_))).returns(Some(h1 + 1)).anyNumberOfTimes()
+      (history.heightOf _).expects(block2.uniqueId).returns(Some(h1 + 1)).anyNumberOfTimes()
 
 
-      Get(routePath(s"/child/${Base58.encode(block1.signerData.signature)}")) ~> route ~> check {
+      Get(routePath(s"/child/${block1.uniqueId.base58}")) ~> route ~> check {
         checkBlock(responseAs[JsValue], block2)
       }
     }

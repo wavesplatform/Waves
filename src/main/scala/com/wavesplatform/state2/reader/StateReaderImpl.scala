@@ -38,11 +38,11 @@ class StateReaderImpl(p: StateStorage, val synchronizationToken: ReentrantReadWr
     Option(sp().accountTransactionIds.get(a.bytes))
       .map(_.toSeq)
       .getOrElse(Seq.empty)
-      .map(EqByteArray)
+      .map(EqByteArray(_))
   }
 
   override def paymentTransactionIdByHash(hash: ByteArray): Option[ByteArray] = read { implicit l =>
-    Option(sp().paymentTransactionHashes.get(hash)).map(EqByteArray)
+    Option(sp().paymentTransactionHashes.get(hash)).map(EqByteArray(_))
   }
 
   override def aliasesOfAddress(a: Account): Seq[Alias] = read { implicit l =>
@@ -89,7 +89,7 @@ class StateReaderImpl(p: StateStorage, val synchronizationToken: ReentrantReadWr
     sp().transactions.containsKey(id.arr)
   }
   override def getAssetIdByUniqueName(assetName: ByteArray): Option[ByteArray] =read { implicit l =>
-    Option(p.uniqueAssets.get(assetName.arr)).map(EqByteArray)
+    Option(p.uniqueAssets.get(assetName.arr)).map(EqByteArray(_))
   }
 
   override def filledVolumeAndFee(orderId: ByteArray): OrderFillInfo =read { implicit l =>

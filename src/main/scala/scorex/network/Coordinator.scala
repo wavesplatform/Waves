@@ -7,6 +7,7 @@ import akka.util.Timeout
 import cats._
 import cats.implicits._
 import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
+import com.wavesplatform.state2.EqByteArray
 import com.wavesplatform.state2.reader.StateReader
 import scorex.block.Block
 import scorex.block.Block.BlockId
@@ -83,7 +84,7 @@ class Coordinator(protected override val networkControllerRef: ActorRef, blockch
       }
   }
 
-  private def state(status: CoordinatorStatus)(logic: Receive): Receive = LoggingReceive ({
+  private def state(status: CoordinatorStatus)(logic: Receive): Receive = LoggingReceive({
     logic orElse {
       case GetCoordinatorStatus => sender() ! status
 
@@ -141,7 +142,7 @@ class Coordinator(protected override val networkControllerRef: ActorRef, blockch
     val fork = existingItems.takeWhile {
       case BlockCheckpoint(h, sig) =>
         val block = history.blockAt(h).get
-        !(block.signerData.signature sameElements sig)
+        block.signerData.signature != EqByteArray(sig)
     }
 
     if (fork.nonEmpty) {
@@ -167,12 +168,12 @@ class Coordinator(protected override val networkControllerRef: ActorRef, blockch
 
         val lastBlock = history.lastBlock
 
-        if (!lastBlock.uniqueId.sameElements(parentBlockId)) {
+        if (lastBlock.uniqueId != parentBlockId) {
           // someone has happened to be faster and already added a block or blocks after the parent
           log.debug(s"A child for parent of the block already exists, local=$local: ${str(newBlock)}")
 
           val cmp = PoSCalc.blockOrdering(history, stateReader, settings.blockchainSettings.functionalitySettings, time)
-          if (lastBlock.reference.sameElements(parentBlockId) && cmp.lt(lastBlock, newBlock)) {
+          if (lastBlock.reference == parentBlockId && cmp.lt(lastBlock, newBlock)) {
             log.debug(s"New block ${str(newBlock)} is better than last ${str(lastBlock)}")
           }
 
@@ -221,8 +222,8 @@ class Coordinator(protected override val networkControllerRef: ActorRef, blockch
       foldM[({type l[α] = Either[(ValidationError, BlockId), α]})#l, List, Block, Unit](newBlocks.toList, ()) { case ((), block: Block) => processNewBlock(block).left.map((_, block.uniqueId)) } match {
         case Right(_) =>
         case Left(err) =>
-          log.error(s"Can't processFork(lastBlockCommonId: ${Base58.encode(lastCommonBlockId)} because: ${err._1}")
-          if (history.lastBlock.uniqueId.sameElements(err._2)) {
+          log.error(s"Can't processFork(lastBlockCommonId: $lastCommonBlockId because: ${err._1}")
+          if (history.lastBlock.uniqueId == err._2) {
             from.foreach(_.blacklist())
           }
       }
@@ -240,7 +241,7 @@ class Coordinator(protected override val networkControllerRef: ActorRef, blockch
       case Checkpoint(items, _) =>
         val blockSignature = candidate.signerData.signature
         items.exists { case BlockCheckpoint(h, sig) =>
-          h == estimatedHeight && !(blockSignature sameElements sig)
+          h == estimatedHeight && (blockSignature != EqByteArray(sig))
         }
     }
 
@@ -256,7 +257,7 @@ class Coordinator(protected override val networkControllerRef: ActorRef, blockch
     else {
       def historyContainsParent = history.contains(b.reference)
 
-      def signatureIsValid = EllipticCurveImpl.verify(b.signerData.signature, b.bytesWithoutSignature,
+      def signatureIsValid = EllipticCurveImpl.verify(b.signerData.signature.arr, b.bytesWithoutSignature,
         b.signerData.generator.publicKey)
 
       def consensusDataIsValid = blockConsensusValidation(
@@ -286,7 +287,7 @@ class Coordinator(protected override val networkControllerRef: ActorRef, blockch
 
   private def str(block: Block) = {
     if (log.logger.isTraceEnabled) block.json
-    else encode(block.uniqueId) + ", parent " + encode(block.reference)
+    else (block.uniqueId) + ", parent " + block.reference
   }
 }
 
@@ -344,18 +345,11 @@ object Coordinator extends ScorexLogging {
     }
 
     val parentOpt = history.parent(block)
-    require(parentOpt.isDefined || history.height() == 1, s"Can't find parent block with id '${
-      Base58.encode(block.reference)
-    }' of block " +
-      s"'${
-        Base58.encode(block.uniqueId)
-      }'")
+    require(parentOpt.isDefined || history.height() == 1, s"Can't find parent block with id '${block.reference}' of block '${block.uniqueId}'")
 
     val parent = parentOpt.get
     val parentHeightOpt = history.heightOf(parent.uniqueId)
-    require(parentHeightOpt.isDefined, s"Can't get parent block with id '${
-      Base58.encode(block.reference)
-    }' height")
+    require(parentHeightOpt.isDefined, s"Can't get parent block with id '${block.reference}' height")
     val parentHeight = parentHeightOpt.get
 
     val prevBlockData = parent.consensusData

@@ -6,7 +6,7 @@ import scorex.transaction.TransactionParser.SignatureLength
 
 trait HistoryTest {
   def appendGenesisBlock(history: HistoryWriterImpl): Unit =
-    history.appendBlock(TestBlock.withReference(Array.fill(SignatureLength)(0: Byte))).explicitGet()
+    history.appendBlock(TestBlock.withReference(EqByteArray(Array.fill(SignatureLength)(0: Byte)))).explicitGet()
   def appendTestBlock(history: HistoryWriterImpl): Unit =
     history.appendBlock(TestBlock.withReference(history.lastBlock.uniqueId)).explicitGet()
 }

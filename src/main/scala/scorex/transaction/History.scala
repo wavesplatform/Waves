@@ -1,5 +1,6 @@
 package scorex.transaction
 
+import com.wavesplatform.state2.{ByteArray, EqByteArray}
 import scorex.account.Account
 import scorex.block.Block
 import scorex.block.Block.BlockId
@@ -8,7 +9,7 @@ import scorex.network.Checkpoint
 
 import scala.util.Try
 import scorex.transaction.History.BlockchainScore
-import scorex.utils.{ Synchronized}
+import scorex.utils.Synchronized
 
 trait History extends Synchronized {
 
@@ -51,13 +52,13 @@ object History {
 
     def contains(block: Block): Boolean = history.contains(block.uniqueId)
 
-    def contains(signature: Array[Byte]): Boolean = history.heightOf(signature).isDefined
+    def contains(signature: ByteArray): Boolean = history.heightOf(signature).isDefined
 
     def blockById(blockId: BlockId): Option[Block] = history.read { implicit lock =>
       history.heightOf(blockId).flatMap(history.blockAt)
     }
 
-    def blockById(blockId: String): Option[Block] = Base58.decode(blockId).toOption.flatMap(history.blockById)
+    def blockById(blockId: String): Option[Block] = EqByteArray.decode(blockId).toOption.flatMap(history.blockById)
 
     def heightOf(block: Block): Option[Int] = history.heightOf(block.uniqueId)
 

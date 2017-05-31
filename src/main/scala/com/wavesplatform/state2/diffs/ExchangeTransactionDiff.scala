@@ -30,7 +30,7 @@ object ExchangeTransactionDiff {
       Map(buyer -> wavesPortfolio(-t.buyMatcherFee)),
       Map(seller -> wavesPortfolio(-t.sellMatcherFee))))
 
-    val priceDiff = t.buyOrder.assetPair.priceAsset.map(EqByteArray) match {
+    val priceDiff = t.buyOrder.assetPair.priceAsset.map(EqByteArray(_)) match {
       case Some(assetId) => Monoid.combine(
         Map(buyer -> Portfolio(0, LeaseInfo.empty, Map(assetId -> buyPriceAssetChange))),
         Map(seller -> Portfolio(0, LeaseInfo.empty, Map(assetId -> sellPriceAssetChange))))
@@ -39,7 +39,7 @@ object ExchangeTransactionDiff {
         Map(seller -> Portfolio(sellPriceAssetChange, LeaseInfo.empty, Map.empty)))
     }
 
-    val amountDiff = t.buyOrder.assetPair.amountAsset.map(EqByteArray) match {
+    val amountDiff = t.buyOrder.assetPair.amountAsset.map(EqByteArray(_)) match {
       case Some(assetId) => Monoid.combine(
         Map(buyer -> Portfolio(0, LeaseInfo.empty, Map(assetId -> buyAmountAssetChange))),
         Map(seller -> Portfolio(0, LeaseInfo.empty, Map(assetId -> sellAmountAssetChange))))

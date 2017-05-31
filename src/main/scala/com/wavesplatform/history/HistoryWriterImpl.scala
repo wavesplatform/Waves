@@ -2,11 +2,11 @@ package com.wavesplatform.history
 
 import java.util.concurrent.locks.ReentrantReadWriteLock
 
+import com.wavesplatform.state2.EqByteArrayMVStoreDataType
 import org.h2.mvstore.MVStore
 import scorex.account.Account
 import scorex.block.Block
 import scorex.block.Block.BlockId
-import scorex.crypto.encode.Base58
 import scorex.transaction.History.BlockchainScore
 import scorex.transaction.ValidationError.CustomError
 import scorex.transaction.{HistoryWriter, ValidationError}
@@ -14,12 +14,12 @@ import scorex.utils.{LogMVMapBuilder, ScorexLogging}
 
 class HistoryWriterImpl private(db: MVStore, val synchronizationToken: ReentrantReadWriteLock) extends HistoryWriter with ScorexLogging {
   private val blockBodyByHeight = Synchronized(db.openMap("blocks", new LogMVMapBuilder[Int, Array[Byte]]))
-  private val blockIdByHeight = Synchronized(db.openMap("signatures", new LogMVMapBuilder[Int, BlockId]))
-  private val heightByBlockId = Synchronized(db.openMap("signaturesReverse", new LogMVMapBuilder[BlockId, Int]))
+  private val blockIdByHeight = Synchronized(db.openMap("signatures", new LogMVMapBuilder[Int, BlockId].valueType(new EqByteArrayMVStoreDataType)))
+  private val heightByBlockId = Synchronized(db.openMap("signaturesReverse", new LogMVMapBuilder[BlockId, Int].keyType(new EqByteArrayMVStoreDataType)))
   private val scoreByHeight = Synchronized(db.openMap("score", new LogMVMapBuilder[Int, BigInt]))
 
   override def appendBlock(block: Block): Either[ValidationError, Unit] = write { implicit lock =>
-    if ((height() == 0) || (this.lastBlock.uniqueId sameElements block.reference)) {
+    if ((height() == 0) || (this.lastBlock.uniqueId == block.reference)) {
       val h = height() + 1
       blockBodyByHeight.mutate(_.put(h, block.bytes))
       scoreByHeight.mutate(_.put(h, score() + block.blockScore))
@@ -28,7 +28,7 @@ class HistoryWriterImpl private(db: MVStore, val synchronizationToken: Reentrant
       db.commit()
       Right(())
     } else {
-      Left(CustomError(s"Failed to append block ${block.encodedId} which parent(${Base58.encode(block.reference)} is not last block in blockchain"))
+      Left(CustomError(s"Failed to append block ${block.encodedId} which parent(${block.reference.base58} is not last block in blockchain"))
     }
   }
 
@@ -60,7 +60,7 @@ class HistoryWriterImpl private(db: MVStore, val synchronizationToken: Reentrant
     heightOf(id).map(scoreByHeight().get(_)).getOrElse(0)
   }
 
-  override def heightOf(blockSignature: Array[Byte]): Option[Int] = read { implicit lock =>
+  override def heightOf(blockSignature: BlockId): Option[Int] = read { implicit lock =>
     Option(heightByBlockId().get(blockSignature))
   }
 

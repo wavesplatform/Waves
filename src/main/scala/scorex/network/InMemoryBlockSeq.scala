@@ -12,17 +12,15 @@ class InMemoryBlockSeq(blockIds: InnerIds) {
 
   private val blocks = mutable.Map.empty[String, Block]
 
-  private val blockIdsSet: Set[String] = blockIds.map(_.toString).toSet
-
-  private def keyToStr(id: BlockId) = Base58.encode(id)
+  private val blockIdsSet: Set[String] = blockIds.map(_.base58).toSet
 
   def addIfNotContained(block: Block): Boolean = {
-    blocks.put(keyToStr(block.uniqueId), block).isEmpty
+    blocks.put(block.uniqueId.base58, block).isEmpty
   }
 
   def noIdsWithoutBlock: Boolean = blockIds.size == blocks.size
 
-  def containsBlockId(blockId: BlockId): Boolean = blockIdsSet.contains(keyToStr(blockId))
+  def containsBlockId(blockId: BlockId): Boolean = blockIdsSet.contains(blockId.base58)
 
   def blocksInOrder: Iterator[Block] = blockIds.
     map(id => blocks.get(id.toString)).
