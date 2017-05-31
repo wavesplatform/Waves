@@ -30,7 +30,7 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
       val prevScore = Option(scores.remove(ch))
       val newPinnedChannel = channelWithHighestScore.map(_._1)
       pinnedChannel.compareAndSet(Some(ch), newPinnedChannel)
-      log.debug(s"${ch.id().asShortText()}: Closed, removing score${prevScore.fold("")(p => s" (was ${p.value})")}")
+      log.debug(s"${id(ctx)} Closed, removing score${prevScore.fold("")(p => s" (was ${p.value})")}")
     }
 
   override def write(ctx: ChannelHandlerContext, msg: AnyRef, promise: ChannelPromise) = msg match {
@@ -48,7 +48,7 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
       val score = RemoteScore(newScoreValue, System.currentTimeMillis())
       scores.compute(ctx.channel(), { (_, prevScore) =>
         if (prevScore == null || score.value > prevScore.value && score.ts >= prevScore.ts) {
-          log.debug(s"Setting score for ${ctx.channel().id().asShortText()} to $newScoreValue${if (isNewHighScore) " (new high score)" else ""}")
+          log.debug(s"${id(ctx)} New score: $newScoreValue${if (isNewHighScore) " (new high score)" else ""}")
         }
         score
       })
@@ -58,7 +58,7 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
       }
 
       if (isNewHighScore && pinnedChannel.getAndSet(Some(ctx.channel())).isEmpty) {
-        log.debug("No previously pinned channel, requesting signatures")
+        log.debug(s"${id(ctx)} No previously pinned channel, requesting signatures")
         ctx.write(LoadBlockchainExtension(lastSignatures))
       }
 

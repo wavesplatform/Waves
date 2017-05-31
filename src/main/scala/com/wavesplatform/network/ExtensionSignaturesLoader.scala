@@ -20,7 +20,7 @@ class ExtensionSignaturesLoader(syncTimeout: FiniteDuration)
       currentTimeout.foreach(_.cancel(true))
       currentTimeout = None
       known.lastOption.foreach { lastKnown =>
-        log.debug(s"${ctx.channel().id().asShortText()}: got extension with ${known.length}/${s.signatures.length} known signatures")
+        log.debug(s"${id(ctx)} Got extension with ${known.length}/${s.signatures.length} known signatures")
         ctx.fireChannelRead(ExtensionIds(lastKnown, unknown))
       }
     case _ => super.channelRead(ctx, msg)
@@ -30,11 +30,11 @@ class ExtensionSignaturesLoader(syncTimeout: FiniteDuration)
     case LoadBlockchainExtension(sigs) if currentTimeout.isEmpty =>
       lastKnownSignatures = sigs
 
-      log.debug(s"${ctx.channel().id().asShortText()}: Loading extension, last ${sigs.length} are [${sigs.head}..${sigs.last}]")
+      log.debug(s"${id(ctx)} Loading extension, last ${sigs.length} are [${sigs.head}..${sigs.last}]")
 
       currentTimeout = Some(ctx.executor().schedule(syncTimeout) {
         if (currentTimeout.nonEmpty) {
-          log.warn(s"${ctx.channel().id().asShortText()}: Timeout expired while loading extension")
+          log.warn(s"${id(ctx)} Timeout expired while loading extension")
           // todo: blacklist peer
         }
       })
@@ -42,7 +42,7 @@ class ExtensionSignaturesLoader(syncTimeout: FiniteDuration)
       ctx.writeAndFlush(GetSignatures(sigs), promise)
 
     case LoadBlockchainExtension(sigs) =>
-      log.debug("Received request to load signatures while waiting for extension, ignoring for now")
+      log.debug(s"${id(ctx)} Received request to load signatures while waiting for extension, ignoring for now")
       promise.setSuccess()
 
     case _ => super.write(ctx, msg, promise)
