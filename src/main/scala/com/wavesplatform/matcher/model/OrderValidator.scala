@@ -4,10 +4,10 @@ import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.market.OrderBookActor.CancelOrder
 import com.wavesplatform.state2.reader.StateReader
 import scorex.account.PublicKeyAccount
+import scorex.transaction.AssetAcc
 import scorex.transaction.ValidationError.CustomError
 import scorex.transaction.assets.exchange.Validation.booleanOperators
 import scorex.transaction.assets.exchange.{Order, Validation}
-import scorex.transaction.{AssetAcc, AssetId}
 import scorex.utils.NTP
 import scorex.wallet.Wallet
 
@@ -39,10 +39,10 @@ trait OrderValidator {
   }
 
   def getTradableBalance(acc: AssetAcc): Long = {
-    storedState.tradableAssetBalance(acc) - orderHistory.getOpenVolume(acc)
+    math.max(0l, storedState.spendableBalance(acc) - orderHistory.getOpenVolume(acc))
   }
 
-  def validateNewOrder(order: Order): Either[CustomValidationError, Order] = {
+  def validateNewOrder(order: Order): Either[CustomError, Order] = {
     //(openOrdersCount.getOrElse(order.matcherPublicKey.address, 0) <= settings.maxOpenOrders) :|
     //  s"Open orders count limit exceeded (Max = ${settings.maxOpenOrders})" &&
     val v =

@@ -76,9 +76,20 @@ class OrderHistoryActor(val settings: MatcherSettings, val storedState: StateRea
   }
 
   def getPairTradableBalance(assetPair: AssetPair, address: String): GetTradableBalanceResponse = {
+    val bal = (for {
+      acc <- Account.fromString(address)
+      amountAcc <- Right(AssetAcc(acc, assetPair.amountAsset))
+      priceAcc <- Right(AssetAcc(acc, assetPair.priceAsset))
+      amountBal <- Right(getTradableBalance(amountAcc))
+      priceBal <- Right(getTradableBalance(priceAcc))
+    } yield (amountBal, priceBal)) match {
+      case Left(_) => (0L, 0L)
+      case Right(b) => b
+    }
+
     GetTradableBalanceResponse(Map(
-      assetPair.amountAssetStr -> getTradableBalance(AssetAcc(new Account(address), assetPair.amountAsset)),
-      assetPair.priceAssetStr -> getTradableBalance(AssetAcc(new Account(address), assetPair.priceAsset))
+      assetPair.amountAssetStr -> bal._1,
+      assetPair.priceAssetStr -> bal._2
     ))
   }
 
