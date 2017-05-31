@@ -30,9 +30,8 @@ class HandshakeTimeoutHandler extends ChannelInboundHandlerAdapter with ScorexLo
   private def cancelTimeout(): Unit = timeout.foreach(_.cancel(true))
 
   override def channelActive(ctx: ChannelHandlerContext) = {
-    log.debug(s"Scheduling handshake timeout for ${ctx.channel().id().asShortText()}")
+    log.trace(s"${id(ctx)} Scheduling handshake timeout")
     timeout = Some(ctx.channel().eventLoop().schedule((() => {
-      log.debug(s"FIRE TIMEOUT ${ctx.channel().id().asShortText()}")
       ctx.fireChannelRead(HandshakeTimeoutExpired)
     }): Runnable, 10, TimeUnit.SECONDS))
 
@@ -64,7 +63,7 @@ class ClientHandshakeHandler(
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef) = msg match {
     case HandshakeTimeoutExpired => ctx.channel().close()
     case incomingHandshake: Handshake =>
-      log.debug(s"${ctx.channel().id().asShortText()}: Received handshake $incomingHandshake")
+      log.debug(s"${id(ctx)} Received handshake $incomingHandshake")
       val channelRemoteAddress = ctx.channel().remoteAddress().asInstanceOf[InetSocketAddress]
       establishedConnections.put(ctx.channel(), PeerInfo(
           channelRemoteAddress,
@@ -82,7 +81,7 @@ class ClientHandshakeHandler(
       }
 
       if (connections.putIfAbsent(key, ctx.channel()) != null) {
-        log.debug(s"${ctx.channel().id().asShortText()}: Already connected to peer, disconnecting")
+        log.debug(s"${id(ctx)} Already connected to peer, disconnecting")
         ctx.close()
       } else {
         ctx.writeAndFlush(handshake.encode(ctx.alloc().buffer()))
@@ -91,14 +90,14 @@ class ClientHandshakeHandler(
         ctx.pipeline().remove(this)
       }
     case other =>
-      log.debug(s"${ctx.channel().id().asShortText()}: Unexpected message $other while waiting for handshake")
+      log.debug(s"${id(ctx)} Unexpected message $other while waiting for handshake")
   }
 
 
   override def exceptionCaught(ctx: ChannelHandlerContext, cause: Throwable) = cause match {
     case ioe: IOException =>
       val hostname = ctx.channel().remoteAddress().asInstanceOf[InetSocketAddress].getHostName
-      log.warn(s"${ctx.channel().id().asShortText()}: Unexpected error while waiting for handshake, blacklisting $hostname", ioe)
+      log.warn(s"${id(ctx)} Unexpected error while waiting for handshake, blacklisting $hostname", ioe)
       peerDatabase.blacklistHost(hostname)
       ctx.close()
     case _ => super.exceptionCaught(ctx, cause)

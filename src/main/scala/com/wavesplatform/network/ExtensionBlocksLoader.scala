@@ -27,17 +27,21 @@ class ExtensionBlocksLoader(history: History, blockSyncTimeout: FiniteDuration)
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef) = msg match {
     case xid@ExtensionIds(_, newIds) if pendingSignatures.isEmpty =>
-      targetExtensionIds = Some(xid)
-      pendingSignatures = newIds.zipWithIndex.toMap
-      cancelTimeout()
-      currentTimeout = Some(ctx.executor().schedule(blockSyncTimeout) {
-        if (targetExtensionIds.contains(xid)) {
-          log.warn(s"${ctx.channel().id().asShortText()}: timeout loading blocks")
-          // todo: blacklist?
-        }
-      })
-      newIds.foreach(s => ctx.write(GetBlock(s)))
-      ctx.flush()
+      if (newIds.nonEmpty) {
+        targetExtensionIds = Some(xid)
+        pendingSignatures = newIds.zipWithIndex.toMap
+        cancelTimeout()
+        currentTimeout = Some(ctx.executor().schedule(blockSyncTimeout) {
+          if (targetExtensionIds.contains(xid)) {
+            log.warn(s"${id(ctx)} Timeout loading blocks")
+            // todo: blacklist?
+          }
+        })
+        newIds.foreach(s => ctx.write(GetBlock(s)))
+        ctx.flush()
+      } else {
+        log.debug(s"${id(ctx)} No new blocks to load")
+      }
 
     case b: Block if pendingSignatures.contains(ByteStr(b.uniqueId)) =>
       val signature = ByteStr(b.uniqueId)
@@ -45,35 +49,28 @@ class ExtensionBlocksLoader(history: History, blockSyncTimeout: FiniteDuration)
       pendingSignatures -= signature
       if (pendingSignatures.isEmpty) {
         cancelTimeout()
-        log.debug(s"${ctx.channel().id().asShortText()}: Loaded all blocks, doing a pre-check")
+        log.debug(s"${id(ctx)} Loaded all blocks, doing a pre-check")
 
         val newBlocks = blockBuffer.values.toSeq
 
         for (tids <- targetExtensionIds) {
           if (!(tids.lastCommonId == ByteStr(newBlocks.head.reference))) {
-            log.warn(s"${ctx.channel().id().asShortText()}: Extension head reference ${encode(newBlocks.head.reference)} differs from last common block id ${tids.lastCommonId}")
+            log.warn(s"${id(ctx)} Extension head reference ${encode(newBlocks.head.reference)} differs from last common block id ${tids.lastCommonId}")
             // todo: blacklist?
           } else if (!newBlocks.sliding(2).forall {
               case Seq(b1, b2) => b1.uniqueId.sameElements(b2.reference)
               case _ => true
             }) {
-            log.warn(s"${ctx.channel().id().asShortText()}: Extension blocks are not contiguous, pre-check failed")
+            log.warn(s"${id(ctx)}Extension blocks are not contiguous, pre-check failed")
             // todo: blacklist?
           } else {
-//            val localScore = history.score()
-//            val forkScore = newBlocks.view.map(_.blockScore).foldLeft(history.scoreOf(tids.lastCommonId.bytes))(_ + _)
-//
-//            if (forkScore <= localScore) {
-//              log.debug(s"${ctx.channel().id().asShortText()}: Fork score $forkScore is not higher than local score $localScore, pre-check failed")
-//            } else {
-              newBlocks.par.find(!blockIsValid(_)) match {
-                case Some(invalidBlock) =>
-                  log.warn(s"${ctx.channel().id().asShortText()}: Got block ${Base58.encode(invalidBlock.uniqueId)} with invalid signature")
-                case None =>
-                  log.debug(s"${ctx.channel().id().asShortText()}: Chain is valid, pre-check passed")
-                  ctx.fireChannelRead(ExtensionBlocks(newBlocks))
-              }
-//            }
+            newBlocks.par.find(!blockIsValid(_)) match {
+              case Some(invalidBlock) =>
+                log.warn(s"${id(ctx)} Got block ${Base58.encode(invalidBlock.uniqueId)} with invalid signature")
+              case None =>
+                log.debug(s"${id(ctx)} Chain is valid, pre-check passed")
+                ctx.fireChannelRead(ExtensionBlocks(newBlocks))
+            }
           }
         }
 
@@ -82,7 +79,7 @@ class ExtensionBlocksLoader(history: History, blockSyncTimeout: FiniteDuration)
       }
 
     case Signatures(sigs) =>
-      log.warn(s"R${ctx.channel().id().asShortText()}: received unexpected extension ids while loading blocks, ignoring")
+      log.warn(s"${id(ctx)} Received unexpected extension ids while loading blocks, ignoring")
     case _ => super.channelRead(ctx, msg)
   }
 

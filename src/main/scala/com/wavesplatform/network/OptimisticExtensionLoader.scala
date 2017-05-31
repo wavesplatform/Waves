@@ -22,10 +22,14 @@ class OptimisticExtensionLoader extends ChannelDuplexHandler with ScorexLogging 
     case ExtensionBlocks(extension) if discardNextBlocks =>
       blocksAreBeingLoaded = false
       discardNextBlocks = false
-      log.debug(s"${ctx.channel().id().asShortText()}: discarding just-loaded ${extension.length} blocks as requested")
+      log.debug(s"${id(ctx)} discarding just-loaded ${extension.length} blocks as requested")
     case ExtensionBlocks(extension) if hopefullyNextIds.isEmpty =>
       loadNextPart(ctx, extension)
       super.channelRead(ctx, msg)
+    case ExtensionBlocks(extension) if extension.isEmpty =>
+      hopefullyNextIds = Seq.empty
+      nextExtensionBlocks = Seq.empty
+      blocksAreBeingLoaded = false
     case ExtensionBlocks(extension) =>
       nextExtensionBlocks = extension
       blocksAreBeingLoaded = false
@@ -35,10 +39,10 @@ class OptimisticExtensionLoader extends ChannelDuplexHandler with ScorexLogging 
   override def write(ctx: ChannelHandlerContext, msg: AnyRef, promise: ChannelPromise) = msg match {
     case LoadBlockchainExtension(localIds) if hopefullyNextIds == localIds =>
       if (blocksAreBeingLoaded) {
-        log.debug(s"${ctx.channel().id().asShortText()}: still waiting for extension to load")
+        log.debug(s"${id(ctx)} Still waiting for extension to load")
         hopefullyNextIds = Seq.empty
       } else {
-        log.debug(s"${ctx.channel().id().asShortText()}: extension already loaded")
+        log.debug(s"${id(ctx)} Extension already loaded")
         ctx.fireChannelRead(ExtensionBlocks(nextExtensionBlocks))
         loadNextPart(ctx, nextExtensionBlocks)
         nextExtensionBlocks = Seq.empty
@@ -46,7 +50,7 @@ class OptimisticExtensionLoader extends ChannelDuplexHandler with ScorexLogging 
     case LoadBlockchainExtension(_) =>
       if (blocksAreBeingLoaded) {
         discardNextBlocks = true
-        log.warn(s"${ctx.channel().id().asShortText()}: got unexpected known block ids, will discard extension once ready")
+        log.warn(s"${id(ctx)} Got unexpected known block ids, will discard extension once ready")
       }
       hopefullyNextIds = Seq.empty
       nextExtensionBlocks = Seq.empty

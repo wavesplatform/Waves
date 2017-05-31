@@ -198,7 +198,7 @@ class Coordinator(
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef) = msg match {
     case ExtensionBlocks(blocks) =>
-      log.debug("Processing fork")
+      log.debug(s"${id(ctx)} Processing fork")
       processFork(blocks.head.reference, blocks.iterator, None)
     case b: Block => processSingleBlock(b, Some(ctx.channel()))
     case other => log.debug(other.getClass.getCanonicalName)
