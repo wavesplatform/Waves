@@ -30,7 +30,6 @@ class Coordinator(
     utxStorage: UnconfirmedTransactionsStorage,
     settings: BlockchainSettings,
     checkpointPublicKey: String,
-    network: Network,
     miner: Miner)
   extends ChannelInboundHandlerAdapter with ScorexLogging {
   import Coordinator._
@@ -78,7 +77,7 @@ class Coordinator(
     else encode(block.uniqueId) + ", parent " + encode(block.reference)
   }
 
-  private def processFork(lastCommonBlockId: BlockId, blocks: Iterator[Block], from: Option[Channel]): Unit = {
+  private def processFork(ctx: ChannelHandlerContext, lastCommonBlockId: BlockId, blocks: Iterator[Block]): Unit = {
     val newBlocks = blocks.toSeq
 
     def isForkValidWithCheckpoint(lastCommonHeight: Int): Boolean = {
@@ -97,7 +96,7 @@ class Coordinator(
           }
       }
 
-      network.requestExtension(history.score())
+      ctx.writeAndFlush(LocalScoreChanged(history.score()))
 
     } else {
 //      from.foreach(_.blacklist())
@@ -199,8 +198,12 @@ class Coordinator(
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef) = msg match {
     case ExtensionBlocks(blocks) =>
       log.debug(s"${id(ctx)} Processing fork")
-      processFork(blocks.head.reference, blocks.iterator, None)
+      processFork(ctx, blocks.head.reference, blocks.iterator)
+      log.debug(s"${id(ctx)} Finished processing fork")
     case b: Block => processSingleBlock(b, Some(ctx.channel()))
+    case RollbackTo(blockId) =>
+      blockchainUpdater.removeAfter(blockId)
+      ctx.writeAndFlush(LocalScoreChanged(history.score()))
     case other => log.debug(other.getClass.getCanonicalName)
   }
 }

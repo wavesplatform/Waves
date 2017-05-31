@@ -28,16 +28,22 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
     ctx.channel().closeFuture().addListener { f: ChannelFuture =>
       val ch = f.channel()
       val prevScore = Option(scores.remove(ch))
-      val newPinnedChannel = channelWithHighestScore.map(_._1)
-      pinnedChannel.compareAndSet(Some(ch), newPinnedChannel)
+      pinnedChannel.compareAndSet(Some(ch), channelWithHighestScore.map(_._1))
       log.debug(s"${id(ctx)} Closed, removing score${prevScore.fold("")(p => s" (was ${p.value})")}")
     }
 
   override def write(ctx: ChannelHandlerContext, msg: AnyRef, promise: ChannelPromise) = msg match {
     case LocalScoreChanged(newLocalScore) =>
-      for ((chan, score) <- channelWithHighestScore if chan == ctx.channel() && score.value > newLocalScore) {
-        log.debug(s"${ctx.channel().id().asShortText()}: Local score $newLocalScore is still lower than remote one ${score.value}, requesting extension")
-        ctx.write(LoadBlockchainExtension(lastSignatures), promise)
+      channelWithHighestScore match {
+        case Some((chan, score)) =>
+          promise.setSuccess()
+          if (score.value > newLocalScore) {
+            log.debug(s"${id(ctx)} Local score $newLocalScore is still lower than remote ${score.value} from ${id(chan)}, requesting extension")
+            chan.writeAndFlush(LoadBlockchainExtension(lastSignatures))
+          } else {
+            log.debug(s"${id(ctx)} Blockchain is up to date")
+          }
+        case _ => log.debug(s"${id(ctx)} No channel with high score")
       }
     case _ => ctx.write(msg, promise)
   }
