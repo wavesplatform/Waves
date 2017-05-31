@@ -23,6 +23,7 @@ case class LoadBlockchainExtension(lastBlockIds: Seq[ByteStr])
 case class ExtensionIds(lastCommonId: ByteStr, extensionIds: Seq[ByteStr])
 case class ExtensionBlocks(extension: Seq[Block])
 case class LocalScoreChanged(newLocalScore: History.BlockchainScore)
+case class BlockForged(block: Block)
 
 case object BlockchainExpired
 case object BlockchainUpdated

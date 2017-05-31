@@ -5,6 +5,7 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 
 import com.wavesplatform.Version
+import com.wavesplatform.mining.Miner
 import com.wavesplatform.settings._
 import com.wavesplatform.state2.reader.StateReader
 import com.wavesplatform.utils.ByteStr
@@ -19,6 +20,7 @@ import io.netty.handler.codec.{LengthFieldBasedFrameDecoder, LengthFieldPrepende
 import scorex.network.message.{BasicMessagesRepo, MessageSpec}
 import scorex.transaction._
 import scorex.utils.{ScorexLogging, Time}
+import scorex.wallet.Wallet
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
@@ -42,29 +44,9 @@ class NetworkServer(
     utxStorage: UnconfirmedTransactionsStorage,
     txHandler: NewTransactionHandler,
     peerDatabase: PeerDatabase,
+    wallet: Wallet,
     allChannels: ChannelGroup,
     peerInfo: ConcurrentHashMap[Channel, PeerInfo]) extends ScorexLogging {
-
-  private val address = new LocalAddress("local-events-channel")
-  private val localServerGroup = new DefaultEventLoopGroup()
-  private val localServer = new ServerBootstrap()
-    .group(localServerGroup)
-    .channel(classOf[LocalServerChannel])
-    .childHandler(new ChannelInitializer[LocalChannel] {
-      override def initChannel(ch: LocalChannel) = ch.pipeline().addLast(coordinatorExecutor, coordinator)
-    })
-
-  localServer.bind(address).sync()
-
-  private val localClientGroup = new DefaultEventLoopGroup()
-  private val localClientChannel = new Bootstrap()
-    .group(localClientGroup)
-    .channel(classOf[LocalChannel])
-    .handler(new ChannelInitializer[LocalChannel] {
-        override def initChannel(ch: LocalChannel) = {}
-      })
-    .connect(address)
-    .channel()
 
   private val bossGroup = new NioEventLoopGroup()
   private val workerGroup = new NioEventLoopGroup()
@@ -90,9 +72,33 @@ class NetworkServer(
     override def broadcast(msg: AnyRef, except: Option[Channel]) = doBroadcast(msg, except)
   }
 
+  private val miner = new Miner(history, stateReader, utxStorage, wallet.privateKeyAccounts(), time,
+    settings.blockchainSettings, b => writeToLocalChannel(BlockForged(b)))
+
   private val coordinatorExecutor = new DefaultEventLoop
   private val coordinator = new Coordinator(checkpoints, history, blockchainUpdater, time, stateReader, utxStorage,
-    settings.blockchainSettings, settings.checkpointsSettings.publicKey, network)
+    settings.blockchainSettings, settings.checkpointsSettings.publicKey, network, miner)
+
+  private val address = new LocalAddress("local-events-channel")
+  private val localServerGroup = new DefaultEventLoopGroup()
+  private val localServer = new ServerBootstrap()
+    .group(localServerGroup)
+    .channel(classOf[LocalServerChannel])
+    .childHandler(new ChannelInitializer[LocalChannel] {
+      override def initChannel(ch: LocalChannel) = ch.pipeline().addLast(coordinatorExecutor, coordinator)
+    })
+
+  localServer.bind(address).sync()
+
+  private val localClientGroup = new DefaultEventLoopGroup()
+  private val localClientChannel = new Bootstrap()
+    .group(localClientGroup)
+    .channel(classOf[LocalChannel])
+    .handler(new ChannelInitializer[LocalChannel] {
+      override def initChannel(ch: LocalChannel) = {}
+    })
+    .connect(address)
+    .channel()
 
   private val bootstrap = new Bootstrap()
     .group(workerGroup)
@@ -155,6 +161,7 @@ class NetworkServer(
       chan
     })
 
+  private def writeToLocalChannel(message: AnyRef): Unit = localClientChannel.writeAndFlush(message)
   private def doBroadcast(message: AnyRef, except: Option[Channel] = None): Unit = {
     log.debug(s"Broadcasting $message to ${allChannels.size()} channels${except.fold("")(c => s" (except ${c.id().asShortText()})")}")
     allChannels.writeAndFlush(message, except.fold(ChannelMatchers.all())(ChannelMatchers.isNot))
