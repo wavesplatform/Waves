@@ -16,12 +16,10 @@ import com.wavesplatform.state2.reader.StateReader
 import io.swagger.annotations._
 import play.api.libs.json._
 import scorex.api.http._
-import scorex.app.Application
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange.OrderJson._
 import scorex.transaction.assets.exchange.{AssetPair, Order}
-import scorex.transaction.state.database.blockchain.StoredState
 import scorex.utils.NTP
 import scorex.wallet.Wallet
 

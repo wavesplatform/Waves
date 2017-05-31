@@ -3,6 +3,7 @@ package com.wavesplatform.matcher.model
 import com.wavesplatform.matcher.model.Events.{OrderCanceled, OrderExecuted}
 import com.wavesplatform.matcher.model.LimitOrder.OrderStatus
 import com.wavesplatform.matcher.util.{Cache, TTLCache}
+import scorex.crypto.encode.Base58
 import scorex.transaction.AssetAcc
 import scorex.transaction.assets.exchange.Order
 
@@ -16,11 +17,13 @@ trait OrderHistoryOld {
   val ordersRemainingAmount: Cache[String, (Long, Long)] =
     TTLCache[String, (Long, Long)]((Order.MaxLiveTime + 3600*1000).millis)
   val openOrdersCount = mutable.Map.empty[AddressString, Int]
+  val addressToOrders = mutable.Map.empty[String, Seq[String]]
 
 
-  def initOrdersCache(m: Map[String, (Long, Long)]) = {
+  def initOrdersCache(m: Map[String, (Long, Long)], a: Map[String, Seq[String]]) = {
     ordersRemainingAmount.clear()
     m.foreach(v => ordersRemainingAmount.set(v._1, v._2))
+    a.foreach(v => addressToOrders.put(v._1, v._2))
   }
 
   def recoverFromOrderBook(ob: OrderBook): Unit = {
@@ -39,6 +42,10 @@ trait OrderHistoryOld {
     assetsToSpend(feeAssetAcc.key) = assetsToSpend.getOrElse(feeAssetAcc.key, 0L) + lo.feeAmount
 
     incCount(order.senderPublicKey.address)
+    val publicKey = Base58.encode(lo.order.senderPublicKey.publicKey)
+    val prev = addressToOrders.getOrElse(publicKey, Vector())
+    if (!prev.contains(lo.order.idStr))
+      addressToOrders(publicKey) = prev :+ lo.order.idStr
   }
 
   private def updateRemaining(orderId: String, d: (Long, Long)) = {
@@ -50,6 +57,10 @@ trait OrderHistoryOld {
     addAssetsToSpend(lo)
 
     updateRemaining(lo.order.idStr, (lo.amount, 0L))
+  }
+
+  def deleteOrder(publicKey: String, orderId: String): Unit = {
+    addressToOrders(publicKey) = addressToOrders.getOrElse(publicKey, Vector()).filterNot(_ == orderId)
   }
 
   def reduceSpendAssets(limitOrder: LimitOrder) = {
@@ -97,5 +108,14 @@ trait OrderHistoryOld {
       else if (filled < full) LimitOrder.PartiallyFilled(filled)
       else LimitOrder.Filled
     }
+  }
+
+  def getOrderHistory(address: String): Seq[(String, OrderStatus, Long, Long)] = {
+    addressToOrders.get(address).map {orders =>
+      orders.map { o =>
+        val (amount, filled) = ordersRemainingAmount.get(o).getOrElse((0L, 0L))
+        (o, getOrderStatus(o), amount, filled)
+      }
+    }.getOrElse(Seq())
   }
 }
