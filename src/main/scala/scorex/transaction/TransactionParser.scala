@@ -21,6 +21,7 @@ object TransactionParser {
     val LeaseCancelTransaction = Value(9)
     val CreateAliasTransaction = Value(10)
     val MakeAssetNameUniqueTransaction = Value(11)
+    val DataTransaction = Value(12)
   }
 
   val TimestampLength = 8
