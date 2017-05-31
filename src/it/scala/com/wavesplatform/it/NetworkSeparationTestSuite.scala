@@ -12,14 +12,12 @@ import scala.concurrent.{Await, Future}
 import scala.util.Random
 
 
-class BlacklistTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll {
+class NetworkSeparationTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll {
 
-  import BlacklistTestSuite._
+  import NetworkSeparationTestSuite._
 
   private val docker = new Docker()
-  private val nodes = Configs.map(docker.startNode)
-  private val richestNode = nodes.head
-  private val otherNodes = nodes.tail
+  private val nodes = NodeConfigs.map(docker.startNode)
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
@@ -32,7 +30,6 @@ class BlacklistTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll {
       } yield count, 1.minute
     )
   }
-
 
   override protected def afterAll(): Unit = {
     super.afterAll()
@@ -49,43 +46,42 @@ class BlacklistTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll {
     all(targetBlocks1) shouldEqual targetBlocks1.head
   }
 
-  "network should grow up to 100 blocks" in {
+  "node should grow up to 100 blocks together" in {
+    val richestNode = nodes.maxBy(n => Await.result(n.balance(n.address), 1.minute).balance)
     Await.result(richestNode.waitForHeight(100), 5.minutes)
-
     Await.result(richestNode.height, 1.minute) >= 100 shouldBe true
   }
 
-  "richest node should blacklist other nodes" in {
-    otherNodes.foreach(n => Await.result(richestNode.blacklist(n), 1.minute))
-
-    Await.result(
-      richestNode.waitFor[Seq[String]](richestNode.blacklistedPeers, _.length >= NodesCount - 1, 5.seconds),
-      5.minutes)
-
-    val blacklisted = Await.result(richestNode.blacklistedPeers, 1.minute)
-    blacklisted.length should be(NodesCount - 1)
+  "then we disconnect nodes from the network" in {
+    nodes.foreach(docker.disconnectFromNetwork)
   }
 
-  "sleep while nodes are blocked" in {
-    Thread.sleep(richestNode.settings.networkSettings.blackListResidenceTime.toMillis + 10.seconds.toMillis)
+  "and wait for another 20 blocks on one node" in {
+    val richestNode = nodes.maxBy(n => Await.result(n.balance(n.address), 1.minute).balance)
+    Await.result(richestNode.waitForHeight(120), 5.minutes)
+    Await.result(richestNode.height, 1.minute) >= 120 shouldBe true
   }
 
-  "and sync again" in {
+  "after that we connect nodes back to the network" in {
+    nodes.foreach(docker.connectToNetwork)
+  }
+
+  "nodes should sync" in {
     validateBlocks(nodes)
   }
 }
 
-object BlacklistTestSuite {
+object NetworkSeparationTestSuite {
 
   private val generatingNodeConfig = ConfigFactory.parseString(
     """
       |waves.miner.offline = yes
     """.stripMargin)
 
-  private val dockerConfigs = Docker.NodeConfigs.getConfigList("nodes").asScala
+  private val configs = Docker.NodeConfigs.getConfigList("nodes").asScala
 
   val NodesCount: Int = 4
 
-  val Configs: Seq[Config] = Seq(generatingNodeConfig.withFallback(dockerConfigs.last)) ++ Random.shuffle(dockerConfigs.init).take(NodesCount - 1)
+  val NodeConfigs: Seq[Config] = Random.shuffle(configs).take(NodesCount).map(generatingNodeConfig.withFallback(_))
 
 }

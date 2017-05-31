@@ -277,12 +277,9 @@ class PeerManager(
   private def addPeerToBlacklist(address: InetSocketAddress): Unit = {
     log.info(s"Host '${address.getHostName}' was blacklisted because of peer '$address'")
     peerDatabase.blacklistHost(address.getHostName)
-    log.debug(s"Closing blacklisted connections for address ${address.getAddress}")
-    log.debug(s"Connections: ${register.logConnections(true)}")
 
     val connectionsToClose = register.getConnectionHandlersByHost(address.getAddress)
-    log.debug(s"CLOSING: (${connectionsToClose.size}) ${connectionsToClose.mkString("[", ",", "]")}")
-
+    log.debug(s"${connectionsToClose.length} will be closed because of blacklisting of '${address.getAddress}'")
     connectionsToClose.foreach(_ ! CloseConnection)
 
     blacklistListeners.foreach { listener =>
