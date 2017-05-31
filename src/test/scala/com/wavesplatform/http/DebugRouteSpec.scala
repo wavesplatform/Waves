@@ -20,7 +20,7 @@ class DebugRouteSpec
   private val state = mock[StateReader]
   private val history = mock[History]
   private val blockchainUpdater = mock[BlockchainUpdater]
-  private val route = DebugApiRoute(restAPISettings, testWallet, state, blockchainUpdater, history).route
+  private val route = DebugApiRoute(restAPISettings, testWallet, state, blockchainUpdater, history, peerManager = null).route
 
   private implicit def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)
   

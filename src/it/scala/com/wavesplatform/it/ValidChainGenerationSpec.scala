@@ -7,7 +7,7 @@ import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.Await.result
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
+import scala.concurrent.{Await, Future}
 import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
 import scala.util.Random
@@ -62,6 +62,40 @@ class ValidChainGenerationSpec(allNodes: Seq[Node]) extends FreeSpec with ScalaF
     } yield blocks.map(_.signature), 5.minutes)
 
     all(targetBlocks) shouldEqual targetBlocks.head
+  }
+
+  "Generate more blocks and resynchronise after rollback" in {
+
+    val targetBlocks1 = result(for {
+      height <- traverse(allNodes)(_.height).map(_.max)
+      _ <- traverse(allNodes)(_.waitForHeight(height + 30)) // wait a little longer to prevent rollbacks...
+      _ <- traverse(allNodes)(_.waitForHeight(height + 25)) // ...before requesting actual blocks
+      blocks <- traverse(allNodes)(_.blockAt(height + 25))
+    } yield blocks.map(_.signature), 5.minutes)
+
+    all(targetBlocks1) shouldEqual targetBlocks1.head
+
+    allNodes.head.rollback(1L)
+
+    val targetBlocks2 = result(for {
+      height <- traverse(allNodes)(_.height).map(_.max)
+      _ <- traverse(allNodes)(_.waitForHeight(height + 40)) // wait a little longer to prevent rollbacks...
+      _ <- traverse(allNodes)(_.waitForHeight(height + 25)) // ...before requesting actual blocks
+      blocks <- traverse(allNodes)(_.blockAt(height + 25))
+    } yield blocks.map(_.signature), 5.minutes)
+
+    all(targetBlocks2) shouldEqual targetBlocks2.head
+
+    allNodes.tail.foreach(_.rollback(1L))
+
+    val targetBlocks3 = result(for {
+      height <- traverse(allNodes)(_.height).map(_.max)
+      _ <- traverse(allNodes)(_.waitForHeight(height + 40)) // wait a little longer to prevent rollbacks...
+      _ <- traverse(allNodes)(_.waitForHeight(height + 25)) // ...before requesting actual blocks
+      blocks <- traverse(allNodes)(_.blockAt(height + 25))
+    } yield blocks.map(_.signature), 5.minutes)
+
+    all(targetBlocks3) shouldEqual targetBlocks3.head
   }
 }
 

@@ -2,17 +2,22 @@ package scorex.network.peer
 
 import java.net.InetSocketAddress
 
+import akka.actor.{ActorRef, ActorSystem}
+import akka.testkit.{TestKit, TestProbe}
 import com.wavesplatform.Version
-import org.scalatest.{FlatSpec, Matchers}
+import org.scalatest.{FlatSpecLike, Matchers}
 import scorex.app.ApplicationVersion
 import scorex.network.Handshake
 
-class PeerRegisterSpecification extends FlatSpec with Matchers {
+class PeerRegisterSpecification extends TestKit(ActorSystem("PeerRegisterSpecification")) with FlatSpecLike with Matchers {
   val address1 = new InetSocketAddress("1.1.1.1", 1)
   val address2 = new InetSocketAddress("2.2.2.2", 2)
   val address3 = new InetSocketAddress("3.3.3.3", 3)
+  val google = new InetSocketAddress("8.8.4.4", 80)
 
-  val handshake1 = Handshake("wavesT", new ApplicationVersion(Version.VersionTuple), "node", 1, None, System.currentTimeMillis() / 1000)
+  val handshake1 = Handshake("wavesT", new ApplicationVersion(Version.VersionTuple), "node1", 1, None, System.currentTimeMillis() / 1000)
+  val handshake2 = Handshake("wavesT", new ApplicationVersion(Version.VersionTuple), "node2", 2, Some(address2), System.currentTimeMillis() / 1000)
+  val handshake = Handshake("wavesT", new ApplicationVersion(Version.VersionTuple), "google", 3, Some(google), System.currentTimeMillis() / 1000)
 
   "PeerRegister" should "support outgoing connection during establishing connection" in {
     val register = new PeerRegister
@@ -58,5 +63,22 @@ class PeerRegisterSpecification extends FlatSpec with Matchers {
     val register = new PeerRegister
 
     register.handshakedAddresses should be(empty)
+  }
+
+  it should "return peer by host" in {
+    val register = new PeerRegister
+    register.initiateOutboundConnection(address1)
+    val handler1 = TestProbe().ref
+    register.registerHandler(address1, handler1)
+    register.registerHandshake(address1, handshake1)
+
+
+    val handler2 = TestProbe().ref
+    register.registerHandler(google, handler2)
+    register.registerHandshake(google, handshake)
+
+    register.getConnectionHandlersByHost(address1.getAddress) should be(Seq(handler1))
+    register.getConnectionHandlersByHost(google.getAddress) should be(Seq(handler2))
+    register.getConnectionHandlersByHost(address2.getAddress) should be (Seq.empty)
   }
 }

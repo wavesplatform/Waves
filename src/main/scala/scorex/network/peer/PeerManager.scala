@@ -86,7 +86,7 @@ class PeerManager(
 
   private def peerCycle: Receive = {
     case Connected(remote, handlerRef, ownSocketAddress) =>
-      log.debug(s"On new connection: ${register.logConnections}")
+      log.debug(s"On new connection: ${register.logConnections()}")
 
       if (isBlacklisted(remote)) {
         log.warn(s"New network connection with blacklisted peer '$remote': Close connection")
@@ -120,7 +120,7 @@ class PeerManager(
       peerDatabase.addPeer(address, None, None)
 
     case GetConnectedPeers =>
-      log.debug(s"Reporting connected peers: ${register.logConnections}")
+      log.debug(s"Reporting connected peers: ${register.logConnections()}")
       sender() ! register.handshakedPeers
 
     case GetConnectedPeersTyped =>
@@ -208,7 +208,7 @@ class PeerManager(
 
   private def disconnect(remote: InetSocketAddress): Unit = {
     register.remove(remote)
-    log.debug(s"After disconnect: ${register.logConnections}")
+    log.debug(s"After disconnect: ${register.logConnections()}")
   }
 
   private def handleHandshake(remote: InetSocketAddress, handshake: Handshake): Unit =
@@ -275,11 +275,12 @@ class PeerManager(
   }
 
   private def addPeerToBlacklist(address: InetSocketAddress): Unit = {
-    log.info(s"Host '${
-      address.getHostName
-    }' was blacklisted because of peer '$address'")
+    log.info(s"Host '${address.getHostName}' was blacklisted because of peer '$address'")
     peerDatabase.blacklistHost(address.getHostName)
-    register.getConnectionHandlersByHost(address.getAddress).foreach(_ ! CloseConnection)
+
+    val connectionsToClose = register.getConnectionHandlersByHost(address.getAddress)
+    log.debug(s"${connectionsToClose.length} will be closed because of blacklisting of '${address.getAddress}'")
+    connectionsToClose.foreach(_ ! CloseConnection)
 
     blacklistListeners.foreach { listener =>
       listener ! BlackListUpdated(address.getHostName)
