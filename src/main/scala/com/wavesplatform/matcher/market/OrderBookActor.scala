@@ -1,9 +1,9 @@
 package com.wavesplatform.matcher.market
 
-import akka.actor.{ActorRef, Props, Stash, UnboundedStash}
+import akka.actor.{ActorRef, Props, Stash}
 import akka.http.scaladsl.model.StatusCodes
 import akka.persistence._
-import com.wavesplatform.matcher.{MatcherSettings, model}
+import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.api.{CancelOrderRequest, MatcherResponse}
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.market.OrderHistoryActor._
@@ -14,9 +14,10 @@ import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.reader.StateReader
 import play.api.libs.json._
 import scorex.crypto.encode.Base58
+import scorex.transaction.ValidationError.CustomError
 import scorex.transaction.assets.exchange._
 import scorex.transaction.{History, NewTransactionHandler}
-import scorex.utils.{NTP, ScorexLogging, Time}
+import scorex.utils.{NTP, ScorexLogging}
 import scorex.wallet.Wallet
 
 import scala.annotation.tailrec
@@ -29,7 +30,7 @@ class OrderBookActor(assetPair: AssetPair, val orderHistory: ActorRef,
                      val functionalitySettings: FunctionalitySettings,
                      val transactionModule: NewTransactionHandler)
   extends PersistentActor
-    with ScorexLogging with OrderValidator with OrderHistoryOld with ExchangeTransactionCreator {
+    with Stash with ScorexLogging with ExchangeTransactionCreator {
   override def persistenceId: String = OrderBookActor.name(assetPair)
 
   private var orderBook = OrderBook.empty
@@ -95,9 +96,9 @@ class OrderBookActor(assetPair: AssetPair, val orderHistory: ActorRef,
     context.become(waitingValidation)
   }
 
-  def handleValidateCancelResult(res: Either[CustomValidationError, CancelOrder]): Unit = res match {
+  def handleValidateCancelResult(res: Either[CustomError, CancelOrder]): Unit = res match {
     case Left(err) =>
-      apiSender.foreach(_ ! OrderCancelRejected(err.err))
+      apiSender.foreach(_ ! OrderCancelRejected(err.s))
     case Right(cancel) =>
       OrderBook.cancelOrder(orderBook, cancel.orderId) match {
         case Some(oc) =>
@@ -141,11 +142,11 @@ class OrderBookActor(assetPair: AssetPair, val orderHistory: ActorRef,
     context.become(waitingValidation)
   }
 
-  def handleValidateOrderResult(res: Either[CustomValidationError, Order]): Unit = {
+  def handleValidateOrderResult(res: Either[CustomError, Order]): Unit = {
     res match {
       case Left(err) =>
         log.debug(s"Order rejected: $err.err")
-        apiSender.foreach(_ ! OrderRejected(err.err))
+        apiSender.foreach(_ ! OrderRejected(err.s))
       case Right(o) =>
         log.debug(s"Order accepted: ${o.idStr}, trying to match ...")
         apiSender.foreach(_ ! OrderAccepted(o))

@@ -4,12 +4,11 @@ import cats.Monoid
 import cats.implicits._
 import com.wavesplatform.matcher.model.MatcherModel.Price
 import com.wavesplatform.state2.reader.StateReader
-import play.api.libs.json.{JsValue, Json}
-import scorex.transaction.AssetId
+import play.api.libs.json.{JsObject, JsValue, Json}
+import scorex.crypto.encode.Base58
+import scorex.transaction.{AssetAcc, AssetId}
+import scorex.transaction.assets.exchange.Validation.booleanOperators
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType, Validation}
-import scorex.transaction.assets.exchange.Validation.booleanOperators
-import scorex.transaction.assets.exchange.Validation.booleanOperators
-import scorex.transaction.state.database.blockchain.StoredState
 
 object MatcherModel {
   type Price = Long

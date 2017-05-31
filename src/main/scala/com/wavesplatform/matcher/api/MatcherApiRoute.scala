@@ -166,7 +166,7 @@ case class MatcherApiRoute(wallet: Wallet,storedState: StateReader, matcher: Act
       sig <-  Base58.decode(signature)
       verified <- Try(if (EllipticCurveImpl.verify(sig, pk ++ Longs.toByteArray(validTs), pk)) true
         else throw new IllegalArgumentException("Incorrect signature"))
-    } yield new PublicKeyAccount(pk).address
+    } yield PublicKeyAccount(pk).address
   }
 
   @Path("/orderbook/{amountAsset}/{priceAsset}/publicKey/{publicKey}")

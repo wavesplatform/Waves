@@ -7,7 +7,7 @@ import com.wavesplatform.matcher.MatcherTestData
 import com.wavesplatform.matcher.fixtures.RestartableActor
 import com.wavesplatform.matcher.fixtures.RestartableActor.RestartActor
 import com.wavesplatform.matcher.market.OrderBookActor._
-import com.wavesplatform.matcher.market.OrderHistoryActor.{ValidateOrder, ValidateOrderResult}
+import com.wavesplatform.matcher.market.OrderHistoryActor.{GetOrderStatus, ValidateOrder, ValidateOrderResult}
 import com.wavesplatform.matcher.model.Events.Event
 import com.wavesplatform.matcher.model.{BuyLimitOrder, LimitOrder, SellLimitOrder}
 import com.wavesplatform.settings.Constants
@@ -17,7 +17,6 @@ import com.wavesplatform.state2.{ByteStr, LeaseInfo, Portfolio}
 import org.h2.mvstore.MVStore
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest._
-import scorex.settings.TestChainParameters
 import scorex.transaction._
 import scorex.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
 import scorex.utils.ScorexLogging
@@ -55,12 +54,15 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
 
   val wallet = new Wallet(None, "matcher".toCharArray, Option(WalletSeed))
   wallet.generateNewAccount()
-val orderHistoryRef = TestActorRef(new Actor {
+
+  val orderHistoryRef = TestActorRef(new Actor {
     def receive: Receive = {
       case ValidateOrder(o) => sender() ! ValidateOrderResult(Right(o))
       case _ =>
     }
-  })  var actor = system.actorOf(Props(new OrderBookActor(pair, orderHistoryRef,storedState,
+  })
+
+  var actor = system.actorOf(Props(new OrderBookActor(pair, orderHistoryRef,storedState,
     wallet, settings, stub[History], stub[FunctionalitySettings], stub[NewTransactionHandler]) with RestartableActor))
 
 
@@ -351,7 +353,7 @@ val orderHistoryRef = TestActorRef(new Actor {
       expectMsg(GetOrderStatusResponse(LimitOrder.Filled))
 
       actor ! GetOrderStatus(pair, ord3.idStr)
-      expectMsg(GetOrderStatusResponse(LimitOrder.Filled))
+      expectMsg(GetOrderStatusResponse(LimitOrder.Filled))*/
     }
 
     "partially execute order with zero fee remaining part" in {
@@ -372,7 +374,7 @@ val orderHistoryRef = TestActorRef(new Actor {
       expectMsg(GetOrderStatusResponse(LimitOrder.Filled))
 
       actor ! GetOrderStatus(pair, ord3.idStr)
-      expectMsg(GetOrderStatusResponse(LimitOrder.Filled))
+      expectMsg(GetOrderStatusResponse(LimitOrder.Filled))*/
     }
 
     "partially execute order with price > 1 and zero fee remaining part " in {
@@ -393,7 +395,7 @@ val orderHistoryRef = TestActorRef(new Actor {
       expectMsg(GetOrderStatusResponse(LimitOrder.Filled))
 
       actor ! GetOrderStatus(pair, ord3.idStr)
-      expectMsg(GetOrderStatusResponse(LimitOrder.Filled))
+      expectMsg(GetOrderStatusResponse(LimitOrder.Filled))*/
     }
   }
 

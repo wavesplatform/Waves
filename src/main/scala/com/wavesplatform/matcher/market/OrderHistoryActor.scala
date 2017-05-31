@@ -11,13 +11,13 @@ import com.wavesplatform.matcher.market.OrderHistoryActor._
 import com.wavesplatform.matcher.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
 import com.wavesplatform.matcher.model.LimitOrder.Filled
 import com.wavesplatform.matcher.model._
+import com.wavesplatform.state2.reader.StateReader
 import org.h2.mvstore.MVStore
-import scorex.transaction.ValidationError.CustomValidationError
+import scorex.transaction.ValidationError.CustomError
 import scorex.transaction.assets.exchange.{AssetPair, Order}
-import scorex.transaction.state.database.blockchain.StoredState
 import scorex.wallet.Wallet
 
-class OrderHistoryActor(val settings: MatcherSettings, val storedState: StoredState, val wallet: Wallet)
+class OrderHistoryActor(val settings: MatcherSettings, val storedState: StateReader, val wallet: Wallet)
   extends Actor with OrderValidator {
 
   val dbFile = new File(settings.orderHistoryFile)
@@ -87,7 +87,7 @@ class OrderHistoryActor(val settings: MatcherSettings, val storedState: StoredSt
 
 object OrderHistoryActor {
   def name = "OrderHistory"
-  def props(settings: MatcherSettings, storedState: StoredState, wallet: Wallet): Props =
+  def props(settings: MatcherSettings, storedState: StateReader, wallet: Wallet): Props =
     Props(new OrderHistoryActor(settings, storedState, wallet))
 
   sealed trait OrderHistoryRequest
@@ -95,8 +95,8 @@ object OrderHistoryActor {
   case class GetOrderStatus(assetPair: AssetPair, id: String) extends OrderHistoryRequest
   case class DeleteOrderFromHistory(assetPair: AssetPair, address: String, id: String) extends OrderHistoryRequest
   case class ValidateOrder(order: Order) extends OrderHistoryRequest
-  case class ValidateOrderResult(result: Either[CustomValidationError, Order])
+  case class ValidateOrderResult(result: Either[CustomError, Order])
   case class ValidateCancelOrder(cancel: CancelOrder) extends OrderHistoryRequest
-  case class ValidateCancelResult(result: Either[CustomValidationError, CancelOrder])
+  case class ValidateCancelResult(result: Either[CustomError, CancelOrder])
   case class RecoverFromOrderBook(ob: OrderBook) extends OrderHistoryRequest
 }
