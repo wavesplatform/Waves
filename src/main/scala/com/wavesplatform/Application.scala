@@ -82,6 +82,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
       utxStorage,
       newTransactionHandler,
       peerDatabase,
+      wallet,
       allChannels,
       establishedConnections)
 
