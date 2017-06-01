@@ -17,7 +17,9 @@ import com.wavesplatform.state2.{ByteStr, LeaseInfo, Portfolio}
 import org.h2.mvstore.MVStore
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest._
+import scorex.account.PrivateKeyAccount
 import scorex.transaction._
+import scorex.transaction.assets.IssueTransaction
 import scorex.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
 import scorex.utils.ScorexLogging
 import scorex.wallet.Wallet
@@ -48,7 +50,17 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
     ByteStr("BTC".getBytes) -> hugeAmount,
     ByteStr("WAVES".getBytes) -> hugeAmount
   )))
+  val issueTransaction: IssueTransaction = IssueTransaction.create(
+    PrivateKeyAccount("123".getBytes),
+    "MinerReward".getBytes,
+    Array.empty,
+    10000000000L,
+    8.toByte,
+    true,
+    100000L,
+    10000L).right.get
 
+  (storedState.transactionInfo _).when(*).returns(Some(1, issueTransaction))
 
   val settings = matcherSettings.copy(account = MatcherAccount.address)
 
@@ -292,48 +304,6 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
       actor ! GetAskOrdersRequest
       expectMsg(GetOrdersResponse(Seq.empty))
 
-    }
-
-    "partially execute order with zero fee remaining part" in {
-
-      val ord1 = sell(pair, 0.0006999, 1500 * Constants.UnitsInWave)
-      val ord2 = sell(pair, 0.00067634, 3075248828L)
-      val ord3 = buy(pair, 0.00073697, 3075363900L)
-
-      actor ! ord1
-      actor ! ord2
-      actor ! ord3
-      receiveN(3)
-
-      actor ! GetAskOrdersRequest
-      expectMsg(GetOrdersResponse(Seq(SellLimitOrder((0.0006999*Order.PriceConstant).toLong, 1500 * Constants.UnitsInWave, ord1))))
-
-      actor ! GetOrderStatus(pair, ord2.idStr)
-      expectMsg(GetOrderStatusResponse(LimitOrder.Filled))
-
-      actor ! GetOrderStatus(pair, ord3.idStr)
-      expectMsg(GetOrderStatusResponse(LimitOrder.Cancelled(3075248828L)))
-    }
-
-    "partially execute order with price > 1 and zero fee remaining part " in {
-      val pair = AssetPair(Some("BTC".getBytes), Some("USD".getBytes))
-      val ord1 = sell(pair, 1850, (0.1 * Constants.UnitsInWave).toLong)
-      val ord2 = sell(pair, 1840, (0.01 * Constants.UnitsInWave).toLong)
-      val ord3 = buy(pair, 2000, (0.0100001 * Constants.UnitsInWave).toLong)
-
-      actor ! ord1
-      actor ! ord2
-      actor ! ord3
-      receiveN(3)
-
-      actor ! GetAskOrdersRequest
-      expectMsg(GetOrdersResponse(Seq(SellLimitOrder((1850*Order.PriceConstant).toLong, (0.1 * Constants.UnitsInWave).toLong, ord1))))
-
-      actor ! GetOrderStatus(pair, ord2.idStr)
-      expectMsg(GetOrderStatusResponse(LimitOrder.Filled))
-
-      actor ! GetOrderStatus(pair, ord3.idStr)
-      expectMsg(GetOrderStatusResponse(LimitOrder.Cancelled((0.01 * Constants.UnitsInWave).toLong)))
     }
 
     "partially execute order with small remaining part" in {
