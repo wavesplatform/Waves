@@ -1,6 +1,5 @@
 package com.wavesplatform.http
 
-import akka.actor.Status.{Failure, Status, Success}
 import akka.http.scaladsl.testkit.RouteTestTimeout
 import akka.testkit.TestProbe
 import com.wavesplatform.Shutdownable
@@ -40,15 +39,15 @@ class NodeRouteSpec extends RouteSpec("/node") with RestAPISettingsHelper with M
       forAll(statusGen) { case (bgs, cs) =>
         val result = Get(routePath("/status")) ~> route ~> runRoute
         blockGenerator.expectMsg(BGC.GetStatus)
-        blockGenerator.reply(bgs)
+        blockGenerator.reply(bgs.name)
 
         coordinator.expectMsg(Coordinator.GetStatus)
-        coordinator.reply(cs)
+        coordinator.reply(cs.name)
 
         check {
           val resp = responseAs[StatusResp]
-          resp.blockGeneratorStatus shouldEqual Some(bgs.toString)
-          resp.historySynchronizationStatus shouldEqual Some(cs.toString)
+          resp.blockGeneratorStatus shouldEqual bgs.name
+          resp.historySynchronizationStatus shouldEqual cs.name
         }(result)
       }
     }
@@ -62,15 +61,15 @@ class NodeRouteSpec extends RouteSpec("/node") with RestAPISettingsHelper with M
       forAll(statusGen) { case (maybeBGS, maybeCS) =>
         val result = Get(routePath("/status")) ~> route ~> runRoute
         blockGenerator.expectMsg(BGC.GetStatus)
-        blockGenerator.reply(maybeBGS.fold[Status](Failure(new Exception))(Success(_)))
+        blockGenerator.reply(if (maybeBGS.isDefined) maybeBGS.get.name else "failure")
 
         coordinator.expectMsg(Coordinator.GetStatus)
-        coordinator.reply(maybeCS.fold[Status](Failure(new Exception))(Success(_)))
+        coordinator.reply(if (maybeCS.isDefined) maybeCS.get.name else "failure")
 
         check {
           val resp = responseAs[StatusResp]
-          resp.blockGeneratorStatus shouldEqual maybeBGS.map(_.toString)
-          resp.historySynchronizationStatus shouldEqual maybeCS.map(_.toString)
+          resp.blockGeneratorStatus shouldEqual (if (maybeBGS.isDefined) maybeBGS.get.name else "failure")
+          resp.historySynchronizationStatus shouldEqual (if (maybeCS.isDefined) maybeCS.get.name else "failure")
         }(result)
       }
     }
@@ -93,6 +92,7 @@ class NodeRouteSpec extends RouteSpec("/node") with RestAPISettingsHelper with M
 }
 
 object NodeRouteSpec {
-  case class StatusResp(blockGeneratorStatus: Option[String], historySynchronizationStatus: Option[String])
+
+  case class StatusResp(blockGeneratorStatus: String, historySynchronizationStatus: String)
   implicit val statusFormat: Format[StatusResp] = Json.format
 }
