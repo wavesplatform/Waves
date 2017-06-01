@@ -75,6 +75,9 @@ class NetworkServer(
   private val miner = new Miner(history, stateReader, utxStorage, wallet.privateKeyAccounts(), time,
     settings.blockchainSettings, b => writeToLocalChannel(BlockForged(b)))
 
+  private val utxPoolSynchronizer = new UtxPoolSynchronizer(txHandler, network)
+  private val localScorePublisher = new LocalScorePublisher(msg => doBroadcast(msg))
+
   private val coordinatorExecutor = new DefaultEventLoop
   private val coordinator = new Coordinator(checkpoints, history, blockchainUpdater, time, stateReader, utxStorage,
     settings.blockchainSettings, settings.checkpointsSettings.publicKey, miner)
@@ -86,7 +89,7 @@ class NetworkServer(
     .channel(classOf[LocalServerChannel])
     .childHandler(new ChannelInitializer[LocalChannel] {
       override def initChannel(ch: LocalChannel) = ch.pipeline()
-        .addLast(scoreObserver)
+        .addLast(utxPoolSynchronizer, scoreObserver, localScorePublisher)
         .addLast(coordinatorExecutor, coordinator)
     })
 
@@ -101,6 +104,8 @@ class NetworkServer(
     })
     .connect(address)
     .channel()
+
+  log.info(s"${id(localClientChannel)} Local channel opened")
 
   private val bootstrap = new Bootstrap()
     .group(workerGroup)
@@ -121,8 +126,9 @@ class NetworkServer(
             new ExtensionSignaturesLoader(settings.synchronizationSettings.synchronizationTimeout),
             new ExtensionBlocksLoader(history, settings.synchronizationSettings.synchronizationTimeout),
             new OptimisticExtensionLoader,
-            new UtxPoolSynchronizer(txHandler, network),
-            scoreObserver)
+            utxPoolSynchronizer,
+            scoreObserver,
+            localScorePublisher)
           .addLast(coordinatorExecutor, coordinator)
     })
 
@@ -132,11 +138,6 @@ class NetworkServer(
     .childHandler(new ServerChannelInitializer(handshake, settings.networkSettings, peerDatabase))
     .bind(settings.networkSettings.port)
     .channel()
-
-  workerGroup.scheduleWithFixedDelay(settings.synchronizationSettings.scoreBroadcastInterval,
-    settings.synchronizationSettings.scoreBroadcastInterval) {
-    doBroadcast(history.score())
-  }
 
   private val outgoingChannelCount = new AtomicInteger(0)
   private val channels = new ConcurrentHashMap[InetSocketAddress, Channel]
@@ -152,10 +153,10 @@ class NetworkServer(
       outgoingChannelCount.incrementAndGet()
       val chan = bootstrap.connect(remoteAddress).channel()
       allChannels.add(chan)
-      log.debug(s"Connecting ${chan.id().asShortText()} to $remoteAddress")
+      log.debug(s"${id(chan)} Connecting to $remoteAddress")
       chan.closeFuture().addListener { (chf: ChannelFuture) =>
         val remainingOutgoingChannelCount = outgoingChannelCount.decrementAndGet()
-        log.debug(s"Connection to $remoteAddress (channel ${chf.channel().id().asShortText()}) is closed, $remainingOutgoingChannelCount channel(s) remaining")
+        log.debug(s"${id(chf.channel)} Connection to $remoteAddress closed, $remainingOutgoingChannelCount channel(s) remaining")
         allChannels.remove(chf.channel())
         channels.remove(remoteAddress, chf.channel())
       }
@@ -165,7 +166,7 @@ class NetworkServer(
   def writeToLocalChannel(message: AnyRef): Unit = localClientChannel.writeAndFlush(message)
 
   private def doBroadcast(message: AnyRef, except: Option[Channel] = None): Unit = {
-    log.debug(s"Broadcasting $message to ${allChannels.size()} channels${except.fold("")(c => s" (except ${c.id().asShortText()})")}")
+    log.debug(s"Broadcasting $message to ${allChannels.size()} channels${except.fold("")(c => s" (except ${id(c)})")}")
     allChannels.writeAndFlush(message, except.fold(ChannelMatchers.all())(ChannelMatchers.isNot))
   }
 

@@ -26,10 +26,12 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
 
   override def handlerAdded(ctx: ChannelHandlerContext) =
     ctx.channel().closeFuture().addListener { f: ChannelFuture =>
-      val ch = f.channel()
-      val prevScore = Option(scores.remove(ch))
-      pinnedChannel.compareAndSet(Some(ch), channelWithHighestScore.map(_._1))
-      log.debug(s"${id(ctx)} Closed, removing score${prevScore.fold("")(p => s" (was ${p.value})")}")
+      val scoreToRemove = Option(scores.remove(f.channel()))
+      val newPinnedChannel = channelWithHighestScore.map(_._1)
+      pinnedChannel.compareAndSet(Some(f.channel()), newPinnedChannel)
+      scoreToRemove.foreach { s =>
+        log.debug(s"${id(ctx)} Closed, removing score ${s.value}${newPinnedChannel.fold("")(ch => s". New pinned channel is ${id(ch)}")}")
+      }
     }
 
   override def write(ctx: ChannelHandlerContext, msg: AnyRef, promise: ChannelPromise) = msg match {
@@ -43,7 +45,7 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
           } else {
             log.debug(s"${id(ctx)} Blockchain is up to date")
           }
-        case _ => log.debug(s"${id(ctx)} No channel with high score")
+        case _ => log.debug(s"${id(ctx)} No channels left?")
       }
     case _ => ctx.write(msg, promise)
   }
@@ -54,7 +56,11 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
       val score = RemoteScore(newScoreValue, System.currentTimeMillis())
       scores.compute(ctx.channel(), { (_, prevScore) =>
         if (prevScore == null || score.value > prevScore.value && score.ts >= prevScore.ts) {
-          log.debug(s"${id(ctx)} New score: $newScoreValue${if (isNewHighScore) " (new high score)" else ""}")
+          if (isNewHighScore) {
+            log.debug(s"${id(ctx)} New high score: $newScoreValue")
+          } else {
+            log.trace(s"${id(ctx)} New score: $newScoreValue")
+          }
         }
         score
       })

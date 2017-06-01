@@ -4,12 +4,11 @@ import com.wavesplatform.settings.UTXSettings
 import com.wavesplatform.state2.ByteStr
 import scorex.transaction.ValidationError.TransactionValidationError
 import scorex.transaction.{Transaction, UnconfirmedTransactionsStorage, ValidationError}
-import scorex.utils.ScorexLogging
 
 import scala.collection.concurrent.TrieMap
 
 
-class UnconfirmedTransactionsDatabaseImpl(size: Int) extends UnconfirmedTransactionsStorage with ScorexLogging {
+class UnconfirmedTransactionsDatabaseImpl(size: Int) extends UnconfirmedTransactionsStorage {
 
   private val transactions = TrieMap[ByteStr, Transaction]()
 
@@ -17,13 +16,10 @@ class UnconfirmedTransactionsDatabaseImpl(size: Int) extends UnconfirmedTransact
     if (transactions.size < size) {
       if (transactions.contains(tx.id)) {
         Left(TransactionValidationError(tx, "already in the pool"))
-      } else txValidator(tx) match {
-        case Right(t) =>
-          transactions.update(tx.id, tx)
-          Right(t)
-        case Left(err) =>
-          log.debug(err.toString)
-          Left(err)
+      } else {
+        val result = txValidator(tx)
+        result.foreach(t => transactions.update(tx.id, t))
+        result
       }
     } else {
       Left(TransactionValidationError(tx, "Transaction pool size limit is reached"))
