@@ -97,10 +97,10 @@ class Coordinator(
       }
 
       ctx.writeAndFlush(LocalScoreChanged(history.score()))
-
+      checkExpiry(ctx)
     } else {
 //      from.foreach(_.blacklist())
-      log.warn(s"Fork contains block that doesn't match checkpoint, declining fork")
+      log.warn(s"${id(ctx)} Fork contains block that doesn't match checkpoint, declining fork")
     }
   }
 
@@ -144,7 +144,7 @@ class Coordinator(
       log.info(s"New block(local: $local): ${str(newBlock)}")
       processNewBlock(newBlock) match {
         case Right(_) =>
-//          blockGenerator ! LastBlockChanged
+          miner.lastBlockChanged(history.height(), newBlock)
           if (local) {
 //            network.broadcast(newBlock)
           } else {
@@ -195,7 +195,16 @@ class Coordinator(
     }
   }
 
+  private def checkExpiry(ctx: ChannelHandlerContext): Unit = {
+    if ((time.correctedTime() - history.lastBlock.timestamp).millis > 1.hour) {
+      ctx.writeAndFlush(BlockchainExpired)
+    } else {
+      ctx.writeAndFlush(BlockchainUpdated)
+    }
+  }
+
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef) = msg match {
+    case c: Checkpoint => handleCheckpoint(c, Some(ctx.channel()))
     case ExtensionBlocks(blocks) =>
       log.debug(s"${id(ctx)} Processing fork")
       processFork(ctx, blocks.head.reference, blocks.iterator)
@@ -205,6 +214,11 @@ class Coordinator(
       blockchainUpdater.removeAfter(blockId)
       ctx.writeAndFlush(LocalScoreChanged(history.score()))
     case other => log.debug(other.getClass.getCanonicalName)
+  }
+
+  override def channelActive(ctx: ChannelHandlerContext) = {
+    ctx.writeAndFlush(history.score())
+    super.channelActive(ctx)
   }
 }
 

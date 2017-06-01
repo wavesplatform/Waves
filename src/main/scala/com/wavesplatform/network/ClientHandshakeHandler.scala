@@ -18,10 +18,6 @@ class HandshakeDecoder extends ReplayingDecoder[Void] with ScorexLogging {
   }
 }
 
-object HandshakeDecoder {
-  val Name = "handshake-decoder"
-}
-
 case object HandshakeTimeoutExpired
 
 class HandshakeTimeoutHandler extends ChannelInboundHandlerAdapter with ScorexLogging {
@@ -104,8 +100,4 @@ class ClientHandshakeHandler(
   }
 
   override def channelInactive(ctx: ChannelHandlerContext) = establishedConnections.remove(ctx.channel())
-}
-
-object ClientHandshakeHandler {
-  val Name = "handshake-handler"
 }
