@@ -51,10 +51,10 @@ case class NodeApiRoute(settings: RestAPISettings, application: Shutdownable, bl
     implicit val timeout = Timeout(5.seconds)
 
     complete(for {
-      bgf <- (blockGenerator ? BGC.GetStatus).mapTo[BGC.Status].transform(f => Try(f.toOption))
-      hsf <- (coordinator ? C.GetStatus).mapTo[C.CoordinatorStatus].transform(f => Try(f.toOption))
+      bgf <- (blockGenerator ? BGC.GetStatus).mapTo[String].transform(f => Try(f.toEither))
+      hsf <- (coordinator ? C.GetStatus).mapTo[String].transform(f => Try(f.toEither))
     } yield Json.obj(
-      "blockGeneratorStatus" -> bgf.map(_.toString),
-      "historySynchronizationStatus" -> hsf.map(_.toString)))
+      "blockGeneratorStatus" -> bgf.getOrElse(s"Failure: ${bgf.left.get.getMessage}").toString,
+      "historySynchronizationStatus" -> hsf.getOrElse(s"Failure: ${hsf.left.get.getMessage}").toString))
   }
 }

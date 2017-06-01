@@ -62,7 +62,7 @@ case class DebugApiRoute(settings: RestAPISettings, wallet: Wallet, stateReader:
   @Path("/stateWaves/{height}")
   @ApiOperation(value = "State at block", notes = "Get state at specified height", httpMethod = "GET")
   @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "height", value = "height", required = true, dataType = "integer", paramType = "body")
+    new ApiImplicitParam(name = "height", value = "height", required = true, dataType = "integer", paramType = "path")
   ))
   def stateWaves: Route = (path("stateWaves" / IntNumber) & get) { height =>
     val result = stateReader.accountPortfolios.keys
