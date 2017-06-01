@@ -7,10 +7,9 @@ import org.scalacheck.{Arbitrary, Gen, Shrink}
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import org.scalatest.{Matchers, PropSpec}
 import scorex.account.AddressScheme
-import scorex.crypto.encode.Base58
 import scorex.lagonaki.mocks.TestBlock
-import scorex.transaction.assets.{BurnTransaction, IssueTransaction, MakeAssetNameUniqueTransaction, ReissueTransaction}
 import scorex.transaction.GenesisTransaction
+import scorex.transaction.assets.{BurnTransaction, IssueTransaction, MakeAssetNameUniqueTransaction, ReissueTransaction}
 
 class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers with TransactionGen {
 
@@ -50,8 +49,8 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Genera
 
         val totalAssetVolume = issue.quantity + reissue.quantity - burn.amount
         newState.accountPortfolio(issue.sender).assets shouldBe Map(EqByteArray(reissue.assetId) -> totalAssetVolume)
-        newState.assetInfo(EqByteArray(issue.id)) shouldBe Some(AssetInfo(reissue.reissuable, totalAssetVolume))
-        newState.getAssetIdByUniqueName(EqByteArray(issue.name)) shouldBe Some(EqByteArray(issue.id))
+        newState.assetInfo(issue.id) shouldBe Some(AssetInfo(reissue.reissuable, totalAssetVolume))
+        newState.getAssetIdByUniqueName(EqByteArray(issue.name)) shouldBe Some(issue.id)
       }
     }
   }
@@ -108,7 +107,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Genera
   property("Cannot make unique asset with already busy name") {
     forAll(issuesAndMakeAssetNameUniquesWithSameName) { case ((gen, issue, makeAssetNameUnique, issue2, makeAssetNameUnique2)) =>
       assertDiffEi(Seq(TestBlock(Seq(gen, issue, issue2, makeAssetNameUnique))), TestBlock(Seq(makeAssetNameUnique2))) { blockDiffEi =>
-        blockDiffEi should produce(s"Asset name has been verified for ${Base58.encode(issue.id)}")
+        blockDiffEi should produce(s"Asset name has been verified for ${issue.id.base58}")
       }
     }
   }

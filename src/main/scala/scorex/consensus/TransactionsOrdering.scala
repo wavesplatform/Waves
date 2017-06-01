@@ -12,7 +12,7 @@ object TransactionsOrdering {
         case None => -t.assetFee._2
       }
       val byTimestamp = txTimestampOrder(t.timestamp)
-      val byTxId = Base58.encode(t.id)
+      val byTxId = t.id.base58
 
       (byFee, byTimestamp, byTxId)
     }

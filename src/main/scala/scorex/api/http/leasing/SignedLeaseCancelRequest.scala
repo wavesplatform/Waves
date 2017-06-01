@@ -26,7 +26,7 @@ case class SignedLeaseCancelRequest(@ApiModelProperty(value = "Base58 encoded se
     _leaseTx <- parseBase58(txId, "invalid.leaseTx", SignatureStringLength)
     _t <- LeaseCancelTransaction.create(
       _sender,
-      _leaseTx,
+      _leaseTx.arr,
       fee,
       timestamp,
       _signature)

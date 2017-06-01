@@ -30,6 +30,6 @@ case class SignedReissueRequest(@ApiModelProperty(value = "Base58 encoded Issuer
     _sender <- PublicKeyAccount.fromBase58String(senderPublicKey)
     _signature <- parseBase58(signature, "invalid.signature", SignatureStringLength)
     _assetId <- parseBase58(assetId, "invalid.assetId", AssetIdStringLength)
-    _t <- ReissueTransaction.create(_sender, _assetId, quantity, reissuable, fee, timestamp, _signature)
+    _t <- ReissueTransaction.create(_sender, _assetId.arr, quantity, reissuable, fee, timestamp, _signature)
   } yield _t
 }

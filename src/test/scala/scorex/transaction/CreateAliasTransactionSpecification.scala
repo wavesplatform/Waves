@@ -28,7 +28,7 @@ class CreateAliasTransactionSpecification extends PropSpec with PropertyChecks w
     forAll(accountGen, accountGen, aliasGen, timestampGen) { case (a1: PrivateKeyAccount, a2: PrivateKeyAccount, a: Alias, t: Long) =>
       val tx1 = CreateAliasTransaction.create(a1, a, MinIssueFee, t).right.get
       val tx2 = CreateAliasTransaction.create(a2, a, MinIssueFee, t).right.get
-      (tx1.id sameElements tx2.id) shouldBe true
+      tx1.id shouldBe tx2.id
     }
   }
 

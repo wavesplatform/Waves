@@ -26,7 +26,7 @@ case class SignedMakeAssetNameUniqueRequest(@ApiModelProperty(value = "Base58 en
     _sender <- PublicKeyAccount.fromBase58String(senderPublicKey)
     _assetId <- parseBase58(assetId, "invalid.assetId", AssetIdStringLength)
     _signature <- parseBase58(signature, "invalid.signature", SignatureStringLength)
-    _t <- MakeAssetNameUniqueTransaction.create(_sender, _assetId, fee, timestamp, networkByte, _signature)
+    _t <- MakeAssetNameUniqueTransaction.create(_sender, _assetId.arr, fee, timestamp, networkByte, _signature)
   } yield _t
 }
 

@@ -1,6 +1,7 @@
 package scorex.transaction
 
 import com.google.common.base.Charsets
+import com.wavesplatform.state2.EqByteArray
 import scorex.account._
 import scorex.api.http.alias.CreateAliasRequest
 import scorex.api.http.assets._
@@ -92,7 +93,7 @@ object TransactionFactory {
 
   def broadcastPayment(payment: SignedPaymentRequest, tm: NewTransactionHandler): Either[ValidationError, PaymentTransaction] =
     for {
-      _signature <- Base58.decode(payment.signature).toOption.toRight(ValidationError.InvalidSignature)
+      _signature <- EqByteArray.decode(payment.signature).toOption.toRight(ValidationError.InvalidSignature)
       _sender <- PublicKeyAccount.fromBase58String(payment.senderPublicKey)
       _recipient <- Account.fromString(payment.recipient)
       tx <- PaymentTransaction.create(_sender, _recipient, payment.amount, payment.fee, payment.timestamp, _signature)

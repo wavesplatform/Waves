@@ -3,6 +3,7 @@ package scorex.transaction
 import java.util
 
 import com.google.common.primitives.{Bytes, Ints, Longs}
+import com.wavesplatform.state2.{ByteArray, EqByteArray}
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
@@ -22,7 +23,7 @@ sealed trait PaymentTransaction extends Transaction {
 
   def fee: Long
 
-  def signature: Array[Byte]
+  def signature: ByteArray
 
   def hash: Array[Byte]
 }
@@ -34,18 +35,18 @@ object PaymentTransaction {
                                             amount: Long,
                                             fee: Long,
                                             timestamp: Long,
-                                            signature: Array[Byte])
+                                            signature: ByteArray)
     extends PaymentTransaction {
     override val transactionType = TransactionType.PaymentTransaction
     override val assetFee: (Option[AssetId], Long) = (None, fee)
-    override val id: Array[Byte] = signature
+    override val id: ByteArray = signature
 
     override lazy val json: JsObject =
       Json.obj("type" -> transactionType.id,
-        "id" -> Base58.encode(id),
+        "id" -> id.base58,
         "fee" -> fee,
         "timestamp" -> timestamp,
-        "signature" -> Base58.encode(this.signature),
+        "signature" -> this.signature.base58,
         "sender" -> sender.address,
         "senderPublicKey" -> Base58.encode(sender.publicKey),
         "recipient" -> recipient.address,
@@ -60,7 +61,7 @@ object PaymentTransaction {
 
     override lazy val hash = FastCryptographicHash(hashBytes)
 
-    override lazy val bytes: Array[Byte] = Bytes.concat(hashBytes, signature)
+    override lazy val bytes: Array[Byte] = Bytes.concat(hashBytes, signature.arr)
 
   }
 
@@ -78,7 +79,7 @@ object PaymentTransaction {
     } else if (Try(Math.addExact(amount, fee)).isFailure) {
       Left(ValidationError.OverflowError) // CHECK THAT fee+amount won't overflow Long
     } else {
-      val signature = EllipticCurveImpl.sign(sender, signatureData(sender, recipient, amount, fee, timestamp))
+      val signature = EqByteArray(EllipticCurveImpl.sign(sender, signatureData(sender, recipient, amount, fee, timestamp)))
       Right(PaymentTransactionImpl(sender, recipient, amount, fee, timestamp, signature))
     }
   }
@@ -88,7 +89,7 @@ object PaymentTransaction {
              amount: Long,
              fee: Long,
              timestamp: Long,
-             signature: Array[Byte]): Either[ValidationError, PaymentTransaction] = {
+             signature: ByteArray): Either[ValidationError, PaymentTransaction] = {
     if (amount <= 0) {
       Left(ValidationError.NegativeAmount) //CHECK IF AMOUNT IS POSITIVE
     } else if (fee <= 0) {
@@ -97,7 +98,7 @@ object PaymentTransaction {
       Left(ValidationError.OverflowError) // CHECK THAT fee+amount won't overflow Long
     } else {
       val sigData = signatureData(sender, recipient, amount, fee, timestamp)
-      if (EllipticCurveImpl.verify(signature, sigData, sender.publicKey)) {
+      if (EllipticCurveImpl.verify(signature.arr, sigData, sender.publicKey)) {
         Right(PaymentTransactionImpl(sender, recipient, amount, fee, timestamp, signature))
       } else {
         Left(ValidationError.InvalidSignature)
@@ -141,7 +142,7 @@ object PaymentTransaction {
     val signatureBytes = util.Arrays.copyOfRange(data, position, position + SignatureLength)
 
     PaymentTransaction
-      .create(sender, recipient, amount, fee, timestamp, signatureBytes)
+      .create(sender, recipient, amount, fee, timestamp, EqByteArray(signatureBytes))
       .fold(left => Failure(new Exception(left.toString)), right => Success(right))
   }.flatten
 

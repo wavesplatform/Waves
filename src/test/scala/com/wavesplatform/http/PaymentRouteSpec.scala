@@ -8,7 +8,6 @@ import org.scalatest.prop.PropertyChecks
 import play.api.libs.json.{JsObject, Json}
 import scorex.api.http.assets.TransferRequest
 import scorex.api.http.{ApiKeyNotValid, PaymentApiRoute}
-import scorex.crypto.encode.Base58
 import scorex.network.ConnectedPeer
 import scorex.transaction.assets.TransferTransaction
 import scorex.transaction.{NewTransactionHandler, Transaction, ValidationError}
@@ -53,7 +52,7 @@ class PaymentRouteSpec extends RouteSpec("/payment")
           (resp \ "fee").as[Int] shouldEqual fee
           (resp \ "amount").as[Long] shouldEqual amount
           (resp \ "timestamp").as[Long] shouldEqual tx.right.get.timestamp
-          (resp \ "signature").as[String] shouldEqual Base58.encode(tx.right.get.signature)
+          (resp \ "signature").as[String] shouldEqual tx.right.get.signature.base58
           (resp \ "sender").as[String] shouldEqual sender.address
           (resp \ "recipient").as[String] shouldEqual recipient.stringRepr
         }

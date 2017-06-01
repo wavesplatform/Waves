@@ -39,7 +39,7 @@ class SignedRequestsTest extends FunSuite with Matchers {
     tx.fee shouldBe 100000L
     tx.quantity shouldBe 100000L
     tx.timestamp shouldBe 1484064349669L
-    Base58.encode(tx.signature) shouldBe "d3JTwzxHj3j74yemdvw2xAdFeMo6hDJ9i2s3v3e4GMrz2Q25G89Pp3HyXfKk3mwNcKWjtyoTWvTt1eLk2KzetoL"
+    tx.signature.base58 shouldBe "d3JTwzxHj3j74yemdvw2xAdFeMo6hDJ9i2s3v3e4GMrz2Q25G89Pp3HyXfKk3mwNcKWjtyoTWvTt1eLk2KzetoL"
   }
 
   test("AssetReissueRequest json parsing works") {
@@ -69,7 +69,7 @@ class SignedRequestsTest extends FunSuite with Matchers {
     tx.quantity shouldBe 100000L
     tx.timestamp shouldBe 1234L
     tx.reissuable shouldBe true
-    Base58.encode(tx.signature) shouldBe "4YWbtkDA7PHH1MCxEUaP12pkNRPNqpJh8X7aagZzLyDNbzgopXJb7NHNNV8rjXcy2WsAKX1wzti7Bishu8u6hwtF"
+    tx.signature.base58 shouldBe "4YWbtkDA7PHH1MCxEUaP12pkNRPNqpJh8X7aagZzLyDNbzgopXJb7NHNNV8rjXcy2WsAKX1wzti7Bishu8u6hwtF"
   }
 
   test("AssetTransfer json parsing works") {
@@ -103,7 +103,7 @@ class SignedRequestsTest extends FunSuite with Matchers {
     Base58.encode(tx.assetId.get) shouldBe "GAXAj8T4pSjunDqpz6Q3bit4fJJN9PD4t8AK8JZVSa5u"
     tx.amount shouldBe 100000
     tx.fee shouldBe 100000
-    Base58.encode(tx.signature) shouldBe "4dPRTW6XyRQUTQwwpuZDCNy1UDHYG9WGsEQnn5v49Lj5uyh4XGDdwtEq3t6ZottweAXHieK32UokHwiTxGFtz9bQ"
+    tx.signature.base58 shouldBe "4dPRTW6XyRQUTQwwpuZDCNy1UDHYG9WGsEQnn5v49Lj5uyh4XGDdwtEq3t6ZottweAXHieK32UokHwiTxGFtz9bQ"
   }
 
   test("AssetTransfer with a fee in an asset json parsing works") {
@@ -140,7 +140,7 @@ class SignedRequestsTest extends FunSuite with Matchers {
     Base58.encode(tx.feeAssetId.get) shouldBe "6MPKrD5B7GrfbciHECg1MwdvRUhRETApgNZspreBJ8JL"
     tx.amount shouldBe 1000
     tx.fee shouldBe 100
-    Base58.encode(tx.signature) shouldBe "UAhYXYdkFAFBuwAuUFP3yw7E8aRTyx56ZL4UPbT4ufomBzVLMRpdW2dCtJmfpCuPPMhGTvdzhXwb7o4ER6HAUpJ"
+    tx.signature.base58 shouldBe "UAhYXYdkFAFBuwAuUFP3yw7E8aRTyx56ZL4UPbT4ufomBzVLMRpdW2dCtJmfpCuPPMhGTvdzhXwb7o4ER6HAUpJ"
   }
 
   test("AssetBurnRequest json parsing works") {

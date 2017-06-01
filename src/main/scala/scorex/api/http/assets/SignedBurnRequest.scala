@@ -29,6 +29,6 @@ case class SignedBurnRequest(@ApiModelProperty(value = "Base58 encoded Issuer pu
     _sender <- PublicKeyAccount.fromBase58String(senderPublicKey)
     _assetId <- parseBase58(assetId, "invalid.assetId", AssetIdStringLength)
     _signature <- parseBase58(signature, "invalid.signature", SignatureStringLength)
-    _t <- BurnTransaction.create(_sender, _assetId, quantity, fee, timestamp, _signature)
+    _t <- BurnTransaction.create(_sender, _assetId.arr, quantity, fee, timestamp, _signature)
   } yield _t
 }

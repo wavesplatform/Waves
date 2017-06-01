@@ -1,6 +1,7 @@
 package scorex.transaction.lease
 
 import com.google.common.primitives.{Bytes, Longs}
+import com.wavesplatform.state2.{ByteArray, EqByteArray}
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
@@ -24,7 +25,7 @@ object LeaseCancelTransaction {
                                                 leaseId: Array[Byte],
                                                 fee: Long,
                                                 timestamp: Long,
-                                                signature: Array[Byte])
+                                                signature: ByteArray)
     extends LeaseCancelTransaction {
 
     override val transactionType: TransactionType.Value = TransactionType.LeaseCancelTransaction
@@ -42,7 +43,7 @@ object LeaseCancelTransaction {
     )
 
     override val assetFee: (Option[AssetId], Long) = (None, fee)
-    override lazy val bytes: Array[Byte] = Bytes.concat(toSign, signature)
+    override lazy val bytes: Array[Byte] = Bytes.concat(toSign, signature.arr)
 
   }
 
@@ -51,7 +52,7 @@ object LeaseCancelTransaction {
     val fee = Longs.fromByteArray(bytes.slice(KeyLength, KeyLength + 8))
     val timestamp = Longs.fromByteArray(bytes.slice(KeyLength + 8, KeyLength + 16))
     val leaseId = bytes.slice(KeyLength + 16, KeyLength + 16 + DigestSize)
-    val signature = bytes.slice(KeyLength + 16 + DigestSize, KeyLength + 16 + DigestSize + SignatureLength)
+    val signature =EqByteArray(bytes.slice(KeyLength + 16 + DigestSize, KeyLength + 16 + DigestSize + SignatureLength))
     LeaseCancelTransaction
       .create(sender, leaseId, fee, timestamp, signature)
       .fold(left => Failure(new Exception(left.toString)), right => Success(right))
@@ -61,7 +62,7 @@ object LeaseCancelTransaction {
                                leaseId: Array[Byte],
                                fee: Long,
                                timestamp: Long,
-                               signature: Option[Array[Byte]] = None): Either[ValidationError, LeaseCancelTransactionImpl] = {
+                               signature: Option[ByteArray] = None): Either[ValidationError, LeaseCancelTransactionImpl] = {
     if (leaseId.length != DigestSize) {
       Left(ValidationError.TransactionParameterValidationError("Lease transaction id is invalid"))
     } else if (fee <= 0) {
@@ -75,7 +76,7 @@ object LeaseCancelTransaction {
              leaseId: Array[Byte],
              fee: Long,
              timestamp: Long,
-             signature: Array[Byte]): Either[ValidationError, LeaseCancelTransaction] = {
+             signature: ByteArray): Either[ValidationError, LeaseCancelTransaction] = {
     createUnverified(sender, leaseId, fee, timestamp, Some(signature))
       .right.flatMap(SignedTransaction.verify)
   }
@@ -85,7 +86,7 @@ object LeaseCancelTransaction {
              fee: Long,
              timestamp: Long): Either[ValidationError, LeaseCancelTransaction] = {
     createUnverified(sender, leaseId, fee, timestamp).right.map { unsigned =>
-      unsigned.copy(signature = EllipticCurveImpl.sign(sender, unsigned.toSign))
+      unsigned.copy(signature = EqByteArray(EllipticCurveImpl.sign(sender, unsigned.toSign)))
     }
   }
 }

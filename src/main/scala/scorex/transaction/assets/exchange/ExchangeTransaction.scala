@@ -1,11 +1,11 @@
 package scorex.transaction.assets.exchange
 
 import com.google.common.primitives.{Ints, Longs}
+import com.wavesplatform.state2.{ByteArray, EqByteArray}
 import io.swagger.annotations.ApiModelProperty
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
-import scorex.crypto.hash.FastCryptographicHash
 import scorex.serialization.BytesSerializable
 import scorex.transaction.TransactionParser.TransactionType
 import scorex.transaction.ValidationError.TransactionParameterValidationError
@@ -27,7 +27,7 @@ sealed trait ExchangeTransaction extends SignedTransaction {
 object ExchangeTransaction {
 
   private case class ExchangeTransactionImpl(buyOrder: Order, sellOrder: Order, price: Long, amount: Long, buyMatcherFee: Long,
-                                             sellMatcherFee: Long, fee: Long, timestamp: Long, signature: Array[Byte])
+                                             sellMatcherFee: Long, fee: Long, timestamp: Long, signature: ByteArray)
     extends ExchangeTransaction with BytesSerializable {
 
     override val transactionType: TransactionType.Value = TransactionType.ExchangeTransaction
@@ -43,7 +43,7 @@ object ExchangeTransaction {
       Longs.toByteArray(buyMatcherFee) ++ Longs.toByteArray(sellMatcherFee) ++ Longs.toByteArray(fee) ++
       Longs.toByteArray(timestamp)
 
-    override def bytes: Array[Byte] = toSign ++ signature
+    override def bytes: Array[Byte] = toSign ++ signature.arr
 
     override def json: JsObject = jsonBase() ++ Json.obj(
       "order1" -> buyOrder.json,
@@ -56,7 +56,7 @@ object ExchangeTransaction {
   }
 
   private def createUnverified(buyOrder: Order, sellOrder: Order, price: Long, amount: Long,
-                               buyMatcherFee: Long, sellMatcherFee: Long, fee: Long, timestamp: Long, signature: Option[Array[Byte]] = None) = {
+                               buyMatcherFee: Long, sellMatcherFee: Long, fee: Long, timestamp: Long, signature: Option[EqByteArray] = None) = {
     lazy val priceIsValid: Boolean = price <= buyOrder.price && price >= sellOrder.price
 
     if (fee <= 0) {
@@ -97,12 +97,12 @@ object ExchangeTransaction {
   def create(matcher: PrivateKeyAccount, buyOrder: Order, sellOrder: Order, price: Long, amount: Long,
              buyMatcherFee: Long, sellMatcherFee: Long, fee: Long, timestamp: Long): Either[ValidationError, ExchangeTransaction] = {
     createUnverified(buyOrder, sellOrder, price, amount, buyMatcherFee, sellMatcherFee, fee, timestamp).right.map { unverified =>
-      unverified.copy(signature = EllipticCurveImpl.sign(matcher.privateKey, unverified.toSign))
+      unverified.copy(signature = EqByteArray(EllipticCurveImpl.sign(matcher.privateKey, unverified.toSign)))
     }
   }
 
   def create(buyOrder: Order, sellOrder: Order, price: Long, amount: Long,
-             buyMatcherFee: Long, sellMatcherFee: Long, fee: Long, timestamp: Long, signature: Array[Byte]): Either[ValidationError, ExchangeTransaction] = {
+             buyMatcherFee: Long, sellMatcherFee: Long, fee: Long, timestamp: Long, signature: ByteArray): Either[ValidationError, ExchangeTransaction] = {
     createUnverified(buyOrder, sellOrder, price, amount, buyMatcherFee, sellMatcherFee, fee, timestamp, Some(signature))
       .right.flatMap(SignedTransaction.verify)
   }
@@ -114,27 +114,27 @@ object ExchangeTransaction {
 
   def parseTail(bytes: Array[Byte]): Try[ExchangeTransaction] = Try {
     var from = 0
-    val o1Size = Ints.fromByteArray(bytes.slice(from, from + 4));
+    val o1Size = Ints.fromByteArray(bytes.slice(from, from + 4))
     from += 4
-    val o2Size = Ints.fromByteArray(bytes.slice(from, from + 4));
+    val o2Size = Ints.fromByteArray(bytes.slice(from, from + 4))
     from += 4
-    val o1 = Order.parseBytes(bytes.slice(from, from + o1Size)).get;
+    val o1 = Order.parseBytes(bytes.slice(from, from + o1Size)).get
     from += o1Size
-    val o2 = Order.parseBytes(bytes.slice(from, from + o2Size)).get;
+    val o2 = Order.parseBytes(bytes.slice(from, from + o2Size)).get
     from += o2Size
-    val price = Longs.fromByteArray(bytes.slice(from, from + 8));
+    val price = Longs.fromByteArray(bytes.slice(from, from + 8))
     from += 8
-    val amount = Longs.fromByteArray(bytes.slice(from, from + 8));
+    val amount = Longs.fromByteArray(bytes.slice(from, from + 8))
     from += 8
-    val buyMatcherFee = Longs.fromByteArray(bytes.slice(from, from + 8));
+    val buyMatcherFee = Longs.fromByteArray(bytes.slice(from, from + 8))
     from += 8
-    val sellMatcherFee = Longs.fromByteArray(bytes.slice(from, from + 8));
+    val sellMatcherFee = Longs.fromByteArray(bytes.slice(from, from + 8))
     from += 8
-    val fee = Longs.fromByteArray(bytes.slice(from, from + 8));
+    val fee = Longs.fromByteArray(bytes.slice(from, from + 8))
     from += 8
-    val timestamp = Longs.fromByteArray(bytes.slice(from, from + 8));
+    val timestamp = Longs.fromByteArray(bytes.slice(from, from + 8))
     from += 8
-    val signature = bytes.slice(from, from + TransactionParser.SignatureLength);
+    val signature = EqByteArray(bytes.slice(from, from + TransactionParser.SignatureLength))
     from += TransactionParser.SignatureLength
 
     create(o1, o2, price, amount, buyMatcherFee, sellMatcherFee, fee, timestamp, signature)
