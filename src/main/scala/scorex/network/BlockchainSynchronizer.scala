@@ -6,8 +6,6 @@ import akka.event.LoggingReceive
 import com.wavesplatform.settings.SynchronizationSettings
 import com.wavesplatform.state2.{ByteArray, EqByteArray}
 import scorex.block.Block
-import scorex.block.Block._
-import scorex.crypto.encode.Base58.encode
 import scorex.network.Coordinator.{AddBlock, SyncFinished}
 import scorex.network.NetworkController.DataFromPeer
 import scorex.network.message.{Message, _}
@@ -51,7 +49,7 @@ class BlockchainSynchronizer(protected val networkControllerRef: ActorRef, coord
       }
   }
 
-  def gettingExtension(requestedIds: InnerIds, peers: Peers): Receive =
+  def gettingExtension(requestedIds: Seq[ByteArray], peers: Peers): Receive =
     state(GettingExtension, acceptSignaturesSpecOnlyFrom(peers.keySet)) {
       case SignaturesFromPeer(blockIds, connectedPeer) =>
 
@@ -80,7 +78,7 @@ class BlockchainSynchronizer(protected val networkControllerRef: ActorRef, coord
         }
     }
 
-  private def gotoGettingExtensionTail(initial: Status, downloadInfo: DownloadInfo, tail: InnerIds)
+  private def gotoGettingExtensionTail(initial: Status, downloadInfo: DownloadInfo, tail: Seq[ByteArray])
                                       (implicit peers: PeerSet): Unit = {
     val activePeer = peers.active
     val blockIdsToDownload = downloadInfo.blockIds ++ tail
@@ -114,7 +112,7 @@ class BlockchainSynchronizer(protected val networkControllerRef: ActorRef, coord
     }
   }
 
-  def gettingExtensionTail(downloadInfo: DownloadInfo, overlap: InnerIds, peers: PeerSet): Receive =
+  def gettingExtensionTail(downloadInfo: DownloadInfo, overlap: Seq[ByteArray], peers: PeerSet): Receive =
     state(GettingExtensionTail, acceptSignaturesSpecOnlyFrom(peers.active)) {
       case SignaturesFromPeer(tail, connectedPeer) =>
 
@@ -134,14 +132,14 @@ class BlockchainSynchronizer(protected val networkControllerRef: ActorRef, coord
         }
     }
 
-  def gettingBlocks(blockIds: InnerIds,
-                    lastCommonBlockId: BlockId,
+  def gettingBlocks(blockIds: Seq[ByteArray],
+                    lastCommonBlockId: ByteArray,
                     peers: PeerSet): Receive = {
 
     log.debug(s"Going to request blocks amt=${blockIds.size}: ${blockIds.take(2)}, ...}, peer: ${peers.active}")
 
     blockIds.foreach { blockId =>
-      val msg = Message(GetBlockSpec, Right(blockId), None)
+      val msg = Message(GetBlockSpec, Right(blockId.arr), None)
       networkControllerRef ! NetworkController.SendToNetwork(msg, SendToChosen(peers.active))
     }
     val initialScore = history.scoreOf(lastCommonBlockId)
@@ -299,7 +297,7 @@ class BlockchainSynchronizer(protected val networkControllerRef: ActorRef, coord
   }
 
   private object SignaturesFromPeer {
-    def unapply(dataFromPeer: DataFromPeer[_]): Option[(InnerIds, ConnectedPeer)] = {
+    def unapply(dataFromPeer: DataFromPeer[_]): Option[(Seq[ByteArray], ConnectedPeer)] = {
       if (dataFromPeer.messageType == SignaturesSpec.messageCode) {
         dataFromPeer match {
           case DataFromPeer(msgId, blockIds: Seq[Array[Byte]]@unchecked, connectedPeer) =>
@@ -339,15 +337,13 @@ object BlockchainSynchronizer {
 
   case class GetExtension(peerScores: Map[ConnectedPeer, BlockchainScore])
 
-  type InnerIds = Seq[ByteArray]
-
-  def blockIdsToStartDownload(blockIds: InnerIds, history: History): Option[(ByteArray, InnerIds)] = {
+  def blockIdsToStartDownload(blockIds: Seq[ByteArray], history: History): Option[(ByteArray, Seq[ByteArray])] = {
     val (common, toDownload) = blockIds.span(id => history.contains(id))
     if (common.nonEmpty) Some((common.last, toDownload)) else None
   }
 
-  case class DownloadInfo(lastCommon: ByteArray, blockIds: InnerIds = Seq.empty) {
-    def lastTwoBlockIds: InnerIds = if (blockIds.size > 1) blockIds.takeRight(2) else lastCommon +: blockIds
+  case class DownloadInfo(lastCommon: ByteArray, blockIds: Seq[ByteArray] = Seq.empty) {
+    def lastTwoBlockIds: Seq[ByteArray] = if (blockIds.size > 1) blockIds.takeRight(2) else lastCommon +: blockIds
   }
 
   private type StopFilter = (Message.MessageCode, ConnectedPeer) => Boolean

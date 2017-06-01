@@ -14,8 +14,9 @@ class EqByteArrayMVStoreDataType extends DataType {
 
   override def read(buff: ByteBuffer): AnyRef = {
     val len = DataUtils.readVarInt(buff)
-    val dst = Array.empty[Byte]
-    EqByteArray(buff.get(dst, 0, len).array())
+    val dst = Array.fill(len){0:Byte}
+    buff.get(dst, 0, len)
+    EqByteArray(dst)
   }
 
   override def read(buff: ByteBuffer, obj: Array[AnyRef], len: Int, key: Boolean): Unit =
@@ -23,7 +24,7 @@ class EqByteArrayMVStoreDataType extends DataType {
       obj(i) = read(buff)
     }
 
-  override def getMemory(obj: scala.Any): Int = 24 + obj.asInstanceOf[EqByteArray].arr.length
+  override def getMemory(obj: scala.Any): Int = 5 + obj.asInstanceOf[EqByteArray].arr.length
 
   override def write(buff: WriteBuffer, obj: scala.Any): Unit = {
     val eba = obj.asInstanceOf[EqByteArray]

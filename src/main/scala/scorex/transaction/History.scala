@@ -3,7 +3,7 @@ package scorex.transaction
 import com.wavesplatform.state2.{ByteArray, EqByteArray}
 import scorex.account.Account
 import scorex.block.Block
-import scorex.block.Block.BlockId
+
 import scorex.crypto.encode.Base58
 import scorex.network.Checkpoint
 
@@ -21,13 +21,13 @@ trait History extends Synchronized {
 
   def score(): BlockchainScore
 
-  def scoreOf(id: BlockId): BlockchainScore
+  def scoreOf(id: ByteArray): BlockchainScore
 
-  def heightOf(blockId: BlockId): Option[Int]
+  def heightOf(blockId: ByteArray): Option[Int]
 
   def generatedBy(account: Account, from: Int, to: Int): Seq[Block]
 
-  def lastBlockIds(howMany: Int): Seq[BlockId]
+  def lastBlockIds(howMany: Int): Seq[ByteArray]
 }
 
 trait HistoryWriter extends History {
@@ -54,7 +54,7 @@ object History {
 
     def contains(signature: ByteArray): Boolean = history.heightOf(signature).isDefined
 
-    def blockById(blockId: BlockId): Option[Block] = history.read { implicit lock =>
+    def blockById(blockId: ByteArray): Option[Block] = history.read { implicit lock =>
       history.heightOf(blockId).flatMap(history.blockAt)
     }
 
@@ -87,7 +87,7 @@ object History {
       (Math.max(1, history.height() - howMany + 1) to history.height()).flatMap(history.blockAt).reverse
     }
 
-    def blockIdsAfter(parentSignature: BlockId, howMany: Int): Seq[BlockId] = history.read { implicit lock =>
+    def blockIdsAfter(parentSignature: ByteArray, howMany: Int): Seq[ByteArray] = history.read { implicit lock =>
       history.heightOf(parentSignature).map { h =>
         (h + 1).to(Math.min(history.height(), h + howMany: Int)).flatMap(history.blockAt).map(_.uniqueId)
       }.getOrElse(Seq())

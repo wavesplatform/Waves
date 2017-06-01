@@ -12,7 +12,7 @@ import org.h2.mvstore.MVStore
 import scorex.ActorTestingCommons
 import scorex.account.PrivateKeyAccount
 import scorex.block.Block
-import scorex.block.Block.BlockId
+
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash.DigestSize
@@ -70,7 +70,7 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
   val gen = PrivateKeyAccount(Array(0.toByte))
   var score: Int = 10000
 
-  def createBlock(reference: BlockId): Block = {
+  def createBlock(reference: ByteArray): Block = {
     val version = 1: Byte
     val timestamp = System.currentTimeMillis()
     //val reference = Array.fill(Block.BlockIdLength)(id.toByte)

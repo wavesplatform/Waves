@@ -1,8 +1,7 @@
 package scorex.lagonaki.mocks
 
-import com.wavesplatform.state2.EqByteArray
+import com.wavesplatform.state2.{ByteArray, EqByteArray}
 import scorex.account.PublicKeyAccount
-import scorex.block.Block.BlockId
 import scorex.block._
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
 import scorex.crypto.EllipticCurveImpl
@@ -30,7 +29,7 @@ object TestBlock {
 
   private val random = new Random(10)
 
-  def withReference(ref: BlockId, time: Long = 0): Block = Block(time, 1, ref, SignerData(PublicKeyAccount(Array.fill(32)(0)), randomSignature),
+  def withReference(ref: ByteArray, time: Long = 0): Block = Block(time, 1, ref, SignerData(PublicKeyAccount(Array.fill(32)(0)), randomSignature),
     NxtLikeConsensusBlockData(1L, randomSignature.arr), Seq.empty)
 
   def empty: Block = withReference(EqByteArray(Array.fill(SignatureLength)(0: Byte)))

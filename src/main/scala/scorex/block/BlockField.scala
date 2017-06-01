@@ -26,23 +26,17 @@ case class ByteBlockField(override val name: String, override val value: Byte) e
   override lazy val bytes: Array[Byte] = Array(value)
 }
 
-case class IntBlockField(override val name: String, override val value: Int) extends BlockField[Int] {
-
-  override lazy val json: JsObject = Json.obj(name -> value)
-  override lazy val bytes: Array[Byte] = Bytes.ensureCapacity(Ints.toByteArray(value), 4, 0)
-}
-
 case class LongBlockField(override val name: String, override val value: Long) extends BlockField[Long] {
 
   override lazy val json: JsObject = Json.obj(name -> value)
   override lazy val bytes: Array[Byte] = Bytes.ensureCapacity(Longs.toByteArray(value), 8, 0)
 }
 
-case class BlockIdField(override val name: String, override val value: Block.BlockId)
-  extends BlockField[Block.BlockId] {
+case class BlockIdField(override val name: String, override val value: Array[Byte])
+  extends BlockField[Array[Byte]] {
 
-  override lazy val json: JsObject = Json.obj(name -> value.base58)
-  override lazy val bytes: Array[Byte] = value.arr
+  override lazy val json: JsObject = Json.obj(name -> Base58.encode(value))
+  override lazy val bytes: Array[Byte] = value
 }
 
 case class TransactionBlockField(override val name: String, override val value: Transaction)

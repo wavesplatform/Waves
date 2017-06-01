@@ -4,7 +4,7 @@ import akka.actor.{ActorRef, ActorSystem}
 import akka.testkit.{ImplicitSender, TestKitBase, TestProbe}
 import akka.util.Timeout
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.state2.EqByteArray
+import com.wavesplatform.state2.{ByteArray, EqByteArray}
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.Matchers
 import scorex.account.PublicKeyAccount
@@ -114,7 +114,7 @@ abstract class ActorTestingCommons extends TestKitBase
 
   protected implicit def toBlockIds(ids: Seq[Int]): BlockIds = blockIds(ids: _*)
 
-  protected implicit def toBlockId(i: Int): BlockId = EqByteArray(Array(i.toByte))
+  protected implicit def toBlockId(i: Int): ByteArray = EqByteArray(Array(i.toByte))
 
   protected def testBlock(id: Int, ts: Long = System.currentTimeMillis()) : Block =
     Block(timestamp = ts,
@@ -132,8 +132,8 @@ abstract class ActorTestingCommons extends TestKitBase
     override def extract(blockIds: BlockIds): Seq[Int] = blockIds.map(BlockIdExtraction.extract)
   }
 
-  protected implicit object BlockIdExtraction extends TestDataExtraction[BlockId] {
-    override def extract(blockId: BlockId): Int = blockId.arr(0)
+  protected implicit object BlockIdExtraction extends TestDataExtraction[ByteArray] {
+    override def extract(blockId: ByteArray): Int = blockId.arr(0)
   }
 
   protected def expectNetworkMessage[Content: TestDataExtraction](expectedSpec: MessageSpec[Content], expectedData: Any): Unit =
