@@ -16,7 +16,7 @@ class StateReaderImpl(p: StateStorage, val synchronizationToken: ReentrantReadWr
   val sp = Synchronized(p)
 
   override def transactionInfo(id: ByteArray): Option[(Int, Transaction)] = read { implicit l =>
-    Option(sp().transactions.get(id.arr)).map {
+    Option(sp().transactions.get(id)).map {
       case (h, bytes) => (h, TransactionParser.parseBytes(bytes).get)
     }
   }
@@ -26,7 +26,7 @@ class StateReaderImpl(p: StateStorage, val synchronizationToken: ReentrantReadWr
   }
 
   override def assetInfo(id: ByteArray): Option[AssetInfo] = read { implicit l =>
-    Option(sp().assets.get(id.arr)).map {
+    Option(sp().assets.get(id)).map {
       case (is, amt) => AssetInfo(is, amt)
     }
   }
@@ -66,13 +66,13 @@ class StateReaderImpl(p: StateStorage, val synchronizationToken: ReentrantReadWr
   }
 
   override def isLeaseActive(leaseTx: LeaseTransaction): Boolean = read { implicit l =>
-    sp().leaseState.getOrDefault(leaseTx.id.arr, false)
+    sp().leaseState.getOrDefault(leaseTx.id, false)
   }
 
   override def activeLeases(): Seq[ByteArray] = read { implicit l =>
     sp().leaseState
       .asScala
-      .collect { case (leaseId, isActive) if isActive => EqByteArray(leaseId) }
+      .collect { case (leaseId, isActive) if isActive => leaseId }
       .toSeq
   }
 
@@ -86,7 +86,7 @@ class StateReaderImpl(p: StateStorage, val synchronizationToken: ReentrantReadWr
   }
 
   override def containsTransaction(id: ByteArray): Boolean = read { implicit l =>
-    sp().transactions.containsKey(id.arr)
+    sp().transactions.containsKey(id)
   }
   override def getAssetIdByUniqueName(assetName: ByteArray): Option[ByteArray] =read { implicit l =>
     Option(p.uniqueAssets.get(assetName.arr)).map(EqByteArray(_))

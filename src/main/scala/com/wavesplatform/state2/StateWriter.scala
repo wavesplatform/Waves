@@ -28,7 +28,7 @@ class StateWriterImpl(p: StateStorage, synchronizationToken: ReentrantReadWriteL
     StateStorage.dirty(p) {
       measureSizeLog("transactions")(txsDiff.transactions) {
         _.par.foreach { case (id, (h, tx, _)) =>
-          sp().transactions.put(id.arr, (h, tx.bytes))
+          sp().transactions.put(id, (h, tx.bytes))
         }
       }
 
@@ -56,12 +56,12 @@ class StateWriterImpl(p: StateStorage, synchronizationToken: ReentrantReadWriteL
 
       measureSizeLog("assets")(txsDiff.issuedAssets) {
         _.foreach { case (id, assetInfo) =>
-          val updated = (Option(sp().assets.get(id.arr)) match {
+          val updated = (Option(sp().assets.get(id)) match {
             case None => Monoid[AssetInfo].empty
             case Some(existing) => AssetInfo(existing._1, existing._2)
           }).combine(assetInfo)
 
-          sp().assets.put(id.arr, (updated.isReissuable, updated.volume))
+          sp().assets.put(id, (updated.isReissuable, updated.volume))
         }
       }
 
@@ -99,7 +99,7 @@ class StateWriterImpl(p: StateStorage, synchronizationToken: ReentrantReadWriteL
       }
 
       measureSizeLog("lease info")(blockDiff.txsDiff.leaseState)(
-        _.foreach { case (id, isActive) => sp().leaseState.put(id.arr, isActive) })
+        _.foreach { case (id, isActive) => sp().leaseState.put(id, isActive) })
 
       measureSizeLog("uniqueAssets")(blockDiff.txsDiff.assetsWithUniqueNames) {
         _.foreach { case (name, id) =>

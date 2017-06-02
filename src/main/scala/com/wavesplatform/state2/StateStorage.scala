@@ -4,6 +4,7 @@ import com.google.common.primitives.Ints
 import com.wavesplatform.state2.StateStorage.SnapshotKey
 import org.h2.mvstore.{MVMap, MVStore}
 import scorex.account.Account
+import scorex.utils.LogMVMapBuilder
 
 class StateStorage private(db: MVStore) {
 
@@ -23,11 +24,11 @@ class StateStorage private(db: MVStore) {
 
   def setHeight(i: Int): Unit = variables.put(heightKey, i)
 
-  val transactions: MVMap[Array[Byte], (Int, Array[Byte])] = db.openMap("txs")
+  val transactions: MVMap[ByteArray, (Int, Array[Byte])] = db.openMap("txs", new LogMVMapBuilder[ByteArray, (Int, Array[Byte])].keyType(new EqByteArrayMVStoreDataType))
 
   val portfolios: MVMap[Array[Byte], (Long, (Long, Long), Map[Array[Byte], Long])] = db.openMap("portfolios")
 
-  val assets: MVMap[Array[Byte], (Boolean, Long)] = db.openMap("assets")
+  val assets: MVMap[ByteArray, (Boolean, Long)] = db.openMap("assets", new LogMVMapBuilder[ByteArray, (Boolean, Long)].keyType(new EqByteArrayMVStoreDataType))
 
   val accountTransactionIds: MVMap[Array[Byte], List[Array[Byte]]] = db.openMap("accountTransactionIds")
 
@@ -39,7 +40,7 @@ class StateStorage private(db: MVStore) {
 
   val orderFills: MVMap[Array[Byte], (Long, Long)] = db.openMap("orderFills")
 
-  val leaseState: MVMap[Array[Byte], Boolean] = db.openMap("leaseState")
+  val leaseState: MVMap[ByteArray, Boolean] = db.openMap("leaseState", new LogMVMapBuilder[ByteArray, Boolean].keyType(new EqByteArrayMVStoreDataType))
 
   val lastUpdateHeight: MVMap[Array[Byte], Int] = db.openMap("lastUpdateHeight")
 
