@@ -66,7 +66,7 @@ class StateReaderImpl(p: StateStorage, val synchronizationToken: ReentrantReadWr
   }
 
   override def isLeaseActive(leaseTx: LeaseTransaction): Boolean = read { implicit l =>
-    sp().leaseState.getOrDefault(leaseTx.id, false)
+    sp().leaseState.getOrDefault(leaseTx.id.arr, false)
   }
 
   override def activeLeases(): Seq[ByteArray] = read { implicit l =>
