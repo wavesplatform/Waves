@@ -4,13 +4,12 @@ import com.google.common.base.Charsets
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.state2.{ByteArray, EqByteArray}
 import play.api.libs.json.{JsObject, Json}
-import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
+import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.serialization.{BytesSerializable, Deser}
 import scorex.transaction.TransactionParser._
-import scorex.transaction.ValidationError
-import scorex.transaction._
+import scorex.transaction.{ValidationError, _}
 
 import scala.util.{Failure, Success, Try}
 
@@ -40,7 +39,7 @@ object IssueTransaction {
     override val assetFee: (Option[AssetId], Long) = (None, fee)
     override val transactionType: TransactionType.Value = TransactionType.IssueTransaction
 
-    override lazy val assetId = id.arr
+    override lazy val assetId = id
 
     lazy val toSign: Array[Byte] = Bytes.concat(Array(transactionType.id.toByte),
       sender.publicKey,
@@ -53,7 +52,7 @@ object IssueTransaction {
       Longs.toByteArray(timestamp))
 
     override lazy val json: JsObject = jsonBase() ++ Json.obj(
-      "assetId" -> Base58.encode(assetId),
+      "assetId" -> assetId.base58,
       "name" -> new String(name, Charsets.UTF_8),
       "description" -> new String(description, Charsets.UTF_8),
       "quantity" -> quantity,

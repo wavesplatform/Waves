@@ -25,7 +25,7 @@ class TransferTransactionDiffTest extends PropSpec with PropertyChecks with Gene
     maybeAsset <- Gen.option(issue1)
     maybeAsset2 <- Gen.option(issue2)
     maybeFeeAsset <- Gen.oneOf(maybeAsset, maybeAsset2)
-    transfer <- transferGeneratorP(master, recepient, maybeAsset.map(_.id.arr), maybeFeeAsset.map(_.id.arr))
+    transfer <- transferGeneratorP(master, recepient, maybeAsset.map(_.id), maybeFeeAsset.map(_.id))
   } yield (genesis, issue1, issue2, transfer)
 
   property("transfers assets to recipient preserving waves invariant") {
@@ -40,7 +40,7 @@ class TransferTransactionDiffTest extends PropSpec with PropertyChecks with Gene
         val recipientPortfolio = newState.accountPortfolio(recipient)
         if (transfer.sender.toAccount != recipient) {
           transfer.assetId match {
-            case Some(aid) => recipientPortfolio shouldBe Portfolio(0, LeaseInfo.empty, Map(EqByteArray(aid) -> transfer.amount))
+            case Some(aid) => recipientPortfolio shouldBe Portfolio(0, LeaseInfo.empty, Map(aid -> transfer.amount))
             case None => recipientPortfolio shouldBe Portfolio(transfer.amount, LeaseInfo.empty, Map.empty)
           }
         }

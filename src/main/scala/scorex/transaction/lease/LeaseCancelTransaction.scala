@@ -6,7 +6,6 @@ import play.api.libs.json.{JsObject, Json}
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.EllipticCurveImpl.SignatureLength
-import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash.DigestSize
 import scorex.transaction.TransactionParser.{KeyLength, _}
 import scorex.transaction._
@@ -16,13 +15,13 @@ import scala.util.{Failure, Success, Try}
 sealed trait LeaseCancelTransaction extends SignedTransaction {
   def fee: Long
 
-  def leaseId: Array[Byte]
+  def leaseId: ByteArray
 }
 
 object LeaseCancelTransaction {
 
   private case class LeaseCancelTransactionImpl(sender: PublicKeyAccount,
-                                                leaseId: Array[Byte],
+                                                leaseId: ByteArray,
                                                 fee: Long,
                                                 timestamp: Long,
                                                 signature: ByteArray)
@@ -34,12 +33,12 @@ object LeaseCancelTransaction {
       sender.publicKey,
       Longs.toByteArray(fee),
       Longs.toByteArray(timestamp),
-      leaseId)
+      leaseId.arr)
 
     override lazy val json: JsObject = jsonBase() ++ Json.obj(
       "fee" -> fee,
       "timestamp" -> timestamp,
-      "leaseId" -> Base58.encode(leaseId)
+      "leaseId" -> leaseId.arr
     )
 
     override val assetFee: (Option[AssetId], Long) = (None, fee)
@@ -51,7 +50,7 @@ object LeaseCancelTransaction {
     val sender = PublicKeyAccount(bytes.slice(0, KeyLength))
     val fee = Longs.fromByteArray(bytes.slice(KeyLength, KeyLength + 8))
     val timestamp = Longs.fromByteArray(bytes.slice(KeyLength + 8, KeyLength + 16))
-    val leaseId = bytes.slice(KeyLength + 16, KeyLength + 16 + DigestSize)
+    val leaseId = EqByteArray(bytes.slice(KeyLength + 16, KeyLength + 16 + DigestSize))
     val signature =EqByteArray(bytes.slice(KeyLength + 16 + DigestSize, KeyLength + 16 + DigestSize + SignatureLength))
     LeaseCancelTransaction
       .create(sender, leaseId, fee, timestamp, signature)
@@ -59,11 +58,11 @@ object LeaseCancelTransaction {
   }.flatten
 
   private def createUnverified(sender: PublicKeyAccount,
-                               leaseId: Array[Byte],
+                               leaseId: ByteArray,
                                fee: Long,
                                timestamp: Long,
                                signature: Option[ByteArray] = None): Either[ValidationError, LeaseCancelTransactionImpl] = {
-    if (leaseId.length != DigestSize) {
+    if (leaseId.arr.length != DigestSize) {
       Left(ValidationError.TransactionParameterValidationError("Lease transaction id is invalid"))
     } else if (fee <= 0) {
       Left(ValidationError.InsufficientFee)
@@ -73,7 +72,7 @@ object LeaseCancelTransaction {
   }
 
   def create(sender: PublicKeyAccount,
-             leaseId: Array[Byte],
+             leaseId: ByteArray,
              fee: Long,
              timestamp: Long,
              signature: ByteArray): Either[ValidationError, LeaseCancelTransaction] = {
@@ -82,7 +81,7 @@ object LeaseCancelTransaction {
   }
 
   def create(sender: PrivateKeyAccount,
-             leaseId: Array[Byte],
+             leaseId: ByteArray,
              fee: Long,
              timestamp: Long): Either[ValidationError, LeaseCancelTransaction] = {
     createUnverified(sender, leaseId, fee, timestamp).right.map { unsigned =>

@@ -32,7 +32,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Gene
       issue2: IssueTransaction <- issueReissueBurnMakeAssetNameUniqueGeneratorP(ENOUGH_AMT, buyer).map(_._1)
       maybeAsset1 <- Gen.option(issue1.id)
       maybeAsset2 <- Gen.option(issue2.id) suchThat (x => x != maybeAsset1)
-      exchange <- exchangeGeneratorP(buyer, seller, maybeAsset1.map(_.arr), maybeAsset2.map(_.arr))
+      exchange <- exchangeGeneratorP(buyer, seller, maybeAsset1, maybeAsset2)
     } yield (gen1, gen2, issue1, issue2, exchange)
 
     forAll(preconditionsAndExchange, accountGen) { case ((gen1, gen2, issue1, issue2, exchange), miner) =>

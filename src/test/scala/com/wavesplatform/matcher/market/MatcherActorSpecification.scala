@@ -18,11 +18,10 @@ import org.h2.mvstore.MVStore
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Matchers, WordSpecLike}
 import scorex.account.PrivateKeyAccount
-import scorex.crypto.encode.Base58
-import scorex.transaction.{History, NewTransactionHandler}
 import scorex.transaction.assets.IssueTransaction
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
-import scorex.utils.{NTP, ScorexLogging, Time, TimeImpl}
+import scorex.transaction.{AssetId, History, NewTransactionHandler}
+import scorex.utils.{NTP, ScorexLogging}
 import scorex.wallet.Wallet
 
 class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest2"))
@@ -65,7 +64,7 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest2"
 
     "AssetPair with same assets" in {
       def sameAssetsOrder(): Order = Order.apply(PrivateKeyAccount("123".getBytes()), MatcherAccount,
-        AssetPair(Some("asset1".getBytes), Some("asset1".getBytes)), OrderType.BUY,
+        AssetPair(strToSomeAssetId("asset1"), strToSomeAssetId("asset1")), OrderType.BUY,
         100000000L, 100L, 1L, 1000L, 100000L)
 
       val invalidOrder = sameAssetsOrder()
@@ -74,36 +73,36 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest2"
     }
 
     "AssetPair with predefined pair" in {
-      def predefinedPair = AssetPair(Base58.decode("BASE2").toOption, Base58.decode("BASE1").toOption)
+      def predefinedPair = AssetPair(EqByteArray.decode("BASE2").toOption, EqByteArray.decode("BASE1").toOption)
 
       actor ! GetOrderBookRequest(predefinedPair, None)
       expectMsg(GetOrderBookResponse(predefinedPair, Seq(), Seq()))
 
-      def reversePredefinedPair = AssetPair(Base58.decode("BASE1").toOption, Base58.decode("BASE2").toOption)
+      def reversePredefinedPair = AssetPair(EqByteArray.decode("BASE1").toOption, EqByteArray.decode("BASE2").toOption)
 
       actor ! GetOrderBookRequest(reversePredefinedPair, None)
       expectMsg(StatusCodeMatcherResponse(StatusCodes.Found, "Invalid AssetPair ordering, should be reversed: BASE2-BASE1"))
     }
 
     "AssetPair with predefined price assets" in {
-      def priceAsset = AssetPair(Base58.decode("ABC").toOption, Base58.decode("BASE1").toOption)
+      def priceAsset = AssetPair(EqByteArray.decode("ABC").toOption, EqByteArray.decode("BASE1").toOption)
 
       actor ! GetOrderBookRequest(priceAsset, None)
       expectMsg(GetOrderBookResponse(priceAsset, Seq(), Seq()))
 
-      def wrongPriceAsset = AssetPair(Base58.decode("BASE2").toOption, Base58.decode("CDE").toOption)
+      def wrongPriceAsset = AssetPair(EqByteArray.decode("BASE2").toOption, EqByteArray.decode("CDE").toOption)
 
       actor ! GetOrderBookRequest(wrongPriceAsset, None)
       expectMsg(StatusCodeMatcherResponse(StatusCodes.Found, "Invalid AssetPair ordering, should be reversed: CDE-BASE2"))
     }
 
     "AssetPair with unknown assets" in {
-      def unknownAssets = AssetPair(Base58.decode("Some2").toOption, Base58.decode("Some1").toOption)
+      def unknownAssets = AssetPair(EqByteArray.decode("Some2").toOption, EqByteArray.decode("Some1").toOption)
 
       actor ! GetOrderBookRequest(unknownAssets, None)
       expectMsg(GetOrderBookResponse(unknownAssets, Seq(), Seq()))
 
-      def wrongUnknownAssets = AssetPair(Base58.decode("Some1").toOption, Base58.decode("Some2").toOption)
+      def wrongUnknownAssets = AssetPair(EqByteArray.decode("Some1").toOption, EqByteArray.decode("Some2").toOption)
 
       actor ! GetOrderBookRequest(wrongUnknownAssets, None)
       expectMsg(StatusCodeMatcherResponse(StatusCodes.Found, "Invalid AssetPair ordering, should be reversed: Some2-Some1"))
@@ -111,7 +110,7 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest2"
 
     "accept orders with AssetPair with same assets" in {
       def sameAssetsOrder(): Order = Order.apply(PrivateKeyAccount("123".getBytes()), MatcherAccount,
-        AssetPair(Some.apply("asset1".getBytes), Some.apply("asset1".getBytes)), OrderType.BUY,
+        AssetPair(strToSomeAssetId("asset1"), strToSomeAssetId("asset1")), OrderType.BUY,
         100000000L, 100L, 1L, 1000L, 100000L)
 
       val invalidOrder = sameAssetsOrder()
@@ -120,7 +119,7 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest2"
     }
 
     "restore OrderBook after restart" in {
-      val pair = AssetPair(Some("123".getBytes), None)
+      val pair = AssetPair(strToSomeAssetId("123"), None)
       val order = buy(pair, 1, 2000)
 
       actor ! order
@@ -132,8 +131,8 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest2"
     }
 
     "return all open markets" in {
-      val a1 = Some("123".getBytes)
-      val a2 = Some("234".getBytes)
+      val a1 = strToSomeAssetId("123")
+      val a2 = strToSomeAssetId("234")
 
       val pair = AssetPair(a2, a1)
       val order = buy(pair, 1, 2000)
@@ -143,7 +142,7 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest2"
 
       actor ! GetMarkets
 
-      val Predefined = AssetPair(Base58.decode("BASE2").toOption, Base58.decode("BASE1").toOption)
+      val Predefined = AssetPair(EqByteArray.decode("BASE2").toOption, EqByteArray.decode("BASE1").toOption)
 
       expectMsgPF() {
         case GetMarketsResponse(publicKey, Seq(
@@ -158,10 +157,10 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest2"
     "serialize to json" in {
       val waves = "WAVES"
       val a1Name = "BITCOIN"
-      val a1 = Some(a1Name.getBytes)
+      val a1 = strToSomeAssetId(a1Name)
 
       val a2Name = "US DOLLAR"
-      val a2 = Some(a2Name.getBytes)
+      val a2 = strToSomeAssetId(a2Name)
 
       val pair1 = AssetPair(a1, None)
       val pair2 = AssetPair(a1, a2)
@@ -172,11 +171,13 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest2"
 
       ((json \ "markets") (0) \ "priceAsset").as[String] shouldBe AssetPair.WavesName
       ((json \ "markets") (0) \ "priceAssetName").as[String] shouldBe waves
-      ((json \ "markets") (0) \ "amountAsset").as[String] shouldBe Base58.encode(a1.get)
+      ((json \ "markets") (0) \ "amountAsset").as[String] shouldBe a1.get.base58
       ((json \ "markets") (0) \ "amountAssetName").as[String] shouldBe a1Name
       ((json \ "markets") (0) \ "created").as[Long] shouldBe now
 
       ((json \ "markets") (1) \ "amountAssetName").as[String] shouldBe a1Name
     }
   }
+
+  def strToSomeAssetId(s: String) : Option[AssetId] = Some(EqByteArray(s.getBytes()))
 }

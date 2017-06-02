@@ -46,14 +46,14 @@ trait TransactionGen {
   val maxOrderTimeGen: Gen[Long] = Gen.choose(10000L, Order.MaxLiveTime).map(_ + NTP.correctedTime())
   val timestampGen: Gen[Long] = Gen.choose(1, Long.MaxValue - 100)
 
-  val wavesAssetGen: Gen[Option[Array[Byte]]] = Gen.const(None)
-  val assetIdGen: Gen[Option[Array[Byte]]] = Gen.frequency((1, wavesAssetGen), (10, Gen.option(bytes32gen)))
+  val wavesAssetGen: Gen[Option[ByteArray]] = Gen.const(None)
+  val assetIdGen: Gen[Option[ByteArray]] = Gen.frequency((1, wavesAssetGen), (10, Gen.option(bytes32gen.map(EqByteArray(_)))))
 
   val assetPairGen = assetIdGen.flatMap {
-    case None => bytes32gen.map(b => AssetPair(None, Some(b)))
+    case None => bytes32gen.map(b => AssetPair(None, Some(EqByteArray(b))))
     case a1@Some(a1bytes) =>
-      val a2bytesGen = byteArrayGen(31).map(a2bytes => Option((~a1bytes(0)).toByte +: a2bytes))
-      Gen.oneOf(Gen.const(None), a2bytesGen).map(a2 => AssetPair(a1, a2))
+      val a2bytesGen = byteArrayGen(31).map(a2bytes => Option((~a1bytes.arr(0)).toByte +: a2bytes))
+      Gen.oneOf(Gen.const(None), a2bytesGen).map(a2 => AssetPair(a1, a2.map(EqByteArray(_))))
   }
 
   val paymentGen: Gen[PaymentTransaction] = for {
@@ -85,13 +85,13 @@ trait TransactionGen {
     (sender, amount, fee, timestamp, recipient) <- leaseParamGen
     lease = LeaseTransaction.create(sender, amount, fee, timestamp, recipient).right.get
     cancelFee <- smallFeeGen
-  } yield (lease, LeaseCancelTransaction.create(sender, lease.id.arr, cancelFee, timestamp + 1).right.get)
+  } yield (lease, LeaseCancelTransaction.create(sender, lease.id, cancelFee, timestamp + 1).right.get)
 
   def leaseAndCancelGeneratorP(leaseSender: PrivateKeyAccount, recipient: AccountOrAlias, unleaseSender: PrivateKeyAccount): Gen[(LeaseTransaction, LeaseCancelTransaction)] = for {
     (_, amount, fee, timestamp, _) <- leaseParamGen
     lease = LeaseTransaction.create(leaseSender, amount, fee, timestamp, recipient).right.get
     fee2 <- smallFeeGen
-    unlease = LeaseCancelTransaction.create(unleaseSender, lease.id.arr, fee2, timestamp + 1).right.get
+    unlease = LeaseCancelTransaction.create(unleaseSender, lease.id, fee2, timestamp + 1).right.get
   } yield (lease, unlease)
 
   val twoLeasesGen: Gen[(LeaseTransaction, LeaseTransaction)] = for {
@@ -108,7 +108,7 @@ trait TransactionGen {
     lease = LeaseTransaction.create(sender, amount, fee, timestamp, recipient).right.get
     fee2 <- smallFeeGen
     timestamp2 <- positiveLongGen
-  } yield (lease, LeaseCancelTransaction.create(otherSender, lease.id.arr, fee2, timestamp2).right.get)
+  } yield (lease, LeaseCancelTransaction.create(otherSender, lease.id, fee2, timestamp2).right.get)
 
   val leaseGen: Gen[LeaseTransaction] = leaseAndCancelGen.map(_._1)
   val leaseCancelGen: Gen[LeaseCancelTransaction] = leaseAndCancelGen.map(_._2)
@@ -122,7 +122,7 @@ trait TransactionGen {
     sender <- accountGen
     attachment <- genBoundedBytes(0, TransferTransaction.MaxAttachmentSize)
     recipient <- accountOrAliasGen
-  } yield (assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment)
+  } yield (assetId.map(EqByteArray(_)), sender, recipient, amount, timestamp, feeAssetId.map(EqByteArray(_)), feeAmount, attachment)
 
   def transferGeneratorP(sender: PrivateKeyAccount, recipient: AccountOrAlias,
                          assetId: Option[AssetId], feeAssetId: Option[AssetId]): Gen[TransferTransaction] = for {
@@ -241,8 +241,8 @@ trait TransactionGen {
     r <- exchangeGeneratorP(sender1, sender2, assetPair.amountAsset, assetPair.priceAsset)
   } yield r
 
-  def exchangeGeneratorP(buyer: PrivateKeyAccount, seller: PrivateKeyAccount, amountAssetId: Option[Array[Byte]],
-                         priceAssetId: Option[Array[Byte]]): Gen[ExchangeTransaction] = for {
+  def exchangeGeneratorP(buyer: PrivateKeyAccount, seller: PrivateKeyAccount, amountAssetId: Option[ByteArray],
+                         priceAssetId: Option[ByteArray]): Gen[ExchangeTransaction] = for {
     (_, matcher, _, _, price, amount1, timestamp, expiration, matcherFee) <- orderParamGen
     amount2: Long <- matcherAmountGen
     matchedAmount: Long <- Gen.choose(Math.min(amount1, amount2) / 2000, Math.min(amount1, amount2) / 1000)

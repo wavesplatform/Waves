@@ -1,13 +1,14 @@
 package com.wavesplatform.matcher.model
 
 import com.wavesplatform.matcher.MatcherTestData
-import com.wavesplatform.matcher.market.OrderBookActor.Snapshot
 import com.wavesplatform.matcher.market.MatcherActor.OrderBookCreated
-import com.wavesplatform.matcher.model.MatcherSerializer._
+import com.wavesplatform.matcher.market.OrderBookActor.Snapshot
 import com.wavesplatform.matcher.model.MatcherModel.{Level, Price}
+import com.wavesplatform.matcher.model.MatcherSerializer._
+import com.wavesplatform.state2.EqByteArray
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
-import org.scalatest.{DoNotDiscover, Matchers, PropSpec}
+import org.scalatest.{Matchers, PropSpec}
 import play.api.libs.json.Json
 import scorex.transaction.assets.exchange.AssetPair
 
@@ -18,7 +19,7 @@ class EventJsonSpecification extends PropSpec
   with Matchers
   with MatcherTestData {
 
-  val pair = AssetPair(Some("BTC".getBytes), Some("WAVES".getBytes))
+  val pair = AssetPair(Some(EqByteArray("BTC".getBytes)), Some(EqByteArray("WAVES".getBytes)))
 
   val buyLevelGen: Gen[Vector[BuyLimitOrder]] =
     Gen.containerOf[Vector, BuyLimitOrder](buyLimitOrderGenerator)

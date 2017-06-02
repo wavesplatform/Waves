@@ -2,9 +2,9 @@ package com.wavesplatform.state2.diffs
 
 import cats.implicits._
 import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state2.reader.StateReader
 import com.wavesplatform.state2._
-import scorex.account.{Account, Alias}
+import com.wavesplatform.state2.reader.StateReader
+import scorex.account.Account
 import scorex.transaction.StateValidationError
 import scorex.transaction.ValidationError.TransactionValidationError
 import scorex.transaction.assets.TransferTransaction
@@ -23,24 +23,23 @@ object TransferTransactionDiff {
             Map(recipient -> Portfolio(tx.amount, LeaseInfo.empty, Map.empty))
           )
           case Some(aid) =>
-            val assetId = EqByteArray(aid)
-            Map(sender -> Portfolio(0, LeaseInfo.empty, Map(assetId -> -tx.amount))).combine(
-              Map(recipient -> Portfolio(0, LeaseInfo.empty, Map(assetId -> tx.amount)))
+            Map(sender -> Portfolio(0, LeaseInfo.empty, Map(aid -> -tx.amount))).combine(
+              Map(recipient -> Portfolio(0, LeaseInfo.empty, Map(aid -> tx.amount)))
             )
         }).combine(
         tx.feeAssetId match {
           case None => Map(sender -> Portfolio(-tx.fee, LeaseInfo.empty, Map.empty))
           case Some(aid) =>
-            Map(sender -> Portfolio(0, LeaseInfo.empty, Map(EqByteArray(aid) -> -tx.fee)))
+            Map(sender -> Portfolio(0, LeaseInfo.empty, Map(aid -> -tx.fee)))
         }
       )
       assetIssued = tx.assetId match {
         case None => true
-        case Some(aid) => state.assetInfo(EqByteArray(aid)).isDefined
+        case Some(aid) => state.assetInfo(aid).isDefined
       }
       feeAssetIssued = tx.feeAssetId match {
         case None => true
-        case Some(aid) => state.assetInfo(EqByteArray(aid)).isDefined
+        case Some(aid) => state.assetInfo(aid).isDefined
       }
     } yield (portfolios, blockTime > s.allowUnissuedAssetsUntil && !(assetIssued && feeAssetIssued))
 

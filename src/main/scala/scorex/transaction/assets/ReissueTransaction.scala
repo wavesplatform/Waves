@@ -5,7 +5,6 @@ import com.wavesplatform.state2.{ByteArray, EqByteArray}
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
-import scorex.crypto.encode.Base58
 import scorex.transaction.TransactionParser._
 import scorex.transaction.{ValidationError, _}
 
@@ -18,7 +17,7 @@ sealed trait ReissueTransaction extends AssetIssuance {
 object ReissueTransaction {
 
   private case class ReissueTransactionImpl(sender: PublicKeyAccount,
-                                            assetId: Array[Byte],
+                                            assetId: ByteArray,
                                             quantity: Long,
                                             reissuable: Boolean,
                                             fee: Long,
@@ -30,14 +29,14 @@ object ReissueTransaction {
 
     lazy val toSign: Array[Byte] = Bytes.concat(Array(transactionType.id.toByte),
       sender.publicKey,
-      assetId,
+      assetId.arr,
       Longs.toByteArray(quantity),
       if (reissuable) Array(1: Byte) else Array(0: Byte),
       Longs.toByteArray(fee),
       Longs.toByteArray(timestamp))
 
     override lazy val json: JsObject = jsonBase() ++ Json.obj(
-      "assetId" -> Base58.encode(assetId),
+      "assetId" -> assetId.base58,
       "quantity" -> quantity,
       "reissuable" -> reissuable
     )
@@ -55,7 +54,7 @@ object ReissueTransaction {
     val txId = bytes(SignatureLength)
     require(txId == TransactionType.ReissueTransaction.id.toByte, s"Signed tx id is not match")
     val sender = PublicKeyAccount(bytes.slice(SignatureLength + 1, SignatureLength + KeyLength + 1))
-    val assetId = bytes.slice(SignatureLength + KeyLength + 1, SignatureLength + KeyLength + AssetIdLength + 1)
+    val assetId = EqByteArray(bytes.slice(SignatureLength + KeyLength + 1, SignatureLength + KeyLength + AssetIdLength + 1))
     val quantityStart = SignatureLength + KeyLength + AssetIdLength + 1
 
     val quantity = Longs.fromByteArray(bytes.slice(quantityStart, quantityStart + 8))
@@ -67,7 +66,7 @@ object ReissueTransaction {
   }.flatten
 
   private def createUnverified(sender: PublicKeyAccount,
-                               assetId: Array[Byte],
+                               assetId: ByteArray,
                                quantity: Long,
                                reissuable: Boolean,
                                fee: Long,
@@ -82,7 +81,7 @@ object ReissueTransaction {
     }
 
   def create(sender: PublicKeyAccount,
-             assetId: Array[Byte],
+             assetId: ByteArray,
              quantity: Long,
              reissuable: Boolean,
              fee: Long,
@@ -94,7 +93,7 @@ object ReissueTransaction {
 
 
   def create(sender: PrivateKeyAccount,
-             assetId: Array[Byte],
+             assetId: ByteArray,
              quantity: Long,
              reissuable: Boolean,
              fee: Long,

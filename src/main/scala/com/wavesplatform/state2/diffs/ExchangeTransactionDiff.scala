@@ -4,7 +4,7 @@ import cats._
 import cats.implicits._
 import com.wavesplatform.state2._
 import com.wavesplatform.state2.reader.StateReader
-import scorex.transaction.{StateValidationError, ValidationError}
+import scorex.transaction.StateValidationError
 import scorex.transaction.ValidationError.TransactionValidationError
 import scorex.transaction.assets.exchange.ExchangeTransaction
 
@@ -30,7 +30,7 @@ object ExchangeTransactionDiff {
       Map(buyer -> wavesPortfolio(-t.buyMatcherFee)),
       Map(seller -> wavesPortfolio(-t.sellMatcherFee))))
 
-    val priceDiff = t.buyOrder.assetPair.priceAsset.map(EqByteArray(_)) match {
+    val priceDiff = t.buyOrder.assetPair.priceAsset match {
       case Some(assetId) => Monoid.combine(
         Map(buyer -> Portfolio(0, LeaseInfo.empty, Map(assetId -> buyPriceAssetChange))),
         Map(seller -> Portfolio(0, LeaseInfo.empty, Map(assetId -> sellPriceAssetChange))))
@@ -39,7 +39,7 @@ object ExchangeTransactionDiff {
         Map(seller -> Portfolio(sellPriceAssetChange, LeaseInfo.empty, Map.empty)))
     }
 
-    val amountDiff = t.buyOrder.assetPair.amountAsset.map(EqByteArray(_)) match {
+    val amountDiff = t.buyOrder.assetPair.amountAsset match {
       case Some(assetId) => Monoid.combine(
         Map(buyer -> Portfolio(0, LeaseInfo.empty, Map(assetId -> buyAmountAssetChange))),
         Map(seller -> Portfolio(0, LeaseInfo.empty, Map(assetId -> sellAmountAssetChange))))

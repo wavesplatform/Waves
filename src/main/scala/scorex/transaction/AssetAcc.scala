@@ -7,7 +7,7 @@ case class AssetAcc(account: Account, assetId: Option[AssetId]) {
   //unique key for account + assetId pair
   lazy val key: String = assetId match {
     case None => account.address
-    case Some(id) => account.address + Base58.encode(id)
+    case Some(id) => account.address + id.base58
   }
 
   override def hashCode(): Int = key.hashCode
@@ -15,6 +15,6 @@ case class AssetAcc(account: Account, assetId: Option[AssetId]) {
     case a: AssetAcc => key.equals(a.key)
     case _ => false
   }
-  override def toString: String = s"AssetAcc[account: '${account.address}', assetId '${assetId.map(Base58.encode)}']"
+  override def toString: String = s"AssetAcc[account: '${account.address}', assetId '${assetId.map(_.base58)}']"
 }
 

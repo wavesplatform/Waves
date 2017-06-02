@@ -14,8 +14,8 @@ class TransferTransactionSpecification extends PropSpec with PropertyChecks with
       val recovered = TransferTransaction.parseTail(transfer.bytes.tail).get
 
       recovered.sender.address shouldEqual transfer.sender.address
-      recovered.assetId.map(_ sameElements transfer.assetId.get).getOrElse(transfer.assetId.isEmpty) shouldBe true
-      recovered.feeAssetId.map(_ sameElements transfer.feeAssetId.get).getOrElse(transfer.feeAssetId.isEmpty) shouldBe true
+      recovered.assetId.map(_ == transfer.assetId.get).getOrElse(transfer.assetId.isEmpty) shouldBe true
+      recovered.feeAssetId.map(_ == transfer.feeAssetId.get).getOrElse(transfer.feeAssetId.isEmpty) shouldBe true
       recovered.timestamp shouldEqual transfer.timestamp
       recovered.amount shouldEqual transfer.amount
       recovered.fee shouldEqual transfer.fee

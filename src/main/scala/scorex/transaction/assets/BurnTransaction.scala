@@ -3,18 +3,15 @@ package scorex.transaction.assets
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.state2.{ByteArray, EqByteArray}
 import play.api.libs.json.{JsObject, Json}
-import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
+import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
-import scorex.crypto.encode.Base58
-import scorex.serialization.Deser
 import scorex.transaction.TransactionParser._
-import scorex.transaction.ValidationError
-import scorex.transaction._
+import scorex.transaction.{ValidationError, _}
 
 import scala.util.{Failure, Success, Try}
 
 sealed trait BurnTransaction extends SignedTransaction {
-  def assetId: Array[Byte]
+  def assetId: ByteArray
 
   def amount: Long
 
@@ -24,7 +21,7 @@ sealed trait BurnTransaction extends SignedTransaction {
 object BurnTransaction {
 
   private case class BurnTransactionImpl(sender: PublicKeyAccount,
-                                         assetId: Array[Byte],
+                                         assetId: ByteArray,
                                          amount: Long,
                                          fee: Long,
                                          timestamp: Long,
@@ -35,13 +32,13 @@ object BurnTransaction {
 
     lazy val toSign: Array[Byte] = Bytes.concat(Array(transactionType.id.toByte),
       sender.publicKey,
-      assetId,
+      assetId.arr,
       Longs.toByteArray(amount),
       Longs.toByteArray(fee),
       Longs.toByteArray(timestamp))
 
     override lazy val json: JsObject = jsonBase() ++ Json.obj(
-      "assetId" -> Base58.encode(assetId),
+      "assetId" -> assetId.arr,
       "amount" -> amount,
       "fee" -> fee
     )
@@ -60,7 +57,7 @@ object BurnTransaction {
   def parseTail(bytes: Array[Byte]): Try[BurnTransaction] = Try {
     import EllipticCurveImpl._
     val sender = PublicKeyAccount(bytes.slice(0, KeyLength))
-    val assetId = bytes.slice(KeyLength, KeyLength + AssetIdLength)
+    val assetId = EqByteArray(bytes.slice(KeyLength, KeyLength + AssetIdLength))
     val quantityStart = KeyLength + AssetIdLength
 
     val quantity = Longs.fromByteArray(bytes.slice(quantityStart, quantityStart + 8))
@@ -73,7 +70,7 @@ object BurnTransaction {
   }.flatten
 
   private def createUnverified(sender: PublicKeyAccount,
-                               assetId: Array[Byte],
+                               assetId: ByteArray,
                                quantity: Long,
                                fee: Long,
                                timestamp: Long,
@@ -87,7 +84,7 @@ object BurnTransaction {
     }
 
   def create(sender: PublicKeyAccount,
-             assetId: Array[Byte],
+             assetId: ByteArray,
              quantity: Long,
              fee: Long,
              timestamp: Long,
@@ -95,7 +92,7 @@ object BurnTransaction {
     createUnverified(sender, assetId, quantity, fee, timestamp, Some(signature)).right.flatMap(SignedTransaction.verify)
 
   def create(sender: PrivateKeyAccount,
-             assetId: Array[Byte],
+             assetId: ByteArray,
              quantity: Long,
              fee: Long,
              timestamp: Long): Either[ValidationError, BurnTransaction] =

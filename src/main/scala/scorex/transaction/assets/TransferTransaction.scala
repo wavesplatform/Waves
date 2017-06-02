@@ -48,9 +48,9 @@ object TransferTransaction {
 
     lazy val toSign: Array[Byte] = {
       val timestampBytes = Longs.toByteArray(timestamp)
-      val assetIdBytes = assetId.map(a => (1: Byte) +: a).getOrElse(Array(0: Byte))
+      val assetIdBytes = assetId.map(a => (1: Byte) +: a.arr).getOrElse(Array(0: Byte))
       val amountBytes = Longs.toByteArray(amount)
-      val feeAssetIdBytes = feeAssetId.map(a => (1: Byte) +: a).getOrElse(Array(0: Byte))
+      val feeAssetIdBytes = feeAssetId.map(a => (1: Byte) +: a.arr).getOrElse(Array(0: Byte))
       val feeBytes = Longs.toByteArray(fee)
 
       Bytes.concat(Array(transactionType.id.toByte),
@@ -67,9 +67,9 @@ object TransferTransaction {
 
     override lazy val json: JsObject = jsonBase() ++ Json.obj(
       "recipient" -> recipient.stringRepr,
-      "assetId" -> assetId.map(Base58.encode),
+      "assetId" -> assetId.map(_.base58),
       "amount" -> amount,
-      "feeAsset" -> feeAssetId.map(Base58.encode),
+      "feeAsset" -> feeAssetId.map(_.base58),
       "attachment" -> Base58.encode(attachment)
     )
 
@@ -94,7 +94,7 @@ object TransferTransaction {
       recRes <- AccountOrAlias.fromBytes(bytes, s1 + 24)
       (recipient, recipientEnd) = recRes
       (attachment, _) = Deser.parseArraySize(bytes, recipientEnd)
-      tt <- TransferTransaction.create(assetIdOpt, sender, recipient, amount, timestamp, feeAssetIdOpt, feeAmount, attachment, signature)
+      tt <- TransferTransaction.create(assetIdOpt.map(EqByteArray(_)), sender, recipient, amount, timestamp, feeAssetIdOpt.map(EqByteArray(_)), feeAmount, attachment, signature)
     } yield tt).fold(left => Failure(new Exception(left.toString)), right => Success(right))
   }.flatten
 

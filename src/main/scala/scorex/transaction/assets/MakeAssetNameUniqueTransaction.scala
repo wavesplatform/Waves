@@ -5,14 +5,13 @@ import com.wavesplatform.state2.{ByteArray, EqByteArray}
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
-import scorex.crypto.encode.Base58
 import scorex.transaction.TransactionParser.{KeyLength, TransactionType}
 import scorex.transaction._
 
 import scala.util.{Failure, Success, Try}
 
 sealed trait MakeAssetNameUniqueTransaction extends SignedTransaction {
-  def assetId: Array[Byte]
+  def assetId: ByteArray
   def fee: Long
   def networkByte: Byte
 }
@@ -20,7 +19,7 @@ sealed trait MakeAssetNameUniqueTransaction extends SignedTransaction {
 object MakeAssetNameUniqueTransaction {
 
   private case class MakeAssetNameUniqueTransactionImpl(sender: PublicKeyAccount,
-                                                        assetId: Array[Byte],
+                                                        assetId: ByteArray,
                                                         fee: Long,
                                                         timestamp: Long,
                                                         networkByte: Byte,
@@ -31,13 +30,13 @@ object MakeAssetNameUniqueTransaction {
 
     lazy val toSign: Array[Byte] = Bytes.concat(Array(transactionType.id.toByte, networkByte),
       sender.publicKey,
-      assetId,
+      assetId.arr,
       Longs.toByteArray(fee),
       Longs.toByteArray(timestamp)
     )
 
     override lazy val json: JsObject = jsonBase() ++ Json.obj(
-      "assetId" -> Base58.encode(assetId),
+      "assetId" -> assetId.base58,
       "fee" -> fee,
       "networkByte" -> networkByte
     )
@@ -57,7 +56,7 @@ object MakeAssetNameUniqueTransaction {
     import EllipticCurveImpl._
     val networkByte   = bytes.head
     val sender        = PublicKeyAccount(bytes.slice(1, 1 + KeyLength))
-    val assetId       = bytes.slice(1 + KeyLength, 1 + KeyLength + AssetIdLength)
+    val assetId       = EqByteArray(bytes.slice(1 + KeyLength, 1 + KeyLength + AssetIdLength))
     val quantityStart = 1 + KeyLength + AssetIdLength
 
     val fee       = Longs.fromByteArray(bytes.slice(quantityStart, quantityStart + 8))
@@ -69,7 +68,7 @@ object MakeAssetNameUniqueTransaction {
   }.flatten
 
   private def createUnverified(sender: PublicKeyAccount,
-                               assetId: Array[Byte],
+                               assetId: ByteArray,
                                fee: Long,
                                timestamp: Long,
                                networkByte: Byte,
@@ -81,7 +80,7 @@ object MakeAssetNameUniqueTransaction {
     }
 
   def create(sender: PublicKeyAccount,
-             assetId: Array[Byte],
+             assetId: ByteArray,
              fee: Long,
              timestamp: Long,
              networkByte: Byte,
@@ -89,7 +88,7 @@ object MakeAssetNameUniqueTransaction {
     createUnverified(sender, assetId, fee, timestamp, networkByte, Some(signature)).right.flatMap(SignedTransaction.verify)
 
   def create(sender: PrivateKeyAccount,
-             assetId: Array[Byte],
+             assetId: ByteArray,
              fee: Long,
              networkByte: Byte,
              timestamp: Long): Either[ValidationError, MakeAssetNameUniqueTransaction] =

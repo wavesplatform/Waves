@@ -7,7 +7,6 @@ import scorex.crypto.hash.FastCryptographicHash
 import scorex.transaction.ValidationError.AliasNotExists
 import scorex.transaction._
 import scorex.transaction.assets.IssueTransaction
-import scorex.transaction.assets.exchange.{ExchangeTransaction, Order}
 import scorex.transaction.lease.LeaseTransaction
 import scorex.utils.{ScorexLogging, Synchronized}
 
@@ -58,8 +57,8 @@ object StateReader {
         .mapValues(portfolio => portfolio.assets.get(assetId))
         .collect { case (acc, Some(amt)) => acc -> amt }
 
-    def findTransaction[T <: Transaction](signature: Array[Byte])(implicit ct: ClassTag[T]): Option[T]
-    = s.transactionInfo(EqByteArray(signature)).map(_._2)
+    def findTransaction[T <: Transaction](signature: ByteArray)(implicit ct: ClassTag[T]): Option[T]
+    = s.transactionInfo(signature).map(_._2)
       .flatMap(tx => {
         if (ct.runtimeClass.isAssignableFrom(tx.getClass))
           Some(tx.asInstanceOf[T])
@@ -87,7 +86,7 @@ object StateReader {
     def assetBalance(account: AssetAcc): Long = {
       val accountPortfolio = s.accountPortfolio(account.account)
       account.assetId match {
-        case Some(assetId) => accountPortfolio.assets.getOrElse(EqByteArray(assetId), 0)
+        case Some(assetId) => accountPortfolio.assets.getOrElse(assetId, 0)
         case None => accountPortfolio.balance
       }
     }
@@ -95,9 +94,9 @@ object StateReader {
     def getAccountBalance(account: Account): Map[AssetId, (Long, Boolean, Long, IssueTransaction, Boolean)] = s.read { implicit l =>
       s.accountPortfolio(account).assets.map { case (id, amt) =>
         val assetInfo = s.assetInfo(id).get
-        val issueTransaction = findTransaction[IssueTransaction](id.arr).get
-        val isUnique = s.getAssetIdByUniqueName(EqByteArray(issueTransaction.name)).contains(EqByteArray(issueTransaction.assetId))
-        id.arr -> (amt, assetInfo.isReissuable, assetInfo.volume, issueTransaction, isUnique)
+        val issueTransaction = findTransaction[IssueTransaction](id).get
+        val isUnique = s.getAssetIdByUniqueName(EqByteArray(issueTransaction.name)).contains(issueTransaction.assetId)
+        id -> (amt, assetInfo.isReissuable, assetInfo.volume, issueTransaction, isUnique)
       }
     }
 
@@ -111,7 +110,7 @@ object StateReader {
       s.assetInfo(EqByteArray(id)).get.isReissuable
 
     def totalAssetQuantity(assetId: AssetId): Long =
-      s.assetInfo(EqByteArray(assetId)).get.volume
+      s.assetInfo(assetId).get.volume
 
     def getAssetName(assetId: AssetId): String = {
       s.findTransaction[IssueTransaction](assetId)

@@ -29,7 +29,7 @@ object BlockDiffer extends ScorexLogging {
       case (AssetAcc(account, maybeAssetId), feeVolume) =>
         account -> (maybeAssetId match {
           case None => Portfolio(feeVolume, LeaseInfo.empty, Map.empty)
-          case Some(assetId) => Portfolio(0L, LeaseInfo.empty, Map(EqByteArray(assetId) -> feeVolume))
+          case Some(assetId) => Portfolio(0L, LeaseInfo.empty, Map(assetId -> feeVolume))
         })
     }
     val feeDiff = Monoid[Diff].combineAll(accountPortfolioFeesMap.map { case (acc, p) =>

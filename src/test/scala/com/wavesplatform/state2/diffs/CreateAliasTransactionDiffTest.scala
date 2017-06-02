@@ -72,7 +72,7 @@ class CreateAliasTransactionDiffTest extends PropSpec with PropertyChecks with G
     alias <- aliasGen
     fee <- smallFeeGen
     aliasTx = CreateAliasTransaction.create(aliasedRecipient, alias, fee, ts).right.get
-    transfer <- transferGeneratorP(master, alias, maybeAsset.map(_.id.arr), maybeFeeAsset.map(_.id.arr))
+    transfer <- transferGeneratorP(master, alias, maybeAsset.map(_.id), maybeFeeAsset.map(_.id))
     lease <- leaseAndCancelGeneratorP(master, alias, master).map(_._1)
   } yield (gen, gen2, issue1, issue2, aliasTx, transfer, lease)
 
@@ -83,7 +83,7 @@ class CreateAliasTransactionDiffTest extends PropSpec with PropertyChecks with G
         if (transfer.sender.toAccount != aliasTx.sender.toAccount) {
           val recipientPortfolioDiff = blockDiff.txsDiff.portfolios(aliasTx.sender)
           transfer.assetId match {
-            case Some(aid) => recipientPortfolioDiff shouldBe Portfolio(0, LeaseInfo.empty, Map(EqByteArray(aid) -> transfer.amount))
+            case Some(aid) => recipientPortfolioDiff shouldBe Portfolio(0, LeaseInfo.empty, Map(aid -> transfer.amount))
             case None => recipientPortfolioDiff shouldBe Portfolio(transfer.amount, LeaseInfo.empty, Map.empty)
           }
         }

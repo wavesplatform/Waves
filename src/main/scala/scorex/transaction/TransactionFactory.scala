@@ -28,12 +28,12 @@ object TransactionFactory {
       senderPrivateKey <- wallet.findWallet(request.sender)
       recipientAcc <- AccountOrAlias.fromString(request.recipient)
       tx <- TransferTransaction
-        .create(request.assetId.map(s => Base58.decode(s).get),
+        .create(request.assetId.map(s => EqByteArray.decode(s).get),
           senderPrivateKey,
           recipientAcc,
           request.amount,
           time.getTimestamp,
-          request.feeAssetId.map(s => Base58.decode(s).get),
+          request.feeAssetId.map(s => EqByteArray.decode(s).get),
           request.fee,
           request.attachment.filter(_.nonEmpty).map(Base58.decode(_).get).getOrElse(Array.emptyByteArray))
       r <- tm.onNewOffchainTransaction(tx)
@@ -59,7 +59,7 @@ object TransactionFactory {
   def leaseCancel(request: LeaseCancelRequest, wallet: Wallet, tm: NewTransactionHandler, time: Time): Either[ValidationError, LeaseCancelTransaction] =
     for {
       pk <- wallet.findWallet(request.sender)
-      tx <- LeaseCancelTransaction.create(pk, Base58.decode(request.txId).get, request.fee, time.getTimestamp)
+      tx <- LeaseCancelTransaction.create(pk, EqByteArray.decode(request.txId).get, request.fee, time.getTimestamp)
       t <- tm.onNewOffchainTransaction(tx)
     } yield t
 
@@ -73,21 +73,21 @@ object TransactionFactory {
 
   def reissueAsset(request: ReissueRequest, wallet: Wallet, tm: NewTransactionHandler, time: Time): Either[ValidationError, ReissueTransaction] = for {
     pk <- wallet.findWallet(request.sender)
-    tx <- ReissueTransaction.create(pk, Base58.decode(request.assetId).get, request.quantity, request.reissuable, request.fee, time.getTimestamp)
+    tx <- ReissueTransaction.create(pk, EqByteArray.decode(request.assetId).get, request.quantity, request.reissuable, request.fee, time.getTimestamp)
     r <- tm.onNewOffchainTransaction(tx)
   } yield r
 
 
   def burnAsset(request: BurnRequest, wallet: Wallet, tm: NewTransactionHandler, time: Time): Either[ValidationError, BurnTransaction] = for {
     pk <- wallet.findWallet(request.sender)
-    tx <- BurnTransaction.create(pk, Base58.decode(request.assetId).get, request.quantity, request.fee, time.getTimestamp)
+    tx <- BurnTransaction.create(pk, EqByteArray.decode(request.assetId).get, request.quantity, request.fee, time.getTimestamp)
     r <- tm.onNewOffchainTransaction(tx)
   } yield r
 
   def makeAssetNameUnique(request: MakeAssetNameUniqueRequest, wallet: Wallet, tm: NewTransactionHandler,
                           time: Time): Either[ValidationError, MakeAssetNameUniqueTransaction] = for {
     pk <- wallet.findWallet(request.sender)
-    tx <- MakeAssetNameUniqueTransaction.create(pk, Base58.decode(request.assetId).get, request.fee, AddressScheme.current.chainId, time.getTimestamp)
+    tx <- MakeAssetNameUniqueTransaction.create(pk, EqByteArray.decode(request.assetId).get, request.fee, AddressScheme.current.chainId, time.getTimestamp)
     r <- tm.onNewOffchainTransaction(tx)
   } yield r
 

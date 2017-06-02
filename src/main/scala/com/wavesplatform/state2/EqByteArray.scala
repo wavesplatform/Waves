@@ -25,6 +25,7 @@ case class EqByteArray(arr: Array[Byte]) {
 
 object EqByteArray {
   def decode(s: String): Try[EqByteArray] = Base58.decode(s).map(EqByteArray(_))
+  val empty : EqByteArray = EqByteArray(Array.emptyByteArray)
 }
 
 

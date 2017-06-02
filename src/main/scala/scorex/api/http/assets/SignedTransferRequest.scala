@@ -39,6 +39,6 @@ case class SignedTransferRequest(@ApiModelProperty(value = "Base58 encoded sende
     _signature <- parseBase58(signature, "invalid.signature", SignatureStringLength)
     _attachment <- parseBase58(attachment.filter(_.length > 0), "invalid.attachment", TransferTransaction.MaxAttachmentStringSize)
     _account <-  AccountOrAlias.fromString(recipient)
-    t <- TransferTransaction.create(_assetId.map(_.arr), _sender, _account, amount, timestamp, _feeAssetId.map(_.arr), fee, _attachment.arr,  _signature)
+    t <- TransferTransaction.create(_assetId, _sender, _account, amount, timestamp, _feeAssetId, fee, _attachment.arr,  _signature)
   } yield t
 }

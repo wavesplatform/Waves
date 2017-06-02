@@ -3,6 +3,7 @@ package scorex.transaction
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.TransactionGen
 import com.wavesplatform.settings.FeesSettings
+import com.wavesplatform.state2.EqByteArray
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import org.scalatest.{Assertion, Matchers, PropSpec}
 import scorex.account.{Account, PrivateKeyAccount}
@@ -53,7 +54,7 @@ class FeeCalculatorSpecification extends PropSpec with PropertyChecks with Gener
 
   private val mySettings = FeesSettings.fromConfig(config)
 
-  private val WhitelistedAsset = Base58.decode("JAudr64y6YxTgLn9T5giKKqWGkbMfzhdRAxmNNfn6FJN").get
+  private val WhitelistedAsset = EqByteArray.decode("JAudr64y6YxTgLn9T5giKKqWGkbMfzhdRAxmNNfn6FJN").get
 
   implicit class ConditionalAssert(v: Either[_, _]) {
 

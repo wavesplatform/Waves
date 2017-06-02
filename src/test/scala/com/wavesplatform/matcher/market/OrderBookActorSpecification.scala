@@ -38,7 +38,7 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
 
   var eventsProbe = TestProbe()
 
-  val pair = AssetPair(Some("BTC".getBytes), Some("WAVES".getBytes))
+  val pair = AssetPair(Some(EqByteArray("BTC".getBytes)), Some(EqByteArray("WAVES".getBytes)))
   val db = new MVStore.Builder().compress().open()
   val storedState: StateReader = stub[StateReader]
   val hugeAmount = Long.MaxValue / 2
@@ -72,6 +72,7 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
     actor = system.actorOf(Props(new OrderBookActor(pair, storedState,
       wallet, settings, history, functionalitySettings, transactionModule) with RestartableActor {
       override def validate(orderMatch: ExchangeTransaction): Either[ValidationError, SignedTransaction] = Right(orderMatch)
+
       override def sendToNetwork(tx: SignedTransaction): Either[ValidationError, SignedTransaction] = Right(tx)
     }))
 

@@ -18,7 +18,7 @@ import scorex.transaction.{Transaction, NewTransactionHandler, ValidationError}
 class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with RequestGen with PathMockFactory with PropertyChecks {
   private val settings = RestAPISettings.fromConfig(ConfigFactory.load())
 
-  "returns StateCheckFiled" - {
+  "returns StateCheckFiled" ignore {
 
     val stmMock = {
 
