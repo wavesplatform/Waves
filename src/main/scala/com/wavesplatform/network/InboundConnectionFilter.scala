@@ -27,7 +27,7 @@ class InboundConnectionFilter(peerDatabase: PeerDatabase, maxInboundConnections:
 
     newTotal <= maxInboundConnections &&
       newCount <= maxConnectionsPerHost &&
-      peerDatabase.getBlacklist.contains(remoteAddress.getHostName)
+      peerDatabase.getBlacklist.contains(remoteAddress.getAddress)
   }
 
   override def channelAccepted(ctx: ChannelHandlerContext, remoteAddress: InetSocketAddress) =

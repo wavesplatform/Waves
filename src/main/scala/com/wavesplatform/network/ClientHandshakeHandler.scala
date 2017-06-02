@@ -52,7 +52,8 @@ class HandshakeTimeoutHandler extends ChannelInboundHandlerAdapter with ScorexLo
 class ClientHandshakeHandler(
     handshake: Handshake,
     peerDatabase: PeerDatabase,
-    establishedConnections: ConcurrentMap[Channel, PeerInfo]) extends ChannelInboundHandlerAdapter with ScorexLogging {
+    establishedConnections: ConcurrentMap[Channel, PeerInfo],
+    blacklist: Channel => Unit) extends ChannelInboundHandlerAdapter with ScorexLogging {
 
   private val connections = new ConcurrentHashMap[PeerKey, Channel]
 
@@ -92,10 +93,8 @@ class ClientHandshakeHandler(
 
   override def exceptionCaught(ctx: ChannelHandlerContext, cause: Throwable) = cause match {
     case ioe: IOException =>
-      val hostname = ctx.channel().remoteAddress().asInstanceOf[InetSocketAddress].getHostName
-      log.warn(s"${id(ctx)} Unexpected error while waiting for handshake, blacklisting $hostname", ioe)
-      peerDatabase.blacklistHost(hostname)
-      ctx.close()
+      log.warn(s"${id(ctx)} Unexpected error while waiting for handshake", ioe)
+      blacklist(ctx.channel())
     case _ => super.exceptionCaught(ctx, cause)
   }
 

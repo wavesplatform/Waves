@@ -1,7 +1,6 @@
 package com.wavesplatform.network
 
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.AtomicReference
 
 import com.wavesplatform.utils.ByteStr
 import io.netty.channel.ChannelHandler.Sharable
@@ -17,8 +16,9 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
   extends ChannelDuplexHandler with ScorexLogging {
   import RemoteScoreObserver._
 
+  @volatile
+  private var localScore = BigInt(0)
   private val scores = new ConcurrentHashMap[Channel, RemoteScore]
-  private val pinnedChannel = new AtomicReference[Option[Channel]](None)
 
   private def channelWithHighestScore =
     Option(scores.reduceEntries(1000, (c1, c2) => if (c1.getValue.value > c2.getValue.value) c1 else c2))
@@ -26,16 +26,20 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
 
   override def handlerAdded(ctx: ChannelHandlerContext) =
     ctx.channel().closeFuture().addListener { f: ChannelFuture =>
-      val scoreToRemove = Option(scores.remove(f.channel()))
-      val newPinnedChannel = channelWithHighestScore.map(_._1)
-      pinnedChannel.compareAndSet(Some(f.channel()), newPinnedChannel)
-      scoreToRemove.foreach { s =>
-        log.debug(s"${id(ctx)} Closed, removing score ${s.value}${newPinnedChannel.fold("")(ch => s". New pinned channel is ${id(ch)}")}")
+      val previousChannel = channelWithHighestScore.fold(f.channel())(_._1)
+      Option(scores.remove(f.channel())).foreach { s =>
+        log.debug(s"${id(ctx)} Closed, removing score ${s.value}")
+      }
+
+      // if the channel which is being removed had the highest score, load extension from the best among remaining ones
+      channelWithHighestScore.filter(_._1 != previousChannel).foreach {
+        case (ch, _) => ch.writeAndFlush(LoadBlockchainExtension(lastSignatures))
       }
     }
 
   override def write(ctx: ChannelHandlerContext, msg: AnyRef, promise: ChannelPromise) = msg match {
     case LocalScoreChanged(newLocalScore) =>
+      localScore = newLocalScore
       channelWithHighestScore match {
         case Some((chan, score)) =>
           promise.setSuccess()
@@ -43,7 +47,7 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
             log.debug(s"${id(ctx)} Local score $newLocalScore is still lower than remote ${score.value} from ${id(chan)}, requesting extension")
             chan.writeAndFlush(LoadBlockchainExtension(lastSignatures))
           } else {
-            log.debug(s"${id(ctx)} Blockchain is up to date")
+            log.trace(s"${id(ctx)} Blockchain is up to date")
           }
         case _ => log.debug(s"${id(ctx)} No channels left?")
       }
@@ -52,29 +56,21 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef) = msg match {
     case newScoreValue: History.BlockchainScore =>
-      val isNewHighScore = channelWithHighestScore.forall(_._2.value < newScoreValue)
       val score = RemoteScore(newScoreValue, System.currentTimeMillis())
-      scores.compute(ctx.channel(), { (_, prevScore) =>
-        if (prevScore == null || score.value > prevScore.value && score.ts >= prevScore.ts) {
-          if (isNewHighScore) {
-            log.debug(s"${id(ctx)} New high score: $newScoreValue")
-          } else {
-            log.trace(s"${id(ctx)} New score: $newScoreValue")
-          }
-        }
-        score
-      })
-
       ctx.executor().schedule(scoreTtl) {
         scores.remove(ctx.channel().id(), score)
       }
 
-      if (isNewHighScore && pinnedChannel.getAndSet(Some(ctx.channel())).isEmpty) {
-        log.debug(s"${id(ctx)} No previously pinned channel, requesting signatures")
-        ctx.write(LoadBlockchainExtension(lastSignatures))
-      }
+      val ourPreviousScore = scores.put(ctx.channel(), score)
 
-      scores.put(ctx.channel(), score)
+      channelWithHighestScore match {
+        case Some((ch, highScore)) if ch == ctx.channel() /* this is the channel with highest score */
+          && (ourPreviousScore == null || ourPreviousScore.value != newScoreValue) /* score has changed */
+          && highScore.value > localScore /* remote score is higher than local */ =>
+          log.debug(s"${id(ctx)} New high score ${highScore.value} > $localScore, requesting extension")
+          ctx.writeAndFlush(LoadBlockchainExtension(lastSignatures))
+        case _ =>
+      }
     case _ => super.channelRead(ctx, msg)
   }
 }

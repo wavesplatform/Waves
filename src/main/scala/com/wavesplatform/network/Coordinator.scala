@@ -97,6 +97,7 @@ class Coordinator(
       }
 
       ctx.writeAndFlush(LocalScoreChanged(history.score()))
+      miner.lastBlockChanged(history.height(), history.lastBlock)
       checkExpiry(ctx)
     } else {
 //      from.foreach(_.blacklist())
@@ -104,7 +105,7 @@ class Coordinator(
     }
   }
 
-  private def processSingleBlock(newBlock: Block, from: Option[Channel]): Unit = {
+  private def processSingleBlock(ctx: ChannelHandlerContext, newBlock: Block, from: Option[Channel]): Unit = {
     val parentBlockId = newBlock.reference
     val local = from.isEmpty
 
@@ -141,10 +142,11 @@ class Coordinator(
     }
 
     if (isBlockToBeAdded) {
-      log.info(s"New block(local: $local): ${str(newBlock)}")
+      log.info(s"${id(ctx)} New ${if (local) "local" else "foreign"} block: ${str(newBlock)}")
       processNewBlock(newBlock) match {
         case Right(_) =>
           miner.lastBlockChanged(history.height(), newBlock)
+          ctx.writeAndFlush(LocalScoreChanged(history.score()))
           if (local) {
 //            network.broadcast(newBlock)
           } else {
@@ -206,10 +208,11 @@ class Coordinator(
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef) = msg match {
     case c: Checkpoint => handleCheckpoint(c, Some(ctx.channel()))
     case ExtensionBlocks(blocks) =>
-      log.debug(s"${id(ctx)} Processing fork")
+      log.debug(s"${id(ctx) } Processing fork")
       processFork(ctx, blocks.head.reference, blocks.iterator)
-      log.debug(s"${id(ctx)} Finished processing fork")
-    case b: Block => processSingleBlock(b, Some(ctx.channel()))
+      log.debug(s"${id(ctx) } Finished processing fork, local score is ${history.score()}")
+    case b: Block =>
+      processSingleBlock(ctx, b, Some(ctx.channel()))
     case RollbackTo(blockId) =>
       blockchainUpdater.removeAfter(blockId)
       ctx.writeAndFlush(LocalScoreChanged(history.score()))
