@@ -116,15 +116,15 @@ class NetworkServer(
           .addLast(
             new HandshakeDecoder,
             new HandshakeTimeoutHandler,
-            new ClientHandshakeHandler(handshake, peerDatabase, peerInfo),
+            new ClientHandshakeHandler(handshake, peerDatabase, peerInfo, blacklist),
             new LengthFieldPrepender(4),
             new LengthFieldBasedFrameDecoder(1024*1024, 0, 4, 0, 4),
             new LegacyFrameCodec,
             discardingHandler,
             messageCodec,
             new PeerSynchronizer(peerDatabase),
-            new ExtensionSignaturesLoader(settings.synchronizationSettings.synchronizationTimeout),
-            new ExtensionBlocksLoader(history, settings.synchronizationSettings.synchronizationTimeout),
+            new ExtensionSignaturesLoader(settings.synchronizationSettings.synchronizationTimeout, blacklist),
+            new ExtensionBlocksLoader(history, settings.synchronizationSettings.synchronizationTimeout, blacklist),
             new OptimisticExtensionLoader,
             utxPoolSynchronizer,
             scoreObserver,
@@ -166,8 +166,15 @@ class NetworkServer(
   def writeToLocalChannel(message: AnyRef): Unit = localClientChannel.writeAndFlush(message)
 
   private def doBroadcast(message: AnyRef, except: Option[Channel] = None): Unit = {
-    log.debug(s"Broadcasting $message to ${allChannels.size()} channels${except.fold("")(c => s" (except ${id(c)})")}")
+    log.trace(s"Broadcasting $message to ${allChannels.size()} channels${except.fold("")(c => s" (except ${id(c)})")}")
     allChannels.writeAndFlush(message, except.fold(ChannelMatchers.all())(ChannelMatchers.isNot))
+  }
+
+  private def blacklist(channel: Channel): Unit = {
+    val hostname = channel.asInstanceOf[NioSocketChannel].remoteAddress().getAddress
+    log.debug(s"${id(channel)} Blacklisting $hostname")
+    peerDatabase.blacklistHost(hostname)
+    channel.close()
   }
 
   def shutdown(): Unit = try {

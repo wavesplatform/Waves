@@ -1,6 +1,6 @@
 package com.wavesplatform.network
 
-import java.net.InetSocketAddress
+import java.net.{InetAddress, InetSocketAddress}
 
 
 
@@ -12,11 +12,11 @@ trait PeerDatabase {
 
   def touch(socketAddress: InetSocketAddress)
 
-  def blacklistHost(host: String)
+  def blacklistHost(host: InetAddress)
 
   def getKnownPeers: Map[InetSocketAddress, PeerDatabase.PeerInfo]
 
-  def getBlacklist: Set[String]
+  def getBlacklist: Set[InetAddress]
 
   def getRandomPeer(excluded: Set[InetSocketAddress]): Option[InetSocketAddress]
 

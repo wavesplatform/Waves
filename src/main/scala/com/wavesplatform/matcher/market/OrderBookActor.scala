@@ -15,7 +15,7 @@ import play.api.libs.json.Json
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange._
 import scorex.transaction.{History, NewTransactionHandler}
-import scorex.utils.{NTP, ScorexLogging, Time}
+import scorex.utils.{NTP, ScorexLogging}
 import scorex.wallet.Wallet
 
 import scala.annotation.tailrec

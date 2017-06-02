@@ -1,6 +1,6 @@
 package scorex.waves.http
 
-import java.net.{InetSocketAddress, URI}
+import java.net.{InetAddress, URI}
 import javax.ws.rs.Path
 
 import akka.http.scaladsl.model.StatusCodes
@@ -18,8 +18,8 @@ import scorex.crypto.hash.FastCryptographicHash
 import scorex.transaction.History
 import scorex.wallet.Wallet
 
+import scala.util.Success
 import scala.util.control.NonFatal
-import scala.util.{Success, Try}
 
 @Path("/debug")
 @Api(value = "/debug")
@@ -146,7 +146,7 @@ case class DebugApiRoute(
       entity(as[String]) { socketAddressString =>
         try {
           val uri = new URI("node://" + socketAddressString)
-          peerDatabase.blacklistHost(uri.getHost)
+          peerDatabase.blacklistHost(InetAddress.getByName(uri.getHost))
           complete(StatusCodes.OK)
         } catch {
           case NonFatal(_) => complete(StatusCodes.BadRequest)

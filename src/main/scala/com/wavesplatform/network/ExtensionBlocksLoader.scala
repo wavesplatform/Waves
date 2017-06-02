@@ -1,7 +1,7 @@
 package com.wavesplatform.network
 
 import com.wavesplatform.utils.ByteStr
-import io.netty.channel.{ChannelHandlerContext, ChannelInboundHandlerAdapter}
+import io.netty.channel.{Channel, ChannelHandlerContext, ChannelInboundHandlerAdapter}
 import io.netty.util.concurrent.ScheduledFuture
 import scorex.block.Block
 import scorex.crypto.EllipticCurveImpl
@@ -13,8 +13,10 @@ import scorex.utils.ScorexLogging
 import scala.collection.mutable
 import scala.concurrent.duration.FiniteDuration
 
-class ExtensionBlocksLoader(history: History, blockSyncTimeout: FiniteDuration)
-    extends ChannelInboundHandlerAdapter with ScorexLogging {
+class ExtensionBlocksLoader(
+    history: History,
+    blockSyncTimeout: FiniteDuration,
+    blacklist: Channel => Unit) extends ChannelInboundHandlerAdapter with ScorexLogging {
   private var pendingSignatures = Map.empty[ByteStr, Int]
   private var targetExtensionIds = Option.empty[ExtensionIds]
   private val blockBuffer = mutable.TreeMap.empty[Int, Block]
@@ -34,7 +36,7 @@ class ExtensionBlocksLoader(history: History, blockSyncTimeout: FiniteDuration)
         currentTimeout = Some(ctx.executor().schedule(blockSyncTimeout) {
           if (targetExtensionIds.contains(xid)) {
             log.warn(s"${id(ctx)} Timeout loading blocks")
-            // todo: blacklist?
+            blacklist(ctx.channel())
           }
         })
         newIds.foreach(s => ctx.write(GetBlock(s)))
