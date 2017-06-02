@@ -28,12 +28,12 @@ object CreateAliasTransaction {
 
     override val transactionType: TransactionType.Value = TransactionType.CreateAliasTransaction
 
-    override lazy val id: ByteArray = EqByteArray(FastCryptographicHash(transactionType.id.toByte +: alias.bytes))
+    override lazy val id: ByteArray = EqByteArray(FastCryptographicHash(transactionType.id.toByte +: alias.bytes.arr))
 
     lazy val toSign: Array[Byte] = Bytes.concat(
       Array(transactionType.id.toByte),
       sender.publicKey,
-      BytesSerializable.arrayWithSize(alias.bytes),
+      BytesSerializable.arrayWithSize(alias.bytes.arr),
       Longs.toByteArray(fee),
       Longs.toByteArray(timestamp))
 

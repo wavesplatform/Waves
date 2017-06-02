@@ -39,7 +39,7 @@ object GenesisTransaction extends {
       val typeBytes      = Array(transactionType.id.toByte)
       val timestampBytes = Bytes.ensureCapacity(Longs.toByteArray(timestamp), TimestampLength, 0)
       val amountBytes    = Bytes.ensureCapacity(Longs.toByteArray(amount), AmountLength, 0)
-      val rcpBytes       = recipient.bytes
+      val rcpBytes       = recipient.bytes.arr
       require(rcpBytes.length == Account.AddressLength)
       val res = Bytes.concat(typeBytes, timestampBytes, rcpBytes, amountBytes)
       require(res.length == TypeLength + BASE_LENGTH)
@@ -56,7 +56,7 @@ object GenesisTransaction extends {
     val amountBytes    = Longs.toByteArray(amount)
     val amountFill     = new Array[Byte](AmountLength - amountBytes.length)
 
-    val data = Bytes.concat(typeBytes, timestampBytes, recipient.bytes, Bytes.concat(amountFill, amountBytes))
+    val data = Bytes.concat(typeBytes, timestampBytes, recipient.bytes.arr, Bytes.concat(amountFill, amountBytes))
 
     val h = hash(data)
     Bytes.concat(h, h)

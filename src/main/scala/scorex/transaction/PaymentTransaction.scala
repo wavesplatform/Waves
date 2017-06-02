@@ -56,7 +56,7 @@ object PaymentTransaction {
       val timestampBytes = Longs.toByteArray(timestamp)
       val amountBytes = Longs.toByteArray(amount)
       val feeBytes = Longs.toByteArray(fee)
-      Bytes.concat(Array(transactionType.id.toByte), timestampBytes, sender.publicKey, recipient.bytes, amountBytes, feeBytes)
+      Bytes.concat(Array(transactionType.id.toByte), timestampBytes, sender.publicKey, recipient.bytes.arr, amountBytes, feeBytes)
     }
 
     override lazy val hash = FastCryptographicHash(hashBytes)
@@ -152,6 +152,6 @@ object PaymentTransaction {
     val amountBytes = Longs.toByteArray(amount)
     val feeBytes = Longs.toByteArray(fee)
 
-    Bytes.concat(typeBytes, timestampBytes, sender.publicKey, recipient.bytes, amountBytes, feeBytes)
+    Bytes.concat(typeBytes, timestampBytes, sender.publicKey, recipient.bytes.arr, amountBytes, feeBytes)
   }
 }

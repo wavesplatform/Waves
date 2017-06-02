@@ -33,7 +33,7 @@ object LeaseTransaction {
 
     lazy val toSign: Array[Byte] = Bytes.concat(Array(transactionType.id.toByte),
       sender.publicKey,
-      recipient.bytes,
+      recipient.bytes.arr,
       Longs.toByteArray(amount),
       Longs.toByteArray(fee),
       Longs.toByteArray(timestamp))

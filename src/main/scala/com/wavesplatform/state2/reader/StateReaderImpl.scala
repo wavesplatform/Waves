@@ -47,19 +47,19 @@ class StateReaderImpl(p: StateStorage, val synchronizationToken: ReentrantReadWr
 
   override def aliasesOfAddress(a: Account): Seq[Alias] = read { implicit l =>
     sp().aliasToAddress.asScala
-      .collect { case (aliasName, addressBytes) if addressBytes sameElements a.bytes =>
+      .collect { case (aliasName, addressBytes) if addressBytes == a.bytes =>
         Alias.buildWithCurrentNetworkByte(aliasName).explicitGet()
       }.toSeq
   }
 
   override def resolveAlias(a: Alias): Option[Account] = read { implicit l =>
     Option(sp().aliasToAddress.get(a.name))
-      .map(b => Account.fromBytes(b).explicitGet())
+      .map(b => Account.fromBytes(b.arr).explicitGet())
   }
 
   override def accountPortfolios: Map[Account, Portfolio] = read { implicit l =>
     sp().portfolios.asScala.map {
-      case (acc, (b, (i, o), as)) => Account.fromBytes(acc).explicitGet() -> Portfolio(b, LeaseInfo(i, o), as.map {
+      case (acc, (b, (i, o), as)) => Account.fromBytes(acc.arr).explicitGet() -> Portfolio(b, LeaseInfo(i, o), as.map {
         case (k, v) => EqByteArray(k) -> v
       })
     }.toMap

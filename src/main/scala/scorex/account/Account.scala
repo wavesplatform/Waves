@@ -1,8 +1,6 @@
 package scorex.account
 
-import java.util
-import java.util.Collections
-
+import com.wavesplatform.state2.{ByteArray, EqByteArray}
 import com.wavesplatform.utils.base58Length
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.SecureCryptographicHash._
@@ -14,19 +12,10 @@ import scala.util.Success
 
 
 sealed trait Account extends AccountOrAlias {
-  lazy val address: String = Base58.encode(bytes)
+  val bytes: ByteArray
+  lazy val address: String = bytes.base58
   lazy val stringRepr: String = Account.Prefix + address
 
-  val bytes: Array[Byte]
-
-  override def toString: String = stringRepr
-
-  override def equals(obj: scala.Any): Boolean = obj match {
-    case a: Account => bytes sameElements a.bytes
-    case _ => false
-  }
-
-  override def hashCode(): Int = java.util.Arrays.hashCode(bytes)
 }
 
 object Account extends ScorexLogging {
@@ -41,24 +30,17 @@ object Account extends ScorexLogging {
 
   private def scheme = AddressScheme.current
 
-  private class AccountImpl(val bytes: Array[Byte]) extends Account {
-    override def equals(obj: Any) = obj match {
-      case that: AccountImpl => bytes sameElements that.bytes
-      case _ => false
-    }
-
-    override def hashCode() = util.Arrays.hashCode(bytes)
-  }
+  private class AccountImpl(val bytes: ByteArray) extends Account
 
   def fromPublicKey(publicKey: Array[Byte]): Account = {
     val publicKeyHash = hash(publicKey).take(HashLength)
     val withoutChecksum = AddressVersion +: scheme.chainId +: publicKeyHash
     val bytes = withoutChecksum ++ calcCheckSum(withoutChecksum)
-    new AccountImpl(bytes)
+    new AccountImpl(EqByteArray(bytes))
   }
 
   def fromBytes(addressBytes: Array[Byte]): Either[ValidationError, Account] = {
-    if (isByteArrayValid(addressBytes)) Right(new AccountImpl(addressBytes))
+    if (isByteArrayValid(addressBytes)) Right(new AccountImpl(EqByteArray(addressBytes)))
     else Left(InvalidAddress)
   }
 
@@ -67,7 +49,7 @@ object Account extends ScorexLogging {
       Left(InvalidAddress)
     } else {
       Base58.decode(address) match {
-        case Success(byteArray) if isByteArrayValid(byteArray) => Right(new AccountImpl(byteArray))
+        case Success(byteArray) if isByteArrayValid(byteArray) => Right(new AccountImpl(EqByteArray(byteArray)))
         case _ => Left(InvalidAddress)
       }
     }

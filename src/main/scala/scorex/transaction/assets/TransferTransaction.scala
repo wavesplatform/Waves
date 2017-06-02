@@ -60,7 +60,7 @@ object TransferTransaction {
         timestampBytes,
         amountBytes,
         feeBytes,
-        recipient.bytes,
+        recipient.bytes.arr,
         BytesSerializable.arrayWithSize(attachment))
     }
 
