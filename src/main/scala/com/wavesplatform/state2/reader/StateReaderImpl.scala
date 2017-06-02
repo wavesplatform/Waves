@@ -42,7 +42,7 @@ class StateReaderImpl(p: StateStorage, val synchronizationToken: ReentrantReadWr
   }
 
   override def paymentTransactionIdByHash(hash: ByteArray): Option[ByteArray] = read { implicit l =>
-    Option(sp().paymentTransactionHashes.get(hash)).map(EqByteArray(_))
+    Option(sp().paymentTransactionHashes.get(hash))
   }
 
   override def aliasesOfAddress(a: Account): Seq[Alias] = read { implicit l =>

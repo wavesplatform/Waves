@@ -24,7 +24,8 @@ class StateStorage private(db: MVStore) {
 
   def setHeight(i: Int): Unit = variables.put(heightKey, i)
 
-  val transactions: MVMap[ByteArray, (Int, Array[Byte])] = db.openMap("txs", new LogMVMapBuilder[ByteArray, (Int, Array[Byte])].keyType(new EqByteArrayMVStoreDataType))
+  val transactions: MVMap[ByteArray, (Int, Array[Byte])] = db.openMap("txs", new LogMVMapBuilder[ByteArray, (Int, Array[Byte])]
+    .keyType(new EqByteArrayMVStoreDataType))
 
   val portfolios: MVMap[Array[Byte], (Long, (Long, Long), Map[Array[Byte], Long])] = db.openMap("portfolios")
 
@@ -34,7 +35,9 @@ class StateStorage private(db: MVStore) {
 
   val balanceSnapshots: MVMap[SnapshotKey, (Int, Long, Long)] = db.openMap("balanceSnapshots")
 
-  val paymentTransactionHashes: MVMap[Array[Byte], Array[Byte]] = db.openMap("paymentTransactionHashes")
+  val paymentTransactionHashes: MVMap[ByteArray, ByteArray] = db.openMap("paymentTransactionHashes", new LogMVMapBuilder[ByteArray, ByteArray]
+    .keyType(new EqByteArrayMVStoreDataType)
+    .valueType(new EqByteArrayMVStoreDataType))
 
   val aliasToAddress: MVMap[String, Array[Byte]] = db.openMap("aliasToAddress")
 

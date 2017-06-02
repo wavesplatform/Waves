@@ -79,7 +79,7 @@ class StateWriterImpl(p: StateStorage, synchronizationToken: ReentrantReadWriteL
       }
 
       measureSizeLog("paymentTransactionIdsByHashes")(blockDiff.txsDiff.paymentTransactionIdsByHashes) {
-        _.foreach { case (EqByteArray(hash), EqByteArray(id)) =>
+        _.foreach { case (hash, id) =>
           sp().paymentTransactionHashes.put(hash, id)
         }
       }
