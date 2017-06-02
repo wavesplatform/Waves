@@ -9,36 +9,30 @@ class OptimisticExtensionLoader extends ChannelDuplexHandler with ScorexLogging 
 
   private var hopefullyNextIds = Seq.empty[ByteStr]
   private var nextExtensionBlocks = Seq.empty[Block]
-  private var blocksAreBeingLoaded = false
   private var discardNextBlocks = false
 
-  private def loadNextPart(ctx: ChannelHandlerContext, blocks: Seq[Block]): Unit = {
+  private def loadNextPart(ctx: ChannelHandlerContext, blocks: Seq[Block]): Unit = if (blocks.size > 1) {
+    // Receiving just one block usually means we've reached the end of blockchain. Pre-Netty nodes
+    // didn't handle GetSignatures(lastBlockId) message properly, hence the check.
     hopefullyNextIds = blocks.view.map(b => ByteStr(b.uniqueId)).reverseIterator.take(100).toSeq
     ctx.writeAndFlush(LoadBlockchainExtension(hopefullyNextIds))
-    blocksAreBeingLoaded = true
   }
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef) = msg match {
     case ExtensionBlocks(extension) if discardNextBlocks =>
-      blocksAreBeingLoaded = false
       discardNextBlocks = false
       log.debug(s"${id(ctx)} discarding just-loaded ${extension.length} blocks as requested")
     case ExtensionBlocks(extension) if hopefullyNextIds.isEmpty =>
       loadNextPart(ctx, extension)
       super.channelRead(ctx, msg)
-    case ExtensionBlocks(extension) if extension.isEmpty =>
-      hopefullyNextIds = Seq.empty
-      nextExtensionBlocks = Seq.empty
-      blocksAreBeingLoaded = false
     case ExtensionBlocks(extension) =>
       nextExtensionBlocks = extension
-      blocksAreBeingLoaded = false
     case _ => super.channelRead(ctx, msg)
   }
 
   override def write(ctx: ChannelHandlerContext, msg: AnyRef, promise: ChannelPromise) = msg match {
     case LoadBlockchainExtension(localIds) if hopefullyNextIds == localIds =>
-      if (blocksAreBeingLoaded) {
+      if (nextExtensionBlocks.isEmpty) {
         log.debug(s"${id(ctx)} Still waiting for extension to load")
         hopefullyNextIds = Seq.empty
       } else {
@@ -47,10 +41,10 @@ class OptimisticExtensionLoader extends ChannelDuplexHandler with ScorexLogging 
         loadNextPart(ctx, nextExtensionBlocks)
         nextExtensionBlocks = Seq.empty
       }
-    case LoadBlockchainExtension(_) =>
-      if (blocksAreBeingLoaded) {
+    case LoadBlockchainExtension(localIds) =>
+      if (!localIds.containsSlice(hopefullyNextIds)) {
+        log.debug(s"${id(ctx)} Got unexpected known block ids, will discard extension once ready")
         discardNextBlocks = true
-        log.warn(s"${id(ctx)} Got unexpected known block ids, will discard extension once ready")
       }
       hopefullyNextIds = Seq.empty
       nextExtensionBlocks = Seq.empty

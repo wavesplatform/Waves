@@ -31,7 +31,7 @@ class BlacklistSpecification extends FeatureSpec with GivenWhenThen {
       Given("Peer database is empty")
       val peerDatabase = new PeerDatabaseImpl(networkSettings)
 
-      def isBlacklisted(address: InetSocketAddress) = peerDatabase.getBlacklist.contains(address.getHostName)
+      def isBlacklisted(address: InetSocketAddress) = peerDatabase.getBlacklist.contains(address.getAddress)
 
       assert(peerDatabase.getKnownPeers.isEmpty)
       assert(peerDatabase.getBlacklist.isEmpty)
@@ -43,7 +43,7 @@ class BlacklistSpecification extends FeatureSpec with GivenWhenThen {
       assert(!isBlacklisted(address))
 
       And("Peer blacklists another peer")
-      peerDatabase.blacklistHost(address.getHostName)
+      peerDatabase.blacklistHost(address.getAddress)
       assert(isBlacklisted(address))
       assert(!peerDatabase.getKnownPeers.contains(address))
 

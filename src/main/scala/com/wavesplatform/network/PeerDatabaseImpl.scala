@@ -1,6 +1,6 @@
 package com.wavesplatform.network
 
-import java.net.InetSocketAddress
+import java.net.{InetAddress, InetSocketAddress}
 
 import com.wavesplatform.settings.NetworkSettings
 import com.wavesplatform.utils.createMVStore
@@ -16,7 +16,7 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Auto
 
   private val peersPersistence: MVMap[InetSocketAddress, PeerDatabase.PeerInfo] =
     database.openMap("peers", new LogMVMapBuilder[InetSocketAddress, PeerDatabase.PeerInfo])
-  private val blacklist: MVMap[String, Long] = database.openMap("blacklist", new LogMVMapBuilder[String, Long])
+  private val blacklist: MVMap[InetAddress, Long] = database.openMap("blacklist", new LogMVMapBuilder[InetAddress, Long])
   private val unverifiedPeers = new CircularBuffer[InetSocketAddress](settings.maxUnverifiedPeers)
 
   for (a <- settings.knownPeers.view.map(inetSocketAddress(_, 6863))) {
@@ -48,20 +48,20 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Auto
     }
   }
 
-  override def blacklistHost(host: String): Unit = {
-    unverifiedPeers.drop(_.getHostName == host)
-    blacklist.put(host, System.currentTimeMillis())
+  override def blacklistHost(address: InetAddress): Unit = {
+    unverifiedPeers.drop(_.getAddress == address)
+    blacklist.put(address, System.currentTimeMillis())
     database.commit()
   }
 
   override def getKnownPeers: Map[InetSocketAddress, PeerDatabase.PeerInfo] = {
     withoutObsoleteRecords(peersPersistence,
       (peerData: PeerDatabase.PeerInfo) => peerData.timestamp, settings.peersDataResidenceTime.toMillis)
-      .asScala.toMap.filterKeys(address => !getBlacklist.contains(address.getHostName))
+      .asScala.toMap.filterKeys(address => !getBlacklist.contains(address.getAddress))
   }
 
-  override def getBlacklist: Set[String] =
-    withoutObsoleteRecords(blacklist, { t: Long => t }, settings.blackListResidenceTime.toMillis).keySet().asScala.toSet
+  override def getBlacklist: Set[InetAddress] =
+    withoutObsoleteRecords(blacklist, identity[Long], settings.blackListResidenceTime.toMillis).keySet().asScala.toSet
 
   override def getRandomPeer(excluded: Set[InetSocketAddress]): Option[InetSocketAddress] = {
     val unverifiedCandidate = if (unverifiedPeers.nonEmpty)

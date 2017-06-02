@@ -94,7 +94,7 @@ case class PeersApiRoute(
     new ApiResponse(code = 200, message = "Json with connected peers or error")
   ))
   def blacklistedPeers: Route = (path("blacklisted") & get) {
-    complete(JsArray(peerDatabase.getBlacklist.take(MaxPeersInResponse).map(JsString).toSeq))
+    complete(JsArray(peerDatabase.getBlacklist.take(MaxPeersInResponse).map(a => JsString(a.toString)).toSeq))
   }
 }
 
