@@ -38,7 +38,7 @@ object LeaseCancelTransaction {
     override lazy val json: JsObject = jsonBase() ++ Json.obj(
       "fee" -> fee,
       "timestamp" -> timestamp,
-      "leaseId" -> leaseId.arr
+      "leaseId" -> leaseId.base58
     )
 
     override val assetFee: (Option[AssetId], Long) = (None, fee)

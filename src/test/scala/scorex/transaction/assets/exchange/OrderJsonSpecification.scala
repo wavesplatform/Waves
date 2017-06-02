@@ -1,6 +1,7 @@
 package scorex.transaction.assets.exchange
 
 import com.wavesplatform.TransactionGen
+import com.wavesplatform.state2.EqByteArray
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import play.api.libs.json._
@@ -39,8 +40,8 @@ class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers 
         val o = s.get
         o.senderPublicKey shouldBe PublicKeyAccount(pk.publicKey)
         o.matcherPublicKey shouldBe PublicKeyAccount(Base58.decode("DZUxn4pC7QdYrRqacmaAJghatvnn1Kh1mkE2scZoLuGJ").get)
-        o.assetPair.amountAsset.get shouldBe Base58.decode("29ot86P3HoUZXH1FCoyvff7aeZ3Kt7GqPwBWXncjRF2b").get
-        o.assetPair.priceAsset.get shouldBe Base58.decode("GEtBMkg419zhDiYRXKwn2uPcabyXKqUqj4w3Gcs1dq44").get
+        o.assetPair.amountAsset.get shouldBe EqByteArray.decode("29ot86P3HoUZXH1FCoyvff7aeZ3Kt7GqPwBWXncjRF2b").get
+        o.assetPair.priceAsset.get shouldBe EqByteArray.decode("GEtBMkg419zhDiYRXKwn2uPcabyXKqUqj4w3Gcs1dq44").get
         o.price shouldBe 0
         o.amount shouldBe 0
         o.matcherFee shouldBe 0

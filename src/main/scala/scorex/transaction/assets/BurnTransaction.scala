@@ -38,7 +38,7 @@ object BurnTransaction {
       Longs.toByteArray(timestamp))
 
     override lazy val json: JsObject = jsonBase() ++ Json.obj(
-      "assetId" -> assetId.arr,
+      "assetId" -> assetId.base58,
       "amount" -> amount,
       "fee" -> fee
     )
