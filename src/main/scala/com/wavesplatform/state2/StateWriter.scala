@@ -34,11 +34,11 @@ class StateWriterImpl(p: StateStorage, synchronizationToken: ReentrantReadWriteL
 
       measureSizeLog("orderFills")(blockDiff.txsDiff.orderFills) {
         _.par.foreach { case (oid, orderFillInfo) =>
-          Option(sp().orderFills.get(oid.arr)) match {
+          Option(sp().orderFills.get(oid)) match {
             case Some(ll) =>
-              sp().orderFills.put(oid.arr, (ll._1 + orderFillInfo.volume, ll._2 + orderFillInfo.fee))
+              sp().orderFills.put(oid, (ll._1 + orderFillInfo.volume, ll._2 + orderFillInfo.fee))
             case None =>
-              sp().orderFills.put(oid.arr, (orderFillInfo.volume, orderFillInfo.fee))
+              sp().orderFills.put(oid, (orderFillInfo.volume, orderFillInfo.fee))
           }
         }
       }
@@ -103,7 +103,7 @@ class StateWriterImpl(p: StateStorage, synchronizationToken: ReentrantReadWriteL
 
       measureSizeLog("uniqueAssets")(blockDiff.txsDiff.assetsWithUniqueNames) {
         _.foreach { case (name, id) =>
-          p.uniqueAssets.put(name.arr, id.arr)
+          p.uniqueAssets.put(name, id)
         }
       }
 

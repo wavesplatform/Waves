@@ -29,7 +29,8 @@ class StateStorage private(db: MVStore) {
 
   val portfolios: MVMap[Array[Byte], (Long, (Long, Long), Map[Array[Byte], Long])] = db.openMap("portfolios")
 
-  val assets: MVMap[ByteArray, (Boolean, Long)] = db.openMap("assets", new LogMVMapBuilder[ByteArray, (Boolean, Long)].keyType(new EqByteArrayMVStoreDataType))
+  val assets: MVMap[ByteArray, (Boolean, Long)] = db.openMap("assets", new LogMVMapBuilder[ByteArray, (Boolean, Long)]
+    .keyType(new EqByteArrayMVStoreDataType))
 
   val accountTransactionIds: MVMap[Array[Byte], List[Array[Byte]]] = db.openMap("accountTransactionIds")
 
@@ -41,13 +42,17 @@ class StateStorage private(db: MVStore) {
 
   val aliasToAddress: MVMap[String, Array[Byte]] = db.openMap("aliasToAddress")
 
-  val orderFills: MVMap[Array[Byte], (Long, Long)] = db.openMap("orderFills")
+  val orderFills: MVMap[ByteArray, (Long, Long)] = db.openMap("orderFills", new LogMVMapBuilder[ByteArray, (Long, Long)]
+    .keyType(new EqByteArrayMVStoreDataType))
 
-  val leaseState: MVMap[ByteArray, Boolean] = db.openMap("leaseState", new LogMVMapBuilder[ByteArray, Boolean].keyType(new EqByteArrayMVStoreDataType))
+  val leaseState: MVMap[ByteArray, Boolean] = db.openMap("leaseState", new LogMVMapBuilder[ByteArray, Boolean]
+    .keyType(new EqByteArrayMVStoreDataType))
 
   val lastUpdateHeight: MVMap[Array[Byte], Int] = db.openMap("lastUpdateHeight")
 
-  val uniqueAssets: MVMap[Array[Byte], Array[Byte]] = db.openMap("uniqueAssets")
+  val uniqueAssets: MVMap[ByteArray, ByteArray] = db.openMap("uniqueAssets", new LogMVMapBuilder[ByteArray, ByteArray]
+    .keyType(new EqByteArrayMVStoreDataType)
+    .valueType(new EqByteArrayMVStoreDataType))
 
   def commit(): Unit = db.commit()
 
