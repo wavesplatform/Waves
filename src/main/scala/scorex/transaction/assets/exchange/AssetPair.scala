@@ -3,10 +3,8 @@ package scorex.transaction.assets.exchange
 import com.wavesplatform.state2.EqByteArray
 import io.swagger.annotations.ApiModelProperty
 import play.api.libs.json.{JsObject, Json}
-import scorex.crypto.encode.Base58
 import scorex.transaction._
 import scorex.transaction.assets.exchange.Order.assetIdBytes
-import scorex.utils.ByteArrayExtension
 import scorex.transaction.assets.exchange.Validation.booleanOperators
 
 import scala.util.{Success, Try}

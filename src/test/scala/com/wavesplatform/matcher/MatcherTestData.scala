@@ -8,7 +8,7 @@ import org.scalacheck.{Arbitrary, Gen}
 import scorex.account.PrivateKeyAccount
 import scorex.crypto.hash.SecureCryptographicHash
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
-import scorex.utils.{ByteArrayExtension, NTP}
+import scorex.utils.{NTP}
 
 trait MatcherTestData {
   val bytes32gen: Gen[Array[Byte]] = Gen.listOfN(32, Arbitrary.arbitrary[Byte]).map(_.toArray)

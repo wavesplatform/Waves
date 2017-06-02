@@ -1,12 +1,6 @@
 package com.wavesplatform.state2
 
-import java.nio.ByteBuffer
-
-import shapeless.syntax.typeable._
-import org.h2.mvstore.WriteBuffer
-import org.h2.mvstore.`type`.DataType
 import scorex.crypto.encode.Base58
-import org.h2.mvstore.DataUtils
 
 import scala.util.Try
 

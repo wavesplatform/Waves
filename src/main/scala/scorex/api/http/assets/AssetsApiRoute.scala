@@ -171,7 +171,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, state: Stat
       complete {
         Base58.decode(base58EncodedAssetName) match {
           case Success(assetName) => state.getAssetIdByUniqueName(EqByteArray(assetName)) match {
-            case Some(assetId) => JsString(Base58.encode(assetId.arr))
+            case Some(assetId) => JsString(assetId.base58)
             case None => JsNull
           }
           case Failure(e) => ApiError.fromValidationError(scorex.transaction.ValidationError.TransactionParameterValidationError("Must be base58-encoded assetId"))

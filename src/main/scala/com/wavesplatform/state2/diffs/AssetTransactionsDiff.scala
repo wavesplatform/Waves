@@ -64,7 +64,7 @@ object AssetTransactionsDiff {
         val assetName = EqByteArray(itx.name)
         state.getAssetIdByUniqueName(assetName) match {
           case Some(assetId) =>
-            Left(TransactionValidationError(tx, s"Asset name has been verified for ${Base58.encode(assetId.arr)}"))
+            Left(TransactionValidationError(tx, s"Asset name has been verified for ${assetId.base58}"))
           case None =>
             Right(Diff(height = height,
               tx = tx,
