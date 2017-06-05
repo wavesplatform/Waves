@@ -2,7 +2,7 @@ package com.wavesplatform.network
 
 import java.util.concurrent.ScheduledFuture
 
-import com.wavesplatform.utils.ByteStr
+import com.wavesplatform.state2.ByteStr
 import io.netty.channel.{Channel, ChannelDuplexHandler, ChannelHandlerContext, ChannelPromise}
 import scorex.utils.ScorexLogging
 

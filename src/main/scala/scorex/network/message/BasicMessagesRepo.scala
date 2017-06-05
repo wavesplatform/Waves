@@ -4,7 +4,7 @@ import java.net.{InetAddress, InetSocketAddress}
 import java.util
 
 import com.google.common.primitives.{Bytes, Ints}
-import com.wavesplatform.network.{BlockCheckpoint, Checkpoint, GetBlock, GetSignatures, KnownPeers, Signatures, GetPeers}
+import com.wavesplatform.network.{BlockCheckpoint, Checkpoint, GetBlock, GetPeers, GetSignatures, KnownPeers, Signatures}
 import com.wavesplatform.state2.ByteStr
 import scorex.block.Block
 import scorex.crypto.signatures.SigningFunctions
@@ -97,7 +97,7 @@ trait SignaturesSeqSpec[A <: AnyRef] extends MessageSpec[A] {
 
 object GetSignaturesSpec extends SignaturesSeqSpec[GetSignatures] {
   override def wrap(signatures: Seq[Signature]) = GetSignatures(signatures.map(ByteStr(_)))
-  override def unwrap(v: GetSignatures) = v.signatures.map(_.bytes)
+  override def unwrap(v: GetSignatures) = v.signatures.map(_.arr)
 
   override val messageCode: MessageCode = 20: Byte
   override val messageName: String = "GetSignatures message"
@@ -105,7 +105,7 @@ object GetSignaturesSpec extends SignaturesSeqSpec[GetSignatures] {
 
 object SignaturesSpec extends SignaturesSeqSpec[Signatures] {
   override def wrap(signatures: Seq[Signature]) = Signatures(signatures.map(ByteStr(_)))
-  override def unwrap(v: Signatures) = v.signatures.map(_.bytes)
+  override def unwrap(v: Signatures) = v.signatures.map(_.arr)
 
   override val messageCode: MessageCode = 21: Byte
   override val messageName: String = "Signatures message"
@@ -115,7 +115,7 @@ object GetBlockSpec extends MessageSpec[GetBlock] {
   override val messageCode: MessageCode = 22: Byte
   override val messageName: String = "GetBlock message"
 
-  override def serializeData(signature: GetBlock): Array[Byte] = signature.signature.bytes
+  override def serializeData(signature: GetBlock): Array[Byte] = signature.signature.arr
 
   override def deserializeData(bytes: Array[Byte]): Try[GetBlock] = Try {
     require(bytes.length == scorex.transaction.TransactionParser.SignatureLength, "Data does not match length")

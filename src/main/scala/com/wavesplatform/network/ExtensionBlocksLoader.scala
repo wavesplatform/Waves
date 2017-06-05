@@ -1,12 +1,10 @@
 package com.wavesplatform.network
 
-import com.wavesplatform.utils.ByteStr
+import com.wavesplatform.state2.ByteStr
 import io.netty.channel.{Channel, ChannelHandlerContext, ChannelInboundHandlerAdapter}
 import io.netty.util.concurrent.ScheduledFuture
 import scorex.block.Block
 import scorex.crypto.EllipticCurveImpl
-import scorex.crypto.encode.Base58
-import scorex.crypto.encode.Base58.encode
 import scorex.transaction.History
 import scorex.utils.ScorexLogging
 
@@ -45,10 +43,9 @@ class ExtensionBlocksLoader(
         log.debug(s"${id(ctx)} No new blocks to load")
       }
 
-    case b: Block if pendingSignatures.contains(ByteStr(b.uniqueId)) =>
-      val signature = ByteStr(b.uniqueId)
-      blockBuffer += pendingSignatures(signature) -> b
-      pendingSignatures -= signature
+    case b: Block if pendingSignatures.contains(b.uniqueId) =>
+      blockBuffer += pendingSignatures(b.uniqueId) -> b
+      pendingSignatures -= b.uniqueId
       if (pendingSignatures.isEmpty) {
         cancelTimeout()
         log.debug(s"${id(ctx)} Loaded all blocks, doing a pre-check")
@@ -56,11 +53,11 @@ class ExtensionBlocksLoader(
         val newBlocks = blockBuffer.values.toSeq
 
         for (tids <- targetExtensionIds) {
-          if (!(tids.lastCommonId == ByteStr(newBlocks.head.reference))) {
-            log.warn(s"${id(ctx)} Extension head reference ${encode(newBlocks.head.reference)} differs from last common block id ${tids.lastCommonId}")
+          if (tids.lastCommonId != newBlocks.head.reference) {
+            log.warn(s"${id(ctx)} Extension head reference ${newBlocks.head.reference} differs from last common block id ${tids.lastCommonId}")
             // todo: blacklist?
           } else if (!newBlocks.sliding(2).forall {
-              case Seq(b1, b2) => b1.uniqueId.sameElements(b2.reference)
+              case Seq(b1, b2) => b1.uniqueId == b2.reference
               case _ => true
             }) {
             log.warn(s"${id(ctx)}Extension blocks are not contiguous, pre-check failed")
@@ -68,7 +65,7 @@ class ExtensionBlocksLoader(
           } else {
             newBlocks.par.find(!blockIsValid(_)) match {
               case Some(invalidBlock) =>
-                log.warn(s"${id(ctx)} Got block ${Base58.encode(invalidBlock.uniqueId)} with invalid signature")
+                log.warn(s"${id(ctx)} Got block ${invalidBlock.uniqueId} with invalid signature")
               case None =>
                 log.debug(s"${id(ctx)} Chain is valid, pre-check passed")
                 ctx.fireChannelRead(ExtensionBlocks(newBlocks))
@@ -86,5 +83,5 @@ class ExtensionBlocksLoader(
   }
 
   private def blockIsValid(b: Block) =
-    EllipticCurveImpl.verify(b.signerData.signature, b.bytesWithoutSignature, b.signerData.generator.publicKey)
+    EllipticCurveImpl.verify(b.signerData.signature.arr, b.bytesWithoutSignature, b.signerData.generator.publicKey)
 }

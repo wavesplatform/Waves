@@ -70,7 +70,6 @@ abstract class HandshakeHandler(
   private def remoteAddress(ctx: ChannelHandlerContext, incomingHandshake: Handshake) =
     incomingHandshake.declaredAddress
       .getOrElse(ctx.channel().remoteAddress().asInstanceOf[InetSocketAddress])
-      .getAddress
 
   def connectionNegotiated(ctx: ChannelHandlerContext): Unit
 
@@ -80,13 +79,20 @@ abstract class HandshakeHandler(
       blacklist(ctx.channel)
     case rhs: Handshake =>
       log.debug(s"${id(ctx)} Received handshake $rhs")
-      if (connections.putIfAbsent(PeerKey(remoteAddress(ctx, rhs), rhs.nodeNonce), ctx.channel()) != null) {
+      val ra = remoteAddress(ctx, rhs)
+      val key = PeerKey(ra.getAddress, rhs.nodeNonce)
+      if (connections.putIfAbsent(key, ctx.channel()) != null) {
         log.debug(s"${id(ctx)} Already connected to peer, disconnecting")
         ctx.close()
       } else {
         removeHandshakeHandlers(ctx, this)
+        ctx.channel().attr(AttributeKeys.NodeName).set(rhs.nodeName)
+        ctx.channel().attr(AttributeKeys.RemoteAddress).set(ra)
         establishedConnections.put(ctx.channel(), peerInfo(rhs, ctx.channel()))
         connectionNegotiated(ctx)
+        ctx.channel().closeFuture().addListener { f: ChannelFuture =>
+          connections.remove(key, f.channel())
+        }
         ctx.fireChannelRead(rhs)
       }
     case _ => super.channelRead(ctx, msg)

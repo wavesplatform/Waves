@@ -8,7 +8,6 @@ import com.wavesplatform.Version
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.settings._
 import com.wavesplatform.state2.reader.StateReader
-import com.wavesplatform.utils.ByteStr
 import io.netty.bootstrap.{Bootstrap, ServerBootstrap}
 import io.netty.channel._
 import io.netty.channel.group.{ChannelGroup, ChannelMatchers}
@@ -46,7 +45,7 @@ class NetworkServer(
 
   private val scoreObserver = new RemoteScoreObserver(
       settings.synchronizationSettings.scoreTTL,
-      history.lastBlockIds(settings.synchronizationSettings.maxRollback).map(ByteStr(_)))
+      history.lastBlockIds(settings.synchronizationSettings.maxRollback))
 
   private val allLocalInterfaces = (for {
     ifc <- NetworkInterface.getNetworkInterfaces.asScala

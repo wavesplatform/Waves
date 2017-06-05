@@ -2,7 +2,7 @@ package com.wavesplatform.network
 
 import java.util.concurrent.ConcurrentHashMap
 
-import com.wavesplatform.utils.ByteStr
+import com.wavesplatform.state2.ByteStr
 import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel._
 import scorex.transaction.History
@@ -44,7 +44,7 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
         case Some((chan, score)) =>
           promise.setSuccess()
           if (score.value > newLocalScore) {
-            log.debug(s"${id(ctx)} Local score $newLocalScore is still lower than remote ${score.value} from ${id(chan)}, requesting extension")
+            log.debug(s"${id(ctx)} Local score $newLocalScore is still lower than remote ${score.value}, requesting extension")
             chan.writeAndFlush(LoadBlockchainExtension(lastSignatures))
           } else {
             log.trace(s"${id(ctx)} Blockchain is up to date")
