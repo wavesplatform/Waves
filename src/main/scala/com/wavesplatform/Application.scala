@@ -39,7 +39,7 @@ import scorex.waves.http.{DebugApiRoute, WavesApiRoute}
 import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.reflect.runtime.universe._
-import scala.util.{Left, Try}
+import scala.util.{Failure, Left, Success, Try}
 
 class Application(val actorSystem: ActorSystem, val settings: WavesSettings) extends ScorexLogging {
 
@@ -51,8 +51,12 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
   val time: Time = new TimeImpl()
   val wallet: Wallet = {
     val maybeWalletFilename = Option(settings.walletSettings.file).filter(_.trim.nonEmpty)
-    val seed = Base58.decode(settings.walletSettings.seed).toOption
-    new Wallet(maybeWalletFilename, settings.walletSettings.password, seed)
+    Base58.decode(settings.walletSettings.seed) match {
+      case Success(seed) =>
+        new Wallet(maybeWalletFilename, settings.walletSettings.password, Some(seed))
+      case Failure(f) =>
+        throw new IllegalArgumentException("Invalid seed in config file, please, fix this",f)
+    }
   }
   val utxStorage: UnconfirmedTransactionsStorage = new UnconfirmedTransactionsDatabaseImpl(settings.utxSettings.size)
   val newTransactionHandler = new NewTransactionHandlerImpl(settings.blockchainSettings.functionalitySettings,

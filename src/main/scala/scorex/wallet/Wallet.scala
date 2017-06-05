@@ -39,7 +39,7 @@ class Wallet(maybeFilename: Option[String], password: String, seedOpt: Option[Ar
       val SeedSize = 64
       lazy val randomSeed = randomBytes(SeedSize)
       lazy val encodedSeed = Base58.encode(randomSeed)
-      log.debug(s"You random generated seed is $encodedSeed")
+      log.info(s"You random generated seed is $encodedSeed")
       randomSeed
     }
     seedPersistence.put("seed", seed)
