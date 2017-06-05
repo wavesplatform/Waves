@@ -2,7 +2,6 @@ package com.wavesplatform.network
 
 import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel.{ChannelHandlerContext, ChannelInboundHandlerAdapter}
-import scorex.crypto.encode.Base58
 import scorex.transaction.ValidationError.TransactionValidationError
 import scorex.transaction.{NewTransactionHandler, Transaction}
 import scorex.utils.ScorexLogging
@@ -14,11 +13,11 @@ class UtxPoolSynchronizer(handler: NewTransactionHandler, network: Network)
     case t: Transaction =>
       handler.onNewTransaction(t) match {
         case Left(TransactionValidationError(tx, err)) =>
-          log.debug(s"${id(ctx)} Error processing transaction ${Base58.encode(tx.id)}: $err")
+          log.debug(s"${id(ctx)} Error processing transaction ${tx.id}: $err")
         case Left(e) =>
-          log.debug(s"${id(ctx)} Error processing transaction ${Base58.encode(t.id)}: $e")
+          log.debug(s"${id(ctx)} Error processing transaction ${t.id}: $e")
         case Right(_) =>
-          log.debug(s"${id(ctx)} Added transaction ${Base58.encode(t.id)} to UTX pool")
+          log.debug(s"${id(ctx)} Added transaction ${t.id} to UTX pool")
           network.broadcast(t, Some(ctx.channel()))
       }
     case _ => super.channelRead(ctx, msg)

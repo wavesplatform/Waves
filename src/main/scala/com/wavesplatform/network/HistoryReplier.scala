@@ -1,6 +1,5 @@
 package com.wavesplatform.network
 
-import com.wavesplatform.utils.ByteStr
 import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel.{ChannelHandlerContext, ChannelInboundHandlerAdapter}
 import scorex.network.message.BlockMessageSpec
@@ -15,7 +14,7 @@ class HistoryReplier(history: History, maxChainLength: Int) extends ChannelInbou
       log.info(s"Got GetSignaturesMessage with ${otherSigs.length} sigs within")
 
       otherSigs.foreach { parent =>
-        val headers = history.blockIdsAfter(parent.bytes, maxChainLength).map(ByteStr(_))
+        val headers = history.blockIdsAfter(parent, maxChainLength)
 
         if (headers.nonEmpty) {
           ctx.write(Signatures(Seq(parent) ++ headers))
@@ -25,7 +24,7 @@ class HistoryReplier(history: History, maxChainLength: Int) extends ChannelInbou
       ctx.flush()
 
     case GetBlock(sig) =>
-      for (h <- history.heightOf(sig.bytes); bytes <- history.blockBytes(h)) {
+      for (h <- history.heightOf(sig); bytes <- history.blockBytes(h)) {
         ctx.writeAndFlush(RawBytes(BlockMessageSpec.messageCode, bytes))
       }
 

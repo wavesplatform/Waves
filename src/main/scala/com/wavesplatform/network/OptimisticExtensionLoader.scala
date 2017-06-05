@@ -1,6 +1,6 @@
 package com.wavesplatform.network
 
-import com.wavesplatform.utils.ByteStr
+import com.wavesplatform.state2.ByteStr
 import io.netty.channel.{ChannelDuplexHandler, ChannelHandlerContext, ChannelPromise}
 import scorex.block.Block
 import scorex.utils.ScorexLogging
@@ -14,7 +14,7 @@ class OptimisticExtensionLoader extends ChannelDuplexHandler with ScorexLogging 
   private def loadNextPart(ctx: ChannelHandlerContext, blocks: Seq[Block]): Unit = if (blocks.size > 1) {
     // Receiving just one block usually means we've reached the end of blockchain. Pre-Netty nodes
     // didn't handle GetSignatures(lastBlockId) message properly, hence the check.
-    hopefullyNextIds = blocks.view.map(b => ByteStr(b.uniqueId)).reverseIterator.take(100).toSeq
+    hopefullyNextIds = blocks.view.map(_.uniqueId).reverseIterator.take(100).toSeq
     ctx.writeAndFlush(LoadBlockchainExtension(hopefullyNextIds))
   }
 
