@@ -49,7 +49,7 @@ object MatcherSettings {
 
     val orderHistoryFile = config.as[String](s"$configPath.order-history-file")
 
-    val isMigrateToNewOrderHistoryStorage = config.as[Boolean](s"$configPath.is-migrate-to-new-order-history-storage")
+    val isMigrateToNewOrderHistoryStorage = !new File(orderHistoryFile).exists()
 
     MatcherSettings(enabled, account, bindAddress, port, minOrderFee, orderMatchTxFee, journalDirectory,
       snapshotsDirectory, snapshotsInterval, maxOpenOrders, baseAssets, basePairs, maxTimestampDiff,
