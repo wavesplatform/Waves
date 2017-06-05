@@ -11,7 +11,7 @@ import com.wavesplatform.matcher.model.Events.Event
 import com.wavesplatform.matcher.model.{BuyLimitOrder, LimitOrder, SellLimitOrder}
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.reader.StateReader
-import com.wavesplatform.state2.{EqByteArray, LeaseInfo, Portfolio}
+import com.wavesplatform.state2.{ByteStr, LeaseInfo, Portfolio}
 import org.h2.mvstore.MVStore
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest._
@@ -38,13 +38,13 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
 
   var eventsProbe = TestProbe()
 
-  val pair = AssetPair(Some("BTC".getBytes), Some("WAVES".getBytes))
+  val pair = AssetPair(Some(ByteStr("BTC".getBytes)), Some(ByteStr("WAVES".getBytes)))
   val db = new MVStore.Builder().compress().open()
   val storedState: StateReader = stub[StateReader]
   val hugeAmount = Long.MaxValue / 2
   (storedState.accountPortfolio _).when(*).returns(Portfolio(hugeAmount, LeaseInfo.empty, Map(
-    EqByteArray("BTC".getBytes) -> hugeAmount,
-    EqByteArray("WAVES".getBytes) -> hugeAmount
+    ByteStr("BTC".getBytes) -> hugeAmount,
+    ByteStr("WAVES".getBytes) -> hugeAmount
   )))
 
 
@@ -72,6 +72,7 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
     actor = system.actorOf(Props(new OrderBookActor(pair, storedState,
       wallet, settings, history, functionalitySettings, transactionModule) with RestartableActor {
       override def validate(orderMatch: ExchangeTransaction): Either[ValidationError, SignedTransaction] = Right(orderMatch)
+
       override def sendToNetwork(tx: SignedTransaction): Either[ValidationError, SignedTransaction] = Right(tx)
     }))
 

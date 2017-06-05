@@ -7,7 +7,6 @@ import scorex.crypto.hash.FastCryptographicHash
 import scorex.transaction.ValidationError.AliasNotExists
 import scorex.transaction._
 import scorex.transaction.assets.IssueTransaction
-import scorex.transaction.assets.exchange.{ExchangeTransaction, Order}
 import scorex.transaction.lease.LeaseTransaction
 import scorex.utils.{ScorexLogging, Synchronized}
 
@@ -19,19 +18,19 @@ trait StateReader extends Synchronized {
 
   def accountPortfolios: Map[Account, Portfolio]
 
-  def transactionInfo(id: ByteArray): Option[(Int, Transaction)]
+  def transactionInfo(id: ByteStr): Option[(Int, Transaction)]
 
-  def containsTransaction(id: ByteArray): Boolean
+  def containsTransaction(id: ByteStr): Boolean
 
   def accountPortfolio(a: Account): Portfolio
 
-  def assetInfo(id: ByteArray): Option[AssetInfo]
+  def assetInfo(id: ByteStr): Option[AssetInfo]
 
   def height: Int
 
-  def accountTransactionIds(a: Account): Seq[ByteArray]
+  def accountTransactionIds(a: Account): Seq[ByteStr]
 
-  def paymentTransactionIdByHash(hash: ByteArray): Option[ByteArray]
+  def paymentTransactionIdByHash(hash: ByteStr): Option[ByteStr]
 
   def aliasesOfAddress(a: Account): Seq[Alias]
 
@@ -39,27 +38,27 @@ trait StateReader extends Synchronized {
 
   def isLeaseActive(leaseTx: LeaseTransaction): Boolean
 
-  def getAssetIdByUniqueName(assetName: ByteArray): Option[ByteArray]
+  def getAssetIdByUniqueName(assetName: ByteStr): Option[ByteStr]
 
-  def activeLeases(): Seq[ByteArray]
+  def activeLeases(): Seq[ByteStr]
 
   def lastUpdateHeight(acc: Account): Option[Int]
 
   def snapshotAtHeight(acc: Account, h: Int): Option[Snapshot]
 
-  def filledVolumeAndFee(orderId: ByteArray): OrderFillInfo
+  def filledVolumeAndFee(orderId: ByteStr): OrderFillInfo
 }
 
 object StateReader {
 
   implicit class StateReaderExt(s: StateReader) extends ScorexLogging {
-    def assetDistribution(assetId: ByteArray): Map[Account, Long] =
+    def assetDistribution(assetId: ByteStr): Map[Account, Long] =
       s.accountPortfolios
         .mapValues(portfolio => portfolio.assets.get(assetId))
         .collect { case (acc, Some(amt)) => acc -> amt }
 
-    def findTransaction[T <: Transaction](signature: Array[Byte])(implicit ct: ClassTag[T]): Option[T]
-    = s.transactionInfo(EqByteArray(signature)).map(_._2)
+    def findTransaction[T <: Transaction](signature: ByteStr)(implicit ct: ClassTag[T]): Option[T]
+    = s.transactionInfo(signature).map(_._2)
       .flatMap(tx => {
         if (ct.runtimeClass.isAssignableFrom(tx.getClass))
           Some(tx.asInstanceOf[T])
@@ -76,7 +75,7 @@ object StateReader {
       }
     }
 
-    def included(signature: Array[Byte]): Option[Int] = s.transactionInfo(EqByteArray(signature)).map(_._1)
+    def included(signature: ByteStr): Option[Int] = s.transactionInfo(signature).map(_._1)
 
     def accountTransactions(account: Account, limit: Int): Seq[_ <: Transaction] = s.read { implicit l =>
       s.accountTransactionIds(account).take(limit).flatMap(s.transactionInfo).map(_._2)
@@ -87,7 +86,7 @@ object StateReader {
     def assetBalance(account: AssetAcc): Long = {
       val accountPortfolio = s.accountPortfolio(account.account)
       account.assetId match {
-        case Some(assetId) => accountPortfolio.assets.getOrElse(EqByteArray(assetId), 0)
+        case Some(assetId) => accountPortfolio.assets.getOrElse(assetId, 0)
         case None => accountPortfolio.balance
       }
     }
@@ -95,23 +94,23 @@ object StateReader {
     def getAccountBalance(account: Account): Map[AssetId, (Long, Boolean, Long, IssueTransaction, Boolean)] = s.read { implicit l =>
       s.accountPortfolio(account).assets.map { case (id, amt) =>
         val assetInfo = s.assetInfo(id).get
-        val issueTransaction = findTransaction[IssueTransaction](id.arr).get
-        val isUnique = s.getAssetIdByUniqueName(EqByteArray(issueTransaction.name)).contains(EqByteArray(issueTransaction.assetId))
-        id.arr -> (amt, assetInfo.isReissuable, assetInfo.volume, issueTransaction, isUnique)
+        val issueTransaction = findTransaction[IssueTransaction](id).get
+        val isUnique = s.getAssetIdByUniqueName(ByteStr(issueTransaction.name)).contains(issueTransaction.assetId)
+        id -> (amt, assetInfo.isReissuable, assetInfo.volume, issueTransaction, isUnique)
       }
     }
 
     def assetDistribution(assetId: Array[Byte]): Map[String, Long] =
-      s.assetDistribution(EqByteArray(assetId))
+      s.assetDistribution(ByteStr(assetId))
         .map { case (acc, amt) => (acc.address, amt) }
 
     def effectiveBalance(account: Account): Long = s.accountPortfolio(account).effectiveBalance
 
     def isReissuable(id: Array[Byte]): Boolean =
-      s.assetInfo(EqByteArray(id)).get.isReissuable
+      s.assetInfo(ByteStr(id)).get.isReissuable
 
     def totalAssetQuantity(assetId: AssetId): Long =
-      s.assetInfo(EqByteArray(assetId)).get.volume
+      s.assetInfo(assetId).get.volume
 
     def getAssetName(assetId: AssetId): String = {
       s.findTransaction[IssueTransaction](assetId)

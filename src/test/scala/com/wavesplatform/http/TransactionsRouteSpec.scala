@@ -2,7 +2,6 @@ package com.wavesplatform.http
 
 import akka.http.scaladsl.model.StatusCodes
 import com.wavesplatform.http.ApiMarshallers._
-import com.wavesplatform.state2.EqByteArray
 import com.wavesplatform.state2.reader.StateReader
 import com.wavesplatform.{BlockGen, TransactionGen}
 import org.scalacheck.Gen._
@@ -57,9 +56,9 @@ class TransactionsRouteSpec extends RouteSpec("/transactions")
         accountGen,
         choose(1, MaxTransactionsPerRequest),
         randomTransactionsGen(transactionsCount)) { case (account, limit, txs) =>
-        (state.accountTransactionIds _).expects(account: Account).returning(txs.map(_.id).map(EqByteArray)).once()
+        (state.accountTransactionIds _).expects(account: Account).returning(txs.map(_.id)).once()
         txs.foreach { tx =>
-          (state.transactionInfo _).expects(EqByteArray(tx.id)).returning(Some(1,tx)).once()
+          (state.transactionInfo _).expects(tx.id).returning(Some(1,tx)).once()
         }
         Get(routePath(s"/address/${account.address}/limit/$limit")) ~> route ~> check {
           responseAs[Seq[JsValue]].length shouldEqual txs.length.min(limit)
@@ -88,9 +87,9 @@ class TransactionsRouteSpec extends RouteSpec("/transactions")
       } yield (tx, height, blk)
 
       forAll(txAvailability) { case (tx, height, block) =>
-        (state.transactionInfo _).expects(EqByteArray(tx.id)).returning(height.map((_, tx))).once()
+        (state.transactionInfo _).expects(tx.id).returning(height.map((_, tx))).once()
         height.foreach { h => (history.blockAt _).expects(h).returning(Some(block)).once() }
-        Get(routePath(s"/info/${Base58.encode(tx.id)}")) ~> route ~> check {
+        Get(routePath(s"/info/${tx.id.base58}")) ~> route ~> check {
           height match {
             case None => status shouldEqual StatusCodes.NotFound
             case Some(h) =>
@@ -114,7 +113,7 @@ class TransactionsRouteSpec extends RouteSpec("/transactions")
         Get(routePath("/unconfirmed")) ~> route ~> check {
           val resp = responseAs[Seq[JsValue]]
           for ((r, t) <- resp.zip(txs)) {
-            (r \ "signature").as[String] shouldEqual Base58.encode(t.signature)
+            (r \ "signature").as[String] shouldEqual t.signature.base58
           }
         }
       }

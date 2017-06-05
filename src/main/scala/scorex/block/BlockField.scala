@@ -1,10 +1,11 @@
 package scorex.block
 
 import com.google.common.primitives.{Bytes, Ints, Longs}
+import com.wavesplatform.state2.ByteStr
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.PublicKeyAccount
 import scorex.crypto.encode.Base58
-import scorex.serialization.{JsonSerializable, BytesSerializable}
+import scorex.serialization.{BytesSerializable, JsonSerializable}
 import scorex.transaction.Transaction
 
 /**
@@ -25,20 +26,14 @@ case class ByteBlockField(override val name: String, override val value: Byte) e
   override lazy val bytes: Array[Byte] = Array(value)
 }
 
-case class IntBlockField(override val name: String, override val value: Int) extends BlockField[Int] {
-
-  override lazy val json: JsObject = Json.obj(name -> value)
-  override lazy val bytes: Array[Byte] = Bytes.ensureCapacity(Ints.toByteArray(value), 4, 0)
-}
-
 case class LongBlockField(override val name: String, override val value: Long) extends BlockField[Long] {
 
   override lazy val json: JsObject = Json.obj(name -> value)
   override lazy val bytes: Array[Byte] = Bytes.ensureCapacity(Longs.toByteArray(value), 8, 0)
 }
 
-case class BlockIdField(override val name: String, override val value: Block.BlockId)
-  extends BlockField[Block.BlockId] {
+case class BlockIdField(override val name: String, override val value: Array[Byte])
+  extends BlockField[Array[Byte]] {
 
   override lazy val json: JsObject = Json.obj(name -> Base58.encode(value))
   override lazy val bytes: Array[Byte] = value
@@ -51,13 +46,13 @@ case class TransactionBlockField(override val name: String, override val value: 
   override lazy val bytes: Array[Byte] = value.bytes
 }
 
-case class SignerData(generator: PublicKeyAccount, signature: Array[Byte])
+case class SignerData(generator: PublicKeyAccount, signature: ByteStr)
 
 case class SignerDataBlockField(override val name: String, override val value: SignerData)
   extends BlockField[SignerData] {
 
   override lazy val json: JsObject = Json.obj("generator" -> value.generator.toString,
-    "signature" -> Base58.encode(value.signature))
+    "signature" -> value.signature.base58)
 
-  override lazy val bytes: Array[Byte] = value.generator.publicKey ++ value.signature
+  override lazy val bytes: Array[Byte] = value.generator.publicKey ++ value.signature.arr
 }

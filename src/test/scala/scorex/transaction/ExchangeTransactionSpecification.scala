@@ -1,6 +1,7 @@
 package scorex.transaction
 
 import com.wavesplatform.TransactionGen
+import com.wavesplatform.state2.ByteStr
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 import scorex.account.PrivateKeyAccount
@@ -59,7 +60,7 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
         create(buyOrder = buy.copy(matcherPublicKey = sender2)) shouldBe an[Left[_, _]]
         create(sellOrder = buy.copy(matcherPublicKey = sender2)) shouldBe an[Left[_, _]]
         create(buyOrder = buy.copy(assetPair = buy.assetPair.copy(amountAsset = None)),
-          sellOrder = sell.copy(assetPair = sell.assetPair.copy(priceAsset = Some(Array(1:Byte))))) shouldBe an[Left[_, _]]
+          sellOrder = sell.copy(assetPair = sell.assetPair.copy(priceAsset = Some(ByteStr(Array(1:Byte)))))) shouldBe an[Left[_, _]]
         create(buyOrder = buy.copy(expiration = 1L)) shouldBe an[Left[_, _]]
         create(price = buy.price + 1) shouldBe an[Left[_, _]]
         create(price = sell.price - 1) shouldBe an[Left[_, _]]

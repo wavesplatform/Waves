@@ -5,7 +5,7 @@ import javax.ws.rs.Path
 import akka.actor.ActorRef
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.settings.{CheckpointsSettings, RestAPISettings}
-import com.wavesplatform.state2.EqByteArray
+import com.wavesplatform.state2.ByteStr
 import io.swagger.annotations._
 import play.api.libs.json._
 import scorex.account.Account
@@ -83,7 +83,7 @@ case class BlocksApiRoute(settings: RestAPISettings, checkpointsSettings: Checkp
     if (encodedSignature.length > TransactionParser.SignatureStringLength)
       complete(InvalidSignature)
     else {
-      Base58.decode(encodedSignature).toOption.toRight(InvalidSignature)
+      ByteStr.decodeBase58(encodedSignature).toOption.toRight(InvalidSignature)
         .flatMap(s => history.heightOf(s).toRight(BlockNotExists)) match {
         case Right(h) => complete(Json.obj("height" -> h))
         case Left(e) => complete(e)
@@ -147,7 +147,7 @@ case class BlocksApiRoute(settings: RestAPISettings, checkpointsSettings: Checkp
   ))
   def signature: Route = (path("signature" / Segment) & get) { encodedSignature =>
     if (encodedSignature.length > TransactionParser.SignatureStringLength) complete(InvalidSignature) else {
-      Base58.decode(encodedSignature).toOption.toRight(InvalidSignature)
+      ByteStr.decodeBase58(encodedSignature).toOption.toRight(InvalidSignature)
         .flatMap(s => history.blockById(s).toRight(BlockNotExists)) match {
         case Right(block) => complete(block.json + ("height" -> history.heightOf(block.uniqueId).map(Json.toJson(_)).getOrElse(JsNull)))
         case Left(e) => complete(e)

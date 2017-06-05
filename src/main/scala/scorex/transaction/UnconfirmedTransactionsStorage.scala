@@ -1,8 +1,8 @@
 package scorex.transaction
 
-import com.wavesplatform.settings.{BlockchainSettings, FunctionalitySettings}
-import com.wavesplatform.state2.Validator
+import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.reader.StateReader
+import com.wavesplatform.state2.{ByteStr, Validator}
 import scorex.block.Block
 import scorex.consensus.TransactionsOrdering
 import scorex.utils.Time
@@ -14,7 +14,7 @@ trait UnconfirmedTransactionsStorage {
 
   def all(): Seq[Transaction]
 
-  def getBySignature(signature: Array[Byte]): Option[Transaction]
+  def getBySignature(signature: ByteStr): Option[Transaction]
 
   def remove(tx: Transaction)
 }

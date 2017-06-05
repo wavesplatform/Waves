@@ -5,7 +5,7 @@ import scorex.crypto.hash.FastCryptographicHash
 
 package object transaction {
 
-  type AssetId = Array[Byte]
+  type AssetId = com.wavesplatform.state2.ByteStr
   val AssetIdLength = FastCryptographicHash.DigestSize
   val AssetIdStringLength = base58Length(AssetIdLength)
 

@@ -1,9 +1,10 @@
 package scorex.block
 
 import com.google.common.primitives.{Bytes, Ints, Longs}
+import com.wavesplatform.state2.ByteStr
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
-import scorex.block.Block.BlockId
+
 import scorex.consensus.nxt.{NxtConsensusBlockField, NxtLikeConsensusBlockData}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
@@ -13,18 +14,18 @@ import scorex.utils.ScorexLogging
 
 import scala.util.{Failure, Try}
 
-case class Block(timestamp: Long, version: Byte, reference: Block.BlockId, signerData: SignerData,
+case class Block(timestamp: Long, version: Byte, reference: ByteStr, signerData: SignerData,
                  consensusData: NxtLikeConsensusBlockData, transactionData: Seq[Transaction]) {
 
   private lazy val versionField: ByteBlockField = ByteBlockField("version", version)
   private lazy val timestampField: LongBlockField = LongBlockField("timestamp", timestamp)
-  private lazy val referenceField: BlockIdField = BlockIdField("reference", reference)
+  private lazy val referenceField: BlockIdField = BlockIdField("reference", reference.arr)
   private lazy val signerDataField: SignerDataBlockField = SignerDataBlockField("signature", signerData)
   private lazy val consensusDataField = NxtConsensusBlockField(consensusData)
   private lazy val transactionDataField = TransactionsBlockField(transactionData)
 
-  lazy val uniqueId: BlockId = signerData.signature
-  lazy val encodedId: String = Base58.encode(uniqueId)
+  lazy val uniqueId: ByteStr = signerData.signature
+  lazy val encodedId: String = uniqueId.base58
 
   lazy val fee: Long =
     transactionData.map(_.assetFee)
@@ -73,17 +74,11 @@ case class Block(timestamp: Long, version: Byte, reference: Block.BlockId, signe
       .groupBy(a => a._1)
       .mapValues((records: Seq[(AssetAcc, Long)]) => records.map(_._2).sum)
   }
-
-  override def equals(obj: scala.Any): Boolean = {
-    import shapeless.syntax.typeable._
-    obj.cast[Block].exists(_.uniqueId.sameElements(this.uniqueId))
-  }
 }
 
 
 object Block extends ScorexLogging {
-  type BlockId = Array[Byte]
-  type BlockIds = Seq[BlockId]
+  type BlockIds = Seq[ByteStr]
 
   val MaxTransactionsPerBlock: Int = 100
   val BaseTargetLength: Int = 8
@@ -119,7 +114,7 @@ object Block extends ScorexLogging {
     val timestamp = Longs.fromByteArray(bytes.slice(position, position + 8))
     position += 8
 
-    val reference = bytes.slice(position, position + Block.BlockIdLength)
+    val reference = ByteStr(bytes.slice(position, position + Block.BlockIdLength))
     position += BlockIdLength
 
     val cBytesLength = Ints.fromByteArray(bytes.slice(position, position + 4))
@@ -137,7 +132,7 @@ object Block extends ScorexLogging {
     val genPK = bytes.slice(position, position + KeyLength)
     position += KeyLength
 
-    val signature = bytes.slice(position, position + SignatureLength)
+    val signature =ByteStr(bytes.slice(position, position + SignatureLength))
 
     new Block(timestamp, version, reference, SignerData(PublicKeyAccount(genPK), signature), consData, txBlockField)
   }.recoverWith { case t: Throwable =>
@@ -147,16 +142,16 @@ object Block extends ScorexLogging {
 
   def build(version: Byte,
             timestamp: Long,
-            reference: BlockId,
+            reference: ByteStr,
             consensusData: NxtLikeConsensusBlockData,
             transactionData: Seq[Transaction],
             generator: PublicKeyAccount,
             signature: Array[Byte])
-  = new Block(timestamp, version, reference, SignerData(generator, signature), consensusData, transactionData)
+  = new Block(timestamp, version, reference, SignerData(generator, ByteStr(signature)), consensusData, transactionData)
 
   def buildAndSign(version: Byte,
                    timestamp: Long,
-                   reference: BlockId,
+                   reference: ByteStr,
                    consensusData: NxtLikeConsensusBlockData,
                    transactionData: Seq[Transaction],
                    signer: PrivateKeyAccount): Block = {
@@ -197,8 +192,8 @@ object Block extends ScorexLogging {
 
     new Block(timestamp = timestamp,
       version = 1,
-      reference = reference,
-      signerData = SignerData(genesisSigner, signature),
+      reference = ByteStr(reference),
+      signerData = SignerData(genesisSigner, ByteStr(signature)),
       consensusData = consensusGenesisData,
       transactionData = transactionGenesisData)
   }

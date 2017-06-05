@@ -40,7 +40,7 @@ trait RequestGen extends TransactionGen {
   val addressGen: G[String] = listOfN(32, Arbitrary.arbByte.arbitrary).map(b => Base58.encode(b.toArray))
   val signatureGen: G[String] = listOfN(TransactionParser.SignatureLength, Arbitrary.arbByte.arbitrary)
     .map(b => Base58.encode(b.toArray))
-  private val assetIdStringGen = assetIdGen.map(_.map(Base58.encode))
+  private val assetIdStringGen = assetIdGen.map(_.map(_.base58))
 
   private val commonFields = for {
     _account <- addressGen
@@ -123,5 +123,5 @@ trait RequestGen extends TransactionGen {
     _signature <- signatureGen
     _timestamp <- ntpTimestampGen
     _cancel <- leaseCancelGen
-  } yield SignedLeaseCancelRequest(_cancel.sender.toString, Base58.encode(_cancel.leaseId), _cancel.timestamp, _signature, _cancel.fee)
+  } yield SignedLeaseCancelRequest(_cancel.sender.toString, _cancel.leaseId.base58, _cancel.timestamp, _signature, _cancel.fee)
 }

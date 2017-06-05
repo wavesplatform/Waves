@@ -1,15 +1,17 @@
 package scorex.transaction.assets
 
-import scala.util.{Failure, Success, Try}
 import com.google.common.primitives.{Bytes, Longs}
+import com.wavesplatform.state2.ByteStr
 import com.wavesplatform.utils.base58Length
 import play.api.libs.json.{JsObject, Json}
-import scorex.account.{Account, AccountOrAlias, PrivateKeyAccount, PublicKeyAccount}
+import scorex.account.{AccountOrAlias, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.serialization.{BytesSerializable, Deser}
 import scorex.transaction.TransactionParser._
 import scorex.transaction.{ValidationError, _}
+
+import scala.util.{Failure, Success, Try}
 
 sealed trait TransferTransaction extends SignedTransaction {
   def assetId: Option[AssetId]
@@ -38,7 +40,7 @@ object TransferTransaction {
                                              feeAssetId: Option[AssetId],
                                              fee: Long,
                                              attachment: Array[Byte],
-                                             signature: Array[Byte])
+                                             signature: ByteStr)
     extends TransferTransaction {
     override val transactionType: TransactionType.Value = TransactionType.TransferTransaction
 
@@ -46,9 +48,9 @@ object TransferTransaction {
 
     lazy val toSign: Array[Byte] = {
       val timestampBytes = Longs.toByteArray(timestamp)
-      val assetIdBytes = assetId.map(a => (1: Byte) +: a).getOrElse(Array(0: Byte))
+      val assetIdBytes = assetId.map(a => (1: Byte) +: a.arr).getOrElse(Array(0: Byte))
       val amountBytes = Longs.toByteArray(amount)
-      val feeAssetIdBytes = feeAssetId.map(a => (1: Byte) +: a).getOrElse(Array(0: Byte))
+      val feeAssetIdBytes = feeAssetId.map(a => (1: Byte) +: a.arr).getOrElse(Array(0: Byte))
       val feeBytes = Longs.toByteArray(fee)
 
       Bytes.concat(Array(transactionType.id.toByte),
@@ -58,27 +60,27 @@ object TransferTransaction {
         timestampBytes,
         amountBytes,
         feeBytes,
-        recipient.bytes,
+        recipient.bytes.arr,
         BytesSerializable.arrayWithSize(attachment))
     }
 
 
     override lazy val json: JsObject = jsonBase() ++ Json.obj(
       "recipient" -> recipient.stringRepr,
-      "assetId" -> assetId.map(Base58.encode),
+      "assetId" -> assetId.map(_.base58),
       "amount" -> amount,
-      "feeAsset" -> feeAssetId.map(Base58.encode),
+      "feeAsset" -> feeAssetId.map(_.base58),
       "attachment" -> Base58.encode(attachment)
     )
 
-    override lazy val bytes: Array[Byte] = Bytes.concat(Array(transactionType.id.toByte), signature, toSign)
+    override lazy val bytes: Array[Byte] = Bytes.concat(Array(transactionType.id.toByte), signature.arr, toSign)
 
   }
 
   def parseTail(bytes: Array[Byte]): Try[TransferTransaction] = Try {
     import EllipticCurveImpl._
 
-    val signature = bytes.slice(0, SignatureLength)
+    val signature = ByteStr(bytes.slice(0, SignatureLength))
     val txId = bytes(SignatureLength)
     require(txId == TransactionType.TransferTransaction.id.toByte, s"Signed tx id is not match")
     val sender = PublicKeyAccount(bytes.slice(SignatureLength + 1, SignatureLength + KeyLength + 1))
@@ -92,7 +94,7 @@ object TransferTransaction {
       recRes <- AccountOrAlias.fromBytes(bytes, s1 + 24)
       (recipient, recipientEnd) = recRes
       (attachment, _) = Deser.parseArraySize(bytes, recipientEnd)
-      tt <- TransferTransaction.create(assetIdOpt, sender, recipient, amount, timestamp, feeAssetIdOpt, feeAmount, attachment, signature)
+      tt <- TransferTransaction.create(assetIdOpt.map(ByteStr(_)), sender, recipient, amount, timestamp, feeAssetIdOpt.map(ByteStr(_)), feeAmount, attachment, signature)
     } yield tt).fold(left => Failure(new Exception(left.toString)), right => Success(right))
   }.flatten
 
@@ -104,7 +106,7 @@ object TransferTransaction {
                                feeAssetId: Option[AssetId],
                                feeAmount: Long,
                                attachment: Array[Byte],
-                               signature: Option[Array[Byte]] = None) = {
+                               signature: Option[ByteStr] = None) = {
     if (attachment.length > TransferTransaction.MaxAttachmentSize) {
       Left(ValidationError.TooBigArray)
     } else if (amount <= 0) {
@@ -126,7 +128,7 @@ object TransferTransaction {
              feeAssetId: Option[AssetId],
              feeAmount: Long,
              attachment: Array[Byte],
-             signature: Array[Byte]): Either[ValidationError, TransferTransaction] = {
+             signature: ByteStr): Either[ValidationError, TransferTransaction] = {
     createUnverified(assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment, Some(signature))
       .right.flatMap(SignedTransaction.verify)
   }
@@ -140,7 +142,7 @@ object TransferTransaction {
              feeAmount: Long,
              attachment: Array[Byte]): Either[ValidationError, TransferTransaction] = {
     createUnverified(assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment).right.map { unsigned =>
-      unsigned.copy(signature = EllipticCurveImpl.sign(sender, unsigned.toSign))
+      unsigned.copy(signature = ByteStr(EllipticCurveImpl.sign(sender, unsigned.toSign)))
     }
   }
 }

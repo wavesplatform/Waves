@@ -1,5 +1,6 @@
 package scorex.account
 
+import com.wavesplatform.state2.ByteStr
 import scorex.serialization.Deser
 import scorex.transaction.ValidationError
 
@@ -7,9 +8,16 @@ import scorex.transaction.ValidationError
 trait AccountOrAlias {
   def stringRepr: String
 
-  def bytes: Array[Byte]
+  def bytes: ByteStr
 
-  override def toString = stringRepr
+  override def toString: String = stringRepr
+
+  override def equals(obj: scala.Any): Boolean = obj match {
+    case a: AccountOrAlias => bytes == a.bytes
+    case _ => false
+  }
+
+  override def hashCode(): Int = java.util.Arrays.hashCode(bytes.arr)
 }
 
 object AccountOrAlias {

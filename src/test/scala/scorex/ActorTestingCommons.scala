@@ -4,6 +4,7 @@ import akka.actor.{ActorRef, ActorSystem}
 import akka.testkit.{ImplicitSender, TestKitBase, TestProbe}
 import akka.util.Timeout
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.state2.ByteStr
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.Matchers
 import scorex.account.PublicKeyAccount
@@ -113,13 +114,13 @@ abstract class ActorTestingCommons extends TestKitBase
 
   protected implicit def toBlockIds(ids: Seq[Int]): BlockIds = blockIds(ids: _*)
 
-  protected implicit def toBlockId(i: Int): BlockId = Array(i.toByte)
+  protected implicit def toBlockId(i: Int): ByteStr = ByteStr(Array(i.toByte))
 
-  protected def testBlock(id: Int, ts: Long = System.currentTimeMillis()) =
+  protected def testBlock(id: Int, ts: Long = System.currentTimeMillis()) : Block =
     Block(timestamp = ts,
       version = 0,
       reference = 1,
-      signerData = SignerData(PublicKeyAccount(Array.fill(32)(0)), Array(id.toByte)),
+      signerData = SignerData(PublicKeyAccount(Array.fill(32)(0)), ByteStr(Array(id.toByte))),
       consensusData = NxtLikeConsensusBlockData(1L, Array.fill(SignatureLength)(0: Byte)),
       transactionData = Seq.empty)
 
@@ -131,8 +132,8 @@ abstract class ActorTestingCommons extends TestKitBase
     override def extract(blockIds: BlockIds): Seq[Int] = blockIds.map(BlockIdExtraction.extract)
   }
 
-  protected implicit object BlockIdExtraction extends TestDataExtraction[BlockId] {
-    override def extract(blockId: BlockId): Int = blockId(0)
+  protected implicit object BlockIdExtraction extends TestDataExtraction[ByteStr] {
+    override def extract(blockId: ByteStr): Int = blockId.arr(0)
   }
 
   protected def expectNetworkMessage[Content: TestDataExtraction](expectedSpec: MessageSpec[Content], expectedData: Any): Unit =

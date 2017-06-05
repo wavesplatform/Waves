@@ -7,7 +7,7 @@ import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.diffs.BlockDiffer
 import com.wavesplatform.state2.reader.{CompositeStateReader, StateReader}
 import scorex.block.Block
-import scorex.block.Block.BlockId
+
 import scorex.crypto.encode.Base58
 import scorex.transaction._
 import scorex.utils.ScorexLogging
@@ -63,7 +63,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader, set
     }
   }
 
-  override def removeAfter(blockId: BlockId): Boolean = write { implicit l =>
+  override def removeAfter(blockId: ByteStr): Boolean = write { implicit l =>
     bc.heightOf(blockId) match {
       case Some(height) =>
         logHeights(s"Rollback to height $height started:")
@@ -82,7 +82,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader, set
         logHeights(s"Rollback to height $height completed:")
         true
       case None =>
-        log.warn(s"removeAfter non-existing block ${Base58.encode(blockId)}")
+        log.warn(s"removeAfter non-existing block $blockId")
         false
     }
   }

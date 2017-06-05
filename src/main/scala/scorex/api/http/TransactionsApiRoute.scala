@@ -5,13 +5,13 @@ import javax.ws.rs.Path
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.settings.RestAPISettings
+import com.wavesplatform.state2.ByteStr
 import com.wavesplatform.state2.reader.StateReader
 import io.swagger.annotations._
 import play.api.libs.json._
 import scorex.account.Account
-import scorex.crypto.encode.Base58
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import scorex.transaction.{History, Transaction, NewTransactionHandler, UnconfirmedTransactionsStorage}
+import scorex.transaction.{History, Transaction, UnconfirmedTransactionsStorage}
 
 import scala.util.Success
 import scala.util.control.Exception
@@ -73,13 +73,13 @@ case class TransactionsApiRoute(
       complete(InvalidSignature)
     } ~
       path(Segment) { encoded =>
-        Base58.decode(encoded) match {
+        ByteStr.decodeBase58(encoded) match {
           case Success(sig) =>
             state.included(sig) match {
               case Some(h) =>
                 val jsonOpt = for {
                   b <- history.blockAt(h).toRight(s"Block height=$h not found")
-                  tx <- b.transactionData.collectFirst { case t if t.id sameElements sig => t }.toRight(s"Tx not found in block")
+                  tx <- b.transactionData.collectFirst { case t if t.id == sig => t }.toRight(s"Tx not found in block")
                 } yield txToExtendedJson(tx) + ("height" -> JsNumber(h))
 
                 jsonOpt match {

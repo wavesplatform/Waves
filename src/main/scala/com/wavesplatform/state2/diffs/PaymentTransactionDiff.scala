@@ -5,7 +5,7 @@ import cats.implicits._
 import cats.Monoid
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.reader.StateReader
-import com.wavesplatform.state2.{ByteArray, Diff, EqByteArray, LeaseInfo, Portfolio}
+import com.wavesplatform.state2.{Diff, ByteStr, LeaseInfo, Portfolio}
 import scorex.account.Account
 import scorex.transaction.ValidationError.TransactionValidationError
 import scorex.transaction.{PaymentTransaction, StateValidationError}
@@ -17,7 +17,7 @@ object PaymentTransactionDiff {
   def apply(stateReader: StateReader, height: Int, settings: FunctionalitySettings, blockTime: Long)
            (tx: PaymentTransaction): Either[StateValidationError, Diff] = {
 
-    stateReader.paymentTransactionIdByHash(EqByteArray(tx.hash)) match {
+    stateReader.paymentTransactionIdByHash(ByteStr(tx.hash)) match {
       case Some(existing) if blockTime >= settings.requirePaymentUniqueId => Left(TransactionValidationError(tx, s"PaymentTx is already registered: $existing"))
       case _ => Right(Diff(height = height,
         tx = tx,
@@ -31,7 +31,7 @@ object PaymentTransactionDiff {
             LeaseInfo.empty,
             assets = Map.empty
           )),
-      paymentTransactionIdsByHashes = Map(EqByteArray(tx.hash) -> EqByteArray(tx.id))
+      paymentTransactionIdsByHashes = Map(ByteStr(tx.hash) -> tx.id)
       ))
     }
   }

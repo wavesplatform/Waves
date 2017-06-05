@@ -40,7 +40,7 @@ class TransferTransactionDiffTest extends PropSpec with PropertyChecks with Gene
         val recipientPortfolio = newState.accountPortfolio(recipient)
         if (transfer.sender.toAccount != recipient) {
           transfer.assetId match {
-            case Some(aid) => recipientPortfolio shouldBe Portfolio(0, LeaseInfo.empty, Map(EqByteArray(aid) -> transfer.amount))
+            case Some(aid) => recipientPortfolio shouldBe Portfolio(0, LeaseInfo.empty, Map(aid -> transfer.amount))
             case None => recipientPortfolio shouldBe Portfolio(transfer.amount, LeaseInfo.empty, Map.empty)
           }
         }

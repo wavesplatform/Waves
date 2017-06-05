@@ -28,17 +28,17 @@ class StateWriterImpl(p: StateStorage, synchronizationToken: ReentrantReadWriteL
     StateStorage.dirty(p) {
       measureSizeLog("transactions")(txsDiff.transactions) {
         _.par.foreach { case (id, (h, tx, _)) =>
-          sp().transactions.put(id.arr, (h, tx.bytes))
+          sp().transactions.put(id, (h, tx.bytes))
         }
       }
 
       measureSizeLog("orderFills")(blockDiff.txsDiff.orderFills) {
         _.par.foreach { case (oid, orderFillInfo) =>
-          Option(sp().orderFills.get(oid.arr)) match {
+          Option(sp().orderFills.get(oid)) match {
             case Some(ll) =>
-              sp().orderFills.put(oid.arr, (ll._1 + orderFillInfo.volume, ll._2 + orderFillInfo.fee))
+              sp().orderFills.put(oid, (ll._1 + orderFillInfo.volume, ll._2 + orderFillInfo.fee))
             case None =>
-              sp().orderFills.put(oid.arr, (orderFillInfo.volume, orderFillInfo.fee))
+              sp().orderFills.put(oid, (orderFillInfo.volume, orderFillInfo.fee))
           }
         }
       }
@@ -56,12 +56,12 @@ class StateWriterImpl(p: StateStorage, synchronizationToken: ReentrantReadWriteL
 
       measureSizeLog("assets")(txsDiff.issuedAssets) {
         _.foreach { case (id, assetInfo) =>
-          val updated = (Option(sp().assets.get(id.arr)) match {
+          val updated = (Option(sp().assets.get(id)) match {
             case None => Monoid[AssetInfo].empty
             case Some(existing) => AssetInfo(existing._1, existing._2)
           }).combine(assetInfo)
 
-          sp().assets.put(id.arr, (updated.isReissuable, updated.volume))
+          sp().assets.put(id, (updated.isReissuable, updated.volume))
         }
       }
 
@@ -79,7 +79,7 @@ class StateWriterImpl(p: StateStorage, synchronizationToken: ReentrantReadWriteL
       }
 
       measureSizeLog("paymentTransactionIdsByHashes")(blockDiff.txsDiff.paymentTransactionIdsByHashes) {
-        _.foreach { case (EqByteArray(hash), EqByteArray(id)) =>
+        _.foreach { case (hash, id) =>
           sp().paymentTransactionHashes.put(hash, id)
         }
       }
@@ -99,11 +99,11 @@ class StateWriterImpl(p: StateStorage, synchronizationToken: ReentrantReadWriteL
       }
 
       measureSizeLog("lease info")(blockDiff.txsDiff.leaseState)(
-        _.foreach { case (id, isActive) => sp().leaseState.put(id.arr, isActive) })
+        _.foreach { case (id, isActive) => sp().leaseState.put(id, isActive) })
 
       measureSizeLog("uniqueAssets")(blockDiff.txsDiff.assetsWithUniqueNames) {
         _.foreach { case (name, id) =>
-          p.uniqueAssets.put(name.arr, id.arr)
+          p.uniqueAssets.put(name, id)
         }
       }
 

@@ -83,7 +83,7 @@ class CreateAliasTransactionDiffTest extends PropSpec with PropertyChecks with G
         if (transfer.sender.toAccount != aliasTx.sender.toAccount) {
           val recipientPortfolioDiff = blockDiff.txsDiff.portfolios(aliasTx.sender)
           transfer.assetId match {
-            case Some(aid) => recipientPortfolioDiff shouldBe Portfolio(0, LeaseInfo.empty, Map(EqByteArray(aid) -> transfer.amount))
+            case Some(aid) => recipientPortfolioDiff shouldBe Portfolio(0, LeaseInfo.empty, Map(aid -> transfer.amount))
             case None => recipientPortfolioDiff shouldBe Portfolio(transfer.amount, LeaseInfo.empty, Map.empty)
           }
         }

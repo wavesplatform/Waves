@@ -39,19 +39,19 @@ object AssetInfo {
   }
 }
 
-case class Diff(transactions: Map[ByteArray, (Int, Transaction, Set[Account])],
+case class Diff(transactions: Map[ByteStr, (Int, Transaction, Set[Account])],
                 portfolios: Map[Account, Portfolio],
-                issuedAssets: Map[ByteArray, AssetInfo],
+                issuedAssets: Map[ByteStr, AssetInfo],
                 aliases: Map[Alias, Account],
-                paymentTransactionIdsByHashes: Map[ByteArray, ByteArray],
-                orderFills: Map[ByteArray, OrderFillInfo],
-                leaseState: Map[ByteArray, Boolean],
-                assetsWithUniqueNames: Map[ByteArray, ByteArray]) {
+                paymentTransactionIdsByHashes: Map[ByteStr, ByteStr],
+                orderFills: Map[ByteStr, OrderFillInfo],
+                leaseState: Map[ByteStr, Boolean],
+                assetsWithUniqueNames: Map[ByteStr, ByteStr]) {
 
-  lazy val accountTransactionIds: Map[Account, List[ByteArray]] = {
-    val map: List[(Account, Set[(Int, Long, ByteArray)])] = transactions.toList
+  lazy val accountTransactionIds: Map[Account, List[ByteStr]] = {
+    val map: List[(Account, Set[(Int, Long, ByteStr)])] = transactions.toList
       .flatMap { case (id, (h, tx, accs)) => accs.map(acc => acc -> Set((h, tx.timestamp, id))) }
-    val groupedByAcc = map.foldLeft(Map.empty[Account, Set[(Int, Long, ByteArray)]]) { case (m, (acc, set)) =>
+    val groupedByAcc = map.foldLeft(Map.empty[Account, Set[(Int, Long, ByteStr)]]) { case (m, (acc, set)) =>
       m.combine(Map(acc -> set))
     }
     groupedByAcc
@@ -63,14 +63,14 @@ case class Diff(transactions: Map[ByteArray, (Int, Transaction, Set[Account])],
 object Diff {
   def apply(height: Int, tx: Transaction,
             portfolios: Map[Account, Portfolio] = Map.empty,
-            assetInfos: Map[ByteArray, AssetInfo] = Map.empty,
+            assetInfos: Map[ByteStr, AssetInfo] = Map.empty,
             aliases: Map[Alias, Account] = Map.empty,
-            orderFills: Map[ByteArray, OrderFillInfo] = Map.empty,
-            paymentTransactionIdsByHashes: Map[ByteArray, ByteArray] = Map.empty,
-            leaseState: Map[ByteArray, Boolean] = Map.empty,
-            assetsWithUniqueNames: Map[ByteArray, ByteArray] = Map.empty
+            orderFills: Map[ByteStr, OrderFillInfo] = Map.empty,
+            paymentTransactionIdsByHashes: Map[ByteStr, ByteStr] = Map.empty,
+            leaseState: Map[ByteStr, Boolean] = Map.empty,
+            assetsWithUniqueNames: Map[ByteStr, ByteStr] = Map.empty
            ): Diff = Diff(
-    transactions = Map(EqByteArray(tx.id) -> (height, tx, portfolios.keys.toSet)),
+    transactions = Map(tx.id -> (height, tx, portfolios.keys.toSet)),
     portfolios = portfolios,
     issuedAssets = assetInfos,
     aliases = aliases,

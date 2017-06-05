@@ -7,10 +7,9 @@ import org.scalacheck.{Gen, Shrink}
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import org.scalatest.{Matchers, PropSpec}
 import scorex.lagonaki.mocks.TestBlock
-import scorex.transaction.assets.IssueTransaction
-import scorex.transaction.assets.exchange.{ExchangeTransaction, Order}
 import scorex.transaction.GenesisTransaction
-import scorex.utils.ByteArrayExtension
+import scorex.transaction.assets.IssueTransaction
+import scorex.transaction.assets.exchange.ExchangeTransaction
 
 class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers with TransactionGen {
 
@@ -31,7 +30,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Gene
       issue1: IssueTransaction <- issueReissueBurnMakeAssetNameUniqueGeneratorP(ENOUGH_AMT, seller).map(_._1)
       issue2: IssueTransaction <- issueReissueBurnMakeAssetNameUniqueGeneratorP(ENOUGH_AMT, buyer).map(_._1)
       maybeAsset1 <- Gen.option(issue1.id)
-      maybeAsset2 <- Gen.option(issue2.id) suchThat (x => !ByteArrayExtension.sameOption(x, maybeAsset1))
+      maybeAsset2 <- Gen.option(issue2.id) suchThat (x => x != maybeAsset1)
       exchange <- exchangeGeneratorP(buyer, seller, maybeAsset1, maybeAsset2)
     } yield (gen1, gen2, issue1, issue2, exchange)
 

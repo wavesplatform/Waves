@@ -1,33 +1,30 @@
 package scorex.network
 
+import com.wavesplatform.state2.ByteStr
 import scorex.block.Block
-import scorex.block.Block._
-import scorex.crypto.encode.Base58
-import scorex.network.BlockchainSynchronizer.InnerIds
 import scorex.transaction.History._
 
 import scala.collection.mutable
 
-class InMemoryBlockSeq(blockIds: InnerIds) {
+class InMemoryBlockSeq(blockIds: Seq[ByteStr]) {
 
-  private val blocks = mutable.Map.empty[String, Block]
+  private val blocks = mutable.Map.empty[ByteStr, Block]
 
-  private val blockIdsSet: Set[String] = blockIds.map(_.toString).toSet
-
-  private def keyToStr(id: BlockId) = Base58.encode(id)
+  private val blockIdsSet: Set[ByteStr] = blockIds.toSet
 
   def addIfNotContained(block: Block): Boolean = {
-    blocks.put(keyToStr(block.uniqueId), block).isEmpty
+    blocks.put(block.uniqueId, block).isEmpty
   }
 
   def noIdsWithoutBlock: Boolean = blockIds.size == blocks.size
 
-  def containsBlockId(blockId: BlockId): Boolean = blockIdsSet.contains(keyToStr(blockId))
+  def containsBlockId(blockId: ByteStr): Boolean = blockIdsSet.contains(blockId)
 
-  def blocksInOrder: Iterator[Block] = blockIds.
-    map(id => blocks.get(id.toString)).
-    takeWhile(_.isDefined).
-    map(_.get).iterator
+  def blocksInOrder: Iterator[Block] = blockIds
+    .map(blocks.get)
+    .takeWhile(_.isDefined)
+    .map(_.get)
+    .iterator
 
   def cumulativeBlockScore(): BlockchainScore =
     blocksInOrder.map(_.blockScore).sum

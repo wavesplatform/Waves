@@ -4,6 +4,7 @@ import java.net.{InetAddress, InetSocketAddress}
 import java.util
 
 import com.google.common.primitives.{Bytes, Ints}
+import com.wavesplatform.state2.ByteStr
 import scorex.block.Block
 import scorex.crypto.signatures.SigningFunctions
 import scorex.crypto.signatures.SigningFunctions.Signature
@@ -97,13 +98,13 @@ object SignaturesSpec extends SignaturesSeqSpec {
   override val messageName: String = "Signatures message"
 }
 
-object GetBlockSpec extends MessageSpec[Block.BlockId] {
+object GetBlockSpec extends MessageSpec[Array[Byte]] {
   override val messageCode: MessageCode = 22: Byte
   override val messageName: String = "GetBlock message"
 
-  override def serializeData(signature: Block.BlockId): Array[Byte] = signature
+  override def serializeData(signature: Array[Byte]): Array[Byte] = signature
 
-  override def deserializeData(bytes: Array[Byte]): Try[Block.BlockId] = Try {
+  override def deserializeData(bytes: Array[Byte]): Try[Array[Byte]] = Try {
     require(bytes.length == scorex.transaction.TransactionParser.SignatureLength, "Data does not match length")
     bytes
   }

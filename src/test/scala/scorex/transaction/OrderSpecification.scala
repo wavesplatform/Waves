@@ -2,10 +2,11 @@ package scorex.transaction
 
 import com.wavesplatform.TransactionGen
 import com.wavesplatform.matcher.ValidationMatcher
+import com.wavesplatform.state2.ByteStr
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
-import scorex.utils.{ByteArrayExtension, NTP}
+import scorex.utils.NTP
 
 class OrderSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen with ValidationMatcher {
 
@@ -81,9 +82,9 @@ class OrderSpecification extends PropSpec with PropertyChecks with Matchers with
       order.copy(senderPublicKey = pka).isValid(NTP.correctedTime()) should contain("signature should be valid")
       order.copy(matcherPublicKey = pka).isValid(NTP.correctedTime()) should contain("signature should be valid")
       val assetPair = order.assetPair
-      order.copy(assetPair = assetPair.copy(amountAsset = assetPair.amountAsset.map(Array(0: Byte) ++ _).orElse(Some(Array(0: Byte))))).
+      order.copy(assetPair = assetPair.copy(amountAsset = assetPair.amountAsset.map(Array(0: Byte) ++ _.arr).orElse(Some(Array(0: Byte))).map(ByteStr(_)))).
         isValid(NTP.correctedTime()) should contain("signature should be valid")
-      order.copy(assetPair = assetPair.copy(priceAsset = assetPair.priceAsset.map(Array(0: Byte) ++ _).orElse(Some(Array(0: Byte))))).
+      order.copy(assetPair = assetPair.copy(priceAsset = assetPair.priceAsset.map(Array(0: Byte) ++ _.arr).orElse(Some(Array(0: Byte))).map(ByteStr(_)))).
         isValid(NTP.correctedTime()) should contain("signature should be valid")
       order.copy(orderType = OrderType.reverse(order.orderType)).isValid(NTP.correctedTime()) should contain("signature should be valid")
       order.copy(price = order.price + 1).isValid(NTP.correctedTime()) should contain("signature should be valid")
@@ -108,7 +109,7 @@ class OrderSpecification extends PropSpec with PropertyChecks with Matchers with
 
   property("AssetPair test") {
     forAll(assetIdGen, assetIdGen) { (assetA: Option[AssetId], assetB: Option[AssetId]) =>
-      whenever(!ByteArrayExtension.sameOption(assetA, assetB)) {
+      whenever(assetA != assetB) {
         val pair = AssetPair(assetA, assetB)
         pair.isValid shouldBe valid
       }

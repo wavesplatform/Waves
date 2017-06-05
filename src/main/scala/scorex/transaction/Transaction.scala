@@ -1,11 +1,11 @@
 package scorex.transaction
 
-import com.google.common.primitives.Ints
-import scorex.account.Account
-import scorex.serialization.JsonSerializable
+import com.wavesplatform.state2.ByteStr
+import scorex.serialization.{BytesSerializable, JsonSerializable}
 import scorex.transaction.TransactionParser.TransactionType
 
-trait Transaction extends StateChangeReason with JsonSerializable {
+trait Transaction extends BytesSerializable with JsonSerializable {
+  val id: ByteStr
 
   val transactionType: TransactionType.Value
   val assetFee: (Option[AssetId], Long)
@@ -13,13 +13,9 @@ trait Transaction extends StateChangeReason with JsonSerializable {
   override def toString: String = json.toString()
 
   override def equals(other: Any): Boolean = other match {
-    case tx: Transaction => id.sameElements(tx.id)
+    case tx: Transaction => id == tx.id
     case _ => false
   }
 
-  override def hashCode(): Int = Ints.fromByteArray(id.takeRight(4))
-
+  override def hashCode(): Int = id.hashCode()
 }
-
-case class BalanceChange(assetAcc: AssetAcc, delta: Long)
-case class EffectiveBalanceChange(account: Account, amount: Long)

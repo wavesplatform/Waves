@@ -16,7 +16,7 @@ class CompositeStateReader(inner: StateReader, blockDiff: BlockDiff) extends Sta
 
   private val txDiff = blockDiff.txsDiff
 
-  override def transactionInfo(id: ByteArray): Option[(Int, Transaction)] =
+  override def transactionInfo(id: ByteStr): Option[(Int, Transaction)] =
     txDiff.transactions.get(id)
       .map(t => (t._1, t._2))
       .orElse(inner.transactionInfo(id))
@@ -24,14 +24,14 @@ class CompositeStateReader(inner: StateReader, blockDiff: BlockDiff) extends Sta
   override def accountPortfolio(a: Account): Portfolio =
     inner.accountPortfolio(a).combine(txDiff.portfolios.get(a).orEmpty)
 
-  override def assetInfo(id: ByteArray): Option[AssetInfo] = (inner.assetInfo(id), txDiff.issuedAssets.get(id)) match {
+  override def assetInfo(id: ByteStr): Option[AssetInfo] = (inner.assetInfo(id), txDiff.issuedAssets.get(id)) match {
     case (None, None) => None
     case (existing, upd) => Some(existing.orEmpty.combine(upd.orEmpty))
   }
 
   override def height: Int = inner.height + blockDiff.heightDiff
 
-  override def accountTransactionIds(a: Account): Seq[ByteArray] = {
+  override def accountTransactionIds(a: Account): Seq[ByteStr] = {
     val fromDiff = txDiff.accountTransactionIds.get(a).orEmpty
     fromDiff ++ inner.accountTransactionIds(a) // fresh head ++ stale tail
   }
@@ -39,7 +39,7 @@ class CompositeStateReader(inner: StateReader, blockDiff: BlockDiff) extends Sta
   override def snapshotAtHeight(acc: Account, h: Int): Option[Snapshot] =
     blockDiff.snapshots.get(acc).flatMap(_.get(h)).orElse(inner.snapshotAtHeight(acc, h))
 
-  override def paymentTransactionIdByHash(hash: ByteArray): Option[ByteArray]
+  override def paymentTransactionIdByHash(hash: ByteStr): Option[ByteStr]
   = blockDiff.txsDiff.paymentTransactionIdsByHashes.get(hash)
     .orElse(inner.paymentTransactionIdByHash(hash))
 
@@ -49,24 +49,24 @@ class CompositeStateReader(inner: StateReader, blockDiff: BlockDiff) extends Sta
 
   override def resolveAlias(a: Alias): Option[Account] = txDiff.aliases.get(a).orElse(inner.resolveAlias(a))
 
-  override def getAssetIdByUniqueName(assetName: ByteArray): Option[ByteArray] = {
+  override def getAssetIdByUniqueName(assetName: ByteStr): Option[ByteStr] = {
     txDiff.assetsWithUniqueNames.get(assetName).orElse(inner.getAssetIdByUniqueName(assetName))
   }
 
   override def accountPortfolios: Map[Account, Portfolio] = Monoid.combine(inner.accountPortfolios, txDiff.portfolios)
 
   override def isLeaseActive(leaseTx: LeaseTransaction): Boolean =
-    blockDiff.txsDiff.leaseState.getOrElse(EqByteArray(leaseTx.id), inner.isLeaseActive(leaseTx))
+    blockDiff.txsDiff.leaseState.getOrElse(leaseTx.id, inner.isLeaseActive(leaseTx))
 
-  override def activeLeases(): Seq[ByteArray] = {
+  override def activeLeases(): Seq[ByteStr] = {
     blockDiff.txsDiff.leaseState.collect { case (id, isActive) if isActive => id }.toSeq ++ inner.activeLeases()
   }
 
   override def lastUpdateHeight(acc: Account): Option[Int] = blockDiff.snapshots.get(acc).map(_.lastKey).orElse(inner.lastUpdateHeight(acc))
 
-  override def containsTransaction(id: ByteArray): Boolean = blockDiff.txsDiff.transactions.contains(id) || inner.containsTransaction(id)
+  override def containsTransaction(id: ByteStr): Boolean = blockDiff.txsDiff.transactions.contains(id) || inner.containsTransaction(id)
 
-  override def filledVolumeAndFee(orderId: ByteArray): OrderFillInfo =
+  override def filledVolumeAndFee(orderId: ByteStr): OrderFillInfo =
     blockDiff.txsDiff.orderFills.get(orderId).orEmpty.combine(inner.filledVolumeAndFee(orderId))
 }
 
@@ -76,7 +76,7 @@ object CompositeStateReader {
 
     override def synchronizationToken: ReentrantReadWriteLock = inner.synchronizationToken
 
-    override def paymentTransactionIdByHash(hash: ByteArray): Option[ByteArray] =
+    override def paymentTransactionIdByHash(hash: ByteStr): Option[ByteStr] =
       new CompositeStateReader(inner, blockDiff()).paymentTransactionIdByHash(hash)
 
     override def aliasesOfAddress(a: Account): Seq[Alias] =
@@ -85,19 +85,19 @@ object CompositeStateReader {
     override def accountPortfolio(a: Account): Portfolio =
       new CompositeStateReader(inner, blockDiff()).accountPortfolio(a)
 
-    override def accountTransactionIds(a: Account): Seq[ByteArray] =
+    override def accountTransactionIds(a: Account): Seq[ByteStr] =
       new CompositeStateReader(inner, blockDiff()).accountTransactionIds(a)
 
     override def accountPortfolios: Map[Account, Portfolio] =
       new CompositeStateReader(inner, blockDiff()).accountPortfolios
 
-    override def transactionInfo(id: ByteArray): Option[(Int, Transaction)] =
+    override def transactionInfo(id: ByteStr): Option[(Int, Transaction)] =
       new CompositeStateReader(inner, blockDiff()).transactionInfo(id)
 
     override def resolveAlias(a: Alias): Option[Account] =
       new CompositeStateReader(inner, blockDiff()).resolveAlias(a)
 
-    override def assetInfo(id: ByteArray): Option[AssetInfo] =
+    override def assetInfo(id: ByteStr): Option[AssetInfo] =
       new CompositeStateReader(inner, blockDiff()).assetInfo(id)
 
     override def height: Int =
@@ -106,10 +106,10 @@ object CompositeStateReader {
     override def isLeaseActive(leaseTx: LeaseTransaction): Boolean =
       new CompositeStateReader(inner, blockDiff()).isLeaseActive(leaseTx)
 
-    override def activeLeases(): Seq[ByteArray] =
+    override def activeLeases(): Seq[ByteStr] =
       new CompositeStateReader(inner, blockDiff()).activeLeases()
 
-    override def getAssetIdByUniqueName(assetName: ByteArray): Option[ByteArray] =
+    override def getAssetIdByUniqueName(assetName: ByteStr): Option[ByteStr] =
       new CompositeStateReader(inner, blockDiff()).getAssetIdByUniqueName(assetName)
 
     override def lastUpdateHeight(acc: Account): Option[Int] =
@@ -118,10 +118,10 @@ object CompositeStateReader {
     override def snapshotAtHeight(acc: Account, h: Int): Option[Snapshot] =
       new CompositeStateReader(inner, blockDiff()).snapshotAtHeight(acc, h)
 
-    override def containsTransaction(id: ByteArray): Boolean =
+    override def containsTransaction(id: ByteStr): Boolean =
       new CompositeStateReader(inner, blockDiff()).containsTransaction(id)
 
-    override def filledVolumeAndFee(orderId: ByteArray): OrderFillInfo =
+    override def filledVolumeAndFee(orderId: ByteStr): OrderFillInfo =
       new CompositeStateReader(inner, blockDiff()).filledVolumeAndFee(orderId)
   }
 

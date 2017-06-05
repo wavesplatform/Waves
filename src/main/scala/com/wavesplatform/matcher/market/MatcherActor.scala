@@ -13,7 +13,7 @@ import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange.Validation.booleanOperators
 import scorex.transaction.assets.exchange.{AssetPair, Order, Validation}
 import scorex.transaction.{AssetId, History, NewTransactionHandler}
-import scorex.utils.{ByteArrayExtension, NTP, ScorexLogging, Time}
+import scorex.utils._
 import scorex.wallet.Wallet
 
 import scala.collection.{immutable, mutable}
@@ -56,7 +56,7 @@ class MatcherActor(storedState: StateReader, wallet: Wallet, settings: MatcherSe
       !settings.priceAssets.contains(aPair.amountAssetStr)) true
     else if (settings.priceAssets.contains(reversePair.priceAssetStr) &&
       !settings.priceAssets.contains(reversePair.amountAssetStr)) false
-    else ByteArrayExtension.compare(aPair.priceAsset, aPair.amountAsset) < 0
+    else compare(aPair.priceAsset.map(_.arr), aPair.amountAsset.map(_.arr)) < 0
 
     isCorrectOrder :| s"Invalid AssetPair ordering, should be reversed: $reversePair"
   }
@@ -175,4 +175,10 @@ object MatcherActor {
 
   case class MarketData(pair: AssetPair, amountAssetName: String, priceAssetName: String, created: Long)
 
+  def compare(buffer1: Option[Array[Byte]], buffer2: Option[Array[Byte]]): Int = {
+    if (buffer1.isEmpty && buffer2.isEmpty) 0
+    else if (buffer1.isEmpty) -1
+    else if (buffer2.isEmpty) 1
+    else ByteArray.compare(buffer1.get, buffer2.get)
+  }
 }

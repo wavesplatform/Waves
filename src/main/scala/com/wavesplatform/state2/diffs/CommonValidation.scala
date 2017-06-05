@@ -3,13 +3,14 @@ package com.wavesplatform.state2.diffs
 import cats._
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.reader.StateReader
-import com.wavesplatform.state2.{EqByteArray, Portfolio, _}
+import com.wavesplatform.state2.{Portfolio, _}
 import scorex.account.Account
 import scorex.transaction.ValidationError.TransactionValidationError
 import scorex.transaction._
-import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.transaction.assets._
+import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
+
 import scala.concurrent.duration._
 import scala.util.{Left, Right}
 
@@ -27,11 +28,11 @@ object CommonValidation {
           val sender: Account = ttx.sender
 
           val amountDiff = ttx.assetId match {
-            case Some(aid) => Portfolio(0, LeaseInfo.empty, Map(EqByteArray(aid) -> -ttx.amount))
+            case Some(aid) => Portfolio(0, LeaseInfo.empty, Map(aid -> -ttx.amount))
             case None => Portfolio(-ttx.amount, LeaseInfo.empty, Map.empty)
           }
           val feeDiff = ttx.feeAssetId match {
-            case Some(aid) => Portfolio(0, LeaseInfo.empty, Map(EqByteArray(aid) -> -ttx.fee))
+            case Some(aid) => Portfolio(0, LeaseInfo.empty, Map(aid -> -ttx.fee))
             case None => Portfolio(-ttx.fee, LeaseInfo.empty, Map.empty)
           }
 
@@ -52,7 +53,7 @@ object CommonValidation {
   def disallowDuplicateIds[T <: Transaction](state: StateReader, settings: FunctionalitySettings, height: Int, tx: T): Either[ValidationError, T] = tx match {
     case ptx: PaymentTransaction if ptx.timestamp < settings.requirePaymentUniqueId => Right(tx)
     case _ =>
-      if (state.containsTransaction(EqByteArray(tx.id)))
+      if (state.containsTransaction(tx.id))
         Left(TransactionValidationError(tx, s"Tx id(exc. for some PaymentTransactions) cannot be duplicated. Current height is: $height. Tx with such id aready present"))
       else Right(tx)
   }

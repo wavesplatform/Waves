@@ -12,6 +12,7 @@ import org.h2.mvstore.MVStore
 import scorex.ActorTestingCommons
 import scorex.account.PrivateKeyAccount
 import scorex.block.Block
+
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash.DigestSize
@@ -69,7 +70,7 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
   val gen = PrivateKeyAccount(Array(0.toByte))
   var score: Int = 10000
 
-  def createBlock(reference: Array[Byte]): Block = {
+  def createBlock(reference: ByteStr): Block = {
     val version = 1: Byte
     val timestamp = System.currentTimeMillis()
     //val reference = Array.fill(Block.BlockIdLength)(id.toByte)
@@ -109,7 +110,7 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
   }
 
   def genCheckpoint(historyPoints: Seq[Int]): Checkpoint = {
-    val items = historyPoints.map(h => BlockCheckpoint(h, history1.blockAt(h).get.signerData.signature))
+    val items = historyPoints.map(h => BlockCheckpoint(h, history1.blockAt(h).get.uniqueId.arr))
     val checkpoint = Checkpoint(items, Array()).signedBy(pk.privateKey)
     checkpoint
   }
@@ -120,7 +121,7 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
 
     val toRollback = 9
     val chpBlock = createBlock(history1.blockAt(toRollback - 1).get.uniqueId)
-    val p = BlockCheckpoint(toRollback, chpBlock.signerData.signature)
+    val p = BlockCheckpoint(toRollback, chpBlock.uniqueId.arr)
     val firstChp = genCheckpoint(Seq(7, 5, 3))
 
     val checkpoint = Checkpoint(p +: firstChp.items, Array()).signedBy(pk.privateKey)

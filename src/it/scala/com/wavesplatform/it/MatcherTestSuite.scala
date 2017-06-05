@@ -3,6 +3,7 @@ package com.wavesplatform.it
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.Node.{AssetBalance, LevelResponse, MatcherStatusResponse, OrderBookResponse, Transaction}
 import com.wavesplatform.matcher.api.CancelOrderRequest
+import com.wavesplatform.state2.ByteStr
 import org.scalatest.{BeforeAndAfterAll, FreeSpec, Matchers}
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.encode.Base58
@@ -47,7 +48,7 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll {
 
     // Alice issues new asset
     asset = issueAsset(aliceNode, AssetQuantity)
-    pair = AssetPair(Base58.decode(asset).toOption, None)
+    pair = AssetPair(ByteStr.decodeBase58(asset).toOption, None)
 
     // Wait for balance on Alice's account
     waitForAssetBalance(aliceNode, asset, AssetQuantity)
