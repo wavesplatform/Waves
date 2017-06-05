@@ -46,14 +46,14 @@ trait TransactionGen {
   val maxOrderTimeGen: Gen[Long] = Gen.choose(10000L, Order.MaxLiveTime).map(_ + NTP.correctedTime())
   val timestampGen: Gen[Long] = Gen.choose(1, Long.MaxValue - 100)
 
-  val wavesAssetGen: Gen[Option[ByteArray]] = Gen.const(None)
-  val assetIdGen: Gen[Option[ByteArray]] = Gen.frequency((1, wavesAssetGen), (10, Gen.option(bytes32gen.map(EqByteArray(_)))))
+  val wavesAssetGen: Gen[Option[ByteStr]] = Gen.const(None)
+  val assetIdGen: Gen[Option[ByteStr]] = Gen.frequency((1, wavesAssetGen), (10, Gen.option(bytes32gen.map(ByteStr(_)))))
 
   val assetPairGen = assetIdGen.flatMap {
-    case None => bytes32gen.map(b => AssetPair(None, Some(EqByteArray(b))))
+    case None => bytes32gen.map(b => AssetPair(None, Some(ByteStr(b))))
     case a1@Some(a1bytes) =>
       val a2bytesGen = byteArrayGen(31).map(a2bytes => Option((~a1bytes.arr(0)).toByte +: a2bytes))
-      Gen.oneOf(Gen.const(None), a2bytesGen).map(a2 => AssetPair(a1, a2.map(EqByteArray(_))))
+      Gen.oneOf(Gen.const(None), a2bytesGen).map(a2 => AssetPair(a1, a2.map(ByteStr(_))))
   }
 
   val paymentGen: Gen[PaymentTransaction] = for {
@@ -122,7 +122,7 @@ trait TransactionGen {
     sender <- accountGen
     attachment <- genBoundedBytes(0, TransferTransaction.MaxAttachmentSize)
     recipient <- accountOrAliasGen
-  } yield (assetId.map(EqByteArray(_)), sender, recipient, amount, timestamp, feeAssetId.map(EqByteArray(_)), feeAmount, attachment)
+  } yield (assetId.map(ByteStr(_)), sender, recipient, amount, timestamp, feeAssetId.map(ByteStr(_)), feeAmount, attachment)
 
   def transferGeneratorP(sender: PrivateKeyAccount, recipient: AccountOrAlias,
                          assetId: Option[AssetId], feeAssetId: Option[AssetId]): Gen[TransferTransaction] = for {
@@ -241,8 +241,8 @@ trait TransactionGen {
     r <- exchangeGeneratorP(sender1, sender2, assetPair.amountAsset, assetPair.priceAsset)
   } yield r
 
-  def exchangeGeneratorP(buyer: PrivateKeyAccount, seller: PrivateKeyAccount, amountAssetId: Option[ByteArray],
-                         priceAssetId: Option[ByteArray]): Gen[ExchangeTransaction] = for {
+  def exchangeGeneratorP(buyer: PrivateKeyAccount, seller: PrivateKeyAccount, amountAssetId: Option[ByteStr],
+                         priceAssetId: Option[ByteStr]): Gen[ExchangeTransaction] = for {
     (_, matcher, _, _, price, amount1, timestamp, expiration, matcherFee) <- orderParamGen
     amount2: Long <- matcherAmountGen
     matchedAmount: Long <- Gen.choose(Math.min(amount1, amount2) / 2000, Math.min(amount1, amount2) / 1000)

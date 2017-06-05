@@ -1,12 +1,12 @@
 package scorex.transaction
 
 import com.google.common.primitives.Ints
-import com.wavesplatform.state2.ByteArray
+import com.wavesplatform.state2.ByteStr
 import scorex.serialization.{BytesSerializable, JsonSerializable}
 import scorex.transaction.TransactionParser.TransactionType
 
 trait Transaction extends BytesSerializable with JsonSerializable {
-  val id: ByteArray
+  val id: ByteStr
 
   val transactionType: TransactionType.Value
   val assetFee: (Option[AssetId], Long)

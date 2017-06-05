@@ -5,7 +5,7 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.BlockGen
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.settings.{CheckpointsSettings, RestAPISettings}
-import com.wavesplatform.state2.{ByteArray, EqByteArray}
+import com.wavesplatform.state2.ByteStr
 import org.scalacheck.{Gen, Shrink}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.prop.PropertyChecks
@@ -87,7 +87,7 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with MockFactory with BlockGe
   routePath("/last") in forAll(randomSignerBlockGen, positiveIntGen) { case (block, h) =>
     (history.height _).expects().returning(h).anyNumberOfTimes()
     (history.blockAt _).expects(h).returning(Some(block)).anyNumberOfTimes()
-    (history.heightOf(_: ByteArray)).expects(block.uniqueId).returning(Some(h)).anyNumberOfTimes()
+    (history.heightOf(_: ByteStr)).expects(block.uniqueId).returning(Some(h)).anyNumberOfTimes()
 
     Get(routePath("/last")) ~> route ~> check {
       val response1: JsObject = responseAs[JsObject]
@@ -107,7 +107,7 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with MockFactory with BlockGe
     // todo: check invalid signature
     // todo: check block not found (404?)
     forAll(randomSignerBlockGen) { block =>
-      (history.heightOf(_: ByteArray)).expects(block.uniqueId).returning(Some(10)).anyNumberOfTimes()
+      (history.heightOf(_: ByteStr)).expects(block.uniqueId).returning(Some(10)).anyNumberOfTimes()
       (history.blockAt _).expects(10).returning(Some(block)).anyNumberOfTimes()
       Get(routePath(s"/height/${block.uniqueId.base58}")) ~> route ~> check {
         (responseAs[JsValue] \ "height").as[Int] shouldBe 10

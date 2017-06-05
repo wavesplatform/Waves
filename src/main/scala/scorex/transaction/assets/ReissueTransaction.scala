@@ -1,7 +1,7 @@
 package scorex.transaction.assets
 
 import com.google.common.primitives.{Bytes, Longs}
-import com.wavesplatform.state2.{ByteArray, EqByteArray}
+import com.wavesplatform.state2.ByteStr
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
@@ -17,12 +17,12 @@ sealed trait ReissueTransaction extends AssetIssuance {
 object ReissueTransaction {
 
   private case class ReissueTransactionImpl(sender: PublicKeyAccount,
-                                            assetId: ByteArray,
+                                            assetId: ByteStr,
                                             quantity: Long,
                                             reissuable: Boolean,
                                             fee: Long,
                                             timestamp: Long,
-                                            signature: ByteArray)
+                                            signature: ByteStr)
     extends ReissueTransaction {
 
     override val transactionType: TransactionType.Value = TransactionType.ReissueTransaction
@@ -50,11 +50,11 @@ object ReissueTransaction {
 
   def parseTail(bytes: Array[Byte]): Try[ReissueTransaction] = Try {
     import EllipticCurveImpl._
-    val signature =EqByteArray(bytes.slice(0, SignatureLength))
+    val signature =ByteStr(bytes.slice(0, SignatureLength))
     val txId = bytes(SignatureLength)
     require(txId == TransactionType.ReissueTransaction.id.toByte, s"Signed tx id is not match")
     val sender = PublicKeyAccount(bytes.slice(SignatureLength + 1, SignatureLength + KeyLength + 1))
-    val assetId = EqByteArray(bytes.slice(SignatureLength + KeyLength + 1, SignatureLength + KeyLength + AssetIdLength + 1))
+    val assetId = ByteStr(bytes.slice(SignatureLength + KeyLength + 1, SignatureLength + KeyLength + AssetIdLength + 1))
     val quantityStart = SignatureLength + KeyLength + AssetIdLength + 1
 
     val quantity = Longs.fromByteArray(bytes.slice(quantityStart, quantityStart + 8))
@@ -66,12 +66,12 @@ object ReissueTransaction {
   }.flatten
 
   private def createUnverified(sender: PublicKeyAccount,
-                               assetId: ByteArray,
+                               assetId: ByteStr,
                                quantity: Long,
                                reissuable: Boolean,
                                fee: Long,
                                timestamp: Long,
-                               signature: Option[ByteArray] = None) =
+                               signature: Option[ByteStr] = None) =
     if (quantity <= 0) {
       Left(ValidationError.NegativeAmount)
     } else if (fee <= 0) {
@@ -81,24 +81,24 @@ object ReissueTransaction {
     }
 
   def create(sender: PublicKeyAccount,
-             assetId: ByteArray,
+             assetId: ByteStr,
              quantity: Long,
              reissuable: Boolean,
              fee: Long,
              timestamp: Long,
-             signature: ByteArray): Either[ValidationError, ReissueTransaction] =
+             signature: ByteStr): Either[ValidationError, ReissueTransaction] =
     createUnverified(sender, assetId, quantity, reissuable, fee, timestamp, Some(signature))
       .right
       .flatMap(SignedTransaction.verify)
 
 
   def create(sender: PrivateKeyAccount,
-             assetId: ByteArray,
+             assetId: ByteStr,
              quantity: Long,
              reissuable: Boolean,
              fee: Long,
              timestamp: Long): Either[ValidationError, ReissueTransaction] =
     createUnverified(sender, assetId, quantity, reissuable, fee, timestamp).right.map { unsigned =>
-      unsigned.copy(signature = EqByteArray(EllipticCurveImpl.sign(sender, unsigned.toSign)))
+      unsigned.copy(signature = ByteStr(EllipticCurveImpl.sign(sender, unsigned.toSign)))
     }
 }

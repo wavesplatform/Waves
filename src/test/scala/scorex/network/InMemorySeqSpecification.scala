@@ -1,6 +1,6 @@
 package scorex.network
 
-import com.wavesplatform.state2.{ByteArray, EqByteArray}
+import com.wavesplatform.state2.ByteStr
 import org.scalatest.{FreeSpec, Matchers}
 import scorex.account.PublicKeyAccount
 import scorex.block.Block._
@@ -13,10 +13,10 @@ import scala.language.{implicitConversions, postfixOps}
 
 class InMemorySeqSpecification extends FreeSpec with Matchers {
 
-  def toBlockId(i: Int): ByteArray = EqByteArray(Array(i.toByte))
+  def toBlockId(i: Int): ByteStr = ByteStr(Array(i.toByte))
 
   private def newBlock(referenceId: Int) =
-    Block(0, 1, toBlockId(referenceId), SignerData(PublicKeyAccount(Array.fill(32)(0)), EqByteArray(Array())),
+    Block(0, 1, toBlockId(referenceId), SignerData(PublicKeyAccount(Array.fill(32)(0)), ByteStr(Array())),
       NxtLikeConsensusBlockData(1L, Array.fill(SignatureLength)(0: Byte)), Seq.empty)
 
   "life cycle" in {

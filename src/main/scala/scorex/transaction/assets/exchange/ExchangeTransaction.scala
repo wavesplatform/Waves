@@ -1,7 +1,7 @@
 package scorex.transaction.assets.exchange
 
 import com.google.common.primitives.{Ints, Longs}
-import com.wavesplatform.state2.{ByteArray, EqByteArray}
+import com.wavesplatform.state2.ByteStr
 import io.swagger.annotations.ApiModelProperty
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
@@ -27,7 +27,7 @@ sealed trait ExchangeTransaction extends SignedTransaction {
 object ExchangeTransaction {
 
   private case class ExchangeTransactionImpl(buyOrder: Order, sellOrder: Order, price: Long, amount: Long, buyMatcherFee: Long,
-                                             sellMatcherFee: Long, fee: Long, timestamp: Long, signature: ByteArray)
+                                             sellMatcherFee: Long, fee: Long, timestamp: Long, signature: ByteStr)
     extends ExchangeTransaction with BytesSerializable {
 
     override val transactionType: TransactionType.Value = TransactionType.ExchangeTransaction
@@ -56,7 +56,7 @@ object ExchangeTransaction {
   }
 
   private def createUnverified(buyOrder: Order, sellOrder: Order, price: Long, amount: Long,
-                               buyMatcherFee: Long, sellMatcherFee: Long, fee: Long, timestamp: Long, signature: Option[EqByteArray] = None) = {
+                               buyMatcherFee: Long, sellMatcherFee: Long, fee: Long, timestamp: Long, signature: Option[ByteStr] = None) = {
     lazy val priceIsValid: Boolean = price <= buyOrder.price && price >= sellOrder.price
 
     if (fee <= 0) {
@@ -97,12 +97,12 @@ object ExchangeTransaction {
   def create(matcher: PrivateKeyAccount, buyOrder: Order, sellOrder: Order, price: Long, amount: Long,
              buyMatcherFee: Long, sellMatcherFee: Long, fee: Long, timestamp: Long): Either[ValidationError, ExchangeTransaction] = {
     createUnverified(buyOrder, sellOrder, price, amount, buyMatcherFee, sellMatcherFee, fee, timestamp).right.map { unverified =>
-      unverified.copy(signature = EqByteArray(EllipticCurveImpl.sign(matcher.privateKey, unverified.toSign)))
+      unverified.copy(signature = ByteStr(EllipticCurveImpl.sign(matcher.privateKey, unverified.toSign)))
     }
   }
 
   def create(buyOrder: Order, sellOrder: Order, price: Long, amount: Long,
-             buyMatcherFee: Long, sellMatcherFee: Long, fee: Long, timestamp: Long, signature: ByteArray): Either[ValidationError, ExchangeTransaction] = {
+             buyMatcherFee: Long, sellMatcherFee: Long, fee: Long, timestamp: Long, signature: ByteStr): Either[ValidationError, ExchangeTransaction] = {
     createUnverified(buyOrder, sellOrder, price, amount, buyMatcherFee, sellMatcherFee, fee, timestamp, Some(signature))
       .right.flatMap(SignedTransaction.verify)
   }
@@ -134,7 +134,7 @@ object ExchangeTransaction {
     from += 8
     val timestamp = Longs.fromByteArray(bytes.slice(from, from + 8))
     from += 8
-    val signature = EqByteArray(bytes.slice(from, from + TransactionParser.SignatureLength))
+    val signature = ByteStr(bytes.slice(from, from + TransactionParser.SignatureLength))
     from += TransactionParser.SignatureLength
 
     create(o1, o2, price, amount, buyMatcherFee, sellMatcherFee, fee, timestamp, signature)

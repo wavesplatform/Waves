@@ -1,6 +1,6 @@
 package scorex.account
 
-import com.wavesplatform.state2.{ByteArray, EqByteArray}
+import com.wavesplatform.state2.ByteStr
 import com.wavesplatform.utils.base58Length
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.SecureCryptographicHash._
@@ -12,7 +12,7 @@ import scala.util.Success
 
 
 sealed trait Account extends AccountOrAlias {
-  val bytes: ByteArray
+  val bytes: ByteStr
   lazy val address: String = bytes.base58
   lazy val stringRepr: String = Account.Prefix + address
 
@@ -30,17 +30,17 @@ object Account extends ScorexLogging {
 
   private def scheme = AddressScheme.current
 
-  private class AccountImpl(val bytes: ByteArray) extends Account
+  private class AccountImpl(val bytes: ByteStr) extends Account
 
   def fromPublicKey(publicKey: Array[Byte]): Account = {
     val publicKeyHash = hash(publicKey).take(HashLength)
     val withoutChecksum = AddressVersion +: scheme.chainId +: publicKeyHash
     val bytes = withoutChecksum ++ calcCheckSum(withoutChecksum)
-    new AccountImpl(EqByteArray(bytes))
+    new AccountImpl(ByteStr(bytes))
   }
 
   def fromBytes(addressBytes: Array[Byte]): Either[ValidationError, Account] = {
-    if (isByteArrayValid(addressBytes)) Right(new AccountImpl(EqByteArray(addressBytes)))
+    if (isByteArrayValid(addressBytes)) Right(new AccountImpl(ByteStr(addressBytes)))
     else Left(InvalidAddress)
   }
 
@@ -49,7 +49,7 @@ object Account extends ScorexLogging {
       Left(InvalidAddress)
     } else {
       Base58.decode(address) match {
-        case Success(byteArray) if isByteArrayValid(byteArray) => Right(new AccountImpl(EqByteArray(byteArray)))
+        case Success(byteArray) if isByteArrayValid(byteArray) => Right(new AccountImpl(ByteStr(byteArray)))
         case _ => Left(InvalidAddress)
       }
     }

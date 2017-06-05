@@ -50,20 +50,20 @@ object ExchangeTransactionDiff {
 
     val portfolios = Monoid.combineAll(Seq(feeDiff, priceDiff, amountDiff))
 
-    lazy val orderExchangeTxsMap: Map[ByteArray, Set[ExchangeTransaction]] = Map(
-      EqByteArray(tx.buyOrder.id) -> Set(tx),
-      EqByteArray(tx.sellOrder.id) -> Set(tx))
+    lazy val orderExchangeTxsMap: Map[ByteStr, Set[ExchangeTransaction]] = Map(
+      ByteStr(tx.buyOrder.id) -> Set(tx),
+      ByteStr(tx.sellOrder.id) -> Set(tx))
 
     Diff(height, tx, portfolios = portfolios, orderFills = Map(
-      EqByteArray(tx.buyOrder.id) -> OrderFillInfo(tx.amount, tx.buyMatcherFee),
-      EqByteArray(tx.sellOrder.id) -> OrderFillInfo(tx.amount, tx.sellMatcherFee)
+      ByteStr(tx.buyOrder.id) -> OrderFillInfo(tx.amount, tx.buyMatcherFee),
+      ByteStr(tx.sellOrder.id) -> OrderFillInfo(tx.amount, tx.sellMatcherFee)
     ))
   }
 
 
   private def enoughVolume(exTrans: ExchangeTransaction, s: StateReader): Either[StateValidationError, ExchangeTransaction] = {
-    val filledBuy = s.filledVolumeAndFee(EqByteArray(exTrans.buyOrder.id))
-    val filledSell = s.filledVolumeAndFee(EqByteArray(exTrans.sellOrder.id))
+    val filledBuy = s.filledVolumeAndFee(ByteStr(exTrans.buyOrder.id))
+    val filledSell = s.filledVolumeAndFee(ByteStr(exTrans.sellOrder.id))
 
     val buyTotal = filledBuy.volume + exTrans.amount
     val sellTotal = filledSell.volume + exTrans.amount

@@ -63,7 +63,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader, set
     }
   }
 
-  override def removeAfter(blockId: ByteArray): Boolean = write { implicit l =>
+  override def removeAfter(blockId: ByteStr): Boolean = write { implicit l =>
     bc.heightOf(blockId) match {
       case Some(height) =>
         logHeights(s"Rollback to height $height started:")

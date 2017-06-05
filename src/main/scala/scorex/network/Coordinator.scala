@@ -7,7 +7,7 @@ import akka.util.Timeout
 import cats._
 import cats.implicits._
 import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
-import com.wavesplatform.state2.{ByteArray, EqByteArray}
+import com.wavesplatform.state2.ByteStr
 import com.wavesplatform.state2.reader.StateReader
 import scorex.block.Block
 import scorex.consensus.TransactionsOrdering
@@ -141,7 +141,7 @@ class Coordinator(protected override val networkControllerRef: ActorRef, blockch
     val fork = existingItems.takeWhile {
       case BlockCheckpoint(h, sig) =>
         val block = history.blockAt(h).get
-        block.signerData.signature != EqByteArray(sig)
+        block.signerData.signature != ByteStr(sig)
     }
 
     if (fork.nonEmpty) {
@@ -208,7 +208,7 @@ class Coordinator(protected override val networkControllerRef: ActorRef, blockch
     }
   }
 
-  private def processFork(lastCommonBlockId: ByteArray, blocks: Iterator[Block], from: Option[ConnectedPeer]): Unit = {
+  private def processFork(lastCommonBlockId: ByteStr, blocks: Iterator[Block], from: Option[ConnectedPeer]): Unit = {
     val newBlocks = blocks.toSeq
 
     def isForkValidWithCheckpoint(lastCommonHeight: Int): Boolean = {
@@ -218,7 +218,7 @@ class Coordinator(protected override val networkControllerRef: ActorRef, blockch
     if (history.heightOf(lastCommonBlockId).exists(isForkValidWithCheckpoint)) {
       blockchainUpdater.removeAfter(lastCommonBlockId)
 
-      foldM[({type l[α] = Either[(ValidationError, ByteArray), α]})#l, List, Block, Unit](newBlocks.toList, ()) { case ((), block: Block) => processNewBlock(block).left.map((_, block.uniqueId)) } match {
+      foldM[({type l[α] = Either[(ValidationError, ByteStr), α]})#l, List, Block, Unit](newBlocks.toList, ()) { case ((), block: Block) => processNewBlock(block).left.map((_, block.uniqueId)) } match {
         case Right(_) =>
         case Left(err) =>
           log.error(s"Can't processFork(lastBlockCommonId: $lastCommonBlockId because: ${err._1}")
@@ -240,7 +240,7 @@ class Coordinator(protected override val networkControllerRef: ActorRef, blockch
       case Checkpoint(items, _) =>
         val blockSignature = candidate.signerData.signature
         items.exists { case BlockCheckpoint(h, sig) =>
-          h == estimatedHeight && (blockSignature != EqByteArray(sig))
+          h == estimatedHeight && (blockSignature != ByteStr(sig))
         }
     }
 
@@ -308,7 +308,7 @@ object Coordinator extends ScorexLogging {
 
   case class AddBlock(block: Block, generator: Option[ConnectedPeer])
 
-  case class SyncFinished(success: Boolean, result: Option[(ByteArray, Iterator[Block], Option[ConnectedPeer])])
+  case class SyncFinished(success: Boolean, result: Option[(ByteStr, Iterator[Block], Option[ConnectedPeer])])
 
   object SyncFinished {
     def unsuccessfully: SyncFinished = SyncFinished(success = false, None)

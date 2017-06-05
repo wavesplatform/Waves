@@ -1,16 +1,16 @@
 package scorex.network
 
-import com.wavesplatform.state2.ByteArray
+import com.wavesplatform.state2.ByteStr
 import scorex.block.Block
 import scorex.transaction.History._
 
 import scala.collection.mutable
 
-class InMemoryBlockSeq(blockIds: Seq[ByteArray]) {
+class InMemoryBlockSeq(blockIds: Seq[ByteStr]) {
 
-  private val blocks = mutable.Map.empty[ByteArray, Block]
+  private val blocks = mutable.Map.empty[ByteStr, Block]
 
-  private val blockIdsSet: Set[ByteArray] = blockIds.toSet
+  private val blockIdsSet: Set[ByteStr] = blockIds.toSet
 
   def addIfNotContained(block: Block): Boolean = {
     blocks.put(block.uniqueId, block).isEmpty
@@ -18,7 +18,7 @@ class InMemoryBlockSeq(blockIds: Seq[ByteArray]) {
 
   def noIdsWithoutBlock: Boolean = blockIds.size == blocks.size
 
-  def containsBlockId(blockId: ByteArray): Boolean = blockIdsSet.contains(blockId)
+  def containsBlockId(blockId: ByteStr): Boolean = blockIdsSet.contains(blockId)
 
   def blocksInOrder: Iterator[Block] = blockIds
     .map(blocks.get)

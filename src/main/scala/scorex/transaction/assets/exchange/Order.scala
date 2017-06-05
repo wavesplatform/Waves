@@ -1,7 +1,7 @@
 package scorex.transaction.assets.exchange
 
 import com.google.common.primitives.Longs
-import com.wavesplatform.state2.EqByteArray
+import com.wavesplatform.state2.ByteStr
 import io.swagger.annotations.ApiModelProperty
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
@@ -226,7 +226,7 @@ object Order {
     from += 8
     val signature = bytes.slice(from, from + SignatureLength)
     from += SignatureLength
-    Order(sender, matcher, AssetPair(amountAssetId.map(EqByteArray(_)), priceAssetId.map(EqByteArray(_))), OrderType(orderType), price, amount, timestamp, expiration, matcherFee, signature)
+    Order(sender, matcher, AssetPair(amountAssetId.map(ByteStr(_)), priceAssetId.map(ByteStr(_))), OrderType(orderType), price, amount, timestamp, expiration, matcherFee, signature)
   }
 
   def sign(unsigned: Order, sender: PrivateKeyAccount): Order = {

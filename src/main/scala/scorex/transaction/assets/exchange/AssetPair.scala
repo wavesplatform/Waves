@@ -1,6 +1,6 @@
 package scorex.transaction.assets.exchange
 
-import com.wavesplatform.state2.EqByteArray
+import com.wavesplatform.state2.ByteStr
 import io.swagger.annotations.ApiModelProperty
 import play.api.libs.json.{JsObject, Json}
 import scorex.transaction._
@@ -45,7 +45,7 @@ object AssetPair {
 
   private def extractAssetId(a: String): Try[Option[AssetId]] = a match {
     case `WavesName` => Success(None)
-    case other => EqByteArray.decode(other).map(Option(_))
+    case other => ByteStr.decodeBase58(other).map(Option(_))
   }
 
   def createAssetPair(amountAsset: String, priceAsset: String): Try[AssetPair] =

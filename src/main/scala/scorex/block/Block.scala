@@ -1,7 +1,7 @@
 package scorex.block
 
 import com.google.common.primitives.{Bytes, Ints, Longs}
-import com.wavesplatform.state2.{ByteArray, EqByteArray}
+import com.wavesplatform.state2.ByteStr
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 
@@ -14,7 +14,7 @@ import scorex.utils.ScorexLogging
 
 import scala.util.{Failure, Try}
 
-case class Block(timestamp: Long, version: Byte, reference: ByteArray, signerData: SignerData,
+case class Block(timestamp: Long, version: Byte, reference: ByteStr, signerData: SignerData,
                  consensusData: NxtLikeConsensusBlockData, transactionData: Seq[Transaction]) {
 
   private lazy val versionField: ByteBlockField = ByteBlockField("version", version)
@@ -24,7 +24,7 @@ case class Block(timestamp: Long, version: Byte, reference: ByteArray, signerDat
   private lazy val consensusDataField = NxtConsensusBlockField(consensusData)
   private lazy val transactionDataField = TransactionsBlockField(transactionData)
 
-  lazy val uniqueId: ByteArray = signerData.signature
+  lazy val uniqueId: ByteStr = signerData.signature
   lazy val encodedId: String = uniqueId.base58
 
   lazy val fee: Long =
@@ -83,7 +83,7 @@ case class Block(timestamp: Long, version: Byte, reference: ByteArray, signerDat
 
 
 object Block extends ScorexLogging {
-  type BlockIds = Seq[ByteArray]
+  type BlockIds = Seq[ByteStr]
 
   val MaxTransactionsPerBlock: Int = 100
   val BaseTargetLength: Int = 8
@@ -119,7 +119,7 @@ object Block extends ScorexLogging {
     val timestamp = Longs.fromByteArray(bytes.slice(position, position + 8))
     position += 8
 
-    val reference = EqByteArray(bytes.slice(position, position + Block.BlockIdLength))
+    val reference = ByteStr(bytes.slice(position, position + Block.BlockIdLength))
     position += BlockIdLength
 
     val cBytesLength = Ints.fromByteArray(bytes.slice(position, position + 4))
@@ -137,7 +137,7 @@ object Block extends ScorexLogging {
     val genPK = bytes.slice(position, position + KeyLength)
     position += KeyLength
 
-    val signature =EqByteArray(bytes.slice(position, position + SignatureLength))
+    val signature =ByteStr(bytes.slice(position, position + SignatureLength))
 
     new Block(timestamp, version, reference, SignerData(PublicKeyAccount(genPK), signature), consData, txBlockField)
   }.recoverWith { case t: Throwable =>
@@ -147,16 +147,16 @@ object Block extends ScorexLogging {
 
   def build(version: Byte,
             timestamp: Long,
-            reference: ByteArray,
+            reference: ByteStr,
             consensusData: NxtLikeConsensusBlockData,
             transactionData: Seq[Transaction],
             generator: PublicKeyAccount,
             signature: Array[Byte])
-  = new Block(timestamp, version, reference, SignerData(generator, EqByteArray(signature)), consensusData, transactionData)
+  = new Block(timestamp, version, reference, SignerData(generator, ByteStr(signature)), consensusData, transactionData)
 
   def buildAndSign(version: Byte,
                    timestamp: Long,
-                   reference: ByteArray,
+                   reference: ByteStr,
                    consensusData: NxtLikeConsensusBlockData,
                    transactionData: Seq[Transaction],
                    signer: PrivateKeyAccount): Block = {
@@ -197,8 +197,8 @@ object Block extends ScorexLogging {
 
     new Block(timestamp = timestamp,
       version = 1,
-      reference = EqByteArray(reference),
-      signerData = SignerData(genesisSigner, EqByteArray(signature)),
+      reference = ByteStr(reference),
+      signerData = SignerData(genesisSigner, ByteStr(signature)),
       consensusData = consensusGenesisData,
       transactionData = transactionGenesisData)
   }

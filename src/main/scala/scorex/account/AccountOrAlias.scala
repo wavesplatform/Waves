@@ -1,6 +1,6 @@
 package scorex.account
 
-import com.wavesplatform.state2.ByteArray
+import com.wavesplatform.state2.ByteStr
 import scorex.serialization.Deser
 import scorex.transaction.ValidationError
 
@@ -8,7 +8,7 @@ import scorex.transaction.ValidationError
 trait AccountOrAlias {
   def stringRepr: String
 
-  def bytes: ByteArray
+  def bytes: ByteStr
 
   override def toString: String = stringRepr
 

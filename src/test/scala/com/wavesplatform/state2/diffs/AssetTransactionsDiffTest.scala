@@ -50,7 +50,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Genera
         val totalAssetVolume = issue.quantity + reissue.quantity - burn.amount
         newState.accountPortfolio(issue.sender).assets shouldBe Map(reissue.assetId -> totalAssetVolume)
         newState.assetInfo(issue.id) shouldBe Some(AssetInfo(reissue.reissuable, totalAssetVolume))
-        newState.getAssetIdByUniqueName(EqByteArray(issue.name)) shouldBe Some(issue.id)
+        newState.getAssetIdByUniqueName(ByteStr(issue.name)) shouldBe Some(issue.id)
       }
     }
   }

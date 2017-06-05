@@ -1,6 +1,6 @@
 package scorex.transaction.assets.exchange
 
-import com.wavesplatform.state2.EqByteArray
+import com.wavesplatform.state2.ByteStr
 import play.api.libs.json._
 import scorex.account.PublicKeyAccount
 import scorex.crypto.encode.Base58
@@ -51,7 +51,7 @@ object OrderJson {
   }
 
   def readAssetPair(amountAsset: Option[Option[Array[Byte]]], priceAsset: Option[Option[Array[Byte]]]): AssetPair = {
-    AssetPair(amountAsset.flatten.map(EqByteArray(_)), priceAsset.flatten.map(EqByteArray(_)))
+    AssetPair(amountAsset.flatten.map(ByteStr(_)), priceAsset.flatten.map(ByteStr(_)))
   }
 
   implicit val assetPairReads: Reads[AssetPair] = {

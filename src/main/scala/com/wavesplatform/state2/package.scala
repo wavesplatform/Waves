@@ -7,8 +7,6 @@ import scala.util.{Left, Right, Try}
 
 package object state2 {
 
-  type ByteArray = EqByteArray
-
   def safeSum(x: Long, y: Long): Long = Try(Math.addExact(x, y)).getOrElse(Long.MinValue)
 
   implicit class EitherExt[L <: ValidationError, R](ei: Either[L, R]) {

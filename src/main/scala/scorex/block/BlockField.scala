@@ -1,7 +1,7 @@
 package scorex.block
 
 import com.google.common.primitives.{Bytes, Ints, Longs}
-import com.wavesplatform.state2.ByteArray
+import com.wavesplatform.state2.ByteStr
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.PublicKeyAccount
 import scorex.crypto.encode.Base58
@@ -46,7 +46,7 @@ case class TransactionBlockField(override val name: String, override val value: 
   override lazy val bytes: Array[Byte] = value.bytes
 }
 
-case class SignerData(generator: PublicKeyAccount, signature: ByteArray)
+case class SignerData(generator: PublicKeyAccount, signature: ByteStr)
 
 case class SignerDataBlockField(override val name: String, override val value: SignerData)
   extends BlockField[SignerData] {

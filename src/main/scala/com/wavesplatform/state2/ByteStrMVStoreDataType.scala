@@ -8,15 +8,15 @@ import org.h2.mvstore.{DataUtils, WriteBuffer}
 /*
     https://github.com/h2database/h2database/blob/master/h2/src/main/org/h2/mvstore/type/StringDataType.java
 */
-class EqByteArrayMVStoreDataType extends DataType {
+class ByteStrMVStoreDataType extends DataType {
 
-  override def compare(a: scala.Any, b: scala.Any): Int = a.asInstanceOf[EqByteArray].hashCode() compareTo b.asInstanceOf[EqByteArray].hashCode()
+  override def compare(a: scala.Any, b: scala.Any): Int = a.asInstanceOf[ByteStr].hashCode() compareTo b.asInstanceOf[ByteStr].hashCode()
 
   override def read(buff: ByteBuffer): AnyRef = {
     val len = DataUtils.readVarInt(buff)
     val dst = Array.fill(len){0:Byte}
     buff.get(dst, 0, len)
-    EqByteArray(dst)
+    ByteStr(dst)
   }
 
   override def read(buff: ByteBuffer, obj: Array[AnyRef], len: Int, key: Boolean): Unit =
@@ -24,10 +24,10 @@ class EqByteArrayMVStoreDataType extends DataType {
       obj(i) = read(buff)
     }
 
-  override def getMemory(obj: scala.Any): Int = 5 + obj.asInstanceOf[EqByteArray].arr.length
+  override def getMemory(obj: scala.Any): Int = 5 + obj.asInstanceOf[ByteStr].arr.length
 
   override def write(buff: WriteBuffer, obj: scala.Any): Unit = {
-    val eba = obj.asInstanceOf[EqByteArray]
+    val eba = obj.asInstanceOf[ByteStr]
     buff.putVarInt(eba.arr.length).put(eba.arr)
   }
 

@@ -1,7 +1,7 @@
 package scorex.transaction.lease
 
 import com.google.common.primitives.{Bytes, Longs}
-import com.wavesplatform.state2.{ByteArray, EqByteArray}
+import com.wavesplatform.state2.ByteStr
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.{Account, AccountOrAlias, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
@@ -26,7 +26,7 @@ object LeaseTransaction {
                                           fee: Long,
                                           timestamp: Long,
                                           recipient: AccountOrAlias,
-                                          signature: ByteArray)
+                                          signature: ByteStr)
     extends LeaseTransaction {
 
     override val transactionType: TransactionType.Value = TransactionType.LeaseTransaction
@@ -60,7 +60,7 @@ object LeaseTransaction {
       quantity = Longs.fromByteArray(bytes.slice(quantityStart, quantityStart + 8))
       fee = Longs.fromByteArray(bytes.slice(quantityStart + 8, quantityStart + 16))
       timestamp = Longs.fromByteArray(bytes.slice(quantityStart + 16, quantityStart + 24))
-      signature = EqByteArray(bytes.slice(quantityStart + 24, quantityStart + 24 + SignatureLength))
+      signature = ByteStr(bytes.slice(quantityStart + 24, quantityStart + 24 + SignatureLength))
       lt <- LeaseTransaction.create(sender, quantity, fee, timestamp, recipient, signature)
     } yield lt).fold(left => Failure(new Exception(left.toString)), right => Success(right))
   }.flatten
@@ -70,7 +70,7 @@ object LeaseTransaction {
                                fee: Long,
                                timestamp: Long,
                                recipient: AccountOrAlias,
-                               signature: Option[ByteArray] = None): Either[ValidationError, LeaseTransactionImpl] = {
+                               signature: Option[ByteStr] = None): Either[ValidationError, LeaseTransactionImpl] = {
     if (amount <= 0) {
       Left(ValidationError.NegativeAmount)
 
@@ -90,7 +90,7 @@ object LeaseTransaction {
              fee: Long,
              timestamp: Long,
              recipient: AccountOrAlias,
-             signature: ByteArray): Either[ValidationError, LeaseTransaction] = {
+             signature: ByteStr): Either[ValidationError, LeaseTransaction] = {
     createUnverified(sender, amount, fee, timestamp, recipient, Some(signature))
       .right.flatMap(SignedTransaction.verify)
   }
@@ -101,7 +101,7 @@ object LeaseTransaction {
              timestamp: Long,
              recipient: AccountOrAlias): Either[ValidationError, LeaseTransaction] = {
     createUnverified(sender, amount, fee, timestamp, recipient).right.map { unsigned =>
-      unsigned.copy(signature = EqByteArray(EllipticCurveImpl.sign(sender, unsigned.toSign)))
+      unsigned.copy(signature = ByteStr(EllipticCurveImpl.sign(sender, unsigned.toSign)))
     }
   }
 }

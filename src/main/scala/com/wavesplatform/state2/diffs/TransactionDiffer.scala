@@ -1,7 +1,7 @@
 package com.wavesplatform.state2.diffs
 
 import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state2.{Diff, EqByteArray}
+import com.wavesplatform.state2.{Diff, ByteStr}
 import com.wavesplatform.state2.reader.StateReader
 import scorex.transaction.ValidationError.UnsupportedTransactionType
 import scorex.transaction._

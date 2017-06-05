@@ -5,7 +5,7 @@ import javax.ws.rs.Path
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.state2.EqByteArray
+import com.wavesplatform.state2.ByteStr
 import com.wavesplatform.state2.reader.StateReader
 import io.swagger.annotations._
 import play.api.libs.json._
@@ -73,7 +73,7 @@ case class TransactionsApiRoute(
       complete(InvalidSignature)
     } ~
       path(Segment) { encoded =>
-        EqByteArray.decode(encoded) match {
+        ByteStr.decodeBase58(encoded) match {
           case Success(sig) =>
             state.included(sig) match {
               case Some(h) =>

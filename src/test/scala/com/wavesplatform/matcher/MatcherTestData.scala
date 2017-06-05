@@ -3,7 +3,7 @@ package com.wavesplatform.matcher
 import com.google.common.primitives.{Bytes, Ints}
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.matcher.model.{BuyLimitOrder, SellLimitOrder}
-import com.wavesplatform.state2.EqByteArray
+import com.wavesplatform.state2.ByteStr
 import org.scalacheck.{Arbitrary, Gen}
 import scorex.account.PrivateKeyAccount
 import scorex.crypto.hash.SecureCryptographicHash
@@ -25,7 +25,7 @@ trait MatcherTestData {
 
   val assetPairGen = Gen.zip(assetIdGen, assetIdGen).
     suchThat(p => p._1 != p._2).
-    map(p => AssetPair(p._1.map(EqByteArray(_)), p._2.map(EqByteArray(_))))
+    map(p => AssetPair(p._1.map(ByteStr(_)), p._2.map(ByteStr(_))))
 
   val maxTimeGen: Gen[Long] = Gen.choose(10000L, Order.MaxLiveTime).map(_ + NTP.correctedTime())
   val createdTimeGen: Gen[Long] = Gen.choose(0L, 10000L).map(NTP.correctedTime() - _)

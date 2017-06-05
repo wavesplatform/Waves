@@ -1,6 +1,6 @@
 package scorex.transaction
 
-import com.wavesplatform.state2.{ByteArray, EqByteArray}
+import com.wavesplatform.state2.ByteStr
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.PublicKeyAccount
 import scorex.crypto.EllipticCurveImpl
@@ -10,9 +10,9 @@ import scorex.crypto.hash.FastCryptographicHash
 trait SignedTransaction extends Transaction {
   def toSign: Array[Byte]
 
-  val signature: ByteArray
+  val signature: ByteStr
   val sender: PublicKeyAccount
-  override lazy val id: ByteArray = EqByteArray(FastCryptographicHash(toSign))
+  override lazy val id: ByteStr = ByteStr(FastCryptographicHash(toSign))
 
   protected def jsonBase(): JsObject = Json.obj("type" -> transactionType.id,
     "id" -> id.base58,

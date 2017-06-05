@@ -4,7 +4,7 @@ import javax.ws.rs.Path
 
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.state2.EqByteArray
+import com.wavesplatform.state2.ByteStr
 import com.wavesplatform.state2.reader.StateReader
 import io.swagger.annotations._
 import play.api.libs.json._
@@ -170,7 +170,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, state: Stat
     (get & path("asset-id-by-unique-name" / Segment)) { base58EncodedAssetName =>
       complete {
         Base58.decode(base58EncodedAssetName) match {
-          case Success(assetName) => state.getAssetIdByUniqueName(EqByteArray(assetName)) match {
+          case Success(assetName) => state.getAssetIdByUniqueName(ByteStr(assetName)) match {
             case Some(assetId) => JsString(assetId.base58)
             case None => JsNull
           }
@@ -181,7 +181,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, state: Stat
 
 
   private def balanceJson(address: String, assetIdStr: String): Either[ApiError, JsObject] = {
-    EqByteArray.decode(assetIdStr) match {
+    ByteStr.decodeBase58(assetIdStr) match {
       case Success(assetId) =>
         (for {
           acc <- Account.fromString(address)

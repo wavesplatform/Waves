@@ -1,6 +1,6 @@
 package scorex.transaction
 
-import com.wavesplatform.state2.{ByteArray, EqByteArray}
+import com.wavesplatform.state2.ByteStr
 import scorex.account.Account
 import scorex.block.Block
 
@@ -21,13 +21,13 @@ trait History extends Synchronized {
 
   def score(): BlockchainScore
 
-  def scoreOf(id: ByteArray): BlockchainScore
+  def scoreOf(id: ByteStr): BlockchainScore
 
-  def heightOf(blockId: ByteArray): Option[Int]
+  def heightOf(blockId: ByteStr): Option[Int]
 
   def generatedBy(account: Account, from: Int, to: Int): Seq[Block]
 
-  def lastBlockIds(howMany: Int): Seq[ByteArray]
+  def lastBlockIds(howMany: Int): Seq[ByteStr]
 }
 
 trait HistoryWriter extends History {
@@ -52,13 +52,13 @@ object History {
 
     def contains(block: Block): Boolean = history.contains(block.uniqueId)
 
-    def contains(signature: ByteArray): Boolean = history.heightOf(signature).isDefined
+    def contains(signature: ByteStr): Boolean = history.heightOf(signature).isDefined
 
-    def blockById(blockId: ByteArray): Option[Block] = history.read { implicit lock =>
+    def blockById(blockId: ByteStr): Option[Block] = history.read { implicit lock =>
       history.heightOf(blockId).flatMap(history.blockAt)
     }
 
-    def blockById(blockId: String): Option[Block] = EqByteArray.decode(blockId).toOption.flatMap(history.blockById)
+    def blockById(blockId: String): Option[Block] = ByteStr.decodeBase58(blockId).toOption.flatMap(history.blockById)
 
     def heightOf(block: Block): Option[Int] = history.heightOf(block.uniqueId)
 
@@ -87,7 +87,7 @@ object History {
       (Math.max(1, history.height() - howMany + 1) to history.height()).flatMap(history.blockAt).reverse
     }
 
-    def blockIdsAfter(parentSignature: ByteArray, howMany: Int): Seq[ByteArray] = history.read { implicit lock =>
+    def blockIdsAfter(parentSignature: ByteStr, howMany: Int): Seq[ByteStr] = history.read { implicit lock =>
       history.heightOf(parentSignature).map { h =>
         (h + 1).to(Math.min(history.height(), h + howMany: Int)).flatMap(history.blockAt).map(_.uniqueId)
       }.getOrElse(Seq())

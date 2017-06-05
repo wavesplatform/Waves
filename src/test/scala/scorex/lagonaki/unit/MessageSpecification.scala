@@ -2,7 +2,7 @@
 //
 //import java.nio.ByteBuffer
 //
-//import com.wavesplatform.state2.{ByteArray, EqByteArray}
+//import com.wavesplatform.state2.{ByteStr, EqByteArray}
 //import org.scalamock.scalatest.MockFactory
 //import org.scalatest.FunSuite
 //import scorex.network.message._
@@ -38,7 +38,7 @@
 //    val s1 = EqByteArray(e2 +: Array.fill(SignatureLength - 1)(e1))
 //
 //    val msg = Message(GetSignaturesSpec, Right(Seq(s1).map(_.arr)), None)
-//    val ss = toMessage(handler.parseBytes(ByteBuffer.wrap(msg.bytes))).get.data.get.asInstanceOf[Seq[ByteArray]]
+//    val ss = toMessage(handler.parseBytes(ByteBuffer.wrap(msg.bytes))).get.data.get.asInstanceOf[Seq[ByteStr]]
 //    assert(ss.head.==(s1))
 //  }
 //
@@ -49,7 +49,7 @@
 //    val s2 = EqByteArray(e1 +: Array.fill(SignatureLength - 1)(e2))
 //
 //    val msg = Message(SignaturesSpec, Right(Seq(s1, s2).map(_.arr)), None)
-//    val ss = toMessage(handler.parseBytes(ByteBuffer.wrap(msg.bytes))).get.data.get.asInstanceOf[Seq[ByteArray]]
+//    val ss = toMessage(handler.parseBytes(ByteBuffer.wrap(msg.bytes))).get.data.get.asInstanceOf[Seq[ByteStr]]
 //    assert(ss.head.==(s1))
 //    assert(ss.tail.head.==(s2))
 //  }

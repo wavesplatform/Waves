@@ -1,7 +1,7 @@
 package scorex.transaction
 
 import com.google.common.primitives.{Bytes, Longs}
-import com.wavesplatform.state2.{ByteArray, EqByteArray}
+import com.wavesplatform.state2.ByteStr
 import play.api.libs.json.{JsObject, Json}
 import scorex.account._
 import scorex.crypto.EllipticCurveImpl
@@ -23,12 +23,12 @@ object CreateAliasTransaction {
                                                 alias: Alias,
                                                 fee: Long,
                                                 timestamp: Long,
-                                                signature: ByteArray)
+                                                signature: ByteStr)
     extends CreateAliasTransaction {
 
     override val transactionType: TransactionType.Value = TransactionType.CreateAliasTransaction
 
-    override lazy val id: ByteArray = EqByteArray(FastCryptographicHash(transactionType.id.toByte +: alias.bytes.arr))
+    override lazy val id: ByteStr = ByteStr(FastCryptographicHash(transactionType.id.toByte +: alias.bytes.arr))
 
     lazy val toSign: Array[Byte] = Bytes.concat(
       Array(transactionType.id.toByte),
@@ -56,7 +56,7 @@ object CreateAliasTransaction {
       alias <- Alias.fromBytes(aliasBytes)
       fee = Longs.fromByteArray(bytes.slice(aliasEnd, aliasEnd + 8))
       timestamp = Longs.fromByteArray(bytes.slice(aliasEnd + 8, aliasEnd + 16))
-      signature = EqByteArray(bytes.slice(aliasEnd + 16, aliasEnd + 16 + SignatureLength))
+      signature = ByteStr(bytes.slice(aliasEnd + 16, aliasEnd + 16 + SignatureLength))
       tx <- CreateAliasTransaction.create(sender, alias, fee, timestamp, signature)
     } yield tx).fold(left => Failure(new Exception(left.toString)), right => Success(right))
   }.flatten
@@ -65,7 +65,7 @@ object CreateAliasTransaction {
                                alias: Alias,
                                fee: Long,
                                timestamp: Long,
-                               signature: Option[EqByteArray] = None): Either[ValidationError, CreateAliasTransactionImpl] = {
+                               signature: Option[ByteStr] = None): Either[ValidationError, CreateAliasTransactionImpl] = {
     if (fee <= 0) {
       Left(ValidationError.InsufficientFee)
     } else {
@@ -77,7 +77,7 @@ object CreateAliasTransaction {
              alias: Alias,
              fee: Long,
              timestamp: Long,
-             signature: EqByteArray): Either[ValidationError, CreateAliasTransaction] = {
+             signature: ByteStr): Either[ValidationError, CreateAliasTransaction] = {
     createUnverified(sender, alias, fee, timestamp, Some(signature))
       .right.flatMap(SignedTransaction.verify)
   }
@@ -87,7 +87,7 @@ object CreateAliasTransaction {
              fee: Long,
              timestamp: Long): Either[ValidationError, CreateAliasTransaction] = {
     createUnverified(sender, alias, fee, timestamp).right.map { unsigned =>
-      unsigned.copy(signature =EqByteArray(EllipticCurveImpl.sign(sender, unsigned.toSign)))
+      unsigned.copy(signature =ByteStr(EllipticCurveImpl.sign(sender, unsigned.toSign)))
     }
   }
 }

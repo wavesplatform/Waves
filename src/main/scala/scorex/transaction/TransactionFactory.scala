@@ -1,7 +1,7 @@
 package scorex.transaction
 
 import com.google.common.base.Charsets
-import com.wavesplatform.state2.EqByteArray
+import com.wavesplatform.state2.ByteStr
 import scorex.account._
 import scorex.api.http.alias.CreateAliasRequest
 import scorex.api.http.assets._
@@ -28,12 +28,12 @@ object TransactionFactory {
       senderPrivateKey <- wallet.findWallet(request.sender)
       recipientAcc <- AccountOrAlias.fromString(request.recipient)
       tx <- TransferTransaction
-        .create(request.assetId.map(s => EqByteArray.decode(s).get),
+        .create(request.assetId.map(s => ByteStr.decodeBase58(s).get),
           senderPrivateKey,
           recipientAcc,
           request.amount,
           time.getTimestamp,
-          request.feeAssetId.map(s => EqByteArray.decode(s).get),
+          request.feeAssetId.map(s => ByteStr.decodeBase58(s).get),
           request.fee,
           request.attachment.filter(_.nonEmpty).map(Base58.decode(_).get).getOrElse(Array.emptyByteArray))
       r <- tm.onNewOffchainTransaction(tx)
@@ -59,7 +59,7 @@ object TransactionFactory {
   def leaseCancel(request: LeaseCancelRequest, wallet: Wallet, tm: NewTransactionHandler, time: Time): Either[ValidationError, LeaseCancelTransaction] =
     for {
       pk <- wallet.findWallet(request.sender)
-      tx <- LeaseCancelTransaction.create(pk, EqByteArray.decode(request.txId).get, request.fee, time.getTimestamp)
+      tx <- LeaseCancelTransaction.create(pk, ByteStr.decodeBase58(request.txId).get, request.fee, time.getTimestamp)
       t <- tm.onNewOffchainTransaction(tx)
     } yield t
 
@@ -73,27 +73,27 @@ object TransactionFactory {
 
   def reissueAsset(request: ReissueRequest, wallet: Wallet, tm: NewTransactionHandler, time: Time): Either[ValidationError, ReissueTransaction] = for {
     pk <- wallet.findWallet(request.sender)
-    tx <- ReissueTransaction.create(pk, EqByteArray.decode(request.assetId).get, request.quantity, request.reissuable, request.fee, time.getTimestamp)
+    tx <- ReissueTransaction.create(pk, ByteStr.decodeBase58(request.assetId).get, request.quantity, request.reissuable, request.fee, time.getTimestamp)
     r <- tm.onNewOffchainTransaction(tx)
   } yield r
 
 
   def burnAsset(request: BurnRequest, wallet: Wallet, tm: NewTransactionHandler, time: Time): Either[ValidationError, BurnTransaction] = for {
     pk <- wallet.findWallet(request.sender)
-    tx <- BurnTransaction.create(pk, EqByteArray.decode(request.assetId).get, request.quantity, request.fee, time.getTimestamp)
+    tx <- BurnTransaction.create(pk, ByteStr.decodeBase58(request.assetId).get, request.quantity, request.fee, time.getTimestamp)
     r <- tm.onNewOffchainTransaction(tx)
   } yield r
 
   def makeAssetNameUnique(request: MakeAssetNameUniqueRequest, wallet: Wallet, tm: NewTransactionHandler,
                           time: Time): Either[ValidationError, MakeAssetNameUniqueTransaction] = for {
     pk <- wallet.findWallet(request.sender)
-    tx <- MakeAssetNameUniqueTransaction.create(pk, EqByteArray.decode(request.assetId).get, request.fee, AddressScheme.current.chainId, time.getTimestamp)
+    tx <- MakeAssetNameUniqueTransaction.create(pk, ByteStr.decodeBase58(request.assetId).get, request.fee, AddressScheme.current.chainId, time.getTimestamp)
     r <- tm.onNewOffchainTransaction(tx)
   } yield r
 
   def broadcastPayment(payment: SignedPaymentRequest, tm: NewTransactionHandler): Either[ValidationError, PaymentTransaction] =
     for {
-      _signature <- EqByteArray.decode(payment.signature).toOption.toRight(ValidationError.InvalidSignature)
+      _signature <- ByteStr.decodeBase58(payment.signature).toOption.toRight(ValidationError.InvalidSignature)
       _sender <- PublicKeyAccount.fromBase58String(payment.senderPublicKey)
       _recipient <- Account.fromString(payment.recipient)
       tx <- PaymentTransaction.create(_sender, _recipient, payment.amount, payment.fee, payment.timestamp, _signature)

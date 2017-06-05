@@ -1,6 +1,6 @@
 package scorex.consensus.nxt
 
-import com.wavesplatform.state2.EqByteArray
+import com.wavesplatform.state2.ByteStr
 import org.scalatest.{Assertions, Matchers, PropSpec}
 import scorex.account.{Account, PrivateKeyAccount}
 import scorex.consensus.TransactionsOrdering
@@ -20,8 +20,8 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
       TransferTransaction.create(None, PrivateKeyAccount(Array.fill(32)(0)), Account.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").right.get, 100000, 1, None, 125L, Array.empty).right.get,
       TransferTransaction.create(None, PrivateKeyAccount(Array.fill(32)(0)), Account.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").right.get, 100000, 2, None, 124L, Array.empty).right.get,
       TransferTransaction.create(None, PrivateKeyAccount(Array.fill(32)(0)), Account.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").right.get, 100000, 1, None, 124L, Array.empty).right.get,
-      TransferTransaction.create(None, PrivateKeyAccount(Array.fill(32)(0)), Account.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").right.get, 100000, 2, Some(EqByteArray.empty), 124L, Array.empty).right.get,
-      TransferTransaction.create(None, PrivateKeyAccount(Array.fill(32)(0)), Account.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").right.get, 100000, 1, Some(EqByteArray.empty), 124L, Array.empty).right.get)
+      TransferTransaction.create(None, PrivateKeyAccount(Array.fill(32)(0)), Account.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").right.get, 100000, 2, Some(ByteStr.empty), 124L, Array.empty).right.get,
+      TransferTransaction.create(None, PrivateKeyAccount(Array.fill(32)(0)), Account.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").right.get, 100000, 1, Some(ByteStr.empty), 124L, Array.empty).right.get)
 
     val sorted = Random.shuffle(correctSeq).sorted(TransactionsOrdering.InBlock)
 
@@ -36,8 +36,8 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
       TransferTransaction.create(None, PrivateKeyAccount(Array.fill(32)(0)), Account.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").right.get, 100000, 1, None, 124L, Array.empty).right.get,
       TransferTransaction.create(None, PrivateKeyAccount(Array.fill(32)(0)), Account.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").right.get, 100000, 1, None, 123L, Array.empty).right.get,
       TransferTransaction.create(None, PrivateKeyAccount(Array.fill(32)(0)), Account.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").right.get, 100000, 2, None, 123L, Array.empty).right.get,
-      TransferTransaction.create(None, PrivateKeyAccount(Array.fill(32)(0)), Account.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").right.get, 100000, 1, Some(EqByteArray.empty), 124L, Array.empty).right.get,
-      TransferTransaction.create(None, PrivateKeyAccount(Array.fill(32)(0)), Account.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").right.get, 100000, 2, Some(EqByteArray.empty), 124L, Array.empty).right.get)
+      TransferTransaction.create(None, PrivateKeyAccount(Array.fill(32)(0)), Account.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").right.get, 100000, 1, Some(ByteStr.empty), 124L, Array.empty).right.get,
+      TransferTransaction.create(None, PrivateKeyAccount(Array.fill(32)(0)), Account.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").right.get, 100000, 2, Some(ByteStr.empty), 124L, Array.empty).right.get)
 
     val sorted = Random.shuffle(correctSeq).sorted(TransactionsOrdering.InUTXPool)
 

@@ -3,7 +3,7 @@ package scorex.transaction
 import java.util
 
 import com.google.common.primitives.{Bytes, Ints, Longs}
-import com.wavesplatform.state2.{ByteArray, EqByteArray}
+import com.wavesplatform.state2.ByteStr
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
@@ -23,7 +23,7 @@ sealed trait PaymentTransaction extends Transaction {
 
   def fee: Long
 
-  def signature: ByteArray
+  def signature: ByteStr
 
   def hash: Array[Byte]
 }
@@ -35,11 +35,11 @@ object PaymentTransaction {
                                             amount: Long,
                                             fee: Long,
                                             timestamp: Long,
-                                            signature: ByteArray)
+                                            signature: ByteStr)
     extends PaymentTransaction {
     override val transactionType = TransactionType.PaymentTransaction
     override val assetFee: (Option[AssetId], Long) = (None, fee)
-    override val id: ByteArray = signature
+    override val id: ByteStr = signature
 
     override lazy val json: JsObject =
       Json.obj("type" -> transactionType.id,
@@ -79,7 +79,7 @@ object PaymentTransaction {
     } else if (Try(Math.addExact(amount, fee)).isFailure) {
       Left(ValidationError.OverflowError) // CHECK THAT fee+amount won't overflow Long
     } else {
-      val signature = EqByteArray(EllipticCurveImpl.sign(sender, signatureData(sender, recipient, amount, fee, timestamp)))
+      val signature = ByteStr(EllipticCurveImpl.sign(sender, signatureData(sender, recipient, amount, fee, timestamp)))
       Right(PaymentTransactionImpl(sender, recipient, amount, fee, timestamp, signature))
     }
   }
@@ -89,7 +89,7 @@ object PaymentTransaction {
              amount: Long,
              fee: Long,
              timestamp: Long,
-             signature: ByteArray): Either[ValidationError, PaymentTransaction] = {
+             signature: ByteStr): Either[ValidationError, PaymentTransaction] = {
     if (amount <= 0) {
       Left(ValidationError.NegativeAmount) //CHECK IF AMOUNT IS POSITIVE
     } else if (fee <= 0) {
@@ -142,7 +142,7 @@ object PaymentTransaction {
     val signatureBytes = util.Arrays.copyOfRange(data, position, position + SignatureLength)
 
     PaymentTransaction
-      .create(sender, recipient, amount, fee, timestamp, EqByteArray(signatureBytes))
+      .create(sender, recipient, amount, fee, timestamp, ByteStr(signatureBytes))
       .fold(left => Failure(new Exception(left.toString)), right => Success(right))
   }.flatten
 

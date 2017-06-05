@@ -1,7 +1,7 @@
 package scorex.transaction
 
 import com.wavesplatform.settings.FeesSettings
-import com.wavesplatform.state2.EqByteArray
+import com.wavesplatform.state2.ByteStr
 import scorex.crypto.encode.Base58
 import scorex.transaction.ValidationError.{InsufficientFee, TransactionValidationError}
 
@@ -14,7 +14,7 @@ class FeeCalculator(settings: FeesSettings) {
     settings.fees.flatMap { fs =>
       val transactionType = fs._1
       fs._2.map { v =>
-        val maybeAsset = if (v.asset.toUpperCase == "WAVES") None else EqByteArray.decode(v.asset).toOption
+        val maybeAsset = if (v.asset.toUpperCase == "WAVES") None else ByteStr.decodeBase58(v.asset).toOption
         val fee = v.fee
 
         TransactionAssetFee(transactionType, maybeAsset).key -> fee

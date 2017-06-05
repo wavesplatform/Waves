@@ -1,7 +1,7 @@
 package scorex.transaction
 
 import com.google.common.primitives.{Bytes, Ints, Longs}
-import com.wavesplatform.state2.{ByteArray, EqByteArray}
+import com.wavesplatform.state2.ByteStr
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.Account
 import scorex.crypto.hash.FastCryptographicHash._
@@ -12,15 +12,15 @@ import scala.util.{Failure, Success, Try}
 sealed trait GenesisTransaction extends Transaction {
   def recipient: Account
   def amount: Long
-  def signature: ByteArray
+  def signature: ByteStr
 }
 
 object GenesisTransaction extends {
 
-  private case class GenesisTransactionImpl(recipient: Account, amount: Long, timestamp: Long, signature: ByteArray) extends GenesisTransaction {
+  private case class GenesisTransactionImpl(recipient: Account, amount: Long, timestamp: Long, signature: ByteStr) extends GenesisTransaction {
 
     override val assetFee: (Option[AssetId], Long) = (None, 0)
-    override val id: EqByteArray                   = signature
+    override val id: ByteStr                   = signature
 
     val transactionType = TransactionType.GenesisTransaction
 
@@ -87,7 +87,7 @@ object GenesisTransaction extends {
     if (amount < 0) {
       Left(ValidationError.NegativeAmount)
     } else {
-      val signature = EqByteArray(GenesisTransaction.generateSignature(recipient, amount, timestamp))
+      val signature = ByteStr(GenesisTransaction.generateSignature(recipient, amount, timestamp))
       Right(GenesisTransactionImpl(recipient, amount, timestamp, signature))
     }
   }

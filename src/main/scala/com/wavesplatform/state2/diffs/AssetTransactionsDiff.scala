@@ -2,7 +2,7 @@ package com.wavesplatform.state2.diffs
 
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.reader.StateReader
-import com.wavesplatform.state2.{AssetInfo, Diff, EqByteArray, LeaseInfo, Portfolio}
+import com.wavesplatform.state2.{AssetInfo, Diff, ByteStr, LeaseInfo, Portfolio}
 import scorex.account.AddressScheme
 import scorex.crypto.encode.Base58
 import scorex.transaction.ValidationError.TransactionValidationError
@@ -61,7 +61,7 @@ object AssetTransactionsDiff {
   def makeAssetNameUnique(state: StateReader, height: Int)(tx: MakeAssetNameUniqueTransaction): Either[StateValidationError, Diff] = {
     checkNetworkByte(tx.networkByte, tx).flatMap(tx =>
       findReferencedAsset(tx, state, tx.assetId).flatMap(itx => {
-        val assetName = EqByteArray(itx.name)
+        val assetName = ByteStr(itx.name)
         state.getAssetIdByUniqueName(assetName) match {
           case Some(assetId) =>
             Left(TransactionValidationError(tx, s"Asset name has been verified for ${assetId.base58}"))

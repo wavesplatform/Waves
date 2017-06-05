@@ -13,7 +13,7 @@ import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.model.LevelAgg
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.reader.StateReader
-import com.wavesplatform.state2.{AssetInfo, EqByteArray, LeaseInfo, Portfolio}
+import com.wavesplatform.state2.{AssetInfo, ByteStr, LeaseInfo, Portfolio}
 import org.h2.mvstore.MVStore
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Matchers, WordSpecLike}
@@ -48,7 +48,7 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest2"
   (storedState.assetInfo _).when(*).returns(Some(AssetInfo(true, 10000000000L)))
   val i1 = IssueTransaction.create(PrivateKeyAccount(Array.empty), "Unknown".getBytes(), Array.empty, 10000000000L, 8.toByte, true, 100000L, 10000L).right.get
   (storedState.transactionInfo _).when(*).returns(Some((1, i1)))
-  (storedState.accountPortfolio _).when(*).returns(Portfolio(Long.MaxValue, LeaseInfo.empty, Map(EqByteArray("123".getBytes) -> Long.MaxValue)))
+  (storedState.accountPortfolio _).when(*).returns(Portfolio(Long.MaxValue, LeaseInfo.empty, Map(ByteStr("123".getBytes) -> Long.MaxValue)))
 
   override protected def beforeEach() = {
     val tp = TestProbe()
@@ -73,36 +73,36 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest2"
     }
 
     "AssetPair with predefined pair" in {
-      def predefinedPair = AssetPair(EqByteArray.decode("BASE2").toOption, EqByteArray.decode("BASE1").toOption)
+      def predefinedPair = AssetPair(ByteStr.decodeBase58("BASE2").toOption, ByteStr.decodeBase58("BASE1").toOption)
 
       actor ! GetOrderBookRequest(predefinedPair, None)
       expectMsg(GetOrderBookResponse(predefinedPair, Seq(), Seq()))
 
-      def reversePredefinedPair = AssetPair(EqByteArray.decode("BASE1").toOption, EqByteArray.decode("BASE2").toOption)
+      def reversePredefinedPair = AssetPair(ByteStr.decodeBase58("BASE1").toOption, ByteStr.decodeBase58("BASE2").toOption)
 
       actor ! GetOrderBookRequest(reversePredefinedPair, None)
       expectMsg(StatusCodeMatcherResponse(StatusCodes.Found, "Invalid AssetPair ordering, should be reversed: BASE2-BASE1"))
     }
 
     "AssetPair with predefined price assets" in {
-      def priceAsset = AssetPair(EqByteArray.decode("ABC").toOption, EqByteArray.decode("BASE1").toOption)
+      def priceAsset = AssetPair(ByteStr.decodeBase58("ABC").toOption, ByteStr.decodeBase58("BASE1").toOption)
 
       actor ! GetOrderBookRequest(priceAsset, None)
       expectMsg(GetOrderBookResponse(priceAsset, Seq(), Seq()))
 
-      def wrongPriceAsset = AssetPair(EqByteArray.decode("BASE2").toOption, EqByteArray.decode("CDE").toOption)
+      def wrongPriceAsset = AssetPair(ByteStr.decodeBase58("BASE2").toOption, ByteStr.decodeBase58("CDE").toOption)
 
       actor ! GetOrderBookRequest(wrongPriceAsset, None)
       expectMsg(StatusCodeMatcherResponse(StatusCodes.Found, "Invalid AssetPair ordering, should be reversed: CDE-BASE2"))
     }
 
     "AssetPair with unknown assets" in {
-      def unknownAssets = AssetPair(EqByteArray.decode("Some2").toOption, EqByteArray.decode("Some1").toOption)
+      def unknownAssets = AssetPair(ByteStr.decodeBase58("Some2").toOption, ByteStr.decodeBase58("Some1").toOption)
 
       actor ! GetOrderBookRequest(unknownAssets, None)
       expectMsg(GetOrderBookResponse(unknownAssets, Seq(), Seq()))
 
-      def wrongUnknownAssets = AssetPair(EqByteArray.decode("Some1").toOption, EqByteArray.decode("Some2").toOption)
+      def wrongUnknownAssets = AssetPair(ByteStr.decodeBase58("Some1").toOption, ByteStr.decodeBase58("Some2").toOption)
 
       actor ! GetOrderBookRequest(wrongUnknownAssets, None)
       expectMsg(StatusCodeMatcherResponse(StatusCodes.Found, "Invalid AssetPair ordering, should be reversed: Some2-Some1"))
@@ -142,7 +142,7 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest2"
 
       actor ! GetMarkets
 
-      val Predefined = AssetPair(EqByteArray.decode("BASE2").toOption, EqByteArray.decode("BASE1").toOption)
+      val Predefined = AssetPair(ByteStr.decodeBase58("BASE2").toOption, ByteStr.decodeBase58("BASE1").toOption)
 
       expectMsgPF() {
         case GetMarketsResponse(publicKey, Seq(
@@ -179,5 +179,5 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest2"
     }
   }
 
-  def strToSomeAssetId(s: String) : Option[AssetId] = Some(EqByteArray(s.getBytes()))
+  def strToSomeAssetId(s: String) : Option[AssetId] = Some(ByteStr(s.getBytes()))
 }

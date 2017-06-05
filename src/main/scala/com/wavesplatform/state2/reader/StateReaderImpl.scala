@@ -15,17 +15,17 @@ class StateReaderImpl(p: StateStorage, val synchronizationToken: ReentrantReadWr
 
   val sp = Synchronized(p)
 
-  override def transactionInfo(id: ByteArray): Option[(Int, Transaction)] = read { implicit l =>
+  override def transactionInfo(id: ByteStr): Option[(Int, Transaction)] = read { implicit l =>
     Option(sp().transactions.get(id)).map {
       case (h, bytes) => (h, TransactionParser.parseBytes(bytes).get)
     }
   }
 
   override def accountPortfolio(a: Account): Portfolio = read { implicit l =>
-    Option(sp().portfolios.get(a.bytes)).map { case (b, (i, o), as) => Portfolio(b, LeaseInfo(i, o), as.map { case (k, v) => EqByteArray(k) -> v }) }.orEmpty
+    Option(sp().portfolios.get(a.bytes)).map { case (b, (i, o), as) => Portfolio(b, LeaseInfo(i, o), as.map { case (k, v) => ByteStr(k) -> v }) }.orEmpty
   }
 
-  override def assetInfo(id: ByteArray): Option[AssetInfo] = read { implicit l =>
+  override def assetInfo(id: ByteStr): Option[AssetInfo] = read { implicit l =>
     Option(sp().assets.get(id)).map {
       case (is, amt) => AssetInfo(is, amt)
     }
@@ -34,14 +34,14 @@ class StateReaderImpl(p: StateStorage, val synchronizationToken: ReentrantReadWr
 
   override def height: Int = read { implicit l => sp().getHeight }
 
-  override def accountTransactionIds(a: Account): Seq[ByteArray] = read { implicit l =>
+  override def accountTransactionIds(a: Account): Seq[ByteStr] = read { implicit l =>
     Option(sp().accountTransactionIds.get(a.bytes))
       .map(_.toSeq)
       .getOrElse(Seq.empty)
-      .map(EqByteArray(_))
+      .map(ByteStr(_))
   }
 
-  override def paymentTransactionIdByHash(hash: ByteArray): Option[ByteArray] = read { implicit l =>
+  override def paymentTransactionIdByHash(hash: ByteStr): Option[ByteStr] = read { implicit l =>
     Option(sp().paymentTransactionHashes.get(hash))
   }
 
@@ -60,7 +60,7 @@ class StateReaderImpl(p: StateStorage, val synchronizationToken: ReentrantReadWr
   override def accountPortfolios: Map[Account, Portfolio] = read { implicit l =>
     sp().portfolios.asScala.map {
       case (acc, (b, (i, o), as)) => Account.fromBytes(acc.arr).explicitGet() -> Portfolio(b, LeaseInfo(i, o), as.map {
-        case (k, v) => EqByteArray(k) -> v
+        case (k, v) => ByteStr(k) -> v
       })
     }.toMap
   }
@@ -69,7 +69,7 @@ class StateReaderImpl(p: StateStorage, val synchronizationToken: ReentrantReadWr
     sp().leaseState.getOrDefault(leaseTx.id, false)
   }
 
-  override def activeLeases(): Seq[ByteArray] = read { implicit l =>
+  override def activeLeases(): Seq[ByteStr] = read { implicit l =>
     sp().leaseState
       .asScala
       .collect { case (leaseId, isActive) if isActive => leaseId }
@@ -85,14 +85,14 @@ class StateReaderImpl(p: StateStorage, val synchronizationToken: ReentrantReadWr
       .map { case (ph, b, eb) => Snapshot(ph, b, eb) }
   }
 
-  override def containsTransaction(id: ByteArray): Boolean = read { implicit l =>
+  override def containsTransaction(id: ByteStr): Boolean = read { implicit l =>
     sp().transactions.containsKey(id)
   }
-  override def getAssetIdByUniqueName(assetName: ByteArray): Option[ByteArray] =read { implicit l =>
+  override def getAssetIdByUniqueName(assetName: ByteStr): Option[ByteStr] =read { implicit l =>
     Option(p.uniqueAssets.get(assetName))
   }
 
-  override def filledVolumeAndFee(orderId: ByteArray): OrderFillInfo =read { implicit l =>
+  override def filledVolumeAndFee(orderId: ByteStr): OrderFillInfo =read { implicit l =>
     Option(p.orderFills.get(orderId)).map(oi => OrderFillInfo(oi._1, oi._2)).orEmpty
   }
 }

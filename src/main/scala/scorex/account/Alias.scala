@@ -1,13 +1,13 @@
 package scorex.account
 
-import com.wavesplatform.state2.{ByteArray, EqByteArray}
+import com.wavesplatform.state2.ByteStr
 import scorex.serialization.BytesSerializable
 import scorex.transaction.ValidationError
 import scorex.transaction.ValidationError.TransactionParameterValidationError
 
 sealed trait Alias extends AccountOrAlias {
   lazy val stringRepr: String = Alias.Prefix + networkByte.toChar + ":" + name
-  lazy val bytes: ByteArray = EqByteArray(Alias.AddressVersion +: networkByte +: BytesSerializable.arrayWithSize(name.getBytes("UTF-8")))
+  lazy val bytes: ByteStr = ByteStr(Alias.AddressVersion +: networkByte +: BytesSerializable.arrayWithSize(name.getBytes("UTF-8")))
 
   val name: String
   val networkByte: Byte

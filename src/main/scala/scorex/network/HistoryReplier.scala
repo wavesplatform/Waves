@@ -1,7 +1,7 @@
 package scorex.network
 
 import akka.actor.ActorRef
-import com.wavesplatform.state2.EqByteArray
+import com.wavesplatform.state2.ByteStr
 import scorex.block.Block
 import scorex.network.NetworkController.{DataFromPeer, SendToNetwork}
 import scorex.network.message.Message
@@ -21,7 +21,7 @@ class HistoryReplier(protected val networkControllerRef: ActorRef, history: Hist
       log.info(s"Got GetSignaturesMessage with ${otherSigs.length} sigs within")
 
       otherSigs.exists { p =>
-        val parent = EqByteArray(p)
+        val parent = ByteStr(p)
         val headers = history.blockIdsAfter(parent, maxChainLength)
 
         if (headers.nonEmpty) {
@@ -35,7 +35,7 @@ class HistoryReplier(protected val networkControllerRef: ActorRef, history: Hist
     case DataFromPeer(msgId, sig: Array[Byte], remote)
       if msgId == GetBlockSpec.messageCode =>
 
-      history.heightOf(EqByteArray(sig)).flatMap(history.blockBytes).foreach { b =>
+      history.heightOf(ByteStr(sig)).flatMap(history.blockBytes).foreach { b =>
         val msg = Message(BlockMessageSpec, Left(b), None)
         val ss = SendToChosen(remote)
         networkControllerRef ! SendToNetwork(msg, ss)

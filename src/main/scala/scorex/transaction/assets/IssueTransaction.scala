@@ -2,7 +2,7 @@ package scorex.transaction.assets
 
 import com.google.common.base.Charsets
 import com.google.common.primitives.{Bytes, Longs}
-import com.wavesplatform.state2.{ByteArray, EqByteArray}
+import com.wavesplatform.state2.ByteStr
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
@@ -33,7 +33,7 @@ object IssueTransaction {
                                           reissuable: Boolean,
                                           fee: Long,
                                           timestamp: Long,
-                                          signature: ByteArray)
+                                          signature: ByteStr)
     extends IssueTransaction {
 
     override val assetFee: (Option[AssetId], Long) = (None, fee)
@@ -75,7 +75,7 @@ object IssueTransaction {
   }
 
   def parseTail(bytes: Array[Byte]): Try[IssueTransaction] = Try {
-    val signature =EqByteArray(bytes.slice(0, SignatureLength))
+    val signature =ByteStr(bytes.slice(0, SignatureLength))
     val txId = bytes(SignatureLength)
     require(txId == TransactionType.IssueTransaction.id.toByte, s"Signed tx id is not match")
     val sender = PublicKeyAccount(bytes.slice(SignatureLength + 1, SignatureLength + KeyLength + 1))
@@ -98,7 +98,7 @@ object IssueTransaction {
                                reissuable: Boolean,
                                fee: Long,
                                timestamp: Long,
-                               signature: Option[ByteArray] = None) =
+                               signature: Option[ByteStr] = None) =
     if (quantity <= 0) {
       Left(ValidationError.NegativeAmount)
     } else if (description.length > MaxDescriptionLength) {
@@ -121,7 +121,7 @@ object IssueTransaction {
              reissuable: Boolean,
              fee: Long,
              timestamp: Long,
-             signature: ByteArray): Either[ValidationError, IssueTransaction] =
+             signature: ByteStr): Either[ValidationError, IssueTransaction] =
     createUnverified(sender, name, description, quantity, decimals, reissuable, fee, timestamp, Some(signature))
       .right.flatMap(SignedTransaction.verify)
 
@@ -134,6 +134,6 @@ object IssueTransaction {
              fee: Long,
              timestamp: Long): Either[ValidationError, IssueTransaction] =
     createUnverified(sender, name, description, quantity, decimals, reissuable, fee, timestamp).right.map { unverified =>
-      unverified.copy(signature = EqByteArray(EllipticCurveImpl.sign(sender, unverified.toSign)))
+      unverified.copy(signature = ByteStr(EllipticCurveImpl.sign(sender, unverified.toSign)))
     }
 }

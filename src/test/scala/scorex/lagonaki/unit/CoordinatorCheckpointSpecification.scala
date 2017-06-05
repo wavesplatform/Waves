@@ -70,7 +70,7 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
   val gen = PrivateKeyAccount(Array(0.toByte))
   var score: Int = 10000
 
-  def createBlock(reference: ByteArray): Block = {
+  def createBlock(reference: ByteStr): Block = {
     val version = 1: Byte
     val timestamp = System.currentTimeMillis()
     //val reference = Array.fill(Block.BlockIdLength)(id.toByte)
