@@ -3,6 +3,7 @@ package com.wavesplatform.matcher.model
 import ch.qos.logback.classic.Level
 import com.wavesplatform.matcher.MatcherTestData
 import com.wavesplatform.matcher.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
+import com.wavesplatform.state2.ByteStr
 import org.h2.mvstore.MVStore
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
@@ -17,7 +18,7 @@ class OrderHistorySpecification extends PropSpec
   with BeforeAndAfterAll
   with BeforeAndAfterEach {
 
-  val pair = AssetPair(Some("WCT".getBytes), Some("BTC".getBytes))
+  val pair = AssetPair(Some(ByteStr("WCT".getBytes)), Some(ByteStr("BTC".getBytes)))
   var storage = new OrderHistoryStorage(new MVStore.Builder().open())
   var oh = OrderHistoryImpl(storage)
 
@@ -55,7 +56,7 @@ class OrderHistorySpecification extends PropSpec
   }
 
   property("New buy WAVES order added") {
-    val pair = AssetPair(None, Some("BTC".getBytes))
+    val pair = AssetPair(None, Some(ByteStr("BTC".getBytes)))
     val ord1 = buy(pair, 0.0008, 10000)
 
     oh.orderAccepted(OrderAdded(LimitOrder(ord1)))
@@ -68,7 +69,7 @@ class OrderHistorySpecification extends PropSpec
   }
 
   property("New sell WAVES order added") {
-    val pair = AssetPair(None, Some("BTC".getBytes))
+    val pair = AssetPair(None, Some(ByteStr("BTC".getBytes)))
     val ord1 = sell(pair, 0.0008, 10000)
 
     oh.orderAccepted(OrderAdded(LimitOrder(ord1)))
@@ -81,7 +82,7 @@ class OrderHistorySpecification extends PropSpec
 
   property("New buy and sell WAVES order  added") {
     val pk = PrivateKeyAccount("private".getBytes("utf-8"))
-    val pair = AssetPair(None, Some("BTC".getBytes))
+    val pair = AssetPair(None, Some(ByteStr("BTC".getBytes)))
     val ord1 = buy(pair, 0.0008, 100000000, Some(pk))
     val ord2 = sell(pair, 0.0009, 210000000, Some(pk))
 
@@ -100,7 +101,7 @@ class OrderHistorySpecification extends PropSpec
   }
 
   property("Buy WAVES order filled") {
-    val pair = AssetPair(None, Some("BTC".getBytes))
+    val pair = AssetPair(None, Some(ByteStr("BTC".getBytes)))
     val ord1 = buy(pair, 0.0008, 10000)
     val ord2 = sell(pair, 0.0007, 10000)
 
@@ -121,7 +122,7 @@ class OrderHistorySpecification extends PropSpec
   }
 
   property("Sell WAVES order - filled, buy order - partial") {
-    val pair = AssetPair(None, Some("BTC".getBytes))
+    val pair = AssetPair(None, Some(ByteStr("BTC".getBytes)))
     val ord1 = sell(pair, 0.0008, 100000000)
     val ord2 = buy(pair, 0.00085, 120000000)
 
@@ -145,7 +146,7 @@ class OrderHistorySpecification extends PropSpec
   }
 
   property("Buy WAVES order - filled with 2 steps, sell order - partial") {
-    val pair = AssetPair(None, Some("BTC".getBytes))
+    val pair = AssetPair(None, Some(ByteStr("BTC".getBytes)))
     val ord1 = buy(pair, 0.0008, 100000000, matcherFee = Some(300001L))
     val ord2 = sell(pair, 0.00075, 50000000, matcherFee = Some(300001L))
     val ord3 = sell(pair, 0.0008, 80000000, matcherFee = Some(300001L))
@@ -181,7 +182,7 @@ class OrderHistorySpecification extends PropSpec
 
   property("Partially will own order") {
     val pk = PrivateKeyAccount("private".getBytes("utf-8"))
-    val pair = AssetPair(None, Some("BTC".getBytes))
+    val pair = AssetPair(None, Some(ByteStr("BTC".getBytes)))
     val ord1 = buy(pair, 0.0008, 100000000, Some(pk), Some(300000L))
     val ord2 = sell(pair, 0.00079, 210000000, Some(pk), Some(300000L))
 
@@ -225,7 +226,7 @@ class OrderHistorySpecification extends PropSpec
   }
 
   property("Cancel partially executed order") {
-    val pair = AssetPair(None, Some("BTC".getBytes))
+    val pair = AssetPair(None, Some(ByteStr("BTC".getBytes)))
     val ord1 = sell(pair, 0.0008, 2100000000, matcherFee = Some(300000L))
     val ord2 = buy(pair, 0.00081, 1000000000, matcherFee = Some(300000L))
 
@@ -245,7 +246,7 @@ class OrderHistorySpecification extends PropSpec
 
   property("Delete order") {
     val pk = PrivateKeyAccount("private".getBytes("utf-8"))
-    val pair = AssetPair(None, Some("BTC".getBytes))
+    val pair = AssetPair(None, Some(ByteStr("BTC".getBytes)))
     val ord1 = buy(pair, 0.0008, 210000000, Some(pk), Some(300000L))
     val ord2 = sell(pair, 0.00079, 100000000, Some(pk), Some(300000L))
 

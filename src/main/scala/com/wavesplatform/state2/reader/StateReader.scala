@@ -109,7 +109,7 @@ object StateReader {
     def spendableBalance(account: AssetAcc): Long = {
       val accountPortfolio = s.accountPortfolio(account.account)
       account.assetId match {
-        case Some(assetId) => accountPortfolio.assets.getOrElse(EqByteArray(assetId), 0)
+        case Some(assetId) => accountPortfolio.assets.getOrElse(assetId, 0)
         case None => accountPortfolio.spendableBalance
       }
     }

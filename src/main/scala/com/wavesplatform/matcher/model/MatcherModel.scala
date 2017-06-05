@@ -34,8 +34,8 @@ sealed trait  LimitOrder {
   def rcvAcc: AssetAcc = AssetAcc(order.senderPublicKey, order.getReceiveAssetId)
   def feeAcc: AssetAcc = AssetAcc(order.senderPublicKey, None)
 
-  def spentAsset: String = order.getSpendAssetId.map(Base58.encode).getOrElse(AssetPair.WavesName)
-  def rcvAsset: String = order.getReceiveAssetId.map(Base58.encode).getOrElse(AssetPair.WavesName)
+  def spentAsset: String = order.getSpendAssetId.map(_.base58).getOrElse(AssetPair.WavesName)
+  def rcvAsset: String = order.getReceiveAssetId.map(_.base58).getOrElse(AssetPair.WavesName)
   def feeAsset: String = AssetPair.WavesName
 }
 

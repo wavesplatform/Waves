@@ -348,7 +348,7 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
     }
 
     "partially execute order with price > 1 and zero fee remaining part " in {
-      val pair = AssetPair(Some("BTC".getBytes), Some("USD".getBytes))
+      val pair = AssetPair(Some(ByteStr("BTC".getBytes)), Some(ByteStr("USD".getBytes)))
       val ord1 = sell(pair, 1850, (0.1 * Constants.UnitsInWave).toLong)
       val ord2 = sell(pair, 1840, (0.01 * Constants.UnitsInWave).toLong)
       val ord3 = buy(pair, 2000, (0.0100001 * Constants.UnitsInWave).toLong)
