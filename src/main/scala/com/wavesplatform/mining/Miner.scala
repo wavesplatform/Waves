@@ -4,8 +4,8 @@ import java.time.{Duration, Instant}
 import java.util.concurrent.{Executors, ScheduledFuture, TimeUnit}
 
 import com.wavesplatform.settings.BlockchainSettings
+import com.wavesplatform.state2.ByteStr
 import com.wavesplatform.state2.reader.StateReader
-import com.wavesplatform.utils.ByteStr
 import scorex.account.PrivateKeyAccount
 import scorex.block.Block
 import scorex.consensus.nxt.NxtLikeConsensusBlockData

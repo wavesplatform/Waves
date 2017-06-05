@@ -4,7 +4,6 @@ import com.google.common.primitives.{Bytes, Ints, Longs}
 import com.wavesplatform.state2.ByteStr
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
-
 import scorex.consensus.nxt.{NxtConsensusBlockField, NxtLikeConsensusBlockData}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
@@ -79,6 +78,7 @@ case class Block(timestamp: Long, version: Byte, reference: ByteStr, signerData:
 
 object Block extends ScorexLogging {
   type BlockIds = Seq[ByteStr]
+  type BlockId = ByteStr
 
   val MaxTransactionsPerBlock: Int = 100
   val BaseTargetLength: Int = 8

@@ -2,7 +2,7 @@ package com.wavesplatform.network
 
 import java.net.InetSocketAddress
 
-import com.wavesplatform.utils.ByteStr
+import com.wavesplatform.state2.ByteStr
 import scorex.block.Block
 import scorex.transaction.History
 

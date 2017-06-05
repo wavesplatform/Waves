@@ -4,6 +4,7 @@ import cats._
 import cats.implicits._
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.settings.BlockchainSettings
+import com.wavesplatform.state2.ByteStr
 import com.wavesplatform.state2.reader.StateReader
 import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel.{Channel, ChannelHandlerContext, ChannelInboundHandlerAdapter}
@@ -12,7 +13,6 @@ import scorex.block.Block.BlockId
 import scorex.consensus.TransactionsOrdering
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
-import scorex.crypto.encode.Base58.encode
 import scorex.transaction.ValidationError.CustomError
 import scorex.transaction._
 import scorex.utils.{ScorexLogging, Time}
@@ -39,7 +39,7 @@ class Coordinator(
       case Checkpoint(items, _) =>
         val blockSignature = candidate.signerData.signature
         items.exists { case BlockCheckpoint(h, sig) =>
-          h == estimatedHeight && !(blockSignature sameElements sig)
+          h == estimatedHeight && blockSignature != ByteStr(sig)
         }
     }
 
@@ -74,7 +74,7 @@ class Coordinator(
 
   private def str(block: Block) = {
     if (log.logger.isTraceEnabled) block.json
-    else encode(block.uniqueId) + ", parent " + encode(block.reference)
+    else block.uniqueId + ", parent " + block.reference
   }
 
   private def processFork(ctx: ChannelHandlerContext, lastCommonBlockId: BlockId, blocks: Iterator[Block]): Unit = {
@@ -90,8 +90,8 @@ class Coordinator(
       foldM[({type l[α] = Either[(ValidationError, BlockId), α]})#l, List, Block, Unit](newBlocks.toList, ()) { case ((), block: Block) => processNewBlock(block).left.map((_, block.uniqueId)) } match {
         case Right(_) =>
         case Left(err) =>
-          log.error(s"Can't processFork(lastBlockCommonId: ${Base58.encode(lastCommonBlockId)} because: ${err._1}")
-          if (history.lastBlock.uniqueId.sameElements(err._2)) {
+          log.error(s"Can't processFork(lastBlockCommonId: $lastCommonBlockId because: ${err._1}")
+          if (history.lastBlock.uniqueId == err._2) {
 //            from.foreach(_.blacklist())
           }
       }
@@ -117,12 +117,12 @@ class Coordinator(
 
         val lastBlock = history.lastBlock
 
-        if (!lastBlock.uniqueId.sameElements(parentBlockId)) {
+        if (lastBlock.uniqueId != parentBlockId) {
           // someone has happened to be faster and already added a block or blocks after the parent
           log.debug(s"A child for parent of the block already exists, local=$local: ${str(newBlock)}")
 
           val cmp = PoSCalc.blockOrdering(history, stateReader, settings.functionalitySettings)
-          if (lastBlock.reference.sameElements(parentBlockId) && cmp.lt(lastBlock, newBlock)) {
+          if (lastBlock.reference == parentBlockId && cmp.lt(lastBlock, newBlock)) {
             log.debug(s"New block ${str(newBlock)} is better than last ${str(lastBlock)}")
           }
 
@@ -183,7 +183,7 @@ class Coordinator(
     val fork = existingItems.takeWhile {
       case BlockCheckpoint(h, sig) =>
         val block = history.blockAt(h).get
-        !(block.signerData.signature sameElements sig)
+        block.signerData.signature != ByteStr(sig)
     }
 
     if (fork.nonEmpty) {
@@ -247,11 +247,11 @@ object Coordinator extends ScorexLogging {
 
     val parentOpt = history.parent(block)
     require(parentOpt.isDefined || history.height() == 1,
-      s"Can't find parent ${Base58.encode(block.reference)} of ${Base58.encode(block.uniqueId)}")
+      s"Can't find parent ${block.reference} of ${block.uniqueId}")
 
     val parent = parentOpt.get
     val parentHeightOpt = history.heightOf(parent.uniqueId)
-    require(parentHeightOpt.isDefined, s"Can't get height of ${Base58.encode(block.reference)}")
+    require(parentHeightOpt.isDefined, s"Can't get height of ${block.reference}")
     val parentHeight = parentHeightOpt.get
 
     val prevBlockData = parent.consensusData
@@ -259,7 +259,7 @@ object Coordinator extends ScorexLogging {
 
     val cbt = calcBaseTarget(bcs.genesisSettings.averageBlockDelay, parentHeight, parent, history.parent(parent, 2), blockTime)
     val bbt = blockData.baseTarget
-    require(cbt == bbt, s"Declared baseTarget $bbt of ${Base58.encode(block.uniqueId)} does not match calculated baseTarget $cbt")
+    require(cbt == bbt, s"Declared baseTarget $bbt of ${block.uniqueId} does not match calculated baseTarget $cbt")
 
     val generator = block.signerData.generator
 
@@ -267,7 +267,7 @@ object Coordinator extends ScorexLogging {
     val calcGs = calcGeneratorSignature(prevBlockData, generator)
     val blockGs = blockData.generationSignature
     require(calcGs.sameElements(blockGs),
-      s"Declared signature ${blockGs.mkString} of ${Base58.encode(block.uniqueId)} does not match calculated signature ${calcGs.mkString}")
+      s"Declared signature ${blockGs.mkString} of ${block.uniqueId} does not match calculated signature ${calcGs.mkString}")
 
     val effectiveBalance = generatingBalance(state, fs)(generator, parentHeight)
 
