@@ -64,6 +64,9 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Auto
     withoutObsoleteRecords(blacklist, identity[Long], settings.blackListResidenceTime.toMillis).keySet().asScala.toSet
 
   override def getRandomPeer(excluded: Set[InetSocketAddress]): Option[InetSocketAddress] = {
+    val blacklist = getBlacklist
+    unverifiedPeers.drop(isa => blacklist(isa.getAddress))
+
     val unverifiedCandidate = if (unverifiedPeers.nonEmpty)
       Some(unverifiedPeers(Random.nextInt(unverifiedPeers.size())))
     else None

@@ -1,46 +1,55 @@
 package com.wavesplatform.network
 
+import java.io.IOException
 import java.net.InetSocketAddress
 
 import io.netty.channel.{ChannelHandlerContext, ChannelInboundHandlerAdapter}
-import io.netty.util.concurrent.ScheduledFuture
 import scorex.utils.ScorexLogging
 
 import scala.concurrent.duration._
 
 class PeerSynchronizer(peerDatabase: PeerDatabase) extends ChannelInboundHandlerAdapter with ScorexLogging {
-  private var touchTask = Option.empty[ScheduledFuture[_]]
-  private var requestPeersTask = Option.empty[ScheduledFuture[_]]
+  private var remoteAddress = Option.empty[InetSocketAddress]
+
+  def requestPeers(ctx: ChannelHandlerContext): Unit = ctx.executor().schedule(5.seconds) {
+    if (ctx.channel().isActive) {
+      log.trace(s"${id(ctx)} Requesting peers")
+      ctx.writeAndFlush(GetPeers)
+      requestPeers(ctx)
+    }
+  }
 
   override def channelActive(ctx: ChannelHandlerContext) = {
-    requestPeersTask = Some(ctx.executor().scheduleWithFixedDelay(1.second, 5.seconds) {
-      ctx.writeAndFlush(GetPeers)
-    })
+    requestPeers(ctx)
     super.channelActive(ctx)
+  }
+
+  override def exceptionCaught(ctx: ChannelHandlerContext, cause: Throwable) = cause match {
+    case ioe: IOException =>
+      log.warn(s"${id(ctx)} Exception caught", ioe)
+      remoteAddress.foreach(a => peerDatabase.blacklistHost(a.getAddress))
+    case _ => super.exceptionCaught(ctx, cause)
   }
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef) = msg match {
     case Handshake(_, _, nodeName, nonce, Some(declaredAddress)) =>
       if (sameAddresses(declaredAddress, ctx.channel().remoteAddress())) {
+        remoteAddress = Some(declaredAddress)
         peerDatabase.addPeer(declaredAddress, Some(nonce), Some(nodeName))
-        touchTask = Some(ctx.executor().scheduleWithFixedDelay(20.seconds, 20.seconds) {
-          if (ctx.channel().isActive) {
-            peerDatabase.touch(ctx.channel().localAddress().asInstanceOf[InetSocketAddress])
-          }
-        })
+        peerDatabase.touch(declaredAddress)
       } else {
         log.debug(s"Declared remote address $declaredAddress does not match actual remote address ${ctx.channel().remoteAddress()}")
       }
-
-    case GetPeers => ctx.writeAndFlush(peerDatabase.getKnownPeers.keys.toSeq)
-    case KnownPeers(peers) => peers.foreach(peerDatabase.addPeer(_, None, None))
-
-    case _ => super.channelRead(ctx, msg)
-  }
-
-  override def channelInactive(ctx: ChannelHandlerContext) = {
-    touchTask.foreach(_.cancel(false))
-    requestPeersTask.foreach(_.cancel(false))
-    super.channelInactive(ctx)
+    case _: Handshake => // peer doesn't declare an address
+    case GetPeers =>
+      remoteAddress.foreach(peerDatabase.touch)
+      ctx.writeAndFlush(peerDatabase.getKnownPeers.keys.toSeq)
+    case KnownPeers(peers) =>
+      log.trace(s"${id(ctx)} Got known peers: ${peers.mkString("[", ", ", "]")}")
+      remoteAddress.foreach(peerDatabase.touch)
+      peers.foreach(peerDatabase.addPeer(_, None, None))
+    case _ =>
+      remoteAddress.foreach(peerDatabase.touch)
+      super.channelRead(ctx, msg)
   }
 }
