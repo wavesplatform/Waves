@@ -14,9 +14,7 @@ import io.netty.channel._
 import io.netty.channel.group.{ChannelGroup, ChannelMatchers}
 import io.netty.channel.local.{LocalAddress, LocalChannel, LocalServerChannel}
 import io.netty.channel.nio.NioEventLoopGroup
-import io.netty.channel.socket.SocketChannel
 import io.netty.channel.socket.nio.{NioServerSocketChannel, NioSocketChannel}
-import io.netty.handler.codec.{LengthFieldBasedFrameDecoder, LengthFieldPrepender}
 import scorex.network.message.{BasicMessagesRepo, MessageSpec}
 import scorex.transaction._
 import scorex.utils.{ScorexLogging, Time}
@@ -24,14 +22,6 @@ import scorex.wallet.Wallet
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
-
-class ServerChannelInitializer(handshake: Handshake, settings: NetworkSettings, peerDatabase: PeerDatabase)
-  extends ChannelInitializer[SocketChannel] {
-  private val inboundFilter = new InboundConnectionFilter(peerDatabase, settings.maxInboundConnections, settings.maxConnectionsWithSingleHost)
-  override def initChannel(ch: SocketChannel): Unit = {
-    ch.pipeline().addLast(inboundFilter, new HandshakeDecoder, new HandshakeTimeoutHandler)
-  }
-}
 
 class NetworkServer(
     chainId: Char,
@@ -59,7 +49,7 @@ class NetworkServer(
       history.lastBlockIds(settings.synchronizationSettings.maxRollback).map(ByteStr(_)))
 
   private val allLocalInterfaces = (for {
-    ifc <-NetworkInterface.getNetworkInterfaces.asScala
+    ifc <- NetworkInterface.getNetworkInterfaces.asScala
     ip <- ifc.getInterfaceAddresses.asScala
   } yield new InetSocketAddress(ip.getAddress, settings.networkSettings.port)).toSet
 
@@ -107,40 +97,34 @@ class NetworkServer(
 
   log.info(s"${id(localClientChannel)} Local channel opened")
 
-  private val bootstrap = new Bootstrap()
-    .group(workerGroup)
-    .channel(classOf[NioSocketChannel])
-    .handler(new ChannelInitializer[SocketChannel] {
-      override def initChannel(ch: SocketChannel): Unit =
-        ch.pipeline()
-          .addLast(
-            new HandshakeDecoder,
-            new HandshakeTimeoutHandler,
-            new ClientHandshakeHandler(handshake, peerDatabase, peerInfo, blacklist),
-            new LengthFieldPrepender(4),
-            new LengthFieldBasedFrameDecoder(1024*1024, 0, 4, 0, 4),
-            new LegacyFrameCodec,
-            discardingHandler,
-            messageCodec,
-            new PeerSynchronizer(peerDatabase),
-            new ExtensionSignaturesLoader(settings.synchronizationSettings.synchronizationTimeout, blacklist),
-            new ExtensionBlocksLoader(history, settings.synchronizationSettings.synchronizationTimeout, blacklist),
-            new OptimisticExtensionLoader,
-            utxPoolSynchronizer,
-            scoreObserver,
-            localScorePublisher)
-          .addLast(coordinatorExecutor, coordinator)
-    })
+  private val peerUniqueness = new ConcurrentHashMap[PeerKey, Channel]()
+
+  private val serverHandshakeHandler =
+    new HandshakeHandler.Server(handshake, peerDatabase, peerInfo, peerUniqueness, blacklist)
 
   private val serverChannel = new ServerBootstrap()
     .group(bossGroup, workerGroup)
     .channel(classOf[NioServerSocketChannel])
-    .childHandler(new ServerChannelInitializer(handshake, settings.networkSettings, peerDatabase))
+    .childHandler(new LegacyChannelInitializer(
+      settings, history, peerDatabase, serverHandshakeHandler, discardingHandler, messageCodec, utxPoolSynchronizer,
+      scoreObserver, localScorePublisher, coordinator, coordinatorExecutor, blacklist
+    ))
     .bind(settings.networkSettings.port)
     .channel()
 
   private val outgoingChannelCount = new AtomicInteger(0)
   private val channels = new ConcurrentHashMap[InetSocketAddress, Channel]
+
+  private val clientHandshakeHandler =
+    new HandshakeHandler.Client(handshake, peerDatabase, peerInfo, peerUniqueness, blacklist)
+
+  private val bootstrap = new Bootstrap()
+    .group(workerGroup)
+    .channel(classOf[NioSocketChannel])
+    .handler(new LegacyChannelInitializer(
+      settings, history, peerDatabase, clientHandshakeHandler, discardingHandler, messageCodec, utxPoolSynchronizer,
+      scoreObserver, localScorePublisher, coordinator, coordinatorExecutor, blacklist
+    ))
 
   workerGroup.scheduleWithFixedDelay(1.second, 5.seconds) {
     if (outgoingChannelCount.get() < settings.networkSettings.maxOutboundConnections) {
