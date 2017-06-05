@@ -10,15 +10,15 @@ import scorex.transaction.assets.exchange.{AssetPair, Order}
 import scorex.utils.ScorexLogging
 
 trait OrderHistory {
-  def didOrderAccepted(event: OrderAdded): Unit
-  def didOrderExecuted(event: OrderExecuted): Unit
-  def didOrderCanceled(event: OrderCanceled)
-  def getOrderStatus(id: String): OrderStatus
-  def getOrderInfo(id: String): OrderInfo
-  def getOpenVolume(assetAcc: AssetAcc): Long
-  def getOrdersByPairAndAddress(assetPair: AssetPair, address: String): Set[String]
+  def orderAccepted(event: OrderAdded): Unit
+  def orderExecuted(event: OrderExecuted): Unit
+  def orderCanceled(event: OrderCanceled)
+  def orderStatus(id: String): OrderStatus
+  def orderInfo(id: String): OrderInfo
+  def openVolume(assetAcc: AssetAcc): Long
+  def ordersByPairAndAddress(assetPair: AssetPair, address: String): Set[String]
   def deleteOrder(assetPair: AssetPair, address: String, orderId: String): Boolean
-  def getOrder(id: String): Option[Order]
+  def order(id: String): Option[Order]
 }
 
 case class OrderHistoryImpl(p: OrderHistoryStorage) extends OrderHistory with ScorexLogging {
@@ -35,8 +35,8 @@ case class OrderHistoryImpl(p: OrderHistoryStorage) extends OrderHistory with Sc
 
   def saveOrdeInfo(event: Event): Unit = {
     Events.createOrderInfo(event).foreach{ case(orderId, oi) =>
-      p.ordersInfo.put(orderId, getOrderInfo(orderId).combine(oi).jsonStr)
-      log.debug(s"Changed OrderInfo for: $orderId -> " + getOrderInfo(orderId))
+      p.ordersInfo.put(orderId, orderInfo(orderId).combine(oi).jsonStr)
+      log.debug(s"Changed OrderInfo for: $orderId -> " + orderInfo(orderId))
     }
   }
 
@@ -58,7 +58,7 @@ case class OrderHistoryImpl(p: OrderHistoryStorage) extends OrderHistory with Sc
     p.orders.remove(orderId)
   }
 
-  override def didOrderAccepted(event: OrderAdded): Unit = {
+  override def orderAccepted(event: OrderAdded): Unit = {
     val lo = event.order
     saveOrder(lo.order)
     saveOrdeInfo(event)
@@ -66,36 +66,36 @@ case class OrderHistoryImpl(p: OrderHistoryStorage) extends OrderHistory with Sc
     savePairAddress(lo.order.assetPair, lo.order.senderPublicKey.address, lo.order.idStr)
   }
 
-  override def didOrderExecuted(event: OrderExecuted): Unit = {
+  override def orderExecuted(event: OrderExecuted): Unit = {
     saveOrder(event.submitted.order)
     savePairAddress(event.submitted.order.assetPair, event.submitted.order.senderPublicKey.address, event.submitted.order.idStr)
     saveOrdeInfo(event)
     saveOpenPortfolio(event)
   }
 
-  override def didOrderCanceled(event: OrderCanceled): Unit = {
+  override def orderCanceled(event: OrderCanceled): Unit = {
     saveOrdeInfo(event)
     saveOpenPortfolio(event)
   }
 
-  override def getOrderInfo(id: String): OrderInfo =
+  override def orderInfo(id: String): OrderInfo =
     Option(p.ordersInfo.get(id)).map(Json.parse).flatMap(_.validate[OrderInfo].asOpt).getOrElse(OrderInfo.empty)
 
-  override def getOrder(id: String): Option[Order] = {
+  override def order(id: String): Option[Order] = {
     import scorex.transaction.assets.exchange.OrderJson.orderFormat
     Option(p.orders.get(id)).map(Json.parse).flatMap(_.validate[Order].asOpt)
   }
 
-  override def getOrderStatus(id: String): OrderStatus = {
-    getOrderInfo(id).status
+  override def orderStatus(id: String): OrderStatus = {
+    orderInfo(id).status
   }
 
-  override def getOpenVolume(assetAcc: AssetAcc): Long = {
+  override def openVolume(assetAcc: AssetAcc): Long = {
     val asset = assetAcc.assetId.map(Base58.encode).getOrElse(AssetPair.WavesName)
     Option(p.addressToOrderPortfolio.get(assetAcc.account.address)).flatMap(_.get(asset)).getOrElse(0L)
   }
 
-  override def getOrdersByPairAndAddress(assetPair: AssetPair, address: String): Set[String] = {
+  override def ordersByPairAndAddress(assetPair: AssetPair, address: String): Set[String] = {
     val pairAddressKey = OrderHistoryStorage.assetPairAddressKey(assetPair, address)
     Option(p.pairAddressToOrderIds.get(pairAddressKey)).getOrElse(Set())
   }
@@ -114,7 +114,7 @@ case class OrderHistoryImpl(p: OrderHistoryStorage) extends OrderHistory with Sc
   }
 
   override def deleteOrder(assetPair: AssetPair, address: String, orderId: String): Boolean = {
-    getOrderStatus(orderId) match {
+    orderStatus(orderId) match {
       case Filled | LimitOrder.Cancelled(_) =>
         deleteFromOrders(orderId)
         deleteFromOrdersInfo(orderId)

@@ -47,11 +47,11 @@ class OrderHistoryActor(val settings: MatcherSettings, val storedState: StateRea
 
   override def receive: Receive = {
     case ev: OrderAdded =>
-      orderHistory.didOrderAccepted(ev)
+      orderHistory.orderAccepted(ev)
     case ev: OrderExecuted =>
-      orderHistory.didOrderExecuted(ev)
+      orderHistory.orderExecuted(ev)
     case ev: OrderCanceled =>
-      orderHistory.didOrderCanceled(ev)
+      orderHistory.orderCanceled(ev)
     case req: GetOrderHistory =>
       fetchOrderHistory(req)
     case ValidateOrder(o) =>
@@ -61,7 +61,7 @@ class OrderHistoryActor(val settings: MatcherSettings, val storedState: StateRea
     case req: DeleteOrderFromHistory =>
       deleteFromOrderHistory(req)
     case GetOrderStatus(_, id) =>
-      sender() ! GetOrderStatusResponse(orderHistory.getOrderStatus(id))
+      sender() ! GetOrderStatusResponse(orderHistory.orderStatus(id))
     case RecoverFromOrderBook(ob) =>
       recoverFromOrderBook(ob)
     case GetTradableBalance(assetPair, addr) =>
@@ -70,8 +70,8 @@ class OrderHistoryActor(val settings: MatcherSettings, val storedState: StateRea
 
   def fetchOrderHistory(req: GetOrderHistory): Unit = {
     val res: Seq[(String, OrderInfo, Option[Order])] =
-      orderHistory.getOrdersByPairAndAddress(req.assetPair, req.address)
-        .map(id => (id, orderHistory.getOrderInfo(id), orderHistory.getOrder(id))).toSeq.sortBy(_._3.map(_.timestamp).getOrElse(-1L))
+      orderHistory.ordersByPairAndAddress(req.assetPair, req.address)
+        .map(id => (id, orderHistory.orderInfo(id), orderHistory.order(id))).toSeq.sortBy(_._3.map(_.timestamp).getOrElse(-1L))
     sender() ! GetOrderHistoryResponse(res)
   }
 
@@ -94,7 +94,7 @@ class OrderHistoryActor(val settings: MatcherSettings, val storedState: StateRea
   }
 
   def deleteFromOrderHistory(req: DeleteOrderFromHistory): Unit = {
-    orderHistory.getOrderStatus(req.id) match {
+    orderHistory.orderStatus(req.id) match {
       case Filled | LimitOrder.Cancelled(_) =>
         orderHistory.deleteOrder(req.assetPair, req.address, req.id)
         sender() ! OrderDeleted(req.id)
@@ -105,10 +105,10 @@ class OrderHistoryActor(val settings: MatcherSettings, val storedState: StateRea
 
   def recoverFromOrderBook(ob: OrderBook): Unit = {
     ob.asks.foreach{ case (_, orders) =>
-      orders.foreach(o => orderHistory.didOrderAccepted(OrderAdded(o)))
+      orders.foreach(o => orderHistory.orderAccepted(OrderAdded(o)))
     }
     ob.bids.foreach{ case (_, orders) =>
-      orders.foreach(o => orderHistory.didOrderAccepted(OrderAdded(o)))
+      orders.foreach(o => orderHistory.orderAccepted(OrderAdded(o)))
     }
   }
 

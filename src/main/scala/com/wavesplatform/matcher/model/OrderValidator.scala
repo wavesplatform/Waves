@@ -24,8 +24,8 @@ trait OrderValidator {
 
     val (acc, feeAcc) = (AssetAcc(order.senderPublicKey, order.getSpendAssetId), AssetAcc(order.senderPublicKey, None))
 
-    val (assTBal, assOBal) = (storedState.spendableBalance(acc), orderHistory.getOpenVolume(acc))
-    val (feeTBal, feeOBal) = (storedState.spendableBalance(feeAcc), orderHistory.getOpenVolume(feeAcc))
+    val (assTBal, assOBal) = (storedState.spendableBalance(acc), orderHistory.openVolume(acc))
+    val (feeTBal, feeOBal) = (storedState.spendableBalance(feeAcc), orderHistory.openVolume(feeAcc))
 
     if (acc != feeAcc) {
       (assTBal - assOBal >= order.getSpendAmount(order.price, order.amount).getOrElse(0L)) :|
@@ -39,7 +39,7 @@ trait OrderValidator {
   }
 
   def getTradableBalance(acc: AssetAcc): Long = {
-    math.max(0l, storedState.spendableBalance(acc) - orderHistory.getOpenVolume(acc))
+    math.max(0l, storedState.spendableBalance(acc) - orderHistory.openVolume(acc))
   }
 
   def validateNewOrder(order: Order): Either[CustomError, Order] = {
@@ -50,7 +50,7 @@ trait OrderValidator {
       LimitOrder.validateIntegerAmount(storedState, LimitOrder(order)) &&
       order.isValid(NTP.correctedTime()) &&
       (order.matcherFee >= settings.minOrderFee) :| s"Order matcherFee should be >= ${settings.minOrderFee}" &&
-      (orderHistory.getOrderStatus(order.idStr) == LimitOrder.NotFound) :| "Order is already accepted" &&
+      (orderHistory.orderStatus(order.idStr) == LimitOrder.NotFound) :| "Order is already accepted" &&
       isBalanceWithOpenOrdersEnough(order)
     if (!v) {
       Left(CustomError(v.messages()))
@@ -60,12 +60,12 @@ trait OrderValidator {
   }
 
   def validateCancelOrder(cancel: CancelOrder): Either[CustomError, CancelOrder] = {
-    val status = orderHistory.getOrderStatus(cancel.orderId)
+    val status = orderHistory.orderStatus(cancel.orderId)
     val v =
       (status != LimitOrder.NotFound) :| "Order not found" &&
         (status != LimitOrder.Filled) :| "Order is already Filled" &&
         cancel.req.isSignatureValid :| "Signature should be valid" &&
-        orderHistory.getOrder(cancel.orderId).fold(false)(_.senderPublicKey == cancel.req.senderPublicKey)  :| "Order not found"
+        orderHistory.order(cancel.orderId).fold(false)(_.senderPublicKey == cancel.req.senderPublicKey)  :| "Order not found"
 
     if (!v) {
       Left(CustomError(v.messages()))

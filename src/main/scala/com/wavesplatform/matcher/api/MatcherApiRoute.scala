@@ -159,15 +159,14 @@ case class MatcherApiRoute(wallet: Wallet,storedState: StateReader, matcher: Act
   }
 
   def checkGetSignature(publicKey: String, timestamp: String, signature: String): Try[String] = {
-    for {
-      pk <- Base58.decode(publicKey)
-      ts <- Try(timestamp.toLong)
-      validTs <- Try(if (math.abs(ts - NTP.correctedTime()).millis < matcherSettings.maxTimestampDiff) ts
-        else throw new IllegalArgumentException("Incorrect timestamp"))
-      sig <-  Base58.decode(signature)
-      verified <- Try(if (EllipticCurveImpl.verify(sig, pk ++ Longs.toByteArray(validTs), pk)) true
-        else throw new IllegalArgumentException("Incorrect signature"))
-    } yield PublicKeyAccount(pk).address
+    Try {
+      val pk = Base58.decode(publicKey).get
+      val sig = Base58.decode(signature).get
+      val ts = timestamp.toLong
+      require(math.abs(ts - NTP.correctedTime()).millis < matcherSettings.maxTimestampDiff, "Incorrect timestamp")
+      require(EllipticCurveImpl.verify(sig, pk ++ Longs.toByteArray(ts), pk), "Incorrect signature")
+      PublicKeyAccount(pk).address
+    }
   }
 
   @Path("/orderbook/{amountAsset}/{priceAsset}/publicKey/{publicKey}")
