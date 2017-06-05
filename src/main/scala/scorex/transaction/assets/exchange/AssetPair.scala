@@ -28,6 +28,16 @@ case class AssetPair(@ApiModelProperty(dataType = "java.lang.String") amountAsse
     "amountAsset" -> amountAsset.map(_.base58),
     "priceAsset" -> priceAsset.map(_.base58)
   )
+
+  override def hashCode(): Int = toString.hashCode()
+
+  override def equals(obj: Any): Boolean = {
+    obj match {
+      case other: AssetPair =>
+        toString == other.toString
+      case _ => false
+    }
+  }
 }
 
 object AssetPair {

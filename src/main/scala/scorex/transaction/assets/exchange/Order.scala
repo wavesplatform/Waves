@@ -151,6 +151,26 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
     "matcherFee" -> matcherFee,
     "signature" -> Base58.encode(signature)
   )
+
+  override def canEqual(that: Any): Boolean = that.isInstanceOf[Order]
+
+  override def equals(obj: Any): Boolean = {
+    obj match {
+      case o: Order => o.canEqual(this) &&
+        senderPublicKey == o.senderPublicKey &&
+        matcherPublicKey == o.matcherPublicKey &&
+        assetPair == o.assetPair
+        orderType == o.orderType
+        price == o.price &&
+          amount == o.amount &&
+          expiration == o.expiration &&
+          matcherFee == o.matcherFee &&
+          (signature sameElements o.signature)
+      case _ => false
+    }
+  }
+
+  override def hashCode(): Int = idStr.hashCode()
 }
 
 object Order {
