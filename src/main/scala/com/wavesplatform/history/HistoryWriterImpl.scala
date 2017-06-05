@@ -2,7 +2,7 @@ package com.wavesplatform.history
 
 import java.util.concurrent.locks.ReentrantReadWriteLock
 
-import com.wavesplatform.state2.{ByteStr, ByteStrMVStoreDataType}
+import com.wavesplatform.state2.{ByteStr, ByteStrDataType}
 import org.h2.mvstore.MVStore
 import scorex.account.Account
 import scorex.block.Block
@@ -13,8 +13,8 @@ import scorex.utils.{LogMVMapBuilder, ScorexLogging}
 
 class HistoryWriterImpl private(db: MVStore, val synchronizationToken: ReentrantReadWriteLock) extends HistoryWriter with ScorexLogging {
   private val blockBodyByHeight = Synchronized(db.openMap("blocks", new LogMVMapBuilder[Int, Array[Byte]]))
-  private val blockIdByHeight = Synchronized(db.openMap("signatures", new LogMVMapBuilder[Int, ByteStr].valueType(new ByteStrMVStoreDataType)))
-  private val heightByBlockId = Synchronized(db.openMap("signaturesReverse", new LogMVMapBuilder[ByteStr, Int].keyType(new ByteStrMVStoreDataType)))
+  private val blockIdByHeight = Synchronized(db.openMap("signatures", new LogMVMapBuilder[Int, ByteStr].valueType(new ByteStrDataType)))
+  private val heightByBlockId = Synchronized(db.openMap("signaturesReverse", new LogMVMapBuilder[ByteStr, Int].keyType(new ByteStrDataType)))
   private val scoreByHeight = Synchronized(db.openMap("score", new LogMVMapBuilder[Int, BigInt]))
 
   override def appendBlock(block: Block): Either[ValidationError, Unit] = write { implicit lock =>

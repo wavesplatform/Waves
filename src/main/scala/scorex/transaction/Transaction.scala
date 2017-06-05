@@ -1,6 +1,5 @@
 package scorex.transaction
 
-import com.google.common.primitives.Ints
 import com.wavesplatform.state2.ByteStr
 import scorex.serialization.{BytesSerializable, JsonSerializable}
 import scorex.transaction.TransactionParser.TransactionType
@@ -18,6 +17,5 @@ trait Transaction extends BytesSerializable with JsonSerializable {
     case _ => false
   }
 
-  override def hashCode(): Int = Ints.fromByteArray(id.arr.takeRight(4))
-
+  override def hashCode(): Int = id.hashCode()
 }

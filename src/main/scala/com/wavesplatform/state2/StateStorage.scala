@@ -24,42 +24,42 @@ class StateStorage private(db: MVStore) {
   def setHeight(i: Int): Unit = variables.put(heightKey, i)
 
   val transactions: MVMap[ByteStr, (Int, Array[Byte])] = db.openMap("txs", new LogMVMapBuilder[ByteStr, (Int, Array[Byte])]
-    .keyType(new ByteStrMVStoreDataType))
+    .keyType(new ByteStrDataType))
 
   val portfolios: MVMap[ByteStr, (Long, (Long, Long), Map[Array[Byte], Long])] = db.openMap("portfolios",
     new LogMVMapBuilder[ByteStr, (Long, (Long, Long), Map[Array[Byte], Long])]
-      .keyType(new ByteStrMVStoreDataType))
+      .keyType(new ByteStrDataType))
 
 
   val assets: MVMap[ByteStr, (Boolean, Long)] = db.openMap("assets", new LogMVMapBuilder[ByteStr, (Boolean, Long)]
-    .keyType(new ByteStrMVStoreDataType))
+    .keyType(new ByteStrDataType))
 
   val accountTransactionIds: MVMap[ByteStr, List[Array[Byte]]] = db.openMap("accountTransactionIds",
     new LogMVMapBuilder[ByteStr, List[Array[Byte]]]
-      .keyType(new ByteStrMVStoreDataType))
+      .keyType(new ByteStrDataType))
 
   val balanceSnapshots: MVMap[SnapshotKey, (Int, Long, Long)] = db.openMap("balanceSnapshots")
 
   val paymentTransactionHashes: MVMap[ByteStr, ByteStr] = db.openMap("paymentTransactionHashes",
     new LogMVMapBuilder[ByteStr, ByteStr]
-      .keyType(new ByteStrMVStoreDataType)
-      .valueType(new ByteStrMVStoreDataType))
+      .keyType(new ByteStrDataType)
+      .valueType(new ByteStrDataType))
 
   val aliasToAddress: MVMap[String, ByteStr] = db.openMap("aliasToAddress", new LogMVMapBuilder[String, ByteStr]
-    .valueType(new ByteStrMVStoreDataType))
+    .valueType(new ByteStrDataType))
 
   val orderFills: MVMap[ByteStr, (Long, Long)] = db.openMap("orderFills", new LogMVMapBuilder[ByteStr, (Long, Long)]
-    .keyType(new ByteStrMVStoreDataType))
+    .keyType(new ByteStrDataType))
 
   val leaseState: MVMap[ByteStr, Boolean] = db.openMap("leaseState", new LogMVMapBuilder[ByteStr, Boolean]
-    .keyType(new ByteStrMVStoreDataType))
+    .keyType(new ByteStrDataType))
 
   val lastUpdateHeight: MVMap[ByteStr, Int] = db.openMap("lastUpdateHeight", new LogMVMapBuilder[ByteStr, Int]
-    .keyType(new ByteStrMVStoreDataType))
+    .keyType(new ByteStrDataType))
 
   val uniqueAssets: MVMap[ByteStr, ByteStr] = db.openMap("uniqueAssets", new LogMVMapBuilder[ByteStr, ByteStr]
-    .keyType(new ByteStrMVStoreDataType)
-    .valueType(new ByteStrMVStoreDataType))
+    .keyType(new ByteStrDataType)
+    .valueType(new ByteStrDataType))
 
   def commit(): Unit = db.commit()
 

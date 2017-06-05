@@ -16,16 +16,6 @@ case class AssetPair(@ApiModelProperty(dataType = "java.lang.String") amountAsse
   @ApiModelProperty(hidden = true)
   lazy val amountAssetStr: String = amountAsset.map(_.base58).getOrElse(AssetPair.WavesName)
 
-  override def hashCode(): Int = toString.hashCode()
-
-  override def equals(obj: Any): Boolean = {
-    obj match {
-      case other: AssetPair =>
-        toString == other.toString
-      case _ => false
-    }
-  }
-
   override def toString: String = amountAssetStr + "-" + priceAssetStr
 
   def isValid: Validation = {

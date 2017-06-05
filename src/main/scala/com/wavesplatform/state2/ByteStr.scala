@@ -6,7 +6,7 @@ import scala.util.Try
 
 case class ByteStr(arr: Array[Byte]) {
   override def equals(a: Any): Boolean = a match {
-    case eba: ByteStr => arr.sameElements(eba.arr)
+    case other: ByteStr => arr.sameElements(other.arr)
     case _ => false
   }
 
@@ -14,7 +14,7 @@ case class ByteStr(arr: Array[Byte]) {
 
   lazy val base58: String = Base58.encode(arr)
 
-  override lazy val toString: String = "ByteStr:" + base58
+  override lazy val toString: String = base58
 }
 
 object ByteStr {

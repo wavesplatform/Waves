@@ -74,11 +74,6 @@ case class Block(timestamp: Long, version: Byte, reference: ByteStr, signerData:
       .groupBy(a => a._1)
       .mapValues((records: Seq[(AssetAcc, Long)]) => records.map(_._2).sum)
   }
-
-  override def equals(obj: scala.Any): Boolean = {
-    import shapeless.syntax.typeable._
-    obj.cast[Block].exists(_.uniqueId == this.uniqueId)
-  }
 }
 
 

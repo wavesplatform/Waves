@@ -2,8 +2,7 @@ package scorex.transaction
 
 import com.wavesplatform.settings.FeesSettings
 import com.wavesplatform.state2.ByteStr
-import scorex.crypto.encode.Base58
-import scorex.transaction.ValidationError.{InsufficientFee, TransactionValidationError}
+import scorex.transaction.ValidationError.TransactionValidationError
 
 /**
   * Class to check, that transaction contains enough fee to put it to UTX pool
@@ -29,14 +28,7 @@ class FeeCalculator(settings: FeesSettings) {
 }
 
 case class TransactionAssetFee(txType: Int, assetId: Option[AssetId]) {
-  override def hashCode(): Int = txType.hashCode() + assetId.hashCode()
-
-  override def equals(obj: Any): Boolean = obj match {
-    case o: TransactionAssetFee => o.key == this.key
-    case _ => false
-  }
 
   val key = s"TransactionAssetFee($txType, ${assetId.map(_.base58)})"
 
-  override def toString: String = key
 }
