@@ -1,5 +1,7 @@
 package com.wavesplatform.settings
 
+import java.io.File
+
 import com.typesafe.config.ConfigFactory
 import org.scalatest.{FlatSpec, Matchers}
 
@@ -55,9 +57,9 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
       """.stripMargin).resolve()
     val settings = BlockchainSettings.fromConfig(config)
 
-    settings.blockchainFile should be("/waves/data/blockchain.dat")
-    settings.stateFile should be("/waves/data/state.dat")
-    settings.checkpointFile should be("/waves/data/checkpoint.dat")
+    settings.blockchainFile should be(Some(new File("/waves/data/blockchain.dat")))
+    settings.stateFile should be(Some(new File("/waves/data/state.dat")))
+    settings.checkpointFile should be(Some(new File("/waves/data/checkpoint.dat")))
     settings.minimumInMemoryDiffSize should be(201)
     settings.addressSchemeCharacter should be('C')
     settings.functionalitySettings.allowTemporaryNegativeUntil should be(1)
@@ -104,9 +106,9 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
       """.stripMargin).resolve()
     val settings = BlockchainSettings.fromConfig(config)
 
-    settings.blockchainFile should be("/waves/data/blockchain.dat")
-    settings.stateFile should be("/waves/data/state.dat")
-    settings.checkpointFile should be("/waves/data/checkpoint.dat")
+    settings.blockchainFile should be(Some(new File("/waves/data/blockchain.dat")))
+    settings.stateFile should be(Some(new File("/waves/data/state.dat")))
+    settings.checkpointFile should be(Some(new File("/waves/data/checkpoint.dat")))
     settings.minimumInMemoryDiffSize should be(202)
     settings.addressSchemeCharacter should be('T')
     settings.functionalitySettings.allowTemporaryNegativeUntil should be(1477958400000L)
@@ -153,9 +155,9 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
       """.stripMargin).resolve()
     val settings = BlockchainSettings.fromConfig(config)
 
-    settings.blockchainFile should be("/waves/data/blockchain.dat")
-    settings.stateFile should be("/waves/data/state.dat")
-    settings.checkpointFile should be("/waves/data/checkpoint.dat")
+    settings.blockchainFile should be(Some(new File("/waves/data/blockchain.dat")))
+    settings.stateFile should be(Some(new File("/waves/data/state.dat")))
+    settings.checkpointFile should be(Some(new File("/waves/data/checkpoint.dat")))
     settings.minimumInMemoryDiffSize should be(203)
     settings.addressSchemeCharacter should be('W')
     settings.functionalitySettings.allowTemporaryNegativeUntil should be(1479168000000L)

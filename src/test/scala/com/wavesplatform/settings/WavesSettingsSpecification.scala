@@ -1,5 +1,7 @@
 package com.wavesplatform.settings
 
+import java.io.File
+
 import com.typesafe.config.ConfigFactory
 import org.scalatest.{FlatSpec, Matchers}
 
@@ -36,12 +38,12 @@ class WavesSettingsSpecification extends FlatSpec with Matchers {
     val settings = WavesSettings.fromConfig(config.resolve())
 
     settings.directory should be("/xxx")
-    settings.networkSettings.file should be("/xxx/data/peers.dat")
-    settings.walletSettings.file should be("/xxx/wallet/wallet.dat")
+    settings.networkSettings.file should be(Some(new File("/xxx/data/peers.dat")))
+    settings.walletSettings.file should be(Some(new File("/xxx/wallet/wallet.dat")))
     settings.loggingLevel should be(LogLevel.TRACE)
-    settings.blockchainSettings.blockchainFile should be("/xxx/data/blockchain.dat")
-    settings.blockchainSettings.stateFile should be("/xxx/data/state.dat")
-    settings.blockchainSettings.checkpointFile should be("/xxx/data/checkpoint.dat")
+    settings.blockchainSettings.blockchainFile should be(Some(new File("/xxx/data/blockchain.dat")))
+    settings.blockchainSettings.stateFile should be(Some(new File("/xxx/data/state.dat")))
+    settings.blockchainSettings.checkpointFile should be(Some(new File("/xxx/data/checkpoint.dat")))
     settings.matcherSettings.journalDataDir should be ("/xxx/journal")
     settings.matcherSettings.snapshotsDataDir should be ("/xxx/snapshots")
   }

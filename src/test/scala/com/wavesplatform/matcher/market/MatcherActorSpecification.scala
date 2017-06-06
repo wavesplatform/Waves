@@ -40,7 +40,7 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest2"
   val settings = matcherSettings.copy(account = MatcherAccount.address)
   val history = stub[History]
   val functionalitySettings = stub[FunctionalitySettings]
-  val wallet = new Wallet(None, "matcher", Option(WalletSeed))
+  val wallet = new Wallet(None, "matcher".toCharArray, Option(WalletSeed))
   wallet.generateNewAccount()
   var actor: ActorRef = system.actorOf(Props(new MatcherActor(storedState, wallet, settings, history, functionalitySettings,
     stub[NewTransactionHandler]) with RestartableActor))

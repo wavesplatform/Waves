@@ -4,8 +4,7 @@ import scorex.wallet.Wallet
 
 trait TestWallet {
   protected val testWallet = {
-    val file = scorex.createTestTemporaryFile("wallet", ".dat")
-    val wallet = new Wallet(Some(file.getCanonicalPath), "123", None)
+    val wallet = new Wallet(None, "123".toCharArray, None)
     wallet.generateNewAccounts(10)
     wallet
   }

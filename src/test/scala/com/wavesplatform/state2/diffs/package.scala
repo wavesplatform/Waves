@@ -4,7 +4,6 @@ import java.util.concurrent.locks.ReentrantReadWriteLock
 
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.reader.{CompositeStateReader, StateReader}
-import org.h2.mvstore.MVStore
 import org.scalatest.matchers.{MatchResult, Matcher}
 import scorex.block.Block
 import scorex.settings.TestFunctionalitySettings
@@ -14,7 +13,7 @@ import scala.util.{Left, Right}
 
 package object diffs {
 
-  def newState(): StateWriterImpl = new StateWriterImpl(StateStorage(new MVStore.Builder().open()).explicitGet(), new ReentrantReadWriteLock())
+  def newState(): StateWriterImpl = new StateWriterImpl(StateStorage(None).get, new ReentrantReadWriteLock())
 
   val ENOUGH_AMT: Long = Long.MaxValue / 3
 

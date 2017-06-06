@@ -1,25 +1,18 @@
 package scorex.network.peer
 
-import java.io.File
 import java.net.InetSocketAddress
 
 import com.wavesplatform.settings.NetworkSettings
-import org.h2.mvstore.{MVMap, MVStore}
+import com.wavesplatform.utils.createMVStore
+import org.h2.mvstore.MVMap
 import scorex.utils.{CircularBuffer, LogMVMapBuilder}
 
 import scala.collection.JavaConverters._
 import scala.util.Random
 
-class PeerDatabaseImpl(settings: NetworkSettings, filename: Option[String]) extends PeerDatabase {
+class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with AutoCloseable {
 
-  private val database = filename match {
-    case Some(s) =>
-      val file = new File(s)
-      file.getParentFile.mkdirs().ensuring(file.getParentFile.exists())
-
-      new MVStore.Builder().fileName(s).compress().open()
-    case None => new MVStore.Builder().open()
-  }
+  private val database = createMVStore(settings.file)
 
   private val peersPersistence: MVMap[InetSocketAddress, PeerInfo] = database.openMap("peers", new LogMVMapBuilder[InetSocketAddress, PeerInfo])
   private val blacklist: MVMap[String, Long] = database.openMap("blacklist", new LogMVMapBuilder[String, Long])
@@ -100,4 +93,6 @@ class PeerDatabaseImpl(settings: NetworkSettings, filename: Option[String]) exte
 
     map
   }
+
+  override def close() = database.close()
 }

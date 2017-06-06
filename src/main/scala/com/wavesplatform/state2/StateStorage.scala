@@ -1,13 +1,18 @@
 package com.wavesplatform.state2
 
+import java.io.File
+
 import com.google.common.primitives.Ints
-import org.h2.mvstore.{MVMap, MVStore}
+import com.wavesplatform.utils._
+import org.h2.mvstore.MVMap
 import scorex.account.Account
 import scorex.utils.LogMVMapBuilder
 
-class StateStorage private(db: MVStore) {
+class StateStorage private(file: Option[File]) extends AutoCloseable {
 
   import StateStorage._
+
+  private val db = createMVStore(file)
 
   private val variables: MVMap[String, Int] = db.openMap("variables")
 
@@ -17,7 +22,7 @@ class StateStorage private(db: MVStore) {
 
   private def setDirty(isDirty: Boolean): Unit = variables.put(isDirtyFlag, if (isDirty) 1 else 0)
 
-  private def dirty(): Boolean = variables.get(isDirtyFlag) == 1
+  private def isDirty(): Boolean = variables.get(isDirtyFlag) == 1
 
   def getHeight: Int = variables.get(heightKey)
 
@@ -63,33 +68,30 @@ class StateStorage private(db: MVStore) {
 
   def commit(): Unit = db.commit()
 
+  override def close() = db.close()
 }
 
 object StateStorage {
-
-  private val VERSION = 1
+  private val Version = 1
 
   private val heightKey = "height"
   private val isDirtyFlag = "isDirty"
   private val stateVersion = "stateVersion"
 
-  def apply(db: MVStore): Either[String, StateStorage] = {
-    val s = new StateStorage(db)
+  private def validateVersion(ss: StateStorage): Boolean =
+    ss.persistedVersion match {
+      case None =>
+        ss.setPersistedVersion(Version)
+        ss.commit()
+        true
+      case Some(v) => v == Version
 
-    if (s.dirty())
-      Left("Persisted state is corrupt")
-    else {
-      s.persistedVersion match {
-        case None =>
-          s.setPersistedVersion(VERSION)
-          s.commit()
-          Right(s)
-        case Some(`VERSION`) => Right(s)
-        case Some(pv) => Left(s"Persisted state has version $pv, current scheme version is $VERSION")
-
-      }
     }
-  }
+
+  def apply(file: Option[File], dropExisting: Boolean = false) = for {
+    ss <- createWithStore[StateStorage](file, new StateStorage(file), ss => !(dropExisting || ss.isDirty()))
+    if validateVersion(ss)
+  } yield ss
 
   type SnapshotKey = Array[Byte]
 

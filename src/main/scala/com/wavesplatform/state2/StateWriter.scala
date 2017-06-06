@@ -16,9 +16,11 @@ trait StateWriter {
 }
 
 class StateWriterImpl(p: StateStorage, synchronizationToken: ReentrantReadWriteLock)
-  extends StateReaderImpl(p, synchronizationToken) with StateWriter with ScorexLogging {
+  extends StateReaderImpl(p, synchronizationToken) with StateWriter with AutoCloseable {
 
   import StateWriterImpl._
+
+  override def close() = p.close()
 
   override def applyBlockDiff(blockDiff: BlockDiff): Unit = write { implicit l =>
     val txsDiff = blockDiff.txsDiff

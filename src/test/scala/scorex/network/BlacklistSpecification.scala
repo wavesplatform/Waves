@@ -12,6 +12,7 @@ class BlacklistSpecification extends FeatureSpec with GivenWhenThen {
     """
       |waves {
       |  network {
+      |    file = ""
       |    black-list-residence-time: 1s
       |  }
       |}
@@ -27,7 +28,7 @@ class BlacklistSpecification extends FeatureSpec with GivenWhenThen {
     scenario("Peer blacklist another peer") {
 
       Given("Peer database is empty")
-      val peerDatabase = new PeerDatabaseImpl(networkSettings, None)
+      val peerDatabase = new PeerDatabaseImpl(networkSettings)
 
       def isBlacklisted(address: InetSocketAddress) = peerDatabase.getBlacklist.contains(address.getHostName)
 

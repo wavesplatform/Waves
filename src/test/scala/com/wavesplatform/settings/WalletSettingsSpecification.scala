@@ -1,5 +1,7 @@
 package com.wavesplatform.settings
 
+import java.io.File
+
 import com.typesafe.config.ConfigFactory
 import org.scalatest.{FlatSpec, Matchers}
 
@@ -19,7 +21,7 @@ class WalletSettingsSpecification extends FlatSpec with Matchers {
     val settings = WalletSettings.fromConfig(config)
 
     settings.seed should be("BASE58SEED")
-    settings.file should be("/waves/wallet/wallet.dat")
+    settings.file should be(Some(new File("/waves/wallet/wallet.dat")))
     settings.password should be ("some string as password")
   }
 }

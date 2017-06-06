@@ -4,15 +4,13 @@ import java.util.concurrent.locks.ReentrantReadWriteLock
 
 import cats.kernel.Monoid
 import com.wavesplatform.settings.FunctionalitySettings
+import com.wavesplatform.state2.BlockchainUpdaterImpl._
+import com.wavesplatform.state2.StateWriterImpl._
 import com.wavesplatform.state2.diffs.BlockDiffer
 import com.wavesplatform.state2.reader.{CompositeStateReader, StateReader}
 import scorex.block.Block
-
-import scorex.crypto.encode.Base58
 import scorex.transaction._
 import scorex.utils.ScorexLogging
-import StateWriterImpl._
-import BlockchainUpdaterImpl._
 
 class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader, settings: FunctionalitySettings,
                                     minimumInMemoryDiffSize: Int, bc: HistoryWriter with History,
@@ -90,16 +88,18 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader, set
 
 object BlockchainUpdaterImpl {
 
-  def apply(persisted: StateWriter with StateReader, settings: FunctionalitySettings, minimumInMemoryDiffSize: Int,
-            bc: HistoryWriter with History, synchronizationToken: ReentrantReadWriteLock): Either[String, BlockchainUpdaterImpl] = {
-    val blockchainUpdater = new BlockchainUpdaterImpl(persisted, settings, minimumInMemoryDiffSize, bc, synchronizationToken)
-    if (persisted.height > bc.height())
-      Left(s"storedBlocks = ${bc.height()}, statedBlocks=${persisted.height}")
-    else {
-      blockchainUpdater.logHeights("Constructing BlockchainUpdaterImpl:")
-      blockchainUpdater.updatePersistedAndInMemory()
-      Right(blockchainUpdater)
-    }
+  def apply(
+    persistedState: StateWriter with StateReader,
+    history: HistoryWriter with History,
+    functionalitySettings: FunctionalitySettings,
+    minimumInMemoryDiffSize: Int,
+    synchronizationToken: ReentrantReadWriteLock): BlockchainUpdaterImpl = {
+
+    val blockchainUpdater =
+      new BlockchainUpdaterImpl(persistedState, functionalitySettings, minimumInMemoryDiffSize, history, synchronizationToken)
+    blockchainUpdater.logHeights("Constructing BlockchainUpdaterImpl:")
+    blockchainUpdater.updatePersistedAndInMemory()
+    blockchainUpdater
   }
 
   def ranges(from: Int, to: Int, by: Int): List[(Int, Int)] =

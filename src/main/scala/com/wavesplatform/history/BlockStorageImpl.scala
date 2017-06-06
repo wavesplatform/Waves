@@ -1,80 +1,38 @@
 package com.wavesplatform.history
 
 import java.io.File
-import java.util.concurrent.locks.ReentrantReadWriteLock
+import java.util.concurrent.locks.{ReentrantReadWriteLock => RWL}
 
 import com.wavesplatform.settings.BlockchainSettings
-import com.wavesplatform.state2.reader.StateReader
-import com.wavesplatform.state2.{BlockchainUpdaterImpl, StateStorage, StateWriterImpl, _}
-import org.h2.mvstore.MVStore
-import scorex.transaction.{CheckpointService, History}
-import scorex.utils.ScorexLogging
+import com.wavesplatform.state2.{BlockchainUpdaterImpl, StateStorage, StateWriterImpl}
+import scorex.transaction.History
 
-object BlockStorageImpl extends ScorexLogging {
+import scala.util.Try
 
-  def apply(settings: BlockchainSettings): (CheckpointService, History, StateReader, BlockchainUpdaterImpl) = {
+object BlockStorageImpl {
 
-    val lock = new ReentrantReadWriteLock(true)
-
-    val checkpointService = {
-      val checkpointStore: MVStore = createMVStore(settings.checkpointFile)
-      new CheckpointServiceImpl(checkpointStore)
-    }
-
-    val historyWriter = {
-      val blockchainStore = createMVStore(settings.blockchainFile)
-      HistoryWriterImpl(blockchainStore, lock) match {
-        case Right(v) => v
-        case Left(err) =>
-          log.error(err)
-          blockchainStore.closeImmediately()
-          delete(settings.stateFile)
-          delete(settings.blockchainFile)
-          val recreatedStore = createMVStore(settings.blockchainFile)
-          HistoryWriterImpl(recreatedStore, lock).explicitGet()
+  private def createStateWriter(history: History, stateFile: Option[File], lock: RWL): Try[StateWriterImpl] = {
+    StateStorage(stateFile)
+      .map(new StateWriterImpl(_, lock))
+      .filter(_.height <= history.height())
+      .recoverWith {
+        case _ =>
+          StateStorage(stateFile, dropExisting = true)
+            .map(new StateWriterImpl(_, lock))
+            .filter(_.height <= history.height())
       }
-    }
-
-    @scala.annotation.tailrec
-    def withStateMVStore(stateMVStore: MVStore, retry: Boolean): (CheckpointService, History, StateReader, BlockchainUpdaterImpl) = (for {
-      stateStorage <- StateStorage(stateMVStore)
-      persistedStateWriter = new StateWriterImpl(stateStorage, lock)
-      bcUpdater <- BlockchainUpdaterImpl(persistedStateWriter, settings.functionalitySettings,
-        settings.minimumInMemoryDiffSize, historyWriter, lock)
-    } yield bcUpdater) match {
-      case Right(bcu) => (checkpointService, historyWriter, bcu.currentState, bcu)
-      case Left(err) =>
-        if (retry) {
-          log.error(err)
-          stateMVStore.closeImmediately()
-          delete(settings.stateFile)
-          withStateMVStore(createMVStore(settings.stateFile), retry = false)
-        } else throw new Exception(err)
-    }
-
-    withStateMVStore(createMVStore(settings.stateFile), retry = true)
-
   }
 
-  private def delete(fileName: String) = {
-    if (new File(fileName).delete()) {
-      log.info(s"Recreating $fileName")
-    } else {
-      throw new Exception(s"Unable to delete $fileName")
-    }
-  }
+  def apply(settings: BlockchainSettings): Try[(CheckpointServiceImpl, HistoryWriterImpl, StateWriterImpl, BlockchainUpdaterImpl)] = {
+    val lock = new RWL(true)
 
-  private def createMVStore(fileName: String): MVStore = {
-    def stringToOption(s: String) = Option(s).filter(_.trim.nonEmpty)
-
-    stringToOption(fileName) match {
-      case Some(s) =>
-        val file = new File(s)
-        file.getParentFile.mkdirs().ensuring(file.getParentFile.exists())
-
-        new MVStore.Builder().fileName(s).compress().open()
-      case None =>
-        new MVStore.Builder().open()
-    }
+    for {
+      historyWriter <- HistoryWriterImpl(settings.blockchainFile, lock)
+      stateWriter <- createStateWriter(historyWriter, settings.stateFile, lock)
+    } yield (
+      new CheckpointServiceImpl(settings.checkpointFile),
+      historyWriter,
+      stateWriter,
+      BlockchainUpdaterImpl(stateWriter, historyWriter, settings.functionalitySettings, settings.minimumInMemoryDiffSize, lock))
   }
 }

@@ -4,7 +4,6 @@ import java.util.concurrent.locks.ReentrantReadWriteLock
 
 import com.wavesplatform.history.HistoryWriterImpl
 import com.wavesplatform.state2._
-import org.h2.mvstore.MVStore
 import org.scalatest.{FunSuite, Matchers}
 import scorex.lagonaki.mocks.TestBlock
 
@@ -14,7 +13,7 @@ import scala.concurrent.Future
 class HistoryWriterTest extends FunSuite with Matchers with HistoryTest {
 
   test("concurrent access to lastBlock doesn't throw any exception") {
-    val history = HistoryWriterImpl(new MVStore.Builder().open(), new ReentrantReadWriteLock()).explicitGet()
+    val history = HistoryWriterImpl(None, new ReentrantReadWriteLock()).get
     appendGenesisBlock(history)
 
     (1 to 1000).foreach { _ =>
