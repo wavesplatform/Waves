@@ -1,8 +1,11 @@
 package com.wavesplatform.settings
 
-import scala.concurrent.duration._
+import java.io.File
+
 import com.typesafe.config.ConfigFactory
 import org.scalatest.{FlatSpec, Matchers}
+
+import scala.concurrent.duration._
 
 class NetworkSettingsSpecification extends FlatSpec with Matchers {
 
@@ -43,7 +46,7 @@ class NetworkSettingsSpecification extends FlatSpec with Matchers {
       """.stripMargin).resolve()
     val networkSettings = NetworkSettings.fromConfig(config)
 
-    networkSettings.file should be("/waves/peers.dat")
+    networkSettings.file should be(Some(new File("/waves/peers.dat")))
     networkSettings.bindAddress should be("127.0.0.1")
     networkSettings.port should be(6868)
     networkSettings.nodeName should be("default-node-name")

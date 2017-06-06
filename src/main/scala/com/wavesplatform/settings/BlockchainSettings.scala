@@ -1,10 +1,10 @@
 package com.wavesplatform.settings
 
+import java.io.File
+
 import com.typesafe.config.Config
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.EnumerationReader._
-import scorex.account.Account
-import scorex.transaction.GenesisTransaction
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
@@ -132,9 +132,9 @@ object GenesisSettings {
   }
 }
 
-case class BlockchainSettings(blockchainFile: String,
-                              stateFile: String,
-                              checkpointFile: String,
+case class BlockchainSettings(blockchainFile: Option[File],
+                              stateFile: Option[File],
+                              checkpointFile: Option[File],
                               addressSchemeCharacter: Char,
                               minimumInMemoryDiffSize: Int,
                               functionalitySettings: FunctionalitySettings,
@@ -164,9 +164,9 @@ object BlockchainSettings {
     }
 
     BlockchainSettings(
-      blockchainFile = config.as[String](s"$configPath.blockchain-file"),
-      stateFile = config.as[String](s"$configPath.state-file"),
-      checkpointFile = config.as[String](s"$configPath.checkpoint-file"),
+      blockchainFile = config.as[Option[File]](s"$configPath.blockchain-file"),
+      stateFile = config.as[Option[File]](s"$configPath.state-file"),
+      checkpointFile = config.as[Option[File]](s"$configPath.checkpoint-file"),
       addressSchemeCharacter = addressSchemeCharacter,
       minimumInMemoryDiffSize = config.as[Int](s"$configPath.minimum-in-memory-diff-blocks"),
       functionalitySettings = functionalitySettings,

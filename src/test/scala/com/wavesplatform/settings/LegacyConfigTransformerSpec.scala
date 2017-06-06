@@ -1,8 +1,11 @@
 package com.wavesplatform.settings
 
-import scala.concurrent.duration._
+import java.io.File
+
 import com.typesafe.config.ConfigFactory
 import org.scalatest.{FreeSpec, Matchers}
+
+import scala.concurrent.duration._
 
 class LegacyConfigTransformerSpec extends FreeSpec with Matchers {
   private val legacyConfig =
@@ -185,7 +188,7 @@ class LegacyConfigTransformerSpec extends FreeSpec with Matchers {
 
     val ws = WavesSettings.fromConfig(legacyConfigFromJson)
 
-    ws.walletSettings.file shouldBe s"${System.getProperty("user.home")}/wallet/wallet.dat"
+    ws.walletSettings.file shouldBe Some(new File(s"${System.getProperty("user.home")}/wallet/wallet.dat"))
     ws.directory shouldBe s"${System.getProperty("user.home")}"
   }
 
@@ -264,7 +267,7 @@ class LegacyConfigTransformerSpec extends FreeSpec with Matchers {
     ws.loggingLevel shouldBe LogLevel.WARN
     ws.directory shouldBe "/root/waves"
 
-    ws.walletSettings.file shouldBe "/root/waves/wallet/wallet.s.dat"
+    ws.walletSettings.file shouldBe Some(new File("/root/waves/wallet/wallet.s.dat"))
 
     ws.minerSettings should have (
       'enable (false),

@@ -7,12 +7,10 @@ import com.wavesplatform.Application
 import com.wavesplatform.history.BlockStorageImpl
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state2._
-import com.wavesplatform.state2.reader.StateReader
 import org.h2.mvstore.MVStore
 import scorex.ActorTestingCommons
 import scorex.account.PrivateKeyAccount
 import scorex.block.Block
-
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash.DigestSize
@@ -25,8 +23,7 @@ import scorex.network.message._
 import scorex.network.peer.PeerManager.{ConnectedPeers, GetConnectedPeersTyped}
 import scorex.transaction._
 import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
-import scorex.utils.{NTP, Time}
-import scorex.wallet.Wallet
+import scorex.utils.NTP
 
 import scala.concurrent.duration._
 import scala.language.postfixOps
@@ -59,7 +56,7 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
   val connectedPeer: ConnectedPeer = stub[ConnectedPeer]
 
   val db: MVStore = new MVStore.Builder().open()
-  val (checkpoints1, history1, stateReader1, blockchainUpdater1) = BlockStorageImpl(wavesSettings.blockchainSettings)
+  val (checkpoints1, history1, stateReader1, blockchainUpdater1) = BlockStorageImpl(wavesSettings.blockchainSettings).get
   val utxStorage1 = new UnconfirmedTransactionsDatabaseImpl(wavesSettings.utxSettings.size)
   class ValidBlockCoordinator extends Coordinator(networkControllerMock, testBlockchainSynchronizer.ref,
     testBlockGenerator.ref, testPeerManager.ref, testScoreObserver.ref, blockchainUpdater1, NTP, utxStorage1, history1, stateReader1, checkpoints1, wavesSettings) {

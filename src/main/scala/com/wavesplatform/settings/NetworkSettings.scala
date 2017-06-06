@@ -1,5 +1,7 @@
 package com.wavesplatform.settings
 
+import java.io.File
+
 import com.typesafe.config.Config
 import net.ceedubs.ficus.Ficus._
 
@@ -20,7 +22,7 @@ object UPnPSettings {
   }
 }
 
-case class NetworkSettings(file: String,
+case class NetworkSettings(file: Option[File],
                            bindAddress: String,
                            port: Int,
                            nodeName: String,
@@ -46,7 +48,7 @@ object NetworkSettings {
   val configPath: String = "waves.network"
 
   def fromConfig(config: Config): NetworkSettings = {
-    val file = config.as[String](s"$configPath.file")
+    val file = config.as[Option[File]](s"$configPath.file")
     val bindAddress = config.as[String](s"$configPath.bind-address")
     val port = config.as[Int](s"$configPath.port")
     val nonce = if (config.hasPath(s"$configPath.nonce")) config.as[Long](s"$configPath.nonce") else randomNonce

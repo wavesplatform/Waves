@@ -31,8 +31,7 @@ class PeerManager(
 
   private implicit val system = context.system
 
-  private val maybeFilename = Option(settings.file).filter(_.trim.nonEmpty)
-  private val peerDatabase: PeerDatabase = new PeerDatabaseImpl(settings, maybeFilename)
+  private val peerDatabase = new PeerDatabaseImpl(settings)
 
   context.system.scheduler.schedule(visitPeersInterval, visitPeersInterval, self, MarkConnectedPeersVisited)
   private val blacklistListeners: scala.collection.mutable.Set[ActorRef] = scala.collection.mutable.Set.empty[ActorRef]
@@ -55,6 +54,9 @@ class PeerManager(
       }
     }.getOrElse(Seq[InetSocketAddress]())
   }
+
+
+  override def postStop() = peerDatabase.close()
 
   override def receive: Receive = LoggingReceive(({
     case CheckPeers =>

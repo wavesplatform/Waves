@@ -34,8 +34,8 @@ class PeerDatabaseImplSpecification extends path.FreeSpecLike with Matchers {
     """.stripMargin).withFallback(ConfigFactory.load()).resolve()
   private val settings2 = NetworkSettings.fromConfig(config2)
 
-  val database = new PeerDatabaseImpl(settings1, None)
-  val database2 = new PeerDatabaseImpl(settings2, None)
+  val database = new PeerDatabaseImpl(settings1)
+  val database2 = new PeerDatabaseImpl(settings2)
   val host1 = "1.1.1.1"
   val host2 = "2.2.2.2"
   val address1 = new InetSocketAddress(host1, 1)

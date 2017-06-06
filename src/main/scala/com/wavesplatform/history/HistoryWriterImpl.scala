@@ -1,9 +1,10 @@
 package com.wavesplatform.history
 
+import java.io.File
 import java.util.concurrent.locks.ReentrantReadWriteLock
 
 import com.wavesplatform.state2.{ByteStr, ByteStrDataType}
-import org.h2.mvstore.MVStore
+import com.wavesplatform.utils._
 import scorex.account.Account
 import scorex.block.Block
 import scorex.transaction.History.BlockchainScore
@@ -11,11 +12,21 @@ import scorex.transaction.ValidationError.CustomError
 import scorex.transaction.{HistoryWriter, ValidationError}
 import scorex.utils.{LogMVMapBuilder, ScorexLogging}
 
-class HistoryWriterImpl private(db: MVStore, val synchronizationToken: ReentrantReadWriteLock) extends HistoryWriter with ScorexLogging {
+import scala.util.Try
+
+class HistoryWriterImpl private(file: Option[File], val synchronizationToken: ReentrantReadWriteLock)
+  extends HistoryWriter with AutoCloseable {
+
+  private val db = createMVStore(file)
   private val blockBodyByHeight = Synchronized(db.openMap("blocks", new LogMVMapBuilder[Int, Array[Byte]]))
   private val blockIdByHeight = Synchronized(db.openMap("signatures", new LogMVMapBuilder[Int, ByteStr].valueType(new ByteStrDataType)))
   private val heightByBlockId = Synchronized(db.openMap("signaturesReverse", new LogMVMapBuilder[ByteStr, Int].keyType(new ByteStrDataType)))
   private val scoreByHeight = Synchronized(db.openMap("score", new LogMVMapBuilder[Int, BigInt]))
+
+  private[HistoryWriterImpl] def isConsistent: Boolean = read { implicit l =>
+    // check if all maps have same size
+    Set(blockBodyByHeight().size(), blockIdByHeight().size(), heightByBlockId().size(), scoreByHeight().size()).size == 1
+  }
 
   override def appendBlock(block: Block): Either[ValidationError, Unit] = write { implicit lock =>
     if ((height() == 0) || (this.lastBlock.uniqueId == block.reference)) {
@@ -74,16 +85,11 @@ class HistoryWriterImpl private(db: MVStore, val synchronizationToken: Reentrant
   override def blockBytes(height: Int): Option[Array[Byte]] = read { implicit lock =>
     Option(blockBodyByHeight().get(height))
   }
+
+  override def close() = db.close()
 }
 
-object HistoryWriterImpl {
-  def apply(db: MVStore, synchronizationToken: ReentrantReadWriteLock): Either[String, HistoryWriterImpl] = {
-    val h = new HistoryWriterImpl(db, synchronizationToken)
-    h.read { implicit lock =>
-      if (Set(h.blockBodyByHeight().size(), h.blockIdByHeight().size(), h.heightByBlockId().size(), h.scoreByHeight().size()).size != 1)
-        Left("Block storage is inconsistent")
-      else
-        Right(h)
-    }
-  }
+object HistoryWriterImpl extends ScorexLogging {
+  def apply(file: Option[File], synchronizationToken: ReentrantReadWriteLock): Try[HistoryWriterImpl] =
+    createWithStore[HistoryWriterImpl](file, new HistoryWriterImpl(file, synchronizationToken), h => h.isConsistent)
 }

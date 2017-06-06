@@ -3,13 +3,11 @@ package scorex.transaction
 import com.wavesplatform.state2.ByteStr
 import scorex.account.Account
 import scorex.block.Block
-
-import scorex.crypto.encode.Base58
 import scorex.network.Checkpoint
-
-import scala.util.Try
 import scorex.transaction.History.BlockchainScore
 import scorex.utils.Synchronized
+
+import scala.util.Try
 
 trait History extends Synchronized {
 

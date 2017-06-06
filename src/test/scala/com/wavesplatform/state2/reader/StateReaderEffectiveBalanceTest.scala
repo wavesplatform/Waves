@@ -3,7 +3,6 @@ package com.wavesplatform.state2.reader
 import java.util.concurrent.locks.ReentrantReadWriteLock
 
 import com.wavesplatform.state2.StateStorage
-import org.h2.mvstore.MVStore
 import org.scalatest.{Matchers, Outcome, fixture}
 import scorex.account.Account
 
@@ -16,7 +15,7 @@ class StateReaderEffectiveBalanceTest extends fixture.FunSuite with Matchers {
   override type FixtureParam = StateStorage
 
   override protected def withFixture(test: OneArgTest): Outcome = {
-    val storage = StateStorage(new MVStore.Builder().open()).explicitGet()
+    val storage = StateStorage(None).get
     storage.setHeight(stateHeight)
     test(storage)
   }

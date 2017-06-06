@@ -3,7 +3,8 @@ package scorex.wallet
 import java.io.File
 
 import com.google.common.primitives.{Bytes, Ints}
-import org.h2.mvstore.{MVMap, MVStore}
+import com.wavesplatform.utils.createMVStore
+import org.h2.mvstore.MVMap
 import scorex.account.{Account, PrivateKeyAccount}
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.SecureCryptographicHash
@@ -15,20 +16,12 @@ import scala.collection.JavaConverters._
 import scala.collection.concurrent.TrieMap
 
 //todo: add accs txs?
-class Wallet(maybeFilename: Option[String], password: String, seedOpt: Option[Array[Byte]]) extends ScorexLogging {
+class Wallet(file: Option[File], password: Array[Char], seedOpt: Option[Array[Byte]])
+  extends AutoCloseable with ScorexLogging {
 
   private val NonceFieldName = "nonce"
 
-  private val database: MVStore = maybeFilename match {
-    case Some(walletFilename) =>
-      log.info(s"Opening wallet from ${walletFilename}")
-      val walletFile = new File(walletFilename)
-      walletFile.getParentFile.mkdirs().ensuring(walletFile.getParentFile.exists())
-
-      new MVStore.Builder().fileName(walletFile.getAbsolutePath).encryptionKey(password.toCharArray).compress().open()
-
-    case None => new MVStore.Builder().open()
-  }
+  private val database = createMVStore(file, Some(password))
 
   private val accountsPersistence: MVMap[Int, Array[Byte]] = database.openMap("privkeys", new LogMVMapBuilder[Int, Array[Byte]])
   private val seedPersistence: MVMap[String, Array[Byte]] = database.openMap("seed", new LogMVMapBuilder[String, Array[Byte]])

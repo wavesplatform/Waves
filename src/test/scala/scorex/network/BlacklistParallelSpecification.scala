@@ -13,6 +13,7 @@ class BlacklistParallelSpecification extends FeatureSpec with GivenWhenThen with
     """
       |waves {
       |  network {
+      |    file = ""
       |    black-list-residence-time: 1s
       |  }
       |}
@@ -26,7 +27,7 @@ class BlacklistParallelSpecification extends FeatureSpec with GivenWhenThen with
 
   feature("Blacklist") {
 
-    val peerDatabase = new PeerDatabaseImpl(networkSettings, None)
+    val peerDatabase = new PeerDatabaseImpl(networkSettings)
 
     val host1 = "1.1.1.1"
     val host2 = "2.2.2.2"
