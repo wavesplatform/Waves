@@ -9,14 +9,14 @@ import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.market.OrderHistoryActor._
 import com.wavesplatform.matcher.model.Events.{Event, OrderAdded, OrderExecuted}
 import com.wavesplatform.matcher.model.MatcherModel._
-import com.wavesplatform.matcher.model.{OrderValidator, _}
+import com.wavesplatform.matcher.model._
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.reader.StateReader
 import play.api.libs.json._
 import scorex.crypto.encode.Base58
-import scorex.transaction.ValidationError.CustomError
+import scorex.transaction.ValidationError.{AccountsValidationError, CustomError, OrderValidationError}
 import scorex.transaction.assets.exchange._
-import scorex.transaction.{History, NewTransactionHandler, ValidationError, ValidationErrorByAccount}
+import scorex.transaction.{History, NewTransactionHandler, ValidationError}
 import scorex.utils.{NTP, ScorexLogging}
 import scorex.wallet.Wallet
 
@@ -197,19 +197,28 @@ class OrderBookActor(assetPair: AssetPair, val orderHistory: ActorRef,
     context.system.eventStream.publish(e)
   }
 
-  def handleMatchEvent(e: Event): Option[LimitOrder] = {
-    def processInvalidTransaction(event: OrderExecuted, err: ValidationError): Option[LimitOrder] = {
-      log.debug(s"Failed to execute order: $err")
-      err match {
-        case byAcc: ValidationErrorByAccount if byAcc.acc.address == event.submitted.order.senderPublicKey.address =>
-          None
-        case _ =>
-          val canceled = Events.OrderCanceled(event.counter)
-          processEvent(canceled)
-          Some(event.submitted)
-      }
+  def processInvalidTransaction(event: OrderExecuted, err: ValidationError): Option[LimitOrder] = {
+    def cancelCounterOrder(): Option[LimitOrder] = {
+      processEvent(Events.OrderCanceled(event.counter))
+      Some(event.submitted)
     }
 
+    log.debug(s"Failed to execute order: $err")
+    err match {
+      case OrderValidationError(order, _) if order == event.submitted.order => None
+      case OrderValidationError(order, _) if order == event.counter.order => cancelCounterOrder()
+      case AccountsValidationError(errs) =>
+        errs.foldLeft(Option.empty[LimitOrder]) { case (res, (acc, _)) =>
+          if (event.counter.order.senderPublicKey.address == acc.address) {
+            cancelCounterOrder()
+          } else {
+            res
+          }
+        }
+    }
+  }
+
+  def handleMatchEvent(e: Event): Option[LimitOrder] = {
     e match {
       case e: OrderAdded =>
         processEvent(e)

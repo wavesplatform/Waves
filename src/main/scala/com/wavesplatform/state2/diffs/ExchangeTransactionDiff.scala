@@ -4,8 +4,8 @@ import cats._
 import cats.implicits._
 import com.wavesplatform.state2._
 import com.wavesplatform.state2.reader.StateReader
-import scorex.transaction.{StateValidationError, ValidationError}
-import scorex.transaction.ValidationError.{TransactionValidationErrorByAccount, TransactionValidationError}
+import scorex.transaction.ValidationError
+import scorex.transaction.ValidationError.OrderValidationError
 import scorex.transaction.assets.exchange.ExchangeTransaction
 
 import scala.util.Right
@@ -83,10 +83,10 @@ object ExchangeTransactionDiff {
       maxfee = exTrans.sellOrder.matcherFee,
       maxAmount = exTrans.sellOrder.amount)
 
-    if (!buyAmountValid) Left(TransactionValidationErrorByAccount(exTrans, exTrans.buyOrder.senderPublicKey, s"Too much buy. Already filled volume for the order: ${filledBuy.volume}"))
-    else if (!sellAmountValid) Left(TransactionValidationErrorByAccount(exTrans, exTrans.sellOrder.senderPublicKey, s"Too much sell. Already filled volume for the order: ${filledSell.volume}"))
-    else if (!buyFeeValid) Left(TransactionValidationErrorByAccount(exTrans, exTrans.buyOrder.senderPublicKey, s"Insufficient buy fee"))
-    else if (!sellFeeValid) Left(TransactionValidationErrorByAccount(exTrans, exTrans.sellOrder.senderPublicKey, s"Insufficient sell fee"))
+    if (!buyAmountValid) Left(OrderValidationError(exTrans.buyOrder, s"Too much buy. Already filled volume for the order: ${filledBuy.volume}"))
+    else if (!sellAmountValid) Left(OrderValidationError(exTrans.sellOrder, s"Too much sell. Already filled volume for the order: ${filledSell.volume}"))
+    else if (!buyFeeValid) Left(OrderValidationError(exTrans.buyOrder, s"Insufficient buy fee"))
+    else if (!sellFeeValid) Left(OrderValidationError(exTrans.sellOrder, s"Insufficient sell fee"))
     else Right(exTrans)
   }
 }

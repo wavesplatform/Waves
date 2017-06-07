@@ -6,14 +6,14 @@ import com.wavesplatform.state2.reader.StateReader
 import com.wavesplatform.state2.{Diff, LeaseInfo, Portfolio}
 import scorex.account.Account
 import scorex.transaction.Transaction
-import scorex.transaction.ValidationError.TransactionValidationErrorByAccount
+import scorex.transaction.ValidationError.AccountsValidationError
 
 import scala.util.{Left, Right}
 
 object BalanceDiffValidation {
 
 
-  def apply[T <: Transaction](s: StateReader, time: Long, fs: FunctionalitySettings)(tx: T, d: Diff): Either[TransactionValidationErrorByAccount, Diff] = {
+  def apply[T <: Transaction](s: StateReader, time: Long, fs: FunctionalitySettings)(tx: T, d: Diff): Either[AccountsValidationError, Diff] = {
 
     val changedAccounts = d.portfolios.keySet
     val positiveBalanceErrors = changedAccounts.flatMap(acc => {
@@ -34,12 +34,11 @@ object BalanceDiffValidation {
       } else Seq.empty[(Account, String)]
     })
 
-    positiveBalanceErrors.headOption
-      .map(h => TransactionValidationErrorByAccount(tx, h._1, s"Transaction application leads to $positiveBalanceErrors")) match {
-      case Some(err) => Left(err)
-      case None    => Right(d)
+    if (positiveBalanceErrors.isEmpty) {
+      Right(d)
+    } else {
+      Left(AccountsValidationError(positiveBalanceErrors.map(e => (e._1, s"Transaction application leads to $e._2"))))
     }
-
   }
 
   private def leaseWavesInfo(p: Portfolio): (Long, LeaseInfo) = (p.balance, p.leaseInfo)
