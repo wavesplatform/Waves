@@ -65,7 +65,7 @@ object StateReader {
         else None
       })
 
-    def resolveAliasEi[T <: Transaction](aoa: AccountOrAlias): Either[StateValidationError, Account] = {
+    def resolveAliasEi[T <: Transaction](aoa: AccountOrAlias): Either[ValidationError, Account] = {
       aoa match {
         case a: Account => Right(a)
         case a: Alias => s.resolveAlias(a) match {

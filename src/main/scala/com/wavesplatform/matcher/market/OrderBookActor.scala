@@ -215,6 +215,7 @@ class OrderBookActor(assetPair: AssetPair, val orderHistory: ActorRef,
             res
           }
         }
+      case _ => cancelCounterOrder()
     }
   }
 

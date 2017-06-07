@@ -1,21 +1,19 @@
 package com.wavesplatform.state2.diffs
 
-import cats._
 import cats.implicits._
-import cats.Monoid
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.reader.StateReader
-import com.wavesplatform.state2.{Diff, ByteStr, LeaseInfo, Portfolio}
+import com.wavesplatform.state2.{ByteStr, Diff, LeaseInfo, Portfolio}
 import scorex.account.Account
 import scorex.transaction.ValidationError.TransactionValidationError
-import scorex.transaction.{PaymentTransaction, StateValidationError}
+import scorex.transaction.{PaymentTransaction, ValidationError}
 
 import scala.util.{Left, Right}
 
 object PaymentTransactionDiff {
 
   def apply(stateReader: StateReader, height: Int, settings: FunctionalitySettings, blockTime: Long)
-           (tx: PaymentTransaction): Either[StateValidationError, Diff] = {
+           (tx: PaymentTransaction): Either[ValidationError, Diff] = {
 
     stateReader.paymentTransactionIdByHash(ByteStr(tx.hash)) match {
       case Some(existing) if blockTime >= settings.requirePaymentUniqueId => Left(TransactionValidationError(tx, s"PaymentTx is already registered: $existing"))

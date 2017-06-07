@@ -1,7 +1,7 @@
 package com.wavesplatform
 
 import scorex.transaction.ValidationError.TransactionValidationError
-import scorex.transaction.{StateValidationError, Transaction, ValidationError}
+import scorex.transaction.{Transaction, ValidationError}
 
 import scala.util.{Left, Right, Try}
 
@@ -10,7 +10,7 @@ package object state2 {
   def safeSum(x: Long, y: Long): Long = Try(Math.addExact(x, y)).getOrElse(Long.MinValue)
 
   implicit class EitherExt[L <: ValidationError, R](ei: Either[L, R]) {
-    def liftValidationError[T <: Transaction](t: T): Either[StateValidationError, R] = {
+    def liftValidationError[T <: Transaction](t: T): Either[ValidationError, R] = {
       ei.left.map(e => TransactionValidationError(t, e.toString))
     }
   }

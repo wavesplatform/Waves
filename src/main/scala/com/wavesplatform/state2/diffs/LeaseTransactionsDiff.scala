@@ -1,13 +1,12 @@
 package com.wavesplatform.state2.diffs
 
 import cats._
-import cats.syntax.all._
 import cats.implicits._
 import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state2.reader.StateReader
 import com.wavesplatform.state2._
-import scorex.account.{Account, Alias}
-import scorex.transaction.StateValidationError
+import com.wavesplatform.state2.reader.StateReader
+import scorex.account.Account
+import scorex.transaction.ValidationError
 import scorex.transaction.ValidationError.TransactionValidationError
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 
@@ -15,7 +14,7 @@ import scala.util.{Left, Right}
 
 object LeaseTransactionsDiff {
 
-  def lease(s: StateReader, height: Int)(tx: LeaseTransaction): Either[StateValidationError, Diff] = {
+  def lease(s: StateReader, height: Int)(tx: LeaseTransaction): Either[ValidationError, Diff] = {
     val sender = Account.fromPublicKey(tx.sender.publicKey)
     s.resolveAliasEi(tx.recipient).flatMap { recipient =>
       if (recipient == sender)
@@ -37,7 +36,7 @@ object LeaseTransactionsDiff {
   }
 
   def leaseCancel(s: StateReader, settings: FunctionalitySettings, time: Long, height: Int)
-                 (tx: LeaseCancelTransaction): Either[StateValidationError, Diff] = {
+                 (tx: LeaseCancelTransaction): Either[ValidationError, Diff] = {
     val leaseEi = s.findTransaction[LeaseTransaction](tx.leaseId) match {
       case None => Left(TransactionValidationError(tx, s"Related LeaseTransaction not found"))
       case Some(l) => Right(l)

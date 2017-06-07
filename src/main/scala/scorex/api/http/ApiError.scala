@@ -32,6 +32,8 @@ object ApiError {
     case ValidationError.UnsupportedTransactionType(tx) => CustomValidationError(s"UnsupportedTransactionType: ${tx.json}")
     case ValidationError.TransactionParameterValidationError(m) => CustomValidationError(m)
     case ValidationError.TransactionValidationError(tx, err) => StateCheckFailed(tx, err)
+    case ValidationError.AccountsValidationError(errs) => CustomValidationError(errs.map(_._2).mkString(", "))
+    case ValidationError.OrderValidationError(order, m) => CustomValidationError(m)
   }
 }
 

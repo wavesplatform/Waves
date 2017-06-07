@@ -5,8 +5,6 @@ import scorex.transaction.assets.exchange.Order
 
 sealed trait ValidationError
 
-sealed trait StateValidationError extends ValidationError
-
 object ValidationError {
 
   case object InvalidAddress extends ValidationError
@@ -22,8 +20,8 @@ object ValidationError {
   case class CustomError(s: String) extends ValidationError
 
   case class UnsupportedTransactionType(tx:Transaction) extends ValidationError
-  case class AliasNotExists(a : Alias) extends StateValidationError
-  case class TransactionValidationError(tx: Transaction, err: String) extends StateValidationError
+  case class AliasNotExists(a : Alias) extends ValidationError
+  case class TransactionValidationError(tx: Transaction, err: String) extends ValidationError
   case class OrderValidationError(order: Order, err: String) extends ValidationError
   case class AccountsValidationError(errs: Set[(Account, String)]) extends ValidationError
 }
