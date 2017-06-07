@@ -71,7 +71,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
       checkpoints,
       blockchainUpdater,
       time,
-      stateWriter,
+      stateReader,
       utxStorage,
       newTransactionHandler,
       peerDatabase,
