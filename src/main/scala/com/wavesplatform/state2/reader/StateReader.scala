@@ -106,6 +106,14 @@ object StateReader {
 
     def effectiveBalance(account: Account): Long = s.accountPortfolio(account).effectiveBalance
 
+    def spendableBalance(account: AssetAcc): Long = {
+      val accountPortfolio = s.accountPortfolio(account.account)
+      account.assetId match {
+        case Some(assetId) => accountPortfolio.assets.getOrElse(assetId, 0)
+        case None => accountPortfolio.spendableBalance
+      }
+    }
+
     def isReissuable(id: Array[Byte]): Boolean =
       s.assetInfo(ByteStr(id)).get.isReissuable
 
@@ -116,6 +124,10 @@ object StateReader {
       s.findTransaction[IssueTransaction](assetId)
         .map(tx => new String(tx.name, Charsets.UTF_8))
         .getOrElse("Unknown")
+    }
+
+    def getIssueTransaction(assetId: AssetId): Option[IssueTransaction] = {
+      s.findTransaction[IssueTransaction](assetId)
     }
 
     def stateHash(): Int = (BigInt(FastCryptographicHash(s.accountPortfolios.toString().getBytes)) % Int.MaxValue).toInt

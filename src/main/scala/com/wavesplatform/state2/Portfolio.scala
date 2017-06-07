@@ -6,6 +6,7 @@ import cats.Monoid
 
 case class Portfolio(balance: Long, leaseInfo: LeaseInfo, assets: Map[ByteStr, Long]) {
   lazy val effectiveBalance: Long = safeSum(balance, leaseInfo.leaseIn) - leaseInfo.leaseOut
+  lazy val spendableBalance: Long = balance - leaseInfo.leaseOut
 }
 
 object Portfolio {

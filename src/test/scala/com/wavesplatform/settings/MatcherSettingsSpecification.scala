@@ -21,6 +21,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
         |    order-match-tx-fee: 100000
         |    journal-directory: ${waves.directory}"/journal"
         |    snapshots-directory: ${waves.directory}"/snapshots"
+        |    order-history-file = ${waves.directory}"/matcher/orderhistory.dat"
         |    snapshots-interval: 1d
         |    max-open-orders: 1000
         |    price-assets: [
@@ -33,6 +34,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
         |      {amountAsset = "DHgwrRvVyqJsepd32YbBqUeDH4GJ1N984X8QoekjgH8J", priceAsset = "WAVES"},
         |      {amountAsset = "DHgwrRvVyqJsepd32YbBqUeDH4GJ1N984X8QoekjgH8J", priceAsset = "8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS"},
         |    ]
+        |    max-timestamp-diff = 3h
         |  }
         |}
       """.stripMargin).resolve()

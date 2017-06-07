@@ -75,8 +75,7 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
   lazy val signatureValid = EllipticCurveImpl.verify(signature, toSign, senderPublicKey.publicKey)
 
   def isValid(atTime: Long): Validation = {
-    (amount > 0) :| "amount should be > 0" &&
-      (price > 0) :| "price should be > 0" &&
+    isValidAmount(price, amount) &&
       assetPair.isValid &&
       (amount < MaxAmount) :| "amount too large" &&
       getSpendAmount(price, amount).isRight :| "SpendAmount too large" &&
@@ -89,6 +88,16 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
       (expiration - atTime <= MaxLiveTime) :| "expiration should be earlier than 30 days" &&
       (expiration >= atTime) :| "expiration should be > currentTime" &&
       signatureValid :| "signature should be valid"
+  }
+
+  def isValidAmount(matchPrice: Long, matchAmount: Long): Validation = {
+    (matchAmount > 0) :| "amount should be > 0" &&
+      (matchPrice > 0) :| "price should be > 0" &&
+      (matchAmount < MaxAmount) :| "amount too large" &&
+      getSpendAmount(matchPrice, matchAmount).isRight :| "SpendAmount too large" &&
+      (getSpendAmount(matchPrice, matchAmount).getOrElse(0L) > 0) :| "SpendAmount should be > 0" &&
+      getReceiveAmount(matchPrice, matchAmount).isRight :| "ReceiveAmount too large" &&
+      (getReceiveAmount(matchPrice, matchAmount).getOrElse(0L) > 0) :| "ReceiveAmount should be > 0"
   }
 
   @ApiModelProperty(hidden = true)
@@ -151,6 +160,8 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
     "matcherFee" -> matcherFee,
     "signature" -> Base58.encode(signature)
   )
+
+  def jsonStr: String = Json.stringify(json)
 
   override def canEqual(that: Any): Boolean = that.isInstanceOf[Order]
 
