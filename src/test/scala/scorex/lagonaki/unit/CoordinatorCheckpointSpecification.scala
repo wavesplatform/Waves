@@ -4,10 +4,9 @@ import akka.actor.{ActorRef, Props}
 import akka.testkit.TestProbe
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.Application
-import com.wavesplatform.history.BlockStorageImpl
+import com.wavesplatform.history.{BlockStorageImpl, CheckpointServiceImpl}
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state2._
-import org.h2.mvstore.MVStore
 import scorex.ActorTestingCommons
 import scorex.account.PrivateKeyAccount
 import scorex.block.Block
@@ -55,8 +54,8 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
   val testPeerManager = TestProbe("PeerManager")
   val connectedPeer: ConnectedPeer = stub[ConnectedPeer]
 
-  val db: MVStore = new MVStore.Builder().open()
-  val (checkpoints1, history1, stateReader1, blockchainUpdater1) = BlockStorageImpl(wavesSettings.blockchainSettings).get
+  val checkpoints1 = new CheckpointServiceImpl(None)
+  val (history1, _, stateReader1, blockchainUpdater1) = BlockStorageImpl(wavesSettings.blockchainSettings).get
   val utxStorage1 = new UnconfirmedTransactionsDatabaseImpl(wavesSettings.utxSettings.size)
   class ValidBlockCoordinator extends Coordinator(networkControllerMock, testBlockchainSynchronizer.ref,
     testBlockGenerator.ref, testPeerManager.ref, testScoreObserver.ref, blockchainUpdater1, NTP, utxStorage1, history1, stateReader1, checkpoints1, wavesSettings) {

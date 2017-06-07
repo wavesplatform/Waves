@@ -3,13 +3,13 @@ package scorex.network
 import java.net.InetSocketAddress
 
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.settings.NetworkSettings
+import com.wavesplatform.settings.{NetworkSettings, loadConfig}
 import org.scalatest.{FeatureSpec, GivenWhenThen, ParallelTestExecution}
 import scorex.network.peer.PeerDatabaseImpl
 
 class BlacklistParallelSpecification extends FeatureSpec with GivenWhenThen with ParallelTestExecution {
 
-  private val config = ConfigFactory.parseString(
+  private val config = loadConfig(ConfigFactory.parseString(
     """
       |waves {
       |  network {
@@ -17,7 +17,7 @@ class BlacklistParallelSpecification extends FeatureSpec with GivenWhenThen with
       |    black-list-residence-time: 1s
       |  }
       |}
-    """.stripMargin).withFallback(ConfigFactory.load()).resolve()
+    """.stripMargin))
 
   private val networkSettings = NetworkSettings.fromConfig(config)
 

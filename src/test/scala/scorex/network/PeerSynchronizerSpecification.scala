@@ -27,7 +27,7 @@ class PeerSynchronizerSpecification extends ActorTestingCommons
     """
       |waves {
       |  network {
-      |    file: none
+      |    file: ""
       |    nonce: 123456789
       |    peers-data-residence-time: 100s
       |    black-list-residence-time: 1000

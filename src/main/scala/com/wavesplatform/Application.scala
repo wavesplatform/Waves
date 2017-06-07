@@ -12,7 +12,7 @@ import akka.stream.ActorMaterializer
 import akka.util.Timeout
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.actor.RootActorSystem
-import com.wavesplatform.history.BlockStorageImpl
+import com.wavesplatform.history.{BlockStorageImpl, CheckpointServiceImpl}
 import com.wavesplatform.http.NodeApiRoute
 import com.wavesplatform.matcher.Matcher
 import com.wavesplatform.settings._
@@ -47,7 +47,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
 
   val messagesHandler = MessageHandler(BasicMessagesRepo.specs ++ TransactionalMessagesRepo.specs)
   val feeCalculator = new FeeCalculator(settings.feesSettings)
-  val (checkpoints, history, stateWriter, blockchainUpdater) = BlockStorageImpl(settings.blockchainSettings).get
+  val checkpoints = new CheckpointServiceImpl(settings.blockchainSettings.checkpointFile)
+  val (history, stateWriter, stateReader, blockchainUpdater) = BlockStorageImpl(settings.blockchainSettings).get
   val time: Time = new TimeImpl()
   val wallet: Wallet = {
     Base58.decode(settings.walletSettings.seed) match {
@@ -59,25 +60,25 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
   }
   val utxStorage: UnconfirmedTransactionsStorage = new UnconfirmedTransactionsDatabaseImpl(settings.utxSettings.size)
   val newTransactionHandler = new NewTransactionHandlerImpl(settings.blockchainSettings.functionalitySettings,
-    networkController, time, feeCalculator, utxStorage, stateWriter)
+    networkController, time, feeCalculator, utxStorage, stateReader)
 
   lazy val apiRoutes = Seq(
     BlocksApiRoute(settings.restAPISettings, settings.checkpointsSettings, history, coordinator),
-    TransactionsApiRoute(settings.restAPISettings, stateWriter, history, utxStorage),
-    NxtConsensusApiRoute(settings.restAPISettings, stateWriter, history, settings.blockchainSettings.functionalitySettings),
+    TransactionsApiRoute(settings.restAPISettings, stateReader, history, utxStorage),
+    NxtConsensusApiRoute(settings.restAPISettings, stateReader, history, settings.blockchainSettings.functionalitySettings),
     WalletApiRoute(settings.restAPISettings, wallet),
     PaymentApiRoute(settings.restAPISettings, wallet, newTransactionHandler, time),
     UtilsApiRoute(settings.restAPISettings),
     PeersApiRoute(settings.restAPISettings, peerManager, networkController),
-    AddressApiRoute(settings.restAPISettings, wallet, stateWriter, settings.blockchainSettings.functionalitySettings),
-    DebugApiRoute(settings.restAPISettings, wallet, stateWriter, blockchainUpdater, history, peerManager),
+    AddressApiRoute(settings.restAPISettings, wallet, stateReader, settings.blockchainSettings.functionalitySettings),
+    DebugApiRoute(settings.restAPISettings, wallet, stateReader, blockchainUpdater, history, peerManager),
     WavesApiRoute(settings.restAPISettings, wallet, newTransactionHandler, time),
-    AssetsApiRoute(settings.restAPISettings, wallet, stateWriter, newTransactionHandler, time),
+    AssetsApiRoute(settings.restAPISettings, wallet, stateReader, newTransactionHandler, time),
     NodeApiRoute(settings.restAPISettings, () => this.shutdown(), blockGenerator, coordinator),
     AssetsBroadcastApiRoute(settings.restAPISettings, newTransactionHandler),
-    LeaseApiRoute(settings.restAPISettings, wallet, stateWriter, newTransactionHandler, time),
+    LeaseApiRoute(settings.restAPISettings, wallet, stateReader, newTransactionHandler, time),
     LeaseBroadcastApiRoute(settings.restAPISettings, newTransactionHandler),
-    AliasApiRoute(settings.restAPISettings, wallet, newTransactionHandler, time, stateWriter),
+    AliasApiRoute(settings.restAPISettings, wallet, newTransactionHandler, time, stateReader),
     AliasBroadcastApiRoute(settings.restAPISettings, newTransactionHandler)
   )
 
@@ -104,11 +105,11 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
   lazy val networkController: ActorRef = actorSystem.actorOf(Props(new NetworkController(settings.networkSettings, upnp, peerManager, messagesHandler)), "NetworkController")
   lazy val peerManager: ActorRef = actorSystem.actorOf(PeerManager.props(settings.networkSettings, networkController, settings.blockchainSettings.addressSchemeCharacter), "PeerManager")
   lazy val unconfirmedPoolSynchronizer: ActorRef = actorSystem.actorOf(Props(new UnconfirmedPoolSynchronizer(newTransactionHandler, settings.utxSettings, networkController, utxStorage)))
-  lazy val coordinator: ActorRef = actorSystem.actorOf(Props(new Coordinator(networkController, blockchainSynchronizer, blockGenerator, peerManager, scoreObserver, blockchainUpdater, time, utxStorage, history, stateWriter, checkpoints, settings)), "Coordinator")
+  lazy val coordinator: ActorRef = actorSystem.actorOf(Props(new Coordinator(networkController, blockchainSynchronizer, blockGenerator, peerManager, scoreObserver, blockchainUpdater, time, utxStorage, history, stateReader, checkpoints, settings)), "Coordinator")
   lazy val scoreObserver: ActorRef = actorSystem.actorOf(Props(new ScoreObserver(networkController, coordinator, settings.synchronizationSettings)), "ScoreObserver")
   lazy val historyReplier: ActorRef = actorSystem.actorOf(Props(new HistoryReplier(networkController, history: History, settings.synchronizationSettings.maxChainLength: Int)), "HistoryReplier")
   lazy val blockGenerator: ActorRef = actorSystem.actorOf(Props(new BlockGeneratorController(settings.minerSettings, history, time, peerManager,
-    wallet, stateWriter, settings.blockchainSettings, utxStorage, coordinator)), "BlockGenerator")
+    wallet, stateReader, settings.blockchainSettings, utxStorage, coordinator)), "BlockGenerator")
   lazy val blockchainSynchronizer: ActorRef = actorSystem.actorOf(Props(new BlockchainSynchronizer(networkController, coordinator, history, settings.synchronizationSettings)), "BlockchainSynchronizer")
   lazy val peerSynchronizer: ActorRef = actorSystem.actorOf(Props(new PeerSynchronizer(networkController, peerManager, settings.networkSettings)), "PeerSynchronizer")
 
@@ -142,7 +143,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
     }
 
     if (settings.matcherSettings.enable) {
-      val matcher = new Matcher(actorSystem, wallet, newTransactionHandler, stateWriter, time, history, settings.blockchainSettings, settings.restAPISettings, settings.matcherSettings)
+      val matcher = new Matcher(actorSystem, wallet, newTransactionHandler, stateReader, time, history, settings.blockchainSettings, settings.restAPISettings, settings.matcherSettings)
       matcher.runMatcher()
     }
   }
@@ -229,12 +230,7 @@ object Application extends ScorexLogging {
           log.error("https://github.com/wavesplatform/Waves/wiki/Waves-Node-configuration-file")
           System.exit(1)
         }
-        ConfigFactory
-          .defaultOverrides()
-          .withFallback(cfg)
-          .withFallback(ConfigFactory.defaultApplication())
-          .withFallback(ConfigFactory.defaultReference())
-          .resolve()
+        loadConfig(cfg)
     }
 
     config
