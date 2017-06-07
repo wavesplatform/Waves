@@ -27,13 +27,11 @@ class WavesSettingsSpecification extends FlatSpec with Matchers {
   }
 
   "WavesSettings" should "resolver folders correctly" in {
-    val config = ConfigFactory.parseString(
-      """
-        |waves {
+    val config = loadConfig(ConfigFactory.parseString(
+      """waves {
         |  logging-level = TRACE
         |  directory = "/xxx"
-        |}
-      """.stripMargin).withFallback(ConfigFactory.defaultApplication().withFallback(ConfigFactory.load()))
+        |}""".stripMargin))
 
     val settings = WavesSettings.fromConfig(config.resolve())
 

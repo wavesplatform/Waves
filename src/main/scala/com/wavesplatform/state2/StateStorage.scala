@@ -89,7 +89,7 @@ object StateStorage {
     }
 
   def apply(file: Option[File], dropExisting: Boolean = false) = for {
-    ss <- createWithStore[StateStorage](file, new StateStorage(file), ss => !(dropExisting || ss.isDirty()))
+    ss <- createWithStore[StateStorage](file, new StateStorage(file), !_.isDirty(), dropExisting)
     if validateVersion(ss)
   } yield ss
 

@@ -36,7 +36,6 @@ class PeerManagerSpecification extends ActorTestingCommons {
     """
       |waves {
       |  network {
-      |    file = ""
       |    known-peers = ["127.0.0.1:1"]
       |    nonce = 123456789
       |    max-inbound-connections = 5

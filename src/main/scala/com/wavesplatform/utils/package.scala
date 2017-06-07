@@ -27,13 +27,17 @@ package object utils extends ScorexLogging {
     }
   }
 
-  def createWithStore[A <: AutoCloseable](storeFile: Option[File], f: => A, pred: A => Boolean): Try[A] = Try {
+  def createWithStore[A <: AutoCloseable](storeFile: Option[File], f: => A, pred: A => Boolean, deleteExisting: Boolean = false): Try[A] = Try {
+    for (fileToDelete <- storeFile if deleteExisting) Files.delete(fileToDelete.toPath)
     val a = f
     if (pred(a)) a else storeFile match {
       case Some(file) =>
         log.debug(s"Re-creating file store at $file")
+        a.close()
         Files.delete(file.toPath)
-        f.ensuring(pred, "store is inconsistent")
+        val newA = f
+        require(pred(a), "store is inconsistent")
+        newA
       case None => throw new IllegalArgumentException("in-memory store is corrupted")
     }
   }
