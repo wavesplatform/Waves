@@ -36,7 +36,7 @@ package object utils extends ScorexLogging {
         a.close()
         Files.delete(file.toPath)
         val newA = f
-        require(pred(a), "store is inconsistent")
+        require(pred(newA), "store is inconsistent")
         newA
       case None => throw new IllegalArgumentException("in-memory store is corrupted")
     }
