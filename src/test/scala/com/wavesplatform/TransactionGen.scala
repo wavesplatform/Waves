@@ -1,5 +1,6 @@
 package com.wavesplatform
 
+import com.wavesplatform.settings.Constants
 import org.scalacheck.{Arbitrary, Gen}
 import scorex.account.PublicKeyAccount._
 import scorex.account._
@@ -198,6 +199,12 @@ trait TransactionGen {
     (issue, reissue1, reissue2)
   }
 
+  def issueGen(sender: PrivateKeyAccount, fixedQuantity: Option[Long] = None): Gen[IssueTransaction] = for {
+    (_, assetName, description, quantity, decimals, _, iFee, timestamp) <- issueParamGen
+  } yield {
+    IssueTransaction.create(sender, assetName, description, fixedQuantity.getOrElse(quantity), decimals, reissuable = false, 1*Constants.UnitsInWave, timestamp).right.get
+  }
+
   val issueGen: Gen[IssueTransaction] = issueReissueBurnMakeAssetNameUniqueGen.map(_._1)
   val reissueGen: Gen[ReissueTransaction] = issueReissueBurnMakeAssetNameUniqueGen.map(_._2)
   val burnGen: Gen[BurnTransaction] = issueReissueBurnMakeAssetNameUniqueGen.map(_._3)
@@ -242,12 +249,13 @@ trait TransactionGen {
   } yield r
 
   def exchangeGeneratorP(buyer: PrivateKeyAccount, seller: PrivateKeyAccount, amountAssetId: Option[ByteStr],
-                         priceAssetId: Option[ByteStr]): Gen[ExchangeTransaction] = for {
-    (_, matcher, _, _, price, amount1, timestamp, expiration, matcherFee) <- orderParamGen
+                         priceAssetId: Option[ByteStr], fixedMatcherFee: Option[Long] = None): Gen[ExchangeTransaction] = for {
+    (_, matcher, _, _, price, amount1, timestamp, expiration, genMatcherFee) <- orderParamGen
     amount2: Long <- matcherAmountGen
     matchedAmount: Long <- Gen.choose(Math.min(amount1, amount2) / 2000, Math.min(amount1, amount2) / 1000)
     assetPair = AssetPair(amountAssetId, priceAssetId)
   } yield {
+    val matcherFee = fixedMatcherFee.getOrElse(genMatcherFee)
     val o1 = Order.buy(buyer, matcher, assetPair, price, amount1, timestamp, expiration, matcherFee)
     val o2 = Order.sell(seller, matcher, assetPair, price, amount2, timestamp, expiration, matcherFee)
     val buyFee = (BigInt(matcherFee) * BigInt(matchedAmount) / BigInt(amount1)).longValue()

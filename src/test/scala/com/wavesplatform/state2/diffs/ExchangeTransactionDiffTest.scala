@@ -2,16 +2,20 @@ package com.wavesplatform.state2.diffs
 
 import cats._
 import com.wavesplatform.TransactionGen
+import com.wavesplatform.settings.Constants
 import com.wavesplatform.state2._
 import org.scalacheck.{Gen, Shrink}
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
-import org.scalatest.{Matchers, PropSpec}
+import org.scalatest.{Inside, Matchers, PropSpec}
+import scorex.account.PrivateKeyAccount
 import scorex.lagonaki.mocks.TestBlock
-import scorex.transaction.GenesisTransaction
+import scorex.transaction.ValidationError.TransactionValidationErrorByAccount
 import scorex.transaction.assets.IssueTransaction
-import scorex.transaction.assets.exchange.ExchangeTransaction
+import scorex.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
+import scorex.transaction.{GenesisTransaction, ValidationError}
 
-class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers with TransactionGen {
+class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks
+  with Matchers with TransactionGen with Inside {
 
   // This might fail from time to time.
   // The logic defining max matched amount is a bit complex
@@ -42,6 +46,97 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Gene
         totalPortfolioDiff.assets.values.toSet shouldBe Set(0L)
 
         blockDiff.txsDiff.portfolios(exchange.sender).balance shouldBe exchange.buyMatcherFee + exchange.sellMatcherFee - exchange.fee
+      }
+    }
+  }
+
+  property("buy waves without enough money for fee") {
+    val preconditions: Gen[(GenesisTransaction, GenesisTransaction, IssueTransaction, ExchangeTransaction)] = for {
+      buyer <- accountGen
+      seller <- accountGen
+      ts <- timestampGen
+      gen1: GenesisTransaction = GenesisTransaction.create(buyer, 1*Constants.UnitsInWave, ts).right.get
+      gen2: GenesisTransaction = GenesisTransaction.create(seller, ENOUGH_AMT, ts).right.get
+      issue1: IssueTransaction <- issueGen(buyer)
+      exchange <- exchangeGeneratorP(buyer, seller, None, Some(issue1.id), fixedMatcherFee = Some(300000))
+    } yield (gen1, gen2, issue1, exchange)
+
+    forAll(preconditions, accountGen) { case ((gen1, gen2, issue1, exchange), miner) =>
+      whenever(exchange.amount > 300000) {
+        assertDiffAndState(Seq(TestBlock(Seq(gen1, gen2, issue1))), TestBlock(Seq(exchange), miner)) { case (blockDiff, state) =>
+          val totalPortfolioDiff: Portfolio = Monoid.combineAll(blockDiff.txsDiff.portfolios.values)
+          totalPortfolioDiff.balance shouldBe 0
+          totalPortfolioDiff.effectiveBalance shouldBe 0
+          totalPortfolioDiff.assets.values.toSet shouldBe Set(0L)
+
+          blockDiff.txsDiff.portfolios(exchange.sender).balance shouldBe exchange.buyMatcherFee + exchange.sellMatcherFee - exchange.fee
+        }
+      }
+    }
+  }
+  def createExTx(buy: Order, sell: Order, price: Long, matcher: PrivateKeyAccount, ts: Long): Either[ValidationError, ExchangeTransaction] = {
+    val mf = buy.matcherFee
+    val amount = math.min(buy.amount, sell.amount)
+    ExchangeTransaction.create(matcher = matcher,
+      buyOrder = buy,
+      sellOrder = sell,
+      price = price,
+      amount = amount,
+      buyMatcherFee = (BigInt(mf)*amount/buy.amount).toLong,
+      sellMatcherFee = (BigInt(mf)*amount/sell.amount).toLong,
+      fee = buy.matcherFee,
+      timestamp = ts)
+  }
+
+  property("small fee cases") {
+    val MatcherFee = 300000L
+    val Ts = 1000L
+
+    val preconditions: Gen[(PrivateKeyAccount, PrivateKeyAccount, PrivateKeyAccount, GenesisTransaction, GenesisTransaction, IssueTransaction)] = for {
+      buyer <- accountGen
+      seller <- accountGen
+      matcher <- accountGen
+      ts <- timestampGen
+      gen1: GenesisTransaction = GenesisTransaction.create(buyer, ENOUGH_AMT, ts).right.get
+      gen2: GenesisTransaction = GenesisTransaction.create(seller, ENOUGH_AMT, ts).right.get
+      issue1: IssueTransaction <- issueGen(seller)
+    } yield (buyer, seller, matcher, gen1, gen2, issue1)
+
+    forAll(preconditions, priceGen) { case ((buyer, seller, matcher, gen1, gen2, issue1), price) =>
+      val assetPair = AssetPair(Some(issue1.id), None)
+      val buy = Order.buy(buyer, matcher, assetPair, price, 1000000L, Ts, Ts + 1, MatcherFee)
+      val sell = Order.sell(seller, matcher, assetPair, price, 1L, Ts, Ts + 1, MatcherFee)
+      val tx = createExTx(buy, sell, price, matcher, Ts).explicitGet()
+      assertDiffAndState(Seq(TestBlock(Seq(gen1, gen2, issue1))), TestBlock(Seq(tx))) { case (blockDiff, state) =>
+        blockDiff.txsDiff.portfolios(tx.sender).balance shouldBe tx.buyMatcherFee + tx.sellMatcherFee - tx.fee
+        state.accountPortfolio(tx.sender).balance shouldBe 0L
+      }
+    }
+  }
+
+  property("Not enough balance") {
+    val MatcherFee = 300000L
+    val Ts = 1000L
+
+    val preconditions: Gen[(PrivateKeyAccount, PrivateKeyAccount, PrivateKeyAccount, GenesisTransaction, GenesisTransaction, IssueTransaction)] = for {
+      buyer <- accountGen
+      seller <- accountGen
+      matcher <- accountGen
+      ts <- timestampGen
+      gen1: GenesisTransaction = GenesisTransaction.create(buyer, ENOUGH_AMT, ts).right.get
+      gen2: GenesisTransaction = GenesisTransaction.create(seller, ENOUGH_AMT, ts).right.get
+      issue1: IssueTransaction <- issueGen(seller, fixedQuantity = Some(1000L))
+    } yield (buyer, seller, matcher, gen1, gen2, issue1)
+
+    forAll(preconditions, priceGen) { case ((buyer, seller, matcher, gen1, gen2, issue1), price) =>
+      val assetPair = AssetPair(Some(issue1.id), None)
+      val buy = Order.buy(buyer, matcher, assetPair, price, issue1.quantity + 1, Ts, Ts + 1, MatcherFee)
+      val sell = Order.sell(seller, matcher, assetPair, price, issue1.quantity + 1, Ts, Ts + 1, MatcherFee)
+      val tx = createExTx(buy, sell, price, matcher, Ts).explicitGet()
+      assertDiffEi(Seq(TestBlock(Seq(gen1, gen2, issue1))), TestBlock(Seq(tx))) { totalDiffEi =>
+        inside(totalDiffEi) { case Left(TransactionValidationErrorByAccount(_, acc, _)) =>
+          acc.address shouldBe seller.address
+        }
       }
     }
   }

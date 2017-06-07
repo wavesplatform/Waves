@@ -8,7 +8,7 @@ import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
 import scorex.serialization.BytesSerializable
 import scorex.transaction.TransactionParser.TransactionType
-import scorex.transaction.ValidationError.TransactionParameterValidationError
+import scorex.transaction.ValidationError.{AccountValidationError, TransactionParameterValidationError}
 import scorex.transaction.{ValidationError, _}
 
 import scala.util.{Failure, Success, Try}
@@ -84,9 +84,13 @@ object ExchangeTransaction {
     } else if (buyOrder.assetPair != sellOrder.assetPair) {
       Left(TransactionParameterValidationError("Both orders should have same AssetPair"))
     } else if (!buyOrder.isValid(timestamp)) {
-      Left(TransactionParameterValidationError(buyOrder.isValid(timestamp).labels.mkString("\n")))
+      Left(AccountValidationError(buyOrder.senderPublicKey, buyOrder.isValid(timestamp).messages()))
+    } else if (!buyOrder.isValidAmount(price, amount)) {
+      Left(AccountValidationError(buyOrder.senderPublicKey, buyOrder.isValidAmount(price, amount).messages()))
     } else if (!sellOrder.isValid(timestamp)) {
-      Left(TransactionParameterValidationError(sellOrder.isValid(timestamp).labels.mkString("\n")))
+      Left(AccountValidationError(sellOrder.senderPublicKey, sellOrder.isValid(timestamp).labels.mkString("\n")))
+    } else if (!sellOrder.isValidAmount(price, amount)) {
+      Left(AccountValidationError(sellOrder.senderPublicKey, sellOrder.isValidAmount(price, amount).messages()))
     } else if (!priceIsValid) {
       Left(TransactionParameterValidationError("priceIsValid"))
     } else {

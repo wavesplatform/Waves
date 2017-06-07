@@ -16,7 +16,7 @@ import play.api.libs.json._
 import scorex.crypto.encode.Base58
 import scorex.transaction.ValidationError.CustomError
 import scorex.transaction.assets.exchange._
-import scorex.transaction.{History, NewTransactionHandler}
+import scorex.transaction.{History, NewTransactionHandler, ValidationError, ValidationErrorByAccount}
 import scorex.utils.{NTP, ScorexLogging}
 import scorex.wallet.Wallet
 
@@ -198,12 +198,24 @@ class OrderBookActor(assetPair: AssetPair, val orderHistory: ActorRef,
   }
 
   def handleMatchEvent(e: Event): Option[LimitOrder] = {
+    def processInvalidTransaction(event: OrderExecuted, err: ValidationError): Option[LimitOrder] = {
+      log.debug(s"Failed to execute order: $err")
+      err match {
+        case byAcc: ValidationErrorByAccount if byAcc.acc.address == event.submitted.order.senderPublicKey.address =>
+          None
+        case _ =>
+          val canceled = Events.OrderCanceled(event.counter)
+          processEvent(canceled)
+          Some(event.submitted)
+      }
+    }
+
     e match {
       case e: OrderAdded =>
         processEvent(e)
         None
 
-      case e@OrderExecuted(o, c) =>
+      case event@OrderExecuted(o, c) =>
         val result = for {
           transaction <- createTransaction(o, c)
           validationResult <- validate(transaction)
@@ -212,14 +224,11 @@ class OrderBookActor(assetPair: AssetPair, val orderHistory: ActorRef,
 
         result match {
           case Left(ex) =>
-            log.debug(s"Failed to execute order: $ex")
-            val canceled = Events.OrderCanceled(c)
-            processEvent(canceled)
-            Some(o)
+            processInvalidTransaction(event, ex)
           case Right(_) =>
-            processEvent(e)
-            if (e.submittedRemaining > 0)
-              Some(o.partial(e.submittedRemaining))
+            processEvent(event)
+            if (event.submittedRemaining > 0)
+              Some(o.partial(event.submittedRemaining))
             else None
         }
       case _ => None
