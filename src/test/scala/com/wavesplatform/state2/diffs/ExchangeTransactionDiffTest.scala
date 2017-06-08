@@ -9,7 +9,7 @@ import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import org.scalatest.{Inside, Matchers, PropSpec}
 import scorex.account.PrivateKeyAccount
 import scorex.lagonaki.mocks.TestBlock
-import scorex.transaction.ValidationError.AccountsValidationError
+import scorex.transaction.ValidationError.AccountBalanceError
 import scorex.transaction.assets.IssueTransaction
 import scorex.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
 import scorex.transaction.{GenesisTransaction, ValidationError}
@@ -134,8 +134,8 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Gene
       val sell = Order.sell(seller, matcher, assetPair, price, issue1.quantity + 1, Ts, Ts + 1, MatcherFee)
       val tx = createExTx(buy, sell, price, matcher, Ts).explicitGet()
       assertDiffEi(Seq(TestBlock(Seq(gen1, gen2, issue1))), TestBlock(Seq(tx))) { totalDiffEi =>
-        inside(totalDiffEi) { case Left(AccountsValidationError(errs)) =>
-          errs.map(_._1.address) shouldBe Set(seller.address)
+        inside(totalDiffEi) { case Left(AccountBalanceError(errs)) =>
+          errs should contain key seller.toAccount
         }
       }
     }

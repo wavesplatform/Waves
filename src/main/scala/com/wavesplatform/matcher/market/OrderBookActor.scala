@@ -14,7 +14,7 @@ import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.reader.StateReader
 import play.api.libs.json._
 import scorex.crypto.encode.Base58
-import scorex.transaction.ValidationError.{AccountsValidationError, CustomError, OrderValidationError}
+import scorex.transaction.ValidationError.{AccountBalanceError, CustomError, OrderValidationError}
 import scorex.transaction.assets.exchange._
 import scorex.transaction.{History, NewTransactionHandler, ValidationError}
 import scorex.utils.{NTP, ScorexLogging}
@@ -207,12 +207,11 @@ class OrderBookActor(assetPair: AssetPair, val orderHistory: ActorRef,
     err match {
       case OrderValidationError(order, _) if order == event.submitted.order => None
       case OrderValidationError(order, _) if order == event.counter.order => cancelCounterOrder()
-      case AccountsValidationError(errs) =>
-        if (errs.exists(_._1.address == event.counter.order.senderPublicKey.address)) {
+      case AccountBalanceError(errs) =>
+        if (errs.contains(event.counter.order.senderPublicKey.toAccount)) {
           cancelCounterOrder()
         }
-
-        if (errs.exists(_._1.address == event.submitted.order.senderPublicKey.address)) {
+        if (errs.contains(event.submitted.order.senderPublicKey.toAccount)) {
           None
         } else {
           Some(event.submitted)
