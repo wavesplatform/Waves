@@ -286,8 +286,6 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
         override def sendToNetwork(tx: SignedTransaction): Either[ValidationError, SignedTransaction] = Right(tx)
       }))
 
-      //ignoreNoMsg()
-
       actor ! ord1
       expectMsg(OrderAccepted(ord1))
       actor ! ord2

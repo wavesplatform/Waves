@@ -2,27 +2,27 @@ package com.wavesplatform.state2.diffs
 
 import cats.implicits._
 import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state2.{Diff, LeaseInfo, Portfolio}
 import com.wavesplatform.state2.reader.StateReader
+import com.wavesplatform.state2.{Diff, LeaseInfo, Portfolio}
+import scorex.account.Account
 import scorex.transaction.Transaction
-import scorex.transaction.ValidationError.TransactionValidationError
+import scorex.transaction.ValidationError.AccountBalanceError
 
 import scala.util.{Left, Right}
 
 object BalanceDiffValidation {
 
 
-  def apply[T <: Transaction](s: StateReader, time: Long, fs: FunctionalitySettings)(tx: T, d: Diff): Either[TransactionValidationError, Diff] = {
+  def apply[T <: Transaction](s: StateReader, time: Long, fs: FunctionalitySettings)(tx: T, d: Diff): Either[AccountBalanceError, Diff] = {
 
     val changedAccounts = d.portfolios.keySet
-    val positiveBalanceErrors = changedAccounts.flatMap(acc => {
+    val positiveBalanceErrors: Map[Account, String] = changedAccounts.flatMap(acc => {
 
       val oldPortfolio = s.accountPortfolio(acc)
       val portfolioDiff = d.portfolios(acc)
       val newPortfolio = oldPortfolio.combine(portfolioDiff)
 
-
-      if (newPortfolio.balance < 0) {
+      val err = if (newPortfolio.balance < 0) {
         Some(s"negative waves balance: $acc, old: ${oldPortfolio.balance}, new: ${newPortfolio.balance}")
       } else if (newPortfolio.assets.values.exists(_ < 0)) {
         Some(s"negative asset balance: $acc, old: $oldPortfolio, new: $newPortfolio")
@@ -31,12 +31,13 @@ object BalanceDiffValidation {
       } else if (newPortfolio.balance < newPortfolio.leaseInfo.leaseOut && time > fs.allowLeasedBalanceTransferUntil) {
         Some(s"leased being more than own: $acc, old: ${leaseWavesInfo(oldPortfolio)}, new: ${leaseWavesInfo(oldPortfolio)}")
       } else None
+      err.map(acc -> _)
+    }).toMap
 
-    })
     if (positiveBalanceErrors.isEmpty) {
       Right(d)
     } else {
-      Left(TransactionValidationError(tx, s"Transaction application leads to $positiveBalanceErrors"))
+      Left(AccountBalanceError(positiveBalanceErrors))
     }
   }
 

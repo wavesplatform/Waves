@@ -77,11 +77,6 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
   def isValid(atTime: Long): Validation = {
     isValidAmount(price, amount) &&
       assetPair.isValid &&
-      (amount < MaxAmount) :| "amount too large" &&
-      getSpendAmount(price, amount).isRight :| "SpendAmount too large" &&
-      (getSpendAmount(price, amount).getOrElse(0L) > 0) :| "SpendAmount should be > 0" &&
-      getReceiveAmount(price, amount).isRight :| "ReceiveAmount too large" &&
-      (getReceiveAmount(price, amount).getOrElse(0L) > 0) :| "ReceiveAmount should be > 0" &&
       (matcherFee > 0) :| "matcherFee should be > 0" &&
       (matcherFee < MaxAmount) :| "matcherFee too large" &&
       (timestamp > 0) :| "timestamp should be > 0" &&

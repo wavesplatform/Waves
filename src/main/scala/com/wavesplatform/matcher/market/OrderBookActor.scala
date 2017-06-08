@@ -9,14 +9,14 @@ import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.market.OrderHistoryActor._
 import com.wavesplatform.matcher.model.Events.{Event, OrderAdded, OrderExecuted}
 import com.wavesplatform.matcher.model.MatcherModel._
-import com.wavesplatform.matcher.model.{OrderValidator, _}
+import com.wavesplatform.matcher.model._
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.reader.StateReader
 import play.api.libs.json._
 import scorex.crypto.encode.Base58
-import scorex.transaction.ValidationError.CustomError
+import scorex.transaction.ValidationError.{AccountBalanceError, CustomError, OrderValidationError}
 import scorex.transaction.assets.exchange._
-import scorex.transaction.{History, NewTransactionHandler}
+import scorex.transaction.{History, NewTransactionHandler, ValidationError}
 import scorex.utils.{NTP, ScorexLogging}
 import scorex.wallet.Wallet
 
@@ -197,13 +197,36 @@ class OrderBookActor(assetPair: AssetPair, val orderHistory: ActorRef,
     context.system.eventStream.publish(e)
   }
 
+  def processInvalidTransaction(event: OrderExecuted, err: ValidationError): Option[LimitOrder] = {
+    def cancelCounterOrder(): Option[LimitOrder] = {
+      processEvent(Events.OrderCanceled(event.counter))
+      Some(event.submitted)
+    }
+
+    log.debug(s"Failed to execute order: $err")
+    err match {
+      case OrderValidationError(order, _) if order == event.submitted.order => None
+      case OrderValidationError(order, _) if order == event.counter.order => cancelCounterOrder()
+      case AccountBalanceError(errs) =>
+        if (errs.contains(event.counter.order.senderPublicKey.toAccount)) {
+          cancelCounterOrder()
+        }
+        if (errs.contains(event.submitted.order.senderPublicKey.toAccount)) {
+          None
+        } else {
+          Some(event.submitted)
+        }
+      case _ => cancelCounterOrder()
+    }
+  }
+
   def handleMatchEvent(e: Event): Option[LimitOrder] = {
     e match {
       case e: OrderAdded =>
         processEvent(e)
         None
 
-      case e@OrderExecuted(o, c) =>
+      case event@OrderExecuted(o, c) =>
         val result = for {
           transaction <- createTransaction(o, c)
           validationResult <- validate(transaction)
@@ -212,14 +235,11 @@ class OrderBookActor(assetPair: AssetPair, val orderHistory: ActorRef,
 
         result match {
           case Left(ex) =>
-            log.debug(s"Failed to execute order: $ex")
-            val canceled = Events.OrderCanceled(c)
-            processEvent(canceled)
-            Some(o)
+            processInvalidTransaction(event, ex)
           case Right(_) =>
-            processEvent(e)
-            if (e.submittedRemaining > 0)
-              Some(o.partial(e.submittedRemaining))
+            processEvent(event)
+            if (event.submittedRemaining > 0)
+              Some(o.partial(event.submittedRemaining))
             else None
         }
       case _ => None

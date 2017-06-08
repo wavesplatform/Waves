@@ -1,10 +1,9 @@
 package scorex.transaction
 
-import scorex.account.{AccountOrAlias, Alias}
+import scorex.account.{Account, Alias}
+import scorex.transaction.assets.exchange.Order
 
 sealed trait ValidationError
-
-sealed trait StateValidationError extends ValidationError
 
 object ValidationError {
 
@@ -19,9 +18,9 @@ object ValidationError {
   case object MissingSenderPrivateKey extends ValidationError
   case class TransactionParameterValidationError(err: String) extends ValidationError
   case class CustomError(s: String) extends ValidationError
-
-  case class UnsupportedTransactionType(tx:Transaction) extends ValidationError
-  case class AliasNotExists(a : Alias) extends StateValidationError
-  case class TransactionValidationError(tx: Transaction, err: String) extends StateValidationError
-
+  case class UnsupportedTransactionType(tx: Transaction) extends ValidationError
+  case class AliasNotExists(a: Alias) extends ValidationError
+  case class TransactionValidationError(tx: Transaction, err: String) extends ValidationError
+  case class OrderValidationError(order: Order, err: String) extends ValidationError
+  case class AccountBalanceError(errs: Map[Account, String]) extends ValidationError
 }

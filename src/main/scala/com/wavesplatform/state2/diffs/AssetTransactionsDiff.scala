@@ -2,18 +2,17 @@ package com.wavesplatform.state2.diffs
 
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.reader.StateReader
-import com.wavesplatform.state2.{AssetInfo, Diff, ByteStr, LeaseInfo, Portfolio}
+import com.wavesplatform.state2.{AssetInfo, ByteStr, Diff, LeaseInfo, Portfolio}
 import scorex.account.AddressScheme
-import scorex.crypto.encode.Base58
 import scorex.transaction.ValidationError.TransactionValidationError
 import scorex.transaction.assets.{BurnTransaction, IssueTransaction, MakeAssetNameUniqueTransaction, ReissueTransaction}
-import scorex.transaction.{AssetId, SignedTransaction, StateValidationError, Transaction}
+import scorex.transaction.{AssetId, SignedTransaction, Transaction, ValidationError}
 
 import scala.util.{Left, Right}
 
 object AssetTransactionsDiff {
 
-  def issue(state: StateReader, height: Int)(tx: IssueTransaction): Either[StateValidationError, Diff] = {
+  def issue(state: StateReader, height: Int)(tx: IssueTransaction): Either[ValidationError, Diff] = {
     val info = AssetInfo(
       isReissuable = tx.reissuable,
       volume = tx.quantity)
@@ -26,7 +25,7 @@ object AssetTransactionsDiff {
       assetInfos = Map(tx.assetId -> info)))
   }
 
-  def reissue(state: StateReader, settings: FunctionalitySettings, blockTime: Long, height: Int)(tx: ReissueTransaction): Either[StateValidationError, Diff] = {
+  def reissue(state: StateReader, settings: FunctionalitySettings, blockTime: Long, height: Int)(tx: ReissueTransaction): Either[ValidationError, Diff] = {
     findReferencedAsset(tx, state, tx.assetId).flatMap(itx => {
       val oldInfo = state.assetInfo(tx.assetId).get
       if (oldInfo.isReissuable || blockTime <= settings.allowInvalidReissueInSameBlockUntilTimestamp) {
@@ -46,7 +45,7 @@ object AssetTransactionsDiff {
     })
   }
 
-  def burn(state: StateReader, height: Int)(tx: BurnTransaction): Either[StateValidationError, Diff] = {
+  def burn(state: StateReader, height: Int)(tx: BurnTransaction): Either[ValidationError, Diff] = {
     findReferencedAsset(tx, state, tx.assetId).map(itx => {
       Diff(height = height,
         tx = tx,
@@ -58,7 +57,7 @@ object AssetTransactionsDiff {
     })
   }
 
-  def makeAssetNameUnique(state: StateReader, height: Int)(tx: MakeAssetNameUniqueTransaction): Either[StateValidationError, Diff] = {
+  def makeAssetNameUnique(state: StateReader, height: Int)(tx: MakeAssetNameUniqueTransaction): Either[ValidationError, Diff] = {
     checkNetworkByte(tx.networkByte, tx).flatMap(tx =>
       findReferencedAsset(tx, state, tx.assetId).flatMap(itx => {
         val assetName = ByteStr(itx.name)
@@ -78,7 +77,7 @@ object AssetTransactionsDiff {
       }))
   }
 
-  private def findReferencedAsset(tx: SignedTransaction, state: StateReader, assetId: AssetId): Either[StateValidationError, IssueTransaction] = {
+  private def findReferencedAsset(tx: SignedTransaction, state: StateReader, assetId: AssetId): Either[ValidationError, IssueTransaction] = {
     state.findTransaction[IssueTransaction](assetId) match {
       case None => Left(TransactionValidationError(tx, "Referenced assetId not found"))
       case Some(itx) if !(itx.sender equals tx.sender) => Left(TransactionValidationError(tx, "Asset was issued by other address"))
@@ -86,7 +85,7 @@ object AssetTransactionsDiff {
     }
   }
 
-  private def checkNetworkByte[T <: Transaction](chainIdFromTx: Byte, tx: T): Either[StateValidationError, T] = {
+  private def checkNetworkByte[T <: Transaction](chainIdFromTx: Byte, tx: T): Either[ValidationError, T] = {
     if (chainIdFromTx != AddressScheme.current.chainId) {
       Left(TransactionValidationError(tx, s"Invalid network byte '$chainIdFromTx', current '${AddressScheme.current.chainId}'"))
     } else Right(tx)
