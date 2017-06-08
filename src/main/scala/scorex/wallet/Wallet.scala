@@ -3,6 +3,7 @@ package scorex.wallet
 import java.io.File
 
 import com.google.common.primitives.{Bytes, Ints}
+import com.wavesplatform.settings.WalletSettings
 import com.wavesplatform.utils.createMVStore
 import org.h2.mvstore.MVMap
 import scorex.account.{Account, PrivateKeyAccount}
@@ -14,9 +15,9 @@ import scorex.utils.{LogMVMapBuilder, ScorexLogging, randomBytes}
 
 import scala.collection.JavaConverters._
 import scala.collection.concurrent.TrieMap
+import scala.util.{Failure, Success}
 
-//todo: add accs txs?
-class Wallet(file: Option[File], password: Array[Char], seedOpt: Option[Array[Byte]])
+class Wallet private(file: Option[File], password: Array[Char], seedOpt: Option[Array[Byte]])
   extends AutoCloseable with ScorexLogging {
 
   private val NonceFieldName = "nonce"
@@ -118,4 +119,14 @@ object Wallet {
   def generateAccountSeed(seed: Array[Byte], nonce: Int): Array[Byte] =
     SecureCryptographicHash(Bytes.concat(Ints.toByteArray(nonce), seed))
 
+  def apply(settings: WalletSettings): Wallet = {
+    val seedOpt =
+      if (settings.seed.isEmpty) None
+      else Base58.decode(settings.seed) match {
+        case Success(seed) => Some(seed)
+        case Failure(f) =>
+          throw new IllegalArgumentException("Invalid seed in config file, please, fix this", f)
+      }
+    new Wallet(settings.file, settings.password.toCharArray, seedOpt)
+  }
 }
