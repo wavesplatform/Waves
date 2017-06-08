@@ -208,12 +208,14 @@ class OrderBookActor(assetPair: AssetPair, val orderHistory: ActorRef,
       case OrderValidationError(order, _) if order == event.submitted.order => None
       case OrderValidationError(order, _) if order == event.counter.order => cancelCounterOrder()
       case AccountsValidationError(errs) =>
-        errs.foldLeft(Option.empty[LimitOrder]) { case (res, (acc, _)) =>
-          if (event.counter.order.senderPublicKey.address == acc.address) {
-            cancelCounterOrder()
-          } else {
-            res
-          }
+        if (errs.exists(_._1.address == event.counter.order.senderPublicKey.address)) {
+          cancelCounterOrder()
+        }
+
+        if (errs.exists(_._1.address == event.submitted.order.senderPublicKey.address)) {
+          None
+        } else {
+          Some(event.submitted)
         }
       case _ => cancelCounterOrder()
     }
