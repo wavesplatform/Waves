@@ -41,7 +41,7 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest2"
   val settings = matcherSettings.copy(account = MatcherAccount.address)
   val history = stub[History]
   val functionalitySettings = stub[FunctionalitySettings]
-  val wallet = Wallet(WalletSettings(None, "matcher", WalletSeed))
+  val wallet = Wallet(WalletSettings(None, "matcher", Some(WalletSeed)))
   wallet.generateNewAccount()
 
   val orderHistoryRef = TestActorRef(new Actor {
@@ -187,5 +187,5 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest2"
     }
   }
 
-  def strToSomeAssetId(s: String) : Option[AssetId] = Some(ByteStr(s.getBytes()))
+  def strToSomeAssetId(s: String): Option[AssetId] = Some(ByteStr(s.getBytes()))
 }
