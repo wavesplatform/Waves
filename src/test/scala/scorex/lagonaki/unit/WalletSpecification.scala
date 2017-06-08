@@ -1,5 +1,7 @@
 package scorex.lagonaki.unit
 
+import com.wavesplatform.settings.WalletSettings
+import com.wavesplatform.state2.ByteStr
 import org.scalatest.{FunSuite, Matchers}
 import scorex.crypto.encode.Base58
 import scorex.wallet.Wallet
@@ -7,7 +9,7 @@ import scorex.wallet.Wallet
 class WalletSpecification extends FunSuite with Matchers {
 
   private val walletSize = 10
-  val w = new Wallet(None, "cookies".toCharArray, Base58.decode("FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz").toOption)
+  val w = Wallet(WalletSettings(None, "cookies", ByteStr.decodeBase58("FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz").toOption))
 
   test("wallet - acc creation") {
     w.generateNewAccounts(walletSize)
@@ -35,12 +37,12 @@ class WalletSpecification extends FunSuite with Matchers {
 
     val walletFile = Some(scorex.createTestTemporaryFile("wallet", ".dat"))
 
-    val w = new Wallet(walletFile, "cookies".toCharArray, Base58.decode("FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz").toOption)
+    val w = Wallet(WalletSettings(walletFile, "cookies", ByteStr.decodeBase58("FQgbSAm6swGbtqA3NE8PttijPhT4N3Ufh4bHFAkyVnQz").toOption))
     w.generateNewAccounts(10)
     val nonce = w.nonce()
     w.close()
 
-    val w2 = new Wallet(walletFile, "cookies".toCharArray, None)
+    val w2 = Wallet(WalletSettings(walletFile, "cookies", None))
     w2.privateKeyAccounts().head.address should not be null
     w2.nonce() shouldBe nonce
   }

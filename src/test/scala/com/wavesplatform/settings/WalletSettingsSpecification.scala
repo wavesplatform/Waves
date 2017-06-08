@@ -3,6 +3,7 @@ package com.wavesplatform.settings
 import java.io.File
 
 import com.typesafe.config.ConfigFactory
+import com.wavesplatform.state2.ByteStr
 import org.scalatest.{FlatSpec, Matchers}
 
 class WalletSettingsSpecification extends FlatSpec with Matchers {
@@ -20,8 +21,8 @@ class WalletSettingsSpecification extends FlatSpec with Matchers {
       """.stripMargin).resolve()
     val settings = WalletSettings.fromConfig(config)
 
-    settings.seed should be("BASE58SEED")
+    settings.seed should be(Some(ByteStr.decodeBase58("BASE58SEED").get))
     settings.file should be(Some(new File("/waves/wallet/wallet.dat")))
-    settings.password should be ("some string as password")
+    settings.password should be("some string as password")
   }
 }

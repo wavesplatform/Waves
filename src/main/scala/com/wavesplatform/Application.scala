@@ -50,14 +50,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
   val checkpoints = new CheckpointServiceImpl(settings.blockchainSettings.checkpointFile)
   val (history, stateWriter, stateReader, blockchainUpdater) = BlockStorageImpl(settings.blockchainSettings).get
   val time: Time = new TimeImpl()
-  val wallet: Wallet = {
-    Base58.decode(settings.walletSettings.seed) match {
-      case Success(seed) =>
-        new Wallet(settings.walletSettings.file, settings.walletSettings.password.toCharArray, Some(seed))
-      case Failure(f) =>
-        throw new IllegalArgumentException("Invalid seed in config file, please, fix this",f)
-    }
-  }
+  val wallet: Wallet = Wallet(settings.walletSettings)
   val utxStorage: UnconfirmedTransactionsStorage = new UnconfirmedTransactionsDatabaseImpl(settings.utxSettings.size)
   val newTransactionHandler = new NewTransactionHandlerImpl(settings.blockchainSettings.functionalitySettings,
     networkController, time, feeCalculator, utxStorage, stateReader)

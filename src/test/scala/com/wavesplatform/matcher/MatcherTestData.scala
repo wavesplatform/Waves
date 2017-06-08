@@ -12,8 +12,8 @@ import scorex.utils.{NTP}
 
 trait MatcherTestData {
   val bytes32gen: Gen[Array[Byte]] = Gen.listOfN(32, Arbitrary.arbitrary[Byte]).map(_.toArray)
-  val WalletSeed = "Matcher".getBytes
-  val MatcherSeed = SecureCryptographicHash(Bytes.concat(Ints.toByteArray(0), WalletSeed))
+  val WalletSeed = ByteStr("Matcher".getBytes())
+  val MatcherSeed = SecureCryptographicHash(Bytes.concat(Ints.toByteArray(0), WalletSeed.arr))
   val MatcherAccount = PrivateKeyAccount(MatcherSeed)
   val accountGen: Gen[PrivateKeyAccount] = bytes32gen.map(seed => PrivateKeyAccount(seed))
   val positiveLongGen: Gen[Long] = Gen.choose(1, Long.MaxValue)

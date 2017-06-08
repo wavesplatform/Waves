@@ -10,8 +10,7 @@ import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.market.OrderHistoryActor.{GetOrderStatus, ValidateOrder, ValidateOrderResult}
 import com.wavesplatform.matcher.model.Events.Event
 import com.wavesplatform.matcher.model.{BuyLimitOrder, LimitOrder, SellLimitOrder}
-import com.wavesplatform.settings.Constants
-import com.wavesplatform.settings.FunctionalitySettings
+import com.wavesplatform.settings.{Constants, FunctionalitySettings, WalletSettings}
 import com.wavesplatform.state2.reader.StateReader
 import com.wavesplatform.state2.{ByteStr, LeaseInfo, Portfolio}
 import org.h2.mvstore.MVStore
@@ -64,7 +63,7 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
 
   val settings = matcherSettings.copy(account = MatcherAccount.address)
 
-  val wallet = new Wallet(None, "matcher".toCharArray, Option(WalletSeed))
+  val wallet = Wallet(WalletSettings(None, "matcher", Some(WalletSeed)))
   wallet.generateNewAccount()
 
   val orderHistoryRef = TestActorRef(new Actor {

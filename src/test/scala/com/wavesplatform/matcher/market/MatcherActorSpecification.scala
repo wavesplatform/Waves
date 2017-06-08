@@ -12,7 +12,7 @@ import com.wavesplatform.matcher.market.MatcherActor.{GetMarkets, GetMarketsResp
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.market.OrderHistoryActor.{ValidateOrder, ValidateOrderResult}
 import com.wavesplatform.matcher.model.LevelAgg
-import com.wavesplatform.settings.FunctionalitySettings
+import com.wavesplatform.settings.{FunctionalitySettings, WalletSettings}
 import com.wavesplatform.state2.reader.StateReader
 import com.wavesplatform.state2.{AssetInfo, ByteStr, LeaseInfo, Portfolio}
 import org.h2.mvstore.MVStore
@@ -41,7 +41,7 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest2"
   val settings = matcherSettings.copy(account = MatcherAccount.address)
   val history = stub[History]
   val functionalitySettings = stub[FunctionalitySettings]
-  val wallet = new Wallet(None, "matcher".toCharArray, Option(WalletSeed))
+  val wallet = Wallet(WalletSettings(None, "matcher", Some(WalletSeed)))
   wallet.generateNewAccount()
 
   val orderHistoryRef = TestActorRef(new Actor {
@@ -187,5 +187,5 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest2"
     }
   }
 
-  def strToSomeAssetId(s: String) : Option[AssetId] = Some(ByteStr(s.getBytes()))
+  def strToSomeAssetId(s: String): Option[AssetId] = Some(ByteStr(s.getBytes()))
 }

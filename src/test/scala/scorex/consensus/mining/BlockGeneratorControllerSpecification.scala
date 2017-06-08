@@ -5,7 +5,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock
 import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
 import com.wavesplatform.history.HistoryWriterImpl
-import com.wavesplatform.settings.{BlockchainSettings, MinerSettings}
+import com.wavesplatform.settings.{BlockchainSettings, MinerSettings, WalletSettings}
 import com.wavesplatform.state2.reader.StateReader
 import org.scalamock.scalatest.MockFactory
 import org.scalatest._
@@ -38,7 +38,7 @@ abstract class BlockGeneratorControllerSpecification extends TestKit(ActorSystem
       history,
       testTime,
       testPeerManager.ref,
-      new Wallet(None, "".toCharArray, None),
+      Wallet(WalletSettings(None, "", None)),
       stub[StateReader],
       stub[BlockchainSettings],
       stub[UnconfirmedTransactionsStorage],
