@@ -4,7 +4,7 @@ import java.net.{InetSocketAddress, SocketAddress, URI}
 import java.util.concurrent.Callable
 
 import io.netty.channel.{Channel, ChannelHandlerContext}
-import io.netty.util.AttributeKey
+import io.netty.util.NetUtil.toSocketAddressString
 import io.netty.util.concurrent.{EventExecutorGroup, ScheduledFuture}
 
 import scala.concurrent.duration._
@@ -30,8 +30,8 @@ package object network {
       e.schedule((() => f): Callable[A], delay.length, delay.unit)
   }
 
-  val HandshakeKey = AttributeKey.newInstance[Handshake]("handshake")
+  private def formatAddress(isa: InetSocketAddress) = if (isa == null) "" else toSocketAddressString(isa)
 
   def id(ctx: ChannelHandlerContext): String = id(ctx.channel())
-  def id(chan: Channel): String = s"[${chan.id().asShortText()}: ${chan.attr(AttributeKeys.NodeName)}@${chan.attr(AttributeKeys.RemoteAddress)}]"
+  def id(chan: Channel): String = s"[${chan.id().asShortText()}: ${formatAddress(chan.attr(AttributeKeys.RemoteAddress).get())}]"
 }

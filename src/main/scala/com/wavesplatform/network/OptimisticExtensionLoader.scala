@@ -30,6 +30,8 @@ class OptimisticExtensionLoader extends ChannelDuplexHandler with ScorexLogging 
     case _ => super.channelRead(ctx, msg)
   }
 
+  private def fmt(tag: String, seq: Seq[_]) = s"$tag:${seq.mkString("\n","\n","\n")}"
+
   override def write(ctx: ChannelHandlerContext, msg: AnyRef, promise: ChannelPromise) = msg match {
     case LoadBlockchainExtension(localIds) if hopefullyNextIds == localIds =>
       if (nextExtensionBlocks.isEmpty) {
@@ -41,8 +43,12 @@ class OptimisticExtensionLoader extends ChannelDuplexHandler with ScorexLogging 
         loadNextPart(ctx, nextExtensionBlocks)
         nextExtensionBlocks = Seq.empty
       }
+    case _: LoadBlockchainExtension if hopefullyNextIds.isEmpty =>
+      super.write(ctx, msg, promise)
     case LoadBlockchainExtension(localIds) =>
-      if (!localIds.containsSlice(hopefullyNextIds)) {
+      val notYetRequestedIds = hopefullyNextIds.dropWhile(_ != localIds.head)
+      if (notYetRequestedIds.isEmpty || !hopefullyNextIds.containsSlice(notYetRequestedIds)) {
+//        log.debug(s"${fmt("LOCAL IDS", localIds)}${fmt("HOPEFULLY NEXT", hopefullyNextIds)}${fmt("DIFF", notYetRequestedIds)}")
         log.debug(s"${id(ctx)} Got unexpected known block ids, will discard extension once ready")
         discardNextBlocks = true
       }

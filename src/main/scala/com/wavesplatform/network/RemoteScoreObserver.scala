@@ -61,11 +61,11 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
         scores.remove(ctx.channel().id(), score)
       }
 
-      val ourPreviousScore = scores.put(ctx.channel(), score)
+      val previousChannelScore = scores.put(ctx.channel(), score)
 
       channelWithHighestScore match {
         case Some((ch, highScore)) if ch == ctx.channel() /* this is the channel with highest score */
-          && (ourPreviousScore == null || ourPreviousScore.value != newScoreValue) /* score has changed */
+          && (previousChannelScore == null || previousChannelScore.value != newScoreValue) /* score has changed */
           && highScore.value > localScore /* remote score is higher than local */ =>
           log.debug(s"${id(ctx)} New high score ${highScore.value} > $localScore, requesting extension")
           ctx.writeAndFlush(LoadBlockchainExtension(lastSignatures))
