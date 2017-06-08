@@ -2,7 +2,6 @@ package com.wavesplatform.http
 
 import javax.ws.rs.Path
 
-import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.Shutdownable
 import com.wavesplatform.settings.{Constants, RestAPISettings}
@@ -40,6 +39,6 @@ case class NodeApiRoute(settings: RestAPISettings, application: Shutdownable)
   @Path("/status")
   @ApiOperation(value = "Status", notes = "Get status of the running core", httpMethod = "GET")
   def status: Route = (get & path("status")) {
-    complete(StatusCodes.BadRequest)
+    complete(Json.obj())
   }
 }
