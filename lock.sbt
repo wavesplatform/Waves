@@ -59,12 +59,12 @@ dependencyOverrides in ThisBuild ++= Set(
   "io.netty" % "netty" % "3.10.0.Final",
   "io.netty" % "netty-buffer" % "4.1.10.Final",
   "io.netty" % "netty-codec" % "4.1.10.Final",
-  "io.netty" % "netty-codec-http" % "4.0.45.Final",
+  "io.netty" % "netty-codec-http" % "4.1.10.Final",
   "io.netty" % "netty-common" % "4.1.10.Final",
   "io.netty" % "netty-handler" % "4.1.10.Final",
   "io.netty" % "netty-resolver" % "4.1.10.Final",
   "io.netty" % "netty-transport" % "4.1.10.Final",
-  "io.netty" % "netty-transport-native-epoll" % "4.0.45.Final",
+  "io.netty" % "netty-transport-native-epoll" % "4.1.10.Final",
   "io.swagger" % "swagger-annotations" % "1.5.13",
   "io.swagger" % "swagger-core" % "1.5.13",
   "io.swagger" % "swagger-jaxrs" % "1.5.13",
@@ -81,11 +81,11 @@ dependencyOverrides in ThisBuild ++= Set(
   "org.apache.commons" % "commons-lang3" % "3.2.1",
   "org.apache.httpcomponents" % "httpclient" % "4.5",
   "org.apache.httpcomponents" % "httpcore" % "4.4.5",
-  "org.asynchttpclient" % "async-http-client" % "2.0.31",
-  "org.asynchttpclient" % "async-http-client-netty-utils" % "2.0.31",
-  "org.asynchttpclient" % "netty-codec-dns" % "2.0.31",
-  "org.asynchttpclient" % "netty-resolver" % "2.0.31",
-  "org.asynchttpclient" % "netty-resolver-dns" % "2.0.31",
+  "org.asynchttpclient" % "async-http-client" % "2.0.32",
+  "org.asynchttpclient" % "async-http-client-netty-utils" % "2.0.32",
+  "org.asynchttpclient" % "netty-codec-dns" % "2.0.32",
+  "org.asynchttpclient" % "netty-resolver" % "2.0.32",
+  "org.asynchttpclient" % "netty-resolver-dns" % "2.0.32",
   "org.bitlet" % "weupnp" % "0.1.4",
   "org.bouncycastle" % "bcpkix-jdk15on" % "1.52",
   "org.bouncycastle" % "bcprov-jdk15on" % "1.52",
@@ -133,4 +133,4 @@ dependencyOverrides in ThisBuild ++= Set(
   "org.whispersystems" % "curve25519-java" % "0.3.0",
   "org.yaml" % "snakeyaml" % "1.17"
 )
-// LIBRARY_DEPENDENCIES_HASH 908fd089b53f5137a5e11192db61981abaf313a8
+// LIBRARY_DEPENDENCIES_HASH c642a481eb5d6dc15ddea897a1204d455f51049c

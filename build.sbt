@@ -17,9 +17,14 @@ logBuffered := false
 
 //assembly settings
 assemblyJarName in assembly := s"waves-all-${version.value}.jar"
+assemblyMergeStrategy in assembly := {
+  case "META-INF/io.netty.versions.properties" => MergeStrategy.concat
+  case other => (assemblyMergeStrategy in assembly).value(other)
+}
 test in assembly := {}
 
 libraryDependencies ++=
+  Dependencies.network ++
   Dependencies.db ++
   Dependencies.http ++
   Dependencies.akka ++
@@ -33,8 +38,7 @@ libraryDependencies ++=
     "com.iheart" %% "ficus" % "1.4.0",
     "org.scorexfoundation" %% "scrypto" % "1.2.0",
     "commons-net" % "commons-net" % "3.+",
-    "org.typelevel" %% "cats-core" % "0.9.0",
-    "io.netty" % "netty-handler" % "4.1.10.Final"
+    "org.typelevel" %% "cats-core" % "0.9.0"
   )
 
 sourceGenerators in Compile += Def.task {
