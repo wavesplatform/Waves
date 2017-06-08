@@ -135,11 +135,12 @@ class NetworkServer(
     channels.computeIfAbsent(remoteAddress, _ => {
       outgoingChannelCount.incrementAndGet()
       val chan = bootstrap.connect(remoteAddress).channel()
+      chan.attr(AttributeKeys.RemoteAddress).set(remoteAddress)
       allChannels.add(chan)
-      log.debug(s"${id(chan)} Connecting to $remoteAddress")
+      log.debug(s"${id(chan)} Connecting...")
       chan.closeFuture().addListener { (chf: ChannelFuture) =>
         val remainingOutgoingChannelCount = outgoingChannelCount.decrementAndGet()
-        log.debug(s"${id(chf.channel)} Connection to $remoteAddress closed, $remainingOutgoingChannelCount channel(s) remaining")
+        log.debug(s"${id(chf.channel)} Connection closed, $remainingOutgoingChannelCount channel(s) remaining")
         allChannels.remove(chf.channel())
         channels.remove(remoteAddress, chf.channel())
       }

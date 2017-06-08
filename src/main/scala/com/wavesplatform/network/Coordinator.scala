@@ -132,7 +132,7 @@ class Coordinator(
 
       } else {
         // the block either has come too early or, if local, too late (e.g. removeAfter() has come earlier)
-        log.debug(s"Parent of the block is not in the history, local=$local: ${str(newBlock)}")
+        log.debug(s"${id(ctx)} Parent of the block is not in the history, local=$local: ${str(newBlock)}")
         false
       }
     } catch {
