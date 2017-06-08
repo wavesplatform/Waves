@@ -127,7 +127,9 @@ class NetworkServer(
 
   workerGroup.scheduleWithFixedDelay(1.second, 5.seconds) {
     if (outgoingChannelCount.get() < settings.networkSettings.maxOutboundConnections) {
-      peerDatabase.getRandomPeer(allLocalInterfaces ++ channels.keySet().asScala).foreach(connect)
+      peerDatabase.getRandomPeer(allLocalInterfaces ++
+        channels.keySet().asScala ++
+        settings.networkSettings.declaredAddress.toSet).foreach(connect)
     }
   }
 

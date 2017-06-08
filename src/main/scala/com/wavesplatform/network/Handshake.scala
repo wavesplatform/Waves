@@ -23,7 +23,9 @@ case class Handshake(
     declaredAddress match {
       case None => out.writeInt(0)
       case Some(addr) =>
-        out.writeBytes(addr.getAddress.getAddress)
+        val addressBytes = addr.getAddress.getAddress
+        out.writeInt(addressBytes.length + 4)
+        out.writeBytes(addressBytes)
         out.writeInt(addr.getPort)
     }
     out.writeLong(System.currentTimeMillis() / 1000)
@@ -40,9 +42,12 @@ object Handshake {
     val nodeNameSize = in.readByte()
     val nodeName = in.readSlice(nodeNameSize).toString(Charsets.UTF_8)
     val nonce = in.readLong()
-    val fas = in.readInt()
-    val isa = if (fas <= 0) None else {
-      val addressBytes = new Array[Byte](4)
+    val declaredAddressLength = in.readInt()
+    // 0 for no declared address, 8 for ipv4 address + port, 20 for ipv6 address + port
+    require(declaredAddressLength == 0 || declaredAddressLength == 8 || declaredAddressLength == 20,
+      s"invalid declared address length: $declaredAddressLength")
+    val isa = if (declaredAddressLength == 0) None else {
+      val addressBytes = new Array[Byte](declaredAddressLength - 4)
       in.readBytes(addressBytes)
       val address = InetAddress.getByAddress(addressBytes)
       val port = in.readInt()
