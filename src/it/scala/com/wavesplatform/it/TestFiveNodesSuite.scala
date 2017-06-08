@@ -36,15 +36,16 @@ class TestFiveNodesSuite extends FreeSpec with BeforeAndAfterAll with ScorexLogg
   }
 
   override def nestedSuites: IndexedSeq[Suite] = IndexedSeq(
-    new ValidChainGenerationSpec(allNodes),
-    new BurnTransactionSpecification(allNodes),
-    new IssueTransactionSpecification(allNodes),
-    new LeasingTransactionsSpecification(allNodes),
-    new MakeAssetNameUniqueTransactionSpecification(allNodes),
-    new PaymentTransactionSpecification(allNodes),
-    new ReissueTransactionSpecification(allNodes),
-    new TransferTransactionSpecification(allNodes),
-    new AliasTransactionSpecification(allNodes)
+//    new ValidChainGenerationSpec(allNodes),
+//    new BurnTransactionSpecification(allNodes),
+//    new IssueTransactionSpecification(allNodes),
+//    new LeasingTransactionsSpecification(allNodes),
+//    new MakeAssetNameUniqueTransactionSpecification(allNodes),
+//    new PaymentTransactionSpecification(allNodes),
+//    new ReissueTransactionSpecification(allNodes),
+//    new TransferTransactionSpecification(allNodes),
+//    new AliasTransactionSpecification(allNodes),
+    new NetworkTestSuite(allNodes)
   )
 
   override protected def afterAll(): Unit = docker.close()
