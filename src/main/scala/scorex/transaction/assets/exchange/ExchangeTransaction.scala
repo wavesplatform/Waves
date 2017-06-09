@@ -85,12 +85,8 @@ object ExchangeTransaction {
       Left(GenericError("Both orders should have same AssetPair"))
     } else if (!buyOrder.isValid(timestamp)) {
       Left(OrderValidationError(buyOrder, buyOrder.isValid(timestamp).messages()))
-    } else if (!buyOrder.isValidAmount(price, amount)) {
-      Left(OrderValidationError(buyOrder, buyOrder.isValidAmount(price, amount).messages()))
     } else if (!sellOrder.isValid(timestamp)) {
       Left(OrderValidationError(sellOrder, sellOrder.isValid(timestamp).labels.mkString("\n")))
-    } else if (!sellOrder.isValidAmount(price, amount)) {
-      Left(OrderValidationError(sellOrder, sellOrder.isValidAmount(price, amount).messages()))
     } else if (!priceIsValid) {
       Left(GenericError("priceIsValid"))
     } else {
