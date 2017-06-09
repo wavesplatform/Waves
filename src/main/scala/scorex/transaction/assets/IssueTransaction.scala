@@ -66,11 +66,6 @@ object IssueTransaction {
   val MinAssetNameLength   = 4
   val MaxDecimals          = 8
 
-  def parseBytes(bytes: Array[Byte]): Try[IssueTransaction] = Try {
-    require(bytes.head == TransactionType.IssueTransaction.id)
-    parseTail(bytes.tail).get
-  }
-
   def parseTail(bytes: Array[Byte]): Try[IssueTransaction] = Try {
     val signature = bytes.slice(0, SignatureLength)
     val txId      = bytes(SignatureLength)
