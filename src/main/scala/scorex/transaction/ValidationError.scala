@@ -3,7 +3,7 @@ package scorex.transaction
 import scorex.account.{Account, Alias}
 import scorex.transaction.assets.exchange.Order
 
-sealed trait ValidationError
+trait ValidationError
 
 object ValidationError {
 
@@ -16,11 +16,9 @@ object ValidationError {
   case object OverflowError extends ValidationError
   case object ToSelf extends ValidationError
   case object MissingSenderPrivateKey extends ValidationError
-  case class TransactionParameterValidationError(err: String) extends ValidationError
-  case class CustomError(s: String) extends ValidationError
-  case class UnsupportedTransactionType(tx: Transaction) extends ValidationError
+  case object UnsupportedTransactionType extends ValidationError
   case class AliasNotExists(a: Alias) extends ValidationError
-  case class TransactionValidationError(tx: Transaction, err: String) extends ValidationError
   case class OrderValidationError(order: Order, err: String) extends ValidationError
   case class AccountBalanceError(errs: Map[Account, String]) extends ValidationError
+  case class GenericError(err: String) extends ValidationError
 }

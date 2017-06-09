@@ -14,7 +14,7 @@ import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.reader.StateReader
 import play.api.libs.json._
 import scorex.crypto.encode.Base58
-import scorex.transaction.ValidationError.{AccountBalanceError, CustomError, OrderValidationError}
+import scorex.transaction.ValidationError.{AccountBalanceError, GenericError, OrderValidationError}
 import scorex.transaction.assets.exchange._
 import scorex.transaction.{History, NewTransactionHandler, ValidationError}
 import scorex.utils.{NTP, ScorexLogging}
@@ -104,10 +104,10 @@ class OrderBookActor(assetPair: AssetPair, val orderHistory: ActorRef,
     context.become(waitingValidation)
   }
 
-  def handleValidateCancelResult(res: Either[CustomError, CancelOrder]): Unit = {
+  def handleValidateCancelResult(res: Either[GenericError, CancelOrder]): Unit = {
     res match {
       case Left(err) =>
-        apiSender.foreach(_ ! OrderCancelRejected(err.s))
+        apiSender.foreach(_ ! OrderCancelRejected(err.err))
       case Right(cancel) =>
         OrderBook.cancelOrder(orderBook, cancel.orderId) match {
           case Some(oc) =>
@@ -155,11 +155,11 @@ class OrderBookActor(assetPair: AssetPair, val orderHistory: ActorRef,
     context.become(waitingValidation)
   }
 
-  def handleValidateOrderResult(res: Either[CustomError, Order]): Unit = {
+  def handleValidateOrderResult(res: Either[GenericError, Order]): Unit = {
     res match {
       case Left(err) =>
         log.debug(s"Order rejected: $err.err")
-        apiSender.foreach(_ ! OrderRejected(err.s))
+        apiSender.foreach(_ ! OrderRejected(err.err))
       case Right(o) =>
         log.debug(s"Order accepted: ${o.idStr}, trying to match ...")
         apiSender.foreach(_ ! OrderAccepted(o))

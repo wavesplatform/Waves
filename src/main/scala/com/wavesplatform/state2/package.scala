@@ -1,6 +1,6 @@
 package com.wavesplatform
 
-import scorex.transaction.ValidationError.TransactionValidationError
+import scorex.transaction.ValidationError.{GenericError}
 import scorex.transaction.{Transaction, ValidationError}
 
 import scala.util.{Left, Right, Try}
@@ -11,7 +11,7 @@ package object state2 {
 
   implicit class EitherExt[L <: ValidationError, R](ei: Either[L, R]) {
     def liftValidationError[T <: Transaction](t: T): Either[ValidationError, R] = {
-      ei.left.map(e => TransactionValidationError(t, e.toString))
+      ei.left.map(e => GenericError(e.toString))
     }
   }
 

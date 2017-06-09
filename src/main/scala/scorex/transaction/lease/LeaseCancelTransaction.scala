@@ -63,7 +63,7 @@ object LeaseCancelTransaction {
                                timestamp: Long,
                                signature: Option[ByteStr] = None): Either[ValidationError, LeaseCancelTransactionImpl] = {
     if (leaseId.arr.length != DigestSize) {
-      Left(ValidationError.TransactionParameterValidationError("Lease transaction id is invalid"))
+      Left(ValidationError.GenericError("Lease transaction id is invalid"))
     } else if (fee <= 0) {
       Left(ValidationError.InsufficientFee)
     } else {

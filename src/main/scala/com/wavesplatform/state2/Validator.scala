@@ -4,7 +4,7 @@ import cats._
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.diffs.TransactionDiffer
 import com.wavesplatform.state2.reader.{CompositeStateReader, StateReader}
-import scorex.transaction.ValidationError.TransactionValidationError
+import scorex.transaction.ValidationError.{GenericError}
 import scorex.transaction._
 import scorex.utils.Time
 
@@ -36,7 +36,7 @@ object Validator {
         case (Seq(err), _) => Left(err)
       }
     } else {
-      Left(TransactionValidationError(tx, s"Transaction is too old: correctedTime is $correctedTime"))
+      Left(GenericError(s"Transaction is too old: correctedTime is $correctedTime"))
     }
   }
 

@@ -24,7 +24,7 @@ class LeaseBroadcastRouteSpec extends RouteSpec("/leasing/broadcast/") with Requ
     val stmMock = {
 
       def alwaysError(t: Transaction, maybePeer: Option[ConnectedPeer]): Either[ValidationError, Transaction] =
-        Left[ValidationError, Transaction](scorex.transaction.ValidationError.TransactionValidationError(t, "foo"))
+        Left[ValidationError, Transaction](scorex.transaction.ValidationError.GenericError("foo"))
 
       val m = mock[NewTransactionHandler]
       (m.onNewOffchainTransactionExcept(_: Transaction, _: Option[ConnectedPeer]))

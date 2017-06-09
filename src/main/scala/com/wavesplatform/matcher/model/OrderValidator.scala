@@ -5,7 +5,7 @@ import com.wavesplatform.matcher.market.OrderBookActor.CancelOrder
 import com.wavesplatform.state2.reader.StateReader
 import scorex.account.PublicKeyAccount
 import scorex.transaction.AssetAcc
-import scorex.transaction.ValidationError.CustomError
+import scorex.transaction.ValidationError.GenericError
 import scorex.transaction.assets.exchange.Validation.booleanOperators
 import scorex.transaction.assets.exchange.{Order, Validation}
 import scorex.utils.NTP
@@ -42,7 +42,7 @@ trait OrderValidator {
     math.max(0l, storedState.spendableBalance(acc) - orderHistory.openVolume(acc))
   }
 
-  def validateNewOrder(order: Order): Either[CustomError, Order] = {
+  def validateNewOrder(order: Order): Either[GenericError, Order] = {
     //(openOrdersCount.getOrElse(order.matcherPublicKey.address, 0) <= settings.maxOpenOrders) :|
     //  s"Open orders count limit exceeded (Max = ${settings.maxOpenOrders})" &&
     val v =
@@ -53,13 +53,13 @@ trait OrderValidator {
       (orderHistory.orderStatus(order.idStr) == LimitOrder.NotFound) :| "Order is already accepted" &&
       isBalanceWithOpenOrdersEnough(order)
     if (!v) {
-      Left(CustomError(v.messages()))
+      Left(GenericError(v.messages()))
     } else {
       Right(order)
     }
   }
 
-  def validateCancelOrder(cancel: CancelOrder): Either[CustomError, CancelOrder] = {
+  def validateCancelOrder(cancel: CancelOrder): Either[GenericError, CancelOrder] = {
     val status = orderHistory.orderStatus(cancel.orderId)
     val v =
       (status != LimitOrder.NotFound) :| "Order not found" &&
@@ -68,7 +68,7 @@ trait OrderValidator {
         orderHistory.order(cancel.orderId).fold(false)(_.senderPublicKey == cancel.req.senderPublicKey)  :| "Order not found"
 
     if (!v) {
-      Left(CustomError(v.messages()))
+      Left(GenericError(v.messages()))
     } else {
       Right(cancel)
     }

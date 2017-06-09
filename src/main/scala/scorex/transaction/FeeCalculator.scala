@@ -2,7 +2,7 @@ package scorex.transaction
 
 import com.wavesplatform.settings.FeesSettings
 import com.wavesplatform.state2.ByteStr
-import scorex.transaction.ValidationError.TransactionValidationError
+import scorex.transaction.ValidationError.{GenericError}
 
 /**
   * Class to check, that transaction contains enough fee to put it to UTX pool
@@ -23,7 +23,7 @@ class FeeCalculator(settings: FeesSettings) {
 
   def enoughFee[T <: Transaction](tx: T): Either[ValidationError, T] = tx match {
     case ttx: Transaction if map.get(TransactionAssetFee(ttx.transactionType.id, ttx.assetFee._1).key).exists(_ <= ttx.assetFee._2) => Right(tx)
-    case _ => Left(TransactionValidationError(tx, "InsufficientFee: Node's settings require more fee or fee in this asset is not enabled"))
+    case _ => Left(GenericError("InsufficientFee: Node's settings require more fee or fee in this asset is not enabled"))
   }
 }
 

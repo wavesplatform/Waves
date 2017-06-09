@@ -4,7 +4,7 @@ import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.reader.StateReader
 import com.wavesplatform.state2.{AssetInfo, ByteStr, Diff, LeaseInfo, Portfolio}
 import scorex.account.AddressScheme
-import scorex.transaction.ValidationError.TransactionValidationError
+import scorex.transaction.ValidationError.{GenericError}
 import scorex.transaction.assets.{BurnTransaction, IssueTransaction, MakeAssetNameUniqueTransaction, ReissueTransaction}
 import scorex.transaction.{AssetId, SignedTransaction, Transaction, ValidationError}
 
@@ -39,7 +39,7 @@ object AssetTransactionsDiff {
             volume = tx.quantity,
             isReissuable = tx.reissuable))))
       } else {
-        Left(TransactionValidationError(tx, s"Asset is not reissuable and blockTime=$blockTime is greater than " +
+        Left(GenericError(s"Asset is not reissuable and blockTime=$blockTime is greater than " +
           s"settings.allowInvalidReissueInSameBlockUntilTimestamp=${settings.allowInvalidReissueInSameBlockUntilTimestamp}"))
       }
     })
@@ -63,7 +63,7 @@ object AssetTransactionsDiff {
         val assetName = ByteStr(itx.name)
         state.getAssetIdByUniqueName(assetName) match {
           case Some(assetId) =>
-            Left(TransactionValidationError(tx, s"Asset name has been verified for ${assetId.base58}"))
+            Left(GenericError(s"Asset name has been verified for ${assetId.base58}"))
           case None =>
             Right(Diff(height = height,
               tx = tx,
@@ -79,15 +79,15 @@ object AssetTransactionsDiff {
 
   private def findReferencedAsset(tx: SignedTransaction, state: StateReader, assetId: AssetId): Either[ValidationError, IssueTransaction] = {
     state.findTransaction[IssueTransaction](assetId) match {
-      case None => Left(TransactionValidationError(tx, "Referenced assetId not found"))
-      case Some(itx) if !(itx.sender equals tx.sender) => Left(TransactionValidationError(tx, "Asset was issued by other address"))
+      case None => Left(GenericError("Referenced assetId not found"))
+      case Some(itx) if !(itx.sender equals tx.sender) => Left(GenericError("Asset was issued by other address"))
       case Some(itx) => Right(itx)
     }
   }
 
   private def checkNetworkByte[T <: Transaction](chainIdFromTx: Byte, tx: T): Either[ValidationError, T] = {
     if (chainIdFromTx != AddressScheme.current.chainId) {
-      Left(TransactionValidationError(tx, s"Invalid network byte '$chainIdFromTx', current '${AddressScheme.current.chainId}'"))
+      Left(GenericError(s"Invalid network byte '$chainIdFromTx', current '${AddressScheme.current.chainId}'"))
     } else Right(tx)
   }
 }

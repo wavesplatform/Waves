@@ -1,6 +1,7 @@
 package scorex.api.http
 
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
+import com.wavesplatform.state2.diffs.TransactionDiffer.TransactionValidationError
 import play.api.libs.json._
 import scorex.account.{Account, AccountOrAlias, Alias}
 import scorex.transaction.{Transaction, ValidationError}
@@ -27,13 +28,12 @@ object ApiError {
     case ValidationError.OverflowError => OverflowError
     case ValidationError.ToSelf => ToSelfError
     case ValidationError.MissingSenderPrivateKey => MissingSenderPrivateKey
-    case ValidationError.CustomError(e) => CustomValidationError(e)
+    case ValidationError.GenericError(ge) => CustomValidationError(ge)
     case ValidationError.AliasNotExists(tx) => AliasNotExists(tx)
-    case ValidationError.UnsupportedTransactionType(tx) => CustomValidationError(s"UnsupportedTransactionType: ${tx.json}")
-    case ValidationError.TransactionParameterValidationError(m) => CustomValidationError(m)
-    case ValidationError.TransactionValidationError(tx, err) => StateCheckFailed(tx, err)
-    case ValidationError.AccountBalanceError(errs) => CustomValidationError(errs.map(_._2).mkString(", "))
+    case ValidationError.UnsupportedTransactionType => CustomValidationError("UnsupportedTransactionType")
+    case ValidationError.AccountBalanceError(errs) => CustomValidationError(errs.values.mkString(", "))
     case ValidationError.OrderValidationError(order, m) => CustomValidationError(m)
+    case TransactionValidationError(tx, err) => StateCheckFailed(tx, fromValidationError(err).message)
   }
 }
 
@@ -165,7 +165,7 @@ case object MissingSenderPrivateKey extends ApiError {
 
 case class CustomValidationError(errorMessage: String) extends ApiError {
   override val id: Int = 199
-  override val message: String = s"validation error: $errorMessage"
+  override val message: String = errorMessage
   override val code: StatusCode = StatusCodes.BadRequest
 }
 

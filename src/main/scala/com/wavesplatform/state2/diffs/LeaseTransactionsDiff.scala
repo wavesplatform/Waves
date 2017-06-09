@@ -7,7 +7,7 @@ import com.wavesplatform.state2._
 import com.wavesplatform.state2.reader.StateReader
 import scorex.account.Account
 import scorex.transaction.ValidationError
-import scorex.transaction.ValidationError.TransactionValidationError
+import scorex.transaction.ValidationError.{GenericError}
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 
 import scala.util.{Left, Right}
@@ -18,11 +18,11 @@ object LeaseTransactionsDiff {
     val sender = Account.fromPublicKey(tx.sender.publicKey)
     s.resolveAliasEi(tx.recipient).flatMap { recipient =>
       if (recipient == sender)
-        Left(TransactionValidationError(tx, "Cannot lease to self"))
+        Left(GenericError("Cannot lease to self"))
       else {
         val ap = s.accountPortfolio(tx.sender)
         if (ap.balance - ap.leaseInfo.leaseOut < tx.amount) {
-          Left(TransactionValidationError(tx, s"Cannot lease more than own: Balance:${ap.balance}, already leased: ${ap.leaseInfo.leaseOut}"))
+          Left(GenericError(s"Cannot lease more than own: Balance:${ap.balance}, already leased: ${ap.leaseInfo.leaseOut}"))
         }
         else {
           val portfolioDiff: Map[Account, Portfolio] = Map(
@@ -38,7 +38,7 @@ object LeaseTransactionsDiff {
   def leaseCancel(s: StateReader, settings: FunctionalitySettings, time: Long, height: Int)
                  (tx: LeaseCancelTransaction): Either[ValidationError, Diff] = {
     val leaseEi = s.findTransaction[LeaseTransaction](tx.leaseId) match {
-      case None => Left(TransactionValidationError(tx, s"Related LeaseTransaction not found"))
+      case None => Left(GenericError(s"Related LeaseTransaction not found"))
       case Some(l) => Right(l)
     }
     for {
@@ -46,7 +46,7 @@ object LeaseTransactionsDiff {
       recipient <- s.resolveAliasEi(lease.recipient)
       isLeaseActive = s.isLeaseActive(lease)
       _ <- if (!isLeaseActive && time > settings.allowMultipleLeaseCancelTransactionUntilTimestamp)
-        Left(TransactionValidationError(tx, s"Cannot cancel already cancelled lease")) else Right(())
+        Left(GenericError(s"Cannot cancel already cancelled lease")) else Right(())
       canceller = Account.fromPublicKey(tx.sender.publicKey)
       portfolioDiff <- if (tx.sender == lease.sender) {
         Right(Monoid.combine(
@@ -56,7 +56,7 @@ object LeaseTransactionsDiff {
         Right(Monoid.combine(
           Map(canceller -> Portfolio(-tx.fee, LeaseInfo(0, -lease.amount), Map.empty)),
           Map(recipient -> Portfolio(0, LeaseInfo(-lease.amount, 0), Map.empty))))
-      } else Left(TransactionValidationError(tx, s"LeaseTransaction was leased by other sender " +
+      } else Left(GenericError(s"LeaseTransaction was leased by other sender " +
         s"and time=$time > allowMultipleLeaseCancelTransactionUntilTimestamp=${settings.allowMultipleLeaseCancelTransactionUntilTimestamp}"))
 
     } yield Diff(height = height, tx = tx, portfolios = portfolioDiff, leaseState = Map(lease.id -> false))
