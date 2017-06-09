@@ -4,21 +4,14 @@ import java.io.File
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.state2.ByteStr
-import net.ceedubs.ficus.readers.ValueReader
+import net.ceedubs.ficus.readers.namemappers.HyphenNameMapper
+import net.ceedubs.ficus.readers.{NameMapper, ValueReader}
 
 package object settings {
-  implicit val optionalPathValueReader: ValueReader[Option[File]] =
-    (config: Config, path: String) => config.getString(path).trim match {
-      case "" => None
-      case str => Some(new File(str))
-    }
+  implicit val hyphenCase: NameMapper = HyphenNameMapper
 
-  implicit val optionalByteStrReader: ValueReader[Option[ByteStr]] =
-    (config: Config, path: String) => config.getString(path).trim match {
-      case "" => None
-      case str => Some(ByteStr.decodeBase58(str).get)
-    }
-
+  implicit val fileReader: ValueReader[File] = (cfg, path) => new File(cfg.getString(path))
+  implicit val byteStrReader: ValueReader[ByteStr] = (cfg, path) => ByteStr.decodeBase58(cfg.getString(path)).get
 
   def loadConfig(userConfig: Config): Config = {
     ConfigFactory

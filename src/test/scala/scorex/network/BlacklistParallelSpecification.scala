@@ -1,25 +1,22 @@
 package scorex.network
 
-import java.net.InetSocketAddress
+import java.net.{InetAddress, InetSocketAddress}
 
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.network.PeerDatabaseImpl
 import com.wavesplatform.settings.{NetworkSettings, loadConfig}
+import net.ceedubs.ficus.Ficus._
 import org.scalatest.{FeatureSpec, GivenWhenThen, ParallelTestExecution}
 
 class BlacklistParallelSpecification extends FeatureSpec with GivenWhenThen with ParallelTestExecution {
 
   private val config = loadConfig(ConfigFactory.parseString(
-    """
-      |waves {
-      |  network {
-      |    file = ""
-      |    black-list-residence-time: 1s
-      |  }
-      |}
-    """.stripMargin))
+    """waves.network {
+      |  file = null
+      |  black-list-residence-time: 1s
+      |}""".stripMargin))
 
-  private val networkSettings = NetworkSettings.fromConfig(config)
+  private val networkSettings = config.as[NetworkSettings]("waves.network")
 
   info("As a Peer")
   info("I want to blacklist other peers for certain time")
@@ -29,16 +26,16 @@ class BlacklistParallelSpecification extends FeatureSpec with GivenWhenThen with
 
     val peerDatabase = new PeerDatabaseImpl(networkSettings)
 
-    val host1 = "1.1.1.1"
-    val host2 = "2.2.2.2"
-    val host3 = "3.3.3.3"
+    val host1 = InetAddress.getByName("1.1.1.1")
+    val host2 = InetAddress.getByName("2.2.2.2")
+    val host3 = InetAddress.getByName("3.3.3.3")
     val address1 = new InetSocketAddress(host1, 1)
     val address2 = new InetSocketAddress(host2, 2)
     val address3 = new InetSocketAddress(host3, 2)
 
-    def isBlacklisted(address: InetSocketAddress): Boolean = false
-//      peerDatabase.getBlacklist.contains(address.getHostName)
-/*
+    def isBlacklisted(address: InetSocketAddress): Boolean =
+      peerDatabase.getBlacklist.contains(address.getAddress)
+
     scenario("Peer blacklist another peer") {
 
       Given("Peer database is empty")
@@ -81,9 +78,9 @@ class BlacklistParallelSpecification extends FeatureSpec with GivenWhenThen with
       assert(!isBlacklisted(address3))
 
       And("Peer blacklists other peers")
-      peerDatabase.blacklistHost(address1.getHostName)
-      peerDatabase.blacklistHost(address2.getHostName)
-      peerDatabase.blacklistHost(address3.getHostName)
+      peerDatabase.blacklistHost(address1.getAddress)
+      peerDatabase.blacklistHost(address2.getAddress)
+      peerDatabase.blacklistHost(address3.getAddress)
       assert(isBlacklisted(address1))
       assert(isBlacklisted(address2))
       assert(isBlacklisted(address3))
@@ -92,7 +89,7 @@ class BlacklistParallelSpecification extends FeatureSpec with GivenWhenThen with
       Thread.sleep(networkSettings.blackListResidenceTime.toMillis / 2)
 
       And("Adds one peer to blacklist one more time")
-      peerDatabase.blacklistHost(address2.getHostName)
+      peerDatabase.blacklistHost(address2.getAddress)
 
       And("Waits another half of period")
       Thread.sleep(networkSettings.blackListResidenceTime.toMillis / 2)
@@ -110,7 +107,6 @@ class BlacklistParallelSpecification extends FeatureSpec with GivenWhenThen with
       assert(!isBlacklisted(address2))
       assert(!isBlacklisted(address3))
     }
-    */
   }
 
 }

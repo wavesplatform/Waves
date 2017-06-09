@@ -1,6 +1,7 @@
 package com.wavesplatform.settings
 
 import java.io.File
+import java.net.InetSocketAddress
 
 import com.typesafe.config.ConfigFactory
 import org.scalatest.{FreeSpec, Matchers}
@@ -12,7 +13,7 @@ class LegacyConfigTransformerSpec extends FreeSpec with Matchers {
     """{
       |  "p2p": {
       |    "localOnly": true,
-      |    "myAddress": "1.2.3.4",
+      |    "myAddress": "1.2.3.4:6868",
       |    "nodeName": "test-node-name",
       |    "bindAddress": "1.2.3.4",
       |    "port": 6886,
@@ -88,7 +89,7 @@ class LegacyConfigTransformerSpec extends FreeSpec with Matchers {
     """{
       |  "p2p": {
       |    "localOnly": true,
-      |    "myAddress": "1.2.3.4",
+      |    "myAddress": "1.2.3.4:6868",
       |    "nodeName": "test-node-name",
       |    "bindAddress": "1.2.3.4",
       |    "port": 6886,
@@ -232,23 +233,19 @@ class LegacyConfigTransformerSpec extends FreeSpec with Matchers {
 
     val ws = WavesSettings.fromConfig(legacyConfigFromJson)
     ws.networkSettings should have (
-      'declaredAddress ("1.2.3.4"),
+      'declaredAddress (Some(InetSocketAddress.createUnresolved("1.2.3.4", 6868))),
       'nodeName ("test-node-name"),
-      'bindAddress ("1.2.3.4"),
-      'port (6886),
+      'bindAddress (InetSocketAddress.createUnresolved("1.2.3.4", 6886)),
       'knownPeers (Seq("138.201.152.166:6868", "138.201.152.165:6868")),
-      'localOnly (true),
       'peersDataResidenceTime (2.days),
       'blackListResidenceTime (45.seconds),
       'maxInboundConnections (10),
       'maxOutboundConnections (10),
-      'maxConnectionsWithSingleHost (3),
+      'maxConnectionsPerHost (3),
       'connectionTimeout (5.seconds),
       'outboundBufferSize (2 * 1024 * 1024),
-      'minEphemeralPortNumber (30000),
       'maxUnverifiedPeers (200),
-      'peersBroadcastInterval (15.seconds),
-      'blackListThreshold (10)
+      'peersBroadcastInterval (15.seconds)
     )
 
     ws.restAPISettings should have (

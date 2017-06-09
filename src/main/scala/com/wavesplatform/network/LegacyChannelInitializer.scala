@@ -1,14 +1,15 @@
 package com.wavesplatform.network
 
-import com.wavesplatform.settings.WavesSettings
 import io.netty.channel.socket.SocketChannel
 import io.netty.channel.{Channel, ChannelInitializer}
 import io.netty.handler.codec.{LengthFieldBasedFrameDecoder, LengthFieldPrepender}
 import io.netty.util.concurrent.EventExecutorGroup
 import scorex.transaction.History
 
+import scala.concurrent.duration.FiniteDuration
+
 class LegacyChannelInitializer(
-    settings: WavesSettings,
+    syncTimeout: FiniteDuration,
     history: History,
     peerDatabase: PeerDatabase,
     handshakeHandler: HandshakeHandler,
@@ -32,8 +33,8 @@ class LegacyChannelInitializer(
       discardingHandler,
       messageCodec,
       new PeerSynchronizer(peerDatabase),
-      new ExtensionSignaturesLoader(settings.synchronizationSettings.synchronizationTimeout, blacklist),
-      new ExtensionBlocksLoader(history, settings.synchronizationSettings.synchronizationTimeout, blacklist),
+      new ExtensionSignaturesLoader(syncTimeout, blacklist),
+      new ExtensionBlocksLoader(history, syncTimeout, blacklist),
       new OptimisticExtensionLoader,
       utxPoolSynchronizer,
       scoreObserver,
