@@ -53,6 +53,8 @@ abstract class HandshakeHandler(
     establishedConnections: ConcurrentMap[Channel, PeerInfo],
     connections: ConcurrentMap[PeerKey, Channel],
     blacklist: Channel => Unit) extends ChannelInboundHandlerAdapter with ScorexLogging {
+  import HandshakeHandler._
+
   private def removeHandshakeHandlers(ctx: ChannelHandlerContext, thisHandler: ChannelHandler): Unit = {
     ctx.pipeline().remove(classOf[HandshakeDecoder])
     ctx.pipeline().remove(classOf[HandshakeTimeoutHandler])
@@ -75,19 +77,22 @@ abstract class HandshakeHandler(
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef) = msg match {
     case rhs: Handshake if localHandshake.applicationName != rhs.applicationName =>
-      log.warn(s"Remote application name ${rhs.applicationName} does not match local ${localHandshake.applicationName}")
+      log.warn(s"${id(ctx)} Remote application name ${rhs.applicationName} does not match local ${localHandshake.applicationName}")
       blacklist(ctx.channel)
+    case rhs: Handshake if !versionIsSupported(rhs.applicationVersion) =>
+      log.debug(s"${id(ctx)} Remote node version ${rhs.applicationVersion} is not supported")
+      blacklist(ctx.channel())
     case rhs: Handshake =>
       log.debug(s"${id(ctx)} Received handshake $rhs")
       val ra = remoteAddress(ctx, rhs)
+      ctx.channel().attr(AttributeKeys.NodeName).set(rhs.nodeName)
+      ctx.channel().attr(AttributeKeys.RemoteAddress).set(ra)
       val key = PeerKey(ra.getAddress, rhs.nodeNonce)
       if (connections.putIfAbsent(key, ctx.channel()) != null) {
         log.debug(s"${id(ctx)} Already connected to peer, disconnecting")
         ctx.close()
       } else {
         removeHandshakeHandlers(ctx, this)
-        ctx.channel().attr(AttributeKeys.NodeName).set(rhs.nodeName)
-        ctx.channel().attr(AttributeKeys.RemoteAddress).set(ra)
         establishedConnections.put(ctx.channel(), peerInfo(rhs, ctx.channel()))
         connectionNegotiated(ctx)
         ctx.channel().closeFuture().addListener { f: ChannelFuture =>
@@ -100,6 +105,9 @@ abstract class HandshakeHandler(
 }
 
 object HandshakeHandler {
+  def versionIsSupported(remoteVersion: (Int, Int, Int)): Boolean =
+    remoteVersion._1 == 0 && remoteVersion._2 >= 6
+
   @Sharable
   class Server(
       handshake: Handshake,
