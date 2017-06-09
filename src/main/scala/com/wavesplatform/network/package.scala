@@ -11,7 +11,7 @@ import scala.concurrent.duration._
 
 package object network {
   def inetSocketAddress(addr: String, defaultPort: Int): InetSocketAddress = {
-    val uri = new URI(s"my://$addr")
+    val uri = new URI(s"node://$addr")
     if (uri.getPort < 0) new InetSocketAddress(addr, defaultPort)
     else new InetSocketAddress(uri.getHost, uri.getPort)
   }
@@ -30,8 +30,8 @@ package object network {
       e.schedule((() => f): Callable[A], delay.length, delay.unit)
   }
 
-  private def formatAddress(isa: InetSocketAddress) = if (isa == null) "" else toSocketAddressString(isa)
+  private def formatAddress(isa: InetSocketAddress) = if (isa == null) "" else s": ${toSocketAddressString(isa)}"
 
   def id(ctx: ChannelHandlerContext): String = id(ctx.channel())
-  def id(chan: Channel): String = s"[${chan.id().asShortText()}: ${formatAddress(chan.attr(AttributeKeys.RemoteAddress).get())}]"
+  def id(chan: Channel): String = s"[${chan.id().asShortText()}${formatAddress(chan.attr(AttributeKeys.RemoteAddress).get())}]"
 }

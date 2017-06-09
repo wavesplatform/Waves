@@ -24,8 +24,8 @@ import scala.concurrent.duration._
 
 class NetworkServer(
     chainId: Char,
-    declaredAddress: Option[InetSocketAddress],
     bindAddress: InetSocketAddress,
+    declaredAddress: Option[InetSocketAddress],
     settings: WavesSettings,
     history: History,
     checkpoints: CheckpointService,
