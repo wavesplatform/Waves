@@ -1,8 +1,8 @@
 package com.wavesplatform.network
 
+import com.wavesplatform.state2.diffs.TransactionDiffer.TransactionValidationError
 import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel.{ChannelHandlerContext, ChannelInboundHandlerAdapter}
-import scorex.transaction.ValidationError.TransactionValidationError
 import scorex.transaction.{NewTransactionHandler, Transaction}
 import scorex.utils.ScorexLogging
 

@@ -13,7 +13,7 @@ import scorex.block.Block.BlockId
 import scorex.consensus.TransactionsOrdering
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
-import scorex.transaction.ValidationError.CustomError
+import scorex.transaction.ValidationError.GenericError
 import scorex.transaction._
 import scorex.utils.{ScorexLogging, Time}
 
@@ -47,7 +47,7 @@ class Coordinator(
     if (isValidWithRespectToCheckpoint(candidate, estimatedHeight))
       Right(())
     else
-      Left(CustomError(s"Block ${str(candidate)} [h = $estimatedHeight] is not valid with respect to checkpoint"))
+      Left(GenericError(s"Block ${str(candidate)} [h = $estimatedHeight] is not valid with respect to checkpoint"))
   }
 
   def isBlockValid(b: Block): Either[ValidationError, Unit] = {
@@ -56,8 +56,8 @@ class Coordinator(
       def historyContainsParent = history.contains(b.reference)
       def consensusDataIsValid = blockConsensusValidation(history, stateReader, settings, time)(b)
 
-      if (!historyContainsParent) Left(CustomError(s"Invalid block ${b.encodedId}: no parent block in history"))
-      else if (!consensusDataIsValid) Left(CustomError(s"Invalid block ${b.encodedId}: consensus data is not valid"))
+      if (!historyContainsParent) Left(GenericError(s"Invalid block ${b.encodedId}: no parent block in history"))
+      else if (!consensusDataIsValid) Left(GenericError(s"Invalid block ${b.encodedId}: consensus data is not valid"))
       else Right(())
     }
   }
