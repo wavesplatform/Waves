@@ -1,6 +1,6 @@
 package com.wavesplatform.network
 
-import java.net.{InetSocketAddress, NetworkInterface}
+import java.net.InetSocketAddress
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -24,6 +24,8 @@ import scala.concurrent.duration._
 
 class NetworkServer(
     chainId: Char,
+    declaredAddress: Option[InetSocketAddress],
+    bindAddress: InetSocketAddress,
     settings: WavesSettings,
     history: History,
     checkpoints: CheckpointService,
@@ -46,11 +48,6 @@ class NetworkServer(
   private val scoreObserver = new RemoteScoreObserver(
       settings.synchronizationSettings.scoreTTL,
       history.lastBlockIds(settings.synchronizationSettings.maxRollback))
-
-  private val allLocalInterfaces = (for {
-    ifc <- NetworkInterface.getNetworkInterfaces.asScala
-    ip <- ifc.getInterfaceAddresses.asScala
-  } yield new InetSocketAddress(ip.getAddress, settings.networkSettings.port)).toSet
 
   private val discardingHandler = new DiscardingHandler
   private val specs: Map[Byte, MessageSpec[_ <: AnyRef]] = (BasicMessagesRepo.specs ++ TransactionalMessagesRepo.specs).map(s => s.messageCode -> s).toMap
@@ -101,15 +98,18 @@ class NetworkServer(
   private val serverHandshakeHandler =
     new HandshakeHandler.Server(handshake, peerDatabase, peerInfo, peerUniqueness, blacklist)
 
-  private val serverChannel = new ServerBootstrap()
-    .group(bossGroup, workerGroup)
-    .channel(classOf[NioServerSocketChannel])
-    .childHandler(new LegacyChannelInitializer(
-      settings, history, peerDatabase, serverHandshakeHandler, discardingHandler, messageCodec, utxPoolSynchronizer,
-      scoreObserver, localScorePublisher, coordinator, coordinatorExecutor, blacklist
-    ))
-    .bind(settings.networkSettings.port)
-    .channel()
+  private val serverChannel = declaredAddress.map { isa =>
+    new ServerBootstrap()
+      .group(bossGroup, workerGroup)
+      .channel(classOf[NioServerSocketChannel])
+      .childHandler(new LegacyChannelInitializer(
+        settings.synchronizationSettings.synchronizationTimeout, history, peerDatabase, serverHandshakeHandler,
+        discardingHandler, messageCodec, utxPoolSynchronizer, scoreObserver, localScorePublisher, coordinator,
+        coordinatorExecutor, blacklist
+      ))
+      .bind(bindAddress)
+      .channel()
+  }
 
   private val outgoingChannelCount = new AtomicInteger(0)
   private val channels = new ConcurrentHashMap[InetSocketAddress, Channel]
@@ -121,15 +121,16 @@ class NetworkServer(
     .group(workerGroup)
     .channel(classOf[NioSocketChannel])
     .handler(new LegacyChannelInitializer(
-      settings, history, peerDatabase, clientHandshakeHandler, discardingHandler, messageCodec, utxPoolSynchronizer,
-      scoreObserver, localScorePublisher, coordinator, coordinatorExecutor, blacklist
+      settings.synchronizationSettings.synchronizationTimeout, history, peerDatabase, clientHandshakeHandler,
+      discardingHandler, messageCodec, utxPoolSynchronizer, scoreObserver, localScorePublisher, coordinator,
+      coordinatorExecutor, blacklist
     ))
 
   workerGroup.scheduleWithFixedDelay(1.second, 5.seconds) {
     if (outgoingChannelCount.get() < settings.networkSettings.maxOutboundConnections) {
-      peerDatabase.getRandomPeer(allLocalInterfaces ++
-        channels.keySet().asScala ++
-        settings.networkSettings.declaredAddress.toSet).foreach(connect)
+      peerDatabase
+        .getRandomPeer(settings.networkSettings.declaredAddress.toSet ++ channels.keySet().asScala)
+        .foreach(connect)
     }
   }
 
@@ -164,7 +165,7 @@ class NetworkServer(
   }
 
   def shutdown(): Unit = try {
-    serverChannel.close().await()
+    serverChannel.foreach(_.close().await())
     log.debug("Unbound server")
     allChannels.close().await()
     log.debug("Closed all channels")

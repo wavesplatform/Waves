@@ -3,6 +3,7 @@ package com.wavesplatform.settings
 import com.typesafe.config.Config
 import com.wavesplatform.matcher.MatcherSettings
 import net.ceedubs.ficus.Ficus._
+import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 import net.ceedubs.ficus.readers.EnumerationReader._
 
 object LogLevel extends Enumeration {
@@ -27,13 +28,15 @@ case class WavesSettings(directory: String,
                          utxSettings: UTXSettings)
 
 object WavesSettings {
+  import NetworkSettings.networkSettingsValueReader
+
   val configPath: String = "waves"
   def fromConfig(config: Config): WavesSettings = {
     val directory = config.as[String](s"$configPath.directory")
     val loggingLevel = config.as[LogLevel.Value](s"$configPath.logging-level")
 
-    val networkSettings = NetworkSettings.fromConfig(config)
-    val walletSettings = WalletSettings.fromConfig(config)
+    val networkSettings = config.as[NetworkSettings]("waves.network")
+    val walletSettings = config.as[WalletSettings]("waves.wallet")
     val blockchainSettings = BlockchainSettings.fromConfig(config)
     val checkpointsSettings = CheckpointsSettings.fromConfig(config)
     val feesSettings = FeesSettings.fromConfig(config)

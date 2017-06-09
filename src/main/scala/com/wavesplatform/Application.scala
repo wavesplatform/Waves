@@ -28,7 +28,6 @@ import scorex.api.http.leasing.{LeaseApiRoute, LeaseBroadcastApiRoute}
 import scorex.block.Block
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
 import scorex.consensus.nxt.api.http.NxtConsensusApiRoute
-import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash.DigestSize
 import scorex.transaction._
 import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
@@ -39,7 +38,7 @@ import scorex.waves.http.{DebugApiRoute, WavesApiRoute}
 import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.reflect.runtime.universe._
-import scala.util.{Failure, Left, Success, Try, Random}
+import scala.util.{Left, Try}
 
 class Application(val actorSystem: ActorSystem, val settings: WavesSettings) extends ScorexLogging {
 
@@ -66,6 +65,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
 
     val network = new NetworkServer(
       settings.blockchainSettings.addressSchemeCharacter,
+      None,
+      settings.networkSettings.bindAddress,
       settings,
       history,
       checkpoints,
@@ -119,7 +120,11 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
       typeOf[AliasBroadcastApiRoute]
     )
 
-    if (settings.networkSettings.uPnPSettings.enable) upnp.addPort(settings.networkSettings.port)
+//    if (settings.networkSettings.uPnPSettings.enable) upnp.addPort(settings.networkSettings.)
+    for (addr <- settings.networkSettings.declaredAddress if settings.networkSettings.uPnPSettings.enable) {
+      upnp.addPort(addr.getPort)
+    }
+
 
     implicit val as = actorSystem
     implicit val materializer = ActorMaterializer()
@@ -171,7 +176,9 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
       if (settings.restAPISettings.enable) {
         Try(Await.ready(serverBinding.unbind(), 60.seconds)).failed.map(e => log.error("Failed to unbind REST API port: " + e.getMessage))
       }
-      if (settings.networkSettings.uPnPSettings.enable) upnp.deletePort(settings.networkSettings.port)
+      for (addr <- settings.networkSettings.declaredAddress if settings.networkSettings.uPnPSettings.enable) {
+        upnp.deletePort(addr.getPort)
+      }
 
       implicit val askTimeout = Timeout(60.seconds)
       Try(Await.result(actorSystem.terminate(), 60.seconds))
