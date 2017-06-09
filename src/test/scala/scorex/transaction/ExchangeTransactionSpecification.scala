@@ -97,7 +97,7 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
         val sell = Order.sell(sender2, matcher, pair, sellPrice, 2, time, expirationTimestamp, mf)
         val buy = Order.buy(sender1, matcher, pair, buyPrice, 1, time, expirationTimestamp, mf)
 
-        createExTx(buy, sell, sellPrice, matcher) shouldBe  Left(OrderValidationError(buy, "SpendAmount should be > 0"))
+        createExTx(buy, sell, sellPrice, matcher) shouldBe an[Right[_, _]]
 
         val sell1 = Order.sell(sender1, matcher, pair, buyPrice, 1, time, time - 1, mf)
         createExTx(buy, sell1, buyPrice, matcher) shouldBe  Left(OrderValidationError(sell1, "expiration should be > currentTime"))
