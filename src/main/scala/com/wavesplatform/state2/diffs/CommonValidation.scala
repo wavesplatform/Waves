@@ -5,7 +5,7 @@ import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.reader.StateReader
 import com.wavesplatform.state2.{Portfolio, _}
 import scorex.account.Account
-import scorex.transaction.ValidationError.TransactionValidationError
+import scorex.transaction.ValidationError.{GenericError}
 import scorex.transaction._
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.ExchangeTransaction
@@ -22,7 +22,7 @@ object CommonValidation {
     if (blockTime >= settings.allowTemporaryNegativeUntil)
       tx match {
         case ptx: PaymentTransaction if s.accountPortfolio(ptx.sender).balance < (ptx.amount + ptx.fee) =>
-          Left(TransactionValidationError(ptx, s"Attempt to pay unavailable funds: balance " +
+          Left(GenericError(s"Attempt to pay unavailable funds: balance " +
             s"${s.accountPortfolio(ptx.sender).balance} is less than ${ptx.amount + ptx.fee}"))
         case ttx: TransferTransaction =>
           val sender: Account = ttx.sender
@@ -44,7 +44,7 @@ object CommonValidation {
           lazy val negativeAssets: Boolean = spendings.assets.exists { case (id, amt) => (accountPortfolio.assets.getOrElse(id, 0L) + amt) < 0L }
           lazy val negativeWaves = accountPortfolio.balance + spendings.balance < 0
           if (negativeWaves || negativeAssets)
-            Left(TransactionValidationError(ttx, s"Attempt to transfer unavailable funds:" +
+            Left(GenericError(s"Attempt to transfer unavailable funds:" +
               s" Transaction application leads from $accountPortfolio to (at least) temporary negative state"))
           else Right(tx)
         case _ => Right(tx)
@@ -54,24 +54,24 @@ object CommonValidation {
     case ptx: PaymentTransaction if ptx.timestamp < settings.requirePaymentUniqueId => Right(tx)
     case _ =>
       if (state.containsTransaction(tx.id))
-        Left(TransactionValidationError(tx, s"Tx id(exc. for some PaymentTransactions) cannot be duplicated. Current height is: $height. Tx with such id aready present"))
+        Left(GenericError(s"Tx id(exc. for some PaymentTransactions) cannot be duplicated. Current height is: $height. Tx with such id aready present"))
       else Right(tx)
   }
 
   def disallowBeforeActivationTime[T <: Transaction](state: StateReader, settings: FunctionalitySettings, tx: T): Either[ValidationError, T] =
     tx match {
       case tx: BurnTransaction if tx.timestamp <= settings.allowBurnTransactionAfterTimestamp =>
-        Left(TransactionValidationError(tx, s"must not appear before time=${settings.allowBurnTransactionAfterTimestamp}"))
+        Left(GenericError(s"must not appear before time=${settings.allowBurnTransactionAfterTimestamp}"))
       case tx: LeaseTransaction if tx.timestamp <= settings.allowLeaseTransactionAfterTimestamp =>
-        Left(TransactionValidationError(tx, s"must not appear before time=${settings.allowLeaseTransactionAfterTimestamp}"))
+        Left(GenericError(s"must not appear before time=${settings.allowLeaseTransactionAfterTimestamp}"))
       case tx: LeaseCancelTransaction if tx.timestamp <= settings.allowLeaseTransactionAfterTimestamp =>
-        Left(TransactionValidationError(tx, s"must not appear before time=${settings.allowLeaseTransactionAfterTimestamp}"))
+        Left(GenericError(s"must not appear before time=${settings.allowLeaseTransactionAfterTimestamp}"))
       case tx: ExchangeTransaction if tx.timestamp <= settings.allowExchangeTransactionAfterTimestamp =>
-        Left(TransactionValidationError(tx, s"must not appear before time=${settings.allowExchangeTransactionAfterTimestamp}"))
+        Left(GenericError(s"must not appear before time=${settings.allowExchangeTransactionAfterTimestamp}"))
       case tx: CreateAliasTransaction if tx.timestamp <= settings.allowCreateAliasTransactionAfterTimestamp =>
-        Left(TransactionValidationError(tx, s"must not appear before time=${settings.allowCreateAliasTransactionAfterTimestamp}"))
+        Left(GenericError(s"must not appear before time=${settings.allowCreateAliasTransactionAfterTimestamp}"))
       case tx: MakeAssetNameUniqueTransaction if tx.timestamp <= settings.allowMakeAssetNameUniqueTransactionAfterTimestamp =>
-        Left(TransactionValidationError(tx, s"must not appear before time=${settings.allowMakeAssetNameUniqueTransactionAfterTimestamp}"))
+        Left(GenericError(s"must not appear before time=${settings.allowMakeAssetNameUniqueTransactionAfterTimestamp}"))
       case _: BurnTransaction => Right(tx)
       case _: PaymentTransaction => Right(tx)
       case _: GenesisTransaction => Right(tx)
@@ -83,7 +83,7 @@ object CommonValidation {
       case _: LeaseCancelTransaction => Right(tx)
       case _: CreateAliasTransaction => Right(tx)
       case _: MakeAssetNameUniqueTransaction => Right(tx)
-      case x => Left(TransactionValidationError(x, "Unknown transaction must be explicitly registered within ActivatedValidator"))
+      case x => Left(GenericError( "Unknown transaction must be explicitly registered within ActivatedValidator"))
     }
 
   def disallowTxFromFuture[T <: Transaction](state: StateReader, settings: FunctionalitySettings, time: Long, tx: T): Either[ValidationError, T] = {
@@ -94,7 +94,7 @@ object CommonValidation {
     } else {
       if ((tx.timestamp - time).millis <= MaxTimeTransactionOverBlockDiff)
         Right(tx)
-      else Left(TransactionValidationError(tx, s"Transaction is from far future. BlockTime: $time"))
+      else Left(GenericError(s"Transaction is from far future. BlockTime: $time"))
     }
   }
 }

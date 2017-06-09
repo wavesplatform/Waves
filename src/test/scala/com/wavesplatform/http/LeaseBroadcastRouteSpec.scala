@@ -4,6 +4,7 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.RequestGen
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.settings.RestAPISettings
+import com.wavesplatform.state2.diffs.TransactionDiffer.TransactionValidationError
 import org.scalacheck.Gen.posNum
 import org.scalacheck.{Gen => G}
 import org.scalamock.scalatest.PathMockFactory
@@ -13,6 +14,7 @@ import play.api.libs.json._
 import scorex.api.http._
 import scorex.api.http.leasing.LeaseBroadcastApiRoute
 import scorex.network.ConnectedPeer
+import scorex.transaction.ValidationError.GenericError
 import scorex.transaction.{NewTransactionHandler, Transaction, ValidationError}
 
 
@@ -24,7 +26,7 @@ class LeaseBroadcastRouteSpec extends RouteSpec("/leasing/broadcast/") with Requ
     val stmMock = {
 
       def alwaysError(t: Transaction, maybePeer: Option[ConnectedPeer]): Either[ValidationError, Transaction] =
-        Left[ValidationError, Transaction](scorex.transaction.ValidationError.TransactionValidationError(t, "foo"))
+        Left[ValidationError, Transaction](TransactionValidationError(t, GenericError("foo")))
 
       val m = mock[NewTransactionHandler]
       (m.onNewOffchainTransactionExcept(_: Transaction, _: Option[ConnectedPeer]))

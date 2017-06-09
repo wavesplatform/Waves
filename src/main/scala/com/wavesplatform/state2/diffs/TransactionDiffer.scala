@@ -1,15 +1,17 @@
 package com.wavesplatform.state2.diffs
 
 import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state2.{Diff, ByteStr}
+import com.wavesplatform.state2.Diff
 import com.wavesplatform.state2.reader.StateReader
 import scorex.transaction.ValidationError.UnsupportedTransactionType
 import scorex.transaction._
-import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.transaction.assets._
+import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 
 object TransactionDiffer {
+  case class TransactionValidationError(tx: Transaction, cause: ValidationError) extends ValidationError
+
   def apply(settings: FunctionalitySettings, time: Long, height: Int)(s: StateReader, tx: Transaction): Either[ValidationError, Diff] = {
     for {
       t0 <- CommonValidation.disallowTxFromFuture(s, settings, time, tx)
@@ -28,9 +30,9 @@ object TransactionDiffer {
         case etx: ExchangeTransaction => ExchangeTransactionDiff(s, height)(etx)
         case atx: CreateAliasTransaction => CreateAliasTransactionDiff(height)(atx)
         case atx: MakeAssetNameUniqueTransaction => AssetTransactionsDiff.makeAssetNameUnique(s, height)(atx)
-        case t => Left(UnsupportedTransactionType(t))
+        case t => Left(UnsupportedTransactionType)
       }
       positiveDiff <- BalanceDiffValidation(s, time, settings)(tx, diff)
     } yield positiveDiff
-  }
+  }.left.map(TransactionValidationError(tx, _))
 }

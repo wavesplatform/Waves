@@ -10,7 +10,7 @@ import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash
 import scorex.serialization.{BytesSerializable, Deser, JsonSerializable}
 import scorex.transaction.TransactionParser._
-import scorex.transaction.ValidationError.CustomError
+import scorex.transaction.ValidationError.GenericError
 import scorex.transaction._
 import scorex.transaction.assets.exchange.Validation.booleanOperators
 
@@ -132,7 +132,7 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
         throw new ArithmeticException("BigInteger out of long range")
       } else spend.bigInteger.longValueExact()
     }
-  }.toEither.left.map(x => CustomError(x.getMessage))
+  }.toEither.left.map(x => GenericError(x.getMessage))
 
   @ApiModelProperty(hidden = true)
   def getReceiveAmount(matchPrice: Long, matchAmount: Long): Either[ValidationError, Long] = Try {
@@ -140,7 +140,7 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
     else {
       (BigInt(matchAmount) * matchPrice / PriceConstant).bigInteger.longValueExact()
     }
-  }.toEither.left.map(x => CustomError(x.getMessage))
+  }.toEither.left.map(x => GenericError(x.getMessage))
 
   override def json: JsObject = Json.obj(
     "id" -> Base58.encode(id),

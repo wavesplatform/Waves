@@ -4,6 +4,7 @@ import cats._
 import com.wavesplatform.TransactionGen
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.state2._
+import com.wavesplatform.state2.diffs.TransactionDiffer.TransactionValidationError
 import org.scalacheck.{Gen, Shrink}
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import org.scalatest.{Inside, Matchers, PropSpec}
@@ -134,7 +135,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Gene
       val sell = Order.sell(seller, matcher, assetPair, price, issue1.quantity + 1, Ts, Ts + 1, MatcherFee)
       val tx = createExTx(buy, sell, price, matcher, Ts).explicitGet()
       assertDiffEi(Seq(TestBlock(Seq(gen1, gen2, issue1))), TestBlock(Seq(tx))) { totalDiffEi =>
-        inside(totalDiffEi) { case Left(AccountBalanceError(errs)) =>
+        inside(totalDiffEi) { case Left(TransactionValidationError(_, AccountBalanceError(errs))) =>
           errs should contain key seller.toAccount
         }
       }

@@ -279,7 +279,7 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
       actor = system.actorOf(Props(new OrderBookActor(pair, orderHistoryRef, storedState,
         wallet, settings, history, functionalitySettings, transactionModule) with RestartableActor {
         override def validate(orderMatch: ExchangeTransaction): Either[ValidationError, SignedTransaction] = {
-          if (orderMatch.buyOrder == ord2) Left(ValidationError.CustomError("test"))
+          if (orderMatch.buyOrder == ord2) Left(ValidationError.GenericError("test"))
           else Right(orderMatch)
         }
 

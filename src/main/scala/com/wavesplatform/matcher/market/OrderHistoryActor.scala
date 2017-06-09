@@ -16,7 +16,7 @@ import org.h2.mvstore.MVStore
 import play.api.libs.json._
 import scorex.account.Account
 import scorex.transaction.AssetAcc
-import scorex.transaction.ValidationError.CustomError
+import scorex.transaction.ValidationError.GenericError
 import scorex.transaction.assets.exchange.{AssetPair, Order}
 import scorex.wallet.Wallet
 
@@ -124,9 +124,9 @@ object OrderHistoryActor {
   case class GetOrderStatus(assetPair: AssetPair, id: String) extends OrderHistoryRequest
   case class DeleteOrderFromHistory(assetPair: AssetPair, address: String, id: String) extends OrderHistoryRequest
   case class ValidateOrder(order: Order) extends OrderHistoryRequest
-  case class ValidateOrderResult(result: Either[CustomError, Order])
+  case class ValidateOrderResult(result: Either[GenericError, Order])
   case class ValidateCancelOrder(cancel: CancelOrder) extends OrderHistoryRequest
-  case class ValidateCancelResult(result: Either[CustomError, CancelOrder])
+  case class ValidateCancelResult(result: Either[GenericError, CancelOrder])
   case class RecoverFromOrderBook(ob: OrderBook) extends OrderHistoryRequest
 
   case class OrderDeleted(orderId: String) extends MatcherResponse {

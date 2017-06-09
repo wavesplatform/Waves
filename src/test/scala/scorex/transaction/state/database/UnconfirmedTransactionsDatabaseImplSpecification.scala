@@ -4,7 +4,7 @@ import com.wavesplatform.settings.UTXSettings
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{FreeSpec, Matchers, OneInstancePerTest}
 import scorex.account.PublicKeyAccount
-import scorex.transaction.ValidationError.{TransactionParameterValidationError, TransactionValidationError}
+import scorex.transaction.ValidationError.{GenericError}
 import scorex.transaction.{GenesisTransaction, Transaction}
 
 import scala.concurrent.duration._
@@ -17,7 +17,7 @@ class UnconfirmedTransactionsDatabaseImplSpecification extends FreeSpec
   "utx database" - {
 
     val validDelegate = (tx: Transaction) => Right(tx)
-    val invalidDelegate = (tx: Transaction) => Left(TransactionValidationError(tx, "Utx is full"))
+    val invalidDelegate = (tx: Transaction) => Left(GenericError("Utx is full"))
     val defaultSizedUtxSettings = UTXSettings(1000, 2.seconds)
 
 

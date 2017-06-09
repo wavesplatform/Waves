@@ -5,7 +5,7 @@ import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.reader.StateReader
 import com.wavesplatform.state2.{ByteStr, Diff, LeaseInfo, Portfolio}
 import scorex.account.Account
-import scorex.transaction.ValidationError.TransactionValidationError
+import scorex.transaction.ValidationError.GenericError
 import scorex.transaction.{PaymentTransaction, ValidationError}
 
 import scala.util.{Left, Right}
@@ -16,7 +16,7 @@ object PaymentTransactionDiff {
            (tx: PaymentTransaction): Either[ValidationError, Diff] = {
 
     stateReader.paymentTransactionIdByHash(ByteStr(tx.hash)) match {
-      case Some(existing) if blockTime >= settings.requirePaymentUniqueId => Left(TransactionValidationError(tx, s"PaymentTx is already registered: $existing"))
+      case Some(existing) if blockTime >= settings.requirePaymentUniqueId => Left(GenericError(s"PaymentTx is already registered: $existing"))
       case _ => Right(Diff(height = height,
         tx = tx,
         portfolios = Map(

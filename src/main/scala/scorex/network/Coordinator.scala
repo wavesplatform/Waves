@@ -21,7 +21,7 @@ import scorex.network.ScoreObserver.{CurrentScore, GetScore}
 import scorex.network.message.{Message, MessageSpec, _}
 import scorex.network.peer.PeerManager.{ConnectedPeers, GetConnectedPeersTyped}
 import scorex.transaction.History.BlockchainScore
-import scorex.transaction.ValidationError.CustomError
+import scorex.transaction.ValidationError.GenericError
 import scorex.transaction._
 import scorex.utils.{ScorexLogging, Time}
 
@@ -248,7 +248,7 @@ class Coordinator(protected override val networkControllerRef: ActorRef, blockch
     if (isValidWithRespectToCheckpoint(candidate, estimatedHeight))
       Right(())
     else
-      Left(CustomError(s"Block ${str(candidate)} [h = $estimatedHeight] is not valid with respect to checkpoint"))
+      Left(GenericError(s"Block ${str(candidate)} [h = $estimatedHeight] is not valid with respect to checkpoint"))
   }
 
   def isBlockValid(b: Block): Either[ValidationError, Unit] = {
@@ -265,9 +265,9 @@ class Coordinator(protected override val networkControllerRef: ActorRef, blockch
         settings.blockchainSettings,
         time)(b)
 
-      if (!historyContainsParent) Left(CustomError(s"Invalid block ${b.encodedId}: no parent block in history"))
-      else if (!signatureIsValid) Left(CustomError(s"Invalid block ${b.encodedId}: signature is not valid"))
-      else if (!consensusDataIsValid) Left(CustomError(s"Invalid block ${b.encodedId}: consensus data is not valid"))
+      if (!historyContainsParent) Left(GenericError(s"Invalid block ${b.encodedId}: no parent block in history"))
+      else if (!signatureIsValid) Left(GenericError(s"Invalid block ${b.encodedId}: signature is not valid"))
+      else if (!consensusDataIsValid) Left(GenericError(s"Invalid block ${b.encodedId}: consensus data is not valid"))
       else Right(())
     }
   }

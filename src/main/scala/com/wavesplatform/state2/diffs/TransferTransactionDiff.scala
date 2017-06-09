@@ -6,7 +6,7 @@ import com.wavesplatform.state2._
 import com.wavesplatform.state2.reader.StateReader
 import scorex.account.Account
 import scorex.transaction.ValidationError
-import scorex.transaction.ValidationError.TransactionValidationError
+import scorex.transaction.ValidationError.{GenericError}
 import scorex.transaction.assets.TransferTransaction
 
 import scala.util.Right
@@ -47,7 +47,7 @@ object TransferTransactionDiff {
       case Left(e) => Left(e)
       case Right((portfolios, invalid)) =>
         if (invalid)
-          Left(TransactionValidationError(tx, s"Unissued assets are not allowed after allowUnissuedAssetsUntil=${s.allowUnissuedAssetsUntil}"))
+          Left(GenericError(s"Unissued assets are not allowed after allowUnissuedAssetsUntil=${s.allowUnissuedAssetsUntil}"))
         else
           Right(Diff(height, tx, portfolios))
     }

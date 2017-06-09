@@ -8,7 +8,7 @@ import com.wavesplatform.utils._
 import scorex.account.Account
 import scorex.block.Block
 import scorex.transaction.History.BlockchainScore
-import scorex.transaction.ValidationError.CustomError
+import scorex.transaction.ValidationError.GenericError
 import scorex.transaction.{HistoryWriter, ValidationError}
 import scorex.utils.{LogMVMapBuilder, ScorexLogging}
 
@@ -38,7 +38,7 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
       db.commit()
       Right(())
     } else {
-      Left(CustomError(s"Failed to append block ${block.encodedId} which parent(${block.reference.base58} is not last block in blockchain"))
+      Left(GenericError(s"Failed to append block ${block.encodedId} which parent(${block.reference.base58} is not last block in blockchain"))
     }
   }
 
