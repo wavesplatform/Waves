@@ -12,7 +12,6 @@ import play.api.libs.json.Json._
 import play.api.libs.json._
 import scorex.api.http._
 import scorex.api.http.alias.AliasBroadcastApiRoute
-import scorex.network.ConnectedPeer
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction.{NewTransactionHandler, Transaction, ValidationError}
 
