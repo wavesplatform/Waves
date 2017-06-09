@@ -85,7 +85,7 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
       timestamp = NTP.correctedTime())
   }
 
-  property("Different account cases") {
+  property("Test transaction with small amount and expired order") {
     forAll(accountGen, accountGen, accountGen, assetPairGen) {
       (sender1: PrivateKeyAccount, sender2: PrivateKeyAccount, matcher: PrivateKeyAccount, pair: AssetPair) =>
         val time = NTP.correctedTime()
