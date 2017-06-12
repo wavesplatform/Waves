@@ -65,6 +65,11 @@ class MatcherActor(orderHistory: ActorRef, storedState: StateReader, wallet: Wal
     isCorrectOrder :| s"Invalid AssetPair ordering, should be reversed: $reversePair"
   }
 
+  def checkBlacklist(aPair: AssetPair): Validation = {
+    !settings.blacklistedAssets.contains(aPair.priceAssetStr) :| s"Invalid Asset ID: ${aPair.priceAssetStr}" &&
+      !settings.blacklistedAssets.contains(aPair.amountAssetStr) :| s"Invalid Asset ID: ${aPair.amountAssetStr}"
+  }
+
   def createAndForward(order: Order): Unit = {
     val orderBook = createOrderBook(order.assetPair)
     persistAsync(OrderBookCreated(order.assetPair)) { _ =>
@@ -83,7 +88,7 @@ class MatcherActor(orderHistory: ActorRef, storedState: StateReader, wallet: Wal
     if (!v) {
       sender() ! StatusCodeMatcherResponse(StatusCodes.NotFound, v.messages())
     } else {
-      val ov = checkPairOrdering(msg.assetPair)
+      val ov = checkPairOrdering(msg.assetPair) && checkBlacklist(msg.assetPair)
       if (!ov) {
         sender() ! StatusCodeMatcherResponse(StatusCodes.Found, ov.messages())
       } else {

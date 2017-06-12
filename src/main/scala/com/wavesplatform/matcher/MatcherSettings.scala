@@ -23,7 +23,8 @@ case class MatcherSettings(enable: Boolean,
                            predefinedPairs: Seq[AssetPair],
                            maxTimestampDiff: FiniteDuration,
                            orderHistoryFile: String,
-                           isMigrateToNewOrderHistoryStorage: Boolean
+                           isMigrateToNewOrderHistoryStorage: Boolean,
+                           blacklistedAssets: Set[String]
                           )
 
 
@@ -51,8 +52,10 @@ object MatcherSettings {
 
     val isMigrateToNewOrderHistoryStorage = !new File(orderHistoryFile).exists()
 
+    val blacklistedAssets = config.as[List[String]](s"$configPath.blacklisted-assets")
+
     MatcherSettings(enabled, account, bindAddress, port, minOrderFee, orderMatchTxFee, journalDirectory,
       snapshotsDirectory, snapshotsInterval, maxOpenOrders, baseAssets, basePairs, maxTimestampDiff,
-      orderHistoryFile, isMigrateToNewOrderHistoryStorage)
+      orderHistoryFile, isMigrateToNewOrderHistoryStorage, blacklistedAssets.toSet)
   }
 }
