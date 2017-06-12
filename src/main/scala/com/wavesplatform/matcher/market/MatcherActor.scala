@@ -10,7 +10,7 @@ import com.wavesplatform.matcher.market.OrderBookActor.{DeleteOrderBookRequest, 
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.reader.StateReader
 import io.netty.channel.group.ChannelGroup
-import play.api.libs.json.{JsArray, JsValue, Json}
+import play.api.libs.json._
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.IssueTransaction
 import scorex.transaction.assets.exchange.Validation.booleanOperators
@@ -35,7 +35,8 @@ class MatcherActor(orderHistory: ActorRef, storedState: StateReader, wallet: Wal
     def getAssetName(asset: Option[AssetId]): String = asset.map(storedState.getAssetName).getOrElse(AssetPair.WavesName)
 
     openMarkets += MarketData(pair, getAssetName(pair.amountAsset), getAssetName(pair.priceAsset), NTP.correctedTime(),
-        pair.amountAsset.flatMap(storedState.getIssueTransaction), pair.priceAsset.flatMap(storedState.getIssueTransaction))
+        pair.amountAsset.flatMap(storedState.getIssueTransaction).map(t => AssetInfo(t.decimals)),
+        pair.priceAsset.flatMap(storedState.getIssueTransaction).map(t => AssetInfo(t.decimals)))
     tradedPairs += pair
 
     context.actorOf(OrderBookActor.props(pair, orderHistory, storedState, settings, wallet, utx, allChannels, history, functionalitySettings),
@@ -161,10 +162,10 @@ object MatcherActor {
     def getMarketsJs: JsValue = JsArray(markets.map(m => Json.obj(
       "amountAsset" -> m.pair.amountAssetStr,
       "amountAssetName" -> m.amountAssetName,
-      "amountAssetInfo" -> m.amountAssetInfo.map(_.json),
+      "amountAssetInfo" -> m.amountAssetInfo,
       "priceAsset" -> m.pair.priceAssetStr,
       "priceAssetName" -> m.priceAssetName,
-      "priceAssetInfo" -> m.priceAssetinfo.map(_.json),
+      "priceAssetInfo" -> m.priceAssetinfo,
       "created" -> m.created
     ))
     )
@@ -177,8 +178,11 @@ object MatcherActor {
     def code: StatusCode = StatusCodes.OK
   }
 
+  case class AssetInfo(decimals: Int)
+  implicit val assetInfoFormat: Format[AssetInfo] = Json.format[AssetInfo]
+
   case class MarketData(pair: AssetPair, amountAssetName: String, priceAssetName: String, created: Long,
-                        amountAssetInfo: Option[IssueTransaction], priceAssetinfo: Option[IssueTransaction])
+                        amountAssetInfo: Option[AssetInfo], priceAssetinfo: Option[AssetInfo])
 
   def compare(buffer1: Option[Array[Byte]], buffer2: Option[Array[Byte]]): Int = {
     if (buffer1.isEmpty && buffer2.isEmpty) 0

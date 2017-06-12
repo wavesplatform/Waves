@@ -142,7 +142,8 @@ object OrderHistoryActor {
       "price" -> h._3.map(_.price),
       "timestamp" -> h._3.map(_.timestamp),
       "filled" -> h._2.filled,
-      "status" -> h._2.status.name
+      "status" -> h._2.status.name,
+      "assetPair" -> h._3.map(_.assetPair.json)
     )))
     val code = StatusCodes.OK
   }
