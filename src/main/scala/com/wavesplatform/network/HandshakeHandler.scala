@@ -7,6 +7,7 @@ import java.util.concurrent.{ConcurrentMap, TimeUnit}
 import io.netty.buffer.ByteBuf
 import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel._
+import io.netty.channel.group.ChannelGroup
 import io.netty.handler.codec.ReplayingDecoder
 import io.netty.util.concurrent.ScheduledFuture
 import scorex.utils.ScorexLogging
@@ -115,10 +116,14 @@ object HandshakeHandler extends ScorexLogging {
       handshake: Handshake,
       establishedConnections: ConcurrentMap[Channel, PeerInfo],
       connections: ConcurrentMap[PeerKey, Channel],
-      blacklist: Channel => Unit)
+      blacklist: Channel => Unit,
+      allChannels: ChannelGroup)
     extends HandshakeHandler(handshake, establishedConnections, connections, blacklist) {
-    override def connectionNegotiated(ctx: ChannelHandlerContext) =
+    override def connectionNegotiated(ctx: ChannelHandlerContext) = {
       ctx.writeAndFlush(handshake.encode(ctx.alloc().buffer()))
+      ctx.channel().closeFuture().addListener((_: ChannelFuture) => allChannels.remove(ctx.channel()))
+      allChannels.add(ctx.channel())
+    }
   }
 
   @Sharable

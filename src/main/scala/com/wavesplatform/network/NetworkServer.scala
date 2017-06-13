@@ -67,7 +67,8 @@ class NetworkServer(
 
   private val peerSynchronizer = new PeerSynchronizer(peerDatabase)
   private val utxPoolSynchronizer = new UtxPoolSynchronizer(txHandler, network)
-  private val localScorePublisher = new LocalScorePublisher(msg => doBroadcast(msg))
+  private val errorHandler = new ErrorHandler(blacklist)
+  private val historyReplier = new HistoryReplier(history, 101)
 
   private val inboundConnectionFilter = new InboundConnectionFilter(peerDatabase,
     settings.networkSettings.maxInboundConnections,
@@ -83,7 +84,7 @@ class NetworkServer(
     .group(localServerGroup)
     .channel(classOf[LocalServerChannel])
     .childHandler(new PipelineInitializer[LocalChannel](Seq(
-        utxPoolSynchronizer, scoreObserver, localScorePublisher,
+        utxPoolSynchronizer, scoreObserver,
         coordinator -> coordinatorExecutor)
     ))
 
@@ -102,7 +103,7 @@ class NetworkServer(
   private val peerUniqueness = new ConcurrentHashMap[PeerKey, Channel]()
 
   private val serverHandshakeHandler =
-    new HandshakeHandler.Server(handshake, peerInfo, peerUniqueness, blacklist)
+    new HandshakeHandler.Server(handshake, peerInfo, peerUniqueness, blacklist, allChannels)
 
   private val serverChannel = declaredAddress.map { _ =>
     new ServerBootstrap()
@@ -110,6 +111,7 @@ class NetworkServer(
       .channel(classOf[NioServerSocketChannel])
       .childHandler(new PipelineInitializer[SocketChannel](Seq(
         inboundConnectionFilter,
+        errorHandler,
         new HandshakeDecoder,
         new HandshakeTimeoutHandler,
         serverHandshakeHandler,
@@ -119,12 +121,12 @@ class NetworkServer(
         discardingHandler,
         messageCodec,
         peerSynchronizer,
+        historyReplier,
         new ExtensionSignaturesLoader(settings.synchronizationSettings.synchronizationTimeout, blacklist),
         new ExtensionBlocksLoader(history, settings.synchronizationSettings.synchronizationTimeout, blacklist),
         new OptimisticExtensionLoader,
         utxPoolSynchronizer,
         scoreObserver,
-        localScorePublisher,
         coordinator -> coordinatorExecutor)))
       .bind(bindAddress)
       .channel()
@@ -140,6 +142,7 @@ class NetworkServer(
     .group(workerGroup)
     .channel(classOf[NioSocketChannel])
     .handler(new PipelineInitializer[SocketChannel](Seq(
+      errorHandler,
       new HandshakeDecoder,
       new HandshakeTimeoutHandler,
       clientHandshakeHandler,
@@ -149,12 +152,12 @@ class NetworkServer(
       discardingHandler,
       messageCodec,
       peerSynchronizer,
+      historyReplier,
       new ExtensionSignaturesLoader(settings.synchronizationSettings.synchronizationTimeout, blacklist),
       new ExtensionBlocksLoader(history, settings.synchronizationSettings.synchronizationTimeout, blacklist),
       new OptimisticExtensionLoader,
       utxPoolSynchronizer,
       scoreObserver,
-      localScorePublisher,
       coordinator -> coordinatorExecutor)))
 
   workerGroup.scheduleWithFixedDelay(1.second, 5.seconds) {

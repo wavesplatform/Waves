@@ -10,8 +10,7 @@ import scorex.utils.ScorexLogging
 class HistoryReplier(history: History, maxChainLength: Int) extends ChannelInboundHandlerAdapter with ScorexLogging {
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef) = msg match {
     case GetSignatures(otherSigs) =>
-
-      log.info(s"Got GetSignaturesMessage with ${otherSigs.length} sigs within")
+      log.debug(s"${id(ctx)} Got GetSignaturesMessage with ${otherSigs.length} sigs within")
 
       otherSigs.foreach { parent =>
         val headers = history.blockIdsAfter(parent, maxChainLength)
@@ -27,6 +26,9 @@ class HistoryReplier(history: History, maxChainLength: Int) extends ChannelInbou
       for (h <- history.heightOf(sig); bytes <- history.blockBytes(h)) {
         ctx.writeAndFlush(RawBytes(BlockMessageSpec.messageCode, bytes))
       }
+
+    case _: Handshake =>
+      ctx.writeAndFlush(LocalScoreChanged(history.score()))
 
     case _ => super.channelRead(ctx, msg)
   }

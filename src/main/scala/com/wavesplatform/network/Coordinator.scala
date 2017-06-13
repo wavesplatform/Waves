@@ -99,7 +99,7 @@ class Coordinator(
           }
       }
 
-      ctx.writeAndFlush(LocalScoreChanged(history.score()))
+      broadcast(LocalScoreChanged(history.score()), None)
       miner.lastBlockChanged(history.height(), history.lastBlock)
       checkExpiry(ctx)
     } else {
@@ -219,8 +219,6 @@ class Coordinator(
     case RollbackTo(blockId) =>
       blockchainUpdater.removeAfter(blockId)
       ctx.writeAndFlush(LocalScoreChanged(history.score()))
-    case _: Handshake =>
-      ctx.writeAndFlush(history.score())
     case other => log.debug(other.getClass.getCanonicalName)
   }
 }

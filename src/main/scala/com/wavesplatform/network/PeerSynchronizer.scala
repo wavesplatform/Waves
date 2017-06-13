@@ -33,7 +33,7 @@ class PeerSynchronizer(peerDatabase: PeerDatabase) extends ChannelInboundHandler
       ctx.fireChannelRead(msg)
     case GetPeers =>
       ctx.channel().declaredAddress.foreach(peerDatabase.touch)
-      ctx.writeAndFlush(peerDatabase.getKnownPeers.keys.toSeq)
+      ctx.writeAndFlush(KnownPeers(peerDatabase.getKnownPeers.keys.toSeq))
     case KnownPeers(peers) =>
       log.trace(s"${id(ctx)} Got known peers: ${peers.mkString("[", ", ", "]")}")
       ctx.channel().declaredAddress.foreach(peerDatabase.touch)

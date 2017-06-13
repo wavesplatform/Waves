@@ -12,6 +12,7 @@ import scorex.utils.ScorexLogging
 class MessageCodec(specs: Map[Byte, MessageSpec[_ <: AnyRef]])
     extends MessageToMessageCodec[RawBytes, Message] with ScorexLogging {
   override def encode(ctx: ChannelHandlerContext, msg: Message, out: util.List[AnyRef]) = msg match {
+    case LocalScoreChanged(score) => out.add(RawBytes(ScoreMessageSpec.messageCode, ScoreMessageSpec.serializeData(score)))
     case GetPeers => out.add(RawBytes(GetPeersSpec.messageCode, Array[Byte]()))
     case k: KnownPeers => out.add(RawBytes(PeersSpec.messageCode, PeersSpec.serializeData(k)))
     case gs: GetSignatures => out.add(RawBytes(GetSignaturesSpec.messageCode, GetSignaturesSpec.serializeData(gs)))
