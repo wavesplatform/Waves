@@ -66,7 +66,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
     val network = new NetworkServer(
       settings.blockchainSettings.addressSchemeCharacter,
       settings.networkSettings.bindAddress,
-      None,
+      settings.networkSettings.declaredAddress,
       settings,
       history,
       checkpoints,

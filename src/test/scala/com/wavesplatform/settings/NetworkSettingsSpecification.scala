@@ -43,9 +43,9 @@ class NetworkSettingsSpecification extends FlatSpec with Matchers {
     val networkSettings = config.as[NetworkSettings]("waves.network")
 
     networkSettings.file should be(Some(new File("/waves/peers.dat")))
-    networkSettings.bindAddress should be(InetSocketAddress.createUnresolved("127.0.0.1", 6868))
+    networkSettings.bindAddress should be(new InetSocketAddress("127.0.0.1", 6868))
     networkSettings.nodeName should be("default-node-name")
-    networkSettings.declaredAddress should be(Some(InetSocketAddress.createUnresolved("127.0.0.1", 6868)))
+    networkSettings.declaredAddress should be(Some(new InetSocketAddress("127.0.0.1", 6868)))
     networkSettings.nonce should be(0)
     networkSettings.knownPeers should be(List("8.8.8.8:6868", "4.4.8.8:6868"))
     networkSettings.peersDataResidenceTime should be(1.day)

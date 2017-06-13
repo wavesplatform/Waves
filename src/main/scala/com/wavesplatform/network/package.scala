@@ -3,6 +3,8 @@ package com.wavesplatform
 import java.net.{InetSocketAddress, SocketAddress, URI}
 import java.util.concurrent.Callable
 
+import io.netty.channel.local.LocalAddress
+import io.netty.channel.socket.SocketChannel
 import io.netty.channel.{Channel, ChannelHandlerContext}
 import io.netty.util.NetUtil.toSocketAddressString
 import io.netty.util.concurrent.{EventExecutorGroup, ScheduledFuture}
@@ -30,8 +32,20 @@ package object network {
       e.schedule((() => f): Callable[A], delay.length, delay.unit)
   }
 
-  private def formatAddress(isa: InetSocketAddress) = if (isa == null) "" else s": ${toSocketAddressString(isa)}"
+  private def formatAddress(sa: SocketAddress) = sa match {
+    case null => ""
+    case l: LocalAddress => s" ${l.toString}"
+    case isa: InetSocketAddress => s" ${toSocketAddressString(isa)}"
+  }
 
   def id(ctx: ChannelHandlerContext): String = id(ctx.channel())
-  def id(chan: Channel): String = s"[${chan.id().asShortText()}${formatAddress(chan.attr(AttributeKeys.RemoteAddress).get())}]"
+  def id(chan: Channel): String = s"[${chan.id().asShortText()}${formatAddress(chan.remoteAddress())}]"
+
+  implicit class ChannelHandlerContextExt(val ctx: ChannelHandlerContext) extends AnyVal {
+    def remoteAddress: InetSocketAddress = ctx.channel().asInstanceOf[SocketChannel].remoteAddress()
+  }
+
+  implicit class ChannelExt(val channel: Channel) extends AnyVal {
+    def declaredAddress: Option[InetSocketAddress] = Option(channel.attr(AttributeKeys.DeclaredAddress).get())
+  }
 }

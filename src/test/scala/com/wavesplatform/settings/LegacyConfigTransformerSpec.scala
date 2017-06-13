@@ -233,9 +233,9 @@ class LegacyConfigTransformerSpec extends FreeSpec with Matchers {
 
     val ws = WavesSettings.fromConfig(legacyConfigFromJson)
     ws.networkSettings should have (
-      'declaredAddress (Some(InetSocketAddress.createUnresolved("1.2.3.4", 6868))),
+      'declaredAddress (Some(new InetSocketAddress("1.2.3.4", 6868))),
       'nodeName ("test-node-name"),
-      'bindAddress (InetSocketAddress.createUnresolved("1.2.3.4", 6886)),
+      'bindAddress (new InetSocketAddress("1.2.3.4", 6886)),
       'knownPeers (Seq("138.201.152.166:6868", "138.201.152.165:6868")),
       'peersDataResidenceTime (2.days),
       'blackListResidenceTime (45.seconds),
