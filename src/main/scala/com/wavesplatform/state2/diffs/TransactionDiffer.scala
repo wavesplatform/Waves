@@ -15,7 +15,7 @@ object TransactionDiffer {
 
   def apply(settings: FunctionalitySettings, time: Long, height: Int)(s: StateReader, tx: Transaction): Either[ValidationError, Diff] = {
     for {
-//      t0 <- Signed.validateSignature(tx)
+      t0 <- Signed.validateSignatures(tx)
       t1 <- CommonValidation.disallowTxFromFuture(s, settings, time, t0)
       t2 <- CommonValidation.disallowBeforeActivationTime(s, settings, t1)
       t3 <- CommonValidation.disallowDuplicateIds(s, settings, height, t2)

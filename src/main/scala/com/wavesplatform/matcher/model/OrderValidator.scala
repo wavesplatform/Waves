@@ -49,7 +49,7 @@ trait OrderValidator {
     val v =
     (order.matcherPublicKey == matcherPubKey) :| "Incorrect matcher public key" &&
       LimitOrder.validateIntegerAmount(storedState, LimitOrder(order)) &&
-      scorex.transaction.Signed.validateSignature(order).isRight :| "signature should be valid"
+      scorex.transaction.Signed.validateSignatures(order).isRight :| "signature should be valid"
       order.isValid(NTP.correctedTime()) &&
       (order.matcherFee >= settings.minOrderFee) :| s"Order matcherFee should be >= ${settings.minOrderFee}" &&
       (orderHistory.orderStatus(order.idStr) == LimitOrder.NotFound) :| "Order is already accepted" &&

@@ -29,6 +29,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.language.{higherKinds, postfixOps}
 import scala.util.control.NonFatal
+import com.wavesplatform.state2._
 
 class Coordinator(protected override val networkControllerRef: ActorRef, blockchainSynchronizer: ActorRef, blockGenerator: ActorRef,
                   peerManager: ActorRef, scoreObserver: ActorRef, blockchainUpdater: BlockchainUpdater, time: Time,
@@ -263,7 +264,7 @@ class Coordinator(protected override val networkControllerRef: ActorRef, blockch
         time)(b)
 
       if (!historyContainsParent) Left(GenericError(s"Invalid block ${b.encodedId}: no parent block in history"))
-      else if (!Signed.validateSignature(b).isRight) Left(GenericError(s"Invalid block ${b.encodedId}: signature is not valid"))
+      else if (!Signed.validateSignatures(b).isRight) Left(GenericError(s"Invalid block ${b.encodedId}: signature is not valid"))
       else if (!consensusDataIsValid) Left(GenericError(s"Invalid block ${b.encodedId}: consensus data is not valid"))
       else Right(())
     }
@@ -320,9 +321,6 @@ object Coordinator extends ScorexLogging {
   case class BroadcastCheckpoint(checkpoint: Checkpoint)
 
   case object ClearCheckpoint
-
-  def foldM[G[_], F[_], A, B](fa: F[A], z: B)(f: (B, A) => G[B])(implicit G: Monad[G], F: Traverse[F]): G[B] =
-    F.foldLeft(fa, G.pure(z))((gb, a) => G.flatMap(gb)(f(_, a)))
 
   val MaxTimeDrift: FiniteDuration = 15.seconds
 

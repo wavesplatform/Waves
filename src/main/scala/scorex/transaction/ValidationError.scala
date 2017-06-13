@@ -11,7 +11,7 @@ object ValidationError {
   case object NegativeAmount extends ValidationError
   case object InsufficientFee extends ValidationError
   case object TooBigArray extends ValidationError
-  case class InvalidSignature(s: Signed) extends ValidationError
+  case class InvalidSignature(s: Signed, details: Option[InvalidSignature] = None) extends ValidationError
   case object InvalidSignatureS extends ValidationError
   case object InvalidName extends ValidationError
   case object OverflowError extends ValidationError

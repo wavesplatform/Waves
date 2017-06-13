@@ -6,64 +6,52 @@ import com.wavesplatform.state2.ByteStr
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
-import scorex.crypto.encode.Base58
 import scorex.serialization.{BytesSerializable, Deser}
 import scorex.transaction.TransactionParser._
 import scorex.transaction.{ValidationError, _}
 
 import scala.util.{Failure, Success, Try}
 
-sealed trait IssueTransaction extends AssetIssuance {
-  def name: Array[Byte]
+case class IssueTransaction private(sender: PublicKeyAccount,
+                                    name: Array[Byte],
+                                    description: Array[Byte],
+                                    quantity: Long,
+                                    decimals: Byte,
+                                    reissuable: Boolean,
+                                    fee: Long,
+                                    timestamp: Long,
+                                    signature: ByteStr)
+  extends AssetIssuance {
 
-  def description: Array[Byte]
+  override val assetFee: (Option[AssetId], Long) = (None, fee)
+  override val transactionType: TransactionType.Value = TransactionType.IssueTransaction
 
-  def decimals: Byte
+  override lazy val assetId = id
 
-  def fee: Long
+  lazy val toSign: Array[Byte] = Bytes.concat(Array(transactionType.id.toByte),
+    sender.publicKey,
+    BytesSerializable.arrayWithSize(name),
+    BytesSerializable.arrayWithSize(description),
+    Longs.toByteArray(quantity),
+    Array(decimals),
+    if (reissuable) Array(1: Byte) else Array(0: Byte),
+    Longs.toByteArray(fee),
+    Longs.toByteArray(timestamp))
+
+  override lazy val json: JsObject = jsonBase() ++ Json.obj(
+    "assetId" -> assetId.base58,
+    "name" -> new String(name, Charsets.UTF_8),
+    "description" -> new String(description, Charsets.UTF_8),
+    "quantity" -> quantity,
+    "decimals" -> decimals,
+    "reissuable" -> reissuable
+  )
+
+  override lazy val bytes: Array[Byte] = Bytes.concat(Array(transactionType.id.toByte), signature.arr, toSign)
+
 }
 
 object IssueTransaction {
-
-  private case class IssueTransactionImpl(sender: PublicKeyAccount,
-                                          name: Array[Byte],
-                                          description: Array[Byte],
-                                          quantity: Long,
-                                          decimals: Byte,
-                                          reissuable: Boolean,
-                                          fee: Long,
-                                          timestamp: Long,
-                                          signature: ByteStr)
-    extends IssueTransaction {
-
-    override val assetFee: (Option[AssetId], Long) = (None, fee)
-    override val transactionType: TransactionType.Value = TransactionType.IssueTransaction
-
-    override lazy val assetId = id
-
-    lazy val toSign: Array[Byte] = Bytes.concat(Array(transactionType.id.toByte),
-      sender.publicKey,
-      BytesSerializable.arrayWithSize(name),
-      BytesSerializable.arrayWithSize(description),
-      Longs.toByteArray(quantity),
-      Array(decimals),
-      if (reissuable) Array(1: Byte) else Array(0: Byte),
-      Longs.toByteArray(fee),
-      Longs.toByteArray(timestamp))
-
-    override lazy val json: JsObject = jsonBase() ++ Json.obj(
-      "assetId" -> assetId.base58,
-      "name" -> new String(name, Charsets.UTF_8),
-      "description" -> new String(description, Charsets.UTF_8),
-      "quantity" -> quantity,
-      "decimals" -> decimals,
-      "reissuable" -> reissuable
-    )
-
-    override lazy val bytes: Array[Byte] = Bytes.concat(Array(transactionType.id.toByte), signature.arr, toSign)
-
-  }
-
   val MaxDescriptionLength = 1000
   val MaxAssetNameLength = 16
   val MinAssetNameLength = 4
@@ -75,7 +63,7 @@ object IssueTransaction {
   }
 
   def parseTail(bytes: Array[Byte]): Try[IssueTransaction] = Try {
-    val signature =ByteStr(bytes.slice(0, SignatureLength))
+    val signature = ByteStr(bytes.slice(0, SignatureLength))
     val txId = bytes(SignatureLength)
     require(txId == TransactionType.IssueTransaction.id.toByte, s"Signed tx id is not match")
     val sender = PublicKeyAccount(bytes.slice(SignatureLength + 1, SignatureLength + KeyLength + 1))
@@ -90,29 +78,6 @@ object IssueTransaction {
       .fold(left => Failure(new Exception(left.toString)), right => Success(right))
   }.flatten
 
-  private def createUnverified(sender: PublicKeyAccount,
-                               name: Array[Byte],
-                               description: Array[Byte],
-                               quantity: Long,
-                               decimals: Byte,
-                               reissuable: Boolean,
-                               fee: Long,
-                               timestamp: Long,
-                               signature: Option[ByteStr] = None) =
-    if (quantity <= 0) {
-      Left(ValidationError.NegativeAmount)
-    } else if (description.length > MaxDescriptionLength) {
-      Left(ValidationError.TooBigArray)
-    } else if (name.length < MinAssetNameLength || name.length > MaxAssetNameLength) {
-      Left(ValidationError.InvalidName)
-    } else if (decimals < 0 || decimals > MaxDecimals) {
-      Left(ValidationError.TooBigArray)
-    } else if (fee <= 0) {
-      Left(ValidationError.InsufficientFee)
-    } else {
-      Right(IssueTransactionImpl(sender, name, description, quantity, decimals, reissuable, fee, timestamp, signature.orNull))
-    }
-
   def create(sender: PublicKeyAccount,
              name: Array[Byte],
              description: Array[Byte],
@@ -121,8 +86,19 @@ object IssueTransaction {
              reissuable: Boolean,
              fee: Long,
              timestamp: Long,
-             signature: ByteStr): Either[ValidationError, IssueTransaction] =
-    createUnverified(sender, name, description, quantity, decimals, reissuable, fee, timestamp, Some(signature))
+             signature: ByteStr): Either[ValidationError, IssueTransaction] = if (quantity <= 0) {
+    Left(ValidationError.NegativeAmount)
+  } else if (description.length > MaxDescriptionLength) {
+    Left(ValidationError.TooBigArray)
+  } else if (name.length < MinAssetNameLength || name.length > MaxAssetNameLength) {
+    Left(ValidationError.InvalidName)
+  } else if (decimals < 0 || decimals > MaxDecimals) {
+    Left(ValidationError.TooBigArray)
+  } else if (fee <= 0) {
+    Left(ValidationError.InsufficientFee)
+  } else {
+    Right(IssueTransaction(sender, name, description, quantity, decimals, reissuable, fee, timestamp, signature))
+  }
 
   def create(sender: PrivateKeyAccount,
              name: Array[Byte],
@@ -132,7 +108,7 @@ object IssueTransaction {
              reissuable: Boolean,
              fee: Long,
              timestamp: Long): Either[ValidationError, IssueTransaction] =
-    createUnverified(sender, name, description, quantity, decimals, reissuable, fee, timestamp).right.map { unverified =>
+    create(sender, name, description, quantity, decimals, reissuable, fee, timestamp, ByteStr.empty).right.map { unverified =>
       unverified.copy(signature = ByteStr(EllipticCurveImpl.sign(sender, unverified.toSign)))
     }
 }

@@ -9,6 +9,7 @@ import scorex.network.Coordinator
 import scorex.serialization.{BytesSerializable, JsonSerializable}
 import scorex.transaction.TransactionParser.TransactionType
 import scorex.transaction.ValidationError.InvalidSignature
+import com.wavesplatform.state2._
 
 trait Transaction extends BytesSerializable with JsonSerializable with Signed {
   val id: ByteStr
@@ -37,9 +38,9 @@ object Signed {
 
   type E[A] = Either[InvalidSignature, A]
 
-  def validateSignature(s: Signed): Either[InvalidSignature, Signed] = for {
-    v <- if (s.signatureValid) Right(s) else Left(InvalidSignature(s))
-    ds <- Coordinator.foldM[E, List, Signed, Signed](s.signedDescendants.toList, v)
-      { case (_, d) => validateSignature(d) }
-  } yield s
+  def validateSignatures[S<: Signed](s: S): Either[InvalidSignature, S] = for {
+    v <- if (s.signatureValid) Right(s) else Left(InvalidSignature(s, None))
+    ds <- foldM[E, List, Signed, Signed](s.signedDescendants.toList, v)
+    { case (_, d) => validateSignatures(d).left.map(inner => InvalidSignature(s, Some(inner))) }
+  } yield v
 }
