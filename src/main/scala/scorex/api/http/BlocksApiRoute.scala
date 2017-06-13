@@ -2,7 +2,6 @@ package scorex.api.http
 
 import javax.ws.rs.Path
 
-import akka.actor.ActorRef
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.network.Checkpoint
 import com.wavesplatform.settings.{CheckpointsSettings, RestAPISettings}
@@ -15,7 +14,7 @@ import scorex.transaction.{History, TransactionParser}
 
 @Path("/blocks")
 @Api(value = "/blocks")
-case class BlocksApiRoute(settings: RestAPISettings, checkpointsSettings: CheckpointsSettings, history: History, coordinator: ActorRef) extends ApiRoute {
+case class BlocksApiRoute(settings: RestAPISettings, checkpointsSettings: CheckpointsSettings, history: History, broadcastCheckpoint: Checkpoint => Unit) extends ApiRoute {
 
   // todo: make this configurable and fix integration tests
   val MaxBlocksPerRequest = 100
@@ -176,7 +175,7 @@ case class BlocksApiRoute(settings: RestAPISettings, checkpointsSettings: Checkp
         validateCheckpoint(checkpoint) match {
           case Some(apiError) => apiError
           case None =>
-            //coordinator ! BroadcastCheckpoint(checkpoint)
+            broadcastCheckpoint(checkpoint)
             Json.obj("message" -> "Checkpoint broadcasted")
         }
       }
