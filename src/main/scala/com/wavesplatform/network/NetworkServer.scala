@@ -75,7 +75,7 @@ class NetworkServer(
 
   private val coordinatorExecutor = new DefaultEventLoop
   private val coordinator = new Coordinator(checkpoints, history, blockchainUpdater, time, stateReader, utxStorage,
-    settings.blockchainSettings, settings.checkpointsSettings.publicKey, miner)
+    settings.blockchainSettings, settings.checkpointsSettings.publicKey, miner, blacklist, doBroadcast)
 
   private val address = new LocalAddress("local-events-channel")
   private val localServerGroup = new DefaultEventLoopGroup()

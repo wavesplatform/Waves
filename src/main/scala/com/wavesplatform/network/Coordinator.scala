@@ -7,6 +7,7 @@ import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state2.ByteStr
 import com.wavesplatform.state2.reader.StateReader
 import io.netty.channel.ChannelHandler.Sharable
+import io.netty.channel.local.LocalChannel
 import io.netty.channel.{Channel, ChannelHandlerContext, ChannelInboundHandlerAdapter}
 import scorex.block.Block
 import scorex.block.Block.BlockId
@@ -30,7 +31,9 @@ class Coordinator(
     utxStorage: UnconfirmedTransactionsStorage,
     settings: BlockchainSettings,
     checkpointPublicKey: String,
-    miner: Miner)
+    miner: Miner,
+    blacklist: Channel => Unit,
+    broadcast: (AnyRef, Option[Channel]) => Unit)
   extends ChannelInboundHandlerAdapter with ScorexLogging {
   import Coordinator._
 
@@ -167,10 +170,10 @@ class Coordinator(
         publicKey =>
           if (EllipticCurveImpl.verify(checkpoint.signature, checkpoint.toSign, publicKey)) {
             checkpoints.set(Some(checkpoint))
-            //            network.broadcast(checkpoint, from.map(_ => ???)) // todo: don't broadcast to sender
+            broadcast(checkpoint, from)
             makeBlockchainCompliantWith(checkpoint)
           } else {
-//            from.foreach(_.blacklist())
+            from.filterNot(_.isInstanceOf[LocalChannel]).foreach(blacklist(_))
           }
       }
     }
