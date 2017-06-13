@@ -49,73 +49,74 @@ class HandshakeTimeoutHandler extends ChannelInboundHandlerAdapter with ScorexLo
 
 abstract class HandshakeHandler(
     localHandshake: Handshake,
-    peerDatabase: PeerDatabase,
     establishedConnections: ConcurrentMap[Channel, PeerInfo],
     connections: ConcurrentMap[PeerKey, Channel],
     blacklist: Channel => Unit) extends ChannelInboundHandlerAdapter with ScorexLogging {
   import HandshakeHandler._
 
-  private def removeHandshakeHandlers(ctx: ChannelHandlerContext, thisHandler: ChannelHandler): Unit = {
-    ctx.pipeline().remove(classOf[HandshakeDecoder])
-    ctx.pipeline().remove(classOf[HandshakeTimeoutHandler])
-    ctx.pipeline().remove(thisHandler)
-  }
-
-  private def peerInfo(incomingHandshake: Handshake, channel: Channel): PeerInfo = PeerInfo(
-    channel.remoteAddress().asInstanceOf[InetSocketAddress],
-    incomingHandshake.declaredAddress,
-    incomingHandshake.applicationName,
-    incomingHandshake.applicationVersion,
-    incomingHandshake.nodeName,
-    incomingHandshake.nodeNonce)
-
-  private def remoteAddress(ctx: ChannelHandlerContext, incomingHandshake: Handshake) =
-    incomingHandshake.declaredAddress
-      .getOrElse(ctx.channel().remoteAddress().asInstanceOf[InetSocketAddress])
-
   def connectionNegotiated(ctx: ChannelHandlerContext): Unit
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef) = msg match {
-    case rhs: Handshake if localHandshake.applicationName != rhs.applicationName =>
-      log.warn(s"${id(ctx)} Remote application name ${rhs.applicationName} does not match local ${localHandshake.applicationName}")
-      blacklist(ctx.channel)
-    case rhs: Handshake if !versionIsSupported(rhs.applicationVersion) =>
-      log.debug(s"${id(ctx)} Remote node version ${rhs.applicationVersion} is not supported")
+    case HandshakeTimeoutExpired =>
+      log.debug(s"${id(ctx)} Timeout expired while waiting for handshake")
       blacklist(ctx.channel())
-    case rhs: Handshake =>
-      log.debug(s"${id(ctx)} Received handshake $rhs")
-      val ra = remoteAddress(ctx, rhs)
-      ctx.channel().attr(AttributeKeys.NodeName).set(rhs.nodeName)
-      ctx.channel().attr(AttributeKeys.RemoteAddress).set(ra)
-      val key = PeerKey(ra.getAddress, rhs.nodeNonce)
-      if (connections.putIfAbsent(key, ctx.channel()) != null) {
-        log.debug(s"${id(ctx)} Already connected to peer, disconnecting")
-        ctx.close()
+    case remoteHandshake: Handshake =>
+      if (localHandshake.applicationName != remoteHandshake.applicationName) {
+        log.warn(s"${id(ctx)} Remote application name ${remoteHandshake.applicationName} does not match local ${localHandshake.applicationName}")
+        blacklist(ctx.channel())
+      } else if (!versionIsSupported(remoteHandshake.applicationVersion)) {
+        log.warn(s"${id(ctx) } Remote application version ${remoteHandshake.applicationVersion } is not supported")
+        blacklist(ctx.channel())
       } else {
-        removeHandshakeHandlers(ctx, this)
-        establishedConnections.put(ctx.channel(), peerInfo(rhs, ctx.channel()))
-        connectionNegotiated(ctx)
-        ctx.channel().closeFuture().addListener { f: ChannelFuture =>
-          connections.remove(key, f.channel())
+        val key = PeerKey(ctx.remoteAddress.getAddress, remoteHandshake.nodeNonce)
+        val previousPeer = connections.putIfAbsent(key, ctx.channel())
+        if (previousPeer != null) {
+          log.debug(s"${id(ctx)} Already connected to peer ${ctx.remoteAddress.getAddress} with nonce ${remoteHandshake.nodeNonce} on channel ${id(previousPeer)}")
+          ctx.close()
+        } else {
+          log.debug(s"${id(ctx)} Accepted handshake $remoteHandshake")
+          removeHandshakeHandlers(ctx, this)
+          establishedConnections.put(ctx.channel(), peerInfo(remoteHandshake, ctx.channel()))
+          ctx.channel().attr(AttributeKeys.NodeName).set(remoteHandshake.nodeName)
+
+          ctx.channel().closeFuture().addListener { f: ChannelFuture =>
+            connections.remove(key, f.channel())
+            establishedConnections.remove(ctx.channel())
+          }
+
+          connectionNegotiated(ctx)
+          ctx.fireChannelRead(msg)
         }
-        ctx.fireChannelRead(rhs)
       }
     case _ => super.channelRead(ctx, msg)
   }
 }
 
-object HandshakeHandler {
+object HandshakeHandler extends ScorexLogging {
   def versionIsSupported(remoteVersion: (Int, Int, Int)): Boolean =
     remoteVersion._1 == 0 && remoteVersion._2 >= 6
+
+  def removeHandshakeHandlers(ctx: ChannelHandlerContext, thisHandler: ChannelHandler): Unit = {
+    ctx.pipeline().remove(classOf[HandshakeDecoder])
+    ctx.pipeline().remove(classOf[HandshakeTimeoutHandler])
+    ctx.pipeline().remove(thisHandler)
+  }
+
+  def peerInfo(remoteHandshake: Handshake, channel: Channel): PeerInfo = PeerInfo(
+    channel.remoteAddress().asInstanceOf[InetSocketAddress],
+    remoteHandshake.declaredAddress,
+    remoteHandshake.applicationName,
+    remoteHandshake.applicationVersion,
+    remoteHandshake.nodeName,
+    remoteHandshake.nodeNonce)
 
   @Sharable
   class Server(
       handshake: Handshake,
-      peerDatabase: PeerDatabase,
       establishedConnections: ConcurrentMap[Channel, PeerInfo],
       connections: ConcurrentMap[PeerKey, Channel],
       blacklist: Channel => Unit)
-    extends HandshakeHandler(handshake, peerDatabase, establishedConnections, connections, blacklist) {
+    extends HandshakeHandler(handshake, establishedConnections, connections, blacklist) {
     override def connectionNegotiated(ctx: ChannelHandlerContext) =
       ctx.writeAndFlush(handshake.encode(ctx.alloc().buffer()))
   }
@@ -123,11 +124,10 @@ object HandshakeHandler {
   @Sharable
   class Client(
       handshake: Handshake,
-      peerDatabase: PeerDatabase,
       establishedConnections: ConcurrentMap[Channel, PeerInfo],
       connections: ConcurrentMap[PeerKey, Channel],
       blacklist: Channel => Unit)
-    extends HandshakeHandler(handshake, peerDatabase, establishedConnections, connections, blacklist) {
+    extends HandshakeHandler(handshake, establishedConnections, connections, blacklist) {
 
     override def connectionNegotiated(ctx: ChannelHandlerContext) = {}
 

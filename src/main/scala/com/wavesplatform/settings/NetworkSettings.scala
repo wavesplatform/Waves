@@ -36,12 +36,12 @@ object NetworkSettings {
 
   private def fromConfig(config: Config): NetworkSettings = {
     val file = config.getAs[File]("file")
-    val bindAddress = InetSocketAddress.createUnresolved(config.as[String]("bind-address"), config.as[Int]("port"))
+    val bindAddress = new InetSocketAddress(config.as[String]("bind-address"), config.as[Int]("port"))
     val nonce = config.getOrElse("nonce", randomNonce)
     val nodeName = config.getOrElse("node-name", s"Node-$nonce")
     val declaredAddress = config.getAs[String]("declared-address").map { address =>
       val uri = new URI(s"my://$address")
-      InetSocketAddress.createUnresolved(uri.getHost, uri.getPort)
+      new InetSocketAddress(uri.getHost, uri.getPort)
     }
 
     val knownPeers = config.as[Seq[String]]("known-peers")
