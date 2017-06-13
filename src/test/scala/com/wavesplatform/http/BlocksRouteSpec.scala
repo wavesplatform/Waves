@@ -3,7 +3,6 @@ package com.wavesplatform.http
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.BlockGen
 import com.wavesplatform.http.ApiMarshallers._
-import com.wavesplatform.network.NetworkServer
 import com.wavesplatform.settings.{CheckpointsSettings, RestAPISettings}
 import com.wavesplatform.state2.ByteStr
 import org.scalacheck.{Gen, Shrink}
