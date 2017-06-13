@@ -89,7 +89,7 @@ object BurnTransaction {
              fee: Long,
              timestamp: Long,
              signature: ByteStr): Either[ValidationError, BurnTransaction] =
-    createUnverified(sender, assetId, quantity, fee, timestamp, Some(signature)).right.flatMap(SignedTransaction.verify)
+    createUnverified(sender, assetId, quantity, fee, timestamp, Some(signature))
 
   def create(sender: PrivateKeyAccount,
              assetId: ByteStr,

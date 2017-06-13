@@ -92,7 +92,6 @@ object LeaseTransaction {
              recipient: AccountOrAlias,
              signature: ByteStr): Either[ValidationError, LeaseTransaction] = {
     createUnverified(sender, amount, fee, timestamp, recipient, Some(signature))
-      .right.flatMap(SignedTransaction.verify)
   }
 
   def create(sender: PrivateKeyAccount,

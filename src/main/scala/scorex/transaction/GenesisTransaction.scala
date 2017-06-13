@@ -45,6 +45,8 @@ object GenesisTransaction extends {
       require(res.length == TypeLength + BASE_LENGTH)
       res
     }
+
+    override lazy val signatureValid: Boolean = true
   }
 
   private val RECIPIENT_LENGTH = Account.AddressLength

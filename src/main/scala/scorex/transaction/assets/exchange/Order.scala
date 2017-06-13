@@ -67,12 +67,12 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
                  @ApiModelProperty(example = "100000") matcherFee: Long,
                  @ApiModelProperty(dataType = "java.lang.String") signature: Array[Byte])
   extends BytesSerializable
-    with JsonSerializable {
+    with JsonSerializable with Signed {
 
   import Order._
 
   @ApiModelProperty(hidden = true)
-  lazy val signatureValid = EllipticCurveImpl.verify(signature, toSign, senderPublicKey.publicKey)
+  lazy val signatureValid: Boolean = EllipticCurveImpl.verify(signature, toSign, senderPublicKey.publicKey)
 
   def isValid(atTime: Long): Validation = {
     isValidAmount(price, amount) &&
@@ -81,8 +81,7 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
       (matcherFee < MaxAmount) :| "matcherFee too large" &&
       (timestamp > 0) :| "timestamp should be > 0" &&
       (expiration - atTime <= MaxLiveTime) :| "expiration should be earlier than 30 days" &&
-      (expiration >= atTime) :| "expiration should be > currentTime" &&
-      signatureValid :| "signature should be valid"
+      (expiration >= atTime) :| "expiration should be > currentTime"
   }
 
   def isValidAmount(matchPrice: Long, matchAmount: Long): Validation = {

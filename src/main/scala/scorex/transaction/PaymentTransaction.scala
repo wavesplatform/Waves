@@ -63,6 +63,8 @@ object PaymentTransaction {
 
     override lazy val bytes: Array[Byte] = Bytes.concat(hashBytes, signature.arr)
 
+    override lazy val signatureValid: Boolean = EllipticCurveImpl.verify(signature.arr,
+      signatureData(sender, recipient, amount, fee, timestamp), sender.publicKey)
   }
 
   val RecipientLength = Account.AddressLength
@@ -101,7 +103,7 @@ object PaymentTransaction {
       if (EllipticCurveImpl.verify(signature.arr, sigData, sender.publicKey)) {
         Right(PaymentTransactionImpl(sender, recipient, amount, fee, timestamp, signature))
       } else {
-        Left(ValidationError.InvalidSignature)
+        Left(ValidationError.InvalidSignatureS)
       }
 
     }

@@ -85,7 +85,7 @@ object MakeAssetNameUniqueTransaction {
              timestamp: Long,
              networkByte: Byte,
              signature: ByteStr): Either[ValidationError, MakeAssetNameUniqueTransaction] =
-    createUnverified(sender, assetId, fee, timestamp, networkByte, Some(signature)).right.flatMap(SignedTransaction.verify)
+    createUnverified(sender, assetId, fee, timestamp, networkByte, Some(signature))
 
   def create(sender: PrivateKeyAccount,
              assetId: ByteStr,

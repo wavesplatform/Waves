@@ -79,7 +79,6 @@ object CreateAliasTransaction {
              timestamp: Long,
              signature: ByteStr): Either[ValidationError, CreateAliasTransaction] = {
     createUnverified(sender, alias, fee, timestamp, Some(signature))
-      .right.flatMap(SignedTransaction.verify)
   }
 
   def create(sender: PrivateKeyAccount,

@@ -256,9 +256,6 @@ class Coordinator(protected override val networkControllerRef: ActorRef, blockch
     else {
       def historyContainsParent = history.contains(b.reference)
 
-      def signatureIsValid = EllipticCurveImpl.verify(b.signerData.signature.arr, b.bytesWithoutSignature,
-        b.signerData.generator.publicKey)
-
       def consensusDataIsValid = blockConsensusValidation(
         history,
         stateReader,
@@ -266,7 +263,7 @@ class Coordinator(protected override val networkControllerRef: ActorRef, blockch
         time)(b)
 
       if (!historyContainsParent) Left(GenericError(s"Invalid block ${b.encodedId}: no parent block in history"))
-      else if (!signatureIsValid) Left(GenericError(s"Invalid block ${b.encodedId}: signature is not valid"))
+      else if (!Signed.validateSignature(b).isRight) Left(GenericError(s"Invalid block ${b.encodedId}: signature is not valid"))
       else if (!consensusDataIsValid) Left(GenericError(s"Invalid block ${b.encodedId}: consensus data is not valid"))
       else Right(())
     }
@@ -286,7 +283,7 @@ class Coordinator(protected override val networkControllerRef: ActorRef, blockch
 
   private def str(block: Block) = {
     if (log.logger.isTraceEnabled) block.json
-    else (block.uniqueId) + ", parent " + block.reference
+    else block.uniqueId + ", parent " + block.reference
   }
 }
 

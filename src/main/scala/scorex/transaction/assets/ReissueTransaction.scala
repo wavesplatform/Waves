@@ -88,8 +88,6 @@ object ReissueTransaction {
              timestamp: Long,
              signature: ByteStr): Either[ValidationError, ReissueTransaction] =
     createUnverified(sender, assetId, quantity, reissuable, fee, timestamp, Some(signature))
-      .right
-      .flatMap(SignedTransaction.verify)
 
 
   def create(sender: PrivateKeyAccount,

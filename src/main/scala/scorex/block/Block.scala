@@ -1,21 +1,24 @@
 package scorex.block
 
+import cats._
+import cats.data._
+import cats.implicits._
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import com.wavesplatform.state2.ByteStr
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
-
 import scorex.consensus.nxt.{NxtConsensusBlockField, NxtLikeConsensusBlockData}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.transaction.TransactionParser._
+import scorex.transaction.ValidationError.{GenericError, InvalidSignature}
 import scorex.transaction._
 import scorex.utils.ScorexLogging
 
 import scala.util.{Failure, Try}
 
 case class Block(timestamp: Long, version: Byte, reference: ByteStr, signerData: SignerData,
-                 consensusData: NxtLikeConsensusBlockData, transactionData: Seq[Transaction]) {
+                 consensusData: NxtLikeConsensusBlockData, transactionData: Seq[Transaction]) extends Signed {
 
   private lazy val versionField: ByteBlockField = ByteBlockField("version", version)
   private lazy val timestampField: LongBlockField = LongBlockField("timestamp", timestamp)
@@ -74,6 +77,9 @@ case class Block(timestamp: Long, version: Byte, reference: ByteStr, signerData:
       .groupBy(a => a._1)
       .mapValues((records: Seq[(AssetAcc, Long)]) => records.map(_._2).sum)
   }
+
+  override lazy val signatureValid: Boolean = EllipticCurveImpl.verify(signerData.signature.arr, bytesWithoutSignature, signerData.generator.publicKey)
+  override lazy val signedDescendants: Seq[Signed] = transactionData
 }
 
 
@@ -132,22 +138,13 @@ object Block extends ScorexLogging {
     val genPK = bytes.slice(position, position + KeyLength)
     position += KeyLength
 
-    val signature =ByteStr(bytes.slice(position, position + SignatureLength))
+    val signature = ByteStr(bytes.slice(position, position + SignatureLength))
 
-    new Block(timestamp, version, reference, SignerData(PublicKeyAccount(genPK), signature), consData, txBlockField)
+    Block(timestamp, version, reference, SignerData(PublicKeyAccount(genPK), signature), consData, txBlockField)
   }.recoverWith { case t: Throwable =>
     log.error("Error when parsing block", t)
     Failure(t)
   }
-
-  def build(version: Byte,
-            timestamp: Long,
-            reference: ByteStr,
-            consensusData: NxtLikeConsensusBlockData,
-            transactionData: Seq[Transaction],
-            generator: PublicKeyAccount,
-            signature: Array[Byte])
-  = new Block(timestamp, version, reference, SignerData(generator, ByteStr(signature)), consensusData, transactionData)
 
   def buildAndSign(version: Byte,
                    timestamp: Long,
@@ -155,16 +152,16 @@ object Block extends ScorexLogging {
                    consensusData: NxtLikeConsensusBlockData,
                    transactionData: Seq[Transaction],
                    signer: PrivateKeyAccount): Block = {
-    val nonSignedBlock = build(version, timestamp, reference, consensusData, transactionData, signer, Array())
+    val nonSignedBlock = Block(timestamp, version, reference, SignerData(signer, ByteStr.empty), consensusData, transactionData)
     val toSign = nonSignedBlock.bytes
     val signature = EllipticCurveImpl.sign(signer, toSign)
-    build(version, timestamp, reference, consensusData, transactionData, signer, signature)
+    nonSignedBlock.copy(signerData = SignerData(signer, ByteStr(signature)))
   }
 
   def genesis(consensusGenesisData: NxtLikeConsensusBlockData,
               transactionGenesisData: Seq[Transaction],
               timestamp: Long = 0L,
-              signatureStringOpt: Option[String] = None): Block = {
+              signatureStringOpt: Option[String] = None): Either[ValidationError, Block] = {
     val version: Byte = 1
 
     val genesisSigner = PrivateKeyAccount(Array.empty)
@@ -188,13 +185,14 @@ object Block extends ScorexLogging {
     val signature = signatureStringOpt.map(Base58.decode(_).get)
       .getOrElse(EllipticCurveImpl.sign(genesisSigner, toSign))
 
-    require(EllipticCurveImpl.verify(signature, toSign, genesisSigner.publicKey), "Passed genesis signature is not valid")
+    if (EllipticCurveImpl.verify(signature, toSign, genesisSigner.publicKey))
+      Right(Block(timestamp = timestamp,
+        version = 1,
+        reference = ByteStr(reference),
+        signerData = SignerData(genesisSigner, ByteStr(signature)),
+        consensusData = consensusGenesisData,
+        transactionData = transactionGenesisData))
+    else Left(GenericError("Passed genesis signature is not valid"))
 
-    new Block(timestamp = timestamp,
-      version = 1,
-      reference = ByteStr(reference),
-      signerData = SignerData(genesisSigner, ByteStr(signature)),
-      consensusData = consensusGenesisData,
-      transactionData = transactionGenesisData)
   }
 }

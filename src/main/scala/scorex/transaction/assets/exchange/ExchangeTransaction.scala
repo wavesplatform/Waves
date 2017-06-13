@@ -16,11 +16,17 @@ import scala.util.{Failure, Success, Try}
 
 sealed trait ExchangeTransaction extends SignedTransaction {
   def buyOrder: Order
+
   def sellOrder: Order
+
   def price: Long
+
   def amount: Long
+
   def buyMatcherFee: Long
+
   def sellMatcherFee: Long
+
   def fee: Long
 }
 
@@ -53,6 +59,8 @@ object ExchangeTransaction {
       "buyMatcherFee" -> buyMatcherFee,
       "sellMatcherFee" -> sellMatcherFee
     )
+
+    override lazy val signedDescendants: Seq[Signed] = Seq(buyOrder, sellOrder)
   }
 
   private def createUnverified(buyOrder: Order, sellOrder: Order, price: Long, amount: Long,
@@ -104,7 +112,6 @@ object ExchangeTransaction {
   def create(buyOrder: Order, sellOrder: Order, price: Long, amount: Long,
              buyMatcherFee: Long, sellMatcherFee: Long, fee: Long, timestamp: Long, signature: ByteStr): Either[ValidationError, ExchangeTransaction] = {
     createUnverified(buyOrder, sellOrder, price, amount, buyMatcherFee, sellMatcherFee, fee, timestamp, Some(signature))
-      .right.flatMap(SignedTransaction.verify)
   }
 
   def parseBytes(bytes: Array[Byte]): Try[ExchangeTransaction] = Try {

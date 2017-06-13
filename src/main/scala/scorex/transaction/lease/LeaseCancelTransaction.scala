@@ -77,7 +77,6 @@ object LeaseCancelTransaction {
              timestamp: Long,
              signature: ByteStr): Either[ValidationError, LeaseCancelTransaction] = {
     createUnverified(sender, leaseId, fee, timestamp, Some(signature))
-      .right.flatMap(SignedTransaction.verify)
   }
 
   def create(sender: PrivateKeyAccount,

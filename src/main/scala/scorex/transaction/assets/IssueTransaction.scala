@@ -123,7 +123,6 @@ object IssueTransaction {
              timestamp: Long,
              signature: ByteStr): Either[ValidationError, IssueTransaction] =
     createUnverified(sender, name, description, quantity, decimals, reissuable, fee, timestamp, Some(signature))
-      .right.flatMap(SignedTransaction.verify)
 
   def create(sender: PrivateKeyAccount,
              name: Array[Byte],
