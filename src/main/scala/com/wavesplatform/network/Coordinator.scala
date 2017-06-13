@@ -208,20 +208,17 @@ class Coordinator(
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef) = msg match {
     case c: Checkpoint => handleCheckpoint(c, Some(ctx.channel()))
     case ExtensionBlocks(blocks) =>
-      log.debug(s"${id(ctx) } Processing fork")
+      log.debug(s"${id(ctx)} Processing fork")
       processFork(ctx, blocks.head.reference, blocks.iterator)
-      log.debug(s"${id(ctx) } Finished processing fork, local score is ${history.score()}")
+      log.debug(s"${id(ctx)} Finished processing fork, local score is ${history.score()}")
     case b: Block =>
       processSingleBlock(ctx, b, Some(ctx.channel()))
     case RollbackTo(blockId) =>
       blockchainUpdater.removeAfter(blockId)
       ctx.writeAndFlush(LocalScoreChanged(history.score()))
+    case _: Handshake =>
+      ctx.writeAndFlush(history.score())
     case other => log.debug(other.getClass.getCanonicalName)
-  }
-
-  override def channelActive(ctx: ChannelHandlerContext) = {
-    ctx.writeAndFlush(history.score())
-    super.channelActive(ctx)
   }
 }
 
@@ -285,5 +282,4 @@ object Coordinator extends ScorexLogging {
       log.error("Fatal error while checking a block", t)
       throw t
   }
-
 }
