@@ -11,44 +11,36 @@ import scorex.transaction._
 
 import scala.util.{Failure, Success, Try}
 
-sealed trait LeaseTransaction extends SignedTransaction {
-  def amount: Long
+case class LeaseTransaction private(sender: PublicKeyAccount,
+                                    amount: Long,
+                                    fee: Long,
+                                    timestamp: Long,
+                                    recipient: AccountOrAlias,
+                                    signature: ByteStr)
+  extends SignedTransaction {
 
-  def fee: Long
+  override val transactionType: TransactionType.Value = TransactionType.LeaseTransaction
 
-  def recipient: AccountOrAlias
+  lazy val toSign: Array[Byte] = Bytes.concat(Array(transactionType.id.toByte),
+    sender.publicKey,
+    recipient.bytes.arr,
+    Longs.toByteArray(amount),
+    Longs.toByteArray(fee),
+    Longs.toByteArray(timestamp))
+
+  override lazy val json: JsObject = jsonBase() ++ Json.obj(
+    "amount" -> amount,
+    "recipient" -> recipient.stringRepr,
+    "fee" -> fee,
+    "timestamp" -> timestamp
+  )
+
+  override val assetFee: (Option[AssetId], Long) = (None, fee)
+  override lazy val bytes: Array[Byte] = Bytes.concat(toSign, signature.arr)
+
 }
 
 object LeaseTransaction {
-
-  private case class LeaseTransactionImpl(sender: PublicKeyAccount,
-                                          amount: Long,
-                                          fee: Long,
-                                          timestamp: Long,
-                                          recipient: AccountOrAlias,
-                                          signature: ByteStr)
-    extends LeaseTransaction {
-
-    override val transactionType: TransactionType.Value = TransactionType.LeaseTransaction
-
-    lazy val toSign: Array[Byte] = Bytes.concat(Array(transactionType.id.toByte),
-      sender.publicKey,
-      recipient.bytes.arr,
-      Longs.toByteArray(amount),
-      Longs.toByteArray(fee),
-      Longs.toByteArray(timestamp))
-
-    override lazy val json: JsObject = jsonBase() ++ Json.obj(
-      "amount" -> amount,
-      "recipient" -> recipient.stringRepr,
-      "fee" -> fee,
-      "timestamp" -> timestamp
-    )
-
-    override val assetFee: (Option[AssetId], Long) = (None, fee)
-    override lazy val bytes: Array[Byte] = Bytes.concat(toSign, signature.arr)
-
-  }
 
   def parseTail(bytes: Array[Byte]): Try[LeaseTransaction] = Try {
     import EllipticCurveImpl._
@@ -65,15 +57,14 @@ object LeaseTransaction {
     } yield lt).fold(left => Failure(new Exception(left.toString)), right => Success(right))
   }.flatten
 
-  private def createUnverified(sender: PublicKeyAccount,
-                               amount: Long,
-                               fee: Long,
-                               timestamp: Long,
-                               recipient: AccountOrAlias,
-                               signature: Option[ByteStr] = None): Either[ValidationError, LeaseTransactionImpl] = {
+  def create(sender: PublicKeyAccount,
+             amount: Long,
+             fee: Long,
+             timestamp: Long,
+             recipient: AccountOrAlias,
+             signature: ByteStr): Either[ValidationError, LeaseTransaction] = {
     if (amount <= 0) {
       Left(ValidationError.NegativeAmount)
-
     } else if (Try(Math.addExact(amount, fee)).isFailure) {
       Left(ValidationError.OverflowError)
     } else if (fee <= 0) {
@@ -81,17 +72,8 @@ object LeaseTransaction {
     } else if (recipient.isInstanceOf[Account] && sender.stringRepr == recipient.stringRepr) {
       Left(ValidationError.ToSelf)
     } else {
-      Right(LeaseTransactionImpl(sender, amount, fee, timestamp, recipient, signature.orNull))
+      Right(LeaseTransaction(sender, amount, fee, timestamp, recipient, signature))
     }
-  }
-
-  def create(sender: PublicKeyAccount,
-             amount: Long,
-             fee: Long,
-             timestamp: Long,
-             recipient: AccountOrAlias,
-             signature: ByteStr): Either[ValidationError, LeaseTransaction] = {
-    createUnverified(sender, amount, fee, timestamp, recipient, Some(signature))
   }
 
   def create(sender: PrivateKeyAccount,
@@ -99,7 +81,7 @@ object LeaseTransaction {
              fee: Long,
              timestamp: Long,
              recipient: AccountOrAlias): Either[ValidationError, LeaseTransaction] = {
-    createUnverified(sender, amount, fee, timestamp, recipient).right.map { unsigned =>
+    create(sender, amount, fee, timestamp, recipient, ByteStr.empty).right.map { unsigned =>
       unsigned.copy(signature = ByteStr(EllipticCurveImpl.sign(sender, unsigned.toSign)))
     }
   }

@@ -93,7 +93,7 @@ object TransactionFactory {
 
   def broadcastPayment(payment: SignedPaymentRequest, tm: NewTransactionHandler): Either[ValidationError, PaymentTransaction] =
     for {
-      _signature <- ByteStr.decodeBase58(payment.signature).toOption.toRight(ValidationError.InvalidSignatureS)
+      _signature <- ByteStr.decodeBase58(payment.signature).toOption.toRight(ValidationError.InvalidRequestSignature)
       _sender <- PublicKeyAccount.fromBase58String(payment.senderPublicKey)
       _recipient <- Account.fromString(payment.recipient)
       tx <- PaymentTransaction.create(_sender, _recipient, payment.amount, payment.fee, payment.timestamp, _signature)

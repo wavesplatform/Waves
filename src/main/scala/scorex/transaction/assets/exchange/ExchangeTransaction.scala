@@ -8,63 +8,52 @@ import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
 import scorex.serialization.BytesSerializable
 import scorex.transaction.TransactionParser.TransactionType
-import scorex.transaction.ValidationError.{OrderValidationError, GenericError}
+import scorex.transaction.ValidationError.{GenericError, OrderValidationError}
 import scorex.transaction.{ValidationError, _}
 
 import scala.util.{Failure, Success, Try}
 
+case class ExchangeTransaction private(buyOrder: Order, sellOrder: Order, price: Long, amount: Long, buyMatcherFee: Long,
+                                           sellMatcherFee: Long, fee: Long, timestamp: Long, signature: ByteStr)
+  extends SignedTransaction {
 
-sealed trait ExchangeTransaction extends SignedTransaction {
-  def buyOrder: Order
+  override val transactionType: TransactionType.Value = TransactionType.ExchangeTransaction
 
-  def sellOrder: Order
+  override val assetFee: (Option[AssetId], Long) = (None, fee)
 
-  def price: Long
+  @ApiModelProperty(hidden = true)
+  override val sender: PublicKeyAccount = buyOrder.matcherPublicKey
 
-  def amount: Long
+  lazy val toSign: Array[Byte] = Array(transactionType.id.toByte) ++
+    Ints.toByteArray(buyOrder.bytes.length) ++ Ints.toByteArray(sellOrder.bytes.length) ++
+    buyOrder.bytes ++ sellOrder.bytes ++ Longs.toByteArray(price) ++ Longs.toByteArray(amount) ++
+    Longs.toByteArray(buyMatcherFee) ++ Longs.toByteArray(sellMatcherFee) ++ Longs.toByteArray(fee) ++
+    Longs.toByteArray(timestamp)
 
-  def buyMatcherFee: Long
+  override def bytes: Array[Byte] = toSign ++ signature.arr
 
-  def sellMatcherFee: Long
+  override def json: JsObject = jsonBase() ++ Json.obj(
+    "order1" -> buyOrder.json,
+    "order2" -> sellOrder.json,
+    "price" -> price,
+    "amount" -> amount,
+    "buyMatcherFee" -> buyMatcherFee,
+    "sellMatcherFee" -> sellMatcherFee
+  )
 
-  def fee: Long
+  override lazy val signedDescendants: Seq[Signed] = Seq(buyOrder, sellOrder)
 }
 
 object ExchangeTransaction {
-
-  private case class ExchangeTransactionImpl(buyOrder: Order, sellOrder: Order, price: Long, amount: Long, buyMatcherFee: Long,
-                                             sellMatcherFee: Long, fee: Long, timestamp: Long, signature: ByteStr)
-    extends ExchangeTransaction with BytesSerializable {
-
-    override val transactionType: TransactionType.Value = TransactionType.ExchangeTransaction
-
-    override val assetFee: (Option[AssetId], Long) = (None, fee)
-
-    @ApiModelProperty(hidden = true)
-    override val sender: PublicKeyAccount = buyOrder.matcherPublicKey
-
-    lazy val toSign: Array[Byte] = Array(transactionType.id.toByte) ++
-      Ints.toByteArray(buyOrder.bytes.length) ++ Ints.toByteArray(sellOrder.bytes.length) ++
-      buyOrder.bytes ++ sellOrder.bytes ++ Longs.toByteArray(price) ++ Longs.toByteArray(amount) ++
-      Longs.toByteArray(buyMatcherFee) ++ Longs.toByteArray(sellMatcherFee) ++ Longs.toByteArray(fee) ++
-      Longs.toByteArray(timestamp)
-
-    override def bytes: Array[Byte] = toSign ++ signature.arr
-
-    override def json: JsObject = jsonBase() ++ Json.obj(
-      "order1" -> buyOrder.json,
-      "order2" -> sellOrder.json,
-      "price" -> price,
-      "amount" -> amount,
-      "buyMatcherFee" -> buyMatcherFee,
-      "sellMatcherFee" -> sellMatcherFee
-    )
-
-    override lazy val signedDescendants: Seq[Signed] = Seq(buyOrder, sellOrder)
+  def create(matcher: PrivateKeyAccount, buyOrder: Order, sellOrder: Order, price: Long, amount: Long,
+             buyMatcherFee: Long, sellMatcherFee: Long, fee: Long, timestamp: Long): Either[ValidationError, ExchangeTransaction] = {
+    create(buyOrder, sellOrder, price, amount, buyMatcherFee, sellMatcherFee, fee, timestamp, ByteStr.empty).right.map { unverified =>
+      unverified.copy(signature = ByteStr(EllipticCurveImpl.sign(matcher.privateKey, unverified.toSign)))
+    }
   }
 
-  private def createUnverified(buyOrder: Order, sellOrder: Order, price: Long, amount: Long,
-                               buyMatcherFee: Long, sellMatcherFee: Long, fee: Long, timestamp: Long, signature: Option[ByteStr] = None) = {
+  def create(buyOrder: Order, sellOrder: Order, price: Long, amount: Long,
+             buyMatcherFee: Long, sellMatcherFee: Long, fee: Long, timestamp: Long, signature: ByteStr): Either[ValidationError, ExchangeTransaction] = {
     lazy val priceIsValid: Boolean = price <= buyOrder.price && price >= sellOrder.price
 
     if (fee <= 0) {
@@ -98,20 +87,8 @@ object ExchangeTransaction {
     } else if (!priceIsValid) {
       Left(GenericError("priceIsValid"))
     } else {
-      Right(ExchangeTransactionImpl(buyOrder, sellOrder, price, amount, buyMatcherFee, sellMatcherFee, fee, timestamp, signature.orNull))
+      Right(ExchangeTransaction(buyOrder, sellOrder, price, amount, buyMatcherFee, sellMatcherFee, fee, timestamp, signature))
     }
-  }
-
-  def create(matcher: PrivateKeyAccount, buyOrder: Order, sellOrder: Order, price: Long, amount: Long,
-             buyMatcherFee: Long, sellMatcherFee: Long, fee: Long, timestamp: Long): Either[ValidationError, ExchangeTransaction] = {
-    createUnverified(buyOrder, sellOrder, price, amount, buyMatcherFee, sellMatcherFee, fee, timestamp).right.map { unverified =>
-      unverified.copy(signature = ByteStr(EllipticCurveImpl.sign(matcher.privateKey, unverified.toSign)))
-    }
-  }
-
-  def create(buyOrder: Order, sellOrder: Order, price: Long, amount: Long,
-             buyMatcherFee: Long, sellMatcherFee: Long, fee: Long, timestamp: Long, signature: ByteStr): Either[ValidationError, ExchangeTransaction] = {
-    createUnverified(buyOrder, sellOrder, price, amount, buyMatcherFee, sellMatcherFee, fee, timestamp, Some(signature))
   }
 
   def parseBytes(bytes: Array[Byte]): Try[ExchangeTransaction] = Try {

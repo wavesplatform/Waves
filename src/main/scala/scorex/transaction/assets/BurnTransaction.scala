@@ -10,44 +10,37 @@ import scorex.transaction.{ValidationError, _}
 
 import scala.util.{Failure, Success, Try}
 
-sealed trait BurnTransaction extends SignedTransaction {
-  def assetId: ByteStr
+case class BurnTransaction private(sender: PublicKeyAccount,
+                                   assetId: ByteStr,
+                                   amount: Long,
+                                   fee: Long,
+                                   timestamp: Long,
+                                   signature: ByteStr)
+  extends SignedTransaction {
 
-  def amount: Long
+  override val transactionType: TransactionType.Value = TransactionType.BurnTransaction
 
-  def fee: Long
+  lazy val toSign: Array[Byte] = Bytes.concat(Array(transactionType.id.toByte),
+    sender.publicKey,
+    assetId.arr,
+    Longs.toByteArray(amount),
+    Longs.toByteArray(fee),
+    Longs.toByteArray(timestamp))
+
+  override lazy val json: JsObject = jsonBase() ++ Json.obj(
+    "assetId" -> assetId.base58,
+    "amount" -> amount,
+    "fee" -> fee
+  )
+
+  override val assetFee: (Option[AssetId], Long) = (None, fee)
+
+  override lazy val bytes: Array[Byte] = Bytes.concat(toSign, signature.arr)
+
 }
 
+
 object BurnTransaction {
-
-  private case class BurnTransactionImpl(sender: PublicKeyAccount,
-                                         assetId: ByteStr,
-                                         amount: Long,
-                                         fee: Long,
-                                         timestamp: Long,
-                                         signature: ByteStr)
-    extends BurnTransaction {
-
-    override val transactionType: TransactionType.Value = TransactionType.BurnTransaction
-
-    lazy val toSign: Array[Byte] = Bytes.concat(Array(transactionType.id.toByte),
-      sender.publicKey,
-      assetId.arr,
-      Longs.toByteArray(amount),
-      Longs.toByteArray(fee),
-      Longs.toByteArray(timestamp))
-
-    override lazy val json: JsObject = jsonBase() ++ Json.obj(
-      "assetId" -> assetId.base58,
-      "amount" -> amount,
-      "fee" -> fee
-    )
-
-    override val assetFee: (Option[AssetId], Long) = (None, fee)
-
-    override lazy val bytes: Array[Byte] = Bytes.concat(toSign, signature.arr)
-
-  }
 
   def parseBytes(bytes: Array[Byte]): Try[BurnTransaction] = Try {
     require(bytes.head == TransactionType.BurnTransaction.id)
@@ -69,34 +62,26 @@ object BurnTransaction {
       .fold(left => Failure(new Exception(left.toString)), right => Success(right))
   }.flatten
 
-  private def createUnverified(sender: PublicKeyAccount,
-                               assetId: ByteStr,
-                               quantity: Long,
-                               fee: Long,
-                               timestamp: Long,
-                               signature: Option[ByteStr] = None): Either[ValidationError, BurnTransactionImpl] =
-    if (quantity < 0) {
-      Left(ValidationError.NegativeAmount)
-    } else if (fee <= 0) {
-      Left(ValidationError.InsufficientFee)
-    } else {
-      Right(BurnTransactionImpl(sender, assetId, quantity, fee, timestamp, signature.orNull))
-    }
-
   def create(sender: PublicKeyAccount,
              assetId: ByteStr,
              quantity: Long,
              fee: Long,
              timestamp: Long,
              signature: ByteStr): Either[ValidationError, BurnTransaction] =
-    createUnverified(sender, assetId, quantity, fee, timestamp, Some(signature))
+    if (quantity < 0) {
+      Left(ValidationError.NegativeAmount)
+    } else if (fee <= 0) {
+      Left(ValidationError.InsufficientFee)
+    } else {
+      Right(BurnTransaction(sender, assetId, quantity, fee, timestamp, signature))
+    }
 
   def create(sender: PrivateKeyAccount,
              assetId: ByteStr,
              quantity: Long,
              fee: Long,
              timestamp: Long): Either[ValidationError, BurnTransaction] =
-    createUnverified(sender, assetId, quantity, fee, timestamp).right.map { unverified =>
+    create(sender, assetId, quantity, fee, timestamp, ByteStr.empty).right.map { unverified =>
       unverified.copy(signature = ByteStr(EllipticCurveImpl.sign(sender, unverified.toSign)))
     }
 }
