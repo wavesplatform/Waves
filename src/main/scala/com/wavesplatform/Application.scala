@@ -81,7 +81,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
       establishedConnections)
 
     val apiRoutes = Seq(
-      BlocksApiRoute(settings.restAPISettings, settings.checkpointsSettings, history, actorSystem.deadLetters),
+      BlocksApiRoute(settings.restAPISettings, settings.checkpointsSettings, history, checkpoint => network.writeToLocalChannel(checkpoint)),
       TransactionsApiRoute(settings.restAPISettings, stateReader, history, utxStorage),
       NxtConsensusApiRoute(settings.restAPISettings, stateReader, history, settings.blockchainSettings.functionalitySettings),
       WalletApiRoute(settings.restAPISettings, wallet),
