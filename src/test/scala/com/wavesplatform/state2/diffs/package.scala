@@ -13,7 +13,7 @@ import scala.util.{Left, Right}
 
 package object diffs {
 
-  def newState(): StateWriterImpl = new StateWriterImpl(StateStorage(None).get, new ReentrantReadWriteLock())
+  def newState(): StateWriterImpl = new StateWriterImpl(StateStorage(None, dropExisting = false).get, new ReentrantReadWriteLock())
 
   val ENOUGH_AMT: Long = Long.MaxValue / 3
 
