@@ -26,6 +26,11 @@ class ExtensionSignaturesLoader(syncTimeout: FiniteDuration, blacklist: Channel 
     case _ => super.channelRead(ctx, msg)
   }
 
+  override def channelInactive(ctx: ChannelHandlerContext) = {
+    currentTimeout.foreach(_.cancel(false))
+    currentTimeout = None
+  }
+
   override def write(ctx: ChannelHandlerContext, msg: AnyRef, promise: ChannelPromise) = msg match {
     case LoadBlockchainExtension(sigs) if currentTimeout.isEmpty =>
       lastKnownSignatures = sigs
@@ -33,7 +38,7 @@ class ExtensionSignaturesLoader(syncTimeout: FiniteDuration, blacklist: Channel 
       log.debug(s"${id(ctx)} Loading extension, last ${sigs.length} are [${sigs.head}..${sigs.last}]")
 
       currentTimeout = Some(ctx.executor().schedule(syncTimeout) {
-        if (currentTimeout.nonEmpty) {
+        if (currentTimeout.nonEmpty && ctx.channel().isActive) {
           log.warn(s"${id(ctx)} Timeout expired while loading extension")
           blacklist(ctx.channel())
         }
