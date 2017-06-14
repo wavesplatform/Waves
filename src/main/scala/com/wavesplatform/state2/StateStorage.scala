@@ -8,6 +8,8 @@ import org.h2.mvstore.MVMap
 import scorex.account.Account
 import scorex.utils.LogMVMapBuilder
 
+import scala.util.Try
+
 class StateStorage private(file: Option[File]) extends AutoCloseable {
 
   import StateStorage._
@@ -68,7 +70,7 @@ class StateStorage private(file: Option[File]) extends AutoCloseable {
 
   def commit(): Unit = db.commit()
 
-  override def close() = db.close()
+  override def close(): Unit = db.close()
 }
 
 object StateStorage {
@@ -88,7 +90,7 @@ object StateStorage {
 
     }
 
-  def apply(file: Option[File], dropExisting: Boolean = false) = for {
+  def apply(file: Option[File], dropExisting: Boolean): Try[StateStorage] = for {
     ss <- createWithStore[StateStorage](file, new StateStorage(file), !_.isDirty(), dropExisting)
     if validateVersion(ss)
   } yield ss

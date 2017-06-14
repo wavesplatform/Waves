@@ -8,7 +8,7 @@ import org.scalatest.{FunSuite, Matchers}
 
 class StateWriterSpec extends FunSuite with Matchers with GeneratorDrivenPropertyChecks {
   test("increase height when applying block diff") {
-    val storage = StateStorage(None).get
+    val storage = StateStorage(None, dropExisting = false).get
     val writer = new StateWriterImpl(storage, new ReentrantReadWriteLock())
     forAll(Gen.choose(0, Int.MaxValue)) { heightDiff =>
       val h = writer.height
