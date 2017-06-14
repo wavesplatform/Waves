@@ -40,16 +40,16 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
   override def write(ctx: ChannelHandlerContext, msg: AnyRef, promise: ChannelPromise) = msg match {
     case LocalScoreChanged(newLocalScore) =>
       localScore = newLocalScore
+      ctx.write(msg, promise)
       channelWithHighestScore match {
-        case Some((chan, score)) =>
-          promise.setSuccess()
+        case Some((chan, score)) if chan == ctx.channel() =>
           if (score.value > newLocalScore) {
             log.debug(s"${id(ctx)} Local score $newLocalScore is still lower than remote ${score.value}, requesting extension")
             chan.writeAndFlush(LoadBlockchainExtension(lastSignatures))
           } else {
             log.trace(s"${id(ctx)} Blockchain is up to date")
           }
-        case _ => log.debug(s"${id(ctx)} No channels left?")
+        case _ =>
       }
     case _ => ctx.write(msg, promise)
   }
