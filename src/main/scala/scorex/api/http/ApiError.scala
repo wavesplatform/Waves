@@ -24,6 +24,7 @@ object ApiError {
     case ValidationError.InsufficientFee => InsufficientFee
     case ValidationError.InvalidName => InvalidName
     case ValidationError.InvalidSignature(_, _) => InvalidSignature
+    case ValidationError.InvalidRequestSignature => InvalidSignature
     case ValidationError.TooBigArray => TooBigArrayAllocation
     case ValidationError.OverflowError => OverflowError
     case ValidationError.ToSelf => ToSelfError
