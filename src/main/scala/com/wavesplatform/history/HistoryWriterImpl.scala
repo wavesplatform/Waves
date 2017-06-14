@@ -17,6 +17,8 @@ import scala.util.Try
 class HistoryWriterImpl private(file: Option[File], val synchronizationToken: ReentrantReadWriteLock)
   extends HistoryWriter with AutoCloseable {
 
+  import HistoryWriterImpl._
+
   private val db = createMVStore(file)
   private val blockBodyByHeight = Synchronized(db.openMap("blocks", new LogMVMapBuilder[Int, Array[Byte]]))
   private val blockIdByHeight = Synchronized(db.openMap("signatures", new LogMVMapBuilder[Int, ByteStr].valueType(new ByteStrDataType)))
@@ -40,6 +42,10 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
     } else {
       Left(GenericError(s"Failed to append block ${block.encodedId} which parent(${block.reference.base58} is not last block in blockchain"))
     }
+  }
+
+  override def compact(): Unit = {
+    db.compact(CompactFillRate, CompactMemorySize)
   }
 
   override def discardBlock(): Unit = write { implicit lock =>
@@ -86,10 +92,13 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
     Option(blockBodyByHeight().get(height))
   }
 
-  override def close() = db.close()
+  override def close(): Unit = db.close()
 }
 
 object HistoryWriterImpl extends ScorexLogging {
+  private val CompactFillRate = 90
+  private val CompactMemorySize = 10 * 1024 * 1024
+
   def apply(file: Option[File], synchronizationToken: ReentrantReadWriteLock): Try[HistoryWriterImpl] =
     createWithStore[HistoryWriterImpl](file, new HistoryWriterImpl(file, synchronizationToken), h => h.isConsistent)
 }
