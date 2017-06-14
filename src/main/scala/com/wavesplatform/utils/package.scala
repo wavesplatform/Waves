@@ -32,7 +32,7 @@ package object utils extends ScorexLogging {
     val a = f
     if (pred(a)) a else storeFile match {
       case Some(file) =>
-        log.debug(s"Re-creating file store at $file")
+        log.info(s"Re-creating file store at $file")
         a.close()
         Files.delete(file.toPath)
         val newA = f
