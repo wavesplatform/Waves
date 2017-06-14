@@ -77,7 +77,7 @@ class ExtensionBlocksLoader(
         blockBuffer.clear()
       }
 
-    case Signatures(sigs) =>
+    case xid: ExtensionIds =>
       log.warn(s"${id(ctx)} Received unexpected extension ids while loading blocks, ignoring")
     case _ => super.channelRead(ctx, msg)
   }

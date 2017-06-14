@@ -63,7 +63,7 @@ class NetworkServer(
   private val lengthFieldPrepender = new LengthFieldPrepender(4)
 
   private val miner = new Miner(history, stateReader, utxStorage, wallet.privateKeyAccounts(), time,
-    settings.blockchainSettings, b => writeToLocalChannel(BlockForged(b)))
+    settings.blockchainSettings, settings.minerSettings, allChannels.size(), b => writeToLocalChannel(BlockForged(b)))
 
   private val peerSynchronizer = new PeerSynchronizer(peerDatabase)
   private val utxPoolSynchronizer = new UtxPoolSynchronizer(txHandler, network)
