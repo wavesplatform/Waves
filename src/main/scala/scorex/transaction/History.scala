@@ -29,9 +29,8 @@ trait History extends Synchronized {
 }
 
 trait HistoryWriter extends History {
-  def appendBlock(block: Block): Either[ValidationError, Unit]
 
-  def compact(): Unit
+  def appendBlock(block: Block): Either[ValidationError, Unit]
 
   def discardBlock(): Unit
 }

@@ -46,10 +46,6 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader, set
     }
 
     inMemoryDiff.set(unsafeDiffAgainstPersistedByRange(persisted.height + 1, bc.height() + 1))
-
-    persisted.compact()
-    bc.compact()
-
     logHeights("State rebuild finished:")
   }
 

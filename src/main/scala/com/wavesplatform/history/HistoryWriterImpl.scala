@@ -37,15 +37,14 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
       scoreByHeight.mutate(_.put(h, score() + block.blockScore))
       blockIdByHeight.mutate(_.put(h, block.uniqueId))
       heightByBlockId.mutate(_.put(block.uniqueId, h))
+
       db.commit()
+      if (h % 100 == 0) db.compact(CompactFillRate, CompactMemorySize)
+
       Right(())
     } else {
       Left(GenericError(s"Failed to append block ${block.encodedId} which parent(${block.reference.base58} is not last block in blockchain"))
     }
-  }
-
-  override def compact(): Unit = {
-    db.compact(CompactFillRate, CompactMemorySize)
   }
 
   override def discardBlock(): Unit = write { implicit lock =>

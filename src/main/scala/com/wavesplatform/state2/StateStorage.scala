@@ -68,9 +68,10 @@ class StateStorage private(file: Option[File]) extends AutoCloseable {
     .keyType(new ByteStrDataType)
     .valueType(new ByteStrDataType))
 
-  def commit(): Unit = db.commit()
-
-  def compact(): Unit = db.compact(CompactFillRate, CompactMemorySize)
+  def commit(): Unit = {
+    db.commit()
+    db.compact(CompactFillRate, CompactMemorySize)
+  }
 
   override def close(): Unit = db.close()
 }

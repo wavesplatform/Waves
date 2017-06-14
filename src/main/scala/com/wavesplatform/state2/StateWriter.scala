@@ -11,9 +11,6 @@ import scala.language.higherKinds
 
 trait StateWriter {
   def applyBlockDiff(blockDiff: BlockDiff): Unit
-
-  def compact(): Unit
-
   def clear(): Unit
 }
 
@@ -115,10 +112,6 @@ class StateWriterImpl(p: StateStorage, synchronizationToken: ReentrantReadWriteL
       sp().commit()
     }
     log.debug("BlockDiff commit complete")
-  }
-
-  override def compact(): Unit = write { implicit l =>
-    sp().compact()
   }
 
   override def clear(): Unit = write { implicit l =>
