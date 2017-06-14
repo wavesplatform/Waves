@@ -68,13 +68,19 @@ class StateStorage private(file: Option[File]) extends AutoCloseable {
     .keyType(new ByteStrDataType)
     .valueType(new ByteStrDataType))
 
-  def commit(): Unit = db.commit()
+  def commit(): Unit = {
+    db.commit()
+    db.compact(CompactFillRate, CompactMemorySize)
+  }
 
   override def close(): Unit = db.close()
 }
 
 object StateStorage {
   private val Version = 1
+
+  private val CompactFillRate = 80
+  private val CompactMemorySize = 19 * 1024 * 1024
 
   private val heightKey = "height"
   private val isDirtyFlag = "isDirty"

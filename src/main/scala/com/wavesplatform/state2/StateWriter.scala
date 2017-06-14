@@ -11,7 +11,6 @@ import scala.language.higherKinds
 
 trait StateWriter {
   def applyBlockDiff(blockDiff: BlockDiff): Unit
-
   def clear(): Unit
 }
 

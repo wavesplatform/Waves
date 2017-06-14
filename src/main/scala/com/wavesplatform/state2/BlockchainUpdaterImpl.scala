@@ -44,6 +44,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader, set
       val diffToBePersisted = unsafeDiffAgainstPersistedByRange(head, last)
       persisted.applyBlockDiff(diffToBePersisted)
     }
+
     inMemoryDiff.set(unsafeDiffAgainstPersistedByRange(persisted.height + 1, bc.height() + 1))
     logHeights("State rebuild finished:")
   }
