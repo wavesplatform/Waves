@@ -10,7 +10,7 @@ import scorex.transaction._
 
 import scala.util.{Failure, Success, Try}
 
-private case class MakeAssetNameUniqueTransaction(sender: PublicKeyAccount,
+case class MakeAssetNameUniqueTransaction private(sender: PublicKeyAccount,
                                                   assetId: ByteStr,
                                                   fee: Long,
                                                   timestamp: Long,
