@@ -7,7 +7,7 @@ import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash
 
-trait SignedTransaction extends Transaction {
+trait SignedTransaction extends Transaction with Signed {
   def toSign: Array[Byte]
 
   val signature: ByteStr
@@ -22,15 +22,6 @@ trait SignedTransaction extends Transaction {
     "timestamp" -> timestamp,
     "signature" -> this.signature.base58
   )
-}
 
-object SignedTransaction {
-  def verify[A <: SignedTransaction](t: A): Either[ValidationError, A] =
-    {
-      if (EllipticCurveImpl.verify(t.signature.arr, t.toSign, t.sender.publicKey)) {
-        Right(t)
-      } else {
-        Left(ValidationError.InvalidSignature)
-      }
-    }
+  lazy val signatureValid : Boolean = EllipticCurveImpl.verify(signature.arr, toSign, sender.publicKey)
 }

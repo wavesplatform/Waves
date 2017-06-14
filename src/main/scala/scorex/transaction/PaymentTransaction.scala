@@ -11,59 +11,48 @@ import scorex.crypto.encode.Base58
 import scorex.transaction.TransactionParser._
 import scorex.account.PublicKeyAccount._
 import scorex.crypto.hash.FastCryptographicHash
+import scorex.transaction.PaymentTransaction.signatureData
 
 import scala.util.{Failure, Success, Try}
 
-sealed trait PaymentTransaction extends Transaction {
-  def sender: PublicKeyAccount
+case class PaymentTransaction private(sender: PublicKeyAccount,
+                                      recipient: Account,
+                                      amount: Long,
+                                      fee: Long,
+                                      timestamp: Long,
+                                      signature: ByteStr) extends Transaction {
+  override val transactionType = TransactionType.PaymentTransaction
+  override val assetFee: (Option[AssetId], Long) = (None, fee)
+  override val id: ByteStr = signature
 
-  def recipient: Account
+  override lazy val json: JsObject =
+    Json.obj("type" -> transactionType.id,
+      "id" -> id.base58,
+      "fee" -> fee,
+      "timestamp" -> timestamp,
+      "signature" -> this.signature.base58,
+      "sender" -> sender.address,
+      "senderPublicKey" -> Base58.encode(sender.publicKey),
+      "recipient" -> recipient.address,
+      "amount" -> amount)
 
-  def amount: Long
+  lazy val hashBytes: Array[Byte] = {
+    val timestampBytes = Longs.toByteArray(timestamp)
+    val amountBytes = Longs.toByteArray(amount)
+    val feeBytes = Longs.toByteArray(fee)
+    Bytes.concat(Array(transactionType.id.toByte), timestampBytes, sender.publicKey, recipient.bytes.arr, amountBytes, feeBytes)
+  }
 
-  def fee: Long
+  lazy val hash = FastCryptographicHash(hashBytes)
 
-  def signature: ByteStr
+  override lazy val bytes: Array[Byte] = Bytes.concat(hashBytes, signature.arr)
 
-  def hash: Array[Byte]
+  override lazy val signatureValid: Boolean = EllipticCurveImpl.verify(signature.arr,
+    signatureData(sender, recipient, amount, fee, timestamp), sender.publicKey)
 }
 
 object PaymentTransaction {
 
-  private case class PaymentTransactionImpl(sender: PublicKeyAccount,
-                                            recipient: Account,
-                                            amount: Long,
-                                            fee: Long,
-                                            timestamp: Long,
-                                            signature: ByteStr)
-    extends PaymentTransaction {
-    override val transactionType = TransactionType.PaymentTransaction
-    override val assetFee: (Option[AssetId], Long) = (None, fee)
-    override val id: ByteStr = signature
-
-    override lazy val json: JsObject =
-      Json.obj("type" -> transactionType.id,
-        "id" -> id.base58,
-        "fee" -> fee,
-        "timestamp" -> timestamp,
-        "signature" -> this.signature.base58,
-        "sender" -> sender.address,
-        "senderPublicKey" -> Base58.encode(sender.publicKey),
-        "recipient" -> recipient.address,
-        "amount" -> amount)
-
-    lazy val hashBytes: Array[Byte] = {
-      val timestampBytes = Longs.toByteArray(timestamp)
-      val amountBytes = Longs.toByteArray(amount)
-      val feeBytes = Longs.toByteArray(fee)
-      Bytes.concat(Array(transactionType.id.toByte), timestampBytes, sender.publicKey, recipient.bytes.arr, amountBytes, feeBytes)
-    }
-
-    override lazy val hash = FastCryptographicHash(hashBytes)
-
-    override lazy val bytes: Array[Byte] = Bytes.concat(hashBytes, signature.arr)
-
-  }
 
   val RecipientLength = Account.AddressLength
 
@@ -72,16 +61,9 @@ object PaymentTransaction {
   private val BaseLength = TimestampLength + SenderLength + RecipientLength + AmountLength + FeeLength + SignatureLength
 
   def create(sender: PrivateKeyAccount, recipient: Account, amount: Long, fee: Long, timestamp: Long): Either[ValidationError, PaymentTransaction] = {
-    if (amount <= 0) {
-      Left(ValidationError.NegativeAmount) //CHECK IF AMOUNT IS POSITIVE
-    } else if (fee <= 0) {
-      Left(ValidationError.InsufficientFee) //CHECK IF FEE IS POSITIVE
-    } else if (Try(Math.addExact(amount, fee)).isFailure) {
-      Left(ValidationError.OverflowError) // CHECK THAT fee+amount won't overflow Long
-    } else {
-      val signature = ByteStr(EllipticCurveImpl.sign(sender, signatureData(sender, recipient, amount, fee, timestamp)))
-      Right(PaymentTransactionImpl(sender, recipient, amount, fee, timestamp, signature))
-    }
+    create(sender, recipient, amount, fee, timestamp, ByteStr.empty).right.map(unsigned => {
+      unsigned.copy(signature = ByteStr(EllipticCurveImpl.sign(sender, signatureData(sender, recipient, amount, fee, timestamp))))
+    })
   }
 
   def create(sender: PublicKeyAccount,
@@ -97,16 +79,9 @@ object PaymentTransaction {
     } else if (Try(Math.addExact(amount, fee)).isFailure) {
       Left(ValidationError.OverflowError) // CHECK THAT fee+amount won't overflow Long
     } else {
-      val sigData = signatureData(sender, recipient, amount, fee, timestamp)
-      if (EllipticCurveImpl.verify(signature.arr, sigData, sender.publicKey)) {
-        Right(PaymentTransactionImpl(sender, recipient, amount, fee, timestamp, signature))
-      } else {
-        Left(ValidationError.InvalidSignature)
-      }
-
+      Right(PaymentTransaction(sender, recipient, amount, fee, timestamp, signature))
     }
   }
-
 
   def parseTail(data: Array[Byte]): Try[PaymentTransaction] = Try {
     require(data.length >= BaseLength, "Data does not match base length")

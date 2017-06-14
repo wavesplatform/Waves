@@ -10,44 +10,37 @@ import scorex.transaction.{ValidationError, _}
 
 import scala.util.{Failure, Success, Try}
 
-sealed trait ReissueTransaction extends AssetIssuance {
-  def fee: Long
+case class ReissueTransaction private(sender: PublicKeyAccount,
+                                          assetId: ByteStr,
+                                          quantity: Long,
+                                          reissuable: Boolean,
+                                          fee: Long,
+                                          timestamp: Long,
+                                          signature: ByteStr)
+  extends AssetIssuance {
+
+  override val transactionType: TransactionType.Value = TransactionType.ReissueTransaction
+
+  lazy val toSign: Array[Byte] = Bytes.concat(Array(transactionType.id.toByte),
+    sender.publicKey,
+    assetId.arr,
+    Longs.toByteArray(quantity),
+    if (reissuable) Array(1: Byte) else Array(0: Byte),
+    Longs.toByteArray(fee),
+    Longs.toByteArray(timestamp))
+
+  override lazy val json: JsObject = jsonBase() ++ Json.obj(
+    "assetId" -> assetId.base58,
+    "quantity" -> quantity,
+    "reissuable" -> reissuable
+  )
+
+  override val assetFee: (Option[AssetId], Long) = (None, fee)
+
+  override lazy val bytes: Array[Byte] = Bytes.concat(Array(transactionType.id.toByte), signature.arr, toSign)
 }
 
 object ReissueTransaction {
-
-  private case class ReissueTransactionImpl(sender: PublicKeyAccount,
-                                            assetId: ByteStr,
-                                            quantity: Long,
-                                            reissuable: Boolean,
-                                            fee: Long,
-                                            timestamp: Long,
-                                            signature: ByteStr)
-    extends ReissueTransaction {
-
-    override val transactionType: TransactionType.Value = TransactionType.ReissueTransaction
-
-    lazy val toSign: Array[Byte] = Bytes.concat(Array(transactionType.id.toByte),
-      sender.publicKey,
-      assetId.arr,
-      Longs.toByteArray(quantity),
-      if (reissuable) Array(1: Byte) else Array(0: Byte),
-      Longs.toByteArray(fee),
-      Longs.toByteArray(timestamp))
-
-    override lazy val json: JsObject = jsonBase() ++ Json.obj(
-      "assetId" -> assetId.base58,
-      "quantity" -> quantity,
-      "reissuable" -> reissuable
-    )
-
-    override val assetFee: (Option[AssetId], Long) = (None, fee)
-
-    override lazy val bytes: Array[Byte] = Bytes.concat(Array(transactionType.id.toByte), signature.arr, toSign)
-
-  }
-
-
   def parseTail(bytes: Array[Byte]): Try[ReissueTransaction] = Try {
     import EllipticCurveImpl._
     val signature =ByteStr(bytes.slice(0, SignatureLength))
@@ -65,21 +58,6 @@ object ReissueTransaction {
       .fold(left => Failure(new Exception(left.toString)), right => Success(right))
   }.flatten
 
-  private def createUnverified(sender: PublicKeyAccount,
-                               assetId: ByteStr,
-                               quantity: Long,
-                               reissuable: Boolean,
-                               fee: Long,
-                               timestamp: Long,
-                               signature: Option[ByteStr] = None) =
-    if (quantity <= 0) {
-      Left(ValidationError.NegativeAmount)
-    } else if (fee <= 0) {
-      Left(ValidationError.InsufficientFee)
-    } else {
-      Right(ReissueTransactionImpl(sender, assetId, quantity, reissuable, fee, timestamp, signature.orNull))
-    }
-
   def create(sender: PublicKeyAccount,
              assetId: ByteStr,
              quantity: Long,
@@ -87,10 +65,13 @@ object ReissueTransaction {
              fee: Long,
              timestamp: Long,
              signature: ByteStr): Either[ValidationError, ReissueTransaction] =
-    createUnverified(sender, assetId, quantity, reissuable, fee, timestamp, Some(signature))
-      .right
-      .flatMap(SignedTransaction.verify)
-
+    if (quantity <= 0) {
+      Left(ValidationError.NegativeAmount)
+    } else if (fee <= 0) {
+      Left(ValidationError.InsufficientFee)
+    } else {
+      Right(ReissueTransaction(sender, assetId, quantity, reissuable, fee, timestamp, signature))
+    }
 
   def create(sender: PrivateKeyAccount,
              assetId: ByteStr,
@@ -98,7 +79,7 @@ object ReissueTransaction {
              reissuable: Boolean,
              fee: Long,
              timestamp: Long): Either[ValidationError, ReissueTransaction] =
-    createUnverified(sender, assetId, quantity, reissuable, fee, timestamp).right.map { unsigned =>
+    create(sender, assetId, quantity, reissuable, fee, timestamp, ByteStr.empty).right.map { unsigned =>
       unsigned.copy(signature = ByteStr(EllipticCurveImpl.sign(sender, unsigned.toSign)))
     }
 }

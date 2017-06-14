@@ -57,6 +57,7 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
   val checkpoints1 = new CheckpointServiceImpl(None)
   val (history1, _, stateReader1, blockchainUpdater1) = BlockStorageImpl(wavesSettings.blockchainSettings).get
   val utxStorage1 = new UnconfirmedTransactionsDatabaseImpl(wavesSettings.utxSettings.size)
+
   class ValidBlockCoordinator extends Coordinator(networkControllerMock, testBlockchainSynchronizer.ref,
     testBlockGenerator.ref, testPeerManager.ref, testScoreObserver.ref, blockchainUpdater1, NTP, utxStorage1, history1, stateReader1, checkpoints1, wavesSettings) {
     override def isBlockValid(b: Block): Either[ValidationError, Unit] = Right(())
@@ -75,10 +76,11 @@ class CoordinatorCheckpointSpecification extends ActorTestingCommons {
   }
 
   val genesisTimestamp: Long = System.currentTimeMillis()
-  blockchainUpdater1.processBlock(
-    Block.genesis(
-      NxtLikeConsensusBlockData(wavesSettings.blockchainSettings.genesisSettings.initialBaseTarget, Array.fill(DigestSize)(0: Byte)),
-      Application.genesisTransactions(wavesSettings.blockchainSettings.genesisSettings), genesisTimestamp)).explicitGet()
+
+  Block.genesis(
+    NxtLikeConsensusBlockData(wavesSettings.blockchainSettings.genesisSettings.initialBaseTarget, Array.fill(DigestSize)(0: Byte)),
+    Application.genesisTransactions(wavesSettings.blockchainSettings.genesisSettings), genesisTimestamp)
+    .flatMap(blockchainUpdater1.processBlock).explicitGet()
 
   def before(): Unit = {
     blockchainUpdater1.removeAfter(history1.genesis.uniqueId)

@@ -29,6 +29,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.language.{higherKinds, postfixOps}
 import scala.util.control.NonFatal
+import com.wavesplatform.state2._
 
 class Coordinator(protected override val networkControllerRef: ActorRef, blockchainSynchronizer: ActorRef, blockGenerator: ActorRef,
                   peerManager: ActorRef, scoreObserver: ActorRef, blockchainUpdater: BlockchainUpdater, time: Time,
@@ -256,9 +257,6 @@ class Coordinator(protected override val networkControllerRef: ActorRef, blockch
     else {
       def historyContainsParent = history.contains(b.reference)
 
-      def signatureIsValid = EllipticCurveImpl.verify(b.signerData.signature.arr, b.bytesWithoutSignature,
-        b.signerData.generator.publicKey)
-
       def consensusDataIsValid = blockConsensusValidation(
         history,
         stateReader,
@@ -266,7 +264,7 @@ class Coordinator(protected override val networkControllerRef: ActorRef, blockch
         time)(b)
 
       if (!historyContainsParent) Left(GenericError(s"Invalid block ${b.encodedId}: no parent block in history"))
-      else if (!signatureIsValid) Left(GenericError(s"Invalid block ${b.encodedId}: signature is not valid"))
+      else if (!Signed.validateSignatures(b).isRight) Left(GenericError(s"Invalid block ${b.encodedId}: signature is not valid"))
       else if (!consensusDataIsValid) Left(GenericError(s"Invalid block ${b.encodedId}: consensus data is not valid"))
       else Right(())
     }
@@ -286,7 +284,7 @@ class Coordinator(protected override val networkControllerRef: ActorRef, blockch
 
   private def str(block: Block) = {
     if (log.logger.isTraceEnabled) block.json
-    else (block.uniqueId) + ", parent " + block.reference
+    else block.uniqueId + ", parent " + block.reference
   }
 }
 
@@ -323,9 +321,6 @@ object Coordinator extends ScorexLogging {
   case class BroadcastCheckpoint(checkpoint: Checkpoint)
 
   case object ClearCheckpoint
-
-  def foldM[G[_], F[_], A, B](fa: F[A], z: B)(f: (B, A) => G[B])(implicit G: Monad[G], F: Traverse[F]): G[B] =
-    F.foldLeft(fa, G.pure(z))((gb, a) => G.flatMap(gb)(f(_, a)))
 
   val MaxTimeDrift: FiniteDuration = 15.seconds
 

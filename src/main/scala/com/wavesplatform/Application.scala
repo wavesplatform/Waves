@@ -144,10 +144,11 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
   def checkGenesis(): Unit = {
     if (history.isEmpty) {
       val maybeGenesisSignature = Option(settings.blockchainSettings.genesisSettings.signature).filter(_.trim.nonEmpty)
-      blockchainUpdater.processBlock(Block.genesis(
+      Block.genesis(
         NxtLikeConsensusBlockData(settings.blockchainSettings.genesisSettings.initialBaseTarget, Array.fill(DigestSize)(0: Byte)),
         Application.genesisTransactions(settings.blockchainSettings.genesisSettings),
-        settings.blockchainSettings.genesisSettings.blockTimestamp, maybeGenesisSignature)) match {
+        settings.blockchainSettings.genesisSettings.blockTimestamp, maybeGenesisSignature)
+        .flatMap(blockchainUpdater.processBlock) match {
         case Left(value) =>
           log.error(value.toString)
           System.exit(1)

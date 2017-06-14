@@ -4,6 +4,7 @@ import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.market.OrderBookActor.CancelOrder
 import com.wavesplatform.state2.reader.StateReader
 import scorex.account.PublicKeyAccount
+import scorex.api.http.AddressApiRoute.Signed
 import scorex.transaction.AssetAcc
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction.assets.exchange.Validation.booleanOperators
@@ -48,6 +49,7 @@ trait OrderValidator {
     val v =
     (order.matcherPublicKey == matcherPubKey) :| "Incorrect matcher public key" &&
       LimitOrder.validateIntegerAmount(storedState, LimitOrder(order)) &&
+      scorex.transaction.Signed.validateSignatures(order).isRight :| "signature should be valid" &&
       order.isValid(NTP.correctedTime()) &&
       (order.matcherFee >= settings.minOrderFee) :| s"Order matcherFee should be >= ${settings.minOrderFee}" &&
       (orderHistory.orderStatus(order.idStr) == LimitOrder.NotFound) :| "Order is already accepted" &&

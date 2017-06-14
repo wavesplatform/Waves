@@ -10,15 +10,17 @@ import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 
 object TransactionDiffer {
+
   case class TransactionValidationError(tx: Transaction, cause: ValidationError) extends ValidationError
 
   def apply(settings: FunctionalitySettings, time: Long, height: Int)(s: StateReader, tx: Transaction): Either[ValidationError, Diff] = {
     for {
-      t0 <- CommonValidation.disallowTxFromFuture(s, settings, time, tx)
-      t1 <- CommonValidation.disallowBeforeActivationTime(s, settings, t0)
-      t2 <- CommonValidation.disallowDuplicateIds(s, settings, height, t1)
-      t3 <- CommonValidation.disallowSendingGreaterThanBalance(s, settings, time, t2)
-      diff <- t3 match {
+      t0 <- Signed.validateSignatures(tx)
+      t1 <- CommonValidation.disallowTxFromFuture(s, settings, time, t0)
+      t2 <- CommonValidation.disallowBeforeActivationTime(s, settings, t1)
+      t3 <- CommonValidation.disallowDuplicateIds(s, settings, height, t2)
+      t4 <- CommonValidation.disallowSendingGreaterThanBalance(s, settings, time, t3)
+      diff <- t4 match {
         case gtx: GenesisTransaction => GenesisTransactionDiff(height)(gtx)
         case ptx: PaymentTransaction => PaymentTransactionDiff(s, height, settings, time)(ptx)
         case itx: IssueTransaction => AssetTransactionsDiff.issue(s, height)(itx)
