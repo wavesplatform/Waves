@@ -72,7 +72,7 @@ class StateStorage private(file: Option[File]) extends AutoCloseable {
 
   def compact(): Unit = db.compact(CompactFillRate, CompactMemorySize)
 
-  override def close() = db.close()
+  override def close(): Unit = db.close()
 }
 
 object StateStorage {
