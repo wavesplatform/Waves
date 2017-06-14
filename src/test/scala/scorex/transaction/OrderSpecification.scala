@@ -3,6 +3,7 @@ package scorex.transaction
 import com.wavesplatform.TransactionGen
 import com.wavesplatform.matcher.ValidationMatcher
 import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state2.diffs.produce
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
@@ -76,24 +77,22 @@ class OrderSpecification extends PropSpec with PropertyChecks with Matchers with
     }
   }
 
-//  property("Order signature validation") {
-//    forAll(orderGen, accountGen) { case (order, pka) =>
-//      order.isValid(NTP.correctedTime()) shouldBe valid
-//      order.copy(senderPublicKey = pka).isValid(NTP.correctedTime()) should contain("signature should be valid")
-//      order.copy(matcherPublicKey = pka).isValid(NTP.correctedTime()) should contain("signature should be valid")
-//      val assetPair = order.assetPair
-//      order.copy(assetPair = assetPair.copy(amountAsset = assetPair.amountAsset.map(Array(0: Byte) ++ _.arr).orElse(Some(Array(0: Byte))).map(ByteStr(_)))).
-//        isValid(NTP.correctedTime()) should contain("signature should be valid")
-//      order.copy(assetPair = assetPair.copy(priceAsset = assetPair.priceAsset.map(Array(0: Byte) ++ _.arr).orElse(Some(Array(0: Byte))).map(ByteStr(_)))).
-//        isValid(NTP.correctedTime()) should contain("signature should be valid")
-//      order.copy(orderType = OrderType.reverse(order.orderType)).isValid(NTP.correctedTime()) should contain("signature should be valid")
-//      order.copy(price = order.price + 1).isValid(NTP.correctedTime()) should contain("signature should be valid")
-//      order.copy(amount = order.amount + 1).isValid(NTP.correctedTime()) should contain("signature should be valid")
-//      order.copy(expiration = order.expiration + 1).isValid(NTP.correctedTime()) should contain("signature should be valid")
-//      order.copy(matcherFee = order.matcherFee + 1).isValid(NTP.correctedTime()) should contain("signature should be valid")
-//      order.copy(signature = pka.publicKey ++ pka.publicKey).isValid(NTP.correctedTime()) should contain("signature should be valid")
-//    }
-//  }
+  property("Order signature validation") {
+    forAll(orderGen, accountGen) { case (order, pka) =>
+      Signed.validateSignatures(order) shouldBe an[Right[_,_]]
+      Signed.validateSignatures(order.copy(senderPublicKey = pka)) should produce("InvalidSignature")
+      Signed.validateSignatures(order.copy(matcherPublicKey = pka)) should produce("InvalidSignature")
+      val assetPair = order.assetPair
+      Signed.validateSignatures(order.copy(assetPair = assetPair.copy(amountAsset = assetPair.amountAsset.map(Array(0: Byte) ++ _.arr).orElse(Some(Array(0: Byte))).map(ByteStr(_))))) should produce("InvalidSignature")
+      Signed.validateSignatures(order.copy(assetPair = assetPair.copy(priceAsset = assetPair.priceAsset.map(Array(0: Byte) ++ _.arr).orElse(Some(Array(0: Byte))).map(ByteStr(_))))) should produce("InvalidSignature")
+      Signed.validateSignatures(order.copy(orderType = OrderType.reverse(order.orderType))) should produce("InvalidSignature")
+      Signed.validateSignatures(order.copy(price = order.price + 1)) should produce("InvalidSignature")
+      Signed.validateSignatures(order.copy(amount = order.amount + 1)) should produce("InvalidSignature")
+      Signed.validateSignatures(order.copy(expiration = order.expiration + 1)) should produce("InvalidSignature")
+      Signed.validateSignatures(order.copy(matcherFee = order.matcherFee + 1)) should produce("InvalidSignature")
+      Signed.validateSignatures(order.copy(signature = pka.publicKey ++ pka.publicKey)) should produce("InvalidSignature")
+    }
+  }
 
   property("Buy and Sell orders") {
     forAll(orderParamGen) {
