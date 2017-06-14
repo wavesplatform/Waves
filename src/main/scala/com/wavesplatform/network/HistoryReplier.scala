@@ -10,17 +10,15 @@ import scorex.utils.ScorexLogging
 class HistoryReplier(history: History, maxChainLength: Int) extends ChannelInboundHandlerAdapter with ScorexLogging {
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef) = msg match {
     case GetSignatures(otherSigs) =>
-      log.debug(s"${id(ctx)} Got GetSignaturesMessage with ${otherSigs.length} sigs within")
-
-      otherSigs.foreach { parent =>
-        val headers = history.blockIdsAfter(parent, maxChainLength)
-
-        if (headers.nonEmpty) {
-          ctx.write(Signatures(Seq(parent) ++ headers))
+      otherSigs.view
+        .map(parent => parent -> history.blockIdsAfter(parent, maxChainLength))
+        .find(_._2.nonEmpty) match {
+          case Some((parent, extension)) =>
+            log.debug(s"${id(ctx)} Got GetSignatures with ${otherSigs.length}, found common parent $parent and sending ${extension.length} more signatures")
+            ctx.writeAndFlush(Signatures(parent +: extension))
+          case None =>
+            log.debug(s"${id(ctx)} Got GetSignatures with ${otherSigs.length} signatures, but could not find an extension")
         }
-      }
-
-      ctx.flush()
 
     case GetBlock(sig) =>
       for (h <- history.heightOf(sig); bytes <- history.blockBytes(h)) {
