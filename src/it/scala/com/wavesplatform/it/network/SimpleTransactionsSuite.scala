@@ -1,25 +1,22 @@
 package com.wavesplatform.it.network
 
 import com.wavesplatform.it.MatcherTestSuite.Configs
+import com.wavesplatform.it._
 import com.wavesplatform.it.network.client.RawBytes
-import com.wavesplatform.it.{Docker, IntegrationNodesInitializationAndStopping, Node, RequestErrorAssert}
 import org.scalatest._
 import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
-import scorex.account.{Account, AddressScheme, PrivateKeyAccount}
+import scorex.account.{Account, PrivateKeyAccount}
 import scorex.crypto.encode.Base58
 import scorex.transaction.PaymentTransaction
 
-import scala.concurrent.{Await, Future}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
+import scala.concurrent.{Await, Future}
 
 
 class SimpleTransactionsSuite extends FunSuite with BeforeAndAfterAll with Matchers with ScalaFutures
-  with IntegrationPatience with RecoverMethods with RequestErrorAssert with IntegrationNodesInitializationAndStopping {
-
-  AddressScheme.current = new AddressScheme {
-    override val chainId: Byte = 'I'
-  }
+  with IntegrationPatience with RecoverMethods with RequestErrorAssert with IntegrationNodesInitializationAndStopping
+  with IntegrationTestsScheme {
 
   override val docker = new Docker()
 

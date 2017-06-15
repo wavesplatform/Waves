@@ -14,7 +14,7 @@ import scala.language.postfixOps
 
 
 trait IntegrationSuiteWithThreeAddresses extends FunSuite with BeforeAndAfterAll with Matchers with ScalaFutures
-  with IntegrationPatience with RecoverMethods with RequestErrorAssert {
+  with IntegrationPatience with RecoverMethods with RequestErrorAssert with IntegrationTestsScheme {
 
   def allNodes: Seq[Node]
 
