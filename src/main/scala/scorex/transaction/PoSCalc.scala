@@ -55,13 +55,22 @@ object PoSCalc extends {
     }
   }
 
-  def blockOrdering(history: History, state: StateReader, fs: FunctionalitySettings): Ordering[Block] = Ordering.by {
-    block =>
-      val parent = history.blockById(block.reference).get
-      val height = history.heightOf(parent).get
-      val blockCreationTime = nextBlockGenerationTime(height, state, fs, parent, block.signerData.generator)
-        .getOrElse(block.timestamp)
-      (block.blockScore, -blockCreationTime)
+  private def blockCreationTime(h: History, state: StateReader, fs: FunctionalitySettings)(b: Block) =
+    (for {
+      parent <- h.blockById(b.reference)
+      height <- h.heightOf(b.reference)
+      ts <- nextBlockGenerationTime(height, state, fs, parent, b.signerData.generator)
+    } yield ts).getOrElse(b.timestamp)
+
+  // This used to be Ordering.by { b => (b.score, -b.timestamp) (overly simplified), but due to
+  // https://issues.scala-lang.org/browse/SI-8541, it has been rewritten the way it is now. It also
+  // has an added benefit of calculating block generation timestamp only when necessary.
+  def blockOrdering(history: History, state: StateReader, fs: FunctionalitySettings): Ordering[Block] = {
+    val bct = blockCreationTime(history, state, fs) _
+    Ordering.fromLessThan { (b1, b2) =>
+      b1.blockScore < b2.blockScore ||
+        b1.blockScore == b2.blockScore && bct(b1) < bct(b2)
+    }
   }
 
   def generatingBalance(state: StateReader, fs: FunctionalitySettings)(account: Account, atHeight: Int): Long = {

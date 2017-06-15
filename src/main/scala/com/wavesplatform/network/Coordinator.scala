@@ -37,6 +37,8 @@ class Coordinator(
   extends ChannelInboundHandlerAdapter with ScorexLogging {
   import Coordinator._
 
+  private val blockOrdering = PoSCalc.blockOrdering(history, stateReader, settings.functionalitySettings)
+
   private def isValidWithRespectToCheckpoint(candidate: Block, estimatedHeight: Int): Boolean =
     !checkpoints.get.exists {
       case Checkpoint(items, _) =>
@@ -124,8 +126,7 @@ class Coordinator(
           // someone has happened to be faster and already added a block or blocks after the parent
           log.debug(s"A child for parent of the block already exists, local=$local: ${str(newBlock)}")
 
-          val cmp = PoSCalc.blockOrdering(history, stateReader, settings.functionalitySettings)
-          if (lastBlock.reference == parentBlockId && cmp.lt(lastBlock, newBlock)) {
+          if (lastBlock.reference == parentBlockId && blockOrdering.lt(lastBlock, newBlock)) {
             log.debug(s"New block ${str(newBlock)} is better than last ${str(lastBlock)}")
           }
 
