@@ -1,12 +1,20 @@
 package com.wavesplatform.it.transactions
 
+import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.it.{IntegrationSuiteWithThreeAddresses, Node}
 import com.wavesplatform.it.util._
+import com.wavesplatform.state2.ByteStr
+import scorex.account.{AccountOrAlias, PrivateKeyAccount}
+import scorex.api.http.assets.SignedTransferRequest
+import scorex.crypto.EllipticCurveImpl
+import scorex.crypto.encode.Base58
+import scorex.crypto.hash.FastCryptographicHash
+import scorex.serialization.BytesSerializable
+import scorex.transaction.AssetId
+
 import scala.concurrent.duration._
 import scala.language.postfixOps
-
 import scala.concurrent.ExecutionContext.Implicits.global
-
 import scala.concurrent.{Await, Future}
 
 class TransferTransactionSpecification(override val allNodes: Seq[Node]) extends IntegrationSuiteWithThreeAddresses {
@@ -52,6 +60,79 @@ class TransferTransactionSpecification(override val allNodes: Seq[Node]) extends
     Await.result(f, 1 minute)
   }
 
+  test("invalid signed waves transfer should not be in UTX or blockchain") {
+    def transferToSign(sender: PrivateKeyAccount,
+                       recipient: AccountOrAlias,
+                       amount: Long,
+                       timestamp: Long,
+                       feeAmount: Long,
+                       attachment: Array[Byte],
+                       assetId: Option[AssetId] = None,
+                       feeAssetId: Option[AssetId] = None): Array[Byte] = {
+      val timestampBytes = Longs.toByteArray(timestamp)
+      val assetIdBytes = assetId.map(a => (1: Byte) +: a.arr).getOrElse(Array(0: Byte))
+      val amountBytes = Longs.toByteArray(amount)
+      val feeAssetIdBytes = feeAssetId.map(a => (1: Byte) +: a.arr).getOrElse(Array(0: Byte))
+      val feeBytes = Longs.toByteArray(feeAmount)
+
+      Bytes.concat(Array(4.toByte),
+        sender.publicKey,
+        assetIdBytes,
+        feeAssetIdBytes,
+        timestampBytes,
+        amountBytes,
+        feeBytes,
+        recipient.bytes.arr,
+        BytesSerializable.arrayWithSize(attachment))
+    }
+
+    def createSignedTransferRequest(sender: PrivateKeyAccount,
+                                    recipient: AccountOrAlias,
+                                    amount: Long,
+                                    timestamp: Long,
+                                    feeAmount: Long,
+                                    attachment: Array[Byte],
+                                    assetId: Option[AssetId] = None,
+                                    feeAssetId: Option[AssetId] = None): SignedTransferRequest = {
+      val signature = ByteStr(EllipticCurveImpl.sign(sender, transferToSign(sender, recipient, amount, timestamp, feeAmount, attachment, assetId, feeAssetId)))
+
+      SignedTransferRequest(
+        Base58.encode(sender.publicKey),
+        assetId.map(_.base58),
+        recipient.stringRepr,
+        amount,
+        feeAmount,
+        feeAssetId.map(_.base58),
+        timestamp,
+        attachment.headOption.map(_ => Base58.encode(attachment)),
+        signature.base58
+      )
+    }
+
+    val id = ByteStr(FastCryptographicHash(transferToSign(
+      PrivateKeyAccount(Base58.decode(sender.accountSeed).get),
+      AccountOrAlias.fromString(sender.address).right.get,
+      1,
+      System.currentTimeMillis() + (1 day).toMillis,
+      1 waves,
+      Array.emptyByteArray))).base58
+
+    val invalidByTsSignedRequest = createSignedTransferRequest(
+      PrivateKeyAccount(Base58.decode(sender.accountSeed).get),
+      AccountOrAlias.fromString(sender.address).right.get,
+      1,
+      System.currentTimeMillis() + (1 day).toMillis,
+      1 waves,
+      Array.emptyByteArray)
+
+    val f = for {
+      _ <- assertBadRequest(sender.signedTransfer(invalidByTsSignedRequest))
+      _ <- Future.sequence(allNodes.map(_.isTransactionNotExists(id)))
+    } yield succeed
+
+    Await.result(f, 1 minute)
+  }
+
   test("can not make transfer without having enough of fee") {
     val f = for {
       fb <- Future.traverse(allNodes)(_.height).map(_.min)
@@ -69,7 +150,6 @@ class TransferTransactionSpecification(override val allNodes: Seq[Node]) extends
 
     Await.result(f, 1 minute)
   }
-
 
 
   test("can not make transfer without having enough of waves") {
