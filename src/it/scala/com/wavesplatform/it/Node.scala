@@ -1,12 +1,18 @@
 package com.wavesplatform.it
 
 import java.io.IOException
+import java.net.InetSocketAddress
+import java.util.concurrent.ConcurrentHashMap
 
 import com.typesafe.config.Config
+import com.wavesplatform.it.network.client.{NetworkServer, PeerInfo, RawBytes}
 import com.wavesplatform.it.util._
 import com.wavesplatform.matcher.api.CancelOrderRequest
 import com.wavesplatform.settings.WavesSettings
+import io.netty.channel.Channel
+import io.netty.channel.group.DefaultChannelGroup
 import io.netty.util.Timer
+import io.netty.util.concurrent.GlobalEventExecutor
 import org.asynchttpclient.Dsl.{get => _get, post => _post}
 import org.asynchttpclient.util.HttpConstants
 import org.asynchttpclient.{Response, _}
@@ -20,6 +26,7 @@ import scorex.transaction.TransactionParser.TransactionType
 import scorex.transaction.assets.exchange.Order
 import scorex.utils.{LoggerFacade, ScorexLogging}
 
+import scala.collection.JavaConverters._
 import scala.compat.java8.FutureConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
@@ -27,7 +34,7 @@ import scala.concurrent.{ExecutionContext, Future, TimeoutException}
 import scala.util.{Failure, Success, Try}
 
 
-class Node (config: Config, val nodeInfo: NodeInfo, client: AsyncHttpClient, timer: Timer) {
+class Node(config: Config, val nodeInfo: NodeInfo, client: AsyncHttpClient, timer: Timer) {
 
   import Node._
 
@@ -104,6 +111,8 @@ class Node (config: Config, val nodeInfo: NodeInfo, client: AsyncHttpClient, tim
 
   def blockAt(height: Long) = get(s"/blocks/at/$height").as[Block]
 
+  def utx = get(s"/transactions/unconfirmed").as[Seq[Transaction]]
+
   def lastBlock: Future[Block] = get("/blocks/last").as[Block]
 
   def blockSeq(from: Long, to: Long) = get(s"/blocks/seq/$from/$to").as[Seq[Block]]
@@ -111,6 +120,12 @@ class Node (config: Config, val nodeInfo: NodeInfo, client: AsyncHttpClient, tim
   def status: Future[Status] = get("/node/status").as[Status]
 
   def balance(address: String): Future[Balance] = get(s"/addresses/balance/$address").as[Balance]
+
+  def secureTransactionInfo(txId: String): Future[Option[Transaction]] = transactionInfo(txId).transform {
+    case Success(tx) => Success(Some(tx))
+    case Failure(UnexpectedStatusCodeException(_, r)) if r.getStatusCode == 404 => Success(None)
+    case Failure(ex) => Failure(ex)
+  }
 
   def waitForTransaction(txId: String): Future[Transaction] = waitFor[Option[Transaction]](transactionInfo(txId).transform {
     case Success(tx) => Success(Some(tx))
@@ -158,11 +173,24 @@ class Node (config: Config, val nodeInfo: NodeInfo, client: AsyncHttpClient, tim
   def transfer(sourceAddress: String, recipient: String, amount: Long, fee: Long): Future[Transaction] =
     postJson("/assets/transfer", TransferRequest(None, None, amount, fee, sourceAddress, None, recipient)).as[Transaction]
 
+  def signedTransfer(transfer: SignedTransferRequest): Future[Transaction] =
+    postJson("/assets/broadcast/transfer", transfer).as[Transaction]
+
   def createAlias(targetAddress: String, alias: String, fee: Long): Future[Transaction] =
     postJson("/alias/create", CreateAliasRequest(targetAddress, alias, fee)).as[Transaction]
 
   def rollback(to: Long): Future[Unit] =
     post("/debug/rollback", to.toString).map(_ => ())
+
+  def isTransactionNotExists(txId: String): Future[Unit] =
+    utx.zip(secureTransactionInfo(txId)).flatMap({
+      case (utx, _) if utx.contains(txId) =>
+        Future.failed(new IllegalStateException(s"Tx $txId is in UTX"))
+      case (_, txOpt) if txOpt.isDefined =>
+        Future.failed(new IllegalStateException(s"Tx $txId is in blockchain"))
+      case _ =>
+        Future.successful()
+    })
 
   def waitFor[A](f: => Future[A], cond: A => Boolean, retryInterval: FiniteDuration): Future[A] =
     timer.retryUntil(f, cond, retryInterval)
@@ -225,6 +253,17 @@ class Node (config: Config, val nodeInfo: NodeInfo, client: AsyncHttpClient, tim
 
   def blacklist(node: Node): Future[Unit] =
     post("/debug/blacklist", s"${node.nodeInfo.networkIpAddress}:${node.nodeInfo.hostNetworkPort}").map(_ => ())
+
+  def sendByNetwork(message: RawBytes): Future[Unit] = {
+    val allChannels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
+    val establishedConnections = new ConcurrentHashMap[Channel, PeerInfo]
+    val s = new NetworkServer('I', settings, allChannels, establishedConnections)
+    s.connect(new InetSocketAddress("localhost", nodeInfo.hostNetworkPort))
+    waitFor(Future.successful(establishedConnections.size()), (size: Int) => size == 1, 1 seconds).map(_ => {
+      establishedConnections.asScala.head._1.writeAndFlush(message)
+      s.shutdown()
+    })
+  }
 }
 
 object Node extends ScorexLogging {
@@ -248,11 +287,11 @@ object Node extends ScorexLogging {
 
   implicit val assetBalanceFormat: Format[AssetBalance] = Json.format
 
-  case class FullAssetInfo(assetId: String, balance: Long, reissuable :Boolean, quantity: Long, unique: Boolean)
+  case class FullAssetInfo(assetId: String, balance: Long, reissuable: Boolean, quantity: Long, unique: Boolean)
 
   implicit val fullAssetInfoFormat: Format[FullAssetInfo] = Json.format
 
-  case class FullAssetsInfo(address: String, balances : List[FullAssetInfo])
+  case class FullAssetsInfo(address: String, balances: List[FullAssetInfo])
 
   implicit val fullAssetsInfoFormat: Format[FullAssetsInfo] = Json.format
 

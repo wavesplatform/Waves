@@ -4,37 +4,19 @@ import com.typesafe.config.{Config, ConfigFactory}
 import org.scalatest.{BeforeAndAfterAll, FreeSpec, Matchers}
 
 import scala.collection.JavaConverters._
+import scala.concurrent.Await
 import scala.concurrent.Await.result
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
-import scala.concurrent.{Await, Future}
 import scala.util.Random
 
-
-class NetworkSeparationTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll {
+class NetworkSeparationTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with IntegrationNodesInitializationAndStopping {
 
   import NetworkSeparationTestSuite._
 
-  private val docker = new Docker()
-  private val nodes = NodeConfigs.map(docker.startNode)
-
-  override protected def beforeAll(): Unit = {
-    super.beforeAll()
-
-    Await.result(Future.traverse(nodes)(_.status), 1.minute)
-
-    Await.result(
-      for {
-        count <- Future.traverse(nodes)(_.waitForPeers(NodesCount - 1))
-      } yield count, 1.minute
-    )
-  }
-
-  override protected def afterAll(): Unit = {
-    super.afterAll()
-    docker.close()
-  }
+  override val docker = new Docker()
+  override val nodes = NodeConfigs.map(docker.startNode)
 
   private def validateBlocks(nodes: Seq[Node]): Unit = {
     val targetBlocks1 = result(for {
