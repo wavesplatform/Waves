@@ -5,6 +5,7 @@ import org.scalatest.{BeforeAndAfterAll, Suite}
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
+import scala.concurrent.ExecutionContext.Implicits.global
 
 trait IntegrationNodesInitializationAndStopping extends BeforeAndAfterAll { this: Suite =>
   def docker: Docker
