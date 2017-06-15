@@ -5,7 +5,7 @@ import java.net.InetSocketAddress
 import java.util.concurrent.ConcurrentHashMap
 
 import com.typesafe.config.Config
-import com.wavesplatform.it.network.client.RawNetworkServer
+import com.wavesplatform.it.network.client.NetworkServer
 import com.wavesplatform.it.util._
 import com.wavesplatform.matcher.api.CancelOrderRequest
 import com.wavesplatform.network.{PeerInfo, RawBytes}
