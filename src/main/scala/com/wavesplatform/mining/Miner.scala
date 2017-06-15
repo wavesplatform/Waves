@@ -12,7 +12,7 @@ import scorex.consensus.nxt.NxtLikeConsensusBlockData
 import scorex.transaction.PoSCalc._
 import scorex.transaction.UnconfirmedTransactionsStorage.packUnconfirmed
 import scorex.transaction.{History, PoSCalc, UnconfirmedTransactionsStorage}
-import scorex.utils.{ScorexLogging, Time}
+import scorex.utils.ScorexLogging
 
 import scala.collection.mutable
 import scala.math.Ordering.Implicits._
@@ -24,9 +24,9 @@ class Miner(
     state: StateReader,
     utx: UnconfirmedTransactionsStorage,
     privateKeyAccounts: => Seq[PrivateKeyAccount],
-    time: Time,
     blockchainSettings: BlockchainSettings,
     minerSettings: MinerSettings,
+    time: => Long,
     peerCount: => Int,
     blockHandler: Block => Unit) extends ScorexLogging {
   import Miner._
@@ -38,14 +38,14 @@ class Miner(
     val greatGrandParent = history.blockAt(parentHeight - 3)
     for (account <- privateKeyAccounts; ts <- PoSCalc.nextBlockGenerationTime(parentHeight, state, blockchainSettings.functionalitySettings, parent, account)) {
       val generationInstant = Instant.ofEpochMilli(ts)
-      val generationOffset = Math.max(MinimalGenerationOffset, ts - time.correctedTime())
+      val generationOffset = Math.max(MinimalGenerationOffset, ts - time)
       log.debug(s"Next attempt in ${Duration.ofMillis(generationOffset)} (${account.address} at $generationInstant)")
 
       val publicKey = ByteStr(account.publicKey)
       scheduledFutures.get(publicKey).foreach(_.cancel(false))
       scheduledFutures += publicKey -> minerPool.schedule((() => {
         val pc = peerCount
-        val blockAge = Duration.between(Instant.ofEpochMilli(parent.timestamp), Instant.ofEpochMilli(time.correctedTime()))
+        val blockAge = Duration.between(Instant.ofEpochMilli(parent.timestamp), Instant.ofEpochMilli(time))
         if (pc < minerSettings.quorum) {
           log.debug(s"Quorum not available ($pc/${minerSettings.quorum}, not forging block with $publicKey")
         } else if (blockAge > minerSettings.intervalAfterLastBlockThenGenerationIsAllowed) {
@@ -57,7 +57,7 @@ class Miner(
             s"Effective balance $balance is less that minimal ($MinimalEffectiveBalanceForGenerator)")
 
           val lastBlockKernelData = parent.consensusData
-          val currentTime = time.correctedTime()
+          val currentTime = time
 
           val h = calcHit(lastBlockKernelData, account)
           val t = calcTarget(parent, currentTime, balance)

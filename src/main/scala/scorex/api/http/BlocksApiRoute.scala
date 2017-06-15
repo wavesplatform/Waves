@@ -9,7 +9,6 @@ import com.wavesplatform.state2.ByteStr
 import io.swagger.annotations._
 import play.api.libs.json._
 import scorex.crypto.EllipticCurveImpl
-import scorex.crypto.encode.Base58
 import scorex.transaction.{History, TransactionParser}
 
 @Path("/blocks")
@@ -163,11 +162,8 @@ case class BlocksApiRoute(settings: RestAPISettings, checkpointsSettings: Checkp
   ))
   def checkpoint: Route = {
     def validateCheckpoint(checkpoint: Checkpoint): Option[ApiError] = {
-      val maybePublicKeyBytes = Base58.decode(checkpointsSettings.publicKey)
-      maybePublicKeyBytes.map { publicKey =>
-        if (!EllipticCurveImpl.verify(checkpoint.signature, checkpoint.toSign, publicKey)) Some(InvalidSignature)
-        else None
-      }.getOrElse(Some(InvalidMessage))
+      if (EllipticCurveImpl.verify(checkpoint.signature, checkpoint.toSign, checkpointsSettings.publicKey.arr)) None
+      else Some(InvalidSignature)
     }
 
     (path("checkpoint") & post) {

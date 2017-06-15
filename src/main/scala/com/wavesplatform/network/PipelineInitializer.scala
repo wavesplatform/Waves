@@ -4,6 +4,8 @@ import com.wavesplatform.network.PipelineInitializer.HandlerWrapper
 import io.netty.channel.{Channel, ChannelHandler, ChannelInitializer}
 import io.netty.util.concurrent.EventExecutorGroup
 
+import scala.language.implicitConversions
+
 class PipelineInitializer[A <: Channel](handlers: => Seq[HandlerWrapper]) extends ChannelInitializer[A] {
   override def initChannel(ch: A) = {
     handlers.foldLeft(ch.pipeline()) {

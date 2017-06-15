@@ -24,9 +24,5 @@ case class RawBytes(code: Byte, data: Array[Byte]) extends Message
 case class LoadBlockchainExtension(lastBlockIds: Seq[ByteStr])
 case class ExtensionIds(lastCommonId: ByteStr, extensionIds: Seq[ByteStr])
 case class ExtensionBlocks(extension: Seq[Block])
-case class RollbackTo(blockId: Block.BlockId)
 
 case class BlockForged(block: Block)
-
-case object BlockchainExpired
-case object BlockchainUpdated

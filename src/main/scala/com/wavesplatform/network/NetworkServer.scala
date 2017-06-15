@@ -2,12 +2,12 @@ package com.wavesplatform.network
 
 import java.net.{InetAddress, InetSocketAddress}
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
 
-import com.wavesplatform.Version
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.settings._
 import com.wavesplatform.state2.reader.StateReader
+import com.wavesplatform.{Coordinator, Version}
 import io.netty.bootstrap.{Bootstrap, ServerBootstrap}
 import io.netty.channel._
 import io.netty.channel.group.{ChannelGroup, ChannelMatchers}
@@ -51,7 +51,9 @@ class NetworkServer(
       settings.synchronizationSettings.scoreTTL,
       history.lastBlockIds(settings.synchronizationSettings.maxRollback))
 
-  private val discardingHandler = new DiscardingHandler
+  private val blockchainReadiness = new AtomicBoolean(false)
+
+  private val discardingHandler = new DiscardingHandler(blockchainReadiness.get())
   private val specs: Map[Byte, MessageSpec[_ <: AnyRef]] = (BasicMessagesRepo.specs ++ TransactionalMessagesRepo.specs).map(s => s.messageCode -> s).toMap
   private val messageCodec = new MessageCodec(specs)
 
@@ -62,8 +64,9 @@ class NetworkServer(
 
   private val lengthFieldPrepender = new LengthFieldPrepender(4)
 
-  private val miner = new Miner(history, stateReader, utxStorage, wallet.privateKeyAccounts(), time,
-    settings.blockchainSettings, settings.minerSettings, allChannels.size(), b => writeToLocalChannel(BlockForged(b)))
+  private val miner = new Miner(history, stateReader, utxStorage, wallet.privateKeyAccounts(),
+    settings.blockchainSettings, settings.minerSettings, time.correctedTime(), allChannels.size(),
+    b => writeToLocalChannel(BlockForged(b)))
 
   private val peerSynchronizer = new PeerSynchronizer(peerDatabase)
   private val utxPoolSynchronizer = new UtxPoolSynchronizer(txHandler, network)
@@ -75,8 +78,10 @@ class NetworkServer(
     settings.networkSettings.maxConnectionsPerHost)
 
   private val coordinatorExecutor = new DefaultEventLoop
-  private val coordinator = new Coordinator(checkpoints, history, blockchainUpdater, time, stateReader, utxStorage,
-    settings.blockchainSettings, settings.checkpointsSettings.publicKey, miner, blacklist, doBroadcast)
+  private val coordinator = new Coordinator(checkpoints, history, blockchainUpdater, stateReader, utxStorage,
+    time.correctedTime(), settings.blockchainSettings, ???, settings.checkpointsSettings.publicKey, miner, ???)
+
+  private val coordinatorHandler = new CoordinatorHandler(coordinator)
 
   private val address = new LocalAddress("local-events-channel")
   private val localServerGroup = new DefaultEventLoopGroup()
@@ -85,7 +90,7 @@ class NetworkServer(
     .channel(classOf[LocalServerChannel])
     .childHandler(new PipelineInitializer[LocalChannel](Seq(
         utxPoolSynchronizer, scoreObserver,
-        coordinator -> coordinatorExecutor)
+        coordinatorHandler -> coordinatorExecutor)
     ))
 
   localServer.bind(address).sync()
@@ -127,7 +132,7 @@ class NetworkServer(
         new OptimisticExtensionLoader,
         utxPoolSynchronizer,
         scoreObserver,
-        coordinator -> coordinatorExecutor)))
+        coordinatorHandler -> coordinatorExecutor)))
       .bind(bindAddress)
       .channel()
   }
@@ -158,7 +163,7 @@ class NetworkServer(
       new OptimisticExtensionLoader,
       utxPoolSynchronizer,
       scoreObserver,
-      coordinator -> coordinatorExecutor)))
+      coordinatorHandler -> coordinatorExecutor)))
 
   workerGroup.scheduleWithFixedDelay(1.second, 5.seconds) {
     if (outgoingChannelCount.get() < settings.networkSettings.maxOutboundConnections) {

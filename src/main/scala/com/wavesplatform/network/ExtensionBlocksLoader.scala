@@ -55,13 +55,13 @@ class ExtensionBlocksLoader(
         for (tids <- targetExtensionIds) {
           if (tids.lastCommonId != newBlocks.head.reference) {
             log.warn(s"${id(ctx)} Extension head reference ${newBlocks.head.reference} differs from last common block id ${tids.lastCommonId}")
-            // todo: blacklist?
+            blacklist(ctx.channel())
           } else if (!newBlocks.sliding(2).forall {
               case Seq(b1, b2) => b1.uniqueId == b2.reference
               case _ => true
             }) {
-            log.warn(s"${id(ctx)}Extension blocks are not contiguous, pre-check failed")
-            // todo: blacklist?
+            log.warn(s"${id(ctx)} Extension blocks are not contiguous, pre-check failed")
+            blacklist(ctx.channel())
           } else {
             newBlocks.par.find(!blockIsValid(_)) match {
               case Some(invalidBlock) =>
@@ -77,7 +77,7 @@ class ExtensionBlocksLoader(
         blockBuffer.clear()
       }
 
-    case xid: ExtensionIds =>
+    case _: ExtensionIds =>
       log.warn(s"${id(ctx)} Received unexpected extension ids while loading blocks, ignoring")
     case _ => super.channelRead(ctx, msg)
   }
