@@ -38,7 +38,8 @@ class Miner(
     val greatGrandParent = history.blockAt(parentHeight - 3)
     for (account <- privateKeyAccounts; ts <- PoSCalc.nextBlockGenerationTime(parentHeight, state, blockchainSettings.functionalitySettings, parent, account)) {
       val generationInstant = Instant.ofEpochMilli(ts)
-      log.debug(s"Next attempt in ${Duration.between(Instant.ofEpochMilli(time.correctedTime()), generationInstant)} (${account.address} at $generationInstant)")
+      val generationOffset = Math.max(MinimalGenerationOffset, ts - time.correctedTime())
+      log.debug(s"Next attempt in ${Duration.ofMillis(generationOffset)} (${account.address} at $generationInstant)")
 
       val publicKey = ByteStr(account.publicKey)
       scheduledFutures.get(publicKey).foreach(_.cancel(false))
@@ -78,7 +79,7 @@ class Miner(
         } catch {
           case NonFatal(e) => log.warn("Error generating block", e)
         }
-      }): Runnable, ts - time.correctedTime(), TimeUnit.MILLISECONDS)
+      }): Runnable, generationOffset, TimeUnit.MILLISECONDS)
 
     }
   }
@@ -88,4 +89,5 @@ class Miner(
 
 object Miner {
   val Version: Byte = 2
+  val MinimalGenerationOffset = 1001
 }
