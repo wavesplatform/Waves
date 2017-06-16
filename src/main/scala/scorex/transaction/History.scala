@@ -1,9 +1,8 @@
 package scorex.transaction
 
-import com.wavesplatform.state2.ByteStr
-import scorex.account.Account
-import scorex.block.Block
 import com.wavesplatform.network.Checkpoint
+import com.wavesplatform.state2.ByteStr
+import scorex.block.Block
 import scorex.transaction.History.BlockchainScore
 import scorex.utils.Synchronized
 
@@ -13,17 +12,11 @@ trait History extends Synchronized {
 
   def height(): Int
 
-  def blockAt(height: Int): Option[Block]
-
-  def blockBytes (height: Int): Option[Array[Byte]]
-
-  def score(): BlockchainScore
+  def blockBytes(height: Int): Option[Array[Byte]]
 
   def scoreOf(id: ByteStr): BlockchainScore
 
   def heightOf(blockId: ByteStr): Option[Int]
-
-  def generatedBy(account: Account, from: Int, to: Int): Seq[Block]
 
   def lastBlockIds(howMany: Int): Seq[ByteStr]
 }
@@ -46,6 +39,16 @@ object History {
   type BlockchainScore = BigInt
 
   implicit class HistoryExt(history: History) {
+
+    def blockAt(height: Int): Option[Block] =
+      history.blockBytes(height).map(Block.parseBytes(_).get)
+
+
+    def score(): BlockchainScore = history.read { implicit lock =>
+      history.scoreOf(history.lastBlock.uniqueId)
+    }
+
+
     def isEmpty: Boolean = history.height() == 0
 
     def contains(block: Block): Boolean = history.contains(block.uniqueId)

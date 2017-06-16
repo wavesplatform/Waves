@@ -34,7 +34,7 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
     if ((height() == 0) || (this.lastBlock.uniqueId == block.reference)) {
       val h = height() + 1
       blockBodyByHeight.mutate(_.put(h, block.bytes))
-      scoreByHeight.mutate(_.put(h, score() + block.blockScore))
+      scoreByHeight.mutate(_.put(h, this.score() + block.blockScore))
       blockIdByHeight.mutate(_.put(h, block.uniqueId))
       heightByBlockId.mutate(_.put(block.uniqueId, h))
 
@@ -56,9 +56,6 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
     db.commit()
   }
 
-  override def blockAt(height: Int): Option[Block] = read { implicit lock =>
-    Option(blockBodyByHeight().get(height)).map(Block.parseBytes(_).get)
-  }
 
   override def lastBlockIds(howMany: Int): Seq[ByteStr] = read { implicit lock =>
     (Math.max(1, height() - howMany + 1) to height()).flatMap(i => Option(blockIdByHeight().get(i)))
@@ -67,24 +64,12 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
 
   override def height(): Int = read { implicit lock => blockIdByHeight().size() }
 
-  override def score(): BlockchainScore = read { implicit lock =>
-    if (height() > 0) scoreByHeight().get(height()) else 0
-  }
-
   override def scoreOf(id: ByteStr): BlockchainScore = read { implicit lock =>
     heightOf(id).map(scoreByHeight().get(_)).getOrElse(0)
   }
 
   override def heightOf(blockSignature: ByteStr): Option[Int] = read { implicit lock =>
     Option(heightByBlockId().get(blockSignature))
-  }
-
-  override def generatedBy(account: Account, from: Int, to: Int): Seq[Block] = read { implicit lock =>
-    for {
-      h <- from to to
-      block <- blockAt(h)
-      if block.signerData.generator.address.equals(account.address)
-    } yield block
   }
 
   override def blockBytes(height: Int): Option[Array[Byte]] = read { implicit lock =>
