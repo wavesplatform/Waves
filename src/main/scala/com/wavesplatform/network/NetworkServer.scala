@@ -82,8 +82,6 @@ class NetworkServer(
     localAddresses ++ settings.networkSettings.declaredAddress.toSet
   }
 
-  println(excludedAddresses.mkString("\n"))
-
   private val lengthFieldPrepender = new LengthFieldPrepender(4)
 
   private val miner = new Miner(history, stateReader, utxStorage, wallet.privateKeyAccounts(),
@@ -105,7 +103,7 @@ class NetworkServer(
     settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed, settings.checkpointsSettings.publicKey,
     miner, setBlockchainExpired)
 
-  private val coordinatorHandler = new CoordinatorHandler(coordinator)
+  private val coordinatorHandler = new CoordinatorHandler(coordinator, blacklist)
 
   private val address = new LocalAddress("local-events-channel")
   private val localServerGroup = new DefaultEventLoopGroup()

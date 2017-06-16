@@ -89,7 +89,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
       UtilsApiRoute(settings.restAPISettings),
       PeersApiRoute(settings.restAPISettings, network.connect, peerDatabase, establishedConnections),
       AddressApiRoute(settings.restAPISettings, wallet, stateReader, settings.blockchainSettings.functionalitySettings),
-      DebugApiRoute(settings.restAPISettings, wallet, stateReader, history, peerDatabase, ???),
+//      DebugApiRoute(settings.restAPISettings, wallet, stateReader, history, peerDatabase, _ => {}),
       WavesApiRoute(settings.restAPISettings, wallet, newTransactionHandler, time),
       AssetsApiRoute(settings.restAPISettings, wallet, stateReader, newTransactionHandler, time),
       NodeApiRoute(settings.restAPISettings, () => this.shutdown()),

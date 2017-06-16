@@ -120,17 +120,17 @@ class Coordinator(
     newScore
   }
 
-  def processCheckpoint(newCheckpoint: Checkpoint): Either[String, BigInt] =
+  def processCheckpoint(newCheckpoint: Checkpoint): Either[ValidationError, BigInt] =
     if (checkpoint.get.forall(_.signature sameElements newCheckpoint.signature)) {
       if (EllipticCurveImpl.verify(newCheckpoint.signature, newCheckpoint.toSign, checkpointPublicKey.arr)) {
         checkpoint.set(Some(newCheckpoint))
         makeBlockchainCompliantWith(newCheckpoint)
         Right(history.score())
       } else {
-        Left("Invalid checkpoint signature")
+        Left(GenericError("Invalid checkpoint signature"))
       }
     } else {
-      Left("Checkpoint already applied")
+      Left(GenericError("Checkpoint already applied"))
     }
 
   private def makeBlockchainCompliantWith(checkpoint: Checkpoint): Unit = {
