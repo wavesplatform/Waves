@@ -1,6 +1,5 @@
 package com.wavesplatform.it
 
-import com.wavesplatform.it.NetworkSeparationTestSuite.NodesCount
 import org.scalatest.{BeforeAndAfterAll, Suite}
 
 import scala.concurrent.duration._
@@ -18,7 +17,7 @@ trait IntegrationNodesInitializationAndStopping extends BeforeAndAfterAll { this
 
     Await.result(
       for {
-        count <- Future.traverse(nodes)(_.waitForPeers(NodesCount - 1))
+        count <- Future.traverse(nodes)(_.waitForPeers(nodes.size - 1))
       } yield count, 1.minute
     )
   }

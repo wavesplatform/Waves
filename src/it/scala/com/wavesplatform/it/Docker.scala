@@ -17,6 +17,7 @@ import scorex.utils.ScorexLogging
 import scala.collection.JavaConverters._
 import scala.concurrent.Await
 import scala.concurrent.duration._
+import scala.util.Random
 
 case class NodeInfo(
                      hostRestApiPort: Int,
@@ -53,7 +54,9 @@ class Docker(suiteConfig: Config = ConfigFactory.empty) extends AutoCloseable wi
     case (ni, index) => s"-Dwaves.network.known-peers.$index=${ni.networkIpAddress}:${ni.containerNetworkPort}"
   } mkString " "
 
-  private val wavesNetwork = client.createNetwork(NetworkConfig.builder().driver("bridge").name("waves").build())
+  private val networkName = "waves-" + new Random().nextInt()
+
+  private val wavesNetwork = client.createNetwork(NetworkConfig.builder().driver("bridge").name(networkName).build())
 
   def startNode(nodeConfig: Config): Node = {
     val configOverrides = s"$knownPeers ${renderProperties(asProperties(nodeConfig.withFallback(suiteConfig)))}"
@@ -100,7 +103,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty) extends AutoCloseable wi
       extractHostPort(ports, networkPort),
       networkPort.toInt,
       containerInfo.networkSettings().ipAddress(),
-      containerInfo.networkSettings().networks().asScala("waves").ipAddress(),
+      containerInfo.networkSettings().networks().asScala(networkName).ipAddress(),
       containerId,
       extractHostPort(ports, matcherApiPort))
     nodes += containerId -> nodeInfo
@@ -125,7 +128,6 @@ class Docker(suiteConfig: Config = ConfigFactory.empty) extends AutoCloseable wi
       client.removeNetwork(wavesNetwork.id())
       client.close()
       http.close()
-      isStopped.set(true)
     }
   }
 
