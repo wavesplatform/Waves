@@ -17,7 +17,18 @@ class NgHistoryWriterImpl(inner: HistoryWriter) extends NgHistoryWriter {
   private val baseBlock = Synchronized(Option.empty[Block])
   private val micros = Synchronized(List.empty[MicroBlock])
 
-  private def totalBlock(): Option[Block] = ???
+  private def totalBlock(): Option[Block] = write { implicit l =>
+    baseBlock().map(base => {
+      val ms = micros()
+      if (ms.isEmpty) {
+        base
+      } else {
+        base.copy(
+          signerData = base.signerData.copy(signature = ms.head.totalResBlockSig),
+          transactionData = base.transactionData ++ ms.map(_.transactions).reverse.flatten)
+      }
+    })
+  }
 
   override def synchronizationToken: ReentrantReadWriteLock = inner.synchronizationToken
 
