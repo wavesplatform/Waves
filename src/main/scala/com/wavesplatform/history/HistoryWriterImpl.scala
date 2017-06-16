@@ -43,7 +43,7 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
 
       Right(())
     } else {
-      Left(GenericError(s"Failed to append block ${block.encodedId} which parent(${block.reference.base58} is not last block in blockchain"))
+      Left(GenericError(s"Failed to append block ${block.encodedId} which parent(${block.reference.base58} is not last block in persisted blockchain"))
     }
   }
 
@@ -64,8 +64,8 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
 
   override def height(): Int = read { implicit lock => blockIdByHeight().size() }
 
-  override def scoreOf(id: ByteStr): BlockchainScore = read { implicit lock =>
-    heightOf(id).map(scoreByHeight().get(_)).getOrElse(0)
+  override def scoreOf(id: ByteStr): Option[BlockchainScore]= read { implicit lock =>
+    heightOf(id).map(scoreByHeight().get(_))
   }
 
   override def heightOf(blockSignature: ByteStr): Option[Int] = read { implicit lock =>
