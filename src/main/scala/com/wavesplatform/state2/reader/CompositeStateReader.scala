@@ -68,6 +68,8 @@ class CompositeStateReader(inner: StateReader, blockDiff: BlockDiff) extends Sta
 
   override def filledVolumeAndFee(orderId: ByteStr): OrderFillInfo =
     blockDiff.txsDiff.orderFills.get(orderId).orEmpty.combine(inner.filledVolumeAndFee(orderId))
+
+  override def stateHash: Int = Diff.hash(blockDiff.snapshots) + inner.stateHash
 }
 
 object CompositeStateReader {

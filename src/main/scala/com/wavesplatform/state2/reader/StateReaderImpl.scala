@@ -86,11 +86,12 @@ class StateReaderImpl(p: StateStorage, val synchronizationToken: ReentrantReadWr
   override def containsTransaction(id: ByteStr): Boolean = read { implicit l =>
     sp().transactions.containsKey(id)
   }
-  override def getAssetIdByUniqueName(assetName: ByteStr): Option[ByteStr] =read { implicit l =>
+
+  override def getAssetIdByUniqueName(assetName: ByteStr): Option[ByteStr] = read { _ =>
     Option(p.uniqueAssets.get(assetName))
   }
 
-  override def filledVolumeAndFee(orderId: ByteStr): OrderFillInfo =read { implicit l =>
+  override def filledVolumeAndFee(orderId: ByteStr): OrderFillInfo = read { _ =>
     Option(p.orderFills.get(orderId)).map(oi => OrderFillInfo(oi._1, oi._2)).orEmpty
   }
 }

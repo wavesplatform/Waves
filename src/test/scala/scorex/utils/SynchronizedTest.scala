@@ -14,30 +14,30 @@ class SynchronizedTest extends FunSuite {
   class A(val synchronizationToken: ReentrantReadWriteLock = st) extends Synchronized {
     val mut = Synchronized(0)
 
-    def read(): Int = read { implicit l =>
+    def read(): Int = read { _ =>
       mut()
     }
 
-    def write(): Int = write { implicit l =>
+    def write(): Int = write { _ =>
       mut.set(1)
     }
 
-    def readWhileWrite(): Int = write { implicit l =>
+    def readWhileWrite(): Int = write { _ =>
       read()
     }
 
-    def longRead(): Unit = read { implicit l =>
+    def longRead(): Unit = read { _ =>
       mut()
       Thread.sleep(5000)
     }
 
-    def longWrite(): Unit = write { implicit l =>
+    def longWrite(): Unit = write { _ =>
       mut.set(1)
       Thread.sleep(5000)
       mut.set(1)
     }
 
-    def nestedWirte(): Unit = write { implicit l =>
+    def nestedWirte(): Unit = write { _ =>
       Thread.sleep(200)
       write()
       Thread.sleep(200)
