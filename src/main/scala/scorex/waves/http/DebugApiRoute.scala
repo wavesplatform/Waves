@@ -101,13 +101,11 @@ case class DebugApiRoute(settings: RestAPISettings, wallet: Wallet, stateReader:
     new ApiResponse(code = 200, message = "Json state")
   ))
   def info: Route = (path("info") & get) {
-    stateReader.read { _ =>
-      val stateHash = (BigInt(FastCryptographicHash(stateReader.accountPortfolios.toString().getBytes)) % Int.MaxValue).toInt
-      complete(Json.obj(
-        "stateHeight" -> stateReader.height,
-        "stateHash" -> stateHash
-      ))
-    }
+    val stateHash = (BigInt(FastCryptographicHash(stateReader.accountPortfolios.toString().getBytes)) % Int.MaxValue).toInt
+    complete(Json.obj(
+      "stateHeight" -> stateReader.height,
+      "stateHash" -> stateHash
+    ))
   }
 
 

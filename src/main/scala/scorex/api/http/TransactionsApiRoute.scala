@@ -75,24 +75,12 @@ case class TransactionsApiRoute(
       path(Segment) { encoded =>
         ByteStr.decodeBase58(encoded) match {
           case Success(sig) =>
-            state.read { _ =>
-              state.included(sig) match {
-                case Some(h) =>
-                  val jsonOpt = for {
-                    b <- history.blockAt(h).toRight(s"Block height=$h not found")
-                    tx <- b.transactionData.collectFirst { case t if t.id == sig => t }.toRight(s"Tx not found in block")
-                  } yield txToExtendedJson(tx) + ("height" -> JsNumber(h))
-
-                  jsonOpt match {
-                    case Right(json) => complete(json)
-                    case Left(err) =>
-                      complete(StatusCodes.InternalServerError -> Json.obj("status" -> "error", "details" -> s"Internal error: $err"))
-                  }
-
+            state.transactionInfo(sig) match {
+              case Some((h, tx)) =>
+                complete(txToExtendedJson(tx) + ("height" -> JsNumber(h)))
                 case None =>
                   complete(StatusCodes.NotFound -> Json.obj("status" -> "error", "details" -> "Transaction is not in blockchain"))
               }
-            }
           case _ => complete(InvalidSignature)
         }
       }
