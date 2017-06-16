@@ -32,7 +32,8 @@ class NgHistoryWriterImpl(inner: HistoryWriter) extends NgHistoryWriter {
       baseBlock.set(Some(block))
       Right(())
     } else {
-      Left(GenericError(s"Failed to append block ${block.encodedId} which parent(${block.reference.base58} is neither last block in persisted blockchain nor is liquid"))
+      Left(GenericError(s"Failed to append block ${block.encodedId} because its parent(${block.reference.base58} " +
+        s"is neither last one in persisted blockchain nor liquid"))
     }
   }
 
@@ -75,7 +76,30 @@ class NgHistoryWriterImpl(inner: HistoryWriter) extends NgHistoryWriter {
       inner.lastBlockIds(howMany)
   }
 
-  override def appendMicroBlock(microBlock: MicroBlock): Either[ValidationError, Unit] = ???
+  override def appendMicroBlock(microBlock: MicroBlock): Either[ValidationError, Unit] = write { implicit l =>
+    baseBlock() match {
+      case Some(base) =>
+        micros().headOption match {
+          case None =>
+            if (base.uniqueId == microBlock.prevResBlockSig) {
+              micros.set(microBlock +: micros())
+              Right(())
+            }
+            else {
+              Left(GenericError(s"MicroBlock $microBlock can't be appended because it is first micro and it doesn't reference existing base block"))
+            }
+          case Some(prevMicro) =>
+            if (prevMicro.totalResBlockSig == microBlock.prevResBlockSig) {
+              micros.set(microBlock +: micros())
+              Right(())
+            } else {
+              Left(GenericError(s"Microblock $microBlock can't be appended because it doesn't reference last known microBlock"))
+            }
+        }
+      case None =>
+        Left(GenericError(s"MicroBlock $microBlock can't be appended because no liquid block exists"))
+    }
+  }
 
   private def containsLocalBlock(blockId: BlockId): Boolean = read { implicit l =>
     baseBlock().find(_.uniqueId == blockId)
@@ -86,19 +110,19 @@ class NgHistoryWriterImpl(inner: HistoryWriter) extends NgHistoryWriter {
 }
 
 object NgHistoryWriter {
-//  override def addMicro(microBlock: MicroBlock, microDiff: Diff): Either[ValidationError, Unit] = write { implicit l =>
-//    val currentMicros = micros()
-//    if (currentMicros.exists(_.totalResBlockSig == microBlock.totalResBlockSig)) Right(())
-//    else {
-//      lazy val isFirstMicro = baseBlock().exists(_.uniqueId == microBlock.prevResBlockSig)
-//      lazy val isNextMicro = currentMicros.headOption.exists(_.totalResBlockSig == microBlock.prevResBlockSig)
-//      if (isFirstMicro || isNextMicro) {
-//        micros.set(microBlock +: currentMicros)
-//        totalDiff.set(Monoid.combine(totalDiff(), microDiff))
-//        Right(())
-//      }
-//      else Left(GenericError("Referenced block/microBlock not found or has been referenced, or the block has been persisted"))
-//    }
-//  }
+  //  override def addMicro(microBlock: MicroBlock, microDiff: Diff): Either[ValidationError, Unit] = write { implicit l =>
+  //    val currentMicros = micros()
+  //    if (currentMicros.exists(_.totalResBlockSig == microBlock.totalResBlockSig)) Right(())
+  //    else {
+  //      lazy val isFirstMicro = baseBlock().exists(_.uniqueId == microBlock.prevResBlockSig)
+  //      lazy val isNextMicro = currentMicros.headOption.exists(_.totalResBlockSig == microBlock.prevResBlockSig)
+  //      if (isFirstMicro || isNextMicro) {
+  //        micros.set(microBlock +: currentMicros)
+  //        totalDiff.set(Monoid.combine(totalDiff(), microDiff))
+  //        Right(())
+  //      }
+  //      else Left(GenericError("Referenced block/microBlock not found or has been referenced, or the block has been persisted"))
+  //    }
+  //  }
 
 }
