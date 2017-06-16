@@ -40,9 +40,9 @@ object History {
 
   implicit class HistoryExt(history: History) {
 
-    def blockAt(height: Int): Option[Block] =
+    def blockAt(height: Int): Option[Block] = history.read { implicit lock =>
       history.blockBytes(height).map(Block.parseBytes(_).get)
-
+    }
 
     def score(): BlockchainScore = history.read { implicit lock =>
       history.scoreOf(history.lastBlock.uniqueId).getOrElse(0)

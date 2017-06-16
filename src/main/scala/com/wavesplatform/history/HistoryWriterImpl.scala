@@ -5,7 +5,6 @@ import java.util.concurrent.locks.ReentrantReadWriteLock
 
 import com.wavesplatform.state2.{ByteStr, ByteStrDataType}
 import com.wavesplatform.utils._
-import scorex.account.Account
 import scorex.block.Block
 import scorex.transaction.History.BlockchainScore
 import scorex.transaction.ValidationError.GenericError
@@ -33,8 +32,9 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
   override def appendBlock(block: Block): Either[ValidationError, Unit] = write { implicit lock =>
     if ((height() == 0) || (this.lastBlock.uniqueId == block.reference)) {
       val h = height() + 1
+      val score = (if (height() == 0) BigInt(0) else this.score()) + block.blockScore
       blockBodyByHeight.mutate(_.put(h, block.bytes))
-      scoreByHeight.mutate(_.put(h, this.score() + block.blockScore))
+      scoreByHeight.mutate(_.put(h, score))
       blockIdByHeight.mutate(_.put(h, block.uniqueId))
       heightByBlockId.mutate(_.put(block.uniqueId, h))
 
@@ -64,7 +64,7 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
 
   override def height(): Int = read { implicit lock => blockIdByHeight().size() }
 
-  override def scoreOf(id: ByteStr): Option[BlockchainScore]= read { implicit lock =>
+  override def scoreOf(id: ByteStr): Option[BlockchainScore] = read { implicit lock =>
     heightOf(id).map(scoreByHeight().get(_))
   }
 
