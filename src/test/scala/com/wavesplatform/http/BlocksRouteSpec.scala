@@ -5,7 +5,6 @@ import com.wavesplatform.BlockGen
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.settings.{CheckpointsSettings, RestAPISettings}
 import com.wavesplatform.state2.ByteStr
-import io.netty.channel.embedded.EmbeddedChannel
 import org.scalacheck.{Gen, Shrink}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.prop.PropertyChecks
@@ -23,9 +22,11 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with MockFactory with BlockGe
   private val restSettings = RestAPISettings.fromConfig(config)
   private val checkpointSettings = CheckpointsSettings.fromConfig(config)
   private val history = mock[History]
-  private val route = BlocksApiRoute(restSettings, checkpointSettings, history, new EmbeddedChannel).route
+  private val route = BlocksApiRoute(restSettings, checkpointSettings, history, mockWriteToChannel).route
 
   private implicit def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)
+
+  private def mockWriteToChannel(checkpoint: com.wavesplatform.network.Checkpoint): Unit = {}
 
   private def checkBlock(response: JsValue, expected: Block): Unit = {
     (response \ "version").asOpt[Int].isDefined shouldBe true
@@ -46,7 +47,7 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with MockFactory with BlockGe
 
     forAll(g) {
       case (height, block) =>
-        (history.blockAt _).expects(height).returning(Some(block)).once()
+        (history.blockBytes _).expects(height).returning(Some(block.bytes)).once()
 
         Get(routePath(s"/at/$height")) ~> route ~> check {
           checkBlock(responseAs[JsValue], block)
@@ -55,7 +56,7 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with MockFactory with BlockGe
   }
 
   routePath("/first") in forAll(randomSignerBlockGen) { block =>
-    (history.blockAt _).expects(1).returning(Some(block)).once()
+    (history.blockBytes _).expects(1).returning(Some(block.bytes)).once()
 
     Get(routePath("/first")) ~> route ~> check {
       checkBlock(responseAs[JsObject], block)
@@ -69,7 +70,7 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with MockFactory with BlockGe
       case (start, end, blocks) =>
         inSequence {
           for (i <- start to end) {
-            (history.blockAt _).expects(i).returning(if (i - start < blocks.length) Some(blocks(i - start)) else None).once()
+            (history.blockBytes _).expects(i).returning(if (i - start < blocks.length) Some(blocks(i - start).bytes) else None).once()
           }
         }
 
@@ -84,7 +85,7 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with MockFactory with BlockGe
 
   routePath("/last") in forAll(randomSignerBlockGen, positiveIntGen) { case (block, h) =>
     (history.height _).expects().returning(h).anyNumberOfTimes()
-    (history.blockAt _).expects(h).returning(Some(block)).anyNumberOfTimes()
+    (history.blockBytes _).expects(h).returning(Some(block.bytes)).anyNumberOfTimes()
     (history.heightOf(_: ByteStr)).expects(block.uniqueId).returning(Some(h)).anyNumberOfTimes()
 
     Get(routePath("/last")) ~> route ~> check {
@@ -106,7 +107,7 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with MockFactory with BlockGe
     // todo: check block not found (404?)
     forAll(randomSignerBlockGen) { block =>
       (history.heightOf(_: ByteStr)).expects(block.uniqueId).returning(Some(10)).anyNumberOfTimes()
-      (history.blockAt _).expects(10).returning(Some(block)).anyNumberOfTimes()
+      (history.blockBytes _).expects(10).returning(Some(block.bytes)).anyNumberOfTimes()
       Get(routePath(s"/height/${block.uniqueId.base58}")) ~> route ~> check {
         (responseAs[JsValue] \ "height").as[Int] shouldBe 10
       }
@@ -122,7 +123,7 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with MockFactory with BlockGe
       case (start, end, blocks) =>
         inSequence {
           for (i <- start to end) {
-            (history.blockAt _).expects(i).returning(if (i - start < blocks.length) Some(blocks(i - start)) else None).once()
+            (history.blockBytes _).expects(i).returning(if (i - start < blocks.length) Some(blocks(i - start).bytes) else None).once()
           }
         }
 
@@ -141,10 +142,10 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with MockFactory with BlockGe
     // todo: check invalid signature
     forAll(randomSignerBlockGen, randomSignerBlockGen, positiveIntGen) { case (block1, block2, h1) =>
 
-      (history.blockAt _).expects(h1).returns(Some(block1)).anyNumberOfTimes()
+      (history.blockBytes _).expects(h1).returns(Some(block1.bytes)).anyNumberOfTimes()
       (history.heightOf _).expects(block1.uniqueId).returns(Some(h1)).anyNumberOfTimes()
 
-      (history.blockAt _).expects(h1 + 1).returns(Some(block2)).anyNumberOfTimes()
+      (history.blockBytes _).expects(h1 + 1).returns(Some(block2.bytes)).anyNumberOfTimes()
       (history.heightOf _).expects(block2.uniqueId).returns(Some(h1 + 1)).anyNumberOfTimes()
 
 

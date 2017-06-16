@@ -88,6 +88,7 @@ class TransactionsRouteSpec extends RouteSpec("/transactions")
 
       forAll(txAvailability) { case (tx, height, block) =>
         (state.transactionInfo _).expects(tx.id).returning(height.map((_, tx))).once()
+        height.foreach { h => (history.blockBytes _).expects(h).returning(Some(block.bytes)).once() }
         Get(routePath(s"/info/${tx.id.base58}")) ~> route ~> check {
           height match {
             case None => status shouldEqual StatusCodes.NotFound
