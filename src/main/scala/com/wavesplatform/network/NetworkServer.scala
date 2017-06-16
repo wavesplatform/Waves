@@ -1,8 +1,10 @@
 package com.wavesplatform.network
 
-import java.net.{InetAddress, InetSocketAddress}
+import java.net.{InetAddress, InetSocketAddress, NetworkInterface}
+import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
+import java.util.stream.Collectors
 
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.settings._
@@ -62,6 +64,25 @@ class NetworkServer(
     override def requestExtension(localScore: BigInt): Unit = broadcast(LocalScoreChanged(localScore))
     override def broadcast(msg: AnyRef, except: Option[Channel]): Unit = doBroadcast(msg, except)
   }
+
+  private val excludedAddresses: Set[InetSocketAddress] = {
+    val localAddresses = if (bindAddress.getAddress.isAnyLocalAddress) {
+      import Collections.list
+      list(NetworkInterface.getNetworkInterfaces)
+        .stream()
+        .flatMap[InetSocketAddress] { i =>
+          list(i.getInetAddresses)
+            .stream()
+            .map(a => new InetSocketAddress(a, settings.networkSettings.bindAddress.getPort))
+        }
+        .collect(Collectors.toSet())
+        .asScala.toSet
+    } else Set(settings.networkSettings.bindAddress)
+
+    localAddresses ++ settings.networkSettings.declaredAddress.toSet
+  }
+
+  println(excludedAddresses.mkString("\n"))
 
   private val lengthFieldPrepender = new LengthFieldPrepender(4)
 
@@ -171,7 +192,7 @@ class NetworkServer(
   workerGroup.scheduleWithFixedDelay(1.second, 5.seconds) {
     if (outgoingChannelCount.get() < settings.networkSettings.maxOutboundConnections) {
       peerDatabase
-        .getRandomPeer(settings.networkSettings.declaredAddress.toSet ++ channels.keySet().asScala)
+        .getRandomPeer(excludedAddresses ++ channels.keySet().asScala)
         .foreach(connect)
     }
   }

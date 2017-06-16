@@ -83,7 +83,7 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Auto
 
     if (result.isDefined) unverifiedPeers.remove(result.get)
 
-    result
+    result.filterNot(excluded)
   }
 
   private def withoutObsoleteRecords[K, T](map: MVMap[K, T], timestamp: T => Long, residenceTimeInMillis: Long) = {
