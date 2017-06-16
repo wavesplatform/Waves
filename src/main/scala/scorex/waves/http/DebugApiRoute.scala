@@ -1,29 +1,35 @@
 package scorex.waves.http
 
-import java.net.{InetSocketAddress, URI}
+import java.net.{InetAddress, URI}
 import javax.ws.rs.Path
 
-import akka.actor.ActorRef
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
+import com.wavesplatform.network.PeerDatabase
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state2.ByteStr
 import com.wavesplatform.state2.reader.StateReader
 import io.swagger.annotations._
 import play.api.libs.json.{JsArray, Json}
 import scorex.api.http._
+import scorex.block.Block
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash
-import scorex.network.peer.PeerManager.AddToBlacklist
-import scorex.transaction.{BlockchainUpdater, History}
+import scorex.transaction.History
 import scorex.wallet.Wallet
 
-import scala.util.Try
+import scala.util.Success
+import scala.util.control.NonFatal
 
 @Path("/debug")
 @Api(value = "/debug")
-case class DebugApiRoute(settings: RestAPISettings, wallet: Wallet, stateReader: StateReader,
-                         blockchainUpdater: BlockchainUpdater, history: History, peerManager: ActorRef) extends ApiRoute {
+case class DebugApiRoute(
+    settings: RestAPISettings,
+    wallet: Wallet,
+    stateReader: StateReader,
+    history: History,
+    peerDatabase: PeerDatabase,
+    rollbackToBlock: Block.BlockId => Unit) extends ApiRoute {
 
   override lazy val route = pathPrefix("debug") {
     blocks ~ state ~ info ~ stateWaves ~ rollback ~ rollbackTo ~ blacklist
@@ -86,8 +92,8 @@ case class DebugApiRoute(settings: RestAPISettings, wallet: Wallet, stateReader:
       entity(as[Int]) { rollbackTo =>
         history.blockAt(rollbackTo) match {
           case Some(block) =>
-            blockchainUpdater.removeAfter(block.uniqueId)
-            complete(StatusCodes.OK)
+            rollbackToBlock(block.uniqueId)
+            complete(StatusCodes.Accepted)
           case None =>
             complete(StatusCodes.BadRequest, "Block at height not found")
         }
@@ -117,11 +123,12 @@ case class DebugApiRoute(settings: RestAPISettings, wallet: Wallet, stateReader:
   ))
   def rollbackTo: Route = path("rollback-to" / Segment) { signature =>
     (delete & withAuth) {
-      val maybeBlockId = ByteStr.decodeBase58(signature).toOption
-      if (maybeBlockId.isEmpty) {
-        complete(InvalidSignature)
-      } else {
-        if (blockchainUpdater.removeAfter(maybeBlockId.get)) complete(StatusCodes.OK) else complete(StatusCodes.BadRequest)
+      ByteStr.decodeBase58(signature) match {
+        case Success(sig) =>
+          rollbackToBlock(sig)
+          complete(StatusCodes.Accepted)
+        case _ =>
+          complete(InvalidSignature)
       }
     }
   }
@@ -137,13 +144,13 @@ case class DebugApiRoute(settings: RestAPISettings, wallet: Wallet, stateReader:
   def blacklist: Route = withAuth {
     (path("blacklist") & post) {
       entity(as[String]) { socketAddressString =>
-        val address = for {
-          u <- Try(new URI("node://" + socketAddressString)).toEither
-        } yield new InetSocketAddress(u.getHost, u.getPort)
-        if (address.isRight) {
-          peerManager ! AddToBlacklist(address.right.get)
+        try {
+          val uri = new URI("node://" + socketAddressString)
+          peerDatabase.blacklistHost(InetAddress.getByName(uri.getHost))
           complete(StatusCodes.OK)
-        } else complete(StatusCodes.BadRequest)
+        } catch {
+          case NonFatal(_) => complete(StatusCodes.BadRequest)
+        }
       } ~ complete(StatusCodes.BadRequest)
     }
   }

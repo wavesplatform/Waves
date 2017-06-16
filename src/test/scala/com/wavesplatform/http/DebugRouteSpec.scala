@@ -8,9 +8,7 @@ import org.scalacheck.{Gen, Shrink}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json._
-import scorex.crypto.encode.Base58
-import scorex.crypto.hash.FastCryptographicHash
-import scorex.transaction.{BlockchainUpdater, History}
+import scorex.transaction.History
 import scorex.waves.http.DebugApiRoute
 
 class DebugRouteSpec
@@ -19,8 +17,7 @@ class DebugRouteSpec
 
   private val state = mock[StateReader]
   private val history = mock[History]
-  private val blockchainUpdater = mock[BlockchainUpdater]
-  private val route = DebugApiRoute(restAPISettings, testWallet, state, blockchainUpdater, history, peerManager = null).route
+  private val route = DebugApiRoute(restAPISettings, testWallet, state, history, ???, _ => {}).route
 
   private implicit def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)
   

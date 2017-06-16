@@ -5,7 +5,7 @@ import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.reader.StateReader
 import com.wavesplatform.state2.{Portfolio, _}
 import scorex.account.Account
-import scorex.transaction.ValidationError.{GenericError}
+import scorex.transaction.ValidationError.GenericError
 import scorex.transaction._
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.ExchangeTransaction
@@ -94,7 +94,7 @@ object CommonValidation {
     } else {
       if ((tx.timestamp - time).millis <= MaxTimeTransactionOverBlockDiff)
         Right(tx)
-      else Left(GenericError(s"Transaction is from far future. BlockTime: $time"))
+      else Left(GenericError(s"Transaction ts ${tx.timestamp} is from far future. BlockTime: $time"))
     }
   }
 }

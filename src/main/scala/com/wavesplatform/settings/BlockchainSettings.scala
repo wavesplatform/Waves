@@ -164,9 +164,9 @@ object BlockchainSettings {
     }
 
     BlockchainSettings(
-      blockchainFile = config.as[Option[File]](s"$configPath.blockchain-file"),
-      stateFile = config.as[Option[File]](s"$configPath.state-file"),
-      checkpointFile = config.as[Option[File]](s"$configPath.checkpoint-file"),
+      blockchainFile = config.getAs[File](s"$configPath.blockchain-file"),
+      stateFile = config.getAs[File](s"$configPath.state-file"),
+      checkpointFile = config.getAs[File](s"$configPath.checkpoint-file"),
       addressSchemeCharacter = addressSchemeCharacter,
       minimumInMemoryDiffSize = config.as[Int](s"$configPath.minimum-in-memory-diff-blocks"),
       functionalitySettings = functionalitySettings,

@@ -8,12 +8,14 @@ import com.wavesplatform.state2.BlockchainUpdaterImpl._
 import com.wavesplatform.state2.StateWriterImpl._
 import com.wavesplatform.state2.diffs.BlockDiffer
 import com.wavesplatform.state2.reader.{CompositeStateReader, StateReader}
-import scorex.block.Block
+import scorex.block.{Block, MicroBlock}
 import scorex.transaction._
 import scorex.utils.ScorexLogging
 
-class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader, settings: FunctionalitySettings,
-                                    minimumInMemoryDiffSize: Int, bc: HistoryWriter with History,
+class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
+                                    settings: FunctionalitySettings,
+                                    minimumInMemoryDiffSize: Int,
+                                    bc: HistoryWriter with History,
                                     val synchronizationToken: ReentrantReadWriteLock) extends BlockchainUpdater with ScorexLogging {
 
   private val MaxInMemDiffHeight = minimumInMemoryDiffSize * 2
@@ -57,7 +59,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader, set
       blockDiff <- BlockDiffer(settings)(currentState, block)
       _ <- bc.appendBlock(block)
     } yield {
-      log.info( s"""Block ${block.encodedId} appended. New height: ${bc.height()}, new score: ${bc.score()})""")
+      log.info(s"""Block ${block.encodedId} appended. New height: ${bc.height()}, new score: ${bc.score()})""")
       inMemoryDiff.set(Monoid[BlockDiff].combine(inMemoryDiff(), blockDiff))
     }
   }
@@ -85,6 +87,8 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader, set
         false
     }
   }
+
+  override def processMicroBlock(microBlock: MicroBlock): Either[ValidationError, Unit] = ???
 }
 
 object BlockchainUpdaterImpl {

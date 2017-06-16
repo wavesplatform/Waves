@@ -45,6 +45,6 @@ trait ExchangeTransactionCreator extends ScorexLogging {
     Validator.validateWithCurrentTime(functionalitySettings, storedState, NTP)(orderMatch)
 
   def sendToNetwork(tx: SignedTransaction): Either[ValidationError, SignedTransaction] = {
-    transactionModule.onNewOffchainTransaction(tx)
+    transactionModule.onNewTransaction(tx)
   }
 }

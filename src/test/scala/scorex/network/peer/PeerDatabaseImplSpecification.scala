@@ -1,9 +1,11 @@
 package scorex.network.peer
 
-import java.net.InetSocketAddress
+import java.net.{InetAddress, InetSocketAddress}
 
 import com.typesafe.config.ConfigFactory
+import com.wavesplatform.network.PeerDatabaseImpl
 import com.wavesplatform.settings.NetworkSettings
+import net.ceedubs.ficus.Ficus._
 import org.scalatest.{Matchers, path}
 
 import scala.language.{implicitConversions, postfixOps}
@@ -11,28 +13,20 @@ import scala.language.{implicitConversions, postfixOps}
 class PeerDatabaseImplSpecification extends path.FreeSpecLike with Matchers {
 
   private val config1 = ConfigFactory.parseString(
-    """
-      |waves {
-      |  network {
-      |    file: ""
-      |    known-peers = []
-      |    peers-data-residence-time: 2s
-      |  }
-      |}
-    """.stripMargin).withFallback(ConfigFactory.load()).resolve()
-  private val settings1 = NetworkSettings.fromConfig(config1)
+    """waves.network {
+      |  file = null
+      |  known-peers = []
+      |  peers-data-residence-time: 2s
+      |}""".stripMargin).withFallback(ConfigFactory.load()).resolve()
+  private val settings1 = config1.as[NetworkSettings]("waves.network")
 
   private val config2 = ConfigFactory.parseString(
-    """
-      |waves {
-      |  network {
-      |    file: ""
-      |    known-peers = []
-      |    peers-data-residence-time: 10s
-      |  }
-      |}
-    """.stripMargin).withFallback(ConfigFactory.load()).resolve()
-  private val settings2 = NetworkSettings.fromConfig(config2)
+    """waves.network {
+      |  file = null
+      |  known-peers = []
+      |  peers-data-residence-time: 10s
+      |}""".stripMargin).withFallback(ConfigFactory.load()).resolve()
+  private val settings2 = config2.as[NetworkSettings]("waves.network")
 
   val database = new PeerDatabaseImpl(settings1)
   val database2 = new PeerDatabaseImpl(settings2)
@@ -94,12 +88,12 @@ class PeerDatabaseImplSpecification extends path.FreeSpecLike with Matchers {
       database.getKnownPeers.keys should contain(address1)
       database.getKnownPeers.keys should not contain address2
 
-      database.blacklistHost(host1)
+      database.blacklistHost(InetAddress.getByName(host1))
       database.getKnownPeers.keys should not contain address1
       database.getKnownPeers should be(empty)
 
       database.getRandomPeer(Set()) should contain(address2)
-      database.blacklistHost(host2)
+      database.blacklistHost(InetAddress.getByName(host2))
       database.getRandomPeer(Set()) should not contain address2
       database.getRandomPeer(Set()) should be(empty)
     }

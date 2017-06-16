@@ -2,7 +2,7 @@ package scorex.network.message
 
 import scala.util.Try
 
-trait MessageSpec[Content] {
+trait MessageSpec[Content <: AnyRef] {
   val messageCode: Message.MessageCode
   val messageName: String
 

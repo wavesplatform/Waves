@@ -1,8 +1,11 @@
 package com.wavesplatform.settings
 
-import scala.concurrent.duration._
 import com.typesafe.config.ConfigFactory
+import net.ceedubs.ficus.Ficus._
+import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 import org.scalatest.{FlatSpec, Matchers}
+
+import scala.concurrent.duration._
 
 class MinerSettingsSpecification extends FlatSpec with Matchers {
   "MinerSettings" should "read values" in {
@@ -11,22 +14,16 @@ class MinerSettingsSpecification extends FlatSpec with Matchers {
         |waves {
         |  miner {
         |    enable: yes
-        |    offline: no
         |    quorum: 1
-        |    generation-delay: 1s
         |    interval-after-last-block-then-generation-is-allowed: 1d
-        |    tf-like-scheduling: yes
         |  }
         |}
       """.stripMargin).resolve()
 
-    val settings = MinerSettings.fromConfig(config)
+    val settings = config.as[MinerSettings]("waves.miner")
 
     settings.enable should be(true)
-    settings.offline should be(false)
     settings.quorum should be(1)
-    settings.generationDelay should be(1.second)
     settings.intervalAfterLastBlockThenGenerationIsAllowed should be(1.day)
-    settings.tfLikeScheduling should be(true)
   }
 }

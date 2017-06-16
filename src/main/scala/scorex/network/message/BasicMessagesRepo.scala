@@ -4,30 +4,33 @@ import java.net.{InetAddress, InetSocketAddress}
 import java.util
 
 import com.google.common.primitives.{Bytes, Ints}
+import com.wavesplatform.network.{BlockCheckpoint, Checkpoint, GetBlock, GetPeers, GetSignatures, KnownPeers, Signatures}
 import com.wavesplatform.state2.ByteStr
 import scorex.block.Block
 import scorex.crypto.signatures.SigningFunctions
 import scorex.crypto.signatures.SigningFunctions.Signature
 import scorex.network.message.Message._
-import scorex.network.{BlockCheckpoint, Checkpoint}
 import scorex.transaction.History
 import scorex.transaction.TransactionParser._
 
 import scala.util.Try
 
 
-object GetPeersSpec extends MessageSpec[Unit] {
+object GetPeersSpec extends MessageSpec[GetPeers.type] {
   override val messageCode: Message.MessageCode = 1: Byte
 
   override val messageName: String = "GetPeers message"
 
-  override def deserializeData(bytes: Array[Byte]): Try[Unit] =
-    Try(require(bytes.isEmpty, "Non-empty data for GetPeers"))
+  override def deserializeData(bytes: Array[Byte]): Try[GetPeers.type] =
+    Try {
+      require(bytes.isEmpty, "Non-empty data for GetPeers")
+      GetPeers
+    }
 
-  override def serializeData(data: Unit): Array[Byte] = Array()
+  override def serializeData(data: GetPeers.type): Array[Byte] = Array()
 }
 
-object PeersSpec extends MessageSpec[Seq[InetSocketAddress]] {
+object PeersSpec extends MessageSpec[KnownPeers] {
   private val AddressLength = 4
   private val PortLength = 4
   private val DataLength = 4
@@ -36,50 +39,54 @@ object PeersSpec extends MessageSpec[Seq[InetSocketAddress]] {
 
   override val messageName: String = "Peers message"
 
-  override def deserializeData(bytes: Array[Byte]): Try[Seq[InetSocketAddress]] = Try {
+  override def deserializeData(bytes: Array[Byte]): Try[KnownPeers] = Try {
     val lengthBytes = util.Arrays.copyOfRange(bytes, 0, DataLength)
     val length = Ints.fromByteArray(lengthBytes)
 
     assert(bytes.length == DataLength + (length * (AddressLength + PortLength)), "Data does not match length")
 
-    (0 until length).map { i =>
+    KnownPeers((0 until length).map { i =>
       val position = lengthBytes.length + (i * (AddressLength + PortLength))
       val addressBytes = util.Arrays.copyOfRange(bytes, position, position + AddressLength)
       val address = InetAddress.getByAddress(addressBytes)
       val portBytes = util.Arrays.copyOfRange(bytes, position + AddressLength, position + AddressLength + PortLength)
       new InetSocketAddress(address, Ints.fromByteArray(portBytes))
-    }
+    })
   }
 
-  override def serializeData(peers: Seq[InetSocketAddress]): Array[Byte] = {
-    val length = peers.size
+  override def serializeData(peers: KnownPeers): Array[Byte] = {
+    val length = peers.peers.size
     val lengthBytes = Ints.toByteArray(length)
 
-    peers.foldLeft(lengthBytes) { case (bs, peer) =>
+    peers.peers.foldLeft(lengthBytes) { case (bs, peer) =>
       Bytes.concat(bs, peer.getAddress.getAddress, Ints.toByteArray(peer.getPort))
     }
   }
 }
 
-trait SignaturesSeqSpec extends MessageSpec[Seq[SigningFunctions.Signature]] {
+trait SignaturesSeqSpec[A <: AnyRef] extends MessageSpec[A] {
 
   import scorex.transaction.TransactionParser.SignatureLength
 
   private val DataLength = 4
 
-  override def deserializeData(bytes: Array[Byte]): Try[Seq[Signature]] = Try {
+  def wrap(signatures: Seq[SigningFunctions.Signature]): A
+  def unwrap(v: A): Seq[SigningFunctions.Signature]
+
+  override def deserializeData(bytes: Array[Byte]): Try[A] = Try {
     val lengthBytes = bytes.take(DataLength)
     val length = Ints.fromByteArray(lengthBytes)
 
     assert(bytes.length == DataLength + (length * SignatureLength), "Data does not match length")
 
-    (0 until length).map { i =>
+    wrap((0 until length).map { i =>
       val position = DataLength + (i * SignatureLength)
       bytes.slice(position, position + SignatureLength)
-    }
+    })
   }
 
-  override def serializeData(signatures: Seq[Signature]): Array[Byte] = {
+  override def serializeData(v: A): Array[Byte] = {
+    val signatures = unwrap(v)
     val length = signatures.size
     val lengthBytes = Ints.toByteArray(length)
 
@@ -88,25 +95,31 @@ trait SignaturesSeqSpec extends MessageSpec[Seq[SigningFunctions.Signature]] {
   }
 }
 
-object GetSignaturesSpec extends SignaturesSeqSpec {
+object GetSignaturesSpec extends SignaturesSeqSpec[GetSignatures] {
+  override def wrap(signatures: Seq[Signature]) = GetSignatures(signatures.map(ByteStr(_)))
+  override def unwrap(v: GetSignatures) = v.signatures.map(_.arr)
+
   override val messageCode: MessageCode = 20: Byte
   override val messageName: String = "GetSignatures message"
 }
 
-object SignaturesSpec extends SignaturesSeqSpec {
+object SignaturesSpec extends SignaturesSeqSpec[Signatures] {
+  override def wrap(signatures: Seq[Signature]) = Signatures(signatures.map(ByteStr(_)))
+  override def unwrap(v: Signatures) = v.signatures.map(_.arr)
+
   override val messageCode: MessageCode = 21: Byte
   override val messageName: String = "Signatures message"
 }
 
-object GetBlockSpec extends MessageSpec[Array[Byte]] {
+object GetBlockSpec extends MessageSpec[GetBlock] {
   override val messageCode: MessageCode = 22: Byte
   override val messageName: String = "GetBlock message"
 
-  override def serializeData(signature: Array[Byte]): Array[Byte] = signature
+  override def serializeData(signature: GetBlock): Array[Byte] = signature.signature.arr
 
-  override def deserializeData(bytes: Array[Byte]): Try[Array[Byte]] = Try {
+  override def deserializeData(bytes: Array[Byte]): Try[GetBlock] = Try {
     require(bytes.length == scorex.transaction.TransactionParser.SignatureLength, "Data does not match length")
-    bytes
+    GetBlock(ByteStr(bytes))
   }
 }
 
@@ -169,6 +182,6 @@ object CheckpointMessageSpec extends MessageSpec[Checkpoint] {
 
 
 object BasicMessagesRepo {
-  val specs = Seq(GetPeersSpec, PeersSpec, GetSignaturesSpec, SignaturesSpec,
+  val specs: Seq[MessageSpec[_ <: AnyRef]] = Seq(GetPeersSpec, PeersSpec, GetSignaturesSpec, SignaturesSpec,
     GetBlockSpec, BlockMessageSpec, ScoreMessageSpec, CheckpointMessageSpec)
 }
