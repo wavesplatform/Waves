@@ -14,7 +14,7 @@ trait History extends Synchronized {
 
   def blockBytes(height: Int): Option[Array[Byte]]
 
-  def scoreOf(id: ByteStr): BlockchainScore
+  def scoreOf(id: ByteStr): Option[BlockchainScore]
 
   def heightOf(blockId: ByteStr): Option[Int]
 
@@ -45,7 +45,7 @@ object History {
 
 
     def score(): BlockchainScore = history.read { implicit lock =>
-      history.scoreOf(history.lastBlock.uniqueId)
+      history.scoreOf(history.lastBlock.uniqueId).getOrElse(0)
     }
 
 
