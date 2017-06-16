@@ -52,14 +52,15 @@ class NetworkServer(
       history.lastBlockIds(settings.synchronizationSettings.maxRollback))
 
   private val blockchainReadiness = new AtomicBoolean(false)
+  def setBlockchainExpired(expired: Boolean): Unit = blockchainReadiness.compareAndSet(expired, !expired)
 
   private val discardingHandler = new DiscardingHandler(blockchainReadiness.get())
   private val specs: Map[Byte, MessageSpec[_ <: AnyRef]] = (BasicMessagesRepo.specs ++ TransactionalMessagesRepo.specs).map(s => s.messageCode -> s).toMap
   private val messageCodec = new MessageCodec(specs)
 
   private val network = new Network {
-    override def requestExtension(localScore: BigInt) = broadcast(LocalScoreChanged(localScore))
-    override def broadcast(msg: AnyRef, except: Option[Channel]) = doBroadcast(msg, except)
+    override def requestExtension(localScore: BigInt): Unit = broadcast(LocalScoreChanged(localScore))
+    override def broadcast(msg: AnyRef, except: Option[Channel]): Unit = doBroadcast(msg, except)
   }
 
   private val lengthFieldPrepender = new LengthFieldPrepender(4)
@@ -71,7 +72,7 @@ class NetworkServer(
   private val peerSynchronizer = new PeerSynchronizer(peerDatabase)
   private val utxPoolSynchronizer = new UtxPoolSynchronizer(txHandler, network)
   private val errorHandler = new ErrorHandler(blacklist)
-  private val historyReplier = new HistoryReplier(history, 101)
+  private val historyReplier = new HistoryReplier(history, settings.synchronizationSettings.maxChainLength)
 
   private val inboundConnectionFilter = new InboundConnectionFilter(peerDatabase,
     settings.networkSettings.maxInboundConnections,
@@ -79,7 +80,9 @@ class NetworkServer(
 
   private val coordinatorExecutor = new DefaultEventLoop
   private val coordinator = new Coordinator(checkpoints, history, blockchainUpdater, stateReader, utxStorage,
-    time.correctedTime(), settings.blockchainSettings, ???, settings.checkpointsSettings.publicKey, miner, ???)
+    time.correctedTime(), settings.blockchainSettings,
+    settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed, settings.checkpointsSettings.publicKey,
+    miner, setBlockchainExpired)
 
   private val coordinatorHandler = new CoordinatorHandler(coordinator)
 
