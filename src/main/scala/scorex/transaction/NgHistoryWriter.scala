@@ -119,7 +119,7 @@ class NgHistoryWriterImpl(inner: HistoryWriter) extends NgHistoryWriter {
       .orElse(micros().find(_.totalResBlockSig == blockId)).isDefined
   }
 
-  private def forgeBlock(id: BlockId): Option[Block] = {
+  private def forgeBlock(id: BlockId): Option[Block] = read { implicit l =>
     baseBlock().flatMap(base => {
       lazy val ms = micros()
       if (base.uniqueId == id) {
