@@ -249,21 +249,25 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
   }
 
   private def balancesDetailsJson(account: Account): BalanceDetails = {
-    val portfolio = state.accountPortfolio(account)
-    BalanceDetails(
-      account.address,
-      portfolio.balance,
-      PoSCalc.generatingBalance(state, functionalitySettings)(account, state.height),
-      portfolio.balance - portfolio.leaseInfo.leaseOut,
-      state.effectiveBalance(account))
+    state.read { _ =>
+      val portfolio = state.accountPortfolio(account)
+      BalanceDetails(
+        account.address,
+        portfolio.balance,
+        PoSCalc.generatingBalance(state, functionalitySettings)(account, state.height),
+        portfolio.balance - portfolio.leaseInfo.leaseOut,
+        state.effectiveBalance(account))
+    }
   }
 
   private def effectiveBalanceJson(address: String, confirmations: Int): ToResponseMarshallable = {
-    Account.fromString(address).right.map(acc => ToResponseMarshallable(Balance(
-      acc.address,
-      confirmations,
-      state.effectiveBalanceAtHeightWithConfirmations(acc, state.height, confirmations))))
-      .getOrElse(InvalidAddress)
+    state.read { _ =>
+      Account.fromString(address).right.map(acc => ToResponseMarshallable(Balance(
+        acc.address,
+        confirmations,
+        state.effectiveBalanceAtHeightWithConfirmations(acc, state.height, confirmations))))
+        .getOrElse(InvalidAddress)
+    }
   }
 
   private def signPath(address: String, encode: Boolean) = (post & entity(as[String])) { message =>

@@ -2,6 +2,7 @@ package com.wavesplatform.state2
 
 import cats.Monoid
 import cats.implicits._
+import com.wavesplatform.state2.StateStorage.SnapshotKey
 import scorex.account.{Account, Alias}
 import scorex.transaction.Transaction
 

@@ -79,7 +79,7 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
     Option(heightByBlockId().get(blockSignature))
   }
 
-  override def generatedBy(account: Account, from: Int, to: Int): Seq[Block] = read { implicit lock =>
+  override def generatedBy(account: Account, from: Int, to: Int): Seq[Block] = read { _ =>
     for {
       h <- from to to
       block <- blockAt(h)
