@@ -22,10 +22,6 @@ class StateStorage private(file: Option[File]) extends AutoCloseable {
 
   private def persistedVersion: Option[Int] = Option(variables.get(stateVersion))
 
-  private def setDirty(isDirty: Boolean): Unit = variables.put(isDirtyFlag, if (isDirty) 1 else 0)
-
-  private def isDirty(): Boolean = variables.get(isDirtyFlag) == 1
-
   def getHeight: Int = variables.get(heightKey)
 
   def setHeight(i: Int): Unit = variables.put(heightKey, i)
@@ -83,7 +79,6 @@ object StateStorage {
   private val CompactMemorySize = 19 * 1024 * 1024
 
   private val heightKey = "height"
-  private val isDirtyFlag = "isDirty"
   private val stateVersion = "stateVersion"
 
   private def validateVersion(ss: StateStorage): Boolean =
@@ -96,19 +91,10 @@ object StateStorage {
 
     }
 
-  def apply(file: Option[File], dropExisting: Boolean): Try[StateStorage] = for {
-    ss <- createWithStore[StateStorage](file, new StateStorage(file), !_.isDirty(), dropExisting)
-    if validateVersion(ss)
-  } yield ss
+  def apply(file: Option[File], dropExisting: Boolean): Try[StateStorage] =
+    createWithStore(file, new StateStorage(file), validateVersion, dropExisting)
 
   type SnapshotKey = Array[Byte]
 
   def snapshotKey(acc: Account, height: Int): SnapshotKey = acc.bytes.arr ++ Ints.toByteArray(height)
-
-  def dirty[R](p: StateStorage)(f: => R): R = {
-    p.setDirty(true)
-    val r = f
-    p.setDirty(false)
-    r
-  }
 }

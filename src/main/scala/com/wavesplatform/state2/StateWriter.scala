@@ -26,110 +26,107 @@ class StateWriterImpl(p: StateStorage, synchronizationToken: ReentrantReadWriteL
 
     log.debug(s"Starting persist from ${sp().getHeight} to ${sp().getHeight + blockDiff.heightDiff}")
 
-    StateStorage.dirty(p) {
-      measureSizeLog("transactions")(txsDiff.transactions) {
-        _.par.foreach { case (id, (h, tx, _)) =>
-          sp().transactions.put(id, (h, tx.bytes))
-        }
+    measureSizeLog("transactions")(txsDiff.transactions) {
+      _.par.foreach { case (id, (h, tx, _)) =>
+        sp().transactions.put(id, (h, tx.bytes))
       }
-
-      measureSizeLog("orderFills")(blockDiff.txsDiff.orderFills) {
-        _.par.foreach { case (oid, orderFillInfo) =>
-          Option(sp().orderFills.get(oid)) match {
-            case Some(ll) =>
-              sp().orderFills.put(oid, (ll._1 + orderFillInfo.volume, ll._2 + orderFillInfo.fee))
-            case None =>
-              sp().orderFills.put(oid, (orderFillInfo.volume, orderFillInfo.fee))
-          }
-        }
-      }
-
-      measureSizeLog("portfolios")(txsDiff.portfolios) {
-        _.foreach { case (account, portfolioDiff) =>
-          val updatedPortfolio = accountPortfolio(account).combine(portfolioDiff)
-          sp().portfolios.put(account.bytes,
-            (updatedPortfolio.balance,
-              (updatedPortfolio.leaseInfo.leaseIn, updatedPortfolio.leaseInfo.leaseOut),
-              updatedPortfolio.assets.map { case (k, v) => k.arr -> v }))
-        }
-      }
-
-
-      measureSizeLog("assets")(txsDiff.issuedAssets) {
-        _.foreach { case (id, assetInfo) =>
-          val updated = (Option(sp().assets.get(id)) match {
-            case None => Monoid[AssetInfo].empty
-            case Some(existing) => AssetInfo(existing._1, existing._2)
-          }).combine(assetInfo)
-
-          sp().assets.put(id, (updated.isReissuable, updated.volume))
-        }
-      }
-
-      measureSizeLog("accountTransactionIds")(blockDiff.txsDiff.accountTransactionIds) {
-        _.foreach { case (acc, txIds) =>
-          Option(sp().accountTransactionIds.get(acc.bytes)) match {
-            case Some(ll) =>
-              // [h=12, h=11, h=10] ++ [h=9, ...]
-              sp().accountTransactionIds.put(acc.bytes, txIds.map(_.arr) ++ ll)
-            case None =>
-              // [h=2, h=1, h=0]
-              sp().accountTransactionIds.put(acc.bytes, txIds.map(_.arr))
-          }
-        }
-      }
-
-      measureSizeLog("paymentTransactionIdsByHashes")(blockDiff.txsDiff.paymentTransactionIdsByHashes) {
-        _.foreach { case (hash, id) =>
-          sp().paymentTransactionHashes.put(hash, id)
-        }
-      }
-
-      measureSizeLog("effectiveBalanceSnapshots")(blockDiff.snapshots)(
-        _.foreach { case (acc, snapshotsByHeight) =>
-          snapshotsByHeight.foreach { case (h, snapshot) =>
-            sp().balanceSnapshots.put(StateStorage.snapshotKey(acc, h), (snapshot.prevHeight, snapshot.balance, snapshot.effectiveBalance))
-          }
-          sp().lastUpdateHeight.put(acc.bytes, snapshotsByHeight.keys.max)
-        })
-
-      measureSizeLog("aliases")(blockDiff.txsDiff.aliases) {
-        _.foreach { case (alias, acc) =>
-          sp().aliasToAddress.put(alias.name, acc.bytes)
-        }
-      }
-
-      measureSizeLog("lease info")(blockDiff.txsDiff.leaseState)(
-        _.foreach { case (id, isActive) => sp().leaseState.put(id, isActive) })
-
-      measureSizeLog("uniqueAssets")(blockDiff.txsDiff.assetsWithUniqueNames) {
-        _.foreach { case (name, id) =>
-          p.uniqueAssets.put(name, id)
-        }
-      }
-
-      sp().setHeight(sp().getHeight + blockDiff.heightDiff)
-      sp().commit()
     }
+
+    measureSizeLog("orderFills")(blockDiff.txsDiff.orderFills) {
+      _.par.foreach { case (oid, orderFillInfo) =>
+        Option(sp().orderFills.get(oid)) match {
+          case Some(ll) =>
+            sp().orderFills.put(oid, (ll._1 + orderFillInfo.volume, ll._2 + orderFillInfo.fee))
+          case None =>
+            sp().orderFills.put(oid, (orderFillInfo.volume, orderFillInfo.fee))
+        }
+      }
+    }
+
+    measureSizeLog("portfolios")(txsDiff.portfolios) {
+      _.foreach { case (account, portfolioDiff) =>
+        val updatedPortfolio = accountPortfolio(account).combine(portfolioDiff)
+        sp().portfolios.put(account.bytes,
+          (updatedPortfolio.balance,
+            (updatedPortfolio.leaseInfo.leaseIn, updatedPortfolio.leaseInfo.leaseOut),
+            updatedPortfolio.assets.map { case (k, v) => k.arr -> v }))
+      }
+    }
+
+
+    measureSizeLog("assets")(txsDiff.issuedAssets) {
+      _.foreach { case (id, assetInfo) =>
+        val updated = (Option(sp().assets.get(id)) match {
+          case None => Monoid[AssetInfo].empty
+          case Some(existing) => AssetInfo(existing._1, existing._2)
+        }).combine(assetInfo)
+
+        sp().assets.put(id, (updated.isReissuable, updated.volume))
+      }
+    }
+
+    measureSizeLog("accountTransactionIds")(blockDiff.txsDiff.accountTransactionIds) {
+      _.foreach { case (acc, txIds) =>
+        Option(sp().accountTransactionIds.get(acc.bytes)) match {
+          case Some(ll) =>
+            // [h=12, h=11, h=10] ++ [h=9, ...]
+            sp().accountTransactionIds.put(acc.bytes, txIds.map(_.arr) ++ ll)
+          case None =>
+            // [h=2, h=1, h=0]
+            sp().accountTransactionIds.put(acc.bytes, txIds.map(_.arr))
+        }
+      }
+    }
+
+    measureSizeLog("paymentTransactionIdsByHashes")(blockDiff.txsDiff.paymentTransactionIdsByHashes) {
+      _.foreach { case (hash, id) =>
+        sp().paymentTransactionHashes.put(hash, id)
+      }
+    }
+
+    measureSizeLog("effectiveBalanceSnapshots")(blockDiff.snapshots)(
+      _.foreach { case (acc, snapshotsByHeight) =>
+        snapshotsByHeight.foreach { case (h, snapshot) =>
+          sp().balanceSnapshots.put(StateStorage.snapshotKey(acc, h), (snapshot.prevHeight, snapshot.balance, snapshot.effectiveBalance))
+        }
+        sp().lastUpdateHeight.put(acc.bytes, snapshotsByHeight.keys.max)
+      })
+
+    measureSizeLog("aliases")(blockDiff.txsDiff.aliases) {
+      _.foreach { case (alias, acc) =>
+        sp().aliasToAddress.put(alias.name, acc.bytes)
+      }
+    }
+
+    measureSizeLog("lease info")(blockDiff.txsDiff.leaseState)(
+      _.foreach { case (id, isActive) => sp().leaseState.put(id, isActive) })
+
+    measureSizeLog("uniqueAssets")(blockDiff.txsDiff.assetsWithUniqueNames) {
+      _.foreach { case (name, id) =>
+        p.uniqueAssets.put(name, id)
+      }
+    }
+
+    sp().setHeight(sp().getHeight + blockDiff.heightDiff)
+    sp().commit()
+
     log.debug("BlockDiff commit complete")
   }
 
   override def clear(): Unit = write { implicit l =>
-    StateStorage.dirty(p) {
-      sp().transactions.clear()
-      sp().portfolios.clear()
-      sp().assets.clear()
-      sp().accountTransactionIds.clear()
-      sp().balanceSnapshots.clear()
-      sp().paymentTransactionHashes.clear()
-      sp().orderFills.clear()
-      sp().aliasToAddress.clear()
-      sp().leaseState.clear()
-      sp().lastUpdateHeight.clear()
-      sp().uniqueAssets.clear()
-      sp().setHeight(0)
-      sp().commit()
-    }
+    sp().transactions.clear()
+    sp().portfolios.clear()
+    sp().assets.clear()
+    sp().accountTransactionIds.clear()
+    sp().balanceSnapshots.clear()
+    sp().paymentTransactionHashes.clear()
+    sp().orderFills.clear()
+    sp().aliasToAddress.clear()
+    sp().leaseState.clear()
+    sp().lastUpdateHeight.clear()
+    sp().uniqueAssets.clear()
+    sp().setHeight(0)
+    sp().commit()
   }
 }
 
