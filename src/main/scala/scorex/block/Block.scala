@@ -85,6 +85,7 @@ case class Block(timestamp: Long, version: Byte, reference: ByteStr, signerData:
 
 object Block extends ScorexLogging {
   type BlockIds = Seq[ByteStr]
+  type BlockId = ByteStr
 
   val MaxTransactionsPerBlock: Int = 100
   val BaseTargetLength: Int = 8

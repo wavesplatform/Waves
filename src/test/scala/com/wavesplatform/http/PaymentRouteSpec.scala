@@ -8,7 +8,7 @@ import org.scalatest.prop.PropertyChecks
 import play.api.libs.json.{JsObject, Json}
 import scorex.api.http.assets.TransferRequest
 import scorex.api.http.{ApiKeyNotValid, PaymentApiRoute}
-import scorex.network.ConnectedPeer
+import scorex.crypto.encode.Base58
 import scorex.transaction.assets.TransferTransaction
 import scorex.transaction.{NewTransactionHandler, Transaction, ValidationError}
 import scorex.utils.NTP
@@ -27,11 +27,11 @@ class PaymentRouteSpec extends RouteSpec("/payment")
         val tx = TransferTransaction.create(None, sender, recipient, amount, System.currentTimeMillis(), None, fee, Array())
         val stmMock: NewTransactionHandler = {
 
-          def alwaysTx(t: Transaction, maybePeer: Option[ConnectedPeer]): Either[ValidationError, Transaction] = tx
+          def alwaysTx(t: Transaction): Either[ValidationError, Transaction] = tx
 
           val m = mock[NewTransactionHandler]
-          (m.onNewOffchainTransactionExcept(_: Transaction, _: Option[ConnectedPeer]))
-            .expects(*, *)
+          (m.onNewTransaction(_: Transaction))
+            .expects(*)
             .onCall(alwaysTx _)
             .anyNumberOfTimes()
           m

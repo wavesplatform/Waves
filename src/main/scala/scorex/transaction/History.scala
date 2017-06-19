@@ -3,7 +3,7 @@ package scorex.transaction
 import com.wavesplatform.state2.ByteStr
 import scorex.account.Account
 import scorex.block.Block
-import scorex.network.Checkpoint
+import com.wavesplatform.network.Checkpoint
 import scorex.transaction.History.BlockchainScore
 import scorex.utils.Synchronized
 
@@ -41,7 +41,6 @@ trait CheckpointService {
 
   def get: Option[Checkpoint]
 }
-
 
 object History {
   type BlockchainScore = BigInt

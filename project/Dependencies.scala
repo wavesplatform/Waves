@@ -5,6 +5,9 @@ object Dependencies {
   def akkaModule(module: String) = "com.typesafe.akka" %% s"akka-$module" % "2.4.17"
   def swaggerModule(module: String) = "io.swagger" % s"swagger-$module" % "1.5.13"
   def akkaHttpModule(module: String) = "com.typesafe.akka" %% module % "10.0.5"
+  def nettyModule(module: String) = "io.netty" % s"netty-$module" % "4.1.10.Final"
+
+  lazy val network = Seq(nettyModule("handler"))
 
   lazy val scalatest = Seq(
     "org.scalatest" %% "scalatest" % "3.0.1",
@@ -26,7 +29,11 @@ object Dependencies {
     // Swagger is using Jersey 1.1, hence the shading (https://github.com/spotify/docker-client#a-note-on-shading)
     "com.spotify" % "docker-client" % "8.1.2" classifier "shaded",
     "com.fasterxml.jackson.dataformat" % "jackson-dataformat-properties" % "2.8.7",
-    "org.asynchttpclient" % "async-http-client" % "2.0.31"
+    ("org.asynchttpclient" % "async-http-client" % "2.0.32")
+      .exclude("io.netty", "netty-codec-http")
+      .exclude("io.netty", "netty-transport-native-epoll"),
+    nettyModule("transport-native-epoll") classifier "linux-x86_64",
+    nettyModule("codec-http")
   )) map (_ % "it,test")
 
   lazy val serialization = Seq(

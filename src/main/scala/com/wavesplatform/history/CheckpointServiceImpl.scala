@@ -3,7 +3,7 @@ package com.wavesplatform.history
 import java.io.File
 
 import com.wavesplatform.utils.createMVStore
-import scorex.network.{BlockCheckpoint, Checkpoint}
+import com.wavesplatform.network.{BlockCheckpoint, Checkpoint}
 import scorex.transaction.CheckpointService
 import scorex.utils.LogMVMapBuilder
 

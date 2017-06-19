@@ -1,5 +1,6 @@
 package scorex.network
 
+import com.wavesplatform.network.{BlockCheckpoint, Checkpoint}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{FreeSpec, Matchers, OneInstancePerTest}
 import scorex.network.message._
