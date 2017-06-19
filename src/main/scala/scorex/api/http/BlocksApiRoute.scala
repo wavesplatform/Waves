@@ -155,7 +155,7 @@ case class BlocksApiRoute(settings: RestAPISettings, checkpointsSettings: Checkp
   @ApiOperation(value = "Checkpoint", notes = "Broadcast checkpoint of blocks", httpMethod = "POST")
   @ApiImplicitParams(Array(
     new ApiImplicitParam(name = "message", value = "Checkpoint message", required = true, paramType = "body",
-      dataType = "scorex.network.Checkpoint")
+      dataType = "com.wavesplatform.network.Checkpoint")
   ))
   @ApiResponses(Array(
     new ApiResponse(code = 200, message = "Json with response or error")
