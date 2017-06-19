@@ -25,6 +25,11 @@ class ExtensionBlocksLoader(
     currentTimeout = None
   }
 
+  override def channelInactive(ctx: ChannelHandlerContext) = {
+    cancelTimeout()
+    super.channelInactive(ctx)
+  }
+
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef) = msg match {
     case xid@ExtensionIds(_, newIds) if pendingSignatures.isEmpty =>
       if (newIds.nonEmpty) {

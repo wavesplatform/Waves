@@ -60,11 +60,6 @@ class NetworkServer(
   private val specs: Map[Byte, MessageSpec[_ <: AnyRef]] = (BasicMessagesRepo.specs ++ TransactionalMessagesRepo.specs).map(s => s.messageCode -> s).toMap
   private val messageCodec = new MessageCodec(specs)
 
-  private val network = new Network {
-    override def requestExtension(localScore: BigInt): Unit = broadcast(LocalScoreChanged(localScore))
-    override def broadcast(msg: AnyRef, except: Option[Channel]): Unit = doBroadcast(msg, except)
-  }
-
   private val excludedAddresses: Set[InetSocketAddress] = {
     val localAddresses = if (bindAddress.getAddress.isAnyLocalAddress) {
       import Collections.list
@@ -89,7 +84,7 @@ class NetworkServer(
     b => writeToLocalChannel(BlockForged(b)))
 
   private val peerSynchronizer = new PeerSynchronizer(peerDatabase)
-  private val utxPoolSynchronizer = new UtxPoolSynchronizer(txHandler, network)
+  private val utxPoolSynchronizer = new UtxPoolSynchronizer(txHandler, doBroadcast)
   private val errorHandler = new ErrorHandler(blacklist)
   private val historyReplier = new HistoryReplier(history, settings.synchronizationSettings.maxChainLength)
 
@@ -187,7 +182,7 @@ class NetworkServer(
       scoreObserver,
       coordinatorHandler -> coordinatorExecutor)))
 
-  workerGroup.scheduleWithFixedDelay(1.second, 5.seconds) {
+  val connectTask = workerGroup.scheduleWithFixedDelay(1.second, 5.seconds) {
     if (outgoingChannelCount.get() < settings.networkSettings.maxOutboundConnections) {
       peerDatabase
         .getRandomPeer(excludedAddresses ++ channels.keySet().asScala)
@@ -220,8 +215,8 @@ class NetworkServer(
 
   def writeToLocalChannel(message: AnyRef): Unit = localClientChannel.writeAndFlush(message)
 
-  private def doBroadcast(message: AnyRef, except: Option[Channel] = None): Unit = {
-    log.trace(s"Broadcasting $message to ${allChannels.size()} channels${except.fold("")(c => s" (except ${id(c)})")}")
+  private def doBroadcast(message: AnyRef, except: Option[Channel]): Unit = {
+    log.debug(s"Broadcasting $message to ${allChannels.size()} channels${except.fold("")(c => s" (except ${id(c)})")}")
     allChannels.writeAndFlush(message, except.fold(ChannelMatchers.all())(ChannelMatchers.isNot))
   }
 
@@ -236,15 +231,17 @@ class NetworkServer(
   }
 
   def shutdown(): Unit = try {
+    connectTask.cancel(true)
     serverChannel.foreach(_.close().await())
     log.debug("Unbound server")
     allChannels.close().await()
+    localClientChannel.close().sync()
     log.debug("Closed all channels")
   } finally {
-    workerGroup.shutdownGracefully()
-    bossGroup.shutdownGracefully()
-    localClientGroup.shutdownGracefully()
-    localServerGroup.shutdownGracefully()
-    coordinatorExecutor.shutdownGracefully()
+    workerGroup.shutdownGracefully().await()
+    bossGroup.shutdownGracefully().await()
+    localClientGroup.shutdownGracefully().await()
+    localServerGroup.shutdownGracefully().await()
+    coordinatorExecutor.shutdownGracefully().await()
   }
 }
