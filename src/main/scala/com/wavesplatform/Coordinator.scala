@@ -58,6 +58,7 @@ class Coordinator(
       def consensusDataIsValid = blockConsensusValidation(history, stateReader, settings, time)(b)
 
       if (!historyContainsParent) Left(GenericError(s"Invalid block ${b.encodedId}: no parent block in history"))
+      else if (!b.signatureValid) Left(GenericError(s"Invalid signature in block ${b.encodedId}"))
       else if (!consensusDataIsValid) Left(GenericError(s"Invalid block ${b.encodedId}: consensus data is not valid"))
       else Right(())
     }
@@ -103,7 +104,7 @@ class Coordinator(
 
   def processBlock(newBlock: Block): Either[ValidationError, BigInt] = {
     val blockCanBeAdded = if (newBlock.reference != history.lastBlock.uniqueId) {
-      Left(GenericError(s"Parent ${newBlock.reference} does not match local block ${newBlock.reference}"))
+      Left(GenericError(s"Parent ${newBlock.reference} does not match local block ${history.lastBlock.uniqueId}"))
     } else if (history.contains(newBlock)) {
       Left(GenericError(s"Block ${newBlock.uniqueId} is already in blockchain"))
     } else Right(newBlock)

@@ -4,7 +4,6 @@ import com.wavesplatform.state2.ByteStr
 import io.netty.channel.{Channel, ChannelHandlerContext, ChannelInboundHandlerAdapter}
 import io.netty.util.concurrent.ScheduledFuture
 import scorex.block.Block
-import scorex.crypto.EllipticCurveImpl
 import scorex.transaction.History
 import scorex.utils.ScorexLogging
 
@@ -68,9 +67,10 @@ class ExtensionBlocksLoader(
             log.warn(s"${id(ctx)} Extension blocks are not contiguous, pre-check failed")
             blacklist(ctx.channel())
           } else {
-            newBlocks.par.find(!blockIsValid(_)) match {
+            newBlocks.par.find(!_.signatureValid) match {
               case Some(invalidBlock) =>
                 log.warn(s"${id(ctx)} Got block ${invalidBlock.uniqueId} with invalid signature")
+                blacklist(ctx.channel())
               case None =>
                 log.debug(s"${id(ctx)} Chain is valid, pre-check passed")
                 ctx.fireChannelRead(ExtensionBlocks(newBlocks))
@@ -86,7 +86,4 @@ class ExtensionBlocksLoader(
       log.warn(s"${id(ctx)} Received unexpected extension ids while loading blocks, ignoring")
     case _ => super.channelRead(ctx, msg)
   }
-
-  private def blockIsValid(b: Block) =
-    EllipticCurveImpl.verify(b.signerData.signature.arr, b.bytesWithoutSignature, b.signerData.generator.publicKey)
 }
