@@ -155,7 +155,9 @@ class NetworkServer(
   }
 
   private val outgoingChannelCount = new AtomicInteger(0)
-  private val channels = new ConcurrentHashMap[InetSocketAddress, Channel]
+  private val outgoingChannels = new ConcurrentHashMap[InetSocketAddress, Channel]
+  private def incomingDeclaredAddresses =
+    peerInfo.reduceValues[Set[InetSocketAddress]](1000, _.declaredAddress.toSet, _ ++ _)
 
   private val clientHandshakeHandler =
     new HandshakeHandler.Client(handshake, peerInfo, peerUniqueness, blacklist)
@@ -185,13 +187,13 @@ class NetworkServer(
   val connectTask = workerGroup.scheduleWithFixedDelay(1.second, 5.seconds) {
     if (outgoingChannelCount.get() < settings.networkSettings.maxOutboundConnections) {
       peerDatabase
-        .getRandomPeer(excludedAddresses ++ channels.keySet().asScala)
+        .getRandomPeer(excludedAddresses ++ outgoingChannels.keySet().asScala ++ incomingDeclaredAddresses)
         .foreach(connect)
     }
   }
 
   def connect(remoteAddress: InetSocketAddress): Unit =
-    channels.computeIfAbsent(remoteAddress, _ => {
+    outgoingChannels.computeIfAbsent(remoteAddress, _ => {
       bootstrap.connect(remoteAddress)
         .addListener { (connFuture: ChannelFuture) =>
           if (connFuture.isDone) {
@@ -205,7 +207,7 @@ class NetworkServer(
                 val remainingCount = outgoingChannelCount.decrementAndGet()
                 log.debug(s"${id(closeFuture.channel)} Connection closed, $remainingCount outgoing channel(s) remaining")
                 allChannels.remove(closeFuture.channel())
-                channels.remove(remoteAddress, closeFuture.channel())
+                outgoingChannels.remove(remoteAddress, closeFuture.channel())
               }
               allChannels.add(connFuture.channel())
             }
