@@ -8,7 +8,7 @@ import scorex.transaction.ValidationError
 import scorex.utils.ScorexLogging
 
 @Sharable
-class CoordinatorHandler(coordinator: Coordinator, blacklist: Channel => Unit)
+class CoordinatorHandler(coordinator: Coordinator, blacklist: Channel => Unit, broadcast: (AnyRef, Option[Channel]) => Unit)
   extends ChannelInboundHandlerAdapter with ScorexLogging {
   import CoordinatorHandler._
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef) = {
@@ -20,6 +20,9 @@ class CoordinatorHandler(coordinator: Coordinator, blacklist: Channel => Unit)
         handleResult(ctx, blacklist, "processing fork", coordinator.processFork(blocks.head.reference, blocks))
       case b: Block =>
         handleResult(ctx, blacklist, "applying block", coordinator.processBlock(b))
+      case BlockForged(b) =>
+        handleResult(ctx, blacklist, "applying locally mined block", coordinator.processBlock(b))
+        broadcast(b, None)
       case other =>
         log.debug(other.getClass.getCanonicalName)
     }
@@ -31,9 +34,10 @@ object CoordinatorHandler extends ScorexLogging {
       ctx: ChannelHandlerContext,
       blacklist: Channel => Unit,
       msg: String,
-      f: => Either[ValidationError, BigInt]): Unit = {
+      f: => Either[ValidationError, BigInt]): Either[ValidationError, BigInt] = {
     log.debug(s"${id(ctx)} Starting $msg")
-    f match {
+    val result = f
+    result match {
       case Left(error) =>
         log.warn(s"${id(ctx)} Error $msg: $error")
         blacklist(ctx.channel())
@@ -41,5 +45,6 @@ object CoordinatorHandler extends ScorexLogging {
         log.debug(s"${id(ctx)} Finished $msg, new local score is $newScore")
         ctx.writeAndFlush(LocalScoreChanged(newScore))
     }
+    result
   }
 }

@@ -98,7 +98,7 @@ class NetworkServer(
     settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed, settings.checkpointsSettings.publicKey,
     miner, setBlockchainExpired)
 
-  private val coordinatorHandler = new CoordinatorHandler(coordinator, blacklist)
+  private val coordinatorHandler = new CoordinatorHandler(coordinator, blacklist, doBroadcast)
 
   private val address = new LocalAddress("local-events-channel")
   private val localServerGroup = new DefaultEventLoopGroup()
