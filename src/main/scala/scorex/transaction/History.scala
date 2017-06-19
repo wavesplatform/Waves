@@ -36,6 +36,7 @@ trait CheckpointService {
 }
 
 object History {
+
   type BlockchainScore = BigInt
 
   implicit class HistoryExt(history: History) {

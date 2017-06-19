@@ -8,7 +8,7 @@ import com.wavesplatform.utils._
 import scorex.block.Block
 import scorex.transaction.History.BlockchainScore
 import scorex.transaction.ValidationError.GenericError
-import scorex.transaction.{HistoryWriter, ValidationError}
+import scorex.transaction.{History, HistoryWriter, ValidationError}
 import scorex.utils.{LogMVMapBuilder, ScorexLogging}
 
 import scala.util.Try
