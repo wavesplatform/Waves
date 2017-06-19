@@ -26,8 +26,6 @@ class NetworkServer(
     Handshake(Constants.ApplicationName + chainId, Version.VersionTuple, settings.networkSettings.nodeName,
       settings.networkSettings.nonce, None)
 
-  private val specs: Map[Byte, MessageSpec[_ <: AnyRef]] = (BasicMessagesRepo.specs ++ TransactionalMessagesRepo.specs).map(s => s.messageCode -> s).toMap
-
   private val peerUniqueness = new ConcurrentHashMap[PeerKey, Channel]()
 
   private val channels = new ConcurrentHashMap[InetSocketAddress, Channel]
