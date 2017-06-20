@@ -158,7 +158,7 @@ class NetworkServer(
   private val outgoingChannels = new ConcurrentHashMap[InetSocketAddress, Channel]
 
   private def incomingDeclaredAddresses =
-    peerInfo.reduceValues[Set[InetSocketAddress]](1000, _.declaredAddress.toSet, _ ++ _)
+    peerInfo.values().asScala.flatMap(_.declaredAddress)
 
   private val clientHandshakeHandler =
     new HandshakeHandler.Client(handshake, peerInfo, peerUniqueness, peerDatabase)
@@ -189,12 +189,16 @@ class NetworkServer(
     if (outgoingChannelCount.get() < settings.networkSettings.maxOutboundConnections) {
       peerDatabase
         .getRandomPeer(excludedAddresses ++ outgoingChannels.keySet().asScala ++ incomingDeclaredAddresses)
-        .foreach(connect)
+        .foreach { peer =>
+          log.debug("Peer $peer was selected for connection")
+          connect(peer)
+        }
     }
   }
 
   def connect(remoteAddress: InetSocketAddress): Unit =
     outgoingChannels.computeIfAbsent(remoteAddress, _ => {
+      log.debug(s"Connecting to $remoteAddress")
       bootstrap.connect(remoteAddress)
         .addListener { (connFuture: ChannelFuture) =>
           if (connFuture.isDone) {

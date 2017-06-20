@@ -25,4 +25,4 @@ case class LoadBlockchainExtension(lastBlockIds: Seq[ByteStr])
 case class ExtensionIds(lastCommonId: ByteStr, extensionIds: Seq[ByteStr])
 case class ExtensionBlocks(extension: Seq[Block])
 
-case class BlockForged(block: Block)
+case class BlockForged(block: Block) extends Message
