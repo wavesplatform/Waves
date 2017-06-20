@@ -3,7 +3,6 @@ package com.wavesplatform.settings
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.state2.ByteStr
 import org.scalatest.{FlatSpec, Matchers}
-import scorex.crypto.encode.Base58
 
 class CheckpointsSettingsSpecification extends FlatSpec with Matchers {
   "CheckpointsSettings" should "read values" in {
@@ -17,6 +16,6 @@ class CheckpointsSettingsSpecification extends FlatSpec with Matchers {
       """.stripMargin).resolve()
     val settings = CheckpointsSettings.fromConfig(config)
 
-    settings.publicKey should be (ByteStr(Base58.decode("BASE58PUBKEY").get))
+    settings.publicKey should be(ByteStr.decodeBase58("BASE58PUBKEY"))
   }
 }

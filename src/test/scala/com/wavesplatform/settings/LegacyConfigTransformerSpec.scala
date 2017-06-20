@@ -2,14 +2,13 @@ package com.wavesplatform.settings
 
 import java.io.File
 import java.net.InetSocketAddress
+import java.time.Duration
 
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.state2.ByteStr
 import org.scalatest.{FreeSpec, Matchers}
-import scorex.crypto.encode.Base58
 
 import scala.concurrent.duration._
-import java.time.Duration
 
 class LegacyConfigTransformerSpec extends FreeSpec with Matchers {
   private val legacyConfig =
@@ -265,7 +264,7 @@ class LegacyConfigTransformerSpec extends FreeSpec with Matchers {
     )
 
     ws.checkpointsSettings should have (
-      'publicKey (ByteStr(Base58.decode("7EXnkmJyz1gPfLJwytThcwGwpyfjzFXC3hxBhvVK4").get))
+      'publicKey (ByteStr.decodeBase58("7EXnkmJyz1gPfLJwytThcwGwpyfjzFXC3hxBhvVK4"))
     )
 
     ws.loggingLevel shouldBe LogLevel.WARN
