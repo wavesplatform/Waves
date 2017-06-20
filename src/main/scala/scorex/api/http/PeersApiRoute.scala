@@ -42,7 +42,7 @@ case class PeersApiRoute(
       JsArray(peerDatabase.getKnownPeers.take(MaxPeersInResponse).map { case (address, timestamp) =>
         Json.obj(
           "address" -> address.toString,
-          "lastSeen" -> timestamp.toString
+          "lastSeen" -> timestamp
         )
       }.toList)))
   }
