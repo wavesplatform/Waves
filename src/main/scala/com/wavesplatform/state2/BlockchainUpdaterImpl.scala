@@ -8,9 +8,11 @@ import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.BlockchainUpdaterImpl._
 import com.wavesplatform.state2.StateWriterImpl._
 import com.wavesplatform.state2.diffs.BlockDiffer
-import com.wavesplatform.state2.reader.{CompositeStateReader, StateReader}
+import com.wavesplatform.state2.reader.CompositeStateReader.proxy
+import com.wavesplatform.state2.reader.StateReader
 import scorex.block.Block.BlockId
 import scorex.block.{Block, MicroBlock}
+import scorex.transaction.ValidationError.MicroBlockAppendError
 import scorex.transaction._
 import scorex.utils.ScorexLogging
 
@@ -39,17 +41,16 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
   }
 
   private def currentPersistedBlocksState: StateReader = read { implicit l =>
-    new CompositeStateReader.Proxy(persisted, () => inMemoryDiff())
+    proxy(persisted, () => inMemoryDiff())
   }
 
   def bestLiquidState: StateReader = read { implicit l =>
     val bestLiquidDiff = ngHistoryWriter.bestLiquidBlock()
       .map(_.uniqueId)
-      .flatMap(liquidBlockCandidatesDiff().get)
+      .map(liquidBlockCandidatesDiff().get(_).get)
       .orEmpty
 
-    new CompositeStateReader.Proxy(persisted,
-      () => Monoid.combine(inMemoryDiff(), bestLiquidDiff))
+    proxy(persisted, () => Monoid.combine(inMemoryDiff(), bestLiquidDiff))
   }
 
   private def updatePersistedAndInMemory(): Unit = write { implicit l =>
@@ -72,13 +73,15 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
     }
 
     liquidBlockCandidatesDiff().get(block.uniqueId) match {
-      case Some(referencedLiquidDiff) => for {
-        newBlockDiff <- BlockDiffer.fromBlock(settings, new CompositeStateReader.Proxy(currentPersistedBlocksState, () => referencedLiquidDiff))(block)
-        _ <- ngHistoryWriter.appendBlock(block)
-      } yield {
-        inMemoryDiff.set(Monoid.combine(inMemoryDiff(), referencedLiquidDiff))
-        liquidBlockCandidatesDiff.set(Map(block.uniqueId -> newBlockDiff))
-      }
+      case Some(referencedLiquidDiff) =>
+        val asFirmBlock = referencedLiquidDiff.copy(heightDiff = 1)
+        for {
+          newBlockDiff <- BlockDiffer.fromBlock(settings, proxy(currentPersistedBlocksState, () => asFirmBlock))(block)
+          _ <- ngHistoryWriter.appendBlock(block)
+        } yield {
+          inMemoryDiff.set(Monoid.combine(inMemoryDiff(), asFirmBlock))
+          liquidBlockCandidatesDiff.set(Map(block.uniqueId -> newBlockDiff))
+        }
       case None => for {
         newBlockDiff <- BlockDiffer.fromBlock(settings, currentPersistedBlocksState)(block)
         _ <- ngHistoryWriter.appendBlock(block)
@@ -113,7 +116,16 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
   }
 
   override def processMicroBlock(microBlock: MicroBlock): Either[ValidationError, Unit] = write { implicit l =>
-    ???
+    ngHistoryWriter.appendMicroBlock(microBlock) {
+      ngHistoryWriter.forgeBlock(microBlock.prevResBlockSig)
+        .toRight(MicroBlockAppendError(microBlock, "Referenced (micro)block doesn't exist"))
+        .map { prevFull =>
+          prevFull.copy(
+            signerData = prevFull.signerData.copy(signature = microBlock.totalResBlockSig),
+            transactionData = prevFull.transactionData ++ microBlock.transactionData)
+        }.flatMap(BlockDiffer.fromLiquidBlock(settings, currentPersistedBlocksState))
+        .map(newTotalDiff => liquidBlockCandidatesDiff.set(liquidBlockCandidatesDiff() + (microBlock.totalResBlockSig -> newTotalDiff)))
+    }
   }
 }
 
