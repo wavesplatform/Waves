@@ -85,7 +85,7 @@ class NetworkServer(
 
   private val peerSynchronizer = new PeerSynchronizer(peerDatabase)
   private val utxPoolSynchronizer = new UtxPoolSynchronizer(txHandler, allChannels)
-  private val errorHandler = new ErrorHandler(peerDatabase.blacklistHost)
+  private val errorHandler = new ErrorHandler(peerDatabase)
   private val historyReplier = new HistoryReplier(history, settings.synchronizationSettings.maxChainLength)
 
   private val inboundConnectionFilter = new InboundConnectionFilter(peerDatabase,
