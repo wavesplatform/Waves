@@ -17,6 +17,7 @@ class PeersRouteSpec extends RouteSpec("/peers") with RestAPISettingsHelper with
   import PeersRouteSpec._
 
   private val peerDatabase = mock[PeerDatabase]
+
   private val connections = mock[ConcurrentMap[Channel, PeerInfo]]
   private val route = PeersApiRoute(restAPISettings, _ => {}, peerDatabase, connections).route
 
@@ -26,17 +27,27 @@ class PeersRouteSpec extends RouteSpec("/peers") with RestAPISettingsHelper with
     port <- Gen.chooseNum(0, 0xFFFF)
   } yield new InetSocketAddress(address, port)
 
+  private val versionGen = for {
+    major <- Arbitrary.arbInt
+    minor <- Arbitrary.arbInt
+    patch <- Arbitrary.arbInt
+  } yield (major, minor, patch)
+
   private def genListOf[A](maxLength: Int, src: Gen[A]) = Gen.chooseNum(0, maxLength).flatMap(n => Gen.listOfN(n, src))
 
   routePath("/connected") in {
     val gen = for {
-      inetAddress <- inetSocketAddressGen
-      ts <- Gen.posNum[Long]
-      nonce <- Arbitrary.arbitrary[Int]
-    } yield inetAddress -> Handshake("", (0, 0, 0), "", nonce, None)
+      remoteAddress <- inetSocketAddressGen
+      declaredAddress <- Gen.option(inetSocketAddressGen)
+      nodeName <- Gen.alphaNumStr
+      nodeNonce <- Arbitrary.arbitrary[Int]
+      applicationName <- Gen.alphaNumStr
+      applicationVersion <- versionGen
+    } yield PeerInfo(remoteAddress, declaredAddress, applicationName, applicationVersion, nodeName, nodeNonce)
 
     forAll(genListOf(20, gen)) { l =>
       val result = Get(routePath("/connected")) ~> route ~> runRoute
+      connections expects 
 //      peerManager.expectMsg(GetConnectedPeers)
 //      peerManager.reply(l)
 
@@ -106,7 +117,8 @@ object PeersRouteSpec {
   case class ConnectResp(status: String, hostname: String)
   implicit val connectRespFormat: Format[ConnectResp] = Json.format
 
-  case class ConnectedPeer(address: String, declaredAddress: String, peerName: String, peerNonce: Long)
+  case class ConnectedPeer(address: String, declaredAddress: String, peerName: String, peerNonce: Long,
+                           applicationName: String, applicationVersion: String)
   implicit val connectedPeerFormat: Format[ConnectedPeer] = Json.format
 
   case class Connected(peers: Seq[ConnectedPeer])
