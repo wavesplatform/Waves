@@ -6,7 +6,7 @@ import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2._
 import com.wavesplatform.state2.patch.LeasePatch
 import com.wavesplatform.state2.reader.{CompositeStateReader, StateReader}
-import scorex.block.{Block, MicroBlock}
+import scorex.block.Block
 import scorex.transaction.{Transaction, ValidationError}
 import scorex.utils.ScorexLogging
 
@@ -19,8 +19,8 @@ object BlockDiffer extends ScorexLogging {
   def fromBlock(settings: FunctionalitySettings, s: StateReader)(block: Block): Either[ValidationError, BlockDiff] =
     apply(settings, s)(block.feesDistribution, block.timestamp, block.transactionData, 1)
 
-  def fromMicroBlock(settings: FunctionalitySettings, s: StateReader)(timestamp: Long, micro: MicroBlock): Either[ValidationError, BlockDiff] =
-    apply(settings, s)(Diff.empty, timestamp, micro.transactionData, 0)
+  def fromLiquidBlock(settings: FunctionalitySettings, s: StateReader)(block: Block): Either[ValidationError, BlockDiff] =
+    apply(settings, s)(block.feesDistribution, block.timestamp, block.transactionData, 0)
 
   def unsafeDiffMany(settings: FunctionalitySettings, s: StateReader)(blocks: Seq[Block]): BlockDiff =
     blocks.foldLeft(Monoid[BlockDiff].empty) { case (diff, block) =>
