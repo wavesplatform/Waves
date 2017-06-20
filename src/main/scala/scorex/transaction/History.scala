@@ -1,7 +1,7 @@
 package scorex.transaction
 
 import com.wavesplatform.network.Checkpoint
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state2.{BlockDiff, ByteStr}
 import scorex.block.Block
 import scorex.transaction.History.BlockchainScore
 import scorex.utils.Synchronized
@@ -23,7 +23,7 @@ trait History extends Synchronized {
 
 trait HistoryWriter extends History {
 
-  def appendBlock(block: Block): Either[ValidationError, Unit]
+  def appendBlock(block: Block)(consensusValidation: Block => Either[ValidationError, BlockDiff]): Either[ValidationError, BlockDiff]
 
   def discardBlock(): Unit
 }

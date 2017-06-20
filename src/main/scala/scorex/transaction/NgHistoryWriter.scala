@@ -36,21 +36,21 @@ class NgHistoryWriterImpl(inner: HistoryWriter) extends NgHistoryWriter {
     })
   }
 
-  override def appendBlock(block: Block): Either[ValidationError, Unit] = write { implicit l =>
-    if (inner.height() == 0 || inner.lastBlock.uniqueId == block.reference) {
+  override def appendBlock(block: Block)(consensusValidation: Block => Either[ValidationError, BlockDiff]): Either[ValidationError, BlockDiff] = write { implicit l =>
+    if (inner.height() == 0 || inner.lastBlock.uniqueId == block.reference) consensusValidation(block).map { blockDiff =>
       micros.set(List.empty)
       baseBlock.set(Some(block))
-      Right(())
-    } else forgeBlock(block.reference) match {
-      case Some(forgedBlock) =>
-        inner.appendBlock(forgedBlock).explicitGet()
-        micros.set(List.empty)
-        baseBlock.set(Some(block))
-        Right(())
-      case None =>
-        Left(GenericError(s"Failed to append block ${block.encodedId} because its parent(${block.reference.base58} " +
-          s"is neither last one in persisted blockchain nor liquid"))
+      blockDiff
     }
+    else forgeBlock(block.reference)
+      .toRight(GenericError(s"Failed to append block ${block.encodedId} because its parent(${block.reference.base58} " + s"is neither last one in persisted blockchain nor liquid"))
+      .flatMap { forgedBlock =>
+        inner.appendBlock(forgedBlock)(consensusValidation).map { blockDiff =>
+          micros.set(List.empty)
+          baseBlock.set(Some(block))
+          blockDiff
+        }
+      }
   }
 
   override def discardBlock(): Unit = write { implicit l =>

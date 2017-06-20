@@ -3,12 +3,12 @@ package com.wavesplatform.history
 import java.io.File
 import java.util.concurrent.locks.ReentrantReadWriteLock
 
-import com.wavesplatform.state2.{ByteStr, ByteStrDataType}
+import com.wavesplatform.state2.{BlockDiff, ByteStr, ByteStrDataType}
 import com.wavesplatform.utils._
 import scorex.block.Block
 import scorex.transaction.History.BlockchainScore
 import scorex.transaction.ValidationError.GenericError
-import scorex.transaction.{History, HistoryWriter, ValidationError}
+import scorex.transaction.{HistoryWriter, ValidationError}
 import scorex.utils.{LogMVMapBuilder, ScorexLogging}
 
 import scala.util.Try
@@ -29,8 +29,8 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
     Set(blockBodyByHeight().size(), blockIdByHeight().size(), heightByBlockId().size(), scoreByHeight().size()).size == 1
   }
 
-  override def appendBlock(block: Block): Either[ValidationError, Unit] = write { implicit lock =>
-    if ((height() == 0) || (this.lastBlock.uniqueId == block.reference)) {
+  override def appendBlock(block: Block)(consensusValidation: Block => Either[ValidationError, BlockDiff]): Either[ValidationError, BlockDiff] = write { implicit lock =>
+    if ((height() == 0) || (this.lastBlock.uniqueId == block.reference)) consensusValidation(block).map { blockDiff =>
       val h = height() + 1
       val score = (if (height() == 0) BigInt(0) else this.score()) + block.blockScore
       blockBodyByHeight.mutate(_.put(h, block.bytes))
@@ -41,8 +41,9 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
       db.commit()
       if (h % 100 == 0) db.compact(CompactFillRate, CompactMemorySize)
 
-      Right(())
-    } else {
+      blockDiff
+    }
+    else {
       Left(GenericError(s"Failed to append block ${block.encodedId} which parent(${block.reference.base58} is not last block in persisted blockchain"))
     }
   }
