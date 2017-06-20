@@ -2,6 +2,9 @@ package com.wavesplatform.network
 
 import java.net.{InetAddress, InetSocketAddress}
 
+import io.netty.channel.Channel
+import io.netty.channel.socket.nio.NioSocketChannel
+import scorex.utils.ScorexLogging
 
 
 trait PeerDatabase {
@@ -22,6 +25,16 @@ trait PeerDatabase {
 
 }
 
-object PeerDatabase {
+object PeerDatabase extends ScorexLogging {
+
   case class PeerInfo(timestamp: Long, nonce: Long, nodeName: String = "")
+
+  implicit class PeerDatabaseExt(peerDatabase: PeerDatabase) {
+    def blacklistAndClose(channel: Channel): Unit = {
+      val address = channel.asInstanceOf[NioSocketChannel].remoteAddress().getAddress
+      log.debug(s"Blacklisting $address")
+      peerDatabase.blacklistHost(address)
+      channel.close()
+    }
+  }
 }

@@ -21,10 +21,14 @@ package object utils extends ScorexLogging {
         .compress()
     }
 
-    encryptionKey match {
+    val store = encryptionKey match {
       case Some(key) => builder.encryptionKey(key).open()
       case _ => builder.open()
     }
+
+    store.rollback()
+
+    store
   }
 
   def createWithStore[A <: AutoCloseable](storeFile: Option[File], f: => A, pred: A => Boolean, deleteExisting: Boolean = false): Try[A] = Try {
