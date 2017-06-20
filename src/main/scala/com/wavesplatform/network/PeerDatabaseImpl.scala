@@ -14,8 +14,8 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Auto
 
   private val database = createMVStore(settings.file)
 
-  private val peersPersistence: MVMap[InetSocketAddress, PeerDatabase.PeerInfo] =
-    database.openMap("peers", new LogMVMapBuilder[InetSocketAddress, PeerDatabase.PeerInfo])
+  private val peersPersistence: MVMap[InetSocketAddress, Long] =
+    database.openMap("peers", new LogMVMapBuilder[InetSocketAddress, Long])
   private val blacklist: MVMap[InetAddress, Long] = database.openMap("blacklist", new LogMVMapBuilder[InetAddress, Long])
   private val unverifiedPeers = new CircularBuffer[InetSocketAddress](settings.maxUnverifiedPeers)
 
@@ -26,7 +26,7 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Auto
   override def addPeer(socketAddress: InetSocketAddress, nonce: Option[Long], nodeName: Option[String]): Unit = {
     if (nonce.isDefined) {
       unverifiedPeers.remove(socketAddress)
-      peersPersistence.put(socketAddress, PeerDatabase.PeerInfo(System.currentTimeMillis(), nonce.get, nodeName.getOrElse("N/A")))
+      peersPersistence.put(socketAddress, System.currentTimeMillis())
       database.commit()
     } else if (!getKnownPeers.contains(socketAddress)) unverifiedPeers += socketAddress
   }
@@ -40,12 +40,8 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Auto
   }
 
   override def touch(socketAddress: InetSocketAddress): Unit = {
-    Option(peersPersistence.get(socketAddress)).map {
-      dbPeerInfo => dbPeerInfo.copy(timestamp = System.currentTimeMillis())
-    } foreach { updated =>
-      peersPersistence.put(socketAddress, updated)
-      database.commit()
-    }
+    peersPersistence.put(socketAddress, System.currentTimeMillis())
+    database.commit()
   }
 
   override def blacklistHost(address: InetAddress): Unit = {
@@ -55,14 +51,13 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Auto
     database.commit()
   }
 
-  override def getKnownPeers: Map[InetSocketAddress, PeerDatabase.PeerInfo] = {
-    withoutObsoleteRecords(peersPersistence,
-      (peerData: PeerDatabase.PeerInfo) => peerData.timestamp, settings.peersDataResidenceTime.toMillis)
+  override def getKnownPeers: Map[InetSocketAddress, Long] = {
+    removeObsoleteRecords(peersPersistence, settings.peersDataResidenceTime.toMillis)
       .asScala.toMap.filterKeys(address => !getBlacklist.contains(address.getAddress))
   }
 
   override def getBlacklist: Set[InetAddress] =
-    withoutObsoleteRecords(blacklist, identity[Long], settings.blackListResidenceTime.toMillis).keySet().asScala.toSet
+    removeObsoleteRecords(blacklist, settings.blackListResidenceTime.toMillis).keySet().asScala.toSet
 
   override def getRandomPeer(excluded: Set[InetSocketAddress]): Option[InetSocketAddress] = {
     val blacklist = getBlacklist
@@ -87,12 +82,12 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Auto
     result.filterNot(excluded)
   }
 
-  private def withoutObsoleteRecords[K, T](map: MVMap[K, T], timestamp: T => Long, residenceTimeInMillis: Long) = {
+  private def removeObsoleteRecords[T](map: MVMap[T, Long], residenceTimeInMillis: Long) = {
     val t = System.currentTimeMillis()
 
     val obsoletePeers = map.asScala
       .filter { case (_, value) =>
-        timestamp(value) <= t - residenceTimeInMillis
+        value <= t - residenceTimeInMillis
       }.keys
 
     if (obsoletePeers.nonEmpty) {
@@ -103,5 +98,5 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Auto
     map
   }
 
-  override def close() = database.close()
+  override def close(): Unit = database.close()
 }

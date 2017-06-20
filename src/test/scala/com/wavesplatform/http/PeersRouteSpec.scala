@@ -1,21 +1,24 @@
 package com.wavesplatform.http
 
 import java.net.{InetAddress, InetSocketAddress}
+import java.util.concurrent.ConcurrentMap
 
-import akka.testkit.TestProbe
 import com.wavesplatform.http.ApiMarshallers._
+import com.wavesplatform.network.PeerInfo
 import com.wavesplatform.network.{Handshake, PeerDatabase}
+import io.netty.channel.Channel
 import org.scalacheck.{Arbitrary, Gen}
+import org.scalamock.scalatest.MockFactory
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json.{Format, JsObject, JsValue, Json}
 import scorex.api.http.{ApiKeyNotValid, PeersApiRoute}
 
-class PeersRouteSpec extends RouteSpec("/peers") with RestAPISettingsHelper with PropertyChecks {
+class PeersRouteSpec extends RouteSpec("/peers") with RestAPISettingsHelper with PropertyChecks with MockFactory {
   import PeersRouteSpec._
 
-  private val peerManager = TestProbe()
-  private val networkController = TestProbe()
-  private val route = PeersApiRoute(restAPISettings, _ => {}, ???, ???).route
+  private val peerDatabase = mock[PeerDatabase]
+  private val connections = mock[ConcurrentMap[Channel, PeerInfo]]
+  private val route = PeersApiRoute(restAPISettings, _ => {}, peerDatabase, connections).route
 
   private val inetAddressGen = Gen.listOfN(4, Arbitrary.arbitrary[Byte]).map(_.toArray).map(InetAddress.getByAddress)
   private val inetSocketAddressGen = for {
@@ -35,7 +38,7 @@ class PeersRouteSpec extends RouteSpec("/peers") with RestAPISettingsHelper with
     forAll(genListOf(20, gen)) { l =>
       val result = Get(routePath("/connected")) ~> route ~> runRoute
 //      peerManager.expectMsg(GetConnectedPeers)
-      peerManager.reply(l)
+//      peerManager.reply(l)
 
       check {
         responseAs[Connected].peers should contain theSameElementsAs l.map {
@@ -49,18 +52,16 @@ class PeersRouteSpec extends RouteSpec("/peers") with RestAPISettingsHelper with
     val gen = for {
       inetAddress <- inetSocketAddressGen
       ts <- Gen.posNum[Long]
-      nonce <- Arbitrary.arbitrary[Int]
-      nodeName <- Gen.alphaNumStr
-    } yield inetAddress -> PeerDatabase.PeerInfo(ts, nonce, nodeName)
+    } yield inetAddress -> ts
 
     forAll(genListOf(20, gen)) { m =>
       val result = Get(routePath("/all")) ~> route ~> runRoute
 //      peerManager.expectMsg(GetAllPeers)
-      peerManager.reply(m.toMap)
+//      peerManager.reply(m.toMap)
 
       check {
         responseAs[AllPeers].peers should contain theSameElementsAs m.map {
-          case (address, pi) => Peer(address.toString, pi.nodeName, pi.nonce, pi.timestamp)
+          case (address, timestamp) => (address.toString -> timestamp)
         }
       }(result)
     }
@@ -89,7 +90,7 @@ class PeersRouteSpec extends RouteSpec("/peers") with RestAPISettingsHelper with
       val addressSet = addresses.map(_.toString).toSet
       val result = Get(routePath("/blacklisted")) ~> route ~> runRoute
 //      peerManager.expectMsg(GetBlacklistedPeers)
-      peerManager.reply(addressSet)
+//      peerManager.reply(addressSet)
 
       check {
         responseAs[Seq[String]] should contain theSameElementsAs addressSet
