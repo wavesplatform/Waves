@@ -1,13 +1,13 @@
 package com.wavesplatform.network
 
-import java.net.{InetAddress, InetSocketAddress}
+import java.net.InetSocketAddress
 
 import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel.{ChannelDuplexHandler, ChannelFuture, ChannelHandlerContext, ChannelPromise}
 import scorex.utils.ScorexLogging
 
 @Sharable
-class ErrorHandler(blacklist: InetAddress => Unit) extends ChannelDuplexHandler with ScorexLogging {
+class ErrorHandler(peerDatabase: PeerDatabase) extends ChannelDuplexHandler with ScorexLogging {
   override def write(ctx: ChannelHandlerContext, msg: AnyRef, promise: ChannelPromise) =
     ctx.write(msg, promise.unvoid().addListener { (chf: ChannelFuture) =>
       if (chf.isDone && chf.cause() != null) {
@@ -17,6 +17,6 @@ class ErrorHandler(blacklist: InetAddress => Unit) extends ChannelDuplexHandler 
 
   override def exceptionCaught(ctx: ChannelHandlerContext, cause: Throwable) = {
     log.debug(s"${id(ctx)} Exception caught", cause)
-    blacklist(ctx.channel().remoteAddress().asInstanceOf[InetSocketAddress].getAddress)
+    peerDatabase.blacklistHost(ctx.channel().remoteAddress().asInstanceOf[InetSocketAddress].getAddress)
   }
 }

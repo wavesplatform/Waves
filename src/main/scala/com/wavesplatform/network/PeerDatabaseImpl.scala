@@ -5,12 +5,12 @@ import java.net.{InetAddress, InetSocketAddress}
 import com.wavesplatform.settings.NetworkSettings
 import com.wavesplatform.utils.createMVStore
 import org.h2.mvstore.MVMap
-import scorex.utils.{CircularBuffer, LogMVMapBuilder}
+import scorex.utils.{CircularBuffer, LogMVMapBuilder, ScorexLogging}
 
 import scala.collection.JavaConverters._
 import scala.util.Random
 
-class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with AutoCloseable {
+class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with AutoCloseable with ScorexLogging {
 
   private val database = createMVStore(settings.file)
 
@@ -49,6 +49,7 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Auto
   }
 
   override def blacklistHost(address: InetAddress): Unit = {
+    log.debug(s"Blacklisting $address")
     unverifiedPeers.drop(_.getAddress == address)
     blacklist.put(address, System.currentTimeMillis())
     database.commit()

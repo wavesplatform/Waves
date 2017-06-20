@@ -2,12 +2,13 @@ package com.wavesplatform.network
 
 import com.wavesplatform.state2.diffs.TransactionDiffer.TransactionValidationError
 import io.netty.channel.ChannelHandler.Sharable
+import io.netty.channel.group.ChannelGroup
 import io.netty.channel.{ChannelHandlerContext, ChannelInboundHandlerAdapter}
 import scorex.transaction.{NewTransactionHandler, Transaction}
 import scorex.utils.ScorexLogging
 
 @Sharable
-class UtxPoolSynchronizer(handler: NewTransactionHandler, broadcaster: Broadcaster)
+class UtxPoolSynchronizer(handler: NewTransactionHandler, allChannels: ChannelGroup)
   extends ChannelInboundHandlerAdapter with ScorexLogging {
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef) = msg match {
     case t: Transaction =>
@@ -18,7 +19,7 @@ class UtxPoolSynchronizer(handler: NewTransactionHandler, broadcaster: Broadcast
           log.debug(s"${id(ctx)} Error processing transaction ${t.id}: $e")
         case Right(_) =>
           log.debug(s"${id(ctx)} Added transaction ${t.id} to UTX pool")
-          broadcaster.broadcast(t, Some(ctx.channel()))
+          allChannels.broadcast(t, Some(ctx.channel()))
       }
     case _ => super.channelRead(ctx, msg)
   }

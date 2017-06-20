@@ -8,7 +8,7 @@ import scorex.utils.ScorexLogging
 
 import scala.concurrent.duration.FiniteDuration
 
-class ExtensionSignaturesLoader(syncTimeout: FiniteDuration, blacklister: Blacklister)
+class ExtensionSignaturesLoader(syncTimeout: FiniteDuration, peerDatabase: PeerDatabase)
   extends ChannelDuplexHandler with ScorexLogging {
 
   private var currentTimeout = Option.empty[ScheduledFuture[Unit]]
@@ -40,7 +40,7 @@ class ExtensionSignaturesLoader(syncTimeout: FiniteDuration, blacklister: Blackl
       currentTimeout = Some(ctx.executor().schedule(syncTimeout) {
         if (currentTimeout.nonEmpty && ctx.channel().isActive) {
           log.warn(s"${id(ctx)} Timeout expired while loading extension")
-          blacklister.blacklist(ctx.channel())
+          peerDatabase.blacklistAndClose(ctx.channel())
         }
       })
 

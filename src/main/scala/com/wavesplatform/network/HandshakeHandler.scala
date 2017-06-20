@@ -52,7 +52,7 @@ abstract class HandshakeHandler(
     localHandshake: Handshake,
     establishedConnections: ConcurrentMap[Channel, PeerInfo],
     connections: ConcurrentMap[PeerKey, Channel],
-    blacklister: Blacklister) extends ChannelInboundHandlerAdapter with ScorexLogging {
+    peerDatabase: PeerDatabase) extends ChannelInboundHandlerAdapter with ScorexLogging {
   import HandshakeHandler._
 
   def connectionNegotiated(ctx: ChannelHandlerContext): Unit
@@ -60,14 +60,14 @@ abstract class HandshakeHandler(
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef) = msg match {
     case HandshakeTimeoutExpired =>
       log.debug(s"${id(ctx)} Timeout expired while waiting for handshake")
-      blacklister.blacklist(ctx.channel())
+      peerDatabase.blacklistAndClose(ctx.channel())
     case remoteHandshake: Handshake =>
       if (localHandshake.applicationName != remoteHandshake.applicationName) {
         log.warn(s"${id(ctx)} Remote application name ${remoteHandshake.applicationName} does not match local ${localHandshake.applicationName}")
-        blacklister.blacklist(ctx.channel())
+        peerDatabase.blacklistAndClose(ctx.channel())
       } else if (!versionIsSupported(remoteHandshake.applicationVersion)) {
         log.warn(s"${id(ctx) } Remote application version ${remoteHandshake.applicationVersion } is not supported")
-        blacklister.blacklist(ctx.channel())
+        peerDatabase.blacklistAndClose(ctx.channel())
       } else {
         val key = PeerKey(ctx.remoteAddress.getAddress, remoteHandshake.nodeNonce)
         val previousPeer = connections.putIfAbsent(key, ctx.channel())
@@ -116,9 +116,9 @@ object HandshakeHandler extends ScorexLogging {
       handshake: Handshake,
       establishedConnections: ConcurrentMap[Channel, PeerInfo],
       connections: ConcurrentMap[PeerKey, Channel],
-      blacklister: Blacklister,
+      peerDatabase: PeerDatabase,
       allChannels: ChannelGroup)
-    extends HandshakeHandler(handshake, establishedConnections, connections, blacklister) {
+    extends HandshakeHandler(handshake, establishedConnections, connections, peerDatabase) {
     override def connectionNegotiated(ctx: ChannelHandlerContext) = {
       ctx.writeAndFlush(handshake.encode(ctx.alloc().buffer()))
       ctx.channel().closeFuture().addListener((_: ChannelFuture) => allChannels.remove(ctx.channel()))
@@ -131,8 +131,8 @@ object HandshakeHandler extends ScorexLogging {
       handshake: Handshake,
       establishedConnections: ConcurrentMap[Channel, PeerInfo],
       connections: ConcurrentMap[PeerKey, Channel],
-      blacklister: Blacklister)
-    extends HandshakeHandler(handshake, establishedConnections, connections, blacklister) {
+      peerDatabase: PeerDatabase)
+    extends HandshakeHandler(handshake, establishedConnections, connections, peerDatabase) {
 
     override def connectionNegotiated(ctx: ChannelHandlerContext) = {}
 
