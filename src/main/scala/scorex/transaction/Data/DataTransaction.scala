@@ -41,11 +41,8 @@ object DataTransaction
                                                 Longs.toByteArray(fee),
                                                 Longs.toByteArray(timestamp))
 
-    override lazy val json: JsObject = jsonBase() ++ Json.obj(
-      "data" -> Base58.encode(data)
-    )
-
-    override lazy val bytes: Array[Byte] = Bytes.concat(Array(transactionType.id.toByte), signature, toSign)
+    override lazy val json: JsObject = jsonBase() ++ Json.obj("data" -> Base58.encode(data))
+    override lazy val bytes: Array[Byte] = Bytes.concat(toSign, signature)
 
   }
 
@@ -82,8 +79,7 @@ object DataTransaction
              fee: Long,
              timestamp:Long,
              signature: Array[Byte]): Either[ValidationError, DataTransaction] =
-    createUnverified(sender, data, fee, timestamp, Some(signature))
-      .right.flatMap(SignedTransaction.verify)
+    createUnverified(sender, data, fee, timestamp, Some(signature)).right.flatMap(SignedTransaction.verify)
 
   def create(sender: PrivateKeyAccount,
              data: Array[Byte],
