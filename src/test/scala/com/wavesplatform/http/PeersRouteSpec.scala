@@ -91,7 +91,7 @@ class PeersRouteSpec extends RouteSpec("/peers") with RestAPISettingsHelper with
     }
 
     forAll(inetSocketAddressGen) { address =>
-      connectToPeer.expects(address).returning().once
+      connectToPeer.expects(address).once
 
       val result = Post(connectUri, ConnectReq(address.getHostName, address.getPort)) ~> api_key(apiKey) ~> route ~> runRoute
 
