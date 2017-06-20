@@ -1,10 +1,9 @@
 package com.wavesplatform.network
 
 import com.wavesplatform.state2.ByteStr
-import io.netty.channel.{Channel, ChannelHandlerContext, ChannelInboundHandlerAdapter}
+import io.netty.channel.{ChannelHandlerContext, ChannelInboundHandlerAdapter}
 import io.netty.util.concurrent.ScheduledFuture
 import scorex.block.Block
-import scorex.crypto.EllipticCurveImpl
 import scorex.transaction.History
 import scorex.utils.ScorexLogging
 
@@ -14,7 +13,7 @@ import scala.concurrent.duration.FiniteDuration
 class ExtensionBlocksLoader(
     history: History,
     blockSyncTimeout: FiniteDuration,
-    blacklist: Channel => Unit) extends ChannelInboundHandlerAdapter with ScorexLogging {
+    peerDatabase: PeerDatabase) extends ChannelInboundHandlerAdapter with ScorexLogging {
   private var pendingSignatures = Map.empty[ByteStr, Int]
   private var targetExtensionIds = Option.empty[ExtensionIds]
   private val blockBuffer = mutable.TreeMap.empty[Int, Block]
@@ -23,6 +22,11 @@ class ExtensionBlocksLoader(
   private def cancelTimeout(): Unit = {
     currentTimeout.foreach(_.cancel(false))
     currentTimeout = None
+  }
+
+  override def channelInactive(ctx: ChannelHandlerContext) = {
+    cancelTimeout()
+    super.channelInactive(ctx)
   }
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef) = msg match {
@@ -34,7 +38,7 @@ class ExtensionBlocksLoader(
         currentTimeout = Some(ctx.executor().schedule(blockSyncTimeout) {
           if (targetExtensionIds.contains(xid)) {
             log.warn(s"${id(ctx)} Timeout loading blocks")
-            blacklist(ctx.channel())
+            peerDatabase.blacklistAndClose(ctx.channel())
           }
         })
         newIds.foreach(s => ctx.write(GetBlock(s)))
@@ -55,17 +59,18 @@ class ExtensionBlocksLoader(
         for (tids <- targetExtensionIds) {
           if (tids.lastCommonId != newBlocks.head.reference) {
             log.warn(s"${id(ctx)} Extension head reference ${newBlocks.head.reference} differs from last common block id ${tids.lastCommonId}")
-            blacklist(ctx.channel())
+            peerDatabase.blacklistAndClose(ctx.channel())
           } else if (!newBlocks.sliding(2).forall {
               case Seq(b1, b2) => b1.uniqueId == b2.reference
               case _ => true
             }) {
             log.warn(s"${id(ctx)} Extension blocks are not contiguous, pre-check failed")
-            blacklist(ctx.channel())
+            peerDatabase.blacklistAndClose(ctx.channel())
           } else {
-            newBlocks.par.find(!blockIsValid(_)) match {
+            newBlocks.par.find(!_.signatureValid) match {
               case Some(invalidBlock) =>
                 log.warn(s"${id(ctx)} Got block ${invalidBlock.uniqueId} with invalid signature")
+                peerDatabase.blacklistAndClose(ctx.channel())
               case None =>
                 log.debug(s"${id(ctx)} Chain is valid, pre-check passed")
                 ctx.fireChannelRead(ExtensionBlocks(newBlocks))
@@ -81,7 +86,4 @@ class ExtensionBlocksLoader(
       log.warn(s"${id(ctx)} Received unexpected extension ids while loading blocks, ignoring")
     case _ => super.channelRead(ctx, msg)
   }
-
-  private def blockIsValid(b: Block) =
-    EllipticCurveImpl.verify(b.signerData.signature.arr, b.bytesWithoutSignature, b.signerData.generator.publicKey)
 }
