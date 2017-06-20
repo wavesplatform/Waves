@@ -65,7 +65,7 @@ trait Synchronized extends ScorexLogging {
     }
   }
 
-  protected def read[T](body: ReadLock => T): T =
+  def read[T](body: ReadLock => T): T =
     synchronizeOperation(instanceReadLock)(body)
 
   protected def write[T](body: WriteLock => T): T =

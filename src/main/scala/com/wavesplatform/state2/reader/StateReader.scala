@@ -77,7 +77,7 @@ object StateReader {
 
     def included(signature: ByteStr): Option[Int] = s.transactionInfo(signature).map(_._1)
 
-    def accountTransactions(account: Account, limit: Int): Seq[_ <: Transaction] = s.read { implicit l =>
+    def accountTransactions(account: Account, limit: Int): Seq[_ <: Transaction] = s.read { _ =>
       s.accountTransactionIds(account).take(limit).flatMap(s.transactionInfo).map(_._2)
     }
 
@@ -91,7 +91,7 @@ object StateReader {
       }
     }
 
-    def getAccountBalance(account: Account): Map[AssetId, (Long, Boolean, Long, IssueTransaction, Boolean)] = s.read { implicit l =>
+    def getAccountBalance(account: Account): Map[AssetId, (Long, Boolean, Long, IssueTransaction, Boolean)] = s.read { _ =>
       s.accountPortfolio(account).assets.map { case (id, amt) =>
         val assetInfo = s.assetInfo(id).get
         val issueTransaction = findTransaction[IssueTransaction](id).get
@@ -130,9 +130,7 @@ object StateReader {
       s.findTransaction[IssueTransaction](assetId)
     }
 
-    def stateHash(): Int = (BigInt(FastCryptographicHash(s.accountPortfolios.toString().getBytes)) % Int.MaxValue).toInt
-
-    private def minBySnapshot(acc: Account, atHeight: Int, confirmations: Int)(extractor: Snapshot => Long): Long = s.read { implicit l =>
+    private def minBySnapshot(acc: Account, atHeight: Int, confirmations: Int)(extractor: Snapshot => Long): Long = s.read { _ =>
       val bottomNotIncluded = atHeight - confirmations
 
       @tailrec
@@ -166,7 +164,7 @@ object StateReader {
     def balanceWithConfirmations(acc: Account, confirmations: Int): Long =
       minBySnapshot(acc, s.height, confirmations)(_.balance)
 
-    def balanceAtHeight(acc: Account, height: Int): Long = s.read { implicit l =>
+    def balanceAtHeight(acc: Account, height: Int): Long = s.read { _ =>
 
       @tailrec
       def loop(lookupHeight: Int): Long = s.snapshotAtHeight(acc, lookupHeight) match {

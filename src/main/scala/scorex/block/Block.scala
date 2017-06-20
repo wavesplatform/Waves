@@ -4,15 +4,15 @@ import cats._
 import cats.data._
 import cats.implicits._
 import com.google.common.primitives.{Bytes, Ints, Longs}
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state2.{ByteStr, Diff, LeaseInfo, Portfolio}
 import play.api.libs.json.{JsObject, Json}
-import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
+import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.consensus.nxt.{NxtConsensusBlockField, NxtLikeConsensusBlockData}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.transaction.TransactionParser._
 import scorex.transaction.ValidationError.{GenericError, InvalidSignature}
-import scorex.transaction._
+import scorex.transaction.{AssetAcc, _}
 import scorex.utils.ScorexLogging
 
 import scala.util.{Failure, Try}
@@ -69,14 +69,22 @@ case class Block(timestamp: Long, version: Byte, reference: ByteStr, signerData:
   lazy val blockScore: BigInt = (BigInt("18446744073709551616") / consensusData.baseTarget)
     .ensuring(_ > 0) // until we make smart-constructor validate consensusData.baseTarget to be positive
 
-  lazy val feesDistribution: Map[AssetAcc, Long] = {
+  lazy val feesDistribution: Diff = Monoid[Diff].combineAll({
     val generator = signerData.generator
     val assetFees: Seq[(Option[AssetId], Long)] = transactionData.map(_.assetFee)
     assetFees
       .map { case (maybeAssetId, vol) => AssetAcc(generator, maybeAssetId) -> vol }
       .groupBy(a => a._1)
       .mapValues((records: Seq[(AssetAcc, Long)]) => records.map(_._2).sum)
-  }
+  }.toList.map {
+    case (AssetAcc(account, maybeAssetId), feeVolume) =>
+      account -> (maybeAssetId match {
+        case None => Portfolio(feeVolume, LeaseInfo.empty, Map.empty)
+        case Some(assetId) => Portfolio(0L, LeaseInfo.empty, Map(assetId -> feeVolume))
+      })
+  }.map { case (acc, p) =>
+    Diff.empty.copy(portfolios = Map(acc -> p))
+  })
 
   override lazy val signatureValid: Boolean = EllipticCurveImpl.verify(signerData.signature.arr, bytesWithoutSignature, signerData.generator.publicKey)
   override lazy val signedDescendants: Seq[Signed] = transactionData

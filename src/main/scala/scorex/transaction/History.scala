@@ -1,9 +1,8 @@
 package scorex.transaction
 
-import com.wavesplatform.state2.ByteStr
-import scorex.account.Account
-import scorex.block.Block
 import com.wavesplatform.network.Checkpoint
+import com.wavesplatform.state2.ByteStr
+import scorex.block.Block
 import scorex.transaction.History.BlockchainScore
 import scorex.utils.Synchronized
 
@@ -13,17 +12,11 @@ trait History extends Synchronized {
 
   def height(): Int
 
-  def blockAt(height: Int): Option[Block]
+  def blockBytes(height: Int): Option[Array[Byte]]
 
-  def blockBytes (height: Int): Option[Array[Byte]]
-
-  def score(): BlockchainScore
-
-  def scoreOf(id: ByteStr): BlockchainScore
+  def scoreOf(id: ByteStr): Option[BlockchainScore]
 
   def heightOf(blockId: ByteStr): Option[Int]
-
-  def generatedBy(account: Account, from: Int, to: Int): Seq[Block]
 
   def lastBlockIds(howMany: Int): Seq[ByteStr]
 }
@@ -43,16 +36,27 @@ trait CheckpointService {
 }
 
 object History {
+
   type BlockchainScore = BigInt
 
   implicit class HistoryExt(history: History) {
+
+    def blockAt(height: Int): Option[Block] = history.read { implicit lock =>
+      history.blockBytes(height).map(Block.parseBytes(_).get)
+    }
+
+    def score(): BlockchainScore = history.read { implicit lock =>
+      history.scoreOf(history.lastBlock.uniqueId).getOrElse(0)
+    }
+
+
     def isEmpty: Boolean = history.height() == 0
 
     def contains(block: Block): Boolean = history.contains(block.uniqueId)
 
     def contains(signature: ByteStr): Boolean = history.heightOf(signature).isDefined
 
-    def blockById(blockId: ByteStr): Option[Block] = history.read { implicit lock =>
+    def blockById(blockId: ByteStr): Option[Block] = history.read { _ =>
       history.heightOf(blockId).flatMap(history.blockAt)
     }
 
@@ -60,11 +64,11 @@ object History {
 
     def heightOf(block: Block): Option[Int] = history.heightOf(block.uniqueId)
 
-    def confirmations(block: Block): Option[Int] = history.read { implicit lock =>
+    def confirmations(block: Block): Option[Int] = history.read { _ =>
       heightOf(block).map(history.height() - _)
     }
 
-    def lastBlock: Block = history.read { implicit lock =>
+    def lastBlock: Block = history.read { _ =>
       history.blockAt(history.height()).get
     }
 
@@ -72,20 +76,20 @@ object History {
       (block.timestamp - parent(block, blockNum).get.timestamp) / blockNum
     }
 
-    def parent(block: Block, back: Int = 1): Option[Block] = history.read { implicit lock =>
+    def parent(block: Block, back: Int = 1): Option[Block] = history.read { _ =>
       require(back > 0)
       history.heightOf(block.reference).flatMap(referenceHeight => history.blockAt(referenceHeight - back + 1))
     }
 
-    def child(block: Block): Option[Block] = history.read { implicit lock =>
+    def child(block: Block): Option[Block] = history.read { _ =>
       history.heightOf(block.uniqueId).flatMap(h => history.blockAt(h + 1))
     }
 
-    def lastBlocks(howMany: Int): Seq[Block] = history.read { implicit lock =>
+    def lastBlocks(howMany: Int): Seq[Block] = history.read { _ =>
       (Math.max(1, history.height() - howMany + 1) to history.height()).flatMap(history.blockAt).reverse
     }
 
-    def blockIdsAfter(parentSignature: ByteStr, howMany: Int): Seq[ByteStr] = history.read { implicit lock =>
+    def blockIdsAfter(parentSignature: ByteStr, howMany: Int): Seq[ByteStr] = history.read { _ =>
       history.heightOf(parentSignature).map { h =>
         (h + 1).to(Math.min(history.height(), h + howMany: Int)).flatMap(history.blockAt).map(_.uniqueId)
       }.getOrElse(Seq())
