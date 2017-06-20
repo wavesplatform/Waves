@@ -9,7 +9,7 @@ import scorex.transaction.History.BlockchainScore
 import scorex.transaction.ValidationError.{BlockAppendError, MicroBlockAppendError}
 
 trait NgHistoryWriter extends HistoryWriter {
-  def appendMicroBlock(microBlock: MicroBlock)(isValid: => Either[ValidationError, Unit]): Either[ValidationError, Unit]
+  def appendMicroBlock(microBlock: MicroBlock)(fullBlockConsensusValidation: => Either[ValidationError, Unit]): Either[ValidationError, Unit]
 
   def bestLiquidBlock(): Option[Block]
 
@@ -23,7 +23,7 @@ class NgHistoryWriterImpl(inner: HistoryWriter) extends NgHistoryWriter {
   private val baseBlock = Synchronized(Option.empty[Block])
   private val micros = Synchronized(List.empty[MicroBlock])
 
-  def bestLiquidBlock(): Option[Block] = write { implicit l =>
+  def bestLiquidBlock(): Option[Block] = read { implicit l =>
     baseBlock().map(base => {
       val ms = micros()
       if (ms.isEmpty) {
@@ -94,7 +94,7 @@ class NgHistoryWriterImpl(inner: HistoryWriter) extends NgHistoryWriter {
     }
   }
 
-  override def appendMicroBlock(microBlock: MicroBlock)(isValid: => Either[ValidationError, Unit]): Either[ValidationError, Unit] = write { implicit l =>
+  override def appendMicroBlock(microBlock: MicroBlock)(fullBlockConsensusValidation: => Either[ValidationError, Unit]): Either[ValidationError, Unit] = write { implicit l =>
     baseBlock() match {
       case None =>
         Left(MicroBlockAppendError(microBlock, "it can't be appended because no base block exists"))
@@ -106,9 +106,10 @@ class NgHistoryWriterImpl(inner: HistoryWriter) extends NgHistoryWriter {
             Left(MicroBlockAppendError(microBlock, "it can't be appended because it is first micro and it doesn't reference existing base block"))
           case Some(prevMicro) if prevMicro.totalResBlockSig != microBlock.prevResBlockSig =>
             Left(MicroBlockAppendError(microBlock, "it doesn't reference last known microBlock"))
-          case _ =>
+          case _ => fullBlockConsensusValidation.map { _ =>
             micros.set(microBlock +: micros())
             Right(())
+          }
         }
     }
   }
@@ -138,4 +139,5 @@ class NgHistoryWriterImpl(inner: HistoryWriter) extends NgHistoryWriter {
       }
     })
   }
+  override def close(): Unit = inner.close()
 }

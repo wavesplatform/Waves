@@ -11,7 +11,7 @@ import scorex.block.Block
 import scorex.block.Block.BlockId
 import scorex.consensus.TransactionsOrdering
 import scorex.crypto.EllipticCurveImpl
-import scorex.transaction.ValidationError.GenericError
+import scorex.transaction.ValidationError.{BlockAppendError, GenericError, InvalidSignature}
 import scorex.transaction._
 import scorex.utils.ScorexLogging
 
@@ -55,11 +55,12 @@ class Coordinator(
     if (history.contains(b)) Right(())
     else {
       def historyContainsParent = history.contains(b.reference)
+
       def consensusDataIsValid = blockConsensusValidation(history, stateReader, settings, time)(b)
 
-      if (!historyContainsParent) Left(GenericError(s"Invalid block ${b.encodedId}: no parent block in history"))
-      else if (!b.signatureValid) Left(GenericError(s"Invalid signature in block ${b.encodedId}"))
-      else if (!consensusDataIsValid) Left(GenericError(s"Invalid block ${b.encodedId}: consensus data is not valid"))
+      if (!historyContainsParent) Left(BlockAppendError(b, "no parent block in history"))
+      else if (!b.signatureValid) Left(InvalidSignature(b, None))
+      else if (!consensusDataIsValid) Left(BlockAppendError(b, "consensus data is not valid"))
       else Right(())
     }
   }

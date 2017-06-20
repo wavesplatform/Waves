@@ -13,8 +13,7 @@ import scorex.utils.{LogMVMapBuilder, ScorexLogging}
 
 import scala.util.Try
 
-class HistoryWriterImpl private(file: Option[File], val synchronizationToken: ReentrantReadWriteLock)
-  extends HistoryWriter with AutoCloseable {
+class HistoryWriterImpl private(file: Option[File], val synchronizationToken: ReentrantReadWriteLock) extends HistoryWriter {
 
   import HistoryWriterImpl._
 
