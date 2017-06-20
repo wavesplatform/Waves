@@ -3,12 +3,12 @@ package com.wavesplatform.network
 import java.util.concurrent.ScheduledFuture
 
 import com.wavesplatform.state2.ByteStr
-import io.netty.channel.{Channel, ChannelDuplexHandler, ChannelHandlerContext, ChannelPromise}
+import io.netty.channel.{ChannelDuplexHandler, ChannelHandlerContext, ChannelPromise}
 import scorex.utils.ScorexLogging
 
 import scala.concurrent.duration.FiniteDuration
 
-class ExtensionSignaturesLoader(syncTimeout: FiniteDuration, blacklist: Channel => Unit)
+class ExtensionSignaturesLoader(syncTimeout: FiniteDuration, blacklister: Blacklister)
   extends ChannelDuplexHandler with ScorexLogging {
 
   private var currentTimeout = Option.empty[ScheduledFuture[Unit]]
@@ -40,7 +40,7 @@ class ExtensionSignaturesLoader(syncTimeout: FiniteDuration, blacklist: Channel 
       currentTimeout = Some(ctx.executor().schedule(syncTimeout) {
         if (currentTimeout.nonEmpty && ctx.channel().isActive) {
           log.warn(s"${id(ctx)} Timeout expired while loading extension")
-          blacklist(ctx.channel())
+          blacklister.blacklist(ctx.channel())
         }
       })
 

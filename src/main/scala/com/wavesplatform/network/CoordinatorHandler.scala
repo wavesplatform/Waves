@@ -8,21 +8,21 @@ import scorex.transaction.ValidationError
 import scorex.utils.ScorexLogging
 
 @Sharable
-class CoordinatorHandler(coordinator: Coordinator, blacklist: Channel => Unit, broadcast: (AnyRef, Option[Channel]) => Unit)
+class CoordinatorHandler(coordinator: Coordinator, blacklister: Blacklister, broadcaster: Broadcaster)
   extends ChannelInboundHandlerAdapter with ScorexLogging {
   import CoordinatorHandler._
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef) = {
     log.debug(s"${id(ctx)} removed: ${ctx.isRemoved}, active: ${ctx.channel().isActive}, open: ${ctx.channel().isOpen}")
     msg match {
       case c: Checkpoint =>
-        handleResult(ctx, blacklist, "applying checkpoint", coordinator.processCheckpoint(c))
+        handleResult(ctx, blacklister.blacklist, "applying checkpoint", coordinator.processCheckpoint(c))
       case ExtensionBlocks(blocks) =>
-        handleResult(ctx, blacklist, "processing fork", coordinator.processFork(blocks.head.reference, blocks))
+        handleResult(ctx, blacklister.blacklist, "processing fork", coordinator.processFork(blocks.head.reference, blocks))
       case b: Block =>
-        handleResult(ctx, blacklist, "applying block", coordinator.processBlock(b))
+        handleResult(ctx, blacklister.blacklist, "applying block", coordinator.processBlock(b))
       case BlockForged(b) =>
-        handleResult(ctx, blacklist, "applying locally mined block", coordinator.processBlock(b))
-        broadcast(b, None)
+        handleResult(ctx, blacklister.blacklist, "applying locally mined block", coordinator.processBlock(b))
+        broadcaster.broadcast(b, None)
       case other =>
         log.debug(other.getClass.getCanonicalName)
     }

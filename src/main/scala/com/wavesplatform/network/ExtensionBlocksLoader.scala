@@ -1,7 +1,7 @@
 package com.wavesplatform.network
 
 import com.wavesplatform.state2.ByteStr
-import io.netty.channel.{Channel, ChannelHandlerContext, ChannelInboundHandlerAdapter}
+import io.netty.channel.{ChannelHandlerContext, ChannelInboundHandlerAdapter}
 import io.netty.util.concurrent.ScheduledFuture
 import scorex.block.Block
 import scorex.transaction.History
@@ -13,7 +13,7 @@ import scala.concurrent.duration.FiniteDuration
 class ExtensionBlocksLoader(
     history: History,
     blockSyncTimeout: FiniteDuration,
-    blacklist: Channel => Unit) extends ChannelInboundHandlerAdapter with ScorexLogging {
+    blacklister: Blacklister) extends ChannelInboundHandlerAdapter with ScorexLogging {
   private var pendingSignatures = Map.empty[ByteStr, Int]
   private var targetExtensionIds = Option.empty[ExtensionIds]
   private val blockBuffer = mutable.TreeMap.empty[Int, Block]
@@ -38,7 +38,7 @@ class ExtensionBlocksLoader(
         currentTimeout = Some(ctx.executor().schedule(blockSyncTimeout) {
           if (targetExtensionIds.contains(xid)) {
             log.warn(s"${id(ctx)} Timeout loading blocks")
-            blacklist(ctx.channel())
+            blacklister.blacklist(ctx.channel())
           }
         })
         newIds.foreach(s => ctx.write(GetBlock(s)))
@@ -59,18 +59,18 @@ class ExtensionBlocksLoader(
         for (tids <- targetExtensionIds) {
           if (tids.lastCommonId != newBlocks.head.reference) {
             log.warn(s"${id(ctx)} Extension head reference ${newBlocks.head.reference} differs from last common block id ${tids.lastCommonId}")
-            blacklist(ctx.channel())
+            blacklister.blacklist(ctx.channel())
           } else if (!newBlocks.sliding(2).forall {
               case Seq(b1, b2) => b1.uniqueId == b2.reference
               case _ => true
             }) {
             log.warn(s"${id(ctx)} Extension blocks are not contiguous, pre-check failed")
-            blacklist(ctx.channel())
+            blacklister.blacklist(ctx.channel())
           } else {
             newBlocks.par.find(!_.signatureValid) match {
               case Some(invalidBlock) =>
                 log.warn(s"${id(ctx)} Got block ${invalidBlock.uniqueId} with invalid signature")
-                blacklist(ctx.channel())
+                blacklister.blacklist(ctx.channel())
               case None =>
                 log.debug(s"${id(ctx)} Chain is valid, pre-check passed")
                 ctx.fireChannelRead(ExtensionBlocks(newBlocks))
