@@ -7,7 +7,7 @@ import com.wavesplatform.state2.{BlockDiff, ByteStr, DataTypes}
 import com.wavesplatform.utils._
 import scorex.block.Block
 import scorex.transaction.History.BlockchainScore
-import scorex.transaction.ValidationError.GenericError
+import scorex.transaction.ValidationError.BlockAppendError
 import scorex.transaction.{HistoryWriter, ValidationError}
 import scorex.utils.{LogMVMapBuilder, ScorexLogging}
 
@@ -29,8 +29,8 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
     Set(blockBodyByHeight().size(), blockIdByHeight().size(), heightByBlockId().size(), scoreByHeight().size()).size == 1
   }
 
-  override def appendBlock(block: Block)(consensusValidation: Block => Either[ValidationError, BlockDiff]): Either[ValidationError, BlockDiff] = write { implicit lock =>
-    if ((height() == 0) || (this.lastBlock.uniqueId == block.reference)) consensusValidation(block).map { blockDiff =>
+  override def appendBlock(block: Block)(consensusValidation: => Either[ValidationError, BlockDiff]): Either[ValidationError, BlockDiff] = write { implicit lock =>
+    if ((height() == 0) || (this.lastBlock.uniqueId == block.reference)) consensusValidation.map { blockDiff =>
       val h = height() + 1
       val score = (if (height() == 0) BigInt(0) else this.score()) + block.blockScore
       blockBodyByHeight.mutate(_.put(h, block.bytes))
@@ -44,7 +44,7 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
       blockDiff
     }
     else {
-      Left(GenericError(s"Failed to append block ${block.encodedId} which parent(${block.reference.base58} is not last block in persisted blockchain"))
+      Left(BlockAppendError(block, "its parent is not last block in persisted blockchain"))
     }
   }
 

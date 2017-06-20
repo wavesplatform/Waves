@@ -23,7 +23,7 @@ trait History extends Synchronized {
 
 trait HistoryWriter extends History {
 
-  def appendBlock(block: Block)(consensusValidation: Block => Either[ValidationError, BlockDiff]): Either[ValidationError, BlockDiff]
+  def appendBlock(block: Block)(consensusValidation: => Either[ValidationError, BlockDiff]): Either[ValidationError, BlockDiff]
 
   def discardBlock(): Unit
 }

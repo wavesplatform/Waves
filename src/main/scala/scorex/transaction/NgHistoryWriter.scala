@@ -6,7 +6,7 @@ import com.wavesplatform.state2._
 import scorex.block.Block.BlockId
 import scorex.block.{Block, MicroBlock}
 import scorex.transaction.History.BlockchainScore
-import scorex.transaction.ValidationError.{GenericError, MicroBlockAppendError}
+import scorex.transaction.ValidationError.{BlockAppendError, MicroBlockAppendError}
 
 trait NgHistoryWriter extends HistoryWriter {
   def appendMicroBlock(microBlock: MicroBlock)(isValid: => Either[ValidationError, Unit]): Either[ValidationError, Unit]
@@ -36,21 +36,21 @@ class NgHistoryWriterImpl(inner: HistoryWriter) extends NgHistoryWriter {
     })
   }
 
-  override def appendBlock(block: Block)(consensusValidation: Block => Either[ValidationError, BlockDiff]): Either[ValidationError, BlockDiff] = write { implicit l =>
-    if (inner.height() == 0 || inner.lastBlock.uniqueId == block.reference) consensusValidation(block).map { blockDiff =>
-      micros.set(List.empty)
-      baseBlock.set(Some(block))
-      blockDiff
-    }
+  override def appendBlock(block: Block)(consensusValidation: => Either[ValidationError, BlockDiff]): Either[ValidationError, BlockDiff]
+  = write { implicit l => {
+    if (inner.height() == 0 || inner.lastBlock.uniqueId == block.reference)
+    // if amending, validate
+      consensusValidation
     else forgeBlock(block.reference)
-      .toRight(GenericError(s"Failed to append block ${block.encodedId} because its parent(${block.reference.base58} " + s"is neither last one in persisted blockchain nor liquid"))
-      .flatMap { forgedBlock =>
-        inner.appendBlock(forgedBlock)(consensusValidation).map { blockDiff =>
-          micros.set(List.empty)
-          baseBlock.set(Some(block))
-          blockDiff
-        }
-      }
+      // if referencing, forge referenced, and append it if new is consensus-valid
+      .toRight(BlockAppendError(block, "its parent is neither last one in persisted blockchain nor liquid"))
+      .flatMap { forgedBlock => inner.appendBlock(forgedBlock)(consensusValidation) }
+  }.map { bd =>
+    // place new as liquid
+    micros.set(List.empty)
+    baseBlock.set(Some(block))
+    bd
+  }
   }
 
   override def discardBlock(): Unit = write { implicit l =>
