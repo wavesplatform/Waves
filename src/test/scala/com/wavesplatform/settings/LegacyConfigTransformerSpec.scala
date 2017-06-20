@@ -2,8 +2,10 @@ package com.wavesplatform.settings
 
 import java.io.File
 import java.net.InetSocketAddress
+import java.time.Duration
 
 import com.typesafe.config.ConfigFactory
+import com.wavesplatform.state2.ByteStr
 import org.scalatest.{FreeSpec, Matchers}
 
 import scala.concurrent.duration._
@@ -46,7 +48,7 @@ class LegacyConfigTransformerSpec extends FreeSpec with Matchers {
       |  "operationRetries": 88,
       |  "scoreBroadcastDelay": 15000,
       |  "walletDir": "/root/waves/wallet",
-      |  "walletSeed": "",
+      |  "walletSeed": "WALLETSEED",
       |  "walletPassword": "ridethewaves!",
       |  "dataDir": "/root/waves/data",
       |  "rpcEnabled": false,
@@ -122,7 +124,7 @@ class LegacyConfigTransformerSpec extends FreeSpec with Matchers {
       |  "operationRetries": 88,
       |  "scoreBroadcastDelay": 15000,
       |  "walletDir": "",
-      |  "walletSeed": "",
+      |  "walletSeed": "WALLETSEED",
       |  "walletPassword": "ridethewaves!",
       |  "dataDir": "",
       |  "rpcEnabled": false,
@@ -262,7 +264,7 @@ class LegacyConfigTransformerSpec extends FreeSpec with Matchers {
     )
 
     ws.checkpointsSettings should have (
-      'publicKey ("7EXnkmJyz1gPfLJwytThcwGwpyfjzFXC3hxBhvVK4")
+      'publicKey (ByteStr.decodeBase58("7EXnkmJyz1gPfLJwytThcwGwpyfjzFXC3hxBhvVK4").get)
     )
 
     ws.loggingLevel shouldBe LogLevel.WARN
@@ -272,11 +274,8 @@ class LegacyConfigTransformerSpec extends FreeSpec with Matchers {
 
     ws.minerSettings should have (
       'enable (false),
-      'offline (true),
       'quorum (10),
-      'generationDelay (5.seconds),
-      'intervalAfterLastBlockThenGenerationIsAllowed (2.days),
-      'tfLikeScheduling (false)
+      'intervalAfterLastBlockThenGenerationIsAllowed (Duration.ofDays(2))
     )
 
     ws.synchronizationSettings should have (
