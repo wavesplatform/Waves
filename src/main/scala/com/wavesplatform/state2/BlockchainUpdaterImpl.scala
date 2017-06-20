@@ -75,19 +75,14 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
     liquidBlockCandidatesDiff().get(block.uniqueId) match {
       case Some(referencedLiquidDiff) =>
         val asFirmBlock = referencedLiquidDiff.copy(heightDiff = 1)
-        for {
-          newBlockDiff <- BlockDiffer.fromBlock(settings, proxy(currentPersistedBlocksState, () => asFirmBlock))(block)
-          _ <- ngHistoryWriter.appendBlock(block)
-        } yield {
+        ngHistoryWriter.appendBlock(block)(BlockDiffer.fromBlock(settings, proxy(currentPersistedBlocksState, () => asFirmBlock))).map { newBlockDiff =>
           inMemoryDiff.set(Monoid.combine(inMemoryDiff(), asFirmBlock))
           liquidBlockCandidatesDiff.set(Map(block.uniqueId -> newBlockDiff))
         }
-      case None => for {
-        newBlockDiff <- BlockDiffer.fromBlock(settings, currentPersistedBlocksState)(block)
-        _ <- ngHistoryWriter.appendBlock(block)
-      } yield {
-        liquidBlockCandidatesDiff.set(Map(block.uniqueId -> newBlockDiff))
-      }
+      case None =>
+        ngHistoryWriter.appendBlock(block)(BlockDiffer.fromBlock(settings, currentPersistedBlocksState)).map { newBlockDiff =>
+          liquidBlockCandidatesDiff.set(Map(block.uniqueId -> newBlockDiff))
+        }
     }
   }
 
