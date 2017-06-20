@@ -113,7 +113,7 @@ class NetworkServer(
   localServer.bind(address).sync()
 
   private val localClientGroup = new DefaultEventLoopGroup()
-  private val localClientChannel = new Bootstrap()
+  val localClientChannel = new Bootstrap()
     .group(localClientGroup)
     .channel(classOf[LocalChannel])
     .handler(new PipelineInitializer[LocalChannel](Seq.empty))
@@ -189,10 +189,7 @@ class NetworkServer(
     if (outgoingChannelCount.get() < settings.networkSettings.maxOutboundConnections) {
       peerDatabase
         .getRandomPeer(excludedAddresses ++ outgoingChannels.keySet().asScala ++ incomingDeclaredAddresses)
-        .foreach { peer =>
-          log.debug("Peer $peer was selected for connection")
-          connect(peer)
-        }
+        .foreach(connect)
     }
   }
 

@@ -4,7 +4,9 @@ import java.net.InetSocketAddress
 
 import com.wavesplatform.state2.ByteStr
 import scorex.block.Block
-import scorex.transaction.History
+import scorex.transaction.{History, Transaction, ValidationError}
+
+import scala.concurrent.Promise
 
 
 sealed trait Message
@@ -21,8 +23,11 @@ case class LocalScoreChanged(newLocalScore: History.BlockchainScore) extends Mes
 
 case class RawBytes(code: Byte, data: Array[Byte]) extends Message
 
+case class BlockForged(block: Block) extends Message
+
 case class LoadBlockchainExtension(lastBlockIds: Seq[ByteStr])
 case class ExtensionIds(lastCommonId: ByteStr, extensionIds: Seq[ByteStr])
 case class ExtensionBlocks(extension: Seq[Block])
 
-case class BlockForged(block: Block) extends Message
+case class OffChainTransaction(t: Transaction, p: Promise[Either[ValidationError, Transaction]])
+case class OffChainCheckpoint(c: Checkpoint, p: Promise[Either[ValidationError, Checkpoint]])

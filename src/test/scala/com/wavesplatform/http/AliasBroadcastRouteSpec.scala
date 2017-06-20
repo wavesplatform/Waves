@@ -5,6 +5,7 @@ import com.wavesplatform.RequestGen
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state2.diffs.TransactionDiffer.TransactionValidationError
+import io.netty.channel.embedded.EmbeddedChannel
 import org.scalacheck.{Gen => G}
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.prop.PropertyChecks
@@ -34,7 +35,7 @@ class AliasBroadcastRouteSpec extends RouteSpec("/alias/broadcast/") with Reques
       m
     }
 
-    val route = AliasBroadcastApiRoute(settings, stmMock).route
+    val route = AliasBroadcastApiRoute(settings, new EmbeddedChannel, stmMock).route
 
     def posting(url: String, v: JsValue) = Post(routePath(url), v) ~> route
 
@@ -46,7 +47,7 @@ class AliasBroadcastRouteSpec extends RouteSpec("/alias/broadcast/") with Reques
   }
 
   "returns appropriate error code when validation fails for" - {
-    val route = AliasBroadcastApiRoute(settings, mock[NewTransactionHandler]).route
+    val route = AliasBroadcastApiRoute(settings, new EmbeddedChannel, mock[NewTransactionHandler]).route
 
     "create alias transaction" in forAll(createAliasReq) { req =>
       import scorex.api.http.alias.SignedCreateAliasRequest.broadcastAliasRequestReadsFormat

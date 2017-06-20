@@ -4,15 +4,21 @@ import javax.ws.rs.Path
 
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.settings.RestAPISettings
+import io.netty.channel.Channel
 import io.swagger.annotations._
 import scorex.BroadcastRoute
 import scorex.api.http._
 import scorex.transaction.NewTransactionHandler
 
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
+
 @Path("/assets/broadcast")
 @Api(value = "assets")
-case class AssetsBroadcastApiRoute(settings: RestAPISettings, transactionModule: NewTransactionHandler)
-  extends ApiRoute with BroadcastRoute {
+case class AssetsBroadcastApiRoute(
+    settings: RestAPISettings,
+    localChannel: Channel,
+    newTransactionHandler: NewTransactionHandler) extends ApiRoute with BroadcastRoute {
 
   override val route: Route = pathPrefix("assets" / "broadcast") {
     issue ~ reissue ~ transfer ~ burnRoute ~ batchTransfer ~ makeAssetNameUniqueRequest
@@ -125,8 +131,9 @@ case class AssetsBroadcastApiRoute(settings: RestAPISettings, transactionModule:
   ))
   def batchTransfer: Route = (path("batch-transfer") & post) {
     json[Seq[SignedTransferRequest]] { reqs =>
-      val tr = reqs.map(r => doBroadcast(r.toTx))
-      tr.map(_.fold(_.json, _.json))
+      Future
+        .sequence(reqs.map(r => doBroadcast(r.toTx)))
+        .map(_.map(_.fold(_.json, _.json)))
     }
   }
 

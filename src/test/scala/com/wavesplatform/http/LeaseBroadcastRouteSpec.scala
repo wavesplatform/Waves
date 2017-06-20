@@ -5,6 +5,7 @@ import com.wavesplatform.RequestGen
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state2.diffs.TransactionDiffer.TransactionValidationError
+import io.netty.channel.embedded.EmbeddedChannel
 import org.scalacheck.Gen.posNum
 import org.scalacheck.{Gen => G}
 import org.scalamock.scalatest.PathMockFactory
@@ -35,7 +36,7 @@ class LeaseBroadcastRouteSpec extends RouteSpec("/leasing/broadcast/") with Requ
       m
     }
 
-    val route = LeaseBroadcastApiRoute(settings, stmMock).route
+    val route = LeaseBroadcastApiRoute(settings, new EmbeddedChannel, stmMock).route
 
     val vt = Table[String, G[_ <: Transaction], (JsValue) => JsValue](
       ("url", "generator", "transform"),
@@ -58,7 +59,7 @@ class LeaseBroadcastRouteSpec extends RouteSpec("/leasing/broadcast/") with Requ
   }
 
   "returns appropriate error code when validation fails for" - {
-    val route = LeaseBroadcastApiRoute(settings, mock[NewTransactionHandler]).route
+    val route = LeaseBroadcastApiRoute(settings, new EmbeddedChannel, mock[NewTransactionHandler]).route
 
     "lease transaction" in forAll(leaseReq) { lease =>
       def posting[A: Writes](v: A) = Post(routePath("lease"), v) ~> route

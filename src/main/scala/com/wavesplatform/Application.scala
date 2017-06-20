@@ -81,7 +81,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
       establishedConnections)
 
     val apiRoutes = Seq(
-      BlocksApiRoute(settings.restAPISettings, settings.checkpointsSettings, history, checkpoint => network.writeToLocalChannel(checkpoint)),
+      BlocksApiRoute(settings.restAPISettings, settings.checkpointsSettings, history, network.localClientChannel),
       TransactionsApiRoute(settings.restAPISettings, stateReader, history, utxStorage),
       NxtConsensusApiRoute(settings.restAPISettings, stateReader, history, settings.blockchainSettings.functionalitySettings),
       WalletApiRoute(settings.restAPISettings, wallet),
@@ -93,11 +93,11 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
       WavesApiRoute(settings.restAPISettings, wallet, newTransactionHandler, time),
       AssetsApiRoute(settings.restAPISettings, wallet, stateReader, newTransactionHandler, time),
       NodeApiRoute(settings.restAPISettings, () => this.shutdown()),
-      AssetsBroadcastApiRoute(settings.restAPISettings, newTransactionHandler),
+      AssetsBroadcastApiRoute(settings.restAPISettings, network.localClientChannel, newTransactionHandler),
       LeaseApiRoute(settings.restAPISettings, wallet, stateReader, newTransactionHandler, time),
-      LeaseBroadcastApiRoute(settings.restAPISettings, newTransactionHandler),
+      LeaseBroadcastApiRoute(settings.restAPISettings, network.localClientChannel, newTransactionHandler),
       AliasApiRoute(settings.restAPISettings, wallet, newTransactionHandler, time, stateReader),
-      AliasBroadcastApiRoute(settings.restAPISettings, newTransactionHandler)
+      AliasBroadcastApiRoute(settings.restAPISettings, network.localClientChannel, newTransactionHandler)
     )
 
     val apiTypes = Seq(
