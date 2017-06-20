@@ -8,7 +8,7 @@ import scorex.utils.Synchronized
 
 import scala.util.Try
 
-trait History extends Synchronized {
+trait History extends Synchronized with AutoCloseable {
 
   def height(): Int
 

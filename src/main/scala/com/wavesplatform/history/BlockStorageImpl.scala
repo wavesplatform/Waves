@@ -26,11 +26,11 @@ object BlockStorageImpl {
     for {
       historyWriter <- HistoryWriterImpl(settings.blockchainFile, lock)
       ngHistoryWriter = new NgHistoryWriterImpl(historyWriter)
-      ss <- createStateStorage(historyWriter, settings.stateFile)
+      ss <- createStateStorage(ngHistoryWriter, settings.stateFile)
       stateWriter = new StateWriterImpl(ss, lock)
     } yield {
       val bcu = BlockchainUpdaterImpl(stateWriter, ngHistoryWriter, settings.functionalitySettings, settings.minimumInMemoryDiffSize, lock)
-      (historyWriter, stateWriter, bcu.bestLiquidState, bcu)
+      (ngHistoryWriter, stateWriter, bcu.bestLiquidState, bcu)
     }
   }
 }
