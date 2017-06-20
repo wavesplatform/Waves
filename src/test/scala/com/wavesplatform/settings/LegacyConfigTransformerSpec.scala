@@ -264,7 +264,7 @@ class LegacyConfigTransformerSpec extends FreeSpec with Matchers {
     )
 
     ws.checkpointsSettings should have (
-      'publicKey (ByteStr.decodeBase58("7EXnkmJyz1gPfLJwytThcwGwpyfjzFXC3hxBhvVK4"))
+      'publicKey (ByteStr.decodeBase58("7EXnkmJyz1gPfLJwytThcwGwpyfjzFXC3hxBhvVK4").get)
     )
 
     ws.loggingLevel shouldBe LogLevel.WARN

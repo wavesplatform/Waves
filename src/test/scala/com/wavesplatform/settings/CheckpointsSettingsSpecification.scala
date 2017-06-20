@@ -16,6 +16,6 @@ class CheckpointsSettingsSpecification extends FlatSpec with Matchers {
       """.stripMargin).resolve()
     val settings = CheckpointsSettings.fromConfig(config)
 
-    settings.publicKey should be(ByteStr.decodeBase58("BASE58PUBKEY"))
+    settings.publicKey should be(ByteStr.decodeBase58("BASE58PUBKEY").get)
   }
 }
