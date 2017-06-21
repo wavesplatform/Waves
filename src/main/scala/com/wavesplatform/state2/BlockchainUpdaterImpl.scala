@@ -116,7 +116,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
   override def processMicroBlock(microBlock: MicroBlock): Either[ValidationError, Unit] = write { implicit l =>
     ngHistoryWriter.appendMicroBlock(microBlock) {
       ngHistoryWriter.forgeBlock(microBlock.prevResBlockSig)
-        .toRight(MicroBlockAppendError(microBlock, "Referenced (micro)block doesn't exist"))
+        .toRight(MicroBlockAppendError("Referenced (micro)block doesn't exist",microBlock))
         .map { prevFull =>
           prevFull.copy(
             signerData = prevFull.signerData.copy(signature = microBlock.totalResBlockSig),
