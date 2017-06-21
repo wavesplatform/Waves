@@ -41,6 +41,14 @@ class CoordinatorHandler(coordinator: Coordinator, peerDatabase: PeerDatabase, a
           allChannels.broadcast(LocalScoreChanged(score))
         }
       )
+    case OffChainRollback(b, p) =>
+      loggingResult(ctx, "processing rollback from API", coordinator.processRollback(b)).fold(
+        e => p.success(Left(e)),
+        { score =>
+          p.success(Right(b))
+          allChannels.broadcast(LocalScoreChanged(score))
+        }
+      )
   }
 }
 

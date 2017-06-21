@@ -31,3 +31,4 @@ case class ExtensionBlocks(extension: Seq[Block])
 
 case class OffChainTransaction(t: Transaction, p: Promise[Either[ValidationError, Transaction]])
 case class OffChainCheckpoint(c: Checkpoint, p: Promise[Either[ValidationError, Checkpoint]])
+case class OffChainRollback(blockId: ByteStr, p: Promise[Either[ValidationError, ByteStr]])

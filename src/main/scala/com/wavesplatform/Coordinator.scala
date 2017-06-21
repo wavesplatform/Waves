@@ -134,6 +134,13 @@ class Coordinator(
       Left(GenericError("Checkpoint already applied"))
     }
 
+  def processRollback(blockId: ByteStr): Either[ValidationError, BigInt] = {
+    if (blockchainUpdater.removeAfter(blockId))
+      Right(history.score())
+    else
+      Left(GenericError(s"Failed to rollback to non existing block $blockId"))
+  }
+
   private def makeBlockchainCompliantWith(checkpoint: Checkpoint): Unit = {
     val existingItems = checkpoint.items.filter {
       checkpoint => history.blockAt(checkpoint.height).isDefined

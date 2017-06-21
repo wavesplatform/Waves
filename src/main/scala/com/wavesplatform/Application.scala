@@ -89,7 +89,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
       UtilsApiRoute(settings.restAPISettings),
       PeersApiRoute(settings.restAPISettings, network.connect, peerDatabase, establishedConnections),
       AddressApiRoute(settings.restAPISettings, wallet, stateReader, settings.blockchainSettings.functionalitySettings),
-//      DebugApiRoute(settings.restAPISettings, wallet, stateReader, history, peerDatabase, _ => {}),
+      DebugApiRoute(settings.restAPISettings, wallet, stateReader, history, peerDatabase, establishedConnections,
+        network.localClientChannel),
       WavesApiRoute(settings.restAPISettings, wallet, newTransactionHandler, time),
       AssetsApiRoute(settings.restAPISettings, wallet, stateReader, newTransactionHandler, time),
       NodeApiRoute(settings.restAPISettings, () => this.shutdown()),
@@ -120,7 +121,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
       typeOf[AliasBroadcastApiRoute]
     )
 
-//    if (settings.networkSettings.uPnPSettings.enable) upnp.addPort(settings.networkSettings.)
     for (addr <- settings.networkSettings.declaredAddress if settings.networkSettings.uPnPSettings.enable) {
       upnp.addPort(addr.getPort)
     }
