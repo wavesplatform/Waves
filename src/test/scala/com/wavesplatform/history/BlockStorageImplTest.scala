@@ -61,19 +61,18 @@ class BlockStorageImplTest extends PropSpec with PropertyChecks with GeneratorDr
       val fp = setup()
       val blocks = chainBlocks(Seq(Seq(genesis), Seq(payment)))
       fp.blockchainUpdater.processBlock(blocks.head) shouldBe 'right
-      fp.blockchainUpdater.processBlock(malformSignature(blocks.last)) should produce("signature")
+      fp.blockchainUpdater.processBlock(malformSignature(blocks.last)) should produce("InvalidSignature")
     }
   }
 
   property("can't apply block with invalid signature after rollback") {
-    forAll(preconditionsAndPayments) { case ((genesis, payment, payment2)) =>
+    forAll(preconditionsAndPayments) { case ((genesis, payment, _)) =>
       val fp = setup()
-      val blocks = chainBlocks(Seq(Seq(genesis), Seq(payment), Seq(payment2)))
+      val blocks = chainBlocks(Seq(Seq(genesis), Seq(payment)))
       fp.blockchainUpdater.processBlock(blocks.head) shouldBe 'right
       fp.blockchainUpdater.processBlock(blocks(1)) shouldBe 'right
       fp.blockchainUpdater.removeAfter(blocks.head.uniqueId) shouldBe true
-      fp.blockchainUpdater.processBlock(blocks(1)) shouldBe 'right
-      fp.blockchainUpdater.processBlock(malformSignature(blocks(2))) should produce("signature")
+      fp.blockchainUpdater.processBlock(malformSignature(blocks(1))) should produce("InvalidSignature")
     }
   }
 }
