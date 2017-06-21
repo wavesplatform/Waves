@@ -39,12 +39,10 @@ case class PeersApiRoute(
   ))
   def allPeers: Route = (path("all") & get) {
     complete(Json.obj("peers" ->
-      JsArray(peerDatabase.getKnownPeers.take(MaxPeersInResponse).map { case (address, peerInfo) =>
+      JsArray(peerDatabase.getKnownPeers.take(MaxPeersInResponse).map { case (address, timestamp) =>
         Json.obj(
           "address" -> address.toString,
-          "nodeName" -> peerInfo.nodeName,
-          "nodeNonce" -> peerInfo.nonce,
-          "lastSeen" -> peerInfo.timestamp
+          "lastSeen" -> timestamp
         )
       }.toList)))
   }

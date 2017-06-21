@@ -17,7 +17,7 @@ trait PeerDatabase {
 
   def blacklistHost(host: InetAddress)
 
-  def getKnownPeers: Map[InetSocketAddress, PeerDatabase.PeerInfo]
+  def getKnownPeers: Map[InetSocketAddress, Long]
 
   def getBlacklist: Set[InetAddress]
 
