@@ -28,8 +28,8 @@ class BalanceDiffValidationTest extends PropSpec with PropertyChecks with Genera
     } yield (gen1, gen2, transfer1, transfer2)
 
 
-    forAll(preconditionsAndPayment, accountGen) { case ((gen1, gen2, transfer1, transfer2), miner) =>
-      assertDiffEi(Seq(TestBlock(Seq(gen1, gen2, transfer1))), TestBlock(Seq(transfer2), miner)) { blockDiffEi =>
+    forAll(preconditionsAndPayment) { case ((gen1, gen2, transfer1, transfer2)) =>
+      assertDiffEi(Seq(TestBlock(Seq(gen1, gen2, transfer1))), TestBlock(Seq(transfer2))) { blockDiffEi =>
         blockDiffEi should produce("negative waves balance")
       }
     }
@@ -82,7 +82,7 @@ class BalanceDiffValidationTest extends PropSpec with PropertyChecks with Genera
     forAll(ownLessThatLeaseOut, timestampGen retryUntil (_ < allowTransferLeasedBalanceUntil)) {
       case ((genesis, masterTransfersToAlice, aliceLeasesToBob, masterLeasesToAlice, aliceTransfersMoreThanOwnsMinusLeaseOut), blockTime) =>
         assertDiffEi(Seq(TestBlock(Seq(genesis, masterTransfersToAlice, aliceLeasesToBob, masterLeasesToAlice))),
-          TestBlock.create(blockTime, Seq(aliceTransfersMoreThanOwnsMinusLeaseOut)),
+          TestBlock.createSigned(blockTime, Seq(aliceTransfersMoreThanOwnsMinusLeaseOut)),
           settings) { totalDiffEi =>
           totalDiffEi shouldBe 'right
         }
@@ -96,7 +96,7 @@ class BalanceDiffValidationTest extends PropSpec with PropertyChecks with Genera
     forAll(ownLessThatLeaseOut, timestampGen retryUntil (_ > allowTransferLeasedBalanceUntil)) {
       case ((genesis, masterTransfersToAlice, aliceLeasesToBob, masterLeasesToAlice, aliceTransfersMoreThanOwnsMinusLeaseOut), blockTime) =>
         assertDiffEi(Seq(TestBlock(Seq(genesis, masterTransfersToAlice, aliceLeasesToBob, masterLeasesToAlice))),
-          TestBlock.create(blockTime, Seq(aliceTransfersMoreThanOwnsMinusLeaseOut)),
+          TestBlock.createSigned(blockTime, Seq(aliceTransfersMoreThanOwnsMinusLeaseOut)),
           settings) { totalDiffEi =>
           totalDiffEi should produce("leased being more than own")
         }

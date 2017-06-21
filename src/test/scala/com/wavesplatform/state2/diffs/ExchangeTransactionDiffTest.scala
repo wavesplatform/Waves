@@ -39,8 +39,8 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Gene
       exchange <- exchangeGeneratorP(buyer, seller, maybeAsset1, maybeAsset2)
     } yield (gen1, gen2, issue1, issue2, exchange)
 
-    forAll(preconditionsAndExchange, accountGen) { case ((gen1, gen2, issue1, issue2, exchange), miner) =>
-      assertDiffAndState(Seq(TestBlock(Seq(gen1, gen2, issue1, issue2))), TestBlock(Seq(exchange), miner)) { case (blockDiff, state) =>
+    forAll(preconditionsAndExchange) { case ((gen1, gen2, issue1, issue2, exchange)) =>
+      assertDiffAndState(Seq(TestBlock(Seq(gen1, gen2, issue1, issue2))), TestBlock(Seq(exchange))) { case (blockDiff, state) =>
         val totalPortfolioDiff: Portfolio = Monoid.combineAll(blockDiff.txsDiff.portfolios.values)
         totalPortfolioDiff.balance shouldBe 0
         totalPortfolioDiff.effectiveBalance shouldBe 0
@@ -62,9 +62,9 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Gene
       exchange <- exchangeGeneratorP(buyer, seller, None, Some(issue1.id), fixedMatcherFee = Some(300000))
     } yield (gen1, gen2, issue1, exchange)
 
-    forAll(preconditions, accountGen) { case ((gen1, gen2, issue1, exchange), miner) =>
+    forAll(preconditions) { case ((gen1, gen2, issue1, exchange)) =>
       whenever(exchange.amount > 300000) {
-        assertDiffAndState(Seq(TestBlock(Seq(gen1, gen2, issue1))), TestBlock(Seq(exchange), miner)) { case (blockDiff, state) =>
+        assertDiffAndState(Seq(TestBlock(Seq(gen1, gen2, issue1))), TestBlock(Seq(exchange))) { case (blockDiff, state) =>
           val totalPortfolioDiff: Portfolio = Monoid.combineAll(blockDiff.txsDiff.portfolios.values)
           totalPortfolioDiff.balance shouldBe 0
           totalPortfolioDiff.effectiveBalance shouldBe 0

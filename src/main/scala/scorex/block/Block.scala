@@ -101,20 +101,20 @@ object Block extends ScorexLogging {
 
   val TransactionSizeLength = 4
 
-  def transParseBytes(bytes: Array[Byte]): Try[Seq[Transaction]] = Try {
-    bytes.isEmpty match {
-      case true => Seq.empty
-      case false =>
-        val txData = bytes.tail
-        val txCount = bytes.head // so 255 txs max
-        (1 to txCount).foldLeft((0: Int, Seq[Transaction]())) { case ((pos, txs), _) =>
-          val transactionLengthBytes = txData.slice(pos, pos + TransactionSizeLength)
-          val transactionLength = Ints.fromByteArray(transactionLengthBytes)
-          val transactionBytes = txData.slice(pos + TransactionSizeLength, pos + TransactionSizeLength + transactionLength)
-          val transaction = TransactionParser.parseBytes(transactionBytes).get
+  private def transParseBytes(bytes: Array[Byte]): Try[Seq[Transaction]] = Try {
+    if (bytes.isEmpty) {
+      Seq.empty
+    } else {
+      val txData = bytes.tail
+      val txCount = bytes.head // so 255 txs max
+      (1 to txCount).foldLeft((0: Int, Seq[Transaction]())) { case ((pos, txs), _) =>
+        val transactionLengthBytes = txData.slice(pos, pos + TransactionSizeLength)
+        val transactionLength = Ints.fromByteArray(transactionLengthBytes)
+        val transactionBytes = txData.slice(pos + TransactionSizeLength, pos + TransactionSizeLength + transactionLength)
+        val transaction = TransactionParser.parseBytes(transactionBytes).get
 
-          (pos + TransactionSizeLength + transactionLength, txs :+ transaction)
-        }._2
+        (pos + TransactionSizeLength + transactionLength, txs :+ transaction)
+      }._2
     }
   }
 
