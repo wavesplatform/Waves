@@ -53,6 +53,9 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
 
     checkGenesis()
 
+    if (wallet.privateKeyAccounts().isEmpty)
+      wallet.generateNewAccounts(1)
+
     val feeCalculator = new FeeCalculator(settings.feesSettings)
     val time: Time = new TimeImpl()
     val utxStorage: UnconfirmedTransactionsStorage = new UnconfirmedTransactionsDatabaseImpl(settings.utxSettings.size)
@@ -257,12 +260,7 @@ object Application extends ScorexLogging {
 
       log.info(s"${Constants.AgentName} Blockchain Id: ${settings.blockchainSettings.addressSchemeCharacter}")
 
-      log.debug("Application.run")
-      val application = new Application(actorSystem, settings)
-      application.run()
-
-      if (application.wallet.privateKeyAccounts().isEmpty)
-        application.wallet.generateNewAccounts(1)
+      new Application(actorSystem, settings).run()
     }
   }
 

@@ -164,6 +164,7 @@ class NetworkServer(
     new HandshakeHandler.Client(handshake, peerInfo, peerUniqueness, peerDatabase)
 
   private val bootstrap = new Bootstrap()
+    .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, settings.networkSettings.connectionTimeout.toMillis.toInt: Integer)
     .group(workerGroup)
     .channel(classOf[NioSocketChannel])
     .handler(new PipelineInitializer[SocketChannel](Seq(
@@ -192,6 +193,9 @@ class NetworkServer(
         .foreach(connect)
     }
   }
+
+  // once the server has been initialized, "start" miner
+  miner.lastBlockChanged(history.height(), history.lastBlock)
 
   def connect(remoteAddress: InetSocketAddress): Unit =
     outgoingChannels.computeIfAbsent(remoteAddress, _ => {
