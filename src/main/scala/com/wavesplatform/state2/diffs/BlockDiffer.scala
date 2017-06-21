@@ -7,7 +7,7 @@ import com.wavesplatform.state2._
 import com.wavesplatform.state2.patch.LeasePatch
 import com.wavesplatform.state2.reader.{CompositeStateReader, StateReader}
 import scorex.block.Block
-import scorex.transaction.{Transaction, ValidationError}
+import scorex.transaction.{Signed, Transaction, ValidationError}
 import scorex.utils.ScorexLogging
 
 import scala.collection.SortedMap
@@ -17,10 +17,10 @@ object BlockDiffer extends ScorexLogging {
   def right(diff: Diff): Either[ValidationError, Diff] = Right(diff)
 
   def fromBlock(settings: FunctionalitySettings, s: StateReader)(block: Block): Either[ValidationError, BlockDiff] =
-    apply(settings, s)(block.feesDistribution, block.timestamp, block.transactionData, 1)
+    Signed.validateSignatures(block).flatMap { _ => apply(settings, s)(block.feesDistribution, block.timestamp, block.transactionData, 1) }
 
   def fromLiquidBlock(settings: FunctionalitySettings, s: StateReader)(block: Block): Either[ValidationError, BlockDiff] =
-    apply(settings, s)(block.feesDistribution, block.timestamp, block.transactionData, 0)
+    Signed.validateSignatures(block).flatMap { _ => apply(settings, s)(block.feesDistribution, block.timestamp, block.transactionData, 0) }
 
   def unsafeDiffMany(settings: FunctionalitySettings, s: StateReader)(blocks: Seq[Block]): BlockDiff =
     blocks.foldLeft(Monoid[BlockDiff].empty) { case (diff, block) =>
