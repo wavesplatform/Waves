@@ -1,23 +1,14 @@
 package com.wavesplatform.history
 
 import com.wavesplatform.TransactionGen
-import com.wavesplatform.settings.BlockchainSettings
+import com.wavesplatform.state2._
 import com.wavesplatform.state2.diffs._
-import com.wavesplatform.state2.reader.StateReader
-import com.wavesplatform.state2.{ByteStr, _}
 import org.scalacheck.{Gen, Shrink}
 import org.scalatest._
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
-import scorex.account.PrivateKeyAccount
-import scorex.block.Block
-import scorex.consensus.nxt.NxtLikeConsensusBlockData
-import scorex.lagonaki.mocks.TestBlock
-import scorex.settings.TestFunctionalitySettings
 import scorex.transaction._
 
-class BlockStorageImplTest extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers with TransactionGen {
-
-  import BlockStorageImplTest._
+class BlockStorageImplBlockOnlyTest extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers with TransactionGen {
 
   private implicit def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)
 
@@ -75,47 +66,4 @@ class BlockStorageImplTest extends PropSpec with PropertyChecks with GeneratorDr
       fp.blockchainUpdater.processBlock(malformSignature(blocks(1))) should produce("InvalidSignature")
     }
   }
-}
-
-object BlockStorageImplTest {
-
-  case class Setup(history: History, stateReader: StateReader, blockchainUpdater: BlockchainUpdater)
-
-  val MinInMemoryDiffSize = 5
-  val DefaultBlockchainSettings = BlockchainSettings(
-    blockchainFile = None,
-    stateFile = None,
-    checkpointFile = None,
-    addressSchemeCharacter = 'N',
-    minimumInMemoryDiffSize = MinInMemoryDiffSize,
-    functionalitySettings = TestFunctionalitySettings.Enabled,
-    genesisSettings = null)
-
-  def setup(): Setup = {
-    val (history, _, stateReader, blockchainUpdater) = BlockStorageImpl(DefaultBlockchainSettings).get
-    Setup(history, stateReader, blockchainUpdater)
-  }
-
-  def chainBlocks(txs: Seq[Seq[Transaction]]): Seq[Block] = {
-    val signer = PrivateKeyAccount(Array.fill(TransactionParser.KeyLength)(0))
-
-    def chainBlocksR(refTo: ByteStr, txs: Seq[Seq[Transaction]]): Seq[Block] = txs match {
-      case (x :: xs) =>
-        val block = Block.buildAndSign(
-          version = 1: Byte,
-          timestamp = 0L,
-          reference = refTo,
-          consensusData = NxtLikeConsensusBlockData(
-            baseTarget = 1L,
-            generationSignature = TestBlock.randomOfLength(Block.GeneratorSignatureLength).arr),
-          transactionData = x,
-          signer = signer)
-        block +: chainBlocksR(block.uniqueId, xs)
-      case _ => Seq.empty
-    }
-
-    chainBlocksR(TestBlock.randomOfLength(Block.BlockIdLength), txs)
-  }
-
-  def malformSignature(b: Block): Block = b.copy(signerData = b.signerData.copy(signature = TestBlock.randomSignature()))
 }

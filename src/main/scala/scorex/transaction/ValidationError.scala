@@ -24,6 +24,5 @@ object ValidationError {
   case class AccountBalanceError(errs: Map[Account, String]) extends ValidationError
   case class GenericError(err: String) extends ValidationError
   case class BlockAppendError(err: String,b: Block) extends ValidationError
-  case class MicroBlockAppendError(microBlock: MicroBlock, err: String) extends ValidationError
-  ???
+  case class MicroBlockAppendError(err: String, microBlock: MicroBlock) extends ValidationError
 }
