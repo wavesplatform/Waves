@@ -30,7 +30,7 @@ class TransferTransactionDiffTest extends PropSpec with PropertyChecks with Gene
 
   property("transfers assets to recipient preserving waves invariant") {
     forAll(preconditionsAndTransfer) { case ((genesis, issue1, issue2, transfer)) =>
-      assertDiffAndState(Seq(TestBlock(Seq(genesis, issue1, issue2))), TestBlock(Seq(transfer))) { case (totalDiff, newState) =>
+      assertDiffAndState(Seq(TestBlock.create(Seq(genesis, issue1, issue2))), TestBlock.create(Seq(transfer))) { case (totalDiff, newState) =>
         val totalPortfolioDiff = Monoid.combineAll(totalDiff.txsDiff.portfolios.values)
         totalPortfolioDiff.balance shouldBe 0
         totalPortfolioDiff.effectiveBalance shouldBe 0
