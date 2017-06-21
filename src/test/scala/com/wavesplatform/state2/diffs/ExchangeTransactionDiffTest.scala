@@ -56,7 +56,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Gene
       buyer <- accountGen
       seller <- accountGen
       ts <- timestampGen
-      gen1: GenesisTransaction = GenesisTransaction.create(buyer, 1*Constants.UnitsInWave, ts).right.get
+      gen1: GenesisTransaction = GenesisTransaction.create(buyer, 1 * Constants.UnitsInWave, ts).right.get
       gen2: GenesisTransaction = GenesisTransaction.create(seller, ENOUGH_AMT, ts).right.get
       issue1: IssueTransaction <- issueGen(buyer)
       exchange <- exchangeGeneratorP(buyer, seller, None, Some(issue1.id), fixedMatcherFee = Some(300000))
@@ -75,6 +75,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Gene
       }
     }
   }
+
   def createExTx(buy: Order, sell: Order, price: Long, matcher: PrivateKeyAccount, ts: Long): Either[ValidationError, ExchangeTransaction] = {
     val mf = buy.matcherFee
     val amount = math.min(buy.amount, sell.amount)
@@ -83,8 +84,8 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Gene
       sellOrder = sell,
       price = price,
       amount = amount,
-      buyMatcherFee = (BigInt(mf)*amount/buy.amount).toLong,
-      sellMatcherFee = (BigInt(mf)*amount/sell.amount).toLong,
+      buyMatcherFee = (BigInt(mf) * amount / buy.amount).toLong,
+      sellMatcherFee = (BigInt(mf) * amount / sell.amount).toLong,
       fee = buy.matcherFee,
       timestamp = ts)
   }
@@ -135,7 +136,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Gene
       val sell = Order.sell(seller, matcher, assetPair, price, issue1.quantity + 1, Ts, Ts + 1, MatcherFee)
       val tx = createExTx(buy, sell, price, matcher, Ts).explicitGet()
       assertDiffEi(Seq(TestBlock(Seq(gen1, gen2, issue1))), TestBlock(Seq(tx))) { totalDiffEi =>
-        inside(totalDiffEi) { case Left(TransactionValidationError(_, AccountBalanceError(errs))) =>
+        inside(totalDiffEi) { case Left(TransactionValidationError(AccountBalanceError(errs), _)) =>
           errs should contain key seller.toAccount
         }
       }

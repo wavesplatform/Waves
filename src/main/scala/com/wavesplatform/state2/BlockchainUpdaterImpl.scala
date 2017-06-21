@@ -44,12 +44,15 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
     proxy(persisted, () => inMemoryDiff())
   }
 
-  def bestLiquidState: StateReader = read { implicit l =>
-    val bestLiquidDiff = ngHistoryWriter.bestLiquidBlock()
+  private def bestLiquidDiff() = read { implicit l =>
+    ngHistoryWriter.bestLiquidBlock()
       .map(_.uniqueId)
       .map(liquidBlockCandidatesDiff().get(_).get)
+      .map(_.copy(heightDiff = 1))
       .orEmpty
+  }
 
+  def bestLiquidState: StateReader = read { implicit l =>
     proxy(persisted, () => Monoid.combine(inMemoryDiff(), bestLiquidDiff))
   }
 
@@ -72,12 +75,14 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
       updatePersistedAndInMemory()
     }
 
-    liquidBlockCandidatesDiff().get(block.uniqueId) match {
+    liquidBlockCandidatesDiff().get(block.reference) match {
       case Some(referencedLiquidDiff) =>
         val asFirmBlock = referencedLiquidDiff.copy(heightDiff = 1)
-        ngHistoryWriter.appendBlock(block)(BlockDiffer.fromBlock(settings, proxy(currentPersistedBlocksState, () => asFirmBlock))(block)).map { newBlockDiff =>
-          inMemoryDiff.set(Monoid.combine(inMemoryDiff(), asFirmBlock))
-          liquidBlockCandidatesDiff.set(Map(block.uniqueId -> newBlockDiff))
+        Signed.validateSignatures(block).flatMap { _ =>
+          ngHistoryWriter.appendBlock(block)(BlockDiffer.fromBlock(settings, proxy(currentPersistedBlocksState, () => asFirmBlock))(block)).map { newBlockDiff =>
+            inMemoryDiff.set(Monoid.combine(inMemoryDiff(), asFirmBlock))
+            liquidBlockCandidatesDiff.set(Map(block.uniqueId -> newBlockDiff))
+          }
         }
       case None =>
         ngHistoryWriter.appendBlock(block)(BlockDiffer.fromBlock(settings, currentPersistedBlocksState)(block)).map { newBlockDiff =>

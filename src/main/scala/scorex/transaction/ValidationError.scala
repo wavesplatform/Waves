@@ -23,7 +23,7 @@ object ValidationError {
   case class OrderValidationError(order: Order, err: String) extends ValidationError
   case class AccountBalanceError(errs: Map[Account, String]) extends ValidationError
   case class GenericError(err: String) extends ValidationError
-  case class BlockAppendError(b: Block, err: String) extends ValidationError
+  case class BlockAppendError(err: String,b: Block) extends ValidationError
   case class MicroBlockAppendError(microBlock: MicroBlock, err: String) extends ValidationError
   ???
 }

@@ -1,17 +1,15 @@
 package scorex.block
 
 import cats._
-import cats.data._
-import cats.implicits._
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import com.wavesplatform.state2.{ByteStr, Diff, LeaseInfo, Portfolio}
 import play.api.libs.json.{JsObject, Json}
-import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
+import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.consensus.nxt.{NxtConsensusBlockField, NxtLikeConsensusBlockData}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.transaction.TransactionParser._
-import scorex.transaction.ValidationError.{GenericError, InvalidSignature}
+import scorex.transaction.ValidationError.GenericError
 import scorex.transaction.{AssetAcc, _}
 import scorex.utils.ScorexLogging
 
@@ -164,6 +162,9 @@ object Block extends ScorexLogging {
     val nonSignedBlock = Block(timestamp, version, reference, SignerData(signer, ByteStr.empty), consensusData, transactionData)
     val toSign = nonSignedBlock.bytes
     val signature = EllipticCurveImpl.sign(signer, toSign)
+    require(reference.arr.length == BlockIdLength, "Incorrect reference")
+    require(consensusData.generationSignature.length == GeneratorSignatureLength, "Incorrect consensusData.generationSignature")
+    require(signer.publicKey.length == KeyLength, "Incorrect signer.publicKey")
     nonSignedBlock.copy(signerData = SignerData(signer, ByteStr(signature)))
   }
 

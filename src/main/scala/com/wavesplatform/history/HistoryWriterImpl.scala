@@ -43,7 +43,7 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
       blockDiff
     }
     else {
-      Left(BlockAppendError(block, "its parent is not last block in persisted blockchain"))
+      Left(BlockAppendError("its parent is not last block in persisted blockchain", block))
     }
   }
 

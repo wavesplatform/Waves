@@ -24,7 +24,7 @@ class AliasBroadcastRouteSpec extends RouteSpec("/alias/broadcast/") with Reques
     val stmMock = {
 
       def alwaysError(t: Transaction): Either[ValidationError, Transaction] =
-        Left[ValidationError, Transaction](TransactionValidationError(t, GenericError("foo")))
+        Left[ValidationError, Transaction](TransactionValidationError(GenericError("foo"),t))
 
       val m = mock[NewTransactionHandler]
       (m.onNewTransaction(_: Transaction))

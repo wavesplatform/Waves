@@ -13,7 +13,7 @@ class UtxPoolSynchronizer(handler: NewTransactionHandler, allChannels: ChannelGr
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef) = msg match {
     case t: Transaction =>
       handler.onNewTransaction(t) match {
-        case Left(TransactionValidationError(tx, err)) =>
+        case Left(TransactionValidationError(err,tx)) =>
           log.debug(s"${id(ctx)} Error processing transaction ${tx.id}: $err")
         case Left(e) =>
           log.debug(s"${id(ctx)} Error processing transaction ${t.id}: $e")

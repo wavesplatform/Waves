@@ -11,7 +11,7 @@ import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 
 object TransactionDiffer {
 
-  case class TransactionValidationError(tx: Transaction, cause: ValidationError) extends ValidationError
+  case class TransactionValidationError(cause: ValidationError,tx: Transaction) extends ValidationError
 
   def apply(settings: FunctionalitySettings, time: Long, height: Int)(s: StateReader, tx: Transaction): Either[ValidationError, Diff] = {
     for {
@@ -36,5 +36,5 @@ object TransactionDiffer {
       }
       positiveDiff <- BalanceDiffValidation(s, time, settings)(tx, diff)
     } yield positiveDiff
-  }.left.map(TransactionValidationError(tx, _))
+  }.left.map(TransactionValidationError(_, tx))
 }

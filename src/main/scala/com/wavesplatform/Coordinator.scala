@@ -18,17 +18,17 @@ import scorex.utils.ScorexLogging
 import scala.util.control.NonFatal
 
 class Coordinator(
-    checkpoint: CheckpointService,
-    history: History,
-    blockchainUpdater: BlockchainUpdater,
-    stateReader: StateReader,
-    utxStorage: UnconfirmedTransactionsStorage,
-    time: => Long,
-    settings: BlockchainSettings,
-    maxBlockchainAge: Duration,
-    checkpointPublicKey: ByteStr,
-    miner: Miner,
-    blockchainExpiryListener: Boolean => Unit) extends ScorexLogging {
+                     checkpoint: CheckpointService,
+                     history: History,
+                     blockchainUpdater: BlockchainUpdater,
+                     stateReader: StateReader,
+                     utxStorage: UnconfirmedTransactionsStorage,
+                     time: => Long,
+                     settings: BlockchainSettings,
+                     maxBlockchainAge: Duration,
+                     checkpointPublicKey: ByteStr,
+                     miner: Miner,
+                     blockchainExpiryListener: Boolean => Unit) extends ScorexLogging {
 
   import Coordinator._
 
@@ -58,9 +58,9 @@ class Coordinator(
 
       def consensusDataIsValid = blockConsensusValidation(history, stateReader, settings, time)(b)
 
-      if (!historyContainsParent) Left(BlockAppendError(b, "no parent block in history"))
+      if (!historyContainsParent) Left(BlockAppendError("no parent block in history", b))
       else if (!b.signatureValid) Left(InvalidSignature(b, None))
-      else if (!consensusDataIsValid) Left(BlockAppendError(b, "consensus data is not valid"))
+      else if (!consensusDataIsValid) Left(BlockAppendError("consensus data is not valid", b))
       else Right(())
     }
   }

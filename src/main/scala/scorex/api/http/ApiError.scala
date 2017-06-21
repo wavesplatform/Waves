@@ -34,7 +34,7 @@ object ApiError {
     case ValidationError.UnsupportedTransactionType => CustomValidationError("UnsupportedTransactionType")
     case ValidationError.AccountBalanceError(errs) => CustomValidationError(errs.values.mkString(", "))
     case ValidationError.OrderValidationError(order, m) => CustomValidationError(m)
-    case TransactionValidationError(tx, err) => StateCheckFailed(tx, fromValidationError(err).message)
+    case TransactionValidationError(err,tx) => StateCheckFailed(tx, fromValidationError(err).message)
   }
 }
 
