@@ -23,8 +23,8 @@ class PaymentTransactionDiffTest extends PropSpec with PropertyChecks with Gener
 
 
   property("Diff doesn't break invariant") {
-    forAll(preconditionsAndPayment, accountGen) { case ((genesis, payment), miner) =>
-      assertDiffAndState(Seq(TestBlock(Seq(genesis))), TestBlock(Seq(payment), miner)) { (blockDiff, newState) =>
+    forAll(preconditionsAndPayment) { case ((genesis, payment)) =>
+      assertDiffAndState(Seq(TestBlock(Seq(genesis))), TestBlock(Seq(payment))) { (blockDiff, newState) =>
         val totalPortfolioDiff: Portfolio = Monoid.combineAll(blockDiff.txsDiff.portfolios.values)
         totalPortfolioDiff.balance shouldBe 0
         totalPortfolioDiff.effectiveBalance shouldBe 0

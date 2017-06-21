@@ -6,10 +6,10 @@ import com.wavesplatform.state2._
 import org.scalacheck.{Gen, Shrink}
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import org.scalatest.{Matchers, PropSpec}
-import scorex.account.{Account, PrivateKeyAccount}
+import scorex.account.Account
 import scorex.lagonaki.mocks.TestBlock
+import scorex.transaction.GenesisTransaction
 import scorex.transaction.assets.{IssueTransaction, TransferTransaction}
-import scorex.transaction.{GenesisTransaction}
 
 class TransferTransactionDiffTest extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers with TransactionGen {
 
@@ -29,8 +29,8 @@ class TransferTransactionDiffTest extends PropSpec with PropertyChecks with Gene
   } yield (genesis, issue1, issue2, transfer)
 
   property("transfers assets to recipient preserving waves invariant") {
-    forAll(preconditionsAndTransfer, accountGen) { case ((genesis, issue1, issue2, transfer), miner: PrivateKeyAccount) =>
-      assertDiffAndState(Seq(TestBlock(Seq(genesis, issue1, issue2))), TestBlock(Seq(transfer), miner)) { case (totalDiff, newState) =>
+    forAll(preconditionsAndTransfer) { case ((genesis, issue1, issue2, transfer)) =>
+      assertDiffAndState(Seq(TestBlock(Seq(genesis, issue1, issue2))), TestBlock(Seq(transfer))) { case (totalDiff, newState) =>
         val totalPortfolioDiff = Monoid.combineAll(totalDiff.txsDiff.portfolios.values)
         totalPortfolioDiff.balance shouldBe 0
         totalPortfolioDiff.effectiveBalance shouldBe 0

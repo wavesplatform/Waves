@@ -97,7 +97,7 @@ object BlockStorageImplTest {
   }
 
   def chainBlocks(txs: Seq[Seq[Transaction]]): Seq[Block] = {
-    val signer = PrivateKeyAccount(Array.fill(32)(0))
+    val signer = PrivateKeyAccount(Array.fill(TransactionParser.KeyLength)(0))
 
     def chainBlocksR(refTo: ByteStr, txs: Seq[Seq[Transaction]]): Seq[Block] = txs match {
       case (x :: xs) =>

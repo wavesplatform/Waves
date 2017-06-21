@@ -26,8 +26,8 @@ class StateReaderLastTransactionsTest extends PropSpec with PropertyChecks with 
 
 
   property("accountTransactions sort results by 'fresh head' rule") {
-    forAll(preconditionsAndPayment, accountGen) { case ((pre, payment), miner) =>
-      assertDiffAndState(Seq(TestBlock(pre)), TestBlock(Seq(payment), miner)) { (blockDiff, newState) =>
+    forAll(preconditionsAndPayment) { case ((pre, payment)) =>
+      assertDiffAndState(Seq(TestBlock(pre)), TestBlock(Seq(payment))) { (blockDiff, newState) =>
 
         newState.accountTransactions(payment.sender, 1) shouldBe Seq(payment)
         val g = pre.head

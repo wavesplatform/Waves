@@ -39,8 +39,8 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Genera
   }
 
   property("Issue+Reissue+Burn+MakeAssetNameUnique do not break waves invariant and updates state") {
-    forAll(issueReissueBurnTxs(isReissuable = true), accountGen) { case (((gen, issue), (reissue, burn, makeAssetNameUnique)), miner) =>
-      assertDiffAndState(Seq(TestBlock(Seq(gen, issue))), TestBlock(Seq(reissue, burn, makeAssetNameUnique), miner)) { case (blockDiff, newState) =>
+    forAll(issueReissueBurnTxs(isReissuable = true)) { case (((gen, issue), (reissue, burn, makeAssetNameUnique))) =>
+      assertDiffAndState(Seq(TestBlock(Seq(gen, issue))), TestBlock(Seq(reissue, burn, makeAssetNameUnique))) { case (blockDiff, newState) =>
         val totalPortfolioDiff = Monoid.combineAll(blockDiff.txsDiff.portfolios.values)
 
         totalPortfolioDiff.balance shouldBe 0

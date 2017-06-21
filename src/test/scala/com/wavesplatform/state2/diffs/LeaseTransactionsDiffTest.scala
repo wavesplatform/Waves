@@ -6,10 +6,9 @@ import com.wavesplatform.state2._
 import org.scalacheck.{Gen, Shrink}
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import org.scalatest.{Matchers, PropSpec}
-import scorex.account.{Account, PrivateKeyAccount}
+import scorex.account.Account
 import scorex.lagonaki.mocks.TestBlock
 import scorex.settings.TestFunctionalitySettings
-import scorex.transaction.assets.TransferTransaction
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction.{GenesisTransaction, PaymentTransaction}
 
@@ -34,8 +33,8 @@ class LeaseTransactionsDiffTest extends PropSpec with PropertyChecks with Genera
       (lease, unlease) <- leaseAndCancelGeneratorP(master, recipient, master)
     } yield (genesis, lease, unlease)
 
-    forAll(sunnyDayLeaseLeaseCancel, accountGen) { case ((genesis, lease, leaseCancel), miner: PrivateKeyAccount) =>
-      assertDiffAndState(Seq(TestBlock(Seq(genesis))), TestBlock(Seq(lease), miner)) { case (totalDiff, newState) =>
+    forAll(sunnyDayLeaseLeaseCancel) { case ((genesis, lease, leaseCancel)) =>
+      assertDiffAndState(Seq(TestBlock(Seq(genesis))), TestBlock(Seq(lease))) { case (totalDiff, newState) =>
         val totalPortfolioDiff = Monoid.combineAll(totalDiff.txsDiff.portfolios.values)
         totalPortfolioDiff.balance shouldBe 0
         total(totalPortfolioDiff.leaseInfo) shouldBe 0
@@ -45,7 +44,7 @@ class LeaseTransactionsDiffTest extends PropSpec with PropertyChecks with Genera
         totalDiff.snapshots(lease.recipient.asInstanceOf[Account]) shouldBe Map(2 -> Snapshot(0, 0, lease.amount))
       }
 
-      assertDiffAndState(Seq(TestBlock(Seq(genesis, lease))), TestBlock(Seq(leaseCancel), miner)) { case (totalDiff, newState) =>
+      assertDiffAndState(Seq(TestBlock(Seq(genesis, lease))), TestBlock(Seq(leaseCancel))) { case (totalDiff, newState) =>
         val totalPortfolioDiff = Monoid.combineAll(totalDiff.txsDiff.portfolios.values)
         totalPortfolioDiff.balance shouldBe 0
         total(totalPortfolioDiff.leaseInfo) shouldBe 0
@@ -75,7 +74,7 @@ class LeaseTransactionsDiffTest extends PropSpec with PropertyChecks with Genera
   property("cannot cancel lease twice after allowMultipleLeaseCancelTransactionUntilTimestamp") {
     forAll(cancelLeaseTwice, timestampGen retryUntil (_ > allowMultipleLeaseCancelTransactionUntilTimestamp)) {
       case ((genesis, payment, lease, leaseCancel, leaseCancel2), blockTime) =>
-        assertDiffEi(Seq(TestBlock(Seq(genesis, payment, lease, leaseCancel))), TestBlock.create(blockTime, Seq(leaseCancel2)), settings) { totalDiffEi =>
+        assertDiffEi(Seq(TestBlock(Seq(genesis, payment, lease, leaseCancel))), TestBlock.createSigned(blockTime, Seq(leaseCancel2)), settings) { totalDiffEi =>
           totalDiffEi should produce("Cannot cancel already cancelled lease")
         }
     }
@@ -84,7 +83,7 @@ class LeaseTransactionsDiffTest extends PropSpec with PropertyChecks with Genera
   property("can cancel lease twice before allowMultipleLeaseCancelTransactionUntilTimestamp") {
     forAll(cancelLeaseTwice, timestampGen retryUntil (_ < allowMultipleLeaseCancelTransactionUntilTimestamp)) {
       case ((genesis, payment, lease, leaseCancel, leaseCancel2), blockTime) =>
-        assertDiffEi(Seq(TestBlock(Seq(genesis, payment, lease, leaseCancel))), TestBlock.create(blockTime, Seq(leaseCancel2)), settings) { totalDiffEi =>
+        assertDiffEi(Seq(TestBlock(Seq(genesis, payment, lease, leaseCancel))), TestBlock.createSigned(blockTime, Seq(leaseCancel2)), settings) { totalDiffEi =>
           totalDiffEi shouldBe 'right
         }
     }
@@ -124,7 +123,7 @@ class LeaseTransactionsDiffTest extends PropSpec with PropertyChecks with Genera
   property("cannot cancel lease of another sender after allowMultipleLeaseCancelTransactionUntilTimestamp") {
     forAll(Gen.oneOf(true, false).flatMap(cancelLeaseOfAnotherSender), timestampGen retryUntil (_ > allowMultipleLeaseCancelTransactionUntilTimestamp)) {
       case ((genesis, genesis2, lease, unleaseOtherOrRecipient), blockTime) =>
-        assertDiffEi(Seq(TestBlock(Seq(genesis, genesis2, lease))), TestBlock.create(blockTime, Seq(unleaseOtherOrRecipient)), settings) { totalDiffEi =>
+        assertDiffEi(Seq(TestBlock(Seq(genesis, genesis2, lease))), TestBlock.createSigned(blockTime, Seq(unleaseOtherOrRecipient)), settings) { totalDiffEi =>
           totalDiffEi should produce("LeaseTransaction was leased by other sender")
         }
     }
@@ -133,7 +132,7 @@ class LeaseTransactionsDiffTest extends PropSpec with PropertyChecks with Genera
   property("can cancel lease of another sender and acquire leasing power before allowMultipleLeaseCancelTransactionUntilTimestamp") {
     forAll(cancelLeaseOfAnotherSender(unleaseByRecipient = false), timestampGen retryUntil (_ < allowMultipleLeaseCancelTransactionUntilTimestamp)) {
       case ((genesis, genesis2, lease, unleaseOther), blockTime) =>
-        assertDiffAndState(Seq(TestBlock(Seq(genesis, genesis2, lease))), TestBlock.create(blockTime, Seq(unleaseOther)), settings) { case (totalDiff, newState) =>
+        assertDiffAndState(Seq(TestBlock(Seq(genesis, genesis2, lease))), TestBlock.createSigned(blockTime, Seq(unleaseOther)), settings) { case (totalDiff, newState) =>
           totalDiff.txsDiff.portfolios.get(lease.sender) shouldBe None
           total(totalDiff.txsDiff.portfolios(lease.recipient.asInstanceOf[Account]).leaseInfo) shouldBe -lease.amount
           total(totalDiff.txsDiff.portfolios(unleaseOther.sender).leaseInfo) shouldBe lease.amount
@@ -144,7 +143,7 @@ class LeaseTransactionsDiffTest extends PropSpec with PropertyChecks with Genera
   property("if recipient cancels lease, it doesn't change leasing component of mining power before allowMultipleLeaseCancelTransactionUntilTimestamp") {
     forAll(cancelLeaseOfAnotherSender(unleaseByRecipient = true), timestampGen retryUntil (_ < allowMultipleLeaseCancelTransactionUntilTimestamp)) {
       case ((genesis, genesis2, lease, unleaseRecipient), blockTime) =>
-        assertDiffAndState(Seq(TestBlock(Seq(genesis, genesis2, lease))), TestBlock.create(blockTime, Seq(unleaseRecipient)), settings) { case (totalDiff, newState) =>
+        assertDiffAndState(Seq(TestBlock(Seq(genesis, genesis2, lease))), TestBlock.createSigned(blockTime, Seq(unleaseRecipient)), settings) { case (totalDiff, newState) =>
           totalDiff.txsDiff.portfolios.get(lease.sender) shouldBe None
           total(totalDiff.txsDiff.portfolios(unleaseRecipient.sender).leaseInfo) shouldBe 0
         }

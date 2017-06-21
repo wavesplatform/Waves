@@ -1,7 +1,6 @@
 package com.wavesplatform.state2.patch
 
 import com.wavesplatform.TransactionGen
-import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.LeaseInfo
 import com.wavesplatform.state2.diffs._
 import org.scalacheck.{Gen, Shrink}
@@ -9,8 +8,8 @@ import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import org.scalatest.{Matchers, PropSpec}
 import scorex.lagonaki.mocks.TestBlock
 import scorex.settings.TestFunctionalitySettings
-import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction.GenesisTransaction
+import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 
 
 class LeasePatchTest extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers with TransactionGen {
@@ -38,7 +37,7 @@ class LeasePatchTest extends PropSpec with PropertyChecks with GeneratorDrivenPr
     forAll(setupAndLeaseInResetBlock, timestampGen retryUntil (_ < settings.allowMultipleLeaseCancelTransactionUntilTimestamp)) {
       case ((genesis, genesis2, lease, unleaseOther, lease2), blockTime) =>
         assertDiffAndState(Seq(
-          TestBlock.create(blockTime, Seq(genesis, genesis2, lease, unleaseOther)),
+          TestBlock.createSigned(blockTime, Seq(genesis, genesis2, lease, unleaseOther)),
           TestBlock(Seq.empty),
           TestBlock(Seq.empty),
           TestBlock(Seq.empty)),

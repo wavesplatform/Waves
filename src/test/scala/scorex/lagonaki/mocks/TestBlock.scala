@@ -1,37 +1,43 @@
 package scorex.lagonaki.mocks
 
 import com.wavesplatform.state2.ByteStr
-import scorex.account.PublicKeyAccount
+import scorex.account.PrivateKeyAccount
 import scorex.block._
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
 import scorex.crypto.EllipticCurveImpl
-import scorex.transaction.Transaction
 import scorex.transaction.TransactionParser._
+import scorex.transaction.{Transaction, TransactionParser}
 
 import scala.util.{Random, Try}
 
 object TestBlock {
-  def apply(txs: Seq[Transaction], signer: PublicKeyAccount = PublicKeyAccount(Array.fill(32)(0))): Block = apply(
-    Try(txs.map(_.timestamp).max).getOrElse(0), txs, signer)
 
-  def apply(time: Long, txs: Seq[Transaction], signer: PublicKeyAccount): Block = Block(
-    time,
-    0,
-    randomSignature,
-    SignerData(signer, ByteStr(Array.fill(EllipticCurveImpl.SignatureLength)(0))),
-    NxtLikeConsensusBlockData(1L, Array.fill(SignatureLength)(0: Byte)),
-    txs)
+  private val defaultSigner = PrivateKeyAccount(Array.fill(TransactionParser.KeyLength)(0))
 
-  def create(time: Long, txs: Seq[Transaction], signer: PublicKeyAccount = PublicKeyAccount(Array.fill(32)(0))): Block = apply(time, txs, signer)
+  private val random: Random = new Random(10)
 
+  def apply(txs: Seq[Transaction]): Block = createSigned(time = Try(txs.map(_.timestamp).max).getOrElse(0), txs = txs)
 
-  def randomOfLength(length:Int) = ByteStr(Array.fill(length)(random.nextInt().toByte))
-  def randomSignature() = randomOfLength(SignatureLength)
+  def createSigned(time: Long, txs: Seq[Transaction]): Block = sign(Block(
+    timestamp = time,
+    version = 0,
+    reference = randomSignature(),
+    signerData = SignerData(defaultSigner, ByteStr(Array.fill(EllipticCurveImpl.SignatureLength)(0))),
+    consensusData = NxtLikeConsensusBlockData(1L, Array.fill(SignatureLength)(0: Byte)),
+    transactionData = txs))
 
-  private val random = new Random(10)
+  def randomOfLength(length: Int): ByteStr = ByteStr(Array.fill(length)(random.nextInt().toByte))
 
-  def withReference(ref: ByteStr, time: Long = 0): Block = Block(time, 1, ref, SignerData(PublicKeyAccount(Array.fill(32)(0)), randomSignature),
-    NxtLikeConsensusBlockData(1L, randomSignature.arr), Seq.empty)
+  def randomSignature(): ByteStr = randomOfLength(SignatureLength)
+
+  def withReference(ref: ByteStr, time: Long = 0): Block = sign(Block(time, 1, ref, SignerData(defaultSigner, randomSignature()),
+    NxtLikeConsensusBlockData(1L, randomSignature().arr), Seq.empty))
 
   def empty: Block = withReference(ByteStr(Array.fill(SignatureLength)(0: Byte)))
+
+  private def sign(nonSignedBlock: Block): Block = {
+    val toSign = nonSignedBlock.bytes
+    val signature = EllipticCurveImpl.sign(defaultSigner, toSign)
+    nonSignedBlock.copy(signerData = SignerData(defaultSigner, ByteStr(signature)))
+  }
 }
