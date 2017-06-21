@@ -8,7 +8,6 @@ import com.wavesplatform.state2.reader.StateReader
 import com.wavesplatform.state2.{LeaseInfo, Portfolio}
 import com.wavesplatform.{BlockGen, TestWallet, TransactionGen}
 import io.netty.channel.Channel
-import io.netty.channel.local.LocalChannel
 import org.scalacheck.{Gen, Shrink}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.prop.PropertyChecks
@@ -23,7 +22,7 @@ class DebugRouteSpec
   private val state = mock[StateReader]
   private val history = mock[History]
   private val peerDatabase = mock[PeerDatabase]
-  private val localChannel = mock[LocalChannel]
+  private val localChannel = mock[Channel]
   private val establishedConnections = mock[ConcurrentMap[Channel, PeerInfo]]
   private val route = DebugApiRoute(restAPISettings, testWallet, state, history, peerDatabase, establishedConnections,
     localChannel).route
