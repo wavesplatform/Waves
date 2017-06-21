@@ -37,11 +37,11 @@ class LeasePatchTest extends PropSpec with PropertyChecks with GeneratorDrivenPr
     forAll(setupAndLeaseInResetBlock, timestampGen retryUntil (_ < settings.allowMultipleLeaseCancelTransactionUntilTimestamp)) {
       case ((genesis, genesis2, lease, unleaseOther, lease2), blockTime) =>
         assertDiffAndState(Seq(
-          TestBlock.createSigned(blockTime, Seq(genesis, genesis2, lease, unleaseOther)),
-          TestBlock(Seq.empty),
-          TestBlock(Seq.empty),
-          TestBlock(Seq.empty)),
-          TestBlock(Seq(lease2)),
+          TestBlock.create(blockTime, Seq(genesis, genesis2, lease, unleaseOther)),
+          TestBlock.create(Seq.empty),
+          TestBlock.create(Seq.empty),
+          TestBlock.create(Seq.empty)),
+          TestBlock.create(Seq(lease2)),
           settings) { case (totalDiff, newState) =>
           newState.activeLeases() shouldBe empty
           newState.accountPortfolios.map(_._2.leaseInfo).foreach(_ shouldBe LeaseInfo.empty)

@@ -16,13 +16,13 @@ object TestBlock {
 
   private val random: Random = new Random(10)
 
-  def apply(txs: Seq[Transaction]): Block = createSigned(time = Try(txs.map(_.timestamp).max).getOrElse(0), txs = txs)
+  def create(txs: Seq[Transaction]): Block = create(time = Try(txs.map(_.timestamp).max).getOrElse(0), txs = txs)
 
-  def createSigned(time: Long, txs: Seq[Transaction]): Block = sign(Block(
+  def create(time: Long, txs: Seq[Transaction]): Block = sign(Block(
     timestamp = time,
     version = 0,
     reference = randomSignature(),
-    signerData = SignerData(defaultSigner, ByteStr(Array.fill(EllipticCurveImpl.SignatureLength)(0))),
+    signerData = SignerData(defaultSigner, ByteStr.empty),
     consensusData = NxtLikeConsensusBlockData(1L, Array.fill(SignatureLength)(0: Byte)),
     transactionData = txs))
 
@@ -30,10 +30,8 @@ object TestBlock {
 
   def randomSignature(): ByteStr = randomOfLength(SignatureLength)
 
-  def withReference(ref: ByteStr, time: Long = 0): Block = sign(Block(time, 1, ref, SignerData(defaultSigner, randomSignature()),
+  def withReference(ref: ByteStr): Block = sign(Block(0, 1, ref, SignerData(defaultSigner, ByteStr.empty),
     NxtLikeConsensusBlockData(1L, randomSignature().arr), Seq.empty))
-
-  def empty: Block = withReference(ByteStr(Array.fill(SignatureLength)(0: Byte)))
 
   private def sign(nonSignedBlock: Block): Block = {
     val toSign = nonSignedBlock.bytes
