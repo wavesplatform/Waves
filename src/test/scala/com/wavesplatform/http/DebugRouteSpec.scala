@@ -47,7 +47,7 @@ class DebugRouteSpec
   routePath("/info") in {
     forAll(Gen.posNum[Int]) { height =>
       (state.height _).expects().returning(height).once()
-      (state.accountPortfolios _).expects().returning(Map.empty).once()
+      (state.accountPortfoliosHash _).expects().returning(123).once()
       Get(routePath("/info")) ~> route ~> check {
         responseAs[JsObject] should have (
           "stateHeight" -> JsNumber(height),
