@@ -32,6 +32,10 @@ class StateReaderImpl(p: StateStorage, val synchronizationToken: ReentrantReadWr
 
   override def height: Int = read { implicit l => sp().getHeight }
 
+  override def accountPortfoliosHash: Int = read { implicit l =>
+    Hash.accountPortfolios(accountPortfolios)
+  }
+
   override def accountTransactionIds(a: Account): Seq[ByteStr] = read { implicit l =>
     Option(sp().accountTransactionIds.get(a.bytes))
       .map(_.toSeq)

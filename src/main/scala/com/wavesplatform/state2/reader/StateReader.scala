@@ -3,7 +3,6 @@ package com.wavesplatform.state2.reader
 import com.google.common.base.Charsets
 import com.wavesplatform.state2._
 import scorex.account.{Account, AccountOrAlias, Alias}
-import scorex.crypto.hash.FastCryptographicHash
 import scorex.transaction.ValidationError.AliasNotExists
 import scorex.transaction._
 import scorex.transaction.assets.IssueTransaction
@@ -27,6 +26,8 @@ trait StateReader extends Synchronized {
   def assetInfo(id: ByteStr): Option[AssetInfo]
 
   def height: Int
+
+  def accountPortfoliosHash: Int
 
   def accountTransactionIds(a: Account): Seq[ByteStr]
 

@@ -31,6 +31,10 @@ class CompositeStateReader(inner: StateReader, blockDiff: BlockDiff) extends Sta
 
   override def height: Int = inner.height + blockDiff.heightDiff
 
+  override def accountPortfoliosHash: Int = {
+    Hash.accountPortfolios(accountPortfolios)
+  }
+
   override def accountTransactionIds(a: Account): Seq[ByteStr] = {
     val fromDiff = txDiff.accountTransactionIds.get(a).orEmpty
     fromDiff ++ inner.accountTransactionIds(a) // fresh head ++ stale tail
@@ -123,6 +127,9 @@ object CompositeStateReader {
 
     override def filledVolumeAndFee(orderId: ByteStr): OrderFillInfo =
       new CompositeStateReader(inner, blockDiff()).filledVolumeAndFee(orderId)
+
+    override def accountPortfoliosHash: Int =
+      new CompositeStateReader(inner, blockDiff()).accountPortfoliosHash
   }
 
 }
