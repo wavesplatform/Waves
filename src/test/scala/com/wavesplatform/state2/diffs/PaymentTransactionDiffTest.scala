@@ -28,7 +28,6 @@ class PaymentTransactionDiffTest extends PropSpec with PropertyChecks with Gener
         val totalPortfolioDiff: Portfolio = Monoid.combineAll(blockDiff.txsDiff.portfolios.values)
         totalPortfolioDiff.balance shouldBe 0
         totalPortfolioDiff.effectiveBalance shouldBe 0
-
         newState.accountTransactionIds(payment.sender, 2).size shouldBe 2 // genesis and payment
       }
     }

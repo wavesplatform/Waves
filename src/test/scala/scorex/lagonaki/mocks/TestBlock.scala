@@ -25,7 +25,8 @@ object TestBlock {
   def create(time: Long, txs: Seq[Transaction], signer: PublicKeyAccount = PublicKeyAccount(Array.fill(32)(0))): Block = apply(time, txs, signer)
 
 
-  def randomSignature = ByteStr(Array.fill(SignatureLength)(random.nextInt().toByte))
+  def randomOfLength(length:Int) = ByteStr(Array.fill(length)(random.nextInt().toByte))
+  def randomSignature() = randomOfLength(SignatureLength)
 
   private val random = new Random(10)
 
