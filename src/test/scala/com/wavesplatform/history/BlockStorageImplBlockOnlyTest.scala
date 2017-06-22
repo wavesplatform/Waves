@@ -23,7 +23,7 @@ class BlockStorageImplBlockOnlyTest extends PropSpec with PropertyChecks with Ge
 
   property("can apply valid blocks") {
     forAll(preconditionsAndPayments) { case ((genesis, payment, _)) =>
-      val fp = setup()
+      val fp = domain()
       val blocks = chainBlocks(Seq(Seq(genesis), Seq(payment)))
       blocks.foreach(block => fp.blockchainUpdater.processBlock(block).explicitGet())
     }
@@ -31,7 +31,7 @@ class BlockStorageImplBlockOnlyTest extends PropSpec with PropertyChecks with Ge
 
   property("can apply, rollback and reprocess valid blocks") {
     forAll(preconditionsAndPayments) { case ((genesis, payment, payment2)) =>
-      val fp = setup()
+      val fp = domain()
       val blocks = chainBlocks(Seq(Seq(genesis), Seq(payment), Seq(payment2)))
       fp.blockchainUpdater.processBlock(blocks.head) shouldBe 'right
       fp.history.height() shouldBe 1
@@ -49,7 +49,7 @@ class BlockStorageImplBlockOnlyTest extends PropSpec with PropertyChecks with Ge
 
   property("can't apply block with invalid signature") {
     forAll(preconditionsAndPayments) { case ((genesis, payment, _)) =>
-      val fp = setup()
+      val fp = domain()
       val blocks = chainBlocks(Seq(Seq(genesis), Seq(payment)))
       fp.blockchainUpdater.processBlock(blocks.head) shouldBe 'right
       fp.blockchainUpdater.processBlock(malformSignature(blocks.last)) should produce("InvalidSignature")
@@ -58,7 +58,7 @@ class BlockStorageImplBlockOnlyTest extends PropSpec with PropertyChecks with Ge
 
   property("can't apply block with invalid signature after rollback") {
     forAll(preconditionsAndPayments) { case ((genesis, payment, _)) =>
-      val fp = setup()
+      val fp = domain()
       val blocks = chainBlocks(Seq(Seq(genesis), Seq(payment)))
       fp.blockchainUpdater.processBlock(blocks.head) shouldBe 'right
       fp.blockchainUpdater.processBlock(blocks(1)) shouldBe 'right
