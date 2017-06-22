@@ -7,6 +7,7 @@ import com.wavesplatform.settings.{CheckpointsSettings, RestAPISettings}
 import com.wavesplatform.state2.ByteStr
 import org.scalacheck.{Gen, Shrink}
 import org.scalamock.scalatest.MockFactory
+import org.scalatest.DoNotDiscover
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json._
 import scorex.account.PublicKeyAccount
@@ -14,6 +15,7 @@ import scorex.api.http._
 import scorex.block.Block
 import scorex.transaction.History
 
+@DoNotDiscover
 class BlocksRouteSpec extends RouteSpec("/blocks") with MockFactory with BlockGen with PropertyChecks {
 
   import BlocksRouteSpec._
