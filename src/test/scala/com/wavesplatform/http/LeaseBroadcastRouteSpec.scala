@@ -3,8 +3,10 @@ package com.wavesplatform.http
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.RequestGen
 import com.wavesplatform.http.ApiMarshallers._
+import com.wavesplatform.network.OffChainTransaction
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state2.diffs.TransactionDiffer.TransactionValidationError
+import io.netty.channel._
 import io.netty.channel.embedded.EmbeddedChannel
 import org.scalacheck.Gen.posNum
 import org.scalacheck.{Gen => G}
@@ -14,8 +16,8 @@ import play.api.libs.json.Json._
 import play.api.libs.json._
 import scorex.api.http._
 import scorex.api.http.leasing.LeaseBroadcastApiRoute
+import scorex.transaction.Transaction
 import scorex.transaction.ValidationError.GenericError
-import scorex.transaction.{NewTransactionHandler, Transaction, ValidationError}
 
 
 class LeaseBroadcastRouteSpec extends RouteSpec("/leasing/broadcast/") with RequestGen with PathMockFactory with PropertyChecks {
@@ -23,20 +25,17 @@ class LeaseBroadcastRouteSpec extends RouteSpec("/leasing/broadcast/") with Requ
 
   "returns StateCheckFiled" - {
 
-    val stmMock = {
-
-      def alwaysError(t: Transaction): Either[ValidationError, Transaction] =
-        Left[ValidationError, Transaction](TransactionValidationError(t, GenericError("foo")))
-
-      val m = mock[NewTransactionHandler]
-      (m.onNewTransaction(_: Transaction))
-        .expects(*)
-        .onCall(alwaysError _)
-        .anyNumberOfTimes()
-      m
+    class MockHandler extends ChannelOutboundHandlerAdapter {
+      override def write(ctx: ChannelHandlerContext, msg: scala.Any, promise: ChannelPromise): Unit = {
+        msg match {
+          case OffChainTransaction(t, p) =>
+            p.success(Left(TransactionValidationError(t, GenericError("foo"))))
+        }
+      }
     }
 
-    val route = LeaseBroadcastApiRoute(settings, new EmbeddedChannel, stmMock).route
+    val channel = new EmbeddedChannel(new MockHandler)
+    val route = LeaseBroadcastApiRoute(settings, channel).route
 
     val vt = Table[String, G[_ <: Transaction], (JsValue) => JsValue](
       ("url", "generator", "transform"),
@@ -47,7 +46,7 @@ class LeaseBroadcastRouteSpec extends RouteSpec("/leasing/broadcast/") with Requ
       })
     )
 
-    def posting(url: String, v: JsValue) = Post(routePath(url), v) ~> route
+    def posting(url: String, v: JsValue): RouteTestResult = Post(routePath(url), v) ~> route
 
     "when state validation fails" in {
       forAll(vt) { (url, gen, transform) =>
@@ -59,10 +58,10 @@ class LeaseBroadcastRouteSpec extends RouteSpec("/leasing/broadcast/") with Requ
   }
 
   "returns appropriate error code when validation fails for" - {
-    val route = LeaseBroadcastApiRoute(settings, new EmbeddedChannel, mock[NewTransactionHandler]).route
+    val route = LeaseBroadcastApiRoute(settings, new EmbeddedChannel).route
 
     "lease transaction" in forAll(leaseReq) { lease =>
-      def posting[A: Writes](v: A) = Post(routePath("lease"), v) ~> route
+      def posting[A: Writes](v: A): RouteTestResult = Post(routePath("lease"), v) ~> route
 
       forAll(nonPositiveLong) { q => posting(lease.copy(amount = q)) should produce(NegativeAmount) }
       forAll(invalidBase58) { pk => posting(lease.copy(senderPublicKey = pk)) should produce(InvalidAddress) }
@@ -72,7 +71,7 @@ class LeaseBroadcastRouteSpec extends RouteSpec("/leasing/broadcast/") with Requ
     }
 
     "lease cancel transaction" in forAll(leaseCancelReq) { cancel =>
-      def posting[A: Writes](v: A) = Post(routePath("cancel"), v) ~> route
+      def posting[A: Writes](v: A): RouteTestResult = Post(routePath("cancel"), v) ~> route
 
       forAll(invalidBase58) { pk => posting(cancel.copy(txId = pk)) should produce(CustomValidationError("invalid.leaseTx")) }
       forAll(invalidBase58) { pk => posting(cancel.copy(senderPublicKey = pk)) should produce(InvalidAddress) }

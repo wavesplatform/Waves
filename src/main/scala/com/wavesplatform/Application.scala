@@ -97,11 +97,11 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
       WavesApiRoute(settings.restAPISettings, wallet, newTransactionHandler, time),
       AssetsApiRoute(settings.restAPISettings, wallet, stateReader, newTransactionHandler, time),
       NodeApiRoute(settings.restAPISettings, () => this.shutdown()),
-      AssetsBroadcastApiRoute(settings.restAPISettings, network.localClientChannel, newTransactionHandler),
+      AssetsBroadcastApiRoute(settings.restAPISettings, network.localClientChannel),
       LeaseApiRoute(settings.restAPISettings, wallet, stateReader, newTransactionHandler, time),
-      LeaseBroadcastApiRoute(settings.restAPISettings, network.localClientChannel, newTransactionHandler),
+      LeaseBroadcastApiRoute(settings.restAPISettings, network.localClientChannel),
       AliasApiRoute(settings.restAPISettings, wallet, newTransactionHandler, time, stateReader),
-      AliasBroadcastApiRoute(settings.restAPISettings, network.localClientChannel, newTransactionHandler)
+      AliasBroadcastApiRoute(settings.restAPISettings, network.localClientChannel)
     )
 
     val apiTypes = Seq(

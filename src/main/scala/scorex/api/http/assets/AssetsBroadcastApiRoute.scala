@@ -17,8 +17,7 @@ import scala.concurrent.Future
 @Api(value = "assets")
 case class AssetsBroadcastApiRoute(
     settings: RestAPISettings,
-    localChannel: Channel,
-    newTransactionHandler: NewTransactionHandler) extends ApiRoute with BroadcastRoute {
+    localChannel: Channel) extends ApiRoute with BroadcastRoute {
 
   override val route: Route = pathPrefix("assets" / "broadcast") {
     issue ~ reissue ~ transfer ~ burnRoute ~ batchTransfer ~ makeAssetNameUniqueRequest
