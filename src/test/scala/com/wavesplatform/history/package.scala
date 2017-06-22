@@ -3,6 +3,9 @@ package com.wavesplatform
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state2._
 import com.wavesplatform.state2.reader.StateReader
+import org.scalacheck.Gen
+import org.scalatest.Assertion
+import org.scalatest.prop.GeneratorDrivenPropertyChecks
 import scorex.account.PrivateKeyAccount
 import scorex.block.{Block, MicroBlock}
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
@@ -45,7 +48,7 @@ package object history {
   }
 
 
-  private def buildMicroBlockOfTxs(totalRefTo: ByteStr, prevTotal: Block, txs: Seq[Transaction]): (Block, MicroBlock) = {
+  def buildMicroBlockOfTxs(totalRefTo: ByteStr, prevTotal: Block, txs: Seq[Transaction]): (Block, MicroBlock) = {
     val newTotalBlock = buildBlockOfTxs(totalRefTo, prevTotal.transactionData ++ txs)
     val microBlock = MicroBlock(
       generator = signer,
@@ -82,4 +85,8 @@ package object history {
 
   def malformSignature(b: Block): Block = b.copy(signerData = b.signerData.copy(signature = TestBlock.randomSignature()))
 
+  trait DomainScenarioDrivenPropertyCheck extends GeneratorDrivenPropertyChecks {
+
+    def scenario[S](gen: Gen[S])(assertion: (Domain, S) => Assertion): Assertion = forAll(gen)(assertion(domain(), _))
+  }
 }
