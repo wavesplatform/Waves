@@ -48,16 +48,15 @@ package object history {
   }
 
 
-  def buildMicroBlockOfTxs(totalRefTo: ByteStr, prevTotal: Block, txs: Seq[Transaction], signer : PrivateKeyAccount = defaultSigner): (Block, MicroBlock) = {
+  def buildMicroBlockOfTxs(totalRefTo: ByteStr, prevTotal: Block, txs: Seq[Transaction], signer: PrivateKeyAccount = defaultSigner): (Block, MicroBlock) = {
     val newTotalBlock = buildBlockOfTxs(totalRefTo, prevTotal.transactionData ++ txs)
-    val microBlock = MicroBlock(
+    val nonSigned = MicroBlock.buildAndSign(
       generator = signer,
       transactionData = txs,
       prevResBlockSig = prevTotal.uniqueId,
-      totalResBlockSig = newTotalBlock.uniqueId,
-      signature = ByteStr.empty // empty until I actually sign it
+      totalResBlockSig = newTotalBlock.uniqueId
     ).explicitGet()
-    (newTotalBlock, microBlock)
+    (newTotalBlock, nonSigned)
   }
 
   def randomSig: ByteStr = TestBlock.randomOfLength(Block.BlockIdLength)

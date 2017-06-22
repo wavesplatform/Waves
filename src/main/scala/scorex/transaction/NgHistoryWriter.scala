@@ -118,10 +118,12 @@ class NgHistoryWriterImpl(inner: HistoryWriter) extends NgHistoryWriter {
           case Some(prevMicro) if prevMicro.totalResBlockSig != microBlock.prevResBlockSig =>
             Left(MicroBlockAppendError("It doesn't reference last known microBlock(which exists)", microBlock))
           case _ =>
-            fullBlockConsensusValidation.map { _ =>
-              micros.set(microBlock +: micros())
-              Right(())
-            }
+            Signed.validateSignatures(microBlock)
+              .flatMap(_ => fullBlockConsensusValidation)
+              .map { _ =>
+                micros.set(microBlock +: micros())
+                Right(())
+              }
         }
     }
   }
