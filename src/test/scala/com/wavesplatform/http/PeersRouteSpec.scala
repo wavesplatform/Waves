@@ -70,7 +70,7 @@ class PeersRouteSpec extends RouteSpec("/peers") with RestAPISettingsHelper with
 
 
     forAll(genListOf(TestsCount, gen)) { m =>
-      (peerDatabase.getKnownPeers _).expects().returning(m.toMap[InetSocketAddress, Long])
+      (peerDatabase.knownPeers _).expects().returning(m.toMap[InetSocketAddress, Long])
 
       val result = Get(routePath("/all")) ~> route ~> runRoute
 
@@ -105,7 +105,7 @@ class PeersRouteSpec extends RouteSpec("/peers") with RestAPISettingsHelper with
     forAll(genListOf(TestsCount, inetSocketAddressGen)) { addresses =>
       val addressSet = addresses.map(_.getAddress).toSet
 
-      (peerDatabase.getBlacklist _).expects().returning(addressSet)
+      (peerDatabase.blacklistedHosts _).expects().returning(addressSet)
 
       val result = Get(routePath("/blacklisted")) ~> route ~> runRoute
 

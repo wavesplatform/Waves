@@ -2,98 +2,73 @@ package com.wavesplatform.network
 
 import java.net.{InetAddress, InetSocketAddress}
 
+import com.google.common.collect.EvictingQueue
 import com.wavesplatform.settings.NetworkSettings
 import com.wavesplatform.utils.createMVStore
 import org.h2.mvstore.MVMap
-import scorex.utils.{CircularBuffer, LogMVMapBuilder, ScorexLogging}
+import scorex.utils.LogMVMapBuilder
 
 import scala.collection.JavaConverters._
 import scala.util.Random
 
-class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with AutoCloseable with ScorexLogging {
+class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with AutoCloseable {
 
   private val database = createMVStore(settings.file)
-
-  private val peersPersistence: MVMap[InetSocketAddress, Long] =
-    database.openMap("peers", new LogMVMapBuilder[InetSocketAddress, Long])
-  private val blacklist: MVMap[InetAddress, Long] = database.openMap("blacklist", new LogMVMapBuilder[InetAddress, Long])
-  private val unverifiedPeers = new CircularBuffer[InetSocketAddress](settings.maxUnverifiedPeers)
+  private val peersPersistence = database.openMap("peers", new LogMVMapBuilder[InetSocketAddress, Long])
+  private val blacklist = database.openMap("blacklist", new LogMVMapBuilder[InetAddress, Long])
+  private val unverifiedPeers = EvictingQueue.create[InetSocketAddress](settings.maxUnverifiedPeers)
 
   for (a <- settings.knownPeers.view.map(inetSocketAddress(_, 6863))) {
-    addPeer(a, None, None)
+    // add known peers with max timestamp so they never get evicted from the list of known peers
+    doTouch(a, Long.MaxValue)
   }
 
-  override def addPeer(socketAddress: InetSocketAddress, nonce: Option[Long], nodeName: Option[String]): Unit = {
-    if (nonce.isDefined) {
-      unverifiedPeers.remove(socketAddress)
-      peersPersistence.put(socketAddress, System.currentTimeMillis())
-      database.commit()
-    } else if (!getKnownPeers.contains(socketAddress)) unverifiedPeers += socketAddress
-  }
+  override def addCandidate(socketAddress: InetSocketAddress): Unit = unverifiedPeers.add(socketAddress)
 
-  override def removePeer(socketAddress: InetSocketAddress): Unit = {
+  private def doTouch(socketAddress: InetSocketAddress, timestamp: Long): Unit = unverifiedPeers.synchronized {
     unverifiedPeers.remove(socketAddress)
-    if (peersPersistence.asScala.contains(socketAddress)) {
-      peersPersistence.remove(socketAddress)
-      database.commit()
-    }
-  }
-
-  override def touch(socketAddress: InetSocketAddress): Unit = {
-    peersPersistence.put(socketAddress, System.currentTimeMillis())
+    peersPersistence.compute(socketAddress, (_, prevTs) => Option(prevTs).fold(timestamp)(_.max(timestamp)))
     database.commit()
   }
 
-  override def blacklistHost(address: InetAddress): Unit = {
-    log.debug(s"Blacklisting $address")
-    unverifiedPeers.drop(_.getAddress == address)
+  override def touch(socketAddress: InetSocketAddress): Unit = doTouch(socketAddress, System.currentTimeMillis())
+
+  override def blacklist(address: InetAddress): Unit = unverifiedPeers.synchronized {
+    unverifiedPeers.removeIf(_.getAddress == address)
     blacklist.put(address, System.currentTimeMillis())
     database.commit()
   }
 
-  override def getKnownPeers: Map[InetSocketAddress, Long] = {
+  override def knownPeers: Map[InetSocketAddress, Long] = {
     removeObsoleteRecords(peersPersistence, settings.peersDataResidenceTime.toMillis)
-      .asScala.toMap.filterKeys(address => !getBlacklist.contains(address.getAddress))
+      .asScala.toMap.filterKeys(address => !blacklistedHosts.contains(address.getAddress))
   }
 
-  override def getBlacklist: Set[InetAddress] =
+  override def blacklistedHosts: Set[InetAddress] =
     removeObsoleteRecords(blacklist, settings.blackListResidenceTime.toMillis).keySet().asScala.toSet
 
-  override def getRandomPeer(excluded: Set[InetSocketAddress]): Option[InetSocketAddress] = {
-    val blacklist = getBlacklist
-    unverifiedPeers.drop(isa => blacklist(isa.getAddress))
+  override def randomPeer(excluded: Set[InetSocketAddress]): Option[InetSocketAddress] = unverifiedPeers.synchronized {
+    def excludeAddress(isa: InetSocketAddress) = excluded(isa) || blacklistedHosts(isa.getAddress)
 
-    val unverifiedCandidate = if (unverifiedPeers.nonEmpty)
-      Some(unverifiedPeers(Random.nextInt(unverifiedPeers.size())))
-    else None
+    val unverified = Option(unverifiedPeers.peek()).filterNot(excludeAddress)
+    val verified = Random.shuffle(knownPeers.keySet.diff(excluded).toSeq).headOption.filterNot(excludeAddress)
 
-    val verifiedCandidates = getKnownPeers.keySet.diff(excluded)
-    val verifiedCandidate = if (verifiedCandidates.nonEmpty)
-      Some(verifiedCandidates.toSeq(Random.nextInt(verifiedCandidates.size)))
-    else None
-
-    val result = if (unverifiedCandidate.isEmpty) verifiedCandidate
-    else if (verifiedCandidate.isEmpty) unverifiedCandidate
-    else if (Random.nextBoolean()) verifiedCandidate
-    else unverifiedCandidate
-
-    if (result.isDefined) unverifiedPeers.remove(result.get)
-
-    result.filterNot(excluded)
+    (unverified, verified) match {
+      case (Some(_), v@Some(_)) => if (Random.nextBoolean()) Some(unverifiedPeers.poll()) else v
+      case (Some(_), None) => Some(unverifiedPeers.poll())
+      case (None, v@Some(_)) => v
+      case _ => None
+    }
   }
 
-  private def removeObsoleteRecords[T](map: MVMap[T, Long], residenceTimeInMillis: Long) = {
-    val t = System.currentTimeMillis()
+  private def removeObsoleteRecords[T](map: MVMap[T, Long], maxAge: Long) = {
+    val earliestValidTs = System.currentTimeMillis() - maxAge
 
-    val obsoletePeers = map.asScala
-      .filter { case (_, value) =>
-        value <= t - residenceTimeInMillis
-      }.keys
+    map.entrySet().asScala.collect {
+      case e if e.getValue < earliestValidTs => e.getKey
+    }.foreach(map.remove)
 
-    if (obsoletePeers.nonEmpty) {
-      obsoletePeers.foreach(map.remove)
-      database.commit()
-    }
+    database.commit()
 
     map
   }

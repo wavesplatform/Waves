@@ -22,9 +22,9 @@ class PeerSynchronizer(peerDatabase: PeerDatabase) extends ChannelInboundHandler
   }
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef) = msg match {
-    case Handshake(_, _, name, nonce, maybeDeclaredAddress) =>
-      maybeDeclaredAddress.foreach { declaredAddress =>
-        peerDatabase.addPeer(declaredAddress, Some(nonce), Some(name))
+    case hs: Handshake =>
+      hs.declaredAddress.foreach { declaredAddress =>
+        peerDatabase.addCandidate(declaredAddress)
 
         if (sameAddresses(declaredAddress, ctx.channel().remoteAddress())) {
           ctx.channel().attr(AttributeKeys.DeclaredAddress).setIfAbsent(declaredAddress)
@@ -33,11 +33,11 @@ class PeerSynchronizer(peerDatabase: PeerDatabase) extends ChannelInboundHandler
       ctx.fireChannelRead(msg)
     case GetPeers =>
       ctx.channel().declaredAddress.foreach(peerDatabase.touch)
-      ctx.writeAndFlush(KnownPeers(peerDatabase.getKnownPeers.keys.toSeq))
+      ctx.writeAndFlush(KnownPeers(peerDatabase.knownPeers.keys.toSeq))
     case KnownPeers(peers) =>
       log.trace(s"${id(ctx)} Got known peers: ${peers.mkString("[", ", ", "]")}")
       ctx.channel().declaredAddress.foreach(peerDatabase.touch)
-      peers.foreach(peerDatabase.addPeer(_, None, None))
+      peers.foreach(peerDatabase.addCandidate)
     case _ =>
       ctx.channel().declaredAddress.foreach(peerDatabase.touch)
       super.channelRead(ctx, msg)

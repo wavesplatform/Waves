@@ -11,6 +11,7 @@ import org.scalatest.{FeatureSpec, GivenWhenThen}
 class BlacklistSpecification extends FeatureSpec with GivenWhenThen {
   private val config = ConfigFactory.parseString(
     """waves.network {
+      |  known-peers = []
       |  file = null
       |  black-list-residence-time: 1s
       |}""".stripMargin).withFallback(ConfigFactory.load()).resolve()
@@ -27,21 +28,21 @@ class BlacklistSpecification extends FeatureSpec with GivenWhenThen {
       Given("Peer database is empty")
       val peerDatabase = new PeerDatabaseImpl(networkSettings)
 
-      def isBlacklisted(address: InetSocketAddress) = peerDatabase.getBlacklist.contains(address.getAddress)
+      def isBlacklisted(address: InetSocketAddress) = peerDatabase.blacklistedHosts.contains(address.getAddress)
 
-      assert(peerDatabase.getKnownPeers.isEmpty)
-      assert(peerDatabase.getBlacklist.isEmpty)
+      assert(peerDatabase.knownPeers.isEmpty)
+      assert(peerDatabase.blacklistedHosts.isEmpty)
 
       When("Peer adds another peer to knownPeers")
       val address = new InetSocketAddress(InetAddress.getByName("localhost"), 1234)
-      peerDatabase.addPeer(address, Some(0), None)
-      assert(peerDatabase.getKnownPeers.contains(address))
+      peerDatabase.touch(address)
+      assert(peerDatabase.knownPeers.contains(address))
       assert(!isBlacklisted(address))
 
       And("Peer blacklists another peer")
-      peerDatabase.blacklistHost(address.getAddress)
+      peerDatabase.blacklist(address.getAddress)
       assert(isBlacklisted(address))
-      assert(!peerDatabase.getKnownPeers.contains(address))
+      assert(!peerDatabase.knownPeers.contains(address))
 
       And("Peer waits for some time")
       Thread.sleep(networkSettings.blackListResidenceTime.toMillis)
@@ -50,7 +51,7 @@ class BlacklistSpecification extends FeatureSpec with GivenWhenThen {
       assert(!isBlacklisted(address))
 
       And("Another peer became known")
-      assert(peerDatabase.getKnownPeers.contains(address))
+      assert(peerDatabase.knownPeers.contains(address))
     }
   }
 }

@@ -189,7 +189,7 @@ class NetworkServer(
   val connectTask = workerGroup.scheduleWithFixedDelay(1.second, 5.seconds) {
     if (outgoingChannelCount.get() < settings.networkSettings.maxOutboundConnections) {
       peerDatabase
-        .getRandomPeer(excludedAddresses ++ outgoingChannels.keySet().asScala ++ incomingDeclaredAddresses)
+        .randomPeer(excludedAddresses ++ outgoingChannels.keySet().asScala ++ incomingDeclaredAddresses)
         .foreach(connect)
     }
   }
@@ -205,7 +205,7 @@ class NetworkServer(
           if (connFuture.isDone) {
             if (connFuture.cause() != null) {
               log.debug(s"${id(connFuture.channel())} Connection failed, blacklisting $remoteAddress", connFuture.cause())
-              peerDatabase.blacklistHost(remoteAddress.getAddress)
+              peerDatabase.blacklist(remoteAddress.getAddress)
             } else if (connFuture.isSuccess) {
               log.debug(s"${id(connFuture.channel())} Connection established")
               outgoingChannelCount.incrementAndGet()
