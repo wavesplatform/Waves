@@ -35,7 +35,7 @@ class BlockStorageImplMicroblockSunnyDayTest extends PropSpec with PropertyCheck
 
   property("all txs in one block: B0 <- B0m1 <- B0m2 <- B0m3!") {
     scenario(preconditionsAndPayments) { case (domain, (genesis, payment, finalPayment, conflictingFinalPayment)) =>
-      val (block, microBlocks) = chainBaseAndMicro(randomRef, genesis, Seq(payment, finalPayment, conflictingFinalPayment))
+      val (block, microBlocks) = chainBaseAndMicro(randomSig, genesis, Seq(payment, finalPayment, conflictingFinalPayment))
       domain.blockchainUpdater.processBlock(block).explicitGet()
       domain.blockchainUpdater.processMicroBlock(microBlocks(0)).explicitGet()
       domain.blockchainUpdater.processMicroBlock(microBlocks(1)).explicitGet()
@@ -46,7 +46,7 @@ class BlockStorageImplMicroblockSunnyDayTest extends PropSpec with PropertyCheck
 
   property("block references microBlock: B0 <- B1 <- B1m1 <- B2!") {
     scenario(preconditionsAndPayments) { case (domain, (genesis, payment, finalPayment, conflictingFinalPayment)) =>
-      val (block, microBlocks) = chainBaseAndMicro(randomRef, genesis, Seq(payment, finalPayment, conflictingFinalPayment))
+      val (block, microBlocks) = chainBaseAndMicro(randomSig, genesis, Seq(payment, finalPayment, conflictingFinalPayment))
       domain.blockchainUpdater.processBlock(block).explicitGet()
       domain.blockchainUpdater.processMicroBlock(microBlocks(0)).explicitGet()
       domain.blockchainUpdater.processMicroBlock(microBlocks(1)).explicitGet()
@@ -56,7 +56,7 @@ class BlockStorageImplMicroblockSunnyDayTest extends PropSpec with PropertyCheck
 
   property("discards some of microBlocks: B0 <- B0m1 <- B0m2; B0m1 <- B1") {
     scenario(preconditionsAndPayments) { case (domain, (genesis, payment, finalPayment, conflictingFinalPayment)) =>
-      val (block0, microBlocks0) = chainBaseAndMicro(randomRef, genesis, Seq(payment, finalPayment))
+      val (block0, microBlocks0) = chainBaseAndMicro(randomSig, genesis, Seq(payment, finalPayment))
       val block1 = buildBlockOfTxs(microBlocks0.head.totalResBlockSig, Seq(conflictingFinalPayment))
       domain.blockchainUpdater.processBlock(block0).explicitGet()
       domain.blockchainUpdater.processMicroBlock(microBlocks0(0)).explicitGet()
@@ -67,7 +67,7 @@ class BlockStorageImplMicroblockSunnyDayTest extends PropSpec with PropertyCheck
 
   property("discards all microBlocks: B0 <- B1 <- B1m1; B1 <- B2") {
     scenario(preconditionsAndPayments) { case (domain, (genesis, payment, finalPayment, conflictingFinalPayment)) =>
-      val block0 = buildBlockOfTxs(randomRef, Seq(genesis))
+      val block0 = buildBlockOfTxs(randomSig, Seq(genesis))
       val (block1, microBlocks1) = chainBaseAndMicro(block0.uniqueId, payment, Seq(finalPayment))
       val block2 = buildBlockOfTxs(block1.uniqueId, Seq(conflictingFinalPayment))
       domain.blockchainUpdater.processBlock(block0).explicitGet()
@@ -79,7 +79,7 @@ class BlockStorageImplMicroblockSunnyDayTest extends PropSpec with PropertyCheck
 
   property("discards liquid block completely: B0 <- B0m1 <- B0m2; B0 <- B1") {
     scenario(preconditionsAndPayments) { case (domain, (genesis, payment, finalPayment, conflictingFinalPayment)) =>
-      val (block0, microBlocks0) = chainBaseAndMicro(randomRef, genesis, Seq(payment, finalPayment))
+      val (block0, microBlocks0) = chainBaseAndMicro(randomSig, genesis, Seq(payment, finalPayment))
       val block1 = buildBlockOfTxs(block0.uniqueId, Seq(payment, conflictingFinalPayment))
       domain.blockchainUpdater.processBlock(block0).explicitGet()
       domain.blockchainUpdater.processMicroBlock(microBlocks0(0)).explicitGet()

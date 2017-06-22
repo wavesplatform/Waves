@@ -25,10 +25,10 @@ class BlockStorageImplMicroblockBadReferencesTest extends PropSpec with Property
 
   property("referenced (micro)block doesn't exist") {
     scenario(preconditionsAndPayments) { case (domain, (genesis, payment, payment2, payment3)) =>
-      val block0 = buildBlockOfTxs(randomRef, Seq(genesis))
+      val block0 = buildBlockOfTxs(randomSig, Seq(genesis))
       val (block1, microblocks1) = chainBaseAndMicro(block0.uniqueId, payment, Seq(payment2, payment3))
       val goodMicro = microblocks1(0)
-      val badMicroRef = microblocks1(1).copy(prevResBlockSig = randomRef)
+      val badMicroRef = microblocks1(1).copy(prevResBlockSig = randomSig)
 
       domain.blockchainUpdater.processBlock(block0).explicitGet()
       domain.blockchainUpdater.processBlock(block1).explicitGet()
@@ -43,7 +43,7 @@ class BlockStorageImplMicroblockBadReferencesTest extends PropSpec with Property
       val block0 = blocks(0)
       val block1 = blocks(1)
       val badMicroRef = buildMicroBlockOfTxs(block0.uniqueId, block1, Seq(payment2))._2
-        .copy(prevResBlockSig = randomRef)
+        .copy(prevResBlockSig = randomSig)
       domain.blockchainUpdater.processBlock(block0).explicitGet()
       domain.blockchainUpdater.processBlock(block1).explicitGet()
       domain.blockchainUpdater.processMicroBlock(badMicroRef) should produce("doesn't reference base block")
@@ -56,7 +56,7 @@ class BlockStorageImplMicroblockBadReferencesTest extends PropSpec with Property
       val block0 = blocks(0)
       val block1 = blocks(1)
       val badMicroRef = buildMicroBlockOfTxs(block0.uniqueId, block1, Seq(payment2))._2
-        .copy(prevResBlockSig = randomRef)
+        .copy(prevResBlockSig = randomSig)
       domain.blockchainUpdater.processBlock(block0).explicitGet()
       domain.blockchainUpdater.processBlock(block1).explicitGet()
       domain.blockchainUpdater.processMicroBlock(badMicroRef) should produce("doesn't reference base block")
@@ -65,7 +65,7 @@ class BlockStorageImplMicroblockBadReferencesTest extends PropSpec with Property
 
   property("no base block at all") {
     scenario(preconditionsAndPayments) { case (domain, (genesis, payment, payment2, payment3)) =>
-      val block0 = buildBlockOfTxs(randomRef, Seq(genesis))
+      val block0 = buildBlockOfTxs(randomSig, Seq(genesis))
       val (block1, microblocks1) = chainBaseAndMicro(block0.uniqueId, payment, Seq(payment2))
       domain.blockchainUpdater.processBlock(block0).explicitGet()
       domain.blockchainUpdater.processBlock(block1).explicitGet()
@@ -77,7 +77,7 @@ class BlockStorageImplMicroblockBadReferencesTest extends PropSpec with Property
 
   property("follow-up micro doesn't reference last known micro") {
     scenario(preconditionsAndPayments) { case (domain, (genesis, payment, payment2, payment3)) =>
-      val block0 = buildBlockOfTxs(randomRef, Seq(genesis))
+      val block0 = buildBlockOfTxs(randomSig, Seq(genesis))
       val (block1, microblocks1) = chainBaseAndMicro(block0.uniqueId, payment, Seq(payment2, payment3))
       val goodMicro = microblocks1(0)
       val badRefMicro = microblocks1(1).copy(prevResBlockSig = block1.uniqueId)
