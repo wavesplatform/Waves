@@ -63,7 +63,6 @@ class Miner(
     val consensusData = NxtLikeConsensusBlockData(btg, gs)
 
     val unconfirmed = packUnconfirmed(state, blockchainSettings.functionalitySettings, utx, time, parentHeight)
-    log.info(s"\n\n${unconfirmed.mkString("\n")}\n\n")
     log.debug(s"Generating block with ${unconfirmed.size} transactions $blockAge after previous block")
 
     Block.buildAndSign(Version, currentTime, parent.uniqueId, consensusData, unconfirmed, account)
