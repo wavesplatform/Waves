@@ -63,6 +63,7 @@ class Miner(
     val consensusData = NxtLikeConsensusBlockData(btg, gs)
 
     val unconfirmed = packUnconfirmed(state, blockchainSettings.functionalitySettings, utx, time, parentHeight)
+    log.info(s"\n\n${unconfirmed.mkString("\n")}\n\n")
     log.debug(s"Generating block with ${unconfirmed.size} transactions $blockAge after previous block")
 
     Block.buildAndSign(Version, currentTime, parent.uniqueId, consensusData, unconfirmed, account)
@@ -91,6 +92,8 @@ class Miner(
             override def onSuccess(result: Block) = blockHandler(result)
 
             override def onFailure(t: Throwable) = t match {
+              case _: CancellationException =>
+                log.trace(s"Block generation cancelled for $key")
               case iae: IllegalArgumentException =>
                 log.debug(s"Error generating block, retrying", iae)
                 scheduledAttempts.remove(key, thisAttempt)

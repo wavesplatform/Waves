@@ -25,13 +25,15 @@ class CoordinatorHandler(coordinator: Coordinator, peerDatabase: PeerDatabase, a
           score => allChannels.broadcast(LocalScoreChanged(score))
         )
     case b: Block =>
-      loggingResult(ctx, "applying block", coordinator.processBlock(b)).fold(
-        _ => peerDatabase.blacklistAndClose(ctx.channel()),
-        score => allChannels.broadcast(LocalScoreChanged(score))
-      )
+      if (b.signatureValid) {
+        loggingResult(ctx, "applying block", coordinator.processBlock(b))
+          .foreach(score => allChannels.broadcast(LocalScoreChanged(score)))
+      } else {
+        peerDatabase.blacklistAndClose(ctx.channel())
+      }
     // "off-chain" messages: locally forged block and checkpoints from API
     case bf@BlockForged(b) =>
-      loggingResult(ctx, "applying locally mined block", coordinator.processBlock(b))
+      loggingResult(ctx, "applying locally mined block", coordinator.processLocalBlock(b))
         .foreach(_ => allChannels.broadcast(bf))
     case OffChainCheckpoint(c, p) =>
       loggingResult(ctx, "processing checkpoint from API", coordinator.processCheckpoint(c)).fold(

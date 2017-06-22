@@ -3,7 +3,7 @@ package scorex
 import com.wavesplatform.network.OffChainTransaction
 import io.netty.channel.Channel
 import scorex.api.http.ApiError
-import scorex.transaction.{NewTransactionHandler, Transaction, ValidationError}
+import scorex.transaction.{Transaction, ValidationError}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.{Future, Promise}

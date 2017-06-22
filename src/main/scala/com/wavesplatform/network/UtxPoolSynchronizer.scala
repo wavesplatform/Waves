@@ -17,14 +17,18 @@ class UtxPoolSynchronizer(handler: NewTransactionHandler, allChannels: ChannelGr
         log.debug(s"${id(ctx)} Error processing transaction ${t.id}: $e")
       case Right(_) =>
         log.debug(s"${id(ctx)} Added transaction ${t.id} to UTX pool")
-        allChannels.broadcast(t, remoteSource)
+        allChannels.broadcast(RawBytes(TransactionalMessagesRepo.TransactionMessageSpec.messageCode, t.bytes), remoteSource)
     }
     result
   }
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef) = msg match {
     case t: Transaction => handleTransaction(ctx, t, Some(ctx.channel()))
-    case OffChainTransaction(t, p) => p.success(handleTransaction(ctx, t, None))
+    case OffChainTransaction(t, p) =>
+      log.debug(s"Handling off-chain transaction ${t.id}")
+      val result = handleTransaction(ctx, t, None)
+      result.left.foreach(ve => log.debug(s"Error processing off-chain transaction ${t.id}: $ve"))
+      p.success(result)
     case _ => super.channelRead(ctx, msg)
   }
 }
