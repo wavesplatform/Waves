@@ -104,7 +104,8 @@ class NgHistoryWriterImpl(inner: HistoryWriter) extends NgHistoryWriter {
     }
   }
 
-  override def appendMicroBlock(microBlock: MicroBlock)(fullBlockConsensusValidation: => Either[ValidationError, Unit]): Either[ValidationError, Unit] = write { implicit l =>
+  override def appendMicroBlock(microBlock: MicroBlock)
+                               (fullBlockConsensusValidation: => Either[ValidationError, Unit]): Either[ValidationError, Unit] = write { implicit l =>
     baseBlock() match {
       case None =>
         Left(MicroBlockAppendError("can't be appended because no base block exists", microBlock))
@@ -152,7 +153,6 @@ class NgHistoryWriterImpl(inner: HistoryWriter) extends NgHistoryWriter {
       }
     })
   }
-
 
   override def close(): Unit = inner.close()
 }

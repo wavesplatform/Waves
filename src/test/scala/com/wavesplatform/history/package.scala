@@ -12,7 +12,7 @@ import scorex.transaction.{BlockchainUpdater, History, Transaction, TransactionP
 
 package object history {
 
-  case class Setup(history: History, stateReader: StateReader, blockchainUpdater: BlockchainUpdater)
+  case class Domain(history: History, stateReader: StateReader, blockchainUpdater: BlockchainUpdater)
 
   val MinInMemoryDiffSize = 5
   val DefaultBlockchainSettings = BlockchainSettings(
@@ -24,9 +24,9 @@ package object history {
     functionalitySettings = TestFunctionalitySettings.Enabled,
     genesisSettings = null)
 
-  def setup(): Setup = {
+  def domain(): Domain = {
     val (history, _, stateReader, blockchainUpdater) = BlockStorageImpl(DefaultBlockchainSettings).get
-    Setup(history, stateReader, blockchainUpdater)
+    Domain(history, stateReader, blockchainUpdater)
   }
 
   private val signer = PrivateKeyAccount(Array.fill(TransactionParser.KeyLength)(0))
@@ -57,6 +57,7 @@ package object history {
     (newTotalBlock, microBlock)
   }
 
+  def randomRef: ByteStr = TestBlock.randomOfLength(Block.BlockIdLength)
 
   def chainBlocks(txs: Seq[Seq[Transaction]]): Seq[Block] = {
     def chainBlocksR(refTo: ByteStr, txs: Seq[Seq[Transaction]]): Seq[Block] = txs match {
@@ -66,7 +67,7 @@ package object history {
       case _ => Seq.empty
     }
 
-    chainBlocksR(TestBlock.randomOfLength(Block.BlockIdLength), txs)
+    chainBlocksR(randomRef, txs)
   }
 
   def chainBaseAndMicro(totalRefTo: ByteStr, base: Transaction, micros: Seq[Transaction]): (Block, Seq[MicroBlock]) = {
@@ -80,4 +81,5 @@ package object history {
   }
 
   def malformSignature(b: Block): Block = b.copy(signerData = b.signerData.copy(signature = TestBlock.randomSignature()))
+
 }
