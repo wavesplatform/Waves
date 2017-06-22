@@ -12,7 +12,6 @@ import com.wavesplatform.state2.reader.CompositeStateReader.proxy
 import com.wavesplatform.state2.reader.StateReader
 import scorex.block.Block.BlockId
 import scorex.block.{Block, MicroBlock}
-import scorex.transaction.ValidationError.MicroBlockAppendError
 import scorex.transaction._
 import scorex.utils.ScorexLogging
 
@@ -78,9 +77,9 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
     liquidBlockCandidatesDiff().get(block.reference) match {
       case Some(referencedLiquidDiff) =>
         val asFirmBlock = referencedLiquidDiff.copy(heightDiff = 1)
-          ngHistoryWriter.appendBlock(block)(BlockDiffer.fromBlock(settings, proxy(currentPersistedBlocksState, () => asFirmBlock))(block)).map { newBlockDiff =>
-            inMemoryDiff.set(Monoid.combine(inMemoryDiff(), asFirmBlock))
-            liquidBlockCandidatesDiff.set(Map(block.uniqueId -> newBlockDiff))
+        ngHistoryWriter.appendBlock(block)(BlockDiffer.fromBlock(settings, proxy(currentPersistedBlocksState, () => asFirmBlock))(block)).map { newBlockDiff =>
+          inMemoryDiff.set(Monoid.combine(inMemoryDiff(), asFirmBlock))
+          liquidBlockCandidatesDiff.set(Map(block.uniqueId -> newBlockDiff))
         }
       case None =>
         ngHistoryWriter.appendBlock(block)(BlockDiffer.fromBlock(settings, currentPersistedBlocksState)(block)).map { newBlockDiff =>
@@ -115,13 +114,11 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
 
   override def processMicroBlock(microBlock: MicroBlock): Either[ValidationError, Unit] = write { implicit l =>
     ngHistoryWriter.appendMicroBlock(microBlock) {
-      ngHistoryWriter.forgeBlock(microBlock.prevResBlockSig)
-        .toRight(MicroBlockAppendError("Referenced (micro)block doesn't exist",microBlock))
-        .map { prevFull =>
-          prevFull.copy(
-            signerData = prevFull.signerData.copy(signature = microBlock.totalResBlockSig),
-            transactionData = prevFull.transactionData ++ microBlock.transactionData)
-        }.flatMap(BlockDiffer.fromLiquidBlock(settings, currentPersistedBlocksState))
+      val prevTotal = ngHistoryWriter.forgeBlock(microBlock.prevResBlockSig).get
+      val newTotal = prevTotal.copy(
+        signerData = prevTotal.signerData.copy(signature = microBlock.totalResBlockSig),
+        transactionData = prevTotal.transactionData ++ microBlock.transactionData)
+      BlockDiffer.fromLiquidBlock(settings, currentPersistedBlocksState)(newTotal)
         .map(newTotalDiff => liquidBlockCandidatesDiff.set(liquidBlockCandidatesDiff() + (microBlock.totalResBlockSig -> newTotalDiff)))
     }
   }
