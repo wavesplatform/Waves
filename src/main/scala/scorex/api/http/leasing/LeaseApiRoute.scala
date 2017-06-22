@@ -5,7 +5,9 @@ import javax.ws.rs.Path
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state2.reader.StateReader
+import io.netty.channel.Channel
 import io.swagger.annotations._
+import scorex.BroadcastRoute
 import scorex.api.http._
 import scorex.api.http.leasing.LeaseCancelRequest.leaseCancelRequestFormat
 import scorex.api.http.leasing.LeaseRequest.leaseCancelRequestFormat
@@ -15,8 +17,8 @@ import scorex.wallet.Wallet
 
 @Path("/leasing")
 @Api(value = "/leasing")
-case class LeaseApiRoute(settings: RestAPISettings, wallet: Wallet, state: StateReader, newTxHandler: NewTransactionHandler, time: Time)
-  extends ApiRoute {
+case class LeaseApiRoute(settings: RestAPISettings, wallet: Wallet, state: StateReader, localChannel: Channel, time: Time)
+  extends ApiRoute with BroadcastRoute {
 
   override val route = pathPrefix("leasing") {
     lease ~ cancel
@@ -38,7 +40,7 @@ case class LeaseApiRoute(settings: RestAPISettings, wallet: Wallet, state: State
     )
   ))
   @ApiResponses(Array(new ApiResponse(code = 200, message = "Json with response or error")))
-  def lease: Route = processRequest("lease", (t: LeaseRequest) => TransactionFactory.lease(t, wallet, newTxHandler, time))
+  def lease: Route = processRequest("lease", (t: LeaseRequest) => doBroadcast(TransactionFactory.lease(t, wallet, time)))
 
   @Path("/cancel")
   @ApiOperation(value = "Interrupt a lease",
@@ -55,5 +57,5 @@ case class LeaseApiRoute(settings: RestAPISettings, wallet: Wallet, state: State
       defaultValue = "{\n\t\"sender\": \"3Myss6gmMckKYtka3cKCM563TBJofnxvfD7\",\n\t\"txId\": \"ABMZDPY4MyQz7kKNAevw5P9eNmRErMutJoV9UNeCtqRV\",\n\t\"fee\": 10000000\n}"
     )
   ))
-  def cancel: Route = processRequest("cancel", (t: LeaseCancelRequest) => TransactionFactory.leaseCancel(t, wallet, newTxHandler, time))
+  def cancel: Route = processRequest("cancel", (t: LeaseCancelRequest) => doBroadcast(TransactionFactory.leaseCancel(t, wallet, time)))
 }

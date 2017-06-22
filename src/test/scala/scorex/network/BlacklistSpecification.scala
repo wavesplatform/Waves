@@ -45,7 +45,7 @@ class BlacklistSpecification extends FeatureSpec with GivenWhenThen {
       assert(!peerDatabase.knownPeers.contains(address))
 
       And("Peer waits for some time")
-      Thread.sleep(networkSettings.blackListResidenceTime.toMillis)
+      Thread.sleep(networkSettings.blackListResidenceTime.toMillis + 500)
 
       Then("Another peer disappear from blacklist")
       assert(!isBlacklisted(address))

@@ -55,7 +55,7 @@ class BlacklistParallelSpecification extends FeatureSpec with GivenWhenThen with
       assert(!peerDatabase.knownPeers.contains(address1))
 
       And("Peer waits for some time")
-      Thread.sleep(networkSettings.blackListResidenceTime.toMillis)
+      Thread.sleep(networkSettings.blackListResidenceTime.toMillis + 500)
 
       Then("Another peer disappear from blacklist")
       assert(!isBlacklisted(address1))
@@ -93,7 +93,7 @@ class BlacklistParallelSpecification extends FeatureSpec with GivenWhenThen with
       peerDatabase.blacklist(address2.getAddress)
 
       And("Waits another half of period")
-      Thread.sleep(networkSettings.blackListResidenceTime.toMillis / 2)
+      Thread.sleep((networkSettings.blackListResidenceTime.toMillis / 1.9).toLong)
 
       Then("Two peers disappear from blacklist")
       assert(!isBlacklisted(address1))
@@ -101,7 +101,7 @@ class BlacklistParallelSpecification extends FeatureSpec with GivenWhenThen with
       assert(!isBlacklisted(address3))
 
       And("Then waits another half of period")
-      Thread.sleep(networkSettings.blackListResidenceTime.toMillis / 2)
+      Thread.sleep((networkSettings.blackListResidenceTime.toMillis / 1.9).toLong)
 
       And("All peers not in blacklist")
       assert(!isBlacklisted(address1))
