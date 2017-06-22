@@ -65,7 +65,7 @@ class Miner(
           require(h < t, s"Hit $h was NOT less than target $t")
 
           log.debug(s"hit=$h, target=$t, ${if (h < t) "" else "NOT"} generating, account=$account, " +
-            s"balance=$balance, lastBlockId=${parent.encodedId}, height=$parentHeight, lastTarget=${lastBlockKernelData.baseTarget}")
+            s"balance=$balance, lastBlockId=${parent.uniqueId}, height=$parentHeight, lastTarget=${lastBlockKernelData.baseTarget}")
 
           val avgBlockDelay = blockchainSettings.genesisSettings.averageBlockDelay
           val btg = calcBaseTarget(avgBlockDelay, parentHeight, parent, greatGrandParent, currentTime)
