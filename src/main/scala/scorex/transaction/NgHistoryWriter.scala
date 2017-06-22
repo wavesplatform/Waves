@@ -38,23 +38,24 @@ class NgHistoryWriterImpl(inner: HistoryWriter) extends NgHistoryWriter {
 
   override def appendBlock(block: Block)(consensusValidation: => Either[ValidationError, BlockDiff]): Either[ValidationError, BlockDiff]
   = write { implicit l => {
+    lazy val referencesLastInner = inner.lastBlock.uniqueId == block.reference
     if (baseBlock().isEmpty) {
-      if (inner.height() > 0 && inner.lastBlock.uniqueId != block.reference)
-        Left(BlockAppendError("liquid block is None, new block reference is not last inner block(which exists)", block))
+      if (inner.height() > 0 && !referencesLastInner)
+        Left(BlockAppendError("References incorrect or non-existing block (inner block exists, liquid block doesn't)", block))
       else
         consensusValidation
     }
-    else if (containsLocalBlock(block.reference)) {
-      val forgedBlock = forgeBlock(block.reference).get
-      inner.appendBlock(forgedBlock)(consensusValidation)
-    } else {
-      if (inner.isEmpty) {
-        Left(BlockAppendError("trying to overwrite liquid block when inner is empty", block))
-      } else if (inner.lastBlock.uniqueId != block.reference) {
-        Left(BlockAppendError("references neither existing liquid block, neither last existing inner block", block))
-      } else {
-        consensusValidation
-      }
+    else forgeBlock(block.reference) match {
+      case Some(forgedBlock) =>
+        inner.appendBlock(forgedBlock)(consensusValidation)
+      case None =>
+        if (inner.isEmpty) {
+            Left(BlockAppendError("References non-existing block (liquid exists, inner doesn't)", block))
+        } else if (!referencesLastInner) {
+          Left(BlockAppendError("References incorrect or non-existing block (liquid block and last inner block exist)", block))
+        } else {
+          consensusValidation
+        }
     }
   }.map { bd => // finally place new as liquid
     micros.set(List.empty)
