@@ -27,8 +27,6 @@ trait StateReader extends Synchronized {
 
   def height: Int
 
-  def accountPortfoliosHash: Int
-
   def accountTransactionIds(a: Account): Seq[ByteStr]
 
   def paymentTransactionIdByHash(hash: ByteStr): Option[ByteStr]
@@ -178,6 +176,10 @@ object StateReader {
       }
 
       loop(s.lastUpdateHeight(acc).getOrElse(0))
+    }
+
+    def accountPortfoliosHash: Int = {
+      Hash.accountPortfolios(s.accountPortfolios)
     }
   }
 
