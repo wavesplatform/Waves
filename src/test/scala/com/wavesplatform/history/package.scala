@@ -32,7 +32,7 @@ package object history {
     Domain(history, stateReader, blockchainUpdater)
   }
 
-  private val signer = PrivateKeyAccount(Array.fill(TransactionParser.KeyLength)(0))
+  private val defaultSigner = PrivateKeyAccount(Array.fill(TransactionParser.KeyLength)(0))
   private val generationSignature = Array.fill(Block.GeneratorSignatureLength)(0: Byte)
 
   def buildBlockOfTxs(refTo: ByteStr, txs: Seq[Transaction]): Block = {
@@ -44,11 +44,11 @@ package object history {
         baseTarget = 1L,
         generationSignature = generationSignature),
       transactionData = txs,
-      signer = signer)
+      signer = defaultSigner)
   }
 
 
-  def buildMicroBlockOfTxs(totalRefTo: ByteStr, prevTotal: Block, txs: Seq[Transaction]): (Block, MicroBlock) = {
+  def buildMicroBlockOfTxs(totalRefTo: ByteStr, prevTotal: Block, txs: Seq[Transaction], signer : PrivateKeyAccount = defaultSigner): (Block, MicroBlock) = {
     val newTotalBlock = buildBlockOfTxs(totalRefTo, prevTotal.transactionData ++ txs)
     val microBlock = MicroBlock(
       generator = signer,
@@ -60,7 +60,7 @@ package object history {
     (newTotalBlock, microBlock)
   }
 
-  def randomRef: ByteStr = TestBlock.randomOfLength(Block.BlockIdLength)
+  def randomSig: ByteStr = TestBlock.randomOfLength(Block.BlockIdLength)
 
   def chainBlocks(txs: Seq[Seq[Transaction]]): Seq[Block] = {
     def chainBlocksR(refTo: ByteStr, txs: Seq[Seq[Transaction]]): Seq[Block] = txs match {
@@ -70,7 +70,7 @@ package object history {
       case _ => Seq.empty
     }
 
-    chainBlocksR(randomRef, txs)
+    chainBlocksR(randomSig, txs)
   }
 
   def chainBaseAndMicro(totalRefTo: ByteStr, base: Transaction, micros: Seq[Transaction]): (Block, Seq[MicroBlock]) = {
