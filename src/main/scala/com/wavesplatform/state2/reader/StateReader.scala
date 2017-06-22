@@ -3,7 +3,6 @@ package com.wavesplatform.state2.reader
 import com.google.common.base.Charsets
 import com.wavesplatform.state2._
 import scorex.account.{Account, AccountOrAlias, Alias}
-import scorex.crypto.hash.FastCryptographicHash
 import scorex.transaction.ValidationError.AliasNotExists
 import scorex.transaction._
 import scorex.transaction.assets.IssueTransaction
@@ -177,6 +176,10 @@ object StateReader {
       }
 
       loop(s.lastUpdateHeight(acc).getOrElse(0))
+    }
+
+    def accountPortfoliosHash: Int = {
+      Hash.accountPortfolios(s.accountPortfolios)
     }
   }
 
