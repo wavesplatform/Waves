@@ -164,7 +164,7 @@ class Coordinator(
       val hh = existingItems.map(_.height) :+ genesisBlockHeight
       history.blockAt(hh(fork.size)).foreach {
         lastValidBlock =>
-          log.warn(s"Fork detected (length = ${fork.size}), rollback to last valid block id [${lastValidBlock.encodedId}]")
+          log.warn(s"Fork detected (length = ${fork.size}), rollback to last valid block id [${lastValidBlock.uniqueId}]")
           blockchainUpdater.removeAfter(lastValidBlock.uniqueId)
       }
     }
@@ -172,7 +172,7 @@ class Coordinator(
 }
 
 object Coordinator extends ScorexLogging {
-  val MaxTimeDrift = Duration.ofSeconds(15).toMillis
+  val MaxTimeDrift: Long = Duration.ofSeconds(15).toMillis
 
   def blockConsensusValidation(history: History, state: StateReader, bcs: BlockchainSettings, currentTs: Long)(block: Block): Boolean = try {
 

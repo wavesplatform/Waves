@@ -47,7 +47,7 @@ class Miner(
           val t = calcTarget(parent, currentTime, balance)
           if (h < t) {
             log.debug(s"Forging new block with ${account.address}, hit $h, target $t, balance $balance")
-            log.debug(s"Previous block ID ${parent.encodedId} at $parentHeight with target ${lastBlockKernelData.baseTarget}")
+            log.debug(s"Previous block ID ${parent.uniqueId} at $parentHeight with target ${lastBlockKernelData.baseTarget}")
 
             val avgBlockDelay = blockchainSettings.genesisSettings.averageBlockDelay
             val btg = calcBaseTarget(avgBlockDelay, parentHeight, parent, greatGrandParent, currentTime)

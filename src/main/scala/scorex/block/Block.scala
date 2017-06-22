@@ -26,7 +26,6 @@ case class Block(timestamp: Long, version: Byte, reference: ByteStr, signerData:
   private lazy val transactionDataField = TransactionsBlockField(transactionData)
 
   lazy val uniqueId: ByteStr = signerData.signature
-  lazy val encodedId: String = uniqueId.base58
 
   lazy val fee: Long =
     transactionData.map(_.assetFee)
@@ -101,7 +100,7 @@ object Block extends ScorexLogging {
 
   val TransactionSizeLength = 4
 
-  private def transParseBytes(bytes: Array[Byte]): Try[Seq[Transaction]] = Try {
+  def transParseBytes(bytes: Array[Byte]): Try[Seq[Transaction]] = Try {
     if (bytes.isEmpty) {
       Seq.empty
     } else {
