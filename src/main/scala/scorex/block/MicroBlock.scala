@@ -3,12 +3,12 @@ package scorex.block
 import com.google.common.primitives.{Bytes, Ints}
 import com.wavesplatform.state2.ByteStr
 import play.api.libs.json.{JsObject, Json}
-import scorex.account.PublicKeyAccount
+import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.block.Block.BlockId
 import scorex.crypto.EllipticCurveImpl
 import scorex.transaction.TransactionParser.SignatureLength
 import scorex.transaction.ValidationError.GenericError
-import scorex.transaction.{Signed, Transaction, TransactionsBlockField, ValidationError}
+import scorex.transaction._
 
 case class MicroBlock private(version: Byte, generator: PublicKeyAccount, transactionData: Seq[Transaction], prevResBlockSig: BlockId,
                               totalResBlockSig: BlockId, signature: ByteStr) extends Signed {
@@ -56,6 +56,19 @@ object MicroBlock {
       Left(GenericError("cannot create empty MicroBlock"))
     else
       Right(new MicroBlock(version = 1: Byte, generator, transactionData, prevResBlockSig, totalResBlockSig, signature))
+  }
+
+  def buildAndSign(generator: PrivateKeyAccount, transactionData: Seq[Transaction], prevResBlockSig: BlockId,
+                   totalResBlockSig: BlockId): Either[ValidationError, MicroBlock] = {
+    require(prevResBlockSig.arr.length == SignatureLength, "Incorrect prevResBlockSig")
+    require(totalResBlockSig.arr.length == SignatureLength, "Incorrect totalResBlockSig")
+    require(generator.publicKey.length == TransactionParser.KeyLength, "Incorrect generator.publicKey")
+
+    apply(generator, transactionData, prevResBlockSig, totalResBlockSig, ByteStr.empty).map { nonSignedBlock =>
+      val toSign = nonSignedBlock.bytes
+      val signature = EllipticCurveImpl.sign(generator, toSign)
+      nonSignedBlock.copy(signature = ByteStr(signature))
+    }
   }
 }
 
