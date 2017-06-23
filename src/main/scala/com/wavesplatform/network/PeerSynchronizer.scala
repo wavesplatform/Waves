@@ -25,10 +25,7 @@ class PeerSynchronizer(peerDatabase: PeerDatabase) extends ChannelInboundHandler
     case hs: Handshake =>
       hs.declaredAddress.foreach { declaredAddress =>
         peerDatabase.addCandidate(declaredAddress)
-
-        if (sameAddresses(declaredAddress, ctx.channel().remoteAddress())) {
-          ctx.channel().attr(AttributeKeys.DeclaredAddress).setIfAbsent(declaredAddress)
-        }
+        ctx.channel().attr(AttributeKeys.DeclaredAddress).setIfAbsent(declaredAddress)
       }
       ctx.fireChannelRead(msg)
     case GetPeers =>

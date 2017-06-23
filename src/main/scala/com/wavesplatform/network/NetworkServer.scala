@@ -208,6 +208,7 @@ class NetworkServer(
               peerDatabase.blacklist(remoteAddress.getAddress)
             } else if (connFuture.isSuccess) {
               log.debug(s"${id(connFuture.channel())} Connection established")
+              peerDatabase.touch(remoteAddress)
               outgoingChannelCount.incrementAndGet()
               connFuture.channel().closeFuture().addListener { (closeFuture: ChannelFuture) =>
                 val remainingCount = outgoingChannelCount.decrementAndGet()
