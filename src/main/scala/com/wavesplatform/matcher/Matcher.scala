@@ -8,8 +8,9 @@ import com.wavesplatform.matcher.api.MatcherApiRoute
 import com.wavesplatform.matcher.market.{MatcherActor, OrderHistoryActor}
 import com.wavesplatform.settings.{BlockchainSettings, RestAPISettings}
 import com.wavesplatform.state2.reader.StateReader
+import io.netty.channel.Channel
 import scorex.api.http.CompositeHttpService
-import scorex.transaction.{History, NewTransactionHandler}
+import scorex.transaction.History
 import scorex.utils.{ScorexLogging, Time}
 import scorex.wallet.Wallet
 
@@ -19,7 +20,7 @@ import scala.reflect.runtime.universe._
 
 class Matcher(actorSystem: ActorSystem,
               wallet: Wallet,
-              newTransactionHandler: NewTransactionHandler,
+              localChannel: Channel,
               stateReader: StateReader,
               time: Time,
               history: History,
@@ -36,8 +37,7 @@ class Matcher(actorSystem: ActorSystem,
   )
 
   lazy val matcher: ActorRef = actorSystem.actorOf(MatcherActor.props(orderHistory, stateReader, wallet, matcherSettings,
-    newTransactionHandler, time, history,
-    blockchainSettings.functionalitySettings), MatcherActor.name)
+    localChannel, time, history, blockchainSettings.functionalitySettings), MatcherActor.name)
 
   lazy val orderHistory: ActorRef = actorSystem.actorOf(OrderHistoryActor.props(matcherSettings, stateReader, wallet),
     OrderHistoryActor.name)

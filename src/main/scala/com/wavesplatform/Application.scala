@@ -59,8 +59,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
     val feeCalculator = new FeeCalculator(settings.feesSettings)
     val time: Time = new TimeImpl()
     val utxStorage: UnconfirmedTransactionsStorage = new UnconfirmedTransactionsDatabaseImpl(settings.utxSettings.size)
-    val newTransactionHandler = new NewTransactionHandlerImpl(settings.blockchainSettings.functionalitySettings,
-      time, feeCalculator, utxStorage, stateReader)
+
 
     val peerDatabase = new PeerDatabaseImpl(settings.networkSettings)
     val establishedConnections = new ConcurrentHashMap[Channel, PeerInfo]
@@ -77,7 +76,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
       time,
       stateReader,
       utxStorage,
-      newTransactionHandler,
+      new NewTransactionHandlerImpl(settings.blockchainSettings.functionalitySettings, time, feeCalculator, utxStorage, stateReader),
       peerDatabase,
       wallet,
       allChannels,
@@ -146,7 +145,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
     }
 
     if (settings.matcherSettings.enable) {
-      val matcher = new Matcher(actorSystem, wallet, newTransactionHandler, stateReader, time, history, settings.blockchainSettings, settings.restAPISettings, settings.matcherSettings)
+      val matcher = new Matcher(actorSystem, wallet, network.localClientChannel, stateReader, time, history, settings.blockchainSettings, settings.restAPISettings, settings.matcherSettings)
       matcher.runMatcher()
     }
   }
