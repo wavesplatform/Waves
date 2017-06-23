@@ -126,8 +126,8 @@ object Block extends ScorexLogging {
     val timestamp = Longs.fromByteArray(bytes.slice(position, position + 8))
     position += 8
 
-    val reference = ByteStr(bytes.slice(position, position + Block.BlockIdLength))
-    position += BlockIdLength
+    val reference = ByteStr(bytes.slice(position, position + SignatureLength))
+    position += SignatureLength
 
     val cBytesLength = Ints.fromByteArray(bytes.slice(position, position + 4))
     position += 4
@@ -161,7 +161,7 @@ object Block extends ScorexLogging {
     val nonSignedBlock = Block(timestamp, version, reference, SignerData(signer, ByteStr.empty), consensusData, transactionData)
     val toSign = nonSignedBlock.bytes
     val signature = EllipticCurveImpl.sign(signer, toSign)
-    require(reference.arr.length == BlockIdLength, "Incorrect reference")
+    require(reference.arr.length == SignatureLength, "Incorrect reference")
     require(consensusData.generationSignature.length == GeneratorSignatureLength, "Incorrect consensusData.generationSignature")
     require(signer.publicKey.length == KeyLength, "Incorrect signer.publicKey")
     nonSignedBlock.copy(signerData = SignerData(signer, ByteStr(signature)))
@@ -182,7 +182,7 @@ object Block extends ScorexLogging {
     val cBytesSize = consensusGenesisDataField.bytes.length
     val cBytes = Bytes.ensureCapacity(Ints.toByteArray(cBytesSize), 4, 0) ++ consensusGenesisDataField.bytes
 
-    val reference = Array.fill(BlockIdLength)(-1: Byte)
+    val reference = Array.fill(SignatureLength)(-1: Byte)
 
     val toSign: Array[Byte] = Array(version) ++
       Bytes.ensureCapacity(Longs.toByteArray(timestamp), 8, 0) ++
