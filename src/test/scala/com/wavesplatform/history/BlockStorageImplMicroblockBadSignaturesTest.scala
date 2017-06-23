@@ -17,7 +17,7 @@ class BlockStorageImplMicroblockBadSignaturesTest extends PropSpec with Property
 
   val preconditionsAndPayments: Gen[(GenesisTransaction, PaymentTransaction, PaymentTransaction)] = for {
     master <- accountGen
-    recipient <- otherAccountGen(candidate = master)
+    recipient <- accountGen
     ts <- positiveIntGen
     genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
     payment: PaymentTransaction <- paymentGeneratorP(master, recipient)

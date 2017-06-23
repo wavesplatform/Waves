@@ -52,7 +52,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
   }
 
   def bestLiquidState: StateReader = read { implicit l =>
-    proxy(persisted, () => Monoid.combine(inMemoryDiff(), bestLiquidDiff))
+    proxy(persisted, () => Monoid.combine(inMemoryDiff(), bestLiquidDiff()))
   }
 
   private def updatePersistedAndInMemory(): Unit = write { implicit l =>

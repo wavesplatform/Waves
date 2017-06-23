@@ -14,7 +14,7 @@ class StateReaderLastTransactionsTest extends PropSpec with PropertyChecks with 
 
   val preconditionsAndPayment: Gen[(Seq[Transaction], PaymentTransaction)] = for {
     master <- accountGen
-    recipient <- otherAccountGen(candidate = master)
+    recipient <- accountGen
     ts <- timestampGen
     genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
     transfer1: PaymentTransaction <- paymentGeneratorP(ts + 1, master, recipient)

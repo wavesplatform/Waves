@@ -124,5 +124,5 @@ object CompositeStateReader {
       new CompositeStateReader(inner, blockDiff()).filledVolumeAndFee(orderId)
   }
 
-  def proxy(inner: StateReader, blockDiff: () => BlockDiff) = new Proxy(inner, blockDiff)
+  def proxy(inner: StateReader, blockDiff: () => BlockDiff): Proxy = new Proxy(inner, blockDiff)
 }
