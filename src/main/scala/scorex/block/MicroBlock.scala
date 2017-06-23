@@ -1,14 +1,17 @@
 package scorex.block
 
 import com.google.common.primitives.{Bytes, Ints}
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state2._
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
-import scorex.block.Block.BlockId
+import scorex.block.Block.{BlockId, transParseBytes}
 import scorex.crypto.EllipticCurveImpl
 import scorex.transaction.TransactionParser.SignatureLength
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction._
+import scorex.utils.ScorexLogging
+
+import scala.util.{Failure, Try}
 
 case class MicroBlock private(version: Byte, generator: PublicKeyAccount, transactionData: Seq[Transaction], prevResBlockSig: BlockId,
                               totalResBlockSig: BlockId, signature: ByteStr) extends Signed {
@@ -49,13 +52,13 @@ case class MicroBlock private(version: Byte, generator: PublicKeyAccount, transa
   override lazy val signedDescendants: Seq[Signed] = transactionData
 }
 
-object MicroBlock {
-  def apply(generator: PublicKeyAccount, transactionData: Seq[Transaction], prevResBlockSig: BlockId,
-            totalResBlockSig: BlockId, signature: ByteStr): Either[ValidationError, MicroBlock] = {
+object MicroBlock extends ScorexLogging {
+  private def create(version: Byte, generator: PublicKeyAccount, transactionData: Seq[Transaction], prevResBlockSig: BlockId,
+                     totalResBlockSig: BlockId, signature: ByteStr): Either[ValidationError, MicroBlock] = {
     if (transactionData.isEmpty)
       Left(GenericError("cannot create empty MicroBlock"))
     else
-      Right(new MicroBlock(version = 1: Byte, generator, transactionData, prevResBlockSig, totalResBlockSig, signature))
+      Right(new MicroBlock(version, generator, transactionData, prevResBlockSig, totalResBlockSig, signature))
   }
 
   def buildAndSign(generator: PrivateKeyAccount, transactionData: Seq[Transaction], prevResBlockSig: BlockId,
@@ -64,11 +67,41 @@ object MicroBlock {
     require(totalResBlockSig.arr.length == SignatureLength, "Incorrect totalResBlockSig")
     require(generator.publicKey.length == TransactionParser.KeyLength, "Incorrect generator.publicKey")
 
-    apply(generator, transactionData, prevResBlockSig, totalResBlockSig, ByteStr.empty).map { nonSignedBlock =>
+    create(version = 1: Byte, generator, transactionData, prevResBlockSig, totalResBlockSig, ByteStr.empty).map { nonSignedBlock =>
       val toSign = nonSignedBlock.bytes
       val signature = EllipticCurveImpl.sign(generator, toSign)
       nonSignedBlock.copy(signature = ByteStr(signature))
     }
   }
+
+  def parseBytes(bytes: Array[Byte]): Try[MicroBlock] = Try {
+
+    val version = bytes.head
+
+    var position = 1
+
+    val prevResBlockSig = ByteStr(bytes.slice(position, position + SignatureLength))
+    position += SignatureLength
+
+    val totalResBlockSig = ByteStr(bytes.slice(position, position + SignatureLength))
+    position += SignatureLength
+
+    val tBytesLength = Ints.fromByteArray(bytes.slice(position, position + 4))
+    position += 4
+    val tBytes = bytes.slice(position, position + tBytesLength)
+    val txBlockField = transParseBytes(tBytes).get
+    position += tBytesLength
+
+    val genPK = bytes.slice(position, position + TransactionParser.KeyLength)
+    position += TransactionParser.KeyLength
+
+    val signature = ByteStr(bytes.slice(position, position + SignatureLength))
+
+    create(version, PublicKeyAccount(genPK), txBlockField, prevResBlockSig, totalResBlockSig, signature).explicitGet()
+  }.recoverWith { case t: Throwable =>
+    log.error("Error when parsing block", t)
+    Failure(t)
+  }
+
 }
 
