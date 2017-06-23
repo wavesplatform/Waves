@@ -14,6 +14,8 @@ trait NgHistoryWriter extends HistoryWriter {
   def bestLiquidBlock(): Option[Block]
 
   def forgeBlock(id: BlockId): Option[Block]
+
+  def liquidBlockExists() : Boolean
 }
 
 class NgHistoryWriterImpl(inner: HistoryWriter) extends NgHistoryWriter {
@@ -22,6 +24,10 @@ class NgHistoryWriterImpl(inner: HistoryWriter) extends NgHistoryWriter {
 
   private val baseBlock = Synchronized(Option.empty[Block])
   private val micros = Synchronized(List.empty[MicroBlock])
+
+  def liquidBlockExists() : Boolean = read { implicit l =>
+    baseBlock().isDefined
+  }
 
   def bestLiquidBlock(): Option[Block] = read { implicit l =>
     baseBlock().map(base => {
