@@ -65,7 +65,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
       persisted.applyBlockDiff(diffToBePersisted)
     }
 
-    inMemoryDiff.set(unsafeDiffAgainstPersistedByRange(persisted.height + 1, ngHistoryWriter.height() + 1))
+    inMemoryDiff.set(unsafeDiffAgainstPersistedByRange(persisted.height + 1, ngHistoryWriter.height() + (if (ngHistoryWriter.liquidBlockExists()) 0 else 1)))
     logHeights("State rebuild finished:")
   }
 
