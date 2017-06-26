@@ -34,38 +34,47 @@ class Miner(
   private val minerPool = MoreExecutors.listeningDecorator(Executors.newScheduledThreadPool(2))
   private val scheduledAttempts = new ConcurrentHashMap[ByteStr, ScheduledFuture[_]]()
 
-  private def generateBlock(account: PrivateKeyAccount, parentHeight: Int, parent: Block, greatGrandParent: Option[Block]): Callable[Block] = () => {
-    val publicKey = ByteStr(account.publicKey)
-    val pc = peerCount
+  private def generateBlock(account: PrivateKeyAccount, parentHeight: Int, parent: Block, greatGrandParent: Option[Block]): Callable[Option[Block]] = () => {
     val blockAge = Duration.between(Instant.ofEpochMilli(parent.timestamp), Instant.ofEpochMilli(time))
-    require(pc >= minerSettings.quorum,
-      s"Quorum not available ($pc/${minerSettings.quorum}, not forging block with $publicKey")
+    if (blockAge <= minerSettings.intervalAfterLastBlockThenGenerationIsAllowed) {
+      val pc = peerCount
+      if (pc >= minerSettings.quorum) {
+        val balance = generatingBalance(state, blockchainSettings.functionalitySettings)(account, parentHeight)
+        if (balance >= MinimalEffectiveBalanceForGenerator) {
+          val lastBlockKernelData = parent.consensusData
+          val currentTime = time
 
-    val balance = generatingBalance(state, blockchainSettings.functionalitySettings)(account, parentHeight)
+          val h = calcHit(lastBlockKernelData, account)
+          val t = calcTarget(parent, currentTime, balance)
+          if (h >= t) {
+            log.debug(s"Forging new block with ${account.address}, hit $h, target $t, balance $balance")
+            log.debug(s"Previous block ID ${parent.encodedId} at $parentHeight with target ${lastBlockKernelData.baseTarget}")
 
-    require(balance >= MinimalEffectiveBalanceForGenerator,
-      s"Effective balance $balance is less that minimal ($MinimalEffectiveBalanceForGenerator)")
+            val avgBlockDelay = blockchainSettings.genesisSettings.averageBlockDelay
+            val btg = calcBaseTarget(avgBlockDelay, parentHeight, parent, greatGrandParent, currentTime)
+            val gs = calcGeneratorSignature(lastBlockKernelData, account)
+            val consensusData = NxtLikeConsensusBlockData(btg, gs)
 
-    val lastBlockKernelData = parent.consensusData
-    val currentTime = time
+            val unconfirmed = packUnconfirmed(state, blockchainSettings.functionalitySettings, utx, time, parentHeight)
+            log.debug(s"Putting ${unconfirmed.size} unconfirmed transactions $blockAge after previous block")
 
-    val h = calcHit(lastBlockKernelData, account)
-    val t = calcTarget(parent, currentTime, balance)
-
-    require(h < t, s"Hit $h was NOT less than target $t")
-
-    log.debug(s"hit=$h, target=$t, ${if (h < t) "" else "NOT"} generating, account=$account, " +
-      s"balance=$balance, lastBlockId=${parent.encodedId}, height=$parentHeight, lastTarget=${lastBlockKernelData.baseTarget}")
-
-    val avgBlockDelay = blockchainSettings.genesisSettings.averageBlockDelay
-    val btg = calcBaseTarget(avgBlockDelay, parentHeight, parent, greatGrandParent, currentTime)
-    val gs = calcGeneratorSignature(lastBlockKernelData, account)
-    val consensusData = NxtLikeConsensusBlockData(btg, gs)
-
-    val unconfirmed = packUnconfirmed(state, blockchainSettings.functionalitySettings, utx, time, parentHeight)
-    log.debug(s"Generating block with ${unconfirmed.size} transactions $blockAge after previous block")
-
-    Block.buildAndSign(Version, currentTime, parent.uniqueId, consensusData, unconfirmed, account)
+            Some(Block.buildAndSign(Version, currentTime, parent.uniqueId, consensusData, unconfirmed, account))
+          } else {
+            log.warn(s"Hit $h was NOT less than target $t, not forging block with ${account.address}")
+            None
+          }
+        } else {
+          log.warn(s"Effective balance $balance is less that minimal ($MinimalEffectiveBalanceForGenerator) on ${account.address}")
+          None
+        }
+      } else {
+        log.warn(s"Quorum not available ($pc/${minerSettings.quorum}, not forging block with ${account.address}")
+        None
+      }
+    } else {
+      log.warn(s"Blockchain is too old ($blockAge > ${minerSettings.intervalAfterLastBlockThenGenerationIsAllowed}), not forging block with ${account.address}")
+      None
+    }
   }
 
   private def retry(parentHeight: Int, parent: Block, greatGrandParent: Option[Block])(account: PrivateKeyAccount): Unit =
@@ -87,14 +96,20 @@ class Miner(
             generateBlock(account, parentHeight, parent, greatGrandParent),
             generationOffset.toMillis, TimeUnit.MILLISECONDS)
 
-          Futures.addCallback(thisAttempt, new FutureCallback[Block] {
-            override def onSuccess(result: Block) = blockHandler(result)
+          Futures.addCallback(thisAttempt, new FutureCallback[Option[Block]] {
+            override def onSuccess(result: Option[Block]): Unit = result match {
+              case Some(block) => blockHandler(block)
+              case None =>
+                log.debug(s"No block generated: Retrying")
+                scheduledAttempts.remove(key, thisAttempt)
+                retry(parentHeight, parent, greatGrandParent)(account)
+            }
 
-            override def onFailure(t: Throwable) = t match {
+            override def onFailure(t: Throwable): Unit = t match {
               case _: CancellationException =>
                 log.trace(s"Block generation cancelled for $key")
-              case iae: IllegalArgumentException =>
-                log.debug(s"Error generating block, retrying", iae)
+              case re: RuntimeException =>
+                log.warn(s"Error generating block, retrying", re)
                 scheduledAttempts.remove(key, thisAttempt)
                 retry(parentHeight, parent, greatGrandParent)(account)
             }
@@ -118,6 +133,7 @@ class Miner(
 }
 
 object Miner extends ScorexLogging {
+  private val minimalDurationMillis = 1001
   val Version: Byte = 2
-  val MinimalGenerationOffset = Duration.ofMillis(1001)
+  val MinimalGenerationOffset: Duration = Duration.ofMillis(minimalDurationMillis)
 }
