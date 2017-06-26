@@ -121,42 +121,6 @@ object DataTypes {
     }
   }
 
-  // List[Array[Byte]]
-  val accountTransactionIds: DataType = new DTTemplate {
-    override def compare(a: scala.Any, b: scala.Any) = {
-      val l1 = a.asInstanceOf[List[Array[Byte]]]
-      val l2 = a.asInstanceOf[List[Array[Byte]]]
-      if (l1.length != l2.length) l1.length - l2.length else {
-        l1.zip(l2).view
-          .map { case (b1, b2) => ByteArray.compare(b1, b2) }
-          .dropWhile(_ == 0)
-          .headOption.getOrElse(0)
-
-      }
-    }
-
-    override def read(buff: ByteBuffer) = {
-      val length = readVarInt(buff)
-      List.fill(length) {
-        val idLength = readVarInt(buff)
-        val bytes = new Array[Byte](idLength)
-        buff.get(bytes)
-        bytes
-      }
-    }
-
-    override def getMemory(obj: scala.Any) = 5 + obj.asInstanceOf[List[Array[Byte]]].map(_.length + 5).sum
-
-    override def write(buff: WriteBuffer, obj: scala.Any) = {
-      val ids = obj.asInstanceOf[List[Array[Byte]]]
-      buff.putVarInt(ids.length)
-      ids.foreach { b =>
-        buff.putVarInt(b.length)
-        buff.put(b)
-      }
-    }
-  }
-
   // (Int, Array[Byte])
   val transactions: DataType = new DTTemplate {
     override def compare(a: scala.Any, b: scala.Any) = throw new UnsupportedOperationException

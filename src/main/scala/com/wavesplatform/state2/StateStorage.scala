@@ -36,11 +36,14 @@ class StateStorage private(file: Option[File]) extends AutoCloseable {
   val assets: MVMap[ByteStr, (Boolean, Long)] = db.openMap("assets",
     new LogMVMapBuilder[ByteStr, (Boolean, Long)].keyType(DataTypes.byteStr).valueType(DataTypes.assets))
 
-  val accountTransactionIds: MVMap[ByteStr, List[Array[Byte]]] = db.openMap("accountTransactionIds",
-    new LogMVMapBuilder[ByteStr, List[Array[Byte]]].keyType(DataTypes.byteStr).valueType(DataTypes.accountTransactionIds))
+  val accountTransactionIds: MVMap[AccountIdxKey, ByteStr] = db.openMap("accountTransactionIds",
+    new LogMVMapBuilder[AccountIdxKey, ByteStr].valueType(DataTypes.byteStr))
 
-  val balanceSnapshots: MVMap[SnapshotKey, (Int, Long, Long)] = db.openMap("balanceSnapshots",
-    new LogMVMapBuilder[SnapshotKey, (Int, Long, Long)].valueType(DataTypes.balanceSnapshots))
+  val accountTransactionsLengths: MVMap[ByteStr, Int] = db.openMap("accountTransactionsLengths",
+    new LogMVMapBuilder[ByteStr, Int].keyType(DataTypes.byteStr))
+
+  val balanceSnapshots: MVMap[AccountIdxKey, (Int, Long, Long)] = db.openMap("balanceSnapshots",
+    new LogMVMapBuilder[AccountIdxKey, (Int, Long, Long)].valueType(DataTypes.balanceSnapshots))
 
   val paymentTransactionHashes: MVMap[ByteStr, ByteStr] = db.openMap("paymentTransactionHashes",
     new LogMVMapBuilder[ByteStr, ByteStr]
@@ -56,7 +59,7 @@ class StateStorage private(file: Option[File]) extends AutoCloseable {
   val leaseState: MVMap[ByteStr, Boolean] = db.openMap("leaseState", new LogMVMapBuilder[ByteStr, Boolean]
     .keyType(DataTypes.byteStr))
 
-  val lastUpdateHeight: MVMap[ByteStr, Int] = db.openMap("lastUpdateHeight", new LogMVMapBuilder[ByteStr, Int]
+  val lastBalanceSnapshotHeight: MVMap[ByteStr, Int] = db.openMap("lastUpdateHeight", new LogMVMapBuilder[ByteStr, Int]
     .keyType(DataTypes.byteStr))
 
   val uniqueAssets: MVMap[ByteStr, ByteStr] = db.openMap("uniqueAssets", new LogMVMapBuilder[ByteStr, ByteStr]
@@ -93,7 +96,7 @@ object StateStorage {
   def apply(file: Option[File], dropExisting: Boolean): Try[StateStorage] =
     createWithStore(file, new StateStorage(file), validateVersion, dropExisting)
 
-  type SnapshotKey = Array[Byte]
+  type AccountIdxKey = Array[Byte]
 
-  def snapshotKey(acc: Account, height: Int): SnapshotKey = acc.bytes.arr ++ Ints.toByteArray(height)
+  def accountIndexKey(acc: Account, index: Int): AccountIdxKey = acc.bytes.arr ++ Ints.toByteArray(index)
 }

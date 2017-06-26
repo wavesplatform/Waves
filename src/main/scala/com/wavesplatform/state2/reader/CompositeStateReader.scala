@@ -7,7 +7,6 @@ import cats.kernel.Monoid
 import com.wavesplatform.state2._
 import scorex.account.{Account, Alias}
 import scorex.transaction.Transaction
-import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.transaction.lease.LeaseTransaction
 
 class CompositeStateReader(inner: StateReader, blockDiff: BlockDiff) extends StateReader {
@@ -31,9 +30,13 @@ class CompositeStateReader(inner: StateReader, blockDiff: BlockDiff) extends Sta
 
   override def height: Int = inner.height + blockDiff.heightDiff
 
-  override def accountTransactionIds(a: Account): Seq[ByteStr] = {
+  override def accountTransactionIds(a: Account, limit: Int): Seq[ByteStr] = {
     val fromDiff = txDiff.accountTransactionIds.get(a).orEmpty
-    fromDiff ++ inner.accountTransactionIds(a) // fresh head ++ stale tail
+    if (fromDiff.length >= limit) {
+      fromDiff.take(limit)
+    } else {
+      fromDiff ++ inner.accountTransactionIds(a, limit - fromDiff.size) // fresh head ++ stale tail
+    }
   }
 
   override def snapshotAtHeight(acc: Account, h: Int): Option[Snapshot] =
@@ -85,8 +88,8 @@ object CompositeStateReader {
     override def accountPortfolio(a: Account): Portfolio =
       new CompositeStateReader(inner, blockDiff()).accountPortfolio(a)
 
-    override def accountTransactionIds(a: Account): Seq[ByteStr] =
-      new CompositeStateReader(inner, blockDiff()).accountTransactionIds(a)
+    override def accountTransactionIds(a: Account, limit: Int): Seq[ByteStr] =
+      new CompositeStateReader(inner, blockDiff()).accountTransactionIds(a, limit)
 
     override def accountPortfolios: Map[Account, Portfolio] =
       new CompositeStateReader(inner, blockDiff()).accountPortfolios

@@ -32,11 +32,11 @@ class StateReaderImpl(p: StateStorage, val synchronizationToken: ReentrantReadWr
 
   override def height: Int = read { implicit l => sp().getHeight }
 
-  override def accountTransactionIds(a: Account): Seq[ByteStr] = read { implicit l =>
-    Option(sp().accountTransactionIds.get(a.bytes))
-      .map(_.toSeq)
-      .getOrElse(Seq.empty)
-      .map(ByteStr(_))
+  override def accountTransactionIds(a: Account, limit: Int): Seq[ByteStr] = read { implicit l =>
+    val totalRecords = sp().accountTransactionsLengths.getOrDefault(a.bytes, 0)
+    Range(Math.max(0, totalRecords - limit), totalRecords)
+      .map(n => sp().accountTransactionIds.get(StateStorage.accountIndexKey(a, n)))
+      .reverse
   }
 
   override def paymentTransactionIdByHash(hash: ByteStr): Option[ByteStr] = read { implicit l =>
@@ -75,11 +75,11 @@ class StateReaderImpl(p: StateStorage, val synchronizationToken: ReentrantReadWr
   }
 
   override def lastUpdateHeight(acc: Account): Option[Int] = read { implicit l =>
-    Option(sp().lastUpdateHeight.get(acc.bytes))
+    Option(sp().lastBalanceSnapshotHeight.get(acc.bytes))
   }
 
   override def snapshotAtHeight(acc: Account, h: Int): Option[Snapshot] = read { implicit l =>
-    Option(sp().balanceSnapshots.get(StateStorage.snapshotKey(acc, h)))
+    Option(sp().balanceSnapshots.get(StateStorage.accountIndexKey(acc, h)))
       .map { case (ph, b, eb) => Snapshot(ph, b, eb) }
   }
 
