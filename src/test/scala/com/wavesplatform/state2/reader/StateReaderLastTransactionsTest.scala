@@ -29,7 +29,7 @@ class StateReaderLastTransactionsTest extends PropSpec with PropertyChecks with 
     forAll(preconditionsAndPayment, accountGen) { case ((pre, payment), miner) =>
       assertDiffAndState(Seq(TestBlock(pre)), TestBlock(Seq(payment), miner)) { (blockDiff, newState) =>
 
-//        newState.accountTransactions(payment.sender, 1) shouldBe Seq(payment)
+        newState.accountTransactions(payment.sender, 1) shouldBe Seq(payment)
         val g = pre.head
         val tx1 = pre(1)
         val tx2 = pre(2)
