@@ -5,7 +5,7 @@ import org.scalatest.{FunSuite, Matchers}
 
 class ByteStrTest extends FunSuite with Matchers {
   test("put/get value by key") {
-    val map = new MVStore.Builder().open().openMap("mapName", new MVMap.Builder[ByteStr, Int].keyType(new ByteStrDataType))
+    val map = new MVStore.Builder().open().openMap("mapName", new MVMap.Builder[ByteStr, Int].keyType(DataTypes.byteStr))
 
     val key = ByteStr(Array(1: Byte))
     val sameKey = ByteStr(Array(1: Byte))
