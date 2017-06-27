@@ -27,7 +27,7 @@ trait StateReader extends Synchronized {
 
   def height: Int
 
-  def accountTransactionIds(a: Account): Seq[ByteStr]
+  def accountTransactionIds(a: Account, limit: Int): Seq[ByteStr]
 
   def paymentTransactionIdByHash(hash: ByteStr): Option[ByteStr]
 
@@ -77,7 +77,7 @@ object StateReader {
     def included(signature: ByteStr): Option[Int] = s.transactionInfo(signature).map(_._1)
 
     def accountTransactions(account: Account, limit: Int): Seq[_ <: Transaction] = s.read { _ =>
-      s.accountTransactionIds(account).take(limit).flatMap(s.transactionInfo).map(_._2)
+      s.accountTransactionIds(account, limit).flatMap(s.transactionInfo).map(_._2)
     }
 
     def balance(account: Account): Long = s.accountPortfolio(account).balance

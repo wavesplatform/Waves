@@ -7,7 +7,7 @@ import org.scalacheck.{Gen, Shrink}
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import org.scalatest.{Matchers, PropSpec}
 import scorex.lagonaki.mocks.TestBlock
-import scorex.transaction.{GenesisTransaction, PaymentTransaction, Transaction}
+import scorex.transaction.{GenesisTransaction, PaymentTransaction}
 
 class PaymentTransactionDiffTest extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers with TransactionGen {
 
@@ -29,7 +29,7 @@ class PaymentTransactionDiffTest extends PropSpec with PropertyChecks with Gener
         totalPortfolioDiff.balance shouldBe 0
         totalPortfolioDiff.effectiveBalance shouldBe 0
 
-        newState.accountTransactionIds(payment.sender).size shouldBe 2 // genesis and payment
+        newState.accountTransactionIds(payment.sender, 2).size shouldBe 2 // genesis and payment
       }
     }
   }
