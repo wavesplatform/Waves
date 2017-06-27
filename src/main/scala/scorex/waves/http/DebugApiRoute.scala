@@ -1,35 +1,41 @@
 package scorex.waves.http
 
 import java.net.{InetAddress, URI}
+import java.util.concurrent.ConcurrentMap
 import javax.ws.rs.Path
 
+import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
-import com.wavesplatform.network.PeerDatabase
+import com.wavesplatform.network.{OffChainRollback, PeerDatabase, PeerInfo}
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state2.ByteStr
 import com.wavesplatform.state2.reader.StateReader
+import io.netty.channel.Channel
 import io.swagger.annotations._
 import play.api.libs.json.{JsArray, Json}
 import scorex.api.http._
-import scorex.block.Block
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash
-import scorex.transaction.History
+import scorex.transaction.{History, ValidationError}
 import scorex.wallet.Wallet
 
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.{Future, Promise}
 import scala.util.Success
 import scala.util.control.NonFatal
+
 
 @Path("/debug")
 @Api(value = "/debug")
 case class DebugApiRoute(
-    settings: RestAPISettings,
-    wallet: Wallet,
-    stateReader: StateReader,
-    history: History,
-    peerDatabase: PeerDatabase,
-    rollbackToBlock: Block.BlockId => Unit) extends ApiRoute {
+                          settings: RestAPISettings,
+                          wallet: Wallet,
+                          stateReader: StateReader,
+                          history: History,
+                          peerDatabase: PeerDatabase,
+                          establishedConnections: ConcurrentMap[Channel, PeerInfo],
+                          localChannel: Channel) extends ApiRoute {
 
   override lazy val route = pathPrefix("debug") {
     blocks ~ state ~ info ~ stateWaves ~ rollback ~ rollbackTo ~ blacklist
@@ -79,6 +85,14 @@ case class DebugApiRoute(
     complete(result)
   }
 
+  private def rollbackToBlock(blockId: ByteStr): Future[ToResponseMarshallable] = {
+    val p = Promise[Either[ValidationError, ByteStr]]
+    localChannel.writeAndFlush(OffChainRollback(blockId, p))
+
+    p.future.map(_.fold(ApiError.fromValidationError, blockId => Json.obj("BlockId" -> blockId.toString)): ToResponseMarshallable)
+
+  }
+
   @Path("/rollback")
   @ApiOperation(value = "Rollback to height", notes = "Removes all blocks after given height", httpMethod = "POST")
   @ApiImplicitParams(Array(
@@ -92,8 +106,7 @@ case class DebugApiRoute(
       entity(as[Int]) { rollbackTo =>
         history.blockAt(rollbackTo) match {
           case Some(block) =>
-            rollbackToBlock(block.uniqueId)
-            complete(StatusCodes.Accepted)
+            complete(rollbackToBlock(block.uniqueId))
           case None =>
             complete(StatusCodes.BadRequest, "Block at height not found")
         }
@@ -107,10 +120,9 @@ case class DebugApiRoute(
     new ApiResponse(code = 200, message = "Json state")
   ))
   def info: Route = (path("info") & get) {
-    val stateHash = (BigInt(FastCryptographicHash(stateReader.accountPortfolios.toString().getBytes)) % Int.MaxValue).toInt
     complete(Json.obj(
       "stateHeight" -> stateReader.height,
-      "stateHash" -> stateHash
+      "stateHash" -> stateReader.accountPortfoliosHash
     ))
   }
 
@@ -124,8 +136,7 @@ case class DebugApiRoute(
     (delete & withAuth) {
       ByteStr.decodeBase58(signature) match {
         case Success(sig) =>
-          rollbackToBlock(sig)
-          complete(StatusCodes.Accepted)
+          complete(rollbackToBlock(sig))
         case _ =>
           complete(InvalidSignature)
       }
@@ -133,9 +144,9 @@ case class DebugApiRoute(
   }
 
   @Path("/blacklist")
-  @ApiOperation(value = "Blacklits given peer", notes = "Moving peer to blacklist", httpMethod = "POST")
+  @ApiOperation(value = "Blacklist given peer", notes = "Moving peer to blacklist", httpMethod = "POST")
   @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "address", value = "IP:PORT address of node", required = true, dataType = "string", paramType = "body")
+    new ApiImplicitParam(name = "address", value = "IP address of node", required = true, dataType = "string", paramType = "body")
   ))
   @ApiResponses(Array(
     new ApiResponse(code = 200, message = "200 if success, 404 if there are no peer with such address")
@@ -145,7 +156,12 @@ case class DebugApiRoute(
       entity(as[String]) { socketAddressString =>
         try {
           val uri = new URI("node://" + socketAddressString)
-          peerDatabase.blacklistHost(InetAddress.getByName(uri.getHost))
+          val address = InetAddress.getByName(uri.getHost)
+          establishedConnections.entrySet().stream().forEach(entry => {
+            if (entry.getValue.remoteAddress.getAddress == address) {
+              peerDatabase.blacklistAndClose(entry.getKey)
+            }
+          })
           complete(StatusCodes.OK)
         } catch {
           case NonFatal(_) => complete(StatusCodes.BadRequest)

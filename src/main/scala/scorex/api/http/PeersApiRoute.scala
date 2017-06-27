@@ -39,7 +39,7 @@ case class PeersApiRoute(
   ))
   def allPeers: Route = (path("all") & get) {
     complete(Json.obj("peers" ->
-      JsArray(peerDatabase.getKnownPeers.take(MaxPeersInResponse).map { case (address, timestamp) =>
+      JsArray(peerDatabase.knownPeers.take(MaxPeersInResponse).map { case (address, timestamp) =>
         Json.obj(
           "address" -> address.toString,
           "lastSeen" -> timestamp
@@ -92,7 +92,7 @@ case class PeersApiRoute(
     new ApiResponse(code = 200, message = "Json with connected peers or error")
   ))
   def blacklistedPeers: Route = (path("blacklisted") & get) {
-    complete(JsArray(peerDatabase.getBlacklist.take(MaxPeersInResponse).map(a => JsString(a.toString)).toSeq))
+    complete(JsArray(peerDatabase.blacklistedHosts.take(MaxPeersInResponse).map(a => JsString(a.toString)).toSeq))
   }
 }
 

@@ -27,42 +27,44 @@ class StateStorage private(file: Option[File]) extends AutoCloseable {
   def setHeight(i: Int): Unit = variables.put(heightKey, i)
 
   val transactions: MVMap[ByteStr, (Int, Array[Byte])] = db.openMap("txs", new LogMVMapBuilder[ByteStr, (Int, Array[Byte])]
-    .keyType(new ByteStrDataType))
+    .keyType(DataTypes.byteStr).valueType(DataTypes.transactions))
 
   val portfolios: MVMap[ByteStr, (Long, (Long, Long), Map[Array[Byte], Long])] = db.openMap("portfolios",
     new LogMVMapBuilder[ByteStr, (Long, (Long, Long), Map[Array[Byte], Long])]
-      .keyType(new ByteStrDataType))
+      .keyType(DataTypes.byteStr).valueType(DataTypes.portfolios))
 
+  val assets: MVMap[ByteStr, (Boolean, Long)] = db.openMap("assets",
+    new LogMVMapBuilder[ByteStr, (Boolean, Long)].keyType(DataTypes.byteStr).valueType(DataTypes.assets))
 
-  val assets: MVMap[ByteStr, (Boolean, Long)] = db.openMap("assets", new LogMVMapBuilder[ByteStr, (Boolean, Long)]
-    .keyType(new ByteStrDataType))
+  val accountTransactionIds: MVMap[AccountIdxKey, ByteStr] = db.openMap("accountTransactionIds",
+    new LogMVMapBuilder[AccountIdxKey, ByteStr].valueType(DataTypes.byteStr))
 
-  val accountTransactionIds: MVMap[ByteStr, List[Array[Byte]]] = db.openMap("accountTransactionIds",
-    new LogMVMapBuilder[ByteStr, List[Array[Byte]]]
-      .keyType(new ByteStrDataType))
+  val accountTransactionsLengths: MVMap[ByteStr, Int] = db.openMap("accountTransactionsLengths",
+    new LogMVMapBuilder[ByteStr, Int].keyType(DataTypes.byteStr))
 
-  val balanceSnapshots: MVMap[SnapshotKey, (Int, Long, Long)] = db.openMap("balanceSnapshots")
+  val balanceSnapshots: MVMap[AccountIdxKey, (Int, Long, Long)] = db.openMap("balanceSnapshots",
+    new LogMVMapBuilder[AccountIdxKey, (Int, Long, Long)].valueType(DataTypes.balanceSnapshots))
 
   val paymentTransactionHashes: MVMap[ByteStr, ByteStr] = db.openMap("paymentTransactionHashes",
     new LogMVMapBuilder[ByteStr, ByteStr]
-      .keyType(new ByteStrDataType)
-      .valueType(new ByteStrDataType))
+      .keyType(DataTypes.byteStr)
+      .valueType(DataTypes.byteStr))
 
   val aliasToAddress: MVMap[String, ByteStr] = db.openMap("aliasToAddress", new LogMVMapBuilder[String, ByteStr]
-    .valueType(new ByteStrDataType))
+    .valueType(DataTypes.byteStr))
 
   val orderFills: MVMap[ByteStr, (Long, Long)] = db.openMap("orderFills", new LogMVMapBuilder[ByteStr, (Long, Long)]
-    .keyType(new ByteStrDataType))
+    .keyType(DataTypes.byteStr).valueType(DataTypes.orderFills))
 
   val leaseState: MVMap[ByteStr, Boolean] = db.openMap("leaseState", new LogMVMapBuilder[ByteStr, Boolean]
-    .keyType(new ByteStrDataType))
+    .keyType(DataTypes.byteStr))
 
-  val lastUpdateHeight: MVMap[ByteStr, Int] = db.openMap("lastUpdateHeight", new LogMVMapBuilder[ByteStr, Int]
-    .keyType(new ByteStrDataType))
+  val lastBalanceSnapshotHeight: MVMap[ByteStr, Int] = db.openMap("lastUpdateHeight", new LogMVMapBuilder[ByteStr, Int]
+    .keyType(DataTypes.byteStr))
 
   val uniqueAssets: MVMap[ByteStr, ByteStr] = db.openMap("uniqueAssets", new LogMVMapBuilder[ByteStr, ByteStr]
-    .keyType(new ByteStrDataType)
-    .valueType(new ByteStrDataType))
+    .keyType(DataTypes.byteStr)
+    .valueType(DataTypes.byteStr))
 
   def commit(): Unit = {
      db.commit()
@@ -94,7 +96,7 @@ object StateStorage {
   def apply(file: Option[File], dropExisting: Boolean): Try[StateStorage] =
     createWithStore(file, new StateStorage(file), validateVersion, dropExisting)
 
-  type SnapshotKey = Array[Byte]
+  type AccountIdxKey = Array[Byte]
 
-  def snapshotKey(acc: Account, height: Int): SnapshotKey = acc.bytes.arr ++ Ints.toByteArray(height)
+  def accountIndexKey(acc: Account, index: Int): AccountIdxKey = acc.bytes.arr ++ Ints.toByteArray(index)
 }

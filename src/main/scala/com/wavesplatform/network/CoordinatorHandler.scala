@@ -3,7 +3,7 @@ package com.wavesplatform.network
 import com.wavesplatform.Coordinator
 import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel.group.ChannelGroup
-import io.netty.channel.{Channel, ChannelHandlerContext, ChannelInboundHandlerAdapter}
+import io.netty.channel.{ChannelHandlerContext, ChannelInboundHandlerAdapter}
 import scorex.block.Block
 import scorex.transaction.ValidationError
 import scorex.utils.ScorexLogging
@@ -12,39 +12,58 @@ import scorex.utils.ScorexLogging
 class CoordinatorHandler(coordinator: Coordinator, peerDatabase: PeerDatabase, allChannels: ChannelGroup)
   extends ChannelInboundHandlerAdapter with ScorexLogging {
   import CoordinatorHandler._
-  override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef) = {
-    log.debug(s"${id(ctx)} removed: ${ctx.isRemoved}, active: ${ctx.channel().isActive}, open: ${ctx.channel().isOpen}")
-    msg match {
-      case c: Checkpoint =>
-        handleResult(ctx, peerDatabase.blacklistAndClose, "applying checkpoint", coordinator.processCheckpoint(c))
-      case ExtensionBlocks(blocks) =>
-        handleResult(ctx, peerDatabase.blacklistAndClose, "processing fork", coordinator.processFork(blocks.head.reference, blocks))
-      case b: Block =>
-        handleResult(ctx, peerDatabase.blacklistAndClose, "applying block", coordinator.processBlock(b))
-      case BlockForged(b) =>
-        handleResult(ctx, peerDatabase.blacklistAndClose, "applying locally mined block", coordinator.processBlock(b))
-        allChannels.broadcast(b)
-      case other =>
-        log.debug(other.getClass.getCanonicalName)
-    }
+  override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef) = msg match {
+    case c: Checkpoint =>
+      loggingResult(ctx, "applying checkpoint", coordinator.processCheckpoint(c)).fold(
+        _ => peerDatabase.blacklistAndClose(ctx.channel()),
+        score => allChannels.broadcast(LocalScoreChanged(score), Some(ctx.channel()))
+      )
+    case ExtensionBlocks(blocks) =>
+      loggingResult(ctx, "processing fork", coordinator.processFork(blocks.head.reference, blocks))
+        .fold(
+          _ => peerDatabase.blacklistAndClose(ctx.channel()),
+          score => allChannels.broadcast(LocalScoreChanged(score))
+        )
+    case b: Block =>
+      if (b.signatureValid) {
+        loggingResult(ctx, "applying block", coordinator.processBlock(b))
+          .foreach(score => allChannels.broadcast(LocalScoreChanged(score)))
+      } else {
+        peerDatabase.blacklistAndClose(ctx.channel())
+      }
+    // "off-chain" messages: locally forged block and checkpoints from API
+    case bf@BlockForged(b) =>
+      loggingResult(ctx, s"applying locally mined block (${b.uniqueId})", coordinator.processLocalBlock(b))
+        .foreach { score =>
+          allChannels.broadcast(LocalScoreChanged(score))
+          allChannels.broadcast(bf)
+        }
+    case OffChainCheckpoint(c, p) =>
+      loggingResult(ctx, "processing checkpoint from API", coordinator.processCheckpoint(c)).fold(
+        e => p.success(Left(e)),
+        { score =>
+          p.success(Right(c))
+          allChannels.broadcast(LocalScoreChanged(score))
+        }
+      )
+    case OffChainRollback(b, p) =>
+      loggingResult(ctx, "processing rollback from API", coordinator.processRollback(b)).fold(
+        e => p.success(Left(e)),
+        { score =>
+          p.success(Right(b))
+          allChannels.broadcast(LocalScoreChanged(score))
+        }
+      )
   }
 }
 
 object CoordinatorHandler extends ScorexLogging {
-  private[CoordinatorHandler] def handleResult(
-      ctx: ChannelHandlerContext,
-      blacklist: Channel => Unit,
-      msg: String,
-      f: => Either[ValidationError, BigInt]): Either[ValidationError, BigInt] = {
+  private[CoordinatorHandler] def loggingResult(ctx: ChannelHandlerContext, msg: String, f: => Either[ValidationError, BigInt]) = {
     log.debug(s"${id(ctx)} Starting $msg")
     val result = f
     result match {
-      case Left(error) =>
-        log.warn(s"${id(ctx)} Error $msg: $error")
-        blacklist(ctx.channel())
-      case Right(newScore) =>
-        log.debug(s"${id(ctx)} Finished $msg, new local score is $newScore")
-        ctx.writeAndFlush(LocalScoreChanged(newScore))
+      case Left(error) => log.warn(s"${id(ctx)} Error $msg: $error")
+      case Right(newScore) => log.debug(s"${id(ctx)} Finished $msg, new local score is $newScore")
     }
     result
   }

@@ -12,6 +12,7 @@ class BlacklistParallelSpecification extends FeatureSpec with GivenWhenThen with
 
   private val config = loadConfig(ConfigFactory.parseString(
     """waves.network {
+      |  known-peers = []
       |  file = null
       |  black-list-residence-time: 1s
       |}""".stripMargin))
@@ -34,53 +35,53 @@ class BlacklistParallelSpecification extends FeatureSpec with GivenWhenThen with
     val address3 = new InetSocketAddress(host3, 2)
 
     def isBlacklisted(address: InetSocketAddress): Boolean =
-      peerDatabase.getBlacklist.contains(address.getAddress)
+      peerDatabase.blacklistedHosts.contains(address.getAddress)
 
     scenario("Peer blacklist another peer") {
 
       Given("Peer database is empty")
-      assert(peerDatabase.getKnownPeers.isEmpty)
-      assert(peerDatabase.getBlacklist.isEmpty)
+      assert(peerDatabase.knownPeers.isEmpty)
+      assert(peerDatabase.blacklistedHosts.isEmpty)
 
       When("Peer adds another peer to knownPeers")
-      peerDatabase.addPeer(address1, Some(0), None)
-      assert(peerDatabase.getKnownPeers.contains(address1))
-      assert(!peerDatabase.getBlacklist.contains(host1))
+      peerDatabase.touch(address1)
+      assert(peerDatabase.knownPeers.contains(address1))
+      assert(!peerDatabase.blacklistedHosts.contains(host1))
 
       And("Peer blacklists another peer")
-      peerDatabase.blacklistHost(host1)
+      peerDatabase.blacklist(host1)
       assert(isBlacklisted(address1))
-      assert(peerDatabase.getBlacklist.contains(host1))
-      assert(!peerDatabase.getKnownPeers.contains(address1))
+      assert(peerDatabase.blacklistedHosts.contains(host1))
+      assert(!peerDatabase.knownPeers.contains(address1))
 
       And("Peer waits for some time")
-      Thread.sleep(networkSettings.blackListResidenceTime.toMillis)
+      Thread.sleep(networkSettings.blackListResidenceTime.toMillis + 500)
 
       Then("Another peer disappear from blacklist")
       assert(!isBlacklisted(address1))
 
       And("Another peer became knownPeer")
-      assert(peerDatabase.getKnownPeers.contains(address1))
+      assert(peerDatabase.knownPeers.contains(address1))
     }
 
     scenario("Peer blacklist few peers") {
 
       Given("Peer database is empty")
-      assert(peerDatabase.getKnownPeers.isEmpty)
-      assert(peerDatabase.getBlacklist.isEmpty)
+      assert(peerDatabase.knownPeers.isEmpty)
+      assert(peerDatabase.blacklistedHosts.isEmpty)
 
       When("Peer adds other peers")
-      peerDatabase.addPeer(address1, Some(0), None)
-      peerDatabase.addPeer(address2, Some(1), None)
-      peerDatabase.addPeer(address3, Some(2), None)
+      peerDatabase.touch(address1)
+      peerDatabase.touch(address2)
+      peerDatabase.touch(address3)
       assert(!isBlacklisted(address1))
       assert(!isBlacklisted(address2))
       assert(!isBlacklisted(address3))
 
       And("Peer blacklists other peers")
-      peerDatabase.blacklistHost(address1.getAddress)
-      peerDatabase.blacklistHost(address2.getAddress)
-      peerDatabase.blacklistHost(address3.getAddress)
+      peerDatabase.blacklist(address1.getAddress)
+      peerDatabase.blacklist(address2.getAddress)
+      peerDatabase.blacklist(address3.getAddress)
       assert(isBlacklisted(address1))
       assert(isBlacklisted(address2))
       assert(isBlacklisted(address3))
@@ -89,10 +90,10 @@ class BlacklistParallelSpecification extends FeatureSpec with GivenWhenThen with
       Thread.sleep(networkSettings.blackListResidenceTime.toMillis / 2)
 
       And("Adds one peer to blacklist one more time")
-      peerDatabase.blacklistHost(address2.getAddress)
+      peerDatabase.blacklist(address2.getAddress)
 
       And("Waits another half of period")
-      Thread.sleep(networkSettings.blackListResidenceTime.toMillis / 2)
+      Thread.sleep((networkSettings.blackListResidenceTime.toMillis / 1.9).toLong)
 
       Then("Two peers disappear from blacklist")
       assert(!isBlacklisted(address1))
@@ -100,7 +101,7 @@ class BlacklistParallelSpecification extends FeatureSpec with GivenWhenThen with
       assert(!isBlacklisted(address3))
 
       And("Then waits another half of period")
-      Thread.sleep(networkSettings.blackListResidenceTime.toMillis / 2)
+      Thread.sleep((networkSettings.blackListResidenceTime.toMillis / 1.9).toLong)
 
       And("All peers not in blacklist")
       assert(!isBlacklisted(address1))

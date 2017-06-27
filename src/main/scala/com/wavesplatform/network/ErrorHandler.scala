@@ -17,6 +17,6 @@ class ErrorHandler(peerDatabase: PeerDatabase) extends ChannelDuplexHandler with
 
   override def exceptionCaught(ctx: ChannelHandlerContext, cause: Throwable) = {
     log.debug(s"${id(ctx)} Exception caught", cause)
-    peerDatabase.blacklistHost(ctx.channel().remoteAddress().asInstanceOf[InetSocketAddress].getAddress)
+    peerDatabase.blacklist(ctx.channel().remoteAddress().asInstanceOf[InetSocketAddress].getAddress)
   }
 }

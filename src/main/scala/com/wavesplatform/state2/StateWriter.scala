@@ -11,15 +11,17 @@ import scala.language.higherKinds
 
 trait StateWriter {
   def applyBlockDiff(blockDiff: BlockDiff): Unit
+
   def clear(): Unit
 }
 
 class StateWriterImpl(p: StateStorage, synchronizationToken: ReentrantReadWriteLock)
   extends StateReaderImpl(p, synchronizationToken) with StateWriter with AutoCloseable {
 
+  import StateStorage._
   import StateWriterImpl._
 
-  override def close() = p.close()
+  override def close(): Unit = p.close()
 
   override def applyBlockDiff(blockDiff: BlockDiff): Unit = write { implicit l =>
     val txsDiff = blockDiff.txsDiff
@@ -67,14 +69,12 @@ class StateWriterImpl(p: StateStorage, synchronizationToken: ReentrantReadWriteL
 
     measureSizeLog("accountTransactionIds")(blockDiff.txsDiff.accountTransactionIds) {
       _.foreach { case (acc, txIds) =>
-        Option(sp().accountTransactionIds.get(acc.bytes)) match {
-          case Some(ll) =>
-            // [h=12, h=11, h=10] ++ [h=9, ...]
-            sp().accountTransactionIds.put(acc.bytes, txIds.map(_.arr) ++ ll)
-          case None =>
-            // [h=2, h=1, h=0]
-            sp().accountTransactionIds.put(acc.bytes, txIds.map(_.arr))
+        val startIdxShift = sp().accountTransactionsLengths.getOrDefault(acc.bytes, 0)
+        txIds.reverse.foldLeft(startIdxShift) { case (shift, txId) =>
+          sp().accountTransactionIds.put(accountIndexKey(acc, shift), txId)
+          shift + 1
         }
+        sp().accountTransactionsLengths.put(acc.bytes, startIdxShift + txIds.length)
       }
     }
 
@@ -87,9 +87,9 @@ class StateWriterImpl(p: StateStorage, synchronizationToken: ReentrantReadWriteL
     measureSizeLog("effectiveBalanceSnapshots")(blockDiff.snapshots)(
       _.foreach { case (acc, snapshotsByHeight) =>
         snapshotsByHeight.foreach { case (h, snapshot) =>
-          sp().balanceSnapshots.put(StateStorage.snapshotKey(acc, h), (snapshot.prevHeight, snapshot.balance, snapshot.effectiveBalance))
+          sp().balanceSnapshots.put(accountIndexKey(acc, h), (snapshot.prevHeight, snapshot.balance, snapshot.effectiveBalance))
         }
-        sp().lastUpdateHeight.put(acc.bytes, snapshotsByHeight.keys.max)
+        sp().lastBalanceSnapshotHeight.put(acc.bytes, snapshotsByHeight.keys.max)
       })
 
     measureSizeLog("aliases")(blockDiff.txsDiff.aliases) {
@@ -118,12 +118,13 @@ class StateWriterImpl(p: StateStorage, synchronizationToken: ReentrantReadWriteL
     sp().portfolios.clear()
     sp().assets.clear()
     sp().accountTransactionIds.clear()
+    sp().accountTransactionsLengths.clear()
     sp().balanceSnapshots.clear()
     sp().paymentTransactionHashes.clear()
     sp().orderFills.clear()
     sp().aliasToAddress.clear()
     sp().leaseState.clear()
-    sp().lastUpdateHeight.clear()
+    sp().lastBalanceSnapshotHeight.clear()
     sp().uniqueAssets.clear()
     sp().setHeight(0)
     sp().commit()

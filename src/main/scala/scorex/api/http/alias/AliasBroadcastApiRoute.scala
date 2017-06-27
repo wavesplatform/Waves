@@ -4,6 +4,7 @@ import javax.ws.rs.Path
 
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.settings.RestAPISettings
+import io.netty.channel.Channel
 import io.swagger.annotations._
 import scorex.BroadcastRoute
 import scorex.api.http._
@@ -11,7 +12,9 @@ import scorex.transaction._
 
 @Path("/alias/broadcast")
 @Api(value = "/alias")
-case class AliasBroadcastApiRoute(settings: RestAPISettings, transactionModule: NewTransactionHandler)
+case class AliasBroadcastApiRoute(
+    settings: RestAPISettings,
+    localChannel: Channel)
   extends ApiRoute with BroadcastRoute {
   override val route = pathPrefix("alias" / "broadcast") {
     signedCreate

@@ -53,11 +53,13 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
 
     checkGenesis()
 
+    if (wallet.privateKeyAccounts().isEmpty)
+      wallet.generateNewAccounts(1)
+
     val feeCalculator = new FeeCalculator(settings.feesSettings)
     val time: Time = new TimeImpl()
     val utxStorage: UnconfirmedTransactionsStorage = new UnconfirmedTransactionsDatabaseImpl(settings.utxSettings.size)
-    val newTransactionHandler = new NewTransactionHandlerImpl(settings.blockchainSettings.functionalitySettings,
-      time, feeCalculator, utxStorage, stateReader)
+
 
     val peerDatabase = new PeerDatabaseImpl(settings.networkSettings)
     val establishedConnections = new ConcurrentHashMap[Channel, PeerInfo]
@@ -74,30 +76,31 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
       time,
       stateReader,
       utxStorage,
-      newTransactionHandler,
+      new NewTransactionHandlerImpl(settings.blockchainSettings.functionalitySettings, time, feeCalculator, utxStorage, stateReader),
       peerDatabase,
       wallet,
       allChannels,
       establishedConnections)
 
     val apiRoutes = Seq(
-      BlocksApiRoute(settings.restAPISettings, settings.checkpointsSettings, history, checkpoint => network.writeToLocalChannel(checkpoint)),
+      BlocksApiRoute(settings.restAPISettings, settings.checkpointsSettings, history, network.localClientChannel),
       TransactionsApiRoute(settings.restAPISettings, stateReader, history, utxStorage),
       NxtConsensusApiRoute(settings.restAPISettings, stateReader, history, settings.blockchainSettings.functionalitySettings),
       WalletApiRoute(settings.restAPISettings, wallet),
-      PaymentApiRoute(settings.restAPISettings, wallet, newTransactionHandler, time),
+      PaymentApiRoute(settings.restAPISettings, wallet, network.localClientChannel, time),
       UtilsApiRoute(settings.restAPISettings),
       PeersApiRoute(settings.restAPISettings, network.connect, peerDatabase, establishedConnections),
       AddressApiRoute(settings.restAPISettings, wallet, stateReader, settings.blockchainSettings.functionalitySettings),
-//      DebugApiRoute(settings.restAPISettings, wallet, stateReader, history, peerDatabase, _ => {}),
-      WavesApiRoute(settings.restAPISettings, wallet, newTransactionHandler, time),
-      AssetsApiRoute(settings.restAPISettings, wallet, stateReader, newTransactionHandler, time),
+      DebugApiRoute(settings.restAPISettings, wallet, stateReader, history, peerDatabase, establishedConnections,
+        network.localClientChannel),
+      WavesApiRoute(settings.restAPISettings, wallet, network.localClientChannel, time),
+      AssetsApiRoute(settings.restAPISettings, wallet, stateReader, network.localClientChannel, time),
       NodeApiRoute(settings.restAPISettings, () => this.shutdown()),
-      AssetsBroadcastApiRoute(settings.restAPISettings, newTransactionHandler),
-      LeaseApiRoute(settings.restAPISettings, wallet, stateReader, newTransactionHandler, time),
-      LeaseBroadcastApiRoute(settings.restAPISettings, newTransactionHandler),
-      AliasApiRoute(settings.restAPISettings, wallet, newTransactionHandler, time, stateReader),
-      AliasBroadcastApiRoute(settings.restAPISettings, newTransactionHandler)
+      AssetsBroadcastApiRoute(settings.restAPISettings, network.localClientChannel),
+      LeaseApiRoute(settings.restAPISettings, wallet, stateReader, network.localClientChannel, time),
+      LeaseBroadcastApiRoute(settings.restAPISettings, network.localClientChannel),
+      AliasApiRoute(settings.restAPISettings, wallet, network.localClientChannel, time, stateReader),
+      AliasBroadcastApiRoute(settings.restAPISettings, network.localClientChannel)
     )
 
     val apiTypes = Seq(
@@ -120,7 +123,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
       typeOf[AliasBroadcastApiRoute]
     )
 
-//    if (settings.networkSettings.uPnPSettings.enable) upnp.addPort(settings.networkSettings.)
     for (addr <- settings.networkSettings.declaredAddress if settings.networkSettings.uPnPSettings.enable) {
       upnp.addPort(addr.getPort)
     }
@@ -143,7 +145,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
     }
 
     if (settings.matcherSettings.enable) {
-      val matcher = new Matcher(actorSystem, wallet, newTransactionHandler, stateReader, time, history, settings.blockchainSettings, settings.restAPISettings, settings.matcherSettings)
+      val matcher = new Matcher(actorSystem, wallet, network.localClientChannel, stateReader, time, history, settings.blockchainSettings, settings.restAPISettings, settings.matcherSettings)
       matcher.runMatcher()
     }
   }
@@ -257,12 +259,7 @@ object Application extends ScorexLogging {
 
       log.info(s"${Constants.AgentName} Blockchain Id: ${settings.blockchainSettings.addressSchemeCharacter}")
 
-      log.debug("Application.run")
-      val application = new Application(actorSystem, settings)
-      application.run()
-
-      if (application.wallet.privateKeyAccounts().isEmpty)
-        application.wallet.generateNewAccounts(1)
+      new Application(actorSystem, settings).run()
     }
   }
 

@@ -160,7 +160,7 @@ trait TransactionGen {
     sender: PrivateKeyAccount <- accountGen
     assetName <- genBoundedString(IssueTransaction.MinAssetNameLength, IssueTransaction.MaxAssetNameLength)
     description <- genBoundedString(0, IssueTransaction.MaxDescriptionLength)
-    quantity <- positiveLongGen
+    quantity <- Gen.choose(Long.MaxValue / 200, Long.MaxValue / 100)
     decimals <- Gen.choose(0: Byte, 8: Byte)
     reissuable <- Arbitrary.arbitrary[Boolean]
     fee <- Gen.choose(MinIssueFee, 2 * MinIssueFee)

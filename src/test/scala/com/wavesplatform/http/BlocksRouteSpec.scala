@@ -5,6 +5,7 @@ import com.wavesplatform.BlockGen
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.settings.{CheckpointsSettings, RestAPISettings}
 import com.wavesplatform.state2.ByteStr
+import io.netty.channel.embedded.EmbeddedChannel
 import org.scalacheck.{Gen, Shrink}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.DoNotDiscover
@@ -24,11 +25,9 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with MockFactory with BlockGe
   private val restSettings = RestAPISettings.fromConfig(config)
   private val checkpointSettings = CheckpointsSettings.fromConfig(config)
   private val history = mock[History]
-  private val route = BlocksApiRoute(restSettings, checkpointSettings, history, mockWriteToChannel).route
+  private val route = BlocksApiRoute(restSettings, checkpointSettings, history, new EmbeddedChannel).route
 
   private implicit def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)
-
-  private def mockWriteToChannel(checkpoint: com.wavesplatform.network.Checkpoint): Unit = {}
 
   private def checkBlock(response: JsValue, expected: Block): Unit = {
     (response \ "version").asOpt[Int].isDefined shouldBe true

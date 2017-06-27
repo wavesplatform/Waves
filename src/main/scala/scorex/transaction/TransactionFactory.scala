@@ -15,15 +15,14 @@ import scorex.waves.transaction.SignedPaymentRequest
 
 object TransactionFactory {
 
-  def createPayment(request: PaymentRequest, wallet: Wallet, tm: NewTransactionHandler, time: Time): Either[ValidationError, PaymentTransaction] = for {
+  def createPayment(request: PaymentRequest, wallet: Wallet, time: Time): Either[ValidationError, PaymentTransaction] = for {
     pk <- wallet.findWallet(request.sender)
     rec <- Account.fromString(request.recipient)
-    tx <- PaymentTransaction.create(pk, rec, request.amount, request.fee, time.getTimestamp)
-    r <- tm.onNewTransaction(tx)
-  } yield r
+    tx <- PaymentTransaction.create(pk, rec, request.amount, request.fee, time.getTimestamp())
+  } yield tx
 
 
-  def transferAsset(request: TransferRequest, wallet: Wallet, tm: NewTransactionHandler, time: Time): Either[ValidationError, TransferTransaction] =
+  def transferAsset(request: TransferRequest, wallet: Wallet, time: Time): Either[ValidationError, TransferTransaction] =
     for {
       senderPrivateKey <- wallet.findWallet(request.sender)
       recipientAcc <- AccountOrAlias.fromString(request.recipient)
@@ -32,71 +31,61 @@ object TransactionFactory {
           senderPrivateKey,
           recipientAcc,
           request.amount,
-          time.getTimestamp,
+          time.getTimestamp(),
           request.feeAssetId.map(s => ByteStr.decodeBase58(s).get),
           request.fee,
           request.attachment.filter(_.nonEmpty).map(Base58.decode(_).get).getOrElse(Array.emptyByteArray))
-      r <- tm.onNewTransaction(tx)
-    } yield r
+    } yield tx
 
-  def issueAsset(wallet: Wallet, tm: NewTransactionHandler, time: Time)(request: IssueRequest): Either[ValidationError, IssueTransaction] =
+  def issueAsset(request: IssueRequest, wallet: Wallet, time: Time): Either[ValidationError, IssueTransaction] =
     for {
       senderPrivateKey <- wallet.findWallet(request.sender)
       tx <- IssueTransaction.create(senderPrivateKey,
         request.name.getBytes(Charsets.UTF_8),
         request.description.getBytes(Charsets.UTF_8),
-        request.quantity, request.decimals, request.reissuable, request.fee, time.getTimestamp)
-      r <- tm.onNewTransaction(tx)
-    } yield r
+        request.quantity, request.decimals, request.reissuable, request.fee, time.getTimestamp())
+    } yield tx
 
-  def lease(request: LeaseRequest, wallet: Wallet, tm: NewTransactionHandler, time: Time): Either[ValidationError, LeaseTransaction] = for {
+  def lease(request: LeaseRequest, wallet: Wallet, time: Time): Either[ValidationError, LeaseTransaction] = for {
     senderPrivateKey <- wallet.findWallet(request.sender)
     recipientAcc <- AccountOrAlias.fromString(request.recipient)
-    tx <- LeaseTransaction.create(senderPrivateKey, request.amount, request.fee, time.getTimestamp, recipientAcc)
-    r <- tm.onNewTransaction(tx)
-  } yield r
+    tx <- LeaseTransaction.create(senderPrivateKey, request.amount, request.fee, time.getTimestamp(), recipientAcc)
+  } yield tx
 
-  def leaseCancel(request: LeaseCancelRequest, wallet: Wallet, tm: NewTransactionHandler, time: Time): Either[ValidationError, LeaseCancelTransaction] =
+  def leaseCancel(request: LeaseCancelRequest, wallet: Wallet, time: Time): Either[ValidationError, LeaseCancelTransaction] =
     for {
       pk <- wallet.findWallet(request.sender)
-      tx <- LeaseCancelTransaction.create(pk, ByteStr.decodeBase58(request.txId).get, request.fee, time.getTimestamp)
-      t <- tm.onNewTransaction(tx)
-    } yield t
+      tx <- LeaseCancelTransaction.create(pk, ByteStr.decodeBase58(request.txId).get, request.fee, time.getTimestamp())
+    } yield tx
 
 
-  def alias(request: CreateAliasRequest, wallet: Wallet, tm: NewTransactionHandler, time: Time): Either[ValidationError, CreateAliasTransaction] = for {
+  def alias(request: CreateAliasRequest, wallet: Wallet, time: Time): Either[ValidationError, CreateAliasTransaction] = for {
     senderPrivateKey <- wallet.findWallet(request.sender)
     alias <- Alias.buildWithCurrentNetworkByte(request.alias)
-    tx <- CreateAliasTransaction.create(senderPrivateKey, alias, request.fee, time.getTimestamp)
-    r <- tm.onNewTransaction(tx)
-  } yield r
+    tx <- CreateAliasTransaction.create(senderPrivateKey, alias, request.fee, time.getTimestamp())
+  } yield tx
 
-  def reissueAsset(request: ReissueRequest, wallet: Wallet, tm: NewTransactionHandler, time: Time): Either[ValidationError, ReissueTransaction] = for {
+  def reissueAsset(request: ReissueRequest, wallet: Wallet, time: Time): Either[ValidationError, ReissueTransaction] = for {
     pk <- wallet.findWallet(request.sender)
-    tx <- ReissueTransaction.create(pk, ByteStr.decodeBase58(request.assetId).get, request.quantity, request.reissuable, request.fee, time.getTimestamp)
-    r <- tm.onNewTransaction(tx)
-  } yield r
+    tx <- ReissueTransaction.create(pk, ByteStr.decodeBase58(request.assetId).get, request.quantity, request.reissuable, request.fee, time.getTimestamp())
+  } yield tx
 
 
-  def burnAsset(request: BurnRequest, wallet: Wallet, tm: NewTransactionHandler, time: Time): Either[ValidationError, BurnTransaction] = for {
+  def burnAsset(request: BurnRequest, wallet: Wallet, time: Time): Either[ValidationError, BurnTransaction] = for {
     pk <- wallet.findWallet(request.sender)
-    tx <- BurnTransaction.create(pk, ByteStr.decodeBase58(request.assetId).get, request.quantity, request.fee, time.getTimestamp)
-    r <- tm.onNewTransaction(tx)
-  } yield r
+    tx <- BurnTransaction.create(pk, ByteStr.decodeBase58(request.assetId).get, request.quantity, request.fee, time.getTimestamp())
+  } yield tx
 
-  def makeAssetNameUnique(request: MakeAssetNameUniqueRequest, wallet: Wallet, tm: NewTransactionHandler,
-                          time: Time): Either[ValidationError, MakeAssetNameUniqueTransaction] = for {
+  def makeAssetNameUnique(request: MakeAssetNameUniqueRequest, wallet: Wallet, time: Time): Either[ValidationError, MakeAssetNameUniqueTransaction] = for {
     pk <- wallet.findWallet(request.sender)
-    tx <- MakeAssetNameUniqueTransaction.create(pk, ByteStr.decodeBase58(request.assetId).get, request.fee, AddressScheme.current.chainId, time.getTimestamp)
-    r <- tm.onNewTransaction(tx)
-  } yield r
+    tx <- MakeAssetNameUniqueTransaction.create(pk, ByteStr.decodeBase58(request.assetId).get, request.fee, AddressScheme.current.chainId, time.getTimestamp())
+  } yield tx
 
-  def broadcastPayment(payment: SignedPaymentRequest, tm: NewTransactionHandler): Either[ValidationError, PaymentTransaction] =
+  def broadcastPayment(payment: SignedPaymentRequest): Either[ValidationError, PaymentTransaction] =
     for {
       _signature <- ByteStr.decodeBase58(payment.signature).toOption.toRight(ValidationError.InvalidRequestSignature)
       _sender <- PublicKeyAccount.fromBase58String(payment.senderPublicKey)
       _recipient <- Account.fromString(payment.recipient)
       tx <- PaymentTransaction.create(_sender, _recipient, payment.amount, payment.fee, payment.timestamp, _signature)
-      t <- tm.onNewTransaction(tx)
-    } yield t
+    } yield tx
 }

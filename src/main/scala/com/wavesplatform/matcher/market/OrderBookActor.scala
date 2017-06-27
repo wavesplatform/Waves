@@ -12,11 +12,12 @@ import com.wavesplatform.matcher.model.MatcherModel._
 import com.wavesplatform.matcher.model._
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.reader.StateReader
+import io.netty.channel.Channel
 import play.api.libs.json._
 import scorex.crypto.encode.Base58
 import scorex.transaction.ValidationError.{AccountBalanceError, GenericError, OrderValidationError}
 import scorex.transaction.assets.exchange._
-import scorex.transaction.{History, NewTransactionHandler, ValidationError}
+import scorex.transaction.{History, ValidationError}
 import scorex.utils.{NTP, ScorexLogging}
 import scorex.wallet.Wallet
 
@@ -29,7 +30,7 @@ class OrderBookActor(assetPair: AssetPair, val orderHistory: ActorRef,
                      val wallet: Wallet, val settings: MatcherSettings,
                      val history: History,
                      val functionalitySettings: FunctionalitySettings,
-                     val transactionModule: NewTransactionHandler)
+                     val localChannel: Channel)
   extends PersistentActor
     with Stash with ScorexLogging with ExchangeTransactionCreator {
   override def persistenceId: String = OrderBookActor.name(assetPair)
@@ -254,9 +255,9 @@ class OrderBookActor(assetPair: AssetPair, val orderHistory: ActorRef,
 }
 
 object OrderBookActor {
-  def props(assetPair: AssetPair, orderHistory: ActorRef,  storedState: StateReader, settings: MatcherSettings, wallet: Wallet, transactionModule: NewTransactionHandler, history: History,
+  def props(assetPair: AssetPair, orderHistory: ActorRef, storedState: StateReader, settings: MatcherSettings, wallet: Wallet, localChannel: Channel, history: History,
             functionalitySettings: FunctionalitySettings): Props =
-    Props(new OrderBookActor(assetPair, orderHistory, storedState, wallet, settings, history, functionalitySettings, transactionModule))
+    Props(new OrderBookActor(assetPair, orderHistory, storedState, wallet, settings, history, functionalitySettings, localChannel))
 
   def name(assetPair: AssetPair): String = assetPair.toString
 

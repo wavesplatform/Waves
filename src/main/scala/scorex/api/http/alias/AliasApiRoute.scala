@@ -5,8 +5,10 @@ import javax.ws.rs.Path
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state2.reader.StateReader
+import io.netty.channel.Channel
 import io.swagger.annotations._
 import play.api.libs.json.{Format, Json}
+import scorex.BroadcastRoute
 import scorex.account.{Account, Alias}
 import scorex.api.http._
 import scorex.transaction._
@@ -15,8 +17,8 @@ import scorex.wallet.Wallet
 
 @Path("/alias")
 @Api(value = "/alias")
-case class AliasApiRoute(settings: RestAPISettings, wallet: Wallet, newTxHandler: NewTransactionHandler, time: Time, state: StateReader)
-  extends ApiRoute {
+case class AliasApiRoute(settings: RestAPISettings, wallet: Wallet, localChannel: Channel, time: Time, state: StateReader)
+  extends ApiRoute with BroadcastRoute {
 
   override val route = pathPrefix("alias") {
     alias ~ addressOfAlias ~ aliasOfAddress
@@ -38,7 +40,7 @@ case class AliasApiRoute(settings: RestAPISettings, wallet: Wallet, newTxHandler
     )
   ))
   @ApiResponses(Array(new ApiResponse(code = 200, message = "Json with response or error")))
-  def alias: Route = processRequest("create", (t: CreateAliasRequest) => TransactionFactory.alias(t, wallet, newTxHandler, time))
+  def alias: Route = processRequest("create", (t: CreateAliasRequest) => doBroadcast(TransactionFactory.alias(t, wallet, time)))
 
 
   @Path("/by-alias/{alias}")
