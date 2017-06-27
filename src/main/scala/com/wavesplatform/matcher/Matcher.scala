@@ -4,11 +4,11 @@ import akka.actor.{ActorRef, ActorSystem}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
 import akka.stream.ActorMaterializer
+import com.wavesplatform.UtxPool
 import com.wavesplatform.matcher.api.MatcherApiRoute
 import com.wavesplatform.matcher.market.{MatcherActor, OrderHistoryActor}
 import com.wavesplatform.settings.{BlockchainSettings, RestAPISettings}
 import com.wavesplatform.state2.reader.StateReader
-import io.netty.channel.Channel
 import scorex.api.http.CompositeHttpService
 import scorex.transaction.History
 import scorex.utils.{ScorexLogging, Time}
@@ -20,7 +20,7 @@ import scala.reflect.runtime.universe._
 
 class Matcher(actorSystem: ActorSystem,
               wallet: Wallet,
-              localChannel: Channel,
+              utx: UtxPool,
               stateReader: StateReader,
               time: Time,
               history: History,
@@ -36,8 +36,8 @@ class Matcher(actorSystem: ActorSystem,
     typeOf[MatcherApiRoute]
   )
 
-  lazy val matcher: ActorRef = actorSystem.actorOf(MatcherActor.props(orderHistory, stateReader, wallet, matcherSettings,
-    localChannel, time, history, blockchainSettings.functionalitySettings), MatcherActor.name)
+  lazy val matcher: ActorRef = actorSystem.actorOf(MatcherActor.props(orderHistory, stateReader, wallet, utx,
+    matcherSettings, time, history, blockchainSettings.functionalitySettings), MatcherActor.name)
 
   lazy val orderHistory: ActorRef = actorSystem.actorOf(OrderHistoryActor.props(matcherSettings, stateReader, wallet),
     OrderHistoryActor.name)

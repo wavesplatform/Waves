@@ -1,23 +1,15 @@
 package scorex
 
-import com.wavesplatform.network.OffChainTransaction
-import io.netty.channel.Channel
+import com.wavesplatform.UtxPool
 import scorex.api.http.ApiError
 import scorex.transaction.{Transaction, ValidationError}
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.{Future, Promise}
+import scala.concurrent.Future
 
 trait BroadcastRoute {
-  def localChannel: Channel
+  def utx: UtxPool
 
   protected def doBroadcast(v: Either[ValidationError, Transaction]): Future[Either[ApiError, Transaction]] =
-    v match {
-      case Right(t) =>
-        val p = Promise[Either[ValidationError, Transaction]]
-        localChannel.writeAndFlush(OffChainTransaction(t, p))
-        p.future.map(_.left.map(ApiError.fromValidationError))
-      case Left(e) =>
-        Future.successful(Left(ApiError.fromValidationError(e)))
-    }
+    Future(v.flatMap(t => utx.putIfNew(t)).left.map(ApiError.fromValidationError))
 }

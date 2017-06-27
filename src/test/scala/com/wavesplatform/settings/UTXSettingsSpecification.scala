@@ -1,22 +1,23 @@
 package com.wavesplatform.settings
 
-import scala.concurrent.duration._
+import java.time.Duration
+
 import com.typesafe.config.ConfigFactory
 import org.scalatest.{FlatSpec, Matchers}
+import net.ceedubs.ficus.Ficus._
+import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 
 class UTXSettingsSpecification extends FlatSpec with Matchers {
   "UTXSettins" should "read values" in {
     val config = ConfigFactory.parseString(
-      """
-        |waves {
+      """waves {
         |  utx {
-        |    size: 10000
-        |    broadcast-interval: 30s
+        |    max-size = 100
+        |    max-transaction-age = 100m
         |  }
-        |}
-      """.stripMargin).resolve()
-    val settings = UTXSettings.fromConfig(config)
-    settings.size should be(10000)
-    settings.broadcastInterval should be(30.seconds)
+        |}""".stripMargin).resolve()
+    val settings = config.as[UtxSettings]("waves.utx")
+    settings.maxSize should be(100)
+    settings.maxTransactionAge shouldBe Duration.ofMinutes(100)
   }
 }

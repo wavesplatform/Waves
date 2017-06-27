@@ -7,7 +7,7 @@ import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.settings._
 import com.wavesplatform.state2.reader.StateReader
-import com.wavesplatform.{Coordinator, Version}
+import com.wavesplatform.{Coordinator, UtxPool, Version}
 import io.netty.bootstrap.{Bootstrap, ServerBootstrap}
 import io.netty.channel._
 import io.netty.channel.group.ChannelGroup
@@ -34,8 +34,7 @@ class NetworkServer(
     blockchainUpdater: BlockchainUpdater,
     time: Time,
     stateReader: StateReader,
-    utxStorage: UnconfirmedTransactionsStorage,
-    txHandler: NewTransactionHandler,
+    utxPool: UtxPool,
     peerDatabase: PeerDatabase,
     wallet: Wallet,
     allChannels: ChannelGroup,
@@ -71,12 +70,12 @@ class NetworkServer(
 
   private val lengthFieldPrepender = new LengthFieldPrepender(4)
 
-  private val miner = new Miner(history, stateReader, utxStorage, wallet.privateKeyAccounts(),
+  private val miner = new Miner(history, stateReader, utxPool, wallet.privateKeyAccounts(),
     settings.blockchainSettings, settings.minerSettings, time.correctedTime(), allChannels.size(),
     b => writeToLocalChannel(BlockForged(b)))
 
   private val peerSynchronizer = new PeerSynchronizer(peerDatabase)
-  private val utxPoolSynchronizer = new UtxPoolSynchronizer(txHandler, allChannels)
+  private val utxPoolSynchronizer = new UtxPoolSynchronizer(utxPool, allChannels)
   private val errorHandler = new ErrorHandler(peerDatabase)
   private val historyReplier = new HistoryReplier(history, settings.synchronizationSettings.maxChainLength)
 
@@ -85,7 +84,7 @@ class NetworkServer(
     settings.networkSettings.maxConnectionsPerHost)
 
   private val coordinatorExecutor = new DefaultEventLoop
-  private val coordinator = new Coordinator(checkpoints, history, blockchainUpdater, stateReader, utxStorage,
+  private val coordinator = new Coordinator(checkpoints, history, blockchainUpdater, stateReader, utxPool,
     time.correctedTime(), settings.blockchainSettings,
     settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed, settings.checkpointsSettings.publicKey,
     miner, setBlockchainExpired)
