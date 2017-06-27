@@ -6,6 +6,7 @@ import java.util.{Collections, Properties, List => JList, Map => JMap}
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.dataformat.javaprop.JavaPropsMapper
 import com.google.common.collect.ImmutableMap
+import com.google.common.util.concurrent.ThreadFactoryBuilder
 import com.spotify.docker.client.DefaultDockerClient
 import com.spotify.docker.client.DockerClient.RemoveContainerParam
 import com.spotify.docker.client.messages.{ContainerConfig, HostConfig, NetworkConfig, PortBinding}
@@ -40,7 +41,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty) extends AutoCloseable wi
     .setRequestTimeout(5000))
 
   private val client = DefaultDockerClient.fromEnv().build()
-  private val timer = new HashedWheelTimer()
+  private val timer = new HashedWheelTimer(new ThreadFactoryBuilder().setDaemon(true).build())
   private var nodes = Map.empty[String, NodeInfo]
   private val isStopped = new AtomicBoolean(false)
 

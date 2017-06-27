@@ -1,22 +1,36 @@
 package com.wavesplatform.it.util
 
+import org.slf4j.LoggerFactory
 import scorex.account.{AccountOrAlias, Alias, PrivateKeyAccount}
 import scorex.transaction.TransactionParser.TransactionType
 import scorex.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
 import scorex.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction, TransferTransaction}
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import scorex.transaction.{CreateAliasTransaction, PaymentTransaction, Transaction}
+import scorex.transaction.{CreateAliasTransaction, PaymentTransaction, Transaction, ValidationError}
+import scorex.utils.LoggerFacade
 
 import scala.concurrent.duration._
 import scala.util.Random
 
 object TransactionGenerator {
   private val r = new Random()
+  private val log = LoggerFacade(LoggerFactory.getLogger(getClass))
   private def randomFrom[T](c: Seq[T]): Option[T] = if (c.nonEmpty) Some(c(r.nextInt(c.size))) else None
+
+  private def logOption[T <: Transaction](txE: Either[ValidationError, T]): Option[T] = {
+    txE match {
+      case Left(e) =>
+        log.warn(e.toString)
+        None
+      case Right(tx) => Some(tx)
+    }
+  }
 
   def gen(accounts: Seq[PrivateKeyAccount], n: Int): Seq[Transaction] = {
     val issueTransactionSender = randomFrom(accounts).get
-    val tradeAssetIssue = IssueTransaction.create(issueTransactionSender, "TRADE".getBytes, "Waves DEX is the best exchange ever".getBytes, 100000000, 2, reissuable = false, 100000, System.currentTimeMillis()).right.get
+    val tradeAssetIssue = IssueTransaction.create(issueTransactionSender, "TRADE".getBytes,
+      "Waves DEX is the best exchange ever".getBytes, 100000000, 2, reissuable = false,
+      100000000L + r.nextInt(100000000), System.currentTimeMillis()).right.get
 
     def tradeAssetDistribution = {
       tradeAssetIssue +: accounts.map(acc => {
@@ -47,25 +61,28 @@ object TransactionGenerator {
             r.nextBytes(name)
             r.nextBytes(description)
             val reissuable = r.nextBoolean()
-            Some(IssueTransaction.create(sender, name, description, 100000000 + Random.nextInt(Int.MaxValue), Random.nextInt(9).toByte, reissuable, 100000000L + r.nextInt(100000000), ts).right.get)
+            val amount = 100000000L + Random.nextInt(Int.MaxValue)
+              logOption(IssueTransaction.create(sender, name, description, amount, Random.nextInt(9).toByte, reissuable, 100000000L + r.nextInt(100000000), ts))
           case TransactionType.TransferTransaction =>
             val sender = randomFrom(accounts).get
             val useAlias = r.nextBoolean()
             val recipientOpt: Option[AccountOrAlias] = if (useAlias && aliases.nonEmpty) randomFrom(aliases).map(_.alias) else randomFrom(accounts).map(_.toAccount)
             val sendAsset = r.nextBoolean()
             val asset = if (sendAsset && validIssueTxs.nonEmpty) randomFrom(validIssueTxs).map(_.id) else None
-            recipientOpt.map(recipient => TransferTransaction.create(asset, sender, recipient, r.nextInt(500000), ts, None, moreThatStandartFee,
-              Array.fill(r.nextInt(100))(r.nextInt().toByte)).right.get)
+            recipientOpt.flatMap(recipient => {
+              logOption(TransferTransaction.create(asset, sender, recipient, r.nextInt(500000), ts, None, moreThatStandartFee,
+                Array.fill(r.nextInt(100))(r.nextInt().toByte)))
+            })
           case TransactionType.ReissueTransaction =>
             val reissuable = r.nextBoolean()
-            randomFrom(reissuableIssueTxs).map(assetTx => {
+            randomFrom(reissuableIssueTxs).flatMap(assetTx => {
               val sender = accounts.find(_.address == assetTx.sender.address).get
-              ReissueTransaction.create(sender, assetTx.id, Random.nextInt(Int.MaxValue), reissuable, moreThatStandartFee, ts).right.get
+              logOption(ReissueTransaction.create(sender, assetTx.id, Random.nextInt(Int.MaxValue), reissuable, moreThatStandartFee, ts))
             })
           case TransactionType.BurnTransaction =>
-            randomFrom(validIssueTxs).map(assetTx => {
+            randomFrom(validIssueTxs).flatMap(assetTx => {
               val sender = accounts.find(_.address == assetTx.sender.address).get
-              BurnTransaction.create(sender, assetTx.id, Random.nextInt(1000), moreThatStandartFee, ts).right.get
+              logOption(BurnTransaction.create(sender, assetTx.id, Random.nextInt(1000), moreThatStandartFee, ts))
             })
           case TransactionType.ExchangeTransaction =>
             val matcher = randomFrom(accounts).get
@@ -74,24 +91,24 @@ object TransactionGenerator {
             val sellOrder = Order.sell(seller, matcher, pair, 100000000, 1, ts, ts + 30.days.toMillis, moreThatStandartFee * 3)
             val buyer = randomFrom(accounts).get
             val buyOrder = Order.buy(buyer, matcher, pair, 100000000, 1, ts, ts + 1.day.toMillis, moreThatStandartFee * 3)
-            Some(ExchangeTransaction.create(matcher, buyOrder, sellOrder, 100000000, 1, 300000, 300000, moreThatStandartFee * 3, ts).right.get)
+            logOption(ExchangeTransaction.create(matcher, buyOrder, sellOrder, 100000000, 1, 300000, 300000, moreThatStandartFee * 3, ts))
           case TransactionType.LeaseTransaction =>
             val sender = randomFrom(accounts).get
             val useAlias = r.nextBoolean()
             val recipientOpt: Option[AccountOrAlias] = if (useAlias && aliases.nonEmpty) randomFrom(aliases.filter(_.sender != sender.toAccount)).map(_.alias) else randomFrom(accounts).map(_.toAccount).filter(_ != sender.toAccount)
-            recipientOpt.map(recipient =>
-              LeaseTransaction.create(sender, 1, moreThatStandartFee * 3, ts, recipient).right.get)
+            recipientOpt.flatMap(recipient =>
+              logOption(LeaseTransaction.create(sender, 1, moreThatStandartFee * 3, ts, recipient)))
           case TransactionType.LeaseCancelTransaction =>
-            randomFrom(activeLeaseTransactions).map(lease => {
+            randomFrom(activeLeaseTransactions).flatMap(lease => {
               val sender = accounts.find(_.address == lease.sender.address).get
-              LeaseCancelTransaction.create(sender, lease.id, moreThatStandartFee * 3, ts).right.get
+              logOption(LeaseCancelTransaction.create(sender, lease.id, moreThatStandartFee * 3, ts))
             })
           case TransactionType.CreateAliasTransaction =>
             val sender = randomFrom(accounts).get
             val aliasBytes = new Array[Byte](15)
             r.nextBytes(aliasBytes)
             val aliasString = new String(aliasBytes).trim.replace("\n", "")
-            Some(CreateAliasTransaction.create(sender, Alias.buildWithCurrentNetworkByte(aliasString).right.get, 100000, ts).right.get)
+            logOption(CreateAliasTransaction.create(sender, Alias.buildWithCurrentNetworkByte(aliasString).right.get, 100000, ts))
         }
         (tx.map(tx => allTxsWithValid :+ tx).getOrElse(allTxsWithValid),
           tx match {

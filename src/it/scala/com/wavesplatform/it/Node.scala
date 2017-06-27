@@ -256,14 +256,7 @@ class Node(config: Config, val nodeInfo: NodeInfo, client: AsyncHttpClient, time
     post("/debug/blacklist", s"${node.nodeInfo.networkIpAddress}:${node.nodeInfo.hostNetworkPort}").map(_ => ())
 
   def sendByNetwork(message: RawBytes): Future[Unit] = {
-    val allChannels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
-    val establishedConnections = new ConcurrentHashMap[Channel, PeerInfo]
-    val s = new RawNetworkServer('I', settings, allChannels, establishedConnections)
-    s.connect(new InetSocketAddress("localhost", nodeInfo.hostNetworkPort))
-    waitFor(Future.successful(establishedConnections.size()), (size: Int) => size == 1, 1 seconds).map(_ => {
-      establishedConnections.asScala.head._1.writeAndFlush(message)
-      s.shutdown()
-    })
+    new NetworkSender(new InetSocketAddress("localhost", nodeInfo.hostNetworkPort), 'I', "it-test-client", 4634745848L).sendByNetwork(message)
   }
 }
 

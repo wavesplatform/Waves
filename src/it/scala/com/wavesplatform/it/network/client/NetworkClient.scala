@@ -13,9 +13,10 @@ import io.netty.channel.socket.nio.NioSocketChannel
 import scorex.network.message.MessageSpec
 import scorex.utils.ScorexLogging
 
-class NetworkServer(
+class NetworkClient(
     chainId: Char,
-    settings: WavesSettings,
+    nodeName: String,
+    nonce: Long,
     allChannels: ChannelGroup,
     peerInfo: ConcurrentHashMap[Channel, PeerInfo]) extends ScorexLogging {
 
@@ -23,8 +24,8 @@ class NetworkServer(
   private val workerGroup = new NioEventLoopGroup()
 
   private val handshake =
-    Handshake(Constants.ApplicationName + chainId, Version.VersionTuple, settings.networkSettings.nodeName,
-      settings.networkSettings.nonce, None)
+    Handshake(Constants.ApplicationName + chainId, Version.VersionTuple, nodeName,
+      nonce, None)
 
   private val specs: Map[Byte, MessageSpec[_ <: AnyRef]] = (BasicMessagesRepo.specs ++ TransactionalMessagesRepo.specs).map(s => s.messageCode -> s).toMap
 
@@ -55,7 +56,6 @@ class NetworkServer(
     })
 
   def shutdown(): Unit = try {
-    log.debug("Unbound server")
     allChannels.close().await()
     log.debug("Closed all channels")
   } finally {
