@@ -7,39 +7,37 @@ import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.EllipticCurveImpl.SignatureLength
 import scorex.crypto.encode.Base58
 import scorex.serialization.{BytesSerializable, Deser}
-import scorex.transaction._
 import scorex.transaction.TransactionParser._
+import scorex.transaction._
 
 import scala.util.{Failure, Success, Try}
-import scala.util.Try
 
 /**
   * Created by DN on 30/05/2017.
   */
-sealed trait DataTransaction extends SignedTransaction
-{
+sealed trait DataTransaction extends SignedTransaction {
   def data: Array[Byte]
+
   def fee: Long
 
 }
 
-object DataTransaction
-{
-  private case class  DataTransactionImpl(sender: PublicKeyAccount,
-                                          data: Array[Byte],
-                                          fee: Long,
-                                          timestamp:Long,
-                                          signature: Array[Byte])
-  extends DataTransaction
-  {
+object DataTransaction {
+
+  private case class DataTransactionImpl(sender: PublicKeyAccount,
+                                         data: Array[Byte],
+                                         fee: Long,
+                                         timestamp: Long,
+                                         signature: Array[Byte])
+    extends DataTransaction {
     override val transactionType: TransactionType.Value = TransactionType.DataTransaction
-    override val assetFee: (Option[AssetId], Long)      = (None, fee)
+    override val assetFee: (Option[AssetId], Long) = (None, fee)
 
     lazy val toSign: Array[Byte] = Bytes.concat(Array(transactionType.id.toByte),
-                                                sender.publicKey,
-                                                data,
-                                                Longs.toByteArray(fee),
-                                                Longs.toByteArray(timestamp))
+      sender.publicKey,
+      BytesSerializable.arrayWithSize(data),
+      Longs.toByteArray(fee),
+      Longs.toByteArray(timestamp))
 
     override lazy val json: JsObject = jsonBase() ++ Json.obj("data" -> Base58.encode(data))
     override lazy val bytes: Array[Byte] = Bytes.concat(toSign, signature)
@@ -47,11 +45,12 @@ object DataTransaction
   }
 
   val MaxDataSize = 140
+
   def parseTail(bytes: Array[Byte]): Try[DataTransaction] = Try {
-    val sender                        = PublicKeyAccount(bytes.slice(0, KeyLength))
-    val (data, dataLength: Int)       = Deser.parseArraySize(bytes, KeyLength)
-    val fee                           = Longs.fromByteArray(bytes.slice(dataLength, dataLength + 8))
-    val timestamp                     = Longs.fromByteArray(bytes.slice(dataLength + 8, dataLength + 16))
+    val sender = PublicKeyAccount(bytes.slice(0, KeyLength))
+    val (data, dataLength: Int) = Deser.parseArraySize(bytes, KeyLength)
+    val fee = Longs.fromByteArray(bytes.slice(dataLength, dataLength + 8))
+    val timestamp = Longs.fromByteArray(bytes.slice(dataLength + 8, dataLength + 16))
     val signature = bytes.slice(dataLength + 16, dataLength + 16 + SignatureLength)
 
     DataTransaction.create(sender, data, fee, timestamp, signature)
@@ -61,12 +60,12 @@ object DataTransaction
   private def createUnverified(sender: PublicKeyAccount,
                                data: Array[Byte],
                                fee: Long,
-                               timestamp:Long,
+                               timestamp: Long,
                                signature: Option[Array[Byte]] = None) =
 
     if (data.length > MaxDataSize) {
       Left(ValidationError.TooBigArray)
-    }  else if (fee <= 0) {
+    } else if (fee <= 0) {
       Left(ValidationError.InsufficientFee)
     } else {
       Right(DataTransactionImpl(sender, data, fee, timestamp, signature.orNull))
@@ -76,7 +75,7 @@ object DataTransaction
   def create(sender: PublicKeyAccount,
              data: Array[Byte],
              fee: Long,
-             timestamp:Long,
+             timestamp: Long,
              signature: Array[Byte]): Either[ValidationError, DataTransaction] =
     createUnverified(sender, data, fee, timestamp, Some(signature)).right.flatMap(SignedTransaction.verify)
 
