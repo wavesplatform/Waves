@@ -43,10 +43,9 @@ class Miner(
         if (balance >= MinimalEffectiveBalanceForGenerator) {
           val lastBlockKernelData = parent.consensusData
           val currentTime = time
-
           val h = calcHit(lastBlockKernelData, account)
           val t = calcTarget(parent, currentTime, balance)
-          if (h >= t) {
+          if (h < t) {
             log.debug(s"Forging new block with ${account.address}, hit $h, target $t, balance $balance")
             log.debug(s"Previous block ID ${parent.encodedId} at $parentHeight with target ${lastBlockKernelData.baseTarget}")
 
@@ -82,9 +81,10 @@ class Miner(
     // balance, in turn, changes only when new block is appended to the blockchain, which causes all scheduled forging
     // attempts to be cancelled and re-scheduled over the new parent.
     for (ts <- PoSCalc.nextBlockGenerationTime(parentHeight, state, blockchainSettings.functionalitySettings, parent, account)) {
-      val generationInstant = Instant.ofEpochMilli(ts)
-
-      val generationOffset = MinimalGenerationOffset.max(Duration.between(Instant.ofEpochMilli(time), generationInstant))
+      val generationInstant = Instant.ofEpochMilli(ts + 10)
+      val calculatedOffset = Duration.between(Instant.ofEpochMilli(time), generationInstant)
+      log.debug(s"Next block generation attempt calculated in $calculatedOffset (parent: ${parent.uniqueId})")
+      val generationOffset = MinimalGenerationOffset.max(calculatedOffset)
       log.debug(s"Next attempt in $generationOffset (${account.address} at $generationInstant)")
 
       scheduledAttempts.compute(ByteStr(account.publicKey), { (key, prevTask) =>
@@ -100,19 +100,13 @@ class Miner(
             override def onSuccess(result: Option[Block]): Unit = result match {
               case Some(block) => blockHandler(block)
               case None =>
-                log.debug(s"No block generated: Retrying")
-                scheduledAttempts.remove(key, thisAttempt)
-                retry(parentHeight, parent, greatGrandParent)(account)
+                if (scheduledAttempts.remove(key, thisAttempt)) {
+                  log.debug(s"No block generated: Retrying")
+                  retry(parentHeight, parent, greatGrandParent)(account)
+                }
             }
 
-            override def onFailure(t: Throwable): Unit = t match {
-              case _: CancellationException =>
-                log.trace(s"Block generation cancelled for $key")
-              case re: RuntimeException =>
-                log.warn(s"Error generating block, retrying", re)
-                scheduledAttempts.remove(key, thisAttempt)
-                retry(parentHeight, parent, greatGrandParent)(account)
-            }
+            override def onFailure(t: Throwable): Unit = {}
           })
 
           thisAttempt
@@ -121,10 +115,10 @@ class Miner(
     }
 
   def lastBlockChanged(parentHeight: Int, parent: Block): Unit = {
+    log.debug(s"Canceling: Parent block: ${parent.uniqueId.toString}")
     scheduledAttempts.values.asScala.foreach(_.cancel(true))
     scheduledAttempts.clear()
-    val greatGrandParent = history.blockAt(parentHeight - 3)
-
+    val greatGrandParent = history.parent(parent, 2)
     log.debug("Attempting to schedule block generation")
     privateKeyAccounts.foreach(retry(parentHeight, parent, greatGrandParent))
   }

@@ -33,8 +33,11 @@ class CoordinatorHandler(coordinator: Coordinator, peerDatabase: PeerDatabase, a
       }
     // "off-chain" messages: locally forged block and checkpoints from API
     case bf@BlockForged(b) =>
-      loggingResult(ctx, "applying locally mined block", coordinator.processLocalBlock(b))
-        .foreach(_ => allChannels.broadcast(bf))
+      loggingResult(ctx, s"applying locally mined block (${b.uniqueId})", coordinator.processLocalBlock(b))
+        .foreach { score =>
+          allChannels.broadcast(LocalScoreChanged(score))
+          allChannels.broadcast(bf)
+        }
     case OffChainCheckpoint(c, p) =>
       loggingResult(ctx, "processing checkpoint from API", coordinator.processCheckpoint(c)).fold(
         e => p.success(Left(e)),

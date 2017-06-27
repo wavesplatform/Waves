@@ -103,10 +103,12 @@ class Coordinator(
   }
 
   def processLocalBlock(newBlock: Block): Either[ValidationError, BigInt] = {
+    log.debug(s"Processing new local block ${newBlock.uniqueId} (history last block: ${history.lastBlock.uniqueId})")
     val result = processBlock(newBlock)
-    // unconditionally notify miner: even if newly generated local block could not have been appended, miner will
+    // even if newly generated local block could not have been appended, miner will
     // schedule next generation attempt.
-    miner.lastBlockChanged(history.height(), history.lastBlock)
+
+    result.left.foreach(_ => miner.lastBlockChanged(history.height(), history.lastBlock))
     result
   }
 

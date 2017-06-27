@@ -23,7 +23,9 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Auto
     doTouch(a, Long.MaxValue)
   }
 
-  override def addCandidate(socketAddress: InetSocketAddress): Unit = unverifiedPeers.add(socketAddress)
+  override def addCandidate(socketAddress: InetSocketAddress): Unit = unverifiedPeers.synchronized {
+    unverifiedPeers.add(socketAddress)
+  }
 
   private def doTouch(socketAddress: InetSocketAddress, timestamp: Long): Unit = unverifiedPeers.synchronized {
     unverifiedPeers.removeIf(_ == socketAddress)
