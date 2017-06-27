@@ -1,15 +1,17 @@
 package com.wavesplatform.http
 
+import java.util.concurrent.ConcurrentMap
+
 import com.wavesplatform.http.ApiMarshallers._
-import com.wavesplatform.network.PeerDatabase
+import com.wavesplatform.network.{PeerDatabase, PeerInfo}
 import com.wavesplatform.state2.reader.StateReader
 import com.wavesplatform.state2.{LeaseInfo, Portfolio}
 import com.wavesplatform.{BlockGen, TestWallet, TransactionGen}
+import io.netty.channel.Channel
 import org.scalacheck.{Gen, Shrink}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json._
-import scorex.block.Block
 import scorex.transaction.History
 import scorex.waves.http.DebugApiRoute
 
@@ -20,9 +22,10 @@ class DebugRouteSpec
   private val state = mock[StateReader]
   private val history = mock[History]
   private val peerDatabase = mock[PeerDatabase]
-  private val rollbackTo = mockFunction[Block.BlockId, Unit]
-
-  private val route = DebugApiRoute(restAPISettings, testWallet, state, history, peerDatabase, rollbackTo).route
+  private val localChannel = mock[Channel]
+  private val establishedConnections = mock[ConcurrentMap[Channel, PeerInfo]]
+  private val route = DebugApiRoute(restAPISettings, testWallet, state, history, peerDatabase, establishedConnections,
+    localChannel).route
 
   private implicit def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)
   

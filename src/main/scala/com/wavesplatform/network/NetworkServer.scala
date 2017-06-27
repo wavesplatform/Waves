@@ -113,7 +113,7 @@ class NetworkServer(
   localServer.bind(address).sync()
 
   private val localClientGroup = new DefaultEventLoopGroup()
-  private val localClientChannel = new Bootstrap()
+  val localClientChannel = new Bootstrap()
     .group(localClientGroup)
     .channel(classOf[LocalChannel])
     .handler(new PipelineInitializer[LocalChannel](Seq.empty))
@@ -158,12 +158,13 @@ class NetworkServer(
   private val outgoingChannels = new ConcurrentHashMap[InetSocketAddress, Channel]
 
   private def incomingDeclaredAddresses =
-    peerInfo.reduceValues[Set[InetSocketAddress]](1000, _.declaredAddress.toSet, _ ++ _)
+    peerInfo.values().asScala.flatMap(_.declaredAddress)
 
   private val clientHandshakeHandler =
     new HandshakeHandler.Client(handshake, peerInfo, peerUniqueness, peerDatabase)
 
   private val bootstrap = new Bootstrap()
+    .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, settings.networkSettings.connectionTimeout.toMillis.toInt: Integer)
     .group(workerGroup)
     .channel(classOf[NioSocketChannel])
     .handler(new PipelineInitializer[SocketChannel](Seq(
@@ -188,21 +189,26 @@ class NetworkServer(
   val connectTask = workerGroup.scheduleWithFixedDelay(1.second, 5.seconds) {
     if (outgoingChannelCount.get() < settings.networkSettings.maxOutboundConnections) {
       peerDatabase
-        .getRandomPeer(excludedAddresses ++ outgoingChannels.keySet().asScala ++ incomingDeclaredAddresses)
+        .randomPeer(excludedAddresses ++ outgoingChannels.keySet().asScala ++ incomingDeclaredAddresses)
         .foreach(connect)
     }
   }
 
+  // once the server has been initialized, "start" miner
+  miner.lastBlockChanged(history.height(), history.lastBlock)
+
   def connect(remoteAddress: InetSocketAddress): Unit =
     outgoingChannels.computeIfAbsent(remoteAddress, _ => {
+      log.debug(s"Connecting to $remoteAddress")
       bootstrap.connect(remoteAddress)
         .addListener { (connFuture: ChannelFuture) =>
           if (connFuture.isDone) {
             if (connFuture.cause() != null) {
               log.debug(s"${id(connFuture.channel())} Connection failed, blacklisting $remoteAddress", connFuture.cause())
-              peerDatabase.blacklistHost(remoteAddress.getAddress)
+              peerDatabase.blacklist(remoteAddress.getAddress)
             } else if (connFuture.isSuccess) {
               log.debug(s"${id(connFuture.channel())} Connection established")
+              peerDatabase.touch(remoteAddress)
               outgoingChannelCount.incrementAndGet()
               connFuture.channel().closeFuture().addListener { (closeFuture: ChannelFuture) =>
                 val remainingCount = outgoingChannelCount.decrementAndGet()

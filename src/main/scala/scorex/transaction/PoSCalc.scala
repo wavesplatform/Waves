@@ -1,16 +1,18 @@
 package scorex.transaction
 
 import com.wavesplatform.settings.FunctionalitySettings
+import com.wavesplatform.state2.ByteStr
 import com.wavesplatform.state2.reader.StateReader
 import scorex.account.{Account, PublicKeyAccount}
 import scorex.block.Block
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
 import scorex.crypto.hash.FastCryptographicHash
 import scorex.crypto.hash.FastCryptographicHash.hash
+import scorex.utils.ScorexLogging
 
 import scala.concurrent.duration.FiniteDuration
 
-object PoSCalc extends {
+object PoSCalc extends ScorexLogging {
 
   val MinimalEffectiveBalanceForGenerator: Long = 1000000000000L
   val AvgBlockTimeDepth: Int = 3
@@ -89,8 +91,12 @@ object PoSCalc extends {
       if (0 < calculatedTs && calculatedTs < Long.MaxValue) {
         Some(calculatedTs.toLong)
       } else {
+        log.debug(s"Invalid next block generation time: $calculatedTs")
         None
       }
-    } else None
+    } else {
+      log.debug(s"Balance $balance of ${ByteStr(account.publicKey)} is lower than $MinimalEffectiveBalanceForGenerator")
+      None
+    }
   }
 }

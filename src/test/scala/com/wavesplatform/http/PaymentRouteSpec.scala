@@ -1,17 +1,17 @@
 package com.wavesplatform.http
 
 import com.wavesplatform.http.ApiMarshallers._
+import com.wavesplatform.network.OffChainTransaction
 import com.wavesplatform.{TestWallet, TransactionGen}
+import io.netty.channel.embedded.EmbeddedChannel
+import io.netty.channel.{ChannelHandlerContext, ChannelOutboundHandlerAdapter, ChannelPromise}
 import org.scalacheck.Shrink
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json.{JsObject, Json}
-import scorex.api.http.assets.TransferRequest
 import scorex.api.http.{ApiKeyNotValid, PaymentApiRoute}
-import scorex.crypto.encode.Base58
 import scorex.transaction.assets.TransferTransaction
-import scorex.transaction.{NewTransactionHandler, Transaction, ValidationError}
-import scorex.utils.NTP
+import scorex.utils.{NTP, Time}
 
 class PaymentRouteSpec extends RouteSpec("/payment")
   with MockFactory with PropertyChecks with RestAPISettingsHelper with TestWallet with TransactionGen {
@@ -23,24 +23,26 @@ class PaymentRouteSpec extends RouteSpec("/payment")
     forAll(accountOrAliasGen.label("recipient"), positiveLongGen.label("amount"), smallFeeGen.label("fee")) {
       case (recipient, amount, fee) =>
 
+        val timestamp = System.currentTimeMillis()
+        val time = mock[Time]
+        (time.getTimestamp _).expects().returns(timestamp).anyNumberOfTimes()
+
         val sender = testWallet.privateKeyAccounts().head
-        val tx = TransferTransaction.create(None, sender, recipient, amount, System.currentTimeMillis(), None, fee, Array())
-        val stmMock: NewTransactionHandler = {
+        val tx = TransferTransaction.create(None, sender, recipient, amount, timestamp, None, fee, Array())
 
-          def alwaysTx(t: Transaction): Either[ValidationError, Transaction] = tx
-
-          val m = mock[NewTransactionHandler]
-          (m.onNewTransaction(_: Transaction))
-            .expects(*)
-            .onCall(alwaysTx _)
-            .anyNumberOfTimes()
-          m
+        class MockHandler extends ChannelOutboundHandlerAdapter {
+          override def write(ctx: ChannelHandlerContext, msg: scala.Any, promise: ChannelPromise): Unit = {
+            msg match {
+              case OffChainTransaction(_, p) =>
+                p.success(tx)
+            }
+          }
         }
 
-        val route = PaymentApiRoute(restAPISettings, testWallet, stmMock, NTP).route
+        val channel = new EmbeddedChannel(new MockHandler)
+        val route = PaymentApiRoute(restAPISettings, testWallet, channel, time).route
 
         val req = Json.obj("sender" -> sender.address, "recipient" -> recipient.stringRepr, "amount" -> amount, "fee" -> fee)
-        val transferReq = TransferRequest(None, None, amount, fee, sender.address, None, recipient.stringRepr)
 
         Post(routePath(""), req) ~> route should produce(ApiKeyNotValid)
         Post(routePath(""), req) ~> api_key(apiKey) ~> route ~> check {

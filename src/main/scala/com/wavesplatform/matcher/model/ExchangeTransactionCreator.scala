@@ -1,17 +1,22 @@
 package com.wavesplatform.matcher.model
 
 import com.wavesplatform.matcher.MatcherSettings
+import com.wavesplatform.network.OffChainTransaction
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.Validator
 import com.wavesplatform.state2.reader.StateReader
+import io.netty.channel.Channel
 import scorex.transaction.assets.exchange.{ExchangeTransaction, Order}
-import scorex.transaction.{NewTransactionHandler, SignedTransaction, ValidationError}
+import scorex.transaction.{SignedTransaction, Transaction, ValidationError}
 import scorex.utils.{NTP, ScorexLogging}
 import scorex.wallet.Wallet
 
+import scala.concurrent.duration._
+import scala.concurrent.{Await, Promise}
+
 trait ExchangeTransactionCreator extends ScorexLogging {
   val functionalitySettings: FunctionalitySettings
-  val transactionModule: NewTransactionHandler
+  val localChannel: Channel
   val storedState: StateReader
   val wallet: Wallet
   val settings: MatcherSettings
@@ -44,7 +49,10 @@ trait ExchangeTransactionCreator extends ScorexLogging {
   def validate(orderMatch: ExchangeTransaction): Either[ValidationError, SignedTransaction] =
     Validator.validateWithCurrentTime(functionalitySettings, storedState, NTP)(orderMatch)
 
-  def sendToNetwork(tx: SignedTransaction): Either[ValidationError, SignedTransaction] = {
-    transactionModule.onNewTransaction(tx)
+  def sendToNetwork(tx: SignedTransaction): Either[ValidationError, Transaction] = {
+    val p = Promise[Either[ValidationError, Transaction]]
+    localChannel.writeAndFlush(OffChainTransaction(tx, p))
+
+    Await.result(p.future, 1.minute)
   }
 }

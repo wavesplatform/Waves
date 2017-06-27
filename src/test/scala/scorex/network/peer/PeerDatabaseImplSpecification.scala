@@ -37,78 +37,64 @@ class PeerDatabaseImplSpecification extends path.FreeSpecLike with Matchers {
 
   "Peer database" - {
     "new peer should not appear in internal buffer but does not appear in database" in {
-      database.getKnownPeers shouldBe empty
-      database.addPeer(address1, None, None)
-      database.getRandomPeer(Set()) should contain(address1)
-      database.getKnownPeers shouldBe empty
+      database.knownPeers shouldBe empty
+      database.addCandidate(address1)
+      database.randomPeer(Set()) should contain(address1)
+      database.knownPeers shouldBe empty
     }
 
     "new peer should move from internal buffer to database" in {
-      database.getKnownPeers shouldBe empty
-      database.addPeer(address1, None, None)
-      database.getKnownPeers shouldBe empty
-      database.addPeer(address1, Some(0), None)
-      database.getKnownPeers.keys should contain(address1)
+      database.knownPeers shouldBe empty
+      database.addCandidate(address1)
+      database.knownPeers shouldBe empty
+      database.touch(address1)
+      database.knownPeers.keys should contain(address1)
     }
 
     "peer should should became obsolete after time" in {
-      database.addPeer(address1, Some(0), None)
-      database.getKnownPeers.keys should contain(address1)
+      database.touch(address1)
+      database.knownPeers.keys should contain(address1)
       sleepLong()
-      database.getKnownPeers shouldBe empty
-      database.getRandomPeer(Set()) shouldBe empty
+      database.knownPeers shouldBe empty
+      database.randomPeer(Set()) shouldBe empty
     }
 
     "touching peer prevent it from obsoleting" in {
-      database.addPeer(address1, None, None)
-      database.addPeer(address1, Some(0), None)
+      database.addCandidate(address1)
+      database.touch(address1)
       sleepLong()
       database.touch(address1)
       sleepShort()
-      database.getKnownPeers.keys should contain(address1)
-    }
-
-    "removing peer removes it from internal buffer" in {
-      database.addPeer(address1, None, None)
-      database.getRandomPeer(Set()) should contain(address1)
-      database.removePeer(address1)
-      database.getRandomPeer(Set()) shouldBe empty
-    }
-
-    "removing peer removes it also from database" in {
-      database.addPeer(address1, Some(0), None)
-      database.getKnownPeers.keys should contain(address1)
-      database.removePeer(address1)
-      database.getKnownPeers.keys should be(empty)
+      database.knownPeers.keys should contain(address1)
     }
 
     "blacklisted peer should disappear from internal buffer and database" in {
-      database.addPeer(address1, Some(0), None)
-      database.addPeer(address2, None, None)
-      database.getKnownPeers.keys should contain(address1)
-      database.getKnownPeers.keys should not contain address2
+      database.touch(address1)
+      database.addCandidate(address2)
+      database.knownPeers.keys should contain(address1)
+      database.knownPeers.keys should not contain address2
 
-      database.blacklistHost(InetAddress.getByName(host1))
-      database.getKnownPeers.keys should not contain address1
-      database.getKnownPeers should be(empty)
+      database.blacklist(InetAddress.getByName(host1))
+      database.knownPeers.keys should not contain address1
+      database.knownPeers should be(empty)
 
-      database.getRandomPeer(Set()) should contain(address2)
-      database.blacklistHost(InetAddress.getByName(host2))
-      database.getRandomPeer(Set()) should not contain address2
-      database.getRandomPeer(Set()) should be(empty)
+      database.randomPeer(Set()) should contain(address2)
+      database.blacklist(InetAddress.getByName(host2))
+      database.randomPeer(Set()) should not contain address2
+      database.randomPeer(Set()) should be(empty)
     }
 
   }
 
   "Peer database2" - {
     "random peer should return peers from both from database and buffer" in {
-      database2.addPeer(address1, Some(0), None)
-      database2.addPeer(address2, None, None)
-      val keys = database2.getKnownPeers.keys
+      database2.touch(address1)
+      database2.addCandidate(address2)
+      val keys = database2.knownPeers.keys
       keys should contain(address1)
       keys should not contain address2
 
-      val set = (1 to 10).flatMap(i => database2.getRandomPeer(Set())).toSet
+      val set = (1 to 10).flatMap(i => database2.randomPeer(Set())).toSet
 
       set should contain(address1)
       set should contain(address2)

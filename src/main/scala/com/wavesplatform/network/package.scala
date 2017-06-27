@@ -20,12 +20,6 @@ package object network extends ScorexLogging {
     else new InetSocketAddress(uri.getHost, uri.getPort)
   }
 
-  def sameAddresses(a1: SocketAddress, a2: SocketAddress): Boolean = a1 == a2 ||
-    ((a1, a2) match {
-      case (isa1: InetSocketAddress, isa2: InetSocketAddress) => isa1.getAddress == isa2.getAddress
-      case _ => false
-    })
-
   implicit class EventExecutorGroupExt(val e: EventExecutorGroup) extends AnyVal {
     def scheduleWithFixedDelay(initialDelay: FiniteDuration, delay: FiniteDuration)(f: => Unit): ScheduledFuture[_] =
       e.scheduleWithFixedDelay((() => f): Runnable, initialDelay.toNanos, delay.toNanos, NANOSECONDS)

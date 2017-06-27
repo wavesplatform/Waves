@@ -66,7 +66,7 @@ abstract class HandshakeHandler(
         log.warn(s"${id(ctx)} Remote application name ${remoteHandshake.applicationName} does not match local ${localHandshake.applicationName}")
         peerDatabase.blacklistAndClose(ctx.channel())
       } else if (!versionIsSupported(remoteHandshake.applicationVersion)) {
-        log.warn(s"${id(ctx) } Remote application version ${remoteHandshake.applicationVersion } is not supported")
+        log.warn(s"${id(ctx)} Remote application version ${remoteHandshake.applicationVersion } is not supported")
         peerDatabase.blacklistAndClose(ctx.channel())
       } else {
         val key = PeerKey(ctx.remoteAddress.getAddress, remoteHandshake.nodeNonce)

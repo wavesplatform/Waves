@@ -4,20 +4,24 @@ import javax.ws.rs.Path
 
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.settings.RestAPISettings
+import io.netty.channel.Channel
 import io.swagger.annotations._
+import scorex.BroadcastRoute
 import scorex.account.Account
 import scorex.api.http._
 import scorex.api.http.assets.PaymentRequest
 import scorex.crypto.encode.Base58
-import scorex.transaction.{NewTransactionHandler, PaymentTransaction, TransactionFactory}
+import scorex.transaction.{PaymentTransaction, TransactionFactory}
 import scorex.utils.Time
 import scorex.wallet.Wallet
 import scorex.waves.transaction.SignedPaymentRequest
+import scala.concurrent.ExecutionContext.Implicits.global
 
 @Path("/waves")
 @Api(value = "waves")
 @Deprecated
-case class WavesApiRoute(settings: RestAPISettings, wallet: Wallet, newTxHandler: NewTransactionHandler, time: Time) extends ApiRoute {
+case class WavesApiRoute(settings: RestAPISettings, wallet: Wallet, localChannel: Channel, time: Time)
+  extends ApiRoute with BroadcastRoute {
 
   override lazy val route = pathPrefix("waves") {
     externalPayment ~ signPayment ~ broadcastSignedPayment ~ payment ~ createdSignedPayment
@@ -44,9 +48,12 @@ case class WavesApiRoute(settings: RestAPISettings, wallet: Wallet, newTxHandler
   def payment: Route = withAuth {
     (path("payment") & post) {
       json[PaymentRequest] { payment =>
-        TransactionFactory.createPayment(payment, wallet, newTxHandler, time).map { tx =>
-          SignedPaymentRequest(tx.timestamp, tx.amount, tx.fee, tx.recipient.address,
-            Base58.encode(tx.sender.publicKey), tx.sender.address, tx.signature.base58)
+        doBroadcast(TransactionFactory.createPayment(payment, wallet, time)) map { f =>
+          f.map { t =>
+            val tx = t.asInstanceOf[PaymentTransaction]
+            SignedPaymentRequest(tx.timestamp, tx.amount, tx.fee, tx.recipient.address,
+              Base58.encode(tx.sender.publicKey), tx.sender.address, tx.signature.base58)
+          }
         }
       }
     }
@@ -118,12 +125,6 @@ case class WavesApiRoute(settings: RestAPISettings, wallet: Wallet, newTxHandler
     }
   }
 
-  private def broadcastPaymentRoute(suffix: String): Route = (path(suffix) & post) {
-    json[SignedPaymentRequest] { payment =>
-      TransactionFactory.broadcastPayment(payment, newTxHandler)
-    }
-  }
-
   @Deprecated
   @Path("/external-payment")
   @ApiOperation(value = "Broadcast payment", notes = "Publish signed payment to the Blockchain", httpMethod = "POST", produces = "application/json", consumes = "application/json")
@@ -157,4 +158,10 @@ case class WavesApiRoute(settings: RestAPISettings, wallet: Wallet, newTxHandler
   ))
   @ApiResponses(Array(new ApiResponse(code = 200, message = "Json with response or error")))
   def broadcastSignedPayment: Route = broadcastPaymentRoute("broadcast-signed-payment")
+
+  private def broadcastPaymentRoute(suffix: String): Route = (path(suffix) & post) {
+    json[SignedPaymentRequest] { payment =>
+      doBroadcast(TransactionFactory.broadcastPayment(payment))
+    }
+  }
 }

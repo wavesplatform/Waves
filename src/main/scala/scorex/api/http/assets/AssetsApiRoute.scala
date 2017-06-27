@@ -6,14 +6,16 @@ import akka.http.scaladsl.server.Route
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state2.ByteStr
 import com.wavesplatform.state2.reader.StateReader
+import io.netty.channel.Channel
 import io.swagger.annotations._
 import play.api.libs.json._
+import scorex.BroadcastRoute
 import scorex.account.Account
 import scorex.api.http.{ApiError, ApiRoute, InvalidAddress}
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange.Order
 import scorex.transaction.assets.exchange.OrderJson._
-import scorex.transaction.{AssetAcc, AssetIdStringLength, NewTransactionHandler, TransactionFactory}
+import scorex.transaction.{AssetAcc, AssetIdStringLength, TransactionFactory}
 import scorex.utils.Time
 import scorex.wallet.Wallet
 
@@ -21,7 +23,8 @@ import scala.util.{Failure, Success}
 
 @Path("/assets")
 @Api(value = "assets")
-case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, state: StateReader, newTxHandler: NewTransactionHandler, time: Time) extends ApiRoute {
+case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, state: StateReader, localChannel: Channel, time: Time)
+  extends ApiRoute with BroadcastRoute {
   val MaxAddressesPerRequest = 1000
 
   override lazy val route =
@@ -83,7 +86,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, state: Stat
     )
   ))
   def transfer: Route =
-    processRequest("transfer", (t: TransferRequest) => TransactionFactory.transferAsset(t, wallet, newTxHandler, time))
+    processRequest("transfer", (t: TransferRequest) => doBroadcast(TransactionFactory.transferAsset(t, wallet, time)))
 
   @Path("/issue")
   @ApiOperation(value = "Issue Asset",
@@ -101,7 +104,8 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, state: Stat
       defaultValue = "{\"sender\":\"string\",\"name\":\"str\",\"description\":\"string\",\"quantity\":100000,\"decimals\":7,\"reissuable\":false,\"fee\":100000000}"
     )
   ))
-  def issue: Route = processRequest("issue", TransactionFactory.issueAsset(wallet, newTxHandler, time) _)
+  def issue: Route =
+    processRequest("issue", (r: IssueRequest) => doBroadcast(TransactionFactory.issueAsset(r, wallet, time)))
 
   @Path("/reissue")
   @ApiOperation(value = "Issue Asset",
@@ -120,7 +124,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, state: Stat
     )
   ))
   def reissue: Route =
-    processRequest("reissue", (r: ReissueRequest) => TransactionFactory.reissueAsset(r, wallet, newTxHandler, time))
+    processRequest("reissue", (r: ReissueRequest) => doBroadcast(TransactionFactory.reissueAsset(r, wallet, time)))
 
   @Path("/burn")
   @ApiOperation(value = "Burn Asset",
@@ -139,7 +143,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, state: Stat
     )
   ))
   def burnRoute: Route =
-    processRequest("burn", (b: BurnRequest) => TransactionFactory.burnAsset(b, wallet, newTxHandler, time))
+    processRequest("burn", (b: BurnRequest) => doBroadcast(TransactionFactory.burnAsset(b, wallet, time)))
 
 
   @Path("/make-asset-name-unique")
@@ -159,7 +163,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, state: Stat
     )
   ))
   def makeAssetNameUniqueRoute: Route =
-    processRequest("make-asset-name-unique", (b: MakeAssetNameUniqueRequest) => TransactionFactory.makeAssetNameUnique(b, wallet, newTxHandler, time))
+    processRequest("make-asset-name-unique", (b: MakeAssetNameUniqueRequest) => doBroadcast(TransactionFactory.makeAssetNameUnique(b, wallet, time)))
 
   @Path("/asset-id-by-unique-name/{name}")
   @ApiOperation(value = "Asset id by unique name, if registered", notes = "Asset id by unique name, if registered", httpMethod = "GET")

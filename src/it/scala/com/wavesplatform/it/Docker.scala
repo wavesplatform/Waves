@@ -15,6 +15,7 @@ import org.asynchttpclient.Dsl._
 import scorex.utils.ScorexLogging
 
 import scala.collection.JavaConverters._
+import scala.concurrent.Await
 import scala.concurrent.duration._
 
 case class NodeInfo(
@@ -87,7 +88,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty) extends AutoCloseable wi
       .env(s"WAVES_OPTS=$configOverrides", s"WAVES_PORT=$networkPort")
       .build()
 
-    val containerId = client.createContainer(containerConfig).id()
+    val containerId = client.createContainer(containerConfig, actualConfig.getString("waves.network.node-name")).id()
     connectToNetwork(containerId)
     client.startContainer(containerId)
     val containerInfo = client.inspectContainer(containerId)
@@ -104,7 +105,9 @@ class Docker(suiteConfig: Config = ConfigFactory.empty) extends AutoCloseable wi
       extractHostPort(ports, matcherApiPort))
     nodes += containerId -> nodeInfo
 
-    new Node(actualConfig, nodeInfo, http, timer)
+    val node = new Node(actualConfig, nodeInfo, http, timer)
+    Await.result(node.lastBlock, Duration.Inf)
+    node
   }
 
   def stopNode(containerId: String): Unit = {
