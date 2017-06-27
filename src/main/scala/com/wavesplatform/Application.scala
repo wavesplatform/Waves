@@ -30,7 +30,6 @@ import scorex.consensus.nxt.NxtLikeConsensusBlockData
 import scorex.consensus.nxt.api.http.NxtConsensusApiRoute
 import scorex.crypto.hash.FastCryptographicHash.DigestSize
 import scorex.transaction._
-import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
 import scorex.utils.{ScorexLogging, Time, TimeImpl}
 import scorex.wallet.Wallet
 import scorex.waves.http.{DebugApiRoute, WavesApiRoute}
@@ -58,12 +57,13 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
 
     val feeCalculator = new FeeCalculator(settings.feesSettings)
     val time: Time = new TimeImpl()
-    val utxStorage: UnconfirmedTransactionsStorage = new UnconfirmedTransactionsDatabaseImpl(settings.utxSettings.size)
-
 
     val peerDatabase = new PeerDatabaseImpl(settings.networkSettings)
     val establishedConnections = new ConcurrentHashMap[Channel, PeerInfo]
     val allChannels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
+
+    val utxStorage = new UtxPool(allChannels,
+      time, stateReader, feeCalculator, settings.blockchainSettings.functionalitySettings, settings.utxSettings)
 
     val network = new NetworkServer(
       settings.blockchainSettings.addressSchemeCharacter,
@@ -76,7 +76,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
       time,
       stateReader,
       utxStorage,
-      new NewTransactionHandlerImpl(settings.blockchainSettings.functionalitySettings, time, feeCalculator, utxStorage, stateReader),
       peerDatabase,
       wallet,
       allChannels,
@@ -87,20 +86,20 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
       TransactionsApiRoute(settings.restAPISettings, stateReader, history, utxStorage),
       NxtConsensusApiRoute(settings.restAPISettings, stateReader, history, settings.blockchainSettings.functionalitySettings),
       WalletApiRoute(settings.restAPISettings, wallet),
-      PaymentApiRoute(settings.restAPISettings, wallet, network.localClientChannel, time),
+      PaymentApiRoute(settings.restAPISettings, wallet, utxStorage, time),
       UtilsApiRoute(settings.restAPISettings),
       PeersApiRoute(settings.restAPISettings, network.connect, peerDatabase, establishedConnections),
       AddressApiRoute(settings.restAPISettings, wallet, stateReader, settings.blockchainSettings.functionalitySettings),
       DebugApiRoute(settings.restAPISettings, wallet, stateReader, history, peerDatabase, establishedConnections,
         network.localClientChannel),
-      WavesApiRoute(settings.restAPISettings, wallet, network.localClientChannel, time),
-      AssetsApiRoute(settings.restAPISettings, wallet, stateReader, network.localClientChannel, time),
+      WavesApiRoute(settings.restAPISettings, wallet, utxStorage, time),
+      AssetsApiRoute(settings.restAPISettings, wallet, utxStorage, stateReader, time),
       NodeApiRoute(settings.restAPISettings, () => this.shutdown()),
-      AssetsBroadcastApiRoute(settings.restAPISettings, network.localClientChannel),
-      LeaseApiRoute(settings.restAPISettings, wallet, stateReader, network.localClientChannel, time),
-      LeaseBroadcastApiRoute(settings.restAPISettings, network.localClientChannel),
-      AliasApiRoute(settings.restAPISettings, wallet, network.localClientChannel, time, stateReader),
-      AliasBroadcastApiRoute(settings.restAPISettings, network.localClientChannel)
+      AssetsBroadcastApiRoute(settings.restAPISettings, utxStorage),
+      LeaseApiRoute(settings.restAPISettings, wallet, utxStorage, stateReader, time),
+      LeaseBroadcastApiRoute(settings.restAPISettings, utxStorage),
+      AliasApiRoute(settings.restAPISettings, wallet, utxStorage, time, stateReader),
+      AliasBroadcastApiRoute(settings.restAPISettings, utxStorage)
     )
 
     val apiTypes = Seq(
@@ -145,7 +144,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
     }
 
     if (settings.matcherSettings.enable) {
-      val matcher = new Matcher(actorSystem, wallet, network.localClientChannel, stateReader, time, history, settings.blockchainSettings, settings.restAPISettings, settings.matcherSettings)
+      val matcher = new Matcher(actorSystem, wallet, utxStorage, stateReader, time, history, settings.blockchainSettings, settings.restAPISettings, settings.matcherSettings)
       matcher.runMatcher()
     }
   }

@@ -3,7 +3,7 @@ package com.wavesplatform.http
 import akka.http.scaladsl.model.StatusCodes
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.state2.reader.StateReader
-import com.wavesplatform.{BlockGen, TransactionGen}
+import com.wavesplatform.{BlockGen, TransactionGen, UtxPool}
 import org.scalacheck.Gen._
 import org.scalacheck.Shrink
 import org.scalamock.scalatest.MockFactory
@@ -26,7 +26,7 @@ class TransactionsRouteSpec extends RouteSpec("/transactions")
 
   private val history = mock[History]
   private val state = mock[StateReader]
-  private val stm = mock[UnconfirmedTransactionsStorage]
+  private val stm = stub[UtxPool]
   private val route = TransactionsApiRoute(restAPISettings, state, history, stm).route
 
   private implicit def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)

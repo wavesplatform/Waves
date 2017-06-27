@@ -3,9 +3,9 @@ package scorex.api.http.leasing
 import javax.ws.rs.Path
 
 import akka.http.scaladsl.server.Route
+import com.wavesplatform.UtxPool
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state2.reader.StateReader
-import io.netty.channel.Channel
 import io.swagger.annotations._
 import scorex.BroadcastRoute
 import scorex.api.http._
@@ -17,7 +17,7 @@ import scorex.wallet.Wallet
 
 @Path("/leasing")
 @Api(value = "/leasing")
-case class LeaseApiRoute(settings: RestAPISettings, wallet: Wallet, state: StateReader, localChannel: Channel, time: Time)
+case class LeaseApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPool, state: StateReader, time: Time)
   extends ApiRoute with BroadcastRoute {
 
   override val route = pathPrefix("leasing") {
