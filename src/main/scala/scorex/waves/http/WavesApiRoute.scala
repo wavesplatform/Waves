@@ -3,8 +3,8 @@ package scorex.waves.http
 import javax.ws.rs.Path
 
 import akka.http.scaladsl.server.Route
+import com.wavesplatform.UtxPool
 import com.wavesplatform.settings.RestAPISettings
-import io.netty.channel.Channel
 import io.swagger.annotations._
 import scorex.BroadcastRoute
 import scorex.account.Account
@@ -15,12 +15,13 @@ import scorex.transaction.{PaymentTransaction, TransactionFactory}
 import scorex.utils.Time
 import scorex.wallet.Wallet
 import scorex.waves.transaction.SignedPaymentRequest
+
 import scala.concurrent.ExecutionContext.Implicits.global
 
 @Path("/waves")
 @Api(value = "waves")
 @Deprecated
-case class WavesApiRoute(settings: RestAPISettings, wallet: Wallet, localChannel: Channel, time: Time)
+case class WavesApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPool, time: Time)
   extends ApiRoute with BroadcastRoute {
 
   override lazy val route = pathPrefix("waves") {

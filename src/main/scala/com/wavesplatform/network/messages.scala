@@ -4,7 +4,7 @@ import java.net.InetSocketAddress
 
 import com.wavesplatform.state2.ByteStr
 import scorex.block.Block
-import scorex.transaction.{History, Transaction, ValidationError}
+import scorex.transaction.{History, ValidationError}
 
 import scala.concurrent.Promise
 
@@ -29,6 +29,5 @@ case class LoadBlockchainExtension(lastBlockIds: Seq[ByteStr])
 case class ExtensionIds(lastCommonId: ByteStr, extensionIds: Seq[ByteStr])
 case class ExtensionBlocks(extension: Seq[Block])
 
-case class OffChainTransaction(t: Transaction, p: Promise[Either[ValidationError, Transaction]])
 case class OffChainCheckpoint(c: Checkpoint, p: Promise[Either[ValidationError, Checkpoint]])
 case class OffChainRollback(blockId: ByteStr, p: Promise[Either[ValidationError, ByteStr]])

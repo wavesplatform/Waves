@@ -22,7 +22,7 @@ class Coordinator(
     history: History,
     blockchainUpdater: BlockchainUpdater,
     stateReader: StateReader,
-    utxStorage: UnconfirmedTransactionsStorage,
+    utxStorage: UtxPool,
     time: => Long,
     settings: BlockchainSettings,
     maxBlockchainAge: Duration,
@@ -68,11 +68,7 @@ class Coordinator(
     _ <- validateWithRespectToCheckpoint(block, history.height() + 1)
     _ <- isBlockValid(block)
     _ <- blockchainUpdater.processBlock(block)
-  } yield {
-    block.transactionData.foreach(utxStorage.remove)
-    UnconfirmedTransactionsStorage.clearIncorrectTransactions(settings.functionalitySettings,
-      stateReader, utxStorage, time)
-  }
+  } yield block.transactionData.foreach(utxStorage.remove)
 
   def processFork(lastCommonBlockId: BlockId, newBlocks: Seq[Block]): Either[ValidationError, BigInt] = {
 

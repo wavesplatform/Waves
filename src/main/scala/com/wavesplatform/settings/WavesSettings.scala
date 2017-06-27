@@ -25,7 +25,7 @@ case class WavesSettings(directory: String,
                          minerSettings: MinerSettings,
                          restAPISettings: RestAPISettings,
                          synchronizationSettings: SynchronizationSettings,
-                         utxSettings: UTXSettings)
+                         utxSettings: UtxSettings)
 
 object WavesSettings {
   import NetworkSettings.networkSettingsValueReader
@@ -44,7 +44,7 @@ object WavesSettings {
     val minerSettings = config.as[MinerSettings]("waves.miner")
     val restAPISettings = RestAPISettings.fromConfig(config)
     val synchronizationSettings = SynchronizationSettings.fromConfig(config)
-    val utxSettings = UTXSettings.fromConfig(config)
+    val utxSettings = config.as[UtxSettings]("waves.utx")
 
     WavesSettings(directory, loggingLevel, networkSettings, walletSettings, blockchainSettings, checkpointsSettings,
       feesSettings, matcherSettings, minerSettings, restAPISettings, synchronizationSettings, utxSettings)
