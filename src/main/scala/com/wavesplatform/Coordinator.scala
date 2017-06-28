@@ -13,7 +13,7 @@ import scorex.consensus.TransactionsOrdering
 import scorex.crypto.EllipticCurveImpl
 import scorex.transaction.ValidationError.{GenericError, InvalidSignature}
 import scorex.transaction._
-import scorex.utils.ScorexLogging
+import scorex.utils.{ScorexLogging, Time}
 
 import scala.util.control.NonFatal
 
@@ -23,7 +23,7 @@ class Coordinator(
                      blockchainUpdater: BlockchainUpdater,
                      stateReader: StateReader,
                      utxStorage: UtxPool,
-                     time: => Long,
+                     time: Time,
                      settings: BlockchainSettings,
                      maxBlockchainAge: Duration,
                      checkpointPublicKey: ByteStr,
@@ -33,7 +33,7 @@ class Coordinator(
   import Coordinator._
 
   private def checkExpiry(): Unit =
-    blockchainExpiryListener(time - history.lastBlock.timestamp < maxBlockchainAge.toMillis)
+    blockchainExpiryListener(time.correctedTime() - history.lastBlock.timestamp < maxBlockchainAge.toMillis)
 
   private def isValidWithRespectToCheckpoint(candidate: Block, estimatedHeight: Int): Boolean =
     !checkpoint.get.exists {
@@ -56,7 +56,7 @@ class Coordinator(
     else {
       def historyContainsParent = history.contains(b.reference)
 
-      def consensusDataIsValid = blockConsensusValidation(history, stateReader, settings, time)(b)
+      def consensusDataIsValid = blockConsensusValidation(history, stateReader, settings, time.correctedTime())(b)
 
       if (!historyContainsParent) Left(BlockAppendError("no parent block in history", b))
       else if (!b.signatureValid) Left(InvalidSignature(b, None))
