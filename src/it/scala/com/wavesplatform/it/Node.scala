@@ -122,7 +122,7 @@ class Node(config: Config, val nodeInfo: NodeInfo, client: AsyncHttpClient, time
 
   def balance(address: String): Future[Balance] = get(s"/addresses/balance/$address").as[Balance]
 
-  def secureTransactionInfo(txId: String): Future[Option[Transaction]] = transactionInfo(txId).transform {
+  def findTransactionInfo(txId: String): Future[Option[Transaction]] = transactionInfo(txId).transform {
     case Success(tx) => Success(Some(tx))
     case Failure(UnexpectedStatusCodeException(_, r)) if r.getStatusCode == 404 => Success(None)
     case Failure(ex) => Failure(ex)
@@ -183,8 +183,8 @@ class Node(config: Config, val nodeInfo: NodeInfo, client: AsyncHttpClient, time
   def rollback(to: Long): Future[Unit] =
     post("/debug/rollback", to.toString).map(_ => ())
 
-  def isTransactionNotExists(txId: String): Future[Unit] =
-    utx.zip(secureTransactionInfo(txId)).flatMap({
+  def ensureTxDoesntExist(txId: String): Future[Unit] =
+    utx.zip(findTransactionInfo(txId)).flatMap({
       case (utx, _) if utx.contains(txId) =>
         Future.failed(new IllegalStateException(s"Tx $txId is in UTX"))
       case (_, txOpt) if txOpt.isDefined =>

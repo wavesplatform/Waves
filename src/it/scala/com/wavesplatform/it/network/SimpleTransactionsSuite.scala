@@ -49,7 +49,7 @@ class SimpleTransactionsSuite extends FunSuite with BeforeAndAfterAll with Match
     val f = for {
       _ <- node.sendByNetwork(RawBytes(25.toByte, tx.bytes))
       _ <- Future.successful(Thread.sleep(2000))
-      _ <- Future.sequence(nodes.map(_.isTransactionNotExists(tx.id.base58)))
+      _ <- Future.sequence(nodes.map(_.ensureTxDoesntExist(tx.id.base58)))
     } yield ()
     Await.result(f, 60 seconds)
   }

@@ -1,21 +1,16 @@
 package com.wavesplatform.it.transactions
 
-import com.google.common.primitives.{Bytes, Longs}
-import com.wavesplatform.it.{IntegrationSuiteWithThreeAddresses, Node}
 import com.wavesplatform.it.util._
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.it.{IntegrationSuiteWithThreeAddresses, Node}
 import scorex.account.{AccountOrAlias, PrivateKeyAccount}
 import scorex.api.http.assets.SignedTransferRequest
-import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
-import scorex.crypto.hash.FastCryptographicHash
-import scorex.serialization.BytesSerializable
-import scorex.transaction.AssetId
+import scorex.transaction.assets.TransferTransaction
 
-import scala.concurrent.duration._
-import scala.language.postfixOps
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
+import scala.language.postfixOps
 
 class TransferTransactionSpecification(override val allNodes: Seq[Node]) extends IntegrationSuiteWithThreeAddresses {
   test("asset transfer changes sender's and recipient's asset balance; issuer's waves balance is decreased by fee") {
@@ -61,47 +56,14 @@ class TransferTransactionSpecification(override val allNodes: Seq[Node]) extends
   }
 
   test("invalid signed waves transfer should not be in UTX or blockchain") {
-    def transferToSign(sender: PrivateKeyAccount,
-                       recipient: AccountOrAlias,
-                       amount: Long,
-                       timestamp: Long,
-                       feeAmount: Long,
-                       attachment: Array[Byte],
-                       assetId: Option[AssetId] = None,
-                       feeAssetId: Option[AssetId] = None): Array[Byte] = {
-      val timestampBytes = Longs.toByteArray(timestamp)
-      val assetIdBytes = assetId.map(a => (1: Byte) +: a.arr).getOrElse(Array(0: Byte))
-      val amountBytes = Longs.toByteArray(amount)
-      val feeAssetIdBytes = feeAssetId.map(a => (1: Byte) +: a.arr).getOrElse(Array(0: Byte))
-      val feeBytes = Longs.toByteArray(feeAmount)
-
-      Bytes.concat(Array(4.toByte),
-        sender.publicKey,
-        assetIdBytes,
-        feeAssetIdBytes,
-        timestampBytes,
-        amountBytes,
-        feeBytes,
-        recipient.bytes.arr,
-        BytesSerializable.arrayWithSize(attachment))
-    }
-
-    def createSignedTransferRequest(sender: PrivateKeyAccount,
-                                    recipient: AccountOrAlias,
-                                    amount: Long,
-                                    timestamp: Long,
-                                    feeAmount: Long,
-                                    attachment: Array[Byte],
-                                    assetId: Option[AssetId] = None,
-                                    feeAssetId: Option[AssetId] = None): SignedTransferRequest = {
-      val signature = ByteStr(EllipticCurveImpl.sign(sender, transferToSign(sender, recipient, amount, timestamp, feeAmount, attachment, assetId, feeAssetId)))
-
+    def createSignedTransferRequest(tx: TransferTransaction): SignedTransferRequest = {
+      import tx._
       SignedTransferRequest(
-        Base58.encode(sender.publicKey),
+        Base58.encode(tx.sender.publicKey),
         assetId.map(_.base58),
         recipient.stringRepr,
         amount,
-        feeAmount,
+        fee,
         feeAssetId.map(_.base58),
         timestamp,
         attachment.headOption.map(_ => Base58.encode(attachment)),
@@ -109,25 +71,23 @@ class TransferTransactionSpecification(override val allNodes: Seq[Node]) extends
       )
     }
 
-    val id = ByteStr(FastCryptographicHash(transferToSign(
+    val invalidByTsTx = TransferTransaction.create(None,
       PrivateKeyAccount(Base58.decode(sender.accountSeed).get),
       AccountOrAlias.fromString(sender.address).right.get,
       1,
       System.currentTimeMillis() + (1 day).toMillis,
+      None,
       1 waves,
-      Array.emptyByteArray))).base58
+      Array.emptyByteArray
+    ).right.get
 
-    val invalidByTsSignedRequest = createSignedTransferRequest(
-      PrivateKeyAccount(Base58.decode(sender.accountSeed).get),
-      AccountOrAlias.fromString(sender.address).right.get,
-      1,
-      System.currentTimeMillis() + (1 day).toMillis,
-      1 waves,
-      Array.emptyByteArray)
+    val invalidTxId = invalidByTsTx.id
+
+    val invalidByTsSignedRequest = createSignedTransferRequest(invalidByTsTx)
 
     val f = for {
       _ <- assertBadRequest(sender.signedTransfer(invalidByTsSignedRequest))
-      _ <- Future.sequence(allNodes.map(_.isTransactionNotExists(id)))
+      _ <- Future.sequence(allNodes.map(_.ensureTxDoesntExist(invalidTxId.base58)))
     } yield succeed
 
     Await.result(f, 1 minute)
