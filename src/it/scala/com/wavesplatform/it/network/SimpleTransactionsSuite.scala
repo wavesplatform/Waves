@@ -2,7 +2,7 @@ package com.wavesplatform.it.network
 
 import com.wavesplatform.it.MatcherTestSuite.Configs
 import com.wavesplatform.it._
-import com.wavesplatform.it.network.client.RawBytes
+import com.wavesplatform.network.RawBytes
 import org.scalatest._
 import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
 import scorex.account.{Account, PrivateKeyAccount}
@@ -12,6 +12,7 @@ import scorex.transaction.PaymentTransaction
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
+import scala.collection.JavaConverters._
 
 
 class SimpleTransactionsSuite extends FunSuite with BeforeAndAfterAll with Matchers with ScalaFutures
@@ -20,7 +21,7 @@ class SimpleTransactionsSuite extends FunSuite with BeforeAndAfterAll with Match
 
   override val docker = new Docker()
 
-  override val nodes = Configs.take(2).map(docker.startNode)
+  override val nodes = Docker.NodeConfigs.getConfigList("nodes").asScala.take(3).map(docker.startNode)
   val node = nodes.head
 
   test("valid tx send by network to node should be in blockchain") {

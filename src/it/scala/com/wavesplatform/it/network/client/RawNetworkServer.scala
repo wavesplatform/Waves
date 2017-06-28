@@ -13,7 +13,7 @@ import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.channel.socket.nio.NioSocketChannel
 import scorex.utils.ScorexLogging
 
-class NetworkServer(
+class RawNetworkServer(
     chainId: Char,
     settings: WavesSettings,
     allChannels: ChannelGroup,
@@ -31,7 +31,7 @@ class NetworkServer(
   private val channels = new ConcurrentHashMap[InetSocketAddress, Channel]
 
   private val clientHandshakeHandler =
-    new HandshakeHandler.Client(handshake, peerInfo, peerUniqueness, new InMemoryPeerDatabase)
+    new HandshakeHandler.Client(handshake, peerInfo, peerUniqueness, new NopPeerDatabase)
 
   private val bootstrap = new Bootstrap()
     .group(workerGroup)
