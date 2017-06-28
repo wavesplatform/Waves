@@ -8,12 +8,14 @@ import com.wavesplatform.UtxPool
 import com.wavesplatform.settings.{BlockchainSettings, MinerSettings}
 import com.wavesplatform.state2.ByteStr
 import com.wavesplatform.state2.reader.StateReader
+import io.netty.channel.group.ChannelGroup
 import scorex.account.PrivateKeyAccount
 import scorex.block.Block
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
 import scorex.transaction.PoSCalc._
 import scorex.transaction.{History, PoSCalc}
-import scorex.utils.ScorexLogging
+import scorex.utils.{ScorexLogging, Time}
+import scorex.wallet.Wallet
 
 import scala.collection.JavaConverters._
 import scala.math.Ordering.Implicits._
@@ -23,11 +25,11 @@ class Miner(
     history: History,
     state: StateReader,
     utx: UtxPool,
-    privateKeyAccounts: => Seq[PrivateKeyAccount],
+    walllet : Wallet,
     blockchainSettings: BlockchainSettings,
     minerSettings: MinerSettings,
-    time: => Long,
-    peerCount: => Int,
+    time: Time,
+    channelGroup: ChannelGroup,
     blockHandler: Block => Unit) extends ScorexLogging {
   import Miner._
 
@@ -35,14 +37,14 @@ class Miner(
   private val scheduledAttempts = new ConcurrentHashMap[ByteStr, ScheduledFuture[_]]()
 
   private def generateBlock(account: PrivateKeyAccount, parentHeight: Int, parent: Block, greatGrandParent: Option[Block]): Callable[Option[Block]] = () => {
-    val blockAge = Duration.between(Instant.ofEpochMilli(parent.timestamp), Instant.ofEpochMilli(time))
+    val blockAge = Duration.between(Instant.ofEpochMilli(parent.timestamp), Instant.ofEpochMilli(time.correctedTime()))
     if (blockAge <= minerSettings.intervalAfterLastBlockThenGenerationIsAllowed) {
-      val pc = peerCount
+      val pc = channelGroup.size()
       if (pc >= minerSettings.quorum) {
         val balance = generatingBalance(state, blockchainSettings.functionalitySettings)(account, parentHeight)
         if (balance >= MinimalEffectiveBalanceForGenerator) {
           val lastBlockKernelData = parent.consensusData
-          val currentTime = time
+          val currentTime = time.correctedTime()
           val h = calcHit(lastBlockKernelData, account)
           val t = calcTarget(parent, currentTime, balance)
           if (h < t) {
@@ -82,7 +84,7 @@ class Miner(
     // attempts to be cancelled and re-scheduled over the new parent.
     for (ts <- PoSCalc.nextBlockGenerationTime(parentHeight, state, blockchainSettings.functionalitySettings, parent, account)) {
       val generationInstant = Instant.ofEpochMilli(ts + 10)
-      val calculatedOffset = Duration.between(Instant.ofEpochMilli(time), generationInstant)
+      val calculatedOffset = Duration.between(Instant.ofEpochMilli(time.correctedTime()), generationInstant)
       log.debug(s"Next block generation attempt calculated in $calculatedOffset (parent: ${parent.uniqueId})")
       val generationOffset = MinimalGenerationOffset.max(calculatedOffset)
       log.debug(s"Next attempt in $generationOffset (${account.address} at $generationInstant)")
@@ -120,7 +122,7 @@ class Miner(
     scheduledAttempts.clear()
     val greatGrandParent = history.parent(parent, 2)
     log.debug("Attempting to schedule block generation")
-    privateKeyAccounts.foreach(retry(parentHeight, parent, greatGrandParent))
+    walllet.privateKeyAccounts().foreach(retry(parentHeight, parent, greatGrandParent))
   }
 
   def shutdown(): Unit = minerPool.shutdownNow()

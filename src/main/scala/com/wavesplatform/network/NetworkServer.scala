@@ -78,8 +78,8 @@ class NetworkServer(
 
   private val lengthFieldPrepender = new LengthFieldPrepender(4)
 
-  private val miner = new Miner(history, stateReader, utxPool, wallet.privateKeyAccounts(),
-    settings.blockchainSettings, settings.minerSettings, time.correctedTime(), allChannels.size(),
+  private val miner = new Miner(history, stateReader, utxPool, wallet,
+    settings.blockchainSettings, settings.minerSettings, time, allChannels,
     b => writeToLocalChannel(BlockForged(b)))
 
   private val peerSynchronizer = new PeerSynchronizer(peerDatabase)
@@ -93,7 +93,7 @@ class NetworkServer(
 
   private val coordinatorExecutor = new DefaultEventLoop
   private val coordinator = new Coordinator(checkpoints, history, blockchainUpdater, stateReader, utxPool,
-    time.correctedTime(), settings.blockchainSettings,
+    time, settings.blockchainSettings,
     settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed, settings.checkpointsSettings.publicKey,
     miner, setBlockchainExpired)
 
