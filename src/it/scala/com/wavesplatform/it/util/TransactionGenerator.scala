@@ -1,5 +1,6 @@
 package com.wavesplatform.it.util
 
+import com.wavesplatform.it.util.Test.n
 import org.slf4j.LoggerFactory
 import scorex.account.{AccountOrAlias, Alias, PrivateKeyAccount}
 import scorex.transaction.TransactionParser.TransactionType
@@ -17,16 +18,33 @@ object TransactionGenerator {
   private val log = LoggerFacade(LoggerFactory.getLogger(getClass))
   private def randomFrom[T](c: Seq[T]): Option[T] = if (c.nonEmpty) Some(c(r.nextInt(c.size))) else None
 
-  private def logOption[T <: Transaction](txE: Either[ValidationError, T]): Option[T] = {
+  private def logOption[T <: Transaction](txE: Either[ValidationError, T])(implicit m: Manifest[T]): Option[T] = {
     txE match {
       case Left(e) =>
-        log.warn(e.toString)
+        log.warn(s"${m.runtimeClass.getName}: ${e.toString}")
         None
       case Right(tx) => Some(tx)
     }
   }
 
-  def gen(accounts: Seq[PrivateKeyAccount], n: Int): Seq[Transaction] = {
+//  class DistributedRandomNumberGenerator[T](probabilities: Map[T, Double]) {
+//    assert(probabilities.values.sum <= 1)
+//    def getRandom: T = {
+//      val rand = Math.random
+//      val ratio = 1.0f / distSum
+//      var tempDist = 0
+//      for (i <- distribution.keySet) {
+//        tempDist += distribution.get(i)
+//        if (rand / ratio <= tempDist) return i
+//      }
+//      0
+//    }
+//  }
+
+  def gen(
+           //probabilities: Map[TransactionType.Value, Double],
+          accounts: Seq[PrivateKeyAccount],
+          n: Int): Seq[Transaction] = {
     val issueTransactionSender = randomFrom(accounts).get
     val tradeAssetIssue = IssueTransaction.create(issueTransactionSender, "TRADE".getBytes,
       "Waves DEX is the best exchange ever".getBytes, 100000000, 2, reissuable = false,
@@ -38,7 +56,7 @@ object TransactionGenerator {
       })
     }
 
-    val generated = (0 until n - tradeAssetDistribution.size).foldLeft((
+    val generated = (0 until (n * 1.2).toInt).foldLeft((
       Seq.empty[Transaction],
       Seq.empty[IssueTransaction],
       Seq.empty[IssueTransaction],
@@ -47,6 +65,7 @@ object TransactionGenerator {
     )) {
       case ((allTxsWithValid, validIssueTxs, reissuableIssueTxs, activeLeaseTransactions, aliases), _) =>
         def moreThatStandartFee = 100000L + r.nextInt(100000)
+        // todo replace with probabilities
         val txType = 2 + r.nextInt(11 - 2)
         def ts = System.currentTimeMillis()
         val tx = TransactionType(txType) match {
@@ -66,7 +85,7 @@ object TransactionGenerator {
           case TransactionType.TransferTransaction =>
             val sender = randomFrom(accounts).get
             val useAlias = r.nextBoolean()
-            val recipientOpt: Option[AccountOrAlias] = if (useAlias && aliases.nonEmpty) randomFrom(aliases).map(_.alias) else randomFrom(accounts).map(_.toAccount)
+            val recipientOpt = if (useAlias && aliases.nonEmpty) randomFrom(aliases).map(_.alias) else randomFrom(accounts).map(_.toAccount)
             val sendAsset = r.nextBoolean()
             val asset = if (sendAsset && validIssueTxs.nonEmpty) randomFrom(validIssueTxs).map(_.id) else None
             recipientOpt.flatMap(recipient => {
@@ -95,7 +114,7 @@ object TransactionGenerator {
           case TransactionType.LeaseTransaction =>
             val sender = randomFrom(accounts).get
             val useAlias = r.nextBoolean()
-            val recipientOpt: Option[AccountOrAlias] = if (useAlias && aliases.nonEmpty) randomFrom(aliases.filter(_.sender != sender.toAccount)).map(_.alias) else randomFrom(accounts).map(_.toAccount).filter(_ != sender.toAccount)
+            val recipientOpt = if (useAlias && aliases.nonEmpty) randomFrom(aliases.filter(_.sender != sender.toAccount)).map(_.alias) else randomFrom(accounts).map(_.toAccount).filter(_ != sender.toAccount)
             recipientOpt.flatMap(recipient =>
               logOption(LeaseTransaction.create(sender, 1, moreThatStandartFee * 3, ts, recipient)))
           case TransactionType.LeaseCancelTransaction =>
@@ -132,6 +151,6 @@ object TransactionGenerator {
         )
     }
 
-    tradeAssetDistribution ++ generated._1
+    tradeAssetDistribution ++ generated._1.take(n - tradeAssetDistribution.size)
   }
 }

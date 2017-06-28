@@ -6,6 +6,9 @@ import com.wavesplatform.it.network.client.RawBytes
 import org.slf4j.LoggerFactory
 import scorex.account.{AddressScheme, PrivateKeyAccount}
 import scorex.crypto.encode.Base58
+import scorex.transaction.{CreateAliasTransaction, Transaction}
+import scorex.transaction.assets.IssueTransaction
+import scorex.transaction.lease.LeaseTransaction
 import scorex.utils.LoggerFacade
 
 import scala.concurrent.Await
@@ -27,12 +30,20 @@ object Test extends App {
   val every = 1.minutes
   log.info(s"Generating $n transactions every $every from addresses:")
   accounts.foreach(a => log.info(a.address))
-  val sender = new NetworkSender(new InetSocketAddress(InetAddress.getByName("52.51.92.182"), 6863), 'T', "generator", 38268732757L)
+  val sender = new NetworkSender(new InetSocketAddress(InetAddress.getByName("52.30.47.67"), 6863), 'T', "generator", 38262732757L)
   while (true) {
-    val txs = TransactionGenerator.gen(accounts, 10000)
-    // todo 5
-    // todo 6
-    // todo 9
+    // todo сделать настройки распределения
+    val txs = TransactionGenerator.gen(accounts, n)
+    // todo разложить транзакции в блоки так, чтобы они были валидными
+    val txsBySequence = txs.foldLeft[Seq[Seq[Transaction]]](Seq(Seq.empty[Transaction])) { case (s, tx) =>
+        def addLastTxAndNewBlock() = s.updated(s.size - 1, s.last :+ tx) :+ Seq()
+        tx match {
+          case _: IssueTransaction => addLastTxAndNewBlock()
+          case _: CreateAliasTransaction => addLastTxAndNewBlock()
+          case _: LeaseTransaction => addLastTxAndNewBlock()
+          case _ => s.updated(s.size - 1, s.last :+ tx)
+        }
+    }
     Await.result(sender.sendByNetwork(txs.map(tx => RawBytes(25.toByte, tx.bytes)): _*).map(_ => log.info("Transactions was sent")), Duration.Inf)
     Thread.sleep(every.toMillis)
   }
