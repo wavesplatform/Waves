@@ -1,13 +1,10 @@
 package com.wavesplatform.http
 
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.RequestGen
+import com.wavesplatform.{RequestGen, UtxPool}
 import com.wavesplatform.http.ApiMarshallers._
-import com.wavesplatform.network.OffChainTransaction
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state2.diffs.TransactionDiffer.TransactionValidationError
-import io.netty.channel.embedded.EmbeddedChannel
-import io.netty.channel.{ChannelHandlerContext, ChannelOutboundHandlerAdapter, ChannelPromise}
 import org.scalacheck.Gen._
 import org.scalacheck.{Gen => G}
 import org.scalamock.scalatest.PathMockFactory
@@ -15,26 +12,19 @@ import org.scalatest.prop.PropertyChecks
 import play.api.libs.json.{JsObject, JsValue, Json, Writes}
 import scorex.api.http._
 import scorex.api.http.assets.AssetsBroadcastApiRoute
-import scorex.transaction.Transaction
 import scorex.transaction.ValidationError.GenericError
+import scorex.transaction.Transaction
 
 
 class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with RequestGen with PathMockFactory with PropertyChecks {
   private val settings = RestAPISettings.fromConfig(ConfigFactory.load())
+  private val utx = stub[UtxPool]
+
+  (utx.putIfNew _).when(*, *).onCall((t, _) => Left(TransactionValidationError(GenericError("foo"),t))).anyNumberOfTimes()
 
   "returns StateCheckFiled" - {
 
-    class MockHandler extends ChannelOutboundHandlerAdapter {
-      override def write(ctx: ChannelHandlerContext, msg: scala.Any, promise: ChannelPromise): Unit = {
-        msg match {
-          case OffChainTransaction(t, p) =>
-            p.success(Left(TransactionValidationError(t, GenericError("foo"))))
-        }
-      }
-    }
-
-    val channel = new EmbeddedChannel(new MockHandler)
-    val route = AssetsBroadcastApiRoute(settings, channel).route
+    val route = AssetsBroadcastApiRoute(settings, utx).route
 
     val vt = Table[String, G[_ <: Transaction], (JsValue) => JsValue](
       ("url", "generator", "transform"),
@@ -63,7 +53,7 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
   }
 
   "returns appropriate error code when validation fails for" - {
-    val route = AssetsBroadcastApiRoute(settings, new EmbeddedChannel).route
+    val route = AssetsBroadcastApiRoute(settings, utx).route
 
     "issue transaction" in forAll(broadcastIssueReq) { ir =>
       def posting[A: Writes](v: A): RouteTestResult = Post(routePath("issue"), v) ~> route
@@ -98,7 +88,7 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
 
       forAll(nonPositiveLong) { q => posting(tr.copy(amount = q)) should produce(NegativeAmount) }
       forAll(invalidBase58) { pk => posting(tr.copy(senderPublicKey = pk)) should produce(InvalidAddress) }
-      forAll(invalidBase58) { a => posting(tr.copy(recipient = a)) should produce (InvalidAddress) }
+      forAll(invalidBase58) { a => posting(tr.copy(recipient = a)) should produce(InvalidAddress) }
       forAll(invalidBase58) { a => posting(tr.copy(assetId = Some(a))) should produce(CustomValidationError("invalid.assetId")) }
       forAll(invalidBase58) { a => posting(tr.copy(feeAssetId = Some(a))) should produce(CustomValidationError("invalid.feeAssetId")) }
       forAll(longAttachment) { a => posting(tr.copy(attachment = Some(a))) should produce(CustomValidationError("invalid.attachment")) }

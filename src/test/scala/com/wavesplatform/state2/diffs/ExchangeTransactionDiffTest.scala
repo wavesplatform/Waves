@@ -39,8 +39,8 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Gene
       exchange <- exchangeGeneratorP(buyer, seller, maybeAsset1, maybeAsset2)
     } yield (gen1, gen2, issue1, issue2, exchange)
 
-    forAll(preconditionsAndExchange, accountGen) { case ((gen1, gen2, issue1, issue2, exchange), miner) =>
-      assertDiffAndState(Seq(TestBlock(Seq(gen1, gen2, issue1, issue2))), TestBlock(Seq(exchange), miner)) { case (blockDiff, state) =>
+    forAll(preconditionsAndExchange) { case ((gen1, gen2, issue1, issue2, exchange)) =>
+      assertDiffAndState(Seq(TestBlock.create(Seq(gen1, gen2, issue1, issue2))), TestBlock.create(Seq(exchange))) { case (blockDiff, state) =>
         val totalPortfolioDiff: Portfolio = Monoid.combineAll(blockDiff.txsDiff.portfolios.values)
         totalPortfolioDiff.balance shouldBe 0
         totalPortfolioDiff.effectiveBalance shouldBe 0
@@ -56,15 +56,15 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Gene
       buyer <- accountGen
       seller <- accountGen
       ts <- timestampGen
-      gen1: GenesisTransaction = GenesisTransaction.create(buyer, 1*Constants.UnitsInWave, ts).right.get
+      gen1: GenesisTransaction = GenesisTransaction.create(buyer, 1 * Constants.UnitsInWave, ts).right.get
       gen2: GenesisTransaction = GenesisTransaction.create(seller, ENOUGH_AMT, ts).right.get
       issue1: IssueTransaction <- issueGen(buyer)
       exchange <- exchangeGeneratorP(buyer, seller, None, Some(issue1.id), fixedMatcherFee = Some(300000))
     } yield (gen1, gen2, issue1, exchange)
 
-    forAll(preconditions, accountGen) { case ((gen1, gen2, issue1, exchange), miner) =>
+    forAll(preconditions) { case ((gen1, gen2, issue1, exchange)) =>
       whenever(exchange.amount > 300000) {
-        assertDiffAndState(Seq(TestBlock(Seq(gen1, gen2, issue1))), TestBlock(Seq(exchange), miner)) { case (blockDiff, state) =>
+        assertDiffAndState(Seq(TestBlock.create(Seq(gen1, gen2, issue1))), TestBlock.create(Seq(exchange))) { case (blockDiff, state) =>
           val totalPortfolioDiff: Portfolio = Monoid.combineAll(blockDiff.txsDiff.portfolios.values)
           totalPortfolioDiff.balance shouldBe 0
           totalPortfolioDiff.effectiveBalance shouldBe 0
@@ -75,6 +75,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Gene
       }
     }
   }
+
   def createExTx(buy: Order, sell: Order, price: Long, matcher: PrivateKeyAccount, ts: Long): Either[ValidationError, ExchangeTransaction] = {
     val mf = buy.matcherFee
     val amount = math.min(buy.amount, sell.amount)
@@ -83,8 +84,8 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Gene
       sellOrder = sell,
       price = price,
       amount = amount,
-      buyMatcherFee = (BigInt(mf)*amount/buy.amount).toLong,
-      sellMatcherFee = (BigInt(mf)*amount/sell.amount).toLong,
+      buyMatcherFee = (BigInt(mf) * amount / buy.amount).toLong,
+      sellMatcherFee = (BigInt(mf) * amount / sell.amount).toLong,
       fee = buy.matcherFee,
       timestamp = ts)
   }
@@ -108,7 +109,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Gene
       val buy = Order.buy(buyer, matcher, assetPair, price, 1000000L, Ts, Ts + 1, MatcherFee)
       val sell = Order.sell(seller, matcher, assetPair, price, 1L, Ts, Ts + 1, MatcherFee)
       val tx = createExTx(buy, sell, price, matcher, Ts).explicitGet()
-      assertDiffAndState(Seq(TestBlock(Seq(gen1, gen2, issue1))), TestBlock(Seq(tx))) { case (blockDiff, state) =>
+      assertDiffAndState(Seq(TestBlock.create(Seq(gen1, gen2, issue1))), TestBlock.create(Seq(tx))) { case (blockDiff, state) =>
         blockDiff.txsDiff.portfolios(tx.sender).balance shouldBe tx.buyMatcherFee + tx.sellMatcherFee - tx.fee
         state.accountPortfolio(tx.sender).balance shouldBe 0L
       }
@@ -134,8 +135,8 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Gene
       val buy = Order.buy(buyer, matcher, assetPair, price, issue1.quantity + 1, Ts, Ts + 1, MatcherFee)
       val sell = Order.sell(seller, matcher, assetPair, price, issue1.quantity + 1, Ts, Ts + 1, MatcherFee)
       val tx = createExTx(buy, sell, price, matcher, Ts).explicitGet()
-      assertDiffEi(Seq(TestBlock(Seq(gen1, gen2, issue1))), TestBlock(Seq(tx))) { totalDiffEi =>
-        inside(totalDiffEi) { case Left(TransactionValidationError(_, AccountBalanceError(errs))) =>
+      assertDiffEi(Seq(TestBlock.create(Seq(gen1, gen2, issue1))), TestBlock.create(Seq(tx))) { totalDiffEi =>
+        inside(totalDiffEi) { case Left(TransactionValidationError(AccountBalanceError(errs), _)) =>
           errs should contain key seller.toAccount
         }
       }

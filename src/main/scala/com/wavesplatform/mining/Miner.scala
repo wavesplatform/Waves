@@ -4,6 +4,7 @@ import java.time.{Duration, Instant}
 import java.util.concurrent._
 
 import com.google.common.util.concurrent.{FutureCallback, Futures, MoreExecutors}
+import com.wavesplatform.UtxPool
 import com.wavesplatform.settings.{BlockchainSettings, MinerSettings}
 import com.wavesplatform.state2.ByteStr
 import com.wavesplatform.state2.reader.StateReader
@@ -11,8 +12,7 @@ import scorex.account.PrivateKeyAccount
 import scorex.block.Block
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
 import scorex.transaction.PoSCalc._
-import scorex.transaction.UnconfirmedTransactionsStorage.packUnconfirmed
-import scorex.transaction.{History, PoSCalc, UnconfirmedTransactionsStorage}
+import scorex.transaction.{History, PoSCalc}
 import scorex.utils.ScorexLogging
 
 import scala.collection.JavaConverters._
@@ -22,7 +22,7 @@ import scala.math.Ordering.Implicits._
 class Miner(
     history: History,
     state: StateReader,
-    utx: UnconfirmedTransactionsStorage,
+    utx: UtxPool,
     privateKeyAccounts: => Seq[PrivateKeyAccount],
     blockchainSettings: BlockchainSettings,
     minerSettings: MinerSettings,
@@ -47,14 +47,14 @@ class Miner(
           val t = calcTarget(parent, currentTime, balance)
           if (h < t) {
             log.debug(s"Forging new block with ${account.address}, hit $h, target $t, balance $balance")
-            log.debug(s"Previous block ID ${parent.encodedId} at $parentHeight with target ${lastBlockKernelData.baseTarget}")
+            log.debug(s"Previous block ID ${parent.uniqueId} at $parentHeight with target ${lastBlockKernelData.baseTarget}")
 
             val avgBlockDelay = blockchainSettings.genesisSettings.averageBlockDelay
             val btg = calcBaseTarget(avgBlockDelay, parentHeight, parent, greatGrandParent, currentTime)
             val gs = calcGeneratorSignature(lastBlockKernelData, account)
             val consensusData = NxtLikeConsensusBlockData(btg, gs)
 
-            val unconfirmed = packUnconfirmed(state, blockchainSettings.functionalitySettings, utx, time, parentHeight)
+            val unconfirmed = utx.packUnconfirmed()
             log.debug(s"Putting ${unconfirmed.size} unconfirmed transactions $blockAge after previous block")
 
             Some(Block.buildAndSign(Version, currentTime, parent.uniqueId, consensusData, unconfirmed, account))

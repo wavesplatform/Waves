@@ -24,9 +24,9 @@ class StateReaderEffectiveBalancePropertyTest extends PropSpec with PropertyChec
 
   property("No-interactions genesis account's effectiveBalance doesn't depend on depths") {
     forAll(setup) { case ((genesis: GenesisTransaction, emptyBlocksAmt, atHeight, confirmations)) =>
-      val genesisBlock = TestBlock(Seq(genesis))
-      val nextBlocks = List.fill(emptyBlocksAmt - 1)(TestBlock(Seq.empty))
-      assertDiffAndState(genesisBlock +: nextBlocks, TestBlock(Seq.empty)) { (_, newState) =>
+      val genesisBlock = TestBlock.create(Seq(genesis))
+      val nextBlocks = List.fill(emptyBlocksAmt - 1)(TestBlock.create(Seq.empty))
+      assertDiffAndState(genesisBlock +: nextBlocks, TestBlock.create(Seq.empty)) { (_, newState) =>
         newState.effectiveBalanceAtHeightWithConfirmations(genesis.recipient, atHeight, confirmations) shouldBe genesis.amount
       }
     }

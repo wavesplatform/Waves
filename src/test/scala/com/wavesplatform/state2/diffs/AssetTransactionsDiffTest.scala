@@ -39,8 +39,8 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Genera
   }
 
   property("Issue+Reissue+Burn+MakeAssetNameUnique do not break waves invariant and updates state") {
-    forAll(issueReissueBurnTxs(isReissuable = true), accountGen) { case (((gen, issue), (reissue, burn, makeAssetNameUnique)), miner) =>
-      assertDiffAndState(Seq(TestBlock(Seq(gen, issue))), TestBlock(Seq(reissue, burn, makeAssetNameUnique), miner)) { case (blockDiff, newState) =>
+    forAll(issueReissueBurnTxs(isReissuable = true)) { case (((gen, issue), (reissue, burn, makeAssetNameUnique))) =>
+      assertDiffAndState(Seq(TestBlock.create(Seq(gen, issue))), TestBlock.create(Seq(reissue, burn, makeAssetNameUnique))) { case (blockDiff, newState) =>
         val totalPortfolioDiff = Monoid.combineAll(blockDiff.txsDiff.portfolios.values)
 
         totalPortfolioDiff.balance shouldBe 0
@@ -66,13 +66,13 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Genera
     } yield (genesis, reissue, burn, makeAssetNameUnique)
 
     forAll(setup) { case ((gen, reissue, burn, makeAssetNameUnique)) =>
-      assertDiffEi(Seq(TestBlock(Seq(gen))), TestBlock(Seq(reissue))) { blockDiffEi =>
+      assertDiffEi(Seq(TestBlock.create(Seq(gen))), TestBlock.create(Seq(reissue))) { blockDiffEi =>
         blockDiffEi should produce ("Referenced assetId not found")
       }
-      assertDiffEi(Seq(TestBlock(Seq(gen))), TestBlock(Seq(burn))) { blockDiffEi =>
+      assertDiffEi(Seq(TestBlock.create(Seq(gen))), TestBlock.create(Seq(burn))) { blockDiffEi =>
         blockDiffEi should produce("Referenced assetId not found")
       }
-      assertDiffEi(Seq(TestBlock(Seq(gen))), TestBlock(Seq(makeAssetNameUnique))) { blockDiffEi =>
+      assertDiffEi(Seq(TestBlock.create(Seq(gen))), TestBlock.create(Seq(makeAssetNameUnique))) { blockDiffEi =>
         blockDiffEi should produce("Referenced assetId not found")
       }
     }
@@ -92,13 +92,13 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Genera
     } yield ((gen, issue), reissue, burn, makeAssetNameUnique)
 
     forAll(setup) { case ((gen, issue), reissue, burn, makeAssetNameUnique) =>
-      assertDiffEi(Seq(TestBlock(Seq(gen, issue))), TestBlock(Seq(reissue))) { blockDiffEi =>
+      assertDiffEi(Seq(TestBlock.create(Seq(gen, issue))), TestBlock.create(Seq(reissue))) { blockDiffEi =>
         blockDiffEi should produce("Asset was issued by other address")
       }
-      assertDiffEi(Seq(TestBlock(Seq(gen, issue))), TestBlock(Seq(burn))) { blockDiffEi =>
+      assertDiffEi(Seq(TestBlock.create(Seq(gen, issue))), TestBlock.create(Seq(burn))) { blockDiffEi =>
         blockDiffEi should produce("Asset was issued by other address")
       }
-      assertDiffEi(Seq(TestBlock(Seq(gen, issue))), TestBlock(Seq(makeAssetNameUnique))) { blockDiffEi =>
+      assertDiffEi(Seq(TestBlock.create(Seq(gen, issue))), TestBlock.create(Seq(makeAssetNameUnique))) { blockDiffEi =>
         blockDiffEi should produce("Asset was issued by other address")
       }
     }
@@ -106,7 +106,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Genera
 
   property("Cannot make unique asset with already busy name") {
     forAll(issuesAndMakeAssetNameUniquesWithSameName) { case ((gen, issue, makeAssetNameUnique, issue2, makeAssetNameUnique2)) =>
-      assertDiffEi(Seq(TestBlock(Seq(gen, issue, issue2, makeAssetNameUnique))), TestBlock(Seq(makeAssetNameUnique2))) { blockDiffEi =>
+      assertDiffEi(Seq(TestBlock.create(Seq(gen, issue, issue2, makeAssetNameUnique))), TestBlock.create(Seq(makeAssetNameUnique2))) { blockDiffEi =>
         blockDiffEi should produce(s"Asset name has been verified for ${issue.id.base58}")
       }
     }
@@ -114,7 +114,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Genera
 
   property("Cannot reissue non-reissuable alias") {
     forAll(issueReissueBurnTxs(isReissuable = false)) { case ((gen, issue), (reissue, _, _)) =>
-      assertDiffEi(Seq(TestBlock(Seq(gen, issue))), TestBlock(Seq(reissue))) { blockDiffEi =>
+      assertDiffEi(Seq(TestBlock.create(Seq(gen, issue))), TestBlock.create(Seq(reissue))) { blockDiffEi =>
         blockDiffEi should produce("Asset is not reissuable")
       }
     }

@@ -1,39 +1,28 @@
 package com.wavesplatform.http
 
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.RequestGen
+import com.wavesplatform.{RequestGen, UtxPool}
 import com.wavesplatform.http.ApiMarshallers._
-import com.wavesplatform.network.OffChainTransaction
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state2.diffs.TransactionDiffer.TransactionValidationError
-import io.netty.channel.embedded.EmbeddedChannel
-import io.netty.channel.{ChannelHandlerContext, ChannelOutboundHandlerAdapter, ChannelPromise}
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json.Json._
 import play.api.libs.json._
 import scorex.api.http._
 import scorex.api.http.alias.AliasBroadcastApiRoute
-import scorex.transaction.Transaction
 import scorex.transaction.ValidationError.GenericError
+import scorex.transaction.Transaction
 
 
 class AliasBroadcastRouteSpec extends RouteSpec("/alias/broadcast/") with RequestGen with PathMockFactory with PropertyChecks {
   private val settings = RestAPISettings.fromConfig(ConfigFactory.load())
+  private val utx = stub[UtxPool]
+
+  (utx.putIfNew _).when(*, *).onCall((t, _) => Left(TransactionValidationError(GenericError("foo"),t))).anyNumberOfTimes()
 
   "returns StateCheckFiled" - {
-
-    class MockHandler extends ChannelOutboundHandlerAdapter {
-      override def write(ctx: ChannelHandlerContext, msg: scala.Any, promise: ChannelPromise): Unit = {
-        msg match {
-          case OffChainTransaction(t, p) =>
-            p.success(Left(TransactionValidationError(t, GenericError("foo"))))
-        }
-      }
-    }
-
-    val channel = new EmbeddedChannel(new MockHandler)
-    val route = AliasBroadcastApiRoute(settings, channel).route
+    val route = AliasBroadcastApiRoute(settings, utx).route
 
     def posting(url: String, v: JsValue): RouteTestResult = Post(routePath(url), v) ~> route
 
@@ -45,7 +34,7 @@ class AliasBroadcastRouteSpec extends RouteSpec("/alias/broadcast/") with Reques
   }
 
   "returns appropriate error code when validation fails for" - {
-    val route = AliasBroadcastApiRoute(settings, new EmbeddedChannel).route
+    val route = AliasBroadcastApiRoute(settings, utx).route
 
     "create alias transaction" in forAll(createAliasReq) { req =>
       import scorex.api.http.alias.SignedCreateAliasRequest.broadcastAliasRequestReadsFormat

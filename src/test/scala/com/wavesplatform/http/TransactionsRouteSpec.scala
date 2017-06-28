@@ -3,7 +3,7 @@ package com.wavesplatform.http
 import akka.http.scaladsl.model.StatusCodes
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.state2.reader.StateReader
-import com.wavesplatform.{BlockGen, TransactionGen}
+import com.wavesplatform.{BlockGen, TransactionGen, UtxPool}
 import org.scalacheck.Gen._
 import org.scalacheck.Shrink
 import org.scalamock.scalatest.MockFactory
@@ -26,7 +26,7 @@ class TransactionsRouteSpec extends RouteSpec("/transactions")
 
   private val history = mock[History]
   private val state = mock[StateReader]
-  private val stm = mock[UnconfirmedTransactionsStorage]
+  private val stm = stub[UtxPool]
   private val route = TransactionsApiRoute(restAPISettings, state, history, stm).route
 
   private implicit def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)
@@ -77,7 +77,7 @@ class TransactionsRouteSpec extends RouteSpec("/transactions")
       Get(routePath(s"/info")) ~> route should produce(InvalidSignature)
     }
 
-    "working properly otherwise" in {
+    "working properly otherwise" ignore {
       val txAvailability = for {
         tx <- randomTransactionGen
         txList <- listOfN(99, tx)
@@ -88,6 +88,7 @@ class TransactionsRouteSpec extends RouteSpec("/transactions")
 
       forAll(txAvailability) { case (tx, height, block) =>
         (state.transactionInfo _).expects(tx.id).returning(height.map((_, tx))).once()
+        height.foreach { h => (history.blockBytes _).expects(h).returning(Some(block.bytes)).once() }
         Get(routePath(s"/info/${tx.id.base58}")) ~> route ~> check {
           height match {
             case None => status shouldEqual StatusCodes.NotFound

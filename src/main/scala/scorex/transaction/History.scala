@@ -1,36 +1,29 @@
 package scorex.transaction
 
-import com.wavesplatform.state2.ByteStr
-import scorex.account.Account
-import scorex.block.Block
 import com.wavesplatform.network.Checkpoint
+import com.wavesplatform.state2.{BlockDiff, ByteStr}
+import scorex.block.Block
 import scorex.transaction.History.BlockchainScore
 import scorex.utils.Synchronized
 
 import scala.util.Try
 
-trait History extends Synchronized {
+trait History extends Synchronized with AutoCloseable {
 
   def height(): Int
 
-  def blockAt(height: Int): Option[Block]
+  def blockBytes(height: Int): Option[Array[Byte]]
 
-  def blockBytes (height: Int): Option[Array[Byte]]
-
-  def score(): BlockchainScore
-
-  def scoreOf(id: ByteStr): BlockchainScore
+  def scoreOf(id: ByteStr): Option[BlockchainScore]
 
   def heightOf(blockId: ByteStr): Option[Int]
-
-  def generatedBy(account: Account, from: Int, to: Int): Seq[Block]
 
   def lastBlockIds(howMany: Int): Seq[ByteStr]
 }
 
 trait HistoryWriter extends History {
 
-  def appendBlock(block: Block): Either[ValidationError, Unit]
+  def appendBlock(block: Block)(consensusValidation: => Either[ValidationError, BlockDiff]): Either[ValidationError, BlockDiff]
 
   def discardBlock(): Unit
 }
@@ -43,9 +36,20 @@ trait CheckpointService {
 }
 
 object History {
+
   type BlockchainScore = BigInt
 
   implicit class HistoryExt(history: History) {
+
+    def blockAt(height: Int): Option[Block] = history.read { implicit lock =>
+      history.blockBytes(height).map(Block.parseBytes(_).get)
+    }
+
+    def score(): BlockchainScore = history.read { implicit lock =>
+      history.scoreOf(history.lastBlock.uniqueId).getOrElse(0)
+    }
+
+
     def isEmpty: Boolean = history.height() == 0
 
     def contains(block: Block): Boolean = history.contains(block.uniqueId)

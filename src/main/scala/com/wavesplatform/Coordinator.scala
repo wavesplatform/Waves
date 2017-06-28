@@ -11,24 +11,24 @@ import scorex.block.Block
 import scorex.block.Block.BlockId
 import scorex.consensus.TransactionsOrdering
 import scorex.crypto.EllipticCurveImpl
-import scorex.transaction.ValidationError.GenericError
+import scorex.transaction.ValidationError.{BlockAppendError, GenericError, InvalidSignature}
 import scorex.transaction._
 import scorex.utils.ScorexLogging
 
 import scala.util.control.NonFatal
 
 class Coordinator(
-    checkpoint: CheckpointService,
-    history: History,
-    blockchainUpdater: BlockchainUpdater,
-    stateReader: StateReader,
-    utxStorage: UnconfirmedTransactionsStorage,
-    time: => Long,
-    settings: BlockchainSettings,
-    maxBlockchainAge: Duration,
-    checkpointPublicKey: ByteStr,
-    miner: Miner,
-    blockchainExpiryListener: Boolean => Unit) extends ScorexLogging {
+                     checkpoint: CheckpointService,
+                     history: History,
+                     blockchainUpdater: BlockchainUpdater,
+                     stateReader: StateReader,
+                     utxStorage: UtxPool,
+                     time: => Long,
+                     settings: BlockchainSettings,
+                     maxBlockchainAge: Duration,
+                     checkpointPublicKey: ByteStr,
+                     miner: Miner,
+                     blockchainExpiryListener: Boolean => Unit) extends ScorexLogging {
 
   import Coordinator._
 
@@ -55,11 +55,12 @@ class Coordinator(
     if (history.contains(b)) Right(())
     else {
       def historyContainsParent = history.contains(b.reference)
+
       def consensusDataIsValid = blockConsensusValidation(history, stateReader, settings, time)(b)
 
-      if (!historyContainsParent) Left(GenericError(s"Invalid block ${b.encodedId}: no parent block in history"))
-      else if (!b.signatureValid) Left(GenericError(s"Invalid signature in block ${b.encodedId}"))
-      else if (!consensusDataIsValid) Left(GenericError(s"Invalid block ${b.encodedId}: consensus data is not valid"))
+      if (!historyContainsParent) Left(BlockAppendError("no parent block in history", b))
+      else if (!b.signatureValid) Left(InvalidSignature(b, None))
+      else if (!consensusDataIsValid) Left(BlockAppendError("consensus data is not valid", b))
       else Right(())
     }
   }
@@ -68,11 +69,7 @@ class Coordinator(
     _ <- validateWithRespectToCheckpoint(block, history.height() + 1)
     _ <- isBlockValid(block)
     _ <- blockchainUpdater.processBlock(block)
-  } yield {
-    block.transactionData.foreach(utxStorage.remove)
-    UnconfirmedTransactionsStorage.clearIncorrectTransactions(settings.functionalitySettings,
-      stateReader, utxStorage, time)
-  }
+  } yield block.transactionData.foreach(utxStorage.remove)
 
   def processFork(lastCommonBlockId: BlockId, newBlocks: Seq[Block]): Either[ValidationError, BigInt] = {
 
@@ -167,7 +164,7 @@ class Coordinator(
       val hh = existingItems.map(_.height) :+ genesisBlockHeight
       history.blockAt(hh(fork.size)).foreach {
         lastValidBlock =>
-          log.warn(s"Fork detected (length = ${fork.size}), rollback to last valid block id [${lastValidBlock.encodedId}]")
+          log.warn(s"Fork detected (length = ${fork.size}), rollback to last valid block id [${lastValidBlock.uniqueId}]")
           blockchainUpdater.removeAfter(lastValidBlock.uniqueId)
       }
     }
@@ -175,7 +172,7 @@ class Coordinator(
 }
 
 object Coordinator extends ScorexLogging {
-  val MaxTimeDrift = Duration.ofSeconds(15).toMillis
+  val MaxTimeDrift: Long = Duration.ofSeconds(15).toMillis
 
   def blockConsensusValidation(history: History, state: StateReader, bcs: BlockchainSettings, currentTs: Long)(block: Block): Boolean = try {
 

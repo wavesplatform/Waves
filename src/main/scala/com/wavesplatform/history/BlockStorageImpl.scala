@@ -6,7 +6,7 @@ import java.util.concurrent.locks.{ReentrantReadWriteLock => RWL}
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state2.reader.StateReader
 import com.wavesplatform.state2.{BlockchainUpdaterImpl, StateStorage, StateWriterImpl}
-import scorex.transaction.{BlockchainUpdater, History}
+import scorex.transaction.{BlockchainUpdater, History, NgHistoryWriterImpl}
 
 import scala.util.{Success, Try}
 
@@ -25,11 +25,12 @@ object BlockStorageImpl {
 
     for {
       historyWriter <- HistoryWriterImpl(settings.blockchainFile, lock)
-      ss <- createStateStorage(historyWriter, settings.stateFile)
+      ngHistoryWriter = new NgHistoryWriterImpl(historyWriter)
+      ss <- createStateStorage(ngHistoryWriter, settings.stateFile)
       stateWriter = new StateWriterImpl(ss, lock)
     } yield {
-      val bcu = BlockchainUpdaterImpl(stateWriter, historyWriter, settings.functionalitySettings, settings.minimumInMemoryDiffSize, lock)
-      (historyWriter, stateWriter, bcu.currentState, bcu)
+      val bcu = BlockchainUpdaterImpl(stateWriter, ngHistoryWriter, settings.functionalitySettings, settings.minimumInMemoryDiffSize, lock)
+      (ngHistoryWriter, stateWriter, bcu.bestLiquidState, bcu)
     }
   }
 }
