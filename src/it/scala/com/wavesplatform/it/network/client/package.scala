@@ -3,6 +3,7 @@ package com.wavesplatform.it.network
 import java.net.{InetSocketAddress, SocketAddress, URI}
 import java.util.concurrent.Callable
 
+import com.wavesplatform.network.{AttributeKeys, Handshake}
 import io.netty.channel.{Channel, ChannelHandlerContext}
 import io.netty.util.AttributeKey
 import io.netty.util.concurrent.{EventExecutorGroup, ScheduledFuture}
@@ -33,5 +34,5 @@ package object client {
   val HandshakeKey = AttributeKey.newInstance[Handshake]("handshake")
 
   def id(ctx: ChannelHandlerContext): String = id(ctx.channel())
-  def id(chan: Channel): String = s"[${chan.id().asShortText()}: ${chan.attr(AttributeKeys.NodeName)}@${chan.attr(AttributeKeys.RemoteAddress)}]"
+  def id(chan: Channel): String = s"[${chan.id().asShortText()}: ${chan.attr(AttributeKeys.NodeName)}@${chan.attr(AttributeKeys.DeclaredAddress)}]"
 }

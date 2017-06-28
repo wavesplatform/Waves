@@ -1,5 +1,6 @@
 package com.wavesplatform.it.network.client
 
+import com.wavesplatform.network.{HandshakeDecoder, HandshakeHandler, HandshakeTimeoutHandler, LegacyFrameCodec}
 import io.netty.channel.ChannelInitializer
 import io.netty.channel.socket.SocketChannel
 import io.netty.handler.codec.{LengthFieldBasedFrameDecoder, LengthFieldPrepender}
