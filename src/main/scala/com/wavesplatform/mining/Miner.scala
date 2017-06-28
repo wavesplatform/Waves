@@ -36,7 +36,7 @@ class Miner(
 
   private def generateBlock(account: PrivateKeyAccount, parentHeight: Int, parent: Block, greatGrandParent: Option[Block]): Callable[Option[Block]] = () => {
     val blockAge = Duration.between(Instant.ofEpochMilli(parent.timestamp), Instant.ofEpochMilli(time))
-    if (blockAge <= minerSettings.intervalAfterLastBlockThenGenerationIsAllowed) {
+    if (blockAge <= minerSettings.intervalAfterLastBlockThenGenerationIsAllowed || parentHeight == 1) {
       val pc = peerCount
       if (pc >= minerSettings.quorum) {
         val balance = generatingBalance(state, blockchainSettings.functionalitySettings)(account, parentHeight)
