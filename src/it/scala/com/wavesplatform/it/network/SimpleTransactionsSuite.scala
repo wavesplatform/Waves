@@ -1,6 +1,5 @@
 package com.wavesplatform.it.network
 
-import com.wavesplatform.it.MatcherTestSuite.Configs
 import com.wavesplatform.it._
 import com.wavesplatform.network.RawBytes
 import org.scalatest._
