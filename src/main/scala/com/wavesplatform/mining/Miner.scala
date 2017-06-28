@@ -116,7 +116,7 @@ class Miner(
 
   def lastBlockChanged(parentHeight: Int, parent: Block): Unit = {
     log.debug(s"Canceling: Parent block: ${parent.uniqueId.toString}")
-    scheduledAttempts.values.asScala.foreach(_.cancel(true))
+    scheduledAttempts.values.asScala.foreach(_.cancel(false))
     scheduledAttempts.clear()
     val greatGrandParent = history.parent(parent, 2)
     log.debug("Attempting to schedule block generation")

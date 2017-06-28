@@ -187,6 +187,7 @@ class NetworkServer(
       coordinatorHandler -> coordinatorExecutor)))
 
   val connectTask = workerGroup.scheduleWithFixedDelay(1.second, 5.seconds) {
+    log.trace(s"Outgoing: ${outgoingChannels.keySet} ++ incoming: $incomingDeclaredAddresses")
     if (outgoingChannelCount.get() < settings.networkSettings.maxOutboundConnections) {
       peerDatabase
         .randomPeer(excludedAddresses ++ outgoingChannels.keySet().asScala ++ incomingDeclaredAddresses)
@@ -225,7 +226,7 @@ class NetworkServer(
   def writeToLocalChannel(message: AnyRef): Unit = localClientChannel.writeAndFlush(message)
 
   def shutdown(): Unit = try {
-    connectTask.cancel(true)
+    connectTask.cancel(false)
     serverChannel.foreach(_.close().await())
     log.debug("Unbound server")
     allChannels.close().await()

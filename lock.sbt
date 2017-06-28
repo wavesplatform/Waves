@@ -30,7 +30,7 @@ dependencyOverrides in ThisBuild ++= Set(
   "com.github.swagger-akka-http" % "swagger-akka-http_2.12" % "0.9.1",
   "com.google.code.findbugs" % "annotations" % "2.0.1",
   "com.google.guava" % "guava" % "21.0",
-  "com.h2database" % "h2-mvstore" % "1.4.195",
+  "com.h2database" % "h2-mvstore" % "1.4.196",
   "com.iheart" % "ficus_2.12" % "1.4.0",
   "com.ning" % "async-http-client" % "1.9.11",
   "com.spotify" % "docker-client" % "8.1.2",
@@ -133,4 +133,4 @@ dependencyOverrides in ThisBuild ++= Set(
   "org.whispersystems" % "curve25519-java" % "0.3.0",
   "org.yaml" % "snakeyaml" % "1.17"
 )
-// LIBRARY_DEPENDENCIES_HASH c642a481eb5d6dc15ddea897a1204d455f51049c
+// LIBRARY_DEPENDENCIES_HASH 7f06bfd16a336c872bb21847b53ad49f13ee8861
