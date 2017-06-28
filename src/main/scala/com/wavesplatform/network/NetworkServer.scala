@@ -1,10 +1,8 @@
 package com.wavesplatform.network
 
 import java.net.{InetSocketAddress, NetworkInterface}
-import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
-import java.util.stream.Collectors
 
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.settings._
@@ -62,16 +60,10 @@ class NetworkServer(
 
   private val excludedAddresses: Set[InetSocketAddress] = {
     val localAddresses = if (bindAddress.getAddress.isAnyLocalAddress) {
-      import Collections.list
-      list(NetworkInterface.getNetworkInterfaces)
-        .stream()
-        .flatMap[InetSocketAddress] { i =>
-          list(i.getInetAddresses)
-            .stream()
-            .map(a => new InetSocketAddress(a, settings.networkSettings.bindAddress.getPort))
-        }
-        .collect(Collectors.toSet())
-        .asScala.toSet
+      NetworkInterface.getNetworkInterfaces.asScala
+        .flatMap(_.getInetAddresses.asScala
+          .map(a => new InetSocketAddress(a, settings.networkSettings.bindAddress.getPort)))
+        .toSet
     } else Set(settings.networkSettings.bindAddress)
 
     localAddresses ++ settings.networkSettings.declaredAddress.toSet
