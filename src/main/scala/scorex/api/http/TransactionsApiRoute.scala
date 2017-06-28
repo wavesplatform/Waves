@@ -4,6 +4,7 @@ import javax.ws.rs.Path
 
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
+import com.wavesplatform.UtxPool
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state2.ByteStr
 import com.wavesplatform.state2.reader.StateReader
@@ -11,7 +12,7 @@ import io.swagger.annotations._
 import play.api.libs.json._
 import scorex.account.Account
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import scorex.transaction.{History, Transaction, UnconfirmedTransactionsStorage}
+import scorex.transaction.{History, Transaction}
 
 import scala.util.Success
 import scala.util.control.Exception
@@ -19,10 +20,10 @@ import scala.util.control.Exception
 @Path("/transactions")
 @Api(value = "/transactions", description = "Information about transactions")
 case class TransactionsApiRoute(
-                                 settings: RestAPISettings,
-                                 state: StateReader,
-                                 history: History,
-                                 utxStorage: UnconfirmedTransactionsStorage) extends ApiRoute with CommonApiFunctions {
+    settings: RestAPISettings,
+    state: StateReader,
+    history: History,
+    utxPool: UtxPool) extends ApiRoute with CommonApiFunctions {
 
   import TransactionsApiRoute.MaxTransactionsPerRequest
 
@@ -89,7 +90,7 @@ case class TransactionsApiRoute(
   @Path("/unconfirmed")
   @ApiOperation(value = "Unconfirmed", notes = "Get list of unconfirmed transactions", httpMethod = "GET")
   def unconfirmed: Route = (path("unconfirmed") & get) {
-    complete(JsArray(utxStorage.all.map(txToExtendedJson)))
+    complete(JsArray(utxPool.all.map(txToExtendedJson)))
   }
 
   private def txToExtendedJson(tx: Transaction): JsObject = {

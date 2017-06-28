@@ -4,6 +4,7 @@ import akka.actor.{Actor, ActorRef, ActorSystem, Props}
 import akka.http.scaladsl.model.StatusCodes
 import akka.persistence.inmemory.extension.{InMemoryJournalStorage, StorageExtension}
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
+import com.wavesplatform.UtxPool
 import com.wavesplatform.matcher.MatcherTestData
 import com.wavesplatform.matcher.api.StatusCodeMatcherResponse
 import com.wavesplatform.matcher.fixtures.RestartableActor
@@ -15,7 +16,6 @@ import com.wavesplatform.matcher.model.LevelAgg
 import com.wavesplatform.settings.{FunctionalitySettings, WalletSettings}
 import com.wavesplatform.state2.reader.StateReader
 import com.wavesplatform.state2.{AssetInfo, ByteStr, LeaseInfo, Portfolio}
-import io.netty.channel.embedded.EmbeddedChannel
 import org.h2.mvstore.MVStore
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Matchers, WordSpecLike}
@@ -51,8 +51,8 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest2"
       case _ =>
     }
   })
-  var actor: ActorRef = system.actorOf(Props(new MatcherActor(orderHistoryRef, storedState, wallet, settings, history, functionalitySettings,
-    new EmbeddedChannel()) with RestartableActor))
+  var actor: ActorRef = system.actorOf(Props(new MatcherActor(orderHistoryRef, storedState, wallet,
+    mock[UtxPool], settings, history, functionalitySettings) with RestartableActor))
 
   (storedState.assetInfo _).when(*).returns(Some(AssetInfo(true, 10000000000L)))
   val i1 = IssueTransaction.create(PrivateKeyAccount(Array.empty), "Unknown".getBytes(), Array.empty, 10000000000L, 8.toByte, true, 100000L, 10000L).right.get
@@ -65,8 +65,8 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest2"
     tp.expectMsg(akka.actor.Status.Success(""))
     super.beforeEach()
 
-    actor = system.actorOf(Props(new MatcherActor(orderHistoryRef, storedState, wallet, settings, history, functionalitySettings,
-      new EmbeddedChannel()) with RestartableActor))
+    actor = system.actorOf(Props(new MatcherActor(orderHistoryRef, storedState, wallet, mock[UtxPool],
+      settings, history, functionalitySettings) with RestartableActor))
   }
 
   "MatcherActor" should {
