@@ -6,12 +6,12 @@ import com.google.common.collect.EvictingQueue
 import com.wavesplatform.settings.NetworkSettings
 import com.wavesplatform.utils.createMVStore
 import org.h2.mvstore.MVMap
-import scorex.utils.LogMVMapBuilder
+import scorex.utils.{LogMVMapBuilder, ScorexLogging}
 
 import scala.collection.JavaConverters._
 import scala.util.Random
 
-class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with AutoCloseable {
+class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with AutoCloseable with ScorexLogging {
 
   private val database = createMVStore(settings.file)
   private val peersPersistence = database.openMap("peers", new LogMVMapBuilder[InetSocketAddress, Long])
@@ -24,7 +24,7 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Auto
   }
 
   override def addCandidate(socketAddress: InetSocketAddress): Unit = unverifiedPeers.synchronized {
-    unverifiedPeers.add(socketAddress)
+    if (!peersPersistence.containsKey(socketAddress)) unverifiedPeers.add(socketAddress)
   }
 
   private def doTouch(socketAddress: InetSocketAddress, timestamp: Long): Unit = unverifiedPeers.synchronized {
@@ -50,11 +50,14 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Auto
     removeObsoleteRecords(blacklist, settings.blackListResidenceTime.toMillis).keySet().asScala.toSet
 
   override def randomPeer(excluded: Set[InetSocketAddress]): Option[InetSocketAddress] = unverifiedPeers.synchronized {
+    log.trace(s"Excluding: $excluded")
     def excludeAddress(isa: InetSocketAddress) = excluded(isa) || blacklistedHosts(isa.getAddress)
 
+    log.trace(s"Evicting queue: $unverifiedPeers")
     val unverified = Option(unverifiedPeers.peek()).filterNot(excludeAddress)
     val verified = Random.shuffle(knownPeers.keySet.diff(excluded).toSeq).headOption.filterNot(excludeAddress)
 
+    log.trace(s"Unverified: $unverified; Verified: $verified")
     (unverified, verified) match {
       case (Some(_), v@Some(_)) => if (Random.nextBoolean()) Some(unverifiedPeers.poll()) else v
       case (Some(_), None) => Some(unverifiedPeers.poll())
