@@ -37,7 +37,7 @@ object DataTransaction
 
     lazy val toSign: Array[Byte] = Bytes.concat(Array(transactionType.id.toByte),
                                                 sender.publicKey,
-                                                BytesSerializable.arrayWithSize(data),
+                                                data,
                                                 Longs.toByteArray(fee),
                                                 Longs.toByteArray(timestamp))
 
@@ -48,13 +48,12 @@ object DataTransaction
 
   val MaxDataSize = 140
   def parseTail(bytes: Array[Byte]): Try[DataTransaction] = Try {
-    val signature = bytes.slice(0, SignatureLength)
-    val txId      = bytes(SignatureLength)
-    require(txId == TransactionType.DataTransaction.id.toByte, s"Signed tx id is not match")
-    val sender                        = PublicKeyAccount(bytes.slice(SignatureLength + 1, SignatureLength + KeyLength + 1))
-    val (data, dataLength: Int)       = Deser.parseArraySize(bytes, SignatureLength + KeyLength + 1)
-    val fee                           = Longs.fromByteArray(bytes.slice(dataLength + 8, dataLength + 16))
-    val timestamp                     = Longs.fromByteArray(bytes.slice(dataLength + 16, dataLength + 24))
+    val sender                        = PublicKeyAccount(bytes.slice(0, KeyLength))
+    val (data, dataLength: Int)       = Deser.parseArraySize(bytes, KeyLength)
+    val fee                           = Longs.fromByteArray(bytes.slice(dataLength, dataLength + 8))
+    val timestamp                     = Longs.fromByteArray(bytes.slice(dataLength + 8, dataLength + 16))
+    val signature = bytes.slice(dataLength + 16, dataLength + 16 + SignatureLength)
+
     DataTransaction.create(sender, data, fee, timestamp, signature)
       .fold(left => Failure(new Exception(left.toString)), right => Success(right))
   }.flatten
@@ -83,7 +82,6 @@ object DataTransaction
 
   def create(sender: PrivateKeyAccount,
              data: Array[Byte],
-             dataLength: Long,
              fee: Long,
              timestamp: Long): Either[ValidationError, DataTransaction] =
     createUnverified(sender, data, fee, timestamp).right.map { unverified =>
