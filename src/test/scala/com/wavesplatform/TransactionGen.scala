@@ -125,11 +125,11 @@ trait TransactionGen {
 
 def dataGeneratorP(sender: PrivateKeyAccount): Gen[DataTransaction]= for {
   (_,data, fee, timestamp) <- dataParamGen
-} yield DataTransaction.create(sender, data, fee, timestamp).right.get
+} yield DataTransaction.create(sender, data, fee, AddressScheme.current.chainId, timestamp).right.get
 
   val dataGen =(for {
     (sender, data, fee, timestamp) <- dataParamGen
-  } yield DataTransaction.create(sender, data, fee, timestamp).right.get).label("dataTransaction")
+  } yield DataTransaction.create(sender, data, fee, AddressScheme.current.chainId, timestamp).right.get).label("dataTransaction")
 
 
 

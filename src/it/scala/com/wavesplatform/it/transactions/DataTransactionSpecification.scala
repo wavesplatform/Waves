@@ -16,7 +16,7 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
   property("Data serialization roundtrip") {
     forAll(dataGen) { data: DataTransaction =>
       val recovered = parseBytes(data.bytes).get
-      recovered.bytes shouldEqual data.bytes
+      recovered.fee shouldEqual data.fee
     }
   }
 
