@@ -77,8 +77,14 @@ class NetworkServer(
 
   private val peerSynchronizer = new PeerSynchronizer(peerDatabase)
   private val utxPoolSynchronizer = new UtxPoolSynchronizer(txHandler, allChannels)
-  private val errorHandler = new ErrorHandler(peerDatabase)
-  private val fatalErrorHandler = new FatalErrorHandler(peerDatabase)
+  // There are two error handlers by design. WriteErrorHandler adds a future listener to make sure writes to network
+  // succeed. It is added to the head of pipeline (it's the closest of the two to actual network), because some writes
+  // are initiated from the middle of the pipeline (e.g. extension requests). FatalErrorHandler, on the other hand,
+  // reacts to inbound exceptions (the ones thrown during channelRead). It is added to the tail of pipeline to handle
+  // exceptions bubbling up from all the handlers below. When a fatal exception is caught (like OutOfMemory), the
+  // application is terminated.
+  private val writeErrorHandler = new WriteErrorHandler
+  private val fatalErrorHandler = new FatalErrorHandler
   private val historyReplier = new HistoryReplier(history, settings.synchronizationSettings.maxChainLength)
 
   private val inboundConnectionFilter = new InboundConnectionFilter(peerDatabase,
@@ -126,9 +132,9 @@ class NetworkServer(
       .channel(classOf[NioServerSocketChannel])
       .childHandler(new PipelineInitializer[SocketChannel](Seq(
         inboundConnectionFilter,
-        errorHandler,
+        writeErrorHandler,
         new HandshakeDecoder,
-        new HandshakeTimeoutHandler,
+        new HandshakeTimeoutHandler(settings.networkSettings.handshakeTimeout),
         serverHandshakeHandler,
         lengthFieldPrepender,
         new LengthFieldBasedFrameDecoder(1024 * 1024, 0, 4, 0, 4),
@@ -162,9 +168,9 @@ class NetworkServer(
     .group(workerGroup)
     .channel(classOf[NioSocketChannel])
     .handler(new PipelineInitializer[SocketChannel](Seq(
-      errorHandler,
+      writeErrorHandler,
       new HandshakeDecoder,
-      new HandshakeTimeoutHandler,
+      new HandshakeTimeoutHandler(settings.networkSettings.handshakeTimeout),
       clientHandshakeHandler,
       lengthFieldPrepender,
       new LengthFieldBasedFrameDecoder(1024 * 1024, 0, 4, 0, 4),
@@ -178,7 +184,8 @@ class NetworkServer(
       new OptimisticExtensionLoader,
       utxPoolSynchronizer,
       scoreObserver,
-      coordinatorHandler -> coordinatorExecutor, fatalErrorHandler)))
+      coordinatorHandler -> coordinatorExecutor,
+      fatalErrorHandler)))
 
   val connectTask = workerGroup.scheduleWithFixedDelay(1.second, 5.seconds) {
     log.trace(s"Outgoing: ${outgoingChannels.keySet} ++ incoming: $incomingDeclaredAddresses")
