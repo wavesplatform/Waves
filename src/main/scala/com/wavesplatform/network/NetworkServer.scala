@@ -78,6 +78,7 @@ class NetworkServer(
   private val peerSynchronizer = new PeerSynchronizer(peerDatabase)
   private val utxPoolSynchronizer = new UtxPoolSynchronizer(txHandler, allChannels)
   private val errorHandler = new ErrorHandler(peerDatabase)
+  private val fatalErrorHandler = new FatalErrorHandler(peerDatabase)
   private val historyReplier = new HistoryReplier(history, settings.synchronizationSettings.maxChainLength)
 
   private val inboundConnectionFilter = new InboundConnectionFilter(peerDatabase,
@@ -141,7 +142,8 @@ class NetworkServer(
         new OptimisticExtensionLoader,
         utxPoolSynchronizer,
         scoreObserver,
-        coordinatorHandler -> coordinatorExecutor)))
+        coordinatorHandler -> coordinatorExecutor,
+        fatalErrorHandler)))
       .bind(bindAddress)
       .channel()
   }
@@ -176,7 +178,7 @@ class NetworkServer(
       new OptimisticExtensionLoader,
       utxPoolSynchronizer,
       scoreObserver,
-      coordinatorHandler -> coordinatorExecutor)))
+      coordinatorHandler -> coordinatorExecutor, fatalErrorHandler)))
 
   val connectTask = workerGroup.scheduleWithFixedDelay(1.second, 5.seconds) {
     log.trace(s"Outgoing: ${outgoingChannels.keySet} ++ incoming: $incomingDeclaredAddresses")

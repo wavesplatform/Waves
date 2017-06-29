@@ -91,7 +91,7 @@ class Miner(
         if (prevTask != null) {
           log.debug(s"Block generation already scheduled for $key")
           prevTask
-        } else {
+        } else if (!minerPool.isShutdown) {
           val thisAttempt = minerPool.schedule(
             generateBlock(account, parentHeight, parent, greatGrandParent),
             generationOffset.toMillis, TimeUnit.MILLISECONDS)
@@ -110,7 +110,7 @@ class Miner(
           })
 
           thisAttempt
-        }
+        } else null
       })
     }
 

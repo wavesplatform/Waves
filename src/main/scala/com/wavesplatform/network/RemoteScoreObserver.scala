@@ -1,6 +1,7 @@
 package com.wavesplatform.network
 
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicReference
 
 import com.wavesplatform.state2.ByteStr
 import io.netty.channel.ChannelHandler.Sharable
@@ -14,6 +15,8 @@ import scala.concurrent.duration.FiniteDuration
 @Sharable
 class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteStr])
   extends ChannelDuplexHandler with ScorexLogging {
+
+  private val pinnedChannel = new AtomicReference[Channel]()
 
   @volatile
   private var localScore = BigInt(0)
@@ -47,6 +50,7 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
       // if this is the channel with the highest score and its score is higher than local, request extension
       for ((chan, score) <- channelWithHighestScore if chan == ctx.channel() && score > newLocalScore) {
         chan.writeAndFlush(LoadBlockchainExtension(lastSignatures))
+        pinnedChannel.set(chan)
       }
 
     case _ => ctx.write(msg, promise)
@@ -66,11 +70,19 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
         (ch, highScore) <- channelWithHighestScore
         if ch == ctx.channel() && // this is the channel with highest score
           (previousScore == null || previousScore < newScore) && // score has increased
-          highScore > localScore // remote score is higher than local
+          highScore > localScore && // remote score is higher than local
+          pinnedChannel.compareAndSet(null, ch)
       } {
         log.debug(s"${id(ctx)} New high score $highScore > $localScore, requesting extension")
         ctx.writeAndFlush(LoadBlockchainExtension(lastSignatures))
       }
+
+    case _: ExtensionBlocks if pinnedChannel.compareAndSet(ctx.channel(), null) =>
+      super.channelRead(ctx, msg)
+
+    case ExtensionBlocks(blocks) =>
+      log.debug(s"${id(ctx)} Unexpected extension blocks: ${blocks.head.uniqueId} .. ${blocks.last.uniqueId}")
+      super.channelRead(ctx, msg)
 
     case _ => super.channelRead(ctx, msg)
   }

@@ -48,7 +48,7 @@ package object network extends ScorexLogging {
 
   implicit class ChannelGroupExt(val allChannels: ChannelGroup) extends AnyVal {
     def broadcast(message: AnyRef, except: Option[Channel] = None): Unit = {
-      log.debug(s"Broadcasting $message to ${allChannels.size()} channels${except.fold("")(c => s" (except ${id(c)})")}")
+      log.trace(s"Broadcasting $message to ${allChannels.size()} channels${except.fold("")(c => s" (except ${id(c)})")}")
       allChannels.writeAndFlush(message, except.fold(ChannelMatchers.all())(ChannelMatchers.isNot))
     }
   }

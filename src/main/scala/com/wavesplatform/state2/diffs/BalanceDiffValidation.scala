@@ -3,7 +3,7 @@ package com.wavesplatform.state2.diffs
 import cats.implicits._
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.reader.StateReader
-import com.wavesplatform.state2.{Diff, LeaseInfo, Portfolio}
+import com.wavesplatform.state2.{ByteStr, Diff, LeaseInfo, Portfolio}
 import scorex.account.Account
 import scorex.transaction.Transaction
 import scorex.transaction.ValidationError.AccountBalanceError
@@ -25,7 +25,7 @@ object BalanceDiffValidation {
       val err = if (newPortfolio.balance < 0) {
         Some(s"negative waves balance: $acc, old: ${oldPortfolio.balance}, new: ${newPortfolio.balance}")
       } else if (newPortfolio.assets.values.exists(_ < 0)) {
-        Some(s"negative asset balance: $acc, old: $oldPortfolio, new: $newPortfolio")
+        Some(s"negative asset balance: $acc, new portfolio: ${negativeAssetsInfo(newPortfolio)}")
       } else if (newPortfolio.effectiveBalance < 0) {
         Some(s"negative effective balance: $acc, old: ${leaseWavesInfo(oldPortfolio)}, new: ${leaseWavesInfo(oldPortfolio)}")
       } else if (newPortfolio.balance < newPortfolio.leaseInfo.leaseOut && time > fs.allowLeasedBalanceTransferUntil) {
@@ -43,4 +43,5 @@ object BalanceDiffValidation {
 
   private def leaseWavesInfo(p: Portfolio): (Long, LeaseInfo) = (p.balance, p.leaseInfo)
 
+  private def negativeAssetsInfo(p: Portfolio): Map[ByteStr, Long] = p.assets.filter(_._2 < 0)
 }
