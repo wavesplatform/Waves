@@ -43,6 +43,8 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
 
   override def write(ctx: ChannelHandlerContext, msg: AnyRef, promise: ChannelPromise) = msg match {
     case LocalScoreChanged(newLocalScore) =>
+      val pinned = Option(pinnedChannel.get()).fold("[NONE]"){id}
+      log.debug(s"Pinned: $pinned <- ${id(ctx)}; New local score: $newLocalScore")
       // unconditionally update local score value and propagate this message downstream
       localScore = newLocalScore
       ctx.write(msg, promise)
@@ -58,6 +60,8 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef) = msg match {
     case newScore: History.BlockchainScore =>
+      val pinned = Option(pinnedChannel.get()).fold("[NONE]"){id}
+      log.debug(s"Pinned: $pinned <- ${id(ctx)}; New score: $newScore")
       ctx.executor().schedule(scoreTtl) {
         if (scores.remove(ctx.channel(), newScore)) {
           log.debug(s"${id(ctx)} Score expired, removing $newScore")
