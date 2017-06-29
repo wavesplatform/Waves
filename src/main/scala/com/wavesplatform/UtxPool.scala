@@ -31,9 +31,8 @@ class UtxPool(
 
   private val transactions = new ConcurrentHashMap[ByteStr, Transaction](utxSettings.maxSize / 2)
 
-  private def validate(t: Transaction): Either[ValidationError, Transaction] =
+  private def validate(t: Transaction) =
     TransactionDiffer.apply(fs, time.correctedTime(), stateReader.height)(stateReader, t)
-      .map(_ => t)
 
   private def collectValidTransactions(currentTs: Long): Seq[Transaction] = {
     val differ = TransactionDiffer.apply(fs, currentTs, stateReader.height) _
@@ -48,7 +47,7 @@ class UtxPool(
               valid += tx
               (invalid, valid, newDiff)
             case Left(e) =>
-              log.debug(s"Removing ${tx.id} from UTX: $e")
+              log.debug(s"Removing invalid transaction ${tx.id} from UTX: $e")
               invalid += tx.id
               (invalid, valid, diff)
           }
@@ -61,23 +60,24 @@ class UtxPool(
 
   def putIfNew(tx: Transaction, source: Option[Channel] = None): Either[ValidationError, Transaction] = {
     removeExpired(time.correctedTime())
+
+    val transactionInPool = Left(GenericError(s"Transaction ${tx.id} already in the pool"))
     if (transactions.size >= utxSettings.maxSize) {
       Left(GenericError("Transaction pool size limit is reached"))
     } else if (transactions.contains(tx.id)) {
-      Left(GenericError(s"Transaction ${tx.id} already in the pool"))
+      transactionInPool
     } else for {
-      validAgainstFee <- feeCalculator.enoughFee(tx)
-      t <- validate(validAgainstFee)
-      _ = transactions.put(t.id, t)
-      _ = allChannels.broadcast(t, source)
-    } yield t
+      _ <- feeCalculator.enoughFee(tx)
+      _ <- validate(tx)
+      _ <- Option(transactions.putIfAbsent(tx.id, tx))
+        .fold[Either[ValidationError, Transaction]](Right(tx))(_ => transactionInPool)
+      _ = allChannels.broadcast(RawBytes(TransactionMessageSpec.messageCode, tx.bytes), source)
+    } yield tx
   }
 
   def remove(tx: Transaction): Unit = transactions.remove(tx.id)
 
-  def all(): Seq[Transaction] = transactions.values.asScala.toSeq
-
-  def getBySignature(signature: ByteStr): Option[Transaction] = Option(transactions.get(signature))
+  def all(): Seq[Transaction] = transactions.values.asScala.toSeq.sorted(TransactionsOrdering.InUTXPool)
 
   private def removeExpired(currentTs: Long): Unit =
     transactions.entrySet().removeIf(tx => (currentTs - tx.getValue.timestamp).millis <= utxSettings.maxTransactionAge)

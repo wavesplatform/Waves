@@ -16,7 +16,7 @@ import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.channel.socket.SocketChannel
 import io.netty.channel.socket.nio.{NioServerSocketChannel, NioSocketChannel}
 import io.netty.handler.codec.{LengthFieldBasedFrameDecoder, LengthFieldPrepender}
-import scorex.network.message.{BasicMessagesRepo, MessageSpec}
+import scorex.network.message.MessageSpec
 import scorex.transaction._
 import scorex.utils.{ScorexLogging, Time}
 import scorex.wallet.Wallet
@@ -54,7 +54,7 @@ class NetworkServer(
   def setBlockchainExpired(expired: Boolean): Unit = blockchainReadiness.compareAndSet(expired, !expired)
 
   private val discardingHandler = new DiscardingHandler(blockchainReadiness.get())
-  private val specs: Map[Byte, MessageSpec[_ <: AnyRef]] = (BasicMessagesRepo.specs ++ TransactionalMessagesRepo.specs).map(s => s.messageCode -> s).toMap
+  private val specs: Map[Byte, MessageSpec[_ <: AnyRef]] = BasicMessagesRepo.specs.map(s => s.messageCode -> s).toMap
   private val messageCodec = new MessageCodec(specs)
 
   private val excludedAddresses: Set[InetSocketAddress] = {

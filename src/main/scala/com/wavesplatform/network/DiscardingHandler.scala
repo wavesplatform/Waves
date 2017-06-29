@@ -1,6 +1,5 @@
 package com.wavesplatform.network
 
-import com.wavesplatform.network.TransactionalMessagesRepo.TransactionMessageSpec
 import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel.{ChannelDuplexHandler, ChannelHandlerContext}
 import scorex.utils.ScorexLogging
