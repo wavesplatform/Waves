@@ -25,9 +25,6 @@ import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 
 class NetworkServer(
-    chainId: Char,
-    bindAddress: InetSocketAddress,
-    declaredAddress: Option[InetSocketAddress],
     settings: WavesSettings,
     history: History,
     checkpoints: CheckpointService,
@@ -43,8 +40,8 @@ class NetworkServer(
   private val bossGroup = new NioEventLoopGroup()
   private val workerGroup = new NioEventLoopGroup()
   private val handshake =
-    Handshake(Constants.ApplicationName + chainId, Version.VersionTuple, settings.networkSettings.nodeName,
-      settings.networkSettings.nonce, settings.networkSettings.declaredAddress)
+    Handshake(Constants.ApplicationName + settings.blockchainSettings.addressSchemeCharacter, Version.VersionTuple,
+      settings.networkSettings.nodeName, settings.networkSettings.nonce, settings.networkSettings.declaredAddress)
 
   private val scoreObserver = new RemoteScoreObserver(
       settings.synchronizationSettings.scoreTTL,
@@ -58,7 +55,7 @@ class NetworkServer(
   private val messageCodec = new MessageCodec(specs)
 
   private val excludedAddresses: Set[InetSocketAddress] = {
-    val localAddresses = if (bindAddress.getAddress.isAnyLocalAddress) {
+    val localAddresses = if (settings.networkSettings.bindAddress.getAddress.isAnyLocalAddress) {
       NetworkInterface.getNetworkInterfaces.asScala
         .flatMap(_.getInetAddresses.asScala
           .map(a => new InetSocketAddress(a, settings.networkSettings.bindAddress.getPort)))
@@ -118,7 +115,7 @@ class NetworkServer(
   private val serverHandshakeHandler =
     new HandshakeHandler.Server(handshake, peerInfo, peerUniqueness, peerDatabase, allChannels)
 
-  private val serverChannel = declaredAddress.map { _ =>
+  private val serverChannel = settings.networkSettings.declaredAddress.map { _ =>
     new ServerBootstrap()
       .group(bossGroup, workerGroup)
       .channel(classOf[NioServerSocketChannel])
@@ -141,7 +138,7 @@ class NetworkServer(
         utxPoolSynchronizer,
         scoreObserver,
         coordinatorHandler -> coordinatorExecutor)))
-      .bind(bindAddress)
+      .bind(settings.networkSettings.bindAddress)
       .channel()
   }
 
