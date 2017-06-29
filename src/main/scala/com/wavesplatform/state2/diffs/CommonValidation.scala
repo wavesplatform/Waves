@@ -38,8 +38,6 @@ object CommonValidation {
 
           val accountPortfolio = s.accountPortfolio(sender)
           val spendings = Monoid.combine(amountDiff, feeDiff)
-          accountPortfolio.balance + spendings.balance
-
 
           lazy val negativeAssets: Boolean = spendings.assets.exists { case (id, amt) => (accountPortfolio.assets.getOrElse(id, 0L) + amt) < 0L }
           lazy val negativeWaves = accountPortfolio.balance + spendings.balance < 0
