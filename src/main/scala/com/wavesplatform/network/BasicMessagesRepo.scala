@@ -1,17 +1,17 @@
-package scorex.network.message
+package com.wavesplatform.network
 
 import java.net.{InetAddress, InetSocketAddress}
 import java.util
 
 import com.google.common.primitives.{Bytes, Ints}
-import com.wavesplatform.network.{BlockCheckpoint, Checkpoint, GetBlock, GetPeers, GetSignatures, KnownPeers, Signatures}
 import com.wavesplatform.state2.ByteStr
 import scorex.block.Block
 import scorex.crypto.signatures.SigningFunctions
 import scorex.crypto.signatures.SigningFunctions.Signature
 import scorex.network.message.Message._
-import scorex.transaction.History
+import scorex.network.message._
 import scorex.transaction.TransactionParser._
+import scorex.transaction.{History, Transaction, TransactionParser}
 
 import scala.util.Try
 
@@ -180,8 +180,18 @@ object CheckpointMessageSpec extends MessageSpec[Checkpoint] {
   }
 }
 
+object TransactionMessageSpec extends MessageSpec[Transaction] {
+  override val messageCode: MessageCode = 25: Byte
+
+  override val messageName: String = "Transaction message"
+
+  override def deserializeData(bytes: Array[MessageCode]): Try[Transaction] =
+    TransactionParser.parseBytes(bytes)
+
+  override def serializeData(tx: Transaction): Array[MessageCode] = tx.bytes
+}
 
 object BasicMessagesRepo {
   val specs: Seq[MessageSpec[_ <: AnyRef]] = Seq(GetPeersSpec, PeersSpec, GetSignaturesSpec, SignaturesSpec,
-    GetBlockSpec, BlockMessageSpec, ScoreMessageSpec, CheckpointMessageSpec)
+    GetBlockSpec, BlockMessageSpec, ScoreMessageSpec, CheckpointMessageSpec, TransactionMessageSpec)
 }
