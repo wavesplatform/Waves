@@ -53,7 +53,7 @@ class NetworkServer(
       history.lastBlockIds(settings.synchronizationSettings.maxRollback))
 
   private val blockchainReadiness = new AtomicBoolean(false)
-  def setBlockchainExpired(expired: Boolean): Unit = blockchainReadiness.compareAndSet(expired, !expired)
+  def setBlockchainReady(ready: Boolean): Unit = blockchainReadiness.compareAndSet(ready, !ready)
 
   private val discardingHandler = new DiscardingHandler(blockchainReadiness.get())
   private val specs: Map[Byte, MessageSpec[_ <: AnyRef]] = (BasicMessagesRepo.specs ++ TransactionalMessagesRepo.specs).map(s => s.messageCode -> s).toMap
@@ -95,7 +95,7 @@ class NetworkServer(
   private val coordinator = new Coordinator(checkpoints, history, blockchainUpdater, stateReader, utxPool,
     time, settings.blockchainSettings,
     settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed, settings.checkpointsSettings.publicKey,
-    miner, setBlockchainExpired)
+    miner, setBlockchainReady)
 
   private val coordinatorHandler = new CoordinatorHandler(coordinator, peerDatabase, allChannels)
 
