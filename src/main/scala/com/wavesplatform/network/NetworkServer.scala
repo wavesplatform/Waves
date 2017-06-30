@@ -6,9 +6,7 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
 import java.util.stream.Collectors
 
-import com.wavesplatform.mining.Miner
 import com.wavesplatform.settings._
-import com.wavesplatform.state2.reader.StateReader
 import com.wavesplatform.{Coordinator, UtxPool, Version}
 import io.netty.bootstrap.{Bootstrap, ServerBootstrap}
 import io.netty.channel._
@@ -20,8 +18,7 @@ import io.netty.channel.socket.nio.{NioServerSocketChannel, NioSocketChannel}
 import io.netty.handler.codec.{LengthFieldBasedFrameDecoder, LengthFieldPrepender}
 import scorex.network.message.{BasicMessagesRepo, MessageSpec}
 import scorex.transaction._
-import scorex.utils.{ScorexLogging, Time}
-import scorex.wallet.Wallet
+import scorex.utils.ScorexLogging
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
@@ -32,15 +29,12 @@ class NetworkServer(
     declaredAddress: Option[InetSocketAddress],
     settings: WavesSettings,
     history: History,
-    checkpoints: CheckpointService,
-    blockchainUpdater: BlockchainUpdater,
-    time: Time,
-    stateReader: StateReader,
+    coordinator: Coordinator,
     utxPool: UtxPool,
     peerDatabase: PeerDatabase,
-    wallet: Wallet,
     allChannels: ChannelGroup,
-    peerInfo: ConcurrentHashMap[Channel, PeerInfo]) extends ScorexLogging {
+    peerInfo: ConcurrentHashMap[Channel, PeerInfo],
+    blockchainReadiness: AtomicBoolean) extends ScorexLogging {
 
   private val bossGroup = new NioEventLoopGroup()
   private val workerGroup = new NioEventLoopGroup()
@@ -51,9 +45,6 @@ class NetworkServer(
   private val scoreObserver = new RemoteScoreObserver(
       settings.synchronizationSettings.scoreTTL,
       history.lastBlockIds(settings.synchronizationSettings.maxRollback))
-
-  private val blockchainReadiness = new AtomicBoolean(false)
-  def setBlockchainReady(ready: Boolean): Unit = blockchainReadiness.compareAndSet(ready, !ready)
 
   private val discardingHandler = new DiscardingHandler(blockchainReadiness.get())
   private val specs: Map[Byte, MessageSpec[_ <: AnyRef]] = (BasicMessagesRepo.specs ++ TransactionalMessagesRepo.specs).map(s => s.messageCode -> s).toMap
@@ -78,10 +69,6 @@ class NetworkServer(
 
   private val lengthFieldPrepender = new LengthFieldPrepender(4)
 
-  private val miner = new Miner(history, stateReader, utxPool, wallet,
-    settings.blockchainSettings, settings.minerSettings, time, allChannels,
-    b => writeToLocalChannel(BlockForged(b)))
-
   private val peerSynchronizer = new PeerSynchronizer(peerDatabase)
   private val utxPoolSynchronizer = new UtxPoolSynchronizer(utxPool, allChannels)
   private val errorHandler = new ErrorHandler(peerDatabase)
@@ -92,11 +79,6 @@ class NetworkServer(
     settings.networkSettings.maxConnectionsPerHost)
 
   private val coordinatorExecutor = new DefaultEventLoop
-  private val coordinator = new Coordinator(checkpoints, history, blockchainUpdater, stateReader, utxPool,
-    time, settings.blockchainSettings,
-    settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed, settings.checkpointsSettings.publicKey,
-    miner, setBlockchainReady)
-
   private val coordinatorHandler = new CoordinatorHandler(coordinator, peerDatabase, allChannels)
 
   private val address = new LocalAddress("local-events-channel")
@@ -193,9 +175,6 @@ class NetworkServer(
         .foreach(connect)
     }
   }
-
-  // once the server has been initialized, "start" miner
-  miner.lastBlockChanged(history.height(), history.lastBlock)
 
   def connect(remoteAddress: InetSocketAddress): Unit =
     outgoingChannels.computeIfAbsent(remoteAddress, _ => {

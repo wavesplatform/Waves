@@ -1,6 +1,7 @@
 package com.wavesplatform
 
 import java.time.Duration
+import java.util.concurrent.atomic.AtomicBoolean
 
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.network.{BlockCheckpoint, Checkpoint}
@@ -28,12 +29,14 @@ class Coordinator(
                      maxBlockchainAge: Duration,
                      checkpointPublicKey: ByteStr,
                      miner: Miner,
-                     setBlockchainReady: Boolean => Unit) extends ScorexLogging {
+                     blockchainReadiness: AtomicBoolean) extends ScorexLogging {
 
   import Coordinator._
 
+  private def setBlockchainExpired(expired: Boolean): Unit = blockchainReadiness.compareAndSet(expired, !expired)
+
   private def updateBlockchainReadinessFlag(): Unit =
-    setBlockchainReady(time.correctedTime() - history.lastBlock.timestamp < maxBlockchainAge.toMillis)
+    setBlockchainExpired(time.correctedTime() - history.lastBlock.timestamp < maxBlockchainAge.toMillis)
 
   private def appendBlock(block: Block): Either[ValidationError, Unit] = for {
     _ <- Either.cond(checkpoint.isBlockValid(block, history.height() + 1), (),
@@ -71,29 +74,12 @@ class Coordinator(
     }
   }
 
-  def processLocalBlock(newBlock: Block): Either[ValidationError, BigInt] = {
-    log.debug(s"Processing new local block ${newBlock.uniqueId} (history last block: ${history.lastBlock.uniqueId})")
-    val result = processBlock(newBlock)
-    // even if newly generated local block could not have been appended, miner will
-    // schedule next generation attempt.
-
-    result.left.foreach(_ => miner.lastBlockChanged(history.height(), history.lastBlock))
-    result
-  }
-
-  def processBlock(newBlock: Block): Either[ValidationError, BigInt] = {
-    val blockCanBeAdded = if (newBlock.reference != history.lastBlock.uniqueId) {
-      Left(GenericError(s"Parent ${newBlock.reference} does not match local block ${history.lastBlock.uniqueId}"))
-    } else if (history.contains(newBlock)) {
-      Left(GenericError(s"Block ${newBlock.uniqueId} is already in blockchain"))
-    } else Right(newBlock)
-
+  def processBlock(newBlock: Block, local: Boolean): Either[ValidationError, BigInt] = {
     val newScore = for {
-      b <- blockCanBeAdded
-      _ <- appendBlock(b)
+      _ <- appendBlock(newBlock)
     } yield history.score()
 
-    newScore.foreach { _ =>
+    if (local || newScore.isRight) {
       updateBlockchainReadinessFlag()
       miner.lastBlockChanged(history.height(), newBlock)
     }

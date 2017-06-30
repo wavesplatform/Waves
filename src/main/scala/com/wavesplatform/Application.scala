@@ -3,6 +3,7 @@ package com.wavesplatform
 import java.io.File
 import java.security.Security
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicBoolean
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
@@ -15,6 +16,7 @@ import com.wavesplatform.actor.RootActorSystem
 import com.wavesplatform.history.{BlockStorageImpl, CheckpointServiceImpl}
 import com.wavesplatform.http.NodeApiRoute
 import com.wavesplatform.matcher.Matcher
+import com.wavesplatform.mining.Miner
 import com.wavesplatform.network.{NetworkServer, PeerDatabaseImpl, PeerInfo, UPnP}
 import com.wavesplatform.settings._
 import io.netty.channel.Channel
@@ -65,21 +67,33 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
     val utxStorage = new UtxPool(allChannels,
       time, stateReader, feeCalculator, settings.blockchainSettings.functionalitySettings, settings.utxSettings)
 
+    val blockchainReadiness = new AtomicBoolean(false)
+
+    lazy val miner = new Miner(history, stateReader, utxStorage, wallet,
+    settings.blockchainSettings, settings.minerSettings, time, allChannels, ???)
+//    b => writeToLocalChannel(BlockForged(b)))
+
+    val coordinator: Coordinator = new Coordinator(checkpoints, history, blockchainUpdater, stateReader, utxStorage,
+      time, settings.blockchainSettings,
+      settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed, settings.checkpointsSettings.publicKey,
+      miner, blockchainReadiness)
+
+
+
     val network = new NetworkServer(
       settings.blockchainSettings.addressSchemeCharacter,
       settings.networkSettings.bindAddress,
       settings.networkSettings.declaredAddress,
       settings,
       history,
-      checkpoints,
-      blockchainUpdater,
-      time,
-      stateReader,
+      coordinator,
       utxStorage,
       peerDatabase,
-      wallet,
       allChannels,
-      establishedConnections)
+      establishedConnections,
+      blockchainReadiness)
+
+    miner.lastBlockChanged(history.height(), history.lastBlock)
 
     val apiRoutes = Seq(
       BlocksApiRoute(settings.restAPISettings, settings.checkpointsSettings, history, network.localClientChannel),
