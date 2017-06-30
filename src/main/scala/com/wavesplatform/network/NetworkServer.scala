@@ -22,14 +22,17 @@ import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 
 class NetworkServer(
-    settings: WavesSettings,
-    history: History,
-    coordinator: Coordinator,
-    utxPool: UtxPool,
-    peerDatabase: PeerDatabase,
-    allChannels: ChannelGroup,
-    peerInfo: ConcurrentHashMap[Channel, PeerInfo],
-    blockchainReadiness: AtomicBoolean) extends ScorexLogging {
+                       settings: WavesSettings,
+                       history: History,
+                       coordinator: Coordinator,
+                       utxPool: UtxPool,
+                       peerDatabase: PeerDatabase,
+                       allChannels: ChannelGroup,
+                       peerInfo: ConcurrentHashMap[Channel, PeerInfo],
+                       blockchainReadiness: AtomicBoolean,
+                       address: LocalAddress,
+                       localClientChannel: Channel
+                   ) extends ScorexLogging {
 
   private val bossGroup = new NioEventLoopGroup()
   private val workerGroup = new NioEventLoopGroup()
@@ -38,8 +41,8 @@ class NetworkServer(
       settings.networkSettings.nodeName, settings.networkSettings.nonce, settings.networkSettings.declaredAddress)
 
   private val scoreObserver = new RemoteScoreObserver(
-      settings.synchronizationSettings.scoreTTL,
-      history.lastBlockIds(settings.synchronizationSettings.maxRollback))
+    settings.synchronizationSettings.scoreTTL,
+    history.lastBlockIds(settings.synchronizationSettings.maxRollback))
 
   private val discardingHandler = new DiscardingHandler(blockchainReadiness.get())
   private val specs: Map[Byte, MessageSpec[_ <: AnyRef]] = BasicMessagesRepo.specs.map(s => s.messageCode -> s).toMap
@@ -70,7 +73,6 @@ class NetworkServer(
   private val coordinatorExecutor = new DefaultEventLoop
   private val coordinatorHandler = new CoordinatorHandler(coordinator, peerDatabase, allChannels)
 
-  private val address = new LocalAddress("local-events-channel")
   private val localServerGroup = new DefaultEventLoopGroup()
   private val localServer = new ServerBootstrap()
     .group(localServerGroup)
@@ -81,14 +83,6 @@ class NetworkServer(
     ))
 
   localServer.bind(address).sync()
-
-  private val localClientGroup = new DefaultEventLoopGroup()
-  val localClientChannel = new Bootstrap()
-    .group(localClientGroup)
-    .channel(classOf[LocalChannel])
-    .handler(new PipelineInitializer[LocalChannel](Seq.empty))
-    .connect(address)
-    .channel()
 
   log.info(s"${id(localClientChannel)} Local channel opened")
 
@@ -190,7 +184,6 @@ class NetworkServer(
         }.channel()
     })
 
-  def writeToLocalChannel(message: AnyRef): Unit = localClientChannel.writeAndFlush(message)
 
   def shutdown(): Unit = try {
     connectTask.cancel(false)
@@ -202,7 +195,6 @@ class NetworkServer(
   } finally {
     workerGroup.shutdownGracefully().await()
     bossGroup.shutdownGracefully().await()
-    localClientGroup.shutdownGracefully().await()
     localServerGroup.shutdownGracefully().await()
     coordinatorExecutor.shutdownGracefully().await()
   }

@@ -33,10 +33,10 @@ class Coordinator(
 
   import Coordinator._
 
-  private def setBlockchainExpired(expired: Boolean): Unit = blockchainReadiness.compareAndSet(expired, !expired)
-
-  private def updateBlockchainReadinessFlag(): Unit =
-    setBlockchainExpired(time.correctedTime() - history.lastBlock.timestamp < maxBlockchainAge.toMillis)
+  private def updateBlockchainReadinessFlag(): Unit = {
+    val expired = time.correctedTime() - history.lastBlock.timestamp < maxBlockchainAge.toMillis
+    blockchainReadiness.compareAndSet(expired, !expired)
+  }
 
   private def appendBlock(block: Block): Either[ValidationError, Unit] = for {
     _ <- Either.cond(checkpoint.isBlockValid(block, history.height() + 1), (),
