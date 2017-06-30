@@ -13,13 +13,15 @@ import scala.concurrent.duration.FiniteDuration
 
 
 @Sharable
-class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteStr])
+class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteStr], initialLocalScore: BigInt)
   extends ChannelDuplexHandler with ScorexLogging {
 
   private val pinnedChannel = new AtomicReference[Channel]()
 
   @volatile
-  private var localScore = BigInt(0)
+  private var localScore = initialLocalScore
+  log.debug(s"Initialized with local score $localScore")
+
   private val scores = new ConcurrentHashMap[Channel, BigInt]
 
   private def channelWithHighestScore =
@@ -43,8 +45,7 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
 
   override def write(ctx: ChannelHandlerContext, msg: AnyRef, promise: ChannelPromise) = msg match {
     case LocalScoreChanged(newLocalScore) =>
-      val pinned = Option(pinnedChannel.get()).fold("[NONE]"){id}
-      log.debug(s"Pinned: $pinned <- ${id(ctx)}; New local score: $newLocalScore")
+      log.debug(s"Pinned: $pinnedChannelId <- ${id(ctx)}; New local score: $newLocalScore")
       // unconditionally update local score value and propagate this message downstream
       localScore = newLocalScore
       ctx.write(msg, promise)
@@ -60,8 +61,7 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef) = msg match {
     case newScore: History.BlockchainScore =>
-      val pinned = Option(pinnedChannel.get()).fold("[NONE]"){id}
-      log.debug(s"Pinned: $pinned <- ${id(ctx)}; New score: $newScore")
+      log.debug(s"Pinned: $pinnedChannelId <- ${id(ctx)}; New score: $newScore")
       ctx.executor().schedule(scoreTtl) {
         if (scores.remove(ctx.channel(), newScore)) {
           log.debug(s"${id(ctx)} Score expired, removing $newScore")
@@ -75,19 +75,22 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
         if ch == ctx.channel() && // this is the channel with highest score
           (previousScore == null || previousScore < newScore) && // score has increased
           highScore > localScore && // remote score is higher than local
-          pinnedChannel.compareAndSet(null, ch)
+          pinnedChannel.compareAndSet(null, ch) // and we've finished to download blocks from previous high score channel
       } {
         log.debug(s"${id(ctx)} New high score $highScore > $localScore, requesting extension")
         ctx.writeAndFlush(LoadBlockchainExtension(lastSignatures))
       }
 
     case _: ExtensionBlocks if pinnedChannel.compareAndSet(ctx.channel(), null) =>
+      log.debug(s"Pinned: $pinnedChannelId <- ${id(ctx)}: Receiving extension blocks")
       super.channelRead(ctx, msg)
 
     case ExtensionBlocks(blocks) =>
-      log.debug(s"${id(ctx)} Unexpected extension blocks: ${blocks.head.uniqueId} .. ${blocks.last.uniqueId}")
+      log.debug(s"${id(ctx)} Unexpected extension blocks: ${blocks.head.uniqueId} .. ${blocks.last.uniqueId} (Pinned: $pinnedChannelId)")
       super.channelRead(ctx, msg)
 
     case _ => super.channelRead(ctx, msg)
   }
+
+  private def pinnedChannelId = Option(pinnedChannel.get()).fold("[NONE]"){id}
 }

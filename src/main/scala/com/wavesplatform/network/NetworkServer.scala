@@ -49,7 +49,7 @@ class NetworkServer(
 
   private val scoreObserver = new RemoteScoreObserver(
       settings.synchronizationSettings.scoreTTL,
-      history.lastBlockIds(settings.synchronizationSettings.maxRollback))
+      history.lastBlockIds(settings.synchronizationSettings.maxRollback), history.score())
 
   private val blockchainReadiness = new AtomicBoolean(false)
   def setBlockchainExpired(expired: Boolean): Unit = blockchainReadiness.compareAndSet(expired, !expired)

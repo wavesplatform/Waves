@@ -132,7 +132,7 @@ class Coordinator(
   }
 
   def processCheckpoint(newCheckpoint: Checkpoint): Either[ValidationError, BigInt] =
-    if (checkpoint.get.forall(_.signature sameElements newCheckpoint.signature)) {
+    if (!checkpoint.get.forall(_.signature sameElements newCheckpoint.signature)) {
       if (EllipticCurveImpl.verify(newCheckpoint.signature, newCheckpoint.toSign, checkpointPublicKey.arr)) {
         checkpoint.set(Some(newCheckpoint))
         makeBlockchainCompliantWith(newCheckpoint)
