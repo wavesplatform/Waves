@@ -28,12 +28,12 @@ class Coordinator(
                      maxBlockchainAge: Duration,
                      checkpointPublicKey: ByteStr,
                      miner: Miner,
-                     blockchainExpiryListener: Boolean => Unit) extends ScorexLogging {
+                     setBlockchainReady: Boolean => Unit) extends ScorexLogging {
 
   import Coordinator._
 
-  private def checkExpiry(): Unit =
-    blockchainExpiryListener(time.correctedTime() - history.lastBlock.timestamp < maxBlockchainAge.toMillis)
+  private def updateBlockchainReadinessFlag(): Unit =
+    setBlockchainReady(time.correctedTime() - history.lastBlock.timestamp < maxBlockchainAge.toMillis)
 
   private def isValidWithRespectToCheckpoint(candidate: Block, estimatedHeight: Int): Boolean =
     !checkpoint.get.exists {
@@ -90,7 +90,7 @@ class Coordinator(
 
       result.foreach { _ =>
         miner.lastBlockChanged(history.height(), history.lastBlock)
-        checkExpiry()
+        updateBlockchainReadinessFlag()
       }
 
       result
@@ -122,7 +122,7 @@ class Coordinator(
     } yield history.score()
 
     newScore.foreach { _ =>
-      checkExpiry()
+      updateBlockchainReadinessFlag()
       miner.lastBlockChanged(history.height(), newBlock)
     }
     newScore
