@@ -11,7 +11,7 @@ import scorex.block.Block
 import scorex.block.Block.BlockId
 import scorex.consensus.TransactionsOrdering
 import scorex.crypto.EllipticCurveImpl
-import scorex.transaction.ValidationError.{GenericError, InvalidSignature}
+import scorex.transaction.ValidationError.{GenericError}
 import scorex.transaction._
 import scorex.utils.{ScorexLogging, Time}
 
@@ -35,46 +35,18 @@ class Coordinator(
   private def updateBlockchainReadinessFlag(): Unit =
     setBlockchainReady(time.correctedTime() - history.lastBlock.timestamp < maxBlockchainAge.toMillis)
 
-  private def isValidWithRespectToCheckpoint(candidate: Block, estimatedHeight: Int): Boolean =
-    !checkpoint.get.exists {
-      case Checkpoint(items, _) =>
-        val blockSignature = candidate.signerData.signature
-        items.exists { case BlockCheckpoint(h, sig) =>
-          h == estimatedHeight && blockSignature != ByteStr(sig)
-        }
-    }
-
-  private def validateWithRespectToCheckpoint(candidate: Block, estimatedHeight: Int): Either[ValidationError, Unit] = {
-    if (isValidWithRespectToCheckpoint(candidate, estimatedHeight))
-      Right(())
-    else
-      Left(GenericError(s"Block ${candidate.uniqueId} [h = $estimatedHeight] is not valid with respect to checkpoint"))
-  }
-
-  private def isBlockValid(b: Block): Either[ValidationError, Unit] = {
-    if (history.contains(b)) Right(())
-    else {
-      def historyContainsParent = history.contains(b.reference)
-
-      def consensusDataIsValid = blockConsensusValidation(history, stateReader, settings, time.correctedTime())(b)
-
-      if (!historyContainsParent) Left(BlockAppendError("no parent block in history", b))
-      else if (!b.signatureValid) Left(InvalidSignature(b, None))
-      else if (!consensusDataIsValid) Left(BlockAppendError("consensus data is not valid", b))
-      else Right(())
-    }
-  }
-
   private def appendBlock(block: Block): Either[ValidationError, Unit] = for {
-    _ <- validateWithRespectToCheckpoint(block, history.height() + 1)
-    _ <- isBlockValid(block)
+    _ <- Either.cond(checkpoint.isBlockValid(block, history.height() + 1), (),
+      BlockAppendError(s"[h = ${history.height() + 1}] is not valid with respect to checkpoint", block))
+    _ <- Either.cond(blockConsensusValidation(history, stateReader, settings, time.correctedTime())(block), (),
+      BlockAppendError("consensus data is not valid", block))
     _ <- blockchainUpdater.processBlock(block)
   } yield block.transactionData.foreach(utxStorage.remove)
 
   def processFork(lastCommonBlockId: BlockId, newBlocks: Seq[Block]): Either[ValidationError, BigInt] = {
 
     def isForkValidWithCheckpoint(lastCommonHeight: Int): Boolean = {
-      newBlocks.zipWithIndex.forall(p => isValidWithRespectToCheckpoint(p._1, lastCommonHeight + 1 + p._2))
+      newBlocks.zipWithIndex.forall(p => checkpoint.isBlockValid(p._1, lastCommonHeight + 1 + p._2))
     }
 
     if (history.heightOf(lastCommonBlockId).exists(isForkValidWithCheckpoint)) {
@@ -141,12 +113,7 @@ class Coordinator(
       Left(GenericError("Checkpoint already applied"))
     }
 
-  def processRollback(blockId: ByteStr): Either[ValidationError, BigInt] = {
-    if (blockchainUpdater.removeAfter(blockId))
-      Right(history.score())
-    else
-      Left(GenericError(s"Failed to rollback to non existing block $blockId"))
-  }
+  def processRollback(blockId: ByteStr): Either[ValidationError, BigInt] = blockchainUpdater.removeAfter(blockId)
 
   private def makeBlockchainCompliantWith(checkpoint: Checkpoint): Unit = {
     val existingItems = checkpoint.items.filter {

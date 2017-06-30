@@ -9,6 +9,6 @@ trait BlockchainUpdater extends Synchronized {
 
   def processMicroBlock(microBlock: MicroBlock): Either[ValidationError, Unit]
 
-  def removeAfter(blockId: ByteStr): Boolean
+  def removeAfter(blockId: ByteStr): Either[ValidationError, BigInt]
 }
 
