@@ -12,6 +12,7 @@ import com.wavesplatform.state2.reader.CompositeStateReader.proxy
 import com.wavesplatform.state2.reader.StateReader
 import scorex.block.Block.BlockId
 import scorex.block.{Block, MicroBlock}
+import scorex.transaction.ValidationError.GenericError
 import scorex.transaction._
 import scorex.utils.ScorexLogging
 
@@ -88,7 +89,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
     }
   }
 
-  override def removeAfter(blockId: ByteStr): Boolean = write { implicit l =>
+  override def removeAfter(blockId: ByteStr): Either[ValidationError, BigInt] = write { implicit l =>
     ngHistoryWriter.heightOf(blockId) match {
       case Some(height) =>
         logHeights(s"Rollback to height $height started:")
@@ -105,10 +106,10 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
           }
         }
         logHeights(s"Rollback to height $height completed:")
-        true
+        Right(ngHistoryWriter.score())
       case None =>
         log.warn(s"removeAfter non-existing block $blockId")
-        false
+        Left(GenericError(s"Failed to rollback to non existing block $blockId"))
     }
   }
 

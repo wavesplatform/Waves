@@ -1,6 +1,6 @@
 package scorex.transaction
 
-import com.wavesplatform.network.Checkpoint
+import com.wavesplatform.network.{BlockCheckpoint, Checkpoint}
 import com.wavesplatform.state2.{BlockDiff, ByteStr}
 import scorex.block.Block
 import scorex.transaction.History.BlockchainScore
@@ -33,6 +33,21 @@ trait CheckpointService {
   def set(checkpoint: Option[Checkpoint])
 
   def get: Option[Checkpoint]
+}
+
+object CheckpointService {
+
+  implicit class CheckpointServiceExt(cs: CheckpointService) {
+    def isBlockValid(candidate: Block, estimatedHeight: Int): Boolean =
+      !cs.get.exists {
+        case Checkpoint(items, _) =>
+          val blockSignature = candidate.signerData.signature
+          items.exists { case BlockCheckpoint(h, sig) =>
+            h == estimatedHeight && blockSignature != ByteStr(sig)
+          }
+      }
+  }
+
 }
 
 object History {
