@@ -17,12 +17,11 @@ import com.wavesplatform.history.{BlockStorageImpl, CheckpointServiceImpl}
 import com.wavesplatform.http.NodeApiRoute
 import com.wavesplatform.matcher.Matcher
 import com.wavesplatform.mining.Miner
-import com.wavesplatform.network.{BlockForged, NetworkServer, PeerDatabaseImpl, PeerInfo, PipelineInitializer, UPnP}
+import com.wavesplatform.network.CoordinatorHandler.loggingResult
+import com.wavesplatform.network.{BlockForged, LocalScoreChanged, NetworkServer, PeerDatabaseImpl, PeerInfo, UPnP, _}
 import com.wavesplatform.settings._
-import io.netty.bootstrap.Bootstrap
+import io.netty.channel.Channel
 import io.netty.channel.group.DefaultChannelGroup
-import io.netty.channel.local.{LocalAddress, LocalChannel}
-import io.netty.channel.{Channel, DefaultEventLoopGroup}
 import io.netty.util.concurrent.GlobalEventExecutor
 import scorex.account.{Account, AddressScheme}
 import scorex.api.http._
@@ -71,23 +70,20 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
 
     val blockchainReadiness = new AtomicBoolean(false)
 
-    val address: LocalAddress = new LocalAddress("local-events-channel")
-    val localClientGroup = new DefaultEventLoopGroup()
-    val localClientChannel = new Bootstrap()
-      .group(localClientGroup)
-      .channel(classOf[LocalChannel])
-      .handler(new PipelineInitializer[LocalChannel](Seq.empty))
-      .connect(address)
-      .channel()
-
-    val miner = new Miner(history, stateReader, utxStorage, wallet,
-      settings.blockchainSettings, settings.minerSettings, time, allChannels,
-      b => localClientChannel.writeAndFlush(BlockForged(b)))
-
-    val coordinator = new Coordinator(checkpoints, history, blockchainUpdater, stateReader, utxStorage,
+    lazy val coordinator = new Coordinator(checkpoints, history, blockchainUpdater, stateReader, utxStorage,
       time, settings.blockchainSettings,
       settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed, settings.checkpointsSettings.publicKey,
       miner, blockchainReadiness)
+
+    lazy val miner : Miner = new Miner(history, stateReader, utxStorage, wallet,
+      settings.blockchainSettings, settings.minerSettings, time, allChannels,
+      b => {
+        loggingResult("local", s"applying locally mined block (${b.uniqueId})", coordinator.processBlock(b, local = true))
+          .foreach { score =>
+            allChannels.broadcast(LocalScoreChanged(score))
+            allChannels.broadcast(BlockForged(b))
+          }
+      })
 
     val network = new NetworkServer(
       settings,
@@ -97,14 +93,12 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
       peerDatabase,
       allChannels,
       establishedConnections,
-      blockchainReadiness,
-      address,
-      localClientChannel)
+      blockchainReadiness)
 
     miner.lastBlockChanged(history.height(), history.lastBlock)
 
     val apiRoutes = Seq(
-      BlocksApiRoute(settings.restAPISettings, settings.checkpointsSettings, history, localClientChannel),
+      BlocksApiRoute(settings.restAPISettings, settings.checkpointsSettings, history, coordinator, allChannels),
       TransactionsApiRoute(settings.restAPISettings, stateReader, history, utxStorage),
       NxtConsensusApiRoute(settings.restAPISettings, stateReader, history, settings.blockchainSettings.functionalitySettings),
       WalletApiRoute(settings.restAPISettings, wallet),
@@ -113,7 +107,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
       PeersApiRoute(settings.restAPISettings, network.connect, peerDatabase, establishedConnections),
       AddressApiRoute(settings.restAPISettings, wallet, stateReader, settings.blockchainSettings.functionalitySettings),
       DebugApiRoute(settings.restAPISettings, wallet, stateReader, history, peerDatabase, establishedConnections,
-        localClientChannel),
+        coordinator, allChannels),
       WavesApiRoute(settings.restAPISettings, wallet, utxStorage, time),
       AssetsApiRoute(settings.restAPISettings, wallet, utxStorage, stateReader, time),
       NodeApiRoute(settings.restAPISettings, () => this.shutdown()),
@@ -162,7 +156,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
     //on unexpected shutdown
     sys.addShutdownHook {
       network.shutdown()
-      localClientGroup.shutdownGracefully().await()
       shutdown()
     }
 

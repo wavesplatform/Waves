@@ -1,5 +1,6 @@
 package com.wavesplatform.http
 
+import akka.http.scaladsl.server.Route
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.BlockGen
 import com.wavesplatform.http.ApiMarshallers._
@@ -24,7 +25,7 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with MockFactory with BlockGe
   private val restSettings = RestAPISettings.fromConfig(config)
   private val checkpointSettings = CheckpointsSettings.fromConfig(config)
   private val history = mock[History]
-  private val route = BlocksApiRoute(restSettings, checkpointSettings, history, mockWriteToChannel).route
+  private val route : Route  = ??? // BlocksApiRoute(restSettings, checkpointSettings, history, mockWriteToChannel).route
 
   private implicit def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)
 

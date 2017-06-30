@@ -4,21 +4,23 @@ import javax.ws.rs.Path
 
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server.Route
-import com.wavesplatform.network.{Checkpoint, OffChainCheckpoint}
+import com.wavesplatform.Coordinator
+import com.wavesplatform.network.{Checkpoint, LocalScoreChanged, _}
 import com.wavesplatform.settings.{CheckpointsSettings, RestAPISettings}
 import com.wavesplatform.state2.ByteStr
-import io.netty.channel.Channel
+import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
 import play.api.libs.json._
 import scorex.crypto.EllipticCurveImpl
-import scorex.transaction.{History, TransactionParser, ValidationError}
+import scorex.transaction.{History, TransactionParser}
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Promise
+import scala.concurrent.Future
 
 @Path("/blocks")
 @Api(value = "/blocks")
-case class BlocksApiRoute(settings: RestAPISettings, checkpointsSettings: CheckpointsSettings, history: History, localChannel: Channel) extends ApiRoute {
+case class BlocksApiRoute(settings: RestAPISettings, checkpointsSettings: CheckpointsSettings,
+                          history: History, coordinator: Coordinator, allChannels: ChannelGroup) extends ApiRoute {
 
   // todo: make this configurable and fix integration tests
   val MaxBlocksPerRequest = 100
@@ -173,10 +175,11 @@ case class BlocksApiRoute(settings: RestAPISettings, checkpointsSettings: Checkp
 
     (path("checkpoint") & post) {
       json[Checkpoint] { checkpoint =>
-        val p = Promise[Either[ValidationError, Checkpoint]]
-        localChannel.writeAndFlush(OffChainCheckpoint(checkpoint, p))
-
-        p.future.map(_.fold(ApiError.fromValidationError, _ => Json.obj("" -> "")): ToResponseMarshallable)
+        Future {
+          coordinator.processCheckpoint(checkpoint)
+            .map(score => allChannels.broadcast(LocalScoreChanged(score)))
+        }.map(_.fold(ApiError.fromValidationError,
+          _ => Json.obj("" -> "")): ToResponseMarshallable)
       }
     }
   }

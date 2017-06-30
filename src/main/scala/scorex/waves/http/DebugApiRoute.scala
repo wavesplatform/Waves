@@ -7,21 +7,23 @@ import javax.ws.rs.Path
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
-import com.wavesplatform.network.{OffChainRollback, PeerDatabase, PeerInfo}
+import com.wavesplatform.Coordinator
+import com.wavesplatform.network.{LocalScoreChanged, PeerDatabase, PeerInfo, _}
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state2.ByteStr
 import com.wavesplatform.state2.reader.StateReader
 import io.netty.channel.Channel
+import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
 import play.api.libs.json.{JsArray, Json}
 import scorex.api.http._
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash
-import scorex.transaction.{History, ValidationError}
+import scorex.transaction.History
 import scorex.wallet.Wallet
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.{Future, Promise}
+import scala.concurrent.Future
 import scala.util.Success
 import scala.util.control.NonFatal
 
@@ -29,13 +31,13 @@ import scala.util.control.NonFatal
 @Path("/debug")
 @Api(value = "/debug")
 case class DebugApiRoute(
-                          settings: RestAPISettings,
-                          wallet: Wallet,
-                          stateReader: StateReader,
-                          history: History,
-                          peerDatabase: PeerDatabase,
-                          establishedConnections: ConcurrentMap[Channel, PeerInfo],
-                          localChannel: Channel) extends ApiRoute {
+                            settings: RestAPISettings,
+                            wallet: Wallet,
+                            stateReader: StateReader,
+                            history: History,
+                            peerDatabase: PeerDatabase,
+                            establishedConnections: ConcurrentMap[Channel, PeerInfo],
+                            coordinator: Coordinator, allChannels: ChannelGroup) extends ApiRoute {
 
   override lazy val route = pathPrefix("debug") {
     blocks ~ state ~ info ~ stateWaves ~ rollback ~ rollbackTo ~ blacklist
@@ -85,13 +87,12 @@ case class DebugApiRoute(
     complete(result)
   }
 
-  private def rollbackToBlock(blockId: ByteStr): Future[ToResponseMarshallable] = {
-    val p = Promise[Either[ValidationError, ByteStr]]
-    localChannel.writeAndFlush(OffChainRollback(blockId, p))
+  private def rollbackToBlock(blockId: ByteStr): Future[ToResponseMarshallable] = Future {
+    coordinator.processRollback(blockId)
+      .map(score => allChannels.broadcast(LocalScoreChanged(score)))
+  }.map(_.fold(ApiError.fromValidationError,
+    blockId => Json.obj("BlockId" -> blockId.toString)): ToResponseMarshallable)
 
-    p.future.map(_.fold(ApiError.fromValidationError, blockId => Json.obj("BlockId" -> blockId.toString)): ToResponseMarshallable)
-
-  }
 
   @Path("/rollback")
   @ApiOperation(value = "Rollback to height", notes = "Removes all blocks after given height", httpMethod = "POST")

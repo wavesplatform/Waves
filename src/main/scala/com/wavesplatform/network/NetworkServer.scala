@@ -9,7 +9,6 @@ import com.wavesplatform.{Coordinator, UtxPool, Version}
 import io.netty.bootstrap.{Bootstrap, ServerBootstrap}
 import io.netty.channel._
 import io.netty.channel.group.ChannelGroup
-import io.netty.channel.local.{LocalAddress, LocalChannel, LocalServerChannel}
 import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.channel.socket.SocketChannel
 import io.netty.channel.socket.nio.{NioServerSocketChannel, NioSocketChannel}
@@ -29,9 +28,7 @@ class NetworkServer(
                        peerDatabase: PeerDatabase,
                        allChannels: ChannelGroup,
                        peerInfo: ConcurrentHashMap[Channel, PeerInfo],
-                       blockchainReadiness: AtomicBoolean,
-                       address: LocalAddress,
-                       localClientChannel: Channel
+                       blockchainReadiness: AtomicBoolean
                    ) extends ScorexLogging {
 
   private val bossGroup = new NioEventLoopGroup()
@@ -62,7 +59,6 @@ class NetworkServer(
   private val lengthFieldPrepender = new LengthFieldPrepender(4)
 
   private val peerSynchronizer = new PeerSynchronizer(peerDatabase)
-  private val utxPoolSynchronizer = new UtxPoolSynchronizer(utxPool, allChannels)
   private val errorHandler = new ErrorHandler(peerDatabase)
   private val historyReplier = new HistoryReplier(history, settings.synchronizationSettings.maxChainLength)
 
@@ -73,18 +69,7 @@ class NetworkServer(
   private val coordinatorExecutor = new DefaultEventLoop
   private val coordinatorHandler = new CoordinatorHandler(coordinator, peerDatabase, allChannels)
 
-  private val localServerGroup = new DefaultEventLoopGroup()
-  private val localServer = new ServerBootstrap()
-    .group(localServerGroup)
-    .channel(classOf[LocalServerChannel])
-    .childHandler(new PipelineInitializer[LocalChannel](Seq(
-      utxPoolSynchronizer, scoreObserver,
-      coordinatorHandler -> coordinatorExecutor)
-    ))
-
-  localServer.bind(address).sync()
-
-  log.info(s"${id(localClientChannel)} Local channel opened")
+//      scoreObserver,
 
   private val peerUniqueness = new ConcurrentHashMap[PeerKey, Channel]()
 
@@ -111,7 +96,6 @@ class NetworkServer(
         new ExtensionSignaturesLoader(settings.synchronizationSettings.synchronizationTimeout, peerDatabase),
         new ExtensionBlocksLoader(history, settings.synchronizationSettings.synchronizationTimeout, peerDatabase),
         new OptimisticExtensionLoader,
-        utxPoolSynchronizer,
         scoreObserver,
         coordinatorHandler -> coordinatorExecutor)))
       .bind(settings.networkSettings.bindAddress)
@@ -146,7 +130,6 @@ class NetworkServer(
       new ExtensionSignaturesLoader(settings.synchronizationSettings.synchronizationTimeout, peerDatabase),
       new ExtensionBlocksLoader(history, settings.synchronizationSettings.synchronizationTimeout, peerDatabase),
       new OptimisticExtensionLoader,
-      utxPoolSynchronizer,
       scoreObserver,
       coordinatorHandler -> coordinatorExecutor)))
 
@@ -190,12 +173,10 @@ class NetworkServer(
     serverChannel.foreach(_.close().await())
     log.debug("Unbound server")
     allChannels.close().await()
-    localClientChannel.close().sync()
     log.debug("Closed all channels")
   } finally {
     workerGroup.shutdownGracefully().await()
     bossGroup.shutdownGracefully().await()
-    localServerGroup.shutdownGracefully().await()
     coordinatorExecutor.shutdownGracefully().await()
   }
 }

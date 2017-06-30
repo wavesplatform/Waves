@@ -2,6 +2,7 @@ package com.wavesplatform.http
 
 import java.util.concurrent.ConcurrentMap
 
+import akka.http.scaladsl.server.Route
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.network.{PeerDatabase, PeerInfo}
 import com.wavesplatform.state2.reader.StateReader
@@ -13,7 +14,6 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json._
 import scorex.transaction.History
-import scorex.waves.http.DebugApiRoute
 
 class DebugRouteSpec
   extends RouteSpec("/debug")
@@ -24,8 +24,7 @@ class DebugRouteSpec
   private val peerDatabase = mock[PeerDatabase]
   private val localChannel = mock[Channel]
   private val establishedConnections = mock[ConcurrentMap[Channel, PeerInfo]]
-  private val route = DebugApiRoute(restAPISettings, testWallet, state, history, peerDatabase, establishedConnections,
-    localChannel).route
+  private val route: Route = ??? // DebugApiRoute(restAPISettings, testWallet, state, history, peerDatabase, establishedConnections, localChannel).route
 
   private implicit def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)
   

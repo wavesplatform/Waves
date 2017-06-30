@@ -16,54 +16,33 @@ class CoordinatorHandler(coordinator: Coordinator, peerDatabase: PeerDatabase, a
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef) = msg match {
     case c: Checkpoint =>
-      loggingResult(ctx, "applying checkpoint", coordinator.processCheckpoint(c)).fold(
+      loggingResult(id(ctx), "applying checkpoint", coordinator.processCheckpoint(c)).fold(
         _ => peerDatabase.blacklistAndClose(ctx.channel()),
         score => allChannels.broadcast(LocalScoreChanged(score), Some(ctx.channel()))
       )
     case ExtensionBlocks(blocks) =>
-      loggingResult(ctx, "processing fork", coordinator.processFork(blocks.head.reference, blocks))
+      loggingResult(id(ctx), "processing fork", coordinator.processFork(blocks.head.reference, blocks))
         .fold(
           _ => peerDatabase.blacklistAndClose(ctx.channel()),
           score => allChannels.broadcast(LocalScoreChanged(score))
         )
     case b: Block =>
       if (b.signatureValid) {
-        loggingResult(ctx, "applying block", coordinator.processBlock(b, local = false))
+        loggingResult(id(ctx), "applying block", coordinator.processBlock(b, local = false))
           .foreach(score => allChannels.broadcast(LocalScoreChanged(score)))
       } else {
         peerDatabase.blacklistAndClose(ctx.channel())
       }
-    // "off-chain" messages: locally forged block and checkpoints from API
-    case bf@BlockForged(b) =>
-      loggingResult(ctx, s"applying locally mined block (${b.uniqueId})", coordinator.processBlock(b, local = true))
-        .foreach { score =>
-          allChannels.broadcast(LocalScoreChanged(score))
-          allChannels.broadcast(bf)
-        }
-    case OffChainCheckpoint(c, p) =>
-      loggingResult(ctx, "processing checkpoint from API", coordinator.processCheckpoint(c)).fold(
-        e => p.success(Left(e)), { score =>
-          p.success(Right(c))
-          allChannels.broadcast(LocalScoreChanged(score))
-        }
-      )
-    case OffChainRollback(b, p) =>
-      loggingResult(ctx, "processing rollback from API", coordinator.processRollback(b)).fold(
-        e => p.success(Left(e)), { score =>
-          p.success(Right(b))
-          allChannels.broadcast(LocalScoreChanged(score))
-        }
-      )
   }
 }
 
 object CoordinatorHandler extends ScorexLogging {
-  private[CoordinatorHandler] def loggingResult(ctx: ChannelHandlerContext, msg: String, f: => Either[ValidationError, BigInt]) = {
-    log.debug(s"${id(ctx)} Starting $msg")
+  def loggingResult(idCtx: String, msg: String, f: => Either[ValidationError, BigInt]): Either[ValidationError, BigInt] = {
+    log.debug(s"$idCtx Starting $msg")
     val result = f
     result match {
-      case Left(error) => log.warn(s"${id(ctx)} Error $msg: $error")
-      case Right(newScore) => log.debug(s"${id(ctx)} Finished $msg, new local score is $newScore")
+      case Left(error) => log.warn(s"$idCtx Error $msg: $error")
+      case Right(newScore) => log.debug(s"$idCtx Finished $msg, new local score is $newScore")
     }
     result
   }
