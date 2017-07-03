@@ -26,7 +26,10 @@ class NetworkSender(address: InetSocketAddress, chainId: Char, name: String, non
     retryTimer.retryUntil(Future.successful(establishedConnections.size()), (size: Int) => size == 1, 1.seconds)
       .map(_ => {
       val channel = establishedConnections.asScala.head._1
-      messages.foreach(channel.writeAndFlush)
+      messages.foreach(msg => {
+        channel.writeAndFlush(msg)
+        Thread.sleep(10)
+      })
       c.shutdown()
     })
   }

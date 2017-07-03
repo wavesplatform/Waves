@@ -1,8 +1,7 @@
 package com.wavesplatform.it.util
 
-import com.wavesplatform.it.util.Test.n
 import org.slf4j.LoggerFactory
-import scorex.account.{AccountOrAlias, Alias, PrivateKeyAccount}
+import scorex.account.{Alias, PrivateKeyAccount}
 import scorex.transaction.TransactionParser.TransactionType
 import scorex.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
 import scorex.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction, TransferTransaction}
@@ -27,22 +26,7 @@ object TransactionGenerator {
     }
   }
 
-//  class DistributedRandomNumberGenerator[T](probabilities: Map[T, Double]) {
-//    assert(probabilities.values.sum <= 1)
-//    def getRandom: T = {
-//      val rand = Math.random
-//      val ratio = 1.0f / distSum
-//      var tempDist = 0
-//      for (i <- distribution.keySet) {
-//        tempDist += distribution.get(i)
-//        if (rand / ratio <= tempDist) return i
-//      }
-//      0
-//    }
-//  }
-
-  def gen(
-           //probabilities: Map[TransactionType.Value, Double],
+  def gen(probabilities: Map[TransactionType.Value, Float],
           accounts: Seq[PrivateKeyAccount],
           n: Int): Seq[Transaction] = {
     val issueTransactionSender = randomFrom(accounts).get
@@ -56,6 +40,8 @@ object TransactionGenerator {
       })
     }
 
+    val typeGen = new DistributedRandomGenerator(probabilities)
+
     val generated = (0 until (n * 1.2).toInt).foldLeft((
       Seq.empty[Transaction],
       Seq.empty[IssueTransaction],
@@ -65,10 +51,9 @@ object TransactionGenerator {
     )) {
       case ((allTxsWithValid, validIssueTxs, reissuableIssueTxs, activeLeaseTransactions, aliases), _) =>
         def moreThatStandartFee = 100000L + r.nextInt(100000)
-        // todo replace with probabilities
-        val txType = 2 + r.nextInt(11 - 2)
+        val txType = typeGen.getRandom
         def ts = System.currentTimeMillis()
-        val tx = TransactionType(txType) match {
+        val tx = txType match {
           case TransactionType.PaymentTransaction =>
             val sender = randomFrom(accounts).get
             val recipient = accounts(new Random().nextInt(accounts.size))
