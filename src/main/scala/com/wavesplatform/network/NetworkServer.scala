@@ -69,12 +69,14 @@ class NetworkServer(
   private val coordinatorExecutor = new DefaultEventLoop
   private val coordinatorHandler = new CoordinatorHandler(coordinator, peerDatabase, allChannels)
 
-//      scoreObserver,
+  //      scoreObserver,
 
   private val peerUniqueness = new ConcurrentHashMap[PeerKey, Channel]()
 
   private val serverHandshakeHandler =
     new HandshakeHandler.Server(handshake, peerInfo, peerUniqueness, peerDatabase, allChannels)
+
+  private val utxPoolSychronizer = new UtxPoolSynchronizer(utxPool, allChannels)
 
   private val serverChannel = settings.networkSettings.declaredAddress.map { _ =>
     new ServerBootstrap()
@@ -93,6 +95,7 @@ class NetworkServer(
         messageCodec,
         peerSynchronizer,
         historyReplier,
+        utxPoolSychronizer,
         new ExtensionSignaturesLoader(settings.synchronizationSettings.synchronizationTimeout, peerDatabase),
         new ExtensionBlocksLoader(history, settings.synchronizationSettings.synchronizationTimeout, peerDatabase),
         new OptimisticExtensionLoader,
@@ -127,6 +130,7 @@ class NetworkServer(
       messageCodec,
       peerSynchronizer,
       historyReplier,
+      utxPoolSychronizer,
       new ExtensionSignaturesLoader(settings.synchronizationSettings.synchronizationTimeout, peerDatabase),
       new ExtensionBlocksLoader(history, settings.synchronizationSettings.synchronizationTimeout, peerDatabase),
       new OptimisticExtensionLoader,

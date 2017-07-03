@@ -20,7 +20,7 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
   private val settings = RestAPISettings.fromConfig(ConfigFactory.load())
   private val utx = stub[UtxPool]
 
-  (utx.putIfNew _).when(*, *).onCall((t, _) => Left(TransactionValidationError(t, GenericError("foo")))).anyNumberOfTimes()
+  (utx.putIfNew _).when(*, *).onCall((t, _) => Left(TransactionValidationError(GenericError("foo"), t))).anyNumberOfTimes()
 
   "returns StateCheckFiled" - {
 

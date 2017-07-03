@@ -12,7 +12,7 @@ import scorex.block.Block
 import scorex.block.Block.BlockId
 import scorex.consensus.TransactionsOrdering
 import scorex.crypto.EllipticCurveImpl
-import scorex.transaction.ValidationError.{GenericError}
+import scorex.transaction.ValidationError.{BlockAppendError, GenericError}
 import scorex.transaction._
 import scorex.utils.{ScorexLogging, Time}
 

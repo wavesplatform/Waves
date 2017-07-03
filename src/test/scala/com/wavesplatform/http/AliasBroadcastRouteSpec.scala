@@ -19,7 +19,7 @@ class AliasBroadcastRouteSpec extends RouteSpec("/alias/broadcast/") with Reques
   private val settings = RestAPISettings.fromConfig(ConfigFactory.load())
   private val utx = stub[UtxPool]
 
-  (utx.putIfNew _).when(*, *).onCall((t, _) => Left(TransactionValidationError(t, GenericError("foo")))).anyNumberOfTimes()
+  (utx.putIfNew _).when(*, *).onCall((t, _) => Left(TransactionValidationError(GenericError("foo"), t))).anyNumberOfTimes()
 
   "returns StateCheckFiled" - {
     val route = AliasBroadcastApiRoute(settings, utx).route
