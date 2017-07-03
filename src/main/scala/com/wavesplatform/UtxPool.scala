@@ -30,7 +30,7 @@ class UtxPool(
 
   private val transactions = new ConcurrentHashMap[ByteStr, Transaction](utxSettings.maxSize / 2)
 
-  private def validate(t: Transaction) =
+  protected def validate(t: Transaction) =
     TransactionDiffer.apply(fs, time.correctedTime(), stateReader.height)(stateReader, t)
 
   private def collectValidTransactions(currentTs: Long): Seq[Transaction] = {

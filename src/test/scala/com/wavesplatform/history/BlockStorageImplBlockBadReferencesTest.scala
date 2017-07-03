@@ -69,7 +69,7 @@ class BlockStorageImplBlockBadReferencesTest extends PropSpec with PropertyCheck
       val (block1, microblocks1) = chainBaseAndMicro(block0.uniqueId, payment, Seq(payment2))
       domain.blockchainUpdater.processBlock(block0).explicitGet()
       domain.blockchainUpdater.processBlock(block1).explicitGet()
-      domain.blockchainUpdater.removeAfter(block0.uniqueId) shouldBe true
+      domain.blockchainUpdater.removeAfter(block0.uniqueId).explicitGet()
       domain.blockchainUpdater.processMicroBlock(microblocks1.head) should produce("No base block exists")
     }
   }
@@ -101,7 +101,7 @@ class BlockStorageImplBlockBadReferencesTest extends PropSpec with PropertyCheck
       val blocks = chainBlocks(Seq(Seq(genesis), Seq(payment), Seq(payment2)))
       domain.blockchainUpdater.processBlock(blocks.head) shouldBe 'right
       domain.blockchainUpdater.processBlock(blocks(1)) shouldBe 'right
-      domain.blockchainUpdater.removeAfter(blocks.head.uniqueId) shouldBe true
+      domain.blockchainUpdater.removeAfter(blocks.head.uniqueId).explicitGet()
       val block2 = buildBlockOfTxs(randomSig, Seq(payment3))
       domain.blockchainUpdater.processBlock(block2) should produce("References incorrect or non-existing block")
     }

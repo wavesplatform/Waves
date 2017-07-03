@@ -36,7 +36,7 @@ class BlockStorageImplBlockOnlyTest extends PropSpec with PropertyChecks with Do
       domain.blockchainUpdater.processBlock(blocks(1)) shouldBe 'right
       domain.history.height() shouldBe 2
       domain.stateReader.height shouldBe 2
-      domain.blockchainUpdater.removeAfter(blocks.head.uniqueId) shouldBe true
+      domain.blockchainUpdater.removeAfter(blocks.head.uniqueId) shouldBe 'right
       domain.history.height() shouldBe 1
       domain.stateReader.height shouldBe 1
       domain.blockchainUpdater.processBlock(blocks(1)) shouldBe 'right
@@ -57,7 +57,7 @@ class BlockStorageImplBlockOnlyTest extends PropSpec with PropertyChecks with Do
       val blocks = chainBlocks(Seq(Seq(genesis), Seq(payment)))
       domain.blockchainUpdater.processBlock(blocks.head) shouldBe 'right
       domain.blockchainUpdater.processBlock(blocks(1)) shouldBe 'right
-      domain.blockchainUpdater.removeAfter(blocks.head.uniqueId) shouldBe true
+      domain.blockchainUpdater.removeAfter(blocks.head.uniqueId) shouldBe 'right
       domain.blockchainUpdater.processBlock(malformSignature(blocks(1))) should produce("InvalidSignature")
     }
   }

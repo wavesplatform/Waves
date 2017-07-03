@@ -187,6 +187,10 @@ class LegacyConfigTransformerSpec extends FreeSpec with Matchers {
           |    order-history-file = ""
           |    max-timestamp-diff = 3h
           |  }
+          |  utx {
+          |    max-size = 100
+          |    max-transaction-age = 100m
+          |  }
           |  synchronization.score-ttl = 90s
           |}
           |""".stripMargin))
@@ -229,6 +233,10 @@ class LegacyConfigTransformerSpec extends FreeSpec with Matchers {
           |    predefined-pairs = []
           |    max-timestamp-diff = 3h
           |  }
+          |  utx {
+          |    max-size = 100
+          |    max-transaction-age = 100m
+          |  }
           |  synchronization.score-ttl = 90s
           |}
           |""".stripMargin))
@@ -258,10 +266,7 @@ class LegacyConfigTransformerSpec extends FreeSpec with Matchers {
      'cors (false)
     )
 
-    ws.utxSettings should have (
-      'size (255),
-      'broadcastInterval (5.second)
-    )
+    ws.utxSettings.maxSize shouldBe 100
 
     ws.checkpointsSettings should have (
       'publicKey (ByteStr.decodeBase58("7EXnkmJyz1gPfLJwytThcwGwpyfjzFXC3hxBhvVK4").get)
