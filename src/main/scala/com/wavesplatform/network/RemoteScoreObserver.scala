@@ -20,7 +20,6 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
 
   @volatile
   private var localScore = initialLocalScore
-  log.debug(s"Initialized with local score $localScore")
 
   private val scores = new ConcurrentHashMap[Channel, BigInt]
 
@@ -30,13 +29,14 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
 
   override def handlerAdded(ctx: ChannelHandlerContext) =
     ctx.channel().closeFuture().addListener { f: ChannelFuture =>
+      pinnedChannel.compareAndSet(ctx.channel(), null)
       for ((ch, s) <- channelWithHighestScore) {
         // having no channel with highest score means scores map is empty, so it's ok to attempt to remove this channel
         // from the map only when there is one.
         Option(scores.remove(ctx.channel())).foreach(_ => log.debug(s"${id(ctx)} Closed, removing score $s"))
         if (ch == f.channel()) {
           // this channel had the highest score, so we should request extension from second-best channel, just in case
-          for ((ch, _) <- channelWithHighestScore) {
+          for ((ch, _) <- channelWithHighestScore if pinnedChannel.compareAndSet(null, ch)) {
             ch.writeAndFlush(LoadBlockchainExtension(lastSignatures))
           }
         }
