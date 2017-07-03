@@ -15,7 +15,7 @@ trait NgHistoryWriter extends HistoryWriter {
 
   def forgeBlock(id: BlockId): Option[Block]
 
-  def liquidBlockExists() : Boolean
+  def liquidBlockExists(): Boolean
 }
 
 class NgHistoryWriterImpl(inner: HistoryWriter) extends NgHistoryWriter {
@@ -25,7 +25,7 @@ class NgHistoryWriterImpl(inner: HistoryWriter) extends NgHistoryWriter {
   private val baseBlock = Synchronized(Option.empty[Block])
   private val micros = Synchronized(List.empty[MicroBlock])
 
-  def liquidBlockExists() : Boolean = read { implicit l =>
+  def liquidBlockExists(): Boolean = read { implicit l =>
     baseBlock().isDefined
   }
 
@@ -44,9 +44,8 @@ class NgHistoryWriterImpl(inner: HistoryWriter) extends NgHistoryWriter {
 
   override def appendBlock(block: Block)(consensusValidation: => Either[ValidationError, BlockDiff]): Either[ValidationError, BlockDiff]
   = write { implicit l => {
-    lazy val referencesLastInner = inner.lastBlock.get.uniqueId == block.reference
     if (baseBlock().isEmpty) {
-      if (inner.height() > 0 && !referencesLastInner)
+      if (inner.lastBlock.exists(_.uniqueId != block.reference))
         Left(BlockAppendError("References incorrect or non-existing block (inner block exists, liquid block doesn't)", block))
       else
         consensusValidation
@@ -55,13 +54,7 @@ class NgHistoryWriterImpl(inner: HistoryWriter) extends NgHistoryWriter {
       case Some(forgedBlock) =>
         inner.appendBlock(forgedBlock)(consensusValidation)
       case None =>
-        if (inner.isEmpty) {
-            Left(BlockAppendError("References non-existing block (liquid exists, inner doesn't)", block))
-        } else if (!referencesLastInner) {
-          Left(BlockAppendError("References incorrect or non-existing block (liquid block and last inner block exist)", block))
-        } else {
-          consensusValidation
-        }
+        Left(BlockAppendError("References incorrect or non-existing block (liquid block exists)", block))
     }
   }.map { bd => // finally place new as liquid
     micros.set(List.empty)

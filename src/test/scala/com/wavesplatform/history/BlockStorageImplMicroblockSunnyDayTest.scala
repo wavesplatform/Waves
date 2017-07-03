@@ -77,14 +77,15 @@ class BlockStorageImplMicroblockSunnyDayTest extends PropSpec with PropertyCheck
     }
   }
 
-  property("discards liquid block completely: B0 <- B0m1 <- B0m2; B0 <- B1") {
+  property("discards liquid block completely: B0 <- B1 <- B1m1; B0 <- B2!") {
     scenario(preconditionsAndPayments) { case (domain, (genesis, payment, finalPayment, conflictingFinalPayment)) =>
-      val (block0, microBlocks0) = chainBaseAndMicro(randomSig, genesis, Seq(payment, finalPayment))
-      val block1 = buildBlockOfTxs(block0.uniqueId, Seq(payment, conflictingFinalPayment))
+      val block0 = buildBlockOfTxs(randomSig, Seq(genesis))
+      val (block1, microBlocks1) = chainBaseAndMicro(block0.uniqueId, payment, Seq(finalPayment))
+      val block2 = buildBlockOfTxs(block0.uniqueId, Seq(conflictingFinalPayment))
       domain.blockchainUpdater.processBlock(block0).explicitGet()
-      domain.blockchainUpdater.processMicroBlock(microBlocks0(0)).explicitGet()
-      domain.blockchainUpdater.processMicroBlock(microBlocks0(1)).explicitGet()
-      domain.blockchainUpdater.processBlock(block1) shouldBe 'right
+      domain.blockchainUpdater.processBlock(block1).explicitGet()
+      domain.blockchainUpdater.processMicroBlock(microBlocks1(0)).explicitGet()
+      domain.blockchainUpdater.processBlock(block2) should produce("References incorrect or non-existing block")
     }
   }
 }

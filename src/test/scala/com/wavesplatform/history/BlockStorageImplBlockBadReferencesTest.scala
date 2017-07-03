@@ -92,7 +92,7 @@ class BlockStorageImplBlockBadReferencesTest extends PropSpec with PropertyCheck
       val block0 = buildBlockOfTxs(randomSig, Seq(genesis, payment))
       val block1 = buildBlockOfTxs(randomSig, Seq(genesis, payment2))
       domain.blockchainUpdater.processBlock(block0) shouldBe 'right
-      domain.blockchainUpdater.processBlock(block1) should produce("References non-existing block")
+      domain.blockchainUpdater.processBlock(block1) should produce("References incorrect or non-existing block")
     }
   }
 
@@ -114,7 +114,7 @@ class BlockStorageImplBlockBadReferencesTest extends PropSpec with PropertyCheck
       domain.blockchainUpdater.processBlock(blocks(0)) shouldBe 'right
       domain.blockchainUpdater.processBlock(blocks(1)) shouldBe 'right
       domain.blockchainUpdater.processBlock(blocks(2)) shouldBe 'right
-      domain.blockchainUpdater.processBlock(block2v2) shouldBe 'right
+      domain.blockchainUpdater.processBlock(block2v2) should produce("References incorrect or non-existing block")
     }
   }
 
