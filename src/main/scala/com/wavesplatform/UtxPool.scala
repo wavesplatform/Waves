@@ -28,7 +28,7 @@ class UtxPool(
     fs: FunctionalitySettings,
     utxSettings: UtxSettings) extends ScorexLogging {
 
-  private val transactions = new ConcurrentHashMap[ByteStr, Transaction](utxSettings.maxSize / 2)
+  private val transactions = new ConcurrentHashMap[ByteStr, Transaction]
 
   protected def validate(t: Transaction) =
     TransactionDiffer.apply(fs, time.correctedTime(), stateReader.height)(stateReader, t)
