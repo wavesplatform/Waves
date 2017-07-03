@@ -12,7 +12,6 @@ import com.wavesplatform.state2.reader.StateReader
 import io.netty.channel.group.ChannelGroup
 import play.api.libs.json._
 import scorex.crypto.encode.Base58
-import scorex.transaction.assets.IssueTransaction
 import scorex.transaction.assets.exchange.Validation.booleanOperators
 import scorex.transaction.assets.exchange.{AssetPair, Order, Validation}
 import scorex.transaction.{AssetId, History}
@@ -72,13 +71,9 @@ class MatcherActor(orderHistory: ActorRef, storedState: StateReader, wallet: Wal
   }
 
   def checkBlacklistRegex(aPair: AssetPair): Validation = {
-    if (tradedPairs.get(aPair).isEmpty) {
       val (amountName, priceName) = (getAssetName(aPair.amountAsset), getAssetName(aPair.priceAsset))
       settings.blacklistedNames.forall(_.findFirstIn(amountName).isEmpty) :| s"Invalid Asset Name: $amountName" &&
         settings.blacklistedNames.forall(_.findFirstIn(priceName).isEmpty) :| s"Invalid Asset Name: $priceName"
-    } else {
-      Validation.success
-    }
   }
 
   def checkBlacklistId(aPair: AssetPair): Validation = {

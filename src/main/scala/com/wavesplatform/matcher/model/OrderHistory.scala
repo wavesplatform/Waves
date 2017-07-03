@@ -8,6 +8,8 @@ import scorex.transaction.AssetAcc
 import scorex.transaction.assets.exchange.{AssetPair, Order}
 import scorex.utils.ScorexLogging
 
+import scala.collection.JavaConverters._
+
 trait OrderHistory {
   def orderAccepted(event: OrderAdded): Unit
   def orderExecuted(event: OrderExecuted): Unit
@@ -16,6 +18,7 @@ trait OrderHistory {
   def orderInfo(id: String): OrderInfo
   def openVolume(assetAcc: AssetAcc): Long
   def ordersByPairAndAddress(assetPair: AssetPair, address: String): Set[String]
+  def getAllOrdersByAddress(address: String): Set[String]
   def deleteOrder(assetPair: AssetPair, address: String, orderId: String): Boolean
   def order(id: String): Option[Order]
   def openPortfolio(address: String): OpenPortfolio
@@ -103,6 +106,11 @@ case class OrderHistoryImpl(p: OrderHistoryStorage) extends OrderHistory with Sc
     val pairAddressKey = OrderHistoryStorage.assetPairAddressKey(assetPair, address)
     Option(p.pairAddressToOrderIds.get(pairAddressKey)).getOrElse(Set())
   }
+
+  override def getAllOrdersByAddress(address: String): Set[String] = {
+    p.pairAddressToOrderIds.asScala.filter(_._1.endsWith(address)).values.flatten.toSet
+  }
+
 
   private def deleteFromOrdersInfo(orderId: String): Unit = {
     p.ordersInfo.remove(orderId)
