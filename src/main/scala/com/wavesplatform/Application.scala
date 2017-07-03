@@ -18,7 +18,7 @@ import com.wavesplatform.http.NodeApiRoute
 import com.wavesplatform.matcher.Matcher
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.network.CoordinatorHandler.loggingResult
-import com.wavesplatform.network.{BlockForged, LocalScoreChanged, NetworkServer, PeerDatabaseImpl, PeerInfo, UPnP, _}
+import com.wavesplatform.network.{BlockForged, NetworkServer, PeerDatabaseImpl, PeerInfo, ScoreChanged, UPnP, _}
 import com.wavesplatform.settings._
 import io.netty.channel.Channel
 import io.netty.channel.group.DefaultChannelGroup
@@ -80,7 +80,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
       b => {
         loggingResult("local", s"applying locally mined block (${b.uniqueId})", coordinator.processBlock(b, local = true))
           .foreach { score =>
-            allChannels.broadcast(LocalScoreChanged(score))
+            allChannels.broadcast(ScoreChanged(score))
             allChannels.broadcast(BlockForged(b))
           }
       })

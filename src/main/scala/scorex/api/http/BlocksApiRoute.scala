@@ -5,7 +5,7 @@ import javax.ws.rs.Path
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.Coordinator
-import com.wavesplatform.network.{Checkpoint, LocalScoreChanged, _}
+import com.wavesplatform.network._
 import com.wavesplatform.settings.{CheckpointsSettings, RestAPISettings}
 import com.wavesplatform.state2.ByteStr
 import io.netty.channel.group.ChannelGroup
@@ -177,7 +177,7 @@ case class BlocksApiRoute(settings: RestAPISettings, checkpointsSettings: Checkp
       json[Checkpoint] { checkpoint =>
         Future {
           coordinator.processCheckpoint(checkpoint)
-            .map(score => allChannels.broadcast(LocalScoreChanged(score)))
+            .map(score => allChannels.broadcast(ScoreChanged(score)))
         }.map(_.fold(ApiError.fromValidationError,
           _ => Json.obj("" -> "")): ToResponseMarshallable)
       }

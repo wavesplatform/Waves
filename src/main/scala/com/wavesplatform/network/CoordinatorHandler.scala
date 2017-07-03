@@ -18,18 +18,18 @@ class CoordinatorHandler(coordinator: Coordinator, peerDatabase: PeerDatabase, a
     case c: Checkpoint =>
       loggingResult(id(ctx), "applying checkpoint", coordinator.processCheckpoint(c)).fold(
         _ => peerDatabase.blacklistAndClose(ctx.channel()),
-        score => allChannels.broadcast(LocalScoreChanged(score), Some(ctx.channel()))
+        score => allChannels.broadcast(ScoreChanged(score), Some(ctx.channel()))
       )
     case ExtensionBlocks(blocks) =>
       loggingResult(id(ctx), "processing fork", coordinator.processFork(blocks.head.reference, blocks))
         .fold(
           _ => peerDatabase.blacklistAndClose(ctx.channel()),
-          score => allChannels.broadcast(LocalScoreChanged(score))
+          score => allChannels.broadcast(ScoreChanged(score))
         )
     case b: Block =>
       if (b.signatureValid) {
         loggingResult(id(ctx), "applying block", coordinator.processBlock(b, local = false))
-          .foreach(score => allChannels.broadcast(LocalScoreChanged(score)))
+          .foreach(score => allChannels.broadcast(ScoreChanged(score)))
       } else {
         peerDatabase.blacklistAndClose(ctx.channel())
       }
