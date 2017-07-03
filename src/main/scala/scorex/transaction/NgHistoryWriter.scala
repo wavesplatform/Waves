@@ -44,7 +44,7 @@ class NgHistoryWriterImpl(inner: HistoryWriter) extends NgHistoryWriter {
 
   override def appendBlock(block: Block)(consensusValidation: => Either[ValidationError, BlockDiff]): Either[ValidationError, BlockDiff]
   = write { implicit l => {
-    lazy val referencesLastInner = inner.lastBlock.uniqueId == block.reference
+    lazy val referencesLastInner = inner.lastBlock.get.uniqueId == block.reference
     if (baseBlock().isEmpty) {
       if (inner.height() > 0 && !referencesLastInner)
         Left(BlockAppendError("References incorrect or non-existing block (inner block exists, liquid block doesn't)", block))

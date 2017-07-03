@@ -61,7 +61,7 @@ object History {
     }
 
     def score(): BlockchainScore = history.read { implicit lock =>
-      history.scoreOf(history.lastBlock.uniqueId).getOrElse(0)
+      history.lastBlock.flatMap(last => history.scoreOf(last.uniqueId)).getOrElse(0)
     }
 
 
@@ -83,8 +83,8 @@ object History {
       heightOf(block).map(history.height() - _)
     }
 
-    def lastBlock: Block = history.read { _ =>
-      history.blockAt(history.height()).get
+    def lastBlock: Option[Block] = history.read { _ =>
+      history.blockAt(history.height())
     }
 
     def averageDelay(block: Block, blockNum: Int): Try[Long] = Try {

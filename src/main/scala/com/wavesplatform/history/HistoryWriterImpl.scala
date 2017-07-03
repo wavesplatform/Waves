@@ -29,7 +29,7 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
   }
 
   override def appendBlock(block: Block)(consensusValidation: => Either[ValidationError, BlockDiff]): Either[ValidationError, BlockDiff] = write { implicit lock =>
-    if ((height() == 0) || (this.lastBlock.uniqueId == block.reference)) consensusValidation.map { blockDiff =>
+    if ((height() == 0) || (this.lastBlock.get.uniqueId == block.reference)) consensusValidation.map { blockDiff =>
       val h = height() + 1
       val score = (if (height() == 0) BigInt(0) else this.score()) + block.blockScore
       blockBodyByHeight.mutate(_.put(h, block.bytes))

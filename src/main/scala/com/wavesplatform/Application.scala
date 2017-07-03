@@ -95,7 +95,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
       establishedConnections,
       blockchainReadiness)
 
-    miner.lastBlockChanged(history.height(), history.lastBlock)
+    miner.lastBlockChanged(history.height(), history.lastBlock.get)
 
     val apiRoutes = Seq(
       BlocksApiRoute(settings.restAPISettings, settings.checkpointsSettings, history, coordinator, allChannels),

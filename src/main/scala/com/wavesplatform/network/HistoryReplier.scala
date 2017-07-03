@@ -15,7 +15,7 @@ class HistoryReplier(history: History, maxChainLength: Int) extends ChannelInbou
           case Some((parent, extension)) =>
             log.debug(s"${id(ctx)} Got GetSignatures with ${otherSigs.length}, found common parent $parent and sending ${extension.length} more signatures")
             ctx.writeAndFlush(Signatures(parent +: extension))
-          case None if otherSigs.length == 1 && otherSigs.head == history.lastBlock.uniqueId =>
+          case None if otherSigs.length == 1 && otherSigs.head == history.lastBlock.get.uniqueId =>
             // this is the special case when both nodes only have genesis block
             log.debug(s"${id(ctx)} Both local and remote nodes only have genesis block")
             ctx.writeAndFlush(Signatures(otherSigs))

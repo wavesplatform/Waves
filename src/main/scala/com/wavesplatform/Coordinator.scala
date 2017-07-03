@@ -34,7 +34,7 @@ class Coordinator(
   import Coordinator._
 
   private def updateBlockchainReadinessFlag(): Unit = {
-    val expired = time.correctedTime() - history.lastBlock.timestamp < maxBlockchainAge.toMillis
+    val expired = time.correctedTime() - history.lastBlock.get.timestamp < maxBlockchainAge.toMillis
     blockchainReadiness.compareAndSet(expired, !expired)
   }
 
@@ -64,7 +64,7 @@ class Coordinator(
       }
 
       result.foreach { _ =>
-        miner.lastBlockChanged(history.height(), history.lastBlock)
+        miner.lastBlockChanged(history.height(), history.lastBlock.get)
         updateBlockchainReadinessFlag()
       }
 

@@ -54,7 +54,7 @@ case class NxtConsensusApiRoute(
   @Path("/generationsignature")
   @ApiOperation(value = "Generation signature last", notes = "Generation signature of a last block", httpMethod = "GET")
   def generationSignature: Route = (path("generationsignature") & get) {
-    complete(Json.obj("generationSignature" -> Base58.encode(history.lastBlock.consensusData.generationSignature)))
+    complete(Json.obj("generationSignature" -> Base58.encode(history.lastBlock.get.consensusData.generationSignature)))
   }
 
   @Path("/basetarget/{blockId}")
@@ -71,7 +71,7 @@ case class NxtConsensusApiRoute(
   @Path("/basetarget")
   @ApiOperation(value = "Base target last", notes = "Base target of a last block", httpMethod = "GET")
   def basetarget: Route = (path("basetarget") & get) {
-    complete(Json.obj("baseTarget" -> history.lastBlock.consensusData.baseTarget))
+    complete(Json.obj("baseTarget" -> history.lastBlock.get.consensusData.baseTarget))
   }
 
   @Path("/algo")
