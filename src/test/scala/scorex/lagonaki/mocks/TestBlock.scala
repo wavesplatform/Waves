@@ -20,7 +20,7 @@ object TestBlock {
 
   def create(time: Long, txs: Seq[Transaction]): Block = sign(Block(
     timestamp = time,
-    version = 0,
+    version = 2,
     reference = randomSignature(),
     signerData = SignerData(defaultSigner, ByteStr.empty),
     consensusData = NxtLikeConsensusBlockData(1L, Array.fill(SignatureLength)(0: Byte)),
