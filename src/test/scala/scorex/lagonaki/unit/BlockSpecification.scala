@@ -32,7 +32,6 @@ class BlockSpecification extends FunSuite with Matchers with MockFactory {
     val tbd = Seq(tx, tr, tr2)
     val cbd = NxtLikeConsensusBlockData(bt, gs)
 
-
     List(1, 2, 3).foreach { version =>
       val timestamp = System.currentTimeMillis()
 
