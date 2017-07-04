@@ -28,6 +28,7 @@ case class NetworkSettings(file: Option[File],
                            outboundBufferSize: Long,
                            maxUnverifiedPeers: Int,
                            peersBroadcastInterval: FiniteDuration,
+                           handshakeTimeout: FiniteDuration,
                            uPnPSettings: UPnPSettings)
 
 object NetworkSettings {
@@ -54,12 +55,13 @@ object NetworkSettings {
     val outboundBufferSize = config.getBytes("outbound-buffer-size")
     val maxUnverifiedPeers = config.as[Int]("max-unverified-peers")
     val peersBroadcastInterval = config.as[FiniteDuration]("peers-broadcast-interval")
+    val handshakeTimeout = config.as[FiniteDuration]("handshake-timeout")
     val uPnPSettings = config.as[UPnPSettings]("upnp")
 
     NetworkSettings(file, bindAddress, declaredAddress, nodeName, nonce, knownPeers,
       peersDataResidenceTime, blackListResidenceTime, maxInboundConnections, maxOutboundConnections,
       maxConnectionsFromSingleHost, connectionTimeout, outboundBufferSize, maxUnverifiedPeers,
-      peersBroadcastInterval, uPnPSettings)
+      peersBroadcastInterval, handshakeTimeout, uPnPSettings)
   }
 
   private def randomNonce: Long = {

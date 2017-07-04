@@ -19,7 +19,7 @@ class CoordinatorHandler(coordinator: Coordinator, peerDatabase: PeerDatabase, a
         score => allChannels.broadcast(LocalScoreChanged(score), Some(ctx.channel()))
       )
     case ExtensionBlocks(blocks) =>
-      loggingResult(ctx, "processing fork", coordinator.processFork(blocks.head.reference, blocks))
+      loggingResult(ctx, "processing fork", coordinator.processFork(blocks))
         .fold(
           _ => peerDatabase.blacklistAndClose(ctx.channel()),
           score => allChannels.broadcast(LocalScoreChanged(score))

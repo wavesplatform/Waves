@@ -74,31 +74,38 @@ class Coordinator(
       stateReader, utxStorage, time)
   }
 
-  def processFork(lastCommonBlockId: BlockId, newBlocks: Seq[Block]): Either[ValidationError, BigInt] = {
+  def processFork(newBlocks: Seq[Block]): Either[ValidationError, BigInt] = {
+    val extension = newBlocks.dropWhile(history.contains)
 
     def isForkValidWithCheckpoint(lastCommonHeight: Int): Boolean = {
-      newBlocks.zipWithIndex.forall(p => isValidWithRespectToCheckpoint(p._1, lastCommonHeight + 1 + p._2))
+      extension.zipWithIndex.forall(p => isValidWithRespectToCheckpoint(p._1, lastCommonHeight + 1 + p._2))
     }
 
-    if (history.heightOf(lastCommonBlockId).exists(isForkValidWithCheckpoint)) {
-      blockchainUpdater.removeAfter(lastCommonBlockId)
+    extension.headOption.map(_.reference) match {
+      case Some(lastCommonBlockId) =>
+        if (history.heightOf(lastCommonBlockId).exists(isForkValidWithCheckpoint)) {
+          blockchainUpdater.removeAfter(lastCommonBlockId)
 
-      val result = newBlocks.view.map(b => b -> appendBlock(b)).collectFirst {
-        case (b, Left(e)) => b -> e
-      }.fold[Either[ValidationError, BigInt]](Right(history.score())) {
-        case (b, e) =>
-          log.warn(s"Can't process fork starting with $lastCommonBlockId, error appending block ${b.uniqueId}: $e")
-          Left(e)
-      }
+          val result = extension.view.map(b => b -> appendBlock(b)).collectFirst {
+            case (b, Left(e)) => b -> e
+          }.fold[Either[ValidationError, BigInt]](Right(history.score())) {
+            case (b, e) =>
+              log.warn(s"Can't process fork starting with $lastCommonBlockId, error appending block ${b.uniqueId}: $e")
+              Left(e)
+          }
 
-      result.foreach { _ =>
-        miner.lastBlockChanged(history.height(), history.lastBlock)
-        checkExpiry()
-      }
+          result.foreach { _ =>
+            miner.lastBlockChanged(history.height(), history.lastBlock)
+            checkExpiry()
+          }
 
-      result
-    } else {
-      Left(GenericError("Fork contains block that doesn't match checkpoint, declining fork"))
+          result
+        } else {
+          Left(GenericError("Fork contains block that doesn't match checkpoint, declining fork"))
+        }
+
+      case None =>
+        Left(GenericError("No common block in sequence"))
     }
   }
 
@@ -132,7 +139,7 @@ class Coordinator(
   }
 
   def processCheckpoint(newCheckpoint: Checkpoint): Either[ValidationError, BigInt] =
-    if (checkpoint.get.forall(_.signature sameElements newCheckpoint.signature)) {
+    if (!checkpoint.get.forall(_.signature sameElements newCheckpoint.signature)) {
       if (EllipticCurveImpl.verify(newCheckpoint.signature, newCheckpoint.toSign, checkpointPublicKey.arr)) {
         checkpoint.set(Some(newCheckpoint))
         makeBlockchainCompliantWith(newCheckpoint)
