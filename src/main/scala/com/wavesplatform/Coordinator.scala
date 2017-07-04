@@ -222,7 +222,7 @@ object Coordinator extends ScorexLogging {
     require(calcGs.sameElements(blockGs),
       s"Declared signature ${blockGs.mkString} of ${block.uniqueId} does not match calculated signature ${calcGs.mkString}")
 
-    val effectiveBalance = generatingBalance(state, fs)(generator, parentHeight)
+    val effectiveBalance = generatingBalance(state, fs, generator, parentHeight)
 
     if (blockTime >= fs.minimalGeneratingBalanceAfterTimestamp) {
       require(effectiveBalance >= MinimalEffectiveBalanceForGenerator, s"Effective balance $effectiveBalance is less that minimal ($MinimalEffectiveBalanceForGenerator)")

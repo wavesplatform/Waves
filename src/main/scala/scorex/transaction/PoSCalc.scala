@@ -57,46 +57,32 @@ object PoSCalc extends ScorexLogging {
     }
   }
 
-  private def blockCreationTime(h: History, state: StateReader, fs: FunctionalitySettings)(b: Block) =
-    (for {
-      parent <- h.blockById(b.reference)
-      height <- h.heightOf(b.reference)
-      ts <- nextBlockGenerationTime(height, state, fs, parent, b.signerData.generator)
-    } yield ts).getOrElse(b.timestamp)
-
-  // This used to be Ordering.by { b => (b.score, -b.timestamp) (overly simplified), but due to
-  // https://issues.scala-lang.org/browse/SI-8541, it has been rewritten the way it is now. It also
-  // has an added benefit of calculating block generation timestamp only when necessary.
-  def blockOrdering(history: History, state: StateReader, fs: FunctionalitySettings): Ordering[Block] = {
-    val bct = blockCreationTime(history, state, fs) _
-    Ordering.fromLessThan { (b1, b2) =>
-      b1.blockScore < b2.blockScore ||
-        b1.blockScore == b2.blockScore && bct(b1) < bct(b2)
-    }
-  }
-
-  def generatingBalance(state: StateReader, fs: FunctionalitySettings)(account: Account, atHeight: Int): Long = {
+  def generatingBalance(state: StateReader, fs: FunctionalitySettings, account: Account, atHeight: Int): Long = {
     val generatingBalanceDepth = if (atHeight >= fs.generatingBalanceDepthFrom50To1000AfterHeight) 1000 else 50
     state.effectiveBalanceAtHeightWithConfirmations(account, atHeight, generatingBalanceDepth)
   }
 
-  def nextBlockGenerationTime(height: Int, state: StateReader, fs: FunctionalitySettings, block: Block, account: PublicKeyAccount): Option[Long] = {
-    val balance = generatingBalance(state, fs)(account, height)
-    if (balance > MinimalEffectiveBalanceForGenerator) {
-      val cData = block.consensusData
-      val hit = calcHit(cData, account)
-      val t = cData.baseTarget
+  def nextBlockGenerationTime(
+      height: Int,
+      state: StateReader,
+      fs: FunctionalitySettings,
+      block: Block,
+      account: PublicKeyAccount): Either[String, Long] = {
+    val balance = generatingBalance(state, fs, account, height)
+    Either.cond(balance >= MinimalEffectiveBalanceForGenerator,
+      balance,
+      s"Balance $balance of ${ByteStr(account.publicKey)} is lower than $MinimalEffectiveBalanceForGenerator")
+      .flatMap { _ =>
+        val cData = block.consensusData
+        val hit = calcHit(cData, account)
+        val t = cData.baseTarget
 
-      val calculatedTs = (hit * 1000) / (BigInt(t) * balance) + block.timestamp
-      if (0 < calculatedTs && calculatedTs < Long.MaxValue) {
-        Some(calculatedTs.toLong)
-      } else {
-        log.debug(s"Invalid next block generation time: $calculatedTs")
-        None
+        val calculatedTs = (hit * 1000) / (BigInt(t) * balance) + block.timestamp
+        if (0 < calculatedTs && calculatedTs < Long.MaxValue) {
+          Right(calculatedTs.toLong)
+        } else {
+          Left(s"Invalid next block generation time: $calculatedTs")
+        }
       }
-    } else {
-      log.debug(s"Balance $balance of ${ByteStr(account.publicKey)} is lower than $MinimalEffectiveBalanceForGenerator")
-      None
-    }
   }
 }
