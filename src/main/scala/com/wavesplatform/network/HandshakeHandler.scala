@@ -12,15 +12,16 @@ import io.netty.handler.codec.ReplayingDecoder
 import io.netty.util.concurrent.ScheduledFuture
 import scorex.utils.ScorexLogging
 
+import scala.concurrent.duration.FiniteDuration
+
 class HandshakeDecoder extends ReplayingDecoder[Void] with ScorexLogging {
-  override def decode(ctx: ChannelHandlerContext, in: ByteBuf, out: util.List[AnyRef]) = {
+  override def decode(ctx: ChannelHandlerContext, in: ByteBuf, out: util.List[AnyRef]) =
     out.add(Handshake.decode(in))
-  }
 }
 
 case object HandshakeTimeoutExpired
 
-class HandshakeTimeoutHandler extends ChannelInboundHandlerAdapter with ScorexLogging {
+class HandshakeTimeoutHandler(handshakeTimeout: FiniteDuration) extends ChannelInboundHandlerAdapter with ScorexLogging {
   private var timeout: Option[ScheduledFuture[_]] = None
 
   private def cancelTimeout(): Unit = timeout.foreach(_.cancel(true))
@@ -29,7 +30,7 @@ class HandshakeTimeoutHandler extends ChannelInboundHandlerAdapter with ScorexLo
     log.trace(s"${id(ctx)} Scheduling handshake timeout")
     timeout = Some(ctx.channel().eventLoop().schedule((() => {
       ctx.fireChannelRead(HandshakeTimeoutExpired)
-    }): Runnable, 10, TimeUnit.SECONDS))
+    }): Runnable, handshakeTimeout.toMillis, TimeUnit.MILLISECONDS))
 
     super.channelActive(ctx)
   }

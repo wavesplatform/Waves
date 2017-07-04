@@ -1,13 +1,16 @@
 package com.wavesplatform.it.transactions
 
-import com.wavesplatform.it.{IntegrationSuiteWithThreeAddresses, Node}
 import com.wavesplatform.it.util._
-import scala.concurrent.duration._
-import scala.language.postfixOps
+import com.wavesplatform.it.{IntegrationSuiteWithThreeAddresses, Node}
+import scorex.account.{AccountOrAlias, PrivateKeyAccount}
+import scorex.api.http.assets.SignedTransferRequest
+import scorex.crypto.encode.Base58
+import scorex.transaction.assets.TransferTransaction
 
 import scala.concurrent.ExecutionContext.Implicits.global
-
+import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
+import scala.language.postfixOps
 
 class TransferTransactionSpecification(override val allNodes: Seq[Node]) extends IntegrationSuiteWithThreeAddresses {
   test("asset transfer changes sender's and recipient's asset balance; issuer's waves balance is decreased by fee") {
@@ -52,6 +55,44 @@ class TransferTransactionSpecification(override val allNodes: Seq[Node]) extends
     Await.result(f, 1 minute)
   }
 
+  test("invalid signed waves transfer should not be in UTX or blockchain") {
+    def createSignedTransferRequest(tx: TransferTransaction): SignedTransferRequest = {
+      import tx._
+      SignedTransferRequest(
+        Base58.encode(tx.sender.publicKey),
+        assetId.map(_.base58),
+        recipient.stringRepr,
+        amount,
+        fee,
+        feeAssetId.map(_.base58),
+        timestamp,
+        attachment.headOption.map(_ => Base58.encode(attachment)),
+        signature.base58
+      )
+    }
+
+    val invalidByTsTx = TransferTransaction.create(None,
+      PrivateKeyAccount(Base58.decode(sender.accountSeed).get),
+      AccountOrAlias.fromString(sender.address).right.get,
+      1,
+      System.currentTimeMillis() + (1 day).toMillis,
+      None,
+      1 waves,
+      Array.emptyByteArray
+    ).right.get
+
+    val invalidTxId = invalidByTsTx.id
+
+    val invalidByTsSignedRequest = createSignedTransferRequest(invalidByTsTx)
+
+    val f = for {
+      _ <- assertBadRequest(sender.signedTransfer(invalidByTsSignedRequest))
+      _ <- Future.sequence(allNodes.map(_.ensureTxDoesntExist(invalidTxId.base58)))
+    } yield succeed
+
+    Await.result(f, 1 minute)
+  }
+
   test("can not make transfer without having enough of fee") {
     val f = for {
       fb <- Future.traverse(allNodes)(_.height).map(_.min)
@@ -69,7 +110,6 @@ class TransferTransactionSpecification(override val allNodes: Seq[Node]) extends
 
     Await.result(f, 1 minute)
   }
-
 
 
   test("can not make transfer without having enough of waves") {

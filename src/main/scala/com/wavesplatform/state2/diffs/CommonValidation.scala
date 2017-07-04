@@ -43,7 +43,7 @@ object CommonValidation {
           lazy val negativeWaves = accountPortfolio.balance + spendings.balance < 0
           if (negativeWaves || negativeAssets)
             Left(GenericError(s"Attempt to transfer unavailable funds:" +
-              s" Transaction application leads from $accountPortfolio to (at least) temporary negative state"))
+              s" Transaction application leads to negative ${if (negativeWaves) "waves" else "asset"} balance to (at least) temporary negative state"))
           else Right(tx)
         case _ => Right(tx)
       } else Right(tx)

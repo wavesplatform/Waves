@@ -49,7 +49,7 @@ dependencyOverrides in ThisBuild ++= Set(
   "com.typesafe.akka" % "akka-stream-testkit_2.12" % "2.4.17",
   "com.typesafe.akka" % "akka-stream_2.12" % "2.4.17",
   "com.typesafe.akka" % "akka-testkit_2.12" % "2.4.17",
-  "com.typesafe.netty" % "netty-reactive-streams" % "1.0.8",
+  "com.typesafe.netty" % "netty-reactive-streams" % "2.0.0-M1",
   "com.typesafe.play" % "play-functional_2.12" % "2.6.0-M1",
   "com.typesafe.play" % "play-json_2.12" % "2.6.0-M1",
   "commons-codec" % "commons-codec" % "1.9",
@@ -59,10 +59,12 @@ dependencyOverrides in ThisBuild ++= Set(
   "io.netty" % "netty" % "3.10.0.Final",
   "io.netty" % "netty-buffer" % "4.1.10.Final",
   "io.netty" % "netty-codec" % "4.1.10.Final",
+  "io.netty" % "netty-codec-dns" % "4.1.12.Final",
   "io.netty" % "netty-codec-http" % "4.1.10.Final",
   "io.netty" % "netty-common" % "4.1.10.Final",
   "io.netty" % "netty-handler" % "4.1.10.Final",
   "io.netty" % "netty-resolver" % "4.1.10.Final",
+  "io.netty" % "netty-resolver-dns" % "4.1.12.Final",
   "io.netty" % "netty-transport" % "4.1.10.Final",
   "io.netty" % "netty-transport-native-epoll" % "4.1.10.Final",
   "io.swagger" % "swagger-annotations" % "1.5.13",
@@ -81,11 +83,8 @@ dependencyOverrides in ThisBuild ++= Set(
   "org.apache.commons" % "commons-lang3" % "3.2.1",
   "org.apache.httpcomponents" % "httpclient" % "4.5",
   "org.apache.httpcomponents" % "httpcore" % "4.4.5",
-  "org.asynchttpclient" % "async-http-client" % "2.0.32",
-  "org.asynchttpclient" % "async-http-client-netty-utils" % "2.0.32",
-  "org.asynchttpclient" % "netty-codec-dns" % "2.0.32",
-  "org.asynchttpclient" % "netty-resolver" % "2.0.32",
-  "org.asynchttpclient" % "netty-resolver-dns" % "2.0.32",
+  "org.asynchttpclient" % "async-http-client" % "2.1.0-alpha20",
+  "org.asynchttpclient" % "async-http-client-netty-utils" % "2.1.0-alpha20",
   "org.bitlet" % "weupnp" % "0.1.4",
   "org.bouncycastle" % "bcpkix-jdk15on" % "1.52",
   "org.bouncycastle" % "bcprov-jdk15on" % "1.52",
@@ -133,4 +132,4 @@ dependencyOverrides in ThisBuild ++= Set(
   "org.whispersystems" % "curve25519-java" % "0.3.0",
   "org.yaml" % "snakeyaml" % "1.17"
 )
-// LIBRARY_DEPENDENCIES_HASH 7f06bfd16a336c872bb21847b53ad49f13ee8861
+// LIBRARY_DEPENDENCIES_HASH fc4b131eb618d1b44fc94d89cdac0431d6243b0b

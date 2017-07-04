@@ -29,7 +29,7 @@ object Dependencies {
     // Swagger is using Jersey 1.1, hence the shading (https://github.com/spotify/docker-client#a-note-on-shading)
     "com.spotify" % "docker-client" % "8.1.2" classifier "shaded",
     "com.fasterxml.jackson.dataformat" % "jackson-dataformat-properties" % "2.8.7",
-    ("org.asynchttpclient" % "async-http-client" % "2.0.32")
+    ("org.asynchttpclient" % "async-http-client" % "2.1.0-alpha20")
       .exclude("io.netty", "netty-codec-http")
       .exclude("io.netty", "netty-transport-native-epoll"),
     nettyModule("transport-native-epoll") classifier "linux-x86_64",

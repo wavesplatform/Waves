@@ -8,6 +8,8 @@ import io.netty.channel.{ChannelHandlerContext, ChannelInboundHandlerAdapter}
 import scorex.transaction.Transaction
 import scorex.utils.ScorexLogging
 
+import scala.concurrent.Future
+
 @Sharable
 class UtxPoolSynchronizer(utx: UtxPool, allChannels: ChannelGroup)
   extends ChannelInboundHandlerAdapter with ScorexLogging {
@@ -19,7 +21,7 @@ class UtxPoolSynchronizer(utx: UtxPool, allChannels: ChannelGroup)
       case Left(e) =>
         log.debug(s"${id(ctx)} Error processing transaction ${t.id}: $e")
       case Right(_) =>
-        log.debug(s"${id(ctx)} Added transaction ${t.id} to UTX pool")
+        log.trace(s"${id(ctx)} Added transaction ${t.id} to UTX pool")
     }
     case _ => super.channelRead(ctx, msg)
   }
