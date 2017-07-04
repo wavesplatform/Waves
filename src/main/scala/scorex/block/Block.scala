@@ -23,7 +23,7 @@ case class Block(timestamp: Long, version: Byte, reference: ByteStr, signerData:
   private lazy val referenceField: BlockIdField = BlockIdField("reference", reference.arr)
   private lazy val signerDataField: SignerDataBlockField = SignerDataBlockField("signature", signerData)
   private lazy val consensusDataField = NxtConsensusBlockField(consensusData)
-  private lazy val transactionDataField = TransactionsBlockField(transactionData)
+  private lazy val transactionDataField = TransactionsBlockField(version.toInt, transactionData)
 
   lazy val uniqueId: ByteStr = signerData.signature
 
@@ -92,7 +92,8 @@ object Block extends ScorexLogging {
   type BlockIds = Seq[ByteStr]
   type BlockId = ByteStr
 
-  val MaxTransactionsPerBlock: Int = 100
+  val MaxTransactionsPerBlockVer1: Int = 100
+  val MaxTransactionsPerBlockVer2: Int = 65535
   val BaseTargetLength: Int = 8
   val GeneratorSignatureLength: Int = 32
 
@@ -100,16 +101,20 @@ object Block extends ScorexLogging {
 
   val TransactionSizeLength = 4
 
-  def transParseBytes(bytes: Array[Byte]): Try[Seq[Transaction]] = Try {
+  def transParseBytes(version: Int, bytes: Array[Byte]): Try[Seq[Transaction]] = Try {
     if (bytes.isEmpty) {
       Seq.empty
     } else {
-      val txData = bytes.tail
-      val txCount = bytes.head // so 255 txs max
-      (1 to txCount).foldLeft((0: Int, Seq[Transaction]())) { case ((pos, txs), _) =>
-        val transactionLengthBytes = txData.slice(pos, pos + TransactionSizeLength)
+      val v: (Array[Byte], Int) = version match {
+        case 1 | 2 => (bytes.tail, bytes.head) // 255 max
+        case 3 => (bytes.tail.tail, bytes.head * 256 + bytes.tail.head) // 65535 max
+        case x => ???
+      }
+
+      (1 to v._2).foldLeft((0: Int, Seq[Transaction]())) { case ((pos, txs), _) =>
+        val transactionLengthBytes = v._1.slice(pos, pos + TransactionSizeLength)
         val transactionLength = Ints.fromByteArray(transactionLengthBytes)
-        val transactionBytes = txData.slice(pos + TransactionSizeLength, pos + TransactionSizeLength + transactionLength)
+        val transactionBytes = v._1.slice(pos + TransactionSizeLength, pos + TransactionSizeLength + transactionLength)
         val transaction = TransactionParser.parseBytes(transactionBytes).get
 
         (pos + TransactionSizeLength + transactionLength, txs :+ transaction)
@@ -138,7 +143,7 @@ object Block extends ScorexLogging {
     val tBytesLength = Ints.fromByteArray(bytes.slice(position, position + 4))
     position += 4
     val tBytes = bytes.slice(position, position + tBytesLength)
-    val txBlockField = transParseBytes(tBytes).get
+    val txBlockField = transParseBytes(version.toInt, tBytes).get
     position += tBytesLength
 
     val genPK = bytes.slice(position, position + KeyLength)
@@ -175,7 +180,7 @@ object Block extends ScorexLogging {
 
     val genesisSigner = PrivateKeyAccount(Array.empty)
 
-    val transactionGenesisDataField = TransactionsBlockField(transactionGenesisData)
+    val transactionGenesisDataField = TransactionsBlockFieldVersion1or2(transactionGenesisData)
     val consensusGenesisDataField = NxtConsensusBlockField(consensusGenesisData)
     val txBytesSize = transactionGenesisDataField.bytes.length
     val txBytes = Bytes.ensureCapacity(Ints.toByteArray(txBytesSize), 4, 0) ++ transactionGenesisDataField.bytes

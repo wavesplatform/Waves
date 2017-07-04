@@ -32,15 +32,16 @@ class BlockSpecification extends FunSuite with Matchers with MockFactory {
     val tbd = Seq(tx, tr, tr2)
     val cbd = NxtLikeConsensusBlockData(bt, gs)
 
-    val version = 1: Byte
-    val timestamp = System.currentTimeMillis()
 
-    val block = Block.buildAndSign(version, timestamp, ByteStr(reference), cbd, tbd, gen)
-    val parsedBlock = Block.parseBytes(block.bytes).get
+    List(1, 2, 3).foreach { version =>
+      val timestamp = System.currentTimeMillis()
 
-    assert(parsedBlock.consensusData.generationSignature.sameElements(gs))
-    assert(parsedBlock.version == version)
-    assert(parsedBlock.signerData.generator.publicKey.sameElements(gen.publicKey))
+      val block = Block.buildAndSign(version.toByte, timestamp, ByteStr(reference), cbd, tbd, gen)
+      val parsedBlock = Block.parseBytes(block.bytes).get
+
+      assert(parsedBlock.consensusData.generationSignature.sameElements(gs))
+      assert(parsedBlock.version.toInt == version)
+      assert(parsedBlock.signerData.generator.publicKey.sameElements(gen.publicKey))
+    }
   }
-
 }

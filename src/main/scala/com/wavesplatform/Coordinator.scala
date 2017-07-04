@@ -14,8 +14,6 @@ import scorex.transaction.ValidationError.{BlockAppendError, GenericError, Micro
 import scorex.transaction._
 import scorex.utils.{ScorexLogging, Time}
 
-import scala.util.control.NonFatal
-
 object Coordinator extends ScorexLogging {
   def processFork(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater, stateReader: StateReader,
                   utxStorage: UtxPool, time: Time, settings: WavesSettings, miner: Miner, blockchainReadiness: AtomicBoolean)
@@ -91,8 +89,7 @@ object Coordinator extends ScorexLogging {
                           settings: BlockchainSettings)(block: Block): Either[ValidationError, Unit] = for {
     _ <- Either.cond(checkpoint.isBlockValid(block.signerData.signature, history.height() + 1), (),
       BlockAppendError(s"[h = ${history.height() + 1}] is not valid with respect to checkpoint", block))
-    _ <- Either.cond(blockConsensusValidation(history, stateReader, settings, time.correctedTime())(block), (),
-      BlockAppendError("consensus data is not valid", block))
+    _ <- blockConsensusValidation(history, stateReader, settings, time.correctedTime())(block)
     _ <- blockchainUpdater.processBlock(block)
   } yield block.transactionData.foreach(utxStorage.remove)
 
@@ -129,58 +126,36 @@ object Coordinator extends ScorexLogging {
 
   val MaxTimeDrift: Long = Duration.ofSeconds(15).toMillis
 
-  private def blockConsensusValidation(history: History, state: StateReader, bcs: BlockchainSettings, currentTs: Long)(block: Block): Boolean = try {
+  private def blockConsensusValidation(history: History, state: StateReader, bcs: BlockchainSettings, currentTs: Long)
+                                      (block: Block): Either[ValidationError, Unit] = {
 
     import PoSCalc._
 
     val fs = bcs.functionalitySettings
-
+    val (sortStart, sortEnd) = (fs.requireSortedTransactionsAfter, Long.MaxValue)
     val blockTime = block.timestamp
 
-    require(blockTime - currentTs < MaxTimeDrift, s"Block timestamp $blockTime is from future")
-
-    if (blockTime > fs.requireSortedTransactionsAfter) {
-      require(block.transactionData.sorted(TransactionsOrdering.InBlock) == block.transactionData, "Transactions must be sorted correctly")
-    }
-
-    val parentOpt = history.parent(block)
-    require(parentOpt.isDefined || history.height() == 1,
-      s"Can't find parent ${block.reference} of ${block.uniqueId}")
-
-    val parent = parentOpt.get
-    val parentHeightOpt = history.heightOf(parent.uniqueId)
-    require(parentHeightOpt.isDefined, s"Can't get height of ${block.reference}")
-    val parentHeight = parentHeightOpt.get
-
-    val prevBlockData = parent.consensusData
-    val blockData = block.consensusData
-
-    val cbt = calcBaseTarget(bcs.genesisSettings.averageBlockDelay, parentHeight, parent, history.parent(parent, 2), blockTime)
-    val bbt = blockData.baseTarget
-    require(cbt == bbt, s"Declared baseTarget $bbt of ${block.uniqueId} does not match calculated baseTarget $cbt")
-
-    val generator = block.signerData.generator
-
-    //check generation signature
-    val calcGs = calcGeneratorSignature(prevBlockData, generator)
-    val blockGs = blockData.generationSignature
-    require(calcGs.sameElements(blockGs),
-      s"Declared signature ${blockGs.mkString} of ${block.uniqueId} does not match calculated signature ${calcGs.mkString}")
-
-    val effectiveBalance = generatingBalance(state, fs)(generator, parentHeight)
-
-    if (blockTime >= fs.minimalGeneratingBalanceAfterTimestamp) {
-      require(effectiveBalance >= MinimalEffectiveBalanceForGenerator, s"Effective balance $effectiveBalance is less that minimal ($MinimalEffectiveBalanceForGenerator)")
-    }
-
-    //check hit < target
-    calcHit(prevBlockData, generator) < calcTarget(parent, blockTime, effectiveBalance)
-  } catch {
-    case e: IllegalArgumentException =>
-      log.error("Error while checking a block", e)
-      false
-    case NonFatal(t) =>
-      log.error("Fatal error while checking a block", t)
-      throw t
+    (for {
+      _ <- Either.cond(blockTime - currentTs < MaxTimeDrift, (), "Block timestamp $blockTime is from future")
+      _ <- Either.cond(blockTime < sortStart || blockTime > sortEnd || block.transactionData.sorted(TransactionsOrdering.InBlock) == block.transactionData,
+        (), "Transactions must be sorted correctly")
+      parent <- history.parent(block).toRight(s"Can't find parent ${block.reference} of ${block.uniqueId}")
+      parentHeight <- history.heightOf(parent.uniqueId).toRight(s"Can't get height of ${block.reference}")
+      prevBlockData = parent.consensusData
+      blockData = block.consensusData
+      cbt = calcBaseTarget(bcs.genesisSettings.averageBlockDelay, parentHeight, parent, history.parent(parent, 2), blockTime)
+      bbt = blockData.baseTarget
+      _ <- Either.cond(cbt == bbt, (), s"Declared baseTarget $bbt of ${block.uniqueId} does not match calculated baseTarget $cbt")
+      generator = block.signerData.generator
+      calcGs = calcGeneratorSignature(prevBlockData, generator)
+      blockGs = blockData.generationSignature
+      _ <- Either.cond(calcGs.sameElements(blockGs), (),
+        s"Declared signature ${blockGs.mkString} of ${block.uniqueId} does not match calculated signature ${calcGs.mkString}")
+      effectiveBalance = generatingBalance(state, fs)(generator, parentHeight)
+      _ <- Either.cond(blockTime < fs.minimalGeneratingBalanceAfterTimestamp || effectiveBalance > MinimalEffectiveBalanceForGenerator, (),
+        s"Effective balance $effectiveBalance is less that minimal ($MinimalEffectiveBalanceForGenerator)")
+      _ <- Either.cond(calcHit(prevBlockData, generator) < calcTarget(parent, blockTime, effectiveBalance), (), "consensus data is not valid")
+    } yield ()).left.map(BlockAppendError(_, block))
   }
+
 }

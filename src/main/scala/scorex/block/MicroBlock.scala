@@ -20,7 +20,7 @@ case class MicroBlock private(version: Byte, generator: PublicKeyAccount, transa
   private lazy val prevResBlockSigField: BlockIdField = BlockIdField("prevResBlockSig", prevResBlockSig.arr)
   private lazy val totalResBlockSigField: BlockIdField = BlockIdField("totalResBlockSigField", totalResBlockSig.arr)
   private lazy val signerDataField: SignerDataBlockField = SignerDataBlockField("signature", SignerData(generator, signature))
-  private lazy val transactionDataField = TransactionsBlockField(transactionData)
+  private lazy val transactionDataField = TransactionsBlockField(version.toInt, transactionData)
 
   lazy val uniqueId: ByteStr = signature
   lazy val encodedId: String = uniqueId.base58
@@ -89,7 +89,7 @@ object MicroBlock extends ScorexLogging {
     val tBytesLength = Ints.fromByteArray(bytes.slice(position, position + 4))
     position += 4
     val tBytes = bytes.slice(position, position + tBytesLength)
-    val txBlockField = transParseBytes(tBytes).get
+    val txBlockField = transParseBytes(1, tBytes).get
     position += tBytesLength
 
     val genPK = bytes.slice(position, position + TransactionParser.KeyLength)

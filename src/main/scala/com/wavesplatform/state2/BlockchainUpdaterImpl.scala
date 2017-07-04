@@ -121,7 +121,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
         transactionData = prevTotal.transactionData ++ microBlock.transactionData)
       BlockDiffer.fromLiquidBlock(settings, currentPersistedBlocksState)(newTotal)
         .map(newTotalDiff => liquidBlockCandidatesDiff.set(liquidBlockCandidatesDiff() + (microBlock.totalResBlockSig -> newTotalDiff)))
-    }
+    }.map(_ => log.info( s"MicroBlock ${microBlock.totalResBlockSig} with ${microBlock.transactionData.size} transactions appended"))
   }
 }
 
