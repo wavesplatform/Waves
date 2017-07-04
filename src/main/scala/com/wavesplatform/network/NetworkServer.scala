@@ -46,9 +46,8 @@ class NetworkServer(checkpointService: CheckpointService,
     settings.synchronizationSettings.scoreTTL,
     history.lastBlockIds(settings.synchronizationSettings.maxRollback), history.score())
 
-  private val discardingHandler = new DiscardingHandler(blockchainReadiness.get())
-  private val specs: Map[Byte, MessageSpec[_ <: AnyRef]] = BasicMessagesRepo.specs.map(s => s.messageCode -> s).toMap
-  private val messageCodec = new MessageCodec(specs)
+  private val discardingHandler = new DiscardingHandler(blockchainReadiness)
+  private val messageCodec = new MessageCodec()
 
   private val excludedAddresses: Set[InetSocketAddress] = {
     val localAddresses = if (settings.networkSettings.bindAddress.getAddress.isAnyLocalAddress) {
