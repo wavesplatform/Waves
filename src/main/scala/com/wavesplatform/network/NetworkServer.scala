@@ -75,7 +75,7 @@ class NetworkServer(checkpointService: CheckpointService,
   private val fatalErrorHandler = new FatalErrorHandler
   private val historyReplier = new HistoryReplier(history, settings.synchronizationSettings.maxChainLength)
 
-  private val inboundConnectionFilter = new InboundConnectionFilter(peerDatabase,
+  private val inboundConnectionFilter : PipelineInitializer.HandlerWrapper = new InboundConnectionFilter(peerDatabase,
     settings.networkSettings.maxInboundConnections,
     settings.networkSettings.maxConnectionsPerHost)
 
@@ -90,35 +90,36 @@ class NetworkServer(checkpointService: CheckpointService,
 
   private val utxPoolSychronizer = new UtxPoolSynchronizer(utxPool, allChannels)
 
+  private def baseHandlers: Seq[PipelineInitializer.HandlerWrapper] = Seq(
+    writeErrorHandler,
+    new HandshakeDecoder,
+    new HandshakeTimeoutHandler(settings.networkSettings.handshakeTimeout),
+    clientHandshakeHandler,
+    lengthFieldPrepender,
+    new LengthFieldBasedFrameDecoder(1024 * 1024, 0, 4, 0, 4),
+    new LegacyFrameCodec,
+    discardingHandler,
+    messageCodec,
+    peerSynchronizer,
+    historyReplier,
+    utxPoolSychronizer,
+    new ExtensionSignaturesLoader(settings.synchronizationSettings.synchronizationTimeout, peerDatabase),
+    new ExtensionBlocksLoader(history, settings.synchronizationSettings.synchronizationTimeout, peerDatabase),
+    new OptimisticExtensionLoader,
+    scoreObserver,
+    coordinatorHandler -> coordinatorExecutor,
+    fatalErrorHandler)
+
   private val serverChannel = settings.networkSettings.declaredAddress.map { _ =>
     new ServerBootstrap()
       .group(bossGroup, workerGroup)
       .channel(classOf[NioServerSocketChannel])
-      .childHandler(new PipelineInitializer[SocketChannel](Seq(
-        inboundConnectionFilter,
-        writeErrorHandler,
-        new HandshakeDecoder,
-        new HandshakeTimeoutHandler(settings.networkSettings.handshakeTimeout),
-        serverHandshakeHandler,
-        lengthFieldPrepender,
-        new LengthFieldBasedFrameDecoder(1024 * 1024, 0, 4, 0, 4),
-        new LegacyFrameCodec,
-        discardingHandler,
-        messageCodec,
-        peerSynchronizer,
-        historyReplier,
-        utxPoolSychronizer,
-        new ExtensionSignaturesLoader(settings.synchronizationSettings.synchronizationTimeout, peerDatabase),
-        new ExtensionBlocksLoader(history, settings.synchronizationSettings.synchronizationTimeout, peerDatabase),
-        new OptimisticExtensionLoader,
-        scoreObserver,
-        coordinatorHandler -> coordinatorExecutor,
-        fatalErrorHandler)))
+      .childHandler(new PipelineInitializer[SocketChannel](inboundConnectionFilter +: baseHandlers))
       .bind(settings.networkSettings.bindAddress)
       .channel()
   }
-
   private val outgoingChannelCount = new AtomicInteger(0)
+
   private val outgoingChannels = new ConcurrentHashMap[InetSocketAddress, Channel]
 
   private def incomingDeclaredAddresses =
@@ -127,31 +128,14 @@ class NetworkServer(checkpointService: CheckpointService,
   private val clientHandshakeHandler =
     new HandshakeHandler.Client(handshake, peerInfo, peerUniqueness, peerDatabase)
 
+
   private val bootstrap = new Bootstrap()
     .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, settings.networkSettings.connectionTimeout.toMillis.toInt: Integer)
     .group(workerGroup)
     .channel(classOf[NioSocketChannel])
-    .handler(new PipelineInitializer[SocketChannel](Seq(
-      writeErrorHandler,
-      new HandshakeDecoder,
-      new HandshakeTimeoutHandler(settings.networkSettings.handshakeTimeout),
-      clientHandshakeHandler,
-      lengthFieldPrepender,
-      new LengthFieldBasedFrameDecoder(1024 * 1024, 0, 4, 0, 4),
-      new LegacyFrameCodec,
-      discardingHandler,
-      messageCodec,
-      peerSynchronizer,
-      historyReplier,
-      utxPoolSychronizer,
-      new ExtensionSignaturesLoader(settings.synchronizationSettings.synchronizationTimeout, peerDatabase),
-      new ExtensionBlocksLoader(history, settings.synchronizationSettings.synchronizationTimeout, peerDatabase),
-      new OptimisticExtensionLoader,
-      scoreObserver,
-      coordinatorHandler -> coordinatorExecutor,
-      fatalErrorHandler)))
+    .handler(new PipelineInitializer[SocketChannel](baseHandlers))
 
-  val connectTask = workerGroup.scheduleWithFixedDelay(1.second, 5.seconds) {
+  private val connectTask = workerGroup.scheduleWithFixedDelay(1.second, 5.seconds) {
     log.trace(s"Outgoing: ${outgoingChannels.keySet} ++ incoming: $incomingDeclaredAddresses")
     if (outgoingChannelCount.get() < settings.networkSettings.maxOutboundConnections) {
       peerDatabase
