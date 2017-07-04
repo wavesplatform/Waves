@@ -255,8 +255,8 @@ class Node(config: Config, val nodeInfo: NodeInfo, client: AsyncHttpClient, time
   def blacklist(node: Node): Future[Unit] =
     post("/debug/blacklist", s"${node.nodeInfo.networkIpAddress}:${node.nodeInfo.hostNetworkPort}").map(_ => ())
 
-  def sendByNetwork(message: RawBytes): Future[Unit] = {
-    new NetworkSender(new InetSocketAddress("localhost", nodeInfo.hostNetworkPort), 'I', "it-test-client", 4634745848L).sendByNetwork(message)
+  def sendByNetwork(message: RawBytes*): Future[Unit] = {
+    new NetworkSender(new InetSocketAddress("localhost", nodeInfo.hostNetworkPort), 'I', "it-test-client", System.currentTimeMillis()).sendByNetwork(message: _*)
   }
 }
 
