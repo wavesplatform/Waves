@@ -4,13 +4,14 @@ import java.net.InetSocketAddress
 import java.util.concurrent.ConcurrentHashMap
 
 import com.wavesplatform.Version
+import com.wavesplatform.network.{Handshake, HandshakeHandler, PeerInfo, PeerKey, TransactionalMessagesRepo}
 import com.wavesplatform.settings._
 import io.netty.bootstrap.Bootstrap
 import io.netty.channel._
 import io.netty.channel.group.ChannelGroup
 import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.channel.socket.nio.NioSocketChannel
-import scorex.network.message.MessageSpec
+import scorex.network.message.{BasicMessagesRepo, MessageSpec}
 import scorex.utils.ScorexLogging
 
 class NetworkClient(
@@ -34,7 +35,7 @@ class NetworkClient(
   private val channels = new ConcurrentHashMap[InetSocketAddress, Channel]
 
   private val clientHandshakeHandler =
-    new HandshakeHandler.Client(handshake, peerInfo, peerUniqueness, _ => ())
+    new HandshakeHandler.Client(handshake, peerInfo, peerUniqueness, new NopPeerDatabase)
 
   private val bootstrap = new Bootstrap()
     .group(workerGroup)

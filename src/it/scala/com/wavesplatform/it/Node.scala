@@ -2,18 +2,13 @@ package com.wavesplatform.it
 
 import java.io.IOException
 import java.net.InetSocketAddress
-import java.util.concurrent.ConcurrentHashMap
 
 import com.typesafe.config.Config
-import com.wavesplatform.it.network.client.NetworkServer
 import com.wavesplatform.it.util._
 import com.wavesplatform.matcher.api.CancelOrderRequest
-import com.wavesplatform.network.{PeerInfo, RawBytes}
+import com.wavesplatform.network.RawBytes
 import com.wavesplatform.settings.WavesSettings
-import io.netty.channel.Channel
-import io.netty.channel.group.DefaultChannelGroup
 import io.netty.util.Timer
-import io.netty.util.concurrent.GlobalEventExecutor
 import org.asynchttpclient.Dsl.{get => _get, post => _post}
 import org.asynchttpclient.util.HttpConstants
 import org.asynchttpclient.{Response, _}
@@ -27,7 +22,6 @@ import scorex.transaction.TransactionParser.TransactionType
 import scorex.transaction.assets.exchange.Order
 import scorex.utils.{LoggerFacade, ScorexLogging}
 
-import scala.collection.JavaConverters._
 import scala.compat.java8.FutureConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._

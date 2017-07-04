@@ -1,19 +1,20 @@
 package com.wavesplatform.it.util
 
 import java.net.InetSocketAddress
-import java.util.concurrent.{ConcurrentHashMap, ThreadFactory}
+import java.util.concurrent.ConcurrentHashMap
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder
-import com.wavesplatform.it.network.client.{NetworkClient, PeerInfo, RawBytes}
+import com.wavesplatform.it.network.client.NetworkClient
+import com.wavesplatform.network.{PeerInfo, RawBytes}
 import io.netty.channel.Channel
 import io.netty.channel.group.DefaultChannelGroup
-import io.netty.util.{HashedWheelTimer, Timer}
+import io.netty.util.HashedWheelTimer
 import io.netty.util.concurrent.GlobalEventExecutor
 
-import scala.concurrent.Future
-import scala.concurrent.duration._
 import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
+import scala.concurrent.duration._
 
 class NetworkSender(address: InetSocketAddress, chainId: Char, name: String, nonce: Long) {
   private val retryTimer = new HashedWheelTimer(new ThreadFactoryBuilder().setDaemon(true).build())

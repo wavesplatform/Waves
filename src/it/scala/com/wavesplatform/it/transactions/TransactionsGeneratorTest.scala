@@ -1,8 +1,8 @@
 package com.wavesplatform.it.transactions
 
-import com.wavesplatform.it.network.client.RawBytes
 import com.wavesplatform.it.util.TransactionGenerator
 import com.wavesplatform.it.{IntegrationSuiteWithThreeAddresses, Node}
+import com.wavesplatform.network.RawBytes
 import scorex.account.PrivateKeyAccount
 import scorex.crypto.encode.Base58
 import scorex.transaction.TransactionParser.{TransactionType => TT}
@@ -10,8 +10,8 @@ import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction, TransferTransaction}
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction.{CreateAliasTransaction, PaymentTransaction, Transaction}
-import scala.concurrent.ExecutionContext.Implicits.global
 
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 

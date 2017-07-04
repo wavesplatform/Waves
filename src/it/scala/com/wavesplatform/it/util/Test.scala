@@ -2,7 +2,7 @@ package com.wavesplatform.it.util
 
 import java.net.{InetAddress, InetSocketAddress}
 
-import com.wavesplatform.it.network.client.RawBytes
+import com.wavesplatform.network.RawBytes
 import org.slf4j.LoggerFactory
 import scorex.account.{AddressScheme, PrivateKeyAccount}
 import scorex.crypto.encode.Base58
