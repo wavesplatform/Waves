@@ -23,6 +23,9 @@ class OptimisticExtensionLoader extends ChannelDuplexHandler with ScorexLogging 
     case ExtensionBlocks(extension) if discardNextBlocks =>
       discardNextBlocks = false
       log.debug(s"${id(ctx)} discarding just-loaded ${extension.length} blocks as requested")
+    case ExtensionBlocks(extension) if extension.isEmpty =>
+      log.debug(s"${id(ctx)} Blockchain is up to date")
+      super.channelRead(ctx, msg)
     case ExtensionBlocks(extension) if hopefullyNextIds.isEmpty =>
       loadNextPart(ctx, extension)
       log.debug(s"${id(ctx)} Passing extension with ${extension.length} blocks upstream")
