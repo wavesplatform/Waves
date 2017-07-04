@@ -36,7 +36,7 @@ case class NxtConsensusApiRoute(
       case Right(account) =>
         complete(Json.obj(
           "address" -> account.address,
-          "balance" -> PoSCalc.generatingBalance(state,fs)(account, state.height)))
+          "balance" -> PoSCalc.generatingBalance(state, fs, account, state.height)))
     }
   }
 

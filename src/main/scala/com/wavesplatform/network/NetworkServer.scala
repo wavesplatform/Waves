@@ -162,6 +162,7 @@ class NetworkServer(checkpointService: CheckpointService,
                 log.debug(s"${id(closeFuture.channel)} Connection closed, $remainingCount outgoing channel(s) remaining")
                 allChannels.remove(closeFuture.channel())
                 outgoingChannels.remove(remoteAddress, closeFuture.channel())
+                peerDatabase.blacklist(remoteAddress.getAddress)
               }
               allChannels.add(connFuture.channel())
             }

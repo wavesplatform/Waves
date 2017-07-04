@@ -57,28 +57,32 @@ object PoSCalc extends ScorexLogging {
     }
   }
 
-  def generatingBalance(state: StateReader, fs: FunctionalitySettings)(account: Account, atHeight: Int): Long = {
+  def generatingBalance(state: StateReader, fs: FunctionalitySettings, account: Account, atHeight: Int): Long = {
     val generatingBalanceDepth = if (atHeight >= fs.generatingBalanceDepthFrom50To1000AfterHeight) 1000 else 50
     state.effectiveBalanceAtHeightWithConfirmations(account, atHeight, generatingBalanceDepth)
   }
 
-  def nextBlockGenerationTime(height: Int, state: StateReader, fs: FunctionalitySettings, block: Block, account: PublicKeyAccount): Option[Long] = {
-    val balance = generatingBalance(state, fs)(account, height)
-    if (balance > MinimalEffectiveBalanceForGenerator) {
-      val cData = block.consensusData
-      val hit = calcHit(cData, account)
-      val t = cData.baseTarget
+  def nextBlockGenerationTime(
+      height: Int,
+      state: StateReader,
+      fs: FunctionalitySettings,
+      block: Block,
+      account: PublicKeyAccount): Either[String, Long] = {
+    val balance = generatingBalance(state, fs, account, height)
+    Either.cond(balance >= MinimalEffectiveBalanceForGenerator,
+      balance,
+      s"Balance $balance of ${ByteStr(account.publicKey)} is lower than $MinimalEffectiveBalanceForGenerator")
+      .flatMap { _ =>
+        val cData = block.consensusData
+        val hit = calcHit(cData, account)
+        val t = cData.baseTarget
 
-      val calculatedTs = (hit * 1000) / (BigInt(t) * balance) + block.timestamp
-      if (0 < calculatedTs && calculatedTs < Long.MaxValue) {
-        Some(calculatedTs.toLong)
-      } else {
-        log.debug(s"Invalid next block generation time: $calculatedTs")
-        None
+        val calculatedTs = (hit * 1000) / (BigInt(t) * balance) + block.timestamp
+        if (0 < calculatedTs && calculatedTs < Long.MaxValue) {
+          Right(calculatedTs.toLong)
+        } else {
+          Left(s"Invalid next block generation time: $calculatedTs")
+        }
       }
-    } else {
-      log.debug(s"Balance $balance of ${ByteStr(account.publicKey)} is lower than $MinimalEffectiveBalanceForGenerator")
-      None
-    }
   }
 }
