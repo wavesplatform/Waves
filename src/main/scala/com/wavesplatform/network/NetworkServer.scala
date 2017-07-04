@@ -87,6 +87,7 @@ class NetworkServer(checkpointService: CheckpointService,
     new HandshakeHandler.Server(handshake, peerInfo, peerUniqueness, peerDatabase, allChannels)
 
   private val utxPoolSychronizer = new UtxPoolSynchronizer(utxPool, allChannels)
+  private val microBlockSynchronizer = new MircoBlockSynchronizer(history)
 
   private def baseHandlers: Seq[PipelineInitializer.HandlerWrapper] = Seq(
     writeErrorHandler,
@@ -101,6 +102,7 @@ class NetworkServer(checkpointService: CheckpointService,
     peerSynchronizer,
     historyReplier,
     utxPoolSychronizer,
+    microBlockSynchronizer,
     new ExtensionSignaturesLoader(settings.synchronizationSettings.synchronizationTimeout, peerDatabase),
     new ExtensionBlocksLoader(history, settings.synchronizationSettings.synchronizationTimeout, peerDatabase),
     new OptimisticExtensionLoader,
