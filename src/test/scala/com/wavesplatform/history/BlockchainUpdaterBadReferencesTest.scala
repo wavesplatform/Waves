@@ -8,7 +8,7 @@ import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 import scorex.transaction.{GenesisTransaction, PaymentTransaction}
 
-class BlockStorageImplBlockBadReferencesTest extends PropSpec with PropertyChecks with
+class BlockchainUpdaterBadReferencesTest extends PropSpec with PropertyChecks with
   DomainScenarioDrivenPropertyCheck with Matchers with TransactionGen {
   private implicit def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)
 

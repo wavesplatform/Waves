@@ -10,7 +10,7 @@ import scorex.transaction.{BlockchainUpdater, History, NgHistoryWriterImpl}
 
 import scala.util.{Success, Try}
 
-object BlockStorageImpl {
+object StorageFactory {
 
   private def createStateStorage(history: History, stateFile: Option[File]): Try[StateStorage] =
     StateStorage(stateFile, dropExisting = false).flatMap { ss =>

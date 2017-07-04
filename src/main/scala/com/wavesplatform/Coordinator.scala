@@ -61,7 +61,7 @@ object Coordinator extends ScorexLogging {
     }
   }
 
-  def updateBlockchainReadinessFlag(history: History, time: Time, blockchainReadiness: AtomicBoolean, maxBlockchainAge: Duration): Boolean = {
+  private def updateBlockchainReadinessFlag(history: History, time: Time, blockchainReadiness: AtomicBoolean, maxBlockchainAge: Duration): Boolean = {
     val expired = time.correctedTime() - history.lastBlock.get.timestamp < maxBlockchainAge.toMillis
     blockchainReadiness.compareAndSet(expired, !expired)
   }

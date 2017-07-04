@@ -24,7 +24,7 @@ class CoordinatorHandler(checkpointService: CheckpointService, history: History,
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef) = msg match {
     case c: Checkpoint =>
       loggingResult(id(ctx), "applying checkpoint",
-        Coordinator.processCheckpoint(checkpointService, history, blockchainUpdater, settings.checkpointsSettings.publicKey)(c))
+        Coordinator.processCheckpoint(checkpointService, history, blockchainUpdater)(c))
         .fold(_ => peerDatabase.blacklistAndClose(ctx.channel()),
           score => allChannels.broadcast(ScoreChanged(score), Some(ctx.channel()))
         )

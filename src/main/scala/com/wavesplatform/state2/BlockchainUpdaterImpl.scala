@@ -75,7 +75,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
       updatePersistedAndInMemory()
     }
 
-    liquidBlockCandidatesDiff().get(block.reference) match {
+    (liquidBlockCandidatesDiff().get(block.reference) match {
       case Some(referencedLiquidDiff) =>
         val asFirmBlock = referencedLiquidDiff.copy(heightDiff = 1)
         ngHistoryWriter.appendBlock(block)(BlockDiffer.fromBlock(settings, proxy(currentPersistedBlocksState, () => asFirmBlock))(block)).map { newBlockDiff =>
@@ -86,7 +86,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
         ngHistoryWriter.appendBlock(block)(BlockDiffer.fromBlock(settings, currentPersistedBlocksState)(block)).map { newBlockDiff =>
           liquidBlockCandidatesDiff.set(Map(block.uniqueId -> newBlockDiff))
         }
-    }
+    }).map(_ => log.info( s"""Block ${block.uniqueId} appended. New height: ${ngHistoryWriter.height()}, new score: ${ngHistoryWriter.score()})"""))
   }
 
   override def removeAfter(blockId: ByteStr): Either[ValidationError, BigInt] = write { implicit l =>

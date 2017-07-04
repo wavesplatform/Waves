@@ -13,7 +13,7 @@ import akka.stream.ActorMaterializer
 import akka.util.Timeout
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.actor.RootActorSystem
-import com.wavesplatform.history.{BlockStorageImpl, CheckpointServiceImpl}
+import com.wavesplatform.history.{StorageFactory, CheckpointServiceImpl}
 import com.wavesplatform.http.NodeApiRoute
 import com.wavesplatform.matcher.Matcher
 import com.wavesplatform.mining.Miner
@@ -44,7 +44,7 @@ import scala.util.{Left, Try}
 class Application(val actorSystem: ActorSystem, val settings: WavesSettings) extends ScorexLogging {
 
   private val checkpointService = new CheckpointServiceImpl(settings.blockchainSettings.checkpointFile, settings.checkpointsSettings)
-  private val (history, stateWriter, stateReader, blockchainUpdater) = BlockStorageImpl(settings.blockchainSettings).get
+  private val (history, stateWriter, stateReader, blockchainUpdater) = StorageFactory(settings.blockchainSettings).get
   private lazy val upnp = new UPnP(settings.networkSettings.uPnPSettings) // don't initialize unless enabled
   private val wallet: Wallet = Wallet(settings.walletSettings)
 

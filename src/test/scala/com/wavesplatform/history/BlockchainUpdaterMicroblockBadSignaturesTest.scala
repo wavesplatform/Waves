@@ -10,7 +10,7 @@ import scorex.account.PrivateKeyAccount
 import scorex.lagonaki.mocks.TestBlock
 import scorex.transaction.{GenesisTransaction, PaymentTransaction, TransactionParser}
 
-class BlockStorageImplMicroblockBadSignaturesTest extends PropSpec with PropertyChecks
+class BlockchainUpdaterMicroblockBadSignaturesTest extends PropSpec with PropertyChecks
   with DomainScenarioDrivenPropertyCheck with Matchers with TransactionGen {
 
   private implicit def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)
