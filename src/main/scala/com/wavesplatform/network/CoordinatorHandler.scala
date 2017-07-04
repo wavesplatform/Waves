@@ -43,11 +43,18 @@ class CoordinatorHandler(checkpointService: CheckpointService, history: History,
       } else {
         peerDatabase.blacklistAndClose(ctx.channel())
       }
+    case MicroBlockResponse(m) =>
+      if (Signed.validateSignatures(m).isLeft) {
+        loggingResult(id(ctx), "applying block", Coordinator.processMicroBlock(checkpointService, history, blockchainUpdater, utxStorage)(m))
+          .foreach(score => allChannels.broadcast(MicroBlockInv(m.totalResBlockSig), Some(ctx.channel())))
+      } else {
+        peerDatabase.blacklistAndClose(ctx.channel())
+      }
   }
 }
 
 object CoordinatorHandler extends ScorexLogging {
-  def loggingResult(idCtx: String, msg: String, f: => Either[ValidationError, BigInt]): Either[ValidationError, BigInt] = {
+  def loggingResult[R](idCtx: String, msg: String, f: => Either[ValidationError, R]): Either[ValidationError, R] = {
     log.debug(s"$idCtx Starting $msg")
     val result = f
     result match {

@@ -2,7 +2,7 @@ package scorex.transaction
 
 import com.wavesplatform.network.{BlockCheckpoint, Checkpoint}
 import com.wavesplatform.state2.{BlockDiff, ByteStr}
-import scorex.block.Block
+import scorex.block.{Block, MicroBlock}
 import scorex.transaction.History.BlockchainScore
 import scorex.utils.Synchronized
 
@@ -19,6 +19,10 @@ trait History extends Synchronized with AutoCloseable {
   def heightOf(blockId: ByteStr): Option[Int]
 
   def lastBlockIds(howMany: Int): Seq[ByteStr]
+}
+
+trait NgHistory extends History {
+  def microBlock(id: ByteStr): Option[MicroBlock]
 }
 
 trait HistoryWriter extends History {
@@ -39,9 +43,10 @@ object CheckpointService {
 
   implicit class CheckpointServiceExt(cs: CheckpointService) {
     def isBlockValid(candidateSignature: ByteStr, estimatedHeight: Int): Boolean =
-      !cs.get.exists { _.items.exists { case BlockCheckpoint(h, sig) =>
-            h == estimatedHeight && candidateSignature != ByteStr(sig)
-          }
+      !cs.get.exists {
+        _.items.exists { case BlockCheckpoint(h, sig) =>
+          h == estimatedHeight && candidateSignature != ByteStr(sig)
+        }
       }
   }
 

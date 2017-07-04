@@ -17,15 +17,9 @@ import scorex.utils.{ScorexLogging, Time}
 import scala.util.control.NonFatal
 
 object Coordinator extends ScorexLogging {
-  def processFork(checkpoint: CheckpointService,
-                  history: History,
-                  blockchainUpdater: BlockchainUpdater,
-                  stateReader: StateReader,
-                  utxStorage: UtxPool,
-                  time: Time,
-                  settings: WavesSettings,
-                  miner: Miner,
-                  blockchainReadiness: AtomicBoolean)(newBlocks: Seq[Block]): Either[ValidationError, BigInt] = {
+  def processFork(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater, stateReader: StateReader,
+                  utxStorage: UtxPool, time: Time, settings: WavesSettings, miner: Miner, blockchainReadiness: AtomicBoolean)
+                 (newBlocks: Seq[Block]): Either[ValidationError, BigInt] = {
     val extension = newBlocks.dropWhile(history.contains)
 
     def isForkValidWithCheckpoint(lastCommonHeight: Int): Boolean = {

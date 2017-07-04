@@ -8,7 +8,7 @@ import scorex.block.{Block, MicroBlock}
 import scorex.transaction.History.BlockchainScore
 import scorex.transaction.ValidationError.{BlockAppendError, MicroBlockAppendError}
 
-trait NgHistoryWriter extends HistoryWriter {
+trait NgHistoryWriter extends HistoryWriter with NgHistory {
   def appendMicroBlock(microBlock: MicroBlock)(fullBlockConsensusValidation: => Either[ValidationError, Unit]): Either[ValidationError, Unit]
 
   def bestLiquidBlock(): Option[Block]
@@ -156,5 +156,8 @@ class NgHistoryWriterImpl(inner: HistoryWriter) extends NgHistoryWriter {
     })
   }
 
+  override def microBlock(id: BlockId): Option[MicroBlock] = read { implicit l =>
+    micros().find(_.totalResBlockSig == id)
+  }
   override def close(): Unit = inner.close()
 }

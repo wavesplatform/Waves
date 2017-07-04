@@ -15,7 +15,6 @@ import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.channel.socket.SocketChannel
 import io.netty.channel.socket.nio.{NioServerSocketChannel, NioSocketChannel}
 import io.netty.handler.codec.{LengthFieldBasedFrameDecoder, LengthFieldPrepender}
-import scorex.network.message.MessageSpec
 import scorex.transaction._
 import scorex.utils.{ScorexLogging, Time}
 
@@ -28,7 +27,7 @@ class NetworkServer(checkpointService: CheckpointService,
                     miner: Miner,
                     stateReader: StateReader,
                     settings: WavesSettings,
-                    history: History,
+                    history: NgHistory,
                     utxPool: UtxPool,
                     peerDatabase: PeerDatabase,
                     allChannels: ChannelGroup,
