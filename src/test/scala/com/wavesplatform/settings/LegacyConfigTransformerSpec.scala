@@ -170,6 +170,7 @@ class LegacyConfigTransformerSpec extends FreeSpec with Matchers {
           |    max-inbound-connections = 30
           |    max-outbound-connections = 30
           |    max-single-host-connections = 3
+          |    handshake-timeout = 30s
           |  }
           |  matcher {
           |    enable = false
@@ -216,6 +217,7 @@ class LegacyConfigTransformerSpec extends FreeSpec with Matchers {
           |    file = ""
           |    unrequested-packets-threshold = 100
           |    max-single-host-connections = 3
+          |    handshake-timeout = 30s
           |  }
           |  matcher {
           |    enable = false
