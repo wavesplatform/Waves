@@ -2,12 +2,13 @@ package com.wavesplatform.history
 
 import java.io.File
 
-import com.wavesplatform.utils.createMVStore
 import com.wavesplatform.network.{BlockCheckpoint, Checkpoint}
+import com.wavesplatform.settings.CheckpointsSettings
+import com.wavesplatform.utils.createMVStore
 import scorex.transaction.CheckpointService
 import scorex.utils.LogMVMapBuilder
 
-class CheckpointServiceImpl(fileName: Option[File]) extends CheckpointService with AutoCloseable {
+class CheckpointServiceImpl(fileName: Option[File], settings: CheckpointsSettings) extends CheckpointService with AutoCloseable {
   private val db = createMVStore(fileName)
   private val checkpoint = db.openMap("checkpoint", new LogMVMapBuilder[Int, (Seq[(Int, Array[Byte])], Array[Byte])])
   private val key = 0

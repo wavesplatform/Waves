@@ -12,15 +12,15 @@ import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
 import play.api.libs.json._
 import scorex.crypto.EllipticCurveImpl
-import scorex.transaction.{History, TransactionParser}
+import scorex.transaction.{BlockchainUpdater, CheckpointService, History, TransactionParser}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
 @Path("/blocks")
 @Api(value = "/blocks")
-case class BlocksApiRoute(settings: RestAPISettings, checkpointsSettings: CheckpointsSettings,
-                          history: History, coordinator: Coordinator, allChannels: ChannelGroup) extends ApiRoute {
+case class BlocksApiRoute(settings: RestAPISettings, checkpointsSettings: CheckpointsSettings, history: History, allChannels: ChannelGroup,
+                          checkpointService: CheckpointService, blockchainUpdater: BlockchainUpdater) extends ApiRoute {
 
   // todo: make this configurable and fix integration tests
   val MaxBlocksPerRequest = 100
@@ -176,7 +176,7 @@ case class BlocksApiRoute(settings: RestAPISettings, checkpointsSettings: Checkp
     (path("checkpoint") & post) {
       json[Checkpoint] { checkpoint =>
         Future {
-          coordinator.processCheckpoint(checkpoint)
+          Coordinator.processCheckpoint(checkpointService, history, blockchainUpdater, checkpointsSettings.publicKey)(checkpoint)
             .map(score => allChannels.broadcast(ScoreChanged(score)))
         }.map(_.fold(ApiError.fromValidationError,
           _ => Json.obj("" -> "")): ToResponseMarshallable)

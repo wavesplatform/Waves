@@ -6,14 +6,14 @@ import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.network.{PeerDatabase, PeerInfo}
 import com.wavesplatform.state2.reader.StateReader
 import com.wavesplatform.state2.{LeaseInfo, Portfolio}
-import com.wavesplatform.{BlockGen, Coordinator, TestWallet, TransactionGen}
+import com.wavesplatform.{BlockGen, TestWallet, TransactionGen}
 import io.netty.channel.Channel
 import io.netty.channel.group.ChannelGroup
 import org.scalacheck.{Gen, Shrink}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json._
-import scorex.transaction.History
+import scorex.transaction.{BlockchainUpdater, History}
 import scorex.waves.http.DebugApiRoute
 
 class DebugRouteSpec
@@ -21,12 +21,11 @@ class DebugRouteSpec
     with RestAPISettingsHelper with TestWallet with MockFactory with PropertyChecks with TransactionGen with BlockGen {
 
   private val state = mock[StateReader]
-  private val coordinator = stub[Coordinator]
   private val history = mock[History]
   private val peerDatabase = mock[PeerDatabase]
   private val channelGroup = mock[ChannelGroup]
   private val establishedConnections = mock[ConcurrentMap[Channel, PeerInfo]]
-  private val route = DebugApiRoute(restAPISettings, testWallet, state, history, peerDatabase, establishedConnections, coordinator, channelGroup).route
+  private val route = DebugApiRoute(restAPISettings, testWallet, state, history, peerDatabase, establishedConnections, mock[BlockchainUpdater], channelGroup).route
 
   private implicit def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)
 

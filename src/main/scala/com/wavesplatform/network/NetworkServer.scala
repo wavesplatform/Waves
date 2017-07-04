@@ -4,8 +4,10 @@ import java.net.{InetSocketAddress, NetworkInterface}
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
 
+import com.wavesplatform.mining.Miner
 import com.wavesplatform.settings._
-import com.wavesplatform.{Coordinator, UtxPool, Version}
+import com.wavesplatform.state2.reader.StateReader
+import com.wavesplatform.{UtxPool, Version}
 import io.netty.bootstrap.{Bootstrap, ServerBootstrap}
 import io.netty.channel._
 import io.netty.channel.group.ChannelGroup
@@ -15,20 +17,23 @@ import io.netty.channel.socket.nio.{NioServerSocketChannel, NioSocketChannel}
 import io.netty.handler.codec.{LengthFieldBasedFrameDecoder, LengthFieldPrepender}
 import scorex.network.message.MessageSpec
 import scorex.transaction._
-import scorex.utils.ScorexLogging
+import scorex.utils.{ScorexLogging, Time}
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 
-class NetworkServer(
-                       settings: WavesSettings,
-                       history: History,
-                       coordinator: Coordinator,
-                       utxPool: UtxPool,
-                       peerDatabase: PeerDatabase,
-                       allChannels: ChannelGroup,
-                       peerInfo: ConcurrentHashMap[Channel, PeerInfo],
-                       blockchainReadiness: AtomicBoolean
+class NetworkServer(checkpointService: CheckpointService,
+                    blockchainUpdater: BlockchainUpdater,
+                    time: Time,
+                    miner: Miner,
+                    stateReader: StateReader,
+                    settings: WavesSettings,
+                    history: History,
+                    utxPool: UtxPool,
+                    peerDatabase: PeerDatabase,
+                    allChannels: ChannelGroup,
+                    peerInfo: ConcurrentHashMap[Channel, PeerInfo],
+                    blockchainReadiness: AtomicBoolean
                    ) extends ScorexLogging {
 
   private val bossGroup = new NioEventLoopGroup()
@@ -75,9 +80,8 @@ class NetworkServer(
     settings.networkSettings.maxConnectionsPerHost)
 
   private val coordinatorExecutor = new DefaultEventLoop
-  private val coordinatorHandler = new CoordinatorHandler(coordinator, peerDatabase, allChannels)
-
-  //      scoreObserver,
+  private val coordinatorHandler = new CoordinatorHandler(checkpointService, history, blockchainUpdater, time,
+    stateReader, utxPool, blockchainReadiness, miner, settings, peerDatabase, allChannels)
 
   private val peerUniqueness = new ConcurrentHashMap[PeerKey, Channel]()
 

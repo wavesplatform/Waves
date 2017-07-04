@@ -2,35 +2,39 @@ package com.wavesplatform.mining
 
 import java.time.{Duration, Instant}
 import java.util.concurrent._
+import java.util.concurrent.atomic.AtomicBoolean
 
 import com.google.common.util.concurrent.{FutureCallback, Futures, MoreExecutors}
-import com.wavesplatform.UtxPool
-import com.wavesplatform.settings.{BlockchainSettings, MinerSettings}
+import com.wavesplatform.network.CoordinatorHandler.loggingResult
+import com.wavesplatform.network.{BlockForged, ScoreChanged, _}
+import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state2.ByteStr
 import com.wavesplatform.state2.reader.StateReader
+import com.wavesplatform.{Coordinator, UtxPool}
 import io.netty.channel.group.ChannelGroup
 import scorex.account.PrivateKeyAccount
 import scorex.block.Block
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
 import scorex.transaction.PoSCalc._
-import scorex.transaction.{History, PoSCalc}
+import scorex.transaction.{BlockchainUpdater, CheckpointService, History, PoSCalc}
 import scorex.utils.{ScorexLogging, Time}
 import scorex.wallet.Wallet
 
 import scala.collection.JavaConverters._
 import scala.math.Ordering.Implicits._
 
-
 class Miner(
-    history: History,
-    state: StateReader,
-    utx: UtxPool,
-    walllet : Wallet,
-    blockchainSettings: BlockchainSettings,
-    minerSettings: MinerSettings,
-    time: Time,
-    channelGroup: ChannelGroup,
-    blockHandler: Block => Unit) extends ScorexLogging {
+               allChannels: ChannelGroup,
+               blockchainReadiness: AtomicBoolean,
+               blockchainUpdater: BlockchainUpdater,
+               checkpoint: CheckpointService,
+               history: History,
+               stateReader: StateReader,
+               settings: WavesSettings,
+               time: Time,
+               utx: UtxPool,
+               wallet: Wallet) extends ScorexLogging {
+
   import Miner._
 
   private val minerPool = MoreExecutors.listeningDecorator(Executors.newScheduledThreadPool(2))
@@ -38,10 +42,11 @@ class Miner(
 
   private def generateBlock(account: PrivateKeyAccount, parentHeight: Int, parent: Block, greatGrandParent: Option[Block]): Callable[Option[Block]] = () => {
     val blockAge = Duration.between(Instant.ofEpochMilli(parent.timestamp), Instant.ofEpochMilli(time.correctedTime()))
+    val minerSettings = settings.minerSettings
     if (blockAge <= minerSettings.intervalAfterLastBlockThenGenerationIsAllowed || parentHeight == 1) {
-      val pc = channelGroup.size()
+      val pc = allChannels.size()
       if (pc >= minerSettings.quorum) {
-        val balance = generatingBalance(state, blockchainSettings.functionalitySettings)(account, parentHeight)
+        val balance = generatingBalance(stateReader, settings.blockchainSettings.functionalitySettings)(account, parentHeight)
         if (balance >= MinimalEffectiveBalanceForGenerator) {
           val lastBlockKernelData = parent.consensusData
           val currentTime = time.correctedTime()
@@ -51,7 +56,7 @@ class Miner(
             log.debug(s"Forging new block with ${account.address}, hit $h, target $t, balance $balance")
             log.debug(s"Previous block ID ${parent.uniqueId} at $parentHeight with target ${lastBlockKernelData.baseTarget}")
 
-            val avgBlockDelay = blockchainSettings.genesisSettings.averageBlockDelay
+            val avgBlockDelay = settings.blockchainSettings.genesisSettings.averageBlockDelay
             val btg = calcBaseTarget(avgBlockDelay, parentHeight, parent, greatGrandParent, currentTime)
             val gs = calcGeneratorSignature(lastBlockKernelData, account)
             val consensusData = NxtLikeConsensusBlockData(btg, gs)
@@ -79,10 +84,10 @@ class Miner(
   }
 
   private def retry(parentHeight: Int, parent: Block, greatGrandParent: Option[Block])(account: PrivateKeyAccount): Unit =
-    // Next block generation time can be None only when the account's generating balance is less than required. The
-    // balance, in turn, changes only when new block is appended to the blockchain, which causes all scheduled forging
-    // attempts to be cancelled and re-scheduled over the new parent.
-    for (ts <- PoSCalc.nextBlockGenerationTime(parentHeight, state, blockchainSettings.functionalitySettings, parent, account)) {
+  // Next block generation time can be None only when the account's generating balance is less than required. The
+  // balance, in turn, changes only when new block is appended to the blockchain, which causes all scheduled forging
+  // attempts to be cancelled and re-scheduled over the new parent.
+    for (ts <- PoSCalc.nextBlockGenerationTime(parentHeight, stateReader, settings.blockchainSettings.functionalitySettings, parent, account)) {
       val generationInstant = Instant.ofEpochMilli(ts + 10)
       val calculatedOffset = Duration.between(Instant.ofEpochMilli(time.correctedTime()), generationInstant)
       log.debug(s"Next block generation attempt calculated in $calculatedOffset (parent: ${parent.uniqueId})")
@@ -100,7 +105,15 @@ class Miner(
 
           Futures.addCallback(thisAttempt, new FutureCallback[Option[Block]] {
             override def onSuccess(result: Option[Block]): Unit = result match {
-              case Some(block) => blockHandler(block)
+              case Some(block) =>
+                loggingResult("local", s"applying locally mined block (${block.uniqueId})",
+                  Coordinator.processBlock(checkpoint, history, blockchainUpdater, time, stateReader,
+                    utx, blockchainReadiness, Miner.this, settings)(block, local = true)
+                    .map { score =>
+                      allChannels.broadcast(ScoreChanged(score))
+                      allChannels.broadcast(BlockForged(block))
+                      score
+                    })
               case None =>
                 if (scheduledAttempts.remove(key, thisAttempt)) {
                   log.debug(s"No block generated: Retrying")
@@ -122,7 +135,7 @@ class Miner(
     scheduledAttempts.clear()
     val greatGrandParent = history.parent(parent, 2)
     log.debug("Attempting to schedule block generation")
-    walllet.privateKeyAccounts().foreach(retry(parentHeight, parent, greatGrandParent))
+    wallet.privateKeyAccounts().foreach(retry(parentHeight, parent, greatGrandParent))
   }
 
   def shutdown(): Unit = minerPool.shutdownNow()

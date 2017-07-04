@@ -14,10 +14,10 @@ import io.netty.channel.socket.nio.NioSocketChannel
 import scorex.utils.ScorexLogging
 
 class RawNetworkServer(
-    chainId: Char,
-    settings: WavesSettings,
-    allChannels: ChannelGroup,
-    peerInfo: ConcurrentHashMap[Channel, PeerInfo]) extends ScorexLogging {
+                          chainId: Char,
+                          settings: WavesSettings,
+                          allChannels: ChannelGroup,
+                          peerInfo: ConcurrentHashMap[Channel, PeerInfo]) extends ScorexLogging {
 
   private val bossGroup = new NioEventLoopGroup()
   private val workerGroup = new NioEventLoopGroup()

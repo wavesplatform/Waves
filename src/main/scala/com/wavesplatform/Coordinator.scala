@@ -5,11 +5,10 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.network.{BlockCheckpoint, Checkpoint}
-import com.wavesplatform.settings.BlockchainSettings
+import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
 import com.wavesplatform.state2.ByteStr
 import com.wavesplatform.state2.reader.StateReader
 import scorex.block.Block
-import scorex.block.Block.BlockId
 import scorex.consensus.TransactionsOrdering
 import scorex.crypto.EllipticCurveImpl
 import scorex.transaction.ValidationError.{BlockAppendError, GenericError}
@@ -18,35 +17,16 @@ import scorex.utils.{ScorexLogging, Time}
 
 import scala.util.control.NonFatal
 
-class Coordinator(
-                     checkpoint: CheckpointService,
-                     history: History,
-                     blockchainUpdater: BlockchainUpdater,
-                     stateReader: StateReader,
-                     utxStorage: UtxPool,
-                     time: Time,
-                     settings: BlockchainSettings,
-                     maxBlockchainAge: Duration,
-                     checkpointPublicKey: ByteStr,
-                     miner: Miner,
-                     blockchainReadiness: AtomicBoolean) extends ScorexLogging {
-
-  import Coordinator._
-
-  private def updateBlockchainReadinessFlag(): Unit = {
-    val expired = time.correctedTime() - history.lastBlock.get.timestamp < maxBlockchainAge.toMillis
-    blockchainReadiness.compareAndSet(expired, !expired)
-  }
-
-  private def appendBlock(block: Block): Either[ValidationError, Unit] = for {
-    _ <- Either.cond(checkpoint.isBlockValid(block, history.height() + 1), (),
-      BlockAppendError(s"[h = ${history.height() + 1}] is not valid with respect to checkpoint", block))
-    _ <- Either.cond(blockConsensusValidation(history, stateReader, settings, time.correctedTime())(block), (),
-      BlockAppendError("consensus data is not valid", block))
-    _ <- blockchainUpdater.processBlock(block)
-  } yield block.transactionData.foreach(utxStorage.remove)
-
-  def processFork(newBlocks: Seq[Block]): Either[ValidationError, BigInt] = {
+object Coordinator extends ScorexLogging {
+  def processFork(checkpoint: CheckpointService,
+                  history: History,
+                  blockchainUpdater: BlockchainUpdater,
+                  stateReader: StateReader,
+                  utxStorage: UtxPool,
+                  time: Time,
+                  settings: WavesSettings,
+                  miner: Miner,
+                  blockchainReadiness: AtomicBoolean)(newBlocks: Seq[Block]): Either[ValidationError, BigInt] = {
     val extension = newBlocks.dropWhile(history.contains)
 
     def isForkValidWithCheckpoint(lastCommonHeight: Int): Boolean = {
@@ -58,18 +38,19 @@ class Coordinator(
         if (history.heightOf(lastCommonBlockId).exists(isForkValidWithCheckpoint)) {
           blockchainUpdater.removeAfter(lastCommonBlockId)
 
-          val result = extension.view.map(b => b -> appendBlock(b)).collectFirst {
-            case (b, Left(e)) => b -> e
-          }.fold[Either[ValidationError, BigInt]](Right(history.score())) {
+          val result = extension.view
+            .map(b => b -> appendBlock(checkpoint, history, blockchainUpdater, stateReader, utxStorage, time, settings.blockchainSettings)(b))
+            .collectFirst { case (b, Left(e)) => b -> e }
+            .fold[Either[ValidationError, BigInt]](Right(history.score())) {
             case (b, e) =>
               log.warn(s"Can't process fork starting with $lastCommonBlockId, error appending block ${b.uniqueId}: $e")
               Left(e)
           }
 
-      result.foreach { _ =>
-        miner.lastBlockChanged(history.height(), history.lastBlock.get)
-        updateBlockchainReadinessFlag()
-      }
+          result.foreach { _ =>
+            miner.lastBlockChanged(history.height(), history.lastBlock.get)
+            updateBlockchainReadinessFlag(history, time, blockchainReadiness, settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed)
+          }
 
           result
         } else {
@@ -81,23 +62,45 @@ class Coordinator(
     }
   }
 
-  def processBlock(newBlock: Block, local: Boolean): Either[ValidationError, BigInt] = {
+  def updateBlockchainReadinessFlag(history: History, time: Time, blockchainReadiness: AtomicBoolean, maxBlockchainAge: Duration): Boolean = {
+    val expired = time.correctedTime() - history.lastBlock.get.timestamp < maxBlockchainAge.toMillis
+    blockchainReadiness.compareAndSet(expired, !expired)
+  }
+
+  def processBlock(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater, time: Time,
+                   stateReader: StateReader, utxStorage: UtxPool, blockchainReadiness: AtomicBoolean, miner: Miner,
+                   settings: WavesSettings)(newBlock: Block, local: Boolean): Either[ValidationError, BigInt] = {
     val newScore = for {
-      _ <- appendBlock(newBlock)
+      _ <- appendBlock(checkpoint, history, blockchainUpdater, stateReader, utxStorage, time, settings.blockchainSettings)(newBlock)
     } yield history.score()
 
     if (local || newScore.isRight) {
-      updateBlockchainReadinessFlag()
+      updateBlockchainReadinessFlag(history, time, blockchainReadiness, settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed)
       miner.lastBlockChanged(history.height(), newBlock)
     }
     newScore
   }
 
-  def processCheckpoint(newCheckpoint: Checkpoint): Either[ValidationError, BigInt] =
+  private def appendBlock(checkpoint: CheckpointService,
+                          history: History,
+                          blockchainUpdater: BlockchainUpdater,
+                          stateReader: StateReader,
+                          utxStorage: UtxPool,
+                          time: Time,
+                          settings: BlockchainSettings)(block: Block): Either[ValidationError, Unit] = for {
+    _ <- Either.cond(checkpoint.isBlockValid(block, history.height() + 1), (),
+      BlockAppendError(s"[h = ${history.height() + 1}] is not valid with respect to checkpoint", block))
+    _ <- Either.cond(blockConsensusValidation(history, stateReader, settings, time.correctedTime())(block), (),
+      BlockAppendError("consensus data is not valid", block))
+    _ <- blockchainUpdater.processBlock(block)
+  } yield block.transactionData.foreach(utxStorage.remove)
+
+  def processCheckpoint(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater, checkpointPublicKey: ByteStr)
+                       (newCheckpoint: Checkpoint): Either[ValidationError, BigInt] =
     if (!checkpoint.get.forall(_.signature sameElements newCheckpoint.signature)) {
       if (EllipticCurveImpl.verify(newCheckpoint.signature, newCheckpoint.toSign, checkpointPublicKey.arr)) {
         checkpoint.set(Some(newCheckpoint))
-        makeBlockchainCompliantWith(newCheckpoint)
+        makeBlockchainCompliantWith(history, blockchainUpdater)(newCheckpoint)
         Right(history.score())
       } else {
         Left(GenericError("Invalid checkpoint signature"))
@@ -106,9 +109,8 @@ class Coordinator(
       Left(GenericError("Checkpoint already applied"))
     }
 
-  def processRollback(blockId: ByteStr): Either[ValidationError, BigInt] = blockchainUpdater.removeAfter(blockId)
 
-  private def makeBlockchainCompliantWith(checkpoint: Checkpoint): Unit = {
+  private def makeBlockchainCompliantWith(history: History, blockchainUpdater: BlockchainUpdater)(checkpoint: Checkpoint): Unit = {
     val existingItems = checkpoint.items.filter {
       checkpoint => history.blockAt(checkpoint.height).isDefined
     }
@@ -129,12 +131,10 @@ class Coordinator(
       }
     }
   }
-}
 
-object Coordinator extends ScorexLogging {
   val MaxTimeDrift: Long = Duration.ofSeconds(15).toMillis
 
-  def blockConsensusValidation(history: History, state: StateReader, bcs: BlockchainSettings, currentTs: Long)(block: Block): Boolean = try {
+  private def blockConsensusValidation(history: History, state: StateReader, bcs: BlockchainSettings, currentTs: Long)(block: Block): Boolean = try {
 
     import PoSCalc._
 

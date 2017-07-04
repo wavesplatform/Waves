@@ -17,8 +17,7 @@ import com.wavesplatform.history.{BlockStorageImpl, CheckpointServiceImpl}
 import com.wavesplatform.http.NodeApiRoute
 import com.wavesplatform.matcher.Matcher
 import com.wavesplatform.mining.Miner
-import com.wavesplatform.network.CoordinatorHandler.loggingResult
-import com.wavesplatform.network.{BlockForged, NetworkServer, PeerDatabaseImpl, PeerInfo, ScoreChanged, UPnP, _}
+import com.wavesplatform.network.{NetworkServer, PeerDatabaseImpl, PeerInfo, UPnP}
 import com.wavesplatform.settings._
 import io.netty.channel.Channel
 import io.netty.channel.group.DefaultChannelGroup
@@ -44,8 +43,8 @@ import scala.util.{Left, Try}
 
 class Application(val actorSystem: ActorSystem, val settings: WavesSettings) extends ScorexLogging {
 
-  private val checkpoints = new CheckpointServiceImpl(settings.blockchainSettings.checkpointFile)
-  val (history, stateWriter, stateReader, blockchainUpdater) = BlockStorageImpl(settings.blockchainSettings).get
+  private val checkpointService = new CheckpointServiceImpl(settings.blockchainSettings.checkpointFile, settings.checkpointsSettings)
+  private val (history, stateWriter, stateReader, blockchainUpdater) = BlockStorageImpl(settings.blockchainSettings).get
   private lazy val upnp = new UPnP(settings.networkSettings.uPnPSettings) // don't initialize unless enabled
   private val wallet: Wallet = Wallet(settings.walletSettings)
 
@@ -70,35 +69,16 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
 
     val blockchainReadiness = new AtomicBoolean(false)
 
-    lazy val coordinator = new Coordinator(checkpoints, history, blockchainUpdater, stateReader, utxStorage,
-      time, settings.blockchainSettings,
-      settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed, settings.checkpointsSettings.publicKey,
-      miner, blockchainReadiness)
+    val miner = new Miner(allChannels, blockchainReadiness, blockchainUpdater, checkpointService,
+      history, stateReader, settings, time, utxStorage, wallet)
 
-    lazy val miner : Miner = new Miner(history, stateReader, utxStorage, wallet,
-      settings.blockchainSettings, settings.minerSettings, time, allChannels,
-      b => {
-        loggingResult("local", s"applying locally mined block (${b.uniqueId})", coordinator.processBlock(b, local = true))
-          .foreach { score =>
-            allChannels.broadcast(ScoreChanged(score))
-            allChannels.broadcast(BlockForged(b))
-          }
-      })
-
-    val network = new NetworkServer(
-      settings,
-      history,
-      coordinator,
-      utxStorage,
-      peerDatabase,
-      allChannels,
-      establishedConnections,
-      blockchainReadiness)
+    val network = new NetworkServer(checkpointService, blockchainUpdater, time, miner, stateReader, settings,
+      history, utxStorage, peerDatabase, allChannels, establishedConnections, blockchainReadiness)
 
     miner.lastBlockChanged(history.height(), history.lastBlock.get)
 
     val apiRoutes = Seq(
-      BlocksApiRoute(settings.restAPISettings, settings.checkpointsSettings, history, coordinator, allChannels),
+      BlocksApiRoute(settings.restAPISettings, settings.checkpointsSettings, history, allChannels, checkpointService, blockchainUpdater),
       TransactionsApiRoute(settings.restAPISettings, stateReader, history, utxStorage),
       NxtConsensusApiRoute(settings.restAPISettings, stateReader, history, settings.blockchainSettings.functionalitySettings),
       WalletApiRoute(settings.restAPISettings, wallet),
@@ -106,8 +86,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
       UtilsApiRoute(settings.restAPISettings),
       PeersApiRoute(settings.restAPISettings, network.connect, peerDatabase, establishedConnections),
       AddressApiRoute(settings.restAPISettings, wallet, stateReader, settings.blockchainSettings.functionalitySettings),
-      DebugApiRoute(settings.restAPISettings, wallet, stateReader, history, peerDatabase, establishedConnections,
-        coordinator, allChannels),
+      DebugApiRoute(settings.restAPISettings, wallet, stateReader, history, peerDatabase, establishedConnections, blockchainUpdater, allChannels),
       WavesApiRoute(settings.restAPISettings, wallet, utxStorage, time),
       AssetsApiRoute(settings.restAPISettings, wallet, utxStorage, stateReader, time),
       NodeApiRoute(settings.restAPISettings, () => this.shutdown()),
