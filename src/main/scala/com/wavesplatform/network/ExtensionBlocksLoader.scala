@@ -45,6 +45,7 @@ class ExtensionBlocksLoader(
         ctx.flush()
       } else {
         log.debug(s"${id(ctx)} No new blocks to load")
+        ctx.fireChannelRead(ExtensionBlocks(Seq.empty))
       }
 
     case b: Block if pendingSignatures.contains(b.uniqueId) =>
