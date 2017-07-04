@@ -10,7 +10,6 @@ import com.wavesplatform.state2.ByteStr
 import com.wavesplatform.state2.reader.StateReader
 import scorex.block.Block
 import scorex.consensus.TransactionsOrdering
-import scorex.crypto.EllipticCurveImpl
 import scorex.transaction.ValidationError.{BlockAppendError, GenericError}
 import scorex.transaction._
 import scorex.utils.{ScorexLogging, Time}
@@ -95,19 +94,13 @@ object Coordinator extends ScorexLogging {
     _ <- blockchainUpdater.processBlock(block)
   } yield block.transactionData.foreach(utxStorage.remove)
 
-  def processCheckpoint(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater, checkpointPublicKey: ByteStr)
+  def processCheckpoint(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater)
                        (newCheckpoint: Checkpoint): Either[ValidationError, BigInt] =
-    if (!checkpoint.get.forall(_.signature sameElements newCheckpoint.signature)) {
-      if (EllipticCurveImpl.verify(newCheckpoint.signature, newCheckpoint.toSign, checkpointPublicKey.arr)) {
-        checkpoint.set(Some(newCheckpoint))
+    checkpoint.set(newCheckpoint)
+      .map { _ =>
         makeBlockchainCompliantWith(history, blockchainUpdater)(newCheckpoint)
-        Right(history.score())
-      } else {
-        Left(GenericError("Invalid checkpoint signature"))
+        history.score()
       }
-    } else {
-      Left(GenericError("Checkpoint already applied"))
-    }
 
 
   private def makeBlockchainCompliantWith(history: History, blockchainUpdater: BlockchainUpdater)(checkpoint: Checkpoint): Unit = {

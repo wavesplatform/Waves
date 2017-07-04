@@ -30,7 +30,7 @@ trait HistoryWriter extends History {
 
 trait CheckpointService {
 
-  def set(checkpoint: Option[Checkpoint])
+  def set(checkpoint: Checkpoint): Either[ValidationError, Unit]
 
   def get: Option[Checkpoint]
 }
@@ -63,7 +63,6 @@ object History {
     def score(): BlockchainScore = history.read { implicit lock =>
       history.lastBlock.flatMap(last => history.scoreOf(last.uniqueId)).getOrElse(0)
     }
-
 
     def isEmpty: Boolean = history.height() == 0
 
