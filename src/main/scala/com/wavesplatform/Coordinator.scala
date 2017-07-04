@@ -8,9 +8,9 @@ import com.wavesplatform.network.{BlockCheckpoint, Checkpoint}
 import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
 import com.wavesplatform.state2.ByteStr
 import com.wavesplatform.state2.reader.StateReader
-import scorex.block.Block
+import scorex.block.{Block, MicroBlock}
 import scorex.consensus.TransactionsOrdering
-import scorex.transaction.ValidationError.{BlockAppendError, GenericError}
+import scorex.transaction.ValidationError.{BlockAppendError, GenericError, MicroBlockAppendError}
 import scorex.transaction._
 import scorex.utils.{ScorexLogging, Time}
 
@@ -29,7 +29,7 @@ object Coordinator extends ScorexLogging {
     val extension = newBlocks.dropWhile(history.contains)
 
     def isForkValidWithCheckpoint(lastCommonHeight: Int): Boolean = {
-      extension.zipWithIndex.forall(p => checkpoint.isBlockValid(p._1, lastCommonHeight + 1 + p._2))
+      extension.zipWithIndex.forall(p => checkpoint.isBlockValid(p._1.signerData.signature, lastCommonHeight + 1 + p._2))
     }
 
     extension.headOption.map(_.reference) match {
@@ -80,6 +80,14 @@ object Coordinator extends ScorexLogging {
     newScore
   }
 
+  def processMicroBlock(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater, utxStorage: UtxPool)
+                       (microBlock: MicroBlock): Either[ValidationError, Unit] = for {
+    _ <- Either.cond(checkpoint.isBlockValid(microBlock.totalResBlockSig, history.height() + 1), (),
+      MicroBlockAppendError(s"[h = ${history.height() + 1}] is not valid with respect to checkpoint", microBlock))
+    _ <- blockchainUpdater.processMicroBlock(microBlock)
+  } yield microBlock.transactionData.foreach(utxStorage.remove)
+
+
   private def appendBlock(checkpoint: CheckpointService,
                           history: History,
                           blockchainUpdater: BlockchainUpdater,
@@ -87,7 +95,7 @@ object Coordinator extends ScorexLogging {
                           utxStorage: UtxPool,
                           time: Time,
                           settings: BlockchainSettings)(block: Block): Either[ValidationError, Unit] = for {
-    _ <- Either.cond(checkpoint.isBlockValid(block, history.height() + 1), (),
+    _ <- Either.cond(checkpoint.isBlockValid(block.signerData.signature, history.height() + 1), (),
       BlockAppendError(s"[h = ${history.height() + 1}] is not valid with respect to checkpoint", block))
     _ <- Either.cond(blockConsensusValidation(history, stateReader, settings, time.correctedTime())(block), (),
       BlockAppendError("consensus data is not valid", block))

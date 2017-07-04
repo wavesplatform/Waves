@@ -10,7 +10,7 @@ import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel.group.ChannelGroup
 import io.netty.channel.{ChannelHandlerContext, ChannelInboundHandlerAdapter}
 import scorex.block.Block
-import scorex.transaction.{BlockchainUpdater, CheckpointService, History, ValidationError}
+import scorex.transaction._
 import scorex.utils.{ScorexLogging, Time}
 
 @Sharable
@@ -36,7 +36,7 @@ class CoordinatorHandler(checkpointService: CheckpointService, history: History,
           score => allChannels.broadcast(ScoreChanged(score))
         )
     case b: Block =>
-      if (b.signatureValid) {
+      if (Signed.validateSignatures(b).isLeft) {
         loggingResult(id(ctx), "applying block", Coordinator.processBlock(checkpointService, history, blockchainUpdater, time,
           stateReader, utxStorage, blockchainReadiness, miner, settings)(b, local = false))
           .foreach(score => allChannels.broadcast(ScoreChanged(score)))

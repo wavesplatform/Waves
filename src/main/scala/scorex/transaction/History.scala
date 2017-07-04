@@ -38,12 +38,9 @@ trait CheckpointService {
 object CheckpointService {
 
   implicit class CheckpointServiceExt(cs: CheckpointService) {
-    def isBlockValid(candidate: Block, estimatedHeight: Int): Boolean =
-      !cs.get.exists {
-        case Checkpoint(items, _) =>
-          val blockSignature = candidate.signerData.signature
-          items.exists { case BlockCheckpoint(h, sig) =>
-            h == estimatedHeight && blockSignature != ByteStr(sig)
+    def isBlockValid(candidateSignature: ByteStr, estimatedHeight: Int): Boolean =
+      !cs.get.exists { _.items.exists { case BlockCheckpoint(h, sig) =>
+            h == estimatedHeight && candidateSignature != ByteStr(sig)
           }
       }
   }
