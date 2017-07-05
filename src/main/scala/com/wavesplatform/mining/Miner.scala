@@ -4,7 +4,7 @@ import java.time.{Duration, Instant}
 import java.util.concurrent._
 import java.util.concurrent.atomic.AtomicBoolean
 
-import com.google.common.util.concurrent.{FutureCallback, Futures, MoreExecutors}
+import com.google.common.util.concurrent.{FutureCallback, Futures, ListenableScheduledFuture, MoreExecutors}
 import com.wavesplatform.network._
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state2.ByteStr
@@ -12,8 +12,9 @@ import com.wavesplatform.state2.reader.StateReader
 import com.wavesplatform.{Coordinator, UtxPool}
 import io.netty.channel.group.ChannelGroup
 import scorex.account.PrivateKeyAccount
-import scorex.block.Block
+import scorex.block.{Block, MicroBlock}
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
+import scorex.crypto.EllipticCurveImpl
 import scorex.transaction.PoSCalc._
 import scorex.transaction.{BlockchainUpdater, CheckpointService, History}
 import scorex.utils.{ScorexLogging, Time}
@@ -136,12 +137,42 @@ class Miner(
     }
   }
 
-  def lastBlockChanged(parentHeight: Int, parent: Block): Unit = {
-    log.debug(s"New parent block: ${parent.uniqueId},${if (scheduledAttempts.isEmpty) "" else s" cancelling ${scheduledAttempts.size()} task(s) and"} trying to schedule new attempts")
-    scheduledAttempts.values.asScala.foreach(_.cancel(false))
-    scheduledAttempts.clear()
-    val greatGrandParent = history.parent(parent, 2)
-    wallet.privateKeyAccounts().foreach(retry(parentHeight, parent, greatGrandParent))
+  @volatile var accumulatedBlock: Block = null
+  @volatile var microblockScheduledFuture: Option[ListenableScheduledFuture[_]] = None
+
+  def lastBlockChanged(currentHeight: Int, lastBlock: Block): Unit = {
+    accumulatedBlock = lastBlock
+    wallet.privateKeyAccounts().find(pk => lastBlock.signerData.generator == pk) match {
+      case None =>
+        log.debug(s"New parent block: ${lastBlock.uniqueId},${if (scheduledAttempts.isEmpty) "" else s" cancelling ${scheduledAttempts.size()} task(s) and"} trying to schedule new attempts")
+        scheduledAttempts.values.asScala.foreach(_.cancel(false))
+        scheduledAttempts.clear()
+        val grandParent = history.parent(lastBlock, 2)
+        wallet.privateKeyAccounts().foreach(retry(currentHeight, lastBlock, grandParent))
+        microblockScheduledFuture.foreach(_.cancel(false))
+        microblockScheduledFuture = None
+      case Some(account) =>
+        microblockScheduledFuture = Some(minerPool.scheduleAtFixedRate(() => {
+          val unconfirmed = utx.packUnconfirmed()
+          if (unconfirmed.isEmpty) {
+            log.debug("skipping microblock because no txs in utx pool")
+          }
+          else {
+            val unsigned = accumulatedBlock.copy(version = 3, transactionData = accumulatedBlock.transactionData ++ unconfirmed)
+            val signature = ByteStr(EllipticCurveImpl.sign(account, unsigned.bytes))
+            val signed = accumulatedBlock.copy(signerData = accumulatedBlock.signerData.copy(signature = signature))
+
+            (for {
+              micro <- MicroBlock.buildAndSign(account, unconfirmed, lastBlock.signerData.signature, signature)
+              r <- Coordinator.processMicroBlock(checkpoint, history, blockchainUpdater, utx)(micro)
+            } yield r) match {
+              case Left(err) => log.debug(err.toString)
+              case Right(_) =>
+                accumulatedBlock = signed
+            }
+          }
+        }, 5, 5, TimeUnit.SECONDS))
+    }
   }
 
   def shutdown(): Unit = minerPool.shutdownNow()

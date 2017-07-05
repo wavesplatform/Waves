@@ -9,10 +9,10 @@ class AccountSpecification extends PropSpec with PropertyChecks with GeneratorDr
 
   property("Account.isValidAddress should return false for another address version") {
     forAll { (data: Array[Byte], AddressVersion2: Byte) =>
-      val publicKeyHash = hash(data).take(Account.HashLength)
+      val publicKeyHash = hash(data).take(Address.HashLength)
       val withoutChecksum = AddressVersion2 +: AddressScheme.current.chainId +: publicKeyHash
-      val addressVersion2 = Base58.encode(withoutChecksum ++ hash(withoutChecksum).take(Account.ChecksumLength))
-      Account.fromString(addressVersion2).isRight shouldBe (AddressVersion2 == Account.AddressVersion)
+      val addressVersion2 = Base58.encode(withoutChecksum ++ hash(withoutChecksum).take(Address.ChecksumLength))
+      Address.fromString(addressVersion2).isRight shouldBe (AddressVersion2 == Address.AddressVersion)
     }
   }
 }

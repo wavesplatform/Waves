@@ -7,7 +7,7 @@ import com.wavesplatform.settings.{FunctionalitySettings, RestAPISettings}
 import com.wavesplatform.state2.reader.StateReader
 import io.swagger.annotations._
 import play.api.libs.json.Json
-import scorex.account.Account
+import scorex.account.Address
 import scorex.api.http.{ApiRoute, CommonApiFunctions, InvalidAddress}
 import scorex.crypto.encode.Base58
 import scorex.transaction.{History, PoSCalc}
@@ -31,7 +31,7 @@ case class NxtConsensusApiRoute(
     new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
   ))
   def generatingBalance: Route = (path("generatingbalance" / Segment) & get) { address =>
-    Account.fromString(address) match {
+    Address.fromString(address) match {
       case Left(_) => complete(InvalidAddress)
       case Right(account) =>
         complete(Json.obj(

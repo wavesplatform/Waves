@@ -6,7 +6,7 @@ import com.wavesplatform.state2._
 import org.scalacheck.{Gen, Shrink}
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import org.scalatest.{Matchers, PropSpec}
-import scorex.account.Account
+import scorex.account.Address
 import scorex.lagonaki.mocks.TestBlock
 import scorex.settings.TestFunctionalitySettings
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
@@ -41,7 +41,7 @@ class LeaseTransactionsDiffTest extends PropSpec with PropertyChecks with Genera
         totalPortfolioDiff.effectiveBalance shouldBe 0
         totalPortfolioDiff.assets.values.foreach(_ shouldBe 0)
 
-        totalDiff.snapshots(lease.recipient.asInstanceOf[Account]) shouldBe Map(2 -> Snapshot(0, 0, lease.amount))
+        totalDiff.snapshots(lease.recipient.asInstanceOf[Address]) shouldBe Map(2 -> Snapshot(0, 0, lease.amount))
       }
 
       assertDiffAndState(Seq(TestBlock.create(Seq(genesis, lease))), TestBlock.create(Seq(leaseCancel))) { case (totalDiff, newState) =>
@@ -51,10 +51,10 @@ class LeaseTransactionsDiffTest extends PropSpec with PropertyChecks with Genera
         totalPortfolioDiff.effectiveBalance shouldBe 0
         totalPortfolioDiff.assets.values.foreach(_ shouldBe 0)
 
-        totalDiff.snapshots(lease.recipient.asInstanceOf[Account]) shouldBe Map(2 -> Snapshot(1, 0, 0))
+        totalDiff.snapshots(lease.recipient.asInstanceOf[Address]) shouldBe Map(2 -> Snapshot(1, 0, 0))
 
         newState.accountPortfolio(lease.sender).leaseInfo shouldBe LeaseInfo.empty
-        newState.accountPortfolio(lease.recipient.asInstanceOf[Account]).leaseInfo shouldBe LeaseInfo.empty
+        newState.accountPortfolio(lease.recipient.asInstanceOf[Address]).leaseInfo shouldBe LeaseInfo.empty
       }
     }
   }
@@ -134,7 +134,7 @@ class LeaseTransactionsDiffTest extends PropSpec with PropertyChecks with Genera
       case ((genesis, genesis2, lease, unleaseOther), blockTime) =>
         assertDiffAndState(Seq(TestBlock.create(Seq(genesis, genesis2, lease))), TestBlock.create(blockTime, Seq(unleaseOther)), settings) { case (totalDiff, newState) =>
           totalDiff.txsDiff.portfolios.get(lease.sender) shouldBe None
-          total(totalDiff.txsDiff.portfolios(lease.recipient.asInstanceOf[Account]).leaseInfo) shouldBe -lease.amount
+          total(totalDiff.txsDiff.portfolios(lease.recipient.asInstanceOf[Address]).leaseInfo) shouldBe -lease.amount
           total(totalDiff.txsDiff.portfolios(unleaseOther.sender).leaseInfo) shouldBe lease.amount
         }
     }

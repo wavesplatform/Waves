@@ -1,20 +1,20 @@
 package scorex.account
 
-import org.scalatest.{Matchers, PropSpec}
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
+import org.scalatest.{Matchers, PropSpec}
 
 class AccountOrAliasTests extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers {
 
   property("Account should get parsed correctly") {
-    AccountOrAlias.fromString("3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8").right.get shouldBe an[Account]
-    AccountOrAlias.fromString("address:3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8").right.get shouldBe an[Account]
+    AddressOrAlias.fromString("3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8").right.get shouldBe an[Address]
+    AddressOrAlias.fromString("address:3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8").right.get shouldBe an[Address]
 
-    Account.fromString("3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8").right.get shouldBe an[Account]
-    Account.fromString("address:3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8").right.get shouldBe an[Account]
+    Address.fromString("3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8").right.get shouldBe an[Address]
+    Address.fromString("address:3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8").right.get shouldBe an[Address]
   }
 
   property("Alias should get parsed correctly") {
-    val alias = AccountOrAlias.fromString("alias:T:sasha").right.get.asInstanceOf[Alias]
+    val alias = AddressOrAlias.fromString("alias:T:sasha").right.get.asInstanceOf[Alias]
     alias.name shouldBe "sasha"
     alias.networkByte shouldBe 'T'
 
@@ -24,15 +24,15 @@ class AccountOrAliasTests extends PropSpec with PropertyChecks with GeneratorDri
 
   }
   property("Alias cannot be from other network") {
-    AccountOrAlias.fromString("alias:Q:sasha") shouldBe 'left
+    AddressOrAlias.fromString("alias:Q:sasha") shouldBe 'left
   }
 
   property("Malformed aliases cannot be reconstructed") {
-    AccountOrAlias.fromString("alias::sasha") shouldBe 'left
-    AccountOrAlias.fromString("alias:T: sasha") shouldBe 'left
-    AccountOrAlias.fromString("alias:T:sasha\nivanov") shouldBe 'left
-    AccountOrAlias.fromString("alias:T:s") shouldBe 'left
-    AccountOrAlias.fromString("alias:TTT:sasha") shouldBe 'left
+    AddressOrAlias.fromString("alias::sasha") shouldBe 'left
+    AddressOrAlias.fromString("alias:T: sasha") shouldBe 'left
+    AddressOrAlias.fromString("alias:T:sasha\nivanov") shouldBe 'left
+    AddressOrAlias.fromString("alias:T:s") shouldBe 'left
+    AddressOrAlias.fromString("alias:TTT:sasha") shouldBe 'left
 
     Alias.fromString("alias:T: sasha") shouldBe 'left
     Alias.fromString("alias:T:sasha\nivanov") shouldBe 'left
@@ -44,6 +44,6 @@ class AccountOrAliasTests extends PropSpec with PropertyChecks with GeneratorDri
   }
 
   property("Unknown address schemes cannot be parsed") {
-    AccountOrAlias.fromString("postcode:119072") shouldBe 'left
+    AddressOrAlias.fromString("postcode:119072") shouldBe 'left
   }
 }

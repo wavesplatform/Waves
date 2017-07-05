@@ -137,7 +137,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Gene
       val tx = createExTx(buy, sell, price, matcher, Ts).explicitGet()
       assertDiffEi(Seq(TestBlock.create(Seq(gen1, gen2, issue1))), TestBlock.create(Seq(tx))) { totalDiffEi =>
         inside(totalDiffEi) { case Left(TransactionValidationError(AccountBalanceError(errs), _)) =>
-          errs should contain key seller.toAccount
+          errs should contain key seller.toAddress
         }
       }
     }

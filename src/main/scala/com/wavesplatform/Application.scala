@@ -13,7 +13,7 @@ import akka.stream.ActorMaterializer
 import akka.util.Timeout
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.actor.RootActorSystem
-import com.wavesplatform.history.{StorageFactory, CheckpointServiceImpl}
+import com.wavesplatform.history.{CheckpointServiceImpl, StorageFactory}
 import com.wavesplatform.http.NodeApiRoute
 import com.wavesplatform.matcher.Matcher
 import com.wavesplatform.mining.Miner
@@ -22,7 +22,7 @@ import com.wavesplatform.settings._
 import io.netty.channel.Channel
 import io.netty.channel.group.DefaultChannelGroup
 import io.netty.util.concurrent.GlobalEventExecutor
-import scorex.account.{Account, AddressScheme}
+import scorex.account.{Address, AddressScheme}
 import scorex.api.http._
 import scorex.api.http.alias.{AliasApiRoute, AliasBroadcastApiRoute}
 import scorex.api.http.assets.{AssetsApiRoute, AssetsBroadcastApiRoute}
@@ -259,7 +259,7 @@ object Application extends ScorexLogging {
 
   def genesisTransactions(gs: GenesisSettings): Seq[GenesisTransaction] = {
     gs.transactions.map { ts =>
-      val acc = Account.fromString(ts.recipient).right.get
+      val acc = Address.fromString(ts.recipient).right.get
       GenesisTransaction.create(acc, ts.amount, gs.transactionsTimestamp).right.get
     }
   }

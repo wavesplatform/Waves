@@ -33,7 +33,7 @@ class DebugRouteSpec
     val portfolioGen = for {
       a <- accountGen
       b <- Gen.posNum[Long]
-    } yield a.toAccount -> Portfolio(b, LeaseInfo.empty, Map.empty)
+    } yield a.toAddress -> Portfolio(b, LeaseInfo.empty, Map.empty)
 
     forAll(Gen.chooseNum(0, 20).flatMap(n => Gen.listOfN(n, portfolioGen))) { portfolios =>
       val portfolioMap = portfolios.toMap

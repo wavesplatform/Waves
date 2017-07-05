@@ -6,7 +6,7 @@ import com.wavesplatform.state2._
 import org.scalacheck.{Gen, Shrink}
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import org.scalatest.{Matchers, PropSpec}
-import scorex.account.Account
+import scorex.account.Address
 import scorex.lagonaki.mocks.TestBlock
 import scorex.transaction.GenesisTransaction
 import scorex.transaction.assets.{IssueTransaction, TransferTransaction}
@@ -36,9 +36,9 @@ class TransferTransactionDiffTest extends PropSpec with PropertyChecks with Gene
         totalPortfolioDiff.effectiveBalance shouldBe 0
         totalPortfolioDiff.assets.values.foreach(_ shouldBe 0)
 
-        val recipient: Account = transfer.recipient.asInstanceOf[Account]
+        val recipient: Address = transfer.recipient.asInstanceOf[Address]
         val recipientPortfolio = newState.accountPortfolio(recipient)
-        if (transfer.sender.toAccount != recipient) {
+        if (transfer.sender.toAddress != recipient) {
           transfer.assetId match {
             case Some(aid) => recipientPortfolio shouldBe Portfolio(0, LeaseInfo.empty, Map(aid -> transfer.amount))
             case None => recipientPortfolio shouldBe Portfolio(transfer.amount, LeaseInfo.empty, Map.empty)

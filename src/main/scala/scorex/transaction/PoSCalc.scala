@@ -3,7 +3,7 @@ package scorex.transaction
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.ByteStr
 import com.wavesplatform.state2.reader.StateReader
-import scorex.account.{Account, PublicKeyAccount}
+import scorex.account.{Address, PublicKeyAccount}
 import scorex.block.Block
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
 import scorex.crypto.hash.FastCryptographicHash
@@ -57,7 +57,7 @@ object PoSCalc extends ScorexLogging {
     }
   }
 
-  def generatingBalance(state: StateReader, fs: FunctionalitySettings, account: Account, atHeight: Int): Long = {
+  def generatingBalance(state: StateReader, fs: FunctionalitySettings, account: Address, atHeight: Int): Long = {
     val generatingBalanceDepth = if (atHeight >= fs.generatingBalanceDepthFrom50To1000AfterHeight) 1000 else 50
     state.effectiveBalanceAtHeightWithConfirmations(account, atHeight, generatingBalanceDepth)
   }

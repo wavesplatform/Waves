@@ -4,7 +4,7 @@ import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.state2.ByteStr
 import com.wavesplatform.utils.base58Length
 import play.api.libs.json.{JsObject, Json}
-import scorex.account.{AccountOrAlias, PrivateKeyAccount, PublicKeyAccount}
+import scorex.account.{AddressOrAlias, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.serialization.{BytesSerializable, Deser}
@@ -14,14 +14,14 @@ import scorex.transaction.{ValidationError, _}
 import scala.util.{Failure, Success, Try}
 
 case class TransferTransaction private(assetId: Option[AssetId],
-                                            sender: PublicKeyAccount,
-                                            recipient: AccountOrAlias,
-                                            amount: Long,
-                                            timestamp: Long,
-                                            feeAssetId: Option[AssetId],
-                                            fee: Long,
-                                            attachment: Array[Byte],
-                                            signature: ByteStr)
+                                       sender: PublicKeyAccount,
+                                       recipient: AddressOrAlias,
+                                       amount: Long,
+                                       timestamp: Long,
+                                       feeAssetId: Option[AssetId],
+                                       fee: Long,
+                                       attachment: Array[Byte],
+                                       signature: ByteStr)
   extends SignedTransaction {
   override val transactionType: TransactionType.Value = TransactionType.TransferTransaction
 
@@ -78,7 +78,7 @@ object TransferTransaction {
     val feeAmount = Longs.fromByteArray(bytes.slice(s1 + 16, s1 + 24))
 
     (for {
-      recRes <- AccountOrAlias.fromBytes(bytes, s1 + 24)
+      recRes <- AddressOrAlias.fromBytes(bytes, s1 + 24)
       (recipient, recipientEnd) = recRes
       (attachment, _) = Deser.parseArraySize(bytes, recipientEnd)
       tt <- TransferTransaction.create(assetIdOpt.map(ByteStr(_)), sender, recipient, amount, timestamp, feeAssetIdOpt.map(ByteStr(_)), feeAmount, attachment, signature)
@@ -87,7 +87,7 @@ object TransferTransaction {
 
   def create(assetId: Option[AssetId],
              sender: PublicKeyAccount,
-             recipient: AccountOrAlias,
+             recipient: AddressOrAlias,
              amount: Long,
              timestamp: Long,
              feeAssetId: Option[AssetId],
@@ -109,7 +109,7 @@ object TransferTransaction {
 
   def create(assetId: Option[AssetId],
              sender: PrivateKeyAccount,
-             recipient: AccountOrAlias,
+             recipient: AddressOrAlias,
              amount: Long,
              timestamp: Long,
              feeAssetId: Option[AssetId],

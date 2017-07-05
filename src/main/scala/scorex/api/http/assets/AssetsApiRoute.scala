@@ -10,7 +10,7 @@ import com.wavesplatform.state2.reader.StateReader
 import io.swagger.annotations._
 import play.api.libs.json._
 import scorex.BroadcastRoute
-import scorex.account.Account
+import scorex.account.Address
 import scorex.api.http.{ApiError, ApiRoute, InvalidAddress}
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange.Order
@@ -188,7 +188,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
     ByteStr.decodeBase58(assetIdStr) match {
       case Success(assetId) =>
         (for {
-          acc <- Account.fromString(address)
+          acc <- Address.fromString(address)
         } yield Json.obj(
           "address" -> acc.address,
           "assetId" -> assetIdStr,
@@ -199,7 +199,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
   }
 
   private def fullAccountAssetsInfo(address: String): Either[ApiError, JsObject] = (for {
-    acc <- Account.fromString(address)
+    acc <- Address.fromString(address)
   } yield {
     val balances: Seq[JsObject] = state.getAccountBalance(acc).map { case ((assetId, (balance, reissuable, quantity, issueTx, unique))) =>
       JsObject(Seq(

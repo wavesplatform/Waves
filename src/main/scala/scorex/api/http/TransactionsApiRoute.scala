@@ -10,7 +10,7 @@ import com.wavesplatform.state2.ByteStr
 import com.wavesplatform.state2.reader.StateReader
 import io.swagger.annotations._
 import play.api.libs.json._
-import scorex.account.Account
+import scorex.account.Address
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction.{History, Transaction}
 
@@ -42,7 +42,7 @@ case class TransactionsApiRoute(
   ))
   def addressLimit: Route = (pathPrefix("address") & get) {
     pathPrefix(Segment) { address =>
-      Account.fromString(address) match {
+      Address.fromString(address) match {
         case Left(e) => complete(ApiError.fromValidationError(e))
         case Right(a) =>
           pathPrefix("limit") {

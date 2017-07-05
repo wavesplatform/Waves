@@ -10,7 +10,7 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json._
-import scorex.account.Account
+import scorex.account.Address
 import scorex.api.http.{InvalidAddress, InvalidSignature, TooBigArrayAllocation, TransactionsApiRoute}
 import scorex.crypto.encode.Base58
 import scorex.transaction._
@@ -56,7 +56,7 @@ class TransactionsRouteSpec extends RouteSpec("/transactions")
         accountGen,
         choose(1, MaxTransactionsPerRequest),
         randomTransactionsGen(transactionsCount)) { case (account, limit, txs) =>
-        (state.accountTransactionIds _).expects(account: Account, limit).returning(txs.map(_.id)).once()
+        (state.accountTransactionIds _).expects(account: Address, limit).returning(txs.map(_.id)).once()
         txs.foreach { tx =>
           (state.transactionInfo _).expects(tx.id).returning(Some(1,tx)).once()
         }

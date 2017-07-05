@@ -4,7 +4,7 @@ import com.wavesplatform.it._
 import com.wavesplatform.network.RawBytes
 import org.scalatest._
 import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
-import scorex.account.{Account, PrivateKeyAccount}
+import scorex.account.{Address, PrivateKeyAccount}
 import scorex.crypto.encode.Base58
 import scorex.transaction.PaymentTransaction
 
@@ -26,7 +26,7 @@ class SimpleTransactionsSuite extends FunSuite with BeforeAndAfterAll with Match
   test("valid tx send by network to node should be in blockchain") {
     val tx = PaymentTransaction.create(
       PrivateKeyAccount(Base58.decode(node.accountSeed).get),
-      Account.fromString(node.address).right.get,
+      Address.fromString(node.address).right.get,
       1L,
       100000L,
       System.currentTimeMillis()).right.get
@@ -42,7 +42,7 @@ class SimpleTransactionsSuite extends FunSuite with BeforeAndAfterAll with Match
   test("invalid tx send by network to node should be not in UTX or blockchain") {
     val tx = PaymentTransaction.create(
       PrivateKeyAccount(Base58.decode(node.accountSeed).get),
-      Account.fromString(node.address).right.get,
+      Address.fromString(node.address).right.get,
       1L,
       100000L,
       System.currentTimeMillis() + (1 days).toMillis).right.get

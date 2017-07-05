@@ -2,13 +2,13 @@ package com.wavesplatform.state2
 
 import cats.Monoid
 import cats.implicits._
-import scorex.account.Account
+import scorex.account.Address
 
 import scala.collection.SortedMap
 
 case class BlockDiff(txsDiff: Diff,
                      heightDiff: Int,
-                     snapshots: Map[Account, SortedMap[Int, Snapshot]])
+                     snapshots: Map[Address, SortedMap[Int, Snapshot]])
 
 object BlockDiff {
 

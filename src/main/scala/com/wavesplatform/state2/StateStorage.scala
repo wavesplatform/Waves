@@ -5,7 +5,7 @@ import java.io.File
 import com.google.common.primitives.Ints
 import com.wavesplatform.utils._
 import org.h2.mvstore.MVMap
-import scorex.account.Account
+import scorex.account.Address
 import scorex.utils.LogMVMapBuilder
 
 import scala.util.Try
@@ -98,5 +98,5 @@ object StateStorage {
 
   type AccountIdxKey = Array[Byte]
 
-  def accountIndexKey(acc: Account, index: Int): AccountIdxKey = acc.bytes.arr ++ Ints.toByteArray(index)
+  def accountIndexKey(acc: Address, index: Int): AccountIdxKey = acc.bytes.arr ++ Ints.toByteArray(index)
 }

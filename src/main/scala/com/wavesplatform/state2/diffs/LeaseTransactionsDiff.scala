@@ -5,9 +5,9 @@ import cats.implicits._
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2._
 import com.wavesplatform.state2.reader.StateReader
-import scorex.account.Account
+import scorex.account.Address
 import scorex.transaction.ValidationError
-import scorex.transaction.ValidationError.{GenericError}
+import scorex.transaction.ValidationError.GenericError
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 
 import scala.util.{Left, Right}
@@ -15,7 +15,7 @@ import scala.util.{Left, Right}
 object LeaseTransactionsDiff {
 
   def lease(s: StateReader, height: Int)(tx: LeaseTransaction): Either[ValidationError, Diff] = {
-    val sender = Account.fromPublicKey(tx.sender.publicKey)
+    val sender = Address.fromPublicKey(tx.sender.publicKey)
     s.resolveAliasEi(tx.recipient).flatMap { recipient =>
       if (recipient == sender)
         Left(GenericError("Cannot lease to self"))
@@ -25,7 +25,7 @@ object LeaseTransactionsDiff {
           Left(GenericError(s"Cannot lease more than own: Balance:${ap.balance}, already leased: ${ap.leaseInfo.leaseOut}"))
         }
         else {
-          val portfolioDiff: Map[Account, Portfolio] = Map(
+          val portfolioDiff: Map[Address, Portfolio] = Map(
             sender -> Portfolio(-tx.fee, LeaseInfo(0, tx.amount), Map.empty),
             recipient -> Portfolio(0, LeaseInfo(tx.amount, 0), Map.empty)
           )
@@ -47,7 +47,7 @@ object LeaseTransactionsDiff {
       isLeaseActive = s.isLeaseActive(lease)
       _ <- if (!isLeaseActive && time > settings.allowMultipleLeaseCancelTransactionUntilTimestamp)
         Left(GenericError(s"Cannot cancel already cancelled lease")) else Right(())
-      canceller = Account.fromPublicKey(tx.sender.publicKey)
+      canceller = Address.fromPublicKey(tx.sender.publicKey)
       portfolioDiff <- if (tx.sender == lease.sender) {
         Right(Monoid.combine(
           Map(canceller -> Portfolio(-tx.fee, LeaseInfo(0, -lease.amount), Map.empty)),

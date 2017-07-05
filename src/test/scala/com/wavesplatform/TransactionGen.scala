@@ -1,15 +1,15 @@
 package com.wavesplatform
 
 import com.wavesplatform.settings.Constants
+import com.wavesplatform.state2._
 import org.scalacheck.{Arbitrary, Gen}
 import scorex.account.PublicKeyAccount._
 import scorex.account._
+import scorex.transaction._
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange._
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import scorex.transaction._
 import scorex.utils.NTP
-import com.wavesplatform.state2._
 
 trait TransactionGen {
 
@@ -35,7 +35,7 @@ trait TransactionGen {
     alias <- Gen.listOfN(l, Gen.alphaNumChar)
   } yield Alias.buildWithCurrentNetworkByte(alias.mkString).explicitGet()
 
-  val accountOrAliasGen: Gen[AccountOrAlias] = Gen.oneOf(aliasGen, accountGen.map(PublicKeyAccount.toAccount(_)))
+  val accountOrAliasGen: Gen[AddressOrAlias] = Gen.oneOf(aliasGen, accountGen.map(PublicKeyAccount.toAddress(_)))
 
   def otherAccountGen(candidate: PrivateKeyAccount): Gen[PrivateKeyAccount] = accountGen.flatMap(Gen.oneOf(candidate, _))
 
@@ -88,7 +88,7 @@ trait TransactionGen {
     cancelFee <- smallFeeGen
   } yield (lease, LeaseCancelTransaction.create(sender, lease.id, cancelFee, timestamp + 1).right.get)
 
-  def leaseAndCancelGeneratorP(leaseSender: PrivateKeyAccount, recipient: AccountOrAlias, unleaseSender: PrivateKeyAccount): Gen[(LeaseTransaction, LeaseCancelTransaction)] = for {
+  def leaseAndCancelGeneratorP(leaseSender: PrivateKeyAccount, recipient: AddressOrAlias, unleaseSender: PrivateKeyAccount): Gen[(LeaseTransaction, LeaseCancelTransaction)] = for {
     (_, amount, fee, timestamp, _) <- leaseParamGen
     lease = LeaseTransaction.create(leaseSender, amount, fee, timestamp, recipient).right.get
     fee2 <- smallFeeGen
@@ -125,7 +125,7 @@ trait TransactionGen {
     recipient <- accountOrAliasGen
   } yield (assetId.map(ByteStr(_)), sender, recipient, amount, timestamp, feeAssetId.map(ByteStr(_)), feeAmount, attachment)
 
-  def transferGeneratorP(sender: PrivateKeyAccount, recipient: AccountOrAlias,
+  def transferGeneratorP(sender: PrivateKeyAccount, recipient: AddressOrAlias,
                          assetId: Option[AssetId], feeAssetId: Option[AssetId]): Gen[TransferTransaction] = for {
     (_, _, _, amount, timestamp, _, feeAmount, attachment) <- transferParamGen
   } yield TransferTransaction.create(assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment).right.get

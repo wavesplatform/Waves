@@ -3,7 +3,7 @@ package scorex.api.http
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import com.wavesplatform.state2.diffs.TransactionDiffer.TransactionValidationError
 import play.api.libs.json._
-import scorex.account.{Account, AccountOrAlias, Alias}
+import scorex.account.{AddressOrAlias, Address, Alias}
 import scorex.transaction.{Transaction, ValidationError}
 
 case class ApiErrorResponse(error: Int, message: String)
@@ -176,11 +176,11 @@ case object BlockNotExists extends ApiError {
   override val message: String = "block does not exist"
 }
 
-case class AliasNotExists(aoa: AccountOrAlias) extends ApiError {
+case class AliasNotExists(aoa: AddressOrAlias) extends ApiError {
   override val id: Int = 301
   override val code = StatusCodes.NotFound
   private lazy val msgReason = aoa match {
-    case a: Account => s"for address '${a.stringRepr}'"
+    case a: Address => s"for address '${a.stringRepr}'"
     case a: Alias => s"'${a.stringRepr}'"
   }
   override val message: String = s"alias $msgReason doesn't exist"

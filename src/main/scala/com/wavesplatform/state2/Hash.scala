@@ -1,10 +1,10 @@
 package com.wavesplatform.state2
 
-import scorex.account.Account
+import scorex.account.Address
 
 object Hash {
-  def accountPortfolios(accountPortfolios: Map[Account, Portfolio]): Int = {
-    def accountPortfolioHash(accP: (Account, Portfolio)): Int = {
+  def accountPortfolios(accountPortfolios: Map[Address, Portfolio]): Int = {
+    def accountPortfolioHash(accP: (Address, Portfolio)): Int = {
       val (account, portfolio) = accP
       val h = account.hashCode() + portfolio.balance.hashCode() + portfolio.leaseInfo.hashCode()
       portfolio.assets.foldLeft(h) {
