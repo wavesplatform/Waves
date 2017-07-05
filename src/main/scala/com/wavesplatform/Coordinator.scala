@@ -82,30 +82,36 @@ class Coordinator(
     }
 
     extension.headOption.map(_.reference) match {
-      case Some(lastCommonBlockId) =>
-        if (history.heightOf(lastCommonBlockId).exists(isForkValidWithCheckpoint)) {
-          blockchainUpdater.removeAfter(lastCommonBlockId)
+      case Some(maybeLastCommonBlockId) =>
+        history.heightOf(maybeLastCommonBlockId) match {
+          case Some(commonBlockHeight) =>
+            if (isForkValidWithCheckpoint(commonBlockHeight)) {
+              blockchainUpdater.removeAfter(maybeLastCommonBlockId)
 
-          val result = extension.view.map(b => b -> appendBlock(b)).collectFirst {
-            case (b, Left(e)) => b -> e
-          }.fold[Either[ValidationError, BigInt]](Right(history.score())) {
-            case (b, e) =>
-              log.warn(s"Can't process fork starting with $lastCommonBlockId, error appending block ${b.uniqueId}: $e")
-              Left(e)
-          }
+              val result = extension.view.map(b => b -> appendBlock(b)).collectFirst {
+                case (b, Left(e)) => b -> e
+              }.fold[Either[ValidationError, BigInt]](Right(history.score())) {
+                case (b, e) =>
+                  log.warn(s"Can't process fork starting with $maybeLastCommonBlockId, error appending block ${b.uniqueId}: $e")
+                  Left(e)
+              }
 
-          result.foreach { _ =>
-            miner.lastBlockChanged(history.height(), history.lastBlock)
-            checkExpiry()
-          }
+              result.foreach { _ =>
+                miner.lastBlockChanged(history.height(), history.lastBlock)
+                checkExpiry()
+              }
 
-          result
-        } else {
-          Left(GenericError("Fork contains block that doesn't match checkpoint, declining fork"))
+              result
+            } else {
+              Left(GenericError("Fork contains block that doesn't match checkpoint, declining fork"))
+            }
+          case None =>
+            Left(GenericError("Fork contains no common parent"))
         }
 
       case None =>
-        Left(GenericError("No common block in sequence"))
+        log.debug("No new blocks found in extension")
+        Right(history.score())
     }
   }
 
