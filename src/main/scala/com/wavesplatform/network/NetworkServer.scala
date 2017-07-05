@@ -75,7 +75,7 @@ class NetworkServer(
     settings.blockchainSettings, settings.minerSettings, time.correctedTime(), allChannels.size(),
     b => writeToLocalChannel(BlockForged(b)))
 
-  private val peerSynchronizer = new PeerSynchronizer(peerDatabase)
+  private val peerSynchronizer = new PeerSynchronizer(peerDatabase, settings.networkSettings.peersBroadcastInterval)
   private val utxPoolSynchronizer = new UtxPoolSynchronizer(txHandler, allChannels)
   // There are two error handlers by design. WriteErrorHandler adds a future listener to make sure writes to network
   // succeed. It is added to the head of pipeline (it's the closest of the two to actual network), because some writes

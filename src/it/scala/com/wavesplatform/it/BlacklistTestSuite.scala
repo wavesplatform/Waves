@@ -29,7 +29,7 @@ class BlacklistTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll {
     Await.result(
       for {
         count <- Future.traverse(nodes)(_.waitForPeers(NodesCount - 1))
-      } yield count, 1.minute
+      } yield count, 3.minute
     )
   }
 
