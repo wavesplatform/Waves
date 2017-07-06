@@ -4,11 +4,12 @@ import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel.{ChannelHandlerContext, ChannelInboundHandlerAdapter}
 import scorex.utils.ScorexLogging
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.FiniteDuration
 
 @Sharable
-class PeerSynchronizer(peerDatabase: PeerDatabase) extends ChannelInboundHandlerAdapter with ScorexLogging {
-  def requestPeers(ctx: ChannelHandlerContext): Unit = ctx.executor().schedule(10.seconds) {
+class PeerSynchronizer(peerDatabase: PeerDatabase, peerRequestInterval: FiniteDuration) extends ChannelInboundHandlerAdapter
+  with ScorexLogging {
+  def requestPeers(ctx: ChannelHandlerContext): Unit = ctx.executor().schedule(peerRequestInterval) {
     if (ctx.channel().isActive) {
       log.trace(s"${id(ctx)} Requesting peers")
       ctx.writeAndFlush(GetPeers)
