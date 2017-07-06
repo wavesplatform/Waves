@@ -14,7 +14,7 @@ object TransactionsBlockField {
 }
 
 case class TransactionsBlockFieldVersion1or2(override val value: Seq[Transaction]) extends TransactionsBlockField {
-  override val name = "transactions v1 v2"
+  override val name = "transactions"
 
   override lazy val json: JsObject = Json.obj(name -> JsArray(value.map(_.json)))
 

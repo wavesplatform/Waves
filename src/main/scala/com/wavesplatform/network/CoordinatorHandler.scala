@@ -23,13 +23,13 @@ class CoordinatorHandler(checkpointService: CheckpointService, history: History,
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
     case c: Checkpoint =>
-      loggingResult(id(ctx), "applying checkpoint",
+      loggingResult(id(ctx), "Checkpoint",
         Coordinator.processCheckpoint(checkpointService, history, blockchainUpdater)(c))
         .fold(_ => peerDatabase.blacklistAndClose(ctx.channel()),
           score => allChannels.broadcast(ScoreChanged(score), Some(ctx.channel()))
         )
     case ExtensionBlocks(blocks) =>
-      loggingResult(id(ctx), "processing fork",
+      loggingResult(id(ctx), "ExtensionBlocks",
         Coordinator.processFork(checkpointService, history, blockchainUpdater, stateReader, utxStorage, time, settings, miner, blockchainReadiness)(blocks))
         .fold(
           _ => peerDatabase.blacklistAndClose(ctx.channel()),
@@ -37,7 +37,7 @@ class CoordinatorHandler(checkpointService: CheckpointService, history: History,
         )
     case b: Block =>
       if (Signed.validateSignatures(b).isLeft) {
-        loggingResult(id(ctx), "applying block", Coordinator.processBlock(checkpointService, history, blockchainUpdater, time,
+        loggingResult(id(ctx), "Block", Coordinator.processBlock(checkpointService, history, blockchainUpdater, time,
           stateReader, utxStorage, blockchainReadiness, miner, settings)(b, local = false))
           .foreach(score => allChannels.broadcast(ScoreChanged(score)))
       } else {
@@ -45,7 +45,7 @@ class CoordinatorHandler(checkpointService: CheckpointService, history: History,
       }
     case MicroBlockResponse(m) =>
       if (Signed.validateSignatures(m).isLeft) {
-        loggingResult(id(ctx), "applying block", Coordinator.processMicroBlock(checkpointService, history, blockchainUpdater, utxStorage)(m))
+        loggingResult(id(ctx), "MicroBlockResponse", Coordinator.processMicroBlock(checkpointService, history, blockchainUpdater, utxStorage)(m))
           .foreach(score => allChannels.broadcast(MicroBlockInv(m.totalResBlockSig), Some(ctx.channel())))
       } else {
         peerDatabase.blacklistAndClose(ctx.channel())
@@ -55,11 +55,11 @@ class CoordinatorHandler(checkpointService: CheckpointService, history: History,
 
 object CoordinatorHandler extends ScorexLogging {
   def loggingResult[R](idCtx: String, msg: String, f: => Either[ValidationError, R]): Either[ValidationError, R] = {
-    log.debug(s"$idCtx Starting $msg")
+    log.debug(s"$idCtx Starting $msg processing")
     val result = f
     result match {
-      case Left(error) => log.warn(s"$idCtx Error $msg: $error")
-      case Right(newScore) => log.debug(s"$idCtx Finished $msg, new local score is $newScore")
+      case Left(error) => log.warn(s"$idCtx Error processing $msg: $error")
+      case Right(newScore) => log.debug(s"$idCtx Finished $msg processing, new local score is $newScore")
     }
     result
   }

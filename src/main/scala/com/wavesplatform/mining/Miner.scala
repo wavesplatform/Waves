@@ -112,23 +112,21 @@ class Miner(
               generationOffset.toMillis, TimeUnit.MILLISECONDS)
 
             Futures.addCallback(thisAttempt, new FutureCallback[Option[Block]] {
-              override def onSuccess(result: Option[Block]): Unit = write { implicit ll =>
-                result match {
-                  case Some(block) =>
-                    CoordinatorHandler.loggingResult("local", s"applying locally mined block (${block.uniqueId})",
-                      Coordinator.processBlock(checkpoint, history, blockchainUpdater, time, stateReader,
-                        utx, blockchainReadiness, Miner.this, settings)(block, local = true)
-                        .map { score =>
-                          allChannels.broadcast(ScoreChanged(score))
-                          allChannels.broadcast(BlockForged(block))
-                          score
-                        })
-                  case None =>
-                    if (scheduledAttempts.mutate(_.remove(key, thisAttempt))) {
-                      log.debug(s"No block generated: Retrying")
-                      retry(parentHeight, parent, greatGrandParent)(account)
-                    }
-                }
+              override def onSuccess(result: Option[Block]): Unit = result match {
+                case Some(block) =>
+                  CoordinatorHandler.loggingResult("local", s"locally mined block (${block.uniqueId})",
+                    Coordinator.processBlock(checkpoint, history, blockchainUpdater, time, stateReader,
+                      utx, blockchainReadiness, Miner.this, settings)(block, local = true)
+                      .map { score =>
+                        allChannels.broadcast(ScoreChanged(score))
+                        allChannels.broadcast(BlockForged(block))
+                        score
+                      })
+                case None =>
+                  if (scheduledAttempts.mutate(_.remove(key, thisAttempt))) {
+                    log.debug(s"No block generated: Retrying")
+                    retry(parentHeight, parent, greatGrandParent)(account)
+                  }
               }
 
               override def onFailure(t: Throwable): Unit = {}
@@ -142,7 +140,6 @@ class Miner(
   def lastBlockChanged(): Unit = write { implicit l =>
     val lastBlock = history.lastBlock.get
     accumulatedBlock.set(lastBlock)
-
 
     val currentAttempts = scheduledAttempts()
     log.debug(s"New block: ${lastBlock.uniqueId}; cancelling scheduled mining tasks(count=${currentAttempts.size}) and trying to schedule new attempts")
@@ -159,6 +156,7 @@ class Miner(
           log.debug("skipping microblock because no txs in utx pool")
         }
         else {
+          log.debug(s"Adding ${unconfirmed.size} unconfirmed transaction(s) to new microBlock")
           val unsigned = accumulatedBlock().copy(version = 3, transactionData = accumulatedBlock().transactionData ++ unconfirmed)
           val signature = ByteStr(EllipticCurveImpl.sign(account, unsigned.bytes))
           val signed = accumulatedBlock().copy(signerData = accumulatedBlock().signerData.copy(signature = signature))
