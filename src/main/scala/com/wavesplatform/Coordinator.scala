@@ -20,43 +20,36 @@ object Coordinator extends ScorexLogging {
                  (newBlocks: Seq[Block]): Either[ValidationError, BigInt] = {
     val extension = newBlocks.dropWhile(history.contains)
 
-    def isForkValidWithCheckpoint(lastCommonHeight: Int): Boolean = {
-      extension.zipWithIndex.forall(p => checkpoint.isBlockValid(p._1.signerData.signature, lastCommonHeight + 1 + p._2))
-    }
-
     extension.headOption.map(_.reference) match {
-      case Some(maybeLastCommonBlockId) =>
-        history.heightOf(maybeLastCommonBlockId) match {
-          case Some(commonBlockHeight) =>
-            if (isForkValidWithCheckpoint(commonBlockHeight)) {
-              blockchainUpdater.removeAfter(maybeLastCommonBlockId)
+      case Some(lastBlockId) =>
 
-          val result = extension.view.map(b => b -> appendBlock(checkpoint, history, blockchainUpdater, stateReader, utxStorage, time, settings.blockchainSettings)(b))
-            .collectFirst {case (b, Left(e)) => b -> e}
+        def isForkValidWithCheckpoint(lastCommonHeight: Int): Boolean =
+          extension.zipWithIndex.forall(p => checkpoint.isBlockValid(p._1.signerData.signature, lastCommonHeight + 1 + p._2))
+
+        def forkApplicationResultEi: Either[ValidationError, BigInt] = extension.view
+          .map(b => b -> appendBlock(checkpoint, history, blockchainUpdater, stateReader, utxStorage, time, settings.blockchainSettings)(b))
+          .collectFirst { case (b, Left(e)) => b -> e }
           .fold[Either[ValidationError, BigInt]](Right(history.score())) {
-            case (b, e) =>
-              log.warn(s"Can't process fork starting with $maybeLastCommonBlockId, error appending block ${b.uniqueId}: $e")
-              Left(e)
-          }
-
-          result.foreach { _ =>
-            miner.lastBlockChanged()
-            updateBlockchainReadinessFlag(history, time, blockchainReadiness, settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed)
-          }
-
-              result
-            } else {
-              Left(GenericError("Fork contains block that doesn't match checkpoint, declining fork"))
-            }
-          case None =>
-            Left(GenericError("Fork contains no common parent"))
+          case (b, e) =>
+            log.warn(s"Can't process fork starting with $lastBlockId, error appending block ${b.uniqueId}: $e")
+            Left(e)
         }
 
+        for {
+          commonBlockHeight <- history.heightOf(lastBlockId).toRight(GenericError("Fork contains no common parent"))
+          _ <- Either.cond(isForkValidWithCheckpoint(commonBlockHeight), (), GenericError("Fork contains block that doesn't match checkpoint, declining fork"))
+          score <- forkApplicationResultEi
+        } yield {
+          miner.lastBlockChanged()
+          updateBlockchainReadinessFlag(history, time, blockchainReadiness, settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed)
+          score
+        }
       case None =>
         log.debug("No new blocks found in extension")
         Right(history.score())
     }
   }
+
 
   private def updateBlockchainReadinessFlag(history: History, time: Time, blockchainReadiness: AtomicBoolean, maxBlockchainAge: Duration): Boolean = {
     val expired = time.correctedTime() - history.lastBlock.get.timestamp < maxBlockchainAge.toMillis
@@ -85,13 +78,9 @@ object Coordinator extends ScorexLogging {
   } yield microBlock.transactionData.foreach(utxStorage.remove)
 
 
-  private def appendBlock(checkpoint: CheckpointService,
-                          history: History,
-                          blockchainUpdater: BlockchainUpdater,
-                          stateReader: StateReader,
-                          utxStorage: UtxPool,
-                          time: Time,
-                          settings: BlockchainSettings)(block: Block): Either[ValidationError, Unit] = for {
+  private def appendBlock(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater,
+                          stateReader: StateReader, utxStorage: UtxPool, time: Time, settings: BlockchainSettings)
+                         (block: Block): Either[ValidationError, Unit] = for {
     _ <- Either.cond(checkpoint.isBlockValid(block.signerData.signature, history.height() + 1), (),
       BlockAppendError(s"[h = ${history.height() + 1}] is not valid with respect to checkpoint", block))
     _ <- blockConsensusValidation(history, stateReader, settings, time.correctedTime())(block)
@@ -100,11 +89,10 @@ object Coordinator extends ScorexLogging {
 
   def processCheckpoint(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater)
                        (newCheckpoint: Checkpoint): Either[ValidationError, BigInt] =
-    checkpoint.set(newCheckpoint)
-      .map { _ =>
-        makeBlockchainCompliantWith(history, blockchainUpdater)(newCheckpoint)
-        history.score()
-      }
+    checkpoint.set(newCheckpoint).map { _ =>
+      makeBlockchainCompliantWith(history, blockchainUpdater)(newCheckpoint)
+      history.score()
+    }
 
 
   private def makeBlockchainCompliantWith(history: History, blockchainUpdater: BlockchainUpdater)(checkpoint: Checkpoint): Unit = {

@@ -21,7 +21,7 @@ class CoordinatorHandler(checkpointService: CheckpointService, history: History,
 
   import CoordinatorHandler._
 
-  override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef) = msg match {
+  override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
     case c: Checkpoint =>
       loggingResult(id(ctx), "applying checkpoint",
         Coordinator.processCheckpoint(checkpointService, history, blockchainUpdater)(c))
