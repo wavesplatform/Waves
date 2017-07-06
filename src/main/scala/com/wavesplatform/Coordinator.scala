@@ -40,7 +40,7 @@ object Coordinator extends ScorexLogging {
           }
 
           result.foreach { _ =>
-            miner.lastBlockChanged(history.height(), history.lastBlock.get)
+            miner.lastBlockChanged()
             updateBlockchainReadinessFlag(history, time, blockchainReadiness, settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed)
           }
 
@@ -72,7 +72,7 @@ object Coordinator extends ScorexLogging {
 
     if (local || newScore.isRight) {
       updateBlockchainReadinessFlag(history, time, blockchainReadiness, settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed)
-      miner.lastBlockChanged(history.height(), newBlock)
+      miner.lastBlockChanged()
     }
     newScore
   }

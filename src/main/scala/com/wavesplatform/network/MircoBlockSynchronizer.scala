@@ -1,30 +1,26 @@
 package com.wavesplatform.network
 
-import java.util.concurrent.locks.ReentrantReadWriteLock
-
 import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel.{Channel, ChannelHandlerContext, ChannelInboundHandlerAdapter}
 import scorex.block.Block.BlockId
 import scorex.transaction.NgHistory
-import scorex.utils.{ScorexLogging, Synchronized}
+import scorex.utils.{ScorexLogging, SynchronizedOne}
 
 @Sharable
 class MircoBlockSynchronizer(history: NgHistory)
-  extends ChannelInboundHandlerAdapter with ScorexLogging with Synchronized {
+  extends ChannelInboundHandlerAdapter with ScorexLogging with SynchronizedOne {
 
-  val synchronizationToken = new ReentrantReadWriteLock()
-  private val awaitingResponse = Synchronized(Map.empty[BlockId, Channel])
+  private val awaitingResponse = Synchronized(scala.collection.mutable.Map.empty[BlockId, Channel])
 
-  override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef) = msg match {
+  override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
     case MicroBlockInv(mid) =>
       history.microBlock(mid) match {
         case Some(_) => // already exists
         case None =>
           write { implicit l =>
-            val snapshot = awaitingResponse()
-            snapshot.get(mid) match {
+            awaitingResponse().get(mid) match {
               case None =>
-                awaitingResponse.set(snapshot + (mid -> ctx.channel()))
+                awaitingResponse.mutate(_ += (mid -> ctx.channel()))
                 ctx.writeAndFlush(MicroBlockRequest(mid))
               case _ => // already requested
             }

@@ -14,7 +14,7 @@ import scala.concurrent.Future
 class UtxPoolSynchronizer(utx: UtxPool, allChannels: ChannelGroup)
   extends ChannelInboundHandlerAdapter with ScorexLogging {
 
-  override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef) = msg match {
+  override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
     case t: Transaction => utx.putIfNew(t, Some(ctx.channel())) match {
       case Left(TransactionValidationError(_, e)) =>
         log.debug(s"${id(ctx)} Error processing transaction ${t.id}: $e")

@@ -83,3 +83,7 @@ trait Synchronized extends ScorexLogging {
     }
   }
 }
+
+trait SynchronizedOne extends Synchronized {
+  val synchronizationToken: ReentrantReadWriteLock = new ReentrantReadWriteLock()
+}
