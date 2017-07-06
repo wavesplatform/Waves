@@ -80,7 +80,7 @@ class UtxPool(
   def all(): Seq[Transaction] = transactions.values.asScala.toSeq.sorted(TransactionsOrdering.InUTXPool)
 
   private def removeExpired(currentTs: Long): Unit =
-    transactions.entrySet().removeIf(tx => (currentTs - tx.getValue.timestamp).millis <= utxSettings.maxTransactionAge)
+    transactions.entrySet().removeIf(tx => (currentTs - tx.getValue.timestamp).millis > utxSettings.maxTransactionAge)
 
   def packUnconfirmed(): Seq[Transaction] = {
     val currentTs = time.correctedTime()

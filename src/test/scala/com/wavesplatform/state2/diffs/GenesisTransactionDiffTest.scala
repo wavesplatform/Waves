@@ -14,7 +14,7 @@ class GenesisTransactionDiffTest extends PropSpec with PropertyChecks with Gener
 
   property("fails if height != 1") {
     forAll(genesisGen, positiveIntGen suchThat (_ > 1)) { (gtx, h) =>
-      GenesisTransactionDiff(h)(gtx) should produce("GenesisTranaction cannot appear in non-initial block")
+      GenesisTransactionDiff(h)(gtx) should produce("GenesisTransaction cannot appear in non-initial block")
     }
   }
 
