@@ -61,7 +61,7 @@ class NetworkServer(checkpointService: CheckpointService,
 
   private val lengthFieldPrepender = new LengthFieldPrepender(4)
 
-  private val peerSynchronizer = new PeerSynchronizer(peerDatabase)
+  private val peerSynchronizer = new PeerSynchronizer(peerDatabase, settings.networkSettings.peersBroadcastInterval)
   private val utxPoolSynchronizer = new UtxPoolSynchronizer(utxPool, allChannels)
   // There are two error handlers by design. WriteErrorHandler adds a future listener to make sure writes to network
   // succeed. It is added to the head of pipeline (it's the closest of the two to actual network), because some writes
