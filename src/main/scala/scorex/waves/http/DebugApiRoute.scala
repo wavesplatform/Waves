@@ -159,7 +159,7 @@ case class DebugApiRoute(settings: RestAPISettings,
           val address = InetAddress.getByName(uri.getHost)
           establishedConnections.entrySet().stream().forEach(entry => {
             if (entry.getValue.remoteAddress.getAddress == address) {
-              peerDatabase.blacklistAndClose(entry.getKey)
+              peerDatabase.blacklistAndClose(entry.getKey, "Debug API request")
             }
           })
           complete(StatusCodes.OK)

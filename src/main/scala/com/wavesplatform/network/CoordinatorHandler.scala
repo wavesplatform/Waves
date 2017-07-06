@@ -25,14 +25,14 @@ class CoordinatorHandler(checkpointService: CheckpointService, history: History,
     case c: Checkpoint =>
       loggingResult(id(ctx), "Checkpoint",
         Coordinator.processCheckpoint(checkpointService, history, blockchainUpdater)(c))
-        .fold(_ => peerDatabase.blacklistAndClose(ctx.channel()),
+        .fold(err => peerDatabase.blacklistAndClose(ctx.channel(), "Unable to process checkpoint due to " + err),
           score => allChannels.broadcast(ScoreChanged(score), Some(ctx.channel()))
         )
     case ExtensionBlocks(blocks) =>
       loggingResult(id(ctx), "ExtensionBlocks",
         Coordinator.processFork(checkpointService, history, blockchainUpdater, stateReader, utxStorage, time, settings, miner, blockchainReadiness)(blocks))
         .fold(
-          _ => peerDatabase.blacklistAndClose(ctx.channel()),
+          err => peerDatabase.blacklistAndClose(ctx.channel(), "Unable to process ExtensionBlocks due to " + err),
           score => allChannels.broadcast(ScoreChanged(score))
         )
     case b: Block =>
@@ -41,14 +41,14 @@ class CoordinatorHandler(checkpointService: CheckpointService, history: History,
           stateReader, utxStorage, blockchainReadiness, miner, settings)(b, local = false))
           .foreach(score => allChannels.broadcast(ScoreChanged(score)))
       } else {
-        peerDatabase.blacklistAndClose(ctx.channel())
+        peerDatabase.blacklistAndClose(ctx.channel(), "Invalid Block Sig")
       }
     case MicroBlockResponse(m) =>
       if (Signed.validateSignatures(m).isLeft) {
         loggingResult(id(ctx), "MicroBlockResponse", Coordinator.processMicroBlock(checkpointService, history, blockchainUpdater, utxStorage)(m))
           .foreach(score => allChannels.broadcast(MicroBlockInv(m.totalResBlockSig), Some(ctx.channel())))
       } else {
-        peerDatabase.blacklistAndClose(ctx.channel())
+        peerDatabase.blacklistAndClose(ctx.channel(), "Invalid MicroBlock Sig")
       }
   }
 }

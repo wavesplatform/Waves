@@ -58,18 +58,15 @@ abstract class HandshakeHandler(
 
   def connectionNegotiated(ctx: ChannelHandlerContext): Unit
 
-  override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef) = msg match {
+  override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
     case HandshakeTimeoutExpired =>
-      log.debug(s"${id(ctx)} Timeout expired while waiting for handshake")
-      peerDatabase.blacklistAndClose(ctx.channel())
+      peerDatabase.blacklistAndClose(ctx.channel(),"Timeout expired while waiting for handshake")
     case remoteHandshake: Handshake =>
-      if (localHandshake.applicationName != remoteHandshake.applicationName) {
-        log.warn(s"${id(ctx)} Remote application name ${remoteHandshake.applicationName} does not match local ${localHandshake.applicationName}")
-        peerDatabase.blacklistAndClose(ctx.channel())
-      } else if (!versionIsSupported(remoteHandshake.applicationVersion)) {
-        log.warn(s"${id(ctx)} Remote application version ${remoteHandshake.applicationVersion } is not supported")
-        peerDatabase.blacklistAndClose(ctx.channel())
-      } else {
+      if (localHandshake.applicationName != remoteHandshake.applicationName)
+        peerDatabase.blacklistAndClose(ctx.channel(),s"Remote application name ${remoteHandshake.applicationName} does not match local ${localHandshake.applicationName}")
+       else if (!versionIsSupported(remoteHandshake.applicationVersion))
+        peerDatabase.blacklistAndClose(ctx.channel(),s"Remote application version ${remoteHandshake.applicationVersion } is not supported")
+       else {
         val key = PeerKey(ctx.remoteAddress.getAddress, remoteHandshake.nodeNonce)
         val previousPeer = connections.putIfAbsent(key, ctx.channel())
         if (previousPeer != null) {
