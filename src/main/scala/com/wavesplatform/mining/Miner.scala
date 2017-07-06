@@ -142,36 +142,34 @@ class Miner(
 
   def lastBlockChanged(currentHeight: Int, lastBlock: Block): Unit = {
     accumulatedBlock = lastBlock
-    wallet.privateKeyAccounts().find(pk => lastBlock.signerData.generator == pk) match {
-      case None =>
-        log.debug(s"New parent block: ${lastBlock.uniqueId},${if (scheduledAttempts.isEmpty) "" else s" cancelling ${scheduledAttempts.size()} task(s) and"} trying to schedule new attempts")
-        scheduledAttempts.values.asScala.foreach(_.cancel(false))
-        scheduledAttempts.clear()
-        val grandParent = history.parent(lastBlock, 2)
-        wallet.privateKeyAccounts().foreach(retry(currentHeight, lastBlock, grandParent))
-        microblockScheduledFuture.foreach(_.cancel(false))
-        microblockScheduledFuture = None
-      case Some(account) =>
-        microblockScheduledFuture = Some(minerPool.scheduleAtFixedRate(() => {
-          val unconfirmed = utx.packUnconfirmed()
-          if (unconfirmed.isEmpty) {
-            log.debug("skipping microblock because no txs in utx pool")
-          }
-          else {
-            val unsigned = accumulatedBlock.copy(version = 3, transactionData = accumulatedBlock.transactionData ++ unconfirmed)
-            val signature = ByteStr(EllipticCurveImpl.sign(account, unsigned.bytes))
-            val signed = accumulatedBlock.copy(signerData = accumulatedBlock.signerData.copy(signature = signature))
+    log.debug(s"New parent block: ${lastBlock.uniqueId},${if (scheduledAttempts.isEmpty) "" else s" cancelling ${scheduledAttempts.size()} task(s) and"} trying to schedule new attempts")
+    scheduledAttempts.values.asScala.foreach(_.cancel(false))
+    scheduledAttempts.clear()
+    val grandParent = history.parent(lastBlock, 2)
+    wallet.privateKeyAccounts().foreach(retry(currentHeight, lastBlock, grandParent))
+    microblockScheduledFuture.foreach(_.cancel(false))
+    microblockScheduledFuture = None
+    wallet.privateKeyAccounts().find(pk => lastBlock.signerData.generator == pk) foreach { account =>
+      microblockScheduledFuture = Some(minerPool.scheduleAtFixedRate(() => {
+        val unconfirmed = utx.packUnconfirmed()
+        if (unconfirmed.isEmpty) {
+          log.debug("skipping microblock because no txs in utx pool")
+        }
+        else {
+          val unsigned = accumulatedBlock.copy(version = 3, transactionData = accumulatedBlock.transactionData ++ unconfirmed)
+          val signature = ByteStr(EllipticCurveImpl.sign(account, unsigned.bytes))
+          val signed = accumulatedBlock.copy(signerData = accumulatedBlock.signerData.copy(signature = signature))
 
-            (for {
-              micro <- MicroBlock.buildAndSign(account, unconfirmed, lastBlock.signerData.signature, signature)
-              r <- Coordinator.processMicroBlock(checkpoint, history, blockchainUpdater, utx)(micro)
-            } yield r) match {
-              case Left(err) => log.debug(err.toString)
-              case Right(_) =>
-                accumulatedBlock = signed
-            }
+          (for {
+            micro <- MicroBlock.buildAndSign(account, unconfirmed, lastBlock.signerData.signature, signature)
+            r <- Coordinator.processMicroBlock(checkpoint, history, blockchainUpdater, utx)(micro)
+          } yield r) match {
+            case Left(err) => log.debug(err.toString)
+            case Right(_) =>
+              accumulatedBlock = signed
           }
-        }, 5, 5, TimeUnit.SECONDS))
+        }
+      }, 3, 3, TimeUnit.SECONDS))
     }
   }
 
@@ -180,6 +178,6 @@ class Miner(
 
 object Miner extends ScorexLogging {
   private val minimalDurationMillis = 1001
-  val Version: Byte = 2
+  val Version: Byte = 3
   val MinimalGenerationOffset: Duration = Duration.ofMillis(minimalDurationMillis)
 }
