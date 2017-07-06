@@ -36,19 +36,21 @@ class CoordinatorHandler(checkpointService: CheckpointService, history: History,
           score => allChannels.broadcast(ScoreChanged(score))
         )
     case b: Block =>
-      if (Signed.validateSignatures(b).isLeft) {
-        loggingResult(id(ctx), "Block", Coordinator.processBlock(checkpointService, history, blockchainUpdater, time,
-          stateReader, utxStorage, blockchainReadiness, miner, settings)(b, local = false))
-          .foreach(score => allChannels.broadcast(ScoreChanged(score)))
-      } else {
-        peerDatabase.blacklistAndClose(ctx.channel(), "Invalid Block Sig")
+      Signed.validateSignatures(b) match {
+        case Right(_) =>
+          loggingResult(id(ctx), "Block", Coordinator.processBlock(checkpointService, history, blockchainUpdater, time,
+            stateReader, utxStorage, blockchainReadiness, miner, settings)(b, local = false))
+            .foreach(score => allChannels.broadcast(ScoreChanged(score)))
+        case Left(err) =>
+          peerDatabase.blacklistAndClose(ctx.channel(), err.toString)
       }
     case MicroBlockResponse(m) =>
-      if (Signed.validateSignatures(m).isLeft) {
-        loggingResult(id(ctx), "MicroBlockResponse", Coordinator.processMicroBlock(checkpointService, history, blockchainUpdater, utxStorage)(m))
-          .foreach(score => allChannels.broadcast(MicroBlockInv(m.totalResBlockSig), Some(ctx.channel())))
-      } else {
-        peerDatabase.blacklistAndClose(ctx.channel(), "Invalid MicroBlock Sig")
+      Signed.validateSignatures(m) match {
+        case Right(_) =>
+          loggingResult(id(ctx), "MicroBlockResponse", Coordinator.processMicroBlock(checkpointService, history, blockchainUpdater, utxStorage)(m))
+            .foreach(score => allChannels.broadcast(MicroBlockInv(m.totalResBlockSig), Some(ctx.channel())))
+        case Left(err) =>
+          peerDatabase.blacklistAndClose(ctx.channel(), err.toString)
       }
   }
 }
