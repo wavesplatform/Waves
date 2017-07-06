@@ -8,7 +8,6 @@ import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state2.ByteStr
 import com.wavesplatform.state2.reader.StateReader
 import scorex.block.Block
-import scorex.block.Block.BlockId
 import scorex.consensus.TransactionsOrdering
 import scorex.crypto.EllipticCurveImpl
 import scorex.transaction.ValidationError.GenericError
@@ -226,7 +225,7 @@ object Coordinator extends ScorexLogging {
 
     val effectiveBalance = generatingBalance(state, fs, generator, parentHeight)
 
-    if (blockTime >= fs.minimalGeneratingBalanceAfterTimestamp) {
+    if (blockTime >= fs.minimalGeneratingBalanceAfter) {
       require(effectiveBalance >= MinimalEffectiveBalanceForGenerator, s"Effective balance $effectiveBalance is less that minimal ($MinimalEffectiveBalanceForGenerator)")
     }
 

@@ -1,19 +1,18 @@
 package scorex.settings
 
-import com.wavesplatform.settings.{BlockchainSettings, FunctionalitySettings, GenesisSettings, GenesisTransactionSettings}
-import scala.concurrent.duration._
+import com.wavesplatform.settings.FunctionalitySettings
 
 object TestFunctionalitySettings {
   val Enabled = FunctionalitySettings(
     allowTemporaryNegativeUntil = 0L, allowInvalidPaymentTransactionsByTimestamp = 0L,
-    requireSortedTransactionsAfter = 0L, generatingBalanceDepthFrom50To1000AfterHeight = 0L,
-    minimalGeneratingBalanceAfterTimestamp = 0L,
+    requireSortedTransactionsAfter = 0L, generationBalanceDepthFrom50To1000AfterHeight = 0L,
+    minimalGeneratingBalanceAfter = 0L,
     allowTransactionsFromFutureUntil = Long.MaxValue, allowUnissuedAssetsUntil = 0L,
-    allowBurnTransactionAfterTimestamp = 0L, allowLeaseTransactionAfterTimestamp = 0L,
-    requirePaymentUniqueId = 0L, allowExchangeTransactionAfterTimestamp = 0L,
-    allowInvalidReissueInSameBlockUntilTimestamp = 0L, allowCreateAliasTransactionAfterTimestamp = 0L,
+    allowBurnTransactionAfter = 0L, allowLeaseTransactionAfter = 0L,
+    requirePaymentUniqueIdAfter = 0L, allowExchangeTransactionAfter = 0L,
+    allowInvalidReissueInSameBlockUntilTimestamp = 0L, allowCreatealiasTransactionAfter = 0L,
     allowMultipleLeaseCancelTransactionUntilTimestamp = 0L, resetEffectiveBalancesAtHeight = 0,
-    allowMakeAssetNameUniqueTransactionAfterTimestamp = 0L,
+    allowMakeAssetNameUniqueTransactionAfter = 0L,
     allowLeasedBalanceTransferUntil = 0L
   )
 }

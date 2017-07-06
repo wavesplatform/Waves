@@ -49,7 +49,7 @@ object CommonValidation {
       } else Right(tx)
 
   def disallowDuplicateIds[T <: Transaction](state: StateReader, settings: FunctionalitySettings, height: Int, tx: T): Either[ValidationError, T] = tx match {
-    case ptx: PaymentTransaction if ptx.timestamp < settings.requirePaymentUniqueId => Right(tx)
+    case ptx: PaymentTransaction if ptx.timestamp < settings.requirePaymentUniqueIdAfter => Right(tx)
     case _ =>
       if (state.containsTransaction(tx.id))
         Left(GenericError(s"Tx id(exc. for some PaymentTransactions) cannot be duplicated. Current height is: $height. Tx with such id aready present"))
@@ -58,18 +58,18 @@ object CommonValidation {
 
   def disallowBeforeActivationTime[T <: Transaction](state: StateReader, settings: FunctionalitySettings, tx: T): Either[ValidationError, T] =
     tx match {
-      case tx: BurnTransaction if tx.timestamp <= settings.allowBurnTransactionAfterTimestamp =>
-        Left(GenericError(s"must not appear before time=${settings.allowBurnTransactionAfterTimestamp}"))
-      case tx: LeaseTransaction if tx.timestamp <= settings.allowLeaseTransactionAfterTimestamp =>
-        Left(GenericError(s"must not appear before time=${settings.allowLeaseTransactionAfterTimestamp}"))
-      case tx: LeaseCancelTransaction if tx.timestamp <= settings.allowLeaseTransactionAfterTimestamp =>
-        Left(GenericError(s"must not appear before time=${settings.allowLeaseTransactionAfterTimestamp}"))
-      case tx: ExchangeTransaction if tx.timestamp <= settings.allowExchangeTransactionAfterTimestamp =>
-        Left(GenericError(s"must not appear before time=${settings.allowExchangeTransactionAfterTimestamp}"))
-      case tx: CreateAliasTransaction if tx.timestamp <= settings.allowCreateAliasTransactionAfterTimestamp =>
-        Left(GenericError(s"must not appear before time=${settings.allowCreateAliasTransactionAfterTimestamp}"))
-      case tx: MakeAssetNameUniqueTransaction if tx.timestamp <= settings.allowMakeAssetNameUniqueTransactionAfterTimestamp =>
-        Left(GenericError(s"must not appear before time=${settings.allowMakeAssetNameUniqueTransactionAfterTimestamp}"))
+      case tx: BurnTransaction if tx.timestamp <= settings.allowBurnTransactionAfter =>
+        Left(GenericError(s"must not appear before time=${settings.allowBurnTransactionAfter}"))
+      case tx: LeaseTransaction if tx.timestamp <= settings.allowLeaseTransactionAfter =>
+        Left(GenericError(s"must not appear before time=${settings.allowLeaseTransactionAfter}"))
+      case tx: LeaseCancelTransaction if tx.timestamp <= settings.allowLeaseTransactionAfter =>
+        Left(GenericError(s"must not appear before time=${settings.allowLeaseTransactionAfter}"))
+      case tx: ExchangeTransaction if tx.timestamp <= settings.allowExchangeTransactionAfter =>
+        Left(GenericError(s"must not appear before time=${settings.allowExchangeTransactionAfter}"))
+      case tx: CreateAliasTransaction if tx.timestamp <= settings.allowCreatealiasTransactionAfter =>
+        Left(GenericError(s"must not appear before time=${settings.allowCreatealiasTransactionAfter}"))
+      case tx: MakeAssetNameUniqueTransaction if tx.timestamp <= settings.allowMakeAssetNameUniqueTransactionAfter =>
+        Left(GenericError(s"must not appear before time=${settings.allowMakeAssetNameUniqueTransactionAfter}"))
       case _: BurnTransaction => Right(tx)
       case _: PaymentTransaction => Right(tx)
       case _: GenesisTransaction => Right(tx)
