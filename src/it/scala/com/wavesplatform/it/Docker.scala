@@ -42,7 +42,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty) extends AutoCloseable wi
 
   private val client = DefaultDockerClient.fromEnv().build()
   private val timer = new HashedWheelTimer()
-  private var nodes = Map.empty[String, NodeInfo]
+  private var nodes = Map.empty[String, Node]
   private val isStopped = new AtomicBoolean(false)
 
   timer.start()
@@ -52,7 +52,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty) extends AutoCloseable wi
   }
 
   private def knownPeers = nodes.values.zipWithIndex.map {
-    case (ni, index) => s"-Dwaves.network.known-peers.$index=${ni.networkIpAddress}:${ni.containerNetworkPort}"
+    case (n, index) => s"-Dwaves.network.known-peers.$index=${n.nodeInfo.networkIpAddress}:${n.nodeInfo.containerNetworkPort}"
   } mkString " "
 
   private val networkName = "waves-" + new Random().nextInt()
@@ -107,9 +107,8 @@ class Docker(suiteConfig: Config = ConfigFactory.empty) extends AutoCloseable wi
       containerInfo.networkSettings().networks().asScala(networkName).ipAddress(),
       containerId,
       extractHostPort(ports, matcherApiPort))
-    nodes += containerId -> nodeInfo
-
-    val node = new Node(actualConfig, nodeInfo, http, timer)
+    val node = new Node(actualConfig, nodeInfo, http)
+    nodes += containerId -> node
     Await.result(node.lastBlock, Duration.Inf)
     node
   }
@@ -125,6 +124,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty) extends AutoCloseable wi
     if (isStopped.compareAndSet(false, true)) {
       timer.stop()
       log.info("Stopping containers")
+      nodes.values.foreach(n => n.close())
       nodes.keys.foreach(id => client.removeContainer(id, RemoveContainerParam.forceKill()))
       client.removeNetwork(wavesNetwork.id())
       client.close()

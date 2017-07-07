@@ -24,11 +24,15 @@ import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 
-class NodeApi(restAddress: String,
-              nodeRestPort: Int,
-              matcherRestPort: Int,
-              blockDelay: FiniteDuration) {
+trait NodeApi {
   import NodeApi._
+
+  def restAddress: String
+  def nodeRestPort: Int
+  def matcherRestPort: Int
+  def blockDelay: FiniteDuration
+
+  protected val log: LoggerFacade = LoggerFacade(LoggerFactory.getLogger(s"${getClass.getName} $restAddress"))
 
   def matcherGet(path: String, f: RequestBuilder => RequestBuilder = identity): Future[Response] =
     retrying(f(_get(s"http://$restAddress:$matcherRestPort$path")).build())
@@ -214,11 +218,9 @@ class NodeApi(restAddress: String,
 
   protected val timer: Timer = new HashedWheelTimer()
 
-  def close: Unit = {
+  def close(): Unit = {
     timer.stop()
   }
-
-  protected val log: LoggerFacade = LoggerFacade(LoggerFactory.getLogger(s"${getClass.getName} $restAddress"))
 
   def retrying(r: Request, interval: FiniteDuration = 1.second): Future[Response] = {
     def executeRequest: Future[Response] = {

@@ -33,5 +33,5 @@ class NetworkSender(address: InetSocketAddress, chainId: Char, name: String, non
       c.shutdown()
     })
   }
-  def close: Unit = retryTimer.stop()
+  def close(): Unit = retryTimer.stop()
 }
