@@ -7,7 +7,7 @@ import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.settings._
 import com.wavesplatform.state2.reader.StateReader
-import com.wavesplatform.{Coordinator, Version}
+import com.wavesplatform.{Coordinator, UtxPool, Version}
 import io.netty.bootstrap.{Bootstrap, ServerBootstrap}
 import io.netty.channel._
 import io.netty.channel.group.ChannelGroup
@@ -16,7 +16,7 @@ import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.channel.socket.SocketChannel
 import io.netty.channel.socket.nio.{NioServerSocketChannel, NioSocketChannel}
 import io.netty.handler.codec.{LengthFieldBasedFrameDecoder, LengthFieldPrepender}
-import scorex.network.message.{BasicMessagesRepo, MessageSpec}
+import scorex.network.message.MessageSpec
 import scorex.transaction._
 import scorex.utils.{ScorexLogging, Time}
 import scorex.wallet.Wallet
@@ -25,17 +25,13 @@ import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 
 class NetworkServer(
-    chainId: Char,
-    bindAddress: InetSocketAddress,
-    declaredAddress: Option[InetSocketAddress],
     settings: WavesSettings,
     history: History,
     checkpoints: CheckpointService,
     blockchainUpdater: BlockchainUpdater,
     time: Time,
     stateReader: StateReader,
-    utxStorage: UnconfirmedTransactionsStorage,
-    txHandler: NewTransactionHandler,
+    utxPool: UtxPool,
     peerDatabase: PeerDatabase,
     wallet: Wallet,
     allChannels: ChannelGroup,
@@ -44,8 +40,8 @@ class NetworkServer(
   private val bossGroup = new NioEventLoopGroup()
   private val workerGroup = new NioEventLoopGroup()
   private val handshake =
-    Handshake(Constants.ApplicationName + chainId, Version.VersionTuple, settings.networkSettings.nodeName,
-      settings.networkSettings.nonce, settings.networkSettings.declaredAddress)
+    Handshake(Constants.ApplicationName + settings.blockchainSettings.addressSchemeCharacter, Version.VersionTuple,
+      settings.networkSettings.nodeName, settings.networkSettings.nonce, settings.networkSettings.declaredAddress)
 
   private val scoreObserver = new RemoteScoreObserver(
       settings.synchronizationSettings.scoreTTL,
@@ -55,11 +51,11 @@ class NetworkServer(
   def setBlockchainExpired(expired: Boolean): Unit = blockchainReadiness.compareAndSet(expired, !expired)
 
   private val discardingHandler = new DiscardingHandler(blockchainReadiness.get())
-  private val specs: Map[Byte, MessageSpec[_ <: AnyRef]] = (BasicMessagesRepo.specs ++ TransactionalMessagesRepo.specs).map(s => s.messageCode -> s).toMap
+  private val specs: Map[Byte, MessageSpec[_ <: AnyRef]] = BasicMessagesRepo.specs.map(s => s.messageCode -> s).toMap
   private val messageCodec = new MessageCodec(specs)
 
   private val excludedAddresses: Set[InetSocketAddress] = {
-    val localAddresses = if (bindAddress.getAddress.isAnyLocalAddress) {
+    val localAddresses = if (settings.networkSettings.bindAddress.getAddress.isAnyLocalAddress) {
       NetworkInterface.getNetworkInterfaces.asScala
         .flatMap(_.getInetAddresses.asScala
           .map(a => new InetSocketAddress(a, settings.networkSettings.bindAddress.getPort)))
@@ -71,12 +67,12 @@ class NetworkServer(
 
   private val lengthFieldPrepender = new LengthFieldPrepender(4)
 
-  private val miner = new Miner(history, stateReader, utxStorage, wallet.privateKeyAccounts(),
+  private val miner = new Miner(history, stateReader, utxPool, wallet.privateKeyAccounts(),
     settings.blockchainSettings, settings.minerSettings, time.correctedTime(), allChannels.size(),
     b => writeToLocalChannel(BlockForged(b)))
 
   private val peerSynchronizer = new PeerSynchronizer(peerDatabase, settings.networkSettings.peersBroadcastInterval)
-  private val utxPoolSynchronizer = new UtxPoolSynchronizer(txHandler, allChannels)
+  private val utxPoolSynchronizer = new UtxPoolSynchronizer(utxPool, allChannels)
   // There are two error handlers by design. WriteErrorHandler adds a future listener to make sure writes to network
   // succeed. It is added to the head of pipeline (it's the closest of the two to actual network), because some writes
   // are initiated from the middle of the pipeline (e.g. extension requests). FatalErrorHandler, on the other hand,
@@ -92,7 +88,7 @@ class NetworkServer(
     settings.networkSettings.maxConnectionsPerHost)
 
   private val coordinatorExecutor = new DefaultEventLoop
-  private val coordinator = new Coordinator(checkpoints, history, blockchainUpdater, stateReader, utxStorage,
+  private val coordinator = new Coordinator(checkpoints, history, blockchainUpdater, stateReader, utxPool,
     time.correctedTime(), settings.blockchainSettings,
     settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed, settings.checkpointsSettings.publicKey,
     miner, setBlockchainExpired)
@@ -126,7 +122,7 @@ class NetworkServer(
   private val serverHandshakeHandler =
     new HandshakeHandler.Server(handshake, peerInfo, peerUniqueness, peerDatabase, allChannels)
 
-  private val serverChannel = declaredAddress.map { _ =>
+  private val serverChannel = settings.networkSettings.declaredAddress.map { _ =>
     new ServerBootstrap()
       .group(bossGroup, workerGroup)
       .channel(classOf[NioServerSocketChannel])
@@ -150,7 +146,7 @@ class NetworkServer(
         scoreObserver,
         coordinatorHandler -> coordinatorExecutor,
         fatalErrorHandler)))
-      .bind(bindAddress)
+      .bind(settings.networkSettings.bindAddress)
       .channel()
   }
 

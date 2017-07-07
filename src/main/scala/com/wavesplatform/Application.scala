@@ -20,17 +20,14 @@ import com.wavesplatform.settings._
 import io.netty.channel.Channel
 import io.netty.channel.group.DefaultChannelGroup
 import io.netty.util.concurrent.GlobalEventExecutor
-import scorex.account.{Account, AddressScheme}
+import scorex.account.AddressScheme
 import scorex.api.http._
 import scorex.api.http.alias.{AliasApiRoute, AliasBroadcastApiRoute}
 import scorex.api.http.assets.{AssetsApiRoute, AssetsBroadcastApiRoute}
 import scorex.api.http.leasing.{LeaseApiRoute, LeaseBroadcastApiRoute}
 import scorex.block.Block
-import scorex.consensus.nxt.NxtLikeConsensusBlockData
 import scorex.consensus.nxt.api.http.NxtConsensusApiRoute
-import scorex.crypto.hash.FastCryptographicHash.DigestSize
 import scorex.transaction._
-import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
 import scorex.utils.{ScorexLogging, Time, TimeImpl}
 import scorex.wallet.Wallet
 import scorex.waves.http.{DebugApiRoute, WavesApiRoute}
@@ -38,7 +35,7 @@ import scorex.waves.http.{DebugApiRoute, WavesApiRoute}
 import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.reflect.runtime.universe._
-import scala.util.{Left, Try}
+import scala.util.Try
 
 class Application(val actorSystem: ActorSystem, val settings: WavesSettings) extends ScorexLogging {
 
@@ -58,17 +55,15 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
 
     val feeCalculator = new FeeCalculator(settings.feesSettings)
     val time: Time = new TimeImpl()
-    val utxStorage: UnconfirmedTransactionsStorage = new UnconfirmedTransactionsDatabaseImpl(settings.utxSettings.size)
-
 
     val peerDatabase = new PeerDatabaseImpl(settings.networkSettings)
     val establishedConnections = new ConcurrentHashMap[Channel, PeerInfo]
     val allChannels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
 
+    val utxStorage = new UtxPool(allChannels,
+      time, stateReader, feeCalculator, settings.blockchainSettings.functionalitySettings, settings.utxSettings)
+
     val network = new NetworkServer(
-      settings.blockchainSettings.addressSchemeCharacter,
-      settings.networkSettings.bindAddress,
-      settings.networkSettings.declaredAddress,
       settings,
       history,
       checkpoints,
@@ -76,7 +71,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
       time,
       stateReader,
       utxStorage,
-      new NewTransactionHandlerImpl(settings.blockchainSettings.functionalitySettings, time, feeCalculator, utxStorage, stateReader),
       peerDatabase,
       wallet,
       allChannels,
@@ -87,20 +81,20 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
       TransactionsApiRoute(settings.restAPISettings, stateReader, history, utxStorage),
       NxtConsensusApiRoute(settings.restAPISettings, stateReader, history, settings.blockchainSettings.functionalitySettings),
       WalletApiRoute(settings.restAPISettings, wallet),
-      PaymentApiRoute(settings.restAPISettings, wallet, network.localClientChannel, time),
+      PaymentApiRoute(settings.restAPISettings, wallet, utxStorage, time),
       UtilsApiRoute(settings.restAPISettings),
       PeersApiRoute(settings.restAPISettings, network.connect, peerDatabase, establishedConnections),
       AddressApiRoute(settings.restAPISettings, wallet, stateReader, settings.blockchainSettings.functionalitySettings),
       DebugApiRoute(settings.restAPISettings, wallet, stateReader, history, peerDatabase, establishedConnections,
         network.localClientChannel),
-      WavesApiRoute(settings.restAPISettings, wallet, network.localClientChannel, time),
-      AssetsApiRoute(settings.restAPISettings, wallet, stateReader, network.localClientChannel, time),
+      WavesApiRoute(settings.restAPISettings, wallet, utxStorage, time),
+      AssetsApiRoute(settings.restAPISettings, wallet, utxStorage, stateReader, time),
       NodeApiRoute(settings.restAPISettings, () => this.shutdown()),
-      AssetsBroadcastApiRoute(settings.restAPISettings, network.localClientChannel),
-      LeaseApiRoute(settings.restAPISettings, wallet, stateReader, network.localClientChannel, time),
-      LeaseBroadcastApiRoute(settings.restAPISettings, network.localClientChannel),
-      AliasApiRoute(settings.restAPISettings, wallet, network.localClientChannel, time, stateReader),
-      AliasBroadcastApiRoute(settings.restAPISettings, network.localClientChannel)
+      AssetsBroadcastApiRoute(settings.restAPISettings, utxStorage),
+      LeaseApiRoute(settings.restAPISettings, wallet, utxStorage, stateReader, time),
+      LeaseBroadcastApiRoute(settings.restAPISettings, utxStorage),
+      AliasApiRoute(settings.restAPISettings, wallet, utxStorage, time, stateReader),
+      AliasBroadcastApiRoute(settings.restAPISettings, utxStorage)
     )
 
     val apiTypes = Seq(
@@ -145,27 +139,19 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
     }
 
     if (settings.matcherSettings.enable) {
-      val matcher = new Matcher(actorSystem, wallet, network.localClientChannel, stateReader, time, history, settings.blockchainSettings, settings.restAPISettings, settings.matcherSettings)
+      val matcher = new Matcher(actorSystem, wallet, utxStorage, stateReader, time, history, settings.blockchainSettings, settings.restAPISettings, settings.matcherSettings)
       matcher.runMatcher()
     }
   }
 
-  def checkGenesis(): Unit = {
-    if (history.isEmpty) {
-      val maybeGenesisSignature = Option(settings.blockchainSettings.genesisSettings.signature).filter(_.trim.nonEmpty)
-      Block.genesis(
-        NxtLikeConsensusBlockData(settings.blockchainSettings.genesisSettings.initialBaseTarget, Array.fill(DigestSize)(0: Byte)),
-        Application.genesisTransactions(settings.blockchainSettings.genesisSettings),
-        settings.blockchainSettings.genesisSettings.blockTimestamp, maybeGenesisSignature)
-        .flatMap(blockchainUpdater.processBlock) match {
-        case Left(value) =>
-          log.error(value.toString)
-          System.exit(1)
-        case _ =>
+  def checkGenesis(): Unit = if (history.isEmpty) {
+    Block.genesis(settings.blockchainSettings.genesisSettings).flatMap(blockchainUpdater.processBlock)
+      .left.foreach { value =>
+        log.error(value.toString)
+        System.exit(1)
       }
 
-      log.info("Genesis block has been added to the state")
-    }
+    log.info("Genesis block has been added to the state")
   }
 
   @volatile var shutdownInProgress = false
@@ -262,12 +248,4 @@ object Application extends ScorexLogging {
       new Application(actorSystem, settings).run()
     }
   }
-
-  def genesisTransactions(gs: GenesisSettings): Seq[GenesisTransaction] = {
-    gs.transactions.map { ts =>
-      val acc = Account.fromString(ts.recipient).right.get
-      GenesisTransaction.create(acc, ts.amount, gs.transactionsTimestamp).right.get
-    }
-  }
-
 }

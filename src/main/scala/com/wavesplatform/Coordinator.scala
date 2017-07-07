@@ -8,7 +8,6 @@ import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state2.ByteStr
 import com.wavesplatform.state2.reader.StateReader
 import scorex.block.Block
-import scorex.block.Block.BlockId
 import scorex.consensus.TransactionsOrdering
 import scorex.crypto.EllipticCurveImpl
 import scorex.transaction.ValidationError.GenericError
@@ -22,7 +21,7 @@ class Coordinator(
     history: History,
     blockchainUpdater: BlockchainUpdater,
     stateReader: StateReader,
-    utxStorage: UnconfirmedTransactionsStorage,
+    utxStorage: UtxPool,
     time: => Long,
     settings: BlockchainSettings,
     maxBlockchainAge: Duration,
@@ -68,11 +67,7 @@ class Coordinator(
     _ <- validateWithRespectToCheckpoint(block, history.height() + 1)
     _ <- isBlockValid(block)
     _ <- blockchainUpdater.processBlock(block)
-  } yield {
-    block.transactionData.foreach(utxStorage.remove)
-    UnconfirmedTransactionsStorage.clearIncorrectTransactions(settings.functionalitySettings,
-      stateReader, utxStorage, time)
-  }
+  } yield block.transactionData.foreach(utxStorage.remove)
 
   def processFork(newBlocks: Seq[Block]): Either[ValidationError, BigInt] = {
     val extension = newBlocks.dropWhile(history.contains)
@@ -230,7 +225,7 @@ object Coordinator extends ScorexLogging {
 
     val effectiveBalance = generatingBalance(state, fs, generator, parentHeight)
 
-    if (blockTime >= fs.minimalGeneratingBalanceAfterTimestamp) {
+    if (blockTime >= fs.minimalGeneratingBalanceAfter) {
       require(effectiveBalance >= MinimalEffectiveBalanceForGenerator, s"Effective balance $effectiveBalance is less that minimal ($MinimalEffectiveBalanceForGenerator)")
     }
 

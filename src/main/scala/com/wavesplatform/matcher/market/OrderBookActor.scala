@@ -3,6 +3,7 @@ package com.wavesplatform.matcher.market
 import akka.actor.{ActorRef, Cancellable, Props, Stash}
 import akka.http.scaladsl.model.StatusCodes
 import akka.persistence._
+import com.wavesplatform.UtxPool
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.api.{CancelOrderRequest, MatcherResponse}
 import com.wavesplatform.matcher.market.OrderBookActor._
@@ -12,7 +13,6 @@ import com.wavesplatform.matcher.model.MatcherModel._
 import com.wavesplatform.matcher.model._
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.reader.StateReader
-import io.netty.channel.Channel
 import play.api.libs.json._
 import scorex.crypto.encode.Base58
 import scorex.transaction.ValidationError.{AccountBalanceError, GenericError, OrderValidationError}
@@ -25,14 +25,15 @@ import scala.annotation.tailrec
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 
-class OrderBookActor(assetPair: AssetPair, val orderHistory: ActorRef,
+class OrderBookActor(assetPair: AssetPair,
+                     val orderHistory: ActorRef,
                      val storedState: StateReader,
-                     val wallet: Wallet, val settings: MatcherSettings,
+                     val wallet: Wallet,
+                     val utx: UtxPool,
+                     val settings: MatcherSettings,
                      val history: History,
-                     val functionalitySettings: FunctionalitySettings,
-                     val localChannel: Channel)
-  extends PersistentActor
-    with Stash with ScorexLogging with ExchangeTransactionCreator {
+                     val functionalitySettings: FunctionalitySettings)
+  extends PersistentActor with Stash with ScorexLogging with ExchangeTransactionCreator {
   override def persistenceId: String = OrderBookActor.name(assetPair)
 
   private var orderBook = OrderBook.empty
@@ -228,13 +229,7 @@ class OrderBookActor(assetPair: AssetPair, val orderHistory: ActorRef,
         None
 
       case event@OrderExecuted(o, c) =>
-        val result = for {
-          transaction <- createTransaction(o, c)
-          validationResult <- validate(transaction)
-          sendResult <- sendToNetwork(validationResult)
-        } yield sendResult
-
-        result match {
+        createTransaction(o, c).flatMap(utx.putIfNew(_, None)) match {
           case Left(ex) =>
             processInvalidTransaction(event, ex)
           case Right(_) =>
@@ -255,9 +250,10 @@ class OrderBookActor(assetPair: AssetPair, val orderHistory: ActorRef,
 }
 
 object OrderBookActor {
-  def props(assetPair: AssetPair, orderHistory: ActorRef, storedState: StateReader, settings: MatcherSettings, wallet: Wallet, localChannel: Channel, history: History,
+  def props(assetPair: AssetPair, orderHistory: ActorRef, storedState: StateReader, settings: MatcherSettings,
+            wallet: Wallet, utx: UtxPool, history: History,
             functionalitySettings: FunctionalitySettings): Props =
-    Props(new OrderBookActor(assetPair, orderHistory, storedState, wallet, settings, history, functionalitySettings, localChannel))
+    Props(new OrderBookActor(assetPair, orderHistory, storedState, wallet, utx, settings, history, functionalitySettings))
 
   def name(assetPair: AssetPair): String = assetPair.toString
 

@@ -1,17 +1,15 @@
 package scorex.block
 
-import cats._
-import cats.data._
-import cats.implicits._
 import com.google.common.primitives.{Bytes, Ints, Longs}
+import com.wavesplatform.settings.GenesisSettings
 import com.wavesplatform.state2.ByteStr
 import play.api.libs.json.{JsObject, Json}
-import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
+import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
 import scorex.consensus.nxt.{NxtConsensusBlockField, NxtLikeConsensusBlockData}
 import scorex.crypto.EllipticCurveImpl
-import scorex.crypto.encode.Base58
+import scorex.crypto.hash.FastCryptographicHash.DigestSize
 import scorex.transaction.TransactionParser._
-import scorex.transaction.ValidationError.{GenericError, InvalidSignature}
+import scorex.transaction.ValidationError.GenericError
 import scorex.transaction._
 import scorex.utils.ScorexLogging
 
@@ -96,19 +94,19 @@ object Block extends ScorexLogging {
   val TransactionSizeLength = 4
 
   def transParseBytes(bytes: Array[Byte]): Try[Seq[Transaction]] = Try {
-    bytes.isEmpty match {
-      case true => Seq.empty
-      case false =>
-        val txData = bytes.tail
-        val txCount = bytes.head // so 255 txs max
-        (1 to txCount).foldLeft((0: Int, Seq[Transaction]())) { case ((pos, txs), _) =>
-          val transactionLengthBytes = txData.slice(pos, pos + TransactionSizeLength)
-          val transactionLength = Ints.fromByteArray(transactionLengthBytes)
-          val transactionBytes = txData.slice(pos + TransactionSizeLength, pos + TransactionSizeLength + transactionLength)
-          val transaction = TransactionParser.parseBytes(transactionBytes).get
+    if (bytes.isEmpty) {
+      Seq.empty
+    } else {
+      val txData = bytes.tail
+      val txCount = bytes.head // so 255 txs max
+      (1 to txCount).foldLeft((0: Int, Seq[Transaction]())) { case ((pos, txs), _) =>
+        val transactionLengthBytes = txData.slice(pos, pos + TransactionSizeLength)
+        val transactionLength = Ints.fromByteArray(transactionLengthBytes)
+        val transactionBytes = txData.slice(pos + TransactionSizeLength, pos + TransactionSizeLength + transactionLength)
+        val transaction = TransactionParser.parseBytes(transactionBytes).get
 
-          (pos + TransactionSizeLength + transactionLength, txs :+ transaction)
-        }._2
+        (pos + TransactionSizeLength + transactionLength, txs :+ transaction)
+      }._2
     }
   }
 
@@ -159,15 +157,21 @@ object Block extends ScorexLogging {
     nonSignedBlock.copy(signerData = SignerData(signer, ByteStr(signature)))
   }
 
-  def genesis(consensusGenesisData: NxtLikeConsensusBlockData,
-              transactionGenesisData: Seq[Transaction],
-              timestamp: Long = 0L,
-              signatureStringOpt: Option[String] = None): Either[ValidationError, Block] = {
+  def genesisTransactions(gs: GenesisSettings): Seq[GenesisTransaction] = {
+    gs.transactions.map { ts =>
+      val acc = Account.fromString(ts.recipient).right.get
+      GenesisTransaction.create(acc, ts.amount, gs.timestamp).right.get
+    }
+  }
+
+  def genesis(genesisSettings: GenesisSettings): Either[ValidationError, Block] = {
     val version: Byte = 1
 
     val genesisSigner = PrivateKeyAccount(Array.empty)
 
+    val transactionGenesisData = genesisTransactions(genesisSettings)
     val transactionGenesisDataField = TransactionsBlockField(transactionGenesisData)
+    val consensusGenesisData = NxtLikeConsensusBlockData(genesisSettings.initialBaseTarget, Array.fill(DigestSize)(0: Byte))
     val consensusGenesisDataField = NxtConsensusBlockField(consensusGenesisData)
     val txBytesSize = transactionGenesisDataField.bytes.length
     val txBytes = Bytes.ensureCapacity(Ints.toByteArray(txBytesSize), 4, 0) ++ transactionGenesisDataField.bytes
@@ -176,6 +180,7 @@ object Block extends ScorexLogging {
 
     val reference = Array.fill(BlockIdLength)(-1: Byte)
 
+    val timestamp = genesisSettings.blockTimestamp
     val toSign: Array[Byte] = Array(version) ++
       Bytes.ensureCapacity(Longs.toByteArray(timestamp), 8, 0) ++
       reference ++
@@ -183,8 +188,7 @@ object Block extends ScorexLogging {
       txBytes ++
       genesisSigner.publicKey
 
-    val signature = signatureStringOpt.map(Base58.decode(_).get)
-      .getOrElse(EllipticCurveImpl.sign(genesisSigner, toSign))
+    val signature = genesisSettings.signature.fold(EllipticCurveImpl.sign(genesisSigner, toSign))(_.arr)
 
     if (EllipticCurveImpl.verify(signature, toSign, genesisSigner.publicKey))
       Right(Block(timestamp = timestamp,

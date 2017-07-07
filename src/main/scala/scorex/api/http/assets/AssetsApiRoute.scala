@@ -3,10 +3,10 @@ package scorex.api.http.assets
 import javax.ws.rs.Path
 
 import akka.http.scaladsl.server.Route
+import com.wavesplatform.UtxPool
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state2.ByteStr
 import com.wavesplatform.state2.reader.StateReader
-import io.netty.channel.Channel
 import io.swagger.annotations._
 import play.api.libs.json._
 import scorex.BroadcastRoute
@@ -23,7 +23,7 @@ import scala.util.{Failure, Success}
 
 @Path("/assets")
 @Api(value = "assets")
-case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, state: StateReader, localChannel: Channel, time: Time)
+case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPool, state: StateReader, time: Time)
   extends ApiRoute with BroadcastRoute {
   val MaxAddressesPerRequest = 1000
 

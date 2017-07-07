@@ -3,6 +3,7 @@ package com.wavesplatform.matcher.market
 import akka.actor.{Actor, ActorSystem, Props}
 import akka.persistence.inmemory.extension.{InMemoryJournalStorage, InMemorySnapshotStorage, StorageExtension}
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
+import com.wavesplatform.UtxPool
 import com.wavesplatform.matcher.MatcherTestData
 import com.wavesplatform.matcher.fixtures.RestartableActor
 import com.wavesplatform.matcher.fixtures.RestartableActor.RestartActor
@@ -13,7 +14,6 @@ import com.wavesplatform.matcher.model.{BuyLimitOrder, LimitOrder, SellLimitOrde
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, WalletSettings}
 import com.wavesplatform.state2.reader.StateReader
 import com.wavesplatform.state2.{ByteStr, LeaseInfo, Portfolio}
-import io.netty.channel.embedded.EmbeddedChannel
 import org.h2.mvstore.MVStore
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest._
@@ -75,7 +75,7 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
   })
 
   var actor = system.actorOf(Props(new OrderBookActor(pair, orderHistoryRef,storedState,
-    wallet, settings, stub[History], stub[FunctionalitySettings], new EmbeddedChannel()) with RestartableActor))
+    wallet, stub[UtxPool], settings, stub[History], FunctionalitySettings.TESTNET) with RestartableActor))
 
 
   override protected def beforeEach() = {
@@ -89,12 +89,10 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
     val history = stub[History]
     val functionalitySettings = stub[FunctionalitySettings]
 
+    val utx = stub[UtxPool]
+    (utx.putIfNew _).when(*, *).onCall((tx, _) => Right(tx))
     actor = system.actorOf(Props(new OrderBookActor(pair, orderHistoryRef, storedState,
-      wallet, settings, history, functionalitySettings, new EmbeddedChannel()) with RestartableActor {
-      override def validate(orderMatch: ExchangeTransaction): Either[ValidationError, SignedTransaction] = Right(orderMatch)
-
-      override def sendToNetwork(tx: SignedTransaction): Either[ValidationError, SignedTransaction] = Right(tx)
-    }))
+      wallet, utx, settings, history, functionalitySettings) with RestartableActor))
 
     eventsProbe = TestProbe()
     system.eventStream.subscribe(eventsProbe.ref, classOf[Event])
@@ -275,15 +273,15 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
       // should be invalid
       val ord3 = sell(pair, 100, 10*Order.PriceConstant)
 
-      actor = system.actorOf(Props(new OrderBookActor(pair, orderHistoryRef, storedState,
-        wallet, settings, history, functionalitySettings, new EmbeddedChannel()) with RestartableActor {
-        override def validate(orderMatch: ExchangeTransaction): Either[ValidationError, SignedTransaction] = {
-          if (orderMatch.buyOrder == ord2) Left(ValidationError.GenericError("test"))
-          else Right(orderMatch)
+      val pool = stub[UtxPool]
+      (pool.putIfNew _).when(*, *).onCall { (tx, _) =>
+        tx match {
+          case om: ExchangeTransaction if om.buyOrder == ord2 => Left(ValidationError.GenericError("test"))
+          case _ => Right(tx)
         }
-
-        override def sendToNetwork(tx: SignedTransaction): Either[ValidationError, SignedTransaction] = Right(tx)
-      }))
+      }
+      actor = system.actorOf(Props(new OrderBookActor(pair, orderHistoryRef, storedState,
+        wallet, pool, settings, history, functionalitySettings) with RestartableActor))
 
       actor ! ord1
       expectMsg(OrderAccepted(ord1))

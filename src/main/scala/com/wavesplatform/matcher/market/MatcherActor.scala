@@ -3,12 +3,12 @@ package com.wavesplatform.matcher.market
 import akka.actor.{ActorRef, Props}
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import akka.persistence.{PersistentActor, RecoveryCompleted}
+import com.wavesplatform.UtxPool
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.api.{MatcherResponse, StatusCodeMatcherResponse}
 import com.wavesplatform.matcher.market.OrderBookActor.{DeleteOrderBookRequest, GetOrderBookResponse, OrderBookRequest}
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.reader.StateReader
-import io.netty.channel.Channel
 import play.api.libs.json.{JsArray, JsValue, Json}
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.IssueTransaction
@@ -21,10 +21,9 @@ import scorex.wallet.Wallet
 import scala.collection.{immutable, mutable}
 import scala.language.reflectiveCalls
 
-class MatcherActor(orderHistory: ActorRef, storedState: StateReader, wallet: Wallet, settings: MatcherSettings, history: History,
-                   functionalitySettings: FunctionalitySettings,
-                   localChannel: Channel
-                  ) extends PersistentActor with ScorexLogging {
+class MatcherActor(orderHistory: ActorRef, storedState: StateReader, wallet: Wallet, utx: UtxPool,
+                   settings: MatcherSettings, history: History, functionalitySettings: FunctionalitySettings)
+  extends PersistentActor with ScorexLogging {
 
   import MatcherActor._
 
@@ -38,7 +37,7 @@ class MatcherActor(orderHistory: ActorRef, storedState: StateReader, wallet: Wal
         pair.amountAsset.flatMap(storedState.getIssueTransaction), pair.priceAsset.flatMap(storedState.getIssueTransaction))
     tradedPairs += pair
 
-    context.actorOf(OrderBookActor.props(pair, orderHistory, storedState, settings, wallet, localChannel, history, functionalitySettings),
+    context.actorOf(OrderBookActor.props(pair, orderHistory, storedState, settings, wallet, utx, history, functionalitySettings),
       OrderBookActor.name(pair))
   }
 
@@ -149,10 +148,9 @@ class MatcherActor(orderHistory: ActorRef, storedState: StateReader, wallet: Wal
 object MatcherActor {
   def name = "matcher"
 
-  def props(orderHistoryActor: ActorRef, storedState: StateReader, wallet: Wallet, settings: MatcherSettings,
-            localChannel: Channel, time: Time, history: History,
-            functionalitySettings: FunctionalitySettings): Props =
-    Props(new MatcherActor(orderHistoryActor, storedState, wallet, settings, history, functionalitySettings, localChannel))
+  def props(orderHistoryActor: ActorRef, storedState: StateReader, wallet: Wallet, utx: UtxPool,
+            settings: MatcherSettings, time: Time, history: History, functionalitySettings: FunctionalitySettings): Props =
+    Props(new MatcherActor(orderHistoryActor, storedState, wallet, utx, settings, history, functionalitySettings))
 
   case class OrderBookCreated(pair: AssetPair)
 

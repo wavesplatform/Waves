@@ -2,7 +2,6 @@ package com.wavesplatform.network
 
 import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel.{ChannelHandlerContext, ChannelInboundHandlerAdapter}
-import scorex.network.message.BlockMessageSpec
 import scorex.transaction.History
 import scorex.utils.ScorexLogging
 
