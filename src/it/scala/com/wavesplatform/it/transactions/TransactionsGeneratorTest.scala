@@ -17,7 +17,7 @@ import scala.concurrent.{Await, Future}
 
 class TransactionsGeneratorTest(override val allNodes: Seq[Node]) extends IntegrationSuiteWithThreeAddresses {
   test("generated transactions should lead to the right state") {
-    val n = 100
+    val n = 1000
 
     val txs = TransactionGenerator.gen(Map(
       TT.IssueTransaction -> 0.1f,
@@ -29,7 +29,7 @@ class TransactionsGeneratorTest(override val allNodes: Seq[Node]) extends Integr
       TT.LeaseCancelTransaction -> 0.075f,
       TT.ExchangeTransaction -> 0.1f,
       TT.PaymentTransaction -> 0.1f
-    ), allNodes.map(n => PrivateKeyAccount(Base58.decode(n.privateKey).get)), n)
+    ), allNodes.map(n => PrivateKeyAccount(Base58.decode(n.accountSeed).get)), n)
 
     val node = allNodes.head
 
@@ -38,14 +38,14 @@ class TransactionsGeneratorTest(override val allNodes: Seq[Node]) extends Integr
         val sortedTxs = txs.sortBy {
           case _: IssueTransaction => 1
           case _: CreateAliasTransaction => 1
-          case _: LeaseTransaction => 2
+          case _: LeaseTransaction => 1
           case _: TransferTransaction => 2
           case _: PaymentTransaction => 2
           case _: ReissueTransaction => 3
           case _: BurnTransaction => 3
           case _: LeaseCancelTransaction => 4
           case _: ExchangeTransaction => 4
-        }
+        }.toList
 
         def importantTransactionType(tt: TT.Value): Boolean = {
           tt == TT.IssueTransaction ||
@@ -62,13 +62,15 @@ class TransactionsGeneratorTest(override val allNodes: Seq[Node]) extends Integr
       splitTransactionsIntoValidBlocks(transactions).foreach(txsPerBlock => {
         val sendF = for {
           _ <- node.sendByNetwork(txsPerBlock.map(tx => RawBytes(25.toByte, tx.bytes)): _*)
-          _ <- node.waitForNextBlock
-        } yield succeed
-        Await.result(sendF, 30 seconds)
+          h <- node.height
+          _ <- node.waitForHeight(h + 1)
+        } yield
+          succeed
+        Await.result(sendF, 5 minutes)
       })
     }
 
-    Await.result(sendTransactionsPerBlock(txs), 2.minutes)
+    Await.result(sendTransactionsPerBlock(txs), 5.minutes)
     println("!!!")
   }
 }
