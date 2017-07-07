@@ -7,7 +7,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.dataformat.javaprop.JavaPropsMapper
 import com.google.common.collect.ImmutableMap
 import com.spotify.docker.client.DefaultDockerClient
-import com.spotify.docker.client.DockerClient.RemoveContainerParam
+import com.spotify.docker.client.DockerClient.{ListContainersParam, RemoveContainerParam}
 import com.spotify.docker.client.messages.{ContainerConfig, HostConfig, NetworkConfig, PortBinding}
 import com.typesafe.config.{Config, ConfigFactory, ConfigRenderOptions}
 import io.netty.util.HashedWheelTimer
@@ -54,7 +54,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty) extends AutoCloseable wi
     case (ni, index) => s"-Dwaves.network.known-peers.$index=${ni.networkIpAddress}:${ni.containerNetworkPort}"
   } mkString " "
 
-  private val networkName = "waves-" + new Random().nextInt()
+  private val networkName = "waves-" + this.##
 
   private val wavesNetwork = client.createNetwork(NetworkConfig.builder().driver("bridge").name(networkName).build())
 
@@ -91,7 +91,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty) extends AutoCloseable wi
       .env(s"WAVES_OPTS=$configOverrides", s"WAVES_PORT=$networkPort")
       .build()
 
-    val containerId = client.createContainer(containerConfig, actualConfig.getString("waves.network.node-name")).id()
+    val containerId = client.createContainer(containerConfig, actualConfig.getString("waves.network.node-name") + "-" + this.##).id()
     connectToNetwork(containerId)
     client.startContainer(containerId)
     val containerInfo = client.inspectContainer(containerId)
