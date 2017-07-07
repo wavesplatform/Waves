@@ -45,8 +45,6 @@ class Docker(suiteConfig: Config = ConfigFactory.empty) extends AutoCloseable wi
   private var nodes = Map.empty[String, Node]
   private val isStopped = new AtomicBoolean(false)
 
-  timer.start()
-
   sys.addShutdownHook {
     close()
   }

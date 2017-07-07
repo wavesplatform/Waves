@@ -32,6 +32,10 @@ trait NodeApi {
   def matcherRestPort: Int
   def blockDelay: FiniteDuration
 
+  protected val client: AsyncHttpClient = new DefaultAsyncHttpClient
+
+  protected val timer: Timer = new HashedWheelTimer()
+
   protected val log: LoggerFacade = LoggerFacade(LoggerFactory.getLogger(s"${getClass.getName} $restAddress"))
 
   def matcherGet(path: String, f: RequestBuilder => RequestBuilder = identity): Future[Response] =
@@ -213,10 +217,6 @@ trait NodeApi {
 
   def cancelOrder(amountAsset: String, priceAsset: String, request: CancelOrderRequest): Future[MatcherStatusResponse] =
     matcherPost(s"/matcher/orderbook/$amountAsset/$priceAsset/cancel", request.json).as[MatcherStatusResponse]
-
-  protected val client: AsyncHttpClient = new DefaultAsyncHttpClient
-
-  protected val timer: Timer = new HashedWheelTimer()
 
   def close(): Unit = {
     timer.stop()

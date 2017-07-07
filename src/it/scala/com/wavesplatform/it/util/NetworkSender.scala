@@ -17,7 +17,6 @@ import scala.concurrent.duration._
 
 class NetworkSender(address: InetSocketAddress, chainId: Char, name: String, nonce: Long) {
   private val retryTimer = new HashedWheelTimer()
-  retryTimer.start()
   def sendByNetwork(messages: RawBytes*): Future[Unit] = {
     val allChannels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
     val establishedConnections = new ConcurrentHashMap[Channel, PeerInfo]

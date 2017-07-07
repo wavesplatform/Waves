@@ -24,7 +24,7 @@ class Node(config: Config, val nodeInfo: NodeInfo, override val client: AsyncHtt
   override val chainId: Char = 'I'
   override val nodeName: String = s"it-test-client-to-${nodeInfo.networkIpAddress}"
   override val restAddress: String = nodeInfo.apiIpAddress
-  override val networkAddress: String = nodeInfo.networkIpAddress
+  override val networkAddress: String = "localhost"
   override val nodeRestPort: Int = nodeInfo.hostRestApiPort
   override val matcherRestPort: Int = nodeInfo.hostMatcherApiPort
   override val networkPort: Int = nodeInfo.hostNetworkPort
