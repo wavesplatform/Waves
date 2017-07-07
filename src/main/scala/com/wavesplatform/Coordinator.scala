@@ -38,6 +38,7 @@ object Coordinator extends ScorexLogging {
         for {
           commonBlockHeight <- history.heightOf(lastBlockId).toRight(GenericError("Fork contains no common parent"))
           _ <- Either.cond(isForkValidWithCheckpoint(commonBlockHeight), (), GenericError("Fork contains block that doesn't match checkpoint, declining fork"))
+          _ <- blockchainUpdater.removeAfter(lastBlockId)
           score <- forkApplicationResultEi
         } yield {
           miner.lastBlockChanged()
