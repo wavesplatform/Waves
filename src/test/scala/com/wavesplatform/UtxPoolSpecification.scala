@@ -3,6 +3,7 @@ package com.wavesplatform
 import com.wavesplatform.history.BlockStorageImpl
 import com.wavesplatform.network.RawBytes
 import com.wavesplatform.settings.{BlockchainSettings, FeeSettings, FeesSettings, FunctionalitySettings, UtxSettings}
+import com.wavesplatform.state2.diffs.produce
 import io.netty.channel.group.{ChannelGroup, ChannelMatcher, ChannelMatchers}
 import org.scalacheck.Gen._
 import org.scalacheck.{Gen, Shrink}
@@ -11,7 +12,6 @@ import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import org.scalatest.{FreeSpec, Matchers}
 import scorex.account.{Account, PrivateKeyAccount}
 import scorex.block.Block
-import scorex.transaction.ValidationError.GenericError
 import scorex.transaction.assets.TransferTransaction
 import scorex.transaction.{FeeCalculator, Transaction}
 import scorex.utils.Time
@@ -70,7 +70,7 @@ class UtxPoolSpecification extends FreeSpec
       }
     }
 
-  private val zzgen: Gen[(UtxPool, TestTime, Seq[Transaction], FiniteDuration, Seq[Transaction])] =
+  private val dualTxGen: Gen[(UtxPool, TestTime, Seq[Transaction], FiniteDuration, Seq[Transaction])] =
     for {
       (sender, senderBalance, state) <- stateGen
       ts = System.currentTimeMillis()
@@ -94,10 +94,10 @@ class UtxPoolSpecification extends FreeSpec
     "does not add the same transaction twice" in utxTest() { (txs, utx, _) =>
       expectBroadcast(txs.head)
       utx.putIfNew(txs.head) shouldBe 'right
-      utx.putIfNew(txs.head) shouldEqual Left(GenericError(s"Transaction ${txs.head.id} already in the pool"))
+      utx.putIfNew(txs.head) should produce(s"Transaction ${txs.head.id} already in the pool")
     }
 
-    "evicts expired transactions when new ones are added" in forAll(zzgen) { case (utx, time, txs1, offset, txs2) =>
+    "evicts expired transactions when new ones are added" in forAll(dualTxGen) { case (utx, time, txs1, offset, txs2) =>
       all(txs1.map { t =>
         expectBroadcast(t)
         utx.putIfNew(t)
@@ -113,6 +113,17 @@ class UtxPoolSpecification extends FreeSpec
       utx.all().size shouldEqual txs2.size
     }
 
-    "evicts invalid transactions when packUnconfirmed is called" in pending
+    "evicts expired transactions when packUnconfirmed is called" in forAll(dualTxGen) { case (utx, time, txs, offset, _) =>
+      all(txs.map { t =>
+        expectBroadcast(t)
+        utx.putIfNew(t)
+      }) shouldBe 'right
+      utx.all().size shouldEqual txs.size
+
+      time.advance(offset)
+
+      utx.packUnconfirmed() shouldBe 'empty
+      utx.all() shouldBe 'empty
+    }
   }
 }
