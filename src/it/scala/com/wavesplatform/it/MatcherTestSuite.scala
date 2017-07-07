@@ -1,7 +1,7 @@
 package com.wavesplatform.it
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.it.Node.{AssetBalance, LevelResponse, MatcherStatusResponse, OrderBookResponse, Transaction}
+import com.wavesplatform.it.api.NodeApi.{AssetBalance, LevelResponse, MatcherStatusResponse, OrderBookResponse, Transaction}
 import com.wavesplatform.matcher.api.CancelOrderRequest
 import com.wavesplatform.state2.ByteStr
 import org.scalatest.{BeforeAndAfterAll, FreeSpec, Matchers}

@@ -3,7 +3,6 @@ package com.wavesplatform.it.util
 import java.net.InetSocketAddress
 import java.util.concurrent.ConcurrentHashMap
 
-import com.google.common.util.concurrent.ThreadFactoryBuilder
 import com.wavesplatform.it.network.client.NetworkClient
 import com.wavesplatform.network.{PeerInfo, RawBytes}
 import io.netty.channel.Channel
@@ -17,7 +16,7 @@ import scala.concurrent.Future
 import scala.concurrent.duration._
 
 class NetworkSender(address: InetSocketAddress, chainId: Char, name: String, nonce: Long) {
-  private val retryTimer = new HashedWheelTimer(new ThreadFactoryBuilder().setDaemon(true).build())
+  private val retryTimer = new HashedWheelTimer()
   retryTimer.start()
   def sendByNetwork(messages: RawBytes*): Future[Unit] = {
     val allChannels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
@@ -34,4 +33,5 @@ class NetworkSender(address: InetSocketAddress, chainId: Char, name: String, non
       c.shutdown()
     })
   }
+  def close: Unit = retryTimer.stop()
 }

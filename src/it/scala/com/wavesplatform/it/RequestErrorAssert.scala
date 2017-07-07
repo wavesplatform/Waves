@@ -1,6 +1,6 @@
 package com.wavesplatform.it
 
-import com.wavesplatform.it.Node.UnexpectedStatusCodeException
+import com.wavesplatform.it.api.NodeApi.UnexpectedStatusCodeException
 import org.scalatest.{Assertion, Assertions}
 
 import scala.concurrent.Future

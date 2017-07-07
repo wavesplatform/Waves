@@ -41,7 +41,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty) extends AutoCloseable wi
     .setRequestTimeout(5000))
 
   private val client = DefaultDockerClient.fromEnv().build()
-  private val timer = new HashedWheelTimer(new ThreadFactoryBuilder().setDaemon(true).build())
+  private val timer = new HashedWheelTimer()
   private var nodes = Map.empty[String, NodeInfo]
   private val isStopped = new AtomicBoolean(false)
 

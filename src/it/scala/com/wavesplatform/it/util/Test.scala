@@ -29,7 +29,7 @@ object Test extends App {
   log.info(s"Generating $n transactions every $every from addresses:")
   accounts.foreach(a => log.info(a.address))
   val sender = new NetworkSender(new InetSocketAddress(InetAddress.getByName("52.30.47.67"), 6863), 'T', "generator", 38262732757L)
-
+  sys.addShutdownHook(sender.close)
   while (true) {
     val txs = TransactionGenerator.gen(Map(
       TT.IssueTransaction -> 0.1f,
