@@ -172,6 +172,10 @@ class LegacyConfigTransformerSpec extends FreeSpec with Matchers {
           |    max-single-host-connections = 3
           |    handshake-timeout = 30s
           |  }
+          |  utx {
+          |    max-size = 10000
+          |    max-transaction-age = 90m
+          |  }
           |  matcher {
           |    enable = false
           |    account = ""
@@ -218,6 +222,10 @@ class LegacyConfigTransformerSpec extends FreeSpec with Matchers {
           |    unrequested-packets-threshold = 100
           |    max-single-host-connections = 3
           |    handshake-timeout = 30s
+          |  }
+          |  utx {
+          |    max-size = 10000
+          |    max-transaction-age = 90m
           |  }
           |  matcher {
           |    enable = false
@@ -268,7 +276,10 @@ class LegacyConfigTransformerSpec extends FreeSpec with Matchers {
      'cors (false)
     )
 
-    ws.utxSettings.maxSize shouldBe 100
+    ws.utxSettings should have (
+      'maxSize (10000),
+      'maxTransactionAge (90.minutes)
+    )
 
     ws.checkpointsSettings should have (
       'publicKey (ByteStr.decodeBase58("7EXnkmJyz1gPfLJwytThcwGwpyfjzFXC3hxBhvVK4").get)

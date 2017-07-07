@@ -26,8 +26,8 @@ class TransactionsRouteSpec extends RouteSpec("/transactions")
 
   private val history = mock[History]
   private val state = mock[StateReader]
-  private val stm = stub[UtxPool]
-  private val route = TransactionsApiRoute(restAPISettings, state, history, stm).route
+  private val utx = mock[UtxPool]
+  private val route = TransactionsApiRoute(restAPISettings, state, history, utx).route
 
   private implicit def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)
 
@@ -109,7 +109,7 @@ class TransactionsRouteSpec extends RouteSpec("/transactions")
       } yield t
 
       forAll(g) { txs =>
-        (stm.all _).when().returns(txs).once()
+        (utx.all _).when().returns(txs).once()
         Get(routePath("/unconfirmed")) ~> route ~> check {
           val resp = responseAs[Seq[JsValue]]
           for ((r, t) <- resp.zip(txs)) {

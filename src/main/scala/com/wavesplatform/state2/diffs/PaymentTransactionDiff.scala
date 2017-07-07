@@ -16,7 +16,7 @@ object PaymentTransactionDiff {
            (tx: PaymentTransaction): Either[ValidationError, Diff] = {
 
     stateReader.paymentTransactionIdByHash(ByteStr(tx.hash)) match {
-      case Some(existing) if blockTime >= settings.requirePaymentUniqueId => Left(GenericError(s"PaymentTx is already registered: $existing"))
+      case Some(existing) if blockTime >= settings.requirePaymentUniqueIdAfter => Left(GenericError(s"PaymentTx is already registered: $existing"))
       case _ => Right(Diff(height = height,
         tx = tx,
         portfolios = Map(

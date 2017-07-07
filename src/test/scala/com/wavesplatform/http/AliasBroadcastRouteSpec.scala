@@ -28,8 +28,8 @@ class AliasBroadcastRouteSpec extends RouteSpec("/alias/broadcast/") with Reques
 
     "when state validation fails" in {
       forAll(createAliasGen) { (t: Transaction) =>
-          posting("create", t.json) should produce(StateCheckFailed(t, "foo"))
-        }
+        posting("create", t.json) should produce(StateCheckFailed(t, "foo"))
+      }
     }
   }
 

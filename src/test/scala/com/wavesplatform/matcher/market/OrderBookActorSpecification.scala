@@ -75,7 +75,7 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
   })
 
   var actor = system.actorOf(Props(new OrderBookActor(pair, orderHistoryRef,storedState,
-    wallet, stub[UtxPool], settings, stub[History], stub[FunctionalitySettings]) with RestartableActor))
+    wallet, stub[UtxPool], settings, stub[History], FunctionalitySettings.TESTNET) with RestartableActor))
 
 
   override protected def beforeEach() = {
@@ -89,12 +89,10 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
     val history = stub[History]
     val functionalitySettings = stub[FunctionalitySettings]
 
+    val utx = stub[UtxPool]
+    (utx.putIfNew _).when(*, *).onCall((tx, _) => Right(tx))
     actor = system.actorOf(Props(new OrderBookActor(pair, orderHistoryRef, storedState,
-      wallet, stub[UtxPool], settings, history, functionalitySettings) with RestartableActor {
-//      override def validate(orderMatch: ExchangeTransaction): Either[ValidationError, SignedTransaction] = Right(orderMatch)
-//
-//      override def sendToNetwork(tx: SignedTransaction): Either[ValidationError, SignedTransaction] = Right(tx)
-    }))
+      wallet, utx, settings, history, functionalitySettings) with RestartableActor))
 
     eventsProbe = TestProbe()
     system.eventStream.subscribe(eventsProbe.ref, classOf[Event])
@@ -275,15 +273,15 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
       // should be invalid
       val ord3 = sell(pair, 100, 10*Order.PriceConstant)
 
+      val pool = stub[UtxPool]
+      (pool.putIfNew _).when(*, *).onCall { (tx, _) =>
+        tx match {
+          case om: ExchangeTransaction if om.buyOrder == ord2 => Left(ValidationError.GenericError("test"))
+          case _ => Right(tx)
+        }
+      }
       actor = system.actorOf(Props(new OrderBookActor(pair, orderHistoryRef, storedState,
-        wallet, stub[UtxPool], settings, history, functionalitySettings) with RestartableActor {
-//        override def validate(orderMatch: ExchangeTransaction): Either[ValidationError, SignedTransaction] = {
-//          if (orderMatch.buyOrder == ord2) Left(ValidationError.GenericError("test"))
-//          else Right(orderMatch)
-//        }
-//
-//        override def sendToNetwork(tx: SignedTransaction): Either[ValidationError, SignedTransaction] = Right(tx)
-      }))
+        wallet, pool, settings, history, functionalitySettings) with RestartableActor))
 
       actor ! ord1
       expectMsg(OrderAccepted(ord1))
