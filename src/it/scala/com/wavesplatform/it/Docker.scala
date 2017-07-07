@@ -6,12 +6,10 @@ import java.util.{Collections, Properties, List => JList, Map => JMap}
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.dataformat.javaprop.JavaPropsMapper
 import com.google.common.collect.ImmutableMap
-import com.google.common.util.concurrent.ThreadFactoryBuilder
 import com.spotify.docker.client.DefaultDockerClient
 import com.spotify.docker.client.DockerClient.RemoveContainerParam
 import com.spotify.docker.client.messages.{ContainerConfig, HostConfig, NetworkConfig, PortBinding}
 import com.typesafe.config.{Config, ConfigFactory, ConfigRenderOptions}
-import io.netty.util.HashedWheelTimer
 import org.asynchttpclient.Dsl._
 import scorex.utils.ScorexLogging
 
@@ -41,7 +39,6 @@ class Docker(suiteConfig: Config = ConfigFactory.empty) extends AutoCloseable wi
     .setRequestTimeout(5000))
 
   private val client = DefaultDockerClient.fromEnv().build()
-  private val timer = new HashedWheelTimer()
   private var nodes = Map.empty[String, Node]
   private val isStopped = new AtomicBoolean(false)
 
@@ -115,12 +112,8 @@ class Docker(suiteConfig: Config = ConfigFactory.empty) extends AutoCloseable wi
     client.stopContainer(containerId, 10)
   }
 
-  def scheduleOnce(initialDelay: FiniteDuration)(f: => Any) =
-    timer.newTimeout(_ => f, initialDelay.toMillis, MILLISECONDS)
-
   override def close(): Unit = {
     if (isStopped.compareAndSet(false, true)) {
-      timer.stop()
       log.info("Stopping containers")
       nodes.values.foreach(n => n.close())
       nodes.keys.foreach(id => client.removeContainer(id, RemoveContainerParam.forceKill()))
