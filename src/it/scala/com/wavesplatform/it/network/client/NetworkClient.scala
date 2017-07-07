@@ -4,14 +4,14 @@ import java.net.InetSocketAddress
 import java.util.concurrent.ConcurrentHashMap
 
 import com.wavesplatform.Version
-import com.wavesplatform.network.{Handshake, HandshakeHandler, PeerInfo, PeerKey, TransactionalMessagesRepo}
+import com.wavesplatform.network.{BasicMessagesRepo, Handshake, HandshakeHandler, PeerInfo, PeerKey}
 import com.wavesplatform.settings._
 import io.netty.bootstrap.Bootstrap
 import io.netty.channel._
 import io.netty.channel.group.ChannelGroup
 import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.channel.socket.nio.NioSocketChannel
-import scorex.network.message.{BasicMessagesRepo, MessageSpec}
+import scorex.network.message.MessageSpec
 import scorex.utils.ScorexLogging
 
 class NetworkClient(
@@ -28,7 +28,7 @@ class NetworkClient(
     Handshake(Constants.ApplicationName + chainId, Version.VersionTuple, nodeName,
       nonce, None)
 
-  private val specs: Map[Byte, MessageSpec[_ <: AnyRef]] = (BasicMessagesRepo.specs ++ TransactionalMessagesRepo.specs).map(s => s.messageCode -> s).toMap
+  private val specs: Map[Byte, MessageSpec[_ <: AnyRef]] = BasicMessagesRepo.specs.map(s => s.messageCode -> s).toMap
 
   private val peerUniqueness = new ConcurrentHashMap[PeerKey, Channel]()
 

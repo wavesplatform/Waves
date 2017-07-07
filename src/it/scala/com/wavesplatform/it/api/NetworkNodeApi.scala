@@ -6,6 +6,7 @@ import com.wavesplatform.it.util.NetworkSender
 import com.wavesplatform.network.RawBytes
 
 import scala.concurrent.Future
+import scala.concurrent.ExecutionContext.Implicits.global
 
 trait NetworkNodeApi {
   def networkAddress: String
@@ -16,10 +17,6 @@ trait NetworkNodeApi {
 
   def sendByNetwork(message: RawBytes*): Future[Unit] = {
     val c = new NetworkSender(new InetSocketAddress(networkAddress, networkPort), chainId, nodeName, nonce)
-    try {
-      c.sendByNetwork(message: _*)
-    } finally {
-      c.close()
-    }
+      c.sendByNetwork(message: _*) map (_ => c.close())
   }
 }
