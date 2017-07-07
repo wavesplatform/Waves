@@ -35,7 +35,7 @@ class TransactionsGeneratorTest(override val allNodes: Seq[Node]) extends Integr
 
     def sendTransactionsPerBlock(transactions: Seq[Transaction]): Future[Unit] = Future {
       def splitTransactionsIntoValidBlocks(txs: Seq[Transaction]): Seq[Seq[Transaction]] = {
-        txs.sortBy {
+        val sortedTxs = txs.sortBy {
           case _: IssueTransaction => 1
           case _: CreateAliasTransaction => 1
           case _: LeaseTransaction => 2
@@ -45,7 +45,18 @@ class TransactionsGeneratorTest(override val allNodes: Seq[Node]) extends Integr
           case _: BurnTransaction => 3
           case _: LeaseCancelTransaction => 4
           case _: ExchangeTransaction => 4
-        }.grouped(100).toSeq
+        }
+
+        def importantTransactionType(tt: TT.Value): Boolean = {
+          tt == TT.IssueTransaction ||
+            tt == TT.CreateAliasTransaction ||
+            tt == TT.LeaseTransaction
+        }
+
+        val lastImportantTransactionIndex = sortedTxs.lastIndexWhere(t => importantTransactionType(t.transactionType))
+
+        val (mostImportant, lessImportant) = sortedTxs.splitAt(lastImportantTransactionIndex)
+        mostImportant.grouped(100).toSeq ++ lessImportant.grouped(100).toSeq
       }
 
       splitTransactionsIntoValidBlocks(transactions).foreach(txsPerBlock => {

@@ -22,8 +22,8 @@ class Node(config: Config, val nodeInfo: NodeInfo, override val client: AsyncHtt
   override protected val log = LoggerFacade(LoggerFactory.getLogger(s"${getClass.getName}.${settings.networkSettings.nodeName}"))
 
   override val chainId: Char = 'I'
-  override val nodeName: String = s"client-to-${nodeInfo.networkIpAddress}"
-  override val restAddress: String = "localhost"
+  override val nodeName: String = s"it-test-client-to-${nodeInfo.networkIpAddress}"
+  override val restAddress: String = nodeInfo.apiIpAddress
   override val networkAddress: String = nodeInfo.networkIpAddress
   override val nodeRestPort: Int = nodeInfo.hostRestApiPort
   override val matcherRestPort: Int = nodeInfo.hostMatcherApiPort
