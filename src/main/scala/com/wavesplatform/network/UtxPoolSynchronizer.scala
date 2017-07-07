@@ -11,7 +11,7 @@ import scorex.utils.ScorexLogging
 import scala.concurrent.Future
 
 @Sharable
-class UtxPoolSynchronizer(utx: UtxPool, allChannels: ChannelGroup)
+class UtxPoolSynchronizer(utx: UtxPool)
   extends ChannelInboundHandlerAdapter with ScorexLogging {
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {

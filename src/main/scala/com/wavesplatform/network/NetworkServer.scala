@@ -62,7 +62,6 @@ class NetworkServer(checkpointService: CheckpointService,
   private val lengthFieldPrepender = new LengthFieldPrepender(4)
 
   private val peerSynchronizer = new PeerSynchronizer(peerDatabase, settings.networkSettings.peersBroadcastInterval)
-  private val utxPoolSynchronizer = new UtxPoolSynchronizer(utxPool, allChannels)
   // There are two error handlers by design. WriteErrorHandler adds a future listener to make sure writes to network
   // succeed. It is added to the head of pipeline (it's the closest of the two to actual network), because some writes
   // are initiated from the middle of the pipeline (e.g. extension requests). FatalErrorHandler, on the other hand,
@@ -72,21 +71,20 @@ class NetworkServer(checkpointService: CheckpointService,
   private val writeErrorHandler = new WriteErrorHandler
   private val fatalErrorHandler = new FatalErrorHandler
   private val historyReplier = new HistoryReplier(history, settings.synchronizationSettings.maxChainLength)
-
   private val inboundConnectionFilter : PipelineInitializer.HandlerWrapper = new InboundConnectionFilter(peerDatabase,
     settings.networkSettings.maxInboundConnections,
     settings.networkSettings.maxConnectionsPerHost)
 
   private val coordinatorExecutor = new DefaultEventLoop
+
   private val coordinatorHandler = new CoordinatorHandler(checkpointService, history, blockchainUpdater, time,
     stateReader, utxPool, blockchainReadiness, miner, settings, peerDatabase, allChannels)
-
   private val peerUniqueness = new ConcurrentHashMap[PeerKey, Channel]()
 
   private val serverHandshakeHandler =
     new HandshakeHandler.Server(handshake, peerInfo, peerUniqueness, peerDatabase, allChannels)
 
-  private val utxPoolSychronizer = new UtxPoolSynchronizer(utxPool, allChannels)
+  private val utxPoolSynchronizer = new UtxPoolSynchronizer(utxPool)
   private val microBlockSynchronizer = new MircoBlockSynchronizer(history)
 
   private def baseHandlers: Seq[PipelineInitializer.HandlerWrapper] = Seq(
@@ -101,7 +99,7 @@ class NetworkServer(checkpointService: CheckpointService,
     messageCodec,
     peerSynchronizer,
     historyReplier,
-    utxPoolSychronizer,
+    utxPoolSynchronizer,
     microBlockSynchronizer,
     new ExtensionSignaturesLoader(settings.synchronizationSettings.synchronizationTimeout, peerDatabase),
     new ExtensionBlocksLoader(history, settings.synchronizationSettings.synchronizationTimeout, peerDatabase),

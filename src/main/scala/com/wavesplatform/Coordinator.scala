@@ -21,7 +21,7 @@ object Coordinator extends ScorexLogging {
     val extension = newBlocks.dropWhile(history.contains)
 
     extension.headOption.map(_.reference) match {
-      case Some(lastBlockId) =>
+      case Some(lastCommonBlockId) =>
 
         def isForkValidWithCheckpoint(lastCommonHeight: Int): Boolean =
           extension.zipWithIndex.forall(p => checkpoint.isBlockValid(p._1.signerData.signature, lastCommonHeight + 1 + p._2))
@@ -31,14 +31,14 @@ object Coordinator extends ScorexLogging {
           .collectFirst { case (b, Left(e)) => b -> e }
           .fold[Either[ValidationError, BigInt]](Right(history.score())) {
           case (b, e) =>
-            log.warn(s"Can't process fork starting with $lastBlockId, error appending block ${b.uniqueId}: $e")
+            log.warn(s"Can't process fork starting with $lastCommonBlockId, error appending block ${b.uniqueId}: $e")
             Left(e)
         }
 
         for {
-          commonBlockHeight <- history.heightOf(lastBlockId).toRight(GenericError("Fork contains no common parent"))
+          commonBlockHeight <- history.heightOf(lastCommonBlockId).toRight(GenericError("Fork contains no common parent"))
           _ <- Either.cond(isForkValidWithCheckpoint(commonBlockHeight), (), GenericError("Fork contains block that doesn't match checkpoint, declining fork"))
-          _ <- blockchainUpdater.removeAfter(lastBlockId)
+          _ <- blockchainUpdater.removeAfter(lastCommonBlockId)
           score <- forkApplicationResultEi
         } yield {
           miner.lastBlockChanged()
