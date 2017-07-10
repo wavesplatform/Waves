@@ -13,7 +13,7 @@ import monix.eval.Task
 import monix.execution.Scheduler.Implicits.global
 import monix.execution._
 import scorex.account.PrivateKeyAccount
-import scorex.block.Block
+import scorex.block.{Block, MicroBlock}
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
 import scorex.transaction.PoSCalc._
 import scorex.transaction.{BlockchainUpdater, CheckpointService, History}
@@ -57,10 +57,10 @@ class Miner(
   private def generateOneBlockTask(account: PrivateKeyAccount, parentHeight: Int, parent: Block,
                                    greatGrandParent: Option[Block], balance: Long)(delay: FiniteDuration): Task[Either[String, Block]] = Task {
     val pc = peerCount
-    val lastBlockKernelData = parent.consensusData
-    val currentTime = timeService.correctedTime()
-    val h = calcHit(lastBlockKernelData, account)
-    val t = calcTarget(parent, currentTime, balance)
+    lazy val lastBlockKernelData = parent.consensusData
+    lazy val currentTime = timeService.correctedTime()
+    lazy val h = calcHit(lastBlockKernelData, account)
+    lazy val t = calcTarget(parent, currentTime, balance)
     for {
       _ <- Either.cond(pc >= minerSettings.quorum, (), s"Hit $h was NOT less than target $t, not forging block with ${account.address}")
       _ <- Either.cond(h < t, (), s"Quorum not available ($pc/${minerSettings.quorum}, not forging block with ${account.address}")
@@ -76,18 +76,21 @@ class Miner(
     } yield block
   }.delayExecution(delay)
 
-  private def generateBlockTask(account: PrivateKeyAccount, parentHeight: Int, parent: Block, greatGrandParent: Option[Block]): Task[Unit] = Task {
+  private def generateBlockTask(account: PrivateKeyAccount): Task[Unit] = Task {
+    val height = history.height()
+    val lastBlock = history.lastBlock.get
+    val grandParent = history.parent(lastBlock, 2)
     (for {
-      _ <- checkAge(parentHeight, parent)
-      ts <- nextBlockGenerationTime(parentHeight, stateReader, blockchainSettings.functionalitySettings, parent, account)
+      _ <- checkAge(height, lastBlock)
+      ts <- nextBlockGenerationTime(height, stateReader, blockchainSettings.functionalitySettings, lastBlock, account)
       offset = calcOffset(timeService, ts)
       key = ByteStr(account.publicKey)
       _ = scheduledAttempts.get(key) match {
         case Some(_) => log.debug(s"Block generation already scheduled for $key")
         case None =>
           log.debug(s"Next attempt for acc=$account in $offset")
-          val balance = generatingBalance(stateReader, blockchainSettings.functionalitySettings, account, parentHeight)
-          val blockGenTask = generateOneBlockTask(account, parentHeight, parent, greatGrandParent, balance)(offset).flatMap {
+          val balance = generatingBalance(stateReader, blockchainSettings.functionalitySettings, account, height)
+          val blockGenTask = generateOneBlockTask(account, height, lastBlock, grandParent, balance)(offset).flatMap {
             case Right(block) => Task {
               Coordinator.processBlock(checkpoint, history, blockchainUpdater, timeService, stateReader,
                 utx, blockchainReadiness, Miner.this, settings)(block, local = true)
@@ -99,19 +102,18 @@ class Miner(
             case Left(err) =>
               scheduledAttempts.remove(key)
               log.debug(s"No block generated because $err, retrying")
-              generateBlockTask(account, parentHeight, parent, greatGrandParent)
+              generateBlockTask(account)
           }
           scheduledAttempts.put(key, blockGenTask.runAsync)
       }
     } yield ()).left.map(err => log.debug(s"NOT scheduling block generation: $err"))
   }
 
-  def lastBlockChanged(newHeight: Int, newBlock: Block): Unit = {
+  def lastBlockChanged(): Unit = {
     log.debug(s"Miner notified of new block")
     scheduledAttempts.values.foreach(_.cancel)
     scheduledAttempts.clear()
-    val grandParent = history.parent(newBlock, 2)
-    wallet.privateKeyAccounts().foreach(generateBlockTask(_, newHeight, newBlock, grandParent).runAsync)
+    wallet.privateKeyAccounts().foreach(generateBlockTask(_).runAsync)
   }
 
   def shutdown(): Unit = ()

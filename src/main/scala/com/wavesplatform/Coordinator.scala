@@ -41,7 +41,7 @@ object Coordinator extends ScorexLogging {
           _ <- blockchainUpdater.removeAfter(lastCommonBlockId)
           score <- forkApplicationResultEi
         } yield {
-          miner.lastBlockChanged(history.height(), history.lastBlock.get)
+          miner.lastBlockChanged()
           updateBlockchainReadinessFlag(history, time, blockchainReadiness, settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed)
           score
         }
@@ -66,7 +66,7 @@ object Coordinator extends ScorexLogging {
 
     if (local || newScore.isRight) {
       updateBlockchainReadinessFlag(history, time, blockchainReadiness, settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed)
-      miner.lastBlockChanged(history.height(), newBlock)
+      miner.lastBlockChanged()
     }
     newScore
   }
