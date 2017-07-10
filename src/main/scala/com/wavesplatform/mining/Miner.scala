@@ -112,14 +112,15 @@ class Miner(
           log.debug(s"Next attempt for acc=$account in $offset")
           val balance = generatingBalance(stateReader, blockchainSettings.functionalitySettings, account, height)
           val blockGenTask = generateOneBlockTask(account, height, lastBlock, grandParent, balance)(offset).flatMap {
-            case Right(block) => Task {
+            case Right(block) =>
               Coordinator.processBlock(checkpoint, history, blockchainUpdater, timeService, stateReader,
-                utx, blockchainReadiness, Miner.this, settings)(block, local = true)
-                .map { score =>
+                utx, blockchainReadiness, Miner.this, settings)(block, local = true) match {
+                case Left(err) => Task(log.warn(err.toString))
+                case Right(score) =>
                   allChannels.broadcast(ScoreChanged(score))
                   allChannels.broadcast(BlockForged(block))
-                }
-            }.flatMap(_ => generateMicroBlockSequence(account, block))
+                  generateMicroBlockSequence(account, block)
+              }
             case Left(err) =>
               scheduledAttempts.remove(key)
               log.debug(s"No block generated because $err, retrying")
