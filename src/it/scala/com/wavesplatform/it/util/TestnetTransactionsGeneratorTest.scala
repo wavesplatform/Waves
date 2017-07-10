@@ -2,6 +2,8 @@ package com.wavesplatform.it.util
 
 import java.net.{InetAddress, InetSocketAddress}
 
+import com.wavesplatform.it.api.NodeApi
+import com.wavesplatform.it.transactions.TransactionsGeneratorTest
 import com.wavesplatform.network.RawBytes
 import org.slf4j.LoggerFactory
 import scorex.account.{AddressScheme, PrivateKeyAccount}
@@ -26,7 +28,7 @@ object TestnetTransactionsGeneratorTest extends App {
     PrivateKeyAccount(Base58.decode("63HeWce3hCmeTSxciqG3MsHSp9A1B8jueeS6NmoGAu3F").get)
   )
 
-  val n = 10000
+  val n = 150
   val every = 10.seconds
 
   // Transactions are sent in a row without waiting for entry into blocks, so Burn, Reissue, LeaseCancel transactions will be invalid
@@ -44,11 +46,16 @@ object TestnetTransactionsGeneratorTest extends App {
 
   log.info(s"Generating $n transactions every $every from addresses:")
   accounts.foreach(a => log.info(a.address))
-  val sender = new NetworkSender(new InetSocketAddress(InetAddress.getByName("52.30.47.67"), 6863), 'T', "generator", 38262732757L)
+  val sender = new NetworkSender(new InetSocketAddress(InetAddress.getByName("127.0.0.1"), 6863), 'T', "generator", 38262732757L)
+  val api = NodeApi.create("127.0.0.1", 6869, 0, 1.minute)
   sys.addShutdownHook(sender.close())
-  while (true) {
+//  while (true) {
     val txs = TransactionGenerator.gen(txTypesProbabilities, accounts, n)
-    Await.result(sender.sendByNetwork(txs.map(tx => RawBytes(25.toByte, tx.bytes)): _*).map(_ => log.info("Transactions was sent")), Duration.Inf)
-    Thread.sleep(every.toMillis)
-  }
+    TransactionsGeneratorTest.splitTransactionsIntoValidBlocks(txs).foreach{txs =>
+      txs.foreach(t => println(t.id, t.toString))
+      Await.result(sender.sendByNetwork(txs.map(tx => RawBytes(25.toByte, tx.bytes)): _*).map(_ => log.info("Transactions was sent")), Duration.Inf)
+      Await.result(api.waitFor[Seq[NodeApi.Transaction]](api.utx, _.isEmpty, 5.seconds), Duration.Inf)
+    }
+//    Thread.sleep(every.toMillis)
+//  }
 }

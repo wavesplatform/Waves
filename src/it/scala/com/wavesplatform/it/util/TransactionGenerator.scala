@@ -126,7 +126,7 @@ object TransactionGenerator {
           },
           tx match {
             case Some(tx: LeaseTransaction) => activeLeaseTransactions :+ tx
-            case Some(tx: LeaseCancelTransaction) => activeLeaseTransactions.filter(_.id != tx.id)
+            case Some(tx: LeaseCancelTransaction) => activeLeaseTransactions.filter(_.id != tx.leaseId)
             case _ => activeLeaseTransactions
           },
           tx match {

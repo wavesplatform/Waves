@@ -309,4 +309,14 @@ object NodeApi extends ScorexLogging {
 
   implicit val orderBookResponseFormat: Format[OrderBookResponse] = Json.format
 
+  def create(_restAddress: String,
+             _nodeRestPort: Int,
+             _matcherRestPort: Int,
+             _blockDelay: FiniteDuration
+            ): NodeApi = new NodeApi{
+    override def restAddress: String = _restAddress
+    override def nodeRestPort: Int = _nodeRestPort
+    override def matcherRestPort: Int = _matcherRestPort
+    override def blockDelay: FiniteDuration = _blockDelay
+  }
 }
