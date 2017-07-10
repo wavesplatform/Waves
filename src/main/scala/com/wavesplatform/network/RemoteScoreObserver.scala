@@ -90,7 +90,7 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
       } else log.debug(s"Pinned: $pinnedChannelId <- ${id(ctx)}: Blockchain is up to date")
 
     case ExtensionBlocks(blocks) =>
-      log.debug(s"${id(ctx)} Unexpected extension blocks: ${blocks.head.uniqueId} .. ${blocks.last.uniqueId} (Pinned: $pinnedChannelId)")
+      log.debug(s"${id(ctx)} Unexpected extension blocks: ${blocks.headOption.map(_.uniqueId)} .. ${blocks.last.uniqueId} (Pinned: $pinnedChannelId)")
       super.channelRead(ctx, msg)
 
     case _ => super.channelRead(ctx, msg)
