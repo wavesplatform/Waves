@@ -51,21 +51,19 @@ class UtxPoolSpecification extends FreeSpec
   } yield TransferTransaction.create(None, sender, recipient, amount, time.getTimestamp(), None, fee, Array.empty[Byte]).right.get)
     .label("transferTransaction")
 
-  private def onlyOneValidFromManyTransfers = (for {
+  private val twoOutOfManyValidPayments = (for {
     (sender, senderBalance, state) <- stateGen
     recipient <- accountGen
+    n <- chooseNum(3, 10)
     fee <- chooseNum(1, (senderBalance * 0.01).toLong)
     offset <- chooseNum(1000L, 2000L)
   } yield {
     val time = new TestTime(System.currentTimeMillis())
     val utx = new UtxPool(group, time, state, calculator, FunctionalitySettings.TESTNET, UtxSettings(10, 10.minutes))
     val amountPart = (senderBalance - fee) / 2 - fee
-    val txs = Seq(
-      PaymentTransaction.create(sender, recipient, amountPart, fee, time.getTimestamp() + 1).right.get,
-      PaymentTransaction.create(sender, recipient, amountPart, fee, time.getTimestamp() + 2).right.get,
-      PaymentTransaction.create(sender, recipient, amountPart, fee, time.getTimestamp() + 3).right.get)
+    val txs = for (i <- 1 to n) yield PaymentTransaction.create(sender, recipient, amountPart, fee, time.getTimestamp() + i).right.get
     (utx, time, txs, (offset + 1000).millis)
-  }).label("onlyOneValidFromManyTransfers")
+  }).label("twoOutOfManyValidPayments")
 
   private def expectBroadcast(tx: Transaction): Unit =
     (group.writeAndFlush(_: Any, _: ChannelMatcher)).expects(RawBytes(25, tx.bytes), ChannelMatchers.all()).once()
@@ -143,7 +141,7 @@ class UtxPoolSpecification extends FreeSpec
       utx.all() shouldBe 'empty
     }
 
-    "evicts one of invalid together transactions when packUnconfirmed is called" in forAll(onlyOneValidFromManyTransfers) { case (utx, time, txs, offset) =>
+    "evicts one of invalid together transactions when packUnconfirmed is called" in forAll(twoOutOfManyValidPayments) { case (utx, time, txs, offset) =>
       all(txs.map { t =>
         expectBroadcast(t)
         utx.putIfNew(t)
