@@ -89,17 +89,12 @@ class Miner(
           val balance = generatingBalance(stateReader, blockchainSettings.functionalitySettings, account, parentHeight)
           val blockGenTask = generateOneBlockTask(account, parentHeight, parent, greatGrandParent, balance)(offset).flatMap {
             case Right(block) => Task {
-              CoordinatorHandler.loggingResult("local", s"locally mined block (${
-                block.uniqueId
-              })",
-                Coordinator.processBlock(checkpoint, history, blockchainUpdater, timeService, stateReader,
-                  utx, blockchainReadiness, Miner.this, settings)(block, local = true)
-                  .map {
-                    score =>
-                      allChannels.broadcast(ScoreChanged(score))
-                      allChannels.broadcast(BlockForged(block))
-                      score
-                  })
+              Coordinator.processBlock(checkpoint, history, blockchainUpdater, timeService, stateReader,
+                utx, blockchainReadiness, Miner.this, settings)(block, local = true)
+                .map { score =>
+                  allChannels.broadcast(ScoreChanged(score))
+                  allChannels.broadcast(BlockForged(block))
+                }
             }
             case Left(err) =>
               scheduledAttempts.remove(key)

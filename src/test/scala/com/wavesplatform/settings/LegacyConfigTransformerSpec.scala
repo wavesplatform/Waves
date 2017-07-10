@@ -244,8 +244,8 @@ class LegacyConfigTransformerSpec extends FreeSpec with Matchers {
           |    max-timestamp-diff = 3h
           |  }
           |  utx {
-          |    max-size = 100
-          |    max-transaction-age = 100m
+          |    max-size = 10000
+          |    max-transaction-age = 90m
           |  }
           |  synchronization.score-ttl = 90s
           |}
