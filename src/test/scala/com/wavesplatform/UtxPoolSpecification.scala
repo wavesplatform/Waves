@@ -51,6 +51,11 @@ class UtxPoolSpecification extends FreeSpec
   } yield TransferTransaction.create(None, sender, recipient, amount, time.getTimestamp(), None, fee, Array.empty[Byte]).right.get)
     .label("transferTransaction")
 
+  private val stateGen = for {
+    sender <- accountGen.label("sender")
+    senderBalance <- positiveLongGen.label("senderBalance")
+  } yield (sender, senderBalance, mkState(sender, senderBalance))
+
   private val twoOutOfManyValidPayments = (for {
     (sender, senderBalance, state) <- stateGen
     recipient <- accountGen
@@ -58,26 +63,21 @@ class UtxPoolSpecification extends FreeSpec
     fee <- chooseNum(1, (senderBalance * 0.01).toLong)
     offset <- chooseNum(1000L, 2000L)
   } yield {
-    val time = new TestTime(System.currentTimeMillis())
+    val time = new TestTime()
     val utx = new UtxPool(group, time, state, calculator, FunctionalitySettings.TESTNET, UtxSettings(10, 10.minutes))
     val amountPart = (senderBalance - fee) / 2 - fee
-    val txs = for (i <- 1 to n) yield PaymentTransaction.create(sender, recipient, amountPart, fee, time.getTimestamp() + i).right.get
+    val txs = for (_ <- 1 to n) yield PaymentTransaction.create(sender, recipient, amountPart, fee, time.getTimestamp()).right.get
     (utx, time, txs, (offset + 1000).millis)
   }).label("twoOutOfManyValidPayments")
 
   private def expectBroadcast(tx: Transaction): Unit =
     (group.writeAndFlush(_: Any, _: ChannelMatcher)).expects(RawBytes(25, tx.bytes), ChannelMatchers.all()).once()
 
-  private val stateGen = for {
-    sender <- accountGen.label("sender")
-    senderBalance <- positiveLongGen.label("senderBalance")
-  } yield (sender, senderBalance, mkState(sender, senderBalance))
-
   private def utxTest(utxSettings: UtxSettings = UtxSettings(20, 5.seconds), txCount: Int = 10)
                      (f: (Seq[TransferTransaction], UtxPool, TestTime) => Unit): Unit = forAll(
     stateGen,
     chooseNum(2, txCount).label("txCount")) { case ((sender, senderBalance, state), count) =>
-      val time = new TestTime().reset()
+      val time = new TestTime()
 
       forAll(listOfN(count, transfer(sender, senderBalance / 2, time))) { txs =>
         val utx = new UtxPool(group, time, state, calculator, FunctionalitySettings.TESTNET, utxSettings)
@@ -94,7 +94,7 @@ class UtxPoolSpecification extends FreeSpec
       offset <- chooseNum(5000L, 10000L)
       tx2 <- listOfN(count1, transfer(sender, senderBalance / 2, new TestTime(ts + offset + 1000)))
     } yield {
-      val time = new TestTime(System.currentTimeMillis())
+      val time = new TestTime()
       val utx = new UtxPool(group, time, state, calculator, FunctionalitySettings.TESTNET, UtxSettings(10, offset.millis))
       (utx, time, tx1, (offset + 1000).millis, tx2)
     }
@@ -141,7 +141,7 @@ class UtxPoolSpecification extends FreeSpec
       utx.all() shouldBe 'empty
     }
 
-    "evicts one of invalid together transactions when packUnconfirmed is called" in forAll(twoOutOfManyValidPayments) { case (utx, time, txs, offset) =>
+    "evicts one of mutually invalid transactions when packUnconfirmed is called" in forAll(twoOutOfManyValidPayments) { case (utx, time, txs, offset) =>
       all(txs.map { t =>
         expectBroadcast(t)
         utx.putIfNew(t)
