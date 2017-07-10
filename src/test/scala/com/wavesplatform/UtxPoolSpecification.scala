@@ -13,7 +13,7 @@ import org.scalatest.{FreeSpec, Matchers}
 import scorex.account.{Account, PrivateKeyAccount}
 import scorex.block.Block
 import scorex.transaction.assets.TransferTransaction
-import scorex.transaction.{FeeCalculator, Transaction}
+import scorex.transaction.{FeeCalculator, PaymentTransaction, Transaction}
 import scorex.utils.Time
 
 import scala.concurrent.duration._
@@ -30,6 +30,7 @@ class UtxPoolSpecification extends FreeSpec
   private val group = mock[ChannelGroup]
   private val calculator = new FeeCalculator(FeesSettings(Map(
     1 -> List(FeeSettings("", 0)),
+    2 -> List(FeeSettings("", 0)),
     4 -> List(FeeSettings("", 0))
   )))
 
@@ -49,6 +50,22 @@ class UtxPoolSpecification extends FreeSpec
     fee <- chooseNum(1, (maxAmount * 0.1).toLong)
   } yield TransferTransaction.create(None, sender, recipient, amount, time.getTimestamp(), None, fee, Array.empty[Byte]).right.get)
     .label("transferTransaction")
+
+  private def onlyOneValidFromManyTransfers = (for {
+    (sender, senderBalance, state) <- stateGen
+    recipient <- accountGen
+    fee <- chooseNum(1, (senderBalance * 0.01).toLong)
+    offset <- chooseNum(1000L, 2000L)
+  } yield {
+    val time = new TestTime(System.currentTimeMillis())
+    val utx = new UtxPool(group, time, state, calculator, FunctionalitySettings.TESTNET, UtxSettings(10, 10.minutes))
+    val amountPart = (senderBalance - fee) / 2 - fee
+    val txs = Seq(
+      PaymentTransaction.create(sender, recipient, amountPart, fee, time.getTimestamp() + 1).right.get,
+      PaymentTransaction.create(sender, recipient, amountPart, fee, time.getTimestamp() + 2).right.get,
+      PaymentTransaction.create(sender, recipient, amountPart, fee, time.getTimestamp() + 3).right.get)
+    (utx, time, txs, (offset + 1000).millis)
+  }).label("onlyOneValidFromManyTransfers")
 
   private def expectBroadcast(tx: Transaction): Unit =
     (group.writeAndFlush(_: Any, _: ChannelMatcher)).expects(RawBytes(25, tx.bytes), ChannelMatchers.all()).once()
@@ -124,6 +141,19 @@ class UtxPoolSpecification extends FreeSpec
 
       utx.packUnconfirmed() shouldBe 'empty
       utx.all() shouldBe 'empty
+    }
+
+    "evicts one of invalid together transactions when packUnconfirmed is called" in forAll(onlyOneValidFromManyTransfers) { case (utx, time, txs, offset) =>
+      all(txs.map { t =>
+        expectBroadcast(t)
+        utx.putIfNew(t)
+      }) shouldBe 'right
+      utx.all().size shouldEqual txs.size
+
+      time.advance(offset)
+
+      utx.packUnconfirmed().size shouldBe 2
+      utx.all().size shouldBe 2
     }
   }
 }
