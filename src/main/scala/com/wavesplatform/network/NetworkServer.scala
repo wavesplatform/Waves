@@ -36,6 +36,9 @@ class NetworkServer(checkpointService: CheckpointService,
                     blockchainReadiness: AtomicBoolean
                    ) extends ScorexLogging {
 
+  @volatile
+  private var shutdownInitiated = false
+
   private val bossGroup = new NioEventLoopGroup()
   private val workerGroup = new NioEventLoopGroup()
   private val handshake =
@@ -196,7 +199,7 @@ class NetworkServer(checkpointService: CheckpointService,
                 log.debug(s"${id(closeFuture.channel)} Connection closed, $remainingCount outgoing channel(s) remaining")
                 allChannels.remove(closeFuture.channel())
                 outgoingChannels.remove(remoteAddress, closeFuture.channel())
-                peerDatabase.blacklist(remoteAddress.getAddress)
+                if (!shutdownInitiated) peerDatabase.blacklist(remoteAddress.getAddress)
               }
               allChannels.add(connFuture.channel())
             }
@@ -206,6 +209,7 @@ class NetworkServer(checkpointService: CheckpointService,
 
 
   def shutdown(): Unit = try {
+    shutdownInitiated = true
     connectTask.cancel(false)
     serverChannel.foreach(_.close().await())
     log.debug("Unbound server")
