@@ -16,18 +16,18 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
 object TransactionsGeneratorTest {
-  def splitTransactionsIntoValidBlocks(txs: Seq[Transaction]): Seq[Seq[Transaction]] = {
+  def splitTransactionsIntoValidBlocks(txs: Seq[Transaction], by: Int = 100): Seq[Seq[Transaction]] = {
     val sortedTxs = txs.sortBy {
       case _: IssueTransaction => 1
       case _: CreateAliasTransaction => 1
-      case _: LeaseTransaction => 1
-      case _: TransferTransaction => 2
-      case _: PaymentTransaction => 2
-      case r: ReissueTransaction if r.reissuable => 3
-      case _: BurnTransaction => 3
-      case r: ReissueTransaction if !r.reissuable => 4
-      case _: LeaseCancelTransaction => 4
-      case _: ExchangeTransaction => 4
+      case _: LeaseTransaction => 2
+      case _: TransferTransaction => 3
+      case _: PaymentTransaction => 3
+      case r: ReissueTransaction if r.reissuable => 4
+      case _: BurnTransaction => 4
+      case r: ReissueTransaction if !r.reissuable => 5
+      case _: LeaseCancelTransaction => 5
+      case _: ExchangeTransaction => 5
     }.toList
 
     def importantTransactionType(tt: TT.Value): Boolean = {
@@ -39,7 +39,7 @@ object TransactionsGeneratorTest {
     val lastImportantTransactionIndex = sortedTxs.lastIndexWhere(t => importantTransactionType(t.transactionType))
 
     val (mostImportant, lessImportant) = sortedTxs.splitAt(lastImportantTransactionIndex)
-    mostImportant.grouped(100).toSeq ++ lessImportant.grouped(100).toSeq
+    mostImportant.grouped(by).toSeq ++ lessImportant.sortBy(_.timestamp).grouped(by)
   }
 }
 
