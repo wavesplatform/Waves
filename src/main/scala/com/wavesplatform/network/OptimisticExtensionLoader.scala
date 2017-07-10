@@ -55,8 +55,8 @@ class OptimisticExtensionLoader extends ChannelDuplexHandler with ScorexLogging 
       val notYetRequestedIds = hopefullyNextIds.dropWhile(_ != localIds.head)
       if (notYetRequestedIds.isEmpty || !hopefullyNextIds.containsSlice(notYetRequestedIds)) {
 //        log.debug(s"${fmt("LOCAL IDS", localIds)}${fmt("HOPEFULLY NEXT", hopefullyNextIds)}${fmt("DIFF", notYetRequestedIds)}")
-        log.debug(s"${id(ctx)} Got unexpected known block ids, will discard extension once ready")
-        discardNextBlocks = true
+        discardNextBlocks = nextExtensionBlocks.isEmpty
+        log.debug(s"${id(ctx)} Got unexpected known block ids${if (discardNextBlocks) ", will discard extension once ready" else ""}")
       }
       hopefullyNextIds = Seq.empty
       nextExtensionBlocks = Seq.empty
