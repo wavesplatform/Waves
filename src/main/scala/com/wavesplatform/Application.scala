@@ -73,7 +73,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
     val network = new NetworkServer(checkpointService, blockchainUpdater, time, miner, stateReader, settings,
       history, utxStorage, peerDatabase, allChannels, establishedConnections, blockchainReadiness)
 
-    miner.lastBlockChanged()
+    miner.lastBlockChanged(history.height(), history.lastBlock.get)
 
     val apiRoutes = Seq(
       BlocksApiRoute(settings.restAPISettings, settings.checkpointsSettings, history, allChannels, checkpointService, blockchainUpdater),
