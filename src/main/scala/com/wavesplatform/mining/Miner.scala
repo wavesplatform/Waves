@@ -17,9 +17,10 @@ import scorex.block.{Block, MicroBlock}
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
 import scorex.crypto.EllipticCurveImpl
 import scorex.transaction.PoSCalc._
-import scorex.transaction.{BlockchainUpdater, CheckpointService, History}
+import scorex.transaction.{BlockchainUpdater, CheckpointService, History, ValidationError}
 import scorex.utils.{ScorexLogging, Time}
 import scorex.wallet.Wallet
+
 import scala.collection.concurrent.TrieMap
 import scala.concurrent.duration._
 import scala.math.Ordering.Implicits._
@@ -76,25 +77,29 @@ class Miner(
   }.delayExecution(delay)
 
 
-  private def generateOneMicroBlockTask(account: PrivateKeyAccount, accumulatedBlock: Block): Task[Either[String, (MicroBlock, Block)]] = Task {
+  private def generateOneMicroBlockTask(account: PrivateKeyAccount, accumulatedBlock: Block): Task[Either[ValidationError, Option[Block]]] = Task {
     val unconfirmed = utx.packUnconfirmed()
-    for {
-      _ <- Either.cond(unconfirmed.nonEmpty, (), "skipping microblock because no txs in utx pool")
-      unsigned = accumulatedBlock.copy(version = 3, transactionData = accumulatedBlock.transactionData ++ unconfirmed)
-      signature = ByteStr(EllipticCurveImpl.sign(account, unsigned.bytes))
-      signed = accumulatedBlock.copy(signerData = accumulatedBlock.signerData.copy(signature = signature))
-      micro <- MicroBlock.buildAndSign(account, unconfirmed, accumulatedBlock.signerData.signature, signature).left.map(_.toString)
-      _ <- Coordinator.processMicroBlock(checkpoint, history, blockchainUpdater, utx)(micro).left.map(_.toString)
-    } yield {
-      allChannels.broadcast(MicroBlockInv(micro.totalResBlockSig))
-      (micro, signed)
+    if (unconfirmed.nonEmpty) {
+      log.trace("skipping microBlock because no txs in utx pool")
+      Right(None)
+    } else {
+      val unsigned = accumulatedBlock.copy(version = 3, transactionData = accumulatedBlock.transactionData ++ unconfirmed)
+      val signature = ByteStr(EllipticCurveImpl.sign(account, unsigned.bytes))
+      val signed = accumulatedBlock.copy(signerData = accumulatedBlock.signerData.copy(signature = signature))
+      for {
+        micro <- MicroBlock.buildAndSign(account, unconfirmed, accumulatedBlock.signerData.signature, signature)
+        _ <- Coordinator.processMicroBlock(checkpoint, history, blockchainUpdater, utx)(micro)
+      } yield {
+        allChannels.broadcast(MicroBlockInv(micro.totalResBlockSig))
+        Some(signed)
+      }
     }
   }.delayExecution(MicroBlockPeriod)
 
   private def generateMicroBlockSequence(account: PrivateKeyAccount, accumulatedBlock: Block): Task[Unit] =
     generateOneMicroBlockTask(account, accumulatedBlock).flatMap {
-      case Left(err) => Task(log.warn(err))
-      case Right((_, newTotal)) => generateMicroBlockSequence(account, newTotal)
+      case Left(err) => Task(log.warn(err.toString))
+      case Right(maybeNewTotal) => generateMicroBlockSequence(account, maybeNewTotal.getOrElse(accumulatedBlock))
     }
 
   private def generateBlockTask(account: PrivateKeyAccount): Task[Unit] = Task {
