@@ -54,7 +54,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty) extends AutoCloseable wi
     case (ni, index) => s"-Dwaves.network.known-peers.$index=${ni.networkIpAddress}:${ni.containerNetworkPort}"
   } mkString " "
 
-  private val networkName = "waves-" + this.##
+  private val networkName = "waves-" + this.##.toLong.toHexString
 
   private val wavesNetwork = client.createNetwork(NetworkConfig.builder().driver("bridge").name(networkName).build())
 
@@ -91,7 +91,8 @@ class Docker(suiteConfig: Config = ConfigFactory.empty) extends AutoCloseable wi
       .env(s"WAVES_OPTS=$configOverrides", s"WAVES_PORT=$networkPort")
       .build()
 
-    val containerId = client.createContainer(containerConfig, actualConfig.getString("waves.network.node-name") + "-" + this.##).id()
+    val containerId = client.createContainer(containerConfig, actualConfig.getString("waves.network.node-name") + "-" +
+      this.##.toLong.toHexString).id()
     connectToNetwork(containerId)
     client.startContainer(containerId)
     val containerInfo = client.inspectContainer(containerId)
