@@ -21,12 +21,12 @@ import scala.util.{Left, Right}
 
 
 class UtxPool(
-    allChannels: ChannelGroup,
-    time: Time,
-    stateReader: StateReader,
-    feeCalculator: FeeCalculator,
-    fs: FunctionalitySettings,
-    utxSettings: UtxSettings) extends ScorexLogging {
+                 allChannels: ChannelGroup,
+                 time: Time,
+                 stateReader: StateReader,
+                 feeCalculator: FeeCalculator,
+                 fs: FunctionalitySettings,
+                 utxSettings: UtxSettings) extends ScorexLogging {
 
   private val transactions = new ConcurrentHashMap[ByteStr, Transaction]
 
@@ -42,7 +42,7 @@ class UtxPool(
         case ((invalid, valid, diff), tx) if valid.size < 100 =>
           differ(new CompositeStateReader(stateReader, diff.asBlockDiff), tx) match {
             case Right(newDiff) =>
-              (invalid, tx +: valid, newDiff)
+              (invalid, tx +: valid, Monoid.combine(diff, newDiff))
             case Left(e) =>
               log.debug(s"Removing invalid transaction ${tx.id} from UTX: $e")
               (tx.id +: invalid, valid, diff)

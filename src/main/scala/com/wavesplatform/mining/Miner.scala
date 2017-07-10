@@ -38,25 +38,18 @@ class Miner(
 
   import Miner._
 
+  private def peerCount = allChannels.size()
 
-  def privateKeyAccounts = wallet.privateKeyAccounts()
-
-  def time = timeService.correctedTime()
-
-  def peerCount = allChannels.size()
-
-  val minerSettings = settings.minerSettings
-  val blockchainSettings = settings.blockchainSettings
+  private val minerSettings = settings.minerSettings
+  private val blockchainSettings = settings.blockchainSettings
 
   private val minerPool = MoreExecutors.listeningDecorator(Executors.newScheduledThreadPool(2))
   private val scheduledAttempts = new ConcurrentHashMap[ByteStr, ScheduledFuture[_]]()
 
   private def checkAge(parentHeight: Int, parent: Block): Either[String, Unit] =
     Either
-      .cond(parentHeight == 1, (), Duration.between(Instant.ofEpochMilli(parent.timestamp), Instant.ofEpochMilli(time)))
-      .left.flatMap(blockAge => Either.cond(
-      blockAge <= minerSettings.intervalAfterLastBlockThenGenerationIsAllowed,
-      (),
+      .cond(parentHeight == 1, (), Duration.between(Instant.ofEpochMilli(parent.timestamp), Instant.ofEpochMilli(timeService.correctedTime())))
+      .left.flatMap(blockAge => Either.cond(blockAge <= minerSettings.intervalAfterLastBlockThenGenerationIsAllowed, (),
       s"Blockchain is too old (last block ${parent.uniqueId} generated $blockAge ago)"
     ))
 
@@ -64,7 +57,7 @@ class Miner(
     val pc = peerCount
     if (pc >= minerSettings.quorum) {
       val lastBlockKernelData = parent.consensusData
-      val currentTime = time
+      val currentTime = timeService.correctedTime()
       val h = calcHit(lastBlockKernelData, account)
       val t = calcTarget(parent, currentTime, balance)
       if (h < t) {
@@ -104,7 +97,7 @@ class Miner(
       case Left(e) => log.debug(s"NOT scheduling block generation: $e")
       case Right(ts) =>
         val generationInstant = Instant.ofEpochMilli(ts + 10)
-        val calculatedOffset = Duration.between(Instant.ofEpochMilli(time), generationInstant)
+        val calculatedOffset = Duration.between(Instant.ofEpochMilli(timeService.correctedTime()), generationInstant)
         val generationOffset = MinimalGenerationOffset.max(calculatedOffset)
         val balance = generatingBalance(stateReader, blockchainSettings.functionalitySettings, account, parentHeight)
 
@@ -144,12 +137,12 @@ class Miner(
     }
   }
 
-  def lastBlockChanged(parentHeight: Int, parent: Block): Unit = {
-    log.debug(s"New parent block: ${parent.uniqueId},${if (scheduledAttempts.isEmpty) "" else s" cancelling ${scheduledAttempts.size()} task(s) and"} trying to schedule new attempts")
+  def lastBlockChanged(newHeight: Int, newBlock: Block): Unit = {
+    log.debug(s"New parent block: ${newBlock.uniqueId},${if (scheduledAttempts.isEmpty) "" else s" cancelling ${scheduledAttempts.size()} task(s) and"} trying to schedule new attempts")
     scheduledAttempts.values.asScala.foreach(_.cancel(false))
     scheduledAttempts.clear()
-    val greatGrandParent = history.parent(parent, 2)
-    privateKeyAccounts.foreach(retry(parentHeight, parent, greatGrandParent))
+    val grandParent = history.parent(newBlock, 2)
+    wallet.privateKeyAccounts().foreach(retry(newHeight, newBlock, grandParent))
   }
 
   def shutdown(): Unit = minerPool.shutdownNow()
