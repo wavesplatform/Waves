@@ -15,15 +15,14 @@ import monix.execution._
 import scorex.account.PrivateKeyAccount
 import scorex.block.{Block, MicroBlock}
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
+import scorex.crypto.EllipticCurveImpl
 import scorex.transaction.PoSCalc._
 import scorex.transaction.{BlockchainUpdater, CheckpointService, History}
 import scorex.utils.{ScorexLogging, Time}
 import scorex.wallet.Wallet
-
 import scala.collection.concurrent.TrieMap
 import scala.concurrent.duration._
 import scala.math.Ordering.Implicits._
-
 
 class Miner(
                allChannels: ChannelGroup,
@@ -51,7 +50,7 @@ class Miner(
     Either
       .cond(parentHeight == 1, (), Duration.between(Instant.ofEpochMilli(parent.timestamp), Instant.ofEpochMilli(timeService.correctedTime())))
       .left.flatMap(blockAge => Either.cond(blockAge <= minerSettings.intervalAfterLastBlockThenGenerationIsAllowed, (),
-      s"BlockVhain is too old (last block ${parent.uniqueId} generated $blockAge ago)"
+      s"BlockChain is too old (last block ${parent.uniqueId} generated $blockAge ago)"
     ))
 
   private def generateOneBlockTask(account: PrivateKeyAccount, parentHeight: Int, parent: Block,
@@ -76,6 +75,28 @@ class Miner(
     } yield block
   }.delayExecution(delay)
 
+
+  private def generateOneMicroBlockTask(account: PrivateKeyAccount, accumulatedBlock: Block): Task[Either[String, (MicroBlock, Block)]] = Task {
+    val unconfirmed = utx.packUnconfirmed()
+    for {
+      _ <- Either.cond(unconfirmed.nonEmpty, (), "skipping microblock because no txs in utx pool")
+      unsigned = accumulatedBlock.copy(version = 3, transactionData = accumulatedBlock.transactionData ++ unconfirmed)
+      signature = ByteStr(EllipticCurveImpl.sign(account, unsigned.bytes))
+      signed = accumulatedBlock.copy(signerData = accumulatedBlock.signerData.copy(signature = signature))
+      micro <- MicroBlock.buildAndSign(account, unconfirmed, accumulatedBlock.signerData.signature, signature).left.map(_.toString)
+      _ <- Coordinator.processMicroBlock(checkpoint, history, blockchainUpdater, utx)(micro).left.map(_.toString)
+    } yield {
+      allChannels.broadcast(MicroBlockInv(micro.totalResBlockSig))
+      (micro, signed)
+    }
+  }.delayExecution(MicroBlockPeriod)
+
+  private def generateMicroBlockSequence(account: PrivateKeyAccount, accumulatedBlock: Block): Task[Unit] =
+    generateOneMicroBlockTask(account, accumulatedBlock).flatMap {
+      case Left(err) => Task(log.warn(err))
+      case Right((_, newTotal)) => generateMicroBlockSequence(account, newTotal)
+    }
+
   private def generateBlockTask(account: PrivateKeyAccount): Task[Unit] = Task {
     val height = history.height()
     val lastBlock = history.lastBlock.get
@@ -98,7 +119,7 @@ class Miner(
                   allChannels.broadcast(ScoreChanged(score))
                   allChannels.broadcast(BlockForged(block))
                 }
-            }
+            }.flatMap(_ => generateMicroBlockSequence(account, block))
             case Left(err) =>
               scheduledAttempts.remove(key)
               log.debug(s"No block generated because $err, retrying")
@@ -120,6 +141,8 @@ class Miner(
 }
 
 object Miner extends ScorexLogging {
+  val MicroBlockPeriod: FiniteDuration = 3.seconds
+
   val Version: Byte = 3
   val MinimalGenerationOffsetMillis: Long = 1001
 
