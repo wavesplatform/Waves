@@ -108,6 +108,7 @@ object Block extends ScorexLogging {
       } else {
         val v: (Array[Byte], Int) = version match {
         case 1 | 2 => (bytes.tail        , bytes.head) //  255  max
+        case 3 => (bytes.tail.tail, bytes.head * 256 + bytes.tail.head) // 65535 max
         case x => ???
       }
 
@@ -207,7 +208,7 @@ object Block extends ScorexLogging {
 
     if (EllipticCurveImpl.verify(signature, toSign, genesisSigner.publicKey))
       Right(Block(timestamp = timestamp,
-        version = version,
+        version = 1,
         reference = ByteStr(reference),
         signerData = SignerData(genesisSigner, ByteStr(signature)),
         consensusData = consensusGenesisData,

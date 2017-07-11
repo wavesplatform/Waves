@@ -7,7 +7,7 @@ import org.scalacheck.Gen
 import org.scalatest.Assertion
 import org.scalatest.prop.GeneratorDrivenPropertyChecks
 import scorex.account.PrivateKeyAccount
-import scorex.block.{Block}
+import scorex.block.{Block, MicroBlock}
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
 import scorex.lagonaki.mocks.TestBlock
 import scorex.settings.TestFunctionalitySettings
@@ -47,6 +47,18 @@ package object history {
       signer = defaultSigner)
   }
 
+
+  def buildMicroBlockOfTxs(totalRefTo: ByteStr, prevTotal: Block, txs: Seq[Transaction], signer: PrivateKeyAccount = defaultSigner): (Block, MicroBlock) = {
+    val newTotalBlock = buildBlockOfTxs(totalRefTo, prevTotal.transactionData ++ txs)
+    val nonSigned = MicroBlock.buildAndSign(
+      generator = signer,
+      transactionData = txs,
+      prevResBlockSig = prevTotal.uniqueId,
+      totalResBlockSig = newTotalBlock.uniqueId
+    ).explicitGet()
+    (newTotalBlock, nonSigned)
+  }
+
   def randomSig: ByteStr = TestBlock.randomOfLength(Block.BlockIdLength)
 
   def chainBlocks(txs: Seq[Seq[Transaction]]): Seq[Block] = {
@@ -58,6 +70,16 @@ package object history {
     }
 
     chainBlocksR(randomSig, txs)
+  }
+
+  def chainBaseAndMicro(totalRefTo: ByteStr, base: Transaction, micros: Seq[Transaction]): (Block, Seq[MicroBlock]) = {
+    val block = buildBlockOfTxs(totalRefTo, Seq(base))
+
+    val microBlocks = micros.foldLeft((block, Seq.empty[MicroBlock])) { case ((lastTotal, allMicros), tx) =>
+      val (newTotal, micro) = buildMicroBlockOfTxs(totalRefTo, lastTotal, Seq(tx))
+      (newTotal, allMicros :+ micro)
+    }._2
+    (block, microBlocks)
   }
 
   def malformSignature(b: Block): Block = b.copy(signerData = b.signerData.copy(signature = TestBlock.randomSignature()))

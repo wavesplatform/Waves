@@ -28,7 +28,7 @@ class NetworkServer(checkpointService: CheckpointService,
                     miner: Miner,
                     stateReader: StateReader,
                     settings: WavesSettings,
-                    history: History,
+                    history: NgHistory,
                     utxPool: UtxPool,
                     peerDatabase: PeerDatabase,
                     allChannels: ChannelGroup,
@@ -89,6 +89,25 @@ class NetworkServer(checkpointService: CheckpointService,
     new HandshakeHandler.Server(handshake, peerInfo, peerUniqueness, peerDatabase, allChannels)
 
   private val utxPoolSynchronizer = new UtxPoolSynchronizer(utxPool)
+  private val microBlockSynchronizer = new MircoBlockSynchronizer(history)
+
+  private def baseHandlers: Seq[PipelineInitializer.HandlerWrapper] = Seq(
+    clientHandshakeHandler,
+    lengthFieldPrepender,
+    new LengthFieldBasedFrameDecoder(1024 * 1024, 0, 4, 0, 4),
+    new LegacyFrameCodec,
+    discardingHandler,
+    messageCodec,
+    peerSynchronizer,
+    historyReplier,
+    utxPoolSynchronizer,
+    microBlockSynchronizer,
+    new ExtensionSignaturesLoader(settings.synchronizationSettings.synchronizationTimeout, peerDatabase),
+    new ExtensionBlocksLoader(history, settings.synchronizationSettings.synchronizationTimeout, peerDatabase),
+    new OptimisticExtensionLoader,
+    scoreObserver,
+    coordinatorHandler -> coordinatorExecutor,
+    fatalErrorHandler)
 
   private val serverChannel = settings.networkSettings.declaredAddress.map { _ =>
     new ServerBootstrap()

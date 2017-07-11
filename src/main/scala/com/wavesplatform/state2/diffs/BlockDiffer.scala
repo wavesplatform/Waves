@@ -19,6 +19,9 @@ object BlockDiffer extends ScorexLogging {
   def fromBlock(settings: FunctionalitySettings, s: StateReader)(block: Block): Either[ValidationError, BlockDiff] =
     Signed.validateSignatures(block).flatMap { _ => apply(settings, s)(block.feesDistribution, block.timestamp, block.transactionData, 1) }
 
+  def fromLiquidBlock(settings: FunctionalitySettings, s: StateReader)(block: Block): Either[ValidationError, BlockDiff] =
+    Signed.validateSignatures(block).flatMap { _ => apply(settings, s)(block.feesDistribution, block.timestamp, block.transactionData, 0) }
+
   def unsafeDiffMany(settings: FunctionalitySettings, s: StateReader)(blocks: Seq[Block]): BlockDiff =
     blocks.foldLeft(Monoid[BlockDiff].empty) { case (diff, block) =>
       val blockDiff = fromBlock(settings, new CompositeStateReader(s, diff))(block).explicitGet()

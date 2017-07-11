@@ -21,7 +21,7 @@ class BlockchainUpdaterInMemoryDiffTest extends PropSpec with PropertyChecks wit
     payment2: PaymentTransaction <- paymentGeneratorP(master, recipient)
   } yield (genesis, payment, payment2)
 
-  property("compactification test") {
+  property("compactification with liquid block doesn't make liquid block affect state once") {
 
     scenario(preconditionsAndPayments) { case (domain, (genesis, payment1, payment2)) =>
       val blocksWithoutCompactification = chainBlocks(
@@ -46,7 +46,7 @@ class BlockchainUpdaterInMemoryDiffTest extends PropSpec with PropertyChecks wit
       mastersBalanceAfterPayment1AndPayment2 shouldBe (ENOUGH_AMT - payment1.amount - payment1.fee - payment2.amount - payment2.fee)
     }
   }
-  property("compactification after rollback test") {
+  property("compactification without liquid block doesn't make liquid block affect state once") {
     scenario(preconditionsAndPayments) { case (domain, (genesis, payment1, payment2)) =>
       val firstBlocks = chainBlocks(Seq(Seq(genesis)) ++ Seq.fill(MinInMemoryDiffSize * 2 - 2)(Seq.empty[Transaction]))
       val payment1Block = buildBlockOfTxs(firstBlocks.last.uniqueId, Seq(payment1))

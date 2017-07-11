@@ -8,9 +8,9 @@ import com.wavesplatform.network.{BlockCheckpoint, Checkpoint}
 import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
 import com.wavesplatform.state2.ByteStr
 import com.wavesplatform.state2.reader.StateReader
-import scorex.block.{Block}
+import scorex.block.{Block, MicroBlock}
 import scorex.consensus.TransactionsOrdering
-import scorex.transaction.ValidationError.{BlockAppendError, GenericError}
+import scorex.transaction.ValidationError.{BlockAppendError, GenericError, MicroBlockAppendError}
 import scorex.transaction._
 import scorex.utils.{ScorexLogging, Time}
 
@@ -70,6 +70,14 @@ object Coordinator extends ScorexLogging {
     }
     newScore
   }
+
+  def processMicroBlock(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater, utxStorage: UtxPool)
+                       (microBlock: MicroBlock): Either[ValidationError, Unit] = for {
+    _ <- Either.cond(checkpoint.isBlockValid(microBlock.totalResBlockSig, history.height() + 1), (),
+      MicroBlockAppendError(s"[h = ${history.height() + 1}] is not valid with respect to checkpoint", microBlock))
+    _ <- blockchainUpdater.processMicroBlock(microBlock)
+  } yield microBlock.transactionData.foreach(utxStorage.remove)
+
 
   private def appendBlock(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater,
                           stateReader: StateReader, utxStorage: UtxPool, time: Time, settings: BlockchainSettings)
