@@ -45,7 +45,7 @@ class UtxPool(
           differ(new CompositeStateReader(stateReader, diff.asBlockDiff), tx) match {
             case Right(newDiff) =>
               valid += tx
-              (invalid, valid, newDiff)
+              (invalid, valid, Monoid.combine(diff, newDiff))
             case Left(e) =>
               log.debug(s"Removing invalid transaction ${tx.id} from UTX: $e")
               invalid += tx.id
