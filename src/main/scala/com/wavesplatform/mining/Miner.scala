@@ -79,6 +79,7 @@ class Miner(
 
 
   private def generateOneMicroBlockTask(account: PrivateKeyAccount, accumulatedBlock: Block): Task[Either[ValidationError, Option[Block]]] = Task {
+    log.trace("attempting to generate microblock")
     val pc = peerCount
     lazy val unconfirmed = utx.packUnconfirmed()
     if (pc < minerSettings.quorum) {
@@ -97,6 +98,7 @@ class Miner(
         _ <- Coordinator.processMicroBlock(checkpoint, history, blockchainUpdater, utx)(micro)
       } yield {
         allChannels.broadcast(MicroBlockInv(micro.totalResBlockSig))
+        log.trace("locally mined microblock appended")
         Some(signed)
       }
     }
@@ -104,7 +106,7 @@ class Miner(
 
   private def generateMicroBlockSequence(account: PrivateKeyAccount, accumulatedBlock: Block): Task[Unit] =
     generateOneMicroBlockTask(account, accumulatedBlock).flatMap {
-      case Left(err) => Task(log.warn(err.toString))
+      case Left(err) => Task(log.warn("Error generating microblock: " + err.toString))
       case Right(maybeNewTotal) => generateMicroBlockSequence(account, maybeNewTotal.getOrElse(accumulatedBlock))
     }
 
@@ -153,6 +155,7 @@ class Miner(
     val lastBlock = history.lastBlock.get
     wallet.privateKeyAccounts().find(_ == lastBlock.signerData.generator).foreach { account =>
       microBlockMiner = Some(generateMicroBlockSequence(account, lastBlock).runAsync)
+      log.trace("requested to generate microblock")
     }
 
 
@@ -162,10 +165,10 @@ class Miner(
 }
 
 object Miner extends ScorexLogging {
-  val MicroBlockPeriod: FiniteDuration = 3.seconds
+  val MicroBlockPeriod: FiniteDuration = 500.millis
 
   val Version: Byte = 3
-  val MinimalGenerationOffsetMillis: Long = 1001
+  val MinimalGenerationOffsetMillis: Long = 5001
 
   def calcOffset(timeService: Time, ts: Long): FiniteDuration = {
     val generationInstant = ts + 10
