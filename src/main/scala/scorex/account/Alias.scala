@@ -5,7 +5,7 @@ import scorex.serialization.BytesSerializable
 import scorex.transaction.ValidationError
 import scorex.transaction.ValidationError.GenericError
 
-sealed trait Alias extends AccountOrAlias {
+sealed trait Alias extends AddressOrAlias {
   lazy val stringRepr: String = Alias.Prefix + networkByte.toChar + ":" + name
   lazy val bytes: ByteStr = ByteStr(Alias.AddressVersion +: networkByte +: BytesSerializable.arrayWithSize(name.getBytes("UTF-8")))
 

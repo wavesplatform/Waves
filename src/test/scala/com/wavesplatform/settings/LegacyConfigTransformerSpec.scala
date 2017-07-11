@@ -192,6 +192,10 @@ class LegacyConfigTransformerSpec extends FreeSpec with Matchers {
           |    order-history-file = ""
           |    max-timestamp-diff = 3h
           |  }
+          |  utx {
+          |    max-size = 100
+          |    max-transaction-age = 100m
+          |  }
           |  synchronization.score-ttl = 90s
           |}
           |""".stripMargin))
@@ -238,6 +242,10 @@ class LegacyConfigTransformerSpec extends FreeSpec with Matchers {
           |    price-assets = []
           |    predefined-pairs = []
           |    max-timestamp-diff = 3h
+          |  }
+          |  utx {
+          |    max-size = 10000
+          |    max-transaction-age = 90m
           |  }
           |  synchronization.score-ttl = 90s
           |}

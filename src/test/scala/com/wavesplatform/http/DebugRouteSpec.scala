@@ -8,11 +8,12 @@ import com.wavesplatform.state2.reader.StateReader
 import com.wavesplatform.state2.{LeaseInfo, Portfolio}
 import com.wavesplatform.{BlockGen, TestWallet, TransactionGen}
 import io.netty.channel.Channel
+import io.netty.channel.group.ChannelGroup
 import org.scalacheck.{Gen, Shrink}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json._
-import scorex.transaction.History
+import scorex.transaction.{BlockchainUpdater, History}
 import scorex.waves.http.DebugApiRoute
 
 class DebugRouteSpec
@@ -22,18 +23,17 @@ class DebugRouteSpec
   private val state = mock[StateReader]
   private val history = mock[History]
   private val peerDatabase = mock[PeerDatabase]
-  private val localChannel = mock[Channel]
+  private val channelGroup = mock[ChannelGroup]
   private val establishedConnections = mock[ConcurrentMap[Channel, PeerInfo]]
-  private val route = DebugApiRoute(restAPISettings, testWallet, state, history, peerDatabase, establishedConnections,
-    localChannel).route
+  private val route = DebugApiRoute(restAPISettings, testWallet, state, history, peerDatabase, establishedConnections, mock[BlockchainUpdater], channelGroup).route
 
   private implicit def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)
-  
+
   routePath("/state") in {
     val portfolioGen = for {
       a <- accountGen
       b <- Gen.posNum[Long]
-    } yield a.toAccount -> Portfolio(b, LeaseInfo.empty, Map.empty)
+    } yield a.toAddress -> Portfolio(b, LeaseInfo.empty, Map.empty)
 
     forAll(Gen.chooseNum(0, 20).flatMap(n => Gen.listOfN(n, portfolioGen))) { portfolios =>
       val portfolioMap = portfolios.toMap
@@ -52,7 +52,7 @@ class DebugRouteSpec
       (state.height _).expects().returning(height).once()
       (state.accountPortfolios _).expects().returning(Map.empty).once()
       Get(routePath("/info")) ~> route ~> check {
-        responseAs[JsObject] should have (
+        responseAs[JsObject] should have(
           "stateHeight" -> JsNumber(height),
           "stateHash".ofType[JsNumber]
         )

@@ -4,7 +4,7 @@ import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.reader.StateReader
 import com.wavesplatform.state2.{AssetInfo, ByteStr, Diff, LeaseInfo, Portfolio}
 import scorex.account.AddressScheme
-import scorex.transaction.ValidationError.{GenericError}
+import scorex.transaction.ValidationError.GenericError
 import scorex.transaction.assets.{BurnTransaction, IssueTransaction, MakeAssetNameUniqueTransaction, ReissueTransaction}
 import scorex.transaction.{AssetId, SignedTransaction, Transaction, ValidationError}
 
@@ -18,7 +18,7 @@ object AssetTransactionsDiff {
       volume = tx.quantity)
     Right(Diff(height = height,
       tx = tx,
-      portfolios = Map(tx.sender.toAccount -> Portfolio(
+      portfolios = Map(tx.sender.toAddress -> Portfolio(
         balance = -tx.fee,
         leaseInfo = LeaseInfo.empty,
         assets = Map(tx.assetId -> tx.quantity))),
@@ -31,7 +31,7 @@ object AssetTransactionsDiff {
       if (oldInfo.isReissuable || blockTime <= settings.allowInvalidReissueInSameBlockUntilTimestamp) {
         Right(Diff(height = height,
           tx = tx,
-          portfolios = Map(tx.sender.toAccount -> Portfolio(
+          portfolios = Map(tx.sender.toAddress -> Portfolio(
             balance = -tx.fee,
             leaseInfo = LeaseInfo.empty,
             assets = Map(tx.assetId -> tx.quantity))),
@@ -49,7 +49,7 @@ object AssetTransactionsDiff {
     findReferencedAsset(tx, state, tx.assetId).map(itx => {
       Diff(height = height,
         tx = tx,
-        portfolios = Map(tx.sender.toAccount -> Portfolio(
+        portfolios = Map(tx.sender.toAddress -> Portfolio(
           balance = -tx.fee,
           leaseInfo = LeaseInfo.empty,
           assets = Map(tx.assetId -> -tx.amount))),
@@ -67,7 +67,7 @@ object AssetTransactionsDiff {
           case None =>
             Right(Diff(height = height,
               tx = tx,
-              portfolios = Map(tx.sender.toAccount -> Portfolio(
+              portfolios = Map(tx.sender.toAddress -> Portfolio(
                 balance = -tx.fee,
                 leaseInfo = LeaseInfo.empty,
                 assets = Map.empty)),

@@ -1,6 +1,6 @@
 package com.wavesplatform
 
-import com.wavesplatform.history.BlockStorageImpl
+import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.network.RawBytes
 import com.wavesplatform.settings.{BlockchainSettings, FeeSettings, FeesSettings, FunctionalitySettings, UtxSettings}
 import com.wavesplatform.state2.diffs.produce
@@ -10,7 +10,7 @@ import org.scalacheck.{Gen, Shrink}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import org.scalatest.{FreeSpec, Matchers}
-import scorex.account.{Account, PrivateKeyAccount}
+import scorex.account.{Address, PrivateKeyAccount}
 import scorex.block.Block
 import scorex.transaction.assets.TransferTransaction
 import scorex.transaction.{FeeCalculator, PaymentTransaction, Transaction}
@@ -34,10 +34,10 @@ class UtxPoolSpecification extends FreeSpec
     4 -> List(FeeSettings("", 0))
   )))
 
-  private def mkState(senderAccount: Account, senderBalance: Long) = {
+  private def mkState(senderAccount: Address, senderBalance: Long) = {
     val genesisSettings = TestHelpers.genesisSettings(Map(senderAccount -> senderBalance))
     val (_, _, state, bcu) =
-      BlockStorageImpl(BlockchainSettings(None, None, None, 'T', 5, FunctionalitySettings.TESTNET, genesisSettings)).get
+      StorageFactory(BlockchainSettings(None, None, None, 'T', 5, FunctionalitySettings.TESTNET, genesisSettings)).get
 
     bcu.processBlock(Block.genesis(genesisSettings).right.get)
 

@@ -32,8 +32,8 @@ import scala.compat.java8.FutureConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future, TimeoutException}
+import scala.language.postfixOps
 import scala.util.{Failure, Success, Try}
-
 
 class Node(config: Config, val nodeInfo: NodeInfo, client: AsyncHttpClient, timer: Timer) {
 
@@ -190,7 +190,7 @@ class Node(config: Config, val nodeInfo: NodeInfo, client: AsyncHttpClient, time
       case (_, txOpt) if txOpt.isDefined =>
         Future.failed(new IllegalStateException(s"Tx $txId is in blockchain"))
       case _ =>
-        Future.successful()
+        Future.successful(())
     })
 
   def waitFor[A](f: => Future[A], cond: A => Boolean, retryInterval: FiniteDuration): Future[A] =

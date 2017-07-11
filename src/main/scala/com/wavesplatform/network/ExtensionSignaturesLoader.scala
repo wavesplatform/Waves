@@ -39,8 +39,7 @@ class ExtensionSignaturesLoader(syncTimeout: FiniteDuration, peerDatabase: PeerD
 
       currentTimeout = Some(ctx.executor().schedule(syncTimeout) {
         if (currentTimeout.nonEmpty && ctx.channel().isActive) {
-          log.warn(s"${id(ctx)} Timeout expired while loading extension")
-          peerDatabase.blacklistAndClose(ctx.channel())
+          peerDatabase.blacklistAndClose(ctx.channel(),"Timeout expired while loading extension")
         }
       })
 

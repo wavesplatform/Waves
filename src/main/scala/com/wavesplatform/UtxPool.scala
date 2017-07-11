@@ -16,45 +16,38 @@ import scorex.transaction.{FeeCalculator, Transaction, ValidationError}
 import scorex.utils.{ScorexLogging, Time}
 
 import scala.collection.JavaConverters._
-import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.duration._
 import scala.util.{Left, Right}
 
 
 class UtxPool(
-    allChannels: ChannelGroup,
-    time: Time,
-    stateReader: StateReader,
-    feeCalculator: FeeCalculator,
-    fs: FunctionalitySettings,
-    utxSettings: UtxSettings) extends ScorexLogging {
+                 allChannels: ChannelGroup,
+                 time: Time,
+                 stateReader: StateReader,
+                 feeCalculator: FeeCalculator,
+                 fs: FunctionalitySettings,
+                 utxSettings: UtxSettings) extends ScorexLogging {
 
   private val transactions = new ConcurrentHashMap[ByteStr, Transaction]
 
-  private def validate(t: Transaction) =
-    TransactionDiffer.apply(fs, time.correctedTime(), stateReader.height)(stateReader, t)
-
   private def collectValidTransactions(currentTs: Long): Seq[Transaction] = {
     val differ = TransactionDiffer.apply(fs, currentTs, stateReader.height) _
-
     val (invalidTxs, validTxs, _) = transactions.asScala
       .values.toSeq
       .sorted(TransactionsOrdering.InUTXPool)
-      .foldLeft((Seq.newBuilder[ByteStr], ArrayBuffer.empty[Transaction], Monoid[Diff].empty)) {
+      .foldLeft((Seq.empty[ByteStr], Seq.empty[Transaction], Monoid[Diff].empty)) {
         case ((invalid, valid, diff), tx) if valid.size < 100 =>
           differ(new CompositeStateReader(stateReader, diff.asBlockDiff), tx) match {
             case Right(newDiff) =>
-              valid += tx
-              (invalid, valid, Monoid.combine(diff, newDiff))
+              (invalid, tx +: valid, Monoid.combine(diff, newDiff))
             case Left(e) =>
               log.debug(s"Removing invalid transaction ${tx.id} from UTX: $e")
-              invalid += tx.id
-              (invalid, valid, diff)
+              (tx.id +: invalid, valid, diff)
           }
         case (r, _) => r
       }
 
-    invalidTxs.result().foreach(transactions.remove)
+    invalidTxs.foreach(transactions.remove)
     validTxs.sorted(TransactionsOrdering.InBlock)
   }
 
@@ -68,7 +61,7 @@ class UtxPool(
       transactionInPool
     } else for {
       _ <- feeCalculator.enoughFee(tx)
-      _ <- validate(tx)
+      _ <- TransactionDiffer.apply(fs, time.correctedTime(), stateReader.height)(stateReader, tx)
       _ <- Option(transactions.putIfAbsent(tx.id, tx))
         .fold[Either[ValidationError, Transaction]](Right(tx))(_ => transactionInPool)
       _ = allChannels.broadcast(RawBytes(TransactionMessageSpec.messageCode, tx.bytes), source)

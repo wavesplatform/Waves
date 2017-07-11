@@ -2,7 +2,7 @@ package com.wavesplatform.state2
 
 import cats.Monoid
 import cats.implicits._
-import scorex.account.{Account, Alias}
+import scorex.account.{Address, Alias}
 import scorex.transaction.Transaction
 
 case class Snapshot(prevHeight: Int, balance: Long, effectiveBalance: Long)
@@ -39,19 +39,19 @@ object AssetInfo {
   }
 }
 
-case class Diff(transactions: Map[ByteStr, (Int, Transaction, Set[Account])],
-                portfolios: Map[Account, Portfolio],
+case class Diff(transactions: Map[ByteStr, (Int, Transaction, Set[Address])],
+                portfolios: Map[Address, Portfolio],
                 issuedAssets: Map[ByteStr, AssetInfo],
-                aliases: Map[Alias, Account],
+                aliases: Map[Alias, Address],
                 paymentTransactionIdsByHashes: Map[ByteStr, ByteStr],
                 orderFills: Map[ByteStr, OrderFillInfo],
                 leaseState: Map[ByteStr, Boolean],
                 assetsWithUniqueNames: Map[ByteStr, ByteStr]) {
 
-  lazy val accountTransactionIds: Map[Account, List[ByteStr]] = {
-    val map: List[(Account, Set[(Int, Long, ByteStr)])] = transactions.toList
+  lazy val accountTransactionIds: Map[Address, List[ByteStr]] = {
+    val map: List[(Address, Set[(Int, Long, ByteStr)])] = transactions.toList
       .flatMap { case (id, (h, tx, accs)) => accs.map(acc => acc -> Set((h, tx.timestamp, id))) }
-    val groupedByAcc = map.foldLeft(Map.empty[Account, Set[(Int, Long, ByteStr)]]) { case (m, (acc, set)) =>
+    val groupedByAcc = map.foldLeft(Map.empty[Address, Set[(Int, Long, ByteStr)]]) { case (m, (acc, set)) =>
       m.combine(Map(acc -> set))
     }
     groupedByAcc
@@ -62,9 +62,9 @@ case class Diff(transactions: Map[ByteStr, (Int, Transaction, Set[Account])],
 
 object Diff {
   def apply(height: Int, tx: Transaction,
-            portfolios: Map[Account, Portfolio] = Map.empty,
+            portfolios: Map[Address, Portfolio] = Map.empty,
             assetInfos: Map[ByteStr, AssetInfo] = Map.empty,
-            aliases: Map[Alias, Account] = Map.empty,
+            aliases: Map[Alias, Address] = Map.empty,
             orderFills: Map[ByteStr, OrderFillInfo] = Map.empty,
             paymentTransactionIdsByHashes: Map[ByteStr, ByteStr] = Map.empty,
             leaseState: Map[ByteStr, Boolean] = Map.empty,
