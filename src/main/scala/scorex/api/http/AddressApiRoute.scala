@@ -9,7 +9,7 @@ import com.wavesplatform.settings.{FunctionalitySettings, RestAPISettings}
 import com.wavesplatform.state2.reader.StateReader
 import io.swagger.annotations._
 import play.api.libs.json._
-import scorex.account.{Account, PublicKeyAccount}
+import scorex.account.{Address, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.transaction.PoSCalc
@@ -37,7 +37,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
   ))
   def deleteAddress: Route = path(Segment) { address =>
     (delete & withAuth) {
-      if (Account.fromString(address).isLeft) {
+      if (Address.fromString(address).isLeft) {
         complete(InvalidAddress)
       } else {
         val deleted = wallet.findWallet(address).exists(account =>
@@ -128,7 +128,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
     new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
   ))
   def balanceDetails: Route = (path("balance" / "details" / Segment) & get) { address =>
-    complete(Account.fromString(address).right.map(acc => {
+    complete(Address.fromString(address).right.map(acc => {
       ToResponseMarshallable(balancesDetailsJson(acc))
     }).getOrElse(InvalidAddress))
   }
@@ -192,7 +192,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
     new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
   ))
   def validate: Route = (path("validate" / Segment) & get) { address =>
-    complete(Validity(address, Account.fromString(address).isRight))
+    complete(Validity(address, Address.fromString(address).isRight))
   }
 
   @Path("/")
@@ -233,7 +233,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
   }
 
   private def balanceJson(address: String, confirmations: Int): ToResponseMarshallable = {
-    Account.fromString(address).right.map(acc => ToResponseMarshallable(Balance(
+    Address.fromString(address).right.map(acc => ToResponseMarshallable(Balance(
       acc.address,
       confirmations,
       state.balanceWithConfirmations(acc, confirmations)
@@ -241,14 +241,14 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
   }
 
   private def balanceJson(address: String): ToResponseMarshallable = {
-    Account.fromString(address).right.map(acc => ToResponseMarshallable(Balance(
+    Address.fromString(address).right.map(acc => ToResponseMarshallable(Balance(
       acc.address,
       0,
       state.balance(acc)
     ))).getOrElse(InvalidAddress)
   }
 
-  private def balancesDetailsJson(account: Account): BalanceDetails = {
+  private def balancesDetailsJson(account: Address): BalanceDetails = {
     state.read { _ =>
       val portfolio = state.accountPortfolio(account)
       BalanceDetails(
@@ -262,7 +262,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
 
   private def effectiveBalanceJson(address: String, confirmations: Int): ToResponseMarshallable = {
     state.read { _ =>
-      Account.fromString(address).right.map(acc => ToResponseMarshallable(Balance(
+      Address.fromString(address).right.map(acc => ToResponseMarshallable(Balance(
         acc.address,
         confirmations,
         state.effectiveBalanceAtHeightWithConfirmations(acc, state.height, confirmations))))
@@ -284,7 +284,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
 
   private def verifyPath(address: String, decode: Boolean) = withAuth {
     json[SignedMessage] { m =>
-      if (Account.fromString(address).isLeft) {
+      if (Address.fromString(address).isLeft) {
         InvalidAddress
       } else {
         //DECODE SIGNATURE
@@ -313,7 +313,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
   def publicKey: Route = (path("publicKey" / Segment) & get) { publicKey =>
     Base58.decode(publicKey) match {
       case Success(pubKeyBytes) => {
-        val account = Account.fromPublicKey(pubKeyBytes)
+        val account = Address.fromPublicKey(pubKeyBytes)
         complete(Json.obj("address" -> account.address))
       }
       case Failure(e) => complete(InvalidPublicKey)

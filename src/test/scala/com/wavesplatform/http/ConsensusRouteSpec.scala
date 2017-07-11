@@ -27,13 +27,13 @@ class ConsensusRouteSpec extends RouteSpec("/consensus") with RestAPISettingsHel
   routePath("/generationsignature") - {
     "for last block" in {
       Get(routePath("/generationsignature")) ~> route ~> check {
-        (responseAs[JsObject] \ "generationSignature").as[String] shouldEqual Base58.encode(history.lastBlock.consensusData.generationSignature)
+        (responseAs[JsObject] \ "generationSignature").as[String] shouldEqual Base58.encode(history.lastBlock.get.consensusData.generationSignature)
       }
     }
 
     "for existed block" in {
       val block = history.blockAt(3).get
-      Get(routePath(s"/generationsignature/${block.encodedId}")) ~> route ~> check {
+      Get(routePath(s"/generationsignature/${block.uniqueId.base58}")) ~> route ~> check {
         (responseAs[JsObject] \ "generationSignature").as[String] shouldEqual Base58.encode(block.consensusData.generationSignature)
       }
     }
@@ -46,7 +46,7 @@ class ConsensusRouteSpec extends RouteSpec("/consensus") with RestAPISettingsHel
   routePath("/basetarget") - {
     "for existed block" in {
       val block = history.blockAt(3).get
-      Get(routePath(s"/basetarget/${block.encodedId}")) ~> route ~> check {
+      Get(routePath(s"/basetarget/${block.uniqueId.base58}")) ~> route ~> check {
         (responseAs[JsObject] \ "baseTarget").as[Long] shouldEqual block.consensusData.baseTarget
       }
     }

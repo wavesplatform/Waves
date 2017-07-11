@@ -9,6 +9,7 @@
 
     <logger name="org.asynchttpclient" level="INFO"/>
     <logger name="io.netty" level="INFO"/>
+    <logger name="io.swagger" level="OFF"/>
 
     <root level="DEBUG">
         <appender-ref ref="STDOUT" />

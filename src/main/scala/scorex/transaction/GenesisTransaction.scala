@@ -3,13 +3,13 @@ package scorex.transaction
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import com.wavesplatform.state2.ByteStr
 import play.api.libs.json.{JsObject, Json}
-import scorex.account.Account
+import scorex.account.Address
 import scorex.crypto.hash.FastCryptographicHash._
 import scorex.transaction.TransactionParser._
 
 import scala.util.{Failure, Success, Try}
 
-case class GenesisTransaction private(recipient: Account, amount: Long, timestamp: Long, signature: ByteStr) extends Transaction {
+case class GenesisTransaction private(recipient: Address, amount: Long, timestamp: Long, signature: ByteStr) extends Transaction {
 
   import GenesisTransaction._
 
@@ -18,7 +18,7 @@ case class GenesisTransaction private(recipient: Account, amount: Long, timestam
 
   val transactionType = TransactionType.GenesisTransaction
 
-  lazy val creator: Option[Account] = None
+  lazy val creator: Option[Address] = None
 
   lazy val json: JsObject =
     Json.obj("type" -> transactionType.id,
@@ -34,7 +34,7 @@ case class GenesisTransaction private(recipient: Account, amount: Long, timestam
     val timestampBytes = Bytes.ensureCapacity(Longs.toByteArray(timestamp), TimestampLength, 0)
     val amountBytes = Bytes.ensureCapacity(Longs.toByteArray(amount), AmountLength, 0)
     val rcpBytes = recipient.bytes.arr
-    require(rcpBytes.length == Account.AddressLength)
+    require(rcpBytes.length == Address.AddressLength)
     val res = Bytes.concat(typeBytes, timestampBytes, rcpBytes, amountBytes)
     require(res.length == TypeLength + BASE_LENGTH)
     res
@@ -46,10 +46,10 @@ case class GenesisTransaction private(recipient: Account, amount: Long, timestam
 
 object GenesisTransaction extends {
 
-  private val RECIPIENT_LENGTH = Account.AddressLength
+  private val RECIPIENT_LENGTH = Address.AddressLength
   private val BASE_LENGTH = TimestampLength + RECIPIENT_LENGTH + AmountLength
 
-  def generateSignature(recipient: Account, amount: Long, timestamp: Long): Array[Byte] = {
+  def generateSignature(recipient: Address, amount: Long, timestamp: Long): Array[Byte] = {
     val typeBytes = Bytes.ensureCapacity(Ints.toByteArray(TransactionType.GenesisTransaction.id), TypeLength, 0)
     val timestampBytes = Bytes.ensureCapacity(Longs.toByteArray(timestamp), TimestampLength, 0)
     val amountBytes = Longs.toByteArray(amount)
@@ -73,7 +73,7 @@ object GenesisTransaction extends {
       position += TimestampLength
 
       val recipientBytes = java.util.Arrays.copyOfRange(data, position, position + RECIPIENT_LENGTH)
-      val recipient = Account.fromBytes(recipientBytes).right.get
+      val recipient = Address.fromBytes(recipientBytes).right.get
       position += RECIPIENT_LENGTH
 
       val amountBytes = java.util.Arrays.copyOfRange(data, position, position + AmountLength)
@@ -82,7 +82,7 @@ object GenesisTransaction extends {
       GenesisTransaction.create(recipient, amount, timestamp).fold(left => Failure(new Exception(left.toString)), right => Success(right))
     }.flatten
 
-  def create(recipient: Account, amount: Long, timestamp: Long): Either[ValidationError, GenesisTransaction] = {
+  def create(recipient: Address, amount: Long, timestamp: Long): Either[ValidationError, GenesisTransaction] = {
     if (amount < 0) {
       Left(ValidationError.NegativeAmount)
     } else {

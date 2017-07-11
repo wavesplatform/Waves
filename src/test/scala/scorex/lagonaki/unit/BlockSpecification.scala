@@ -13,7 +13,8 @@ import scala.util.Random
 
 class BlockSpecification extends FunSuite with Matchers with MockFactory {
 
-  test("Nxt block with txs bytes/parse roundtrip") {
+  test(" block with txs bytes/parse roundtrip") {
+
     val reference = Array.fill(Block.BlockIdLength)(Random.nextInt(100).toByte)
     val gen = PrivateKeyAccount(reference)
 
@@ -31,15 +32,16 @@ class BlockSpecification extends FunSuite with Matchers with MockFactory {
     val tbd = Seq(tx, tr, tr2)
     val cbd = NxtLikeConsensusBlockData(bt, gs)
 
-    val version = 1: Byte
-    val timestamp = System.currentTimeMillis()
+    List(1, 2).foreach { version =>
+      val timestamp = System.currentTimeMillis()
 
-    val block = Block.buildAndSign(version, timestamp, ByteStr(reference), cbd, tbd, gen)
-    val parsedBlock = Block.parseBytes(block.bytes).get
-
-    assert(parsedBlock.consensusData.generationSignature.sameElements(gs))
-    assert(parsedBlock.version == version)
-    assert(parsedBlock.signerData.generator.publicKey.sameElements(gen.publicKey))
+      val block = Block.buildAndSign(version.toByte, timestamp, ByteStr(reference), cbd, tbd, gen)
+      val parsedBlock = Block.parseBytes(block.bytes).get
+      assert(Signed.validateSignatures(block).isRight)
+      assert(Signed.validateSignatures(parsedBlock).isRight)
+      assert(parsedBlock.consensusData.generationSignature.sameElements(gs))
+      assert(parsedBlock.version.toInt == version)
+      assert(parsedBlock.signerData.generator.publicKey.sameElements(gen.publicKey))
+    }
   }
-
 }

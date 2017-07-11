@@ -10,7 +10,7 @@ import scorex.transaction.{BlockchainUpdater, History}
 
 import scala.util.{Success, Try}
 
-object BlockStorageImpl {
+object StorageFactory {
 
   private def createStateStorage(history: History, stateFile: Option[File]): Try[StateStorage] =
     StateStorage(stateFile, dropExisting = false).flatMap { ss =>
@@ -29,7 +29,7 @@ object BlockStorageImpl {
       stateWriter = new StateWriterImpl(ss, lock)
     } yield {
       val bcu = BlockchainUpdaterImpl(stateWriter, historyWriter, settings.functionalitySettings, settings.minimumInMemoryDiffSize, lock)
-      (historyWriter, stateWriter, bcu.currentState, bcu)
+      (historyWriter, stateWriter, bcu.currentPersistedBlocksState, bcu)
     }
   }
 }

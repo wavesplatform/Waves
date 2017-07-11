@@ -4,7 +4,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock
 
 import cats.implicits._
 import com.wavesplatform.state2._
-import scorex.account.{Account, Alias}
+import scorex.account.{Address, Alias}
 import scorex.transaction.lease.LeaseTransaction
 import scorex.transaction.{Transaction, TransactionParser}
 
@@ -20,7 +20,7 @@ class StateReaderImpl(p: StateStorage, val synchronizationToken: ReentrantReadWr
     }
   }
 
-  override def accountPortfolio(a: Account): Portfolio = read { implicit l =>
+  override def accountPortfolio(a: Address): Portfolio = read { implicit l =>
     Option(sp().portfolios.get(a.bytes)).map { case (b, (i, o), as) => Portfolio(b, LeaseInfo(i, o), as.map { case (k, v) => ByteStr(k) -> v }) }.orEmpty
   }
 
@@ -32,7 +32,7 @@ class StateReaderImpl(p: StateStorage, val synchronizationToken: ReentrantReadWr
 
   override def height: Int = read { implicit l => sp().getHeight }
 
-  override def accountTransactionIds(a: Account, limit: Int): Seq[ByteStr] = read { implicit l =>
+  override def accountTransactionIds(a: Address, limit: Int): Seq[ByteStr] = read { implicit l =>
     val totalRecords = sp().accountTransactionsLengths.getOrDefault(a.bytes, 0)
     Range(Math.max(0, totalRecords - limit), totalRecords)
       .map(n => sp().accountTransactionIds.get(StateStorage.accountIndexKey(a, n)))
@@ -43,21 +43,21 @@ class StateReaderImpl(p: StateStorage, val synchronizationToken: ReentrantReadWr
     Option(sp().paymentTransactionHashes.get(hash))
   }
 
-  override def aliasesOfAddress(a: Account): Seq[Alias] = read { implicit l =>
+  override def aliasesOfAddress(a: Address): Seq[Alias] = read { implicit l =>
     sp().aliasToAddress.asScala
       .collect { case (aliasName, addressBytes) if addressBytes == a.bytes =>
         Alias.buildWithCurrentNetworkByte(aliasName).explicitGet()
       }.toSeq
   }
 
-  override def resolveAlias(a: Alias): Option[Account] = read { implicit l =>
+  override def resolveAlias(a: Alias): Option[Address] = read { implicit l =>
     Option(sp().aliasToAddress.get(a.name))
-      .map(b => Account.fromBytes(b.arr).explicitGet())
+      .map(b => Address.fromBytes(b.arr).explicitGet())
   }
 
-  override def accountPortfolios: Map[Account, Portfolio] = read { implicit l =>
+  override def accountPortfolios: Map[Address, Portfolio] = read { implicit l =>
     sp().portfolios.asScala.map {
-      case (acc, (b, (i, o), as)) => Account.fromBytes(acc.arr).explicitGet() -> Portfolio(b, LeaseInfo(i, o), as.map {
+      case (acc, (b, (i, o), as)) => Address.fromBytes(acc.arr).explicitGet() -> Portfolio(b, LeaseInfo(i, o), as.map {
         case (k, v) => ByteStr(k) -> v
       })
     }.toMap
@@ -74,11 +74,11 @@ class StateReaderImpl(p: StateStorage, val synchronizationToken: ReentrantReadWr
       .toSeq
   }
 
-  override def lastUpdateHeight(acc: Account): Option[Int] = read { implicit l =>
+  override def lastUpdateHeight(acc: Address): Option[Int] = read { implicit l =>
     Option(sp().lastBalanceSnapshotHeight.get(acc.bytes))
   }
 
-  override def snapshotAtHeight(acc: Account, h: Int): Option[Snapshot] = read { implicit l =>
+  override def snapshotAtHeight(acc: Address, h: Int): Option[Snapshot] = read { implicit l =>
     Option(sp().balanceSnapshots.get(StateStorage.accountIndexKey(acc, h)))
       .map { case (ph, b, eb) => Snapshot(ph, b, eb) }
   }

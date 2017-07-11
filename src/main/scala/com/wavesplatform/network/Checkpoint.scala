@@ -3,7 +3,6 @@ package com.wavesplatform.network
 import com.google.common.primitives.{Bytes, Ints}
 import io.swagger.annotations.ApiModelProperty
 import play.api.libs.json._
-import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 
 import scala.collection.immutable.Stream
@@ -22,8 +21,6 @@ case class Checkpoint(items: Seq[BlockCheckpoint],
       Bytes.concat(bs, Ints.toByteArray(h), s)
     }
   }
-
-  def signedBy(privateKey: Array[Byte]) = copy(signature = EllipticCurveImpl.sign(privateKey, toSign))
 }
 
 object Checkpoint {

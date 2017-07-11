@@ -19,9 +19,9 @@ object ExchangeTransactionDiff {
     sellPriceAssetChange <- t.sellOrder.getReceiveAmount(t.price, t.amount).liftValidationError(tx)
     sellAmountAssetChange <- t.sellOrder.getSpendAmount(t.price, t.amount).liftValidationError(tx).map(-_)
   } yield {
-    val matcher = t.buyOrder.matcherPublicKey.toAccount
-    val buyer = t.buyOrder.senderPublicKey.toAccount
-    val seller = t.sellOrder.senderPublicKey.toAccount
+    val matcher = t.buyOrder.matcherPublicKey.toAddress
+    val buyer = t.buyOrder.senderPublicKey.toAddress
+    val seller = t.sellOrder.senderPublicKey.toAddress
 
     def wavesPortfolio(amt: Long) = Portfolio(amt, LeaseInfo.empty, Map.empty)
 

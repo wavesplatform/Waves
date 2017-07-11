@@ -5,12 +5,12 @@ import java.util.concurrent.locks.ReentrantReadWriteLock
 import com.wavesplatform.state2.StateStorage
 import com.wavesplatform.state2.StateStorage._
 import org.scalatest.{Matchers, Outcome, fixture}
-import scorex.account.Account
+import scorex.account.Address
 
 
 class StateReaderEffectiveBalanceTest extends fixture.FunSuite with Matchers {
 
-  val acc: Account = Account.fromPublicKey(Array.emptyByteArray)
+  val acc: Address = Address.fromPublicKey(Array.emptyByteArray)
   val stateHeight = 100
 
   override type FixtureParam = StateStorage

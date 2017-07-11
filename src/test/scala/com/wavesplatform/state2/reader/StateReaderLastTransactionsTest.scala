@@ -14,7 +14,7 @@ class StateReaderLastTransactionsTest extends PropSpec with PropertyChecks with 
 
   val preconditionsAndPayment: Gen[(Seq[Transaction], PaymentTransaction)] = for {
     master <- accountGen
-    recipient <- otherAccountGen(candidate = master)
+    recipient <- accountGen
     ts <- timestampGen
     genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
     transfer1: PaymentTransaction <- paymentGeneratorP(ts + 1, master, recipient)
@@ -26,8 +26,8 @@ class StateReaderLastTransactionsTest extends PropSpec with PropertyChecks with 
 
 
   property("accountTransactions sort results by 'fresh head' rule") {
-    forAll(preconditionsAndPayment, accountGen) { case ((pre, payment), miner) =>
-      assertDiffAndState(Seq(TestBlock(pre)), TestBlock(Seq(payment), miner)) { (blockDiff, newState) =>
+    forAll(preconditionsAndPayment) { case ((pre, payment)) =>
+      assertDiffAndState(Seq(TestBlock.create(pre)), TestBlock.create(Seq(payment))) { (blockDiff, newState) =>
 
         newState.accountTransactions(payment.sender, 1) shouldBe Seq(payment)
         val g = pre.head
