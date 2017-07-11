@@ -91,7 +91,7 @@ class Miner(
       Right(None)
     } else {
       val unsigned = accumulatedBlock.copy(version = 3, transactionData = accumulatedBlock.transactionData ++ unconfirmed)
-      val signature = ByteStr(EllipticCurveImpl.sign(account, unsigned.bytes))
+      val signature = ByteStr(EllipticCurveImpl.sign(account, unsigned.bytesWithoutSignature))
       val signed = accumulatedBlock.copy(signerData = accumulatedBlock.signerData.copy(signature = signature))
       for {
         micro <- MicroBlock.buildAndSign(account, unconfirmed, accumulatedBlock.signerData.signature, signature)

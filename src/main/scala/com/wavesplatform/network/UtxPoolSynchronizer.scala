@@ -6,9 +6,9 @@ import akka.dispatch.ExecutionContexts
 import com.wavesplatform.UtxPool
 import com.wavesplatform.state2.diffs.TransactionDiffer.TransactionValidationError
 import io.netty.channel.ChannelHandler.Sharable
-import io.netty.channel.group.ChannelGroup
 import io.netty.channel.{ChannelHandlerContext, ChannelInboundHandlerAdapter}
 import scorex.transaction.Transaction
+import scorex.transaction.ValidationError.AlreadyInThePool
 import scorex.utils.ScorexLogging
 
 import scala.concurrent.Future
@@ -21,6 +21,8 @@ class UtxPoolSynchronizer(utx: UtxPool)
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
     case t: Transaction => Future(utx.putIfNew(t, Some(ctx.channel())) match {
+      case already@Left(AlreadyInThePool(_)) =>
+        log.trace(s"${id(ctx)} Transaction $already")
       case Left(TransactionValidationError(e, _)) =>
         log.debug(s"${id(ctx)} Error processing transaction ${t.id}: $e")
       case Left(e) =>

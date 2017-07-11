@@ -1,5 +1,6 @@
 package scorex.transaction
 
+import com.wavesplatform.state2.ByteStr
 import scorex.account.{Address, Alias}
 import scorex.block.{Block, MicroBlock}
 import scorex.transaction.assets.exchange.Order
@@ -25,6 +26,7 @@ object ValidationError {
   case class OrderValidationError(order: Order, err: String) extends ValidationError
   case class AccountBalanceError(errs: Map[Address, String]) extends ValidationError
   case class GenericError(err: String) extends ValidationError
+  case class AlreadyInThePool(txId: ByteStr) extends ValidationError
   case class BlockAppendError(err: String,b: Block) extends ValidationError
   case class MicroBlockAppendError(err: String, microBlock: MicroBlock) extends ValidationError
 }

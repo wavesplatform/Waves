@@ -109,7 +109,7 @@ class UtxPoolSpecification extends FreeSpec
     "does not add the same transaction twice" in utxTest() { (txs, utx, _) =>
       expectBroadcast(txs.head)
       utx.putIfNew(txs.head) shouldBe 'right
-      utx.putIfNew(txs.head) should produce(s"Transaction ${txs.head.id} already in the pool")
+      utx.putIfNew(txs.head) should produce("already in the pool")
     }
 
     "evicts expired transactions when new ones are added" in forAll(dualTxGen) { case (utx, time, txs1, offset, txs2) =>

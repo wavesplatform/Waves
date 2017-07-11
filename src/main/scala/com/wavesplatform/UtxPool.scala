@@ -11,7 +11,7 @@ import com.wavesplatform.state2.{ByteStr, Diff}
 import io.netty.channel.Channel
 import io.netty.channel.group.ChannelGroup
 import scorex.consensus.TransactionsOrdering
-import scorex.transaction.ValidationError.GenericError
+import scorex.transaction.ValidationError.{AlreadyInThePool, GenericError}
 import scorex.transaction.{FeeCalculator, Transaction, ValidationError}
 import scorex.utils.{ScorexLogging, Time}
 
@@ -54,18 +54,17 @@ class UtxPool(
   def putIfNew(tx: Transaction, source: Option[Channel] = None): Either[ValidationError, Transaction] = {
     removeExpired(time.correctedTime())
 
-    val transactionInPool = Left(GenericError(s"Transaction ${tx.id} already in the pool"))
-    if (transactions.size >= utxSettings.maxSize) {
-      Left(GenericError("Transaction pool size limit is reached"))
-    } else if (transactions.contains(tx.id)) {
-      transactionInPool
-    } else for {
+    lazy val transactionInPool = AlreadyInThePool(tx.id)
+    for {
+      _ <- Either.cond(transactions.size < utxSettings.maxSize, (), GenericError("Transaction pool size limit is reached"))
+      _ <- Either.cond(!transactions.contains(tx.id), (), transactionInPool)
       _ <- feeCalculator.enoughFee(tx)
       _ <- TransactionDiffer.apply(fs, time.correctedTime(), stateReader.height)(stateReader, tx)
-      _ <- Option(transactions.putIfAbsent(tx.id, tx))
-        .fold[Either[ValidationError, Transaction]](Right(tx))(_ => transactionInPool)
-      _ = allChannels.broadcast(RawBytes(TransactionMessageSpec.messageCode, tx.bytes), source)
-    } yield tx
+      _ <- Option(transactions.putIfAbsent(tx.id, tx)).toRight(transactionInPool)
+    } yield {
+      allChannels.broadcast(RawBytes(TransactionMessageSpec.messageCode, tx.bytes), source)
+      tx
+    }
   }
 
   def remove(tx: Transaction): Unit = transactions.remove(tx.id)
