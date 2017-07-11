@@ -7,7 +7,7 @@ enablePlugins(sbtdocker.DockerPlugin, JavaServerAppPackaging, JDebPackaging, Sys
 name := "waves"
 organization := "com.wavesplatform"
 version := "0.7.2-SNAPSHOT"
-scalaVersion := "2.12.1"
+scalaVersion in ThisBuild := "2.12.1"
 crossPaths := false
 publishArtifact in (Compile, packageDoc) := false
 publishArtifact in (Compile, packageSrc) := false
@@ -152,3 +152,6 @@ inConfig(Debian)(Seq(
   serviceAutostart := false,
   maintainerScripts := maintainerScriptsFromDirectory(packageSource.value / "debian", Seq("preinst", "postinst", "postrm", "prerm"))
 ))
+
+lazy val node = project.in(file("."))
+lazy val generator = project.in(file("generator")).dependsOn(node % "compile->it")
