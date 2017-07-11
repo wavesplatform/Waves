@@ -41,7 +41,6 @@ object Coordinator extends ScorexLogging {
           _ <- blockchainUpdater.removeAfter(lastCommonBlockId)
           score <- forkApplicationResultEi
         } yield {
-          miner.lastBlockChanged()
           updateBlockchainReadinessFlag(history, time, blockchainReadiness, settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed)
           score
         }
@@ -58,7 +57,7 @@ object Coordinator extends ScorexLogging {
   }
 
   def processBlock(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater, time: Time,
-                   stateReader: StateReader, utxStorage: UtxPool, blockchainReadiness: AtomicBoolean, miner: Miner,
+                   stateReader: StateReader, utxStorage: UtxPool, blockchainReadiness: AtomicBoolean,
                    settings: WavesSettings)(newBlock: Block, local: Boolean): Either[ValidationError, BigInt] = {
     val newScore = for {
       _ <- appendBlock(checkpoint, history, blockchainUpdater, stateReader, utxStorage, time, settings.blockchainSettings)(newBlock)
@@ -66,7 +65,6 @@ object Coordinator extends ScorexLogging {
 
     if (local || newScore.isRight) {
       updateBlockchainReadinessFlag(history, time, blockchainReadiness, settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed)
-      miner.lastBlockChanged()
     }
     newScore
   }

@@ -33,14 +33,20 @@ class CoordinatorHandler(checkpointService: CheckpointService, history: History,
         Coordinator.processFork(checkpointService, history, blockchainUpdater, stateReader, utxStorage, time, settings, miner, blockchainReadiness)(blocks))
         .fold(
           err => peerDatabase.blacklistAndClose(ctx.channel(), "Unable to process ExtensionBlocks due to " + err),
-          score => allChannels.broadcast(LocalScoreChanged(score))
+          score => {
+            allChannels.broadcast(LocalScoreChanged(score))
+            miner.lastBlockChanged()
+          }
         )
     case b: Block =>
       Signed.validateSignatures(b) match {
         case Right(_) =>
           loggingResult(id(ctx), "Block", Coordinator.processBlock(checkpointService, history, blockchainUpdater, time,
-            stateReader, utxStorage, blockchainReadiness, miner, settings)(b, local = false))
-            .foreach(score => allChannels.broadcast(LocalScoreChanged(score)))
+            stateReader, utxStorage, blockchainReadiness, settings)(b, local = false))
+            .foreach(score => {
+              allChannels.broadcast(LocalScoreChanged(score))
+              miner.lastBlockChanged()
+            })
         case Left(err) =>
           peerDatabase.blacklistAndClose(ctx.channel(), err.toString)
       }

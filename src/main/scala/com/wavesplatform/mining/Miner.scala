@@ -120,12 +120,14 @@ class Miner(
           val blockGenTask = generateOneBlockTask(account, height, lastBlock, grandParent, balance)(offset).flatMap {
             case Right(block) =>
               Coordinator.processBlock(checkpoint, history, blockchainUpdater, timeService, stateReader,
-                utx, blockchainReadiness, Miner.this, settings)(block, local = true) match {
+                utx, blockchainReadiness, settings)(block, local = true) match {
                 case Left(err) => Task(log.warn(err.toString))
                 case Right(score) =>
                   allChannels.broadcast(LocalScoreChanged(score))
                   allChannels.broadcast(BlockForged(block))
+                  lastBlockChanged()
                   generateMicroBlockSequence(account, block)
+
               }
             case Left(err) =>
               scheduledAttempts.remove(key)
