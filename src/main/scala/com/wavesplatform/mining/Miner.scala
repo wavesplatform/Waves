@@ -13,11 +13,10 @@ import monix.eval.Task
 import monix.execution.Scheduler.Implicits.global
 import monix.execution._
 import scorex.account.PrivateKeyAccount
-import scorex.block.{Block, MicroBlock}
+import scorex.block.Block
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
-import scorex.crypto.EllipticCurveImpl
 import scorex.transaction.PoSCalc._
-import scorex.transaction.{BlockchainUpdater, CheckpointService, History, ValidationError}
+import scorex.transaction.{BlockchainUpdater, CheckpointService, History}
 import scorex.utils.{ScorexLogging, Time}
 import scorex.wallet.Wallet
 
@@ -76,32 +75,6 @@ class Miner(
     } yield block
   }.delayExecution(delay)
 
-
-  private def generateOneMicroBlockTask(account: PrivateKeyAccount, accumulatedBlock: Block): Task[Either[ValidationError, Option[Block]]] = Task {
-    val unconfirmed = utx.packUnconfirmed()
-    if (unconfirmed.nonEmpty) {
-      log.trace("skipping microBlock because no txs in utx pool")
-      Right(None)
-    } else {
-      val unsigned = accumulatedBlock.copy(version = 3, transactionData = accumulatedBlock.transactionData ++ unconfirmed)
-      val signature = ByteStr(EllipticCurveImpl.sign(account, unsigned.bytes))
-      val signed = accumulatedBlock.copy(signerData = accumulatedBlock.signerData.copy(signature = signature))
-      for {
-        micro <- MicroBlock.buildAndSign(account, unconfirmed, accumulatedBlock.signerData.signature, signature)
-        _ <- Coordinator.processMicroBlock(checkpoint, history, blockchainUpdater, utx)(micro)
-      } yield {
-        allChannels.broadcast(MicroBlockInv(micro.totalResBlockSig))
-        Some(signed)
-      }
-    }
-  }.delayExecution(MicroBlockPeriod)
-
-  private def generateMicroBlockSequence(account: PrivateKeyAccount, accumulatedBlock: Block): Task[Unit] =
-    generateOneMicroBlockTask(account, accumulatedBlock).flatMap {
-      case Left(err) => Task(log.warn(err.toString))
-      case Right(maybeNewTotal) => generateMicroBlockSequence(account, maybeNewTotal.getOrElse(accumulatedBlock))
-    }
-
   private def generateBlockTask(account: PrivateKeyAccount): Task[Unit] = Task {
     val height = history.height()
     val lastBlock = history.lastBlock.get
@@ -117,15 +90,15 @@ class Miner(
           log.debug(s"Next attempt for acc=$account in $offset")
           val balance = generatingBalance(stateReader, blockchainSettings.functionalitySettings, account, height)
           val blockGenTask = generateOneBlockTask(account, height, lastBlock, grandParent, balance)(offset).flatMap {
-            case Right(block) =>
+            case Right(block) => Task {
               Coordinator.processBlock(checkpoint, history, blockchainUpdater, timeService, stateReader,
                 utx, blockchainReadiness, Miner.this, settings)(block, local = true) match {
                 case Left(err) => Task(log.warn(err.toString))
                 case Right(score) =>
                   allChannels.broadcast(ScoreChanged(score))
                   allChannels.broadcast(BlockForged(block))
-                  generateMicroBlockSequence(account, block)
               }
+            }
             case Left(err) =>
               scheduledAttempts.remove(key)
               log.debug(s"No block generated because $err, retrying")
@@ -147,9 +120,8 @@ class Miner(
 }
 
 object Miner extends ScorexLogging {
-  val MicroBlockPeriod: FiniteDuration = 3.seconds
 
-  val Version: Byte = 3
+  val Version: Byte = 2
   val MinimalGenerationOffsetMillis: Long = 1001
 
   def calcOffset(timeService: Time, ts: Long): FiniteDuration = {

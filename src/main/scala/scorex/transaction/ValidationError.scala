@@ -1,7 +1,7 @@
 package scorex.transaction
 
 import scorex.account.{Address, Alias}
-import scorex.block.{Block, MicroBlock}
+import scorex.block.Block
 import scorex.transaction.assets.exchange.Order
 
 trait ValidationError
@@ -24,5 +24,4 @@ object ValidationError {
   case class AccountBalanceError(errs: Map[Address, String]) extends ValidationError
   case class GenericError(err: String) extends ValidationError
   case class BlockAppendError(err: String,b: Block) extends ValidationError
-  case class MicroBlockAppendError(err: String, microBlock: MicroBlock) extends ValidationError
 }

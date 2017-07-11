@@ -2,11 +2,11 @@ package com.wavesplatform.network
 
 import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel.{ChannelHandlerContext, ChannelInboundHandlerAdapter}
-import scorex.transaction.NgHistory
+import scorex.transaction.{History}
 import scorex.utils.ScorexLogging
 
 @Sharable
-class HistoryReplier(history: NgHistory, maxChainLength: Int) extends ChannelInboundHandlerAdapter with ScorexLogging {
+class HistoryReplier(history: History, maxChainLength: Int) extends ChannelInboundHandlerAdapter with ScorexLogging {
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
     case GetSignatures(otherSigs) =>
       otherSigs.view
@@ -26,12 +26,6 @@ class HistoryReplier(history: NgHistory, maxChainLength: Int) extends ChannelInb
     case GetBlock(sig) =>
       for (h <- history.heightOf(sig); bytes <- history.blockBytes(h)) {
         ctx.writeAndFlush(RawBytes(BlockMessageSpec.messageCode, bytes))
-      }
-
-    case mbr@MicroBlockRequest(sig) =>
-      log.debug(id(ctx) + "Received " + mbr)
-      history.microBlock(sig).foreach { h =>
-        ctx.writeAndFlush(MicroBlockResponse(h))
       }
 
     case _: Handshake =>
