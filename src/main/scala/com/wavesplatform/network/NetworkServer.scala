@@ -91,24 +91,6 @@ class NetworkServer(checkpointService: CheckpointService,
   private val utxPoolSynchronizer = new UtxPoolSynchronizer(utxPool)
   private val microBlockSynchronizer = new MircoBlockSynchronizer(history)
 
-  private def baseHandlers: Seq[PipelineInitializer.HandlerWrapper] = Seq(
-    clientHandshakeHandler,
-    lengthFieldPrepender,
-    new LengthFieldBasedFrameDecoder(1024 * 1024, 0, 4, 0, 4),
-    new LegacyFrameCodec,
-    discardingHandler,
-    messageCodec,
-    peerSynchronizer,
-    historyReplier,
-    utxPoolSynchronizer,
-    microBlockSynchronizer,
-    new ExtensionSignaturesLoader(settings.synchronizationSettings.synchronizationTimeout, peerDatabase),
-    new ExtensionBlocksLoader(history, settings.synchronizationSettings.synchronizationTimeout, peerDatabase),
-    new OptimisticExtensionLoader,
-    scoreObserver,
-    coordinatorHandler -> coordinatorExecutor,
-    fatalErrorHandler)
-
   private val serverChannel = settings.networkSettings.declaredAddress.map { _ =>
     new ServerBootstrap()
       .group(bossGroup, workerGroup)
@@ -126,6 +108,7 @@ class NetworkServer(checkpointService: CheckpointService,
         messageCodec,
         peerSynchronizer,
         historyReplier,
+        microBlockSynchronizer,
         new ExtensionSignaturesLoader(settings.synchronizationSettings.synchronizationTimeout, peerDatabase),
         new ExtensionBlocksLoader(history, settings.synchronizationSettings.synchronizationTimeout, peerDatabase),
         new OptimisticExtensionLoader,
@@ -164,6 +147,7 @@ class NetworkServer(checkpointService: CheckpointService,
       messageCodec,
       peerSynchronizer,
       historyReplier,
+      microBlockSynchronizer,
       new ExtensionSignaturesLoader(settings.synchronizationSettings.synchronizationTimeout, peerDatabase),
       new ExtensionBlocksLoader(history, settings.synchronizationSettings.synchronizationTimeout, peerDatabase),
       new OptimisticExtensionLoader,
