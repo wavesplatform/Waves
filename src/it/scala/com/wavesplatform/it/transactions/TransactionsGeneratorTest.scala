@@ -32,8 +32,7 @@ object TransactionsGeneratorTest {
 
     def importantTransactionType(tt: TT.Value): Boolean = {
       tt == TT.IssueTransaction ||
-        tt == TT.CreateAliasTransaction ||
-        tt == TT.LeaseTransaction
+        tt == TT.CreateAliasTransaction
     }
 
     val lastImportantTransactionIndex = sortedTxs.lastIndexWhere(t => importantTransactionType(t.transactionType))
