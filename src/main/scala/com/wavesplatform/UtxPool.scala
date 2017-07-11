@@ -30,9 +30,6 @@ class UtxPool(
 
   private val transactions = new ConcurrentHashMap[ByteStr, Transaction]
 
-  protected def validate(t: Transaction) =
-    TransactionDiffer.apply(fs, time.correctedTime(), stateReader.height)(stateReader, t)
-
   private def collectValidTransactions(currentTs: Long): Seq[Transaction] = {
     val differ = TransactionDiffer.apply(fs, currentTs, stateReader.height) _
     val (invalidTxs, validTxs, _) = transactions.asScala
@@ -64,7 +61,7 @@ class UtxPool(
       transactionInPool
     } else for {
       _ <- feeCalculator.enoughFee(tx)
-      _ <- validate(tx)
+      _ <- TransactionDiffer.apply(fs, time.correctedTime(), stateReader.height)(stateReader, tx)
       _ <- Option(transactions.putIfAbsent(tx.id, tx))
         .fold[Either[ValidationError, Transaction]](Right(tx))(_ => transactionInPool)
       _ = allChannels.broadcast(RawBytes(TransactionMessageSpec.messageCode, tx.bytes), source)
