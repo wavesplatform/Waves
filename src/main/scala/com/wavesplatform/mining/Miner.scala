@@ -10,7 +10,6 @@ import com.wavesplatform.state2.reader.StateReader
 import com.wavesplatform.{Coordinator, UtxPool}
 import io.netty.channel.group.ChannelGroup
 import monix.eval.Task
-import monix.execution.Scheduler.Implicits.global
 import monix.execution._
 import scorex.account.PrivateKeyAccount
 import scorex.block.Block
@@ -25,19 +24,21 @@ import scala.concurrent.duration._
 import scala.math.Ordering.Implicits._
 
 class Miner(
-               allChannels: ChannelGroup,
-               blockchainReadiness: AtomicBoolean,
-               blockchainUpdater: BlockchainUpdater,
-               checkpoint: CheckpointService,
-               history: History,
-               stateReader: StateReader,
-               settings: WavesSettings,
-               timeService: Time,
-               utx: UtxPool,
-               wallet: Wallet,
-               startingLastBlock: Block) extends ScorexLogging {
+    allChannels: ChannelGroup,
+    blockchainReadiness: AtomicBoolean,
+    blockchainUpdater: BlockchainUpdater,
+    checkpoint: CheckpointService,
+    history: History,
+    stateReader: StateReader,
+    settings: WavesSettings,
+    timeService: Time,
+    utx: UtxPool,
+    wallet: Wallet,
+    startingLastBlock: Block) extends ScorexLogging {
 
   import Miner._
+
+  private implicit val scheduler = Scheduler.fixedPool(name = "miner-pool", poolSize = 2)
 
   private def peerCount = allChannels.size()
 
@@ -95,7 +96,7 @@ class Miner(
                 utx, blockchainReadiness, Miner.this, settings)(block, local = true) match {
                 case Left(err) => Task(log.warn(err.toString))
                 case Right(score) =>
-                  allChannels.broadcast(ScoreChanged(score))
+                  allChannels.broadcast(LocalScoreChanged(score))
                   allChannels.broadcast(BlockForged(block))
               }
             }

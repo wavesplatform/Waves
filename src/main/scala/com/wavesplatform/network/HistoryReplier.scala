@@ -29,7 +29,7 @@ class HistoryReplier(history: History, maxChainLength: Int) extends ChannelInbou
       }
 
     case _: Handshake =>
-      ctx.writeAndFlush(ScoreChanged(history.score()))
+      ctx.writeAndFlush(LocalScoreChanged(history.score()))
 
     case _ => super.channelRead(ctx, msg)
   }

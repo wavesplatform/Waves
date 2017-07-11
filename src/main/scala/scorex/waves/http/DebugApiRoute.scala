@@ -7,7 +7,7 @@ import javax.ws.rs.Path
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
-import com.wavesplatform.network.{PeerDatabase, PeerInfo, ScoreChanged, _}
+import com.wavesplatform.network.{PeerDatabase, PeerInfo, LocalScoreChanged, _}
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state2.ByteStr
 import com.wavesplatform.state2.reader.StateReader
@@ -88,7 +88,7 @@ case class DebugApiRoute(settings: RestAPISettings,
 
   private def rollbackToBlock(blockId: ByteStr): Future[ToResponseMarshallable] = Future {
     blockchainUpdater.removeAfter(blockId)
-      .map(score => allChannels.broadcast(ScoreChanged(score)))
+      .map(score => allChannels.broadcast(LocalScoreChanged(score)))
   }.map(_.fold(ApiError.fromValidationError,
     blockId => Json.obj("BlockId" -> blockId.toString)): ToResponseMarshallable)
 
