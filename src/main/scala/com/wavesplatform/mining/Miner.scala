@@ -90,11 +90,14 @@ class Miner(
       log.trace("skipping microBlock because no txs in utx pool")
       Right(None)
     } else {
-      val unsigned = accumulatedBlock.copy(version = 3, transactionData = accumulatedBlock.transactionData ++ unconfirmed)
-      val signature = ByteStr(EllipticCurveImpl.sign(account, unsigned.bytesWithoutSignature))
-      val signed = accumulatedBlock.copy(signerData = accumulatedBlock.signerData.copy(signature = signature))
+      val signed = Block.buildAndSign(version = 3,
+        timestamp = accumulatedBlock.timestamp,
+        reference = accumulatedBlock.reference,
+        consensusData = accumulatedBlock.consensusData,
+        transactionData = accumulatedBlock.transactionData ++ unconfirmed,
+        signer = account)
       for {
-        micro <- MicroBlock.buildAndSign(account, unconfirmed, accumulatedBlock.signerData.signature, signature)
+        micro <- MicroBlock.buildAndSign(account, unconfirmed, accumulatedBlock.signerData.signature, signed.signerData.signature)
         _ <- Coordinator.processMicroBlock(checkpoint, history, blockchainUpdater, utx)(micro)
       } yield {
         allChannels.broadcast(MicroBlockInv(micro.totalResBlockSig))
@@ -132,7 +135,8 @@ class Miner(
                 case Right(score) => Task {
                   allChannels.broadcast(LocalScoreChanged(score))
                   allChannels.broadcast(BlockForged(block))
-                  lastBlockChanged()
+                  scheduleMining()
+                  startMicroblockMining(account, block)
                 }
               }
             case Left(err) =>
@@ -145,19 +149,18 @@ class Miner(
     } yield ()).left.map(err => log.debug(s"NOT scheduling block generation: $err"))
   }
 
-  def lastBlockChanged(): Unit = {
+  def scheduleMining(): Unit = {
     log.debug(s"Miner notified of new block")
     scheduledAttempts.values.foreach(_.cancel)
     scheduledAttempts.clear()
-    wallet.privateKeyAccounts().foreach(generateBlockTask(_).runAsync)
     microBlockMiner.foreach(_.cancel())
     microBlockMiner = None
-    val lastBlock = history.lastBlock.get
-    wallet.privateKeyAccounts().find(_ == lastBlock.signerData.generator).foreach { account =>
-      microBlockMiner = Some(generateMicroBlockSequence(account, lastBlock).runAsync)
-      log.trace("requested to generate microblock")
-    }
+    wallet.privateKeyAccounts().foreach(generateBlockTask(_).runAsync)
+  }
 
+  private def startMicroblockMining(account: PrivateKeyAccount, lastBlock: Block): Unit = {
+    microBlockMiner = Some(generateMicroBlockSequence(account, lastBlock).runAsync)
+    log.trace("requested to generate microblock")
 
   }
 

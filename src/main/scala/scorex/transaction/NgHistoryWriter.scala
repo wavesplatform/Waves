@@ -44,17 +44,19 @@ class NgHistoryWriterImpl(inner: HistoryWriter) extends NgHistoryWriter {
 
   override def appendBlock(block: Block)(consensusValidation: => Either[ValidationError, BlockDiff]): Either[ValidationError, BlockDiff]
   = write { implicit l => {
+    lazy val logDetails = s"The referenced block(${block.reference}) ${if (inner.contains(block.reference)) "exits, it's not last persisted" else "doesn't exist"}"
     if (baseBlock().isEmpty) {
-      if (inner.lastBlock.exists(_.uniqueId != block.reference))
-        Left(BlockAppendError("References incorrect or non-existing block (inner block exists, liquid block doesn't)", block))
-      else
-        consensusValidation
+      inner.lastBlock match {
+        case Some(lastInner) if lastInner.uniqueId != block.reference =>
+          Left(BlockAppendError(s"References incorrect or non-existing block: -> ${block.reference}. " + logDetails, block))
+        case _ => consensusValidation
+      }
     }
     else forgeBlock(block.reference) match {
       case Some(forgedBlock) =>
         inner.appendBlock(forgedBlock)(consensusValidation)
       case None =>
-        Left(BlockAppendError("References incorrect or non-existing block (liquid block exists)", block))
+        Left(BlockAppendError(s"References incorrect or non-existing block(liquid block exists): -> ${block.reference}. " + logDetails, block))
     }
   }.map { bd => // finally place new as liquid
     micros.set(List.empty)
@@ -140,18 +142,22 @@ class NgHistoryWriterImpl(inner: HistoryWriter) extends NgHistoryWriter {
         Some(base)
       } else if (!ms.exists(_.totalResBlockSig == id)) None
       else {
-        val (txs, found) = ms.reverse.foldLeft((List.empty[Transaction], false)) { case ((accumulated, matched), micro) =>
-          if (matched)
-            (accumulated, true)
-          else if (micro.totalResBlockSig == id)
-            (accumulated ++ micro.transactionData, true)
-          else
-            (accumulated ++ micro.transactionData, false)
+        val (accumulatedTxs, discardedTxsCount) = ms.reverse.foldLeft((List.empty[Transaction], Option.empty[Int])) { case ((accumulated, discarded), micro) =>
+          discarded match {
+            case Some(d) => (accumulated, Some(d + micro.transactionData.size))
+            case None =>
+              if (micro.totalResBlockSig == id)
+                (accumulated ++ micro.transactionData, Some(0))
+              else
+                (accumulated ++ micro.transactionData, None)
+          }
         }
-        assert(found)
-        Some(base.copy(
-          signerData = base.signerData.copy(signature = ms.head.totalResBlockSig),
-          transactionData = base.transactionData ++ txs))
+        discardedTxsCount.map { discarded =>
+          log.trace(s"Forged block with base_size=${base.transactionData.size} + accumulated_size=${accumulatedTxs.size}(discarded=$discarded)")
+          base.copy(
+            signerData = base.signerData.copy(signature = ms.head.totalResBlockSig),
+            transactionData = base.transactionData ++ accumulatedTxs)
+        }
       }
     })
   }
@@ -159,5 +165,6 @@ class NgHistoryWriterImpl(inner: HistoryWriter) extends NgHistoryWriter {
   override def microBlock(id: BlockId): Option[MicroBlock] = read { implicit l =>
     micros().find(_.totalResBlockSig == id)
   }
+
   override def close(): Unit = inner.close()
 }

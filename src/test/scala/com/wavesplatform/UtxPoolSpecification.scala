@@ -103,13 +103,13 @@ class UtxPoolSpecification extends FreeSpec
     "does not add new transactions when full" in utxTest(UtxSettings(1, 5.seconds)) { (txs, utx, _) =>
       expectBroadcast(txs.head)
       utx.putIfNew(txs.head) shouldBe 'right
-      all(txs.tail.map(t => utx.putIfNew(t))) shouldBe 'left
+      all(txs.tail.map(t => utx.putIfNew(t))) should produce("pool size limit")
     }
 
     "does not add the same transaction twice" in utxTest() { (txs, utx, _) =>
       expectBroadcast(txs.head)
       utx.putIfNew(txs.head) shouldBe 'right
-      utx.putIfNew(txs.head) should produce("already in the pool")
+      utx.putIfNew(txs.head) should produce("AlreadyInThePool")
     }
 
     "evicts expired transactions when new ones are added" in forAll(dualTxGen) { case (utx, time, txs1, offset, txs2) =>

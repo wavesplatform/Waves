@@ -20,13 +20,15 @@ object ValidationError {
   case object UnsupportedTransactionType extends ValidationError
   case object InvalidRequestSignature extends ValidationError
   case class InvalidSignature(s: Signed, details: Option[InvalidSignature] = None) extends ValidationError {
-    override def toString: String = s.toString.take(300) + "... reason: " + details
+    override def toString: String = s"InvalidSignature(${s.toString.take(300) + "... reason: " + details})"
   }
-  case class AliasNotExists(a: Alias) extends ValidationError
-  case class OrderValidationError(order: Order, err: String) extends ValidationError
-  case class AccountBalanceError(errs: Map[Address, String]) extends ValidationError
   case class GenericError(err: String) extends ValidationError
   case class AlreadyInThePool(txId: ByteStr) extends ValidationError
+  case class AccountBalanceError(errs: Map[Address, String]) extends ValidationError
+  case class AliasNotExists(a: Alias) extends ValidationError
+  case class OrderValidationError(order: Order, err: String) extends ValidationError
   case class BlockAppendError(err: String,b: Block) extends ValidationError
-  case class MicroBlockAppendError(err: String, microBlock: MicroBlock) extends ValidationError
+  case class MicroBlockAppendError(err: String, microBlock: MicroBlock) extends ValidationError {
+    override def toString: String = s"MicroBlockAppendError($err, MicroBlockId=${microBlock.totalResBlockSig}[-->${microBlock.prevResBlockSig}])"
+  }
 }

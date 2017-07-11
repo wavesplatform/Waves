@@ -60,7 +60,7 @@ class UtxPool(
       _ <- Either.cond(!transactions.contains(tx.id), (), transactionInPool)
       _ <- feeCalculator.enoughFee(tx)
       _ <- TransactionDiffer.apply(fs, time.correctedTime(), stateReader.height)(stateReader, tx)
-      _ <- Option(transactions.putIfAbsent(tx.id, tx)).toRight(transactionInPool)
+      _ <- Either.cond(Option(transactions.putIfAbsent(tx.id, tx)).isEmpty, (), transactionInPool)
     } yield {
       allChannels.broadcast(RawBytes(TransactionMessageSpec.messageCode, tx.bytes), source)
       tx

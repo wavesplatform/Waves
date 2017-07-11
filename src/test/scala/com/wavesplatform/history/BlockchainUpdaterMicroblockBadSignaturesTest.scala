@@ -54,7 +54,7 @@ class BlockchainUpdaterMicroblockBadSignaturesTest extends PropSpec with Propert
       val badSigMicro = buildMicroBlockOfTxs(block0.uniqueId, block1, Seq(payment2), otherSigner)._2
       domain.blockchainUpdater.processBlock(block0).explicitGet()
       domain.blockchainUpdater.processBlock(block1).explicitGet()
-      domain.blockchainUpdater.processMicroBlock(badSigMicro) should produce("sender")
+      domain.blockchainUpdater.processMicroBlock(badSigMicro) should produce("another account")
     }
   }
 }

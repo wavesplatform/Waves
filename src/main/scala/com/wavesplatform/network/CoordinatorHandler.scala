@@ -35,7 +35,7 @@ class CoordinatorHandler(checkpointService: CheckpointService, history: History,
           err => peerDatabase.blacklistAndClose(ctx.channel(), "Unable to process ExtensionBlocks due to " + err),
           score => {
             allChannels.broadcast(LocalScoreChanged(score))
-            miner.lastBlockChanged()
+            miner.scheduleMining()
           }
         )
     case b: Block =>
@@ -45,7 +45,7 @@ class CoordinatorHandler(checkpointService: CheckpointService, history: History,
             stateReader, utxStorage, blockchainReadiness, settings)(b, local = false))
             .foreach(score => {
               allChannels.broadcast(LocalScoreChanged(score))
-              miner.lastBlockChanged()
+              miner.scheduleMining()
             })
         case Left(err) =>
           peerDatabase.blacklistAndClose(ctx.channel(), err.toString)
@@ -54,7 +54,10 @@ class CoordinatorHandler(checkpointService: CheckpointService, history: History,
       Signed.validateSignatures(m) match {
         case Right(_) =>
           loggingResult(id(ctx), "MicroBlockResponse", Coordinator.processMicroBlock(checkpointService, history, blockchainUpdater, utxStorage)(m))
-            .foreach(score => allChannels.broadcast(MicroBlockInv(m.totalResBlockSig), Some(ctx.channel())))
+            .foreach(score => {
+              allChannels.broadcast(MicroBlockInv(m.totalResBlockSig), Some(ctx.channel()))
+              miner.scheduleMining()
+            })
         case Left(err) =>
           peerDatabase.blacklistAndClose(ctx.channel(), err.toString)
       }

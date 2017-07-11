@@ -30,11 +30,13 @@ object ApiError {
     case ValidationError.ToSelf => ToSelfError
     case ValidationError.MissingSenderPrivateKey => MissingSenderPrivateKey
     case ValidationError.GenericError(ge) => CustomValidationError(ge)
-    case ValidationError.AliasNotExists(tx) => AliasNotExists(tx)
-    case ValidationError.UnsupportedTransactionType => CustomValidationError("UnsupportedTransactionType")
+    case ValidationError.AlreadyInThePool(tx) => CustomValidationError(s"Transaction $tx already in the pool")
     case ValidationError.AccountBalanceError(errs) => CustomValidationError(errs.values.mkString(", "))
+    case ValidationError.AliasNotExists(tx) => AliasNotExists(tx)
     case ValidationError.OrderValidationError(order, m) => CustomValidationError(m)
-    case TransactionValidationError(err,tx) => StateCheckFailed(tx, fromValidationError(err).message)
+    case ValidationError.UnsupportedTransactionType => CustomValidationError("UnsupportedTransactionType")
+    case TransactionValidationError(err, tx) => StateCheckFailed(tx, fromValidationError(err).message)
+    case error => CustomValidationError(error.toString)
   }
 }
 
