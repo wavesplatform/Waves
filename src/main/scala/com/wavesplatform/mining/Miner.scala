@@ -1,7 +1,7 @@
 package com.wavesplatform.mining
 
 import java.time.{Duration, Instant}
-import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
 
 import com.wavesplatform.network._
 import com.wavesplatform.settings.WavesSettings
@@ -25,17 +25,16 @@ import scala.concurrent.duration._
 import scala.math.Ordering.Implicits._
 
 class Miner(
-    allChannels: ChannelGroup,
-    blockchainReadiness: AtomicBoolean,
-    blockchainUpdater: BlockchainUpdater,
-    checkpoint: CheckpointService,
-    history: History,
-    stateReader: StateReader,
-    settings: WavesSettings,
-    timeService: Time,
-    utx: UtxPool,
-    wallet: Wallet,
-    startingLastBlock: Block) extends ScorexLogging {
+               allChannels: ChannelGroup,
+               blockchainReadiness: AtomicBoolean,
+               blockchainUpdater: BlockchainUpdater,
+               checkpoint: CheckpointService,
+               history: History,
+               stateReader: StateReader,
+               settings: WavesSettings,
+               timeService: Time,
+               utx: UtxPool,
+               wallet: Wallet) extends ScorexLogging {
 
   import Miner._
 
@@ -47,6 +46,7 @@ class Miner(
   private val blockchainSettings = settings.blockchainSettings
 
   private val scheduledAttempts = TrieMap.empty[ByteStr, Cancelable]
+  @volatile private var microBlockMiner: Option[Cancelable] = None
 
   private def checkAge(parentHeight: Int, parent: Block): Either[String, Unit] =
     Either
@@ -63,8 +63,8 @@ class Miner(
     lazy val h = calcHit(lastBlockKernelData, account)
     lazy val t = calcTarget(parent, currentTime, balance)
     for {
-      _ <- Either.cond(pc >= minerSettings.quorum, (), s"Hit $h was NOT less than target $t, not forging block with ${account.address}")
-      _ <- Either.cond(h < t, (), s"Quorum not available ($pc/${minerSettings.quorum}, not forging block with ${account.address}")
+      _ <- Either.cond(pc >= minerSettings.quorum, (), s"Quorum not available ($pc/${minerSettings.quorum}, not forging block with ${account.address}")
+      _ <- Either.cond(h < t, (), s"Hit $h was NOT less than target $t, not forging block with ${account.address}")
       _ = log.debug(s"Forging with ${account.address}, H $h < T $t, balance $balance, prev block ${parent.uniqueId}")
       _ = log.debug(s"Previous block ID ${parent.uniqueId} at $parentHeight with target ${lastBlockKernelData.baseTarget}")
       avgBlockDelay = blockchainSettings.genesisSettings.averageBlockDelay
@@ -79,8 +79,13 @@ class Miner(
 
 
   private def generateOneMicroBlockTask(account: PrivateKeyAccount, accumulatedBlock: Block): Task[Either[ValidationError, Option[Block]]] = Task {
-    val unconfirmed = utx.packUnconfirmed()
-    if (unconfirmed.nonEmpty) {
+    val pc = peerCount
+    lazy val unconfirmed = utx.packUnconfirmed()
+    if (pc < minerSettings.quorum) {
+      log.trace(s"Quorum not available ($pc/${minerSettings.quorum}, not forging block with ${account.address}")
+      Right(None)
+    }
+    else if (unconfirmed.isEmpty) {
       log.trace("skipping microBlock because no txs in utx pool")
       Right(None)
     } else {
@@ -122,12 +127,11 @@ class Miner(
               Coordinator.processBlock(checkpoint, history, blockchainUpdater, timeService, stateReader,
                 utx, blockchainReadiness, settings)(block, local = true) match {
                 case Left(err) => Task(log.warn(err.toString))
-                case Right(score) =>
+                case Right(score) => Task {
                   allChannels.broadcast(LocalScoreChanged(score))
                   allChannels.broadcast(BlockForged(block))
                   lastBlockChanged()
-                  generateMicroBlockSequence(account, block)
-
+                }
               }
             case Left(err) =>
               scheduledAttempts.remove(key)
@@ -144,6 +148,14 @@ class Miner(
     scheduledAttempts.values.foreach(_.cancel)
     scheduledAttempts.clear()
     wallet.privateKeyAccounts().foreach(generateBlockTask(_).runAsync)
+    microBlockMiner.foreach(_.cancel())
+    microBlockMiner = None
+    val lastBlock = history.lastBlock.get
+    wallet.privateKeyAccounts().find(_ == lastBlock.signerData.generator).foreach { account =>
+      microBlockMiner = Some(generateMicroBlockSequence(account, lastBlock).runAsync)
+    }
+
+
   }
 
   def shutdown(): Unit = ()
