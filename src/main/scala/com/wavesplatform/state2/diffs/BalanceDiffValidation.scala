@@ -22,7 +22,6 @@ object BalanceDiffValidation {
       val portfolioDiff = d.portfolios(acc)
       val newPortfolio = oldPortfolio.combine(portfolioDiff)
 
-      // todo чем отличается от disallowSendingGreaterThanBalance?
       val err = if (newPortfolio.balance < 0) {
         Some(s"negative waves balance: $acc, old: ${oldPortfolio.balance}, new: ${newPortfolio.balance}")
       } else if (newPortfolio.assets.values.exists(_ < 0)) {
