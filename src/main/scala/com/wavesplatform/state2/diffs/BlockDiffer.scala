@@ -40,7 +40,7 @@ object BlockDiffer extends ScorexLogging {
           leaseInfo = LeaseInfo.empty,
           assets = Map(asset -> fee))))
       case (None, fee) => Diff(currentBlockHeight, tx, portfolios = Map(blockGenerator -> Portfolio(
-        balance = tx.fee,
+        balance = fee,
         leaseInfo = LeaseInfo.empty,
         assets = Map.empty)))
     }
