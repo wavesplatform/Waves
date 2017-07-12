@@ -67,7 +67,7 @@ class Miner(
       btg = calcBaseTarget(avgBlockDelay, parentHeight, parent, greatGrandParent, currentTime)
       gs = calcGeneratorSignature(lastBlockKernelData, account)
       consensusData = NxtLikeConsensusBlockData(btg, gs)
-      unconfirmed = utx.packUnconfirmed()
+      unconfirmed = utx.packUnconfirmed(minerSettings.maxTransactionsInKeyBlock)
       _ = log.debug(s"Adding ${unconfirmed.size} unconfirmed transaction(s) to new block")
       block = Block.buildAndSign(Version, currentTime, parent.uniqueId, consensusData, unconfirmed, account)
     } yield block
@@ -77,7 +77,7 @@ class Miner(
   private def generateOneMicroBlockTask(account: PrivateKeyAccount, accumulatedBlock: Block): Task[Either[ValidationError, Option[Block]]] = Task {
     log.trace("attempting to generate microblock")
     val pc = peerCount
-    lazy val unconfirmed = utx.packUnconfirmed()
+    lazy val unconfirmed = utx.packUnconfirmed(MaxTransactionsPerMicroblock)
     if (pc < minerSettings.quorum) {
       log.trace(s"Quorum not available ($pc/${minerSettings.quorum}, not forging block with ${account.address}")
       Right(None)
@@ -101,7 +101,7 @@ class Miner(
         Some(signed)
       }
     }
-  }.delayExecution(MicroBlockPeriod)
+  }.delayExecution(minerSettings.microBlockInterval)
 
   private def generateMicroBlockSequence(account: PrivateKeyAccount, accumulatedBlock: Block): Task[Unit] =
     generateOneMicroBlockTask(account, accumulatedBlock).flatMap {
@@ -118,7 +118,7 @@ class Miner(
     } yield ts) match {
       case Left(err) => log.debug(s"NOT scheduling block generation: $err")
       case Right(ts) =>
-        val offset = calcOffset(timeService, ts)
+        val offset = calcOffset(timeService, minerSettings.minimalBlockGenerationOffset, ts)
         val key = ByteStr(account.publicKey)
         scheduledAttempts.remove(key).foreach(_.cancel())
         val lastBlock = history.lastBlock.get
@@ -167,14 +167,13 @@ class Miner(
 }
 
 object Miner extends ScorexLogging {
-  val MicroBlockPeriod: FiniteDuration = 1000.millis
 
+  val MaxTransactionsPerMicroblock: Int = 255
   val Version: Byte = 3
-  val MinimalGenerationOffsetMillis: Long = 1001
 
-  def calcOffset(timeService: Time, ts: Long): FiniteDuration = {
+  def calcOffset(timeService: Time, minimalBlockGenerationOffset: FiniteDuration, ts: Long): FiniteDuration = {
     val generationInstant = ts + 10
     val calculatedOffset = generationInstant - timeService.correctedTime()
-    Math.max(MinimalGenerationOffsetMillis, calculatedOffset).millis
+    Math.max(minimalBlockGenerationOffset.toMillis, calculatedOffset).millis
   }
 }

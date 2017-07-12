@@ -61,7 +61,7 @@ class UtxPool(
 
   def all(): Seq[Transaction] = transactions.values.asScala.toSeq.sorted(TransactionsOrdering.InUTXPool)
 
-  def packUnconfirmed(): Seq[Transaction] = {
+  def packUnconfirmed(max: Int): Seq[Transaction] = {
     val currentTs = time.correctedTime()
     removeExpired(currentTs)
     val differ = TransactionDiffer.apply(fs, currentTs, stateReader.height) _
@@ -69,7 +69,7 @@ class UtxPool(
       .values.toSeq
       .sorted(TransactionsOrdering.InUTXPool)
       .foldLeft((Seq.empty[ByteStr], Seq.empty[Transaction], Monoid[Diff].empty)) {
-        case ((invalid, valid, diff), tx) if valid.size < 100 =>
+        case ((invalid, valid, diff), tx) if valid.size <= max =>
           differ(new CompositeStateReader(stateReader, diff.asBlockDiff), tx) match {
             case Right(newDiff) =>
               (invalid, tx +: valid, Monoid.combine(diff, newDiff))
