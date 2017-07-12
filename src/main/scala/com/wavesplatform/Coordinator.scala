@@ -39,8 +39,8 @@ object Coordinator extends ScorexLogging {
           commonBlockHeight <- history.heightOf(lastCommonBlockId).toRight(GenericError("Fork contains no common parent"))
           _ <- Either.cond(isForkValidWithCheckpoint(commonBlockHeight), (), GenericError("Fork contains block that doesn't match checkpoint, declining fork"))
           droppedTransactions <- blockchainUpdater.removeAfter(lastCommonBlockId)
-          _ = droppedTransactions.foreach(t => utxStorage.putIfNew(t))
           score <- forkApplicationResultEi
+          _ = droppedTransactions.foreach(t => utxStorage.putIfNew(t))
         } yield {
           miner.lastBlockChanged()
           updateBlockchainReadinessFlag(history, time, blockchainReadiness, settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed)
