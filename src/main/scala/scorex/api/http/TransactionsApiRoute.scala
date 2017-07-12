@@ -33,6 +33,7 @@ case class TransactionsApiRoute(
     }
 
   private val invalidLimit = StatusCodes.BadRequest -> Json.obj("message" -> "invalid.limit")
+
   //TODO implement general pagination
   @Path("/address/{address}/limit/{limit}")
   @ApiOperation(value = "Address", notes = "Get list of transactions where specified address has been involved", httpMethod = "GET")
@@ -79,9 +80,9 @@ case class TransactionsApiRoute(
             state.transactionInfo(sig) match {
               case Some((h, tx)) =>
                 complete(txToExtendedJson(tx) + ("height" -> JsNumber(h)))
-                case None =>
-                  complete(StatusCodes.NotFound -> Json.obj("status" -> "error", "details" -> "Transaction is not in blockchain"))
-              }
+              case None =>
+                complete(StatusCodes.NotFound -> Json.obj("status" -> "error", "details" -> "Transaction is not in blockchain"))
+            }
           case _ => complete(InvalidSignature)
         }
       }
@@ -89,15 +90,46 @@ case class TransactionsApiRoute(
 
   @Path("/unconfirmed")
   @ApiOperation(value = "Unconfirmed", notes = "Get list of unconfirmed transactions", httpMethod = "GET")
-  def unconfirmed: Route = (path("unconfirmed") & get) {
-    complete(JsArray(utxPool.all.map(txToExtendedJson)))
+  def unconfirmed: Route = (pathPrefix("unconfirmed") & get) {
+    pathEndOrSingleSlash {
+      complete(JsArray(utxPool.all().map(txToExtendedJson)))
+    } ~ utxSize ~ utxTransactionInfo
+  }
+
+  @Path("/size")
+  @ApiOperation(value = "Size or UTX pool", notes = "Get number of unconfirmed transactions in the UTX pool", httpMethod = "GET")
+  def utxSize: Route = (pathPrefix("size") & get) {
+    complete(Json.obj("size" -> JsNumber(utxPool.size)))
+  }
+
+  @Path("/info/{signature}")
+  @ApiOperation(value = "Transaction Info", notes = "Get transaction that is in the UTX", httpMethod = "GET")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(name = "signature", value = "Transaction signature ", required = true, dataType = "string", paramType = "path")
+  ))
+  def utxTransactionInfo: Route = (pathPrefix("info") & get) {
+    pathEndOrSingleSlash {
+      complete(InvalidSignature)
+    } ~
+      path(Segment) { encoded =>
+        ByteStr.decodeBase58(encoded) match {
+          case Success(sig) =>
+            utxPool.getTransactionById(sig) match {
+              case Some(tx) =>
+                complete(txToExtendedJson(tx))
+              case None =>
+                complete(StatusCodes.NotFound -> Json.obj("status" -> "error", "details" -> "Transaction is not in UTX"))
+            }
+          case _ => complete(InvalidSignature)
+        }
+      }
   }
 
   private def txToExtendedJson(tx: Transaction): JsObject = {
     tx match {
       case leaseCancel: LeaseCancelTransaction =>
         leaseCancel.json ++ Json.obj("lease" -> state.findTransaction[LeaseTransaction](leaseCancel.leaseId).map(_.json).getOrElse[JsValue](JsNull))
-      case tx => tx.json
+      case t => t.json
     }
   }
 }
