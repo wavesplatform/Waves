@@ -54,8 +54,9 @@ object BlockDiffer extends ScorexLogging {
       txs.foldLeft(right(Diff.empty)) { case (ei, tx) => ei.flatMap(diff =>
         txDiffer(new CompositeStateReader(s, diff.asBlockDiff), tx)
           .map(newDiff =>
-            diff.combine(newDiff)
-                .combine(txFeeDiffer(tx))
+            diff
+              .combine(txFeeDiffer(tx))
+              .combine(newDiff)
           ))
       }
     }
