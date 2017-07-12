@@ -40,7 +40,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
   }
 
   def currentPersistedBlocksState: StateReader = read { implicit l =>
-    proxy(persisted, () => Monoid.combine(bottomMemoryDiff(),topMemoryDiff()))
+    proxy(proxy(persisted,() =>bottomMemoryDiff()), () => topMemoryDiff())
   }
 
   private def updatePersistedAndInMemory(): Unit = write { implicit l =>
