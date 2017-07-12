@@ -29,16 +29,16 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
 
   override def handlerAdded(ctx: ChannelHandlerContext) =
     ctx.channel().closeFuture().addListener { f: ChannelFuture =>
-      log.debug(s"${id(ctx)}: On close: Clear Pinned: $pinnedChannelId to NONE")
-      pinnedChannel.compareAndSet(ctx.channel(), null)
-      for ((ch, s) <- channelWithHighestScore) {
+      if (pinnedChannel.compareAndSet(ctx.channel(), null))
+        log.debug(s"${id(ctx)}: On close: Clear Pinned: $pinnedChannelId to NONE")
+      for ((currentHighestScoredChannel, s) <- channelWithHighestScore) {
         // having no channel with highest score means scores map is empty, so it's ok to attempt to remove this channel
         // from the map only when there is one.
         Option(scores.remove(ctx.channel())).foreach(_ => log.debug(s"${id(ctx)} Closed, removing score $s"))
-        if (ch == f.channel()) {
+        if (currentHighestScoredChannel == f.channel()) {
           // this channel had the highest score, so we should request extension from second-best channel, just in case
-          for ((ch, _) <- channelWithHighestScore if pinnedChannel.compareAndSet(null, ch)) {
-            ch.writeAndFlush(LoadBlockchainExtension(lastSignatures))
+          for ((secondHighestScoredChannel, _) <- channelWithHighestScore if pinnedChannel.compareAndSet(currentHighestScoredChannel, secondHighestScoredChannel)) {
+            secondHighestScoredChannel.writeAndFlush(LoadBlockchainExtension(lastSignatures))
           }
         }
       }
@@ -46,16 +46,17 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
 
   override def write(ctx: ChannelHandlerContext, msg: AnyRef, promise: ChannelPromise) = msg match {
     case LocalScoreChanged(newLocalScore) =>
-      log.debug(s"Pinned: $pinnedChannelId <- ${id(ctx)}; New local score: $newLocalScore")
+      pinnedChannel.compareAndSet(ctx.channel(), null) // Fork applied
+      log.debug(s"${id(ctx)} Pinned: $pinnedChannelId: New local score: $newLocalScore")
       // unconditionally update local score value and propagate this message downstream
       localScore = newLocalScore
       ctx.write(msg, promise)
 
       // if this is the channel with the highest score and its score is higher than local, request extension
       for ((chan, score) <- channelWithHighestScore if chan == ctx.channel() && score > newLocalScore) {
-        chan.writeAndFlush(LoadBlockchainExtension(lastSignatures))
         log.debug(s"${id(ctx)}: Pinned: $pinnedChannelId: Setting pinned to ${id(chan)}")
         pinnedChannel.set(chan)
+        chan.writeAndFlush(LoadBlockchainExtension(lastSignatures))
       }
 
     case _ => ctx.write(msg, promise)
@@ -63,7 +64,7 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef) = msg match {
     case newScore: History.BlockchainScore =>
-      log.debug(s"Pinned: $pinnedChannelId <- ${id(ctx)}; New score: $newScore")
+      log.debug(s"${id(ctx)} Pinned: $pinnedChannelId: New score: $newScore")
       ctx.executor().schedule(scoreTtl) {
         if (scores.remove(ctx.channel(), newScore)) {
           log.debug(s"${id(ctx)} Score expired, removing $newScore")
@@ -83,14 +84,20 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
         ctx.writeAndFlush(LoadBlockchainExtension(lastSignatures))
       }
 
-    case ExtensionBlocks(blocks) if pinnedChannel.compareAndSet(ctx.channel(), null) =>
+    case ExtensionBlocks(blocks) if pinnedChannel.get() == ctx.channel() =>
       if (blocks.nonEmpty){
-        log.debug(s"Pinned: $pinnedChannelId <- ${id(ctx)}: Receiving extension blocks")
+        log.debug(s"${id(ctx)} Pinned: $pinnedChannelId: Receiving extension blocks")
         super.channelRead(ctx, msg)
-      } else log.debug(s"Pinned: $pinnedChannelId <- ${id(ctx)}: Blockchain is up to date")
+      } else {
+        log.debug(s"${id(ctx)} Pinned: $pinnedChannelId: Blockchain is up to date")
+        pinnedChannel.compareAndSet(ctx.channel(), null)
+      }
 
     case ExtensionBlocks(blocks) =>
-      log.debug(s"${id(ctx)} Unexpected extension blocks: ${blocks.headOption.map(_.uniqueId)} .. ${blocks.lastOption.map(_.uniqueId)} (Pinned: $pinnedChannelId)")
+      if (blocks.nonEmpty)
+        log.debug(s"${id(ctx)} Receiving extension blocks from non-pinned channel: ${blocks.head.uniqueId} .. ${blocks.lastOption.map(_.uniqueId)} (Pinned: $pinnedChannelId)")
+      else
+        log.debug(s"${id(ctx)} Receiving extension blocks from non-pinned channel: EMPTY (Pinned: $pinnedChannelId)")
       super.channelRead(ctx, msg)
 
     case _ => super.channelRead(ctx, msg)

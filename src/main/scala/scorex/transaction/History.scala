@@ -29,7 +29,7 @@ trait HistoryWriter extends History {
 
   def appendBlock(block: Block)(consensusValidation: => Either[ValidationError, BlockDiff]): Either[ValidationError, BlockDiff]
 
-  def discardBlock(): Unit
+  def discardBlock(): Seq[Transaction]
 }
 
 trait CheckpointService {

@@ -39,8 +39,9 @@ object Coordinator extends ScorexLogging {
         for {
           commonBlockHeight <- history.heightOf(lastCommonBlockId).toRight(GenericError("Fork contains no common parent"))
           _ <- Either.cond(isForkValidWithCheckpoint(commonBlockHeight), (), GenericError("Fork contains block that doesn't match checkpoint, declining fork"))
-          _ <- blockchainUpdater.removeAfter(lastCommonBlockId)
+          droppedTransactions <- blockchainUpdater.removeAfter(lastCommonBlockId)
           score <- forkApplicationResultEi
+          _ = droppedTransactions.foreach(t => utxStorage.putIfNew(t))
         } yield {
           updateBlockchainReadinessFlag(history, time, blockchainReadiness, settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed)
           score
@@ -75,7 +76,7 @@ object Coordinator extends ScorexLogging {
     _ <- Either.cond(checkpoint.isBlockValid(microBlock.totalResBlockSig, history.height() + 1), (),
       MicroBlockAppendError(s"[h = ${history.height() + 1}] is not valid with respect to checkpoint", microBlock))
     _ <- blockchainUpdater.processMicroBlock(microBlock)
-  } yield microBlock.transactionData.foreach(utxStorage.remove)
+  } yield utxStorage.removeAll(microBlock.transactionData)
 
 
   private def appendBlock(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater,
@@ -85,7 +86,7 @@ object Coordinator extends ScorexLogging {
       BlockAppendError(s"[h = ${history.height() + 1}] is not valid with respect to checkpoint", block))
     _ <- blockConsensusValidation(history, stateReader, settings, time.correctedTime())(block)
     _ <- blockchainUpdater.processBlock(block)
-  } yield block.transactionData.foreach(utxStorage.remove)
+  } yield utxStorage.removeAll(block.transactionData)
 
   def processCheckpoint(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater)
                        (newCheckpoint: Checkpoint): Either[ValidationError, BigInt] =

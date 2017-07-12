@@ -48,7 +48,7 @@ class NgHistoryWriterImpl(inner: HistoryWriter) extends NgHistoryWriter {
     if (baseBlock().isEmpty) {
       inner.lastBlock match {
         case Some(lastInner) if lastInner.uniqueId != block.reference =>
-          Left(BlockAppendError(s"References incorrect or non-existing block: -> ${block.reference}. " + logDetails, block))
+          Left(BlockAppendError(s"References incorrect or non-existing block: " + logDetails, block))
         case _ => consensusValidation
       }
     }
@@ -56,7 +56,7 @@ class NgHistoryWriterImpl(inner: HistoryWriter) extends NgHistoryWriter {
       case Some(forgedBlock) =>
         inner.appendBlock(forgedBlock)(consensusValidation)
       case None =>
-        Left(BlockAppendError(s"References incorrect or non-existing block(liquid block exists): -> ${block.reference}. " + logDetails, block))
+        Left(BlockAppendError(s"References incorrect or non-existing block(liquid block exists): " + logDetails, block))
     }
   }.map { bd => // finally place new as liquid
     micros.set(List.empty)
@@ -65,12 +65,14 @@ class NgHistoryWriterImpl(inner: HistoryWriter) extends NgHistoryWriter {
   }
   }
 
-  override def discardBlock(): Unit = write { implicit l =>
-    if (baseBlock().isDefined) {
-      baseBlock.set(None)
-      micros.set(List.empty)
-    } else {
-      inner.discardBlock()
+  override def discardBlock(): Seq[Transaction] = write { implicit l =>
+    baseBlock() match {
+      case Some(block) =>
+        baseBlock.set(None)
+        micros.set(List.empty)
+        block.transactionData
+      case None =>
+        inner.discardBlock()
     }
   }
 
