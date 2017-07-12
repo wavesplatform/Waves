@@ -56,6 +56,11 @@ dependencyOverrides in ThisBuild ++= Set(
   "commons-lang" % "commons-lang" % "2.6",
   "commons-logging" % "commons-logging" % "1.2",
   "commons-net" % "commons-net" % "3.6",
+  "io.monix" % "monix-eval_2.12" % "2.3.0",
+  "io.monix" % "monix-execution_2.12" % "2.3.0",
+  "io.monix" % "monix-reactive_2.12" % "2.3.0",
+  "io.monix" % "monix-types_2.12" % "2.3.0",
+  "io.monix" % "monix_2.12" % "2.3.0",
   "io.netty" % "netty" % "3.10.0.Final",
   "io.netty" % "netty-buffer" % "4.1.10.Final",
   "io.netty" % "netty-codec" % "4.1.10.Final",
@@ -104,6 +109,7 @@ dependencyOverrides in ThisBuild ++= Set(
   "org.iq80.leveldb" % "leveldb" % "0.7",
   "org.iq80.leveldb" % "leveldb-api" % "0.7",
   "org.javassist" % "javassist" % "3.18.2-GA",
+  "org.jctools" % "jctools-core" % "2.0.1",
   "org.mockito" % "mockito-all" % "1.10.19",
   "org.ow2.asm" % "asm" % "5.0.3",
   "org.ow2.asm" % "asm-analysis" % "5.0.3",
@@ -132,4 +138,4 @@ dependencyOverrides in ThisBuild ++= Set(
   "org.whispersystems" % "curve25519-java" % "0.3.0",
   "org.yaml" % "snakeyaml" % "1.17"
 )
-// LIBRARY_DEPENDENCIES_HASH fc4b131eb618d1b44fc94d89cdac0431d6243b0b
+// LIBRARY_DEPENDENCIES_HASH 8d66e0a773d55981918e990f7e00f14dea69fec4

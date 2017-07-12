@@ -32,6 +32,7 @@ class SimpleTransactionsSuite extends FunSuite with BeforeAndAfterAll with Match
       System.currentTimeMillis()).right.get
     val f = for {
       _ <- node.sendByNetwork(RawBytes(25.toByte, tx.bytes))
+      _ <- Future.successful(Thread.sleep(2000))
       tx <- node.waitForTransaction(tx.id.base58)
     } yield {
       tx shouldBe Node.Transaction(tx.`type`, tx.id, tx.fee, tx.timestamp)
