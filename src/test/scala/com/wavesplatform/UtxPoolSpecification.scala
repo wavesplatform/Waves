@@ -1,16 +1,15 @@
 package com.wavesplatform
 
-import com.wavesplatform.history.BlockStorageImpl
+import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.network.RawBytes
 import com.wavesplatform.settings.{BlockchainSettings, FeeSettings, FeesSettings, FunctionalitySettings, UtxSettings}
-import com.wavesplatform.state2.diffs.produce
 import io.netty.channel.group.{ChannelGroup, ChannelMatcher, ChannelMatchers}
 import org.scalacheck.Gen._
 import org.scalacheck.{Gen, Shrink}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import org.scalatest.{FreeSpec, Matchers}
-import scorex.account.{Account, PrivateKeyAccount}
+import scorex.account.{Address, PrivateKeyAccount}
 import scorex.block.Block
 import scorex.transaction.assets.TransferTransaction
 import scorex.transaction.{FeeCalculator, PaymentTransaction, Transaction}
@@ -34,10 +33,10 @@ class UtxPoolSpecification extends FreeSpec
     4 -> List(FeeSettings("", 0))
   )))
 
-  private def mkState(senderAccount: Account, senderBalance: Long) = {
+  private def mkState(senderAccount: Address, senderBalance: Long) = {
     val genesisSettings = TestHelpers.genesisSettings(Map(senderAccount -> senderBalance))
     val (_, _, state, bcu) =
-      BlockStorageImpl(BlockchainSettings(None, None, None, 'T', 5, FunctionalitySettings.TESTNET, genesisSettings)).get
+      StorageFactory(BlockchainSettings(None, None, None, 'T', 5, FunctionalitySettings.TESTNET, genesisSettings)).get
 
     bcu.processBlock(Block.genesis(genesisSettings).right.get)
 
@@ -106,13 +105,13 @@ class UtxPoolSpecification extends FreeSpec
       all(txs.tail.map(t => utx.putIfNew(t))) shouldBe 'left
     }
 
-    "does not add the same transaction twice" in utxTest() { (txs, utx, _) =>
+    "does not broadcast the same transaction twice" in utxTest() { (txs, utx, _) =>
       expectBroadcast(txs.head)
       utx.putIfNew(txs.head) shouldBe 'right
-      utx.putIfNew(txs.head) should produce(s"Transaction ${txs.head.id} already in the pool")
+      utx.putIfNew(txs.head) shouldBe 'right
     }
 
-    "evicts expired transactions when new ones are added" in forAll(dualTxGen) { case (utx, time, txs1, offset, txs2) =>
+    "evicts expired transactions when removeAll is called" in forAll(dualTxGen) { case (utx, time, txs1, offset, txs2) =>
       all(txs1.map { t =>
         expectBroadcast(t)
         utx.putIfNew(t)
@@ -120,6 +119,7 @@ class UtxPoolSpecification extends FreeSpec
       utx.all().size shouldEqual txs1.size
 
       time.advance(offset)
+      utx.removeAll(Seq.empty)
 
       all(txs2.map { t =>
         expectBroadcast(t)

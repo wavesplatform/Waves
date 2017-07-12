@@ -2,9 +2,7 @@ package scorex.transaction.api.http.leasing
 
 import org.scalatest.{FunSuite, Matchers}
 import play.api.libs.json.Json
-import scorex.account.{Account, PublicKeyAccount}
 import scorex.api.http.leasing.{LeaseCancelRequest, LeaseRequest, SignedLeaseCancelRequest, SignedLeaseRequest}
-import scorex.crypto.encode.Base58
 
 class LeaseRequestsTests extends FunSuite with Matchers {
 

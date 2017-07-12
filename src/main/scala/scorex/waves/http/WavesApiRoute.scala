@@ -7,7 +7,7 @@ import com.wavesplatform.UtxPool
 import com.wavesplatform.settings.RestAPISettings
 import io.swagger.annotations._
 import scorex.BroadcastRoute
-import scorex.account.Account
+import scorex.account.Address
 import scorex.api.http._
 import scorex.api.http.assets.PaymentRequest
 import scorex.crypto.encode.Base58
@@ -82,7 +82,7 @@ case class WavesApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPool
     json[PaymentRequest] { payment =>
       (for {
         sender <- wallet.findWallet(payment.sender)
-        recipient <- Account.fromString(payment.recipient)
+        recipient <- Address.fromString(payment.recipient)
         pt <- PaymentTransaction.create(sender, recipient, payment.amount, payment.fee, time.correctedTime())
       } yield pt)
         .left.map(ApiError.fromValidationError)
@@ -117,7 +117,7 @@ case class WavesApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPool
         for {
           _seed <- Base58.decode(payment.senderWalletSeed).toOption.toRight(InvalidSeed)
           senderAccount = Wallet.generateNewAccount(_seed, payment.senderAddressNonce)
-          recipientAccount <- Account.fromString(payment.recipient).left.map(ApiError.fromValidationError)
+          recipientAccount <- Address.fromString(payment.recipient).left.map(ApiError.fromValidationError)
           _tx <- PaymentTransaction.create(senderAccount, recipientAccount, payment.amount, payment.fee, payment.timestamp)
             .left.map(ApiError.fromValidationError)
         } yield SignedPaymentRequest(_tx.timestamp, _tx.amount, _tx.fee, _tx.recipient.address, Base58.encode(_tx.sender.publicKey),

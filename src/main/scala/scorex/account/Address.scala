@@ -11,14 +11,14 @@ import scorex.utils.ScorexLogging
 import scala.util.Success
 
 
-sealed trait Account extends AccountOrAlias {
+sealed trait Address extends AddressOrAlias {
   val bytes: ByteStr
   lazy val address: String = bytes.base58
-  lazy val stringRepr: String = Account.Prefix + address
+  lazy val stringRepr: String = Address.Prefix + address
 
 }
 
-object Account extends ScorexLogging {
+object Address extends ScorexLogging {
 
   val Prefix: String = "address:"
 
@@ -30,31 +30,31 @@ object Account extends ScorexLogging {
 
   private def scheme = AddressScheme.current
 
-  private class AccountImpl(val bytes: ByteStr) extends Account
+  private class AddressImpl(val bytes: ByteStr) extends Address
 
-  def fromPublicKey(publicKey: Array[Byte]): Account = {
+  def fromPublicKey(publicKey: Array[Byte]): Address = {
     val publicKeyHash = hash(publicKey).take(HashLength)
     val withoutChecksum = AddressVersion +: scheme.chainId +: publicKeyHash
     val bytes = withoutChecksum ++ calcCheckSum(withoutChecksum)
-    new AccountImpl(ByteStr(bytes))
+    new AddressImpl(ByteStr(bytes))
   }
 
-  def fromBytes(addressBytes: Array[Byte]): Either[ValidationError, Account] = {
-    if (isByteArrayValid(addressBytes)) Right(new AccountImpl(ByteStr(addressBytes)))
+  def fromBytes(addressBytes: Array[Byte]): Either[ValidationError, Address] = {
+    if (isByteArrayValid(addressBytes)) Right(new AddressImpl(ByteStr(addressBytes)))
     else Left(InvalidAddress)
   }
 
-  private def fromBase58String(address: String): Either[ValidationError, Account] =
+  private def fromBase58String(address: String): Either[ValidationError, Address] =
     if (address.length > AddressStringLength) {
       Left(InvalidAddress)
     } else {
       Base58.decode(address) match {
-        case Success(byteArray) if isByteArrayValid(byteArray) => Right(new AccountImpl(ByteStr(byteArray)))
+        case Success(byteArray) if isByteArrayValid(byteArray) => Right(new AddressImpl(ByteStr(byteArray)))
         case _ => Left(InvalidAddress)
       }
     }
 
-  def fromString(address: String): Either[ValidationError, Account] = {
+  def fromString(address: String): Either[ValidationError, Address] = {
     val base58String = if (address.startsWith(Prefix))
       address.drop(Prefix.length)
     else address
@@ -73,7 +73,7 @@ object Account extends ScorexLogging {
       log.warn(s"~ Actual network: $network(${network.toChar}")
       false
     } else {
-      if (addressBytes.length != Account.AddressLength)
+      if (addressBytes.length != Address.AddressLength)
         false
       else {
         val checkSum = addressBytes.takeRight(ChecksumLength)

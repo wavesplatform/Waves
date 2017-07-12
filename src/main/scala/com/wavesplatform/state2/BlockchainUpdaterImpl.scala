@@ -2,100 +2,123 @@ package com.wavesplatform.state2
 
 import java.util.concurrent.locks.ReentrantReadWriteLock
 
-import cats.kernel.Monoid
+import cats._
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.BlockchainUpdaterImpl._
 import com.wavesplatform.state2.StateWriterImpl._
 import com.wavesplatform.state2.diffs.BlockDiffer
-import com.wavesplatform.state2.reader.{CompositeStateReader, StateReader}
+import com.wavesplatform.state2.reader.CompositeStateReader.proxy
+import com.wavesplatform.state2.reader.StateReader
 import scorex.block.Block
+import scorex.transaction.ValidationError.GenericError
 import scorex.transaction._
 import scorex.utils.ScorexLogging
 
-class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader, settings: FunctionalitySettings,
-                                    minimumInMemoryDiffSize: Int, bc: HistoryWriter with History,
+class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
+                                    settings: FunctionalitySettings,
+                                    minimumInMemoryDiffSize: Int,
+                                    historyWriter: HistoryWriter,
                                     val synchronizationToken: ReentrantReadWriteLock) extends BlockchainUpdater with ScorexLogging {
 
   private val MaxInMemDiffHeight = minimumInMemoryDiffSize * 2
 
-  private val inMemoryDiff = Synchronized(Monoid[BlockDiff].empty)
+  private val topMemoryDiff = Synchronized(Monoid[BlockDiff].empty)
+  private val bottomMemoryDiff = Synchronized(Monoid[BlockDiff].empty)
 
-  private def unsafeDiffAgainstPersistedByRange(from: Int, to: Int): BlockDiff =  {
-      val blocks = measureLog(s"Reading blocks from $from up to $to") {
-        Range(from, to).map(bc.blockBytes).par.map(b => Block.parseBytes(b.get).get).seq
-      }
-      measureLog(s"Building diff from $from up to $to") {
-        BlockDiffer.unsafeDiffMany(settings)(persisted, blocks)
-      }
+  private def unsafeDiffAgainstPersistedByRange(from: Int, to: Int): BlockDiff = {
+    val blocks = measureLog(s"Reading blocks from $from up to $to") {
+      Range(from, to).map(historyWriter.blockBytes).par.map(b => Block.parseBytes(b.get).get).seq
+    }
+    measureLog(s"Building diff from $from up to $to") {
+      BlockDiffer.unsafeDiffMany(settings, persisted)(blocks)
+    }
   }
 
   private def logHeights(prefix: String): Unit = read { implicit l =>
-    log.info(s"$prefix Total blocks: ${bc.height()}, persisted: ${persisted.height}, imMemDiff: ${inMemoryDiff().heightDiff}")
+    log.info(s"$prefix Total blocks: ${historyWriter.height()}, persisted: ${persisted.height}, " +
+      s"topMemDiff: ${topMemoryDiff().heightDiff}, bottomMemDiff: ${bottomMemoryDiff().heightDiff}")
   }
 
-  def currentState: StateReader = read { implicit l => new CompositeStateReader.Proxy(persisted, () => inMemoryDiff()) }
+  def currentPersistedBlocksState: StateReader = read { implicit l =>
+    proxy(proxy(persisted,() =>bottomMemoryDiff()), () => topMemoryDiff())
+  }
 
   private def updatePersistedAndInMemory(): Unit = write { implicit l =>
     logHeights("State rebuild started:")
     val persistFrom = persisted.height + 1
-    val persistUpTo = bc.height - minimumInMemoryDiffSize + 1
+    val persistUpTo = historyWriter.height - minimumInMemoryDiffSize + 1
 
     ranges(persistFrom, persistUpTo, minimumInMemoryDiffSize).foreach { case (head, last) =>
       val diffToBePersisted = unsafeDiffAgainstPersistedByRange(head, last)
       persisted.applyBlockDiff(diffToBePersisted)
     }
 
-    inMemoryDiff.set(unsafeDiffAgainstPersistedByRange(persisted.height + 1, bc.height() + 1))
+    bottomMemoryDiff.set(unsafeDiffAgainstPersistedByRange(persisted.height + 1, historyWriter.height() + 1))
+    topMemoryDiff.set(BlockDiff.empty)
     logHeights("State rebuild finished:")
   }
 
   override def processBlock(block: Block): Either[ValidationError, Unit] = write { implicit l =>
-    if (inMemoryDiff().heightDiff >= MaxInMemDiffHeight) {
-      updatePersistedAndInMemory()
+    if (topMemoryDiff().heightDiff >= minimumInMemoryDiffSize) {
+      persisted.applyBlockDiff(bottomMemoryDiff())
+      bottomMemoryDiff.set(topMemoryDiff())
+      topMemoryDiff.set(BlockDiff.empty)
     }
-    for {
-      blockDiff <- BlockDiffer(settings)(currentState, block)
-      _ <- bc.appendBlock(block)
-    } yield {
-      log.info(s"""Block ${block.encodedId} appended. New height: ${bc.height()}, new score: ${bc.score()})""")
-      inMemoryDiff.set(Monoid[BlockDiff].combine(inMemoryDiff(), blockDiff))
-    }
+    historyWriter.appendBlock(block)(BlockDiffer.fromBlock(settings, currentPersistedBlocksState)(block)).map { newBlockDiff =>
+      topMemoryDiff.set(Monoid[BlockDiff].combine(topMemoryDiff(), newBlockDiff))
+    }.map(_ => log.info( s"""Block ${block.uniqueId} appended. New height: ${historyWriter.height()}, new score: ${historyWriter.score()})"""))
   }
 
-  override def removeAfter(blockId: ByteStr): Boolean = write { implicit l =>
-    bc.heightOf(blockId) match {
+  override def removeAfter(blockId: ByteStr): Either[ValidationError, Seq[Transaction]] = write { implicit l =>
+    historyWriter.heightOf(blockId) match {
       case Some(height) =>
         logHeights(s"Rollback to height $height started:")
-        while (bc.height > height) {
-          bc.discardBlock()
+        val discardedTransactions = Seq.newBuilder[Transaction]
+        while (historyWriter.height > height) {
+          val transactions = historyWriter.discardBlock()
+          log.trace(s"Collecting ${transactions.size} discarded transactions: $transactions")
+          discardedTransactions ++= transactions
         }
         if (height < persisted.height) {
           log.warn(s"Rollback to h=$height requested. Persisted height=${persisted.height}, will drop state and reapply blockchain now")
           persisted.clear()
           updatePersistedAndInMemory()
         } else {
-          if (currentState.height != height) {
-            inMemoryDiff.set(unsafeDiffAgainstPersistedByRange(persisted.height + 1, height + 1))
+          if (currentPersistedBlocksState.height != height) {
+            val persistedPlusBottomHeight = persisted.height + bottomMemoryDiff().heightDiff
+            if (height > persistedPlusBottomHeight) {
+              val from = persistedPlusBottomHeight + 1
+              val to = height + 1
+              val blocks = measureLog(s"Reading blocks from $from up to $to") {
+                Range(from,to)
+                  .map(historyWriter.blockBytes).par.map(b => Block.parseBytes(b.get).get).seq
+              }
+              val newTopDiff = measureLog(s"Building diff from $from up to $to") {
+                BlockDiffer.unsafeDiffMany(settings, proxy(persisted, () => bottomMemoryDiff()))(blocks)
+              }
+              topMemoryDiff.set(newTopDiff)
+            } else {
+              topMemoryDiff.set(BlockDiff.empty)
+              bottomMemoryDiff.set(unsafeDiffAgainstPersistedByRange(persisted.height + 1, height + 1))
+            }
           }
         }
         logHeights(s"Rollback to height $height completed:")
-        true
+        Right(discardedTransactions.result())
       case None =>
         log.warn(s"removeAfter non-existing block $blockId")
-        false
+        Left(GenericError(s"Failed to rollback to non existing block $blockId"))
     }
   }
 }
 
 object BlockchainUpdaterImpl {
-
   def apply(
-    persistedState: StateWriter with StateReader,
-    history: HistoryWriter with History,
-    functionalitySettings: FunctionalitySettings,
-    minimumInMemoryDiffSize: Int,
-    synchronizationToken: ReentrantReadWriteLock): BlockchainUpdaterImpl = {
-
+               persistedState: StateWriter with StateReader,
+               history: HistoryWriter,
+               functionalitySettings: FunctionalitySettings,
+               minimumInMemoryDiffSize: Int,
+               synchronizationToken: ReentrantReadWriteLock): BlockchainUpdaterImpl = {
     val blockchainUpdater =
       new BlockchainUpdaterImpl(persistedState, functionalitySettings, minimumInMemoryDiffSize, history, synchronizationToken)
     blockchainUpdater.logHeights("Constructing BlockchainUpdaterImpl:")

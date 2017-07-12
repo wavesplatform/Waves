@@ -5,7 +5,7 @@ import java.util
 
 import com.google.common.primitives.{Bytes, Ints}
 import com.wavesplatform.state2.ByteStr
-import scorex.block.Block
+import scorex.block.{Block}
 import scorex.crypto.signatures.SigningFunctions
 import scorex.crypto.signatures.SigningFunctions.Signature
 import scorex.network.message.Message._
@@ -185,11 +185,13 @@ object TransactionMessageSpec extends MessageSpec[Transaction] {
 
   override val messageName: String = "Transaction message"
 
-  override def deserializeData(bytes: Array[MessageCode]): Try[Transaction] =
+  override def deserializeData(bytes: Array[Byte]): Try[Transaction] =
     TransactionParser.parseBytes(bytes)
 
-  override def serializeData(tx: Transaction): Array[MessageCode] = tx.bytes
+  override def serializeData(tx: Transaction): Array[Byte] = tx.bytes
 }
+
+
 
 object BasicMessagesRepo {
   val specs: Seq[MessageSpec[_ <: AnyRef]] = Seq(GetPeersSpec, PeersSpec, GetSignaturesSpec, SignaturesSpec,

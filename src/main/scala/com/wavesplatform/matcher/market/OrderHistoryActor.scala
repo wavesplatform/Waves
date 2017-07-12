@@ -14,7 +14,7 @@ import com.wavesplatform.matcher.model._
 import com.wavesplatform.state2.reader.StateReader
 import org.h2.mvstore.MVStore
 import play.api.libs.json._
-import scorex.account.Account
+import scorex.account.Address
 import scorex.transaction.AssetAcc
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction.assets.exchange.{AssetPair, Order}
@@ -77,7 +77,7 @@ class OrderHistoryActor(val settings: MatcherSettings, val storedState: StateRea
 
   def getPairTradableBalance(assetPair: AssetPair, address: String): GetTradableBalanceResponse = {
     val bal = (for {
-      acc <- Account.fromString(address)
+      acc <- Address.fromString(address)
       amountAcc <- Right(AssetAcc(acc, assetPair.amountAsset))
       priceAcc <- Right(AssetAcc(acc, assetPair.priceAsset))
       amountBal <- Right(getTradableBalance(amountAcc))

@@ -7,7 +7,7 @@ import com.wavesplatform.settings.WalletSettings
 import com.wavesplatform.state2.ByteStr
 import com.wavesplatform.utils.createMVStore
 import org.h2.mvstore.MVMap
-import scorex.account.{Account, PrivateKeyAccount}
+import scorex.account.{Address, PrivateKeyAccount}
 import scorex.crypto.hash.SecureCryptographicHash
 import scorex.transaction.ValidationError
 import scorex.transaction.ValidationError.MissingSenderPrivateKey
@@ -68,7 +68,7 @@ class Wallet private(file: Option[File], password: Array[Char]) extends AutoClos
     res.isDefined
   }
 
-  def privateKeyAccount(account: Account): Either[ValidationError, PrivateKeyAccount] =
+  def privateKeyAccount(account: Address): Either[ValidationError, PrivateKeyAccount] =
     accountsCache.get(account.address).toRight[ValidationError](MissingSenderPrivateKey)
 
 
@@ -91,11 +91,11 @@ object Wallet extends ScorexLogging {
 
   implicit class WalletExtension(w: Wallet) {
     def findWallet(addressString: String): Either[ValidationError, PrivateKeyAccount] = for {
-      acc <- Account.fromString(addressString)
+      acc <- Address.fromString(addressString)
       privKeyAcc <- w.privateKeyAccount(acc)
     } yield privKeyAcc
 
-    def exportAccountSeed(account: Account): Either[ValidationError, Array[Byte]] = w.privateKeyAccount(account).map(_.seed)
+    def exportAccountSeed(account: Address): Either[ValidationError, Array[Byte]] = w.privateKeyAccount(account).map(_.seed)
   }
 
 

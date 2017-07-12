@@ -5,7 +5,7 @@ import scorex.serialization.Deser
 import scorex.transaction.ValidationError
 
 
-trait AccountOrAlias {
+trait AddressOrAlias {
   def stringRepr: String
 
   def bytes: ByteStr
@@ -13,21 +13,21 @@ trait AccountOrAlias {
   override def toString: String = stringRepr
 
   override def equals(obj: scala.Any): Boolean = obj match {
-    case a: AccountOrAlias => bytes == a.bytes
+    case a: AddressOrAlias => bytes == a.bytes
     case _ => false
   }
 
   override def hashCode(): Int = java.util.Arrays.hashCode(bytes.arr)
 }
 
-object AccountOrAlias {
+object AddressOrAlias {
 
-  def fromBytes(bytes: Array[Byte], position: Int): Either[ValidationError, (AccountOrAlias, Int)] = {
+  def fromBytes(bytes: Array[Byte], position: Int): Either[ValidationError, (AddressOrAlias, Int)] = {
     bytes(position) match {
-      case Account.AddressVersion =>
-        val addressEnd = position + Account.AddressLength
+      case Address.AddressVersion =>
+        val addressEnd = position + Address.AddressLength
         val addressBytes = bytes.slice(position, addressEnd)
-        Account.fromBytes(addressBytes).map((_, addressEnd))
+        Address.fromBytes(addressBytes).map((_, addressEnd))
       case Alias.AddressVersion =>
         val (arr, aliasEnd) = Deser.parseArraySize(bytes, position + 2)
         Alias.fromBytes(bytes.slice(position, aliasEnd)).map((_, aliasEnd))
@@ -35,9 +35,9 @@ object AccountOrAlias {
     }
   }
 
-  def fromString(s: String): Either[ValidationError, AccountOrAlias] = {
+  def fromString(s: String): Either[ValidationError, AddressOrAlias] = {
     if (s.startsWith(Alias.Prefix))
       Alias.fromString(s)
-    else Account.fromString(s)
+    else Address.fromString(s)
   }
 }

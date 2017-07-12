@@ -6,8 +6,7 @@ import com.wavesplatform.settings.FeesSettings
 import com.wavesplatform.state2.ByteStr
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import org.scalatest.{Assertion, Matchers, PropSpec}
-import scorex.account.{Account, PrivateKeyAccount}
-import scorex.crypto.encode.Base58
+import scorex.account.{Address, PrivateKeyAccount}
 import scorex.transaction.assets._
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 
@@ -81,7 +80,7 @@ class FeeCalculatorSpecification extends PropSpec with PropertyChecks with Gener
   property("Transfer transaction with fee in asset") {
     val feeCalculator = new FeeCalculator(mySettings)
     val sender = PrivateKeyAccount(Array.emptyByteArray)
-    val recipient = Account.fromString("3NBVqYXrapgJP9atQccdBPAgJPwHDKkh6A8").right.get
+    val recipient = Address.fromString("3NBVqYXrapgJP9atQccdBPAgJPwHDKkh6A8").right.get
     val tx1: TransferTransaction = TransferTransaction.create(Some(WhitelistedAsset), sender, recipient, 1000000, 100000000,
       Some(WhitelistedAsset), 2, Array.emptyByteArray).right.get
     val tx2: TransferTransaction = TransferTransaction.create(Some(WhitelistedAsset), sender, recipient, 1000000, 100000000,

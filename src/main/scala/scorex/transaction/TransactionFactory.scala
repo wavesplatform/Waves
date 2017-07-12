@@ -17,7 +17,7 @@ object TransactionFactory {
 
   def createPayment(request: PaymentRequest, wallet: Wallet, time: Time): Either[ValidationError, PaymentTransaction] = for {
     pk <- wallet.findWallet(request.sender)
-    rec <- Account.fromString(request.recipient)
+    rec <- Address.fromString(request.recipient)
     tx <- PaymentTransaction.create(pk, rec, request.amount, request.fee, time.getTimestamp())
   } yield tx
 
@@ -25,7 +25,7 @@ object TransactionFactory {
   def transferAsset(request: TransferRequest, wallet: Wallet, time: Time): Either[ValidationError, TransferTransaction] =
     for {
       senderPrivateKey <- wallet.findWallet(request.sender)
-      recipientAcc <- AccountOrAlias.fromString(request.recipient)
+      recipientAcc <- AddressOrAlias.fromString(request.recipient)
       tx <- TransferTransaction
         .create(request.assetId.map(s => ByteStr.decodeBase58(s).get),
           senderPrivateKey,
@@ -48,7 +48,7 @@ object TransactionFactory {
 
   def lease(request: LeaseRequest, wallet: Wallet, time: Time): Either[ValidationError, LeaseTransaction] = for {
     senderPrivateKey <- wallet.findWallet(request.sender)
-    recipientAcc <- AccountOrAlias.fromString(request.recipient)
+    recipientAcc <- AddressOrAlias.fromString(request.recipient)
     tx <- LeaseTransaction.create(senderPrivateKey, request.amount, request.fee, time.getTimestamp(), recipientAcc)
   } yield tx
 
@@ -85,7 +85,7 @@ object TransactionFactory {
     for {
       _signature <- ByteStr.decodeBase58(payment.signature).toOption.toRight(ValidationError.InvalidRequestSignature)
       _sender <- PublicKeyAccount.fromBase58String(payment.senderPublicKey)
-      _recipient <- Account.fromString(payment.recipient)
+      _recipient <- Address.fromString(payment.recipient)
       tx <- PaymentTransaction.create(_sender, _recipient, payment.amount, payment.fee, payment.timestamp, _signature)
     } yield tx
 }

@@ -4,7 +4,7 @@ import cats._
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.reader.StateReader
 import com.wavesplatform.state2.{Portfolio, _}
-import scorex.account.Account
+import scorex.account.Address
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction._
 import scorex.transaction.assets._
@@ -25,7 +25,7 @@ object CommonValidation {
           Left(GenericError(s"Attempt to pay unavailable funds: balance " +
             s"${s.accountPortfolio(ptx.sender).balance} is less than ${ptx.amount + ptx.fee}"))
         case ttx: TransferTransaction =>
-          val sender: Account = ttx.sender
+          val sender: Address = ttx.sender
 
           val amountDiff = ttx.assetId match {
             case Some(aid) => Portfolio(0, LeaseInfo.empty, Map(aid -> -ttx.amount))

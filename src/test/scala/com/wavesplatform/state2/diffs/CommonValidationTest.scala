@@ -2,8 +2,8 @@ package com.wavesplatform.state2.diffs
 
 import com.wavesplatform.TransactionGen
 import org.scalacheck.Gen
-import org.scalatest.{Matchers, PropSpec}
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
+import org.scalatest.{Matchers, PropSpec}
 import scorex.lagonaki.mocks.TestBlock
 import scorex.transaction.{GenesisTransaction, PaymentTransaction}
 
@@ -19,11 +19,11 @@ class CommonValidationTest extends PropSpec with PropertyChecks with GeneratorDr
     } yield (genesis, transfer)
 
     forAll(preconditionsAndPayment) { case ((genesis, transfer)) =>
-      assertDiffEi(Seq(TestBlock(Seq(genesis, transfer))), TestBlock(Seq(transfer))) { blockDiffEi =>
+      assertDiffEi(Seq(TestBlock.create(Seq(genesis, transfer))), TestBlock.create(Seq(transfer))) { blockDiffEi =>
         blockDiffEi should produce("Tx with such id aready present")
       }
 
-      assertDiffEi(Seq(TestBlock(Seq(genesis))), TestBlock(Seq(transfer, transfer))) { blockDiffEi =>
+      assertDiffEi(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(transfer, transfer))) { blockDiffEi =>
         blockDiffEi should produce("Tx with such id aready present")
       }
     }
