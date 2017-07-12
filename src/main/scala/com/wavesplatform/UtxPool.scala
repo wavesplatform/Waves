@@ -61,6 +61,10 @@ class UtxPool(
 
   def all(): Seq[Transaction] = transactions.values.asScala.toSeq.sorted(TransactionsOrdering.InUTXPool)
 
+  def size: Int = transactions.size()
+
+  def transactionById(transactionId: ByteStr): Option[Transaction] = Option(transactions.get(transactionId))
+
   def packUnconfirmed(): Seq[Transaction] = {
     val currentTs = time.correctedTime()
     removeExpired(currentTs)
