@@ -3,6 +3,7 @@ package com.wavesplatform.state2
 import java.util.concurrent.locks.ReentrantReadWriteLock
 
 import cats._
+import cats.data._
 import cats.implicits._
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.BlockchainUpdaterImpl._
@@ -91,12 +92,15 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
 
   }
 
-  override def removeAfter(blockId: ByteStr): Either[ValidationError, BigInt] = write { implicit l =>
+  override def removeAfter(blockId: ByteStr): Either[ValidationError, Seq[Transaction]] = write { implicit l =>
     ngHistoryWriter.heightOf(blockId) match {
       case Some(height) =>
         logHeights(s"Rollback to height $height started:")
+        val discardedTransactions = Seq.newBuilder[Transaction]
         while (ngHistoryWriter.height > height) {
-          ngHistoryWriter.discardBlock()
+          val transactions = ngHistoryWriter.discardBlock()
+          log.trace(s"Collecting ${transactions.size} discarded transactions: $transactions")
+          discardedTransactions ++= transactions
         }
         if (height < persisted.height) {
           log.warn(s"Rollback to h=$height requested. Persisted height=${persisted.height}, will drop state and reapply blockchain now")
@@ -108,7 +112,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
           }
         }
         logHeights(s"Rollback to height $height completed:")
-        Right(ngHistoryWriter.score())
+        Right(discardedTransactions.result())
       case None =>
         log.warn(s"removeAfter non-existing block $blockId")
         Left(GenericError(s"Failed to rollback to non existing block $blockId"))

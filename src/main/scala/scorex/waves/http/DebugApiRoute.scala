@@ -87,10 +87,11 @@ case class DebugApiRoute(settings: RestAPISettings,
   }
 
   private def rollbackToBlock(blockId: ByteStr): Future[ToResponseMarshallable] = Future {
-    blockchainUpdater.removeAfter(blockId)
-      .map(score => allChannels.broadcast(LocalScoreChanged(score)))
+    val txs = blockchainUpdater.removeAfter(blockId)
+      txs.foreach(_ => allChannels.broadcast(LocalScoreChanged(history.score())))
+    txs
   }.map(_.fold(ApiError.fromValidationError,
-    blockId => Json.obj("BlockId" -> blockId.toString)): ToResponseMarshallable)
+    _ => Json.obj("BlockId" -> blockId.toString)): ToResponseMarshallable)
 
 
   @Path("/rollback")

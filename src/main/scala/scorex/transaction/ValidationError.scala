@@ -27,7 +27,9 @@ object ValidationError {
   case class AccountBalanceError(errs: Map[Address, String]) extends ValidationError
   case class AliasNotExists(a: Alias) extends ValidationError
   case class OrderValidationError(order: Order, err: String) extends ValidationError
-  case class BlockAppendError(err: String,b: Block) extends ValidationError
+  case class BlockAppendError(err: String,b: Block)  extends ValidationError {
+    override def toString: String = s"BlockAppendError($err, BlockId=${b.uniqueId}])"
+  }
   case class MicroBlockAppendError(err: String, microBlock: MicroBlock) extends ValidationError {
     override def toString: String = s"MicroBlockAppendError($err, MicroBlockId=${microBlock.totalResBlockSig}[-->${microBlock.prevResBlockSig}])"
   }
