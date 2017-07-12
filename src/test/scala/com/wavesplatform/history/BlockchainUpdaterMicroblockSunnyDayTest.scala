@@ -40,6 +40,7 @@ class BlockchainUpdaterMicroblockSunnyDayTest extends PropSpec with PropertyChec
       domain.blockchainUpdater.processMicroBlock(microBlocks(0)).explicitGet()
       domain.blockchainUpdater.processMicroBlock(microBlocks(1)).explicitGet()
       domain.blockchainUpdater.processMicroBlock(microBlocks(2)) should produce("unavailable funds")
+      domain.history.lastBlock.get.transactionData shouldBe Seq(genesis, payment, finalPayment)
     }
   }
 

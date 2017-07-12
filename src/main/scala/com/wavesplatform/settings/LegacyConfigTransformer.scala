@@ -1,13 +1,13 @@
 package com.wavesplatform.settings
 
 import java.io.File
-import java.time.Duration
 import scala.collection.convert.ImplicitConversionsToJava._
 import scala.collection.convert.ImplicitConversionsToScala._
 import com.google.common.base.CaseFormat
 import com.typesafe.config.ConfigValueFactory.{fromAnyRef => cv}
 import com.typesafe.config.{Config, ConfigFactory, ConfigRenderOptions, ConfigValue, ConfigValueFactory}
 import scorex.transaction.TransactionParser.TransactionType
+import scala.concurrent.duration._
 
 object LegacyConfigTransformer {
   private val converter = CaseFormat.UPPER_CAMEL.converterTo(CaseFormat.LOWER_HYPHEN)
@@ -21,16 +21,16 @@ object LegacyConfigTransformer {
     ConfigValueFactory.fromMap(m)
   }
 
-  private def millis(cfg: Config, path: String) = cv(Duration.ofMillis(cfg.getLong(path)))
+  private def millis(cfg: Config, path: String) = cv(cfg.getLong(path).millis)
 
-  private def seconds(cfg: Config, path: String) = cv(Duration.ofSeconds(cfg.getLong(path)))
+  private def seconds(cfg: Config, path: String) = cv(cfg.getLong(path).seconds)
 
-  private def days(cfg: Config, path: String) = cv(Duration.ofDays(cfg.getLong(path)))
+  private def days(cfg: Config, path: String) = cv(cfg.getLong(path).days)
 
   private def defaultDir = s"${System.getProperty("user.home")}"
 
   private val transformers: Seq[(String, (Config, String) => ConfigValue)] = Seq(
-    "p2p.peersDataResidenceTimeDays" -> { (cfg, p) => cv(Duration.ofDays(cfg.getInt(p))) },
+    "p2p.peersDataResidenceTimeDays" -> days,
     "p2p.blacklistResidenceTimeMilliseconds" -> millis,
     "p2p.peersDataBroadcastDelay" -> millis,
     "p2p.upnpGatewayTimeout" -> seconds,
@@ -112,39 +112,6 @@ object LegacyConfigTransformer {
     "utxRebroadcastInterval" -> Seq("utx.broadcast-interval"),
 
     "checkpoints.publicKey" -> Seq("checkpoints.public-key"))
-
-  val legacyDefaults = ConfigFactory.parseString(
-    """feeMap = {}
-      |testnet = false
-      |logLevel = info
-      |blacklistThreshold = 50
-      |minerEnabled = true
-      |quorum = 1
-      |allowedGenerationTimeFromLastBlockInterval = 1
-      |tflikeScheduling = true
-      |maxChain = 11
-      |loadEntireChain = true
-      |pinToInitialPeer = false
-      |retriesBeforeBlacklisted = 2
-      |operationRetries = 50
-      |scoreBroadcastDelay = 30000
-      |utxSize = 10000
-      |utxRebroadcastInterval = 30
-      |historySynchronizerTimeout = 30
-      |blockGenerationDelay = 1000
-      |p2p {
-      |  localOnly = false
-      |  peersDataResidenceTimeDays = 1
-      |  blacklistResidenceTimeMilliseconds = 600000
-      |  connectionTimeout = 60
-      |  outboundBufferSizeMb = 15
-      |  minEphemeralPortNumber = 32768
-      |  maxUnverifiedPeers = 1000
-      |  peersDataBroadcastDelay = 30000
-      |  upnpGatewayTimeout = 100
-      |  upnpDiscoverTimeout = 100
-      |}
-      |""".stripMargin)
 
   def transform(legacyConfig: Config): Config = {
     val transformedLegacyConfig = transformers.filter {

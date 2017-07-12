@@ -86,7 +86,9 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
         ngHistoryWriter.appendBlock(block)(BlockDiffer.fromBlock(settings, currentPersistedBlocksState)(block)).map { newBlockDiff =>
           liquidBlockCandidatesDiff.set(Map(block.uniqueId -> newBlockDiff))
         }
-    }).map(_ => log.info( s"""Block ${block.uniqueId} appended. New height: ${ngHistoryWriter.height()}, new score: ${ngHistoryWriter.score()})"""))
+    }).map(_ => log.info(s"Block ${block.uniqueId}->${trim(block.reference)} " +
+      s"[generator=${block.signerData.generator} | txs=${block.transactionData.size} | h=${ngHistoryWriter.height()} | score=${ngHistoryWriter.score()}] appended"))
+
   }
 
   override def removeAfter(blockId: ByteStr): Either[ValidationError, BigInt] = write { implicit l =>
@@ -121,7 +123,8 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
         transactionData = prevTotal.transactionData ++ microBlock.transactionData)
       BlockDiffer.fromLiquidBlock(settings, currentPersistedBlocksState)(newTotal)
         .map(newTotalDiff => liquidBlockCandidatesDiff.set(liquidBlockCandidatesDiff() + (microBlock.totalResBlockSig -> newTotalDiff)))
-    }.map(_ => log.info( s"MicroBlock ${microBlock.totalResBlockSig} with ${microBlock.transactionData.size} transactions appended"))
+    }.map(_ => log.info(s"MicroBlock ${trim(microBlock.totalResBlockSig)}~>${trim(microBlock.prevResBlockSig)} " +
+      s"with ${microBlock.transactionData.size} transactions appended"))
   }
 }
 

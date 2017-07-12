@@ -1,6 +1,5 @@
 package com.wavesplatform
 
-import java.time.Duration
 import java.util.concurrent.atomic.AtomicBoolean
 
 import com.wavesplatform.mining.Miner
@@ -13,6 +12,8 @@ import scorex.consensus.TransactionsOrdering
 import scorex.transaction.ValidationError.{BlockAppendError, GenericError, MicroBlockAppendError}
 import scorex.transaction._
 import scorex.utils.{ScorexLogging, Time}
+
+import scala.concurrent.duration._
 
 object Coordinator extends ScorexLogging {
   def processFork(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater, stateReader: StateReader,
@@ -51,7 +52,7 @@ object Coordinator extends ScorexLogging {
   }
 
 
-  private def updateBlockchainReadinessFlag(history: History, time: Time, blockchainReadiness: AtomicBoolean, maxBlockchainAge: Duration): Boolean = {
+  private def updateBlockchainReadinessFlag(history: History, time: Time, blockchainReadiness: AtomicBoolean, maxBlockchainAge: FiniteDuration): Boolean = {
     val expired = time.correctedTime() - history.lastBlock.get.timestamp < maxBlockchainAge.toMillis
     blockchainReadiness.compareAndSet(expired, !expired)
   }
@@ -116,7 +117,7 @@ object Coordinator extends ScorexLogging {
     }
   }
 
-  val MaxTimeDrift: Long = Duration.ofSeconds(15).toMillis
+  val MaxTimeDrift: Long = 15.seconds.toMillis
 
   private def blockConsensusValidation(history: History, state: StateReader, bcs: BlockchainSettings, currentTs: Long)
                                       (block: Block): Either[ValidationError, Unit] = {

@@ -2,7 +2,6 @@ package com.wavesplatform.settings
 
 import java.io.File
 import java.net.InetSocketAddress
-import java.time.Duration
 
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.state2.ByteStr
@@ -293,7 +292,7 @@ class LegacyConfigTransformerSpec extends FreeSpec with Matchers {
     ws.minerSettings should have (
       'enable (false),
       'quorum (10),
-      'intervalAfterLastBlockThenGenerationIsAllowed (Duration.ofDays(2))
+      'intervalAfterLastBlockThenGenerationIsAllowed (2.days)
     )
 
     ws.synchronizationSettings should have (

@@ -56,7 +56,6 @@ class CoordinatorHandler(checkpointService: CheckpointService, history: History,
           loggingResult(id(ctx), "MicroBlockResponse", Coordinator.processMicroBlock(checkpointService, history, blockchainUpdater, utxStorage)(m))
             .foreach(score => {
               allChannels.broadcast(MicroBlockInv(m.totalResBlockSig), Some(ctx.channel()))
-              miner.scheduleMining()
             })
         case Left(err) =>
           peerDatabase.blacklistAndClose(ctx.channel(), err.toString)

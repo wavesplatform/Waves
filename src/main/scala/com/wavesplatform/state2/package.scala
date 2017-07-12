@@ -27,4 +27,5 @@ package object state2 {
     }
   }
 
+  def trim(s: ByteStr): String = s.toString.take(7) + "..."
 }

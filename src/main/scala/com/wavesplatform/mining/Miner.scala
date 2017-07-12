@@ -1,11 +1,10 @@
 package com.wavesplatform.mining
 
-import java.time.{Duration, Instant}
-import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
+import java.util.concurrent.atomic.AtomicBoolean
 
 import com.wavesplatform.network._
 import com.wavesplatform.settings.WavesSettings
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state2._
 import com.wavesplatform.state2.reader.StateReader
 import com.wavesplatform.{Coordinator, UtxPool}
 import io.netty.channel.group.ChannelGroup
@@ -14,7 +13,6 @@ import monix.execution._
 import scorex.account.PrivateKeyAccount
 import scorex.block.{Block, MicroBlock}
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
-import scorex.crypto.EllipticCurveImpl
 import scorex.transaction.PoSCalc._
 import scorex.transaction.{BlockchainUpdater, CheckpointService, History, ValidationError}
 import scorex.utils.{ScorexLogging, Time}
@@ -22,7 +20,6 @@ import scorex.wallet.Wallet
 
 import scala.collection.concurrent.TrieMap
 import scala.concurrent.duration._
-import scala.math.Ordering.Implicits._
 
 class Miner(
                allChannels: ChannelGroup,
@@ -49,8 +46,7 @@ class Miner(
   @volatile private var microBlockMiner: Option[Cancelable] = None
 
   private def checkAge(parentHeight: Int, parent: Block): Either[String, Unit] =
-    Either
-      .cond(parentHeight == 1, (), Duration.between(Instant.ofEpochMilli(parent.timestamp), Instant.ofEpochMilli(timeService.correctedTime())))
+    Either.cond(parentHeight == 1, (), (timeService.correctedTime() - parent.timestamp).millis)
       .left.flatMap(blockAge => Either.cond(blockAge <= minerSettings.intervalAfterLastBlockThenGenerationIsAllowed, (),
       s"BlockChain is too old (last block ${parent.uniqueId} generated $blockAge ago)"
     ))
@@ -100,8 +96,8 @@ class Miner(
         micro <- MicroBlock.buildAndSign(account, unconfirmed, accumulatedBlock.signerData.signature, signed.signerData.signature)
         _ <- Coordinator.processMicroBlock(checkpoint, history, blockchainUpdater, utx)(micro)
       } yield {
+        log.trace(s"Locally mined MicroBlock(id=${trim(micro.uniqueId)}")
         allChannels.broadcast(MicroBlockInv(micro.totalResBlockSig))
-        log.trace("locally mined microblock appended")
         Some(signed)
       }
     }
@@ -115,63 +111,66 @@ class Miner(
 
   private def generateBlockTask(account: PrivateKeyAccount): Task[Unit] = Task {
     val height = history.height()
-    val lastBlock = history.lastBlock.get
-    val grandParent = history.parent(lastBlock, 2)
+    val lastBlock0 = history.lastBlock.get
     (for {
-      _ <- checkAge(height, lastBlock)
-      ts <- nextBlockGenerationTime(height, stateReader, blockchainSettings.functionalitySettings, lastBlock, account)
-      offset = calcOffset(timeService, ts)
-      key = ByteStr(account.publicKey)
-      _ = scheduledAttempts.get(key) match {
-        case Some(_) => log.debug(s"Block generation already scheduled for $key")
-        case None =>
-          log.debug(s"Next attempt for acc=$account in $offset")
-          val balance = generatingBalance(stateReader, blockchainSettings.functionalitySettings, account, height)
-          val blockGenTask = generateOneBlockTask(account, height, lastBlock, grandParent, balance)(offset).flatMap {
-            case Right(block) =>
-              Coordinator.processBlock(checkpoint, history, blockchainUpdater, timeService, stateReader,
-                utx, blockchainReadiness, settings)(block, local = true) match {
-                case Left(err) => Task(log.warn(err.toString))
-                case Right(score) => Task {
-                  allChannels.broadcast(LocalScoreChanged(score))
-                  allChannels.broadcast(BlockForged(block))
-                  scheduleMining()
-                  startMicroblockMining(account, block)
-                }
+      _ <- checkAge(height, history.lastBlock.get)
+      ts <- nextBlockGenerationTime(height, stateReader, blockchainSettings.functionalitySettings, lastBlock0, account)
+    } yield ts) match {
+      case Left(err) => log.debug(s"NOT scheduling block generation: $err")
+      case Right(ts) =>
+        val offset = calcOffset(timeService, ts)
+        val key = ByteStr(account.publicKey)
+        scheduledAttempts.remove(key).foreach(_.cancel())
+        val lastBlock = history.lastBlock.get
+        log.trace(s"Scheduling mining task for account=$account in $offset, referencing ${trim(lastBlock.uniqueId)})")
+        val balance = generatingBalance(stateReader, blockchainSettings.functionalitySettings, account, height)
+        val grandParent = history.parent(lastBlock, 2)
+
+        val blockGenTask = generateOneBlockTask(account, height, lastBlock, grandParent, balance)(offset).flatMap {
+          case Right(block) =>
+            Coordinator.processBlock(checkpoint, history, blockchainUpdater, timeService, stateReader,
+              utx, blockchainReadiness, settings)(block, local = true) match {
+              case Left(err) => Task(log.warn(err.toString))
+              case Right(score) => Task {
+                allChannels.broadcast(LocalScoreChanged(score))
+                allChannels.broadcast(BlockForged(block))
+                scheduleMining()
+//                startMicroBlockMining(account, block)
               }
-            case Left(err) =>
-              scheduledAttempts.remove(key)
-              log.debug(s"No block generated because $err, retrying")
-              generateBlockTask(account)
-          }
-          scheduledAttempts.put(key, blockGenTask.runAsync)
-      }
-    } yield ()).left.map(err => log.debug(s"NOT scheduling block generation: $err"))
+            }
+          case Left(err) =>
+            scheduledAttempts.remove(key)
+            log.debug(s"No block generated because $err, retrying")
+            generateBlockTask(account)
+        }
+        scheduledAttempts.put(key, blockGenTask.runAsync)
+    }
   }
 
   def scheduleMining(): Unit = {
     log.debug(s"Miner notified of new block")
     scheduledAttempts.values.foreach(_.cancel)
     scheduledAttempts.clear()
-    microBlockMiner.foreach(_.cancel())
-    microBlockMiner = None
+    if (wallet.privateKeyAccount(history.lastBlock.get.signerData.generator).isLeft) {
+      microBlockMiner.foreach(_.cancel())
+      microBlockMiner = None
+    }
     wallet.privateKeyAccounts().foreach(generateBlockTask(_).runAsync)
   }
 
-  private def startMicroblockMining(account: PrivateKeyAccount, lastBlock: Block): Unit = {
+  private def startMicroBlockMining(account: PrivateKeyAccount, lastBlock: Block): Unit = {
     microBlockMiner = Some(generateMicroBlockSequence(account, lastBlock).runAsync)
     log.trace("requested to generate microblock")
-
   }
 
   def shutdown(): Unit = ()
 }
 
 object Miner extends ScorexLogging {
-  val MicroBlockPeriod: FiniteDuration = 500.millis
+  val MicroBlockPeriod: FiniteDuration = 1000.millis
 
   val Version: Byte = 3
-  val MinimalGenerationOffsetMillis: Long = 5001
+  val MinimalGenerationOffsetMillis: Long = 1001
 
   def calcOffset(timeService: Time, ts: Long): FiniteDuration = {
     val generationInstant = ts + 10
