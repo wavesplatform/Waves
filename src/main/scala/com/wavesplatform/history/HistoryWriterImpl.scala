@@ -8,7 +8,7 @@ import com.wavesplatform.utils._
 import scorex.block.Block
 import scorex.transaction.History.BlockchainScore
 import scorex.transaction.ValidationError.BlockAppendError
-import scorex.transaction.{HistoryWriter, ValidationError}
+import scorex.transaction.{HistoryWriter, Transaction, ValidationError}
 import scorex.utils.{LogMVMapBuilder, ScorexLogging}
 
 import scala.util.Try
@@ -47,13 +47,16 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
     }
   }
 
-  override def discardBlock(): Unit = write { implicit lock =>
+  override def discardBlock(): Seq[Transaction] = write { implicit lock =>
     val h = height()
-    blockBodyByHeight.mutate(_.remove(h))
+    val transactions =
+      Block.parseBytes(blockBodyByHeight.mutate(_.remove(h))).fold(_ => Seq.empty[Transaction], _.transactionData)
     scoreByHeight.mutate(_.remove(h))
     val vOpt = Option(blockIdByHeight.mutate(_.remove(h)))
     vOpt.map(v => heightByBlockId.mutate(_.remove(v)))
     db.commit()
+
+    transactions
   }
 
 

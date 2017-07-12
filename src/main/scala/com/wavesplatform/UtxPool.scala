@@ -3,6 +3,7 @@ package com.wavesplatform
 import java.util.concurrent.ConcurrentHashMap
 
 import cats.Monoid
+import com.google.common.cache.CacheBuilder
 import com.wavesplatform.network._
 import com.wavesplatform.settings.{FunctionalitySettings, UtxSettings}
 import com.wavesplatform.state2.diffs.TransactionDiffer
@@ -21,16 +22,48 @@ import scala.util.{Left, Right}
 
 
 class UtxPool(
-                 allChannels: ChannelGroup,
-                 time: Time,
-                 stateReader: StateReader,
-                 feeCalculator: FeeCalculator,
-                 fs: FunctionalitySettings,
-                 utxSettings: UtxSettings) extends ScorexLogging {
+    allChannels: ChannelGroup,
+    time: Time,
+    stateReader: StateReader,
+    feeCalculator: FeeCalculator,
+    fs: FunctionalitySettings,
+    utxSettings: UtxSettings) extends ScorexLogging {
 
   private val transactions = new ConcurrentHashMap[ByteStr, Transaction]
+  private lazy val knownTransactions = CacheBuilder.newBuilder()
+    .maximumSize(utxSettings.maxSize * 2)
+    .build[ByteStr, Either[ValidationError, Transaction]]()
 
-  private def collectValidTransactions(currentTs: Long): Seq[Transaction] = {
+  private def removeExpired(currentTs: Long): Unit =
+    transactions.entrySet().removeIf(tx => (currentTs - tx.getValue.timestamp).millis > utxSettings.maxTransactionAge)
+
+  def putIfNew(tx: Transaction, source: Option[Channel] = None): Either[ValidationError, Transaction] =
+    if (transactions.size >= utxSettings.maxSize) {
+      Left(GenericError("Transaction pool size limit is reached"))
+    } else knownTransactions.get(tx.id, () => {
+      val validationResult = for {
+        _ <- feeCalculator.enoughFee(tx)
+        _ <- TransactionDiffer.apply(fs, time.correctedTime(), stateReader.height)(stateReader, tx)
+        _ = transactions.putIfAbsent(tx.id, tx)
+        _ = allChannels.broadcast(RawBytes(TransactionMessageSpec.messageCode, tx.bytes), source)
+      } yield tx
+
+      validationResult
+  })
+
+  def removeAll(tx: Traversable[Transaction]): Unit = {
+    removeExpired(time.correctedTime())
+    tx.view.map(_.id).foreach { id =>
+      knownTransactions.invalidate(id)
+      transactions.remove(id)
+    }
+  }
+
+  def all(): Seq[Transaction] = transactions.values.asScala.toSeq.sorted(TransactionsOrdering.InUTXPool)
+
+  def packUnconfirmed(): Seq[Transaction] = {
+    val currentTs = time.correctedTime()
+    removeExpired(currentTs)
     val differ = TransactionDiffer.apply(fs, currentTs, stateReader.height) _
     val (invalidTxs, validTxs, _) = transactions.asScala
       .values.toSeq
@@ -49,35 +82,5 @@ class UtxPool(
 
     invalidTxs.foreach(transactions.remove)
     validTxs.sorted(TransactionsOrdering.InBlock)
-  }
-
-  def putIfNew(tx: Transaction, source: Option[Channel] = None): Either[ValidationError, Transaction] = {
-    removeExpired(time.correctedTime())
-
-    val transactionInPool = Left(GenericError(s"Transaction ${tx.id} already in the pool"))
-    if (transactions.size >= utxSettings.maxSize) {
-      Left(GenericError("Transaction pool size limit is reached"))
-    } else if (transactions.contains(tx.id)) {
-      transactionInPool
-    } else for {
-      _ <- feeCalculator.enoughFee(tx)
-      _ <- TransactionDiffer.apply(fs, time.correctedTime(), stateReader.height)(stateReader, tx)
-      _ <- Option(transactions.putIfAbsent(tx.id, tx))
-        .fold[Either[ValidationError, Transaction]](Right(tx))(_ => transactionInPool)
-      _ = allChannels.broadcast(RawBytes(TransactionMessageSpec.messageCode, tx.bytes), source)
-    } yield tx
-  }
-
-  def remove(tx: Transaction): Unit = transactions.remove(tx.id)
-
-  def all(): Seq[Transaction] = transactions.values.asScala.toSeq.sorted(TransactionsOrdering.InUTXPool)
-
-  private def removeExpired(currentTs: Long): Unit =
-    transactions.entrySet().removeIf(tx => (currentTs - tx.getValue.timestamp).millis > utxSettings.maxTransactionAge)
-
-  def packUnconfirmed(): Seq[Transaction] = {
-    val currentTs = time.correctedTime()
-    removeExpired(currentTs)
-    collectValidTransactions(currentTs)
   }
 }

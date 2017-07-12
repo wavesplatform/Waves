@@ -8,7 +8,7 @@ import com.wavesplatform.network.{BlockCheckpoint, Checkpoint}
 import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
 import com.wavesplatform.state2.ByteStr
 import com.wavesplatform.state2.reader.StateReader
-import scorex.block.{Block}
+import scorex.block.Block
 import scorex.consensus.TransactionsOrdering
 import scorex.transaction.ValidationError.{BlockAppendError, GenericError}
 import scorex.transaction._
@@ -38,8 +38,9 @@ object Coordinator extends ScorexLogging {
         for {
           commonBlockHeight <- history.heightOf(lastCommonBlockId).toRight(GenericError("Fork contains no common parent"))
           _ <- Either.cond(isForkValidWithCheckpoint(commonBlockHeight), (), GenericError("Fork contains block that doesn't match checkpoint, declining fork"))
-          _ <- blockchainUpdater.removeAfter(lastCommonBlockId)
+          droppedTransactions <- blockchainUpdater.removeAfter(lastCommonBlockId)
           score <- forkApplicationResultEi
+          _ = droppedTransactions.foreach(t => utxStorage.putIfNew(t))
         } yield {
           miner.lastBlockChanged()
           updateBlockchainReadinessFlag(history, time, blockchainReadiness, settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed)
@@ -78,7 +79,7 @@ object Coordinator extends ScorexLogging {
       BlockAppendError(s"[h = ${history.height() + 1}] is not valid with respect to checkpoint", block))
     _ <- blockConsensusValidation(history, stateReader, settings, time.correctedTime())(block)
     _ <- blockchainUpdater.processBlock(block)
-  } yield block.transactionData.foreach(utxStorage.remove)
+  } yield utxStorage.removeAll(block.transactionData)
 
   def processCheckpoint(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater)
                        (newCheckpoint: Checkpoint): Either[ValidationError, BigInt] =
