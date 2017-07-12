@@ -4,7 +4,6 @@ import cats.implicits._
 import com.wavesplatform.matcher.model.Events.{Event, OrderAdded, OrderCanceled, OrderExecuted}
 import com.wavesplatform.matcher.model.LimitOrder.{Filled, OrderStatus}
 import play.api.libs.json.Json
-import scorex.crypto.encode.Base58
 import scorex.transaction.AssetAcc
 import scorex.transaction.assets.exchange.{AssetPair, Order}
 import scorex.utils.ScorexLogging
@@ -19,6 +18,7 @@ trait OrderHistory {
   def ordersByPairAndAddress(assetPair: AssetPair, address: String): Set[String]
   def deleteOrder(assetPair: AssetPair, address: String, orderId: String): Boolean
   def order(id: String): Option[Order]
+  def openPortfolio(address: String): OpenPortfolio
 }
 
 case class OrderHistoryImpl(p: OrderHistoryStorage) extends OrderHistory with ScorexLogging {
@@ -40,9 +40,13 @@ case class OrderHistoryImpl(p: OrderHistoryStorage) extends OrderHistory with Sc
     }
   }
 
+  def openPortfolio(address: String): OpenPortfolio = {
+    Option(p.addressToOrderPortfolio.get(address)).map(OpenPortfolio(_)).getOrElse(OpenPortfolio.empty)
+  }
+
   def saveOpenPortfolio(event: Event): Unit = {
     Events.createOpenPortfolio(event).foreach{ case(addr, op) =>
-      val prev = Option(p.addressToOrderPortfolio.get(addr)).map(OpenPortfolio(_)).getOrElse(OpenPortfolio.empty)
+      val prev = openPortfolio(addr)
       p.addressToOrderPortfolio.put(addr, prev.combine(op).orders)
       log.debug(s"Changed OpenPortfolio for: $addr -> " + p.addressToOrderPortfolio.get(addr).toString)
     }
