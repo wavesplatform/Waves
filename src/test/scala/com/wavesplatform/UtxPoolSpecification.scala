@@ -138,7 +138,7 @@ class UtxPoolSpecification extends FreeSpec
 
       time.advance(offset)
 
-      utx.packUnconfirmed() shouldBe 'empty
+      utx.packUnconfirmed(100) shouldBe 'empty
       utx.all() shouldBe 'empty
     }
 
@@ -151,7 +151,7 @@ class UtxPoolSpecification extends FreeSpec
 
       time.advance(offset)
 
-      utx.packUnconfirmed().size shouldBe 2
+      utx.packUnconfirmed(100).size shouldBe 2
       utx.all().size shouldBe 2
     }
   }
