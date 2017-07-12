@@ -141,7 +141,7 @@ class TransactionsRouteSpec extends RouteSpec("/transactions")
 
     "working properly otherwise" in {
       forAll(randomTransactionGen) { tx =>
-        (utx.getTransactionById _).expects(tx.id).returns(Some(tx)).once()
+        (utx.transactionById _).expects(tx.id).returns(Some(tx)).once()
         Get(routePath(s"/unconfirmed/info/${tx.id.base58}")) ~> route ~> check {
           status shouldEqual StatusCodes.OK
           responseAs[JsValue] shouldEqual tx.json

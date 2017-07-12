@@ -96,13 +96,13 @@ case class TransactionsApiRoute(
     } ~ utxSize ~ utxTransactionInfo
   }
 
-  @Path("/size")
-  @ApiOperation(value = "Size or UTX pool", notes = "Get number of unconfirmed transactions in the UTX pool", httpMethod = "GET")
+  @Path("/unconfirmed/size")
+  @ApiOperation(value = "Size of UTX pool", notes = "Get number of unconfirmed transactions in the UTX pool", httpMethod = "GET")
   def utxSize: Route = (pathPrefix("size") & get) {
     complete(Json.obj("size" -> JsNumber(utxPool.size)))
   }
 
-  @Path("/info/{signature}")
+  @Path("/unconfirmed/info/{signature}")
   @ApiOperation(value = "Transaction Info", notes = "Get transaction that is in the UTX", httpMethod = "GET")
   @ApiImplicitParams(Array(
     new ApiImplicitParam(name = "signature", value = "Transaction signature ", required = true, dataType = "string", paramType = "path")
@@ -114,7 +114,7 @@ case class TransactionsApiRoute(
       path(Segment) { encoded =>
         ByteStr.decodeBase58(encoded) match {
           case Success(sig) =>
-            utxPool.getTransactionById(sig) match {
+            utxPool.transactionById(sig) match {
               case Some(tx) =>
                 complete(txToExtendedJson(tx))
               case None =>

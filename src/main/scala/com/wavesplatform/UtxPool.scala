@@ -63,7 +63,7 @@ class UtxPool(
 
   def size: Int = transactions.size()
 
-  def getTransactionById(transactionId: ByteStr): Option[Transaction] = Option(transactions.get(transactionId))
+  def transactionById(transactionId: ByteStr): Option[Transaction] = Option(transactions.get(transactionId))
 
   def packUnconfirmed(): Seq[Transaction] = {
     val currentTs = time.correctedTime()
