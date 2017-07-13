@@ -63,7 +63,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
     val allChannels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
 
     val utxStorage = new UtxPool(allChannels,
-      time, stateReader, feeCalculator, settings.blockchainSettings.functionalitySettings, settings.utxSettings)
+      time, stateReader, history, feeCalculator, settings.blockchainSettings.functionalitySettings, settings.utxSettings)
 
     val blockchainReadiness = new AtomicBoolean(false)
 

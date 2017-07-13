@@ -30,7 +30,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
       Range(from, to).map(historyWriter.blockBytes).par.map(b => Block.parseBytes(b.get).get).seq
     }
     measureLog(s"Building diff from $from up to $to") {
-      BlockDiffer.unsafeDiffMany(settings, persisted)(blocks)
+      BlockDiffer.unsafeDiffMany(settings, persisted, historyWriter)(blocks)
     }
   }
 
@@ -40,7 +40,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
   }
 
   def currentPersistedBlocksState: StateReader = read { implicit l =>
-    proxy(proxy(persisted,() =>bottomMemoryDiff()), () => topMemoryDiff())
+    proxy(proxy(persisted, () => bottomMemoryDiff()), () => topMemoryDiff())
   }
 
   private def updatePersistedAndInMemory(): Unit = write { implicit l =>
@@ -64,7 +64,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
       bottomMemoryDiff.set(topMemoryDiff())
       topMemoryDiff.set(BlockDiff.empty)
     }
-    historyWriter.appendBlock(block)(BlockDiffer.fromBlock(settings, currentPersistedBlocksState)(block)).map { newBlockDiff =>
+    historyWriter.appendBlock(block)(BlockDiffer.fromBlock(settings, currentPersistedBlocksState, historyWriter)(block)).map { newBlockDiff =>
       topMemoryDiff.set(Monoid[BlockDiff].combine(topMemoryDiff(), newBlockDiff))
     }.map(_ => log.info( s"""Block ${block.uniqueId} appended. New height: ${historyWriter.height()}, new score: ${historyWriter.score()})"""))
   }
@@ -90,11 +90,11 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
               val from = persistedPlusBottomHeight + 1
               val to = height + 1
               val blocks = measureLog(s"Reading blocks from $from up to $to") {
-                Range(from,to)
+                Range(from, to)
                   .map(historyWriter.blockBytes).par.map(b => Block.parseBytes(b.get).get).seq
               }
               val newTopDiff = measureLog(s"Building diff from $from up to $to") {
-                BlockDiffer.unsafeDiffMany(settings, proxy(persisted, () => bottomMemoryDiff()))(blocks)
+                BlockDiffer.unsafeDiffMany(settings, proxy(persisted, () => bottomMemoryDiff()), historyWriter)(blocks)
               }
               topMemoryDiff.set(newTopDiff)
             } else {
