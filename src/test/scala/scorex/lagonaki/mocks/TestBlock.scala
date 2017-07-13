@@ -12,7 +12,7 @@ import scala.util.{Random, Try}
 
 object TestBlock {
 
-  private val defaultSigner = PrivateKeyAccount(Array.fill(TransactionParser.KeyLength)(0))
+  val defaultSigner = PrivateKeyAccount(Array.fill(TransactionParser.KeyLength)(0))
 
   private val random: Random = new Random(10)
 
