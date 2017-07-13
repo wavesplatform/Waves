@@ -110,7 +110,7 @@ class NetworkServer(checkpointService: CheckpointService,
         new OptimisticExtensionLoader,
         utxPoolSynchronizer,
         scoreObserver,
-        coordinatorHandler -> coordinatorExecutor,
+        coordinatorHandler,
         fatalErrorHandler)))
       .bind(settings.networkSettings.bindAddress)
       .channel()
@@ -148,7 +148,7 @@ class NetworkServer(checkpointService: CheckpointService,
       new OptimisticExtensionLoader,
       utxPoolSynchronizer,
       scoreObserver,
-      coordinatorHandler -> coordinatorExecutor,
+      coordinatorHandler,
       fatalErrorHandler)))
 
   private val connectTask = workerGroup.scheduleWithFixedDelay(1.second, 5.seconds) {
@@ -170,12 +170,12 @@ class NetworkServer(checkpointService: CheckpointService,
               log.debug(s"${id(connFuture.channel())} Connection failed, blacklisting $remoteAddress", connFuture.cause())
               peerDatabase.blacklist(remoteAddress.getAddress)
             } else if (connFuture.isSuccess) {
-              log.debug(s"${id(connFuture.channel())} Connection established")
+              log.info(s"${id(connFuture.channel())} Connection established")
               peerDatabase.touch(remoteAddress)
               outgoingChannelCount.incrementAndGet()
               connFuture.channel().closeFuture().addListener { (closeFuture: ChannelFuture) =>
                 val remainingCount = outgoingChannelCount.decrementAndGet()
-                log.debug(s"${id(closeFuture.channel)} Connection closed, $remainingCount outgoing channel(s) remaining")
+                log.info(s"${id(closeFuture.channel)} Connection closed, $remainingCount outgoing channel(s) remaining")
                 allChannels.remove(closeFuture.channel())
                 outgoingChannels.remove(remoteAddress, closeFuture.channel())
                 if (!shutdownInitiated) peerDatabase.blacklist(remoteAddress.getAddress)

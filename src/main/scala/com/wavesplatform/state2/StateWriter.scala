@@ -142,13 +142,13 @@ object StateWriterImpl extends ScorexLogging {
 
   def measureSizeLog[F[_] <: TraversableOnce[_], A, R](s: String)(fa: => F[A])(f: F[A] => R): R = {
     val (r, time) = withTime(f(fa))
-    log.debug(s"processing of ${fa.size} $s took ${time}ms")
+    log.trace(s"processing of ${fa.size} $s took ${time}ms")
     r
   }
 
   def measureLog[R](s: String)(f: => R): R = {
     val (r, time) = withTime(f)
-    log.debug(s"$s took ${time}ms")
+    log.trace(s"$s took ${time}ms")
     r
   }
 }

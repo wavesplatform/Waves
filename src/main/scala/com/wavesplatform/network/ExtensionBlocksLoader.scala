@@ -52,7 +52,7 @@ class ExtensionBlocksLoader(
       pendingSignatures -= b.uniqueId
       if (pendingSignatures.isEmpty) {
         cancelTimeout()
-        log.debug(s"${id(ctx)} Loaded all blocks, doing a pre-check")
+        log.trace(s"${id(ctx)} Loaded all blocks, doing a pre-check")
 
         val newBlocks = blockBuffer.values.toSeq
 
@@ -69,7 +69,7 @@ class ExtensionBlocksLoader(
               case Some(invalidBlock) =>
                 peerDatabase.blacklistAndClose(ctx.channel(),s"Got block ${invalidBlock.uniqueId} with invalid signature")
               case None =>
-                log.debug(s"${id(ctx)} Chain is valid, pre-check passed")
+                log.trace(s"${id(ctx)} Chain is valid, pre-check passed")
                 ctx.fireChannelRead(ExtensionBlocks(newBlocks))
             }
           }
