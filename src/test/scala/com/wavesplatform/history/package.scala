@@ -27,13 +27,13 @@ package object history {
     functionalitySettings = TestFunctionalitySettings.Enabled,
     genesisSettings = null)
 
-  def domain(): Domain = {
-    val (history, _, stateReader, blockchainUpdater) = StorageFactory(DefaultBlockchainSettings).get
+  def domain(bs: BlockchainSettings = DefaultBlockchainSettings): Domain = {
+    val (history, _, stateReader, blockchainUpdater) = StorageFactory(bs).get
     Domain(history, stateReader, blockchainUpdater)
   }
 
-  private val defaultSigner = PrivateKeyAccount(Array.fill(TransactionParser.KeyLength)(0))
-  private val generationSignature = Array.fill(Block.GeneratorSignatureLength)(0: Byte)
+  val defaultSigner = PrivateKeyAccount(Array.fill(TransactionParser.KeyLength)(0))
+  val generationSignature = Array.fill(Block.GeneratorSignatureLength)(0: Byte)
 
   def buildBlockOfTxs(refTo: ByteStr, txs: Seq[Transaction]): Block = {
     Block.buildAndSign(
@@ -86,6 +86,6 @@ package object history {
 
   trait DomainScenarioDrivenPropertyCheck extends GeneratorDrivenPropertyChecks {
 
-    def scenario[S](gen: Gen[S])(assertion: (Domain, S) => Assertion): Assertion = forAll(gen)(assertion(domain(), _))
+    def scenario[S](gen: Gen[S], bs: BlockchainSettings = DefaultBlockchainSettings)(assertion: (Domain, S) => Assertion): Assertion = forAll(gen)(assertion(domain(bs), _))
   }
 }
