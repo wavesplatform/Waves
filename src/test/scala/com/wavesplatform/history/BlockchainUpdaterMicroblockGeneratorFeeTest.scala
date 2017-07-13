@@ -28,8 +28,7 @@ class BlockchainUpdaterMicroblockGeneratorFeeTest extends PropSpec with Property
     scenario(preconditionsAndPayments,
       DefaultBlockchainSettings.copy(functionalitySettings = TestFunctionalitySettings.Enabled.copy(applyMinerFeeWithTransactionAfter = Long.MaxValue))) { case (domain, (genesis, somePayment, generatorPaymentOnFeeWithMoreFee)) =>
       val blocks = chainBlocks(Seq(Seq(genesis), Seq(generatorPaymentOnFeeWithMoreFee, somePayment)))
-      blocks.init.foreach(block => domain.blockchainUpdater.processBlock(block).explicitGet())
-      domain.blockchainUpdater.processBlock(blocks.last) shouldNot produce("unavailable funds")
+      all(blocks.map(block => domain.blockchainUpdater.processBlock(block))) shouldBe 'right
     }
   }
 
