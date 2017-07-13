@@ -33,7 +33,8 @@ object BlockDiffer extends ScorexLogging {
     val currentBlockHeight = s.height + 1
 
     val txDiffer = TransactionDiffer(settings, timestamp, currentBlockHeight) _
-    def txFeeDiffer(tx: Transaction): Diff = tx.assetFee match {
+    def txFeeDiffer(tx: Transaction): Map[Address, Portfolio] = Map(blockGenerator ->
+      (tx.assetFee match {
       case (Some(asset), fee) =>
         Portfolio(
           balance = 0,
@@ -42,7 +43,8 @@ object BlockDiffer extends ScorexLogging {
       case (None, fee) => Portfolio(
         balance = fee,
         leaseInfo = LeaseInfo.empty,
-        assets = Map.empty)}))
+        assets = Map.empty)
+    }))
 
     val txsDiffEi = if (timestamp < settings.giveBlockFeeToGeneratorBeforeApplyUntil) {
       txs.foldLeft(right(feesDistribution)) { case (ei, tx) => ei.flatMap(diff =>
