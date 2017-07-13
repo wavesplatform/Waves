@@ -14,6 +14,6 @@ object TestFunctionalitySettings {
     allowMultipleLeaseCancelTransactionUntilTimestamp = 0L, resetEffectiveBalancesAtHeight = 0,
     allowMakeAssetNameUniqueTransactionAfter = 0L,
     allowLeasedBalanceTransferUntil = 0L,
-    giveBlockFeeToGeneratorBeforeApplyUntil = 0L
+    applyMinerFeeWithTransactionAfter = 0L
   )
 }

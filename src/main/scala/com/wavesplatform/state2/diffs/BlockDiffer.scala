@@ -46,7 +46,7 @@ object BlockDiffer extends ScorexLogging {
         assets = Map.empty)
     }))
 
-    val txsDiffEi = if (timestamp < settings.giveBlockFeeToGeneratorBeforeApplyUntil) {
+    val txsDiffEi = if (timestamp < settings.applyMinerFeeWithTransactionAfter) {
       txs.foldLeft(right(feesDistribution)) { case (ei, tx) => ei.flatMap(diff =>
         txDiffer(new CompositeStateReader(s, diff.asBlockDiff), tx)
           .map(newDiff => diff.combine(newDiff)))

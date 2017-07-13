@@ -27,7 +27,7 @@ case class FunctionalitySettings(allowTemporaryNegativeUntil: Long,
                                  allowMultipleLeaseCancelTransactionUntilTimestamp: Long,
                                  resetEffectiveBalancesAtHeight: Long,
                                  allowLeasedBalanceTransferUntil: Long,
-                                 giveBlockFeeToGeneratorBeforeApplyUntil: Long)
+                                 applyMinerFeeWithTransactionAfter: Long)
 
 object FunctionalitySettings {
   val MAINNET = FunctionalitySettings(allowTemporaryNegativeUntil = 1479168000000L,
@@ -47,7 +47,7 @@ object FunctionalitySettings {
     allowMultipleLeaseCancelTransactionUntilTimestamp = 1492768800000L,
     resetEffectiveBalancesAtHeight = 462000,
     allowLeasedBalanceTransferUntil = Long.MaxValue,
-    giveBlockFeeToGeneratorBeforeApplyUntil = Long.MaxValue
+    applyMinerFeeWithTransactionAfter = Long.MaxValue
   )
 
   val TESTNET = FunctionalitySettings(
@@ -68,7 +68,7 @@ object FunctionalitySettings {
     allowMultipleLeaseCancelTransactionUntilTimestamp = 1492560000000L,
     resetEffectiveBalancesAtHeight = 51500,
     allowLeasedBalanceTransferUntil = 1495238400000L,
-    giveBlockFeeToGeneratorBeforeApplyUntil = Long.MaxValue)
+    applyMinerFeeWithTransactionAfter = Long.MaxValue)
 
   val configPath = "waves.blockchain.custom.functionality"
 }
