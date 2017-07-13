@@ -17,20 +17,23 @@ import scala.concurrent.duration._
 
 class NetworkSender(address: InetSocketAddress, chainId: Char, name: String, nonce: Long) {
   private val retryTimer = new HashedWheelTimer()
+  val allChannels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
+  val establishedConnections = new ConcurrentHashMap[Channel, PeerInfo]
+  val c = new NetworkClient(chainId, name, nonce, allChannels, establishedConnections)
+  c.connect(address)
+
   def sendByNetwork(messages: RawBytes*): Future[Unit] = {
-    val allChannels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
-    val establishedConnections = new ConcurrentHashMap[Channel, PeerInfo]
-    val c = new NetworkClient(chainId, name, nonce, allChannels, establishedConnections)
-    c.connect(address)
     retryTimer.retryUntil(Future.successful(establishedConnections.size()), (size: Int) => size == 1, 1.seconds)
       .map(_ => {
       val channel = establishedConnections.asScala.head._1
       messages.foreach(msg => {
         channel.writeAndFlush(msg)
-        Thread.sleep(10)
       })
-      c.shutdown()
     })
   }
-  def close(): Unit = retryTimer.stop()
+
+  def close(): Unit = {
+    retryTimer.stop()
+    c.shutdown()
+  }
 }

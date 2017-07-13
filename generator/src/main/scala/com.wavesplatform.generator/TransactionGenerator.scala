@@ -36,7 +36,7 @@ object TransactionGenerator {
 
     val tradeAssetDistribution = {
       tradeAssetIssue +: accounts.map(acc => {
-        TransferTransaction.create(Some(tradeAssetIssue.id), issueTransactionSender, acc.toAccount, 5, System.currentTimeMillis(), None, 100000, Array.fill(r.nextInt(100))(r.nextInt().toByte)).right.get
+        TransferTransaction.create(Some(tradeAssetIssue.id), issueTransactionSender, acc, 5, System.currentTimeMillis(), None, 100000, Array.fill(r.nextInt(100))(r.nextInt().toByte)).right.get
       })
     }
 
@@ -72,12 +72,12 @@ object TransactionGenerator {
             logOption(IssueTransaction.create(sender, name, description, amount, Random.nextInt(9).toByte, reissuable, 100000000L + r.nextInt(100000000), ts))
           case TransactionType.TransferTransaction =>
             val useAlias = r.nextBoolean()
-            val recipient = if (useAlias && aliases.nonEmpty) randomFrom(aliases).map(_.alias).get else randomFrom(accounts).map(_.toAccount).get
+            val recipient = if (useAlias && aliases.nonEmpty) randomFrom(aliases).map(_.alias).get else randomFrom(accounts).get.toAddress
             val sendAsset = r.nextBoolean()
             val senderAndAssetOpt = if (sendAsset) {
               val asset = randomFrom(validIssueTxs)
               asset.map(issue => {
-                val pk = accounts.find(_.toAccount == issue.sender.toAccount).get
+                val pk = accounts.find(_ == issue.sender).get
                 (pk, Some(issue.id))
               })
             } else Some(randomFrom(accounts).get, None)
@@ -107,7 +107,7 @@ object TransactionGenerator {
           case TransactionType.LeaseTransaction =>
             val sender = randomFrom(accounts).get
             val useAlias = r.nextBoolean()
-            val recipientOpt = if (useAlias && aliases.nonEmpty) randomFrom(aliases.filter(_.sender != sender)).map(_.alias) else randomFrom(accounts.filter(_ != sender)).map(_.toAccount)
+            val recipientOpt = if (useAlias && aliases.nonEmpty) randomFrom(aliases.filter(_.sender != sender)).map(_.alias) else randomFrom(accounts.filter(_ != sender).map(_.toAddress))
             recipientOpt.flatMap(recipient =>
               logOption(LeaseTransaction.create(sender, 1, moreThatStandartFee * 3, ts, recipient)))
           case TransactionType.LeaseCancelTransaction =>
