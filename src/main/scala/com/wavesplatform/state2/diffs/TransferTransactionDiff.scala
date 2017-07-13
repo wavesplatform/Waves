@@ -4,16 +4,16 @@ import cats.implicits._
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2._
 import com.wavesplatform.state2.reader.StateReader
-import scorex.account.Account
+import scorex.account.Address
 import scorex.transaction.ValidationError
-import scorex.transaction.ValidationError.{GenericError}
+import scorex.transaction.ValidationError.GenericError
 import scorex.transaction.assets.TransferTransaction
 
 import scala.util.Right
 
 object TransferTransactionDiff {
   def apply(state: StateReader, s: FunctionalitySettings, blockTime: Long, height: Int)(tx: TransferTransaction): Either[ValidationError, Diff] = {
-    val sender = Account.fromPublicKey(tx.sender.publicKey)
+    val sender = Address.fromPublicKey(tx.sender.publicKey)
 
     val isInvalidEi = for {
       recipient <- state.resolveAliasEi(tx.recipient)

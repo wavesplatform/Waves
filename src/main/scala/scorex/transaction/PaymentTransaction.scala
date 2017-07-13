@@ -5,18 +5,18 @@ import java.util
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import com.wavesplatform.state2.ByteStr
 import play.api.libs.json.{JsObject, Json}
-import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
+import scorex.account.PublicKeyAccount._
+import scorex.account.{Address, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
-import scorex.transaction.TransactionParser._
-import scorex.account.PublicKeyAccount._
 import scorex.crypto.hash.FastCryptographicHash
 import scorex.transaction.PaymentTransaction.signatureData
+import scorex.transaction.TransactionParser._
 
 import scala.util.{Failure, Success, Try}
 
 case class PaymentTransaction private(sender: PublicKeyAccount,
-                                      recipient: Account,
+                                      recipient: Address,
                                       amount: Long,
                                       fee: Long,
                                       timestamp: Long,
@@ -54,20 +54,20 @@ case class PaymentTransaction private(sender: PublicKeyAccount,
 object PaymentTransaction {
 
 
-  val RecipientLength = Account.AddressLength
+  val RecipientLength = Address.AddressLength
 
   private val SenderLength = 32
   private val FeeLength = 8
   private val BaseLength = TimestampLength + SenderLength + RecipientLength + AmountLength + FeeLength + SignatureLength
 
-  def create(sender: PrivateKeyAccount, recipient: Account, amount: Long, fee: Long, timestamp: Long): Either[ValidationError, PaymentTransaction] = {
+  def create(sender: PrivateKeyAccount, recipient: Address, amount: Long, fee: Long, timestamp: Long): Either[ValidationError, PaymentTransaction] = {
     create(sender, recipient, amount, fee, timestamp, ByteStr.empty).right.map(unsigned => {
       unsigned.copy(signature = ByteStr(EllipticCurveImpl.sign(sender, signatureData(sender, recipient, amount, fee, timestamp))))
     })
   }
 
   def create(sender: PublicKeyAccount,
-             recipient: Account,
+             recipient: Address,
              amount: Long,
              fee: Long,
              timestamp: Long,
@@ -100,7 +100,7 @@ object PaymentTransaction {
 
     //READ RECIPIENT
     val recipientBytes = util.Arrays.copyOfRange(data, position, position + RecipientLength)
-    val recipient = Account.fromBytes(recipientBytes).right.get
+    val recipient = Address.fromBytes(recipientBytes).right.get
     position += RecipientLength
 
     //READ AMOUNT
@@ -121,7 +121,7 @@ object PaymentTransaction {
       .fold(left => Failure(new Exception(left.toString)), right => Success(right))
   }.flatten
 
-  private def signatureData(sender: PublicKeyAccount, recipient: Account, amount: Long, fee: Long, timestamp: Long): Array[Byte] = {
+  private def signatureData(sender: PublicKeyAccount, recipient: Address, amount: Long, fee: Long, timestamp: Long): Array[Byte] = {
     val typeBytes = Ints.toByteArray(TransactionType.PaymentTransaction.id)
     val timestampBytes = Longs.toByteArray(timestamp)
     val amountBytes = Longs.toByteArray(amount)

@@ -2,7 +2,7 @@ package com.wavesplatform.it.transactions
 
 import com.wavesplatform.it.util._
 import com.wavesplatform.it.{IntegrationSuiteWithThreeAddresses, Node}
-import scorex.account.{AccountOrAlias, PrivateKeyAccount}
+import scorex.account.{AddressOrAlias, PrivateKeyAccount}
 import scorex.api.http.assets.SignedTransferRequest
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.TransferTransaction
@@ -73,7 +73,7 @@ class TransferTransactionSpecification(override val allNodes: Seq[Node]) extends
 
     val invalidByTsTx = TransferTransaction.create(None,
       PrivateKeyAccount(Base58.decode(sender.accountSeed).get),
-      AccountOrAlias.fromString(sender.address).right.get,
+      AddressOrAlias.fromString(sender.address).right.get,
       1,
       System.currentTimeMillis() + (1 day).toMillis,
       None,

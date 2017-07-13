@@ -4,7 +4,7 @@ import cats.implicits._
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.reader.StateReader
 import com.wavesplatform.state2.{ByteStr, Diff, LeaseInfo, Portfolio}
-import scorex.account.Account
+import scorex.account.Address
 import scorex.transaction.Transaction
 import scorex.transaction.ValidationError.AccountBalanceError
 
@@ -16,7 +16,7 @@ object BalanceDiffValidation {
   def apply[T <: Transaction](s: StateReader, time: Long, fs: FunctionalitySettings)(tx: T, d: Diff): Either[AccountBalanceError, Diff] = {
 
     val changedAccounts = d.portfolios.keySet
-    val positiveBalanceErrors: Map[Account, String] = changedAccounts.flatMap(acc => {
+    val positiveBalanceErrors: Map[Address, String] = changedAccounts.flatMap(acc => {
 
       val oldPortfolio = s.accountPortfolio(acc)
       val portfolioDiff = d.portfolios(acc)

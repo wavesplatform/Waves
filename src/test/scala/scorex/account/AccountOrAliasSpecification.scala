@@ -1,15 +1,15 @@
 package scorex.account
 
 import com.wavesplatform.TransactionGen
-import org.scalatest.{Matchers, PropSpec}
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
+import org.scalatest.{Matchers, PropSpec}
 
 class AccountOrAliasSpecification extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers with TransactionGen {
 
   property("Account serialization roundtrip") {
     forAll(accountGen) { acc: PrivateKeyAccount =>
       val ser = acc.bytes.arr
-      val deser = Account.fromBytes(ser).right.get
+      val deser = Address.fromBytes(ser).right.get
       deser.stringRepr shouldBe acc.stringRepr
     }
   }
@@ -23,9 +23,9 @@ class AccountOrAliasSpecification extends PropSpec with PropertyChecks with Gene
   }
 
   property("AccountOrAlias serialization roundtrip") {
-    forAll(accountOrAliasGen) { aoa: AccountOrAlias =>
+    forAll(accountOrAliasGen) { aoa: AddressOrAlias =>
       val ser = aoa.bytes.arr
-      val deser = AccountOrAlias.fromBytes(ser, 0).right.get
+      val deser = AddressOrAlias.fromBytes(ser, 0).right.get
       deser._1.stringRepr shouldBe aoa.stringRepr
     }
   }

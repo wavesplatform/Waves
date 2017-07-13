@@ -6,11 +6,12 @@ import org.scalatest._
 import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
 import scorex.transaction.TransactionParser.TransactionType
 
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
-import scala.util.Random
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.language.postfixOps
+import scala.util.Random
 
 
 trait IntegrationSuiteWithThreeAddresses extends FunSuite with BeforeAndAfterAll with Matchers with ScalaFutures
@@ -74,6 +75,8 @@ trait IntegrationSuiteWithThreeAddresses extends FunSuite with BeforeAndAfterAll
       txs <- makeTransfers
 
       _ <- waitForTxsToReachAllNodes(txs)
+      height <- traverse(allNodes)(_.height).map(_.max)
+      _ <- traverse(allNodes)(_.waitForHeight(height + 1))
 
       _ <- Future.sequence(Seq(firstAddress, secondAddress, thirdAddress).map(address => assertBalances(address, defaultBalance, defaultBalance)))
     } yield succeed

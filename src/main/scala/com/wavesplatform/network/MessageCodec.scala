@@ -9,8 +9,10 @@ import scorex.network.message._
 import scorex.utils.ScorexLogging
 
 @Sharable
-class MessageCodec(specs: Map[Byte, MessageSpec[_ <: AnyRef]])
-    extends MessageToMessageCodec[RawBytes, Message] with ScorexLogging {
+class MessageCodec extends MessageToMessageCodec[RawBytes, Message] with ScorexLogging {
+
+  private val specs: Map[Byte, MessageSpec[_ <: AnyRef]] = BasicMessagesRepo.specs.map(s => s.messageCode -> s).toMap
+
   override def encode(ctx: ChannelHandlerContext, msg: Message, out: util.List[AnyRef]) = msg match {
     case LocalScoreChanged(score) => out.add(RawBytes(ScoreMessageSpec.messageCode, ScoreMessageSpec.serializeData(score)))
     case GetPeers => out.add(RawBytes(GetPeersSpec.messageCode, Array[Byte]()))

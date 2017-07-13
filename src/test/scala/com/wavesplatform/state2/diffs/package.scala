@@ -19,7 +19,7 @@ package object diffs {
 
   def assertDiffEi(preconditions: Seq[Block], block: Block, fs: FunctionalitySettings = TestFunctionalitySettings.Enabled)(assertion: Either[ValidationError, BlockDiff] => Unit): Unit = {
     val state = newState()
-    val differ: (StateReader, Block) => Either[ValidationError, BlockDiff] =  BlockDiffer(fs)
+    val differ: (StateReader, Block) => Either[ValidationError, BlockDiff] = (s, b) => BlockDiffer.fromBlock(fs, s)(b)
 
     preconditions.foreach { precondition =>
       val preconditionDiff = differ(state, precondition).explicitGet()
@@ -28,7 +28,7 @@ package object diffs {
     val totalDiff1 = differ(state, block)
     assertion(totalDiff1)
 
-    val preconditionDiff = BlockDiffer.unsafeDiffMany(fs)(newState(), preconditions)
+    val preconditionDiff = BlockDiffer.unsafeDiffMany(fs, newState())(preconditions)
     val compositeState = new CompositeStateReader(newState(), preconditionDiff)
     val totalDiff2 = differ(compositeState, block)
     assertion(totalDiff2)
@@ -36,7 +36,7 @@ package object diffs {
 
   def assertDiffAndState(preconditions: Seq[Block], block: Block, fs: FunctionalitySettings = TestFunctionalitySettings.Enabled)(assertion: (BlockDiff, StateReader) => Unit): Unit = {
     val state = newState()
-    val differ: (StateReader, Block) => Either[ValidationError, BlockDiff] =  BlockDiffer(fs)
+    val differ: (StateReader, Block) => Either[ValidationError, BlockDiff] = (s, b) => BlockDiffer.fromBlock(fs, s)(b)
     preconditions.foreach { precondition =>
       val preconditionDiff = differ(state, precondition).explicitGet()
       state.applyBlockDiff(preconditionDiff)
@@ -45,7 +45,7 @@ package object diffs {
     state.applyBlockDiff(totalDiff1)
     assertion(totalDiff1, state)
 
-    val preconditionDiff = BlockDiffer.unsafeDiffMany(fs)(newState(), preconditions)
+    val preconditionDiff = BlockDiffer.unsafeDiffMany(fs, newState())(preconditions)
     val compositeState = new CompositeStateReader(newState(), preconditionDiff)
     val totalDiff2 = differ(compositeState, block).explicitGet()
     assertion(totalDiff2, new CompositeStateReader(compositeState, totalDiff2))

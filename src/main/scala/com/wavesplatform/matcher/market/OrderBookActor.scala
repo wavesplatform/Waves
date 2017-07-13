@@ -210,10 +210,10 @@ class OrderBookActor(assetPair: AssetPair,
       case OrderValidationError(order, _) if order == event.submitted.order => None
       case OrderValidationError(order, _) if order == event.counter.order => cancelCounterOrder()
       case AccountBalanceError(errs) =>
-        if (errs.contains(event.counter.order.senderPublicKey.toAccount)) {
+        if (errs.contains(event.counter.order.senderPublicKey.toAddress)) {
           cancelCounterOrder()
         }
-        if (errs.contains(event.submitted.order.senderPublicKey.toAccount)) {
+        if (errs.contains(event.submitted.order.senderPublicKey.toAddress)) {
           None
         } else {
           Some(event.submitted)

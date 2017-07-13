@@ -7,7 +7,7 @@ import com.wavesplatform.settings.{FunctionalitySettings, RestAPISettings}
 import com.wavesplatform.state2.reader.StateReader
 import io.swagger.annotations._
 import play.api.libs.json.Json
-import scorex.account.Account
+import scorex.account.Address
 import scorex.api.http.{ApiRoute, CommonApiFunctions, InvalidAddress}
 import scorex.crypto.encode.Base58
 import scorex.transaction.{History, PoSCalc}
@@ -31,7 +31,7 @@ case class NxtConsensusApiRoute(
     new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
   ))
   def generatingBalance: Route = (path("generatingbalance" / Segment) & get) { address =>
-    Account.fromString(address) match {
+    Address.fromString(address) match {
       case Left(_) => complete(InvalidAddress)
       case Right(account) =>
         complete(Json.obj(
@@ -54,7 +54,7 @@ case class NxtConsensusApiRoute(
   @Path("/generationsignature")
   @ApiOperation(value = "Generation signature last", notes = "Generation signature of a last block", httpMethod = "GET")
   def generationSignature: Route = (path("generationsignature") & get) {
-    complete(Json.obj("generationSignature" -> Base58.encode(history.lastBlock.consensusData.generationSignature)))
+    complete(Json.obj("generationSignature" -> Base58.encode(history.lastBlock.get.consensusData.generationSignature)))
   }
 
   @Path("/basetarget/{blockId}")
@@ -71,7 +71,7 @@ case class NxtConsensusApiRoute(
   @Path("/basetarget")
   @ApiOperation(value = "Base target last", notes = "Base target of a last block", httpMethod = "GET")
   def basetarget: Route = (path("basetarget") & get) {
-    complete(Json.obj("baseTarget" -> history.lastBlock.consensusData.baseTarget))
+    complete(Json.obj("baseTarget" -> history.lastBlock.get.consensusData.baseTarget))
   }
 
   @Path("/algo")

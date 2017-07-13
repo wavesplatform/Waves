@@ -37,8 +37,7 @@ class ExtensionBlocksLoader(
         cancelTimeout()
         currentTimeout = Some(ctx.executor().schedule(blockSyncTimeout) {
           if (targetExtensionIds.contains(xid)) {
-            log.warn(s"${id(ctx)} Timeout loading blocks")
-            peerDatabase.blacklistAndClose(ctx.channel())
+            peerDatabase.blacklistAndClose(ctx.channel(), "Timeout loading blocks")
           }
         })
         newIds.foreach(s => ctx.write(GetBlock(s)))
@@ -59,19 +58,16 @@ class ExtensionBlocksLoader(
 
         for (tids <- targetExtensionIds) {
           if (tids.lastCommonId != newBlocks.head.reference) {
-            log.warn(s"${id(ctx)} Extension head reference ${newBlocks.head.reference} differs from last common block id ${tids.lastCommonId}")
-            peerDatabase.blacklistAndClose(ctx.channel())
+            peerDatabase.blacklistAndClose(ctx.channel(),s"Extension head reference ${newBlocks.head.reference} differs from last common block id ${tids.lastCommonId}")
           } else if (!newBlocks.sliding(2).forall {
               case Seq(b1, b2) => b1.uniqueId == b2.reference
               case _ => true
             }) {
-            log.warn(s"${id(ctx)} Extension blocks are not contiguous, pre-check failed")
-            peerDatabase.blacklistAndClose(ctx.channel())
+            peerDatabase.blacklistAndClose(ctx.channel(),"Extension blocks are not contiguous, pre-check failed")
           } else {
             newBlocks.par.find(!_.signatureValid) match {
               case Some(invalidBlock) =>
-                log.warn(s"${id(ctx)} Got block ${invalidBlock.uniqueId} with invalid signature")
-                peerDatabase.blacklistAndClose(ctx.channel())
+                peerDatabase.blacklistAndClose(ctx.channel(),s"Got block ${invalidBlock.uniqueId} with invalid signature")
               case None =>
                 log.debug(s"${id(ctx)} Chain is valid, pre-check passed")
                 ctx.fireChannelRead(ExtensionBlocks(newBlocks))

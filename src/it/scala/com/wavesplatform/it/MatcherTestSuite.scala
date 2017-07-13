@@ -246,6 +246,9 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll {
     )
 
   private def getBalance(node: Node): (Long, Long) = {
+    val initialHeight = Await.result(node.height, 1.minute)
+    Await.result(node.waitForHeight(initialHeight + 1), 1.minute)
+
     val balance = Await.result(node.balance(node.address), 1.minute).balance
     val height = Await.result(node.height, 1.minute)
 
