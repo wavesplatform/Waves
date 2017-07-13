@@ -21,7 +21,7 @@ import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 
-object TestnetTransactionsGeneratorTest extends App {
+object TransactionsGeneratorApp extends App {
   val log = LoggerFacade(LoggerFactory.getLogger(getClass))
 
   val generatorConfig = fromConfig(readConfig(args.headOption))
