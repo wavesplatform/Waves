@@ -72,11 +72,11 @@ package object history {
     chainBlocksR(randomSig, txs)
   }
 
-  def chainBaseAndMicro(totalRefTo: ByteStr, base: Transaction, micros: Seq[Transaction]): (Block, Seq[MicroBlock]) = {
+  def chainBaseAndMicro(totalRefTo: ByteStr, base: Transaction, micros: Seq[Seq[Transaction]]): (Block, Seq[MicroBlock]) = {
     val block = buildBlockOfTxs(totalRefTo, Seq(base))
 
-    val microBlocks = micros.foldLeft((block, Seq.empty[MicroBlock])) { case ((lastTotal, allMicros), tx) =>
-      val (newTotal, micro) = buildMicroBlockOfTxs(totalRefTo, lastTotal, Seq(tx))
+    val microBlocks = micros.foldLeft((block, Seq.empty[MicroBlock])) { case ((lastTotal, allMicros), txs) =>
+      val (newTotal, micro) = buildMicroBlockOfTxs(totalRefTo, lastTotal, txs)
       (newTotal, allMicros :+ micro)
     }._2
     (block, microBlocks)

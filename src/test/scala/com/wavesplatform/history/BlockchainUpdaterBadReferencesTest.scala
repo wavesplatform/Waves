@@ -26,7 +26,7 @@ class BlockchainUpdaterBadReferencesTest extends PropSpec with PropertyChecks wi
   property("microBlock: referenced (micro)block doesn't exist") {
     scenario(preconditionsAndPayments) { case (domain, (genesis, payment, payment2, payment3)) =>
       val block0 = buildBlockOfTxs(randomSig, Seq(genesis))
-      val (block1, microblocks1) = chainBaseAndMicro(block0.uniqueId, payment, Seq(payment2, payment3))
+      val (block1, microblocks1) = chainBaseAndMicro(block0.uniqueId, payment, Seq(payment2, payment3).map(Seq(_)))
       val goodMicro = microblocks1(0)
       val badMicroRef = microblocks1(1).copy(prevResBlockSig = randomSig)
 
@@ -66,7 +66,7 @@ class BlockchainUpdaterBadReferencesTest extends PropSpec with PropertyChecks wi
   property("microblock: no base block at all") {
     scenario(preconditionsAndPayments) { case (domain, (genesis, payment, payment2, payment3)) =>
       val block0 = buildBlockOfTxs(randomSig, Seq(genesis))
-      val (block1, microblocks1) = chainBaseAndMicro(block0.uniqueId, payment, Seq(payment2))
+      val (block1, microblocks1) = chainBaseAndMicro(block0.uniqueId, payment, Seq(payment2).map(Seq(_)))
       domain.blockchainUpdater.processBlock(block0).explicitGet()
       domain.blockchainUpdater.processBlock(block1).explicitGet()
       domain.blockchainUpdater.removeAfter(block0.uniqueId).explicitGet()
@@ -77,7 +77,7 @@ class BlockchainUpdaterBadReferencesTest extends PropSpec with PropertyChecks wi
   property("microblock: follow-up micro doesn't reference last known micro") {
     scenario(preconditionsAndPayments) { case (domain, (genesis, payment, payment2, payment3)) =>
       val block0 = buildBlockOfTxs(randomSig, Seq(genesis))
-      val (block1, microblocks1) = chainBaseAndMicro(block0.uniqueId, payment, Seq(payment2, payment3))
+      val (block1, microblocks1) = chainBaseAndMicro(block0.uniqueId, payment, Seq(payment2, payment3).map(Seq(_)))
       val goodMicro = microblocks1(0)
       val badRefMicro = microblocks1(1).copy(prevResBlockSig = block1.uniqueId)
       domain.blockchainUpdater.processBlock(block0).explicitGet()

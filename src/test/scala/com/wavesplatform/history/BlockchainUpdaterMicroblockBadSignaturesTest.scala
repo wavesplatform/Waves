@@ -27,7 +27,7 @@ class BlockchainUpdaterMicroblockBadSignaturesTest extends PropSpec with Propert
   property("bad total resulting block signature") {
     scenario(preconditionsAndPayments) { case (domain, (genesis, payment, payment2)) =>
       val block0 = buildBlockOfTxs(randomSig, Seq(genesis))
-      val (block1, microblocks1) = chainBaseAndMicro(block0.uniqueId, payment, Seq(payment2))
+      val (block1, microblocks1) = chainBaseAndMicro(block0.uniqueId, payment, Seq(payment2).map(Seq(_)))
       val badSigMicro = microblocks1.head.copy(totalResBlockSig = randomSig)
       domain.blockchainUpdater.processBlock(block0).explicitGet()
       domain.blockchainUpdater.processBlock(block1).explicitGet()
@@ -38,7 +38,7 @@ class BlockchainUpdaterMicroblockBadSignaturesTest extends PropSpec with Propert
   property("bad microBlock signature") {
     scenario(preconditionsAndPayments) { case (domain, (genesis, payment, payment2)) =>
       val block0 = buildBlockOfTxs(randomSig, Seq(genesis))
-      val (block1, microblocks1) = chainBaseAndMicro(block0.uniqueId, payment, Seq(payment2))
+      val (block1, microblocks1) = chainBaseAndMicro(block0.uniqueId, payment, Seq(payment2).map(Seq(_)))
       val badSigMicro = microblocks1.head.copy(signature = randomSig)
       domain.blockchainUpdater.processBlock(block0).explicitGet()
       domain.blockchainUpdater.processBlock(block1).explicitGet()
