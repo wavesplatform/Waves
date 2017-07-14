@@ -45,4 +45,6 @@ package object utils extends ScorexLogging {
       case None => throw new IllegalArgumentException("in-memory store is corrupted")
     }
   }
+
+  def forceStopApplication(): Unit = new Thread(() => { System.exit(1) }, "waves-platform-shutdown-thread").start()
 }

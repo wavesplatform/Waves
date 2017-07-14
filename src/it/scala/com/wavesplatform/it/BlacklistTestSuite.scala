@@ -56,7 +56,7 @@ class BlacklistTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll {
   }
 
   "richest node should blacklist other nodes" in {
-    otherNodes.foreach(n => Await.result(richestNode.blacklist(n), 1.minute))
+    otherNodes.foreach(n => Await.result(richestNode.blacklist(n.nodeInfo.networkIpAddress, n.nodeInfo.hostNetworkPort), 1.minute))
 
     Await.result(
       richestNode.waitFor[Seq[String]](richestNode.blacklistedPeers, _.length >= NodesCount - 1, 5.seconds),

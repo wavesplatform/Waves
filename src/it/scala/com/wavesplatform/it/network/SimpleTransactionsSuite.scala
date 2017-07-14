@@ -1,6 +1,7 @@
 package com.wavesplatform.it.network
 
 import com.wavesplatform.it._
+import com.wavesplatform.it.api.NodeApi
 import com.wavesplatform.network.RawBytes
 import org.scalatest._
 import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
@@ -35,7 +36,7 @@ class SimpleTransactionsSuite extends FunSuite with BeforeAndAfterAll with Match
       _ <- Future.successful(Thread.sleep(2000))
       tx <- node.waitForTransaction(tx.id.base58)
     } yield {
-      tx shouldBe Node.Transaction(tx.`type`, tx.id, tx.fee, tx.timestamp)
+      tx shouldBe NodeApi.Transaction(tx.`type`, tx.id, tx.fee, tx.timestamp)
     }
     Await.result(f, 60 seconds)
   }

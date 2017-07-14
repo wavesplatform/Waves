@@ -56,11 +56,12 @@ class Miner(
     val pc = peerCount
     lazy val lastBlockKernelData = parent.consensusData
     lazy val currentTime = timeService.correctedTime()
+    log.debug(s"${System.currentTimeMillis()}: Corrected time: $currentTime")
     lazy val h = calcHit(lastBlockKernelData, account)
     lazy val t = calcTarget(parent, currentTime, balance)
     for {
       _ <- Either.cond(pc >= minerSettings.quorum, (), s"Quorum not available ($pc/${minerSettings.quorum}, not forging block with ${account.address}")
-      _ <- Either.cond(h < t, (), s"Hit $h was NOT less than target $t, not forging block with ${account.address}")
+      _ <- Either.cond(h < t, (), s"${System.currentTimeMillis()}: Hit $h was NOT less than target $t, not forging block with ${account.address}")
       _ = log.debug(s"Forging with ${account.address}, H $h < T $t, balance $balance, prev block ${parent.uniqueId}")
       _ = log.debug(s"Previous block ID ${parent.uniqueId} at $parentHeight with target ${lastBlockKernelData.baseTarget}")
       avgBlockDelay = blockchainSettings.genesisSettings.averageBlockDelay
@@ -111,40 +112,38 @@ class Miner(
 
   private def generateBlockTask(account: PrivateKeyAccount): Task[Unit] = Task {
     val height = history.height()
-    val lastBlock0 = history.lastBlock.get
-    (for {
-      _ <- checkAge(height, history.lastBlock.get)
-      ts <- nextBlockGenerationTime(height, stateReader, blockchainSettings.functionalitySettings, lastBlock0, account)
-    } yield ts) match {
-      case Left(err) => log.debug(s"NOT scheduling block generation: $err")
-      case Right(ts) =>
-        val offset = calcOffset(timeService, minerSettings.minimalBlockGenerationOffset, ts)
-        val key = ByteStr(account.publicKey)
-        scheduledAttempts.remove(key).foreach(_.cancel())
-        val lastBlock = history.lastBlock.get
-        log.trace(s"Scheduling mining task for account=$account in $offset, referencing ${trim(lastBlock.uniqueId)})")
-        val balance = generatingBalance(stateReader, blockchainSettings.functionalitySettings, account, height)
-        val grandParent = history.parent(lastBlock, 2)
-
-        val blockGenTask = generateOneBlockTask(account, height, lastBlock, grandParent, balance)(offset).flatMap {
-          case Right(block) =>
-            Coordinator.processBlock(checkpoint, history, blockchainUpdater, timeService, stateReader,
-              utx, blockchainReadiness, settings)(block, local = true) match {
-              case Left(err) => Task(log.warn(err.toString))
-              case Right(score) => Task {
-                allChannels.broadcast(LocalScoreChanged(score))
-                allChannels.broadcast(BlockForged(block))
-                scheduleMining()
-//                startMicroBlockMining(account, block)
+    val lastBlock = history.lastBlock.get
+    val grandParent = history.parent(lastBlock, 2)
+    for {
+      _ <- checkAge(height, lastBlock)
+      ts <- nextBlockGenerationTime(height, stateReader, blockchainSettings.functionalitySettings, lastBlock, account)
+      offset = calcOffset(timeService, ts, minerSettings.minimalBlockGenerationOffset)
+      key = ByteStr(account.publicKey)
+      _ = scheduledAttempts.get(key) match {
+        case Some(_) => log.debug(s"Block generation already scheduled for $key")
+        case None =>
+          log.debug(s"${System.currentTimeMillis()}: Next attempt for acc=$account in $offset")
+          val balance = generatingBalance(stateReader, blockchainSettings.functionalitySettings, account, height)
+          val blockGenTask = generateOneBlockTask(account, height, lastBlock, grandParent, balance)(offset).flatMap {
+            case Right(block) => Task {
+              Coordinator.processBlock(checkpoint, history, blockchainUpdater, timeService, stateReader,
+                utx, blockchainReadiness, settings)(block, local = true) match {
+                case Left(err) => log.warn(err.toString)
+                case Right(score) =>
+                  allChannels.broadcast(LocalScoreChanged(score))
+                  allChannels.broadcast(BlockForged(block))
+                  scheduleMining()
               }
             }
-          case Left(err) =>
-            scheduledAttempts.remove(key)
-            log.debug(s"No block generated because $err, retrying")
-            generateBlockTask(account)
-        }
-        scheduledAttempts.put(key, blockGenTask.runAsync)
+            case Left(err) =>
+              scheduledAttempts.remove(key).foreach(_.cancel())
+              log.debug(s"No block generated because $err, retrying")
+              generateBlockTask(account)
+          }
+          scheduledAttempts.put(key, blockGenTask.runAsync)
+      }
     }
+      ???
   }
 
   def scheduleMining(): Unit = {
@@ -171,9 +170,9 @@ object Miner extends ScorexLogging {
   val MaxTransactionsPerMicroblock: Int = 255
   val Version: Byte = 3
 
-  def calcOffset(timeService: Time, minimalBlockGenerationOffset: FiniteDuration, ts: Long): FiniteDuration = {
-    val generationInstant = ts + 10
-    val calculatedOffset = generationInstant - timeService.correctedTime()
+  def calcOffset(timeService: Time, calculatedTimestamp: Long, minimalBlockGenerationOffset: FiniteDuration): FiniteDuration = {
+    val calculatedGenerationTimestamp = (Math.ceil(calculatedTimestamp / 1000.0) * 1000).toLong
+    val calculatedOffset = calculatedGenerationTimestamp - timeService.correctedTime()
     Math.max(minimalBlockGenerationOffset.toMillis, calculatedOffset).millis
   }
 }

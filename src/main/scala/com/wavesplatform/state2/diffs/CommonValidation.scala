@@ -17,6 +17,7 @@ import scala.util.{Left, Right}
 object CommonValidation {
 
   val MaxTimeTransactionOverBlockDiff: FiniteDuration = 90.minutes
+  val MaxTimePrevBlockOverTransactionDiff: FiniteDuration = 2.hours
 
   def disallowSendingGreaterThanBalance[T <: Transaction](s: StateReader, settings: FunctionalitySettings, blockTime: Long, tx: T): Either[ValidationError, T] =
     if (blockTime >= settings.allowTemporaryNegativeUntil)
@@ -39,11 +40,15 @@ object CommonValidation {
           val accountPortfolio = s.accountPortfolio(sender)
           val spendings = Monoid.combine(amountDiff, feeDiff)
 
-          lazy val negativeAssets: Boolean = spendings.assets.exists { case (id, amt) => (accountPortfolio.assets.getOrElse(id, 0L) + amt) < 0L }
-          lazy val negativeWaves = accountPortfolio.balance + spendings.balance < 0
-          if (negativeWaves || negativeAssets)
+          lazy val negativeAsset = spendings.assets.find { case (id, amt) => (accountPortfolio.assets.getOrElse(id, 0L) + amt) < 0L }.map { case (id, amt) => (id, accountPortfolio.assets.getOrElse(id, 0L), amt, accountPortfolio.assets.getOrElse(id, 0L) + amt) }
+          lazy val newWavesBalance = accountPortfolio.balance + spendings.balance
+          lazy val negativeWaves = newWavesBalance < 0
+          if (negativeWaves)
             Left(GenericError(s"Attempt to transfer unavailable funds:" +
-              s" Transaction application leads to negative ${if (negativeWaves) "waves" else "asset"} balance to (at least) temporary negative state"))
+              s" Transaction application leads to negative waves balance to (at least) temporary negative state, current balance equals ${accountPortfolio.balance}, spends equals ${spendings.balance}, result is $newWavesBalance"))
+          else if (negativeAsset.nonEmpty)
+            Left(GenericError(s"Attempt to transfer unavailable funds:" +
+              s" Transaction application leads to negative asset '${negativeAsset.get._1}' balance to (at least) temporary negative state, current balance is ${negativeAsset.get._2}, spends equals ${negativeAsset.get._3}, result is ${negativeAsset.get._4}"))
           else Right(tx)
         case _ => Right(tx)
       } else Right(tx)
@@ -81,20 +86,22 @@ object CommonValidation {
       case _: LeaseCancelTransaction => Right(tx)
       case _: CreateAliasTransaction => Right(tx)
       case _: MakeAssetNameUniqueTransaction => Right(tx)
-      case x => Left(GenericError( "Unknown transaction must be explicitly registered within ActivatedValidator"))
+      case x => Left(GenericError("Unknown transaction must be explicitly registered within ActivatedValidator"))
     }
 
-  def disallowTxFromFuture[T <: Transaction](state: StateReader, settings: FunctionalitySettings, time: Long, tx: T): Either[ValidationError, T] = {
-
+  def disallowTxFromFuture[T <: Transaction](settings: FunctionalitySettings, time: Long, tx: T): Either[ValidationError, T] = {
     val allowTransactionsFromFutureByTimestamp = tx.timestamp < settings.allowTransactionsFromFutureUntil
-    if (allowTransactionsFromFutureByTimestamp) {
-      Right(tx)
-    } else {
-      if ((tx.timestamp - time).millis <= MaxTimeTransactionOverBlockDiff)
-        Right(tx)
-      else Left(GenericError(s"Transaction ts ${tx.timestamp} is from far future. BlockTime: $time"))
-    }
+    if (!allowTransactionsFromFutureByTimestamp && (tx.timestamp - time).millis > MaxTimeTransactionOverBlockDiff)
+      Left(GenericError(s"Transaction ts ${tx.timestamp} is from far future. BlockTime: $time"))
+    else Right(tx)
   }
+
+  def disallowTxFromPast[T <: Transaction](prevBlockTime: Option[Long], tx: T): Either[ValidationError, T] =
+    prevBlockTime match {
+      case Some(t) if (t - tx.timestamp) > MaxTimePrevBlockOverTransactionDiff.toMillis =>
+        Left(GenericError(s"Transaction ts ${tx.timestamp} is too old. Previous block time: $prevBlockTime"))
+      case _ => Right(tx)
+    }
 }
 
 

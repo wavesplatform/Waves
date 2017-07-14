@@ -1,14 +1,15 @@
 package com.wavesplatform.matcher.model
 
+import cats.implicits._
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.market.OrderBookActor.CancelOrder
+import com.wavesplatform.matcher.model.Events.OrderAdded
 import com.wavesplatform.state2.reader.StateReader
 import scorex.account.PublicKeyAccount
-import scorex.api.http.AddressApiRoute.Signed
 import scorex.transaction.AssetAcc
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction.assets.exchange.Validation.booleanOperators
-import scorex.transaction.assets.exchange.{Order, Validation}
+import scorex.transaction.assets.exchange.{AssetPair, Order, Validation}
 import scorex.utils.NTP
 import scorex.wallet.Wallet
 
@@ -21,22 +22,19 @@ trait OrderValidator {
   lazy val matcherPubKey: PublicKeyAccount = wallet.findWallet(settings.account).right.get
 
   def isBalanceWithOpenOrdersEnough(order: Order): Validation = {
-    def notEnoughError(tBal: Long, oBal: Long, needs: Long): String = s"Not enough balance: [$tBal, $oBal], needs: $needs"
+    val lo = LimitOrder(order)
 
-    val (acc, feeAcc) = (AssetAcc(order.senderPublicKey, order.getSpendAssetId), AssetAcc(order.senderPublicKey, None))
+    val b: Map[String, Long] = (Map(lo.spentAcc -> 0L) ++ Map(lo.feeAcc -> 0L))
+      .map { case(a, _) => a -> storedState.spendableBalance(a) }
+      .map { case(a, v) => a.assetId.map(_.base58).getOrElse(AssetPair.WavesName) -> v }
 
-    val (assTBal, assOBal) = (storedState.spendableBalance(acc), orderHistory.openVolume(acc))
-    val (feeTBal, feeOBal) = (storedState.spendableBalance(feeAcc), orderHistory.openVolume(feeAcc))
+    val newOrder = Events.createOpenPortfolio(OrderAdded(lo)).getOrElse(order.senderPublicKey.address, OpenPortfolio.empty)
+    val open = orderHistory.openPortfolio(order.senderPublicKey.address).orders.filter { case (k, _) => b.contains(k) }
+    val needs = OpenPortfolio(open).combine(newOrder)
 
-    if (acc != feeAcc) {
-      (assTBal - assOBal >= order.getSpendAmount(order.price, order.amount).getOrElse(0L)) :|
-        notEnoughError(assTBal, assOBal, order.getSpendAmount(order.price, order.amount).getOrElse(0L)) &&
-        (feeTBal - feeOBal >= order.matcherFee) :| notEnoughError(feeTBal, feeOBal, order.matcherFee)
-    }
-    else {
-      (assTBal - assOBal >= order.getSpendAmount(order.price, order.amount).getOrElse(0L) + order.matcherFee) :|
-        notEnoughError(assTBal, assOBal, order.getSpendAmount(order.price, order.amount).getOrElse(0L) + order.matcherFee)
-    }
+    val res: Boolean = b.combine(needs.orders.mapValues(-_)).forall(_._2 >= 0)
+
+    res :| s"Not enough tradable balance: ${b.combine(open.mapValues(-_))}, needs: $newOrder"
   }
 
   def getTradableBalance(acc: AssetAcc): Long = {

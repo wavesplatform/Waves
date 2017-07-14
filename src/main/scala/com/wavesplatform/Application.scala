@@ -19,6 +19,7 @@ import com.wavesplatform.matcher.Matcher
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.network.{NetworkServer, PeerDatabaseImpl, PeerInfo, UPnP}
 import com.wavesplatform.settings._
+import com.wavesplatform.utils.forceStopApplication
 import io.netty.channel.Channel
 import io.netty.channel.group.DefaultChannelGroup
 import io.netty.util.concurrent.GlobalEventExecutor
@@ -63,7 +64,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
     val allChannels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
 
     val utxStorage = new UtxPool(allChannels,
-      time, stateReader, feeCalculator, settings.blockchainSettings.functionalitySettings, settings.utxSettings)
+      time, stateReader, history, feeCalculator, settings.blockchainSettings.functionalitySettings, settings.utxSettings)
 
     val blockchainReadiness = new AtomicBoolean(false)
 
@@ -146,7 +147,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
     Block.genesis(settings.blockchainSettings.genesisSettings).flatMap(blockchainUpdater.processBlock)
       .left.foreach { value =>
         log.error(value.toString)
-        System.exit(1)
+        forceStopApplication()
       }
 
     log.info("Genesis block has been added to the state")
@@ -215,7 +216,7 @@ object Application extends ScorexLogging {
           log.error("Malformed configuration file was provided! Aborting!")
           log.error("Please, read following article about configuration file format:")
           log.error("https://github.com/wavesplatform/Waves/wiki/Waves-Node-configuration-file")
-          System.exit(1)
+          forceStopApplication()
         }
         loadConfig(cfg)
     }

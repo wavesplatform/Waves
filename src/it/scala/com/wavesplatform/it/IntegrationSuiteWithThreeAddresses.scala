@@ -1,6 +1,6 @@
 package com.wavesplatform.it
 
-import com.wavesplatform.it.Node.{AssetBalance, FullAssetInfo}
+import com.wavesplatform.it.api.NodeApi.{AssetBalance, FullAssetInfo}
 import com.wavesplatform.it.util._
 import org.scalatest._
 import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
@@ -74,9 +74,10 @@ trait IntegrationSuiteWithThreeAddresses extends FunSuite with BeforeAndAfterAll
     val correctStartBalancesFuture = for {
       txs <- makeTransfers
 
-      _ <- waitForTxsToReachAllNodes(txs)
       height <- traverse(allNodes)(_.height).map(_.max)
       _ <- traverse(allNodes)(_.waitForHeight(height + 1))
+
+      _ <- waitForTxsToReachAllNodes(txs)
 
       _ <- Future.sequence(Seq(firstAddress, secondAddress, thirdAddress).map(address => assertBalances(address, defaultBalance, defaultBalance)))
     } yield succeed

@@ -9,7 +9,7 @@ import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.BlockchainUpdaterImpl._
 import com.wavesplatform.state2.StateWriterImpl._
 import com.wavesplatform.state2.diffs.BlockDiffer
-import com.wavesplatform.state2.reader.CompositeStateReader.proxy
+import com.wavesplatform.state2.reader.CompositeStateReader.composite
 import com.wavesplatform.state2.reader.StateReader
 import scorex.block.Block.BlockId
 import scorex.block.{Block, MicroBlock}
@@ -23,18 +23,16 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
                                     ngHistoryWriter: NgHistoryWriter,
                                     val synchronizationToken: ReentrantReadWriteLock) extends BlockchainUpdater with ScorexLogging {
 
-  private val MaxInMemDiffHeight = minimumInMemoryDiffSize * 2
-
   private val topMemoryDiff = Synchronized(Monoid[BlockDiff].empty)
   private val bottomMemoryDiff = Synchronized(Monoid[BlockDiff].empty)
   private val liquidBlockCandidatesDiff = Synchronized(Map.empty[BlockId, BlockDiff])
 
-  private def unsafeDiffAgainstPersistedByRange(from: Int, to: Int): BlockDiff = {
+  private def unsafeDiffByRange(state: StateReader, from: Int, to: Int): BlockDiff = {
     val blocks = measureLog(s"Reading blocks from $from up to $to") {
       Range(from, to).map(ngHistoryWriter.blockBytes).par.map(b => Block.parseBytes(b.get).get).seq
     }
     measureLog(s"Building diff from $from up to $to") {
-      BlockDiffer.unsafeDiffMany(settings, persisted)(blocks)
+      BlockDiffer.unsafeDiffMany(settings, state, ngHistoryWriter.blockAt(from - 1).map(_.timestamp))(blocks)
     }
   }
 
@@ -44,7 +42,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
   }
 
   private def currentPersistedBlocksState: StateReader = read { implicit l =>
-    proxy(proxy(persisted,() =>bottomMemoryDiff()), () => topMemoryDiff())
+    composite(composite(persisted, () => bottomMemoryDiff()), () => topMemoryDiff())
   }
 
   private def bestLiquidDiff() = read { implicit l =>
@@ -56,7 +54,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
   }
 
   def bestLiquidState: StateReader = read { implicit l =>
-    proxy(currentPersistedBlocksState, () => bestLiquidDiff())
+    composite(currentPersistedBlocksState, () => bestLiquidDiff())
   }
 
   private def updatePersistedAndInMemory(): Unit = write { implicit l =>
@@ -65,11 +63,11 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
     val persistUpTo = ngHistoryWriter.height - minimumInMemoryDiffSize + 1
 
     ranges(persistFrom, persistUpTo, minimumInMemoryDiffSize).foreach { case (head, last) =>
-      val diffToBePersisted = unsafeDiffAgainstPersistedByRange(head, last)
+      val diffToBePersisted = unsafeDiffByRange(persisted, head, last)
       persisted.applyBlockDiff(diffToBePersisted)
     }
 
-    bottomMemoryDiff.set(unsafeDiffAgainstPersistedByRange(persisted.height + 1, ngHistoryWriter.height() + (if (ngHistoryWriter.liquidBlockExists()) 0 else 1)))
+    bottomMemoryDiff.set(unsafeDiffByRange(persisted, persisted.height + 1, ngHistoryWriter.height() + (if (ngHistoryWriter.liquidBlockExists()) 0 else 1)))
     topMemoryDiff.set(BlockDiff.empty)
     logHeights("State rebuild finished:")
   }
@@ -83,16 +81,18 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
     (liquidBlockCandidatesDiff().get(block.reference) match {
       case Some(referencedLiquidDiff) =>
         val asFirmBlock = referencedLiquidDiff.copy(heightDiff = 1)
-        ngHistoryWriter.appendBlock(block)(BlockDiffer.fromBlock(settings, proxy(currentPersistedBlocksState, () => asFirmBlock))(block)).map { newBlockDiff =>
-      topMemoryDiff.set(Monoid.combine(topMemoryDiff(), asFirmBlock))
-          liquidBlockCandidatesDiff.set(Map(block.uniqueId ->newBlockDiff))
-    }
-      case None =>
-        ngHistoryWriter.appendBlock(block)(BlockDiffer.fromBlock(settings, currentPersistedBlocksState)(block)).map { newBlockDiff =>
+        ngHistoryWriter.appendBlock(block)(BlockDiffer.fromBlock(settings,
+          composite(currentPersistedBlocksState, () => asFirmBlock),
+          ngHistoryWriter.bestLiquidBlock().map(_.timestamp))(block)).map { newBlockDiff =>
+          topMemoryDiff.set(Monoid.combine(topMemoryDiff(), asFirmBlock))
           liquidBlockCandidatesDiff.set(Map(block.uniqueId -> newBlockDiff))
         }
-    }).map(_ => log.info( s"Block ${block.uniqueId} ->${trim(block.reference)} " +
-      s"[generator=${block.signerData.generator} | txs=${block.transactionData.size} | h=${ngHistoryWriter. height()} | score= ${ngHistoryWriter.score()}] appended"))
+      case None =>
+        ngHistoryWriter.appendBlock(block)(BlockDiffer.fromBlock(
+          settings, currentPersistedBlocksState, ngHistoryWriter.lastBlock.map(_.timestamp))(block)).map { newBlockDiff =>
+          topMemoryDiff.set(Monoid[BlockDiff].combine(topMemoryDiff(), newBlockDiff))
+        }
+    }).map(_ => log.info( s"""Block ${block.uniqueId} appended. New height: ${ngHistoryWriter.height()}, new score: ${ngHistoryWriter.score()})"""))
   }
 
   override def removeAfter(blockId: ByteStr): Either[ValidationError, Seq[Transaction]] = write { implicit l =>
@@ -113,19 +113,12 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
           if (bestLiquidState.height != height) {
             val persistedPlusBottomHeight = persisted.height + bottomMemoryDiff().heightDiff
             if (height > persistedPlusBottomHeight) {
-              val from = persistedPlusBottomHeight + 1
-              val to = height + 1
-              val blocks = measureLog(s"Reading blocks from $from up to $to") {
-                Range(from,to)
-                  .map(ngHistoryWriter.blockBytes).par.map(b => Block.parseBytes(b.get).get).seq
-              }
-              val newTopDiff = measureLog(s"Building diff from $from up to $to") {
-                BlockDiffer.unsafeDiffMany(settings, proxy(persisted, () => bottomMemoryDiff()))(blocks)
-              }
+              val newTopDiff = unsafeDiffByRange(composite(persisted, () => bottomMemoryDiff()), persistedPlusBottomHeight + 1, height + 1)
               topMemoryDiff.set(newTopDiff)
             } else {
               topMemoryDiff.set(BlockDiff.empty)
-              bottomMemoryDiff.set(unsafeDiffAgainstPersistedByRange(persisted.height + 1, height + 1))
+              if (height < persistedPlusBottomHeight)
+                bottomMemoryDiff.set(unsafeDiffByRange(persisted, persisted.height + 1, height + 1))
             }
           }
         }
@@ -143,7 +136,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
       val newTotal = prevTotal.copy(
         signerData = prevTotal.signerData.copy(signature = microBlock.totalResBlockSig),
         transactionData = prevTotal.transactionData ++ microBlock.transactionData)
-      BlockDiffer.fromLiquidBlock(settings, currentPersistedBlocksState)(newTotal)
+      BlockDiffer.fromLiquidBlock(settings, currentPersistedBlocksState, ngHistoryWriter.parent(ngHistoryWriter.lastBlock.get).map(_.timestamp))(newTotal)
         .map(newTotalDiff => liquidBlockCandidatesDiff.set(liquidBlockCandidatesDiff() + (microBlock.totalResBlockSig -> newTotalDiff)))
     }.map(_ => log.info(s"MicroBlock ${trim(microBlock.totalResBlockSig)}~>${trim(microBlock.prevResBlockSig)} " +
       s"with ${microBlock.transactionData.size} transactions appended"))
