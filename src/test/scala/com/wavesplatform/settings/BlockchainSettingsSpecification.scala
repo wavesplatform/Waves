@@ -40,6 +40,7 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
         |        reset-effective-balances-at-height: 15
         |        allow-make-asset-name-unique-transaction-after: 16
         |        allow-leased-balance-transfer-until: 17
+        |        apply-miner-fee-with-transaction-after: 18
         |      }
         |      genesis {
         |        timestamp: 1460678400000
@@ -81,6 +82,7 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
     settings.functionalitySettings.resetEffectiveBalancesAtHeight should be(15)
     settings.functionalitySettings.allowMakeAssetNameUniqueTransactionAfter should be(16)
     settings.functionalitySettings.allowLeasedBalanceTransferUntil should be(17)
+    settings.functionalitySettings.applyMinerFeeWithTransactionAfter should be(18)
     settings.genesisSettings.blockTimestamp should be(1460678400000L)
     settings.genesisSettings.timestamp should be(1460678400000L)
     settings.genesisSettings.signature should be(ByteStr.decodeBase58("BASE58BLKSGNATURE").toOption)

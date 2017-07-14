@@ -6,6 +6,7 @@ import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2._
 import com.wavesplatform.state2.patch.LeasePatch
 import com.wavesplatform.state2.reader.{CompositeStateReader, StateReader}
+import scorex.account.Address
 import scorex.block.Block
 import scorex.transaction.{Signed, Transaction, ValidationError}
 import scorex.utils.ScorexLogging
@@ -17,10 +18,10 @@ object BlockDiffer extends ScorexLogging {
   def right(diff: Diff): Either[ValidationError, Diff] = Right(diff)
 
   def fromBlock(settings: FunctionalitySettings, s: StateReader)(block: Block): Either[ValidationError, BlockDiff] =
-    Signed.validateSignatures(block).flatMap { _ => apply(settings, s)(block.feesDistribution, block.timestamp, block.transactionData, 1) }
+    Signed.validateSignatures(block).flatMap { _ => apply(settings, s)(block.signerData.generator, block.feesDistribution, block.timestamp, block.transactionData, 1) }
 
   def fromLiquidBlock(settings: FunctionalitySettings, s: StateReader)(block: Block): Either[ValidationError, BlockDiff] =
-    Signed.validateSignatures(block).flatMap { _ => apply(settings, s)(block.feesDistribution, block.timestamp, block.transactionData, 0) }
+    Signed.validateSignatures(block).flatMap { _ => apply(settings, s)(block.signerData.generator, block.feesDistribution, block.timestamp, block.transactionData, 0) }
 
   def unsafeDiffMany(settings: FunctionalitySettings, s: StateReader)(blocks: Seq[Block]): BlockDiff =
     blocks.foldLeft(Monoid[BlockDiff].empty) { case (diff, block) =>
@@ -28,14 +29,33 @@ object BlockDiffer extends ScorexLogging {
       Monoid[BlockDiff].combine(diff, blockDiff)
     }
 
-  private def apply(settings: FunctionalitySettings, s: StateReader)(feesDistribution: Diff, timestamp: Long, txs: Seq[Transaction], heightDiff: Int) = {
+  private def apply(settings: FunctionalitySettings, s: StateReader)(blockGenerator: Address, feesDistribution: Diff, timestamp: Long, txs: Seq[Transaction], heightDiff: Int) = {
     val currentBlockHeight = s.height + 1
 
     val txDiffer = TransactionDiffer(settings, timestamp, currentBlockHeight) _
+    def txFeeDiffer(tx: Transaction): Map[Address, Portfolio] = Map(blockGenerator ->
+      (tx.assetFee match {
+      case (Some(asset), fee) =>
+        Portfolio(
+          balance = 0,
+          leaseInfo = LeaseInfo.empty,
+          assets = Map(asset -> fee))
+      case (None, fee) => Portfolio(
+        balance = fee,
+        leaseInfo = LeaseInfo.empty,
+        assets = Map.empty)
+    }))
 
-    val txsDiffEi = txs.foldLeft(right(feesDistribution)) { case (ei, tx) => ei.flatMap(diff =>
-      txDiffer(new CompositeStateReader(s, diff.asBlockDiff), tx)
-        .map(newDiff => diff.combine(newDiff)))
+    val txsDiffEi = if (timestamp < settings.applyMinerFeeWithTransactionAfter) {
+      txs.foldLeft(right(feesDistribution)) { case (ei, tx) => ei.flatMap(diff =>
+        txDiffer(new CompositeStateReader(s, diff.asBlockDiff), tx)
+          .map(newDiff => diff.combine(newDiff)))
+      }
+    } else {
+      txs.foldLeft(right(Diff.empty)) { case (ei, tx) => ei.flatMap(diff =>
+        txDiffer(new CompositeStateReader(s, diff.asBlockDiff), tx)
+          .map(newDiff => diff.combine(newDiff.copy(portfolios = newDiff.portfolios.combine(txFeeDiffer(tx))))))
+      }
     }
 
     txsDiffEi.map { d =>
