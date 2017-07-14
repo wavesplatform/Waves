@@ -13,7 +13,7 @@ import io.netty.channel.Channel
 import io.netty.channel.group.ChannelGroup
 import scorex.consensus.TransactionsOrdering
 import scorex.transaction.ValidationError.GenericError
-import scorex.transaction.{FeeCalculator, Transaction, ValidationError}
+import scorex.transaction.{FeeCalculator, History, Transaction, ValidationError}
 import scorex.utils.{ScorexLogging, Time}
 
 import scala.collection.JavaConverters._
@@ -22,12 +22,13 @@ import scala.util.{Left, Right}
 
 
 class UtxPool(
-    allChannels: ChannelGroup,
-    time: Time,
-    stateReader: StateReader,
-    feeCalculator: FeeCalculator,
-    fs: FunctionalitySettings,
-    utxSettings: UtxSettings) extends ScorexLogging {
+                 allChannels: ChannelGroup,
+                 time: Time,
+                 stateReader: StateReader,
+                 history: History,
+                 feeCalculator: FeeCalculator,
+                 fs: FunctionalitySettings,
+                 utxSettings: UtxSettings) extends ScorexLogging {
 
   private val transactions = new ConcurrentHashMap[ByteStr, Transaction]
   private lazy val knownTransactions = CacheBuilder.newBuilder()
@@ -43,13 +44,13 @@ class UtxPool(
     } else knownTransactions.get(tx.id, () => {
       val validationResult = for {
         _ <- feeCalculator.enoughFee(tx)
-        _ <- TransactionDiffer.apply(fs, time.correctedTime(), stateReader.height)(stateReader, tx)
+        _ <- TransactionDiffer.apply(fs, history.lastBlock.map(_.timestamp), time.correctedTime(), stateReader.height)(stateReader, tx)
         _ = transactions.putIfAbsent(tx.id, tx)
         _ = allChannels.broadcast(RawBytes(TransactionMessageSpec.messageCode, tx.bytes), source)
       } yield tx
 
       validationResult
-  })
+    })
 
   def removeAll(tx: Traversable[Transaction]): Unit = {
     removeExpired(time.correctedTime())
@@ -68,7 +69,7 @@ class UtxPool(
   def packUnconfirmed(): Seq[Transaction] = {
     val currentTs = time.correctedTime()
     removeExpired(currentTs)
-    val differ = TransactionDiffer.apply(fs, currentTs, stateReader.height) _
+    val differ = TransactionDiffer.apply(fs, history.lastBlock.map(_.timestamp), currentTs, stateReader.height) _
     val (invalidTxs, validTxs, _) = transactions.asScala
       .values.toSeq
       .sorted(TransactionsOrdering.InUTXPool)

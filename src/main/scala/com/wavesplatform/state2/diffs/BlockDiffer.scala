@@ -7,7 +7,7 @@ import com.wavesplatform.state2._
 import com.wavesplatform.state2.patch.LeasePatch
 import com.wavesplatform.state2.reader.{CompositeStateReader, StateReader}
 import scorex.block.Block
-import scorex.transaction.{Signed, Transaction, ValidationError}
+import scorex.transaction.{History, Signed, Transaction, ValidationError}
 import scorex.utils.ScorexLogging
 
 import scala.collection.SortedMap
@@ -16,19 +16,19 @@ object BlockDiffer extends ScorexLogging {
 
   def right(diff: Diff): Either[ValidationError, Diff] = Right(diff)
 
-  def fromBlock(settings: FunctionalitySettings, s: StateReader)(block: Block): Either[ValidationError, BlockDiff] =
-    Signed.validateSignatures(block).flatMap { _ => apply(settings, s)(block.feesDistribution, block.timestamp, block.transactionData, 1) }
+  def fromBlock(settings: FunctionalitySettings, s: StateReader,  pervBlockTimestamp : Option[Long])(block: Block): Either[ValidationError, BlockDiff] =
+    Signed.validateSignatures(block).flatMap { _ => apply(settings, s, pervBlockTimestamp)(block.feesDistribution, block.timestamp, block.transactionData, 1) }
 
-  def unsafeDiffMany(settings: FunctionalitySettings, s: StateReader)(blocks: Seq[Block]): BlockDiff =
-    blocks.foldLeft(Monoid[BlockDiff].empty) { case (diff, block) =>
-      val blockDiff = fromBlock(settings, new CompositeStateReader(s, diff))(block).explicitGet()
-      Monoid[BlockDiff].combine(diff, blockDiff)
-    }
+  def unsafeDiffMany(settings: FunctionalitySettings, s: StateReader, prevBlockTimestamp: Option[Long])(blocks: Seq[Block]): BlockDiff =
+    blocks.foldLeft((Monoid[BlockDiff].empty, prevBlockTimestamp)) { case ((diff, prev), block) =>
+      val blockDiff = fromBlock(settings, new CompositeStateReader(s, diff), prev)(block).explicitGet()
+      (Monoid[BlockDiff].combine(diff, blockDiff), Some(block.timestamp))
+    }._1
 
-  private def apply(settings: FunctionalitySettings, s: StateReader)(feesDistribution: Diff, timestamp: Long, txs: Seq[Transaction], heightDiff: Int) = {
+  private def apply(settings: FunctionalitySettings, s: StateReader, pervBlockTimestamp : Option[Long])(feesDistribution: Diff, timestamp: Long, txs: Seq[Transaction], heightDiff: Int) = {
     val currentBlockHeight = s.height + 1
 
-    val txDiffer = TransactionDiffer(settings, timestamp, currentBlockHeight) _
+    val txDiffer = TransactionDiffer(settings, pervBlockTimestamp, timestamp, currentBlockHeight) _
 
     val txsDiffEi = txs.foldLeft(right(feesDistribution)) { case (ei, tx) => ei.flatMap(diff =>
       txDiffer(new CompositeStateReader(s, diff.asBlockDiff), tx)

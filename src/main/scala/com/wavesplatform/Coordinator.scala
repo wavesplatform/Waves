@@ -139,7 +139,7 @@ object Coordinator extends ScorexLogging {
       _ <- Either.cond(calcGs.sameElements(blockGs), (),
         s"Declared signature ${blockGs.mkString} of ${block.uniqueId} does not match calculated signature ${calcGs.mkString}")
       effectiveBalance = generatingBalance(state, fs, generator, parentHeight)
-      _ <- Either.cond(blockTime < fs.minimalGeneratingBalanceAfter || effectiveBalance > MinimalEffectiveBalanceForGenerator, (),
+      _ <- Either.cond(blockTime < fs.minimalGeneratingBalanceAfter || effectiveBalance >= MinimalEffectiveBalanceForGenerator, (),
         s"Effective balance $effectiveBalance is less that minimal ($MinimalEffectiveBalanceForGenerator)")
       _ <- Either.cond(calcHit(prevBlockData, generator) < calcTarget(parent, blockTime, effectiveBalance), (), "consensus data is not valid")
     } yield ()).left.map(BlockAppendError(_, block))
