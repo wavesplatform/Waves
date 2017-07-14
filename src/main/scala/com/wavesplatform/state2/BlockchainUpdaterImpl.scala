@@ -30,7 +30,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
       Range(from, to).map(historyWriter.blockBytes).par.map(b => Block.parseBytes(b.get).get).seq
     }
     measureLog(s"Building diff from $from up to $to") {
-      BlockDiffer.unsafeDiffMany(settings, persisted, historyWriter, historyWriter.height())(blocks)
+      BlockDiffer.unsafeDiffMany(settings, persisted, historyWriter.lastBlock.map(_.timestamp))(blocks)
     }
   }
 
@@ -64,7 +64,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
       bottomMemoryDiff.set(topMemoryDiff())
       topMemoryDiff.set(BlockDiff.empty)
     }
-    historyWriter.appendBlock(block)(BlockDiffer.fromBlock(settings, currentPersistedBlocksState, historyWriter, historyWriter.height())(block)).map { newBlockDiff =>
+    historyWriter.appendBlock(block)(BlockDiffer.fromBlock(settings, currentPersistedBlocksState, historyWriter.lastBlock.map(_.timestamp))(block)).map { newBlockDiff =>
       topMemoryDiff.set(Monoid[BlockDiff].combine(topMemoryDiff(), newBlockDiff))
     }.map(_ => log.info( s"""Block ${block.uniqueId} appended. New height: ${historyWriter.height()}, new score: ${historyWriter.score()})"""))
   }
@@ -94,7 +94,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
                   .map(historyWriter.blockBytes).par.map(b => Block.parseBytes(b.get).get).seq
               }
               val newTopDiff = measureLog(s"Building diff from $from up to $to") {
-                BlockDiffer.unsafeDiffMany(settings, proxy(persisted, () => bottomMemoryDiff()), historyWriter, height)(blocks)
+                BlockDiffer.unsafeDiffMany(settings, proxy(persisted, () => bottomMemoryDiff()), historyWriter.blockAt(height).map(_.timestamp))(blocks)
               }
               topMemoryDiff.set(newTopDiff)
             } else {

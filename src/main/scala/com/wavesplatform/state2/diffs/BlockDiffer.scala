@@ -16,19 +16,19 @@ object BlockDiffer extends ScorexLogging {
 
   def right(diff: Diff): Either[ValidationError, Diff] = Right(diff)
 
-  def fromBlock(settings: FunctionalitySettings, s: StateReader, history: History, historyHeight: Int)(block: Block): Either[ValidationError, BlockDiff] =
-    Signed.validateSignatures(block).flatMap { _ => apply(settings, s, history, historyHeight)(block.feesDistribution, block.timestamp, block.transactionData, 1) }
+  def fromBlock(settings: FunctionalitySettings, s: StateReader,  pervBlockTimestamp : Option[Long])(block: Block): Either[ValidationError, BlockDiff] =
+    Signed.validateSignatures(block).flatMap { _ => apply(settings, s, pervBlockTimestamp)(block.feesDistribution, block.timestamp, block.transactionData, 1) }
 
-  def unsafeDiffMany(settings: FunctionalitySettings, s: StateReader, history: History, initialHistoryHeight: Int)(blocks: Seq[Block]): BlockDiff =
-    blocks.foldLeft((Monoid[BlockDiff].empty, initialHistoryHeight)) { case ((diff, historyHeight), block) =>
-      val blockDiff = fromBlock(settings, new CompositeStateReader(s, diff), history, historyHeight)(block).explicitGet()
-      (Monoid[BlockDiff].combine(diff, blockDiff), historyHeight + 1)
+  def unsafeDiffMany(settings: FunctionalitySettings, s: StateReader, prevBlockTimestamp: Option[Long])(blocks: Seq[Block]): BlockDiff =
+    blocks.foldLeft((Monoid[BlockDiff].empty, prevBlockTimestamp)) { case ((diff, prev), block) =>
+      val blockDiff = fromBlock(settings, new CompositeStateReader(s, diff), prev)(block).explicitGet()
+      (Monoid[BlockDiff].combine(diff, blockDiff), Some(block.timestamp))
     }._1
 
-  private def apply(settings: FunctionalitySettings, s: StateReader, h: History, prevBlockHeight: Int)(feesDistribution: Diff, timestamp: Long, txs: Seq[Transaction], heightDiff: Int) = {
+  private def apply(settings: FunctionalitySettings, s: StateReader, pervBlockTimestamp : Option[Long])(feesDistribution: Diff, timestamp: Long, txs: Seq[Transaction], heightDiff: Int) = {
     val currentBlockHeight = s.height + 1
 
-    val txDiffer = TransactionDiffer(settings, h.blockAt(prevBlockHeight).map(_.timestamp), timestamp, currentBlockHeight) _
+    val txDiffer = TransactionDiffer(settings, pervBlockTimestamp, timestamp, currentBlockHeight) _
 
     val txsDiffEi = txs.foldLeft(right(feesDistribution)) { case (ei, tx) => ei.flatMap(diff =>
       txDiffer(new CompositeStateReader(s, diff.asBlockDiff), tx)

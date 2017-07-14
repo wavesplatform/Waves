@@ -23,42 +23,38 @@ package object diffs {
   val ENOUGH_AMT: Long = Long.MaxValue / 3
 
   def assertDiffEi(preconditions: Seq[Block], block: Block, fs: FunctionalitySettings = TestFunctionalitySettings.Enabled)(assertion: Either[ValidationError, BlockDiff] => Unit): Unit = {
-    val differ: (StateReader, History, Block) => Either[ValidationError, BlockDiff] = (s, h, b) => BlockDiffer.fromBlock(fs, s, h, h.height())(b)
+    val differ: (StateReader,  Block) => Either[ValidationError, BlockDiff] = (s, b) => BlockDiffer.fromBlock(fs, s, None)(b)
 
     val state = newState()
-    val history = newHistory()
 
     preconditions.foreach { precondition =>
-      val preconditionDiff = differ(state, history, precondition).explicitGet()
+      val preconditionDiff = differ(state,  precondition).explicitGet()
       state.applyBlockDiff(preconditionDiff)
     }
-    val totalDiff1 = differ(state, history, block)
+    val totalDiff1 = differ(state,  block)
     assertion(totalDiff1)
 
-    val history0 = newHistory()
-    val preconditionDiff = BlockDiffer.unsafeDiffMany(fs, newState(), history0, history0.height())(preconditions)
+    val preconditionDiff = BlockDiffer.unsafeDiffMany(fs, newState(), None)(preconditions)
     val compositeState = new CompositeStateReader(newState(), preconditionDiff)
-    val totalDiff2 = differ(compositeState, history, block)
+    val totalDiff2 = differ(compositeState, block)
     assertion(totalDiff2)
   }
 
   def assertDiffAndState(preconditions: Seq[Block], block: Block, fs: FunctionalitySettings = TestFunctionalitySettings.Enabled)(assertion: (BlockDiff, StateReader) => Unit): Unit = {
-    val differ: (StateReader, History, Block) => Either[ValidationError, BlockDiff] = (s, h, b) => BlockDiffer.fromBlock(fs, s, h, h.height())(b)
+    val differ: (StateReader, Block) => Either[ValidationError, BlockDiff] = (s, b) => BlockDiffer.fromBlock(fs, s, None)(b)
 
     val state = newState()
-    val history = newHistory()
     preconditions.foreach { precondition =>
-      val preconditionDiff = differ(state, history, precondition).explicitGet()
+      val preconditionDiff = differ(state,  precondition).explicitGet()
       state.applyBlockDiff(preconditionDiff)
     }
-    val totalDiff1 = differ(state, history, block).explicitGet()
+    val totalDiff1 = differ(state,  block).explicitGet()
     state.applyBlockDiff(totalDiff1)
     assertion(totalDiff1, state)
 
-    val history0 = newHistory()
-    val preconditionDiff = BlockDiffer.unsafeDiffMany(fs, newState(), history0, history0.height())(preconditions)
+    val preconditionDiff = BlockDiffer.unsafeDiffMany(fs, newState(), None)(preconditions)
     val compositeState = new CompositeStateReader(newState(), preconditionDiff)
-    val totalDiff2 = differ(compositeState, newHistory(), block).explicitGet()
+    val totalDiff2 = differ(compositeState,  block).explicitGet()
     assertion(totalDiff2, new CompositeStateReader(compositeState, totalDiff2))
   }
 
