@@ -20,8 +20,6 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
                                     historyWriter: HistoryWriter,
                                     val synchronizationToken: ReentrantReadWriteLock) extends BlockchainUpdater with ScorexLogging {
 
-  private val MaxInMemDiffHeight = minimumInMemoryDiffSize * 2
-
   private val topMemoryDiff = Synchronized(Monoid[BlockDiff].empty)
   private val bottomMemoryDiff = Synchronized(Monoid[BlockDiff].empty)
 
@@ -94,7 +92,6 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
                   .map(historyWriter.blockBytes).par.map(b => Block.parseBytes(b.get).get).seq
               }
               val newTopDiff = measureLog(s"Building diff from $from up to $to") {
-                log.debug("")
                 BlockDiffer.unsafeDiffMany(settings, proxy(persisted, () => bottomMemoryDiff()), historyWriter.blockAt(persistedPlusBottomHeight).map(_.timestamp))(blocks)
               }
               topMemoryDiff.set(newTopDiff)
