@@ -10,7 +10,6 @@ import com.spotify.docker.client.DefaultDockerClient
 import com.spotify.docker.client.DockerClient.{ListContainersParam, RemoveContainerParam}
 import com.spotify.docker.client.messages.{ContainerConfig, HostConfig, NetworkConfig, PortBinding}
 import com.typesafe.config.{Config, ConfigFactory, ConfigRenderOptions}
-import io.netty.util.HashedWheelTimer
 import org.asynchttpclient.Dsl._
 import scorex.utils.ScorexLogging
 
@@ -40,18 +39,15 @@ class Docker(suiteConfig: Config = ConfigFactory.empty) extends AutoCloseable wi
     .setRequestTimeout(5000))
 
   private val client = DefaultDockerClient.fromEnv().build()
-  private val timer = new HashedWheelTimer()
-  private var nodes = Map.empty[String, NodeInfo]
+  private var nodes = Map.empty[String, Node]
   private val isStopped = new AtomicBoolean(false)
-
-  timer.start()
 
   sys.addShutdownHook {
     close()
   }
 
   private def knownPeers = nodes.values.zipWithIndex.map {
-    case (ni, index) => s"-Dwaves.network.known-peers.$index=${ni.networkIpAddress}:${ni.containerNetworkPort}"
+    case (n, index) => s"-Dwaves.network.known-peers.$index=${n.nodeInfo.networkIpAddress}:${n.nodeInfo.containerNetworkPort}"
   } mkString " "
 
   private val networkName = "waves-" + this.##.toLong.toHexString
@@ -107,9 +103,8 @@ class Docker(suiteConfig: Config = ConfigFactory.empty) extends AutoCloseable wi
       containerInfo.networkSettings().networks().asScala(networkName).ipAddress(),
       containerId,
       extractHostPort(ports, matcherApiPort))
-    nodes += containerId -> nodeInfo
-
-    val node = new Node(actualConfig, nodeInfo, http, timer)
+    val node = new Node(actualConfig, nodeInfo, http)
+    nodes += containerId -> node
     Await.result(node.lastBlock, Duration.Inf)
     node
   }
@@ -118,13 +113,10 @@ class Docker(suiteConfig: Config = ConfigFactory.empty) extends AutoCloseable wi
     client.stopContainer(containerId, 10)
   }
 
-  def scheduleOnce(initialDelay: FiniteDuration)(f: => Any) =
-    timer.newTimeout(_ => f, initialDelay.toMillis, MILLISECONDS)
-
   override def close(): Unit = {
     if (isStopped.compareAndSet(false, true)) {
-      timer.stop()
       log.info("Stopping containers")
+      nodes.values.foreach(n => n.close())
       nodes.keys.foreach(id => client.removeContainer(id, RemoveContainerParam.forceKill()))
       client.removeNetwork(wavesNetwork.id())
       client.close()
