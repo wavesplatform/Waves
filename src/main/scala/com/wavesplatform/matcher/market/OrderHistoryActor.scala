@@ -136,7 +136,7 @@ object OrderHistoryActor {
   case class GetOrderHistory(assetPair: AssetPair, address: String, ts: Long) extends ExpirableOrderHistoryRequest
   case class GetAllOrderHistory(address: String, ts: Long) extends ExpirableOrderHistoryRequest
   case class GetOrderStatus(assetPair: AssetPair, id: String, ts: Long) extends ExpirableOrderHistoryRequest
-  case class DeleteOrderFromHistory(assetPair: AssetPair, address: String, id: String) extends OrderHistoryRequest
+  case class DeleteOrderFromHistory(assetPair: AssetPair, address: String, id: String, ts: Long) extends ExpirableOrderHistoryRequest
   case class ValidateOrder(order: Order, ts: Long) extends ExpirableOrderHistoryRequest
   case class ValidateOrderResult(result: Either[GenericError, Order])
   case class ValidateCancelOrder(cancel: CancelOrder, ts: Long) extends ExpirableOrderHistoryRequest
