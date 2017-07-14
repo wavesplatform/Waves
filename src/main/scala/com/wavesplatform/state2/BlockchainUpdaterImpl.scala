@@ -7,7 +7,7 @@ import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.BlockchainUpdaterImpl._
 import com.wavesplatform.state2.StateWriterImpl._
 import com.wavesplatform.state2.diffs.BlockDiffer
-import com.wavesplatform.state2.reader.CompositeStateReader.proxy
+import com.wavesplatform.state2.reader.CompositeStateReader.composite
 import com.wavesplatform.state2.reader.StateReader
 import scorex.block.Block
 import scorex.transaction.ValidationError.GenericError
@@ -23,12 +23,12 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
   private val topMemoryDiff = Synchronized(Monoid[BlockDiff].empty)
   private val bottomMemoryDiff = Synchronized(Monoid[BlockDiff].empty)
 
-  private def unsafeDiffAgainstPersistedByRange(from: Int, to: Int): BlockDiff = {
+  private def unsafeDiffByRange(state: StateReader, from: Int, to: Int): BlockDiff = {
     val blocks = measureLog(s"Reading blocks from $from up to $to") {
       Range(from, to).map(historyWriter.blockBytes).par.map(b => Block.parseBytes(b.get).get).seq
     }
     measureLog(s"Building diff from $from up to $to") {
-      BlockDiffer.unsafeDiffMany(settings, persisted, historyWriter.lastBlock.map(_.timestamp))(blocks)
+      BlockDiffer.unsafeDiffMany(settings, state, historyWriter.blockAt(from - 1).map(_.timestamp))(blocks)
     }
   }
 
@@ -38,7 +38,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
   }
 
   def currentPersistedBlocksState: StateReader = read { implicit l =>
-    proxy(proxy(persisted, () => bottomMemoryDiff()), () => topMemoryDiff())
+    composite(composite(persisted, () => bottomMemoryDiff()), () => topMemoryDiff())
   }
 
   private def updatePersistedAndInMemory(): Unit = write { implicit l =>
@@ -47,11 +47,11 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
     val persistUpTo = historyWriter.height - minimumInMemoryDiffSize + 1
 
     ranges(persistFrom, persistUpTo, minimumInMemoryDiffSize).foreach { case (head, last) =>
-      val diffToBePersisted = unsafeDiffAgainstPersistedByRange(head, last)
+      val diffToBePersisted = unsafeDiffByRange(persisted, head, last)
       persisted.applyBlockDiff(diffToBePersisted)
     }
 
-    bottomMemoryDiff.set(unsafeDiffAgainstPersistedByRange(persisted.height + 1, historyWriter.height() + 1))
+    bottomMemoryDiff.set(unsafeDiffByRange(persisted, persisted.height + 1, historyWriter.height() + 1))
     topMemoryDiff.set(BlockDiff.empty)
     logHeights("State rebuild finished:")
   }
@@ -85,19 +85,12 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
           if (currentPersistedBlocksState.height != height) {
             val persistedPlusBottomHeight = persisted.height + bottomMemoryDiff().heightDiff
             if (height > persistedPlusBottomHeight) {
-              val from = persistedPlusBottomHeight + 1
-              val to = height + 1
-              val blocks = measureLog(s"Reading blocks from $from up to $to") {
-                Range(from, to)
-                  .map(historyWriter.blockBytes).par.map(b => Block.parseBytes(b.get).get).seq
-              }
-              val newTopDiff = measureLog(s"Building diff from $from up to $to") {
-                BlockDiffer.unsafeDiffMany(settings, proxy(persisted, () => bottomMemoryDiff()), historyWriter.blockAt(persistedPlusBottomHeight).map(_.timestamp))(blocks)
-              }
+              val newTopDiff = unsafeDiffByRange(composite(persisted, () => bottomMemoryDiff()), persistedPlusBottomHeight + 1, height + 1)
               topMemoryDiff.set(newTopDiff)
             } else {
               topMemoryDiff.set(BlockDiff.empty)
-              bottomMemoryDiff.set(unsafeDiffAgainstPersistedByRange(persisted.height + 1, height + 1))
+              if (height < persistedPlusBottomHeight)
+                bottomMemoryDiff.set(unsafeDiffByRange(persisted, persisted.height + 1, height + 1))
             }
           }
         }
