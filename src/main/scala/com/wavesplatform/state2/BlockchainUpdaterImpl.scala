@@ -94,7 +94,8 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
                   .map(historyWriter.blockBytes).par.map(b => Block.parseBytes(b.get).get).seq
               }
               val newTopDiff = measureLog(s"Building diff from $from up to $to") {
-                BlockDiffer.unsafeDiffMany(settings, proxy(persisted, () => bottomMemoryDiff()), historyWriter.blockAt(height).map(_.timestamp))(blocks)
+                log.debug("")
+                BlockDiffer.unsafeDiffMany(settings, proxy(persisted, () => bottomMemoryDiff()), historyWriter.blockAt(persistedPlusBottomHeight).map(_.timestamp))(blocks)
               }
               topMemoryDiff.set(newTopDiff)
             } else {
