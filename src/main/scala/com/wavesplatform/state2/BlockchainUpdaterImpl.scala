@@ -45,7 +45,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
     composite(composite(persisted, () => bottomMemoryDiff()), () => topMemoryDiff())
   }
 
-  private def bestLiquidDiff() = read { implicit l =>
+  private def bestLiquidDiff(): BlockDiff = read { implicit l =>
     ngHistoryWriter.bestLiquidBlock()
       .map(_.uniqueId)
       .map(liquidBlockCandidatesDiff().get(_).get)
@@ -90,7 +90,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
       case None =>
         ngHistoryWriter.appendBlock(block)(BlockDiffer.fromBlock(
           settings, currentPersistedBlocksState, ngHistoryWriter.lastBlock.map(_.timestamp))(block)).map { newBlockDiff =>
-          topMemoryDiff.set(Monoid[BlockDiff].combine(topMemoryDiff(), newBlockDiff))
+          liquidBlockCandidatesDiff.set(Map(block.uniqueId -> newBlockDiff))
         }
     }).map(_ => log.info( s"""Block ${block.uniqueId} appended. New height: ${ngHistoryWriter.height()}, new score: ${ngHistoryWriter.score()})"""))
   }

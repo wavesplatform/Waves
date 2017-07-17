@@ -162,7 +162,7 @@ trait NodeApi {
       case (_, txOpt) if txOpt.isDefined =>
         Future.failed(new IllegalStateException(s"Tx $txId is in blockchain"))
       case _ =>
-        Future.successful()
+        Future.successful(())
     })
 
   def waitFor[A](f: => Future[A], cond: A => Boolean, retryInterval: FiniteDuration): Future[A] =
