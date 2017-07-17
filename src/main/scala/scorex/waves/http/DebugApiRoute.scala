@@ -88,18 +88,17 @@ case class DebugApiRoute(settings: RestAPISettings,
     complete(result)
   }
 
-  private def rollbackToBlock(blockId: ByteStr, returnTransactionsInUTX: Boolean): Future[ToResponseMarshallable] = Future {
-    val txs = blockchainUpdater.removeAfter(blockId)
-    txs.foreach(txs => {
-      allChannels.broadcast(LocalScoreChanged(history.score()))
-      if (returnTransactionsInUTX) {
-        txs.foreach(tx => utxStorage.putIfNew(tx))
-      }
-    })
-    txs
-  }.map(_.fold(ApiError.fromValidationError,
-    _ => Json.obj("BlockId" -> blockId.toString)): ToResponseMarshallable)
-
+  private def rollbackToBlock(blockId: ByteStr, returnTransactionsToUtx: Boolean): Future[ToResponseMarshallable] = Future {
+    blockchainUpdater.removeAfter(blockId) match {
+      case Right(txs) =>
+        allChannels.broadcast(LocalScoreChanged(history.score()))
+        if (returnTransactionsToUtx) {
+          txs.foreach(tx => utxStorage.putIfNew(tx))
+        }
+        Json.obj("BlockId" -> blockId.toString): ToResponseMarshallable
+      case Left(error) => ApiError.fromValidationError(error)
+    }
+  }
 
   @Path("/rollback")
   @ApiOperation(value = "Rollback to height", notes = "Removes all blocks after given height", httpMethod = "POST")
@@ -121,7 +120,7 @@ case class DebugApiRoute(settings: RestAPISettings,
       json[RollbackParams] { params =>
         history.blockAt(params.rollbackTo) match {
           case Some(block) =>
-            rollbackToBlock(block.uniqueId, params.returnTransactionsInUTX)
+            rollbackToBlock(block.uniqueId, params.returnTransactionsToUtx)
           case None =>
             (StatusCodes.BadRequest, "Block at height not found")
         }
@@ -151,7 +150,7 @@ case class DebugApiRoute(settings: RestAPISettings,
     (delete & withAuth) {
       ByteStr.decodeBase58(signature) match {
         case Success(sig) =>
-          complete(rollbackToBlock(sig, returnTransactionsInUTX = false))
+          complete(rollbackToBlock(sig, returnTransactionsToUtx = false))
         case _ =>
           complete(InvalidSignature)
       }
