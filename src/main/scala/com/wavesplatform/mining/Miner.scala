@@ -10,6 +10,7 @@ import com.wavesplatform.{Coordinator, UtxPool}
 import io.netty.channel.group.ChannelGroup
 import monix.eval.Task
 import monix.execution._
+import monix.execution.cancelables.{CompositeCancelable, SerialCancelable}
 import scorex.account.PrivateKeyAccount
 import scorex.block.{Block, MicroBlock}
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
@@ -18,7 +19,6 @@ import scorex.transaction.{BlockchainUpdater, CheckpointService, History, Valida
 import scorex.utils.{ScorexLogging, Time}
 import scorex.wallet.Wallet
 
-import scala.collection.concurrent.TrieMap
 import scala.concurrent.duration._
 
 class Miner(
@@ -37,13 +37,12 @@ class Miner(
 
   private implicit val scheduler = Scheduler.fixedPool(name = "miner-pool", poolSize = 2)
 
-  private def peerCount = allChannels.size()
-
   private val minerSettings = settings.minerSettings
   private val blockchainSettings = settings.blockchainSettings
+  private lazy val processBlock = Coordinator.processBlock(checkpoint, history, blockchainUpdater, timeService, stateReader, utx, blockchainReadiness, settings) _
 
-  private val scheduledAttempts = TrieMap.empty[ByteStr, Cancelable]
-  @volatile private var microBlockMiner: Option[Cancelable] = None
+  private val scheduledAttempts = SerialCancelable()
+  private val microBlockAttempt = SerialCancelable()
 
   private def checkAge(parentHeight: Int, parent: Block): Either[String, Unit] =
     Either.cond(parentHeight == 1, (), (timeService.correctedTime() - parent.timestamp).millis)
@@ -53,7 +52,7 @@ class Miner(
 
   private def generateOneBlockTask(account: PrivateKeyAccount, parentHeight: Int, parent: Block,
                                    greatGrandParent: Option[Block], balance: Long)(delay: FiniteDuration): Task[Either[String, Block]] = Task {
-    val pc = peerCount
+    val pc = allChannels.size()
     lazy val lastBlockKernelData = parent.consensusData
     lazy val currentTime = timeService.correctedTime()
     log.debug(s"${System.currentTimeMillis()}: Corrected time: $currentTime")
@@ -77,7 +76,7 @@ class Miner(
 
   private def generateOneMicroBlockTask(account: PrivateKeyAccount, accumulatedBlock: Block): Task[Either[ValidationError, Option[Block]]] = Task {
     log.trace("attempting to generate microblock")
-    val pc = peerCount
+    val pc = allChannels.size()
     lazy val unconfirmed = utx.packUnconfirmed(MaxTransactionsPerMicroblock)
     if (pc < minerSettings.quorum) {
       log.trace(s"Quorum not available ($pc/${minerSettings.quorum}, not forging block with ${account.address}")
@@ -110,7 +109,7 @@ class Miner(
       case Right(maybeNewTotal) => generateMicroBlockSequence(account, maybeNewTotal.getOrElse(accumulatedBlock))
     }
 
-  private def generateBlockTask(account: PrivateKeyAccount): Task[Unit] = Task {
+  private def generateBlockTask(account: PrivateKeyAccount): Option[Task[Unit]] = {
     val height = history.height()
     val lastBlock = history.lastBlock.get
     val grandParent = history.parent(lastBlock, 2)
@@ -118,47 +117,40 @@ class Miner(
       _ <- checkAge(height, history.lastBlock.get)
       ts <- nextBlockGenerationTime(height, stateReader, blockchainSettings.functionalitySettings, lastBlock, account)
     } yield ts) match {
-      case Left(err) => log.debug(s"NOT scheduling block generation: $err")
       case Right(ts) =>
         val offset = calcOffset(timeService, ts, minerSettings.minimalBlockGenerationOffset)
-        val key = ByteStr(account.publicKey)
-        scheduledAttempts.remove(key).foreach(_.cancel())
-        log.trace(s"Scheduling mining task for account=$account in $offset, referencing ${trim(lastBlock.uniqueId)})")
+        log.debug(s"Next attempt for acc=$account in $offset")
         val balance = generatingBalance(stateReader, blockchainSettings.functionalitySettings, account, height)
-        val blockGenTask = generateOneBlockTask(account, height, lastBlock, grandParent, balance)(offset).flatMap {
-          case Right(block) =>
-            Coordinator.processBlock(checkpoint, history, blockchainUpdater, timeService, stateReader,
-              utx, blockchainReadiness, settings)(block, local = true) match {
-              case Left(err) => Task(log.warn(err.toString))
-              case Right(score) => Task {
+        Some(generateOneBlockTask(account, height, lastBlock, grandParent, balance)(offset).map {
+          case Right(block) => Some(Task {
+            processBlock(block, true) match {
+              case Left(err) => log.warn(err.toString)
+              case Right(score) =>
                 allChannels.broadcast(LocalScoreChanged(score))
                 allChannels.broadcast(BlockForged(block))
                 scheduleMining()
                 startMicroBlockMining(account, block)
-              }
             }
+          })
           case Left(err) =>
-            scheduledAttempts.remove(key)
             log.debug(s"No block generated because $err, retrying")
             generateBlockTask(account)
-        }
-        scheduledAttempts.put(key, blockGenTask.runAsync)
+        }.map(_.getOrElse(Task.unit)).flatten)
+      case Left(err) =>
+        log.debug(s"Not scheduling block mining because $err")
+        None
     }
   }
 
   def scheduleMining(): Unit = {
-    log.debug(s"Miner notified of new block")
-    scheduledAttempts.values.foreach(_.cancel)
-    scheduledAttempts.clear()
-    if (wallet.privateKeyAccount(history.lastBlock.get.signerData.generator).isLeft) {
-      microBlockMiner.foreach(_.cancel())
-      microBlockMiner = None
-    }
-    wallet.privateKeyAccounts().foreach(generateBlockTask(_).runAsync)
+    log.debug(s"Miner notified of new block, restarting all mining tasks")
+    scheduledAttempts := CompositeCancelable.fromSet(
+      wallet.privateKeyAccounts().flatMap(generateBlockTask).map(_.runAsync).toSet)
+    microBlockAttempt := SerialCancelable()
   }
 
   private def startMicroBlockMining(account: PrivateKeyAccount, lastBlock: Block): Unit = {
-    microBlockMiner = Some(generateMicroBlockSequence(account, lastBlock).runAsync)
+    microBlockAttempt := generateMicroBlockSequence(account, lastBlock).runAsync
     log.trace("requested to generate microblock")
   }
 

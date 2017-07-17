@@ -49,10 +49,10 @@ class BlacklistTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll {
     all(targetBlocks1) shouldEqual targetBlocks1.head
   }
 
-  "network should grow up to 100 blocks" in {
-    Await.result(richestNode.waitForHeight(100), 5.minutes)
+  "network should grow up to 60 blocks" in {
+    Await.result(richestNode.waitForHeight(60), 5.minutes)
 
-    Await.result(richestNode.height, 1.minute) >= 100 shouldBe true
+    Await.result(richestNode.height, 1.minute) >= 60 shouldBe true
   }
 
   "richest node should blacklist other nodes" in {
