@@ -5,12 +5,12 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 import com.wavesplatform.network._
 import com.wavesplatform.settings.WavesSettings
-import com.wavesplatform.state2.ByteStr
 import com.wavesplatform.state2.reader.StateReader
 import com.wavesplatform.{Coordinator, UtxPool}
 import io.netty.channel.group.ChannelGroup
 import monix.eval.Task
 import monix.execution._
+import monix.execution.cancelables.{CompositeCancelable, SerialCancelable}
 import scorex.account.PrivateKeyAccount
 import scorex.block.Block
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
@@ -19,33 +19,31 @@ import scorex.transaction.{BlockchainUpdater, CheckpointService, History}
 import scorex.utils.{ScorexLogging, Time}
 import scorex.wallet.Wallet
 
-import scala.collection.concurrent.TrieMap
 import scala.concurrent.duration._
 import scala.math.Ordering.Implicits._
 
 class Miner(
-    allChannels: ChannelGroup,
-    blockchainReadiness: AtomicBoolean,
-    blockchainUpdater: BlockchainUpdater,
-    checkpoint: CheckpointService,
-    history: History,
-    stateReader: StateReader,
-    settings: WavesSettings,
-    timeService: Time,
-    utx: UtxPool,
-    wallet: Wallet,
-    startingLastBlock: Block) extends ScorexLogging {
+               allChannels: ChannelGroup,
+               blockchainReadiness: AtomicBoolean,
+               blockchainUpdater: BlockchainUpdater,
+               checkpoint: CheckpointService,
+               history: History,
+               stateReader: StateReader,
+               settings: WavesSettings,
+               timeService: Time,
+               utx: UtxPool,
+               wallet: Wallet,
+               startingLastBlock: Block) extends ScorexLogging {
 
   import Miner._
 
   private implicit val scheduler = Scheduler.fixedPool(name = "miner-pool", poolSize = 2)
 
-  private def peerCount = allChannels.size()
-
   private val minerSettings = settings.minerSettings
   private val blockchainSettings = settings.blockchainSettings
+  private lazy val processBlock = Coordinator.processBlock(checkpoint, history, blockchainUpdater, timeService, stateReader, utx, blockchainReadiness, Miner.this, settings) _
 
-  private val scheduledAttempts = TrieMap.empty[ByteStr, Cancelable]
+  private val scheduledAttempts = SerialCancelable()
 
   private def checkAge(parentHeight: Int, parent: Block): Either[String, Unit] =
     Either
@@ -56,7 +54,7 @@ class Miner(
 
   private def generateOneBlockTask(account: PrivateKeyAccount, parentHeight: Int, parent: Block,
                                    greatGrandParent: Option[Block], balance: Long)(delay: FiniteDuration): Task[Either[String, Block]] = Task {
-    val pc = peerCount
+    val pc = allChannels.size()
     lazy val lastBlockKernelData = parent.consensusData
     lazy val currentTime = timeService.correctedTime()
     log.debug(s"${System.currentTimeMillis()}: Corrected time: $currentTime")
@@ -77,45 +75,41 @@ class Miner(
     } yield block
   }.delayExecution(delay)
 
-  private def generateBlockTask(account: PrivateKeyAccount): Task[Unit] = Task {
+  private def generateBlockTask(account: PrivateKeyAccount): Option[Task[Unit]] = {
     val height = history.height()
     val lastBlock = history.lastBlock.get
     val grandParent = history.parent(lastBlock, 2)
     (for {
       _ <- checkAge(height, lastBlock)
       ts <- nextBlockGenerationTime(height, stateReader, blockchainSettings.functionalitySettings, lastBlock, account)
-      offset = calcOffset(timeService, ts)
-      key = ByteStr(account.publicKey)
-      _ = scheduledAttempts.get(key) match {
-        case Some(_) => log.debug(s"Block generation already scheduled for $key")
-        case None =>
-          log.debug(s"${System.currentTimeMillis()}: Next attempt for acc=$account in $offset")
-          val balance = generatingBalance(stateReader, blockchainSettings.functionalitySettings, account, height)
-          val blockGenTask = generateOneBlockTask(account, height, lastBlock, grandParent, balance)(offset).flatMap {
-            case Right(block) => Task {
-              Coordinator.processBlock(checkpoint, history, blockchainUpdater, timeService, stateReader,
-                utx, blockchainReadiness, Miner.this, settings)(block, local = true) match {
-                case Left(err) => log.warn(err.toString)
-                case Right(score) =>
-                  allChannels.broadcast(LocalScoreChanged(score))
-                  allChannels.broadcast(BlockForged(block))
-              }
+    } yield ts) match {
+      case Right(ts) =>
+        val offset = calcOffset(timeService, ts)
+        log.debug(s"Next attempt for acc=$account in $offset")
+        val balance = generatingBalance(stateReader, blockchainSettings.functionalitySettings, account, height)
+        Some(generateOneBlockTask(account, height, lastBlock, grandParent, balance)(offset).map {
+          case Right(block) => Some(Task {
+            processBlock(block, true) match {
+              case Left(err) => log.warn(err.toString)
+              case Right(score) =>
+                allChannels.broadcast(LocalScoreChanged(score))
+                allChannels.broadcast(BlockForged(block))
             }
-            case Left(err) =>
-              scheduledAttempts.remove(key).foreach(_.cancel())
-              log.debug(s"No block generated because $err, retrying")
-              generateBlockTask(account)
-          }
-          scheduledAttempts.put(key, blockGenTask.runAsync)
-      }
-    } yield ()).left.map(err => log.debug(s"NOT scheduling block generation: $err"))
+          })
+          case Left(err) =>
+            log.debug(s"No block generated because $err, retrying")
+            generateBlockTask(account)
+        }.map(_.getOrElse(Task.unit)).flatten)
+      case Left(err) =>
+        log.debug(s"Not scheduling block mining because $err")
+        None
+    }
   }
 
   def lastBlockChanged(): Unit = {
-    log.debug(s"Miner notified of new block")
-    scheduledAttempts.values.foreach(_.cancel)
-    scheduledAttempts.clear()
-    wallet.privateKeyAccounts().foreach(generateBlockTask(_).runAsync)
+    log.debug(s"Miner notified of new block, restarting all mining tasks")
+    scheduledAttempts := CompositeCancelable.fromSet(
+      wallet.privateKeyAccounts().flatMap(generateBlockTask).map(_.runAsync).toSet)
   }
 
   def shutdown(): Unit = ()
