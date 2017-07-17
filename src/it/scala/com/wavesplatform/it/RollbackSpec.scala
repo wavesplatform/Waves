@@ -54,7 +54,7 @@ class RollbackSpec extends FreeSpec with ScalaFutures with IntegrationPatience
         infos.head
       })
       stateAfterFirstTry <- nodes.head.debugStateAt(startHeight + waitBlocks)
-      _ <- traverse(nodes)(_.rollback(startHeight, returnInUTX = false))
+      _ <- traverse(nodes)(_.rollback(startHeight, returnToUTX = false))
       _ <- processRequests(requests)
       hashAfterSecondTry <- traverse(nodes)(_.waitForDebugInfoAt(startHeight + waitBlocks).map(_.stateHash)).map(infos => {
         all(infos) shouldEqual infos.head

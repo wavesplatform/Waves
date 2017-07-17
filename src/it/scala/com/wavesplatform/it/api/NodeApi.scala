@@ -153,8 +153,8 @@ trait NodeApi {
   def createAlias(targetAddress: String, alias: String, fee: Long): Future[Transaction] =
     postJson("/alias/create", CreateAliasRequest(targetAddress, alias, fee)).as[Transaction]
 
-  def rollback(to: Int, returnInUTX: Boolean = true): Future[Unit] =
-    postJson("/debug/rollback", RollbackParams(to, returnInUTX)).map(_ => ())
+  def rollback(to: Int, returnToUTX: Boolean = true): Future[Unit] =
+    postJson("/debug/rollback", RollbackParams(to, returnToUTX)).map(_ => ())
 
   def ensureTxDoesntExist(txId: String): Future[Unit] =
     utx.zip(findTransactionInfo(txId)).flatMap({
