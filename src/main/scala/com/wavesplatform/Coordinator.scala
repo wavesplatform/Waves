@@ -126,12 +126,12 @@ object Coordinator extends ScorexLogging {
     import PoSCalc._
 
     val fs = bcs.functionalitySettings
-    val (sortStart, sortEnd) = (fs.requireSortedTransactionsAfter, Long.MaxValue)
+    val (sortStart, sortEnd) = (fs.requireSortedTransactionsAfter, fs.requireSortedTransactionsAfter)
     val blockTime = block.timestamp
 
     (for {
       _ <- Either.cond(blockTime - currentTs < MaxTimeDrift, (), "Block timestamp $blockTime is from future")
-      _ <- Either.cond(blockTime < sortStart || blockTime > sortEnd || block.transactionData.sorted(TransactionsOrdering.InBlock) == block.transactionData,
+      _ <- Either.cond(blockTime < sortStart || blockTime >= sortEnd || block.transactionData.sorted(TransactionsOrdering.InBlock) == block.transactionData,
         (), "Transactions must be sorted correctly")
       parent <- history.parent(block).toRight(s"Can't find parent ${block.reference} of ${block.uniqueId}")
       parentHeight <- history.heightOf(parent.uniqueId).toRight(s"Can't get height of ${block.reference}")
