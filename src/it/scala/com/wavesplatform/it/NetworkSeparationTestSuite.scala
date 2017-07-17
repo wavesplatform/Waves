@@ -28,10 +28,10 @@ class NetworkSeparationTestSuite extends FreeSpec with Matchers with BeforeAndAf
     all(targetBlocks1) shouldEqual targetBlocks1.head
   }
 
-  "node should grow up to 100 blocks together" in {
+  "node should grow up to 60 blocks together" in {
     val richestNode = nodes.maxBy(n => Await.result(n.balance(n.address), 1.minute).balance)
-    Await.result(richestNode.waitForHeight(100), 5.minutes)
-    Await.result(richestNode.height, 1.minute) >= 100 shouldBe true
+    Await.result(richestNode.waitForHeight(60), 5.minutes)
+    Await.result(richestNode.height, 1.minute) >= 60 shouldBe true
   }
 
   "then we disconnect nodes from the network" in {
@@ -40,8 +40,8 @@ class NetworkSeparationTestSuite extends FreeSpec with Matchers with BeforeAndAf
 
   "and wait for another 20 blocks on one node" in {
     val richestNode = nodes.maxBy(n => Await.result(n.balance(n.address), 1.minute).balance)
-    Await.result(richestNode.waitForHeight(120), 5.minutes)
-    Await.result(richestNode.height, 1.minute) >= 120 shouldBe true
+    Await.result(richestNode.waitForHeight(80), 5.minutes)
+    Await.result(richestNode.height, 1.minute) >= 80 shouldBe true
   }
 
   "after that we connect nodes back to the network" in {

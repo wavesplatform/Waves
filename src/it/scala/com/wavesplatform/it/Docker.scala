@@ -75,9 +75,6 @@ class Docker(suiteConfig: Config = ConfigFactory.empty) extends AutoCloseable wi
 
     val hostConfig = HostConfig.builder()
       .portBindings(portBindings)
-      .cpuPeriod(100000L)
-      .cpuQuota(200000L)
-      .memory(1024000000L)
       .build()
 
     val containerConfig = ContainerConfig.builder()

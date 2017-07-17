@@ -1,10 +1,10 @@
 package com.wavesplatform.it.api
 
 import java.io.IOException
+import java.util.concurrent.TimeoutException
 
 import com.wavesplatform.it.util._
 import com.wavesplatform.matcher.api.CancelOrderRequest
-import io.netty.handler.timeout.TimeoutException
 import io.netty.util.{HashedWheelTimer, Timer}
 import org.asynchttpclient.Dsl.{get => _get, post => _post}
 import org.asynchttpclient._
