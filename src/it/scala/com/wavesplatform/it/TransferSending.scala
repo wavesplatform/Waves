@@ -14,10 +14,10 @@ object TransferSending {
 }
 
 trait TransferSending {
-  def allNodes: Seq[Node]
+  def nodes: Seq[Node]
 
   def generateRequests(n: Int, balances: mutable.Map[String, Long]): Seq[Req] = {
-    val addresses = allNodes.map(_.address)
+    val addresses = nodes.map(_.address)
     val sourceAndDest = (1 to n).map { _ =>
       val Seq(src, dest) = Random.shuffle(addresses).take(2)
       (src, dest)
@@ -40,7 +40,7 @@ trait TransferSending {
   def balanceForNode(n: Node): Future[(String, Long)] = n.balance(n.address).map(b => b.address -> b.balance)
 
   def makeTransfer(r: Req): Future[Transaction] = {
-    val addressToNode = allNodes.map(n => n.address -> n).toMap
+    val addressToNode = nodes.map(n => n.address -> n).toMap
     addressToNode(r.source).transfer(r.source, r.targetAddress, r.amount, r.fee)
   }
 
