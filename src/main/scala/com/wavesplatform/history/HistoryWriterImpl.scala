@@ -8,7 +8,7 @@ import com.wavesplatform.utils._
 import scorex.block.Block
 import scorex.transaction.History.BlockchainScore
 import scorex.transaction.ValidationError.BlockAppendError
-import scorex.transaction.{HistoryWriter, Transaction, ValidationError}
+import scorex.transaction.{DiscardedTransactions, HistoryWriter, Transaction, ValidationError}
 import scorex.utils.{LogMVMapBuilder, ScorexLogging}
 
 import scala.util.Try
@@ -28,7 +28,8 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
     Set(blockBodyByHeight().size(), blockIdByHeight().size(), heightByBlockId().size(), scoreByHeight().size()).size == 1
   }
 
-  override def appendBlock(block: Block)(consensusValidation: => Either[ValidationError, BlockDiff]): Either[ValidationError, BlockDiff] = write { implicit lock =>
+  override def appendBlock(block: Block)(consensusValidation: => Either[ValidationError, BlockDiff]): Either[ValidationError, (BlockDiff, DiscardedTransactions)]
+  = write { implicit lock =>
     if ((height() == 0) || (this.lastBlock.get.uniqueId == block.reference)) consensusValidation.map { blockDiff =>
       val h = height() + 1
       val score = (if (height() == 0) BigInt(0) else this.score()) + block.blockScore
@@ -41,7 +42,7 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
       if (h % 100 == 0) db.compact(CompactFillRate, CompactMemorySize)
 
       log.trace(s"Full Block(id=${block.uniqueId},txs_count=${block.transactionData.size}) persisted")
-      blockDiff
+      (blockDiff, Seq.empty)
     }
     else {
       Left(BlockAppendError("its parent is not last block in persisted blockchain", block))

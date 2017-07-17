@@ -58,9 +58,9 @@ object Coordinator extends ScorexLogging {
     blockchainReadiness.compareAndSet(expired, !expired)
   }
 
-  def processBlock(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater, time: Time,
-                   stateReader: StateReader, utxStorage: UtxPool, blockchainReadiness: AtomicBoolean,
-                   settings: WavesSettings)(newBlock: Block, local: Boolean): Either[ValidationError, BigInt] = {
+  def processSingleBlock(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater, time: Time,
+                         stateReader: StateReader, utxStorage: UtxPool, blockchainReadiness: AtomicBoolean,
+                         settings: WavesSettings)(newBlock: Block, local: Boolean): Either[ValidationError, BigInt] = {
     val newScore = for {
       _ <- appendBlock(checkpoint, history, blockchainUpdater, stateReader, utxStorage, time, settings.blockchainSettings)(newBlock)
     } yield history.score()
@@ -85,8 +85,11 @@ object Coordinator extends ScorexLogging {
     _ <- Either.cond(checkpoint.isBlockValid(block.signerData.signature, history.height() + 1), (),
       BlockAppendError(s"[h = ${history.height() + 1}] is not valid with respect to checkpoint", block))
     _ <- blockConsensusValidation(history, stateReader, settings, time.correctedTime())(block)
-    _ <- blockchainUpdater.processBlock(block)
-  } yield utxStorage.removeAll(block.transactionData)
+    discardedTxs <- blockchainUpdater.processBlock(block)
+  } yield {
+    utxStorage.removeAll(block.transactionData)
+    discardedTxs.foreach(utxStorage.putIfNew(_, None))
+  }
 
   def processCheckpoint(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater)
                        (newCheckpoint: Checkpoint): Either[ValidationError, BigInt] =

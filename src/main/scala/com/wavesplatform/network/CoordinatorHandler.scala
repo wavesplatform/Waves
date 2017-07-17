@@ -41,7 +41,7 @@ class CoordinatorHandler(checkpointService: CheckpointService, history: History,
     case b: Block =>
       Signed.validateSignatures(b) match {
         case Right(_) =>
-          loggingResult(id(ctx), "Block", Coordinator.processBlock(checkpointService, history, blockchainUpdater, time,
+          loggingResult(id(ctx), "Block", Coordinator.processSingleBlock(checkpointService, history, blockchainUpdater, time,
             stateReader, utxStorage, blockchainReadiness, settings)(b, local = false))
             .foreach(score => {
               allChannels.broadcast(LocalScoreChanged(score))

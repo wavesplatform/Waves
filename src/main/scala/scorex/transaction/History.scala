@@ -27,7 +27,7 @@ trait NgHistory extends History {
 
 trait HistoryWriter extends History {
 
-  def appendBlock(block: Block)(consensusValidation: => Either[ValidationError, BlockDiff]): Either[ValidationError, BlockDiff]
+  def appendBlock(block: Block)(consensusValidation: => Either[ValidationError, BlockDiff]): Either[ValidationError, (BlockDiff, DiscardedTransactions)]
 
   def discardBlock(): Seq[Transaction]
 }

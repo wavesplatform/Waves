@@ -39,7 +39,7 @@ class Miner(
 
   private val minerSettings = settings.minerSettings
   private val blockchainSettings = settings.blockchainSettings
-  private lazy val processBlock = Coordinator.processBlock(checkpoint, history, blockchainUpdater, timeService, stateReader, utx, blockchainReadiness, settings) _
+  private lazy val processBlock = Coordinator.processSingleBlock(checkpoint, history, blockchainUpdater, timeService, stateReader, utx, blockchainReadiness, settings) _
 
   private val scheduledAttempts = SerialCancelable()
   private val microBlockAttempt = SerialCancelable()
@@ -75,7 +75,7 @@ class Miner(
 
 
   private def generateOneMicroBlockTask(account: PrivateKeyAccount, accumulatedBlock: Block): Task[Either[ValidationError, Option[Block]]] = Task {
-    log.trace("attempting to generate microblock")
+    log.trace(s"Generating microblock for $account")
     val pc = allChannels.size()
     lazy val unconfirmed = utx.packUnconfirmed(MaxTransactionsPerMicroblock)
     if (pc < minerSettings.quorum) {
@@ -96,7 +96,7 @@ class Miner(
         micro <- MicroBlock.buildAndSign(account, unconfirmed, accumulatedBlock.signerData.signature, signed.signerData.signature)
         _ <- Coordinator.processMicroBlock(checkpoint, history, blockchainUpdater, utx)(micro)
       } yield {
-        log.trace(s"Locally mined MicroBlock(id=${trim(micro.uniqueId)}")
+        log.trace(s"MicroBlock(id=${trim(micro.uniqueId)}) has been mined for $account}")
         allChannels.broadcast(MicroBlockInv(micro.totalResBlockSig))
         Some(signed)
       }
@@ -105,7 +105,7 @@ class Miner(
 
   private def generateMicroBlockSequence(account: PrivateKeyAccount, accumulatedBlock: Block): Task[Unit] =
     generateOneMicroBlockTask(account, accumulatedBlock).flatMap {
-      case Left(err) => Task(log.warn("Error generating microblock: " + err.toString))
+      case Left(err) => Task(log.warn("Error mining MicroBlock: " + err.toString))
       case Right(maybeNewTotal) => generateMicroBlockSequence(account, maybeNewTotal.getOrElse(accumulatedBlock))
     }
 
@@ -143,15 +143,15 @@ class Miner(
   }
 
   def scheduleMining(): Unit = {
-    log.debug(s"Miner notified of new block, restarting all mining tasks")
     scheduledAttempts := CompositeCancelable.fromSet(
-      wallet.privateKeyAccounts().flatMap(generateBlockTask).map(_.runAsync).toSet)
+        wallet.privateKeyAccounts().flatMap(generateBlockTask).map(_.runAsync).toSet)
     microBlockAttempt := SerialCancelable()
+    log.debug(s"Block mining scheduled")
   }
 
   private def startMicroBlockMining(account: PrivateKeyAccount, lastBlock: Block): Unit = {
     microBlockAttempt := generateMicroBlockSequence(account, lastBlock).runAsync
-    log.trace("requested to generate microblock")
+    log.trace(s"MicroBlock mining scheduled for $account")
   }
 
   def shutdown(): Unit = ()

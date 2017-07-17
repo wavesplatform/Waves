@@ -8,5 +8,6 @@ package object transaction {
   type AssetId = com.wavesplatform.state2.ByteStr
   val AssetIdLength = FastCryptographicHash.DigestSize
   val AssetIdStringLength = base58Length(AssetIdLength)
+  type DiscardedTransactions = Seq[Transaction]
 
 }

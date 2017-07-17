@@ -13,7 +13,7 @@ trait NgHistoryWriter extends HistoryWriter with NgHistory {
 
   def bestLiquidBlock(): Option[Block]
 
-  def forgeBlock(id: BlockId): Option[Block]
+  def forgeBlock(id: BlockId): Option[(Block, DiscardedTransactions)]
 
   def liquidBlockExists(): Boolean
 }
@@ -42,26 +42,26 @@ class NgHistoryWriterImpl(inner: HistoryWriter) extends NgHistoryWriter {
     })
   }
 
-  override def appendBlock(block: Block)(consensusValidation: => Either[ValidationError, BlockDiff]): Either[ValidationError, BlockDiff]
+  override def appendBlock(block: Block)(consensusValidation: => Either[ValidationError, BlockDiff]): Either[ValidationError, (BlockDiff, DiscardedTransactions)]
   = write { implicit l => {
     lazy val logDetails = s"The referenced block(${block.reference}) ${if (inner.contains(block.reference)) "exits, it's not last persisted" else "doesn't exist"}"
     if (baseBlock().isEmpty) {
       inner.lastBlock match {
         case Some(lastInner) if lastInner.uniqueId != block.reference =>
           Left(BlockAppendError(s"References incorrect or non-existing block: " + logDetails, block))
-        case _ => consensusValidation
+        case _ => consensusValidation.map((_, Seq.empty[Transaction]))
       }
     }
     else forgeBlock(block.reference) match {
-      case Some(forgedBlock) =>
-        inner.appendBlock(forgedBlock)(consensusValidation)
+      case Some((forgedBlock, discarded)) =>
+        inner.appendBlock(forgedBlock)(consensusValidation).map(dd => (dd._1, discarded))
       case None =>
         Left(BlockAppendError(s"References incorrect or non-existing block(liquid block exists): " + logDetails, block))
     }
-  }.map { bd => // finally place new as liquid
+  }.map { case ((bd, discarded)) => // finally place new as liquid
     micros.set(List.empty)
     baseBlock.set(Some(block))
-    bd
+    (bd, discarded)
   }
   }
 
@@ -137,28 +137,27 @@ class NgHistoryWriterImpl(inner: HistoryWriter) extends NgHistoryWriter {
       .orElse(micros().find(_.totalResBlockSig == blockId)).isDefined
   }
 
-  def forgeBlock(id: BlockId): Option[Block] = read { implicit l =>
-    baseBlock().flatMap(base => {
+  def forgeBlock(id: BlockId): Option[(Block, DiscardedTransactions)] = read { implicit l =>
+    baseBlock().flatMap(f = base => {
       lazy val ms = micros()
       if (base.uniqueId == id) {
-        Some(base)
+        Some((base, ms.flatMap(_.transactionData)))
       } else if (!ms.exists(_.totalResBlockSig == id)) None
       else {
-        val (accumulatedTxs, discardedTxsCount) = ms.reverse.foldLeft((List.empty[Transaction], Option.empty[Int])) { case ((accumulated, discarded), micro) =>
-          discarded match {
-            case Some(d) => (accumulated, Some(d + micro.transactionData.size))
-            case None =>
-              if (micro.totalResBlockSig == id)
-                (accumulated ++ micro.transactionData, Some(0))
-              else
-                (accumulated ++ micro.transactionData, None)
-          }
+        val (accumulatedTxs, discardedTxs) = ms.reverse.foldLeft((List.empty[Transaction], Option.empty[DiscardedTransactions])) { case ((accumulated, maybeDiscarded), micro) => maybeDiscarded match {
+          case Some(discarded) => (accumulated, Some(discarded ++ micro.transactionData))
+          case None =>
+            if (micro.totalResBlockSig == id)
+              (accumulated ++ micro.transactionData, Some(Seq.empty[Transaction]))
+            else
+              (accumulated ++ micro.transactionData, None)
         }
-        discardedTxsCount.map { discarded =>
-          log.trace(s"Forged block with base_size=${base.transactionData.size} + accumulated_size=${accumulatedTxs.size}(discarded=$discarded)")
-          base.copy(
+        }
+        discardedTxs.map { discarded =>
+          log.trace(s"Forged block with base_size=${base.transactionData.size} + accumulated_size=${accumulatedTxs.size}(discarded=${discarded.size})")
+          (base.copy(
             signerData = base.signerData.copy(signature = ms.head.totalResBlockSig),
-            transactionData = base.transactionData ++ accumulatedTxs)
+            transactionData = base.transactionData ++ accumulatedTxs), discarded)
         }
       }
     })

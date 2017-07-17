@@ -72,7 +72,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
     logHeights("State rebuild finished:")
   }
 
-  override def processBlock(block: Block): Either[ValidationError, Unit] = write { implicit l =>
+  override def processBlock(block: Block): Either[ValidationError, DiscardedTransactions] = write { implicit l =>
     if (topMemoryDiff().heightDiff >= minimumInMemoryDiffSize) {
       persisted.applyBlockDiff(bottomMemoryDiff())
       bottomMemoryDiff.set(topMemoryDiff())
@@ -83,18 +83,23 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
         val asFirmBlock = referencedLiquidDiff.copy(heightDiff = 1)
         ngHistoryWriter.appendBlock(block)(BlockDiffer.fromBlock(settings,
           composite(currentPersistedBlocksState, () => asFirmBlock),
-          ngHistoryWriter.bestLiquidBlock().map(_.timestamp))(block)).map { newBlockDiff =>
+          ngHistoryWriter.bestLiquidBlock().map(_.timestamp))(block)).map { case ((newBlockDiff, discraded)) =>
           topMemoryDiff.set(Monoid.combine(topMemoryDiff(), asFirmBlock))
           liquidBlockCandidatesDiff.set(Map(block.uniqueId -> newBlockDiff))
+          discraded
         }
       case None =>
         ngHistoryWriter.appendBlock(block)(BlockDiffer.fromBlock(
-          settings, currentPersistedBlocksState, ngHistoryWriter.lastBlock.map(_.timestamp))(block)).map { newBlockDiff =>
+          settings, currentPersistedBlocksState, ngHistoryWriter.lastBlock.map(_.timestamp))(block)).map { case ((newBlockDiff, discraded)) =>
           liquidBlockCandidatesDiff.set(Map(block.uniqueId -> newBlockDiff))
+          discraded
         }
-    }).map(_ => log.info(
-      s"""Block ${block.uniqueId} -> ${trim(block.reference)} appended.
-         | -- New height: ${ngHistoryWriter.height()}, new score: ${ngHistoryWriter.score()}, transactions: ${block.transactionData.size})""".stripMargin))
+    }).map(discacrded => {
+      log.info(
+        s"""Block ${block.uniqueId} -> ${trim(block.reference)} appended.
+           | -- New height: ${ngHistoryWriter.height()}, new score: ${ngHistoryWriter.score()}, transactions: ${block.transactionData.size})""".stripMargin)
+      discacrded
+    })
   }
 
   override def removeAfter(blockId: ByteStr): Either[ValidationError, Seq[Transaction]] = write { implicit l =>
@@ -134,7 +139,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
 
   override def processMicroBlock(microBlock: MicroBlock): Either[ValidationError, Unit] = write { implicit l =>
     ngHistoryWriter.appendMicroBlock(microBlock) {
-      val prevTotal = ngHistoryWriter.forgeBlock(microBlock.prevResBlockSig).get
+      val(prevTotal, discarded) = ngHistoryWriter.forgeBlock(microBlock.prevResBlockSig).get
       val newTotal = prevTotal.copy(
         signerData = prevTotal.signerData.copy(signature = microBlock.totalResBlockSig),
         transactionData = prevTotal.transactionData ++ microBlock.transactionData)
