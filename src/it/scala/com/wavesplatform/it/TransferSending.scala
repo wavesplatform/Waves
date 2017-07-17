@@ -24,7 +24,7 @@ trait TransferSending {
     }
     val (_, requests) = sourceAndDest.foldLeft((balances, ArrayBuffer.empty[Req])) {
       case ((b, reqs), (src, dest)) =>
-        val transferAmount = (Random.nextDouble() * 1e-3 * b(src)).toLong
+        val transferAmount = (Random.nextDouble() * 1e-8 * b(src)).toLong
 
         b += src -> (b(src) - transferAmount)
         b += dest -> (b(dest) + transferAmount)

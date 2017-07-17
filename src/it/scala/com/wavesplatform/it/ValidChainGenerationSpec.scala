@@ -34,7 +34,7 @@ class ValidChainGenerationSpec(override val allNodes: Seq[Node]) extends FreeSpe
 
     all(targetBlocks1) shouldEqual targetBlocks1.head
 
-    allNodes.head.rollback(1L)
+    allNodes.head.rollback(1)
 
     val targetBlocks2 = result(for {
       height <- traverse(allNodes)(_.height).map(_.max)
@@ -45,7 +45,7 @@ class ValidChainGenerationSpec(override val allNodes: Seq[Node]) extends FreeSpe
 
     all(targetBlocks2) shouldEqual targetBlocks2.head
 
-    allNodes.tail.foreach(_.rollback(1L))
+    allNodes.tail.foreach(_.rollback(1))
 
     val targetBlocks3 = result(for {
       height <- traverse(allNodes)(_.height).map(_.max)

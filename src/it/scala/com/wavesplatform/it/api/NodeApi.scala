@@ -17,6 +17,7 @@ import scorex.api.http.assets._
 import scorex.api.http.leasing.{LeaseCancelRequest, LeaseRequest}
 import scorex.transaction.assets.exchange.Order
 import scorex.utils.{LoggerFacade, ScorexLogging}
+import scorex.waves.http.RollbackParams
 
 import scala.compat.java8.FutureConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -80,15 +81,15 @@ trait NodeApi {
 
   def waitForPeers(targetPeersCount: Int): Future[Seq[Peer]] = waitFor[Seq[Peer]](connectedPeers, _.length >= targetPeersCount, 1.second)
 
-  def height: Future[Long] = get("/blocks/height").as[JsValue].map(v => (v \ "height").as[Long])
+  def height: Future[Int] = get("/blocks/height").as[JsValue].map(v => (v \ "height").as[Int])
 
-  def blockAt(height: Long) = get(s"/blocks/at/$height").as[Block]
+  def blockAt(height: Int) = get(s"/blocks/at/$height").as[Block]
 
   def utx = get(s"/transactions/unconfirmed").as[Seq[Transaction]]
 
   def lastBlock: Future[Block] = get("/blocks/last").as[Block]
 
-  def blockSeq(from: Long, to: Long) = get(s"/blocks/seq/$from/$to").as[Seq[Block]]
+  def blockSeq(from: Int, to: Int) = get(s"/blocks/seq/$from/$to").as[Seq[Block]]
 
   def status: Future[Status] = get("/node/status").as[Status]
 
@@ -106,7 +107,7 @@ trait NodeApi {
     case Failure(ex) => Failure(ex)
   }, tOpt => tOpt.exists(_.id == txId), 1.second).map(_.get)
 
-  def waitForHeight(expectedHeight: Long): Future[Long] = waitFor[Long](height, h => h >= expectedHeight, 1.second)
+  def waitForHeight(expectedHeight: Int): Future[Int] = waitFor[Int](height, h => h >= expectedHeight, 1.second)
 
   def transactionInfo(txId: String): Future[Transaction] = get(s"/transactions/info/$txId").as[Transaction]
 
@@ -152,12 +153,12 @@ trait NodeApi {
   def createAlias(targetAddress: String, alias: String, fee: Long): Future[Transaction] =
     postJson("/alias/create", CreateAliasRequest(targetAddress, alias, fee)).as[Transaction]
 
-  def rollback(to: Long): Future[Unit] =
-    post("/debug/rollback", to.toString).map(_ => ())
+  def rollback(to: Int, returnInUTX: Boolean = true): Future[Unit] =
+    postJson("/debug/rollback", RollbackParams(to, returnInUTX)).map(_ => ())
 
   def ensureTxDoesntExist(txId: String): Future[Unit] =
     utx.zip(findTransactionInfo(txId)).flatMap({
-      case (utx, _) if utx.contains(txId) =>
+      case (utx, _) if utx.map(_.id).contains(txId) =>
         Future.failed(new IllegalStateException(s"Tx $txId is in UTX"))
       case (_, txOpt) if txOpt.isDefined =>
         Future.failed(new IllegalStateException(s"Tx $txId is in blockchain"))
@@ -176,14 +177,14 @@ trait NodeApi {
     actualBlock <- findBlock(_.height > currentBlock.height, currentBlock.height)
   } yield actualBlock
 
-  def findBlock(cond: Block => Boolean, from: Long = 1, to: Long = Long.MaxValue): Future[Block] = {
-    def load(_from: Long, _to: Long): Future[Block] = blockSeq(_from, _to).flatMap { blocks =>
+  def findBlock(cond: Block => Boolean, from: Int = 1, to: Int = Int.MaxValue): Future[Block] = {
+    def load(_from: Int, _to: Int): Future[Block] = blockSeq(_from, _to).flatMap { blocks =>
       blocks.find(cond).fold[Future[NodeApi.Block]] {
         val maybeLastBlock = blocks.lastOption
         if (maybeLastBlock.exists(_.height >= to)) {
           Future.failed(new NoSuchElementException)
         } else {
-          val newFrom = maybeLastBlock.fold(_from)(b => (b.height + 19L).min(to))
+          val newFrom = maybeLastBlock.fold(_from)(b => (b.height + 19).min(to))
           val newTo = newFrom + 19
           log.debug(s"Loaded ${blocks.length} blocks, no match found. Next range: [$newFrom, ${newFrom + 19}]")
           timer.schedule(load(newFrom, newTo), blockDelay)
@@ -247,6 +248,8 @@ trait NodeApi {
   }
 
   def waitForDebugInfoAt(height: Long): Future[DebugInfo] = waitFor[DebugInfo](get("/debug/info").as[DebugInfo], _.stateHeight >= height, 1.seconds)
+
+  def debugStateAt(height: Long): Future[Map[String, Long]] = get(s"/debug/stateWaves/$height").as[Map[String, Long]]
 }
 
 object NodeApi extends ScorexLogging {
@@ -282,7 +285,7 @@ object NodeApi extends ScorexLogging {
 
   implicit val transactionFormat: Format[Transaction] = Json.format
 
-  case class Block(signature: String, height: Long, timestamp: Long, generator: String, transactions: Seq[Transaction],
+  case class Block(signature: String, height: Int, timestamp: Long, generator: String, transactions: Seq[Transaction],
                    fee: Long)
 
   implicit val blockFormat: Format[Block] = Json.format
