@@ -134,7 +134,7 @@ class Miner(
                 allChannels.broadcast(LocalScoreChanged(score))
                 allChannels.broadcast(BlockForged(block))
                 scheduleMining()
-                //                startMicroBlockMining(account, block)
+                startMicroBlockMining(account, block)
               }
             }
           case Left(err) =>
