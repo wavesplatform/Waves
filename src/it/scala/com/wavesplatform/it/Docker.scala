@@ -35,8 +35,8 @@ class Docker(suiteConfig: Config = ConfigFactory.empty) extends AutoCloseable wi
     .setMaxConnections(50)
     .setMaxConnectionsPerHost(10)
     .setMaxRequestRetry(1)
-    .setReadTimeout(5000)
-    .setRequestTimeout(5000))
+    .setReadTimeout(10000)
+    .setRequestTimeout(10000))
 
   private val client = DefaultDockerClient.fromEnv().build()
   private var nodes = Map.empty[String, Node]
