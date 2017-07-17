@@ -32,8 +32,7 @@ class Miner(
                settings: WavesSettings,
                timeService: Time,
                utx: UtxPool,
-               wallet: Wallet,
-               startingLastBlock: Block) extends ScorexLogging {
+               wallet: Wallet) extends ScorexLogging {
 
   import Miner._
 
