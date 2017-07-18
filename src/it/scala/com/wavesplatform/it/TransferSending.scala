@@ -16,7 +16,7 @@ object TransferSending {
 trait TransferSending {
   def nodes: Seq[Node]
 
-  def generateRequests(n: Int, balances: mutable.Map[String, Long]): Seq[Req] = {
+  def generateRequests(n: Int, balances: Map[String, Long]): Seq[Req] = {
     val addresses = nodes.map(_.address)
     val sourceAndDest = (1 to n).map { _ =>
       val Seq(src, dest) = Random.shuffle(addresses).take(2)
@@ -26,7 +26,7 @@ trait TransferSending {
       case ((b, reqs), (src, dest)) =>
         val transferAmount = (Random.nextDouble() * 1e-8 * b(src)).toLong
 
-        b += src -> (b(src) - transferAmount)
+        b += src -> (b(src) - transferAmount - 100000)
         b += dest -> (b(dest) + transferAmount)
 
         reqs += Req(src, dest, transferAmount, 100000)
