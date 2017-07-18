@@ -1,55 +1,41 @@
 package com.wavesplatform.network
 
-import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel.{ChannelHandlerContext, ChannelInboundHandlerAdapter}
 import scorex.utils.ScorexLogging
 
 import scala.concurrent.duration.FiniteDuration
 
-@Sharable
-class PeerSynchronizer(peerDatabase: PeerDatabase, peerRequestInterval: FiniteDuration) extends ChannelInboundHandlerAdapter
-  with ScorexLogging {
+class PeerSynchronizer(peerDatabase: PeerDatabase, peerRequestInterval: FiniteDuration)
+  extends ChannelInboundHandlerAdapter with ScorexLogging {
 
-  import AttributeKeys.PeersRequested
+  private var peersRequested = false
 
-  def requestPeers(ctx: ChannelHandlerContext): Unit = ctx.executor().schedule(peerRequestInterval) {
-    if (ctx.channel().isActive && ctx.channel().attr(PeersRequested).compareAndSet(false, true)) {
-      log.trace(s"${id(ctx)} Requesting peers")
-      ctx.writeAndFlush(GetPeers)
-    } else {
-      log.debug(s"${id(ctx)} NOT requesting peers this time, previous request is still pending")
+  def requestPeers(ctx: ChannelHandlerContext): Unit = if (ctx.channel().isActive) {
+    log.trace(s"${id(ctx)} Requesting peers")
+    peersRequested = true
+    ctx.writeAndFlush(GetPeers)
+
+    ctx.executor().schedule(peerRequestInterval) {
+      requestPeers(ctx)
     }
-    requestPeers(ctx)
   }
 
-  override def handlerAdded(ctx: ChannelHandlerContext) = {
-    ctx.channel().attr(PeersRequested).set(false)
-    super.handlerAdded(ctx)
-  }
-
-  override def channelActive(ctx: ChannelHandlerContext) = {
-    requestPeers(ctx)
-    super.channelActive(ctx)
-  }
-
-  override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef) = msg match {
-    case hs: Handshake =>
-      hs.declaredAddress.foreach { declaredAddress =>
-        peerDatabase.addCandidate(declaredAddress)
-        ctx.channel().attr(AttributeKeys.DeclaredAddress).setIfAbsent(declaredAddress)
-      }
-      ctx.fireChannelRead(msg)
-    case GetPeers =>
-      ctx.channel().declaredAddress.foreach(peerDatabase.touch)
-      ctx.writeAndFlush(KnownPeers(peerDatabase.knownPeers.keys.toSeq))
-    case KnownPeers(peers) if Option(ctx.channel().attr(PeersRequested).getAndSet(false)).contains(true) =>
-      log.trace(s"${id(ctx)} Got known peers: ${peers.mkString("[", ", ", "]")}")
-      ctx.channel().declaredAddress.foreach(peerDatabase.touch)
-      peers.foreach(peerDatabase.addCandidate)
-    case KnownPeers(peers) =>
-      log.debug(s"${id(ctx)} Got unexpected list of known peers containing ${peers.size} entries")
-    case _ =>
-      ctx.channel().declaredAddress.foreach(peerDatabase.touch)
-      super.channelRead(ctx, msg)
+  override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef) = {
+    Option(ctx.channel().attr(AttributeKeys.DeclaredAddress).get()).foreach(peerDatabase.touch)
+    msg match {
+      case hs: Handshake =>
+        hs.declaredAddress.foreach(peerDatabase.addCandidate)
+        super.channelRead(ctx, msg)
+      case GetPeers =>
+        ctx.writeAndFlush(KnownPeers(peerDatabase.knownPeers.keys.toSeq))
+      case KnownPeers(peers) if peersRequested =>
+        peersRequested = false
+        log.trace(s"${id(ctx)} Got known peers: ${peers.mkString("[", ", ", "]")}")
+        peers.foreach(peerDatabase.addCandidate)
+      case KnownPeers(peers) =>
+        log.debug(s"${id(ctx)} Got unexpected list of known peers containing ${peers.size} entries")
+      case _ =>
+        super.channelRead(ctx, msg)
+    }
   }
 }

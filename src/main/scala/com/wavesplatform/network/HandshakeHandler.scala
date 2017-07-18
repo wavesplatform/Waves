@@ -76,7 +76,6 @@ abstract class HandshakeHandler(
           log.debug(s"${id(ctx)} Accepted handshake $remoteHandshake")
           removeHandshakeHandlers(ctx, this)
           establishedConnections.put(ctx.channel(), peerInfo(remoteHandshake, ctx.channel()))
-          ctx.channel().attr(AttributeKeys.NodeName).set(remoteHandshake.nodeName)
 
           ctx.channel().closeFuture().addListener { f: ChannelFuture =>
             connections.remove(key, f.channel())
@@ -132,7 +131,9 @@ object HandshakeHandler extends ScorexLogging {
       peerDatabase: PeerDatabase)
     extends HandshakeHandler(handshake, establishedConnections, connections, peerDatabase) {
 
-    override def connectionNegotiated(ctx: ChannelHandlerContext) = {}
+    override def connectionNegotiated(ctx: ChannelHandlerContext) = {
+      ctx.channel().attr(AttributeKeys.DeclaredAddress).set(ctx.remoteAddress)
+    }
 
     override def channelActive(ctx: ChannelHandlerContext) = {
       ctx.writeAndFlush(handshake.encode(ctx.alloc().buffer()))

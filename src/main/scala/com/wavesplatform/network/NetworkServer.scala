@@ -15,7 +15,6 @@ import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.channel.socket.SocketChannel
 import io.netty.channel.socket.nio.{NioServerSocketChannel, NioSocketChannel}
 import io.netty.handler.codec.{LengthFieldBasedFrameDecoder, LengthFieldPrepender}
-import scorex.network.message.MessageSpec
 import scorex.transaction._
 import scorex.utils.{ScorexLogging, Time}
 
@@ -65,7 +64,6 @@ class NetworkServer(checkpointService: CheckpointService,
 
   private val lengthFieldPrepender = new LengthFieldPrepender(4)
 
-  private val peerSynchronizer = new PeerSynchronizer(peerDatabase, settings.networkSettings.peersBroadcastInterval)
   // There are two error handlers by design. WriteErrorHandler adds a future listener to make sure writes to network
   // succeed. It is added to the head of pipeline (it's the closest of the two to actual network), because some writes
   // are initiated from the middle of the pipeline (e.g. extension requests). FatalErrorHandler, on the other hand,
@@ -105,7 +103,7 @@ class NetworkServer(checkpointService: CheckpointService,
         new LegacyFrameCodec,
         discardingHandler,
         messageCodec,
-        peerSynchronizer,
+        new PeerSynchronizer(peerDatabase, settings.networkSettings.peersBroadcastInterval),
         historyReplier,
         new ExtensionSignaturesLoader(settings.synchronizationSettings.synchronizationTimeout, peerDatabase),
         new ExtensionBlocksLoader(history, settings.synchronizationSettings.synchronizationTimeout, peerDatabase),
@@ -143,7 +141,7 @@ class NetworkServer(checkpointService: CheckpointService,
       new LegacyFrameCodec,
       discardingHandler,
       messageCodec,
-      peerSynchronizer,
+      new PeerSynchronizer(peerDatabase, settings.networkSettings.peersBroadcastInterval),
       historyReplier,
       new ExtensionSignaturesLoader(settings.synchronizationSettings.synchronizationTimeout, peerDatabase),
       new ExtensionBlocksLoader(history, settings.synchronizationSettings.synchronizationTimeout, peerDatabase),
