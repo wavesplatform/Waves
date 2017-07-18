@@ -50,8 +50,11 @@ class Miner(
       s"BlockChain is too old (last block ${parent.uniqueId} generated $blockAge ago)"
     ))
 
-  private def generateOneBlockTask(account: PrivateKeyAccount, parentHeight: Int, parent: Block,
+  private def generateOneBlockTask(account: PrivateKeyAccount, parentHeight: Int,
                                    greatGrandParent: Option[Block], balance: Long)(delay: FiniteDuration): Task[Either[String, Block]] = Task {
+    // should take last block right at the time of mining since microblocks might have been added
+    // the rest doesn't change
+    val parent = history.lastBlock.get
     val pc = allChannels.size()
     lazy val lastBlockKernelData = parent.consensusData
     lazy val currentTime = timeService.correctedTime()
@@ -121,7 +124,7 @@ class Miner(
         val offset = calcOffset(timeService, ts, minerSettings.minimalBlockGenerationOffset)
         log.debug(s"Next attempt for acc=$account in $offset")
         val balance = generatingBalance(stateReader, blockchainSettings.functionalitySettings, account, height)
-        Some(generateOneBlockTask(account, height, lastBlock, grandParent, balance)(offset).map {
+        Some(generateOneBlockTask(account, height, grandParent, balance)(offset).map {
           case Right(block) => Some(Task {
             processBlock(block, true) match {
               case Left(err) => log.warn(err.toString)

@@ -54,7 +54,14 @@ class NgHistoryWriterImpl(inner: HistoryWriter) extends NgHistoryWriter {
     }
     else forgeBlock(block.reference) match {
       case Some((forgedBlock, discarded)) =>
-        inner.appendBlock(forgedBlock)(consensusValidation).map(dd => (dd._1, discarded))
+        if (forgedBlock.signatureValid)
+          inner.appendBlock(forgedBlock)(consensusValidation).map(dd => (dd._1, discarded))
+        else {
+          val errorText = s"Forged block has invalid signature: base: ${baseBlock()}, micros: ${micros()}, requested reference: ${block.reference}"
+          log.error(errorText)
+          Left(BlockAppendError(s"ERROR: $errorText", block))
+
+        }
       case None =>
         Left(BlockAppendError(s"References incorrect or non-existing block(liquid block exists): " + logDetails, block))
     }
@@ -139,25 +146,25 @@ class NgHistoryWriterImpl(inner: HistoryWriter) extends NgHistoryWriter {
 
   def forgeBlock(id: BlockId): Option[(Block, DiscardedTransactions)] = read { implicit l =>
     baseBlock().flatMap(f = base => {
-      lazy val ms = micros()
+      val ms = micros().reverse
       if (base.uniqueId == id) {
-        Some((base, ms.flatMap(_.transactionData)))
+        val discardedTxs = ms.flatMap(_.transactionData)
+        log.trace(s"Forged base block [id=$id] with base_size=${base.transactionData.size}(discarded=${discardedTxs.size})")
+        Some((base, discardedTxs))
       } else if (!ms.exists(_.totalResBlockSig == id)) None
       else {
-        val (accumulatedTxs, discardedTxs) = ms.reverse.foldLeft((List.empty[Transaction], Option.empty[DiscardedTransactions])) { case ((accumulated, maybeDiscarded), micro) => maybeDiscarded match {
-          case Some(discarded) => (accumulated, Some(discarded ++ micro.transactionData))
+        val (accumulatedTxs, maybeFound) = ms.foldLeft((List.empty[Transaction], Option.empty[(ByteStr, DiscardedTransactions)])) { case ((accumulated, maybeDiscarded), micro) => maybeDiscarded match {
+          case Some((sig, discarded)) => (accumulated, Some((sig, discarded ++ micro.transactionData)))
           case None =>
             if (micro.totalResBlockSig == id)
-              (accumulated ++ micro.transactionData, Some(Seq.empty[Transaction]))
+              (accumulated ++ micro.transactionData, Some((micro.totalResBlockSig, Seq.empty[Transaction])))
             else
               (accumulated ++ micro.transactionData, None)
         }
         }
-        discardedTxs.map { discarded =>
-          log.trace(s"Forged block with base_size=${base.transactionData.size} + accumulated_size=${accumulatedTxs.size}(discarded=${discarded.size})")
-          (base.copy(
-            signerData = base.signerData.copy(signature = ms.head.totalResBlockSig),
-            transactionData = base.transactionData ++ accumulatedTxs), discarded)
+        maybeFound.map { case (sig, discardedTxs) =>
+          log.trace(s"Forged block[id=$sig] with base_size=${base.transactionData.size} + accumulated_size=${accumulatedTxs.size}(discarded=${discardedTxs.size})")
+          (base.copy(signerData = base.signerData.copy(signature = sig), transactionData = base.transactionData ++ accumulatedTxs), discardedTxs)
         }
       }
     })
