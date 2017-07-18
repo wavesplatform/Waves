@@ -22,16 +22,10 @@ trait TransferSending {
       val Seq(src, dest) = Random.shuffle(addresses).take(2)
       (src, dest)
     }
-    val (_, requests) = sourceAndDest.foldLeft((balances, ArrayBuffer.empty[Req])) {
-      case ((b, reqs), (src, dest)) =>
-        val transferAmount = (Random.nextDouble() * 1e-8 * b(src)).toLong
-
-        b += src -> (b(src) - transferAmount - 100000)
-        b += dest -> (b(dest) + transferAmount)
-
-        reqs += Req(src, dest, transferAmount, 100000)
-
-        (b, reqs)
+    val requests = sourceAndDest.foldLeft(List.empty[Req]) {
+      case (reqs, (src, dest)) =>
+        val transferAmount = (Random.nextDouble() * 1e-8 * balances(src)).toLong
+        reqs :+ Req(src, dest, transferAmount, 100000)
     }
 
     requests

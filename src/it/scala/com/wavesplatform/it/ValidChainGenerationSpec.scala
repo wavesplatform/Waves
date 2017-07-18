@@ -13,7 +13,7 @@ class ValidChainGenerationSpec(override val nodes: Seq[Node]) extends FreeSpec w
   with Matchers with TransferSending {
   "Generate 30 blocks and synchronise" in {
     val targetBlocks = result(for {
-      b <- traverse(nodes)(balanceForNode).map(mutable.AnyRefMap[String, Long](_: _*))
+      b <- traverse(nodes)(balanceForNode).map(_.toMap)
       _ <- processRequests(generateRequests(1000, b))
       height <- traverse(nodes)(_.height).map(_.max)
       _ <- traverse(nodes)(_.waitForHeight(height + 40)) // wait a little longer to prevent rollbacks...

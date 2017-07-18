@@ -22,7 +22,7 @@ class RollbackSpecSuite extends FreeSpec with ScalaFutures with IntegrationPatie
   def rollbackTest(rollbackAndReturnTransactionsToUTX: (Int, Seq[Req]) => Future[_]): Unit = {
     val waitBlocks = 5
     result(for {
-      b <- traverse(nodes)(balanceForNode).map(mutable.AnyRefMap[String, Long](_: _*))
+      b <- traverse(nodes)(balanceForNode).map(_.toMap)
       requests = generateRequests(301, b)
       startHeight <- Future.traverse(nodes)(_.height).map(_.min)
       _ <- processRequests(requests)
@@ -59,7 +59,7 @@ class RollbackSpecSuite extends FreeSpec with ScalaFutures with IntegrationPatie
   "Just rollback transactions" in {
     val waitBlocks = 5
     result(for {
-      b <- traverse(nodes)(balanceForNode).map(mutable.AnyRefMap[String, Long](_: _*))
+      b <- traverse(nodes)(balanceForNode).map(_.toMap)
       requests = generateRequests(301, b)
       startHeight <- Future.traverse(nodes)(_.height).map(_.min)
       hashBeforeApply <- traverse(nodes)(_.waitForDebugInfoAt(startHeight + waitBlocks).map(_.stateHash)).map(infos => {
