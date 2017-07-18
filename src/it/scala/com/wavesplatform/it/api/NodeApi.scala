@@ -11,7 +11,7 @@ import org.asynchttpclient._
 import org.asynchttpclient.util.HttpConstants
 import org.slf4j.LoggerFactory
 import play.api.libs.json.Json.{parse, stringify, toJson}
-import play.api.libs.json.{Format, JsValue, Json, Writes}
+import play.api.libs.json._
 import scorex.api.http.alias.CreateAliasRequest
 import scorex.api.http.assets._
 import scorex.api.http.leasing.{LeaseCancelRequest, LeaseRequest}
@@ -86,6 +86,8 @@ trait NodeApi {
   def blockAt(height: Int) = get(s"/blocks/at/$height").as[Block]
 
   def utx = get(s"/transactions/unconfirmed").as[Seq[Transaction]]
+
+  def utxSize = get(s"/transactions/unconfirmed/size").as[JsObject].map(_.value("size").as[Int])
 
   def lastBlock: Future[Block] = get("/blocks/last").as[Block]
 
