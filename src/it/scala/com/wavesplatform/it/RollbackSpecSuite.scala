@@ -32,7 +32,6 @@ class RollbackSpecSuite extends FreeSpec with ScalaFutures with IntegrationPatie
       })
       stateAfterFirstTry <- nodes.head.debugStateAt(startHeight + waitBlocks)
       _ <- rollbackAndReturnTransactionsToUTX(startHeight, requests)
-      _ <- processRequests(requests)
       hashAfterSecondTry <- traverse(nodes)(_.waitForDebugInfoAt(startHeight + waitBlocks).map(_.stateHash)).map(infos => {
         all(infos) shouldEqual infos.head
         infos.head
@@ -73,7 +72,7 @@ class RollbackSpecSuite extends FreeSpec with ScalaFutures with IntegrationPatie
       _ <- traverse(nodes)(_.utx).map(utxs => {
         all(utxs) shouldBe 'empty
       })
-      hashAfterApply <- nodes.head.debugStateAt(startHeight + waitBlocks)
+      hashAfterApply <- nodes.head.waitForDebugInfoAt(startHeight + waitBlocks).map(_.stateHash)
     } yield {
       hashBeforeApply shouldBe hashAfterApply
     }, 5.minutes)

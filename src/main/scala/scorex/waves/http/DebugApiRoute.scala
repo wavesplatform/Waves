@@ -109,7 +109,7 @@ case class DebugApiRoute(settings: RestAPISettings,
       required = true,
       paramType = "body",
       dataType = "scorex.waves.http.RollbackParams",
-      defaultValue = "{\n\t\"rollbackTo\": 3,\n\t\"returnTransactionsInUTX\": false\n}"
+      defaultValue = "{\n\t\"rollbackTo\": 3,\n\t\"returnTransactionsToUTX\": false\n}"
     )
   ))
   @ApiResponses(Array(
