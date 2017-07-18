@@ -27,13 +27,20 @@ package object history {
     functionalitySettings = TestFunctionalitySettings.Enabled,
     genesisSettings = null)
 
+  val ApplyMinerFeeWithTransactionSettings: BlockchainSettings = DefaultBlockchainSettings.copy(
+    functionalitySettings = DefaultBlockchainSettings.functionalitySettings.copy(applyMinerFeeWithTransactionAfter = 0))
+
+  val ApplyMinerFeeBeforeAllTransactionsSettings: BlockchainSettings = DefaultBlockchainSettings.copy(
+    functionalitySettings = DefaultBlockchainSettings.functionalitySettings.copy(applyMinerFeeWithTransactionAfter = Long.MaxValue))
+
+
   def domain(bs: BlockchainSettings = DefaultBlockchainSettings): Domain = {
     val (history, _, stateReader, blockchainUpdater) = StorageFactory(bs).get
     Domain(history, stateReader, blockchainUpdater)
   }
 
   val defaultSigner = PrivateKeyAccount(Array.fill(TransactionParser.KeyLength)(0))
-  val generationSignature = Array.fill(Block.GeneratorSignatureLength)(0: Byte)
+  val generationSignature: Array[Byte] = Array.fill(Block.GeneratorSignatureLength)(0: Byte)
 
   def buildBlockOfTxs(refTo: ByteStr, txs: Seq[Transaction]): Block = {
     Block.buildAndSign(
@@ -88,4 +95,5 @@ package object history {
 
     def scenario[S](gen: Gen[S], bs: BlockchainSettings = DefaultBlockchainSettings)(assertion: (Domain, S) => Assertion): Assertion = forAll(gen)(assertion(domain(bs), _))
   }
+
 }

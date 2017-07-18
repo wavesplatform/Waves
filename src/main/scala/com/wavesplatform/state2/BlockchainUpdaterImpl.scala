@@ -3,7 +3,6 @@ package com.wavesplatform.state2
 import java.util.concurrent.locks.ReentrantReadWriteLock
 
 import cats._
-import cats.data._
 import cats.implicits._
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.BlockchainUpdaterImpl._
@@ -67,7 +66,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
       persisted.applyBlockDiff(diffToBePersisted)
     }
 
-    bottomMemoryDiff.set(unsafeDiffByRange(persisted, persisted.height + 1, ngHistoryWriter.height() + (if (ngHistoryWriter.liquidBlockExists()) 0 else 1)))
+    bottomMemoryDiff.set(unsafeDiffByRange(persisted, persisted.height + 1, ngHistoryWriter.height() + (if (ngHistoryWriter.baseBlock().isDefined) 0 else 1)))
     topMemoryDiff.set(BlockDiff.empty)
     logHeights("State rebuild finished:")
   }
@@ -83,14 +82,14 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
         val asFirmBlock = referencedLiquidDiff.copy(heightDiff = 1)
         ngHistoryWriter.appendBlock(block)(BlockDiffer.fromBlock(settings,
           composite(currentPersistedBlocksState, () => asFirmBlock),
-          ngHistoryWriter.bestLiquidBlock().map(_.timestamp))(block)).map { case ((newBlockDiff, discraded)) =>
+          ngHistoryWriter.bestLiquidBlock().map(_.timestamp), block)).map { case ((newBlockDiff, discraded)) =>
           topMemoryDiff.set(Monoid.combine(topMemoryDiff(), asFirmBlock))
           liquidBlockCandidatesDiff.set(Map(block.uniqueId -> newBlockDiff))
           discraded
         }
       case None =>
         ngHistoryWriter.appendBlock(block)(BlockDiffer.fromBlock(
-          settings, currentPersistedBlocksState, ngHistoryWriter.lastBlock.map(_.timestamp))(block)).map { case ((newBlockDiff, discraded)) =>
+          settings, currentPersistedBlocksState, ngHistoryWriter.lastBlock.map(_.timestamp), block)).map { case ((newBlockDiff, discraded)) =>
           liquidBlockCandidatesDiff.set(Map(block.uniqueId -> newBlockDiff))
           discraded
         }
@@ -138,15 +137,13 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
   }
 
   override def processMicroBlock(microBlock: MicroBlock): Either[ValidationError, Unit] = write { implicit l =>
-    ngHistoryWriter.appendMicroBlock(microBlock) {
-      val(prevTotal, discarded) = ngHistoryWriter.forgeBlock(microBlock.prevResBlockSig).get
-      val newTotal = prevTotal.copy(
-        signerData = prevTotal.signerData.copy(signature = microBlock.totalResBlockSig),
-        transactionData = prevTotal.transactionData ++ microBlock.transactionData)
-      BlockDiffer.fromLiquidBlock(settings, currentPersistedBlocksState, ngHistoryWriter.parent(ngHistoryWriter.lastBlock.get).map(_.timestamp))(newTotal)
-        .map(newTotalDiff => liquidBlockCandidatesDiff.set(liquidBlockCandidatesDiff() + (microBlock.totalResBlockSig -> newTotalDiff)))
-    }.map(_ => log.info(s"MicroBlock ${trim(microBlock.totalResBlockSig)}~>${trim(microBlock.prevResBlockSig)} appended. " +
-      s" -- with ${microBlock.transactionData.size} transactions"))
+    ngHistoryWriter.appendMicroBlock(microBlock)(ts =>
+      BlockDiffer.fromMicroBlock(settings, bestLiquidState, ngHistoryWriter.parent(ngHistoryWriter.lastBlock.get).map(_.timestamp), microBlock, ts))
+      .map(newTotalDiff => {
+        liquidBlockCandidatesDiff.set(liquidBlockCandidatesDiff() + (microBlock.totalResBlockSig -> newTotalDiff))
+        log.info(s"MicroBlock ${trim(microBlock.totalResBlockSig)}~>${trim(microBlock.prevResBlockSig)} appended. " +
+          s" -- with ${microBlock.transactionData.size} transactions")
+      })
   }
 }
 

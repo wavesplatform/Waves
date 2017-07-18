@@ -30,7 +30,7 @@ class NgHistoryWriterImplTest extends PropSpec with GeneratorDrivenPropertyCheck
       val history = new NgHistoryWriterImpl(HistoryWriterImpl(None, new ReentrantReadWriteLock()).get)
       val (block, microBlocks) = chainBaseAndMicro(randomSig, genesis, Seq(Seq(payment), Seq(payment2), Seq(payment3)))
       history.appendBlock(block)(Right(BlockDiff.empty)).explicitGet()
-      microBlocks.foreach(mb => history.appendMicroBlock(mb)(Right(BlockDiff.empty)).right.get)
+      microBlocks.foreach(mb => history.appendMicroBlock(mb)(_ => Right(BlockDiff.empty)).right.get)
 
       history.forgeBlock(block.signerData.signature).get match {
         case ((forged, txs)) =>
