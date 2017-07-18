@@ -5,6 +5,7 @@ import com.wavesplatform.{RequestGen, UtxPool}
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state2.diffs.TransactionDiffer.TransactionValidationError
+import io.netty.channel.group.ChannelGroup
 import org.scalacheck.Gen._
 import org.scalacheck.{Gen => G}
 import org.scalamock.scalatest.PathMockFactory
@@ -19,12 +20,13 @@ import scorex.transaction.Transaction
 class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with RequestGen with PathMockFactory with PropertyChecks {
   private val settings = RestAPISettings.fromConfig(ConfigFactory.load())
   private val utx = stub[UtxPool]
+  private val allChannels = stub[ChannelGroup]
 
-  (utx.putIfNew _).when(*, *, *).onCall((t, _, _) => Left(TransactionValidationError(GenericError("foo"), t))).anyNumberOfTimes()
+  (utx.putIfNew _).when(*).onCall((t: Transaction) => Left(TransactionValidationError(GenericError("foo"), t))).anyNumberOfTimes()
 
   "returns StateCheckFiled" - {
 
-    val route = AssetsBroadcastApiRoute(settings, utx).route
+    val route = AssetsBroadcastApiRoute(settings, utx, allChannels).route
 
     val vt = Table[String, G[_ <: Transaction], (JsValue) => JsValue](
       ("url", "generator", "transform"),
@@ -53,7 +55,7 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
   }
 
   "returns appropriate error code when validation fails for" - {
-    val route = AssetsBroadcastApiRoute(settings, utx).route
+    val route = AssetsBroadcastApiRoute(settings, utx, allChannels).route
 
     "issue transaction" in forAll(broadcastIssueReq) { ir =>
       def posting[A: Writes](v: A): RouteTestResult = Post(routePath("issue"), v) ~> route

@@ -22,7 +22,6 @@ import scala.util.{Left, Right}
 
 
 class UtxPool(
-                 allChannels: ChannelGroup,
                  time: Time,
                  stateReader: StateReader,
                  history: History,
@@ -38,7 +37,7 @@ class UtxPool(
   private def removeExpired(currentTs: Long): Unit =
     transactions.entrySet().removeIf(tx => (currentTs - tx.getValue.timestamp).millis > utxSettings.maxTransactionAge)
 
-  def putIfNew(tx: Transaction, source: Option[Channel] = None, broadcast: Boolean = true): Either[ValidationError, Transaction] =
+  def putIfNew(tx: Transaction): Either[ValidationError, Transaction] =
     if (transactions.size >= utxSettings.maxSize) {
       Left(GenericError("Transaction pool size limit is reached"))
     } else knownTransactions.get(tx.id, () => {
@@ -46,7 +45,6 @@ class UtxPool(
         _ <- feeCalculator.enoughFee(tx)
         _ <- TransactionDiffer.apply(fs, history.lastBlock.map(_.timestamp), time.correctedTime(), stateReader.height)(stateReader, tx)
         _ = transactions.putIfAbsent(tx.id, tx)
-        _ = if (broadcast) allChannels.broadcast(RawBytes(TransactionMessageSpec.messageCode, tx.bytes), source)
       } yield tx
 
       validationResult

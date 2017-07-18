@@ -13,6 +13,7 @@ import com.wavesplatform.matcher.model.MatcherModel._
 import com.wavesplatform.matcher.model._
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.reader.StateReader
+import io.netty.channel.group.ChannelGroup
 import play.api.libs.json._
 import scorex.crypto.encode.Base58
 import scorex.transaction.ValidationError.{AccountBalanceError, GenericError, OrderValidationError}
@@ -25,11 +26,14 @@ import scala.annotation.tailrec
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 
+import com.wavesplatform.network._
+
 class OrderBookActor(assetPair: AssetPair,
                      val orderHistory: ActorRef,
                      val storedState: StateReader,
                      val wallet: Wallet,
                      val utx: UtxPool,
+                     val allChannels: ChannelGroup,
                      val settings: MatcherSettings,
                      val history: History,
                      val functionalitySettings: FunctionalitySettings)
@@ -229,10 +233,11 @@ class OrderBookActor(assetPair: AssetPair,
         None
 
       case event@OrderExecuted(o, c) =>
-        createTransaction(o, c).flatMap(utx.putIfNew(_, None)) match {
+        createTransaction(o, c).flatMap(utx.putIfNew(_)) match {
           case Left(ex) =>
             processInvalidTransaction(event, ex)
-          case Right(_) =>
+          case Right(tx) =>
+            allChannels.broadcast(RawBytes(TransactionMessageSpec.messageCode, tx.bytes))
             processEvent(event)
             if (event.submittedRemaining > 0)
               Some(o.partial(event.submittedRemaining))
@@ -251,9 +256,9 @@ class OrderBookActor(assetPair: AssetPair,
 
 object OrderBookActor {
   def props(assetPair: AssetPair, orderHistory: ActorRef, storedState: StateReader, settings: MatcherSettings,
-            wallet: Wallet, utx: UtxPool, history: History,
+            wallet: Wallet, utx: UtxPool, allChannels: ChannelGroup, history: History,
             functionalitySettings: FunctionalitySettings): Props =
-    Props(new OrderBookActor(assetPair, orderHistory, storedState, wallet, utx, settings, history, functionalitySettings))
+    Props(new OrderBookActor(assetPair, orderHistory, storedState, wallet, utx, allChannels, settings, history, functionalitySettings))
 
   def name(assetPair: AssetPair): String = assetPair.toString
 

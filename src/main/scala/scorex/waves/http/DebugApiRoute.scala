@@ -93,7 +93,7 @@ case class DebugApiRoute(settings: RestAPISettings,
       case Right(txs) =>
         allChannels.broadcast(LocalScoreChanged(history.score()))
         if (returnTransactionsToUtx) {
-          txs.foreach(tx => utxStorage.putIfNew(tx, broadcast = false))
+          txs.foreach(tx => utxStorage.putIfNew(tx))
         }
         Json.obj("BlockId" -> blockId.toString): ToResponseMarshallable
       case Left(error) => ApiError.fromValidationError(error)

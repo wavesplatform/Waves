@@ -28,7 +28,6 @@ class UtxPoolSpecification extends FreeSpec
 
   private implicit def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)
 
-  private val group = mock[ChannelGroup]
   private val calculator = new FeeCalculator(FeesSettings(Map(
     1 -> List(FeeSettings("", 0)),
     2 -> List(FeeSettings("", 0)),
@@ -67,14 +66,11 @@ class UtxPoolSpecification extends FreeSpec
     offset <- chooseNum(1000L, 2000L)
   } yield {
     val time = new TestTime()
-    val utx = new UtxPool(group, time, state, history, calculator, FunctionalitySettings.TESTNET, UtxSettings(10, 10.minutes))
+    val utx = new UtxPool(time, state, history, calculator, FunctionalitySettings.TESTNET, UtxSettings(10, 10.minutes))
     val amountPart = (senderBalance - fee) / 2 - fee
     val txs = for (_ <- 1 to n) yield PaymentTransaction.create(sender, recipient, amountPart, fee, time.getTimestamp()).right.get
     (utx, time, txs, (offset + 1000).millis)
   }).label("twoOutOfManyValidPayments")
-
-  private def expectBroadcast(tx: Transaction): Unit =
-    (group.writeAndFlush(_: Any, _: ChannelMatcher)).expects(RawBytes(25, tx.bytes), ChannelMatchers.all()).once()
 
   private def utxTest(utxSettings: UtxSettings = UtxSettings(20, 5.seconds), txCount: Int = 10)
                      (f: (Seq[TransferTransaction], UtxPool, TestTime) => Unit): Unit = forAll(
@@ -83,7 +79,7 @@ class UtxPoolSpecification extends FreeSpec
     val time = new TestTime()
 
     forAll(listOfN(count, transfer(sender, senderBalance / 2, time))) { txs =>
-      val utx = new UtxPool(group, time, state, history, calculator, FunctionalitySettings.TESTNET, utxSettings)
+      val utx = new UtxPool(time, state, history, calculator, FunctionalitySettings.TESTNET, utxSettings)
       f(txs, utx, time)
     }
   }
@@ -99,26 +95,23 @@ class UtxPoolSpecification extends FreeSpec
     } yield {
       val time = new TestTime()
       val history = HistoryWriterImpl(None, new ReentrantReadWriteLock()).get
-      val utx = new UtxPool(group, time, state, history, calculator, FunctionalitySettings.TESTNET, UtxSettings(10, offset.millis))
+      val utx = new UtxPool(time, state, history, calculator, FunctionalitySettings.TESTNET, UtxSettings(10, offset.millis))
       (utx, time, tx1, (offset + 1000).millis, tx2)
     }
 
   "UTX Pool" - {
     "does not add new transactions when full" in utxTest(UtxSettings(1, 5.seconds)) { (txs, utx, _) =>
-      expectBroadcast(txs.head)
       utx.putIfNew(txs.head) shouldBe 'right
       all(txs.tail.map(t => utx.putIfNew(t))) shouldBe 'left
     }
 
     "does not broadcast the same transaction twice" in utxTest() { (txs, utx, _) =>
-      expectBroadcast(txs.head)
       utx.putIfNew(txs.head) shouldBe 'right
       utx.putIfNew(txs.head) shouldBe 'right
     }
 
     "evicts expired transactions when removeAll is called" in forAll(dualTxGen) { case (utx, time, txs1, offset, txs2) =>
       all(txs1.map { t =>
-        expectBroadcast(t)
         utx.putIfNew(t)
       }) shouldBe 'right
       utx.all().size shouldEqual txs1.size
@@ -127,7 +120,6 @@ class UtxPoolSpecification extends FreeSpec
       utx.removeAll(Seq.empty)
 
       all(txs2.map { t =>
-        expectBroadcast(t)
         utx.putIfNew(t)
       }) shouldBe 'right
       utx.all().size shouldEqual txs2.size
@@ -135,7 +127,6 @@ class UtxPoolSpecification extends FreeSpec
 
     "evicts expired transactions when packUnconfirmed is called" in forAll(dualTxGen) { case (utx, time, txs, offset, _) =>
       all(txs.map { t =>
-        expectBroadcast(t)
         utx.putIfNew(t)
       }) shouldBe 'right
       utx.all().size shouldEqual txs.size
@@ -148,7 +139,6 @@ class UtxPoolSpecification extends FreeSpec
 
     "evicts one of mutually invalid transactions when packUnconfirmed is called" in forAll(twoOutOfManyValidPayments) { case (utx, time, txs, offset) =>
       all(txs.map { t =>
-        expectBroadcast(t)
         utx.putIfNew(t)
       }) shouldBe 'right
       utx.all().size shouldEqual txs.size

@@ -6,6 +6,7 @@ import akka.http.scaladsl.server.Route
 import com.wavesplatform.UtxPool
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state2.reader.StateReader
+import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
 import play.api.libs.json.{Format, Json}
 import scorex.BroadcastRoute
@@ -17,7 +18,7 @@ import scorex.wallet.Wallet
 
 @Path("/alias")
 @Api(value = "/alias")
-case class AliasApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPool, time: Time, state: StateReader)
+case class AliasApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPool, allChannels: ChannelGroup, time: Time, state: StateReader)
   extends ApiRoute with BroadcastRoute {
 
   override val route = pathPrefix("alias") {

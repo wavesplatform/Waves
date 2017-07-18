@@ -5,6 +5,7 @@ import javax.ws.rs.Path
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.UtxPool
 import com.wavesplatform.settings.RestAPISettings
+import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
 import scorex.BroadcastRoute
 import scorex.api.http._
@@ -16,7 +17,8 @@ import scala.concurrent.Future
 @Api(value = "assets")
 case class AssetsBroadcastApiRoute(
     settings: RestAPISettings,
-    utx: UtxPool) extends ApiRoute with BroadcastRoute {
+    utx: UtxPool,
+    allChannels: ChannelGroup) extends ApiRoute with BroadcastRoute {
 
   override val route: Route = pathPrefix("assets" / "broadcast") {
     issue ~ reissue ~ transfer ~ burnRoute ~ batchTransfer ~ makeAssetNameUniqueRequest
