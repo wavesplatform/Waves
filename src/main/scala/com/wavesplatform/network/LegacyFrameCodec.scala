@@ -8,15 +8,24 @@ import io.netty.channel.ChannelHandlerContext
 import io.netty.handler.codec.ByteToMessageCodec
 import scorex.crypto.hash.FastCryptographicHash
 import scorex.network.message.Message._
+import scorex.network.message.MessageSpec
 import scorex.utils.ScorexLogging
 
-class LegacyFrameCodec extends ByteToMessageCodec[RawBytes] with ScorexLogging {
+import scala.util.control.NonFatal
+
+class LegacyFrameCodec(peerDatabase: PeerDatabase) extends ByteToMessageCodec[RawBytes] with ScorexLogging {
   import LegacyFrameCodec._
-  override def decode(ctx: ChannelHandlerContext, in: ByteBuf, out: util.List[AnyRef]) = {
+
+  override def decode(ctx: ChannelHandlerContext, in: ByteBuf, out: util.List[AnyRef]) = try {
     require(in.readInt() == Magic, "invalid magic number")
 
     val code = in.readByte()
+    require(messageSpecs.contains(code), s"Unexpected message code $code")
+
+    val spec = messageSpecs(code)
     val length = in.readInt()
+    require(length <= spec.maxLength, s"${spec.messageName} length $length exceeds ${spec.maxLength}")
+
     val dataBytes = new Array[Byte](length)
     if (length > 0) {
       val declaredChecksum = in.readSlice(ChecksumLength)
@@ -29,6 +38,10 @@ class LegacyFrameCodec extends ByteToMessageCodec[RawBytes] with ScorexLogging {
     }
 
     out.add(RawBytes(code, dataBytes))
+  } catch {
+    case NonFatal(e) =>
+      log.warn(s"${id(ctx)} Malformed network message", e)
+      peerDatabase.blacklistAndClose(ctx.channel(), "Malformed network message")
   }
 
   override def encode(ctx: ChannelHandlerContext, msg: RawBytes, out: ByteBuf) = {
@@ -46,4 +59,7 @@ class LegacyFrameCodec extends ByteToMessageCodec[RawBytes] with ScorexLogging {
 
 object LegacyFrameCodec {
   val Magic = 0x12345678
+
+  private val messageSpecs: Map[Byte, MessageSpec[_ <: AnyRef]] =
+    BasicMessagesRepo.specs.map(s => s.messageCode -> s).toMap
 }

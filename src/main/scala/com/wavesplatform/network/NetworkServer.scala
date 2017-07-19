@@ -15,7 +15,6 @@ import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.channel.socket.SocketChannel
 import io.netty.channel.socket.nio.{NioServerSocketChannel, NioSocketChannel}
 import io.netty.handler.codec.{LengthFieldBasedFrameDecoder, LengthFieldPrepender}
-import scorex.network.message.MessageSpec
 import scorex.transaction._
 import scorex.utils.{ScorexLogging, Time}
 
@@ -102,7 +101,7 @@ class NetworkServer(checkpointService: CheckpointService,
         serverHandshakeHandler,
         lengthFieldPrepender,
         new LengthFieldBasedFrameDecoder(1024 * 1024, 0, 4, 0, 4),
-        new LegacyFrameCodec,
+        new LegacyFrameCodec(peerDatabase),
         discardingHandler,
         messageCodec,
         peerSynchronizer,
@@ -140,7 +139,7 @@ class NetworkServer(checkpointService: CheckpointService,
       clientHandshakeHandler,
       lengthFieldPrepender,
       new LengthFieldBasedFrameDecoder(1024 * 1024, 0, 4, 0, 4),
-      new LegacyFrameCodec,
+      new LegacyFrameCodec(peerDatabase),
       discardingHandler,
       messageCodec,
       peerSynchronizer,
