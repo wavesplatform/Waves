@@ -63,7 +63,7 @@ class AliasTransactionSpecification(override val allNodes: Seq[Node]) extends In
       aliasTxId <- sender.createAlias(firstAddress, alias, 1 waves).map(_.id)
       _ <- Future.traverse(allNodes)(_.waitForTransaction(aliasTxId))
       _ <- assertBalances(firstAddress, 95 waves, 95 waves)
-      _ <- Future.traverse(allNodes)(_.rollback(startHeight))
+      _ <- Future.traverse(allNodes)(_.rollback(startHeight, returnToUTX = false))
       _ <- assertBalances(firstAddress, 96 waves, 96 waves)
       secondAliasTxId <- sender.createAlias(firstAddress, alias, 1 waves).map(_.id)
       _ <- Future.traverse(allNodes)(_.waitForTransaction(secondAliasTxId))
