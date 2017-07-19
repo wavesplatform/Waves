@@ -44,7 +44,7 @@ class UtxPool(
     } else knownTransactions.get(tx.id, () => {
       val validationResult = for {
         _ <- feeCalculator.enoughFee(tx)
-        _ <- TransactionDiffer.apply(fs, history.lastBlock.map(_.timestamp), time.correctedTime(), stateReader.height)(stateReader, tx)
+        _ <- TransactionDiffer.apply(fs, history.lastBlockTimestamp(), time.correctedTime(), stateReader.height)(stateReader, tx)
         _ = transactions.putIfAbsent(tx.id, tx)
         _ = allChannels.broadcast(RawBytes(TransactionMessageSpec.messageCode, tx.bytes), source)
       } yield tx
@@ -69,7 +69,7 @@ class UtxPool(
   def packUnconfirmed(max: Int): Seq[Transaction] = {
     val currentTs = time.correctedTime()
     removeExpired(currentTs)
-    val differ = TransactionDiffer.apply(fs, history.lastBlock.map(_.timestamp), currentTs, stateReader.height) _
+    val differ = TransactionDiffer.apply(fs, history.lastBlockTimestamp(), currentTs, stateReader.height) _
     val (invalidTxs, validTxs, _) = transactions.asScala
       .values.toSeq
       .sorted(TransactionsOrdering.InUTXPool)

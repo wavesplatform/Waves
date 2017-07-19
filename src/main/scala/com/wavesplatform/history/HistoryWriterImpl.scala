@@ -82,6 +82,8 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
   }
 
   override def close(): Unit = db.close()
+
+  override def lastBlockTimestamp(): Option[Long] = this.lastBlock.map(_.timestamp)
 }
 
 object HistoryWriterImpl extends ScorexLogging {

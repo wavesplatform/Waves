@@ -44,10 +44,10 @@ class Miner(
   private val scheduledAttempts = SerialCancelable()
   private val microBlockAttempt = SerialCancelable()
 
-  private def checkAge(parentHeight: Int, parent: Block): Either[String, Unit] =
-    Either.cond(parentHeight == 1, (), (timeService.correctedTime() - parent.timestamp).millis)
+  private def checkAge(parentHeight: Int, parentTimestamp: Long): Either[String, Unit] =
+    Either.cond(parentHeight == 1, (), (timeService.correctedTime() - parentTimestamp).millis)
       .left.flatMap(blockAge => Either.cond(blockAge <= minerSettings.intervalAfterLastBlockThenGenerationIsAllowed, (),
-      s"BlockChain is too old (last block ${parent.uniqueId} generated $blockAge ago)"
+      s"BlockChain is too old (last block timestamp is $parentTimestamp generated $blockAge ago)"
     ))
 
   private def generateOneBlockTask(account: PrivateKeyAccount, parentHeight: Int,
@@ -117,7 +117,7 @@ class Miner(
     val lastBlock = history.lastBlock.get
     val grandParent = history.parent(lastBlock, 2)
     (for {
-      _ <- checkAge(height, history.lastBlock.get)
+      _ <- checkAge(height, history.lastBlockTimestamp().get)
       ts <- nextBlockGenerationTime(height, stateReader, blockchainSettings.functionalitySettings, lastBlock, account)
     } yield ts) match {
       case Right(ts) =>

@@ -19,6 +19,8 @@ trait History extends Synchronized with AutoCloseable {
   def heightOf(blockId: ByteStr): Option[Int]
 
   def lastBlockIds(howMany: Int): Seq[ByteStr]
+
+  def lastBlockTimestamp() : Option[Long]
 }
 
 trait NgHistory extends History {

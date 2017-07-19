@@ -89,7 +89,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
         }
       case None =>
         ngHistoryWriter.appendBlock(block)(BlockDiffer.fromBlock(
-          settings, currentPersistedBlocksState, ngHistoryWriter.lastBlock.map(_.timestamp), block)).map { case ((newBlockDiff, discraded)) =>
+          settings, currentPersistedBlocksState, ngHistoryWriter.lastBlockTimestamp(), block)).map { case ((newBlockDiff, discraded)) =>
           liquidBlockCandidatesDiff.set(Map(block.uniqueId -> newBlockDiff))
           discraded
         }

@@ -178,4 +178,6 @@ class NgHistoryWriterImpl(inner: HistoryWriter) extends NgHistoryWriter {
   }
 
   override def close(): Unit = inner.close()
+
+  override def lastBlockTimestamp(): Option[Long] = baseBlock().map(_.timestamp).orElse(inner.lastBlockTimestamp())
 }
