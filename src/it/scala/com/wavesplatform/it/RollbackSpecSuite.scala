@@ -23,7 +23,7 @@ class RollbackSpecSuite extends FreeSpec with ScalaFutures with IntegrationPatie
   override val nodes = Configs.map(docker.startNode)
 
   "Apply the same transfer transactions twice with return to UTX" in {
-    val waitBlocks = 5
+    val waitBlocks = 8
     result(for {
       b <- traverse(nodes)(balanceForNode).map(_.toMap)
       requests = generateRequests(301, b)
@@ -47,7 +47,7 @@ class RollbackSpecSuite extends FreeSpec with ScalaFutures with IntegrationPatie
   }
 
   "Just rollback transactions" in {
-    val waitBlocks = 5
+    val waitBlocks = 8
     result(for {
       b <- traverse(nodes)(balanceForNode).map(_.toMap)
       requests = generateRequests(301, b)
@@ -78,6 +78,6 @@ object RollbackSpecSuite {
     """.stripMargin
   )
 
-  val Configs: Seq[Config] = Seq(dockerConfigs.head) ++
-    Random.shuffle(dockerConfigs.tail).take(2).map(nonGeneratingNodesConfig.withFallback(_))
+  val Configs: Seq[Config] = Seq(dockerConfigs.last) :+
+    nonGeneratingNodesConfig.withFallback(Random.shuffle(dockerConfigs.init).head)
 }
