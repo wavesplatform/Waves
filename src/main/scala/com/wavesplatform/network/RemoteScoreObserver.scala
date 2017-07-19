@@ -29,8 +29,6 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
 
   override def handlerAdded(ctx: ChannelHandlerContext) =
     ctx.channel().closeFuture().addListener { f: ChannelFuture =>
-      if (pinnedChannel.compareAndSet(ctx.channel(), null))
-        log.debug(s"${id(ctx)}: On close: Clear Pinned: $pinnedChannelId to NONE")
       for ((currentHighestScoredChannel, s) <- channelWithHighestScore) {
         // having no channel with highest score means scores map is empty, so it's ok to attempt to remove this channel
         // from the map only when there is one.
@@ -40,6 +38,9 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
           for ((secondHighestScoredChannel, _) <- channelWithHighestScore if pinnedChannel.compareAndSet(currentHighestScoredChannel, secondHighestScoredChannel)) {
             secondHighestScoredChannel.writeAndFlush(LoadBlockchainExtension(lastSignatures))
           }
+        } else {
+          if (pinnedChannel.compareAndSet(ctx.channel(), null))
+            log.debug(s"${id(ctx)}: On close: Clear Pinned: $pinnedChannelId to NONE")
         }
       }
     }
