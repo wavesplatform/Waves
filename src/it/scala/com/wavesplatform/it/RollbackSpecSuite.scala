@@ -1,5 +1,6 @@
 package com.wavesplatform.it
 
+import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.TransferSending.Req
 import org.scalatest.{FreeSpec, Matchers}
 import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
@@ -11,13 +12,15 @@ import scala.concurrent.Future
 import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
 import scala.collection.JavaConverters._
+import scala.util.Random
+
+import com.wavesplatform.it.RollbackSpecSuite._
 
 class RollbackSpecSuite extends FreeSpec with ScalaFutures with IntegrationPatience
   with Matchers with TransferSending with IntegrationNodesInitializationAndStopping {
   override val docker = new Docker()
-  private val allNodes = Docker.NodeConfigs.getConfigList("nodes").asScala
   // there are nodes with big and small balances to reduce the number of forks
-  override val nodes = Seq(allNodes.head, allNodes.last).map(docker.startNode)
+  override val nodes = Configs.map(docker.startNode)
 
   "Apply the same transfer transactions twice with return to UTX" in {
     val waitBlocks = 5
@@ -64,4 +67,17 @@ class RollbackSpecSuite extends FreeSpec with ScalaFutures with IntegrationPatie
       hashBeforeApply shouldBe hashAfterApply
     }, 5.minutes)
   }
+}
+
+object RollbackSpecSuite {
+  private val dockerConfigs = Docker.NodeConfigs.getConfigList("nodes").asScala
+
+  private val nonGeneratingNodesConfig = ConfigFactory.parseString(
+    """
+      |waves.miner.enable=no
+    """.stripMargin
+  )
+
+  val Configs: Seq[Config] = Seq(dockerConfigs.head) ++
+    Random.shuffle(dockerConfigs.tail).take(2).map(nonGeneratingNodesConfig.withFallback(_))
 }
