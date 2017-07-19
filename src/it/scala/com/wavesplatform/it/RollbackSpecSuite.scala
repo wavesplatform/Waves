@@ -19,7 +19,7 @@ class RollbackSpecSuite extends FreeSpec with ScalaFutures with IntegrationPatie
   // there are nodes with big and small balances to reduce the number of forks
   override val nodes = Seq(allNodes.head, allNodes.last).map(docker.startNode)
 
-  def rollbackTest(rollbackAndReturnTransactionsToUTX: (Int, Seq[Req]) => Future[_]): Unit = {
+  "Apply the same transfer transactions twice with return to UTX" in {
     val waitBlocks = 5
     result(for {
       b <- traverse(nodes)(balanceForNode).map(_.toMap)
@@ -31,7 +31,7 @@ class RollbackSpecSuite extends FreeSpec with ScalaFutures with IntegrationPatie
         infos.head
       })
       stateAfterFirstTry <- nodes.head.debugStateAt(startHeight + waitBlocks)
-      _ <- rollbackAndReturnTransactionsToUTX(startHeight, requests)
+      _ <- traverse(nodes)(_.rollback(startHeight))
       hashAfterSecondTry <- traverse(nodes)(_.waitForDebugInfoAt(startHeight + waitBlocks).map(_.stateHash)).map(infos => {
         all(infos) shouldEqual infos.head
         infos.head
@@ -41,19 +41,6 @@ class RollbackSpecSuite extends FreeSpec with ScalaFutures with IntegrationPatie
       stateAfterFirstTry should contain theSameElementsAs stateAfterSecondTry
       hashAfterFirstTry shouldBe hashAfterSecondTry
     }, 5.minutes)
-  }
-
-  "Apply the same transfer transactions twice with return to UTX" in {
-    rollbackTest((startHeight, _) => traverse(nodes)(_.rollback(startHeight)))
-  }
-
-  "Apply the same transfer transactions twice without return to UTX" in {
-    rollbackTest((startHeight, requests) =>
-      for {
-      _ <- traverse(nodes)(_.rollback(startHeight, returnToUTX = false))
-      _ <- processRequests(requests)
-      } yield ()
-    )
   }
 
   "Just rollback transactions" in {
