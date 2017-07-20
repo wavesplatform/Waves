@@ -18,7 +18,7 @@ logBuffered := false
 //assembly settings
 assemblyJarName in assembly := s"waves-all-${version.value}.jar"
 assemblyMergeStrategy in assembly := {
-  case "META-INF/io.netty.versions.properties" => MergeStrategy.concat
+  case PathList("META-INF", "io.netty.versions.properties") => MergeStrategy.concat
   case other => (assemblyMergeStrategy in assembly).value(other)
 }
 test in assembly := {}
