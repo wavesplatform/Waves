@@ -41,7 +41,7 @@ object PeersSpec extends MessageSpec[KnownPeers] {
   override val messageName: String = "Peers message"
 
 
-  override def maxLength = DataLength + 10 * (AddressLength + PortLength)
+  override def maxLength = DataLength + 1000 * (AddressLength + PortLength)
 
   override def deserializeData(bytes: Array[Byte]): Try[KnownPeers] = Try {
     val lengthBytes = util.Arrays.copyOfRange(bytes, 0, DataLength)
@@ -78,7 +78,7 @@ trait SignaturesSeqSpec[A <: AnyRef] extends MessageSpec[A] {
   def unwrap(v: A): Seq[Signature]
 
 
-  override def maxLength = DataLength + (110 * SignatureLength)
+  override def maxLength = DataLength + (200 * SignatureLength)
 
   override def deserializeData(bytes: Array[Byte]): Try[A] = Try {
     val lengthBytes = bytes.take(DataLength)
