@@ -16,5 +16,5 @@ class LegacyChannelInitializer(handshakeHandler: HandshakeHandler) extends Chann
       handshakeHandler,
       new LengthFieldPrepender(4),
       new LengthFieldBasedFrameDecoder(1024*1024, 0, 4, 0, 4),
-      new LegacyFrameCodec)
+      new LegacyFrameCodec(NopPeerDatabase))
 }
