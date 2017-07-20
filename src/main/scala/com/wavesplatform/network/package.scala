@@ -42,15 +42,10 @@ package object network extends ScorexLogging {
     def remoteAddress: InetSocketAddress = ctx.channel().asInstanceOf[SocketChannel].remoteAddress()
   }
 
-  implicit class ChannelExt(val channel: Channel) extends AnyVal {
-    def declaredAddress: Option[InetSocketAddress] = Option(channel.attr(AttributeKeys.DeclaredAddress).get())
-  }
-
   implicit class ChannelGroupExt(val allChannels: ChannelGroup) extends AnyVal {
     def broadcast(message: AnyRef, except: Option[Channel] = None): Unit = {
       log.trace(s"Broadcasting $message to ${allChannels.size()} channels${except.fold("")(c => s" (except ${id(c)})")}")
       allChannels.writeAndFlush(message, except.fold(ChannelMatchers.all())(ChannelMatchers.isNot))
     }
   }
-
 }
