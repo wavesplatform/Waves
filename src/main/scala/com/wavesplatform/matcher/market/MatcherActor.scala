@@ -9,6 +9,7 @@ import com.wavesplatform.matcher.api.{MatcherResponse, StatusCodeMatcherResponse
 import com.wavesplatform.matcher.market.OrderBookActor.{DeleteOrderBookRequest, GetOrderBookResponse, OrderBookRequest}
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.reader.StateReader
+import io.netty.channel.group.ChannelGroup
 import play.api.libs.json.{JsArray, JsValue, Json}
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.IssueTransaction
@@ -21,7 +22,7 @@ import scorex.wallet.Wallet
 import scala.collection.{immutable, mutable}
 import scala.language.reflectiveCalls
 
-class MatcherActor(orderHistory: ActorRef, storedState: StateReader, wallet: Wallet, utx: UtxPool,
+class MatcherActor(orderHistory: ActorRef, storedState: StateReader, wallet: Wallet, utx: UtxPool, allChannels: ChannelGroup,
                    settings: MatcherSettings, history: History, functionalitySettings: FunctionalitySettings)
   extends PersistentActor with ScorexLogging {
 
@@ -37,7 +38,7 @@ class MatcherActor(orderHistory: ActorRef, storedState: StateReader, wallet: Wal
         pair.amountAsset.flatMap(storedState.getIssueTransaction), pair.priceAsset.flatMap(storedState.getIssueTransaction))
     tradedPairs += pair
 
-    context.actorOf(OrderBookActor.props(pair, orderHistory, storedState, settings, wallet, utx, history, functionalitySettings),
+    context.actorOf(OrderBookActor.props(pair, orderHistory, storedState, settings, wallet, utx, allChannels, history, functionalitySettings),
       OrderBookActor.name(pair))
   }
 
@@ -148,9 +149,9 @@ class MatcherActor(orderHistory: ActorRef, storedState: StateReader, wallet: Wal
 object MatcherActor {
   def name = "matcher"
 
-  def props(orderHistoryActor: ActorRef, storedState: StateReader, wallet: Wallet, utx: UtxPool,
+  def props(orderHistoryActor: ActorRef, storedState: StateReader, wallet: Wallet, utx: UtxPool, allChannels: ChannelGroup,
             settings: MatcherSettings, time: Time, history: History, functionalitySettings: FunctionalitySettings): Props =
-    Props(new MatcherActor(orderHistoryActor, storedState, wallet, utx, settings, history, functionalitySettings))
+    Props(new MatcherActor(orderHistoryActor, storedState, wallet, utx, allChannels,settings, history, functionalitySettings))
 
   case class OrderBookCreated(pair: AssetPair)
 

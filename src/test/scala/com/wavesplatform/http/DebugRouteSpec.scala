@@ -6,7 +6,7 @@ import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.network.{PeerDatabase, PeerInfo}
 import com.wavesplatform.state2.reader.StateReader
 import com.wavesplatform.state2.{LeaseInfo, Portfolio}
-import com.wavesplatform.{BlockGen, TestWallet, TransactionGen}
+import com.wavesplatform.{BlockGen, TestWallet, TransactionGen, UtxPool}
 import io.netty.channel.Channel
 import io.netty.channel.group.ChannelGroup
 import org.scalacheck.{Gen, Shrink}
@@ -24,8 +24,9 @@ class DebugRouteSpec
   private val history = mock[History]
   private val peerDatabase = mock[PeerDatabase]
   private val channelGroup = mock[ChannelGroup]
+  private val utxPool = mock[UtxPool]
   private val establishedConnections = mock[ConcurrentMap[Channel, PeerInfo]]
-  private val route = DebugApiRoute(restAPISettings, testWallet, state, history, peerDatabase, establishedConnections, mock[BlockchainUpdater], channelGroup).route
+  private val route = DebugApiRoute(restAPISettings, testWallet, state, history, peerDatabase, establishedConnections, mock[BlockchainUpdater], channelGroup, utxPool).route
 
   private implicit def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)
 

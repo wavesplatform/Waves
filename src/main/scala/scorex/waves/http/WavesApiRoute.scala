@@ -5,6 +5,7 @@ import javax.ws.rs.Path
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.UtxPool
 import com.wavesplatform.settings.RestAPISettings
+import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
 import scorex.BroadcastRoute
 import scorex.account.Address
@@ -21,7 +22,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 @Path("/waves")
 @Api(value = "waves")
 @Deprecated
-case class WavesApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPool, time: Time)
+case class WavesApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPool, allChannels: ChannelGroup, time: Time)
   extends ApiRoute with BroadcastRoute {
 
   override lazy val route = pathPrefix("waves") {

@@ -7,7 +7,8 @@ import javax.ws.rs.Path
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
-import com.wavesplatform.network.{PeerDatabase, PeerInfo, LocalScoreChanged, _}
+import com.wavesplatform.UtxPool
+import com.wavesplatform.network.{LocalScoreChanged, PeerDatabase, PeerInfo, _}
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state2.ByteStr
 import com.wavesplatform.state2.reader.StateReader
@@ -36,7 +37,8 @@ case class DebugApiRoute(settings: RestAPISettings,
                          peerDatabase: PeerDatabase,
                          establishedConnections: ConcurrentMap[Channel, PeerInfo],
                          blockchainUpdater: BlockchainUpdater,
-                         allChannels: ChannelGroup) extends ApiRoute {
+                         allChannels: ChannelGroup,
+                         utxStorage: UtxPool) extends ApiRoute {
 
   override lazy val route = pathPrefix("debug") {
     blocks ~ state ~ info ~ stateWaves ~ rollback ~ rollbackTo ~ blacklist
@@ -86,30 +88,41 @@ case class DebugApiRoute(settings: RestAPISettings,
     complete(result)
   }
 
-  private def rollbackToBlock(blockId: ByteStr): Future[ToResponseMarshallable] = Future {
-    val txs = blockchainUpdater.removeAfter(blockId)
-      txs.foreach(_ => allChannels.broadcast(LocalScoreChanged(history.score())))
-    txs
-  }.map(_.fold(ApiError.fromValidationError,
-    _ => Json.obj("BlockId" -> blockId.toString)): ToResponseMarshallable)
-
+  private def rollbackToBlock(blockId: ByteStr, returnTransactionsToUtx: Boolean): Future[ToResponseMarshallable] = Future {
+    blockchainUpdater.removeAfter(blockId) match {
+      case Right(txs) =>
+        allChannels.broadcast(LocalScoreChanged(history.score()))
+        if (returnTransactionsToUtx) {
+          txs.foreach(tx => utxStorage.putIfNew(tx))
+        }
+        Json.obj("BlockId" -> blockId.toString): ToResponseMarshallable
+      case Left(error) => ApiError.fromValidationError(error)
+    }
+  }
 
   @Path("/rollback")
   @ApiOperation(value = "Rollback to height", notes = "Removes all blocks after given height", httpMethod = "POST")
   @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "height", value = "Height to rollback to", required = true, dataType = "integer", paramType = "body")
+    new ApiImplicitParam(
+      name = "body",
+      value = "Json with data",
+      required = true,
+      paramType = "body",
+      dataType = "scorex.waves.http.RollbackParams",
+      defaultValue = "{\n\t\"rollbackTo\": 3,\n\t\"returnTransactionsToUTX\": false\n}"
+    )
   ))
   @ApiResponses(Array(
     new ApiResponse(code = 200, message = "200 if success, 404 if there are no block at this height")
   ))
   def rollback: Route = withAuth {
     (path("rollback") & post) {
-      entity(as[Int]) { rollbackTo =>
-        history.blockAt(rollbackTo) match {
+      json[RollbackParams] { params =>
+        history.blockAt(params.rollbackTo) match {
           case Some(block) =>
-            complete(rollbackToBlock(block.uniqueId))
+            rollbackToBlock(block.uniqueId, params.returnTransactionsToUtx)
           case None =>
-            complete(StatusCodes.BadRequest, "Block at height not found")
+            (StatusCodes.BadRequest, "Block at height not found")
         }
       } ~ complete(StatusCodes.BadRequest)
     }
@@ -137,7 +150,7 @@ case class DebugApiRoute(settings: RestAPISettings,
     (delete & withAuth) {
       ByteStr.decodeBase58(signature) match {
         case Success(sig) =>
-          complete(rollbackToBlock(sig))
+          complete(rollbackToBlock(sig, returnTransactionsToUtx = false))
         case _ =>
           complete(InvalidSignature)
       }

@@ -5,6 +5,7 @@ import javax.ws.rs.Path
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.UtxPool
 import com.wavesplatform.settings.RestAPISettings
+import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
 import scorex.BroadcastRoute
 import scorex.api.http.assets.TransferRequest
@@ -15,7 +16,7 @@ import scorex.wallet.Wallet
 @Path("/payment")
 @Api(value = "/payment")
 @Deprecated
-case class PaymentApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPool, time: Time)
+case class PaymentApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPool, allChannels: ChannelGroup, time: Time)
   extends ApiRoute with BroadcastRoute {
 
   override lazy val route = payment

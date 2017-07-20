@@ -88,7 +88,7 @@ object Coordinator extends ScorexLogging {
     discardedTxs <- blockchainUpdater.processBlock(block)
   } yield {
     utxStorage.removeAll(block.transactionData)
-    discardedTxs.foreach(utxStorage.putIfNew(_, None))
+    discardedTxs.foreach(utxStorage.putIfNew)
   }
 
   def processCheckpoint(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater)
