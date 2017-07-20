@@ -63,8 +63,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
     val establishedConnections = new ConcurrentHashMap[Channel, PeerInfo]
     val allChannels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
 
-    val utxStorage = new UtxPool(allChannels,
-      time, stateReader, history, feeCalculator, settings.blockchainSettings.functionalitySettings, settings.utxSettings)
+    val utxStorage = new UtxPool(time, stateReader, history, feeCalculator, settings.blockchainSettings.functionalitySettings, settings.utxSettings)
 
     val blockchainReadiness = new AtomicBoolean(false)
 
@@ -81,19 +80,19 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
       TransactionsApiRoute(settings.restAPISettings, stateReader, history, utxStorage),
       NxtConsensusApiRoute(settings.restAPISettings, stateReader, history, settings.blockchainSettings.functionalitySettings),
       WalletApiRoute(settings.restAPISettings, wallet),
-      PaymentApiRoute(settings.restAPISettings, wallet, utxStorage, time),
+      PaymentApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, time),
       UtilsApiRoute(settings.restAPISettings),
       PeersApiRoute(settings.restAPISettings, network.connect, peerDatabase, establishedConnections),
       AddressApiRoute(settings.restAPISettings, wallet, stateReader, settings.blockchainSettings.functionalitySettings),
       DebugApiRoute(settings.restAPISettings, wallet, stateReader, history, peerDatabase, establishedConnections, blockchainUpdater, allChannels, utxStorage),
-      WavesApiRoute(settings.restAPISettings, wallet, utxStorage, time),
-      AssetsApiRoute(settings.restAPISettings, wallet, utxStorage, stateReader, time),
+      WavesApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, time),
+      AssetsApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, stateReader, time),
       NodeApiRoute(settings.restAPISettings, () => this.shutdown()),
-      AssetsBroadcastApiRoute(settings.restAPISettings, utxStorage),
-      LeaseApiRoute(settings.restAPISettings, wallet, utxStorage, stateReader, time),
-      LeaseBroadcastApiRoute(settings.restAPISettings, utxStorage),
-      AliasApiRoute(settings.restAPISettings, wallet, utxStorage, time, stateReader),
-      AliasBroadcastApiRoute(settings.restAPISettings, utxStorage)
+      AssetsBroadcastApiRoute(settings.restAPISettings, utxStorage, allChannels),
+      LeaseApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, stateReader, time),
+      LeaseBroadcastApiRoute(settings.restAPISettings, utxStorage, allChannels),
+      AliasApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, time, stateReader),
+      AliasBroadcastApiRoute(settings.restAPISettings, utxStorage, allChannels)
     )
 
     val apiTypes = Seq(
@@ -138,7 +137,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
     }
 
     if (settings.matcherSettings.enable) {
-      val matcher = new Matcher(actorSystem, wallet, utxStorage, stateReader, time, history, settings.blockchainSettings, settings.restAPISettings, settings.matcherSettings)
+      val matcher = new Matcher(actorSystem, wallet, utxStorage, allChannels, stateReader, time, history, settings.blockchainSettings, settings.restAPISettings, settings.matcherSettings)
       matcher.runMatcher()
     }
   }

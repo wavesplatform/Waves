@@ -5,6 +5,7 @@ import com.wavesplatform.{RequestGen, UtxPool}
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state2.diffs.TransactionDiffer.TransactionValidationError
+import io.netty.channel.group.ChannelGroup
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json.Json._
@@ -18,11 +19,12 @@ import scorex.transaction.Transaction
 class AliasBroadcastRouteSpec extends RouteSpec("/alias/broadcast/") with RequestGen with PathMockFactory with PropertyChecks {
   private val settings = RestAPISettings.fromConfig(ConfigFactory.load())
   private val utx = stub[UtxPool]
+  private val allChannels = stub[ChannelGroup]
 
-  (utx.putIfNew _).when(*, *).onCall((t, _) => Left(TransactionValidationError(GenericError("foo"), t))).anyNumberOfTimes()
+  (utx.putIfNew _).when(*).onCall((t: Transaction) => Left(TransactionValidationError(GenericError("foo"), t))).anyNumberOfTimes()
 
   "returns StateCheckFiled" - {
-    val route = AliasBroadcastApiRoute(settings, utx).route
+    val route = AliasBroadcastApiRoute(settings, utx, allChannels).route
 
     def posting(url: String, v: JsValue): RouteTestResult = Post(routePath(url), v) ~> route
 
@@ -34,7 +36,7 @@ class AliasBroadcastRouteSpec extends RouteSpec("/alias/broadcast/") with Reques
   }
 
   "returns appropriate error code when validation fails for" - {
-    val route = AliasBroadcastApiRoute(settings, utx).route
+    val route = AliasBroadcastApiRoute(settings, utx, allChannels).route
 
     "create alias transaction" in forAll(createAliasReq) { req =>
       import scorex.api.http.alias.SignedCreateAliasRequest.broadcastAliasRequestReadsFormat

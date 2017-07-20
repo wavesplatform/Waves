@@ -5,6 +5,7 @@ import com.wavesplatform.{RequestGen, UtxPool}
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state2.diffs.TransactionDiffer.TransactionValidationError
+import io.netty.channel.group.ChannelGroup
 import org.scalacheck.Gen.posNum
 import org.scalacheck.{Gen => G}
 import org.scalamock.scalatest.PathMockFactory
@@ -20,11 +21,12 @@ import scorex.transaction.Transaction
 class LeaseBroadcastRouteSpec extends RouteSpec("/leasing/broadcast/") with RequestGen with PathMockFactory with PropertyChecks {
   private val settings = RestAPISettings.fromConfig(ConfigFactory.load())
   private val utx = stub[UtxPool]
+  private val allChannels = stub[ChannelGroup]
 
-  (utx.putIfNew _).when(*, *).onCall((t, _) => Left(TransactionValidationError(GenericError("foo"), t))).anyNumberOfTimes()
+  (utx.putIfNew _).when(*).onCall((t: Transaction) => Left(TransactionValidationError(GenericError("foo"), t))).anyNumberOfTimes()
 
   "returns StateCheckFiled" - {
-    val route = LeaseBroadcastApiRoute(settings, utx).route
+    val route = LeaseBroadcastApiRoute(settings, utx, allChannels).route
 
     val vt = Table[String, G[_ <: Transaction], (JsValue) => JsValue](
       ("url", "generator", "transform"),
@@ -47,7 +49,7 @@ class LeaseBroadcastRouteSpec extends RouteSpec("/leasing/broadcast/") with Requ
   }
 
   "returns appropriate error code when validation fails for" - {
-    val route = LeaseBroadcastApiRoute(settings, utx).route
+    val route = LeaseBroadcastApiRoute(settings, utx, allChannels).route
 
     "lease transaction" in forAll(leaseReq) { lease =>
       def posting[A: Writes](v: A): RouteTestResult = Post(routePath("lease"), v) ~> route
