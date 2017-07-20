@@ -53,23 +53,4 @@ class AliasTransactionSpecification(override val allNodes: Seq[Node]) extends In
 
     Await.result(f, 1 minute)
   }
-
-  test("alias transaction rollback should works fine") {
-    val alias = "TEST_ALIAS4"
-
-    val f = for {
-      startHeight <- Future.traverse(allNodes)(_.height).map(_.min)
-      _ <- assertBalances(firstAddress, 96 waves, 96 waves)
-      aliasTxId <- sender.createAlias(firstAddress, alias, 1 waves).map(_.id)
-      _ <- Future.traverse(allNodes)(_.waitForTransaction(aliasTxId))
-      _ <- assertBalances(firstAddress, 95 waves, 95 waves)
-      _ <- Future.traverse(allNodes)(_.rollback(startHeight, returnToUTX = false))
-      _ <- assertBalances(firstAddress, 96 waves, 96 waves)
-      secondAliasTxId <- sender.createAlias(firstAddress, alias, 1 waves).map(_.id)
-      _ <- Future.traverse(allNodes)(_.waitForTransaction(secondAliasTxId))
-      _ <- assertBalances(firstAddress, 95 waves, 95 waves)
-    }  yield succeed
-
-    Await.result(f, 1 minute)
-  }
 }

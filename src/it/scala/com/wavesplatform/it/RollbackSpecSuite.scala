@@ -1,20 +1,18 @@
 package com.wavesplatform.it
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.it.TransferSending.Req
-import org.scalatest.{FreeSpec, Matchers}
+import com.wavesplatform.it.RollbackSpecSuite._
+import com.wavesplatform.it.util._
 import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
+import org.scalatest.{FreeSpec, Matchers}
 
-import scala.collection.mutable
+import scala.collection.JavaConverters._
 import scala.concurrent.Await.result
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
 import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
-import scala.collection.JavaConverters._
+import scala.concurrent.{Await, Future}
 import scala.util.Random
-
-import com.wavesplatform.it.RollbackSpecSuite._
 
 class RollbackSpecSuite extends FreeSpec with ScalaFutures with IntegrationPatience
   with Matchers with TransferSending with IntegrationNodesInitializationAndStopping {
@@ -66,6 +64,21 @@ class RollbackSpecSuite extends FreeSpec with ScalaFutures with IntegrationPatie
     } yield {
       hashBeforeApply shouldBe hashAfterApply
     }, 5.minutes)
+  }
+
+  "Alias transaction rollback should works fine" in {
+    val alias = "TEST_ALIAS4"
+
+    val f = for {
+      startHeight <- Future.traverse(nodes)(_.height).map(_.min)
+      aliasTxId <- nodes.head.createAlias(nodes.head.address, alias, 1 waves).map(_.id)
+      _ <- Future.traverse(nodes)(_.waitForTransaction(aliasTxId))
+      _ <- Future.traverse(nodes)(_.rollback(startHeight, returnToUTX = false))
+      secondAliasTxId <- nodes.head.createAlias(nodes.head.address, alias, 1 waves).map(_.id)
+      _ <- Future.traverse(nodes)(_.waitForTransaction(secondAliasTxId))
+    } yield succeed
+
+    Await.result(f, 1 minute)
   }
 }
 
