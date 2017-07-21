@@ -11,6 +11,7 @@ import scorex.transaction.PaymentTransaction
 
 import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.language.postfixOps
@@ -34,11 +35,14 @@ class SimpleTransactionsSuite extends FunSuite with BeforeAndAfterAll with Match
     val f = for {
       _ <- node.sendByNetwork(RawBytes(25.toByte, tx.bytes))
       _ <- Future.successful(Thread.sleep(2000))
+
+      height <- traverse(nodes)(_.height).map(_.max)
+      _ <- traverse(nodes)(_.waitForHeight(height + 1))
       tx <- node.waitForTransaction(tx.id.base58)
     } yield {
       tx shouldBe NodeApi.Transaction(tx.`type`, tx.id, tx.fee, tx.timestamp)
     }
-    Await.result(f, 60 seconds)
+    Await.result(f, 60.seconds)
   }
 
   test("invalid tx send by network to node should be not in UTX or blockchain") {
@@ -53,7 +57,7 @@ class SimpleTransactionsSuite extends FunSuite with BeforeAndAfterAll with Match
       _ <- Future.successful(Thread.sleep(2000))
       _ <- Future.sequence(nodes.map(_.ensureTxDoesntExist(tx.id.base58)))
     } yield ()
-    Await.result(f, 60 seconds)
+    Await.result(f, 60.seconds)
   }
 
   override protected def afterAll(): Unit = {
