@@ -4,8 +4,6 @@ import sbt._
 
 enablePlugins(sbtdocker.DockerPlugin, JavaServerAppPackaging, JDebPackaging, SystemdPlugin)
 
-
-
 name := "waves"
 organization := "com.wavesplatform"
 version := "0.7.3-SNAPSHOT"
