@@ -121,10 +121,9 @@ object Coordinator extends ScorexLogging {
     val fs = bcs.functionalitySettings
     val (sortStart, sortEnd) = (fs.requireSortedTransactionsAfter, Long.MaxValue)
     val blockTime = block.timestamp
-    val errorTemplate = ""//s"Block ${block.uniqueId} consensus data is invalid: "
 
     (for {
-      _ <- Either.cond(blockTime - currentTs < MaxTimeDrift, (), s"block timestamp $blockTime is from future")
+      _ <- Either.cond(blockTime - currentTs < MaxTimeDrift, (), s"timestamp $blockTime is from future")
       _ <- Either.cond(blockTime < sortStart || blockTime > sortEnd || block.transactionData.sorted(TransactionsOrdering.InBlock) == block.transactionData,
         (), "transactions are not sorted")
       parent <- history.parent(block).toRight(s"history does not contain parent ${block.reference}")
@@ -145,7 +144,7 @@ object Coordinator extends ScorexLogging {
       hit = calcHit(prevBlockData, generator)
       target = calcTarget(parent, blockTime, effectiveBalance)
       _ <- Either.cond(hit < target, (), s"calculated hit $hit >= calculated target $target")
-    } yield ()).left.map(e => GenericError(errorTemplate + e))
+    } yield ()).left.map(e => GenericError(s"Block ${block.uniqueId} is invalid: $e"))
   }
 
 }
