@@ -247,11 +247,6 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
       val ord1 = sell(pair, 100, 10 * Order.PriceConstant)
       val ord2 = buy(pair, 100, 19 * Order.PriceConstant)
 
-      /*ignoreMsg {
-        case GetOrdersResponse(_) => false
-        case m => true
-      }*/
-
       (1 to 100).foreach({ i =>
         actor ! ord1.copy()
       })
@@ -318,11 +313,6 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
       actor ! GetAskOrdersRequest
       expectMsg(GetOrdersResponse(Seq(SellLimitOrder((0.00041 * Order.PriceConstant).toLong, 200000000, ord1))))
 
-      /*actor ! GetOrderStatus(pair, ord2.idStr)
-      expectMsg(GetOrderStatusResponse(LimitOrder.Filled))
-
-      actor ! GetOrderStatus(pair, ord3.idStr)
-      expectMsg(GetOrderStatusResponse(LimitOrder.Filled))*/
     }
 
     "partially execute order with zero fee remaining part" in {
