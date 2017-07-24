@@ -22,12 +22,12 @@ if [ "$1" = configure ]; then
 
     # ensure home directory ownership
     mkdir -p /var/lib/${{app_name}}
-    chown ${{app_name}}:${{app_name}} /var/lib/${{app_name}}
-    chown ${{app_name}}:${{app_name}} /usr/share/${{app_name}}
+    chown -R ${{app_name}}:${{app_name}} /var/lib/${{app_name}}
+    chown -R ${{app_name}}:${{app_name}} /usr/share/${{app_name}}
 
     # nicer log directory permissions
     mkdir -p /var/log/${{app_name}}
-    chmod 1775 /var/log/${{app_name}}
+    chmod 770 /var/log/${{app_name}}
     chown root:${{app_name}} /var/log/${{app_name}}
 
     if [ -f /etc/${{app_name}}/waves.json ]; then
@@ -36,6 +36,7 @@ if [ "$1" = configure ]; then
 
     if [ ! -f "$config_file" ]; then
         cp /usr/share/${{app_name}}/doc/waves.conf.sample "$config_file"
+        chmod 640 "$config_file"
     fi
 
     if is_systemd; then
