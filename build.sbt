@@ -8,6 +8,7 @@ name := "waves"
 organization := "com.wavesplatform"
 version := "0.7.3-SNAPSHOT"
 scalaVersion in ThisBuild := "2.12.1"
+
 crossPaths := false
 publishArtifact in (Compile, packageDoc) := false
 publishArtifact in (Compile, packageSrc) := false
