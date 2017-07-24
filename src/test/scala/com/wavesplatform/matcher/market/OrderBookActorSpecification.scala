@@ -256,11 +256,13 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
         actor ! ord1.copy()
       })
 
-      receiveN(100)
+      within(10.seconds) {
+        receiveN(100)
+      }
 
       actor ! RestartActor
 
-      within(5.seconds) {
+      within(10.seconds) {
         actor ! GetOrdersRequest
         val items = expectMsgType[GetOrdersResponse].orders.map(_.order.id) should have size 100
       }
