@@ -35,8 +35,10 @@ if [ "$1" = configure ]; then
     fi
 
     if [ ! -f "$config_file" ]; then
+        echo Creating default config file ...
         cp /usr/share/${{app_name}}/doc/waves.conf.sample "$config_file"
-        chmod 640 "$config_file"
+        chmod 600 "$config_file"
+        chown ${{app_name}}:${{app_name}} "$config_file"
     fi
 
     if is_systemd; then
