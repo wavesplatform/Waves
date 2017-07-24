@@ -10,7 +10,7 @@ import com.wavesplatform.state2.ByteStr
 import com.wavesplatform.state2.reader.StateReader
 import scorex.block.Block
 import scorex.consensus.TransactionsOrdering
-import scorex.transaction.ValidationError.{BlockAppendError, GenericError}
+import scorex.transaction.ValidationError.GenericError
 import scorex.transaction._
 import scorex.utils.{ScorexLogging, Time}
 
@@ -76,7 +76,7 @@ object Coordinator extends ScorexLogging {
                           stateReader: StateReader, utxStorage: UtxPool, time: Time, settings: BlockchainSettings)
                          (block: Block): Either[ValidationError, Unit] = for {
     _ <- Either.cond(checkpoint.isBlockValid(block.signerData.signature, history.height() + 1), (),
-      BlockAppendError(s"[h = ${history.height() + 1}] is not valid with respect to checkpoint", block))
+      GenericError(s"Block ${block.uniqueId} at height ${history.height() + 1} is not valid w.r.t. checkpoint"))
     _ <- blockConsensusValidation(history, stateReader, settings, time.correctedTime())(block)
     _ <- blockchainUpdater.processBlock(block)
   } yield utxStorage.removeAll(block.transactionData)
@@ -123,26 +123,28 @@ object Coordinator extends ScorexLogging {
     val blockTime = block.timestamp
 
     (for {
-      _ <- Either.cond(blockTime - currentTs < MaxTimeDrift, (), "Block timestamp $blockTime is from future")
+      _ <- Either.cond(blockTime - currentTs < MaxTimeDrift, (), s"timestamp $blockTime is from future")
       _ <- Either.cond(blockTime < sortStart || blockTime > sortEnd || block.transactionData.sorted(TransactionsOrdering.InBlock) == block.transactionData,
-        (), "Transactions must be sorted correctly")
-      parent <- history.parent(block).toRight(s"Can't find parent ${block.reference} of ${block.uniqueId}")
-      parentHeight <- history.heightOf(parent.uniqueId).toRight(s"Can't get height of ${block.reference}")
+        (), "transactions are not sorted")
+      parent <- history.parent(block).toRight(s"history does not contain parent ${block.reference}")
+      parentHeight <- history.heightOf(parent.uniqueId).toRight(s"history does not contain parent ${block.reference}")
       prevBlockData = parent.consensusData
       blockData = block.consensusData
       cbt = calcBaseTarget(bcs.genesisSettings.averageBlockDelay, parentHeight, parent, history.parent(parent, 2), blockTime)
       bbt = blockData.baseTarget
-      _ <- Either.cond(cbt == bbt, (), s"Declared baseTarget $bbt of ${block.uniqueId} does not match calculated baseTarget $cbt")
+      _ <- Either.cond(cbt == bbt, (), s"declared baseTarget $bbt does not match calculated baseTarget $cbt")
       generator = block.signerData.generator
       calcGs = calcGeneratorSignature(prevBlockData, generator)
       blockGs = blockData.generationSignature
       _ <- Either.cond(calcGs.sameElements(blockGs), (),
-        s"Declared signature ${blockGs.mkString} of ${block.uniqueId} does not match calculated signature ${calcGs.mkString}")
+        s"declared generation signature ${blockGs.mkString} does not match calculated generation signature ${calcGs.mkString}")
       effectiveBalance = generatingBalance(state, fs, generator, parentHeight)
       _ <- Either.cond(blockTime < fs.minimalGeneratingBalanceAfter || effectiveBalance >= MinimalEffectiveBalanceForGenerator, (),
-        s"Effective balance $effectiveBalance is less that minimal ($MinimalEffectiveBalanceForGenerator)")
-      _ <- Either.cond(calcHit(prevBlockData, generator) < calcTarget(parent, blockTime, effectiveBalance), (), "consensus data is not valid")
-    } yield ()).left.map(BlockAppendError(_, block))
+        s"generator's effective balance $effectiveBalance is less that minimal ($MinimalEffectiveBalanceForGenerator)")
+      hit = calcHit(prevBlockData, generator)
+      target = calcTarget(parent, blockTime, effectiveBalance)
+      _ <- Either.cond(hit < target, (), s"calculated hit $hit >= calculated target $target")
+    } yield ()).left.map(e => GenericError(s"Block ${block.uniqueId} is invalid: $e"))
   }
 
 }

@@ -73,7 +73,7 @@ abstract class HandshakeHandler(
           log.debug(s"${id(ctx)} Already connected to peer ${ctx.remoteAddress.getAddress} with nonce ${remoteHandshake.nodeNonce} on channel ${id(previousPeer)}")
           ctx.close()
         } else {
-          log.debug(s"${id(ctx)} Accepted handshake $remoteHandshake")
+          log.info(s"${id(ctx)} Accepted handshake $remoteHandshake")
           removeHandshakeHandlers(ctx, this)
           establishedConnections.put(ctx.channel(), peerInfo(remoteHandshake, ctx.channel()))
 

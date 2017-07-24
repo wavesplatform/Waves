@@ -14,7 +14,7 @@ class OptimisticExtensionLoader extends ChannelDuplexHandler with ScorexLogging 
   private def loadNextPart(ctx: ChannelHandlerContext, blocks: Seq[Block]): Unit = if (blocks.size > 1) {
     // Receiving just one block usually means we've reached the end of blockchain. Pre-Netty nodes
     // didn't handle GetSignatures(lastBlockId) message properly, hence the check.
-    log.debug(s"${id(ctx)} loading next part")
+    log.trace(s"${id(ctx)} loading next part")
     hopefullyNextIds = blocks.view.map(_.uniqueId).reverseIterator.take(100).toSeq
     ctx.writeAndFlush(LoadBlockchainExtension(hopefullyNextIds))
   }
@@ -29,7 +29,7 @@ class OptimisticExtensionLoader extends ChannelDuplexHandler with ScorexLogging 
       super.channelRead(ctx, msg)
     case ExtensionBlocks(extension) if hopefullyNextIds.isEmpty =>
       loadNextPart(ctx, extension)
-      log.debug(s"${id(ctx)} Passing extension with ${extension.length} blocks upstream")
+      log.trace(s"${id(ctx)} Passing extension with ${extension.length} blocks upstream")
       super.channelRead(ctx, msg)
     case ExtensionBlocks(extension) =>
       nextExtensionBlocks = extension
