@@ -31,8 +31,6 @@ if [ "$1" = configure ]; then
     chown root:${{app_name}} /var/log/${{app_name}}
 
     if [ -f /etc/${{app_name}}/waves.json ]; then
-        su -s /bin/sh ${{app_name}} -c "legacy-config-transformer /etc/${{app_name}}/waves.json" > "$config_file"
-        chown ${{app_name}}:${{app_name}} "$config_file"
         mv /etc/${{app_name}}/waves.json /etc/${{app_name}}/waves.json.bak
     fi
 
