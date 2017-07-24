@@ -8,7 +8,7 @@ import com.wavesplatform.matcher.MatcherTestData
 import com.wavesplatform.matcher.fixtures.RestartableActor
 import com.wavesplatform.matcher.fixtures.RestartableActor.RestartActor
 import com.wavesplatform.matcher.market.OrderBookActor._
-import com.wavesplatform.matcher.market.OrderHistoryActor.{ValidateOrder, ValidateOrderResult}
+import com.wavesplatform.matcher.market.OrderHistoryActor.{GetOrderStatus, ValidateOrder, ValidateOrderResult}
 import com.wavesplatform.matcher.model.Events.Event
 import com.wavesplatform.matcher.model.{BuyLimitOrder, LimitOrder, SellLimitOrder}
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, WalletSettings}
@@ -335,13 +335,8 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
       receiveN(3)
 
       actor ! GetAskOrdersRequest
-      expectMsg(GetOrdersResponse(Seq(SellLimitOrder((0.0006999 * Order.PriceConstant).toLong, 1500 * Constants.UnitsInWave, ord1))))
-
-      /*actor ! GetOrderStatus(pair, ord2.idStr)
-      expectMsg(GetOrderStatusResponse(LimitOrder.Filled))
-
-      actor ! GetOrderStatus(pair, ord3.idStr)
-      expectMsg(GetOrderStatusResponse(LimitOrder.Filled))*/
+      expectMsg(GetOrdersResponse(Seq(SellLimitOrder((0.0006999 * Order.PriceConstant).toLong,
+        1500 * Constants.UnitsInWave - (3075363900L - 3075248828L), ord1))))
     }
 
     "partially execute order with price > 1 and zero fee remaining part " in {
@@ -356,13 +351,8 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
       receiveN(3)
 
       actor ! GetAskOrdersRequest
-      expectMsg(GetOrdersResponse(Seq(SellLimitOrder((1850 * Order.PriceConstant).toLong, (0.1 * Constants.UnitsInWave).toLong, ord1))))
-
-      /*actor ! GetOrderStatus(pair, ord2.idStr)
-      expectMsg(GetOrderStatusResponse(LimitOrder.Filled))
-
-      actor ! GetOrderStatus(pair, ord3.idStr)
-      expectMsg(GetOrderStatusResponse(LimitOrder.Filled))*/
+      expectMsg(GetOrdersResponse(Seq(SellLimitOrder(1850 * Order.PriceConstant,
+        ((0.1 - (0.0100001 - 0.01))*Constants.UnitsInWave).toLong, ord1))))
     }
   }
 

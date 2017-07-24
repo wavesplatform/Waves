@@ -46,7 +46,6 @@ trait OrderValidator {
     //  s"Open orders count limit exceeded (Max = ${settings.maxOpenOrders})" &&
     val v =
     (order.matcherPublicKey == matcherPubKey) :| "Incorrect matcher public key" &&
-      LimitOrder.validateIntegerAmount(storedState, LimitOrder(order)) &&
       scorex.transaction.Signed.validateSignatures(order).isRight :| "signature should be valid" &&
       order.isValid(NTP.correctedTime()) &&
       (order.matcherFee >= settings.minOrderFee) :| s"Order matcherFee should be >= ${settings.minOrderFee}" &&
