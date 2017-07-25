@@ -87,7 +87,7 @@ class Miner(
         log.debug(s"Next attempt for acc=$account in $offset")
         val balance = generatingBalance(stateReader, blockchainSettings.functionalitySettings, account, height)
         generateOneBlockTask(account, height, lastBlock, grandParent, balance)(offset).flatMap {
-          case Right(block) => Task {
+          case Right(block) => Task.now {
             processBlock(block, true) match {
               case Left(err) => log.warn(err.toString)
               case Right(score) =>
