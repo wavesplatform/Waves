@@ -16,9 +16,9 @@ class ValidChainGenerationSpec(override val nodes: Seq[Node]) extends FreeSpec w
       b <- traverse(nodes)(balanceForNode).map(_.toMap)
       _ <- processRequests(generateRequests(1000, b))
       height <- traverse(nodes)(_.height).map(_.max)
-      _ <- traverse(nodes)(_.waitForHeight(height + 40)) // wait a little longer to prevent rollbacks...
-      _ <- traverse(nodes)(_.waitForHeight(height + 35)) // ...before requesting actual blocks
-      blocks <- traverse(nodes)(_.blockAt(height + 35))
+      _ <- traverse(nodes)(_.waitForHeight(height + 30)) // wait a little longer to prevent rollbacks...
+      _ <- traverse(nodes)(_.waitForHeight(height + 25)) // ...before requesting actual blocks
+      blocks <- traverse(nodes)(_.blockAt(height + 25))
     } yield blocks.map(_.signature), 5.minutes)
 
     all(targetBlocks) shouldEqual targetBlocks.head
@@ -38,7 +38,7 @@ class ValidChainGenerationSpec(override val nodes: Seq[Node]) extends FreeSpec w
 
     val targetBlocks2 = result(for {
       height <- traverse(nodes)(_.height).map(_.max)
-      _ <- traverse(nodes)(_.waitForHeight(height + 40)) // wait a little longer to prevent rollbacks...
+      _ <- traverse(nodes)(_.waitForHeight(height + 30)) // wait a little longer to prevent rollbacks...
       _ <- traverse(nodes)(_.waitForHeight(height + 25)) // ...before requesting actual blocks
       blocks <- traverse(nodes)(_.blockAt(height + 25))
     } yield blocks.map(_.signature), 5.minutes)
@@ -49,7 +49,7 @@ class ValidChainGenerationSpec(override val nodes: Seq[Node]) extends FreeSpec w
 
     val targetBlocks3 = result(for {
       height <- traverse(nodes)(_.height).map(_.max)
-      _ <- traverse(nodes)(_.waitForHeight(height + 40)) // wait a little longer to prevent rollbacks...
+      _ <- traverse(nodes)(_.waitForHeight(height + 30)) // wait a little longer to prevent rollbacks...
       _ <- traverse(nodes)(_.waitForHeight(height + 25)) // ...before requesting actual blocks
       blocks <- traverse(nodes)(_.blockAt(height + 25))
     } yield blocks.map(_.signature), 5.minutes)
