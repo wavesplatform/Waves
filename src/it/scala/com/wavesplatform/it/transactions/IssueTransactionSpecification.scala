@@ -8,7 +8,8 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
 
-class IssueTransactionSpecification(override val allNodes: Seq[Node]) extends IntegrationSuiteWithThreeAddresses {
+class IssueTransactionSpecification(override val allNodes: Seq[Node], override val notMiner: Node)
+  extends IntegrationSuiteWithThreeAddresses {
   test("asset issue changes issuer's asset balance; issuer's waves balance is decreased by fee") {
     val f = for {
       _ <- assertBalances(firstAddress, 100.waves, 100.waves)

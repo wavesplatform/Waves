@@ -15,10 +15,11 @@ class ValidChainGenerationSpec(override val nodes: Seq[Node]) extends FreeSpec w
     val targetBlocks = result(for {
       b <- traverse(nodes)(balanceForNode).map(_.toMap)
       _ <- processRequests(generateRequests(1000, b))
-      height <- traverse(nodes)(_.height).map(_.max)
-      _ <- traverse(nodes)(_.waitForHeight(height + 30)) // wait a little longer to prevent rollbacks...
-      _ <- traverse(nodes)(_.waitForHeight(height + 25)) // ...before requesting actual blocks
-      blocks <- traverse(nodes)(_.blockAt(height + 25))
+      height1 <- traverse(nodes)(_.height).map(_.max)
+      _ <- traverse(nodes)(_.waitForHeight(height1 + 30)) // wait a little longer to prevent rollbacks...
+      height2 <- traverse(nodes)(_.height).map(_.max)
+      _ <- traverse(nodes)(_.waitForHeight(height2 + 25)) // ...before requesting actual blocks
+      blocks <- traverse(nodes)(_.blockAt(height1 + 25))
     } yield blocks.map(_.signature), 5.minutes)
 
     all(targetBlocks) shouldEqual targetBlocks.head
@@ -26,10 +27,11 @@ class ValidChainGenerationSpec(override val nodes: Seq[Node]) extends FreeSpec w
 
   "Generate more blocks and resynchronise after rollback" in {
     val targetBlocks1 = result(for {
-      height <- traverse(nodes)(_.height).map(_.max)
-      _ <- traverse(nodes)(_.waitForHeight(height + 30)) // wait a little longer to prevent rollbacks...
-      _ <- traverse(nodes)(_.waitForHeight(height + 25)) // ...before requesting actual blocks
-      blocks <- traverse(nodes)(_.blockAt(height + 25))
+      height1 <- traverse(nodes)(_.height).map(_.max)
+      _ <- traverse(nodes)(_.waitForHeight(height1 + 30)) // wait a little longer to prevent rollbacks...
+      height2 <- traverse(nodes)(_.height).map(_.max)
+      _ <- traverse(nodes)(_.waitForHeight(height2 + 25)) // ...before requesting actual blocks
+      blocks <- traverse(nodes)(_.blockAt(height1 + 25))
     } yield blocks.map(_.signature), 5.minutes)
 
     all(targetBlocks1) shouldEqual targetBlocks1.head
@@ -37,10 +39,11 @@ class ValidChainGenerationSpec(override val nodes: Seq[Node]) extends FreeSpec w
     nodes.head.rollback(1)
 
     val targetBlocks2 = result(for {
-      height <- traverse(nodes)(_.height).map(_.max)
-      _ <- traverse(nodes)(_.waitForHeight(height + 30)) // wait a little longer to prevent rollbacks...
-      _ <- traverse(nodes)(_.waitForHeight(height + 25)) // ...before requesting actual blocks
-      blocks <- traverse(nodes)(_.blockAt(height + 25))
+      height1 <- traverse(nodes)(_.height).map(_.max)
+      _ <- traverse(nodes)(_.waitForHeight(height1 + 30)) // wait a little longer to prevent rollbacks...
+      height2 <- traverse(nodes)(_.height).map(_.max)
+      _ <- traverse(nodes)(_.waitForHeight(height2 + 25)) // ...before requesting actual blocks
+      blocks <- traverse(nodes)(_.blockAt(height1 + 25))
     } yield blocks.map(_.signature), 5.minutes)
 
     all(targetBlocks2) shouldEqual targetBlocks2.head
@@ -48,10 +51,11 @@ class ValidChainGenerationSpec(override val nodes: Seq[Node]) extends FreeSpec w
     nodes.tail.foreach(_.rollback(1))
 
     val targetBlocks3 = result(for {
-      height <- traverse(nodes)(_.height).map(_.max)
-      _ <- traverse(nodes)(_.waitForHeight(height + 30)) // wait a little longer to prevent rollbacks...
-      _ <- traverse(nodes)(_.waitForHeight(height + 25)) // ...before requesting actual blocks
-      blocks <- traverse(nodes)(_.blockAt(height + 25))
+      height1 <- traverse(nodes)(_.height).map(_.max)
+      _ <- traverse(nodes)(_.waitForHeight(height1 + 30)) // wait a little longer to prevent rollbacks...
+      height2 <- traverse(nodes)(_.height).map(_.max)
+      _ <- traverse(nodes)(_.waitForHeight(height2 + 25)) // ...before requesting actual blocks
+      blocks <- traverse(nodes)(_.blockAt(height1 + 25))
     } yield blocks.map(_.signature), 5.minutes)
 
     all(targetBlocks3) shouldEqual targetBlocks3.head

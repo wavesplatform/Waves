@@ -8,7 +8,8 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
 
-class AliasTransactionSpecification(override val allNodes: Seq[Node]) extends IntegrationSuiteWithThreeAddresses {
+class AliasTransactionSpecification(override val allNodes: Seq[Node], override val notMiner: Node)
+  extends IntegrationSuiteWithThreeAddresses {
   test("Able to send money to an alias") {
     val alias = "TEST_ALIAS"
 

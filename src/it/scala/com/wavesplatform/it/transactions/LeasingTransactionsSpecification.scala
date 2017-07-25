@@ -8,7 +8,8 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
 
-class LeasingTransactionsSpecification(override val allNodes: Seq[Node]) extends IntegrationSuiteWithThreeAddresses {
+class LeasingTransactionsSpecification(override val allNodes: Seq[Node], override val notMiner: Node)
+  extends IntegrationSuiteWithThreeAddresses {
   test("leasing waves decreases lessor's eff.b. and increases lessee's eff.b.; lessor pays fee") {
     val f = for {
       _ <- assertBalances(firstAddress, 100.waves, 100.waves)

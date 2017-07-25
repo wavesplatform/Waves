@@ -11,7 +11,6 @@ import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.language.postfixOps
-import scala.util.Random
 
 
 trait IntegrationSuiteWithThreeAddresses extends FunSuite with BeforeAndAfterAll with Matchers with ScalaFutures
@@ -19,7 +18,9 @@ trait IntegrationSuiteWithThreeAddresses extends FunSuite with BeforeAndAfterAll
 
   def allNodes: Seq[Node]
 
-  protected val sender = Random.shuffle(allNodes).head
+  def notMiner: Node
+
+  protected val sender: Node = notMiner
   private val richAddress = sender.address
 
   protected val defaultBalance: Long = 100 waves

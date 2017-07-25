@@ -1,5 +1,6 @@
 package com.wavesplatform.it
 
+import com.typesafe.config.ConfigFactory
 import com.wavesplatform.it.transactions._
 import org.scalatest.{BeforeAndAfterAll, FreeSpec, Matchers, Suite}
 import scorex.utils.ScorexLogging
@@ -11,11 +12,22 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.util.Random
 
-class TestFiveNodesSuite extends FreeSpec with BeforeAndAfterAll with ScorexLogging with Matchers {
+class TestFourNodesSuite extends FreeSpec with BeforeAndAfterAll with ScorexLogging with Matchers {
+
+  private val nonGeneratingPeerConfig = ConfigFactory.parseString(
+    """
+      |waves.miner.enable=no
+    """.stripMargin
+  )
+
   private val docker = new Docker()
   private val nodesCount = 4
-  private val nodeConfigs = Random.shuffle(Docker.NodeConfigs.getConfigList("nodes").asScala).take(nodesCount)
+  private val dockerConfigs = Random.shuffle(Docker.NodeConfigs.getConfigList("nodes").asScala).take(nodesCount)
+  private val nodeConfigs = Seq(nonGeneratingPeerConfig.withFallback(dockerConfigs.head)) ++ dockerConfigs.tail
+
+
   private val allNodes = nodeConfigs.map(docker.startNode)
+  private val notMiner = allNodes.head
 
   override protected def beforeAll(): Unit = {
     log.debug("Waiting for nodes to start")
@@ -37,14 +49,14 @@ class TestFiveNodesSuite extends FreeSpec with BeforeAndAfterAll with ScorexLogg
 
   override def nestedSuites: IndexedSeq[Suite] = IndexedSeq(
     new ValidChainGenerationSpec(allNodes),
-    new BurnTransactionSpecification(allNodes),
-    new IssueTransactionSpecification(allNodes),
-    new LeasingTransactionsSpecification(allNodes),
-    new MakeAssetNameUniqueTransactionSpecification(allNodes),
-    new PaymentTransactionSpecification(allNodes),
-    new ReissueTransactionSpecification(allNodes),
-    new TransferTransactionSpecification(allNodes),
-    new AliasTransactionSpecification(allNodes)
+    new BurnTransactionSpecification(allNodes, notMiner),
+    new IssueTransactionSpecification(allNodes, notMiner),
+    new LeasingTransactionsSpecification(allNodes, notMiner),
+    new MakeAssetNameUniqueTransactionSpecification(allNodes, notMiner),
+    new PaymentTransactionSpecification(allNodes, notMiner),
+    new ReissueTransactionSpecification(allNodes, notMiner),
+    new TransferTransactionSpecification(allNodes, notMiner),
+    new AliasTransactionSpecification(allNodes, notMiner)
   )
 
   override protected def afterAll(): Unit = docker.close()

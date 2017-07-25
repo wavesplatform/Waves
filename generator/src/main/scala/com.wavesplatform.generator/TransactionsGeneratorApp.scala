@@ -6,7 +6,7 @@ import java.io.File
 import java.net.{InetAddress, InetSocketAddress}
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.it.api.NodeApi
+//import com.wavesplatform.it.api.NodeApi
 import com.wavesplatform.it.util.NetworkSender
 import com.wavesplatform.network.RawBytes
 import org.slf4j.LoggerFactory
