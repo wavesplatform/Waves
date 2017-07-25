@@ -71,7 +71,7 @@ object PoSCalc extends ScorexLogging {
     val balance = generatingBalance(state, fs, account, height)
     Either.cond(balance >= MinimalEffectiveBalanceForGenerator,
       balance,
-      s"Balance $balance of ${ByteStr(account.publicKey)} is lower than $MinimalEffectiveBalanceForGenerator")
+      s"Balance $balance of ${account.address} is lower than $MinimalEffectiveBalanceForGenerator")
       .flatMap { _ =>
         val cData = block.consensusData
         val hit = calcHit(cData, account)

@@ -112,7 +112,7 @@ class Miner(
       case Right(maybeNewTotal) => generateMicroBlockSequence(account, maybeNewTotal.getOrElse(accumulatedBlock))
     }
 
-  private def generateBlockTask(account: PrivateKeyAccount): Option[Task[Unit]] = {
+  private def generateBlockTask(account: PrivateKeyAccount): Task[Unit] = {
     val height = history.height()
     val lastBlock = history.lastBlock.get
     val grandParent = history.parent(lastBlock, 2)
@@ -124,8 +124,8 @@ class Miner(
         val offset = calcOffset(timeService, ts, minerSettings.minimalBlockGenerationOffset)
         log.debug(s"Next attempt for acc=$account in $offset")
         val balance = generatingBalance(stateReader, blockchainSettings.functionalitySettings, account, height)
-        Some(generateOneBlockTask(account, height, grandParent, balance)(offset).map {
-          case Right(block) => Some(Task {
+        generateOneBlockTask(account, height, grandParent, balance)(offset).flatMap {
+          case Right(block) => Task {
             processBlock(block, true) match {
               case Left(err) => log.warn(err.toString)
               case Right(score) =>
@@ -134,20 +134,20 @@ class Miner(
                 scheduleMining()
                 startMicroBlockMining(account, block)
             }
-          })
+          }
           case Left(err) =>
             log.debug(s"No block generated because $err, retrying")
             generateBlockTask(account)
-        }.map(_.getOrElse(Task.unit)).flatten)
+        }
       case Left(err) =>
         log.debug(s"Not scheduling block mining because $err")
-        None
+        Task.unit
     }
   }
 
   def scheduleMining(): Unit = {
     scheduledAttempts := CompositeCancelable.fromSet(
-        wallet.privateKeyAccounts().flatMap(generateBlockTask).map(_.runAsync).toSet)
+        wallet.privateKeyAccounts().map(generateBlockTask).map(_.runAsync).toSet)
     microBlockAttempt := SerialCancelable()
     log.debug(s"Block mining scheduled")
   }

@@ -35,7 +35,7 @@ class ExtensionSignaturesLoader(syncTimeout: FiniteDuration, peerDatabase: PeerD
     case LoadBlockchainExtension(sigs) if currentTimeout.isEmpty =>
       lastKnownSignatures = sigs
 
-      log.debug(s"${id(ctx)} Loading extension, last ${sigs.length} are [${sigs.head}..${sigs.last}]")
+      log.debug(s"${id(ctx)} Loading extension, last ${sigs.length} are ${formatSignatures(sigs)}")
 
       currentTimeout = Some(ctx.executor().schedule(syncTimeout) {
         if (currentTimeout.nonEmpty && ctx.channel().isActive) {

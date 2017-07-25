@@ -35,7 +35,7 @@ class NetworkClient(
   private val channels = new ConcurrentHashMap[InetSocketAddress, Channel]
 
   private val clientHandshakeHandler =
-    new HandshakeHandler.Client(handshake, peerInfo, peerUniqueness, new NopPeerDatabase)
+    new HandshakeHandler.Client(handshake, peerInfo, peerUniqueness, NopPeerDatabase)
 
   private val bootstrap = new Bootstrap()
     .group(workerGroup)

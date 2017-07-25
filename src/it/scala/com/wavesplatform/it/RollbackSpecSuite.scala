@@ -18,7 +18,7 @@ class RollbackSpecSuite extends FreeSpec with ScalaFutures with IntegrationPatie
   with Matchers with TransferSending with IntegrationNodesInitializationAndStopping {
   override val docker = new Docker()
   // there are nodes with big and small balances to reduce the number of forks
-  override val nodes = Configs.map(docker.startNode)
+  override val nodes: Seq[Node] = Configs.map(docker.startNode)
 
   "Apply the same transfer transactions twice with return to UTX" in {
     val waitBlocks = 8
@@ -71,14 +71,14 @@ class RollbackSpecSuite extends FreeSpec with ScalaFutures with IntegrationPatie
 
     val f = for {
       startHeight <- Future.traverse(nodes)(_.height).map(_.min)
-      aliasTxId <- nodes.head.createAlias(nodes.head.address, alias, 1 waves).map(_.id)
+      aliasTxId <- nodes.head.createAlias(nodes.head.address, alias, 1.waves).map(_.id)
       _ <- Future.traverse(nodes)(_.waitForTransaction(aliasTxId))
       _ <- Future.traverse(nodes)(_.rollback(startHeight, returnToUTX = false))
-      secondAliasTxId <- nodes.head.createAlias(nodes.head.address, alias, 1 waves).map(_.id)
+      secondAliasTxId <- nodes.head.createAlias(nodes.head.address, alias, 1.waves).map(_.id)
       _ <- Future.traverse(nodes)(_.waitForTransaction(secondAliasTxId))
     } yield succeed
 
-    Await.result(f, 1 minute)
+    Await.result(f, 1.minute)
   }
 }
 

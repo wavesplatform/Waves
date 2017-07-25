@@ -7,7 +7,7 @@ import com.wavesplatform.state2.{BlockDiff, ByteStr, DataTypes}
 import com.wavesplatform.utils._
 import scorex.block.Block
 import scorex.transaction.History.BlockchainScore
-import scorex.transaction.ValidationError.BlockAppendError
+import scorex.transaction.ValidationError.GenericError
 import scorex.transaction.{DiscardedTransactions, HistoryWriter, Transaction, ValidationError}
 import scorex.utils.{LogMVMapBuilder, ScorexLogging}
 
@@ -45,7 +45,7 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
       (blockDiff, Seq.empty)
     }
     else {
-      Left(BlockAppendError("its parent is not last block in persisted blockchain", block))
+      Left(GenericError(s"Parent ${block.reference} of block ${block.uniqueId} does not match last local block ${this.lastBlock.map(_.uniqueId)}"))
     }
   }
 

@@ -15,7 +15,6 @@ import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.channel.socket.SocketChannel
 import io.netty.channel.socket.nio.{NioServerSocketChannel, NioSocketChannel}
 import io.netty.handler.codec.{LengthFieldBasedFrameDecoder, LengthFieldPrepender}
-import scorex.network.message.MessageSpec
 import scorex.transaction._
 import scorex.utils.{ScorexLogging, Time}
 
@@ -65,7 +64,6 @@ class NetworkServer(checkpointService: CheckpointService,
 
   private val lengthFieldPrepender = new LengthFieldPrepender(4)
 
-  private val peerSynchronizer = new PeerSynchronizer(peerDatabase, settings.networkSettings.peersBroadcastInterval)
   // There are two error handlers by design. WriteErrorHandler adds a future listener to make sure writes to network
   // succeed. It is added to the head of pipeline (it's the closest of the two to actual network), because some writes
   // are initiated from the middle of the pipeline (e.g. extension requests). FatalErrorHandler, on the other hand,
@@ -103,10 +101,10 @@ class NetworkServer(checkpointService: CheckpointService,
         serverHandshakeHandler,
         lengthFieldPrepender,
         new LengthFieldBasedFrameDecoder(1024 * 1024, 0, 4, 0, 4),
-        new LegacyFrameCodec,
+        new LegacyFrameCodec(peerDatabase),
         discardingHandler,
         messageCodec,
-        peerSynchronizer,
+        new PeerSynchronizer(peerDatabase, settings.networkSettings.peersBroadcastInterval),
         historyReplier,
         microBlockSynchronizer,
         new ExtensionSignaturesLoader(settings.synchronizationSettings.synchronizationTimeout, peerDatabase),
@@ -114,7 +112,7 @@ class NetworkServer(checkpointService: CheckpointService,
         new OptimisticExtensionLoader,
         utxPoolSynchronizer,
         scoreObserver,
-        coordinatorHandler -> coordinatorExecutor,
+        coordinatorHandler,
         fatalErrorHandler)))
       .bind(settings.networkSettings.bindAddress)
       .channel()
@@ -142,10 +140,10 @@ class NetworkServer(checkpointService: CheckpointService,
       clientHandshakeHandler,
       lengthFieldPrepender,
       new LengthFieldBasedFrameDecoder(1024 * 1024, 0, 4, 0, 4),
-      new LegacyFrameCodec,
+      new LegacyFrameCodec(peerDatabase),
       discardingHandler,
       messageCodec,
-      peerSynchronizer,
+      new PeerSynchronizer(peerDatabase, settings.networkSettings.peersBroadcastInterval),
       historyReplier,
       microBlockSynchronizer,
       new ExtensionSignaturesLoader(settings.synchronizationSettings.synchronizationTimeout, peerDatabase),
@@ -153,7 +151,7 @@ class NetworkServer(checkpointService: CheckpointService,
       new OptimisticExtensionLoader,
       utxPoolSynchronizer,
       scoreObserver,
-      coordinatorHandler -> coordinatorExecutor,
+      coordinatorHandler,
       fatalErrorHandler)))
 
   private val connectTask = workerGroup.scheduleWithFixedDelay(1.second, 5.seconds) {
@@ -175,12 +173,12 @@ class NetworkServer(checkpointService: CheckpointService,
               log.debug(s"${id(connFuture.channel())} Connection failed, blacklisting $remoteAddress", connFuture.cause())
               peerDatabase.blacklist(remoteAddress.getAddress)
             } else if (connFuture.isSuccess) {
-              log.debug(s"${id(connFuture.channel())} Connection established")
+              log.info(s"${id(connFuture.channel())} Connection established")
               peerDatabase.touch(remoteAddress)
               outgoingChannelCount.incrementAndGet()
               connFuture.channel().closeFuture().addListener { (closeFuture: ChannelFuture) =>
                 val remainingCount = outgoingChannelCount.decrementAndGet()
-                log.debug(s"${id(closeFuture.channel)} Connection closed, $remainingCount outgoing channel(s) remaining")
+                log.info(s"${id(closeFuture.channel)} Connection closed, $remainingCount outgoing channel(s) remaining")
                 allChannels.remove(closeFuture.channel())
                 outgoingChannels.remove(remoteAddress, closeFuture.channel())
                 if (!shutdownInitiated) peerDatabase.blacklist(remoteAddress.getAddress)

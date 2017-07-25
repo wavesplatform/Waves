@@ -3,12 +3,14 @@ package com.wavesplatform
 import java.net.{InetSocketAddress, SocketAddress, URI}
 import java.util.concurrent.Callable
 
+import com.wavesplatform.state2.ByteStr
 import io.netty.channel.group.{ChannelGroup, ChannelMatchers}
 import io.netty.channel.local.LocalAddress
 import io.netty.channel.socket.SocketChannel
 import io.netty.channel.{Channel, ChannelHandlerContext}
 import io.netty.util.NetUtil.toSocketAddressString
 import io.netty.util.concurrent.{EventExecutorGroup, ScheduledFuture}
+import scorex.block.Block
 import scorex.utils.ScorexLogging
 
 import scala.concurrent.duration._
@@ -36,14 +38,16 @@ package object network extends ScorexLogging {
 
   def id(ctx: ChannelHandlerContext): String = id(ctx.channel())
 
-  def id(chan: Channel): String = s"[${chan.id().asShortText()}${formatAddress(chan.remoteAddress())}]"
+  def id(chan: Channel, prefix: String = ""): String = s"[$prefix${chan.id().asShortText()}${formatAddress(chan.remoteAddress())}]"
+
+  def formatBlocks(blocks: Seq[Block]): String = formatSignatures(blocks.view.map(_.uniqueId))
+
+  def formatSignatures(signatures: Seq[ByteStr]): String = if (signatures.isEmpty) ""
+    else if (signatures.size == 1) s"[${signatures.head}]"
+    else s"[${signatures.head}..${signatures.last}]"
 
   implicit class ChannelHandlerContextExt(val ctx: ChannelHandlerContext) extends AnyVal {
     def remoteAddress: InetSocketAddress = ctx.channel().asInstanceOf[SocketChannel].remoteAddress()
-  }
-
-  implicit class ChannelExt(val channel: Channel) extends AnyVal {
-    def declaredAddress: Option[InetSocketAddress] = Option(channel.attr(AttributeKeys.DeclaredAddress).get())
   }
 
   implicit class ChannelGroupExt(val allChannels: ChannelGroup) extends AnyVal {
@@ -52,5 +56,4 @@ package object network extends ScorexLogging {
       allChannels.writeAndFlush(message, except.fold(ChannelMatchers.all())(ChannelMatchers.isNot))
     }
   }
-
 }

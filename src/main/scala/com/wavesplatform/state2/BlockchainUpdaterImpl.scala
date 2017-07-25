@@ -36,7 +36,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
   }
 
   private def logHeights(prefix: String): Unit = read { implicit l =>
-    log.info(s"$prefix Total blocks: ${ngHistoryWriter.height()}, persisted: ${persisted.height}, " +
+    log.info(s"$prefix, total blocks: ${ngHistoryWriter.height()}, persisted: ${persisted.height}, " +
       s"topMemDiff: ${topMemoryDiff().heightDiff}, bottomMemDiff: ${bottomMemoryDiff().heightDiff}")
   }
 
@@ -57,7 +57,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
   }
 
   private def updatePersistedAndInMemory(): Unit = write { implicit l =>
-    logHeights("State rebuild started:")
+    logHeights("State rebuild started")
     val persistFrom = persisted.height + 1
     val persistUpTo = ngHistoryWriter.height - minimumInMemoryDiffSize + 1
 
@@ -68,7 +68,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
 
     bottomMemoryDiff.set(unsafeDiffByRange(persisted, persisted.height + 1, ngHistoryWriter.height() + (if (ngHistoryWriter.baseBlock().isDefined) 0 else 1)))
     topMemoryDiff.set(BlockDiff.empty)
-    logHeights("State rebuild finished:")
+    logHeights("State rebuild finished")
   }
 
   override def processBlock(block: Block): Either[ValidationError, DiscardedTransactions] = write { implicit l =>
@@ -103,8 +103,11 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
 
   override def removeAfter(blockId: ByteStr): Either[ValidationError, Seq[Transaction]] = write { implicit l =>
     ngHistoryWriter.heightOf(blockId) match {
+      case Some(height) if height == ngHistoryWriter.height() =>
+        log.trace("No rollback necessary")
+        Right(Seq.empty)
       case Some(height) =>
-        logHeights(s"Rollback to height $height started:")
+        logHeights(s"Rollback to h=$height started")
         val discardedTransactions = Seq.newBuilder[Transaction]
         while (ngHistoryWriter.height > height) {
           val transactions = ngHistoryWriter.discardBlock()
@@ -112,7 +115,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
           discardedTransactions ++= transactions
         }
         if (height < persisted.height) {
-          log.warn(s"Rollback to h=$height requested. Persisted height=${persisted.height}, will drop state and reapply blockchain now")
+          log.info(s"Rollback to h=$height requested. Persisted height=${persisted.height}, will drop state and reapply blockchain now")
           persisted.clear()
           updatePersistedAndInMemory()
         } else {
@@ -128,11 +131,11 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
             }
           }
         }
-        logHeights(s"Rollback to height $height completed:")
+        logHeights(s"Rollback to h=$height completed:")
         Right(discardedTransactions.result())
       case None =>
-        log.warn(s"removeAfter non-existing block $blockId")
-        Left(GenericError(s"Failed to rollback to non existing block $blockId"))
+        log.warn(s"removeAfter nonexistent block $blockId")
+        Left(GenericError(s"Failed to rollback to nonexistent block $blockId"))
     }
   }
 
@@ -156,7 +159,7 @@ object BlockchainUpdaterImpl {
                synchronizationToken: ReentrantReadWriteLock): BlockchainUpdaterImpl = {
     val blockchainUpdater =
       new BlockchainUpdaterImpl(persistedState, functionalitySettings, minimumInMemoryDiffSize, history, synchronizationToken)
-    blockchainUpdater.logHeights("Constructing BlockchainUpdaterImpl:")
+    blockchainUpdater.logHeights("Constructing BlockchainUpdaterImpl")
     blockchainUpdater.updatePersistedAndInMemory()
     blockchainUpdater
   }

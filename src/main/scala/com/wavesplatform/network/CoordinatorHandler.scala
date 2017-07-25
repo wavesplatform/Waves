@@ -1,6 +1,7 @@
 package com.wavesplatform.network
 
-import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.Executors
+import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
 
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.settings.WavesSettings
@@ -8,55 +9,85 @@ import com.wavesplatform.state2.reader.StateReader
 import com.wavesplatform.{Coordinator, UtxPool}
 import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel.group.ChannelGroup
-import io.netty.channel.{ChannelHandlerContext, ChannelInboundHandlerAdapter}
+import io.netty.channel.{Channel, ChannelHandlerContext, ChannelInboundHandlerAdapter}
 import scorex.block.Block
 import scorex.transaction._
 import scorex.utils.{ScorexLogging, Time}
 
+import scala.concurrent.{ExecutionContext, Future}
+
 @Sharable
-class CoordinatorHandler(checkpointService: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater, time: Time,
-                         stateReader: StateReader, utxStorage: UtxPool, blockchainReadiness: AtomicBoolean, miner: Miner,
-                         settings: WavesSettings, peerDatabase: PeerDatabase, allChannels: ChannelGroup)
+class CoordinatorHandler(
+                            checkpointService: CheckpointService,
+                            history: History,
+                            blockchainUpdater: BlockchainUpdater,
+                            time: Time,
+                            stateReader: StateReader,
+                            utxStorage: UtxPool,
+                            blockchainReadiness:
+                            AtomicBoolean,
+                            miner: Miner,
+                            settings: WavesSettings,
+                            peerDatabase: PeerDatabase,
+                            allChannels: ChannelGroup)
   extends ChannelInboundHandlerAdapter with ScorexLogging {
 
-  import CoordinatorHandler._
+  private val counter = new AtomicInteger
+  private implicit val ec = ExecutionContext.fromExecutor(Executors.newSingleThreadExecutor { r =>
+    val t = new Thread(r)
+    t.setName(s"coordinator-handler-${counter.incrementAndGet()}")
+    t.setDaemon(true)
+    t
+  })
+
+  private val processCheckpoint = Coordinator.processCheckpoint(checkpointService, history, blockchainUpdater) _
+  private val processFork = Coordinator.processFork(checkpointService, history, blockchainUpdater, stateReader, utxStorage, time, settings, miner, blockchainReadiness) _
+  private val processBlock = Coordinator.processSingleBlock(checkpointService, history, blockchainUpdater, time, stateReader, utxStorage, blockchainReadiness, settings) _
+
+  private def broadcastingScore(
+    src: Channel,
+    start: => String,
+    success: => String,
+    failure: => String,
+    f: => Either[_, BigInt]): Unit = Future {
+    log.debug(s"${id(src)} $start")
+    f match {
+      case Right(newLocalScore) =>
+        log.info(s"${id(src)} $success, new local score is $newLocalScore")
+        allChannels.broadcast(LocalScoreChanged(newLocalScore))
+      case Left(e) =>
+        log.warn(s"${id(src)} $failure: $e")
+    }
+  }
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
-    case c: Checkpoint =>
-      loggingResult(id(ctx), "Checkpoint",
-        Coordinator.processCheckpoint(checkpointService, history, blockchainUpdater)(c))
-        .fold(err => peerDatabase.blacklistAndClose(ctx.channel(), "Unable to process checkpoint due to " + err),
-          score => allChannels.broadcast(LocalScoreChanged(score), Some(ctx.channel()))
-        )
-    case ExtensionBlocks(blocks) =>
-      loggingResult(id(ctx), "ExtensionBlocks",
-        Coordinator.processFork(checkpointService, history, blockchainUpdater, stateReader, utxStorage, time, settings, miner, blockchainReadiness)(blocks))
-        .fold(
-          err => peerDatabase.blacklistAndClose(ctx.channel(), "Unable to process ExtensionBlocks due to " + err),
-          score => {
-            allChannels.broadcast(LocalScoreChanged(score))
-            miner.scheduleMining()
-          }
-        )
+
+    case c: Checkpoint => broadcastingScore(ctx.channel,
+      "Attempting to process checkpoint",
+      "Successfully processed checkpoint",
+      s"Error processing checkpoint",
+      processCheckpoint(c))
+
+    case ExtensionBlocks(blocks) => broadcastingScore(ctx.channel(),
+      s"Attempting to append extension ${formatBlocks(blocks)}",
+      s"Successfully appended extension ${formatBlocks(blocks)}",
+      s"Error appending extension ${formatBlocks(blocks)}",
+      processFork(blocks))
+
     case b: Block =>
       Signed.validateSignatures(b) match {
-        case Right(_) =>
-          loggingResult(id(ctx), "Block", Coordinator.processSingleBlock(checkpointService, history, blockchainUpdater, time,
-            stateReader, utxStorage, blockchainReadiness, settings)(b, local = false))
-            .foreach(score => {
-              allChannels.broadcast(LocalScoreChanged(score))
-              miner.scheduleMining()
-            })
-        case Left(err) =>
-          peerDatabase.blacklistAndClose(ctx.channel(), err.toString)
+        case Left(err) => peerDatabase.blacklistAndClose(ctx.channel(), err.toString)
+        case Right(_) => broadcastingScore(ctx.channel(),
+          s"Attempting to append block ${b.uniqueId}",
+          s"Successfully appended block ${b.uniqueId}",
+          s"Could not append block ${b.uniqueId}",
+          processBlock(b, false))
       }
     case MicroBlockResponse(m) =>
       Signed.validateSignatures(m) match {
         case Right(_) =>
-          loggingResult(id(ctx), "MicroBlockResponse", Coordinator.processMicroBlock(checkpointService, history, blockchainUpdater, utxStorage)(m))
-            .foreach(score => {
-              allChannels.broadcast(MicroBlockInv(m.totalResBlockSig), Some(ctx.channel()))
-            })
+          Coordinator.processMicroBlock(checkpointService, history, blockchainUpdater, utxStorage)(m)
+            .foreach(_ => allChannels.broadcast(MicroBlockInv(m.totalResBlockSig), Some(ctx.channel())))
         case Left(err) =>
           peerDatabase.blacklistAndClose(ctx.channel(), err.toString)
       }

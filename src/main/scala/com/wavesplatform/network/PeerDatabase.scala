@@ -24,9 +24,9 @@ trait PeerDatabase {
 
 object PeerDatabase extends ScorexLogging {
   implicit class PeerDatabaseExt(peerDatabase: PeerDatabase) {
-    def blacklistAndClose(channel: Channel, reason:String): Unit = {
+    def blacklistAndClose(channel: Channel, reason: String): Unit = {
       val address = channel.asInstanceOf[NioSocketChannel].remoteAddress().getAddress
-      log.debug(s"${id(channel)} Blacklisting $address. Reason: $reason")
+      log.debug(s"Blacklisting ${id(channel)}: $reason")
       peerDatabase.blacklist(address)
       channel.close()
     }

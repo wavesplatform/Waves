@@ -24,7 +24,9 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Auto
   }
 
   override def addCandidate(socketAddress: InetSocketAddress): Unit = unverifiedPeers.synchronized {
-    if (!peersPersistence.containsKey(socketAddress)) unverifiedPeers.add(socketAddress)
+    if (!peersPersistence.containsKey(socketAddress) && !unverifiedPeers.contains(socketAddress)) {
+      unverifiedPeers.add(socketAddress)
+    }
   }
 
   private def doTouch(socketAddress: InetSocketAddress, timestamp: Long): Unit = unverifiedPeers.synchronized {
