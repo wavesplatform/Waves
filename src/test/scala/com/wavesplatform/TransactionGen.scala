@@ -2,6 +2,7 @@ package com.wavesplatform
 
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.state2._
+import org.scalacheck.Gen.{alphaLowerChar, frequency, numChar, alphaUpperChar}
 import org.scalacheck.{Arbitrary, Gen}
 import scorex.account.PublicKeyAccount._
 import scorex.account._
@@ -15,8 +16,8 @@ trait TransactionGen {
 
   def byteArrayGen(length: Int): Gen[Array[Byte]] = Gen.listOfN(length, Arbitrary.arbitrary[Byte]).map(_.toArray)
 
-  val bytes32gen = byteArrayGen(32)
-  val bytes64gen = byteArrayGen(64)
+  val bytes32gen: Gen[Array[Byte]] = byteArrayGen(32)
+  val bytes64gen: Gen[Array[Byte]] = byteArrayGen(64)
 
   def genBoundedBytes(minSize: Int, maxSize: Int): Gen[Array[Byte]] = for {
     length <- Gen.chooseNum(minSize, maxSize)
@@ -30,15 +31,30 @@ trait TransactionGen {
   val ntpTimestampGen: Gen[Long] = Gen.choose(1, 1000).map(NTP.correctedTime() - _)
 
   val accountGen: Gen[PrivateKeyAccount] = bytes32gen.map(seed => PrivateKeyAccount(seed))
+
+  val aliasSymbolChar: Gen[Char] = Gen.oneOf('.','@', '_', '-')
+
+  val aliasAlphabetGen: Gen[Char] = frequency((1, numChar), (1, aliasSymbolChar), (9, alphaLowerChar))
+
+  val invalidAliasAlphabetGen: Gen[Char] = frequency((1, numChar), (1, aliasSymbolChar), (2, alphaLowerChar), (9, alphaUpperChar))
+
+  val validAliasStringGen: Gen[String] = for {
+    length <- Gen.chooseNum(Alias.MinLength, Alias.MaxLength)
+    aliasChars <- Gen.listOfN(length, aliasAlphabetGen)
+  } yield aliasChars.mkString
+
   val aliasGen: Gen[Alias] = for {
-    l <- Gen.chooseNum(Alias.MinLength, Alias.MaxLength)
-    alias <- Gen.listOfN(l, Gen.alphaNumChar)
-  } yield Alias.buildWithCurrentNetworkByte(alias.mkString).explicitGet()
+    str <- validAliasStringGen
+  } yield Alias.buildWithCurrentNetworkByte(str.mkString).explicitGet()
+
+  val invalidAliasStringGen: Gen[String] = for {
+    length <- Gen.chooseNum(Alias.MinLength, Alias.MaxLength)
+    aliasChars <- Gen.listOfN(length, invalidAliasAlphabetGen)
+  } yield aliasChars.mkString
 
   val accountOrAliasGen: Gen[AddressOrAlias] = Gen.oneOf(aliasGen, accountGen.map(PublicKeyAccount.toAddress(_)))
 
   def otherAccountGen(candidate: PrivateKeyAccount): Gen[PrivateKeyAccount] = accountGen.flatMap(Gen.oneOf(candidate, _))
-
 
   val positiveLongGen: Gen[Long] = Gen.choose(1, Long.MaxValue / 100)
   val positiveIntGen: Gen[Int] = Gen.choose(1, Int.MaxValue / 100)
