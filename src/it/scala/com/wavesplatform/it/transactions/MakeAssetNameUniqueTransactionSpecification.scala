@@ -16,6 +16,9 @@ class MakeAssetNameUniqueTransactionSpecification(override val allNodes: Seq[Nod
 
   test("make unique assets transaction makes asset name unique") {
     val f = for {
+      height <- traverse(allNodes)(_.height).map(_.max)
+      _ <- traverse(allNodes)(_.waitForHeight(height + 1))
+
       _ <- assertBalances(firstAddress, 100.waves, 100.waves)
 
       issuedAssetId <- sender.issue(firstAddress, "asset1", "description", defaultQuantity, 2, reissuable = true, fee = 10.waves).map(_.id)
@@ -52,6 +55,9 @@ class MakeAssetNameUniqueTransactionSpecification(override val allNodes: Seq[Nod
 
   test("can't make unique assets issued by other address") {
     val f = for {
+      height <- traverse(allNodes)(_.height).map(_.max)
+      _ <- traverse(allNodes)(_.waitForHeight(height + 1))
+
       _ <- assertBalances(firstAddress, 80.waves, 80.waves)
 
       issuedAssetId <- sender.issue(firstAddress, "asset4", "description", defaultQuantity, 2, reissuable = true, fee = 10.waves).map(_.id)
@@ -71,6 +77,9 @@ class MakeAssetNameUniqueTransactionSpecification(override val allNodes: Seq[Nod
 
   test("make unique assets transaction can be applied only once") {
     val f = for {
+      height <- traverse(allNodes)(_.height).map(_.max)
+      _ <- traverse(allNodes)(_.waitForHeight(height + 1))
+
       _ <- assertBalances(firstAddress, 70.waves, 70.waves)
 
       issuedAssetId <- sender.issue(firstAddress, "asset2", "description", defaultQuantity, 2, reissuable = true, fee = 10.waves).map(_.id)
@@ -103,6 +112,9 @@ class MakeAssetNameUniqueTransactionSpecification(override val allNodes: Seq[Nod
 
   test("make unique assets does not prohibit creating an asset with this name") {
     val f = for {
+      height <- traverse(allNodes)(_.height).map(_.max)
+      _ <- traverse(allNodes)(_.waitForHeight(height + 1))
+
       _ <- assertBalances(firstAddress, 40.waves, 40.waves)
 
       issuedAssetId <- sender.issue(firstAddress, "asset3", "description", defaultQuantity, 2, reissuable = true, fee = 10.waves).map(_.id)
