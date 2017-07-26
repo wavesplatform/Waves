@@ -30,7 +30,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
 
   override lazy val route =
     pathPrefix("assets") {
-      balance ~ balances ~ issue ~ reissue ~ burnRoute ~ makeAssetNameUniqueRoute ~ transfer ~ signOrder ~ balanceDistribution ~ assetIdByUniqueName
+      balance ~ balances ~ issue ~ reissue ~ burnRoute ~ transfer ~ signOrder ~ balanceDistribution
     }
 
   @Path("/balance/{address}/{assetId}")
@@ -146,45 +146,6 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
   def burnRoute: Route =
     processRequest("burn", (b: BurnRequest) => doBroadcast(TransactionFactory.burnAsset(b, wallet, time)))
 
-
-  @Path("/make-asset-name-unique")
-  @ApiOperation(value = "Make asset unique by name",
-    notes = "Makes asset unique by name",
-    httpMethod = "POST",
-    produces = "application/json",
-    consumes = "application/json")
-  @ApiImplicitParams(Array(
-    new ApiImplicitParam(
-      name = "body",
-      value = "Json with data",
-      required = true,
-      paramType = "body",
-      dataType = "scorex.api.http.assets.MakeAssetNameUniqueRequest",
-      defaultValue = "{\"sender\":\"string\",\"assetId\":\"Base58\",\"fee\":100000}"
-    )
-  ))
-  def makeAssetNameUniqueRoute: Route =
-    processRequest("make-asset-name-unique", (b: MakeAssetNameUniqueRequest) => doBroadcast(TransactionFactory.makeAssetNameUnique(b, wallet, time)))
-
-  @Path("/asset-id-by-unique-name/{name}")
-  @ApiOperation(value = "Asset id by unique name, if registered", notes = "Asset id by unique name, if registered", httpMethod = "GET")
-  @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "name", value = "Asset Name", required = true, dataType = "string", paramType = "path")
-  ))
-  def assetIdByUniqueName: Route =
-    (get & path("asset-id-by-unique-name" / Segment)) { base58EncodedAssetName =>
-      complete {
-        Base58.decode(base58EncodedAssetName) match {
-          case Success(assetName) => state.getAssetIdByUniqueName(ByteStr(assetName)) match {
-            case Some(assetId) => JsString(assetId.base58)
-            case None => JsNull
-          }
-          case Failure(e) => ApiError.fromValidationError(scorex.transaction.ValidationError.GenericError("Must be base58-encoded assetId"))
-        }
-      }
-    }
-
-
   private def balanceJson(address: String, assetIdStr: String): Either[ApiError, JsObject] = {
     ByteStr.decodeBase58(assetIdStr) match {
       case Success(assetId) =>
@@ -202,13 +163,12 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
   private def fullAccountAssetsInfo(address: String): Either[ApiError, JsObject] = (for {
     acc <- Address.fromString(address)
   } yield {
-    val balances: Seq[JsObject] = state.getAccountBalance(acc).map { case ((assetId, (balance, reissuable, quantity, issueTx, unique))) =>
+    val balances: Seq[JsObject] = state.getAccountBalance(acc).map { case ((assetId, (balance, reissuable, quantity, issueTx))) =>
       JsObject(Seq(
         "assetId" -> JsString(assetId.base58),
         "balance" -> JsNumber(balance),
         "reissuable" -> JsBoolean(reissuable),
         "quantity" -> JsNumber(quantity),
-        "unique" -> JsBoolean(unique),
         "issueTransaction" -> issueTx.json
       ))
     }.toSeq

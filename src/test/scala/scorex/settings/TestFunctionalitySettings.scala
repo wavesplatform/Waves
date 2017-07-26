@@ -12,7 +12,6 @@ object TestFunctionalitySettings {
     requirePaymentUniqueIdAfter = 0L, allowExchangeTransactionAfter = 0L,
     allowInvalidReissueInSameBlockUntilTimestamp = 0L, allowCreatealiasTransactionAfter = 0L,
     allowMultipleLeaseCancelTransactionUntilTimestamp = 0L, resetEffectiveBalancesAtHeight = 0,
-    allowMakeAssetNameUniqueTransactionAfter = 0L,
     allowLeasedBalanceTransferUntil = 0L
   )
 }

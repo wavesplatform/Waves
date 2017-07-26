@@ -76,11 +76,6 @@ object TransactionFactory {
     tx <- BurnTransaction.create(pk, ByteStr.decodeBase58(request.assetId).get, request.quantity, request.fee, time.getTimestamp())
   } yield tx
 
-  def makeAssetNameUnique(request: MakeAssetNameUniqueRequest, wallet: Wallet, time: Time): Either[ValidationError, MakeAssetNameUniqueTransaction] = for {
-    pk <- wallet.findWallet(request.sender)
-    tx <- MakeAssetNameUniqueTransaction.create(pk, ByteStr.decodeBase58(request.assetId).get, request.fee, AddressScheme.current.chainId, time.getTimestamp())
-  } yield tx
-
   def broadcastPayment(payment: SignedPaymentRequest): Either[ValidationError, PaymentTransaction] =
     for {
       _signature <- ByteStr.decodeBase58(payment.signature).toOption.toRight(ValidationError.InvalidRequestSignature)

@@ -62,10 +62,6 @@ class StateStorage private(file: Option[File]) extends AutoCloseable {
   val lastBalanceSnapshotHeight: MVMap[ByteStr, Int] = db.openMap("lastUpdateHeight", new LogMVMapBuilder[ByteStr, Int]
     .keyType(DataTypes.byteStr))
 
-  val uniqueAssets: MVMap[ByteStr, ByteStr] = db.openMap("uniqueAssets", new LogMVMapBuilder[ByteStr, ByteStr]
-    .keyType(DataTypes.byteStr)
-    .valueType(DataTypes.byteStr))
-
   def commit(): Unit = {
      db.commit()
     db.compact(CompactFillRate, CompactMemorySize)

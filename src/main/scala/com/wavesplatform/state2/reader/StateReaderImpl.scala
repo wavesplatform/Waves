@@ -87,10 +87,6 @@ class StateReaderImpl(p: StateStorage, val synchronizationToken: ReentrantReadWr
     sp().transactions.containsKey(id)
   }
 
-  override def getAssetIdByUniqueName(assetName: ByteStr): Option[ByteStr] = read { _ =>
-    Option(p.uniqueAssets.get(assetName))
-  }
-
   override def filledVolumeAndFee(orderId: ByteStr): OrderFillInfo = read { _ =>
     Option(p.orderFills.get(orderId)).map(oi => OrderFillInfo(oi._1, oi._2)).orEmpty
   }
