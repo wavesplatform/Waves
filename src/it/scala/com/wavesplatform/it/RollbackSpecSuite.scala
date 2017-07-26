@@ -20,11 +20,13 @@ class RollbackSpecSuite extends FreeSpec with ScalaFutures with IntegrationPatie
   // there are nodes with big and small balances to reduce the number of forks
   override val nodes: Seq[Node] = Configs.map(docker.startNode)
 
+  private val transactionsCount = 301
+
   "Apply the same transfer transactions twice with return to UTX" in {
     val waitBlocks = 8
     result(for {
       b <- traverse(nodes)(balanceForNode).map(_.toMap)
-      requests = generateRequests(301, b)
+      requests = generateRequests(transactionsCount, b)
       startHeight <- Future.traverse(nodes)(_.height).map(_.min)
       _ <- processRequests(requests)
       hashAfterFirstTry <- traverse(nodes)(_.waitForDebugInfoAt(startHeight + waitBlocks).map(_.stateHash)).map(infos => {
@@ -48,7 +50,7 @@ class RollbackSpecSuite extends FreeSpec with ScalaFutures with IntegrationPatie
     val waitBlocks = 8
     result(for {
       b <- traverse(nodes)(balanceForNode).map(_.toMap)
-      requests = generateRequests(301, b)
+      requests = generateRequests(transactionsCount, b)
       startHeight <- Future.traverse(nodes)(_.height).map(_.min)
       hashBeforeApply <- traverse(nodes)(_.waitForDebugInfoAt(startHeight + waitBlocks).map(_.stateHash)).map(infos => {
         all(infos) shouldEqual infos.head
