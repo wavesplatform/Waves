@@ -26,6 +26,10 @@ object TransactionGenerator {
     }
   }
 
+  private val aliasAlphabet = "-.0123456789@_abcdefghijklmnopqrstuvwxyz"
+
+  private def generateAlias(len: Int): String = Random.shuffle(aliasAlphabet).take(len)
+
   def gen(probabilities: Map[TransactionType.Value, Float],
           accounts: Seq[PrivateKeyAccount],
           n: Int): Seq[Transaction] = {
@@ -117,9 +121,7 @@ object TransactionGenerator {
             })
           case TransactionType.CreateAliasTransaction =>
             val sender = randomFrom(accounts).get
-            val aliasBytes = new Array[Byte](15)
-            r.nextBytes(aliasBytes)
-            val aliasString = new String(aliasBytes).trim.replace("\n", "")
+            val aliasString = generateAlias(15)
             logOption(CreateAliasTransaction.create(sender, Alias.buildWithCurrentNetworkByte(aliasString).right.get, 100000, ts))
         }
         (tx.map(tx => allTxsWithValid :+ tx).getOrElse(allTxsWithValid),
