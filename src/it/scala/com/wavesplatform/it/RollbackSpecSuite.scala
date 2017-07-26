@@ -25,16 +25,22 @@ class RollbackSpecSuite extends FreeSpec with ScalaFutures with IntegrationPatie
   "Apply the same transfer transactions twice with return to UTX" in {
     val waitBlocks = 8
     result(for {
-      b <- traverse(nodes)(balanceForNode).map(_.toMap)
-      requests = generateRequests(transactionsCount, b)
       startHeight <- Future.traverse(nodes)(_.height).map(_.min)
+
+      b <- traverse(nodes)(balanceForNode).map(_.toMap)
+
+      requests = generateRequests(transactionsCount, b)
       _ <- processRequests(requests)
+
       hashAfterFirstTry <- traverse(nodes)(_.waitForDebugInfoAt(startHeight + waitBlocks).map(_.stateHash)).map(infos => {
         all(infos) shouldEqual infos.head
         infos.head
       })
       stateAfterFirstTry <- nodes.head.debugStateAt(startHeight + waitBlocks)
-      _ <- traverse(nodes)(_.rollback(startHeight))
+
+      _ <- nodes.tail.head.rollback(1)
+      _ <- nodes.head.rollback(startHeight)
+
       hashAfterSecondTry <- traverse(nodes)(_.waitForDebugInfoAt(startHeight + waitBlocks).map(_.stateHash)).map(infos => {
         all(infos) shouldEqual infos.head
         infos.head
