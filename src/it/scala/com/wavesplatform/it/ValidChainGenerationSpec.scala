@@ -5,6 +5,7 @@ import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
 
 import scala.concurrent.Await.result
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
 
@@ -19,6 +20,11 @@ class ValidChainGenerationSpec(override val nodes: Seq[Node]) extends FreeSpec w
       _ <- processRequests(generateRequests(requestsCount, b))
       height <- traverse(nodes)(_.height).map(_.max)
       _ <- traverse(nodes)(_.waitForHeight(height + 30))
+
+      signatures <- traverse(nodes)(_.blockAt(height + 25).map(_.signature))
+      eq = signatures.tail.forall(_ == signatures.head)
+      _ <- if (eq) Future.successful(()) else traverse(nodes)(_.waitForHeight(height + 40))
+
       blocks <- traverse(nodes)(_.blockAt(height + 25))
     } yield blocks.map(_.signature), 5.minutes)
 

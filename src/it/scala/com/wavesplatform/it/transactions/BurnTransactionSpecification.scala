@@ -10,20 +10,22 @@ import scala.concurrent.duration._
 
 class BurnTransactionSpecification(override val allNodes: Seq[Node], override val notMiner: Node)
   extends IntegrationSuiteWithThreeAddresses {
+
+  private val defaultQuantity = 100000
   test("burning assets changes issuer's asset balance; issuer's waves balance is decreased by fee") {
     val f = for {
       _ <- assertBalances(firstAddress, 100.waves, 100.waves)
 
-      issuedAssetId <- sender.issue(firstAddress, "name", "description", 100000, 2, reissuable = false, fee = 1.waves).map(_.id)
+      issuedAssetId <- sender.issue(firstAddress, "name", "description", defaultQuantity, 2, reissuable = false, fee = 1.waves).map(_.id)
 
       height <- traverse(allNodes)(_.height).map(_.max)
       _ <- traverse(allNodes)(_.waitForHeight(height + 1))
       _ <- traverse(allNodes)(_.waitForTransaction(issuedAssetId))
 
       _ <- assertBalances(firstAddress, 99.waves, 99.waves)
-      _ <- assertAssetBalance(firstAddress, issuedAssetId, 100000)
+      _ <- assertAssetBalance(firstAddress, issuedAssetId, defaultQuantity)
 
-      burnId <- sender.burn(firstAddress, issuedAssetId, 50000, fee = 1.waves).map(_.id)
+      burnId <- sender.burn(firstAddress, issuedAssetId, defaultQuantity / 2, fee = 1.waves).map(_.id)
 
       height <- traverse(allNodes)(_.height).map(_.max)
       _ <- traverse(allNodes)(_.waitForHeight(height + 1))
@@ -31,7 +33,7 @@ class BurnTransactionSpecification(override val allNodes: Seq[Node], override va
 
       _ <- assertBalances(firstAddress, 98.waves, 98.waves)
 
-      _ <- assertAssetBalance(firstAddress, issuedAssetId, 50000)
+      _ <- assertAssetBalance(firstAddress, issuedAssetId, defaultQuantity / 2)
     } yield succeed
 
     Await.result(f, 1.minute)
