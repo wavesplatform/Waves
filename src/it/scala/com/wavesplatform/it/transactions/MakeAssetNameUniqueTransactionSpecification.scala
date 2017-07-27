@@ -9,19 +9,26 @@ import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
-class MakeAssetNameUniqueTransactionSpecification(override val allNodes: Seq[Node]) extends IntegrationSuiteWithThreeAddresses {
+class MakeAssetNameUniqueTransactionSpecification(override val allNodes: Seq[Node], override val notMiner: Node)
+  extends IntegrationSuiteWithThreeAddresses {
+
+  private val defaultQuantity = 100000
+
   test("make unique assets transaction makes asset name unique") {
     val f = for {
+      height <- traverse(allNodes)(_.height).map(_.max)
+      _ <- traverse(allNodes)(_.waitForHeight(height + 1))
+
       _ <- assertBalances(firstAddress, 100.waves, 100.waves)
 
-      issuedAssetId <- sender.issue(firstAddress, "asset1", "description", 100000, 2, reissuable = true, fee = 10.waves).map(_.id)
+      issuedAssetId <- sender.issue(firstAddress, "asset1", "description", defaultQuantity, 2, reissuable = true, fee = 10.waves).map(_.id)
 
       height <- traverse(allNodes)(_.height).map(_.max)
       _ <- traverse(allNodes)(_.waitForHeight(height + 1))
       _ <- traverse(allNodes)(_.waitForTransaction(issuedAssetId))
 
       _ <- assertBalances(firstAddress, 90.waves, 90.waves)
-      _ <- assertAssetBalance(firstAddress, issuedAssetId, 100000)
+      _ <- assertAssetBalance(firstAddress, issuedAssetId, defaultQuantity)
       _ <- assertFullAssetInfo(firstAddress,issuedAssetId)(_.unique shouldBe false)
 
       makeAssetNameUnique <- sender.makeAssetNameUnique(firstAddress, issuedAssetId, 10.waves, 'I').map(_.id)
@@ -31,7 +38,7 @@ class MakeAssetNameUniqueTransactionSpecification(override val allNodes: Seq[Nod
       _ <- traverse(allNodes)(_.waitForTransaction(makeAssetNameUnique))
 
       _ <- assertBalances(firstAddress, 80.waves, 80.waves)
-      _ <- assertAssetBalance(firstAddress, issuedAssetId, 100000)
+      _ <- assertAssetBalance(firstAddress, issuedAssetId, defaultQuantity)
       _ <- assertFullAssetInfo(firstAddress,issuedAssetId)(_.unique shouldBe true)
     } yield succeed
 
@@ -48,16 +55,19 @@ class MakeAssetNameUniqueTransactionSpecification(override val allNodes: Seq[Nod
 
   test("can't make unique assets issued by other address") {
     val f = for {
+      height <- traverse(allNodes)(_.height).map(_.max)
+      _ <- traverse(allNodes)(_.waitForHeight(height + 1))
+
       _ <- assertBalances(firstAddress, 80.waves, 80.waves)
 
-      issuedAssetId <- sender.issue(firstAddress, "asset4", "description", 100000, 2, reissuable = true, fee = 10.waves).map(_.id)
+      issuedAssetId <- sender.issue(firstAddress, "asset4", "description", defaultQuantity, 2, reissuable = true, fee = 10.waves).map(_.id)
 
       height <- traverse(allNodes)(_.height).map(_.max)
       _ <- traverse(allNodes)(_.waitForHeight(height + 1))
       _ <- traverse(allNodes)(_.waitForTransaction(issuedAssetId))
 
       _ <- assertBalances(firstAddress, 70.waves, 70.waves)
-      _ <- assertAssetBalance(firstAddress, issuedAssetId, 100000)
+      _ <- assertAssetBalance(firstAddress, issuedAssetId, defaultQuantity)
 
       _ <- assertBadRequest(sender.makeAssetNameUnique(thirdAddress, issuedAssetId, 10.waves, 'I'))
     } yield succeed
@@ -67,20 +77,23 @@ class MakeAssetNameUniqueTransactionSpecification(override val allNodes: Seq[Nod
 
   test("make unique assets transaction can be applied only once") {
     val f = for {
+      height <- traverse(allNodes)(_.height).map(_.max)
+      _ <- traverse(allNodes)(_.waitForHeight(height + 1))
+
       _ <- assertBalances(firstAddress, 70.waves, 70.waves)
 
-      issuedAssetId <- sender.issue(firstAddress, "asset2", "description", 100000, 2, reissuable = true, fee = 10.waves).map(_.id)
+      issuedAssetId <- sender.issue(firstAddress, "asset2", "description", defaultQuantity, 2, reissuable = true, fee = 10.waves).map(_.id)
       _ <- traverse(allNodes)(_.waitForTransaction(issuedAssetId))
 
-      secondIssuedAssetId <- sender.issue(firstAddress, "asset2", "description", 100000, 2, reissuable = true, fee = 10.waves).map(_.id)
+      secondIssuedAssetId <- sender.issue(firstAddress, "asset2", "description", defaultQuantity, 2, reissuable = true, fee = 10.waves).map(_.id)
 
       height <- traverse(allNodes)(_.height).map(_.max)
       _ <- traverse(allNodes)(_.waitForHeight(height + 1))
       _ <- traverse(allNodes)(_.waitForTransaction(secondIssuedAssetId))
 
       _ <- assertBalances(firstAddress, 50.waves, 50.waves)
-      _ <- assertAssetBalance(firstAddress, issuedAssetId, 100000)
-      _ <- assertAssetBalance(firstAddress, secondIssuedAssetId, 100000)
+      _ <- assertAssetBalance(firstAddress, issuedAssetId, defaultQuantity)
+      _ <- assertAssetBalance(firstAddress, secondIssuedAssetId, defaultQuantity)
 
       makeAssetNameUniqueId <- sender.makeAssetNameUnique(firstAddress, secondIssuedAssetId, 10.waves, 'I').map(_.id)
 
@@ -99,16 +112,19 @@ class MakeAssetNameUniqueTransactionSpecification(override val allNodes: Seq[Nod
 
   test("make unique assets does not prohibit creating an asset with this name") {
     val f = for {
+      height <- traverse(allNodes)(_.height).map(_.max)
+      _ <- traverse(allNodes)(_.waitForHeight(height + 1))
+
       _ <- assertBalances(firstAddress, 40.waves, 40.waves)
 
-      issuedAssetId <- sender.issue(firstAddress, "asset3", "description", 100000, 2, reissuable = true, fee = 10.waves).map(_.id)
+      issuedAssetId <- sender.issue(firstAddress, "asset3", "description", defaultQuantity, 2, reissuable = true, fee = 10.waves).map(_.id)
 
       height <- traverse(allNodes)(_.height).map(_.max)
       _ <- traverse(allNodes)(_.waitForHeight(height + 1))
       _ <- traverse(allNodes)(_.waitForTransaction(issuedAssetId))
 
       _ <- assertBalances(firstAddress, 30.waves, 30.waves)
-      _ <- assertAssetBalance(firstAddress, issuedAssetId, 100000)
+      _ <- assertAssetBalance(firstAddress, issuedAssetId, defaultQuantity)
 
       makeAssetNameUnique <- sender.makeAssetNameUnique(firstAddress, issuedAssetId, 10 waves, 'I').map(_.id)
 
@@ -117,16 +133,16 @@ class MakeAssetNameUniqueTransactionSpecification(override val allNodes: Seq[Nod
       _ <- traverse(allNodes)(_.waitForTransaction(makeAssetNameUnique))
 
       _ <- assertBalances(firstAddress, 20.waves, 20.waves)
-      _ <- assertAssetBalance(firstAddress, issuedAssetId, 100000)
+      _ <- assertAssetBalance(firstAddress, issuedAssetId, defaultQuantity)
 
-      secondIssueId <- sender.issue(firstAddress, "asset3", "description", 100000, 2, reissuable = true, fee = 10.waves).map(_.id)
+      secondIssueId <- sender.issue(firstAddress, "asset3", "description", defaultQuantity, 2, reissuable = true, fee = 10.waves).map(_.id)
 
       height <- traverse(allNodes)(_.height).map(_.max)
       _ <- traverse(allNodes)(_.waitForHeight(height + 1))
       _ <- traverse(allNodes)(_.waitForTransaction(secondIssueId))
 
       _ <- assertBalances(firstAddress, 10.waves, 10.waves)
-      _ <- assertAssetBalance(firstAddress, secondIssueId, 100000)
+      _ <- assertAssetBalance(firstAddress, secondIssueId, defaultQuantity)
     } yield succeed
 
     Await.result(f, 1.minute)

@@ -8,9 +8,13 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
 
-class LeasingTransactionsSpecification(override val allNodes: Seq[Node]) extends IntegrationSuiteWithThreeAddresses {
+class LeasingTransactionsSpecification(override val allNodes: Seq[Node], override val notMiner: Node)
+  extends IntegrationSuiteWithThreeAddresses {
   test("leasing waves decreases lessor's eff.b. and increases lessee's eff.b.; lessor pays fee") {
     val f = for {
+      height <- traverse(allNodes)(_.height).map(_.max)
+      _ <- traverse(allNodes)(_.waitForHeight(height + 1))
+
       _ <- assertBalances(firstAddress, 100.waves, 100.waves)
       _ <- assertBalances(secondAddress, 100.waves, 100.waves)
 
@@ -27,7 +31,7 @@ class LeasingTransactionsSpecification(override val allNodes: Seq[Node]) extends
     Await.result(f, 1.minute)
   }
 
-  test("сan not make leasing without having enough waves") {
+  test("can not make leasing without having enough waves") {
     val f = for {
       fb <- traverse(allNodes)(_.height).map(_.min)
 

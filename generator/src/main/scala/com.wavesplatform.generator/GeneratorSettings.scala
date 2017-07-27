@@ -6,15 +6,14 @@ import java.net.InetSocketAddress
 import com.google.common.base.CaseFormat
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.settings.loadConfig
-import scorex.account.PrivateKeyAccount
-import scorex.transaction.TransactionParser
 import net.ceedubs.ficus.Ficus._
 import org.slf4j.LoggerFactory
+import scorex.account.PrivateKeyAccount
 import scorex.crypto.encode.Base58
+import scorex.transaction.TransactionParser
 import scorex.transaction.TransactionParser.TransactionType
 import scorex.utils.LoggerFacade
 
-import scala.collection.JavaConverters._
 import scala.concurrent.duration.FiniteDuration
 
 case class GeneratorSettings(chainId: Char,

@@ -40,7 +40,7 @@ object Synchronized {
 
 }
 
-trait Synchronized extends ScorexLogging {
+trait Synchronized {
 
   def synchronizationToken: ReentrantReadWriteLock
 
