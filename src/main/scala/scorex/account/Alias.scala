@@ -34,7 +34,7 @@ object Alias {
 
     case class AliasImpl(networkByte: Byte, name: String) extends Alias
 
-    if (!(MinLength to MaxLength contains name.length))
+    if (name.length < MinLength || MaxLength < name.length)
       Left(GenericError(s"Alias '$name' length should be between $MinLength and $MaxLength"))
     else if (!name.forall(validAliasChar))
       Left(GenericError(s"Alias should contain only following characters: $aliasAlphabet"))
