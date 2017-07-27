@@ -27,20 +27,27 @@ class SynchronizedTest extends FunSuite {
 
     def longRead(): Unit = read { implicit l =>
       mut()
-      Thread.sleep(1200)
+      Thread.sleep(1500)
     }
 
     def longWrite(): Unit = write { implicit l =>
       mut.set(1)
-      Thread.sleep(1200)
+      Thread.sleep(1500)
       mut.set(1)
     }
 
     def nestedWrite(): Unit = write { _ =>
-      Thread.sleep(100)
+      Thread.sleep(200)
       write()
       Thread.sleep(200)
     }
+  }
+
+  private def sleep = Thread.sleep(1500)
+
+  test("nested writes work") {
+    val a = new A()
+    Await.result(Future(a.nestedWrite()), 600.millis)
   }
 
   test("nested writes hold write lock") {
@@ -59,7 +66,7 @@ class SynchronizedTest extends FunSuite {
     val a2 = new A(token)
     Future(a1.nestedWrite())
     intercept[TimeoutException] {
-      Await.result(Future(a2.read()), 150.millis)
+      Await.result(Future(a2.read()), 200.millis)
     }
   }
 
@@ -70,17 +77,12 @@ class SynchronizedTest extends FunSuite {
     a.readWhileWrite()
   }
 
-  test("nested writes work") {
-    val a = new A()
-    Await.result(Future(a.nestedWrite()), 500.millis)
-  }
-
-
   test("can do concurrent reads") {
     val a = new A()
     Future(a.longRead())
     Thread.sleep(100)
     Await.result(Future(a.read()), 200.millis)
+    sleep
   }
 
   test("can't do concurrent writes") {
@@ -90,6 +92,7 @@ class SynchronizedTest extends FunSuite {
     intercept[TimeoutException] {
       Await.result(Future(a.write()), 100.millis)
     }
+    sleep
   }
 
   test("can't write while read") {
@@ -99,6 +102,7 @@ class SynchronizedTest extends FunSuite {
     intercept[TimeoutException] {
       Await.result(Future(a.write()), 100.millis)
     }
+    sleep
   }
 
   test("can't read while write") {
@@ -108,5 +112,6 @@ class SynchronizedTest extends FunSuite {
     intercept[TimeoutException] {
       Await.result(Future(a.read()), 100.millis)
     }
+    sleep
   }
 }
