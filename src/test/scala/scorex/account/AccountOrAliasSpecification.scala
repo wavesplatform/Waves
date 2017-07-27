@@ -6,27 +6,27 @@ import org.scalatest.{Matchers, PropSpec}
 
 class AccountOrAliasSpecification extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers with TransactionGen {
 
-  property("Account serialization roundtrip") {
-    forAll(accountGen) { acc: PrivateKeyAccount =>
-      val ser = acc.bytes.arr
-      val deser = Address.fromBytes(ser).right.get
-      deser.stringRepr shouldBe acc.stringRepr
+  property("Account serialization round trip") {
+    forAll(accountGen) { account: PrivateKeyAccount =>
+      val bytes = account.bytes.arr
+      val address = Address.fromBytes(bytes).right.get
+      address.stringRepr shouldBe account.stringRepr
     }
   }
 
-  property("Alias serialization roundtrip") {
+  property("Alias serialization round trip") {
     forAll(aliasGen) { alias: Alias =>
-      val ser = alias.bytes.arr
-      val deser = Alias.fromBytes(ser).right.get
-      deser.stringRepr shouldBe alias.stringRepr
+      val bytes = alias.bytes.arr
+      val representation = Alias.fromBytes(bytes).right.get
+      representation.stringRepr shouldBe representation.stringRepr
     }
   }
 
-  property("AccountOrAlias serialization roundtrip") {
+  property("AccountOrAlias serialization round trip") {
     forAll(accountOrAliasGen) { aoa: AddressOrAlias =>
-      val ser = aoa.bytes.arr
-      val deser = AddressOrAlias.fromBytes(ser, 0).right.get
-      deser._1.stringRepr shouldBe aoa.stringRepr
+      val bytes = aoa.bytes.arr
+      val addressOrAlias = AddressOrAlias.fromBytes(bytes, 0).right.get
+      addressOrAlias._1.stringRepr shouldBe aoa.stringRepr
     }
   }
 }
