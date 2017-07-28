@@ -8,8 +8,6 @@ import com.wavesplatform.settings.NetworkSettings
 import net.ceedubs.ficus.Ficus._
 import org.scalatest.{Matchers, path}
 
-import scala.language.{implicitConversions, postfixOps}
-
 class PeerDatabaseImplSpecification extends path.FreeSpecLike with Matchers {
 
   private val config1 = ConfigFactory.parseString(

@@ -8,7 +8,6 @@ import com.wavesplatform.settings.{CheckpointsSettings, RestAPISettings}
 import com.wavesplatform.state2.ByteStr
 import org.scalacheck.{Gen, Shrink}
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.DoNotDiscover
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json._
 import scorex.account.PublicKeyAccount
@@ -16,7 +15,6 @@ import scorex.api.http._
 import scorex.block.Block
 import scorex.transaction.History
 
-@DoNotDiscover
 class BlocksRouteSpec extends RouteSpec("/blocks") with MockFactory with BlockGen with PropertyChecks {
 
   import BlocksRouteSpec._
@@ -25,11 +23,9 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with MockFactory with BlockGe
   private val restSettings = RestAPISettings.fromConfig(config)
   private val checkpointSettings = CheckpointsSettings.fromConfig(config)
   private val history = mock[History]
-  private val route : Route  = ??? // BlocksApiRoute(restSettings, checkpointSettings, history, mockWriteToChannel).route
+  private val route: Route = BlocksApiRoute(restSettings, checkpointSettings, history, ???, ???, ???).route
 
   private implicit def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)
-
-  private def mockWriteToChannel(checkpoint: com.wavesplatform.network.Checkpoint): Unit = {}
 
   private def checkBlock(response: JsValue, expected: Block): Unit = {
     (response \ "version").asOpt[Int].isDefined shouldBe true

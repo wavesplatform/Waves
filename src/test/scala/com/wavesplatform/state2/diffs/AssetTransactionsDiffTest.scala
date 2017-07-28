@@ -6,7 +6,6 @@ import com.wavesplatform.state2._
 import org.scalacheck.{Arbitrary, Gen, Shrink}
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import org.scalatest.{Matchers, PropSpec}
-import scorex.account.AddressScheme
 import scorex.lagonaki.mocks.TestBlock
 import scorex.transaction.GenesisTransaction
 import scorex.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction}

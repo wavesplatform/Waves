@@ -8,9 +8,8 @@ import scorex.transaction.assets.exchange.AssetPair
 
 class MatcherSettingsSpecification extends FlatSpec with Matchers {
   "MatcherSettings" should "read values" in {
-    val config = ConfigFactory.parseString(
-      """
-        |waves {
+    val config = loadConfig(ConfigFactory.parseString(
+      """waves {
         |  directory: "/waves"
         |  matcher {
         |    enable: yes
@@ -19,9 +18,6 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
         |    port: 6886
         |    min-order-fee: 100000
         |    order-match-tx-fee: 100000
-        |    journal-directory: ${waves.directory}"/journal"
-        |    snapshots-directory: ${waves.directory}"/snapshots"
-        |    order-history-file = ${waves.directory}"/matcher/orderhistory.dat"
         |    snapshots-interval: 1d
         |    max-open-orders: 1000
         |    price-assets: [
@@ -36,8 +32,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
         |    ]
         |    max-timestamp-diff = 3h
         |  }
-        |}
-      """.stripMargin).resolve()
+        |}""".stripMargin))
 
     val settings = MatcherSettings.fromConfig(config)
     settings.enable should be(true)

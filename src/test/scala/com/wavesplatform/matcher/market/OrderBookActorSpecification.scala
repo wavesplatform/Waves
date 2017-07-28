@@ -8,7 +8,7 @@ import com.wavesplatform.matcher.MatcherTestData
 import com.wavesplatform.matcher.fixtures.RestartableActor
 import com.wavesplatform.matcher.fixtures.RestartableActor.RestartActor
 import com.wavesplatform.matcher.market.OrderBookActor._
-import com.wavesplatform.matcher.market.OrderHistoryActor.{GetOrderStatus, ValidateOrder, ValidateOrderResult}
+import com.wavesplatform.matcher.market.OrderHistoryActor.{ValidateOrder, ValidateOrderResult}
 import com.wavesplatform.matcher.model.Events.Event
 import com.wavesplatform.matcher.model.{BuyLimitOrder, LimitOrder, SellLimitOrder}
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, WalletSettings}
@@ -61,7 +61,7 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
     100000L,
     10000L).right.get
 
-  (storedState.transactionInfo _).when(*).returns(Some(1, issueTransaction))
+  (storedState.transactionInfo _).when(*).returns(Some((1, issueTransaction)))
 
   val settings = matcherSettings.copy(account = MatcherAccount.address)
 
@@ -245,7 +245,6 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
 
     "place orders and restart without waiting for responce" in {
       val ord1 = sell(pair, 100, 10 * Order.PriceConstant)
-      val ord2 = buy(pair, 100, 19 * Order.PriceConstant)
 
       (1 to 100).foreach({ i =>
         actor ! ord1.copy()
@@ -259,7 +258,7 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
 
       within(10.seconds) {
         actor ! GetOrdersRequest
-        val items = expectMsgType[GetOrdersResponse].orders.map(_.order.id) should have size 100
+        expectMsgType[GetOrdersResponse].orders.map(_.order.id) should have size 100
       }
 
     }
