@@ -8,9 +8,10 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
 
-class AliasTransactionSpecification(override val allNodes: Seq[Node]) extends IntegrationSuiteWithThreeAddresses {
+class AliasTransactionSpecification(override val allNodes: Seq[Node], override val notMiner: Node)
+  extends IntegrationSuiteWithThreeAddresses {
   test("Able to send money to an alias") {
-    val alias = "TEST_ALIAS"
+    val alias = "test_alias"
 
     val f = for {
       _ <- assertBalances(firstAddress, 100.waves, 100.waves)
@@ -34,7 +35,7 @@ class AliasTransactionSpecification(override val allNodes: Seq[Node]) extends In
   }
 
   test("Not able to create two aliases to same address") {
-    val alias = "TEST_ALIAS2"
+    val alias = "test_alias2"
 
     val f = for {
       _ <- assertBalances(firstAddress, 98.waves, 98.waves)
@@ -53,7 +54,7 @@ class AliasTransactionSpecification(override val allNodes: Seq[Node]) extends In
 
 
   test("Not able to create two aliases to other addresses") {
-    val alias = "TEST_ALIAS3"
+    val alias = "test_alias3"
 
     val f = for {
       _ <- assertBalances(firstAddress, 97.waves, 97.waves)

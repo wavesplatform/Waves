@@ -20,19 +20,27 @@ class RollbackSpecSuite extends FreeSpec with ScalaFutures with IntegrationPatie
   // there are nodes with big and small balances to reduce the number of forks
   override val nodes: Seq[Node] = Configs.map(docker.startNode)
 
+  private val transactionsCount = 190
+
   "Apply the same transfer transactions twice with return to UTX" in {
-    val waitBlocks = 8
+    val waitBlocks = 10
     result(for {
-      b <- traverse(nodes)(balanceForNode).map(_.toMap)
-      requests = generateRequests(301, b)
       startHeight <- Future.traverse(nodes)(_.height).map(_.min)
+
+      b <- traverse(nodes)(balanceForNode).map(_.toMap)
+
+      requests = generateRequests(transactionsCount, b)
       _ <- processRequests(requests)
+
       hashAfterFirstTry <- traverse(nodes)(_.waitForDebugInfoAt(startHeight + waitBlocks).map(_.stateHash)).map(infos => {
         all(infos) shouldEqual infos.head
         infos.head
       })
       stateAfterFirstTry <- nodes.head.debugStateAt(startHeight + waitBlocks)
-      _ <- traverse(nodes)(_.rollback(startHeight))
+
+      _ <- nodes.tail.head.rollback(1)
+      _ <- nodes.head.rollback(startHeight)
+
       hashAfterSecondTry <- traverse(nodes)(_.waitForDebugInfoAt(startHeight + waitBlocks).map(_.stateHash)).map(infos => {
         all(infos) shouldEqual infos.head
         infos.head
@@ -47,19 +55,26 @@ class RollbackSpecSuite extends FreeSpec with ScalaFutures with IntegrationPatie
   "Just rollback transactions" in {
     val waitBlocks = 8
     result(for {
-      b <- traverse(nodes)(balanceForNode).map(_.toMap)
-      requests = generateRequests(301, b)
       startHeight <- Future.traverse(nodes)(_.height).map(_.min)
+
+      b <- traverse(nodes)(balanceForNode).map(_.toMap)
+      requests = generateRequests(transactionsCount, b)
+
       hashBeforeApply <- traverse(nodes)(_.waitForDebugInfoAt(startHeight + waitBlocks).map(_.stateHash)).map(infos => {
         all(infos) shouldEqual infos.head
         infos.head
       })
+
       _ <- processRequests(requests)
+
       _ <- traverse(nodes)(n => n.waitFor[Int](n.utxSize, _ == 0, 1.second))
+
       _ <- traverse(nodes)(_.rollback(startHeight, returnToUTX = false))
+
       _ <- traverse(nodes)(_.utx).map(utxs => {
         all(utxs) shouldBe 'empty
       })
+
       hashAfterApply <- nodes.head.waitForDebugInfoAt(startHeight + waitBlocks).map(_.stateHash)
     } yield {
       hashBeforeApply shouldBe hashAfterApply
@@ -67,7 +82,7 @@ class RollbackSpecSuite extends FreeSpec with ScalaFutures with IntegrationPatie
   }
 
   "Alias transaction rollback should works fine" in {
-    val alias = "TEST_ALIAS4"
+    val alias = "test_alias4"
 
     val f = for {
       startHeight <- Future.traverse(nodes)(_.height).map(_.min)

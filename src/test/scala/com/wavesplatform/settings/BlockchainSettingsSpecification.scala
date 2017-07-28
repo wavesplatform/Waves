@@ -38,7 +38,6 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
         |        allow-createalias-transaction-after: 13
         |        allow-multiple-lease-cancel-transaction-until-timestamp: 14
         |        reset-effective-balances-at-height: 15
-        |        allow-make-asset-name-unique-transaction-after: 16
         |        allow-leased-balance-transfer-until: 17
         |        apply-miner-fee-with-transaction-after: 18
         |      }
@@ -80,7 +79,6 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
     settings.functionalitySettings.allowCreatealiasTransactionAfter should be(13)
     settings.functionalitySettings.allowMultipleLeaseCancelTransactionUntilTimestamp should be(14)
     settings.functionalitySettings.resetEffectiveBalancesAtHeight should be(15)
-    settings.functionalitySettings.allowMakeAssetNameUniqueTransactionAfter should be(16)
     settings.functionalitySettings.allowLeasedBalanceTransferUntil should be(17)
     settings.functionalitySettings.applyMinerFeeWithTransactionAfter should be(18)
     settings.genesisSettings.blockTimestamp should be(1460678400000L)
@@ -129,7 +127,6 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
     settings.functionalitySettings.allowExchangeTransactionAfter should be(1483228800000L)
     settings.functionalitySettings.resetEffectiveBalancesAtHeight should be(51500)
     settings.functionalitySettings.allowCreatealiasTransactionAfter should be(1493596800000L)
-    settings.functionalitySettings.allowMakeAssetNameUniqueTransactionAfter should be(1495238400000L)
     settings.functionalitySettings.allowLeasedBalanceTransferUntil should be(1495238400000L)
     settings.genesisSettings.blockTimestamp should be(1460678400000L)
     settings.genesisSettings.timestamp should be(1478000000000L)
@@ -177,7 +174,6 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
     settings.functionalitySettings.resetEffectiveBalancesAtHeight should be(462000)
     settings.functionalitySettings.requirePaymentUniqueIdAfter should be(1491192000000L)
     settings.functionalitySettings.allowExchangeTransactionAfter should be(1491192000000L)
-    settings.functionalitySettings.allowMakeAssetNameUniqueTransactionAfter should be(Long.MaxValue)
     settings.functionalitySettings.allowLeasedBalanceTransferUntil should be(Long.MaxValue)
     settings.genesisSettings.blockTimestamp should be(1460678400000L)
     settings.genesisSettings.timestamp should be(1465742577614L)

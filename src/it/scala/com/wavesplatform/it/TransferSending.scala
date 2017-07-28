@@ -17,15 +17,16 @@ trait TransferSending {
   def nodes: Seq[Node]
 
   def generateRequests(n: Int, balances: Map[String, Long]): Seq[Req] = {
+    val fee = 100000
     val addresses = nodes.map(_.address)
     val sourceAndDest = (1 to n).map { _ =>
       val Seq(src, dest) = Random.shuffle(addresses).take(2)
       (src, dest)
     }
     val requests = sourceAndDest.foldLeft(List.empty[Req]) {
-      case (reqs, (src, dest)) =>
-        val transferAmount = (Random.nextDouble() * 1e-8 * balances(src)).toLong
-        reqs :+ Req(src, dest, transferAmount, 100000)
+      case (rs, (src, dest)) =>
+        val transferAmount = (1e-8 +  Random.nextDouble() * 1e-8 * balances(src)).toLong
+        rs :+ Req(src, dest, transferAmount, fee)
     }
 
     requests
@@ -38,10 +39,10 @@ trait TransferSending {
     addressToNode(r.source).transfer(r.source, r.targetAddress, r.amount, r.fee)
   }
 
-  def processRequests(reqs: Seq[Req]): Future[Unit] = if (reqs.isEmpty) {
+  def processRequests(requests: Seq[Req]): Future[Unit] = if (requests.isEmpty) {
     Future.successful(())
   } else {
-    makeTransfer(reqs.head).flatMap(_ => processRequests(reqs.tail))
+    makeTransfer(requests.head).flatMap(_ => processRequests(requests.tail))
   }
 
 }

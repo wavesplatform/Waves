@@ -10,8 +10,6 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
-import scala.language.postfixOps
-import scala.util.Random
 
 
 trait IntegrationSuiteWithThreeAddresses extends FunSuite with BeforeAndAfterAll with Matchers with ScalaFutures
@@ -19,10 +17,12 @@ trait IntegrationSuiteWithThreeAddresses extends FunSuite with BeforeAndAfterAll
 
   def allNodes: Seq[Node]
 
-  protected val sender = Random.shuffle(allNodes).head
+  def notMiner: Node
+
+  protected val sender: Node = notMiner
   private val richAddress = sender.address
 
-  protected val defaultBalance: Long = 100 waves
+  protected val defaultBalance: Long = 100.waves
 
   protected lazy val firstAddress: String = Await.result(sender.createAddress, 1.minutes)
   protected lazy val secondAddress: String = Await.result(sender.createAddress, 1.minutes)
@@ -82,6 +82,6 @@ trait IntegrationSuiteWithThreeAddresses extends FunSuite with BeforeAndAfterAll
       _ <- Future.sequence(Seq(firstAddress, secondAddress, thirdAddress).map(address => assertBalances(address, defaultBalance, defaultBalance)))
     } yield succeed
 
-    Await.result(correctStartBalancesFuture, 90 seconds)
+    Await.result(correctStartBalancesFuture, 2.minutes)
   }
 }

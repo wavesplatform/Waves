@@ -24,7 +24,7 @@ object OrderFillInfo {
   implicit val orderFillInfoMonoid = new Monoid[OrderFillInfo] {
     override def empty: OrderFillInfo = OrderFillInfo(0, 0)
 
-    override def combine(x: OrderFillInfo, y: OrderFillInfo): OrderFillInfo =OrderFillInfo(x.volume + y.volume, x.fee + y.fee)
+    override def combine(x: OrderFillInfo, y: OrderFillInfo): OrderFillInfo = OrderFillInfo(x.volume + y.volume, x.fee + y.fee)
   }
 }
 
@@ -45,8 +45,7 @@ case class Diff(transactions: Map[ByteStr, (Int, Transaction, Set[Address])],
                 aliases: Map[Alias, Address],
                 paymentTransactionIdsByHashes: Map[ByteStr, ByteStr],
                 orderFills: Map[ByteStr, OrderFillInfo],
-                leaseState: Map[ByteStr, Boolean],
-                assetsWithUniqueNames: Map[ByteStr, ByteStr]) {
+                leaseState: Map[ByteStr, Boolean]) {
 
   lazy val accountTransactionIds: Map[Address, List[ByteStr]] = {
     val map: List[(Address, Set[(Int, Long, ByteStr)])] = transactions.toList
@@ -67,19 +66,16 @@ object Diff {
             aliases: Map[Alias, Address] = Map.empty,
             orderFills: Map[ByteStr, OrderFillInfo] = Map.empty,
             paymentTransactionIdsByHashes: Map[ByteStr, ByteStr] = Map.empty,
-            leaseState: Map[ByteStr, Boolean] = Map.empty,
-            assetsWithUniqueNames: Map[ByteStr, ByteStr] = Map.empty
-           ): Diff = Diff(
+            leaseState: Map[ByteStr, Boolean] = Map.empty): Diff = Diff(
     transactions = Map(tx.id -> (height, tx, portfolios.keys.toSet)),
     portfolios = portfolios,
     issuedAssets = assetInfos,
     aliases = aliases,
     paymentTransactionIdsByHashes = paymentTransactionIdsByHashes,
     orderFills = orderFills,
-    leaseState = leaseState,
-    assetsWithUniqueNames = assetsWithUniqueNames)
+    leaseState = leaseState)
 
-  val empty = new Diff(Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty)
+  val empty = new Diff(Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty)
 
   implicit class DiffExt(d: Diff) {
     def asBlockDiff: BlockDiff = BlockDiff(d, 0, Map.empty)
@@ -95,7 +91,6 @@ object Diff {
       aliases = older.aliases ++ newer.aliases,
       paymentTransactionIdsByHashes = older.paymentTransactionIdsByHashes ++ newer.paymentTransactionIdsByHashes,
       orderFills = older.orderFills.combine(newer.orderFills),
-      leaseState = older.leaseState ++ newer.leaseState,
-      assetsWithUniqueNames = older.assetsWithUniqueNames ++ newer.assetsWithUniqueNames)
+      leaseState = older.leaseState ++ newer.leaseState)
   }
 }
