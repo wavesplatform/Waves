@@ -130,9 +130,6 @@ trait NodeApi {
   def issue(sourceAddress: String, name: String, description: String, quantity: Long, decimals: Byte, reissuable: Boolean, fee: Long): Future[Transaction] =
     postJson("/assets/issue", IssueRequest(sourceAddress, name, description, quantity, decimals, reissuable, fee)).as[Transaction]
 
-  def makeAssetNameUnique(sourceAddress: String, assetId: String, fee: Long, networkByte: Byte): Future[Transaction] =
-    postJson("/assets/make-asset-name-unique", MakeAssetNameUniqueRequest(sourceAddress, assetId, fee, networkByte)).as[Transaction]
-
   def reissue(sourceAddress: String, assetId: String, quantity: Long, reissuable: Boolean, fee: Long): Future[Transaction] =
     postJson("/assets/reissue", ReissueRequest(sourceAddress, assetId, quantity, reissuable, fee)).as[Transaction]
 
@@ -275,7 +272,7 @@ object NodeApi extends ScorexLogging {
 
   implicit val assetBalanceFormat: Format[AssetBalance] = Json.format
 
-  case class FullAssetInfo(assetId: String, balance: Long, reissuable: Boolean, quantity: Long, unique: Boolean)
+  case class FullAssetInfo(assetId: String, balance: Long, reissuable: Boolean, quantity: Long)
 
   implicit val fullAssetInfoFormat: Format[FullAssetInfo] = Json.format
 

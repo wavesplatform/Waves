@@ -52,10 +52,6 @@ class CompositeStateReader(inner: StateReader, blockDiff: BlockDiff) extends Sta
 
   override def resolveAlias(a: Alias): Option[Address] = txDiff.aliases.get(a).orElse(inner.resolveAlias(a))
 
-  override def getAssetIdByUniqueName(assetName: ByteStr): Option[ByteStr] = {
-    txDiff.assetsWithUniqueNames.get(assetName).orElse(inner.getAssetIdByUniqueName(assetName))
-  }
-
   override def accountPortfolios: Map[Address, Portfolio] = Monoid.combine(inner.accountPortfolios, txDiff.portfolios)
 
   override def isLeaseActive(leaseTx: LeaseTransaction): Boolean =
@@ -111,9 +107,6 @@ object CompositeStateReader {
 
     override def activeLeases(): Seq[ByteStr] =
       new CompositeStateReader(inner, blockDiff()).activeLeases()
-
-    override def getAssetIdByUniqueName(assetName: ByteStr): Option[ByteStr] =
-      new CompositeStateReader(inner, blockDiff()).getAssetIdByUniqueName(assetName)
 
     override def lastUpdateHeight(acc: Address): Option[Int] =
       new CompositeStateReader(inner, blockDiff()).lastUpdateHeight(acc)
