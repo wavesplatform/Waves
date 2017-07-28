@@ -19,13 +19,13 @@ object TransactionDiffer {
       t0 <- Signed.validateSignatures(tx)
       t1 <- CommonValidation.disallowTxFromFuture(settings, currentBlockTimestamp, t0)
       t2 <- CommonValidation.disallowTxFromPast(prevBlockTimestamp, t1)
-      t3 <- CommonValidation.disallowBeforeActivationTime(s, settings, t2)
+      t3 <- CommonValidation.disallowBeforeActivationTime(settings, t2)
       t4 <- CommonValidation.disallowDuplicateIds(s, settings, currentBlockHeight, t3)
       t5 <- CommonValidation.disallowSendingGreaterThanBalance(s, settings, currentBlockTimestamp, t4)
       diff <- t5 match {
         case gtx: GenesisTransaction => GenesisTransactionDiff(currentBlockHeight)(gtx)
         case ptx: PaymentTransaction => PaymentTransactionDiff(s, currentBlockHeight, settings, currentBlockTimestamp)(ptx)
-        case itx: IssueTransaction => AssetTransactionsDiff.issue(s, currentBlockHeight)(itx)
+        case itx: IssueTransaction => AssetTransactionsDiff.issue(currentBlockHeight)(itx)
         case rtx: ReissueTransaction => AssetTransactionsDiff.reissue(s, settings, currentBlockTimestamp, currentBlockHeight)(rtx)
         case btx: BurnTransaction => AssetTransactionsDiff.burn(s, currentBlockHeight)(btx)
         case ttx: TransferTransaction => TransferTransactionDiff(s, settings, currentBlockTimestamp, currentBlockHeight)(ttx)
@@ -33,9 +33,9 @@ object TransactionDiffer {
         case ltx: LeaseCancelTransaction => LeaseTransactionsDiff.leaseCancel(s, settings, currentBlockTimestamp, currentBlockHeight)(ltx)
         case etx: ExchangeTransaction => ExchangeTransactionDiff(s, currentBlockHeight)(etx)
         case atx: CreateAliasTransaction => CreateAliasTransactionDiff(currentBlockHeight)(atx)
-        case t => Left(UnsupportedTransactionType)
+        case _ => Left(UnsupportedTransactionType)
       }
-      positiveDiff <- BalanceDiffValidation(s, currentBlockTimestamp, settings)(tx, diff)
+      positiveDiff <- BalanceDiffValidation(s, currentBlockTimestamp, settings)(diff)
     } yield positiveDiff
   }.left.map(TransactionValidationError(_, tx))
 }

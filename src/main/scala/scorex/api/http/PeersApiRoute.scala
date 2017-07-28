@@ -6,7 +6,6 @@ import java.util.stream.Collectors
 import javax.ws.rs.Path
 
 import akka.http.scaladsl.server.Route
-import akka.util.Timeout
 import com.wavesplatform.network.{PeerDatabase, PeerInfo}
 import com.wavesplatform.settings.RestAPISettings
 import io.netty.channel.Channel
@@ -14,7 +13,6 @@ import io.swagger.annotations._
 import play.api.libs.json._
 
 import scala.collection.JavaConverters._
-import scala.concurrent.duration._
 
 @Path("/peers")
 @Api(value = "/peers", description = "Get info about peers", position = 2)
@@ -24,8 +22,6 @@ case class PeersApiRoute(
     peerDatabase: PeerDatabase,
     establishedConnections: ConcurrentMap[Channel, PeerInfo]) extends ApiRoute {
   import PeersApiRoute._
-
-  private implicit val timeout: Timeout = 5.seconds
 
   override lazy val route =
     pathPrefix("peers") {

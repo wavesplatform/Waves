@@ -2,11 +2,9 @@ package com.wavesplatform.matcher.model
 
 import java.util
 
-import com.wavesplatform.matcher.model.OrderHistoryStorage.{AssetPairAddressKey, AssetPairAddressListKey}
+import com.wavesplatform.matcher.model.OrderHistoryStorage.AssetPairAddressKey
 import org.h2.mvstore.MVStore
 import scorex.transaction.assets.exchange.AssetPair
-
-import scala.collection.SortedSet
 
 class OrderHistoryStorage(db: MVStore) {
   val orders: util.Map[String, String] = db.openMap("orders")

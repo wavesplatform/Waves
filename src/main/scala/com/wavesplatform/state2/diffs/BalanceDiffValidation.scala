@@ -13,7 +13,7 @@ import scala.util.{Left, Right}
 object BalanceDiffValidation {
 
 
-  def apply[T <: Transaction](s: StateReader, time: Long, fs: FunctionalitySettings)(tx: T, d: Diff): Either[AccountBalanceError, Diff] = {
+  def apply[T <: Transaction](s: StateReader, time: Long, fs: FunctionalitySettings)(d: Diff): Either[AccountBalanceError, Diff] = {
 
     val changedAccounts = d.portfolios.keySet
     val positiveBalanceErrors: Map[Address, String] = changedAccounts.flatMap(acc => {

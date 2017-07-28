@@ -61,7 +61,7 @@ object CommonValidation {
       else Right(tx)
   }
 
-  def disallowBeforeActivationTime[T <: Transaction](state: StateReader, settings: FunctionalitySettings, tx: T): Either[ValidationError, T] =
+  def disallowBeforeActivationTime[T <: Transaction](settings: FunctionalitySettings, tx: T): Either[ValidationError, T] =
     tx match {
       case tx: BurnTransaction if tx.timestamp <= settings.allowBurnTransactionAfter =>
         Left(GenericError(s"must not appear before time=${settings.allowBurnTransactionAfter}"))
@@ -83,7 +83,7 @@ object CommonValidation {
       case _: LeaseTransaction => Right(tx)
       case _: LeaseCancelTransaction => Right(tx)
       case _: CreateAliasTransaction => Right(tx)
-      case x => Left(GenericError("Unknown transaction must be explicitly registered within ActivatedValidator"))
+      case _ => Left(GenericError("Unknown transaction must be explicitly registered within ActivatedValidator"))
     }
 
   def disallowTxFromFuture[T <: Transaction](settings: FunctionalitySettings, time: Long, tx: T): Either[ValidationError, T] = {

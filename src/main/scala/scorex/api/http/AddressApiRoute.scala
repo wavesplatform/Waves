@@ -316,7 +316,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
         val account = Address.fromPublicKey(pubKeyBytes)
         complete(Json.obj("address" -> account.address))
       }
-      case Failure(e) => complete(InvalidPublicKey)
+      case Failure(_) => complete(InvalidPublicKey)
     }
   }
 }
