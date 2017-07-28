@@ -28,6 +28,9 @@ trait IntegrationSuiteWithThreeAddresses extends FunSuite with BeforeAndAfterAll
   protected lazy val secondAddress: String = Await.result(sender.createAddress, 1.minutes)
   protected lazy val thirdAddress: String = Await.result(sender.createAddress, 1.minutes)
 
+  protected def getAccountEffectiveBalance(acc: String): Future[Long] = sender.effectiveBalance(acc).map(_.balance)
+  protected def getAccountBalance(acc: String): Future[Long] = sender.balance(acc).map(_.balance)
+
   protected def assertBalances(acc: String, balance: Long, effectiveBalance: Long): Future[Unit] = {
     for {
       newBalance <- sender.balance(acc).map(_.balance)

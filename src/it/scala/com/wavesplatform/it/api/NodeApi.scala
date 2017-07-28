@@ -155,6 +155,9 @@ trait NodeApi {
   def createAlias(targetAddress: String, alias: String, fee: Long): Future[Transaction] =
     postJson("/alias/create", CreateAliasRequest(targetAddress, alias, fee)).as[Transaction]
 
+  def aliasByAddress(targetAddress: String): Future[Set[String]] =
+    get(s"/alias/by-address.$targetAddress").as[Set[String]]
+
   def rollback(to: Int, returnToUTX: Boolean = true): Future[Unit] =
     postJson("/debug/rollback", RollbackParams(to, returnToUTX)).map(_ => ())
 
