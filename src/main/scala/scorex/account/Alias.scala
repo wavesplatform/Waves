@@ -25,7 +25,7 @@ object Alias {
 
   private def schemeByte: Byte = AddressScheme.current.chainId
 
-  private def buildAlias(networkByte: Byte, name: String): Either[ValidationError, Alias] = {
+  def buildAlias(networkByte: Byte, name: String): Either[ValidationError, Alias] = {
 
     case class AliasImpl(networkByte: Byte, name: String) extends Alias
 

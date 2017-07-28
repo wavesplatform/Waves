@@ -3,13 +3,15 @@ package com.wavesplatform.it.transactions
 import com.wavesplatform.it.api.NodeApi
 import com.wavesplatform.it.util._
 import com.wavesplatform.it.{IntegrationSuiteWithThreeAddresses, Node}
-
+import scorex.account.Alias
+import com.wavesplatform.state2._
 import scala.concurrent.{Await, Future}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
 
-class AliasTransactionSpecification(override val allNodes: Seq[Node]) extends IntegrationSuiteWithThreeAddresses {
+class AliasTransactionSpecification(override val allNodes: Seq[Node]) extends IntegrationSuiteWithThreeAddresses
+  with AllElementsOf {
 
   val aliasFee = 1.waves;
   //todo ignore to test
@@ -92,10 +94,10 @@ class AliasTransactionSpecification(override val allNodes: Seq[Node]) extends In
 
     val f = for {
 
-      balance <- getAccountBalance(firstAddress)
-      effectiveBalance <- getAccountEffectiveBalance(firstAddress)
+      balance <- getAccountBalance(secondAddress)
+      effectiveBalance <- getAccountEffectiveBalance(secondAddress)
 
-      aliasFirstTxId <- sender.createAlias(firstAddress, first_alias, aliasFee).map(_.id)
+      aliasFirstTxId <- sender.createAlias(secondAddress, first_alias, aliasFee).map(_.id)
 
       height <- traverse(allNodes)(_.height).map(_.max)
       _ <- traverse(allNodes)(_.waitForHeight(height + 1))
@@ -104,16 +106,22 @@ class AliasTransactionSpecification(override val allNodes: Seq[Node]) extends In
       newBalance = balance - aliasFee
       newEffectiveBalance = effectiveBalance - aliasFee
 
-      _ <- assertBalances(firstAddress, newBalance, newEffectiveBalance)
+      _ <- assertBalances(secondAddress, newBalance, newEffectiveBalance)
 
-      aliasSecondTxId <- sender.createAlias(firstAddress, second_alias, aliasFee).map(_.id)
+      aliasSecondTxId <- sender.createAlias(secondAddress, second_alias, aliasFee).map(_.id)
+
 
       height <- traverse(allNodes)(_.height).map(_.max)
       _ <- traverse(allNodes)(_.waitForHeight(height + 1))
       _ <- traverse(allNodes)(_.waitForTransaction(aliasFirstTxId))
 
-      _ <- assertBalances(firstAddress, newBalance - aliasFee, newEffectiveBalance - aliasFee)
-    } yield succeed
+      _ <- assertBalances(secondAddress, newBalance - aliasFee, newEffectiveBalance - aliasFee)
+
+      aliasesList <- sender.aliasByAddress(secondAddress)
+
+    } yield {
+      aliasesList should contain allElementsOf Seq(first_alias, second_alias).map(s => s"aliase:$s")//Alias.buildAlias('I',s).explicitGet().stringRepr)
+    }
 
     Await.result(f, 1.minute)
   }
