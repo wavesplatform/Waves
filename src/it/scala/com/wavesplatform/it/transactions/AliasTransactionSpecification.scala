@@ -11,11 +11,11 @@ import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
 
 class AliasTransactionSpecification(override val allNodes: Seq[Node], override val notMiner: Node)
-  extends IntegrationSuiteWithThreeAddresses with AllElementsOf {
+  extends IntegrationSuiteWithThreeAddresses  {
 
   val aliasFee = 1.waves;
 
-  test("Able to send money to an alias") {
+  ignore("Able to send money to an alias") {
     val alias = "test_alias"
 
     val f = for {
@@ -87,8 +87,8 @@ class AliasTransactionSpecification(override val allNodes: Seq[Node], override v
   }
 
   test("Able to create several different aliases to same addresses") {
-    val first_alias = "TEST_ALIAS4"
-    val second_alias = "TEST_ALIAS5"
+    val first_alias = "test_alias4"
+    val second_alias = "test_alias5"
 
     val f = for {
 
@@ -118,7 +118,7 @@ class AliasTransactionSpecification(override val allNodes: Seq[Node], override v
       aliasesList <- sender.aliasByAddress(secondAddress)
 
     } yield {
-      aliasesList should contain allElementsOf Seq(first_alias, second_alias).map(s => s"aliase:$s")//Alias.buildAlias('I',s).explicitGet().stringRepr)
+      aliasesList should contain allElementsOf Seq(first_alias, second_alias).map(s => Alias.buildAlias('I',s).explicitGet().stringRepr)
     }
 
     Await.result(f, 1.minute)
