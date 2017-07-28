@@ -7,6 +7,7 @@ import scorex.block.Block.BlockId
 import scorex.block.{Block, MicroBlock}
 import scorex.transaction.History.BlockchainScore
 import scorex.transaction.ValidationError.{BlockAppendError, MicroBlockAppendError}
+import scorex.utils.ScorexLogging
 
 trait NgHistoryWriter extends HistoryWriter with NgHistory {
   def appendMicroBlock(microBlock: MicroBlock)(microBlockConsensusValidation: Long => Either[ValidationError, BlockDiff]): Either[ValidationError, BlockDiff]
@@ -18,7 +19,7 @@ trait NgHistoryWriter extends HistoryWriter with NgHistory {
   def forgeBlock(id: BlockId): Option[(Block, DiscardedTransactions)]
 }
 
-class NgHistoryWriterImpl(inner: HistoryWriter) extends NgHistoryWriter {
+class NgHistoryWriterImpl(inner: HistoryWriter) extends NgHistoryWriter with ScorexLogging {
 
   override def synchronizationToken: ReentrantReadWriteLock = inner.synchronizationToken
 
