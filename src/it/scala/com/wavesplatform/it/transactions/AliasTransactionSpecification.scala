@@ -10,13 +10,13 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
 
-class AliasTransactionSpecification(override val allNodes: Seq[Node]) extends IntegrationSuiteWithThreeAddresses
-  with AllElementsOf {
+class AliasTransactionSpecification(override val allNodes: Seq[Node], override val notMiner: Node)
+  extends IntegrationSuiteWithThreeAddresses with AllElementsOf {
 
   val aliasFee = 1.waves;
-  //todo ignore to test
-  ignore("Able to send money to an alias") {
-    val alias = "TEST_ALIAS"
+
+  test("Able to send money to an alias") {
+    val alias = "test_alias"
 
     val f = for {
       _ <- assertBalances(firstAddress, 100.waves, 100.waves)
@@ -27,9 +27,7 @@ class AliasTransactionSpecification(override val allNodes: Seq[Node]) extends In
       _ <- traverse(allNodes)(_.waitForTransaction(aliasTxId))
 
       _ <- assertBalances(firstAddress, 99.waves, 99.waves)
-      transferId <- sender.transfer(firstAddress,
-        s"alias:${sender.settings.blockchainSettings.addressSchemeCharacter}:$alias",
-        1.waves, 1.waves).map(_.id)
+      transferId <- sender.transfer(firstAddress, s"alias:${sender.settings.blockchainSettings.addressSchemeCharacter}:$alias", 1.waves, 1.waves).map(_.id)
 
       height <- traverse(allNodes)(_.height).map(_.max)
       _ <- traverse(allNodes)(_.waitForHeight(height + 1))
@@ -42,7 +40,7 @@ class AliasTransactionSpecification(override val allNodes: Seq[Node]) extends In
   }
 
   ignore("Not able to create same aliases to same address") {
-    val alias = "TEST_ALIAS2"
+    val alias = "test_alias2"
 
     val f = for {
       balance <- getAccountBalance(firstAddress)
@@ -67,7 +65,7 @@ class AliasTransactionSpecification(override val allNodes: Seq[Node]) extends In
 
 
   test("Not able to create aliases to other addresses") {
-    val alias = "TEST_ALIAS3"
+    val alias = "test_alias3"
 
     val f = for {
       balance <- getAccountBalance(firstAddress)

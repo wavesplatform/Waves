@@ -37,8 +37,6 @@ trait StateReader extends Synchronized {
 
   def isLeaseActive(leaseTx: LeaseTransaction): Boolean
 
-  def getAssetIdByUniqueName(assetName: ByteStr): Option[ByteStr]
-
   def activeLeases(): Seq[ByteStr]
 
   def lastUpdateHeight(acc: Address): Option[Int]
@@ -90,12 +88,11 @@ object StateReader {
       }
     }
 
-    def getAccountBalance(account: Address): Map[AssetId, (Long, Boolean, Long, IssueTransaction, Boolean)] = s.read { _ =>
+    def getAccountBalance(account: Address): Map[AssetId, (Long, Boolean, Long, IssueTransaction)] = s.read { _ =>
       s.accountPortfolio(account).assets.map { case (id, amt) =>
         val assetInfo = s.assetInfo(id).get
         val issueTransaction = findTransaction[IssueTransaction](id).get
-        val isUnique = s.getAssetIdByUniqueName(ByteStr(issueTransaction.name)).contains(issueTransaction.assetId)
-        id -> (amt, assetInfo.isReissuable, assetInfo.volume, issueTransaction, isUnique)
+        id -> (amt, assetInfo.isReissuable, assetInfo.volume, issueTransaction)
       }
     }
 

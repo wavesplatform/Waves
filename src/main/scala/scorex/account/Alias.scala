@@ -21,20 +21,23 @@ object Alias {
   val MinLength = 4
   val MaxLength = 30
 
+  val aliasAlphabet = "-.0123456789@_abcdefghijklmnopqrstuvwxyz"
+
   private val AliasPatternInfo = "Alias string pattern is 'alias:<chain-id>:<address-alias>"
 
   private def schemeByte: Byte = AddressScheme.current.chainId
 
-  def buildAlias(networkByte: Byte, name: String): Either[ValidationError, Alias] = {
+  private def validAliasChar(c: Char): Boolean =
+    ('0' <= c && c <= '9') || ('a' <= c && c <= 'z') || c == '_' || c == '@' || c == '-' || c == '.'
+
+  private def buildAlias(networkByte: Byte, name: String): Either[ValidationError, Alias] = {
 
     case class AliasImpl(networkByte: Byte, name: String) extends Alias
 
-    if (name contains "\n") {
-      Left(GenericError("Alias cannot be multiline"))
-    } else if (name.trim() != name) {
-      Left(GenericError("Alias cannot contain leading or trailing whitespaces"))
-    } else if (!(MinLength to MaxLength contains name.length))
+    if (name.length < MinLength || MaxLength < name.length)
       Left(GenericError(s"Alias '$name' length should be between $MinLength and $MaxLength"))
+    else if (!name.forall(validAliasChar))
+      Left(GenericError(s"Alias should contain only following characters: $aliasAlphabet"))
     else if (networkByte != schemeByte)
       Left(GenericError("Alias network char doesn't match current scheme"))
     else
