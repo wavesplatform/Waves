@@ -1,7 +1,6 @@
 package scorex.transaction
 
 import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state2.ByteStr
 import com.wavesplatform.state2.reader.StateReader
 import scorex.account.{Address, PublicKeyAccount}
 import scorex.block.Block

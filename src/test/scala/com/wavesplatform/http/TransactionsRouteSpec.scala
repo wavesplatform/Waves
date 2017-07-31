@@ -15,8 +15,6 @@ import scorex.api.http.{InvalidAddress, InvalidSignature, TooBigArrayAllocation,
 import scorex.crypto.encode.Base58
 import scorex.transaction._
 
-import scala.util.Random
-
 class TransactionsRouteSpec extends RouteSpec("/transactions")
   with RestAPISettingsHelper with MockFactory with Matchers with TransactionGen with BlockGen with PropertyChecks {
 
@@ -58,7 +56,7 @@ class TransactionsRouteSpec extends RouteSpec("/transactions")
         randomTransactionsGen(transactionsCount)) { case (account, limit, txs) =>
         (state.accountTransactionIds _).expects(account: Address, limit).returning(txs.map(_.id)).once()
         txs.foreach { tx =>
-          (state.transactionInfo _).expects(tx.id).returning(Some(1,tx)).once()
+          (state.transactionInfo _).expects(tx.id).returning(Some((1, tx))).once()
         }
         Get(routePath(s"/address/${account.address}/limit/$limit")) ~> route ~> check {
           responseAs[Seq[JsValue]].length shouldEqual txs.length.min(limit)
@@ -84,7 +82,7 @@ class TransactionsRouteSpec extends RouteSpec("/transactions")
       } yield (tx, height)
 
       forAll(txAvailability) { case (tx, height) =>
-        (state.transactionInfo _).expects(tx.id).returning(Some(height, tx)).once()
+        (state.transactionInfo _).expects(tx.id).returning(Some((height, tx))).once()
         Get(routePath(s"/info/${tx.id.base58}")) ~> route ~> check {
           status shouldEqual StatusCodes.OK
           responseAs[JsValue] shouldEqual tx.json + ("height" -> JsNumber(height))

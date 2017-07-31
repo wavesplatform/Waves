@@ -27,7 +27,7 @@ class BlockchainUpdaterGeneratorFeeNextBlockOrMicroBlockTest extends PropSpec wi
   } yield (genesis, somePayment, generatorPaymentOnFee, someOtherPayment)
 
   property("generator should get fees before applying block before applyMinerFeeWithTransactionAfter in two blocks") {
-    scenario(preconditionsAndPayments, ApplyMinerFeeBeforeAllTransactionsSettings) { case (domain, (genesis, somePayment, generatorPaymentOnFee, someOtherPayment)) =>
+    scenario(preconditionsAndPayments, ApplyMinerFeeBeforeAllTransactionsSettings) { case (domain: Domain, (genesis, somePayment, generatorPaymentOnFee, someOtherPayment)) =>
       val blocks = chainBlocks(Seq(Seq(genesis, somePayment), Seq(generatorPaymentOnFee, someOtherPayment)))
       all(blocks.map(block => domain.blockchainUpdater.processBlock(block))) shouldBe 'right
     }

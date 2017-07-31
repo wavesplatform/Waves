@@ -66,7 +66,6 @@ object DataTypes {
     }
   }
 
-  private type Portfolio = (Long, (Long, Long), Map[Array[Byte], Long])
   val portfolios: DataType = new DTTemplate {
     override def compare(a: scala.Any, b: scala.Any) = throw new UnsupportedOperationException
 

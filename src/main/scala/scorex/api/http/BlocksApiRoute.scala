@@ -11,7 +11,6 @@ import com.wavesplatform.state2.ByteStr
 import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
 import play.api.libs.json._
-import scorex.crypto.EllipticCurveImpl
 import scorex.transaction.{BlockchainUpdater, CheckpointService, History, TransactionParser}
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -65,7 +64,7 @@ case class BlocksApiRoute(settings: RestAPISettings, checkpointsSettings: Checkp
 
   @Path("/delay/{signature}/{blockNum}")
   @ApiOperation(value = "Average delay",
-    notes = "Average delay in milliseconds between last $blockNum blocks starting from block with $signature", httpMethod = "GET")
+    notes = "Average delay in milliseconds between last `blockNum` blocks starting from block with `signature`", httpMethod = "GET")
   @ApiImplicitParams(Array(
     new ApiImplicitParam(name = "signature", value = "Base58-encoded signature", required = true, dataType = "string", paramType = "path"),
     new ApiImplicitParam(name = "blockNum", value = "Number of blocks to count delay", required = true, dataType = "string", paramType = "path")
@@ -167,20 +166,13 @@ case class BlocksApiRoute(settings: RestAPISettings, checkpointsSettings: Checkp
   @ApiResponses(Array(
     new ApiResponse(code = 200, message = "Json with response or error")
   ))
-  def checkpoint: Route = {
-    def validateCheckpoint(checkpoint: Checkpoint): Option[ApiError] = {
-      if (EllipticCurveImpl.verify(checkpoint.signature, checkpoint.toSign, checkpointsSettings.publicKey.arr)) None
-      else Some(InvalidSignature)
-    }
-
-    (path("checkpoint") & post) {
-      json[Checkpoint] { checkpoint =>
-        Future {
-          Coordinator.processCheckpoint(checkpointService, history, blockchainUpdater)(checkpoint)
-            .map(score => allChannels.broadcast(LocalScoreChanged(score)))
-        }.map(_.fold(ApiError.fromValidationError,
-          _ => Json.obj("" -> "")): ToResponseMarshallable)
-      }
+  def checkpoint: Route = (path("checkpoint") & post) {
+    json[Checkpoint] { checkpoint =>
+      Future {
+        Coordinator.processCheckpoint(checkpointService, history, blockchainUpdater)(checkpoint)
+          .map(score => allChannels.broadcast(LocalScoreChanged(score)))
+      }.map(_.fold(ApiError.fromValidationError,
+        _ => Json.obj("" -> "")): ToResponseMarshallable)
     }
   }
 }

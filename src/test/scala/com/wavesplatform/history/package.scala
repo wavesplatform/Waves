@@ -2,21 +2,14 @@ package com.wavesplatform
 
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state2._
-import com.wavesplatform.state2.reader.StateReader
-import org.scalacheck.Gen
-import org.scalatest.Assertion
-import org.scalatest.prop.GeneratorDrivenPropertyChecks
 import scorex.account.PrivateKeyAccount
 import scorex.block.{Block, MicroBlock}
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
 import scorex.lagonaki.mocks.TestBlock
 import scorex.settings.TestFunctionalitySettings
-import scorex.transaction.{BlockchainUpdater, History, Transaction, TransactionParser}
+import scorex.transaction.{Transaction, TransactionParser}
 
 package object history {
-
-  case class Domain(history: History, stateReader: StateReader, blockchainUpdater: BlockchainUpdater)
-
   val MinInMemoryDiffSize = 5
   val DefaultBlockchainSettings = BlockchainSettings(
     blockchainFile = None,
@@ -34,7 +27,7 @@ package object history {
     functionalitySettings = DefaultBlockchainSettings.functionalitySettings.copy(applyMinerFeeWithTransactionAfter = Long.MaxValue))
 
 
-  def domain(bs: BlockchainSettings = DefaultBlockchainSettings): Domain = {
+  def domain(bs: BlockchainSettings): Domain = {
     val (history, _, stateReader, blockchainUpdater) = StorageFactory(bs).get
     Domain(history, stateReader, blockchainUpdater)
   }
@@ -90,10 +83,4 @@ package object history {
   }
 
   def malformSignature(b: Block): Block = b.copy(signerData = b.signerData.copy(signature = TestBlock.randomSignature()))
-
-  trait DomainScenarioDrivenPropertyCheck extends GeneratorDrivenPropertyChecks {
-
-    def scenario[S](gen: Gen[S], bs: BlockchainSettings = DefaultBlockchainSettings)(assertion: (Domain, S) => Assertion): Assertion = forAll(gen)(assertion(domain(bs), _))
-  }
-
 }

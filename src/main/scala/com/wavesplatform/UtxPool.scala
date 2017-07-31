@@ -4,13 +4,10 @@ import java.util.concurrent.ConcurrentHashMap
 
 import cats.Monoid
 import com.google.common.cache.CacheBuilder
-import com.wavesplatform.network._
 import com.wavesplatform.settings.{FunctionalitySettings, UtxSettings}
 import com.wavesplatform.state2.diffs.TransactionDiffer
 import com.wavesplatform.state2.reader.{CompositeStateReader, StateReader}
 import com.wavesplatform.state2.{ByteStr, Diff}
-import io.netty.channel.Channel
-import io.netty.channel.group.ChannelGroup
 import scorex.consensus.TransactionsOrdering
 import scorex.transaction.ValidationError.{AlreadyInThePool, GenericError}
 import scorex.transaction.{FeeCalculator, History, Transaction, ValidationError}

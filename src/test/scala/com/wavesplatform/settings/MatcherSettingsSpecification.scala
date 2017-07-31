@@ -8,9 +8,8 @@ import scorex.transaction.assets.exchange.AssetPair
 
 class MatcherSettingsSpecification extends FlatSpec with Matchers {
   "MatcherSettings" should "read values" in {
-    val config = ConfigFactory.parseString(
-      """
-        |waves {
+    val config = loadConfig(ConfigFactory.parseString(
+      """waves {
         |  directory: "/waves"
         |  matcher {
         |    enable: yes
@@ -19,9 +18,6 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
         |    port: 6886
         |    min-order-fee: 100000
         |    order-match-tx-fee: 100000
-        |    journal-directory: ${waves.directory}"/journal"
-        |    snapshots-directory: ${waves.directory}"/snapshots"
-        |    order-history-file = ${waves.directory}"/matcher/orderhistory.dat"
         |    snapshots-interval: 1d
         |    max-open-orders: 1000
         |    price-assets: [
@@ -36,8 +32,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
         |    ]
         |    max-timestamp-diff = 3h
         |  }
-        |}
-      """.stripMargin).resolve()
+        |}""".stripMargin))
 
     val settings = MatcherSettings.fromConfig(config)
     settings.enable should be(true)
@@ -46,8 +41,8 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
     settings.port should be(6886)
     settings.minOrderFee should be(100000)
     settings.orderMatchTxFee should be(100000)
-    settings.journalDataDir should be("/waves/journal")
-    settings.snapshotsDataDir should be("/waves/snapshots")
+    settings.journalDataDir should be("/waves/matcher/journal")
+    settings.snapshotsDataDir should be("/waves/matcher/snapshots")
     settings.snapshotsInterval should be(1.day)
     settings.maxOpenOrders should be(1000)
     settings.priceAssets should be(Seq("WAVES", "8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS", "DHgwrRvVyqJsepd32YbBqUeDH4GJ1N984X8QoekjgH8J"))

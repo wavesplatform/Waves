@@ -3,9 +3,7 @@ package com.wavesplatform.matcher.model
 import cats.instances.map._
 import cats.syntax.semigroup._
 import cats.{Monoid, Semigroup}
-import com.google.common.primitives.{Bytes, Longs}
-import play.api.libs.json.{Format, Json, OFormat}
-import scorex.utils.Booleans
+import play.api.libs.json.{Format, Json}
 
 import scala.util.Try
 

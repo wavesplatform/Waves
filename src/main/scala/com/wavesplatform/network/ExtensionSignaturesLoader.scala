@@ -45,7 +45,7 @@ class ExtensionSignaturesLoader(syncTimeout: FiniteDuration, peerDatabase: PeerD
 
       ctx.writeAndFlush(GetSignatures(sigs), promise)
 
-    case LoadBlockchainExtension(sigs) =>
+    case LoadBlockchainExtension(_) =>
       log.debug(s"${id(ctx)} Received request to load signatures while waiting for extension, ignoring for now")
       promise.setSuccess()
 

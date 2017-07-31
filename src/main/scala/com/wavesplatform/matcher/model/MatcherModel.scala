@@ -3,11 +3,8 @@ package com.wavesplatform.matcher.model
 import cats.Monoid
 import cats.implicits._
 import com.wavesplatform.matcher.model.MatcherModel.Price
-import com.wavesplatform.state2.reader.StateReader
 import play.api.libs.json.{JsObject, JsValue, Json}
-import scorex.crypto.encode.Base58
-import scorex.transaction.{AssetAcc, AssetId}
-import scorex.transaction.assets.exchange.Validation.booleanOperators
+import scorex.transaction.AssetAcc
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType, Validation}
 
 object MatcherModel {
@@ -88,23 +85,6 @@ object LimitOrder {
   }
 
   def validateAmount(lo: LimitOrder): Validation = lo.order.isValidAmount(lo.price, lo.amount)
-
-  def validateIntegerAmount(storedState: StateReader, lo: LimitOrder): Validation = {
-    def getDecimals(assetId: Option[AssetId]) = assetId.flatMap(storedState.getIssueTransaction).map(_.decimals.toInt).getOrElse(8)
-
-    val amountDecimals = getDecimals(lo.order.assetPair.amountAsset)
-    val priceDecimals = getDecimals(lo.order.assetPair.priceAsset)
-    val price = BigDecimal(lo.price)*math.pow(10, amountDecimals - priceDecimals)/Order.PriceConstant
-
-    val scaled = if (price >= 1) {
-      val amount = (BigInt(lo.amount) * lo.price / Order.PriceConstant).bigInteger.longValueExact()
-      BigDecimal(amount, priceDecimals)
-    } else {
-      BigDecimal(lo.amount, amountDecimals)
-    }
-
-    (scaled >= 1) :| "Order amount is too small"
-  }
 }
 
 object Events {

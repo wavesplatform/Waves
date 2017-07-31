@@ -10,7 +10,6 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
 import akka.http.scaladsl.server.Route
 import akka.stream.ActorMaterializer
-import akka.util.Timeout
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.actor.RootActorSystem
 import com.wavesplatform.history.{CheckpointServiceImpl, StorageFactory}
@@ -23,7 +22,7 @@ import com.wavesplatform.utils.forceStopApplication
 import io.netty.channel.Channel
 import io.netty.channel.group.DefaultChannelGroup
 import io.netty.util.concurrent.GlobalEventExecutor
-import scorex.account.{Address, AddressScheme}
+import scorex.account.AddressScheme
 import scorex.api.http._
 import scorex.api.http.alias.{AliasApiRoute, AliasBroadcastApiRoute}
 import scorex.api.http.assets.{AssetsApiRoute, AssetsBroadcastApiRoute}
@@ -137,7 +136,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
     }
 
     if (settings.matcherSettings.enable) {
-      val matcher = new Matcher(actorSystem, wallet, utxStorage, allChannels, stateReader, time, history, settings.blockchainSettings, settings.restAPISettings, settings.matcherSettings)
+      val matcher = new Matcher(actorSystem, wallet, utxStorage, allChannels, stateReader, history, settings.blockchainSettings, settings.restAPISettings, settings.matcherSettings)
       matcher.runMatcher()
     }
   }
@@ -166,7 +165,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
         upnp.deletePort(addr.getPort)
       }
 
-      implicit val askTimeout = Timeout(60.seconds)
       Try(Await.result(actorSystem.terminate(), 60.seconds))
         .failed.map(e => log.error("Failed to terminate actor system: " + e.getMessage))
       log.debug("Closing storage")
