@@ -52,14 +52,14 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Auto
     removeObsoleteRecords(blacklist, settings.blackListResidenceTime.toMillis).keySet().asScala.toSet
 
   override def randomPeer(excluded: Set[InetSocketAddress]): Option[InetSocketAddress] = unverifiedPeers.synchronized {
-    log.trace(s"Excluding: $excluded")
+//    log.trace(s"Excluding: $excluded")
     def excludeAddress(isa: InetSocketAddress) = excluded(isa) || blacklistedHosts(isa.getAddress)
 
-    log.trace(s"Evicting queue: $unverifiedPeers")
+//    log.trace(s"Evicting queue: $unverifiedPeers")
     val unverified = Option(unverifiedPeers.peek()).filterNot(excludeAddress)
     val verified = Random.shuffle(knownPeers.keySet.diff(excluded).toSeq).headOption.filterNot(excludeAddress)
 
-    log.trace(s"Unverified: $unverified; Verified: $verified")
+//    log.trace(s"Unverified: $unverified; Verified: $verified")
     (unverified, verified) match {
       case (Some(_), v@Some(_)) => if (Random.nextBoolean()) Some(unverifiedPeers.poll()) else v
       case (Some(_), None) => Some(unverifiedPeers.poll())
