@@ -28,7 +28,7 @@ object TransactionGenerator {
 
   private val aliasAlphabet = "-.0123456789@_abcdefghijklmnopqrstuvwxyz"
 
-  private def generateAlias(len: Int): String = Random.shuffle(aliasAlphabet).take(len)
+  private def generateAlias(len: Int): String = Random.shuffle(aliasAlphabet.toVector).take(len).mkString
 
   def gen(probabilities: Map[TransactionType.Value, Float],
           accounts: Seq[PrivateKeyAccount],
