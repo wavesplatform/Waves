@@ -25,11 +25,12 @@ object RootActorSystem extends ScorexLogging {
   def start(id: String, settings: MatcherSettings)(init: ActorSystem => Unit): Unit = {
     val journalDir = new File(settings.journalDataDir)
     val snapshotDir = new File(settings.snapshotsDataDir)
-    journalDir.mkdirs()
-    snapshotDir.mkdirs()
-
-    checkDirectory(journalDir)
-    checkDirectory(snapshotDir)
+    if (settings.enable) {
+      journalDir.mkdirs()
+      snapshotDir.mkdirs()
+      checkDirectory(journalDir)
+      checkDirectory(snapshotDir)
+    }
 
     val system = ActorSystem(id, ConfigFactory.load().withValue("akka.actor.guardian-supervisor-strategy",
       ConfigValueFactory.fromAnyRef("com.wavesplatform.actor.RootActorSystem$EscalatingStrategy"))
