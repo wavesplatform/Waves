@@ -1,6 +1,6 @@
 package scorex.utils
 
-import java.util.concurrent.locks.{Lock, ReentrantReadWriteLock}
+import java.util.concurrent.locks.ReentrantReadWriteLock
 
 import scorex.utils.Synchronized.{ReadLock, _}
 

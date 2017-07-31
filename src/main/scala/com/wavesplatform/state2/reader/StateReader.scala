@@ -92,7 +92,7 @@ object StateReader {
       s.accountPortfolio(account).assets.map { case (id, amt) =>
         val assetInfo = s.assetInfo(id).get
         val issueTransaction = findTransaction[IssueTransaction](id).get
-        id -> (amt, assetInfo.isReissuable, assetInfo.volume, issueTransaction)
+        id -> ((amt, assetInfo.isReissuable, assetInfo.volume, issueTransaction))
       }
     }
 

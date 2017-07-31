@@ -1,14 +1,14 @@
 package com.wavesplatform.matcher.market
 
-import com.wavesplatform.matcher.{MatcherSettings, MatcherTestData, ValidationMatcher}
 import com.wavesplatform.matcher.model.{OrderHistory, OrderHistoryImpl, OrderHistoryStorage, OrderValidator}
+import com.wavesplatform.matcher.{MatcherSettings, MatcherTestData}
 import com.wavesplatform.settings.{Constants, WalletSettings}
-import com.wavesplatform.state2.{AssetInfo, ByteStr, LeaseInfo, Portfolio}
 import com.wavesplatform.state2.reader.StateReader
-import org.scalamock.scalatest.PathMockFactory
+import com.wavesplatform.state2.{AssetInfo, ByteStr, LeaseInfo, Portfolio}
 import org.h2.mvstore.MVStore
-import org.scalatest.prop.PropertyChecks
+import org.scalamock.scalatest.PathMockFactory
 import org.scalatest._
+import org.scalatest.prop.PropertyChecks
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.transaction.assets.IssueTransaction
 import scorex.transaction.assets.exchange.AssetPair
@@ -36,7 +36,7 @@ class OrderValidatorSpecification extends WordSpec
 
   val matcherPubKey: PublicKeyAccount = w.findWallet(s.account).right.get
 
-  var ov = new OrderValidator {
+  private var ov = new OrderValidator {
     override val orderHistory: OrderHistory = oh
     override val storedState: StateReader = ss
     override val settings: MatcherSettings = s

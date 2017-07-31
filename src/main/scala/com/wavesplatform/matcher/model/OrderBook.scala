@@ -1,9 +1,7 @@
 package com.wavesplatform.matcher.model
 
-import com.wavesplatform.matcher.model.Events.Event
 import com.wavesplatform.matcher.model.MatcherModel.{Level, Price}
 
-import scala.collection.+:
 import scala.collection.immutable.TreeMap
 
 case class OrderBook(bids: TreeMap[Price, Level[BuyLimitOrder]],
@@ -13,15 +11,9 @@ case class OrderBook(bids: TreeMap[Price, Level[BuyLimitOrder]],
 
 }
 
-
-
 object OrderBook {
-  val bidsOrdering: Ordering[Long] = new Ordering[Long] {
-    def compare(x: Long, y: Long): Int = - Ordering.Long.compare(x, y)
-  }
-  val asksOrdering: Ordering[Long] = new Ordering[Long] {
-    def compare(x: Long, y: Long): Int = Ordering.Long.compare(x, y)
-  }
+  val bidsOrdering: Ordering[Long] = (x: Long, y: Long) => -Ordering.Long.compare(x, y)
+  val asksOrdering: Ordering[Long] = (x: Long, y: Long) => Ordering.Long.compare(x, y)
 
   val empty: OrderBook = OrderBook(TreeMap.empty[Price, Level[BuyLimitOrder]](bidsOrdering),
     TreeMap.empty[Price, Level[SellLimitOrder]](asksOrdering))
@@ -30,22 +22,24 @@ object OrderBook {
 
   def matchOrder(ob: OrderBook, o: LimitOrder): Event = o match {
     case oo: BuyLimitOrder =>
-      ob.bestAsk.exists(oo.price >= _.price) match {
-        case true => OrderExecuted(o, ob.bestAsk.get)
-        case false => OrderAdded(oo)
+      if (ob.bestAsk.exists(oo.price >= _.price)) {
+        OrderExecuted(o, ob.bestAsk.get)
+      } else {
+        OrderAdded(oo)
       }
     case oo: SellLimitOrder =>
-      ob.bestBid.exists(oo.price <= _.price) match {
-        case true => OrderExecuted(o, ob.bestBid.get)
-        case false => OrderAdded(oo)
+      if (ob.bestBid.exists(oo.price <= _.price)) {
+        OrderExecuted(o, ob.bestBid.get)
+      } else {
+        OrderAdded(oo)
       }
   }
 
   def cancelOrder(ob: OrderBook, orderId: String): Option[OrderCanceled] = {
-    ob.bids.find { case (p, v) => v.exists(_.order.idStr == orderId)}
-        .orElse(ob.asks.find { case (p, v) => v.exists(_.order.idStr == orderId)})
+    ob.bids.find { case (_, v) => v.exists(_.order.idStr == orderId)}
+        .orElse(ob.asks.find { case (_, v) => v.exists(_.order.idStr == orderId)})
       .fold(Option.empty[OrderCanceled]) {
-        case (p, v) =>
+        case (_, v) =>
           Some(OrderCanceled(v.find(_.order.idStr == orderId).get))
       }
   }
@@ -55,17 +49,19 @@ object OrderBook {
       case oo@BuyLimitOrder(p, _, _) =>
         ob.bids.get(p).map { lvl =>
           val updatedQ = lvl.filter(_ != oo)
-          ob.copy(bids = updatedQ.nonEmpty match {
-            case true => ob.bids + (p -> updatedQ)
-            case false => ob.bids - p
+          ob.copy(bids = if (updatedQ.nonEmpty) {
+            ob.bids + (p -> updatedQ)
+          } else {
+            ob.bids - p
           })
         }
       case oo@SellLimitOrder(p, _, _) =>
         ob.asks.get(p).map { lvl =>
           val updatedQ = lvl.filter(_ != oo)
-          ob.copy(asks = updatedQ.nonEmpty match {
-            case true => ob.asks + (p -> updatedQ)
-            case false => ob.asks - p
+          ob.copy(asks = if (updatedQ.nonEmpty) {
+            ob.asks + (p -> updatedQ)
+          } else {
+            ob.asks - p
           })
         }
     }).getOrElse(ob)
@@ -98,29 +94,4 @@ object OrderBook {
     case e@OrderExecuted(_, c: SellLimitOrder) => updateExecutedSell(ob, c, e.counterRemaining)
     case OrderCanceled(limitOrder) => updateCancelOrder(ob, limitOrder)
   }
-
-
-  private def executeBuy(ob: OrderBook, level: (Price, Level[SellLimitOrder]),
-                 o: BuyLimitOrder): (OrderBook, Option[SellLimitOrder], Long) = level._2 match {
-    case h +: t if h.amount > o.amount =>
-      (ob.copy(asks = ob.asks + (level._1 -> (h.copy(amount = h.amount - o.amount) +: t))),
-        Some(h.copy(amount = o.amount)), 0L)
-    case h +: t if t.nonEmpty =>
-      (ob.copy(asks = ob.asks + (level._1 -> t)), Some(h), o.amount - h.amount)
-    case h +: _ =>
-      (ob.copy(asks = ob.asks - level._1), Some(h), o.amount - h.amount)
-    }
-
-
-  private def executeSell(ob: OrderBook, level: (Price, Level[BuyLimitOrder]),
-                 o: SellLimitOrder): (OrderBook, Option[BuyLimitOrder], Long) = level._2 match {
-    case h +: t if h.amount > o.amount =>
-      (ob.copy(bids = ob.bids + (level._1 -> (h.copy(amount = h.amount - o.amount) +: t))),
-        Some(h.copy(amount = o.amount)), 0L)
-    case h +: t if t.nonEmpty =>
-      (ob.copy(bids = ob.bids + (level._1 -> t)), Some(h), o.amount - h.amount)
-    case h +: _ =>
-      (ob.copy(bids = ob.bids - level._1), Some(h), o.amount - h.amount)
-  }
-
 }

@@ -108,7 +108,7 @@ object Block extends ScorexLogging {
       } else {
         val v: (Array[Byte], Int) = version match {
         case 1 | 2 => (bytes.tail        , bytes.head) //  255  max
-        case x => ???
+        case _ => ???
       }
 
       (1 to v._2).foldLeft((0: Int, Seq[Transaction]())) { case ((pos, txs), _) =>

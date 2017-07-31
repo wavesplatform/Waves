@@ -3,9 +3,7 @@ package com.wavesplatform
 import java.util.concurrent.locks.ReentrantReadWriteLock
 
 import com.wavesplatform.history.{HistoryWriterImpl, StorageFactory}
-import com.wavesplatform.network.RawBytes
 import com.wavesplatform.settings.{BlockchainSettings, FeeSettings, FeesSettings, FunctionalitySettings, UtxSettings}
-import io.netty.channel.group.{ChannelGroup, ChannelMatcher, ChannelMatchers}
 import org.scalacheck.Gen._
 import org.scalacheck.{Gen, Shrink}
 import org.scalamock.scalatest.MockFactory

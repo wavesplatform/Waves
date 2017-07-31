@@ -3,7 +3,6 @@ package scorex.lagonaki.unit
 import com.wavesplatform.settings.WalletSettings
 import com.wavesplatform.state2.ByteStr
 import org.scalatest.{FunSuite, Matchers}
-import scorex.crypto.encode.Base58
 import scorex.wallet.Wallet
 
 class WalletSpecification extends FunSuite with Matchers {

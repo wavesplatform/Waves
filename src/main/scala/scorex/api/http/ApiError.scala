@@ -3,7 +3,7 @@ package scorex.api.http
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import com.wavesplatform.state2.diffs.TransactionDiffer.TransactionValidationError
 import play.api.libs.json._
-import scorex.account.{AddressOrAlias, Address, Alias}
+import scorex.account.{Address, AddressOrAlias, Alias}
 import scorex.transaction.{Transaction, ValidationError}
 
 case class ApiErrorResponse(error: Int, message: String)
@@ -33,7 +33,7 @@ object ApiError {
     case ValidationError.AliasNotExists(tx) => AliasNotExists(tx)
     case ValidationError.UnsupportedTransactionType => CustomValidationError("UnsupportedTransactionType")
     case ValidationError.AccountBalanceError(errs) => CustomValidationError(errs.values.mkString(", "))
-    case ValidationError.OrderValidationError(order, m) => CustomValidationError(m)
+    case ValidationError.OrderValidationError(_, m) => CustomValidationError(m)
     case TransactionValidationError(err,tx) => StateCheckFailed(tx, fromValidationError(err).message)
   }
 }
