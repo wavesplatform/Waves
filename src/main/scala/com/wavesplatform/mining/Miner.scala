@@ -58,7 +58,6 @@ class Miner(
     val pc = allChannels.size()
     lazy val lastBlockKernelData = parent.consensusData
     lazy val currentTime = timeService.correctedTime()
-    log.debug(s"${System.currentTimeMillis()}: Corrected time: $currentTime")
     lazy val h = calcHit(lastBlockKernelData, account)
     lazy val t = calcTarget(parent, currentTime, balance)
     for {
@@ -82,7 +81,7 @@ class Miner(
     val pc = allChannels.size()
     lazy val unconfirmed = utx.packUnconfirmed(MaxTransactionsPerMicroblock)
     if (pc < minerSettings.quorum) {
-      log.trace(s"Quorum not available ($pc/${minerSettings.quorum}, not forging block with ${account.address}")
+      log.trace(s"Quorum not available ($pc/${minerSettings.quorum}, not forging microblock with ${account.address}")
       Right(None)
     }
     else if (unconfirmed.isEmpty) {
@@ -95,14 +94,21 @@ class Miner(
         consensusData = accumulatedBlock.consensusData,
         transactionData = accumulatedBlock.transactionData ++ unconfirmed,
         signer = account)
-      for {
+      val microBlockEi = for {
         micro <- MicroBlock.buildAndSign(account, unconfirmed, accumulatedBlock.signerData.signature, signed.signerData.signature)
         _ <- Coordinator.processMicroBlock(checkpoint, history, blockchainUpdater, utx)(micro)
-      } yield {
-        log.trace(s"MicroBlock(id=${trim(micro.uniqueId)}) has been mined for $account}")
-        allChannels.broadcast(MicroBlockInv(micro.totalResBlockSig))
-        Some(signed)
+      } yield micro
+
+      microBlockEi match {
+        case Right(mb) =>
+          log.trace(s"MicroBlock(id=${trim(mb.uniqueId)}) has been mined for $account}")
+          allChannels.broadcast(MicroBlockInv(mb.totalResBlockSig))
+          Right(Some(signed))
+        case Left(err) =>
+          log.trace(s"MicroBlock has NOT been mined for $account} because $err")
+          Left(err)
       }
+
     }
   }.delayExecution(minerSettings.microBlockInterval)
 
@@ -147,7 +153,7 @@ class Miner(
 
   def scheduleMining(): Unit = {
     scheduledAttempts := CompositeCancelable.fromSet(
-        wallet.privateKeyAccounts().map(generateBlockTask).map(_.runAsync).toSet)
+      wallet.privateKeyAccounts().map(generateBlockTask).map(_.runAsync).toSet)
     microBlockAttempt := SerialCancelable()
     log.debug(s"Block mining scheduled")
   }
