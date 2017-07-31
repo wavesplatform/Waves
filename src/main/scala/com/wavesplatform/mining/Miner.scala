@@ -1,4 +1,4 @@
-`package com.wavesplatform.mining
+package com.wavesplatform.mining
 
 import java.util.concurrent.atomic.AtomicBoolean
 
