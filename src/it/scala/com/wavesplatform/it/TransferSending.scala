@@ -3,8 +3,6 @@ package com.wavesplatform.it
 import com.wavesplatform.it.TransferSending.Req
 import com.wavesplatform.it.api.NodeApi.Transaction
 
-import scala.collection.mutable
-import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.Future
 import scala.util.Random
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -25,7 +23,7 @@ trait TransferSending {
     }
     val requests = sourceAndDest.foldLeft(List.empty[Req]) {
       case (rs, (src, dest)) =>
-        val transferAmount = (1e-8 +  Random.nextDouble() * 1e-8 * balances(src)).toLong
+        val transferAmount = (1e-8 + Random.nextDouble() * 1e-8 * balances(src)).toLong
         rs :+ Req(src, dest, transferAmount, fee)
     }
 

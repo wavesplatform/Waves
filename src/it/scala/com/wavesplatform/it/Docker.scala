@@ -7,7 +7,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.dataformat.javaprop.JavaPropsMapper
 import com.google.common.collect.ImmutableMap
 import com.spotify.docker.client.DefaultDockerClient
-import com.spotify.docker.client.DockerClient.{ListContainersParam, RemoveContainerParam}
+import com.spotify.docker.client.DockerClient.RemoveContainerParam
 import com.spotify.docker.client.messages.{ContainerConfig, HostConfig, NetworkConfig, PortBinding}
 import com.typesafe.config.{Config, ConfigFactory, ConfigRenderOptions}
 import org.asynchttpclient.Dsl._
@@ -16,7 +16,6 @@ import scorex.utils.ScorexLogging
 import scala.collection.JavaConverters._
 import scala.concurrent.Await
 import scala.concurrent.duration._
-import scala.util.Random
 
 case class NodeInfo(
                      hostRestApiPort: Int,
