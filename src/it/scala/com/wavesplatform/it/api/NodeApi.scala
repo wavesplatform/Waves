@@ -155,6 +155,9 @@ trait NodeApi {
   def aliasByAddress(targetAddress: String) =
     get(s"/alias/by-address/$targetAddress").as[Seq[String]]
 
+  def addressByAlias(targetAlias: String): Future[Address]=
+    get(s"alias/by-alias/$targetAlias").as[Address]
+
   def rollback(to: Int, returnToUTX: Boolean = true): Future[Unit] =
     postJson("/debug/rollback", RollbackParams(to, returnToUTX)).map(_ => ())
 
@@ -266,6 +269,10 @@ object NodeApi extends ScorexLogging {
   case class Peer(address: String, declaredAddress: String, peerName: String)
 
   implicit val peerFormat: Format[Peer] = Json.format
+
+  case class Address(address:String)
+
+  implicit val addressFormat: Format[Address] = Json.format
 
   case class Balance(address: String, confirmations: Int, balance: Long)
 

@@ -11,7 +11,7 @@ import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
 
 class AliasTransactionSpecification(override val allNodes: Seq[Node], override val notMiner: Node)
-  extends IntegrationSuiteWithThreeAddresses  {
+  extends IntegrationSuiteWithThreeAddresses {
 
   val aliasFee = 1.waves;
 
@@ -41,7 +41,6 @@ class AliasTransactionSpecification(override val allNodes: Seq[Node], override v
 
   ignore("Not able to create same aliases to same address") {
     val alias = "test_alias2"
-
     val f = for {
       balance <- getAccountBalance(firstAddress)
       effectiveBalance <- getAccountEffectiveBalance(firstAddress)
@@ -118,13 +117,35 @@ class AliasTransactionSpecification(override val allNodes: Seq[Node], override v
       aliasesList <- sender.aliasByAddress(secondAddress)
 
     } yield {
-      aliasesList should contain allElementsOf Seq(first_alias, second_alias).map(s => Alias.buildAlias('I',s).explicitGet().stringRepr)
+      aliasesList should contain allElementsOf Seq(first_alias, second_alias).map(s => Alias.buildAlias('I', s).explicitGet().stringRepr)
     }
 
     Await.result(f, 1.minute)
   }
 
 
+  test("Able to get address by alias") {
+    val alias = "test_alias_6"
+
+    val f = for {
+
+      balance <- getAccountBalance(firstAddress)
+      effectiveBalance <- getAccountEffectiveBalance(firstAddress)
+
+      aliasFirstTxId <- sender.createAlias(firstAddress, alias, aliasFee).map(_.id)
+
+      height <- traverse(allNodes)(_.height).map(_.max)
+      _ <- traverse(allNodes)(_.waitForHeight(height + 1))
+      _ <- traverse(allNodes)(_.waitForTransaction(aliasFirstTxId))
+
+      addressByAlias <- sender.addressByAlias(alias).map(_.address)
+
+    } yield {
+      addressByAlias should be (firstAddress)
+    }
+
+    Await.result(f, 1.minute)
+  }
   test("just print balance") {
 
     println(getAccountBalance(firstAddress))
