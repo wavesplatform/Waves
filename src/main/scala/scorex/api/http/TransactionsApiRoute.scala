@@ -65,10 +65,10 @@ case class TransactionsApiRoute(
     }
   }
 
-  @Path("/info/{signature}")
+  @Path("/info/{id}")
   @ApiOperation(value = "Info", notes = "Get transaction info", httpMethod = "GET")
   @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "signature", value = "transaction signature ", required = true, dataType = "string", paramType = "path")
+    new ApiImplicitParam(name = "id", value = "transaction id ", required = true, dataType = "string", paramType = "path")
   ))
   def info: Route = (pathPrefix("info") & get) {
     pathEndOrSingleSlash {
@@ -76,8 +76,8 @@ case class TransactionsApiRoute(
     } ~
       path(Segment) { encoded =>
         ByteStr.decodeBase58(encoded) match {
-          case Success(sig) =>
-            state.transactionInfo(sig) match {
+          case Success(id) =>
+            state.transactionInfo(id) match {
               case Some((h, tx)) =>
                 complete(txToExtendedJson(tx) + ("height" -> JsNumber(h)))
               case None =>
@@ -102,10 +102,10 @@ case class TransactionsApiRoute(
     complete(Json.obj("size" -> JsNumber(utxPool.size)))
   }
 
-  @Path("/unconfirmed/info/{signature}")
+  @Path("/unconfirmed/info/{id}")
   @ApiOperation(value = "Transaction Info", notes = "Get transaction that is in the UTX", httpMethod = "GET")
   @ApiImplicitParams(Array(
-    new ApiImplicitParam(name = "signature", value = "Transaction signature ", required = true, dataType = "string", paramType = "path")
+    new ApiImplicitParam(name = "id", value = "Transaction id ", required = true, dataType = "string", paramType = "path")
   ))
   def utxTransactionInfo: Route = (pathPrefix("info") & get) {
     pathEndOrSingleSlash {
@@ -113,8 +113,8 @@ case class TransactionsApiRoute(
     } ~
       path(Segment) { encoded =>
         ByteStr.decodeBase58(encoded) match {
-          case Success(sig) =>
-            utxPool.transactionById(sig) match {
+          case Success(id) =>
+            utxPool.transactionById(id) match {
               case Some(tx) =>
                 complete(txToExtendedJson(tx))
               case None =>
