@@ -39,8 +39,9 @@ libraryDependencies ++=
   Dependencies.matcher ++
   Dependencies.p2p ++
   Seq(
-    "com.iheart" %% "ficus" % "1.4.0",
-    "org.scorexfoundation" %% "scrypto" % "1.2.0",
+    "com.iheart" %% "ficus" % "1.4.1",
+    ("org.scorexfoundation" %% "scrypto" % "1.2.2")
+      .exclude("org.slf4j", "slf4j-api"),
     "commons-net" % "commons-net" % "3.+",
     "org.typelevel" %% "cats-core" % "0.9.0",
     "io.monix" %% "monix" % "2.3.0"
