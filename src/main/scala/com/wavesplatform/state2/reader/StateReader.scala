@@ -136,6 +136,9 @@ object StateReader {
           val snapshot = s.snapshotAtHeight(acc, deeperHeight).get
           if (deeperHeight <= bottomNotIncluded)
             snapshot +: list
+          else if(snapshot.prevHeight == deeperHeight) {
+            throw new Exception(s"Cannot lookup minBySnapshot for $acc for height $deeperHeight(current=${s.height}). Infinite loop detected")
+          }
           else if (deeperHeight > atHeight && snapshot.prevHeight > atHeight) {
             loop(snapshot.prevHeight, list)
           } else
@@ -166,6 +169,8 @@ object StateReader {
       def loop(lookupHeight: Int): Long = s.snapshotAtHeight(acc, lookupHeight) match {
         case None if lookupHeight == 0 => 0
         case Some(snapshot) if lookupHeight <= height => snapshot.balance
+        case Some(snapshot) if snapshot.prevHeight == lookupHeight =>
+          throw new Exception(s"Cannot lookup account $acc for height $height(current=${s.height}). Infinite loop detected")
         case Some(snapshot) => loop(snapshot.prevHeight)
         case None =>
           throw new Exception(s"Cannot lookup account $acc for height $height(current=${s.height}). " +

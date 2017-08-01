@@ -35,7 +35,7 @@ class Miner(
 
   import Miner._
 
-  private implicit val scheduler = Scheduler.fixedPool(name = "miner-pool", poolSize = 2)
+  private implicit val scheduler = Scheduler.fixedPool(name = "miner-pool", poolSize = 4)
 
   private val minerSettings = settings.minerSettings
   private val blockchainSettings = settings.blockchainSettings

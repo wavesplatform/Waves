@@ -41,6 +41,10 @@ class SynchronizedTest extends FunSuite {
       write()
       Thread.sleep(200)
     }
+
+    def lock(): Unit = read { _ =>
+      write()
+    }
   }
 
   private def sleep() = Thread.sleep(1500)
@@ -113,5 +117,10 @@ class SynchronizedTest extends FunSuite {
       Await.result(Future(a.read()), 100.millis)
     }
     sleep()
+  }
+  ignore("deadlock") {
+    val a = new A()
+    a.lock()
+    println("never happens")
   }
 }
