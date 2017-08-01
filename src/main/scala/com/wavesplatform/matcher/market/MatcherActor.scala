@@ -150,7 +150,7 @@ object MatcherActor {
   def name = "matcher"
 
   def props(orderHistoryActor: ActorRef, storedState: StateReader, wallet: Wallet, utx: UtxPool, allChannels: ChannelGroup,
-            settings: MatcherSettings, time: Time, history: History, functionalitySettings: FunctionalitySettings): Props =
+            settings: MatcherSettings, history: History, functionalitySettings: FunctionalitySettings): Props =
     Props(new MatcherActor(orderHistoryActor, storedState, wallet, utx, allChannels,settings, history, functionalitySettings))
 
   case class OrderBookCreated(pair: AssetPair)

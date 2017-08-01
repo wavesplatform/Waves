@@ -3,17 +3,15 @@ package com.wavesplatform.matcher
 import com.google.common.primitives.{Bytes, Ints}
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.matcher.model.{BuyLimitOrder, SellLimitOrder}
+import com.wavesplatform.settings.loadConfig
 import com.wavesplatform.state2.ByteStr
-import org.scalacheck.{Arbitrary, Gen, Shrink}
+import org.scalacheck.{Arbitrary, Gen}
 import scorex.account.PrivateKeyAccount
 import scorex.crypto.hash.SecureCryptographicHash
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import scorex.utils.NTP
 
 trait MatcherTestData {
-
-  private implicit def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)
-
   private val signatureSize = 32
 
   val bytes32gen: Gen[Array[Byte]] = Gen.listOfN(signatureSize, Arbitrary.arbitrary[Byte]).map(_.toArray)
@@ -33,9 +31,8 @@ trait MatcherTestData {
   val maxTimeGen: Gen[Long] = Gen.choose(10000L, Order.MaxLiveTime).map(_ + NTP.correctedTime())
   val createdTimeGen: Gen[Long] = Gen.choose(0L, 10000L).map(NTP.correctedTime() - _)
 
-  val config = ConfigFactory.parseString(
-    """
-      |waves {
+  val config = loadConfig(ConfigFactory.parseString(
+    """waves {
       |  directory: "/tmp/waves-test"
       |  matcher {
       |    enable: yes
@@ -44,15 +41,12 @@ trait MatcherTestData {
       |    port: 6886
       |    min-order-fee: 100000
       |    order-match-tx-fee: 100000
-      |    journal-directory: ${waves.directory}"/journal"
-      |    snapshots-directory: ${waves.directory}"/snapshots"
       |    snapshots-interval: 1d
       |    max-open-orders: 1000
       |    price-assets: ["BASE1", "BASE2"]
       |    predefined-pairs: [{amountAsset = "BASE2", priceAsset = "BASE1"}]
       |  }
-      |}
-    """.stripMargin).withFallback(ConfigFactory.load()).resolve()
+      |}""".stripMargin))
 
   val matcherSettings = MatcherSettings.fromConfig(config)
 

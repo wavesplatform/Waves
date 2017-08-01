@@ -14,10 +14,10 @@ object BlockDiff {
 
   val empty: BlockDiff = BlockDiff(Monoid[Diff].empty, 0, Map.empty)
 
-  implicit def sortedMapForSnapshotsMonoid[A: Ordering, Snapshot]: Monoid[SortedMap[A, Snapshot]] = new Monoid[SortedMap[A, Snapshot]] {
-    def empty: SortedMap[A, Snapshot] = SortedMap.empty[A, Snapshot]
+  implicit def sortedMapForSnapshotsMonoid[A: Ordering, S]: Monoid[SortedMap[A, S]] = new Monoid[SortedMap[A, S]] {
+    def empty: SortedMap[A, S] = SortedMap.empty[A, S]
 
-    def combine(f1: SortedMap[A, Snapshot], f2: SortedMap[A, Snapshot]): SortedMap[A, Snapshot] = f1 ++ f2
+    def combine(f1: SortedMap[A, S], f2: SortedMap[A, S]): SortedMap[A, S] = f1 ++ f2
   }
 
   implicit val blockDiffMonoid = new Monoid[BlockDiff] {

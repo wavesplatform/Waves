@@ -6,13 +6,17 @@ enablePlugins(sbtdocker.DockerPlugin, JavaServerAppPackaging, JDebPackaging, Sys
 
 name := "waves"
 organization := "com.wavesplatform"
-version := "0.7.3-SNAPSHOT"
-scalaVersion in ThisBuild := "2.12.1"
+version := "0.7.3"
+scalaVersion in ThisBuild := "2.12.3"
 crossPaths := false
 publishArtifact in (Compile, packageDoc) := false
 publishArtifact in (Compile, packageSrc) := false
 mainClass in Compile := Some("com.wavesplatform.Application")
-scalacOptions ++= Seq("-feature", "-deprecation", "-Xmax-classfile-name", "128")
+scalacOptions ++= Seq(
+  "-feature",
+  "-deprecation",
+  "-Ywarn-unused:-implicits",
+  "-Xlint")
 logBuffered := false
 
 //assembly settings

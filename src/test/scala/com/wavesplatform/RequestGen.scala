@@ -7,7 +7,7 @@ import scorex.api.http.alias.SignedCreateAliasRequest
 import scorex.api.http.assets._
 import scorex.api.http.leasing.{SignedLeaseCancelRequest, SignedLeaseRequest}
 import scorex.crypto.encode.Base58
-import scorex.transaction.{CreateAliasTransaction, TransactionParser}
+import scorex.transaction.TransactionParser
 import scorex.transaction.assets.{IssueTransaction, TransferTransaction}
 
 trait RequestGen extends TransactionGen {

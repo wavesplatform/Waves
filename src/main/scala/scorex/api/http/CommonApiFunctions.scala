@@ -3,7 +3,6 @@ package scorex.api.http
 import akka.http.scaladsl.server.Directive1
 import com.wavesplatform.state2.ByteStr
 import scorex.block.Block
-import scorex.crypto.encode.Base58
 import scorex.transaction.{History, TransactionParser}
 
 

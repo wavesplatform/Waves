@@ -4,14 +4,12 @@ import com.wavesplatform.state2.ByteStr
 import io.netty.channel.{ChannelHandlerContext, ChannelInboundHandlerAdapter}
 import io.netty.util.concurrent.ScheduledFuture
 import scorex.block.Block
-import scorex.transaction.History
 import scorex.utils.ScorexLogging
 
 import scala.collection.mutable
 import scala.concurrent.duration.FiniteDuration
 
 class ExtensionBlocksLoader(
-    history: History,
     blockSyncTimeout: FiniteDuration,
     peerDatabase: PeerDatabase) extends ChannelInboundHandlerAdapter with ScorexLogging {
   private var pendingSignatures = Map.empty[ByteStr, Int]

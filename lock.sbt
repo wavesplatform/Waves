@@ -82,7 +82,7 @@ dependencyOverrides in ThisBuild ++= Set(
   "javax.validation" % "validation-api" % "1.1.0.Final",
   "javax.ws.rs" % "javax.ws.rs-api" % "2.0.1",
   "javax.ws.rs" % "jsr311-api" % "1.1.1",
-  "jline" % "jline" % "2.14.1",
+  "jline" % "jline" % "2.14.4",
   "net.databinder.dispatch" % "dispatch-core_2.12" % "0.12.0",
   "org.apache.commons" % "commons-compress" % "1.9",
   "org.apache.commons" % "commons-lang3" % "3.2.1",
@@ -138,4 +138,4 @@ dependencyOverrides in ThisBuild ++= Set(
   "org.whispersystems" % "curve25519-java" % "0.3.0",
   "org.yaml" % "snakeyaml" % "1.17"
 )
-// LIBRARY_DEPENDENCIES_HASH 8d66e0a773d55981918e990f7e00f14dea69fec4
+// LIBRARY_DEPENDENCIES_HASH 0d2814d643c6076e88aa0237ffb152dec2e81d89

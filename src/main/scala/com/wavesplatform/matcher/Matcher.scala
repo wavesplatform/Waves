@@ -12,7 +12,7 @@ import com.wavesplatform.state2.reader.StateReader
 import io.netty.channel.group.ChannelGroup
 import scorex.api.http.CompositeHttpService
 import scorex.transaction.History
-import scorex.utils.{ScorexLogging, Time}
+import scorex.utils.ScorexLogging
 import scorex.wallet.Wallet
 
 import scala.concurrent.Await
@@ -24,7 +24,6 @@ class Matcher(actorSystem: ActorSystem,
               utx: UtxPool,
               allChannels: ChannelGroup,
               stateReader: StateReader,
-              time: Time,
               history: History,
               blockchainSettings: BlockchainSettings,
               restAPISettings: RestAPISettings, matcherSettings: MatcherSettings) extends ScorexLogging {
@@ -39,7 +38,7 @@ class Matcher(actorSystem: ActorSystem,
   )
 
   lazy val matcher: ActorRef = actorSystem.actorOf(MatcherActor.props(orderHistory, stateReader, wallet, utx, allChannels,
-    matcherSettings, time, history, blockchainSettings.functionalitySettings), MatcherActor.name)
+    matcherSettings, history, blockchainSettings.functionalitySettings), MatcherActor.name)
 
   lazy val orderHistory: ActorRef = actorSystem.actorOf(OrderHistoryActor.props(matcherSettings, stateReader, wallet),
     OrderHistoryActor.name)
@@ -60,7 +59,6 @@ class Matcher(actorSystem: ActorSystem,
     matcherServerBinding = Await.result(Http().bindAndHandle(combinedRoute, matcherSettings.bindAddress,
       matcherSettings.port), 5.seconds)
 
-    implicit val ec = actorSystem.dispatcher
     log.info(s"Matcher bound to ${matcherServerBinding.localAddress} ")
   }
 

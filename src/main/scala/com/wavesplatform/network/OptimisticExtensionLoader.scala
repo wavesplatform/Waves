@@ -36,8 +36,6 @@ class OptimisticExtensionLoader extends ChannelDuplexHandler with ScorexLogging 
     case _ => super.channelRead(ctx, msg)
   }
 
-  private def fmt(tag: String, seq: Seq[_]) = s"$tag:${seq.mkString("\n","\n","\n")}"
-
   override def write(ctx: ChannelHandlerContext, msg: AnyRef, promise: ChannelPromise) = msg match {
     case LoadBlockchainExtension(localIds) if hopefullyNextIds == localIds =>
       if (nextExtensionBlocks.isEmpty) {

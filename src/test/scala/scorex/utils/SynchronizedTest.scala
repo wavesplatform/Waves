@@ -43,7 +43,7 @@ class SynchronizedTest extends FunSuite {
     }
   }
 
-  private def sleep = Thread.sleep(1500)
+  private def sleep() = Thread.sleep(1500)
 
   test("nested writes work") {
     val a = new A()
@@ -82,7 +82,7 @@ class SynchronizedTest extends FunSuite {
     Future(a.longRead())
     Thread.sleep(100)
     Await.result(Future(a.read()), 200.millis)
-    sleep
+    sleep()
   }
 
   test("can't do concurrent writes") {
@@ -92,7 +92,7 @@ class SynchronizedTest extends FunSuite {
     intercept[TimeoutException] {
       Await.result(Future(a.write()), 100.millis)
     }
-    sleep
+    sleep()
   }
 
   test("can't write while read") {
@@ -102,7 +102,7 @@ class SynchronizedTest extends FunSuite {
     intercept[TimeoutException] {
       Await.result(Future(a.write()), 100.millis)
     }
-    sleep
+    sleep()
   }
 
   test("can't read while write") {
@@ -112,6 +112,6 @@ class SynchronizedTest extends FunSuite {
     intercept[TimeoutException] {
       Await.result(Future(a.read()), 100.millis)
     }
-    sleep
+    sleep()
   }
 }
