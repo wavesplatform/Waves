@@ -1,6 +1,6 @@
 package com.wavesplatform.it
 
-import com.wavesplatform.it.api.NodeApi.{AssetBalance, FullAssetInfo}
+import com.wavesplatform.it.api.NodeApi.{AssetBalance, FullAssetInfo, Transaction}
 import com.wavesplatform.it.util._
 import org.scalatest._
 import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
@@ -29,6 +29,7 @@ trait IntegrationSuiteWithThreeAddresses extends FunSuite with BeforeAndAfterAll
   protected lazy val thirdAddress: String = Await.result(sender.createAddress, 1.minutes)
 
   protected def getAccountEffectiveBalance(acc: String): Future[Long] = sender.effectiveBalance(acc).map(_.balance)
+
   protected def getAccountBalance(acc: String): Future[Long] = sender.balance(acc).map(_.balance)
 
   protected def assertBalances(acc: String, balance: Long, effectiveBalance: Long): Future[Unit] = {
@@ -40,6 +41,9 @@ trait IntegrationSuiteWithThreeAddresses extends FunSuite with BeforeAndAfterAll
       newBalance shouldBe balance
     }
   }
+
+
+
 
   protected def assertAssetBalance(acc: String, assetIdString: String, balance: Long): Future[Unit] = {
     assertAsset(acc, assetIdString)(_.balance shouldBe balance)
