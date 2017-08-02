@@ -111,7 +111,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
         val discardedTransactions = Seq.newBuilder[Transaction]
         while (ngHistoryWriter.height > height) {
           val transactions = ngHistoryWriter.discardBlock()
-          log.trace(s"Collecting ${transactions.size} discarded transactions: $transactions")
+          log.trace(s"Collecting ${transactions.size} discarded transactions.")
           discardedTransactions ++= transactions
         }
         if (height < persisted.height) {
