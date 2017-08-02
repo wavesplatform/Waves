@@ -1,5 +1,7 @@
 package com.wavesplatform.matcher
 
+import java.io.File
+
 import akka.actor.{ActorRef, ActorSystem}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
@@ -49,7 +51,20 @@ class Matcher(actorSystem: ActorSystem,
     Await.result(matcherServerBinding.unbind(), 10.seconds)
   }
 
+  private def checkDirectory(directory: File): Unit = if (!directory.exists()) {
+    log.error(s"Failed to create directory '${directory.getPath}'")
+    sys.exit(1)
+  }
+
   def runMatcher() {
+    val journalDir = new File(matcherSettings.journalDataDir)
+    val snapshotDir = new File(matcherSettings.snapshotsDataDir)
+    journalDir.mkdirs()
+    snapshotDir.mkdirs()
+
+    checkDirectory(journalDir)
+    checkDirectory(snapshotDir)
+
     log.info(s"Starting matcher on: ${matcherSettings.bindAddress}:${matcherSettings.port} ...")
 
     implicit val as = actorSystem
