@@ -29,14 +29,19 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
 
   override def handlerAdded(ctx: ChannelHandlerContext) =
     ctx.channel().closeFuture().addListener { f: ChannelFuture =>
-      for ((currentHighestScoredChannel, s) <- channelWithHighestScore) {
+      for ((bestChannel, s) <- channelWithHighestScore) {
         // having no channel with highest score means scores map is empty, so it's ok to attempt to remove this channel
         // from the map only when there is one.
         Option(scores.remove(ctx.channel())).foreach(_ => log.debug(s"${id(ctx)} Closed, removing score $s"))
-        if (currentHighestScoredChannel == f.channel()) {
+        if (bestChannel == f.channel()) {
           // this channel had the highest score, so we should request extension from second-best channel, just in case
-          for ((secondHighestScoredChannel, _) <- channelWithHighestScore if pinnedChannel.compareAndSet(currentHighestScoredChannel, secondHighestScoredChannel)) {
-            secondHighestScoredChannel.writeAndFlush(LoadBlockchainExtension(lastSignatures))
+          channelWithHighestScore match {
+            case Some((secondBestChannel, secondBestScore))
+              if secondBestScore > localScore && pinnedChannel.compareAndSet(bestChannel, secondBestChannel) =>
+              log.debug(s"${id(ctx)} Switching to second best channel $pinnedChannelId")
+              secondBestChannel.writeAndFlush(LoadBlockchainExtension(lastSignatures))
+            case _ =>
+              if (pinnedChannel.compareAndSet(f.channel(), null)) log.debug(s"${id(ctx)} Unpinning unconditionally")
           }
         } else {
           if (pinnedChannel.compareAndSet(ctx.channel(), null))
@@ -85,7 +90,7 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
           highScore > localScore // remote score is higher than local
       } if (pinnedChannel.compareAndSet(null, ch)) {
         // we've finished to download blocks from previous high score channel
-        log.debug(s"${id(ctx)} New high score $highScore > $localScore, requesting extension")
+        log.debug(s"${id(ctx)} ${pinnedChannelId}New high score $highScore > $localScore, requesting extension")
         ctx.writeAndFlush(LoadBlockchainExtension(lastSignatures))
       } else {
         log.trace(s"${id(ctx)} New high score $highScore")
