@@ -7,7 +7,9 @@ object Dependencies {
   def akkaHttpModule(module: String) = "com.typesafe.akka" %% module % "10.0.9"
   def nettyModule(module: String) = "io.netty" % s"netty-$module" % "4.1.13.Final"
 
-  lazy val network = Seq(nettyModule("handler"))
+  lazy val network = Seq("handler", "buffer", "codec").map(nettyModule) ++ Seq(
+    "org.bitlet" % "weupnp" % "0.1.4"
+  )
 
   lazy val scalatest = Seq(
     "org.scalatest" %% "scalatest" % "3.0.3",
@@ -35,10 +37,6 @@ object Dependencies {
   )
   lazy val akka = Seq("actor", "slf4j").map(akkaModule)
 
-  lazy val p2p = Seq(
-    "org.bitlet" % "weupnp" % "0.1.4"
-  )
-
   lazy val db = Seq(
     "com.h2database" % "h2-mvstore" % "1.4.196"
   )
@@ -50,7 +48,6 @@ object Dependencies {
 
   lazy val http = Seq("core", "annotations", "models", "jaxrs").map(swaggerModule) ++ Seq(
     "io.swagger" %% "swagger-scala-module" % "1.0.4",
-    "com.chuusai" %% "shapeless" % "2.3.2",
     "com.github.swagger-akka-http" %% "swagger-akka-http" % "0.10.0",
     akkaHttpModule("akka-http")
   )
@@ -58,7 +55,6 @@ object Dependencies {
   lazy val matcher = Seq(
     akkaModule("persistence"),
     "com.github.dnvriend" %% "akka-persistence-inmemory" % "2.4.18.1" % "test",
-    "org.iq80.leveldb" % "leveldb" % "0.9",
     "org.fusesource.leveldbjni" % "leveldbjni-all" % "1.8"
   )
 }

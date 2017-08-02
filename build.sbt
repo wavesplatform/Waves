@@ -37,7 +37,6 @@ libraryDependencies ++=
   Dependencies.itKit ++
   Dependencies.logging ++
   Dependencies.matcher ++
-  Dependencies.p2p ++
   Seq(
     "com.iheart" %% "ficus" % "1.4.1",
     ("org.scorexfoundation" %% "scrypto" % "1.2.2")
