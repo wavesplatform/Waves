@@ -9,7 +9,7 @@ import com.wavesplatform.state2.diffs.TransactionDiffer
 import com.wavesplatform.state2.reader.{CompositeStateReader, StateReader}
 import com.wavesplatform.state2.{ByteStr, Diff}
 import scorex.consensus.TransactionsOrdering
-import scorex.transaction.ValidationError.{AlreadyInThePool, GenericError}
+import scorex.transaction.ValidationError.GenericError
 import scorex.transaction.{FeeCalculator, History, Transaction, ValidationError}
 import scorex.utils.{ScorexLogging, Time}
 

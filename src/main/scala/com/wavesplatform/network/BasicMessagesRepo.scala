@@ -6,7 +6,6 @@ import java.util
 import com.google.common.primitives.{Bytes, Ints}
 import com.wavesplatform.state2.ByteStr
 import scorex.block.{Block, MicroBlock}
-import scorex.crypto.signatures.SigningFunctions
 import scorex.crypto.signatures.SigningFunctions.Signature
 import scorex.network.message.Message._
 import scorex.network.message._

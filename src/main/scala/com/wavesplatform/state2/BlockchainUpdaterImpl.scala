@@ -140,10 +140,13 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
   }
 
   override def processMicroBlock(microBlock: MicroBlock): Either[ValidationError, Unit] = write { implicit l =>
+    val bld = bestLiquidDiff()
     ngHistoryWriter.appendMicroBlock(microBlock)(ts =>
-      BlockDiffer.fromMicroBlock(settings, bestLiquidState, ngHistoryWriter.parent(ngHistoryWriter.lastBlock.get).map(_.timestamp), microBlock, ts))
-      .map(newTotalDiff => {
-        liquidBlockCandidatesDiff.set(liquidBlockCandidatesDiff() + (microBlock.totalResBlockSig -> newTotalDiff))
+      BlockDiffer.fromMicroBlock(settings,
+        composite(currentPersistedBlocksState, () => bestLiquidDiff().copy(snapshots = Map.empty)),
+        ngHistoryWriter.parent(ngHistoryWriter.lastBlock.get).map(_.timestamp), microBlock, ts))
+      .map(microBlockDiff => {
+        liquidBlockCandidatesDiff.set(liquidBlockCandidatesDiff() + (microBlock.totalResBlockSig -> Monoid.combine(bld, microBlockDiff)))
         log.info(s"MicroBlock ${trim(microBlock.totalResBlockSig)}~>${trim(microBlock.prevResBlockSig)} appended. " +
           s" -- with ${microBlock.transactionData.size} transactions")
       })

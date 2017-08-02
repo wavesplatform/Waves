@@ -42,7 +42,7 @@ object BlockDiffer extends ScorexLogging {
 
   private def apply(settings: FunctionalitySettings, s: StateReader, pervBlockTimestamp: Option[Long])
                    (blockGenerator: Address, maybeFeesDistr: Option[Diff], timestamp: Long, txs: Seq[Transaction], heightDiff: Int): Either[ValidationError, BlockDiff] = {
-    val currentBlockHeight = s.height + 1
+    val currentBlockHeight = s.height + heightDiff
 
     val txDiffer = TransactionDiffer(settings, pervBlockTimestamp, timestamp, currentBlockHeight) _
 
@@ -79,6 +79,10 @@ object BlockDiffer extends ScorexLogging {
       val newSnapshots = diff.portfolios
         .collect { case (acc, portfolioDiff) if portfolioDiff.balance != 0 || portfolioDiff.effectiveBalance != 0 =>
           val oldPortfolio = s.accountPortfolio(acc)
+          if (s.lastUpdateHeight(acc).contains(currentBlockHeight)) {
+            throw new Exception(s"CRITICAL: attempting to build a circular reference in snapshot list. " +
+              s"acc=$acc, currentBlockHeight=$currentBlockHeight")
+          }
           acc -> SortedMap(currentBlockHeight -> Snapshot(
             prevHeight = s.lastUpdateHeight(acc).getOrElse(0),
             balance = oldPortfolio.balance + portfolioDiff.balance,

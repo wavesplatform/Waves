@@ -9,7 +9,7 @@ import com.wavesplatform.state2.ByteStr
 import com.wavesplatform.state2.reader.StateReader
 import scorex.block.{Block, MicroBlock}
 import scorex.consensus.TransactionsOrdering
-import scorex.transaction.ValidationError.{BlockAppendError, GenericError, MicroBlockAppendError}
+import scorex.transaction.ValidationError.{GenericError, MicroBlockAppendError}
 import scorex.transaction._
 import scorex.utils.{ScorexLogging, Time}
 

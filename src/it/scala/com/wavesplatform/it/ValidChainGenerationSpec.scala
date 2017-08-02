@@ -3,7 +3,6 @@ package com.wavesplatform.it
 import org.scalatest._
 import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
 
-import scala.collection.mutable
 import scala.concurrent.Await.result
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future

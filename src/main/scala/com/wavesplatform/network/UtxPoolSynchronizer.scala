@@ -9,7 +9,6 @@ import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel.group.ChannelGroup
 import io.netty.channel.{ChannelHandlerContext, ChannelInboundHandlerAdapter}
 import scorex.transaction.Transaction
-import scorex.transaction.ValidationError.AlreadyInThePool
 import scorex.utils.ScorexLogging
 
 import scala.concurrent.Future
