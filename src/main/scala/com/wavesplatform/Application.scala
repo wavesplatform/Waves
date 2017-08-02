@@ -231,7 +231,7 @@ object Application extends ScorexLogging {
     val config = readConfig(args.headOption)
     val settings = WavesSettings.fromConfig(config)
 
-    RootActorSystem.start("wavesplatform", settings.matcherSettings) { actorSystem =>
+    RootActorSystem.start("wavesplatform", config) { actorSystem =>
       configureLogging(settings)
 
       // Initialize global var with actual address scheme
