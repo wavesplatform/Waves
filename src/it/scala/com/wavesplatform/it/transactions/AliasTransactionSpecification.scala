@@ -2,11 +2,9 @@ package com.wavesplatform.it.transactions
 
 import com.wavesplatform.it.util._
 import com.wavesplatform.it.{IntegrationSuiteWithThreeAddresses, Node}
-import com.wavesplatform.state2._
 import org.scalatest.prop.TableDrivenPropertyChecks
-import scorex.account.Alias
 
-import scala.concurrent.Await
+import scala.concurrent.{Await, Future}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
@@ -15,33 +13,29 @@ import scala.concurrent.duration._
 class AliasTransactionSpecification(override val allNodes: Seq[Node], override val notMiner: Node)
   extends IntegrationSuiteWithThreeAddresses with TableDrivenPropertyChecks {
 
-  val aliasFee = 1.waves;
+  private val aliasFee = 1.waves
+  private val leasingFee = 0.001.waves
 
-  ignore("Able to send money to an alias") {
+  test("Able to send money to an alias") {
     val alias = "test_alias"
 
     val f = for {
       _ <- assertBalances(firstAddress, 100.waves, 100.waves)
-      aliasTxId <- sender.createAlias(firstAddress, alias, 1.waves).map(_.id)
+      aliasTxId <- sender.createAlias(firstAddress, alias, aliasFee).map(_.id)
 
-      height <- traverse(allNodes)(_.height).map(_.max)
-      _ <- traverse(allNodes)(_.waitForHeight(height + 1))
-      _ <- traverse(allNodes)(_.waitForTransaction(aliasTxId))
+      _ <- waitForHeightAraise(aliasTxId, 1)
 
       _ <- assertBalances(firstAddress, 99.waves, 99.waves)
       transferId <- sender.transfer(firstAddress, s"alias:${sender.settings.blockchainSettings.addressSchemeCharacter}:$alias", 1.waves, 1.waves).map(_.id)
 
-      height <- traverse(allNodes)(_.height).map(_.max)
-      _ <- traverse(allNodes)(_.waitForHeight(height + 1))
-      _ <- traverse(allNodes)(_.waitForTransaction(transferId))
-
+      _ <- waitForHeightAraise(transferId, 1)
       _ <- assertBalances(firstAddress, 98.waves, 98.waves)
     } yield succeed
 
     Await.result(f, 1.minute)
   }
 
-  ignore("Not able to create same aliases to same address") {
+  test("Not able to create same aliases to same address") {
     val alias = "test_alias2"
     val f = for {
       balance <- getAccountBalance(firstAddress)
@@ -49,10 +43,7 @@ class AliasTransactionSpecification(override val allNodes: Seq[Node], override v
 
       aliasTxId <- sender.createAlias(firstAddress, alias, aliasFee).map(_.id)
 
-      height <- traverse(allNodes)(_.height).map(_.max)
-      _ <- traverse(allNodes)(_.waitForHeight(height + 1))
-      _ <- traverse(allNodes)(_.waitForTransaction(aliasTxId))
-
+      _ <- waitForHeightAraise(aliasTxId, 1)
       newBalance = balance - aliasFee
       newEffectiveBalance = effectiveBalance - aliasFee
 
@@ -65,7 +56,7 @@ class AliasTransactionSpecification(override val allNodes: Seq[Node], override v
   }
 
 
-  ignore("Not able to create aliases to other addresses") {
+  test("Not able to create aliases to other addresses") {
     val alias = "test_alias3"
 
     val f = for {
@@ -74,9 +65,7 @@ class AliasTransactionSpecification(override val allNodes: Seq[Node], override v
 
       aliasTxId <- sender.createAlias(firstAddress, alias, aliasFee).map(_.id)
 
-      height <- traverse(allNodes)(_.height).map(_.max)
-      _ <- traverse(allNodes)(_.waitForHeight(height + 1))
-      _ <- traverse(allNodes)(_.waitForTransaction(aliasTxId))
+      _ <- waitForHeightAraise(aliasTxId, 1)
       _ <- assertBadRequest(sender.createAlias(secondAddress, alias, aliasFee))
       //todo add request with error deserialization
       _ <- assertBadRequestAndMessage(sender.createAlias(secondAddress, alias, aliasFee), "Tx with such id aready present")
@@ -86,63 +75,51 @@ class AliasTransactionSpecification(override val allNodes: Seq[Node], override v
     Await.result(f, 1.minute)
   }
 
-  ignore("Able to create several different aliases to same addresses") {
-    val first_alias = "test_alias4"
-    val second_alias = "test_alias5"
+  test("Able to create several different aliases to same addresses") {
+    val firstAlias = "test_alias4"
+    val secondAlias = "test_alias5"
 
     val f = for {
 
       balance <- getAccountBalance(secondAddress)
       effectiveBalance <- getAccountEffectiveBalance(secondAddress)
 
-      aliasFirstTxId <- sender.createAlias(secondAddress, first_alias, aliasFee).map(_.id)
-
-      height <- traverse(allNodes)(_.height).map(_.max)
-      _ <- traverse(allNodes)(_.waitForHeight(height + 1))
-      _ <- traverse(allNodes)(_.waitForTransaction(aliasFirstTxId))
+      aliasFirstTxId <- sender.createAlias(secondAddress, firstAlias, aliasFee).map(_.id)
+      _ <- waitForHeightAraise(aliasFirstTxId, 1)
 
       newBalance = balance - aliasFee
       newEffectiveBalance = effectiveBalance - aliasFee
 
       _ <- assertBalances(secondAddress, newBalance, newEffectiveBalance)
 
-      aliasSecondTxId <- sender.createAlias(secondAddress, second_alias, aliasFee).map(_.id)
+      aliasSecondTxId <- sender.createAlias(secondAddress, secondAlias, aliasFee).map(_.id)
 
-
-      height <- traverse(allNodes)(_.height).map(_.max)
-      _ <- traverse(allNodes)(_.waitForHeight(height + 1))
-      _ <- traverse(allNodes)(_.waitForTransaction(aliasFirstTxId))
-
+      _ <- waitForHeightAraise(aliasSecondTxId, 1)
       _ <- assertBalances(secondAddress, newBalance - aliasFee, newEffectiveBalance - aliasFee)
 
       aliasesList <- sender.aliasByAddress(secondAddress)
 
     } yield {
-      aliasesList should contain allElementsOf Seq(first_alias, second_alias).map(s => Alias.buildAlias('I', s).explicitGet().stringRepr)
+      aliasesList should contain allElementsOf Seq(firstAlias, secondAlias)
+        .map(s => s"alias:${sender.settings.blockchainSettings.addressSchemeCharacter}:$s")
     }
 
     Await.result(f, 1.minute)
   }
 
 
-  //  def waitForHeightAraise(transactionId: String, heightIncreaseOn: Integer)  {
-  //    var f = for {
-  //      height <- traverse(allNodes)(_.height).map(_.max)
-  //      _ <- traverse(allNodes)(_.waitForHeight(height + heightIncreaseOn))
-  //      _ <- traverse(allNodes)(_.waitForTransaction(transactionId))
-  //    }
-  //      Await.result(f, 1.minute)
-  //  }
+  def waitForHeightAraise(transactionId: String, heightIncreaseOn: Integer): Future[Unit] = for {
+    height <- traverse(allNodes)(_.height).map(_.max)
+    _ <- traverse(allNodes)(_.waitForHeight(height + heightIncreaseOn))
+    _ <- traverse(allNodes)(_.waitForTransaction(transactionId))
+  } yield ()
 
-  ignore("Able to get address by alias") {
+  test("Able to get address by alias") {
     val alias = "test_alias_6"
-    var f = for {
+    val f = for {
       balance <- getAccountBalance(firstAddress)
       aliasFirstTxId <- sender.createAlias(firstAddress, alias, aliasFee).map(_.id)
-      height <- traverse(allNodes)(_.height).map(_.max)
-      _ <- traverse(allNodes)(_.waitForHeight(height + 1))
-      _ <- traverse(allNodes)(_.waitForTransaction(aliasFirstTxId))
-      //      obj <- waitForHeightAraise(aliasFirstTxId, 1)
+      _ <- waitForHeightAraise(aliasFirstTxId, 1)
       addressByAlias <- sender.addressByAlias(alias).map(_.address)
     } yield {
       addressByAlias should be(s"address:$firstAddress")
@@ -152,13 +129,12 @@ class AliasTransactionSpecification(override val allNodes: Seq[Node], override v
   }
 
   val aliases_names =
-    Table("alias_name",
+    Table("aliasName",
       "aaaa",
       "sixteen_chars_al",
       "....",
       "1234567890123456",
-      "@.@-@_@"
-    ,"UpperCaseAliase")
+      "@.@-@_@")
 
   aliases_names.foreach { alias =>
     test(s"create alias named $alias") {
@@ -166,10 +142,7 @@ class AliasTransactionSpecification(override val allNodes: Seq[Node], override v
         balance <- getAccountBalance(secondAddress)
         effectiveBalance <- getAccountEffectiveBalance(secondAddress)
         aliasTxId <- sender.createAlias(secondAddress, alias, aliasFee).map(_.id)
-
-        height <- traverse(allNodes)(_.height).map(_.max)
-        _ <- traverse(allNodes)(_.waitForHeight(height + 1))
-        _ <- traverse(allNodes)(_.waitForTransaction(aliasTxId))
+        _ <- waitForHeightAraise(aliasTxId, 1)
         _ <- assertBalances(secondAddress, balance - aliasFee, effectiveBalance - aliasFee)
 
       } yield succeed
@@ -180,17 +153,17 @@ class AliasTransactionSpecification(override val allNodes: Seq[Node], override v
   }
 
   val invalid_aliases_names =
-    Table(("alias_name", "message"),
-      ("", "Alias 'abc' length should be between 4 and 30"),
+    Table(("aliasName", "message"),
+      ("", "Alias '' length should be between 4 and 30"),
       ("abc", "Alias 'abc' length should be between 4 and 30"),
-      (null, "Alias 'abc' length should be between 4 and 30"),
-      ("morethen_thirtycharactersinline", ""),
-      ("~!|#$%^&*()_+=\";:/?><|\\][{}", ""),
-      ("multilnetest\ntest", "Alias cannot be multiline"),
-      ("UpperCaseAliase", ""))
+      (null, "failed to parse json message"),
+      ("morethen_thirtycharactersinline", "Alias 'morethen_thirtycharactersinline' length should be between 4 and 30"),
+      ("~!|#$%^&*()_+=\";:/?><|\\][{}", "Alias should contain only following characters: -.0123456789@_abcdefghijklmnopqrstuvwxyz"),
+      ("multilnetest\ntest", "Alias should contain only following characters: -.0123456789@_abcdefghijklmnopqrstuvwxyz"),
+      ("UpperCaseAliase", "Alias should contain only following characters: -.0123456789@_abcdefghijklmnopqrstuvwxyz"))
 
   forAll(invalid_aliases_names) { (alias: String, message: String) =>
-    ignore(s"Not able to create alias named $alias") {
+    test(s"Not able to create alias named $alias") {
       val f = for {
         _ <- assertBadRequestAndMessage(sender.createAlias(secondAddress, alias, aliasFee), message)
       } yield succeed
@@ -199,5 +172,40 @@ class AliasTransactionSpecification(override val allNodes: Seq[Node], override v
     }
 
 
+  }
+
+  test("Able to lease by alias") {
+    val thirdAddressAlias = "leasing_alias"
+    val buildedThirdAddressAlias = s"alias:${sender.settings.blockchainSettings.addressSchemeCharacter}:$thirdAddressAlias"
+
+    val f = for {
+      firstAddressBalance <- getAccountBalance(firstAddress)
+      firstAddressEffectiveBalance <- getAccountEffectiveBalance(firstAddress)
+      thirdAddressBalance <- getAccountBalance(thirdAddress)
+      thirdAddressEffectiveBalance <- getAccountEffectiveBalance(thirdAddress)
+      aliasTxId <- sender.createAlias(thirdAddress, thirdAddressAlias, aliasFee).map(_.id)
+      _ <- waitForHeightAraise(aliasTxId, 1)
+
+      //lease maximum value, to pass next test
+      leasingAmount = firstAddressBalance - leasingFee - 0.5.waves
+
+      leasingTx <- sender.lease(firstAddress, buildedThirdAddressAlias, leasingAmount, leasingFee).map(_.id)
+      _ <- waitForHeightAraise(leasingTx, 1)
+
+      _ <- assertBalances(firstAddress, firstAddressBalance - leasingFee,
+        firstAddressEffectiveBalance - leasingAmount - leasingFee)
+      _ <- assertBalances(thirdAddress, thirdAddressBalance - aliasFee, thirdAddressEffectiveBalance -aliasFee + leasingAmount)
+    } yield succeed
+    Await.result(f, 1.minute)
+  }
+
+  test("Not able to create aliase when insufficient funds"){
+    val alias = "test_alias7"
+    val f = for {
+      _ <- assertBadRequestAndMessage(sender.createAlias(firstAddress, alias, aliasFee),
+        "State check failed. Reason: negative effective balance")
+
+    }yield succeed
+    Await.result(f, 1.minute)
   }
 }
