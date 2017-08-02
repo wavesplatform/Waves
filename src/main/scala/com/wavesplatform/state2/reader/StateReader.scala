@@ -2,7 +2,7 @@ package com.wavesplatform.state2.reader
 
 import com.google.common.base.Charsets
 import com.wavesplatform.state2._
-import scorex.account.{AddressOrAlias, Address, Alias}
+import scorex.account.{Address, AddressOrAlias, Alias}
 import scorex.transaction.ValidationError.AliasNotExists
 import scorex.transaction._
 import scorex.transaction.assets.IssueTransaction
@@ -11,7 +11,7 @@ import scorex.utils.{ScorexLogging, Synchronized}
 
 import scala.annotation.tailrec
 import scala.reflect.ClassTag
-import scala.util.Right
+import scala.util.{Right, Try}
 
 trait StateReader extends Synchronized {
 
@@ -136,7 +136,10 @@ object StateReader {
           val snapshot = s.snapshotAtHeight(acc, deeperHeight).get
           if (deeperHeight <= bottomNotIncluded)
             snapshot +: list
-          else if (deeperHeight > atHeight && snapshot.prevHeight > atHeight) {
+          else if (snapshot.prevHeight == deeperHeight) {
+            throw new Exception(s"CRITICAL: Infinite loop detected while calculating minBySnapshot: acc=$acc, atHeight=$atHeight, " +
+              s"confirmations=$confirmations; lastUpdateHeight=${s.lastUpdateHeight(acc)}; current step: deeperHeight=$deeperHeight, list.size=${list.size}")
+          } else if (deeperHeight > atHeight && snapshot.prevHeight > atHeight) {
             loop(snapshot.prevHeight, list)
           } else
             loop(snapshot.prevHeight, snapshot +: list)
@@ -154,23 +157,27 @@ object StateReader {
       snapshots.map(extractor).min
     }
 
-    def effectiveBalanceAtHeightWithConfirmations(acc: Address, atHeight: Int, confirmations: Int): Long =
+    def effectiveBalanceAtHeightWithConfirmations(acc: Address, atHeight: Int, confirmations: Int): Try[Long] = Try {
       minBySnapshot(acc, atHeight, confirmations)(_.effectiveBalance)
+    }
 
     def balanceWithConfirmations(acc: Address, confirmations: Int): Long =
       minBySnapshot(acc, s.height, confirmations)(_.balance)
 
     def balanceAtHeight(acc: Address, height: Int): Long = s.read { _ =>
-
       @tailrec
       def loop(lookupHeight: Int): Long = s.snapshotAtHeight(acc, lookupHeight) match {
         case None if lookupHeight == 0 => 0
         case Some(snapshot) if lookupHeight <= height => snapshot.balance
+        case Some(snapshot) if snapshot.prevHeight == lookupHeight =>
+          throw new Exception(s"CRITICAL: Cannot lookup account $acc for height $height(current=${s.height}). Infinite loop detected. " +
+            s"This indicates snapshots processing error.")
         case Some(snapshot) => loop(snapshot.prevHeight)
         case None =>
-          throw new Exception(s"Cannot lookup account $acc for height $height(current=${s.height}). " +
+          throw new Exception(s"CRITICAL: Cannot lookup account $acc for height $height(current=${s.height}). " +
             s"No history found at requested lookupHeight=$lookupHeight")
       }
+
 
       loop(s.lastUpdateHeight(acc).getOrElse(0))
     }

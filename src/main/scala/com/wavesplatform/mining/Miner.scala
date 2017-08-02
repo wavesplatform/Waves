@@ -15,6 +15,7 @@ import scorex.account.PrivateKeyAccount
 import scorex.block.Block
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
 import scorex.transaction.PoSCalc._
+import scorex.transaction.ValidationError.GenericError
 import scorex.transaction.{BlockchainUpdater, CheckpointService, History}
 import scorex.utils.{ScorexLogging, Time}
 import scorex.wallet.Wallet
@@ -81,11 +82,11 @@ class Miner(
     (for {
       _ <- checkAge(height, lastBlock)
       ts <- nextBlockGenerationTime(height, stateReader, blockchainSettings.functionalitySettings, lastBlock, account)
-    } yield ts) match {
-      case Right(ts) =>
-        val offset = calcOffset(timeService, ts)
+      offset = calcOffset(timeService, ts)
+      balance <- generatingBalance(stateReader, blockchainSettings.functionalitySettings, account, height).toEither.left.map(er => GenericError(er.getMessage))
+    } yield (offset, balance)) match {
+      case Right((offset, balance)) =>
         log.debug(s"Next attempt for acc=$account in $offset")
-        val balance = generatingBalance(stateReader, blockchainSettings.functionalitySettings, account, height)
         generateOneBlockTask(account, height, lastBlock, grandParent, balance)(offset).flatMap {
           case Right(block) => Task.now {
             processBlock(block, true) match {
