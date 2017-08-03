@@ -38,8 +38,8 @@ class AliasTransactionSpecification(override val allNodes: Seq[Node], override v
   test("Not able to create same aliases to same address") {
     val alias = "test_alias2"
     val f = for {
-      balance <- getAccountBalance(firstAddress)
-      effectiveBalance <- getAccountEffectiveBalance(firstAddress)
+      balance <- accountBalance(firstAddress)
+      effectiveBalance <- accountEffectiveBalance(firstAddress)
 
       aliasTxId <- sender.createAlias(firstAddress, alias, aliasFee).map(_.id)
 
@@ -60,8 +60,8 @@ class AliasTransactionSpecification(override val allNodes: Seq[Node], override v
     val alias = "test_alias3"
 
     val f = for {
-      balance <- getAccountBalance(firstAddress)
-      effectiveBalance <- getAccountEffectiveBalance(firstAddress)
+      balance <- accountBalance(firstAddress)
+      effectiveBalance <- accountEffectiveBalance(firstAddress)
 
       aliasTxId <- sender.createAlias(firstAddress, alias, aliasFee).map(_.id)
 
@@ -81,8 +81,8 @@ class AliasTransactionSpecification(override val allNodes: Seq[Node], override v
 
     val f = for {
 
-      balance <- getAccountBalance(secondAddress)
-      effectiveBalance <- getAccountEffectiveBalance(secondAddress)
+      balance <- accountBalance(secondAddress)
+      effectiveBalance <- accountEffectiveBalance(secondAddress)
 
       aliasFirstTxId <- sender.createAlias(secondAddress, firstAlias, aliasFee).map(_.id)
       _ <- waitForHeightAraise(aliasFirstTxId, 1)
@@ -117,7 +117,7 @@ class AliasTransactionSpecification(override val allNodes: Seq[Node], override v
   test("Able to get address by alias") {
     val alias = "test_alias_6"
     val f = for {
-      balance <- getAccountBalance(firstAddress)
+      balance <- accountBalance(firstAddress)
       aliasFirstTxId <- sender.createAlias(firstAddress, alias, aliasFee).map(_.id)
       _ <- waitForHeightAraise(aliasFirstTxId, 1)
       addressByAlias <- sender.addressByAlias(alias).map(_.address)
@@ -139,8 +139,8 @@ class AliasTransactionSpecification(override val allNodes: Seq[Node], override v
   aliases_names.foreach { alias =>
     test(s"create alias named $alias") {
       val f = for {
-        balance <- getAccountBalance(secondAddress)
-        effectiveBalance <- getAccountEffectiveBalance(secondAddress)
+        balance <- accountBalance(secondAddress)
+        effectiveBalance <- accountEffectiveBalance(secondAddress)
         aliasTxId <- sender.createAlias(secondAddress, alias, aliasFee).map(_.id)
         _ <- waitForHeightAraise(aliasTxId, 1)
         _ <- assertBalances(secondAddress, balance - aliasFee, effectiveBalance - aliasFee)
@@ -179,10 +179,10 @@ class AliasTransactionSpecification(override val allNodes: Seq[Node], override v
     val buildedThirdAddressAlias = s"alias:${sender.settings.blockchainSettings.addressSchemeCharacter}:$thirdAddressAlias"
 
     val f = for {
-      firstAddressBalance <- getAccountBalance(firstAddress)
-      firstAddressEffectiveBalance <- getAccountEffectiveBalance(firstAddress)
-      thirdAddressBalance <- getAccountBalance(thirdAddress)
-      thirdAddressEffectiveBalance <- getAccountEffectiveBalance(thirdAddress)
+      firstAddressBalance <- accountBalance(firstAddress)
+      firstAddressEffectiveBalance <- accountEffectiveBalance(firstAddress)
+      thirdAddressBalance <- accountBalance(thirdAddress)
+      thirdAddressEffectiveBalance <- accountEffectiveBalance(thirdAddress)
       aliasTxId <- sender.createAlias(thirdAddress, thirdAddressAlias, aliasFee).map(_.id)
       _ <- waitForHeightAraise(aliasTxId, 1)
 
@@ -199,6 +199,7 @@ class AliasTransactionSpecification(override val allNodes: Seq[Node], override v
     Await.result(f, 1.minute)
   }
 
+  //previous test should not be commented to run this one
   test("Not able to create aliase when insufficient funds"){
     val alias = "test_alias7"
     val f = for {

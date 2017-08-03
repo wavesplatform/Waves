@@ -30,7 +30,7 @@ object Alias {
   private def validAliasChar(c: Char): Boolean =
     ('0' <= c && c <= '9') || ('a' <= c && c <= 'z') || c == '_' || c == '@' || c == '-' || c == '.'
 
-  def buildAlias(networkByte: Byte, name: String): Either[ValidationError, Alias] = {
+  private def buildAlias(networkByte: Byte, name: String): Either[ValidationError, Alias] = {
 
     case class AliasImpl(networkByte: Byte, name: String) extends Alias
 
