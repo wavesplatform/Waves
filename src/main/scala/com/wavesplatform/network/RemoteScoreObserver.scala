@@ -27,12 +27,12 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
     Option(scores.reduceEntries(1000, (c1, c2) => if (c1.getValue > c2.getValue) c1 else c2))
       .map(e => e.getKey -> e.getValue)
 
-  override def handlerAdded(ctx: ChannelHandlerContext) =
+  override def handlerAdded(ctx: ChannelHandlerContext): Unit =
     ctx.channel().closeFuture().addListener { f: ChannelFuture =>
-      for ((bestChannel, s) <- channelWithHighestScore) {
+      for ((bestChannel, _) <- channelWithHighestScore) {
         // having no channel with highest score means scores map is empty, so it's ok to attempt to remove this channel
         // from the map only when there is one.
-        Option(scores.remove(ctx.channel())).foreach(_ => log.debug(s"${id(ctx)} Closed, removing score $s"))
+        Option(scores.remove(ctx.channel())).foreach(removedScore => log.debug(s"${id(ctx)} Closed, removing score $removedScore"))
         if (bestChannel == f.channel()) {
           // this channel had the highest score, so we should request extension from second-best channel, just in case
           channelWithHighestScore match {
@@ -50,7 +50,7 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
       }
     }
 
-  override def write(ctx: ChannelHandlerContext, msg: AnyRef, promise: ChannelPromise) = msg match {
+  override def write(ctx: ChannelHandlerContext, msg: AnyRef, promise: ChannelPromise): Unit = msg match {
     case LocalScoreChanged(newLocalScore) =>
       if (pinnedChannel.compareAndSet(ctx.channel(), null)) { // Fork applied
         log.debug(s"${id(ctx)} ${pinnedChannelId}New local score: $newLocalScore")
@@ -69,7 +69,7 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
     case _ => ctx.write(msg, promise)
   }
 
-  override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef) = msg match {
+  override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
     case newScore: History.BlockchainScore =>
 
       ctx.executor().schedule(scoreTtl) {
