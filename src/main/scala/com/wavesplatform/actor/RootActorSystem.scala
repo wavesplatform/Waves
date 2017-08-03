@@ -1,10 +1,7 @@
 package com.wavesplatform.actor
 
-import java.io.File
-
 import akka.actor.{ActorSystem, AllForOneStrategy, SupervisorStrategy, SupervisorStrategyConfigurator}
-import com.typesafe.config.{ConfigFactory, ConfigValueFactory}
-import com.wavesplatform.matcher.MatcherSettings
+import com.typesafe.config.Config
 import scorex.utils.ScorexLogging
 
 import scala.concurrent.Await
@@ -22,21 +19,8 @@ object RootActorSystem extends ScorexLogging {
     }
   }
 
-  def start(id: String, settings: MatcherSettings)(init: ActorSystem => Unit): Unit = {
-    val journalDir = new File(settings.journalDataDir)
-    val snapshotDir = new File(settings.snapshotsDataDir)
-    if (settings.enable) {
-      journalDir.mkdirs()
-      snapshotDir.mkdirs()
-      checkDirectory(journalDir)
-      checkDirectory(snapshotDir)
-    }
-
-    val system = ActorSystem(id, ConfigFactory.load().withValue("akka.actor.guardian-supervisor-strategy",
-      ConfigValueFactory.fromAnyRef("com.wavesplatform.actor.RootActorSystem$EscalatingStrategy"))
-      .withValue("akka.persistence.journal.leveldb.dir", ConfigValueFactory.fromAnyRef(settings.journalDataDir))
-      .withValue("akka.persistence.snapshot-store.local.dir", ConfigValueFactory.fromAnyRef(settings.snapshotsDataDir)))
-
+  def start(id: String, config: Config)(init: ActorSystem => Unit): Unit = {
+    val system = ActorSystem(id, config)
     try {
       init(system)
     } catch {
@@ -51,10 +35,5 @@ object RootActorSystem extends ScorexLogging {
     } else {
       sys.exit(0)
     }
-  }
-
-  private def checkDirectory(directory: File): Unit = if (!directory.exists()) {
-    log.error(s"Failed to create directory '${directory.getPath}'")
-    sys.exit(1)
   }
 }
