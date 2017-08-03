@@ -6,15 +6,12 @@ import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.model.headers._
 import akka.http.scaladsl.server.Directive0
 import akka.http.scaladsl.server.Directives._
-import akka.stream.ActorMaterializer
 import com.wavesplatform.settings.RestAPISettings
 import scorex.api.http.swagger.SwaggerDocService
 
-import scala.reflect.runtime.universe.Type
+case class CompositeHttpService(system: ActorSystem, apiClasses: Set[Class[_]], routes: Seq[ApiRoute], settings: RestAPISettings) {
 
-case class CompositeHttpService(system: ActorSystem, apiTypes: Seq[Type], routes: Seq[ApiRoute], settings: RestAPISettings) {
-
-  val swaggerService = new SwaggerDocService(system, ActorMaterializer()(system), apiTypes, settings)
+  val swaggerService = new SwaggerDocService(system, apiClasses, settings)
 
   def withCors: Directive0 = if (settings.cors)
     respondWithHeader(`Access-Control-Allow-Origin`.*) else pass
