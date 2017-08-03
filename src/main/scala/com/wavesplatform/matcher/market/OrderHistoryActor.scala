@@ -29,7 +29,9 @@ class OrderHistoryActor(val settings: MatcherSettings, val storedState: StateRea
         val file = new File(s)
         file.getParentFile.mkdirs().ensuring(file.getParentFile.exists())
 
-        new MVStore.Builder().fileName(s).compress().open()
+        val db = new MVStore.Builder().fileName(s).open()
+        db.rollback()
+        db
       case None =>
         new MVStore.Builder().open()
     }
@@ -43,6 +45,11 @@ class OrderHistoryActor(val settings: MatcherSettings, val storedState: StateRea
     context.system.eventStream.subscribe(self, classOf[OrderAdded])
     context.system.eventStream.subscribe(self, classOf[OrderExecuted])
     context.system.eventStream.subscribe(self, classOf[OrderCanceled])
+  }
+
+  override def postStop(): Unit = {
+    db.commit()
+    db.close()
   }
 
   override def receive: Receive = {

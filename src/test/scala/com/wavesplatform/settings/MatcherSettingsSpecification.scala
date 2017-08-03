@@ -32,6 +32,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
         |    ]
         |    max-timestamp-diff = 3h
         |    blacklisted-assets: []
+        |    blacklisted-names: []
         |  }
         |}""".stripMargin))
 

@@ -46,6 +46,7 @@ trait MatcherTestData {
       |    price-assets: ["BASE1", "BASE2"]
       |    predefined-pairs: [{amountAsset = "BASE2", priceAsset = "BASE1"}]
       |    blacklisted-assets: []
+      |    blacklisted-names: []
       |  }
       |}""".stripMargin))
 
