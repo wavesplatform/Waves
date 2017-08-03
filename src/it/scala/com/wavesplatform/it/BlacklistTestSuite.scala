@@ -39,29 +39,15 @@ class BlacklistTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll {
     docker.close()
   }
 
-  private def validateBlocks(nodes: Seq[Node]): Unit = {
-    val targetBlocks1 = result(for {
-      height <- traverse(nodes)(_.height).map(_.max)
-      _ <- traverse(nodes)(_.waitForHeight(height + 30))
-      _ <- traverse(nodes)(_.waitForHeight(height + 25))
-      blocks <- traverse(nodes)(_.blockAt(height + 25))
-    } yield blocks.map(_.signature), 5.minutes)
-    all(targetBlocks1) shouldEqual targetBlocks1.head
-  }
-
   "network should grow up to 60 blocks" in {
-    Await.result(richestNode.waitForHeight(60), 5.minutes)
+    Await.result(richestNode.waitForHeight(50), 5.minutes)
 
-    Await.result(richestNode.height, 1.minute) >= 60 shouldBe true
+    Await.result(richestNode.height, 1.minute) >= 50 shouldBe true
   }
 
   "richest node should blacklist other nodes" in {
     otherNodes.foreach(n => Await.result(richestNode.blacklist(n.nodeInfo.networkIpAddress, n.nodeInfo.hostNetworkPort), 1.minute))
-
-    Await.result(
-      richestNode.waitFor[Seq[String]](richestNode.blacklistedPeers, _.length >= NodesCount - 1, 5.seconds),
-      5.minutes)
-
+    Await.result(richestNode.waitFor[Seq[String]](richestNode.blacklistedPeers, _.length >= NodesCount - 1, 5.seconds), 2.minutes)
     val blacklisted = Await.result(richestNode.blacklistedPeers, 1.minute)
     blacklisted.length should be(NodesCount - 1)
   }
@@ -71,7 +57,12 @@ class BlacklistTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll {
   }
 
   "and sync again" in {
-    validateBlocks(nodes)
+    val targetBlocks = Await.result(for {
+      height <- traverse(nodes)(_.height).map(_.max)
+      _ <- traverse(nodes)(_.waitForHeight(height + 30))
+      blocks <- traverse(nodes)(_.blockAt(height + 25))
+    } yield blocks.map(_.signature), 5.minutes)
+    all(targetBlocks) shouldEqual targetBlocks.head
   }
 }
 

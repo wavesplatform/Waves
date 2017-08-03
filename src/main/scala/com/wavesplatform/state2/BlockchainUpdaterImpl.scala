@@ -109,6 +109,9 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
       case Some(height) =>
         logHeights(s"Rollback to h=$height started")
         val discardedTransactions = Seq.newBuilder[Transaction]
+        if (ngHistoryWriter.height > height) {
+          liquidBlockCandidatesDiff.set(Map.empty)
+        }
         while (ngHistoryWriter.height > height) {
           val transactions = ngHistoryWriter.discardBlock()
           log.trace(s"Collecting ${transactions.size} discarded transactions.")
