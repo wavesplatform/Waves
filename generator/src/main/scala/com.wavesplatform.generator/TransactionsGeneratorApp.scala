@@ -11,9 +11,9 @@ import scopt.OptionParser
 import scorex.account.AddressScheme
 import scorex.utils.LoggerFacade
 
-import scala.concurrent.Await
+import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
-import scala.util.Random
+import scala.util.{Failure, Random, Success}
 
 object Mode extends Enumeration {
   type Mode = Value
@@ -82,19 +82,26 @@ object TransactionsGeneratorApp extends App {
     log.info(s"Source addresses: ${generator.accounts.mkString(", ")}")
 
     val nonce = Random.nextLong()
-    val sender = new NetworkSender(node, chainId, "generator", nonce)
+    val sender = new NetworkSender(chainId, "generator", nonce)
     sys.addShutdownHook(sender.close())
 
-    (1 to iterations).foreach { i =>
-      log.info(s"Iteration $i")
-      val transactions = generator.generate(count)
-      Await.result(
-        sender.sendByNetwork(transactions.map(tx => RawBytes(25.toByte, tx.bytes)): _*)
-          .map(_ => log.info("Transactions had been sent")), Duration.Inf
-      )
-      log.info(s"Sleeping for $delay")
-      Thread.sleep(delay.toMillis)
+    sender.connect(node).onComplete {
+      case Success(channel) =>
+        (1 to iterations).foreach { i =>
+          log.info(s"Iteration $i")
+          val transactions = generator.generate(count)
+          Await.result(
+            sender.send(channel, transactions.map(tx => RawBytes(25.toByte, tx.bytes)): _*)
+              .map(_ => log.info("Transactions had been sent")), delay
+          )
+          log.info(s"Sleeping for $delay")
+          if (i != iterations) Thread.sleep(delay.toMillis)
+        }
+        log.info("Done")
+
+      case Failure(_) => log.error(s"Failed to establish connection to $node")
     }
-    log.info("Done")
+    sender.close()
   }
+
 }
