@@ -144,7 +144,7 @@ object Coordinator extends ScorexLogging {
       _ <- Either.cond(cbt == bbt, (), s"declared baseTarget $bbt does not match calculated baseTarget $cbt")
       generator = block.signerData.generator
       calcGs = calcGeneratorSignature(prevBlockData, generator)
-      blockGs = blockData.generationSignature
+      blockGs = blockData.generationSignature.arr
       _ <- Either.cond(calcGs.sameElements(blockGs), (),
         s"declared generation signature ${blockGs.mkString} does not match calculated generation signature ${calcGs.mkString}")
       effectiveBalance <- generatingBalance(state, fs, generator, parentHeight).toEither.left.map(er => GenericError(er.getMessage))

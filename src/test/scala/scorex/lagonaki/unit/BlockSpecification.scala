@@ -19,7 +19,7 @@ class BlockSpecification extends FunSuite with Matchers with MockFactory {
     val gen = PrivateKeyAccount(reference)
 
     val bt = Random.nextLong()
-    val gs = Array.fill(Block.GeneratorSignatureLength)(Random.nextInt(100).toByte)
+    val gs = ByteStr(Array.fill(Block.GeneratorSignatureLength)(Random.nextInt(100).toByte))
 
 
     val ts = System.currentTimeMillis() - 5000
@@ -39,7 +39,7 @@ class BlockSpecification extends FunSuite with Matchers with MockFactory {
       val parsedBlock = Block.parseBytes(block.bytes).get
       assert(Signed.validateSignatures(block).isRight)
       assert(Signed.validateSignatures(parsedBlock).isRight)
-      assert(parsedBlock.consensusData.generationSignature.sameElements(gs))
+      assert(parsedBlock.consensusData.generationSignature == gs)
       assert(parsedBlock.version.toInt == version)
       assert(parsedBlock.signerData.generator.publicKey.sameElements(gen.publicKey))
     }

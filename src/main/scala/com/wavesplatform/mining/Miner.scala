@@ -69,7 +69,7 @@ class Miner(
       avgBlockDelay = blockchainSettings.genesisSettings.averageBlockDelay
       btg = calcBaseTarget(avgBlockDelay, parentHeight, parent, greatGrandParent, currentTime)
       gs = calcGeneratorSignature(lastBlockKernelData, account)
-      consensusData = NxtLikeConsensusBlockData(btg, gs)
+      consensusData = NxtLikeConsensusBlockData(btg, ByteStr(gs))
       unconfirmed = utx.packUnconfirmed(minerSettings.maxTransactionsInKeyBlock)
       _ = log.debug(s"Adding ${unconfirmed.size} unconfirmed transaction(s) to new block")
       block = Block.buildAndSign(Version, currentTime, parent.uniqueId, consensusData, unconfirmed, account)

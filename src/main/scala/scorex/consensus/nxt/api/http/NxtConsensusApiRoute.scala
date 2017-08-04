@@ -47,14 +47,14 @@ case class NxtConsensusApiRoute(
   ))
   def generationSignatureId: Route = (path("generationsignature" / Segment) & get) { encodedSignature =>
     withBlock(history, encodedSignature) { block =>
-      complete(Json.obj("generationSignature" -> Base58.encode(block.consensusData.generationSignature)))
+      complete(Json.obj("generationSignature" -> block.consensusData.generationSignature.base58))
     }
   }
 
   @Path("/generationsignature")
   @ApiOperation(value = "Generation signature last", notes = "Generation signature of a last block", httpMethod = "GET")
   def generationSignature: Route = (path("generationsignature") & get) {
-    complete(Json.obj("generationSignature" -> Base58.encode(history.lastBlock.get.consensusData.generationSignature)))
+    complete(Json.obj("generationSignature" -> history.lastBlock.get.consensusData.generationSignature.base58))
   }
 
   @Path("/basetarget/{blockId}")

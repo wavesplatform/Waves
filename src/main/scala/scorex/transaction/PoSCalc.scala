@@ -27,7 +27,7 @@ object PoSCalc extends ScorexLogging {
     BigInt(1, calcGeneratorSignature(lastBlockData, generator).take(8).reverse)
 
   def calcGeneratorSignature(lastBlockData: NxtLikeConsensusBlockData, generator: PublicKeyAccount): FastCryptographicHash.Digest =
-    hash(lastBlockData.generationSignature ++ generator.publicKey)
+    hash(lastBlockData.generationSignature.arr ++ generator.publicKey)
 
   def calcBaseTarget(avgBlockDelay: FiniteDuration, parentHeight: Int, parent: Block, greatGrandParent: Option[Block], timestamp: Long): Long = {
     val avgDelayInSeconds = avgBlockDelay.toSeconds

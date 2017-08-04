@@ -43,7 +43,7 @@ object GenesisBlockGenerator extends App {
 
     val accounts = Range(0, accountsTotal).map(n => n -> generateFullAddressInfo())
     val genesisTxs = accounts.map { case (n, (_, _, _, _, address)) => GenesisTransaction(address, distributions(accountsTotal)(n), timestamp, ByteStr.empty) }
-    val genesisBlock = Block.buildAndSign(1, timestamp, reference, NxtLikeConsensusBlockData(baseTraget, Array.fill(DigestSize)(0: Byte)), genesisTxs, genesisSigner)
+    val genesisBlock = Block.buildAndSign(1, timestamp, reference, NxtLikeConsensusBlockData(baseTraget, ByteStr(Array.fill(DigestSize)(0: Byte))), genesisTxs, genesisSigner)
     val signature = genesisBlock.signerData.signature
 
     (accounts, GenesisSettings(timestamp, timestamp, initialBalance, Some(signature),

@@ -138,7 +138,7 @@ object Block extends ScorexLogging {
     val cBytesLength = Ints.fromByteArray(bytes.slice(position, position + 4))
     position += 4
     val cBytes = bytes.slice(position, position + cBytesLength)
-    val consData = NxtLikeConsensusBlockData(Longs.fromByteArray(cBytes.take(Block.BaseTargetLength)), cBytes.takeRight(Block.GeneratorSignatureLength))
+    val consData = NxtLikeConsensusBlockData(Longs.fromByteArray(cBytes.take(Block.BaseTargetLength)), ByteStr(cBytes.takeRight(Block.GeneratorSignatureLength)))
     position += cBytesLength
 
     val tBytesLength = Ints.fromByteArray(bytes.slice(position, position + 4))
@@ -168,7 +168,7 @@ object Block extends ScorexLogging {
     val toSign = nonSignedBlock.bytes
     val signature = EllipticCurveImpl.sign(signer, toSign)
     require(reference.arr.length == SignatureLength, "Incorrect reference")
-    require(consensusData.generationSignature.length == GeneratorSignatureLength, "Incorrect consensusData.generationSignature")
+    require(consensusData.generationSignature.arr.length == GeneratorSignatureLength, "Incorrect consensusData.generationSignature")
     require(signer.publicKey.length == KeyLength, "Incorrect signer.publicKey")
     nonSignedBlock.copy(signerData = SignerData(signer, ByteStr(signature)))
   }
@@ -187,7 +187,7 @@ object Block extends ScorexLogging {
 
     val transactionGenesisData = genesisTransactions(genesisSettings)
     val transactionGenesisDataField = TransactionsBlockFieldVersion1or2(transactionGenesisData)
-    val consensusGenesisData = NxtLikeConsensusBlockData(genesisSettings.initialBaseTarget, Array.fill(DigestSize)(0: Byte))
+    val consensusGenesisData = NxtLikeConsensusBlockData(genesisSettings.initialBaseTarget, ByteStr(Array.fill(DigestSize)(0: Byte)))
     val consensusGenesisDataField = NxtConsensusBlockField(consensusGenesisData)
     val txBytesSize = transactionGenesisDataField.bytes.length
     val txBytes = Bytes.ensureCapacity(Ints.toByteArray(txBytesSize), 4, 0) ++ transactionGenesisDataField.bytes
