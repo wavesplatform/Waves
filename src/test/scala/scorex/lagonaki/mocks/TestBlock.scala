@@ -23,7 +23,7 @@ object TestBlock {
     version = 2,
     reference = randomSignature(),
     signerData = SignerData(defaultSigner, ByteStr.empty),
-    consensusData = NxtLikeConsensusBlockData(1L, Array.fill(SignatureLength)(0: Byte)),
+    consensusData = NxtLikeConsensusBlockData(1L, ByteStr(Array.fill(SignatureLength)(0: Byte))),
     transactionData = txs))
 
   def randomOfLength(length: Int): ByteStr = ByteStr(Array.fill(length)(random.nextInt().toByte))
@@ -31,7 +31,7 @@ object TestBlock {
   def randomSignature(): ByteStr = randomOfLength(SignatureLength)
 
   def withReference(ref: ByteStr): Block = sign(Block(0, 1, ref, SignerData(defaultSigner, ByteStr.empty),
-    NxtLikeConsensusBlockData(1L, randomSignature().arr), Seq.empty))
+    NxtLikeConsensusBlockData(1L, ByteStr(randomSignature().arr)), Seq.empty))
 
   private def sign(nonSignedBlock: Block): Block = {
     val toSign = nonSignedBlock.bytes

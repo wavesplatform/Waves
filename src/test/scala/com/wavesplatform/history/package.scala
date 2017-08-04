@@ -33,7 +33,7 @@ package object history {
   }
 
   val defaultSigner = PrivateKeyAccount(Array.fill(TransactionParser.KeyLength)(0))
-  val generationSignature: Array[Byte] = Array.fill(Block.GeneratorSignatureLength)(0: Byte)
+  val generationSignature = ByteStr(Array.fill(Block.GeneratorSignatureLength)(0: Byte))
 
   def buildBlockOfTxs(refTo: ByteStr, txs: Seq[Transaction]): Block = {
     Block.buildAndSign(
