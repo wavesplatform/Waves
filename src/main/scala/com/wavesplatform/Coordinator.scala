@@ -124,8 +124,7 @@ object Coordinator extends ScorexLogging {
   val MaxTimeDrift: Long = 15.seconds.toMillis
 
   private def blockConsensusValidation(history: History, state: StateReader, bcs: BlockchainSettings, currentTs: Long)
-                                      (block: Block): Either[ValidationError, Unit] = {
-
+                                      (block: Block): Either[ValidationError, Unit] = history.read { _ =>
     import PoSCalc._
 
     val fs = bcs.functionalitySettings

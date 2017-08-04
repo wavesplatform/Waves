@@ -148,7 +148,7 @@ class NgHistoryWriterImpl(inner: HistoryWriter) extends NgHistoryWriter with Sco
   }
 
   def forgeBlock(id: BlockId): Option[(Block, DiscardedTransactions)] = read { implicit l =>
-    baseB().flatMap(f = base => {
+    baseB().flatMap(base => {
       val ms = micros().reverse
       if (base.uniqueId == id) {
         val discardedTxs = ms.flatMap(_.transactionData)
