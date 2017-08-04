@@ -10,6 +10,7 @@ import akka.util.Timeout
 import com.google.common.primitives.Longs
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.market.MatcherActor.{GetMarkets, GetMarketsResponse}
+import com.wavesplatform.matcher.market.MatcherTransactionWriter.GetTransactionsByOrder
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.market.OrderHistoryActor._
 import com.wavesplatform.settings.RestAPISettings
@@ -31,13 +32,15 @@ import scala.util.{Failure, Success, Try}
 
 @Path("/matcher")
 @Api(value = "/matcher/")
-case class MatcherApiRoute(wallet: Wallet,storedState: StateReader, matcher: ActorRef,orderHistory: ActorRef, settings: RestAPISettings, matcherSettings: MatcherSettings) extends ApiRoute {
+case class MatcherApiRoute(wallet: Wallet,storedState: StateReader,
+                           matcher: ActorRef, orderHistory: ActorRef,
+                           txWriter: ActorRef, settings: RestAPISettings, matcherSettings: MatcherSettings) extends ApiRoute {
   private implicit val timeout: Timeout = 5.seconds
 
   override lazy val route: Route =
     pathPrefix("matcher") {
       matcherPublicKey ~ orderBook ~ place ~ getOrderHistory ~ getAllOrderHistory ~ getTradableBalance ~ orderStatus ~
-        historyDelete ~ cancel ~ orderbooks ~ orderBookDelete
+        historyDelete ~ cancel ~ orderbooks ~ orderBookDelete ~ getTransactionsByOrder
     }
 
   def withAssetPair(a1: String, a2: String): Directive1[AssetPair] = {
@@ -65,6 +68,7 @@ case class MatcherApiRoute(wallet: Wallet,storedState: StateReader, matcher: Act
   ))
   def orderBook: Route = (path("orderbook" / Segment / Segment) & get) { (a1, a2) =>
     withAssetPair(a1, a2) { pair =>
+
       onComplete((matcher ? GetOrderBookRequest(pair, None)).mapTo[MatcherResponse]) {
         case Success(resp) => resp.code match {
           case StatusCodes.Found => redirect(Uri(s"/matcher/orderbook/$a2/$a1"), StatusCodes.Found)
@@ -185,7 +189,7 @@ case class MatcherApiRoute(wallet: Wallet,storedState: StateReader, matcher: Act
       checkGetSignature(publicKey, ts, sig) match {
         case Success(addr) =>
           withAssetPair(a1, a2) { pair =>
-            complete((orderHistory ? GetOrderHistory(pair, addr))
+            complete((orderHistory ? GetOrderHistory(pair, addr, NTP.correctedTime()))
               .mapTo[MatcherResponse]
               .map(r => r.code -> r.json))
           }
@@ -204,9 +208,10 @@ case class MatcherApiRoute(wallet: Wallet,storedState: StateReader, matcher: Act
     new ApiImplicitParam(name = "address", value = "Address", dataType = "string", paramType = "path")
    ))
   def getAllOrderHistory: Route = (path("orders" / Segment) & get & withAuth) { addr =>
-      complete((orderHistory ? GetAllOrderHistory(addr))
-        .mapTo[MatcherResponse]
-        .map(r => r.code -> r.json))
+    implicit val timeout = Timeout(10.seconds)
+    complete((orderHistory ? GetAllOrderHistory(addr, NTP.correctedTime()))
+      .mapTo[MatcherResponse]
+      .map(r => r.code -> r.json))
   }
 
   @Path("/orderbook/{amountAsset}/{priceAsset}/tradableBalance/{address}")
@@ -220,7 +225,7 @@ case class MatcherApiRoute(wallet: Wallet,storedState: StateReader, matcher: Act
   ))
   def getTradableBalance: Route = (path("orderbook" / Segment / Segment / "tradableBalance" / Segment) & get) { (a1, a2, address) =>
     withAssetPair(a1, a2) { pair =>
-      complete((orderHistory ? GetTradableBalance(pair, address))
+      complete((orderHistory ? GetTradableBalance(pair, address, NTP.correctedTime()))
         .mapTo[MatcherResponse]
         .map(r => r.code -> r.json))
     }
@@ -237,7 +242,7 @@ case class MatcherApiRoute(wallet: Wallet,storedState: StateReader, matcher: Act
   ))
   def orderStatus: Route = (path("orderbook" / Segment / Segment / Segment) & get) { (a1, a2, orderId) =>
     withAssetPair(a1, a2) { pair =>
-      complete((orderHistory ? GetOrderStatus(pair, orderId))
+      complete((orderHistory ? GetOrderStatus(pair, orderId, NTP.correctedTime()))
         .mapTo[MatcherResponse]
         .map(r => r.code -> r.json))
     }
@@ -269,4 +274,16 @@ case class MatcherApiRoute(wallet: Wallet,storedState: StateReader, matcher: Act
     }
   }
 
+  @Path("/transactions/{orderId}")
+  @ApiOperation(value = "Get Exchange Transactions for order",
+    notes = "Get all exchange transactions created by DEX on execution of the given order",
+    httpMethod = "GET")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(name = "orderId", value = "Order Id", dataType = "string", paramType = "path")
+  ))
+  def getTransactionsByOrder: Route = (path("transactions" / Segment) & get) { orderId =>
+    complete((txWriter ? GetTransactionsByOrder(orderId))
+      .mapTo[MatcherResponse]
+      .map(r => r.code -> r.json))
+  }
 }

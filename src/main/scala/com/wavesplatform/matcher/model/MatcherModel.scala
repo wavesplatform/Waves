@@ -5,7 +5,7 @@ import cats.implicits._
 import com.wavesplatform.matcher.model.MatcherModel.Price
 import play.api.libs.json.{JsObject, JsValue, Json}
 import scorex.transaction.AssetAcc
-import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType, Validation}
+import scorex.transaction.assets.exchange._
 
 object MatcherModel {
   type Price = Long
@@ -52,26 +52,33 @@ object LimitOrder {
   sealed trait OrderStatus {
     def name: String
     def json: JsValue
+    def isFinal: Boolean
   }
+
   case object Accepted extends OrderStatus {
     val name = "Accepted"
     def json: JsObject = Json.obj("status" -> name)
+    val isFinal: Boolean = false
   }
   case object NotFound extends OrderStatus {
     val name = "NotFound"
     def json: JsObject = Json.obj("status" -> name)
+    val isFinal: Boolean = true
   }
   case class PartiallyFilled(filled: Long) extends OrderStatus {
     val name = "PartiallyFilled"
     def json: JsObject = Json.obj("status" -> name, "filledAmount" -> filled)
+    val isFinal: Boolean = false
   }
   case object Filled extends OrderStatus {
     val name = "Filled"
     def json = Json.obj("status" -> name)
+    val isFinal: Boolean = true
   }
   case class Cancelled(filled: Long) extends OrderStatus {
     val name = "Cancelled"
     def json = Json.obj("status" -> name, "filledAmount" -> filled)
+    val isFinal: Boolean = true
   }
 
   def apply(o: Order): LimitOrder = o.orderType match {
@@ -102,6 +109,8 @@ object Events {
   }
   case class OrderAdded(order: LimitOrder) extends Event
   case class OrderCanceled(limitOrder: LimitOrder) extends Event
+
+  case class ExchangeTransactionCreated(tx: ExchangeTransaction)
 
   def createOrderInfo(event: Event): Map[String, OrderInfo] = {
     event match {
