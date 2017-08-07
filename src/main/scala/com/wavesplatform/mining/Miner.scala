@@ -139,7 +139,7 @@ class Miner(
               case Right(score) =>
                 allChannels.broadcast(LocalScoreChanged(score))
                 allChannels.broadcast(BlockForged(block))
-//                startMicroBlockMining(account, block)
+                startMicroBlockMining(account, block)
             }
           }
           case Left(err) =>
