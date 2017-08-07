@@ -40,7 +40,7 @@ class Miner(
 
   private val minerSettings = settings.minerSettings
   private val blockchainSettings = settings.blockchainSettings
-  private lazy val processBlock = Coordinator.processSingleBlock(checkpoint, history, blockchainUpdater, timeService, stateReader, utx, blockchainReadiness, settings) _
+  private lazy val processBlock = Coordinator.processSingleBlock(checkpoint, history, blockchainUpdater, timeService, stateReader, utx, blockchainReadiness, settings, this) _
 
   private val scheduledAttempts = SerialCancelable()
   private val microBlockAttempt = SerialCancelable()
@@ -139,7 +139,6 @@ class Miner(
               case Right(score) =>
                 allChannels.broadcast(LocalScoreChanged(score))
                 allChannels.broadcast(BlockForged(block))
-                scheduleMining()
 //                startMicroBlockMining(account, block)
             }
           }

@@ -42,7 +42,7 @@ class CoordinatorHandler(
 
   private val processCheckpoint = Coordinator.processCheckpoint(checkpointService, history, blockchainUpdater) _
   private val processFork = Coordinator.processFork(checkpointService, history, blockchainUpdater, stateReader, utxStorage, time, settings, miner, blockchainReadiness) _
-  private val processBlock = Coordinator.processSingleBlock(checkpointService, history, blockchainUpdater, time, stateReader, utxStorage, blockchainReadiness, settings) _
+  private val processBlock = Coordinator.processSingleBlock(checkpointService, history, blockchainUpdater, time, stateReader, utxStorage, blockchainReadiness, settings, miner) _
 
   private def broadcastingScore(
     src: Channel,
