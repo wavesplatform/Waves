@@ -82,15 +82,13 @@ case class DebugApiRoute(settings: RestAPISettings,
     notes = "Get current portfolio considering pessimistic transactions in the UTX pool",
     httpMethod = "GET"
   )
-  @ApiImplicitParams(Array(
-    new ApiImplicitParam(
-      name = "address",
-      value = "An address of portfolio",
-      required = true,
-      dataType = "string",
-      paramType = "path"
-    )
-  ))
+  @ApiImplicitParam(
+    name = "address",
+    value = "An address of portfolio",
+    required = true,
+    dataType = "string",
+    paramType = "path"
+  )
   @ApiParam(
     name = "considerUnspent",
     value = "Taking into account pessimistic transactions from UTX pool",
@@ -237,7 +235,6 @@ object DebugApiRoute {
     },
     m => Json.toJson(m.map { case (assetId, count) => assetId.base58 -> count })
   )
-
   implicit val leaseInfoFormat: Format[LeaseInfo] = Json.format
   implicit val portfolioFormat: Format[Portfolio] = Json.format
 }
