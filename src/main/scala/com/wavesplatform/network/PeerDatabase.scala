@@ -12,7 +12,7 @@ trait PeerDatabase {
 
   def touch(socketAddress: InetSocketAddress)
 
-  def blacklist(host: InetAddress)
+  def blacklist(host: InetAddress, reason: String)
 
   def knownPeers: Map[InetSocketAddress, Long]
 
@@ -20,15 +20,18 @@ trait PeerDatabase {
 
   def randomPeer(excluded: Set[InetSocketAddress]): Option[InetSocketAddress]
 
+  def detailedBlacklist: Map[InetAddress, (Long, String)]
 }
 
 object PeerDatabase extends ScorexLogging {
+
   implicit class PeerDatabaseExt(peerDatabase: PeerDatabase) {
     def blacklistAndClose(channel: Channel, reason: String): Unit = {
       val address = channel.asInstanceOf[NioSocketChannel].remoteAddress().getAddress
       log.debug(s"Blacklisting ${id(channel)}: $reason")
-      peerDatabase.blacklist(address)
+      peerDatabase.blacklist(address, reason)
       channel.close()
     }
   }
+
 }
