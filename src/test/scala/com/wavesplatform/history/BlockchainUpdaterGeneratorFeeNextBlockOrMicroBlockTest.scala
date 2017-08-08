@@ -6,8 +6,7 @@ import com.wavesplatform.state2.diffs._
 import org.scalacheck.{Gen, Shrink}
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
-import scorex.settings.TestFunctionalitySettings
-import scorex.transaction.{GenesisTransaction, PaymentTransaction, Transaction}
+import scorex.transaction.{GenesisTransaction, PaymentTransaction}
 
 class BlockchainUpdaterGeneratorFeeNextBlockOrMicroBlockTest extends PropSpec with PropertyChecks with DomainScenarioDrivenPropertyCheck with Matchers with TransactionGen {
 

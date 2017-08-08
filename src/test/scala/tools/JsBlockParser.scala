@@ -37,11 +37,11 @@ object JsBlockParser extends App {
   2017-08-04 12:57:41 TRACE [miner-pool-21] c.w.network.package$ - Broadcasting BlockForged(Block(1501851461300,3,
   4GkW491kuPtg3LDkCrXwBRASdQ7qUV2BNEFpM9XzD56JufSpmLqV9672wRQcSqJdxyEgq8nSQs2ogHit8Sr1ZtGT,
   SignerData(3HiC9YuigWLcwy3RmxJjPj2cFFyNbf7W7jm,2S5A8DnwrqpxFv3cjYKJB8D86h4PS1tAy2Qaii1ntZhpiuj3bmTC8McES5XoBFj8z2yQn9yAxCPTxjsexjfjddXo),
-  NxtLikeConsensusBlockData(197518,96C1rM2CxoKEua8Ha1xdVEYmnsL3VB44Z2uVKmbXPV3D),List(
+  NxtLikeConsensusBlockData(197518,96C1rM2CxoKEua8Ha1xdVEYmnsL3VB44Z2uVKmbXPV3D),List(..)))
 
- account-seed = 4Go1R2JSbveVZLrhiYS2PTysTTpo7qkiMD1bb3t9rHwz   // recreated
+  account-seed = 4Go1R2JSbveVZLrhiYS2PTysTTpo7qkiMD1bb3t9rHwz   // recreated
   private-key = 81Cfr86V8sWEpR5skuegDXCrMbuofHFDAQx11BFwkSWB
-  public-key = 1DV4udQonVAb452qm34wX39euJV3VhJcMLS29JFeurF   // actual private key, not address
+  public-key = 1DV4udQonVAb452qm34wX39euJV3VhJcMLS29JFeurF   // actual public key, not address
   address = 3HiC9YuigWLcwy3RmxJjPj2cFFyNbf7W7jm
 
    */
@@ -59,11 +59,5 @@ object JsBlockParser extends App {
   )
 
   println(Block.parseBytes(recreated.bytes).get.signatureValid)
-//
-//
-//  println(block.signatureValid)
-//  println(block.signerData.signature)
-//  println(recreated.signerData.signature)
-
 
 }
