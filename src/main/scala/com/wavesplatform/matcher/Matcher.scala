@@ -8,7 +8,7 @@ import akka.http.scaladsl.Http.ServerBinding
 import akka.stream.ActorMaterializer
 import com.wavesplatform.UtxPool
 import com.wavesplatform.matcher.api.MatcherApiRoute
-import com.wavesplatform.matcher.market.{MatcherActor, OrderHistoryActor}
+import com.wavesplatform.matcher.market.{MatcherActor, MatcherTransactionWriter, OrderHistoryActor}
 import com.wavesplatform.settings.{BlockchainSettings, RestAPISettings}
 import com.wavesplatform.state2.reader.StateReader
 import io.netty.channel.group.ChannelGroup
@@ -29,9 +29,7 @@ class Matcher(actorSystem: ActorSystem,
               blockchainSettings: BlockchainSettings,
               restAPISettings: RestAPISettings, matcherSettings: MatcherSettings) extends ScorexLogging {
   lazy val matcherApiRoutes = Seq(
-    MatcherApiRoute(wallet,
-      stateReader,
-      matcher, orderHistory, restAPISettings, matcherSettings)
+    MatcherApiRoute(wallet, stateReader, matcher, orderHistory, txWriter, restAPISettings, matcherSettings)
   )
 
   lazy val matcherApiTypes: Set[Class[_]] = Set(
@@ -43,6 +41,9 @@ class Matcher(actorSystem: ActorSystem,
 
   lazy val orderHistory: ActorRef = actorSystem.actorOf(OrderHistoryActor.props(matcherSettings, stateReader, wallet),
     OrderHistoryActor.name)
+
+  lazy val txWriter: ActorRef = actorSystem.actorOf(MatcherTransactionWriter.props(matcherSettings),
+    MatcherTransactionWriter.name)
 
   @volatile var matcherServerBinding: ServerBinding = _
 

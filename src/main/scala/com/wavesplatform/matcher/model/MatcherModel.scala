@@ -141,14 +141,17 @@ object Events {
         )))
       case oe: OrderExecuted =>
         val (o1, o2) = (oe.submittedExecuted, oe.counterExecuted)
-        Map(o1.order.senderPublicKey.address -> OpenPortfolio(Monoid.combine(
-          Map(o1.spentAsset -> 0),
-          Map(o1.feeAsset -> 0)
-        )),
-          o2.order.senderPublicKey.address -> OpenPortfolio(Monoid.combine(
-            Map(o2.spentAsset -> -o2.getSpendAmount),
-            Map(o2.feeAsset -> -overdraftFee(o2))
-          ))
+        val op1 = OpenPortfolio(Monoid.combine(
+          Map(o1.spentAsset -> -o1.getSpendAmount),
+          Map(o1.feeAsset -> -overdraftFee(o1))
+        ))
+        val op2 = OpenPortfolio(Monoid.combine(
+          Map(o2.spentAsset -> -o2.getSpendAmount),
+          Map(o2.feeAsset -> -overdraftFee(o2))
+        ))
+        Monoid.combine(
+          Map(o1.order.senderPublicKey.address -> op1),
+          Map(o2.order.senderPublicKey.address -> op2)
         )
       case OrderCanceled(lo) =>
         val feeDiff = if (lo.feeAcc == lo.rcvAcc) math.max(lo.remainingFee - lo.getReceiveAmount, 0L) else lo.remainingFee
