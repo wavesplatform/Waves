@@ -95,7 +95,7 @@ object MicroBlock extends ScorexLogging {
     val tBytesLength = Ints.fromByteArray(bytes.slice(position, position + 4))
     position += 4
     val tBytes = bytes.slice(position, position + tBytesLength)
-    val txBlockField = transParseBytes(1, tBytes).get
+    val txBlockField = transParseBytes(version, tBytes).get
     position += tBytesLength
 
     val genPK = bytes.slice(position, position + TransactionParser.KeyLength)
@@ -105,7 +105,7 @@ object MicroBlock extends ScorexLogging {
 
     create(version, PublicKeyAccount(genPK), txBlockField, prevResBlockSig, totalResBlockSig, signature).explicitGet()
   }.recoverWith { case t: Throwable =>
-    log.error("Error when parsing block", t)
+    log.error("Error when parsing microblock", t)
     Failure(t)
   }
 }
