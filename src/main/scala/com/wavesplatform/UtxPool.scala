@@ -18,9 +18,6 @@ import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.util.{Left, Right}
 
-/**
-  * A pool with unconfirmed transactions
-  */
 class UtxPool(
                  time: Time,
                  stateReader: StateReader,

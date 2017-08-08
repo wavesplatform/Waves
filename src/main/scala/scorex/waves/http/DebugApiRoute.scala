@@ -82,18 +82,23 @@ case class DebugApiRoute(settings: RestAPISettings,
     notes = "Get current portfolio considering pessimistic transactions in the UTX pool",
     httpMethod = "GET"
   )
-  @ApiImplicitParam(
-    name = "address",
-    value = "An address of portfolio",
-    required = true,
-    dataType = "string",
-    paramType = "path"
-  )
-  @ApiParam(
-    name = "considerUnspent",
-    value = "Taking into account pessimistic transactions from UTX pool",
-    `type` = "Boolean"
-  )
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(
+      name = "address",
+      value = "An address of portfolio",
+      required = true,
+      dataType = "string",
+      paramType = "path"
+    ),
+    new ApiImplicitParam(
+      name = "considerUnspent",
+      value = "Taking into account pessimistic transactions from UTX pool",
+      required = false,
+      dataType = "boolean",
+      paramType = "query",
+      defaultValue = "true"
+    )
+  ))
   @ApiResponses(Array(new ApiResponse(code = 200, message = "Json portfolio")))
   def portfolios: Route = path("portfolios" / Segment) { (rawAddress) =>
     (get & parameter('considerUnspent.as[Boolean])) { (considerUnspent) =>

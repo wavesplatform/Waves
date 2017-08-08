@@ -59,7 +59,7 @@ trait NodeApi {
   def get(path: String, f: RequestBuilder => RequestBuilder = identity): Future[Response] =
     retrying(f(_get(s"http://$restAddress:$nodeRestPort$path")).build())
 
-  def getDebug(path: String, f: RequestBuilder => RequestBuilder = identity): Future[Response] = retrying {
+  def getWihApiKey(path: String, f: RequestBuilder => RequestBuilder = identity): Future[Response] = retrying {
     _get(s"http://$restAddress:$nodeRestPort$path")
       .setHeader("api_key", "integration-test-rest-api")
       .build()
@@ -266,7 +266,7 @@ trait NodeApi {
   def debugStateAt(height: Long): Future[Map[String, Long]] = get(s"/debug/stateWaves/$height").as[Map[String, Long]]
 
   def debugPortfoliosFor(address: Address, considerUnspent: Boolean) = {
-    getDebug(s"/debug/portfolios/${address.address}?considerUnspent=$considerUnspent")
+    getWihApiKey(s"/debug/portfolios/${address.address}?considerUnspent=$considerUnspent")
   }.as[Portfolio]
 
 }
