@@ -25,7 +25,7 @@ case class OrderInfo(amount: Long, filled: Long, canceled: Boolean) {
 }
 
 object OrderInfo {
-  def safeSum(x: Long, y: Long): Long =  Try(Math.addExact(x, y)).getOrElse(Long.MinValue)
+  def safeSum(x: Long, y: Long): Long =  Try(Math.addExact(x, y)).getOrElse(Long.MaxValue)
   implicit val longSemigroup: Semigroup[Long] = (x: Long, y: Long) => safeSum(x, y)
 
   val empty = OrderInfo(0L, 0L, false)

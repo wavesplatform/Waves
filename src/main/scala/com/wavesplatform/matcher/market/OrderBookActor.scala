@@ -242,6 +242,7 @@ class OrderBookActor(assetPair: AssetPair,
               Some(o.partial(event.submittedRemaining))
             else None
           case Left(ex) =>
+            log.info("Can't create tx for o1: " + Json.prettyPrint(o.order.json) + "\n, o2: " + Json.prettyPrint(c.order.json))
             processInvalidTransaction(event, ex)
         }
       case _ => None

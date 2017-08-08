@@ -7,6 +7,8 @@ import play.api.libs.json.{JsObject, JsValue, Json}
 import scorex.transaction.AssetAcc
 import scorex.transaction.assets.exchange._
 
+import scala.util.Try
+
 object MatcherModel {
   type Price = Long
   type Level[+A] = Vector[A]
@@ -23,9 +25,9 @@ sealed trait  LimitOrder {
 
   def getSpendAmount: Long
   def getReceiveAmount: Long
-  def feeAmount: Long = (BigInt(amount) * order.matcherFee  / order.amount).toLong
+  def feeAmount: Long = Try((BigInt(amount) * order.matcherFee  / order.amount).bigInteger.longValueExact()).getOrElse(Long.MaxValue)
   def remainingAmount: Long = order.amount - amount
-  val remainingFee: Long = order.matcherFee - (BigInt(remainingAmount) * order.matcherFee  / order.amount).toLong
+  val remainingFee: Long = order.matcherFee - Try((BigInt(remainingAmount) * order.matcherFee  / order.amount).bigInteger.longValueExact()).getOrElse(0L)
 
   def spentAcc: AssetAcc = AssetAcc(order.senderPublicKey, order.getSpendAssetId)
   def rcvAcc: AssetAcc = AssetAcc(order.senderPublicKey, order.getReceiveAssetId)
@@ -39,12 +41,12 @@ sealed trait  LimitOrder {
 case class BuyLimitOrder(price: Price, amount: Long, order: Order) extends LimitOrder {
   def partial(amount: Price): LimitOrder = copy(amount = amount)
   def getReceiveAmount: Long = amount
-  def getSpendAmount: Long = (BigInt(amount) * price / Order.PriceConstant ).bigInteger.longValueExact()
+  def getSpendAmount: Long = Try((BigInt(amount) * price / Order.PriceConstant ).bigInteger.longValueExact()).getOrElse(Long.MaxValue)
 }
 case class SellLimitOrder(price: Price, amount: Long, order: Order) extends LimitOrder {
   def partial(amount: Price): LimitOrder = copy(amount = amount)
   def getSpendAmount: Long = amount
-  def getReceiveAmount: Long = (BigInt(amount) * price / Order.PriceConstant).bigInteger.longValueExact()
+  def getReceiveAmount: Long = Try((BigInt(amount) * price / Order.PriceConstant).bigInteger.longValueExact()).getOrElse(Long.MaxValue)
 }
 
 

@@ -27,6 +27,7 @@ trait OrderHistory {
 
 case class OrderHistoryImpl(p: OrderHistoryStorage) extends OrderHistory with ScorexLogging {
   val MaxOrdersPerAddress = 1000
+  val MaxOrdersPerRequest = 100
 
   def savePairAddress(assetPair: AssetPair, address: String, orderId: String): Unit = {
     val pairAddress = OrderHistoryStorage.assetPairAddressKey(assetPair, address)
@@ -115,12 +116,12 @@ case class OrderHistoryImpl(p: OrderHistoryStorage) extends OrderHistory with Sc
 
   override def openVolume(assetAcc: AssetAcc): Long = {
     val asset = assetAcc.assetId.map(_.base58).getOrElse(AssetPair.WavesName)
-    Option(p.addressToOrderPortfolio.get(assetAcc.account.address)).flatMap(_.get(asset)).getOrElse(0L)
+    Option(p.addressToOrderPortfolio.get(assetAcc.account.address)).flatMap(_.get(asset)).map(math.max(0L, _)).getOrElse(0L)
   }
 
   override def ordersByPairAndAddress(assetPair: AssetPair, address: String): Set[String] = {
     val pairAddressKey = OrderHistoryStorage.assetPairAddressKey(assetPair, address)
-    Option(p.pairAddressToOrderIds.get(pairAddressKey)).map(_.takeRight(MaxOrdersPerAddress).toSet).getOrElse(Set())
+    Option(p.pairAddressToOrderIds.get(pairAddressKey)).map(_.takeRight(100).toSet).getOrElse(Set())
   }
 
   override def getAllOrdersByAddress(address: String): Set[String] = {
