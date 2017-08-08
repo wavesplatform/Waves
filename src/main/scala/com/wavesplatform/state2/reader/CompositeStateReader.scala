@@ -9,6 +9,9 @@ import scorex.account.{Address, Alias}
 import scorex.transaction.Transaction
 import scorex.transaction.lease.LeaseTransaction
 
+/**
+  * Reads the state including an in-memory diff
+  */
 class CompositeStateReader(inner: StateReader, blockDiff: BlockDiff) extends StateReader {
 
   def synchronizationToken: ReentrantReadWriteLock = inner.synchronizationToken

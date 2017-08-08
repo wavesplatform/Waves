@@ -49,6 +49,12 @@ class UtxPoolSpecification extends FreeSpec
   } yield TransferTransaction.create(None, sender, recipient, amount, time.getTimestamp(), None, fee, Array.empty[Byte]).right.get)
     .label("transferTransaction")
 
+  private def transferWithRecipient(sender: PrivateKeyAccount, recipient: PrivateKeyAccount, maxAmount: Long, time: Time) = (for {
+    amount <- chooseNum(1, (maxAmount * 0.9).toLong)
+    fee <- chooseNum(1, (maxAmount * 0.1).toLong)
+  } yield TransferTransaction.create(None, sender, recipient, amount, time.getTimestamp(), None, fee, Array.empty[Byte]).right.get)
+    .label("transferWithRecipient")
+
   private val stateGen = for {
     sender <- accountGen.label("sender")
     senderBalance <- positiveLongGen.label("senderBalance")
@@ -69,6 +75,25 @@ class UtxPoolSpecification extends FreeSpec
     val txs = for (_ <- 1 to n) yield PaymentTransaction.create(sender, recipient, amountPart, fee, time.getTimestamp()).right.get
     (utx, time, txs, (offset + 1000).millis)
   }).label("twoOutOfManyValidPayments")
+
+  private val emptyUtxPool = stateGen
+    .map { case (sender, senderBalance, state, history) =>
+      val time = new TestTime()
+      val utxPool = new UtxPool(time, state, history, calculator, FunctionalitySettings.TESTNET, UtxSettings(10, 10.minutes))
+      (sender, state, utxPool)
+    }
+    .label("emptyUtxPool")
+
+  private val withValidPayments = (for {
+    (sender, senderBalance, state, history) <- stateGen
+    recipient <- accountGen
+    time = new TestTime()
+    txs <- Gen.nonEmptyListOf(transferWithRecipient(sender, recipient, senderBalance / 10, time))
+  } yield {
+    val utxPool = new UtxPool(time, state, history, calculator, FunctionalitySettings.TESTNET, UtxSettings(10, 10.minutes))
+    txs.foreach(utxPool.putIfNew)
+    (sender, state, utxPool, time)
+  }).label("withValidPayments")
 
   private def utxTest(utxSettings: UtxSettings = UtxSettings(20, 5.seconds), txCount: Int = 10)
                      (f: (Seq[TransferTransaction], UtxPool, TestTime) => Unit): Unit = forAll(
@@ -145,6 +170,49 @@ class UtxPoolSpecification extends FreeSpec
 
       utx.packUnconfirmed().size shouldBe 2
       utx.all().size shouldBe 2
+    }
+
+    "portfolio" - {
+      "returns a count of assets from the state if there is no transaction" in forAll(emptyUtxPool) { case (sender, state, utxPool) =>
+        val basePortfolio = state.accountPortfolio(sender)
+
+        utxPool.size shouldBe 0
+        val utxPortfolio = utxPool.portfolio(sender)
+
+        basePortfolio shouldBe utxPortfolio
+      }
+
+      "taking into account unconfirmed transactions" in forAll(withValidPayments) { case (sender, state, utxPool, _) =>
+        val basePortfolio = state.accountPortfolio(sender)
+
+        utxPool.size should be > 0
+        val utxPortfolio = utxPool.portfolio(sender)
+
+        utxPortfolio.balance should be <= basePortfolio.balance
+        utxPortfolio.leaseInfo.leaseOut should be <= basePortfolio.leaseInfo.leaseOut
+        // should not be changed
+        utxPortfolio.leaseInfo.leaseIn shouldBe basePortfolio.leaseInfo.leaseIn
+        utxPortfolio.assets.foreach { case (assetId, count) =>
+          count should be <= basePortfolio.assets.getOrElse(assetId, count)
+        }
+      }
+
+      "were changed after transactions with these assets are removed" in forAll(withValidPayments) { case (sender, _, utxPool, time) =>
+        val utxPortfolioBefore = utxPool.portfolio(sender)
+        val poolSizeBefore = utxPool.size
+
+        time.advance(1000.seconds)
+        utxPool.packUnconfirmed()
+
+        poolSizeBefore should be > utxPool.size
+        val utxPortfolioAfter = utxPool.portfolio(sender)
+
+        utxPortfolioAfter.balance should be >= utxPortfolioBefore.balance
+        utxPortfolioAfter.leaseInfo.leaseOut should be >= utxPortfolioBefore.leaseInfo.leaseOut
+        utxPortfolioAfter.assets.foreach { case (assetId, count) =>
+          count should be >= utxPortfolioBefore.assets.getOrElse(assetId, count)
+        }
+      }
     }
   }
 }

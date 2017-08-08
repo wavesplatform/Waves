@@ -7,6 +7,20 @@ import cats.Monoid
 case class Portfolio(balance: Long, leaseInfo: LeaseInfo, assets: Map[ByteStr, Long]) {
   lazy val effectiveBalance: Long = safeSum(balance, leaseInfo.leaseIn) - leaseInfo.leaseOut
   lazy val spendableBalance: Long = balance - leaseInfo.leaseOut
+
+  /**
+    * The Portfolio with only the withdraw part
+    */
+  def pessimistic: Portfolio = Portfolio(
+    balance = Math.min(balance, 0),
+    leaseInfo = LeaseInfo(
+      leaseIn = 0,
+      leaseOut = Math.min(leaseInfo.leaseOut, 0)
+    ),
+    assets = assets.filter { case (_, v) => v < 0 }
+  )
+
+  def isEmpty: Boolean = this == Monoid.empty[Portfolio]
 }
 
 object Portfolio {
