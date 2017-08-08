@@ -1,6 +1,7 @@
 package scorex.block
 
 import com.google.common.primitives.{Bytes, Ints}
+import com.wavesplatform.mining.Miner.MaxTransactionsPerMicroblock
 import com.wavesplatform.state2._
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
@@ -57,7 +58,12 @@ object MicroBlock extends ScorexLogging {
                      totalResBlockSig: BlockId, signature: ByteStr): Either[ValidationError, MicroBlock] = {
     if (transactionData.isEmpty)
       Left(GenericError("cannot create empty MicroBlock"))
-    else
+    else {
+      val txsCount = transactionData.size
+      if (txsCount > MaxTransactionsPerMicroblock) {
+        Left(GenericError(s"too many txs in MicroBlock: allowed: $MaxTransactionsPerMicroblock, actual: $txsCount"))
+      }
+    }
       Right(new MicroBlock(version, generator, transactionData, prevResBlockSig, totalResBlockSig, signature))
   }
 
@@ -67,7 +73,7 @@ object MicroBlock extends ScorexLogging {
     require(totalResBlockSig.arr.length == SignatureLength, "Incorrect totalResBlockSig")
     require(generator.publicKey.length == TransactionParser.KeyLength, "Incorrect generator.publicKey")
 
-    create(version = 1: Byte, generator, transactionData, prevResBlockSig, totalResBlockSig, ByteStr.empty).map { nonSignedBlock =>
+    create(version = 3: Byte, generator, transactionData, prevResBlockSig, totalResBlockSig, ByteStr.empty).map { nonSignedBlock =>
       val toSign = nonSignedBlock.bytes
       val signature = EllipticCurveImpl.sign(generator, toSign)
       nonSignedBlock.copy(signature = ByteStr(signature))
@@ -102,6 +108,5 @@ object MicroBlock extends ScorexLogging {
     log.error("Error when parsing block", t)
     Failure(t)
   }
-
 }
 

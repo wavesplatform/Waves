@@ -41,7 +41,7 @@ class LegacyFrameCodec(peerDatabase: PeerDatabase) extends ByteToMessageCodec[Ra
   } catch {
     case NonFatal(e) =>
       log.warn(s"${id(ctx)} Malformed network message", e)
-      peerDatabase.blacklistAndClose(ctx.channel(), "Malformed network message")
+      peerDatabase.blacklistAndClose(ctx.channel(), s"Malformed network message: $e")
   }
 
   override def encode(ctx: ChannelHandlerContext, msg: RawBytes, out: ByteBuf) = {

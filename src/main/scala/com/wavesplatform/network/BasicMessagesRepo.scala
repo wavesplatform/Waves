@@ -4,6 +4,7 @@ import java.net.{InetAddress, InetSocketAddress}
 import java.util
 
 import com.google.common.primitives.{Bytes, Ints}
+import com.wavesplatform.mining.Miner.MaxTransactionsPerMicroblock
 import com.wavesplatform.state2.ByteStr
 import scorex.block.{Block, MicroBlock}
 import scorex.crypto.signatures.SigningFunctions.Signature
@@ -138,7 +139,7 @@ object BlockMessageSpec extends MessageSpec[Block] {
 
   override val messageName: String = "Block message"
 
-  override def maxLength = 271 + TransactionMessageSpec.maxLength * 255
+  override def maxLength = 271 + TransactionMessageSpec.maxLength * 65535
 
   override def serializeData(block: Block): Array[Byte] = block.bytes
 
@@ -246,7 +247,7 @@ object MicroBlockResponseMessageSpec extends MessageSpec[MicroBlockResponse] {
 
   override def serializeData(resp: MicroBlockResponse): Array[Byte] = resp.microblock.bytes
 
-  override def maxLength = 271 + TransactionMessageSpec.maxLength * 255
+  override def maxLength = 271 + TransactionMessageSpec.maxLength * MaxTransactionsPerMicroblock
 
 }
 
