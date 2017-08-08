@@ -22,6 +22,7 @@ import scorex.wallet.Wallet
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
+import scala.language.postfixOps
 
 class OrderHistoryActor(val settings: MatcherSettings, val storedState: StateReader, val wallet: Wallet)
   extends Actor with OrderValidator {
