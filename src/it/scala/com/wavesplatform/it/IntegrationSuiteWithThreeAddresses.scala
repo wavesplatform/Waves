@@ -42,6 +42,11 @@ trait IntegrationSuiteWithThreeAddresses extends FunSuite with BeforeAndAfterAll
     }
   }
 
+  protected def waitForHeightAraise(transactionId: String, heightIncreaseOn: Integer): Future[Unit] = for {
+    height <- traverse(allNodes)(_.height).map(_.max)
+    _ <- traverse(allNodes)(_.waitForHeight(height + heightIncreaseOn))
+    _ <- traverse(allNodes)(_.waitForTransaction(transactionId))
+  } yield ()
 
 
 

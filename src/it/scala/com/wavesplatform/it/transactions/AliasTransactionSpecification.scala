@@ -108,11 +108,7 @@ class AliasTransactionSpecification(override val allNodes: Seq[Node], override v
   }
 
 
-  def waitForHeightAraise(transactionId: String, heightIncreaseOn: Integer): Future[Unit] = for {
-    height <- traverse(allNodes)(_.height).map(_.max)
-    _ <- traverse(allNodes)(_.waitForHeight(height + heightIncreaseOn))
-    _ <- traverse(allNodes)(_.waitForTransaction(transactionId))
-  } yield ()
+
 
   test("Able to get address by alias") {
     val alias = "test_alias_6"
