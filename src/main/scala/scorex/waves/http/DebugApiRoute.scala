@@ -10,12 +10,13 @@ import akka.http.scaladsl.server.Route
 import com.wavesplatform.UtxPool
 import com.wavesplatform.network.{LocalScoreChanged, PeerDatabase, PeerInfo, _}
 import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state2.{ByteStr, LeaseInfo, Portfolio}
 import com.wavesplatform.state2.reader.StateReader
 import io.netty.channel.Channel
 import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
-import play.api.libs.json.{JsArray, Json}
+import play.api.libs.json._
+import scorex.account.Address
 import scorex.api.http._
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash
@@ -24,8 +25,9 @@ import scorex.wallet.Wallet
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
-import scala.util.Success
+import scala.util.{Failure, Success}
 import scala.util.control.NonFatal
+import DebugApiRoute._
 
 
 @Path("/debug")
@@ -41,7 +43,7 @@ case class DebugApiRoute(settings: RestAPISettings,
                          utxStorage: UtxPool) extends ApiRoute {
 
   override lazy val route = pathPrefix("debug") {
-    blocks ~ state ~ info ~ stateWaves ~ rollback ~ rollbackTo ~ blacklist
+    blocks ~ state ~ info ~ stateWaves ~ rollback ~ rollbackTo ~ blacklist ~ portfolios
   }
 
   @Path("/blocks/{howMany}")
@@ -74,6 +76,40 @@ case class DebugApiRoute(settings: RestAPISettings,
     )
   }
 
+  @Path("/portfolios/{address}")
+  @ApiOperation(
+    value = "Portfolio",
+    notes = "Get current portfolio considering pessimistic transactions in the UTX pool",
+    httpMethod = "GET"
+  )
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(
+      name = "address",
+      value = "An address of portfolio",
+      required = true,
+      dataType = "string",
+      paramType = "path"
+    ),
+    new ApiImplicitParam(
+      name = "considerUnspent",
+      value = "Taking into account pessimistic transactions from UTX pool",
+      required = false,
+      dataType = "boolean",
+      paramType = "query",
+      defaultValue = "true"
+    )
+  ))
+  @ApiResponses(Array(new ApiResponse(code = 200, message = "Json portfolio")))
+  def portfolios: Route = path("portfolios" / Segment) { (rawAddress) =>
+    (get & parameter('considerUnspent.as[Boolean])) { (considerUnspent) =>
+      Address.fromString(rawAddress) match {
+        case Left(_) => complete(InvalidAddress)
+        case Right(address) =>
+          val portfolio = if (considerUnspent) utxStorage.portfolio(address) else stateReader.accountPortfolio(address)
+          complete(Json.toJson(portfolio))
+      }
+    }
+  }
 
   @Path("/stateWaves/{height}")
   @ApiOperation(value = "State at block", notes = "Get state at specified height", httpMethod = "GET")
@@ -184,4 +220,26 @@ case class DebugApiRoute(settings: RestAPISettings,
     }
   }
 
+}
+
+object DebugApiRoute {
+  implicit val assetsFormat: Format[Map[ByteStr, Long]] = Format[Map[ByteStr, Long]](
+    _ match {
+      case JsObject(m) => m.foldLeft[JsResult[Map[ByteStr, Long]]](JsSuccess(Map.empty)) {
+        case (e: JsError, _) => e
+        case (JsSuccess(m, _), (rawAssetId, JsNumber(count))) =>
+          (ByteStr.decodeBase58(rawAssetId), count) match {
+            case (Success(assetId), count) if count.isValidLong => JsSuccess(m.updated(assetId, count.toLong))
+            case (Failure(_), _) => JsError(s"Can't parse '$rawAssetId' as base58 string")
+            case (_, count) => JsError(s"Invalid count of assets: $count")
+          }
+        case (_, (_, rawCount)) =>
+          JsError(s"Invalid count of assets: $rawCount")
+      }
+      case _ => JsError("The map is expected")
+    },
+    m => Json.toJson(m.map { case (assetId, count) => assetId.base58 -> count })
+  )
+  implicit val leaseInfoFormat: Format[LeaseInfo] = Json.format
+  implicit val portfolioFormat: Format[Portfolio] = Json.format
 }

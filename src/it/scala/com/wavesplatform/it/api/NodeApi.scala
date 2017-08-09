@@ -5,6 +5,7 @@ import java.util.concurrent.TimeoutException
 
 import com.wavesplatform.it.util._
 import com.wavesplatform.matcher.api.CancelOrderRequest
+import com.wavesplatform.state2.Portfolio
 import io.netty.util.{HashedWheelTimer, Timer}
 import org.asynchttpclient.Dsl.{get => _get, post => _post}
 import org.asynchttpclient._
@@ -12,12 +13,14 @@ import org.asynchttpclient.util.HttpConstants
 import org.slf4j.LoggerFactory
 import play.api.libs.json.Json.{parse, stringify, toJson}
 import play.api.libs.json._
+import scorex.account.Address
 import scorex.api.http.alias.CreateAliasRequest
 import scorex.api.http.assets._
 import scorex.api.http.leasing.{LeaseCancelRequest, LeaseRequest}
 import scorex.transaction.assets.exchange.Order
 import scorex.utils.{LoggerFacade, ScorexLogging}
 import scorex.waves.http.RollbackParams
+import scorex.waves.http.DebugApiRoute.portfolioFormat
 
 import scala.compat.java8.FutureConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -55,6 +58,12 @@ trait NodeApi {
 
   def get(path: String, f: RequestBuilder => RequestBuilder = identity): Future[Response] =
     retrying(f(_get(s"http://$restAddress:$nodeRestPort$path")).build())
+
+  def getWihApiKey(path: String, f: RequestBuilder => RequestBuilder = identity): Future[Response] = retrying {
+    _get(s"http://$restAddress:$nodeRestPort$path")
+      .setHeader("api_key", "integration-test-rest-api")
+      .build()
+  }
 
   def post(url: String, port: Int, path: String, f: RequestBuilder => RequestBuilder = identity): Future[Response] =
     retrying(f(
@@ -108,6 +117,12 @@ trait NodeApi {
     case Failure(UnexpectedStatusCodeException(_, r)) if r.getStatusCode == 404 => Success(None)
     case Failure(ex) => Failure(ex)
   }, tOpt => tOpt.exists(_.id == txId), 1.second).map(_.get)
+
+  def waitForUtxIncreased(fromSize: Int): Future[Int] = waitFor[Int](
+    utxSize,
+    _ > fromSize,
+    100.millis
+  )
 
   def waitForHeight(expectedHeight: Int): Future[Int] = waitFor[Int](height, h => h >= expectedHeight, 1.second)
 
@@ -249,6 +264,11 @@ trait NodeApi {
   def waitForDebugInfoAt(height: Long): Future[DebugInfo] = waitFor[DebugInfo](get("/debug/info").as[DebugInfo], _.stateHeight >= height, 1.seconds)
 
   def debugStateAt(height: Long): Future[Map[String, Long]] = get(s"/debug/stateWaves/$height").as[Map[String, Long]]
+
+  def debugPortfoliosFor(address: Address, considerUnspent: Boolean) = {
+    getWihApiKey(s"/debug/portfolios/${address.address}?considerUnspent=$considerUnspent")
+  }.as[Portfolio]
+
 }
 
 object NodeApi extends ScorexLogging {
