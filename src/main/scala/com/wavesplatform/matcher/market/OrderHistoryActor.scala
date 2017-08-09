@@ -26,8 +26,6 @@ import scala.language.postfixOps
 
 class OrderHistoryActor(val settings: MatcherSettings, val storedState: StateReader, val wallet: Wallet)
   extends Actor with OrderValidator {
-  val RequestTTL: Int = 5*1000
-  val UpdateOpenPortfolioDelay: FiniteDuration = 30 seconds
 
   val db: MVStore = utils.createMVStore(settings.orderHistoryFile)
   val storage = new OrderHistoryStorage(db)
@@ -133,6 +131,8 @@ class OrderHistoryActor(val settings: MatcherSettings, val storedState: StateRea
 }
 
 object OrderHistoryActor {
+  val RequestTTL: Int = 5*1000
+  val UpdateOpenPortfolioDelay: FiniteDuration = 30 seconds
   def name = "OrderHistory"
   def props(settings: MatcherSettings, storedState: StateReader, wallet: Wallet): Props =
     Props(new OrderHistoryActor(settings, storedState, wallet))
