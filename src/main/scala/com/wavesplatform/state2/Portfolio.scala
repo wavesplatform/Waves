@@ -15,7 +15,7 @@ case class Portfolio(balance: Long, leaseInfo: LeaseInfo, assets: Map[ByteStr, L
     balance = Math.min(balance, 0),
     leaseInfo = LeaseInfo(
       leaseIn = 0,
-      leaseOut = Math.min(leaseInfo.leaseOut, 0)
+      leaseOut = Math.max(leaseInfo.leaseOut, 0)
     ),
     assets = assets.filter { case (_, v) => v < 0 }
   )

@@ -9,7 +9,7 @@ import org.scalacheck.{Gen, Shrink}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import org.scalatest.{FreeSpec, Matchers}
-import scorex.account.{Address, PrivateKeyAccount}
+import scorex.account.{Address, PrivateKeyAccount, PublicKeyAccount}
 import scorex.block.Block
 import scorex.transaction.assets.TransferTransaction
 import scorex.transaction.{FeeCalculator, PaymentTransaction, Transaction}
@@ -49,7 +49,7 @@ class UtxPoolSpecification extends FreeSpec
   } yield TransferTransaction.create(None, sender, recipient, amount, time.getTimestamp(), None, fee, Array.empty[Byte]).right.get)
     .label("transferTransaction")
 
-  private def transferWithRecipient(sender: PrivateKeyAccount, recipient: PrivateKeyAccount, maxAmount: Long, time: Time) = (for {
+  private def transferWithRecipient(sender: PrivateKeyAccount, recipient: PublicKeyAccount, maxAmount: Long, time: Time) = (for {
     amount <- chooseNum(1, (maxAmount * 0.9).toLong)
     fee <- chooseNum(1, (maxAmount * 0.1).toLong)
   } yield TransferTransaction.create(None, sender, recipient, amount, time.getTimestamp(), None, fee, Array.empty[Byte]).right.get)
@@ -79,7 +79,7 @@ class UtxPoolSpecification extends FreeSpec
   private val emptyUtxPool = stateGen
     .map { case (sender, senderBalance, state, history) =>
       val time = new TestTime()
-      val utxPool = new UtxPool(time, state, history, calculator, FunctionalitySettings.TESTNET, UtxSettings(10, 10.minutes))
+      val utxPool = new UtxPool(time, state, history, calculator, FunctionalitySettings.TESTNET, UtxSettings(10, 1.minute))
       (sender, state, utxPool)
     }
     .label("emptyUtxPool")
@@ -90,9 +90,10 @@ class UtxPoolSpecification extends FreeSpec
     time = new TestTime()
     txs <- Gen.nonEmptyListOf(transferWithRecipient(sender, recipient, senderBalance / 10, time))
   } yield {
-    val utxPool = new UtxPool(time, state, history, calculator, FunctionalitySettings.TESTNET, UtxSettings(10, 10.minutes))
+    val settings = UtxSettings(10, 1.minute)
+    val utxPool = new UtxPool(time, state, history, calculator, FunctionalitySettings.TESTNET, settings)
     txs.foreach(utxPool.putIfNew)
-    (sender, state, utxPool, time)
+    (sender, state, utxPool, time, settings)
   }).label("withValidPayments")
 
   private def utxTest(utxSettings: UtxSettings = UtxSettings(20, 5.seconds), txCount: Int = 10)
@@ -182,7 +183,7 @@ class UtxPoolSpecification extends FreeSpec
         basePortfolio shouldBe utxPortfolio
       }
 
-      "taking into account unconfirmed transactions" in forAll(withValidPayments) { case (sender, state, utxPool, _) =>
+      "taking into account unconfirmed transactions" in forAll(withValidPayments) { case (sender, state, utxPool, _, _) =>
         val basePortfolio = state.accountPortfolio(sender)
 
         utxPool.size should be > 0
@@ -197,11 +198,11 @@ class UtxPoolSpecification extends FreeSpec
         }
       }
 
-      "were changed after transactions with these assets are removed" in forAll(withValidPayments) { case (sender, _, utxPool, time) =>
+      "is changed after transactions with these assets are removed" in forAll(withValidPayments) { case (sender, _, utxPool, time, settings) =>
         val utxPortfolioBefore = utxPool.portfolio(sender)
         val poolSizeBefore = utxPool.size
 
-        time.advance(1000.seconds)
+        time.advance(settings.maxTransactionAge * 2)
         utxPool.packUnconfirmed()
 
         poolSizeBefore should be > utxPool.size

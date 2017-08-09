@@ -1,9 +1,10 @@
 package com.wavesplatform
 
-import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.locks.ReentrantReadWriteLock
 
 import cats._
 import com.google.common.cache.CacheBuilder
+import com.wavesplatform.UtxPool.PessimisticPortfolios
 import com.wavesplatform.settings.{FunctionalitySettings, UtxSettings}
 import com.wavesplatform.state2.diffs.TransactionDiffer
 import com.wavesplatform.state2.reader.{CompositeStateReader, StateReader}
@@ -12,111 +13,90 @@ import scorex.account.Address
 import scorex.consensus.TransactionsOrdering
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction._
-import scorex.utils.{ScorexLogging, Time}
+import scorex.utils.{ScorexLogging, Synchronized, Time}
 
-import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.util.{Left, Right}
 
-class UtxPool(
-                 time: Time,
-                 stateReader: StateReader,
-                 history: History,
-                 feeCalculator: FeeCalculator,
-                 fs: FunctionalitySettings,
-                 utxSettings: UtxSettings) extends ScorexLogging {
+class UtxPool(time: Time,
+              stateReader: StateReader,
+              history: History,
+              feeCalculator: FeeCalculator,
+              fs: FunctionalitySettings,
+              utxSettings: UtxSettings) extends Synchronized with ScorexLogging {
 
-  private type Portfolios = Map[Address, Portfolio]
+  def synchronizationToken: ReentrantReadWriteLock = new ReentrantReadWriteLock()
 
-  private val transactions = new ConcurrentHashMap[ByteStr, Transaction]
+  private val transactions = Synchronized(Map.empty[ByteStr, Transaction])
 
-  private lazy val knownTransactions = CacheBuilder.newBuilder()
-    .maximumSize(utxSettings.maxSize * 2)
-    .build[ByteStr, Either[ValidationError, Transaction]]()
-
-  /**
-    * Transaction.id -> diff
-    * Transactions which withdraw
-    */
-  private val txPessimisticPortfolios = new ConcurrentHashMap[ByteStr, Portfolios]
-
-  private def removeExpired(currentTs: Long): Unit = {
-    def isExpired(tx: Transaction) = (currentTs - tx.timestamp).millis > utxSettings.maxTransactionAge
-
-    if (!transactions.isEmpty) {
-      val expiredTxs = transactions.reduceValues[Vector[Transaction]](
-        1, // maximal parallelism
-        { tx => if (isExpired(tx)) Vector(tx) else Vector.empty },
-        _ ++ _
-      )
-
-      expiredTxs.foreach { tx =>
-        transactions.remove(tx.id)
-        txPessimisticPortfolios.remove(tx.id)
-      }
-    }
+  private lazy val knownTransactions = Synchronized {
+    CacheBuilder
+      .newBuilder()
+      .maximumSize(utxSettings.maxSize * 2)
+      .build[ByteStr, Either[ValidationError, Transaction]]()
   }
 
-  def putIfNew(tx: Transaction): Either[ValidationError, Transaction] =
-    if (transactions.size >= utxSettings.maxSize) {
+  private val pessimisticPortfolios = Synchronized(new PessimisticPortfolios)
+
+  private def removeExpired(currentTs: Long): Unit = write { implicit l =>
+    def isExpired(tx: Transaction) = (currentTs - tx.timestamp).millis > utxSettings.maxTransactionAge
+
+    transactions()
+      .values
+      .view
+      .filter(isExpired)
+      .foreach { tx =>
+        transactions.transform(_ - tx.id)
+        pessimisticPortfolios.mutate(_.remove(tx.id))
+      }
+  }
+
+  def putIfNew(tx: Transaction): Either[ValidationError, Transaction] = write { implicit l =>
+    if (transactions().size >= utxSettings.maxSize) {
       Left(GenericError("Transaction pool size limit is reached"))
-    } else knownTransactions.get(tx.id, () => {
+    } else knownTransactions().get(tx.id, () => {
       val validationResult = for {
         _ <- feeCalculator.enoughFee(tx)
         diff <- TransactionDiffer(fs, history.lastBlock.map(_.timestamp), time.correctedTime(), stateReader.height)(stateReader, tx)
-        _ = {
-          val nonEmptyPessimisticPortfolios = diff.portfolios
-            .mapValues(_.pessimistic)
-            .filterNot {
-              case (_, portfolio) => portfolio.isEmpty
-            }
-
-          if (nonEmptyPessimisticPortfolios.nonEmpty) {
-            txPessimisticPortfolios.put(tx.id, nonEmptyPessimisticPortfolios)
-          }
-        }
-        _ = transactions.putIfAbsent(tx.id, tx)
+        _ = pessimisticPortfolios.mutate(_.add(tx.id, diff))
+        _ = transactions.transform(_.updated(tx.id, tx))
       } yield tx
 
       validationResult
     })
+  }
 
-  def removeAll(tx: Traversable[Transaction]): Unit = {
+  def removeAll(tx: Traversable[Transaction]): Unit = write { implicit l =>
     removeExpired(time.correctedTime())
     tx.view.map(_.id).foreach { id =>
-      knownTransactions.invalidate(id)
-      transactions.remove(id)
+      knownTransactions.mutate(_.invalidate(id))
+      transactions.transform(_ - id)
+      pessimisticPortfolios.mutate(_.remove(id))
     }
   }
 
-  def portfolio(addr: Address): Portfolio = {
-    val empty = Monoid.empty[Portfolio]
+  def portfolio(addr: Address): Portfolio = read { implicit l =>
     val base = stateReader.accountPortfolio(addr)
-
-    val foundInUtx = if (txPessimisticPortfolios.isEmpty) {
-      empty
-    } else {
-      txPessimisticPortfolios.reduceValues[Portfolio](
-        1,
-        _.getOrElse(addr, empty),
-        Monoid.combine[Portfolio]
-      )
-    }
+    val foundInUtx = pessimisticPortfolios().getAggregated(addr)
 
     Monoid.combine(base, foundInUtx)
   }
 
-  def all(): Seq[Transaction] = transactions.values.asScala.toSeq.sorted(TransactionsOrdering.InUTXPool)
+  def all(): Seq[Transaction] = read { implicit l =>
+    transactions().values.toSeq.sorted(TransactionsOrdering.InUTXPool)
+  }
 
-  def size: Int = transactions.size()
+  def size: Int = read { implicit l => transactions().size }
 
-  def transactionById(transactionId: ByteStr): Option[Transaction] = Option(transactions.get(transactionId))
+  def transactionById(transactionId: ByteStr): Option[Transaction] = read { implicit l =>
+    transactions().get(transactionId)
+  }
 
-  def packUnconfirmed(): Seq[Transaction] = {
+  def packUnconfirmed(): Seq[Transaction] = write { implicit l =>
     val currentTs = time.correctedTime()
     removeExpired(currentTs)
-    val differ = TransactionDiffer.apply(fs, history.lastBlock.map(_.timestamp), currentTs, stateReader.height) _
-    val (invalidTxs, validTxs, _) = transactions.asScala
+    val differ = TransactionDiffer(fs, history.lastBlock.map(_.timestamp), currentTs, stateReader.height) _
+    val (invalidTxs, validTxs, _) = transactions()
       .values.toSeq
       .sorted(TransactionsOrdering.InUTXPool)
       .foldLeft((Seq.empty[ByteStr], Seq.empty[Transaction], Monoid[Diff].empty)) {
@@ -131,7 +111,52 @@ class UtxPool(
         case (r, _) => r
       }
 
-    invalidTxs.foreach(transactions.remove)
+    transactions.transform(_ -- invalidTxs)
+    pessimisticPortfolios.mutate { p =>
+      invalidTxs.foreach(p.remove)
+    }
     validTxs.sorted(TransactionsOrdering.InBlock)
   }
+}
+
+object UtxPool {
+
+  private class PessimisticPortfolios {
+    private type Portfolios = Map[Address, Portfolio]
+
+    private var transactionPortfolios = Map.empty[ByteStr, Portfolios]
+    private var transactions = Map.empty[Address, Set[ByteStr]]
+
+    def add(txId: ByteStr, txDiff: Diff): Unit = {
+      val nonEmptyPessimisticPortfolios = txDiff.portfolios
+        .mapValues(_.pessimistic)
+        .filterNot {
+          case (_, portfolio) => portfolio.isEmpty
+        }
+
+      if (nonEmptyPessimisticPortfolios.nonEmpty) {
+        transactionPortfolios += txId -> nonEmptyPessimisticPortfolios
+        nonEmptyPessimisticPortfolios.keys.foreach { address =>
+          transactions += address -> (transactions.getOrElse(address, Set.empty) + txId)
+        }
+      }
+    }
+
+    def getAggregated(accountAddr: Address): Portfolio = {
+      val portfolios = for {
+        txIds <- transactions.get(accountAddr).toSeq
+        txId <- txIds
+        txPortfolios <- transactionPortfolios.get(txId)
+        txAccountPortfolio <- txPortfolios.get(accountAddr)
+      } yield txAccountPortfolio
+
+      Monoid.combineAll[Portfolio](portfolios)
+    }
+
+    def remove(txId: ByteStr): Unit = {
+      transactionPortfolios -= txId
+      transactions = transactions.mapValues(_ - txId)
+    }
+  }
+
 }
