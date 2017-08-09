@@ -53,7 +53,7 @@ case class OrderHistoryImpl(p: OrderHistoryStorage) extends OrderHistory with Sc
   }
 
   def openPortfolio(address: String): OpenPortfolio = {
-    Option(p.addressToOrderPortfolio.get(address)).map(OpenPortfolio(_)).getOrElse(OpenPortfolio.empty)
+    Option(p.addressToOrderPortfolio.get(address)).map(OpenPortfolio(_)).orEmpty
   }
 
   def saveOpenPortfolio(event: Event): Unit = {
@@ -121,7 +121,7 @@ case class OrderHistoryImpl(p: OrderHistoryStorage) extends OrderHistory with Sc
 
   override def ordersByPairAndAddress(assetPair: AssetPair, address: String): Set[String] = {
     val pairAddressKey = OrderHistoryStorage.assetPairAddressKey(assetPair, address)
-    Option(p.pairAddressToOrderIds.get(pairAddressKey)).map(_.takeRight(100).toSet).getOrElse(Set())
+    Option(p.pairAddressToOrderIds.get(pairAddressKey)).map(_.takeRight(MaxOrdersPerRequest).toSet).getOrElse(Set())
   }
 
   override def getAllOrdersByAddress(address: String): Set[String] = {

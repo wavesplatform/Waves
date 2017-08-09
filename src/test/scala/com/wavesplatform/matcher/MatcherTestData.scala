@@ -45,8 +45,8 @@ trait MatcherTestData {
       |    max-open-orders: 1000
       |    price-assets: ["BASE1", "BASE2"]
       |    predefined-pairs: [{amountAsset = "BASE2", priceAsset = "BASE1"}]
-      |    blacklisted-assets: []
-      |    blacklisted-names: []
+      |    blacklisted-assets: ["BLACKLST"]
+      |    blacklisted-names: ["[F,f]orbidden"]
       |  }
       |}""".stripMargin))
 
