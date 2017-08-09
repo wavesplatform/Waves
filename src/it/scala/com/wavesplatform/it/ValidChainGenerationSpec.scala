@@ -17,7 +17,12 @@ class ValidChainGenerationSpec(override val nodes: Seq[Node]) extends FreeSpec w
   "Generate 30 blocks and synchronise" in {
     val targetBlocks = result(for {
       b <- traverse(nodes)(balanceForNode).map(_.toMap)
+
+      height <- traverse(nodes)(_.height).map(_.max)
+      _ <- traverse(nodes)(_.waitForHeight(height + 1))
+
       _ <- processRequests(generateRequests(requestsCount, b))
+
       height <- traverse(nodes)(_.height).map(_.max)
       _ <- traverse(nodes)(_.waitForHeight(height + 30))
 
@@ -26,7 +31,7 @@ class ValidChainGenerationSpec(override val nodes: Seq[Node]) extends FreeSpec w
       _ <- if (eq) Future.successful(()) else traverse(nodes)(_.waitForHeight(height + 40))
 
       blocks <- traverse(nodes)(_.blockAt(height + 25))
-    } yield blocks.map(_.signature), 5.minutes)
+    } yield blocks.map(_.signature), 6.minutes)
 
     all(targetBlocks) shouldEqual targetBlocks.head
   }
