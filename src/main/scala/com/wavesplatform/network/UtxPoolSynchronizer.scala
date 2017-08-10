@@ -25,9 +25,11 @@ class UtxPoolSynchronizer(utx: UtxPool, allChannels: ChannelGroup)
         log.debug(s"${id(ctx)} Error processing transaction ${t.id}: $e")
       case Left(e) =>
         log.debug(s"${id(ctx)} Error processing transaction ${t.id}: $e")
-      case Right(_) =>
+      case Right(true) =>
         allChannels.broadcast(RawBytes(TransactionMessageSpec.messageCode, t.bytes), Some(ctx.channel()))
         log.trace(s"${id(ctx)} Added transaction ${t.id} to UTX pool")
+      case Right(false) =>
+        log.trace(s"${id(ctx)} TX ${t.id} already known")
     })
     case _ => super.channelRead(ctx, msg)
   }
