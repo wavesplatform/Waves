@@ -55,7 +55,7 @@ class OrderBookActor(assetPair: AssetPair,
 
   def fullCommands: Receive = readOnlyCommands orElse snapshotsCommands orElse executeCommands
 
-  def executeCommands: Receive =  {
+  def executeCommands: Receive = {
     case order: Order =>
       onAddOrder(order)
     case cancel: CancelOrder =>
@@ -233,7 +233,10 @@ class OrderBookActor(assetPair: AssetPair,
         None
 
       case event@OrderExecuted(o, c) =>
-        createTransaction(o, c).flatMap(utx.putIfNew(_)) match {
+        (for {
+          tx <- createTransaction(o, c)
+          _ <- utx.putIfNew(tx)
+        } yield tx) match {
           case Right(tx) if tx.isInstanceOf[ExchangeTransaction] =>
             allChannels.broadcast(RawBytes(TransactionMessageSpec.messageCode, tx.bytes))
             processEvent(event)
@@ -324,5 +327,6 @@ object OrderBookActor {
   case class Snapshot(orderBook: OrderBook)
 
   case object ValidationTimeoutExceeded
+
 }
 

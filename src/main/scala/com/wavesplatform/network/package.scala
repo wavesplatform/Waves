@@ -11,6 +11,7 @@ import io.netty.channel.{Channel, ChannelHandlerContext}
 import io.netty.util.NetUtil.toSocketAddressString
 import io.netty.util.concurrent.{EventExecutorGroup, ScheduledFuture}
 import scorex.block.Block
+import scorex.transaction.Transaction
 import scorex.utils.ScorexLogging
 
 import scala.concurrent.duration._
@@ -55,5 +56,8 @@ package object network extends ScorexLogging {
       log.trace(s"Broadcasting $message to ${allChannels.size()} channels${except.fold("")(c => s" (except ${id(c)})")}")
       allChannels.writeAndFlush(message, except.fold(ChannelMatchers.all())(ChannelMatchers.isNot))
     }
+
+    def broadcastTx(tx:Transaction, except: Option[Channel] = None): Unit =
+      allChannels.broadcast(RawBytes(TransactionMessageSpec.messageCode, tx.bytes), except)
   }
 }

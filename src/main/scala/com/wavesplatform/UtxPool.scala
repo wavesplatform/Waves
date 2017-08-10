@@ -51,19 +51,24 @@ class UtxPool(time: Time,
       }
   }
 
-  def putIfNew(tx: Transaction): Either[ValidationError, Transaction] = write { implicit l =>
-    if (transactions().size >= utxSettings.maxSize) {
-      Left(GenericError("Transaction pool size limit is reached"))
-    } else knownTransactions().get(tx.id, () => {
-      val validationResult = for {
-        _ <- feeCalculator.enoughFee(tx)
-        diff <- TransactionDiffer(fs, history.lastBlock.map(_.timestamp), time.correctedTime(), stateReader.height)(stateReader, tx)
-        _ = pessimisticPortfolios.mutate(_.add(tx.id, diff))
-        _ = transactions.transform(_.updated(tx.id, tx))
-      } yield tx
-
-      validationResult
-    })
+  def putIfNew(tx: Transaction): Either[ValidationError, Boolean] = write { implicit l =>
+    knownTransactions.mutate(cache =>
+      Option(cache.getIfPresent(tx.id)) match {
+        case Some(Right(_)) => Right(false)
+        case Some(Left(er)) => Left(er)
+        case None =>
+          val res = for {
+            _ <- Either.cond(transactions().size < utxSettings.maxSize, (), GenericError("Transaction pool size limit is reached"))
+            _ <- feeCalculator.enoughFee(tx)
+            diff <- TransactionDiffer(fs, history.lastBlock.map(_.timestamp), time.correctedTime(), stateReader.height)(stateReader, tx)
+          } yield {
+            pessimisticPortfolios.mutate(_.add(tx.id, diff))
+            transactions.transform(_.updated(tx.id, tx))
+            tx
+          }
+          cache.put(tx.id, res)
+          res.right.map(_ => true)
+      })
   }
 
   def removeAll(tx: Traversable[Transaction]): Unit = write { implicit l =>
