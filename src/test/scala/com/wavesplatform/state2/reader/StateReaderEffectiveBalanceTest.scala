@@ -27,7 +27,7 @@ class StateReaderEffectiveBalanceTest extends fixture.FunSuite with Matchers {
     storage.balanceSnapshots.put(accountIndexKey(acc, 90), (75, 0, 100))
     storage.lastBalanceSnapshotHeight.put(acc.bytes, 90)
 
-    new StateReaderImpl(storage, new ReentrantReadWriteLock()).effectiveBalanceAtHeightWithConfirmations(acc, stateHeight, 50) shouldBe 1
+    new StateReaderImpl(storage, new ReentrantReadWriteLock()).effectiveBalanceAtHeightWithConfirmations(acc, stateHeight, 50).get shouldBe 1
   }
 
   test("exposes current effective balance if no records in past N blocks are made") { storage =>
@@ -35,7 +35,7 @@ class StateReaderEffectiveBalanceTest extends fixture.FunSuite with Matchers {
     storage.portfolios.put(acc.bytes, (1, (0, 0), Map.empty))
     storage.lastBalanceSnapshotHeight.put(acc.bytes, 20)
 
-    new StateReaderImpl(storage, new ReentrantReadWriteLock()).effectiveBalanceAtHeightWithConfirmations(acc, stateHeight, 50) shouldBe 1
+    new StateReaderImpl(storage, new ReentrantReadWriteLock()).effectiveBalanceAtHeightWithConfirmations(acc, stateHeight, 50).get shouldBe 1
   }
 
   test("doesn't include info older than N blocks") { storage =>
@@ -44,7 +44,7 @@ class StateReaderEffectiveBalanceTest extends fixture.FunSuite with Matchers {
     storage.balanceSnapshots.put(accountIndexKey(acc, 75), (50, 0, 100000))
     storage.lastBalanceSnapshotHeight.put(acc.bytes, 75)
 
-    new StateReaderImpl(storage, new ReentrantReadWriteLock()).effectiveBalanceAtHeightWithConfirmations(acc, stateHeight, 50) shouldBe 50000
+    new StateReaderImpl(storage, new ReentrantReadWriteLock()).effectiveBalanceAtHeightWithConfirmations(acc, stateHeight, 50).get shouldBe 50000
   }
 
   test("includes most recent update") { storage =>
@@ -53,6 +53,6 @@ class StateReaderEffectiveBalanceTest extends fixture.FunSuite with Matchers {
     storage.balanceSnapshots.put(accountIndexKey(acc, 100), (51, 0, 1))
     storage.lastBalanceSnapshotHeight.put(acc.bytes, 100)
 
-    new StateReaderImpl(storage, new ReentrantReadWriteLock()).effectiveBalanceAtHeightWithConfirmations(acc, stateHeight, 50) shouldBe 1
+    new StateReaderImpl(storage, new ReentrantReadWriteLock()).effectiveBalanceAtHeightWithConfirmations(acc, stateHeight, 50).get shouldBe 1
   }
 }
