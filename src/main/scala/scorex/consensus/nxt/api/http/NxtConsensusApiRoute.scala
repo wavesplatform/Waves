@@ -9,7 +9,6 @@ import io.swagger.annotations._
 import play.api.libs.json.Json
 import scorex.account.Address
 import scorex.api.http.{ApiRoute, CommonApiFunctions, InvalidAddress}
-import scorex.crypto.encode.Base58
 import scorex.transaction.{History, PoSCalc}
 
 @Path("/consensus")
