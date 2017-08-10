@@ -9,8 +9,7 @@ import com.wavesplatform.matcher.market.OrderHistoryActor._
 import com.wavesplatform.matcher.model.Events.{Event, OrderAdded, OrderCanceled, OrderExecuted}
 import com.wavesplatform.matcher.model.LimitOrder.Filled
 import com.wavesplatform.matcher.model._
-import com.wavesplatform.state2.reader.StateReader
-import com.wavesplatform.utils
+import com.wavesplatform.{UtxPool, utils}
 import org.h2.mvstore.MVStore
 import play.api.libs.json._
 import scorex.account.Address
@@ -24,7 +23,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
-class OrderHistoryActor(val settings: MatcherSettings, val storedState: StateReader, val wallet: Wallet)
+class OrderHistoryActor(val settings: MatcherSettings, val utxPool: UtxPool, val wallet: Wallet)
   extends Actor with OrderValidator {
 
   val db: MVStore = utils.createMVStore(settings.orderHistoryFile)
@@ -134,8 +133,8 @@ object OrderHistoryActor {
   val RequestTTL: Int = 5*1000
   val UpdateOpenPortfolioDelay: FiniteDuration = 30 seconds
   def name = "OrderHistory"
-  def props(settings: MatcherSettings, storedState: StateReader, wallet: Wallet): Props =
-    Props(new OrderHistoryActor(settings, storedState, wallet))
+  def props(settings: MatcherSettings, utxPool: UtxPool, wallet: Wallet): Props =
+    Props(new OrderHistoryActor(settings, utxPool, wallet))
 
   sealed trait OrderHistoryRequest
   sealed trait ExpirableOrderHistoryRequest extends OrderHistoryRequest {
