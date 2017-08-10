@@ -42,8 +42,11 @@ trait NodeApi {
 
   protected val log: LoggerFacade = LoggerFacade(LoggerFactory.getLogger(s"${getClass.getName} $restAddress"))
 
-  def matcherGet(path: String, f: RequestBuilder => RequestBuilder = identity): Future[Response] =
-    retrying(f(_get(s"http://$restAddress:$matcherRestPort$path")).build())
+  def matcherGet(path: String, f: RequestBuilder => RequestBuilder = identity, statusCode: Int = HttpConstants.ResponseStatusCodes.OK_200): Future[Response] =
+    retrying(f(_get(s"http://$restAddress:$matcherRestPort$path")).build(), statusCode = statusCode)
+
+  def matcherGetStatusCode(path: String, statusCode: Int): Future[MessageMatcherResponse] =
+    matcherGet(path, statusCode = statusCode).as[MessageMatcherResponse]
 
   def matcherPost[A: Writes](path: String, body: A): Future[Response] =
     post(s"http://$restAddress", matcherRestPort, path,
@@ -237,12 +240,12 @@ trait NodeApi {
     timer.stop()
   }
 
-  def retrying(r: Request, interval: FiniteDuration = 1.second): Future[Response] = {
+  def retrying(r: Request, interval: FiniteDuration = 1.second, statusCode: Int = HttpConstants.ResponseStatusCodes.OK_200): Future[Response] = {
     def executeRequest: Future[Response] = {
       log.trace(s"Executing request '$r'")
       client.executeRequest(r, new AsyncCompletionHandler[Response] {
         override def onCompleted(response: Response): Response = {
-          if (response.getStatusCode == HttpConstants.ResponseStatusCodes.OK_200) {
+          if (response.getStatusCode == statusCode) {
             log.debug(s"Request: ${r.getUrl} \n Response: ${response.getResponseBody}")
             response
           } else {
@@ -320,6 +323,10 @@ object NodeApi extends ScorexLogging {
   case class MatcherStatusResponse(status: String)
 
   implicit val matcherStatusResponseFormat: Format[MatcherStatusResponse] = Json.format
+
+  case class MessageMatcherResponse(message: String)
+
+  implicit val messageMatcherResponseFormat: Format[MessageMatcherResponse] = Json.format
 
   case class PairResponse(amountAsset: String, priceAsset: String)
 

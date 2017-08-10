@@ -46,9 +46,9 @@ class MatcherActor(orderHistory: ActorRef, storedState: StateReader, wallet: Wal
 
   def basicValidation(msg: {def assetPair: AssetPair}): Validation = {
     def isAssetsExist: Validation = {
-      msg.assetPair.priceAsset.map(storedState.totalAssetQuantity).forall(_ > 0) :|
+      msg.assetPair.priceAsset.forall(storedState.assetExists(_)) :|
         s"Unknown Asset ID: ${msg.assetPair.priceAssetStr}" &&
-        msg.assetPair.amountAsset.map(storedState.totalAssetQuantity).forall(_ > 0) :|
+        msg.assetPair.amountAsset.forall(storedState.assetExists(_)) :|
           s"Unknown Asset ID: ${msg.assetPair.amountAssetStr}"
     }
 
@@ -98,7 +98,7 @@ class MatcherActor(orderHistory: ActorRef, storedState: StateReader, wallet: Wal
     if (tradedPairs.contains(msg.assetPair)) {
       f
     } else {
-      val v = basicValidation(msg) && checkBlacklistId(msg.assetPair) && checkBlacklistRegex(msg.assetPair)
+      val v =  checkBlacklistId(msg.assetPair) && basicValidation(msg) && checkBlacklistRegex(msg.assetPair)
       if (!v) {
         sender() ! StatusCodeMatcherResponse(StatusCodes.NotFound, v.messages())
       } else {
