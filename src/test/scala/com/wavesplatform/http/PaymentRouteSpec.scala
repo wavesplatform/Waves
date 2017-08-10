@@ -16,7 +16,7 @@ class PaymentRouteSpec extends RouteSpec("/payment")
   with MockFactory with PropertyChecks with RestAPISettingsHelper with TestWallet with TransactionGen {
 
   private val utx = stub[UtxPool]
-  (utx.putIfNew _).when(*).onCall((t: Transaction) => Right(t)).anyNumberOfTimes()
+  (utx.putIfNew _).when(*, *).onCall((t: Transaction, _) => Right(t)).anyNumberOfTimes()
   private val allChannels = stub[ChannelGroup]
   private implicit def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)
 

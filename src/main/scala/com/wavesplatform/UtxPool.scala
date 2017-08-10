@@ -9,21 +9,24 @@ import com.wavesplatform.settings.{FunctionalitySettings, UtxSettings}
 import com.wavesplatform.state2.diffs.TransactionDiffer
 import com.wavesplatform.state2.reader.{CompositeStateReader, StateReader}
 import com.wavesplatform.state2.{ByteStr, Diff, Portfolio}
+import io.netty.channel.Channel
+import io.netty.channel.group.ChannelGroup
 import scorex.account.Address
 import scorex.consensus.TransactionsOrdering
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction._
 import scorex.utils.{ScorexLogging, Synchronized, Time}
+import com.wavesplatform.network._
 
 import scala.concurrent.duration._
-import scala.util.{Left, Right}
 
-class UtxPool(time: Time,
-              stateReader: StateReader,
-              history: History,
-              feeCalculator: FeeCalculator,
-              fs: FunctionalitySettings,
-              utxSettings: UtxSettings) extends Synchronized with ScorexLogging {
+class UtxPool(
+    time: Time,
+    stateReader: StateReader,
+    history: History,
+    feeCalculator: FeeCalculator,
+    fs: FunctionalitySettings,
+    utxSettings: UtxSettings) extends Synchronized with ScorexLogging {
 
   def synchronizationToken: ReentrantReadWriteLock = new ReentrantReadWriteLock()
 
@@ -51,19 +54,16 @@ class UtxPool(time: Time,
       }
   }
 
-  def putIfNew(tx: Transaction): Either[ValidationError, Transaction] = write { implicit l =>
+  def putIfNew(tx: Transaction, whenAdded: Transaction => Unit = _ => {}): Either[ValidationError, Transaction] = write { implicit l =>
     if (transactions().size >= utxSettings.maxSize) {
       Left(GenericError("Transaction pool size limit is reached"))
-    } else knownTransactions().get(tx.id, () => {
-      val validationResult = for {
+    } else knownTransactions().get(tx.id, () => for {
         _ <- feeCalculator.enoughFee(tx)
         diff <- TransactionDiffer(fs, history.lastBlock.map(_.timestamp), time.correctedTime(), stateReader.height)(stateReader, tx)
         _ = pessimisticPortfolios.mutate(_.add(tx.id, diff))
         _ = transactions.transform(_.updated(tx.id, tx))
-      } yield tx
-
-      validationResult
-    })
+        _ = whenAdded(tx)
+      } yield tx)
   }
 
   def removeAll(tx: Traversable[Transaction]): Unit = write { implicit l =>
@@ -120,6 +120,8 @@ class UtxPool(time: Time,
 }
 
 object UtxPool {
+  def broadcastTx(allChannels: ChannelGroup, source: Option[Channel])(t: Transaction) =
+    allChannels.broadcast(RawBytes(TransactionMessageSpec.messageCode, t.bytes), source)
 
   private class PessimisticPortfolios {
     private type Portfolios = Map[Address, Portfolio]

@@ -91,7 +91,7 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
     val functionalitySettings = stub[FunctionalitySettings]
 
     val utx = stub[UtxPool]
-    (utx.putIfNew _).when(*).onCall((tx: Transaction) => Right(tx))
+    (utx.putIfNew _).when(*, *).onCall((tx: Transaction, _) => Right(tx))
     val allChannels = stub[ChannelGroup]
     actor = system.actorOf(Props(new OrderBookActor(pair, orderHistoryRef, storedState,
       wallet, utx, allChannels, settings, history, functionalitySettings) with RestartableActor))
@@ -272,7 +272,7 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
       val ord3 = sell(pair, 100, 10 * Order.PriceConstant)
 
       val pool = stub[UtxPool]
-      (pool.putIfNew _).when(*).onCall { (tx: Transaction) =>
+      (pool.putIfNew _).when(*, *).onCall { (tx: Transaction, _) =>
         tx match {
           case om: ExchangeTransaction if om.buyOrder == ord2 => Left(ValidationError.GenericError("test"))
           case _: Transaction => Right(tx)
