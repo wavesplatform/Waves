@@ -39,7 +39,7 @@ class BlacklistTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll {
     docker.close()
   }
 
-  "network should grow up to 60 blocks" in {
+  "network should grow up to 50 blocks" in {
     Await.result(richestNode.waitForHeight(50), 5.minutes)
 
     Await.result(richestNode.height, 1.minute) >= 50 shouldBe true
