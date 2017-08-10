@@ -41,8 +41,8 @@ object Coordinator extends ScorexLogging {
           _ <- Either.cond(isForkValidWithCheckpoint(commonBlockHeight), (), GenericError("Fork contains block that doesn't match checkpoint, declining fork"))
           droppedTransactions <- blockchainUpdater.removeAfter(lastCommonBlockId)
           score <- forkApplicationResultEi
-          _ = droppedTransactions.foreach(t => utxStorage.putIfNew(t))
         } yield {
+          droppedTransactions.foreach(utxStorage.putIfNew)
           miner.scheduleMining()
           updateBlockchainReadinessFlag(history, time, blockchainReadiness, settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed)
           score

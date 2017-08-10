@@ -25,8 +25,8 @@ case class OrderInfo(amount: Long, filled: Long, canceled: Boolean) {
 }
 
 object OrderInfo {
-  def limitSum(x: Long, y: Long): Long = Try(math.max(0L, Math.addExact(x, y))).getOrElse(Long.MaxValue)
-  implicit val limitSemigroup: Semigroup[Long] = (x: Long, y: Long) => limitSum(x, y)
+  def safeSum(x: Long, y: Long): Long =  Try(Math.addExact(x, y)).getOrElse(Long.MaxValue)
+  implicit val longSemigroup: Semigroup[Long] = (x: Long, y: Long) => safeSum(x, y)
 
   val empty = OrderInfo(0L, 0L, false)
   implicit val orderInfoMonoid = new Monoid[OrderInfo] {
@@ -46,9 +46,8 @@ object OrderInfo {
 case class OpenPortfolio(orders: Map[String, Long])
 
 object OpenPortfolio {
-  import OrderInfo.limitSemigroup
+  import OrderInfo.longSemigroup
   val empty = OpenPortfolio(Map())
-  def limitSubstract(x: Long, y: Long): Long = math.max(0L, x - y)
 
   implicit val orderPortfolioMonoid = new Monoid[OpenPortfolio] {
     override def empty: OpenPortfolio = OpenPortfolio.empty

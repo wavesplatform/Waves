@@ -116,6 +116,10 @@ object StateReader {
     def totalAssetQuantity(assetId: AssetId): Long =
       s.assetInfo(assetId).get.volume
 
+    def assetExists(assetId: AssetId): Boolean = {
+      s.findTransaction[IssueTransaction](assetId).nonEmpty
+    }
+
     def getAssetName(assetId: AssetId): String = {
       s.findTransaction[IssueTransaction](assetId)
         .map(tx => new String(tx.name, Charsets.UTF_8))

@@ -225,6 +225,13 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll {
 
   }
 
+  "request order book for blacklisted pair" in {
+    val f = matcherNode.matcherGetStatusCode(s"/matcher/orderbook/$ForbiddenAssetId/WAVES", 404)
+
+    val result = Await.result(f, 1.minute)
+    result.message shouldBe s"Invalid Asset ID: $ForbiddenAssetId"
+  }
+
   private def issueAsset(node: Node, amount: Long): String = {
     val name = "test-asset"
     val description = "asset for integration tests of matcher"
@@ -322,15 +329,18 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll {
 }
 
 object MatcherTestSuite {
+  val ForbiddenAssetId = "FdbnAsset"
+
   private val dockerConfigs = Docker.NodeConfigs.getConfigList("nodes").asScala
 
   private val generatingMatcherConfig = ConfigFactory.parseString(
-    """
+    s"""
       |waves.matcher {
       |  enable=yes
       |  account="3HevUqdcHuiLvpeVLo4sGVqxSsZczJuCYHo"
       |  bind-address="0.0.0.0"
       |  order-match-tx-fee = 300000
+      |  blacklisted-assets = [$ForbiddenAssetId]
       |}
     """.stripMargin)
 

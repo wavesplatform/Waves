@@ -59,6 +59,11 @@ trait Synchronized extends ScorexLogging {
       f(value)
     }
 
+    def transform(newVal: T => T)(implicit readWriteLock: WriteLock): T = {
+      value = newVal(value)
+      value
+    }
+
     def set(newVal: => T)(implicit readWriteLock: WriteLock): T = {
       val oldVal = value
       value = newVal
