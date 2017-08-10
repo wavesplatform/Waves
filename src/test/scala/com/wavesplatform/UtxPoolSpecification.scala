@@ -92,7 +92,7 @@ class UtxPoolSpecification extends FreeSpec
   } yield {
     val settings = UtxSettings(10, 1.minute)
     val utxPool = new UtxPool(time, state, history, calculator, FunctionalitySettings.TESTNET, settings)
-    txs.foreach(utxPool.putIfNew)
+    txs.foreach(t => utxPool.putIfNew(t))
     (sender, state, utxPool, time, settings)
   }).label("withValidPayments")
 

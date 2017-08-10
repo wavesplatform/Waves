@@ -26,8 +26,6 @@ import scala.annotation.tailrec
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 
-import com.wavesplatform.network._
-
 class OrderBookActor(assetPair: AssetPair,
                      val orderHistory: ActorRef,
                      val storedState: StateReader,
@@ -233,11 +231,10 @@ class OrderBookActor(assetPair: AssetPair,
         None
 
       case event@OrderExecuted(o, c) =>
-        createTransaction(o, c).flatMap(utx.putIfNew(_)) match {
+        createTransaction(o, c).flatMap(t => utx.putIfNew(t, UtxPool.broadcastTx(allChannels, None))) match {
           case Left(ex) =>
             processInvalidTransaction(event, ex)
-          case Right(tx) =>
-            allChannels.broadcast(RawBytes(TransactionMessageSpec.messageCode, tx.bytes))
+          case Right(_) =>
             processEvent(event)
             if (event.submittedRemaining > 0)
               Some(o.partial(event.submittedRemaining))
