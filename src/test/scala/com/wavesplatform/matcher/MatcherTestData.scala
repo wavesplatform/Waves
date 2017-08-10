@@ -39,12 +39,15 @@ trait MatcherTestData {
       |    account: ""
       |    bind-address: "127.0.0.1"
       |    port: 6886
+      |    order-history-file: null
       |    min-order-fee: 100000
       |    order-match-tx-fee: 100000
       |    snapshots-interval: 1d
       |    max-open-orders: 1000
       |    price-assets: ["BASE1", "BASE2"]
       |    predefined-pairs: [{amountAsset = "BASE2", priceAsset = "BASE1"}]
+      |    blacklisted-assets: ["BLACKLST"]
+      |    blacklisted-names: ["[F,f]orbidden"]
       |  }
       |}""".stripMargin))
 

@@ -48,7 +48,7 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest2"
 
   val orderHistoryRef = TestActorRef(new Actor {
     def receive: Receive = {
-      case ValidateOrder(o) => sender() ! ValidateOrderResult(Right(o))
+      case ValidateOrder(o, _) => sender() ! ValidateOrderResult(Right(o))
       case _ =>
     }
   })
@@ -57,6 +57,8 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest2"
 
   (storedState.assetInfo _).when(*).returns(Some(AssetInfo(true, 10000000000L)))
   val i1 = IssueTransaction.create(PrivateKeyAccount(Array.empty), "Unknown".getBytes(), Array.empty, 10000000000L, 8.toByte, true, 100000L, 10000L).right.get
+  val i2 = IssueTransaction.create(PrivateKeyAccount(Array.empty), "ForbiddenName".getBytes(), Array.empty, 10000000000L, 8.toByte, true, 100000L, 10000L).right.get
+  (storedState.transactionInfo _).when(i2.id).returns(Some((1, i2)))
   (storedState.transactionInfo _).when(*).returns(Some((1, i1)))
   (storedState.accountPortfolio _).when(*).returns(Portfolio(Long.MaxValue, LeaseInfo.empty, Map(ByteStr("123".getBytes) -> Long.MaxValue)))
 
@@ -160,6 +162,17 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest2"
         MarketData(_, "Unknown", "Unknown", _, _, _))) =>
           publicKey shouldBe MatcherAccount.publicKey
       }
+    }
+
+    "GetOrderBookRequest to the blacklisted asset" in {
+      def pair = AssetPair(ByteStr.decodeBase58("BLACKLST").toOption, ByteStr.decodeBase58("BASE1").toOption)
+
+      actor ! GetOrderBookRequest(pair, None)
+      expectMsg(StatusCodeMatcherResponse(StatusCodes.NotFound, "Invalid Asset ID: BLACKLST"))
+
+      def fbdnNamePair = AssetPair(Some(i2.assetId), ByteStr.decodeBase58("BASE1").toOption)
+      actor ! GetOrderBookRequest(fbdnNamePair, None)
+      expectMsg(StatusCodeMatcherResponse(StatusCodes.NotFound, "Invalid Asset Name: ForbiddenName"))
     }
   }
 

@@ -70,7 +70,7 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
 
   val orderHistoryRef = TestActorRef(new Actor {
     def receive: Receive = {
-      case ValidateOrder(o) => sender() ! ValidateOrderResult(Right(o))
+      case ValidateOrder(o, _) => sender() ! ValidateOrderResult(Right(o))
       case _ =>
     }
   })

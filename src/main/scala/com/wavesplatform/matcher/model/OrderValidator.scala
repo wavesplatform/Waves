@@ -20,6 +20,7 @@ trait OrderValidator {
   val wallet: Wallet
 
   lazy val matcherPubKey: PublicKeyAccount = wallet.findWallet(settings.account).right.get
+  val MinExpiration = 60 * 1000L
 
   def isBalanceWithOpenOrdersEnough(order: Order): Validation = {
     val lo = LimitOrder(order)
@@ -46,6 +47,7 @@ trait OrderValidator {
     //  s"Open orders count limit exceeded (Max = ${settings.maxOpenOrders})" &&
     val v =
     (order.matcherPublicKey == matcherPubKey) :| "Incorrect matcher public key" &&
+      (order.expiration > NTP.correctedTime() + MinExpiration) :| "Order expiration should be > 1 min" &&
       scorex.transaction.Signed.validateSignatures(order).isRight :| "signature should be valid" &&
       order.isValid(NTP.correctedTime()) &&
       (order.matcherFee >= settings.minOrderFee) :| s"Order matcherFee should be >= ${settings.minOrderFee}" &&
