@@ -1,6 +1,7 @@
 package com.wavesplatform.it
 
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.it.api.NodeApi.BlacklistedPeer
 import org.scalatest.{BeforeAndAfterAll, FreeSpec, Matchers}
 
 import scala.collection.JavaConverters._
@@ -46,7 +47,7 @@ class BlacklistTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll {
 
   "richest node should blacklist other nodes" in {
     otherNodes.foreach(n => Await.result(richestNode.blacklist(n.nodeInfo.networkIpAddress, n.nodeInfo.hostNetworkPort), 1.minute))
-    Await.result(richestNode.waitFor[Seq[String]](richestNode.blacklistedPeers, _.length >= NodesCount - 1, 5.seconds), 2.minutes)
+    Await.result(richestNode.waitFor[Seq[BlacklistedPeer]](richestNode.blacklistedPeers, _.length >= NodesCount - 1, 5.seconds), 2.minutes)
     val blacklisted = Await.result(richestNode.blacklistedPeers, 1.minute)
     blacklisted.length should be(NodesCount - 1)
   }
