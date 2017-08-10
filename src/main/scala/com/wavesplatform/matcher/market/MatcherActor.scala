@@ -52,8 +52,7 @@ class MatcherActor(orderHistory: ActorRef, storedState: StateReader, wallet: Wal
           s"Unknown Asset ID: ${msg.assetPair.amountAssetStr}"
     }
 
-    msg.assetPair.isValid :| "Invalid AssetPair" &&
-      isAssetsExist
+    msg.assetPair.isValid :| "Invalid AssetPair" && isAssetsExist
   }
 
   def checkPairOrdering(aPair: AssetPair): Validation = {
