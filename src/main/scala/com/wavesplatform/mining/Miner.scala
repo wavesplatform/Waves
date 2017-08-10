@@ -104,7 +104,7 @@ class Miner(
       microBlockEi match {
         case Right(mb) =>
           log.trace(s"MicroBlock(id=${trim(mb.uniqueId)}) has been mined for $account}")
-          allChannels.broadcast(MicroBlockInv(mb.totalResBlockSig))
+          allChannels.broadcast(MicroBlockInv(mb.totalResBlockSig, mb.prevResBlockSig))
           Right(Some(signed))
         case Left(err) =>
           log.trace(s"MicroBlock has NOT been mined for $account} because $err")

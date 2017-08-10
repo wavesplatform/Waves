@@ -181,4 +181,10 @@ class NgHistoryWriterImpl(inner: HistoryWriter) extends NgHistoryWriter with Sco
   override def close(): Unit = inner.close()
 
   override def lastBlockTimestamp(): Option[Long] = baseBlock().map(_.timestamp).orElse(inner.lastBlockTimestamp())
+
+  override def lastBlockId(): Option[AssetId] = read { implicit l =>
+    micros().headOption.map(_.totalResBlockSig)
+      .orElse(baseB().map(_.uniqueId))
+      .orElse(inner.lastBlockId())
+  }
 }

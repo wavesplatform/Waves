@@ -13,21 +13,26 @@ class MircoBlockSynchronizer(history: NgHistory)
   private val awaitingResponse = Synchronized(scala.collection.mutable.Map.empty[BlockId, Channel])
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
-    case mi@MicroBlockInv(mid) =>
+    case mi@MicroBlockInv(totalResBlockSig, prevResBlockSig) =>
       log.debug(id(ctx) + "Received " + mi)
-      history.microBlock(mid) match {
-        case Some(_) => // already exists
-        case None =>
-          write { implicit l =>
-            awaitingResponse().get(mid) match {
-              case None =>
-                awaitingResponse.mutate(_ += (mid -> ctx.channel()))
-                ctx.writeAndFlush(MicroBlockRequest(mid))
-              case _ => // already requested
+      history.lastBlockId() match {
+        case Some(lbid) =>
+          if (lbid == prevResBlockSig) {
+            write { implicit l =>
+              awaitingResponse().get(totalResBlockSig) match {
+                case None =>
+                  awaitingResponse.mutate(_ += (totalResBlockSig -> ctx.channel()))
+                  ctx.writeAndFlush(MicroBlockRequest(totalResBlockSig))
+                case _ => // already requested
+              }
             }
-
           }
+          else {
+            log.trace(s"Discarding $mi because it doesn't match last (micro)block")
+          }
+        case None => ??? // Shouldn't happen
       }
+
     case _ => super.channelRead(ctx, msg)
   }
 }

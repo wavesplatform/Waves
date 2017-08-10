@@ -45,11 +45,11 @@ class CoordinatorHandler(
   private val processBlock = Coordinator.processSingleBlock(checkpointService, history, blockchainUpdater, time, stateReader, utxStorage, blockchainReadiness, settings, miner) _
 
   private def broadcastingScore(
-    src: Channel,
-    start: => String,
-    success: => String,
-    failure: => String,
-    f: => Either[_, BigInt]): Unit = Future {
+                                   src: Channel,
+                                   start: => String,
+                                   success: => String,
+                                   failure: => String,
+                                   f: => Either[_, BigInt]): Unit = Future {
     log.debug(s"${id(src)} $start")
     f match {
       case Right(newLocalScore) =>
@@ -87,7 +87,7 @@ class CoordinatorHandler(
       Signed.validateSignatures(m) match {
         case Right(_) =>
           Coordinator.processMicroBlock(checkpointService, history, blockchainUpdater, utxStorage)(m)
-            .foreach(_ => allChannels.broadcast(MicroBlockInv(m.totalResBlockSig), Some(ctx.channel())))
+            .foreach(_ => allChannels.broadcast(MicroBlockInv(m.totalResBlockSig, m.prevResBlockSig), Some(ctx.channel())))
         case Left(err) =>
           peerDatabase.blacklistAndClose(ctx.channel(), err.toString)
       }

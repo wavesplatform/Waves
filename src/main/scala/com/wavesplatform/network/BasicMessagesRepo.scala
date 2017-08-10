@@ -217,9 +217,9 @@ object MicroBlockInvMessageSpec extends MessageSpec[MicroBlockInv] {
   override val messageName: String = "Microblock Inv message"
 
   override def deserializeData(bytes: Array[Byte]): Try[MicroBlockInv] =
-    Try(MicroBlockInv(ByteStr(bytes)))
+    Try(MicroBlockInv(ByteStr(bytes.take(SignatureLength)), ByteStr(bytes.takeRight(SignatureLength))))
 
-  override def serializeData(inv: MicroBlockInv): Array[Byte] = inv.totalBlockSig.arr
+  override def serializeData(inv: MicroBlockInv): Array[Byte] = inv.totalBlockSig.arr ++ inv.prevBlockSig.arr
 
   override def maxLength = 500
 }
