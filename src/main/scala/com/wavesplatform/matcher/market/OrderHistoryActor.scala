@@ -6,7 +6,7 @@ import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.api.{BadMatcherResponse, MatcherResponse}
 import com.wavesplatform.matcher.market.OrderBookActor.{CancelOrder, GetOrderStatusResponse}
 import com.wavesplatform.matcher.market.OrderHistoryActor._
-import com.wavesplatform.matcher.model.Events.{Event, OrderAdded, OrderCanceled, OrderExecuted}
+import com.wavesplatform.matcher.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
 import com.wavesplatform.matcher.model.LimitOrder.Filled
 import com.wavesplatform.matcher.model._
 import com.wavesplatform.{UtxPool, utils}
@@ -70,8 +70,6 @@ class OrderHistoryActor(val settings: MatcherSettings, val utxPool: UtxPool, val
       orderHistory.orderCanceled(ev)
     case RecoverFromOrderBook(ob) =>
       recoverFromOrderBook(ob)
-    case UpdateOpenPortfolio(ev) =>
-      orderHistory.saveOpenPortfolio(ev)
   }
 
   def fetchOrderHistory(req: GetOrderHistory): Unit = {
@@ -172,6 +170,4 @@ object OrderHistoryActor {
     val json: JsObject = JsObject(balances.map{ case (k, v) => (k, JsNumber(v)) })
     val code = StatusCodes.OK
   }
-
-  case class UpdateOpenPortfolio(event: Event)
 }
