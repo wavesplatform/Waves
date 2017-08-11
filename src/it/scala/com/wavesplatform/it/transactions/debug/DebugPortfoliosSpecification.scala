@@ -2,7 +2,6 @@ package com.wavesplatform.it.transactions.debug
 
 import com.wavesplatform.it.util._
 import com.wavesplatform.it.{IntegrationSuiteWithThreeAddresses, Node}
-import scorex.account.Address
 
 import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -12,19 +11,17 @@ class DebugPortfoliosSpecification(override val allNodes: Seq[Node], override va
   extends IntegrationSuiteWithThreeAddresses {
 
   test("getting a balance considering pessimistic transactions from UTX pool - changed after UTX") {
-    val firstAddr = Address.fromString(firstAddress).right.get
-
     val f = for {
       _ <- assertBalances(firstAddress, 100.waves, 100.waves)
       _ <- assertBalances(secondAddress, 100.waves, 100.waves)
 
-      portfolioBefore <- sender.debugPortfoliosFor(firstAddr, considerUnspent = true)
+      portfolioBefore <- sender.debugPortfoliosFor(firstAddress, considerUnspent = true)
       utxSizeBefore <- sender.utxSize
 
       _ <- sender.payment(firstAddress, secondAddress, 5.waves, fee = 5.waves)
       _ <- sender.waitForUtxIncreased(utxSizeBefore)
 
-      portfolioAfter <- sender.debugPortfoliosFor(firstAddr, considerUnspent = true)
+      portfolioAfter <- sender.debugPortfoliosFor(firstAddress, considerUnspent = true)
     } yield {
       val expectedBalance = portfolioBefore.balance - 10.waves // withdraw + fee
       assert(portfolioAfter.balance == expectedBalance)
@@ -34,19 +31,17 @@ class DebugPortfoliosSpecification(override val allNodes: Seq[Node], override va
   }
 
   test("getting a balance without pessimistic transactions from UTX pool - not changed after UTX") {
-    val firstAddr = Address.fromString(firstAddress).right.get
-
     val f = for {
       _ <- assertBalances(firstAddress, 100.waves, 100.waves)
       _ <- assertBalances(secondAddress, 100.waves, 100.waves)
 
-      portfolioBefore <- sender.debugPortfoliosFor(firstAddr, considerUnspent = false)
+      portfolioBefore <- sender.debugPortfoliosFor(firstAddress, considerUnspent = false)
       utxSizeBefore <- sender.utxSize
 
       _ <- sender.payment(firstAddress, secondAddress, 5.waves, fee = 5.waves)
       _ <- sender.waitForUtxIncreased(utxSizeBefore)
 
-      portfolioAfter <- sender.debugPortfoliosFor(firstAddr, considerUnspent = false)
+      portfolioAfter <- sender.debugPortfoliosFor(firstAddress, considerUnspent = false)
     } yield {
       assert(portfolioAfter.balance == portfolioBefore.balance)
     }
