@@ -19,7 +19,6 @@ import scorex.transaction.assets.exchange.{AssetPair, Order}
 import scorex.utils.NTP
 import scorex.wallet.Wallet
 
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
@@ -66,8 +65,7 @@ class OrderHistoryActor(val settings: MatcherSettings, val utxPool: UtxPool, val
     case ev: OrderAdded =>
       orderHistory.orderAccepted(ev)
     case ev: OrderExecuted =>
-      orderHistory.orderExecutedUnconfirmed(ev)
-      context.system.scheduler.scheduleOnce(UpdateOpenPortfolioDelay, self, UpdateOpenPortfolio(ev))
+      orderHistory.orderExecuted(ev)
     case ev: OrderCanceled =>
       orderHistory.orderCanceled(ev)
     case RecoverFromOrderBook(ob) =>
