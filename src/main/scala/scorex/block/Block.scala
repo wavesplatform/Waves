@@ -186,7 +186,6 @@ object Block extends ScorexLogging {
   }
 
   def genesis(genesisSettings: GenesisSettings): Either[ValidationError, Block] = {
-    val version: Byte = 1
 
     val genesisSigner = PrivateKeyAccount(Array.empty)
 
@@ -202,7 +201,7 @@ object Block extends ScorexLogging {
     val reference = Array.fill(SignatureLength)(-1: Byte)
 
     val timestamp = genesisSettings.blockTimestamp
-    val toSign: Array[Byte] = Array(version) ++
+    val toSign: Array[Byte] = Array(GenesisBlockVersion) ++
       Bytes.ensureCapacity(Longs.toByteArray(timestamp), 8, 0) ++
       reference ++
       cBytes ++
@@ -213,7 +212,7 @@ object Block extends ScorexLogging {
 
     if (EllipticCurveImpl.verify(signature, toSign, genesisSigner.publicKey))
       Right(Block(timestamp = timestamp,
-        version = 1,
+        version = GenesisBlockVersion,
         reference = ByteStr(reference),
         signerData = SignerData(genesisSigner, ByteStr(signature)),
         consensusData = consensusGenesisData,
@@ -221,4 +220,8 @@ object Block extends ScorexLogging {
     else Left(GenericError("Passed genesis signature is not valid"))
 
   }
+
+  val GenesisBlockVersion: Byte = 1
+  val PlainBlockVersion: Byte = 2
+  val NgBlockVersion: Byte = 3
 }

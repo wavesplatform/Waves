@@ -29,9 +29,6 @@ class MicroBlockSpecification extends FunSuite with Matchers with MockFactory {
 
     val transactions = Seq(tx, tr, tr2)
 
-    val version = 8: Byte
-    val timestamp = System.currentTimeMillis()
-
     val microBlock = MicroBlock.buildAndSign(sender, transactions, prevResBlockSig, totalResBlockSig).explicitGet()
     val parsedBlock = MicroBlock.parseBytes(microBlock.bytes).get
 

@@ -13,6 +13,7 @@ import monix.execution._
 import monix.execution.cancelables.{CompositeCancelable, SerialCancelable}
 import scorex.account.PrivateKeyAccount
 import scorex.block.{Block, MicroBlock}
+import scorex.block.Block._
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
 import scorex.transaction.PoSCalc._
 import scorex.transaction.ValidationError.GenericError
@@ -52,7 +53,7 @@ class Miner(
     ))
 
   private def generateOneBlockTask(account: PrivateKeyAccount, parentHeight: Int,
-                                   greatGrandParent: Option[Block], balance: Long)(delay: FiniteDuration): Task[Either[String, Block]] = Task {
+                                   greatGrandParent: Option[Block], balance: Long, version: Byte  )(delay: FiniteDuration): Task[Either[String, Block]] = Task {
     // should take last block right at the time of mining since microblocks might have been added
     // the rest doesn't change
     val parent = history.lastBlock.get
@@ -72,7 +73,7 @@ class Miner(
       consensusData = NxtLikeConsensusBlockData(btg, ByteStr(gs))
       unconfirmed = utx.packUnconfirmed(minerSettings.maxTransactionsInKeyBlock)
       _ = log.debug(s"Adding ${unconfirmed.size} unconfirmed transaction(s) to new block")
-      block = Block.buildAndSign(Version, currentTime, parent.uniqueId, consensusData, unconfirmed, account)
+      block = Block.buildAndSign(version, currentTime, parent.uniqueId, consensusData, unconfirmed, account)
     } yield block
   }.delayExecution(delay)
 
@@ -132,14 +133,17 @@ class Miner(
     } yield (offset, balance)) match {
       case Right((offset, balance)) =>
         log.debug(s"Next attempt for acc=$account in $offset")
-        generateOneBlockTask(account, height, grandParent, balance)(offset).flatMap {
+        val microBlocksEnabled = timeService.correctedTime() < blockchainSettings.functionalitySettings.enableMicroblocksAfter
+        val version = if (microBlocksEnabled) PlainBlockVersion else NgBlockVersion
+        generateOneBlockTask(account, height, grandParent, balance, version)(offset).flatMap {
           case Right(block) => Task.now {
             processBlock(block, true) match {
               case Left(err) => log.warn(err.toString)
               case Right(score) =>
                 allChannels.broadcast(LocalScoreChanged(score))
                 allChannels.broadcast(BlockForged(block))
-                startMicroBlockMining(account, block)
+                if (microBlocksEnabled)
+                  startMicroBlockMining(account, block)
             }
           }
           case Left(err) =>
@@ -170,7 +174,6 @@ class Miner(
 object Miner extends ScorexLogging {
 
   val MaxTransactionsPerMicroblock: Int = 255
-  val Version: Byte = 3
 
   def calcOffset(timeService: Time, calculatedTimestamp: Long, minimalBlockGenerationOffset: FiniteDuration): FiniteDuration = {
     val calculatedGenerationTimestamp = (Math.ceil(calculatedTimestamp / 1000.0) * 1000).toLong

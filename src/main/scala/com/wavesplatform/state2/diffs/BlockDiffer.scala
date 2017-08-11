@@ -18,7 +18,7 @@ object BlockDiffer extends ScorexLogging {
   def right(diff: Diff): Either[ValidationError, Diff] = Right(diff)
 
   def fromBlock(settings: FunctionalitySettings, s: StateReader, pervBlockTimestamp: Option[Long], block: Block): Either[ValidationError, BlockDiff] = {
-    val feeDistr = if (block.timestamp < settings.applyMinerFeeWithTransactionAfter)
+    val feeDistr = if (block.timestamp < settings.enableMicroblocksAfter)
       Some(block.feesDistribution)
     else None
     for {
