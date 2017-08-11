@@ -13,8 +13,14 @@ class MircoBlockSynchronizer(history: NgHistory)
   private val awaitingResponse = Synchronized(scala.collection.mutable.Map.empty[BlockId, Channel])
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
+    case MicroBlockResponse(mb) =>
+      log.trace(id(ctx) + "Received MicroBlockResponse " + mb)
+      write { implicit l =>
+        awaitingResponse.mutate(_ -= mb.totalResBlockSig)
+      }
+
     case mi@MicroBlockInv(totalResBlockSig, prevResBlockSig) =>
-      log.debug(id(ctx) + "Received " + mi)
+      log.trace(id(ctx) + "Received " + mi)
       history.lastBlockId() match {
         case Some(lbid) =>
           if (lbid == prevResBlockSig) {
