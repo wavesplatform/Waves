@@ -12,13 +12,15 @@ case class Handshake(
     nodeNonce: Long,
     declaredAddress: Option[InetSocketAddress]) {
   def encode(out: ByteBuf): out.type = {
-    out.writeByte(applicationName.length)
-    out.writeBytes(applicationName.getBytes(Charsets.UTF_8))
+    val applicationNameBytes = applicationName.getBytes(Charsets.UTF_8)
+    val nodeNameBytes = nodeName.getBytes(Charsets.UTF_8)
+    out.writeByte(applicationNameBytes.length)
+    out.writeBytes(applicationNameBytes)
     out.writeInt(applicationVersion._1)
     out.writeInt(applicationVersion._2)
     out.writeInt(applicationVersion._3)
-    out.writeByte(nodeName.length)
-    out.writeBytes(nodeName.getBytes(Charsets.UTF_8))
+    out.writeByte(nodeNameBytes.length)
+    out.writeBytes(nodeNameBytes)
     out.writeLong(nodeNonce)
     declaredAddress match {
       case None => out.writeInt(0)
