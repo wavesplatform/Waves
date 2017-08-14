@@ -152,7 +152,7 @@ class NgHistoryWriterImpl(inner: HistoryWriter) extends NgHistoryWriter with Sco
       val ms = micros().reverse
       if (base.uniqueId == id) {
         val discardedTxs = ms.flatMap(_.transactionData)
-        log.trace(s"Forged base block [id=$id] with base_size=${base.transactionData.size}(discarded=${discardedTxs.size})")
+//        log.trace(s"Forged base block [id=$id] with base_size=${base.transactionData.size}(discarded=${discardedTxs.size})")
         Some((base, discardedTxs))
       } else if (!ms.exists(_.totalResBlockSig == id)) None
       else {
@@ -167,7 +167,7 @@ class NgHistoryWriterImpl(inner: HistoryWriter) extends NgHistoryWriter with Sco
           }
         }
         maybeFound.map { case (sig, discardedTxs) =>
-          log.trace(s"Forged block[id=$sig] with base_size=${base.transactionData.size} + accumulated_size=${accumulatedTxs.size}(discarded=${discardedTxs.size})")
+//          log.trace(s"Forged block[id=$sig] with base_size=${base.transactionData.size} + accumulated_size=${accumulatedTxs.size}(discarded=${discardedTxs.size})")
           (base.copy(signerData = base.signerData.copy(signature = sig), transactionData = base.transactionData ++ accumulatedTxs), discardedTxs)
         }
       }

@@ -6,7 +6,6 @@ import cats._
 import cats.implicits._
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.BlockchainUpdaterImpl._
-import com.wavesplatform.state2.StateWriterImpl._
 import com.wavesplatform.state2.diffs.BlockDiffer
 import com.wavesplatform.state2.reader.CompositeStateReader.composite
 import com.wavesplatform.state2.reader.StateReader
@@ -20,7 +19,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
                                     settings: FunctionalitySettings,
                                     minimumInMemoryDiffSize: Int,
                                     ngHistoryWriter: NgHistoryWriter,
-                                    val synchronizationToken: ReentrantReadWriteLock) extends BlockchainUpdater with ScorexLogging {
+                                    val synchronizationToken: ReentrantReadWriteLock) extends BlockchainUpdater with ScorexLogging with Instrumented {
 
   private val topMemoryDiff = Synchronized(Monoid[BlockDiff].empty)
   private val bottomMemoryDiff = Synchronized(Monoid[BlockDiff].empty)
@@ -96,7 +95,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
     }).map(discacrded => {
       log.info(
         s"""Block ${block.uniqueId} -> ${trim(block.reference)} appended.
-           | -- New height: ${ngHistoryWriter.height()}, new score: ${ngHistoryWriter.score()}, transactions: ${block.transactionData.size})""".stripMargin)
+           | -- New height: ${ngHistoryWriter.height()}, transactions: ${block.transactionData.size})""".stripMargin)
       discacrded
     })
   }

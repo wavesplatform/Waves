@@ -33,7 +33,7 @@ class Miner(
                settings: WavesSettings,
                timeService: Time,
                utx: UtxPool,
-               wallet: Wallet) extends ScorexLogging {
+               wallet: Wallet) extends ScorexLogging with Instrumented {
 
   import Miner._
 
@@ -81,7 +81,7 @@ class Miner(
   private def generateOneMicroBlockTask(account: PrivateKeyAccount, accumulatedBlock: Block): Task[Either[ValidationError, Option[Block]]] = Task {
     log.trace(s"Generating microblock for $account")
     val pc = allChannels.size()
-    lazy val unconfirmed = StateWriterImpl.measureLog("packing unconfirmed transactions for microblock")(utx.packUnconfirmed(MaxTransactionsPerMicroblock))
+    lazy val unconfirmed = measureLog("packing unconfirmed transactions for microblock")(utx.packUnconfirmed(MaxTransactionsPerMicroblock))
     if (pc < minerSettings.quorum) {
       log.trace(s"Quorum not available ($pc/${minerSettings.quorum}, not forging microblock with ${account.address}")
       Right(None)

@@ -13,19 +13,20 @@ import scorex.utils.ScorexLogging
 
 import scala.collection.SortedMap
 
-object BlockDiffer extends ScorexLogging {
+object BlockDiffer extends ScorexLogging with Instrumented {
 
   def right(diff: Diff): Either[ValidationError, Diff] = Right(diff)
 
-  def fromBlock(settings: FunctionalitySettings, s: StateReader, pervBlockTimestamp: Option[Long], block: Block): Either[ValidationError, BlockDiff] = {
-    val feeDistr = if (block.timestamp < settings.enableMicroblocksAfter)
-      Some(block.feesDistribution)
-    else None
-    for {
-      _ <- Signed.validateSignatures(block)
-      r <- apply(settings, s, pervBlockTimestamp)(block.signerData.generator, feeDistr, block.timestamp, block.transactionData, 1)
-    } yield r
-  }
+  def fromBlock(settings: FunctionalitySettings, s: StateReader, pervBlockTimestamp: Option[Long], block: Block): Either[ValidationError, BlockDiff] =
+    measureLog(s"Building diff for ${block.uniqueId} with ${block.transactionData.size} transactions") {
+      val feeDistr = if (block.timestamp < settings.enableMicroblocksAfter)
+        Some(block.feesDistribution)
+      else None
+      for {
+        _ <- Signed.validateSignatures(block)
+        r <- apply(settings, s, pervBlockTimestamp)(block.signerData.generator, feeDistr, block.timestamp, block.transactionData, 1)
+      } yield r
+    }
 
   def fromMicroBlock(settings: FunctionalitySettings, s: StateReader, pervBlockTimestamp: Option[Long], micro: MicroBlock, timestamp: Long): Either[ValidationError, BlockDiff] =
     for {
@@ -37,13 +38,12 @@ object BlockDiffer extends ScorexLogging {
   def unsafeDiffMany(settings: FunctionalitySettings, s: StateReader, prevBlockTimestamp: Option[Long])(blocks: Seq[Block]): BlockDiff =
     blocks.foldLeft((Monoid[BlockDiff].empty, prevBlockTimestamp)) { case ((diff, prev), block) =>
       val blockDiff = fromBlock(settings, new CompositeStateReader(s, diff), prev, block).explicitGet()
-      (Monoid[BlockDiff].combine(diff, blockDiff), Some(block.timestamp))
+      measureLog(s"Combining diff for ${trim(block.uniqueId)}")(Monoid[BlockDiff].combine(diff, blockDiff), Some(block.timestamp))
     }._1
 
   private def apply(settings: FunctionalitySettings, s: StateReader, pervBlockTimestamp: Option[Long])
                    (blockGenerator: Address, maybeFeesDistr: Option[Diff], timestamp: Long, txs: Seq[Transaction], heightDiff: Int): Either[ValidationError, BlockDiff] = {
     val currentBlockHeight = s.height + heightDiff
-
     val txDiffer = TransactionDiffer(settings, pervBlockTimestamp, timestamp, currentBlockHeight) _
 
     def txFeeDiffer(tx: Transaction): Map[Address, Portfolio] = Map(blockGenerator ->
