@@ -4,7 +4,7 @@ import java.io.File
 
 import com.google.common.primitives.Ints
 import com.wavesplatform.utils._
-import org.h2.mvstore.MVMap
+import org.h2.mvstore.{MVMap, MVStore}
 import scorex.account.Address
 import scorex.utils.LogMVMapBuilder
 
@@ -14,7 +14,7 @@ class StateStorage private(file: Option[File]) extends AutoCloseable {
 
   import StateStorage._
 
-  private val db = createMVStore(file)
+  private val db: MVStore = createMVStore(file)
 
   private val variables: MVMap[String, Int] = db.openMap("variables")
 

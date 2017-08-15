@@ -8,6 +8,7 @@ import org.h2.mvstore.`type`.DataType
 import scorex.utils.ByteArray
 
 object DataTypes {
+
   trait DTTemplate extends DataType {
     override def read(buff: ByteBuffer, obj: Array[AnyRef], len: Int, key: Boolean) =
       0 until len foreach { i => obj(i) = read(buff) }
@@ -138,6 +139,30 @@ object DataTypes {
       buff.putVarInt(i)
       buff.putVarInt(v.length)
       buff.put(v)
+    }
+  }
+  val byteStrList: DataType = new DTTemplate {
+    override def compare(a: scala.Any, b: scala.Any) = throw new UnsupportedOperationException
+
+    override def read(buff: ByteBuffer) = {
+      val total = readVarInt(buff)
+      Range(0, total).map { i =>
+        val b = new Array[Byte](readVarInt(buff))
+        buff.get(b)
+        ByteStr(b)
+      }.toList
+    }
+
+
+    override def getMemory(obj: scala.Any) = 5 + obj.asInstanceOf[List[ByteStr]].map(_.arr.length + 5).sum
+
+    override def write(buff: WriteBuffer, obj: scala.Any) = {
+      val list = obj.asInstanceOf[List[ByteStr]]
+      buff.putVarInt(list.size)
+      list.foreach { byteStr =>
+        buff.putVarInt(byteStr.arr.length)
+        buff.put(byteStr.arr)
+      }
     }
   }
 }
