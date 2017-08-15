@@ -17,8 +17,7 @@ object BlockDiffer extends ScorexLogging with Instrumented {
 
   def right(diff: Diff): Either[ValidationError, Diff] = Right(diff)
 
-  def fromBlock(settings: FunctionalitySettings, s: StateReader, pervBlockTimestamp: Option[Long], block: Block): Either[ValidationError, BlockDiff] =
-    measureLog(s"Building diff for ${block.uniqueId} with ${block.transactionData.size} transactions") {
+  def fromBlock(settings: FunctionalitySettings, s: StateReader, pervBlockTimestamp: Option[Long], block: Block): Either[ValidationError, BlockDiff] = {
       val feeDistr = if (block.timestamp < settings.enableMicroblocksAfter)
         Some(block.feesDistribution)
       else None
@@ -38,7 +37,7 @@ object BlockDiffer extends ScorexLogging with Instrumented {
   def unsafeDiffMany(settings: FunctionalitySettings, s: StateReader, prevBlockTimestamp: Option[Long])(blocks: Seq[Block]): BlockDiff =
     blocks.foldLeft((Monoid[BlockDiff].empty, prevBlockTimestamp)) { case ((diff, prev), block) =>
       val blockDiff = fromBlock(settings, new CompositeStateReader(s, diff), prev, block).explicitGet()
-      measureLog(s"Combining diff for ${trim(block.uniqueId)}")(Monoid[BlockDiff].combine(diff, blockDiff), Some(block.timestamp))
+      (Monoid[BlockDiff].combine(diff, blockDiff), Some(block.timestamp))
     }._1
 
   private def apply(settings: FunctionalitySettings, s: StateReader, pervBlockTimestamp: Option[Long])
@@ -78,7 +77,7 @@ object BlockDiffer extends ScorexLogging with Instrumented {
       else d
       val newSnapshots = diff.portfolios
         .collect { case (acc, portfolioDiff) if portfolioDiff.balance != 0 || portfolioDiff.effectiveBalance != 0 =>
-          val oldPortfolio = s.accountPortfolio(acc)
+          val oldPortfolio = s.partialPortfolio(acc, Set.empty[ByteStr])
           if (s.lastUpdateHeight(acc).contains(currentBlockHeight)) {
             throw new Exception(s"CRITICAL: attempting to build a circular reference in snapshot list. " +
               s"acc=$acc, currentBlockHeight=$currentBlockHeight")

@@ -20,9 +20,7 @@ class StateReaderImpl(p: StateStorage, val synchronizationToken: ReentrantReadWr
     }
   }
 
-  override def accountPortfolio(a: Address): Portfolio = read { implicit l =>
-    Option(sp().portfolios.get(a.bytes)).map { case (b, (i, o), as) => Portfolio(b, LeaseInfo(i, o), as.map { case (k, v) => ByteStr(k) -> v }) }.orEmpty
-  }
+  override def accountPortfolio(a: Address): Portfolio = ???
 
   override def assetInfo(id: ByteStr): Option[AssetInfo] = read { implicit l =>
     Option(sp().assets.get(id)).map {
@@ -55,13 +53,7 @@ class StateReaderImpl(p: StateStorage, val synchronizationToken: ReentrantReadWr
       .map(b => Address.fromBytes(b.arr).explicitGet())
   }
 
-  override def accountPortfolios: Map[Address, Portfolio] = read { implicit l =>
-    sp().portfolios.asScala.map {
-      case (acc, (b, (i, o), as)) => Address.fromBytes(acc.arr).explicitGet() -> Portfolio(b, LeaseInfo(i, o), as.map {
-        case (k, v) => ByteStr(k) -> v
-      })
-    }.toMap
-  }
+  override def accountPortfolios: Map[Address, Portfolio] = ???
 
   override def isLeaseActive(leaseTx: LeaseTransaction): Boolean = read { implicit l =>
     sp().leaseState.getOrDefault(leaseTx.id, false)
@@ -90,4 +82,11 @@ class StateReaderImpl(p: StateStorage, val synchronizationToken: ReentrantReadWr
   override def filledVolumeAndFee(orderId: ByteStr): OrderFillInfo = read { _ =>
     Option(p.orderFills.get(orderId)).map(oi => OrderFillInfo(oi._1, oi._2)).orEmpty
   }
+
+  override def wavesBalance(a: Address): (Long, LeaseInfo) =
+    Option(p.wavesBalance.get(a.bytes))
+      .map { case (v1, v2, v3) => (v1, LeaseInfo(v2, v3)) }
+      .getOrElse((0L, LeaseInfo(0L, 0L)))
+
+  override def assetBalance(a: Address, asset: ByteStr): Long = p.assetBalance.get(a.bytes,asset).getOrElse(0L)
 }

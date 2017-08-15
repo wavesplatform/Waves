@@ -35,4 +35,9 @@ class MultiKeyMap[K1 <: ByteStr, K2 <: ByteStr, V](db: MVStore, valueDataType: D
   def getMap(k1: K1): Map[K2, V] = keys(k1)
     .map(x => x -> get(k1, x).get)
     .toMap
+
+  def clear() : Unit = {
+    k1k2v.clear()
+    k1k2set.clear()
+  }
 }

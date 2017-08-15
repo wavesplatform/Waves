@@ -7,8 +7,6 @@ import cats.implicits._
 import com.wavesplatform.state2.reader.StateReaderImpl
 import scorex.utils.ScorexLogging
 
-import scala.language.higherKinds
-
 trait StateWriter {
   def applyBlockDiff(blockDiff: BlockDiff): Unit
 
@@ -46,11 +44,11 @@ class StateWriterImpl(p: StateStorage, synchronizationToken: ReentrantReadWriteL
 
     measureSizeLog("portfolios")(txsDiff.portfolios) {
       _.foreach { case (account, portfolioDiff) =>
-        val updatedPortfolio = accountPortfolio(account).combine(portfolioDiff)
-        sp().portfolios.put(account.bytes,
-          (updatedPortfolio.balance,
-            (updatedPortfolio.leaseInfo.leaseIn, updatedPortfolio.leaseInfo.leaseOut),
-            updatedPortfolio.assets.map { case (k, v) => k.arr -> v }))
+        val updatedPortfolio = this.partialPortfolio(account, portfolioDiff.assets.keySet).combine(portfolioDiff)
+        sp().wavesBalance.put(account.bytes, (updatedPortfolio.balance, updatedPortfolio.leaseInfo.leaseIn, updatedPortfolio.leaseInfo.leaseOut))
+        updatedPortfolio.assets.foreach { case (asset, amt) =>
+          sp().assetBalance.put(account.bytes, asset, amt)
+        }
       }
     }
 
@@ -109,7 +107,8 @@ class StateWriterImpl(p: StateStorage, synchronizationToken: ReentrantReadWriteL
 
   override def clear(): Unit = write { implicit l =>
     sp().transactions.clear()
-    sp().portfolios.clear()
+    sp().wavesBalance.clear()
+    sp().assetBalance.clear()
     sp().assets.clear()
     sp().accountTransactionIds.clear()
     sp().accountTransactionsLengths.clear()

@@ -32,7 +32,7 @@ class StateReaderEffectiveBalanceTest extends fixture.FunSuite with Matchers {
 
   test("exposes current effective balance if no records in past N blocks are made") { storage =>
     storage.balanceSnapshots.put(accountIndexKey(acc, 20), (0, 0, 1))
-    storage.portfolios.put(acc.bytes, (1, (0, 0), Map.empty))
+    storage.wavesBalance.put(acc.bytes, (1, 0, 0))
     storage.lastBalanceSnapshotHeight.put(acc.bytes, 20)
 
     new StateReaderImpl(storage, new ReentrantReadWriteLock()).effectiveBalanceAtHeightWithConfirmations(acc, stateHeight, 50).get shouldBe 1

@@ -25,6 +25,10 @@ trait StateReader extends Synchronized {
 
   def assetInfo(id: ByteStr): Option[AssetInfo]
 
+  def wavesBalance(a: Address): (Long, LeaseInfo)
+
+  def assetBalance(a: Address, asset: ByteStr): Long
+
   def height: Int
 
   def accountTransactionIds(a: Address, limit: Int): Seq[ByteStr]
@@ -78,13 +82,12 @@ object StateReader {
       s.accountTransactionIds(account, limit).flatMap(s.transactionInfo).map(_._2)
     }
 
-    def balance(account: Address): Long = s.accountPortfolio(account).balance
+    def balance(account: Address): Long = s.wavesBalance(account)._1
 
-    def assetBalance(account: AssetAcc): Long = {
-      val accountPortfolio = s.accountPortfolio(account.account)
-      account.assetId match {
-        case Some(assetId) => accountPortfolio.assets.getOrElse(assetId, 0)
-        case None => accountPortfolio.balance
+    def assetBalance(assetAcc: AssetAcc): Long = {
+      assetAcc.assetId match {
+        case Some(assetId) => s.assetBalance(assetAcc.account, assetId)
+        case None => s.wavesBalance(assetAcc.account)._1
       }
     }
 
@@ -165,7 +168,7 @@ object StateReader {
       val snapshots: Seq[Snapshot] = s.lastUpdateHeight(acc) match {
         case None => Seq(Snapshot(0, 0, 0))
         case Some(h) if h < bottomNotIncluded =>
-          val pf = s.accountPortfolio(acc)
+          val pf = s.partialPortfolio(acc)
           Seq(Snapshot(h, pf.balance, pf.effectiveBalance))
         case Some(h) => loop(h, Seq.empty)
       }
@@ -200,6 +203,11 @@ object StateReader {
 
     def accountPortfoliosHash: Int = {
       Hash.accountPortfolios(s.accountPortfolios)
+    }
+
+    def partialPortfolio(a: Address, assets: Set[AssetId] = Set.empty): Portfolio = {
+      val (w, l) = s.wavesBalance(a)
+      Portfolio(w, l, assets.map(id => id -> s.assetBalance(a, id)).toMap)
     }
   }
 

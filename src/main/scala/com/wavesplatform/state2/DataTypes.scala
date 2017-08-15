@@ -67,6 +67,27 @@ object DataTypes {
     }
   }
 
+  // (Long, Long, Long)
+  val waves: DataType = new DTTemplate {
+    override def compare(a: scala.Any, b: scala.Any): Int = throw new UnsupportedOperationException
+
+    override def read(buff: ByteBuffer): AnyRef = {
+      val v1 = readVarLong(buff)
+      val v2 = readVarLong(buff)
+      val v3 = readVarLong(buff)
+      (v1, v2, v3)
+    }
+
+    override def getMemory(obj: scala.Any): Int = 9 * 3 + 5
+
+    override def write(buff: WriteBuffer, obj: scala.Any): Unit = {
+      val (v1, v2, v3) = obj.asInstanceOf[(Long, Long, Long)]
+      buff.putVarLong(v1)
+        .putVarLong(v2)
+        .putVarLong(v3)
+    }
+  }
+
   val portfolios: DataType = new DTTemplate {
     override def compare(a: scala.Any, b: scala.Any) = throw new UnsupportedOperationException
 
@@ -141,6 +162,8 @@ object DataTypes {
       buff.put(v)
     }
   }
+
+  // List[ByteStr]
   val byteStrList: DataType = new DTTemplate {
     override def compare(a: scala.Any, b: scala.Any) = throw new UnsupportedOperationException
 
