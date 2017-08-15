@@ -8,7 +8,7 @@ import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import org.scalatest.{Matchers, PropSpec}
 
 class MultiKeyMapTest extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with TransactionGen with Matchers {
-  def newMap() = new MultiKeyMap[ByteStr, ByteStr, Long](new MVStore.Builder().open(), new ObjectDataType(), "p")
+  def newMap() = new MultiKeyMap[Long](new MVStore.Builder().open(), new ObjectDataType(), "p")
 
   val addressByteStr: Gen[ByteStr] = accountGen.map(_.toAddress.bytes)
   val assetByteStr: Gen[ByteStr] = byteArrayGen(64).map(ByteStr(_))

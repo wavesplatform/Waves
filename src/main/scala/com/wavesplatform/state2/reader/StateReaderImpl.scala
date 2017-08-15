@@ -2,6 +2,8 @@ package com.wavesplatform.state2.reader
 
 import java.util.concurrent.locks.ReentrantReadWriteLock
 
+import cats._
+import cats.data._
 import cats.implicits._
 import com.wavesplatform.state2._
 import scorex.account.{Address, Alias}
@@ -53,7 +55,13 @@ class StateReaderImpl(p: StateStorage, val synchronizationToken: ReentrantReadWr
       .map(b => Address.fromBytes(b.arr).explicitGet())
   }
 
-  override def accountPortfolios: Map[Address, Portfolio] = ???
+  override def accountPortfolios: Map[Address, Portfolio] = read { implicit l =>
+    val assets = sp().assetBalance.all()
+      .map { case (k, v) => Address.fromBytes(k.arr).explicitGet() -> Portfolio(0, LeaseInfo.empty, v) }.toMap
+    val waves = sp()
+      .wavesBalance.asScala.toMap.map { case (k, (b, li, lo)) => Address.fromBytes(k.arr).explicitGet() -> Portfolio(b, LeaseInfo(li, lo), Map.empty) }
+    Monoid.combine(assets, waves)
+  }
 
   override def isLeaseActive(leaseTx: LeaseTransaction): Boolean = read { implicit l =>
     sp().leaseState.getOrDefault(leaseTx.id, false)
@@ -88,5 +96,5 @@ class StateReaderImpl(p: StateStorage, val synchronizationToken: ReentrantReadWr
       .map { case (v1, v2, v3) => (v1, LeaseInfo(v2, v3)) }
       .getOrElse((0L, LeaseInfo(0L, 0L)))
 
-  override def assetBalance(a: Address, asset: ByteStr): Long = p.assetBalance.get(a.bytes,asset).getOrElse(0L)
+  override def assetBalance(a: Address, asset: ByteStr): Long = p.assetBalance.get(a.bytes, asset).getOrElse(0L)
 }

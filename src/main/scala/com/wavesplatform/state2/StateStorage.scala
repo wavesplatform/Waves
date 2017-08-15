@@ -34,7 +34,7 @@ class StateStorage private(file: Option[File]) extends AutoCloseable {
     new LogMVMapBuilder[ByteStr, (Long, Long, Long)]
       .keyType(DataTypes.byteStr).valueType(DataTypes.waves))
 
-  val assetBalance = new MultiKeyMap[ByteStr,ByteStr,Long](db,new ObjectDataType(),"assetBalance")
+  val assetBalance = new MultiKeyMap[Long](db,new ObjectDataType(),"assetBalance")
 
   val assets: MVMap[ByteStr, (Boolean, Long)] = db.openMap("assets",
     new LogMVMapBuilder[ByteStr, (Boolean, Long)].keyType(DataTypes.byteStr).valueType(DataTypes.assets))
