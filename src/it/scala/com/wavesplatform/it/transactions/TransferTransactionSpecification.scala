@@ -3,6 +3,7 @@ package com.wavesplatform.it.transactions
 import com.wavesplatform.it.util._
 import com.wavesplatform.it.{IntegrationSuiteWithThreeAddresses, Node}
 import scorex.account.{AddressOrAlias, PrivateKeyAccount}
+import scorex.api.http.Mistiming
 import scorex.api.http.assets.SignedTransferRequest
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.TransferTransaction
@@ -96,7 +97,9 @@ class TransferTransactionSpecification(override val allNodes: Seq[Node], overrid
     val invalidByTsSignedRequest = createSignedTransferRequest(invalidByTsTx)
 
     val f = for {
-      _ <- assertBadRequest(sender.signedTransfer(invalidByTsSignedRequest))
+      _ <- expectErrorResponse(sender.signedTransfer(invalidByTsSignedRequest)) { x =>
+        x.error == Mistiming.Id
+      }
       _ <- sequence(allNodes.map(_.ensureTxDoesntExist(invalidTxId.base58)))
     } yield succeed
 
