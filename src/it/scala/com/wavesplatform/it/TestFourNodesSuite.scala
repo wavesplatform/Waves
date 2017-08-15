@@ -2,6 +2,7 @@ package com.wavesplatform.it
 
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.it.transactions._
+import com.wavesplatform.it.transactions.debug._
 import org.scalatest.{BeforeAndAfterAll, FreeSpec, Matchers, Suite}
 import scorex.utils.ScorexLogging
 
@@ -48,14 +49,15 @@ class TestFourNodesSuite extends FreeSpec with BeforeAndAfterAll with ScorexLogg
   }
 
   override def nestedSuites: IndexedSeq[Suite] = IndexedSeq(
-//    new ValidChainGenerationSpec(allNodes),
-//    new BurnTransactionSpecification(allNodes, notMiner),
-//    new IssueTransactionSpecification(allNodes, notMiner),
-//    new LeasingTransactionsSpecification(allNodes, notMiner),
-//    new PaymentTransactionSpecification(allNodes, notMiner),
-//    new ReissueTransactionSpecification(allNodes, notMiner),
-//    new TransferTransactionSpecification(allNodes, notMiner),
-    new AliasTransactionSpecification(allNodes, notMiner)
+    new ValidChainGenerationSpec(allNodes),
+    new BurnTransactionSpecification(allNodes, notMiner),
+    new IssueTransactionSpecification(allNodes, notMiner),
+    new LeasingTransactionsSpecification(allNodes, notMiner),
+    new PaymentTransactionSpecification(allNodes, notMiner),
+    new ReissueTransactionSpecification(allNodes, notMiner),
+    new TransferTransactionSpecification(allNodes, notMiner),
+    new AliasTransactionSpecification(allNodes, notMiner),
+    new DebugPortfoliosSpecification(allNodes, notMiner)
   )
 
   override protected def afterAll(): Unit = docker.close()

@@ -1,10 +1,10 @@
 package com.wavesplatform.matcher.model
 
 import cats.implicits._
+import com.wavesplatform.UtxPool
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.market.OrderBookActor.CancelOrder
 import com.wavesplatform.matcher.model.Events.OrderAdded
-import com.wavesplatform.state2.reader.StateReader
 import scorex.account.PublicKeyAccount
 import scorex.transaction.AssetAcc
 import scorex.transaction.ValidationError.GenericError
@@ -15,17 +15,18 @@ import scorex.wallet.Wallet
 
 trait OrderValidator {
   val orderHistory: OrderHistory
-  val storedState: StateReader
+  val utxPool: UtxPool
   val settings: MatcherSettings
   val wallet: Wallet
 
   lazy val matcherPubKey: PublicKeyAccount = wallet.findWallet(settings.account).right.get
+  val MinExpiration = 60 * 1000L
 
   def isBalanceWithOpenOrdersEnough(order: Order): Validation = {
     val lo = LimitOrder(order)
 
     val b: Map[String, Long] = (Map(lo.spentAcc -> 0L) ++ Map(lo.feeAcc -> 0L))
-      .map { case(a, _) => a -> storedState.spendableBalance(a) }
+      .map { case(a, _) => a -> spendableBalance(a) }
       .map { case(a, v) => a.assetId.map(_.base58).getOrElse(AssetPair.WavesName) -> v }
 
     val newOrder = Events.createOpenPortfolio(OrderAdded(lo)).getOrElse(order.senderPublicKey.address, OpenPortfolio.empty)
@@ -38,7 +39,7 @@ trait OrderValidator {
   }
 
   def getTradableBalance(acc: AssetAcc): Long = {
-    math.max(0l, storedState.spendableBalance(acc) - orderHistory.openVolume(acc))
+    math.max(0l, spendableBalance(acc) - orderHistory.openVolume(acc))
   }
 
   def validateNewOrder(order: Order): Either[GenericError, Order] = {
@@ -46,6 +47,7 @@ trait OrderValidator {
     //  s"Open orders count limit exceeded (Max = ${settings.maxOpenOrders})" &&
     val v =
     (order.matcherPublicKey == matcherPubKey) :| "Incorrect matcher public key" &&
+      (order.expiration > NTP.correctedTime() + MinExpiration) :| "Order expiration should be > 1 min" &&
       scorex.transaction.Signed.validateSignatures(order).isRight :| "signature should be valid" &&
       order.isValid(NTP.correctedTime()) &&
       (order.matcherFee >= settings.minOrderFee) :| s"Order matcherFee should be >= ${settings.minOrderFee}" &&
@@ -70,6 +72,14 @@ trait OrderValidator {
       Left(GenericError(v.messages()))
     } else {
       Right(cancel)
+    }
+  }
+
+  private def spendableBalance(a: AssetAcc): Long = {
+    val portfolio = utxPool.portfolio(a.account)
+    a.assetId match {
+      case Some(x) => portfolio.assets.getOrElse(x, 0)
+      case None => portfolio.spendableBalance
     }
   }
 }

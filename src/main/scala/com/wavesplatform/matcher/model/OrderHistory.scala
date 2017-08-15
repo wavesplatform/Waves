@@ -8,6 +8,8 @@ import scorex.transaction.AssetAcc
 import scorex.transaction.assets.exchange.{AssetPair, Order}
 import scorex.utils.ScorexLogging
 
+import scala.collection.JavaConverters._
+
 trait OrderHistory {
   def orderAccepted(event: OrderAdded): Unit
   def orderExecuted(event: OrderExecuted): Unit
@@ -16,20 +18,29 @@ trait OrderHistory {
   def orderInfo(id: String): OrderInfo
   def openVolume(assetAcc: AssetAcc): Long
   def ordersByPairAndAddress(assetPair: AssetPair, address: String): Set[String]
+  def getAllOrdersByAddress(address: String): Set[String]
   def deleteOrder(assetPair: AssetPair, address: String, orderId: String): Boolean
   def order(id: String): Option[Order]
   def openPortfolio(address: String): OpenPortfolio
 }
 
 case class OrderHistoryImpl(p: OrderHistoryStorage) extends OrderHistory with ScorexLogging {
+  val MaxOrdersPerAddress = 1000
+  val MaxOrdersPerRequest = 100
 
   def savePairAddress(assetPair: AssetPair, address: String, orderId: String): Unit = {
     val pairAddress = OrderHistoryStorage.assetPairAddressKey(assetPair, address)
     Option(p.pairAddressToOrderIds.get(pairAddress)) match {
       case Some(prev) =>
-        if (!prev.contains(orderId)) p.pairAddressToOrderIds.put(pairAddress, prev + orderId)
+        var r = prev
+        if (prev.length >= MaxOrdersPerAddress) {
+          val (p1, p2) = prev.span(!orderStatus(_).isInstanceOf[LimitOrder.Cancelled])
+          r = if (p2.isEmpty) p1 else p1 ++ p2.tail
+
+        }
+        p.pairAddressToOrderIds.put(pairAddress, r :+ orderId)
       case _ =>
-        p.pairAddressToOrderIds.put(pairAddress, Set(orderId))
+        p.pairAddressToOrderIds.put(pairAddress, Array(orderId))
     }
   }
 
@@ -41,12 +52,12 @@ case class OrderHistoryImpl(p: OrderHistoryStorage) extends OrderHistory with Sc
   }
 
   def openPortfolio(address: String): OpenPortfolio = {
-    Option(p.addressToOrderPortfolio.get(address)).map(OpenPortfolio(_)).getOrElse(OpenPortfolio.empty)
+    Option(p.addressToOrderPortfolio.get(address)).map(OpenPortfolio(_)).orEmpty
   }
 
   def saveOpenPortfolio(event: Event): Unit = {
     Events.createOpenPortfolio(event).foreach{ case(addr, op) =>
-      val prev = openPortfolio(addr)
+      val prev = Option(p.addressToOrderPortfolio.get(addr)).map(OpenPortfolio(_)).getOrElse(OpenPortfolio.empty)
       p.addressToOrderPortfolio.put(addr, prev.combine(op).orders)
       log.debug(s"Changed OpenPortfolio for: $addr -> " + p.addressToOrderPortfolio.get(addr).toString)
     }
@@ -74,6 +85,7 @@ case class OrderHistoryImpl(p: OrderHistoryStorage) extends OrderHistory with Sc
     saveOrder(event.submitted.order)
     savePairAddress(event.submitted.order.assetPair, event.submitted.order.senderPublicKey.address, event.submitted.order.idStr)
     saveOrdeInfo(event)
+    saveOpenPortfolio(OrderAdded(event.submittedExecuted))
     saveOpenPortfolio(event)
   }
 
@@ -96,13 +108,18 @@ case class OrderHistoryImpl(p: OrderHistoryStorage) extends OrderHistory with Sc
 
   override def openVolume(assetAcc: AssetAcc): Long = {
     val asset = assetAcc.assetId.map(_.base58).getOrElse(AssetPair.WavesName)
-    Option(p.addressToOrderPortfolio.get(assetAcc.account.address)).flatMap(_.get(asset)).getOrElse(0L)
+    Option(p.addressToOrderPortfolio.get(assetAcc.account.address)).flatMap(_.get(asset)).map(math.max(0L, _)).getOrElse(0L)
   }
 
   override def ordersByPairAndAddress(assetPair: AssetPair, address: String): Set[String] = {
     val pairAddressKey = OrderHistoryStorage.assetPairAddressKey(assetPair, address)
-    Option(p.pairAddressToOrderIds.get(pairAddressKey)).getOrElse(Set())
+    Option(p.pairAddressToOrderIds.get(pairAddressKey)).map(_.takeRight(MaxOrdersPerRequest).toSet).getOrElse(Set())
   }
+
+  override def getAllOrdersByAddress(address: String): Set[String] = {
+    p.pairAddressToOrderIds.asScala.filter(_._1.endsWith(address)).values.flatten.toSet
+  }
+
 
   private def deleteFromOrdersInfo(orderId: String): Unit = {
     p.ordersInfo.remove(orderId)
@@ -112,7 +129,7 @@ case class OrderHistoryImpl(p: OrderHistoryStorage) extends OrderHistory with Sc
     val pairAddress = OrderHistoryStorage.assetPairAddressKey(assetPair, address)
     Option(p.pairAddressToOrderIds.get(pairAddress)) match {
       case Some(prev) =>
-        if (prev.contains(orderId)) p.pairAddressToOrderIds.put(pairAddress, prev - orderId)
+        if (prev.contains(orderId)) p.pairAddressToOrderIds.put(pairAddress, prev.filterNot(_ == orderId))
       case _ =>
     }
   }

@@ -8,6 +8,7 @@ import scorex.transaction.assets.exchange.AssetPair
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration.FiniteDuration
+import scala.util.matching.Regex
 
 case class MatcherSettings(enable: Boolean,
                            account: String,
@@ -22,13 +23,17 @@ case class MatcherSettings(enable: Boolean,
                            priceAssets: Seq[String],
                            predefinedPairs: Seq[AssetPair],
                            maxTimestampDiff: FiniteDuration,
-                           orderHistoryFile: String,
-                           isMigrateToNewOrderHistoryStorage: Boolean
+                           orderHistoryFile: Option[File],
+                           isMigrateToNewOrderHistoryStorage: Boolean,
+                           blacklistedAssets: Set[String],
+                           blacklistedNames: Seq[Regex],
+                           txHistoryFile: Option[File]
                           )
 
 
 object MatcherSettings {
   val configPath: String = "waves.matcher"
+  import com.wavesplatform.settings.fileReader
 
   def fromConfig(config: Config): MatcherSettings = {
     val enabled = config.as[Boolean](s"$configPath.enable")
@@ -47,12 +52,16 @@ object MatcherSettings {
     }
     val maxTimestampDiff = config.as[FiniteDuration](s"$configPath.max-timestamp-diff")
 
-    val orderHistoryFile = config.as[String](s"$configPath.order-history-file")
+    val orderHistoryFile = config.getAs[File](s"$configPath.order-history-file")
+    val txHistoryFile = config.getAs[File](s"$configPath.tx-history-file")
 
-    val isMigrateToNewOrderHistoryStorage = !new File(orderHistoryFile).exists()
+    val isMigrateToNewOrderHistoryStorage = !orderHistoryFile.exists(_.exists())
+
+    val blacklistedAssets = config.as[List[String]](s"$configPath.blacklisted-assets")
+    val blacklistedNames = config.as[List[String]](s"$configPath.blacklisted-names").map(_.r)
 
     MatcherSettings(enabled, account, bindAddress, port, minOrderFee, orderMatchTxFee, journalDirectory,
       snapshotsDirectory, snapshotsInterval, maxOpenOrders, baseAssets, basePairs, maxTimestampDiff,
-      orderHistoryFile, isMigrateToNewOrderHistoryStorage)
+      orderHistoryFile, isMigrateToNewOrderHistoryStorage, blacklistedAssets.toSet, blacklistedNames, txHistoryFile)
   }
 }

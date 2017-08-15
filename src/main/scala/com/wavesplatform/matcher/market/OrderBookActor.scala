@@ -8,7 +8,7 @@ import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.api.{CancelOrderRequest, MatcherResponse}
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.market.OrderHistoryActor._
-import com.wavesplatform.matcher.model.Events.{Event, OrderAdded, OrderExecuted}
+import com.wavesplatform.matcher.model.Events.{Event, ExchangeTransactionCreated, OrderAdded, OrderExecuted}
 import com.wavesplatform.matcher.model.MatcherModel._
 import com.wavesplatform.matcher.model._
 import com.wavesplatform.settings.FunctionalitySettings
@@ -55,7 +55,7 @@ class OrderBookActor(assetPair: AssetPair,
 
   def fullCommands: Receive = readOnlyCommands orElse snapshotsCommands orElse executeCommands
 
-  def executeCommands: Receive =  {
+  def executeCommands: Receive = {
     case order: Order =>
       onAddOrder(order)
     case cancel: CancelOrder =>
@@ -104,7 +104,7 @@ class OrderBookActor(assetPair: AssetPair,
   }
 
   def onCancelOrder(cancel: CancelOrder): Unit = {
-    orderHistory ! ValidateCancelOrder(cancel)
+    orderHistory ! ValidateCancelOrder(cancel, NTP.correctedTime())
     apiSender = Some(sender())
     cancellable = Some(context.system.scheduler.scheduleOnce(ValidationTimeout, self, ValidationTimeoutExceeded))
     context.become(waitingValidation)
@@ -155,7 +155,7 @@ class OrderBookActor(assetPair: AssetPair,
   }
 
   def onAddOrder(order: Order): Unit = {
-    orderHistory ! ValidateOrder(order)
+    orderHistory ! ValidateOrder(order, NTP.correctedTime())
     apiSender = Some(sender())
     cancellable = Some(context.system.scheduler.scheduleOnce(ValidationTimeout, self, ValidationTimeoutExceeded))
     context.become(waitingValidation)
@@ -233,15 +233,20 @@ class OrderBookActor(assetPair: AssetPair,
         None
 
       case event@OrderExecuted(o, c) =>
-        createTransaction(o, c).flatMap(utx.putIfNew(_)) match {
-          case Left(ex) =>
-            processInvalidTransaction(event, ex)
-          case Right(tx) =>
+        (for {
+          tx <- createTransaction(o, c)
+          _ <- utx.putIfNew(tx)
+        } yield tx) match {
+          case Right(tx) if tx.isInstanceOf[ExchangeTransaction] =>
             allChannels.broadcast(RawBytes(TransactionMessageSpec.messageCode, tx.bytes))
             processEvent(event)
+            context.system.eventStream.publish(ExchangeTransactionCreated(tx.asInstanceOf[ExchangeTransaction]))
             if (event.submittedRemaining > 0)
               Some(o.partial(event.submittedRemaining))
             else None
+          case Left(ex) =>
+            log.info("Can't create tx for o1: " + Json.prettyPrint(o.order.json) + "\n, o2: " + Json.prettyPrint(c.order.json))
+            processInvalidTransaction(event, ex)
         }
       case _ => None
     }
@@ -263,7 +268,7 @@ object OrderBookActor {
   def name(assetPair: AssetPair): String = assetPair.toString
 
   val MaxDepth = 50
-  val ValidationTimeout = 3.seconds
+  val ValidationTimeout: FiniteDuration = 5.seconds
 
   //protocol
   sealed trait OrderBookRequest {
@@ -322,5 +327,6 @@ object OrderBookActor {
   case class Snapshot(orderBook: OrderBook)
 
   case object ValidationTimeoutExceeded
+
 }
 

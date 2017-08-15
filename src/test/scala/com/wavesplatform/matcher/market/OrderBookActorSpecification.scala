@@ -70,7 +70,7 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
 
   val orderHistoryRef = TestActorRef(new Actor {
     def receive: Receive = {
-      case ValidateOrder(o) => sender() ! ValidateOrderResult(Right(o))
+      case ValidateOrder(o, _) => sender() ! ValidateOrderResult(Right(o))
       case _ =>
     }
   })
@@ -91,7 +91,7 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
     val functionalitySettings = stub[FunctionalitySettings]
 
     val utx = stub[UtxPool]
-    (utx.putIfNew _).when(*).onCall((tx: Transaction) => Right(tx))
+    (utx.putIfNew _).when(*).onCall((tx: Transaction) => Right(true))
     val allChannels = stub[ChannelGroup]
     actor = system.actorOf(Props(new OrderBookActor(pair, orderHistoryRef, storedState,
       wallet, utx, allChannels, settings, history, functionalitySettings) with RestartableActor))
@@ -275,7 +275,7 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
       (pool.putIfNew _).when(*).onCall { (tx: Transaction) =>
         tx match {
           case om: ExchangeTransaction if om.buyOrder == ord2 => Left(ValidationError.GenericError("test"))
-          case _: Transaction => Right(tx)
+          case _: Transaction => Right(true)
         }
       }
       val allChannels = stub[ChannelGroup]

@@ -1,6 +1,7 @@
 package com.wavesplatform.matcher.market
 
-import com.wavesplatform.matcher.model.{OrderHistory, OrderHistoryImpl, OrderHistoryStorage, OrderValidator}
+import com.wavesplatform.UtxPool
+import com.wavesplatform.matcher.model._
 import com.wavesplatform.matcher.{MatcherSettings, MatcherTestData}
 import com.wavesplatform.settings.{Constants, WalletSettings}
 import com.wavesplatform.state2.reader.StateReader
@@ -10,8 +11,9 @@ import org.scalamock.scalatest.PathMockFactory
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
+import scorex.transaction.ValidationError
 import scorex.transaction.assets.IssueTransaction
-import scorex.transaction.assets.exchange.AssetPair
+import scorex.transaction.assets.exchange.{AssetPair, Order}
 import scorex.wallet.Wallet
 
 class OrderValidatorSpecification extends WordSpec
@@ -24,6 +26,8 @@ class OrderValidatorSpecification extends WordSpec
 
   var storage = new OrderHistoryStorage(new MVStore.Builder().open())
   var oh = OrderHistoryImpl(storage)
+
+  val utxPool: UtxPool = stub[UtxPool]
 
   val ss: StateReader = stub[StateReader]
   (ss.assetInfo _).when(*).returns(Some(AssetInfo(true, 10000000000L)))
@@ -38,7 +42,7 @@ class OrderValidatorSpecification extends WordSpec
 
   private var ov = new OrderValidator {
     override val orderHistory: OrderHistory = oh
-    override val storedState: StateReader = ss
+    override val utxPool: UtxPool = stub[UtxPool]
     override val settings: MatcherSettings = s
     override val wallet: Wallet = w
   }
@@ -47,7 +51,7 @@ class OrderValidatorSpecification extends WordSpec
     storage = new OrderHistoryStorage(new MVStore.Builder().open())
     ov = new OrderValidator {
       override val orderHistory: OrderHistory = oh
-      override val storedState: StateReader = ss
+      override val utxPool: UtxPool = stub[UtxPool]
       override val settings: MatcherSettings = s
       override val wallet: Wallet = w
     }
@@ -57,14 +61,27 @@ class OrderValidatorSpecification extends WordSpec
   val pairWavesBtc = AssetPair(None, Some(wbtc))
 
   "OrderValidator" should {
-
-    "Allows buy WAVES for BTC without balance for order fee" in {
-      (ss.accountPortfolio _).when(*).returns(Portfolio(0, LeaseInfo.empty, Map(
-        wbtc -> 10*Constants.UnitsInWave
-      )))
-
-      val o = buy(pairWavesBtc, 0.0022, 100*Constants.UnitsInWave, matcherFee = Some((0.003*Constants.UnitsInWave).toLong))
-      ov.validateNewOrder(o) shouldBe an[Right[_, _]]
+    "allows buy WAVES for BTC without balance for order fee" in {
+      validateNewOrderTest(Portfolio(0, LeaseInfo.empty, Map(
+        wbtc -> 10 * Constants.UnitsInWave
+      ))) shouldBe an[Right[_, _]]
     }
+
+    "does not allow buy WAVES for BTC when assets number is negative" in {
+      validateNewOrderTest(Portfolio(0, LeaseInfo.empty, Map(
+        wbtc -> -10 * Constants.UnitsInWave
+      ))) shouldBe a[Left[_, _]]
+    }
+  }
+
+  private def validateNewOrderTest(expectedPortfolio: Portfolio): Either[ValidationError.GenericError, Order] = {
+    (ov.utxPool.portfolio _).when(*).returns(expectedPortfolio)
+    val o = buy(
+      pair = pairWavesBtc,
+      price = 0.0022,
+      amount = 100 * Constants.UnitsInWave,
+      matcherFee = Some((0.003 * Constants.UnitsInWave).toLong)
+    )
+    ov.validateNewOrder(o)
   }
 }

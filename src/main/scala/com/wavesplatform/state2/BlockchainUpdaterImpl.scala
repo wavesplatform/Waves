@@ -120,9 +120,9 @@ object BlockchainUpdaterImpl {
     blockchainUpdater
   }
 
-  def ranges(from: Int, to: Int, by: Int): List[(Int, Int)] =
+  def ranges(from: Int, to: Int, by: Int): Stream[(Int, Int)] =
     if (from + by < to)
-      (from, from + by) +: ranges(from + by, to, by)
-    else List((from, to))
-
+      (from, from + by) #:: ranges(from + by, to, by)
+    else
+      (from, to) #:: Stream.empty[(Int, Int)]
 }

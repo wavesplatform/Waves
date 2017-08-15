@@ -26,7 +26,7 @@ case class AliasApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPool
   }
 
   @Path("/create")
-  @ApiOperation(value = "Creates a alias",
+  @ApiOperation(value = "Creates an alias",
     httpMethod = "POST",
     produces = "application/json",
     consumes = "application/json")
@@ -45,7 +45,7 @@ case class AliasApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPool
 
 
   @Path("/by-alias/{alias}")
-  @ApiOperation(value = "Account", notes = "Address by Alias", httpMethod = "GET")
+  @ApiOperation(value = "Account", notes = "Returns an address associated with an Alias. Alias should be plain text without an 'alias' prefix and network code.", httpMethod = "GET")
   @ApiImplicitParams(Array(
     new ApiImplicitParam(name = "alias", value = "Alias", required = true, dataType = "string", paramType = "path")
   ))
@@ -62,7 +62,7 @@ case class AliasApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPool
   }
 
   @Path("/by-address/{address}")
-  @ApiOperation(value = "Alias", notes = "Alias by Address", httpMethod = "GET")
+  @ApiOperation(value = "Alias", notes = "Returns a collection of aliases associated with an Address", httpMethod = "GET")
   @ApiImplicitParams(Array(
     new ApiImplicitParam(name = "address", value = "3Mx2afTZ2KbRrLNbytyzTtXukZvqEB8SkW7", required = true, dataType = "string", paramType = "path")
   ))

@@ -36,6 +36,7 @@ import scorex.waves.http.{DebugApiRoute, WavesApiRoute}
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
+import scala.reflect.runtime.universe._
 import scala.util.Try
 
 class Application(val actorSystem: ActorSystem, val settings: WavesSettings) extends ScorexLogging {
@@ -93,35 +94,36 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
       AliasBroadcastApiRoute(settings.restAPISettings, utxStorage, allChannels)
     )
 
+    val apiTypes = Seq(
+      typeOf[BlocksApiRoute],
+      typeOf[TransactionsApiRoute],
+      typeOf[NxtConsensusApiRoute],
+      typeOf[WalletApiRoute],
+      typeOf[PaymentApiRoute],
+      typeOf[UtilsApiRoute],
+      typeOf[PeersApiRoute],
+      typeOf[AddressApiRoute],
+      typeOf[DebugApiRoute],
+      typeOf[WavesApiRoute],
+      typeOf[AssetsApiRoute],
+      typeOf[NodeApiRoute],
+      typeOf[AssetsBroadcastApiRoute],
+      typeOf[LeaseApiRoute],
+      typeOf[LeaseBroadcastApiRoute],
+      typeOf[AliasApiRoute],
+      typeOf[AliasBroadcastApiRoute]
+    )
+
     for (addr <- settings.networkSettings.declaredAddress if settings.networkSettings.uPnPSettings.enable) {
       upnp.addPort(addr.getPort)
     }
+
 
     implicit val as = actorSystem
     implicit val materializer = ActorMaterializer()
 
     if (settings.restAPISettings.enable) {
-      val apiClasses: Set[Class[_]] = Set(
-        classOf[BlocksApiRoute],
-        classOf[TransactionsApiRoute],
-        classOf[NxtConsensusApiRoute],
-        classOf[WalletApiRoute],
-        classOf[PaymentApiRoute],
-        classOf[UtilsApiRoute],
-        classOf[PeersApiRoute],
-        classOf[AddressApiRoute],
-        classOf[DebugApiRoute],
-        classOf[WavesApiRoute],
-        classOf[AssetsApiRoute],
-        classOf[NodeApiRoute],
-        classOf[AssetsBroadcastApiRoute],
-        classOf[LeaseApiRoute],
-        classOf[LeaseBroadcastApiRoute],
-        classOf[AliasApiRoute],
-        classOf[AliasBroadcastApiRoute]
-      )
-
-      val combinedRoute: Route = CompositeHttpService(actorSystem, apiClasses, apiRoutes, settings.restAPISettings).compositeRoute
+      val combinedRoute: Route = CompositeHttpService(actorSystem, apiTypes, apiRoutes, settings.restAPISettings).compositeRoute
       val httpFuture = Http().bindAndHandle(combinedRoute, settings.restAPISettings.bindAddress, settings.restAPISettings.port)
       serverBinding = Await.result(httpFuture, 10.seconds)
       log.info(s"REST API was bound on ${settings.restAPISettings.bindAddress}:${settings.restAPISettings.port}")
