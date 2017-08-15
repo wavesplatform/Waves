@@ -5,7 +5,6 @@ import com.wavesplatform.it.{IntegrationSuiteWithThreeAddresses, Node}
 
 import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
 
 class ReissueTransactionSpecification(override val allNodes: Seq[Node], override val notMiner: Node)
@@ -46,17 +45,39 @@ class ReissueTransactionSpecification(override val allNodes: Seq[Node], override
       issuedAssetId <- sender.issue(firstAddress, "name2", "description2", defaultQuantity, decimals = 2, reissuable = false, issueFee).map(_.id)
 
       _ <- waitForHeightAraise(issuedAssetId, 1)
-//70.waves
+
       _ <- assertBalances(firstAddress, firstAddressBalance - issueFee, firstAddressBalance - issueFee)
       _ <- assertAssetBalance(firstAddress, issuedAssetId, defaultQuantity)
 
-      message = "bla"
-
-      reissuedAssetId <- sender.reissue(firstAddress, issuedAssetId, defaultQuantity, reissuable = true, fee = 10.waves).map(_.id)
+      _ <- assertBadRequestAndMessage(
+        sender.reissue(firstAddress, issuedAssetId, defaultQuantity, reissuable = true, fee = issueFee), "Asset is not reissuable")
       _ <- waitForHeightAraise(issuedAssetId, 1)
 
-//      _ <- assertBadRequestAndMessage( 60.wavws
-//        sender.reissue(firstAddress, issuedAssetId, defaultQuantity, reissuable = true, fee = issueFee), message)
+      _ <- assertAssetBalance(firstAddress, issuedAssetId, defaultQuantity)
+      _ <- assertBalances(firstAddress, firstAddressBalance - issueFee, firstAddressBalance - issueFee)
+
+    } yield succeed
+
+    Await.result(f, 1.minute)
+  }
+
+  test("not able to reissue if cannot pay fee - insufficient funds") {
+
+    val f = for {
+
+      firstAddressBalance <- accountBalance(firstAddress)
+      firstAddressEffectiveBalance <- accountEffectiveBalance(firstAddress)
+      issueFee = 10.waves
+      reissueFee = firstAddressEffectiveBalance + 1.waves
+
+      issuedAssetId <- sender.issue(firstAddress, "name3", "description3", defaultQuantity, decimals = 2, reissuable = true, issueFee).map(_.id)
+
+      _ <- waitForHeightAraise(issuedAssetId, 1)
+
+      _ <- assertBadRequestAndMessage(
+        sender.reissue(firstAddress, issuedAssetId, defaultQuantity, reissuable = true, fee = reissueFee), "negative waves balance")
+      _ <- waitForHeightAraise(issuedAssetId, 1)
+
       _ <- assertAssetBalance(firstAddress, issuedAssetId, defaultQuantity)
       _ <- assertBalances(firstAddress, firstAddressBalance - issueFee, firstAddressBalance - issueFee)
 

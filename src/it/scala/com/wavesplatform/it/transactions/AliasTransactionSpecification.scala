@@ -4,9 +4,8 @@ import com.wavesplatform.it.util._
 import com.wavesplatform.it.{IntegrationSuiteWithThreeAddresses, Node}
 import org.scalatest.prop.TableDrivenPropertyChecks
 
-import scala.concurrent.{Await, Future}
+import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
 
 
@@ -16,7 +15,7 @@ class AliasTransactionSpecification(override val allNodes: Seq[Node], override v
   private val aliasFee = 1.waves
   private val leasingFee = 0.001.waves
 
-  test("Able to send money to an alias") {
+  ignore("Able to send money to an alias") {
     val alias = "test_alias"
 
     val f = for {
@@ -35,7 +34,7 @@ class AliasTransactionSpecification(override val allNodes: Seq[Node], override v
     Await.result(f, 1.minute)
   }
 
-  test("Not able to create same aliases to same address") {
+  ignore("Not able to create same aliases to same address") {
     val alias = "test_alias2"
     val f = for {
       balance <- accountBalance(firstAddress)
@@ -56,7 +55,7 @@ class AliasTransactionSpecification(override val allNodes: Seq[Node], override v
   }
 
 
-  test("Not able to create aliases to other addresses") {
+  ignore("Not able to create aliases to other addresses") {
     val alias = "test_alias3"
 
     val f = for {
@@ -67,7 +66,6 @@ class AliasTransactionSpecification(override val allNodes: Seq[Node], override v
 
       _ <- waitForHeightAraise(aliasTxId, 1)
       _ <- assertBadRequest(sender.createAlias(secondAddress, alias, aliasFee))
-      //todo add request with error deserialization
       _ <- assertBadRequestAndMessage(sender.createAlias(secondAddress, alias, aliasFee), "Tx with such id aready present")
       _ <- assertBalances(firstAddress, balance - aliasFee, effectiveBalance - aliasFee)
     } yield succeed
@@ -75,7 +73,7 @@ class AliasTransactionSpecification(override val allNodes: Seq[Node], override v
     Await.result(f, 1.minute)
   }
 
-  test("Able to create several different aliases to same addresses") {
+  ignore("Able to create several different aliases to same addresses") {
     val firstAlias = "test_alias4"
     val secondAlias = "test_alias5"
 
@@ -110,7 +108,7 @@ class AliasTransactionSpecification(override val allNodes: Seq[Node], override v
 
 
 
-  test("Able to get address by alias") {
+  ignore("Able to get address by alias") {
     val alias = "test_alias_6"
     val f = for {
       balance <- accountBalance(firstAddress)
@@ -133,7 +131,7 @@ class AliasTransactionSpecification(override val allNodes: Seq[Node], override v
       "@.@-@_@")
 
   aliases_names.foreach { alias =>
-    test(s"create alias named $alias") {
+    ignore(s"create alias named $alias") {
       val f = for {
         balance <- accountBalance(secondAddress)
         effectiveBalance <- accountEffectiveBalance(secondAddress)
@@ -159,7 +157,7 @@ class AliasTransactionSpecification(override val allNodes: Seq[Node], override v
       ("UpperCaseAliase", "Alias should contain only following characters: -.0123456789@_abcdefghijklmnopqrstuvwxyz"))
 
   forAll(invalid_aliases_names) { (alias: String, message: String) =>
-    test(s"Not able to create alias named $alias") {
+    ignore(s"Not able to create alias named $alias") {
       val f = for {
         _ <- assertBadRequestAndMessage(sender.createAlias(secondAddress, alias, aliasFee), message)
       } yield succeed
@@ -170,7 +168,7 @@ class AliasTransactionSpecification(override val allNodes: Seq[Node], override v
 
   }
 
-  test("Able to lease by alias") {
+  ignore("Able to lease by alias") {
     val thirdAddressAlias = "leasing_alias"
     val buildedThirdAddressAlias = s"alias:${sender.settings.blockchainSettings.addressSchemeCharacter}:$thirdAddressAlias"
 
@@ -196,7 +194,7 @@ class AliasTransactionSpecification(override val allNodes: Seq[Node], override v
   }
 
   //previous test should not be commented to run this one
-  test("Not able to create aliase when insufficient funds"){
+  ignore("Not able to create aliase when insufficient funds"){
     val alias = "test_alias7"
     val f = for {
       _ <- assertBadRequestAndMessage(sender.createAlias(firstAddress, alias, aliasFee),

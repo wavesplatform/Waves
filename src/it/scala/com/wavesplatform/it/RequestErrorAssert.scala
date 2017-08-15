@@ -21,9 +21,6 @@ trait RequestErrorAssert extends Assertions {
 
   protected def assertBadRequestAndMessage(f: Future[_], errorMessage: String): Future[Assertion] = f transform {
     case Failure(UnexpectedStatusCodeException(_, r)) => {
-      println("!!!!!!!!!!!!!!!!!")
-      println(r.getResponseBody)
-      println("#################")
       Success(Assertions.assert(r.getStatusCode == StatusCodes.BadRequest.intValue && parse(r.getResponseBody).as[ErrorMessage].message.contains(errorMessage)))
     }
     case Failure(e) => Success[Assertion](Assertions.fail(e))

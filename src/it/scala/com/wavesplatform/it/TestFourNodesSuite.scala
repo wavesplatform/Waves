@@ -53,9 +53,9 @@ class TestFourNodesSuite extends FreeSpec with BeforeAndAfterAll with ScorexLogg
 //    new IssueTransactionSpecification(allNodes, notMiner),
 //    new LeasingTransactionsSpecification(allNodes, notMiner),
 //    new PaymentTransactionSpecification(allNodes, notMiner),
-    new ReissueTransactionSpecification(allNodes, notMiner),
+//    new ReissueTransactionSpecification(allNodes, notMiner),
 //    new TransferTransactionSpecification(allNodes, notMiner),
-//    new AliasTransactionSpecification(allNodes, notMiner)
+    new AliasTransactionSpecification(allNodes, notMiner)
   )
 
   override protected def afterAll(): Unit = docker.close()

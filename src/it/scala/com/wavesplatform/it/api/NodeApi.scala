@@ -158,6 +158,8 @@ trait NodeApi {
   def addressByAlias(targetAlias: String): Future[Address]=
     get(s"/alias/by-alias/$targetAlias").as[Address]
 
+
+
   def rollback(to: Int, returnToUTX: Boolean = true): Future[Unit] =
     postJson("/debug/rollback", RollbackParams(to, returnToUTX)).map(_ => ())
 
