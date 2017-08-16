@@ -14,23 +14,23 @@ import scala.reflect.runtime.universe.Type
 
 case class CompositeHttpService(system: ActorSystem, apiTypes: Seq[Type], routes: Seq[ApiRoute], settings: RestAPISettings) {
 
-//  val swaggerService = new SwaggerDocService(system, ActorMaterializer()(system), apiTypes, settings)
+  val swaggerService = new SwaggerDocService(system, ActorMaterializer()(system), apiTypes, settings)
 
   def withCors: Directive0 = if (settings.cors)
     respondWithHeader(`Access-Control-Allow-Origin`.*) else pass
 
   val compositeRoute =
     withCors(routes.map(_.route).reduce(_ ~ _)) ~
-//    swaggerService.routes ~
-    (pathEndOrSingleSlash | path("swagger")) {
-      redirect("/api-docs/index.html", StatusCodes.PermanentRedirect)
-    } ~
-    pathPrefix("api-docs") {
-      pathEndOrSingleSlash {
+      swaggerService.routes ~
+      (pathEndOrSingleSlash | path("swagger")) {
         redirect("/api-docs/index.html", StatusCodes.PermanentRedirect)
       } ~
-      getFromResourceDirectory("swagger-ui")
-    } ~ options {
+      pathPrefix("api-docs") {
+        pathEndOrSingleSlash {
+          redirect("/api-docs/index.html", StatusCodes.PermanentRedirect)
+        } ~
+          getFromResourceDirectory("swagger-ui")
+      } ~ options {
       respondWithDefaultHeaders(
         `Access-Control-Allow-Credentials`(true),
         `Access-Control-Allow-Headers`("Authorization", "Content-Type", "X-Requested-With", "Timestamp", "Signature"),
