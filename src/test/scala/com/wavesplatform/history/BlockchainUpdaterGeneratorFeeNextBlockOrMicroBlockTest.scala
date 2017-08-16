@@ -10,8 +10,6 @@ import scorex.transaction.{GenesisTransaction, PaymentTransaction}
 
 class BlockchainUpdaterGeneratorFeeNextBlockOrMicroBlockTest extends PropSpec with PropertyChecks with DomainScenarioDrivenPropertyCheck with Matchers with TransactionGen {
 
-  private implicit def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)
-
   type Setup = (GenesisTransaction, PaymentTransaction, PaymentTransaction, PaymentTransaction)
 
   val preconditionsAndPayments: Gen[Setup] = for {

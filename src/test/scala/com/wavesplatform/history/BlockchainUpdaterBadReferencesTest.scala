@@ -10,7 +10,6 @@ import scorex.transaction.{GenesisTransaction, PaymentTransaction}
 
 class BlockchainUpdaterBadReferencesTest extends PropSpec with PropertyChecks with
   DomainScenarioDrivenPropertyCheck with Matchers with TransactionGen {
-  private implicit def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)
 
   val preconditionsAndPayments: Gen[(GenesisTransaction, PaymentTransaction, PaymentTransaction, PaymentTransaction)] = for {
     master <- accountGen

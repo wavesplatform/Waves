@@ -13,8 +13,6 @@ import scorex.transaction.{GenesisTransaction, PaymentTransaction, TransactionPa
 class BlockchainUpdaterMicroblockBadSignaturesTest extends PropSpec with PropertyChecks
   with DomainScenarioDrivenPropertyCheck with Matchers with TransactionGen {
 
-  private implicit def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)
-
   val preconditionsAndPayments: Gen[(GenesisTransaction, PaymentTransaction, PaymentTransaction)] = for {
     master <- accountGen
     recipient <- accountGen

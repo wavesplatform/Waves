@@ -1,12 +1,11 @@
 package tools
 
+import com.wavesplatform.state2._
 import play.api.libs.json._
 import scorex.account.{Address, AddressScheme, PrivateKeyAccount, PublicKeyAccount}
-import scorex.api.http.assets.SignedTransferRequest
-import scorex.transaction.assets.TransferTransaction
-import com.wavesplatform.state2._
 import scorex.block.{Block, SignerData}
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
+import scorex.transaction.assets.TransferTransaction
 
 import scala.io.Source
 

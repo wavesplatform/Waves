@@ -2,16 +2,12 @@ package com.wavesplatform.history
 
 import com.wavesplatform.TransactionGen
 import com.wavesplatform.state2._
-import com.wavesplatform.state2.diffs._
 import org.scalacheck.{Gen, Shrink}
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
-import scorex.settings.TestFunctionalitySettings
 import scorex.transaction.{GenesisTransaction, PaymentTransaction}
 
 class BlockchainUpdaterGeneratorFeeSameBlockTest extends PropSpec with PropertyChecks with DomainScenarioDrivenPropertyCheck with Matchers with TransactionGen {
-
-  private implicit def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)
 
   type Setup = (GenesisTransaction, PaymentTransaction, PaymentTransaction)
 

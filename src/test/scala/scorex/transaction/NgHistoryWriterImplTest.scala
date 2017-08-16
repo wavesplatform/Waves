@@ -4,11 +4,11 @@ import java.util.concurrent.locks.ReentrantReadWriteLock
 
 import com.wavesplatform.TransactionGen
 import com.wavesplatform.history._
-import com.wavesplatform.state2.{BlockDiff, ByteStr}
+import com.wavesplatform.state2.BlockDiff
 import com.wavesplatform.state2.diffs._
 import org.scalacheck.{Gen, Shrink}
-import org.scalatest.{FunSuite, Matchers, PropSpec}
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
+import org.scalatest.{Matchers, PropSpec}
 
 class NgHistoryWriterImplTest extends PropSpec with GeneratorDrivenPropertyChecks with PropertyChecks with Matchers with TransactionGen {
 
