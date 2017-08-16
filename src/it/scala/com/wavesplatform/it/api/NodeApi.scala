@@ -268,8 +268,8 @@ trait NodeApi {
 
   def debugStateAt(height: Long): Future[Map[String, Long]] = get(s"/debug/stateWaves/$height").as[Map[String, Long]]
 
-  def debugPortfoliosFor(address: Address, considerUnspent: Boolean) = {
-    getWihApiKey(s"/debug/portfolios/${address.address}?considerUnspent=$considerUnspent")
+  def debugPortfoliosFor(address: String, considerUnspent: Boolean) = {
+    getWihApiKey(s"/debug/portfolios/$address?considerUnspent=$considerUnspent")
   }.as[Portfolio]
 
 }

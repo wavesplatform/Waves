@@ -48,7 +48,7 @@ object Dependencies {
 
   lazy val http = Seq("core", "annotations", "models", "jaxrs").map(swaggerModule) ++ Seq(
     "io.swagger" %% "swagger-scala-module" % "1.0.4",
-    "com.github.swagger-akka-http" %% "swagger-akka-http" % "0.10.0",
+    "com.github.swagger-akka-http" %% "swagger-akka-http" % "0.9.2",
     akkaHttpModule("akka-http")
   )
 

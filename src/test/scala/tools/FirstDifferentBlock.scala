@@ -1,12 +1,17 @@
 package tools
 
+import play.api.libs.json.Json
+
 object FirstDifferentBlock extends App {
 
   def get(url: String) = scala.io.Source.fromURL(url).mkString
 
   def blockAt(nodeHttp: String, blockHeight: Int) = get(nodeHttp + "/blocks/at/" + blockHeight)
+  def blockSigAt(nodeHttp: String, blockHeight: Int) = (Json.parse(blockAt(nodeHttp,blockHeight))  \ "signature").get.as[String]
 
-  def nodeComparator(node1: String, node2: String)(h: Int): Boolean = blockAt(node1, h) == blockAt(node2, h)
+  def nodeComparator(node1: String, node2: String)(h: Int): Boolean = {
+    blockSigAt(node1, h) == blockSigAt(node2, h)
+  }
 
   val TESTNET1 = "http://52.30.47.67:6869"
   val TESTNET2 = "http://52.28.66.217:6869"
@@ -16,6 +21,10 @@ object FirstDifferentBlock extends App {
   val DEVNET1 = "http://34.251.200.245:6869"
   val DEVNET2 = "http://35.157.212.173:6869"
   val DEVNET3 = "http://13.229.61.140:6869"
+
+  val MAINNET1 = "http://138.201.152.163"
+  val MAINNET2 = "http://138.201.152.164"
+  val MAINNET3 = "http://138.201.152.165" // 626195
 
   def firstDifferent(min: Int, max: Int, areSame: Int => Boolean): Int = {
     println("searching [" + min + ", " + max + ")")
@@ -29,5 +38,5 @@ object FirstDifferentBlock extends App {
     }
   }
 
-  println("first different block height is " + firstDifferent(1, 10402, nodeComparator(DEVNET2, DEVNET3)))
+  println("first different block height is " + firstDifferent(1, 626195, nodeComparator(MAINNET2, MAINNET3)))
 }

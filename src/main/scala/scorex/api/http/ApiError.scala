@@ -8,6 +8,10 @@ import scorex.transaction.{Transaction, ValidationError}
 
 case class ApiErrorResponse(error: Int, message: String)
 
+object ApiErrorResponse {
+  implicit val toFormat: Reads[ApiErrorResponse] = Json.reads[ApiErrorResponse]
+}
+
 trait ApiError {
   val id: Int
   val message: String
@@ -35,7 +39,11 @@ object ApiError {
     case ValidationError.AliasNotExists(tx) => AliasNotExists(tx)
     case ValidationError.OrderValidationError(_, m) => CustomValidationError(m)
     case ValidationError.UnsupportedTransactionType => CustomValidationError("UnsupportedTransactionType")
-    case TransactionValidationError(err, tx) => StateCheckFailed(tx, fromValidationError(err).message)
+    case ValidationError.Mistiming(err) => Mistiming(err)
+    case TransactionValidationError(error, tx) => error match {
+      case ValidationError.Mistiming(errorMessage) => Mistiming(errorMessage)
+      case _ => StateCheckFailed(tx, fromValidationError(error).message)
+    }
     case error => CustomValidationError(error.toString)
   }
 }
@@ -179,11 +187,21 @@ case object BlockNotExists extends ApiError {
 }
 
 case class AliasNotExists(aoa: AddressOrAlias) extends ApiError {
-  override val id: Int = 301
+  override val id: Int = 302
   override val code = StatusCodes.NotFound
   private lazy val msgReason = aoa match {
     case a: Address => s"for address '${a.stringRepr}'"
     case a: Alias => s"'${a.stringRepr}'"
   }
   override val message: String = s"alias $msgReason doesn't exist"
+}
+
+case class Mistiming(errorMessage: String) extends ApiError {
+  override val id: Int = Mistiming.Id
+  override val message: String = errorMessage
+  override val code: StatusCode = StatusCodes.BadRequest
+}
+
+object Mistiming {
+  val Id = 303
 }

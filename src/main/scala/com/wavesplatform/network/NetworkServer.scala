@@ -49,7 +49,7 @@ class NetworkServer(checkpointService: CheckpointService,
     history.lastBlockIds(settings.synchronizationSettings.maxRollback), history.score())
 
   private val discardingHandler = new DiscardingHandler(blockchainReadiness)
-  private val messageCodec = new MessageCodec()
+  private val messageCodec = new MessageCodec(peerDatabase)
 
   private val excludedAddresses: Set[InetSocketAddress] = {
     val localAddresses = if (settings.networkSettings.bindAddress.getAddress.isAnyLocalAddress) {

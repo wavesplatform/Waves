@@ -18,11 +18,11 @@ class LegacyFrameCodecSpec extends FreeSpec
   with GeneratorDrivenPropertyChecks
   with TransactionGen {
 
-  "should handle a message with the maximal size" in forAll(issueGen) { tx =>
+  "should handle a message with the maximal size" in forAll(issueGen) { origTx =>
     val codec = new LegacyFrameCodec(NopPeerDatabase)
 
     val buff = Unpooled.buffer
-    val txBytes = tx.bytes
+    val txBytes = origTx.bytes
     val checkSum = wrappedBuffer(FastCryptographicHash.hash(txBytes), 0, ScorexMessage.ChecksumLength)
 
     buff.writeInt(LegacyFrameCodec.Magic)
@@ -32,6 +32,11 @@ class LegacyFrameCodecSpec extends FreeSpec
     buff.writeBytes(txBytes)
 
     val ch = new EmbeddedChannel(codec)
-    ch.writeInbound(buff) shouldBe true
+    ch.writeInbound(buff)
+
+    val decodedBytes = ch.readInbound[RawBytes]()
+
+    decodedBytes.code shouldBe TransactionMessageSpec.messageCode
+    decodedBytes.data shouldEqual origTx.bytes
   }
 }

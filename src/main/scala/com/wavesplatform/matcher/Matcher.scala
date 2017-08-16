@@ -19,6 +19,7 @@ import scorex.wallet.Wallet
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
+import scala.reflect.runtime.universe._
 
 class Matcher(actorSystem: ActorSystem,
               wallet: Wallet,
@@ -32,14 +33,14 @@ class Matcher(actorSystem: ActorSystem,
     MatcherApiRoute(wallet, stateReader, matcher, orderHistory, txWriter, restAPISettings, matcherSettings)
   )
 
-  lazy val matcherApiTypes: Set[Class[_]] = Set(
-    classOf[MatcherApiRoute]
+  lazy val matcherApiTypes = Seq(
+    typeOf[MatcherApiRoute]
   )
 
   lazy val matcher: ActorRef = actorSystem.actorOf(MatcherActor.props(orderHistory, stateReader, wallet, utx, allChannels,
     matcherSettings, history, blockchainSettings.functionalitySettings), MatcherActor.name)
 
-  lazy val orderHistory: ActorRef = actorSystem.actorOf(OrderHistoryActor.props(matcherSettings, stateReader, wallet),
+  lazy val orderHistory: ActorRef = actorSystem.actorOf(OrderHistoryActor.props(matcherSettings, utx, wallet),
     OrderHistoryActor.name)
 
   lazy val txWriter: ActorRef = actorSystem.actorOf(MatcherTransactionWriter.props(matcherSettings),

@@ -13,7 +13,6 @@ import scala.collection.JavaConverters._
 trait OrderHistory {
   def orderAccepted(event: OrderAdded): Unit
   def orderExecuted(event: OrderExecuted): Unit
-  def orderExecutedUnconfirmed(event: OrderExecuted): Unit
   def orderCanceled(event: OrderCanceled)
   def orderStatus(id: String): OrderStatus
   def orderInfo(id: String): OrderInfo
@@ -88,13 +87,6 @@ case class OrderHistoryImpl(p: OrderHistoryStorage) extends OrderHistory with Sc
     saveOrdeInfo(event)
     saveOpenPortfolio(OrderAdded(event.submittedExecuted))
     saveOpenPortfolio(event)
-  }
-
-  override def orderExecutedUnconfirmed(event: OrderExecuted): Unit = {
-    saveOrder(event.submitted.order)
-    savePairAddress(event.submitted.order.assetPair, event.submitted.order.senderPublicKey.address, event.submitted.order.idStr)
-    saveOrdeInfo(event)
-    saveOpenPortfolio(OrderAdded(event.submittedExecuted))
   }
 
   override def orderCanceled(event: OrderCanceled): Unit = {
