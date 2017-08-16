@@ -33,9 +33,9 @@ trait OrderValidator {
     val open = orderHistory.openPortfolio(order.senderPublicKey.address).orders.filter { case (k, _) => b.contains(k) }
     val needs = OpenPortfolio(open).combine(newOrder)
 
-    val res: Boolean = b.combine(needs.orders.mapValues(-_)).forall(_._2 >= 0)
+    val res: Boolean = b.combine(needs.orders.map { case (k, v) => k -> (-v) }).forall(_._2 >= 0)
 
-    res :| s"Not enough tradable balance: ${b.combine(open.mapValues(-_))}, needs: $newOrder"
+    res :| s"Not enough tradable balance: ${b.combine(open.map { case (k, v) => k -> (-v) })}, needs: $newOrder"
   }
 
   def getTradableBalance(acc: AssetAcc): Long = {

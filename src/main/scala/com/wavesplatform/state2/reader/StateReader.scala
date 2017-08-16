@@ -51,7 +51,7 @@ object StateReader {
   implicit class StateReaderExt(s: StateReader) extends ScorexLogging {
     def assetDistribution(assetId: ByteStr): Map[Address, Long] =
       s.accountPortfolios
-        .mapValues(portfolio => portfolio.assets.get(assetId))
+        .map { case (k, portfolio) => k -> portfolio.assets.get(assetId) }
         .collect { case (acc, Some(amt)) => acc -> amt }
 
     def findTransaction[T <: Transaction](signature: ByteStr)(implicit ct: ClassTag[T]): Option[T]
