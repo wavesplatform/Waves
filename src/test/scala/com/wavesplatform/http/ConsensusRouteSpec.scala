@@ -4,6 +4,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock
 
 import com.wavesplatform.BlockGen
 import com.wavesplatform.history.HistoryWriterImpl
+import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2._
 import com.wavesplatform.state2.reader.StateReader
