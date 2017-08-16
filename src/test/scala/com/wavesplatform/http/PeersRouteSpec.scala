@@ -101,7 +101,7 @@ class PeersRouteSpec extends RouteSpec("/peers") with RestAPISettingsHelper with
     }
   }
 
-  routePath("/blacklisted") in {
+  routePath("/blacklisted") ignore {
     forAll(genListOf(TestsCount, inetSocketAddressGen)) { addresses =>
       val addressSet = addresses.map(_.getAddress).toSet
 

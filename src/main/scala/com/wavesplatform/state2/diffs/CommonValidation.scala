@@ -22,9 +22,9 @@ object CommonValidation {
   def disallowSendingGreaterThanBalance[T <: Transaction](s: StateReader, settings: FunctionalitySettings, blockTime: Long, tx: T): Either[ValidationError, T] =
     if (blockTime >= settings.allowTemporaryNegativeUntil)
       tx match {
-        case ptx: PaymentTransaction if s.wavesBalance(ptx.sender)._1 < (ptx.amount + ptx.fee) =>
+        case ptx: PaymentTransaction if s.partialPortfolio(ptx.sender).balance < (ptx.amount + ptx.fee) =>
           Left(GenericError(s"Attempt to pay unavailable funds: balance " +
-            s"${s.wavesBalance(ptx.sender)._1} is less than ${ptx.amount + ptx.fee}"))
+            s"${s.partialPortfolio(ptx.sender).balance} is less than ${ptx.amount + ptx.fee}"))
         case ttx: TransferTransaction =>
           val sender: Address = ttx.sender
 

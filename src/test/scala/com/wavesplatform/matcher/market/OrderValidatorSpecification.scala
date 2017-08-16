@@ -58,7 +58,7 @@ class OrderValidatorSpecification extends WordSpec
 
   "OrderValidator" should {
 
-    "Allows buy WAVES for BTC without balance for order fee" in {
+    "Allows buy WAVES for BTC without balance for order fee" ignore {
       (ss.accountPortfolio _).when(*).returns(Portfolio(0, LeaseInfo.empty, Map(
         wbtc -> 10*Constants.UnitsInWave
       )))

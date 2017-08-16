@@ -3,7 +3,6 @@ package com.wavesplatform.state2.reader
 import java.util.concurrent.locks.ReentrantReadWriteLock
 
 import cats._
-import cats.data._
 import cats.implicits._
 import com.wavesplatform.state2._
 import scorex.account.{Address, Alias}
@@ -22,7 +21,11 @@ class StateReaderImpl(p: StateStorage, val synchronizationToken: ReentrantReadWr
     }
   }
 
-  override def accountPortfolio(a: Address): Portfolio = ???
+  override def accountPortfolio(a: Address): Portfolio = read { implicit l =>
+    val waves = Option(sp().wavesBalance.get(a.bytes)).map { case (b, li, lo) => Portfolio(b, LeaseInfo(li, lo), Map.empty) }.orEmpty
+    val assets = Portfolio(0, LeaseInfo.empty, sp().assetBalance.getMap(a.bytes))
+    Monoid.combine(waves, assets)
+  }
 
   override def assetInfo(id: ByteStr): Option[AssetInfo] = read { implicit l =>
     Option(sp().assets.get(id)).map {
@@ -56,10 +59,10 @@ class StateReaderImpl(p: StateStorage, val synchronizationToken: ReentrantReadWr
   }
 
   override def accountPortfolios: Map[Address, Portfolio] = read { implicit l =>
-    val assets = sp().assetBalance.all()
-      .map { case (k, v) => Address.fromBytes(k.arr).explicitGet() -> Portfolio(0, LeaseInfo.empty, v) }.toMap
     val waves = sp()
       .wavesBalance.asScala.toMap.map { case (k, (b, li, lo)) => Address.fromBytes(k.arr).explicitGet() -> Portfolio(b, LeaseInfo(li, lo), Map.empty) }
+    val assets = sp().assetBalance.all()
+      .map { case (k, v) => Address.fromBytes(k.arr).explicitGet() -> Portfolio(0, LeaseInfo.empty, v) }
     Monoid.combine(assets, waves)
   }
 

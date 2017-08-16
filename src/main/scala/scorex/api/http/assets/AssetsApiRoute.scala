@@ -16,7 +16,7 @@ import scorex.api.http.{ApiError, ApiRoute, InvalidAddress}
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange.Order
 import scorex.transaction.assets.exchange.OrderJson._
-import scorex.transaction.{AssetAcc, AssetIdStringLength, TransactionFactory}
+import scorex.transaction.{AssetIdStringLength, TransactionFactory}
 import scorex.utils.Time
 import scorex.wallet.Wallet
 
@@ -154,7 +154,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
         } yield Json.obj(
           "address" -> acc.address,
           "assetId" -> assetIdStr,
-          "balance" -> state.assetBalance(AssetAcc(acc, Some(assetId))))
+          "balance" -> state.assetBalance(acc, assetId))
           ).left.map(ApiError.fromValidationError)
       case _ => Left(InvalidAddress)
     }

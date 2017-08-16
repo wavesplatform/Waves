@@ -25,7 +25,7 @@ trait StateReader extends Synchronized {
 
   def assetInfo(id: ByteStr): Option[AssetInfo]
 
-  def wavesBalance(a: Address): (Long, LeaseInfo)
+  protected def wavesBalance(a: Address): (Long, LeaseInfo)
 
   def assetBalance(a: Address, asset: ByteStr): Long
 
@@ -84,12 +84,6 @@ object StateReader {
 
     def balance(account: Address): Long = s.wavesBalance(account)._1
 
-    def assetBalance(assetAcc: AssetAcc): Long = {
-      assetAcc.assetId match {
-        case Some(assetId) => s.assetBalance(assetAcc.account, assetId)
-        case None => s.wavesBalance(assetAcc.account)._1
-      }
-    }
 
     def getAccountBalance(account: Address): Map[AssetId, (Long, Boolean, Long, IssueTransaction)] = s.read { _ =>
       s.accountPortfolio(account).assets.map { case (id, amt) =>
@@ -103,11 +97,11 @@ object StateReader {
       s.assetDistribution(ByteStr(assetId))
         .map { case (acc, amt) => (acc.address, amt) }
 
-    def effectiveBalance(account: Address): Long = s.accountPortfolio(account).effectiveBalance
+    def effectiveBalance(account: Address): Long = s.partialPortfolio(account).effectiveBalance
 
-    def spendableBalance(account: AssetAcc): Long = {
-      val accountPortfolio = s.accountPortfolio(account.account)
-      account.assetId match {
+    def spendableBalance(assetAcc: AssetAcc): Long = {
+      val accountPortfolio = s.partialPortfolio(assetAcc.account, assetAcc.assetId.toSet)
+      assetAcc.assetId match {
         case Some(assetId) => accountPortfolio.assets.getOrElse(assetId, 0)
         case None => accountPortfolio.spendableBalance
       }
