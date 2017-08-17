@@ -6,7 +6,7 @@ enablePlugins(sbtdocker.DockerPlugin, JavaServerAppPackaging, JDebPackaging, Sys
 
 name := "waves"
 organization := "com.wavesplatform"
-version := "0.7.5"
+version := "0.7.6"
 scalaVersion in ThisBuild := "2.12.3"
 crossPaths := false
 publishArtifact in (Compile, packageDoc) := false
