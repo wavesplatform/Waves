@@ -1,8 +1,10 @@
 package com.wavesplatform.it.network
 
+import java.nio.charset.StandardCharsets
+
 import com.wavesplatform.it._
 import com.wavesplatform.it.api.NodeApi
-import com.wavesplatform.network.RawBytes
+import com.wavesplatform.network.{RawBytes, TransactionMessageSpec}
 import org.scalatest._
 import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
 import scorex.account.{Address, PrivateKeyAccount}
@@ -33,7 +35,7 @@ class SimpleTransactionsSuite extends FunSuite with BeforeAndAfterAll with Match
       100000L,
       System.currentTimeMillis()).right.get
     val f = for {
-      _ <- node.sendByNetwork(RawBytes(25.toByte, tx.bytes))
+      _ <- node.sendByNetwork(RawBytes(TransactionMessageSpec.messageCode, tx.bytes))
       _ <- Future.successful(Thread.sleep(2000))
 
       height <- traverse(nodes)(_.height).map(_.max)
@@ -53,15 +55,20 @@ class SimpleTransactionsSuite extends FunSuite with BeforeAndAfterAll with Match
       100000L,
       System.currentTimeMillis() + (1 days).toMillis).right.get
     val f = for {
-      _ <- node.sendByNetwork(RawBytes(25.toByte, tx.bytes))
+      _ <- node.sendByNetwork(RawBytes(TransactionMessageSpec.messageCode, tx.bytes))
       _ <- Future.successful(Thread.sleep(2000))
       _ <- Future.sequence(nodes.map(_.ensureTxDoesntExist(tx.id.base58)))
     } yield ()
     Await.result(f, 60.seconds)
   }
 
-  override protected def afterAll(): Unit = {
-    docker.close()
-    super.afterAll()
+  test("should blacklist senders of non-parsable transactions") {
+    val f = for {
+      blacklistBefore <- node.blacklistedPeers
+      _ <- node.sendByNetwork(RawBytes(TransactionMessageSpec.messageCode, "foobar".getBytes(StandardCharsets.UTF_8)))
+      _ <- Future.successful(Thread.sleep(2000))
+      blacklistAfter <- node.blacklistedPeers
+    } yield blacklistAfter.size should be > blacklistBefore.size
+    Await.result(f, 60.seconds)
   }
 }

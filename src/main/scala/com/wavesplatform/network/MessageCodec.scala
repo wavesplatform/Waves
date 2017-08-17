@@ -8,8 +8,10 @@ import io.netty.handler.codec.MessageToMessageCodec
 import scorex.network.message._
 import scorex.utils.ScorexLogging
 
+import scala.util.{Failure, Success}
+
 @Sharable
-class MessageCodec extends MessageToMessageCodec[RawBytes, Message] with ScorexLogging {
+class MessageCodec(peerDatabase: PeerDatabase) extends MessageToMessageCodec[RawBytes, Message] with ScorexLogging {
 
   private val specs: Map[Byte, MessageSpec[_ <: AnyRef]] = BasicMessagesRepo.specs.map(s => s.messageCode -> s).toMap
 
@@ -24,6 +26,15 @@ class MessageCodec extends MessageToMessageCodec[RawBytes, Message] with ScorexL
     case r: RawBytes => out.add(r)
   }
 
-  override def decode(ctx: ChannelHandlerContext, msg: RawBytes, out: util.List[AnyRef]) =
-    out.add(specs(msg.code).deserializeData(msg.data).get)
+  override def decode(ctx: ChannelHandlerContext, msg: RawBytes, out: util.List[AnyRef]): Unit = {
+    specs(msg.code).deserializeData(msg.data) match {
+      case Success(x) => out.add(x)
+      case Failure(e) => block(ctx, e)
+    }
+  }
+
+  protected def block(ctx: ChannelHandlerContext, e: Throwable): Unit = {
+    peerDatabase.blacklistAndClose(ctx.channel(), s"Invalid message. ${e.getMessage}")
+  }
+
 }
