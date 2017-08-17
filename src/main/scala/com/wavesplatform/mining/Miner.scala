@@ -8,6 +8,8 @@ import com.wavesplatform.state2._
 import com.wavesplatform.state2.reader.StateReader
 import com.wavesplatform.{Coordinator, UtxPool}
 import io.netty.channel.group.ChannelGroup
+import kamon.Kamon
+import kamon.metric.instrument
 import monix.eval.Task
 import monix.execution._
 import monix.execution.cancelables.{CompositeCancelable, SerialCancelable}
@@ -46,6 +48,8 @@ class Miner(
   private val scheduledAttempts = SerialCancelable()
   private val microBlockAttempt = SerialCancelable()
 
+  private val blockBuildTimeStats = Kamon.metrics.histogram("block-build-time", instrument.Time.Milliseconds)
+
   private def checkAge(parentHeight: Int, parentTimestamp: Long): Either[String, Unit] =
     Either.cond(parentHeight == 1, (), (timeService.correctedTime() - parentTimestamp).millis)
       .left.flatMap(blockAge => Either.cond(blockAge <= minerSettings.intervalAfterLastBlockThenGenerationIsAllowed, (),
@@ -60,6 +64,7 @@ class Miner(
     val pc = allChannels.size()
     lazy val lastBlockKernelData = parent.consensusData
     lazy val currentTime = timeService.correctedTime()
+    val start = System.currentTimeMillis()
     lazy val h = calcHit(lastBlockKernelData, account)
     lazy val t = calcTarget(parent, currentTime, balance)
     for {
@@ -74,6 +79,7 @@ class Miner(
       unconfirmed = utx.packUnconfirmed(minerSettings.maxTransactionsInKeyBlock)
       _ = log.debug(s"Adding ${unconfirmed.size} unconfirmed transaction(s) to new block")
       block = Block.buildAndSign(version, currentTime, parent.uniqueId, consensusData, unconfirmed, account)
+      _ = blockBuildTimeStats.record(System.currentTimeMillis() - start)
     } yield block
   }.delayExecution(delay)
 
