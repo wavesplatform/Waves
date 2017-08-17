@@ -32,8 +32,8 @@ case class Block(timestamp: Long, version: Byte, reference: ByteStr, signerData:
     transactionData.map(_.assetFee)
       .map(a => AssetAcc(signerData.generator, a._1) -> a._2)
       .groupBy(a => a._1)
-      .mapValues(_.map(_._2).sum)
-      .values.sum
+      .map { case (_, v) => v.map(_._2).sum }
+      .sum
 
   lazy val json: JsObject =
     versionField.json ++
@@ -73,7 +73,7 @@ case class Block(timestamp: Long, version: Byte, reference: ByteStr, signerData:
     assetFees
       .map { case (maybeAssetId, vol) => AssetAcc(generator, maybeAssetId) -> vol }
       .groupBy(a => a._1)
-      .mapValues((records: Seq[(AssetAcc, Long)]) => records.map(_._2).sum)
+      .map { case (k, records) => k -> records.map(_._2).sum }
   }.toList.map {
     case (AssetAcc(account, maybeAssetId), feeVolume) =>
       account -> (maybeAssetId match {

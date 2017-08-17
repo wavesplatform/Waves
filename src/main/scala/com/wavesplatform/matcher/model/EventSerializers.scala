@@ -120,7 +120,7 @@ object MatcherSerializer {
 
   implicit val cacheFormat = new Format[Map[String, (Long, Long)]] {
     def writes(cache: Map[String, (Long, Long)]): JsValue =
-      JsObject(cache.mapValues(v => Json.arr(v._1, v._2)))
+      JsObject(cache.map { case (k, v) => k -> Json.arr(v._1, v._2) })
 
     def reads(jv: JsValue): JsResult[Map[String, (Long, Long)]] =
       JsSuccess(jv.as[Map[String, (Long, Long)]])

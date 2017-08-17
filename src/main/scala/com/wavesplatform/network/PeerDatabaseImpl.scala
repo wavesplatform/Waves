@@ -45,7 +45,7 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Auto
 
   override def knownPeers: Map[InetSocketAddress, Long] = {
     removeObsoleteRecords(peersPersistence, settings.peersDataResidenceTime.toMillis)
-      .asScala.toMap.filterKeys(address => !blacklistedHosts.contains(address.getAddress))
+      .asScala.toMap.filter { case (address, _) => !blacklistedHosts.contains(address.getAddress) }
   }
 
   override def blacklistedHosts: Set[InetAddress] =
