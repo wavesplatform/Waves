@@ -1,6 +1,8 @@
 package com.wavesplatform.state2
 
+import kamon.metric.instrument.Histogram
 import scorex.utils.ScorexLogging
+
 import scala.language.higherKinds
 
 trait Instrumented {
@@ -21,6 +23,20 @@ trait Instrumented {
   def measureLog[R](s: String)(f: => R): R = {
     val (r, time) = withTime(f)
     log.trace(s"$s took ${time}ms")
+    r
+  }
+
+  def measureSuccessful[A, B](h: Histogram, f: => Either[A, B]): Either[A, B] = {
+    val (r, time) = withTime(f)
+    if (r.isRight)
+      h.record(time)
+    r
+  }
+
+  def measureSuccessful[A](h: Histogram, f: => Option[A]): Option[A] = {
+    val (r, time) = withTime(f)
+    if (r.isDefined)
+      h.record(time)
     r
   }
 }
