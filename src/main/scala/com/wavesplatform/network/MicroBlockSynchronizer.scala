@@ -1,6 +1,9 @@
 package com.wavesplatform.network
 
-import com.wavesplatform.network.MircoBlockSynchronizer.{QueuedRequests, Settings}
+import java.util.concurrent.TimeUnit
+
+import com.google.common.cache.{Cache, CacheBuilder}
+import com.wavesplatform.network.MicroBlockSynchronizer.{QueuedRequests, Settings}
 import com.wavesplatform.state2.ByteStr
 import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel._
@@ -8,11 +11,12 @@ import monix.execution.Cancelable
 import scorex.transaction.NgHistory
 import scorex.utils.ScorexLogging
 
+import scala.collection.immutable.{SortedSet, TreeMap}
 import scala.concurrent.duration.FiniteDuration
 import scala.util.{Failure, Success}
 
 @Sharable
-class MircoBlockSynchronizer(settings: Settings, history: NgHistory)
+class MicroBlockSynchronizer(settings: Settings, history: NgHistory)
   extends ChannelInboundHandlerAdapter with ScorexLogging {
 
   private val requests = new QueuedRequests(settings.waitResponseTimeout)
@@ -40,31 +44,42 @@ class MircoBlockSynchronizer(settings: Settings, history: NgHistory)
   }
 }
 
-object MircoBlockSynchronizer {
+object MicroBlockSynchronizer {
 
   private type MicroBlockSignature = ByteStr
 
   case class Settings(waitResponseTimeout: FiniteDuration)
 
-  // microblock interval
   private[network] class QueuedRequests(waitResponseTimeout: FiniteDuration) extends ScorexLogging {
 
     // Possible issue: it has unbounded queue size
     private val scheduler = monix.execution.Scheduler.singleThread("r")
     private var info: Map[MicroBlockSignature, MicroBlockInfo] = Map.empty
 
-    def ask(ownerCtx: ChannelHandlerContext, sig: MicroBlockSignature): Unit = runInQueue {
-      val orig = info.getOrElse(sig, RequestsInfo.empty)
-      val updated = if (orig.isBusy) {
-        orig.copy(freeOwnerCtxs = ownerCtx :: orig.freeOwnerCtxs)
-      } else {
-        orig.copy(madeRequests = newTask(ownerCtx, sig) :: orig.madeRequests)
-      }
+    private val dummy = new Object
+    private val processed: Cache[MicroBlockSignature, Object] = CacheBuilder.newBuilder()
+      .expireAfterWrite(1, TimeUnit.MINUTES)
+      .build[MicroBlockSignature, Object]()
 
-      info += sig -> updated
+    def ask(ownerCtx: ChannelHandlerContext, sig: MicroBlockSignature): Unit = runInQueue {
+      val c = Option(processed.getIfPresent(sig))
+      if (c.isEmpty) {
+        val orig = info.getOrElse(sig, MicroBlockInfo.empty)
+
+        if (!orig.contains(ownerCtx)) {
+          val updated = if (orig.canDoNextRequest) {
+            orig.copy(madeRequests = orig.madeRequests.updated(ownerCtx, newTask(ownerCtx, sig)))
+          } else {
+            orig.copy(freeOwnerCtxs = orig.freeOwnerCtxs + ownerCtx)
+          }
+
+          info += sig -> updated
+        }
+      }
     }
 
     def complete(sig: MicroBlockSignature): Unit = runInQueue {
+      processed.put(sig, dummy)
       info(sig).cancel()
       info -= sig
     }
@@ -75,20 +90,26 @@ object MircoBlockSynchronizer {
 
     private def newTask(ownerCtx: ChannelHandlerContext, sig: MicroBlockSignature) = Request(
       ctx = ownerCtx,
-      worker = newRequest(ownerCtx, sig),
-      timeoutTimer = scheduleReRequest(sig)
+      sender = newRequest(ownerCtx, sig),
+      timeoutTimer = scheduleReRequest(ownerCtx, sig)
     )
 
-    private def scheduleReRequest(sig: MicroBlockSignature): Cancelable = {
+    private def scheduleReRequest(ownerCtx: ChannelHandlerContext, sig: MicroBlockSignature): Cancelable = {
       def reRequest(sig: MicroBlockSignature): Unit = info.get(sig).foreach { orig =>
-        val updated = orig.freeOwnerCtxs match {
-          case owner :: restOwners =>
+        val newMadeRequests = orig.madeRequests.updated(
+          ownerCtx,
+          orig.madeRequests(ownerCtx).copy(timedOut = true)
+        )
+        val updated = orig.freeOwnerCtxs.headOption match {
+          case Some(owner) =>
             orig.copy(
-              freeOwnerCtxs = restOwners,
-              madeRequests = newTask(owner.ctx, sig) :: orig.madeRequests
+              freeOwnerCtxs = orig.freeOwnerCtxs - owner,
+              madeRequests = newMadeRequests.updated(owner.ctx, newTask(owner.ctx, sig))
             )
 
-          case _ => orig
+          case _ => orig.copy(
+            madeRequests = newMadeRequests
+          )
         }
 
         info += sig -> updated
@@ -103,25 +124,29 @@ object MircoBlockSynchronizer {
     }(scheduler)
   }
 
-  private case class MicroBlockInfo(freeOwnerCtxs: List[ChannelHandlerContext],
-                                    madeRequests: List[Request]) {
-    def isBusy: Boolean = madeRequests.exists(!_.worker.isDone)
-    def cancel(): Unit = madeRequests.foreach(_.cancel())
+  private case class MicroBlockInfo(freeOwnerCtxs: SortedSet[ChannelHandlerContext],
+                                    madeRequests: Map[ChannelHandlerContext, Request]) {
+    def canDoNextRequest: Boolean = madeRequests.values.forall(_.timedOut)
+    def cancel(): Unit = madeRequests.values.foreach(_.cancel())
+
+    // make tests for it
+    def contains(x: ChannelHandlerContext): Boolean = freeOwnerCtxs.contains(x) || madeRequests.contains(x)
   }
 
-  private object RequestsInfo {
+  private object MicroBlockInfo {
     val empty = MicroBlockInfo(
-      freeOwnerCtxs = List.empty,
-      madeRequests = List.empty
+      freeOwnerCtxs = SortedSet.empty(Ordering.by[ChannelHandlerContext, String](_.name())),
+      madeRequests = TreeMap.empty(Ordering.by[ChannelHandlerContext, String](_.name()))
     )
   }
 
   private case class Request(ctx: ChannelHandlerContext,
-                             worker: ChannelFuture,
-                             timeoutTimer: Cancelable) {
+                             sender: ChannelFuture,
+                             timeoutTimer: Cancelable,
+                             timedOut: Boolean = false) {
     def cancel(): Unit = {
       timeoutTimer.cancel()
-      worker.cancel(false)
+      sender.cancel(false)
     }
   }
 

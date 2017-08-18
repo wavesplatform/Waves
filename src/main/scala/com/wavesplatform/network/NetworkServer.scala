@@ -87,7 +87,7 @@ class NetworkServer(checkpointService: CheckpointService,
     new HandshakeHandler.Server(handshake, peerInfo, peerUniqueness, peerDatabase, allChannels)
 
   private val utxPoolSynchronizer = new UtxPoolSynchronizer(utxPool, allChannels)
-  private val microBlockSynchronizer = new MircoBlockSynchronizer(
+  private val microBlockSynchronizer = new MicroBlockSynchronizer(
     settings.synchronizationSettings.microBlockSynchronizer,
     history
   )

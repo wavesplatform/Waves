@@ -2,7 +2,7 @@ package com.wavesplatform.settings
 
 import scala.concurrent.duration._
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.network.MircoBlockSynchronizer
+import com.wavesplatform.network.MicroBlockSynchronizer
 import org.scalatest.{FlatSpec, Matchers}
 
 class SynchronizationSettingsSpecification extends FlatSpec with Matchers {
@@ -37,7 +37,7 @@ class SynchronizationSettingsSpecification extends FlatSpec with Matchers {
     settings.operationRetries should be(3)
     settings.scoreBroadcastInterval should be(30.seconds)
     settings.scoreTTL should be(90.seconds)
-    settings.microBlockSynchronizer shouldBe MircoBlockSynchronizer.Settings(
+    settings.microBlockSynchronizer shouldBe MicroBlockSynchronizer.Settings(
       waitResponseTimeout = 5.seconds
     )
   }
