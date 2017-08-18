@@ -19,7 +19,7 @@ class MicroBlockSynchronizerQueuedRequestsSpec extends FreeSpec
   with GeneratorDrivenPropertyChecks
   with TransactionGen {
 
-  private val waitResponseTimeout = 100.millis
+  private val waitResponseTimeout = 500.millis
   private val completeWaitTime = 50.millis
 
   "should make a second request, when the first is timed out" in {

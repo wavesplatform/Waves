@@ -1,6 +1,6 @@
 package com.wavesplatform.network
 
-import com.wavesplatform.network.MircoBlockSynchronizer.QueuedRequests
+import com.wavesplatform.network.MircoBlockSynchronizer.{QueuedRequests, Settings}
 import com.wavesplatform.state2.ByteStr
 import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel._
@@ -8,13 +8,14 @@ import monix.execution.Cancelable
 import scorex.transaction.NgHistory
 import scorex.utils.ScorexLogging
 
-import scala.concurrent.duration.{DurationInt, FiniteDuration}
+import scala.concurrent.duration.FiniteDuration
 import scala.util.{Failure, Success}
 
 @Sharable
-class MircoBlockSynchronizer(history: NgHistory) extends ChannelInboundHandlerAdapter with ScorexLogging {
+class MircoBlockSynchronizer(settings: Settings, history: NgHistory)
+  extends ChannelInboundHandlerAdapter with ScorexLogging {
 
-  private val requests = new QueuedRequests()
+  private val requests = new QueuedRequests(settings.waitResponseTimeout)
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
     case MicroBlockResponse(mb) =>
@@ -43,8 +44,10 @@ object MircoBlockSynchronizer {
 
   private type MicroBlockSignature = ByteStr
 
+  case class Settings(waitResponseTimeout: FiniteDuration)
+
   // microblock interval
-  private[network] class QueuedRequests(waitResponseTimeout: FiniteDuration = 10.seconds) extends ScorexLogging {
+  private[network] class QueuedRequests(waitResponseTimeout: FiniteDuration) extends ScorexLogging {
 
     // Possible issue: it has unbounded queue size
     private val scheduler = monix.execution.Scheduler.singleThread("r")
