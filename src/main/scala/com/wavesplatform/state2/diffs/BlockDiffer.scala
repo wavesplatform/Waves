@@ -18,12 +18,12 @@ object BlockDiffer extends ScorexLogging with Instrumented {
   def right(diff: Diff): Either[ValidationError, Diff] = Right(diff)
 
   def fromBlock(settings: FunctionalitySettings, s: StateReader, pervBlockTimestamp: Option[Long], block: Block): Either[ValidationError, BlockDiff] = {
-      val feeDistr = if (block.timestamp < settings.enableMicroblocksAfter)
+      val maybeFeeDistr = if (s.height <= settings.enableMicroblocksAfterHeight)
         Some(block.feesDistribution)
       else None
       for {
         _ <- Signed.validateSignatures(block)
-        r <- apply(settings, s, pervBlockTimestamp)(block.signerData.generator, feeDistr, block.timestamp, block.transactionData, 1)
+        r <- apply(settings, s, pervBlockTimestamp)(block.signerData.generator, maybeFeeDistr, block.timestamp, block.transactionData, 1)
       } yield r
     }
 

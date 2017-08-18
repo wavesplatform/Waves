@@ -20,6 +20,9 @@ case class Portfolio(balance: Long, leaseInfo: LeaseInfo, assets: Map[ByteStr, L
     assets = assets.filter { case (_, v) => v < 0 }
   )
 
+  def multiply(m: Float): Portfolio =
+    Portfolio((balance * m).toLong, LeaseInfo((leaseInfo.leaseIn * m).toLong, (leaseInfo.leaseOut * m).toLong), assets.mapValues(v => (v * m).toLong))
+
   def isEmpty: Boolean = this == Monoid.empty[Portfolio]
 }
 
