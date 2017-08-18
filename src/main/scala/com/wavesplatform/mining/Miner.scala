@@ -53,7 +53,7 @@ class Miner(
     ))
 
   private def generateOneBlockTask(account: PrivateKeyAccount, parentHeight: Int,
-                                   greatGrandParent: Option[Block], balance: Long, version: Byte  )(delay: FiniteDuration): Task[Either[String, Block]] = Task {
+                                   greatGrandParent: Option[Block], balance: Long, version: Byte)(delay: FiniteDuration): Task[Either[String, Block]] = Task {
     // should take last block right at the time of mining since microblocks might have been added
     // the rest doesn't change
     val parent = history.lastBlock.get
@@ -133,8 +133,8 @@ class Miner(
     } yield (offset, balance)) match {
       case Right((offset, balance)) =>
         log.debug(s"Next attempt for acc=$account in $offset")
-        val microBlocksEnabled = timeService.correctedTime() < blockchainSettings.functionalitySettings.enableMicroblocksAfter
-        val version = if (microBlocksEnabled) PlainBlockVersion else NgBlockVersion
+        val microBlocksEnabled = timeService.correctedTime() > blockchainSettings.functionalitySettings.enableMicroblocksAfter
+        val version = if (microBlocksEnabled) NgBlockVersion else PlainBlockVersion
         generateOneBlockTask(account, height, grandParent, balance, version)(offset).flatMap {
           case Right(block) => Task.now {
             processBlock(block, true) match {
