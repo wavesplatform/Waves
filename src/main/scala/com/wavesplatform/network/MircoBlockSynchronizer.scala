@@ -44,21 +44,18 @@ object MircoBlockSynchronizer {
   private type MicroBlockSignature = ByteStr
 
   // microblock interval
-  class QueuedRequests(waitResponseTimeout: FiniteDuration = 10.seconds) extends ScorexLogging {
+  private[network] class QueuedRequests(waitResponseTimeout: FiniteDuration = 10.seconds) extends ScorexLogging {
 
     // Possible issue: it has unbounded queue size
     private val scheduler = monix.execution.Scheduler.singleThread("r")
-
-    // 1. Can we have multiple microblocks from microblock A: A -> B, A -> C?
-    // 2. Should we limit seq?
-    private var info: Map[MicroBlockSignature, RequestsInfo] = Map.empty
+    private var info: Map[MicroBlockSignature, MicroBlockInfo] = Map.empty
 
     def ask(ownerCtx: ChannelHandlerContext, sig: MicroBlockSignature): Unit = runInQueue {
       val orig = info.getOrElse(sig, RequestsInfo.empty)
       val updated = if (orig.isBusy) {
-        orig.copy(ownerCtxs = ownerCtx :: orig.ownerCtxs)
+        orig.copy(freeOwnerCtxs = ownerCtx :: orig.freeOwnerCtxs)
       } else {
-        orig.copy(tasks = newTask(ownerCtx, sig) :: orig.tasks)
+        orig.copy(madeRequests = newTask(ownerCtx, sig) :: orig.madeRequests)
       }
 
       info += sig -> updated
@@ -73,19 +70,19 @@ object MircoBlockSynchronizer {
       ownerCtx.writeAndFlush(MicroBlockRequest(sig))
     }
 
-    private def newTask(ownerCtx: ChannelHandlerContext, sig: MicroBlockSignature) = Task(
+    private def newTask(ownerCtx: ChannelHandlerContext, sig: MicroBlockSignature) = Request(
       ctx = ownerCtx,
-      request = newRequest(ownerCtx, sig),
+      worker = newRequest(ownerCtx, sig),
       timeoutTimer = scheduleReRequest(sig)
     )
 
     private def scheduleReRequest(sig: MicroBlockSignature): Cancelable = {
       def reRequest(sig: MicroBlockSignature): Unit = info.get(sig).foreach { orig =>
-        val updated = orig.ownerCtxs match {
+        val updated = orig.freeOwnerCtxs match {
           case owner :: restOwners =>
             orig.copy(
-              ownerCtxs = restOwners,
-              tasks = newTask(owner.ctx, sig) :: orig.tasks
+              freeOwnerCtxs = restOwners,
+              madeRequests = newTask(owner.ctx, sig) :: orig.madeRequests
             )
 
           case _ => orig
@@ -97,36 +94,31 @@ object MircoBlockSynchronizer {
       scheduler.scheduleOnce(waitResponseTimeout)(reRequest(sig))
     }
 
-    private def runInQueue(f: => Unit): Unit = monix.eval.Task(f)
-      .runOnComplete {
-        case Failure(e) => log.error("Failed to run in queue", e)
-        case Success(_) => log.info("test")
-      }(scheduler)
+    private def runInQueue(f: => Unit): Unit = monix.eval.Task(f).runOnComplete {
+      case Failure(e) => log.error("Failed to run in queue", e)
+      case Success(_) => log.info("test")
+    }(scheduler)
   }
 
-  private case class RequestsInfo(isDone: Boolean,
-                                  ownerCtxs: List[ChannelHandlerContext], // other owners TODO
-                                  tasks: List[Task]) {
-    def isBusy: Boolean = {
-      tasks.exists(!_.request.isDone)
-    }
-    def cancel(): Unit = tasks.foreach(_.cancel())
+  private case class MicroBlockInfo(freeOwnerCtxs: List[ChannelHandlerContext],
+                                    madeRequests: List[Request]) {
+    def isBusy: Boolean = madeRequests.exists(!_.worker.isDone)
+    def cancel(): Unit = madeRequests.foreach(_.cancel())
   }
 
   private object RequestsInfo {
-    val empty = RequestsInfo(
-      isDone = false,
-      ownerCtxs = List.empty,
-      tasks = List.empty
+    val empty = MicroBlockInfo(
+      freeOwnerCtxs = List.empty,
+      madeRequests = List.empty
     )
   }
 
-  private case class Task(ctx: ChannelHandlerContext,
-                          request: ChannelFuture,
-                          timeoutTimer: Cancelable) {
+  private case class Request(ctx: ChannelHandlerContext,
+                             worker: ChannelFuture,
+                             timeoutTimer: Cancelable) {
     def cancel(): Unit = {
       timeoutTimer.cancel()
-      request.cancel(false)
+      worker.cancel(false)
     }
   }
 

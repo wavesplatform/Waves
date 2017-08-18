@@ -10,6 +10,7 @@ import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import org.scalatest.{FreeSpec, Matchers}
 
 import scala.concurrent.duration.DurationInt
+import scala.language.reflectiveCalls
 
 class MicroBlockSynchronizerQueuedRequestsSpec extends FreeSpec
   with Matchers
