@@ -6,13 +6,13 @@ import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel._
 import monix.execution.Cancelable
 import scorex.transaction.NgHistory
-import scorex.utils.{ScorexLogging, SynchronizedOne}
+import scorex.utils.ScorexLogging
 
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
+import scala.util.{Failure, Success}
 
 @Sharable
-class MircoBlockSynchronizer(history: NgHistory)
-  extends ChannelInboundHandlerAdapter with ScorexLogging with SynchronizedOne {
+class MircoBlockSynchronizer(history: NgHistory) extends ChannelInboundHandlerAdapter with ScorexLogging {
 
   private val requests = new QueuedRequests()
 
@@ -44,19 +44,21 @@ object MircoBlockSynchronizer {
   private type MicroBlockSignature = ByteStr
 
   // microblock interval
-  class QueuedRequests(waitResponseTimeout: FiniteDuration = 10.seconds) {
+  class QueuedRequests(waitResponseTimeout: FiniteDuration = 10.seconds) extends ScorexLogging {
 
     // Possible issue: it has unbounded queue size
     private val scheduler = monix.execution.Scheduler.singleThread("r")
 
+    // 1. Can we have multiple microblocks from microblock A: A -> B, A -> C?
+    // 2. Should we limit seq?
     private var info: Map[MicroBlockSignature, RequestsInfo] = Map.empty
 
-    def ask(ctx: ChannelHandlerContext, sig: MicroBlockSignature): Unit = runInQueue {
+    def ask(ownerCtx: ChannelHandlerContext, sig: MicroBlockSignature): Unit = runInQueue {
       val orig = info.getOrElse(sig, RequestsInfo.empty)
       val updated = if (orig.isBusy) {
-        orig.copy(owners = ctx :: orig.owners)
+        orig.copy(ownerCtxs = ownerCtx :: orig.ownerCtxs)
       } else {
-        orig.copy(tasks = newTask(ctx, sig) :: orig.tasks)
+        orig.copy(tasks = newTask(ownerCtx, sig) :: orig.tasks)
       }
 
       info += sig -> updated
@@ -67,22 +69,22 @@ object MircoBlockSynchronizer {
       info -= sig
     }
 
-    protected def request(ctx: ChannelHandlerContext, sig: MicroBlockSignature): ChannelFuture = {
-      ctx.writeAndFlush(MicroBlockRequest(sig))
+    protected def newRequest(ownerCtx: ChannelHandlerContext, sig: MicroBlockSignature): ChannelFuture = {
+      ownerCtx.writeAndFlush(MicroBlockRequest(sig))
     }
 
-    private def newTask(ctx: ChannelHandlerContext, sig: MicroBlockSignature) = Task(
-      ctx = ctx,
-      request = request(ctx, sig),
+    private def newTask(ownerCtx: ChannelHandlerContext, sig: MicroBlockSignature) = Task(
+      ctx = ownerCtx,
+      request = newRequest(ownerCtx, sig),
       timeoutTimer = scheduleReRequest(sig)
     )
 
     private def scheduleReRequest(sig: MicroBlockSignature): Cancelable = {
       def reRequest(sig: MicroBlockSignature): Unit = info.get(sig).foreach { orig =>
-        val updated = orig.owners match {
+        val updated = orig.ownerCtxs match {
           case owner :: restOwners =>
             orig.copy(
-              owners = restOwners,
+              ownerCtxs = restOwners,
               tasks = newTask(owner.ctx, sig) :: orig.tasks
             )
 
@@ -95,20 +97,26 @@ object MircoBlockSynchronizer {
       scheduler.scheduleOnce(waitResponseTimeout)(reRequest(sig))
     }
 
-    private def runInQueue(f: => Unit): Unit = monix.eval.Task(f).runAsync(scheduler)
+    private def runInQueue(f: => Unit): Unit = monix.eval.Task(f)
+      .runOnComplete {
+        case Failure(e) => log.error("Failed to run in queue", e)
+        case Success(_) => log.info("test")
+      }(scheduler)
   }
 
   private case class RequestsInfo(isDone: Boolean,
-                                  owners: List[ChannelHandlerContext],
+                                  ownerCtxs: List[ChannelHandlerContext], // other owners TODO
                                   tasks: List[Task]) {
-    def isBusy: Boolean = tasks.exists(!_.request.isDone)
+    def isBusy: Boolean = {
+      tasks.exists(!_.request.isDone)
+    }
     def cancel(): Unit = tasks.foreach(_.cancel())
   }
 
   private object RequestsInfo {
     val empty = RequestsInfo(
       isDone = false,
-      owners = List.empty,
+      ownerCtxs = List.empty,
       tasks = List.empty
     )
   }
@@ -118,9 +126,7 @@ object MircoBlockSynchronizer {
                           timeoutTimer: Cancelable) {
     def cancel(): Unit = {
       timeoutTimer.cancel()
-      if (!request.isDone) {
-        request.cancel(true)
-      }
+      request.cancel(false)
     }
   }
 
