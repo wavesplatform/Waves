@@ -10,6 +10,6 @@ package object transaction {
   val AssetIdLength = FastCryptographicHash.DigestSize
   val AssetIdStringLength = base58Length(AssetIdLength)
   type DiscardedTransactions = Seq[Transaction]
-  type DiscardedMicroBlocks= Seq[MicroBlock]
+  type DiscardedMicroBlocks = Seq[MicroBlock]
 
 }

@@ -65,7 +65,6 @@ class Miner(
     val pc = allChannels.size()
     lazy val lastBlockKernelData = parent.consensusData
     lazy val currentTime = timeService.correctedTime()
-    val start = System.currentTimeMillis()
     lazy val h = calcHit(lastBlockKernelData, account)
     lazy val t = calcTarget(parent, currentTime, balance)
     measureSuccessful(blockBuildTimeStats, {

@@ -15,6 +15,7 @@ mainClass in Compile := Some("com.wavesplatform.Application")
 scalacOptions ++= Seq(
   "-feature",
   "-deprecation",
+  "-language:higherKinds",
   "-Ywarn-unused:-implicits",
   "-Xlint")
 logBuffered := false
