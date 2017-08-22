@@ -3,36 +3,31 @@ package com.wavesplatform.job
 import com.wavesplatform.job.CachedParallelJobPoolSpec._
 import org.scalatest.{FreeSpec, Matchers}
 
+import scala.concurrent.duration.DurationInt
+
 class CachedParallelJobPoolSpec extends FreeSpec with Matchers {
 
   "CachedParallelJobPool" - {
-    "should add a job to an original pool" in {
+    "should add a job with an unique id to an original pool" in {
       val orig = new TestParallelJobPool
-      val cached = new CachedParallelJobPool(orig)
+      val cached = testJobPool(orig)
       cached.add("foo")
       cached.add("bar")
 
-      orig.jobs shouldBe List("bar", "foo")
+      orig.items shouldBe List("bar", "foo")
     }
 
-    "should not add a job after it group was shutdown" in {
+    "should not add a job with the same id to an original pool" in {
       val orig = new TestParallelJobPool
-      val cached = new CachedParallelJobPool(orig)
-      cached.shutdownPoolOf("bar")
+      val cached = testJobPool(orig)
+      cached.add("bar")
       cached.add("bar")
 
-      orig.jobs shouldBe empty
-    }
-
-    "shutdownGroup should call an original shutdownGroup" in {
-      val orig = new TestParallelJobPool
-      val cached = new CachedParallelJobPool(orig)
-      cached.shutdownPoolOf("foo")
-
-      orig.shutdownNowCalls.size shouldBe 1
-      orig.shutdownNowCalls("foo") shouldBe 1
+      orig.items shouldBe List("bar")
     }
   }
+
+  private def testJobPool(orig: TestParallelJobPool) = new CachedParallelJobPool(1.minute, orig)(identity)
 
 }
 
@@ -48,17 +43,11 @@ private object CachedParallelJobPoolSpec {
   }
 
   class TestParallelJobPool extends ParallelJobPool[String, String, TestJob] {
-    var jobs: List[String] = List.empty
-    var shutdownNowCalls: Map[String, Int] = Map.empty.withDefaultValue(0)
+    var items: List[String] = List.empty
 
-    override def add(job: String): Unit = {
-      jobs ::= job
-      super.add(job)
-    }
-
-    override def shutdownPoolOf(item: String): Unit = {
-      shutdownNowCalls = shutdownNowCalls.updated(item, shutdownNowCalls(item) + 1)
-      super.shutdownPoolOf(item)
+    override def add(item: String): Unit = {
+      items ::= item
+      super.add(item)
     }
 
     override def groupId(item: String): String = item

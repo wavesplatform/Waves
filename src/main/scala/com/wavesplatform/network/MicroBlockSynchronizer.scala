@@ -1,7 +1,7 @@
 package com.wavesplatform.network
 
 import com.wavesplatform.job._
-import com.wavesplatform.network.MicroBlockSynchronizer.{Item, QueuedRequests, Settings}
+import com.wavesplatform.network.MicroBlockSynchronizer._
 import com.wavesplatform.state2.ByteStr
 import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel._
@@ -14,7 +14,18 @@ import scala.concurrent.duration.FiniteDuration
 class MicroBlockSynchronizer(settings: Settings, history: NgHistory)
   extends ChannelInboundHandlerAdapter with ScorexLogging {
 
-  private val requests = new CachedParallelJobPool(new QueuedRequests(settings.waitResponseTimeout))
+  private val requests: ParallelJobPool[Item, MicroBlockSignature, SynchronizerRequest] = {
+    val orig = new QueuedRequests(settings.waitResponseTimeout)
+
+    // Prevents processing of the same microblock in gap between MicroBlockSynchronizer and CoordinatorHandler
+    val ignoreStaleGroups = ParallelJobPool.ignoreStaleGroups(settings.processedMicroBlocksCacheTimeout, orig)
+
+    val cached = ParallelJobPool.cached(settings.invCacheTimeout, ignoreStaleGroups) { x =>
+      s"${x.microBlockSig}.${x.ctx.channel().id().asLongText()}"
+    }
+
+    cached
+  }
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
     case MicroBlockResponse(mb) =>
@@ -41,26 +52,29 @@ class MicroBlockSynchronizer(settings: Settings, history: NgHistory)
 
 object MicroBlockSynchronizer {
 
-  case class Settings(waitResponseTimeout: FiniteDuration)
+  type MicroBlockSignature = ByteStr
+
+  case class Settings(waitResponseTimeout: FiniteDuration,
+                      processedMicroBlocksCacheTimeout: FiniteDuration,
+                      invCacheTimeout: FiniteDuration)
 
   case class Item(ctx: ChannelHandlerContext,
-                  microBlockSig: ByteStr)
+                  microBlockSig: MicroBlockSignature)
 
-  case class Request(item: Item) extends Runnable {
-    val id: String = s"${item.microBlockSig}.${item.ctx.channel().id().asLongText()}"
-
+  case class SynchronizerRequest(item: Item) extends Runnable {
     override def run(): Unit = item.ctx.writeAndFlush(MicroBlockRequest(item.microBlockSig))
   }
 
-  class QueuedRequests(waitResponseTimeout: FiniteDuration) extends ParallelJobPool[Item, ByteStr, Request] {
+  class QueuedRequests(waitResponseTimeout: FiniteDuration)
+    extends ParallelJobPool[Item, MicroBlockSignature, SynchronizerRequest] {
+
     // A possible issue: it has an unbounded queue size
     private val scheduler = monix.execution.Scheduler.singleThread("queued-requests")
 
-    override def groupId(item: Item): ByteStr = item.microBlockSig
-    override def newJob(item: Item): Request = Request(item)
-    override def newJobPool: JobPool[Request] = {
-      val orig = new DelayQueueJobPool[Request](waitResponseTimeout)(scheduler)
-      new CachedJobPool(orig, _.id)
+    override def groupId(item: Item): MicroBlockSignature = item.microBlockSig
+    override def newJob(item: Item): SynchronizerRequest = SynchronizerRequest(item)
+    override def newJobPool: JobPool[SynchronizerRequest] = {
+      new DelayQueueJobPool[SynchronizerRequest](waitResponseTimeout)(scheduler)
     }
   }
 

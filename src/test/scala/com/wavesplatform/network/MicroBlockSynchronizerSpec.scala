@@ -24,7 +24,9 @@ class MicroBlockSynchronizerSpec extends FreeSpec
   with TransactionGen {
 
   private val settings = MicroBlockSynchronizer.Settings(
-    waitResponseTimeout = 500.millis
+    waitResponseTimeout = 500.millis,
+    processedMicroBlocksCacheTimeout = 1.second,
+    invCacheTimeout = 1.second
   )
 
   private implicit val pc: PatienceConfig = PatienceConfig(

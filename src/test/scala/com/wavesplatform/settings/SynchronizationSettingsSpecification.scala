@@ -22,6 +22,8 @@ class SynchronizationSettingsSpecification extends FlatSpec with Matchers {
         |    score-ttl: 90s
         |    micro-block-synchronizer {
         |      wait-response-timeout: 5s
+        |      processed-micro-blocks-cache-timeout: 2s
+        |      inv-cache-timeout: 3s
         |    }
         |  }
         |}
@@ -38,7 +40,9 @@ class SynchronizationSettingsSpecification extends FlatSpec with Matchers {
     settings.scoreBroadcastInterval should be(30.seconds)
     settings.scoreTTL should be(90.seconds)
     settings.microBlockSynchronizer shouldBe MicroBlockSynchronizer.Settings(
-      waitResponseTimeout = 5.seconds
+      waitResponseTimeout = 5.seconds,
+      processedMicroBlocksCacheTimeout = 2.seconds,
+      invCacheTimeout = 3.seconds,
     )
   }
 }
