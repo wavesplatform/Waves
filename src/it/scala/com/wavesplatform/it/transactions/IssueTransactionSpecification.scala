@@ -75,11 +75,9 @@ class IssueTransactionSpecification(override val allNodes: Seq[Node], override v
   val invalidAssetValue =
     Table(("assetVal", "decimals", "message"),
       (0l, 2, "negative amount"),
-      (9223372036854775807l, 1, "Too big sequences requested"),
-      (9223372036854775807l, 5, "Too big sequences requested"),
       (1l, 9, "Too big sequences requested"),
       (-1l, 1, "negative amount"),
-      (1l, -1, "Too big sequences requested"))
+      (1l, -1, "Too big sequences requested"))   //??? what message shoild be?
 
   forAll(invalidAssetValue) { (assetVal: Long, decimals: Int, message: String) =>
     test(s"Not able to create asset total token='$assetVal', decimals='$decimals' ") {
