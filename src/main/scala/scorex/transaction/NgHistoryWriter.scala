@@ -3,6 +3,7 @@ package scorex.transaction
 import java.util.concurrent.locks.ReentrantReadWriteLock
 
 import com.wavesplatform.state2._
+import kamon.Kamon
 import scorex.block.Block.BlockId
 import scorex.block.{Block, MicroBlock}
 import scorex.transaction.History.BlockchainScore
@@ -19,7 +20,7 @@ trait NgHistoryWriter extends HistoryWriter with NgHistory {
   def forgeBlock(id: BlockId): Option[(Block, DiscardedTransactions)]
 }
 
-class NgHistoryWriterImpl(inner: HistoryWriter) extends NgHistoryWriter with ScorexLogging {
+class NgHistoryWriterImpl(inner: HistoryWriter) extends NgHistoryWriter with ScorexLogging with Instrumented {
 
   override def synchronizationToken: ReentrantReadWriteLock = inner.synchronizationToken
 
@@ -147,30 +148,32 @@ class NgHistoryWriterImpl(inner: HistoryWriter) extends NgHistoryWriter with Sco
       .orElse(micros().find(_.totalResBlockSig == blockId)).isDefined
   }
 
+  private val forgeBlockTimeStats = Kamon.metrics.histogram("forge-block-time")
+
   def forgeBlock(id: BlockId): Option[(Block, DiscardedTransactions)] = read { implicit l =>
-    baseB().flatMap(base => {
-      val ms = micros().reverse
-      if (base.uniqueId == id) {
-        val discardedTxs = ms.flatMap(_.transactionData)
-//        log.trace(s"Forged base block [id=$id] with base_size=${base.transactionData.size}(discarded=${discardedTxs.size})")
-        Some((base, discardedTxs))
-      } else if (!ms.exists(_.totalResBlockSig == id)) None
-      else {
-        val (accumulatedTxs, maybeFound) = ms.foldLeft((List.empty[Transaction], Option.empty[(ByteStr, DiscardedTransactions)])) { case ((accumulated, maybeDiscarded), micro) =>
-          maybeDiscarded match {
-            case Some((sig, discarded)) => (accumulated, Some((sig, discarded ++ micro.transactionData)))
-            case None =>
-              if (micro.totalResBlockSig == id)
-                (accumulated ++ micro.transactionData, Some((micro.totalResBlockSig, Seq.empty[Transaction])))
-              else
-                (accumulated ++ micro.transactionData, None)
+    measureSuccessful(forgeBlockTimeStats, {
+      baseB().flatMap(base => {
+        val ms = micros().reverse
+        if (base.uniqueId == id) {
+          val discardedTxs = ms.flatMap(_.transactionData)
+          Some((base, discardedTxs))
+        } else if (!ms.exists(_.totalResBlockSig == id)) None
+        else {
+          val (accumulatedTxs, maybeFound) = ms.foldLeft((List.empty[Transaction], Option.empty[(ByteStr, DiscardedMicroBlocks)])) { case ((accumulated, maybeDiscarded), micro) =>
+            maybeDiscarded match {
+              case Some((sig, discarded)) => (accumulated, Some((sig, micro +: discarded)))
+              case None =>
+                if (micro.totalResBlockSig == id)
+                  (accumulated ++ micro.transactionData, Some((micro.totalResBlockSig, Seq.empty[MicroBlock])))
+                else
+                  (accumulated ++ micro.transactionData, None)
+            }
+          }
+          maybeFound.map { case (sig, discardedMicroblocks) =>
+            (base.copy(signerData = base.signerData.copy(signature = sig), transactionData = base.transactionData ++ accumulatedTxs), discardedMicroblocks.flatMap(_.transactionData))
           }
         }
-        maybeFound.map { case (sig, discardedTxs) =>
-//          log.trace(s"Forged block[id=$sig] with base_size=${base.transactionData.size} + accumulated_size=${accumulatedTxs.size}(discarded=${discardedTxs.size})")
-          (base.copy(signerData = base.signerData.copy(signature = sig), transactionData = base.transactionData ++ accumulatedTxs), discardedTxs)
-        }
-      }
+      })
     })
   }
 

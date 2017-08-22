@@ -8,7 +8,8 @@ import com.wavesplatform.UtxPool.PessimisticPortfolios
 import com.wavesplatform.settings.{FunctionalitySettings, UtxSettings}
 import com.wavesplatform.state2.diffs.TransactionDiffer
 import com.wavesplatform.state2.reader.{CompositeStateReader, StateReader}
-import com.wavesplatform.state2.{ByteStr, Diff, Portfolio}
+import com.wavesplatform.state2.{ByteStr, Diff, Instrumented, Portfolio}
+import kamon.Kamon
 import scorex.account.Address
 import scorex.consensus.TransactionsOrdering
 import scorex.transaction.ValidationError.GenericError
@@ -23,7 +24,7 @@ class UtxPool(time: Time,
               history: History,
               feeCalculator: FeeCalculator,
               fs: FunctionalitySettings,
-              utxSettings: UtxSettings) extends Synchronized with ScorexLogging {
+              utxSettings: UtxSettings) extends Synchronized with ScorexLogging with Instrumented {
 
   def synchronizationToken: ReentrantReadWriteLock = new ReentrantReadWriteLock()
 
@@ -37,6 +38,9 @@ class UtxPool(time: Time,
   }
 
   private val pessimisticPortfolios = Synchronized(new PessimisticPortfolios)
+
+  private val sizeStats = Kamon.metrics.histogram("utx-pool-size")
+  private val processingTimeStats = Kamon.metrics.histogram("utx-transaction-processing-time")
 
   private def removeExpired(currentTs: Long): Unit = write { implicit l =>
     def isExpired(tx: Transaction) = (currentTs - tx.timestamp).millis > utxSettings.maxTransactionAge
@@ -52,23 +56,26 @@ class UtxPool(time: Time,
   }
 
   def putIfNew(tx: Transaction): Either[ValidationError, Boolean] = write { implicit l =>
-    knownTransactions.mutate(cache =>
-      Option(cache.getIfPresent(tx.id)) match {
-        case Some(Right(_)) => Right(false)
-        case Some(Left(er)) => Left(er)
-        case None =>
-          val res = for {
-            _ <- Either.cond(transactions().size < utxSettings.maxSize, (), GenericError("Transaction pool size limit is reached"))
-            _ <- feeCalculator.enoughFee(tx)
-            diff <- TransactionDiffer(fs, history.lastBlockTimestamp(), time.correctedTime(), stateReader.height)(stateReader, tx)
-          } yield {
-            pessimisticPortfolios.mutate(_.add(tx.id, diff))
-            transactions.transform(_.updated(tx.id, tx))
-            tx
-          }
-          cache.put(tx.id, res)
-          res.right.map(_ => true)
-      })
+    measureSuccessful(processingTimeStats, {
+      knownTransactions.mutate(cache =>
+        Option(cache.getIfPresent(tx.id)) match {
+          case Some(Right(_)) => Right(false)
+          case Some(Left(er)) => Left(er)
+          case None =>
+            val res = for {
+              _ <- Either.cond(transactions().size < utxSettings.maxSize, (), GenericError("Transaction pool size limit is reached"))
+              _ <- feeCalculator.enoughFee(tx)
+              diff <- TransactionDiffer(fs, history.lastBlockTimestamp(), time.correctedTime(), stateReader.height)(stateReader, tx)
+            } yield {
+              pessimisticPortfolios.mutate(_.add(tx.id, diff))
+              transactions.transform(_.updated(tx.id, tx))
+              tx
+            }
+            cache.put(tx.id, res)
+            sizeStats.record(transactions().size)
+            res.right.map(_ => true)
+        })
+    })
   }
 
   def removeAll(tx: Traversable[Transaction]): Unit = write { implicit l =>

@@ -15,6 +15,7 @@ mainClass in Compile := Some("com.wavesplatform.Application")
 scalacOptions ++= Seq(
   "-feature",
   "-deprecation",
+  "-language:higherKinds",
   "-Ywarn-unused:-implicits",
   "-Xlint")
 logBuffered := false
@@ -37,6 +38,7 @@ libraryDependencies ++=
   Dependencies.itKit ++
   Dependencies.logging ++
   Dependencies.matcher ++
+  Dependencies.kamon ++
   Seq(
     "com.iheart" %% "ficus" % "1.4.1",
     ("org.scorexfoundation" %% "scrypto" % "1.2.2")
