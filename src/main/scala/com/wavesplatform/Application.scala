@@ -22,6 +22,7 @@ import com.wavesplatform.utils.forceStopApplication
 import io.netty.channel.Channel
 import io.netty.channel.group.DefaultChannelGroup
 import io.netty.util.concurrent.GlobalEventExecutor
+import kamon.Kamon
 import scorex.account.AddressScheme
 import scorex.api.http._
 import scorex.api.http.alias.{AliasApiRoute, AliasBroadcastApiRoute}
@@ -230,6 +231,7 @@ object Application extends ScorexLogging {
 
     val config = readConfig(args.headOption)
     val settings = WavesSettings.fromConfig(config)
+    Kamon.start(config)
 
     RootActorSystem.start("wavesplatform", config) { actorSystem =>
       configureLogging(settings)
@@ -241,7 +243,12 @@ object Application extends ScorexLogging {
 
       log.info(s"${Constants.AgentName} Blockchain Id: ${settings.blockchainSettings.addressSchemeCharacter}")
 
-      new Application(actorSystem, settings).run()
+      new Application(actorSystem, settings) {
+        override def shutdown(): Unit = {
+          Kamon.shutdown()
+          super.shutdown()
+        }
+      }.run()
     }
   }
 }
