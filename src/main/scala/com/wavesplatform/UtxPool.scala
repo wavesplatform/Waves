@@ -166,7 +166,7 @@ object UtxPool {
 
     def remove(txId: ByteStr): Unit = {
       transactionPortfolios -= txId
-      transactions = transactions.mapValues(_ - txId)
+      transactions = transactions.map { case (k, v) => k -> (v - txId) }
     }
   }
 
