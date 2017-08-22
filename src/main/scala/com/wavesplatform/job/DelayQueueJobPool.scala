@@ -4,20 +4,21 @@ import monix.execution.Cancelable
 import monix.execution.schedulers.SchedulerService
 import scorex.utils.ScorexLogging
 
+import scala.collection.immutable.Queue
 import scala.concurrent.duration.FiniteDuration
 import scala.util.{Failure, Success}
 
-class DelayedJobQueue[JobT <: Runnable](delay: FiniteDuration)(implicit val scheduler: SchedulerService)
-  extends JobQueue[JobT] with ScorexLogging {
+class DelayQueueJobPool[JobT <: Runnable](delay: FiniteDuration)(implicit val scheduler: SchedulerService)
+  extends JobPool[JobT] with ScorexLogging {
 
   private var isReady = true
-  private var pending = List.empty[JobT]
+  private var pending = Queue.empty[JobT]
   private var isScheduled = false
   private var timer = Cancelable.empty
 
-  override def enqueue(job: JobT): Unit = runInQueue {
+  override def add(job: JobT): Unit = runInQueue {
     if (isReady) {
-      if (isScheduled) pending ::= job
+      if (isScheduled) pending = pending.enqueue(job)
       else {
         isScheduled = true
         job.run()
@@ -28,20 +29,21 @@ class DelayedJobQueue[JobT <: Runnable](delay: FiniteDuration)(implicit val sche
 
   override def shutdownNow(): Unit = runInQueue {
     isReady = false
-    pending = List.empty
+    pending = Queue.empty
     timer.cancel()
   }
 
   private def schedule(): Unit = {
     timer = scheduler.scheduleOnce(delay) {
-      pending match {
-        case job :: rest =>
-          pending = rest
+      pending = pending.dequeueOption match {
+        case Some((job, rest)) =>
           job.run()
           schedule()
+          rest
 
         case _ =>
           isScheduled = false
+          pending
       }
     }
   }

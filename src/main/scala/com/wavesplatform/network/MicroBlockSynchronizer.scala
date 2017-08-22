@@ -14,19 +14,19 @@ import scala.concurrent.duration.FiniteDuration
 class MicroBlockSynchronizer(settings: Settings, history: NgHistory)
   extends ChannelInboundHandlerAdapter with ScorexLogging {
 
-  private val requests = new CachedParallelJobQueue(new QueuedRequests(settings.waitResponseTimeout))
+  private val requests = new CachedParallelJobPool(new QueuedRequests(settings.waitResponseTimeout))
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
     case MicroBlockResponse(mb) =>
       log.trace(id(ctx) + "Received MicroBlockResponse " + mb)
-      requests.shutdownGroup(Item(ctx, mb.signature))
+      requests.shutdownPoolOf(Item(ctx, mb.signature))
 
     case mi @ MicroBlockInv(totalResBlockSig, prevResBlockSig) =>
       log.trace(id(ctx) + "Received " + mi)
       history.lastBlockId() match {
         case Some(lastBlockId) =>
           if (lastBlockId == prevResBlockSig) {
-            requests.enqueue(Item(ctx, totalResBlockSig))
+            requests.add(Item(ctx, totalResBlockSig))
           } else {
             log.trace(s"Discarding $mi because it doesn't match last (micro)block")
           }
@@ -52,15 +52,15 @@ object MicroBlockSynchronizer {
     override def run(): Unit = item.ctx.writeAndFlush(MicroBlockRequest(item.microBlockSig))
   }
 
-  class QueuedRequests(waitResponseTimeout: FiniteDuration) extends ParallelJobQueue[Item, ByteStr, Request] {
+  class QueuedRequests(waitResponseTimeout: FiniteDuration) extends ParallelJobPool[Item, ByteStr, Request] {
     // A possible issue: it has an unbounded queue size
     private val scheduler = monix.execution.Scheduler.singleThread("queued-requests")
 
     override def groupId(item: Item): ByteStr = item.microBlockSig
     override def newJob(item: Item): Request = Request(item)
-    override def newJobQueue: JobQueue[Request] = {
-      val orig = new DelayedJobQueue[Request](waitResponseTimeout)(scheduler)
-      new CachedJobQueue(orig, _.id)
+    override def newJobPool: JobPool[Request] = {
+      val orig = new DelayQueueJobPool[Request](waitResponseTimeout)(scheduler)
+      new CachedJobPool(orig, _.id)
     }
   }
 

@@ -2,12 +2,12 @@ package com.wavesplatform.job
 
 import java.util.concurrent.ConcurrentHashMap
 
-class CachedJobQueue[JobT](orig: JobQueue[JobT], id: JobT => String) extends JobQueue[JobT] {
+class CachedJobPool[JobT](orig: JobPool[JobT], id: JobT => String) extends JobPool[JobT] {
   private val cache = new ConcurrentHashMap[String, Boolean]()
 
-  override def enqueue(job: JobT): Unit = {
+  override def add(job: JobT): Unit = {
     cache.computeIfAbsent(id(job), { _ =>
-      orig.enqueue(job)
+      orig.add(job)
       true
     })
   }
