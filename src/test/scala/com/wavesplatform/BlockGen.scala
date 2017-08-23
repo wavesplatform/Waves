@@ -38,19 +38,16 @@ trait BlockGen extends TransactionGen {
     block <- Gen.oneOf(randomSignerBlockGen, predefinedSignerBlockGen)
   } yield block
 
-  val randomBlocksSeqGen: Gen[(Int, Int, Seq[Block])] = for {
+  def blocksSeqGen(blockGen: Gen[Block]): Gen[(Int, Int, Seq[Block])] = for {
     start <- Gen.posNum[Int].label("from")
     end <- Gen.chooseNum(start, start + 20).label("to")
     blockCount <- Gen.choose(0, end - start + 1).label("actualBlockCount")
-    blocks <- Gen.listOfN(blockCount, randomSignerBlockGen).label("blocks")
+    blocks <- Gen.listOfN(blockCount, blockGen).label("blocks")
   } yield (start, end, blocks)
 
-  val mixedBlocksSeqGen: Gen[(Int, Int, Seq[Block])] = for {
-    start <- Gen.posNum[Int].label("from")
-    end <- Gen.chooseNum(start, start + 20).label("to")
-    blockCount <- Gen.choose(0, end - start + 1).label("actualBlockCount")
-    blocks <- Gen.listOfN(blockCount, mixedBlockGen).label("blocks")
-  } yield (start, end, blocks)
+  val randomBlocksSeqGen: Gen[(Int, Int, Seq[Block])] = blocksSeqGen(randomSignerBlockGen)
+
+  val mixedBlocksSeqGen: Gen[(Int, Int, Seq[Block])] = blocksSeqGen(mixedBlockGen)
 
 }
 

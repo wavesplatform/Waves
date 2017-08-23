@@ -15,7 +15,6 @@ import scala.collection.SortedMap
 
 object BlockDiffer extends ScorexLogging with Instrumented {
 
-
   def right(diff: Diff): Either[ValidationError, Diff] = Right(diff)
 
   def fromBlock(settings: FunctionalitySettings, s: StateReader, maybePrevBlock: Option[Block], block: Block): Either[ValidationError, BlockDiff] = {
@@ -26,7 +25,7 @@ object BlockDiffer extends ScorexLogging with Instrumented {
       if (stateHeight > settings.enableMicroblocksAfterHeight)
         maybePrevBlock
           .map(prevBlock => Diff.empty.copy(
-            portfolios = Map(blockSigner -> prevBlock.feesPortfolio.minus(prevBlock.feesPortfolio.prevBlockFeePart))))
+            portfolios = Map(blockSigner -> prevBlock.feesPortfolio.prevBlockFeePart)))
       else None
 
     lazy val currentBlockFeeDistr =
