@@ -5,6 +5,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock
 
 import com.wavesplatform.state2.{BlockDiff, ByteStr, DataTypes}
 import com.wavesplatform.utils._
+import kamon.Kamon
 import scorex.block.Block
 import scorex.transaction.History.BlockchainScore
 import scorex.transaction.ValidationError.GenericError
@@ -23,6 +24,8 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
   private val heightByBlockId = Synchronized(db.openMap("signaturesReverse", new LogMVMapBuilder[ByteStr, Int].keyType(DataTypes.byteStr)))
   private val scoreByHeight = Synchronized(db.openMap("score", new LogMVMapBuilder[Int, BigInt]))
 
+  private val blockHeightStats = Kamon.metrics.histogram("block-height")
+
   private[HistoryWriterImpl] def isConsistent: Boolean = read { implicit l =>
     // check if all maps have same size
     Set(blockBodyByHeight().size(), blockIdByHeight().size(), heightByBlockId().size(), scoreByHeight().size()).size == 1
@@ -38,6 +41,8 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
       heightByBlockId.mutate(_.put(block.uniqueId, h))
 
       db.commit()
+      blockHeightStats.record(h)
+
       if (h % 100 == 0) db.compact(CompactFillRate, CompactMemorySize)
 
       blockDiff

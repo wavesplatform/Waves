@@ -9,6 +9,7 @@ import com.wavesplatform.settings.{FunctionalitySettings, UtxSettings}
 import com.wavesplatform.state2.diffs.TransactionDiffer
 import com.wavesplatform.state2.reader.{CompositeStateReader, StateReader}
 import com.wavesplatform.state2.{ByteStr, Diff, Portfolio}
+import kamon.Kamon
 import scorex.account.Address
 import scorex.consensus.TransactionsOrdering
 import scorex.transaction.ValidationError.GenericError
@@ -38,6 +39,9 @@ class UtxPool(time: Time,
 
   private val pessimisticPortfolios = Synchronized(new PessimisticPortfolios)
 
+  private val sizeStats = Kamon.metrics.histogram("utx-pool-size")
+  private val putRequestStats = Kamon.metrics.counter("utx-pool-put-if-new")
+
   private def removeExpired(currentTs: Long): Unit = write { implicit l =>
     def isExpired(tx: Transaction) = (currentTs - tx.timestamp).millis > utxSettings.maxTransactionAge
 
@@ -52,6 +56,7 @@ class UtxPool(time: Time,
   }
 
   def putIfNew(tx: Transaction): Either[ValidationError, Boolean] = write { implicit l =>
+    putRequestStats.increment()
     knownTransactions.mutate(cache =>
       Option(cache.getIfPresent(tx.id)) match {
         case Some(Right(_)) => Right(false)
@@ -67,6 +72,7 @@ class UtxPool(time: Time,
             tx
           }
           cache.put(tx.id, res)
+          sizeStats.record(transactions().size)
           res.right.map(_ => true)
       })
   }
@@ -160,7 +166,7 @@ object UtxPool {
 
     def remove(txId: ByteStr): Unit = {
       transactionPortfolios -= txId
-      transactions = transactions.mapValues(_ - txId)
+      transactions = transactions.map { case (k, v) => k -> (v - txId) }
     }
   }
 

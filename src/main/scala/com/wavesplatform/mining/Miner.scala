@@ -8,6 +8,8 @@ import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state2.reader.StateReader
 import com.wavesplatform.{Coordinator, UtxPool}
 import io.netty.channel.group.ChannelGroup
+import kamon.Kamon
+import kamon.metric.instrument
 import monix.eval.Task
 import monix.execution._
 import monix.execution.cancelables.{CompositeCancelable, SerialCancelable}
@@ -44,6 +46,8 @@ class Miner(
 
   private val scheduledAttempts = SerialCancelable()
 
+  private val blockBuildTimeStats = Kamon.metrics.histogram("block-build-time", instrument.Time.Milliseconds)
+
   private def checkAge(parentHeight: Int, parent: Block): Either[String, Unit] =
     Either
       .cond(parentHeight == 1, (), Duration.between(Instant.ofEpochMilli(parent.timestamp), Instant.ofEpochMilli(timeService.correctedTime())))
@@ -55,8 +59,9 @@ class Miner(
                                    greatGrandParent: Option[Block], balance: Long)(delay: FiniteDuration): Task[Either[String, Block]] = Task {
     val pc = allChannels.size()
     lazy val lastBlockKernelData = parent.consensusData
-    lazy val currentTime = timeService.correctedTime()
-    log.debug(s"${System.currentTimeMillis()}: Corrected time: $currentTime")
+    val currentTime = timeService.correctedTime()
+    val start = System.currentTimeMillis()
+    log.debug(s"$start: Corrected time: $currentTime")
     lazy val h = calcHit(lastBlockKernelData, account)
     lazy val t = calcTarget(parent, currentTime, balance)
     for {
@@ -71,6 +76,7 @@ class Miner(
       unconfirmed = utx.packUnconfirmed()
       _ = log.debug(s"Adding ${unconfirmed.size} unconfirmed transaction(s) to new block")
       block = Block.buildAndSign(Version, currentTime, parent.uniqueId, consensusData, unconfirmed, account)
+      _ = blockBuildTimeStats.record(System.currentTimeMillis() - start)
     } yield block
   }.delayExecution(delay)
 
