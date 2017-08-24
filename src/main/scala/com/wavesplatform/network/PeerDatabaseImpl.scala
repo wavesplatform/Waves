@@ -16,6 +16,7 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Auto
   private val database = createMVStore(settings.file)
   private val peersPersistence = database.openMap("peers", new LogMVMapBuilder[InetSocketAddress, Long])
   private val blacklist = database.openMap("blacklist", new LogMVMapBuilder[InetAddress, Long])
+  private val reasons = database.openMap("reasons", new LogMVMapBuilder[InetAddress, String])
   private val unverifiedPeers = EvictingQueue.create[InetSocketAddress](settings.maxUnverifiedPeers)
 
   for (a <- settings.knownPeers.view.map(inetSocketAddress(_, 6863))) {
@@ -37,9 +38,10 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Auto
 
   override def touch(socketAddress: InetSocketAddress): Unit = doTouch(socketAddress, System.currentTimeMillis())
 
-  override def blacklist(address: InetAddress): Unit = unverifiedPeers.synchronized {
+  override def blacklist(address: InetAddress, reason: String): Unit = unverifiedPeers.synchronized {
     unverifiedPeers.removeIf(_.getAddress == address)
     blacklist.put(address, System.currentTimeMillis())
+    reasons.put(address, reason)
     database.commit()
   }
 
@@ -51,8 +53,15 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Auto
   override def blacklistedHosts: Set[InetAddress] =
     removeObsoleteRecords(blacklist, settings.blackListResidenceTime.toMillis).keySet().asScala.toSet
 
+  override def detailedBlacklist: Map[InetAddress, (Long, String)] =
+    removeObsoleteRecords(blacklist, settings.blackListResidenceTime.toMillis)
+      .asScala
+      .toMap
+      .map { case (h, t) => h -> (t, Option(reasons.get(h)).getOrElse("")) }
+
   override def randomPeer(excluded: Set[InetSocketAddress]): Option[InetSocketAddress] = unverifiedPeers.synchronized {
     log.trace(s"Excluding: $excluded")
+
     def excludeAddress(isa: InetSocketAddress) = excluded(isa) || blacklistedHosts(isa.getAddress)
 
     log.trace(s"Evicting queue: $unverifiedPeers")
@@ -68,7 +77,7 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Auto
     }
   }
 
-  private def removeObsoleteRecords[T](map: MVMap[T, Long], maxAge: Long) = {
+  private def removeObsoleteRecords[T](map: MVMap[T, Long], maxAge: Long): MVMap[T, Long] = {
     val earliestValidTs = System.currentTimeMillis() - maxAge
 
     map.entrySet().asScala.collect {
