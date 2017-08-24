@@ -13,7 +13,7 @@ import org.asynchttpclient.util.HttpConstants
 import org.slf4j.LoggerFactory
 import play.api.libs.json.Json.{parse, stringify, toJson}
 import play.api.libs.json._
-import scorex.account.Address
+
 import scorex.api.http.alias.CreateAliasRequest
 import scorex.api.http.assets._
 import scorex.api.http.leasing.{LeaseCancelRequest, LeaseRequest}
@@ -170,6 +170,14 @@ trait NodeApi {
   def createAlias(targetAddress: String, alias: String, fee: Long): Future[Transaction] =
     postJson("/alias/create", CreateAliasRequest(targetAddress, alias, fee)).as[Transaction]
 
+  def aliasByAddress(targetAddress: String) =
+    get(s"/alias/by-address/$targetAddress").as[Seq[String]]
+
+  def addressByAlias(targetAlias: String): Future[Address]=
+    get(s"/alias/by-alias/$targetAlias").as[Address]
+
+
+
   def rollback(to: Int, returnToUTX: Boolean = true): Future[Unit] =
     postJson("/debug/rollback", RollbackParams(to, returnToUTX)).map(_ => ())
 
@@ -286,6 +294,10 @@ object NodeApi extends ScorexLogging {
   case class Peer(address: String, declaredAddress: String, peerName: String)
 
   implicit val peerFormat: Format[Peer] = Json.format
+
+  case class Address(address:String)
+
+  implicit val addressFormat: Format[Address] = Json.format
 
   case class Balance(address: String, confirmations: Int, balance: Long)
 

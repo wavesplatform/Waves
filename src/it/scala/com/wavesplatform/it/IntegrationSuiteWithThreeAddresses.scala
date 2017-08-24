@@ -1,6 +1,6 @@
 package com.wavesplatform.it
 
-import com.wavesplatform.it.api.NodeApi.{AssetBalance, FullAssetInfo}
+import com.wavesplatform.it.api.NodeApi.{AssetBalance, FullAssetInfo, Transaction}
 import com.wavesplatform.it.util._
 import org.scalatest._
 import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
@@ -28,6 +28,10 @@ trait IntegrationSuiteWithThreeAddresses extends FunSuite with BeforeAndAfterAll
   protected lazy val secondAddress: String = Await.result(sender.createAddress, 1.minutes)
   protected lazy val thirdAddress: String = Await.result(sender.createAddress, 1.minutes)
 
+  protected def accountEffectiveBalance(acc: String): Future[Long] = sender.effectiveBalance(acc).map(_.balance)
+
+  protected def accountBalance(acc: String): Future[Long] = sender.balance(acc).map(_.balance)
+
   protected def assertBalances(acc: String, balance: Long, effectiveBalance: Long): Future[Unit] = {
     for {
       newBalance <- sender.balance(acc).map(_.balance)
@@ -37,6 +41,14 @@ trait IntegrationSuiteWithThreeAddresses extends FunSuite with BeforeAndAfterAll
       newBalance shouldBe balance
     }
   }
+
+  protected def waitForHeightAraise(transactionId: String, heightIncreaseOn: Integer): Future[Unit] = for {
+    height <- traverse(allNodes)(_.height).map(_.max)
+    _ <- traverse(allNodes)(_.waitForHeight(height + heightIncreaseOn))
+    _ <- traverse(allNodes)(_.waitForTransaction(transactionId))
+  } yield ()
+
+
 
   protected def assertAssetBalance(acc: String, assetIdString: String, balance: Long): Future[Unit] = {
     assertAsset(acc, assetIdString)(_.balance shouldBe balance)
