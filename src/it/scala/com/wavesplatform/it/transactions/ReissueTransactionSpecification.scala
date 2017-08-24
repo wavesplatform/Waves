@@ -33,8 +33,6 @@ class ReissueTransactionSpecification(override val allNodes: Seq[Node], override
     Await.result(f, 1.minute)
   }
 
-  // todo can't reissue not reissuable asset
-
   test("can't reissue not reissuable asset") {
     val issueFee = 10.waves
     val f = for {
