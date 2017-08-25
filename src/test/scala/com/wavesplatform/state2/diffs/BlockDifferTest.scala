@@ -12,58 +12,101 @@ import scorex.transaction.{GenesisTransaction, PaymentTransaction, ValidationErr
 
 class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen {
 
-  private val NumTransactions = 10
   private val TransactionFee = 10
 
-  private val signer1, signer2 = PrivateKeyAccount.random
+  private val signerA, signerB = PrivateKeyAccount.random
 
   private val testChain: Seq[Block] = {
     val master, recipient = PrivateKeyAccount.random
-    getTwoMinersBlockChain(master, recipient, NumTransactions)
+    getTwoMinersBlockChain(master, recipient, 9)
   }
 
   "BlockDiffer" - {
     "enableMicroblocksAfterHeight" - {
+      /*
+      | N | fee | signer | A receive | A balance | B receive | B balance |
+      |--:|:---:|:------:|----------:|----------:|----------:|-----------|
+      |1  |0    |A       |0          |0          |0          |0          | <- genesis
+      |2  |10   |B       |0          |0          |10         |+10        |
+      |3  |10   |A       |10         |+10        |0          |0          |
+      |4  |10   |B       |0          |10         |+10        |10+10=20   |
+      |5  |10   |A       |10         |10+10=20   |0          |20         |
+      |6  |10   |B       |0          |20         |+10        |20+10=30   |
+      |7  |10   |A       |10         |20+10=30   |0          |30         |
+      |8  |10   |B       |0          |30         |+10        |30+10=40   |
+      |9  |10   |A       |10         |30+10=40   |0          |40         | <- 1st check
+      |10 |10   |B       |0          |40         |+10        |40+10=50   | <- 2nd check
+       */
       "height < enableMicroblocksAfterHeight - a miner should receive 100% of the current block's fee" in {
         val fs = TestFunctionalitySettings.Enabled.copy(
-          enableMicroblocksAfterHeight = NumTransactions + 1000
+          enableMicroblocksAfterHeight = 1000
         )
 
-        assertDiff(testChain, fs) { diff =>
-          val actualTotalFeeOfSigner1 = diff.right.get.snapshots(signer1)(NumTransactions + 1).balance
-          actualTotalFeeOfSigner1 shouldBe 50
+        assertDiff(testChain.init, fs) { diff =>
+          val actualBalanceOfSignerA = diff.right.get.snapshots(signerA)(9).balance
+          actualBalanceOfSignerA shouldBe 40
         }
 
-        assertDiff(testChain.init, fs) { diff =>
-          val actualTotalFeeOfSigner2 = diff.right.get.snapshots(signer2)(NumTransactions).balance
-          actualTotalFeeOfSigner2 shouldBe 50
+        assertDiff(testChain, fs) { diff =>
+          val actualTotalFeeOfSignerB = diff.right.get.snapshots(signerB)(10).balance
+          actualTotalFeeOfSignerB shouldBe 50
         }
       }
 
+      /*
+      | N | fee | signer | A receive | A balance | B receive | B balance |
+      |--:|:---:|:------:|----------:|----------:|----------:|-----------|
+      |1  |0    |A       |0          |0          |0          |0          | <- genesis
+      |2  |10   |B       |0          |0          |10         |+10        |
+      |3  |10   |A       |10         |+10        |0          |0          |
+      |4  |10   |B       |0          |10         |+10        |10+10=20   |
+      |5  |10   |A       |10         |10+10=20   |0          |20         |
+      |6  |10   |B       |0          |20         |+10        |20+10=30   |
+      |7  |10   |A       |10         |20+10=30   |0          |30         |
+      |8  |10   |B       |0          |30         |+10        |30+10=40   |
+      |9  |10   |A       |10         |30+10=40   |0          |40         |
+      |-------------------------- Enable NG -----------------------------|
+      |10 |10   |B       |0          |40         |+4         |40+4=44    | <- check
+       */
       "height = enableMicroblocksAfterHeight - a miner should receive 40% of the current block's fee only" in {
         val fs = TestFunctionalitySettings.Enabled.copy(
-          enableMicroblocksAfterHeight = NumTransactions
+          enableMicroblocksAfterHeight = 9
         )
 
         assertDiff(testChain, fs) { diff =>
-          val actualTotalFeeOfSigner1 = diff.right.get.snapshots(signer1)(NumTransactions + 1).balance
-          actualTotalFeeOfSigner1 shouldBe 44
+          val actualBalanceOfSignerB = diff.right.get.snapshots(signerB)(10).balance
+          actualBalanceOfSignerB shouldBe 44
         }
       }
 
+      /*
+      | N | fee | signer | A receive | A balance | B receive | B balance |
+      |--:|:---:|:------:|----------:|----------:|----------:|-----------|
+      |1  |0    |A       |0          |0          |0          |0          | <- genesis
+      |2  |10   |B       |0          |0          |10         |+10        |
+      |3  |10   |A       |10         |+10        |0          |0          |
+      |4  |10   |B       |0          |10         |+10        |10+10=20   |
+      |-------------------------- Enable NG -----------------------------|
+      |5  |10   |A       |4          |10+4=14    |0          |20         |
+      |6  |10   |B       |0          |14         |+4+6=10    |20+10=30   |
+      |7  |10   |A       |4+6=10     |14+10=24   |0          |30         |
+      |8  |10   |B       |0          |24         |+4+6=10    |30+10=40   |
+      |9  |10   |A       |4+6=10     |24+10=34   |0          |40         | <- 1st check
+      |10 |10   |B       |0          |34         |+4+6=10    |40+10=50   | <- 2nd check
+       */
       "height > enableMicroblocksAfterHeight - a miner should receive 60% of previous block's fee and 40% of the current one" in {
         val fs = TestFunctionalitySettings.Enabled.copy(
-          enableMicroblocksAfterHeight = NumTransactions / 2
+          enableMicroblocksAfterHeight = 4
         )
 
-        assertDiff(testChain, fs) { diff =>
-          val actualTotalFeeOfSigner1 = diff.right.get.snapshots(signer1)(NumTransactions + 1).balance
-          actualTotalFeeOfSigner1 shouldBe 50
+        assertDiff(testChain.init, fs) { diff =>
+          val actualBalanceOfSignerA = diff.right.get.snapshots(signerA)(9).balance
+          actualBalanceOfSignerA shouldBe 34
         }
 
-        assertDiff(testChain.init, fs) { diff =>
-          val actualTotalFeeOfSigner2 = diff.right.get.snapshots(signer2)(NumTransactions).balance
-          actualTotalFeeOfSigner2 shouldBe 44
+        assertDiff(testChain, fs) { diff =>
+          val actualBalanceOfSignerB = diff.right.get.snapshots(signerB)(10).balance
+          actualBalanceOfSignerB shouldBe 50
         }
       }
     }
@@ -90,11 +133,11 @@ class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen {
       ).right.get
     }
 
-    val signer1TestBlock = new TestBlock(signer1)
-    val signer2TestBlock = new TestBlock(signer2)
+    val signerATestBlock = new TestBlock(signerA)
+    val signerBTestBlock = new TestBlock(signerB)
 
     (genesisTx +: paymentTxs).zipWithIndex.map { case (x, i) =>
-      val testBlock = if (i % 2 == 0) signer1TestBlock else signer2TestBlock
+      val testBlock = if (i % 2 == 0) signerATestBlock else signerBTestBlock
       testBlock.create(Seq(x))
     }
   }
