@@ -35,7 +35,7 @@ class StateReaderLastTransactionsTest extends PropSpec with PropertyChecks with 
         val tx2 = pre(2)
         newState.accountTransactions(payment.sender, 3) shouldBe Seq(payment, tx2, tx1)
         newState.accountTransactions(payment.sender, 10) shouldBe Seq(payment, tx2, tx1, g)
-        newState.accountTransactionIds(TestBlock.defaultSigner, 10).size shouldBe 0
+        newState.accountTransactionIds(TestBlock.signer, 10).size shouldBe 0
       }
     }
   }
