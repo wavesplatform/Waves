@@ -121,6 +121,7 @@ class NgHistoryWriterImpl(inner: HistoryWriter) extends NgHistoryWriter with Sco
 
   override def appendMicroBlock(microBlock: MicroBlock)
                                (microBlockConsensusValidation: Long => Either[ValidationError, BlockDiff]): Either[ValidationError, BlockDiff] = write { implicit l =>
+    // !!!!!
     baseB() match {
       case None =>
         Left(MicroBlockAppendError("No base block exists", microBlock))

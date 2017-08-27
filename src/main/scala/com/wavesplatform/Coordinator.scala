@@ -7,6 +7,7 @@ import com.wavesplatform.network.{BlockCheckpoint, Checkpoint}
 import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
 import com.wavesplatform.state2.ByteStr
 import com.wavesplatform.state2.reader.StateReader
+import kamon.Kamon
 import scorex.block.{Block, MicroBlock}
 import scorex.consensus.TransactionsOrdering
 import scorex.transaction.ValidationError.{GenericError, MicroBlockAppendError}
@@ -76,7 +77,7 @@ object Coordinator extends ScorexLogging {
   def processMicroBlock(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater, utxStorage: UtxPool)
                        (microBlock: MicroBlock): Either[ValidationError, Unit] = for {
     _ <- Either.cond(checkpoint.isBlockValid(microBlock.totalResBlockSig, history.height() + 1), (),
-      MicroBlockAppendError(s"[h = ${history.height() + 1}] is not valid with respect to checkpoint", microBlock))
+      MicroBlockAppendError(s"[h = ${history.height() + 1}] is not valid with respect to checkpoint", microBlock)) // Possible
     _ <- blockchainUpdater.processMicroBlock(microBlock)
   } yield utxStorage.removeAll(microBlock.transactionData)
 
@@ -109,7 +110,7 @@ object Coordinator extends ScorexLogging {
     val fork = existingItems.takeWhile {
       case BlockCheckpoint(h, sig) =>
         val block = history.blockAt(h).get
-        block.signerData.signature != ByteStr(sig)
+        block.signerData.signature != ByteStr(sig) // <--- fork if at this height signatures are different!
     }
 
     if (fork.nonEmpty) {
@@ -118,6 +119,7 @@ object Coordinator extends ScorexLogging {
       history.blockAt(hh(fork.size)).foreach {
         lastValidBlock =>
           log.warn(s"Fork detected (length = ${fork.size}), rollback to last valid block id [${lastValidBlock.uniqueId}]")
+          blockForkCounter.increment()
           blockchainUpdater.removeAfter(lastValidBlock.uniqueId)
       }
     }
@@ -160,5 +162,9 @@ object Coordinator extends ScorexLogging {
       _ <- Either.cond(hit < target, (), s"calculated hit $hit >= calculated target $target")
     } yield ()).left.map(e => GenericError(s"Block ${block.uniqueId} is invalid: $e"))
   }
+
+  private val blockForkCounter = Kamon.metrics.counter("block-fork")
+  private val microBlockForkCounter = Kamon.metrics.counter("micro-block-fork")
+  private val microBlockForkCounter = Kamon.metrics.counter("micro-block-fork") // block-micro-block-fork?
 
 }

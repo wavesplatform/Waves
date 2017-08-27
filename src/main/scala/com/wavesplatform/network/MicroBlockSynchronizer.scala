@@ -8,6 +8,8 @@ import com.wavesplatform.state2.ByteStr
 import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel._
 import monix.eval.Task
+import kamon.Kamon
+import kamon.metric.instrument.Time
 import scorex.transaction.NgHistory
 import scorex.utils.ScorexLogging
 
@@ -60,10 +62,14 @@ class MicroBlockSynchronizer(settings: Settings, history: NgHistory) extends Cha
               requestMicroBlockTask(totalResBlockSig, 2)
             else Task.unit
           } else {
+            notLastMicroblockCounter.increment()
             log.trace(s"Discarding $mi because it doesn't match last (micro)block")
             Task.unit
           }
-        case None => Task.unit
+
+        case None =>
+          unknownMicroblockCounter.increment()
+          Task.unit
       }
     }.flatten.runAsync
     case _ => super.channelRead(ctx, msg)
@@ -73,6 +79,15 @@ class MicroBlockSynchronizer(settings: Settings, history: NgHistory) extends Cha
 object MicroBlockSynchronizer {
 
   type MicroBlockSignature = ByteStr
+
+  private val microBlockInvCounter = Kamon.metrics.registerCounter("micro-block-inv")
+  private val microBlockReceiveLag = Kamon.metrics.registerHistogram(
+    name = "micro-block-receive-lag",
+    unitOfMeasurement = Some(Time.Milliseconds)
+  )
+
+  private val notLastMicroblockCounter = Kamon.metrics.registerCounter("micro-block-not-last")
+  private val unknownMicroblockCounter = Kamon.metrics.registerCounter("micro-block-unknown")
 
   case class Settings(waitResponseTimeout: FiniteDuration,
                       processedMicroBlocksCacheTimeout: FiniteDuration,
@@ -89,5 +104,7 @@ object MicroBlockSynchronizer {
     .expireAfterWrite(timeout.toMillis, TimeUnit.MILLISECONDS)
     .build[K, V]()
 
-  private val dummy = new Object()
+
+    private val dummy =
+      new Object()
 }
