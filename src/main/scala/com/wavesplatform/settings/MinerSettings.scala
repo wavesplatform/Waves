@@ -1,6 +1,7 @@
 package com.wavesplatform.settings
 
-import java.time.Duration
+import scala.concurrent.duration.Duration
+
 
 case class MinerSettings(
   enable: Boolean,

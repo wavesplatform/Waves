@@ -2,7 +2,7 @@ package com.wavesplatform.network
 
 import java.net.{InetSocketAddress, NetworkInterface}
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
+import java.util.concurrent.atomic.{AtomicInteger}
 
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.settings._
@@ -32,7 +32,6 @@ class NetworkServer(checkpointService: CheckpointService,
                     peerDatabase: PeerDatabase,
                     allChannels: ChannelGroup,
                     peerInfo: ConcurrentHashMap[Channel, PeerInfo],
-                    blockchainReadiness: AtomicBoolean
                    ) extends ScorexLogging {
 
   @volatile
@@ -48,7 +47,7 @@ class NetworkServer(checkpointService: CheckpointService,
     settings.synchronizationSettings.scoreTTL,
     history.lastBlockIds(settings.synchronizationSettings.maxRollback), history.score())
 
-  private val discardingHandler = new DiscardingHandler(blockchainReadiness)
+  private val discardingHandler = new DiscardingHandler(history, time, settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed)
   private val messageCodec = new MessageCodec(peerDatabase)
 
   private val excludedAddresses: Set[InetSocketAddress] = {
@@ -80,7 +79,7 @@ class NetworkServer(checkpointService: CheckpointService,
   private val coordinatorExecutor = new DefaultEventLoop
 
   private val coordinatorHandler = new CoordinatorHandler(checkpointService, history, blockchainUpdater, time,
-    stateReader, utxPool, blockchainReadiness, miner, settings, peerDatabase, allChannels)
+    stateReader, utxPool, miner, settings, peerDatabase, allChannels)
   private val peerUniqueness = new ConcurrentHashMap[PeerKey, Channel]()
 
   private val serverHandshakeHandler =

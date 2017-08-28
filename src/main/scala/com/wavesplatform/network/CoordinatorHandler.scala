@@ -1,7 +1,7 @@
 package com.wavesplatform.network
 
 import java.util.concurrent.Executors
-import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
+import java.util.concurrent.atomic.AtomicInteger
 
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.settings.WavesSettings
@@ -24,8 +24,6 @@ class CoordinatorHandler(
     time: Time,
     stateReader: StateReader,
     utxStorage: UtxPool,
-    blockchainReadiness:
-    AtomicBoolean,
     miner: Miner,
     settings: WavesSettings,
     peerDatabase: PeerDatabase,
@@ -41,8 +39,8 @@ class CoordinatorHandler(
   })
 
   private val processCheckpoint = Coordinator.processCheckpoint(checkpointService, history, blockchainUpdater) _
-  private val processFork = Coordinator.processFork(checkpointService, history, blockchainUpdater, stateReader, utxStorage, time, settings, miner, blockchainReadiness) _
-  private val processBlock = Coordinator.processBlock(checkpointService, history, blockchainUpdater, time, stateReader, utxStorage, blockchainReadiness, miner, settings) _
+  private val processFork = Coordinator.processFork(checkpointService, history, blockchainUpdater, stateReader, utxStorage, time, settings.blockchainSettings, miner) _
+  private val processBlock = Coordinator.appendBlock(checkpointService, history, blockchainUpdater, stateReader, utxStorage, time, settings.blockchainSettings) _
 
   private def broadcastingScore(
       src: Channel,
@@ -80,7 +78,10 @@ class CoordinatorHandler(
           s"Attempting to append block ${b.uniqueId}",
           s"Successfully appended block ${b.uniqueId}",
           s"Could not append block ${b.uniqueId}",
-          processBlock(b, false))
+          processBlock(b).right.map { _ =>
+            miner.lastBlockChanged()
+            history.score()
+          })
       }
   }
 }
