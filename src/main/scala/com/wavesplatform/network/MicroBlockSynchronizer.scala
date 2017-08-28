@@ -17,25 +17,19 @@ class MicroBlockSynchronizer(settings: Settings, history: NgHistory)
 
   private implicit val scheduler = monix.execution.Scheduler.singleThread("microblock-synchronizer")
 
-  def requestMicroblock(microBlockSig: MicroBlockSignature, retriesAllowed: Int): Task[Unit] = {
-    if (retriesAllowed == 0) Task.unit
-    else Task {
-      val knownChannels = knownMicroblockOwners.getOrElse(microBlockSig, MSet.empty)
-      random(knownChannels) match {
-        case None => Task.unit
-        case Some(ctx) =>
-          knownChannels -= ctx
-          ctx.writeAndFlush(MicroBlockRequest(microBlockSig))
-          awaitingMicroblocks += microBlockSig
-          Task {
-            // still not received the microblock
-            if (awaitingMicroblocks.contains(microBlockSig))
-              requestMicroblock(microBlockSig, retriesAllowed - 1)
-            // the microblock has been recieved
-            else Task.unit
-
-          }.delayExecution(settings.waitResponseTimeout).flatten
-      }
+  def requestMicroblock(microBlockSig: MicroBlockSignature, attemptsAllowed: Int): Unit = if (attemptsAllowed > 0) {
+    val knownChannels = knownMicroblockOwners.getOrElse(microBlockSig, MSet.empty)
+    random(knownChannels) match {
+      case None => ()
+      case Some(ctx) =>
+        knownChannels -= ctx
+        ctx.writeAndFlush(MicroBlockRequest(microBlockSig))
+        awaitingMicroblocks += microBlockSig
+        Task { // still not received the microBlock
+          if (awaitingMicroblocks.contains(microBlockSig))
+            requestMicroblock(microBlockSig, attemptsAllowed - 1)
+        }.delayExecution(settings.waitResponseTimeout)
+          .runAsync
     }
   }
 
@@ -48,26 +42,25 @@ class MicroBlockSynchronizer(settings: Settings, history: NgHistory)
       knownMicroblockOwners -= mb.totalResBlockSig
       awaitingMicroblocks -= mb.totalResBlockSig
     }.runAsync
-    case mi@MicroBlockInv(totalResBlockSig, prevResBlockSig) =>
+    case mi@MicroBlockInv(totalResBlockSig, prevResBlockSig) => Task {
       log.trace(id(ctx) + "Received " + mi)
       history.lastBlockId() match {
-        case Some(lastBlockId) => Task {
+        case Some(lastBlockId) =>
           if (lastBlockId == prevResBlockSig) {
             knownMicroblockOwners.get(totalResBlockSig) match {
               case None => knownMicroblockOwners += (totalResBlockSig -> MSet(ctx))
               case Some(set) => set += ctx
             }
             if (!awaitingMicroblocks.contains(totalResBlockSig)) {
-              requestMicroblock(totalResBlockSig, 2).runAsync
+              requestMicroblock(totalResBlockSig, 2)
             }
           } else {
             log.trace(s"Discarding $mi because it doesn't match last (micro)block")
           }
-        }.runAsync
         case None =>
           log.warn("History does not contain the last block!")
       }
-
+    }.runAsync
     case _ => super.channelRead(ctx, msg)
   }
 }
