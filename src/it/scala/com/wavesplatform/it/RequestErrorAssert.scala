@@ -2,20 +2,17 @@ package com.wavesplatform.it
 
 import java.nio.charset.StandardCharsets
 
-import com.wavesplatform.it.api.NodeApi.UnexpectedStatusCodeException
-
 import akka.http.scaladsl.model.StatusCodes
 import com.wavesplatform.it.RequestErrorAssert.ErrorMessage
-import com.wavesplatform.it.api.NodeApi.{Balance, UnexpectedStatusCodeException}
+import com.wavesplatform.it.api.NodeApi.UnexpectedStatusCodeException
 import org.scalatest.{Assertion, Assertions}
-import play.api.libs.json.Json
-import scorex.api.http.ApiErrorResponse
-import play.api.libs.json.{Format, Json}
 import play.api.libs.json.Json.parse
+import play.api.libs.json.{Format, Json}
+import scorex.api.http.ApiErrorResponse
 
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
-import scala.concurrent.ExecutionContext.Implicits.global
 
 trait RequestErrorAssert extends Assertions {
   protected def assertBadRequest(f: Future[_]): Future[Assertion] = f transform {

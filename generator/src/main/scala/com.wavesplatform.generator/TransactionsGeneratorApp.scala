@@ -85,7 +85,7 @@ object TransactionsGeneratorApp extends App {
     val sender = new NetworkSender(chainId, "generator", nonce)
     sys.addShutdownHook(sender.close())
 
-    sender.connect(node).onComplete {
+    val f = sender.connect(node).transform {
       case Success(channel) =>
         (1 to iterations).foreach { i =>
           log.info(s"Iteration $i")
@@ -98,9 +98,12 @@ object TransactionsGeneratorApp extends App {
           if (i != iterations) Thread.sleep(delay.toMillis)
         }
         log.info("Done")
-
-      case Failure(_) => log.error(s"Failed to establish connection to $node")
+        Success(())
+      case Failure(e) =>
+        log.error(s"Failed to establish connection to $node", e)
+        Success(())
     }
+    Await.result(f, Duration.Inf)
     sender.close()
   }
 

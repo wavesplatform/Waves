@@ -24,7 +24,7 @@ class NetworkSender(chainId: Char, name: String, nonce: Long) {
   def send(channel: Channel, messages: RawBytes*): Future[Seq[Unit]] = {
     Future.traverse(messages) { msg =>
       val p = Promise[Unit]
-      channel.writeAndFlush(msg).addListener((_: io.netty.util.concurrent.Future[Void]) => p.success())
+      channel.writeAndFlush(msg).addListener((_: io.netty.util.concurrent.Future[Void]) => p.success(()))
       p.future
     }
   }
