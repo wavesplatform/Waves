@@ -82,9 +82,6 @@ class PeerDatabaseImplSpecification extends path.FreeSpecLike with Matchers {
       database.randomPeer(Set()) should be(empty)
     }
 
-  }
-
-  "Peer database2" - {
     "random peer should return peers from both from database and buffer" in {
       database2.touch(address1)
       database2.addCandidate(address2)
@@ -96,6 +93,14 @@ class PeerDatabaseImplSpecification extends path.FreeSpecLike with Matchers {
 
       set should contain(address1)
       set should contain(address2)
+    }
+
+    "filters out excluded candidates" in {
+      database.addCandidate(address1)
+      database.addCandidate(address1)
+      database.addCandidate(address2)
+
+      database.randomPeer(Set(address1)) should contain(address2)
     }
   }
 
