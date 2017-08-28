@@ -1,7 +1,6 @@
 package com.wavesplatform.mining
 
 import java.time.{Duration, Instant}
-import java.util.concurrent.atomic.AtomicBoolean
 
 import com.wavesplatform.network._
 import com.wavesplatform.settings.WavesSettings
@@ -22,11 +21,9 @@ import scorex.utils.{ScorexLogging, Time}
 import scorex.wallet.Wallet
 
 import scala.concurrent.duration._
-import scala.math.Ordering.Implicits._
 
 class Miner(
                allChannels: ChannelGroup,
-               blockchainReadiness: AtomicBoolean,
                blockchainUpdater: BlockchainUpdater,
                checkpoint: CheckpointService,
                history: History,
@@ -42,7 +39,7 @@ class Miner(
 
   private val minerSettings = settings.minerSettings
   private val blockchainSettings = settings.blockchainSettings
-  private lazy val processBlock = Coordinator.processBlock(checkpoint, history, blockchainUpdater, timeService, stateReader, utx, blockchainReadiness, Miner.this, settings) _
+  private val processBlock = Coordinator.appendBlock(checkpoint, history, blockchainUpdater, stateReader, utx, timeService, blockchainSettings) _
 
   private val scheduledAttempts = SerialCancelable()
 
@@ -51,7 +48,7 @@ class Miner(
   private def checkAge(parentHeight: Int, parent: Block): Either[String, Unit] =
     Either
       .cond(parentHeight == 1, (), Duration.between(Instant.ofEpochMilli(parent.timestamp), Instant.ofEpochMilli(timeService.correctedTime())))
-      .left.flatMap(blockAge => Either.cond(blockAge <= minerSettings.intervalAfterLastBlockThenGenerationIsAllowed, (),
+      .left.flatMap(blockAge => Either.cond(blockAge.toMillis <= minerSettings.intervalAfterLastBlockThenGenerationIsAllowed.toMillis, (),
       s"BlockChain is too old (last block ${parent.uniqueId} generated $blockAge ago)"
     ))
 
@@ -94,12 +91,13 @@ class Miner(
         val balance = generatingBalance(stateReader, blockchainSettings.functionalitySettings, account, height)
         generateOneBlockTask(account, height, lastBlock, grandParent, balance)(offset).flatMap {
           case Right(block) => Task.now {
-            processBlock(block, true) match {
+            processBlock(block) match {
               case Left(err) => log.warn(err.toString)
               case Right(score) =>
-                allChannels.broadcast(LocalScoreChanged(score))
+                allChannels.broadcast(LocalScoreChanged(history.score()))
                 allChannels.broadcast(BlockForged(block))
             }
+            lastBlockChanged()
           }
           case Left(err) =>
             log.debug(s"No block generated because $err, retrying")

@@ -1,11 +1,10 @@
 package com.wavesplatform
 
 import java.time.Duration
-import java.util.concurrent.atomic.AtomicBoolean
 
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.network.{BlockCheckpoint, Checkpoint}
-import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
+import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state2.ByteStr
 import com.wavesplatform.state2.reader.StateReader
 import scorex.block.Block
@@ -16,7 +15,7 @@ import scorex.utils.{ScorexLogging, Time}
 
 object Coordinator extends ScorexLogging {
   def processFork(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater, stateReader: StateReader,
-                  utxStorage: UtxPool, time: Time, settings: WavesSettings, miner: Miner, blockchainReadiness: AtomicBoolean)
+                  utxStorage: UtxPool, time: Time, blockchainSettings: BlockchainSettings, miner: Miner)
                  (newBlocks: Seq[Block]): Either[ValidationError, BigInt] = {
     val extension = newBlocks.dropWhile(history.contains)
 
@@ -27,7 +26,7 @@ object Coordinator extends ScorexLogging {
           extension.zipWithIndex.forall(p => checkpoint.isBlockValid(p._1.signerData.signature, lastCommonHeight + 1 + p._2))
 
         def forkApplicationResultEi: Either[ValidationError, BigInt] = extension.view
-          .map(b => b -> appendBlock(checkpoint, history, blockchainUpdater, stateReader, utxStorage, time, settings.blockchainSettings)(b))
+          .map(b => b -> appendBlock(checkpoint, history, blockchainUpdater, stateReader, utxStorage, time, blockchainSettings)(b))
           .collectFirst { case (b, Left(e)) => b -> e }
           .fold[Either[ValidationError, BigInt]](Right(history.score())) {
           case (b, e) =>
@@ -43,7 +42,6 @@ object Coordinator extends ScorexLogging {
         } yield {
           droppedTransactions.foreach(utxStorage.putIfNew)
           miner.lastBlockChanged()
-          updateBlockchainReadinessFlag(history, time, blockchainReadiness, settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed)
           score
         }
       case None =>
@@ -52,29 +50,9 @@ object Coordinator extends ScorexLogging {
     }
   }
 
-
-  private def updateBlockchainReadinessFlag(history: History, time: Time, blockchainReadiness: AtomicBoolean, maxBlockchainAge: Duration): Boolean = {
-    val expired = time.correctedTime() - history.lastBlock.get.timestamp < maxBlockchainAge.toMillis
-    blockchainReadiness.compareAndSet(expired, !expired)
-  }
-
-  def processBlock(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater, time: Time,
-                   stateReader: StateReader, utxStorage: UtxPool, blockchainReadiness: AtomicBoolean, miner: Miner,
-                   settings: WavesSettings)(newBlock: Block, local: Boolean): Either[ValidationError, BigInt] = {
-    val newScore = for {
-      _ <- appendBlock(checkpoint, history, blockchainUpdater, stateReader, utxStorage, time, settings.blockchainSettings)(newBlock)
-    } yield history.score()
-
-    if (local || newScore.isRight) {
-      updateBlockchainReadinessFlag(history, time, blockchainReadiness, settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed)
-      miner.lastBlockChanged()
-    }
-    newScore
-  }
-
-  private def appendBlock(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater,
-                          stateReader: StateReader, utxStorage: UtxPool, time: Time, settings: BlockchainSettings)
-                         (block: Block): Either[ValidationError, Unit] = for {
+  def appendBlock(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater,
+                  stateReader: StateReader, utxStorage: UtxPool, time: Time, settings: BlockchainSettings)
+                 (block: Block): Either[ValidationError, Unit] = for {
     _ <- Either.cond(checkpoint.isBlockValid(block.signerData.signature, history.height() + 1), (),
       GenericError(s"Block ${block.uniqueId} at height ${history.height() + 1} is not valid w.r.t. checkpoint"))
     _ <- blockConsensusValidation(history, stateReader, settings, time.correctedTime())(block)
