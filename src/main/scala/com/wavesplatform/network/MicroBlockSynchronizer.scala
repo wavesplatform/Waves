@@ -24,6 +24,7 @@ class MicroBlockSynchronizer(settings: Settings, history: NgHistory) extends Cha
   private val successfullyReceivedMicroBlocks = cache[MicroBlockSignature, Object](settings.processedMicroBlocksCacheTimeout)
 
   private def alreadyRequested(microBlockSig: MicroBlockSignature): Boolean = Option(awaitingMicroBlocks.getIfPresent(microBlockSig)).isDefined
+
   private def alreadyProcessed(microBlockSig: MicroBlockSignature): Boolean = Option(successfullyReceivedMicroBlocks.getIfPresent(microBlockSig)).isDefined
 
   def requestMicroBlockTask(microBlockSig: MicroBlockSignature, attemptsAllowed: Int): Task[Unit] = Task {
@@ -57,6 +58,7 @@ class MicroBlockSynchronizer(settings: Settings, history: NgHistory) extends Cha
             knownMicroBlockOwners.get(totalResBlockSig, () => MSet.empty) += ctx
             if (!alreadyRequested(totalResBlockSig))
               requestMicroBlockTask(totalResBlockSig, 2)
+            else Task.unit
           } else {
             log.trace(s"Discarding $mi because it doesn't match last (micro)block")
             Task.unit
