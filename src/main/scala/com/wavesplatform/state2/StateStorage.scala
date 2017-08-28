@@ -74,7 +74,7 @@ class StateStorage private(file: Option[File]) extends AutoCloseable {
 }
 
 object StateStorage {
-  private val Version = 1
+  private val Version = 2
 
   private val CompactFillRate = 80
   private val CompactMemorySize = 19 * 1024 * 1024
