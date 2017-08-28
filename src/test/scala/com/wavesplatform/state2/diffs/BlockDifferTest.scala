@@ -1,5 +1,7 @@
 package com.wavesplatform.state2.diffs
 
+import java.util.concurrent.ThreadLocalRandom
+
 import com.wavesplatform.BlockGen
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.BlockDiff
@@ -8,16 +10,22 @@ import scorex.account.PrivateKeyAccount
 import scorex.block.Block
 import scorex.lagonaki.mocks.TestBlock
 import scorex.settings.TestFunctionalitySettings
-import scorex.transaction.{GenesisTransaction, PaymentTransaction, ValidationError}
+import scorex.transaction.{GenesisTransaction, PaymentTransaction, TransactionParser, ValidationError}
 
 class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen {
 
   private val TransactionFee = 10
 
-  private val signerA, signerB = PrivateKeyAccount.random
+  def randomPrivateKeyAccount(): PrivateKeyAccount = {
+    val seed = Array.ofDim[Byte](TransactionParser.KeyLength)
+    ThreadLocalRandom.current().nextBytes(seed)
+    PrivateKeyAccount(seed)
+  }
+
+  private val signerA, signerB = randomPrivateKeyAccount()
 
   private val testChain: Seq[Block] = {
-    val master, recipient = PrivateKeyAccount.random
+    val master, recipient = randomPrivateKeyAccount()
     getTwoMinersBlockChain(master, recipient, 9)
   }
 
