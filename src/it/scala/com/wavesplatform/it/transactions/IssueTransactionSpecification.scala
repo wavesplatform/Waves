@@ -6,7 +6,6 @@ import org.scalatest.prop.TableDrivenPropertyChecks
 
 import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
 
 class IssueTransactionSpecification(override val allNodes: Seq[Node], override val notMiner: Node)
@@ -77,7 +76,7 @@ class IssueTransactionSpecification(override val allNodes: Seq[Node], override v
       (0l, 2, "negative amount"),
       (1l, 9, "Too big sequences requested"),
       (-1l, 1, "negative amount"),
-      (1l, -1, "Too big sequences requested"))   //??? what message shoild be?
+      (1l, -1, "Too big sequences requested")) //??? what message shoild be?
 
   forAll(invalidAssetValue) { (assetVal: Long, decimals: Int, message: String) =>
     test(s"Not able to create asset total token='$assetVal', decimals='$decimals' ") {
