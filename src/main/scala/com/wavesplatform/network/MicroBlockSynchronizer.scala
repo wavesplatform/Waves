@@ -23,11 +23,11 @@ class MicroBlockSynchronizer(settings: Settings, history: NgHistory) extends Cha
   private val knownMicroBlockOwners = cache[MicroBlockSignature, MSet[ChannelHandlerContext]](settings.invCacheTimeout)
   private val successfullyReceivedMicroBlocks = cache[MicroBlockSignature, Object](settings.processedMicroBlocksCacheTimeout)
 
-  private def awaitingMicroBlockResponse(microBlockSig: MicroBlockSignature): Boolean = Option(awaitingMicroBlocks.getIfPresent(microBlockSig)).isDefined
-  private def alreadyProcessedMicroBlock(microBlockSig: MicroBlockSignature): Boolean = Option(successfullyReceivedMicroBlocks.getIfPresent(microBlockSig)).isDefined
+  private def alreadyRequested(microBlockSig: MicroBlockSignature): Boolean = Option(awaitingMicroBlocks.getIfPresent(microBlockSig)).isDefined
+  private def alreadyProcessed(microBlockSig: MicroBlockSignature): Boolean = Option(successfullyReceivedMicroBlocks.getIfPresent(microBlockSig)).isDefined
 
   def requestMicroBlockTask(microBlockSig: MicroBlockSignature, attemptsAllowed: Int): Task[Unit] = Task {
-    if (attemptsAllowed > 0 && !alreadyProcessedMicroBlock(microBlockSig)) {
+    if (attemptsAllowed > 0 && !alreadyProcessed(microBlockSig)) {
       val knownChannels = knownMicroBlockOwners.get(microBlockSig, () => MSet.empty)
       random(knownChannels) match {
         case Some(ctx) =>
@@ -55,7 +55,7 @@ class MicroBlockSynchronizer(settings: Settings, history: NgHistory) extends Cha
         case Some(lastBlockId) =>
           if (lastBlockId == prevResBlockSig) {
             knownMicroBlockOwners.get(totalResBlockSig, () => MSet.empty) += ctx
-            if (!awaitingMicroBlockResponse(totalResBlockSig))
+            if (!alreadyRequested(totalResBlockSig))
               requestMicroBlockTask(totalResBlockSig, 2)
           } else {
             log.trace(s"Discarding $mi because it doesn't match last (micro)block")
