@@ -77,7 +77,7 @@ object Coordinator extends ScorexLogging {
   def processMicroBlock(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater, utxStorage: UtxPool)
                        (microBlock: MicroBlock): Either[ValidationError, Unit] = for {
     _ <- Either.cond(checkpoint.isBlockValid(microBlock.totalResBlockSig, history.height() + 1), (),
-      MicroBlockAppendError(s"[h = ${history.height() + 1}] is not valid with respect to checkpoint", microBlock)) // Possible
+      MicroBlockAppendError(s"[h = ${history.height() + 1}] is not valid with respect to checkpoint", microBlock))
     _ <- blockchainUpdater.processMicroBlock(microBlock)
   } yield utxStorage.removeAll(microBlock.transactionData)
 
@@ -110,7 +110,7 @@ object Coordinator extends ScorexLogging {
     val fork = existingItems.takeWhile {
       case BlockCheckpoint(h, sig) =>
         val block = history.blockAt(h).get
-        block.signerData.signature != ByteStr(sig) // <--- fork if at this height signatures are different!
+        block.signerData.signature != ByteStr(sig)
     }
 
     if (fork.nonEmpty) {
@@ -119,7 +119,9 @@ object Coordinator extends ScorexLogging {
       history.blockAt(hh(fork.size)).foreach {
         lastValidBlock =>
           log.warn(s"Fork detected (length = ${fork.size}), rollback to last valid block id [${lastValidBlock.uniqueId}]")
-          blockForkCounter.increment()
+          blockBlockForkStats.increment()
+          blockBlockForkHeightStats.record(fork.size)
+
           blockchainUpdater.removeAfter(lastValidBlock.uniqueId)
       }
     }
@@ -163,8 +165,7 @@ object Coordinator extends ScorexLogging {
     } yield ()).left.map(e => GenericError(s"Block ${block.uniqueId} is invalid: $e"))
   }
 
-  private val blockForkCounter = Kamon.metrics.counter("block-fork")
-  private val microBlockForkCounter = Kamon.metrics.counter("micro-block-fork")
-  private val microBlockForkCounter = Kamon.metrics.counter("micro-block-fork") // block-micro-block-fork?
+  private val blockBlockForkStats = Kamon.metrics.counter("block-fork")
+  private val blockBlockForkHeightStats = Kamon.metrics.histogram("block-block-fork-height")
 
 }

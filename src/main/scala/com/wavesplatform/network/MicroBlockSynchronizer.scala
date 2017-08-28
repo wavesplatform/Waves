@@ -62,13 +62,13 @@ class MicroBlockSynchronizer(settings: Settings, history: NgHistory) extends Cha
               requestMicroBlockTask(totalResBlockSig, 2)
             else Task.unit
           } else {
-            notLastMicroblockCounter.increment()
+            notLastMicroblockStats.increment()
             log.trace(s"Discarding $mi because it doesn't match last (micro)block")
             Task.unit
           }
 
         case None =>
-          unknownMicroblockCounter.increment()
+          unknownMicroblockStats.increment()
           Task.unit
       }
     }.flatten.runAsync
@@ -80,14 +80,14 @@ object MicroBlockSynchronizer {
 
   type MicroBlockSignature = ByteStr
 
-  private val microBlockInvCounter = Kamon.metrics.registerCounter("micro-block-inv")
-  private val microBlockReceiveLag = Kamon.metrics.registerHistogram(
-    name = "micro-block-receive-lag",
+  private val microBlockInvStats = Kamon.metrics.registerCounter("micro-inv")
+  private val microBlockReceiveLagStats = Kamon.metrics.registerHistogram(
+    name = "micro-receive-lag",
     unitOfMeasurement = Some(Time.Milliseconds)
   )
 
-  private val notLastMicroblockCounter = Kamon.metrics.registerCounter("micro-block-not-last")
-  private val unknownMicroblockCounter = Kamon.metrics.registerCounter("micro-block-unknown")
+  private val notLastMicroblockStats = Kamon.metrics.registerCounter("micro-not-last")
+  private val unknownMicroblockStats = Kamon.metrics.registerCounter("micro-unknown")
 
   case class Settings(waitResponseTimeout: FiniteDuration,
                       processedMicroBlocksCacheTimeout: FiniteDuration,
@@ -107,4 +107,5 @@ object MicroBlockSynchronizer {
 
     private val dummy =
       new Object()
+
 }

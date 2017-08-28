@@ -144,7 +144,6 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
   override def processMicroBlock(microBlock: MicroBlock): Either[ValidationError, Unit] = write { implicit l =>
     val bld = bestLiquidDiff()
     ngHistoryWriter.appendMicroBlock(microBlock)(ts =>
-      // or this
       BlockDiffer.fromMicroBlock(settings,
         composite(currentPersistedBlocksState, () => bestLiquidDiff().copy(snapshots = Map.empty)),
         ngHistoryWriter.parent(ngHistoryWriter.lastBlock.get).map(_.timestamp), microBlock, ts))

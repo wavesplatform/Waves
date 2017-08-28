@@ -33,7 +33,7 @@ class NgHistoryWriterImplTest extends PropSpec with GeneratorDrivenPropertyCheck
       microBlocks.foreach(mb => history.appendMicroBlock(mb)(_ => Right(BlockDiff.empty)).right.get)
 
       history.forgeBlock(block.signerData.signature).get match {
-        case ((forged, txs)) =>
+        case ((forged, _, txs)) =>
           Signed.validateSignatures(forged) shouldBe 'right
           txs shouldBe Seq(payment, payment2, payment3)
         case _ => ???
@@ -41,7 +41,7 @@ class NgHistoryWriterImplTest extends PropSpec with GeneratorDrivenPropertyCheck
 
       microBlocks.foreach { m =>
         history.forgeBlock(m.totalResBlockSig).get match {
-          case ((forged, txs)) =>
+          case ((forged, _, txs)) =>
             Signed.validateSignatures(forged) shouldBe 'right
           case _ => ???
         }

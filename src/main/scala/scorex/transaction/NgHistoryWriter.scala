@@ -4,6 +4,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock
 
 import com.wavesplatform.state2._
 import kamon.Kamon
+import kamon.metric.instrument.Time
 import scorex.block.Block.BlockId
 import scorex.block.{Block, MicroBlock}
 import scorex.transaction.History.BlockchainScore
@@ -17,7 +18,7 @@ trait NgHistoryWriter extends HistoryWriter with NgHistory {
 
   def bestLiquidBlock(): Option[Block]
 
-  def forgeBlock(id: BlockId): Option[(Block, DiscardedTransactions)]
+  def forgeBlock(id: BlockId): Option[(Block, Int, DiscardedTransactions)]
 }
 
 class NgHistoryWriterImpl(inner: HistoryWriter) extends NgHistoryWriter with ScorexLogging with Instrumented {
@@ -57,14 +58,17 @@ class NgHistoryWriterImpl(inner: HistoryWriter) extends NgHistoryWriter with Sco
       }
     }
     else forgeBlock(block.reference) match {
-      case Some((forgedBlock, discarded)) =>
-        if (forgedBlock.signatureValid)
-          inner.appendBlock(forgedBlock)(consensusValidation).map(dd => (dd._1, discarded))
-        else {
+      case Some((forgedBlock, discardedMicroBlocks, discardedTxs)) =>
+        if (forgedBlock.signatureValid) {
+          if (discardedMicroBlocks > 0) {
+            microBlockForkStats.increment()
+            microBlockForkHeightStats.record(discardedMicroBlocks)
+          }
+          inner.appendBlock(forgedBlock)(consensusValidation).map(dd => (dd._1, discardedTxs))
+        } else {
           val errorText = s"Forged block has invalid signature: base: ${baseB()}, micros: ${micros()}, requested reference: ${block.reference}"
           log.error(errorText)
           Left(BlockAppendError(s"ERROR: $errorText", block))
-
         }
       case None =>
         Left(BlockAppendError(s"References incorrect or non-existing block(liquid block exists): " + logDetails, block))
@@ -121,7 +125,6 @@ class NgHistoryWriterImpl(inner: HistoryWriter) extends NgHistoryWriter with Sco
 
   override def appendMicroBlock(microBlock: MicroBlock)
                                (microBlockConsensusValidation: Long => Either[ValidationError, BlockDiff]): Either[ValidationError, BlockDiff] = write { implicit l =>
-    // !!!!!
     baseB() match {
       case None =>
         Left(MicroBlockAppendError("No base block exists", microBlock))
@@ -130,8 +133,10 @@ class NgHistoryWriterImpl(inner: HistoryWriter) extends NgHistoryWriter with Sco
       case Some(base) =>
         micros().headOption match {
           case None if base.uniqueId != microBlock.prevResBlockSig =>
+            blockMicroForkStats.increment()
             Left(MicroBlockAppendError("It's first micro and it doesn't reference base block(which exists)", microBlock))
           case Some(prevMicro) if prevMicro.totalResBlockSig != microBlock.prevResBlockSig =>
+            microMicroForkStats.increment()
             Left(MicroBlockAppendError("It doesn't reference last known microBlock(which exists)", microBlock))
           case _ =>
             Signed.validateSignatures(microBlock)
@@ -149,15 +154,15 @@ class NgHistoryWriterImpl(inner: HistoryWriter) extends NgHistoryWriter with Sco
       .orElse(micros().find(_.totalResBlockSig == blockId)).isDefined
   }
 
-  private val forgeBlockTimeStats = Kamon.metrics.histogram("forge-block-time")
+  private val forgeBlockTimeStats = Kamon.metrics.histogram("forge-block-time", Time.Milliseconds)
 
-  def forgeBlock(id: BlockId): Option[(Block, DiscardedTransactions)] = read { implicit l =>
+  def forgeBlock(id: BlockId): Option[(Block, Int, DiscardedTransactions)] = read { implicit l =>
     measureSuccessful(forgeBlockTimeStats, {
       baseB().flatMap(base => {
         val ms = micros().reverse
         if (base.uniqueId == id) {
           val discardedTxs = ms.flatMap(_.transactionData)
-          Some((base, discardedTxs))
+          Some((base, ms.size, discardedTxs))
         } else if (!ms.exists(_.totalResBlockSig == id)) None
         else {
           val (accumulatedTxs, maybeFound) = ms.foldLeft((List.empty[Transaction], Option.empty[(ByteStr, DiscardedMicroBlocks)])) { case ((accumulated, maybeDiscarded), micro) =>
@@ -171,7 +176,11 @@ class NgHistoryWriterImpl(inner: HistoryWriter) extends NgHistoryWriter with Sco
             }
           }
           maybeFound.map { case (sig, discardedMicroblocks) =>
-            (base.copy(signerData = base.signerData.copy(signature = sig), transactionData = base.transactionData ++ accumulatedTxs), discardedMicroblocks.flatMap(_.transactionData))
+            (
+              base.copy(signerData = base.signerData.copy(signature = sig), transactionData = base.transactionData ++ accumulatedTxs),
+              discardedMicroblocks.size,
+              discardedMicroblocks.flatMap(_.transactionData)
+            )
           }
         }
       })
@@ -191,4 +200,12 @@ class NgHistoryWriterImpl(inner: HistoryWriter) extends NgHistoryWriter with Sco
       .orElse(baseB().map(_.uniqueId))
       .orElse(inner.lastBlockId())
   }
+
+  private val blockMicroForkStats = Kamon.metrics.counter("block-micro-fork")
+
+  private val microBlockForkStats = Kamon.metrics.counter("micro-block-fork")
+  private val microBlockForkHeightStats = Kamon.metrics.histogram("micro-block-fork-height")
+
+  private val microMicroForkStats = Kamon.metrics.counter("micro-micro-fork")
+
 }
