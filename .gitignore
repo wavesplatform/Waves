@@ -35,3 +35,4 @@ Dockerfile
 
 package
 !src/package
+native

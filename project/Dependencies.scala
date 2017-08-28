@@ -6,6 +6,7 @@ object Dependencies {
   def swaggerModule(module: String) = "io.swagger" % s"swagger-$module" % "1.5.16"
   def akkaHttpModule(module: String) = "com.typesafe.akka" %% module % "10.0.9"
   def nettyModule(module: String) = "io.netty" % s"netty-$module" % "4.1.13.Final"
+  def kamonModule(module: String) = "io.kamon" %% s"kamon-$module" % "0.6.7"
 
   lazy val network = Seq("handler", "buffer", "codec").map(nettyModule) ++ Seq(
     "org.bitlet" % "weupnp" % "0.1.4"
@@ -57,4 +58,6 @@ object Dependencies {
     "com.github.dnvriend" %% "akka-persistence-inmemory" % "2.4.18.1" % "test",
     "org.fusesource.leveldbjni" % "leveldbjni-all" % "1.8"
   )
+
+  lazy val kamon = Seq("core", "statsd", "system-metrics").map(kamonModule)
 }
