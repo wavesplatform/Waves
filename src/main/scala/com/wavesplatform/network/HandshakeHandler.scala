@@ -2,7 +2,7 @@ package com.wavesplatform.network
 
 import java.net.InetSocketAddress
 import java.util
-import java.util.concurrent.{ConcurrentMap, TimeUnit}
+import java.util.concurrent.{ConcurrentHashMap, ConcurrentMap, TimeUnit}
 
 import io.netty.buffer.ByteBuf
 import io.netty.channel.ChannelHandler.Sharable
@@ -52,9 +52,10 @@ class HandshakeTimeoutHandler(handshakeTimeout: FiniteDuration) extends ChannelI
 abstract class HandshakeHandler(
     localHandshake: Handshake,
     establishedConnections: ConcurrentMap[Channel, PeerInfo],
-    connections: ConcurrentMap[PeerKey, Channel],
     peerDatabase: PeerDatabase) extends ChannelInboundHandlerAdapter with ScorexLogging {
   import HandshakeHandler._
+
+  private val connections = new ConcurrentHashMap[PeerKey, Channel](10, 0.9f, 10)
 
   def connectionNegotiated(ctx: ChannelHandlerContext): Unit
 
@@ -112,10 +113,9 @@ object HandshakeHandler extends ScorexLogging {
   class Server(
       handshake: Handshake,
       establishedConnections: ConcurrentMap[Channel, PeerInfo],
-      connections: ConcurrentMap[PeerKey, Channel],
       peerDatabase: PeerDatabase,
       allChannels: ChannelGroup)
-    extends HandshakeHandler(handshake, establishedConnections, connections, peerDatabase) {
+    extends HandshakeHandler(handshake, establishedConnections, peerDatabase) {
     override def connectionNegotiated(ctx: ChannelHandlerContext) = {
       ctx.writeAndFlush(handshake.encode(ctx.alloc().buffer()))
       ctx.channel().closeFuture().addListener((_: ChannelFuture) => allChannels.remove(ctx.channel()))
@@ -127,13 +127,10 @@ object HandshakeHandler extends ScorexLogging {
   class Client(
       handshake: Handshake,
       establishedConnections: ConcurrentMap[Channel, PeerInfo],
-      connections: ConcurrentMap[PeerKey, Channel],
       peerDatabase: PeerDatabase)
-    extends HandshakeHandler(handshake, establishedConnections, connections, peerDatabase) {
+    extends HandshakeHandler(handshake, establishedConnections, peerDatabase) {
 
-    override def connectionNegotiated(ctx: ChannelHandlerContext) = {
-      ctx.channel().attr(AttributeKeys.DeclaredAddress).set(ctx.remoteAddress)
-    }
+    override def connectionNegotiated(ctx: ChannelHandlerContext) = {}
 
     override def channelActive(ctx: ChannelHandlerContext) = {
       ctx.writeAndFlush(handshake.encode(ctx.alloc().buffer()))
