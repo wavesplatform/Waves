@@ -1,51 +1,71 @@
 package com.wavesplatform.network
 
-import com.wavesplatform.job._
+import java.util.concurrent.TimeUnit
+
+import com.google.common.cache.{Cache, CacheBuilder}
 import com.wavesplatform.network.MicroBlockSynchronizer._
 import com.wavesplatform.state2.ByteStr
 import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel._
+import monix.eval.Task
 import scorex.transaction.NgHistory
 import scorex.utils.ScorexLogging
 
+import scala.collection.mutable.{Set => MSet}
 import scala.concurrent.duration.FiniteDuration
 
 @Sharable
-class MicroBlockSynchronizer(settings: Settings, history: NgHistory)
-  extends ChannelInboundHandlerAdapter with ScorexLogging {
+class MicroBlockSynchronizer(settings: Settings, history: NgHistory) extends ChannelInboundHandlerAdapter with ScorexLogging {
 
-  private val requests: ParallelJobPool[Item, MicroBlockSignature, SynchronizerRequest] = {
-    val orig = new QueuedRequests(settings.waitResponseTimeout)
+  private implicit val scheduler = monix.execution.Scheduler.singleThread("microblock-synchronizer")
 
-    // Prevents processing of the same microblock in gap between MicroBlockSynchronizer and CoordinatorHandler
-    val ignoreStaleGroups = ParallelJobPool.ignoreStaleGroups(settings.processedMicroBlocksCacheTimeout, orig)
+  private val awaitingMicroBlocks = cache[MicroBlockSignature, Object](settings.invCacheTimeout)
+  private val knownMicroBlockOwners = cache[MicroBlockSignature, MSet[ChannelHandlerContext]](settings.invCacheTimeout)
+  private val successfullyReceivedMicroBlocks = cache[MicroBlockSignature, Object](settings.processedMicroBlocksCacheTimeout)
 
-    val cached = ParallelJobPool.cached(settings.invCacheTimeout, ignoreStaleGroups) { x =>
-      s"${x.microBlockSig}.${x.ctx.channel().id().asLongText()}"
-    }
+  private def alreadyRequested(microBlockSig: MicroBlockSignature): Boolean = Option(awaitingMicroBlocks.getIfPresent(microBlockSig)).isDefined
 
-    cached
-  }
+  private def alreadyProcessed(microBlockSig: MicroBlockSignature): Boolean = Option(successfullyReceivedMicroBlocks.getIfPresent(microBlockSig)).isDefined
+
+  def requestMicroBlockTask(microBlockSig: MicroBlockSignature, attemptsAllowed: Int): Task[Unit] = Task {
+    if (attemptsAllowed > 0 && !alreadyProcessed(microBlockSig)) {
+      val knownChannels = knownMicroBlockOwners.get(microBlockSig, () => MSet.empty)
+      random(knownChannels) match {
+        case Some(ctx) =>
+          knownChannels -= ctx
+          ctx.writeAndFlush(MicroBlockRequest(microBlockSig))
+          awaitingMicroBlocks.put(microBlockSig, dummy)
+          requestMicroBlockTask(microBlockSig, attemptsAllowed - 1)
+            .delayExecution(settings.waitResponseTimeout)
+        case None => Task.unit
+      }
+    } else Task.unit
+  }.flatten
+
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
-    case MicroBlockResponse(mb) =>
+    case MicroBlockResponse(mb) => Task {
       log.trace(id(ctx) + "Received MicroBlockResponse " + mb)
-      requests.shutdownPoolOf(Item(ctx, mb.signature))
-
-    case mi @ MicroBlockInv(totalResBlockSig, prevResBlockSig) =>
+      knownMicroBlockOwners.invalidate(mb.totalResBlockSig)
+      awaitingMicroBlocks.invalidate(mb.totalResBlockSig)
+      successfullyReceivedMicroBlocks.put(mb.totalResBlockSig, dummy)
+    }.runAsync
+    case mi@MicroBlockInv(totalResBlockSig, prevResBlockSig) => Task {
       log.trace(id(ctx) + "Received " + mi)
       history.lastBlockId() match {
         case Some(lastBlockId) =>
           if (lastBlockId == prevResBlockSig) {
-            requests.add(Item(ctx, totalResBlockSig))
+            knownMicroBlockOwners.get(totalResBlockSig, () => MSet.empty) += ctx
+            if (!alreadyRequested(totalResBlockSig))
+              requestMicroBlockTask(totalResBlockSig, 2)
+            else Task.unit
           } else {
             log.trace(s"Discarding $mi because it doesn't match last (micro)block")
+            Task.unit
           }
-
-        case None =>
-          log.warn("History does not contain the last block!")
+        case None => Task.unit
       }
-
+    }.flatten.runAsync
     case _ => super.channelRead(ctx, msg)
   }
 }
@@ -58,24 +78,16 @@ object MicroBlockSynchronizer {
                       processedMicroBlocksCacheTimeout: FiniteDuration,
                       invCacheTimeout: FiniteDuration)
 
-  case class Item(ctx: ChannelHandlerContext,
-                  microBlockSig: MicroBlockSignature)
-
-  case class SynchronizerRequest(item: Item) extends Runnable {
-    override def run(): Unit = item.ctx.writeAndFlush(MicroBlockRequest(item.microBlockSig))
+  def random[T](s: MSet[T]): Option[T] = {
+    val n = util.Random.nextInt(s.size)
+    val ts = s.iterator.drop(n)
+    if (ts.hasNext) Some(ts.next)
+    else None
   }
 
-  class QueuedRequests(waitResponseTimeout: FiniteDuration)
-    extends ParallelJobPool[Item, MicroBlockSignature, SynchronizerRequest] {
+  def cache[K <: AnyRef, V <: AnyRef](timeout: FiniteDuration): Cache[K, V] = CacheBuilder.newBuilder()
+    .expireAfterWrite(timeout.toMillis, TimeUnit.MILLISECONDS)
+    .build[K, V]()
 
-    // A possible issue: it has an unbounded queue size
-    private val scheduler = monix.execution.Scheduler.singleThread("queued-requests")
-
-    override def groupId(item: Item): MicroBlockSignature = item.microBlockSig
-    override def newJob(item: Item): SynchronizerRequest = SynchronizerRequest(item)
-    override def newJobPool: JobPool[SynchronizerRequest] = {
-      new DelayQueueJobPool[SynchronizerRequest](waitResponseTimeout)(scheduler)
-    }
-  }
-
+  private val dummy = new Object()
 }
