@@ -37,6 +37,24 @@ package object diffs {
     assertion(totalDiff2)
   }
 
+  def assertDiffEiWithPrev(preconditions: Seq[Block], block: Block, fs: FunctionalitySettings = TestFunctionalitySettings.Enabled)(assertion: Either[ValidationError, BlockDiff] => Unit): Unit = {
+    val differ: (StateReader, Block) => Either[ValidationError, BlockDiff] = (s, b) => BlockDiffer.fromBlock(fs, s, preconditions.lastOption, b)
+
+    val state = newState()
+
+    preconditions.foreach { precondition =>
+      val preconditionDiff = differ(state, precondition).explicitGet()
+      state.applyBlockDiff(preconditionDiff)
+    }
+    val totalDiff1 = differ(state, block)
+    assertion(totalDiff1)
+
+    val preconditionDiff = BlockDiffer.unsafeDiffMany(fs, newState(), None)(preconditions)
+    val compositeState = new CompositeStateReader(newState(), preconditionDiff)
+    val totalDiff2 = differ(compositeState, block)
+    assertion(totalDiff2)
+  }
+
   def assertDiffAndState(preconditions: Seq[Block], block: Block, fs: FunctionalitySettings = TestFunctionalitySettings.Enabled)(assertion: (BlockDiff, StateReader) => Unit): Unit = {
     val differ: (StateReader, Block) => Either[ValidationError, BlockDiff] = (s, b) => BlockDiffer.fromBlock(fs, s, None, b)
 

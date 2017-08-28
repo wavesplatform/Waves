@@ -30,7 +30,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
       Range(from, to).map(ngHistoryWriter.blockBytes).par.map(b => Block.parseBytes(b.get).get).seq
     }
     measureLog(s"Building diff from $from up to $to") {
-      BlockDiffer.unsafeDiffMany(settings, state, ngHistoryWriter.blockAt(from - 1).map(_.timestamp))(blocks)
+      BlockDiffer.unsafeDiffMany(settings, state, ngHistoryWriter.blockAt(from - 1))(blocks)
     }
   }
 
@@ -81,14 +81,14 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
         val asFirmBlock = referencedLiquidDiff.copy(heightDiff = 1)
         ngHistoryWriter.appendBlock(block)(BlockDiffer.fromBlock(settings,
           composite(currentPersistedBlocksState, () => asFirmBlock),
-          ngHistoryWriter.bestLiquidBlock().map(_.timestamp), block)).map { case ((newBlockDiff, discraded)) =>
+          ngHistoryWriter.bestLiquidBlock(), block)).map { case ((newBlockDiff, discraded)) =>
           topMemoryDiff.set(Monoid.combine(topMemoryDiff(), asFirmBlock))
           liquidBlockCandidatesDiff.set(Map(block.uniqueId -> newBlockDiff))
           discraded
         }
       case None =>
         ngHistoryWriter.appendBlock(block)(BlockDiffer.fromBlock(
-          settings, currentPersistedBlocksState, ngHistoryWriter.lastBlockTimestamp(), block)).map { case ((newBlockDiff, discraded)) =>
+          settings, currentPersistedBlocksState, ngHistoryWriter.lastBlock, block)).map { case ((newBlockDiff, discraded)) =>
           liquidBlockCandidatesDiff.set(Map(block.uniqueId -> newBlockDiff))
           discraded
         }

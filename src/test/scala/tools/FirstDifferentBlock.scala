@@ -38,5 +38,5 @@ object FirstDifferentBlock extends App {
     }
   }
 
-  println("first different block height is " + firstDifferent(1, 626195, nodeComparator(MAINNET2, MAINNET3)))
+    println("first different block height is " + firstDifferent(1, 15445, nodeComparator(DEVNET2, DEVNET3)))
 }

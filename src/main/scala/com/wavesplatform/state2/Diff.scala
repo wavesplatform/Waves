@@ -79,6 +79,8 @@ object Diff {
 
   implicit class DiffExt(d: Diff) {
     def asBlockDiff: BlockDiff = BlockDiff(d, 0, Map.empty)
+
+    def multiply(m: Float): Diff = d.copy(portfolios = d.portfolios.mapValues(_.multiply(m)))
   }
 
   implicit val diffMonoid = new Monoid[Diff] {

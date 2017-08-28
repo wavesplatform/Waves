@@ -130,14 +130,15 @@ object Coordinator extends ScorexLogging {
     import PoSCalc._
 
     val fs = bcs.functionalitySettings
-    val (sortStart, sortEnd) = (fs.requireSortedTransactionsAfter, fs.enableMicroblocksAfter)
+    val sortStart = fs.requireSortedTransactionsAfter
+    val sortEndHeight = fs.enableMicroblocksAfterHeight
     val blockTime = block.timestamp
 
     (for {
-      _ <- Either.cond(blockTime > fs.enableMicroblocksAfter || block.version == Block.GenesisBlockVersion || block.version == Block.PlainBlockVersion, (),
-        s"Block Version 3 can only appear with timestamp greater than ${fs.enableMicroblocksAfter}")
+      _ <- Either.cond(state.height > sortEndHeight || block.version == Block.GenesisBlockVersion || block.version == Block.PlainBlockVersion, (),
+        s"Block Version 3 can only appear at height greater than $sortEndHeight")
       _ <- Either.cond(blockTime - currentTs < MaxTimeDrift, (), s"timestamp $blockTime is from future")
-      _ <- Either.cond(blockTime < sortStart || blockTime >= sortEnd || block.transactionData.sorted(TransactionsOrdering.InBlock) == block.transactionData,
+      _ <- Either.cond(blockTime < sortStart || state.height > sortEndHeight || block.transactionData.sorted(TransactionsOrdering.InBlock) == block.transactionData,
         (), "transactions are not sorted")
       parent <- history.parent(block).toRight(s"history does not contain parent ${block.reference}")
       parentHeight <- history.heightOf(parent.uniqueId).toRight(s"history does not contain parent ${block.reference}")

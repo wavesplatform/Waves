@@ -21,10 +21,10 @@ package object history {
     genesisSettings = null)
 
   val ApplyMinerFeeWithTransactionSettings: BlockchainSettings = DefaultBlockchainSettings.copy(
-    functionalitySettings = DefaultBlockchainSettings.functionalitySettings.copy(enableMicroblocksAfter = 0))
+    functionalitySettings = DefaultBlockchainSettings.functionalitySettings.copy(enableMicroblocksAfterHeight = 0))
 
   val ApplyMinerFeeBeforeAllTransactionsSettings: BlockchainSettings = DefaultBlockchainSettings.copy(
-    functionalitySettings = DefaultBlockchainSettings.functionalitySettings.copy(enableMicroblocksAfter = Long.MaxValue))
+    functionalitySettings = DefaultBlockchainSettings.functionalitySettings.copy(enableMicroblocksAfterHeight = Long.MaxValue))
 
 
   def domain(bs: BlockchainSettings): Domain = {
