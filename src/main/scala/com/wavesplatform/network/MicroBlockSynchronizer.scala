@@ -1,8 +1,5 @@
 package com.wavesplatform.network
 
-import java.util.concurrent.ConcurrentHashMap
-
-import com.wavesplatform.job._
 import java.util.concurrent.TimeUnit
 
 import com.google.common.cache.{Cache, CacheBuilder}
@@ -23,11 +20,12 @@ import scala.concurrent.duration.FiniteDuration
 class MicroBlockSynchronizer(settings: Settings, history: NgHistory) extends ChannelInboundHandlerAdapter with ScorexLogging {
 
   private implicit val scheduler = monix.execution.Scheduler.singleThread("microblock-synchronizer")
-  private val microBlockCreationTime = new ConcurrentHashMap[ByteStr, Long]()
 
   private val awaitingMicroBlocks = cache[MicroBlockSignature, Object](settings.invCacheTimeout)
   private val knownMicroBlockOwners = cache[MicroBlockSignature, MSet[ChannelHandlerContext]](settings.invCacheTimeout)
   private val successfullyReceivedMicroBlocks = cache[MicroBlockSignature, Object](settings.processedMicroBlocksCacheTimeout)
+
+  private val microBlockCreationTime = cache[ByteStr, java.lang.Long](settings.invCacheTimeout)
 
   private def alreadyRequested(microBlockSig: MicroBlockSignature): Boolean = Option(awaitingMicroBlocks.getIfPresent(microBlockSig)).isDefined
 
@@ -51,25 +49,28 @@ class MicroBlockSynchronizer(settings: Settings, history: NgHistory) extends Cha
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
     case MicroBlockResponse(mb) => Task {
+      log.trace(id(ctx) + "Received MicroBlockResponse " + mb)
       knownMicroBlockOwners.invalidate(mb.totalResBlockSig)
       awaitingMicroBlocks.invalidate(mb.totalResBlockSig)
       successfullyReceivedMicroBlocks.put(mb.totalResBlockSig, dummy)
 
-      log.trace(id(ctx) + "Received MicroBlockResponse " + mb)
-      Option(microBlockCreationTime.remove(mb.totalResBlockSig)).foreach { created =>
+      Option(microBlockCreationTime.getIfPresent(mb.totalResBlockSig)).foreach { created =>
         microBlockReceiveLagStats.record(System.currentTimeMillis() - created)
+        microBlockCreationTime.invalidate(mb.totalResBlockSig)
       }
     }.runAsync
-    case mi@MicroBlockInv(totalResBlockSig, prevResBlockSig) => Task {
+    case mi@MicroBlockInv(totalResBlockSig, prevResBlockSig, created) => Task {
       log.trace(id(ctx) + "Received " + mi)
-      microBlockCreationTime.put(totalResBlockSig, created)
       history.lastBlockId() match {
         case Some(lastBlockId) =>
           if (lastBlockId == prevResBlockSig) {
             knownMicroBlockOwners.get(totalResBlockSig, () => MSet.empty) += ctx
-            if (!alreadyRequested(totalResBlockSig))
-              requestMicroBlockTask(totalResBlockSig, 2)
-            else Task.unit
+
+            microBlockInvStats.increment()
+            microBlockCreationTime.put(totalResBlockSig, created)
+
+            if (alreadyRequested(totalResBlockSig)) Task.unit
+            else requestMicroBlockTask(totalResBlockSig, 2)
           } else {
             notLastMicroblockStats.increment()
             log.trace(s"Discarding $mi because it doesn't match last (micro)block")
@@ -113,8 +114,5 @@ object MicroBlockSynchronizer {
     .expireAfterWrite(timeout.toMillis, TimeUnit.MILLISECONDS)
     .build[K, V]()
 
-
-    private val dummy =
-      new Object()
-
+  private val dummy = new Object()
 }

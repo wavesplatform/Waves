@@ -18,7 +18,7 @@ trait NgHistoryWriter extends HistoryWriter with NgHistory {
 
   def bestLiquidBlock(): Option[Block]
 
-  def forgeBlock(id: BlockId): Option[(Block, Int, DiscardedTransactions)]
+  def forgeBlock(id: BlockId): Option[(Block, DiscardedMicroBlocks)]
 }
 
 class NgHistoryWriterImpl(inner: HistoryWriter) extends NgHistoryWriter with ScorexLogging with Instrumented {
@@ -58,17 +58,18 @@ class NgHistoryWriterImpl(inner: HistoryWriter) extends NgHistoryWriter with Sco
       }
     }
     else forgeBlock(block.reference) match {
-      case Some((forgedBlock, discardedMicroBlocks, discardedTxs)) =>
+      case Some((forgedBlock, discarded)) =>
         if (forgedBlock.signatureValid) {
-          if (discardedMicroBlocks > 0) {
+          if (discarded.nonEmpty) {
             microBlockForkStats.increment()
-            microBlockForkHeightStats.record(discardedMicroBlocks)
+            microBlockForkHeightStats.record(discarded.size)
           }
-          inner.appendBlock(forgedBlock)(consensusValidation).map(dd => (dd._1, discardedTxs))
+          inner.appendBlock(forgedBlock)(consensusValidation).map(dd => (dd._1, discarded.flatMap(_.transactionData)))
         } else {
           val errorText = s"Forged block has invalid signature: base: ${baseB()}, micros: ${micros()}, requested reference: ${block.reference}"
           log.error(errorText)
           Left(BlockAppendError(s"ERROR: $errorText", block))
+
         }
       case None =>
         Left(BlockAppendError(s"References incorrect or non-existing block(liquid block exists): " + logDetails, block))
@@ -156,13 +157,12 @@ class NgHistoryWriterImpl(inner: HistoryWriter) extends NgHistoryWriter with Sco
 
   private val forgeBlockTimeStats = Kamon.metrics.histogram("forge-block-time", Time.Milliseconds)
 
-  def forgeBlock(id: BlockId): Option[(Block, Int, DiscardedTransactions)] = read { implicit l =>
+  def forgeBlock(id: BlockId): Option[(Block, DiscardedMicroBlocks)] = read { implicit l =>
     measureSuccessful(forgeBlockTimeStats, {
       baseB().flatMap(base => {
         val ms = micros().reverse
         if (base.uniqueId == id) {
-          val discardedTxs = ms.flatMap(_.transactionData)
-          Some((base, ms.size, discardedTxs))
+          Some((base, ms))
         } else if (!ms.exists(_.totalResBlockSig == id)) None
         else {
           val (accumulatedTxs, maybeFound) = ms.foldLeft((List.empty[Transaction], Option.empty[(ByteStr, DiscardedMicroBlocks)])) { case ((accumulated, maybeDiscarded), micro) =>
@@ -178,8 +178,7 @@ class NgHistoryWriterImpl(inner: HistoryWriter) extends NgHistoryWriter with Sco
           maybeFound.map { case (sig, discardedMicroblocks) =>
             (
               base.copy(signerData = base.signerData.copy(signature = sig), transactionData = base.transactionData ++ accumulatedTxs),
-              discardedMicroblocks.size,
-              discardedMicroblocks.flatMap(_.transactionData)
+              discardedMicroblocks
             )
           }
         }
