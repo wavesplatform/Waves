@@ -29,7 +29,7 @@ class RollbackSpecSuite extends FreeSpec with ScalaFutures with IntegrationPatie
 
       b <- traverse(nodes)(balanceForNode).map(_.toMap)
 
-      requests = generateRequests(transactionsCount, b)
+      requests = generateTransfersBetweenAccounts(transactionsCount, b)
       _ <- processRequests(requests)
 
       hashAfterFirstTry <- traverse(nodes)(_.waitForDebugInfoAt(startHeight + waitBlocks).map(_.stateHash)).map(infos => {
@@ -58,7 +58,7 @@ class RollbackSpecSuite extends FreeSpec with ScalaFutures with IntegrationPatie
       startHeight <- Future.traverse(nodes)(_.height).map(_.min)
 
       b <- traverse(nodes)(balanceForNode).map(_.toMap)
-      requests = generateRequests(transactionsCount, b)
+      requests = generateTransfersBetweenAccounts(transactionsCount, b)
 
       hashBeforeApply <- traverse(nodes)(_.waitForDebugInfoAt(startHeight + waitBlocks).map(_.stateHash)).map(infos => {
         all(infos) shouldEqual infos.head

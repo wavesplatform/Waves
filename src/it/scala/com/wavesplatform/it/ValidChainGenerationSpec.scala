@@ -21,7 +21,7 @@ class ValidChainGenerationSpec(override val nodes: Seq[Node]) extends FreeSpec w
       height <- traverse(nodes)(_.height).map(_.max)
       _ <- traverse(nodes)(_.waitForHeight(height + 1))
 
-      _ <- processRequests(generateRequests(requestsCount, b))
+      _ <- processRequests(generateTransfersBetweenAccounts(requestsCount, b))
 
       height <- traverse(nodes)(_.height).map(_.max)
       _ <- traverse(nodes)(_.waitForHeight(height + 30))
