@@ -14,8 +14,8 @@ import monix.eval.Task
 import monix.execution._
 import monix.execution.cancelables.{CompositeCancelable, SerialCancelable}
 import scorex.account.PrivateKeyAccount
-import scorex.block.{Block, MicroBlock}
 import scorex.block.Block._
+import scorex.block.{Block, MicroBlock}
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
 import scorex.transaction.PoSCalc._
 import scorex.transaction.ValidationError.GenericError
@@ -80,7 +80,8 @@ class Miner(
       val btg = calcBaseTarget(avgBlockDelay, parentHeight, parent, greatGrandParent, currentTime)
       val gs = calcGeneratorSignature(lastBlockKernelData, account)
       val consensusData = NxtLikeConsensusBlockData(btg, ByteStr(gs))
-      val unconfirmed = utx.packUnconfirmed(minerSettings.maxTransactionsInKeyBlock)
+      val sortInBlock = history.height() <= blockchainSettings.functionalitySettings.resetEffectiveBalancesAtHeight
+      val unconfirmed = utx.packUnconfirmed(minerSettings.maxTransactionsInKeyBlock, sortInBlock)
       log.debug(s"Adding ${unconfirmed.size} unconfirmed transaction(s) to new block")
       val block = Block.buildAndSign(version, currentTime, parent.uniqueId, consensusData, unconfirmed, account)
       blockBuildTimeStats.record(System.currentTimeMillis() - start)
@@ -92,7 +93,7 @@ class Miner(
   private def generateOneMicroBlockTask(account: PrivateKeyAccount, accumulatedBlock: Block): Task[Either[ValidationError, Option[Block]]] = Task {
     log.trace(s"Generating microblock for $account")
     val pc = allChannels.size()
-    lazy val unconfirmed = measureLog("packing unconfirmed transactions for microblock")(utx.packUnconfirmed(MaxTransactionsPerMicroblock))
+    lazy val unconfirmed = measureLog("packing unconfirmed transactions for microblock")(utx.packUnconfirmed(MaxTransactionsPerMicroblock, sortInBlock = false))
     if (pc < minerSettings.quorum) {
       log.trace(s"Quorum not available ($pc/${minerSettings.quorum}, not forging microblock with ${account.address}")
       Right(None)

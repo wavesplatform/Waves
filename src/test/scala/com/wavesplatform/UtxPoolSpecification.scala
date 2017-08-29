@@ -158,7 +158,7 @@ class UtxPoolSpecification extends FreeSpec
 
       time.advance(offset)
 
-      utx.packUnconfirmed(100) shouldBe 'empty
+      utx.packUnconfirmed(100, false) shouldBe 'empty
       utx.all() shouldBe 'empty
     }
 
@@ -170,7 +170,7 @@ class UtxPoolSpecification extends FreeSpec
 
       time.advance(offset)
 
-      utx.packUnconfirmed(100).size shouldBe 2
+      utx.packUnconfirmed(100, false).size shouldBe 2
       utx.all().size shouldBe 2
     }
 
@@ -204,7 +204,7 @@ class UtxPoolSpecification extends FreeSpec
         val poolSizeBefore = utxPool.size
 
         time.advance(settings.maxTransactionAge * 2)
-        utxPool.packUnconfirmed(100)
+        utxPool.packUnconfirmed(100, false)
 
         poolSizeBefore should be > utxPool.size
         val utxPortfolioAfter = utxPool.portfolio(sender)

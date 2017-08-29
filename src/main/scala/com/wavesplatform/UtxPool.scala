@@ -110,7 +110,7 @@ class UtxPool(time: Time,
     transactions().get(transactionId)
   }
 
-  def packUnconfirmed(max: Int): Seq[Transaction] = write { implicit l =>
+  def packUnconfirmed(max: Int, sortInBlock: Boolean): Seq[Transaction] = write { implicit l =>
     val currentTs = time.correctedTime()
     removeExpired(currentTs)
     val differ = TransactionDiffer(fs, history.lastBlockTimestamp(), currentTs, stateReader.height) _
@@ -133,7 +133,9 @@ class UtxPool(time: Time,
     pessimisticPortfolios.mutate { p =>
       invalidTxs.foreach(p.remove)
     }
-    validTxs.sorted(TransactionsOrdering.InBlock)
+    if(sortInBlock)
+      validTxs.sorted(TransactionsOrdering.InBlock)
+    else validTxs
   }
 }
 
