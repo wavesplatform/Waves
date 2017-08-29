@@ -40,11 +40,6 @@ object TransactionsGeneratorApp extends App {
     new InetSocketAddress(uri.getHost, uri.getPort)
   })
 
-  val defaultConfig = fromConfig(readConfig(None))
-
-  AddressScheme.current = new AddressScheme {
-    override val chainId: Byte = defaultConfig.chainId.toByte
-  }
 
   val parser = new OptionParser[GenerationParameters]("generator") {
     head("TransactionsGenerator - Waves load testing transactions generator")
@@ -57,6 +52,8 @@ object TransactionsGeneratorApp extends App {
     help("help") text "display this help message"
   }
 
+  val defaultConfig = fromConfig(readConfig(None))
+
   val initialParameters = GenerationParameters(
     transactions = defaultConfig.transactions,
     iterations = defaultConfig.iterations,
@@ -65,13 +62,19 @@ object TransactionsGeneratorApp extends App {
 
   parser.parse(args, initialParameters) match {
     case Some(parameters) =>
-      val generator = parameters.mode match {
-        case Mode.NARROW => new NarrowTransactionGenerator(defaultConfig.txProbabilities, defaultConfig.accounts)
-        case Mode.WIDE => new WideTransactionGenerator(defaultConfig.accounts)
+      val actualConfig = parameters.config.map(file => fromConfig(readConfig(Some(file.getAbsolutePath))))
+        .getOrElse(defaultConfig)
+
+      AddressScheme.current = new AddressScheme {
+        override val chainId: Byte = actualConfig.chainId.toByte
       }
 
-      val node = parameters.node.getOrElse(defaultConfig.sendTo)
-      generateAndSend(generator, parameters.transactions, parameters.iterations, parameters.delay, node, defaultConfig.chainId)
+      val generator = parameters.mode match {
+        case Mode.NARROW => new NarrowTransactionGenerator(actualConfig.txProbabilities, actualConfig.accounts)
+        case Mode.WIDE => new WideTransactionGenerator(actualConfig.accounts)
+      }
+      val node = parameters.node.getOrElse(actualConfig.sendTo)
+      generateAndSend(generator, parameters.transactions, parameters.iterations, parameters.delay, node, actualConfig.chainId)
     case None => parser.failure("Failed to parse command line parameters")
   }
 
