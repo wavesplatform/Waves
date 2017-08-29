@@ -12,13 +12,11 @@ class DebugPortfoliosSpecification(override val allNodes: Seq[Node], override va
 
   test("getting a balance considering pessimistic transactions from UTX pool - changed after UTX") {
     val f = for {
-      _ <- assertBalances(firstAddress, 100.waves, 100.waves)
-      _ <- assertBalances(secondAddress, 100.waves, 100.waves)
-
       portfolioBefore <- sender.debugPortfoliosFor(firstAddress, considerUnspent = true)
       utxSizeBefore <- sender.utxSize
 
       _ <- sender.payment(firstAddress, secondAddress, 5.waves, fee = 5.waves)
+      _ <- sender.payment(secondAddress, firstAddress, 7.waves, 5.waves)
       _ <- sender.waitForUtxIncreased(utxSizeBefore)
 
       portfolioAfter <- sender.debugPortfoliosFor(firstAddress, considerUnspent = true)
@@ -32,9 +30,6 @@ class DebugPortfoliosSpecification(override val allNodes: Seq[Node], override va
 
   test("getting a balance without pessimistic transactions from UTX pool - not changed after UTX") {
     val f = for {
-      _ <- assertBalances(firstAddress, 100.waves, 100.waves)
-      _ <- assertBalances(secondAddress, 100.waves, 100.waves)
-
       portfolioBefore <- sender.debugPortfoliosFor(firstAddress, considerUnspent = false)
       utxSizeBefore <- sender.utxSize
 

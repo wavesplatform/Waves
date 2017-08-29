@@ -1,39 +1,33 @@
 package com.wavesplatform.it.util
 
 import java.net.InetSocketAddress
-import java.util.concurrent.ConcurrentHashMap
 
 import com.wavesplatform.it.network.client.NetworkClient
-import com.wavesplatform.network.{PeerInfo, RawBytes}
+import com.wavesplatform.network.RawBytes
 import io.netty.channel.Channel
 import io.netty.channel.group.DefaultChannelGroup
-import io.netty.util.HashedWheelTimer
 import io.netty.util.concurrent.GlobalEventExecutor
 
-import scala.collection.JavaConverters._
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
-import scala.concurrent.duration._
+import scala.concurrent.{Future, Promise}
 
-class NetworkSender(address: InetSocketAddress, chainId: Char, name: String, nonce: Long) {
-  private val retryTimer = new HashedWheelTimer()
-  val allChannels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
-  val establishedConnections = new ConcurrentHashMap[Channel, PeerInfo]
-  val c = new NetworkClient(chainId, name, nonce, allChannels, establishedConnections)
-  c.connect(address)
+class NetworkSender(chainId: Char, name: String, nonce: Long) {
 
-  def sendByNetwork(messages: RawBytes*): Future[Unit] = {
-    retryTimer.retryUntil(Future.successful(establishedConnections.size()), (size: Int) => size == 1, 1.seconds)
-      .map(_ => {
-      val channel = establishedConnections.asScala.head._1
-      messages.foreach(msg => {
-        channel.writeAndFlush(msg)
-      })
-    })
+  import scala.concurrent.ExecutionContext.Implicits.global
+
+  private val allChannels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
+  private val client = new NetworkClient(chainId, name, nonce, allChannels)
+
+  def connect(address: InetSocketAddress): Future[Channel] = {
+    client.connect(address)
   }
 
-  def close(): Unit = {
-    retryTimer.stop()
-    c.shutdown()
+  def send(channel: Channel, messages: RawBytes*): Future[Seq[Unit]] = {
+    Future.traverse(messages) { msg =>
+      val p = Promise[Unit]
+      channel.writeAndFlush(msg).addListener((_: io.netty.util.concurrent.Future[Void]) => p.success(()))
+      p.future
+    }
   }
+
+  def close(): Unit = client.shutdown()
 }

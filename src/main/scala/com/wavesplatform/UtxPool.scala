@@ -41,6 +41,7 @@ class UtxPool(time: Time,
 
   private val sizeStats = Kamon.metrics.histogram("utx-pool-size")
   private val processingTimeStats = Kamon.metrics.histogram("utx-transaction-processing-time")
+  private val putRequestStats = Kamon.metrics.counter("utx-pool-put-if-new")
 
   private def removeExpired(currentTs: Long): Unit = write { implicit l =>
     def isExpired(tx: Transaction) = (currentTs - tx.timestamp).millis > utxSettings.maxTransactionAge
@@ -56,6 +57,7 @@ class UtxPool(time: Time,
   }
 
   def putIfNew(tx: Transaction): Either[ValidationError, Boolean] = write { implicit l =>
+    putRequestStats.increment()
     measureSuccessful(processingTimeStats, {
       knownTransactions.mutate(cache =>
         Option(cache.getIfPresent(tx.id)) match {
@@ -167,7 +169,7 @@ object UtxPool {
 
     def remove(txId: ByteStr): Unit = {
       transactionPortfolios -= txId
-      transactions = transactions.mapValues(_ - txId)
+      transactions = transactions.map { case (k, v) => k -> (v - txId) }
     }
   }
 

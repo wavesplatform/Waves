@@ -51,11 +51,13 @@ class Miner(
   private val blockBuildTimeStats = Kamon.metrics.histogram("forge-block-time", instrument.Time.Milliseconds)
   private val microBlockBuildTimeStats = Kamon.metrics.histogram("forge-microblock-time", instrument.Time.Milliseconds)
 
+
   private def checkAge(parentHeight: Int, parentTimestamp: Long): Either[String, Unit] =
     Either.cond(parentHeight == 1, (), (timeService.correctedTime() - parentTimestamp).millis)
       .left.flatMap(blockAge => Either.cond(blockAge <= minerSettings.intervalAfterLastBlockThenGenerationIsAllowed, (),
       s"BlockChain is too old (last block timestamp is $parentTimestamp generated $blockAge ago)"
     ))
+
 
   private def generateOneBlockTask(account: PrivateKeyAccount, parentHeight: Int,
                                    greatGrandParent: Option[Block], balance: Long, version: Byte)(delay: FiniteDuration): Task[Either[String, Block]] = Task {
@@ -65,22 +67,24 @@ class Miner(
     val pc = allChannels.size()
     lazy val lastBlockKernelData = parent.consensusData
     lazy val currentTime = timeService.correctedTime()
+    val start = System.currentTimeMillis()
     lazy val h = calcHit(lastBlockKernelData, account)
     lazy val t = calcTarget(parent, currentTime, balance)
-    measureSuccessful(blockBuildTimeStats, {
-      for {
-        _ <- Either.cond(pc >= minerSettings.quorum, (), s"Quorum not available ($pc/${minerSettings.quorum}, not forging block with ${account.address}")
-        _ <- Either.cond(h < t, (), s"${System.currentTimeMillis()}: Hit $h was NOT less than target $t, not forging block with ${account.address}")
-        _ = log.debug(s"Forging with ${account.address}, H $h < T $t, balance $balance, prev block ${parent.uniqueId}")
-        _ = log.debug(s"Previous block ID ${parent.uniqueId} at $parentHeight with target ${lastBlockKernelData.baseTarget}")
-        avgBlockDelay = blockchainSettings.genesisSettings.averageBlockDelay
-        btg = calcBaseTarget(avgBlockDelay, parentHeight, parent, greatGrandParent, currentTime)
-        gs = calcGeneratorSignature(lastBlockKernelData, account)
-        consensusData = NxtLikeConsensusBlockData(btg, ByteStr(gs))
-        unconfirmed = utx.packUnconfirmed(minerSettings.maxTransactionsInKeyBlock)
-        _ = log.debug(s"Adding ${unconfirmed.size} unconfirmed transaction(s) to new block")
-        block = Block.buildAndSign(version, currentTime, parent.uniqueId, consensusData, unconfirmed, account)
-      } yield block
+    measureSuccessful(blockBuildTimeStats, for {
+      _ <- Either.cond(pc >= minerSettings.quorum, (), s"Quorum not available ($pc/${minerSettings.quorum}, not forging block with ${account.address}")
+      _ <- Either.cond(h < t, (), s"${System.currentTimeMillis()}: Hit $h was NOT less than target $t, not forging block with ${account.address}")
+    } yield {
+      log.debug(s"Forging with ${account.address}, H $h < T $t, balance $balance, prev block ${parent.uniqueId}")
+      log.debug(s"Previous block ID ${parent.uniqueId} at $parentHeight with target ${lastBlockKernelData.baseTarget}")
+      val avgBlockDelay = blockchainSettings.genesisSettings.averageBlockDelay
+      val btg = calcBaseTarget(avgBlockDelay, parentHeight, parent, greatGrandParent, currentTime)
+      val gs = calcGeneratorSignature(lastBlockKernelData, account)
+      val consensusData = NxtLikeConsensusBlockData(btg, ByteStr(gs))
+      val unconfirmed = utx.packUnconfirmed(minerSettings.maxTransactionsInKeyBlock)
+      log.debug(s"Adding ${unconfirmed.size} unconfirmed transaction(s) to new block")
+      val block = Block.buildAndSign(version, currentTime, parent.uniqueId, consensusData, unconfirmed, account)
+      blockBuildTimeStats.record(System.currentTimeMillis() - start)
+      block
     })
   }.delayExecution(delay)
 

@@ -18,8 +18,9 @@ import scala.concurrent.duration.FiniteDuration
 
 case class GeneratorSettings(chainId: Char,
                              accounts: Seq[PrivateKeyAccount],
-                             n: Int,
-                             every: FiniteDuration,
+                             transactions: Int,
+                             iterations: Int,
+                             delay: FiniteDuration,
                              txProbabilities: Map[TransactionParser.TransactionType.Value, Float],
                              sendTo: InetSocketAddress)
 
@@ -34,12 +35,13 @@ object GeneratorSettings {
 
     val chainId = config.as[String](s"$configPath.chainId").head
     val accounts = config.as[List[String]](s"$configPath.accounts").map(s => PrivateKeyAccount(Base58.decode(s).get))
-    val n = config.as[Int](s"$configPath.n")
-    val every = config.as[FiniteDuration](s"$configPath.every")
+    val transactions = config.as[Int](s"$configPath.transactions")
+    val iterations = config.as[Int](s"$configPath.iterations")
+    val delay = config.as[FiniteDuration](s"$configPath.delay")
     val txProbabilities = config.as[Map[String, Double]](s"$configPath.probabilities").map(kv => toTxType(kv._1) -> kv._2.toFloat)
     val sendTo = new InetSocketAddress(config.as[String](s"$configPath.send-to.address"), config.as[Int](s"$configPath.send-to.port"))
 
-    GeneratorSettings(chainId, accounts, n, every, txProbabilities, sendTo)
+    GeneratorSettings(chainId, accounts, transactions, iterations, delay, txProbabilities, sendTo)
   }
 
   private val log = LoggerFacade(LoggerFactory.getLogger(getClass))
@@ -67,7 +69,6 @@ object GeneratorSettings {
         }
         loadConfig(cfg)
     }
-
     config
   }
 }

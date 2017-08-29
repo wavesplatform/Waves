@@ -9,7 +9,7 @@ import io.netty.channel.embedded.EmbeddedChannel
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import org.scalatest.{FreeSpec, Matchers}
-import scorex.transaction.Transaction
+import scorex.transaction.{SignedTransaction, Transaction}
 import scorex.transaction.assets.IssueTransaction
 
 class MessageCodecSpec extends FreeSpec
@@ -29,7 +29,7 @@ class MessageCodecSpec extends FreeSpec
     codec.blockCalls shouldBe 1
   }
 
-  "should not block a sender of valid messages" in forAll(randomTransactionGen) { origTx =>
+  "should not block a sender of valid messages" in forAll(randomTransactionGen) { origTx : SignedTransaction =>
     val codec = new SpiedMessageCodec
     val ch = new EmbeddedChannel(codec)
 

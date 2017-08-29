@@ -14,7 +14,7 @@ import scala.util.Success
 sealed trait Address extends AddressOrAlias {
   val bytes: ByteStr
   lazy val address: String = bytes.base58
-  lazy val stringRepr: String = Address.Prefix + address
+  lazy val stringRepr: String = address
 
 }
 

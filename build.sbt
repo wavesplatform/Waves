@@ -161,4 +161,6 @@ inConfig(Debian)(Seq(
 ))
 
 lazy val node = project.in(file("."))
-lazy val generator = project.in(file("generator")).dependsOn(node % "compile->it")
+lazy val generator = project.in(file("generator"))
+  .dependsOn(node % "compile->it")
+  .settings(libraryDependencies ++= Seq("com.github.scopt" %% "scopt" % "3.6.0"))
