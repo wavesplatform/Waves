@@ -137,7 +137,7 @@ object TransactionsGeneratorApp extends App {
       .connect(node)
       .flatMap(sendTransactions)
       .recover {
-        case e => log.error(s"[$node] Failed to establish connection to $node", e)
+        case e => log.error(s"[$node] Failed to send transactions", e)
       }
       .andThen {
         case _ => sender.close()
