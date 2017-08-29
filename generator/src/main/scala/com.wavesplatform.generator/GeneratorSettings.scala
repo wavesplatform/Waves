@@ -19,9 +19,6 @@ import scala.concurrent.duration.FiniteDuration
 
 case class GeneratorSettings(chainId: Char,
                              accounts: Seq[PrivateKeyAccount],
-                             transactions: Int,
-                             iterations: Int,
-                             delay: FiniteDuration,
                              txProbabilities: Map[TransactionParser.TransactionType.Value, Float],
                              sendTo: Seq[InetSocketAddress])
 
@@ -41,15 +38,11 @@ object GeneratorSettings {
     def toTxType(key: String): TransactionType.Value =
       TransactionType.withName(s"${converter.convert(key)}Transaction")
 
-    val chainId = config.as[String](s"$configPath.chainId").head
-    val accounts = config.as[List[String]](s"$configPath.accounts").map(s => PrivateKeyAccount(Base58.decode(s).get))
-    val transactions = config.as[Int](s"$configPath.transactions")
-    val iterations = config.as[Int](s"$configPath.iterations")
-    val delay = config.as[FiniteDuration](s"$configPath.delay")
-    val txProbabilities = config.as[Map[String, Double]](s"$configPath.probabilities").map(kv => toTxType(kv._1) -> kv._2.toFloat)
-    val sendTo = config.as[Seq[InetSocketAddress]](s"$configPath.send-to")
-
-    GeneratorSettings(chainId, accounts, transactions, iterations, delay, txProbabilities, sendTo)
+    GeneratorSettings(
+      chainId = config.as[String](s"$configPath.chainId").head,
+      accounts = config.as[List[String]](s"$configPath.accounts").map(s => PrivateKeyAccount(Base58.decode(s).get)),
+      txProbabilities = config.as[Map[String, Double]](s"$configPath.probabilities").map(kv => toTxType(kv._1) -> kv._2.toFloat),
+      sendTo = config.as[Seq[InetSocketAddress]](s"$configPath.send-to"))
   }
 
   private val log = LoggerFacade(LoggerFactory.getLogger(getClass))
