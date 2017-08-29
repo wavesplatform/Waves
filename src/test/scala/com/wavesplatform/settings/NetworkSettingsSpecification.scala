@@ -24,6 +24,7 @@ class NetworkSettingsSpecification extends FlatSpec with Matchers {
         |  local-only: no
         |  peers-data-residence-time: 1d
         |  black-list-residence-time: 10m
+        |  blockchain-readiness-cache-time: 100m
         |  max-inbound-connections: 30
         |  max-outbound-connections = 20
         |  max-single-host-connections = 2
@@ -50,6 +51,7 @@ class NetworkSettingsSpecification extends FlatSpec with Matchers {
     networkSettings.knownPeers should be(List("8.8.8.8:6868", "4.4.8.8:6868"))
     networkSettings.peersDataResidenceTime should be(1.day)
     networkSettings.blackListResidenceTime should be(10.minutes)
+    networkSettings.blockchainReadinessCacheTime should be(100.minutes)
     networkSettings.maxInboundConnections should be(30)
     networkSettings.maxOutboundConnections should be(20)
     networkSettings.maxConnectionsPerHost should be(2)

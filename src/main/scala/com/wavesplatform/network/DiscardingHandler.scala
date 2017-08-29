@@ -12,13 +12,13 @@ import scorex.utils.{ScorexLogging, Time}
 import scala.concurrent.duration._
 
 @Sharable
-class DiscardingHandler(history: History, time: Time, maxBlockchainAge: Duration) extends ChannelDuplexHandler with ScorexLogging {
+class DiscardingHandler(history: History, time: Time, maxBlockchainAge: Duration, blockchainReadinessCacheTime: Duration) extends ChannelDuplexHandler with ScorexLogging {
 
   import DiscardingHandler._
 
   private val readinessCache: Cache[Object, Boxed] = CacheBuilder
     .newBuilder()
-    .expireAfterWrite(5, TimeUnit.SECONDS)
+    .expireAfterWrite(blockchainReadinessCacheTime.toMillis, TimeUnit.MILLISECONDS)
     .build[Object, Boxed]()
 
   private def blockchainReady: Boolean = readinessCache.get(key, () => Boxed(time.correctedTime() - history.lastBlock.get.timestamp < maxBlockchainAge.toMillis)).value

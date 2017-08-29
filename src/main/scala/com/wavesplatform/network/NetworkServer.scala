@@ -47,7 +47,7 @@ class NetworkServer(checkpointService: CheckpointService,
     settings.synchronizationSettings.scoreTTL,
     history.lastBlockIds(settings.synchronizationSettings.maxRollback), history.score())
 
-  private val discardingHandler = new DiscardingHandler(history, time, settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed)
+  private val discardingHandler = new DiscardingHandler(history, time, settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed, settings.networkSettings.blockchainReadinessCacheTime)
   private val messageCodec = new MessageCodec(peerDatabase)
 
   private val excludedAddresses: Set[InetSocketAddress] = {

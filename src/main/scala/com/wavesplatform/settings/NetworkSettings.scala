@@ -21,6 +21,7 @@ case class NetworkSettings(file: Option[File],
                            knownPeers: Seq[String],
                            peersDataResidenceTime: FiniteDuration,
                            blackListResidenceTime: FiniteDuration,
+                           blockchainReadinessCacheTime: FiniteDuration,
                            maxInboundConnections: Int,
                            maxOutboundConnections: Int,
                            maxConnectionsPerHost: Int,
@@ -45,23 +46,24 @@ object NetworkSettings {
       new InetSocketAddress(uri.getHost, uri.getPort)
     }
 
-    val knownPeers = config.as[Seq[String]]("known-peers")
-    val peersDataResidenceTime = config.as[FiniteDuration]("peers-data-residence-time")
-    val blackListResidenceTime = config.as[FiniteDuration]("black-list-residence-time")
-    val maxInboundConnections = config.as[Int]("max-inbound-connections")
-    val maxOutboundConnections = config.as[Int]("max-outbound-connections")
-    val maxConnectionsFromSingleHost = config.as[Int]("max-single-host-connections")
-    val connectionTimeout = config.as[FiniteDuration]("connection-timeout")
-    val outboundBufferSize = config.getBytes("outbound-buffer-size")
-    val maxUnverifiedPeers = config.as[Int]("max-unverified-peers")
-    val peersBroadcastInterval = config.as[FiniteDuration]("peers-broadcast-interval")
-    val handshakeTimeout = config.as[FiniteDuration]("handshake-timeout")
-    val uPnPSettings = config.as[UPnPSettings]("upnp")
-
-    NetworkSettings(file, bindAddress, declaredAddress, nodeName, nonce, knownPeers,
-      peersDataResidenceTime, blackListResidenceTime, maxInboundConnections, maxOutboundConnections,
-      maxConnectionsFromSingleHost, connectionTimeout, outboundBufferSize, maxUnverifiedPeers,
-      peersBroadcastInterval, handshakeTimeout, uPnPSettings)
+    NetworkSettings(file = file,
+      bindAddress = bindAddress,
+      declaredAddress = declaredAddress,
+      nodeName = nodeName,
+      nonce = nonce,
+      knownPeers = config.as[Seq[String]]("known-peers"),
+      peersDataResidenceTime = config.as[FiniteDuration]("peers-data-residence-time"),
+      blackListResidenceTime = config.as[FiniteDuration]("black-list-residence-time"),
+      blockchainReadinessCacheTime = config.as[FiniteDuration]("blockchain-readiness-cache-time"),
+      maxInboundConnections = config.as[Int]("max-inbound-connections"),
+      maxOutboundConnections = config.as[Int]("max-outbound-connections"),
+      maxConnectionsPerHost = config.as[Int]("max-single-host-connections"),
+      connectionTimeout = config.as[FiniteDuration]("connection-timeout"),
+      outboundBufferSize = config.getBytes("outbound-buffer-size"),
+      maxUnverifiedPeers = config.as[Int]("max-unverified-peers"),
+      peersBroadcastInterval = config.as[FiniteDuration]("peers-broadcast-interval"),
+      handshakeTimeout = config.as[FiniteDuration]("handshake-timeout"),
+      uPnPSettings = config.as[UPnPSettings]("upnp"))
   }
 
   private def randomNonce: Long = {
