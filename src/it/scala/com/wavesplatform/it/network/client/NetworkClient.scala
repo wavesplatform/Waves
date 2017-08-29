@@ -41,8 +41,10 @@ class NetworkClient(chainId: Char,
     val channel = channelFuture.channel()
     allChannels.add(channel)
     channel.closeFuture().addListener { (chf: ChannelFuture) =>
-      val cause = Option(chf.cause()).getOrElse(new IllegalStateException("The connection is closed before handshake"))
-      if (!p.isCompleted) p.failure(new IOException(cause))
+      if (!p.isCompleted) {
+        val cause = Option(chf.cause()).getOrElse(new IllegalStateException("The connection is closed before handshake"))
+        p.failure(new IOException(cause))
+      }
       log.debug(s"Connection to $remoteAddress closed")
       allChannels.remove(chf.channel())
     }
