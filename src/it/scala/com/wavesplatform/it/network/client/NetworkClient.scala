@@ -34,13 +34,15 @@ class NetworkClient(chainId: Char,
     log.debug(s"Connecting to $remoteAddress")
     val channelFuture = bootstrap.connect(remoteAddress)
     channelFuture.addListener((_: io.netty.util.concurrent.Future[Void]) => {
+      log.debug(s"Connected to $remoteAddress")
       channelFuture.channel().write(p)
     })
 
     val channel = channelFuture.channel()
     allChannels.add(channel)
     channel.closeFuture().addListener { (chf: ChannelFuture) =>
-      if (!p.isCompleted) p.failure(new IOException(chf.cause()))
+      val cause = Option(chf.cause()).getOrElse(new IllegalStateException("The connection is closed before handshake"))
+      if (!p.isCompleted) p.failure(new IOException(cause))
       log.debug(s"Connection to $remoteAddress closed")
       allChannels.remove(chf.channel())
     }

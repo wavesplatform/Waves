@@ -7,6 +7,7 @@ import com.google.common.base.CaseFormat
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.settings.loadConfig
 import net.ceedubs.ficus.Ficus._
+import net.ceedubs.ficus.readers.ValueReader
 import org.slf4j.LoggerFactory
 import scorex.account.PrivateKeyAccount
 import scorex.crypto.encode.Base58
@@ -22,10 +23,17 @@ case class GeneratorSettings(chainId: Char,
                              iterations: Int,
                              delay: FiniteDuration,
                              txProbabilities: Map[TransactionParser.TransactionType.Value, Float],
-                             sendTo: InetSocketAddress)
+                             sendTo: Seq[InetSocketAddress])
 
 object GeneratorSettings {
   val configPath: String = "generator"
+
+  private implicit val inetSocketAddressReader: ValueReader[InetSocketAddress] = { (config: Config, path: String) =>
+    new InetSocketAddress(
+      config.as[String](s"$path.address"),
+      config.as[Int](s"$path.port")
+    )
+  }
 
   def fromConfig(config: Config): GeneratorSettings = {
     val converter = CaseFormat.LOWER_HYPHEN.converterTo(CaseFormat.UPPER_CAMEL)
@@ -39,7 +47,7 @@ object GeneratorSettings {
     val iterations = config.as[Int](s"$configPath.iterations")
     val delay = config.as[FiniteDuration](s"$configPath.delay")
     val txProbabilities = config.as[Map[String, Double]](s"$configPath.probabilities").map(kv => toTxType(kv._1) -> kv._2.toFloat)
-    val sendTo = new InetSocketAddress(config.as[String](s"$configPath.send-to.address"), config.as[Int](s"$configPath.send-to.port"))
+    val sendTo = config.as[Seq[InetSocketAddress]](s"$configPath.send-to")
 
     GeneratorSettings(chainId, accounts, transactions, iterations, delay, txProbabilities, sendTo)
   }

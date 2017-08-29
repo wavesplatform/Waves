@@ -10,12 +10,13 @@ import scorex.transaction.{CreateAliasTransaction, PaymentTransaction, Transacti
 import scorex.utils.LoggerFacade
 
 import scala.concurrent.duration._
+import java.util.concurrent.ThreadLocalRandom
 import scala.util.Random
 
 class NarrowTransactionGenerator(val probabilities: Map[TransactionType.Value, Float],
                                  val accounts: Seq[PrivateKeyAccount]) extends TransactionGenerator {
 
-  private val r = new Random()
+  private def r = ThreadLocalRandom.current
   private val log = LoggerFacade(LoggerFactory.getLogger(getClass))
   private val typeGen = new DistributedRandomGenerator(probabilities)
 
