@@ -1,5 +1,7 @@
 package com.wavesplatform.network
 
+import java.net.InetSocketAddress
+
 import io.netty.channel.{ChannelHandlerContext, ChannelInboundHandlerAdapter}
 import scorex.utils.ScorexLogging
 
@@ -9,6 +11,7 @@ class PeerSynchronizer(peerDatabase: PeerDatabase, peerRequestInterval: FiniteDu
   extends ChannelInboundHandlerAdapter with ScorexLogging {
 
   private var peersRequested = false
+  private var declaredAddress = Option.empty[InetSocketAddress]
 
   def requestPeers(ctx: ChannelHandlerContext): Unit = if (ctx.channel().isActive) {
     log.trace(s"${id(ctx)} Requesting peers")
@@ -20,13 +23,23 @@ class PeerSynchronizer(peerDatabase: PeerDatabase, peerRequestInterval: FiniteDu
     }
   }
 
-  override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef) = {
-    Option(ctx.channel().attr(AttributeKeys.DeclaredAddress).get()).foreach(peerDatabase.touch)
+  override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = {
+    declaredAddress.foreach(peerDatabase.touch)
     msg match {
       case hs: Handshake =>
-        hs.declaredAddress.foreach(peerDatabase.addCandidate)
+        hs.declaredAddress.foreach { rda =>
+          if (rda.getAddress == ctx.remoteAddress.getAddress) {
+            log.trace(s"${id(ctx)} Touching declared address")
+            peerDatabase.touch(rda)
+            declaredAddress = Some(rda)
+          } else {
+            log.debug(s"${id(ctx)} Declared address $rda does not match actual remote address")
+          }
+        }
+        requestPeers(ctx)
         super.channelRead(ctx, msg)
       case GetPeers =>
+        log.debug(s"${id(ctx)} Sending known peers: ${peerDatabase.knownPeers.mkString("[", ", ", "]")}")
         ctx.writeAndFlush(KnownPeers(peerDatabase.knownPeers.keys.toSeq))
       case KnownPeers(peers) if peersRequested =>
         peersRequested = false

@@ -85,4 +85,11 @@ class NetworkSettingsSpecification extends FlatSpec with Matchers {
     networkSettings.nonce should not be 0
     networkSettings.nodeName should be(s"Node-${networkSettings.nonce}")
   }
+
+  it should "fail with IllegalArgumentException on too long node name" in {
+    val config = loadConfig(ConfigFactory.parseString("waves.network.node-name = очень-длинное-название-в-многобайтной-кодировке-отличной-от-однобайтной-кодировки-американского-института-стандартов"))
+    intercept[IllegalArgumentException] {
+      config.as[NetworkSettings]("waves.network")
+    }
+  }
 }
