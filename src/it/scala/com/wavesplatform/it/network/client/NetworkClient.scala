@@ -4,7 +4,7 @@ import java.net.InetSocketAddress
 import java.util.concurrent.ConcurrentHashMap
 
 import com.wavesplatform.Version
-import com.wavesplatform.network.{Handshake, HandshakeHandler, PeerInfo, PeerKey}
+import com.wavesplatform.network.{Handshake, HandshakeHandler, PeerInfo}
 import com.wavesplatform.settings._
 import io.netty.bootstrap.Bootstrap
 import io.netty.channel._
@@ -27,12 +27,9 @@ class NetworkClient(
     Handshake(Constants.ApplicationName + chainId, Version.VersionTuple, nodeName,
       nonce, None)
 
-  private val peerUniqueness = new ConcurrentHashMap[PeerKey, Channel]()
-
   private val channels = new ConcurrentHashMap[InetSocketAddress, Channel]
 
-  private val clientHandshakeHandler =
-    new HandshakeHandler.Client(handshake, peerInfo, peerUniqueness, NopPeerDatabase)
+  private val clientHandshakeHandler = new HandshakeHandler.Client(handshake, peerInfo, NopPeerDatabase)
 
   private val bootstrap = new Bootstrap()
     .group(workerGroup)

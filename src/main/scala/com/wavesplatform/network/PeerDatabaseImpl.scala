@@ -25,7 +25,10 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Auto
 
   override def addCandidate(socketAddress: InetSocketAddress): Unit = unverifiedPeers.synchronized {
     if (!peersPersistence.containsKey(socketAddress) && !unverifiedPeers.contains(socketAddress)) {
+      log.trace(s"Adding candidate $socketAddress")
       unverifiedPeers.add(socketAddress)
+    } else {
+      log.trace(s"NOT adding candidate $socketAddress")
     }
   }
 
@@ -55,6 +58,9 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Auto
     log.trace(s"Excluding: $excluded")
     def excludeAddress(isa: InetSocketAddress) = excluded(isa) || blacklistedHosts(isa.getAddress)
 
+    // excluded only contains local addresses, our declared address, and external declared addresses we already have
+    // connection to, so it's safe to filter out all matching candidates
+    unverifiedPeers.removeIf(isa => excluded(isa))
     log.trace(s"Evicting queue: $unverifiedPeers")
     val unverified = Option(unverifiedPeers.peek()).filterNot(excludeAddress)
     val verified = Random.shuffle(knownPeers.keySet.diff(excluded).toSeq).headOption.filterNot(excludeAddress)
