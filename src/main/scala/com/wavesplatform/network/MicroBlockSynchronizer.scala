@@ -8,6 +8,8 @@ import com.wavesplatform.state2.ByteStr
 import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel._
 import monix.eval.Task
+import kamon.Kamon
+import kamon.metric.instrument.Time
 import scorex.transaction.NgHistory
 import scorex.utils.ScorexLogging
 
@@ -22,6 +24,8 @@ class MicroBlockSynchronizer(settings: Settings, history: NgHistory) extends Cha
   private val awaitingMicroBlocks = cache[MicroBlockSignature, Object](settings.invCacheTimeout)
   private val knownMicroBlockOwners = cache[MicroBlockSignature, MSet[ChannelHandlerContext]](settings.invCacheTimeout)
   private val successfullyReceivedMicroBlocks = cache[MicroBlockSignature, Object](settings.processedMicroBlocksCacheTimeout)
+
+  private val microBlockCreationTime = cache[ByteStr, java.lang.Long](settings.invCacheTimeout)
 
   private def alreadyRequested(microBlockSig: MicroBlockSignature): Boolean = Option(awaitingMicroBlocks.getIfPresent(microBlockSig)).isDefined
 
@@ -49,21 +53,33 @@ class MicroBlockSynchronizer(settings: Settings, history: NgHistory) extends Cha
       knownMicroBlockOwners.invalidate(mb.totalResBlockSig)
       awaitingMicroBlocks.invalidate(mb.totalResBlockSig)
       successfullyReceivedMicroBlocks.put(mb.totalResBlockSig, dummy)
+
+      Option(microBlockCreationTime.getIfPresent(mb.totalResBlockSig)).foreach { created =>
+        microBlockReceiveLagStats.record(System.currentTimeMillis() - created)
+        microBlockCreationTime.invalidate(mb.totalResBlockSig)
+      }
     }.runAsync
-    case mi@MicroBlockInv(totalResBlockSig, prevResBlockSig) => Task {
+    case mi@MicroBlockInv(totalResBlockSig, prevResBlockSig, created) => Task {
       log.trace(id(ctx) + "Received " + mi)
       history.lastBlockId() match {
         case Some(lastBlockId) =>
           if (lastBlockId == prevResBlockSig) {
             knownMicroBlockOwners.get(totalResBlockSig, () => MSet.empty) += ctx
-            if (!alreadyRequested(totalResBlockSig))
-              requestMicroBlockTask(totalResBlockSig, 2)
-            else Task.unit
+
+            microBlockInvStats.increment()
+            microBlockCreationTime.put(totalResBlockSig, created)
+
+            if (alreadyRequested(totalResBlockSig)) Task.unit
+            else requestMicroBlockTask(totalResBlockSig, 2)
           } else {
+            notLastMicroblockStats.increment()
             log.trace(s"Discarding $mi because it doesn't match last (micro)block")
             Task.unit
           }
-        case None => Task.unit
+
+        case None =>
+          unknownMicroblockStats.increment()
+          Task.unit
       }
     }.flatten.runAsync
     case _ => super.channelRead(ctx, msg)
@@ -73,6 +89,15 @@ class MicroBlockSynchronizer(settings: Settings, history: NgHistory) extends Cha
 object MicroBlockSynchronizer {
 
   type MicroBlockSignature = ByteStr
+
+  private val microBlockInvStats = Kamon.metrics.registerCounter("micro-inv")
+  private val microBlockReceiveLagStats = Kamon.metrics.registerHistogram(
+    name = "micro-receive-lag",
+    unitOfMeasurement = Some(Time.Milliseconds)
+  )
+
+  private val notLastMicroblockStats = Kamon.metrics.registerCounter("micro-not-last")
+  private val unknownMicroblockStats = Kamon.metrics.registerCounter("micro-unknown")
 
   case class Settings(waitResponseTimeout: FiniteDuration,
                       processedMicroBlocksCacheTimeout: FiniteDuration,

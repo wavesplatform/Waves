@@ -87,7 +87,12 @@ class CoordinatorHandler(
       Signed.validateSignatures(m) match {
         case Right(_) =>
           Coordinator.processMicroBlock(checkpointService, history, blockchainUpdater, utxStorage)(m)
-            .foreach(_ => allChannels.broadcast(MicroBlockInv(m.totalResBlockSig, m.prevResBlockSig), Some(ctx.channel())))
+            .foreach { _ =>
+              allChannels.broadcast(
+                MicroBlockInv(m.totalResBlockSig, m.prevResBlockSig, System.currentTimeMillis()),
+                Some(ctx.channel())
+              )
+            }
         case Left(err) =>
           peerDatabase.blacklistAndClose(ctx.channel(), err.toString)
       }

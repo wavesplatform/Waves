@@ -3,7 +3,7 @@ package com.wavesplatform.network
 import java.net.{InetAddress, InetSocketAddress}
 import java.util
 
-import com.google.common.primitives.{Bytes, Ints}
+import com.google.common.primitives.{Bytes, Ints, Longs}
 import com.wavesplatform.mining.Miner.MaxTransactionsPerMicroblock
 import com.wavesplatform.state2.ByteStr
 import scorex.block.{Block, MicroBlock}
@@ -217,9 +217,15 @@ object MicroBlockInvMessageSpec extends MessageSpec[MicroBlockInv] {
   override val messageName: String = "Microblock Inv message"
 
   override def deserializeData(bytes: Array[Byte]): Try[MicroBlockInv] =
-    Try(MicroBlockInv(ByteStr(bytes.take(SignatureLength)), ByteStr(bytes.takeRight(SignatureLength))))
+    Try(MicroBlockInv(
+      totalBlockSig = ByteStr(bytes.take(SignatureLength)),
+      prevBlockSig = ByteStr(bytes.view.slice(SignatureLength, SignatureLength * 2).toArray),
+      created = Longs.fromByteArray(bytes.drop(SignatureLength * 2))
+    ))
 
-  override def serializeData(inv: MicroBlockInv): Array[Byte] = inv.totalBlockSig.arr ++ inv.prevBlockSig.arr
+  override def serializeData(inv: MicroBlockInv): Array[Byte] = {
+    inv.totalBlockSig.arr ++ inv.prevBlockSig.arr ++ Longs.toByteArray(inv.created)
+  }
 
   override def maxLength = 500
 }

@@ -10,6 +10,7 @@ import com.wavesplatform.state2.diffs.TransactionDiffer
 import com.wavesplatform.state2.reader.{CompositeStateReader, StateReader}
 import com.wavesplatform.state2.{ByteStr, Diff, Instrumented, Portfolio}
 import kamon.Kamon
+import kamon.metric.instrument.{Time => KamonTime}
 import scorex.account.Address
 import scorex.consensus.TransactionsOrdering
 import scorex.transaction.ValidationError.GenericError
@@ -40,7 +41,10 @@ class UtxPool(time: Time,
   private val pessimisticPortfolios = Synchronized(new PessimisticPortfolios)
 
   private val sizeStats = Kamon.metrics.histogram("utx-pool-size")
-  private val processingTimeStats = Kamon.metrics.histogram("utx-transaction-processing-time")
+  private val processingTimeStats = Kamon.metrics.histogram(
+    "utx-transaction-processing-time",
+    KamonTime.Milliseconds
+  )
 
   private def removeExpired(currentTs: Long): Unit = write { implicit l =>
     def isExpired(tx: Transaction) = (currentTs - tx.timestamp).millis > utxSettings.maxTransactionAge
