@@ -35,6 +35,7 @@ import DebugApiRoute._
 case class DebugApiRoute(settings: RestAPISettings,
                          wallet: Wallet,
                          stateReader: StateReader,
+                         persistedStateReader: StateReader,
                          history: History,
                          peerDatabase: PeerDatabase,
                          establishedConnections: ConcurrentMap[Channel, PeerInfo],
@@ -172,7 +173,7 @@ case class DebugApiRoute(settings: RestAPISettings,
   def info: Route = (path("info") & get) {
     complete(Json.obj(
       "stateHeight" -> stateReader.height,
-      "stateHash" -> stateReader.accountPortfoliosHash
+      "stateHash" -> persistedStateReader.accountPortfoliosHash
     ))
   }
 

@@ -39,7 +39,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
       s"topMemDiff: ${topMemoryDiff().heightDiff}, bottomMemDiff: ${bottomMemoryDiff().heightDiff}")
   }
 
-  private def currentPersistedBlocksState: StateReader = read { implicit l =>
+  def currentPersistedBlocksState: StateReader = read { implicit l =>
     composite(composite(persisted, () => bottomMemoryDiff()), () => topMemoryDiff())
   }
 

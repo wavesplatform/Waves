@@ -20,7 +20,7 @@ object StorageFactory {
       }
     }
 
-  def apply(settings: BlockchainSettings): Try[(NgHistory with AutoCloseable, AutoCloseable, StateReader, BlockchainUpdater)] = {
+  def apply(settings: BlockchainSettings): Try[(NgHistory with AutoCloseable, AutoCloseable, StateReader, StateReader, BlockchainUpdater)] = {
     val lock = new RWL(true)
 
     for {
@@ -30,7 +30,7 @@ object StorageFactory {
       stateWriter = new StateWriterImpl(ss, lock)
     } yield {
       val bcu = BlockchainUpdaterImpl(stateWriter, ngHistoryWriter, settings.functionalitySettings, settings.minimumInMemoryDiffSize, lock)
-      (ngHistoryWriter, stateWriter, bcu.bestLiquidState, bcu)
+      (ngHistoryWriter, stateWriter, bcu.bestLiquidState, bcu.currentPersistedBlocksState, bcu)
     }
   }
 }

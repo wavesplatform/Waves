@@ -28,7 +28,7 @@ package object history {
 
 
   def domain(bs: BlockchainSettings): Domain = {
-    val (history, _, stateReader, blockchainUpdater) = StorageFactory(bs).get
+    val (history, _, stateReader, _, blockchainUpdater) = StorageFactory(bs).get
     Domain(history, stateReader, blockchainUpdater)
   }
 

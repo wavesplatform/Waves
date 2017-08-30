@@ -21,12 +21,13 @@ class DebugRouteSpec
     with RestAPISettingsHelper with TestWallet with MockFactory with PropertyChecks with TransactionGen with BlockGen {
 
   private val state = mock[StateReader]
+  private val persistedState = mock[StateReader]
   private val history = mock[History]
   private val peerDatabase = mock[PeerDatabase]
   private val channelGroup = mock[ChannelGroup]
   private val utxPool = mock[UtxPool]
   private val establishedConnections = mock[ConcurrentMap[Channel, PeerInfo]]
-  private val route = DebugApiRoute(restAPISettings, testWallet, state, history, peerDatabase, establishedConnections, mock[BlockchainUpdater], channelGroup, utxPool).route
+  private val route = DebugApiRoute(restAPISettings, testWallet, state, persistedState, history, peerDatabase, establishedConnections, mock[BlockchainUpdater], channelGroup, utxPool).route
 
   private implicit def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)
 
@@ -51,7 +52,7 @@ class DebugRouteSpec
   routePath("/info") in {
     forAll(Gen.posNum[Int]) { height =>
       (state.height _).expects().returning(height).once()
-      (state.accountPortfolios _).expects().returning(Map.empty).once()
+      (persistedState.accountPortfolios _).expects().returning(Map.empty).once()
       Get(routePath("/info")) ~> route ~> check {
         responseAs[JsObject] should have(
           "stateHeight" -> JsNumber(height),

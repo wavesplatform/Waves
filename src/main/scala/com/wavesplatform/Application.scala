@@ -43,7 +43,7 @@ import scala.util.Try
 class Application(val actorSystem: ActorSystem, val settings: WavesSettings) extends ScorexLogging {
 
   private val checkpointService = new CheckpointServiceImpl(settings.blockchainSettings.checkpointFile, settings.checkpointsSettings)
-  private val (history, stateWriter, stateReader, blockchainUpdater) = StorageFactory(settings.blockchainSettings).get
+  private val (history, stateWriter, stateReader, persistedStateReader, blockchainUpdater) = StorageFactory(settings.blockchainSettings).get
   private lazy val upnp = new UPnP(settings.networkSettings.uPnPSettings) // don't initialize unless enabled
   private val wallet: Wallet = Wallet(settings.walletSettings)
 
@@ -84,7 +84,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
       UtilsApiRoute(settings.restAPISettings),
       PeersApiRoute(settings.restAPISettings, network.connect, peerDatabase, establishedConnections),
       AddressApiRoute(settings.restAPISettings, wallet, stateReader, settings.blockchainSettings.functionalitySettings),
-      DebugApiRoute(settings.restAPISettings, wallet, stateReader, history, peerDatabase, establishedConnections, blockchainUpdater, allChannels, utxStorage),
+      DebugApiRoute(settings.restAPISettings, wallet, stateReader, persistedStateReader, history, peerDatabase, establishedConnections, blockchainUpdater, allChannels, utxStorage),
       WavesApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, time),
       AssetsApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, stateReader, time),
       NodeApiRoute(settings.restAPISettings, () => this.shutdown()),
