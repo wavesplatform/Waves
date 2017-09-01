@@ -7,6 +7,7 @@ import com.google.common.base.CaseFormat
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.settings.loadConfig
 import net.ceedubs.ficus.Ficus._
+import net.ceedubs.ficus.readers.ValueReader
 import org.slf4j.LoggerFactory
 import scorex.account.PrivateKeyAccount
 import scorex.crypto.encode.Base58
@@ -18,14 +19,18 @@ import scala.concurrent.duration.FiniteDuration
 
 case class GeneratorSettings(chainId: Char,
                              accounts: Seq[PrivateKeyAccount],
-                             transactions: Int,
-                             iterations: Int,
-                             delay: FiniteDuration,
                              txProbabilities: Map[TransactionParser.TransactionType.Value, Float],
-                             sendTo: InetSocketAddress)
+                             sendTo: Seq[InetSocketAddress])
 
 object GeneratorSettings {
   val configPath: String = "generator"
+
+  private implicit val inetSocketAddressReader: ValueReader[InetSocketAddress] = { (config: Config, path: String) =>
+    new InetSocketAddress(
+      config.as[String](s"$path.address"),
+      config.as[Int](s"$path.port")
+    )
+  }
 
   def fromConfig(config: Config): GeneratorSettings = {
     val converter = CaseFormat.LOWER_HYPHEN.converterTo(CaseFormat.UPPER_CAMEL)
@@ -33,15 +38,11 @@ object GeneratorSettings {
     def toTxType(key: String): TransactionType.Value =
       TransactionType.withName(s"${converter.convert(key)}Transaction")
 
-    val chainId = config.as[String](s"$configPath.chainId").head
-    val accounts = config.as[List[String]](s"$configPath.accounts").map(s => PrivateKeyAccount(Base58.decode(s).get))
-    val transactions = config.as[Int](s"$configPath.transactions")
-    val iterations = config.as[Int](s"$configPath.iterations")
-    val delay = config.as[FiniteDuration](s"$configPath.delay")
-    val txProbabilities = config.as[Map[String, Double]](s"$configPath.probabilities").map(kv => toTxType(kv._1) -> kv._2.toFloat)
-    val sendTo = new InetSocketAddress(config.as[String](s"$configPath.send-to.address"), config.as[Int](s"$configPath.send-to.port"))
-
-    GeneratorSettings(chainId, accounts, transactions, iterations, delay, txProbabilities, sendTo)
+    GeneratorSettings(
+      chainId = config.as[String](s"$configPath.chainId").head,
+      accounts = config.as[List[String]](s"$configPath.accounts").map(s => PrivateKeyAccount(Base58.decode(s).get)),
+      txProbabilities = config.as[Map[String, Double]](s"$configPath.probabilities").map(kv => toTxType(kv._1) -> kv._2.toFloat),
+      sendTo = config.as[Seq[InetSocketAddress]](s"$configPath.send-to"))
   }
 
   private val log = LoggerFacade(LoggerFactory.getLogger(getClass))
