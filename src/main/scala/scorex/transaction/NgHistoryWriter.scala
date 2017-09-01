@@ -18,6 +18,8 @@ trait NgHistoryWriter extends HistoryWriter with NgHistory {
 
   def bestLiquidBlock(): Option[Block]
 
+  def bestLiquidBlockId(): Option[ByteStr]
+
   def forgeBlock(id: BlockId): Option[(Block, DiscardedMicroBlocks)]
 }
 
@@ -46,6 +48,11 @@ class NgHistoryWriterImpl(inner: HistoryWriter) extends NgHistoryWriter with Sco
       }
     })
   }
+
+  override def bestLiquidBlockId(): Option[AssetId] = read { implicit l =>
+    micros().headOption.map(_.totalResBlockSig).orElse(baseB().map(_.uniqueId))
+  }
+
 
   override def appendBlock(block: Block)(consensusValidation: => Either[ValidationError, BlockDiff]): Either[ValidationError, (BlockDiff, DiscardedTransactions)]
   = write { implicit l => {

@@ -44,8 +44,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
   }
 
   private def bestLiquidDiff(): BlockDiff = read { implicit l =>
-    ngHistoryWriter.bestLiquidBlock()
-      .map(_.uniqueId)
+    ngHistoryWriter.bestLiquidBlockId()
       .map(liquidBlockCandidatesDiff().get(_).get)
       .map(_.copy(heightDiff = 1))
       .orEmpty
