@@ -28,6 +28,7 @@ case class NetworkSettings(file: Option[File],
                            connectionTimeout: FiniteDuration,
                            outboundBufferSize: Long,
                            maxUnverifiedPeers: Int,
+                           enablePeersExchange: Boolean,
                            peersBroadcastInterval: FiniteDuration,
                            handshakeTimeout: FiniteDuration,
                            uPnPSettings: UPnPSettings)
@@ -58,13 +59,14 @@ object NetworkSettings {
     val connectionTimeout = config.as[FiniteDuration]("connection-timeout")
     val outboundBufferSize = config.getBytes("outbound-buffer-size")
     val maxUnverifiedPeers = config.as[Int]("max-unverified-peers")
+    val enablePeersExchange = config.as[Boolean]("enable-peers-exchange")
     val peersBroadcastInterval = config.as[FiniteDuration]("peers-broadcast-interval")
     val handshakeTimeout = config.as[FiniteDuration]("handshake-timeout")
     val uPnPSettings = config.as[UPnPSettings]("upnp")
 
     NetworkSettings(file, bindAddress, declaredAddress, nodeName, nonce, knownPeers,
       peersDataResidenceTime, blackListResidenceTime, maxInboundConnections, maxOutboundConnections,
-      maxConnectionsFromSingleHost, connectionTimeout, outboundBufferSize, maxUnverifiedPeers,
+      maxConnectionsFromSingleHost, connectionTimeout, outboundBufferSize, maxUnverifiedPeers, enablePeersExchange,
       peersBroadcastInterval, handshakeTimeout, uPnPSettings)
   }
 

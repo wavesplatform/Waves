@@ -91,6 +91,8 @@ class NetworkServer(checkpointService: CheckpointService,
     history
   )
 
+  private val noopHandler = new NoopHandler()
+
   private val serverChannel = settings.networkSettings.declaredAddress.map { _ =>
     new ServerBootstrap()
       .group(bossGroup, workerGroup)
@@ -106,7 +108,7 @@ class NetworkServer(checkpointService: CheckpointService,
         new LegacyFrameCodec(peerDatabase),
         discardingHandler,
         messageCodec,
-        new PeerSynchronizer(peerDatabase, settings.networkSettings.peersBroadcastInterval),
+        peerSynchronizer,
         historyReplier,
         microBlockSynchronizer,
         new ExtensionSignaturesLoader(settings.synchronizationSettings.synchronizationTimeout, peerDatabase),
@@ -145,7 +147,7 @@ class NetworkServer(checkpointService: CheckpointService,
       new LegacyFrameCodec(peerDatabase),
       discardingHandler,
       messageCodec,
-      new PeerSynchronizer(peerDatabase, settings.networkSettings.peersBroadcastInterval),
+      peerSynchronizer,
       historyReplier,
       microBlockSynchronizer,
       new ExtensionSignaturesLoader(settings.synchronizationSettings.synchronizationTimeout, peerDatabase),
@@ -163,6 +165,12 @@ class NetworkServer(checkpointService: CheckpointService,
         .randomPeer(excludedAddresses ++ outgoingChannels.keySet().asScala ++ incomingDeclaredAddresses)
         .foreach(connect)
     }
+  }
+
+  private def peerSynchronizer: ChannelHandlerAdapter = {
+    if (settings.networkSettings.enablePeersExchange) {
+      new PeerSynchronizer(peerDatabase, settings.networkSettings.peersBroadcastInterval)
+    } else noopHandler
   }
 
   def connect(remoteAddress: InetSocketAddress): Unit =
