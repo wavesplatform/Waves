@@ -48,7 +48,7 @@ class Miner(
   private val scheduledAttempts = SerialCancelable()
   private val microBlockAttempt = SerialCancelable()
 
-  private val blockBuildTimeStats = Kamon.metrics.histogram("forge-block-time", instrument.Time.Milliseconds)
+  private val blockBuildTimeStats = Kamon.metrics.histogram("pack-and-forge-block-time", instrument.Time.Milliseconds)
   private val microBlockBuildTimeStats = Kamon.metrics.histogram("forge-microblock-time", instrument.Time.Milliseconds)
 
 
@@ -67,7 +67,6 @@ class Miner(
     val pc = allChannels.size()
     lazy val lastBlockKernelData = parent.consensusData
     lazy val currentTime = timeService.correctedTime()
-    val start = System.currentTimeMillis()
     lazy val h = calcHit(lastBlockKernelData, account)
     lazy val t = calcTarget(parent, currentTime, balance)
     measureSuccessful(blockBuildTimeStats, for {
@@ -84,7 +83,6 @@ class Miner(
       val unconfirmed = utx.packUnconfirmed(minerSettings.maxTransactionsInKeyBlock, sortInBlock)
       log.debug(s"Adding ${unconfirmed.size} unconfirmed transaction(s) to new block")
       val block = Block.buildAndSign(version, currentTime, parent.uniqueId, consensusData, unconfirmed, account)
-      blockBuildTimeStats.record(System.currentTimeMillis() - start)
       block
     })
   }.delayExecution(delay)
@@ -103,27 +101,26 @@ class Miner(
       Right(None)
     } else {
       log.trace(s"Accumulated ${unconfirmed.size} txs for microblock")
-      measureSuccessful(microBlockBuildTimeStats, {
-        val signed = Block.buildAndSign(version = 3,
-          timestamp = accumulatedBlock.timestamp,
-          reference = accumulatedBlock.reference,
-          consensusData = accumulatedBlock.consensusData,
-          transactionData = accumulatedBlock.transactionData ++ unconfirmed,
-          signer = account)
-        val microBlockEi = for {
-          micro <- MicroBlock.buildAndSign(account, unconfirmed, accumulatedBlock.signerData.signature, signed.signerData.signature)
-          _ <- Coordinator.processMicroBlock(checkpoint, history, blockchainUpdater, utx)(micro)
-        } yield micro
-        microBlockEi match {
-          case Right(mb) =>
-            log.trace(s"MicroBlock(id=${trim(mb.uniqueId)}) has been mined for $account}")
-            allChannels.broadcast(MicroBlockInv(mb.totalResBlockSig, mb.prevResBlockSig, System.currentTimeMillis()))
-            Right(Some(signed))
-          case Left(err) =>
-            log.trace(s"MicroBlock has NOT been mined for $account} because $err")
-            Left(err)
-        }
-      })
+      (for {
+        fullAndMicro <- measureSuccessful(microBlockBuildTimeStats, {
+          val signedBlock = Block.buildAndSign(version = 3,
+            timestamp = accumulatedBlock.timestamp,
+            reference = accumulatedBlock.reference,
+            consensusData = accumulatedBlock.consensusData,
+            transactionData = accumulatedBlock.transactionData ++ unconfirmed,
+            signer = account)
+          MicroBlock.buildAndSign(account, unconfirmed, accumulatedBlock.signerData.signature, signedBlock.signerData.signature).map((signedBlock, _))
+        })
+        _ <- Coordinator.processMicroBlock(checkpoint, history, blockchainUpdater, utx)(fullAndMicro._2)
+      } yield fullAndMicro) match {
+        case Right((full, micro)) =>
+          log.trace(s"MicroBlock(id=${trim(micro.uniqueId)}) has been mined for $account}")
+          allChannels.broadcast(MicroBlockInv(micro.totalResBlockSig, micro.prevResBlockSig, System.currentTimeMillis()))
+          Right(Some(full))
+        case Left(err) =>
+          log.trace(s"MicroBlock has NOT been mined for $account} because $err")
+          Left(err)
+      }
     }
   }.delayExecution(minerSettings.microBlockInterval)
 

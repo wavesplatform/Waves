@@ -5,7 +5,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.network.{BlockCheckpoint, Checkpoint}
 import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state2.{ByteStr, Instrumented}
 import com.wavesplatform.state2.reader.StateReader
 import kamon.Kamon
 import scorex.block.{Block, MicroBlock}
@@ -16,7 +16,7 @@ import scorex.utils.{ScorexLogging, Time}
 
 import scala.concurrent.duration._
 
-object Coordinator extends ScorexLogging {
+object Coordinator extends ScorexLogging with Instrumented {
   def processFork(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater, stateReader: StateReader,
                   utxStorage: UtxPool, time: Time, settings: WavesSettings, miner: Miner, blockchainReadiness: AtomicBoolean)
                  (newBlocks: Seq[Block]): Either[ValidationError, BigInt] = {
@@ -62,7 +62,7 @@ object Coordinator extends ScorexLogging {
 
   def processSingleBlock(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater, time: Time,
                          stateReader: StateReader, utxStorage: UtxPool, blockchainReadiness: AtomicBoolean,
-                         settings: WavesSettings, miner: Miner)(newBlock: Block, local: Boolean): Either[ValidationError, BigInt] = {
+                         settings: WavesSettings, miner: Miner)(newBlock: Block, local: Boolean): Either[ValidationError, BigInt] = measureSuccessful(blockProcessingTimeStats, {
     val newScore = for {
       _ <- appendBlock(checkpoint, history, blockchainUpdater, stateReader, utxStorage, time, settings.blockchainSettings)(newBlock)
     } yield history.score()
@@ -72,14 +72,14 @@ object Coordinator extends ScorexLogging {
       miner.scheduleMining()
     }
     newScore
-  }
+  })
 
   def processMicroBlock(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater, utxStorage: UtxPool)
-                       (microBlock: MicroBlock): Either[ValidationError, Unit] = for {
+                       (microBlock: MicroBlock): Either[ValidationError, Unit] = measureSuccessful(microblockProcessingTimeStats, for {
     _ <- Either.cond(checkpoint.isBlockValid(microBlock.totalResBlockSig, history.height() + 1), (),
       MicroBlockAppendError(s"[h = ${history.height() + 1}] is not valid with respect to checkpoint", microBlock))
     _ <- blockchainUpdater.processMicroBlock(microBlock)
-  } yield utxStorage.removeAll(microBlock.transactionData)
+  } yield utxStorage.removeAll(microBlock.transactionData))
 
 
   private def appendBlock(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater,
@@ -120,8 +120,7 @@ object Coordinator extends ScorexLogging {
         lastValidBlock =>
           log.warn(s"Fork detected (length = ${fork.size}), rollback to last valid block id [${lastValidBlock.uniqueId}]")
           blockBlockForkStats.increment()
-          blockBlockForkHeightStats.record(fork.size)
-
+          blockForkHeightStats.record(fork.size)
           blockchainUpdater.removeAfter(lastValidBlock.uniqueId)
       }
     }
@@ -166,6 +165,8 @@ object Coordinator extends ScorexLogging {
   }
 
   private val blockBlockForkStats = Kamon.metrics.counter("block-fork")
-  private val blockBlockForkHeightStats = Kamon.metrics.histogram("block-block-fork-height")
+  private val blockForkHeightStats = Kamon.metrics.histogram("block-fork-height")
+  private val microblockProcessingTimeStats = Kamon.metrics.histogram("microblock-processing-time")
+  private val blockProcessingTimeStats = Kamon.metrics.histogram("single-block-processing-time")
 
 }
