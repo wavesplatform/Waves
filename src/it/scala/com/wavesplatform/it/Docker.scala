@@ -39,15 +39,14 @@ class Docker(suiteConfig: Config = ConfigFactory.empty) extends AutoCloseable wi
 
   private val client = DefaultDockerClient.fromEnv().build()
   private var nodes = Map.empty[String, Node]
+  private var seedAddress = Option.empty[String]
   private val isStopped = new AtomicBoolean(false)
 
   sys.addShutdownHook {
     close()
   }
 
-  private def knownPeers = nodes.values.zipWithIndex.map {
-    case (n, index) => s"-Dwaves.network.known-peers.$index=${n.nodeInfo.networkIpAddress}:${n.nodeInfo.containerNetworkPort}"
-  } mkString " "
+  private def knownPeers = seedAddress.fold("")(sa => s"-Dwaves.network.known-peers.0=$sa")
 
   private val networkName = "waves-" + this.##.toLong.toHexString
 
@@ -100,6 +99,9 @@ class Docker(suiteConfig: Config = ConfigFactory.empty) extends AutoCloseable wi
       containerId,
       extractHostPort(ports, matcherApiPort))
     val node = new Node(actualConfig, nodeInfo, http)
+    if (seedAddress.isEmpty) {
+      seedAddress = Some(s"${nodeInfo.networkIpAddress}:${nodeInfo.containerNetworkPort}")
+    }
     nodes += containerId -> node
     Await.result(node.lastBlock, Duration.Inf)
     node
