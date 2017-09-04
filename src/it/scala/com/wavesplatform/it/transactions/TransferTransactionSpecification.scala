@@ -194,7 +194,7 @@ class TransferTransactionSpecification(override val allNodes: Seq[Node], overrid
     Await.result(f, 1.minute)
   }
 
-  test("can not make transfer to self without having enough assets") {
+  test("can forge block with sending majority of some asse to self and to other account") {
     val f = for {
       _ <- assertBalances(firstAddress, 60.waves, 50.waves)
       _ <- assertBalances(secondAddress, 105.waves, 115.waves)
