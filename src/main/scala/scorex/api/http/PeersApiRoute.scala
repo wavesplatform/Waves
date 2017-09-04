@@ -6,7 +6,7 @@ import java.util.stream.Collectors
 import javax.ws.rs.Path
 
 import akka.http.scaladsl.server.Route
-import com.wavesplatform.network.{PeerDatabase, PeerInfo}
+import com.wavesplatform.network.{NetworkServer, PeerDatabase, PeerInfo}
 import com.wavesplatform.settings.RestAPISettings
 import io.netty.channel.Channel
 import io.swagger.annotations._
@@ -26,7 +26,7 @@ case class PeersApiRoute(
 
   override lazy val route =
     pathPrefix("peers") {
-      allPeers ~ connectedPeers ~ blacklistedPeers ~ connect
+      allPeers ~ connectedPeers ~ blacklistedPeers ~ connect ~ clearBlacklist
     }
 
   @Path("/all")
@@ -92,6 +92,17 @@ case class PeersApiRoute(
     complete(JsArray(peerDatabase.detailedBlacklist.take(MaxPeersInResponse)
       .map { case (h, (t, r)) => Json.obj("hostname" -> h.toString, "timestamp" -> t, "reason" -> r) }
       .toList))
+  }
+
+
+  @Path("/clearblacklist")
+  @ApiOperation(value = "Remove all blacklisted peers", notes = "Clear blacklist", httpMethod = "POST")
+  @ApiResponses(Array(
+    new ApiResponse(code = 200, message = "200")
+  ))
+  def clearBlacklist: Route = (path("clearblacklist") & post & withAuth) {
+    peerDatabase.clearBlacklist()
+    complete(Json.obj("result" -> "blacklist cleared"))
   }
 }
 

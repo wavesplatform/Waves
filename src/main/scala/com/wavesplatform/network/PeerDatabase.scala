@@ -21,6 +21,8 @@ trait PeerDatabase {
   def randomPeer(excluded: Set[InetSocketAddress]): Option[InetSocketAddress]
 
   def detailedBlacklist: Map[InetAddress, (Long, String)]
+
+  def clearBlacklist() : Unit
 }
 
 object PeerDatabase extends ScorexLogging {

@@ -12,4 +12,5 @@ object NopPeerDatabase extends PeerDatabase {
   override def blacklistedHosts: Set[InetAddress] = Set.empty
   override def randomPeer(excluded: Set[InetSocketAddress]): Option[InetSocketAddress] = None
   override def detailedBlacklist: Map[InetAddress, (Long, String)] = Map.empty
+  override def clearBlacklist(): Unit = ()
 }

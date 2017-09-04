@@ -25,6 +25,7 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
   private val scoreByHeight = Synchronized(db.openMap("score", new LogMVMapBuilder[Int, BigInt]))
 
   private val blockHeightStats = Kamon.metrics.histogram("block-height")
+  private val blockSizeStats = Kamon.metrics.histogram("block-size-bytes")
   private val transactionsInBlockStats = Kamon.metrics.histogram("transactions-in-block")
 
   private[HistoryWriterImpl] def isConsistent: Boolean = read { implicit l =>
@@ -47,6 +48,7 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
 
       db.commit()
       blockHeightStats.record(h)
+      blockSizeStats.record(block.bytes.length)
       transactionsInBlockStats.record(block.transactionData.size)
 
       if (h % 100 == 0) db.compact(CompactFillRate, CompactMemorySize)

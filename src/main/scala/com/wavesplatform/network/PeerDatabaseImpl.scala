@@ -94,5 +94,12 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Auto
     map
   }
 
+  def clearBlacklist(): Unit ={
+    blacklist.clear()
+    reasons.clear()
+
+    database.commit()
+  }
+
   override def close(): Unit = database.close()
 }
