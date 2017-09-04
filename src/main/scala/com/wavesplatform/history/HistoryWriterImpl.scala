@@ -96,6 +96,9 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
   override def lastBlockTimestamp(): Option[Long] = this.lastBlock.map(_.timestamp)
 
   override def lastBlockId(): Option[ByteStr] = this.lastBlock.map(_.signerData.signature)
+
+  override  def blockAt(height: Int): Option[Block] = blockBytes(height).map(Block.parseBytes(_).get)
+
 }
 
 object HistoryWriterImpl extends ScorexLogging {

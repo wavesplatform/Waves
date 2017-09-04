@@ -214,4 +214,10 @@ class NgHistoryWriterImpl(inner: HistoryWriter) extends NgHistoryWriter with Sco
 
   private val microMicroForkStats = Kamon.metrics.counter("micro-micro-fork")
 
+  override def blockAt(height: Int): Option[Block] = read { implicit l =>
+    if (height == inner.height() + 1)
+      bestLiquidBlock()
+    else
+      inner.blockAt(height)
+  }
 }

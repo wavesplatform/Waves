@@ -12,6 +12,8 @@ trait History extends Synchronized with AutoCloseable {
 
   def height(): Int
 
+  def blockAt(height: Int): Option[Block]
+
   def blockBytes(height: Int): Option[Array[Byte]]
 
   def scoreOf(id: ByteStr): Option[BlockchainScore]
@@ -61,10 +63,6 @@ object History {
   type BlockchainScore = BigInt
 
   implicit class HistoryExt(history: History) {
-
-    def blockAt(height: Int): Option[Block] = history.read { implicit lock =>
-      history.blockBytes(height).map(Block.parseBytes(_).get)
-    }
 
     def score(): BlockchainScore = history.read { implicit lock =>
       history.lastBlock.flatMap(last => history.scoreOf(last.uniqueId)).getOrElse(0)
