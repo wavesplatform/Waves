@@ -196,4 +196,35 @@ class TransferTransactionSpecification(override val allNodes: Seq[Node], overrid
 
     Await.result(f, 1.minute)
   }
+
+  test("can forge block with sending majority of some asse to self and to other account") {
+    val f = for {
+      _ <- assertBalances(firstAddress, 60.waves, 50.waves)
+      _ <- assertBalances(secondAddress, 105.waves, 115.waves)
+
+      asset <- sender.issue(firstAddress, "second asset", "description", defaultQuantity, 0, reissuable = false, fee = 1.waves).map(_.id)
+
+      height <- traverse(allNodes)(_.height).map(_.max)
+      _ <- traverse(allNodes)(_.waitForHeight(height + 1))
+      _ <- traverse(allNodes)(_.waitForTransaction(asset))
+
+      _ <- assertBalances(firstAddress, 59.waves, 49.waves)
+      _ <- assertAssetBalance(firstAddress, asset, defaultQuantity)
+
+      tx1 <- sender.transfer(firstAddress, firstAddress, defaultQuantity, fee = 1.waves, Some(asset)).map(_.id)
+      tx2 <- sender.transfer(firstAddress, secondAddress, defaultQuantity / 2, fee = 1.waves, Some(asset)).map(_.id)
+
+      height <- traverse(allNodes)(_.height).map(_.max)
+      _ <- traverse(allNodes)(_.waitForHeight(height + 1))
+      _ <- traverse(allNodes)(_.waitForTransaction(tx1))
+      _ <- traverse(allNodes)(_.waitForTransaction(tx2))
+
+      _ <- traverse(allNodes)(_.waitForHeight(height + 5))
+
+      _ <- assertBalances(firstAddress, 57.waves, 47.waves)
+      _ <- assertBalances(secondAddress, 105.waves, 115.waves)
+    } yield succeed
+
+    Await.result(f, 1.minute)
+  }
 }
