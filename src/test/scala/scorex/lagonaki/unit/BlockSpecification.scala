@@ -51,7 +51,7 @@ class BlockSpecification extends FunSuite with Matchers with MockFactory with Bl
     Range(40, 80).foreach(x => testBlock(Seq.fill(x)(tbd).flatten)(3))
   }
 
-  ignore("sign time for 60k txs") {
+  ignore ("sign time for 60k txs") {
     forAll(randomTransactionsGen(60000), accountGen, byteArrayGen(Block.BlockIdLength), byteArrayGen(Block.GeneratorSignatureLength)) { case ((txs, acc, ref, gs)) =>
       val (block, t0) = Instrumented.withTime(Block.buildAndSign(3, 1, ByteStr(ref), NxtLikeConsensusBlockData(1, ByteStr(gs)), txs, acc))
       val (bytes, t1) = Instrumented.withTime(block.bytesWithoutSignature)

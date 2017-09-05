@@ -1,9 +1,11 @@
 package scorex.transaction
 
+import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 
 import com.google.common.primitives.{Bytes, Ints}
 import com.wavesplatform.network.TransactionMessageSpec
+import com.wavesplatform.state2.ByteStr
 import play.api.libs.json.{JsArray, JsObject, Json}
 import scorex.block.{Block, BlockField}
 
@@ -16,14 +18,15 @@ object TransactionsBlockField {
   }
 
   def serTxs(value: Seq[Transaction], serTxCount: Array[Byte]): Array[Byte] = {
-    val byteBuffer = ByteBuffer.allocate(2 + value.size * TransactionMessageSpec.maxLength)
-    byteBuffer.put(serTxCount)
+    val byteBuffer = new ByteArrayOutputStream(value.size * TransactionMessageSpec.maxLength / 2)
+    byteBuffer.write(serTxCount, 0, serTxCount.length)
     value.foreach { tx =>
       val txBytes = tx.bytes
-      byteBuffer.put(Bytes.ensureCapacity(Ints.toByteArray(txBytes.length), 4, 0))
-      byteBuffer.put(txBytes)
+      val txSize = Bytes.ensureCapacity(Ints.toByteArray(txBytes.length), 4, 0)
+      byteBuffer.write(txSize, 0, txSize.length)
+      byteBuffer.write(txBytes, 0, txBytes.length)
     }
-    byteBuffer.array()
+    byteBuffer.toByteArray()
   }
 }
 
