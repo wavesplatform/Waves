@@ -7,12 +7,8 @@ import scala.language.higherKinds
 
 trait Instrumented {
   self: ScorexLogging =>
-  private def withTime[R](f: => R): (R, Long) = {
-    val t0 = System.currentTimeMillis()
-    val r: R = f
-    val t1 = System.currentTimeMillis()
-    (r, t1 - t0)
-  }
+
+  import Instrumented._
 
   def measureSizeLog[F[_] <: TraversableOnce[_], A, R](s: String)(fa: => F[A])(f: F[A] => R): R = {
     val (r, time) = withTime(f(fa))
@@ -38,5 +34,14 @@ trait Instrumented {
     if (r.isDefined)
       h.record(time)
     r
+  }
+}
+
+object Instrumented {
+  def withTime[R](f: => R): (R, Long) = {
+    val t0 = System.currentTimeMillis()
+    val r: R = f
+    val t1 = System.currentTimeMillis()
+    (r, t1 - t0)
   }
 }

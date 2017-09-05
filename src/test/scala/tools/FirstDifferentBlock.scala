@@ -19,6 +19,7 @@ object FirstDifferentBlock extends App {
   val TESTNET4 = "http://52.51.92.182:6869"
 
   val DEVNET1 = "http://34.251.200.245:6869"
+  val DEVNET3D = "http://13.229.61.140:16869"
   val DEVNET2 = "http://35.157.212.173:6869"
   val DEVNET3 = "http://13.229.61.140:6869"
 
@@ -38,5 +39,5 @@ object FirstDifferentBlock extends App {
     }
   }
 
-    println("first different block height is " + firstDifferent(1, 15445, nodeComparator(DEVNET2, DEVNET3)))
+    println("first different block height is " + firstDifferent(1, 1530, nodeComparator(DEVNET3D, DEVNET3)))
 }

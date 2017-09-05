@@ -1,6 +1,9 @@
 package scorex.transaction
 
+import java.nio.ByteBuffer
+
 import com.google.common.primitives.{Bytes, Ints}
+import com.wavesplatform.network.TransactionMessageSpec
 import play.api.libs.json.{JsArray, JsObject, Json}
 import scorex.block.{Block, BlockField}
 
@@ -11,6 +14,17 @@ object TransactionsBlockField {
     case 1 | 2 => TransactionsBlockFieldVersion1or2(value)
     case 3 => TransactionsBlockFieldVersion3(value)
   }
+
+  def serTxs(value: Seq[Transaction], serTxCount: Array[Byte]): Array[Byte] = {
+    val byteBuffer = ByteBuffer.allocate(2 + value.size * TransactionMessageSpec.maxLength)
+    byteBuffer.put(serTxCount)
+    value.foreach { tx =>
+      val txBytes = tx.bytes
+      byteBuffer.put(Bytes.ensureCapacity(Ints.toByteArray(txBytes.length), 4, 0))
+      byteBuffer.put(txBytes)
+    }
+    byteBuffer.array()
+  }
 }
 
 case class TransactionsBlockFieldVersion1or2(override val value: Seq[Transaction]) extends TransactionsBlockField {
@@ -20,10 +34,7 @@ case class TransactionsBlockFieldVersion1or2(override val value: Seq[Transaction
 
   override lazy val bytes: Array[Byte] = {
     val txCount = value.size.ensuring(_ <= Block.MaxTransactionsPerBlockVer1Ver2).toByte
-    value.foldLeft(Array(txCount)) { case (bs, tx) =>
-      val txBytes = tx.bytes
-      bs ++ Bytes.ensureCapacity(Ints.toByteArray(txBytes.length), 4, 0) ++ txBytes
-    }
+    TransactionsBlockField.serTxs(value, Array(txCount))
   }
 }
 
@@ -38,9 +49,6 @@ case class TransactionsBlockFieldVersion3(override val value: Seq[Transaction]) 
     val size0 = (txCount & 0xFF).asInstanceOf[Byte]
     val size1 = ((txCount >> 8) & 0xFF).asInstanceOf[Byte]
     val serTxCount = Seq(size0, size1).toArray
-    value.foldLeft(serTxCount) { case (bs, tx) =>
-      val txBytes = tx.bytes
-      bs ++ Bytes.ensureCapacity(Ints.toByteArray(txBytes.length), 4, 0) ++ txBytes
-    }
+    TransactionsBlockField.serTxs(value, serTxCount)
   }
 }

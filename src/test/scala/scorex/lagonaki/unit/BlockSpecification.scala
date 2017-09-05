@@ -1,17 +1,21 @@
 package scorex.lagonaki.unit
 
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.BlockGen
+import com.wavesplatform.state2.{ByteStr, Instrumented}
 import org.scalamock.scalatest.MockFactory
+import org.scalatest.prop.GeneratorDrivenPropertyChecks
 import org.scalatest.{FunSuite, Matchers}
 import scorex.account.PrivateKeyAccount
 import scorex.block.Block
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
+import scorex.crypto.EllipticCurveImpl
+import scorex.crypto.hash.FastCryptographicHash
 import scorex.transaction._
 import scorex.transaction.assets.TransferTransaction
 
 import scala.util.Random
 
-class BlockSpecification extends FunSuite with Matchers with MockFactory {
+class BlockSpecification extends FunSuite with Matchers with MockFactory with BlockGen with GeneratorDrivenPropertyChecks {
 
   test(" block with txs bytes/parse roundtrip") {
 
@@ -45,5 +49,16 @@ class BlockSpecification extends FunSuite with Matchers with MockFactory {
 
     List(1, 2).foreach(testBlock(tbd))
     Range(40, 80).foreach(x => testBlock(Seq.fill(x)(tbd).flatten)(3))
+  }
+
+  ignore("sign time for 60k txs") {
+    forAll(randomTransactionsGen(60000), accountGen, byteArrayGen(Block.BlockIdLength), byteArrayGen(Block.GeneratorSignatureLength)) { case ((txs, acc, ref, gs)) =>
+      val (block, t0) = Instrumented.withTime(Block.buildAndSign(3, 1, ByteStr(ref), NxtLikeConsensusBlockData(1, ByteStr(gs)), txs, acc))
+      val (bytes, t1) = Instrumented.withTime(block.bytesWithoutSignature)
+      val (hash, t2) = Instrumented.withTime(FastCryptographicHash.hash(bytes))
+      val (sig, t3) = Instrumented.withTime(EllipticCurveImpl.sign(acc, hash))
+      println((t0, t1, t2,t3))
+    }
+
   }
 }
