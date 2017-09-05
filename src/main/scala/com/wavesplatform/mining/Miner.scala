@@ -99,7 +99,11 @@ class Miner(
     else if (unconfirmed.isEmpty) {
       log.trace("skipping microBlock because no txs in utx pool")
       Right(None)
-    } else {
+    }
+    else if(accumulatedBlock.transactionData.size > MaxTransactionsPerBlockVer3) {
+      Left(GenericError(s"too many transactions in Block: allowed: $MaxTransactionsPerBlockVer3, actual: ${accumulatedBlock.transactionData.size}"))
+    }
+    else {
       log.trace(s"Accumulated ${unconfirmed.size} txs for microblock")
       (for {
         fullAndMicro <- measureSuccessful(microBlockBuildTimeStats, {
