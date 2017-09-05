@@ -1,5 +1,6 @@
 package scorex.lagonaki.unit
 
+import com.wavesplatform.mining.Miner
 import com.wavesplatform.state2._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{FunSuite, Matchers}
@@ -12,16 +13,15 @@ import scala.util.Random
 
 class MicroBlockSpecification extends FunSuite with Matchers with MockFactory {
 
+  val prevResBlockSig = ByteStr(Array.fill(Block.BlockIdLength)(Random.nextInt(100).toByte))
+  val totalResBlockSig = ByteStr(Array.fill(Block.BlockIdLength)(Random.nextInt(100).toByte))
+  val reference = Array.fill(Block.BlockIdLength)(Random.nextInt(100).toByte)
+  val sender = PrivateKeyAccount(reference.dropRight(2))
+  val gen = PrivateKeyAccount(reference)
+
   test("MicroBlock with txs bytes/parse roundtrip") {
 
-    val prevResBlockSig = ByteStr(Array.fill(Block.BlockIdLength)(Random.nextInt(100).toByte))
-    val totalResBlockSig = ByteStr(Array.fill(Block.BlockIdLength)(Random.nextInt(100).toByte))
-
-    val reference = Array.fill(Block.BlockIdLength)(Random.nextInt(100).toByte)
-    val gen = PrivateKeyAccount(reference)
-
     val ts = System.currentTimeMillis() - 5000
-    val sender = PrivateKeyAccount(reference.dropRight(2))
     val tx: Transaction = PaymentTransaction.create(sender, gen, 5, 1000, ts).right.get
     val tr: TransferTransaction = TransferTransaction.create(None, sender, gen, 5, ts + 1, None, 2, Array()).right.get
     val assetId = Some(ByteStr(Array.fill(AssetIdLength)(Random.nextInt(100).toByte)))
@@ -43,4 +43,21 @@ class MicroBlockSpecification extends FunSuite with Matchers with MockFactory {
     assert(microBlock == parsedBlock)
   }
 
+  test("MicroBlock cannot be created with zero transactions") {
+
+    val transactions = Seq.empty[PaymentTransaction]
+    val eitherBlockOrError = MicroBlock.buildAndSign(sender, transactions, prevResBlockSig, totalResBlockSig)
+
+    assert(eitherBlockOrError.isLeft)
+  }
+
+  test("MicroBlock cannot contain more than Miner.MaxTransactionsPerMicroblock") {
+
+    val transaction = PaymentTransaction.create(sender, gen, 5, 1000, System.currentTimeMillis()).right.get
+    val transactions = Seq.fill(Miner.MaxTransactionsPerMicroblock + 1)(transaction)
+
+    val eitherBlockOrError = MicroBlock.buildAndSign(sender, transactions, prevResBlockSig, totalResBlockSig)
+
+    assert(eitherBlockOrError.isLeft)
+  }
 }

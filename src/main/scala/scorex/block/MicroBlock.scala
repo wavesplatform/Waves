@@ -58,12 +58,9 @@ object MicroBlock extends ScorexLogging {
                      totalResBlockSig: BlockId, signature: ByteStr): Either[ValidationError, MicroBlock] = {
     if (transactionData.isEmpty)
       Left(GenericError("cannot create empty MicroBlock"))
-    else {
-      val txsCount = transactionData.size
-      if (txsCount > MaxTransactionsPerMicroblock) {
-        Left(GenericError(s"too many txs in MicroBlock: allowed: $MaxTransactionsPerMicroblock, actual: $txsCount"))
-      }
-    }
+    else if (transactionData.size > MaxTransactionsPerMicroblock)
+      Left(GenericError(s"too many txs in MicroBlock: allowed: $MaxTransactionsPerMicroblock, actual: ${transactionData.size}"))
+    else
       Right(new MicroBlock(version, generator, transactionData, prevResBlockSig, totalResBlockSig, signature))
   }
 
