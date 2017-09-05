@@ -6,7 +6,7 @@ import java.util.stream.Collectors
 import javax.ws.rs.Path
 
 import akka.http.scaladsl.server.Route
-import com.wavesplatform.network.{NetworkServer, PeerDatabase, PeerInfo}
+import com.wavesplatform.network.{PeerDatabase, PeerInfo}
 import com.wavesplatform.settings.RestAPISettings
 import io.netty.channel.Channel
 import io.swagger.annotations._

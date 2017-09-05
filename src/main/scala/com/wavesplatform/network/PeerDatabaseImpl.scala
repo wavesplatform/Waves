@@ -24,6 +24,10 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Auto
     doTouch(a, Long.MaxValue)
   }
 
+  if (!settings.enableBlacklisting) {
+    clearBlacklist()
+  }
+
   override def addCandidate(socketAddress: InetSocketAddress): Unit = unverifiedPeers.synchronized {
     if (!peersPersistence.containsKey(socketAddress) && !unverifiedPeers.contains(socketAddress)) {
       log.trace(s"Adding candidate $socketAddress")
@@ -41,11 +45,15 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Auto
 
   override def touch(socketAddress: InetSocketAddress): Unit = doTouch(socketAddress, System.currentTimeMillis())
 
-  override def blacklist(address: InetAddress, reason: String): Unit = unverifiedPeers.synchronized {
-    unverifiedPeers.removeIf(_.getAddress == address)
-    blacklist.put(address, System.currentTimeMillis())
-    reasons.put(address, reason)
-    database.commit()
+  override def blacklist(address: InetAddress, reason: String): Unit = {
+    if (settings.enableBlacklisting) {
+      unverifiedPeers.synchronized {
+        unverifiedPeers.removeIf(_.getAddress == address)
+        blacklist.put(address, System.currentTimeMillis())
+        reasons.put(address, reason)
+        database.commit()
+      }
+    }
   }
 
   override def knownPeers: Map[InetSocketAddress, Long] = {
