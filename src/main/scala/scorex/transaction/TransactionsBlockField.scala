@@ -1,11 +1,9 @@
 package scorex.transaction
 
 import java.io.ByteArrayOutputStream
-import java.nio.ByteBuffer
 
 import com.google.common.primitives.{Bytes, Ints}
 import com.wavesplatform.network.TransactionMessageSpec
-import com.wavesplatform.state2.ByteStr
 import play.api.libs.json.{JsArray, JsObject, Json}
 import scorex.block.{Block, BlockField}
 
@@ -26,7 +24,7 @@ object TransactionsBlockField {
       byteBuffer.write(txSize, 0, txSize.length)
       byteBuffer.write(txBytes, 0, txBytes.length)
     }
-    byteBuffer.toByteArray()
+    byteBuffer.toByteArray
   }
 }
 
