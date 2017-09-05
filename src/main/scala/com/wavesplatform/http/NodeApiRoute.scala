@@ -3,7 +3,7 @@ package com.wavesplatform.http
 import javax.ws.rs.Path
 
 import akka.http.scaladsl.server.Route
-import com.wavesplatform.Shutdownable
+import com.wavesplatform.{Shutdownable, Version}
 import com.wavesplatform.settings.{Constants, RestAPISettings}
 import io.swagger.annotations._
 import play.api.libs.json.Json
@@ -25,7 +25,10 @@ case class NodeApiRoute(settings: RestAPISettings, application: Shutdownable)
     new ApiResponse(code = 200, message = "Json Waves node version")
   ))
   def version: Route = (get & path("version")) {
-    complete(Json.obj("version" -> Constants.AgentName))
+    complete(Json.obj(
+      "version" -> Constants.AgentName,
+      "commitId" -> Version.CommitId
+    ))
   }
 
   @Path("/stop")

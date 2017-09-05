@@ -58,6 +58,7 @@ sourceGenerators in Compile += Def.task {
       |object Version {
       |  val VersionString = "${version.value}"
       |  val VersionTuple = ($major, $minor, $bugfix)
+      |  val CommitId = "${git.gitHeadCommit.value.getOrElse("unknown")}"
       |}
       |""".stripMargin)
   Seq(versionFile)
