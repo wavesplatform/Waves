@@ -2,7 +2,9 @@ package scorex.lagonaki.unit
 
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.state2._
+import com.wavesplatform.state2.diffs.produce
 import org.scalamock.scalatest.MockFactory
+import org.scalatest.words.ShouldVerb
 import org.scalatest.{FunSuite, Matchers}
 import scorex.account.PrivateKeyAccount
 import scorex.block.{Block, MicroBlock}
@@ -11,7 +13,7 @@ import scorex.transaction.assets.TransferTransaction
 
 import scala.util.Random
 
-class MicroBlockSpecification extends FunSuite with Matchers with MockFactory {
+class MicroBlockSpecification extends FunSuite with Matchers with MockFactory with ShouldVerb{
 
   val prevResBlockSig = ByteStr(Array.fill(Block.BlockIdLength)(Random.nextInt(100).toByte))
   val totalResBlockSig = ByteStr(Array.fill(Block.BlockIdLength)(Random.nextInt(100).toByte))
@@ -48,7 +50,7 @@ class MicroBlockSpecification extends FunSuite with Matchers with MockFactory {
     val transactions = Seq.empty[PaymentTransaction]
     val eitherBlockOrError = MicroBlock.buildAndSign(sender, transactions, prevResBlockSig, totalResBlockSig)
 
-    assert(eitherBlockOrError.isLeft)
+    eitherBlockOrError should produce("cannot create empty MicroBlock")
   }
 
   test("MicroBlock cannot contain more than Miner.MaxTransactionsPerMicroblock") {
@@ -58,6 +60,6 @@ class MicroBlockSpecification extends FunSuite with Matchers with MockFactory {
 
     val eitherBlockOrError = MicroBlock.buildAndSign(sender, transactions, prevResBlockSig, totalResBlockSig)
 
-    assert(eitherBlockOrError.isLeft)
+    eitherBlockOrError should produce("too many txs in MicroBlock")
   }
 }
