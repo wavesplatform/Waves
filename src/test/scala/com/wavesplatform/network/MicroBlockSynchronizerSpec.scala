@@ -42,7 +42,7 @@ class MicroBlockSynchronizerSpec extends FreeSpec
     Mockito.doReturn(Some(lastBlockSig)).when(history).lastBlockId()
 
     val channel = new EmbeddedChannel(new MicroBlockSynchronizer(settings, history))
-    channel.writeInbound(MicroBlockInv(nextBlockSig, lastBlockSig, System.currentTimeMillis()))
+    channel.writeInbound(MicroBlockInv(nextBlockSig, lastBlockSig))
     channel.flushInbound()
 
     val r = eventually {
@@ -65,7 +65,7 @@ class MicroBlockSynchronizerSpec extends FreeSpec
     val channel1 = new EmbeddedChannel(synchronizer)
     val channel2 = new EmbeddedChannel(synchronizer)
 
-    channel1.writeInbound(MicroBlockInv(nextBlockSig, lastBlockSig, System.currentTimeMillis()))
+    channel1.writeInbound(MicroBlockInv(nextBlockSig, lastBlockSig))
     channel1.flushInbound()
 
     eventually {
@@ -84,7 +84,7 @@ class MicroBlockSynchronizerSpec extends FreeSpec
     )))
     channel1.flushInbound()
 
-    channel2.writeInbound(MicroBlockInv(nextBlockSig, lastBlockSig, System.currentTimeMillis()))
+    channel2.writeInbound(MicroBlockInv(nextBlockSig, lastBlockSig))
     channel2.flushInbound()
 
     intercept[TestFailedDueToTimeoutException] {

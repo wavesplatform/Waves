@@ -18,8 +18,7 @@ class MicroBlockInvMessageSpecSpec extends FreeSpec
   private val microBlockInvGen: Gen[MicroBlockInv] = for {
     totalSig <- byteArrayGen(TransactionParser.SignatureLength)
     prevBlockSig <- byteArrayGen(TransactionParser.SignatureLength)
-    created <- timestampGen
-  } yield MicroBlockInv(ByteStr(totalSig), ByteStr(prevBlockSig), created)
+  } yield MicroBlockInv(ByteStr(totalSig), ByteStr(prevBlockSig))
 
   "MicroBlockInvMessageSpec" - {
     import MicroBlockInvMessageSpec._

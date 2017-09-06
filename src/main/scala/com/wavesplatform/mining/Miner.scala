@@ -118,7 +118,7 @@ class Miner(
       } yield fullAndMicro) match {
         case Right((full, micro)) =>
           log.trace(s"MicroBlock(id=${trim(micro.uniqueId)}) has been mined for $account}")
-          allChannels.broadcast(MicroBlockInv(micro.totalResBlockSig, micro.prevResBlockSig, System.currentTimeMillis()))
+          allChannels.broadcast(MicroBlockInv(micro.totalResBlockSig, micro.prevResBlockSig))
           Right(Some(full))
         case Left(err) =>
           log.trace(s"MicroBlock has NOT been mined for $account} because $err")

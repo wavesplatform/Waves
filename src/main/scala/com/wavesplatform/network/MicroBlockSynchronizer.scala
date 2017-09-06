@@ -24,7 +24,7 @@ class MicroBlockSynchronizer(settings: Settings, history: NgHistory) extends Cha
   private val awaitingMicroBlocks = cache[MicroBlockSignature, Object](settings.invCacheTimeout)
   private val knownMicroBlockOwners = cache[MicroBlockSignature, MSet[ChannelHandlerContext]](settings.invCacheTimeout)
   private val successfullyReceivedMicroBlocks = cache[MicroBlockSignature, Object](settings.processedMicroBlocksCacheTimeout)
-  private val microBlockCreationTime = cache[ByteStr, java.lang.Long](settings.invCacheTimeout)
+  private val microBlockRecieveTime = cache[ByteStr, java.lang.Long](settings.invCacheTimeout)
 
   private def alreadyRequested(microBlockSig: MicroBlockSignature): Boolean = Option(awaitingMicroBlocks.getIfPresent(microBlockSig)).isDefined
 
@@ -53,21 +53,20 @@ class MicroBlockSynchronizer(settings: Settings, history: NgHistory) extends Cha
       awaitingMicroBlocks.invalidate(mb.totalResBlockSig)
       successfullyReceivedMicroBlocks.put(mb.totalResBlockSig, dummy)
 
-      Option(microBlockCreationTime.getIfPresent(mb.totalResBlockSig)).foreach { created =>
+      Option(microBlockRecieveTime.getIfPresent(mb.totalResBlockSig)).foreach { created =>
         microBlockReceiveLagStats.record(System.currentTimeMillis() - created)
-        microBlockCreationTime.invalidate(mb.totalResBlockSig)
+        microBlockRecieveTime.invalidate(mb.totalResBlockSig)
         super.channelRead(ctx, msg)
       }
     }.runAsync
-    case mi@MicroBlockInv(totalResBlockSig, prevResBlockSig, created) => Task {
+    case mi@MicroBlockInv(totalResBlockSig, prevResBlockSig) => Task {
       log.trace(id(ctx) + "Received " + mi)
       history.lastBlockId() match {
         case Some(lastBlockId) =>
           if (lastBlockId == prevResBlockSig) {
+            microBlockRecieveTime.put(totalResBlockSig, System.currentTimeMillis())
             knownMicroBlockOwners.get(totalResBlockSig, () => MSet.empty) += ctx
-
             microBlockInvStats.increment()
-            microBlockCreationTime.put(totalResBlockSig, created)
 
             if (alreadyRequested(totalResBlockSig)) Task.unit
             else requestMicroBlockTask(totalResBlockSig, 2)
