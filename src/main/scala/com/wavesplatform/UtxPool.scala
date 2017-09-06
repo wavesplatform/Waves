@@ -120,8 +120,10 @@ class UtxPool(time: Time,
       .foldLeft((Seq.empty[ByteStr], Seq.empty[Transaction], Monoid[Diff].empty)) {
         case ((invalid, valid, diff), tx) if valid.size <= max =>
           differ(new CompositeStateReader(stateReader, diff.asBlockDiff), tx) match {
-            case Right(newDiff) =>
+            case Right(newDiff) if valid.size < max =>
               (invalid, tx +: valid, Monoid.combine(diff, newDiff))
+            case Right(_) =>
+              (invalid, valid, diff)
             case Left(e) =>
               log.debug(s"Removing invalid transaction ${tx.id} from UTX: $e")
               (tx.id +: invalid, valid, diff)
@@ -133,7 +135,7 @@ class UtxPool(time: Time,
     pessimisticPortfolios.mutate { p =>
       invalidTxs.foreach(p.remove)
     }
-    if(sortInBlock)
+    if (sortInBlock)
       validTxs.sorted(TransactionsOrdering.InBlock)
     else validTxs
   }
