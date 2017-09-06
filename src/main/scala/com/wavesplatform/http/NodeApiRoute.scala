@@ -27,7 +27,7 @@ case class NodeApiRoute(settings: RestAPISettings, application: Shutdownable)
   def version: Route = (get & path("version")) {
     complete(Json.obj(
       "version" -> Constants.AgentName,
-      "commitId" -> Version.CommitId
+      "rawVersion" -> Version.RawVersionString
     ))
   }
 

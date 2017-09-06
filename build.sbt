@@ -2,11 +2,11 @@ import com.typesafe.sbt.packager.archetypes.TemplateWriter
 import sbt.Keys._
 import sbt._
 
-enablePlugins(sbtdocker.DockerPlugin, JavaServerAppPackaging, JDebPackaging, SystemdPlugin)
+enablePlugins(sbtdocker.DockerPlugin, JavaServerAppPackaging, JDebPackaging, SystemdPlugin, GitVersioning)
 
 name := "waves"
 organization := "com.wavesplatform"
-version := "0.7.5"
+git.useGitDescribe := true
 scalaVersion in ThisBuild := "2.12.3"
 crossPaths := false
 publishArtifact in (Compile, packageDoc) := false
@@ -56,9 +56,9 @@ sourceGenerators in Compile += Def.task {
     s"""package com.wavesplatform
       |
       |object Version {
-      |  val VersionString = "${version.value}"
+      |  val VersionString = "$major.$minor.$bugfix"
       |  val VersionTuple = ($major, $minor, $bugfix)
-      |  val CommitId = "${git.gitHeadCommit.value.getOrElse("unknown")}"
+      |  val RawVersionString = "${version.value}"
       |}
       |""".stripMargin)
   Seq(versionFile)
