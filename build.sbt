@@ -56,9 +56,8 @@ sourceGenerators in Compile += Def.task {
     s"""package com.wavesplatform
       |
       |object Version {
-      |  val VersionString = "$major.$minor.$bugfix"
+      |  val VersionString = "${version.value}"
       |  val VersionTuple = ($major, $minor, $bugfix)
-      |  val RawVersionString = "${version.value}"
       |}
       |""".stripMargin)
   Seq(versionFile)
