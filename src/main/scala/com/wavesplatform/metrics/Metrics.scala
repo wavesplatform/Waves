@@ -8,7 +8,7 @@ import monix.execution.Scheduler
 import monix.execution.schedulers.SchedulerService
 import org.influxdb.dto.Point
 import org.influxdb.{InfluxDB, InfluxDBFactory}
-import scorex.utils.{NTP, ScorexLogging}
+import scorex.utils.{ScorexLogging, TimeImpl}
 
 import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
@@ -31,6 +31,7 @@ object Metrics extends ScorexLogging {
 
   private var settings: Settings = _
   private var db: Option[InfluxDB] = None
+  private val time = new TimeImpl
 
   def start(config: Settings): Future[Boolean] = Task {
     shutdown()
@@ -66,17 +67,18 @@ object Metrics extends ScorexLogging {
 
   def shutdown(): Unit = Task {
     db.foreach(_.close())
+    time.close()
   }.runAsyncLogErr
 
   def write(b: Point.Builder): Unit = {
-    val time = NTP.getTimestamp()
+    val ts = time.getTimestamp()
     Task {
       db.foreach(_.write(b
         // Should be a tag, but tags are the strings now
         // https://docs.influxdata.com/influxdb/v1.3/concepts/glossary/#tag-value
         .addField("node", settings.nodeId)
         .tag("node", settings.nodeId.toString)
-        .time(time, TimeUnit.MILLISECONDS)
+        .time(ts, TimeUnit.MILLISECONDS)
         .build()
       ))
     }.runAsyncLogErr

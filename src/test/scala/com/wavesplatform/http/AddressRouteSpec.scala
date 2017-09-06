@@ -3,7 +3,6 @@ package com.wavesplatform.http
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.state2.reader.SnapshotStateReader
 import com.wavesplatform.{NoShrink, TestWallet, crypto}
-import monix.eval.Coeval
 import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.prop.PropertyChecks
@@ -23,7 +22,7 @@ class AddressRouteSpec
   private val allAccounts = testWallet.privateKeyAccounts
   private val allAddresses = allAccounts.map(_.address)
 
-  private val route = AddressApiRoute(restAPISettings, testWallet, Coeval.now(mock[SnapshotStateReader]), TestFunctionalitySettings.Stub).route
+  private val route = AddressApiRoute(restAPISettings, testWallet, mock[SnapshotStateReader], TestFunctionalitySettings.Stub).route
 
   private val generatedMessages = for {
     account <- Gen.oneOf(allAccounts).label("account")

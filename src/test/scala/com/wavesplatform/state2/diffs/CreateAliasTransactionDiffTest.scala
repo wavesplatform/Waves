@@ -2,7 +2,7 @@ package com.wavesplatform.state2.diffs
 
 import cats._
 import com.wavesplatform.state2._
-import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
+import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
@@ -12,7 +12,7 @@ import scorex.transaction.assets.IssueTransaction
 import scorex.transaction.{CreateAliasTransaction, GenesisTransaction}
 
 class CreateAliasTransactionDiffTest extends PropSpec
-  with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDB {
+  with PropertyChecks with Matchers with TransactionGen with NoShrink {
 
   val preconditionsAndAliasCreations: Gen[(GenesisTransaction, CreateAliasTransaction, CreateAliasTransaction, CreateAliasTransaction, CreateAliasTransaction)] = for {
     master <- accountGen
@@ -30,13 +30,13 @@ class CreateAliasTransactionDiffTest extends PropSpec
 
   property("can create and resolve aliases preserving waves invariant") {
     forAll(preconditionsAndAliasCreations) { case (gen, aliasTx, _, _, anotherAliasTx) =>
-      assertDiffAndState(db, Seq(TestBlock.create(Seq(gen, aliasTx))), TestBlock.create(Seq(anotherAliasTx))) { case (blockDiff, newState) =>
-        val totalPortfolioDiff = Monoid.combineAll(blockDiff.txsDiff.portfolios.values)
+      assertDiffAndState(Seq(TestBlock.create(Seq(gen, aliasTx))), TestBlock.create(Seq(anotherAliasTx))) { case (blockDiff, newState) =>
+        val totalPortfolioDiff = Monoid.combineAll(blockDiff.portfolios.values)
         totalPortfolioDiff.balance shouldBe 0
         totalPortfolioDiff.effectiveBalance shouldBe 0
 
         val senderAcc = anotherAliasTx.sender.toAddress
-        blockDiff.txsDiff.aliases shouldBe Map(anotherAliasTx.alias -> senderAcc)
+        blockDiff.aliases shouldBe Map(anotherAliasTx.alias -> senderAcc)
 
         newState.aliasesOfAddress(senderAcc).toSet shouldBe Set(anotherAliasTx.alias, aliasTx.alias)
         newState.resolveAlias(aliasTx.alias) shouldBe Some(senderAcc)
@@ -47,11 +47,11 @@ class CreateAliasTransactionDiffTest extends PropSpec
 
   property("cannot recreate existing alias") {
     forAll(preconditionsAndAliasCreations) { case (gen, aliasTx, sameAliasTx, sameAliasOtherSenderTx, _) =>
-      assertDiffEi(db, Seq(TestBlock.create(Seq(gen, aliasTx))), TestBlock.create(Seq(sameAliasTx))) { blockDiffEi =>
+      assertDiffEi(Seq(TestBlock.create(Seq(gen, aliasTx))), TestBlock.create(Seq(sameAliasTx))) { blockDiffEi =>
         blockDiffEi should produce("AlreadyInTheState")
       }
 
-      assertDiffEi(db, Seq(TestBlock.create(Seq(gen, aliasTx))), TestBlock.create(Seq(sameAliasOtherSenderTx))) { blockDiffEi =>
+      assertDiffEi(Seq(TestBlock.create(Seq(gen, aliasTx))), TestBlock.create(Seq(sameAliasOtherSenderTx))) { blockDiffEi =>
         blockDiffEi should produce("AlreadyInTheState")
       }
     }
@@ -78,12 +78,12 @@ class CreateAliasTransactionDiffTest extends PropSpec
 
   property("Can transfer to alias") {
     forAll(preconditionsTransferLease) { case (gen, gen2, issue1, issue2, aliasTx, transfer, _) =>
-      assertDiffAndState(db, Seq(TestBlock.create(Seq(gen, gen2, issue1, issue2, aliasTx))), TestBlock.create(Seq(transfer))) { case (blockDiff, _) =>
+      assertDiffAndState(Seq(TestBlock.create(Seq(gen, gen2, issue1, issue2, aliasTx))), TestBlock.create(Seq(transfer))) { case (blockDiff, _) =>
         if (transfer.sender.toAddress != aliasTx.sender.toAddress) {
-          val recipientPortfolioDiff = blockDiff.txsDiff.portfolios(aliasTx.sender)
+          val recipientPortfolioDiff = blockDiff.portfolios(aliasTx.sender)
           transfer.assetId match {
-            case Some(aid) => recipientPortfolioDiff shouldBe Portfolio(0, LeaseInfo.empty, Map(aid -> transfer.amount))
-            case None => recipientPortfolioDiff shouldBe Portfolio(transfer.amount, LeaseInfo.empty, Map.empty)
+            case Some(aid) => recipientPortfolioDiff shouldBe Portfolio(0, LeaseBalance.empty, Map(aid -> transfer.amount))
+            case None => recipientPortfolioDiff shouldBe Portfolio(transfer.amount, LeaseBalance.empty, Map.empty)
           }
         }
       }
@@ -92,10 +92,10 @@ class CreateAliasTransactionDiffTest extends PropSpec
 
   property("Can lease to alias except for self") {
     forAll(preconditionsTransferLease) { case (gen, gen2, issue1, issue2, aliasTx, _, lease) =>
-      assertDiffEi(db, Seq(TestBlock.create(Seq(gen, gen2, issue1, issue2, aliasTx))), TestBlock.create(Seq(lease))) { blockDiffEi =>
+      assertDiffEi(Seq(TestBlock.create(Seq(gen, gen2, issue1, issue2, aliasTx))), TestBlock.create(Seq(lease))) { blockDiffEi =>
         if (lease.sender.toAddress != aliasTx.sender.toAddress) {
-          val recipientPortfolioDiff = blockDiffEi.explicitGet().txsDiff.portfolios(aliasTx.sender)
-          recipientPortfolioDiff shouldBe Portfolio(0, LeaseInfo(lease.amount, 0), Map.empty)
+          val recipientPortfolioDiff = blockDiffEi.explicitGet().portfolios(aliasTx.sender)
+          recipientPortfolioDiff shouldBe Portfolio(0, LeaseBalance(lease.amount, 0), Map.empty)
         }
         else {
           blockDiffEi should produce("Cannot lease to self")

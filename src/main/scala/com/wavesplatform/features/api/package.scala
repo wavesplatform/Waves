@@ -51,6 +51,6 @@ package object api {
       }
     }
 
-  implicit val activationStatusFeatureFormat: Format[ActivationStatusFeature] = Json.format
+  implicit val activationStatusFeatureFormat: Format[FeatureActivationStatus] = Json.format
   implicit val activationStatusFormat: Format[ActivationStatus] = Json.format
 }

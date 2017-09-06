@@ -4,7 +4,7 @@ import javax.ws.rs.Path
 
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.settings.{FunctionalitySettings, RestAPISettings}
-import com.wavesplatform.state2.StateReader
+import com.wavesplatform.state2.reader.SnapshotStateReader
 import io.swagger.annotations._
 import play.api.libs.json.Json
 import scorex.account.Address
@@ -15,7 +15,7 @@ import scorex.transaction.{History, PoSCalc}
 @Api(value = "/consensus")
 case class NxtConsensusApiRoute(
     settings: RestAPISettings,
-    state: StateReader,
+    state: SnapshotStateReader,
     history: History,
     fs: FunctionalitySettings) extends ApiRoute with CommonApiFunctions {
 
@@ -33,10 +33,10 @@ case class NxtConsensusApiRoute(
     Address.fromString(address) match {
       case Left(_) => complete(InvalidAddress)
       case Right(account) =>
-        val s = state()
+        val s = state
         complete(Json.obj(
           "address" -> account.address,
-          "balance" -> PoSCalc.generatingBalance(s, fs, account, s.height).get))
+          "balance" -> PoSCalc.generatingBalance(s, fs, account, s.height)))
     }
   }
 
@@ -73,7 +73,7 @@ case class NxtConsensusApiRoute(
   def basetarget: Route = (path("basetarget") & get) {
     complete(Json.obj(
       "baseTarget" -> history.lastBlock.get.consensusData.baseTarget,
-      "score" -> history.score().toString()
+      "score" -> history.score.toString()
     )
     )
   }

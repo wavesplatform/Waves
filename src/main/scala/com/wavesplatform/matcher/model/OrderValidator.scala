@@ -43,8 +43,6 @@ trait OrderValidator {
   }
 
   def validateNewOrder(order: Order): Either[GenericError, Order] = {
-    //(openOrdersCount.getOrElse(order.matcherPublicKey.address, 0) <= settings.maxOpenOrders) :|
-    //  s"Open orders count limit exceeded (Max = ${settings.maxOpenOrders})" &&
     val v =
     (order.matcherPublicKey == matcherPubKey) :| "Incorrect matcher public key" &&
       (order.expiration > NTP.correctedTime() + MinExpiration) :| "Order expiration should be > 1 min" &&

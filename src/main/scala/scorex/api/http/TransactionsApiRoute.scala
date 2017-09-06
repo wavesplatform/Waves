@@ -6,7 +6,8 @@ import javax.ws.rs.Path
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.{ExceptionHandler, Route}
 import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.state2.{ByteStr, StateReader}
+import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state2.reader.SnapshotStateReader
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
@@ -26,11 +27,11 @@ import scala.util.Success
 import scala.util.control.Exception
 
 @Path("/transactions")
-@Api(value = "/transactions", description = "Information about transactions")
+@Api(value = "/transactions")
 case class TransactionsApiRoute(
     settings: RestAPISettings,
     wallet: Wallet,
-    state: StateReader,
+    state: SnapshotStateReader,
     history: History,
     utx: UtxPool,
     allChannels: ChannelGroup,
@@ -65,9 +66,9 @@ case class TransactionsApiRoute(
                 Exception.allCatch.opt(limitStr.toInt) match {
                   case Some(limit) if limit > 0 && limit <= MaxTransactionsPerRequest =>
                     complete(Json.arr(JsArray(
-                      state().accountTransactions(a, limit).map { case (h, tx) =>
+                      state.addressTransactions(a, Set.empty, 0, 1000).map { case (h, tx) =>
                         txToCompactJson(a, tx) + ("height" -> JsNumber(h))
-                    })))
+                      })))
                   case Some(limit) if limit > MaxTransactionsPerRequest =>
                     complete(TooBigArrayAllocation)
                   case _ =>
@@ -91,9 +92,8 @@ case class TransactionsApiRoute(
     path(Segment) { encoded =>
       ByteStr.decodeBase58(encoded) match {
         case Success(id) =>
-          state().transactionInfo(id) match {
-            case Some((h, Some(tx))) => complete(txToExtendedJson(tx) + ("height" -> JsNumber(h)))
-            case Some((h, None)) => complete(Json.obj("height" -> JsNumber(h)))
+          state.transactionInfo(id) match {
+            case Some((h, tx)) => complete(txToExtendedJson(tx) + ("height" -> JsNumber(h)))
             case None => complete(StatusCodes.NotFound -> Json.obj("status" -> "error", "details" -> "Transaction is not in blockchain"))
           }
         case _ => complete(InvalidSignature)
@@ -201,9 +201,9 @@ case class TransactionsApiRoute(
     tx match {
       case lease: LeaseTransaction =>
         import LeaseTransaction.Status._
-        lease.json() ++ Json.obj("status" -> (if (state().isLeaseActive(lease)) Active else Canceled))
+        lease.json() ++ Json.obj("status" -> (if (state.leaseDetails(lease.id()).exists(_.isActive)) Active else Canceled))
       case leaseCancel: LeaseCancelTransaction =>
-        leaseCancel.json() ++ Json.obj("lease" -> state().findTransaction[LeaseTransaction](leaseCancel.leaseId).map(_.json()).getOrElse[JsValue](JsNull))
+        leaseCancel.json() ++ Json.obj("lease" -> state.transactionInfo(leaseCancel.leaseId).map(_._2.json()).getOrElse[JsValue](JsNull))
       case t => t.json()
     }
   }

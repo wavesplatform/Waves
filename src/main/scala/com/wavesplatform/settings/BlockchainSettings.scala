@@ -22,11 +22,22 @@ case class FunctionalitySettings(featureCheckBlocksPeriod: Int,
                                  blockVersion3AfterHeight: Int,
                                  preActivatedFeatures: Map[Short, Int],
                                  doubleFeaturesPeriodsAfterHeight: Int) {
-  val dontRequireSortedTransactionsAfter = blockVersion3AfterHeight
-  val allowLeasedBalanceTransferUntilHeight = blockVersion3AfterHeight
+  val dontRequireSortedTransactionsAfter: Int = blockVersion3AfterHeight
+  val allowLeasedBalanceTransferUntilHeight: Int = blockVersion3AfterHeight
 
   require(featureCheckBlocksPeriod > 0, "featureCheckBlocksPeriod must be greater than 0")
   require((blocksForFeatureActivation > 0) && (blocksForFeatureActivation <= featureCheckBlocksPeriod), s"blocksForFeatureActivation must be in range 1 to $featureCheckBlocksPeriod")
+
+  def activationWindowSize(height: Int): Int =
+    featureCheckBlocksPeriod * (if (height <= doubleFeaturesPeriodsAfterHeight) 1 else 2)
+
+  def activationWindow(height: Int): Range = if (height < 1) Range(0, 0) else {
+    val ws = activationWindowSize(height)
+    Range.inclusive((height - 1) / ws * ws + 1, ((height - 1) / ws + 1) * ws)
+  }
+
+  def blocksForFeatureActivation(height: Int): Int =
+    blocksForFeatureActivation * (if (height <= doubleFeaturesPeriodsAfterHeight) 1 else 2)
 }
 
 object FunctionalitySettings {
