@@ -48,8 +48,8 @@ class MicroBlockSynchronizer(settings: Settings, history: NgHistory) extends Cha
 
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
-    case MicroBlockResponse(mb) => Task {
-      log.trace(id(ctx) + "Received MicroBlockResponse " + mb)
+    case mbr@MicroBlockResponse(mb) => Task {
+      log.trace(id(ctx) + "Received " + mbr)
       knownMicroBlockOwners.invalidate(mb.totalResBlockSig)
       awaitingMicroBlocks.invalidate(mb.totalResBlockSig)
       successfullyReceivedMicroBlocks.put(mb.totalResBlockSig, dummy)
@@ -58,6 +58,7 @@ class MicroBlockSynchronizer(settings: Settings, history: NgHistory) extends Cha
         microBlockReceiveLagStats.record(System.currentTimeMillis() - created)
         microBlockCreationTime.invalidate(mb.totalResBlockSig)
       }
+      super.channelRead(ctx, msg)
     }.runAsync
     case mi@MicroBlockInv(totalResBlockSig, prevResBlockSig, created) => Task {
       log.trace(id(ctx) + "Received " + mi)
