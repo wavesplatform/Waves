@@ -24,7 +24,6 @@ class MicroBlockSynchronizer(settings: Settings, history: NgHistory) extends Cha
   private val awaitingMicroBlocks = cache[MicroBlockSignature, Object](settings.invCacheTimeout)
   private val knownMicroBlockOwners = cache[MicroBlockSignature, MSet[ChannelHandlerContext]](settings.invCacheTimeout)
   private val successfullyReceivedMicroBlocks = cache[MicroBlockSignature, Object](settings.processedMicroBlocksCacheTimeout)
-
   private val microBlockCreationTime = cache[ByteStr, java.lang.Long](settings.invCacheTimeout)
 
   private def alreadyRequested(microBlockSig: MicroBlockSignature): Boolean = Option(awaitingMicroBlocks.getIfPresent(microBlockSig)).isDefined
@@ -57,8 +56,8 @@ class MicroBlockSynchronizer(settings: Settings, history: NgHistory) extends Cha
       Option(microBlockCreationTime.getIfPresent(mb.totalResBlockSig)).foreach { created =>
         microBlockReceiveLagStats.record(System.currentTimeMillis() - created)
         microBlockCreationTime.invalidate(mb.totalResBlockSig)
+        super.channelRead(ctx, msg)
       }
-      super.channelRead(ctx, msg)
     }.runAsync
     case mi@MicroBlockInv(totalResBlockSig, prevResBlockSig, created) => Task {
       log.trace(id(ctx) + "Received " + mi)
