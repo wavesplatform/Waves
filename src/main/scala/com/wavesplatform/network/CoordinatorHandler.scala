@@ -10,6 +10,7 @@ import com.wavesplatform.{Coordinator, UtxPool}
 import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel.group.ChannelGroup
 import io.netty.channel.{Channel, ChannelHandlerContext, ChannelInboundHandlerAdapter}
+import kamon.Kamon
 import scorex.block.Block
 import scorex.transaction._
 import scorex.utils.{ScorexLogging, Time}
@@ -75,6 +76,7 @@ class CoordinatorHandler(
       processFork(blocks))
 
     case b: Block =>
+      CoordinatorHandler.blockReceivingLag.record(System.currentTimeMillis() - b.timestamp)
       Signed.validateSignatures(b) match {
         case Left(err) => peerDatabase.blacklistAndClose(ctx.channel(), err.toString)
         case Right(_) => broadcastingScore(ctx.channel(),
@@ -97,6 +99,8 @@ class CoordinatorHandler(
 }
 
 object CoordinatorHandler extends ScorexLogging {
+  private val blockReceivingLag = Kamon.metrics.histogram("block-receiving-lag")
+
   def loggingResult[R](idCtx: String, msg: String, f: => Either[ValidationError, R]): Either[ValidationError, R] = {
     log.debug(s"$idCtx Starting $msg processing")
     val result = f

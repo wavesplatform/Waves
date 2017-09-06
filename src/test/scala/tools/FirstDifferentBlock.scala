@@ -19,9 +19,11 @@ object FirstDifferentBlock extends App {
   val TESTNET4 = "http://52.51.92.182:6869"
 
   val DEVNET1 = "http://34.251.200.245:6869"
-  val DEVNET3D = "http://13.229.61.140:16869"
+  val DEVNET1D = "http://34.251.200.245:16869"
   val DEVNET2 = "http://35.157.212.173:6869"
+  val DEVNET2D = "http://35.157.212.173:16869"
   val DEVNET3 = "http://13.229.61.140:6869"
+  val DEVNET3D = "http://13.229.61.140:16869"
 
   val MAINNET1 = "http://138.201.152.163"
   val MAINNET2 = "http://138.201.152.164"

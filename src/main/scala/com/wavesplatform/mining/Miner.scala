@@ -175,13 +175,20 @@ class Miner(
   }
 
   def scheduleMining(): Unit = {
+    Miner.blockMiningStarted.increment()
     scheduledAttempts := CompositeCancelable.fromSet(
       wallet.privateKeyAccounts().map(generateBlockTask).map(_.runAsync).toSet)
     microBlockAttempt := SerialCancelable()
     log.debug(s"Block mining scheduled")
   }
 
+  def stopMicroblockMining(): Unit = {
+    microBlockAttempt := SerialCancelable()
+    log.debug(s"Microblock mining was stopped")
+  }
+
   private def startMicroBlockMining(account: PrivateKeyAccount, lastBlock: Block): Unit = {
+    Miner.microMiningStarted.increment()
     microBlockAttempt := generateMicroBlockSequence(account, lastBlock).runAsync
     log.trace(s"MicroBlock mining scheduled for $account")
   }
@@ -196,6 +203,9 @@ object Miner extends ScorexLogging {
     val calculatedOffset = calculatedGenerationTimestamp - timeService.correctedTime()
     Math.max(minimalBlockGenerationOffset.toMillis, calculatedOffset).millis
   }
+
+  private val blockMiningStarted = Kamon.metrics.counter("block-mining-started")
+  private val microMiningStarted = Kamon.metrics.counter("micro-mining-started")
 }
 
 trait MinerDebugInfo {
