@@ -12,6 +12,7 @@ import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.hash.FastCryptographicHash
 import scorex.transaction._
 import scorex.transaction.assets.TransferTransaction
+import com.wavesplatform.state2._
 
 import scala.util.Random
 
@@ -38,7 +39,7 @@ class BlockSpecification extends FunSuite with Matchers with MockFactory with Bl
 
     def testBlock(txs: Seq[Transaction])(version: Int) = {
       val timestamp = System.currentTimeMillis()
-      val block = Block.buildAndSign(version.toByte, timestamp, ByteStr(reference), cbd, txs, gen)
+      val block = Block.buildAndSign(version.toByte, timestamp, ByteStr(reference), cbd, txs, gen).explicitGet()
       val parsedBlock = Block.parseBytes(block.bytes).get
       assert(Signed.validateSignatures(block).isRight)
       assert(Signed.validateSignatures(parsedBlock).isRight)
@@ -53,7 +54,7 @@ class BlockSpecification extends FunSuite with Matchers with MockFactory with Bl
 
   ignore ("sign time for 60k txs") {
     forAll(randomTransactionsGen(60000), accountGen, byteArrayGen(Block.BlockIdLength), byteArrayGen(Block.GeneratorSignatureLength)) { case ((txs, acc, ref, gs)) =>
-      val (block, t0) = Instrumented.withTime(Block.buildAndSign(3, 1, ByteStr(ref), NxtLikeConsensusBlockData(1, ByteStr(gs)), txs, acc))
+      val (block, t0) = Instrumented.withTime(Block.buildAndSign(3, 1, ByteStr(ref), NxtLikeConsensusBlockData(1, ByteStr(gs)), txs, acc).explicitGet())
       val (bytes, t1) = Instrumented.withTime(block.bytesWithoutSignature)
       val (hash, t2) = Instrumented.withTime(FastCryptographicHash.hash(bytes))
       val (sig, t3) = Instrumented.withTime(EllipticCurveImpl.sign(acc, hash))

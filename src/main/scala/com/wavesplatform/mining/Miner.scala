@@ -72,19 +72,20 @@ class Miner(
     measureSuccessful(blockBuildTimeStats, for {
       _ <- Either.cond(pc >= minerSettings.quorum, (), s"Quorum not available ($pc/${minerSettings.quorum}, not forging block with ${account.address}")
       _ <- Either.cond(h < t, (), s"${System.currentTimeMillis()}: Hit $h was NOT less than target $t, not forging block with ${account.address}")
-    } yield {
-      log.debug(s"Forging with ${account.address}, H $h < T $t, balance $balance, prev block ${parent.uniqueId}")
-      log.debug(s"Previous block ID ${parent.uniqueId} at $parentHeight with target ${lastBlockKernelData.baseTarget}")
-      val avgBlockDelay = blockchainSettings.genesisSettings.averageBlockDelay
-      val btg = calcBaseTarget(avgBlockDelay, parentHeight, parent, greatGrandParent, currentTime)
-      val gs = calcGeneratorSignature(lastBlockKernelData, account)
-      val consensusData = NxtLikeConsensusBlockData(btg, ByteStr(gs))
-      val sortInBlock = history.height() <= blockchainSettings.functionalitySettings.resetEffectiveBalancesAtHeight
-      val unconfirmed = utx.packUnconfirmed(minerSettings.maxTransactionsInKeyBlock, sortInBlock)
-      log.debug(s"Adding ${unconfirmed.size} unconfirmed transaction(s) to new block")
-      val block = Block.buildAndSign(version, currentTime, parent.uniqueId, consensusData, unconfirmed, account)
-      block
-    })
+      block <- {
+        log.debug(s"Forging with ${account.address}, H $h < T $t, balance $balance, prev block ${parent.uniqueId}")
+        log.debug(s"Previous block ID ${parent.uniqueId} at $parentHeight with target ${lastBlockKernelData.baseTarget}")
+        val avgBlockDelay = blockchainSettings.genesisSettings.averageBlockDelay
+        val btg = calcBaseTarget(avgBlockDelay, parentHeight, parent, greatGrandParent, currentTime)
+        val gs = calcGeneratorSignature(lastBlockKernelData, account)
+        val consensusData = NxtLikeConsensusBlockData(btg, ByteStr(gs))
+        val sortInBlock = history.height() <= blockchainSettings.functionalitySettings.resetEffectiveBalancesAtHeight
+        val unconfirmed = utx.packUnconfirmed(minerSettings.maxTransactionsInKeyBlock, sortInBlock)
+        log.debug(s"Adding ${unconfirmed.size} unconfirmed transaction(s) to new block")
+        Block.buildAndSign(version, currentTime, parent.uniqueId, consensusData, unconfirmed, account)
+          .left.map(l => l.err)
+      }
+    } yield block )
   }.delayExecution(delay)
 
 
@@ -100,20 +101,19 @@ class Miner(
       log.trace("skipping microBlock because no txs in utx pool")
       Right(None)
     }
-    else if(accumulatedBlock.transactionData.size > MaxTransactionsPerBlockVer3) {
-      Left(GenericError(s"too many transactions in Block: allowed: $MaxTransactionsPerBlockVer3, actual: ${accumulatedBlock.transactionData.size}"))
-    }
     else {
       log.trace(s"Accumulated ${unconfirmed.size} txs for microblock")
       (for {
         fullAndMicro <- measureSuccessful(microBlockBuildTimeStats, {
-          val signedBlock = Block.buildAndSign(version = 3,
+
+          val eitherBlock = Block.buildAndSign(version = 3,
             timestamp = accumulatedBlock.timestamp,
             reference = accumulatedBlock.reference,
             consensusData = accumulatedBlock.consensusData,
             transactionData = accumulatedBlock.transactionData ++ unconfirmed,
             signer = account)
-          MicroBlock.buildAndSign(account, unconfirmed, accumulatedBlock.signerData.signature, signedBlock.signerData.signature).map((signedBlock, _))
+
+          eitherBlock.flatMap(signedBlock => MicroBlock.buildAndSign(account, unconfirmed, accumulatedBlock.signerData.signature, signedBlock.signerData.signature).map((signedBlock, _)))
         })
         _ <- Coordinator.processMicroBlock(checkpoint, history, blockchainUpdater, utx)(fullAndMicro._2)
       } yield fullAndMicro) match {

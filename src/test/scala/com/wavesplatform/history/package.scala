@@ -44,7 +44,7 @@ package object history {
         baseTarget = 1L,
         generationSignature = generationSignature),
       transactionData = txs,
-      signer = defaultSigner)
+      signer = defaultSigner).explicitGet()
   }
 
 

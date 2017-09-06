@@ -1,6 +1,6 @@
 package com.wavesplatform
 
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state2._
 import org.scalacheck.Gen
 import scorex.account.PrivateKeyAccount
 import scorex.block.Block
@@ -21,7 +21,7 @@ trait BlockGen extends TransactionGen {
     reference <- byteArrayGen(Block.BlockIdLength)
     baseTarget <- Gen.posNum[Long]
     generationSignature <- byteArrayGen(Block.GeneratorSignatureLength)
-  } yield Block.buildAndSign(version, txs.map(_.timestamp).max, ByteStr(reference), NxtLikeConsensusBlockData(baseTarget, ByteStr(generationSignature)), txs, signer)
+  } yield Block.buildAndSign(version, txs.map(_.timestamp).max, ByteStr(reference), NxtLikeConsensusBlockData(baseTarget, ByteStr(generationSignature)), txs, signer).explicitGet()
 
   def blockGen(txs: Seq[Transaction], signer: PrivateKeyAccount): Gen[Block] = versionedBlockGen(txs, signer, 1)
 

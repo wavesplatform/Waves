@@ -169,15 +169,17 @@ object Block extends ScorexLogging {
                    reference: ByteStr,
                    consensusData: NxtLikeConsensusBlockData,
                    transactionData: Seq[Transaction],
-                   signer: PrivateKeyAccount): Block = {
+                   signer: PrivateKeyAccount): Either[GenericError, Block] = (for {
+    _ <- Either.cond(transactionData.size <= MaxTransactionsPerBlockVer3, (), s"too many transactions in Block: allowed: $MaxTransactionsPerBlockVer3, actual: ${transactionData.size}")
+    _ <- Either.cond(reference.arr.length == SignatureLength, (), "Incorrect reference")
+    _ <- Either.cond(consensusData.generationSignature.arr.length == GeneratorSignatureLength, (), "Incorrect consensusData.generationSignature")
+    _ <- Either.cond(signer.publicKey.length == KeyLength, (), "Incorrect signer.publicKey")
+  } yield {
     val nonSignedBlock = Block(timestamp, version, reference, SignerData(signer, ByteStr.empty), consensusData, transactionData)
     val toSign = nonSignedBlock.bytes
     val signature = EllipticCurveImpl.sign(signer, toSign)
-    require(reference.arr.length == SignatureLength, "Incorrect reference")
-    require(consensusData.generationSignature.arr.length == GeneratorSignatureLength, "Incorrect consensusData.generationSignature")
-    require(signer.publicKey.length == KeyLength, "Incorrect signer.publicKey")
     nonSignedBlock.copy(signerData = SignerData(signer, ByteStr(signature)))
-  }
+  }).left.map(GenericError)
 
   def genesisTransactions(gs: GenesisSettings): Seq[GenesisTransaction] = {
     gs.transactions.map { ts =>
