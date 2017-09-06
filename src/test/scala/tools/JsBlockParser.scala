@@ -55,7 +55,7 @@ object JsBlockParser extends App {
   val recreated = Block.buildAndSign(3, 1501851461300L, ByteStr.decodeBase58("4GkW491kuPtg3LDkCrXwBRASdQ7qUV2BNEFpM9XzD56JufSpmLqV9672wRQcSqJdxyEgq8nSQs2ogHit8Sr1ZtGT").get,
     NxtLikeConsensusBlockData(197518, ByteStr.decodeBase58("96C1rM2CxoKEua8Ha1xdVEYmnsL3VB44Z2uVKmbXPV3D").get),txs.take(128),
     PrivateKeyAccount(ByteStr.decodeBase58("4Go1R2JSbveVZLrhiYS2PTysTTpo7qkiMD1bb3t9rHwz").get.arr)
-  )
+  ).explicitGet()
 
   println(Block.parseBytes(recreated.bytes).get.signatureValid)
 
