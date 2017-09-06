@@ -16,9 +16,6 @@ package object utils extends ScorexLogging {
     val builder = file.fold(new MVStore.Builder) { p =>
       p.getParentFile.mkdirs()
 
-      if(!p.canWrite || !p.canRead)
-        throw new IOException(s"Insufficient access rights to file: ${p.getCanonicalPath}" )
-
       new MVStore.Builder()
         .fileName(p.getCanonicalPath)
         .autoCommitDisabled()
