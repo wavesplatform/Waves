@@ -7,6 +7,7 @@ enablePlugins(sbtdocker.DockerPlugin, JavaServerAppPackaging, JDebPackaging, Sys
 name := "waves"
 organization := "com.wavesplatform"
 git.useGitDescribe := true
+git.uncommittedSignifier := Some("DIRTY")
 scalaVersion in ThisBuild := "2.12.3"
 crossPaths := false
 publishArtifact in (Compile, packageDoc) := false
