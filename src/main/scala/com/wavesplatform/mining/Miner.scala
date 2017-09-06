@@ -104,17 +104,16 @@ class Miner(
     else {
       log.trace(s"Accumulated ${unconfirmed.size} txs for microblock")
       (for {
-        fullAndMicro <- measureSuccessful(microBlockBuildTimeStats, {
-
-          val eitherBlock = Block.buildAndSign(version = 3,
-            timestamp = accumulatedBlock.timestamp,
-            reference = accumulatedBlock.reference,
-            consensusData = accumulatedBlock.consensusData,
-            transactionData = accumulatedBlock.transactionData ++ unconfirmed,
-            signer = account)
-
-          eitherBlock.flatMap(signedBlock => MicroBlock.buildAndSign(account, unconfirmed, accumulatedBlock.signerData.signature, signedBlock.signerData.signature).map((signedBlock, _)))
-        })
+        fullAndMicro <- measureSuccessful(microBlockBuildTimeStats,
+          for {
+            signedBlock <- Block.buildAndSign(version = 3,
+              timestamp = accumulatedBlock.timestamp,
+              reference = accumulatedBlock.reference,
+              consensusData = accumulatedBlock.consensusData,
+              transactionData = accumulatedBlock.transactionData ++ unconfirmed,
+              signer = account)
+            microBlock <- MicroBlock.buildAndSign(account, unconfirmed, accumulatedBlock.signerData.signature, signedBlock.signerData.signature)
+          } yield (signedBlock, microBlock))
         _ <- Coordinator.processMicroBlock(checkpoint, history, blockchainUpdater, utx)(fullAndMicro._2)
       } yield fullAndMicro) match {
         case Right((full, micro)) =>
