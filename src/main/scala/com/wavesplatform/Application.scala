@@ -2,7 +2,8 @@ package com.wavesplatform
 
 import java.io.File
 import java.security.Security
-import java.util.concurrent._
+import java.util.concurrent.ConcurrentHashMap
+import javax.sql.DataSource
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
@@ -28,6 +29,7 @@ import io.netty.channel.Channel
 import io.netty.channel.group.DefaultChannelGroup
 import io.netty.util.concurrent.GlobalEventExecutor
 import kamon.Kamon
+import monix.eval.Coeval
 import monix.execution.Scheduler.global
 import monix.execution.schedulers.SchedulerService
 import monix.execution.{Scheduler, UncaughtExceptionReporter}
@@ -50,7 +52,7 @@ import scala.concurrent.duration._
 import scala.reflect.runtime.universe._
 import scala.util.Try
 
-class Application(val actorSystem: ActorSystem, val settings: WavesSettings, configRoot: ConfigObject) extends ScorexLogging {
+class Application(val actorSystem: ActorSystem, val settings: WavesSettings, configRoot: ConfigObject, ds: DataSource) extends ScorexLogging {
 
   import monix.execution.Scheduler.Implicits.{global => scheduler}
 
@@ -61,10 +63,9 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   // Start /node API right away
   private implicit val as: ActorSystem = actorSystem
   private implicit val materializer: ActorMaterializer = ActorMaterializer()
-  private val (storage, heights) = StorageFactory(db, settings).get
   private val nodeApi = Option(settings.restAPISettings.enable).collect { case true =>
     val tags = Seq(typeOf[NodeApiRoute])
-    val routes = Seq(NodeApiRoute(settings.restAPISettings, heights, () => apiShutdown()))
+    val routes = Seq(NodeApiRoute(settings.restAPISettings, Coeval.now(((1, 1L), (1, 1L))), () => apiShutdown()))
     val combinedRoute: Route = CompositeHttpService(actorSystem, tags, routes, settings.restAPISettings).compositeRoute
     val httpFuture = Http().bindAndHandle(combinedRoute, settings.restAPISettings.bindAddress, settings.restAPISettings.port)
     serverBinding = Await.result(httpFuture, 10.seconds)
@@ -73,7 +74,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   }
 
   private val checkpointService = new CheckpointServiceImpl(db, settings.checkpointsSettings)
-  private val (history, featureProvider, stateReader, blockchainUpdater, blockchainDebugInfo) = storage()
+  private val (history, state, blockchainUpdater) = StorageFactory(settings, ???, NTP)
   private lazy val upnp = new UPnP(settings.networkSettings.uPnPSettings) // don't initialize unless enabled
 
   private val wallet: Wallet = try {
@@ -115,20 +116,21 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     val time: Time = NTP
     val establishedConnections = new ConcurrentHashMap[Channel, PeerInfo]
     val allChannels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
-    val utxStorage = new UtxPoolImpl(time, stateReader, history, featureProvider, feeCalculator, settings.blockchainSettings.functionalitySettings, settings.utxSettings)
+    val utxStorage = new UtxPoolImpl(time, blockchainUpdater.stateReader, blockchainUpdater.historyReader, feeCalculator,
+      settings.blockchainSettings.functionalitySettings, settings.utxSettings)
     maybeUtx = Some(utxStorage)
     val knownInvalidBlocks = new InvalidBlockStorageImpl(settings.synchronizationSettings.invalidBlocksStorage)
     val miner = if (settings.minerSettings.enable)
-      new MinerImpl(allChannels, blockchainUpdater, checkpointService, history, featureProvider, stateReader, settings,
+      new MinerImpl(allChannels, blockchainUpdater, checkpointService, history, history, state, settings,
         time, utxStorage, wallet, minerScheduler, appenderScheduler)
     else Miner.Disabled
 
-    val processBlock = BlockAppender(checkpointService, history, blockchainUpdater, time, stateReader, utxStorage,
-      settings, featureProvider, allChannels, peerDatabase, miner, appenderScheduler) _
+    val processBlock = BlockAppender(checkpointService, history, blockchainUpdater, time, state, utxStorage,
+      settings, history, allChannels, peerDatabase, miner, appenderScheduler) _
     val processCheckpoint = CheckpointAppender(checkpointService, history, blockchainUpdater, peerDatabase, miner,
       allChannels, appenderScheduler) _
-    val processFork = ExtensionAppender(checkpointService, history, blockchainUpdater, stateReader, utxStorage, time,
-      settings, featureProvider, knownInvalidBlocks, peerDatabase, miner, allChannels, appenderScheduler) _
+    val processFork = ExtensionAppender(checkpointService, history, blockchainUpdater, state, utxStorage, time,
+      settings, history, knownInvalidBlocks, peerDatabase, miner, allChannels, appenderScheduler) _
     val processMicroBlock = MicroblockAppender(checkpointService, history, blockchainUpdater, utxStorage, allChannels, peerDatabase, appenderScheduler) _
 
     import blockchainUpdater.lastBlockInfo
@@ -150,11 +152,12 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     val (signatures, blocks, blockchainScores, checkpoints, microblockInvs, microblockResponses, transactions) = network.messages
 
     val (syncWithChannelClosed, scoreStatsReporter) = RxScoreObserver(settings.synchronizationSettings.scoreTTL, 1.second,
-      history.score(), lastScore, blockchainScores, network.closedChannels, scoreObserverScheduler)
+      history.score, lastScore, blockchainScores, network.closedChannels, scoreObserverScheduler)
     val (microblockDatas, mbSyncCacheSizes) = MicroBlockSynchronizer(settings.synchronizationSettings.microBlockSynchronizer,
       peerDatabase, lastBlockInfo.map(_.id), microblockInvs, microblockResponses, microblockSynchronizerScheduler)
-    val (newBlocks, extLoaderState, sh) = RxExtensionLoader(settings.synchronizationSettings.maxRollback, settings.synchronizationSettings.synchronizationTimeout,
-      history, peerDatabase, knownInvalidBlocks, blocks, signatures, syncWithChannelClosed, extensionLoaderScheduler) { case ((c, b)) => processFork(c, b.blocks) }
+    val (newBlocks, extLoaderState, sh) = RxExtensionLoader(settings.synchronizationSettings.synchronizationTimeout,
+      Coeval(history.lastBlockIds(settings.synchronizationSettings.maxRollback)), peerDatabase, knownInvalidBlocks,
+      blocks, signatures, syncWithChannelClosed, extensionLoaderScheduler) { case ((c, b)) => processFork(c, b.blocks) }
 
     rxExtensionLoaderShutdown = Some(sh)
 
@@ -170,26 +173,28 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       upnp.addPort(addr.getPort)
     }
 
+    val nodeApi: Option[(Seq[Type], Seq[ApiRoute])] = None
+
     // Start complete REST API. Node API is already running, so we need to re-bind
     nodeApi.foreach { case (tags, routes) =>
       val apiRoutes = routes ++ Seq(
         BlocksApiRoute(settings.restAPISettings, history, blockchainUpdater, allChannels, c => processCheckpoint(None, c)),
-        TransactionsApiRoute(settings.restAPISettings, wallet, stateReader, history, utxStorage, allChannels, time),
-        NxtConsensusApiRoute(settings.restAPISettings, stateReader, history, settings.blockchainSettings.functionalitySettings),
+        TransactionsApiRoute(settings.restAPISettings, wallet, state, history, utxStorage, allChannels, time),
+        NxtConsensusApiRoute(settings.restAPISettings, state, history, settings.blockchainSettings.functionalitySettings),
         WalletApiRoute(settings.restAPISettings, wallet),
         PaymentApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, time),
         UtilsApiRoute(settings.restAPISettings),
         PeersApiRoute(settings.restAPISettings, network.connect, peerDatabase, establishedConnections),
-        AddressApiRoute(settings.restAPISettings, wallet, stateReader, settings.blockchainSettings.functionalitySettings),
-        DebugApiRoute(settings.restAPISettings, wallet, stateReader, history, peerDatabase, establishedConnections, blockchainUpdater, allChannels,
-          utxStorage, blockchainDebugInfo, miner, historyReplier, extLoaderState, mbSyncCacheSizes, scoreStatsReporter, configRoot),
+        AddressApiRoute(settings.restAPISettings, wallet, state, settings.blockchainSettings.functionalitySettings),
+        DebugApiRoute(settings.restAPISettings, wallet, state, history, peerDatabase, establishedConnections, blockchainUpdater, allChannels,
+          utxStorage, miner, historyReplier, extLoaderState, mbSyncCacheSizes, scoreStatsReporter, configRoot),
         WavesApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, time),
-        AssetsApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, stateReader, time),
-        ActivationApiRoute(settings.restAPISettings, settings.blockchainSettings.functionalitySettings, settings.featuresSettings, history, featureProvider),
+        AssetsApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, state, time),
+        ActivationApiRoute(settings.restAPISettings, settings.blockchainSettings.functionalitySettings, settings.featuresSettings, history, history),
         AssetsBroadcastApiRoute(settings.restAPISettings, utxStorage, allChannels),
-        LeaseApiRoute(settings.restAPISettings, wallet, stateReader, utxStorage, allChannels, time),
+        LeaseApiRoute(settings.restAPISettings, wallet, state, utxStorage, allChannels, time),
         LeaseBroadcastApiRoute(settings.restAPISettings, utxStorage, allChannels),
-        AliasApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, time, stateReader),
+        AliasApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, time, state),
         AliasBroadcastApiRoute(settings.restAPISettings, utxStorage, allChannels)
       )
 
@@ -228,7 +233,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     }
 
     matcher = if (settings.matcherSettings.enable) {
-      val m = new Matcher(actorSystem, wallet, utxStorage, allChannels, stateReader, history,
+      val m = new Matcher(actorSystem, wallet, utxStorage, allChannels, state, history,
         settings.blockchainSettings, settings.restAPISettings, settings.matcherSettings)
       m.runMatcher()
       Some(m)
@@ -347,6 +352,11 @@ object Application extends ScorexLogging {
     Kamon.start(config)
     val isMetricsStarted = Metrics.start(settings.metrics)
 
+    log.trace(s"System property sun.net.inetaddr.ttl=${System.getProperty("sun.net.inetaddr.ttl")}")
+    log.trace(s"System property sun.net.inetaddr.negative.ttl=${System.getProperty("sun.net.inetaddr.negative.ttl")}")
+    log.trace(s"Security property networkaddress.cache.ttl=${Security.getProperty("networkaddress.cache.ttl")}")
+    log.trace(s"Security property networkaddress.cache.negative.ttl=${Security.getProperty("networkaddress.cache.negative.ttl")}")
+
     RootActorSystem.start("wavesplatform", config) { actorSystem =>
       import actorSystem.dispatcher
       isMetricsStarted.foreach { started =>
@@ -373,7 +383,9 @@ object Application extends ScorexLogging {
 
       log.info(s"${Constants.AgentName} Blockchain Id: ${settings.blockchainSettings.addressSchemeCharacter}")
 
-      new Application(actorSystem, settings, config.root()).run()
+      val hds = database.createDataSource(config.getConfig("waves.database"))
+
+      new Application(actorSystem, settings, config.root(), hds).run()
     }
   }
 }

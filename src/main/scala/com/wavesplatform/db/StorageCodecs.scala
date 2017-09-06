@@ -3,7 +3,7 @@ package com.wavesplatform.db
 import com.google.common.base.Charsets
 import com.google.common.primitives.{Ints, Longs, Shorts}
 import com.wavesplatform.network.{BlockCheckpoint, Checkpoint}
-import com.wavesplatform.state2.{AssetInfo, ByteStr, OrderFillInfo}
+import com.wavesplatform.state2.{AssetInfo, ByteStr, VolumeAndFee}
 import scorex.account.Alias
 
 import scala.util.Try
@@ -154,19 +154,19 @@ object BalanceSnapshotValueCodec extends Codec[(Int, Long, Long)] {
   }
 }
 
-object OrderFillInfoValueCodec extends Codec[OrderFillInfo] {
-  override def encode(value: OrderFillInfo): Array[Byte] = {
+object OrderFillInfoValueCodec extends Codec[VolumeAndFee] {
+  override def encode(value: VolumeAndFee): Array[Byte] = {
     val result = new Array[Byte](2 * Longs.BYTES)
     System.arraycopy(Longs.toByteArray(value.volume), 0, result, 0, Longs.BYTES)
     System.arraycopy(Longs.toByteArray(value.fee), 0, result, Longs.BYTES, Longs.BYTES)
     result
   }
 
-  override def decode(bytes: Array[Byte]): Either[CodecFailure, DecodeResult[OrderFillInfo]] = {
+  override def decode(bytes: Array[Byte]): Either[CodecFailure, DecodeResult[VolumeAndFee]] = {
     for {
       vol <- decodeLong(bytes.take(Longs.BYTES))
       fee <- decodeLong(bytes.slice(Longs.BYTES, 2 * Longs.BYTES))
-    } yield DecodeResult(Longs.BYTES * 2, OrderFillInfo(vol, fee))
+    } yield DecodeResult(Longs.BYTES * 2, VolumeAndFee(vol, fee))
   }
 }
 
@@ -219,7 +219,7 @@ object AssetInfoCodec extends Codec[AssetInfo] {
   override def encode(value: AssetInfo): Array[Byte] = {
     val result = new Array[Byte](1 + Longs.BYTES)
     System.arraycopy(encodeBoolean(value.isReissuable), 0, result, 0, 1)
-    System.arraycopy(Longs.toByteArray(value.volume), 0, result, 1, Longs.BYTES)
+    System.arraycopy(Longs.toByteArray(???), 0, result, 1, Longs.BYTES)
     result
   }
 

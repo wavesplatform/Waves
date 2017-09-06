@@ -1,8 +1,8 @@
 package com.wavesplatform.history
 
+import com.wavesplatform.TransactionGen
 import com.wavesplatform.state2._
 import com.wavesplatform.state2.diffs._
-import com.wavesplatform.{TransactionGen, WithDB}
 import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
@@ -10,7 +10,7 @@ import scorex.transaction.GenesisTransaction
 import scorex.transaction.assets.TransferTransaction
 
 class BlockchainUpdaterBadReferencesTest extends PropSpec with PropertyChecks with
-  DomainScenarioDrivenPropertyCheck with Matchers with TransactionGen with WithDB {
+  DomainScenarioDrivenPropertyCheck with Matchers with TransactionGen {
 
   val preconditionsAndPayments: Gen[(GenesisTransaction, TransferTransaction, TransferTransaction, TransferTransaction)] = for {
     master <- accountGen
@@ -24,7 +24,7 @@ class BlockchainUpdaterBadReferencesTest extends PropSpec with PropertyChecks wi
 
 
   property("microBlock: referenced (micro)block doesn't exist") {
-    scenario(preconditionsAndPayments, db, MicroblocksActivatedAt0WavesSettings) { case (domain, (genesis, payment, payment2, payment3)) =>
+    scenario(preconditionsAndPayments, MicroblocksActivatedAt0WavesSettings) { case (domain, (genesis, payment, payment2, payment3)) =>
       val block0 = buildBlockOfTxs(randomSig, Seq(genesis))
       val (block1, microblocks1) = chainBaseAndMicro(block0.uniqueId, payment, Seq(payment2, payment3).map(Seq(_)))
       val goodMicro = microblocks1(0)
@@ -38,7 +38,7 @@ class BlockchainUpdaterBadReferencesTest extends PropSpec with PropertyChecks wi
   }
 
   property("microblock: first micro doesn't reference base block(references nothing)") {
-    scenario(preconditionsAndPayments, db, MicroblocksActivatedAt0WavesSettings) { case (domain, (genesis, payment, payment2, payment3)) =>
+    scenario(preconditionsAndPayments, MicroblocksActivatedAt0WavesSettings) { case (domain, (genesis, payment, payment2, payment3)) =>
       val blocks = chainBlocks(Seq(Seq(genesis), Seq(payment)))
       val block0 = blocks(0)
       val block1 = blocks(1)
@@ -51,7 +51,7 @@ class BlockchainUpdaterBadReferencesTest extends PropSpec with PropertyChecks wi
   }
 
   property("microblock: first micro doesn't reference base block(references firm block)") {
-    scenario(preconditionsAndPayments, db, MicroblocksActivatedAt0WavesSettings) { case (domain, (genesis, payment, payment2, payment3)) =>
+    scenario(preconditionsAndPayments, MicroblocksActivatedAt0WavesSettings) { case (domain, (genesis, payment, payment2, payment3)) =>
       val blocks = chainBlocks(Seq(Seq(genesis), Seq(payment)))
       val block0 = blocks(0)
       val block1 = blocks(1)
@@ -64,7 +64,7 @@ class BlockchainUpdaterBadReferencesTest extends PropSpec with PropertyChecks wi
   }
 
   property("microblock: no base block at all") {
-    scenario(preconditionsAndPayments, db, MicroblocksActivatedAt0WavesSettings) { case (domain, (genesis, payment, payment2, payment3)) =>
+    scenario(preconditionsAndPayments, MicroblocksActivatedAt0WavesSettings) { case (domain, (genesis, payment, payment2, payment3)) =>
       val block0 = buildBlockOfTxs(randomSig, Seq(genesis))
       val (block1, microblocks1) = chainBaseAndMicro(block0.uniqueId, payment, Seq(payment2).map(Seq(_)))
       domain.blockchainUpdater.processBlock(block0).explicitGet()
@@ -75,7 +75,7 @@ class BlockchainUpdaterBadReferencesTest extends PropSpec with PropertyChecks wi
   }
 
   property("microblock: follow-up micro doesn't reference last known micro") {
-    scenario(preconditionsAndPayments, db, MicroblocksActivatedAt0WavesSettings) { case (domain, (genesis, payment, payment2, payment3)) =>
+    scenario(preconditionsAndPayments, MicroblocksActivatedAt0WavesSettings) { case (domain, (genesis, payment, payment2, payment3)) =>
       val block0 = buildBlockOfTxs(randomSig, Seq(genesis))
       val (block1, microblocks1) = chainBaseAndMicro(block0.uniqueId, payment, Seq(payment2, payment3).map(Seq(_)))
       val goodMicro = microblocks1(0)
@@ -88,7 +88,7 @@ class BlockchainUpdaterBadReferencesTest extends PropSpec with PropertyChecks wi
   }
 
   property("block: second 'genesis' block") {
-    scenario(preconditionsAndPayments, db, MicroblocksActivatedAt0WavesSettings) { case (domain, (genesis, payment, payment2, payment3)) =>
+    scenario(preconditionsAndPayments, MicroblocksActivatedAt0WavesSettings) { case (domain, (genesis, payment, payment2, payment3)) =>
       val block0 = buildBlockOfTxs(randomSig, Seq(genesis, payment))
       val block1 = buildBlockOfTxs(randomSig, Seq(genesis, payment2))
       domain.blockchainUpdater.processBlock(block0) shouldBe 'right
@@ -97,7 +97,7 @@ class BlockchainUpdaterBadReferencesTest extends PropSpec with PropertyChecks wi
   }
 
   property("block: incorrect or non-existing block when liquid is empty") {
-    scenario(preconditionsAndPayments, db, MicroblocksActivatedAt0WavesSettings) { case (domain, (genesis, payment, payment2, payment3)) =>
+    scenario(preconditionsAndPayments, MicroblocksActivatedAt0WavesSettings) { case (domain, (genesis, payment, payment2, payment3)) =>
       val blocks = chainBlocks(Seq(Seq(genesis), Seq(payment), Seq(payment2)))
       domain.blockchainUpdater.processBlock(blocks.head) shouldBe 'right
       domain.blockchainUpdater.processBlock(blocks(1)) shouldBe 'right
@@ -108,7 +108,7 @@ class BlockchainUpdaterBadReferencesTest extends PropSpec with PropertyChecks wi
   }
 
   property("block: incorrect or non-existing block when liquid exists") {
-    scenario(preconditionsAndPayments, db) { case (domain, (genesis, payment, payment2, payment3)) =>
+    scenario(preconditionsAndPayments) { case (domain, (genesis, payment, payment2, payment3)) =>
       val blocks = chainBlocks(Seq(Seq(genesis), Seq(payment), Seq(payment2)))
       val block1v2 = buildBlockOfTxs(blocks(0).uniqueId, Seq(payment3))
       domain.blockchainUpdater.processBlock(blocks(0)) shouldBe 'right

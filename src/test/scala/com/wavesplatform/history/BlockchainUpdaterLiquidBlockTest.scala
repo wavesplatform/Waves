@@ -2,7 +2,7 @@ package com.wavesplatform.history
 
 import com.wavesplatform.state2._
 import com.wavesplatform.state2.diffs.ENOUGH_AMT
-import com.wavesplatform.{TransactionGen, WithDB, crypto}
+import com.wavesplatform._
 import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
@@ -15,7 +15,7 @@ import scorex.transaction.assets.TransferTransaction
 import scorex.transaction.{GenesisTransaction, Transaction}
 
 class BlockchainUpdaterLiquidBlockTest extends PropSpec
-  with PropertyChecks with DomainScenarioDrivenPropertyCheck with Matchers with TransactionGen with WithDB {
+  with PropertyChecks with DomainScenarioDrivenPropertyCheck with Matchers with TransactionGen {
 
   private val preconditionsAndPayments: Gen[(Block, Block, Seq[MicroBlock])] = for {
     richAccount <- accountGen
@@ -47,27 +47,28 @@ class BlockchainUpdaterLiquidBlockTest extends PropSpec
   }
 
   property("liquid block can't be overfilled") {
-    val (prevBlock, keyBlock, microBlocks) = preconditionsAndPayments.sample.get
-    val d = domain(db, MicroblocksActivatedAt0WavesSettings)
+    withDomain(MicroblocksActivatedAt0WavesSettings) { d =>
+      val (prevBlock, keyBlock, microBlocks) = preconditionsAndPayments.sample.get
 
-    val blocksApplied = for {
-      _ <- d.blockchainUpdater.processBlock(prevBlock)
-      _ <- d.blockchainUpdater.processBlock(keyBlock)
-    } yield ()
+      val blocksApplied = for {
+        _ <- d.blockchainUpdater.processBlock(prevBlock)
+        _ <- d.blockchainUpdater.processBlock(keyBlock)
+      } yield ()
 
-    val r = microBlocks.foldLeft(blocksApplied) {
-      case (Right(_), curr) => d.blockchainUpdater.processMicroBlock(curr)
-      case (x, _) => x
-    }
+      val r = microBlocks.foldLeft(blocksApplied) {
+        case (Right(_), curr) => d.blockchainUpdater.processMicroBlock(curr)
+        case (x, _) => x
+      }
 
-    withClue("All microblocks should not be processed") {
-      r match {
-        case Left(e: MicroBlockAppendError) => e.err should include("Limit of txs was reached")
-        case x =>
-          val txNumberByMicroBlock = microBlocks.map(_.transactionData.size)
-          fail(s"Unexpected result: $x. keyblock txs: ${keyBlock.transactionCount}, " +
-            s"microblock txs: ${txNumberByMicroBlock.mkString(", ")} (total: ${txNumberByMicroBlock.sum}), " +
-            s"total txs: ${keyBlock.transactionCount + txNumberByMicroBlock.sum}")
+      withClue("All microblocks should not be processed") {
+        r match {
+          case Left(e: MicroBlockAppendError) => e.err should include("Limit of txs was reached")
+          case x =>
+            val txNumberByMicroBlock = microBlocks.map(_.transactionData.size)
+            fail(s"Unexpected result: $x. keyblock txs: ${keyBlock.transactionCount}, " +
+              s"microblock txs: ${txNumberByMicroBlock.mkString(", ")} (total: ${txNumberByMicroBlock.sum}), " +
+              s"total txs: ${keyBlock.transactionCount + txNumberByMicroBlock.sum}")
+        }
       }
     }
   }

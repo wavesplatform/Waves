@@ -5,7 +5,8 @@ import javax.ws.rs.Path
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.UtxPool
 import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.state2.{ByteStr, StateReader}
+import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state2.reader.SnapshotStateReader
 import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
 import play.api.libs.json._
@@ -23,7 +24,7 @@ import scala.util.{Failure, Success}
 
 @Path("/assets")
 @Api(value = "assets")
-case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPool, allChannels: ChannelGroup, state: StateReader, time: Time)
+case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPool, allChannels: ChannelGroup, state: SnapshotStateReader, time: Time)
   extends ApiRoute with BroadcastRoute {
   val MaxAddressesPerRequest = 1000
 
@@ -52,7 +53,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
     (get & path(Segment / "distribution")) { assetId =>
       complete {
         Success(assetId).filter(_.length <= AssetIdStringLength).flatMap(Base58.decode) match {
-          case Success(byteArray) => Json.toJson(state().assetDistribution(byteArray))
+          case Success(byteArray) => ???
           case Failure(_) => ApiError.fromValidationError(scorex.transaction.ValidationError.GenericError("Must be base58-encoded assetId"))
         }
       }
@@ -172,30 +173,13 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
         } yield Json.obj(
           "address" -> acc.address,
           "assetId" -> assetIdStr,
-          "balance" -> state().assetBalance(acc, assetId))
+          "balance" -> ???)
           ).left.map(ApiError.fromValidationError)
       case _ => Left(InvalidAddress)
     }
   }
 
-  private def fullAccountAssetsInfo(address: String): Either[ApiError, JsObject] = (for {
-    acc <- Address.fromString(address)
-  } yield {
-    val balances: Seq[JsObject] = state().getAccountBalance(acc).map { case ((assetId, (balance, reissuable, quantity, issueTx))) =>
-      JsObject(Seq(
-        "assetId" -> JsString(assetId.base58),
-        "balance" -> JsNumber(balance),
-        "reissuable" -> JsBoolean(reissuable),
-        "quantity" -> JsNumber(quantity),
-        "issueTransaction" -> issueTx.json()
-      ))
-    }.toSeq
-    Json.obj(
-      "address" -> acc.address,
-      "balances" -> JsArray(balances)
-    )
-  }).left.map(ApiError.fromValidationError)
-
+  private def fullAccountAssetsInfo(address: String): Either[ApiError, JsObject] = ???
 
   @Path("/order")
   @ApiOperation(value = "Sign Order",

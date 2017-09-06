@@ -7,6 +7,7 @@ import com.wavesplatform.mining.Miner
 import com.wavesplatform.network.{InvalidBlockStorage, PeerDatabase, formatBlocks, id}
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state2._
+import com.wavesplatform.state2.reader.SnapshotStateReader
 import io.netty.channel.Channel
 import io.netty.channel.group.ChannelGroup
 import monix.eval.{Coeval, Task}
@@ -22,12 +23,12 @@ import scala.util.{Left, Right}
 object ExtensionAppender extends ScorexLogging with Instrumented {
 
   def apply(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater,
-            stateReader: StateReader, utxStorage: UtxPool, time: Time, settings: WavesSettings,
+            stateReader: SnapshotStateReader, utxStorage: UtxPool, time: Time, settings: WavesSettings,
             featureProvider: FeatureProvider, invalidBlocks: InvalidBlockStorage,
             peerDatabase: PeerDatabase, miner: Miner, allChannels: ChannelGroup, scheduler: Scheduler
            )(ch: Channel, extensionBlocks: Seq[Block]): Task[Either[ValidationError, Option[BigInt]]] = {
     def p(blocks: Seq[Block]): Task[Either[ValidationError, Option[BigInt]]] = Task(Signed.validateOrdered(blocks).flatMap { newBlocks =>
-      history.write("apply") { implicit l =>
+      {
         val extension = newBlocks.dropWhile(history.contains)
 
         extension.headOption.map(_.reference) match {
@@ -38,7 +39,7 @@ object ExtensionAppender extends ScorexLogging with Instrumented {
             val forkApplicationResultEi = Coeval {
               extension.view
                 .map { b =>
-                  b -> appendBlock(checkpoint, history, blockchainUpdater, stateReader(), utxStorage, time, settings, featureProvider)(b).right.map {
+                  b -> appendBlock(checkpoint, history, blockchainUpdater, stateReader, utxStorage, time, settings, featureProvider)(b).right.map {
                     _.foreach(bh => BlockStats.applied(b, BlockStats.Source.Ext, bh))
                   }
                 }
@@ -62,7 +63,7 @@ object ExtensionAppender extends ScorexLogging with Instrumented {
               }
             }
 
-            val initalHeight = history.height()
+            val initalHeight = history.height
 
             val droppedBlocksEi = for {
               commonBlockHeight <- history.heightOf(lastCommonBlockId).toRight(GenericError("Fork contains no common parent"))
@@ -89,7 +90,7 @@ object ExtensionAppender extends ScorexLogging with Instrumented {
                       )
                     }
                     droppedBlocks.flatMap(_.transactionData).foreach(utxStorage.putIfNew)
-                    Right(Some(history.score()))
+                    Right(Some(history.score))
                 }
             }
 

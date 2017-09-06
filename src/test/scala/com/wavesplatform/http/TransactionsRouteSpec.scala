@@ -6,7 +6,6 @@ import com.wavesplatform.settings.WalletSettings
 import com.wavesplatform.state2.reader.SnapshotStateReader
 import com.wavesplatform.{BlockGen, NoShrink, TestTime, TransactionGen, UtxPool}
 import io.netty.channel.group.ChannelGroup
-import monix.eval.Coeval
 import org.scalacheck.Gen._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers
@@ -33,7 +32,7 @@ class TransactionsRouteSpec extends RouteSpec("/transactions")
   private val state = mock[SnapshotStateReader]
   private val utx = mock[UtxPool]
   private val allChannels = mock[ChannelGroup]
-  private val route = TransactionsApiRoute(restAPISettings, wallet, Coeval.now(state), history, utx, allChannels, new TestTime).route
+  private val route = TransactionsApiRoute(restAPISettings, wallet, state, history, utx, allChannels, new TestTime).route
 
 
   routePath("/address/{address}/limit/{limit}") - {
@@ -75,7 +74,7 @@ class TransactionsRouteSpec extends RouteSpec("/transactions")
       } yield (tx, height)
 
       forAll(txAvailability) { case (tx, height) =>
-        (state.transactionInfo _).expects(tx.id()).returning(Some((height, Some(tx)))).once()
+        (state.transactionInfo _).expects(tx.id()).returning(Some((height, tx))).once()
         Get(routePath(s"/info/${tx.id().base58}")) ~> route ~> check {
           status shouldEqual StatusCodes.OK
           responseAs[JsValue] shouldEqual tx.json() + ("height" -> JsNumber(height))

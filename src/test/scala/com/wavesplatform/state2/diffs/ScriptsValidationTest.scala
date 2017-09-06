@@ -64,8 +64,8 @@ class ScriptsValidationTest extends PropSpec with PropertyChecks with Matchers w
     )
     forAll(preconditionsTransferAndLease(onlySend)) {
       case ((genesis, script, lease, transfer)) =>
-        assertDiffAndState(db, Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(transfer)), fs) { case _ => () }
-        assertDiffEi(db, Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(lease)), fs)(totalDiffEi =>
+        assertDiffAndState(Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(transfer)), fs) { case _ => () }
+        assertDiffEi(Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(lease)), fs)(totalDiffEi =>
           totalDiffEi should produce("TransactionNotAllowedByScript"))
     }
   }
@@ -73,9 +73,7 @@ class ScriptsValidationTest extends PropSpec with PropertyChecks with Matchers w
   property("2 of 3 multisig") {
     def multisig2Of3Lang(pk0: PublicKeyAccount, pk1: PublicKeyAccount, pk2: PublicKeyAccount): Typed.EXPR = {
       val script =
-        s"""
-           |
-          |let A = base58'${ByteStr(pk0.publicKey)}'
+        s"""let A = base58'${ByteStr(pk0.publicKey)}'
            |let B = base58'${ByteStr(pk1.publicKey)}'
            |let C = base58'${ByteStr(pk2.publicKey)}'
            |
@@ -83,9 +81,7 @@ class ScriptsValidationTest extends PropSpec with PropertyChecks with Matchers w
            |let BC = if(SIGVERIFY(TX.BODYBYTES,TX.PROOFB,B)) then 1 else 0
            |let CC = if(SIGVERIFY(TX.BODYBYTES,TX.PROOFC,C)) then 1 else 0
            |
-          | AC + BC+ CC >= 2
-           |
-      """.stripMargin
+           | AC + BC+ CC >= 2""".stripMargin
       val untyped = Parser(script).get.value
       TypeChecker(context, untyped).explicitGet()
     }
@@ -126,9 +122,9 @@ class ScriptsValidationTest extends PropSpec with PropertyChecks with Matchers w
           transfer.copy(proofs = Proofs.create(Seq(sigs(1), sigs(0))).explicitGet())
         )
 
-        validProofs.foreach(tx => assertDiffAndState(db, Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(tx)), fs) { case _ => () })
+        validProofs.foreach(tx => assertDiffAndState(Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(tx)), fs) { case _ => () })
         invalidProofs.foreach(tx =>
-          assertLeft(db, Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(tx)), fs)("TransactionNotAllowedByScript"))
+          assertLeft(Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(tx)), fs)("TransactionNotAllowedByScript"))
     }
   }
 
@@ -150,16 +146,17 @@ class ScriptsValidationTest extends PropSpec with PropertyChecks with Matchers w
 
     forAll(preconditionsTransferAndLease(goodScript)) {
       case ((genesis, script, lease, transfer)) =>
-        assertDiffAndState(db, Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(transfer)), fs) { case _ => () }
-        assertDiffEi(db, Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(lease)), fs)(totalDiffEi =>
+        assertDiffAndState(Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(transfer)), fs) { case _ => () }
+        assertDiffEi(Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(lease)), fs)(totalDiffEi =>
           totalDiffEi should produce("TransactionNotAllowedByScript"))
     }
 
     forAll(preconditionsTransferAndLease(badScript)) {
       case ((genesis, script, lease, transfer)) =>
-        assertDiffAndState(db, Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(transfer)), fs) { case _ => () }
-        assertDiffEi(db, Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(lease)), fs)(totalDiffEi =>
-          totalDiffEi should produce("doesn't contain asset id"))
+        assertDiffAndState(Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(transfer)), fs) { case _ => () }
+        assertDiffEi(Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(lease)), fs) { totalDiffEi =>
+          totalDiffEi should produce("doesn't contain asset id")
+        }
     }
   }
 

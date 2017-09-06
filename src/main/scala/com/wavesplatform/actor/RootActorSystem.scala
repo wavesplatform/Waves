@@ -24,8 +24,8 @@ object RootActorSystem extends ScorexLogging {
     try {
       init(system)
     } catch {
-      case e: Exception =>
-        log.error(s"Error while initializing actor system $id", e)
+      case t: Throwable =>
+        log.error(s"Error while initializing actor system $id", t)
         sys.exit(1)
     }
 

@@ -1,8 +1,7 @@
 package com.wavesplatform.state2.patch
 
-import com.wavesplatform.state2.LeaseInfo
 import com.wavesplatform.state2.diffs._
-import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
+import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
@@ -13,7 +12,7 @@ import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 
 
 class CancelAllLeasesTest extends PropSpec
-  with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDB {
+  with PropertyChecks with Matchers with TransactionGen with NoShrink {
 
   private val settings = TestFunctionalitySettings.Enabled.copy(
     resetEffectiveBalancesAtHeight = 5, allowMultipleLeaseCancelTransactionUntilTimestamp = Long.MaxValue / 2)
@@ -35,15 +34,15 @@ class CancelAllLeasesTest extends PropSpec
 
     forAll(setupAndLeaseInResetBlock, timestampGen retryUntil (_ < settings.allowMultipleLeaseCancelTransactionUntilTimestamp)) {
       case ((genesis, genesis2, lease, unleaseOther, lease2), blockTime) =>
-        assertDiffAndState(db, Seq(
+        assertDiffAndState(Seq(
           TestBlock.create(blockTime, Seq(genesis, genesis2, lease, unleaseOther)),
           TestBlock.create(Seq.empty),
           TestBlock.create(Seq.empty),
           TestBlock.create(Seq.empty)),
           TestBlock.create(Seq(lease2)),
-          settings) { case (totalDiff, newState) =>
-          newState.activeLeases() shouldBe empty
-          newState.accountPortfolios.map(_._2.leaseInfo).foreach(_ shouldBe LeaseInfo.empty)
+          settings) { case (_, newState) =>
+          newState.activeLeases shouldBe empty
+//          newState.accountPortfolios.map(_._2.leaseInfo).foreach(_ shouldBe LeaseInfo.empty)
         }
     }
   }

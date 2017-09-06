@@ -5,6 +5,7 @@ import com.wavesplatform.settings.Constants
 import com.wavesplatform.state2._
 import org.scalacheck.Gen.{alphaLowerChar, alphaUpperChar, frequency, numChar}
 import org.scalacheck.{Arbitrary, Gen}
+import org.scalatest.{BeforeAndAfterAll, Suite}
 import scorex.account.PublicKeyAccount._
 import scorex.account._
 import scorex.transaction._
@@ -12,10 +13,10 @@ import scorex.transaction.assets.MassTransferTransaction.ParsedTransfer
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange._
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
+import scorex.utils.TimeImpl
 import scorex.transaction.smart.{Script, SetScriptTransaction}
-import scorex.utils.NTP
 
-trait TransactionGen extends ScriptGen {
+trait TransactionGen extends BeforeAndAfterAll with ScriptGen { _: Suite =>
 
   def byteArrayGen(length: Int): Gen[Array[Byte]] = Gen.containerOfN[Array, Byte](length, Arbitrary.arbitrary[Byte])
 
@@ -31,7 +32,14 @@ trait TransactionGen extends ScriptGen {
     Gen.choose(minSize, maxSize) flatMap { sz => Gen.listOfN(sz, Gen.choose(0, 0x7f).map(_.toByte)).map(_.toArray) }
   }
 
-  val ntpTimestampGen: Gen[Long] = Gen.choose(1, 1000).map(NTP.correctedTime() - _)
+  private val time = new TimeImpl
+
+  override protected def afterAll(): Unit = {
+    time.close()
+    super.afterAll()
+  }
+
+  val ntpTimestampGen: Gen[Long] = Gen.choose(1, 1000).map(time.correctedTime() - _)
 
   val accountGen: Gen[PrivateKeyAccount] = bytes32gen.map(seed => PrivateKeyAccount(seed))
 
@@ -61,11 +69,11 @@ trait TransactionGen extends ScriptGen {
 
   def otherAccountGen(candidate: PrivateKeyAccount): Gen[PrivateKeyAccount] = accountGen.flatMap(Gen.oneOf(candidate, _))
 
-  val positiveLongGen: Gen[Long] = Gen.choose(1, Long.MaxValue / 100)
+  val positiveLongGen: Gen[Long] = Gen.choose(1, 100000000L * 100000000L / 100)
   val positiveIntGen: Gen[Int] = Gen.choose(1, Int.MaxValue / 100)
   val smallFeeGen: Gen[Long] = Gen.choose(1, 100000000)
 
-  val maxOrderTimeGen: Gen[Long] = Gen.choose(10000L, Order.MaxLiveTime).map(_ + NTP.correctedTime())
+  val maxOrderTimeGen: Gen[Long] = Gen.choose(10000L, Order.MaxLiveTime).map(_ + time.correctedTime())
   val timestampGen: Gen[Long] = Gen.choose(1, Long.MaxValue - 100)
 
   val wavesAssetGen: Gen[Option[ByteStr]] = Gen.const(None)
@@ -361,7 +369,7 @@ trait TransactionGen extends ScriptGen {
   val genesisGen: Gen[GenesisTransaction] = accountGen.flatMap(genesisGeneratorP)
 
   def genesisGeneratorP(recipient: PrivateKeyAccount): Gen[GenesisTransaction] = for {
-    amt <- positiveLongGen
+    amt <- Gen.choose(1, 100000000L * 100000000L)
     ts <- positiveIntGen
   } yield GenesisTransaction.create(recipient, amt, ts).right.get
 
