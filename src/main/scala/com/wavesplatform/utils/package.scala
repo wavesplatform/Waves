@@ -1,6 +1,6 @@
 package com.wavesplatform
 
-import java.io.{File, IOException}
+import java.io.File
 import java.nio.file.Files
 
 import org.h2.mvstore.MVStore
