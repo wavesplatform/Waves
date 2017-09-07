@@ -28,6 +28,7 @@ import scala.concurrent.Future
 import scala.util.{Failure, Success}
 import scala.util.control.NonFatal
 import DebugApiRoute._
+import com.wavesplatform.mining.Miner
 
 
 @Path("/debug")
@@ -40,9 +41,10 @@ case class DebugApiRoute(settings: RestAPISettings,
                          establishedConnections: ConcurrentMap[Channel, PeerInfo],
                          blockchainUpdater: BlockchainUpdater,
                          allChannels: ChannelGroup,
-                         utxStorage: UtxPool) extends ApiRoute {
+                         utxStorage: UtxPool,
+                         miner: Miner) extends ApiRoute {
 
-  override lazy val route = pathPrefix("debug") {
+  override lazy val route: Route = pathPrefix("debug") {
     blocks ~ state ~ info ~ stateWaves ~ rollback ~ rollbackTo ~ blacklist ~ portfolios
   }
 
@@ -131,6 +133,7 @@ case class DebugApiRoute(settings: RestAPISettings,
         if (returnTransactionsToUtx) {
           txs.foreach(tx => utxStorage.putIfNew(tx))
         }
+        miner.lastBlockChanged()
         Json.obj("BlockId" -> blockId.toString): ToResponseMarshallable
       case Left(error) => ApiError.fromValidationError(error)
     }
