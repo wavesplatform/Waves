@@ -3,6 +3,7 @@ package com.wavesplatform.http
 import java.util.concurrent.ConcurrentMap
 
 import com.wavesplatform.http.ApiMarshallers._
+import com.wavesplatform.mining.MinerDebugInfo
 import com.wavesplatform.network.{PeerDatabase, PeerInfo}
 import com.wavesplatform.state2.reader.StateReader
 import com.wavesplatform.state2.{LeaseInfo, Portfolio}
@@ -26,7 +27,8 @@ class DebugRouteSpec
   private val channelGroup = mock[ChannelGroup]
   private val utxPool = mock[UtxPool]
   private val establishedConnections = mock[ConcurrentMap[Channel, PeerInfo]]
-  private val route = DebugApiRoute(restAPISettings, testWallet, state, history, peerDatabase, establishedConnections, mock[BlockchainUpdater], channelGroup, utxPool, mock[BlockchainDebugInfo]).route
+  private val route = DebugApiRoute(restAPISettings, testWallet, state, history, peerDatabase, establishedConnections,
+    mock[BlockchainUpdater], channelGroup, utxPool, mock[BlockchainDebugInfo], mock[MinerDebugInfo]).route
 
   private implicit def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)
 

@@ -13,7 +13,7 @@ import kamon.metric.instrument
 import monix.eval.Task
 import monix.execution._
 import monix.execution.cancelables.{CompositeCancelable, SerialCancelable}
-import scorex.account.PrivateKeyAccount
+import scorex.account.{Address, PrivateKeyAccount}
 import scorex.block.Block._
 import scorex.block.{Block, MicroBlock}
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
@@ -23,6 +23,8 @@ import scorex.transaction.{BlockchainUpdater, CheckpointService, History, Valida
 import scorex.utils.{ScorexLogging, Time}
 import scorex.wallet.Wallet
 
+import scala.collection.mutable.{Map => MMap}
+import scala.concurrent.Await
 import scala.concurrent.duration._
 
 class Miner(
@@ -35,7 +37,7 @@ class Miner(
                settings: WavesSettings,
                timeService: Time,
                utx: UtxPool,
-               wallet: Wallet) extends ScorexLogging with Instrumented {
+               wallet: Wallet) extends MinerDebugInfo with ScorexLogging with Instrumented {
 
   import Miner._
 
@@ -51,6 +53,9 @@ class Miner(
   private val blockBuildTimeStats = Kamon.metrics.histogram("pack-and-forge-block-time", instrument.Time.Milliseconds)
   private val microBlockBuildTimeStats = Kamon.metrics.histogram("forge-microblock-time", instrument.Time.Milliseconds)
 
+  private val nextBlockGenerationTimes: MMap[Address, Long] = MMap.empty
+
+  def collectNextBlockGenerationTimes: List[(Address, Long)] = Await.result(Task.now(nextBlockGenerationTimes.toList).runAsync, Duration.Inf)
 
   private def checkAge(parentHeight: Int, parentTimestamp: Long): Either[String, Unit] =
     Either.cond(parentHeight == 1, (), (timeService.correctedTime() - parentTimestamp).millis)
@@ -67,6 +72,7 @@ class Miner(
     val pc = allChannels.size()
     lazy val lastBlockKernelData = parent.consensusData
     lazy val currentTime = timeService.correctedTime()
+    nextBlockGenerationTimes += account.toAddress -> (currentTime + delay.toMillis)
     lazy val h = calcHit(lastBlockKernelData, account)
     lazy val t = calcTarget(parent, currentTime, balance)
     measureSuccessful(blockBuildTimeStats, for {
@@ -85,7 +91,7 @@ class Miner(
         Block.buildAndSign(version, currentTime, parent.uniqueId, consensusData, unconfirmed, account)
           .left.map(l => l.err)
       }
-    } yield block )
+    } yield block)
   }.delayExecution(delay)
 
 
@@ -179,8 +185,6 @@ class Miner(
     microBlockAttempt := generateMicroBlockSequence(account, lastBlock).runAsync
     log.trace(s"MicroBlock mining scheduled for $account")
   }
-
-  def shutdown(): Unit = ()
 }
 
 object Miner extends ScorexLogging {
@@ -192,4 +196,8 @@ object Miner extends ScorexLogging {
     val calculatedOffset = calculatedGenerationTimestamp - timeService.correctedTime()
     Math.max(minimalBlockGenerationOffset.toMillis, calculatedOffset).millis
   }
+}
+
+trait MinerDebugInfo {
+  def collectNextBlockGenerationTimes: List[(Address, Long)]
 }

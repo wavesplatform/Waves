@@ -28,6 +28,7 @@ import scala.concurrent.Future
 import scala.util.{Failure, Success}
 import scala.util.control.NonFatal
 import DebugApiRoute._
+import com.wavesplatform.mining.MinerDebugInfo
 
 
 @Path("/debug")
@@ -41,10 +42,12 @@ case class DebugApiRoute(settings: RestAPISettings,
                          blockchainUpdater: BlockchainUpdater,
                          allChannels: ChannelGroup,
                          utxStorage: UtxPool,
-                         blockchainDebugInfo: BlockchainDebugInfo) extends ApiRoute {
+                         blockchainDebugInfo: BlockchainDebugInfo,
+                         minerDebugInfo: MinerDebugInfo
+                        ) extends ApiRoute {
 
   override lazy val route = pathPrefix("debug") {
-    blocks ~ state ~ info ~ stateWaves ~ rollback ~ rollbackTo ~ blacklist ~ portfolios ~ walletInfo
+    blocks ~ state ~ info ~ stateWaves ~ rollback ~ rollbackTo ~ blacklist ~ portfolios ~ minerInfo
   }
 
   @Path("/blocks/{howMany}")
@@ -178,16 +181,19 @@ case class DebugApiRoute(settings: RestAPISettings,
     ))
   }
 
-  @Path("/walletInfo")
-  @ApiOperation(value = "State", notes = "All info you need to debug", httpMethod = "GET")
+  @Path("/minerInfo")
+  @ApiOperation(value = "State", notes = "All miner info you need to debug", httpMethod = "GET")
   @ApiResponses(Array(
     new ApiResponse(code = 200, message = "Json state")
   ))
-  def walletInfo: Route = (path("walletInfo") & get & withAuth) {
-    val result = wallet.privateKeyAccounts()
-      .map(acc => AccountMiningBalance(acc.stringRepr, stateReader.effectiveBalanceAtHeightWithConfirmations(acc, stateReader.height, 1000).get))
-    complete(result)
+  def minerInfo: Route = (path("minerInfo") & get & withAuth) {
+    complete(minerDebugInfo.collectNextBlockGenerationTimes.map { case (a, t) =>
+      AccountMiningInfo(a.stringRepr,
+        stateReader.effectiveBalanceAtHeightWithConfirmations(a, stateReader.height, 1000).get,
+        t)
+    })
   }
+
 
   @Path("/rollback-to/{signature}")
   @ApiOperation(value = "Block signature", notes = "Rollback the state to the block with a given signature", httpMethod = "DELETE")
@@ -255,10 +261,12 @@ object DebugApiRoute {
   implicit val leaseInfoFormat: Format[LeaseInfo] = Json.format
   implicit val portfolioFormat: Format[Portfolio] = Json.format
 
-  case class AccountMiningBalance(address: String, miningBalance: Long)
-  implicit val accountMiningBalanceFormat: Format[AccountMiningBalance] = Json.format
+  case class AccountMiningInfo(address: String, miningBalance: Long, timestamp: Long)
+
+  implicit val accountMiningBalanceFormat: Format[AccountMiningInfo] = Json.format
 
 
-  implicit val hashInfoFormat : Format[HashInfo] = Json.format
-  implicit val stateDebugInfoFormat : Format[StateDebugInfo] = Json.format
+  implicit val hashInfoFormat: Format[HashInfo] = Json.format
+  implicit val stateDebugInfoFormat: Format[StateDebugInfo] = Json.format
+
 }
