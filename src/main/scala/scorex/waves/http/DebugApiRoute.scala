@@ -20,7 +20,7 @@ import scorex.account.Address
 import scorex.api.http._
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash
-import scorex.transaction.{BlockchainUpdater, History}
+import scorex.transaction._
 import scorex.wallet.Wallet
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -35,16 +35,16 @@ import DebugApiRoute._
 case class DebugApiRoute(settings: RestAPISettings,
                          wallet: Wallet,
                          stateReader: StateReader,
-                         persistedStateReader: StateReader,
                          history: History,
                          peerDatabase: PeerDatabase,
                          establishedConnections: ConcurrentMap[Channel, PeerInfo],
                          blockchainUpdater: BlockchainUpdater,
                          allChannels: ChannelGroup,
-                         utxStorage: UtxPool) extends ApiRoute {
+                         utxStorage: UtxPool,
+                         blockchainDebugInfo: BlockchainDebugInfo) extends ApiRoute {
 
   override lazy val route = pathPrefix("debug") {
-    blocks ~ state ~ info ~ stateWaves ~ rollback ~ rollbackTo ~ blacklist ~ portfolios
+    blocks ~ state ~ info ~ stateWaves ~ rollback ~ rollbackTo ~ blacklist ~ portfolios ~ walletInfo
   }
 
   @Path("/blocks/{howMany}")
@@ -173,10 +173,21 @@ case class DebugApiRoute(settings: RestAPISettings,
   def info: Route = (path("info") & get) {
     complete(Json.obj(
       "stateHeight" -> stateReader.height,
-      "stateHash" -> persistedStateReader.accountPortfoliosHash
+      "stateHash" -> blockchainDebugInfo.persistedAccountPortfoliosHash,
+      "blockchainDebugInfo" -> blockchainDebugInfo.debugInfo()
     ))
   }
 
+  @Path("/walletInfo")
+  @ApiOperation(value = "State", notes = "All info you need to debug", httpMethod = "GET")
+  @ApiResponses(Array(
+    new ApiResponse(code = 200, message = "Json state")
+  ))
+  def walletInfo: Route = (path("walletInfo") & get & withAuth) {
+    val result = wallet.privateKeyAccounts()
+      .map(acc => AccountMiningBalance(acc.stringRepr, stateReader.effectiveBalanceAtHeightWithConfirmations(acc, stateReader.height, 1000).get))
+    complete(result)
+  }
 
   @Path("/rollback-to/{signature}")
   @ApiOperation(value = "Block signature", notes = "Rollback the state to the block with a given signature", httpMethod = "DELETE")
@@ -243,4 +254,11 @@ object DebugApiRoute {
   )
   implicit val leaseInfoFormat: Format[LeaseInfo] = Json.format
   implicit val portfolioFormat: Format[Portfolio] = Json.format
+
+  case class AccountMiningBalance(address: String, miningBalance: Long)
+  implicit val accountMiningBalanceFormat: Format[AccountMiningBalance] = Json.format
+
+
+  implicit val hashInfoFormat : Format[HashInfo] = Json.format
+  implicit val stateDebugInfoFormat : Format[StateDebugInfo] = Json.format
 }

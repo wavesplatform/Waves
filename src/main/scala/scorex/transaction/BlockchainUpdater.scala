@@ -13,3 +13,16 @@ trait BlockchainUpdater extends Synchronized {
   def removeAfter(blockId: ByteStr): Either[ValidationError, DiscardedTransactions]
 }
 
+trait BlockchainDebugInfo {
+  def debugInfo(): StateDebugInfo
+
+  def persistedAccountPortfoliosHash(): Int
+}
+
+case class HashInfo(height: Int, hash: Int)
+
+case class StateDebugInfo(persisted: HashInfo,
+                          top: HashInfo,
+                          bottom: HashInfo,
+                          microBaseHash: Option[Int],
+                          lastBlockId: String)

@@ -19,7 +19,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
                                     settings: FunctionalitySettings,
                                     minimumInMemoryDiffSize: Int,
                                     ngHistoryWriter: NgHistoryWriter,
-                                    val synchronizationToken: ReentrantReadWriteLock) extends BlockchainUpdater with ScorexLogging with Instrumented {
+                                    val synchronizationToken: ReentrantReadWriteLock) extends BlockchainUpdater with BlockchainDebugInfo with ScorexLogging with Instrumented {
 
   private val topMemoryDiff = Synchronized(Monoid[BlockDiff].empty)
   private val bottomMemoryDiff = Synchronized(Monoid[BlockDiff].empty)
@@ -39,7 +39,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
       s"topMemDiff: ${topMemoryDiff().heightDiff}, bottomMemDiff: ${bottomMemoryDiff().heightDiff}")
   }
 
-  def currentPersistedBlocksState: StateReader = read { implicit l =>
+  private def currentPersistedBlocksState: StateReader = read { implicit l =>
     composite(composite(persisted, () => bottomMemoryDiff()), () => topMemoryDiff())
   }
 
@@ -152,9 +152,21 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
           s" -- with ${microBlock.transactionData.size} transactions")
       })
   }
+
+  override def debugInfo(): StateDebugInfo = read { implicit l =>
+    StateDebugInfo(persisted = HashInfo(height = persisted.height, hash = persisted.accountPortfoliosHash),
+      top = HashInfo(height = topMemoryDiff().heightDiff, hash = Hash.accountPortfolios(topMemoryDiff().txsDiff.portfolios)),
+      bottom = HashInfo(height = bottomMemoryDiff().heightDiff, hash = Hash.accountPortfolios(bottomMemoryDiff().txsDiff.portfolios)),
+      microBaseHash = ngHistoryWriter.baseBlock().flatMap(bb => liquidBlockCandidatesDiff().get(bb.uniqueId)).map(bbDiff => Hash.accountPortfolios(bbDiff.txsDiff.portfolios)),
+      lastBlockId = ngHistoryWriter.lastBlockId().get.base58
+    )
+  }
+
+  override def persistedAccountPortfoliosHash(): Int = Hash.accountPortfolios(currentPersistedBlocksState.accountPortfolios)
 }
 
 object BlockchainUpdaterImpl {
+
   def apply(
                persistedState: StateWriter with StateReader,
                history: NgHistoryWriter,

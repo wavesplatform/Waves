@@ -17,7 +17,7 @@ case class NxtConsensusApiRoute(
     settings: RestAPISettings,
     state: StateReader,
     history: History,
-    fs:FunctionalitySettings) extends ApiRoute with CommonApiFunctions {
+    fs: FunctionalitySettings) extends ApiRoute with CommonApiFunctions {
 
   override val route: Route =
     pathPrefix("consensus") {
@@ -70,7 +70,11 @@ case class NxtConsensusApiRoute(
   @Path("/basetarget")
   @ApiOperation(value = "Base target last", notes = "Base target of a last block", httpMethod = "GET")
   def basetarget: Route = (path("basetarget") & get) {
-    complete(Json.obj("baseTarget" -> history.lastBlock.get.consensusData.baseTarget))
+    complete(Json.obj(
+      "baseTarget" -> history.lastBlock.get.consensusData.baseTarget,
+      "score" -> history.score().toString()
+    )
+    )
   }
 
   @Path("/algo")
