@@ -155,17 +155,15 @@ case class DebugApiRoute(settings: RestAPISettings,
   @ApiResponses(Array(
     new ApiResponse(code = 200, message = "200 if success, 404 if there are no block at this height")
   ))
-  def rollback: Route = withAuth {
-    (path("rollback") & post) {
-      json[RollbackParams] { params =>
-        history.blockAt(params.rollbackTo) match {
-          case Some(block) =>
-            rollbackToBlock(block.uniqueId, params.returnTransactionsToUtx)
-          case None =>
-            (StatusCodes.BadRequest, "Block at height not found")
-        }
-      } ~ complete(StatusCodes.BadRequest)
-    }
+  def rollback: Route = (path("rollback") & post & withAuth) {
+    json[RollbackParams] { params =>
+      history.blockAt(params.rollbackTo) match {
+        case Some(block) =>
+          rollbackToBlock(block.uniqueId, params.returnTransactionsToUtx)
+        case None =>
+          (StatusCodes.BadRequest, "Block at height not found")
+      }
+    } ~ complete(StatusCodes.BadRequest)
   }
 
   @Path("/info")
@@ -219,23 +217,21 @@ case class DebugApiRoute(settings: RestAPISettings,
   @ApiResponses(Array(
     new ApiResponse(code = 200, message = "200 if success, 404 if there are no peer with such address")
   ))
-  def blacklist: Route = withAuth {
-    (path("blacklist") & post) {
-      entity(as[String]) { socketAddressString =>
-        try {
-          val uri = new URI("node://" + socketAddressString)
-          val address = InetAddress.getByName(uri.getHost)
-          establishedConnections.entrySet().stream().forEach(entry => {
-            if (entry.getValue.remoteAddress.getAddress == address) {
-              peerDatabase.blacklistAndClose(entry.getKey, "Debug API request")
-            }
-          })
-          complete(StatusCodes.OK)
-        } catch {
-          case NonFatal(_) => complete(StatusCodes.BadRequest)
-        }
-      } ~ complete(StatusCodes.BadRequest)
-    }
+  def blacklist: Route = (path("blacklist") & post & withAuth) {
+    entity(as[String]) { socketAddressString =>
+      try {
+        val uri = new URI("node://" + socketAddressString)
+        val address = InetAddress.getByName(uri.getHost)
+        establishedConnections.entrySet().stream().forEach(entry => {
+          if (entry.getValue.remoteAddress.getAddress == address) {
+            peerDatabase.blacklistAndClose(entry.getKey, "Debug API request")
+          }
+        })
+        complete(StatusCodes.OK)
+      } catch {
+        case NonFatal(_) => complete(StatusCodes.BadRequest)
+      }
+    } ~ complete(StatusCodes.BadRequest)
   }
 
 }

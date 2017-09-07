@@ -223,12 +223,10 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
 
   @Path("/")
   @ApiOperation(value = "Create", notes = "Create a new account in the wallet(if it exists)", httpMethod = "POST")
-  def create: Route = (path("addresses") & post) {
-    withAuth {
-      wallet.generateNewAccount() match {
-        case Some(pka) => complete(Json.obj("address" -> pka.address))
-        case None => complete(Unknown)
-      }
+  def create: Route = (path("addresses") & post & withAuth) {
+    wallet.generateNewAccount() match {
+      case Some(pka) => complete(Json.obj("address" -> pka.address))
+      case None => complete(Unknown)
     }
   }
 
