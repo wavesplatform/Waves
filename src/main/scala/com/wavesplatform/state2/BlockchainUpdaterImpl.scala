@@ -9,6 +9,7 @@ import com.wavesplatform.state2.BlockchainUpdaterImpl._
 import com.wavesplatform.state2.diffs.BlockDiffer
 import com.wavesplatform.state2.reader.CompositeStateReader.composite
 import com.wavesplatform.state2.reader.StateReader
+import scorex.account.Address
 import scorex.block.Block.BlockId
 import scorex.block.{Block, MicroBlock}
 import scorex.transaction.ValidationError.GenericError
@@ -158,11 +159,15 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
       top = HashInfo(height = topMemoryDiff().heightDiff, hash = Hash.accountPortfolios(topMemoryDiff().txsDiff.portfolios)),
       bottom = HashInfo(height = bottomMemoryDiff().heightDiff, hash = Hash.accountPortfolios(bottomMemoryDiff().txsDiff.portfolios)),
       microBaseHash = ngHistoryWriter.baseBlock().flatMap(bb => liquidBlockCandidatesDiff().get(bb.uniqueId)).map(bbDiff => Hash.accountPortfolios(bbDiff.txsDiff.portfolios)),
-      lastBlockId = ngHistoryWriter.lastBlockId().get.base58
+      lastBlockId = ngHistoryWriter.lastBlockId().get.toString
     )
   }
 
   override def persistedAccountPortfoliosHash(): Int = Hash.accountPortfolios(currentPersistedBlocksState.accountPortfolios)
+
+  override def topDiff(): Map[Address, Portfolio] = read { implicit l =>
+    topMemoryDiff().txsDiff.portfolios
+  }
 }
 
 object BlockchainUpdaterImpl {

@@ -47,7 +47,7 @@ case class DebugApiRoute(settings: RestAPISettings,
                         ) extends ApiRoute {
 
   override lazy val route = pathPrefix("debug") {
-    blocks ~ state ~ info ~ stateWaves ~ rollback ~ rollbackTo ~ blacklist ~ portfolios ~ minerInfo
+    blocks ~ state ~ info ~ stateWaves ~ rollback ~ rollbackTo ~ blacklist ~ portfolios ~ minerInfo ~ topDiffAccountPortfolios
   }
 
   @Path("/blocks/{howMany}")
@@ -179,6 +179,15 @@ case class DebugApiRoute(settings: RestAPISettings,
     ))
   }
 
+  @Path("/topDiffAccountPortfolios")
+  @ApiOperation(value = "State", notes = "All top diff info you need to debug", httpMethod = "GET")
+  @ApiResponses(Array(
+    new ApiResponse(code = 200, message = "Json state")
+  ))
+  def topDiffAccountPortfolios: Route = (path("topDiffAccountPortfolios") & get & withAuth) {
+    complete(blockchainDebugInfo.topDiff())
+  }
+
   @Path("/minerInfo")
   @ApiOperation(value = "State", notes = "All miner info you need to debug", httpMethod = "GET")
   @ApiResponses(Array(
@@ -264,5 +273,16 @@ object DebugApiRoute {
 
   implicit val hashInfoFormat: Format[HashInfo] = Json.format
   implicit val stateDebugInfoFormat: Format[StateDebugInfo] = Json.format
+
+  implicit val addressWrites: Writes[Address] = new Writes[Address] {
+    override def writes(o: Address): JsValue = JsString(o.stringRepr)
+  }
+
+  implicit val byteStrWrites : Writes[ByteStr] = new Writes[ByteStr] {
+    override def writes(o: AssetId): JsValue = JsString(o.base58)
+  }
+
+
+
 
 }

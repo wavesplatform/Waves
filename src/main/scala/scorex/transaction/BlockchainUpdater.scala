@@ -1,6 +1,7 @@
 package scorex.transaction
 
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state2.{ByteStr, Portfolio}
+import scorex.account.Address
 import scorex.block.{Block, MicroBlock}
 import scorex.utils.Synchronized
 
@@ -17,6 +18,8 @@ trait BlockchainDebugInfo {
   def debugInfo(): StateDebugInfo
 
   def persistedAccountPortfoliosHash(): Int
+
+  def topDiff(): Map[Address, Portfolio]
 }
 
 case class HashInfo(height: Int, hash: Int)
