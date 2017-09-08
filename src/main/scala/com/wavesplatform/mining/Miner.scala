@@ -69,14 +69,17 @@ class Miner(
       _ <- Either.cond(h < t, (), s"${System.currentTimeMillis()}: Hit $h was NOT less than target $t, not forging block with ${account.address}")
       _ = log.debug(s"Forging with ${account.address}, H $h < T $t, balance $balance, prev block ${parent.uniqueId}")
       _ = log.debug(s"Previous block ID ${parent.uniqueId} at $parentHeight with target ${lastBlockKernelData.baseTarget}")
-      avgBlockDelay = blockchainSettings.genesisSettings.averageBlockDelay
-      btg = calcBaseTarget(avgBlockDelay, parentHeight, parent, greatGrandParent, currentTime)
-      gs = calcGeneratorSignature(lastBlockKernelData, account)
-      consensusData = NxtLikeConsensusBlockData(btg, gs)
-      unconfirmed = utx.packUnconfirmed()
-      _ = log.debug(s"Adding ${unconfirmed.size} unconfirmed transaction(s) to new block")
-      block = Block.buildAndSign(Version, currentTime, parent.uniqueId, consensusData, unconfirmed, account)
-      _ = blockBuildTimeStats.record(System.currentTimeMillis() - start)
+      block <- {
+        val avgBlockDelay = blockchainSettings.genesisSettings.averageBlockDelay
+        val btg = calcBaseTarget(avgBlockDelay, parentHeight, parent, greatGrandParent, currentTime)
+        val gs = calcGeneratorSignature(lastBlockKernelData, account)
+        val consensusData = NxtLikeConsensusBlockData(btg, gs)
+        val sortInBlock = history.height() <= blockchainSettings.functionalitySettings.resetEffectiveBalancesAtHeight
+        val unconfirmed = utx.packUnconfirmed()
+        log.debug(s"Adding ${unconfirmed.size} unconfirmed transaction(s) to new block")
+        Block.buildAndSign(Version, currentTime, parent.uniqueId, consensusData, unconfirmed, account)
+          .left.map(l => l.err)
+      }
     } yield block
   }.delayExecution(delay)
 

@@ -90,11 +90,15 @@ case class Block(timestamp: Long, version: Byte, reference: ByteStr, signerData:
 
 
 object Block extends ScorexLogging {
+
+  val PrevBlockFee: Float = 0.6f
+  val CurrentBlockFee: Float = 0.4f
+
   type BlockIds = Seq[ByteStr]
   type BlockId = ByteStr
 
-  val MaxTransactionsPerBlockVer1: Int = 100
-  val MaxTransactionsPerBlockVer2: Int = 65535
+  val MaxTransactionsPerBlockVer1Ver2: Int = 100
+  val MaxTransactionsPerBlockVer3: Int = 65535
   val BaseTargetLength: Int = 8
   val GeneratorSignatureLength: Int = 32
 
@@ -102,20 +106,26 @@ object Block extends ScorexLogging {
 
   val TransactionSizeLength = 4
 
-  def transParseBytes(version: Int,bytes: Array[Byte]): Try[Seq[Transaction]] = Try {
-    if (bytes.isEmpty ) {
-       Seq.empty
-      } else {
-        val v: (Array[Byte], Int) = version match {
-        case 1 | 2 => (bytes.tail        , bytes.head) //  255  max
+  def transParseBytes(version: Int, bytes: Array[Byte]): Try[Seq[Transaction]] = Try {
+    if (bytes.isEmpty) {
+      Seq.empty
+    } else {
+      val v: (Array[Byte], Int) = version match {
+        case 1 | 2 => (bytes.tail, bytes.head) //  127 max, won't work properly wif greater
+        case 3 =>
+          // https://stackoverflow.com/a/18247942/288091
+          val high = if (bytes(1) >= 0) bytes(1) else 256 + bytes(1)
+          val low = if (bytes(0) >= 0) bytes(0) else 256 + bytes(0)
+          val amount = low | (high << 8)
+          (bytes.tail.tail, amount) // 65535 max
         case _ => ???
       }
 
       (1 to v._2).foldLeft((0: Int, Seq[Transaction]())) { case ((pos, txs), _) =>
-          val transactionLengthBytes = v._1.slice(pos, pos + TransactionSizeLength)
-          val transactionLength = Ints.fromByteArray(transactionLengthBytes)
-          val transactionBytes = v._1.slice(pos + TransactionSizeLength, pos + TransactionSizeLength + transactionLength)
-          val transaction = TransactionParser.parseBytes(transactionBytes).get
+        val transactionLengthBytes = v._1.slice(pos, pos + TransactionSizeLength)
+        val transactionLength = Ints.fromByteArray(transactionLengthBytes)
+        val transactionBytes = v._1.slice(pos + TransactionSizeLength, pos + TransactionSizeLength + transactionLength)
+        val transaction = TransactionParser.parseBytes(transactionBytes).get
 
         (pos + TransactionSizeLength + transactionLength, txs :+ transaction)
       }._2
@@ -162,15 +172,17 @@ object Block extends ScorexLogging {
                    reference: ByteStr,
                    consensusData: NxtLikeConsensusBlockData,
                    transactionData: Seq[Transaction],
-                   signer: PrivateKeyAccount): Block = {
+                   signer: PrivateKeyAccount): Either[GenericError, Block] = (for {
+    _ <- Either.cond(transactionData.size <= MaxTransactionsPerBlockVer3, (), s"too many transactions in Block: allowed: $MaxTransactionsPerBlockVer3, actual: ${transactionData.size}")
+    _ <- Either.cond(reference.arr.length == SignatureLength, (), "Incorrect reference")
+    _ <- Either.cond(consensusData.generationSignature.length == GeneratorSignatureLength, (), "Incorrect consensusData.generationSignature")
+    _ <- Either.cond(signer.publicKey.length == KeyLength, (), "Incorrect signer.publicKey")
+  } yield {
     val nonSignedBlock = Block(timestamp, version, reference, SignerData(signer, ByteStr.empty), consensusData, transactionData)
     val toSign = nonSignedBlock.bytes
     val signature = EllipticCurveImpl.sign(signer, toSign)
-    require(reference.arr.length == SignatureLength, "Incorrect reference")
-    require(consensusData.generationSignature.length == GeneratorSignatureLength, "Incorrect consensusData.generationSignature")
-    require(signer.publicKey.length == KeyLength, "Incorrect signer.publicKey")
     nonSignedBlock.copy(signerData = SignerData(signer, ByteStr(signature)))
-  }
+  }).left.map(GenericError)
 
   def genesisTransactions(gs: GenesisSettings): Seq[GenesisTransaction] = {
     gs.transactions.map { ts =>
@@ -180,7 +192,6 @@ object Block extends ScorexLogging {
   }
 
   def genesis(genesisSettings: GenesisSettings): Either[ValidationError, Block] = {
-    val version: Byte = 1
 
     val genesisSigner = PrivateKeyAccount(Array.empty)
 
@@ -196,7 +207,7 @@ object Block extends ScorexLogging {
     val reference = Array.fill(SignatureLength)(-1: Byte)
 
     val timestamp = genesisSettings.blockTimestamp
-    val toSign: Array[Byte] = Array(version) ++
+    val toSign: Array[Byte] = Array(GenesisBlockVersion) ++
       Bytes.ensureCapacity(Longs.toByteArray(timestamp), 8, 0) ++
       reference ++
       cBytes ++
@@ -207,7 +218,7 @@ object Block extends ScorexLogging {
 
     if (EllipticCurveImpl.verify(signature, toSign, genesisSigner.publicKey))
       Right(Block(timestamp = timestamp,
-        version = version,
+        version = GenesisBlockVersion,
         reference = ByteStr(reference),
         signerData = SignerData(genesisSigner, ByteStr(signature)),
         consensusData = consensusGenesisData,
@@ -215,4 +226,8 @@ object Block extends ScorexLogging {
     else Left(GenericError("Passed genesis signature is not valid"))
 
   }
+
+  val GenesisBlockVersion: Byte = 1
+  val PlainBlockVersion: Byte = 2
+  val NgBlockVersion: Byte = 3
 }
