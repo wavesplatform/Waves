@@ -15,20 +15,26 @@ package object utils extends ScorexLogging {
   def createMVStore(file: Option[File], encryptionKey: Option[Array[Char]] = None): MVStore = {
     val builder = file.fold(new MVStore.Builder) { p =>
       p.getParentFile.mkdirs()
+
       new MVStore.Builder()
         .fileName(p.getCanonicalPath)
         .autoCommitDisabled()
         .compress()
     }
 
-    val store = encryptionKey match {
-      case Some(key) => builder.encryptionKey(key).open()
-      case _ => builder.open()
+    try {
+      val store = encryptionKey match {
+        case Some(key) => builder.encryptionKey(key).open()
+        case _ => builder.open()
+      }
+
+      store.rollback()
+      store
     }
-
-    store.rollback()
-
-    store
+    catch {
+      case e: IllegalStateException if e.getMessage.contains("corrupt") =>
+        throw new IllegalStateException("wallet.password is incorrect or " + e.getMessage)
+    }
   }
 
   def createWithStore[A <: AutoCloseable](storeFile: Option[File], f: => A, pred: A => Boolean, deleteExisting: Boolean = false): Try[A] = Try {
