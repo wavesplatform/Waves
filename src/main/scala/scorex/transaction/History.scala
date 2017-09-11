@@ -2,6 +2,7 @@ package scorex.transaction
 
 import com.wavesplatform.network.{BlockCheckpoint, Checkpoint}
 import com.wavesplatform.state2.{BlockDiff, ByteStr}
+import scorex.block.Block.BlockId
 import scorex.block.{Block, MicroBlock}
 import scorex.transaction.History.BlockchainScore
 import scorex.utils.Synchronized
@@ -29,6 +30,12 @@ trait History extends Synchronized with AutoCloseable {
 
 trait NgHistory extends History {
   def microBlock(id: ByteStr): Option[MicroBlock]
+}
+
+trait DebugNgHistory {
+  def lastPersistedBlockIds(count: Int): Seq[BlockId]
+
+  def microblockIds(): Seq[BlockId]
 }
 
 trait HistoryWriter extends History {

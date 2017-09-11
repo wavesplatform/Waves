@@ -83,6 +83,10 @@ case class Block(timestamp: Long, version: Byte, reference: ByteStr, signerData:
 
   override lazy val signatureValid: Boolean = EllipticCurveImpl.verify(signerData.signature.arr, bytesWithoutSignature, signerData.generator.publicKey)
   override lazy val signedDescendants: Seq[Signed] = transactionData
+
+  override def toString: String =
+    s"Block(timestamp=$timestamp, version=$version, reference=$reference, signerData=$signerData, consensusData=$consensusData, transactions.size=${transactionData.size})"
+
 }
 
 

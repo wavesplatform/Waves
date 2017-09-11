@@ -20,7 +20,7 @@ object StorageFactory {
       }
     }
 
-  def apply(settings: BlockchainSettings): Try[(NgHistory with AutoCloseable, AutoCloseable, StateReader, BlockchainUpdater, BlockchainDebugInfo)] = {
+  def apply(settings: BlockchainSettings): Try[(NgHistory with DebugNgHistory with AutoCloseable, AutoCloseable, StateReader, BlockchainUpdater, BlockchainDebugInfo)] = {
     val lock = new RWL(true)
 
     for {

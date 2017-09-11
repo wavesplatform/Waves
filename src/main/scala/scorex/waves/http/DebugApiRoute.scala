@@ -29,6 +29,7 @@ import scala.util.{Failure, Success}
 import scala.util.control.NonFatal
 import DebugApiRoute._
 import com.wavesplatform.mining.MinerDebugInfo
+import scorex.block.Block.BlockId
 
 
 @Path("/debug")
@@ -36,7 +37,7 @@ import com.wavesplatform.mining.MinerDebugInfo
 case class DebugApiRoute(settings: RestAPISettings,
                          wallet: Wallet,
                          stateReader: StateReader,
-                         history: History,
+                         history: History with DebugNgHistory,
                          peerDatabase: PeerDatabase,
                          establishedConnections: ConcurrentMap[Channel, PeerInfo],
                          blockchainUpdater: BlockchainUpdater,
@@ -47,7 +48,7 @@ case class DebugApiRoute(settings: RestAPISettings,
                         ) extends ApiRoute {
 
   override lazy val route = pathPrefix("debug") {
-    blocks ~ state ~ info ~ stateWaves ~ rollback ~ rollbackTo ~ blacklist ~ portfolios ~ minerInfo ~ topDiffAccountPortfolios
+    blocks ~ state ~ info ~ stateWaves ~ rollback ~ rollbackTo ~ blacklist ~ portfolios ~ minerInfo ~ topDiffAccountPortfolios ~ historyInfo
   }
 
   @Path("/blocks/{howMany}")
@@ -202,6 +203,20 @@ case class DebugApiRoute(settings: RestAPISettings,
   }
 
 
+  @Path("/historyInfo")
+  @ApiOperation(value = "State", notes = "All history info you need to debug", httpMethod = "GET")
+  @ApiResponses(Array(
+    new ApiResponse(code = 200, message = "Json state")
+  ))
+  def historyInfo: Route = (path("historyInfo") & get & withAuth) {
+    val a = history.lastPersistedBlockIds(10)
+    val b = history.microblockIds()
+    complete(HistoryInfo(a,b))
+
+  }
+
+
+
   @Path("/rollback-to/{signature}")
   @ApiOperation(value = "Block signature", notes = "Rollback the state to the block with a given signature", httpMethod = "DELETE")
   @ApiImplicitParams(Array(
@@ -267,20 +282,24 @@ object DebugApiRoute {
   implicit val portfolioFormat: Format[Portfolio] = Json.format
 
   case class AccountMiningInfo(address: String, miningBalance: Long, timestamp: Long)
-
   implicit val accountMiningBalanceFormat: Format[AccountMiningInfo] = Json.format
-
 
   implicit val hashInfoFormat: Format[HashInfo] = Json.format
   implicit val stateDebugInfoFormat: Format[StateDebugInfo] = Json.format
 
-  implicit val addressWrites: Writes[Address] = new Writes[Address] {
+  implicit val addressWrites: Format[Address] = new Format[Address] {
     override def writes(o: Address): JsValue = JsString(o.stringRepr)
+    override def reads(json: JsValue): JsResult[Address] = ???
   }
 
-  implicit val byteStrWrites : Writes[ByteStr] = new Writes[ByteStr] {
+  implicit val byteStrWrites : Format[ByteStr] = new Format[ByteStr] {
     override def writes(o: AssetId): JsValue = JsString(o.base58)
+    override def reads(json: JsValue): JsResult[BlockId] = ???
   }
+
+  case class HistoryInfo(lastBlockIds: Seq[BlockId], microBlockIds: Seq[BlockId])
+  implicit val historyInfoFormat: Format[HistoryInfo] = Json.format
+
 
 
 

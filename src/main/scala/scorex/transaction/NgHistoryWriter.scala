@@ -23,7 +23,7 @@ trait NgHistoryWriter extends HistoryWriter with NgHistory {
   def forgeBlock(id: BlockId): Option[(Block, DiscardedMicroBlocks)]
 }
 
-class NgHistoryWriterImpl(inner: HistoryWriter) extends NgHistoryWriter with ScorexLogging with Instrumented {
+class NgHistoryWriterImpl(inner: HistoryWriter) extends NgHistoryWriter with DebugNgHistory with ScorexLogging with Instrumented {
 
   override def synchronizationToken: ReentrantReadWriteLock = inner.synchronizationToken
 
@@ -219,5 +219,13 @@ class NgHistoryWriterImpl(inner: HistoryWriter) extends NgHistoryWriter with Sco
       bestLiquidBlock()
     else
       inner.blockAt(height)
+  }
+
+  override def lastPersistedBlockIds(count: Int): Seq[BlockId] = read { implicit l =>
+    inner.lastBlockIds(count)
+  }
+
+  override def microblockIds(): Seq[BlockId] = read { implicit l =>
+    micros().map(_.totalResBlockSig) ++ baseB().map(_.uniqueId)
   }
 }

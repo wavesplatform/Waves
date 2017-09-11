@@ -9,7 +9,6 @@ case class Portfolio(balance: Long, leaseInfo: LeaseInfo, assets: Map[ByteStr, L
   lazy val effectiveBalance: Long = safeSum(balance, leaseInfo.leaseIn) - leaseInfo.leaseOut
   lazy val spendableBalance: Long = balance - leaseInfo.leaseOut
 
-  lazy val currBlockFeePart: Portfolio = this.multiply(Block.CurrentBlockFee)
   lazy val prevBlockFeePart: Portfolio = this.minus(this.multiply(Block.CurrentBlockFee))
   lazy val isEmpty: Boolean = this == Portfolio.portfolioMonoid.empty
 }

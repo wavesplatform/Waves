@@ -125,7 +125,7 @@ class UtxPool(time: Time,
             case Right(_) =>
               (invalid, valid, diff)
             case Left(e) =>
-              log.debug(s"Removing invalid transaction ${tx.id} from UTX: $e")
+ //             log.trace(s"Removing invalid transaction ${tx.id} from UTX: $e")
               (tx.id +: invalid, valid, diff)
           }
         case (r, _) => r
