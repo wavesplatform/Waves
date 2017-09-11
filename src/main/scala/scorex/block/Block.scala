@@ -1,5 +1,7 @@
 package scorex.block
 
+import java.nio.ByteBuffer
+
 import cats._
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import com.wavesplatform.settings.GenesisSettings
@@ -111,13 +113,11 @@ object Block extends ScorexLogging {
       Seq.empty
     } else {
       val v: (Array[Byte], Int) = version match {
-        case 1 | 2 => (bytes.tail, bytes.head) //  127 max, won't work properly wif greater
+        case 1 | 2 => (bytes.tail, bytes.head) //  127 max, won't work properly if greater
         case 3 =>
           // https://stackoverflow.com/a/18247942/288091
-          val high = if (bytes(1) >= 0) bytes(1) else 256 + bytes(1)
-          val low = if (bytes(0) >= 0) bytes(0) else 256 + bytes(0)
-          val amount = low | (high << 8)
-          (bytes.tail.tail, amount) // 65535 max
+          val size = ByteBuffer.wrap(bytes, 0, 2).getShort()
+          (bytes.tail.tail, if (size >= 0) size else size + (2 << 15)) // 65535 max
         case _ => ???
       }
 
