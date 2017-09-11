@@ -38,20 +38,23 @@ package object diffs {
   }
 
   def assertDiffEiWithPrev(preconditions: Seq[Block], block: Block, fs: FunctionalitySettings = TestFunctionalitySettings.Enabled)(assertion: Either[ValidationError, BlockDiff] => Unit): Unit = {
-    val differ: (StateReader, Block) => Either[ValidationError, BlockDiff] = (s, b) => BlockDiffer.fromBlock(fs, s, preconditions.lastOption, b)
+    val differ: (StateReader, (Option[Block], Block)) => Either[ValidationError, BlockDiff] = {
+      case (s, (prev, b)) => BlockDiffer.fromBlock(fs, s, prev, b)
+    }
 
     val state = newState()
 
-    preconditions.foreach { precondition =>
-      val preconditionDiff = differ(state, precondition).explicitGet()
+    zipWithPrev(preconditions).foreach { wp =>
+      val preconditionDiff = differ(state, wp).explicitGet()
       state.applyBlockDiff(preconditionDiff)
     }
-    val totalDiff1 = differ(state, block)
+
+    val totalDiff1 = differ(state, (preconditions.lastOption, block))
     assertion(totalDiff1)
 
     val preconditionDiff = BlockDiffer.unsafeDiffMany(fs, newState(), None)(preconditions)
     val compositeState = new CompositeStateReader(newState(), preconditionDiff)
-    val totalDiff2 = differ(compositeState, block)
+    val totalDiff2 = differ(compositeState, (preconditions.lastOption, block))
     assertion(totalDiff2)
   }
 
@@ -74,4 +77,8 @@ package object diffs {
   }
 
   def produce(errorMessage: String): ProduceError = new ProduceError(errorMessage)
+
+  def zipWithPrev[A](seq: Seq[A]): Seq[(Option[A], A)] = {
+    seq.zipWithIndex.map { case ((a, i)) => (if (i == 0) None else Some(seq(i - 1)), a) }
+  }
 }

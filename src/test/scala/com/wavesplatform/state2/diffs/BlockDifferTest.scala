@@ -51,12 +51,12 @@ class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen {
         )
 
         assertDiff(testChain.init, fs) { diff =>
-          val actualBalanceOfSignerA = diff.right.get.snapshots(signerA)(9).balance
+          val actualBalanceOfSignerA = diff.explicitGet().snapshots(signerA)(9).balance
           actualBalanceOfSignerA shouldBe 40
         }
 
         assertDiff(testChain, fs) { diff =>
-          val actualTotalFeeOfSignerB = diff.right.get.snapshots(signerB)(10).balance
+          val actualTotalFeeOfSignerB = diff.explicitGet().snapshots(signerB)(10).balance
           actualTotalFeeOfSignerB shouldBe 50
         }
       }
@@ -82,7 +82,7 @@ class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen {
         )
 
         assertDiff(testChain, fs) { diff =>
-          val actualBalanceOfSignerB = diff.right.get.snapshots(signerB)(10).balance
+          val actualBalanceOfSignerB = diff.explicitGet().snapshots(signerB)(10).balance
           actualBalanceOfSignerB shouldBe 44
         }
       }
@@ -108,12 +108,12 @@ class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen {
         )
 
         assertDiff(testChain.init, fs) { diff =>
-          val actualBalanceOfSignerA = diff.right.get.snapshots(signerA)(9).balance
+          val actualBalanceOfSignerA = diff.explicitGet().snapshots(signerA)(9).balance
           actualBalanceOfSignerA shouldBe 34
         }
 
         assertDiff(testChain, fs) { diff =>
-          val actualBalanceOfSignerB = diff.right.get.snapshots(signerB)(10).balance
+          val actualBalanceOfSignerB = diff.explicitGet().snapshots(signerB)(10).balance
           actualBalanceOfSignerB shouldBe 50
         }
       }
