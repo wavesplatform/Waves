@@ -1,6 +1,6 @@
 package scorex.lagonaki.unit
 
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state2._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{FunSuite, Matchers}
 import scorex.account.PrivateKeyAccount
@@ -35,7 +35,7 @@ class BlockSpecification extends FunSuite with Matchers with MockFactory {
     List(1, 2).foreach { version =>
       val timestamp = System.currentTimeMillis()
 
-      val block = Block.buildAndSign(version.toByte, timestamp, ByteStr(reference), cbd, tbd, gen)
+      val block = Block.buildAndSign(version.toByte, timestamp, ByteStr(reference), cbd, tbd, gen).explicitGet()
       val parsedBlock = Block.parseBytes(block.bytes).get
       assert(Signed.validateSignatures(block).isRight)
       assert(Signed.validateSignatures(parsedBlock).isRight)

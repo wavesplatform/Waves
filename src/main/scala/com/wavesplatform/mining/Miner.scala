@@ -8,11 +8,10 @@ import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state2.reader.StateReader
 import com.wavesplatform.{Coordinator, UtxPool}
 import io.netty.channel.group.ChannelGroup
-import kamon.Kamon
-import kamon.metric.instrument
 import monix.eval.Task
 import monix.execution._
 import monix.execution.cancelables.{CompositeCancelable, SerialCancelable}
+import monix.execution.schedulers.SchedulerService
 import scorex.account.PrivateKeyAccount
 import scorex.block.Block
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
@@ -38,15 +37,13 @@ class Miner(
 
   import Miner._
 
-  private implicit val scheduler = Scheduler.fixedPool(name = "miner-pool", poolSize = 2)
+  private implicit val scheduler: SchedulerService = Scheduler.fixedPool(name = "miner-pool", poolSize = 2)
 
   private val minerSettings = settings.minerSettings
   private val blockchainSettings = settings.blockchainSettings
   private lazy val processBlock = Coordinator.processBlock(checkpoint, history, blockchainUpdater, timeService, stateReader, utx, blockchainReadiness, Miner.this, settings) _
 
   private val scheduledAttempts = SerialCancelable()
-
-  private val blockBuildTimeStats = Kamon.metrics.histogram("block-build-time", instrument.Time.Milliseconds)
 
   private def checkAge(parentHeight: Int, parent: Block): Either[String, Unit] =
     Either
@@ -69,14 +66,16 @@ class Miner(
       _ <- Either.cond(h < t, (), s"${System.currentTimeMillis()}: Hit $h was NOT less than target $t, not forging block with ${account.address}")
       _ = log.debug(s"Forging with ${account.address}, H $h < T $t, balance $balance, prev block ${parent.uniqueId}")
       _ = log.debug(s"Previous block ID ${parent.uniqueId} at $parentHeight with target ${lastBlockKernelData.baseTarget}")
-      avgBlockDelay = blockchainSettings.genesisSettings.averageBlockDelay
-      btg = calcBaseTarget(avgBlockDelay, parentHeight, parent, greatGrandParent, currentTime)
-      gs = calcGeneratorSignature(lastBlockKernelData, account)
-      consensusData = NxtLikeConsensusBlockData(btg, gs)
-      unconfirmed = utx.packUnconfirmed()
-      _ = log.debug(s"Adding ${unconfirmed.size} unconfirmed transaction(s) to new block")
-      block = Block.buildAndSign(Version, currentTime, parent.uniqueId, consensusData, unconfirmed, account)
-      _ = blockBuildTimeStats.record(System.currentTimeMillis() - start)
+      block <- {
+        val avgBlockDelay = blockchainSettings.genesisSettings.averageBlockDelay
+        val btg = calcBaseTarget(avgBlockDelay, parentHeight, parent, greatGrandParent, currentTime)
+        val gs = calcGeneratorSignature(lastBlockKernelData, account)
+        val consensusData = NxtLikeConsensusBlockData(btg, gs)
+        val unconfirmed = utx.packUnconfirmed()
+        log.debug(s"Adding ${unconfirmed.size} unconfirmed transaction(s) to new block")
+        Block.buildAndSign(Version, currentTime, parent.uniqueId, consensusData, unconfirmed, account)
+          .left.map(l => l.err)
+      }
     } yield block
   }.delayExecution(delay)
 
