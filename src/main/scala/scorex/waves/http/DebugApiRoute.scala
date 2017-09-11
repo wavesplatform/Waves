@@ -48,7 +48,7 @@ case class DebugApiRoute(settings: RestAPISettings,
                         ) extends ApiRoute {
 
   override lazy val route = pathPrefix("debug") {
-    blocks ~ state ~ info ~ stateWaves ~ rollback ~ rollbackTo ~ blacklist ~ portfolios ~ minerInfo ~ topDiffAccountPortfolios ~ historyInfo
+    blocks ~ state ~ info ~ stateWaves ~ rollback ~ rollbackTo ~ blacklist ~ portfolios ~ minerInfo ~ topDiffAccountPortfolios ~ bottomDiffAccountPortfolios ~ historyInfo
   }
 
   @Path("/blocks/{howMany}")
@@ -189,6 +189,15 @@ case class DebugApiRoute(settings: RestAPISettings,
     complete(blockchainDebugInfo.topDiff())
   }
 
+  @Path("/bottomDiffAccountPortfolios")
+  @ApiOperation(value = "State", notes = "All bottom diff info you need to debug", httpMethod = "GET")
+  @ApiResponses(Array(
+    new ApiResponse(code = 200, message = "Json state")
+  ))
+  def bottomDiffAccountPortfolios: Route = (path("bottomDiffAccountPortfolios") & get & withAuth) {
+    complete(blockchainDebugInfo.bottomDiff())
+  }
+
   @Path("/minerInfo")
   @ApiOperation(value = "State", notes = "All miner info you need to debug", httpMethod = "GET")
   @ApiResponses(Array(
@@ -211,10 +220,9 @@ case class DebugApiRoute(settings: RestAPISettings,
   def historyInfo: Route = (path("historyInfo") & get & withAuth) {
     val a = history.lastPersistedBlockIds(10)
     val b = history.microblockIds()
-    complete(HistoryInfo(a,b))
+    complete(HistoryInfo(a, b))
 
   }
-
 
 
   @Path("/rollback-to/{signature}")
@@ -282,6 +290,7 @@ object DebugApiRoute {
   implicit val portfolioFormat: Format[Portfolio] = Json.format
 
   case class AccountMiningInfo(address: String, miningBalance: Long, timestamp: Long)
+
   implicit val accountMiningBalanceFormat: Format[AccountMiningInfo] = Json.format
 
   implicit val hashInfoFormat: Format[HashInfo] = Json.format
@@ -289,19 +298,19 @@ object DebugApiRoute {
 
   implicit val addressWrites: Format[Address] = new Format[Address] {
     override def writes(o: Address): JsValue = JsString(o.stringRepr)
+
     override def reads(json: JsValue): JsResult[Address] = ???
   }
 
-  implicit val byteStrWrites : Format[ByteStr] = new Format[ByteStr] {
+  implicit val byteStrWrites: Format[ByteStr] = new Format[ByteStr] {
     override def writes(o: AssetId): JsValue = JsString(o.base58)
+
     override def reads(json: JsValue): JsResult[BlockId] = ???
   }
 
   case class HistoryInfo(lastBlockIds: Seq[BlockId], microBlockIds: Seq[BlockId])
+
   implicit val historyInfoFormat: Format[HistoryInfo] = Json.format
-
-
-
 
 
 }

@@ -20,6 +20,8 @@ trait BlockchainDebugInfo {
   def persistedAccountPortfoliosHash(): Int
 
   def topDiff(): Map[Address, Portfolio]
+
+  def bottomDiff(): Map[Address, Portfolio]
 }
 
 case class HashInfo(height: Int, hash: Int)

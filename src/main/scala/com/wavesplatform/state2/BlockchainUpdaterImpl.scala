@@ -168,6 +168,10 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
   override def topDiff(): Map[Address, Portfolio] = read { implicit l =>
     topMemoryDiff().txsDiff.portfolios
   }
+
+  override def bottomDiff(): Map[Address, Portfolio] = read { implicit l =>
+    bottomMemoryDiff().txsDiff.portfolios
+  }
 }
 
 object BlockchainUpdaterImpl {
