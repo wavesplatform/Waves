@@ -90,7 +90,6 @@ object Coordinator extends ScorexLogging with Instrumented {
     _ <- Either.cond(checkpoint.isBlockValid(microBlock.totalResBlockSig, history.height() + 1), (),
       MicroBlockAppendError(s"[h = ${history.height() + 1}] is not valid with respect to checkpoint", microBlock))
     _ <- blockchainUpdater.processMicroBlock(microBlock)
-    _ = microAppliedStats()
   } yield utxStorage.removeAll(microBlock.transactionData))
 
 
@@ -180,7 +179,5 @@ object Coordinator extends ScorexLogging with Instrumented {
   private val blockForkHeightStats = Kamon.metrics.histogram("block-fork-height")
   private val microblockProcessingTimeStats = Kamon.metrics.histogram("microblock-processing-time")
   private val blockProcessingTimeStats = Kamon.metrics.histogram("single-block-processing-time")
-
-  private def microAppliedStats(): Unit = Metrics.write(Point.measurement("micro-applied"))
 
 }

@@ -15,6 +15,7 @@ import monix.eval.Task
 import monix.execution._
 import monix.execution.cancelables.{CompositeCancelable, SerialCancelable}
 import monix.execution.schedulers.SchedulerService
+import org.influxdb.dto.Point
 import scorex.account.{Address, PrivateKeyAccount}
 import scorex.block.Block._
 import scorex.block.{Block, MicroBlock}
@@ -52,8 +53,19 @@ class Miner(
   private val scheduledAttempts = SerialCancelable()
   private val microBlockAttempt = SerialCancelable()
 
-  private def blockGeneratedAndAppliedStats(): Unit = Metrics.writeEvent("block-generated-applied")
-  private def microGeneratedAndAppliedStats(): Unit = Metrics.writeEvent("micro-generated-applied")
+  private def blockInternalStats(b: Block): Unit = Metrics.write(
+    Point
+      .measurement("block-internal")
+      .addField("id", b.uniqueId.toString)
+      .addField("type", "Apply")
+  )
+
+  private def microInternalStats(m: MicroBlock): Unit = Metrics.write(
+    Point
+      .measurement("micro-internal")
+      .addField("id", m.uniqueId.toString)
+      .addField("type", "Apply")
+  )
 
   private val blockBuildTimeStats = Kamon.metrics.histogram("pack-and-forge-block-time", instrument.Time.Milliseconds)
   private val microBlockBuildTimeStats = Kamon.metrics.histogram("forge-microblock-time", instrument.Time.Milliseconds)
@@ -95,7 +107,6 @@ class Miner(
         Block.buildAndSign(version, currentTime, parent.uniqueId, consensusData, unconfirmed, account)
           .left.map(l => l.err)
       }
-      _ = blockGeneratedAndAppliedStats()
     } yield block)
   }.delayExecution(delay)
 
@@ -126,7 +137,7 @@ class Miner(
             microBlock <- MicroBlock.buildAndSign(account, unconfirmed, accumulatedBlock.signerData.signature, signedBlock.signerData.signature)
           } yield (signedBlock, microBlock))
         _ <- Coordinator.processMicroBlock(checkpoint, history, blockchainUpdater, utx)(fullAndMicro._2)
-        _ = microGeneratedAndAppliedStats()
+        _ = microInternalStats(fullAndMicro._2)
       } yield fullAndMicro) match {
         case Right((full, micro)) =>
           log.trace(s"MicroBlock(id=${trim(micro.uniqueId)}) has been mined for $account}")
@@ -164,6 +175,7 @@ class Miner(
             processBlock(block, true) match {
               case Left(err) => log.warn(err.toString)
               case Right(score) =>
+                blockInternalStats(block)
                 allChannels.broadcast(LocalScoreChanged(score))
                 allChannels.broadcast(BlockForged(block))
                 if (microBlocksEnabled)
