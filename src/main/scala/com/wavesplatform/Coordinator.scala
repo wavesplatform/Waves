@@ -46,11 +46,14 @@ object Coordinator extends ScorexLogging with Instrumented {
           droppedTransactions <- blockchainUpdater.removeAfter(lastCommonBlockId)
           score <- forkApplicationResultEi
         } yield {
-          Metrics.write(
-            Point
-              .measurement("rollback")
-              .addField("depth", initalHeight - commonBlockHeight)
-          )
+          val depth = initalHeight - commonBlockHeight
+          if (depth > 0) {
+            Metrics.write(
+              Point
+                .measurement("rollback")
+                .addField("depth", initalHeight - commonBlockHeight)
+            )
+          }
           droppedTransactions.foreach(utxStorage.putIfNew)
           miner.scheduleMining()
           updateBlockchainReadinessFlag(history, time, blockchainReadiness, settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed)
