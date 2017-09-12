@@ -2,6 +2,7 @@ package com.wavesplatform.mining
 
 import java.util.concurrent.atomic.AtomicBoolean
 
+import com.wavesplatform.metrics.Metrics
 import com.wavesplatform.network._
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state2._
@@ -51,6 +52,9 @@ class Miner(
   private val scheduledAttempts = SerialCancelable()
   private val microBlockAttempt = SerialCancelable()
 
+  private def blockGeneratedAndAppliedStats(): Unit = Metrics.writeEvent("block-generated-applied")
+  private def microGeneratedAndAppliedStats(): Unit = Metrics.writeEvent("micro-generated-applied")
+
   private val blockBuildTimeStats = Kamon.metrics.histogram("pack-and-forge-block-time", instrument.Time.Milliseconds)
   private val microBlockBuildTimeStats = Kamon.metrics.histogram("forge-microblock-time", instrument.Time.Milliseconds)
 
@@ -91,6 +95,7 @@ class Miner(
         Block.buildAndSign(version, currentTime, parent.uniqueId, consensusData, unconfirmed, account)
           .left.map(l => l.err)
       }
+      _ = blockGeneratedAndAppliedStats()
     } yield block)
   }.delayExecution(delay)
 
@@ -121,6 +126,7 @@ class Miner(
             microBlock <- MicroBlock.buildAndSign(account, unconfirmed, accumulatedBlock.signerData.signature, signedBlock.signerData.signature)
           } yield (signedBlock, microBlock))
         _ <- Coordinator.processMicroBlock(checkpoint, history, blockchainUpdater, utx)(fullAndMicro._2)
+        _ = microGeneratedAndAppliedStats()
       } yield fullAndMicro) match {
         case Right((full, micro)) =>
           log.trace(s"MicroBlock(id=${trim(micro.uniqueId)}) has been mined for $account}")

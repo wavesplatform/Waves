@@ -2,12 +2,14 @@ package com.wavesplatform
 
 import java.util.concurrent.atomic.AtomicBoolean
 
+import com.wavesplatform.metrics.Metrics
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.network.{BlockCheckpoint, Checkpoint}
 import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
 import com.wavesplatform.state2.{ByteStr, Instrumented}
 import com.wavesplatform.state2.reader.StateReader
 import kamon.Kamon
+import org.influxdb.dto.Point
 import scorex.block.{Block, MicroBlock}
 import scorex.consensus.TransactionsOrdering
 import scorex.transaction.ValidationError.{GenericError, MicroBlockAppendError}
@@ -37,12 +39,18 @@ object Coordinator extends ScorexLogging with Instrumented {
             Left(e)
         }
 
+        val initalHeight = history.height()
         for {
           commonBlockHeight <- history.heightOf(lastCommonBlockId).toRight(GenericError("Fork contains no common parent"))
           _ <- Either.cond(isForkValidWithCheckpoint(commonBlockHeight), (), GenericError("Fork contains block that doesn't match checkpoint, declining fork"))
           droppedTransactions <- blockchainUpdater.removeAfter(lastCommonBlockId)
           score <- forkApplicationResultEi
         } yield {
+          Metrics.write(
+            Point
+              .measurement("rollback")
+              .addField("depth", initalHeight - commonBlockHeight)
+          )
           droppedTransactions.foreach(utxStorage.putIfNew)
           miner.scheduleMining()
           updateBlockchainReadinessFlag(history, time, blockchainReadiness, settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed)
@@ -79,6 +87,7 @@ object Coordinator extends ScorexLogging with Instrumented {
     _ <- Either.cond(checkpoint.isBlockValid(microBlock.totalResBlockSig, history.height() + 1), (),
       MicroBlockAppendError(s"[h = ${history.height() + 1}] is not valid with respect to checkpoint", microBlock))
     _ <- blockchainUpdater.processMicroBlock(microBlock)
+    _ = microAppliedStats()
   } yield utxStorage.removeAll(microBlock.transactionData))
 
 
@@ -168,5 +177,7 @@ object Coordinator extends ScorexLogging with Instrumented {
   private val blockForkHeightStats = Kamon.metrics.histogram("block-fork-height")
   private val microblockProcessingTimeStats = Kamon.metrics.histogram("microblock-processing-time")
   private val blockProcessingTimeStats = Kamon.metrics.histogram("single-block-processing-time")
+
+  private def microAppliedStats(): Unit = Metrics.write(Point.measurement("micro-applied"))
 
 }

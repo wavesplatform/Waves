@@ -35,9 +35,45 @@ trait Instrumented {
       h.record(time)
     r
   }
+
+  def measureSuccessfulFun[A, B](writeTime: Long => Unit, f: => Either[A, B]): Either[A, B] = {
+    val (r, time) = withTime(f)
+    if (r.isRight)
+      writeTime(time)
+    r
+  }
+
+  def measureSuccessfulFun[A](writeTime: Long => Unit, f: => Option[A]): Option[A] = {
+    val (r, time) = withTime(f)
+    if (r.isDefined)
+      writeTime(time)
+    r
+  }
 }
 
 object Instrumented {
+//  case class Measured[T](x: T, measurements: Map[String, Long])
+//
+//  object Measured {
+//    implicit def monad[T]: Monad[Measured[T]] = new Monad[Measured[T]] {
+//      override def pure[A](x: A) = Measured(x, Map.empty)
+//      override def flatMap[A, B](fa: Measured[A])(f: (A) => Measured[B]): Measured[B] = {
+//        val fb = f(fa.x)
+//        Measured(fb.x, Monoid.combine(fa.measurements, fb.measurements))
+//      }
+//      override def tailRecM[A, B](a: A)(f: (A) => Measured[Either[A, B]]) = {
+//
+//      }
+//    }
+//
+//    def apply[T](name: String)(f: => T): Measured[T] = {
+//      val start = System.currentTimeMillis()
+//      val v = f
+//      val end = System.currentTimeMillis()
+//      Measured[T](v, Map(name -> (end - start)))
+//    }
+//  }
+
   def withTime[R](f: => R): (R, Long) = {
     val t0 = System.currentTimeMillis()
     val r: R = f

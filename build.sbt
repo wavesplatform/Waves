@@ -39,9 +39,9 @@ libraryDependencies ++=
   Dependencies.itKit ++
   Dependencies.logging ++
   Dependencies.matcher ++
-  Dependencies.kamon ++
+  Dependencies.metrics ++
   Seq(
-    "com.iheart" %% "ficus" % "1.4.1",
+    "com.iheart" %% "ficus" % "1.4.2",
     ("org.scorexfoundation" %% "scrypto" % "1.2.2")
       .exclude("org.slf4j", "slf4j-api"),
     "commons-net" % "commons-net" % "3.+",

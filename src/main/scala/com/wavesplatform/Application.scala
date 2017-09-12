@@ -15,6 +15,7 @@ import com.wavesplatform.actor.RootActorSystem
 import com.wavesplatform.history.{CheckpointServiceImpl, StorageFactory}
 import com.wavesplatform.http.NodeApiRoute
 import com.wavesplatform.matcher.Matcher
+import com.wavesplatform.metrics.Metrics
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.network.{NetworkServer, PeerDatabaseImpl, PeerInfo, UPnP}
 import com.wavesplatform.settings._
@@ -232,6 +233,7 @@ object Application extends ScorexLogging {
     val config = readConfig(args.headOption)
     val settings = WavesSettings.fromConfig(config)
     Kamon.start(config)
+    Metrics.start(settings.metrics)
 
     RootActorSystem.start("wavesplatform", config) { actorSystem =>
       configureLogging(settings)
@@ -246,6 +248,7 @@ object Application extends ScorexLogging {
       new Application(actorSystem, settings) {
         override def shutdown(): Unit = {
           Kamon.shutdown()
+          Metrics.shutdown()
           super.shutdown()
         }
       }.run()

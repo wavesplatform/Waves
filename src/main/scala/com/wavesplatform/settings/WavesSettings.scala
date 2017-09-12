@@ -2,9 +2,11 @@ package com.wavesplatform.settings
 
 import com.typesafe.config.Config
 import com.wavesplatform.matcher.MatcherSettings
+import com.wavesplatform.metrics.Metrics
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 import net.ceedubs.ficus.readers.EnumerationReader._
+import net.ceedubs.ficus.readers.URIReaders.javaURIReader
 
 object LogLevel extends Enumeration {
   val TRACE = Value("TRACE")
@@ -26,7 +28,8 @@ case class WavesSettings(directory: String,
                          restAPISettings: RestAPISettings,
                          synchronizationSettings: SynchronizationSettings,
                          utxSettings: UtxSettings,
-                         featuresSettings: FeaturesSettings)
+                         featuresSettings: FeaturesSettings,
+                         metrics: Metrics.Settings)
 
 object WavesSettings {
   import NetworkSettings.networkSettingsValueReader
@@ -47,8 +50,10 @@ object WavesSettings {
     val synchronizationSettings = SynchronizationSettings.fromConfig(config)
     val utxSettings = config.as[UtxSettings]("waves.utx")
     val featuresSettings = config.as[FeaturesSettings]("waves.features")
+    val metrics = config.as[Metrics.Settings]("metrics")
 
     WavesSettings(directory, loggingLevel, networkSettings, walletSettings, blockchainSettings, checkpointsSettings,
-      feesSettings, matcherSettings, minerSettings, restAPISettings, synchronizationSettings, utxSettings, featuresSettings)
+      feesSettings, matcherSettings, minerSettings, restAPISettings, synchronizationSettings, utxSettings,
+      featuresSettings, metrics)
   }
 }
