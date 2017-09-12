@@ -13,6 +13,7 @@ import kamon.metric.instrument
 import monix.eval.Task
 import monix.execution._
 import monix.execution.cancelables.{CompositeCancelable, SerialCancelable}
+import monix.execution.schedulers.SchedulerService
 import scorex.account.{Address, PrivateKeyAccount}
 import scorex.block.Block._
 import scorex.block.{Block, MicroBlock}
@@ -41,7 +42,7 @@ class Miner(
 
   import Miner._
 
-  private implicit val scheduler = Scheduler.fixedPool(name = "miner-pool", poolSize = 2)
+  private implicit val scheduler: SchedulerService = Scheduler.fixedPool(name = "miner-pool", poolSize = 2)
 
   private val minerSettings = settings.minerSettings
   private val blockchainSettings = settings.blockchainSettings
@@ -63,7 +64,6 @@ class Miner(
       s"BlockChain is too old (last block timestamp is $parentTimestamp generated $blockAge ago)"
     ))
 
-
   private def generateOneBlockTask(account: PrivateKeyAccount, parentHeight: Int,
                                    greatGrandParent: Option[Block], balance: Long, version: Byte)(delay: FiniteDuration): Task[Either[String, Block]] = Task {
     // should take last block right at the time of mining since microblocks might have been added
@@ -78,9 +78,9 @@ class Miner(
     measureSuccessful(blockBuildTimeStats, for {
       _ <- Either.cond(pc >= minerSettings.quorum, (), s"Quorum not available ($pc/${minerSettings.quorum}, not forging block with ${account.address}")
       _ <- Either.cond(h < t, (), s"${System.currentTimeMillis()}: Hit $h was NOT less than target $t, not forging block with ${account.address}")
+      _ = log.debug(s"Forging with ${account.address}, H $h < T $t, balance $balance, prev block ${parent.uniqueId}")
+      _ = log.debug(s"Previous block ID ${parent.uniqueId} at $parentHeight with target ${lastBlockKernelData.baseTarget}")
       block <- {
-        log.debug(s"Forging with ${account.address}, H $h < T $t, balance $balance, prev block ${parent.uniqueId}")
-        log.debug(s"Previous block ID ${parent.uniqueId} at $parentHeight with target ${lastBlockKernelData.baseTarget}")
         val avgBlockDelay = blockchainSettings.genesisSettings.averageBlockDelay
         val btg = calcBaseTarget(avgBlockDelay, parentHeight, parent, greatGrandParent, currentTime)
         val gs = calcGeneratorSignature(lastBlockKernelData, account)

@@ -1,8 +1,11 @@
 package com.wavesplatform.network
 
+import com.wavesplatform.metrics.LatencyHistogram
 import com.wavesplatform.state2.ByteStr
 import io.netty.channel.{ChannelHandlerContext, ChannelInboundHandlerAdapter}
 import io.netty.util.concurrent.ScheduledFuture
+import kamon.Kamon
+import kamon.metric.instrument
 import scorex.block.Block
 import scorex.utils.ScorexLogging
 
@@ -16,10 +19,20 @@ class ExtensionBlocksLoader(
   private var targetExtensionIds = Option.empty[ExtensionIds]
   private val blockBuffer = mutable.TreeMap.empty[Int, Block]
   private var currentTimeout = Option.empty[ScheduledFuture[_]]
+  private val extensionsFetchingTimeStats = new LatencyHistogram(Kamon.metrics.histogram("extensions-fetching-time", instrument.Time.Milliseconds))
 
   private def cancelTimeout(): Unit = {
     currentTimeout.foreach(_.cancel(false))
     currentTimeout = None
+  }
+
+  private def resetTimeout(ctx: ChannelHandlerContext, xid: ExtensionIds): Unit = {
+    cancelTimeout()
+    currentTimeout = Some(ctx.executor().schedule(blockSyncTimeout) {
+      if (targetExtensionIds.contains(xid)) {
+        peerDatabase.blacklistAndClose(ctx.channel(), "Timeout loading blocks")
+      }
+    })
   }
 
   override def channelInactive(ctx: ChannelHandlerContext) = {
@@ -29,27 +42,23 @@ class ExtensionBlocksLoader(
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef) = msg match {
     case xid@ExtensionIds(_, newIds) if pendingSignatures.isEmpty =>
-      if (newIds.nonEmpty) {
-        targetExtensionIds = Some(xid)
-        pendingSignatures = newIds.zipWithIndex.toMap
-        cancelTimeout()
-        currentTimeout = Some(ctx.executor().schedule(blockSyncTimeout) {
-          if (targetExtensionIds.contains(xid)) {
-            peerDatabase.blacklistAndClose(ctx.channel(), "Timeout loading blocks")
-          }
-        })
-        newIds.foreach(s => ctx.write(GetBlock(s)))
-        ctx.flush()
-      } else {
-        log.debug(s"${id(ctx)} No new blocks to load")
-        ctx.fireChannelRead(ExtensionBlocks(Seq.empty))
-      }
-
+        if (newIds.nonEmpty) {
+          targetExtensionIds = Some(xid)
+          pendingSignatures = newIds.zipWithIndex.toMap
+          resetTimeout(ctx, xid)
+          extensionsFetchingTimeStats.start()
+          newIds.foreach(s => ctx.write(GetBlock(s)))
+          ctx.flush()
+        } else {
+          log.debug(s"${id(ctx)} No new blocks to load")
+          ctx.fireChannelRead(ExtensionBlocks(Seq.empty))
+        }
     case b: Block if pendingSignatures.contains(b.uniqueId) =>
       blockBuffer += pendingSignatures(b.uniqueId) -> b
       pendingSignatures -= b.uniqueId
       if (pendingSignatures.isEmpty) {
         cancelTimeout()
+        extensionsFetchingTimeStats.record()
         log.trace(s"${id(ctx)} Loaded all blocks, doing a pre-check")
 
         val newBlocks = blockBuffer.values.toSeq

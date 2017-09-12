@@ -1,7 +1,7 @@
 package scorex.lagonaki.unit
 
+import com.wavesplatform.state2._
 import com.wavesplatform.BlockGen
-import com.wavesplatform.state2.{ByteStr, Instrumented}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.prop.GeneratorDrivenPropertyChecks
 import org.scalatest.{FunSuite, Matchers}

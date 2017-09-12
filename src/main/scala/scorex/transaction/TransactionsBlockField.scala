@@ -1,6 +1,9 @@
 package scorex.transaction
 
 import java.io.ByteArrayOutputStream
+import java.nio.ByteBuffer
+
+import java.io.ByteArrayOutputStream
 
 import com.google.common.primitives.{Bytes, Ints}
 import com.wavesplatform.network.TransactionMessageSpec
@@ -46,10 +49,7 @@ case class TransactionsBlockFieldVersion3(override val value: Seq[Transaction]) 
 
   override lazy val bytes: Array[Byte] = {
     val txCount = value.size.ensuring(_ <= Block.MaxTransactionsPerBlockVer3)
-    // https://stackoverflow.com/a/18247942/288091
-    val size0 = (txCount & 0xFF).asInstanceOf[Byte]
-    val size1 = ((txCount >> 8) & 0xFF).asInstanceOf[Byte]
-    val serTxCount = Seq(size0, size1).toArray
-    TransactionsBlockField.serTxs(value, serTxCount)
+    val bb = ByteBuffer.allocate(2)
+    TransactionsBlockField.serTxs(value, bb.putShort(txCount.toShort).array)
   }
 }
