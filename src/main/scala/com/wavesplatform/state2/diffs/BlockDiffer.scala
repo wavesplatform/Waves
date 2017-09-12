@@ -25,7 +25,7 @@ object BlockDiffer extends ScorexLogging with Instrumented {
       if (stateHeight > settings.enableMicroblocksAfterHeight)
         maybePrevBlock
           .map(prevBlock => Diff.empty.copy(
-            portfolios = Map(blockSigner -> prevBlock.feesPortfolio.prevBlockFeePart)))
+            portfolios = Map(blockSigner -> prevBlock.prevBlockFeePart)))
       else None
 
     lazy val currentBlockFeeDistr =
@@ -59,19 +59,6 @@ object BlockDiffer extends ScorexLogging with Instrumented {
     val currentBlockHeight = s.height + heightDiff
     val txDiffer = TransactionDiffer(settings, pervBlockTimestamp, timestamp, currentBlockHeight) _
 
-    def txFeeDiffer(tx: Transaction): Map[Address, Portfolio] = Map(blockGenerator ->
-      (tx.assetFee match {
-        case (Some(asset), fee) =>
-          Portfolio(
-            balance = 0,
-            leaseInfo = LeaseInfo.empty,
-            assets = Map(asset -> fee))
-        case (None, fee) => Portfolio(
-          balance = fee,
-          leaseInfo = LeaseInfo.empty,
-          assets = Map.empty)
-      }))
-
     val txsDiffEi = maybeFeesDistr match {
       case Some(feedistr) =>
         txs.foldLeft(right(Monoid.combine(prevBlockFeeDistr.orEmpty, feedistr))) { case (ei, tx) => ei.flatMap(diff =>
@@ -81,7 +68,7 @@ object BlockDiffer extends ScorexLogging with Instrumented {
       case None =>
         txs.foldLeft(right(prevBlockFeeDistr.orEmpty)) { case (ei, tx) => ei.flatMap(diff =>
           txDiffer(new CompositeStateReader(s, diff.asBlockDiff), tx)
-            .map(newDiff => diff.combine(newDiff.copy(portfolios = newDiff.portfolios.combine(txFeeDiffer(tx).mapValues(_.multiply(Block.CurrentBlockFee)))))))
+            .map(newDiff => diff.combine(newDiff.copy(portfolios = newDiff.portfolios.combine(Map(blockGenerator -> tx.feeDiff()).mapValues(_.multiply(Block.CurrentBlockFeePart)))))))
         }
     }
 

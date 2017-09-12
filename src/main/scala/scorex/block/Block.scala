@@ -19,6 +19,8 @@ import scala.util.{Failure, Try}
 case class Block(timestamp: Long, version: Byte, reference: ByteStr, signerData: SignerData,
                  consensusData: NxtLikeConsensusBlockData, transactionData: Seq[Transaction]) extends Signed {
 
+  import Block._
+
   private lazy val versionField: ByteBlockField = ByteBlockField("version", version)
   private lazy val timestampField: LongBlockField = LongBlockField("timestamp", timestamp)
   private lazy val referenceField: BlockIdField = BlockIdField("reference", reference.arr)
@@ -81,6 +83,8 @@ case class Block(timestamp: Long, version: Byte, reference: ByteStr, signerData:
       }
   })
 
+  lazy val prevBlockFeePart: Portfolio = Monoid[Portfolio].combineAll(transactionData.map(tx => tx.feeDiff().minus(tx.feeDiff().multiply(CurrentBlockFeePart))))
+
   override lazy val signatureValid: Boolean = EllipticCurveImpl.verify(signerData.signature.arr, bytesWithoutSignature, signerData.generator.publicKey)
   override lazy val signedDescendants: Seq[Signed] = transactionData
 
@@ -92,8 +96,11 @@ case class Block(timestamp: Long, version: Byte, reference: ByteStr, signerData:
 
 object Block extends ScorexLogging {
 
-  val PrevBlockFee: Float = 0.6f
-  val CurrentBlockFee: Float = 0.4f
+  case class Fraction(dividend: Int, divider: Int) {
+    def apply(l: Long): Long = l / divider * dividend
+  }
+
+  val CurrentBlockFeePart: Fraction = Fraction(2, 5)
 
   type BlockIds = Seq[ByteStr]
   type BlockId = ByteStr

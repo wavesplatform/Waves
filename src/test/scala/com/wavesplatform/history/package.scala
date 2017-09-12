@@ -2,7 +2,6 @@ package com.wavesplatform
 
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state2._
-import org.apache.commons.net.ntp.TimeStamp
 import scorex.account.PrivateKeyAccount
 import scorex.block.{Block, MicroBlock}
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
