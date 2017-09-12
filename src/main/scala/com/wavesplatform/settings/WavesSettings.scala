@@ -46,7 +46,7 @@ object WavesSettings {
     val restAPISettings = RestAPISettings.fromConfig(config)
     val synchronizationSettings = SynchronizationSettings.fromConfig(config)
     val utxSettings = config.as[UtxSettings]("waves.utx")
-    val featuresSettings = FeaturesSettings.fromConfig(config)
+    val featuresSettings = config.as[FeaturesSettings]("waves.features")
 
     WavesSettings(directory, loggingLevel, networkSettings, walletSettings, blockchainSettings, checkpointsSettings,
       feesSettings, matcherSettings, minerSettings, restAPISettings, synchronizationSettings, utxSettings, featuresSettings)
