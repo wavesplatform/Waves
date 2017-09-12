@@ -41,7 +41,7 @@ class BlockchainUpdaterBadReferencesTest extends PropSpec with PropertyChecks wi
       val blocks = chainBlocks(Seq(Seq(genesis), Seq(payment)))
       val block0 = blocks(0)
       val block1 = blocks(1)
-      val badMicroRef = buildMicroBlockOfTxs(block0.uniqueId, block1, Seq(payment2))._2
+      val badMicroRef = buildMicroBlockOfTxs(block0.uniqueId, block1, Seq(payment2), defaultSigner)._2
         .copy(prevResBlockSig = randomSig)
       domain.blockchainUpdater.processBlock(block0).explicitGet()
       domain.blockchainUpdater.processBlock(block1).explicitGet()
@@ -54,7 +54,7 @@ class BlockchainUpdaterBadReferencesTest extends PropSpec with PropertyChecks wi
       val blocks = chainBlocks(Seq(Seq(genesis), Seq(payment)))
       val block0 = blocks(0)
       val block1 = blocks(1)
-      val badMicroRef = buildMicroBlockOfTxs(block0.uniqueId, block1, Seq(payment2))._2
+      val badMicroRef = buildMicroBlockOfTxs(block0.uniqueId, block1, Seq(payment2), defaultSigner)._2
         .copy(prevResBlockSig = randomSig)
       domain.blockchainUpdater.processBlock(block0).explicitGet()
       domain.blockchainUpdater.processBlock(block1).explicitGet()

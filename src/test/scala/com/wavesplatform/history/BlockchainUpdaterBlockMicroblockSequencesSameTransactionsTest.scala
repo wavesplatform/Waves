@@ -32,7 +32,7 @@ class BlockchainUpdaterBlockMicroblockSequencesSameTransactionsTest extends Prop
         d.blockchainUpdater.processBlock(last)
         val r = d.stateReader.accountPortfolios.mapValues(_.balance)
         println(r)
-        d.stateReader.accountPortfolios.keys.foreach( a=> println(a + "    " + d.stateReader.accountTransactionIds(a, 10)))
+        d.stateReader.accountPortfolios.keys.foreach(a => println(a + "    " + d.stateReader.accountTransactionIds(a, 10)))
         r
       }
 
@@ -125,7 +125,7 @@ object BlockchainUpdaterBlockMicroblockSequencesSameTransactionsTest extends Tra
     genesis2: GenesisTransaction = GenesisTransaction.create(bob, TOTAL_WAVES / 4, ts + 1).explicitGet()
     genesis3: GenesisTransaction = GenesisTransaction.create(charlie, TOTAL_WAVES / 4, ts + 2).explicitGet()
     genesis4: GenesisTransaction = GenesisTransaction.create(dave, TOTAL_WAVES / 4, ts + 4).explicitGet()
-  } yield (Seq(alice, bob, charlie, dave), buildBlockOfTxs(randomSig, Seq(genesis1, genesis2, genesis3, genesis4)), ts)
+  } yield (Seq(alice, bob, charlie, dave), customBuildBlockOfTxs(randomSig, Seq(genesis1, genesis2, genesis3, genesis4), defaultSigner, 1, ts), ts)
 
 
   def g(totalTxs: Int, totalScenarios: Int): Gen[(Block, Seq[(BlockAndMicroblockSequence, Block)])] = for {
@@ -138,7 +138,7 @@ object BlockchainUpdaterBlockMicroblockSequencesSameTransactionsTest extends Tra
     val blocksAndMicros = intSeqs.map { intSeq =>
       val blockAndMicroblockSequence = r(payments, intSeq, genesis.uniqueId, signer, version, ts)
       val ref = bestRef(blockAndMicroblockSequence.last)
-      val lastBlock = buildBlockOfTxs(ref, Seq.empty, signer, version, ts)
+      val lastBlock = customBuildBlockOfTxs(ref, Seq.empty, signer, version, ts)
       (blockAndMicroblockSequence, lastBlock)
     }
     (genesis, blocksAndMicros)
