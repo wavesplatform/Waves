@@ -5,12 +5,13 @@ import java.util.concurrent.ThreadLocalRandom
 import com.wavesplatform.BlockGen
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.BlockDiff
+import com.wavesplatform.state2.reader.StateReader
 import org.scalatest.{FreeSpecLike, Matchers}
 import scorex.account.PrivateKeyAccount
 import scorex.block.Block
 import scorex.lagonaki.mocks.TestBlock
 import scorex.settings.TestFunctionalitySettings
-import scorex.transaction.{GenesisTransaction, PaymentTransaction, TransactionParser, ValidationError}
+import scorex.transaction.{GenesisTransaction, PaymentTransaction, TransactionParser}
 
 class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen {
 
@@ -50,14 +51,14 @@ class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen {
           enableMicroblocksAfterHeight = 1000
         )
 
-        assertDiff(testChain.init, fs) { diff =>
-          val actualBalanceOfSignerA = diff.explicitGet().snapshots(signerA)(9).balance
-          actualBalanceOfSignerA shouldBe 40
+        assertDiff(testChain.init, fs) { case (diff, s) =>
+          diff.snapshots(signerA)(9).balance shouldBe 40
+          s.balance(signerA) shouldBe 40
         }
 
-        assertDiff(testChain, fs) { diff =>
-          val actualTotalFeeOfSignerB = diff.explicitGet().snapshots(signerB)(10).balance
-          actualTotalFeeOfSignerB shouldBe 50
+        assertDiff(testChain, fs) { case (diff, s) =>
+          diff.snapshots(signerB)(10).balance shouldBe 50
+          s.balance(signerB) shouldBe 50
         }
       }
 
@@ -81,9 +82,9 @@ class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen {
           enableMicroblocksAfterHeight = 9
         )
 
-        assertDiff(testChain, fs) { diff =>
-          val actualBalanceOfSignerB = diff.explicitGet().snapshots(signerB)(10).balance
-          actualBalanceOfSignerB shouldBe 44
+        assertDiff(testChain, fs) { case (diff, s) =>
+          diff.snapshots(signerB)(10).balance shouldBe 44
+          s.balance(signerB) shouldBe 44
         }
       }
 
@@ -107,21 +108,21 @@ class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen {
           enableMicroblocksAfterHeight = 4
         )
 
-        assertDiff(testChain.init, fs) { diff =>
-          val actualBalanceOfSignerA = diff.explicitGet().snapshots(signerA)(9).balance
-          actualBalanceOfSignerA shouldBe 34
+        assertDiff(testChain.init, fs) { case (diff, s) =>
+          diff.snapshots(signerA)(9).balance shouldBe 34
+          s.balance(signerA) shouldBe 34
         }
 
-        assertDiff(testChain, fs) { diff =>
-          val actualBalanceOfSignerB = diff.explicitGet().snapshots(signerB)(10).balance
-          actualBalanceOfSignerB shouldBe 50
+        assertDiff(testChain, fs) { case (diff, s) =>
+          diff.snapshots(signerB)(10).balance shouldBe 50
+          s.balance(signerB) shouldBe 50
         }
       }
     }
   }
 
   private def assertDiff(blocks: Seq[Block], fs: FunctionalitySettings)
-                        (assertion: Either[ValidationError, BlockDiff] => Unit): Unit = {
+                        (assertion: (BlockDiff, StateReader) => Unit): Unit = {
     assertDiffEiWithPrev(blocks.init, blocks.last, fs)(assertion)
   }
 

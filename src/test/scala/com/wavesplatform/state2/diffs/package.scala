@@ -37,7 +37,7 @@ package object diffs {
     assertion(totalDiff2)
   }
 
-  def assertDiffEiWithPrev(preconditions: Seq[Block], block: Block, fs: FunctionalitySettings = TestFunctionalitySettings.Enabled)(assertion: Either[ValidationError, BlockDiff] => Unit): Unit = {
+  def assertDiffEiWithPrev(preconditions: Seq[Block], block: Block, fs: FunctionalitySettings = TestFunctionalitySettings.Enabled)(assertion: (BlockDiff, StateReader) => Unit): Unit = {
     val differ: (StateReader, (Option[Block], Block)) => Either[ValidationError, BlockDiff] = {
       case (s, (prev, b)) => BlockDiffer.fromBlock(fs, s, prev, b)
     }
@@ -49,13 +49,16 @@ package object diffs {
       state.applyBlockDiff(preconditionDiff)
     }
 
-    val totalDiff1 = differ(state, (preconditions.lastOption, block))
-    assertion(totalDiff1)
+    val totalDiff1 = differ(state, (preconditions.lastOption, block)).explicitGet()
+    state.applyBlockDiff(totalDiff1)
+    assertion(totalDiff1, state)
 
     val preconditionDiff = BlockDiffer.unsafeDiffMany(fs, newState(), None)(preconditions)
     val compositeState = new CompositeStateReader(newState(), preconditionDiff)
-    val totalDiff2 = differ(compositeState, (preconditions.lastOption, block))
-    assertion(totalDiff2)
+    val totalDiff2 = differ(compositeState, (preconditions.lastOption, block)).explicitGet()
+    assertion(totalDiff2, CompositeStateReader.composite(compositeState, () => totalDiff2))
+
+    assert(totalDiff1 == totalDiff2)
   }
 
   def assertDiffAndState(preconditions: Seq[Block], block: Block, fs: FunctionalitySettings = TestFunctionalitySettings.Enabled)(assertion: (BlockDiff, StateReader) => Unit): Unit = {
