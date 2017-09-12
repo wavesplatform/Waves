@@ -1,6 +1,7 @@
 package scorex.lagonaki.unit
 
 import com.wavesplatform.state2._
+import com.wavesplatform.state2.diffs.produce
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{FunSuite, Matchers}
 import scorex.account.PrivateKeyAccount
@@ -40,6 +41,20 @@ class BlockSpecification extends FunSuite with Matchers with MockFactory {
     assert(parsedBlock.version.toInt == version)
     parsedBlock.supportedFeaturesIds shouldEqual supportedFeatures
     assert(parsedBlock.signerData.generator.publicKey.sameElements(gen.publicKey))
+  }
+
+  test(" block version 1,2 could not contain supported feature flags") {
+    val timestamp = System.currentTimeMillis()
+
+    Seq[Byte](1, 2).foreach { version =>
+      Block.buildAndSign(
+        version,
+        timestamp,
+        ByteStr(reference),
+        cbd, tbd,
+        gen, List(1)
+      ) should produce("could not contain supported feature flags")
+    }
   }
 
   test(" block with txs bytes/parse roundtrip version 1,2") {
