@@ -39,8 +39,8 @@ class Miner(
 
   private implicit val scheduler: SchedulerService = Scheduler.fixedPool(name = "miner-pool", poolSize = 2)
 
-  private val minerSettings = settings.minerSettings
-  private val blockchainSettings = settings.blockchainSettings
+  private lazy val minerSettings = settings.minerSettings
+  private lazy val blockchainSettings = settings.blockchainSettings
   private lazy val processBlock = Coordinator.processBlock(checkpoint, history, blockchainUpdater, timeService, stateReader, utx, blockchainReadiness, Miner.this, settings) _
 
   private val scheduledAttempts = SerialCancelable()
