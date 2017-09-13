@@ -2,6 +2,7 @@ package com.wavesplatform.mining
 
 import java.util.concurrent.atomic.AtomicBoolean
 
+import com.wavesplatform.metrics.BlockStats
 import com.wavesplatform.network._
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state2._
@@ -120,6 +121,7 @@ class Miner(
             microBlock <- MicroBlock.buildAndSign(account, unconfirmed, accumulatedBlock.signerData.signature, signedBlock.signerData.signature)
           } yield (signedBlock, microBlock))
         _ <- Coordinator.processMicroBlock(checkpoint, history, blockchainUpdater, utx)(fullAndMicro._2)
+        _ = BlockStats.write(fullAndMicro._2, BlockStats.Event.Mined)
       } yield fullAndMicro) match {
         case Right((full, micro)) =>
           log.trace(s"MicroBlock(id=${trim(micro.uniqueId)}) has been mined for $account}")
@@ -158,6 +160,7 @@ class Miner(
             processBlock(block, true) match {
               case Left(err) => log.warn(err.toString)
               case Right(score) =>
+                BlockStats.write(block, BlockStats.Event.Mined)
                 allChannels.broadcast(LocalScoreChanged(score))
                 allChannels.broadcast(BlockForged(block))
                 if (microBlocksEnabled)
@@ -175,13 +178,20 @@ class Miner(
   }
 
   def scheduleMining(): Unit = {
+    Miner.blockMiningStarted.increment()
     scheduledAttempts := CompositeCancelable.fromSet(
       wallet.privateKeyAccounts().map(generateBlockTask).map(_.runAsync).toSet)
     microBlockAttempt := SerialCancelable()
     log.debug(s"Block mining scheduled")
   }
 
+  def stopMicroblockMining(): Unit = {
+    microBlockAttempt := SerialCancelable()
+    log.debug(s"Microblock mining was stopped")
+  }
+
   private def startMicroBlockMining(account: PrivateKeyAccount, lastBlock: Block): Unit = {
+    Miner.microMiningStarted.increment()
     microBlockAttempt := generateMicroBlockSequence(account, lastBlock).runAsync
     log.trace(s"MicroBlock mining scheduled for $account")
   }
@@ -196,6 +206,9 @@ object Miner extends ScorexLogging {
     val calculatedOffset = calculatedGenerationTimestamp - timeService.correctedTime()
     Math.max(minimalBlockGenerationOffset.toMillis, calculatedOffset).millis
   }
+
+  private val blockMiningStarted = Kamon.metrics.counter("block-mining-started")
+  private val microMiningStarted = Kamon.metrics.counter("micro-mining-started")
 }
 
 trait MinerDebugInfo {

@@ -1,8 +1,10 @@
 package com.wavesplatform.network
 
+import java.net.InetSocketAddress
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
 
+import com.wavesplatform.metrics.BlockStats
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state2.reader.StateReader
@@ -10,6 +12,7 @@ import com.wavesplatform.{Coordinator, UtxPool}
 import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel.group.ChannelGroup
 import io.netty.channel.{Channel, ChannelHandlerContext, ChannelInboundHandlerAdapter}
+import kamon.Kamon
 import scorex.block.Block
 import scorex.transaction._
 import scorex.utils.{ScorexLogging, Time}
@@ -60,43 +63,70 @@ class CoordinatorHandler(
     }
   }
 
-  override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
+  override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = {
+    def from = ctx.channel().remoteAddress().asInstanceOf[InetSocketAddress].toString
 
-    case c: Checkpoint => broadcastingScore(ctx.channel,
-      "Attempting to process checkpoint",
-      "Successfully processed checkpoint",
-      s"Error processing checkpoint",
-      processCheckpoint(c))
+    msg match {
+      case c: Checkpoint => broadcastingScore(ctx.channel,
+        "Attempting to process checkpoint",
+        "Successfully processed checkpoint",
+        s"Error processing checkpoint",
+        processCheckpoint(c))
 
-    case ExtensionBlocks(blocks) => broadcastingScore(ctx.channel(),
-      s"Attempting to append extension ${formatBlocks(blocks)}",
-      s"Successfully appended extension ${formatBlocks(blocks)}",
-      s"Error appending extension ${formatBlocks(blocks)}",
-      processFork(blocks))
+      case ExtensionBlocks(blocks) => broadcastingScore(ctx.channel(),
+        s"Attempting to append extension ${formatBlocks(blocks)}",
+        s"Successfully appended extension ${formatBlocks(blocks)}",
+        s"Error appending extension ${formatBlocks(blocks)}",
+        processFork(blocks))
 
-    case b: Block =>
-      Signed.validateSignatures(b) match {
-        case Left(err) => peerDatabase.blacklistAndClose(ctx.channel(), err.toString)
-        case Right(_) => broadcastingScore(ctx.channel(),
-          s"Attempting to append block ${b.uniqueId}",
-          s"Successfully appended block ${b.uniqueId}",
-          s"Could not append block ${b.uniqueId}",
-          processBlock(b, false))
-      }
-    case MicroBlockResponse(m) =>
-      Signed.validateSignatures(m) match {
-        case Right(_) =>
-          Coordinator.processMicroBlock(checkpointService, history, blockchainUpdater, utxStorage)(m)
-            .foreach { _ =>
-              allChannels.broadcast(MicroBlockInv(m.totalResBlockSig, m.prevResBlockSig), Some(ctx.channel()))
+      case b: Block =>
+        BlockStats.write(b, BlockStats.Event.Received, "from" -> from)
+        CoordinatorHandler.blockReceivingLag.record(System.currentTimeMillis() - b.timestamp)
+        Signed.validateSignatures(b) match {
+          case Left(err) => peerDatabase.blacklistAndClose(ctx.channel(), err.toString)
+          case Right(_) => broadcastingScore(ctx.channel(),
+            s"Attempting to append block ${b.uniqueId}",
+            s"Successfully appended block ${b.uniqueId}",
+            s"Could not append block ${b.uniqueId}",
+            processBlock(b, false)
+              .right.map { x =>
+              BlockStats.write(b, BlockStats.Event.Applied)
+              x
             }
-        case Left(err) =>
-          peerDatabase.blacklistAndClose(ctx.channel(), err.toString)
-      }
+              .left.map { x =>
+              BlockStats.write(b, BlockStats.Event.Rejected)
+              x
+            }
+          )
+        }
+      case MicroBlockResponse(m) =>
+        BlockStats.write(m, BlockStats.Event.Received, "from" -> from)
+        val r: Either[Any, Any] = Signed.validateSignatures(m) match {
+          case Right(_) =>
+            Coordinator.processMicroBlock(checkpointService, history, blockchainUpdater, utxStorage)(m)
+              .map { _ =>
+                allChannels.broadcast(MicroBlockInv(m.totalResBlockSig, m.prevResBlockSig), Some(ctx.channel()))
+              }
+          case Left(err) =>
+            peerDatabase.blacklistAndClose(ctx.channel(), err.toString)
+            Left(())
+        }
+        r
+          .right.map { x =>
+            BlockStats.write(m, BlockStats.Event.Applied)
+            x
+          }
+          .left.map { x =>
+            BlockStats.write(m, BlockStats.Event.Rejected)
+            x
+          }
+    }
   }
 }
 
 object CoordinatorHandler extends ScorexLogging {
+  private val blockReceivingLag = Kamon.metrics.histogram("block-receiving-lag")
+
   def loggingResult[R](idCtx: String, msg: String, f: => Either[ValidationError, R]): Either[ValidationError, R] = {
     log.debug(s"$idCtx Starting $msg processing")
     val result = f
