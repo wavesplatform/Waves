@@ -72,7 +72,6 @@ class Miner(
     val pc = allChannels.size()
     lazy val lastBlockKernelData = parent.consensusData
     lazy val currentTime = timeService.correctedTime()
-    nextBlockGenerationTimes += account.toAddress -> (currentTime + delay.toMillis)
     lazy val h = calcHit(lastBlockKernelData, account)
     lazy val t = calcTarget(parent, currentTime, balance)
     measureSuccessful(blockBuildTimeStats, for {
@@ -153,6 +152,7 @@ class Miner(
         log.debug(s"Next attempt for acc=$account in $offset")
         val microBlocksEnabled = history.height() > blockchainSettings.functionalitySettings.enableMicroblocksAfterHeight
         val version = if (microBlocksEnabled) NgBlockVersion else PlainBlockVersion
+        nextBlockGenerationTimes += account.toAddress -> (System.currentTimeMillis() + offset.toMillis)
         generateOneBlockTask(account, height, grandParent, balance, version)(offset).flatMap {
           case Right(block) => Task.now {
             processBlock(block, true) match {
