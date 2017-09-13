@@ -82,8 +82,10 @@ class NetworkServer(checkpointService: CheckpointService,
   private val coordinatorHandler = new CoordinatorHandler(checkpointService, history, blockchainUpdater, time,
     stateReader, utxPool, blockchainReadiness, miner, settings, peerDatabase, allChannels)
 
+  private val peerConnections = new ConcurrentHashMap[PeerKey, Channel](10, 0.9f, 10)
+
   private val serverHandshakeHandler =
-    new HandshakeHandler.Server(handshake, peerInfo, peerDatabase, allChannels)
+    new HandshakeHandler.Server(handshake, peerInfo, peerConnections, peerDatabase, allChannels)
 
   private val utxPoolSynchronizer = new UtxPoolSynchronizer(utxPool, allChannels)
 
@@ -123,7 +125,7 @@ class NetworkServer(checkpointService: CheckpointService,
     peerInfo.values().asScala.flatMap(_.declaredAddress)
 
   private val clientHandshakeHandler =
-    new HandshakeHandler.Client(handshake, peerInfo, peerDatabase)
+    new HandshakeHandler.Client(handshake, peerInfo, peerConnections, peerDatabase)
 
 
   private val bootstrap = new Bootstrap()
