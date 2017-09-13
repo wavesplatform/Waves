@@ -12,7 +12,7 @@ class StateWriterSpec extends FunSuite with Matchers with GeneratorDrivenPropert
     val writer = new StateWriterImpl(storage, new ReentrantReadWriteLock())
     forAll(Gen.choose(0, Int.MaxValue)) { heightDiff =>
       val h = writer.height
-      writer.applyBlockDiff(BlockDiff(Diff.empty, heightDiff, Map.empty))
+      writer.applyBlockDiff(BlockDiff(Diff.empty, heightDiff, Map.empty, Set.empty))
       writer.height shouldBe h + heightDiff
       storage.getHeight shouldBe h + heightDiff
     }
