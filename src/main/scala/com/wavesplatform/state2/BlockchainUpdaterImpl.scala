@@ -81,7 +81,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
         val asFirmBlock = referencedLiquidDiff.copy(heightDiff = 1)
         ngHistoryWriter.appendBlock(block)(BlockDiffer.fromBlock(settings,
           composite(currentPersistedBlocksState, () => asFirmBlock),
-          ngHistoryWriter.bestLiquidBlock(), block)).map { case ((newBlockDiff, discraded)) =>
+          ngHistoryWriter.forgeBlock(block.reference).map(_._1), block)).map { case ((newBlockDiff, discraded)) =>
           topMemoryDiff.set(Monoid.combine(topMemoryDiff(), asFirmBlock))
           liquidBlockCandidatesDiff.set(Map(block.uniqueId -> newBlockDiff))
           discraded
