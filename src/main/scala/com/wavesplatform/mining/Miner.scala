@@ -2,7 +2,7 @@ package com.wavesplatform.mining
 
 import java.util.concurrent.atomic.AtomicBoolean
 
-import com.wavesplatform.metrics.Metrics
+import com.wavesplatform.metrics.BlockStats
 import com.wavesplatform.network._
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state2._
@@ -52,20 +52,6 @@ class Miner(
 
   private val scheduledAttempts = SerialCancelable()
   private val microBlockAttempt = SerialCancelable()
-
-  private def blockInternalStats(b: Block): Unit = Metrics.write(
-    Point
-      .measurement("block-internal")
-      .addField("id", b.uniqueId.toString)
-      .addField("type", "Apply")
-  )
-
-  private def microInternalStats(m: MicroBlock): Unit = Metrics.write(
-    Point
-      .measurement("micro-internal")
-      .addField("id", m.uniqueId.toString)
-      .addField("type", "Apply")
-  )
 
   private val blockBuildTimeStats = Kamon.metrics.histogram("pack-and-forge-block-time", instrument.Time.Milliseconds)
   private val microBlockBuildTimeStats = Kamon.metrics.histogram("forge-microblock-time", instrument.Time.Milliseconds)
@@ -137,7 +123,7 @@ class Miner(
             microBlock <- MicroBlock.buildAndSign(account, unconfirmed, accumulatedBlock.signerData.signature, signedBlock.signerData.signature)
           } yield (signedBlock, microBlock))
         _ <- Coordinator.processMicroBlock(checkpoint, history, blockchainUpdater, utx)(fullAndMicro._2)
-        _ = microInternalStats(fullAndMicro._2)
+        _ = BlockStats.write(fullAndMicro._2, BlockStats.Event.Mined)
       } yield fullAndMicro) match {
         case Right((full, micro)) =>
           log.trace(s"MicroBlock(id=${trim(micro.uniqueId)}) has been mined for $account}")
@@ -175,7 +161,7 @@ class Miner(
             processBlock(block, true) match {
               case Left(err) => log.warn(err.toString)
               case Right(score) =>
-                blockInternalStats(block)
+                BlockStats.write(block, BlockStats.Event.Mined)
                 allChannels.broadcast(LocalScoreChanged(score))
                 allChannels.broadcast(BlockForged(block))
                 if (microBlocksEnabled)
