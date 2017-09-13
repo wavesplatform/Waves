@@ -5,6 +5,8 @@ import scorex.block.{Block, MicroBlock}
 
 object BlockStats {
 
+  private val StringIdLength = 6
+
   sealed abstract class Event {
     val name: String = {
       val className = getClass.getName
@@ -22,7 +24,7 @@ object BlockStats {
   def write(b: Block, event: Event, addFields: (String, String)*): Unit = write(
     Point
       .measurement("block")
-      .addField("id", b.uniqueId.toString),
+      .addField("id", b.uniqueId.toString.take(StringIdLength)),
     event,
     addFields
   )
@@ -30,7 +32,7 @@ object BlockStats {
   def write(m: MicroBlock, event: Event, addFields: (String, String)*): Unit = write(
     Point
       .measurement("micro")
-      .addField("id", m.uniqueId.toString),
+      .addField("id", m.uniqueId.toString.take(StringIdLength)),
     event,
     addFields
   )

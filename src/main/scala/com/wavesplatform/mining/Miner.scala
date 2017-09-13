@@ -15,7 +15,6 @@ import monix.eval.Task
 import monix.execution._
 import monix.execution.cancelables.{CompositeCancelable, SerialCancelable}
 import monix.execution.schedulers.SchedulerService
-import org.influxdb.dto.Point
 import scorex.account.{Address, PrivateKeyAccount}
 import scorex.block.Block._
 import scorex.block.{Block, MicroBlock}
