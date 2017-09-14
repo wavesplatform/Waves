@@ -78,7 +78,7 @@ object Diff {
   val empty = new Diff(Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty)
 
   implicit class DiffExt(d: Diff) {
-    def asBlockDiff: BlockDiff = BlockDiff(d, 0, Map.empty, Set.empty)
+    def asBlockDiff: BlockDiff = BlockDiff(d, 0, Map.empty)
   }
 
   implicit val diffMonoid = new Monoid[Diff] {

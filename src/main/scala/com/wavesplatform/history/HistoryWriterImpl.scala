@@ -3,6 +3,7 @@ package com.wavesplatform.history
 import java.io.File
 import java.util.concurrent.locks.ReentrantReadWriteLock
 
+import com.wavesplatform.features.FeatureStatus
 import com.wavesplatform.state2.{BlockDiff, ByteStr, DataTypes}
 import com.wavesplatform.utils._
 import kamon.Kamon
@@ -23,12 +24,31 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
   private val blockIdByHeight = Synchronized(db.openMap("signatures", new LogMVMapBuilder[Int, ByteStr].valueType(DataTypes.byteStr)))
   private val heightByBlockId = Synchronized(db.openMap("signaturesReverse", new LogMVMapBuilder[ByteStr, Int].keyType(DataTypes.byteStr)))
   private val scoreByHeight = Synchronized(db.openMap("score", new LogMVMapBuilder[Int, BigInt]))
+  private val featuresAtHeight = Synchronized(db.openMap("features-at-height", new LogMVMapBuilder[Int, Set[Short]].valueType(DataTypes.featureIds)))
+  private val featuresState = Synchronized(db.openMap("features-state", new LogMVMapBuilder[Int, Map[Short, Byte]].valueType(DataTypes.featureState)))
 
   private val blockHeightStats = Kamon.metrics.histogram("block-height")
 
   private[HistoryWriterImpl] def isConsistent: Boolean = read { implicit l =>
     // check if all maps have same size
     Set(blockBodyByHeight().size(), blockIdByHeight().size(), heightByBlockId().size(), scoreByHeight().size()).size == 1
+  }
+
+  private def updateFeaturesState(height: Int): Unit = write { implicit lock =>
+    val activated = (Math.max(1, height - FeatureApprovalBlocksCount + 1) to height)
+      .flatMap(h => featuresAtHeight.mutate(_.get(h)))
+      .foldLeft(Map.empty[Short, Int]) { (counts, feature) =>
+        counts.updated(feature, counts.getOrElse(feature, 0) + 1)
+      }.filter(p => p._2 >= MinBlocksCountToActivateFeature)
+      .keys.map(k => k -> FeatureStatus.Accepted.status).toMap
+
+    val previousApprovalHeight = Math.max(FeatureApprovalBlocksCount, height - FeatureApprovalBlocksCount)
+
+    val prev: Option[Map[Short, Byte]] = Option(featuresState.mutate(_.get(previousApprovalHeight)))
+      .map(m => m.mapValues(v => if (v == FeatureStatus.Accepted.status) FeatureStatus.Activated.status else v))
+
+    val combined = prev.map(_ ++ activated)
+    combined.map(c => featuresState.mutate(_.put(height, c)))
   }
 
   override def appendBlock(block: Block)(consensusValidation: => Either[ValidationError, BlockDiff]): Either[ValidationError, BlockDiff] = write { implicit lock =>
@@ -39,6 +59,9 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
       scoreByHeight.mutate(_.put(h, score))
       blockIdByHeight.mutate(_.put(h, block.uniqueId))
       heightByBlockId.mutate(_.put(block.uniqueId, h))
+      featuresAtHeight.mutate(_.put(h, block.supportedFeaturesIds))
+
+      if (h % FeatureApprovalBlocksCount == 0) updateFeaturesState(h)
 
       db.commit()
       blockHeightStats.record(h)
@@ -57,13 +80,18 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
     val transactions =
       Block.parseBytes(blockBodyByHeight.mutate(_.remove(h))).fold(_ => Seq.empty[Transaction], _.transactionData)
     scoreByHeight.mutate(_.remove(h))
+
+    featuresAtHeight.mutate(_.remove(h))
+    if (h % FeatureApprovalBlocksCount == 0) {
+      featuresState.mutate(_.remove(h))
+    }
+
     val vOpt = Option(blockIdByHeight.mutate(_.remove(h)))
     vOpt.map(v => heightByBlockId.mutate(_.remove(v)))
     db.commit()
 
     transactions
   }
-
 
   override def lastBlockIds(howMany: Int): Seq[ByteStr] = read { implicit lock =>
     (Math.max(1, height() - howMany + 1) to height()).flatMap(i => Option(blockIdByHeight().get(i)))
@@ -85,11 +113,21 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
   }
 
   override def close(): Unit = db.close()
+
+  override def status(feature: Short): FeatureStatus = read { implicit lock =>
+    val lastApprovalHeight = height() % FeatureApprovalBlocksCount
+    Option(featuresState().get(lastApprovalHeight)).map { m =>
+      val byte: Byte = m.getOrElse(feature, FeatureStatus.Defined.status)
+      FeatureStatus(byte)
+    }.getOrElse(FeatureStatus.Defined)
+  }
 }
 
 object HistoryWriterImpl extends ScorexLogging {
   private val CompactFillRate = 90
   private val CompactMemorySize = 10 * 1024 * 1024
+  private val FeatureApprovalBlocksCount = 10000
+  private val MinBlocksCountToActivateFeature = 9000
 
   def apply(file: Option[File], synchronizationToken: ReentrantReadWriteLock): Try[HistoryWriterImpl] =
     createWithStore[HistoryWriterImpl](file, new HistoryWriterImpl(file, synchronizationToken), h => h.isConsistent)

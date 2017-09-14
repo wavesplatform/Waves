@@ -47,7 +47,7 @@ object BlockDiffer extends ScorexLogging {
             balance = oldPortfolio.balance + portfolioDiff.balance,
             effectiveBalance = oldPortfolio.effectiveBalance + portfolioDiff.effectiveBalance))
         }
-      BlockDiff(diff, heightDiff, newSnapshots, features)
+      BlockDiff(diff, heightDiff, newSnapshots)
     }
   }
 }

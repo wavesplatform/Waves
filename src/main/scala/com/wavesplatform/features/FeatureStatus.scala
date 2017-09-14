@@ -1,17 +1,11 @@
 package com.wavesplatform.features
 
-sealed trait FeatureStatus {
-  def value: Int
-}
+sealed case class FeatureStatus(status: Byte)
 
-case object FeatureDefined extends FeatureStatus {
-  val value = 0
-}
+object FeatureStatus {
+  object Defined extends FeatureStatus(0)
+  object Accepted extends FeatureStatus(1)
+  object Activated extends FeatureStatus(2)
 
-case object FeatureAccepted extends FeatureStatus {
-  val value = 1
-}
-
-case object FeatureActivated extends FeatureStatus {
-  val value = 2
+  val values = Seq(Defined, Accepted, Activated)
 }
