@@ -34,16 +34,6 @@ case class LongBlockField(override val name: String, override val value: Long) e
   override lazy val bytes: Array[Byte] = Bytes.ensureCapacity(Longs.toByteArray(value), 8, 0)
 }
 
-case class ShortArrayBlockField(override val name: String, override val value: Array[Short]) extends BlockField[Array[Short]] {
-
-  override lazy val json: JsObject = Json.obj(name -> value)
-  override lazy val bytes: Array[Byte] = {
-    val bb = ByteBuffer.allocate(Integer.BYTES + value.length * java.lang.Short.BYTES)
-    bb.putInt(value.length).asShortBuffer().put(value)
-    bb.array
-  }
-}
-
 case class BlockIdField(override val name: String, override val value: Array[Byte])
   extends BlockField[Array[Byte]] {
 

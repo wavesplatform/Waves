@@ -8,6 +8,7 @@ import com.wavesplatform.settings.GenesisSettings
 import com.wavesplatform.state2.{ByteStr, Diff, LeaseInfo, Portfolio}
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.{Address, PrivateKeyAccount, PublicKeyAccount}
+import scorex.block.fields.FeaturesBlockField
 import scorex.consensus.nxt.{NxtConsensusBlockField, NxtLikeConsensusBlockData}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.hash.FastCryptographicHash.DigestSize
@@ -32,7 +33,7 @@ case class Block(timestamp: Long,
   private lazy val signerField: SignerDataBlockField = SignerDataBlockField("signature", signerData)
   private lazy val consensusField = NxtConsensusBlockField(consensusData)
   private lazy val transactionField = TransactionsBlockField(version.toInt, transactionData)
-  private lazy val supportedFeaturesField = ShortArrayBlockField("supportedFeatures", supportedFeaturesIds.toArray)
+  private lazy val supportedFeaturesField = FeaturesBlockField(version, supportedFeaturesIds)
 
   lazy val uniqueId: ByteStr = signerData.signature
 
@@ -68,8 +69,7 @@ case class Block(timestamp: Long,
       referenceField.bytes ++
       cBytes ++
       txBytes ++
-      (if (version > 2)
-        supportedFeaturesField.bytes else Array.empty[Byte]) ++
+      supportedFeaturesField.bytes ++
       signerField.bytes
   }
 
