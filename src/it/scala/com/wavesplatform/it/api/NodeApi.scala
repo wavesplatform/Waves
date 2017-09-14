@@ -13,10 +13,10 @@ import org.asynchttpclient.util.HttpConstants
 import org.slf4j.LoggerFactory
 import play.api.libs.json.Json.{parse, stringify, toJson}
 import play.api.libs.json._
-
 import scorex.api.http.alias.CreateAliasRequest
 import scorex.api.http.assets._
 import scorex.api.http.leasing.{LeaseCancelRequest, LeaseRequest}
+import scorex.api.http.PeersApiRoute.{ConnectReq, connectFormat}
 import scorex.transaction.assets.exchange.Order
 import scorex.utils.{LoggerFacade, ScorexLogging}
 import scorex.waves.http.RollbackParams
@@ -90,6 +90,8 @@ trait NodeApi {
   def blacklistedPeers: Future[Seq[String]] = get("/peers/blacklisted").map { r =>
     Json.parse(r.getResponseBody).as[Seq[String]]
   }
+
+  def connect(host: String, port: Int): Future[Unit] = postJson("/peers/connect", ConnectReq(host, port)).map(_ => ())
 
   def waitForPeers(targetPeersCount: Int): Future[Seq[Peer]] = waitFor[Seq[Peer]](connectedPeers, _.length >= targetPeersCount, 1.second)
 
