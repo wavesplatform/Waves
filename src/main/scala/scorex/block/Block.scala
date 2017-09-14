@@ -8,6 +8,7 @@ import com.wavesplatform.settings.GenesisSettings
 import com.wavesplatform.state2.{ByteStr, Diff, LeaseInfo, Portfolio}
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.{Address, PrivateKeyAccount, PublicKeyAccount}
+import scorex.block.fields.FeaturesBlockField
 import scorex.consensus.nxt.{NxtConsensusBlockField, NxtLikeConsensusBlockData}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.hash.FastCryptographicHash.DigestSize
@@ -18,15 +19,21 @@ import scorex.utils.ScorexLogging
 
 import scala.util.{Failure, Try}
 
-case class Block(timestamp: Long, version: Byte, reference: ByteStr, signerData: SignerData,
-                 consensusData: NxtLikeConsensusBlockData, transactionData: Seq[Transaction]) extends Signed {
+case class Block(timestamp: Long,
+                 version: Byte,
+                 reference: ByteStr,
+                 signerData: SignerData,
+                 consensusData: NxtLikeConsensusBlockData,
+                 transactionData: Seq[Transaction],
+                 supportedFeaturesIds: Set[Short]) extends Signed {
 
   private lazy val versionField: ByteBlockField = ByteBlockField("version", version)
   private lazy val timestampField: LongBlockField = LongBlockField("timestamp", timestamp)
   private lazy val referenceField: BlockIdField = BlockIdField("reference", reference.arr)
-  private lazy val signerDataField: SignerDataBlockField = SignerDataBlockField("signature", signerData)
-  private lazy val consensusDataField = NxtConsensusBlockField(consensusData)
-  private lazy val transactionDataField = TransactionsBlockField(version.toInt, transactionData)
+  private lazy val signerField: SignerDataBlockField = SignerDataBlockField("signature", signerData)
+  private lazy val consensusField = NxtConsensusBlockField(consensusData)
+  private lazy val transactionField = TransactionsBlockField(version.toInt, transactionData)
+  private lazy val supportedFeaturesField = FeaturesBlockField(version, supportedFeaturesIds)
 
   lazy val uniqueId: ByteStr = signerData.signature
 
@@ -41,27 +48,29 @@ case class Block(timestamp: Long, version: Byte, reference: ByteStr, signerData:
     versionField.json ++
       timestampField.json ++
       referenceField.json ++
-      consensusDataField.json ++
-      transactionDataField.json ++
-      signerDataField.json ++
+      consensusField.json ++
+      transactionField.json ++
+      supportedFeaturesField.json ++
+      signerField.json ++
       Json.obj(
         "fee" -> fee,
         "blocksize" -> bytes.length
       )
 
   lazy val bytes: Array[Byte] = {
-    val txBytesSize = transactionDataField.bytes.length
-    val txBytes = Bytes.ensureCapacity(Ints.toByteArray(txBytesSize), 4, 0) ++ transactionDataField.bytes
+    val txBytesSize = transactionField.bytes.length
+    val txBytes = Bytes.ensureCapacity(Ints.toByteArray(txBytesSize), 4, 0) ++ transactionField.bytes
 
-    val cBytesSize = consensusDataField.bytes.length
-    val cBytes = Bytes.ensureCapacity(Ints.toByteArray(cBytesSize), 4, 0) ++ consensusDataField.bytes
+    val cBytesSize = consensusField.bytes.length
+    val cBytes = Bytes.ensureCapacity(Ints.toByteArray(cBytesSize), 4, 0) ++ consensusField.bytes
 
     versionField.bytes ++
       timestampField.bytes ++
       referenceField.bytes ++
       cBytes ++
       txBytes ++
-      signerDataField.bytes
+      supportedFeaturesField.bytes ++
+      signerField.bytes
   }
 
   lazy val bytesWithoutSignature: Array[Byte] = bytes.dropRight(SignatureLength)
@@ -101,6 +110,7 @@ object Block extends ScorexLogging {
 
   val MaxTransactionsPerBlockVer1Ver2: Int = 100
   val MaxTransactionsPerBlockVer3: Int = 65535
+  val MaxFeaturesInBlock: Int = 64
   val BaseTargetLength: Int = 8
   val GeneratorSignatureLength: Int = 32
 
@@ -156,12 +166,26 @@ object Block extends ScorexLogging {
     val txBlockField = transParseBytes(version.toInt, tBytes).get
     position += tBytesLength
 
+    var supportedFeaturesIds  = Set.empty[Short]
+
+    if(version > 2) {
+      val featuresCount = Ints.fromByteArray(bytes.slice(position, position + 4))
+      position += 4
+
+      val buffer = ByteBuffer.wrap(bytes.slice(position, position + featuresCount * 2)).asShortBuffer
+      val arr = new Array[Short](featuresCount)
+      buffer.get(arr)
+      position += featuresCount * 2
+      supportedFeaturesIds = arr.toSet
+    }
+
     val genPK = bytes.slice(position, position + KeyLength)
     position += KeyLength
 
     val signature = ByteStr(bytes.slice(position, position + SignatureLength))
+    position += SignatureLength
 
-    Block(timestamp, version, reference, SignerData(PublicKeyAccount(genPK), signature), consData, txBlockField)
+    Block(timestamp, version, reference, SignerData(PublicKeyAccount(genPK), signature), consData, txBlockField, supportedFeaturesIds)
   }.recoverWith { case t: Throwable =>
     log.error("Error when parsing block", t)
     Failure(t)
@@ -172,13 +196,16 @@ object Block extends ScorexLogging {
                    reference: ByteStr,
                    consensusData: NxtLikeConsensusBlockData,
                    transactionData: Seq[Transaction],
-                   signer: PrivateKeyAccount): Either[GenericError, Block] = (for {
-    _ <- Either.cond(transactionData.size <= MaxTransactionsPerBlockVer3, (), s"too many transactions in Block: allowed: $MaxTransactionsPerBlockVer3, actual: ${transactionData.size}")
+                   signer: PrivateKeyAccount,
+                   supportedFeaturesIds: Set[Short] = Set.empty): Either[GenericError, Block] = (for {
+    _ <- Either.cond(transactionData.size <= MaxTransactionsPerBlockVer3, (), s"Too many transactions in Block: allowed: $MaxTransactionsPerBlockVer3, actual: ${transactionData.size}")
     _ <- Either.cond(reference.arr.length == SignatureLength, (), "Incorrect reference")
     _ <- Either.cond(consensusData.generationSignature.length == GeneratorSignatureLength, (), "Incorrect consensusData.generationSignature")
     _ <- Either.cond(signer.publicKey.length == KeyLength, (), "Incorrect signer.publicKey")
+    _ <- Either.cond(version > 2 || supportedFeaturesIds.isEmpty, (), s"Block version $version could not contain supported feature flags")
+    _ <- Either.cond(supportedFeaturesIds.size <= MaxFeaturesInBlock, (), s"Block could not contain more than $MaxFeaturesInBlock feature flags")
   } yield {
-    val nonSignedBlock = Block(timestamp, version, reference, SignerData(signer, ByteStr.empty), consensusData, transactionData)
+    val nonSignedBlock = Block(timestamp, version, reference, SignerData(signer, ByteStr.empty), consensusData, transactionData, supportedFeaturesIds)
     val toSign = nonSignedBlock.bytes
     val signature = EllipticCurveImpl.sign(signer, toSign)
     nonSignedBlock.copy(signerData = SignerData(signer, ByteStr(signature)))
@@ -222,7 +249,8 @@ object Block extends ScorexLogging {
         reference = ByteStr(reference),
         signerData = SignerData(genesisSigner, ByteStr(signature)),
         consensusData = consensusGenesisData,
-        transactionData = transactionGenesisData))
+        transactionData = transactionGenesisData,
+        supportedFeaturesIds = Set.empty))
     else Left(GenericError("Passed genesis signature is not valid"))
 
   }
@@ -231,3 +259,4 @@ object Block extends ScorexLogging {
   val PlainBlockVersion: Byte = 2
   val NgBlockVersion: Byte = 3
 }
+
