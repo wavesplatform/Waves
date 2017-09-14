@@ -1,7 +1,5 @@
 package scorex.block
 
-import java.nio.ByteBuffer
-
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.state2.ByteStr
 import play.api.libs.json.{JsObject, Json}
