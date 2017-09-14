@@ -66,9 +66,8 @@ class SimpleTransactionsSuite extends FunSuite with BeforeAndAfterAll with Match
     val f = for {
       blacklistBefore <- node.blacklistedPeers
       _ <- node.sendByNetwork(RawBytes(TransactionMessageSpec.messageCode, "foobar".getBytes(StandardCharsets.UTF_8)))
-      _ <- Future.successful(Thread.sleep(2000))
-      blacklistAfter <- node.blacklistedPeers
-    } yield blacklistAfter.size should be > blacklistBefore.size
+      _ <- node.waitFor[Seq[String]](_.blacklistedPeers, _.size > blacklistBefore.size, 500.millis)
+    } yield ()
     Await.result(f, 60.seconds)
   }
 }

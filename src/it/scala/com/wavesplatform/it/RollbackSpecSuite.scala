@@ -67,7 +67,7 @@ class RollbackSpecSuite extends FreeSpec with ScalaFutures with IntegrationPatie
 
       _ <- processRequests(requests)
 
-      _ <- traverse(nodes)(n => n.waitFor[Int](n.utxSize, _ == 0, 1.second))
+      _ <- traverse(nodes)(_.waitFor[Int](_.utxSize, _ == 0, 1.second))
 
       _ <- traverse(nodes)(_.rollback(startHeight, returnToUTX = false))
 
