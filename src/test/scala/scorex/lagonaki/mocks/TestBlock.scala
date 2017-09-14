@@ -40,3 +40,24 @@ object TestBlock {
     nonSignedBlock.copy(signerData = SignerData(defaultSigner, ByteStr(signature)))
   }
 }
+
+object TestBlock3 {
+
+  private val defaultSigner = PrivateKeyAccount(Array.fill(TransactionParser.KeyLength)(0))
+
+  private val random: Random = new Random()
+
+  def randomOfLength(length: Int): ByteStr = ByteStr(Array.fill(length)(random.nextInt().toByte))
+
+  def randomSignature(): ByteStr = randomOfLength(SignatureLength)
+
+  def withReferenceAndFeatures(ref: ByteStr, features: Set[Short]): Block = sign(Block(0, 3, ref, SignerData(defaultSigner, ByteStr.empty),
+    NxtLikeConsensusBlockData(1L, randomSignature().arr), Seq.empty, features))
+
+  private def sign(nonSignedBlock: Block): Block = {
+    val toSign = nonSignedBlock.bytes
+    val signature = EllipticCurveImpl.sign(defaultSigner, toSign)
+    nonSignedBlock.copy(signerData = SignerData(defaultSigner, ByteStr(signature)))
+  }
+
+}

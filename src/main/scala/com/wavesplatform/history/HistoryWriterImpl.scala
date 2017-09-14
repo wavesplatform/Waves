@@ -44,11 +44,12 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
 
     val previousApprovalHeight = Math.max(FeatureApprovalBlocksCount, height - FeatureApprovalBlocksCount)
 
-    val prev: Option[Map[Short, Byte]] = Option(featuresState.mutate(_.get(previousApprovalHeight)))
-      .map(m => m.mapValues(v => if (v == FeatureStatus.Accepted.status) FeatureStatus.Activated.status else v))
+    val previousState: Map[Short, Byte] = Option(featuresState.mutate(_.get(previousApprovalHeight)))
+      .getOrElse(Map.empty[Short, Byte])
+      .mapValues(v => if (v == FeatureStatus.Accepted.status) FeatureStatus.Activated.status else v)
 
-    val combined = prev.map(_ ++ activated)
-    combined.map(c => featuresState.mutate(_.put(height, c)))
+    val combined: Map[Short, Byte] = previousState ++ activated
+    featuresState.mutate(_.put(height, combined))
   }
 
   override def appendBlock(block: Block)(consensusValidation: => Either[ValidationError, BlockDiff]): Either[ValidationError, BlockDiff] = write { implicit lock =>
@@ -115,7 +116,8 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
   override def close(): Unit = db.close()
 
   override def status(feature: Short): FeatureStatus = read { implicit lock =>
-    val lastApprovalHeight = height() % FeatureApprovalBlocksCount
+    val h = height()
+    val lastApprovalHeight = h - h % FeatureApprovalBlocksCount
     Option(featuresState().get(lastApprovalHeight)).map { m =>
       val byte: Byte = m.getOrElse(feature, FeatureStatus.Defined.status)
       FeatureStatus(byte)
