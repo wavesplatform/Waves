@@ -47,7 +47,7 @@ case class DebugApiRoute(settings: RestAPISettings,
                          minerDebugInfo: MinerDebugInfo
                         ) extends ApiRoute {
 
-  override lazy val route = pathPrefix("debug") {
+  override lazy val route: Route = pathPrefix("debug") {
     blocks ~ state ~ info ~ stateWaves ~ rollback ~ rollbackTo ~ blacklist ~ portfolios ~ minerInfo ~ topDiffAccountPortfolios ~ bottomDiffAccountPortfolios ~ historyInfo
   }
 

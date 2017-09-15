@@ -275,7 +275,7 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll {
 
   private def waitForAssetBalance(node: Node, asset: String, expectedBalance: Long): Unit =
     Await.result(
-      node.waitFor[AssetBalance](node.assetBalance(node.address, asset), _.balance >= expectedBalance, 5.seconds),
+      node.waitFor[AssetBalance](_.assetBalance(node.address, asset), _.balance >= expectedBalance, 5.seconds),
       3.minute
     )
 
@@ -322,7 +322,7 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll {
   }
 
   def waitForOrderStatus(asset: String, orderId: String, expectedStatus: String): Unit = Await.result(
-    matcherNode.waitFor[MatcherStatusResponse](matcherNode.getOrderStatus(asset, orderId), _.status == expectedStatus, 5.seconds),
+    matcherNode.waitFor[MatcherStatusResponse](_.getOrderStatus(asset, orderId), _.status == expectedStatus, 5.seconds),
     1.minute
   )
 

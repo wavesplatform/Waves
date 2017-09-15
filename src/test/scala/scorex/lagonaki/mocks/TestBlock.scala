@@ -24,14 +24,15 @@ class TestBlock(val signer: PrivateKeyAccount) {
     reference = randomSignature(),
     signerData = SignerData(signer, ByteStr.empty),
     consensusData = NxtLikeConsensusBlockData(1L, ByteStr(Array.fill(SignatureLength)(0: Byte))),
-    transactionData = txs))
+    transactionData = txs,
+    supportedFeaturesIds = Set.empty))
 
   def randomOfLength(length: Int): ByteStr = ByteStr(Array.fill(length)(random.nextInt().toByte))
 
   def randomSignature(): ByteStr = randomOfLength(SignatureLength)
 
   def withReference(ref: ByteStr): Block = sign(Block(0, 1, ref, SignerData(signer, ByteStr.empty),
-    NxtLikeConsensusBlockData(1L, ByteStr(randomSignature().arr)), Seq.empty))
+    NxtLikeConsensusBlockData(1L, ByteStr(randomSignature().arr)), Seq.empty, Set.empty))
 
   private def sign(nonSignedBlock: Block): Block = {
     val toSign = nonSignedBlock.bytes
