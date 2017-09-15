@@ -12,6 +12,6 @@ object TestHelpers {
       GenesisTransactionSettings(account.address, amount)
     }.toSeq
 
-    GenesisSettings(blockTimestamp, blockTimestamp, totalAmount, None, transactions, 1000, 60.seconds)
+    GenesisSettings(blockTimestamp, blockTimestamp, totalAmount, None, transactions, 1000, 60.seconds, 10000)
   }
 }
