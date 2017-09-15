@@ -43,6 +43,7 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
         |        initial-balance = 100000000000000
         |        initial-base-target = 153722867
         |        average-block-delay = 60s
+        |        feature-check-blocks-period = 10000
         |        transactions = [
         |          {recipient = "BASE58ADDRESS1", amount = 50000000000001},
         |          {recipient = "BASE58ADDRESS2", amount = 49999999999999}
@@ -80,6 +81,7 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
     settings.genesisSettings.initialBalance should be(100000000000000L)
     settings.genesisSettings.initialBaseTarget should be(153722867)
     settings.genesisSettings.averageBlockDelay should be(60.seconds)
+    settings.genesisSettings.featureCheckBlocksPeriod should be(10000)
     settings.genesisSettings.transactions should be(Seq(
       GenesisTransactionSettings("BASE58ADDRESS1", 50000000000001L),
       GenesisTransactionSettings("BASE58ADDRESS2", 49999999999999L)))
