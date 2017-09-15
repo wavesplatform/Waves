@@ -38,13 +38,6 @@ trait DebugNgHistory {
   def microblockIds(): Seq[BlockId]
 }
 
-trait HistoryWriter extends History {
-
-  def appendBlock(block: Block)(consensusValidation: => Either[ValidationError, BlockDiff]): Either[ValidationError, (BlockDiff, DiscardedTransactions)]
-
-  def discardBlock(): Seq[Transaction]
-}
-
 trait CheckpointService {
 
   def set(checkpoint: Checkpoint): Either[ValidationError, Unit]

@@ -9,12 +9,12 @@ import kamon.Kamon
 import scorex.block.Block
 import scorex.transaction.History.BlockchainScore
 import scorex.transaction.ValidationError.GenericError
-import scorex.transaction.{DiscardedTransactions, HistoryWriter, Transaction, ValidationError}
+import scorex.transaction._
 import scorex.utils.{LogMVMapBuilder, ScorexLogging}
 
 import scala.util.Try
 
-class HistoryWriterImpl private(file: Option[File], val synchronizationToken: ReentrantReadWriteLock) extends HistoryWriter with ScorexLogging {
+class HistoryWriterImpl private(file: Option[File], val synchronizationToken: ReentrantReadWriteLock) extends History with ScorexLogging {
 
   import HistoryWriterImpl._
 
@@ -24,16 +24,12 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
   private val heightByBlockId = Synchronized(db.openMap("signaturesReverse", new LogMVMapBuilder[ByteStr, Int].keyType(DataTypes.byteStr)))
   private val scoreByHeight = Synchronized(db.openMap("score", new LogMVMapBuilder[Int, BigInt]))
 
-  private val blockHeightStats = Kamon.metrics.histogram("block-height")
-  private val blockSizeStats = Kamon.metrics.histogram("block-size-bytes")
-  private val transactionsInBlockStats = Kamon.metrics.histogram("transactions-in-block")
-
   private[HistoryWriterImpl] def isConsistent: Boolean = read { implicit l =>
     // check if all maps have same size
     Set(blockBodyByHeight().size(), blockIdByHeight().size(), heightByBlockId().size(), scoreByHeight().size()).size == 1
   }
 
-  override def appendBlock(block: Block)(consensusValidation: => Either[ValidationError, BlockDiff]): Either[ValidationError, (BlockDiff, DiscardedTransactions)]
+  def appendBlock(block: Block)(consensusValidation: => Either[ValidationError, BlockDiff]): Either[ValidationError, BlockDiff]
   = write { implicit lock =>
 
     assert(block.signatureValid)
@@ -54,14 +50,14 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
       if (h % 100 == 0) db.compact(CompactFillRate, CompactMemorySize)
 
       log.trace(s"Full Block(id=${block.uniqueId},txs_count=${block.transactionData.size}) persisted")
-      (blockDiff, Seq.empty)
+      blockDiff
     }
     else {
-      Left(GenericError(s"Parent ${block.reference} of block ${block.uniqueId} does not match last local block ${this.lastBlock.map(_.uniqueId)}"))
+      Left(GenericError(s"Parent ${block.reference} of block ${block.uniqueId} does not match last block ${this.lastBlock.map(_.uniqueId)}"))
     }
   }
 
-  override def discardBlock(): Seq[Transaction] = write { implicit lock =>
+  def discardBlock(): Seq[Transaction] = write { implicit lock =>
     val h = height()
     val transactions =
       Block.parseBytes(blockBodyByHeight.mutate(_.remove(h))).fold(_ => Seq.empty[Transaction], _.transactionData)
@@ -109,4 +105,9 @@ object HistoryWriterImpl extends ScorexLogging {
 
   def apply(file: Option[File], synchronizationToken: ReentrantReadWriteLock): Try[HistoryWriterImpl] =
     createWithStore[HistoryWriterImpl](file, new HistoryWriterImpl(file, synchronizationToken), h => h.isConsistent)
+
+  private val blockHeightStats = Kamon.metrics.histogram("block-height")
+  private val blockSizeStats = Kamon.metrics.histogram("block-size-bytes")
+  private val transactionsInBlockStats = Kamon.metrics.histogram("transactions-in-block")
+
 }
