@@ -2,7 +2,7 @@ package com.wavesplatform.network
 
 import java.net.InetSocketAddress
 import java.util
-import java.util.concurrent.{ConcurrentHashMap, ConcurrentMap, TimeUnit}
+import java.util.concurrent.{ConcurrentMap, TimeUnit}
 
 import io.netty.buffer.ByteBuf
 import io.netty.channel.ChannelHandler.Sharable
@@ -52,10 +52,9 @@ class HandshakeTimeoutHandler(handshakeTimeout: FiniteDuration) extends ChannelI
 abstract class HandshakeHandler(
     localHandshake: Handshake,
     establishedConnections: ConcurrentMap[Channel, PeerInfo],
+    peerConnections: ConcurrentMap[PeerKey, Channel],
     peerDatabase: PeerDatabase) extends ChannelInboundHandlerAdapter with ScorexLogging {
   import HandshakeHandler._
-
-  private val connections = new ConcurrentHashMap[PeerKey, Channel](10, 0.9f, 10)
 
   def connectionNegotiated(ctx: ChannelHandlerContext): Unit
 
@@ -69,7 +68,7 @@ abstract class HandshakeHandler(
         peerDatabase.blacklistAndClose(ctx.channel(),s"Remote application version ${remoteHandshake.applicationVersion } is not supported")
        else {
         val key = PeerKey(ctx.remoteAddress.getAddress, remoteHandshake.nodeNonce)
-        val previousPeer = connections.putIfAbsent(key, ctx.channel())
+        val previousPeer = peerConnections.putIfAbsent(key, ctx.channel())
         if (previousPeer != null) {
           log.debug(s"${id(ctx)} Already connected to peer ${ctx.remoteAddress.getAddress} with nonce ${remoteHandshake.nodeNonce} on channel ${id(previousPeer)}")
           ctx.close()
@@ -79,7 +78,7 @@ abstract class HandshakeHandler(
           establishedConnections.put(ctx.channel(), peerInfo(remoteHandshake, ctx.channel()))
 
           ctx.channel().closeFuture().addListener { f: ChannelFuture =>
-            connections.remove(key, f.channel())
+            peerConnections.remove(key, f.channel())
             establishedConnections.remove(ctx.channel())
           }
 
@@ -113,9 +112,10 @@ object HandshakeHandler extends ScorexLogging {
   class Server(
       handshake: Handshake,
       establishedConnections: ConcurrentMap[Channel, PeerInfo],
+      peerConnections: ConcurrentMap[PeerKey, Channel],
       peerDatabase: PeerDatabase,
       allChannels: ChannelGroup)
-    extends HandshakeHandler(handshake, establishedConnections, peerDatabase) {
+    extends HandshakeHandler(handshake, establishedConnections, peerConnections, peerDatabase) {
     override def connectionNegotiated(ctx: ChannelHandlerContext) = {
       ctx.writeAndFlush(handshake.encode(ctx.alloc().buffer()))
       ctx.channel().closeFuture().addListener((_: ChannelFuture) => allChannels.remove(ctx.channel()))
@@ -127,8 +127,9 @@ object HandshakeHandler extends ScorexLogging {
   class Client(
       handshake: Handshake,
       establishedConnections: ConcurrentMap[Channel, PeerInfo],
+      peerConnections: ConcurrentMap[PeerKey, Channel],
       peerDatabase: PeerDatabase)
-    extends HandshakeHandler(handshake, establishedConnections, peerDatabase) {
+    extends HandshakeHandler(handshake, establishedConnections, peerConnections, peerDatabase) {
 
     override def connectionNegotiated(ctx: ChannelHandlerContext) = {}
 

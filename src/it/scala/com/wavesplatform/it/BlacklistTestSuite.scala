@@ -11,7 +11,6 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.util.Random
 
-
 class BlacklistTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll {
 
   import BlacklistTestSuite._
@@ -39,15 +38,19 @@ class BlacklistTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll {
     docker.close()
   }
 
-  "network should grow up to 50 blocks" in {
-    Await.result(richestNode.waitForHeight(50), 5.minutes)
+  "network should grow up to 60 blocks" in {
+    Await.result(richestNode.waitForHeight(60), 5.minutes)
 
-    Await.result(richestNode.height, 1.minute) >= 50 shouldBe true
+    Await.result(richestNode.height, 1.minute) >= 60 shouldBe true
   }
 
   "richest node should blacklist other nodes" in {
     otherNodes.foreach(n => Await.result(richestNode.blacklist(n.nodeInfo.networkIpAddress, n.nodeInfo.hostNetworkPort), 1.minute))
-    Await.result(richestNode.waitFor[Seq[BlacklistedPeer]](richestNode.blacklistedPeers, _.length >= NodesCount - 1, 5.seconds), 2.minutes)
+
+    Await.result(
+      richestNode.waitFor[Seq[BlacklistedPeer]](_.blacklistedPeers, _.length >= NodesCount - 1, 5.seconds),
+      5.minutes)
+
     val blacklisted = Await.result(richestNode.blacklistedPeers, 1.minute)
     blacklisted.length should be(NodesCount - 1)
   }

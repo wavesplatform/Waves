@@ -45,11 +45,13 @@ object JsBlockParser extends App {
 
    */
 
-  val block = Block(timestamp = 1501851461300L, version = 3,
+  val block = Block(timestamp = 1501851461300L, version = 3.toByte,
     reference = ByteStr.decodeBase58("4GkW491kuPtg3LDkCrXwBRASdQ7qUV2BNEFpM9XzD56JufSpmLqV9672wRQcSqJdxyEgq8nSQs2ogHit8Sr1ZtGT").get,
     signerData = SignerData(PublicKeyAccount(ByteStr.decodeBase58("1DV4udQonVAb452qm34wX39euJV3VhJcMLS29JFeurF").get.arr),
       ByteStr.decodeBase58("2S5A8DnwrqpxFv3cjYKJB8D86h4PS1tAy2Qaii1ntZhpiuj3bmTC8McES5XoBFj8z2yQn9yAxCPTxjsexjfjddXo").get),
-    consensusData = NxtLikeConsensusBlockData(197518, ByteStr.decodeBase58("96C1rM2CxoKEua8Ha1xdVEYmnsL3VB44Z2uVKmbXPV3D").get), transactionData = txs)
+    consensusData = NxtLikeConsensusBlockData(197518, ByteStr.decodeBase58("96C1rM2CxoKEua8Ha1xdVEYmnsL3VB44Z2uVKmbXPV3D").get),
+    transactionData = txs,
+    Set.empty)
 
 
   val recreated = Block.buildAndSign(3, 1501851461300L, ByteStr.decodeBase58("4GkW491kuPtg3LDkCrXwBRASdQ7qUV2BNEFpM9XzD56JufSpmLqV9672wRQcSqJdxyEgq8nSQs2ogHit8Sr1ZtGT").get,

@@ -1,55 +1,102 @@
 package scorex.lagonaki.unit
 
-import com.wavesplatform.state2._
-import com.wavesplatform.BlockGen
-import org.scalamock.scalatest.MockFactory
-import org.scalatest.prop.GeneratorDrivenPropertyChecks
-import org.scalatest.{FunSuite, Matchers}
-import scorex.account.PrivateKeyAccount
+import com.wavesplatform.TransactionGen
+import org.scalatest.prop.PropertyChecks
+import org.scalatest._
+import com.wavesplatform.state2.diffs.produce
+import org.scalacheck.Arbitrary.arbitrary
+import org.scalacheck.{Gen, Shrink}
 import scorex.block.Block
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.hash.FastCryptographicHash
 import scorex.transaction._
-import scorex.transaction.assets.TransferTransaction
 import com.wavesplatform.state2._
 
-import scala.util.Random
+class BlockSpecification extends PropSpec with PropertyChecks with TransactionGen with Matchers {
 
-class BlockSpecification extends FunSuite with Matchers with MockFactory with BlockGen with GeneratorDrivenPropertyChecks {
+  private implicit def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)
 
-  test(" block with txs bytes/parse roundtrip") {
+  val time = System.currentTimeMillis() - 5000
 
-    val reference = Array.fill(Block.BlockIdLength)(Random.nextInt(100).toByte)
-    val gen = PrivateKeyAccount(reference)
+  val blockGen = for {
+    baseTarget <- arbitrary[Long]
+    reference <- byteArrayGen(Block.BlockIdLength).map(r => ByteStr(r))
+    generationSignature <- byteArrayGen(Block.GeneratorSignatureLength)
+    assetBytes <- byteArrayGen(AssetIdLength)
+    assetId = Some(ByteStr(assetBytes))
+    sender <- accountGen
+    recipient <- accountGen
+    paymentTransaction <- paymentGeneratorP(time, sender, recipient)
+    transferTrancation <- transferGeneratorP(1 + time, sender, recipient, assetId, None)
+    anotherPaymentTransaction <- paymentGeneratorP(2 + time, sender, recipient)
+    transactionData = Seq(paymentTransaction, transferTrancation, anotherPaymentTransaction)
+  } yield (baseTarget, reference, ByteStr(generationSignature), recipient, transactionData)
 
-    val bt = Random.nextLong()
-    val gs = ByteStr(Array.fill(Block.GeneratorSignatureLength)(Random.nextInt(100).toByte))
-
-
-    val ts = System.currentTimeMillis() - 5000
-    val sender = PrivateKeyAccount(reference.dropRight(2))
-    val tx: Transaction = PaymentTransaction.create(sender, gen, 5, 1000, ts).right.get
-    val tr: TransferTransaction = TransferTransaction.create(None, sender, gen, 5, ts + 1, None, 2, Array()).right.get
-    val assetId = Some(ByteStr(Array.fill(AssetIdLength)(Random.nextInt(100).toByte)))
-    val tr2: TransferTransaction = TransferTransaction.create(assetId, sender, gen, 5, ts + 2, None, 2, Array()).right.get
-
-    val tbd = Seq(tx, tr, tr2)
-    val cbd = NxtLikeConsensusBlockData(bt, gs)
-
-    def testBlock(txs: Seq[Transaction])(version: Int) = {
-      val timestamp = System.currentTimeMillis()
-      val block = Block.buildAndSign(version.toByte, timestamp, ByteStr(reference), cbd, txs, gen).explicitGet()
-      val parsedBlock = Block.parseBytes(block.bytes).get
-      assert(Signed.validateSignatures(block).isRight)
-      assert(Signed.validateSignatures(parsedBlock).isRight)
-      assert(parsedBlock.consensusData.generationSignature == gs)
-      assert(parsedBlock.version.toInt == version)
-      assert(parsedBlock.signerData.generator.publicKey.sameElements(gen.publicKey))
+  property(" block with txs bytes/parse roundtrip version 1,2") {
+    Seq[Byte](1, 2).foreach { version =>
+      forAll(blockGen){
+        case (baseTarget, reference, generationSignature, recipient, transactionData) =>
+          val block = Block.buildAndSign(version, time, reference, NxtLikeConsensusBlockData(baseTarget, generationSignature), transactionData, recipient, Set.empty).explicitGet()
+          val parsedBlock = Block.parseBytes(block.bytes).get
+          assert(Signed.validateSignatures(block).isRight)
+          assert(Signed.validateSignatures(parsedBlock).isRight)
+          assert(parsedBlock.consensusData.generationSignature == generationSignature)
+          assert(parsedBlock.version.toInt == version)
+          assert(parsedBlock.signerData.generator.publicKey.sameElements(recipient.publicKey))
+      }
     }
+  }
 
-    List(1, 2).foreach(testBlock(tbd))
-    Range(40, 80).foreach(x => testBlock(Seq.fill(x)(tbd).flatten)(3))
+  property(" block version 1,2 could not contain supported feature flags") {
+    Seq[Byte](1, 2).foreach { version =>
+      forAll(blockGen){
+        case (baseTarget, reference, generationSignature, recipient, transactionData) =>
+          Block.buildAndSign(
+            version,
+            time,
+            reference,
+            NxtLikeConsensusBlockData(baseTarget, generationSignature),
+            transactionData,
+            recipient,
+            Set(1)) should produce("could not contain supported feature flags")
+      }
+    }
+  }
+
+  property(s" feature flags limit is ${Block.MaxFeaturesInBlock}") {
+    val version = 3.toByte
+    val supportedFeatures = (0 to Block.MaxFeaturesInBlock * 2).map(_.toShort).toSet
+
+    forAll(blockGen){
+      case (baseTarget, reference, generationSignature, recipient, transactionData) =>
+        Block.buildAndSign(
+          version,
+          time,
+          reference,
+          NxtLikeConsensusBlockData(baseTarget, generationSignature),
+          transactionData,
+          recipient,
+          supportedFeatures) should produce(s"Block could not contain more than ${Block.MaxFeaturesInBlock} feature flags")
+    }
+  }
+
+  property(" block with txs bytes/parse roundtrip version 3") {
+    val version = 3.toByte
+    val featuresCount = Gen.choose(0,Block.MaxFeaturesInBlock).sample.get
+    val supportedFeatures = Gen.containerOfN[Set, Short](featuresCount, arbitrary[Short]).sample.get
+
+    forAll(blockGen){
+      case (baseTarget, reference, generationSignature, recipient, transactionData) =>
+        val block = Block.buildAndSign(version, time, reference, NxtLikeConsensusBlockData(baseTarget, generationSignature), transactionData, recipient, supportedFeatures).explicitGet()
+        val parsedBlock = Block.parseBytes(block.bytes).get
+        assert(Signed.validateSignatures(block).isRight)
+        assert(Signed.validateSignatures(parsedBlock).isRight)
+        assert(parsedBlock.consensusData.generationSignature == generationSignature)
+        assert(parsedBlock.version.toInt == version)
+        assert(parsedBlock.signerData.generator.publicKey.sameElements(recipient.publicKey))
+        assert(parsedBlock.supportedFeaturesIds == supportedFeatures)
+    }
   }
 
   ignore ("sign time for 60k txs") {
@@ -60,6 +107,5 @@ class BlockSpecification extends FunSuite with Matchers with MockFactory with Bl
       val (sig, t3) = Instrumented.withTime(EllipticCurveImpl.sign(acc, hash))
       println((t0, t1, t2,t3))
     }
-
   }
 }
