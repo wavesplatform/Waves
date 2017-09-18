@@ -13,7 +13,7 @@ class NgHistoryReader(ngState: () => Option[NgState], inner: History) extends Hi
   override def synchronizationToken: ReentrantReadWriteLock = inner.synchronizationToken
 
   override def height(): Int = read { implicit l =>
-    inner.height() + ngState().map(_ => 1).getOrElse(0)
+    inner.height() + ngState().size
   }
 
   override def blockBytes(height: Int): Option[Array[Byte]] = read { implicit l =>
@@ -23,7 +23,7 @@ class NgHistoryReader(ngState: () => Option[NgState], inner: History) extends Hi
   override def scoreOf(blockId: BlockId): Option[BlockchainScore] = read { implicit l =>
     inner.scoreOf(blockId)
       .orElse(ngState() match {
-        case Some(ng) => Some(inner.score() + ng.base.blockScore)
+        case Some(ng) if ng.contains(blockId) => Some(inner.score() + ng.base.blockScore)
         case _ => None
       })
   }
