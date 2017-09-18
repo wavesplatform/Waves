@@ -1,15 +1,16 @@
 package com.wavesplatform.network
 
+import java.net.InetSocketAddress
 import java.util.concurrent.TimeUnit
 
 import com.google.common.cache.{Cache, CacheBuilder}
+import com.wavesplatform.metrics.BlockStats
 import com.wavesplatform.network.MicroBlockSynchronizer._
 import com.wavesplatform.state2.ByteStr
 import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel._
 import monix.eval.Task
 import kamon.Kamon
-import kamon.metric.instrument.Time
 import scorex.transaction.NgHistory
 import scorex.utils.ScorexLogging
 
@@ -54,7 +55,11 @@ class MicroBlockSynchronizer(settings: Settings, history: NgHistory) extends Cha
       successfullyReceivedMicroBlocks.put(mb.totalResBlockSig, dummy)
 
       Option(microBlockRecieveTime.getIfPresent(mb.totalResBlockSig)).foreach { created =>
-        microBlockReceiveLagStats.record(System.currentTimeMillis() - created)
+        BlockStats.received(
+          m = mb,
+          from = ctx.channel().remoteAddress().asInstanceOf[InetSocketAddress],
+          propagationTime = System.currentTimeMillis() - created
+        )
         microBlockRecieveTime.invalidate(mb.totalResBlockSig)
         super.channelRead(ctx, msg)
       }
@@ -90,10 +95,6 @@ object MicroBlockSynchronizer {
   type MicroBlockSignature = ByteStr
 
   private val microBlockInvStats = Kamon.metrics.registerCounter("micro-inv")
-  private val microBlockReceiveLagStats = Kamon.metrics.registerHistogram(
-    name = "micro-receive-lag",
-    unitOfMeasurement = Some(Time.Milliseconds)
-  )
 
   private val notLastMicroblockStats = Kamon.metrics.registerCounter("micro-not-last")
   private val unknownMicroblockStats = Kamon.metrics.registerCounter("micro-unknown")

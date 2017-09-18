@@ -4,6 +4,7 @@ import java.nio.charset.StandardCharsets
 
 import com.wavesplatform.it._
 import com.wavesplatform.it.api.NodeApi
+import com.wavesplatform.it.api.NodeApi.BlacklistedPeer
 import com.wavesplatform.network.{RawBytes, TransactionMessageSpec}
 import org.scalatest._
 import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
@@ -66,9 +67,8 @@ class SimpleTransactionsSuite extends FunSuite with BeforeAndAfterAll with Match
     val f = for {
       blacklistBefore <- node.blacklistedPeers
       _ <- node.sendByNetwork(RawBytes(TransactionMessageSpec.messageCode, "foobar".getBytes(StandardCharsets.UTF_8)))
-      _ <- Future.successful(Thread.sleep(2000))
-      blacklistAfter <- node.blacklistedPeers
-    } yield blacklistAfter.size should be > blacklistBefore.size
+      _ <- node.waitFor[Seq[BlacklistedPeer]](_.blacklistedPeers, _.size > blacklistBefore.size, 500.millis)
+    } yield ()
     Await.result(f, 60.seconds)
   }
 }
