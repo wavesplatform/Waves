@@ -12,6 +12,9 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
 class HistoryWriterTest extends FunSuite with Matchers with HistoryTest {
+
+  private val ApprovalPeriod = 10000
+
   test("concurrent access to lastBlock doesn't throw any exception") {
     val history = HistoryWriterImpl(None, new ReentrantReadWriteLock()).get
     appendGenesisBlock(history)
@@ -43,29 +46,29 @@ class HistoryWriterTest extends FunSuite with Matchers with HistoryTest {
     history.status(2) shouldBe FeatureStatus.Defined
     history.status(3) shouldBe FeatureStatus.Defined
 
-    (1 to 9999).foreach { _ =>
+    (1 to ApprovalPeriod - 1).foreach { _ =>
       appendTestBlock3(history, Set(1))
     }
 
-    history.height() shouldBe 10000
+    history.height() shouldBe ApprovalPeriod
     history.status(1) shouldBe FeatureStatus.Accepted
     history.status(2) shouldBe FeatureStatus.Defined
     history.status(3) shouldBe FeatureStatus.Defined
 
-    (1 to 10000).foreach { _ =>
+    (1 to ApprovalPeriod).foreach { _ =>
       appendTestBlock3(history, Set(2))
     }
 
-    history.height() shouldBe 20000
+    history.height() shouldBe 2 * ApprovalPeriod
     history.status(1) shouldBe FeatureStatus.Activated
     history.status(2) shouldBe FeatureStatus.Accepted
     history.status(3) shouldBe FeatureStatus.Defined
 
-    (1 to 10000).foreach { _ =>
+    (1 to ApprovalPeriod).foreach { _ =>
       appendTestBlock3(history, Set())
     }
 
-    history.height() shouldBe 30000
+    history.height() shouldBe 3 * ApprovalPeriod
     history.status(1) shouldBe FeatureStatus.Activated
     history.status(2) shouldBe FeatureStatus.Activated
     history.status(3) shouldBe FeatureStatus.Defined
@@ -79,37 +82,37 @@ class HistoryWriterTest extends FunSuite with Matchers with HistoryTest {
     history.status(1) shouldBe FeatureStatus.Defined
     history.status(2) shouldBe FeatureStatus.Defined
 
-    (1 to 9999).foreach { _ =>
+    (1 to ApprovalPeriod - 1).foreach { _ =>
       appendTestBlock3(history, Set(1))
     }
 
-    history.height() shouldBe 10000
+    history.height() shouldBe ApprovalPeriod
     history.status(1) shouldBe FeatureStatus.Accepted
     history.status(2) shouldBe FeatureStatus.Defined
 
     history.discardBlock()
 
-    history.height() shouldBe 9999
+    history.height() shouldBe ApprovalPeriod - 1
     history.status(1) shouldBe FeatureStatus.Defined
     history.status(2) shouldBe FeatureStatus.Defined
 
-    (1 to 10001).foreach { _ =>
+    (1 to ApprovalPeriod + 1).foreach { _ =>
       appendTestBlock3(history, Set(2))
     }
 
-    history.height() shouldBe 20000
+    history.height() shouldBe 2 * ApprovalPeriod
     history.status(1) shouldBe FeatureStatus.Activated
     history.status(2) shouldBe FeatureStatus.Accepted
 
     history.discardBlock()
 
-    history.height() shouldBe 19999
+    history.height() shouldBe 2 * ApprovalPeriod - 1
     history.status(1) shouldBe FeatureStatus.Accepted
     history.status(2) shouldBe FeatureStatus.Defined
 
-    (1 to 10000).foreach { _ => history.discardBlock() }
+    (1 to ApprovalPeriod).foreach { _ => history.discardBlock() }
 
-    history.height() shouldBe 9999
+    history.height() shouldBe ApprovalPeriod - 1
     history.status(1) shouldBe FeatureStatus.Defined
     history.status(2) shouldBe FeatureStatus.Defined
   }
@@ -120,17 +123,17 @@ class HistoryWriterTest extends FunSuite with Matchers with HistoryTest {
     appendGenesisBlock(history)
     history.status(1) shouldBe FeatureStatus.Defined
 
-    (1 to 9999).foreach { i =>
+    (1 to ApprovalPeriod - 1).foreach { i =>
       appendTestBlock3(history, if (i % 2 == 0) Set(1) else Set())
     }
     history.status(1) shouldBe FeatureStatus.Defined
 
-    (1 to 10000).foreach { i =>
+    (1 to ApprovalPeriod).foreach { i =>
       appendTestBlock3(history, if (i % 10 == 0) Set() else Set(1))
     }
     history.status(1) shouldBe FeatureStatus.Accepted
 
-    (1 to 10000).foreach { i =>
+    (1 to ApprovalPeriod).foreach { i =>
       appendTestBlock3(history, Set())
     }
     history.status(1) shouldBe FeatureStatus.Activated
