@@ -4,22 +4,23 @@ sealed trait FeatureStatus {
   def status: Byte
 }
 
-case object FeatureDefined extends FeatureStatus {
-  override val status = 0
-}
-
-case object FeatureAccepted extends FeatureStatus {
-  override val status = 1
-}
-
-case object FeatureActivated extends FeatureStatus {
-  override val status = 2
-}
-
 object FeatureStatus {
+
+  case object Defined extends FeatureStatus {
+    override def status: Byte = 0
+  }
+
+  case object Accepted extends FeatureStatus {
+    override def status: Byte = 1
+  }
+
+  case object Activated extends FeatureStatus {
+    override def status: Byte = 2
+  }
+
   def apply(status: Byte): FeatureStatus = status match {
-    case 1 => FeatureAccepted
-    case 2 => FeatureActivated
-    case _ => FeatureDefined
+    case 1 => Accepted
+    case 2 => Activated
+    case _ => Defined
   }
 }

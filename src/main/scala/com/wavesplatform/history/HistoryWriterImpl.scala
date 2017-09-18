@@ -3,7 +3,7 @@ package com.wavesplatform.history
 import java.io.File
 import java.util.concurrent.locks.ReentrantReadWriteLock
 
-import com.wavesplatform.features.{FeatureAccepted, FeatureActivated, FeatureDefined, FeatureStatus}
+import com.wavesplatform.features.FeatureStatus
 import com.wavesplatform.state2.{BlockDiff, ByteStr, DataTypes}
 import com.wavesplatform.utils._
 import kamon.Kamon
@@ -38,17 +38,17 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
     require(height % FeatureApprovalBlocksCount == 0, s"Features' state can't be updated at given height: $height")
 
     val activated = (Math.max(1, height - FeatureApprovalBlocksCount + 1) to height)
-      .flatMap(h => featuresAtHeight.mutate(_.get(h)))
+      .flatMap(h => featuresAtHeight().get(h))
       .foldLeft(Map.empty[Short, Int]) { (counts, feature) =>
         counts.updated(feature, counts.getOrElse(feature, 0) + 1)
       }.filter(p => p._2 >= MinBlocksCountToActivateFeature)
-      .keys.map(k => k -> FeatureAccepted.status).toMap
+      .keys.map(k => k -> FeatureStatus.Accepted.status).toMap
 
     val previousApprovalHeight = Math.max(FeatureApprovalBlocksCount, height - FeatureApprovalBlocksCount)
 
     val previousState: Map[Short, Byte] = Option(featuresState().get(previousApprovalHeight))
       .getOrElse(Map.empty[Short, Byte])
-      .mapValues(v => if (v == FeatureAccepted.status) FeatureActivated.status else v)
+      .mapValues(v => if (v == FeatureStatus.Accepted.status) FeatureStatus.Activated.status else v)
 
     val combined: Map[Short, Byte] = previousState ++ activated
     featuresState.mutate(_.put(height, combined))
@@ -121,9 +121,9 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
     val h = height()
     val lastApprovalHeight = h - h % FeatureApprovalBlocksCount
     Option(featuresState().get(lastApprovalHeight)).map { m =>
-      val byte: Byte = m.getOrElse(feature, FeatureDefined.status)
+      val byte: Byte = m.getOrElse(feature, FeatureStatus.Defined.status)
       FeatureStatus(byte)
-    }.getOrElse(FeatureDefined)
+    }.getOrElse(FeatureStatus.Defined)
   }
 }
 
