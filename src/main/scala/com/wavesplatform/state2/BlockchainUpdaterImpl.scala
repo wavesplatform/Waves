@@ -7,14 +7,13 @@ import cats.implicits._
 import com.wavesplatform.history.HistoryWriterImpl
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.BlockchainUpdaterImpl._
+import com.wavesplatform.state2.NgState._
 import com.wavesplatform.state2.diffs.BlockDiffer
 import com.wavesplatform.state2.reader.CompositeStateReader.composite
-import com.wavesplatform.state2.NgState._
 import com.wavesplatform.state2.reader.StateReader
 import kamon.Kamon
 import kamon.metric.instrument.Time
 import scorex.account.Address
-import scorex.block.Block.BlockId
 import scorex.block.{Block, MicroBlock}
 import scorex.transaction.ValidationError.{BlockAppendError, GenericError, MicroBlockAppendError}
 import scorex.transaction._
@@ -48,9 +47,9 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
     composite(composite(persisted, () => bottomMemoryDiff()), () => topMemoryDiff())
   }
 
-  def bestLiquidState: StateReader = read { implicit l =>
-    composite(currentPersistedBlocksState, () => ngState().map(_.bestLiquidDiff).orEmpty)
-  }
+  def bestLiquidState: StateReader = read { implicit l => composite(currentPersistedBlocksState, () => ngState().map(_.bestLiquidDiff).orEmpty) }
+
+  def historyReader: NgHistory with DebugNgHistory = read { implicit l => new NgHistoryReader(() => ngState(), historyWriter) }
 
   private def updatePersistedAndInMemory(): Unit = write { implicit l =>
     logHeights("State rebuild started")
@@ -80,8 +79,12 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
         historyWriter.lastBlock match {
           case Some(lastInner) if lastInner.uniqueId != block.reference =>
             Left(BlockAppendError(s"References incorrect or non-existing block: " + logDetails, block))
-          case _ => historyWriter.appendBlock(block)(BlockDiffer.fromBlock(settings, currentPersistedBlocksState, historyWriter.lastBlock, block))
-            .map((_, Seq.empty[Transaction]))
+          case _ =>
+            historyWriter.lastBlock.map(_.uniqueId) match {
+              case Some(lastId) if lastId != block.reference => Left(GenericError(s"Parent ${block.reference} of new liquid block ${block.uniqueId}" +
+                s" does not match last block $lastId"))
+              case _ => BlockDiffer.fromBlock(settings, currentPersistedBlocksState, historyWriter.lastBlock, block).map((_, Seq.empty[Transaction]))
+            }
         }
       case Some(ng) if !ng.contains(block.reference) =>
         Left(BlockAppendError(s"References incorrect or non-existing block", block))
@@ -96,7 +99,10 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
           historyWriter.appendBlock(referencedForgedBlock)(BlockDiffer.fromBlock(settings,
             composite(currentPersistedBlocksState, () => referencedLiquidDiff.copy(heightDiff = 1)),
             Some(referencedForgedBlock), block))
-            .map((_, discarded.flatMap(_.transactionData)))
+            .map { hardenedDiff =>
+              topMemoryDiff.transform(Monoid.combine(_, referencedLiquidDiff))
+              (hardenedDiff, discarded.flatMap(_.transactionData))
+            }
         } else {
           val errorText = s"Forged block has invalid signature: base: ${ng.base}, micros: ${ng.micros}, requested reference: ${block.reference}"
           log.error(errorText)

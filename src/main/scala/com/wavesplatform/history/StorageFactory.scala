@@ -29,7 +29,7 @@ object StorageFactory {
       stateWriter = new StateWriterImpl(ss, lock)
     } yield {
       val bcu = BlockchainUpdaterImpl(stateWriter, historyWriter, settings.functionalitySettings, settings.minimumInMemoryDiffSize, lock)
-      (???, stateWriter, bcu.bestLiquidState, bcu, bcu)
+      (bcu.historyReader, stateWriter, bcu.bestLiquidState, bcu, bcu)
     }
   }
 }
