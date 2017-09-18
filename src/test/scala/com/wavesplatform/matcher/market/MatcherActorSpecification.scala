@@ -13,7 +13,7 @@ import com.wavesplatform.matcher.market.MatcherActor.{GetMarkets, GetMarketsResp
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.market.OrderHistoryActor.{ValidateOrder, ValidateOrderResult}
 import com.wavesplatform.matcher.model.LevelAgg
-import com.wavesplatform.settings.{FunctionalitySettings, WalletSettings}
+import com.wavesplatform.settings.WalletSettings
 import com.wavesplatform.state2.reader.StateReader
 import com.wavesplatform.state2.{AssetInfo, ByteStr, LeaseInfo, Portfolio}
 import io.netty.channel.group.ChannelGroup
@@ -21,6 +21,7 @@ import org.h2.mvstore.MVStore
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Matchers, WordSpecLike}
 import scorex.account.PrivateKeyAccount
+import scorex.settings.TestFunctionalitySettings
 import scorex.transaction.assets.IssueTransaction
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import scorex.transaction.{AssetId, History}
@@ -42,7 +43,7 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest2"
 
   val settings = matcherSettings.copy(account = MatcherAccount.address)
   val history = stub[History]
-  val functionalitySettings = stub[FunctionalitySettings]
+  val functionalitySettings = TestFunctionalitySettings.Stub
   val wallet = Wallet(WalletSettings(None, "matcher", Some(WalletSeed)))
   wallet.generateNewAccount()
 

@@ -2,7 +2,6 @@ package com.wavesplatform.http
 
 import com.wavesplatform.TestWallet
 import com.wavesplatform.http.ApiMarshallers._
-import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.reader.StateReader
 import com.wavesplatform.state2.{LeaseInfo, Portfolio}
 import org.scalacheck.Gen
@@ -12,6 +11,7 @@ import play.api.libs.json._
 import scorex.api.http.{AddressApiRoute, ApiKeyNotValid, InvalidMessage}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
+import scorex.settings.TestFunctionalitySettings
 
 class AddressRouteSpec
   extends RouteSpec("/addresses")
@@ -26,7 +26,7 @@ class AddressRouteSpec
   private val allAccounts = testWallet.privateKeyAccounts()
   private val allAddresses = allAccounts.map(_.address)
 
-  private val route = AddressApiRoute(restAPISettings, testWallet, mock[StateReader], mock[FunctionalitySettings]).route
+  private val route = AddressApiRoute(restAPISettings, testWallet, mock[StateReader], TestFunctionalitySettings.Stub).route
 
   private val generatedMessages = for {
     account <- Gen.oneOf(allAccounts).label("account")
@@ -80,7 +80,7 @@ class AddressRouteSpec
   routePath("/balance/{address}") in {
     val state = stub[StateReader]
     (state.accountPortfolio _).when(*).returns(Portfolio(0, mock[LeaseInfo], Map.empty))
-    val route = AddressApiRoute(restAPISettings, testWallet, state, mock[FunctionalitySettings]).route
+    val route = AddressApiRoute(restAPISettings, testWallet, state, TestFunctionalitySettings.Stub).route
     Get(routePath(s"/balance/${allAddresses.head}")) ~> route ~> check {
       val r = responseAs[AddressApiRoute.Balance]
       r.balance shouldEqual 0

@@ -34,7 +34,7 @@ object GenesisBlockGenerator extends App with TransactionGen {
     (ByteStr(seed), ByteStr(acc.seed), privateKey, publicKey, address)
   }
 
-  def generate(networkByte: Char, accountsTotal: Int, baseTraget: Long, averageBlockDelay: FiniteDuration, featureCheckBlocksPeriod: Long) = {
+  def generate(networkByte: Char, accountsTotal: Int, baseTraget: Long, averageBlockDelay: FiniteDuration) = {
     scorex.account.AddressScheme.current = new AddressScheme {
       override val chainId: Byte = networkByte.toByte
     }
@@ -47,7 +47,7 @@ object GenesisBlockGenerator extends App with TransactionGen {
     val signature = genesisBlock.signerData.signature
 
     (accounts, GenesisSettings(timestamp, timestamp, initialBalance, Some(signature),
-      genesisTxs.map(tx => GenesisTransactionSettings(tx.recipient.stringRepr, tx.amount)), baseTraget, averageBlockDelay, featureCheckBlocksPeriod))
+      genesisTxs.map(tx => GenesisTransactionSettings(tx.recipient.stringRepr, tx.amount)), baseTraget, averageBlockDelay))
   }
 
   def print(accs: Seq[(Int, (ByteStr, ByteStr, ByteStr, ByteStr, Address))], settings: GenesisSettings): Unit = {
@@ -77,6 +77,6 @@ object GenesisBlockGenerator extends App with TransactionGen {
      """.stripMargin)
   }
 
-  val (a, s) = generate('D', 3, 153722867, 60.seconds, 10000)
+  val (a, s) = generate('D', 3, 153722867, 60.seconds)
   print(a, s)
 }

@@ -10,7 +10,9 @@ import net.ceedubs.ficus.readers.EnumerationReader._
 
 import scala.concurrent.duration._
 
-case class FunctionalitySettings(allowTemporaryNegativeUntil: Long,
+case class FunctionalitySettings private(featureCheckBlocksPeriod: Int,
+                                 blocksForFeatureActivation: Int,
+                                 allowTemporaryNegativeUntil: Long,
                                  allowInvalidPaymentTransactionsByTimestamp: Long,
                                  requireSortedTransactionsAfter: Long,
                                  generationBalanceDepthFrom50To1000AfterHeight: Long,
@@ -28,7 +30,10 @@ case class FunctionalitySettings(allowTemporaryNegativeUntil: Long,
                                  allowLeasedBalanceTransferUntil: Long)
 
 object FunctionalitySettings {
-  val MAINNET = FunctionalitySettings(allowTemporaryNegativeUntil = 1479168000000L,
+  val MAINNET = apply(
+    featureCheckBlocksPeriod = 10000,
+    blocksForFeatureActivation = 9000,
+    allowTemporaryNegativeUntil = 1479168000000L,
     allowInvalidPaymentTransactionsByTimestamp = 1479168000000L,
     requireSortedTransactionsAfter = 1479168000000L,
     generationBalanceDepthFrom50To1000AfterHeight = 232000L,
@@ -45,7 +50,9 @@ object FunctionalitySettings {
     resetEffectiveBalancesAtHeight = 462000,
     allowLeasedBalanceTransferUntil = Long.MaxValue)
 
-  val TESTNET = FunctionalitySettings(
+  val TESTNET = apply(
+    featureCheckBlocksPeriod = 10000,
+    blocksForFeatureActivation = 9000,
     allowTemporaryNegativeUntil = 1477958400000L,
     allowInvalidPaymentTransactionsByTimestamp = 1477958400000L,
     requireSortedTransactionsAfter = 1477958400000L,
@@ -64,6 +71,30 @@ object FunctionalitySettings {
     allowLeasedBalanceTransferUntil = 1495238400000L)
 
   val configPath = "waves.blockchain.custom.functionality"
+
+  def apply(featureCheckBlocksPeriod: Int,
+            blocksForFeatureActivation: Int,
+            allowTemporaryNegativeUntil: Long,
+            allowInvalidPaymentTransactionsByTimestamp: Long,
+            requireSortedTransactionsAfter: Long,
+            generationBalanceDepthFrom50To1000AfterHeight: Long,
+            minimalGeneratingBalanceAfter: Long,
+            allowTransactionsFromFutureUntil: Long,
+            allowUnissuedAssetsUntil: Long,
+            allowBurnTransactionAfter: Long,
+            allowLeaseTransactionAfter: Long,
+            requirePaymentUniqueIdAfter: Long,
+            allowExchangeTransactionAfter: Long,
+            allowInvalidReissueInSameBlockUntilTimestamp: Long,
+            allowCreatealiasTransactionAfter: Long,
+            allowMultipleLeaseCancelTransactionUntilTimestamp: Long,
+            resetEffectiveBalancesAtHeight: Long,
+            allowLeasedBalanceTransferUntil: Long): FunctionalitySettings = {
+    require(featureCheckBlocksPeriod > 0, "featureCheckBlocksPeriod must be greater than 0")
+    require((blocksForFeatureActivation > 0) && (blocksForFeatureActivation <= featureCheckBlocksPeriod), s"blocksForFeatureActivation must be in range 1 to $featureCheckBlocksPeriod")
+
+    new FunctionalitySettings(featureCheckBlocksPeriod, blocksForFeatureActivation, allowTemporaryNegativeUntil, allowInvalidPaymentTransactionsByTimestamp, requireSortedTransactionsAfter, generationBalanceDepthFrom50To1000AfterHeight, minimalGeneratingBalanceAfter, allowTransactionsFromFutureUntil, allowUnissuedAssetsUntil, allowBurnTransactionAfter, allowLeaseTransactionAfter, requirePaymentUniqueIdAfter, allowExchangeTransactionAfter, allowInvalidReissueInSameBlockUntilTimestamp, allowCreatealiasTransactionAfter, allowMultipleLeaseCancelTransactionUntilTimestamp, resetEffectiveBalancesAtHeight, allowLeasedBalanceTransferUntil)
+  }
 }
 
 case class GenesisTransactionSettings(recipient: String, amount: Long)
@@ -75,8 +106,7 @@ case class GenesisSettings(
   signature: Option[ByteStr],
   transactions: Seq[GenesisTransactionSettings],
   initialBaseTarget: Long,
-  averageBlockDelay: FiniteDuration,
-  featureCheckBlocksPeriod: Long)
+  averageBlockDelay: FiniteDuration)
 
 object GenesisSettings {
   val MAINNET = GenesisSettings(1460678400000L, 1465742577614L, Constants.UnitsInWave * Constants.TotalWaves,
@@ -88,7 +118,7 @@ object GenesisSettings {
       GenesisTransactionSettings("3P9o3ZYwtHkaU1KxsKkFjJqJKS3dLHLC9oF", Constants.UnitsInWave),
       GenesisTransactionSettings("3PJaDyprvekvPXPuAtxrapacuDJopgJRaU3", Constants.UnitsInWave),
       GenesisTransactionSettings("3PBWXDFUc86N2EQxKJmW8eFco65xTyMZx6J", Constants.UnitsInWave)),
-    153722867L, 60.seconds, 10000)
+    153722867L, 60.seconds)
 
   val TESTNET = GenesisSettings(1460678400000L, 1478000000000L, Constants.UnitsInWave * Constants.TotalWaves,
     ByteStr.decodeBase58("5uqnLK3Z9eiot6FyYBfwUnbyid3abicQbAZjz38GQ1Q8XigQMxTK4C1zNkqS1SVw7FqSidbZKxWAKLVoEsp4nNqa").toOption,
@@ -98,7 +128,7 @@ object GenesisSettings {
       GenesisTransactionSettings("3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh", (Constants.UnitsInWave * Constants.TotalWaves * 0.02).toLong),
       GenesisTransactionSettings("3NCBMxgdghg4tUhEEffSXy11L6hUi6fcBpd", (Constants.UnitsInWave * Constants.TotalWaves * 0.02).toLong),
       GenesisTransactionSettings("3N18z4B8kyyQ96PhN5eyhCAbg4j49CgwZJx", (Constants.UnitsInWave * Constants.TotalWaves - Constants.UnitsInWave * Constants.TotalWaves * 0.1).toLong)),
-    153722867L, 60.seconds, 10000)
+    153722867L, 60.seconds)
 }
 
 case class BlockchainSettings(blockchainFile: Option[File],

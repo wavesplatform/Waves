@@ -7,6 +7,7 @@ import com.wavesplatform.history.HistoryWriterImpl
 import com.wavesplatform.state2._
 import org.scalatest.{FunSuite, Matchers}
 import scorex.lagonaki.mocks.TestBlock
+import scorex.settings.TestFunctionalitySettings
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -16,7 +17,7 @@ class HistoryWriterTest extends FunSuite with Matchers with HistoryTest {
   private val ApprovalPeriod = 10000
 
   test("concurrent access to lastBlock doesn't throw any exception") {
-    val history = HistoryWriterImpl(None, new ReentrantReadWriteLock()).get
+    val history = HistoryWriterImpl(None, new ReentrantReadWriteLock(), TestFunctionalitySettings.Enabled).get
     appendGenesisBlock(history)
 
     (1 to 1000).foreach { _ =>
@@ -38,7 +39,7 @@ class HistoryWriterTest extends FunSuite with Matchers with HistoryTest {
   }
 
   test("features approved and accepted as height grows") {
-    val history = HistoryWriterImpl(None, new ReentrantReadWriteLock()).get
+    val history = HistoryWriterImpl(None, new ReentrantReadWriteLock(), TestFunctionalitySettings.Enabled).get
 
     appendGenesisBlock(history)
 
@@ -75,7 +76,7 @@ class HistoryWriterTest extends FunSuite with Matchers with HistoryTest {
   }
 
   test("features rollback with block rollback") {
-    val history = HistoryWriterImpl(None, new ReentrantReadWriteLock()).get
+    val history = HistoryWriterImpl(None, new ReentrantReadWriteLock(), TestFunctionalitySettings.Enabled).get
 
     appendGenesisBlock(history)
 
@@ -118,7 +119,7 @@ class HistoryWriterTest extends FunSuite with Matchers with HistoryTest {
   }
 
   test("feature activated only by 90% of blocks") {
-    val history = HistoryWriterImpl(None, new ReentrantReadWriteLock()).get
+    val history = HistoryWriterImpl(None, new ReentrantReadWriteLock(), TestFunctionalitySettings.Enabled).get
 
     appendGenesisBlock(history)
     history.status(1) shouldBe FeatureStatus.Defined

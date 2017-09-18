@@ -19,6 +19,8 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
         |    custom {
         |      address-scheme-character = "C"
         |      functionality {
+        |        feature-check-blocks-period = 10000
+        |        blocks-for-feature-activation = 9000
         |        allow-temporary-negative-until = 1
         |        allow-invalid-payment-transactions-by-timestamp = 2
         |        require-sorted-transactions-after = 3
@@ -43,7 +45,6 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
         |        initial-balance = 100000000000000
         |        initial-base-target = 153722867
         |        average-block-delay = 60s
-        |        feature-check-blocks-period = 10000
         |        transactions = [
         |          {recipient = "BASE58ADDRESS1", amount = 50000000000001},
         |          {recipient = "BASE58ADDRESS2", amount = 49999999999999}
@@ -59,6 +60,8 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
     settings.checkpointFile should be(Some(new File("/waves/data/checkpoint.dat")))
     settings.minimumInMemoryDiffSize should be(201)
     settings.addressSchemeCharacter should be('C')
+    settings.functionalitySettings.featureCheckBlocksPeriod should be(10000)
+    settings.functionalitySettings.blocksForFeatureActivation should be(9000)
     settings.functionalitySettings.allowTemporaryNegativeUntil should be(1)
     settings.functionalitySettings.allowInvalidPaymentTransactionsByTimestamp should be(2)
     settings.functionalitySettings.requireSortedTransactionsAfter should be(3)
@@ -81,7 +84,6 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
     settings.genesisSettings.initialBalance should be(100000000000000L)
     settings.genesisSettings.initialBaseTarget should be(153722867)
     settings.genesisSettings.averageBlockDelay should be(60.seconds)
-    settings.genesisSettings.featureCheckBlocksPeriod should be(10000)
     settings.genesisSettings.transactions should be(Seq(
       GenesisTransactionSettings("BASE58ADDRESS1", 50000000000001L),
       GenesisTransactionSettings("BASE58ADDRESS2", 49999999999999L)))
