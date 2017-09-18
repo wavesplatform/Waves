@@ -90,7 +90,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
         Left(BlockAppendError(s"References incorrect or non-existing block", block))
       case Some(ng) =>
         val referencedLiquidDiff = ng.diffs.get(block.reference).get
-        val (referencedForgedBlock, discarded) = ng.forgeBlock(block.reference).get
+        val (referencedForgedBlock, discarded) = measureSuccessful(forgeBlockTimeStats, ng.forgeBlock(block.reference)).get
         if (referencedForgedBlock.signatureValid) {
           if (discarded.nonEmpty) {
             microBlockForkStats.increment()

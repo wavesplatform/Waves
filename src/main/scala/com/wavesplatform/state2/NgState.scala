@@ -1,7 +1,5 @@
 package com.wavesplatform.state2
 
-import cats.implicits._
-import com.wavesplatform.state2.BlockDiff._
 import scorex.block.Block.BlockId
 import scorex.block.{Block, MicroBlock}
 import scorex.transaction.{AssetId, DiscardedMicroBlocks, Transaction}
