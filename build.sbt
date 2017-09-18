@@ -120,6 +120,7 @@ javaOptions in Universal ++= Seq(
   // JVM memory tuning for 1g ram
   "-J-Xms128m",
   "-J-Xmx1g",
+  "-J-XX:+ExitOnOutOfMemoryError",
 
   // from https://groups.google.com/d/msg/akka-user/9s4Yl7aEz3E/zfxmdc0cGQAJ
   "-J-XX:+UseG1GC",
