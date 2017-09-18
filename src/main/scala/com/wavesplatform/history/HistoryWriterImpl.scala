@@ -35,6 +35,8 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
   }
 
   private def updateFeaturesState(height: Int): Unit = write { implicit lock =>
+    require(height % FeatureApprovalBlocksCount == 0, s"Features' state can't be updated at given height: $height")
+
     val activated = (Math.max(1, height - FeatureApprovalBlocksCount + 1) to height)
       .flatMap(h => featuresAtHeight.mutate(_.get(h)))
       .foldLeft(Map.empty[Short, Int]) { (counts, feature) =>
@@ -44,7 +46,7 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
 
     val previousApprovalHeight = Math.max(FeatureApprovalBlocksCount, height - FeatureApprovalBlocksCount)
 
-    val previousState: Map[Short, Byte] = Option(featuresState.mutate(_.get(previousApprovalHeight)))
+    val previousState: Map[Short, Byte] = Option(featuresState().get(previousApprovalHeight))
       .getOrElse(Map.empty[Short, Byte])
       .mapValues(v => if (v == FeatureStatus.Accepted.status) FeatureStatus.Activated.status else v)
 
