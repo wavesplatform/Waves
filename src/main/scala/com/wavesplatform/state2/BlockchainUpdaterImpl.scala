@@ -79,17 +79,12 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
         historyWriter.lastBlock match {
           case Some(lastInner) if lastInner.uniqueId != block.reference =>
             Left(BlockAppendError(s"References incorrect or non-existing block: " + logDetails, block))
-          case _ =>
-            historyWriter.lastBlock.map(_.uniqueId) match {
-              case Some(lastId) if lastId != block.reference => Left(GenericError(s"Parent ${block.reference} of new liquid block ${block.uniqueId}" +
-                s" does not match last block $lastId"))
-              case _ => BlockDiffer.fromBlock(settings, currentPersistedBlocksState, historyWriter.lastBlock, block).map((_, Seq.empty[Transaction]))
-            }
+          case _ => BlockDiffer.fromBlock(settings, currentPersistedBlocksState, historyWriter.lastBlock, block).map((_, Seq.empty[Transaction]))
         }
       case Some(ng) if !ng.contains(block.reference) =>
         Left(BlockAppendError(s"References incorrect or non-existing block", block))
       case Some(ng) =>
-        val referencedLiquidDiff = ng.diffs.get(block.reference).get
+        val referencedLiquidDiff = ng.diffs(block.reference)
         val (referencedForgedBlock, discarded) = measureSuccessful(forgeBlockTimeStats, ng.forgeBlock(block.reference)).get
         if (referencedForgedBlock.signatureValid) {
           if (discarded.nonEmpty) {
