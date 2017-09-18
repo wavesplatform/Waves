@@ -29,5 +29,4 @@ case class HashInfo(height: Int, hash: Int)
 case class StateDebugInfo(persisted: HashInfo,
                           top: HashInfo,
                           bottom: HashInfo,
-                          microBaseHash: Option[Int],
-                          lastBlockId: String)
+                          microBaseHash: Option[Int])

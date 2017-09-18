@@ -1,7 +1,7 @@
 package scorex.transaction
 
 import com.wavesplatform.network.{BlockCheckpoint, Checkpoint}
-import com.wavesplatform.state2.{BlockDiff, ByteStr}
+import com.wavesplatform.state2.ByteStr
 import scorex.block.Block.BlockId
 import scorex.block.{Block, MicroBlock}
 import scorex.transaction.History.BlockchainScore
@@ -36,13 +36,6 @@ trait DebugNgHistory {
   def lastPersistedBlockIds(count: Int): Seq[BlockId]
 
   def microblockIds(): Seq[BlockId]
-}
-
-trait HistoryWriter extends History {
-
-  def appendBlock(block: Block)(consensusValidation: => Either[ValidationError, BlockDiff]): Either[ValidationError, (BlockDiff, DiscardedTransactions)]
-
-  def discardBlock(): Seq[Transaction]
 }
 
 trait CheckpointService {

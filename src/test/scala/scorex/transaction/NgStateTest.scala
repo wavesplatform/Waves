@@ -1,16 +1,15 @@
 package scorex.transaction
 
-import java.util.concurrent.locks.ReentrantReadWriteLock
-
 import com.wavesplatform.TransactionGen
 import com.wavesplatform.history._
-import com.wavesplatform.state2.BlockDiff
+import com.wavesplatform.state2.NgState._
 import com.wavesplatform.state2.diffs._
+import com.wavesplatform.state2.{BlockDiff, NgState}
 import org.scalacheck.{Gen, Shrink}
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import org.scalatest.{Matchers, PropSpec}
 
-class NgHistoryWriterImplTest extends PropSpec with GeneratorDrivenPropertyChecks with PropertyChecks with Matchers with TransactionGen {
+class NgStateTest extends PropSpec with GeneratorDrivenPropertyChecks with PropertyChecks with Matchers with TransactionGen {
 
   private implicit def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)
 
@@ -27,20 +26,12 @@ class NgHistoryWriterImplTest extends PropSpec with GeneratorDrivenPropertyCheck
   property("can forge correctly signed blocks") {
 
     forAll(preconditionsAndPayments) { case (genesis, payment, payment2, payment3) =>
-      val history = new NgHistoryWriterImpl(HistoryWriterImpl(None, new ReentrantReadWriteLock()).get)
       val (block, microBlocks) = chainBaseAndMicro(randomSig, genesis, Seq(Seq(payment), Seq(payment2), Seq(payment3)))
-      history.appendBlock(block)(Right(BlockDiff.empty)).explicitGet()
-      microBlocks.foreach(mb => history.appendMicroBlock(mb)(_ => Right(BlockDiff.empty)).right.get)
 
-      history.forgeBlock(block.signerData.signature).get match {
-        case ((forged, ms)) =>
-          Signed.validateSignatures(forged) shouldBe 'right
-          ms.flatMap(_.transactionData) shouldBe Seq(payment, payment2, payment3)
-        case _ => ???
-      }
+      val ngState = microBlocks.foldLeft(NgState(block, BlockDiff.empty)) { case ((ng, m)) => ng + (m, BlockDiff.empty) }
 
       microBlocks.foreach { m =>
-        history.forgeBlock(m.totalResBlockSig).get match {
+        ngState.forgeBlock(m.totalResBlockSig).get match {
           case ((forged, _)) =>
             Signed.validateSignatures(forged) shouldBe 'right
           case _ => ???
