@@ -3,6 +3,7 @@ package com.wavesplatform.mining
 import java.time.{Duration, Instant}
 import java.util.concurrent.atomic.AtomicBoolean
 
+import com.wavesplatform.features.{FeatureProvider, FeatureStatus}
 import com.wavesplatform.network._
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state2.reader.StateReader
@@ -24,16 +25,17 @@ import scala.concurrent.duration._
 import scala.math.Ordering.Implicits._
 
 class Miner(
-               allChannels: ChannelGroup,
-               blockchainReadiness: AtomicBoolean,
-               blockchainUpdater: BlockchainUpdater,
-               checkpoint: CheckpointService,
-               history: History,
-               stateReader: StateReader,
-               settings: WavesSettings,
-               timeService: Time,
-               utx: UtxPool,
-               wallet: Wallet) extends ScorexLogging {
+             allChannels: ChannelGroup,
+             blockchainReadiness: AtomicBoolean,
+             blockchainUpdater: BlockchainUpdater,
+             checkpoint: CheckpointService,
+             history: History,
+             featureProvider: FeatureProvider,
+             stateReader: StateReader,
+             settings: WavesSettings,
+             timeService: Time,
+             utx: UtxPool,
+             wallet: Wallet) extends ScorexLogging {
 
   import Miner._
 
@@ -72,8 +74,11 @@ class Miner(
         val gs = calcGeneratorSignature(lastBlockKernelData, account)
         val consensusData = NxtLikeConsensusBlockData(btg, gs)
         val unconfirmed = utx.packUnconfirmed()
+        val features = settings.featuresSettings.supported
+          .filter(featureProvider.status(_) == FeatureStatus.Defined).toSet
+
         log.debug(s"Adding ${unconfirmed.size} unconfirmed transaction(s) to new block")
-        Block.buildAndSign(Version, currentTime, parent.uniqueId, consensusData, unconfirmed, account)
+        Block.buildAndSign(Version, currentTime, parent.uniqueId, consensusData, unconfirmed, account, features)
           .left.map(l => l.err)
       }
     } yield block

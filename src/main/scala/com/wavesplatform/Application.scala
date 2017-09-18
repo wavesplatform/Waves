@@ -68,7 +68,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
     val blockchainReadiness = new AtomicBoolean(false)
 
     val miner = new Miner(allChannels, blockchainReadiness, blockchainUpdater, checkpointService,
-      history, stateReader, settings, time, utxStorage, wallet)
+      history, history, stateReader, settings, time, utxStorage, wallet)
 
     val network = new NetworkServer(checkpointService, blockchainUpdater, time, miner, stateReader, settings,
       history, utxStorage, peerDatabase, allChannels, establishedConnections, blockchainReadiness)
@@ -145,9 +145,9 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
   def checkGenesis(): Unit = if (history.isEmpty) {
     Block.genesis(settings.blockchainSettings.genesisSettings).flatMap(blockchainUpdater.processBlock)
       .left.foreach { value =>
-        log.error(value.toString)
-        forceStopApplication()
-      }
+      log.error(value.toString)
+      forceStopApplication()
+    }
 
     log.info("Genesis block has been added to the state")
   }
