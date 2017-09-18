@@ -64,7 +64,7 @@ class CoordinatorHandler(
   }
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = {
-    def from = ctx.channel().remoteAddress().asInstanceOf[InetSocketAddress].toString
+    def from = ctx.channel().remoteAddress().asInstanceOf[InetSocketAddress]
 
     msg match {
       case c: Checkpoint => broadcastingScore(ctx.channel,
@@ -73,14 +73,16 @@ class CoordinatorHandler(
         s"Error processing checkpoint",
         processCheckpoint(c))
 
-      case ExtensionBlocks(blocks) => broadcastingScore(ctx.channel(),
-        s"Attempting to append extension ${formatBlocks(blocks)}",
-        s"Successfully appended extension ${formatBlocks(blocks)}",
-        s"Error appending extension ${formatBlocks(blocks)}",
-        processFork(blocks))
+      case ExtensionBlocks(blocks) =>
+        blocks.foreach(BlockStats.received(_, from))
+        broadcastingScore(ctx.channel(),
+          s"Attempting to append extension ${formatBlocks(blocks)}",
+          s"Successfully appended extension ${formatBlocks(blocks)}",
+          s"Error appending extension ${formatBlocks(blocks)}",
+          processFork(blocks))
 
       case b: Block =>
-        BlockStats.write(b, BlockStats.Event.Received, "from" -> from)
+        BlockStats.received(b, from)
         CoordinatorHandler.blockReceivingLag.record(System.currentTimeMillis() - b.timestamp)
         Signed.validateSignatures(b) match {
           case Left(err) => peerDatabase.blacklistAndClose(ctx.channel(), err.toString)
@@ -88,19 +90,13 @@ class CoordinatorHandler(
             s"Attempting to append block ${b.uniqueId}",
             s"Successfully appended block ${b.uniqueId}",
             s"Could not append block ${b.uniqueId}",
-            processBlock(b, false)
-              .right.map { x =>
-              BlockStats.write(b, BlockStats.Event.Applied)
-              x
-            }
-              .left.map { x =>
-              BlockStats.write(b, BlockStats.Event.Rejected)
+            processBlock(b, false).left.map { x =>
+              BlockStats.declined(b)
               x
             }
           )
         }
       case MicroBlockResponse(m) =>
-        BlockStats.write(m, BlockStats.Event.Received, "from" -> from)
         val r: Either[Any, Any] = Signed.validateSignatures(m) match {
           case Right(_) =>
             Coordinator.processMicroBlock(checkpointService, history, blockchainUpdater, utxStorage)(m)
@@ -112,14 +108,8 @@ class CoordinatorHandler(
             Left(())
         }
         r
-          .right.map { x =>
-            BlockStats.write(m, BlockStats.Event.Applied)
-            x
-          }
-          .left.map { x =>
-            BlockStats.write(m, BlockStats.Event.Rejected)
-            x
-          }
+          .left.map { _ => BlockStats.declined(m) }
+          .right.map { _ => BlockStats.applied(m) }
     }
   }
 }

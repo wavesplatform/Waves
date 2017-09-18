@@ -109,27 +109,28 @@ class Miner(
     }
     else {
       log.trace(s"Accumulated ${unconfirmed.size} txs for microblock")
-      (for {
-        fullAndMicro <- measureSuccessful(microBlockBuildTimeStats,
-          for {
-            signedBlock <- Block.buildAndSign(version = 3,
-              timestamp = accumulatedBlock.timestamp,
-              reference = accumulatedBlock.reference,
-              consensusData = accumulatedBlock.consensusData,
-              transactionData = accumulatedBlock.transactionData ++ unconfirmed,
-              signer = account)
-            microBlock <- MicroBlock.buildAndSign(account, unconfirmed, accumulatedBlock.signerData.signature, signedBlock.signerData.signature)
-          } yield (signedBlock, microBlock))
-        _ <- Coordinator.processMicroBlock(checkpoint, history, blockchainUpdater, utx)(fullAndMicro._2)
-        _ = BlockStats.write(fullAndMicro._2, BlockStats.Event.Mined)
-      } yield fullAndMicro) match {
-        case Right((full, micro)) =>
-          log.trace(s"MicroBlock(id=${trim(micro.uniqueId)}) has been mined for $account}")
-          allChannels.broadcast(MicroBlockInv(micro.totalResBlockSig, micro.prevResBlockSig))
-          Right(Some(full))
-        case Left(err) =>
-          log.trace(s"MicroBlock has NOT been mined for $account} because $err")
-          Left(err)
+      val start = System.currentTimeMillis()
+      val block = for {
+        signedBlock <- Block.buildAndSign(
+          version = 3,
+          timestamp = accumulatedBlock.timestamp,
+          reference = accumulatedBlock.reference,
+          consensusData = accumulatedBlock.consensusData,
+          transactionData = accumulatedBlock.transactionData ++ unconfirmed,
+          signer = account
+        )
+        microBlock <- MicroBlock.buildAndSign(account, unconfirmed, accumulatedBlock.signerData.signature, signedBlock.signerData.signature)
+        _ = microBlockBuildTimeStats.record(System.currentTimeMillis() - start)
+        _ <- Coordinator.processMicroBlock(checkpoint, history, blockchainUpdater, utx)(microBlock)
+      } yield {
+        BlockStats.mined(microBlock)
+        log.trace(s"MicroBlock(id=${trim(microBlock.uniqueId)}) has been mined for $account}")
+        allChannels.broadcast(MicroBlockInv(microBlock.totalResBlockSig, microBlock.prevResBlockSig))
+        Some(signedBlock)
+      }
+      block.left.map { err =>
+        log.trace(s"MicroBlock has NOT been mined for $account} because $err")
+        err
       }
     }
   }.delayExecution(minerSettings.microBlockInterval)
@@ -160,7 +161,6 @@ class Miner(
             processBlock(block, true) match {
               case Left(err) => log.warn(err.toString)
               case Right(score) =>
-                BlockStats.write(block, BlockStats.Event.Mined)
                 allChannels.broadcast(LocalScoreChanged(score))
                 allChannels.broadcast(BlockForged(block))
                 if (microBlocksEnabled)

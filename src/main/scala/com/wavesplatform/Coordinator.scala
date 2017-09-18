@@ -2,7 +2,7 @@ package com.wavesplatform
 
 import java.util.concurrent.atomic.AtomicBoolean
 
-import com.wavesplatform.metrics.Metrics
+import com.wavesplatform.metrics.{BlockStats, Metrics, TxsInBlockchainStats}
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.network.{BlockCheckpoint, Checkpoint}
 import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
@@ -30,13 +30,21 @@ object Coordinator extends ScorexLogging with Instrumented {
         def isForkValidWithCheckpoint(lastCommonHeight: Int): Boolean =
           extension.zipWithIndex.forall(p => checkpoint.isBlockValid(p._1.signerData.signature, lastCommonHeight + 1 + p._2))
 
-        def forkApplicationResultEi: Either[ValidationError, BigInt] = extension.view
-          .map(b => b -> appendBlock(checkpoint, history, blockchainUpdater, stateReader, utxStorage, time, settings.blockchainSettings)(b))
-          .collectFirst { case (b, Left(e)) => b -> e }
-          .fold[Either[ValidationError, BigInt]](Right(history.score())) {
-          case (b, e) =>
-            log.warn(s"Can't process fork starting with $lastCommonBlockId, error appending block ${b.uniqueId}: $e")
-            Left(e)
+        def forkApplicationResultEi: Either[ValidationError, BigInt] = {
+          val firstDeclined = extension.view
+            .map(b => b -> appendBlock(checkpoint, history, blockchainUpdater, stateReader, utxStorage, time, settings.blockchainSettings)(b, local = false))
+            .collectFirst { case (b, Left(e)) => b -> e }
+
+          firstDeclined.foreach {
+            case (declinedBlock, _) => extension.view.dropWhile(_ != declinedBlock).foreach(BlockStats.declined)
+          }
+
+          firstDeclined
+            .fold[Either[ValidationError, BigInt]](Right(history.score())) {
+            case (b, e) =>
+              log.warn(s"Can't process fork starting with $lastCommonBlockId, error appending block ${b.uniqueId}: $e")
+              Left(e)
+          }
         }
 
         val initalHeight = history.height()
@@ -52,6 +60,7 @@ object Coordinator extends ScorexLogging with Instrumented {
               Point
                 .measurement("rollback")
                 .addField("depth", initalHeight - commonBlockHeight)
+                .addField("txs", droppedTransactions.size)
             )
           }
           droppedTransactions.foreach(utxStorage.putIfNew)
@@ -75,7 +84,7 @@ object Coordinator extends ScorexLogging with Instrumented {
                          stateReader: StateReader, utxStorage: UtxPool, blockchainReadiness: AtomicBoolean,
                          settings: WavesSettings, miner: Miner)(newBlock: Block, local: Boolean): Either[ValidationError, BigInt] = measureSuccessful(blockProcessingTimeStats, {
     val newScore = for {
-      _ <- appendBlock(checkpoint, history, blockchainUpdater, stateReader, utxStorage, time, settings.blockchainSettings)(newBlock)
+      _ <- appendBlock(checkpoint, history, blockchainUpdater, stateReader, utxStorage, time, settings.blockchainSettings)(newBlock, local)
     } yield history.score()
 
     if (local || newScore.isRight) {
@@ -95,12 +104,16 @@ object Coordinator extends ScorexLogging with Instrumented {
 
   private def appendBlock(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater,
                           stateReader: StateReader, utxStorage: UtxPool, time: Time, settings: BlockchainSettings)
-                         (block: Block): Either[ValidationError, Unit] = for {
+                         (block: Block, local: Boolean): Either[ValidationError, Unit] = for {
     _ <- Either.cond(checkpoint.isBlockValid(block.signerData.signature, history.height() + 1), (),
       GenericError(s"Block ${block.uniqueId} at height ${history.height() + 1} is not valid w.r.t. checkpoint"))
     _ <- blockConsensusValidation(history, stateReader, settings, time.correctedTime())(block)
+    height = history.height()
     discardedTxs <- blockchainUpdater.processBlock(block)
   } yield {
+    if (local) BlockStats.mined(block, height) else BlockStats.applied(block, height)
+    TxsInBlockchainStats.record(block.transactionData.size - discardedTxs.size)
+
     utxStorage.removeAll(block.transactionData)
     discardedTxs.foreach(utxStorage.putIfNew)
   }
