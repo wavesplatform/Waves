@@ -10,12 +10,24 @@ import scorex.transaction.{Transaction, TransactionParser}
 
 import scala.util.{Random, Try}
 
-object TestBlock {
+sealed trait TestBlock {
+  val defaultSigner = PrivateKeyAccount(Array.fill(TransactionParser.KeyLength)(0))
 
-  private val defaultSigner = PrivateKeyAccount(Array.fill(TransactionParser.KeyLength)(0))
+  val random: Random = new Random()
 
-  private val random: Random = new Random(10)
+  def randomOfLength(length: Int): ByteStr = ByteStr(Array.fill(length)(random.nextInt().toByte))
 
+  def randomSignature(): ByteStr = randomOfLength(SignatureLength)
+
+  def sign(nonSignedBlock: Block): Block = {
+    val toSign = nonSignedBlock.bytes
+    val signature = EllipticCurveImpl.sign(defaultSigner, toSign)
+    nonSignedBlock.copy(signerData = SignerData(defaultSigner, ByteStr(signature)))
+  }
+
+}
+
+object TestBlock extends TestBlock {
   def create(txs: Seq[Transaction]): Block = create(time = Try(txs.map(_.timestamp).max).getOrElse(0), txs = txs)
 
   def create(time: Long, txs: Seq[Transaction]): Block = sign(Block(
@@ -27,16 +39,11 @@ object TestBlock {
     transactionData = txs,
     supportedFeaturesIds = Set.empty))
 
-  def randomOfLength(length: Int): ByteStr = ByteStr(Array.fill(length)(random.nextInt().toByte))
-
-  def randomSignature(): ByteStr = randomOfLength(SignatureLength)
-
   def withReference(ref: ByteStr): Block = sign(Block(0, 1, ref, SignerData(defaultSigner, ByteStr.empty),
     NxtLikeConsensusBlockData(1L, randomSignature().arr), Seq.empty, Set.empty))
+}
 
-  private def sign(nonSignedBlock: Block): Block = {
-    val toSign = nonSignedBlock.bytes
-    val signature = EllipticCurveImpl.sign(defaultSigner, toSign)
-    nonSignedBlock.copy(signerData = SignerData(defaultSigner, ByteStr(signature)))
-  }
+object TestBlock3 extends TestBlock {
+  def withReferenceAndFeatures(ref: ByteStr, features: Set[Short]): Block = sign(Block(0, 3, ref, SignerData(defaultSigner, ByteStr.empty),
+    NxtLikeConsensusBlockData(1L, randomSignature().arr), Seq.empty, features))
 }

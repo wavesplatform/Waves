@@ -17,7 +17,7 @@ object BlockDiffer extends ScorexLogging {
   def right(diff: Diff): Either[ValidationError, Diff] = Right(diff)
 
   def fromBlock(settings: FunctionalitySettings, s: StateReader,  pervBlockTimestamp : Option[Long])(block: Block): Either[ValidationError, BlockDiff] =
-    Signed.validateSignatures(block).flatMap { _ => apply(settings, s, pervBlockTimestamp)(block.feesDistribution, block.timestamp, block.transactionData, 1) }
+    Signed.validateSignatures(block).flatMap { _ => apply(settings, s, pervBlockTimestamp)(block.feesDistribution, block.timestamp, block.transactionData, 1, block.supportedFeaturesIds) }
 
   def unsafeDiffMany(settings: FunctionalitySettings, s: StateReader, prevBlockTimestamp: Option[Long])(blocks: Seq[Block]): BlockDiff =
     blocks.foldLeft((Monoid[BlockDiff].empty, prevBlockTimestamp)) { case ((diff, prev), block) =>
@@ -25,7 +25,7 @@ object BlockDiffer extends ScorexLogging {
       (Monoid[BlockDiff].combine(diff, blockDiff), Some(block.timestamp))
     }._1
 
-  private def apply(settings: FunctionalitySettings, s: StateReader, pervBlockTimestamp : Option[Long])(feesDistribution: Diff, timestamp: Long, txs: Seq[Transaction], heightDiff: Int) = {
+  private def apply(settings: FunctionalitySettings, s: StateReader, pervBlockTimestamp : Option[Long])(feesDistribution: Diff, timestamp: Long, txs: Seq[Transaction], heightDiff: Int, features: Set[Short]) = {
     val currentBlockHeight = s.height + 1
 
     val txDiffer = TransactionDiffer(settings, pervBlockTimestamp, timestamp, currentBlockHeight) _

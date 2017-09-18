@@ -101,7 +101,6 @@ class StateWriterImpl(p: StateStorage, synchronizationToken: ReentrantReadWriteL
     measureSizeLog("lease info")(blockDiff.txsDiff.leaseState)(
       _.foreach { case (id, isActive) => sp().leaseState.put(id, isActive) })
 
-
     sp().setHeight(sp().getHeight + blockDiff.heightDiff)
     sp().commit()
 
