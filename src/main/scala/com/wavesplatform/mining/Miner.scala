@@ -4,6 +4,7 @@ import java.time.{Duration, Instant}
 import java.util.concurrent.atomic.AtomicBoolean
 
 import com.wavesplatform.features.{FeatureProvider, FeatureStatus}
+import com.wavesplatform.general.BlockVersionResolver
 import com.wavesplatform.network._
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state2.reader.StateReader
@@ -34,6 +35,7 @@ class Miner(
              stateReader: StateReader,
              settings: WavesSettings,
              timeService: Time,
+             blockVersionResolver: BlockVersionResolver,
              utx: UtxPool,
              wallet: Wallet) extends ScorexLogging {
 
@@ -54,7 +56,7 @@ class Miner(
       s"BlockChain is too old (last block ${parent.uniqueId} generated $blockAge ago)"
     ))
 
-  private def generateOneBlockTask(account: PrivateKeyAccount, parentHeight: Int, parent: Block,
+  private def generateOneBlockTask(version: Int, account: PrivateKeyAccount, parentHeight: Int, parent: Block,
                                    greatGrandParent: Option[Block], balance: Long)(delay: FiniteDuration): Task[Either[String, Block]] = Task {
     val pc = allChannels.size()
     lazy val lastBlockKernelData = parent.consensusData
@@ -77,8 +79,10 @@ class Miner(
         val features = settings.featuresSettings.supported
           .filter(featureProvider.status(_) == FeatureStatus.Defined).toSet
 
+
+
         log.debug(s"Adding ${unconfirmed.size} unconfirmed transaction(s) to new block")
-        Block.buildAndSign(Version, currentTime, parent.uniqueId, consensusData, unconfirmed, account, features)
+        Block.buildAndSign(version.toByte, currentTime, parent.uniqueId, consensusData, unconfirmed, account, features)
           .left.map(l => l.err)
       }
     } yield block
@@ -86,6 +90,7 @@ class Miner(
 
   private def generateBlockTask(account: PrivateKeyAccount): Task[Unit] = {
     val height = history.height()
+    val version = blockVersionResolver.resolve(height, settings)
     val lastBlock = history.lastBlock.get
     val grandParent = history.parent(lastBlock, 2)
     (for {
@@ -96,7 +101,7 @@ class Miner(
         val offset = calcOffset(timeService, ts)
         log.debug(s"Next attempt for acc=$account in $offset")
         val balance = generatingBalance(stateReader, blockchainSettings.functionalitySettings, account, height)
-        generateOneBlockTask(account, height, lastBlock, grandParent, balance)(offset).flatMap {
+        generateOneBlockTask(version, account, height, lastBlock, grandParent, balance)(offset).flatMap {
           case Right(block) => Task.now {
             processBlock(block, true) match {
               case Left(err) => log.warn(err.toString)
@@ -128,7 +133,6 @@ class Miner(
 
 object Miner extends ScorexLogging {
 
-  val Version: Byte = 2
   val MinimalGenerationOffsetMillis: Long = 1001
 
   def calcOffset(timeService: Time, calculatedTimestamp: Long): FiniteDuration = {
@@ -138,3 +142,6 @@ object Miner extends ScorexLogging {
     Math.max(MinimalGenerationOffsetMillis, calculatedOffset).millis
   }
 }
+
+
+

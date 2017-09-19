@@ -27,7 +27,8 @@ case class FunctionalitySettings private(featureCheckBlocksPeriod: Int,
                                  allowCreatealiasTransactionAfter: Long,
                                  allowMultipleLeaseCancelTransactionUntilTimestamp: Long,
                                  resetEffectiveBalancesAtHeight: Long,
-                                 allowLeasedBalanceTransferUntil: Long)
+                                 allowLeasedBalanceTransferUntil: Long,
+                                 blockVersion3After: Long)
 
 object FunctionalitySettings {
   val MAINNET = apply(
@@ -48,7 +49,8 @@ object FunctionalitySettings {
     allowCreatealiasTransactionAfter = 1503914400000L, // 2017-08-28T10:00:00Z
     allowMultipleLeaseCancelTransactionUntilTimestamp = 1492768800000L,
     resetEffectiveBalancesAtHeight = 462000,
-    allowLeasedBalanceTransferUntil = Long.MaxValue)
+    allowLeasedBalanceTransferUntil = Long.MaxValue,
+    blockVersion3After = Long.MaxValue)
 
   val TESTNET = apply(
     featureCheckBlocksPeriod = 10000,
@@ -68,7 +70,9 @@ object FunctionalitySettings {
     allowCreatealiasTransactionAfter = 1493596800000L,
     allowMultipleLeaseCancelTransactionUntilTimestamp = 1492560000000L,
     resetEffectiveBalancesAtHeight = 51500,
-    allowLeasedBalanceTransferUntil = 1495238400000L)
+    allowLeasedBalanceTransferUntil = 1495238400000L,
+    blockVersion3After = Long.MaxValue)
+
 
   val configPath = "waves.blockchain.custom.functionality"
 
@@ -89,11 +93,12 @@ object FunctionalitySettings {
             allowCreatealiasTransactionAfter: Long,
             allowMultipleLeaseCancelTransactionUntilTimestamp: Long,
             resetEffectiveBalancesAtHeight: Long,
-            allowLeasedBalanceTransferUntil: Long): FunctionalitySettings = {
+            allowLeasedBalanceTransferUntil: Long,
+            blockVersion3After: Long): FunctionalitySettings = {
     require(featureCheckBlocksPeriod > 0, "featureCheckBlocksPeriod must be greater than 0")
     require((blocksForFeatureActivation > 0) && (blocksForFeatureActivation <= featureCheckBlocksPeriod), s"blocksForFeatureActivation must be in range 1 to $featureCheckBlocksPeriod")
 
-    new FunctionalitySettings(featureCheckBlocksPeriod, blocksForFeatureActivation, allowTemporaryNegativeUntil, allowInvalidPaymentTransactionsByTimestamp, requireSortedTransactionsAfter, generationBalanceDepthFrom50To1000AfterHeight, minimalGeneratingBalanceAfter, allowTransactionsFromFutureUntil, allowUnissuedAssetsUntil, allowBurnTransactionAfter, allowLeaseTransactionAfter, requirePaymentUniqueIdAfter, allowExchangeTransactionAfter, allowInvalidReissueInSameBlockUntilTimestamp, allowCreatealiasTransactionAfter, allowMultipleLeaseCancelTransactionUntilTimestamp, resetEffectiveBalancesAtHeight, allowLeasedBalanceTransferUntil)
+    new FunctionalitySettings(featureCheckBlocksPeriod, blocksForFeatureActivation, allowTemporaryNegativeUntil, allowInvalidPaymentTransactionsByTimestamp, requireSortedTransactionsAfter, generationBalanceDepthFrom50To1000AfterHeight, minimalGeneratingBalanceAfter, allowTransactionsFromFutureUntil, allowUnissuedAssetsUntil, allowBurnTransactionAfter, allowLeaseTransactionAfter, requirePaymentUniqueIdAfter, allowExchangeTransactionAfter, allowInvalidReissueInSameBlockUntilTimestamp, allowCreatealiasTransactionAfter, allowMultipleLeaseCancelTransactionUntilTimestamp, resetEffectiveBalancesAtHeight, allowLeasedBalanceTransferUntil, blockVersion3After)
   }
 }
 
