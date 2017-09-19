@@ -2,8 +2,6 @@ package scorex.transaction
 
 import com.wavesplatform.features.FeatureProvider
 import com.wavesplatform.network.{BlockCheckpoint, Checkpoint}
-import com.wavesplatform.state2.{BlockDiff, ByteStr}
-import scorex.block.Block
 import com.wavesplatform.state2.ByteStr
 import scorex.block.Block.BlockId
 import scorex.block.{Block, MicroBlock}
