@@ -10,6 +10,10 @@ import scala.util.Try
 
 package object utils extends ScorexLogging {
 
+  sealed abstract class ApplicationStopReason(val code: Int)
+  case object Default extends ApplicationStopReason(1)
+  case object UnsupportedFeature extends ApplicationStopReason(38)
+
   def base58Length(byteArrayLength: Int): Int = math.ceil(math.log(256) / math.log(58) * byteArrayLength).toInt
 
   def createMVStore(file: Option[File], encryptionKey: Option[Array[Char]] = None): MVStore = {
@@ -52,5 +56,7 @@ package object utils extends ScorexLogging {
     }
   }
 
-  def forceStopApplication(): Unit = new Thread(() => { System.exit(1) }, "waves-platform-shutdown-thread").start()
+  def forceStopApplication(reason: ApplicationStopReason = Default): Unit = new Thread(() => { System.exit(reason.code) }, "waves-platform-shutdown-thread").start()
 }
+
+
