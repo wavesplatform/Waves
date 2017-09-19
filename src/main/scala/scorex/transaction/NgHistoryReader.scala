@@ -2,6 +2,7 @@ package scorex.transaction
 
 import java.util.concurrent.locks.ReentrantReadWriteLock
 
+import com.wavesplatform.features.FeatureStatus
 import com.wavesplatform.state2._
 import scorex.block.Block.BlockId
 import scorex.block.{Block, MicroBlock}
@@ -73,4 +74,6 @@ class NgHistoryReader(ngState: () => Option[NgState], inner: History) extends Hi
 
   override def microblockIds(): Seq[BlockId] =
     ngState().toSeq.flatMap(ng => ng.micros.map(_.totalResBlockSig))
+
+  override def status(feature: Short): FeatureStatus = ???
 }

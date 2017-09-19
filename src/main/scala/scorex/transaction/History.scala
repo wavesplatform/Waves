@@ -1,6 +1,9 @@
 package scorex.transaction
 
+import com.wavesplatform.features.FeatureProvider
 import com.wavesplatform.network.{BlockCheckpoint, Checkpoint}
+import com.wavesplatform.state2.{BlockDiff, ByteStr}
+import scorex.block.Block
 import com.wavesplatform.state2.ByteStr
 import scorex.block.Block.BlockId
 import scorex.block.{Block, MicroBlock}
@@ -9,7 +12,7 @@ import scorex.utils.Synchronized
 
 import scala.util.Try
 
-trait History extends Synchronized with AutoCloseable {
+trait History extends Synchronized with AutoCloseable with FeatureProvider {
 
   def height(): Int
 

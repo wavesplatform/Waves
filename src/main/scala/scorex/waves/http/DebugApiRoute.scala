@@ -28,6 +28,7 @@ import scala.concurrent.Future
 import scala.util.{Failure, Success}
 import scala.util.control.NonFatal
 import DebugApiRoute._
+import com.wavesplatform.mining.Miner
 import com.wavesplatform.mining.MinerDebugInfo
 import scorex.block.Block.BlockId
 
@@ -44,7 +45,7 @@ case class DebugApiRoute(settings: RestAPISettings,
                          allChannels: ChannelGroup,
                          utxStorage: UtxPool,
                          blockchainDebugInfo: BlockchainDebugInfo,
-                         minerDebugInfo: MinerDebugInfo
+                         miner: Miner with MinerDebugInfo
                         ) extends ApiRoute {
 
   override lazy val route: Route = pathPrefix("debug") {
@@ -136,6 +137,7 @@ case class DebugApiRoute(settings: RestAPISettings,
         if (returnTransactionsToUtx) {
           txs.foreach(tx => utxStorage.putIfNew(tx))
         }
+        miner.scheduleMining()
         Json.obj("BlockId" -> blockId.toString): ToResponseMarshallable
       case Left(error) => ApiError.fromValidationError(error)
     }
@@ -204,7 +206,7 @@ case class DebugApiRoute(settings: RestAPISettings,
     new ApiResponse(code = 200, message = "Json state")
   ))
   def minerInfo: Route = (path("minerInfo") & get & withAuth) {
-    complete(minerDebugInfo.collectNextBlockGenerationTimes.map { case (a, t) =>
+    complete(miner.collectNextBlockGenerationTimes.map { case (a, t) =>
       AccountMiningInfo(a.stringRepr,
         stateReader.effectiveBalanceAtHeightWithConfirmations(a, stateReader.height, 1000).get,
         t)

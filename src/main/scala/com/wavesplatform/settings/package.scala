@@ -12,6 +12,7 @@ package object settings {
 
   implicit val fileReader: ValueReader[File] = (cfg, path) => new File(cfg.getString(path))
   implicit val byteStrReader: ValueReader[ByteStr] = (cfg, path) => ByteStr.decodeBase58(cfg.getString(path)).get
+  implicit val shortValueReader: ValueReader[Short] = (cfg, path) => cfg.getLong(path).toShort
 
   def loadConfig(userConfig: Config): Config = {
     ConfigFactory
