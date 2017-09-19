@@ -59,5 +59,7 @@ object Dependencies {
     "org.fusesource.leveldbjni" % "leveldbjni-all" % "1.8"
   )
 
-  lazy val kamon = Seq("core", "statsd", "system-metrics").map(kamonModule)
+  lazy val metrics = Seq("core", "statsd", "system-metrics").map(kamonModule) ++ Seq(
+    "org.influxdb" % "influxdb-java" % "2.7"
+  )
 }

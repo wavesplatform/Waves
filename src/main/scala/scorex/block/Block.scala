@@ -5,7 +5,7 @@ import java.nio.ByteBuffer
 import cats._
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import com.wavesplatform.settings.GenesisSettings
-import com.wavesplatform.state2.{ByteStr, Diff, LeaseInfo, Portfolio}
+import com.wavesplatform.state2.{ByteStr, LeaseInfo, Portfolio}
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.{Address, PrivateKeyAccount, PublicKeyAccount}
 import scorex.block.fields.FeaturesBlockField
@@ -26,6 +26,8 @@ case class Block(timestamp: Long,
                  consensusData: NxtLikeConsensusBlockData,
                  transactionData: Seq[Transaction],
                  supportedFeaturesIds: Set[Short]) extends Signed {
+
+  import Block._
 
   private lazy val versionField: ByteBlockField = ByteBlockField("version", version)
   private lazy val timestampField: LongBlockField = LongBlockField("timestamp", timestamp)
@@ -78,32 +80,38 @@ case class Block(timestamp: Long,
   lazy val blockScore: BigInt = (BigInt("18446744073709551616") / consensusData.baseTarget)
     .ensuring(_ > 0) // until we make smart-constructor validate consensusData.baseTarget to be positive
 
-  lazy val feesDistribution: Diff = Monoid[Diff].combineAll({
-    val generator = signerData.generator
+  lazy val feesPortfolio: Portfolio = Monoid[Portfolio].combineAll({
     val assetFees: Seq[(Option[AssetId], Long)] = transactionData.map(_.assetFee)
     assetFees
-      .map { case (maybeAssetId, vol) => AssetAcc(generator, maybeAssetId) -> vol }
+      .map { case (maybeAssetId, vol) => maybeAssetId -> vol }
       .groupBy(a => a._1)
-      .mapValues((records: Seq[(AssetAcc, Long)]) => records.map(_._2).sum)
+      .mapValues((records: Seq[(Option[ByteStr], Long)]) => records.map(_._2).sum)
   }.toList.map {
-    case (AssetAcc(account, maybeAssetId), feeVolume) =>
-      account -> (maybeAssetId match {
+    case (maybeAssetId, feeVolume) =>
+      maybeAssetId match {
         case None => Portfolio(feeVolume, LeaseInfo.empty, Map.empty)
         case Some(assetId) => Portfolio(0L, LeaseInfo.empty, Map(assetId -> feeVolume))
-      })
-  }.map { case (acc, p) =>
-    Diff.empty.copy(portfolios = Map(acc -> p))
+      }
   })
+
+  lazy val prevBlockFeePart: Portfolio = Monoid[Portfolio].combineAll(transactionData.map(tx => tx.feeDiff().minus(tx.feeDiff().multiply(CurrentBlockFeePart))))
 
   override lazy val signatureValid: Boolean = EllipticCurveImpl.verify(signerData.signature.arr, bytesWithoutSignature, signerData.generator.publicKey)
   override lazy val signedDescendants: Seq[Signed] = transactionData
+
+  override def toString: String =
+    s"Block(timestamp=$timestamp, version=$version, reference=$reference, signerData=$signerData, consensusData=$consensusData, transactions.size=${transactionData.size})"
+
 }
 
 
 object Block extends ScorexLogging {
 
-  val PrevBlockFee: Float = 0.6f
-  val CurrentBlockFee: Float = 0.4f
+  case class Fraction(dividend: Int, divider: Int) {
+    def apply(l: Long): Long = l / divider * dividend
+  }
+
+  val CurrentBlockFeePart: Fraction = Fraction(2, 5)
 
   type BlockIds = Seq[ByteStr]
   type BlockId = ByteStr
@@ -157,7 +165,7 @@ object Block extends ScorexLogging {
     val cBytesLength = Ints.fromByteArray(bytes.slice(position, position + 4))
     position += 4
     val cBytes = bytes.slice(position, position + cBytesLength)
-    val consData = NxtLikeConsensusBlockData(Longs.fromByteArray(cBytes.take(Block.BaseTargetLength)), cBytes.takeRight(Block.GeneratorSignatureLength))
+    val consData = NxtLikeConsensusBlockData(Longs.fromByteArray(cBytes.take(Block.BaseTargetLength)), ByteStr(cBytes.takeRight(Block.GeneratorSignatureLength)))
     position += cBytesLength
 
     val tBytesLength = Ints.fromByteArray(bytes.slice(position, position + 4))
@@ -200,7 +208,7 @@ object Block extends ScorexLogging {
                    supportedFeaturesIds: Set[Short] = Set.empty): Either[GenericError, Block] = (for {
     _ <- Either.cond(transactionData.size <= MaxTransactionsPerBlockVer3, (), s"Too many transactions in Block: allowed: $MaxTransactionsPerBlockVer3, actual: ${transactionData.size}")
     _ <- Either.cond(reference.arr.length == SignatureLength, (), "Incorrect reference")
-    _ <- Either.cond(consensusData.generationSignature.length == GeneratorSignatureLength, (), "Incorrect consensusData.generationSignature")
+    _ <- Either.cond(consensusData.generationSignature.arr.length == GeneratorSignatureLength, (), "Incorrect consensusData.generationSignature")
     _ <- Either.cond(signer.publicKey.length == KeyLength, (), "Incorrect signer.publicKey")
     _ <- Either.cond(version > 2 || supportedFeaturesIds.isEmpty, (), s"Block version $version could not contain supported feature flags")
     _ <- Either.cond(supportedFeaturesIds.size <= MaxFeaturesInBlock, (), s"Block could not contain more than $MaxFeaturesInBlock feature flags")
@@ -224,7 +232,7 @@ object Block extends ScorexLogging {
 
     val transactionGenesisData = genesisTransactions(genesisSettings)
     val transactionGenesisDataField = TransactionsBlockFieldVersion1or2(transactionGenesisData)
-    val consensusGenesisData = NxtLikeConsensusBlockData(genesisSettings.initialBaseTarget, Array.fill(DigestSize)(0: Byte))
+    val consensusGenesisData = NxtLikeConsensusBlockData(genesisSettings.initialBaseTarget, ByteStr(Array.fill(DigestSize)(0: Byte)))
     val consensusGenesisDataField = NxtConsensusBlockField(consensusGenesisData)
     val txBytesSize = transactionGenesisDataField.bytes.length
     val txBytes = Bytes.ensureCapacity(Ints.toByteArray(txBytesSize), 4, 0) ++ transactionGenesisDataField.bytes

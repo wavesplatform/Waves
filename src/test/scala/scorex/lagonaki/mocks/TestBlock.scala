@@ -1,5 +1,6 @@
 package scorex.lagonaki.mocks
 
+
 import com.wavesplatform.state2.ByteStr
 import scorex.account.PrivateKeyAccount
 import scorex.block._
@@ -8,7 +9,7 @@ import scorex.crypto.EllipticCurveImpl
 import scorex.transaction.TransactionParser._
 import scorex.transaction.{Transaction, TransactionParser}
 
-import scala.util.{Random, Try}
+import scala.util.{Try,Random}
 
 sealed trait TestBlock {
   val defaultSigner = PrivateKeyAccount(Array.fill(TransactionParser.KeyLength)(0))
@@ -35,15 +36,16 @@ object TestBlock extends TestBlock {
     version = 2,
     reference = randomSignature(),
     signerData = SignerData(defaultSigner, ByteStr.empty),
-    consensusData = NxtLikeConsensusBlockData(1L, Array.fill(SignatureLength)(0: Byte)),
+    consensusData = NxtLikeConsensusBlockData(1L, ByteStr(Array.fill(SignatureLength)(0: Byte))),
     transactionData = txs,
     supportedFeaturesIds = Set.empty))
 
+
   def withReference(ref: ByteStr): Block = sign(Block(0, 1, ref, SignerData(defaultSigner, ByteStr.empty),
-    NxtLikeConsensusBlockData(1L, randomSignature().arr), Seq.empty, Set.empty))
+    NxtLikeConsensusBlockData(1L, ByteStr(randomSignature().arr)), Seq.empty, Set.empty))
 }
 
 object TestBlock3 extends TestBlock {
   def withReferenceAndFeatures(ref: ByteStr, features: Set[Short]): Block = sign(Block(0, 3, ref, SignerData(defaultSigner, ByteStr.empty),
-    NxtLikeConsensusBlockData(1L, randomSignature().arr), Seq.empty, features))
+    NxtLikeConsensusBlockData(1L, ByteStr(randomSignature().arr)), Seq.empty, features))
 }

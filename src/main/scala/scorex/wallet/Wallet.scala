@@ -86,7 +86,6 @@ class Wallet private(file: Option[File], password: Array[Char]) extends AutoClos
 
 }
 
-
 object Wallet extends ScorexLogging {
 
   implicit class WalletExtension(w: Wallet) {

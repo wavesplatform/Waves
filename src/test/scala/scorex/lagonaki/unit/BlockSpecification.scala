@@ -1,16 +1,17 @@
 package scorex.lagonaki.unit
 
 import com.wavesplatform.TransactionGen
-import com.wavesplatform.state2._
+import org.scalatest.prop.PropertyChecks
+import org.scalatest._
 import com.wavesplatform.state2.diffs.produce
 import org.scalacheck.Arbitrary.arbitrary
 import org.scalacheck.{Gen, Shrink}
-import org.scalatest.{Matchers, PropSpec}
 import scorex.block.Block
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
+import scorex.crypto.EllipticCurveImpl
+import scorex.crypto.hash.FastCryptographicHash
 import scorex.transaction._
-import org.scalatest.prop.PropertyChecks
-
+import com.wavesplatform.state2._
 
 class BlockSpecification extends PropSpec with PropertyChecks with TransactionGen with Matchers {
 
@@ -30,9 +31,7 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
     transferTrancation <- transferGeneratorP(1 + time, sender, recipient, assetId, None)
     anotherPaymentTransaction <- paymentGeneratorP(2 + time, sender, recipient)
     transactionData = Seq(paymentTransaction, transferTrancation, anotherPaymentTransaction)
-
-  } yield (baseTarget, reference, generationSignature, recipient, transactionData)
-
+  } yield (baseTarget, reference, ByteStr(generationSignature), recipient, transactionData)
 
   property(" block with txs bytes/parse roundtrip version 1,2") {
     Seq[Byte](1, 2).foreach { version =>
@@ -42,7 +41,7 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
           val parsedBlock = Block.parseBytes(block.bytes).get
           assert(Signed.validateSignatures(block).isRight)
           assert(Signed.validateSignatures(parsedBlock).isRight)
-          assert(parsedBlock.consensusData.generationSignature.sameElements(generationSignature))
+          assert(parsedBlock.consensusData.generationSignature == generationSignature)
           assert(parsedBlock.version.toInt == version)
           assert(parsedBlock.signerData.generator.publicKey.sameElements(recipient.publicKey))
       }
@@ -93,10 +92,20 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
         val parsedBlock = Block.parseBytes(block.bytes).get
         assert(Signed.validateSignatures(block).isRight)
         assert(Signed.validateSignatures(parsedBlock).isRight)
-        assert(parsedBlock.consensusData.generationSignature.sameElements(generationSignature))
+        assert(parsedBlock.consensusData.generationSignature == generationSignature)
         assert(parsedBlock.version.toInt == version)
         assert(parsedBlock.signerData.generator.publicKey.sameElements(recipient.publicKey))
         assert(parsedBlock.supportedFeaturesIds == supportedFeatures)
+    }
+  }
+
+  ignore ("sign time for 60k txs") {
+    forAll(randomTransactionsGen(60000), accountGen, byteArrayGen(Block.BlockIdLength), byteArrayGen(Block.GeneratorSignatureLength)) { case ((txs, acc, ref, gs)) =>
+      val (block, t0) = Instrumented.withTime(Block.buildAndSign(3, 1, ByteStr(ref), NxtLikeConsensusBlockData(1, ByteStr(gs)), txs, acc).explicitGet())
+      val (bytes, t1) = Instrumented.withTime(block.bytesWithoutSignature)
+      val (hash, t2) = Instrumented.withTime(FastCryptographicHash.hash(bytes))
+      val (sig, t3) = Instrumented.withTime(EllipticCurveImpl.sign(acc, hash))
+      println((t0, t1, t2,t3))
     }
   }
 }

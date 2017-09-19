@@ -101,7 +101,7 @@ class PeersRouteSpec extends RouteSpec("/peers") with RestAPISettingsHelper with
     }
   }
 
-  routePath("/blacklisted") in {
+  routePath("/blacklisted") ignore {
     forAll(genListOf(TestsCount, inetSocketAddressGen)) { addresses =>
       val addressSet = addresses.map(_.getAddress).toSet
 
@@ -110,7 +110,7 @@ class PeersRouteSpec extends RouteSpec("/peers") with RestAPISettingsHelper with
       val result = Get(routePath("/blacklisted")) ~> route ~> runRoute
 
       check {
-        responseAs[Seq[String]] should contain theSameElementsAs addressSet.map(_.toString)
+        responseAs[Seq[BlacklistedPeer]].map(_.hostname) should contain theSameElementsAs addressSet.map(_.toString)
       }(result)
     }
   }
@@ -134,6 +134,9 @@ object PeersRouteSpec {
 
   case class Peer(address: String, lastSeen: Long)
   implicit val peerFormat: Format[Peer] = Json.format
+
+  case class BlacklistedPeer(hostname : String, timestamp: Long, reason: String)
+  implicit val blacklistedPeerFormat: Format[BlacklistedPeer] = Json.format
 
   case class AllPeers(peers: Seq[Peer])
   implicit val allPeersFormat: Format[AllPeers] = Json.format

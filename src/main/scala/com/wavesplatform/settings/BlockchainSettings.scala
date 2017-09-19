@@ -25,7 +25,8 @@ case class FunctionalitySettings(allowTemporaryNegativeUntil: Long,
                                  allowCreatealiasTransactionAfter: Long,
                                  allowMultipleLeaseCancelTransactionUntilTimestamp: Long,
                                  resetEffectiveBalancesAtHeight: Long,
-                                 allowLeasedBalanceTransferUntil: Long)
+                                 allowLeasedBalanceTransferUntil: Long,
+                                 enableMicroblocksAfterHeight: Long)
 
 object FunctionalitySettings {
   val MAINNET = FunctionalitySettings(allowTemporaryNegativeUntil = 1479168000000L,
@@ -43,7 +44,9 @@ object FunctionalitySettings {
     allowCreatealiasTransactionAfter = 1503914400000L, // 2017-08-28T10:00:00Z
     allowMultipleLeaseCancelTransactionUntilTimestamp = 1492768800000L,
     resetEffectiveBalancesAtHeight = 462000,
-    allowLeasedBalanceTransferUntil = Long.MaxValue)
+    allowLeasedBalanceTransferUntil = Long.MaxValue,
+    enableMicroblocksAfterHeight = Long.MaxValue
+  )
 
   val TESTNET = FunctionalitySettings(
     allowTemporaryNegativeUntil = 1477958400000L,
@@ -61,7 +64,8 @@ object FunctionalitySettings {
     allowCreatealiasTransactionAfter = 1493596800000L,
     allowMultipleLeaseCancelTransactionUntilTimestamp = 1492560000000L,
     resetEffectiveBalancesAtHeight = 51500,
-    allowLeasedBalanceTransferUntil = 1495238400000L)
+    allowLeasedBalanceTransferUntil = 1495238400000L,
+    enableMicroblocksAfterHeight = Long.MaxValue)
 
   val configPath = "waves.blockchain.custom.functionality"
 }

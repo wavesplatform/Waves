@@ -17,15 +17,16 @@ import scala.collection.JavaConverters._
 @Path("/peers")
 @Api(value = "/peers", description = "Get info about peers", position = 2)
 case class PeersApiRoute(
-    settings: RestAPISettings,
-    connectToPeer: InetSocketAddress => Unit,
-    peerDatabase: PeerDatabase,
-    establishedConnections: ConcurrentMap[Channel, PeerInfo]) extends ApiRoute {
+                            settings: RestAPISettings,
+                            connectToPeer: InetSocketAddress => Unit,
+                            peerDatabase: PeerDatabase,
+                            establishedConnections: ConcurrentMap[Channel, PeerInfo]) extends ApiRoute {
+
   import PeersApiRoute._
 
   override lazy val route =
     pathPrefix("peers") {
-      allPeers ~ connectedPeers ~ blacklistedPeers ~ connect
+      allPeers ~ connectedPeers ~ blacklistedPeers ~ connect ~ clearBlacklist
     }
 
   @Path("/all")
@@ -88,7 +89,20 @@ case class PeersApiRoute(
     new ApiResponse(code = 200, message = "Json with connected peers or error")
   ))
   def blacklistedPeers: Route = (path("blacklisted") & get) {
-    complete(JsArray(peerDatabase.blacklistedHosts.take(MaxPeersInResponse).map(a => JsString(a.toString)).toSeq))
+    complete(JsArray(peerDatabase.detailedBlacklist.take(MaxPeersInResponse)
+      .map { case (h, (t, r)) => Json.obj("hostname" -> h.toString, "timestamp" -> t, "reason" -> r) }
+      .toList))
+  }
+
+
+  @Path("/clearblacklist")
+  @ApiOperation(value = "Remove all blacklisted peers", notes = "Clear blacklist", httpMethod = "POST")
+  @ApiResponses(Array(
+    new ApiResponse(code = 200, message = "200")
+  ))
+  def clearBlacklist: Route = (path("clearblacklist") & post & withAuth) {
+    peerDatabase.clearBlacklist()
+    complete(Json.obj("result" -> "blacklist cleared"))
   }
 }
 
@@ -96,5 +110,6 @@ object PeersApiRoute {
   val MaxPeersInResponse = 1000
 
   case class ConnectReq(host: String, port: Int)
+
   implicit val connectFormat: Format[ConnectReq] = Json.format
 }

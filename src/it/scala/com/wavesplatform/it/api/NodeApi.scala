@@ -87,8 +87,8 @@ trait NodeApi {
     (Json.parse(r.getResponseBody) \ "peers").as[Seq[Peer]]
   }
 
-  def blacklistedPeers: Future[Seq[String]] = get("/peers/blacklisted").map { r =>
-    Json.parse(r.getResponseBody).as[Seq[String]]
+  def blacklistedPeers: Future[Seq[BlacklistedPeer]] = get("/peers/blacklisted").map { r =>
+    Json.parse(r.getResponseBody).as[Seq[BlacklistedPeer]]
   }
 
   def connect(host: String, port: Int): Future[Unit] = postJson("/peers/connect", ConnectReq(host, port)).map(_ => ())
@@ -358,14 +358,8 @@ object NodeApi extends ScorexLogging {
 
   implicit val debugInfoFormat: Format[DebugInfo] = Json.format
 
-  def create(_restAddress: String,
-             _nodeRestPort: Int,
-             _matcherRestPort: Int,
-             _blockDelay: FiniteDuration
-            ): NodeApi = new NodeApi{
-    override def restAddress: String = _restAddress
-    override def nodeRestPort: Int = _nodeRestPort
-    override def matcherRestPort: Int = _matcherRestPort
-    override def blockDelay: FiniteDuration = _blockDelay
-  }
+
+  case class BlacklistedPeer(hostname : String, timestamp: Long, reason: String)
+  implicit val blacklistedPeerFormat: Format[BlacklistedPeer] = Json.format
+
 }

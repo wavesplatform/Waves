@@ -7,8 +7,6 @@ import cats.implicits._
 import com.wavesplatform.state2.reader.StateReaderImpl
 import scorex.utils.ScorexLogging
 
-import scala.language.higherKinds
-
 trait StateWriter {
   def applyBlockDiff(blockDiff: BlockDiff): Unit
 
@@ -16,10 +14,9 @@ trait StateWriter {
 }
 
 class StateWriterImpl(p: StateStorage, synchronizationToken: ReentrantReadWriteLock)
-  extends StateReaderImpl(p, synchronizationToken) with StateWriter with AutoCloseable with ScorexLogging {
+  extends StateReaderImpl(p, synchronizationToken) with StateWriter with AutoCloseable with ScorexLogging with Instrumented {
 
   import StateStorage._
-  import StateWriterImpl._
 
   override def close(): Unit = p.close()
 
@@ -47,11 +44,11 @@ class StateWriterImpl(p: StateStorage, synchronizationToken: ReentrantReadWriteL
 
     measureSizeLog("portfolios")(txsDiff.portfolios) {
       _.foreach { case (account, portfolioDiff) =>
-        val updatedPortfolio = accountPortfolio(account).combine(portfolioDiff)
-        sp().portfolios.put(account.bytes,
-          (updatedPortfolio.balance,
-            (updatedPortfolio.leaseInfo.leaseIn, updatedPortfolio.leaseInfo.leaseOut),
-            updatedPortfolio.assets.map { case (k, v) => k.arr -> v }))
+        val updatedPortfolio = this.partialPortfolio(account, portfolioDiff.assets.keySet).combine(portfolioDiff)
+        sp().wavesBalance.put(account.bytes, (updatedPortfolio.balance, updatedPortfolio.leaseInfo.leaseIn, updatedPortfolio.leaseInfo.leaseOut))
+        updatedPortfolio.assets.foreach { case (asset, amt) =>
+          sp().assetBalance.put(account.bytes, asset, amt)
+        }
       }
     }
 
@@ -109,7 +106,8 @@ class StateWriterImpl(p: StateStorage, synchronizationToken: ReentrantReadWriteL
 
   override def clear(): Unit = write { implicit l =>
     sp().transactions.clear()
-    sp().portfolios.clear()
+    sp().wavesBalance.clear()
+    sp().assetBalance.clear()
     sp().assets.clear()
     sp().accountTransactionIds.clear()
     sp().accountTransactionsLengths.clear()
@@ -123,26 +121,3 @@ class StateWriterImpl(p: StateStorage, synchronizationToken: ReentrantReadWriteL
     sp().commit()
   }
 }
-
-object StateWriterImpl extends ScorexLogging {
-
-  private def withTime[R](f: => R): (R, Long) = {
-    val t0 = System.currentTimeMillis()
-    val r: R = f
-    val t1 = System.currentTimeMillis()
-    (r, t1 - t0)
-  }
-
-  def measureSizeLog[F[_] <: TraversableOnce[_], A, R](s: String)(fa: => F[A])(f: F[A] => R): R = {
-    val (r, time) = withTime(f(fa))
-    log.trace(s"processing of ${fa.size} $s took ${time}ms")
-    r
-  }
-
-  def measureLog[R](s: String)(f: => R): R = {
-    val (r, time) = withTime(f)
-    log.trace(s"$s took ${time}ms")
-    r
-  }
-}
-

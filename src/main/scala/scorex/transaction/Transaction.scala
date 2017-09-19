@@ -23,6 +23,25 @@ trait Transaction extends BytesSerializable with JsonSerializable with Signed {
   override def hashCode(): Int = id.hashCode()
 }
 
+object Transaction {
+
+  implicit class TransactionExt(tx: Transaction) {
+    def feeDiff(): Portfolio = tx.assetFee match {
+      case (Some(asset), fee) =>
+        Portfolio(
+          balance = 0,
+          leaseInfo = LeaseInfo.empty,
+          assets = Map(asset -> fee))
+      case (None, fee) => Portfolio(
+        balance = fee,
+        leaseInfo = LeaseInfo.empty,
+        assets = Map.empty)
+    }
+  }
+
+}
+
+
 trait Signed {
   protected def signatureValid: Boolean
 
@@ -33,9 +52,8 @@ object Signed {
 
   type E[A] = Either[InvalidSignature, A]
 
-  def validateSignatures[S<: Signed](s: S): Either[InvalidSignature, S] = for {
+  def validateSignatures[S <: Signed](s: S): Either[InvalidSignature, S] = for {
     v <- if (s.signatureValid) Right(s) else Left(InvalidSignature(s, None))
-    ds <- foldM[E, List, Signed, Signed](s.signedDescendants.toList, v)
-    { case (_, d) => validateSignatures(d).left.map(inner => InvalidSignature(s, Some(inner))) }
+    ds <- foldM[E, List, Signed, Signed](s.signedDescendants.toList, v) { case (_, d) => validateSignatures(d).left.map(inner => InvalidSignature(s, Some(inner))) }
   } yield v
 }

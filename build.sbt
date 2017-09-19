@@ -2,11 +2,12 @@ import com.typesafe.sbt.packager.archetypes.TemplateWriter
 import sbt.Keys._
 import sbt._
 
-enablePlugins(sbtdocker.DockerPlugin, JavaServerAppPackaging, JDebPackaging, SystemdPlugin)
+enablePlugins(sbtdocker.DockerPlugin, JavaServerAppPackaging, JDebPackaging, SystemdPlugin, GitVersioning)
 
 name := "waves"
 organization := "com.wavesplatform"
-version := "0.7.5"
+git.useGitDescribe := true
+git.uncommittedSignifier := Some("DIRTY")
 scalaVersion in ThisBuild := "2.12.3"
 crossPaths := false
 publishArtifact in (Compile, packageDoc) := false
@@ -15,6 +16,7 @@ mainClass in Compile := Some("com.wavesplatform.Application")
 scalacOptions ++= Seq(
   "-feature",
   "-deprecation",
+  "-language:higherKinds",
   "-Ywarn-unused:-implicits",
   "-Xlint")
 logBuffered := false
@@ -37,9 +39,9 @@ libraryDependencies ++=
   Dependencies.itKit ++
   Dependencies.logging ++
   Dependencies.matcher ++
-  Dependencies.kamon ++
+  Dependencies.metrics ++
   Seq(
-    "com.iheart" %% "ficus" % "1.4.1",
+    "com.iheart" %% "ficus" % "1.4.2",
     ("org.scorexfoundation" %% "scrypto" % "1.2.2")
       .exclude("org.slf4j", "slf4j-api"),
     "commons-net" % "commons-net" % "3.+",

@@ -44,8 +44,8 @@ package object network extends ScorexLogging {
   def formatBlocks(blocks: Seq[Block]): String = formatSignatures(blocks.view.map(_.uniqueId))
 
   def formatSignatures(signatures: Seq[ByteStr]): String = if (signatures.isEmpty) ""
-    else if (signatures.size == 1) s"[${signatures.head}]"
-    else s"[${signatures.head}..${signatures.last}]"
+  else if (signatures.size == 1) s"[${signatures.head}]"
+  else s"[${signatures.head}..${signatures.last}]"
 
   implicit class ChannelHandlerContextExt(val ctx: ChannelHandlerContext) extends AnyVal {
     def remoteAddress: InetSocketAddress = ctx.channel().asInstanceOf[SocketChannel].remoteAddress()
@@ -53,11 +53,16 @@ package object network extends ScorexLogging {
 
   implicit class ChannelGroupExt(val allChannels: ChannelGroup) extends AnyVal {
     def broadcast(message: AnyRef, except: Option[Channel] = None): Unit = {
-      log.trace(s"Broadcasting $message to ${allChannels.size()} channels${except.fold("")(c => s" (except ${id(c)})")}")
+      message match {
+        case RawBytes(TransactionMessageSpec.messageCode, _) =>
+        case _ => log.trace(s"Broadcasting $message to ${allChannels.size()} channels${except.fold("")(c => s" (except ${id(c)})")}")
+
+      }
       allChannels.writeAndFlush(message, except.fold(ChannelMatchers.all())(ChannelMatchers.isNot))
     }
 
-    def broadcastTx(tx:Transaction, except: Option[Channel] = None): Unit =
+    def broadcastTx(tx: Transaction, except: Option[Channel] = None): Unit =
       allChannels.broadcast(RawBytes(TransactionMessageSpec.messageCode, tx.bytes), except)
   }
+
 }

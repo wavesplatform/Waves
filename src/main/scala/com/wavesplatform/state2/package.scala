@@ -4,8 +4,8 @@ import cats.{Monad, Traverse}
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction.{Transaction, ValidationError}
 
-import scala.util.{Left, Right, Try}
 import scala.language.higherKinds
+import scala.util.{Left, Right, Try}
 
 package object state2 {
 
@@ -26,5 +26,7 @@ package object state2 {
       case Right(value) => value
     }
   }
+
+  def trim(s: ByteStr): String = s.toString.take(7) + "..."
 
 }

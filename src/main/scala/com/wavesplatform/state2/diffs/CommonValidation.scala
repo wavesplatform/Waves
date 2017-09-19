@@ -22,9 +22,9 @@ object CommonValidation {
   def disallowSendingGreaterThanBalance[T <: Transaction](s: StateReader, settings: FunctionalitySettings, blockTime: Long, tx: T): Either[ValidationError, T] =
     if (blockTime >= settings.allowTemporaryNegativeUntil)
       tx match {
-        case ptx: PaymentTransaction if s.accountPortfolio(ptx.sender).balance < (ptx.amount + ptx.fee) =>
+        case ptx: PaymentTransaction if s.partialPortfolio(ptx.sender).balance < (ptx.amount + ptx.fee) =>
           Left(GenericError(s"Attempt to pay unavailable funds: balance " +
-            s"${s.accountPortfolio(ptx.sender).balance} is less than ${ptx.amount + ptx.fee}"))
+            s"${s.partialPortfolio(ptx.sender).balance} is less than ${ptx.amount + ptx.fee}"))
         case ttx: TransferTransaction =>
           val sender: Address = ttx.sender
 
@@ -37,8 +37,8 @@ object CommonValidation {
             case None => Portfolio(-ttx.fee, LeaseInfo.empty, Map.empty)
           }
 
-          val accountPortfolio = s.accountPortfolio(sender)
           val spendings = Monoid.combine(amountDiff, feeDiff)
+          val accountPortfolio = s.partialPortfolio(sender, spendings.assets.keySet)
 
           lazy val negativeAsset = spendings.assets.find { case (id, amt) => (accountPortfolio.assets.getOrElse(id, 0L) + amt) < 0L }.map { case (id, amt) => (id, accountPortfolio.assets.getOrElse(id, 0L), amt, accountPortfolio.assets.getOrElse(id, 0L) + amt) }
           lazy val newWavesBalance = accountPortfolio.balance + spendings.balance

@@ -67,6 +67,18 @@ class CompositeStateReader(inner: StateReader, blockDiff: BlockDiff) extends Sta
 
   override def filledVolumeAndFee(orderId: ByteStr): OrderFillInfo =
     blockDiff.txsDiff.orderFills.get(orderId).orEmpty.combine(inner.filledVolumeAndFee(orderId))
+
+  override def wavesBalance(a: Address): (Long, LeaseInfo) = {
+    val in = inner.partialPortfolio(a)
+    val diffed = blockDiff.txsDiff.portfolios.get(a).orEmpty
+    (in.balance + diffed.balance, Monoid.combine(diffed.leaseInfo, in.leaseInfo))
+  }
+
+  override def assetBalance(a: Address, asset: ByteStr): Long = {
+    val in: Long = inner.assetBalance(a, asset)
+    val diffed: Long = blockDiff.txsDiff.portfolios.get(a).orEmpty.assets.getOrElse(asset, 0)
+    in + diffed
+  }
 }
 
 object CompositeStateReader {
@@ -119,6 +131,12 @@ object CompositeStateReader {
 
     override def filledVolumeAndFee(orderId: ByteStr): OrderFillInfo =
       new CompositeStateReader(inner, blockDiff()).filledVolumeAndFee(orderId)
+
+    override def wavesBalance(a: Address): (Long, LeaseInfo) =
+      new CompositeStateReader(inner, blockDiff()).wavesBalance(a)
+
+    override def assetBalance(a: Address, asset: ByteStr): Long =
+      new CompositeStateReader(inner, blockDiff()).assetBalance(a, asset)
   }
 
   def composite(inner: StateReader, blockDiff: () => BlockDiff): Proxy = new Proxy(inner, blockDiff)

@@ -20,7 +20,7 @@ import scorex.account.Address
 import scorex.api.http._
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash
-import scorex.transaction.{BlockchainUpdater, History}
+import scorex.transaction._
 import scorex.wallet.Wallet
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -29,6 +29,8 @@ import scala.util.{Failure, Success}
 import scala.util.control.NonFatal
 import DebugApiRoute._
 import com.wavesplatform.mining.Miner
+import com.wavesplatform.mining.MinerDebugInfo
+import scorex.block.Block.BlockId
 
 
 @Path("/debug")
@@ -36,16 +38,18 @@ import com.wavesplatform.mining.Miner
 case class DebugApiRoute(settings: RestAPISettings,
                          wallet: Wallet,
                          stateReader: StateReader,
-                         history: History,
+                         history: History with DebugNgHistory,
                          peerDatabase: PeerDatabase,
                          establishedConnections: ConcurrentMap[Channel, PeerInfo],
                          blockchainUpdater: BlockchainUpdater,
                          allChannels: ChannelGroup,
                          utxStorage: UtxPool,
-                         miner: Miner) extends ApiRoute {
+                         blockchainDebugInfo: BlockchainDebugInfo,
+                         miner: Miner with MinerDebugInfo
+                        ) extends ApiRoute {
 
   override lazy val route: Route = pathPrefix("debug") {
-    blocks ~ state ~ info ~ stateWaves ~ rollback ~ rollbackTo ~ blacklist ~ portfolios
+    blocks ~ state ~ info ~ stateWaves ~ rollback ~ rollbackTo ~ blacklist ~ portfolios ~ minerInfo ~ topDiffAccountPortfolios ~ bottomDiffAccountPortfolios ~ historyInfo
   }
 
   @Path("/blocks/{howMany}")
@@ -133,7 +137,7 @@ case class DebugApiRoute(settings: RestAPISettings,
         if (returnTransactionsToUtx) {
           txs.foreach(tx => utxStorage.putIfNew(tx))
         }
-        miner.lastBlockChanged()
+        miner.scheduleMining()
         Json.obj("BlockId" -> blockId.toString): ToResponseMarshallable
       case Left(error) => ApiError.fromValidationError(error)
     }
@@ -154,17 +158,15 @@ case class DebugApiRoute(settings: RestAPISettings,
   @ApiResponses(Array(
     new ApiResponse(code = 200, message = "200 if success, 404 if there are no block at this height")
   ))
-  def rollback: Route = withAuth {
-    (path("rollback") & post) {
-      json[RollbackParams] { params =>
-        history.blockAt(params.rollbackTo) match {
-          case Some(block) =>
-            rollbackToBlock(block.uniqueId, params.returnTransactionsToUtx)
-          case None =>
-            (StatusCodes.BadRequest, "Block at height not found")
-        }
-      } ~ complete(StatusCodes.BadRequest)
-    }
+  def rollback: Route = (path("rollback") & post & withAuth) {
+    json[RollbackParams] { params =>
+      history.blockAt(params.rollbackTo) match {
+        case Some(block) =>
+          rollbackToBlock(block.uniqueId, params.returnTransactionsToUtx)
+        case None =>
+          (StatusCodes.BadRequest, "Block at height not found")
+      }
+    } ~ complete(StatusCodes.BadRequest)
   }
 
   @Path("/info")
@@ -175,8 +177,53 @@ case class DebugApiRoute(settings: RestAPISettings,
   def info: Route = (path("info") & get) {
     complete(Json.obj(
       "stateHeight" -> stateReader.height,
-      "stateHash" -> stateReader.accountPortfoliosHash
+      "stateHash" -> blockchainDebugInfo.persistedAccountPortfoliosHash,
+      "blockchainDebugInfo" -> blockchainDebugInfo.debugInfo()
     ))
+  }
+
+  @Path("/topDiffAccountPortfolios")
+  @ApiOperation(value = "State", notes = "All top diff info you need to debug", httpMethod = "GET")
+  @ApiResponses(Array(
+    new ApiResponse(code = 200, message = "Json state")
+  ))
+  def topDiffAccountPortfolios: Route = (path("topDiffAccountPortfolios") & get & withAuth) {
+    complete(blockchainDebugInfo.topDiff())
+  }
+
+  @Path("/bottomDiffAccountPortfolios")
+  @ApiOperation(value = "State", notes = "All bottom diff info you need to debug", httpMethod = "GET")
+  @ApiResponses(Array(
+    new ApiResponse(code = 200, message = "Json state")
+  ))
+  def bottomDiffAccountPortfolios: Route = (path("bottomDiffAccountPortfolios") & get & withAuth) {
+    complete(blockchainDebugInfo.bottomDiff())
+  }
+
+  @Path("/minerInfo")
+  @ApiOperation(value = "State", notes = "All miner info you need to debug", httpMethod = "GET")
+  @ApiResponses(Array(
+    new ApiResponse(code = 200, message = "Json state")
+  ))
+  def minerInfo: Route = (path("minerInfo") & get & withAuth) {
+    complete(miner.collectNextBlockGenerationTimes.map { case (a, t) =>
+      AccountMiningInfo(a.stringRepr,
+        stateReader.effectiveBalanceAtHeightWithConfirmations(a, stateReader.height, 1000).get,
+        t)
+    })
+  }
+
+
+  @Path("/historyInfo")
+  @ApiOperation(value = "State", notes = "All history info you need to debug", httpMethod = "GET")
+  @ApiResponses(Array(
+    new ApiResponse(code = 200, message = "Json state")
+  ))
+  def historyInfo: Route = (path("historyInfo") & get & withAuth) {
+    val a = history.lastPersistedBlockIds(10)
+    val b = history.microblockIds()
+    complete(HistoryInfo(a, b))
+
   }
 
 
@@ -204,23 +251,21 @@ case class DebugApiRoute(settings: RestAPISettings,
   @ApiResponses(Array(
     new ApiResponse(code = 200, message = "200 if success, 404 if there are no peer with such address")
   ))
-  def blacklist: Route = withAuth {
-    (path("blacklist") & post) {
-      entity(as[String]) { socketAddressString =>
-        try {
-          val uri = new URI("node://" + socketAddressString)
-          val address = InetAddress.getByName(uri.getHost)
-          establishedConnections.entrySet().stream().forEach(entry => {
-            if (entry.getValue.remoteAddress.getAddress == address) {
-              peerDatabase.blacklistAndClose(entry.getKey, "Debug API request")
-            }
-          })
-          complete(StatusCodes.OK)
-        } catch {
-          case NonFatal(_) => complete(StatusCodes.BadRequest)
-        }
-      } ~ complete(StatusCodes.BadRequest)
-    }
+  def blacklist: Route = (path("blacklist") & post & withAuth) {
+    entity(as[String]) { socketAddressString =>
+      try {
+        val uri = new URI("node://" + socketAddressString)
+        val address = InetAddress.getByName(uri.getHost)
+        establishedConnections.entrySet().stream().forEach(entry => {
+          if (entry.getValue.remoteAddress.getAddress == address) {
+            peerDatabase.blacklistAndClose(entry.getKey, "Debug API request")
+          }
+        })
+        complete(StatusCodes.OK)
+      } catch {
+        case NonFatal(_) => complete(StatusCodes.BadRequest)
+      }
+    } ~ complete(StatusCodes.BadRequest)
   }
 
 }
@@ -245,4 +290,29 @@ object DebugApiRoute {
   )
   implicit val leaseInfoFormat: Format[LeaseInfo] = Json.format
   implicit val portfolioFormat: Format[Portfolio] = Json.format
+
+  case class AccountMiningInfo(address: String, miningBalance: Long, timestamp: Long)
+
+  implicit val accountMiningBalanceFormat: Format[AccountMiningInfo] = Json.format
+
+  implicit val hashInfoFormat: Format[HashInfo] = Json.format
+  implicit val stateDebugInfoFormat: Format[StateDebugInfo] = Json.format
+
+  implicit val addressWrites: Format[Address] = new Format[Address] {
+    override def writes(o: Address): JsValue = JsString(o.stringRepr)
+
+    override def reads(json: JsValue): JsResult[Address] = ???
+  }
+
+  implicit val byteStrWrites: Format[ByteStr] = new Format[ByteStr] {
+    override def writes(o: AssetId): JsValue = JsString(o.base58)
+
+    override def reads(json: JsValue): JsResult[BlockId] = ???
+  }
+
+  case class HistoryInfo(lastBlockIds: Seq[BlockId], microBlockIds: Seq[BlockId])
+
+  implicit val historyInfoFormat: Format[HistoryInfo] = Json.format
+
+
 }

@@ -4,8 +4,9 @@ import java.net.{InetAddress, InetSocketAddress}
 import java.util
 
 import com.google.common.primitives.{Bytes, Ints}
+import com.wavesplatform.mining.Miner.MaxTransactionsPerMicroblock
 import com.wavesplatform.state2.ByteStr
-import scorex.block.Block
+import scorex.block.{Block, MicroBlock}
 import scorex.crypto.signatures.SigningFunctions.Signature
 import scorex.network.message.Message._
 import scorex.network.message._
@@ -138,7 +139,7 @@ object BlockMessageSpec extends MessageSpec[Block] {
 
   override val messageName: String = "Block message"
 
-  override def maxLength = 271 + TransactionMessageSpec.maxLength * 255
+  override def maxLength = 271 + TransactionMessageSpec.maxLength * Block.MaxTransactionsPerBlockVer3
 
   override def serializeData(block: Block): Array[Byte] = block.bytes
 
@@ -210,9 +211,53 @@ object TransactionMessageSpec extends MessageSpec[Transaction] {
   override def serializeData(tx: Transaction): Array[Byte] = tx.bytes
 }
 
+object MicroBlockInvMessageSpec extends MessageSpec[MicroBlockInv] {
+  override val messageCode: MessageCode = 26: Byte
+
+  override val messageName: String = "Microblock Inv message"
+
+  override def deserializeData(bytes: Array[Byte]): Try[MicroBlockInv] =
+    Try(MicroBlockInv(
+      totalBlockSig = ByteStr(bytes.take(SignatureLength)),
+      prevBlockSig = ByteStr(bytes.view.slice(SignatureLength, SignatureLength * 2).toArray)))
+
+  override def serializeData(inv: MicroBlockInv): Array[Byte] = {
+    inv.totalBlockSig.arr ++ inv.prevBlockSig.arr
+  }
+
+  override def maxLength = 500
+}
+
+object MicroBlockRequestMessageSpec extends MessageSpec[MicroBlockRequest] {
+  override val messageCode: MessageCode = 27: Byte
+
+  override val messageName: String = "Microblock Request message"
+
+  override def deserializeData(bytes: Array[Byte]): Try[MicroBlockRequest] =
+    Try(MicroBlockRequest(ByteStr(bytes)))
+
+  override def serializeData(req: MicroBlockRequest): Array[Byte] = req.totalBlockSig.arr
+
+  override def maxLength = 500
+}
+
+object MicroBlockResponseMessageSpec extends MessageSpec[MicroBlockResponse] {
+  override val messageCode: MessageCode = 28: Byte
+
+  override val messageName: String = "Microblock Response message"
+
+  override def deserializeData(bytes: Array[Byte]): Try[MicroBlockResponse] =
+    MicroBlock.parseBytes(bytes).map(MicroBlockResponse)
+
+  override def serializeData(resp: MicroBlockResponse): Array[Byte] = resp.microblock.bytes
+
+  override def maxLength = 271 + TransactionMessageSpec.maxLength * MaxTransactionsPerMicroblock
+
+}
 
 
 object BasicMessagesRepo {
   val specs: Seq[MessageSpec[_ <: AnyRef]] = Seq(GetPeersSpec, PeersSpec, GetSignaturesSpec, SignaturesSpec,
-    GetBlockSpec, BlockMessageSpec, ScoreMessageSpec, CheckpointMessageSpec, TransactionMessageSpec)
+    GetBlockSpec, BlockMessageSpec, ScoreMessageSpec, CheckpointMessageSpec, TransactionMessageSpec,
+    MicroBlockInvMessageSpec, MicroBlockRequestMessageSpec, MicroBlockResponseMessageSpec)
 }
