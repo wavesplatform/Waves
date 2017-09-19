@@ -1,5 +1,6 @@
 package tools
 
+import com.wavesplatform.TransactionGen
 import com.wavesplatform.settings.{GenesisSettings, GenesisTransactionSettings}
 import com.wavesplatform.state2._
 import scorex.account.{Address, AddressScheme, PrivateKeyAccount}
@@ -12,7 +13,7 @@ import scorex.wallet.Wallet
 
 import scala.concurrent.duration._
 
-object GenesisBlockGenerator extends App {
+object GenesisBlockGenerator extends App with TransactionGen {
 
   val genesisSigner = PrivateKeyAccount(Array.empty)
   val reference = ByteStr(Array.fill(SignatureLength)(-1: Byte))
@@ -23,9 +24,8 @@ object GenesisBlockGenerator extends App {
     4 -> Seq(700000000000000L, 200000000000000L, 150000000000000L, 50000000000000L)
   )
 
-
   def generateFullAddressInfo() = {
-    val seed = Array.fill(32)((scala.util.Random.nextInt(256)).toByte)
+    val seed = bytes32gen.sample.get
     val acc = Wallet.generateNewAccount(seed, 0)
     val privateKey = ByteStr(acc.privateKey)
     val publicKey = ByteStr(acc.publicKey)
@@ -48,7 +48,6 @@ object GenesisBlockGenerator extends App {
 
     (accounts, GenesisSettings(timestamp, timestamp, initialBalance, Some(signature),
       genesisTxs.map(tx => GenesisTransactionSettings(tx.recipient.stringRepr, tx.amount)), baseTraget, averageBlockDelay))
-
   }
 
   def print(accs: Seq[(Int, (ByteStr, ByteStr, ByteStr, ByteStr, Address))], settings: GenesisSettings): Unit = {
@@ -80,6 +79,4 @@ object GenesisBlockGenerator extends App {
 
   val (a, s) = generate('D', 3, 153722867, 60.seconds)
   print(a, s)
-
-
 }

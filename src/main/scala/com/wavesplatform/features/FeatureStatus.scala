@@ -19,8 +19,9 @@ object FeatureStatus {
   }
 
   def apply(status: Byte): FeatureStatus = status match {
+    case 0 => Defined
     case 1 => Accepted
     case 2 => Activated
-    case _ => Defined
+    case _ => ???
   }
 }
