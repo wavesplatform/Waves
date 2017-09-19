@@ -84,7 +84,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
       case Some(ng) if !ng.contains(block.reference) =>
         Left(BlockAppendError(s"References incorrect or non-existing block", block))
       case Some(ng) =>
-        val referencedLiquidDiff = ng.diffs(block.reference)
+        val referencedLiquidDiff = ng.diffs(block.reference)._1
         val (referencedForgedBlock, discarded) = measureSuccessful(forgeBlockTimeStats, ng.forgeBlock(block.reference)).get
         if (referencedForgedBlock.signatureValid) {
           if (discarded.nonEmpty) {
@@ -104,7 +104,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
           Left(BlockAppendError(errorText, block))
         }
     }).map { case ((newBlockDiff, discacrded)) =>
-      ngState.set(Some(NgState(block, newBlockDiff)))
+      ngState.set(Some(NgState(block, newBlockDiff, 0L)))
       log.info(
         s"""Block ${block.uniqueId} -> ${trim(block.reference)} appended.
            | -- New height: ${historyWriter.height() + 1}, transactions: ${block.transactionData.size})""".stripMargin)
@@ -175,7 +175,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
             } yield {
               log.info(s"MicroBlock ${trim(microBlock.totalResBlockSig)}~>${trim(microBlock.prevResBlockSig)} appended. " +
                 s"-- with ${microBlock.transactionData.size} transactions")
-              ngState.set(Some(ng + (microBlock, Monoid.combine(ng.bestLiquidDiff, diff))))
+              ngState.set(Some(ng + (microBlock, Monoid.combine(ng.bestLiquidDiff, diff), System.currentTimeMillis())))
             }
         }
     }

@@ -8,6 +8,7 @@ import scorex.block.{Block, MicroBlock}
 import scorex.transaction.History.BlockchainScore
 import scorex.utils.Synchronized
 
+import scala.concurrent.duration.Duration
 import scala.util.Try
 
 trait History extends Synchronized with AutoCloseable with FeatureProvider {
@@ -31,6 +32,8 @@ trait History extends Synchronized with AutoCloseable with FeatureProvider {
 
 trait NgHistory extends History {
   def microBlock(id: ByteStr): Option[MicroBlock]
+
+  def bestLastBlock(maxTimestamp: Long) : Option[Block]
 }
 
 trait DebugNgHistory {

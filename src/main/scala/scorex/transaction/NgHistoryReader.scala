@@ -7,9 +7,8 @@ import com.wavesplatform.state2._
 import scorex.block.Block.BlockId
 import scorex.block.{Block, MicroBlock}
 import scorex.transaction.History.BlockchainScore
-import scorex.utils.ScorexLogging
 
-class NgHistoryReader(ngState: () => Option[NgState], inner: History) extends History with NgHistory with DebugNgHistory with ScorexLogging with Instrumented {
+class NgHistoryReader(ngState: () => Option[NgState], inner: History) extends History with NgHistory with DebugNgHistory {
 
   override def synchronizationToken: ReentrantReadWriteLock = inner.synchronizationToken
 
@@ -74,6 +73,10 @@ class NgHistoryReader(ngState: () => Option[NgState], inner: History) extends Hi
 
   override def microblockIds(): Seq[BlockId] =
     ngState().toSeq.flatMap(ng => ng.micros.map(_.totalResBlockSig))
+
+  override def bestLastBlock(maxTimestamp: Long): Option[Block] = {
+      ngState().map(_.bestLastBlock(maxTimestamp)).orElse(inner.lastBlock)
+  }
 
   override def status(feature: Short): FeatureStatus = ???
 }

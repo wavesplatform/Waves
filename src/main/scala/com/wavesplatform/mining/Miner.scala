@@ -22,7 +22,7 @@ import scorex.block.{Block, MicroBlock}
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
 import scorex.transaction.PoSCalc._
 import scorex.transaction.ValidationError.GenericError
-import scorex.transaction.{BlockchainUpdater, CheckpointService, History, ValidationError}
+import scorex.transaction._
 import scorex.utils.{ScorexLogging, Time}
 import scorex.wallet.Wallet
 
@@ -31,17 +31,17 @@ import scala.concurrent.Await
 import scala.concurrent.duration._
 
 class Miner(
-             allChannels: ChannelGroup,
-             blockchainReadiness: AtomicBoolean,
-             blockchainUpdater: BlockchainUpdater,
-             checkpoint: CheckpointService,
-             history: History,
-             featureProvider: FeatureProvider,
-             stateReader: StateReader,
-             settings: WavesSettings,
-             timeService: Time,
-             utx: UtxPool,
-             wallet: Wallet) extends MinerDebugInfo with ScorexLogging with Instrumented {
+               allChannels: ChannelGroup,
+               blockchainReadiness: AtomicBoolean,
+               blockchainUpdater: BlockchainUpdater,
+               checkpoint: CheckpointService,
+               history: NgHistory,
+               featureProvider: FeatureProvider,
+               stateReader: StateReader,
+               settings: WavesSettings,
+               timeService: Time,
+               utx: UtxPool,
+               wallet: Wallet) extends MinerDebugInfo with ScorexLogging with Instrumented {
 
   import Miner._
 
@@ -71,7 +71,7 @@ class Miner(
                                    greatGrandParent: Option[Block], balance: Long, version: Byte)(delay: FiniteDuration): Task[Either[String, Block]] = Task {
     // should take last block right at the time of mining since microblocks might have been added
     // the rest doesn't change
-    val parent = history.lastBlock.get
+    val parent = history.bestLastBlock(System.currentTimeMillis() - 3000L).get
     val pc = allChannels.size()
     lazy val lastBlockKernelData = parent.consensusData
     lazy val currentTime = timeService.correctedTime()
