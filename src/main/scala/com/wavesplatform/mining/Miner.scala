@@ -4,7 +4,7 @@ import java.time.{Duration, Instant}
 import java.util.concurrent.atomic.AtomicBoolean
 
 import com.wavesplatform.features.{FeatureProvider, FeatureStatus}
-import com.wavesplatform.general.BlockVersionResolver
+import com.wavesplatform.general.BlockVersion
 import com.wavesplatform.network._
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state2.reader.StateReader
@@ -35,7 +35,6 @@ class Miner(
              stateReader: StateReader,
              settings: WavesSettings,
              timeService: Time,
-             blockVersionResolver: BlockVersionResolver,
              utx: UtxPool,
              wallet: Wallet) extends ScorexLogging {
 
@@ -90,7 +89,7 @@ class Miner(
 
   private def generateBlockTask(account: PrivateKeyAccount): Task[Unit] = {
     val height = history.height()
-    val version = blockVersionResolver.resolve(height, settings)
+    val version = BlockVersion.resolve(height, settings)
     val lastBlock = history.lastBlock.get
     val grandParent = history.parent(lastBlock, 2)
     (for {

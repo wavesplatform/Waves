@@ -28,7 +28,10 @@ case class FunctionalitySettings private(featureCheckBlocksPeriod: Int,
                                  allowMultipleLeaseCancelTransactionUntilTimestamp: Long,
                                  resetEffectiveBalancesAtHeight: Long,
                                  allowLeasedBalanceTransferUntil: Long,
-                                 blockVersion3After: Long)
+                                 blockVersion3After: Long) {
+  require(featureCheckBlocksPeriod > 0, "featureCheckBlocksPeriod must be greater than 0")
+  require((blocksForFeatureActivation > 0) && (blocksForFeatureActivation <= featureCheckBlocksPeriod), s"blocksForFeatureActivation must be in range 1 to $featureCheckBlocksPeriod")
+}
 
 object FunctionalitySettings {
   val MAINNET = apply(
@@ -75,31 +78,6 @@ object FunctionalitySettings {
 
 
   val configPath = "waves.blockchain.custom.functionality"
-
-  def apply(featureCheckBlocksPeriod: Int,
-            blocksForFeatureActivation: Int,
-            allowTemporaryNegativeUntil: Long,
-            allowInvalidPaymentTransactionsByTimestamp: Long,
-            requireSortedTransactionsAfter: Long,
-            generationBalanceDepthFrom50To1000AfterHeight: Long,
-            minimalGeneratingBalanceAfter: Long,
-            allowTransactionsFromFutureUntil: Long,
-            allowUnissuedAssetsUntil: Long,
-            allowBurnTransactionAfter: Long,
-            allowLeaseTransactionAfter: Long,
-            requirePaymentUniqueIdAfter: Long,
-            allowExchangeTransactionAfter: Long,
-            allowInvalidReissueInSameBlockUntilTimestamp: Long,
-            allowCreatealiasTransactionAfter: Long,
-            allowMultipleLeaseCancelTransactionUntilTimestamp: Long,
-            resetEffectiveBalancesAtHeight: Long,
-            allowLeasedBalanceTransferUntil: Long,
-            blockVersion3After: Long): FunctionalitySettings = {
-    require(featureCheckBlocksPeriod > 0, "featureCheckBlocksPeriod must be greater than 0")
-    require((blocksForFeatureActivation > 0) && (blocksForFeatureActivation <= featureCheckBlocksPeriod), s"blocksForFeatureActivation must be in range 1 to $featureCheckBlocksPeriod")
-
-    new FunctionalitySettings(featureCheckBlocksPeriod, blocksForFeatureActivation, allowTemporaryNegativeUntil, allowInvalidPaymentTransactionsByTimestamp, requireSortedTransactionsAfter, generationBalanceDepthFrom50To1000AfterHeight, minimalGeneratingBalanceAfter, allowTransactionsFromFutureUntil, allowUnissuedAssetsUntil, allowBurnTransactionAfter, allowLeaseTransactionAfter, requirePaymentUniqueIdAfter, allowExchangeTransactionAfter, allowInvalidReissueInSameBlockUntilTimestamp, allowCreatealiasTransactionAfter, allowMultipleLeaseCancelTransactionUntilTimestamp, resetEffectiveBalancesAtHeight, allowLeasedBalanceTransferUntil, blockVersion3After)
-  }
 }
 
 case class GenesisTransactionSettings(recipient: String, amount: Long)
