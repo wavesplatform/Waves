@@ -1,3 +1,5 @@
 package scorex.consensus.nxt
 
-case class NxtLikeConsensusBlockData(baseTarget: Long, generationSignature: Array[Byte])
+import com.wavesplatform.state2.ByteStr
+
+case class NxtLikeConsensusBlockData(baseTarget: Long, generationSignature: ByteStr)

@@ -1,7 +1,6 @@
 package com.wavesplatform
 
 import java.io.File
-import java.time.Duration
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.state2.ByteStr
@@ -13,7 +12,6 @@ package object settings {
 
   implicit val fileReader: ValueReader[File] = (cfg, path) => new File(cfg.getString(path))
   implicit val byteStrReader: ValueReader[ByteStr] = (cfg, path) => ByteStr.decodeBase58(cfg.getString(path)).get
-  implicit val javaDurationReader: ValueReader[Duration] = (cfg, path) => cfg.getDuration(path)
   implicit val shortValueReader: ValueReader[Short] = (cfg, path) => cfg.getLong(path).toShort
 
   def loadConfig(userConfig: Config): Config = {

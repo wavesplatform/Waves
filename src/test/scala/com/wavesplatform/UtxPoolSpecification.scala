@@ -3,6 +3,7 @@ package com.wavesplatform
 import java.util.concurrent.locks.ReentrantReadWriteLock
 
 import com.wavesplatform.history.{HistoryWriterImpl, StorageFactory}
+import com.wavesplatform.state2.diffs._
 import com.wavesplatform.settings.{BlockchainSettings, FeeSettings, FeesSettings, FunctionalitySettings, UtxSettings}
 import org.scalacheck.Gen._
 import org.scalacheck.{Gen, Shrink}
@@ -35,7 +36,7 @@ class UtxPoolSpecification extends FreeSpec
 
   private def mkState(senderAccount: Address, senderBalance: Long) = {
     val genesisSettings = TestHelpers.genesisSettings(Map(senderAccount -> senderBalance))
-    val (history, _, state, bcu) =
+    val (history, _, state, bcu, _) =
       StorageFactory(BlockchainSettings(None, None, None, 'T', 5, FunctionalitySettings.TESTNET, genesisSettings)).get
 
     bcu.processBlock(Block.genesis(genesisSettings).right.get)
@@ -127,7 +128,7 @@ class UtxPoolSpecification extends FreeSpec
   "UTX Pool" - {
     "does not add new transactions when full" in utxTest(UtxSettings(1, 5.seconds)) { (txs, utx, _) =>
       utx.putIfNew(txs.head) shouldBe 'right
-      all(txs.tail.map(t => utx.putIfNew(t))) shouldBe 'left
+      all(txs.tail.map(t => utx.putIfNew(t))) should produce("pool size limit")
     }
 
     "does not broadcast the same transaction twice" in utxTest() { (txs, utx, _) =>
@@ -158,7 +159,7 @@ class UtxPoolSpecification extends FreeSpec
 
       time.advance(offset)
 
-      utx.packUnconfirmed() shouldBe 'empty
+      utx.packUnconfirmed(100, false) shouldBe 'empty
       utx.all() shouldBe 'empty
     }
 
@@ -170,7 +171,7 @@ class UtxPoolSpecification extends FreeSpec
 
       time.advance(offset)
 
-      utx.packUnconfirmed().size shouldBe 2
+      utx.packUnconfirmed(100, false).size shouldBe 2
       utx.all().size shouldBe 2
     }
 
@@ -204,7 +205,7 @@ class UtxPoolSpecification extends FreeSpec
         val poolSizeBefore = utxPool.size
 
         time.advance(settings.maxTransactionAge * 2)
-        utxPool.packUnconfirmed()
+        utxPool.packUnconfirmed(100, false)
 
         poolSizeBefore should be > utxPool.size
         val utxPortfolioAfter = utxPool.portfolio(sender)

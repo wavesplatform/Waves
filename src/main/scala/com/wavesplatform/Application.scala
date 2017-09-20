@@ -15,6 +15,7 @@ import com.wavesplatform.actor.RootActorSystem
 import com.wavesplatform.history.{CheckpointServiceImpl, StorageFactory}
 import com.wavesplatform.http.NodeApiRoute
 import com.wavesplatform.matcher.Matcher
+import com.wavesplatform.metrics.Metrics
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.network.{NetworkServer, PeerDatabaseImpl, PeerInfo, UPnP}
 import com.wavesplatform.settings._
@@ -43,7 +44,7 @@ import scala.util.Try
 class Application(val actorSystem: ActorSystem, val settings: WavesSettings) extends ScorexLogging {
 
   private val checkpointService = new CheckpointServiceImpl(settings.blockchainSettings.checkpointFile, settings.checkpointsSettings)
-  private val (history, stateWriter, stateReader, blockchainUpdater) = StorageFactory(settings.blockchainSettings).get
+  private val (history, stateWriter, stateReader, blockchainUpdater, blockchainDebugInfo) = StorageFactory(settings.blockchainSettings).get
   private lazy val upnp = new UPnP(settings.networkSettings.uPnPSettings) // don't initialize unless enabled
   private val wallet: Wallet = Wallet(settings.walletSettings)
 
@@ -73,7 +74,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
     val network = new NetworkServer(checkpointService, blockchainUpdater, time, miner, stateReader, settings,
       history, utxStorage, peerDatabase, allChannels, establishedConnections, blockchainReadiness)
 
-    miner.lastBlockChanged()
+    miner.scheduleMining()
 
     val apiRoutes = Seq(
       BlocksApiRoute(settings.restAPISettings, settings.checkpointsSettings, history, allChannels, checkpointService, blockchainUpdater),
@@ -84,7 +85,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
       UtilsApiRoute(settings.restAPISettings),
       PeersApiRoute(settings.restAPISettings, network.connect, peerDatabase, establishedConnections),
       AddressApiRoute(settings.restAPISettings, wallet, stateReader, settings.blockchainSettings.functionalitySettings),
-      DebugApiRoute(settings.restAPISettings, wallet, stateReader, history, peerDatabase, establishedConnections, blockchainUpdater, allChannels, utxStorage, miner),
+      DebugApiRoute(settings.restAPISettings, wallet, stateReader, history, peerDatabase, establishedConnections, blockchainUpdater, allChannels, utxStorage, blockchainDebugInfo, miner),
       WavesApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, time),
       AssetsApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, stateReader, time),
       NodeApiRoute(settings.restAPISettings, () => this.shutdown()),
@@ -232,6 +233,7 @@ object Application extends ScorexLogging {
     val config = readConfig(args.headOption)
     val settings = WavesSettings.fromConfig(config)
     Kamon.start(config)
+    Metrics.start(settings.metrics)
 
     RootActorSystem.start("wavesplatform", config) { actorSystem =>
       configureLogging(settings)
@@ -246,6 +248,7 @@ object Application extends ScorexLogging {
       new Application(actorSystem, settings) {
         override def shutdown(): Unit = {
           Kamon.shutdown()
+          Metrics.shutdown()
           super.shutdown()
         }
       }.run()

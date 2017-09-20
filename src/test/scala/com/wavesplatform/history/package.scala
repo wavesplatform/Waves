@@ -3,7 +3,7 @@ package com.wavesplatform
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state2._
 import scorex.account.PrivateKeyAccount
-import scorex.block.Block
+import scorex.block.{Block, MicroBlock}
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
 import scorex.lagonaki.mocks.TestBlock
 import scorex.settings.TestFunctionalitySettings
@@ -20,24 +20,59 @@ package object history {
     functionalitySettings = TestFunctionalitySettings.Enabled,
     genesisSettings = null)
 
-  def domain(): Domain = {
-    val (history, _, stateReader, blockchainUpdater) = StorageFactory(DefaultBlockchainSettings).get
+  val ApplyMinerFeeWithTransactionSettings: BlockchainSettings = DefaultBlockchainSettings.copy(
+    functionalitySettings = DefaultBlockchainSettings.functionalitySettings.copy(enableMicroblocksAfterHeight = 0))
+
+  val ApplyMinerFeeBeforeAllTransactionsSettings: BlockchainSettings = DefaultBlockchainSettings.copy(
+    functionalitySettings = DefaultBlockchainSettings.functionalitySettings.copy(enableMicroblocksAfterHeight = Long.MaxValue))
+
+
+  def domain(bs: BlockchainSettings): Domain = {
+    val (history, _, stateReader, blockchainUpdater, _) = StorageFactory(bs).get
     Domain(history, stateReader, blockchainUpdater)
   }
 
-  private val defaultSigner = PrivateKeyAccount(Array.fill(TransactionParser.KeyLength)(0))
-  private val generationSignature = Array.fill(Block.GeneratorSignatureLength)(0: Byte)
+  val defaultSigner = PrivateKeyAccount(Array.fill(TransactionParser.KeyLength)(0))
+  val generationSignature = ByteStr(Array.fill(Block.GeneratorSignatureLength)(0: Byte))
 
-  def buildBlockOfTxs(refTo: ByteStr, txs: Seq[Transaction]): Block = {
+  def buildBlockOfTxs(refTo: ByteStr, txs: Seq[Transaction]): Block = customBuildBlockOfTxs(refTo, txs, defaultSigner, 1, 0L)
+
+  def customBuildBlockOfTxs(refTo: ByteStr, txs: Seq[Transaction],
+                            signer: PrivateKeyAccount, version: Byte, timestamp: Long): Block =
     Block.buildAndSign(
-      version = 1: Byte,
-      timestamp = 0L,
+      version = version,
+      timestamp = timestamp,
       reference = refTo,
       consensusData = NxtLikeConsensusBlockData(
         baseTarget = 1L,
         generationSignature = generationSignature),
       transactionData = txs,
-      signer = defaultSigner).explicitGet()
+      signer = signer).explicitGet()
+
+
+  def customBuildMicroBlockOfTxs(totalRefTo: ByteStr, prevTotal: Block, txs: Seq[Transaction],
+                                 signer: PrivateKeyAccount, version: Byte, ts: Long): (Block, MicroBlock) = {
+    val newTotalBlock = customBuildBlockOfTxs(totalRefTo, prevTotal.transactionData ++ txs, signer, version, ts)
+    val nonSigned = MicroBlock.buildAndSign(
+      generator = signer,
+      transactionData = txs,
+      prevResBlockSig = prevTotal.uniqueId,
+      totalResBlockSig = newTotalBlock.uniqueId
+    ).explicitGet()
+    (newTotalBlock, nonSigned)
+  }
+
+
+  def buildMicroBlockOfTxs(totalRefTo: ByteStr, prevTotal: Block, txs: Seq[Transaction],
+                           signer: PrivateKeyAccount): (Block, MicroBlock) = {
+    val newTotalBlock = buildBlockOfTxs(totalRefTo, prevTotal.transactionData ++ txs)
+    val nonSigned = MicroBlock.buildAndSign(
+      generator = signer,
+      transactionData = txs,
+      prevResBlockSig = prevTotal.uniqueId,
+      totalResBlockSig = newTotalBlock.uniqueId
+    ).explicitGet()
+    (newTotalBlock, nonSigned)
   }
 
   def randomSig: ByteStr = TestBlock.randomOfLength(Block.BlockIdLength)
@@ -51,6 +86,19 @@ package object history {
     }
 
     chainBlocksR(randomSig, txs)
+  }
+
+  def chainBaseAndMicro(totalRefTo: ByteStr, base: Transaction, micros: Seq[Seq[Transaction]]): (Block, Seq[MicroBlock]) =
+    chainBaseAndMicro(totalRefTo, Seq(base), micros, defaultSigner, 1, 0L)
+
+  def chainBaseAndMicro(totalRefTo: ByteStr, base: Seq[Transaction], micros: Seq[Seq[Transaction]],
+                        signer: PrivateKeyAccount, version: Byte, timestamp: Long): (Block, Seq[MicroBlock]) = {
+    val block = customBuildBlockOfTxs(totalRefTo, base, signer, version, timestamp)
+    val microBlocks = micros.foldLeft((block, Seq.empty[MicroBlock])) { case ((lastTotal, allMicros), txs) =>
+      val (newTotal, micro) = customBuildMicroBlockOfTxs(totalRefTo, lastTotal, txs, signer, version, timestamp)
+      (newTotal, allMicros :+ micro)
+    }._2
+    (block, microBlocks)
   }
 
   def malformSignature(b: Block): Block = b.copy(signerData = b.signerData.copy(signature = TestBlock.randomSignature()))

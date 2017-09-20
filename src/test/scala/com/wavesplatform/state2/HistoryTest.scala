@@ -1,7 +1,7 @@
 package com.wavesplatform.state2
 
 import com.wavesplatform.history.HistoryWriterImpl
-import scorex.lagonaki.mocks.{TestBlock, TestBlock3}
+import scorex.lagonaki.mocks.TestBlock
 import scorex.transaction.TransactionParser.SignatureLength
 
 trait HistoryTest {
@@ -12,5 +12,5 @@ trait HistoryTest {
     history.appendBlock(TestBlock.withReference(history.lastBlock.get.uniqueId))(Right(BlockDiff.empty)).explicitGet()
 
   def appendTestBlock3(history: HistoryWriterImpl, features: Set[Short]): Unit =
-    history.appendBlock(TestBlock3.withReferenceAndFeatures(history.lastBlock.get.uniqueId, features))(Right(BlockDiff.empty)).explicitGet()
+    history.appendBlock(TestBlock.withReferenceAndFeatures(history.lastBlock.get.uniqueId, features))(Right(BlockDiff.empty)).explicitGet()
 }

@@ -16,4 +16,5 @@ object PrivateKeyAccount {
     val pair = EllipticCurveImpl.createKeyPair(seed)
     PrivateKeyAccountImpl(seed, pair._1, pair._2)
   }
+
 }

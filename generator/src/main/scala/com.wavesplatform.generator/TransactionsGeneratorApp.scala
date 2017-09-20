@@ -1,7 +1,6 @@
 package com.wavesplatform.generator
 
-import java.io.File
-import java.net.{InetSocketAddress, URI}
+import java.net.InetSocketAddress
 import java.util.concurrent.{Executors, ThreadLocalRandom}
 
 import com.wavesplatform.generator.GeneratorSettings._
@@ -48,6 +47,8 @@ object TransactionsGeneratorApp extends App {
     help("help") text "display this help message"
   }
 
+  val defaultConfig = fromConfig(readConfig(None))
+
   val initialParameters = GenerationParameters(
     mode = Mode.NARROW,
     transactions = 1000,
@@ -57,23 +58,22 @@ object TransactionsGeneratorApp extends App {
 
   parser.parse(args, initialParameters) match {
     case Some(parameters) =>
-
-      val defaultConfig = fromConfig(readConfig(None))
+      val actualConfig = fromConfig(readConfig(None))
 
       AddressScheme.current = new AddressScheme {
-        override val chainId: Byte = defaultConfig.chainId.toByte
+        override val chainId: Byte = actualConfig.chainId.toByte
       }
       val generator = parameters.mode match {
-        case Mode.NARROW => new NarrowTransactionGenerator(defaultConfig.txProbabilities, defaultConfig.accounts)
-        case Mode.WIDE => new WideTransactionGenerator(defaultConfig.accounts)
+        case Mode.NARROW => new NarrowTransactionGenerator(actualConfig.txProbabilities, actualConfig.accounts)
+        case Mode.WIDE => new WideTransactionGenerator(actualConfig.accounts)
       }
 
-      val nodes = defaultConfig.sendTo
+      val nodes = actualConfig.sendTo
       val threadPool = Executors.newFixedThreadPool(Math.max(1, nodes.size))
       implicit val ec = ExecutionContext.fromExecutor(threadPool)
 
       val workers = nodes.map { node =>
-        generateAndSend(generator, parameters.transactions, parameters.iterations, parameters.delay, node, defaultConfig.chainId)
+        generateAndSend(generator, parameters.transactions, parameters.iterations, parameters.delay, node, actualConfig.chainId)
       }
 
       Future.sequence(workers).onComplete { _ =>

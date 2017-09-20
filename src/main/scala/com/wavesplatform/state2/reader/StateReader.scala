@@ -2,7 +2,7 @@ package com.wavesplatform.state2.reader
 
 import com.google.common.base.Charsets
 import com.wavesplatform.state2._
-import scorex.account.{AddressOrAlias, Address, Alias}
+import scorex.account.{Address, AddressOrAlias, Alias}
 import scorex.transaction.ValidationError.AliasNotExists
 import scorex.transaction._
 import scorex.transaction.assets.IssueTransaction
@@ -11,7 +11,7 @@ import scorex.utils.{ScorexLogging, Synchronized}
 
 import scala.annotation.tailrec
 import scala.reflect.ClassTag
-import scala.util.Right
+import scala.util.{Right, Try}
 
 trait StateReader extends Synchronized {
 
@@ -24,6 +24,10 @@ trait StateReader extends Synchronized {
   def accountPortfolio(a: Address): Portfolio
 
   def assetInfo(id: ByteStr): Option[AssetInfo]
+
+  protected def wavesBalance(a: Address): (Long, LeaseInfo)
+
+  def assetBalance(a: Address, asset: ByteStr): Long
 
   def height: Int
 
@@ -78,15 +82,8 @@ object StateReader {
       s.accountTransactionIds(account, limit).flatMap(s.transactionInfo).map(_._2)
     }
 
-    def balance(account: Address): Long = s.accountPortfolio(account).balance
+    def balance(account: Address): Long = s.wavesBalance(account)._1
 
-    def assetBalance(account: AssetAcc): Long = {
-      val accountPortfolio = s.accountPortfolio(account.account)
-      account.assetId match {
-        case Some(assetId) => accountPortfolio.assets.getOrElse(assetId, 0)
-        case None => accountPortfolio.balance
-      }
-    }
 
     def getAccountBalance(account: Address): Map[AssetId, (Long, Boolean, Long, IssueTransaction)] = s.read { _ =>
       s.accountPortfolio(account).assets.map { case (id, amt) =>
@@ -100,11 +97,11 @@ object StateReader {
       s.assetDistribution(ByteStr(assetId))
         .map { case (acc, amt) => (acc.address, amt) }
 
-    def effectiveBalance(account: Address): Long = s.accountPortfolio(account).effectiveBalance
+    def effectiveBalance(account: Address): Long = s.partialPortfolio(account).effectiveBalance
 
-    def spendableBalance(account: AssetAcc): Long = {
-      val accountPortfolio = s.accountPortfolio(account.account)
-      account.assetId match {
+    def spendableBalance(assetAcc: AssetAcc): Long = {
+      val accountPortfolio = s.partialPortfolio(assetAcc.account, assetAcc.assetId.toSet)
+      assetAcc.assetId match {
         case Some(assetId) => accountPortfolio.assets.getOrElse(assetId, 0)
         case None => accountPortfolio.spendableBalance
       }
@@ -135,22 +132,37 @@ object StateReader {
 
       @tailrec
       def loop(deeperHeight: Int, list: Seq[Snapshot]): Seq[Snapshot] = {
-        if (deeperHeight == 0) list
+        if (deeperHeight == 0) {
+          s.snapshotAtHeight(acc, 1) match {
+            case Some(genesisSnapshot) =>
+              genesisSnapshot +: list
+            case None =>
+              Snapshot(0, 0, 0) +: list
+          }
+        }
         else {
-          val snapshot = s.snapshotAtHeight(acc, deeperHeight).get
-          if (deeperHeight <= bottomNotIncluded)
-            snapshot +: list
-          else if (deeperHeight > atHeight && snapshot.prevHeight > atHeight) {
-            loop(snapshot.prevHeight, list)
-          } else
-            loop(snapshot.prevHeight, snapshot +: list)
+          s.snapshotAtHeight(acc, deeperHeight) match {
+            case Some(snapshot) =>
+              if (deeperHeight <= bottomNotIncluded)
+                snapshot +: list
+              else if (snapshot.prevHeight == deeperHeight) {
+                throw new Exception(s"CRITICAL: Infinite loop detected while calculating minBySnapshot: acc=$acc, atHeight=$atHeight, " +
+                  s"confirmations=$confirmations; lastUpdateHeight=${s.lastUpdateHeight(acc)}; current step: deeperHeight=$deeperHeight, list.size=${list.size}")
+              } else if (deeperHeight > atHeight && snapshot.prevHeight > atHeight) {
+                loop(snapshot.prevHeight, list)
+              } else
+                loop(snapshot.prevHeight, snapshot +: list)
+            case None =>
+              throw new Exception(s"CRITICAL: Cannot lookup referenced height: acc=$acc, atHeight=$atHeight, " +
+                s"confirmations=$confirmations; lastUpdateHeight=${s.lastUpdateHeight(acc)}; current step: deeperHeight=$deeperHeight, list.size=${list.size}")
+          }
         }
       }
 
       val snapshots: Seq[Snapshot] = s.lastUpdateHeight(acc) match {
         case None => Seq(Snapshot(0, 0, 0))
-        case Some(h) if h < atHeight - confirmations =>
-          val pf = s.accountPortfolio(acc)
+        case Some(h) if h < bottomNotIncluded =>
+          val pf = s.partialPortfolio(acc)
           Seq(Snapshot(h, pf.balance, pf.effectiveBalance))
         case Some(h) => loop(h, Seq.empty)
       }
@@ -158,29 +170,38 @@ object StateReader {
       snapshots.map(extractor).min
     }
 
-    def effectiveBalanceAtHeightWithConfirmations(acc: Address, atHeight: Int, confirmations: Int): Long =
+    def effectiveBalanceAtHeightWithConfirmations(acc: Address, atHeight: Int, confirmations: Int): Try[Long] = Try {
       minBySnapshot(acc, atHeight, confirmations)(_.effectiveBalance)
+    }
 
     def balanceWithConfirmations(acc: Address, confirmations: Int): Long =
       minBySnapshot(acc, s.height, confirmations)(_.balance)
 
     def balanceAtHeight(acc: Address, height: Int): Long = s.read { _ =>
-
       @tailrec
       def loop(lookupHeight: Int): Long = s.snapshotAtHeight(acc, lookupHeight) match {
         case None if lookupHeight == 0 => 0
         case Some(snapshot) if lookupHeight <= height => snapshot.balance
+        case Some(snapshot) if snapshot.prevHeight == lookupHeight =>
+          throw new Exception(s"CRITICAL: Cannot lookup account $acc for height $height(current=${s.height}). Infinite loop detected. " +
+            s"This indicates snapshots processing error.")
         case Some(snapshot) => loop(snapshot.prevHeight)
         case None =>
-          throw new Exception(s"Cannot lookup account $acc for height $height(current=${s.height}). " +
+          throw new Exception(s"CRITICAL: Cannot lookup account $acc for height $height(current=${s.height}). " +
             s"No history found at requested lookupHeight=$lookupHeight")
       }
+
 
       loop(s.lastUpdateHeight(acc).getOrElse(0))
     }
 
     def accountPortfoliosHash: Int = {
       Hash.accountPortfolios(s.accountPortfolios)
+    }
+
+    def partialPortfolio(a: Address, assets: Set[AssetId] = Set.empty): Portfolio = {
+      val (w, l) = s.wavesBalance(a)
+      Portfolio(w, l, assets.map(id => id -> s.assetBalance(a, id)).toMap)
     }
   }
 

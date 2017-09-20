@@ -27,7 +27,7 @@ class NetworkServer(checkpointService: CheckpointService,
                     miner: Miner,
                     stateReader: StateReader,
                     settings: WavesSettings,
-                    history: History,
+                    history: NgHistory,
                     utxPool: UtxPool,
                     peerDatabase: PeerDatabase,
                     allChannels: ChannelGroup,
@@ -88,6 +88,12 @@ class NetworkServer(checkpointService: CheckpointService,
     new HandshakeHandler.Server(handshake, peerInfo, peerConnections, peerDatabase, allChannels)
 
   private val utxPoolSynchronizer = new UtxPoolSynchronizer(utxPool, allChannels)
+  private val microBlockSynchronizer = new MicroBlockSynchronizer(
+    settings.synchronizationSettings.microBlockSynchronizer,
+    history
+  )
+
+  private val noopHandler = new NoopHandler()
 
   private val serverChannel = settings.networkSettings.declaredAddress.map { _ =>
     new ServerBootstrap()
@@ -100,12 +106,13 @@ class NetworkServer(checkpointService: CheckpointService,
         new HandshakeTimeoutHandler(settings.networkSettings.handshakeTimeout),
         serverHandshakeHandler,
         lengthFieldPrepender,
-        new LengthFieldBasedFrameDecoder(1024 * 1024, 0, 4, 0, 4),
+        new LengthFieldBasedFrameDecoder(100 * 1024 * 1024, 0, 4, 0, 4),
         new LegacyFrameCodec(peerDatabase),
         discardingHandler,
         messageCodec,
-        new PeerSynchronizer(peerDatabase, settings.networkSettings.peersBroadcastInterval),
+        peerSynchronizer,
         historyReplier,
+        microBlockSynchronizer,
         new ExtensionSignaturesLoader(settings.synchronizationSettings.synchronizationTimeout, peerDatabase),
         new ExtensionBlocksLoader(settings.synchronizationSettings.synchronizationTimeout, peerDatabase),
         new OptimisticExtensionLoader,
@@ -138,12 +145,13 @@ class NetworkServer(checkpointService: CheckpointService,
       new HandshakeTimeoutHandler(settings.networkSettings.handshakeTimeout),
       clientHandshakeHandler,
       lengthFieldPrepender,
-      new LengthFieldBasedFrameDecoder(1024 * 1024, 0, 4, 0, 4),
+      new LengthFieldBasedFrameDecoder(100 * 1024 * 1024, 0, 4, 0, 4),
       new LegacyFrameCodec(peerDatabase),
       discardingHandler,
       messageCodec,
-      new PeerSynchronizer(peerDatabase, settings.networkSettings.peersBroadcastInterval),
+      peerSynchronizer,
       historyReplier,
+      microBlockSynchronizer,
       new ExtensionSignaturesLoader(settings.synchronizationSettings.synchronizationTimeout, peerDatabase),
       new ExtensionBlocksLoader(settings.synchronizationSettings.synchronizationTimeout, peerDatabase),
       new OptimisticExtensionLoader,
@@ -161,6 +169,12 @@ class NetworkServer(checkpointService: CheckpointService,
     }
   }
 
+  private def peerSynchronizer: ChannelHandlerAdapter = {
+    if (settings.networkSettings.enablePeersExchange) {
+      new PeerSynchronizer(peerDatabase, settings.networkSettings.peersBroadcastInterval)
+    } else noopHandler
+  }
+
   def connect(remoteAddress: InetSocketAddress): Unit =
     outgoingChannels.computeIfAbsent(remoteAddress, _ => {
       log.debug(s"Connecting to $remoteAddress")
@@ -168,18 +182,20 @@ class NetworkServer(checkpointService: CheckpointService,
         .addListener { (connFuture: ChannelFuture) =>
           if (connFuture.isDone) {
             if (connFuture.cause() != null) {
-              log.debug(s"${id(connFuture.channel())} Connection failed, blacklisting $remoteAddress", connFuture.cause())
-              peerDatabase.blacklist(remoteAddress.getAddress)
+              val reason = s"${id(connFuture.channel())} Connection failed, blacklisting $remoteAddress"
+              log.debug(reason, connFuture.cause())
+//              peerDatabase.blacklist(remoteAddress.getAddress, reason)
             } else if (connFuture.isSuccess) {
               log.info(s"${id(connFuture.channel())} Connection established")
               peerDatabase.touch(remoteAddress)
               outgoingChannelCount.incrementAndGet()
               connFuture.channel().closeFuture().addListener { (closeFuture: ChannelFuture) =>
                 val remainingCount = outgoingChannelCount.decrementAndGet()
-                log.info(s"${id(closeFuture.channel)} Connection closed, $remainingCount outgoing channel(s) remaining")
+                val reason = s"${id(closeFuture.channel)} Connection closed, $remainingCount outgoing channel(s) remaining"
+                log.info(reason)
                 allChannels.remove(closeFuture.channel())
                 outgoingChannels.remove(remoteAddress, closeFuture.channel())
-                if (!shutdownInitiated) peerDatabase.blacklist(remoteAddress.getAddress)
+                if (!shutdownInitiated) peerDatabase.blacklist(remoteAddress.getAddress, reason)
               }
               allChannels.add(connFuture.channel())
             }

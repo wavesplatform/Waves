@@ -1,6 +1,7 @@
 package scorex
 
 import com.wavesplatform.utils.base58Length
+import scorex.block.MicroBlock
 import scorex.crypto.hash.FastCryptographicHash
 
 package object transaction {
@@ -8,5 +9,7 @@ package object transaction {
   type AssetId = com.wavesplatform.state2.ByteStr
   val AssetIdLength = FastCryptographicHash.DigestSize
   val AssetIdStringLength = base58Length(AssetIdLength)
+  type DiscardedTransactions = Seq[Transaction]
+  type DiscardedMicroBlocks = Seq[MicroBlock]
 
 }

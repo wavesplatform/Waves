@@ -2,8 +2,9 @@ package scorex.transaction
 
 import com.wavesplatform.features.FeatureProvider
 import com.wavesplatform.network.{BlockCheckpoint, Checkpoint}
-import com.wavesplatform.state2.{BlockDiff, ByteStr}
-import scorex.block.Block
+import com.wavesplatform.state2.ByteStr
+import scorex.block.Block.BlockId
+import scorex.block.{Block, MicroBlock}
 import scorex.transaction.History.BlockchainScore
 import scorex.utils.Synchronized
 
@@ -13,6 +14,8 @@ trait History extends Synchronized with AutoCloseable with FeatureProvider {
 
   def height(): Int
 
+  def blockAt(height: Int): Option[Block]
+
   def blockBytes(height: Int): Option[Array[Byte]]
 
   def scoreOf(id: ByteStr): Option[BlockchainScore]
@@ -20,13 +23,22 @@ trait History extends Synchronized with AutoCloseable with FeatureProvider {
   def heightOf(blockId: ByteStr): Option[Int]
 
   def lastBlockIds(howMany: Int): Seq[ByteStr]
+
+  def lastBlockTimestamp() : Option[Long]
+
+  def lastBlockId() : Option[ByteStr]
 }
 
-trait HistoryWriter extends History {
+trait NgHistory extends History {
+  def microBlock(id: ByteStr): Option[MicroBlock]
 
-  def appendBlock(block: Block)(consensusValidation: => Either[ValidationError, BlockDiff]): Either[ValidationError, BlockDiff]
+  def bestLastBlock(maxTimestamp: Long) : Option[Block]
+}
 
-  def discardBlock(): Seq[Transaction]
+trait DebugNgHistory {
+  def lastPersistedBlockIds(count: Int): Seq[BlockId]
+
+  def microblockIds(): Seq[BlockId]
 }
 
 trait CheckpointService {
@@ -54,10 +66,6 @@ object History {
   type BlockchainScore = BigInt
 
   implicit class HistoryExt(history: History) {
-
-    def blockAt(height: Int): Option[Block] = history.read { implicit lock =>
-      history.blockBytes(height).map(Block.parseBytes(_).get)
-    }
 
     def score(): BlockchainScore = history.read { implicit lock =>
       history.lastBlock.flatMap(last => history.scoreOf(last.uniqueId)).getOrElse(0)

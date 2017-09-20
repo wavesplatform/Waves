@@ -4,7 +4,8 @@ import java.io.File
 
 import com.google.common.primitives.Ints
 import com.wavesplatform.utils._
-import org.h2.mvstore.MVMap
+import org.h2.mvstore.`type`.ObjectDataType
+import org.h2.mvstore.{MVMap, MVStore}
 import scorex.account.Address
 import scorex.utils.LogMVMapBuilder
 
@@ -14,7 +15,7 @@ class StateStorage private(file: Option[File]) extends AutoCloseable {
 
   import StateStorage._
 
-  private val db = createMVStore(file)
+  private val db: MVStore = createMVStore(file)
 
   private val variables: MVMap[String, Int] = db.openMap("variables")
 
@@ -29,9 +30,11 @@ class StateStorage private(file: Option[File]) extends AutoCloseable {
   val transactions: MVMap[ByteStr, (Int, Array[Byte])] = db.openMap("txs", new LogMVMapBuilder[ByteStr, (Int, Array[Byte])]
     .keyType(DataTypes.byteStr).valueType(DataTypes.transactions))
 
-  val portfolios: MVMap[ByteStr, (Long, (Long, Long), Map[Array[Byte], Long])] = db.openMap("portfolios",
-    new LogMVMapBuilder[ByteStr, (Long, (Long, Long), Map[Array[Byte], Long])]
-      .keyType(DataTypes.byteStr).valueType(DataTypes.portfolios))
+  val wavesBalance: MVMap[ByteStr, (Long, Long, Long)] = db.openMap("wavesBalance",
+    new LogMVMapBuilder[ByteStr, (Long, Long, Long)]
+      .keyType(DataTypes.byteStr).valueType(DataTypes.waves))
+
+  val assetBalance = new MultiKeyMap[Long](db,new ObjectDataType(),"assetBalance")
 
   val assets: MVMap[ByteStr, (Boolean, Long)] = db.openMap("assets",
     new LogMVMapBuilder[ByteStr, (Boolean, Long)].keyType(DataTypes.byteStr).valueType(DataTypes.assets))
@@ -71,7 +74,7 @@ class StateStorage private(file: Option[File]) extends AutoCloseable {
 }
 
 object StateStorage {
-  private val Version = 1
+  private val Version = 2
 
   private val CompactFillRate = 80
   private val CompactMemorySize = 19 * 1024 * 1024
@@ -95,4 +98,5 @@ object StateStorage {
   type AccountIdxKey = Array[Byte]
 
   def accountIndexKey(acc: Address, index: Int): AccountIdxKey = acc.bytes.arr ++ Ints.toByteArray(index)
+
 }

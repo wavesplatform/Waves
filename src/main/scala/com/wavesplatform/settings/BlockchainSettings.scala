@@ -10,7 +10,7 @@ import net.ceedubs.ficus.readers.EnumerationReader._
 
 import scala.concurrent.duration._
 
-case class FunctionalitySettings private(featureCheckBlocksPeriod: Int,
+case class FunctionalitySettings(featureCheckBlocksPeriod: Int,
                                  blocksForFeatureActivation: Int,
                                  allowTemporaryNegativeUntil: Long,
                                  allowInvalidPaymentTransactionsByTimestamp: Long,
@@ -28,7 +28,8 @@ case class FunctionalitySettings private(featureCheckBlocksPeriod: Int,
                                  allowMultipleLeaseCancelTransactionUntilTimestamp: Long,
                                  resetEffectiveBalancesAtHeight: Long,
                                  allowLeasedBalanceTransferUntil: Long,
-                                 blockVersion3After: Long) {
+                                 blockVersion3After: Long,
+                                 enableMicroblocksAfterHeight: Long) {
   require(featureCheckBlocksPeriod > 0, "featureCheckBlocksPeriod must be greater than 0")
   require((blocksForFeatureActivation > 0) && (blocksForFeatureActivation <= featureCheckBlocksPeriod), s"blocksForFeatureActivation must be in range 1 to $featureCheckBlocksPeriod")
 }
@@ -53,7 +54,8 @@ object FunctionalitySettings {
     allowMultipleLeaseCancelTransactionUntilTimestamp = 1492768800000L,
     resetEffectiveBalancesAtHeight = 462000,
     allowLeasedBalanceTransferUntil = Long.MaxValue,
-    blockVersion3After = Long.MaxValue)
+    blockVersion3After = Long.MaxValue,
+    enableMicroblocksAfterHeight = Long.MaxValue)
 
   val TESTNET = apply(
     featureCheckBlocksPeriod = 10000,
@@ -74,7 +76,8 @@ object FunctionalitySettings {
     allowMultipleLeaseCancelTransactionUntilTimestamp = 1492560000000L,
     resetEffectiveBalancesAtHeight = 51500,
     allowLeasedBalanceTransferUntil = 1495238400000L,
-    blockVersion3After = Long.MaxValue)
+    blockVersion3After = Long.MaxValue,
+    enableMicroblocksAfterHeight = Long.MaxValue)
 
 
   val configPath = "waves.blockchain.custom.functionality"

@@ -223,12 +223,10 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
 
   @Path("/")
   @ApiOperation(value = "Create", notes = "Create a new account in the wallet(if it exists)", httpMethod = "POST")
-  def create: Route = (path("addresses") & post) {
-    withAuth {
-      wallet.generateNewAccount() match {
-        case Some(pka) => complete(Json.obj("address" -> pka.address))
-        case None => complete(Unknown)
-      }
+  def create: Route = (path("addresses") & post & withAuth) {
+    wallet.generateNewAccount() match {
+      case Some(pka) => complete(Json.obj("address" -> pka.address))
+      case None => complete(Unknown)
     }
   }
 
@@ -254,7 +252,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
       BalanceDetails(
         account.address,
         portfolio.balance,
-        PoSCalc.generatingBalance(state, functionalitySettings, account, state.height),
+        PoSCalc.generatingBalance(state, functionalitySettings, account, state.height).get,
         portfolio.balance - portfolio.leaseInfo.leaseOut,
         state.effectiveBalance(account))
     }
@@ -265,7 +263,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
       Address.fromString(address).right.map(acc => ToResponseMarshallable(Balance(
         acc.address,
         confirmations,
-        state.effectiveBalanceAtHeightWithConfirmations(acc, state.height, confirmations))))
+        state.effectiveBalanceAtHeightWithConfirmations(acc, state.height, confirmations).get)))
         .getOrElse(InvalidAddress)
     }
   }

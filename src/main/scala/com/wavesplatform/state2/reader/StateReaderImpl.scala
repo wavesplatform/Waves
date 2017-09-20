@@ -2,6 +2,7 @@ package com.wavesplatform.state2.reader
 
 import java.util.concurrent.locks.ReentrantReadWriteLock
 
+import cats._
 import cats.implicits._
 import com.wavesplatform.state2._
 import scorex.account.{Address, Alias}
@@ -21,7 +22,9 @@ class StateReaderImpl(p: StateStorage, val synchronizationToken: ReentrantReadWr
   }
 
   override def accountPortfolio(a: Address): Portfolio = read { implicit l =>
-    Option(sp().portfolios.get(a.bytes)).map { case (b, (i, o), as) => Portfolio(b, LeaseInfo(i, o), as.map { case (k, v) => ByteStr(k) -> v }) }.orEmpty
+    val waves = Option(sp().wavesBalance.get(a.bytes)).map { case (b, li, lo) => Portfolio(b, LeaseInfo(li, lo), Map.empty) }.orEmpty
+    val assets = Portfolio(0, LeaseInfo.empty, sp().assetBalance.getMap(a.bytes))
+    Monoid.combine(waves, assets)
   }
 
   override def assetInfo(id: ByteStr): Option[AssetInfo] = read { implicit l =>
@@ -56,11 +59,11 @@ class StateReaderImpl(p: StateStorage, val synchronizationToken: ReentrantReadWr
   }
 
   override def accountPortfolios: Map[Address, Portfolio] = read { implicit l =>
-    sp().portfolios.asScala.map {
-      case (acc, (b, (i, o), as)) => Address.fromBytes(acc.arr).explicitGet() -> Portfolio(b, LeaseInfo(i, o), as.map {
-        case (k, v) => ByteStr(k) -> v
-      })
-    }.toMap
+    val waves = sp()
+      .wavesBalance.asScala.toMap.map { case (k, (b, li, lo)) => Address.fromBytes(k.arr).explicitGet() -> Portfolio(b, LeaseInfo(li, lo), Map.empty) }
+    val assets = sp().assetBalance.all()
+      .map { case (k, v) => Address.fromBytes(k.arr).explicitGet() -> Portfolio(0, LeaseInfo.empty, v) }
+    Monoid.combine(assets, waves)
   }
 
   override def isLeaseActive(leaseTx: LeaseTransaction): Boolean = read { implicit l =>
@@ -90,4 +93,11 @@ class StateReaderImpl(p: StateStorage, val synchronizationToken: ReentrantReadWr
   override def filledVolumeAndFee(orderId: ByteStr): OrderFillInfo = read { _ =>
     Option(p.orderFills.get(orderId)).map(oi => OrderFillInfo(oi._1, oi._2)).orEmpty
   }
+
+  override def wavesBalance(a: Address): (Long, LeaseInfo) =
+    Option(p.wavesBalance.get(a.bytes))
+      .map { case (v1, v2, v3) => (v1, LeaseInfo(v2, v3)) }
+      .getOrElse((0L, LeaseInfo(0L, 0L)))
+
+  override def assetBalance(a: Address, asset: ByteStr): Long = p.assetBalance.get(a.bytes, asset).getOrElse(0L)
 }

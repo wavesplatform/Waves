@@ -48,15 +48,18 @@ object GeneratorSettings {
   private val log = LoggerFacade(LoggerFactory.getLogger(getClass))
 
   def readConfig(userConfigPath: Option[String]): Config = {
+    log.info(s"Loading config from path: $userConfigPath")
+
     val maybeConfigFile = for {
-      maybeFilename <- userConfigPath
-      file = new File(maybeFilename)
+      filename <- userConfigPath
+      file = new File(filename)
       if file.exists
     } yield file
 
     val config = maybeConfigFile match {
       // if no user config is supplied, the library will handle overrides/application/reference automatically
       case None =>
+        log.info("No config found/provided, using reference.conf automatically")
         ConfigFactory.load()
       // application config needs to be resolved wrt both system properties *and* user-supplied config.
       case Some(file) =>

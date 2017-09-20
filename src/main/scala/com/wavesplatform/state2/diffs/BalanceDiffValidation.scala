@@ -3,23 +3,24 @@ package com.wavesplatform.state2.diffs
 import cats.implicits._
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.reader.StateReader
-import com.wavesplatform.state2.{ByteStr, Diff, LeaseInfo, Portfolio}
+import com.wavesplatform.state2.{ByteStr, Diff, Instrumented, LeaseInfo, Portfolio}
 import scorex.account.Address
 import scorex.transaction.Transaction
 import scorex.transaction.ValidationError.AccountBalanceError
+import scorex.utils.ScorexLogging
 
 import scala.util.{Left, Right}
 
-object BalanceDiffValidation {
-
+object BalanceDiffValidation extends ScorexLogging with Instrumented {
 
   def apply[T <: Transaction](s: StateReader, time: Long, fs: FunctionalitySettings)(d: Diff): Either[AccountBalanceError, Diff] = {
 
     val changedAccounts = d.portfolios.keySet
+
     val positiveBalanceErrors: Map[Address, String] = changedAccounts.flatMap(acc => {
 
-      val oldPortfolio = s.accountPortfolio(acc)
       val portfolioDiff = d.portfolios(acc)
+      val oldPortfolio = s.partialPortfolio(acc, portfolioDiff.assets.keySet)
       val newPortfolio = oldPortfolio.combine(portfolioDiff)
 
       val err = if (newPortfolio.balance < 0) {
