@@ -8,4 +8,5 @@ case class MinerSettings(
     intervalAfterLastBlockThenGenerationIsAllowed: FiniteDuration,
     microBlockInterval: FiniteDuration,
     minimalBlockGenerationOffset: FiniteDuration,
-    maxTransactionsInKeyBlock: Int)
+    maxTransactionsInKeyBlock: Int,
+    minMicroBlockAge: FiniteDuration)

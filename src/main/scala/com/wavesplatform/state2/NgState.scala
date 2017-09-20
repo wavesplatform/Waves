@@ -66,10 +66,10 @@ case class NgState private(base: Block, diffs: Map[BlockId, (BlockDiff, Long)], 
 object NgState {
 
   def apply(base: Block, diff: BlockDiff, timestamp: Long): NgState =
-    NgState(base, Map(base.uniqueId -> (diff, timestamp)), List.empty)
+    NgState(base, Map(base.uniqueId -> ((diff, timestamp))), List.empty)
 
   implicit class NgStateExt(n: NgState) {
-    def +(m: MicroBlock, diff: BlockDiff, timestamp: Long): NgState = NgState(n.base, n.diffs + (m.totalResBlockSig -> (diff, timestamp)), m +: n.micros)
+    def +(m: MicroBlock, diff: BlockDiff, timestamp: Long): NgState = NgState(n.base, n.diffs + (m.totalResBlockSig -> ((diff, timestamp))), m +: n.micros)
   }
 
 }

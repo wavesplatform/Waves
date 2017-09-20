@@ -48,6 +48,7 @@ class Miner(
   private implicit val scheduler: SchedulerService = Scheduler.fixedPool(name = "miner-pool", poolSize = 2)
 
   private lazy val minerSettings = settings.minerSettings
+  private lazy val minMicroBlockDurationMills = minerSettings.minMicroBlockAge.toMillis
   private lazy val blockchainSettings = settings.blockchainSettings
   private lazy val processBlock = Coordinator.processSingleBlock(checkpoint, history, blockchainUpdater, timeService, stateReader, utx, blockchainReadiness, settings, this) _
 
@@ -71,7 +72,7 @@ class Miner(
                                    greatGrandParent: Option[Block], balance: Long, version: Byte)(delay: FiniteDuration): Task[Either[String, Block]] = Task {
     // should take last block right at the time of mining since microblocks might have been added
     // the rest doesn't change
-    val parent = history.bestLastBlock(System.currentTimeMillis() - 3000L).get
+    val parent = history.bestLastBlock(System.currentTimeMillis() - minMicroBlockDurationMills).get
     val pc = allChannels.size()
     lazy val lastBlockKernelData = parent.consensusData
     lazy val currentTime = timeService.correctedTime()
