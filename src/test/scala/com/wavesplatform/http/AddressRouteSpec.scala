@@ -12,7 +12,6 @@ import play.api.libs.json._
 import scorex.api.http.{AddressApiRoute, ApiKeyNotValid, InvalidMessage}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
-import scorex.settings.TestFunctionalitySettings
 
 class AddressRouteSpec
   extends RouteSpec("/addresses")

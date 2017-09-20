@@ -25,7 +25,7 @@ object StorageFactory {
     val lock = new RWL(true)
 
     for {
-      historyWriter <- HistoryWriterImpl(settings.blockchainFile, lock)
+      historyWriter <- HistoryWriterImpl(settings.blockchainFile, lock, settings.functionalitySettings)
       fn = new Functionalities(settings.functionalitySettings, historyWriter)
       ss <- createStateStorage(historyWriter, settings.stateFile)
       stateWriter = new StateWriterImpl(ss, lock)

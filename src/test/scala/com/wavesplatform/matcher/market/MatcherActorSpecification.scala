@@ -21,7 +21,7 @@ import org.h2.mvstore.MVStore
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Matchers, WordSpecLike}
 import scorex.account.PrivateKeyAccount
-import scorex.settings.TestFunctionalitySettings
+import scorex.settings.TestFunctionality
 import scorex.transaction.assets.IssueTransaction
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import scorex.transaction.{AssetId, History}
@@ -43,7 +43,7 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest2"
 
   val settings = matcherSettings.copy(account = MatcherAccount.address)
   val history = stub[History]
-  val functionalitySettings = TestFunctionalitySettings.Stub
+  val functionalitySettings = TestFunctionality.EnabledSettings
   val wallet = Wallet(WalletSettings(None, "matcher", Some(WalletSeed)))
   wallet.generateNewAccount()
 

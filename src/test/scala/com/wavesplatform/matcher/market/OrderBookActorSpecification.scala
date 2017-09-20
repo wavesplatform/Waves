@@ -19,7 +19,7 @@ import org.h2.mvstore.MVStore
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest._
 import scorex.account.PrivateKeyAccount
-import scorex.settings.TestFunctionalitySettings
+import scorex.settings.TestFunctionality
 import scorex.transaction._
 import scorex.transaction.assets.IssueTransaction
 import scorex.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
@@ -89,7 +89,7 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
     super.beforeEach()
 
     val history = stub[History]
-    val functionalitySettings = TestFunctionalitySettings.Stub
+    val functionalitySettings = TestFunctionality.EnabledSettings
 
     val utx = stub[UtxPool]
     (utx.putIfNew _).when(*).onCall((tx: Transaction) => Right(true))
@@ -266,7 +266,7 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
 
     "order matched with invalid order should keep matching with others, invalid is removed" in {
       val history = stub[History]
-      val functionalitySettings = TestFunctionalitySettings.Stub
+      val functionalitySettings = TestFunctionality.EnabledSettings
       val ord1 = buy(pair, 100, 20 * Order.PriceConstant)
       val ord2 = buy(pair, 5000, 1000 * Order.PriceConstant)
       // should be invalid

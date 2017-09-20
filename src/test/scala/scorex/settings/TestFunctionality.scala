@@ -15,7 +15,7 @@ object TestFunctionality {
     allowInvalidReissueInSameBlockUntilTimestamp = 0L, allowCreatealiasTransactionAfter = 0L,
     allowMultipleLeaseCancelTransactionUntilTimestamp = 0L, resetEffectiveBalancesAtHeight = 0,
     allowLeasedBalanceTransferUntil = 0L,
-    blockVersion3After = 0L
+    featureCheckBlocksPeriod = 100, blocksForFeatureActivation = 90
   )
 
   val EnabledProvider: FeatureProvider = (_: Short) => FeatureStatus.Activated
