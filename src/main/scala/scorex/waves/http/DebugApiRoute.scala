@@ -47,7 +47,7 @@ case class DebugApiRoute(settings: RestAPISettings,
                          miner: Miner) extends ApiRoute {
 
   override lazy val route: Route = pathPrefix("debug") {
-    blocks ~ state ~ info ~ stateWaves ~ rollback ~ rollbackTo ~ blacklist ~ portfolios
+    blocks ~ state ~ featureStatus ~ info ~ stateWaves ~ rollback ~ rollbackTo ~ blacklist ~ portfolios
   }
 
   @Path("/blocks/{howMany}")

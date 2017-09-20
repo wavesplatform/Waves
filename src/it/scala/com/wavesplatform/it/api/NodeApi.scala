@@ -109,6 +109,8 @@ trait NodeApi {
 
   def status: Future[Status] = get("/node/status").as[Status]
 
+  def featureStatus(featureId:Int): Future[FeatureStatus] = get(s"/node/featureStatus/$featureId").as[FeatureStatus]
+
   def balance(address: String): Future[Balance] = get(s"/addresses/balance/$address").as[Balance]
 
   def findTransactionInfo(txId: String): Future[Option[Transaction]] = transactionInfo(txId).transform {
@@ -288,6 +290,10 @@ object NodeApi extends ScorexLogging {
 
   case class UnexpectedStatusCodeException(request: Request, response: Response) extends Exception(s"Request: ${request.getUrl}\n" +
     s"Unexpected status code (${response.getStatusCode}): ${response.getResponseBody}")
+
+  case class FeatureStatus(status: Int)
+
+  implicit val featureStatusFormat: Format[FeatureStatus] = Json.format
 
   case class Status(blockGeneratorStatus: Option[String], historySynchronizationStatus: Option[String])
 
