@@ -14,7 +14,8 @@ object TestFunctionalitySettings {
     requirePaymentUniqueIdAfter = 0L, allowExchangeTransactionAfter = 0L,
     allowInvalidReissueInSameBlockUntilTimestamp = 0L, allowCreatealiasTransactionAfter = 0L,
     allowMultipleLeaseCancelTransactionUntilTimestamp = 0L, resetEffectiveBalancesAtHeight = 0,
-    allowLeasedBalanceTransferUntil = 0L
+    allowLeasedBalanceTransferUntil = 0L,
+    blockVersion3After = 0L
   )
 
    val Stub = Enabled.copy(featureCheckBlocksPeriod = 100, blocksForFeatureActivation = 90)
