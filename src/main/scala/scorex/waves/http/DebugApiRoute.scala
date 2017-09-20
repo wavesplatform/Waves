@@ -28,6 +28,7 @@ import scala.concurrent.Future
 import scala.util.{Failure, Success}
 import scala.util.control.NonFatal
 import DebugApiRoute._
+import com.wavesplatform.features.FeatureProvider
 import com.wavesplatform.mining.Miner
 
 
@@ -37,6 +38,7 @@ case class DebugApiRoute(settings: RestAPISettings,
                          wallet: Wallet,
                          stateReader: StateReader,
                          history: History,
+                         featureProvider: FeatureProvider,
                          peerDatabase: PeerDatabase,
                          establishedConnections: ConcurrentMap[Channel, PeerInfo],
                          blockchainUpdater: BlockchainUpdater,
@@ -76,6 +78,18 @@ case class DebugApiRoute(settings: RestAPISettings,
         k.address -> v.balance
       }
     )
+  }
+
+  @Path("/featureStatus/{featureId}")
+  @ApiOperation(value = "Feature status", notes = "Get feature current status", httpMethod = "GET")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(name = "featureId", value = "featureId", required = true, dataType = "integer", paramType = "path")
+  ))
+  @ApiResponses(Array(new ApiResponse(code = 200, message = "Feature status")))
+  def featureStatus: Route = (path("featureStatus" / IntNumber) & get) { featureId =>
+    complete(Json.obj(
+      "status" -> featureProvider.status(featureId.toShort).status,
+    ))
   }
 
   @Path("/portfolios/{address}")

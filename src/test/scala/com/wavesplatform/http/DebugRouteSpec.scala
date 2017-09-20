@@ -28,7 +28,7 @@ class DebugRouteSpec
   private val utxPool = mock[UtxPool]
   private val establishedConnections = mock[ConcurrentMap[Channel, PeerInfo]]
   private val miner = mock[Miner]
-  private val route = DebugApiRoute(restAPISettings, testWallet, state, history, peerDatabase, establishedConnections, mock[BlockchainUpdater], channelGroup, utxPool, miner).route
+  private val route = DebugApiRoute(restAPISettings, testWallet, state, history, history, peerDatabase, establishedConnections, mock[BlockchainUpdater], channelGroup, utxPool, miner).route
 
   private implicit def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)
 
