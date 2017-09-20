@@ -1,6 +1,6 @@
 package com.wavesplatform.state2.diffs
 
-import com.wavesplatform.settings.FunctionalitySettings
+import com.wavesplatform.features.Functionalities
 import com.wavesplatform.state2.reader.StateReader
 import com.wavesplatform.state2.{AssetInfo, Diff, LeaseInfo, Portfolio}
 import scorex.transaction.ValidationError.GenericError
@@ -24,10 +24,10 @@ object AssetTransactionsDiff {
       assetInfos = Map(tx.assetId -> info)))
   }
 
-  def reissue(state: StateReader, settings: FunctionalitySettings, blockTime: Long, height: Int)(tx: ReissueTransaction): Either[ValidationError, Diff] = {
-    findReferencedAsset(tx, state, tx.assetId).flatMap(itx => {
+  def reissue(state: StateReader, fn: Functionalities, blockTime: Long, height: Int)(tx: ReissueTransaction): Either[ValidationError, Diff] = {
+    findReferencedAsset(tx, state, tx.assetId).flatMap(_ => {
       val oldInfo = state.assetInfo(tx.assetId).get
-      if (oldInfo.isReissuable || blockTime <= settings.allowInvalidReissueInSameBlockUntilTimestamp) {
+      if (oldInfo.isReissuable || fn.allowInvalidReissueInSameBlockUpTo.check(blockTime).isRight) {
         Right(Diff(height = height,
           tx = tx,
           portfolios = Map(tx.sender.toAddress -> Portfolio(
@@ -38,8 +38,7 @@ object AssetTransactionsDiff {
             volume = tx.quantity,
             isReissuable = tx.reissuable))))
       } else {
-        Left(GenericError(s"Asset is not reissuable and blockTime=$blockTime is greater than " +
-          s"settings.allowInvalidReissueInSameBlockUntilTimestamp=${settings.allowInvalidReissueInSameBlockUntilTimestamp}"))
+        Left(GenericError(s"Asset is not reissuable and invalid reissue is not allowed"))
       }
     })
   }

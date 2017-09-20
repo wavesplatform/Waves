@@ -4,6 +4,7 @@ import java.net.{InetSocketAddress, NetworkInterface}
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
 
+import com.wavesplatform.features.Functionalities
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.settings._
 import com.wavesplatform.state2.reader.StateReader
@@ -32,7 +33,8 @@ class NetworkServer(checkpointService: CheckpointService,
                     peerDatabase: PeerDatabase,
                     allChannels: ChannelGroup,
                     peerInfo: ConcurrentHashMap[Channel, PeerInfo],
-                    blockchainReadiness: AtomicBoolean
+                    blockchainReadiness: AtomicBoolean,
+                    fn: Functionalities
                    ) extends ScorexLogging {
 
   @volatile
@@ -80,7 +82,7 @@ class NetworkServer(checkpointService: CheckpointService,
   private val coordinatorExecutor = new DefaultEventLoop
 
   private val coordinatorHandler = new CoordinatorHandler(checkpointService, history, blockchainUpdater, time,
-    stateReader, utxPool, blockchainReadiness, miner, settings, peerDatabase, allChannels)
+    stateReader, utxPool, blockchainReadiness, miner, settings, peerDatabase, allChannels, fn)
 
   private val peerConnections = new ConcurrentHashMap[PeerKey, Channel](10, 0.9f, 10)
 

@@ -3,8 +3,7 @@ package com.wavesplatform.mining
 import java.time.{Duration, Instant}
 import java.util.concurrent.atomic.AtomicBoolean
 
-import com.wavesplatform.features.{FeatureProvider, FeatureStatus}
-import com.wavesplatform.general.BlockVersion
+import com.wavesplatform.features.{FeatureProvider, FeatureStatus, Functionalities}
 import com.wavesplatform.network._
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state2.reader.StateReader
@@ -36,7 +35,8 @@ class Miner(
              settings: WavesSettings,
              timeService: Time,
              utx: UtxPool,
-             wallet: Wallet) extends ScorexLogging {
+             wallet: Wallet,
+             fn: Functionalities) extends ScorexLogging {
 
   import Miner._
 
@@ -44,7 +44,7 @@ class Miner(
 
   private lazy val minerSettings = settings.minerSettings
   private lazy val blockchainSettings = settings.blockchainSettings
-  private lazy val processBlock = Coordinator.processBlock(checkpoint, history, blockchainUpdater, timeService, stateReader, utx, blockchainReadiness, Miner.this, settings) _
+  private lazy val processBlock = Coordinator.processBlock(checkpoint, history, blockchainUpdater, timeService, stateReader, utx, blockchainReadiness, Miner.this, settings, fn) _
 
   private val scheduledAttempts = SerialCancelable()
 
@@ -94,13 +94,13 @@ class Miner(
     val grandParent = history.parent(lastBlock, 2)
     (for {
       _ <- checkAge(height, lastBlock)
-      ts <- nextBlockGenerationTime(height, stateReader, blockchainSettings.functionalitySettings, lastBlock, account)
+      ts <- nextBlockGenerationTime(height, stateReader, fn, lastBlock, account)
     } yield ts) match {
       case Right(ts) =>
         val offset = calcOffset(timeService, ts)
         log.debug(s"Next attempt for acc=$account in $offset")
-        val balance = generatingBalance(stateReader, blockchainSettings.functionalitySettings, account, height)
-        generateOneBlockTask(version, account, height, lastBlock, grandParent, balance)(offset).flatMap {
+        val balance = generatingBalance(stateReader, fn, account, height)
+        generateOneBlockTask(account, height, lastBlock, grandParent, balance)(offset).flatMap {
           case Right(block) => Task.now {
             processBlock(block, true) match {
               case Left(err) => log.warn(err.toString)

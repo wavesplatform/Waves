@@ -35,12 +35,12 @@ class UtxPoolSpecification extends FreeSpec
 
   private def mkState(senderAccount: Address, senderBalance: Long) = {
     val genesisSettings = TestHelpers.genesisSettings(Map(senderAccount -> senderBalance))
-    val (history, _, state, bcu) =
+    val (history, _, state, bcu, fn) =
       StorageFactory(BlockchainSettings(None, None, None, 'T', 5, FunctionalitySettings.TESTNET, genesisSettings)).get
 
     bcu.processBlock(Block.genesis(genesisSettings).right.get)
 
-    (state, history)
+    (state, history, fn)
   }
 
   private def transfer(sender: PrivateKeyAccount, maxAmount: Long, time: Time) = (for {
@@ -60,58 +60,58 @@ class UtxPoolSpecification extends FreeSpec
     sender <- accountGen.label("sender")
     senderBalance <- positiveLongGen.label("senderBalance")
   } yield {
-    val (state, history) = mkState(sender, senderBalance)
-    (sender, senderBalance, state, history)
+    val (state, history, fn) = mkState(sender, senderBalance)
+    (sender, senderBalance, state, history, fn)
   }
   private val twoOutOfManyValidPayments = (for {
-    (sender, senderBalance, state, history) <- stateGen
+    (sender, senderBalance, state, history, fn) <- stateGen
     recipient <- accountGen
     n <- chooseNum(3, 10)
     fee <- chooseNum(1, (senderBalance * 0.01).toLong)
     offset <- chooseNum(1000L, 2000L)
   } yield {
     val time = new TestTime()
-    val utx = new UtxPool(time, state, history, calculator, FunctionalitySettings.TESTNET, UtxSettings(10, 10.minutes))
+    val utx = new UtxPool(time, state, history, calculator, fn, UtxSettings(10, 10.minutes))
     val amountPart = (senderBalance - fee) / 2 - fee
     val txs = for (_ <- 1 to n) yield PaymentTransaction.create(sender, recipient, amountPart, fee, time.getTimestamp()).right.get
     (utx, time, txs, (offset + 1000).millis)
   }).label("twoOutOfManyValidPayments")
 
   private val emptyUtxPool = stateGen
-    .map { case (sender, senderBalance, state, history) =>
+    .map { case (sender, senderBalance, state, history, fn) =>
       val time = new TestTime()
-      val utxPool = new UtxPool(time, state, history, calculator, FunctionalitySettings.TESTNET, UtxSettings(10, 1.minute))
+      val utxPool = new UtxPool(time, state, history, calculator, fn, UtxSettings(10, 1.minute))
       (sender, state, utxPool)
     }
     .label("emptyUtxPool")
 
   private val withValidPayments = (for {
-    (sender, senderBalance, state, history) <- stateGen
+    (sender, senderBalance, state, history, fn) <- stateGen
     recipient <- accountGen
     time = new TestTime()
     txs <- Gen.nonEmptyListOf(transferWithRecipient(sender, recipient, senderBalance / 10, time))
   } yield {
     val settings = UtxSettings(10, 1.minute)
-    val utxPool = new UtxPool(time, state, history, calculator, FunctionalitySettings.TESTNET, settings)
+    val utxPool = new UtxPool(time, state, history, calculator, fn, settings)
     txs.foreach(utxPool.putIfNew)
-    (sender, state, utxPool, time, settings)
+    (sender, state, utxPool, time, settings, fn)
   }).label("withValidPayments")
 
   private def utxTest(utxSettings: UtxSettings = UtxSettings(20, 5.seconds), txCount: Int = 10)
                      (f: (Seq[TransferTransaction], UtxPool, TestTime) => Unit): Unit = forAll(
     stateGen,
-    chooseNum(2, txCount).label("txCount")) { case ((sender, senderBalance, state, history), count) =>
+    chooseNum(2, txCount).label("txCount")) { case ((sender, senderBalance, state, history, fn), count) =>
     val time = new TestTime()
 
     forAll(listOfN(count, transfer(sender, senderBalance / 2, time))) { txs =>
-      val utx = new UtxPool(time, state, history, calculator, FunctionalitySettings.TESTNET, utxSettings)
+      val utx = new UtxPool(time, state, history, calculator, fn, utxSettings)
       f(txs, utx, time)
     }
   }
 
   private val dualTxGen: Gen[(UtxPool, TestTime, Seq[Transaction], FiniteDuration, Seq[Transaction])] =
     for {
-      (sender, senderBalance, state, history) <- stateGen
+      (sender, senderBalance, state, history, fn) <- stateGen
       ts = System.currentTimeMillis()
       count1 <- chooseNum(5, 10)
       tx1 <- listOfN(count1, transfer(sender, senderBalance / 2, new TestTime(ts)))
@@ -119,8 +119,8 @@ class UtxPoolSpecification extends FreeSpec
       tx2 <- listOfN(count1, transfer(sender, senderBalance / 2, new TestTime(ts + offset + 1000)))
     } yield {
       val time = new TestTime()
-      val history = HistoryWriterImpl(None, new ReentrantReadWriteLock(), TestFunctionalitySettings.Stub).get
-      val utx = new UtxPool(time, state, history, calculator, FunctionalitySettings.TESTNET, UtxSettings(10, offset.millis))
+      val history = HistoryWriterImpl(None, new ReentrantReadWriteLock()).get
+      val utx = new UtxPool(time, state, history, calculator, fn, UtxSettings(10, offset.millis))
       (utx, time, tx1, (offset + 1000).millis, tx2)
     }
 
@@ -184,7 +184,7 @@ class UtxPoolSpecification extends FreeSpec
         basePortfolio shouldBe utxPortfolio
       }
 
-      "taking into account unconfirmed transactions" in forAll(withValidPayments) { case (sender, state, utxPool, _, _) =>
+      "taking into account unconfirmed transactions" in forAll(withValidPayments) { case (sender, state, utxPool, _, _, _) =>
         val basePortfolio = state.accountPortfolio(sender)
 
         utxPool.size should be > 0
@@ -199,7 +199,7 @@ class UtxPoolSpecification extends FreeSpec
         }
       }
 
-      "is changed after transactions with these assets are removed" in forAll(withValidPayments) { case (sender, _, utxPool, time, settings) =>
+      "is changed after transactions with these assets are removed" in forAll(withValidPayments) { case (sender, _, utxPool, time, settings, fn) =>
         val utxPortfolioBefore = utxPool.portfolio(sender)
         val poolSizeBefore = utxPool.size
 

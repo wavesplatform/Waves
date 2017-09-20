@@ -3,6 +3,7 @@ package com.wavesplatform.history
 import java.io.File
 import java.util.concurrent.locks.{ReentrantReadWriteLock => RWL}
 
+import com.wavesplatform.features.Functionalities
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state2.reader.StateReader
 import com.wavesplatform.state2.{BlockchainUpdaterImpl, StateStorage, StateWriterImpl}
@@ -20,16 +21,17 @@ object StorageFactory {
       }
     }
 
-  def apply(settings: BlockchainSettings): Try[(History with AutoCloseable, AutoCloseable, StateReader, BlockchainUpdater)] = {
+  def apply(settings: BlockchainSettings): Try[(History with AutoCloseable, AutoCloseable, StateReader, BlockchainUpdater, Functionalities)] = {
     val lock = new RWL(true)
 
     for {
-      historyWriter <- HistoryWriterImpl(settings.blockchainFile, lock, settings.functionalitySettings)
+      historyWriter <- HistoryWriterImpl(settings.blockchainFile, lock)
+      fn = new Functionalities(settings.functionalitySettings, historyWriter)
       ss <- createStateStorage(historyWriter, settings.stateFile)
       stateWriter = new StateWriterImpl(ss, lock)
     } yield {
-      val bcu = BlockchainUpdaterImpl(stateWriter, historyWriter, settings.functionalitySettings, settings.minimumInMemoryDiffSize, lock)
-      (historyWriter, stateWriter, bcu.currentPersistedBlocksState, bcu)
+      val bcu = BlockchainUpdaterImpl(stateWriter, historyWriter, fn, settings.minimumInMemoryDiffSize, lock)
+      (historyWriter, stateWriter, bcu.currentPersistedBlocksState, bcu, fn)
     }
   }
 }

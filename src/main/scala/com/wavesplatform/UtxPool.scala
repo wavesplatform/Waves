@@ -5,7 +5,8 @@ import java.util.concurrent.locks.ReentrantReadWriteLock
 import cats._
 import com.google.common.cache.CacheBuilder
 import com.wavesplatform.UtxPool.PessimisticPortfolios
-import com.wavesplatform.settings.{FunctionalitySettings, UtxSettings}
+import com.wavesplatform.features.Functionalities
+import com.wavesplatform.settings.UtxSettings
 import com.wavesplatform.state2.diffs.TransactionDiffer
 import com.wavesplatform.state2.reader.{CompositeStateReader, StateReader}
 import com.wavesplatform.state2.{ByteStr, Diff, Portfolio}
@@ -23,7 +24,7 @@ class UtxPool(time: Time,
               stateReader: StateReader,
               history: History,
               feeCalculator: FeeCalculator,
-              fs: FunctionalitySettings,
+              fn: Functionalities,
               utxSettings: UtxSettings) extends Synchronized with ScorexLogging {
 
   def synchronizationToken: ReentrantReadWriteLock = new ReentrantReadWriteLock()
@@ -65,7 +66,7 @@ class UtxPool(time: Time,
           val res = for {
             _ <- Either.cond(transactions().size < utxSettings.maxSize, (), GenericError("Transaction pool size limit is reached"))
             _ <- feeCalculator.enoughFee(tx)
-            diff <- TransactionDiffer(fs, history.lastBlock.map(_.timestamp), time.correctedTime(), stateReader.height)(stateReader, tx)
+            diff <- TransactionDiffer(fn, history.lastBlock.map(_.timestamp), time.correctedTime(), stateReader.height)(stateReader, tx)
           } yield {
             pessimisticPortfolios.mutate(_.add(tx.id, diff))
             transactions.transform(_.updated(tx.id, tx))
@@ -106,7 +107,7 @@ class UtxPool(time: Time,
   def packUnconfirmed(): Seq[Transaction] = write { implicit l =>
     val currentTs = time.correctedTime()
     removeExpired(currentTs)
-    val differ = TransactionDiffer(fs, history.lastBlock.map(_.timestamp), currentTs, stateReader.height) _
+    val differ = TransactionDiffer(fn, history.lastBlock.map(_.timestamp), currentTs, stateReader.height) _
     val (invalidTxs, validTxs, _) = transactions()
       .values.toSeq
       .sorted(TransactionsOrdering.InUTXPool)

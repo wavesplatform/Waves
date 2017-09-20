@@ -1,6 +1,7 @@
 package com.wavesplatform.http
 
 import com.wavesplatform.TestWallet
+import com.wavesplatform.features.Functionalities
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.state2.reader.StateReader
 import com.wavesplatform.state2.{LeaseInfo, Portfolio}
@@ -19,6 +20,7 @@ class AddressRouteSpec
     with PropertyChecks
     with RestAPISettingsHelper
     with TestWallet {
+
   import org.scalacheck.Shrink
 
   implicit val noShrink: Shrink[String] = Shrink.shrinkAny
@@ -26,7 +28,7 @@ class AddressRouteSpec
   private val allAccounts = testWallet.privateKeyAccounts()
   private val allAddresses = allAccounts.map(_.address)
 
-  private val route = AddressApiRoute(restAPISettings, testWallet, mock[StateReader], TestFunctionalitySettings.Stub).route
+  private val route = AddressApiRoute(restAPISettings, testWallet, mock[StateReader], mock[Functionalities]).route
 
   private val generatedMessages = for {
     account <- Gen.oneOf(allAccounts).label("account")
@@ -80,7 +82,7 @@ class AddressRouteSpec
   routePath("/balance/{address}") in {
     val state = stub[StateReader]
     (state.accountPortfolio _).when(*).returns(Portfolio(0, mock[LeaseInfo], Map.empty))
-    val route = AddressApiRoute(restAPISettings, testWallet, state, TestFunctionalitySettings.Stub).route
+    val route = AddressApiRoute(restAPISettings, testWallet, state, mock[Functionalities]).route
     Get(routePath(s"/balance/${allAddresses.head}")) ~> route ~> check {
       val r = responseAs[AddressApiRoute.Balance]
       r.balance shouldEqual 0

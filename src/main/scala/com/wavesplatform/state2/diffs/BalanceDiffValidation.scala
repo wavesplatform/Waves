@@ -1,7 +1,7 @@
 package com.wavesplatform.state2.diffs
 
 import cats.implicits._
-import com.wavesplatform.settings.FunctionalitySettings
+import com.wavesplatform.features.Functionalities
 import com.wavesplatform.state2.reader.StateReader
 import com.wavesplatform.state2.{ByteStr, Diff, LeaseInfo, Portfolio}
 import scorex.account.Address
@@ -13,7 +13,7 @@ import scala.util.{Left, Right}
 object BalanceDiffValidation {
 
 
-  def apply[T <: Transaction](s: StateReader, time: Long, fs: FunctionalitySettings)(d: Diff): Either[AccountBalanceError, Diff] = {
+  def apply[T <: Transaction](s: StateReader, time: Long, fn: Functionalities)(d: Diff): Either[AccountBalanceError, Diff] = {
 
     val changedAccounts = d.portfolios.keySet
     val positiveBalanceErrors: Map[Address, String] = changedAccounts.flatMap(acc => {
@@ -28,7 +28,7 @@ object BalanceDiffValidation {
         Some(s"negative asset balance: $acc, new portfolio: ${negativeAssetsInfo(newPortfolio)}")
       } else if (newPortfolio.effectiveBalance < 0) {
         Some(s"negative effective balance: $acc, old: ${leaseWavesInfo(oldPortfolio)}, new: ${leaseWavesInfo(oldPortfolio)}")
-      } else if (newPortfolio.balance < newPortfolio.leaseInfo.leaseOut && time > fs.allowLeasedBalanceTransferUntil) {
+      } else if (newPortfolio.balance < newPortfolio.leaseInfo.leaseOut && fn.allowLeasedBalanceTransferUpTo.check(time).isLeft) {
         Some(s"leased being more than own: $acc, old: ${leaseWavesInfo(oldPortfolio)}, new: ${leaseWavesInfo(oldPortfolio)}")
       } else None
       err.map(acc -> _)

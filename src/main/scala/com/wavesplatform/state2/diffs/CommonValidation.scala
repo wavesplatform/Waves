@@ -1,7 +1,7 @@
 package com.wavesplatform.state2.diffs
 
 import cats._
-import com.wavesplatform.settings.FunctionalitySettings
+import com.wavesplatform.features.Functionalities
 import com.wavesplatform.state2.reader.StateReader
 import com.wavesplatform.state2.{Portfolio, _}
 import scorex.account.Address
@@ -19,8 +19,8 @@ object CommonValidation {
   val MaxTimeTransactionOverBlockDiff: FiniteDuration = 90.minutes
   val MaxTimePrevBlockOverTransactionDiff: FiniteDuration = 2.hours
 
-  def disallowSendingGreaterThanBalance[T <: Transaction](s: StateReader, settings: FunctionalitySettings, blockTime: Long, tx: T): Either[ValidationError, T] =
-    if (blockTime >= settings.allowTemporaryNegativeUntil)
+  def disallowSendingGreaterThanBalance[T <: Transaction](s: StateReader, fn: Functionalities, blockTime: Long, tx: T): Either[ValidationError, T] =
+    fn.allowTemporaryNegativeUntil.check(blockTime).fold(_ =>
       tx match {
         case ptx: PaymentTransaction if s.accountPortfolio(ptx.sender).balance < (ptx.amount + ptx.fee) =>
           Left(GenericError(s"Attempt to pay unavailable funds: balance " +
@@ -51,44 +51,33 @@ object CommonValidation {
               s" Transaction application leads to negative asset '${negativeAsset.get._1}' balance to (at least) temporary negative state, current balance is ${negativeAsset.get._2}, spends equals ${negativeAsset.get._3}, result is ${negativeAsset.get._4}"))
           else Right(tx)
         case _ => Right(tx)
-      } else Right(tx)
+      }, _ => Right(tx))
 
-  def disallowDuplicateIds[T <: Transaction](state: StateReader, settings: FunctionalitySettings, height: Int, tx: T): Either[ValidationError, T] = tx match {
-    case ptx: PaymentTransaction if ptx.timestamp < settings.requirePaymentUniqueIdAfter => Right(tx)
+  def disallowDuplicateIds[T <: Transaction](state: StateReader, fn: Functionalities, height: Int, tx: T): Either[ValidationError, T] = tx match {
+    case ptx: PaymentTransaction if fn.requirePaymentUniqueIdAfter.check(ptx.timestamp).isLeft => Right(tx)
     case _ =>
       if (state.containsTransaction(tx.id))
-        Left(GenericError(s"Tx id(exc. for some PaymentTransactions) cannot be duplicated. Current height is: $height. Tx with such id aready present"))
+        Left(GenericError(s"Tx id(exc. for some PaymentTransactions) cannot be duplicated. Current height is: $height. Tx with such id already present"))
       else Right(tx)
   }
 
-  def disallowBeforeActivationTime[T <: Transaction](settings: FunctionalitySettings, tx: T): Either[ValidationError, T] =
+  def disallowBeforeActivationTime[T <: Transaction](fn: Functionalities, tx: T): Either[ValidationError, T] =
     tx match {
-      case tx: BurnTransaction if tx.timestamp <= settings.allowBurnTransactionAfter =>
-        Left(GenericError(s"must not appear before time=${settings.allowBurnTransactionAfter}"))
-      case tx: LeaseTransaction if tx.timestamp <= settings.allowLeaseTransactionAfter =>
-        Left(GenericError(s"must not appear before time=${settings.allowLeaseTransactionAfter}"))
-      case tx: LeaseCancelTransaction if tx.timestamp <= settings.allowLeaseTransactionAfter =>
-        Left(GenericError(s"must not appear before time=${settings.allowLeaseTransactionAfter}"))
-      case tx: ExchangeTransaction if tx.timestamp <= settings.allowExchangeTransactionAfter =>
-        Left(GenericError(s"must not appear before time=${settings.allowExchangeTransactionAfter}"))
-      case tx: CreateAliasTransaction if tx.timestamp <= settings.allowCreatealiasTransactionAfter =>
-        Left(GenericError(s"must not appear before time=${settings.allowCreatealiasTransactionAfter}"))
-      case _: BurnTransaction => Right(tx)
+      case _: BurnTransaction => fn.allowBurnTransactionAfter.check(tx.timestamp).fold(e => Left(GenericError(e.message)), _ => Right(tx))
+      case _: LeaseTransaction => fn.allowLeaseTransactionAfter.check(tx.timestamp).fold(e => Left(GenericError(e.message)), _ => Right(tx))
+      case _: LeaseCancelTransaction => fn.allowLeaseTransactionAfter.check(tx.timestamp).fold(e => Left(GenericError(e.message)), _ => Right(tx))
+      case _: ExchangeTransaction => fn.allowExchangeTransactionAfter.check(tx.timestamp).fold(e => Left(GenericError(e.message)), _ => Right(tx))
+      case _: CreateAliasTransaction => fn.allowCreateAliasTransactionAfter.check(tx.timestamp).fold(e => Left(GenericError(e.message)), _ => Right(tx))
       case _: PaymentTransaction => Right(tx)
       case _: GenesisTransaction => Right(tx)
       case _: TransferTransaction => Right(tx)
       case _: IssueTransaction => Right(tx)
       case _: ReissueTransaction => Right(tx)
-      case _: ExchangeTransaction => Right(tx)
-      case _: LeaseTransaction => Right(tx)
-      case _: LeaseCancelTransaction => Right(tx)
-      case _: CreateAliasTransaction => Right(tx)
       case _ => Left(GenericError("Unknown transaction must be explicitly registered within ActivatedValidator"))
     }
 
-  def disallowTxFromFuture[T <: Transaction](settings: FunctionalitySettings, time: Long, tx: T): Either[ValidationError, T] = {
-    val allowTransactionsFromFutureByTimestamp = tx.timestamp < settings.allowTransactionsFromFutureUntil
-    if (!allowTransactionsFromFutureByTimestamp && (tx.timestamp - time).millis > MaxTimeTransactionOverBlockDiff)
+  def disallowTxFromFuture[T <: Transaction](fn: Functionalities, time: Long, tx: T): Either[ValidationError, T] = {
+    if (fn.allowTransactionsFromFutureUntil.check(tx.timestamp).isLeft && (tx.timestamp - time).millis > MaxTimeTransactionOverBlockDiff)
       Left(Mistiming(s"Transaction ts ${tx.timestamp} is from far future. BlockTime: $time"))
     else Right(tx)
   }

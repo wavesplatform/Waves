@@ -1,6 +1,6 @@
 package scorex.transaction
 
-import com.wavesplatform.settings.FunctionalitySettings
+import com.wavesplatform.features.Functionalities
 import com.wavesplatform.state2.reader.StateReader
 import scorex.account.{Address, PublicKeyAccount}
 import scorex.block.Block
@@ -12,6 +12,9 @@ import scorex.utils.ScorexLogging
 import scala.concurrent.duration.FiniteDuration
 
 object PoSCalc extends ScorexLogging {
+
+  private val shallowGenerationBalanceDepth = 50
+  private val deepGenerationBalanceDepth = 1000
 
   val MinimalEffectiveBalanceForGenerator: Long = 1000000000000L
   val AvgBlockTimeDepth: Int = 3
@@ -56,18 +59,19 @@ object PoSCalc extends ScorexLogging {
     }
   }
 
-  def generatingBalance(state: StateReader, fs: FunctionalitySettings, account: Address, atHeight: Int): Long = {
-    val generatingBalanceDepth = if (atHeight >= fs.generationBalanceDepthFrom50To1000AfterHeight) 1000 else 50
+  def generatingBalance(state: StateReader, fn: Functionalities, account: Address, atHeight: Int): Long = {
+    val generatingBalanceDepth = fn.deepGenerationBalanceDepthAfter.check(atHeight)
+      .fold(_ => deepGenerationBalanceDepth, _ => shallowGenerationBalanceDepth)
     state.effectiveBalanceAtHeightWithConfirmations(account, atHeight, generatingBalanceDepth)
   }
 
   def nextBlockGenerationTime(
-      height: Int,
-      state: StateReader,
-      fs: FunctionalitySettings,
-      block: Block,
-      account: PublicKeyAccount): Either[String, Long] = {
-    val balance = generatingBalance(state, fs, account, height)
+                               height: Int,
+                               state: StateReader,
+                               fn: Functionalities,
+                               block: Block,
+                               account: PublicKeyAccount): Either[String, Long] = {
+    val balance = generatingBalance(state, fn, account, height)
     Either.cond(balance >= MinimalEffectiveBalanceForGenerator,
       balance,
       s"Balance $balance of ${account.address} is lower than $MinimalEffectiveBalanceForGenerator")

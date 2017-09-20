@@ -3,7 +3,7 @@ package com.wavesplatform.state2
 import java.util.concurrent.locks.ReentrantReadWriteLock
 
 import cats._
-import com.wavesplatform.settings.FunctionalitySettings
+import com.wavesplatform.features.Functionalities
 import com.wavesplatform.state2.BlockchainUpdaterImpl._
 import com.wavesplatform.state2.StateWriterImpl._
 import com.wavesplatform.state2.diffs.BlockDiffer
@@ -15,7 +15,7 @@ import scorex.transaction._
 import scorex.utils.ScorexLogging
 
 class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
-                                    settings: FunctionalitySettings,
+                                    fn: Functionalities,
                                     minimumInMemoryDiffSize: Int,
                                     historyWriter: HistoryWriter,
                                     val synchronizationToken: ReentrantReadWriteLock) extends BlockchainUpdater with ScorexLogging {
@@ -28,7 +28,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
       Range(from, to).map(historyWriter.blockBytes).par.map(b => Block.parseBytes(b.get).get).seq
     }
     measureLog(s"Building diff from $from up to $to") {
-      BlockDiffer.unsafeDiffMany(settings, state, historyWriter.blockAt(from - 1).map(_.timestamp))(blocks)
+      BlockDiffer.unsafeDiffMany(fn, state, historyWriter.blockAt(from - 1).map(_.timestamp))(blocks)
     }
   }
 
@@ -62,7 +62,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
       bottomMemoryDiff.set(topMemoryDiff())
       topMemoryDiff.set(BlockDiff.empty)
     }
-    historyWriter.appendBlock(block)(BlockDiffer.fromBlock(settings, currentPersistedBlocksState, historyWriter.lastBlock.map(_.timestamp))(block)).map { newBlockDiff =>
+    historyWriter.appendBlock(block)(BlockDiffer.fromBlock(fn, currentPersistedBlocksState, historyWriter.lastBlock.map(_.timestamp))(block)).map { newBlockDiff =>
       topMemoryDiff.set(Monoid.combine(topMemoryDiff(), newBlockDiff))
     }.map(_ => log.trace(s"Block ${block.uniqueId} appended. New height: ${historyWriter.height()}, new score: ${historyWriter.score()}"))
   }
@@ -108,13 +108,13 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
 
 object BlockchainUpdaterImpl {
   def apply(
-               persistedState: StateWriter with StateReader,
-               history: HistoryWriter,
-               functionalitySettings: FunctionalitySettings,
-               minimumInMemoryDiffSize: Int,
-               synchronizationToken: ReentrantReadWriteLock): BlockchainUpdaterImpl = {
+             persistedState: StateWriter with StateReader,
+             history: HistoryWriter,
+             fn: Functionalities,
+             minimumInMemoryDiffSize: Int,
+             synchronizationToken: ReentrantReadWriteLock): BlockchainUpdaterImpl = {
     val blockchainUpdater =
-      new BlockchainUpdaterImpl(persistedState, functionalitySettings, minimumInMemoryDiffSize, history, synchronizationToken)
+      new BlockchainUpdaterImpl(persistedState, fn, minimumInMemoryDiffSize, history, synchronizationToken)
     blockchainUpdater.logHeights("Constructing BlockchainUpdaterImpl")
     blockchainUpdater.updatePersistedAndInMemory()
     blockchainUpdater
