@@ -114,7 +114,7 @@ class UtxPool(time: Time,
     val currentTs = time.correctedTime()
     removeExpired(currentTs)
     val differ = TransactionDiffer(fs, history.lastBlockTimestamp(), currentTs, stateReader.height) _
-    val (invalidTxs, validTxs, _) = transactions()
+    val (invalidTxs, reversedValidTxs, _) = transactions()
       .values.toSeq
       .sorted(TransactionsOrdering.InUTXPool)
       .foldLeft((Seq.empty[ByteStr], Seq.empty[Transaction], Monoid[Diff].empty)) {
@@ -124,8 +124,7 @@ class UtxPool(time: Time,
               (invalid, tx +: valid, Monoid.combine(diff, newDiff))
             case Right(_) =>
               (invalid, valid, diff)
-            case Left(e) =>
- //             log.trace(s"Removing invalid transaction ${tx.id} from UTX: $e")
+            case Left(_) =>
               (tx.id +: invalid, valid, diff)
           }
         case (r, _) => r
@@ -136,8 +135,8 @@ class UtxPool(time: Time,
       invalidTxs.foreach(p.remove)
     }
     if (sortInBlock)
-      validTxs.sorted(TransactionsOrdering.InBlock)
-    else validTxs
+      reversedValidTxs.sorted(TransactionsOrdering.InBlock)
+    else reversedValidTxs.reverse
   }
 }
 

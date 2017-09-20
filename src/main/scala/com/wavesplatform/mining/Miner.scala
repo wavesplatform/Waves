@@ -88,7 +88,7 @@ class Miner(
         val btg = calcBaseTarget(avgBlockDelay, parentHeight, parent, greatGrandParent, currentTime)
         val gs = calcGeneratorSignature(lastBlockKernelData, account)
         val consensusData = NxtLikeConsensusBlockData(btg, ByteStr(gs))
-        val sortInBlock = history.height() <= blockchainSettings.functionalitySettings.resetEffectiveBalancesAtHeight
+        val sortInBlock = history.height() <= blockchainSettings.functionalitySettings.enableMicroblocksAfterHeight
         val unconfirmed = utx.packUnconfirmed(minerSettings.maxTransactionsInKeyBlock, sortInBlock)
         val features = settings.featuresSettings.supported
           .filter(featureProvider.status(_) == FeatureStatus.Defined).toSet
@@ -164,7 +164,7 @@ class Miner(
         generateOneBlockTask(account, height, grandParent, balance, version)(offset).flatMap {
           case Right(block) => Task.now {
             processBlock(block, true) match {
-              case Left(err) => log.warn(err.toString)
+              case Left(err) => log.warn("Error mining Block: " + err.toString)
               case Right(score) =>
                 allChannels.broadcast(LocalScoreChanged(score))
                 allChannels.broadcast(BlockForged(block))
