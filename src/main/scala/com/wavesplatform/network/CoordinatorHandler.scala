@@ -3,6 +3,7 @@ package com.wavesplatform.network
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
 
+import com.wavesplatform.features.Functionalities
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state2.reader.StateReader
@@ -29,7 +30,8 @@ class CoordinatorHandler(
     miner: Miner,
     settings: WavesSettings,
     peerDatabase: PeerDatabase,
-    allChannels: ChannelGroup)
+    allChannels: ChannelGroup,
+    fn: Functionalities)
   extends ChannelInboundHandlerAdapter with ScorexLogging {
 
   private val counter = new AtomicInteger
@@ -41,8 +43,8 @@ class CoordinatorHandler(
   })
 
   private val processCheckpoint = Coordinator.processCheckpoint(checkpointService, history, blockchainUpdater) _
-  private val processFork = Coordinator.processFork(checkpointService, history, blockchainUpdater, stateReader, utxStorage, time, settings, miner, blockchainReadiness) _
-  private val processBlock = Coordinator.processBlock(checkpointService, history, blockchainUpdater, time, stateReader, utxStorage, blockchainReadiness, miner, settings) _
+  private val processFork = Coordinator.processFork(checkpointService, history, blockchainUpdater, stateReader, utxStorage, time, settings, miner, blockchainReadiness, fn) _
+  private val processBlock = Coordinator.processBlock(checkpointService, history, blockchainUpdater, time, stateReader, utxStorage, blockchainReadiness, miner, settings, fn) _
 
   private def broadcastingScore(
       src: Channel,

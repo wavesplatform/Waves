@@ -2,7 +2,7 @@ package com.wavesplatform.state2.diffs
 
 import cats._
 import cats.implicits._
-import com.wavesplatform.settings.FunctionalitySettings
+import com.wavesplatform.features.Functionalities
 import com.wavesplatform.state2._
 import com.wavesplatform.state2.reader.StateReader
 import scorex.account.Address
@@ -35,7 +35,7 @@ object LeaseTransactionsDiff {
     }
   }
 
-  def leaseCancel(s: StateReader, settings: FunctionalitySettings, time: Long, height: Int)
+  def leaseCancel(s: StateReader, fn: Functionalities, time: Long, height: Int)
                  (tx: LeaseCancelTransaction): Either[ValidationError, Diff] = {
     val leaseEi = s.findTransaction[LeaseTransaction](tx.leaseId) match {
       case None => Left(GenericError(s"Related LeaseTransaction not found"))
@@ -45,19 +45,18 @@ object LeaseTransactionsDiff {
       lease <- leaseEi
       recipient <- s.resolveAliasEi(lease.recipient)
       isLeaseActive = s.isLeaseActive(lease)
-      _ <- if (!isLeaseActive && time > settings.allowMultipleLeaseCancelTransactionUntilTimestamp)
+      _ <- if (!isLeaseActive && fn.allowMultipleLeaseCancelTransactionUntil.check(time).isLeft)
         Left(GenericError(s"Cannot cancel already cancelled lease")) else Right(())
       canceller = Address.fromPublicKey(tx.sender.publicKey)
       portfolioDiff <- if (tx.sender == lease.sender) {
         Right(Monoid.combine(
           Map(canceller -> Portfolio(-tx.fee, LeaseInfo(0, -lease.amount), Map.empty)),
           Map(recipient -> Portfolio(0, LeaseInfo(-lease.amount, 0), Map.empty))))
-      } else if (time < settings.allowMultipleLeaseCancelTransactionUntilTimestamp) { // cancel of another acc
+      } else if (fn.allowMultipleLeaseCancelTransactionUntil.check(time).isRight) { // cancel of another acc
         Right(Monoid.combine(
           Map(canceller -> Portfolio(-tx.fee, LeaseInfo(0, -lease.amount), Map.empty)),
           Map(recipient -> Portfolio(0, LeaseInfo(-lease.amount, 0), Map.empty))))
-      } else Left(GenericError(s"LeaseTransaction was leased by other sender " +
-        s"and time=$time > allowMultipleLeaseCancelTransactionUntilTimestamp=${settings.allowMultipleLeaseCancelTransactionUntilTimestamp}"))
+      } else Left(GenericError(s"LeaseTransaction was leased by other sender"))
 
     } yield Diff(height = height, tx = tx, portfolios = portfolioDiff, leaseState = Map(lease.id -> false))
   }

@@ -1,11 +1,11 @@
 package scorex.settings
 
+import com.wavesplatform.features.{FeatureProvider, FeatureStatus, Functionalities}
 import com.wavesplatform.settings.FunctionalitySettings
 
-object TestFunctionalitySettings {
-  val Enabled = FunctionalitySettings(
-    featureCheckBlocksPeriod = 10000,
-    blocksForFeatureActivation = 9000,
+object TestFunctionality {
+
+  val EnabledSettings = FunctionalitySettings(
     allowTemporaryNegativeUntil = 0L, allowInvalidPaymentTransactionsByTimestamp = 0L,
     requireSortedTransactionsAfter = 0L, generationBalanceDepthFrom50To1000AfterHeight = 0L,
     minimalGeneratingBalanceAfter = 0L,
@@ -15,8 +15,11 @@ object TestFunctionalitySettings {
     allowInvalidReissueInSameBlockUntilTimestamp = 0L, allowCreatealiasTransactionAfter = 0L,
     allowMultipleLeaseCancelTransactionUntilTimestamp = 0L, resetEffectiveBalancesAtHeight = 0,
     allowLeasedBalanceTransferUntil = 0L,
-    blockVersion3After = 0L
+    featureCheckBlocksPeriod = 100, blocksForFeatureActivation = 90,
+    blockVersion3After = 0
   )
 
-   val Stub = Enabled.copy(featureCheckBlocksPeriod = 100, blocksForFeatureActivation = 90)
+  val EnabledProvider: FeatureProvider = (_: Short) => FeatureStatus.Activated
+
+  val EnabledFunctionalities: Functionalities = new Functionalities(EnabledSettings, EnabledProvider)
 }

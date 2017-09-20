@@ -1,7 +1,7 @@
 package com.wavesplatform.state2.diffs
 
 import cats.implicits._
-import com.wavesplatform.settings.FunctionalitySettings
+import com.wavesplatform.features.Functionalities
 import com.wavesplatform.state2.reader.StateReader
 import com.wavesplatform.state2.{ByteStr, Diff, LeaseInfo, Portfolio}
 import scorex.account.Address
@@ -12,11 +12,11 @@ import scala.util.{Left, Right}
 
 object PaymentTransactionDiff {
 
-  def apply(stateReader: StateReader, height: Int, settings: FunctionalitySettings, blockTime: Long)
+  def apply(stateReader: StateReader, height: Int, fn: Functionalities, blockTime: Long)
            (tx: PaymentTransaction): Either[ValidationError, Diff] = {
 
     stateReader.paymentTransactionIdByHash(ByteStr(tx.hash)) match {
-      case Some(existing) if blockTime >= settings.requirePaymentUniqueIdAfter => Left(GenericError(s"PaymentTx is already registered: $existing"))
+      case Some(existing) if fn.requirePaymentUniqueIdAfter.check(blockTime).isRight => Left(GenericError(s"PaymentTx is already registered: $existing"))
       case _ => Right(Diff(height = height,
         tx = tx,
         portfolios = Map(
@@ -29,7 +29,7 @@ object PaymentTransactionDiff {
             LeaseInfo.empty,
             assets = Map.empty
           )),
-      paymentTransactionIdsByHashes = Map(ByteStr(tx.hash) -> tx.id)
+        paymentTransactionIdsByHashes = Map(ByteStr(tx.hash) -> tx.id)
       ))
     }
   }

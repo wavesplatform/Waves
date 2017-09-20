@@ -1,11 +1,12 @@
 package com.wavesplatform.state2.diffs
 
 import com.wavesplatform.TransactionGen
+import com.wavesplatform.features.Functionalities
 import org.scalacheck.{Gen, Shrink}
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import org.scalatest.{Matchers, PropSpec}
 import scorex.lagonaki.mocks.TestBlock
-import scorex.settings.TestFunctionalitySettings
+import scorex.settings.TestFunctionality
 import scorex.transaction.lease.LeaseTransaction
 import scorex.transaction.{GenesisTransaction, PaymentTransaction}
 
@@ -77,13 +78,14 @@ class BalanceDiffValidationTest extends PropSpec with PropertyChecks with Genera
 
   property("can transfer more than own-leaseOut before allow-leased-balance-transfer-until") {
     val allowTransferLeasedBalanceUntil = Long.MaxValue / 2
-    val settings = TestFunctionalitySettings.Enabled.copy(allowLeasedBalanceTransferUntil = allowTransferLeasedBalanceUntil)
+    val settings = TestFunctionality.EnabledSettings.copy(allowLeasedBalanceTransferUntil = allowTransferLeasedBalanceUntil)
+    val fn = new Functionalities(settings, TestFunctionality.EnabledProvider)
 
     forAll(ownLessThatLeaseOut, timestampGen retryUntil (_ < allowTransferLeasedBalanceUntil)) {
       case ((genesis, masterTransfersToAlice, aliceLeasesToBob, masterLeasesToAlice, aliceTransfersMoreThanOwnsMinusLeaseOut), blockTime) =>
         assertDiffEi(Seq(TestBlock.create(Seq(genesis, masterTransfersToAlice, aliceLeasesToBob, masterLeasesToAlice))),
           TestBlock.create(blockTime, Seq(aliceTransfersMoreThanOwnsMinusLeaseOut)),
-          settings) { totalDiffEi =>
+          fn) { totalDiffEi =>
           totalDiffEi shouldBe 'right
         }
     }
@@ -91,13 +93,14 @@ class BalanceDiffValidationTest extends PropSpec with PropertyChecks with Genera
 
   property("cannot transfer more than own-leaseOut after allow-leased-balance-transfer-until") {
     val allowTransferLeasedBalanceUntil = Long.MaxValue / 2
-    val settings = TestFunctionalitySettings.Enabled.copy(allowLeasedBalanceTransferUntil = allowTransferLeasedBalanceUntil)
+    val settings = TestFunctionality.EnabledSettings.copy(allowLeasedBalanceTransferUntil = allowTransferLeasedBalanceUntil)
+    val fn = new Functionalities(settings, TestFunctionality.EnabledProvider)
 
     forAll(ownLessThatLeaseOut, timestampGen retryUntil (_ > allowTransferLeasedBalanceUntil)) {
       case ((genesis, masterTransfersToAlice, aliceLeasesToBob, masterLeasesToAlice, aliceTransfersMoreThanOwnsMinusLeaseOut), blockTime) =>
         assertDiffEi(Seq(TestBlock.create(Seq(genesis, masterTransfersToAlice, aliceLeasesToBob, masterLeasesToAlice))),
           TestBlock.create(blockTime, Seq(aliceTransfersMoreThanOwnsMinusLeaseOut)),
-          settings) { totalDiffEi =>
+          fn) { totalDiffEi =>
           totalDiffEi should produce("leased being more than own")
         }
     }

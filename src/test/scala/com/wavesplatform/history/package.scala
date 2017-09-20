@@ -6,7 +6,7 @@ import scorex.account.PrivateKeyAccount
 import scorex.block.Block
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
 import scorex.lagonaki.mocks.TestBlock
-import scorex.settings.TestFunctionalitySettings
+import scorex.settings.TestFunctionality
 import scorex.transaction.{Transaction, TransactionParser}
 
 package object history {
@@ -17,11 +17,11 @@ package object history {
     checkpointFile = None,
     addressSchemeCharacter = 'N',
     minimumInMemoryDiffSize = MinInMemoryDiffSize,
-    functionalitySettings = TestFunctionalitySettings.Enabled,
+    functionalitySettings = TestFunctionality.EnabledSettings,
     genesisSettings = null)
 
   def domain(): Domain = {
-    val (history, _, stateReader, blockchainUpdater) = StorageFactory(DefaultBlockchainSettings).get
+    val (history, _, stateReader, blockchainUpdater, fn) = StorageFactory(DefaultBlockchainSettings).get
     Domain(history, stateReader, blockchainUpdater)
   }
 

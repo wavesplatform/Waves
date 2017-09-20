@@ -66,7 +66,7 @@ class AliasTransactionSpecification(override val allNodes: Seq[Node], override v
 
       _ <- waitForHeightAraise(aliasTxId, 1)
       _ <- assertBadRequest(sender.createAlias(secondAddress, alias, aliasFee))
-      _ <- assertBadRequestAndMessage(sender.createAlias(secondAddress, alias, aliasFee), "Tx with such id aready present")
+      _ <- assertBadRequestAndMessage(sender.createAlias(secondAddress, alias, aliasFee), "Tx with such id already present")
       _ <- assertBalances(firstAddress, balance - aliasFee, effectiveBalance - aliasFee)
     } yield succeed
 

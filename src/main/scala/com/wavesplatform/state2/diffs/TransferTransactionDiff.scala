@@ -1,7 +1,7 @@
 package com.wavesplatform.state2.diffs
 
 import cats.implicits._
-import com.wavesplatform.settings.FunctionalitySettings
+import com.wavesplatform.features.Functionalities
 import com.wavesplatform.state2._
 import com.wavesplatform.state2.reader.StateReader
 import scorex.account.Address
@@ -12,7 +12,8 @@ import scorex.transaction.assets.TransferTransaction
 import scala.util.Right
 
 object TransferTransactionDiff {
-  def apply(state: StateReader, s: FunctionalitySettings, blockTime: Long, height: Int)(tx: TransferTransaction): Either[ValidationError, Diff] = {
+  def apply(state: StateReader, fn: Functionalities, blockTime: Long, height: Int)
+           (tx: TransferTransaction): Either[ValidationError, Diff] = {
     val sender = Address.fromPublicKey(tx.sender.publicKey)
 
     val isInvalidEi = for {
@@ -41,13 +42,13 @@ object TransferTransactionDiff {
         case None => true
         case Some(aid) => state.assetInfo(aid).isDefined
       }
-    } yield (portfolios, blockTime > s.allowUnissuedAssetsUntil && !(assetIssued && feeAssetIssued))
+    } yield (portfolios, fn.allowUnissuedAssetsUpTo.check(blockTime).isLeft && !(assetIssued && feeAssetIssued))
 
     isInvalidEi match {
       case Left(e) => Left(e)
       case Right((portfolios, invalid)) =>
         if (invalid)
-          Left(GenericError(s"Unissued assets are not allowed after allowUnissuedAssetsUntil=${s.allowUnissuedAssetsUntil}"))
+          Left(GenericError(s"Unissued assets are not allowed"))
         else
           Right(Diff(height, tx, portfolios))
     }

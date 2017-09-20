@@ -1,13 +1,14 @@
 package com.wavesplatform.state2.patch
 
 import com.wavesplatform.TransactionGen
+import com.wavesplatform.features.Functionalities
 import com.wavesplatform.state2.LeaseInfo
 import com.wavesplatform.state2.diffs._
 import org.scalacheck.{Gen, Shrink}
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import org.scalatest.{Matchers, PropSpec}
 import scorex.lagonaki.mocks.TestBlock
-import scorex.settings.TestFunctionalitySettings
+import scorex.settings.TestFunctionality
 import scorex.transaction.GenesisTransaction
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 
@@ -16,8 +17,9 @@ class LeasePatchTest extends PropSpec with PropertyChecks with GeneratorDrivenPr
 
   private implicit def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)
 
-  private val settings = TestFunctionalitySettings.Enabled.copy(
+  private val settings = TestFunctionality.EnabledSettings.copy(
     resetEffectiveBalancesAtHeight = 5, allowMultipleLeaseCancelTransactionUntilTimestamp = Long.MaxValue / 2)
+  private val fn = new Functionalities(settings, TestFunctionality.EnabledProvider)
 
   property("LeasePatch cancels all active leases and its effects including those in the block") {
     val setupAndLeaseInResetBlock: Gen[(GenesisTransaction, GenesisTransaction, LeaseTransaction, LeaseCancelTransaction, LeaseTransaction)] = for {
@@ -42,7 +44,7 @@ class LeasePatchTest extends PropSpec with PropertyChecks with GeneratorDrivenPr
           TestBlock.create(Seq.empty),
           TestBlock.create(Seq.empty)),
           TestBlock.create(Seq(lease2)),
-          settings) { case (totalDiff, newState) =>
+          fn) { case (totalDiff, newState) =>
           newState.activeLeases() shouldBe empty
           newState.accountPortfolios.map(_._2.leaseInfo).foreach(_ shouldBe LeaseInfo.empty)
         }
