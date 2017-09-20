@@ -5,7 +5,7 @@ import scorex.block.{Block, MicroBlock}
 import scorex.transaction.{AssetId, DiscardedMicroBlocks, Transaction}
 
 
-case class NgState private(base: Block, diffs: Map[BlockId, BlockDiff], micros: List[MicroBlock]) {
+case class NgState private(base: Block, diffs: Map[BlockId, (BlockDiff, Long)], micros: List[MicroBlock]) {
 
   lazy val lastMicroTotalSig: Option[ByteStr] =
     micros.headOption.map(_.totalResBlockSig)
@@ -24,7 +24,7 @@ case class NgState private(base: Block, diffs: Map[BlockId, BlockDiff], micros: 
     }
 
   lazy val bestLiquidDiff: BlockDiff =
-    diffs(bestLiquidBlockId)
+    diffs(bestLiquidBlockId)._1
       .copy(heightDiff = 1)
 
   def contains(blockId: BlockId): Boolean = diffs.contains(blockId)
@@ -53,15 +53,23 @@ case class NgState private(base: Block, diffs: Map[BlockId, BlockDiff], micros: 
       }
     }
   }
+
+  def bestLastBlock(maxTimeStamp: Long): Block = {
+    micros.find(micro => diffs(micro.uniqueId)._2 <= maxTimeStamp)
+      .map(_.uniqueId)
+      .flatMap(forgeBlock)
+      .map(_._1)
+      .getOrElse(base)
+  }
 }
 
 object NgState {
 
-  def apply(base: Block, diff: BlockDiff): NgState =
-    NgState(base, Map(base.uniqueId -> diff), List.empty)
+  def apply(base: Block, diff: BlockDiff, timestamp: Long): NgState =
+    NgState(base, Map(base.uniqueId -> ((diff, timestamp))), List.empty)
 
   implicit class NgStateExt(n: NgState) {
-    def +(m: MicroBlock, diff: BlockDiff): NgState = NgState(n.base, n.diffs + (m.totalResBlockSig -> diff), m +: n.micros)
+    def +(m: MicroBlock, diff: BlockDiff, timestamp: Long): NgState = NgState(n.base, n.diffs + (m.totalResBlockSig -> ((diff, timestamp))), m +: n.micros)
   }
 
 }

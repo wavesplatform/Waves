@@ -31,6 +31,8 @@ trait History extends Synchronized with AutoCloseable with FeatureProvider {
 
 trait NgHistory extends History {
   def microBlock(id: ByteStr): Option[MicroBlock]
+
+  def bestLastBlock(maxTimestamp: Long) : Option[Block]
 }
 
 trait DebugNgHistory {
