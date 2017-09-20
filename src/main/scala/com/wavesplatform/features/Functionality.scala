@@ -42,24 +42,23 @@ class Functionalities(settings: FunctionalitySettings, provider: FeatureProvider
     if (h == settings.resetEffectiveBalancesAtHeight) Right(Unit)
     else Left(InvalidFunctionalityError(s"not available at height=$h"))
   val allowLeasedBalanceTransferUpTo: TimestampedFunctionality = (ts: Long) => allowUpTo(ts, settings.allowLeasedBalanceTransferUntil)
+  val smallerMinimumBalance: BlockchainFunctionality = () => activated(provider, 1)
 }
 
 object Functionalities {
 
-  private def allowUntil(timestamp: Long, expectation: Long): Either[InvalidFunctionalityError, Unit] = {
-    if (timestamp < expectation) Right(Unit) else Left(InvalidFunctionalityError.allowUntilTimestamp(expectation))
-  }
+  private def allowUntil(timestamp: Long, expectation: Long): Either[InvalidFunctionalityError, Unit] =
+    Either.cond(timestamp < expectation, Unit, InvalidFunctionalityError.allowUntilTimestamp(expectation))
 
-  private def allowUpTo(timestamp: Long, expectation: Long): Either[InvalidFunctionalityError, Unit] = {
-    if (timestamp <= expectation) Right(Unit) else Left(InvalidFunctionalityError.allowUntilTimestamp(expectation))
-  }
+  private def allowUpTo(timestamp: Long, expectation: Long): Either[InvalidFunctionalityError, Unit] =
+    Either.cond(timestamp <= expectation, Unit, InvalidFunctionalityError.allowUntilTimestamp(expectation))
 
-  private def allowAfter(timestamp: Long, expectation: Long): Either[InvalidFunctionalityError, Unit] = {
-    if (timestamp > expectation) Right(Unit) else Left(InvalidFunctionalityError.allowAfterTimestamp(expectation))
-  }
+  private def allowAfter(timestamp: Long, expectation: Long): Either[InvalidFunctionalityError, Unit] =
+    Either.cond(timestamp > expectation, Unit, InvalidFunctionalityError.allowAfterTimestamp(expectation))
 
-  private def requiredAfter(timestamp: Long, expectation: Long): Either[InvalidFunctionalityError, Unit] = {
-    if (timestamp >= expectation) Right(Unit) else Left(InvalidFunctionalityError.requiredAfterTimestamp(expectation))
-  }
+  private def requiredAfter(timestamp: Long, expectation: Long): Either[InvalidFunctionalityError, Unit] =
+    Either.cond(timestamp >= expectation, Unit, InvalidFunctionalityError.requiredAfterTimestamp(expectation))
 
+  private def activated(provider: FeatureProvider, id: Short): Either[InvalidFunctionalityError, Unit] =
+    Either.cond(provider.status(id) == FeatureStatus.Activated, Unit, InvalidFunctionalityError(s"feature $id not activated on blockchain"))
 }

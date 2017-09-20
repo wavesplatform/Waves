@@ -119,8 +119,12 @@ object Coordinator extends ScorexLogging {
 
   private def blockConsensusValidation(history: History, state: StateReader, settings: BlockchainSettings, fn: Functionalities, currentTs: Long)
                                       (block: Block): Either[ValidationError, Unit] = {
-
     import PoSCalc._
+
+    def enoughBalance(balance: Long, blockTime: Long): Boolean =
+      fn.minimalGeneratingBalanceAfter.check(blockTime).isLeft ||
+        (fn.minimalGeneratingBalanceAfter.check(blockTime).isRight && balance >= PoSCalc.MinimalEffectiveBalanceForGenerator1) ||
+        (fn.smallerMinimumBalance.check().isRight || balance >= PoSCalc.MinimalEffectiveBalanceForGenerator2)
 
     val blockTime = block.timestamp
 
@@ -142,8 +146,7 @@ object Coordinator extends ScorexLogging {
       _ <- Either.cond(calcGs.sameElements(blockGs), (),
         s"declared generation signature ${blockGs.mkString} does not match calculated generation signature ${calcGs.mkString}")
       effectiveBalance = generatingBalance(state, fn, generator, parentHeight)
-      _ <- Either.cond(fn.minimalGeneratingBalanceAfter.check(blockTime).isRight || effectiveBalance >= MinimalEffectiveBalanceForGenerator, (),
-        s"generator's effective balance $effectiveBalance is less that minimal ($MinimalEffectiveBalanceForGenerator)")
+      _ <- Either.cond(enoughBalance(effectiveBalance, blockTime), (), s"generator's effective balance $effectiveBalance is less that required")
       hit = calcHit(prevBlockData, generator)
       target = calcTarget(parent, blockTime, effectiveBalance)
       _ <- Either.cond(hit < target, (), s"calculated hit $hit >= calculated target $target")

@@ -16,7 +16,8 @@ object PoSCalc extends ScorexLogging {
   private val shallowGenerationBalanceDepth = 50
   private val deepGenerationBalanceDepth = 1000
 
-  val MinimalEffectiveBalanceForGenerator: Long = 1000000000000L
+  val MinimalEffectiveBalanceForGenerator1: Long = 1000000000000L
+  val MinimalEffectiveBalanceForGenerator2: Long = 100000000000L
   val AvgBlockTimeDepth: Int = 3
 
   def calcTarget(prevBlock: Block, timestamp: Long, balance: Long): BigInt = {
@@ -72,9 +73,9 @@ object PoSCalc extends ScorexLogging {
                                block: Block,
                                account: PublicKeyAccount): Either[String, Long] = {
     val balance = generatingBalance(state, fn, account, height)
-    Either.cond(balance >= MinimalEffectiveBalanceForGenerator,
+    Either.cond(balance >= MinimalEffectiveBalanceForGenerator1,
       balance,
-      s"Balance $balance of ${account.address} is lower than $MinimalEffectiveBalanceForGenerator")
+      s"Balance $balance of ${account.address} is lower than $MinimalEffectiveBalanceForGenerator1")
       .flatMap { _ =>
         val cData = block.consensusData
         val hit = calcHit(cData, account)
