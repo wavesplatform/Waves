@@ -4,6 +4,7 @@ import java.time.{Duration, Instant}
 import java.util.concurrent.atomic.AtomicBoolean
 
 import com.wavesplatform.features.{FeatureProvider, FeatureStatus, Functionalities}
+import com.wavesplatform.general.BlockVersion
 import com.wavesplatform.network._
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state2.reader.StateReader
@@ -100,7 +101,7 @@ class Miner(
         val offset = calcOffset(timeService, ts)
         log.debug(s"Next attempt for acc=$account in $offset")
         val balance = generatingBalance(stateReader, fn, account, height)
-        generateOneBlockTask(account, height, lastBlock, grandParent, balance)(offset).flatMap {
+        generateOneBlockTask(version, account, height, lastBlock, grandParent, balance)(offset).flatMap {
           case Right(block) => Task.now {
             processBlock(block, true) match {
               case Left(err) => log.warn(err.toString)
