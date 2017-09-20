@@ -4,6 +4,7 @@ import java.io.File
 import java.util.concurrent.locks.ReentrantReadWriteLock
 
 import com.wavesplatform.features.FeatureStatus
+import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.{BlockDiff, ByteStr, DataTypes}
 import com.wavesplatform.utils._
 import kamon.Kamon
@@ -15,9 +16,12 @@ import scorex.utils.{LogMVMapBuilder, ScorexLogging}
 
 import scala.util.Try
 
-class HistoryWriterImpl private(file: Option[File], val synchronizationToken: ReentrantReadWriteLock) extends History with ScorexLogging {
+class HistoryWriterImpl private(file: Option[File], val synchronizationToken: ReentrantReadWriteLock, functionalitySettings: FunctionalitySettings) extends History with ScorexLogging {
 
   import HistoryWriterImpl._
+
+  private val FeatureApprovalBlocksCount = functionalitySettings.featureCheckBlocksPeriod
+  private val MinBlocksCountToActivateFeature = functionalitySettings.blocksForFeatureActivation
 
   private val db = createMVStore(file)
   private val blockBodyByHeight = Synchronized(db.openMap("blocks", new LogMVMapBuilder[Int, Array[Byte]]))
@@ -142,14 +146,11 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
 object HistoryWriterImpl extends ScorexLogging {
   private val CompactFillRate = 90
   private val CompactMemorySize = 10 * 1024 * 1024
-  private val FeatureApprovalBlocksCount = 10000
-  private val MinBlocksCountToActivateFeature = 9000
 
-  def apply(file: Option[File], synchronizationToken: ReentrantReadWriteLock): Try[HistoryWriterImpl] =
-    createWithStore[HistoryWriterImpl](file, new HistoryWriterImpl(file, synchronizationToken), h => h.isConsistent)
+  def apply(file: Option[File], synchronizationToken: ReentrantReadWriteLock, functionalitySettings: FunctionalitySettings): Try[HistoryWriterImpl] =
+    createWithStore[HistoryWriterImpl](file, new HistoryWriterImpl(file, synchronizationToken, functionalitySettings), h => h.isConsistent)
 
   private val blockHeightStats = Kamon.metrics.histogram("block-height")
   private val blockSizeStats = Kamon.metrics.histogram("block-size-bytes")
   private val transactionsInBlockStats = Kamon.metrics.histogram("transactions-in-block")
-
 }

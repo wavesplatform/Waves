@@ -19,6 +19,8 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
         |    custom {
         |      address-scheme-character = "C"
         |      functionality {
+        |        feature-check-blocks-period = 10000
+        |        blocks-for-feature-activation = 9000
         |        allow-temporary-negative-until = 1
         |        allow-invalid-payment-transactions-by-timestamp = 2
         |        require-sorted-transactions-after = 3
@@ -35,7 +37,8 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
         |        allow-multiple-lease-cancel-transaction-until-timestamp = 14
         |        reset-effective-balances-at-height = 15
         |        allow-leased-balance-transfer-until = 17
-        |        enable-microblocks-after-height: 18
+        |        block-version-3-after = 18
+        |        enable-microblocks-after-height: 19
         |      }
         |      genesis {
         |        timestamp = 1460678400000
@@ -59,6 +62,8 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
     settings.checkpointFile should be(Some(new File("/waves/data/checkpoint.dat")))
     settings.minimumInMemoryDiffSize should be(201)
     settings.addressSchemeCharacter should be('C')
+    settings.functionalitySettings.featureCheckBlocksPeriod should be(10000)
+    settings.functionalitySettings.blocksForFeatureActivation should be(9000)
     settings.functionalitySettings.allowTemporaryNegativeUntil should be(1)
     settings.functionalitySettings.allowInvalidPaymentTransactionsByTimestamp should be(2)
     settings.functionalitySettings.requireSortedTransactionsAfter should be(3)
@@ -75,7 +80,8 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
     settings.functionalitySettings.allowMultipleLeaseCancelTransactionUntilTimestamp should be(14)
     settings.functionalitySettings.resetEffectiveBalancesAtHeight should be(15)
     settings.functionalitySettings.allowLeasedBalanceTransferUntil should be(17)
-    settings.functionalitySettings.enableMicroblocksAfterHeight should be(18)
+    settings.functionalitySettings.blockVersion3After should be(18)
+    settings.functionalitySettings.enableMicroblocksAfterHeight should be(19)
     settings.genesisSettings.blockTimestamp should be(1460678400000L)
     settings.genesisSettings.timestamp should be(1460678400000L)
     settings.genesisSettings.signature should be(ByteStr.decodeBase58("BASE58BLKSGNATURE").toOption)

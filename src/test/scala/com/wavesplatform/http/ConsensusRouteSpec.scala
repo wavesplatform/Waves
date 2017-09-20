@@ -13,11 +13,12 @@ import org.scalatest.prop.PropertyChecks
 import play.api.libs.json.JsObject
 import scorex.api.http.BlockNotExists
 import scorex.consensus.nxt.api.http.NxtConsensusApiRoute
+import scorex.settings.TestFunctionalitySettings
 
 class ConsensusRouteSpec extends RouteSpec("/consensus") with RestAPISettingsHelper with PropertyChecks with MockFactory with BlockGen with HistoryTest {
   private val state = mock[StateReader]
 
-  private val history = HistoryWriterImpl(None, new ReentrantReadWriteLock()).get
+  private val history = HistoryWriterImpl(None, new ReentrantReadWriteLock(), TestFunctionalitySettings.Stub).get
   appendGenesisBlock(history)
   for (i <- 1 to 10) appendTestBlock(history)
 

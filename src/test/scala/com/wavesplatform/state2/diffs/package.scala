@@ -15,7 +15,7 @@ package object diffs {
 
   def newState(): StateWriterImpl = new StateWriterImpl(StateStorage(None, dropExisting = false).get, lock)
 
-  def newHistory(): History = HistoryWriterImpl(None, lock).get
+  def newHistory(): History = HistoryWriterImpl(None, lock, TestFunctionalitySettings.Enabled).get
 
   val ENOUGH_AMT: Long = Long.MaxValue / 3
 

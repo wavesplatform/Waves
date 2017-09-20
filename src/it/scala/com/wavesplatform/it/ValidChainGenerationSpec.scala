@@ -8,6 +8,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
+import scala.util.Random
 
 class ValidChainGenerationSpec(override val nodes: Seq[Node]) extends FreeSpec with ScalaFutures with IntegrationPatience
   with Matchers with TransferSending {
@@ -36,33 +37,27 @@ class ValidChainGenerationSpec(override val nodes: Seq[Node]) extends FreeSpec w
     all(targetBlocks) shouldEqual targetBlocks.head
   }
 
-  "Generate more blocks and resynchronise after rollback" in {
-    val targetBlocks1 = result(for {
-      height <- traverse(nodes)(_.height).map(_.max)
-      _ <- traverse(nodes)(_.waitForHeight(height + 30))
-      blocks <- traverse(nodes)(_.blockAt(height + 25))
-    } yield blocks.map(_.signature), 5.minutes)
+  "Generate more blocks and resynchronise after rollback" - {
+    "1 of N" in test(1)
+    "N-1 of N" in test(nodes.size - 1)
 
-    all(targetBlocks1) shouldEqual targetBlocks1.head
+    def test(n: Int):Unit = {
+      val initialHeight = result(for {
+        height <- traverse(nodes)(_.height).map(_.max)
+        newHeight = height + 5
+        _ <- traverse(nodes)(_.waitForHeight(newHeight))
+      } yield newHeight, 5.minutes)
 
-    nodes.head.rollback(1)
+      val targetHeight = initialHeight + 5
+      val rollbackNodes = Random.shuffle(nodes).take(n)
 
-    val targetBlocks2 = result(for {
-      height <- traverse(nodes)(_.height).map(_.max)
-      _ <- traverse(nodes)(_.waitForHeight(height + 30))
-      blocks <- traverse(nodes)(_.blockAt(height + 25))
-    } yield blocks.map(_.signature), 5.minutes)
+      rollbackNodes.foreach(_.rollback(1))
+      val synchronizedBlocks = result(for {
+        _ <- traverse(nodes)(_.waitForHeight(targetHeight))
+        blocks <- traverse(nodes)(_.blockAt(targetHeight))
+      } yield blocks, 5.minutes)
 
-    all(targetBlocks2) shouldEqual targetBlocks2.head
-
-    nodes.tail.foreach(_.rollback(1))
-
-    val targetBlocks3 = result(for {
-      height <- traverse(nodes)(_.height).map(_.max)
-      _ <- traverse(nodes)(_.waitForHeight(height + 30))
-      blocks <- traverse(nodes)(_.blockAt(height + 25))
-    } yield blocks.map(_.signature), 5.minutes)
-
-    all(targetBlocks3) shouldEqual targetBlocks3.head
+      all(synchronizedBlocks) shouldEqual synchronizedBlocks.head
+    }
   }
 }

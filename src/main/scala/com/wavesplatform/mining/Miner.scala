@@ -68,8 +68,8 @@ class Miner(
       s"BlockChain is too old (last block timestamp is $parentTimestamp generated $blockAge ago)"
     ))
 
-  private def generateOneBlockTask(account: PrivateKeyAccount, parentHeight: Int,
-                                   greatGrandParent: Option[Block], balance: Long, version: Byte)(delay: FiniteDuration): Task[Either[String, Block]] = Task {
+  private def generateOneBlockTask(version: Int, account: PrivateKeyAccount, parentHeight: Int,
+                                   greatGrandParent: Option[Block], balance: Long)(delay: FiniteDuration): Task[Either[String, Block]] = Task {
     // should take last block right at the time of mining since microblocks might have been added
     // the rest doesn't change
     val parent = history.bestLastBlock(System.currentTimeMillis() - minMicroBlockDurationMills).get
@@ -93,7 +93,7 @@ class Miner(
         val features = settings.featuresSettings.supported
           .filter(featureProvider.status(_) == FeatureStatus.Defined).toSet
         log.debug(s"Adding ${unconfirmed.size} unconfirmed transaction(s) to new block")
-        Block.buildAndSign(version, currentTime, parent.uniqueId, consensusData, unconfirmed, account, features)
+        Block.buildAndSign(version.toByte, currentTime, parent.uniqueId, consensusData, unconfirmed, account, features)
           .left.map(l => l.err)
       }
     } yield block)
@@ -159,9 +159,10 @@ class Miner(
       case Right((offset, balance)) =>
         log.debug(s"Next attempt for acc=$account in $offset")
         val microBlocksEnabled = history.height() > blockchainSettings.functionalitySettings.enableMicroblocksAfterHeight
+//        val version = BlockVersion.resolve(height, settings)
         val version = if (microBlocksEnabled) NgBlockVersion else PlainBlockVersion
         nextBlockGenerationTimes += account.toAddress -> (System.currentTimeMillis() + offset.toMillis)
-        generateOneBlockTask(account, height, grandParent, balance, version)(offset).flatMap {
+        generateOneBlockTask(version, account, height, grandParent, balance)(offset).flatMap {
           case Right(block) => Task.now {
             processBlock(block, true) match {
               case Left(err) => log.warn("Error mining Block: " + err.toString)
@@ -204,6 +205,7 @@ class Miner(
 
 object Miner extends ScorexLogging {
 
+  val MinimalGenerationOffsetMillis: Long = 1001
   val MaxTransactionsPerMicroblock: Int = 255
 
   def calcOffset(timeService: Time, calculatedTimestamp: Long, minimalBlockGenerationOffset: FiniteDuration): FiniteDuration = {
@@ -219,3 +221,6 @@ object Miner extends ScorexLogging {
 trait MinerDebugInfo {
   def collectNextBlockGenerationTimes: List[(Address, Long)]
 }
+
+
+

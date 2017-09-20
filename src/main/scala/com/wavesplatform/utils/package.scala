@@ -52,5 +52,7 @@ package object utils extends ScorexLogging {
     }
   }
 
-  def forceStopApplication(): Unit = new Thread(() => { System.exit(1) }, "waves-platform-shutdown-thread").start()
+  def forceStopApplication(reason: ApplicationStopReason = Default): Unit = new Thread(() => { System.exit(reason.code) }, "waves-platform-shutdown-thread").start()
 }
+
+

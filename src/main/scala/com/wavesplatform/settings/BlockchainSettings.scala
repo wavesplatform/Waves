@@ -10,7 +10,9 @@ import net.ceedubs.ficus.readers.EnumerationReader._
 
 import scala.concurrent.duration._
 
-case class FunctionalitySettings(allowTemporaryNegativeUntil: Long,
+case class FunctionalitySettings(featureCheckBlocksPeriod: Int,
+                                 blocksForFeatureActivation: Int,
+                                 allowTemporaryNegativeUntil: Long,
                                  allowInvalidPaymentTransactionsByTimestamp: Long,
                                  requireSortedTransactionsAfter: Long,
                                  generationBalanceDepthFrom50To1000AfterHeight: Long,
@@ -26,10 +28,17 @@ case class FunctionalitySettings(allowTemporaryNegativeUntil: Long,
                                  allowMultipleLeaseCancelTransactionUntilTimestamp: Long,
                                  resetEffectiveBalancesAtHeight: Long,
                                  allowLeasedBalanceTransferUntil: Long,
-                                 enableMicroblocksAfterHeight: Long)
+                                 blockVersion3After: Long,
+                                 enableMicroblocksAfterHeight: Long) {
+  require(featureCheckBlocksPeriod > 0, "featureCheckBlocksPeriod must be greater than 0")
+  require((blocksForFeatureActivation > 0) && (blocksForFeatureActivation <= featureCheckBlocksPeriod), s"blocksForFeatureActivation must be in range 1 to $featureCheckBlocksPeriod")
+}
 
 object FunctionalitySettings {
-  val MAINNET = FunctionalitySettings(allowTemporaryNegativeUntil = 1479168000000L,
+  val MAINNET = apply(
+    featureCheckBlocksPeriod = 10000,
+    blocksForFeatureActivation = 9000,
+    allowTemporaryNegativeUntil = 1479168000000L,
     allowInvalidPaymentTransactionsByTimestamp = 1479168000000L,
     requireSortedTransactionsAfter = 1479168000000L,
     generationBalanceDepthFrom50To1000AfterHeight = 232000L,
@@ -45,10 +54,12 @@ object FunctionalitySettings {
     allowMultipleLeaseCancelTransactionUntilTimestamp = 1492768800000L,
     resetEffectiveBalancesAtHeight = 462000,
     allowLeasedBalanceTransferUntil = Long.MaxValue,
-    enableMicroblocksAfterHeight = Long.MaxValue
-  )
+    blockVersion3After = Long.MaxValue,
+    enableMicroblocksAfterHeight = Long.MaxValue)
 
-  val TESTNET = FunctionalitySettings(
+  val TESTNET = apply(
+    featureCheckBlocksPeriod = 10000,
+    blocksForFeatureActivation = 9000,
     allowTemporaryNegativeUntil = 1477958400000L,
     allowInvalidPaymentTransactionsByTimestamp = 1477958400000L,
     requireSortedTransactionsAfter = 1477958400000L,
@@ -65,7 +76,9 @@ object FunctionalitySettings {
     allowMultipleLeaseCancelTransactionUntilTimestamp = 1492560000000L,
     resetEffectiveBalancesAtHeight = 51500,
     allowLeasedBalanceTransferUntil = 1495238400000L,
+    blockVersion3After = Long.MaxValue,
     enableMicroblocksAfterHeight = Long.MaxValue)
+
 
   val configPath = "waves.blockchain.custom.functionality"
 }

@@ -1,5 +1,6 @@
 package tools
 
+import com.wavesplatform.TransactionGen
 import java.io.{File, FileNotFoundException}
 
 import com.typesafe.config.ConfigFactory
@@ -17,7 +18,7 @@ import scorex.wallet.Wallet
 
 import scala.concurrent.duration._
 
-object GenesisBlockGenerator extends App {
+object GenesisBlockGenerator extends App with TransactionGen {
 
   private type SeedText = String
   private type Share = Long
@@ -100,17 +101,13 @@ object GenesisBlockGenerator extends App {
 
   val signature = genesisBlock.signerData.signature
 
-  report(
+    report(
     addrInfos = shares.keysIterator,
-    settings = GenesisSettings(
-      settings.timestamp,
-      genesisBlock.timestamp,
-      settings.initialBalance,
-      Some(signature),
-      genesisTxs.map { tx => GenesisTransactionSettings(tx.recipient.stringRepr, tx.amount) },
-      settings.baseTarget,
-      settings.averageBlockDelay
-    )
+    settings = GenesisSettings(settings.timestamp, genesisBlock.timestamp, settings.initialBalance, Some(signature),
+      genesisTxs.map{tx => GenesisTransactionSettings(tx.recipient.stringRepr, tx.amount)}, settings.baseTarget,
+      settings. averageBlockDelay
+
+  )
   )
 
   private def report(addrInfos: Iterator[FullAddressInfo],
@@ -147,13 +144,12 @@ object GenesisBlockGenerator extends App {
          |""".stripMargin
     )
 
-    output.append(
-      s"""
-         |Don't forget to delete the data!
+  output.append( s"""
+  |Don't forget to delete the data!
          |""".stripMargin
     )
 
     System.out.print(output)
-  }
 
+}
 }
