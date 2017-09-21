@@ -65,8 +65,6 @@ object PoSCalc extends ScorexLogging {
     state.effectiveBalanceAtHeightWithConfirmations(account, atHeight, generatingBalanceDepth)
   }
 
-  import com.wavesplatform.features.FeatureProviderExtensions._
-
   def nextBlockGenerationTime(height: Int, state: StateReader, fs: FunctionalitySettings, block: Block,
                               account: PublicKeyAccount, featureProvider: FeatureProvider): Either[String, Long] = {
     generatingBalance(state, fs, account, height) match {

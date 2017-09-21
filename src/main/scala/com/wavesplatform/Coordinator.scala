@@ -160,7 +160,6 @@ object Coordinator extends ScorexLogging with Instrumented {
                                        featureProvider: FeatureProvider)
                                       (block: Block): Either[ValidationError, Unit] = history.read { _ =>
     import PoSCalc._
-    import com.wavesplatform.features.FeatureProviderExtensions._
 
     val fs = bcs.functionalitySettings
     val sortStart = fs.requireSortedTransactionsAfter
