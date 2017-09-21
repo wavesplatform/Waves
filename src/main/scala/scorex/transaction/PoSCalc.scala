@@ -1,7 +1,7 @@
 package scorex.transaction
 
 import com.google.common.base.Throwables
-import com.wavesplatform.features.BlockchainFunctionalities
+import com.wavesplatform.features.{BlockchainFeatures, FeatureProvider}
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.reader.StateReader
 import scorex.account.{Address, PublicKeyAccount}
@@ -65,12 +65,14 @@ object PoSCalc extends ScorexLogging {
     state.effectiveBalanceAtHeightWithConfirmations(account, atHeight, generatingBalanceDepth)
   }
 
-  def nextBlockGenerationTime(height: Int, state: StateReader, fs: FunctionalitySettings, fn: BlockchainFunctionalities,
-                              block: Block, account: PublicKeyAccount): Either[String, Long] = {
+  import com.wavesplatform.features.FeatureProviderExtensions._
+
+  def nextBlockGenerationTime(height: Int, state: StateReader, fs: FunctionalitySettings, block: Block,
+                              account: PublicKeyAccount, featureProvider: FeatureProvider): Either[String, Long] = {
     generatingBalance(state, fs, account, height) match {
       case Success(balance) => for {
-        _ <- Either.cond((!fn.smallerMinimalGeneratingBalance.available() && balance >= MinimalEffectiveBalanceForGenerator1) ||
-          (fn.smallerMinimalGeneratingBalance.available() && balance >= MinimalEffectiveBalanceForGenerator2), (),
+        _ <- Either.cond((!featureProvider.activated(BlockchainFeatures.SmallerMinimalGeneratingBalance) && balance >= MinimalEffectiveBalanceForGenerator1) ||
+          (featureProvider.activated(BlockchainFeatures.SmallerMinimalGeneratingBalance) && balance >= MinimalEffectiveBalanceForGenerator2), (),
           s"Balance $balance of ${account.address} is lower than required for generation")
         cData = block.consensusData
         hit = calcHit(cData, account)

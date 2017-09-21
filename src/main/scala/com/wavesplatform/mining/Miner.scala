@@ -2,7 +2,7 @@ package com.wavesplatform.mining
 
 import java.util.concurrent.atomic.AtomicBoolean
 
-import com.wavesplatform.features.{BlockchainFunctionalities, FeatureProvider, FeatureStatus}
+import com.wavesplatform.features.{FeatureProvider, FeatureStatus}
 import com.wavesplatform.metrics.BlockStats
 import com.wavesplatform.network._
 import com.wavesplatform.settings.WavesSettings
@@ -41,8 +41,7 @@ class Miner(
              settings: WavesSettings,
              timeService: Time,
              utx: UtxPool,
-             wallet: Wallet,
-             fn: BlockchainFunctionalities) extends MinerDebugInfo with ScorexLogging with Instrumented {
+             wallet: Wallet) extends MinerDebugInfo with ScorexLogging with Instrumented {
 
   import Miner._
 
@@ -52,7 +51,7 @@ class Miner(
   private lazy val minMicroBlockDurationMills = minerSettings.minMicroBlockAge.toMillis
   private lazy val blockchainSettings = settings.blockchainSettings
   private lazy val processBlock = Coordinator.processSingleBlock(checkpoint, history, blockchainUpdater, timeService,
-    stateReader, utx, blockchainReadiness, settings, this, fn) _
+    stateReader, utx, blockchainReadiness, settings, this, featureProvider) _
 
   private val scheduledAttempts = SerialCancelable()
   private val microBlockAttempt = SerialCancelable()
@@ -154,7 +153,7 @@ class Miner(
     val grandParent = history.parent(lastBlock, 2)
     (for {
       _ <- checkAge(height, history.lastBlockTimestamp().get)
-      ts <- nextBlockGenerationTime(height, stateReader, blockchainSettings.functionalitySettings, fn, lastBlock, account)
+      ts <- nextBlockGenerationTime(height, stateReader, blockchainSettings.functionalitySettings, lastBlock, account, featureProvider)
       offset = calcOffset(timeService, ts, minerSettings.minimalBlockGenerationOffset)
       balance <- generatingBalance(stateReader, blockchainSettings.functionalitySettings, account, height).toEither.left.map(er => GenericError(er.getMessage))
     } yield (offset, balance)) match {

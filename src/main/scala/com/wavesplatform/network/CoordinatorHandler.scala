@@ -4,7 +4,7 @@ import java.net.InetSocketAddress
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
 
-import com.wavesplatform.features.BlockchainFunctionalities
+import com.wavesplatform.features.FeatureProvider
 import com.wavesplatform.metrics.BlockStats
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.settings.WavesSettings
@@ -33,7 +33,7 @@ class CoordinatorHandler(checkpointService: CheckpointService,
                          settings: WavesSettings,
                          peerDatabase: PeerDatabase,
                          allChannels: ChannelGroup,
-                         fn: BlockchainFunctionalities)
+                         featureProvider: FeatureProvider)
   extends ChannelInboundHandlerAdapter with ScorexLogging {
 
   private val counter = new AtomicInteger
@@ -45,15 +45,14 @@ class CoordinatorHandler(checkpointService: CheckpointService,
   })
 
   private val processCheckpoint = Coordinator.processCheckpoint(checkpointService, history, blockchainUpdater) _
-  private val processFork = Coordinator.processFork(checkpointService, history, blockchainUpdater, stateReader, utxStorage, time, settings, miner, blockchainReadiness, fn) _
-  private val processBlock = Coordinator.processSingleBlock(checkpointService, history, blockchainUpdater, time, stateReader, utxStorage, blockchainReadiness, settings, miner, fn) _
+  private val processFork = Coordinator.processFork(checkpointService, history, blockchainUpdater, stateReader, utxStorage, time, settings, miner, blockchainReadiness, featureProvider) _
+  private val processBlock = Coordinator.processSingleBlock(checkpointService, history, blockchainUpdater, time, stateReader, utxStorage, blockchainReadiness, settings, miner, featureProvider) _
 
-  private def broadcastingScore(
-                                 src: Channel,
-                                 start: => String,
-                                 success: => String,
-                                 failure: => String,
-                                 f: => Either[_, BigInt]): Unit = Future {
+  private def broadcastingScore(src: Channel,
+                                start: => String,
+                                success: => String,
+                                failure: => String,
+                                f: => Either[_, BigInt]): Unit = Future {
     log.debug(s"${id(src)} $start")
     f match {
       case Right(newLocalScore) =>
