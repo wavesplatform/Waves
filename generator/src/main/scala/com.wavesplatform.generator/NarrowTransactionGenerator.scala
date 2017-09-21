@@ -11,14 +11,17 @@ import scorex.utils.LoggerFacade
 
 import scala.concurrent.duration._
 import java.util.concurrent.ThreadLocalRandom
+
+import com.wavesplatform.generator.NarrowTransactionGenerator.Settings
+
 import scala.util.Random
 
-class NarrowTransactionGenerator(val probabilities: Map[TransactionType.Value, Float],
+class NarrowTransactionGenerator(settings: Settings,
                                  val accounts: Seq[PrivateKeyAccount]) extends TransactionGenerator {
 
   private def r = ThreadLocalRandom.current
   private val log = LoggerFacade(LoggerFactory.getLogger(getClass))
-  private val typeGen = new DistributedRandomGenerator(probabilities)
+  private val typeGen = new DistributedRandomGenerator(settings.probabilities)
 
   private def randomFrom[T](c: Seq[T]): Option[T] = if (c.nonEmpty) Some(c(r.nextInt(c.size))) else None
 
@@ -30,6 +33,8 @@ class NarrowTransactionGenerator(val probabilities: Map[TransactionType.Value, F
       case Right(tx) => Some(tx)
     }
   }
+
+  override def next(): Iterator[Transaction] = generate(settings.transactions).toIterator
 
   def generate(n: Int): Seq[Transaction] = {
     val issueTransactionSender = randomFrom(accounts).get
@@ -149,6 +154,8 @@ class NarrowTransactionGenerator(val probabilities: Map[TransactionType.Value, F
 }
 
 object NarrowTransactionGenerator {
+
+  case class Settings(transactions: Int, probabilities: Map[TransactionType.Value, Double])
 
   private val minAliasLength = 4
   private val maxAliasLength = 30
