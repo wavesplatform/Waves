@@ -17,7 +17,8 @@ class HistoryWriterTest extends FunSuite with Matchers with HistoryTest {
   private val ApprovalPeriod = 10000
 
   test("concurrent access to lastBlock doesn't throw any exception") {
-    val history = HistoryWriterImpl(None, new ReentrantReadWriteLock(), TestFunctionalitySettings.Enabled).get
+    val history = HistoryWriterImpl(None, new ReentrantReadWriteLock(), TestFunctionalitySettings.Enabled,
+      TestFunctionalitySettings.EmptyFeaturesSettings).get
     appendGenesisBlock(history)
 
     (1 to 1000).foreach { _ =>
@@ -39,7 +40,8 @@ class HistoryWriterTest extends FunSuite with Matchers with HistoryTest {
   }
 
   test("features approved and accepted as height grows") {
-    val history = HistoryWriterImpl(None, new ReentrantReadWriteLock(), TestFunctionalitySettings.Enabled).get
+    val history = HistoryWriterImpl(None, new ReentrantReadWriteLock(), TestFunctionalitySettings.Enabled,
+      TestFunctionalitySettings.EmptyFeaturesSettings).get
 
     appendGenesisBlock(history)
 
@@ -76,7 +78,8 @@ class HistoryWriterTest extends FunSuite with Matchers with HistoryTest {
   }
 
   test("features rollback with block rollback") {
-    val history = HistoryWriterImpl(None, new ReentrantReadWriteLock(), TestFunctionalitySettings.Enabled).get
+    val history = HistoryWriterImpl(None, new ReentrantReadWriteLock(), TestFunctionalitySettings.Enabled,
+      TestFunctionalitySettings.EmptyFeaturesSettings).get
 
     appendGenesisBlock(history)
 
@@ -119,7 +122,8 @@ class HistoryWriterTest extends FunSuite with Matchers with HistoryTest {
   }
 
   test("feature activated only by 90% of blocks") {
-    val history = HistoryWriterImpl(None, new ReentrantReadWriteLock(), TestFunctionalitySettings.Enabled).get
+    val history = HistoryWriterImpl(None, new ReentrantReadWriteLock(), TestFunctionalitySettings.Enabled,
+      TestFunctionalitySettings.EmptyFeaturesSettings).get
 
     appendGenesisBlock(history)
     history.status(1) shouldBe FeatureStatus.Defined

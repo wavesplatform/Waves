@@ -3,8 +3,8 @@ package com.wavesplatform
 import java.util.concurrent.locks.ReentrantReadWriteLock
 
 import com.wavesplatform.history.{HistoryWriterImpl, StorageFactory}
-import com.wavesplatform.state2.diffs._
 import com.wavesplatform.settings.{BlockchainSettings, FeeSettings, FeesSettings, FunctionalitySettings, UtxSettings}
+import com.wavesplatform.state2.diffs._
 import org.scalacheck.Gen._
 import org.scalacheck.{Gen, Shrink}
 import org.scalamock.scalatest.MockFactory
@@ -37,7 +37,8 @@ class UtxPoolSpecification extends FreeSpec
   private def mkState(senderAccount: Address, senderBalance: Long) = {
     val genesisSettings = TestHelpers.genesisSettings(Map(senderAccount -> senderBalance))
     val (history, _, state, bcu, _) =
-      StorageFactory(BlockchainSettings(None, None, None, 'T', 5, FunctionalitySettings.TESTNET, genesisSettings)).get
+      StorageFactory(BlockchainSettings(None, None, None, 'T', 5, FunctionalitySettings.TESTNET, genesisSettings),
+        TestFunctionalitySettings.EmptyFeaturesSettings).get
 
     bcu.processBlock(Block.genesis(genesisSettings).right.get)
 
@@ -120,7 +121,8 @@ class UtxPoolSpecification extends FreeSpec
       tx2 <- listOfN(count1, transfer(sender, senderBalance / 2, new TestTime(ts + offset + 1000)))
     } yield {
       val time = new TestTime()
-      val history = HistoryWriterImpl(None, new ReentrantReadWriteLock(), TestFunctionalitySettings.Stub).get
+      val history = HistoryWriterImpl(None, new ReentrantReadWriteLock(), TestFunctionalitySettings.Stub,
+        TestFunctionalitySettings.EmptyFeaturesSettings).get
       val utx = new UtxPool(time, state, history, calculator, FunctionalitySettings.TESTNET, UtxSettings(10, offset.millis))
       (utx, time, tx1, (offset + 1000).millis, tx2)
     }
