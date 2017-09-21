@@ -4,6 +4,7 @@ import java.net.{InetSocketAddress, NetworkInterface}
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
 
+import com.wavesplatform.features.FeatureProvider
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.settings._
 import com.wavesplatform.state2.reader.StateReader
@@ -32,8 +33,8 @@ class NetworkServer(checkpointService: CheckpointService,
                     peerDatabase: PeerDatabase,
                     allChannels: ChannelGroup,
                     peerInfo: ConcurrentHashMap[Channel, PeerInfo],
-                    blockchainReadiness: AtomicBoolean
-                   ) extends ScorexLogging {
+                    blockchainReadiness: AtomicBoolean,
+                    featureProvider: FeatureProvider) extends ScorexLogging {
 
   @volatile
   private var shutdownInitiated = false
@@ -80,7 +81,7 @@ class NetworkServer(checkpointService: CheckpointService,
   private val coordinatorExecutor = new DefaultEventLoop
 
   private val coordinatorHandler = new CoordinatorHandler(checkpointService, history, blockchainUpdater, time,
-    stateReader, utxPool, blockchainReadiness, miner, settings, peerDatabase, allChannels)
+    stateReader, utxPool, blockchainReadiness, miner, settings, peerDatabase, allChannels, history)
 
   private val peerConnections = new ConcurrentHashMap[PeerKey, Channel](10, 0.9f, 10)
 
@@ -184,7 +185,7 @@ class NetworkServer(checkpointService: CheckpointService,
             if (connFuture.cause() != null) {
               val reason = s"${id(connFuture.channel())} Connection failed, blacklisting $remoteAddress"
               log.debug(reason, connFuture.cause())
-//              peerDatabase.blacklist(remoteAddress.getAddress, reason)
+              //              peerDatabase.blacklist(remoteAddress.getAddress, reason)
             } else if (connFuture.isSuccess) {
               log.info(s"${id(connFuture.channel())} Connection established")
               peerDatabase.touch(remoteAddress)

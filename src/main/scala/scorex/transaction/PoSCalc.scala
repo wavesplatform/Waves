@@ -1,6 +1,7 @@
 package scorex.transaction
 
 import com.google.common.base.Throwables
+import com.wavesplatform.features.{BlockchainFeatures, FeatureProvider}
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.reader.StateReader
 import scorex.account.{Address, PublicKeyAccount}
@@ -15,7 +16,8 @@ import scala.util.{Failure, Success, Try}
 
 object PoSCalc extends ScorexLogging {
 
-  val MinimalEffectiveBalanceForGenerator: Long = 1000000000000L
+  val MinimalEffectiveBalanceForGenerator1: Long = 1000000000000L
+  val MinimalEffectiveBalanceForGenerator2: Long = 100000000000L
   val AvgBlockTimeDepth: Int = 3
 
   def calcTarget(prevBlock: Block, timestamp: Long, balance: Long): BigInt = {
@@ -63,12 +65,13 @@ object PoSCalc extends ScorexLogging {
     state.effectiveBalanceAtHeightWithConfirmations(account, atHeight, generatingBalanceDepth)
   }
 
-  def nextBlockGenerationTime(height: Int, state: StateReader, fs: FunctionalitySettings,
-                              block: Block, account: PublicKeyAccount): Either[String, Long] = {
+  def nextBlockGenerationTime(height: Int, state: StateReader, fs: FunctionalitySettings, block: Block,
+                              account: PublicKeyAccount, featureProvider: FeatureProvider): Either[String, Long] = {
     generatingBalance(state, fs, account, height) match {
       case Success(balance) => for {
-        _ <- Either.cond(balance >= MinimalEffectiveBalanceForGenerator, (),
-          s"Balance $balance of ${account.address} is lower than $MinimalEffectiveBalanceForGenerator")
+        _ <- Either.cond((!featureProvider.activated(BlockchainFeatures.SmallerMinimalGeneratingBalance) && balance >= MinimalEffectiveBalanceForGenerator1) ||
+          (featureProvider.activated(BlockchainFeatures.SmallerMinimalGeneratingBalance) && balance >= MinimalEffectiveBalanceForGenerator2), (),
+          s"Balance $balance of ${account.address} is lower than required for generation")
         cData = block.consensusData
         hit = calcHit(cData, account)
         t = cData.baseTarget
