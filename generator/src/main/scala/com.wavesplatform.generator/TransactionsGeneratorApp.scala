@@ -65,7 +65,7 @@ object TransactionsGeneratorApp extends App {
       }
       val generator = parameters.mode match {
         case Mode.NARROW => new NarrowTransactionGenerator(actualConfig.txProbabilities, actualConfig.accounts)
-        case Mode.WIDE => new WideTransactionGenerator(actualConfig.accounts)
+        case Mode.WIDE => new WideTransactionGenerator(actualConfig.limitDestAccounts, actualConfig.accounts)
       }
 
       val nodes = actualConfig.sendTo

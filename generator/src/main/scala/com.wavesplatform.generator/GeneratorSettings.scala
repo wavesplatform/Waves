@@ -20,6 +20,7 @@ import scala.concurrent.duration.FiniteDuration
 case class GeneratorSettings(chainId: Char,
                              accounts: Seq[PrivateKeyAccount],
                              txProbabilities: Map[TransactionParser.TransactionType.Value, Float],
+                             limitDestAccounts: Option[Int],
                              sendTo: Seq[InetSocketAddress])
 
 object GeneratorSettings {
@@ -42,6 +43,7 @@ object GeneratorSettings {
       chainId = config.as[String](s"$configPath.chainId").head,
       accounts = config.as[List[String]](s"$configPath.accounts").map(s => PrivateKeyAccount(Base58.decode(s).get)),
       txProbabilities = config.as[Map[String, Double]](s"$configPath.probabilities").map(kv => toTxType(kv._1) -> kv._2.toFloat),
+      limitDestAccounts = config.as[Option[Int]](s"$configPath.limit-dest-accounts"),
       sendTo = config.as[Seq[InetSocketAddress]](s"$configPath.send-to"))
   }
 
