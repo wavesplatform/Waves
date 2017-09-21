@@ -8,7 +8,7 @@ import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.{CollectionReaders, ValueReader}
 import scorex.transaction.TransactionParser.TransactionType
 
-object FicusImplicits {
+trait FicusImplicits {
   implicit val inetSocketAddressReader: ValueReader[InetSocketAddress] = { (config: Config, path: String) =>
     new InetSocketAddress(
       config.as[String](s"$path.address"),

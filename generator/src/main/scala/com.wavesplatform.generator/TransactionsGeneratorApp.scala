@@ -3,30 +3,28 @@ package com.wavesplatform.generator
 import java.net.InetSocketAddress
 import java.util.concurrent.{Executors, ThreadLocalRandom}
 
+import cats.implicits.showInterpolator
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.it.util.NetworkSender
-import com.wavesplatform.generator.cli.ScoptImplicits._
-import com.wavesplatform.generator.config.FicusImplicits._
+import com.wavesplatform.generator.cli.ScoptImplicits
+import com.wavesplatform.generator.config.FicusImplicits
 import com.wavesplatform.network.RawBytes
+import com.wavesplatform.network.client.NetworkSender
 import io.netty.channel.Channel
-import org.slf4j.LoggerFactory
-import scopt.{OptionParser, Read}
-import scorex.account.{AddressScheme, PrivateKeyAccount}
-import scorex.transaction.Transaction
-import scorex.utils.LoggerFacade
-
-import scala.concurrent.duration._
-import scala.concurrent._
-import scala.util.{Failure, Success}
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._
-import net.ceedubs.ficus.readers.EnumerationReader._
-import net.ceedubs.ficus.readers.{CollectionReaders, ValueReader}
-import net.ceedubs.ficus.readers.namemappers.implicits.hyphenCase
-import cli.ScoptImplicits._
-import cats.implicits.showInterpolator
+import net.ceedubs.ficus.readers.{EnumerationReader, NameMapper}
+import org.slf4j.LoggerFactory
+import scopt.OptionParser
+import scorex.account.AddressScheme
+import scorex.utils.LoggerFacade
 
-object TransactionsGeneratorApp extends App {
+import scala.concurrent._
+import scala.concurrent.duration._
+import scala.util.{Failure, Success}
+
+object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplicits with EnumerationReader {
+
+  implicit val readConfigInHyphen: NameMapper = net.ceedubs.ficus.readers.namemappers.implicits.hyphenCase // IDEA bug
 
   val log = LoggerFacade(LoggerFactory.getLogger("generator"))
 

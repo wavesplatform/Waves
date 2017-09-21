@@ -3,7 +3,6 @@ package com.wavesplatform.network
 import java.nio.charset.StandardCharsets
 
 import com.wavesplatform.TransactionGen
-import com.wavesplatform.network.client.NopPeerDatabase
 import io.netty.channel.ChannelHandlerContext
 import io.netty.channel.embedded.EmbeddedChannel
 import org.scalamock.scalatest.MockFactory
@@ -40,7 +39,7 @@ class MessageCodecSpec extends FreeSpec
     codec.blockCalls shouldBe 0
   }
 
-  private class SpiedMessageCodec extends MessageCodec(NopPeerDatabase) {
+  private class SpiedMessageCodec extends MessageCodec(PeerDatabase.Noop) {
     var blockCalls = 0
 
     override def block(ctx: ChannelHandlerContext, e: Throwable): Unit = {

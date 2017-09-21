@@ -1,8 +1,8 @@
-package com.wavesplatform.it.network.client
+package com.wavesplatform.network.client
 
 import java.io.IOException
 
-import com.wavesplatform.network.{Handshake, HandshakeDecoder, HandshakeTimeoutExpired, HandshakeTimeoutHandler, LegacyFrameCodec}
+import com.wavesplatform.network._
 import io.netty.channel._
 import io.netty.channel.socket.SocketChannel
 import io.netty.handler.codec.{LengthFieldBasedFrameDecoder, LengthFieldPrepender}
@@ -12,6 +12,7 @@ import scala.concurrent.Promise
 import scala.concurrent.duration._
 
 class ClientHandshakeHandler(handshake: Handshake, promise: Promise[Channel]) extends ChannelInboundHandlerAdapter with ScorexLogging {
+
   private def removeHandlers(ctx: ChannelHandlerContext): Unit = {
     ctx.pipeline().remove(classOf[HandshakeDecoder])
     ctx.pipeline().remove(classOf[HandshakeTimeoutHandler])
@@ -53,5 +54,5 @@ class LegacyChannelInitializer(handshake: Handshake, promise: Promise[Channel]) 
       new ClientHandshakeHandler(handshake, promise),
       new LengthFieldPrepender(lengthFieldLength),
       new LengthFieldBasedFrameDecoder(maxFieldLength, 0, lengthFieldLength, 0, lengthFieldLength),
-      new LegacyFrameCodec(NopPeerDatabase))
+      new LegacyFrameCodec(PeerDatabase.Noop))
 }

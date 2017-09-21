@@ -5,7 +5,7 @@ import scopt.Read
 
 import scala.concurrent.duration.FiniteDuration
 
-object ScoptImplicits {
+trait ScoptImplicits {
   implicit def scoptOptionReads[T](implicit r: Read[T]): Read[Option[T]] = Read.stringRead.map {
     case "null" => None
     case x => Option(r.reads(x))
