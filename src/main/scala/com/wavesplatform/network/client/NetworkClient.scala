@@ -1,4 +1,4 @@
-package com.wavesplatform.it.network.client
+package com.wavesplatform.network.client
 
 import java.io.IOException
 import java.net.InetSocketAddress

@@ -1,7 +1,6 @@
 package com.wavesplatform.network
 
 import com.wavesplatform.TransactionGen
-import com.wavesplatform.network.client.NopPeerDatabase
 import io.netty.buffer.Unpooled
 import io.netty.buffer.Unpooled.wrappedBuffer
 import io.netty.channel.embedded.EmbeddedChannel
@@ -19,7 +18,7 @@ class LegacyFrameCodecSpec extends FreeSpec
   with TransactionGen {
 
   "should handle a message with the maximal size" in forAll(issueGen) { origTx =>
-    val codec = new LegacyFrameCodec(NopPeerDatabase)
+    val codec = new LegacyFrameCodec(PeerDatabase.Noop)
 
     val buff = Unpooled.buffer
     val txBytes = origTx.bytes
