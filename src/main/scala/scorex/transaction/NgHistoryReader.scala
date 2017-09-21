@@ -80,5 +80,5 @@ class NgHistoryReader(ngState: () => Option[NgState], inner: History) extends Hi
       ngState().map(_.bestLastBlock(maxTimestamp)).orElse(inner.lastBlock)
   }
 
-  override def status(feature: Short): FeatureStatus = ???
+  override def status(feature: Short): FeatureStatus = FeatureStatus.Defined
 }
