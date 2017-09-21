@@ -12,6 +12,7 @@ import akka.http.scaladsl.server.Route
 import akka.stream.ActorMaterializer
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.actor.RootActorSystem
+import com.wavesplatform.features.BlockchainFunctionalities
 import com.wavesplatform.history.{CheckpointServiceImpl, StorageFactory}
 import com.wavesplatform.http.NodeApiRoute
 import com.wavesplatform.matcher.Matcher
@@ -47,6 +48,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
   private val (history, stateWriter, stateReader, blockchainUpdater, blockchainDebugInfo) = StorageFactory(settings.blockchainSettings).get
   private lazy val upnp = new UPnP(settings.networkSettings.uPnPSettings) // don't initialize unless enabled
   private val wallet: Wallet = Wallet(settings.walletSettings)
+  private val fn = new BlockchainFunctionalities(history)
 
   def run(): Unit = {
     log.debug(s"Available processors: ${Runtime.getRuntime.availableProcessors}")
@@ -69,10 +71,10 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
     val blockchainReadiness = new AtomicBoolean(false)
 
     val miner = new Miner(allChannels, blockchainReadiness, blockchainUpdater, checkpointService,
-      history, history, stateReader, settings, time, utxStorage, wallet)
+      history, history, stateReader, settings, time, utxStorage, wallet, fn)
 
     val network = new NetworkServer(checkpointService, blockchainUpdater, time, miner, stateReader, settings,
-      history, utxStorage, peerDatabase, allChannels, establishedConnections, blockchainReadiness)
+      history, utxStorage, peerDatabase, allChannels, establishedConnections, blockchainReadiness, fn)
 
     miner.scheduleMining()
 

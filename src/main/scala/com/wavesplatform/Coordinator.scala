@@ -2,12 +2,13 @@ package com.wavesplatform
 
 import java.util.concurrent.atomic.AtomicBoolean
 
+import com.wavesplatform.features.BlockchainFunctionalities
 import com.wavesplatform.metrics.{BlockStats, Metrics, TxsInBlockchainStats}
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.network.{BlockCheckpoint, Checkpoint}
 import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
-import com.wavesplatform.state2.{ByteStr, Instrumented}
 import com.wavesplatform.state2.reader.StateReader
+import com.wavesplatform.state2.{ByteStr, Instrumented}
 import kamon.Kamon
 import org.influxdb.dto.Point
 import scorex.block.{Block, MicroBlock}
@@ -19,8 +20,9 @@ import scorex.utils.{ScorexLogging, Time}
 import scala.concurrent.duration._
 
 object Coordinator extends ScorexLogging with Instrumented {
-  def processFork(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater, stateReader: StateReader,
-                  utxStorage: UtxPool, time: Time, settings: WavesSettings, miner: Miner, blockchainReadiness: AtomicBoolean)
+  def processFork(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater,
+                  stateReader: StateReader, utxStorage: UtxPool, time: Time, settings: WavesSettings, miner: Miner,
+                  blockchainReadiness: AtomicBoolean, fn: BlockchainFunctionalities)
                  (newBlocks: Seq[Block]): Either[ValidationError, BigInt] = {
     val extension = newBlocks.dropWhile(history.contains)
 
@@ -32,7 +34,7 @@ object Coordinator extends ScorexLogging with Instrumented {
 
         def forkApplicationResultEi: Either[ValidationError, BigInt] = {
           val firstDeclined = extension.view
-            .map(b => b -> appendBlock(checkpoint, history, blockchainUpdater, stateReader, utxStorage, time, settings.blockchainSettings)(b, local = false))
+            .map(b => b -> appendBlock(checkpoint, history, blockchainUpdater, stateReader, utxStorage, time, settings.blockchainSettings, fn)(b, local = false))
             .collectFirst { case (b, Left(e)) => b -> e }
 
           firstDeclined.foreach {
@@ -82,9 +84,10 @@ object Coordinator extends ScorexLogging with Instrumented {
 
   def processSingleBlock(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater, time: Time,
                          stateReader: StateReader, utxStorage: UtxPool, blockchainReadiness: AtomicBoolean,
-                         settings: WavesSettings, miner: Miner)(newBlock: Block, local: Boolean): Either[ValidationError, BigInt] = measureSuccessful(blockProcessingTimeStats, {
+                         settings: WavesSettings, miner: Miner, fn: BlockchainFunctionalities)
+                        (newBlock: Block, local: Boolean): Either[ValidationError, BigInt] = measureSuccessful(blockProcessingTimeStats, {
     val newScore = for {
-      _ <- appendBlock(checkpoint, history, blockchainUpdater, stateReader, utxStorage, time, settings.blockchainSettings)(newBlock, local)
+      _ <- appendBlock(checkpoint, history, blockchainUpdater, stateReader, utxStorage, time, settings.blockchainSettings, fn)(newBlock, local)
     } yield history.score()
 
     if (local || newScore.isRight) {
@@ -103,11 +106,12 @@ object Coordinator extends ScorexLogging with Instrumented {
 
 
   private def appendBlock(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater,
-                          stateReader: StateReader, utxStorage: UtxPool, time: Time, settings: BlockchainSettings)
+                          stateReader: StateReader, utxStorage: UtxPool, time: Time, settings: BlockchainSettings,
+                          fn: BlockchainFunctionalities)
                          (block: Block, local: Boolean): Either[ValidationError, Unit] = for {
     _ <- Either.cond(checkpoint.isBlockValid(block.signerData.signature, history.height() + 1), (),
       GenericError(s"Block ${block.uniqueId} at height ${history.height() + 1} is not valid w.r.t. checkpoint"))
-    _ <- blockConsensusValidation(history, stateReader, settings, time.correctedTime())(block)
+    _ <- blockConsensusValidation(history, stateReader, settings, time.correctedTime(), fn)(block)
     height = history.height()
     discardedTxs <- blockchainUpdater.processBlock(block)
   } yield {
@@ -152,7 +156,8 @@ object Coordinator extends ScorexLogging with Instrumented {
 
   val MaxTimeDrift: Long = 15.seconds.toMillis
 
-  private def blockConsensusValidation(history: History, state: StateReader, bcs: BlockchainSettings, currentTs: Long)
+  private def blockConsensusValidation(history: History, state: StateReader, bcs: BlockchainSettings, currentTs: Long,
+                                       fn: BlockchainFunctionalities)
                                       (block: Block): Either[ValidationError, Unit] = history.read { _ =>
     import PoSCalc._
 
@@ -180,8 +185,10 @@ object Coordinator extends ScorexLogging with Instrumented {
       _ <- Either.cond(calcGs.sameElements(blockGs), (),
         s"declared generation signature ${blockGs.mkString} does not match calculated generation signature ${calcGs.mkString}")
       effectiveBalance <- generatingBalance(state, fs, generator, parentHeight).toEither.left.map(er => GenericError(er.getMessage))
-      _ <- Either.cond(blockTime < fs.minimalGeneratingBalanceAfter || effectiveBalance >= MinimalEffectiveBalanceForGenerator, (),
-        s"generator's effective balance $effectiveBalance is less that minimal ($MinimalEffectiveBalanceForGenerator)")
+      _ <- Either.cond(blockTime < fs.minimalGeneratingBalanceAfter ||
+        (blockTime >= fs.minimalGeneratingBalanceAfter && effectiveBalance >= MinimalEffectiveBalanceForGenerator1) ||
+        (fn.smallerMinimalGeneratingBalance.available() && effectiveBalance >= MinimalEffectiveBalanceForGenerator2), (),
+        s"generator's effective balance $effectiveBalance is less that required for generation")
       hit = calcHit(prevBlockData, generator)
       target = calcTarget(parent, blockTime, effectiveBalance)
       _ <- Either.cond(hit < target, (), s"calculated hit $hit >= calculated target $target")

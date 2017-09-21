@@ -4,6 +4,7 @@ import java.net.InetSocketAddress
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
 
+import com.wavesplatform.features.BlockchainFunctionalities
 import com.wavesplatform.metrics.BlockStats
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.settings.WavesSettings
@@ -20,19 +21,19 @@ import scorex.utils.{ScorexLogging, Time}
 import scala.concurrent.{ExecutionContext, Future}
 
 @Sharable
-class CoordinatorHandler(
-                            checkpointService: CheckpointService,
-                            history: History,
-                            blockchainUpdater: BlockchainUpdater,
-                            time: Time,
-                            stateReader: StateReader,
-                            utxStorage: UtxPool,
-                            blockchainReadiness:
-                            AtomicBoolean,
-                            miner: Miner,
-                            settings: WavesSettings,
-                            peerDatabase: PeerDatabase,
-                            allChannels: ChannelGroup)
+class CoordinatorHandler(checkpointService: CheckpointService,
+                         history: History,
+                         blockchainUpdater: BlockchainUpdater,
+                         time: Time,
+                         stateReader: StateReader,
+                         utxStorage: UtxPool,
+                         blockchainReadiness:
+                         AtomicBoolean,
+                         miner: Miner,
+                         settings: WavesSettings,
+                         peerDatabase: PeerDatabase,
+                         allChannels: ChannelGroup,
+                         fn: BlockchainFunctionalities)
   extends ChannelInboundHandlerAdapter with ScorexLogging {
 
   private val counter = new AtomicInteger
@@ -44,15 +45,15 @@ class CoordinatorHandler(
   })
 
   private val processCheckpoint = Coordinator.processCheckpoint(checkpointService, history, blockchainUpdater) _
-  private val processFork = Coordinator.processFork(checkpointService, history, blockchainUpdater, stateReader, utxStorage, time, settings, miner, blockchainReadiness) _
-  private val processBlock = Coordinator.processSingleBlock(checkpointService, history, blockchainUpdater, time, stateReader, utxStorage, blockchainReadiness, settings, miner) _
+  private val processFork = Coordinator.processFork(checkpointService, history, blockchainUpdater, stateReader, utxStorage, time, settings, miner, blockchainReadiness, fn) _
+  private val processBlock = Coordinator.processSingleBlock(checkpointService, history, blockchainUpdater, time, stateReader, utxStorage, blockchainReadiness, settings, miner, fn) _
 
   private def broadcastingScore(
-                                   src: Channel,
-                                   start: => String,
-                                   success: => String,
-                                   failure: => String,
-                                   f: => Either[_, BigInt]): Unit = Future {
+                                 src: Channel,
+                                 start: => String,
+                                 success: => String,
+                                 failure: => String,
+                                 f: => Either[_, BigInt]): Unit = Future {
     log.debug(s"${id(src)} $start")
     f match {
       case Right(newLocalScore) =>

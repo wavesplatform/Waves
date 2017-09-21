@@ -2,7 +2,7 @@ package com.wavesplatform.mining
 
 import java.util.concurrent.atomic.AtomicBoolean
 
-import com.wavesplatform.features.{FeatureProvider, FeatureStatus}
+import com.wavesplatform.features.{BlockchainFunctionalities, FeatureProvider, FeatureStatus}
 import com.wavesplatform.metrics.BlockStats
 import com.wavesplatform.network._
 import com.wavesplatform.settings.WavesSettings
@@ -31,17 +31,18 @@ import scala.concurrent.Await
 import scala.concurrent.duration._
 
 class Miner(
-               allChannels: ChannelGroup,
-               blockchainReadiness: AtomicBoolean,
-               blockchainUpdater: BlockchainUpdater,
-               checkpoint: CheckpointService,
-               history: NgHistory,
-               featureProvider: FeatureProvider,
-               stateReader: StateReader,
-               settings: WavesSettings,
-               timeService: Time,
-               utx: UtxPool,
-               wallet: Wallet) extends MinerDebugInfo with ScorexLogging with Instrumented {
+             allChannels: ChannelGroup,
+             blockchainReadiness: AtomicBoolean,
+             blockchainUpdater: BlockchainUpdater,
+             checkpoint: CheckpointService,
+             history: NgHistory,
+             featureProvider: FeatureProvider,
+             stateReader: StateReader,
+             settings: WavesSettings,
+             timeService: Time,
+             utx: UtxPool,
+             wallet: Wallet,
+             fn: BlockchainFunctionalities) extends MinerDebugInfo with ScorexLogging with Instrumented {
 
   import Miner._
 
@@ -50,7 +51,8 @@ class Miner(
   private lazy val minerSettings = settings.minerSettings
   private lazy val minMicroBlockDurationMills = minerSettings.minMicroBlockAge.toMillis
   private lazy val blockchainSettings = settings.blockchainSettings
-  private lazy val processBlock = Coordinator.processSingleBlock(checkpoint, history, blockchainUpdater, timeService, stateReader, utx, blockchainReadiness, settings, this) _
+  private lazy val processBlock = Coordinator.processSingleBlock(checkpoint, history, blockchainUpdater, timeService,
+    stateReader, utx, blockchainReadiness, settings, this, fn) _
 
   private val scheduledAttempts = SerialCancelable()
   private val microBlockAttempt = SerialCancelable()
@@ -152,14 +154,14 @@ class Miner(
     val grandParent = history.parent(lastBlock, 2)
     (for {
       _ <- checkAge(height, history.lastBlockTimestamp().get)
-      ts <- nextBlockGenerationTime(height, stateReader, blockchainSettings.functionalitySettings, lastBlock, account)
+      ts <- nextBlockGenerationTime(height, stateReader, blockchainSettings.functionalitySettings, fn, lastBlock, account)
       offset = calcOffset(timeService, ts, minerSettings.minimalBlockGenerationOffset)
       balance <- generatingBalance(stateReader, blockchainSettings.functionalitySettings, account, height).toEither.left.map(er => GenericError(er.getMessage))
     } yield (offset, balance)) match {
       case Right((offset, balance)) =>
         log.debug(s"Next attempt for acc=$account in $offset")
         val microBlocksEnabled = history.height() > blockchainSettings.functionalitySettings.enableMicroblocksAfterHeight
-//        val version = BlockVersion.resolve(height, settings)
+        //        val version = BlockVersion.resolve(height, settings)
         val version = if (microBlocksEnabled) NgBlockVersion else PlainBlockVersion
         nextBlockGenerationTimes += account.toAddress -> (System.currentTimeMillis() + offset.toMillis)
         generateOneBlockTask(version, account, height, grandParent, balance)(offset).flatMap {
