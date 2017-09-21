@@ -54,7 +54,9 @@ class NgHistoryReader(ngState: () => Option[NgState], inner: History) extends Hi
 
   override def close(): Unit = inner.close()
 
-  override def lastBlockTimestamp(): Option[Long] = ngState().map(_.base.timestamp).orElse(inner.lastBlockTimestamp())
+  override def lastBlockTimestamp(): Option[Long] = read { implicit l =>
+    ngState().map(_.base.timestamp).orElse(inner.lastBlockTimestamp())
+  }
 
   override def lastBlockId(): Option[AssetId] = read { implicit l =>
     ngState().map(_.bestLiquidBlockId).orElse(inner.lastBlockId())
@@ -74,7 +76,7 @@ class NgHistoryReader(ngState: () => Option[NgState], inner: History) extends Hi
   override def microblockIds(): Seq[BlockId] =
     ngState().toSeq.flatMap(ng => ng.micros.map(_.totalResBlockSig))
 
-  override def bestLastBlock(maxTimestamp: Long): Option[Block] = {
+  override def bestLastBlock(maxTimestamp: Long): Option[Block] = read { implicit l =>
       ngState().map(_.bestLastBlock(maxTimestamp)).orElse(inner.lastBlock)
   }
 
