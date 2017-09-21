@@ -12,6 +12,7 @@ import scorex.utils.LoggerFacade
 import scala.concurrent.duration._
 import java.util.concurrent.ThreadLocalRandom
 
+import cats.Show
 import com.wavesplatform.generator.NarrowTransactionGenerator.Settings
 
 import scala.util.Random
@@ -164,6 +165,15 @@ object NarrowTransactionGenerator {
   def generateAlias(): String = {
     val len = Random.nextInt(maxAliasLength - minAliasLength) + minAliasLength
     Random.shuffle(aliasAlphabet).take(len).mkString
+  }
+
+  object Settings {
+    implicit val toPrintable: Show[Settings] = { x =>
+      import x._
+      s"""transactions per iteration: $transactions
+          |probabilities:
+          |  ${probabilities.mkString("\n  ")}""".stripMargin
+    }
   }
 
 }
