@@ -84,7 +84,7 @@ object Coordinator extends ScorexLogging with Instrumented {
 
   def processSingleBlock(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater, time: Time,
                          stateReader: StateReader, utxStorage: UtxPool, blockchainReadiness: AtomicBoolean,
-                         settings: WavesSettings, miner: Miner, featureProvider: FeatureProvider)
+                         settings: WavesSettings, featureProvider: FeatureProvider)
                         (newBlock: Block, local: Boolean): Either[ValidationError, BigInt] = measureSuccessful(blockProcessingTimeStats, {
     val newScore = for {
       _ <- appendBlock(checkpoint, history, blockchainUpdater, stateReader, utxStorage, time, settings.blockchainSettings, featureProvider)(newBlock, local)
@@ -92,7 +92,6 @@ object Coordinator extends ScorexLogging with Instrumented {
 
     if (local || newScore.isRight) {
       updateBlockchainReadinessFlag(history, time, blockchainReadiness, settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed)
-      miner.scheduleMining()
     }
     newScore
   })

@@ -46,7 +46,7 @@ class CoordinatorHandler(checkpointService: CheckpointService,
 
   private val processCheckpoint = Coordinator.processCheckpoint(checkpointService, history, blockchainUpdater) _
   private val processFork = Coordinator.processFork(checkpointService, history, blockchainUpdater, stateReader, utxStorage, time, settings, miner, blockchainReadiness, featureProvider) _
-  private val processBlock = Coordinator.processSingleBlock(checkpointService, history, blockchainUpdater, time, stateReader, utxStorage, blockchainReadiness, settings, miner, featureProvider) _
+  private val processBlock = Coordinator.processSingleBlock(checkpointService, history, blockchainUpdater, time, stateReader, utxStorage, blockchainReadiness, settings, featureProvider) _
 
   private def broadcastingScore(src: Channel,
                                 start: => String,
@@ -92,6 +92,9 @@ class CoordinatorHandler(checkpointService: CheckpointService,
             s"Could not append block ${b.uniqueId}",
             processBlock(b, false).left.map { x =>
               BlockStats.declined(b)
+              x
+            }.right.map { x =>
+              miner.scheduleMining()
               x
             }
           )
