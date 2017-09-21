@@ -1,16 +1,11 @@
 package com.wavesplatform
 
-import cats.{Monad, Traverse}
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction.{Transaction, ValidationError}
 
-import scala.language.higherKinds
 import scala.util.{Left, Right, Try}
 
 package object state2 {
-
-  def foldM[G[_], F[_], A, B](fa: F[A], z: B)(f: (B, A) => G[B])(implicit G: Monad[G], F: Traverse[F]): G[B] =
-    F.foldLeft(fa, G.pure(z))((gb, a) => G.flatMap(gb)(f(_, a)))
 
   def safeSum(x: Long, y: Long): Long = Try(Math.addExact(x, y)).getOrElse(Long.MinValue)
 
