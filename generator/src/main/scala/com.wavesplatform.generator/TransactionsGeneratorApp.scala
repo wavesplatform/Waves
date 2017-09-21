@@ -66,8 +66,8 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
         opt[Int]("start").abbr("s").optional().text("initial amount of transactions").action { (x, c) =>
           c.copy(dynWide = c.dynWide.copy(start = x))
         },
-        opt[Double]("grow-factor").abbr("g").optional().action { (x, c) =>
-          c.copy(dynWide = c.dynWide.copy(growFactor = x))
+        opt[Double]("grow-adder").abbr("g").optional().action { (x, c) =>
+          c.copy(dynWide = c.dynWide.copy(growAdder = x))
         }
       )
   }

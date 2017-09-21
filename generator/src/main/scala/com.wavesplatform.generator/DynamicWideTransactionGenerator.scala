@@ -15,7 +15,7 @@ class DynamicWideTransactionGenerator(settings: Settings,
   private val nextTxsNumber = new AtomicReference[Double](settings.start)
 
   override def next(): Iterator[Transaction] = {
-    val currTxsNumber = nextTxsNumber.getAndUpdate(_ * settings.growFactor).toInt
+    val currTxsNumber = nextTxsNumber.getAndUpdate(_ + settings.growAdder).toInt
     Gen.txs(accounts).take(currTxsNumber)
   }
 
@@ -24,17 +24,16 @@ class DynamicWideTransactionGenerator(settings: Settings,
 object DynamicWideTransactionGenerator {
 
   case class Settings(start: Int,
-                      growFactor: Double,
+                      growAdder: Double,
                       limitDestAccounts: Option[Int]) {
     require(start >= 1)
-    require(growFactor > 0)
   }
 
   object Settings {
     implicit val toPrintable: Show[Settings] = { x =>
       import x._
       s"""transactions at start: $start
-         |grow factor: $growFactor""".stripMargin
+         |grow factor: $growAdder""".stripMargin
     }
   }
 
