@@ -72,7 +72,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
       history, history, stateReader, settings, time, utxStorage, wallet)
 
     val network = new NetworkServer(checkpointService, blockchainUpdater, time, miner, stateReader, settings,
-      history, utxStorage, peerDatabase, allChannels, establishedConnections, blockchainReadiness)
+      history, utxStorage, peerDatabase, allChannels, establishedConnections, blockchainReadiness, history)
 
     miner.scheduleMining()
 
