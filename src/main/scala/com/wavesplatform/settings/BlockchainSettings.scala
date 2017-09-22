@@ -30,6 +30,11 @@ case class FunctionalitySettings(featureCheckBlocksPeriod: Int,
                                  allowLeasedBalanceTransferUntil: Long,
                                  blockVersion3After: Long,
                                  enableMicroblocksAfterHeight: Long) {
+
+  val ng4060switchHeight: Long = enableMicroblocksAfterHeight
+  val dontRequireSortedTransactionsAfter: Long = blockVersion3After
+
+  require(enableMicroblocksAfterHeight >= blockVersion3After, "BlockVersion=3 must be enabled before processing microblocks")
   require(featureCheckBlocksPeriod > 0, "featureCheckBlocksPeriod must be greater than 0")
   require((blocksForFeatureActivation > 0) && (blocksForFeatureActivation <= featureCheckBlocksPeriod), s"blocksForFeatureActivation must be in range 1 to $featureCheckBlocksPeriod")
 }
@@ -86,13 +91,13 @@ object FunctionalitySettings {
 case class GenesisTransactionSettings(recipient: String, amount: Long)
 
 case class GenesisSettings(
-  blockTimestamp: Long,
-  timestamp: Long,
-  initialBalance: Long,
-  signature: Option[ByteStr],
-  transactions: Seq[GenesisTransactionSettings],
-  initialBaseTarget: Long,
-  averageBlockDelay: FiniteDuration)
+                              blockTimestamp: Long,
+                              timestamp: Long,
+                              initialBalance: Long,
+                              signature: Option[ByteStr],
+                              transactions: Seq[GenesisTransactionSettings],
+                              initialBaseTarget: Long,
+                              averageBlockDelay: FiniteDuration)
 
 object GenesisSettings {
   val MAINNET = GenesisSettings(1460678400000L, 1465742577614L, Constants.UnitsInWave * Constants.TotalWaves,

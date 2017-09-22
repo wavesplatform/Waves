@@ -79,7 +79,7 @@ class Miner(
     lazy val h = calcHit(lastBlockKernelData, account)
     lazy val t = calcTarget(parent, currentTime, balance)
     measureSuccessful(blockBuildTimeStats, for {
-       _ <- Either.cond(pc >= minerSettings.quorum, (), s"Quorum not available ($pc/${minerSettings.quorum}, not forging block with ${account.address}")
+      _ <- Either.cond(pc >= minerSettings.quorum, (), s"Quorum not available ($pc/${minerSettings.quorum}, not forging block with ${account.address}")
       _ <- Either.cond(h < t, (), s"${System.currentTimeMillis()}: Hit $h was NOT less than target $t, not forging block with ${account.address}")
       _ = log.debug(s"Forging with ${account.address}, H $h < T $t, balance $balance, prev block ${parent.uniqueId}")
       _ = log.debug(s"Previous block ID ${parent.uniqueId} at $parentHeight with target ${lastBlockKernelData.baseTarget}")
@@ -88,7 +88,7 @@ class Miner(
         val btg = calcBaseTarget(avgBlockDelay, parentHeight, parent, greatGrandParent, currentTime)
         val gs = calcGeneratorSignature(lastBlockKernelData, account)
         val consensusData = NxtLikeConsensusBlockData(btg, ByteStr(gs))
-        val sortInBlock = history.height() <= blockchainSettings.functionalitySettings.enableMicroblocksAfterHeight
+        val sortInBlock = history.height() <= blockchainSettings.functionalitySettings.dontRequireSortedTransactionsAfter
         val unconfirmed = utx.packUnconfirmed(minerSettings.maxTransactionsInKeyBlock, sortInBlock)
         val features = settings.featuresSettings.supported
           .filter(featureProvider.status(_) == FeatureStatus.Defined).toSet
@@ -159,8 +159,7 @@ class Miner(
       case Right((offset, balance)) =>
         log.debug(s"Next attempt for acc=$account in $offset")
         val microBlocksEnabled = history.height() > blockchainSettings.functionalitySettings.enableMicroblocksAfterHeight
-        //        val version =  if (height < blockchainSettings.functionalitySettings.blockVersion3After) 2 else 3
-        val version = if (microBlocksEnabled) NgBlockVersion else PlainBlockVersion
+        val version = if (height <= blockchainSettings.functionalitySettings.blockVersion3After) PlainBlockVersion else NgBlockVersion
         nextBlockGenerationTimes += account.toAddress -> (System.currentTimeMillis() + offset.toMillis)
         generateOneBlockTask(version, account, height, grandParent, balance)(offset).flatMap {
           case Right(block) => Task.now {
