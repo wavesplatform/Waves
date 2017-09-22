@@ -1,77 +1,46 @@
 package com.wavesplatform.generator
 
-import java.io.File
 import java.net.InetSocketAddress
 
-import com.google.common.base.CaseFormat
-import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.settings.loadConfig
-import net.ceedubs.ficus.Ficus._
-import net.ceedubs.ficus.readers.ValueReader
-import org.slf4j.LoggerFactory
+import cats.Show
+import cats.implicits.showInterpolator
 import scorex.account.PrivateKeyAccount
 import scorex.crypto.encode.Base58
-import scorex.transaction.TransactionParser
-import scorex.transaction.TransactionParser.TransactionType
-import scorex.utils.LoggerFacade
 
 import scala.concurrent.duration.FiniteDuration
 
-case class GeneratorSettings(chainId: Char,
-                             accounts: Seq[PrivateKeyAccount],
-                             txProbabilities: Map[TransactionParser.TransactionType.Value, Float],
-                             limitDestAccounts: Option[Int],
-                             sendTo: Seq[InetSocketAddress])
+case class GeneratorSettings(chainId: String,
+                             accounts: Seq[String],
+                             sendTo: Seq[InetSocketAddress],
+                             iterations: Int,
+                             delay: FiniteDuration,
+                             mode: Mode.Value,
+                             narrow: NarrowTransactionGenerator.Settings,
+                             wide: WideTransactionGenerator.Settings,
+                             dynWide: DynamicWideTransactionGenerator.Settings) {
+  val addressScheme: Char = chainId.head
+  val privateKeyAccounts: Seq[PrivateKeyAccount] = accounts.map(s => PrivateKeyAccount(Base58.decode(s).get))
+}
 
 object GeneratorSettings {
-  val configPath: String = "generator"
+  implicit val toPrintable: Show[GeneratorSettings] = { x =>
+    import x._
 
-  private implicit val inetSocketAddressReader: ValueReader[InetSocketAddress] = { (config: Config, path: String) =>
-    new InetSocketAddress(
-      config.as[String](s"$path.address"),
-      config.as[Int](s"$path.port")
-    )
-  }
+    val modeSettings: String = (mode match {
+      case Mode.NARROW => show"$narrow"
+      case Mode.WIDE => show"$wide"
+      case Mode.DYN_WIDE => show"$dynWide"
+    }).toString
 
-  def fromConfig(config: Config): GeneratorSettings = {
-    val converter = CaseFormat.LOWER_HYPHEN.converterTo(CaseFormat.UPPER_CAMEL)
-
-    def toTxType(key: String): TransactionType.Value =
-      TransactionType.withName(s"${converter.convert(key)}Transaction")
-
-    GeneratorSettings(
-      chainId = config.as[String](s"$configPath.chainId").head,
-      accounts = config.as[List[String]](s"$configPath.accounts").map(s => PrivateKeyAccount(Base58.decode(s).get)),
-      txProbabilities = config.as[Map[String, Double]](s"$configPath.probabilities").map(kv => toTxType(kv._1) -> kv._2.toFloat),
-      limitDestAccounts = config.as[Option[Int]](s"$configPath.limit-dest-accounts"),
-      sendTo = config.as[Seq[InetSocketAddress]](s"$configPath.send-to"))
-  }
-
-  private val log = LoggerFacade(LoggerFactory.getLogger(getClass))
-
-  def readConfig(userConfigPath: Option[String]): Config = {
-    log.info(s"Loading config from path: $userConfigPath")
-
-    val maybeConfigFile = for {
-      filename <- userConfigPath
-      file = new File(filename)
-      if file.exists
-    } yield file
-
-    val config = maybeConfigFile match {
-      // if no user config is supplied, the library will handle overrides/application/reference automatically
-      case None =>
-        log.info("No config found/provided, using reference.conf automatically")
-        ConfigFactory.load()
-      // application config needs to be resolved wrt both system properties *and* user-supplied config.
-      case Some(file) =>
-        val cfg = ConfigFactory.parseFile(file)
-        if (!cfg.hasPath("generator")) {
-          log.error("Malformed configuration file was provided! Aborting!")
-          System.exit(1)
-        }
-        loadConfig(cfg)
-    }
-    config
+    s"""network byte: $chainId
+       |rich accounts:
+       |  ${accounts.mkString("\n  ")}
+       |recipient nodes:
+       |  ${sendTo.mkString("\n  ")}
+       |number of iterations: $iterations
+       |delay between iterations: $delay
+       |mode: $mode
+       |$mode settings:
+       |  ${modeSettings.split('\n').mkString("\n  ")}""".stripMargin
   }
 }

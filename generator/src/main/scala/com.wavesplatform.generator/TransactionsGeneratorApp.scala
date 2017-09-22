@@ -3,94 +3,110 @@ package com.wavesplatform.generator
 import java.net.InetSocketAddress
 import java.util.concurrent.{Executors, ThreadLocalRandom}
 
-import com.wavesplatform.generator.GeneratorSettings._
-import com.wavesplatform.it.util.NetworkSender
+import cats.implicits.showInterpolator
+import com.typesafe.config.ConfigFactory
+import com.wavesplatform.generator.cli.ScoptImplicits
+import com.wavesplatform.generator.config.FicusImplicits
 import com.wavesplatform.network.RawBytes
+import com.wavesplatform.network.client.NetworkSender
 import io.netty.channel.Channel
+import net.ceedubs.ficus.Ficus._
+import net.ceedubs.ficus.readers.ArbitraryTypeReader._
+import net.ceedubs.ficus.readers.{EnumerationReader, NameMapper}
 import org.slf4j.LoggerFactory
 import scopt.OptionParser
 import scorex.account.AddressScheme
 import scorex.utils.LoggerFacade
 
+import scala.concurrent._
 import scala.concurrent.duration._
-import scala.concurrent.{ExecutionContext, Future, blocking}
 import scala.util.{Failure, Success}
 
-object Mode extends Enumeration {
-  type Mode = Value
-  val WIDE, NARROW = Value
-}
+object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplicits with EnumerationReader {
 
-case class GenerationParameters(mode: Mode.Value,
-                                transactions: Int,
-                                iterations: Int,
-                                delay: FiniteDuration)
-
-object TransactionsGeneratorApp extends App {
+  implicit val readConfigInHyphen: NameMapper = net.ceedubs.ficus.readers.namemappers.implicits.hyphenCase // IDEA bug
 
   val log = LoggerFacade(LoggerFactory.getLogger("generator"))
 
-  implicit val modeRead: scopt.Read[Mode.Value] = scopt.Read.reads(Mode withName _.toUpperCase)
-
-  private implicit val finiteDurationRead: scopt.Read[FiniteDuration] = scopt.Read.durationRead.map { x =>
-    if (x.isFinite()) FiniteDuration(x.length, x.unit)
-    else throw new IllegalArgumentException(s"Duration '$x' expected to be finite")
-  }
-
-
-  val parser = new OptionParser[GenerationParameters]("generator") {
+  val parser = new OptionParser[GeneratorSettings]("generator") {
     head("TransactionsGenerator - Waves load testing transactions generator")
-    opt[Mode.Value]('m', "mode") valueName "<mode>" action { (v, c) => c.copy(mode = v) } text "generation mode (NARROW|WIDE)"
-    opt[Int]('t', "transactions") valueName "<transactions>" action { (v, c) => c.copy(transactions = v) } text "number of transactions to generate per iteration"
-    opt[Int]('i', "iterations") valueName "<iterations>" action { (v, c) => c.copy(iterations = v) } text "number of iterations"
-    opt[FiniteDuration]('d', "delay") valueName "<delay>" action { (v, c) => c.copy(delay = v) } text "delay between iterations"
-    help("help") text "display this help message"
+    opt[Int]('i', "iterations").valueName("<iterations>").text("number of iterations").action { (v, c) =>
+      c.copy(iterations = v)
+    }
+    opt[FiniteDuration]('d', "delay").valueName("<delay>").text("delay between iterations").action { (v, c) =>
+      c.copy(delay = v)
+    }
+    help("help").text("display this help message")
+
+    cmd("narrow")
+      .action { (_, c) => c.copy(mode = Mode.NARROW) }
+      .text("Run transactions between pre-defined accounts")
+      .children(
+        opt[Int]("transactions").abbr("t").optional().text("number of transactions").action { (x, c) =>
+          c.copy(narrow = c.narrow.copy(transactions = x))
+        }
+      )
+
+    cmd("wide")
+      .action { (_, c) => c.copy(mode = Mode.WIDE) }
+      .text("Run transactions those transfer funds to another accounts")
+      .children(
+        opt[Int]("transactions").abbr("t").optional().text("number of transactions").action { (x, c) =>
+          c.copy(wide = c.wide.copy(transactions = x))
+        },
+        opt[Option[Int]]("limit-accounts").abbr("la").optional().text("limit recipients").action { (x, c) =>
+          c.copy(wide = c.wide.copy(limitAccounts = x))
+        }
+      )
+
+    cmd("dyn-wide")
+      .action { (_, c) => c.copy(mode = Mode.DYN_WIDE) }
+      .text("Like wide, but the number of transactions is changed during the iteration")
+      .children(
+        opt[Int]("start").abbr("s").optional().text("initial amount of transactions").action { (x, c) =>
+          c.copy(dynWide = c.dynWide.copy(start = x))
+        },
+        opt[Double]("grow-adder").abbr("g").optional().action { (x, c) =>
+          c.copy(dynWide = c.dynWide.copy(growAdder = x))
+        }
+      )
   }
 
-  val defaultConfig = fromConfig(readConfig(None))
-
-  val initialParameters = GenerationParameters(
-    mode = Mode.NARROW,
-    transactions = 1000,
-    iterations = 1,
-    delay = 1.minutes
-  )
-
-  parser.parse(args, initialParameters) match {
-    case Some(parameters) =>
-      val actualConfig = fromConfig(readConfig(None))
+  val defaultConfig = ConfigFactory.load().as[GeneratorSettings]("generator")
+  parser.parse(args, defaultConfig) match {
+    case None => parser.failure("Failed to parse command line parameters")
+    case Some(finalConfig) =>
+      log.info(show"The final configuration: \n$finalConfig")
 
       AddressScheme.current = new AddressScheme {
-        override val chainId: Byte = actualConfig.chainId.toByte
-      }
-      val generator = parameters.mode match {
-        case Mode.NARROW => new NarrowTransactionGenerator(actualConfig.txProbabilities, actualConfig.accounts)
-        case Mode.WIDE => new WideTransactionGenerator(actualConfig.limitDestAccounts, actualConfig.accounts)
+        override val chainId: Byte = finalConfig.addressScheme.toByte
       }
 
-      val nodes = actualConfig.sendTo
-      val threadPool = Executors.newFixedThreadPool(Math.max(1, nodes.size))
-      implicit val ec = ExecutionContext.fromExecutor(threadPool)
+      val generator: TransactionGenerator = finalConfig.mode match {
+        case Mode.NARROW => new NarrowTransactionGenerator(finalConfig.narrow, finalConfig.privateKeyAccounts)
+        case Mode.WIDE => new WideTransactionGenerator(finalConfig.wide, finalConfig.privateKeyAccounts)
+        case Mode.DYN_WIDE => new DynamicWideTransactionGenerator(finalConfig.dynWide, finalConfig.privateKeyAccounts)
+      }
 
-      val workers = nodes.map { node =>
-        generateAndSend(generator, parameters.transactions, parameters.iterations, parameters.delay, node, actualConfig.chainId)
+      val threadPool = Executors.newFixedThreadPool(Math.max(1, finalConfig.sendTo.size))
+      implicit val ec: ExecutionContextExecutor = ExecutionContext.fromExecutor(threadPool)
+
+      val workers = finalConfig.sendTo.map { node =>
+        generateAndSend(node, finalConfig.addressScheme, finalConfig.iterations, finalConfig.delay, generator)
       }
 
       Future.sequence(workers).onComplete { _ =>
         log.info("Done all")
         threadPool.shutdown()
       }
-    case None => parser.failure("Failed to parse command line parameters")
   }
 
-  private def generateAndSend(generator: TransactionGenerator, count: Int, iterations: Int, delay: FiniteDuration,
-                              node: InetSocketAddress, chainId: Char)
+  private def generateAndSend(node: InetSocketAddress,
+                              chainId: Char,
+                              iterations: Int,
+                              delay: FiniteDuration,
+                              generator: TransactionGenerator)
                              (implicit ec: ExecutionContext): Future[Unit] = {
-    log.info(s"[$node] Going to perform $iterations iterations")
-    log.info(s"[$node] Generating $count transactions per iteration")
-    log.info(s"[$node] With $delay between iterations")
-    log.info(s"[$node] Source addresses: ${generator.accounts.mkString(", ")}")
-
     val nonce = ThreadLocalRandom.current.nextLong()
     val sender = new NetworkSender(chainId, "generator", nonce)
     sys.addShutdownHook(sender.close())
@@ -98,8 +114,7 @@ object TransactionsGeneratorApp extends App {
     def sendTransactions(channel: Channel): Future[Unit] = {
       def loop(step: Int): Future[Unit] = {
         log.info(s"[$node] Iteration $step")
-        val transactions = generator.generate(count)
-        val messages = transactions.map(tx => RawBytes(25.toByte, tx.bytes))
+        val messages: Seq[RawBytes] = generator.next.map(tx => RawBytes(25.toByte, tx.bytes)).toSeq
 
         sender
           .send(channel, messages: _*)

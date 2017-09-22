@@ -2,11 +2,11 @@ package com.wavesplatform.generator
 
 import scala.collection.immutable.TreeMap
 
-class DistributedRandomGenerator[T](probabilities: Map[T, Float]) {
+class DistributedRandomGenerator[T](probabilities: Map[T, Double]) {
   assert(probabilities.values.sum == 1)
   def getRandom: T = {
     val rand = Math.random
-    val g = probabilities.foldLeft((TreeMap[Float, Option[T]](0f -> None), 0f)) { case ((m, max), (t, prob)) =>
+    val g = probabilities.foldLeft((TreeMap[Double, Option[T]](0d -> None), 0d)) { case ((m, max), (t, prob)) =>
       val limit = max + prob
       (m.updated(limit, Some(t)), limit)
     }._1
