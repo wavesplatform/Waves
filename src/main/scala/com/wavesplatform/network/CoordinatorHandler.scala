@@ -95,6 +95,8 @@ class CoordinatorHandler(checkpointService: CheckpointService,
               x
             }.right.map { x =>
               miner.scheduleMining()
+              if(b.transactionData.isEmpty)
+                allChannels.broadcast(BlockForged(b), Some(ctx.channel()))
               x
             }
           )
