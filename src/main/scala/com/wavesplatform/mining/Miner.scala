@@ -159,7 +159,7 @@ class Miner(
       case Right((offset, balance)) =>
         log.debug(s"Next attempt for acc=$account in $offset")
         val microBlocksEnabled = history.height() > blockchainSettings.functionalitySettings.enableMicroblocksAfterHeight
-        //        val version = BlockVersion.resolve(height, settings)
+        //        val version =  if (height < blockchainSettings.functionalitySettings.blockVersion3After) 2 else 3
         val version = if (microBlocksEnabled) NgBlockVersion else PlainBlockVersion
         nextBlockGenerationTimes += account.toAddress -> (System.currentTimeMillis() + offset.toMillis)
         generateOneBlockTask(version, account, height, grandParent, balance)(offset).flatMap {
