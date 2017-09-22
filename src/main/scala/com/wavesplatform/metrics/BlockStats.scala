@@ -49,7 +49,7 @@ object BlockStats {
 
   def mined(b: Block, height: Int): Unit = write(
     block(b)
-      .addField("parent-id", b.reference.toString.take(StringIdLength))
+      .tag("parent-id", b.reference.toString.take(StringIdLength))
       .addField("txs", b.transactionData.size)
       .addField("score", b.blockScore)
       .addField("height", height),
@@ -60,7 +60,7 @@ object BlockStats {
 
   def received(m: MicroBlock, from: InetSocketAddress, propagationTime: Long): Unit = write(
     micro(m)
-      .addField("parent-id", m.prevResBlockSig.toString.take(StringIdLength))
+      .tag("parent-id", m.prevResBlockSig.toString.take(StringIdLength))
       .addField("from", from.toString)
       .addField("prop-time", propagationTime),
     Event.Received,
@@ -90,18 +90,18 @@ object BlockStats {
   private def block(b: Block): Point.Builder = {
     Point
       .measurement("block")
-      .addField("id", id(b.uniqueId))
+      .tag("id", id(b.uniqueId))
   }
 
   private def micro(m: MicroBlock): Point.Builder = {
     Point
       .measurement("micro")
-      .addField("id", id(m.uniqueId))
+      .tag("id", id(m.uniqueId))
   }
 
   private def id(x: ByteStr): String = x.toString.take(StringIdLength)
 
   private def write(init: Point.Builder, event: Event, addFields: Seq[(String, String)]): Unit = {
-    Metrics.write(addFields.foldLeft(init.addField("event", event.name)) { case (r, (k, v)) => r.addField(k, v) })
+    Metrics.write(addFields.foldLeft(init.tag("event", event.name)) { case (r, (k, v)) => r.addField(k, v) })
   }
 }
