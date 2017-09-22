@@ -130,7 +130,6 @@ object Coordinator extends ScorexLogging with Instrumented {
     discardedTxs <- blockchainUpdater.processBlock(block)
   } yield {
     if (local) BlockStats.mined(block, height) else BlockStats.applied(block, height)
-    TxsInBlockchainStats.record(block.transactionData.size - discardedTxs.size)
 
     utxStorage.removeAll(block.transactionData)
     discardedTxs.foreach(utxStorage.putIfNew)
