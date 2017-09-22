@@ -5,6 +5,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock
 import cats._
 import com.google.common.cache.CacheBuilder
 import com.wavesplatform.UtxPool.PessimisticPortfolios
+import com.wavesplatform.metrics.Metrics
 import com.wavesplatform.metrics.Instrumented
 import com.wavesplatform.settings.{FunctionalitySettings, UtxSettings}
 import com.wavesplatform.state2.diffs.TransactionDiffer
@@ -12,6 +13,7 @@ import com.wavesplatform.state2.reader.{CompositeStateReader, StateReader}
 import com.wavesplatform.state2.{ByteStr, Diff, Portfolio}
 import kamon.Kamon
 import kamon.metric.instrument.{Time => KamonTime}
+import org.influxdb.dto.Point
 import scorex.account.Address
 import scorex.consensus.TransactionsOrdering
 import scorex.transaction.ValidationError.GenericError
@@ -41,7 +43,12 @@ class UtxPool(time: Time,
 
   private val pessimisticPortfolios = Synchronized(new PessimisticPortfolios)
 
-  private val sizeStats = Kamon.metrics.histogram("utx-pool-size")
+  private def sizeStats(height: Int): Unit = Metrics.write(
+    Point
+      .measurement("utx-pool-size")
+      .addField("height", height)
+  )
+
   private val processingTimeStats = Kamon.metrics.histogram(
     "utx-transaction-processing-time",
     KamonTime.Milliseconds
@@ -79,7 +86,7 @@ class UtxPool(time: Time,
               tx
             }
             cache.put(tx.id, res)
-            sizeStats.record(transactions().size)
+            sizeStats(transactions().size)
             res.right.map(_ => true)
         })
     })
