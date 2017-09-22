@@ -68,6 +68,9 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
         },
         opt[Double]("grow-adder").abbr("g").optional().action { (x, c) =>
           c.copy(dynWide = c.dynWide.copy(growAdder = x))
+        },
+        opt[Int]("max").abbr("m").optional().action { (x, c) =>
+          c.copy(dynWide = c.dynWide.copy(maxTxsPerRequest = Some(x)))
         }
       )
   }
