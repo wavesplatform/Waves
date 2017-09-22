@@ -17,9 +17,11 @@ object Metrics extends ScorexLogging {
   case class InfluxDbSettings(uri: URI, db: String, batchActions: Int, batchFlashDuration: FiniteDuration)
 
   case class Settings(enable: Boolean,
-                      addTags: Map[String, String],
+                      addFields: Map[String, String],
                       influxDb: InfluxDbSettings) {
-    private[Metrics] val addMetricTags: java.util.Map[String, String] = addTags.asJava
+    private[Metrics] val addMetricFields: java.util.Map[String, AnyRef] = addFields.map {
+      case (k, v) => k -> v.asInstanceOf[AnyRef]
+    }.asJava
   }
 
   private implicit val scheduler: SchedulerService = monix.execution.Scheduler.singleThread("metrics", reporter = com.wavesplatform.utils.UncaughtExceptionsToLogReporter)
@@ -46,7 +48,7 @@ object Metrics extends ScorexLogging {
 
   def write(b: Point.Builder): Unit = Task {
     db.foreach(_.write(b
-      .tag(settings.addMetricTags)
+      .fields(settings.addMetricFields)
       .build()
     ))
   }.runAsync
