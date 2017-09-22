@@ -39,4 +39,15 @@ class NgStateTest extends PropSpec with GeneratorDrivenPropertyChecks with Prope
       }
     }
   }
+  property("can resolve best last block") {
+
+    forAll(preconditionsAndPayments) { case (genesis, payment, payment2, payment3) =>
+      val (block, microBlocks) = chainBaseAndMicro(randomSig, genesis, Seq(Seq(payment), Seq(payment2), Seq(payment3)))
+
+      microBlocks.foldLeft(NgState(block, BlockDiff.empty, 0L)) { case ((ng, m)) => ng + (m, BlockDiff.empty, 0L) }
+        .bestLiquidBlock.uniqueId shouldBe microBlocks.last.totalResBlockSig
+
+      NgState(block, BlockDiff.empty, 0L) .bestLiquidBlock.uniqueId shouldBe block.uniqueId
+    }
+  }
 }
