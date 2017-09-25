@@ -4,6 +4,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock
 
 import com.wavesplatform.features.FeatureStatus
 import com.wavesplatform.history.HistoryWriterImpl
+import com.wavesplatform.settings.FeaturesSettings
 import com.wavesplatform.state2._
 import org.scalatest.{FunSuite, Matchers}
 import scorex.lagonaki.mocks.TestBlock
@@ -15,6 +16,12 @@ import scala.concurrent.Future
 class HistoryWriterTest extends FunSuite with Matchers with HistoryTest {
 
   private val ApprovalPeriod = 10000
+
+  private val FeaturesSettingsWithAutoActivation: FeaturesSettings =
+    FeaturesSettings(autoActivate = true, autoShutdownOnUnsupportedFeature = false, List.empty)
+
+  private val FeaturesSettingsWithoutAutoActivationAndWithOneSupportedFeature =
+    FeaturesSettings(autoActivate = false, autoShutdownOnUnsupportedFeature = false, List(1))
 
   test("concurrent access to lastBlock doesn't throw any exception") {
     val history = HistoryWriterImpl(None, new ReentrantReadWriteLock(), TestFunctionalitySettings.Enabled,
@@ -41,7 +48,7 @@ class HistoryWriterTest extends FunSuite with Matchers with HistoryTest {
 
   test("features approved and accepted as height grows") {
     val history = HistoryWriterImpl(None, new ReentrantReadWriteLock(), TestFunctionalitySettings.Enabled,
-      TestFunctionalitySettings.EmptyFeaturesSettings).get
+      FeaturesSettingsWithAutoActivation).get
 
     appendGenesisBlock(history)
 
@@ -79,7 +86,7 @@ class HistoryWriterTest extends FunSuite with Matchers with HistoryTest {
 
   test("features rollback with block rollback") {
     val history = HistoryWriterImpl(None, new ReentrantReadWriteLock(), TestFunctionalitySettings.Enabled,
-      TestFunctionalitySettings.EmptyFeaturesSettings).get
+      FeaturesSettingsWithAutoActivation).get
 
     appendGenesisBlock(history)
 
@@ -123,7 +130,7 @@ class HistoryWriterTest extends FunSuite with Matchers with HistoryTest {
 
   test("feature activated only by 90% of blocks") {
     val history = HistoryWriterImpl(None, new ReentrantReadWriteLock(), TestFunctionalitySettings.Enabled,
-      TestFunctionalitySettings.EmptyFeaturesSettings).get
+      FeaturesSettingsWithAutoActivation).get
 
     appendGenesisBlock(history)
     history.status(1) shouldBe FeatureStatus.Defined
@@ -142,5 +149,24 @@ class HistoryWriterTest extends FunSuite with Matchers with HistoryTest {
       appendTestBlock3(history, Set())
     }
     history.status(1) shouldBe FeatureStatus.Activated
+  }
+
+  test("features won't be approved or activated without auto-activation is on") {
+    val history = HistoryWriterImpl(None, new ReentrantReadWriteLock(), TestFunctionalitySettings.Enabled,
+      FeaturesSettingsWithoutAutoActivationAndWithOneSupportedFeature).get
+
+    appendGenesisBlock(history)
+
+    (1 until ApprovalPeriod).foreach { _ =>
+      appendTestBlock3(history, Set(1, 2))
+    }
+    history.status(1) shouldBe FeatureStatus.Accepted
+    history.status(2) shouldBe FeatureStatus.Defined
+
+    (1 to ApprovalPeriod).foreach { _ =>
+      appendTestBlock3(history, Set())
+    }
+    history.status(1) shouldBe FeatureStatus.Activated
+    history.status(2) shouldBe FeatureStatus.Defined
   }
 }

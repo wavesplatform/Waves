@@ -67,7 +67,7 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
       log.error(s"UNIMPLEMENTED ${displayFeatures(unimplementedActivated)} ACTIVATED ON BLOCKCHAIN")
       log.error("PLEASE, UPDATE THE NODE IMMEDIATELY")
       if (featuresSettings.autoShutdownOnUnsupportedFeature) {
-        log.error("THE NODE WAS STOPPED AUTOMATICALLY")
+        log.error("FOR THIS REASON THE NODE WAS STOPPED AUTOMATICALLY")
         forceStopApplication(UnsupportedFeature)
       }
       else log.error("OTHERWISE THE NODE WILL END UP ON A FORK")
@@ -79,33 +79,33 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
   def appendBlock(block: Block)(consensusValidation: => Either[ValidationError, BlockDiff]): Either[ValidationError, BlockDiff] =
     write { implicit lock =>
 
-    assert(block.signatureValid)
+      assert(block.signatureValid)
 
-    if ((height() == 0) || (this.lastBlock.get.uniqueId == block.reference)) consensusValidation.map { blockDiff =>
-      val h = height() + 1
-      val score = (if (height() == 0) BigInt(0) else this.score()) + block.blockScore
-      blockBodyByHeight.mutate(_.put(h, block.bytes))
-      scoreByHeight.mutate(_.put(h, score))
-      blockIdByHeight.mutate(_.put(h, block.uniqueId))
-      heightByBlockId.mutate(_.put(block.uniqueId, h))
-      featuresAtHeight.mutate(_.put(h, block.supportedFeaturesIds))
+      if ((height() == 0) || (this.lastBlock.get.uniqueId == block.reference)) consensusValidation.map { blockDiff =>
+        val h = height() + 1
+        val score = (if (height() == 0) BigInt(0) else this.score()) + block.blockScore
+        blockBodyByHeight.mutate(_.put(h, block.bytes))
+        scoreByHeight.mutate(_.put(h, score))
+        blockIdByHeight.mutate(_.put(h, block.uniqueId))
+        heightByBlockId.mutate(_.put(block.uniqueId, h))
+        featuresAtHeight.mutate(_.put(h, block.supportedFeaturesIds))
 
-      if (h % FeatureApprovalBlocksCount == 0) updateFeaturesState(h)
+        if (h % FeatureApprovalBlocksCount == 0) updateFeaturesState(h)
 
-      db.commit()
-      blockHeightStats.record(h)
-      blockSizeStats.record(block.bytes.length)
-      transactionsInBlockStats.record(block.transactionData.size)
+        db.commit()
+        blockHeightStats.record(h)
+        blockSizeStats.record(block.bytes.length)
+        transactionsInBlockStats.record(block.transactionData.size)
 
-      if (h % 100 == 0) db.compact(CompactFillRate, CompactMemorySize)
+        if (h % 100 == 0) db.compact(CompactFillRate, CompactMemorySize)
 
-      log.trace(s"Full Block(id=${block.uniqueId},txs_count=${block.transactionData.size}) persisted")
-      blockDiff
+        log.trace(s"Full Block(id=${block.uniqueId},txs_count=${block.transactionData.size}) persisted")
+        blockDiff
+      }
+      else {
+        Left(GenericError(s"Parent ${block.reference} of block ${block.uniqueId} does not match last block ${this.lastBlock.map(_.uniqueId)}"))
+      }
     }
-    else {
-      Left(GenericError(s"Parent ${block.reference} of block ${block.uniqueId} does not match last block ${this.lastBlock.map(_.uniqueId)}"))
-    }
-  }
 
   def discardBlock(): Seq[Transaction] = write { implicit lock =>
     val h = height()
@@ -151,7 +151,10 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
     val lastApprovalHeight = h - h % FeatureApprovalBlocksCount
     Option(featuresState().get(lastApprovalHeight)).map { m =>
       val byte: Byte = m.getOrElse(feature, FeatureStatus.Defined.status)
-      FeatureStatus(byte)
+      if (featuresSettings.autoActivate || featuresSettings.supported.contains(feature))
+        FeatureStatus(byte)
+      else
+        FeatureStatus.Defined
     }.getOrElse(FeatureStatus.Defined)
   }
 
