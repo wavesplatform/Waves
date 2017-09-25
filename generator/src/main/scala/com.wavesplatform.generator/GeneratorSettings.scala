@@ -14,6 +14,7 @@ case class GeneratorSettings(chainId: String,
                              sendTo: Seq[InetSocketAddress],
                              iterations: Int,
                              delay: FiniteDuration,
+                             autoReconnect: Boolean,
                              mode: Mode.Value,
                              narrow: NarrowTransactionGenerator.Settings,
                              wide: WideTransactionGenerator.Settings,
@@ -39,6 +40,7 @@ object GeneratorSettings {
        |  ${sendTo.mkString("\n  ")}
        |number of iterations: $iterations
        |delay between iterations: $delay
+       |auto reconnect is ${if (autoReconnect) "enabled" else "disabled"}
        |mode: $mode
        |$mode settings:
        |  ${modeSettings.split('\n').mkString("\n  ")}""".stripMargin
