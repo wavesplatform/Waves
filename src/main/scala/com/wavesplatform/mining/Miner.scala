@@ -125,7 +125,7 @@ class Miner(
           signer = account
         )
         microBlock <- MicroBlock.buildAndSign(account, unconfirmed, accumulatedBlock.signerData.signature, signedBlock.signerData.signature)
-        _ = microBlockBuildTimeStats.record(System.currentTimeMillis() - start)
+        _ = microBlockBuildTimeStats.safeRecord(System.currentTimeMillis() - start)
         _ <- Coordinator.processMicroBlock(checkpoint, history, blockchainUpdater, utx)(microBlock)
       } yield {
         BlockStats.mined(microBlock)

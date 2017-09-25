@@ -2,6 +2,7 @@ package com.wavesplatform.metrics
 
 import kamon.metric.instrument.Histogram
 import kamon.util.{NanoInterval, RelativeNanoTimestamp}
+import com.wavesplatform.network._
 
 class LatencyHistogram(private val histogram: Histogram) {
   private var timestamp = Option.empty[RelativeNanoTimestamp]
@@ -11,6 +12,6 @@ class LatencyHistogram(private val histogram: Histogram) {
   }
 
   def record(): Unit = {
-    timestamp.foreach(t => histogram.record(NanoInterval.since(t).nanos))
+    timestamp.foreach(t => histogram.safeRecord(NanoInterval.since(t).nanos))
   }
 }
