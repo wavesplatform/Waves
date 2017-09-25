@@ -18,7 +18,7 @@ class LegacyFrameCodecSpec extends FreeSpec
   with TransactionGen {
 
   "should handle a message with the maximal size" in forAll(issueGen) { origTx =>
-    val codec = new LegacyFrameCodec(PeerDatabase.Noop)
+    val codec = new LegacyFrameCodec(PeerDatabase.NoOp)
 
     val buff = Unpooled.buffer
     val txBytes = origTx.bytes

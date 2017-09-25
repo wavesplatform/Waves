@@ -1,6 +1,6 @@
 package com.wavesplatform.network
 
-import java.net.{InetSocketAddress, NetworkInterface}
+import java.net.{InetSocketAddress, NetworkInterface, NoRouteToHostException}
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
 
@@ -8,6 +8,7 @@ import com.wavesplatform.features.FeatureProvider
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.settings._
 import com.wavesplatform.state2.reader.StateReader
+import com.wavesplatform.utils._
 import com.wavesplatform.{UtxPool, Version}
 import io.netty.bootstrap.{Bootstrap, ServerBootstrap}
 import io.netty.channel._
@@ -183,9 +184,14 @@ class NetworkServer(checkpointService: CheckpointService,
         .addListener { (connFuture: ChannelFuture) =>
           if (connFuture.isDone) {
             if (connFuture.cause() != null) {
-              val reason = s"${id(connFuture.channel())} Connection failed, blacklisting $remoteAddress"
-              log.debug(reason, connFuture.cause())
-              //              peerDatabase.blacklist(remoteAddress.getAddress, reason)
+              if (connFuture.cause().isInstanceOf[NoRouteToHostException]) {
+                log.warn(s"${id(connFuture.channel())} Unrecoverable network issue has occurred, restarting", connFuture.cause())
+                forceStopApplication()
+              } else {
+                val reason = s"${id(connFuture.channel())} Connection failed, suspending $remoteAddress"
+                log.debug(reason, connFuture.cause())
+                peerDatabase.suspend(remoteAddress.getAddress)
+              }
             } else if (connFuture.isSuccess) {
               log.info(s"${id(connFuture.channel())} Connection established")
               peerDatabase.touch(remoteAddress)
