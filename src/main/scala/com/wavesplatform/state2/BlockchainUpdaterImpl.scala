@@ -162,7 +162,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
           }
           logHeights(s"Rollback to h=$height completed:")
           val r = discardedTransactions.result()
-          TxsInBlockchainStats.record(r.size)
+          TxsInBlockchainStats.record(-r.size)
           Right(r)
       }
     }
