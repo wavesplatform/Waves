@@ -1,6 +1,6 @@
 package com.wavesplatform
 
-import com.wavesplatform.settings.BlockchainSettings
+import com.wavesplatform.settings.{BlockchainSettings, FeaturesSettings}
 import com.wavesplatform.state2._
 import scorex.account.PrivateKeyAccount
 import scorex.block.{Block, MicroBlock}
@@ -26,9 +26,10 @@ package object history {
   val ApplyMinerFeeBeforeAllTransactionsSettings: BlockchainSettings = DefaultBlockchainSettings.copy(
     functionalitySettings = DefaultBlockchainSettings.functionalitySettings.copy(enableMicroblocksAfterHeight = Long.MaxValue))
 
+  val EmptyFeaturesSettings = FeaturesSettings(autoActivate = false, autoShutdownOnUnsupportedFeature = false, List.empty)
 
-  def domain(bs: BlockchainSettings): Domain = {
-    val (history, _, stateReader, blockchainUpdater, _) = StorageFactory(bs).get
+  def domain(bs: BlockchainSettings, featuresSettings: FeaturesSettings): Domain = {
+    val (history, _, stateReader, blockchainUpdater, _) = StorageFactory(bs, featuresSettings).get
     Domain(history, stateReader, blockchainUpdater)
   }
 
@@ -101,5 +102,5 @@ package object history {
     (block, microBlocks)
   }
 
-  def malformSignature(b: Block): Block = b.copy(signerData = b.signerData.copy(signature = TestBlock.randomSignature()))
+  def spoilSignature(b: Block): Block = b.copy(signerData = b.signerData.copy(signature = TestBlock.randomSignature()))
 }

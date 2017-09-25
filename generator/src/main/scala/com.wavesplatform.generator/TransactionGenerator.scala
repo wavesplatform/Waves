@@ -1,12 +1,7 @@
 package com.wavesplatform.generator
 
-import scorex.account.PrivateKeyAccount
 import scorex.transaction.Transaction
 
-trait TransactionGenerator {
-
-  val accounts: Seq[PrivateKeyAccount]
-
-  def generate(count: Int): Seq[Transaction]
-
+trait TransactionGenerator extends Iterator[Iterator[Transaction]] {
+  override val hasNext = true
 }

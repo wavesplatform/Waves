@@ -40,12 +40,12 @@ libraryDependencies ++=
   Dependencies.logging ++
   Dependencies.matcher ++
   Dependencies.metrics ++
+  Dependencies.fp ++
   Seq(
     "com.iheart" %% "ficus" % "1.4.2",
     ("org.scorexfoundation" %% "scrypto" % "1.2.2")
       .exclude("org.slf4j", "slf4j-api"),
     "commons-net" % "commons-net" % "3.+",
-    "org.typelevel" %% "cats-core" % "0.9.0",
     "io.monix" %% "monix" % "2.3.0"
   )
 
@@ -165,4 +165,10 @@ inConfig(Debian)(Seq(
 lazy val node = project.in(file("."))
 lazy val generator = project.in(file("generator"))
   .dependsOn(node % "compile->it")
-  .settings(libraryDependencies ++= Seq("com.github.scopt" %% "scopt" % "3.6.0"))
+  .settings(
+    libraryDependencies ++=
+      Dependencies.fp ++
+      Seq(
+        "com.github.scopt" %% "scopt" % "3.6.0"
+      )
+  )

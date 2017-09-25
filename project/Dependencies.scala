@@ -62,4 +62,8 @@ object Dependencies {
   lazy val metrics = Seq("core", "statsd", "system-metrics").map(kamonModule) ++ Seq(
     "org.influxdb" % "influxdb-java" % "2.7"
   )
+
+  lazy val fp = Seq(
+    "org.typelevel" %% "cats-core" % "0.9.0"
+  )
 }

@@ -22,14 +22,14 @@ object BlockDiffer extends ScorexLogging with Instrumented {
     val stateHeight = s.height
 
     lazy val prevBlockFeeDistr: Option[Diff] =
-      if (stateHeight > settings.enableMicroblocksAfterHeight)
+      if (stateHeight > settings.ng4060switchHeight)
         maybePrevBlock
           .map(prevBlock => Diff.empty.copy(
             portfolios = Map(blockSigner -> prevBlock.prevBlockFeePart)))
       else None
 
     lazy val currentBlockFeeDistr =
-      if (stateHeight < settings.enableMicroblocksAfterHeight)
+      if (stateHeight < settings.ng4060switchHeight)
         Some(Diff.empty.copy(portfolios = Map(blockSigner -> block.feesPortfolio)))
       else
         None

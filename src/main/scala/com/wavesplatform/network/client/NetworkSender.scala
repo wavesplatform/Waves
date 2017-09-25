@@ -1,8 +1,7 @@
-package com.wavesplatform.it.util
+package com.wavesplatform.network.client
 
 import java.net.InetSocketAddress
 
-import com.wavesplatform.network.client.NetworkClient
 import com.wavesplatform.network.RawBytes
 import io.netty.channel.Channel
 import io.netty.channel.group.DefaultChannelGroup

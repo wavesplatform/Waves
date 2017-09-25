@@ -3,7 +3,7 @@ package com.wavesplatform.history
 import java.io.File
 import java.util.concurrent.locks.{ReentrantReadWriteLock => RWL}
 
-import com.wavesplatform.settings.BlockchainSettings
+import com.wavesplatform.settings.{BlockchainSettings, FeaturesSettings}
 import com.wavesplatform.state2.reader.StateReader
 import com.wavesplatform.state2.{BlockchainUpdaterImpl, StateStorage, StateWriterImpl}
 import scorex.transaction._
@@ -20,11 +20,11 @@ object StorageFactory {
       }
     }
 
-  def apply(settings: BlockchainSettings): Try[(NgHistory with DebugNgHistory with AutoCloseable, AutoCloseable, StateReader, BlockchainUpdater, BlockchainDebugInfo)] = {
+  def apply(settings: BlockchainSettings, featuresSettings: FeaturesSettings): Try[(NgHistory with DebugNgHistory with AutoCloseable, AutoCloseable, StateReader, BlockchainUpdater, BlockchainDebugInfo)] = {
     val lock = new RWL(true)
 
     for {
-      historyWriter <- HistoryWriterImpl(settings.blockchainFile, lock, settings.functionalitySettings)
+      historyWriter <- HistoryWriterImpl(settings.blockchainFile, lock, settings.functionalitySettings, featuresSettings)
       ss <- createStateStorage(historyWriter, settings.stateFile)
       stateWriter = new StateWriterImpl(ss, lock)
     } yield {
