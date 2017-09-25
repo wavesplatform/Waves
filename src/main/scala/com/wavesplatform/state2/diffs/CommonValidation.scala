@@ -63,16 +63,6 @@ object CommonValidation {
 
   def disallowBeforeActivationTime[T <: Transaction](settings: FunctionalitySettings, tx: T): Either[ValidationError, T] =
     tx match {
-      case tx: BurnTransaction if tx.timestamp <= settings.allowBurnTransactionAfter =>
-        Left(GenericError(s"must not appear before time=${settings.allowBurnTransactionAfter}"))
-      case tx: LeaseTransaction if tx.timestamp <= settings.allowLeaseTransactionAfter =>
-        Left(GenericError(s"must not appear before time=${settings.allowLeaseTransactionAfter}"))
-      case tx: LeaseCancelTransaction if tx.timestamp <= settings.allowLeaseTransactionAfter =>
-        Left(GenericError(s"must not appear before time=${settings.allowLeaseTransactionAfter}"))
-      case tx: ExchangeTransaction if tx.timestamp <= settings.allowExchangeTransactionAfter =>
-        Left(GenericError(s"must not appear before time=${settings.allowExchangeTransactionAfter}"))
-      case tx: CreateAliasTransaction if tx.timestamp <= settings.allowCreatealiasTransactionAfter =>
-        Left(GenericError(s"must not appear before time=${settings.allowCreatealiasTransactionAfter}"))
       case _: BurnTransaction => Right(tx)
       case _: PaymentTransaction => Right(tx)
       case _: GenesisTransaction => Right(tx)
