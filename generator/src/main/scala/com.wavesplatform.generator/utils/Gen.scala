@@ -10,7 +10,9 @@ import scorex.transaction.{Transaction, TransactionParser}
 import scala.util.Random
 
 object Gen {
-  def txs(accounts: Seq[PrivateKeyAccount]): Iterator[Transaction] = {
+  def txs(minFee: Long,
+          maxFee: Long,
+          accounts: Seq[PrivateKeyAccount]): Iterator[Transaction] = {
     def random = Random.javaRandomToRandom(ThreadLocalRandom.current)
 
     val senderGen = Iterator.randomContinually(accounts)
@@ -20,8 +22,9 @@ object Gen {
       Address.fromPublicKey(pk)
     }
 
-    val maxFee = 100000
-    val feeGen = Iterator.continually(random.nextInt(maxFee) + 1)
+    val feeGen = Iterator.continually {
+      minFee + random.nextLong() % maxFee
+    }
 
     senderGen.zip(recipientGen).zip(feeGen)
       .map {

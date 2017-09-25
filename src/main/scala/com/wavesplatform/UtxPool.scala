@@ -52,6 +52,8 @@ class UtxPool(time: Time,
   private def removeExpired(currentTs: Long): Unit = write { implicit l =>
     def isExpired(tx: Transaction) = (currentTs - tx.timestamp).millis > utxSettings.maxTransactionAge
 
+    log.trace(s"==> utxsize: removeExpired before = ${transactions().size}")
+
     transactions()
       .values
       .view
@@ -60,6 +62,9 @@ class UtxPool(time: Time,
         transactions.transform(_ - tx.id)
         pessimisticPortfolios.mutate(_.remove(tx.id))
       }
+
+    log.trace(s"==> utxsize: removeExpired after = ${transactions().size}")
+    sizeStats.record(transactions().size)
   }
 
   def putIfNew(tx: Transaction): Either[ValidationError, Boolean] = write { implicit l =>
@@ -79,20 +84,30 @@ class UtxPool(time: Time,
               transactions.transform(_.updated(tx.id, tx))
               tx
             }
+
+            res
+              .left.map { x => log.trace(s"Can't add transaction $tx")}
+              .right.map { x => log.trace(s"Added $tx") }
+
             cache.put(tx.id, res)
-            sizeStats.record(transactions().size)
             res.right.map(_ => true)
         })
     })
   }
 
   def removeAll(tx: Traversable[Transaction]): Unit = write { implicit l =>
+    log.trace(s"==> utxsize: removeAll before = ${transactions().size}")
+    sizeStats.record(transactions().size)
+
     removeExpired(time.correctedTime())
+
     tx.view.map(_.id).foreach { id =>
       knownTransactions.mutate(_.invalidate(id))
       transactions.transform(_ - id)
       pessimisticPortfolios.mutate(_.remove(id))
     }
+
+    sizeStats.record(0)
   }
 
   def portfolio(addr: Address): Portfolio = read { implicit l =>
@@ -136,6 +151,7 @@ class UtxPool(time: Time,
     pessimisticPortfolios.mutate { p =>
       invalidTxs.foreach(p.remove)
     }
+
     if (sortInBlock)
       reversedValidTxs.sorted(TransactionsOrdering.InBlock)
     else reversedValidTxs.reverse
