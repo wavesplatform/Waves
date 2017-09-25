@@ -31,7 +31,9 @@ class MessageCodec(peerDatabase: PeerDatabase) extends MessageToMessageCodec[Raw
 
   override def decode(ctx: ChannelHandlerContext, msg: RawBytes, out: util.List[AnyRef]): Unit = {
     specs(msg.code).deserializeData(msg.data) match {
-      case Success(x) => out.add(x)
+      case Success(x) =>
+        if (msg.code == TransactionMessageSpec.messageCode) log.trace(s"==> Got transaction: $msg")
+        out.add(x)
       case Failure(e) => block(ctx, e)
     }
   }
