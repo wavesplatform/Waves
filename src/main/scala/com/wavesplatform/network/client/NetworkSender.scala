@@ -1,6 +1,7 @@
 package com.wavesplatform.network.client
 
 import java.net.InetSocketAddress
+import java.nio.channels.ClosedChannelException
 
 import com.wavesplatform.network.RawBytes
 import io.netty.channel.Channel
@@ -21,10 +22,14 @@ class NetworkSender(chainId: Char, name: String, nonce: Long) {
   }
 
   def send(channel: Channel, messages: RawBytes*): Future[Seq[Unit]] = {
-    Future.traverse(messages) { msg =>
-      val p = Promise[Unit]
-      channel.writeAndFlush(msg).addListener((_: io.netty.util.concurrent.Future[Void]) => p.success(()))
-      p.future
+    if (channel.isOpen) {
+      Future.traverse(messages) { msg =>
+        val p = Promise[Unit]
+        channel.writeAndFlush(msg).addListener((_: io.netty.util.concurrent.Future[Void]) => p.success(()))
+        p.future
+      }
+    } else {
+      Future.failed(new ClosedChannelException)
     }
   }
 

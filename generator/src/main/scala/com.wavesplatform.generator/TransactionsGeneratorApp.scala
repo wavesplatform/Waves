@@ -1,15 +1,12 @@
 package com.wavesplatform.generator
 
-import java.net.InetSocketAddress
-import java.util.concurrent.{Executors, ThreadLocalRandom}
+import java.util.concurrent.Executors
 
 import cats.implicits.showInterpolator
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.generator.cli.ScoptImplicits
 import com.wavesplatform.generator.config.FicusImplicits
-import com.wavesplatform.network.RawBytes
 import com.wavesplatform.network.client.NetworkSender
-import io.netty.channel.Channel
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 import net.ceedubs.ficus.readers.{EnumerationReader, NameMapper}
@@ -20,7 +17,7 @@ import scorex.utils.LoggerFacade
 
 import scala.concurrent._
 import scala.concurrent.duration._
-import scala.util.{Failure, Success}
+import scala.util.{Failure, Random, Success}
 
 object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplicits with EnumerationReader {
 
@@ -31,10 +28,13 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
   val parser = new OptionParser[GeneratorSettings]("generator") {
     head("TransactionsGenerator - Waves load testing transactions generator")
     opt[Int]('i', "iterations").valueName("<iterations>").text("number of iterations").action { (v, c) =>
-      c.copy(iterations = v)
+      c.copy(worker = c.worker.copy(iterations = v))
     }
     opt[FiniteDuration]('d', "delay").valueName("<delay>").text("delay between iterations").action { (v, c) =>
-      c.copy(delay = v)
+      c.copy(worker = c.worker.copy(delay = v))
+    }
+    opt[Boolean]('r', "auto-reconnect").valueName("<true|false>").text("reconnect on errors").action { (v, c) =>
+      c.copy(worker = c.worker.copy(autoReconnect = v))
     }
     help("help").text("display this help message")
 
@@ -91,65 +91,30 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
       val threadPool = Executors.newFixedThreadPool(Math.max(1, finalConfig.sendTo.size))
       implicit val ec: ExecutionContextExecutor = ExecutionContext.fromExecutor(threadPool)
 
+      val sender = new NetworkSender(finalConfig.addressScheme, "generator", nonce = Random.nextLong())
+      sys.addShutdownHook(sender.close())
+
       val workers = finalConfig.sendTo.map { node =>
-        generateAndSend(node, finalConfig.addressScheme, finalConfig.iterations, finalConfig.delay, generator)
+        new Worker(finalConfig.worker, sender, node, generator)
       }
 
-      Future.sequence(workers).onComplete { _ =>
-        log.info("Done all")
+      def close(status: Int): Unit = {
+        sender.close()
         threadPool.shutdown()
-      }
-  }
-
-  private def generateAndSend(node: InetSocketAddress,
-                              chainId: Char,
-                              iterations: Int,
-                              delay: FiniteDuration,
-                              generator: TransactionGenerator)
-                             (implicit ec: ExecutionContext): Future[Unit] = {
-    val nonce = ThreadLocalRandom.current.nextLong()
-    val sender = new NetworkSender(chainId, "generator", nonce)
-    sys.addShutdownHook(sender.close())
-
-    def sendTransactions(channel: Channel): Future[Unit] = {
-      def loop(step: Int): Future[Unit] = {
-        log.info(s"[$node] Iteration $step")
-        val messages: Seq[RawBytes] = generator.next.map(tx => RawBytes(25.toByte, tx.bytes)).toSeq
-
-        sender
-          .send(channel, messages: _*)
-          .andThen {
-            case Success(_) => log.info(s"[$node] Transactions had been sent")
-            case Failure(e) => log.error(s"[$node] An error during sending transations", e)
-          }
-          .map { _ =>
-            blocking {
-              if (step != iterations) {
-                log.info(s"[$node] Sleeping for $delay")
-                Thread.sleep(delay.toMillis)
-              }
-            }
-          }
-          .flatMap { _ =>
-            if (step < iterations) loop(step + 1) else {
-              log.info(s"[$node] Done")
-              Future.successful(())
-            }
-          }
+        System.exit(status)
       }
 
-      loop(1)
-    }
+      Future
+        .sequence(workers.map(_.run()))
+        .onComplete {
+          case Success(_) =>
+            log.info("Done")
+            close(0)
 
-    sender
-      .connect(node)
-      .flatMap(sendTransactions)
-      .recover {
-        case e => log.error(s"[$node] Failed to send transactions", e)
-      }
-      .andThen {
-        case _ => sender.close()
-      }
+          case Failure(e) =>
+            log.error("Failed", e)
+            close(1)
+        }
   }
 
 }

@@ -7,13 +7,10 @@ import cats.implicits.showInterpolator
 import scorex.account.PrivateKeyAccount
 import scorex.crypto.encode.Base58
 
-import scala.concurrent.duration.FiniteDuration
-
 case class GeneratorSettings(chainId: String,
                              accounts: Seq[String],
                              sendTo: Seq[InetSocketAddress],
-                             iterations: Int,
-                             delay: FiniteDuration,
+                             worker: Worker.Settings,
                              mode: Mode.Value,
                              narrow: NarrowTransactionGenerator.Settings,
                              wide: WideTransactionGenerator.Settings,
@@ -37,8 +34,8 @@ object GeneratorSettings {
        |  ${accounts.mkString("\n  ")}
        |recipient nodes:
        |  ${sendTo.mkString("\n  ")}
-       |number of iterations: $iterations
-       |delay between iterations: $delay
+       |worker:
+       |  ${show"$worker".split('\n').mkString("\n  ")}
        |mode: $mode
        |$mode settings:
        |  ${modeSettings.split('\n').mkString("\n  ")}""".stripMargin

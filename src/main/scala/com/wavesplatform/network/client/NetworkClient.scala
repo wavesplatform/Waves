@@ -20,9 +20,7 @@ class NetworkClient(chainId: Char,
                     nonce: Long,
                     allChannels: ChannelGroup) extends ScorexLogging {
 
-  private val bossGroup = new NioEventLoopGroup()
   private val workerGroup = new NioEventLoopGroup()
-
   private val handshake = Handshake(Constants.ApplicationName + chainId, Version.VersionTuple, nodeName, nonce, None)
 
   def connect(remoteAddress: InetSocketAddress): Future[Channel] = {
@@ -57,6 +55,5 @@ class NetworkClient(chainId: Char,
     log.debug("Closed all channels")
   } finally {
     workerGroup.shutdownGracefully()
-    bossGroup.shutdownGracefully()
   }
 }
