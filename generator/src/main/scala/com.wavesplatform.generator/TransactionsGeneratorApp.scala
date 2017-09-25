@@ -1,7 +1,8 @@
 package com.wavesplatform.generator
 
+import java.io.IOException
 import java.net.InetSocketAddress
-import java.util.concurrent.{Executors, ThreadLocalRandom}
+import java.util.concurrent.Executors
 
 import cats.implicits.showInterpolator
 import com.typesafe.config.ConfigFactory
@@ -20,9 +21,12 @@ import scorex.utils.LoggerFacade
 
 import scala.concurrent._
 import scala.concurrent.duration._
-import scala.util.{Failure, Success}
+import scala.util.control.NonFatal
+import scala.util.{Failure, Random, Success}
 
 object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplicits with EnumerationReader {
+
+  private val DelayBetweenReconnects = 3.seconds
 
   implicit val readConfigInHyphen: NameMapper = net.ceedubs.ficus.readers.namemappers.implicits.hyphenCase // IDEA bug
 
@@ -35,6 +39,9 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
     }
     opt[FiniteDuration]('d', "delay").valueName("<delay>").text("delay between iterations").action { (v, c) =>
       c.copy(delay = v)
+    }
+    opt[Boolean]('r', "auto-reconnect").valueName("<true|false>").text("reconnect on errors").action { (v, c) =>
+      c.copy(autoReconnect = v)
     }
     help("help").text("display this help message")
 
@@ -91,65 +98,105 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
       val threadPool = Executors.newFixedThreadPool(Math.max(1, finalConfig.sendTo.size))
       implicit val ec: ExecutionContextExecutor = ExecutionContext.fromExecutor(threadPool)
 
+      val sender = new NetworkSender(finalConfig.addressScheme, "generator", nonce = Random.nextLong())
+      sys.addShutdownHook(sender.close())
+
       val workers = finalConfig.sendTo.map { node =>
-        generateAndSend(node, finalConfig.addressScheme, finalConfig.iterations, finalConfig.delay, generator)
+        generateAndSend(sender, node, finalConfig, generator)
       }
 
-      Future.sequence(workers).onComplete { _ =>
-        log.info("Done all")
+      def close(status: Int): Unit = {
+        sender.close()
         threadPool.shutdown()
+        System.exit(status)
       }
+
+      Future
+        .sequence(workers)
+        .onComplete {
+          case Success(_) =>
+            log.info("Done")
+            close(0)
+
+          case Failure(e) =>
+            log.error("Failed", e)
+            close(1)
+        }
   }
 
-  private def generateAndSend(node: InetSocketAddress,
-                              chainId: Char,
-                              iterations: Int,
-                              delay: FiniteDuration,
+  private def generateAndSend(sender: NetworkSender,
+                              node: InetSocketAddress,
+                              settings: GeneratorSettings,
                               generator: TransactionGenerator)
                              (implicit ec: ExecutionContext): Future[Unit] = {
-    val nonce = ThreadLocalRandom.current.nextLong()
-    val sender = new NetworkSender(chainId, "generator", nonce)
-    sys.addShutdownHook(sender.close())
+    import cats.data._
+    import cats.implicits._
 
-    def sendTransactions(channel: Channel): Future[Unit] = {
-      def loop(step: Int): Future[Unit] = {
+    type Result[T] = EitherT[Future, (Int, Throwable), T]
+
+    def sendTransactions(startStep: Int, channel: Channel): Result[Unit] = {
+      def loop(step: Int): Result[Unit] = {
         log.info(s"[$node] Iteration $step")
         val messages: Seq[RawBytes] = generator.next.map(tx => RawBytes(25.toByte, tx.bytes)).toSeq
 
-        sender
-          .send(channel, messages: _*)
-          .andThen {
-            case Success(_) => log.info(s"[$node] Transactions had been sent")
-            case Failure(e) => log.error(s"[$node] An error during sending transations", e)
-          }
-          .map { _ =>
+        def trySend: Result[Unit] = EitherT {
+          sender
+            .send(channel, messages: _*)
+            .map { _ => Right(()) }
+            .recover {
+              case NonFatal(e) => Left(step -> e)
+            }
+        }
+
+        def next: Result[Unit] = {
+          log.info(s"[$node] Transactions had been sent")
+          if (step < settings.iterations) {
+            log.info(s"[$node] Sleeping for ${settings.delay}")
             blocking {
-              if (step != iterations) {
-                log.info(s"[$node] Sleeping for $delay")
-                Thread.sleep(delay.toMillis)
-              }
+              Thread.sleep(settings.delay.toMillis)
             }
+            loop(step + 1)
+          } else {
+            log.info(s"[$node] Done")
+            EitherT.right(Future.successful(Right(())))
           }
-          .flatMap { _ =>
-            if (step < iterations) loop(step + 1) else {
-              log.info(s"[$node] Done")
-              Future.successful(())
-            }
-          }
+        }
+
+        trySend.flatMap(_ => next)
       }
 
-      loop(1)
+      loop(startStep)
     }
 
-    sender
-      .connect(node)
-      .flatMap(sendTransactions)
-      .recover {
-        case e => log.error(s"[$node] Failed to send transactions", e)
-      }
-      .andThen {
-        case _ => sender.close()
-      }
+    def tryConnect: Result[Channel] = EitherT {
+      sender
+        .connect(node)
+        .map { x => Right(x) }
+        .recover {
+          case NonFatal(e) => Left(0 -> e)
+        }
+    }
+
+    def guardedSend(startStep: Int): Result[Unit] = {
+      tryConnect
+        .flatMap(sendTransactions(startStep, _))
+        .recoverWith {
+          case (_, e) if !settings.autoReconnect =>
+            log.error("Stopping because autoReconnect is disabled", e)
+            EitherT.left(Future.failed(new IOException(s"Errors during sending transactions to $node", e)))
+
+          case (lastStep, NonFatal(e)) if lastStep < settings.iterations =>
+            log.error(s"[$node] An error during sending transations, reconnect", e)
+            blocking {
+              Thread.sleep(DelayBetweenReconnects.toMillis)
+            }
+            guardedSend(lastStep)
+        }
+    }
+
+    guardedSend(1)
+      .leftMap { _ => () }
+      .merge
   }
 
 }
