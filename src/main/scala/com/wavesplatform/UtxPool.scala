@@ -52,8 +52,6 @@ class UtxPool(time: Time,
   private def removeExpired(currentTs: Long): Unit = write { implicit l =>
     def isExpired(tx: Transaction) = (currentTs - tx.timestamp).millis > utxSettings.maxTransactionAge
 
-    log.trace(s"==> utxsize: removeExpired before = ${transactions().size}")
-
     transactions()
       .values
       .view
@@ -63,7 +61,6 @@ class UtxPool(time: Time,
         pessimisticPortfolios.mutate(_.remove(tx.id))
       }
 
-    log.trace(s"==> utxsize: removeExpired after = ${transactions().size}")
     sizeStats.record(transactions().size)
   }
 
@@ -96,7 +93,6 @@ class UtxPool(time: Time,
   }
 
   def removeAll(tx: Traversable[Transaction]): Unit = write { implicit l =>
-    log.trace(s"==> utxsize: removeAll before = ${transactions().size}")
     sizeStats.record(transactions().size)
 
     removeExpired(time.correctedTime())
