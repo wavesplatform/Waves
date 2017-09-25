@@ -61,13 +61,13 @@ class OrderValidatorSpecification extends WordSpec
   val pairWavesBtc = AssetPair(None, Some(wbtc))
 
   "OrderValidator" should {
-    "allows buy WAVES for BTC without balance for order fee" ignore {
+    "allows buy WAVES for BTC without balance for order fee" in {
       validateNewOrderTest(Portfolio(0, LeaseInfo.empty, Map(
         wbtc -> 10 * Constants.UnitsInWave
       ))) shouldBe an[Right[_, _]]
     }
 
-    "does not allow buy WAVES for BTC when assets number is negative" ignore {
+    "does not allow buy WAVES for BTC when assets number is negative" in {
       validateNewOrderTest(Portfolio(0, LeaseInfo.empty, Map(
         wbtc -> -10 * Constants.UnitsInWave
       ))) shouldBe a[Left[_, _]]
