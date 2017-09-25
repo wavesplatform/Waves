@@ -83,7 +83,7 @@ class CoordinatorHandler(checkpointService: CheckpointService,
 
       case b: Block =>
         BlockStats.received(b, from)
-        CoordinatorHandler.blockReceivingLag.record(System.currentTimeMillis() - b.timestamp)
+        CoordinatorHandler.blockReceivingLag.safeRecord(System.currentTimeMillis() - b.timestamp)
         Signed.validateSignatures(b) match {
           case Left(err) => peerDatabase.blacklistAndClose(ctx.channel(), err.toString)
           case Right(_) => broadcastingScore(ctx.channel(),
