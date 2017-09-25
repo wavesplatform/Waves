@@ -7,8 +7,8 @@ trait FeatureProvider {
 object FeatureProvider {
 
   implicit class FeatureProviderExt(provider: FeatureProvider) {
-    def activated(id: Short): Boolean = {
-      provider.status(id) == FeatureStatus.Activated
+    def activated(feature: BlockchainFeature): Boolean = {
+      provider.status(feature.id) == FeatureStatus.Activated
     }
   }
 

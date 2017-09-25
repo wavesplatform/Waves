@@ -1,6 +1,6 @@
 package scorex.settings
 
-import com.wavesplatform.settings.FunctionalitySettings
+import com.wavesplatform.settings.{FeaturesSettings, FunctionalitySettings}
 
 object TestFunctionalitySettings {
   val Enabled = FunctionalitySettings(
@@ -19,5 +19,8 @@ object TestFunctionalitySettings {
     enableMicroblocksAfterHeight = Long.MaxValue
   )
 
-   val Stub = Enabled.copy(featureCheckBlocksPeriod = 100, blocksForFeatureActivation = 90)
+  val Stub: FunctionalitySettings = Enabled.copy(featureCheckBlocksPeriod = 100, blocksForFeatureActivation = 90)
+
+  val EmptyFeaturesSettings: FeaturesSettings =
+    FeaturesSettings(autoActivate = false, autoShutdownOnUnsupportedFeature = false, List.empty)
 }
