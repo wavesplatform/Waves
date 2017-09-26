@@ -2,6 +2,7 @@ package com.wavesplatform.state2
 
 import scorex.block.Block.BlockId
 import scorex.block.{Block, MicroBlock}
+import scorex.transaction.History.BlockMinerInfo
 import scorex.transaction.{AssetId, DiscardedMicroBlocks, Transaction}
 
 
@@ -54,12 +55,11 @@ case class NgState private(base: Block, diffs: Map[BlockId, (BlockDiff, Long)], 
     }
   }
 
-  def bestLastBlock(maxTimeStamp: Long): Block = {
-    micros.find(micro => diffs(micro.totalResBlockSig)._2 <= maxTimeStamp)
+  def bestLastBlockInfo(maxTimeStamp: Long): BlockMinerInfo = {
+    val blockId = micros.find(micro => diffs(micro.totalResBlockSig)._2 <= maxTimeStamp)
       .map(_.totalResBlockSig)
-      .flatMap(forgeBlock)
-      .map(_._1)
-      .getOrElse(base)
+      .getOrElse(base.uniqueId)
+    BlockMinerInfo(base.consensusData, base.timestamp, blockId)
   }
 }
 
@@ -71,6 +71,7 @@ object NgState {
   implicit class NgStateExt(n: NgState) {
     def +(m: MicroBlock, diff: BlockDiff, timestamp: Long): NgState = NgState(n.base, n.diffs + (m.totalResBlockSig -> ((diff, timestamp))), m +: n.micros)
   }
+
 
 }
 

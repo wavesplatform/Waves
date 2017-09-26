@@ -58,10 +58,10 @@ class NgStateTest extends PropSpec with GeneratorDrivenPropertyChecks with Prope
 
       val ngState = microBlocks.foldLeft((NgState(block, BlockDiff.empty, 0L), 1000)) { case (((ng, thisTime), m)) => (ng + (m, BlockDiff.empty, thisTime), thisTime + 50) }._1
 
-      ngState.bestLastBlock(0).uniqueId shouldBe block.uniqueId
-      ngState.bestLastBlock(1001).uniqueId shouldBe microBlocks.head.totalResBlockSig
-      ngState.bestLastBlock(1051).uniqueId shouldBe microBlocks.tail.head.totalResBlockSig
-      ngState.bestLastBlock(1101).uniqueId shouldBe microBlocks.last.totalResBlockSig
+      ngState.bestLastBlockInfo(0).blockId shouldBe block.uniqueId
+      ngState.bestLastBlockInfo(1001).blockId shouldBe microBlocks.head.totalResBlockSig
+      ngState.bestLastBlockInfo(1051).blockId shouldBe microBlocks.tail.head.totalResBlockSig
+      ngState.bestLastBlockInfo(1101).blockId shouldBe microBlocks.last.totalResBlockSig
 
       NgState(block, BlockDiff.empty, 0L).bestLiquidBlock.uniqueId shouldBe block.uniqueId
     }
