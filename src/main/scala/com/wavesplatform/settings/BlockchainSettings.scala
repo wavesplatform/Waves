@@ -63,8 +63,8 @@ object FunctionalitySettings {
     enableMicroblocksAfterHeight = Long.MaxValue)
 
   val TESTNET = apply(
-    featureCheckBlocksPeriod = 10000,
-    blocksForFeatureActivation = 9000,
+    featureCheckBlocksPeriod = 3000,
+    blocksForFeatureActivation = 2700,
     allowTemporaryNegativeUntil = 1477958400000L,
     allowInvalidPaymentTransactionsByTimestamp = 1477958400000L,
     requireSortedTransactionsAfter = 1477958400000L,
