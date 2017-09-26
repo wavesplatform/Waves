@@ -6,7 +6,7 @@ import com.wavesplatform.features.{FeatureProvider, FeatureStatus}
 import com.wavesplatform.state2._
 import scorex.block.Block.BlockId
 import scorex.block.{Block, MicroBlock}
-import scorex.transaction.History.BlockchainScore
+import scorex.transaction.History.{BlockchainScore, BlockMinerInfo}
 
 class NgHistoryReader(ngState: () => Option[NgState], inner: History with FeatureProvider) extends History with NgHistory with DebugNgHistory with FeatureProvider {
 
@@ -76,8 +76,9 @@ class NgHistoryReader(ngState: () => Option[NgState], inner: History with Featur
   override def microblockIds(): Seq[BlockId] =
     ngState().toSeq.flatMap(ng => ng.micros.map(_.totalResBlockSig))
 
-  override def bestLastBlock(maxTimestamp: Long): Option[Block] = read { implicit l =>
-    ngState().map(_.bestLastBlock(maxTimestamp)).orElse(inner.lastBlock)
+  override def bestLastBlockInfo(maxTimestamp: Long): Option[BlockMinerInfo] = read { implicit l =>
+    ngState().map(_.bestLastBlockInfo(maxTimestamp))
+      .orElse(inner.lastBlock.map(b => BlockMinerInfo(b.consensusData, b.timestamp, b.uniqueId)))
   }
 
   override def status(feature: Short): FeatureStatus = FeatureStatus.Defined
