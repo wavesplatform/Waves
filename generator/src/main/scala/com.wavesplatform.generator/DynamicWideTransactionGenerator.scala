@@ -14,6 +14,8 @@ class DynamicWideTransactionGenerator(settings: Settings,
 
   private val nextTxsNumber = new AtomicReference[Double](settings.start)
 
+  private val limitedRecipientGen = Gen.address(settings.limitDestAccounts)
+
   override def next(): Iterator[Transaction] = {
     val currTxsNumber = nextTxsNumber
       .getAndUpdate { x =>
@@ -21,7 +23,8 @@ class DynamicWideTransactionGenerator(settings: Settings,
         settings.maxTxsPerRequest.foldLeft(newValue)(Math.min(_, _))
       }
       .toInt
-    Gen.txs(settings.minFee, settings.maxFee, accounts).take(currTxsNumber)
+
+    Gen.txs(settings.minFee, settings.maxFee, accounts, limitedRecipientGen).take(currTxsNumber)
   }
 
 }
