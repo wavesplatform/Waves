@@ -1,5 +1,7 @@
 package com.wavesplatform.settings
 
+import com.wavesplatform.mining.Miner
+
 import scala.concurrent.duration.FiniteDuration
 
 case class MinerSettings(
@@ -9,4 +11,7 @@ case class MinerSettings(
     microBlockInterval: FiniteDuration,
     minimalBlockGenerationOffset: FiniteDuration,
     maxTransactionsInKeyBlock: Int,
-    minMicroBlockAge: FiniteDuration)
+    maxTransactionsInMicroBlock: Int,
+    minMicroBlockAge: FiniteDuration) {
+  require(maxTransactionsInMicroBlock < Miner.MaxTransactionsPerMicroblock)
+}
