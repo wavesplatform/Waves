@@ -3,8 +3,6 @@ package scorex.transaction
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 
-import java.io.ByteArrayOutputStream
-
 import com.google.common.primitives.{Bytes, Ints}
 import com.wavesplatform.network.TransactionMessageSpec
 import play.api.libs.json.{JsArray, JsObject, Json}
