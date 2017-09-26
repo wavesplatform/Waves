@@ -56,7 +56,7 @@ case class NgState private(base: Block, diffs: Map[BlockId, (BlockDiff, Long)], 
 
   def bestLastBlock(maxTimeStamp: Long): Block = {
     micros.find(micro => diffs(micro.totalResBlockSig)._2 <= maxTimeStamp)
-      .map(_.uniqueId)
+      .map(_.totalResBlockSig)
       .flatMap(forgeBlock)
       .map(_._1)
       .getOrElse(base)

@@ -39,7 +39,7 @@ class NgStateTest extends PropSpec with GeneratorDrivenPropertyChecks with Prope
       }
     }
   }
-  property("can resolve best last block") {
+  property("can resolve best liquid block") {
 
     forAll(preconditionsAndPayments) { case (genesis, payment, payment2, payment3) =>
       val (block, microBlocks) = chainBaseAndMicro(randomSig, genesis, Seq(Seq(payment), Seq(payment2), Seq(payment3)))
@@ -47,7 +47,23 @@ class NgStateTest extends PropSpec with GeneratorDrivenPropertyChecks with Prope
       microBlocks.foldLeft(NgState(block, BlockDiff.empty, 0L)) { case ((ng, m)) => ng + (m, BlockDiff.empty, 0L) }
         .bestLiquidBlock.uniqueId shouldBe microBlocks.last.totalResBlockSig
 
-      NgState(block, BlockDiff.empty, 0L) .bestLiquidBlock.uniqueId shouldBe block.uniqueId
+      NgState(block, BlockDiff.empty, 0L).bestLiquidBlock.uniqueId shouldBe block.uniqueId
+    }
+  }
+
+  property("can resolve best last block") {
+
+    forAll(preconditionsAndPayments) { case (genesis, payment, payment2, payment3) =>
+      val (block, microBlocks) = chainBaseAndMicro(randomSig, genesis, Seq(Seq(payment), Seq(payment2), Seq(payment3)))
+
+      val ngState = microBlocks.foldLeft((NgState(block, BlockDiff.empty, 0L), 1000)) { case (((ng, thisTime), m)) => (ng + (m, BlockDiff.empty, thisTime), thisTime + 50) }._1
+
+      ngState.bestLastBlock(0).uniqueId shouldBe block.uniqueId
+      ngState.bestLastBlock(1001).uniqueId shouldBe microBlocks.head.totalResBlockSig
+      ngState.bestLastBlock(1051).uniqueId shouldBe microBlocks.tail.head.totalResBlockSig
+      ngState.bestLastBlock(1101).uniqueId shouldBe microBlocks.last.totalResBlockSig
+
+      NgState(block, BlockDiff.empty, 0L).bestLiquidBlock.uniqueId shouldBe block.uniqueId
     }
   }
 }
