@@ -72,28 +72,27 @@ class Miner(
                                    greatGrandParent: Option[Block], balance: Long)(delay: FiniteDuration): Task[Either[String, Block]] = Task {
     // should take last block right at the time of mining since microblocks might have been added
     // the rest doesn't change
-    val parent = history.bestLastBlock(System.currentTimeMillis() - minMicroBlockDurationMills).get
+    val referencedBlockInfo = history.bestLastBlockInfo(System.currentTimeMillis() - minMicroBlockDurationMills).get
     val pc = allChannels.size()
-    lazy val lastBlockKernelData = parent.consensusData
     lazy val currentTime = timeService.correctedTime()
-    lazy val h = calcHit(lastBlockKernelData, account)
-    lazy val t = calcTarget(parent, currentTime, balance)
+    lazy val h = calcHit(referencedBlockInfo.consensus, account)
+    lazy val t = calcTarget(referencedBlockInfo.timestamp, referencedBlockInfo.consensus.baseTarget, currentTime, balance)
     measureSuccessful(blockBuildTimeStats, for {
       _ <- Either.cond(pc >= minerSettings.quorum, (), s"Quorum not available ($pc/${minerSettings.quorum}, not forging block with ${account.address}")
       _ <- Either.cond(h < t, (), s"${System.currentTimeMillis()}: Hit $h was NOT less than target $t, not forging block with ${account.address}")
-      _ = log.debug(s"Forging with ${account.address}, H $h < T $t, balance $balance, prev block ${parent.uniqueId}")
-      _ = log.debug(s"Previous block ID ${parent.uniqueId} at $parentHeight with target ${lastBlockKernelData.baseTarget}")
+      _ = log.debug(s"Forging with ${account.address}, H $h < T $t, balance $balance, prev block ${referencedBlockInfo.blockId}")
+      _ = log.debug(s"Previous block ID ${referencedBlockInfo.blockId} at $parentHeight with target ${referencedBlockInfo.consensus.baseTarget}")
       block <- {
         val avgBlockDelay = blockchainSettings.genesisSettings.averageBlockDelay
-        val btg = calcBaseTarget(avgBlockDelay, parentHeight, parent, greatGrandParent, currentTime)
-        val gs = calcGeneratorSignature(lastBlockKernelData, account)
+        val btg = calcBaseTarget(avgBlockDelay, parentHeight, referencedBlockInfo.consensus.baseTarget, referencedBlockInfo.timestamp, greatGrandParent.map(_.timestamp), currentTime)
+        val gs = calcGeneratorSignature(referencedBlockInfo.consensus, account)
         val consensusData = NxtLikeConsensusBlockData(btg, ByteStr(gs))
         val sortInBlock = history.height() <= blockchainSettings.functionalitySettings.dontRequireSortedTransactionsAfter
         val unconfirmed = utx.packUnconfirmed(minerSettings.maxTransactionsInKeyBlock, sortInBlock)
         val features = settings.featuresSettings.supported
           .filter(featureProvider.status(_) == FeatureStatus.Defined).toSet
         log.debug(s"Adding ${unconfirmed.size} unconfirmed transaction(s) to new block")
-        Block.buildAndSign(version.toByte, currentTime, parent.uniqueId, consensusData, unconfirmed, account, features)
+        Block.buildAndSign(version.toByte, currentTime, referencedBlockInfo.blockId, consensusData, unconfirmed, account, features)
           .left.map(l => l.err)
       }
     } yield block)

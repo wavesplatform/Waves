@@ -177,7 +177,7 @@ object Coordinator extends ScorexLogging with Instrumented {
       parentHeight <- history.heightOf(parent.uniqueId).toRight(s"history does not contain parent ${block.reference}")
       prevBlockData = parent.consensusData
       blockData = block.consensusData
-      cbt = calcBaseTarget(bcs.genesisSettings.averageBlockDelay, parentHeight, parent, history.parent(parent, 2), blockTime)
+      cbt = calcBaseTarget(bcs.genesisSettings.averageBlockDelay, parentHeight, parent.consensusData.baseTarget, parent.timestamp, history.parent(parent, 2).map(_.timestamp), blockTime)
       bbt = blockData.baseTarget
       _ <- Either.cond(cbt == bbt, (), s"declared baseTarget $bbt does not match calculated baseTarget $cbt")
       generator = block.signerData.generator
@@ -191,7 +191,7 @@ object Coordinator extends ScorexLogging with Instrumented {
         (featureProvider.activated(BlockchainFeatures.SmallerMinimalGeneratingBalance) && effectiveBalance >= MinimalEffectiveBalanceForGenerator2), (),
         s"generator's effective balance $effectiveBalance is less that required for generation")
       hit = calcHit(prevBlockData, generator)
-      target = calcTarget(parent, blockTime, effectiveBalance)
+      target = calcTarget(parent.consensusData.baseTarget, parent.timestamp, blockTime, effectiveBalance)
       _ <- Either.cond(hit < target, (), s"calculated hit $hit >= calculated target $target")
     } yield ()).left.map(e => GenericError(s"Block ${block.uniqueId} is invalid: $e"))
   }
