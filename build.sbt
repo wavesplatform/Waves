@@ -93,6 +93,10 @@ dockerfile in docker := {
   }
 }
 
+buildOptions in docker := BuildOptions(
+  removeIntermediateContainers = BuildOptions.Remove.OnSuccess
+)
+
 // packaging settings
 val upstartScript = TaskKey[File]("upstartScript")
 val packageSource = SettingKey[File]("packageSource")
