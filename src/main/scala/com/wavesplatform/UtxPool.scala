@@ -13,10 +13,12 @@ import com.wavesplatform.state2.reader.{CompositeStateReader, StateReader}
 import com.wavesplatform.state2.{ByteStr, Diff, Portfolio}
 import kamon.Kamon
 import kamon.metric.instrument.{Time => KamonTime}
+import org.influxdb.dto.Point
 import scorex.account.Address
 import scorex.consensus.TransactionsOrdering
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction._
+import scorex.utils.Synchronized.ReadLock
 import scorex.utils.{ScorexLogging, Synchronized, Time}
 
 import scala.concurrent.duration._
@@ -42,7 +44,12 @@ class UtxPool(time: Time,
 
   private val pessimisticPortfolios = Synchronized(new PessimisticPortfolios)
 
-  private val sizeStats = Kamon.metrics.histogram("utx-pool-size")
+  private def measureSize()(implicit l: ReadLock): Unit = Metrics.write(
+    Point
+      .measurement("utx-pool-size")
+      .addField("n", transactions().size)
+  )
+
   private val processingTimeStats = Kamon.metrics.histogram(
     "utx-transaction-processing-time",
     KamonTime.Milliseconds
@@ -61,7 +68,7 @@ class UtxPool(time: Time,
         pessimisticPortfolios.mutate(_.remove(tx.id))
       }
 
-    sizeStats.record(transactions().size)
+    measureSize()
   }
 
   def putIfNew(tx: Transaction): Either[ValidationError, Boolean] = write { implicit l =>
@@ -82,10 +89,6 @@ class UtxPool(time: Time,
               tx
             }
 
-            res
-              .left.map { x => log.trace(s"Can't add transaction $tx, $x")}
-              .right.map { x => log.trace(s"Added $x") }
-
             cache.put(tx.id, res)
             res.right.map(_ => true)
         })
@@ -93,17 +96,13 @@ class UtxPool(time: Time,
   }
 
   def removeAll(tx: Traversable[Transaction]): Unit = write { implicit l =>
-    sizeStats.record(transactions().size)
-
-    removeExpired(time.correctedTime())
-
     tx.view.map(_.id).foreach { id =>
       knownTransactions.mutate(_.invalidate(id))
       transactions.transform(_ - id)
       pessimisticPortfolios.mutate(_.remove(id))
     }
 
-    sizeStats.record(-tx.size)
+    removeExpired(time.correctedTime())
   }
 
   def portfolio(addr: Address): Portfolio = read { implicit l =>

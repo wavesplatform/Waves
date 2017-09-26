@@ -55,7 +55,7 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
           c.copy(wide = c.wide.copy(transactions = x))
         },
         opt[Option[Int]]("limit-accounts").abbr("la").optional().text("limit recipients").action { (x, c) =>
-          c.copy(wide = c.wide.copy(limitAccounts = x))
+          c.copy(wide = c.wide.copy(limitDestAccounts = x))
         }
       )
 
@@ -71,6 +71,9 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
         },
         opt[Int]("max").abbr("m").optional().action { (x, c) =>
           c.copy(dynWide = c.dynWide.copy(maxTxsPerRequest = Some(x)))
+        },
+        opt[Option[Int]]("limit-accounts").abbr("la").optional().text("limit recipients").action { (x, c) =>
+          c.copy(dynWide = c.dynWide.copy(limitDestAccounts = x))
         }
       )
   }
