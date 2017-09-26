@@ -103,7 +103,9 @@ class Miner(
   private def generateOneMicroBlockTask(account: PrivateKeyAccount, accumulatedBlock: Block): Task[Either[ValidationError, Option[Block]]] = Task {
     log.trace(s"Generating microblock for $account")
     val pc = allChannels.size()
-    lazy val unconfirmed = measureLog("packing unconfirmed transactions for microblock")(utx.packUnconfirmed(MaxTransactionsPerMicroblock, sortInBlock = false))
+    lazy val unconfirmed = measureLog("packing unconfirmed transactions for microblock") {
+      utx.packUnconfirmed(settings.minerSettings.maxTransactionsInMicroBlock, sortInBlock = false)
+    }
     if (pc < minerSettings.quorum) {
       log.trace(s"Quorum not available ($pc/${minerSettings.quorum}, not forging microblock with ${account.address}")
       Right(None)
@@ -205,8 +207,7 @@ class Miner(
 
 object Miner extends ScorexLogging {
 
-  val MinimalGenerationOffsetMillis: Long = 1001
-  val MaxTransactionsPerMicroblock: Int = 255
+  val MaxTransactionsPerMicroblock: Int = 5000
 
   def calcOffset(timeService: Time, calculatedTimestamp: Long, minimalBlockGenerationOffset: FiniteDuration): FiniteDuration = {
     val calculatedGenerationTimestamp = (Math.ceil(calculatedTimestamp / 1000.0) * 1000).toLong
