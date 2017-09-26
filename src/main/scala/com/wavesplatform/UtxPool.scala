@@ -83,8 +83,8 @@ class UtxPool(time: Time,
             }
 
             res
-              .left.map { x => log.trace(s"Can't add transaction $tx")}
-              .right.map { x => log.trace(s"Added $tx") }
+              .left.map { x => log.trace(s"Can't add transaction $tx, $x")}
+              .right.map { x => log.trace(s"Added $x") }
 
             cache.put(tx.id, res)
             res.right.map(_ => true)
@@ -103,7 +103,7 @@ class UtxPool(time: Time,
       pessimisticPortfolios.mutate(_.remove(id))
     }
 
-    sizeStats.record(0)
+    sizeStats.record(-tx.size)
   }
 
   def portfolio(addr: Address): Portfolio = read { implicit l =>
