@@ -2,7 +2,7 @@ package com.wavesplatform.mining
 
 import java.util.concurrent.atomic.AtomicBoolean
 
-import com.wavesplatform.features.{FeatureProvider, FeatureStatus}
+import com.wavesplatform.features.{BlockchainFeatures, FeatureProvider, FeatureStatus}
 import com.wavesplatform.metrics.BlockStats
 import com.wavesplatform.network._
 import com.wavesplatform.settings.WavesSettings
@@ -158,7 +158,6 @@ class Miner(
     } yield (offset, balance)) match {
       case Right((offset, balance)) =>
         log.debug(s"Next attempt for acc=$account in $offset")
-        val microBlocksEnabled = history.height() > blockchainSettings.functionalitySettings.enableMicroblocksAfterHeight
         val version = if (height <= blockchainSettings.functionalitySettings.blockVersion3After) PlainBlockVersion else NgBlockVersion
         nextBlockGenerationTimes += account.toAddress -> (System.currentTimeMillis() + offset.toMillis)
         generateOneBlockTask(version, account, height, grandParent, balance)(offset).flatMap {
@@ -169,7 +168,7 @@ class Miner(
                 allChannels.broadcast(LocalScoreChanged(score))
                 allChannels.broadcast(BlockForged(block))
                 scheduleMining()
-                if (microBlocksEnabled)
+                if (featureProvider.activationHeight(BlockchainFeatures.NG).exists(history.height > _ + 1))
                   startMicroBlockMining(account, block)
             }
           }

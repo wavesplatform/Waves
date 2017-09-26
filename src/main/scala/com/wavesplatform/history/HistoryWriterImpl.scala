@@ -3,7 +3,7 @@ package com.wavesplatform.history
 import java.io.File
 import java.util.concurrent.locks.ReentrantReadWriteLock
 
-import com.wavesplatform.features.{BlockchainFeatures, FeatureStatus}
+import com.wavesplatform.features.{BlockchainFeatures, FeatureProvider, FeatureStatus}
 import com.wavesplatform.settings.{FeaturesSettings, FunctionalitySettings}
 import com.wavesplatform.state2.{BlockDiff, ByteStr, DataTypes}
 import com.wavesplatform.utils._
@@ -18,7 +18,7 @@ import scala.util.Try
 
 class HistoryWriterImpl private(file: Option[File], val synchronizationToken: ReentrantReadWriteLock,
                                 functionalitySettings: FunctionalitySettings, featuresSettings: FeaturesSettings)
-  extends History with ScorexLogging {
+  extends History with FeatureProvider with ScorexLogging {
 
   import HistoryWriterImpl._
 
@@ -146,6 +146,12 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
 
   override def close(): Unit = db.close()
 
+  override def lastBlockTimestamp(): Option[Long] = this.lastBlock.map(_.timestamp)
+
+  override def lastBlockId(): Option[ByteStr] = this.lastBlock.map(_.signerData.signature)
+
+  override def blockAt(height: Int): Option[Block] = blockBytes(height).map(Block.parseBytes(_).get)
+
   override def status(feature: Short): FeatureStatus = read { implicit lock =>
     val h = height()
     val lastApprovalHeight = h - h % FeatureApprovalBlocksCount
@@ -158,12 +164,7 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
     }.getOrElse(FeatureStatus.Defined)
   }
 
-  override def lastBlockTimestamp(): Option[Long] = this.lastBlock.map(_.timestamp)
-
-  override def lastBlockId(): Option[ByteStr] = this.lastBlock.map(_.signerData.signature)
-
-  override def blockAt(height: Int): Option[Block] = blockBytes(height).map(Block.parseBytes(_).get)
-
+  override def activationHeight(feature: Short): Option[Int] = if (functionalitySettings.preActivatedFeatures.contains(feature)) Some(0) else None
 }
 
 object HistoryWriterImpl extends ScorexLogging {

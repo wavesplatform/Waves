@@ -38,7 +38,6 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
         |        reset-effective-balances-at-height = 15
         |        allow-leased-balance-transfer-until = 17
         |        block-version-3-after = 18
-        |        enable-microblocks-after-height: 19
         |      }
         |      genesis {
         |        timestamp = 1460678400000
@@ -81,7 +80,6 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
     settings.functionalitySettings.resetEffectiveBalancesAtHeight should be(15)
     settings.functionalitySettings.allowLeasedBalanceTransferUntil should be(17)
     settings.functionalitySettings.blockVersion3After should be(18)
-    settings.functionalitySettings.enableMicroblocksAfterHeight should be(19)
     settings.genesisSettings.blockTimestamp should be(1460678400000L)
     settings.genesisSettings.timestamp should be(1460678400000L)
     settings.genesisSettings.signature should be(ByteStr.decodeBase58("BASE58BLKSGNATURE").toOption)

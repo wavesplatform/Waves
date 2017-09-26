@@ -2,13 +2,13 @@ package scorex.transaction
 
 import java.util.concurrent.locks.ReentrantReadWriteLock
 
-import com.wavesplatform.features.FeatureStatus
+import com.wavesplatform.features.{FeatureProvider, FeatureStatus}
 import com.wavesplatform.state2._
 import scorex.block.Block.BlockId
 import scorex.block.{Block, MicroBlock}
 import scorex.transaction.History.BlockchainScore
 
-class NgHistoryReader(ngState: () => Option[NgState], inner: History) extends History with NgHistory with DebugNgHistory {
+class NgHistoryReader(ngState: () => Option[NgState], inner: History with FeatureProvider) extends History with NgHistory with DebugNgHistory with FeatureProvider {
 
   override def synchronizationToken: ReentrantReadWriteLock = inner.synchronizationToken
 
@@ -77,8 +77,10 @@ class NgHistoryReader(ngState: () => Option[NgState], inner: History) extends Hi
     ngState().toSeq.flatMap(ng => ng.micros.map(_.totalResBlockSig))
 
   override def bestLastBlock(maxTimestamp: Long): Option[Block] = read { implicit l =>
-      ngState().map(_.bestLastBlock(maxTimestamp)).orElse(inner.lastBlock)
+    ngState().map(_.bestLastBlock(maxTimestamp)).orElse(inner.lastBlock)
   }
 
   override def status(feature: Short): FeatureStatus = FeatureStatus.Defined
+
+  override def activationHeight(feature: Short): Option[Int] = inner.activationHeight(feature)
 }

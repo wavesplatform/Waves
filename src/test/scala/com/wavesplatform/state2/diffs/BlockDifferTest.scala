@@ -47,9 +47,7 @@ class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen {
       |10 |10   |B       |0          |40         |+10        |40+10=50   | <- 2nd check
        */
       "height < enableMicroblocksAfterHeight - a miner should receive 100% of the current block's fee" in {
-        val fs = TestFunctionalitySettings.Enabled.copy(
-          enableMicroblocksAfterHeight = 1000
-        )
+        val fs = TestFunctionalitySettings.Enabled
 
         assertDiff(testChain.init, fs) { case (diff, s) =>
           diff.snapshots(signerA)(9).balance shouldBe 40
@@ -78,8 +76,10 @@ class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen {
       |10 |10   |B       |0          |40         |+4         |40+4=44    | <- check
        */
       "height = enableMicroblocksAfterHeight - a miner should receive 40% of the current block's fee only" in {
+        ???
+
         val fs = TestFunctionalitySettings.Enabled.copy(
-          enableMicroblocksAfterHeight = 9
+//          enableMicroblocksAfterHeight = 9
         )
 
         assertDiff(testChain, fs) { case (diff, s) =>
@@ -104,8 +104,10 @@ class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen {
       |10 |10   |B       |0          |34         |+4+6=10    |40+10=50   | <- 2nd check
        */
       "height > enableMicroblocksAfterHeight - a miner should receive 60% of previous block's fee and 40% of the current one" in {
+        ???
+
         val fs = TestFunctionalitySettings.Enabled.copy(
-          enableMicroblocksAfterHeight = 4
+//          enableMicroblocksAfterHeight = 4
         )
 
         assertDiff(testChain.init, fs) { case (diff, s) =>

@@ -1,5 +1,6 @@
 package com.wavesplatform
 
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.settings.{BlockchainSettings, FeaturesSettings}
 import com.wavesplatform.state2._
 import scorex.account.PrivateKeyAccount
@@ -21,15 +22,15 @@ package object history {
     genesisSettings = null)
 
   val ApplyMinerFeeWithTransactionSettings: BlockchainSettings = DefaultBlockchainSettings.copy(
-    functionalitySettings = DefaultBlockchainSettings.functionalitySettings.copy(enableMicroblocksAfterHeight = 0))
+    functionalitySettings = DefaultBlockchainSettings.functionalitySettings.copy(preActivatedFeatures = Set(BlockchainFeatures.NG.id)))
 
   val ApplyMinerFeeBeforeAllTransactionsSettings: BlockchainSettings = DefaultBlockchainSettings.copy(
-    functionalitySettings = DefaultBlockchainSettings.functionalitySettings.copy(enableMicroblocksAfterHeight = Long.MaxValue))
+    functionalitySettings = DefaultBlockchainSettings.functionalitySettings.copy(preActivatedFeatures = Set.empty))
 
   val EmptyFeaturesSettings = FeaturesSettings(autoActivate = false, autoShutdownOnUnsupportedFeature = false, List.empty)
 
   def domain(bs: BlockchainSettings, featuresSettings: FeaturesSettings): Domain = {
-    val (history, _, stateReader, blockchainUpdater, _) = StorageFactory(bs, featuresSettings).get
+    val (history, _, _, stateReader, blockchainUpdater, _) = StorageFactory(bs, featuresSettings).get
     Domain(history, stateReader, blockchainUpdater)
   }
 
