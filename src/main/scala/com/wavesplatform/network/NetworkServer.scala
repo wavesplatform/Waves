@@ -202,7 +202,7 @@ class NetworkServer(checkpointService: CheckpointService,
                 log.info(reason)
                 allChannels.remove(closeFuture.channel())
                 outgoingChannels.remove(remoteAddress, closeFuture.channel())
-                if (!shutdownInitiated) peerDatabase.blacklist(remoteAddress.getAddress, reason)
+                if (!shutdownInitiated) peerDatabase.suspend(remoteAddress.getAddress)
               }
               allChannels.add(connFuture.channel())
             }
