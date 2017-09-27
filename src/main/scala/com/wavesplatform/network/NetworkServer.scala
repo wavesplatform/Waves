@@ -104,7 +104,7 @@ class NetworkServer(checkpointService: CheckpointService,
       .childHandler(new PipelineInitializer[SocketChannel](Seq(
         inboundConnectionFilter,
         writeErrorHandler,
-        new HandshakeDecoder,
+        new HandshakeDecoder(peerDatabase),
         new HandshakeTimeoutHandler(settings.networkSettings.handshakeTimeout),
         serverHandshakeHandler,
         lengthFieldPrepender,
@@ -143,7 +143,7 @@ class NetworkServer(checkpointService: CheckpointService,
     .channel(classOf[NioSocketChannel])
     .handler(new PipelineInitializer[SocketChannel](Seq(
       writeErrorHandler,
-      new HandshakeDecoder,
+      new HandshakeDecoder(peerDatabase),
       new HandshakeTimeoutHandler(settings.networkSettings.handshakeTimeout),
       clientHandshakeHandler,
       lengthFieldPrepender,
