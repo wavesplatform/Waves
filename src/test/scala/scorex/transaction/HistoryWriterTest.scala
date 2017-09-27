@@ -5,7 +5,10 @@ import java.util.concurrent.locks.ReentrantReadWriteLock
 import com.wavesplatform.features.FeatureStatus
 import com.wavesplatform.history.HistoryWriterImpl
 import com.wavesplatform.settings.FeaturesSettings
+import com.wavesplatform.state2
 import com.wavesplatform.state2._
+import com.wavesplatform.state2.diffs.BlockDiffer
+import com.wavesplatform.state2.reader.StateReader
 import org.scalatest.{FunSuite, Matchers}
 import scorex.lagonaki.mocks.TestBlock
 import scorex.settings.TestFunctionalitySettings
@@ -84,7 +87,38 @@ class HistoryWriterTest extends FunSuite with Matchers with HistoryTest {
     history.status(3) shouldBe FeatureStatus.Defined
   }
 
-  test("features rollback with block rollback") {
+  test("last block should affect feature voting the same way either liquid or saved to history") {
+    val history = HistoryWriterImpl(None, new ReentrantReadWriteLock(), TestFunctionalitySettings.Enabled,
+      FeaturesSettingsWithAutoActivation).get
+
+    appendGenesisBlock(history)
+
+    history.status(1) shouldBe FeatureStatus.Defined
+    history.status(2) shouldBe FeatureStatus.Defined
+
+    (1 until ApprovalPeriod - 1).foreach { _ =>
+      appendTestBlock3(history, Set(1))
+    }
+
+    history.height() shouldBe ApprovalPeriod - 1
+
+    //one block before feature check
+    history.status(1) shouldBe FeatureStatus.Defined
+    history.status(2) shouldBe FeatureStatus.Defined
+
+    val nextBlock = getNextTestBlock(history)
+
+    //last ng block
+    history.status(1, Option(NgState(nextBlock, BlockDiff.empty, 0L))) shouldBe FeatureStatus.Accepted
+    history.status(2, Option(NgState(nextBlock, BlockDiff.empty, 0L))) shouldBe FeatureStatus.Defined
+
+    //last solid block
+    history.appendBlock(nextBlock)(Right(BlockDiff.empty))
+    history.status(1) shouldBe FeatureStatus.Accepted
+    history.status(2) shouldBe FeatureStatus.Defined
+  }
+
+    test("features rollback with block rollback") {
     val history = HistoryWriterImpl(None, new ReentrantReadWriteLock(), TestFunctionalitySettings.Enabled,
       FeaturesSettingsWithAutoActivation).get
 
@@ -128,7 +162,29 @@ class HistoryWriterTest extends FunSuite with Matchers with HistoryTest {
     history.status(2) shouldBe FeatureStatus.Defined
   }
 
-  test("feature activated only by 90% of blocks") {
+  test("feature activation height") {
+    val history = HistoryWriterImpl(None, new ReentrantReadWriteLock(), TestFunctionalitySettings.Enabled,
+      FeaturesSettingsWithAutoActivation).get
+
+    appendGenesisBlock(history)
+    history.status(1) shouldBe FeatureStatus.Defined
+
+    history.activationHeight(1) shouldBe None
+
+    (1 until ApprovalPeriod).foreach { _ =>
+      appendTestBlock3(history, Set(1))
+    }
+
+    history.activationHeight(1) shouldBe Some(ApprovalPeriod * 2)
+
+    (1 to ApprovalPeriod).foreach { _ =>
+      appendTestBlock3(history, Set(1))
+    }
+
+    history.activationHeight(1) shouldBe Some(ApprovalPeriod * 2)
+  }
+
+    test("feature activated only by 90% of blocks") {
     val history = HistoryWriterImpl(None, new ReentrantReadWriteLock(), TestFunctionalitySettings.Enabled,
       FeaturesSettingsWithAutoActivation).get
 

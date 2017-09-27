@@ -5,8 +5,10 @@ import java.util.concurrent.locks.ReentrantReadWriteLock
 
 import com.wavesplatform.features.{BlockchainFeatures, FeatureStatus}
 import com.wavesplatform.settings.{FeaturesSettings, FunctionalitySettings}
-import com.wavesplatform.state2.{BlockDiff, ByteStr, DataTypes}
+import com.wavesplatform.state2.{BlockDiff, ByteStr, DataTypes, NgState}
 import com.wavesplatform.utils._
+
+import scala.collection.JavaConverters._
 import kamon.Kamon
 import scorex.block.Block
 import scorex.transaction.History.BlockchainScore
@@ -23,7 +25,7 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
   import HistoryWriterImpl._
 
   private val FeatureApprovalBlocksCount = functionalitySettings.featureCheckBlocksPeriod
-  private val MinBlocksCountToActivateFeature = functionalitySettings.blocksForFeatureActivation
+  private val MinVotesCountToActivateFeature = functionalitySettings.blocksForFeatureActivation
 
   private val db = createMVStore(file)
   private val blockBodyByHeight = Synchronized(db.openMap("blocks", new LogMVMapBuilder[Int, Array[Byte]]))
@@ -31,7 +33,7 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
   private val heightByBlockId = Synchronized(db.openMap("signaturesReverse", new LogMVMapBuilder[ByteStr, Int].keyType(DataTypes.byteStr)))
   private val scoreByHeight = Synchronized(db.openMap("score", new LogMVMapBuilder[Int, BigInt]))
   private val featuresAtHeight = Synchronized(db.openMap("features-at-height", new LogMVMapBuilder[Int, Set[Short]].valueType(DataTypes.featureIds)))
-  private val featuresState = Synchronized(db.openMap("features-state", new LogMVMapBuilder[Int, Map[Short, Byte]].valueType(DataTypes.featureState)))
+  private val featuresState = Synchronized(db.openMap("features-state", new LogMVMapBuilder[Short, Int]))
 
   private[HistoryWriterImpl] def isConsistent: Boolean = read { implicit l =>
     // check if all maps have same size
@@ -40,29 +42,35 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
 
   private def displayFeatures(s: Set[Short]): String = s"FEATURE${if (s.size > 1) "S"} ${s.mkString(", ")} ${if (s.size > 1) "WERE" else "WAS"}"
 
+  private def featureVotesCountInActivationWindow(windowClosingHeight: Int, ngState: Option[NgState] = None): Map[Short, Int] = read { implicit lock =>
+    (Math.max(1, windowClosingHeight - FeatureApprovalBlocksCount + 1 + ngState.size) to windowClosingHeight)
+      .flatMap(featuresAtHeight().get(_))
+      .foldLeft(ngState.map(ng => ng.base.supportedFeaturesIds.map(_ -> 1).toMap).getOrElse(Map.empty[Short, Int])) { (counts, feature) =>
+        counts.updated(feature, counts.getOrElse(feature, 0) + 1)
+      }
+  }
+
+  private def acceptedFeaturesInActivationWindow(windowClosingHeight: Int, ngState: Option[NgState] = None): Set[Short] = {
+    featureVotesCountInActivationWindow(windowClosingHeight, ngState)
+      .filter(p => p._2 >= MinVotesCountToActivateFeature)
+      .keySet
+  }
+
   private def updateFeaturesState(height: Int): Unit = write { implicit lock =>
     require(height % FeatureApprovalBlocksCount == 0, s"Features' state can't be updated at given height: $height")
 
-    val acceptedFeatures = (Math.max(1, height - FeatureApprovalBlocksCount + 1) to height)
-      .flatMap(h => featuresAtHeight().get(h))
-      .foldLeft(Map.empty[Short, Int]) { (counts, feature) =>
-        counts.updated(feature, counts.getOrElse(feature, 0) + 1)
-      }.filter(p => p._2 >= MinBlocksCountToActivateFeature)
-      .keys.map(k => k -> FeatureStatus.Accepted.status).toMap
+    val acceptedFeatures = acceptedFeaturesInActivationWindow(height)
 
-    val unimplementedAccepted = acceptedFeatures.keySet.diff(BlockchainFeatures.implemented)
+    val unimplementedAccepted = acceptedFeatures.diff(BlockchainFeatures.implemented)
     if (unimplementedAccepted.nonEmpty) {
       log.warn(s"UNIMPLEMENTED ${displayFeatures(unimplementedAccepted)} ACCEPTED ON BLOCKCHAIN")
       log.warn("PLEASE, UPDATE THE NODE AS SOON AS POSSIBLE")
       log.warn("OTHERWISE THE NODE WILL BE STOPPED OR FORKED UPON FEATURE ACTIVATION")
     }
 
-    val previousApprovalHeight = Math.max(FeatureApprovalBlocksCount, height - FeatureApprovalBlocksCount)
-    val activatedFeatures: Map[Short, Byte] = Option(featuresState().get(previousApprovalHeight))
-      .getOrElse(Map.empty[Short, Byte])
-      .mapValues(v => if (v == FeatureStatus.Accepted.status) FeatureStatus.Activated.status else v)
+    val activatedFeatures = featuresState().entrySet().asScala.filter(_.getValue <= height - FeatureApprovalBlocksCount).map(_.getKey).toSet
 
-    val unimplementedActivated = activatedFeatures.keySet.diff(BlockchainFeatures.implemented)
+    val unimplementedActivated = activatedFeatures.diff(BlockchainFeatures.implemented)
     if (unimplementedActivated.nonEmpty) {
       log.error(s"UNIMPLEMENTED ${displayFeatures(unimplementedActivated)} ACTIVATED ON BLOCKCHAIN")
       log.error("PLEASE, UPDATE THE NODE IMMEDIATELY")
@@ -73,7 +81,7 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
       else log.error("OTHERWISE THE NODE WILL END UP ON A FORK")
     }
 
-    featuresState.mutate(_.put(height, activatedFeatures ++ acceptedFeatures))
+    featuresState.mutate(_.putAll(acceptedFeatures.diff(featuresState().keySet.asScala).map(_ -> height).toMap.asJava))
   }
 
   def appendBlock(block: Block)(consensusValidation: => Either[ValidationError, BlockDiff]): Either[ValidationError, BlockDiff] =
@@ -115,7 +123,8 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
 
     featuresAtHeight.mutate(_.remove(h))
     if (h % FeatureApprovalBlocksCount == 0) {
-      featuresState.mutate(_.remove(h))
+      val featuresToRemove = featuresState().entrySet().asScala.filter(_.getValue == h).map(_.getKey)
+      featuresState.mutate(fs => featuresToRemove.foreach(fs.remove))
     }
 
     val vOpt = Option(blockIdByHeight.mutate(_.remove(h)))
@@ -146,16 +155,28 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
 
   override def close(): Unit = db.close()
 
-  override def status(feature: Short): FeatureStatus = read { implicit lock =>
-    val h = height()
-    val lastApprovalHeight = h - h % FeatureApprovalBlocksCount
-    Option(featuresState().get(lastApprovalHeight)).map { m =>
-      val byte: Byte = m.getOrElse(feature, FeatureStatus.Defined.status)
-      if (featuresSettings.autoActivate || featuresSettings.supported.contains(feature))
-        FeatureStatus(byte)
-      else
-        FeatureStatus.Defined
-    }.getOrElse(FeatureStatus.Defined)
+  override def status(feature: Short): FeatureStatus =
+    status(feature, None)
+
+  override def activationHeight(feature: Short): Option[Int] = read { implicit lock =>
+    Option(featuresState().get(feature)).map(h => h + FeatureApprovalBlocksCount)
+  }
+
+  def status(feature: Short, ngState: Option[NgState]): FeatureStatus = read { implicit lock =>
+    if (!featuresSettings.autoActivate && !featuresSettings.supported.contains(feature))
+      FeatureStatus.Defined
+    else
+      Option(featuresState().get(feature))
+        .map(h => if (h <= height + ngState.size - FeatureApprovalBlocksCount)
+          FeatureStatus.Activated else
+          FeatureStatus.Accepted)
+        .getOrElse {
+          ngState match {
+            case Some(ng) => if(acceptedFeaturesInActivationWindow(height(), Some(ng)).contains(feature))
+              FeatureStatus.Accepted else FeatureStatus.Defined
+            case None => FeatureStatus.Defined
+          }
+        }
   }
 
   override def lastBlockTimestamp(): Option[Long] = this.lastBlock.map(_.timestamp)
@@ -163,7 +184,6 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
   override def lastBlockId(): Option[ByteStr] = this.lastBlock.map(_.signerData.signature)
 
   override def blockAt(height: Int): Option[Block] = blockBytes(height).map(Block.parseBytes(_).get)
-
 }
 
 object HistoryWriterImpl extends ScorexLogging {

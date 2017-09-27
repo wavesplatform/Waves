@@ -105,9 +105,11 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
         }
     }).map { case ((newBlockDiff, discacrded)) =>
       ngState.set(Some(NgState(block, newBlockDiff, 0L)))
+      val height = historyWriter.height() + 1
+//      historyWriter.updateFeaturesState(Map(height -> block.supportedFeaturesIds))
       log.info(
         s"""Block ${block.uniqueId} -> ${trim(block.reference)} appended.
-           | -- New height: ${historyWriter.height() + 1}, transactions: ${block.transactionData.size})""".stripMargin)
+           | -- New height: $height, transactions: ${block.transactionData.size})""".stripMargin)
       discacrded
     }
   }
@@ -127,6 +129,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
           val discardedTransactions = Seq.newBuilder[Transaction]
           discardedTransactions ++= ng.toSeq.flatMap(_.transactions)
           ngState.set(None)
+
           while (historyWriter.height > height)
             discardedTransactions ++= historyWriter.discardBlock()
           if (height < persisted.height) {
