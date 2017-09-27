@@ -42,22 +42,30 @@ case class Handshake(
 }
 
 object Handshake {
+  class InvalidHandshakeException(msg: String) extends IllegalArgumentException(msg)
+
   def decode(in: ByteBuf): Handshake = {
     val appNameSize = in.readByte()
 
-    require(appNameSize >= 0, s"Got an invalid application name's size: $appNameSize")
+    if (appNameSize < 0 || appNameSize > Byte.MaxValue) {
+      throw new InvalidHandshakeException(s"An invalid application name's size: $appNameSize")
+    }
     val appName = in.readSlice(appNameSize).toString(Charsets.UTF_8)
     val appVersion = (in.readInt(), in.readInt(), in.readInt())
 
     val nodeNameSize = in.readByte()
-    require(nodeNameSize >= 0, s"Got an invalid node name's size: $nodeNameSize")
+    if(nodeNameSize < 0 || nodeNameSize > Byte.MaxValue) {
+      throw new InvalidHandshakeException(s"An invalid node name's size: $nodeNameSize")
+    }
     val nodeName = in.readSlice(nodeNameSize).toString(Charsets.UTF_8)
 
     val nonce = in.readLong()
+
     val declaredAddressLength = in.readInt()
     // 0 for no declared address, 8 for ipv4 address + port, 20 for ipv6 address + port
-    require(declaredAddressLength == 0 || declaredAddressLength == 8 || declaredAddressLength == 20,
-      s"invalid declared address length: $declaredAddressLength")
+    if (declaredAddressLength != 0 && declaredAddressLength != 8 && declaredAddressLength != 20) {
+      throw new InvalidHandshakeException(s"An invalid declared address length: $declaredAddressLength")
+    }
     val isa = if (declaredAddressLength == 0) None else {
       val addressBytes = new Array[Byte](declaredAddressLength - Integer.BYTES)
       in.readBytes(addressBytes)
