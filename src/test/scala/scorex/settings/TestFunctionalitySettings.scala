@@ -15,7 +15,7 @@ object TestFunctionalitySettings {
     allowMultipleLeaseCancelTransactionUntilTimestamp = 0L, resetEffectiveBalancesAtHeight = 0,
     allowLeasedBalanceTransferUntil = 0L,
     blockVersion3After = 0L,
-    enableMicroblocksAfterHeight = Long.MaxValue
+    Set.empty
   )
 
   val Stub: FunctionalitySettings = Enabled.copy(featureCheckBlocksPeriod = 100, blocksForFeatureActivation = 90)

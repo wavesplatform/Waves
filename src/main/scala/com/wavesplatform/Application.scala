@@ -44,7 +44,7 @@ import scala.util.Try
 class Application(val actorSystem: ActorSystem, val settings: WavesSettings) extends ScorexLogging {
 
   private val checkpointService = new CheckpointServiceImpl(settings.blockchainSettings.checkpointFile, settings.checkpointsSettings)
-  private val (history, stateWriter, stateReader, blockchainUpdater, blockchainDebugInfo) =
+  private val (history, featureProvider, stateWriter, stateReader, blockchainUpdater, blockchainDebugInfo) =
     StorageFactory(settings.blockchainSettings, settings.featuresSettings).get
   private lazy val upnp = new UPnP(settings.networkSettings.uPnPSettings) // don't initialize unless enabled
   private val wallet: Wallet = Wallet(settings.walletSettings)
@@ -70,10 +70,10 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
     val blockchainReadiness = new AtomicBoolean(false)
 
     val miner = new Miner(allChannels, blockchainReadiness, blockchainUpdater, checkpointService,
-      history, history, stateReader, settings, time, utxStorage, wallet)
+      history, featureProvider, stateReader, settings, time, utxStorage, wallet)
 
     val network = new NetworkServer(checkpointService, blockchainUpdater, time, miner, stateReader, settings,
-      history, utxStorage, peerDatabase, allChannels, establishedConnections, blockchainReadiness, history)
+      history, utxStorage, peerDatabase, allChannels, establishedConnections, blockchainReadiness, featureProvider)
 
     miner.scheduleMining()
 

@@ -25,12 +25,9 @@ case class FunctionalitySettings(featureCheckBlocksPeriod: Int,
                                  resetEffectiveBalancesAtHeight: Long,
                                  allowLeasedBalanceTransferUntil: Long,
                                  blockVersion3After: Long,
-                                 enableMicroblocksAfterHeight: Long) {
-
-  val ng4060switchHeight: Long = enableMicroblocksAfterHeight
+                                 preActivatedFeatures: Set[Short]) {
   val dontRequireSortedTransactionsAfter: Long = blockVersion3After
 
-  require(enableMicroblocksAfterHeight >= blockVersion3After, "BlockVersion=3 must be enabled before processing microblocks")
   require(featureCheckBlocksPeriod > 0, "featureCheckBlocksPeriod must be greater than 0")
   require((blocksForFeatureActivation > 0) && (blocksForFeatureActivation <= featureCheckBlocksPeriod), s"blocksForFeatureActivation must be in range 1 to $featureCheckBlocksPeriod")
 }
@@ -52,7 +49,7 @@ object FunctionalitySettings {
     resetEffectiveBalancesAtHeight = 462000,
     allowLeasedBalanceTransferUntil = Long.MaxValue,
     blockVersion3After = Long.MaxValue,
-    enableMicroblocksAfterHeight = Long.MaxValue)
+    preActivatedFeatures = Set.empty)
 
   val TESTNET = apply(
     featureCheckBlocksPeriod = 3000,
@@ -70,7 +67,7 @@ object FunctionalitySettings {
     resetEffectiveBalancesAtHeight = 51500,
     allowLeasedBalanceTransferUntil = 1495238400000L,
     blockVersion3After = Long.MaxValue,
-    enableMicroblocksAfterHeight = Long.MaxValue)
+    preActivatedFeatures = Set.empty)
 
 
   val configPath = "waves.blockchain.custom.functionality"

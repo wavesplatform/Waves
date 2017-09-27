@@ -3,15 +3,16 @@ package com.wavesplatform.state2.diffs
 import java.util.concurrent.ThreadLocalRandom
 
 import com.wavesplatform.BlockGen
+import com.wavesplatform.features.{BlockchainFeatures, FeatureProvider, FeatureStatus}
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.BlockDiff
-import com.wavesplatform.state2.reader.StateReader
+import com.wavesplatform.state2.reader.{CompositeStateReader, StateReader}
 import org.scalatest.{FreeSpecLike, Matchers}
 import scorex.account.PrivateKeyAccount
 import scorex.block.Block
 import scorex.lagonaki.mocks.TestBlock
 import scorex.settings.TestFunctionalitySettings
-import scorex.transaction.{GenesisTransaction, PaymentTransaction, TransactionParser}
+import scorex.transaction.{GenesisTransaction, PaymentTransaction, TransactionParser, ValidationError}
 
 class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen {
 
@@ -47,16 +48,12 @@ class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen {
       |10 |10   |B       |0          |40         |+10        |40+10=50   | <- 2nd check
        */
       "height < enableMicroblocksAfterHeight - a miner should receive 100% of the current block's fee" in {
-        val fs = TestFunctionalitySettings.Enabled.copy(
-          enableMicroblocksAfterHeight = 1000
-        )
-
-        assertDiff(testChain.init, fs) { case (diff, s) =>
+        assertDiff(testChain.init, TestFunctionalitySettings.Enabled, 1000) { case (diff, s) =>
           diff.snapshots(signerA)(9).balance shouldBe 40
           s.balance(signerA) shouldBe 40
         }
 
-        assertDiff(testChain, fs) { case (diff, s) =>
+        assertDiff(testChain, TestFunctionalitySettings.Enabled, 1000) { case (diff, s) =>
           diff.snapshots(signerB)(10).balance shouldBe 50
           s.balance(signerB) shouldBe 50
         }
@@ -78,11 +75,7 @@ class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen {
       |10 |10   |B       |0          |40         |+4         |40+4=44    | <- check
        */
       "height = enableMicroblocksAfterHeight - a miner should receive 40% of the current block's fee only" in {
-        val fs = TestFunctionalitySettings.Enabled.copy(
-          enableMicroblocksAfterHeight = 9
-        )
-
-        assertDiff(testChain, fs) { case (diff, s) =>
+        assertDiff(testChain, TestFunctionalitySettings.Enabled, 9) { case (diff, s) =>
           diff.snapshots(signerB)(10).balance shouldBe 44
           s.balance(signerB) shouldBe 44
         }
@@ -104,16 +97,12 @@ class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen {
       |10 |10   |B       |0          |34         |+4+6=10    |40+10=50   | <- 2nd check
        */
       "height > enableMicroblocksAfterHeight - a miner should receive 60% of previous block's fee and 40% of the current one" in {
-        val fs = TestFunctionalitySettings.Enabled.copy(
-          enableMicroblocksAfterHeight = 4
-        )
-
-        assertDiff(testChain.init, fs) { case (diff, s) =>
+        assertDiff(testChain.init, TestFunctionalitySettings.Enabled, 4) { case (diff, s) =>
           diff.snapshots(signerA)(9).balance shouldBe 34
           s.balance(signerA) shouldBe 34
         }
 
-        assertDiff(testChain, fs) { case (diff, s) =>
+        assertDiff(testChain, TestFunctionalitySettings.Enabled, 4) { case (diff, s) =>
           diff.snapshots(signerB)(10).balance shouldBe 50
           s.balance(signerB) shouldBe 50
         }
@@ -121,9 +110,43 @@ class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen {
     }
   }
 
-  private def assertDiff(blocks: Seq[Block], fs: FunctionalitySettings)
+  private def assertDiff(blocks: Seq[Block], fs: FunctionalitySettings, ngAtHeight: Int)
                         (assertion: (BlockDiff, StateReader) => Unit): Unit = {
-    assertDiffEiWithPrev(blocks.init, blocks.last, fs)(assertion)
+    val fp = new FeatureProvider {
+      override def activationHeight(feature: Short): Option[Int] = feature match {
+        case BlockchainFeatures.NG.id => Some(ngAtHeight)
+        case _ => None
+      }
+
+      override def status(feature: Short): FeatureStatus = feature match {
+        case BlockchainFeatures.NG.id => FeatureStatus.Activated
+        case _ => FeatureStatus.Defined
+      }
+    }
+    assertDiffEiWithPrev(blocks.init, blocks.last,fp, fs)(assertion)
+  }
+
+  private def assertDiffEiWithPrev(preconditions: Seq[Block], block: Block, fp: FeatureProvider, fs: FunctionalitySettings)(assertion: (BlockDiff, StateReader) => Unit): Unit = {
+    val state = newState()
+
+    val differ: (StateReader, (Option[Block], Block)) => Either[ValidationError, BlockDiff] = {
+      case (s, (prev, b)) => BlockDiffer.fromBlock(fs, fp, s, prev, b)
+    }
+    zipWithPrev(preconditions).foreach { wp =>
+      val preconditionDiff = differ(state, wp).explicitGet()
+      state.applyBlockDiff(preconditionDiff)
+    }
+
+    val totalDiff1 = differ(state, (preconditions.lastOption, block)).explicitGet()
+    state.applyBlockDiff(totalDiff1)
+    assertion(totalDiff1, state)
+
+    val preconditionDiff = BlockDiffer.unsafeDiffMany(fs, fp, newState(), None)(preconditions)
+    val compositeState = new CompositeStateReader(newState(), preconditionDiff)
+    val totalDiff2 = differ(compositeState, (preconditions.lastOption, block)).explicitGet()
+    assertion(totalDiff2, CompositeStateReader.composite(compositeState, () => totalDiff2))
+
+    assert(totalDiff1 == totalDiff2)
   }
 
   private def getTwoMinersBlockChain(from: PrivateKeyAccount,

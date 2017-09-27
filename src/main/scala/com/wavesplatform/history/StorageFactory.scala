@@ -3,6 +3,7 @@ package com.wavesplatform.history
 import java.io.File
 import java.util.concurrent.locks.{ReentrantReadWriteLock => RWL}
 
+import com.wavesplatform.features.FeatureProvider
 import com.wavesplatform.settings.{BlockchainSettings, FeaturesSettings}
 import com.wavesplatform.state2.reader.StateReader
 import com.wavesplatform.state2.{BlockchainUpdaterImpl, StateStorage, StateWriterImpl}
@@ -20,7 +21,7 @@ object StorageFactory {
       }
     }
 
-  def apply(settings: BlockchainSettings, featuresSettings: FeaturesSettings): Try[(NgHistory with DebugNgHistory with AutoCloseable, AutoCloseable, StateReader, BlockchainUpdater, BlockchainDebugInfo)] = {
+  def apply(settings: BlockchainSettings, featuresSettings: FeaturesSettings): Try[(NgHistory with DebugNgHistory with AutoCloseable, FeatureProvider, AutoCloseable, StateReader, BlockchainUpdater, BlockchainDebugInfo)] = {
     val lock = new RWL(true)
 
     for {
@@ -29,7 +30,8 @@ object StorageFactory {
       stateWriter = new StateWriterImpl(ss, lock)
     } yield {
       val bcu = BlockchainUpdaterImpl(stateWriter, historyWriter, settings.functionalitySettings, settings.minimumInMemoryDiffSize, lock)
-      (bcu.historyReader, stateWriter, bcu.bestLiquidState, bcu, bcu)
+      val history: NgHistory with DebugNgHistory with FeatureProvider = bcu.historyReader
+      (history, history,stateWriter, bcu.bestLiquidState, bcu, bcu)
     }
   }
 }
