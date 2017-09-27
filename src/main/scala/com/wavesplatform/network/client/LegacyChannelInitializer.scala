@@ -54,5 +54,5 @@ class LegacyChannelInitializer(handshake: Handshake, promise: Promise[Channel]) 
       new ClientHandshakeHandler(handshake, promise),
       new LengthFieldPrepender(lengthFieldLength),
       new LengthFieldBasedFrameDecoder(maxFieldLength, 0, lengthFieldLength, 0, lengthFieldLength),
-      new LegacyFrameCodec(PeerDatabase.Noop))
+      new LegacyFrameCodec(PeerDatabase.NoOp))
 }

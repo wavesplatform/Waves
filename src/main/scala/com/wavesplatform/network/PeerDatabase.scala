@@ -18,11 +18,17 @@ trait PeerDatabase {
 
   def blacklistedHosts: Set[InetAddress]
 
+  def suspendedHosts: Set[InetAddress]
+
   def randomPeer(excluded: Set[InetSocketAddress]): Option[InetSocketAddress]
 
   def detailedBlacklist: Map[InetAddress, (Long, String)]
 
-  def clearBlacklist() : Unit
+  def detailedSuspended: Map[InetAddress, Long]
+
+  def clearBlacklist(): Unit
+
+  def suspend(host: InetAddress)
 }
 
 object PeerDatabase extends ScorexLogging {
@@ -36,15 +42,28 @@ object PeerDatabase extends ScorexLogging {
     }
   }
 
-  val Noop = new PeerDatabase {
+  val NoOp: PeerDatabase = new PeerDatabase {
     override def addCandidate(socketAddress: InetSocketAddress): Unit = {}
+
     override def touch(socketAddress: InetSocketAddress): Unit = {}
+
     override def blacklist(host: InetAddress, reason: String): Unit = {}
+
     override def knownPeers: Map[InetSocketAddress, Long] = Map.empty
+
     override def blacklistedHosts: Set[InetAddress] = Set.empty
+
     override def randomPeer(excluded: Set[InetSocketAddress]): Option[InetSocketAddress] = None
+
     override def detailedBlacklist: Map[InetAddress, (Long, String)] = Map.empty
+
     override def clearBlacklist(): Unit = ()
+
+    override def suspend(host: InetAddress): Unit = {}
+
+    override def suspendedHosts = Set.empty
+
+    override def detailedSuspended = Map.empty
   }
 
 }

@@ -16,6 +16,7 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Auto
   private val database = createMVStore(settings.file)
   private val peersPersistence = database.openMap("peers", new LogMVMapBuilder[InetSocketAddress, Long])
   private val blacklist = database.openMap("blacklist", new LogMVMapBuilder[InetAddress, Long])
+  private val suspension = database.openMap("suspension", new LogMVMapBuilder[InetAddress, Long])
   private val reasons = database.openMap("reasons", new LogMVMapBuilder[InetAddress, String])
   private val unverifiedPeers = EvictingQueue.create[InetSocketAddress](settings.maxUnverifiedPeers)
 
@@ -56,6 +57,14 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Auto
     }
   }
 
+  override def suspend(address: InetAddress): Unit = {
+    unverifiedPeers.synchronized {
+      unverifiedPeers.removeIf(_.getAddress == address)
+      suspension.put(address, System.currentTimeMillis())
+      database.commit()
+    }
+  }
+
   override def knownPeers: Map[InetSocketAddress, Long] = {
     removeObsoleteRecords(peersPersistence, settings.peersDataResidenceTime.toMillis)
       .asScala.toMap.filterKeys(address => !blacklistedHosts.contains(address.getAddress))
@@ -64,24 +73,30 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Auto
   override def blacklistedHosts: Set[InetAddress] =
     removeObsoleteRecords(blacklist, settings.blackListResidenceTime.toMillis).keySet().asScala.toSet
 
+  override def suspendedHosts: Set[InetAddress] =
+    removeObsoleteRecords(suspension, settings.suspensionResidenceTime.toMillis).keySet().asScala.toSet
+
   override def detailedBlacklist: Map[InetAddress, (Long, String)] =
     removeObsoleteRecords(blacklist, settings.blackListResidenceTime.toMillis)
       .asScala
       .toMap
-      .map { case ((h, t)) => (h -> ((t, Option(reasons.get(h)).getOrElse("")))) }
+      .map { case ((h, t)) => h -> ((t, Option(reasons.get(h)).getOrElse(""))) }
+
+  override def detailedSuspended: Map[InetAddress, Long] =
+    removeObsoleteRecords(suspension, settings.suspensionResidenceTime.toMillis).asScala.toMap
 
   override def randomPeer(excluded: Set[InetSocketAddress]): Option[InetSocketAddress] = unverifiedPeers.synchronized {
-//    log.trace(s"Excluding: $excluded")
-    def excludeAddress(isa: InetSocketAddress) = excluded(isa) || blacklistedHosts(isa.getAddress)
+    //    log.trace(s"Excluding: $excluded")
+    def excludeAddress(isa: InetSocketAddress) = excluded(isa) || blacklistedHosts(isa.getAddress) || suspendedHosts(isa.getAddress)
 
     // excluded only contains local addresses, our declared address, and external declared addresses we already have
     // connection to, so it's safe to filter out all matching candidates
     unverifiedPeers.removeIf(isa => excluded(isa))
-//    log.trace(s"Evicting queue: $unverifiedPeers")
+    //    log.trace(s"Evicting queue: $unverifiedPeers")
     val unverified = Option(unverifiedPeers.peek()).filterNot(excludeAddress)
     val verified = Random.shuffle(knownPeers.keySet.diff(excluded).toSeq).headOption.filterNot(excludeAddress)
 
-//    log.trace(s"Unverified: $unverified; Verified: $verified")
+    //    log.trace(s"Unverified: $unverified; Verified: $verified")
     (unverified, verified) match {
       case (Some(_), v@Some(_)) => if (Random.nextBoolean()) Some(unverifiedPeers.poll()) else v
       case (Some(_), None) => Some(unverifiedPeers.poll())
@@ -102,7 +117,7 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Auto
     map
   }
 
-  def clearBlacklist(): Unit ={
+  def clearBlacklist(): Unit = {
     blacklist.clear()
     reasons.clear()
 
