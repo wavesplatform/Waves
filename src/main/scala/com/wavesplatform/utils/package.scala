@@ -3,12 +3,16 @@ package com.wavesplatform
 import java.io.File
 import java.nio.file.Files
 
+import com.google.common.base.Throwables
+import monix.execution.UncaughtExceptionReporter
 import org.h2.mvstore.MVStore
 import scorex.utils.ScorexLogging
 
 import scala.util.Try
 
 package object utils extends ScorexLogging {
+
+  val UncaughtExceptionsToLogReporter = UncaughtExceptionReporter(exc => log.error(Throwables.getStackTraceAsString(exc)))
 
   def base58Length(byteArrayLength: Int): Int = math.ceil(math.log(256) / math.log(58) * byteArrayLength).toInt
 
@@ -52,7 +56,9 @@ package object utils extends ScorexLogging {
     }
   }
 
-  def forceStopApplication(reason: ApplicationStopReason = Default): Unit = new Thread(() => { System.exit(reason.code) }, "waves-platform-shutdown-thread").start()
+  def forceStopApplication(reason: ApplicationStopReason = Default): Unit = new Thread(() => {
+    System.exit(reason.code)
+  }, "waves-platform-shutdown-thread").start()
 }
 
 

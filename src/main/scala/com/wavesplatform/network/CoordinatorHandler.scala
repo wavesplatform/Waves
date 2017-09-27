@@ -19,6 +19,7 @@ import scorex.transaction._
 import scorex.utils.{ScorexLogging, Time}
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.{Failure, Success}
 
 @Sharable
 class CoordinatorHandler(checkpointService: CheckpointService,
@@ -54,13 +55,15 @@ class CoordinatorHandler(checkpointService: CheckpointService,
                                 failure: => String,
                                 f: => Either[_, BigInt]): Unit = Future {
     log.debug(s"${id(src)} $start")
-    f match {
-      case Right(newLocalScore) =>
-        log.info(s"${id(src)} $success, new local score is $newLocalScore")
-        allChannels.broadcast(LocalScoreChanged(newLocalScore))
-      case Left(e) =>
-        log.warn(s"${id(src)} $failure: $e")
-    }
+    f
+  }.onComplete {
+    case Failure(e) =>
+      log.error(s"${id(src)} Failure: $failure: $e")
+    case Success(Right(newLocalScore)) =>
+      log.info(s"${id(src)} $success, new local score is $newLocalScore")
+      allChannels.broadcast(LocalScoreChanged(newLocalScore))
+    case Success(Left(e)) =>
+      log.warn(s"${id(src)} Left: $failure: $e")
   }
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = {
@@ -95,7 +98,7 @@ class CoordinatorHandler(checkpointService: CheckpointService,
               x
             }.right.map { x =>
               miner.scheduleMining()
-              if(b.transactionData.isEmpty)
+              if (b.transactionData.isEmpty)
                 allChannels.broadcast(BlockForged(b), Some(ctx.channel()))
               x
             }

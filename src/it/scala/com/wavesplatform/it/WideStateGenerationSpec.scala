@@ -19,9 +19,9 @@ class WideStateGenerationSpec(override val nodes: Seq[Node]) extends FreeSpec wi
       _ <- processRequests(generateTransfersToRandomAddresses(requestsCount, b))
 
       height <- traverse(nodes)(_.height).map(_.max)
-      _ <- traverse(nodes)(_.waitForHeight(height + 130))
+      _ <- traverse(nodes)(_.waitForHeight(height + 30))
 
-      blocks <- traverse(nodes)(_.blockAt(height + 110))
+      blocks <- traverse(nodes)(_.blockAt(height + 10))
     } yield blocks.map(_.signature), 10.minutes)
 
     all(targetBlocks) shouldEqual targetBlocks.head
