@@ -134,7 +134,7 @@ class NetworkServer(checkpointService: CheckpointService,
     peerInfo.values().asScala.flatMap(_.declaredAddress)
 
   private val clientHandshakeHandler =
-    new HandshakeHandler.Client(handshake, peerInfo, peerConnections, peerDatabase)
+    new HandshakeHandler.Client(handshake, peerInfo, peerConnections, peerDatabase, allChannels)
 
 
   private val bootstrap = new Bootstrap()
@@ -204,7 +204,6 @@ class NetworkServer(checkpointService: CheckpointService,
                 outgoingChannels.remove(remoteAddress, closeFuture.channel())
                 if (!shutdownInitiated) peerDatabase.suspend(remoteAddress.getAddress)
               }
-              allChannels.add(connFuture.channel())
             }
           }
         }.channel()

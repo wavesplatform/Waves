@@ -35,7 +35,7 @@ class HandshakeTimeoutHandler(handshakeTimeout: FiniteDuration) extends ChannelI
 
   private def cancelTimeout(): Unit = timeout.foreach(_.cancel(true))
 
-  override def channelActive(ctx: ChannelHandlerContext) = {
+  override def channelActive(ctx: ChannelHandlerContext): Unit = {
     log.trace(s"${id(ctx)} Scheduling handshake timeout")
     timeout = Some(ctx.channel().eventLoop().schedule((() => {
       ctx.fireChannelRead(HandshakeTimeoutExpired)
@@ -44,12 +44,12 @@ class HandshakeTimeoutHandler(handshakeTimeout: FiniteDuration) extends ChannelI
     super.channelActive(ctx)
   }
 
-  override def channelInactive(ctx: ChannelHandlerContext) = {
+  override def channelInactive(ctx: ChannelHandlerContext): Unit = {
     cancelTimeout()
     super.channelInactive(ctx)
   }
 
-  override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef) = msg match {
+  override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
     case hs: Handshake =>
       cancelTimeout()
       super.channelRead(ctx, hs)
@@ -62,10 +62,9 @@ abstract class HandshakeHandler(
     localHandshake: Handshake,
     establishedConnections: ConcurrentMap[Channel, PeerInfo],
     peerConnections: ConcurrentMap[PeerKey, Channel],
-    peerDatabase: PeerDatabase) extends ChannelInboundHandlerAdapter with ScorexLogging {
+    peerDatabase: PeerDatabase,
+    allChannels: ChannelGroup) extends ChannelInboundHandlerAdapter with ScorexLogging {
   import HandshakeHandler._
-
-  def connectionNegotiated(ctx: ChannelHandlerContext): Unit
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
     case HandshakeTimeoutExpired =>
@@ -97,6 +96,15 @@ abstract class HandshakeHandler(
       }
     case _ => super.channelRead(ctx, msg)
   }
+
+  protected def connectionNegotiated(ctx: ChannelHandlerContext): Unit = {
+    ctx.channel().closeFuture().addListener((_: ChannelFuture) => allChannels.remove(ctx.channel()))
+    allChannels.add(ctx.channel())
+  }
+
+  protected def sendLocalHandshake(ctx: ChannelHandlerContext): Unit = {
+    ctx.writeAndFlush(localHandshake.encode(ctx.alloc().buffer()))
+  }
 }
 
 object HandshakeHandler extends ScorexLogging {
@@ -123,11 +131,10 @@ object HandshakeHandler extends ScorexLogging {
       peerConnections: ConcurrentMap[PeerKey, Channel],
       peerDatabase: PeerDatabase,
       allChannels: ChannelGroup)
-    extends HandshakeHandler(handshake, establishedConnections, peerConnections, peerDatabase) {
-    override def connectionNegotiated(ctx: ChannelHandlerContext) = {
-      ctx.writeAndFlush(handshake.encode(ctx.alloc().buffer()))
-      ctx.channel().closeFuture().addListener((_: ChannelFuture) => allChannels.remove(ctx.channel()))
-      allChannels.add(ctx.channel())
+    extends HandshakeHandler(handshake, establishedConnections, peerConnections, peerDatabase, allChannels) {
+    override protected def connectionNegotiated(ctx: ChannelHandlerContext): Unit = {
+      sendLocalHandshake(ctx)
+      super.connectionNegotiated(ctx)
     }
   }
 
@@ -136,13 +143,11 @@ object HandshakeHandler extends ScorexLogging {
       handshake: Handshake,
       establishedConnections: ConcurrentMap[Channel, PeerInfo],
       peerConnections: ConcurrentMap[PeerKey, Channel],
-      peerDatabase: PeerDatabase)
-    extends HandshakeHandler(handshake, establishedConnections, peerConnections, peerDatabase) {
-
-    override def connectionNegotiated(ctx: ChannelHandlerContext) = {}
-
-    override def channelActive(ctx: ChannelHandlerContext) = {
-      ctx.writeAndFlush(handshake.encode(ctx.alloc().buffer()))
+      peerDatabase: PeerDatabase,
+      allChannels: ChannelGroup)
+    extends HandshakeHandler(handshake, establishedConnections, peerConnections, peerDatabase, allChannels) {
+    override protected def channelActive(ctx: ChannelHandlerContext): Unit = {
+      sendLocalHandshake(ctx)
       super.channelActive(ctx)
     }
   }
