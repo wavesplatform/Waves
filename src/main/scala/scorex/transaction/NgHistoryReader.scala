@@ -2,7 +2,7 @@ package scorex.transaction
 
 import java.util.concurrent.locks.ReentrantReadWriteLock
 
-import com.wavesplatform.features.FeatureStatus
+import com.wavesplatform.features.BlockchainFeatureStatus
 import com.wavesplatform.history.HistoryWriterImpl
 import com.wavesplatform.state2._
 import scorex.block.Block.BlockId
@@ -81,9 +81,26 @@ class NgHistoryReader(ngState: () => Option[NgState], inner: HistoryWriterImpl) 
     ngState().map(_.bestLastBlock(maxTimestamp)).orElse(inner.lastBlock)
   }
 
-  override def status(feature: Short): FeatureStatus =
-    inner.status(feature, ngState())
+  override def featureStatus(feature: Short): BlockchainFeatureStatus = {
+    val status = inner.featureStatus(feature)
+    if (height() % inner.FeatureApprovalBlocksCount != 0) status
+    else {
+      val ngVote = ngState().map(_.base.supportedFeaturesIds.count(_ == feature)).getOrElse(0)
+      if (inner.featureVotesCountInActivationWindow(height()).getOrElse(feature, 0) + ngVote >= inner.MinVotesCountToActivateFeature)
+        BlockchainFeatureStatus.promote(status) else status
+    }
+  }
 
-  override def activationHeight(feature: Short): Option[Int] =
-    inner.activationHeight(feature)
+  override def featureActivationHeight(feature: Short): Option[Int] =
+    inner.featureActivationHeight(feature).orElse {
+      featureStatus(feature) match {
+        case BlockchainFeatureStatus.Activated => Some(height())
+        case BlockchainFeatureStatus.Accepted => Some(height() + inner.FeatureApprovalBlocksCount)
+        case BlockchainFeatureStatus.Undefined => None
+      }
+    }
+
+  override def isFeatureLocallyActivated(feature: Short): Boolean =
+    inner.isFeatureAllowedByConfig(feature) &&
+      featureStatus(feature) == BlockchainFeatureStatus.Activated
 }

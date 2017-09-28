@@ -188,7 +188,7 @@ object Coordinator extends ScorexLogging with Instrumented {
       effectiveBalance <- generatingBalance(state, fs, generator, parentHeight).toEither.left.map(er => GenericError(er.getMessage))
       _ <- Either.cond(blockTime < fs.minimalGeneratingBalanceAfter ||
         (blockTime >= fs.minimalGeneratingBalanceAfter && effectiveBalance >= MinimalEffectiveBalanceForGenerator1) ||
-        (featureProvider.activated(BlockchainFeatures.SmallerMinimalGeneratingBalance) && effectiveBalance >= MinimalEffectiveBalanceForGenerator2), (),
+        (featureProvider.isFeatureLocallyActivated(BlockchainFeatures.SmallerMinimalGeneratingBalance.id) && effectiveBalance >= MinimalEffectiveBalanceForGenerator2), (),
         s"generator's effective balance $effectiveBalance is less that required for generation")
       hit = calcHit(prevBlockData, generator)
       target = calcTarget(parent, blockTime, effectiveBalance)

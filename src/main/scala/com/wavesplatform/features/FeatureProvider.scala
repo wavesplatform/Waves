@@ -1,16 +1,18 @@
 package com.wavesplatform.features
 
 trait FeatureProvider {
-  def status(feature: Short): FeatureStatus
-  def activationHeight(feature: Short): Option[Int]
+  def featureStatus(feature: Short): BlockchainFeatureStatus
+  def featureActivationHeight(feature: Short): Option[Int]
+  def isFeatureLocallyActivated(feature: Short): Boolean
 }
 
 object FeatureProvider {
-
   implicit class FeatureProviderExt(provider: FeatureProvider) {
     def activated(feature: BlockchainFeature): Boolean = {
-      provider.status(feature.id) == FeatureStatus.Activated
+
+
+
+      provider.featureStatus(feature.id) == BlockchainFeatureStatus.Activated
     }
   }
-
 }

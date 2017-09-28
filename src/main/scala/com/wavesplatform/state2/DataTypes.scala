@@ -163,33 +163,8 @@ object DataTypes {
     }
   }
 
-  // Set[Short]
-  val featureIds: DataType = new DTTemplate {
-    override def compare(a: scala.Any, b: scala.Any): Int = throw new UnsupportedOperationException
-
-    override def read(buff: ByteBuffer): AnyRef = {
-      val n = buff.get()
-      val s = Seq.fill(n) {
-        buff.getShort()
-      }.toSet[Short]
-      s
-    }
-
-    override def getMemory(obj: scala.Any): Int = {
-      val s = obj.asInstanceOf[Set[Short]]
-      1 + s.size * 2
-    }
-
-    override def write(buff: WriteBuffer, obj: scala.Any): Unit = {
-      val s = obj.asInstanceOf[Set[Short]]
-      buff.put(s.size.toByte)
-      for (v <- s) {
-        buff.putShort(v)
-      }
-    }
-  }
-
-  val featureState: DataType = new DTTemplate {
+  //Map[Short,Int]
+  val mapShortInt: DataType = new DTTemplate {
     override def compare(a: scala.Any, b: scala.Any): Int = throw new UnsupportedOperationException
 
     override def read(buff: ByteBuffer): AnyRef = {
@@ -203,16 +178,16 @@ object DataTypes {
     }
 
     override def getMemory(obj: scala.Any): Int = {
-      val m = obj.asInstanceOf[Map[Short, Byte]]
-      5 + m.size * 3
+      val m = obj.asInstanceOf[Map[Short, Int]]
+      5 + m.size * (2 + 4)
     }
 
     override def write(buff: WriteBuffer, obj: scala.Any): Unit = {
-      val m = obj.asInstanceOf[Map[Short, Byte]]
+      val m = obj.asInstanceOf[Map[Short, Int]]
       buff.putVarInt(m.size)
       for (v <- m) {
         buff.putShort(v._1)
-        buff.put(v._2)
+        buff.putInt(v._2)
       }
     }
   }

@@ -69,8 +69,8 @@ object PoSCalc extends ScorexLogging {
                               account: PublicKeyAccount, featureProvider: FeatureProvider): Either[String, Long] = {
     generatingBalance(state, fs, account, height) match {
       case Success(balance) => for {
-        _ <- Either.cond((!featureProvider.activated(BlockchainFeatures.SmallerMinimalGeneratingBalance) && balance >= MinimalEffectiveBalanceForGenerator1) ||
-          (featureProvider.activated(BlockchainFeatures.SmallerMinimalGeneratingBalance) && balance >= MinimalEffectiveBalanceForGenerator2), (),
+        _ <- Either.cond((!featureProvider.isFeatureLocallyActivated(BlockchainFeatures.SmallerMinimalGeneratingBalance.id) && balance >= MinimalEffectiveBalanceForGenerator1) ||
+          (featureProvider.isFeatureLocallyActivated(BlockchainFeatures.SmallerMinimalGeneratingBalance.id) && balance >= MinimalEffectiveBalanceForGenerator2), (),
           s"Balance $balance of ${account.address} is lower than required for generation")
         cData = block.consensusData
         hit = calcHit(cData, account)

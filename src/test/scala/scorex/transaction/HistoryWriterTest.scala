@@ -2,13 +2,10 @@ package scorex.transaction
 
 import java.util.concurrent.locks.ReentrantReadWriteLock
 
-import com.wavesplatform.features.FeatureStatus
+import com.wavesplatform.features.BlockchainFeatureStatus
 import com.wavesplatform.history.HistoryWriterImpl
 import com.wavesplatform.settings.FeaturesSettings
-import com.wavesplatform.state2
 import com.wavesplatform.state2._
-import com.wavesplatform.state2.diffs.BlockDiffer
-import com.wavesplatform.state2.reader.StateReader
 import org.scalatest.{FunSuite, Matchers}
 import scorex.lagonaki.mocks.TestBlock
 import scorex.settings.TestFunctionalitySettings
@@ -55,36 +52,36 @@ class HistoryWriterTest extends FunSuite with Matchers with HistoryTest {
 
     appendGenesisBlock(history)
 
-    history.status(1) shouldBe FeatureStatus.Defined
-    history.status(2) shouldBe FeatureStatus.Defined
-    history.status(3) shouldBe FeatureStatus.Defined
+    history.featureStatus(1) shouldBe BlockchainFeatureStatus.Undefined
+    history.featureStatus(2) shouldBe BlockchainFeatureStatus.Undefined
+    history.featureStatus(3) shouldBe BlockchainFeatureStatus.Undefined
 
     (1 until ApprovalPeriod).foreach { _ =>
       appendTestBlock3(history, Set(1))
     }
 
     history.height() shouldBe ApprovalPeriod
-    history.status(1) shouldBe FeatureStatus.Accepted
-    history.status(2) shouldBe FeatureStatus.Defined
-    history.status(3) shouldBe FeatureStatus.Defined
+    history.featureStatus(1) shouldBe BlockchainFeatureStatus.Accepted
+    history.featureStatus(2) shouldBe BlockchainFeatureStatus.Undefined
+    history.featureStatus(3) shouldBe BlockchainFeatureStatus.Undefined
 
     (1 to ApprovalPeriod).foreach { _ =>
       appendTestBlock3(history, Set(2))
     }
 
     history.height() shouldBe 2 * ApprovalPeriod
-    history.status(1) shouldBe FeatureStatus.Activated
-    history.status(2) shouldBe FeatureStatus.Accepted
-    history.status(3) shouldBe FeatureStatus.Defined
+    history.featureStatus(1) shouldBe BlockchainFeatureStatus.Activated
+    history.featureStatus(2) shouldBe BlockchainFeatureStatus.Accepted
+    history.featureStatus(3) shouldBe BlockchainFeatureStatus.Undefined
 
     (1 to ApprovalPeriod).foreach { _ =>
       appendTestBlock3(history, Set())
     }
 
     history.height() shouldBe 3 * ApprovalPeriod
-    history.status(1) shouldBe FeatureStatus.Activated
-    history.status(2) shouldBe FeatureStatus.Activated
-    history.status(3) shouldBe FeatureStatus.Defined
+    history.featureStatus(1) shouldBe BlockchainFeatureStatus.Activated
+    history.featureStatus(2) shouldBe BlockchainFeatureStatus.Activated
+    history.featureStatus(3) shouldBe BlockchainFeatureStatus.Undefined
   }
 
   test("last block should affect feature voting the same way either liquid or saved to history") {
@@ -93,8 +90,8 @@ class HistoryWriterTest extends FunSuite with Matchers with HistoryTest {
 
     appendGenesisBlock(history)
 
-    history.status(1) shouldBe FeatureStatus.Defined
-    history.status(2) shouldBe FeatureStatus.Defined
+    history.featureStatus(1) shouldBe BlockchainFeatureStatus.Undefined
+    history.featureStatus(2) shouldBe BlockchainFeatureStatus.Undefined
 
     (1 until ApprovalPeriod - 1).foreach { _ =>
       appendTestBlock3(history, Set(1))
@@ -103,19 +100,19 @@ class HistoryWriterTest extends FunSuite with Matchers with HistoryTest {
     history.height() shouldBe ApprovalPeriod - 1
 
     //one block before feature check
-    history.status(1) shouldBe FeatureStatus.Defined
-    history.status(2) shouldBe FeatureStatus.Defined
+    history.featureStatus(1) shouldBe BlockchainFeatureStatus.Undefined
+    history.featureStatus(2) shouldBe BlockchainFeatureStatus.Undefined
 
     val nextBlock = getNextTestBlock(history)
 
     //last ng block
-    history.status(1, Option(NgState(nextBlock, BlockDiff.empty, 0L))) shouldBe FeatureStatus.Accepted
-    history.status(2, Option(NgState(nextBlock, BlockDiff.empty, 0L))) shouldBe FeatureStatus.Defined
+//    history.featureStatus(1, Option(NgState(nextBlock, BlockDiff.empty, 0L))) shouldBe BlockchainFeatureStatus.Accepted
+//    history.featureStatus(2, Option(NgState(nextBlock, BlockDiff.empty, 0L))) shouldBe BlockchainFeatureStatus.Undefined
 
     //last solid block
     history.appendBlock(nextBlock)(Right(BlockDiff.empty))
-    history.status(1) shouldBe FeatureStatus.Accepted
-    history.status(2) shouldBe FeatureStatus.Defined
+    history.featureStatus(1) shouldBe BlockchainFeatureStatus.Accepted
+    history.featureStatus(2) shouldBe BlockchainFeatureStatus.Undefined
   }
 
     test("features rollback with block rollback") {
@@ -124,42 +121,42 @@ class HistoryWriterTest extends FunSuite with Matchers with HistoryTest {
 
     appendGenesisBlock(history)
 
-    history.status(1) shouldBe FeatureStatus.Defined
-    history.status(2) shouldBe FeatureStatus.Defined
+    history.featureStatus(1) shouldBe BlockchainFeatureStatus.Undefined
+    history.featureStatus(2) shouldBe BlockchainFeatureStatus.Undefined
 
     (1 until ApprovalPeriod).foreach { _ =>
       appendTestBlock3(history, Set(1))
     }
 
     history.height() shouldBe ApprovalPeriod
-    history.status(1) shouldBe FeatureStatus.Accepted
-    history.status(2) shouldBe FeatureStatus.Defined
+    history.featureStatus(1) shouldBe BlockchainFeatureStatus.Accepted
+    history.featureStatus(2) shouldBe BlockchainFeatureStatus.Undefined
 
     history.discardBlock()
 
     history.height() shouldBe ApprovalPeriod - 1
-    history.status(1) shouldBe FeatureStatus.Defined
-    history.status(2) shouldBe FeatureStatus.Defined
+    history.featureStatus(1) shouldBe BlockchainFeatureStatus.Undefined
+    history.featureStatus(2) shouldBe BlockchainFeatureStatus.Undefined
 
     (1 to ApprovalPeriod + 1).foreach { _ =>
       appendTestBlock3(history, Set(2))
     }
 
     history.height() shouldBe 2 * ApprovalPeriod
-    history.status(1) shouldBe FeatureStatus.Activated
-    history.status(2) shouldBe FeatureStatus.Accepted
+    history.featureStatus(1) shouldBe BlockchainFeatureStatus.Activated
+    history.featureStatus(2) shouldBe BlockchainFeatureStatus.Accepted
 
     history.discardBlock()
 
     history.height() shouldBe 2 * ApprovalPeriod - 1
-    history.status(1) shouldBe FeatureStatus.Accepted
-    history.status(2) shouldBe FeatureStatus.Defined
+    history.featureStatus(1) shouldBe BlockchainFeatureStatus.Accepted
+    history.featureStatus(2) shouldBe BlockchainFeatureStatus.Undefined
 
     (1 to ApprovalPeriod).foreach { _ => history.discardBlock() }
 
     history.height() shouldBe ApprovalPeriod - 1
-    history.status(1) shouldBe FeatureStatus.Defined
-    history.status(2) shouldBe FeatureStatus.Defined
+    history.featureStatus(1) shouldBe BlockchainFeatureStatus.Undefined
+    history.featureStatus(2) shouldBe BlockchainFeatureStatus.Undefined
   }
 
   test("feature activation height") {
@@ -167,21 +164,21 @@ class HistoryWriterTest extends FunSuite with Matchers with HistoryTest {
       FeaturesSettingsWithAutoActivation).get
 
     appendGenesisBlock(history)
-    history.status(1) shouldBe FeatureStatus.Defined
+    history.featureStatus(1) shouldBe BlockchainFeatureStatus.Undefined
 
-    history.activationHeight(1) shouldBe None
+    history.featureActivationHeight(1) shouldBe None
 
     (1 until ApprovalPeriod).foreach { _ =>
       appendTestBlock3(history, Set(1))
     }
 
-    history.activationHeight(1) shouldBe Some(ApprovalPeriod * 2)
+    history.featureActivationHeight(1) shouldBe Some(ApprovalPeriod * 2)
 
     (1 to ApprovalPeriod).foreach { _ =>
       appendTestBlock3(history, Set(1))
     }
 
-    history.activationHeight(1) shouldBe Some(ApprovalPeriod * 2)
+    history.featureActivationHeight(1) shouldBe Some(ApprovalPeriod * 2)
   }
 
     test("feature activated only by 90% of blocks") {
@@ -189,25 +186,25 @@ class HistoryWriterTest extends FunSuite with Matchers with HistoryTest {
       FeaturesSettingsWithAutoActivation).get
 
     appendGenesisBlock(history)
-    history.status(1) shouldBe FeatureStatus.Defined
+    history.featureStatus(1) shouldBe BlockchainFeatureStatus.Undefined
 
     (1 until ApprovalPeriod).foreach { i =>
       appendTestBlock3(history, if (i % 2 == 0) Set(1) else Set())
     }
-    history.status(1) shouldBe FeatureStatus.Defined
+    history.featureStatus(1) shouldBe BlockchainFeatureStatus.Undefined
 
     (1 to ApprovalPeriod).foreach { i =>
       appendTestBlock3(history, if (i % 10 == 0) Set() else Set(1))
     }
-    history.status(1) shouldBe FeatureStatus.Accepted
+    history.featureStatus(1) shouldBe BlockchainFeatureStatus.Accepted
 
     (1 to ApprovalPeriod).foreach { i =>
       appendTestBlock3(history, Set())
     }
-    history.status(1) shouldBe FeatureStatus.Activated
+    history.featureStatus(1) shouldBe BlockchainFeatureStatus.Activated
   }
 
-  test("features won't be approved or activated without auto-activation is on") {
+  test("features won't be activated locally without auto-activation is on") {
     val history = HistoryWriterImpl(None, new ReentrantReadWriteLock(), TestFunctionalitySettings.Enabled,
       FeaturesSettingsWithoutAutoActivationAndWithOneSupportedFeature).get
 
@@ -216,13 +213,15 @@ class HistoryWriterTest extends FunSuite with Matchers with HistoryTest {
     (1 until ApprovalPeriod).foreach { _ =>
       appendTestBlock3(history, Set(1, 2))
     }
-    history.status(1) shouldBe FeatureStatus.Accepted
-    history.status(2) shouldBe FeatureStatus.Defined
+    history.featureStatus(1) shouldBe BlockchainFeatureStatus.Accepted
+    history.featureStatus(2) shouldBe BlockchainFeatureStatus.Accepted
+    history.isFeatureLocallyActivated(2) shouldBe false
 
     (1 to ApprovalPeriod).foreach { _ =>
       appendTestBlock3(history, Set())
     }
-    history.status(1) shouldBe FeatureStatus.Activated
-    history.status(2) shouldBe FeatureStatus.Defined
+    history.featureStatus(1) shouldBe BlockchainFeatureStatus.Activated
+    history.featureStatus(2) shouldBe BlockchainFeatureStatus.Activated
+    history.isFeatureLocallyActivated(2) shouldBe false
   }
 }

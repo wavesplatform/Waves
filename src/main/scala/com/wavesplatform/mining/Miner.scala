@@ -2,7 +2,7 @@ package com.wavesplatform.mining
 
 import java.util.concurrent.atomic.AtomicBoolean
 
-import com.wavesplatform.features.{FeatureProvider, FeatureStatus}
+import com.wavesplatform.features.{FeatureProvider, BlockchainFeatureStatus}
 import com.wavesplatform.metrics.BlockStats
 import com.wavesplatform.network._
 import com.wavesplatform.settings.WavesSettings
@@ -91,7 +91,7 @@ class Miner(
         val sortInBlock = history.height() <= blockchainSettings.functionalitySettings.dontRequireSortedTransactionsAfter
         val unconfirmed = utx.packUnconfirmed(minerSettings.maxTransactionsInKeyBlock, sortInBlock)
         val features = settings.featuresSettings.supported
-          .filter(featureProvider.status(_) == FeatureStatus.Defined).toSet
+          .filter(featureProvider.featureStatus(_) == BlockchainFeatureStatus.Undefined).toSet
         log.debug(s"Adding ${unconfirmed.size} unconfirmed transaction(s) to new block")
         Block.buildAndSign(version.toByte, currentTime, parent.uniqueId, consensusData, unconfirmed, account, features)
           .left.map(l => l.err)
