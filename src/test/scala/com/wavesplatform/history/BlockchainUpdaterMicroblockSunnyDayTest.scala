@@ -95,7 +95,7 @@ class BlockchainUpdaterMicroblockSunnyDayTest extends PropSpec with PropertyChec
     }
   }
 
-  property("discards liquid block completely: B0 <- B1 <- B1m1; B0 <- B2!") {
+  property("doesn't discard liquid block if competitor is not better: B0 <- B1 <- B1m1; B0 <- B2!") {
     scenario(preconditionsAndPayments) { case (domain, (genesis, masterToAlice, aliceToBob, aliceToBob2)) =>
       val block0 = buildBlockOfTxs(randomSig, Seq(genesis))
       val (block1, microBlocks1) = chainBaseAndMicro(block0.uniqueId, masterToAlice, Seq(Seq(aliceToBob)))
@@ -103,7 +103,23 @@ class BlockchainUpdaterMicroblockSunnyDayTest extends PropSpec with PropertyChec
       domain.blockchainUpdater.processBlock(block0).explicitGet()
       domain.blockchainUpdater.processBlock(block1).explicitGet()
       domain.blockchainUpdater.processMicroBlock(microBlocks1(0)).explicitGet()
-      domain.blockchainUpdater.processBlock(block2) should produce("References incorrect or non-existing block")
+      domain.blockchainUpdater.processBlock(block2) should produce("Competitor's liquid block")
+
+      domain.effBalance(genesis.recipient) > 0 shouldBe true
+      domain.effBalance(masterToAlice.recipient) shouldBe 0
+      domain.effBalance(aliceToBob.recipient) shouldBe 0
+    }
+  }
+
+  property("discards liquid block if competitor is better: B0 <- B1 <- B1m1; B0 <- B2") {
+    scenario(preconditionsAndPayments) { case (domain, (genesis, masterToAlice, aliceToBob, aliceToBob2)) =>
+      val block0 = buildBlockOfTxs(randomSig, Seq(genesis))
+      val (block1, microBlocks1) = chainBaseAndMicro(block0.uniqueId, masterToAlice, Seq(Seq(aliceToBob)))
+      val block2 = customBuildBlockOfTxs(block0.uniqueId, Seq(masterToAlice, aliceToBob2), defaultSigner, 1, 0L, DefaultBaseTarget / 2)
+      domain.blockchainUpdater.processBlock(block0).explicitGet()
+      domain.blockchainUpdater.processBlock(block1).explicitGet()
+      domain.blockchainUpdater.processMicroBlock(microBlocks1(0)).explicitGet()
+      domain.blockchainUpdater.processBlock(block2) shouldBe 'right
 
       domain.effBalance(genesis.recipient) > 0 shouldBe true
       domain.effBalance(masterToAlice.recipient) shouldBe 0
