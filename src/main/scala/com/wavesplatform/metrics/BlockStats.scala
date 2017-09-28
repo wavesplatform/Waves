@@ -28,7 +28,8 @@ object BlockStats {
     block(b)
       .addField("from", from.toString)
       .addField("prop-time", System.currentTimeMillis() - b.timestamp)
-      .addField("score", b.blockScore),
+      .addField("score", b.blockScore)
+      .addField("bt", b.consensusData.baseTarget),
     Event.Received,
     Seq.empty
   )
@@ -52,6 +53,7 @@ object BlockStats {
       .tag("parent-id", b.reference.toString.take(StringIdLength))
       .addField("txs", b.transactionData.size)
       .addField("score", b.blockScore)
+      .addField("bt", b.consensusData.baseTarget)
       .addField("height", height),
     Event.Mined,
     Seq.empty
@@ -82,6 +84,7 @@ object BlockStats {
 
   def mined(m: MicroBlock): Unit = write(
     micro(m)
+      .tag("parent-id", m.prevResBlockSig.toString.take(StringIdLength))
       .addField("txs", m.transactionData.size),
     Event.Mined,
     Seq.empty
