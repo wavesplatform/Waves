@@ -1,13 +1,13 @@
 package com.wavesplatform.network
 
-import java.net.{InetSocketAddress, NetworkInterface}
+import java.net.{InetSocketAddress, NetworkInterface, NoRouteToHostException}
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
 
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.settings._
 import com.wavesplatform.state2.reader.StateReader
-import com.wavesplatform.{UtxPool, Version}
+import com.wavesplatform.{UtxPool, Version, utils}
 import io.netty.bootstrap.{Bootstrap, ServerBootstrap}
 import io.netty.channel._
 import io.netty.channel.group.ChannelGroup
@@ -125,7 +125,6 @@ class NetworkServer(checkpointService: CheckpointService,
   private val clientHandshakeHandler =
     new HandshakeHandler.Client(handshake, peerInfo, peerDatabase)
 
-
   private val bootstrap = new Bootstrap()
     .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, settings.networkSettings.connectionTimeout.toMillis.toInt: Integer)
     .group(workerGroup)
@@ -166,8 +165,13 @@ class NetworkServer(checkpointService: CheckpointService,
         .addListener { (connFuture: ChannelFuture) =>
           if (connFuture.isDone) {
             if (connFuture.cause() != null) {
-              log.debug(s"${id(connFuture.channel())} Connection failed, blacklisting $remoteAddress", connFuture.cause())
-              peerDatabase.blacklist(remoteAddress.getAddress)
+              if (connFuture.cause().isInstanceOf[NoRouteToHostException]) {
+                log.warn(s"${id(connFuture.channel())} Unrecoverable network issue has occurred, restarting", connFuture.cause())
+                utils.forceStopApplication()
+              } else {
+                log.debug(s"${id(connFuture.channel())} Connection failed, blacklisting $remoteAddress", connFuture.cause())
+                peerDatabase.blacklist(remoteAddress.getAddress)
+              }
             } else if (connFuture.isSuccess) {
               log.info(s"${id(connFuture.channel())} Connection established")
               peerDatabase.touch(remoteAddress)
@@ -184,7 +188,6 @@ class NetworkServer(checkpointService: CheckpointService,
           }
         }.channel()
     })
-
 
   def shutdown(): Unit = try {
     shutdownInitiated = true
