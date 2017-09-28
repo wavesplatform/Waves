@@ -30,18 +30,26 @@ import scala.collection.mutable.{Map => MMap}
 import scala.concurrent.Await
 import scala.concurrent.duration._
 
-class Miner(
-             allChannels: ChannelGroup,
-             blockchainReadiness: AtomicBoolean,
-             blockchainUpdater: BlockchainUpdater,
-             checkpoint: CheckpointService,
-             history: NgHistory,
-             featureProvider: FeatureProvider,
-             stateReader: StateReader,
-             settings: WavesSettings,
-             timeService: Time,
-             utx: UtxPool,
-             wallet: Wallet) extends MinerDebugInfo with ScorexLogging with Instrumented {
+trait Miner {
+  def scheduleMining(): Unit
+}
+
+trait MinerDebugInfo {
+  def collectNextBlockGenerationTimes: List[(Address, Long)]
+}
+
+class MinerImpl(
+                   allChannels: ChannelGroup,
+                   blockchainReadiness: AtomicBoolean,
+                   blockchainUpdater: BlockchainUpdater,
+                   checkpoint: CheckpointService,
+                   history: NgHistory,
+                   featureProvider: FeatureProvider,
+                   stateReader: StateReader,
+                   settings: WavesSettings,
+                   timeService: Time,
+                   utx: UtxPool,
+                   wallet: Wallet) extends Miner with MinerDebugInfo with ScorexLogging with Instrumented {
 
   import Miner._
 
@@ -192,11 +200,6 @@ class Miner(
     log.debug(s"Block mining scheduled")
   }
 
-  def stopMicroblockMining(): Unit = {
-    microBlockAttempt := SerialCancelable()
-    log.debug(s"Microblock mining was stopped")
-  }
-
   private def startMicroBlockMining(account: PrivateKeyAccount, lastBlock: Block): Unit = {
     Miner.microMiningStarted.increment()
     microBlockAttempt := generateMicroBlockSequence(account, lastBlock).runAsync
@@ -204,23 +207,21 @@ class Miner(
   }
 }
 
-object Miner extends ScorexLogging {
+object Miner {
+  val blockMiningStarted = Kamon.metrics.counter("block-mining-started")
+  val microMiningStarted = Kamon.metrics.counter("micro-mining-started")
 
   val MaxTransactionsPerMicroblock: Int = 5000
+
+  val NopMiner = new Miner with MinerDebugInfo {
+    override def scheduleMining(): Unit = ()
+
+    override def collectNextBlockGenerationTimes: List[(Address, Long)] = List.empty
+  }
 
   def calcOffset(timeService: Time, calculatedTimestamp: Long, minimalBlockGenerationOffset: FiniteDuration): FiniteDuration = {
     val calculatedGenerationTimestamp = (Math.ceil(calculatedTimestamp / 1000.0) * 1000).toLong
     val calculatedOffset = calculatedGenerationTimestamp - timeService.correctedTime()
     Math.max(minimalBlockGenerationOffset.toMillis, calculatedOffset).millis
   }
-
-  private val blockMiningStarted = Kamon.metrics.counter("block-mining-started")
-  private val microMiningStarted = Kamon.metrics.counter("micro-mining-started")
 }
-
-trait MinerDebugInfo {
-  def collectNextBlockGenerationTimes: List[(Address, Long)]
-}
-
-
-
