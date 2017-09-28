@@ -109,10 +109,10 @@ object Coordinator extends ScorexLogging with Instrumented {
     _ <- blockchainUpdater.processMicroBlock(microBlock)
   } yield utxStorage.removeAll(microBlock.transactionData))
 
-  private def validateEffectiveBalance(fp: FeatureProvider, fs: FunctionalitySettings, block: Block, h: Int)(effectiveBalance: Long): Either[String, Long] =
+  private def validateEffectiveBalance(fp: FeatureProvider, fs: FunctionalitySettings, block: Block, height: Int)(effectiveBalance: Long): Either[String, Long] =
     Either.cond(block.timestamp < fs.minimalGeneratingBalanceAfter ||
       (block.timestamp >= fs.minimalGeneratingBalanceAfter && effectiveBalance >= MinimalEffectiveBalanceForGenerator1) ||
-      fp.activationHeight(BlockchainFeatures.SmallerMinimalGeneratingBalance).exists(h >= _)
+      fp.activationHeight(BlockchainFeatures.SmallerMinimalGeneratingBalance).exists(height > _)
         && effectiveBalance >= MinimalEffectiveBalanceForGenerator2, effectiveBalance,
       s"generator's effective balance $effectiveBalance is less that required for generation")
 
