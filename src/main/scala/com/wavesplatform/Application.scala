@@ -236,11 +236,6 @@ object Application extends ScorexLogging {
     val settings = WavesSettings.fromConfig(config)
     Kamon.start(config)
 
-    log.trace(s"System property sun.net.inetaddr.ttl=${System.getProperty("sun.net.inetaddr.ttl")}")
-    log.trace(s"System property sun.net.inetaddr.negative.ttl=${System.getProperty("sun.net.inetaddr.negative.ttl")}")
-    log.trace(s"Security property networkaddress.cache.ttl=${Security.getProperty("networkaddress.cache.ttl")}")
-    log.trace(s"Security property networkaddress.cache.negative.ttl=${Security.getProperty("networkaddress.cache.negative.ttl")}")
-
     RootActorSystem.start("wavesplatform", config) { actorSystem =>
       configureLogging(settings)
 
