@@ -44,7 +44,7 @@ class PeersRouteSpec extends RouteSpec("/peers") with RestAPISettingsHelper with
       nodeNonce <- Arbitrary.arbitrary[Int]
       applicationName <- Gen.alphaNumStr
       applicationVersion <- versionGen
-    } yield PeerInfo(remoteAddress, declaredAddress, applicationName, applicationVersion, nodeName, nodeNonce)
+    } yield PeerInfo(remoteAddress.toString, declaredAddress, applicationName, applicationVersion, nodeName, nodeNonce)
 
     forAll(genListOf(TestsCount, gen)) { l: List[PeerInfo] =>
 
@@ -54,7 +54,7 @@ class PeersRouteSpec extends RouteSpec("/peers") with RestAPISettingsHelper with
 
       check {
         responseAs[Connected].peers should contain theSameElementsAs l.map { pi =>
-          ConnectedPeer(pi.remoteAddress.toString, pi.declaredAddress.fold("N/A")(_.toString),
+          ConnectedPeer(pi.remoteAddress, pi.declaredAddress.fold("N/A")(_.toString),
             pi.nodeName, pi.nodeNonce, pi.applicationName,
             s"${pi.applicationVersion._1}.${pi.applicationVersion._2}.${pi.applicationVersion._3}")
         }

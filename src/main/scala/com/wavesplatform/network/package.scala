@@ -4,6 +4,7 @@ import java.net.{InetSocketAddress, SocketAddress, URI}
 import java.util.concurrent.Callable
 
 import com.wavesplatform.state2.ByteStr
+import io.netty.channel.embedded.EmbeddedChannel
 import io.netty.channel.group.{ChannelGroup, ChannelMatchers}
 import io.netty.channel.local.LocalAddress
 import io.netty.channel.socket.SocketChannel
@@ -50,6 +51,11 @@ package object network extends ScorexLogging {
 
   implicit class ChannelHandlerContextExt(val ctx: ChannelHandlerContext) extends AnyVal {
     def remoteAddress: InetSocketAddress = ctx.channel().asInstanceOf[SocketChannel].remoteAddress()
+
+    def toPeerKey(nodeNonce: Long): PeerKey = ctx.channel() match {
+      case x: SocketChannel => PeerKey.InetPeerKey(x.remoteAddress().getAddress, nodeNonce)
+      case x: EmbeddedChannel => PeerKey.SocketPeerKey(x.remoteAddress(), nodeNonce)
+    }
   }
 
   implicit class ChannelGroupExt(val allChannels: ChannelGroup) extends AnyVal {

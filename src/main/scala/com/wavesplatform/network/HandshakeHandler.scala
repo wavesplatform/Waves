@@ -1,6 +1,5 @@
 package com.wavesplatform.network
 
-import java.net.InetSocketAddress
 import java.util
 import java.util.concurrent.{ConcurrentMap, TimeUnit}
 
@@ -75,7 +74,7 @@ abstract class HandshakeHandler(
        else if (!versionIsSupported(remoteHandshake.applicationVersion))
         peerDatabase.blacklistAndClose(ctx.channel(),s"Remote application version ${remoteHandshake.applicationVersion } is not supported")
        else {
-        val key = PeerKey(ctx.remoteAddress.getAddress, remoteHandshake.nodeNonce)
+        val key = ctx.toPeerKey(remoteHandshake.nodeNonce)
         val previousPeer = peerConnections.putIfAbsent(key, ctx.channel())
         if (previousPeer != null) {
           log.debug(s"${id(ctx)} Already connected to peer ${ctx.remoteAddress.getAddress} with nonce ${remoteHandshake.nodeNonce} on channel ${id(previousPeer)}")
@@ -117,7 +116,7 @@ object HandshakeHandler extends ScorexLogging {
   }
 
   def peerInfo(remoteHandshake: Handshake, channel: Channel): PeerInfo = PeerInfo(
-    channel.remoteAddress().asInstanceOf[InetSocketAddress],
+    channel.remoteAddress().toString,
     remoteHandshake.declaredAddress,
     remoteHandshake.applicationName,
     remoteHandshake.applicationVersion,

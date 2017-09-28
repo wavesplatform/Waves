@@ -3,7 +3,7 @@ package com.wavesplatform.network
 import java.net.InetSocketAddress
 
 case class PeerInfo(
-    remoteAddress: InetSocketAddress,
+    remoteAddress: String,
     declaredAddress: Option[InetSocketAddress],
     applicationName: String,
     applicationVersion: (Int, Int, Int),
