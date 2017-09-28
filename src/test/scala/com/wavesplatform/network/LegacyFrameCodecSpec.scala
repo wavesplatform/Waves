@@ -35,7 +35,7 @@ class LegacyFrameCodecSpec extends FreeSpec
   }
 
   "should handle multiple messages" in forAll(Gen.nonEmptyListOf(issueGen)) { origTxs =>
-    val codec = new LegacyFrameCodec(PeerDatabase.Noop)
+    val codec = new LegacyFrameCodec(PeerDatabase.NoOp)
 
     val buff = Unpooled.buffer
     origTxs.foreach(write(buff, _))
