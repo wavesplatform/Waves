@@ -88,6 +88,7 @@ object Coordinator extends ScorexLogging with Instrumented {
                          settings: WavesSettings, featureProvider: FeatureProvider)
                         (newBlock: Block, local: Boolean): Either[ValidationError, BigInt] = measureSuccessful(blockProcessingTimeStats, {
     val newScore = for {
+      _ <- Either.cond(history.heightOf(newBlock.reference).exists(_ >= history.height() - 1), (), GenericError("Can process either new top block or current top block's competitor"))
       _ <- appendBlock(checkpoint, history, blockchainUpdater, stateReader, utxStorage, time, settings.blockchainSettings, featureProvider)(newBlock, local)
     } yield history.score()
 

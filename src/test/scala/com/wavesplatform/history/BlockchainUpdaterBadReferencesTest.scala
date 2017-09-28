@@ -106,17 +106,6 @@ class BlockchainUpdaterBadReferencesTest extends PropSpec with PropertyChecks wi
     }
   }
 
-  property("block: overwrite liquid block") {
-    scenario(preconditionsAndPayments) { case (domain, (genesis, payment, payment2, payment3)) =>
-      val blocks = chainBlocks(Seq(Seq(genesis), Seq(payment), Seq(payment2)))
-      val block2v2 = buildBlockOfTxs(blocks(1).uniqueId, Seq(payment3))
-      domain.blockchainUpdater.processBlock(blocks(0)) shouldBe 'right
-      domain.blockchainUpdater.processBlock(blocks(1)) shouldBe 'right
-      domain.blockchainUpdater.processBlock(blocks(2)) shouldBe 'right
-      domain.blockchainUpdater.processBlock(block2v2) should produce("References incorrect or non-existing block")
-    }
-  }
-
   property("block: incorrect or non-existing block when liquid exists") {
     scenario(preconditionsAndPayments) { case (domain, (genesis, payment, payment2, payment3)) =>
       val blocks = chainBlocks(Seq(Seq(genesis), Seq(payment), Seq(payment2)))

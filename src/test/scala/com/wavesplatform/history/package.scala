@@ -12,6 +12,7 @@ import scorex.transaction.{Transaction, TransactionParser}
 
 package object history {
   val MinInMemoryDiffSize = 5
+  val DefaultBaseTarget = 1000L
   val DefaultBlockchainSettings = BlockchainSettings(
     blockchainFile = None,
     stateFile = None,
@@ -40,13 +41,13 @@ package object history {
   def buildBlockOfTxs(refTo: ByteStr, txs: Seq[Transaction]): Block = customBuildBlockOfTxs(refTo, txs, defaultSigner, 1, 0L)
 
   def customBuildBlockOfTxs(refTo: ByteStr, txs: Seq[Transaction],
-                            signer: PrivateKeyAccount, version: Byte, timestamp: Long): Block =
+                            signer: PrivateKeyAccount, version: Byte, timestamp: Long, bTarget: Long = DefaultBaseTarget): Block =
     Block.buildAndSign(
       version = version,
       timestamp = timestamp,
       reference = refTo,
       consensusData = NxtLikeConsensusBlockData(
-        baseTarget = 1L,
+        baseTarget = bTarget,
         generationSignature = generationSignature),
       transactionData = txs,
       signer = signer).explicitGet()
