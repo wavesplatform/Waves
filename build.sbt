@@ -22,7 +22,10 @@ scalacOptions ++= Seq(
 logBuffered := false
 
 //assembly settings
-assemblyJarName in assembly := s"waves-all-${version.value}.jar"
+assemblyJarName in assembly := {
+  val buildId = sys.env.get("BUILD_NUMBER").map(x => s".$x").getOrElse("")
+  s"waves-all-${version.value}$buildId.jar"
+}
 assemblyMergeStrategy in assembly := {
   case PathList("META-INF", "io.netty.versions.properties") => MergeStrategy.concat
   case other => (assemblyMergeStrategy in assembly).value(other)
