@@ -52,7 +52,9 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
 
   override def write(ctx: ChannelHandlerContext, msg: AnyRef, promise: ChannelPromise): Unit = msg match {
     case LocalScoreChanged(newLocalScore) =>
-      log.trace(s"${id(ctx)} ${pinnedChannelId}New local score: $newLocalScore")
+      if (pinnedChannel.compareAndSet(ctx.channel(), null)) { // Fork applied
+        log.debug(s"${id(ctx)} ${pinnedChannelId}New local score: $newLocalScore")
+      }
       // unconditionally update local score value and propagate this message downstream
       localScore = newLocalScore
       ctx.write(msg, promise)
@@ -98,8 +100,10 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
       if (blocks.nonEmpty) {
         log.debug(s"${id(ctx)} ${pinnedChannelId}Receiving extension blocks ${formatBlocks(blocks)}")
         super.channelRead(ctx, msg)
-      } else log.debug(s"${id(ctx)} ${pinnedChannelId}Blockchain is up to date")
-      pinnedChannel.compareAndSet(ctx.channel(), null)
+      } else {
+        log.debug(s"${id(ctx)} ${pinnedChannelId}Blockchain is up to date")
+        pinnedChannel.compareAndSet(ctx.channel(), null)
+      }
 
     case ExtensionBlocks(blocks) =>
       log.debug(s"${id(ctx)} ${pinnedChannelId}Received blocks ${formatBlocks(blocks)} from non-pinned channel")

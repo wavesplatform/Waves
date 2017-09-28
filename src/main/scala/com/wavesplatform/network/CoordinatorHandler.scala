@@ -11,10 +11,12 @@ import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel.group.ChannelGroup
 import io.netty.channel.{Channel, ChannelHandlerContext, ChannelInboundHandlerAdapter}
 import scorex.block.Block
+import scorex.transaction.ValidationError.InvalidSignature
 import scorex.transaction._
 import scorex.utils.{ScorexLogging, Time}
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.{Failure, Success}
 
 @Sharable
 class CoordinatorHandler(
@@ -33,7 +35,7 @@ class CoordinatorHandler(
   extends ChannelInboundHandlerAdapter with ScorexLogging {
 
   private val counter = new AtomicInteger
-  private implicit val ec = ExecutionContext.fromExecutor(Executors.newSingleThreadExecutor { r =>
+  private implicit val ec: ExecutionContext = ExecutionContext.fromExecutor(Executors.newSingleThreadExecutor { r =>
     val t = new Thread(r)
     t.setName(s"coordinator-handler-${counter.incrementAndGet()}")
     t.setDaemon(true)
@@ -44,43 +46,53 @@ class CoordinatorHandler(
   private val processFork = Coordinator.processFork(checkpointService, history, blockchainUpdater, stateReader, utxStorage, time, settings, miner, blockchainReadiness) _
   private val processBlock = Coordinator.processBlock(checkpointService, history, blockchainUpdater, time, stateReader, utxStorage, blockchainReadiness, miner, settings) _
 
-  private def broadcastingScore(
+  private def processAndBlacklistOnFailure(
       src: Channel,
       start: => String,
       success: => String,
-      failure: => String,
-      f: => Either[_, BigInt]): Unit = Future {
-    log.debug(s"${id(src)} $start")
-    f match {
-      case Right(newLocalScore) =>
-        log.info(s"${id(src)} $success, new local score is $newLocalScore")
-        allChannels.broadcast(LocalScoreChanged(newLocalScore))
-      case Left(e) =>
-        log.warn(s"${id(src)} $failure: $e")
+      errorPrefix: String,
+      f: => Either[_, BigInt]): Unit = {
+    log.debug(start)
+    Future(f) onComplete {
+      case Success(Right(newScore)) =>
+        log.debug(success)
+        allChannels.broadcast(LocalScoreChanged(newScore))
+      case Success(Left(ve)) =>
+        log.warn(s"$errorPrefix: $ve")
+        peerDatabase.blacklistAndClose(src, s"$errorPrefix: $ve")
+      case Failure(t) => rethrow(errorPrefix, t)
     }
   }
 
+  private def rethrow(msg: String, failure: Throwable) = throw new Exception(msg, failure.getCause)
+  private def warnAndBlacklist(msg: => String, ch: Channel): Unit = {
+    log.warn(msg)
+    peerDatabase.blacklistAndClose(ch, msg)
+  }
+
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
-    case c: Checkpoint => broadcastingScore(ctx.channel,
+    case c: Checkpoint => processAndBlacklistOnFailure(ctx.channel,
       "Attempting to process checkpoint",
       "Successfully processed checkpoint",
       s"Error processing checkpoint",
       processCheckpoint(c))
 
-    case ExtensionBlocks(blocks) => broadcastingScore(ctx.channel(),
+    case ExtensionBlocks(blocks) => processAndBlacklistOnFailure(ctx.channel(),
       s"Attempting to append extension ${formatBlocks(blocks)}",
       s"Successfully appended extension ${formatBlocks(blocks)}",
       s"Error appending extension ${formatBlocks(blocks)}",
       processFork(blocks))
 
-    case b: Block =>
-      Signed.validateSignatures(b) match {
-        case Left(err) => peerDatabase.blacklistAndClose(ctx.channel(), err.toString)
-        case Right(_) => broadcastingScore(ctx.channel(),
-          s"Attempting to append block ${b.uniqueId}",
-          s"Successfully appended block ${b.uniqueId}",
-          s"Could not append block ${b.uniqueId}",
-          processBlock(b, false))
-      }
+    case b: Block => Future(Signed.validateSignatures(b).flatMap(b => processBlock(b, false))) onComplete {
+      case Success(Right(newScore)) =>
+        log.debug(s"Appended block ${b.uniqueId}")
+        allChannels.broadcast(LocalScoreChanged(newScore))
+      case Success(Left(is: InvalidSignature)) =>
+        warnAndBlacklist(s"Could not append block ${b.uniqueId}: $is", ctx.channel())
+      case Success(Left(ve)) =>
+        log.debug(s"Could not append block ${b.uniqueId}: $ve")
+        // no need to push anything downstream in here, because channels are pinned only when handling extensions
+      case Failure(t) => rethrow(s"Error appending block ${b.uniqueId}", t)
+    }
   }
 }
