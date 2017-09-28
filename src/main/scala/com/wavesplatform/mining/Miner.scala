@@ -165,12 +165,13 @@ class Miner(
           case Right(block) => Task.now {
             processBlock(block, true) match {
               case Left(err) => log.warn("Error mining Block: " + err.toString)
-              case Right(score) =>
+              case Right(Some(score)) =>
                 allChannels.broadcast(LocalScoreChanged(score))
                 allChannels.broadcast(BlockForged(block))
                 scheduleMining()
                 if (featureProvider.activationHeight(BlockchainFeatures.NG).exists(history.height > _ + 1))
                   startMicroBlockMining(account, block)
+              case Right(None) => log.warn("Newly created block has already been appended, should not happen")
             }
           }
           case Left(err) =>

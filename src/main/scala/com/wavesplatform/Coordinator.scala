@@ -24,7 +24,7 @@ object Coordinator extends ScorexLogging with Instrumented {
   def processFork(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater,
                   stateReader: StateReader, utxStorage: UtxPool, time: Time, settings: WavesSettings, miner: Miner,
                   blockchainReadiness: AtomicBoolean, featureProvider: FeatureProvider)
-                 (newBlocks: Seq[Block]): Either[ValidationError, BigInt] = {
+                 (newBlocks: Seq[Block]): Either[ValidationError, Option[BigInt]] = {
     val extension = newBlocks.dropWhile(history.contains)
 
     extension.headOption.map(_.reference) match {
@@ -69,11 +69,11 @@ object Coordinator extends ScorexLogging with Instrumented {
           droppedTransactions.foreach(utxStorage.putIfNew)
           miner.scheduleMining()
           updateBlockchainReadinessFlag(history, time, blockchainReadiness, settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed)
-          score
+          Some(score)
         }
       case None =>
         log.debug("No new blocks found in extension")
-        Right(history.score())
+        Right(None)
     }
   }
 
@@ -86,16 +86,20 @@ object Coordinator extends ScorexLogging with Instrumented {
   def processSingleBlock(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater, time: Time,
                          stateReader: StateReader, utxStorage: UtxPool, blockchainReadiness: AtomicBoolean,
                          settings: WavesSettings, featureProvider: FeatureProvider)
-                        (newBlock: Block, local: Boolean): Either[ValidationError, BigInt] = measureSuccessful(blockProcessingTimeStats, {
-    val newScore = for {
-      _ <- Either.cond(history.heightOf(newBlock.reference).exists(_ >= history.height() - 1), (), GenericError("Can process either new top block or current top block's competitor"))
-      _ <- appendBlock(checkpoint, history, blockchainUpdater, stateReader, utxStorage, time, settings.blockchainSettings, featureProvider)(newBlock, local)
-    } yield history.score()
+                        (newBlock: Block, local: Boolean): Either[ValidationError, Option[BigInt]] = measureSuccessful(blockProcessingTimeStats, {
+    if (history.contains(newBlock))
+      Right(None)
+    else {
+      val newScore = for {
+        _ <- Either.cond(history.heightOf(newBlock.reference).exists(_ >= history.height() - 1), (), GenericError("Can process either new top block or current top block's competitor"))
+        _ <- appendBlock(checkpoint, history, blockchainUpdater, stateReader, utxStorage, time, settings.blockchainSettings, featureProvider)(newBlock, local)
+      } yield history.score()
 
-    if (local || newScore.isRight) {
-      updateBlockchainReadinessFlag(history, time, blockchainReadiness, settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed)
+      if (local || newScore.isRight) {
+        updateBlockchainReadinessFlag(history, time, blockchainReadiness, settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed)
+      }
+      newScore.right.map(Some(_))
     }
-    newScore
   })
 
   def processMicroBlock(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater, utxStorage: UtxPool)
@@ -135,6 +139,7 @@ object Coordinator extends ScorexLogging with Instrumented {
   def processCheckpoint(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater)
                        (newCheckpoint: Checkpoint): Either[ValidationError, BigInt] =
     checkpoint.set(newCheckpoint).map { _ =>
+      log.info(s"Processing checkpoint $checkpoint")
       makeBlockchainCompliantWith(history, blockchainUpdater)(newCheckpoint)
       history.score()
     }
