@@ -6,7 +6,7 @@ import com.wavesplatform.features.{BlockchainFeatures, FeatureProvider}
 import com.wavesplatform.metrics.{BlockStats, Metrics, TxsInBlockchainStats}
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.network.{BlockCheckpoint, Checkpoint}
-import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
+import com.wavesplatform.settings.{BlockchainSettings, FunctionalitySettings, WavesSettings}
 import com.wavesplatform.state2.reader.StateReader
 import com.wavesplatform.state2.{ByteStr, Instrumented}
 import kamon.Kamon
@@ -18,6 +18,7 @@ import scorex.transaction._
 import scorex.utils.{ScorexLogging, Time}
 
 import scala.concurrent.duration._
+import PoSCalc._
 
 object Coordinator extends ScorexLogging with Instrumented {
   def processFork(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater,
@@ -103,6 +104,12 @@ object Coordinator extends ScorexLogging with Instrumented {
     _ <- blockchainUpdater.processMicroBlock(microBlock)
   } yield utxStorage.removeAll(microBlock.transactionData))
 
+  private def validateEffectiveBalance(fp: FeatureProvider, fs: FunctionalitySettings, block: Block, h: Int)(effectiveBalance: Long): Either[String, Long] =
+    Either.cond(block.timestamp < fs.minimalGeneratingBalanceAfter ||
+      (block.timestamp >= fs.minimalGeneratingBalanceAfter && effectiveBalance >= MinimalEffectiveBalanceForGenerator1) ||
+      fp.activationHeight(BlockchainFeatures.SmallerMinimalGeneratingBalance).exists(h >= _)
+        && effectiveBalance >= MinimalEffectiveBalanceForGenerator2, effectiveBalance,
+      s"generator's effective balance $effectiveBalance is less that required for generation")
 
   private def appendBlock(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater,
                           stateReader: StateReader, utxStorage: UtxPool, time: Time, settings: BlockchainSettings,
@@ -110,7 +117,10 @@ object Coordinator extends ScorexLogging with Instrumented {
                          (block: Block, local: Boolean): Either[ValidationError, Unit] = for {
     _ <- Either.cond(checkpoint.isBlockValid(block.signerData.signature, history.height() + 1), (),
       GenericError(s"Block ${block.uniqueId} at height ${history.height() + 1} is not valid w.r.t. checkpoint"))
-    _ <- blockConsensusValidation(history, stateReader, settings, time.correctedTime(), featureProvider)(block)
+    _ <- blockConsensusValidation(history, featureProvider, settings, time.correctedTime(), block) { height =>
+      PoSCalc.generatingBalance(stateReader, settings.functionalitySettings, block.signerData.generator, height).toEither.left.map(_.toString)
+        .flatMap(validateEffectiveBalance(featureProvider, settings.functionalitySettings, block, height))
+    }
     height = history.height()
     discardedTxs <- blockchainUpdater.processBlock(block)
   } yield {
@@ -155,41 +165,34 @@ object Coordinator extends ScorexLogging with Instrumented {
 
   val MaxTimeDrift: Long = 15.seconds.toMillis
 
-  private def blockConsensusValidation(history: History, state: StateReader, bcs: BlockchainSettings, currentTs: Long,
-                                       featureProvider: FeatureProvider)
-                                      (block: Block): Either[ValidationError, Unit] = history.read { _ =>
-    import PoSCalc._
+  private def blockConsensusValidation(history: History, fp: FeatureProvider, bcs: BlockchainSettings, currentTs: Long, block: Block)
+                                      (genBalance: Int => Either[String, Long]): Either[ValidationError, Unit] = history.read { _ =>
 
     val fs = bcs.functionalitySettings
     val blockTime = block.timestamp
+    val generator = block.signerData.generator
 
     (for {
-      _ <- Either.cond(state.height > fs.blockVersion3After
+      height <- history.heightOf(block.reference).toRight(s"history does not contain parent ${block.reference}")
+      _ <- Either.cond(height > fs.blockVersion3After
         || block.version == Block.GenesisBlockVersion
         || block.version == Block.PlainBlockVersion,
         (), s"Block Version 3 can only appear at height greater than ${fs.blockVersion3After}")
       _ <- Either.cond(blockTime - currentTs < MaxTimeDrift, (), s"timestamp $blockTime is from future")
       _ <- Either.cond(blockTime < fs.requireSortedTransactionsAfter
-        || state.height > fs.dontRequireSortedTransactionsAfter
+        || height > fs.dontRequireSortedTransactionsAfter
         || block.transactionData.sorted(TransactionsOrdering.InBlock) == block.transactionData,
         (), "transactions are not sorted")
       parent <- history.parent(block).toRight(s"history does not contain parent ${block.reference}")
-      parentHeight <- history.heightOf(parent.uniqueId).toRight(s"history does not contain parent ${block.reference}")
       prevBlockData = parent.consensusData
       blockData = block.consensusData
-      cbt = calcBaseTarget(bcs.genesisSettings.averageBlockDelay, parentHeight, parent.consensusData.baseTarget, parent.timestamp, history.parent(parent, 2).map(_.timestamp), blockTime)
+      cbt = calcBaseTarget(bcs.genesisSettings.averageBlockDelay, height, parent.consensusData.baseTarget, parent.timestamp, history.parent(parent, 2).map(_.timestamp), blockTime)
       bbt = blockData.baseTarget
       _ <- Either.cond(cbt == bbt, (), s"declared baseTarget $bbt does not match calculated baseTarget $cbt")
-      generator = block.signerData.generator
       calcGs = calcGeneratorSignature(prevBlockData, generator)
       blockGs = blockData.generationSignature.arr
-      _ <- Either.cond(calcGs.sameElements(blockGs), (),
-        s"declared generation signature ${blockGs.mkString} does not match calculated generation signature ${calcGs.mkString}")
-      effectiveBalance <- generatingBalance(state, fs, generator, parentHeight).toEither.left.map(er => GenericError(er.getMessage))
-      _ <- Either.cond(blockTime < fs.minimalGeneratingBalanceAfter ||
-        (blockTime >= fs.minimalGeneratingBalanceAfter && effectiveBalance >= MinimalEffectiveBalanceForGenerator1) ||
-        (featureProvider.activated(BlockchainFeatures.SmallerMinimalGeneratingBalance) && effectiveBalance >= MinimalEffectiveBalanceForGenerator2), (),
-        s"generator's effective balance $effectiveBalance is less that required for generation")
+      _ <- Either.cond(calcGs.sameElements(blockGs), (), s"declared generation signature ${blockGs.mkString} does not match calculated generation signature ${calcGs.mkString}")
+      effectiveBalance <- genBalance(height)
       hit = calcHit(prevBlockData, generator)
       target = calcTarget(parent.consensusData.baseTarget, parent.timestamp, blockTime, effectiveBalance)
       _ <- Either.cond(hit < target, (), s"calculated hit $hit >= calculated target $target")
