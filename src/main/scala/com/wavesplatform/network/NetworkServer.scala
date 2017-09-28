@@ -5,6 +5,7 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
 
 import com.wavesplatform.features.FeatureProvider
+import com.wavesplatform.metrics.Metrics
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.settings._
 import com.wavesplatform.state2.reader.StateReader
@@ -17,6 +18,7 @@ import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.channel.socket.SocketChannel
 import io.netty.channel.socket.nio.{NioServerSocketChannel, NioSocketChannel}
 import io.netty.handler.codec.{LengthFieldBasedFrameDecoder, LengthFieldPrepender}
+import org.influxdb.dto.Point
 import scorex.transaction._
 import scorex.utils.{ScorexLogging, Time}
 
@@ -163,12 +165,30 @@ class NetworkServer(checkpointService: CheckpointService,
       fatalErrorHandler)))
 
   private val connectTask = workerGroup.scheduleWithFixedDelay(1.second, 5.seconds) {
-    log.trace(s"Outgoing: ${outgoingChannels.keySet} ++ incoming: $incomingDeclaredAddresses")
-    if (outgoingChannelCount.get() < settings.networkSettings.maxOutboundConnections) {
+    import scala.collection.JavaConverters._
+    import scala.collection.breakOut
+
+    val outgoingStr = outgoingChannels.keySet.asScala.map[String, Vector[String]](_.toString)(breakOut)
+      .sorted.mkString(", ")
+    val incoming = incomingDeclaredAddresses.map[String, Vector[String]](_.toString)(breakOut).sorted
+    val incomingStr = incoming.mkString(", ")
+
+    log.trace(s"Outgoing: $outgoingStr ++ incoming: $incomingStr")
+    val shouldConnect = outgoingChannelCount.get() < settings.networkSettings.maxOutboundConnections
+    if (shouldConnect) {
       peerDatabase
         .randomPeer(excludedAddresses ++ outgoingChannels.keySet().asScala ++ incomingDeclaredAddresses)
         .foreach(connect)
     }
+
+    Metrics.write(
+      Point
+        .measurement("connections")
+        .addField("outgoing", outgoingStr)
+        .addField("incoming", incomingStr)
+        .addField("n", outgoingChannels.keySet.size() + incoming.size)
+        .addField("connecting", shouldConnect)
+    )
   }
 
   private def peerSynchronizer: ChannelHandlerAdapter = {
