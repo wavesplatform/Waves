@@ -32,6 +32,7 @@ case class NetworkSettings(file: Option[File],
                            enableBlacklisting: Boolean,
                            peersBroadcastInterval: FiniteDuration,
                            handshakeTimeout: FiniteDuration,
+                           suspensionResidenceTime: FiniteDuration,
                            uPnPSettings: UPnPSettings)
 
 object NetworkSettings {
@@ -64,12 +65,13 @@ object NetworkSettings {
     val enableBlacklisting = config.as[Boolean]("enable-blacklisting")
     val peersBroadcastInterval = config.as[FiniteDuration]("peers-broadcast-interval")
     val handshakeTimeout = config.as[FiniteDuration]("handshake-timeout")
+    val suspensionResidenceTime = config.as[FiniteDuration]("suspension-residence-time")
     val uPnPSettings = config.as[UPnPSettings]("upnp")
 
     NetworkSettings(file, bindAddress, declaredAddress, nodeName, nonce, knownPeers,
       peersDataResidenceTime, blackListResidenceTime, maxInboundConnections, maxOutboundConnections,
       maxConnectionsFromSingleHost, connectionTimeout, outboundBufferSize, maxUnverifiedPeers, enablePeersExchange,
-      enableBlacklisting, peersBroadcastInterval, handshakeTimeout, uPnPSettings)
+      enableBlacklisting, peersBroadcastInterval, handshakeTimeout, suspensionResidenceTime, uPnPSettings)
   }
 
   private def randomNonce: Long = {

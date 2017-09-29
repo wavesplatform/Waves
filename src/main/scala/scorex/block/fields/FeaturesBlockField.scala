@@ -2,13 +2,16 @@ package scorex.block.fields
 
 import java.nio.ByteBuffer
 
-import play.api.libs.json.JsObject
+import play.api.libs.json._
 import scorex.block.BlockField
 
 case class FeaturesBlockField(version: Byte, override val value: Set[Short]) extends BlockField[Set[Short]] {
   override val name = "features"
 
-  override def json: JsObject = JsObject.empty
+  override def json: JsObject = version match {
+    case v if v < 3 => JsObject.empty
+    case _ => Json.obj(name -> JsArray(value.map(id => JsNumber(id.toInt)).toSeq))
+  }
 
   override def bytes: Array[Byte] = version match {
     case v if v < 3 => Array.empty
@@ -18,4 +21,3 @@ case class FeaturesBlockField(version: Byte, override val value: Set[Short]) ext
       bb.array
   }
 }
-

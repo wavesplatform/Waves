@@ -24,7 +24,7 @@ object Metrics extends ScorexLogging {
     }.asJava
   }
 
-  private implicit val scheduler: SchedulerService = monix.execution.Scheduler.singleThread("metrics")
+  private implicit val scheduler: SchedulerService = monix.execution.Scheduler.singleThread("metrics", reporter = com.wavesplatform.utils.UncaughtExceptionsToLogReporter)
 
   private var settings: Settings = _
   private var db: Option[InfluxDB] = None

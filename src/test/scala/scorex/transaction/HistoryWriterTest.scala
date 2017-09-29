@@ -17,11 +17,11 @@ class HistoryWriterTest extends FunSuite with Matchers with HistoryTest {
 
   private val ApprovalPeriod = 10000
 
-  private val FeaturesSettingsWithAutoActivation: FeaturesSettings =
-    FeaturesSettings(autoActivate = true, autoShutdownOnUnsupportedFeature = false, List.empty)
+  private val FeaturesSettingsWithoutSupportedFeatures: FeaturesSettings =
+    FeaturesSettings(autoShutdownOnUnsupportedFeature = false, List.empty)
 
-  private val FeaturesSettingsWithoutAutoActivationAndWithOneSupportedFeature =
-    FeaturesSettings(autoActivate = false, autoShutdownOnUnsupportedFeature = false, List(1))
+  private val FeaturesSettingsWithOneSupportedFeature =
+    FeaturesSettings(autoShutdownOnUnsupportedFeature = false, List(1))
 
   test("concurrent access to lastBlock doesn't throw any exception") {
     val history = HistoryWriterImpl(None, new ReentrantReadWriteLock(), TestFunctionalitySettings.Enabled,
@@ -48,7 +48,7 @@ class HistoryWriterTest extends FunSuite with Matchers with HistoryTest {
 
   test("features approved and accepted as height grows") {
     val history = HistoryWriterImpl(None, new ReentrantReadWriteLock(), TestFunctionalitySettings.Enabled,
-      FeaturesSettingsWithAutoActivation).get
+      FeaturesSettingsWithoutSupportedFeatures).get
 
     appendGenesisBlock(history)
 
@@ -86,7 +86,7 @@ class HistoryWriterTest extends FunSuite with Matchers with HistoryTest {
 
   test("last block should affect feature voting the same way either liquid or saved to history") {
     val history = HistoryWriterImpl(None, new ReentrantReadWriteLock(), TestFunctionalitySettings.Enabled,
-      FeaturesSettingsWithAutoActivation).get
+      FeaturesSettingsWithoutSupportedFeatures).get
 
     appendGenesisBlock(history)
 
@@ -117,7 +117,7 @@ class HistoryWriterTest extends FunSuite with Matchers with HistoryTest {
 
     test("features rollback with block rollback") {
     val history = HistoryWriterImpl(None, new ReentrantReadWriteLock(), TestFunctionalitySettings.Enabled,
-      FeaturesSettingsWithAutoActivation).get
+      FeaturesSettingsWithoutSupportedFeatures).get
 
     appendGenesisBlock(history)
 
@@ -161,7 +161,7 @@ class HistoryWriterTest extends FunSuite with Matchers with HistoryTest {
 
   test("feature activation height") {
     val history = HistoryWriterImpl(None, new ReentrantReadWriteLock(), TestFunctionalitySettings.Enabled,
-      FeaturesSettingsWithAutoActivation).get
+      FeaturesSettingsWithoutSupportedFeatures).get
 
     appendGenesisBlock(history)
     history.featureStatus(1) shouldBe BlockchainFeatureStatus.Undefined
@@ -183,7 +183,7 @@ class HistoryWriterTest extends FunSuite with Matchers with HistoryTest {
 
     test("feature activated only by 90% of blocks") {
     val history = HistoryWriterImpl(None, new ReentrantReadWriteLock(), TestFunctionalitySettings.Enabled,
-      FeaturesSettingsWithAutoActivation).get
+      FeaturesSettingsWithoutSupportedFeatures).get
 
     appendGenesisBlock(history)
     history.featureStatus(1) shouldBe BlockchainFeatureStatus.Undefined
@@ -202,26 +202,5 @@ class HistoryWriterTest extends FunSuite with Matchers with HistoryTest {
       appendTestBlock3(history, Set())
     }
     history.featureStatus(1) shouldBe BlockchainFeatureStatus.Activated
-  }
-
-  test("features won't be activated locally without auto-activation is on") {
-    val history = HistoryWriterImpl(None, new ReentrantReadWriteLock(), TestFunctionalitySettings.Enabled,
-      FeaturesSettingsWithoutAutoActivationAndWithOneSupportedFeature).get
-
-    appendGenesisBlock(history)
-
-    (1 until ApprovalPeriod).foreach { _ =>
-      appendTestBlock3(history, Set(1, 2))
-    }
-    history.featureStatus(1) shouldBe BlockchainFeatureStatus.Accepted
-    history.featureStatus(2) shouldBe BlockchainFeatureStatus.Accepted
-    history.isFeatureLocallyActivated(2) shouldBe false
-
-    (1 to ApprovalPeriod).foreach { _ =>
-      appendTestBlock3(history, Set())
-    }
-    history.featureStatus(1) shouldBe BlockchainFeatureStatus.Activated
-    history.featureStatus(2) shouldBe BlockchainFeatureStatus.Activated
-    history.isFeatureLocallyActivated(2) shouldBe false
   }
 }

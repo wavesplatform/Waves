@@ -20,9 +20,9 @@ object PoSCalc extends ScorexLogging {
   val MinimalEffectiveBalanceForGenerator2: Long = 100000000000L
   val AvgBlockTimeDepth: Int = 3
 
-  def calcTarget(prevBlock: Block, timestamp: Long, balance: Long): BigInt = {
-    val eta = (timestamp - prevBlock.timestamp) / 1000
-    BigInt(prevBlock.consensusData.baseTarget) * eta * balance
+  def calcTarget(prevBlockTimestamp: Long, prevBlockBaseTarget: Long, timestamp: Long, balance: Long): BigInt = {
+    val eta = (timestamp - prevBlockTimestamp) / 1000
+    BigInt(prevBlockBaseTarget) * eta * balance
   }
 
   def calcHit(lastBlockData: NxtLikeConsensusBlockData, generator: PublicKeyAccount): BigInt =
@@ -31,17 +31,15 @@ object PoSCalc extends ScorexLogging {
   def calcGeneratorSignature(lastBlockData: NxtLikeConsensusBlockData, generator: PublicKeyAccount): FastCryptographicHash.Digest =
     hash(lastBlockData.generationSignature.arr ++ generator.publicKey)
 
-  def calcBaseTarget(avgBlockDelay: FiniteDuration, parentHeight: Int, parent: Block, greatGrandParent: Option[Block], timestamp: Long): Long = {
+  def calcBaseTarget(avgBlockDelay: FiniteDuration, parentHeight: Int, parentBaseTarget: Long,
+                     parentTimestamp: Long, maybeGreatGrandParentTimestamp: Option[Long], timestamp: Long): Long = {
     val avgDelayInSeconds = avgBlockDelay.toSeconds
 
     def normalize(value: Long): Double = value * avgDelayInSeconds / (60: Double)
 
-    val prevBaseTarget = parent.consensusData.baseTarget
+    val prevBaseTarget = parentBaseTarget
     if (parentHeight % 2 == 0) {
-      val blocktimeAverage = greatGrandParent.fold(timestamp - parent.timestamp) {
-        b => (timestamp - b.timestamp) / AvgBlockTimeDepth
-      } / 1000
-
+      val blocktimeAverage = maybeGreatGrandParentTimestamp.fold(timestamp - parentTimestamp)(ggpts => (timestamp - ggpts) / AvgBlockTimeDepth) / 1000
       val minBlocktimeLimit = normalize(53)
       val maxBlocktimeLimit = normalize(67)
       val baseTargetGamma = normalize(64)
@@ -69,8 +67,8 @@ object PoSCalc extends ScorexLogging {
                               account: PublicKeyAccount, featureProvider: FeatureProvider): Either[String, Long] = {
     generatingBalance(state, fs, account, height) match {
       case Success(balance) => for {
-        _ <- Either.cond((!featureProvider.isFeatureLocallyActivated(BlockchainFeatures.SmallerMinimalGeneratingBalance.id) && balance >= MinimalEffectiveBalanceForGenerator1) ||
-          (featureProvider.isFeatureLocallyActivated(BlockchainFeatures.SmallerMinimalGeneratingBalance.id) && balance >= MinimalEffectiveBalanceForGenerator2), (),
+        _ <- Either.cond((!featureProvider.isFeatureActivated(BlockchainFeatures.SmallerMinimalGeneratingBalance) && balance >= MinimalEffectiveBalanceForGenerator1) ||
+          (featureProvider.isFeatureActivated(BlockchainFeatures.SmallerMinimalGeneratingBalance) && balance >= MinimalEffectiveBalanceForGenerator2), (),
           s"Balance $balance of ${account.address} is lower than required for generation")
         cData = block.consensusData
         hit = calcHit(cData, account)

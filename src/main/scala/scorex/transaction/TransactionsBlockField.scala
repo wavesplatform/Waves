@@ -3,8 +3,6 @@ package scorex.transaction
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 
-import java.io.ByteArrayOutputStream
-
 import com.google.common.primitives.{Bytes, Ints}
 import com.wavesplatform.network.TransactionMessageSpec
 import play.api.libs.json.{JsArray, JsObject, Json}
@@ -49,7 +47,7 @@ case class TransactionsBlockFieldVersion3(override val value: Seq[Transaction]) 
 
   override lazy val bytes: Array[Byte] = {
     val txCount = value.size.ensuring(_ <= Block.MaxTransactionsPerBlockVer3)
-    val bb = ByteBuffer.allocate(2)
-    TransactionsBlockField.serTxs(value, bb.putShort(txCount.toShort).array)
+    val bb = ByteBuffer.allocate(4)
+    TransactionsBlockField.serTxs(value, bb.putInt(txCount).array)
   }
 }

@@ -19,6 +19,7 @@ import scorex.transaction._
 import scorex.utils.{ScorexLogging, Time}
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.{Failure, Success}
 
 @Sharable
 class CoordinatorHandler(checkpointService: CheckpointService,
@@ -52,15 +53,18 @@ class CoordinatorHandler(checkpointService: CheckpointService,
                                 start: => String,
                                 success: => String,
                                 failure: => String,
-                                f: => Either[_, BigInt]): Unit = Future {
+                                f: => Either[_, Option[BigInt]]): Unit = Future {
     log.debug(s"${id(src)} $start")
-    f match {
-      case Right(newLocalScore) =>
-        log.info(s"${id(src)} $success, new local score is $newLocalScore")
-        allChannels.broadcast(LocalScoreChanged(newLocalScore))
-      case Left(e) =>
-        log.warn(s"${id(src)} $failure: $e")
-    }
+    f
+  }.onComplete {
+    case Failure(e) =>
+      log.error(s"${id(src)} Failure: $failure: $e")
+    case Success(Right(Some(newLocalScore))) =>
+      log.info(s"${id(src)} $success, new local score is $newLocalScore")
+      allChannels.broadcast(LocalScoreChanged(newLocalScore))
+    case Success(Right(None)) => // score has not changed
+    case Success(Left(e)) =>
+      log.warn(s"${id(src)} Left: $failure: $e")
   }
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = {
@@ -71,7 +75,7 @@ class CoordinatorHandler(checkpointService: CheckpointService,
         "Attempting to process checkpoint",
         "Successfully processed checkpoint",
         s"Error processing checkpoint",
-        processCheckpoint(c))
+        processCheckpoint(c).map(Some(_)))
 
       case ExtensionBlocks(blocks) =>
         blocks.foreach(BlockStats.received(_, from))
@@ -89,15 +93,17 @@ class CoordinatorHandler(checkpointService: CheckpointService,
           case Right(_) => broadcastingScore(ctx.channel(),
             s"Attempting to append block ${b.uniqueId}",
             s"Successfully appended block ${b.uniqueId}",
-            s"Could not append block ${b.uniqueId}",
-            processBlock(b, false).left.map { x =>
-              BlockStats.declined(b)
-              x
-            }.right.map { x =>
-              miner.scheduleMining()
-              if(b.transactionData.isEmpty)
-                allChannels.broadcast(BlockForged(b), Some(ctx.channel()))
-              x
+            s"Could not append block ${b.uniqueId}", {
+              val blockProcessingResult = processBlock(b, false)
+              blockProcessingResult match {
+                case Left(_) => BlockStats.declined(b)
+                case Right(Some(_)) =>
+                  miner.scheduleMining()
+                  if (b.transactionData.isEmpty)
+                    allChannels.broadcast(BlockForged(b), Some(ctx.channel()))
+                case _ =>
+              }
+              blockProcessingResult
             }
           )
         }

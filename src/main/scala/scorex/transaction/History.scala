@@ -1,16 +1,16 @@
 package scorex.transaction
 
-import com.wavesplatform.features.FeatureProvider
 import com.wavesplatform.network.{BlockCheckpoint, Checkpoint}
 import com.wavesplatform.state2.ByteStr
 import scorex.block.Block.BlockId
 import scorex.block.{Block, MicroBlock}
-import scorex.transaction.History.BlockchainScore
+import scorex.consensus.nxt.NxtLikeConsensusBlockData
+import scorex.transaction.History.{BlockchainScore, BlockMinerInfo}
 import scorex.utils.Synchronized
 
 import scala.util.Try
 
-trait History extends Synchronized with AutoCloseable with FeatureProvider {
+trait History extends Synchronized with AutoCloseable {
 
   def height(): Int
 
@@ -24,15 +24,15 @@ trait History extends Synchronized with AutoCloseable with FeatureProvider {
 
   def lastBlockIds(howMany: Int): Seq[ByteStr]
 
-  def lastBlockTimestamp() : Option[Long]
+  def lastBlockTimestamp(): Option[Long]
 
-  def lastBlockId() : Option[ByteStr]
+  def lastBlockId(): Option[ByteStr]
 }
 
 trait NgHistory extends History {
   def microBlock(id: ByteStr): Option[MicroBlock]
 
-  def bestLastBlock(maxTimestamp: Long) : Option[Block]
+  def bestLastBlockInfo(maxTimestamp: Long): Option[BlockMinerInfo]
 }
 
 trait DebugNgHistory {
@@ -64,6 +64,8 @@ object CheckpointService {
 object History {
 
   type BlockchainScore = BigInt
+
+  case class BlockMinerInfo(consensus: NxtLikeConsensusBlockData, timestamp: Long, blockId: BlockId)
 
   implicit class HistoryExt(history: History) {
 
@@ -118,5 +120,6 @@ object History {
 
     def genesis: Block = history.blockAt(1).get
   }
+
 
 }

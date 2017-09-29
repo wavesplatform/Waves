@@ -6,7 +6,7 @@ import com.wavesplatform.features.{BlockchainFeatures, FeatureProvider}
 import com.wavesplatform.metrics.{BlockStats, Metrics, TxsInBlockchainStats}
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.network.{BlockCheckpoint, Checkpoint}
-import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
+import com.wavesplatform.settings.{BlockchainSettings, FunctionalitySettings, WavesSettings}
 import com.wavesplatform.state2.reader.StateReader
 import com.wavesplatform.state2.{ByteStr, Instrumented}
 import kamon.Kamon
@@ -18,12 +18,13 @@ import scorex.transaction._
 import scorex.utils.{ScorexLogging, Time}
 
 import scala.concurrent.duration._
+import PoSCalc._
 
 object Coordinator extends ScorexLogging with Instrumented {
   def processFork(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater,
                   stateReader: StateReader, utxStorage: UtxPool, time: Time, settings: WavesSettings, miner: Miner,
                   blockchainReadiness: AtomicBoolean, featureProvider: FeatureProvider)
-                 (newBlocks: Seq[Block]): Either[ValidationError, BigInt] = {
+                 (newBlocks: Seq[Block]): Either[ValidationError, Option[BigInt]] = {
     val extension = newBlocks.dropWhile(history.contains)
 
     extension.headOption.map(_.reference) match {
@@ -68,11 +69,11 @@ object Coordinator extends ScorexLogging with Instrumented {
           droppedTransactions.foreach(utxStorage.putIfNew)
           miner.scheduleMining()
           updateBlockchainReadinessFlag(history, time, blockchainReadiness, settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed)
-          score
+          Some(score)
         }
       case None =>
         log.debug("No new blocks found in extension")
-        Right(history.score())
+        Right(None)
     }
   }
 
@@ -85,15 +86,20 @@ object Coordinator extends ScorexLogging with Instrumented {
   def processSingleBlock(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater, time: Time,
                          stateReader: StateReader, utxStorage: UtxPool, blockchainReadiness: AtomicBoolean,
                          settings: WavesSettings, featureProvider: FeatureProvider)
-                        (newBlock: Block, local: Boolean): Either[ValidationError, BigInt] = measureSuccessful(blockProcessingTimeStats, {
-    val newScore = for {
-      _ <- appendBlock(checkpoint, history, blockchainUpdater, stateReader, utxStorage, time, settings.blockchainSettings, featureProvider)(newBlock, local)
-    } yield history.score()
+                        (newBlock: Block, local: Boolean): Either[ValidationError, Option[BigInt]] = measureSuccessful(blockProcessingTimeStats, {
+    if (history.contains(newBlock))
+      Right(None)
+    else {
+      val newScore = for {
+        _ <- Either.cond(history.heightOf(newBlock.reference).exists(_ >= history.height() - 1), (), GenericError("Can process either new top block or current top block's competitor"))
+        _ <- appendBlock(checkpoint, history, blockchainUpdater, stateReader, utxStorage, time, settings.blockchainSettings, featureProvider)(newBlock, local)
+      } yield history.score()
 
-    if (local || newScore.isRight) {
-      updateBlockchainReadinessFlag(history, time, blockchainReadiness, settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed)
+      if (local || newScore.isRight) {
+        updateBlockchainReadinessFlag(history, time, blockchainReadiness, settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed)
+      }
+      newScore.right.map(Some(_))
     }
-    newScore
   })
 
   def processMicroBlock(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater, utxStorage: UtxPool)
@@ -103,6 +109,12 @@ object Coordinator extends ScorexLogging with Instrumented {
     _ <- blockchainUpdater.processMicroBlock(microBlock)
   } yield utxStorage.removeAll(microBlock.transactionData))
 
+  private def validateEffectiveBalance(fp: FeatureProvider, fs: FunctionalitySettings, block: Block, baseHeight: Int)(effectiveBalance: Long): Either[String, Long] =
+    Either.cond(block.timestamp < fs.minimalGeneratingBalanceAfter ||
+      (block.timestamp >= fs.minimalGeneratingBalanceAfter && effectiveBalance >= MinimalEffectiveBalanceForGenerator1) ||
+      fp.featureActivationHeight(BlockchainFeatures.SmallerMinimalGeneratingBalance.id).exists(baseHeight >= _)
+        && effectiveBalance >= MinimalEffectiveBalanceForGenerator2, effectiveBalance,
+      s"generator's effective balance $effectiveBalance is less that required for generation")
 
   private def appendBlock(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater,
                           stateReader: StateReader, utxStorage: UtxPool, time: Time, settings: BlockchainSettings,
@@ -110,7 +122,10 @@ object Coordinator extends ScorexLogging with Instrumented {
                          (block: Block, local: Boolean): Either[ValidationError, Unit] = for {
     _ <- Either.cond(checkpoint.isBlockValid(block.signerData.signature, history.height() + 1), (),
       GenericError(s"Block ${block.uniqueId} at height ${history.height() + 1} is not valid w.r.t. checkpoint"))
-    _ <- blockConsensusValidation(history, stateReader, settings, time.correctedTime(), featureProvider)(block)
+    _ <- blockConsensusValidation(history, featureProvider, settings, time.correctedTime(), block) { height =>
+      PoSCalc.generatingBalance(stateReader, settings.functionalitySettings, block.signerData.generator, height).toEither.left.map(_.toString)
+        .flatMap(validateEffectiveBalance(featureProvider, settings.functionalitySettings, block, height))
+    }
     height = history.height()
     discardedTxs <- blockchainUpdater.processBlock(block)
   } yield {
@@ -124,6 +139,7 @@ object Coordinator extends ScorexLogging with Instrumented {
   def processCheckpoint(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater)
                        (newCheckpoint: Checkpoint): Either[ValidationError, BigInt] =
     checkpoint.set(newCheckpoint).map { _ =>
+      log.info(s"Processing checkpoint $checkpoint")
       makeBlockchainCompliantWith(history, blockchainUpdater)(newCheckpoint)
       history.score()
     }
@@ -155,43 +171,40 @@ object Coordinator extends ScorexLogging with Instrumented {
 
   val MaxTimeDrift: Long = 15.seconds.toMillis
 
-  private def blockConsensusValidation(history: History, state: StateReader, bcs: BlockchainSettings, currentTs: Long,
-                                       featureProvider: FeatureProvider)
-                                      (block: Block): Either[ValidationError, Unit] = history.read { _ =>
-    import PoSCalc._
+  private def blockConsensusValidation(history: History, fp: FeatureProvider, bcs: BlockchainSettings, currentTs: Long, block: Block)
+                                      (genBalance: Int => Either[String, Long]): Either[ValidationError, Unit] = history.read { _ =>
 
     val fs = bcs.functionalitySettings
     val blockTime = block.timestamp
+    val generator = block.signerData.generator
 
     (for {
-      _ <- Either.cond(state.height > fs.blockVersion3After
+      height <- history.heightOf(block.reference).toRight(s"history does not contain parent ${block.reference}")
+      _ <- Either.cond(height > fs.blockVersion3After
         || block.version == Block.GenesisBlockVersion
         || block.version == Block.PlainBlockVersion,
         (), s"Block Version 3 can only appear at height greater than ${fs.blockVersion3After}")
       _ <- Either.cond(blockTime - currentTs < MaxTimeDrift, (), s"timestamp $blockTime is from future")
       _ <- Either.cond(blockTime < fs.requireSortedTransactionsAfter
-        || state.height > fs.dontRequireSortedTransactionsAfter
+        || height > fs.dontRequireSortedTransactionsAfter
         || block.transactionData.sorted(TransactionsOrdering.InBlock) == block.transactionData,
         (), "transactions are not sorted")
       parent <- history.parent(block).toRight(s"history does not contain parent ${block.reference}")
-      parentHeight <- history.heightOf(parent.uniqueId).toRight(s"history does not contain parent ${block.reference}")
       prevBlockData = parent.consensusData
       blockData = block.consensusData
-      cbt = calcBaseTarget(bcs.genesisSettings.averageBlockDelay, parentHeight, parent, history.parent(parent, 2), blockTime)
+      cbt = calcBaseTarget(bcs.genesisSettings.averageBlockDelay, height, parent.consensusData.baseTarget, parent.timestamp, history.parent(parent, 2).map(_.timestamp), blockTime)
       bbt = blockData.baseTarget
       _ <- Either.cond(cbt == bbt, (), s"declared baseTarget $bbt does not match calculated baseTarget $cbt")
-      generator = block.signerData.generator
       calcGs = calcGeneratorSignature(prevBlockData, generator)
       blockGs = blockData.generationSignature.arr
-      _ <- Either.cond(calcGs.sameElements(blockGs), (),
-        s"declared generation signature ${blockGs.mkString} does not match calculated generation signature ${calcGs.mkString}")
-      effectiveBalance <- generatingBalance(state, fs, generator, parentHeight).toEither.left.map(er => GenericError(er.getMessage))
+      _ <- Either.cond(calcGs.sameElements(blockGs), (), s"declared generation signature ${blockGs.mkString} does not match calculated generation signature ${calcGs.mkString}")
+      effectiveBalance <- genBalance(height)
       _ <- Either.cond(blockTime < fs.minimalGeneratingBalanceAfter ||
         (blockTime >= fs.minimalGeneratingBalanceAfter && effectiveBalance >= MinimalEffectiveBalanceForGenerator1) ||
-        (featureProvider.isFeatureLocallyActivated(BlockchainFeatures.SmallerMinimalGeneratingBalance.id) && effectiveBalance >= MinimalEffectiveBalanceForGenerator2), (),
+        (fp.isFeatureActivated(BlockchainFeatures.SmallerMinimalGeneratingBalance) && effectiveBalance >= MinimalEffectiveBalanceForGenerator2), (),
         s"generator's effective balance $effectiveBalance is less that required for generation")
       hit = calcHit(prevBlockData, generator)
-      target = calcTarget(parent, blockTime, effectiveBalance)
+      target = calcTarget(parent.consensusData.baseTarget, parent.timestamp, blockTime, effectiveBalance)
       _ <- Either.cond(hit < target, (), s"calculated hit $hit >= calculated target $target")
     } yield ()).left.map(e => GenericError(s"Block ${block.uniqueId} is invalid: $e"))
   }

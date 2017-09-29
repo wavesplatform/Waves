@@ -133,9 +133,8 @@ object Block extends ScorexLogging {
       val v: (Array[Byte], Int) = version match {
         case 1 | 2 => (bytes.tail, bytes.head) //  127 max, won't work properly if greater
         case 3 =>
-          // https://stackoverflow.com/a/18247942/288091
-          val size = ByteBuffer.wrap(bytes, 0, 2).getShort()
-          (bytes.tail.tail, if (size >= 0) size else size + (2 << 15)) // 65535 max
+          val size = ByteBuffer.wrap(bytes, 0, 4).getInt()
+          (bytes.drop(4), size)
         case _ => ???
       }
 
@@ -174,9 +173,9 @@ object Block extends ScorexLogging {
     val txBlockField = transParseBytes(version.toInt, tBytes).get
     position += tBytesLength
 
-    var supportedFeaturesIds  = Set.empty[Short]
+    var supportedFeaturesIds = Set.empty[Short]
 
-    if(version > 2) {
+    if (version > 2) {
       val featuresCount = Ints.fromByteArray(bytes.slice(position, position + 4))
       position += 4
 

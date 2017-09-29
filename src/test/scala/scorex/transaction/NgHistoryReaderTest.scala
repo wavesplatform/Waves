@@ -13,14 +13,14 @@ import scorex.settings.TestFunctionalitySettings
 class NgHistoryReaderTest extends FunSuite with Matchers with HistoryTest {
   private val ApprovalPeriod = 10000
 
-  private val FeaturesSettingsWithAutoActivation: FeaturesSettings =
-    FeaturesSettings(autoActivate = true, autoShutdownOnUnsupportedFeature = false, List.empty)
+  private val FeaturesSettingsWithoutSupportedFeatures: FeaturesSettings =
+    FeaturesSettings(autoShutdownOnUnsupportedFeature = false, List.empty)
 
   test("ng reader feature activation and rollback") {
     var ngState = Option.empty[NgState]
 
     val history = HistoryWriterImpl(None, new ReentrantReadWriteLock(), TestFunctionalitySettings.Enabled,
-      FeaturesSettingsWithAutoActivation).get
+      FeaturesSettingsWithoutSupportedFeatures).get
 
     val ngHistoryReader = new NgHistoryReader(() => ngState, history)
 

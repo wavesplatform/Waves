@@ -3,7 +3,7 @@ package com.wavesplatform.history
 import java.io.File
 import java.util.concurrent.locks.ReentrantReadWriteLock
 
-import com.wavesplatform.features.{BlockchainFeatures, BlockchainFeatureStatus}
+import com.wavesplatform.features.{BlockchainFeatures, FeatureProvider, BlockchainFeatureStatus}
 import com.wavesplatform.settings.{FeaturesSettings, FunctionalitySettings}
 import com.wavesplatform.state2.{BlockDiff, ByteStr, DataTypes}
 import com.wavesplatform.utils._
@@ -20,12 +20,12 @@ import scala.util.Try
 
 class HistoryWriterImpl private(file: Option[File], val synchronizationToken: ReentrantReadWriteLock,
                                 functionalitySettings: FunctionalitySettings, featuresSettings: FeaturesSettings)
-  extends History with ScorexLogging {
+  extends History with FeatureProvider with ScorexLogging {
 
   import HistoryWriterImpl._
 
-  val FeatureApprovalBlocksCount: Int = functionalitySettings.featureCheckBlocksPeriod
-  val MinVotesCountToActivateFeature: Int = functionalitySettings.blocksForFeatureActivation
+  override val ActivationWindowSize: Int = functionalitySettings.featureCheckBlocksPeriod
+  override val MinVotesWithinWindowToActivateFeature: Int = functionalitySettings.blocksForFeatureActivation
 
   private val db = createMVStore(file)
   private val blockBodyByHeight = Synchronized(db.openMap("blocks", new LogMVMapBuilder[Int, Array[Byte]]))
@@ -42,18 +42,18 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
 
   private def displayFeatures(s: Set[Short]): String = s"FEATURE${if (s.size > 1) "S"} ${s.mkString(", ")} ${if (s.size > 1) "WERE" else "WAS"}"
 
-  def featureVotesCountInActivationWindow(heightWithinWindow: Int): Map[Short, Int] = read { implicit lock =>
-    featuresVotes().get(votingWindowOpeningFromHeight(heightWithinWindow))
+  def featureVotesCountWithinActivationWindow(height: Int): Map[Short, Int] = read { implicit lock =>
+    featuresVotes().get(activationWindowOpeningFromHeight(height))
   }
 
-  private def acceptedFeaturesInActivationWindow(windowClosingHeight: Int): Set[Short] = {
-    featureVotesCountInActivationWindow(windowClosingHeight)
-      .filter(p => p._2 >= MinVotesCountToActivateFeature)
+  private def acceptedFeaturesInActivationWindow(height: Int): Set[Short] = {
+    featureVotesCountWithinActivationWindow(height)
+      .filter(p => p._2 >= MinVotesWithinWindowToActivateFeature)
       .keySet
   }
 
   private def updateFeaturesState(height: Int): Unit = write { implicit lock =>
-    require(height % FeatureApprovalBlocksCount == 0, s"Features' state can't be updated at given height: $height")
+    require(height % ActivationWindowSize == 0, s"Features' state can't be updated at given height: $height")
 
     val acceptedFeatures = acceptedFeaturesInActivationWindow(height)
 
@@ -64,7 +64,7 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
       log.warn("OTHERWISE THE NODE WILL BE STOPPED OR FORKED UPON FEATURE ACTIVATION")
     }
 
-    val activatedFeatures = featuresState().entrySet().asScala.filter(_.getValue <= height - FeatureApprovalBlocksCount).map(_.getKey).toSet
+    val activatedFeatures = featuresState().entrySet().asScala.filter(_.getValue <= height - ActivationWindowSize).map(_.getKey).toSet
 
     val unimplementedActivated = activatedFeatures.diff(BlockchainFeatures.implemented)
     if (unimplementedActivated.nonEmpty) {
@@ -80,18 +80,12 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
     featuresState.mutate(_.putAll(acceptedFeatures.diff(featuresState().keySet.asScala).map(_ -> height).toMap.asJava))
   }
 
-  private def votingWindowOpeningFromHeight(height: Int) = {
-    val r = 1 + height - height % FeatureApprovalBlocksCount
-    if(r <= height) r else r - FeatureApprovalBlocksCount
-  }
-
   private def alterVotes(height: Int, votes: Set[Short], voteMod: Int): Unit = write { implicit lock =>
-    val votingWindowOpening = votingWindowOpeningFromHeight(height)
+    val votingWindowOpening = activationWindowOpeningFromHeight(height)
     val votesWithinWindow = featuresVotes().getOrDefault(votingWindowOpening, Map.empty[Short, Int])
     val newVotes = votes.foldLeft(votesWithinWindow)((v, feature) => v + (feature -> (v.getOrElse(feature, 0) + voteMod)))
     featuresVotes.mutate(_.put(votingWindowOpening, newVotes))
   }
-
 
   def appendBlock(block: Block)(consensusValidation: => Either[ValidationError, BlockDiff]): Either[ValidationError, BlockDiff] =
     write { implicit lock =>
@@ -108,7 +102,7 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
 
         alterVotes(h, block.supportedFeaturesIds, 1)
 
-        if (h % FeatureApprovalBlocksCount == 0) updateFeaturesState(h)
+        if (h % ActivationWindowSize == 0) updateFeaturesState(h)
 
         db.commit()
         blockHeightStats.record(h)
@@ -134,7 +128,7 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
       Block.parseBytes(blockBodyByHeight.mutate(_.remove(h))).fold(_ => Seq.empty[Transaction], _.transactionData)
     scoreByHeight.mutate(_.remove(h))
 
-    if (h % FeatureApprovalBlocksCount == 0) {
+    if (h % ActivationWindowSize == 0) {
       val featuresToRemove = featuresState().entrySet().asScala.filter(_.getValue == h).map(_.getKey)
       featuresState.mutate(fs => featuresToRemove.foreach(fs.remove))
     }
@@ -168,24 +162,21 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
   override def close(): Unit = db.close()
 
   override def featureActivationHeight(feature: Short): Option[Int] = read { implicit lock =>
-    Option(featuresState().get(feature)).map(h => h + FeatureApprovalBlocksCount)
+    Option(featuresState().get(feature)).map(h => h + ActivationWindowSize)
   }
 
   override def featureStatus(feature: Short): BlockchainFeatureStatus = read { implicit lock =>
     Option(featuresState().get(feature))
-      .map(h => if (h <= height - FeatureApprovalBlocksCount)
+      .map(h => if (h <= height - ActivationWindowSize)
         BlockchainFeatureStatus.Activated else
         BlockchainFeatureStatus.Accepted)
       .getOrElse(BlockchainFeatureStatus.Undefined)
   }
 
-  def isFeatureAllowedByConfig(feature: Short): Boolean =
-    featuresSettings.autoActivate || featuresSettings.supported.contains(feature)
-
-
-  override def isFeatureLocallyActivated(feature: Short): Boolean =
-    isFeatureAllowedByConfig(feature) &&
-      featureStatus(feature) == BlockchainFeatureStatus.Activated
+  override def activationWindowOpeningFromHeight(height: Int): Int = {
+    val r = 1 + height - height % ActivationWindowSize
+    if (r <= height) r else r - ActivationWindowSize
+  }
 
   override def lastBlockTimestamp(): Option[Long] = this.lastBlock.map(_.timestamp)
 

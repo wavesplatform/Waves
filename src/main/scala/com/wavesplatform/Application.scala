@@ -44,7 +44,7 @@ import scala.util.Try
 class Application(val actorSystem: ActorSystem, val settings: WavesSettings) extends ScorexLogging {
 
   private val checkpointService = new CheckpointServiceImpl(settings.blockchainSettings.checkpointFile, settings.checkpointsSettings)
-  private val (history, stateWriter, stateReader, blockchainUpdater, blockchainDebugInfo) =
+  private val (history, featureProvider, stateWriter, stateReader, blockchainUpdater, blockchainDebugInfo) =
     StorageFactory(settings.blockchainSettings, settings.featuresSettings).get
   private lazy val upnp = new UPnP(settings.networkSettings.uPnPSettings) // don't initialize unless enabled
   private val wallet: Wallet = Wallet(settings.walletSettings)
@@ -70,10 +70,10 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
     val blockchainReadiness = new AtomicBoolean(false)
 
     val miner = new Miner(allChannels, blockchainReadiness, blockchainUpdater, checkpointService,
-      history, history, stateReader, settings, time, utxStorage, wallet)
+      history, featureProvider, stateReader, settings, time, utxStorage, wallet)
 
     val network = new NetworkServer(checkpointService, blockchainUpdater, time, miner, stateReader, settings,
-      history, utxStorage, peerDatabase, allChannels, establishedConnections, blockchainReadiness, history)
+      history, utxStorage, peerDatabase, allChannels, establishedConnections, blockchainReadiness, featureProvider)
 
     miner.scheduleMining()
 
@@ -227,7 +227,10 @@ object Application extends ScorexLogging {
   def main(args: Array[String]): Unit = {
     // prevents java from caching successful name resolutions, which is needed e.g. for proper NTP server rotation
     // http://stackoverflow.com/a/17219327
-    Security.setProperty("networkaddress.cache.ttl", "0")
+    System.setProperty("sun.net.inetaddr.ttl", "15")
+    System.setProperty("sun.net.inetaddr.negative.ttl", "15")
+    Security.setProperty("networkaddress.cache.ttl", "15")
+    Security.setProperty("networkaddress.cache.negative.ttl", "15")
 
     log.info("Starting...")
 
@@ -235,6 +238,11 @@ object Application extends ScorexLogging {
     val settings = WavesSettings.fromConfig(config)
     Kamon.start(config)
     Metrics.start(settings.metrics)
+
+    log.trace(s"System property sun.net.inetaddr.ttl=${System.getProperty("sun.net.inetaddr.ttl")}")
+    log.trace(s"System property sun.net.inetaddr.negative.ttl=${System.getProperty("sun.net.inetaddr.negative.ttl")}")
+    log.trace(s"Security property networkaddress.cache.ttl=${Security.getProperty("networkaddress.cache.ttl")}")
+    log.trace(s"Security property networkaddress.cache.negative.ttl=${Security.getProperty("networkaddress.cache.negative.ttl")}")
 
     RootActorSystem.start("wavesplatform", config) { actorSystem =>
       configureLogging(settings)
