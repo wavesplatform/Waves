@@ -43,7 +43,7 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
   private def displayFeatures(s: Set[Short]): String = s"FEATURE${if (s.size > 1) "S"} ${s.mkString(", ")} ${if (s.size > 1) "WERE" else "WAS"}"
 
   def featureVotesCountWithinActivationWindow(height: Int): Map[Short, Int] = read { implicit lock =>
-    featuresVotes().get(activationWindowOpeningFromHeight(height))
+    featuresVotes().get(FeatureProvider.activationWindowOpeningFromHeight(height, ActivationWindowSize))
   }
 
   private def acceptedFeaturesInActivationWindow(height: Int): Set[Short] = {
@@ -81,7 +81,7 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
   }
 
   private def alterVotes(height: Int, votes: Set[Short], voteMod: Int): Unit = write { implicit lock =>
-    val votingWindowOpening = activationWindowOpeningFromHeight(height)
+    val votingWindowOpening = FeatureProvider.activationWindowOpeningFromHeight(height, ActivationWindowSize)
     val votesWithinWindow = featuresVotes().getOrDefault(votingWindowOpening, Map.empty[Short, Int])
     val newVotes = votes.foldLeft(votesWithinWindow)((v, feature) => v + (feature -> (v.getOrElse(feature, 0) + voteMod)))
     featuresVotes.mutate(_.put(votingWindowOpening, newVotes))
@@ -172,11 +172,6 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
         BlockchainFeatureStatus.Activated else
         BlockchainFeatureStatus.Accepted)
       .getOrElse(BlockchainFeatureStatus.Undefined)
-  }
-
-  override def activationWindowOpeningFromHeight(height: Int): Int = {
-    val r = 1 + height - height % ActivationWindowSize
-    if (r <= height) r else r - ActivationWindowSize
   }
 
   override def lastBlockTimestamp(): Option[Long] = this.lastBlock.map(_.timestamp)

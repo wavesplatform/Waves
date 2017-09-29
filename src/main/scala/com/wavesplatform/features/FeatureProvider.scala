@@ -7,7 +7,6 @@ trait FeatureProvider {
 
   def featureVotesCountWithinActivationWindow(height: Int): Map[Short, Int]
 
-  def activationWindowOpeningFromHeight(height: Int): Int
 }
 
 object FeatureProvider {
@@ -18,4 +17,8 @@ object FeatureProvider {
     }
   }
 
+  def activationWindowOpeningFromHeight(height: Int, activationWindowSize: Int): Int = {
+    val r = 1 + height - height % activationWindowSize
+    if (r <= height) r else r - activationWindowSize
+  }
 }

@@ -124,8 +124,6 @@ class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen {
       }
 
       override def featureVotesCountWithinActivationWindow(height: Int): Map[Short, Int] = ???
-
-      override def activationWindowOpeningFromHeight(height: Int) = ???
     }
     assertDiffEiWithPrev(blocks.init, blocks.last,fp, fs)(assertion)
   }

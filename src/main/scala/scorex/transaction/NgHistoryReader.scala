@@ -87,12 +87,11 @@ class NgHistoryReader(ngState: () => Option[NgState], inner: History with Featur
 
   override def featureVotesCountWithinActivationWindow(height: Int): Map[Short, Int] = {
     val votes = inner.featureVotesCountWithinActivationWindow(height)
-    if (activationWindowOpeningFromHeight(this.height()) == activationWindowOpeningFromHeight(height))
+    if (FeatureProvider.activationWindowOpeningFromHeight(this.height(), ActivationWindowSize) ==
+      FeatureProvider.activationWindowOpeningFromHeight(height, ActivationWindowSize))
       ngState().map(_.base.supportedFeaturesIds).getOrElse(Seq.empty).foldLeft(votes)((votes, f) => votes + (f -> (votes.getOrElse(f, 0) + 1)))
     else votes
   }
-
-  override def activationWindowOpeningFromHeight(height: Int): Int = inner.activationWindowOpeningFromHeight(height)
 
   override def featureStatus(feature: Short): BlockchainFeatureStatus = {
     val status = inner.featureStatus(feature)
