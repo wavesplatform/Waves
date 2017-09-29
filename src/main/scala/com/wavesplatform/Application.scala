@@ -16,7 +16,7 @@ import com.wavesplatform.history.{CheckpointServiceImpl, StorageFactory}
 import com.wavesplatform.http.NodeApiRoute
 import com.wavesplatform.matcher.Matcher
 import com.wavesplatform.metrics.Metrics
-import com.wavesplatform.mining.Miner
+import com.wavesplatform.mining.{Miner, MinerImpl}
 import com.wavesplatform.network.{NetworkServer, PeerDatabaseImpl, PeerInfo, UPnP}
 import com.wavesplatform.settings._
 import com.wavesplatform.utils.forceStopApplication
@@ -69,8 +69,9 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
 
     val blockchainReadiness = new AtomicBoolean(false)
 
-    val miner = new Miner(allChannels, blockchainReadiness, blockchainUpdater, checkpointService,
-      history, featureProvider, stateReader, settings, time, utxStorage, wallet)
+    val miner = if (settings.minerSettings.enable)
+      new MinerImpl(allChannels, blockchainReadiness, blockchainUpdater, checkpointService, history, featureProvider, stateReader, settings, time, utxStorage, wallet)
+    else Miner.NopMiner
 
     val network = new NetworkServer(checkpointService, blockchainUpdater, time, miner, stateReader, settings,
       history, utxStorage, peerDatabase, allChannels, establishedConnections, blockchainReadiness, featureProvider)
