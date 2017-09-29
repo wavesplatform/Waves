@@ -43,7 +43,7 @@ object FunctionalitySettings {
     allowCreatealiasTransactionAfter = 1503914400000L, // 2017-08-28T10:00:00Z
     allowMultipleLeaseCancelTransactionUntilTimestamp = 1492768800000L,
     resetEffectiveBalancesAtHeight = 462000,
-    allowLeasedBalanceTransferUntil = 1532044800000L)
+    allowLeasedBalanceTransferUntil = 1495061686527L)
 
   val TESTNET = FunctionalitySettings(
     allowTemporaryNegativeUntil = 1477958400000L,

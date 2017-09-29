@@ -158,7 +158,7 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
     settings.functionalitySettings.resetEffectiveBalancesAtHeight should be(462000)
     settings.functionalitySettings.requirePaymentUniqueIdAfter should be(1491192000000L)
     settings.functionalitySettings.allowExchangeTransactionAfter should be(1491192000000L)
-    settings.functionalitySettings.allowLeasedBalanceTransferUntil should be(Long.MaxValue)
+    settings.functionalitySettings.allowLeasedBalanceTransferUntil should be(1495061686527L)
     settings.genesisSettings.blockTimestamp should be(1460678400000L)
     settings.genesisSettings.timestamp should be(1465742577614L)
     settings.genesisSettings.signature should be(ByteStr.decodeBase58("FSH8eAAzZNqnG8xgTZtz5xuLqXySsXgAjmFEC25hXMbEufiGjqWPnGCZFt6gLiVLJny16ipxRNAkkzjjhqTjBE2").toOption)
