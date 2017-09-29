@@ -254,18 +254,23 @@ case class DebugApiRoute(settings: RestAPISettings,
   def blacklist: Route = (path("blacklist") & post & withAuth) {
     entity(as[String]) { socketAddressString =>
       try {
-        val uri = new URI("node://" + socketAddressString)
-        val address = InetAddress.getByName(uri.getHost)
-        establishedConnections.entrySet().stream().forEach(entry => {
-          if (entry.getValue.remoteAddress == address.toString) {
+        val address = parseInetAddress(socketAddressString)
+        establishedConnections.entrySet().stream().forEach { entry =>
+          val entryAddress = parseInetAddress(entry.getValue.remoteAddress)
+          if (entryAddress == address) {
             peerDatabase.blacklistAndClose(entry.getKey, "Debug API request")
           }
-        })
+        }
         complete(StatusCodes.OK)
       } catch {
         case NonFatal(_) => complete(StatusCodes.BadRequest)
       }
     } ~ complete(StatusCodes.BadRequest)
+  }
+
+  private def parseInetAddress(x: String): InetAddress = {
+    val uri = new URI(s"node://${x.replace("/", "")}")
+    InetAddress.getByName(uri.getHost)
   }
 
 }
