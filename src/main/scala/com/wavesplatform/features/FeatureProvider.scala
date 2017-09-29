@@ -1,9 +1,6 @@
 package com.wavesplatform.features
 
 trait FeatureProvider {
-  val ActivationWindowSize: Int
-  val MinVotesWithinWindowToActivateFeature: Int
-
   def featureStatus(feature: Short): BlockchainFeatureStatus
 
   def featureActivationHeight(feature: Short): Option[Int]

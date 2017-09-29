@@ -81,38 +81,7 @@ class HistoryWriterTest extends FunSuite with Matchers with HistoryTest {
     history.featureStatus(3) shouldBe BlockchainFeatureStatus.Undefined
   }
 
-  test("last block should affect feature voting the same way either liquid or saved to history") {
-    val history = HistoryWriterImpl(None, new ReentrantReadWriteLock(), TestFunctionalitySettings.Enabled,
-      FeaturesSettingsWithoutSupportedFeatures).get
-
-    appendGenesisBlock(history)
-
-    history.featureStatus(1) shouldBe BlockchainFeatureStatus.Undefined
-    history.featureStatus(2) shouldBe BlockchainFeatureStatus.Undefined
-
-    (1 until ApprovalPeriod - 1).foreach { _ =>
-      appendTestBlock3(history, Set(1))
-    }
-
-    history.height() shouldBe ApprovalPeriod - 1
-
-    //one block before feature check
-    history.featureStatus(1) shouldBe BlockchainFeatureStatus.Undefined
-    history.featureStatus(2) shouldBe BlockchainFeatureStatus.Undefined
-
-    val nextBlock = getNextTestBlock(history)
-
-    //last ng block
-//    history.featureStatus(1, Option(NgState(nextBlock, BlockDiff.empty, 0L))) shouldBe BlockchainFeatureStatus.Accepted
-//    history.featureStatus(2, Option(NgState(nextBlock, BlockDiff.empty, 0L))) shouldBe BlockchainFeatureStatus.Undefined
-
-    //last solid block
-    history.appendBlock(nextBlock)(Right(BlockDiff.empty))
-    history.featureStatus(1) shouldBe BlockchainFeatureStatus.Accepted
-    history.featureStatus(2) shouldBe BlockchainFeatureStatus.Undefined
-  }
-
-    test("features rollback with block rollback") {
+  test("features rollback with block rollback") {
     val history = HistoryWriterImpl(None, new ReentrantReadWriteLock(), TestFunctionalitySettings.Enabled,
       FeaturesSettingsWithoutSupportedFeatures).get
 
@@ -178,7 +147,7 @@ class HistoryWriterTest extends FunSuite with Matchers with HistoryTest {
     history.featureActivationHeight(1) shouldBe Some(ApprovalPeriod * 2)
   }
 
-    test("feature activated only by 90% of blocks") {
+  test("feature activated only by 90% of blocks") {
     val history = HistoryWriterImpl(None, new ReentrantReadWriteLock(), TestFunctionalitySettings.Enabled,
       FeaturesSettingsWithoutSupportedFeatures).get
 

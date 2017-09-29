@@ -1,6 +1,8 @@
 package com.wavesplatform.history
 
-import com.wavesplatform.TransactionGen
+import com.typesafe.config.ConfigFactory
+import com.wavesplatform.{TestHelpers, TransactionGen}
+import com.wavesplatform.settings.{BlockchainSettings, FunctionalitySettings, WavesSettings}
 import com.wavesplatform.state2._
 import com.wavesplatform.state2.diffs._
 import org.scalacheck.{Gen, Shrink}
@@ -18,10 +20,11 @@ class BlockchainUpdaterBlockMicroblockSequencesSameTransactionsTest extends Prop
 
   private implicit def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)
 
+
   property("resulting miner balance should not depend on tx distribution among blocks and microblocks") {
     forAll(g(100,5)) { case ((gen, rest)) =>
       val finalMinerBalances = rest.map { case (a@(bmb: BlockAndMicroblockSequence, last: Block)) =>
-        val d = domain(ApplyMinerFeeWithTransactionSettings, EmptyFeaturesSettings)
+        val d = domain(RootApplyMinerFeeWithTransactionSettings, EmptyFeaturesSettings)
         d.blockchainUpdater.processBlock(gen).explicitGet()
         bmb.foreach { case ((b, mbs)) =>
           d.blockchainUpdater.processBlock(b).explicitGet()
@@ -45,7 +48,7 @@ class BlockchainUpdaterBlockMicroblockSequencesSameTransactionsTest extends Prop
       genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
       payment: PaymentTransaction = PaymentTransaction.create(master, master, amt, fee, ts).explicitGet()
     } yield (miner, genesis, payment, ts)
-    scenario(preconditionsAndPayments, ApplyMinerFeeWithTransactionSettings) { case (domain, (miner, genesis, payment, ts)) =>
+    scenario(preconditionsAndPayments, RootApplyMinerFeeWithTransactionSettings) { case (domain, (miner, genesis, payment, ts)) =>
       val genBlock = buildBlockOfTxs(randomSig, Seq(genesis))
       val (base, micros) = chainBaseAndMicro(genBlock.uniqueId, Seq.empty, Seq(Seq(payment)), miner, 3, ts)
       val emptyBlock = customBuildBlockOfTxs(micros.last.totalResBlockSig, Seq.empty, miner, 3, ts)

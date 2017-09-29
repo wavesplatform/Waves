@@ -1,7 +1,8 @@
 package com.wavesplatform
 
+import com.typesafe.config.ConfigFactory
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.settings.{BlockchainSettings, FeaturesSettings}
+import com.wavesplatform.settings.{BlockchainSettings, FeaturesSettings, WavesSettings}
 import com.wavesplatform.state2._
 import scorex.account.PrivateKeyAccount
 import scorex.block.{Block, MicroBlock}
@@ -22,16 +23,26 @@ package object history {
     functionalitySettings = TestFunctionalitySettings.Enabled,
     genesisSettings = null)
 
+
+  val config = ConfigFactory.load()
+  val settings = WavesSettings.fromConfig(config)
+
   val ApplyMinerFeeWithTransactionSettings: BlockchainSettings = DefaultBlockchainSettings.copy(
     functionalitySettings = DefaultBlockchainSettings.functionalitySettings.copy(preActivatedFeatures = Map(BlockchainFeatures.NG.id -> 0)))
+
+  val RootApplyMinerFeeWithTransactionSettings: WavesSettings = settings.copy(blockchainSettings = ApplyMinerFeeWithTransactionSettings)
+
+  val RootDefaultSettings: WavesSettings = settings.copy(blockchainSettings = DefaultBlockchainSettings)
 
   val ApplyMinerFeeBeforeAllTransactionsSettings: BlockchainSettings = DefaultBlockchainSettings.copy(
     functionalitySettings = DefaultBlockchainSettings.functionalitySettings.copy(preActivatedFeatures = Map.empty))
 
+  val RootApplyMinerFeeBeforeAllTransactionsSettings: WavesSettings = settings.copy(blockchainSettings = ApplyMinerFeeBeforeAllTransactionsSettings)
+
   val EmptyFeaturesSettings = FeaturesSettings(autoShutdownOnUnsupportedFeature = false, List.empty)
 
-  def domain(bs: BlockchainSettings, featuresSettings: FeaturesSettings): Domain = {
-    val (history, _, _, stateReader, blockchainUpdater, _) = StorageFactory(bs, featuresSettings).get
+  def domain(settings: WavesSettings, featuresSettings: FeaturesSettings): Domain = {
+    val (history, _, _, stateReader, blockchainUpdater, _) = StorageFactory(settings, featuresSettings).get
     Domain(history, stateReader, blockchainUpdater)
   }
 

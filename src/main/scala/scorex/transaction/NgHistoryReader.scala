@@ -2,16 +2,17 @@ package scorex.transaction
 
 import java.util.concurrent.locks.ReentrantReadWriteLock
 
-import com.wavesplatform.features.{FeatureProvider, BlockchainFeatureStatus}
+import com.wavesplatform.features.{BlockchainFeatureStatus, FeatureProvider}
+import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2._
 import scorex.block.Block.BlockId
 import scorex.block.{Block, MicroBlock}
-import scorex.transaction.History.{BlockchainScore, BlockMinerInfo}
+import scorex.transaction.History.{BlockMinerInfo, BlockchainScore}
 
-class NgHistoryReader(ngState: () => Option[NgState], inner: History with FeatureProvider) extends History with NgHistory with DebugNgHistory with FeatureProvider {
+class NgHistoryReader(ngState: () => Option[NgState], inner: History with FeatureProvider, settings: FunctionalitySettings) extends History with NgHistory with DebugNgHistory with FeatureProvider {
 
-  override val ActivationWindowSize: Int = inner.ActivationWindowSize
-  override val MinVotesWithinWindowToActivateFeature: Int = inner.MinVotesWithinWindowToActivateFeature
+  val ActivationWindowSize: Int = settings.featureCheckBlocksPeriod
+  val MinVotesWithinWindowToActivateFeature: Int = settings.blocksForFeatureActivation
 
   override def synchronizationToken: ReentrantReadWriteLock = inner.synchronizationToken
 

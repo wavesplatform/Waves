@@ -6,7 +6,7 @@ import cats._
 import cats.implicits._
 import com.wavesplatform.features.FeatureProvider
 import com.wavesplatform.history.HistoryWriterImpl
-import com.wavesplatform.settings.FunctionalitySettings
+import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state2.BlockchainUpdaterImpl._
 import com.wavesplatform.state2.NgState._
 import com.wavesplatform.state2.diffs.BlockDiffer
@@ -21,7 +21,7 @@ import scorex.transaction._
 import scorex.utils.ScorexLogging
 
 class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
-                                    settings: FunctionalitySettings,
+                                    settings: WavesSettings,
                                     featureProvider: FeatureProvider,
                                     minimumInMemoryDiffSize: Int,
                                     historyWriter: HistoryWriterImpl,
@@ -36,7 +36,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
       Range(from, to).map(historyWriter.blockBytes).par.map(b => Block.parseBytes(b.get).get).seq
     }
     measureLog(s"Building diff from $from up to $to") {
-      BlockDiffer.unsafeDiffMany(settings, featureProvider, state, historyWriter.blockAt(from - 1))(blocks)
+      BlockDiffer.unsafeDiffMany(settings.blockchainSettings.functionalitySettings, featureProvider, state, historyWriter.blockAt(from - 1))(blocks)
     }
   }
 
@@ -51,7 +51,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
 
   def bestLiquidState: StateReader = read { implicit l => composite(currentPersistedBlocksState, () => ngState().map(_.bestLiquidDiff).orEmpty) }
 
-  def historyReader: NgHistory with DebugNgHistory with FeatureProvider = read { implicit l => new NgHistoryReader(() => ngState(), historyWriter) }
+  def historyReader: NgHistory with DebugNgHistory with FeatureProvider = read { implicit l => new NgHistoryReader(() => ngState(), historyWriter, settings.blockchainSettings.functionalitySettings) }
 
   private def updatePersistedAndInMemory(): Unit = write { implicit l =>
     logHeights("State rebuild started")
@@ -81,11 +81,11 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
             val logDetails = s"The referenced block(${block.reference})" +
               s" ${if (historyWriter.contains(block.reference)) "exits, it's not last persisted" else "doesn't exist"}"
             Left(BlockAppendError(s"References incorrect or non-existing block: " + logDetails, block))
-          case _ => BlockDiffer.fromBlock(settings, featureProvider, currentPersistedBlocksState, historyWriter.lastBlock, block).map((_, Seq.empty[Transaction]))
+          case _ => BlockDiffer.fromBlock(settings.blockchainSettings.functionalitySettings, featureProvider, currentPersistedBlocksState, historyWriter.lastBlock, block).map((_, Seq.empty[Transaction]))
         }
       case Some(ng) if ng.base.reference == block.reference =>
         if (block.blockScore > ng.base.blockScore) {
-          BlockDiffer.fromBlock(settings, featureProvider, currentPersistedBlocksState, historyWriter.lastBlock, block).map { diff =>
+          BlockDiffer.fromBlock(settings.blockchainSettings.functionalitySettings, featureProvider, currentPersistedBlocksState, historyWriter.lastBlock, block).map { diff =>
             log.trace(s"Better liquid block(score=${block.blockScore}) received and applied instead of existing(score=${ng.base.blockScore})")
             (diff, ng.transactions)
           }
@@ -102,7 +102,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
             microBlockForkStats.increment()
             microBlockForkHeightStats.record(discarded.size)
           }
-          historyWriter.appendBlock(referencedForgedBlock)(BlockDiffer.fromBlock(settings, featureProvider,
+          historyWriter.appendBlock(referencedForgedBlock)(BlockDiffer.fromBlock(settings.blockchainSettings.functionalitySettings, featureProvider,
             composite(currentPersistedBlocksState, () => referencedLiquidDiff.copy(heightDiff = 1)),
             Some(referencedForgedBlock), block))
             .map { hardenedDiff =>
@@ -183,7 +183,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
           case _ =>
             for {
               _ <- Signed.validateSignatures(microBlock)
-              diff <- BlockDiffer.fromMicroBlock(settings, composite(currentPersistedBlocksState,
+              diff <- BlockDiffer.fromMicroBlock(settings.blockchainSettings.functionalitySettings, composite(currentPersistedBlocksState,
                 () => ng.bestLiquidDiff.copy(snapshots = Map.empty)),
                 historyWriter.lastBlock.map(_.timestamp), microBlock, ng.base.timestamp)
             } yield {
@@ -225,11 +225,11 @@ object BlockchainUpdaterImpl {
 
   def apply(persistedState: StateWriter with StateReader,
             history: HistoryWriterImpl,
-            functionalitySettings: FunctionalitySettings,
+            settings: WavesSettings,
             minimumInMemoryDiffSize: Int,
             synchronizationToken: ReentrantReadWriteLock): BlockchainUpdaterImpl = {
     val blockchainUpdater =
-      new BlockchainUpdaterImpl(persistedState, functionalitySettings, history, minimumInMemoryDiffSize, history, synchronizationToken)
+      new BlockchainUpdaterImpl(persistedState, settings, history, minimumInMemoryDiffSize, history, synchronizationToken)
     blockchainUpdater.logHeights("Constructing BlockchainUpdaterImpl")
     blockchainUpdater.updatePersistedAndInMemory()
     blockchainUpdater

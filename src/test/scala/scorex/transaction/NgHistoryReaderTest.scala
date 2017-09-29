@@ -22,7 +22,7 @@ class NgHistoryReaderTest extends FunSuite with Matchers with HistoryTest {
     val history = HistoryWriterImpl(None, new ReentrantReadWriteLock(), TestFunctionalitySettings.Enabled,
       FeaturesSettingsWithoutSupportedFeatures).get
 
-    val ngHistoryReader = new NgHistoryReader(() => ngState, history)
+    val ngHistoryReader = new NgHistoryReader(() => ngState, history, TestFunctionalitySettings.Enabled)
 
     appendBlock(history, genesisBlock)
 

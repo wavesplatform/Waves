@@ -199,10 +199,6 @@ object Coordinator extends ScorexLogging with Instrumented {
       blockGs = blockData.generationSignature.arr
       _ <- Either.cond(calcGs.sameElements(blockGs), (), s"declared generation signature ${blockGs.mkString} does not match calculated generation signature ${calcGs.mkString}")
       effectiveBalance <- genBalance(height)
-      _ <- Either.cond(blockTime < fs.minimalGeneratingBalanceAfter ||
-        (blockTime >= fs.minimalGeneratingBalanceAfter && effectiveBalance >= MinimalEffectiveBalanceForGenerator1) ||
-        (fp.isFeatureActivated(BlockchainFeatures.SmallerMinimalGeneratingBalance) && effectiveBalance >= MinimalEffectiveBalanceForGenerator2), (),
-        s"generator's effective balance $effectiveBalance is less that required for generation")
       hit = calcHit(prevBlockData, generator)
       target = calcTarget(parent.consensusData.baseTarget, parent.timestamp, blockTime, effectiveBalance)
       _ <- Either.cond(hit < target, (), s"calculated hit $hit >= calculated target $target")

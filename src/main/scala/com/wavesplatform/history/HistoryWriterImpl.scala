@@ -24,8 +24,8 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
 
   import HistoryWriterImpl._
 
-  override val ActivationWindowSize: Int = functionalitySettings.featureCheckBlocksPeriod
-  override val MinVotesWithinWindowToActivateFeature: Int = functionalitySettings.blocksForFeatureActivation
+  val ActivationWindowSize: Int = functionalitySettings.featureCheckBlocksPeriod
+  val MinVotesWithinWindowToActivateFeature: Int = functionalitySettings.blocksForFeatureActivation
 
   private val db = createMVStore(file)
   private val blockBodyByHeight = Synchronized(db.openMap("blocks", new LogMVMapBuilder[Int, Array[Byte]]))
@@ -167,7 +167,7 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
   }
 
   override def featureStatus(feature: Short): BlockchainFeatureStatus = read { implicit lock =>
-    Option(featuresState().get(feature))
+    functionalitySettings.preActivatedFeatures.get(feature).orElse(Option(featuresState().get(feature)))
       .map(h => if (h <= height - ActivationWindowSize)
         BlockchainFeatureStatus.Activated else
         BlockchainFeatureStatus.Accepted)

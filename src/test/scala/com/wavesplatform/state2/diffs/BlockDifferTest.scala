@@ -123,10 +123,6 @@ class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen {
         case _ => BlockchainFeatureStatus.Undefined
       }
 
-      override val ActivationWindowSize = 10000
-
-      override val MinVotesWithinWindowToActivateFeature = 9000
-
       override def featureVotesCountWithinActivationWindow(height: Int): Map[Short, Int] = ???
 
       override def activationWindowOpeningFromHeight(height: Int) = ???
