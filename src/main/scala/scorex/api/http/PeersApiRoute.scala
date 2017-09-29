@@ -51,7 +51,7 @@ case class PeersApiRoute(
   ))
   def connectedPeers: Route = (path("connected") & get) {
     val peers = establishedConnections.values().stream().map[JsValue](pi => Json.obj(
-      "address" -> pi.remoteAddress,
+      "address" -> pi.remoteAddress.toString,
       "declaredAddress" -> pi.declaredAddress.fold("N/A")(_.toString),
       "peerName" -> pi.nodeName,
       "peerNonce" -> pi.nodeNonce,

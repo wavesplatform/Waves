@@ -1,6 +1,6 @@
 package scorex.waves.http
 
-import java.net.{InetAddress, URI}
+import java.net.{InetAddress, InetSocketAddress, URI}
 import java.util.concurrent.ConcurrentMap
 import javax.ws.rs.Path
 
@@ -254,11 +254,13 @@ case class DebugApiRoute(settings: RestAPISettings,
   def blacklist: Route = (path("blacklist") & post & withAuth) {
     entity(as[String]) { socketAddressString =>
       try {
-        val address = parseInetAddress(socketAddressString)
+        val uri = new URI("node://" + socketAddressString)
+        val address = InetAddress.getByName(uri.getHost)
         establishedConnections.entrySet().stream().forEach { entry =>
-          val entryAddress = parseInetAddress(entry.getValue.remoteAddress)
-          if (entryAddress == address) {
-            peerDatabase.blacklistAndClose(entry.getKey, "Debug API request")
+          entry.getValue.remoteAddress match {
+            case x: InetSocketAddress if x.getAddress == address =>
+              peerDatabase.blacklistAndClose(entry.getKey, "Debug API request")
+            case _ =>
           }
         }
         complete(StatusCodes.OK)
@@ -266,11 +268,6 @@ case class DebugApiRoute(settings: RestAPISettings,
         case NonFatal(_) => complete(StatusCodes.BadRequest)
       }
     } ~ complete(StatusCodes.BadRequest)
-  }
-
-  private def parseInetAddress(x: String): InetAddress = {
-    val uri = new URI(s"node://${x.replace("/", "")}")
-    InetAddress.getByName(uri.getHost)
   }
 
 }

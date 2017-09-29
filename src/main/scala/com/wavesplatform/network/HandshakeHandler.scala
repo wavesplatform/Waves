@@ -116,7 +116,7 @@ object HandshakeHandler extends ScorexLogging {
   }
 
   def peerInfo(remoteHandshake: Handshake, channel: Channel): PeerInfo = PeerInfo(
-    channel.remoteAddress().toString,
+    channel.remoteAddress(),
     remoteHandshake.declaredAddress,
     remoteHandshake.applicationName,
     remoteHandshake.applicationVersion,
