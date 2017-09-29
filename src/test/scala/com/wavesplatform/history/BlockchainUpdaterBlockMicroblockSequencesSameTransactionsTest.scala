@@ -1,8 +1,6 @@
 package com.wavesplatform.history
 
-import com.typesafe.config.ConfigFactory
-import com.wavesplatform.{TestHelpers, TransactionGen}
-import com.wavesplatform.settings.{BlockchainSettings, FunctionalitySettings, WavesSettings}
+import com.wavesplatform.TransactionGen
 import com.wavesplatform.state2._
 import com.wavesplatform.state2.diffs._
 import org.scalacheck.{Gen, Shrink}
