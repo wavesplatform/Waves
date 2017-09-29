@@ -162,7 +162,8 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
   override def close(): Unit = db.close()
 
   override def featureActivationHeight(feature: Short): Option[Int] = read { implicit lock =>
-    Option(featuresState().get(feature)).map(h => h + ActivationWindowSize)
+    functionalitySettings.preActivatedFeatures.get(feature)
+      .orElse(Option(featuresState().get(feature)).map(h => h + ActivationWindowSize))
   }
 
   override def featureStatus(feature: Short): BlockchainFeatureStatus = read { implicit lock =>

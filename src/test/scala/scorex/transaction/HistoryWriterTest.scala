@@ -20,9 +20,6 @@ class HistoryWriterTest extends FunSuite with Matchers with HistoryTest {
   private val FeaturesSettingsWithoutSupportedFeatures: FeaturesSettings =
     FeaturesSettings(autoShutdownOnUnsupportedFeature = false, List.empty)
 
-  private val FeaturesSettingsWithOneSupportedFeature =
-    FeaturesSettings(autoShutdownOnUnsupportedFeature = false, List(1))
-
   test("concurrent access to lastBlock doesn't throw any exception") {
     val history = HistoryWriterImpl(None, new ReentrantReadWriteLock(), TestFunctionalitySettings.Enabled,
       TestFunctionalitySettings.EmptyFeaturesSettings).get
