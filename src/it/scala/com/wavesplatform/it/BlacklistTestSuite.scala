@@ -2,7 +2,6 @@ package com.wavesplatform.it
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.api.NodeApi.BlacklistedPeer
-import com.wavesplatform.it.test.StrictFlow
 import org.scalatest._
 
 import scala.collection.JavaConverters._
@@ -12,7 +11,7 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.util.Random
 
-class BlacklistTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with StrictFlow {
+class BlacklistTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with CancelAfterFailure {
 
   import BlacklistTestSuite._
 
