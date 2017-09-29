@@ -10,19 +10,14 @@ import org.influxdb.{InfluxDB, InfluxDBFactory}
 import scorex.utils.ScorexLogging
 
 import scala.concurrent.duration.FiniteDuration
-import scala.collection.JavaConverters._
 
 object Metrics extends ScorexLogging {
 
   case class InfluxDbSettings(uri: URI, db: String, batchActions: Int, batchFlashDuration: FiniteDuration)
 
   case class Settings(enable: Boolean,
-                      addFields: Map[String, String],
-                      influxDb: InfluxDbSettings) {
-    private[Metrics] val addMetricFields: java.util.Map[String, AnyRef] = addFields.map {
-      case (k, v) => k -> v.asInstanceOf[AnyRef]
-    }.asJava
-  }
+                      nodeId: Int,
+                      influxDb: InfluxDbSettings)
 
   private implicit val scheduler: SchedulerService = monix.execution.Scheduler.singleThread("metrics", reporter = com.wavesplatform.utils.UncaughtExceptionsToLogReporter)
 
@@ -48,7 +43,9 @@ object Metrics extends ScorexLogging {
 
   def write(b: Point.Builder): Unit = Task {
     db.foreach(_.write(b
-      .fields(settings.addMetricFields)
+      // Should be a tag, but tags are the strings now
+      // https://docs.influxdata.com/influxdb/v1.3/concepts/glossary/#tag-value
+      .addField("node", settings.nodeId)
       .build()
     ))
   }.runAsync
