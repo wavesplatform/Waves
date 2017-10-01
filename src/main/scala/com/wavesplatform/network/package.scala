@@ -67,12 +67,7 @@ package object network extends ScorexLogging {
   }
 
   implicit class HistorgramExt(h: Histogram) {
-    def safeRecord(value: Long) = try {
-      h.record(value)
-    } catch {
-      case e: Throwable =>
-        log.warn("Unable to send metrics", e)
-    }
+    def safeRecord(value: Long): Unit = h.record(Math.max(value, 0))
   }
 
 }

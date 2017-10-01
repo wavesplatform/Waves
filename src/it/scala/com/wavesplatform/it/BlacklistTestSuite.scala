@@ -2,7 +2,7 @@ package com.wavesplatform.it
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.api.NodeApi.BlacklistedPeer
-import org.scalatest.{BeforeAndAfterAll, FreeSpec, Matchers}
+import org.scalatest._
 
 import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -11,7 +11,7 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.util.Random
 
-class BlacklistTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll {
+class BlacklistTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with CancelAfterFailure {
 
   import BlacklistTestSuite._
 
@@ -22,48 +22,37 @@ class BlacklistTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll {
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-
-    Await.result(Future.traverse(nodes)(_.status), 1.minute)
-
-    Await.result(
-      for {
-        count <- Future.traverse(nodes)(_.waitForPeers(NodesCount - 1))
-      } yield count, 1.minute
-    )
+    Await.result(Future.traverse(nodes)(_.waitForPeers(NodesCount - 1)), 2.minute)
   }
-
 
   override protected def afterAll(): Unit = {
     super.afterAll()
     docker.close()
   }
 
-  "network should grow up to 60 blocks" in {
-    Await.result(richestNode.waitForHeight(60), 5.minutes)
-
-    Await.result(richestNode.height, 1.minute) >= 60 shouldBe true
-  }
+  "network should grow up to 30 blocks" in Await.result(richestNode.waitForHeight(30), 3.minutes)
 
   "richest node should blacklist other nodes" in {
-    otherNodes.foreach(n => Await.result(richestNode.blacklist(n.nodeInfo.networkIpAddress, n.nodeInfo.hostNetworkPort), 1.minute))
+    val test = for {
+      _ <- traverse(otherNodes) { n => richestNode.blacklist(n.nodeInfo.networkIpAddress, n.nodeInfo.hostNetworkPort) }
+      blacklisted <- richestNode.blacklistedPeers
+    } yield {
+      blacklisted.length should be(NodesCount - 1)
+    }
 
-    Await.result(
-      richestNode.waitFor[Seq[BlacklistedPeer]](_.blacklistedPeers, _.length >= NodesCount - 1, 5.seconds),
-      5.minutes)
-
-    val blacklisted = Await.result(richestNode.blacklistedPeers, 1.minute)
-    blacklisted.length should be(NodesCount - 1)
+    Await.result(test, 1.minute)
   }
 
-  "sleep while nodes are blocked" in {
-    Thread.sleep(richestNode.settings.networkSettings.blackListResidenceTime.toMillis + 10.seconds.toMillis)
-  }
+  "sleep while nodes are blocked" in Await.result(
+    richestNode.waitFor[Seq[BlacklistedPeer]](_.blacklistedPeers, _.isEmpty, 5.second),
+    richestNode.settings.networkSettings.blackListResidenceTime + 5.seconds
+  )
 
   "and sync again" in {
     val targetBlocks = Await.result(for {
-      height <- traverse(nodes)(_.height).map(_.max)
-      _ <- traverse(nodes)(_.waitForHeight(height + 30))
-      blocks <- traverse(nodes)(_.blockAt(height + 25))
+      baseHeight <- traverse(nodes)(_.height).map(_.max)
+      _ <- traverse(nodes)(_.waitForHeight(baseHeight + 30))
+      blocks <- traverse(nodes)(_.blockAt(baseHeight + 25))
     } yield blocks.map(_.signature), 5.minutes)
     all(targetBlocks) shouldEqual targetBlocks.head
   }
