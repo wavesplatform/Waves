@@ -23,7 +23,7 @@ class SimpleTransactionsSuite extends FunSuite with BeforeAndAfterAll with Match
   with IntegrationPatience with RecoverMethods with RequestErrorAssert with IntegrationNodesInitializationAndStopping
   with IntegrationTestsScheme {
 
-  override val docker = new Docker()
+  override val docker = Docker(getClass)
 
   override val nodes = Docker.NodeConfigs.getConfigList("nodes").asScala.take(3).map(docker.startNode)
   val node = nodes.head

@@ -15,7 +15,7 @@ class NetworkSeparationTestSuite extends FreeSpec with Matchers with BeforeAndAf
 
   import NetworkSeparationTestSuite._
 
-  override val docker = new Docker()
+  override val docker = Docker(getClass)
   override val nodes = NodeConfigs.map(docker.startNode)
 
   private def validateBlocks(nodes: Seq[Node]): Unit = {
