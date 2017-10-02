@@ -12,7 +12,7 @@ import scala.util.Random
 
 class NetworkUniqueConnectionsTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll {
 
-  private val docker = new Docker()
+  private val docker = Docker(getClass)
 
   "nodes should up and connect with each other" in {
     val firstNode = docker.startNode(FirstNodeConfig)

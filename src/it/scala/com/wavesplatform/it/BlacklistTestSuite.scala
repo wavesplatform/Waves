@@ -15,7 +15,7 @@ class BlacklistTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll w
 
   import BlacklistTestSuite._
 
-  private val docker = new Docker()
+  private val docker = Docker(getClass)
   private val nodes = Configs.map(docker.startNode)
   private val richestNode = nodes.head
   private val otherNodes = nodes.tail

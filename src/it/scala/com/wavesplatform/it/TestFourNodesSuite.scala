@@ -21,7 +21,7 @@ class TestFourNodesSuite extends FreeSpec with BeforeAndAfterAll with ScorexLogg
     """.stripMargin
   )
 
-  private val docker = new Docker()
+  private val docker = Docker(getClass)
   private val nodesCount = 4
   private val dockerConfigs = Random.shuffle(Docker.NodeConfigs.getConfigList("nodes").asScala).take(nodesCount)
   private val nodeConfigs = Seq(nonGeneratingPeerConfig.withFallback(dockerConfigs.head)) ++ dockerConfigs.tail
