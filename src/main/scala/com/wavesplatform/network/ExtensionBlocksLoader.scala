@@ -18,23 +18,23 @@ class ExtensionBlocksLoader(
   private var pendingSignatures = Map.empty[ByteStr, Int]
   private var targetExtensionIds = Option.empty[ExtensionIds]
   private val blockBuffer = mutable.TreeMap.empty[Int, Block]
-  private var currentTimeout = Option.empty[ScheduledFuture[_]]
+  private var blacklistingScheduledFuture = Option.empty[ScheduledFuture[_]]
   private val extensionsFetchingTimeStats = new LatencyHistogram(Kamon.metrics.histogram("extensions-fetching-time", instrument.Time.Milliseconds))
 
-  private def cancelBlaclkistTask(): Unit = {
-    currentTimeout.foreach(_.cancel(false))
-    currentTimeout = None
+  private def cancelBlaclkist(): Unit = {
+    blacklistingScheduledFuture.foreach(_.cancel(false))
+    blacklistingScheduledFuture = None
   }
 
-  private def rescheduleBlacklistOnTimeput(ctx: ChannelHandlerContext): Unit = {
-    cancelBlaclkistTask()
-    currentTimeout = Some(ctx.executor().schedule(blockSyncTimeout) {
+  private def blacklistAfterTimeout(ctx: ChannelHandlerContext): Unit = {
+    cancelBlaclkist()
+    blacklistingScheduledFuture = Some(ctx.executor().schedule(blockSyncTimeout) {
         peerDatabase.blacklistAndClose(ctx.channel(), "Timeout loading blocks")
     })
   }
 
   override def channelInactive(ctx: ChannelHandlerContext) = {
-    cancelBlaclkistTask()
+    cancelBlaclkist()
     super.channelInactive(ctx)
   }
 
@@ -43,7 +43,7 @@ class ExtensionBlocksLoader(
         if (newIds.nonEmpty) {
           targetExtensionIds = Some(xid)
           pendingSignatures = newIds.zipWithIndex.toMap
-          rescheduleBlacklistOnTimeput(ctx)
+          blacklistAfterTimeout(ctx)
           extensionsFetchingTimeStats.start()
           newIds.foreach(s => ctx.write(GetBlock(s)))
           ctx.flush()
@@ -54,9 +54,9 @@ class ExtensionBlocksLoader(
     case b: Block if pendingSignatures.contains(b.uniqueId) =>
       blockBuffer += pendingSignatures(b.uniqueId) -> b
       pendingSignatures -= b.uniqueId
-      rescheduleBlacklistOnTimeput(ctx)
+      blacklistAfterTimeout(ctx)
       if (pendingSignatures.isEmpty) {
-        cancelBlaclkistTask()
+        cancelBlaclkist()
         extensionsFetchingTimeStats.record()
         log.trace(s"${id(ctx)} Loaded all blocks, doing a pre-check")
 
