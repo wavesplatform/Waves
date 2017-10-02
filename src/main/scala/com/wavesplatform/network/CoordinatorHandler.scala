@@ -6,6 +6,7 @@ import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
 
 import com.wavesplatform.features.FeatureProvider
 import com.wavesplatform.metrics.BlockStats
+import com.wavesplatform.metrics.Implicits.toHistogramExt
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state2.reader.StateReader

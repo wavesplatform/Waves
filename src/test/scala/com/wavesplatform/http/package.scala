@@ -7,8 +7,6 @@ import scala.reflect.ClassTag
 
 package object http {
 
-  import scala.language.implicitConversions
-
   def sameSignature(target: Array[Byte])(actual: Array[Byte]): Boolean = target sameElements actual
 
   implicit class JsFieldTypeChecker(val s: String) extends AnyVal {

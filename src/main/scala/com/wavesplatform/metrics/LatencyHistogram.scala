@@ -1,8 +1,8 @@
 package com.wavesplatform.metrics
 
+import com.wavesplatform.metrics.Implicits._
 import kamon.metric.instrument.Histogram
 import kamon.util.{NanoInterval, RelativeNanoTimestamp}
-import com.wavesplatform.network._
 
 class LatencyHistogram(private val histogram: Histogram) {
   private var timestamp = Option.empty[RelativeNanoTimestamp]

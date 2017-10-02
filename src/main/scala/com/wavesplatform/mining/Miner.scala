@@ -3,7 +3,8 @@ package com.wavesplatform.mining
 import java.util.concurrent.atomic.AtomicBoolean
 
 import com.wavesplatform.features.{BlockchainFeatures, FeatureProvider, FeatureStatus}
-import com.wavesplatform.metrics.BlockStats
+import com.wavesplatform.metrics.{BlockStats, Instrumented}
+import com.wavesplatform.metrics.Implicits.toHistogramExt
 import com.wavesplatform.network._
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state2._

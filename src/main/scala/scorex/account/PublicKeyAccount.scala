@@ -4,9 +4,6 @@ import scorex.crypto.encode.Base58
 import scorex.transaction.ValidationError.InvalidAddress
 import scorex.transaction.{TransactionParser, ValidationError}
 
-import scala.language.implicitConversions
-
-
 trait PublicKeyAccount {
   def publicKey: Array[Byte]
 

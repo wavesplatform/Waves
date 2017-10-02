@@ -1,9 +1,8 @@
-package com.wavesplatform.state2
+package com.wavesplatform.metrics
 
+import com.wavesplatform.metrics.Implicits.toHistogramExt
 import kamon.metric.instrument.Histogram
 import scorex.utils.ScorexLogging
-
-import scala.language.higherKinds
 
 trait Instrumented {
   self: ScorexLogging =>
@@ -25,14 +24,14 @@ trait Instrumented {
   def measureSuccessful[A, B](h: Histogram, f: => Either[A, B]): Either[A, B] = {
     val (r, time) = withTime(f)
     if (r.isRight)
-      h.record(time)
+      h.safeRecord(time)
     r
   }
 
   def measureSuccessful[A](h: Histogram, f: => Option[A]): Option[A] = {
     val (r, time) = withTime(f)
     if (r.isDefined)
-      h.record(time)
+      h.safeRecord(time)
     r
   }
 
