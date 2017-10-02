@@ -28,7 +28,7 @@ class NgStateTest extends PropSpec with GeneratorDrivenPropertyChecks with Prope
     forAll(preconditionsAndPayments) { case (genesis, payment, payment2, payment3) =>
       val (block, microBlocks) = chainBaseAndMicro(randomSig, genesis, Seq(Seq(payment), Seq(payment2), Seq(payment3)))
 
-      val ngState = microBlocks.foldLeft(NgState(block, BlockDiff.empty, 0L)) { case ((ng, m)) => ng + (m, BlockDiff.empty, 0L) }
+      val ngState = microBlocks.foldLeft(NgState(block, BlockDiff.empty, 0L, Set.empty[Short])) { case ((ng, m)) => ng + (m, BlockDiff.empty, 0L) }
 
       microBlocks.foreach { m =>
         ngState.forgeBlock(m.totalResBlockSig).get match {
@@ -44,10 +44,10 @@ class NgStateTest extends PropSpec with GeneratorDrivenPropertyChecks with Prope
     forAll(preconditionsAndPayments) { case (genesis, payment, payment2, payment3) =>
       val (block, microBlocks) = chainBaseAndMicro(randomSig, genesis, Seq(Seq(payment), Seq(payment2), Seq(payment3)))
 
-      microBlocks.foldLeft(NgState(block, BlockDiff.empty, 0L)) { case ((ng, m)) => ng + (m, BlockDiff.empty, 0L) }
+      microBlocks.foldLeft(NgState(block, BlockDiff.empty, 0L, Set.empty[Short])) { case ((ng, m)) => ng + (m, BlockDiff.empty, 0L) }
         .bestLiquidBlock.uniqueId shouldBe microBlocks.last.totalResBlockSig
 
-      NgState(block, BlockDiff.empty, 0L).bestLiquidBlock.uniqueId shouldBe block.uniqueId
+      NgState(block, BlockDiff.empty, 0L, Set.empty[Short]).bestLiquidBlock.uniqueId shouldBe block.uniqueId
     }
   }
 
@@ -56,14 +56,14 @@ class NgStateTest extends PropSpec with GeneratorDrivenPropertyChecks with Prope
     forAll(preconditionsAndPayments) { case (genesis, payment, payment2, payment3) =>
       val (block, microBlocks) = chainBaseAndMicro(randomSig, genesis, Seq(Seq(payment), Seq(payment2), Seq(payment3)))
 
-      val ngState = microBlocks.foldLeft((NgState(block, BlockDiff.empty, 0L), 1000)) { case (((ng, thisTime), m)) => (ng + (m, BlockDiff.empty, thisTime), thisTime + 50) }._1
+      val ngState = microBlocks.foldLeft((NgState(block, BlockDiff.empty, 0L, Set.empty[Short]), 1000)) { case (((ng, thisTime), m)) => (ng + (m, BlockDiff.empty, thisTime), thisTime + 50) }._1
 
       ngState.bestLastBlockInfo(0).blockId shouldBe block.uniqueId
       ngState.bestLastBlockInfo(1001).blockId shouldBe microBlocks.head.totalResBlockSig
       ngState.bestLastBlockInfo(1051).blockId shouldBe microBlocks.tail.head.totalResBlockSig
       ngState.bestLastBlockInfo(1101).blockId shouldBe microBlocks.last.totalResBlockSig
 
-      NgState(block, BlockDiff.empty, 0L).bestLiquidBlock.uniqueId shouldBe block.uniqueId
+      NgState(block, BlockDiff.empty, 0L, Set.empty[Short]).bestLiquidBlock.uniqueId shouldBe block.uniqueId
     }
   }
 }

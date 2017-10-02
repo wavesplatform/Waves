@@ -13,7 +13,7 @@ import scala.util.{Success, Try}
 
 object StorageFactory {
 
-  private def createStateStorage(history: History, stateFile: Option[File]): Try[StateStorage] =
+  private def createStateStorage(history: History with FeatureProvider, stateFile: Option[File]): Try[StateStorage] =
     StateStorage(stateFile, dropExisting = false).flatMap { ss =>
       if (ss.getHeight <= history.height()) Success(ss) else {
         ss.close()

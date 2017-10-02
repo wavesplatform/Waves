@@ -77,38 +77,36 @@ class NgHistoryReader(ngState: () => Option[NgState], inner: History with Featur
     inner.lastBlockIds(count)
   }
 
-  override def microblockIds(): Seq[BlockId] =
+  override def microblockIds(): Seq[BlockId] = read { implicit l =>
     ngState().toSeq.flatMap(ng => ng.micros.map(_.totalResBlockSig))
+  }
 
   override def bestLastBlockInfo(maxTimestamp: Long): Option[BlockMinerInfo] = read { implicit l =>
     ngState().map(_.bestLastBlockInfo(maxTimestamp))
       .orElse(inner.lastBlock.map(b => BlockMinerInfo(b.consensusData, b.timestamp, b.uniqueId)))
   }
 
-  override def featureVotesCountWithinActivationWindow(height: Int): Map[Short, Int] = {
-    val votes = inner.featureVotesCountWithinActivationWindow(height)
-    if (FeatureProvider.activationWindowOpeningFromHeight(this.height(), ActivationWindowSize) ==
-      FeatureProvider.activationWindowOpeningFromHeight(height, ActivationWindowSize))
-      ngState().map(_.base.supportedFeaturesIds).getOrElse(Seq.empty).foldLeft(votes)((votes, f) => votes + (f -> (votes.getOrElse(f, 0) + 1)))
-    else votes
+  override def featureVotesCountWithinActivationWindow(height: Int): Map[Short, Int] = read { implicit l =>
+    val ngVotes = ngState().map(_.acceptedFeatures).getOrElse(Set.empty)
+    inner.featureVotesCountWithinActivationWindow(height)
+      .map { case (feature, votes) => feature -> (if (ngVotes.contains(feature)) votes + 1 else votes) }
   }
 
-  override def featureStatus(feature: Short): BlockchainFeatureStatus = {
-    val status = inner.featureStatus(feature)
-    if (height() % ActivationWindowSize != 0) status
-    else {
-      val ngVote = ngState().map(_.base.supportedFeaturesIds.count(_ == feature)).getOrElse(0)
-      if (inner.featureVotesCountWithinActivationWindow(height()).getOrElse(feature, 0) + ngVote >= MinVotesWithinWindowToActivateFeature)
-        BlockchainFeatureStatus.promote(status) else status
-    }
-  }
-
-  override def featureActivationHeight(feature: Short): Option[Int] =
-    inner.featureActivationHeight(feature).orElse {
-      featureStatus(feature) match {
-        case BlockchainFeatureStatus.Activated => Some(height())
-        case BlockchainFeatureStatus.Accepted => Some(height() + ActivationWindowSize)
-        case BlockchainFeatureStatus.Undefined => None
+  override def featureStatus(feature: Short, height: Int): BlockchainFeatureStatus = read { implicit l =>
+    if (height == this.height()) {
+      ngState() match {
+        case Some(ng) if ng.acceptedFeatures.contains(feature) => BlockchainFeatureStatus.Accepted
+        case Some(ng) => inner.featureStatus(feature, height)
+        case _ => BlockchainFeatureStatus.Undefined
       }
     }
+    else inner.featureStatus(feature, height)
+  }
+
+  override def featureActivationHeight(feature: Short): Option[Int] = read { implicit l =>
+    ngState().flatMap(x => if (x.acceptedFeatures.contains(feature)) Some(height() + ActivationWindowSize) else None)
+      .orElse(inner.featureActivationHeight(feature))
+  }
+
+  override def activatedFeatures(height: Int): Set[Short] = read { implicit l => inner.activatedFeatures(height + ngState().size) }
 }

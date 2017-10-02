@@ -98,7 +98,7 @@ class MinerImpl(
         val sortInBlock = history.height() <= blockchainSettings.functionalitySettings.dontRequireSortedTransactionsAfter
         val unconfirmed = utx.packUnconfirmed(minerSettings.maxTransactionsInKeyBlock, sortInBlock)
         val features = settings.featuresSettings.supported
-          .filter(featureProvider.featureStatus(_) == BlockchainFeatureStatus.Undefined).toSet
+          .filter(featureProvider.featureStatus(_, parentHeight) == BlockchainFeatureStatus.Undefined).toSet
         log.debug(s"Adding ${unconfirmed.size} unconfirmed transaction(s) to new block")
         Block.buildAndSign(version.toByte, currentTime, referencedBlockInfo.blockId, consensusData, unconfirmed, account, features)
           .left.map(l => l.err)

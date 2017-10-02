@@ -4,7 +4,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock
 
 import cats._
 import cats.implicits._
-import com.wavesplatform.features.FeatureProvider
+import com.wavesplatform.features.{BlockchainFeatures, FeatureProvider}
 import com.wavesplatform.history.HistoryWriterImpl
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state2.BlockchainUpdaterImpl._
@@ -12,6 +12,7 @@ import com.wavesplatform.state2.NgState._
 import com.wavesplatform.state2.diffs.BlockDiffer
 import com.wavesplatform.state2.reader.CompositeStateReader.composite
 import com.wavesplatform.state2.reader.StateReader
+import com.wavesplatform.utils.{UnsupportedFeature, forceStopApplication}
 import kamon.Kamon
 import kamon.metric.instrument.Time
 import scorex.account.Address
@@ -68,6 +69,43 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
     logHeights("State rebuild finished")
   }
 
+  private def displayFeatures(s: Set[Short]): String = s"FEATURE${if (s.size > 1) "S"} ${s.mkString(", ")} ${if (s.size > 1) "WERE" else "WAS"}"
+
+  def featuresAcceptedWithBlock(block: Block): Set[Short] ={
+    val height = historyWriter.height() + 1
+
+    if (height % settings.blockchainSettings.functionalitySettings.featureCheckBlocksPeriod == 0) {
+
+      val acceptedFeatures = historyWriter.featureVotesCountWithinActivationWindow(height)
+        .map { case (feature, votes) => feature -> (if (block.supportedFeaturesIds.contains(feature)) votes + 1 else votes) }
+        .filter { case (_, votes) => votes >= settings.blockchainSettings.functionalitySettings.blocksForFeatureActivation }
+        .keySet
+
+      val unimplementedAccepted = acceptedFeatures.diff(BlockchainFeatures.implemented)
+      if (unimplementedAccepted.nonEmpty) {
+        log.warn(s"UNIMPLEMENTED ${displayFeatures(unimplementedAccepted)} ACCEPTED ON BLOCKCHAIN")
+        log.warn("PLEASE, UPDATE THE NODE AS SOON AS POSSIBLE")
+        log.warn("OTHERWISE THE NODE WILL BE STOPPED OR FORKED UPON FEATURE ACTIVATION")
+      }
+
+      val activatedFeatures = historyWriter.activatedFeatures(height)
+
+      val unimplementedActivated = activatedFeatures.diff(BlockchainFeatures.implemented)
+      if (unimplementedActivated.nonEmpty) {
+        log.error(s"UNIMPLEMENTED ${displayFeatures(unimplementedActivated)} ACTIVATED ON BLOCKCHAIN")
+        log.error("PLEASE, UPDATE THE NODE IMMEDIATELY")
+        if (settings.featuresSettings.autoShutdownOnUnsupportedFeature) {
+          log.error("FOR THIS REASON THE NODE WAS STOPPED AUTOMATICALLY")
+          forceStopApplication(UnsupportedFeature)
+        }
+        else log.error("OTHERWISE THE NODE WILL END UP ON A FORK")
+      }
+
+      acceptedFeatures
+    }
+    else Set.empty
+  }
+
   override def processBlock(block: Block): Either[ValidationError, DiscardedTransactions] = write { implicit l =>
     if (topMemoryDiff().heightDiff >= minimumInMemoryDiffSize) {
       persisted.applyBlockDiff(bottomMemoryDiff())
@@ -102,7 +140,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
             microBlockForkStats.increment()
             microBlockForkHeightStats.record(discarded.size)
           }
-          historyWriter.appendBlock(referencedForgedBlock)(BlockDiffer.fromBlock(settings.blockchainSettings.functionalitySettings, featureProvider,
+          historyWriter.appendBlock(referencedForgedBlock, ng.acceptedFeatures)(BlockDiffer.fromBlock(settings.blockchainSettings.functionalitySettings, featureProvider,
             composite(currentPersistedBlocksState, () => referencedLiquidDiff.copy(heightDiff = 1)),
             Some(referencedForgedBlock), block))
             .map { hardenedDiff =>
@@ -115,8 +153,9 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
           Left(BlockAppendError(errorText, block))
         }
     }).map { case ((newBlockDiff, discacrded)) =>
-      ngState.set(Some(NgState(block, newBlockDiff, 0L)))
       val height = historyWriter.height() + 1
+
+      ngState.set(Some(NgState(block, newBlockDiff, 0L, featuresAcceptedWithBlock(block))))
 //      historyWriter.updateFeaturesState(Map(height -> block.supportedFeaturesIds))
       log.info(
         s"""Block ${block.uniqueId} -> ${trim(block.reference)} appended.

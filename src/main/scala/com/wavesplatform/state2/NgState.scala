@@ -6,7 +6,7 @@ import scorex.transaction.History.BlockMinerInfo
 import scorex.transaction.{AssetId, DiscardedMicroBlocks, Transaction}
 
 
-case class NgState private(base: Block, diffs: Map[BlockId, (BlockDiff, Long)], micros: List[MicroBlock]) {
+case class NgState private(base: Block, diffs: Map[BlockId, (BlockDiff, Long)], micros: List[MicroBlock], acceptedFeatures: Set[Short]) {
 
   lazy val lastMicroTotalSig: Option[ByteStr] =
     micros.headOption.map(_.totalResBlockSig)
@@ -65,11 +65,11 @@ case class NgState private(base: Block, diffs: Map[BlockId, (BlockDiff, Long)], 
 
 object NgState {
 
-  def apply(base: Block, diff: BlockDiff, timestamp: Long): NgState =
-    NgState(base, Map(base.uniqueId -> ((diff, timestamp))), List.empty)
+  def apply(base: Block, diff: BlockDiff, timestamp: Long, acceptedFeatures: Set[Short]): NgState =
+    NgState(base, Map(base.uniqueId -> ((diff, timestamp))), List.empty, acceptedFeatures)
 
   implicit class NgStateExt(n: NgState) {
-    def +(m: MicroBlock, diff: BlockDiff, timestamp: Long): NgState = NgState(n.base, n.diffs + (m.totalResBlockSig -> ((diff, timestamp))), m +: n.micros)
+    def +(m: MicroBlock, diff: BlockDiff, timestamp: Long): NgState = NgState(n.base, n.diffs + (m.totalResBlockSig -> ((diff, timestamp))), m +: n.micros, n.acceptedFeatures)
   }
 
 
