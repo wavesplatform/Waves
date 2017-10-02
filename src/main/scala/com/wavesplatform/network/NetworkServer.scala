@@ -165,13 +165,8 @@ class NetworkServer(checkpointService: CheckpointService,
         .addListener { (connFuture: ChannelFuture) =>
           if (connFuture.isDone) {
             if (connFuture.cause() != null) {
-              if (connFuture.cause().isInstanceOf[NoRouteToHostException]) {
-                log.warn(s"${id(connFuture.channel())} Unrecoverable network issue has occurred, restarting", connFuture.cause())
-                utils.forceStopApplication()
-              } else {
-                log.debug(s"${id(connFuture.channel())} Connection failed, blacklisting $remoteAddress", connFuture.cause())
-                peerDatabase.blacklist(remoteAddress.getAddress)
-              }
+              log.debug(s"${id(connFuture.channel())} Connection failed, blacklisting $remoteAddress", connFuture.cause())
+              peerDatabase.blacklist(remoteAddress.getAddress)
             } else if (connFuture.isSuccess) {
               log.info(s"${id(connFuture.channel())} Connection established")
               peerDatabase.touch(remoteAddress)
