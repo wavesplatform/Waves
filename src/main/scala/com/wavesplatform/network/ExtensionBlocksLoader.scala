@@ -21,22 +21,20 @@ class ExtensionBlocksLoader(
   private var currentTimeout = Option.empty[ScheduledFuture[_]]
   private val extensionsFetchingTimeStats = new LatencyHistogram(Kamon.metrics.histogram("extensions-fetching-time", instrument.Time.Milliseconds))
 
-  private def cancelTimeout(): Unit = {
+  private def cancelBlaclkistTask(): Unit = {
     currentTimeout.foreach(_.cancel(false))
     currentTimeout = None
   }
 
-  private def resetTimeout(ctx: ChannelHandlerContext, xid: ExtensionIds): Unit = {
-    cancelTimeout()
+  private def rescheduleBlacklistOnTimeput(ctx: ChannelHandlerContext): Unit = {
+    cancelBlaclkistTask()
     currentTimeout = Some(ctx.executor().schedule(blockSyncTimeout) {
-      if (targetExtensionIds.contains(xid)) {
         peerDatabase.blacklistAndClose(ctx.channel(), "Timeout loading blocks")
-      }
     })
   }
 
   override def channelInactive(ctx: ChannelHandlerContext) = {
-    cancelTimeout()
+    cancelBlaclkistTask()
     super.channelInactive(ctx)
   }
 
@@ -45,7 +43,7 @@ class ExtensionBlocksLoader(
         if (newIds.nonEmpty) {
           targetExtensionIds = Some(xid)
           pendingSignatures = newIds.zipWithIndex.toMap
-          resetTimeout(ctx, xid)
+          rescheduleBlacklistOnTimeput(ctx)
           extensionsFetchingTimeStats.start()
           newIds.foreach(s => ctx.write(GetBlock(s)))
           ctx.flush()
@@ -56,8 +54,9 @@ class ExtensionBlocksLoader(
     case b: Block if pendingSignatures.contains(b.uniqueId) =>
       blockBuffer += pendingSignatures(b.uniqueId) -> b
       pendingSignatures -= b.uniqueId
+      rescheduleBlacklistOnTimeput(ctx)
       if (pendingSignatures.isEmpty) {
-        cancelTimeout()
+        cancelBlaclkistTask()
         extensionsFetchingTimeStats.record()
         log.trace(s"${id(ctx)} Loaded all blocks, doing a pre-check")
 
