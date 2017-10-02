@@ -1,13 +1,13 @@
 package com.wavesplatform.network
 
-import java.net.{InetSocketAddress, NetworkInterface, NoRouteToHostException}
+import java.net.{InetSocketAddress, NetworkInterface}
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
 
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.settings._
 import com.wavesplatform.state2.reader.StateReader
-import com.wavesplatform.{UtxPool, Version, utils}
+import com.wavesplatform.{UtxPool, Version}
 import io.netty.bootstrap.{Bootstrap, ServerBootstrap}
 import io.netty.channel._
 import io.netty.channel.group.ChannelGroup
