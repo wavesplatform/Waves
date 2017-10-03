@@ -8,6 +8,7 @@ import com.wavesplatform.settings.FeaturesSettings
 import com.wavesplatform.state2._
 import com.wavesplatform.history._
 import com.wavesplatform.state2.reader.StateReader
+import org.scalacheck.Shrink
 import org.scalatest.{FunSuite, Matchers}
 import scorex.block.Block
 import scorex.lagonaki.mocks.TestBlock
@@ -17,6 +18,8 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
 class HistoryWriterTest extends FunSuite with Matchers with HistoryTest {
+
+  private implicit def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)
 
   private val ApprovalPeriod = 10000
 
@@ -58,8 +61,6 @@ class HistoryWriterTest extends FunSuite with Matchers with HistoryTest {
 
     bu.processBlock(genesisBlock)
 
-    getNextTestBlock(h)
-
     fp.featureStatus(1, 1) shouldBe BlockchainFeatureStatus.Undefined
     fp.featureStatus(2, 1) shouldBe BlockchainFeatureStatus.Undefined
     fp.featureStatus(3, 1) shouldBe BlockchainFeatureStatus.Undefined
@@ -92,52 +93,53 @@ class HistoryWriterTest extends FunSuite with Matchers with HistoryTest {
     fp.featureStatus(3, 3 * ApprovalPeriod) shouldBe BlockchainFeatureStatus.Undefined
   }
 
-  /*
-
   test("features rollback with block rollback") {
-    val history = HistoryWriterImpl(None, new ReentrantReadWriteLock(), TestFunctionalitySettings.Enabled,
-      FeaturesSettingsWithoutSupportedFeatures).get
+    val (h, fp, _, _, bu, _) = StorageFactory(RootDefaultSettings, EmptyFeaturesSettings).get
 
-    appendGenesisBlock(history)
+    bu.processBlock(genesisBlock)
 
-    history.featureStatus(1, 1) shouldBe BlockchainFeatureStatus.Undefined
-    history.featureStatus(2, 1) shouldBe BlockchainFeatureStatus.Undefined
+    fp.featureStatus(1, 1) shouldBe BlockchainFeatureStatus.Undefined
+    fp.featureStatus(2, 1) shouldBe BlockchainFeatureStatus.Undefined
 
     (1 until ApprovalPeriod).foreach { _ =>
-      appendTestBlock3(history, Set(1))
+      bu.processBlock(getNextTestBlockWithVotes(h, Set(1)))
     }
 
-    history.height() shouldBe ApprovalPeriod
-    history.featureStatus(1, ApprovalPeriod) shouldBe BlockchainFeatureStatus.Accepted
-    history.featureStatus(2, ApprovalPeriod) shouldBe BlockchainFeatureStatus.Undefined
+    h.height() shouldBe ApprovalPeriod
+    fp.featureStatus(1, ApprovalPeriod) shouldBe BlockchainFeatureStatus.Accepted
+    fp.featureStatus(2, ApprovalPeriod) shouldBe BlockchainFeatureStatus.Undefined
 
-    history.discardBlock()
+    bu.removeAfter(h.lastBlockIds(2).last).explicitGet()
 
-    history.height() shouldBe ApprovalPeriod - 1
-    history.featureStatus(1, ApprovalPeriod - 1) shouldBe BlockchainFeatureStatus.Undefined
-    history.featureStatus(2, ApprovalPeriod - 1) shouldBe BlockchainFeatureStatus.Undefined
+    h.height() shouldBe ApprovalPeriod - 1
+    fp.featureStatus(1, ApprovalPeriod - 1) shouldBe BlockchainFeatureStatus.Undefined
+    fp.featureStatus(2, ApprovalPeriod - 1) shouldBe BlockchainFeatureStatus.Undefined
 
     (1 to ApprovalPeriod + 1).foreach { _ =>
-      appendTestBlock3(history, Set(2))
+      bu.processBlock(getNextTestBlockWithVotes(h, Set(2)))
     }
 
-    history.height() shouldBe 2 * ApprovalPeriod
-    history.featureStatus(1, 2 * ApprovalPeriod) shouldBe BlockchainFeatureStatus.Activated
-    history.featureStatus(2, 2 * ApprovalPeriod) shouldBe BlockchainFeatureStatus.Accepted
+    h.height() shouldBe 2 * ApprovalPeriod
+    fp.featureStatus(1, 2 * ApprovalPeriod) shouldBe BlockchainFeatureStatus.Activated
+    fp.featureStatus(2, 2 * ApprovalPeriod) shouldBe BlockchainFeatureStatus.Accepted
 
-    history.discardBlock()
+    bu.removeAfter(h.lastBlockIds(2).last).explicitGet()
 
-    history.height() shouldBe 2 * ApprovalPeriod - 1
-    history.featureStatus(1, 2 * ApprovalPeriod - 1) shouldBe BlockchainFeatureStatus.Accepted
-    history.featureStatus(2, 2 * ApprovalPeriod - 1) shouldBe BlockchainFeatureStatus.Undefined
+    h.height() shouldBe 2 * ApprovalPeriod - 1
+    fp.featureStatus(1, 2 * ApprovalPeriod - 1) shouldBe BlockchainFeatureStatus.Accepted
+    fp.featureStatus(2, 2 * ApprovalPeriod - 1) shouldBe BlockchainFeatureStatus.Undefined
 
-    (1 to ApprovalPeriod).foreach { _ => history.discardBlock() }
+    bu.removeAfter(h.lastBlockIds(2).last).explicitGet()
+    bu.removeAfter(h.lastBlockIds(2).last).explicitGet()
+    bu.removeAfter(h.lastBlockIds(2).last).explicitGet()
+    bu.removeAfter(h.lastBlockIds(2).last).explicitGet()
 
-    history.height() shouldBe ApprovalPeriod - 1
-    history.featureStatus(1, ApprovalPeriod - 1) shouldBe BlockchainFeatureStatus.Undefined
-    history.featureStatus(2, ApprovalPeriod - 1) shouldBe BlockchainFeatureStatus.Undefined
+    h.height() shouldBe ApprovalPeriod - 1
+    fp.featureStatus(1, ApprovalPeriod - 1) shouldBe BlockchainFeatureStatus.Undefined
+    fp.featureStatus(2, ApprovalPeriod - 1) shouldBe BlockchainFeatureStatus.Undefined
   }
 
+  /*
   test("feature activation height") {
     val history = HistoryWriterImpl(None, new ReentrantReadWriteLock(), TestFunctionalitySettings.Enabled,
       FeaturesSettingsWithoutSupportedFeatures).get

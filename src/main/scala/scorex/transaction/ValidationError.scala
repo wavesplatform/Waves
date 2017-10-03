@@ -20,7 +20,7 @@ object ValidationError {
   case object UnsupportedTransactionType extends ValidationError
   case object InvalidRequestSignature extends ValidationError
   case class InvalidSignature(s: Signed, details: Option[InvalidSignature] = None) extends ValidationError {
-    override def toString: String = s"InvalidSignature(${s.toString.take(300) + "... reason: " + details})"
+    override def toString: String = s"InvalidSignature(${s.toString + " reason: " + details})"
   }
   case class GenericError(err: String) extends ValidationError
   case class AlreadyInThePool(txId: ByteStr) extends ValidationError
