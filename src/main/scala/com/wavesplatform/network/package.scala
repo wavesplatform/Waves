@@ -10,7 +10,6 @@ import io.netty.channel.socket.SocketChannel
 import io.netty.channel.{Channel, ChannelHandlerContext}
 import io.netty.util.NetUtil.toSocketAddressString
 import io.netty.util.concurrent.{EventExecutorGroup, ScheduledFuture}
-import kamon.metric.instrument.Histogram
 import scorex.block.Block
 import scorex.transaction.Transaction
 import scorex.utils.ScorexLogging
@@ -64,10 +63,6 @@ package object network extends ScorexLogging {
 
     def broadcastTx(tx: Transaction, except: Option[Channel] = None): Unit =
       allChannels.broadcast(RawBytes(TransactionMessageSpec.messageCode, tx.bytes), except)
-  }
-
-  implicit class HistorgramExt(h: Histogram) {
-    def safeRecord(value: Long): Unit = h.record(Math.max(value, 0))
   }
 
 }

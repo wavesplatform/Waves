@@ -4,6 +4,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock
 
 import cats.Monoid
 import cats.implicits._
+import com.wavesplatform.metrics.Instrumented
 import com.wavesplatform.state2.reader.StateReaderImpl
 import scorex.utils.ScorexLogging
 
