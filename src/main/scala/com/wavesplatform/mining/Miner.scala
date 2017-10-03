@@ -177,7 +177,7 @@ class MinerImpl(
                 allChannels.broadcast(LocalScoreChanged(score))
                 allChannels.broadcast(BlockForged(block))
                 scheduleMining()
-                if (featureProvider.featureActivationHeight(BlockchainFeatures.NG.id).exists(history.height > _ + 1))
+                if (featureProvider.featureActivatedHeight(BlockchainFeatures.NG.id).exists(history.height > _ + 1))
                   startMicroBlockMining(account, block)
               case Right(None) => log.warn("Newly created block has already been appended, should not happen")
             }

@@ -2,7 +2,7 @@ package scorex.transaction
 
 import java.util.concurrent.locks.ReentrantReadWriteLock
 
-import com.wavesplatform.features.{BlockchainFeatureStatus, FeatureProvider}
+import com.wavesplatform.features.FeatureProvider
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2._
 import scorex.block.Block.BlockId
@@ -11,8 +11,7 @@ import scorex.transaction.History.{BlockMinerInfo, BlockchainScore}
 
 class NgHistoryReader(ngState: () => Option[NgState], inner: History with FeatureProvider, settings: FunctionalitySettings) extends History with NgHistory with DebugNgHistory with FeatureProvider {
 
-  val ActivationWindowSize: Int = settings.featureCheckBlocksPeriod
-  val MinVotesWithinWindowToActivateFeature: Int = settings.blocksForFeatureActivation
+  override val ActivationWindowSize: Int = settings.featureCheckBlocksPeriod
 
   override def synchronizationToken: ReentrantReadWriteLock = inner.synchronizationToken
 
@@ -86,27 +85,10 @@ class NgHistoryReader(ngState: () => Option[NgState], inner: History with Featur
       .orElse(inner.lastBlock.map(b => BlockMinerInfo(b.consensusData, b.timestamp, b.uniqueId)))
   }
 
-  override def featureVotesCountWithinActivationWindow(height: Int): Map[Short, Int] = read { implicit l =>
-    val ngVotes = ngState().map(_.acceptedFeatures).getOrElse(Set.empty)
-    inner.featureVotesCountWithinActivationWindow(height)
-      .map { case (feature, votes) => feature -> (if (ngVotes.contains(feature)) votes + 1 else votes) }
+  override def acceptedFeatures(): Map[Short, Int] = {
+    lazy val h = height()
+    inner.acceptedFeatures() ++ ngState().map(_.acceptedFeatures.map(_ -> h).toMap).getOrElse(Map.empty)
   }
 
-  override def featureStatus(feature: Short, height: Int): BlockchainFeatureStatus = read { implicit l =>
-    if (height == this.height()) {
-      ngState() match {
-        case Some(ng) if ng.acceptedFeatures.contains(feature) => BlockchainFeatureStatus.Accepted
-        case Some(ng) => inner.featureStatus(feature, height)
-        case _ => BlockchainFeatureStatus.Undefined
-      }
-    }
-    else inner.featureStatus(feature, height)
-  }
-
-  override def featureActivationHeight(feature: Short): Option[Int] = read { implicit l =>
-    ngState().flatMap(x => if (x.acceptedFeatures.contains(feature)) Some(height() + ActivationWindowSize) else None)
-      .orElse(inner.featureActivationHeight(feature))
-  }
-
-  override def activatedFeatures(height: Int): Set[Short] = read { implicit l => inner.activatedFeatures(height + ngState().size) }
+  override def featureVotesCountWithinActivationWindow(height: Int): Map[Short, Int] = inner.featureVotesCountWithinActivationWindow(height)
 }

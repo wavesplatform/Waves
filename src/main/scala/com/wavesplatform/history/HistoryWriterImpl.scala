@@ -24,7 +24,7 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
 
   import HistoryWriterImpl._
 
-  val ActivationWindowSize: Int = functionalitySettings.featureCheckBlocksPeriod
+  override val ActivationWindowSize: Int = functionalitySettings.featureCheckBlocksPeriod
   val MinVotesWithinWindowToActivateFeature: Int = functionalitySettings.blocksForFeatureActivation
 
   private val db = createMVStore(file)
@@ -40,7 +40,13 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
     Set(blockBodyByHeight().size(), blockIdByHeight().size(), heightByBlockId().size(), scoreByHeight().size()).size == 1
   }
 
-  def featureVotesCountWithinActivationWindow(height: Int): Map[Short, Int] = read { implicit lock =>
+  private lazy val preAcceptedFeatures = functionalitySettings.preActivatedFeatures.mapValues(h => h - ActivationWindowSize)
+
+  override def acceptedFeatures(): Map[Short, Int] = read { implicit lock =>
+    preAcceptedFeatures ++ featuresState().asScala
+  }
+
+  override def featureVotesCountWithinActivationWindow(height: Int): Map[Short, Int] = read { implicit lock =>
     featuresVotes().get(FeatureProvider.activationWindowOpeningFromHeight(height, ActivationWindowSize))
   }
 
@@ -101,10 +107,6 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
     transactions
   }
 
-  override def activatedFeatures(height: Int): Set[Short] = read { implicit lock =>
-    featuresState().asScala.filter{case (_, acceptedHeight) => acceptedHeight <= height - ActivationWindowSize}.keys.toSet
-  }
-
   override def lastBlockIds(howMany: Int): Seq[ByteStr] = read { implicit lock =>
     (Math.max(1, height() - howMany + 1) to height()).flatMap(i => Option(blockIdByHeight().get(i)))
       .reverse
@@ -126,24 +128,12 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
 
   override def close(): Unit = db.close()
 
-  override def featureActivationHeight(feature: Short): Option[Int] = read { implicit lock =>
-    functionalitySettings.preActivatedFeatures.get(feature)
-      .orElse(Option(featuresState().get(feature)).map(h => h + ActivationWindowSize))
-  }
-
-  override def featureStatus(feature: Short, height: Int): BlockchainFeatureStatus = read { implicit lock =>
-    functionalitySettings.preActivatedFeatures.get(feature).orElse(Option(featuresState().get(feature)))
-      .map(h => if (h <= height - ActivationWindowSize)
-        BlockchainFeatureStatus.Activated else
-        BlockchainFeatureStatus.Accepted)
-      .getOrElse(BlockchainFeatureStatus.Undefined)
-  }
-
   override def lastBlockTimestamp(): Option[Long] = this.lastBlock.map(_.timestamp)
 
   override def lastBlockId(): Option[ByteStr] = this.lastBlock.map(_.signerData.signature)
 
   override def blockAt(height: Int): Option[Block] = blockBytes(height).map(Block.parseBytes(_).get)
+
 }
 
 object HistoryWriterImpl extends ScorexLogging {

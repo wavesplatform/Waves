@@ -114,19 +114,11 @@ class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen {
                         (assertion: (BlockDiff, StateReader) => Unit): Unit = {
     val fp = new FeatureProvider {
 
-      override def featureActivationHeight(feature: Short): Option[Int] = feature match {
-        case BlockchainFeatures.NG.id => Some(ngAtHeight)
-        case _ => None
-      }
-
-      override def featureStatus(feature: Short, height: Int): BlockchainFeatureStatus = feature match {
-        case BlockchainFeatures.NG.id => BlockchainFeatureStatus.Activated
-        case _ => BlockchainFeatureStatus.Undefined
-      }
+      override val ActivationWindowSize: Int = ngAtHeight
 
       override def featureVotesCountWithinActivationWindow(height: Int): Map[Short, Int] = ???
 
-      override def activatedFeatures(height: Int) = Set(BlockchainFeatures.NG.id)
+      override def acceptedFeatures() = Map(BlockchainFeatures.NG.id -> 0)
     }
     assertDiffEiWithPrev(blocks.init, blocks.last,fp, fs)(assertion)
   }
