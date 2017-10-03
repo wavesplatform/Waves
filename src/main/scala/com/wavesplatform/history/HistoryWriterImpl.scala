@@ -3,12 +3,10 @@ package com.wavesplatform.history
 import java.io.File
 import java.util.concurrent.locks.ReentrantReadWriteLock
 
-import com.wavesplatform.features.{FeatureProvider, BlockchainFeatureStatus}
+import com.wavesplatform.features.FeatureProvider
 import com.wavesplatform.settings.{FeaturesSettings, FunctionalitySettings}
 import com.wavesplatform.state2.{BlockDiff, ByteStr, DataTypes}
 import com.wavesplatform.utils._
-
-import scala.collection.JavaConverters._
 import kamon.Kamon
 import scorex.block.Block
 import scorex.transaction.History.BlockchainScore
@@ -16,6 +14,7 @@ import scorex.transaction.ValidationError.GenericError
 import scorex.transaction._
 import scorex.utils.{LogMVMapBuilder, ScorexLogging}
 
+import scala.collection.JavaConverters._
 import scala.util.Try
 
 class HistoryWriterImpl private(file: Option[File], val synchronizationToken: ReentrantReadWriteLock,
