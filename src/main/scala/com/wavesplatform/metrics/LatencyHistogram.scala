@@ -1,6 +1,5 @@
 package com.wavesplatform.metrics
 
-import com.wavesplatform.metrics.Implicits._
 import kamon.metric.instrument.Histogram
 import kamon.util.{NanoInterval, RelativeNanoTimestamp}
 

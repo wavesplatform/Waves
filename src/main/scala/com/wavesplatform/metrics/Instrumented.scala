@@ -1,6 +1,5 @@
 package com.wavesplatform.metrics
 
-import com.wavesplatform.metrics.Implicits.toHistogramExt
 import kamon.metric.instrument.Histogram
 import scorex.utils.ScorexLogging
 
