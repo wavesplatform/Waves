@@ -1,6 +1,5 @@
 package com.wavesplatform.network
 
-import java.net.InetSocketAddress
 import java.util.concurrent.TimeUnit
 
 import com.google.common.cache.{Cache, CacheBuilder}
@@ -55,11 +54,7 @@ class MicroBlockSynchronizer(settings: Settings, history: NgHistory) extends Cha
       successfullyReceivedMicroBlocks.put(mb.totalResBlockSig, dummy)
 
       Option(microBlockRecieveTime.getIfPresent(mb.totalResBlockSig)).foreach { created =>
-        BlockStats.received(
-          m = mb,
-          from = ctx.channel().remoteAddress().asInstanceOf[InetSocketAddress],
-          propagationTime = System.currentTimeMillis() - created
-        )
+        BlockStats.received(mb, ctx, propagationTime = System.currentTimeMillis() - created)
         microBlockRecieveTime.invalidate(mb.totalResBlockSig)
         super.channelRead(ctx, msg)
       }
@@ -74,7 +69,10 @@ class MicroBlockSynchronizer(settings: Settings, history: NgHistory) extends Cha
             microBlockInvStats.increment()
 
             if (alreadyRequested(totalResBlockSig)) Task.unit
-            else requestMicroBlockTask(totalResBlockSig, 2)
+            else {
+              BlockStats.inv(mi, ctx)
+              requestMicroBlockTask(totalResBlockSig, 2)
+            }
           } else {
             notLastMicroblockStats.increment()
             log.trace(s"Discarding $mi because it doesn't match last (micro)block")
