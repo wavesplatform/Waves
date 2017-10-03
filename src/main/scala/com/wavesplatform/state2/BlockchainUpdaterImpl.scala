@@ -192,23 +192,22 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
     }
   }
 
-  override def debugInfo(): StateDebugInfo = read {
-    implicit l =>
-      StateDebugInfo(persisted = HashInfo(height = persisted.height, hash = persisted.accountPortfoliosHash),
-        top = HashInfo(height = topMemoryDiff().heightDiff, hash = Hash.accountPortfolios(topMemoryDiff().txsDiff.portfolios)),
-        bottom = HashInfo(height = bottomMemoryDiff().heightDiff, hash = Hash.accountPortfolios(bottomMemoryDiff().txsDiff.portfolios)),
-        microBaseHash = ngState().map(ng => Hash.accountPortfolios(ng.diffs(ng.base.uniqueId)._1.txsDiff.portfolios))
-      )
+  override def debugInfo(): StateDebugInfo = read { implicit l =>
+    StateDebugInfo(persisted = HashInfo(height = persisted.height, hash = persisted.accountPortfoliosHash),
+      top = HashInfo(height = topMemoryDiff().heightDiff, hash = Hash.accountPortfolios(topMemoryDiff().txsDiff.portfolios)),
+      bottom = HashInfo(height = bottomMemoryDiff().heightDiff, hash = Hash.accountPortfolios(bottomMemoryDiff().txsDiff.portfolios)),
+      microBaseHash = ngState().map(ng => Hash.accountPortfolios(ng.diffs(ng.base.uniqueId)._1.txsDiff.portfolios))
+    )
   }
 
   override def persistedAccountPortfoliosHash(): Int = Hash.accountPortfolios(currentPersistedBlocksState.accountPortfolios)
 
-  override def topDiff(): Map[Address, Portfolio] = read {
-    implicit l => topMemoryDiff().txsDiff.portfolios
+  override def topDiff(): Map[Address, Portfolio] = read { implicit l =>
+    topMemoryDiff().txsDiff.portfolios
   }
 
-  override def bottomDiff(): Map[Address, Portfolio] = read {
-    implicit l => bottomMemoryDiff().txsDiff.portfolios
+  override def bottomDiff(): Map[Address, Portfolio] = read { implicit l =>
+    bottomMemoryDiff().txsDiff.portfolios
   }
 }
 
