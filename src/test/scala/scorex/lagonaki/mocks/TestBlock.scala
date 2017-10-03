@@ -36,7 +36,7 @@ object TestBlock {
     version = 2,
     reference = randomSignature(),
     signerData = SignerData(signer, ByteStr.empty),
-    consensusData = NxtLikeConsensusBlockData(1L, ByteStr(Array.fill(SignatureLength)(0: Byte))),
+    consensusData = NxtLikeConsensusBlockData(1L, ByteStr(Array.fill(Block.GeneratorSignatureLength)(0: Byte))),
     transactionData = txs,
     supportedFeaturesIds = Set.empty))
 

@@ -1,55 +1,50 @@
 package scorex.transaction
 
-import java.util.concurrent.locks.ReentrantReadWriteLock
-
-import com.wavesplatform.features.{BlockchainFeatureStatus, FeatureProvider}
-import com.wavesplatform.history.HistoryWriterImpl
-import com.wavesplatform.settings.FeaturesSettings
+import com.wavesplatform.features.BlockchainFeatureStatus
 import com.wavesplatform.state2._
 import com.wavesplatform.history._
-import com.wavesplatform.state2.reader.StateReader
 import org.scalacheck.Shrink
 import org.scalatest.{FunSuite, Matchers}
 import scorex.block.Block
-import scorex.lagonaki.mocks.TestBlock
-import scorex.settings.TestFunctionalitySettings
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
-class HistoryWriterTest extends FunSuite with Matchers with HistoryTest {
+class BlockhainUpdaterTest extends FunSuite with Matchers with HistoryTest {
 
   private implicit def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)
 
-  private val ApprovalPeriod = 10000
+  private val ApprovalPeriod = 100
 
-  private val FeaturesSettingsWithoutSupportedFeatures: FeaturesSettings =
-    FeaturesSettings(autoShutdownOnUnsupportedFeature = false, List.empty)
+  private val WavesSettings = RootDefaultSettings.copy(blockchainSettings =
+    RootDefaultSettings.blockchainSettings.copy(
+      functionalitySettings = RootDefaultSettings.blockchainSettings.functionalitySettings.copy(
+        featureCheckBlocksPeriod = ApprovalPeriod,
+        blocksForFeatureActivation = (ApprovalPeriod * 0.9).toInt
+      )
+    )
+  )
 
-  /*
   test("concurrent access to lastBlock doesn't throw any exception") {
-    val history = HistoryWriterImpl(None, new ReentrantReadWriteLock(), TestFunctionalitySettings.Enabled,
-      TestFunctionalitySettings.EmptyFeaturesSettings).get
-    appendGenesisBlock(history)
+    val (h, fp, _, _, bu, _) = StorageFactory(WavesSettings, EmptyFeaturesSettings).get
+
+    bu.processBlock(genesisBlock)
 
     (1 to 1000).foreach { _ =>
-      appendTestBlock(history)
+      bu.processBlock(getNextTestBlock(h))
     }
 
     @volatile var failed = false
 
-    def tryAppendTestBlock(history: HistoryWriterImpl): Either[ValidationError, BlockDiff] =
-      history.appendBlock(TestBlock.withReference(history.lastBlock.get.uniqueId), )(Right(BlockDiff.empty))
-
     (1 to 1000).foreach { _ =>
-      Future(tryAppendTestBlock(history)).recover[Any] { case e => e.printStackTrace(); failed = true }
-      Future(history.discardBlock()).recover[Any] { case e => e.printStackTrace(); failed = true }
+      Future(bu.processBlock(getNextTestBlock(h))).recover[Any] { case e => e.printStackTrace(); failed = true }
+      Future(bu.removeAfter(h.lastBlockIds(2).last)).recover[Any] { case e => e.printStackTrace(); failed = true }
     }
+
     Thread.sleep(1000)
 
     failed shouldBe false
   }
-  */
 
   def appendBlock(block: Block, blockchainUpdater: BlockchainUpdater): Unit = {
     blockchainUpdater.processBlock(block)
@@ -57,7 +52,7 @@ class HistoryWriterTest extends FunSuite with Matchers with HistoryTest {
 
   test("features approved and accepted as height grows") {
 
-    val (h, fp, _, _, bu, _) = StorageFactory(RootDefaultSettings, EmptyFeaturesSettings).get
+    val (h, fp, _, _, bu, _) = StorageFactory(WavesSettings, EmptyFeaturesSettings).get
 
     bu.processBlock(genesisBlock)
 
@@ -94,7 +89,7 @@ class HistoryWriterTest extends FunSuite with Matchers with HistoryTest {
   }
 
   test("features rollback with block rollback") {
-    val (h, fp, _, _, bu, _) = StorageFactory(RootDefaultSettings, EmptyFeaturesSettings).get
+    val (h, fp, _, _, bu, _) = StorageFactory(WavesSettings, EmptyFeaturesSettings).get
 
     bu.processBlock(genesisBlock)
 
@@ -102,7 +97,7 @@ class HistoryWriterTest extends FunSuite with Matchers with HistoryTest {
     fp.featureStatus(2, 1) shouldBe BlockchainFeatureStatus.Undefined
 
     (1 until ApprovalPeriod).foreach { _ =>
-      bu.processBlock(getNextTestBlockWithVotes(h, Set(1)))
+      bu.processBlock(getNextTestBlockWithVotes(h, Set(1))).explicitGet()
     }
 
     h.height() shouldBe ApprovalPeriod
@@ -116,7 +111,7 @@ class HistoryWriterTest extends FunSuite with Matchers with HistoryTest {
     fp.featureStatus(2, ApprovalPeriod - 1) shouldBe BlockchainFeatureStatus.Undefined
 
     (1 to ApprovalPeriod + 1).foreach { _ =>
-      bu.processBlock(getNextTestBlockWithVotes(h, Set(2)))
+      bu.processBlock(getNextTestBlockWithVotes(h, Set(2))).explicitGet()
     }
 
     h.height() shouldBe 2 * ApprovalPeriod
@@ -129,60 +124,55 @@ class HistoryWriterTest extends FunSuite with Matchers with HistoryTest {
     fp.featureStatus(1, 2 * ApprovalPeriod - 1) shouldBe BlockchainFeatureStatus.Accepted
     fp.featureStatus(2, 2 * ApprovalPeriod - 1) shouldBe BlockchainFeatureStatus.Undefined
 
-    bu.removeAfter(h.lastBlockIds(2).last).explicitGet()
-    bu.removeAfter(h.lastBlockIds(2).last).explicitGet()
-    bu.removeAfter(h.lastBlockIds(2).last).explicitGet()
-    bu.removeAfter(h.lastBlockIds(2).last).explicitGet()
+    (1 to ApprovalPeriod).foreach { _ => bu.removeAfter(h.lastBlockIds(2).last).explicitGet() }
 
     h.height() shouldBe ApprovalPeriod - 1
     fp.featureStatus(1, ApprovalPeriod - 1) shouldBe BlockchainFeatureStatus.Undefined
     fp.featureStatus(2, ApprovalPeriod - 1) shouldBe BlockchainFeatureStatus.Undefined
   }
 
-  /*
-  test("feature activation height") {
-    val history = HistoryWriterImpl(None, new ReentrantReadWriteLock(), TestFunctionalitySettings.Enabled,
-      FeaturesSettingsWithoutSupportedFeatures).get
+  test("feature activation height is not overrided with further periods") {
+    val (h, fp, _, _, bu, _) = StorageFactory(WavesSettings, EmptyFeaturesSettings).get
 
-    appendGenesisBlock(history)
-    history.featureStatus(1, 1) shouldBe BlockchainFeatureStatus.Undefined
+    bu.processBlock(genesisBlock)
 
-    history.featureActivationHeight(1) shouldBe None
+    fp.featureStatus(1, 1) shouldBe BlockchainFeatureStatus.Undefined
+
+    fp.featureActivatedHeight(1) shouldBe None
 
     (1 until ApprovalPeriod).foreach { _ =>
-      appendTestBlock3(history, Set(1))
+      bu.processBlock(getNextTestBlockWithVotes(h, Set(1))).explicitGet()
     }
 
-    history.featureActivationHeight(1) shouldBe Some(ApprovalPeriod * 2)
+    fp.featureActivatedHeight(1) shouldBe Some(ApprovalPeriod * 2)
 
     (1 to ApprovalPeriod).foreach { _ =>
-      appendTestBlock3(history, Set(1))
+      bu.processBlock(getNextTestBlockWithVotes(h, Set(1))).explicitGet()
     }
 
-    history.featureActivationHeight(1) shouldBe Some(ApprovalPeriod * 2)
+    fp.featureActivatedHeight(1) shouldBe Some(ApprovalPeriod * 2)
   }
 
   test("feature activated only by 90% of blocks") {
-    val history = HistoryWriterImpl(None, new ReentrantReadWriteLock(), TestFunctionalitySettings.Enabled,
-      FeaturesSettingsWithoutSupportedFeatures).get
+    val (h, fp, _, _, bu, _) = StorageFactory(WavesSettings, EmptyFeaturesSettings).get
 
-    appendGenesisBlock(history)
-    history.featureStatus(1, 1) shouldBe BlockchainFeatureStatus.Undefined
+    bu.processBlock(genesisBlock)
+
+    fp.featureStatus(1, 1) shouldBe BlockchainFeatureStatus.Undefined
 
     (1 until ApprovalPeriod).foreach { i =>
-      appendTestBlock3(history, if (i % 2 == 0) Set(1) else Set())
+      bu.processBlock(getNextTestBlockWithVotes(h, if (i % 2 == 0) Set(1) else Set())).explicitGet()
     }
-    history.featureStatus(1, ApprovalPeriod) shouldBe BlockchainFeatureStatus.Undefined
+    fp.featureStatus(1, ApprovalPeriod) shouldBe BlockchainFeatureStatus.Undefined
 
     (1 to ApprovalPeriod).foreach { i =>
-      appendTestBlock3(history, if (i % 10 == 0) Set() else Set(1))
+      bu.processBlock(getNextTestBlockWithVotes(h, if (i % 10 == 0) Set() else Set(1))).explicitGet()
     }
-    history.featureStatus(1, ApprovalPeriod * 2) shouldBe BlockchainFeatureStatus.Accepted
+    fp.featureStatus(1, ApprovalPeriod * 2) shouldBe BlockchainFeatureStatus.Accepted
 
     (1 to ApprovalPeriod).foreach { i =>
-      appendTestBlock3(history, Set())
+      bu.processBlock(getNextTestBlock(h)).explicitGet()
     }
-    history.featureStatus(1, ApprovalPeriod * 3) shouldBe BlockchainFeatureStatus.Activated
+    fp.featureStatus(1, ApprovalPeriod * 3) shouldBe BlockchainFeatureStatus.Activated
   }
-  */
 }

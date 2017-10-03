@@ -8,6 +8,7 @@ import com.wavesplatform.state2._
 import scorex.block.Block.BlockId
 import scorex.block.{Block, MicroBlock}
 import scorex.transaction.History.{BlockMinerInfo, BlockchainScore}
+import cats.implicits._
 
 class NgHistoryReader(ngState: () => Option[NgState], inner: History with FeatureProvider, settings: FunctionalitySettings) extends History with NgHistory with DebugNgHistory with FeatureProvider {
 
@@ -16,7 +17,7 @@ class NgHistoryReader(ngState: () => Option[NgState], inner: History with Featur
   override def synchronizationToken: ReentrantReadWriteLock = inner.synchronizationToken
 
   override def height(): Int = read { implicit l =>
-    inner.height() + ngState().size
+    inner.height() + ngState().map(_ => 1).getOrElse(0)
   }
 
   override def blockBytes(height: Int): Option[Array[Byte]] = read { implicit l =>
@@ -87,8 +88,10 @@ class NgHistoryReader(ngState: () => Option[NgState], inner: History with Featur
 
   override def acceptedFeatures(): Map[Short, Int] = {
     lazy val h = height()
-    inner.acceptedFeatures() ++ ngState().map(_.acceptedFeatures.map(_ -> h).toMap).getOrElse(Map.empty)
+    ngState().map(_.acceptedFeatures.map(_ -> h).toMap).getOrElse(Map.empty) ++ inner.acceptedFeatures()
   }
 
-  override def featureVotesCountWithinActivationWindow(height: Int): Map[Short, Int] = inner.featureVotesCountWithinActivationWindow(height)
+  override def featureVotesCountWithinActivationWindow(height: Int): Map[Short, Int] = read { implicit l =>
+    inner.featureVotesCountWithinActivationWindow(height) |+| ngState().map(_.acceptedFeatures.map(_ -> 1).toMap).getOrElse(Map.empty)
+  }
 }
