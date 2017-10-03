@@ -77,10 +77,11 @@ class MinerImpl(
       s"BlockChain is too old (last block timestamp is $parentTimestamp generated $blockAge ago)"
     ))
 
+  private def ngEnabled : Boolean = featureProvider.activationHeight(BlockchainFeatures.NG).exists(history.height > _ + 1)
+
   private def generateOneBlockTask(version: Int, account: PrivateKeyAccount, parentHeight: Int,
                                    greatGrandParent: Option[Block], balance: Long)(delay: FiniteDuration): Task[Either[String, Block]] = Task {
     // should take last block right at the time of mining since microblocks might have been added
-    // the rest doesn't change
     val referencedBlockInfo = history.bestLastBlockInfo(System.currentTimeMillis() - minMicroBlockDurationMills).get
     val pc = allChannels.size()
     lazy val currentTime = timeService.correctedTime()
@@ -97,7 +98,8 @@ class MinerImpl(
         val gs = calcGeneratorSignature(referencedBlockInfo.consensus, account)
         val consensusData = NxtLikeConsensusBlockData(btg, ByteStr(gs))
         val sortInBlock = history.height() <= blockchainSettings.functionalitySettings.dontRequireSortedTransactionsAfter
-        val unconfirmed = utx.packUnconfirmed(minerSettings.maxTransactionsInKeyBlock, sortInBlock)
+        val txAmount = if (ngEnabled) minerSettings.maxTransactionsInKeyBlock else ClassicAmountOfTxsInBlock
+        val unconfirmed = utx.packUnconfirmed(txAmount, sortInBlock)
         val features = settings.featuresSettings.supported
           .filter(featureProvider.status(_) == FeatureStatus.Defined).toSet
         log.debug(s"Adding ${unconfirmed.size} unconfirmed transaction(s) to new block")
@@ -178,7 +180,7 @@ class MinerImpl(
                 allChannels.broadcast(LocalScoreChanged(score))
                 allChannels.broadcast(BlockForged(block))
                 scheduleMining()
-                if (featureProvider.activationHeight(BlockchainFeatures.NG).exists(history.height > _ + 1))
+                if (ngEnabled)
                   startMicroBlockMining(account, block)
               case Right(None) => log.warn("Newly created block has already been appended, should not happen")
             }
@@ -213,6 +215,7 @@ object Miner {
   val microMiningStarted = Kamon.metrics.counter("micro-mining-started")
 
   val MaxTransactionsPerMicroblock: Int = 5000
+  val ClassicAmountOfTxsInBlock: Int = 100
 
   val NopMiner = new Miner with MinerDebugInfo {
     override def scheduleMining(): Unit = ()
