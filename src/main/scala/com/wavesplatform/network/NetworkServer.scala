@@ -132,9 +132,6 @@ class NetworkServer(checkpointService: CheckpointService,
 
   private val outgoingChannels = new ConcurrentHashMap[InetSocketAddress, Channel]
 
-  private def incomingDeclaredAddresses =
-    peerInfo.values().asScala.flatMap(_.declaredAddress)
-
   private val clientHandshakeHandler =
     new HandshakeHandler.Client(handshake, peerInfo, peerConnections, peerDatabase, allChannels)
 
@@ -166,18 +163,18 @@ class NetworkServer(checkpointService: CheckpointService,
 
   private val connectTask = workerGroup.scheduleWithFixedDelay(1.second, 5.seconds) {
     import scala.collection.JavaConverters._
-    import scala.collection.breakOut
 
-    val outgoingStr = outgoingChannels.keySet.asScala.map[String, Vector[String]](_.toString)(breakOut)
-      .sorted.mkString(", ")
-    val incoming = incomingDeclaredAddresses.map[String, Vector[String]](_.toString)(breakOut).sorted
-    val incomingStr = incoming.mkString(", ")
+    val outgoing = outgoingChannels.keySet.iterator().asScala.toVector
+    val outgoingStr = outgoing.map(_.toString).sorted.mkString(", ")
+
+    val incoming = peerInfo.values().iterator().asScala.flatMap(_.declaredAddress).toVector
+    val incomingStr = incoming.map(_.toString).sorted.mkString(", ")
 
     log.trace(s"Outgoing: $outgoingStr ++ incoming: $incomingStr")
     val shouldConnect = outgoingChannelCount.get() < settings.networkSettings.maxOutboundConnections
     if (shouldConnect) {
       peerDatabase
-        .randomPeer(excludedAddresses ++ outgoingChannels.keySet().asScala ++ incomingDeclaredAddresses)
+        .randomPeer(excludedAddresses ++ outgoing ++ incoming)
         .foreach(connect)
     }
 
