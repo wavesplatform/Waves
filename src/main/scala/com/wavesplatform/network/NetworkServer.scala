@@ -5,6 +5,7 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
 
 import com.wavesplatform.features.FeatureProvider
+import com.wavesplatform.metrics.Metrics
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.settings._
 import com.wavesplatform.state2.reader.StateReader
@@ -17,6 +18,7 @@ import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.channel.socket.SocketChannel
 import io.netty.channel.socket.nio.{NioServerSocketChannel, NioSocketChannel}
 import io.netty.handler.codec.{LengthFieldBasedFrameDecoder, LengthFieldPrepender}
+import org.influxdb.dto.Point
 import scorex.transaction._
 import scorex.utils.{ScorexLogging, Time}
 
@@ -130,9 +132,6 @@ class NetworkServer(checkpointService: CheckpointService,
 
   private val outgoingChannels = new ConcurrentHashMap[InetSocketAddress, Channel]
 
-  private def incomingDeclaredAddresses =
-    peerInfo.values().asScala.flatMap(_.declaredAddress)
-
   private val clientHandshakeHandler =
     new HandshakeHandler.Client(handshake, peerInfo, peerConnections, peerDatabase, allChannels)
 
@@ -163,12 +162,30 @@ class NetworkServer(checkpointService: CheckpointService,
       fatalErrorHandler)))
 
   private val connectTask = workerGroup.scheduleWithFixedDelay(1.second, 5.seconds) {
-    log.trace(s"Outgoing: ${outgoingChannels.keySet} ++ incoming: $incomingDeclaredAddresses")
-    if (outgoingChannelCount.get() < settings.networkSettings.maxOutboundConnections) {
+    import scala.collection.JavaConverters._
+
+    val outgoing = outgoingChannels.keySet.iterator().asScala.toVector
+    val outgoingStr = outgoing.map(_.toString).sorted.mkString(", ")
+
+    val incoming = peerInfo.values().iterator().asScala.flatMap(_.declaredAddress).toVector
+    val incomingStr = incoming.map(_.toString).sorted.mkString(", ")
+
+    log.trace(s"Outgoing: $outgoingStr ++ incoming: $incomingStr")
+    val shouldConnect = outgoingChannelCount.get() < settings.networkSettings.maxOutboundConnections
+    if (shouldConnect) {
       peerDatabase
-        .randomPeer(excludedAddresses ++ outgoingChannels.keySet().asScala ++ incomingDeclaredAddresses)
+        .randomPeer(excludedAddresses ++ outgoing ++ incoming)
         .foreach(connect)
     }
+
+    Metrics.write(
+      Point
+        .measurement("connections")
+        .addField("outgoing", outgoingStr)
+        .addField("incoming", incomingStr)
+        .addField("n", outgoingChannels.keySet.size() + incoming.size)
+        .addField("connecting", shouldConnect)
+    )
   }
 
   private def peerSynchronizer: ChannelHandlerAdapter = {

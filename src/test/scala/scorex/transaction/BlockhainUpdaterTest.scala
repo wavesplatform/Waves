@@ -10,6 +10,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
 class BlockhainUpdaterTest extends FunSuite with Matchers with HistoryTest {
+
   private val ApprovalPeriod = 100
 
   private val WavesSettings = RootDefaultSettings.copy(blockchainSettings =
