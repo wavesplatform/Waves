@@ -20,7 +20,6 @@ object TestBlock {
   def randomSignature(): ByteStr = randomOfLength(SignatureLength)
 
   private def sign(signer: PrivateKeyAccount, b: Block): Block = {
-    val toSign = b.bytes
     Block.buildAndSign(version = b.version, timestamp = b.timestamp, reference = b.reference,
       consensusData = b.consensusData, transactionData = b.transactionData,
       signer = signer, supportedFeaturesIds = b.supportedFeaturesIds).explicitGet()

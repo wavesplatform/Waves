@@ -3,7 +3,7 @@ package com.wavesplatform.state2.diffs
 import java.util.concurrent.ThreadLocalRandom
 
 import com.wavesplatform.BlockGen
-import com.wavesplatform.features.{BlockchainFeatureStatus, BlockchainFeatures, FeatureProvider}
+import com.wavesplatform.features.{BlockchainFeatures, FeatureProvider}
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.BlockDiff
 import com.wavesplatform.state2.reader.{CompositeStateReader, StateReader}

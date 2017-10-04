@@ -1,14 +1,10 @@
 package tools
 
 import com.wavesplatform.state2._
-import play.api.libs.json._
-import scorex.account.{Address, AddressScheme, PrivateKeyAccount, PublicKeyAccount}
+import scorex.account.{AddressScheme, PublicKeyAccount}
 import scorex.block.{Block, SignerData}
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
 import scorex.lagonaki.mocks.TestBlock
-import scorex.transaction.assets.TransferTransaction
-
-import scala.io.Source
 
 object JsBlockParser extends App {
 

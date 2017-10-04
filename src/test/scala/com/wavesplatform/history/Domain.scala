@@ -1,6 +1,5 @@
 package com.wavesplatform.history
 
-import com.wavesplatform.features.FeatureProvider
 import com.wavesplatform.state2.reader.StateReader
 import scorex.account.Address
 import scorex.transaction.{BlockchainUpdater, History}
