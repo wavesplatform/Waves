@@ -1,6 +1,7 @@
 package scorex.lagonaki.unit
 
 import com.wavesplatform.TransactionGen
+import com.wavesplatform.metrics.Instrumented
 import org.scalatest.prop.PropertyChecks
 import org.scalatest._
 import com.wavesplatform.state2.diffs.produce

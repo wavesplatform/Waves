@@ -5,10 +5,11 @@ import java.util.concurrent.locks.ReentrantReadWriteLock
 import cats._
 import com.google.common.cache.CacheBuilder
 import com.wavesplatform.UtxPool.PessimisticPortfolios
+import com.wavesplatform.metrics.Instrumented
 import com.wavesplatform.settings.{FunctionalitySettings, UtxSettings}
 import com.wavesplatform.state2.diffs.TransactionDiffer
 import com.wavesplatform.state2.reader.{CompositeStateReader, StateReader}
-import com.wavesplatform.state2.{ByteStr, Diff, Instrumented, Portfolio}
+import com.wavesplatform.state2.{ByteStr, Diff, Portfolio}
 import kamon.Kamon
 import kamon.metric.instrument.{Time => KamonTime}
 import scorex.account.Address

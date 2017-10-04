@@ -17,6 +17,7 @@ scalacOptions ++= Seq(
   "-feature",
   "-deprecation",
   "-language:higherKinds",
+  "-language:implicitConversions",
   "-Ywarn-unused:-implicits",
   "-Xlint")
 logBuffered := false

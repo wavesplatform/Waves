@@ -1,12 +1,14 @@
 package com.wavesplatform.it
 
+import java.io.FileOutputStream
+import java.nio.file.{Files, Paths}
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.{Collections, Properties, List => JList, Map => JMap}
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.dataformat.javaprop.JavaPropsMapper
 import com.google.common.collect.ImmutableMap
-import com.spotify.docker.client.DefaultDockerClient
+import com.spotify.docker.client.{DefaultDockerClient, DockerClient}
 import com.spotify.docker.client.DockerClient.RemoveContainerParam
 import com.spotify.docker.client.messages.{ContainerConfig, HostConfig, NetworkConfig, PortBinding}
 import com.typesafe.config.{Config, ConfigFactory, ConfigRenderOptions}
@@ -26,7 +28,8 @@ case class NodeInfo(
                      containerId: String,
                      hostMatcherApiPort: Int)
 
-class Docker(suiteConfig: Config = ConfigFactory.empty) extends AutoCloseable with ScorexLogging {
+class Docker(suiteConfig: Config = ConfigFactory.empty,
+             tag: String = "") extends AutoCloseable with ScorexLogging {
 
   import Docker._
 
@@ -114,11 +117,41 @@ class Docker(suiteConfig: Config = ConfigFactory.empty) extends AutoCloseable wi
   override def close(): Unit = {
     if (isStopped.compareAndSet(false, true)) {
       log.info("Stopping containers")
-      nodes.values.foreach(n => n.close())
+      nodes.foreach {
+        case (id, n) =>
+          n.close()
+          client.stopContainer(id, 0)
+      }
+      http.close()
+
+      saveLogs()
+
       nodes.keys.foreach(id => client.removeContainer(id, RemoveContainerParam.forceKill()))
       client.removeNetwork(wavesNetwork.id())
       client.close()
-      http.close()
+    }
+  }
+
+  private def saveLogs(): Unit = {
+    val logDir = Paths.get(System.getProperty("user.dir"), "target", "logs")
+    Files.createDirectories(logDir)
+    nodes.values.foreach { node =>
+      import node.nodeInfo.containerId
+
+      val fileName = if (tag.isEmpty) containerId else s"$tag-$containerId"
+      val logFile = logDir.resolve(s"$fileName.log").toFile
+      log.info(s"Writing logs of $containerId to ${logFile.getAbsolutePath}")
+
+      val fileStream = new FileOutputStream(logFile, false)
+      client
+        .logs(
+          containerId,
+          DockerClient.LogsParam.timestamps(),
+          DockerClient.LogsParam.follow(),
+          DockerClient.LogsParam.stdout(),
+          DockerClient.LogsParam.stderr()
+        )
+        .attach(fileStream, fileStream)
     }
   }
 
@@ -132,6 +165,8 @@ class Docker(suiteConfig: Config = ConfigFactory.empty) extends AutoCloseable wi
 object Docker {
   private val jsonMapper = new ObjectMapper
   private val propsMapper = new JavaPropsMapper
+
+  def apply(owner: Class[_]): Docker = new Docker(tag = owner.getSimpleName)
 
   private def asProperties(config: Config): Properties = {
     val jsonConfig = config.root().render(ConfigRenderOptions.concise())

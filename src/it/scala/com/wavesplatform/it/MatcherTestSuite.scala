@@ -20,7 +20,7 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll {
 
   import MatcherTestSuite._
 
-  private val docker = new Docker()
+  private val docker = Docker(getClass)
 
   private val nodes = Configs.map(docker.startNode)
 

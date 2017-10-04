@@ -3,6 +3,7 @@ package com.wavesplatform.state2.diffs
 import cats.Monoid
 import cats.implicits._
 import com.wavesplatform.features.{BlockchainFeatures, FeatureProvider}
+import com.wavesplatform.metrics.Instrumented
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2._
 import com.wavesplatform.state2.patch.LeasePatch

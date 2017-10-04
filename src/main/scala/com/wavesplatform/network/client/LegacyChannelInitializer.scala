@@ -14,7 +14,6 @@ import scala.concurrent.duration._
 class ClientHandshakeHandler(handshake: Handshake, promise: Promise[Channel]) extends ChannelInboundHandlerAdapter with ScorexLogging {
 
   private def removeHandlers(ctx: ChannelHandlerContext): Unit = {
-    ctx.pipeline().remove(classOf[HandshakeDecoder])
     ctx.pipeline().remove(classOf[HandshakeTimeoutHandler])
     ctx.pipeline().remove(this)
   }

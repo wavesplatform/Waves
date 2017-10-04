@@ -3,12 +3,12 @@ package com.wavesplatform
 import java.util.concurrent.atomic.AtomicBoolean
 
 import com.wavesplatform.features.{BlockchainFeatures, FeatureProvider}
-import com.wavesplatform.metrics.{BlockStats, Metrics, TxsInBlockchainStats}
+import com.wavesplatform.metrics._
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.network.{BlockCheckpoint, Checkpoint}
 import com.wavesplatform.settings.{BlockchainSettings, FunctionalitySettings, WavesSettings}
 import com.wavesplatform.state2.reader.StateReader
-import com.wavesplatform.state2.{ByteStr, Instrumented}
+import com.wavesplatform.state2.ByteStr
 import kamon.Kamon
 import org.influxdb.dto.Point
 import scorex.block.{Block, MicroBlock}
