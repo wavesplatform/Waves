@@ -23,7 +23,7 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
 
   import HistoryWriterImpl._
 
-  override val ActivationWindowSize: Int = functionalitySettings.featureCheckBlocksPeriod
+  override val activationWindowSize: Int = functionalitySettings.featureCheckBlocksPeriod
   val MinVotesWithinWindowToActivateFeature: Int = functionalitySettings.blocksForFeatureActivation
 
   private val db = createMVStore(file)
@@ -39,18 +39,18 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
     Set(blockBodyByHeight().size(), blockIdByHeight().size(), heightByBlockId().size(), scoreByHeight().size()).size == 1
   }
 
-  private lazy val preAcceptedFeatures = functionalitySettings.preActivatedFeatures.mapValues(h => h - ActivationWindowSize)
+  private lazy val preAcceptedFeatures = functionalitySettings.preActivatedFeatures.mapValues(h => h - activationWindowSize)
 
   override def acceptedFeatures(): Map[Short, Int] = read { implicit lock =>
     preAcceptedFeatures ++ featuresState().asScala
   }
 
   override def featureVotesCountWithinActivationWindow(height: Int): Map[Short, Int] = read { implicit lock =>
-    featuresVotes().get(FeatureProvider.activationWindowOpeningFromHeight(height, ActivationWindowSize))
+    featuresVotes().get(FeatureProvider.activationWindowOpeningFromHeight(height, activationWindowSize))
   }
 
   private def alterVotes(height: Int, votes: Set[Short], voteMod: Int): Unit = write { implicit lock =>
-    val votingWindowOpening = FeatureProvider.activationWindowOpeningFromHeight(height, ActivationWindowSize)
+    val votingWindowOpening = FeatureProvider.activationWindowOpeningFromHeight(height, activationWindowSize)
     val votesWithinWindow = featuresVotes().getOrDefault(votingWindowOpening, Map.empty[Short, Int])
     val newVotes = votes.foldLeft(votesWithinWindow)((v, feature) => v + (feature -> (v.getOrElse(feature, 0) + voteMod)))
     featuresVotes.mutate(_.put(votingWindowOpening, newVotes))
@@ -94,7 +94,7 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
       Block.parseBytes(blockBodyByHeight.mutate(_.remove(h))).fold(_ => Seq.empty[Transaction], _.transactionData)
     scoreByHeight.mutate(_.remove(h))
 
-    if (h % ActivationWindowSize == 0) {
+    if (h % activationWindowSize == 0) {
       val featuresToRemove = featuresState().entrySet().asScala.filter(_.getValue == h).map(_.getKey)
       featuresState.mutate(fs => featuresToRemove.foreach(fs.remove))
     }

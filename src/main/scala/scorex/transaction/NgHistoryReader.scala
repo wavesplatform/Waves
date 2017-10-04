@@ -12,7 +12,7 @@ import cats.implicits._
 
 class NgHistoryReader(ngState: () => Option[NgState], inner: History with FeatureProvider, settings: FunctionalitySettings) extends History with NgHistory with DebugNgHistory with FeatureProvider {
 
-  override val ActivationWindowSize: Int = settings.featureCheckBlocksPeriod
+  override val activationWindowSize: Int = settings.featureCheckBlocksPeriod
 
   override def synchronizationToken: ReentrantReadWriteLock = inner.synchronizationToken
 
