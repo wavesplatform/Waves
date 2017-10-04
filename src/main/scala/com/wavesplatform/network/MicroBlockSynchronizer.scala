@@ -51,16 +51,16 @@ class MicroBlockSynchronizer(processScoreBarrier: FutureSemaphore, settings: Set
       log.trace(id(ctx) + "Received " + mbr)
       knownMicroBlockOwners.invalidate(mb.totalResBlockSig)
       awaitingMicroBlocks.invalidate(mb.totalResBlockSig)
-
-      // TODO: Possible issue with timeouted reponses, will be fixed later
-      processScoreBarrier.decrement()
-
       successfullyReceivedMicroBlocks.put(mb.totalResBlockSig, dummy)
 
-      Option(microBlockRecieveTime.getIfPresent(mb.totalResBlockSig)).foreach { created =>
-        BlockStats.received(mb, ctx, propagationTime = System.currentTimeMillis() - created)
-        microBlockRecieveTime.invalidate(mb.totalResBlockSig)
-        super.channelRead(ctx, msg)
+      if (history.lastBlockId().contains(mb.prevResBlockSig)) {
+        // TODO: Possible issue with timeouted reponses, will be fixed later
+        processScoreBarrier.decrement()
+        Option(microBlockRecieveTime.getIfPresent(mb.totalResBlockSig)).foreach { created =>
+          BlockStats.received(mb, ctx, propagationTime = System.currentTimeMillis() - created)
+          microBlockRecieveTime.invalidate(mb.totalResBlockSig)
+          super.channelRead(ctx, msg)
+        }
       }
     }.runAsync
 
