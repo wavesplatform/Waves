@@ -46,7 +46,7 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
   }
 
   override def featureVotesCountWithinActivationWindow(height: Int): Map[Short, Int] = read { implicit lock =>
-    featuresVotes().get(FeatureProvider.activationWindowOpeningFromHeight(height, activationWindowSize))
+    featuresVotes().getOrDefault(FeatureProvider.activationWindowOpeningFromHeight(height, activationWindowSize), Map.empty)
   }
 
   private def alterVotes(height: Int, votes: Set[Short], voteMod: Int): Unit = write { implicit lock =>
