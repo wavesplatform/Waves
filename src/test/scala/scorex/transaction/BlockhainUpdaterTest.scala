@@ -3,7 +3,6 @@ package scorex.transaction
 import com.wavesplatform.features.BlockchainFeatureStatus
 import com.wavesplatform.state2._
 import com.wavesplatform.history._
-import org.scalacheck.Shrink
 import org.scalatest.{FunSuite, Matchers}
 import scorex.block.Block
 
@@ -11,8 +10,6 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
 class BlockhainUpdaterTest extends FunSuite with Matchers with HistoryTest {
-
-  private implicit def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)
 
   private val ApprovalPeriod = 100
 

@@ -48,10 +48,10 @@ object BlockStats {
     Seq.empty
   )
 
-  def applied(b: Block, source: Source, height: Int): Unit = write(
+  def applied(b: Block, source: Source, baseHeight: Int): Unit = write(
     block(b, source)
       .addField("txs", b.transactionData.size)
-      .addField("height", height),
+      .addField("height", baseHeight),
     Event.Applied,
     Seq.empty
   )
@@ -62,13 +62,13 @@ object BlockStats {
     Seq.empty
   )
 
-  def mined(b: Block, height: Int): Unit = write(
+  def mined(b: Block, baseHeight: Int): Unit = write(
     block(b, Source.Broadcast)
       .tag("parent-id", id(b.reference))
       .addField("txs", b.transactionData.size)
       .addField("score", b.blockScore)
       .addField("bt", b.consensusData.baseTarget)
-      .addField("height", height),
+      .addField("height", baseHeight),
     Event.Mined,
     Seq.empty
   )
