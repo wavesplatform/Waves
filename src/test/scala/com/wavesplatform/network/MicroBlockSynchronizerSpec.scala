@@ -1,6 +1,7 @@
 package com.wavesplatform.network
 
 import com.wavesplatform.TransactionGen
+import com.wavesplatform.concurrent.FutureSemaphore
 import com.wavesplatform.state2.ByteStr
 import io.netty.channel.{ChannelHandlerContext, ChannelInboundHandlerAdapter}
 import io.netty.channel.embedded.EmbeddedChannel
@@ -42,7 +43,7 @@ class MicroBlockSynchronizerSpec extends FreeSpec
     val history = Mockito.mock(classOf[NgHistory])
     Mockito.doReturn(Some(lastBlockSig)).when(history).lastBlockId()
 
-    val channel = new EmbeddedChannel(new MicroBlockSynchronizer(settings, history))
+    val channel = new EmbeddedChannel(new MicroBlockSynchronizer(new FutureSemaphore, settings, history))
     channel.writeInbound(MicroBlockInv(nextBlockSig, lastBlockSig))
     channel.flushInbound()
 
@@ -61,7 +62,7 @@ class MicroBlockSynchronizerSpec extends FreeSpec
     val history = Mockito.mock(classOf[NgHistory])
     Mockito.doReturn(Some(lastBlockSig)).when(history).lastBlockId()
 
-    val synchronizer = new MicroBlockSynchronizer(settings, history)
+    val synchronizer = new MicroBlockSynchronizer(new FutureSemaphore, settings, history)
 
     val channel1 = new EmbeddedChannel(synchronizer)
     val channel2 = new EmbeddedChannel(synchronizer)
@@ -100,16 +101,16 @@ class MicroBlockSynchronizerSpec extends FreeSpec
   "should wait until microblock is downloaded and then pass a received score to the pipeline" in {
     val lastBlockSig = ByteStr("lastBlockId".getBytes)
     val nextBlockSig = ByteStr("nextBlockId".getBytes)
-    var localScorePropagated = false
+    var localScoreWasPropagated = false
 
     val history = Mockito.mock(classOf[NgHistory])
     Mockito.doReturn(Some(lastBlockSig)).when(history).lastBlockId()
 
     val channel = new EmbeddedChannel(
-      new MicroBlockSynchronizer(settings, history),
+      new MicroBlockSynchronizer(new FutureSemaphore, settings, history),
       new ChannelInboundHandlerAdapter {
         override def channelRead(ctx: ChannelHandlerContext, msg: Any): Unit = msg match {
-          case _: LocalScoreChanged => localScorePropagated = true
+          case _: LocalScoreChanged => localScoreWasPropagated = true
           case _ =>
         }
       }
@@ -125,7 +126,7 @@ class MicroBlockSynchronizerSpec extends FreeSpec
     channel.flushInbound()
     intercept[TestFailedException] {
       eventually(timeout(300.millis)) {
-        localScorePropagated shouldBe true
+        localScoreWasPropagated shouldBe true
       }
     }
 
@@ -139,7 +140,7 @@ class MicroBlockSynchronizerSpec extends FreeSpec
     )))
     channel.flushInbound()
     eventually(timeout(300.millis)) {
-      localScorePropagated shouldBe true
+      localScoreWasPropagated shouldBe true
     }
   }
 
