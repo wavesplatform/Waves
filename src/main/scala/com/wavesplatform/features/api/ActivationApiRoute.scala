@@ -3,7 +3,7 @@ package com.wavesplatform.features.api
 import javax.ws.rs.Path
 
 import akka.http.scaladsl.server.Route
-import com.wavesplatform.features.FeatureProvider
+import com.wavesplatform.features.{BlockchainFeatures, FeatureProvider}
 import com.wavesplatform.settings.{FeaturesSettings, FunctionalitySettings, RestAPISettings}
 import io.swagger.annotations._
 import play.api.libs.json.Json
@@ -39,24 +39,15 @@ case class ActivationApiRoute(settings: RestAPISettings,
         activationInterval,
         functionalitySettings.blocksForFeatureActivation,
         (FeatureProvider.activationWindowOpeningFromHeight(height, activationInterval) + activationInterval) - 1,
-        Set.empty))
+        BlockchainFeatures.implemented.map(id => {
+          val status = featureProvider.featureStatus(id, height)
+          ActivationStatusFeature(id,
+            status,
+            if (featuresSettings.supported.contains(id)) NodeFeatureStatus.Supported else NodeFeatureStatus.Unsupported,
+            featureProvider.featureActivatedHeight(id),
+            featureProvider.featureVotesCountWithinActivationWindow(height).get(id)
+          )
+        })))
     )
-
-//    complete(Json.obj(
-//      "height" -> height,
-//      "activationInterval" -> activationInterval,
-//      "activationTreshold" -> functionalitySettings.blocksForFeatureActivation,
-//      "nextCheck" -> (FeatureProvider.activationWindowOpeningFromHeight(height, activationInterval) + activationInterval),
-//      "features" -> Json.arr(BlockchainFeatures.implemented.map(id => {
-//        val status = featureProvider.featureStatus(id, height)
-//        Json.obj(
-//          "id" -> id,
-//          "blockhainStatus" -> status.toString,
-//          "activationHeight" -> featureProvider.featureActivatedHeight(id).getOrElse(0).toString,
-//          "supportedBlocks" -> featureProvider.featureVotesCountWithinActivationWindow(height).getOrElse(id, 0).toString,
-//          "nodeStatus" -> (if (featuresSettings.supported.contains(id)) "Supported" else "Unsupported")
-//        )
-//      }))
-//    ))
   }
 }

@@ -14,14 +14,13 @@ case class ActivationStatusFeature(id: Short,
 object ActivationStatusFeature {
   implicit val activationStatuFeatureWrites = new Writes[ActivationStatusFeature] {
     def writes(asf: ActivationStatusFeature) = {
-      val json = Json.obj(
+      Json.obj(
         "id" -> asf.id,
         "blockhainStatus" -> asf.blockchainStatus.toString,
-        "nodeStatus" -> asf.nodeStatus.toString
+        "nodeStatus" -> asf.nodeStatus.toString,
+        "activationHeight" -> Json.toJson(asf.activationHeight.getOrElse(0)),
+        "supportedBlocks" -> Json.toJson(asf.supportedBlocks.getOrElse(0)),
       )
-       //asf.activationHeight.map("name" -> JsNumber(_)).getOrElse(())
-
-      Seq(asf.activationHeight, asf.supportedBlocks).flatten.foldLeft(json)((j, o) => j + )
     }
   }
 }
