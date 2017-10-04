@@ -7,6 +7,7 @@ import io.netty.util.concurrent.ScheduledFuture
 import kamon.Kamon
 import kamon.metric.instrument
 import scorex.block.Block
+import scorex.transaction.NgHistory
 import scorex.utils.ScorexLogging
 
 import scala.collection.mutable
@@ -14,7 +15,7 @@ import scala.concurrent.duration.FiniteDuration
 
 class ExtensionBlocksLoader(
     blockSyncTimeout: FiniteDuration,
-    peerDatabase: PeerDatabase) extends ChannelInboundHandlerAdapter with ScorexLogging {
+    peerDatabase: PeerDatabase, history: NgHistory) extends ChannelInboundHandlerAdapter with ScorexLogging {
   private var pendingSignatures = Map.empty[ByteStr, Int]
   private var targetExtensionIds = Option.empty[ExtensionIds]
   private val blockBuffer = mutable.TreeMap.empty[Int, Block]
@@ -40,7 +41,8 @@ class ExtensionBlocksLoader(
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef) = msg match {
     case xid@ExtensionIds(_, newIds) if pendingSignatures.isEmpty =>
-        if (newIds.nonEmpty) {
+      val requestingIds = newIds.filterNot(history.contains)
+      if (requestingIds.nonEmpty) {
           targetExtensionIds = Some(xid)
           pendingSignatures = newIds.zipWithIndex.toMap
           blacklistAfterTimeout(ctx)
