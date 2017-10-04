@@ -88,7 +88,6 @@ class UtxPool(time: Time,
               transactions.transform(_.updated(tx.id, tx))
               tx
             }
-
             cache.put(tx.id, res)
             res.right.map(_ => true)
         })
@@ -146,7 +145,6 @@ class UtxPool(time: Time,
     pessimisticPortfolios.mutate { p =>
       invalidTxs.foreach(p.remove)
     }
-
     if (sortInBlock)
       reversedValidTxs.sorted(TransactionsOrdering.InBlock)
     else reversedValidTxs.reverse

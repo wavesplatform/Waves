@@ -76,7 +76,7 @@ class CoordinatorHandler(checkpointService: CheckpointService,
         processCheckpoint(c).map(Some(_)))
 
       case ExtensionBlocks(blocks) =>
-        blocks.foreach(BlockStats.received(_, BlockStats.BlockType.Ext, ctx))
+        blocks.foreach(BlockStats.received(_, BlockStats.Source.Ext, ctx))
         broadcastingScore(ctx.channel(),
           s"Attempting to append extension ${formatBlocks(blocks)}",
           s"Successfully appended extension ${formatBlocks(blocks)}",
@@ -84,7 +84,7 @@ class CoordinatorHandler(checkpointService: CheckpointService,
           processFork(blocks))
 
       case b: Block =>
-        BlockStats.received(b, BlockStats.BlockType.Broadcast, ctx)
+        BlockStats.received(b, BlockStats.Source.Broadcast, ctx)
         CoordinatorHandler.blockReceivingLag.safeRecord(System.currentTimeMillis() - b.timestamp)
         Signed.validateSignatures(b) match {
           case Left(err) => peerDatabase.blacklistAndClose(ctx.channel(), err.toString)
@@ -94,7 +94,7 @@ class CoordinatorHandler(checkpointService: CheckpointService,
             s"Could not append block ${b.uniqueId}", {
               val blockProcessingResult = processBlock(b, false)
               blockProcessingResult match {
-                case Left(_) => BlockStats.declined(b, BlockStats.BlockType.Broadcast)
+                case Left(_) => BlockStats.declined(b, BlockStats.Source.Broadcast)
                 case Right(Some(_)) =>
                   miner.scheduleMining()
                   if (b.transactionData.isEmpty)

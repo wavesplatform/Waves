@@ -32,14 +32,14 @@ object BlockStats {
     case object Micro extends Type
   }
 
-  sealed abstract class BlockType extends Named
-  object BlockType {
-    case object Broadcast extends BlockType
-    case object Ext extends BlockType
+  sealed abstract class Source extends Named
+  object Source {
+    case object Broadcast extends Source
+    case object Ext extends Source
   }
 
-  def received(b: Block, bType: BlockType, ctx: ChannelHandlerContext): Unit = write(
-    block(b, bType)
+  def received(b: Block, source: Source, ctx: ChannelHandlerContext): Unit = write(
+    block(b, source)
       .addField("from", nodeName(ctx))
       .addField("prop-time", System.currentTimeMillis() - b.timestamp)
       .addField("score", b.blockScore)
@@ -48,22 +48,22 @@ object BlockStats {
     Seq.empty
   )
 
-  def applied(b: Block, bType: BlockType, height: Int): Unit = write(
-    block(b, bType)
+  def applied(b: Block, source: Source, height: Int): Unit = write(
+    block(b, source)
       .addField("txs", b.transactionData.size)
       .addField("height", height),
     Event.Applied,
     Seq.empty
   )
 
-  def declined(b: Block, bType: BlockType): Unit = write(
-    block(b, bType),
+  def declined(b: Block, source: Source): Unit = write(
+    block(b, source),
     Event.Declined,
     Seq.empty
   )
 
   def mined(b: Block, height: Int): Unit = write(
-    block(b, BlockType.Broadcast)
+    block(b, Source.Broadcast)
       .tag("parent-id", id(b.reference))
       .addField("txs", b.transactionData.size)
       .addField("score", b.blockScore)
@@ -113,9 +113,9 @@ object BlockStats {
     Seq.empty
   )
 
-  private def block(b: Block, bType: BlockType): Point.Builder = measurement(Type.Block)
+  private def block(b: Block, source: Source): Point.Builder = measurement(Type.Block)
     .tag("id", id(b.uniqueId))
-    .tag("btype", bType.name)
+    .tag("source", source.name)
 
   private def micro(m: MicroBlock): Point.Builder = measurement(Type.Micro)
     .tag("id", id(m.totalResBlockSig))
