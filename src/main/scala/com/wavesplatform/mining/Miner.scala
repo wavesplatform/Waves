@@ -177,8 +177,8 @@ class MinerImpl(
             processBlock(block, true) match {
               case Left(err) => log.warn("Error mining Block: " + err.toString)
               case Right(Some(score)) =>
-                allChannels.broadcast(LocalScoreChanged(score))
                 allChannels.broadcast(BlockForged(block))
+                allChannels.broadcast(LocalScoreChanged(score))
                 scheduleMining()
                 if (ngEnabled)
                   startMicroBlockMining(account, block)
