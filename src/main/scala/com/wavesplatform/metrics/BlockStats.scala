@@ -1,8 +1,8 @@
 package com.wavesplatform.metrics
 
-import java.net.InetSocketAddress
-
+import com.wavesplatform.network.{HandshakeHandler, MicroBlockInv}
 import com.wavesplatform.state2.ByteStr
+import io.netty.channel.ChannelHandlerContext
 import org.influxdb.dto.Point
 import scorex.block.{Block, MicroBlock}
 
@@ -10,58 +10,83 @@ object BlockStats {
 
   private val StringIdLength = 6
 
-  private sealed abstract class Event {
-    val name: String = {
+  trait Named {
+    private[BlockStats] val name: String = {
       val className = getClass.getName
       className.slice(className.lastIndexOf('$', className.length - 2) + 1, className.length - 1)
     }
   }
 
+  private sealed abstract class Event extends Named
   private object Event {
+    case object Inv extends Event
     case object Received extends Event
     case object Applied extends Event
     case object Declined extends Event
     case object Mined extends Event
   }
 
-  def received(b: Block, from: InetSocketAddress): Unit = write(
-    block(b)
-      .addField("from", from.toString)
+  private sealed abstract class Type extends Named
+  private object Type {
+    case object Block extends Type
+    case object Micro extends Type
+  }
+
+  sealed abstract class Source extends Named
+  object Source {
+    case object Broadcast extends Source
+    case object Ext extends Source
+  }
+
+  def received(b: Block, source: Source, ctx: ChannelHandlerContext): Unit = write(
+    block(b, source)
+      .addField("from", nodeName(ctx))
       .addField("prop-time", System.currentTimeMillis() - b.timestamp)
-      .addField("score", b.blockScore),
+      .addField("score", b.blockScore)
+      .addField("bt", b.consensusData.baseTarget),
     Event.Received,
     Seq.empty
   )
 
-  def applied(b: Block, height: Int): Unit = write(
-    block(b)
+  def applied(b: Block, source: Source, baseHeight: Int): Unit = write(
+    block(b, source)
       .addField("txs", b.transactionData.size)
-      .addField("height", height),
+      .addField("height", baseHeight),
     Event.Applied,
     Seq.empty
   )
 
-  def declined(b: Block): Unit = write(
-    block(b),
+  def declined(b: Block, source: Source): Unit = write(
+    block(b, source),
     Event.Declined,
     Seq.empty
   )
 
-  def mined(b: Block, height: Int): Unit = write(
-    block(b)
-      .addField("parent-id", b.reference.toString.take(StringIdLength))
+  def mined(b: Block, baseHeight: Int): Unit = write(
+    block(b, Source.Broadcast)
+      .tag("parent-id", id(b.reference))
       .addField("txs", b.transactionData.size)
       .addField("score", b.blockScore)
-      .addField("height", height),
+      .addField("bt", b.consensusData.baseTarget)
+      .addField("height", baseHeight),
     Event.Mined,
     Seq.empty
   )
 
 
-  def received(m: MicroBlock, from: InetSocketAddress, propagationTime: Long): Unit = write(
+  def inv(m: MicroBlockInv, ctx: ChannelHandlerContext): Unit = write(
+    measurement(Type.Micro)
+      .tag("id", id(m.totalBlockSig))
+      .tag("parent-id", id(m.prevBlockSig))
+      .addField("from", nodeName(ctx)),
+    Event.Inv,
+    Seq.empty
+  )
+
+  def received(m: MicroBlock, ctx: ChannelHandlerContext, propagationTime: Long): Unit = write(
     micro(m)
-      .addField("parent-id", m.prevResBlockSig.toString.take(StringIdLength))
-      .addField("from", from.toString)
+      .tag("parent-id", id(m.prevResBlockSig))
+      .addField("from", nodeName(ctx))
       .addField("prop-time", propagationTime),
     Event.Received,
     Seq.empty
@@ -82,26 +107,28 @@ object BlockStats {
 
   def mined(m: MicroBlock): Unit = write(
     micro(m)
+      .tag("parent-id", id(m.prevResBlockSig))
       .addField("txs", m.transactionData.size),
     Event.Mined,
     Seq.empty
   )
 
-  private def block(b: Block): Point.Builder = {
-    Point
-      .measurement("block")
-      .addField("id", id(b.uniqueId))
-  }
+  private def block(b: Block, source: Source): Point.Builder = measurement(Type.Block)
+    .tag("id", id(b.uniqueId))
+    .tag("source", source.name)
 
-  private def micro(m: MicroBlock): Point.Builder = {
-    Point
-      .measurement("micro")
-      .addField("id", id(m.uniqueId))
+  private def micro(m: MicroBlock): Point.Builder = measurement(Type.Micro)
+    .tag("id", id(m.totalResBlockSig))
+
+  private def measurement(t: Type): Point.Builder = Point.measurement("block").tag("type", t.toString)
+
+  private def nodeName(ctx: ChannelHandlerContext): String = {
+    Option(ctx.channel().attr(HandshakeHandler.NodeNameAttributeKey).get()).getOrElse("")
   }
 
   private def id(x: ByteStr): String = x.toString.take(StringIdLength)
 
   private def write(init: Point.Builder, event: Event, addFields: Seq[(String, String)]): Unit = {
-    Metrics.write(addFields.foldLeft(init.addField("event", event.name)) { case (r, (k, v)) => r.addField(k, v) })
+    Metrics.write(addFields.foldLeft(init.tag("event", event.name)) { case (r, (k, v)) => r.addField(k, v) })
   }
 }

@@ -10,24 +10,31 @@ class WideTransactionGenerator(settings: Settings,
                                accounts: Seq[PrivateKeyAccount]) extends TransactionGenerator {
   require(accounts.nonEmpty)
 
-  override def next(): Iterator[Transaction] = Gen.txs(accounts).take(settings.txsPerIteration)
+  private val limitedRecipientGen = Gen.address(settings.limitDestAccounts)
+
+  override def next(): Iterator[Transaction] = {
+    Gen.txs(settings.minFee, settings.maxFee, accounts, limitedRecipientGen).take(settings.transactions)
+  }
 
 }
 
 object WideTransactionGenerator {
 
-  case class Settings(transactions: Int, limitAccounts: Option[Int]) {
+  case class Settings(transactions: Int,
+                      limitDestAccounts: Option[Int],
+                      minFee: Long,
+                      maxFee: Long) {
     require(transactions > 0)
-    require(limitAccounts.forall(_ > 0))
-
-    val txsPerIteration: Int = Math.min(limitAccounts.getOrElse(transactions), transactions)
+    require(limitDestAccounts.forall(_ > 0))
   }
 
   object Settings {
     implicit val toPrintable: Show[Settings] = { x =>
       import x._
       s"""transactions per iteration: $transactions
-         |number of recipients is ${limitAccounts.map(x => s"limited by $x").getOrElse("not limited")}""".stripMargin
+         |number of recipients is ${limitDestAccounts.map(x => s"limited by $x").getOrElse("not limited")}
+         |min fee: $minFee
+         |max fee: $maxFee""".stripMargin
     }
   }
 

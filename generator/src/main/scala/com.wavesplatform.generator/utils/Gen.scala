@@ -7,21 +7,15 @@ import scorex.account.{Address, PrivateKeyAccount}
 import scorex.transaction.assets.TransferTransaction
 import scorex.transaction.{Transaction, TransactionParser}
 
-import scala.util.Random
-
 object Gen {
-  def txs(accounts: Seq[PrivateKeyAccount]): Iterator[Transaction] = {
-    def random = Random.javaRandomToRandom(ThreadLocalRandom.current)
+  private def random = ThreadLocalRandom.current
 
-    val senderGen = Iterator.randomContinually(accounts)
-
-    val recipientGen = Iterator.continually {
-      val pk = Array.fill[Byte](TransactionParser.KeyLength)(random.nextInt(Byte.MaxValue).toByte)
-      Address.fromPublicKey(pk)
-    }
-
-    val maxFee = 100000
-    val feeGen = Iterator.continually(random.nextInt(maxFee) + 1)
+  def txs(minFee: Long,
+          maxFee: Long,
+          senderAccounts: Seq[PrivateKeyAccount],
+          recipientGen: Iterator[Address]): Iterator[Transaction] = {
+    val senderGen = Iterator.randomContinually(senderAccounts)
+    val feeGen = Iterator.continually(minFee + random.nextLong(maxFee - minFee))
 
     senderGen.zip(recipientGen).zip(feeGen)
       .map {
@@ -30,4 +24,14 @@ object Gen {
       }
       .collect { case Right(x) => x }
   }
+
+  val address: Iterator[Address] = Iterator.continually {
+    val pk = Array.fill[Byte](TransactionParser.KeyLength)(random.nextInt(Byte.MaxValue).toByte)
+    Address.fromPublicKey(pk)
+  }
+
+  def address(uniqNumber: Int): Iterator[Address] = Iterator.randomContinually(address.take(uniqNumber).toSeq)
+
+  def address(limitUniqNumber: Option[Int]): Iterator[Address] = limitUniqNumber.map(address(_)).getOrElse(address)
+
 }
