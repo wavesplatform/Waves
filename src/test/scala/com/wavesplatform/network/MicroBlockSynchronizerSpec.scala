@@ -2,11 +2,12 @@ package com.wavesplatform.network
 
 import com.wavesplatform.TransactionGen
 import com.wavesplatform.state2.ByteStr
+import io.netty.channel.{ChannelHandlerContext, ChannelInboundHandlerAdapter}
 import io.netty.channel.embedded.EmbeddedChannel
 import org.mockito.Mockito
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.Eventually
-import org.scalatest.exceptions.TestFailedDueToTimeoutException
+import org.scalatest.exceptions.{TestFailedDueToTimeoutException, TestFailedException}
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import org.scalatest.{FreeSpec, Matchers}
 import scorex.account.PublicKeyAccount
@@ -92,6 +93,53 @@ class MicroBlockSynchronizerSpec extends FreeSpec
         val request = channel2.readOutbound[MicroBlockRequest]()
         Option(request) shouldBe defined
       }
+    }
+  }
+
+  // This hack should be removed after the refactoring
+  "should wait until microblock is downloaded and then pass a received score to the pipeline" in {
+    val lastBlockSig = ByteStr("lastBlockId".getBytes)
+    val nextBlockSig = ByteStr("nextBlockId".getBytes)
+    var localScorePropagated = false
+
+    val history = Mockito.mock(classOf[NgHistory])
+    Mockito.doReturn(Some(lastBlockSig)).when(history).lastBlockId()
+
+    val channel = new EmbeddedChannel(
+      new MicroBlockSynchronizer(settings, history),
+      new ChannelInboundHandlerAdapter {
+        override def channelRead(ctx: ChannelHandlerContext, msg: Any): Unit = msg match {
+          case _: LocalScoreChanged => localScorePropagated = true
+          case _ =>
+        }
+      }
+    )
+
+    channel.writeInbound(MicroBlockInv(nextBlockSig, lastBlockSig))
+    channel.flushInbound()
+    eventually(timeout(300.millis)) {
+      Option(channel.readOutbound[MicroBlockRequest]()) shouldNot be(empty)
+    }
+
+    channel.writeInbound(LocalScoreChanged(1))
+    channel.flushInbound()
+    intercept[TestFailedException] {
+      eventually(timeout(300.millis)) {
+        localScorePropagated shouldBe true
+      }
+    }
+
+    channel.writeInbound(MicroBlockResponse(MicroBlock(
+      version = 1.toByte,
+      generator = PublicKeyAccount("pubkey".getBytes),
+      transactionData = Seq.empty,
+      prevResBlockSig = lastBlockSig,
+      totalResBlockSig = nextBlockSig,
+      signature = nextBlockSig
+    )))
+    channel.flushInbound()
+    eventually(timeout(300.millis)) {
+      localScorePropagated shouldBe true
     }
   }
 

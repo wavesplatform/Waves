@@ -1,6 +1,6 @@
 package com.wavesplatform.network
 
-import java.util.concurrent.TimeUnit
+import java.util.concurrent.{ConcurrentHashMap, ConcurrentLinkedQueue, TimeUnit}
 
 import com.google.common.cache.{Cache, CacheBuilder}
 import com.wavesplatform.metrics.BlockStats
@@ -26,6 +26,11 @@ class MicroBlockSynchronizer(settings: Settings, history: NgHistory) extends Cha
   private val successfullyReceivedMicroBlocks = cache[MicroBlockSignature, Object](settings.processedMicroBlocksCacheTimeout)
   private val microBlockRecieveTime = cache[ByteStr, java.lang.Long](settings.invCacheTimeout)
 
+  private val scorePropagationQueue = new ConcurrentHashMap[ChannelId, ConcurrentLinkedQueue[LocalScoreChanged]]
+  private def scoreQueueOf(ctx: ChannelHandlerContext): ConcurrentLinkedQueue[LocalScoreChanged] = {
+    scorePropagationQueue.computeIfAbsent(ctx.channel().id, _ => new ConcurrentLinkedQueue)
+  }
+
   private def alreadyRequested(microBlockSig: MicroBlockSignature): Boolean = Option(awaitingMicroBlocks.getIfPresent(microBlockSig)).isDefined
 
   private def alreadyProcessed(microBlockSig: MicroBlockSignature): Boolean = Option(successfullyReceivedMicroBlocks.getIfPresent(microBlockSig)).isDefined
@@ -45,12 +50,17 @@ class MicroBlockSynchronizer(settings: Settings, history: NgHistory) extends Cha
     } else Task.unit
   }.flatten
 
-
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
     case mbr@MicroBlockResponse(mb) => Task {
       log.trace(id(ctx) + "Received " + mbr)
       knownMicroBlockOwners.invalidate(mb.totalResBlockSig)
       awaitingMicroBlocks.invalidate(mb.totalResBlockSig)
+
+      val scoreQueue = scoreQueueOf(ctx)
+      while (scoreQueue.size() > 0) {
+        super.channelRead(ctx, scoreQueue.poll())
+      }
+
       successfullyReceivedMicroBlocks.put(mb.totalResBlockSig, dummy)
 
       Option(microBlockRecieveTime.getIfPresent(mb.totalResBlockSig)).foreach { created =>
@@ -59,6 +69,7 @@ class MicroBlockSynchronizer(settings: Settings, history: NgHistory) extends Cha
         super.channelRead(ctx, msg)
       }
     }.runAsync
+
     case mi@MicroBlockInv(totalResBlockSig, prevResBlockSig) => Task {
       log.trace(id(ctx) + "Received " + mi)
       history.lastBlockId() match {
@@ -84,6 +95,15 @@ class MicroBlockSynchronizer(settings: Settings, history: NgHistory) extends Cha
           Task.unit
       }
     }.flatten.runAsync
+
+    case x: LocalScoreChanged =>
+      if (awaitingMicroBlocks.size() == 0) {
+        super.channelRead(ctx, x)
+      } else {
+        val scoreQueue = scoreQueueOf(ctx)
+        scoreQueue.add(x)
+      }
+
     case _ => super.channelRead(ctx, msg)
   }
 }
