@@ -2,7 +2,7 @@ package com.wavesplatform.mining
 
 import java.util.concurrent.atomic.AtomicBoolean
 
-import com.wavesplatform.features.{BlockchainFeatures, FeatureProvider, FeatureStatus}
+import com.wavesplatform.features.{BlockchainFeatures, FeatureProvider, BlockchainFeatureStatus}
 import com.wavesplatform.metrics.{BlockStats, Instrumented}
 import com.wavesplatform.metrics.HistogramExt
 import com.wavesplatform.network._
@@ -77,7 +77,7 @@ class MinerImpl(
       s"BlockChain is too old (last block timestamp is $parentTimestamp generated $blockAge ago)"
     ))
 
-  private def ngEnabled : Boolean = featureProvider.activationHeight(BlockchainFeatures.NG).exists(history.height > _ + 1)
+  private def ngEnabled : Boolean = featureProvider.featureActivatedHeight(BlockchainFeatures.NG.id).exists(history.height > _ + 1)
 
   private def generateOneBlockTask(version: Int, account: PrivateKeyAccount, parentHeight: Int,
                                    greatGrandParent: Option[Block], balance: Long)(delay: FiniteDuration): Task[Either[String, Block]] = Task {
@@ -101,7 +101,7 @@ class MinerImpl(
         val txAmount = if (ngEnabled) minerSettings.maxTransactionsInKeyBlock else ClassicAmountOfTxsInBlock
         val unconfirmed = utx.packUnconfirmed(txAmount, sortInBlock)
         val features = settings.featuresSettings.supported
-          .filter(featureProvider.status(_) == FeatureStatus.Defined).toSet
+          .filter(featureProvider.featureStatus(_, parentHeight) == BlockchainFeatureStatus.Undefined).toSet
         log.debug(s"Adding ${unconfirmed.size} unconfirmed transaction(s) to new block")
         Block.buildAndSign(version.toByte, currentTime, referencedBlockInfo.blockId, consensusData, unconfirmed, account, features)
           .left.map(l => l.err)

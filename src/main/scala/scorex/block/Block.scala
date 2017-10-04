@@ -100,7 +100,7 @@ case class Block(timestamp: Long,
   override lazy val signedDescendants: Seq[Signed] = transactionData
 
   override def toString: String =
-    s"Block(timestamp=$timestamp, version=$version, reference=$reference, signerData=$signerData, consensusData=$consensusData, transactions.size=${transactionData.size})"
+    s"Block(timestamp=$timestamp, version=$version, reference=$reference, signerData=$signerData, consensusData=$consensusData, transactions.size=${transactionData.size}, supportedFeaturesIds=$supportedFeaturesIds) "
 
 }
 

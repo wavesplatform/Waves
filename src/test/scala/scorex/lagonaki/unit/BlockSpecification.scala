@@ -90,7 +90,9 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
   property(" block with txs bytes/parse roundtrip version 3") {
     val version = 3.toByte
 
-    forAll(blockGen, Gen.choose(0, Block.MaxFeaturesInBlock).flatMap(fc => Gen.listOfN(fc, arbitrary[Short])).map(_.toSet)) {
+    val faetureSetGen : Gen[Set[Short]] = Gen.choose(0, Block.MaxFeaturesInBlock).flatMap(fc => Gen.listOfN(fc, arbitrary[Short])).map(_.toSet)
+
+    forAll(blockGen, faetureSetGen) {
       case ((baseTarget, reference, generationSignature, recipient, transactionData), supportedFeatures) =>
         val block = Block.buildAndSign(version, time, reference, NxtLikeConsensusBlockData(baseTarget, generationSignature), transactionData, recipient, supportedFeatures).explicitGet()
         val parsedBlock = Block.parseBytes(block.bytes).get

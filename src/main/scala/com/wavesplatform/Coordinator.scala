@@ -112,7 +112,7 @@ object Coordinator extends ScorexLogging with Instrumented {
   private def validateEffectiveBalance(fp: FeatureProvider, fs: FunctionalitySettings, block: Block, baseHeight: Int)(effectiveBalance: Long): Either[String, Long] =
     Either.cond(block.timestamp < fs.minimalGeneratingBalanceAfter ||
       (block.timestamp >= fs.minimalGeneratingBalanceAfter && effectiveBalance >= MinimalEffectiveBalanceForGenerator1) ||
-      fp.activationHeight(BlockchainFeatures.SmallerMinimalGeneratingBalance).exists(baseHeight >= _)
+      fp.featureActivatedHeight(BlockchainFeatures.SmallerMinimalGeneratingBalance.id).exists(baseHeight >= _)
         && effectiveBalance >= MinimalEffectiveBalanceForGenerator2, effectiveBalance,
       s"generator's effective balance $effectiveBalance is less that required for generation")
 

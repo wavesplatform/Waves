@@ -1,5 +1,4 @@
 package com.wavesplatform.settings
 
-case class FeaturesSettings(autoActivate: Boolean,
-                            autoShutdownOnUnsupportedFeature: Boolean,
+case class FeaturesSettings(autoShutdownOnUnsupportedFeature: Boolean,
                             supported: List[Short])

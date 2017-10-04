@@ -12,7 +12,6 @@ class FeaturesSettingsSpecification extends FlatSpec with Matchers {
       """
         |waves {
         |  features {
-        |    auto-activate = yes
         |    auto-shutdown-on-unsupported-feature = yes
         |    supported = [123,124,135]
         |  }
@@ -21,7 +20,6 @@ class FeaturesSettingsSpecification extends FlatSpec with Matchers {
 
     val settings = config.as[FeaturesSettings]("waves.features")
 
-    settings.autoActivate should be(true)
     settings.autoShutdownOnUnsupportedFeature should be(true)
     settings.supported shouldEqual List(123,124,135)
   }

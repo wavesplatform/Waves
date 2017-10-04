@@ -2,8 +2,9 @@ package com.wavesplatform
 
 import java.util.concurrent.locks.ReentrantReadWriteLock
 
+import com.typesafe.config.ConfigFactory
 import com.wavesplatform.history.{HistoryWriterImpl, StorageFactory}
-import com.wavesplatform.settings.{BlockchainSettings, FeeSettings, FeesSettings, FunctionalitySettings, UtxSettings}
+import com.wavesplatform.settings.{BlockchainSettings, FeeSettings, FeesSettings, FunctionalitySettings, UtxSettings, WavesSettings}
 import com.wavesplatform.state2.diffs._
 import org.scalacheck.Gen._
 import org.scalacheck.{Gen, Shrink}
@@ -35,10 +36,13 @@ class UtxPoolSpecification extends FreeSpec
   )))
 
   private def mkState(senderAccount: Address, senderBalance: Long) = {
+
+    val config = ConfigFactory.load()
     val genesisSettings = TestHelpers.genesisSettings(Map(senderAccount -> senderBalance))
+    val settings = WavesSettings.fromConfig(config).copy(blockchainSettings = BlockchainSettings(None, None, None, 'T', 5, FunctionalitySettings.TESTNET, genesisSettings))
+
     val (history, _, _, state, bcu, _) =
-      StorageFactory(BlockchainSettings(None, None, None, 'T', 5, FunctionalitySettings.TESTNET, genesisSettings),
-        TestFunctionalitySettings.EmptyFeaturesSettings).get
+      StorageFactory(settings, TestFunctionalitySettings.EmptyFeaturesSettings).get
 
     bcu.processBlock(Block.genesis(genesisSettings).right.get)
 

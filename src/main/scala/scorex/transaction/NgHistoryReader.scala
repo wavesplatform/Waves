@@ -2,18 +2,22 @@ package scorex.transaction
 
 import java.util.concurrent.locks.ReentrantReadWriteLock
 
-import com.wavesplatform.features.{FeatureProvider, FeatureStatus}
+import com.wavesplatform.features.FeatureProvider
+import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2._
 import scorex.block.Block.BlockId
 import scorex.block.{Block, MicroBlock}
-import scorex.transaction.History.{BlockchainScore, BlockMinerInfo}
+import scorex.transaction.History.{BlockMinerInfo, BlockchainScore}
+import cats.implicits._
 
-class NgHistoryReader(ngState: () => Option[NgState], inner: History with FeatureProvider) extends History with NgHistory with DebugNgHistory with FeatureProvider {
+class NgHistoryReader(ngState: () => Option[NgState], inner: History with FeatureProvider, settings: FunctionalitySettings) extends History with NgHistory with DebugNgHistory with FeatureProvider {
+
+  override val activationWindowSize: Int = settings.featureCheckBlocksPeriod
 
   override def synchronizationToken: ReentrantReadWriteLock = inner.synchronizationToken
 
   override def height(): Int = read { implicit l =>
-    inner.height() + ngState().size
+    inner.height() + ngState().map(_ => 1).getOrElse(0)
   }
 
   override def blockBytes(height: Int): Option[Array[Byte]] = read { implicit l =>
@@ -73,15 +77,21 @@ class NgHistoryReader(ngState: () => Option[NgState], inner: History with Featur
     inner.lastBlockIds(count)
   }
 
-  override def microblockIds(): Seq[BlockId] =
+  override def microblockIds(): Seq[BlockId] = read { implicit l =>
     ngState().toSeq.flatMap(ng => ng.micros.map(_.totalResBlockSig))
+  }
 
   override def bestLastBlockInfo(maxTimestamp: Long): Option[BlockMinerInfo] = read { implicit l =>
     ngState().map(_.bestLastBlockInfo(maxTimestamp))
       .orElse(inner.lastBlock.map(b => BlockMinerInfo(b.consensusData, b.timestamp, b.uniqueId)))
   }
 
-  override def status(feature: Short): FeatureStatus = FeatureStatus.Defined
+  override def acceptedFeatures(): Map[Short, Int] = {
+    lazy val h = height()
+    ngState().map(_.acceptedFeatures.map(_ -> h).toMap).getOrElse(Map.empty) ++ inner.acceptedFeatures()
+  }
 
-  override def activationHeight(feature: Short): Option[Int] = inner.activationHeight(feature)
+  override def featureVotesCountWithinActivationWindow(height: Int): Map[Short, Int] = read { implicit l =>
+    inner.featureVotesCountWithinActivationWindow(height) |+| ngState().map(_.acceptedFeatures.map(_ -> 1).toMap).getOrElse(Map.empty)
+  }
 }

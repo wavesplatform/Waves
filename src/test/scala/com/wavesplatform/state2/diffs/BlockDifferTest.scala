@@ -3,7 +3,7 @@ package com.wavesplatform.state2.diffs
 import java.util.concurrent.ThreadLocalRandom
 
 import com.wavesplatform.BlockGen
-import com.wavesplatform.features.{BlockchainFeatures, FeatureProvider, FeatureStatus}
+import com.wavesplatform.features.{BlockchainFeatures, FeatureProvider}
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.BlockDiff
 import com.wavesplatform.state2.reader.{CompositeStateReader, StateReader}
@@ -113,15 +113,12 @@ class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen {
   private def assertDiff(blocks: Seq[Block], fs: FunctionalitySettings, ngAtHeight: Int)
                         (assertion: (BlockDiff, StateReader) => Unit): Unit = {
     val fp = new FeatureProvider {
-      override def activationHeight(feature: Short): Option[Int] = feature match {
-        case BlockchainFeatures.NG.id => Some(ngAtHeight)
-        case _ => None
-      }
 
-      override def status(feature: Short): FeatureStatus = feature match {
-        case BlockchainFeatures.NG.id => FeatureStatus.Activated
-        case _ => FeatureStatus.Defined
-      }
+      override val activationWindowSize: Int = ngAtHeight
+
+      override def featureVotesCountWithinActivationWindow(height: Int): Map[Short, Int] = ???
+
+      override def acceptedFeatures() = Map(BlockchainFeatures.NG.id -> 0)
     }
     assertDiffEiWithPrev(blocks.init, blocks.last,fp, fs)(assertion)
   }
