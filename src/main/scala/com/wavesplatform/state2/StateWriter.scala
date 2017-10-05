@@ -24,7 +24,9 @@ class StateWriterImpl(p: StateStorage, synchronizationToken: ReentrantReadWriteL
   override def applyBlockDiff(blockDiff: BlockDiff): Unit = write { implicit l =>
     val txsDiff = blockDiff.txsDiff
 
-    log.debug(s"Starting persist from ${sp().getHeight} to ${sp().getHeight + blockDiff.heightDiff}")
+    val oldHeight = sp().getHeight
+    val newHeight = oldHeight + blockDiff.heightDiff
+    log.debug(s"Starting persist from $oldHeight to $newHeight")
 
     measureSizeLog("transactions")(txsDiff.transactions) {
       _.par.foreach { case (id, (h, tx, _)) =>
@@ -99,10 +101,10 @@ class StateWriterImpl(p: StateStorage, synchronizationToken: ReentrantReadWriteL
     measureSizeLog("lease info")(blockDiff.txsDiff.leaseState)(
       _.foreach { case (id, isActive) => sp().leaseState.put(id, isActive) })
 
-    sp().setHeight(sp().getHeight + blockDiff.heightDiff)
+    sp().setHeight(newHeight)
     sp().commit()
 
-    log.debug("BlockDiff commit complete")
+    log.infoIf((newHeight / 10000) != (oldHeight / 10000), s"BlockDiff commit complete. Persisted height = $newHeight")
   }
 
   override def clear(): Unit = write { implicit l =>

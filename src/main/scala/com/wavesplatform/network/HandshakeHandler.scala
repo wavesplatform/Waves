@@ -9,6 +9,7 @@ import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel._
 import io.netty.channel.group.ChannelGroup
 import io.netty.handler.codec.ReplayingDecoder
+import io.netty.util.AttributeKey
 import io.netty.util.concurrent.ScheduledFuture
 import scorex.utils.ScorexLogging
 
@@ -84,6 +85,7 @@ abstract class HandshakeHandler(
           removeHandshakeHandlers(ctx, this)
           establishedConnections.put(ctx.channel(), peerInfo(remoteHandshake, ctx.channel()))
 
+          ctx.channel().attr(NodeNameAttributeKey).set(remoteHandshake.nodeName)
           ctx.channel().closeFuture().addListener { f: ChannelFuture =>
             peerConnections.remove(key, f.channel())
             establishedConnections.remove(ctx.channel())
@@ -107,6 +109,9 @@ abstract class HandshakeHandler(
 }
 
 object HandshakeHandler extends ScorexLogging {
+
+  val NodeNameAttributeKey = AttributeKey.newInstance[String]("name")
+
   def versionIsSupported(remoteVersion: (Int, Int, Int)): Boolean =
     remoteVersion._1 == 0 && remoteVersion._2 >= 6
 

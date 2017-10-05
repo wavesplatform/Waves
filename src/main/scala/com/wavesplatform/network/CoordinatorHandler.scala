@@ -1,6 +1,5 @@
 package com.wavesplatform.network
 
-import java.net.InetSocketAddress
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
 
@@ -69,8 +68,6 @@ class CoordinatorHandler(checkpointService: CheckpointService,
   }
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = {
-    def from = ctx.channel().remoteAddress().asInstanceOf[InetSocketAddress]
-
     msg match {
       case c: Checkpoint => broadcastingScore(ctx.channel,
         "Attempting to process checkpoint",
@@ -79,7 +76,7 @@ class CoordinatorHandler(checkpointService: CheckpointService,
         processCheckpoint(c).map(Some(_)))
 
       case ExtensionBlocks(blocks) =>
-        blocks.foreach(BlockStats.received(_, from))
+        blocks.foreach(BlockStats.received(_, BlockStats.Source.Ext, ctx))
         broadcastingScore(ctx.channel(),
           s"Attempting to append extension ${formatBlocks(blocks)}",
           s"Successfully appended extension ${formatBlocks(blocks)}",
@@ -87,7 +84,7 @@ class CoordinatorHandler(checkpointService: CheckpointService,
           processFork(blocks))
 
       case b: Block =>
-        BlockStats.received(b, from)
+        BlockStats.received(b, BlockStats.Source.Broadcast, ctx)
         CoordinatorHandler.blockReceivingLag.safeRecord(System.currentTimeMillis() - b.timestamp)
         Signed.validateSignatures(b) match {
           case Left(err) => peerDatabase.blacklistAndClose(ctx.channel(), err.toString)
@@ -97,7 +94,7 @@ class CoordinatorHandler(checkpointService: CheckpointService,
             s"Could not append block ${b.uniqueId}", {
               val blockProcessingResult = processBlock(b, false)
               blockProcessingResult match {
-                case Left(_) => BlockStats.declined(b)
+                case Left(_) => BlockStats.declined(b, BlockStats.Source.Broadcast)
                 case Right(Some(_)) =>
                   miner.scheduleMining()
                   if (b.transactionData.isEmpty)

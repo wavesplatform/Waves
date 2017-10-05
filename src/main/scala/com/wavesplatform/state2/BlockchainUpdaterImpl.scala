@@ -7,6 +7,7 @@ import cats.implicits._
 import com.wavesplatform.features.{BlockchainFeatures, FeatureProvider}
 import com.wavesplatform.history.HistoryWriterImpl
 import com.wavesplatform.settings.WavesSettings
+import com.wavesplatform.metrics.TxsInBlockchainStats
 import com.wavesplatform.metrics.Instrumented
 import com.wavesplatform.state2.BlockchainUpdaterImpl._
 import com.wavesplatform.state2.NgState._
@@ -145,6 +146,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
             composite(currentPersistedBlocksState, () => referencedLiquidDiff.copy(heightDiff = 1)),
             Some(referencedForgedBlock), block))
             .map { hardenedDiff =>
+              TxsInBlockchainStats.record(ng.transactions.size)
               topMemoryDiff.transform(Monoid.combine(_, referencedLiquidDiff))
               (hardenedDiff, discarded.flatMap(_.transactionData))
             }
@@ -158,9 +160,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
 
       ngState.set(Some(NgState(block, newBlockDiff, 0L, featuresAcceptedWithBlock(block))))
 //      historyWriter.updateFeaturesState(Map(height -> block.supportedFeaturesIds))
-      log.info(
-        s"""Block ${block.uniqueId} -> ${trim(block.reference)} appended.
-           | -- New height: $height, transactions: ${block.transactionData.size})""".stripMargin)
+      log.info(s"Block ${block.uniqueId} -> ${trim(block.reference)} appended. New height: $height, transactions: ${block.transactionData.size})")
       discacrded
     }
   }
@@ -176,32 +176,39 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
           log.warn(s"removeAfter nonexistent block $blockId")
           Left(GenericError(s"Failed to rollback to nonexistent block $blockId"))
         case Some(height) =>
-          logHeights(s"Rollback to h=$height started")
           val discardedTransactions = Seq.newBuilder[Transaction]
           discardedTransactions ++= ng.toSeq.flatMap(_.transactions)
           ngState.set(None)
 
-          while (historyWriter.height > height)
-            discardedTransactions ++= historyWriter.discardBlock()
-          if (height < persisted.height) {
-            log.info(s"Rollback to h=$height requested. Persisted height=${persisted.height}, will drop state and reapply blockchain now")
-            persisted.clear()
-            updatePersistedAndInMemory()
-          } else {
-            if (bestLiquidState.height != height) {
-              val persistedPlusBottomHeight = persisted.height + bottomMemoryDiff().heightDiff
-              if (height > persistedPlusBottomHeight) {
-                val newTopDiff = unsafeDiffByRange(composite(persisted, () => bottomMemoryDiff()), persistedPlusBottomHeight + 1, height + 1)
-                topMemoryDiff.set(newTopDiff)
-              } else {
-                topMemoryDiff.set(BlockDiff.empty)
-                if (height < persistedPlusBottomHeight)
-                  bottomMemoryDiff.set(unsafeDiffByRange(persisted, persisted.height + 1, height + 1))
+          if (height < historyWriter.height()) {
+            logHeights(s"Rollback to h=$height started")
+            while (historyWriter.height > height)
+              discardedTransactions ++= historyWriter.discardBlock()
+            if (height < persisted.height) {
+              log.info(s"Rollback to h=$height requested. Persisted height=${persisted.height}, will drop state and reapply blockchain now")
+              persisted.clear()
+              updatePersistedAndInMemory()
+            } else {
+              if (bestLiquidState.height != height) {
+                val persistedPlusBottomHeight = persisted.height + bottomMemoryDiff().heightDiff
+                if (height > persistedPlusBottomHeight) {
+                  val newTopDiff = unsafeDiffByRange(composite(persisted, () => bottomMemoryDiff()), persistedPlusBottomHeight + 1, height + 1)
+                  topMemoryDiff.set(newTopDiff)
+                } else {
+                  topMemoryDiff.set(BlockDiff.empty)
+                  if (height < persistedPlusBottomHeight)
+                    bottomMemoryDiff.set(unsafeDiffByRange(persisted, persisted.height + 1, height + 1))
+                }
               }
             }
+            logHeights(s"Rollback to h=$height completed:")
+          } else {
+            log.debug(s"No rollback necessary")
           }
-          logHeights(s"Rollback to h=$height completed:")
-          Right(discardedTransactions.result())
+
+          val r = discardedTransactions.result()
+          TxsInBlockchainStats.record(-r.size)
+          Right(r)
       }
     }
   }
@@ -227,8 +234,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
                 () => ng.bestLiquidDiff.copy(snapshots = Map.empty)),
                 historyWriter.lastBlock.map(_.timestamp), microBlock, ng.base.timestamp)
             } yield {
-              log.info(s"MicroBlock ${trim(microBlock.totalResBlockSig)}~>${trim(microBlock.prevResBlockSig)} appended. " +
-                s"-- with ${microBlock.transactionData.size} transactions")
+              log.info(s"MicroBlock ${trim(microBlock.totalResBlockSig)}~>${trim(microBlock.prevResBlockSig)} appended, tx count: ${microBlock.transactionData.size}")
               ngState.set(Some(ng + (microBlock, Monoid.combine(ng.bestLiquidDiff, diff), System.currentTimeMillis())))
             }
         }
