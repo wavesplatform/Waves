@@ -20,6 +20,13 @@ scalacOptions ++= Seq(
   "-language:implicitConversions",
   "-Ywarn-unused:-implicits",
   "-Xlint")
+
+scalacOptions in console := Seq(
+  "-feature",
+  "-deprecation",
+  "-language:higherKinds",
+  "-language:implicitConversions")
+
 logBuffered := false
 
 //assembly settings
