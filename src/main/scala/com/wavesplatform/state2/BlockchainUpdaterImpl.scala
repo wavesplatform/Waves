@@ -176,12 +176,12 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
           log.warn(s"removeAfter nonexistent block $blockId")
           Left(GenericError(s"Failed to rollback to nonexistent block $blockId"))
         case Some(height) =>
+          val discardedTransactions = Seq.newBuilder[Transaction]
+          discardedTransactions ++= ng.toSeq.flatMap(_.transactions)
           ngState.set(None)
+
           if (height < historyWriter.height()) {
             logHeights(s"Rollback to h=$height started")
-            val discardedTransactions = Seq.newBuilder[Transaction]
-            discardedTransactions ++= ng.toSeq.flatMap(_.transactions)
-
             while (historyWriter.height > height)
               discardedTransactions ++= historyWriter.discardBlock()
             if (height < persisted.height) {
@@ -202,13 +202,13 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
               }
             }
             logHeights(s"Rollback to h=$height completed:")
-            val r = discardedTransactions.result()
-            TxsInBlockchainStats.record(-r.size)
-            Right(r)
           } else {
             log.debug(s"No rollback necessary")
-            Right(Seq.empty)
           }
+
+          val r = discardedTransactions.result()
+          TxsInBlockchainStats.record(-r.size)
+          Right(r)
       }
     }
   }
