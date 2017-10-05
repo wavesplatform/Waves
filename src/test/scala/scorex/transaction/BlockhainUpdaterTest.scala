@@ -172,4 +172,26 @@ class BlockhainUpdaterTest extends FunSuite with Matchers with HistoryTest {
     }
     fp.featureStatus(1, ApprovalPeriod * 3) shouldBe BlockchainFeatureStatus.Activated
   }
+
+  test("features votes resets when voting window changes") {
+    val (h, fp, _, _, bu, _) = StorageFactory(WavesSettings, EmptyFeaturesSettings).get
+
+    bu.processBlock(genesisBlock)
+
+    fp.featureVotesCountWithinActivationWindow(h.height()) shouldBe Map.empty
+
+    fp.featureStatus(1, h.height()) shouldBe BlockchainFeatureStatus.Undefined
+
+    (1 until ApprovalPeriod).foreach { i =>
+      bu.processBlock(getNextTestBlockWithVotes(h, Set(1)))
+      fp.featureVotesCountWithinActivationWindow(h.height()) shouldBe Map(1.toShort -> i)
+    }
+
+    fp.featureStatus(1, h.height()) shouldBe BlockchainFeatureStatus.Accepted
+
+    bu.processBlock(getNextTestBlockWithVotes(h, Set(1)))
+    fp.featureVotesCountWithinActivationWindow(h.height()) shouldBe Map(1.toShort -> 1)
+
+    fp.featureStatus(1, h.height()) shouldBe BlockchainFeatureStatus.Accepted
+  }
 }
