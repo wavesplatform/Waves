@@ -4,7 +4,7 @@ import java.net.{InetSocketAddress, NetworkInterface, NoRouteToHostException}
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
 
-import com.wavesplatform.concurrent.FutureSemaphore
+import com.wavesplatform.concurrent.{FutureSemaphore, TimeoutedFutureSemaphore}
 import com.wavesplatform.features.FeatureProvider
 import com.wavesplatform.metrics.Metrics
 import com.wavesplatform.mining.Miner
@@ -95,7 +95,7 @@ class NetworkServer(checkpointService: CheckpointService,
 
   private val utxPoolSynchronizer = new UtxPoolSynchronizer(utxPool, allChannels)
   private val microBlockSynchronizer = new MicroBlockSynchronizer(
-    new FutureSemaphore,
+    new TimeoutedFutureSemaphore,
     settings.synchronizationSettings.microBlockSynchronizer,
     history
   )

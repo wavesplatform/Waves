@@ -3,7 +3,7 @@ package com.wavesplatform.network
 import java.util.concurrent.TimeUnit
 
 import com.google.common.cache.{Cache, CacheBuilder}
-import com.wavesplatform.concurrent.FutureSemaphore
+import com.wavesplatform.concurrent.TimeoutedFutureSemaphore
 import com.wavesplatform.metrics.BlockStats
 import com.wavesplatform.network.MicroBlockSynchronizer._
 import com.wavesplatform.state2.ByteStr
@@ -18,7 +18,7 @@ import scala.collection.mutable.{Set => MSet}
 import scala.concurrent.duration.FiniteDuration
 
 @Sharable
-class MicroBlockSynchronizer(processScoreBarrier: FutureSemaphore, settings: Settings, history: NgHistory) extends ChannelInboundHandlerAdapter with ScorexLogging {
+class MicroBlockSynchronizer(processScoreBarrier: TimeoutedFutureSemaphore, settings: Settings, history: NgHistory) extends ChannelInboundHandlerAdapter with ScorexLogging {
 
   private implicit val scheduler = monix.execution.Scheduler.singleThread("microblock-synchronizer", reporter = com.wavesplatform.utils.UncaughtExceptionsToLogReporter)
 
