@@ -14,6 +14,7 @@ package object api {
         json match {
           case JsString(`unsupported`) => JsSuccess(Unsupported)
           case JsString(`supported`) => JsSuccess(Supported)
+          case _ => ???
         }
 
       override def writes(o: NodeFeatureStatus): JsValue = {
@@ -35,6 +36,7 @@ package object api {
           case JsString(`undefined`) => JsSuccess(Undefined)
           case JsString(`accepted`) => JsSuccess(Accepted)
           case JsString(`activated`) => JsSuccess(Activated)
+          case _ => ???
         }
 
       override def writes(o: BlockchainFeatureStatus): JsValue = {
