@@ -3,9 +3,7 @@ package com.wavesplatform.features.api
 import javax.ws.rs.Path
 
 import akka.http.scaladsl.server.Route
-import com.wavesplatform.features.BlockchainFeatureStatus.{Accepted, Activated, Undefined}
-import com.wavesplatform.features.api.NodeFeatureStatus.{Supported, Unsupported}
-import com.wavesplatform.features.{BlockchainFeatureStatus, BlockchainFeatures, FeatureProvider}
+import com.wavesplatform.features.{BlockchainFeatures, FeatureProvider}
 import com.wavesplatform.settings.{FeaturesSettings, FunctionalitySettings, RestAPISettings}
 import io.swagger.annotations._
 import play.api.libs.json._
