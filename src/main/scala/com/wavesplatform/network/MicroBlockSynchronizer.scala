@@ -59,7 +59,7 @@ class MicroBlockSynchronizer(settings: Settings, history: NgHistory) extends Cha
         super.channelRead(ctx, msg)
       }
     }.runAsync
-    case mi@MicroBlockInv(totalResBlockSig, prevResBlockSig) => Task {
+    case mi@MicroBlockInv(totalResBlockSig, prevResBlockSig, _) => Task {
       log.trace(id(ctx) + "Received " + mi)
       history.lastBlockId() match {
         case Some(lastBlockId) =>

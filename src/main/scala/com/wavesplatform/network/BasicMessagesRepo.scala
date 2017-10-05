@@ -219,10 +219,11 @@ object MicroBlockInvMessageSpec extends MessageSpec[MicroBlockInv] {
   override def deserializeData(bytes: Array[Byte]): Try[MicroBlockInv] =
     Try(MicroBlockInv(
       totalBlockSig = ByteStr(bytes.take(SignatureLength)),
-      prevBlockSig = ByteStr(bytes.view.slice(SignatureLength, SignatureLength * 2).toArray)))
+      prevBlockSig = ByteStr(bytes.view.slice(SignatureLength, SignatureLength * 2).toArray),
+      unused = ByteStr(bytes.view.slice(SignatureLength * 2, SignatureLength * 3).toArray)))
 
   override def serializeData(inv: MicroBlockInv): Array[Byte] = {
-    inv.totalBlockSig.arr ++ inv.prevBlockSig.arr
+    inv.totalBlockSig.arr ++ inv.prevBlockSig.arr ++ inv.unused.arr
   }
 
   override def maxLength = 500

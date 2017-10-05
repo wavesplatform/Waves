@@ -20,4 +20,6 @@ object EllipticCurveImpl {
   def createKeyPair(seed: Array[Byte]): (PrivateKey, PublicKey) = Curve25519.createKeyPair(seed)
 
   val SignatureLength: Int = Curve25519.SignatureLength
+
+  val emptySignature: Array[Byte] = Array.fill(Curve25519.SignatureLength)(0: Byte)
 }
