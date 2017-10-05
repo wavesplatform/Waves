@@ -3,6 +3,7 @@ package com.wavesplatform.network
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
 
+import com.wavesplatform.concurrent.FutureSemaphore
 import com.wavesplatform.features.FeatureProvider
 import com.wavesplatform.metrics.BlockStats
 import com.wavesplatform.metrics.HistogramExt
@@ -34,7 +35,8 @@ class CoordinatorHandler(checkpointService: CheckpointService,
                          settings: WavesSettings,
                          peerDatabase: PeerDatabase,
                          allChannels: ChannelGroup,
-                         featureProvider: FeatureProvider)
+                         featureProvider: FeatureProvider,
+                         processScoreBarrier: FutureSemaphore)
   extends ChannelInboundHandlerAdapter with ScorexLogging {
 
   private val counter = new AtomicInteger
@@ -101,6 +103,7 @@ class CoordinatorHandler(checkpointService: CheckpointService,
                     allChannels.broadcast(BlockForged(b), Some(ctx.channel()))
                 case _ =>
               }
+              processScoreBarrier.decrement()
               blockProcessingResult
             }
           )
