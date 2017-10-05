@@ -159,7 +159,6 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
       val height = historyWriter.height() + 1
 
       ngState.set(Some(NgState(block, newBlockDiff, 0L, featuresAcceptedWithBlock(block))))
-//      historyWriter.updateFeaturesState(Map(height -> block.supportedFeaturesIds))
       log.info(
         s"""Block ${block.uniqueId} -> ${trim(block.reference)} appended.
            | -- New height: $height, transactions: ${block.transactionData.size})""".stripMargin)
