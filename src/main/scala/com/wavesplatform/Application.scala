@@ -12,6 +12,7 @@ import akka.http.scaladsl.server.Route
 import akka.stream.ActorMaterializer
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.actor.RootActorSystem
+import com.wavesplatform.features.api.ActivationApiRoute
 import com.wavesplatform.history.{CheckpointServiceImpl, StorageFactory}
 import com.wavesplatform.http.NodeApiRoute
 import com.wavesplatform.matcher.Matcher
@@ -90,7 +91,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
       DebugApiRoute(settings.restAPISettings, wallet, stateReader, history, peerDatabase, establishedConnections, blockchainUpdater, allChannels, utxStorage, blockchainDebugInfo, miner),
       WavesApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, time),
       AssetsApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, stateReader, time),
-      NodeApiRoute(settings.restAPISettings, () => this.shutdown()),
+      NodeApiRoute(settings.restAPISettings,() => this.shutdown()),
+      ActivationApiRoute(settings.restAPISettings, settings.blockchainSettings.functionalitySettings, settings.featuresSettings, history, featureProvider),
       AssetsBroadcastApiRoute(settings.restAPISettings, utxStorage, allChannels),
       LeaseApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, stateReader, time),
       LeaseBroadcastApiRoute(settings.restAPISettings, utxStorage, allChannels),
@@ -111,6 +113,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
       typeOf[WavesApiRoute],
       typeOf[AssetsApiRoute],
       typeOf[NodeApiRoute],
+      typeOf[ActivationApiRoute],
       typeOf[AssetsBroadcastApiRoute],
       typeOf[LeaseApiRoute],
       typeOf[LeaseBroadcastApiRoute],
