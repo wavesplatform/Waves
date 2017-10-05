@@ -3,6 +3,7 @@ package com.wavesplatform.network
 import java.util.concurrent.TimeUnit
 
 import com.google.common.cache.{Cache, CacheBuilder}
+import com.wavesplatform.concurrent.TimeoutedFutureSemaphore
 import com.wavesplatform.metrics.BlockStats
 import com.wavesplatform.network.MicroBlockSynchronizer._
 import com.wavesplatform.state2.ByteStr
@@ -17,7 +18,7 @@ import scala.collection.mutable.{Set => MSet}
 import scala.concurrent.duration.FiniteDuration
 
 @Sharable
-class MicroBlockSynchronizer(settings: Settings, history: NgHistory) extends ChannelInboundHandlerAdapter with ScorexLogging {
+class MicroBlockSynchronizer(processScoreBarrier: TimeoutedFutureSemaphore, settings: Settings, history: NgHistory) extends ChannelInboundHandlerAdapter with ScorexLogging {
 
   private implicit val scheduler = monix.execution.Scheduler.singleThread("microblock-synchronizer", reporter = com.wavesplatform.utils.UncaughtExceptionsToLogReporter)
 
@@ -45,7 +46,6 @@ class MicroBlockSynchronizer(settings: Settings, history: NgHistory) extends Cha
     } else Task.unit
   }.flatten
 
-
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
     case mbr@MicroBlockResponse(mb) => Task {
       log.trace(id(ctx) + "Received " + mbr)
@@ -53,13 +53,18 @@ class MicroBlockSynchronizer(settings: Settings, history: NgHistory) extends Cha
       awaitingMicroBlocks.invalidate(mb.totalResBlockSig)
       successfullyReceivedMicroBlocks.put(mb.totalResBlockSig, dummy)
 
-      Option(microBlockRecieveTime.getIfPresent(mb.totalResBlockSig)).foreach { created =>
-        BlockStats.received(mb, ctx, propagationTime = System.currentTimeMillis() - created)
-        microBlockRecieveTime.invalidate(mb.totalResBlockSig)
-        super.channelRead(ctx, msg)
+      if (history.lastBlockId().contains(mb.prevResBlockSig)) {
+        // TODO: Possible issue with timeouted reponses, will be fixed later
+        processScoreBarrier.decrement()
+        Option(microBlockRecieveTime.getIfPresent(mb.totalResBlockSig)).foreach { created =>
+          BlockStats.received(mb, ctx, propagationTime = System.currentTimeMillis() - created)
+          microBlockRecieveTime.invalidate(mb.totalResBlockSig)
+          super.channelRead(ctx, msg)
+        }
       }
     }.runAsync
-    case mi@MicroBlockInv(totalResBlockSig, prevResBlockSig) => Task {
+
+    case mi@MicroBlockInv(totalResBlockSig, prevResBlockSig) => Task.unit.flatMap { _ =>
       log.trace(id(ctx) + "Received " + mi)
       history.lastBlockId() match {
         case Some(lastBlockId) =>
@@ -71,6 +76,7 @@ class MicroBlockSynchronizer(settings: Settings, history: NgHistory) extends Cha
             if (alreadyRequested(totalResBlockSig)) Task.unit
             else {
               BlockStats.inv(mi, ctx)
+              processScoreBarrier.increment()
               requestMicroBlockTask(totalResBlockSig, 2)
             }
           } else {
@@ -83,7 +89,13 @@ class MicroBlockSynchronizer(settings: Settings, history: NgHistory) extends Cha
           unknownMicroblockStats.increment()
           Task.unit
       }
-    }.flatten.runAsync
+    }.runAsync
+
+    case _: LocalScoreChanged =>
+      processScoreBarrier.completion.onComplete { _ =>
+        super.channelRead(ctx, msg)
+      }
+
     case _ => super.channelRead(ctx, msg)
   }
 }

@@ -4,6 +4,7 @@ import java.net.{InetSocketAddress, NetworkInterface, NoRouteToHostException}
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
 
+import com.wavesplatform.concurrent.{FutureSemaphore, TimeoutedFutureSemaphore}
 import com.wavesplatform.features.FeatureProvider
 import com.wavesplatform.metrics.Metrics
 import com.wavesplatform.mining.Miner
@@ -48,7 +49,9 @@ class NetworkServer(checkpointService: CheckpointService,
     Handshake(Constants.ApplicationName + settings.blockchainSettings.addressSchemeCharacter, Version.VersionTuple,
       settings.networkSettings.nodeName, settings.networkSettings.nonce, settings.networkSettings.declaredAddress)
 
+  private val blockWaiter = new FutureSemaphore
   private val scoreObserver = new RemoteScoreObserver(
+    blockWaiter,
     settings.synchronizationSettings.scoreTTL,
     history.lastBlockIds(settings.synchronizationSettings.maxRollback), history.score())
 
@@ -84,7 +87,7 @@ class NetworkServer(checkpointService: CheckpointService,
   private val coordinatorExecutor = new DefaultEventLoop
 
   private val coordinatorHandler = new CoordinatorHandler(checkpointService, history, blockchainUpdater, time,
-    stateReader, utxPool, blockchainReadiness, miner, settings, peerDatabase, allChannels, featureProvider)
+    stateReader, utxPool, blockchainReadiness, miner, settings, peerDatabase, allChannels, featureProvider, blockWaiter)
 
   private val peerConnections = new ConcurrentHashMap[PeerKey, Channel](10, 0.9f, 10)
 
@@ -93,6 +96,7 @@ class NetworkServer(checkpointService: CheckpointService,
 
   private val utxPoolSynchronizer = new UtxPoolSynchronizer(utxPool, allChannels)
   private val microBlockSynchronizer = new MicroBlockSynchronizer(
+    new TimeoutedFutureSemaphore,
     settings.synchronizationSettings.microBlockSynchronizer,
     history
   )

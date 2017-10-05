@@ -1,12 +1,14 @@
 package com.wavesplatform.network
 
 import com.wavesplatform.TransactionGen
+import com.wavesplatform.concurrent.TimeoutedFutureSemaphore
 import com.wavesplatform.state2.ByteStr
 import io.netty.channel.embedded.EmbeddedChannel
+import io.netty.channel.{ChannelHandlerContext, ChannelInboundHandlerAdapter}
 import org.mockito.Mockito
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.Eventually
-import org.scalatest.exceptions.TestFailedDueToTimeoutException
+import org.scalatest.exceptions.{TestFailedDueToTimeoutException, TestFailedException}
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import org.scalatest.{FreeSpec, Matchers}
 import scorex.account.PublicKeyAccount
@@ -41,7 +43,7 @@ class MicroBlockSynchronizerSpec extends FreeSpec
     val history = Mockito.mock(classOf[NgHistory])
     Mockito.doReturn(Some(lastBlockSig)).when(history).lastBlockId()
 
-    val channel = new EmbeddedChannel(new MicroBlockSynchronizer(settings, history))
+    val channel = new EmbeddedChannel(new MicroBlockSynchronizer(new TimeoutedFutureSemaphore, settings, history))
     channel.writeInbound(MicroBlockInv(nextBlockSig, lastBlockSig))
     channel.flushInbound()
 
@@ -60,7 +62,7 @@ class MicroBlockSynchronizerSpec extends FreeSpec
     val history = Mockito.mock(classOf[NgHistory])
     Mockito.doReturn(Some(lastBlockSig)).when(history).lastBlockId()
 
-    val synchronizer = new MicroBlockSynchronizer(settings, history)
+    val synchronizer = new MicroBlockSynchronizer(new TimeoutedFutureSemaphore, settings, history)
 
     val channel1 = new EmbeddedChannel(synchronizer)
     val channel2 = new EmbeddedChannel(synchronizer)
@@ -91,6 +93,81 @@ class MicroBlockSynchronizerSpec extends FreeSpec
       eventually {
         val request = channel2.readOutbound[MicroBlockRequest]()
         Option(request) shouldBe defined
+      }
+    }
+  }
+
+  // This hack should be removed after the refactoring
+  "should wait until microblock is downloaded and then pass a received score to the pipeline" - {
+    val lastBlockSig = ByteStr("lastBlockId".getBytes)
+    val nextBlockSig = ByteStr("nextBlockId".getBytes)
+
+    "sunny" in {
+      var localScoreWasPropagated = false
+
+      val history = Mockito.mock(classOf[NgHistory])
+      Mockito.doReturn(Some(lastBlockSig)).when(history).lastBlockId()
+
+      val channel = new EmbeddedChannel(
+        new MicroBlockSynchronizer(new TimeoutedFutureSemaphore, settings, history),
+        new ChannelInboundHandlerAdapter {
+          override def channelRead(ctx: ChannelHandlerContext, msg: Any): Unit = msg match {
+            case _: LocalScoreChanged => localScoreWasPropagated = true
+            case _ =>
+          }
+        }
+      )
+
+      channel.writeInbound(MicroBlockInv(nextBlockSig, lastBlockSig))
+      channel.flushInbound()
+      eventually(timeout(300.millis)) {
+        Option(channel.readOutbound[MicroBlockRequest]()) shouldNot be(empty)
+      }
+
+      channel.writeInbound(LocalScoreChanged(1))
+      channel.flushInbound()
+      intercept[TestFailedException] {
+        eventually(timeout(300.millis)) {
+          localScoreWasPropagated shouldBe true
+        }
+      }
+
+      channel.writeInbound(MicroBlockResponse(MicroBlock(
+        version = 1.toByte,
+        generator = PublicKeyAccount("pubkey".getBytes),
+        transactionData = Seq.empty,
+        prevResBlockSig = lastBlockSig,
+        totalResBlockSig = nextBlockSig,
+        signature = nextBlockSig
+      )))
+      channel.flushInbound()
+      eventually(timeout(300.millis)) {
+        localScoreWasPropagated shouldBe true
+      }
+    }
+
+    "timeout" in {
+      var localScoreWasPropagated = false
+
+      val history = Mockito.mock(classOf[NgHistory])
+      Mockito.doReturn(Some(lastBlockSig)).when(history).lastBlockId()
+
+      val channel = new EmbeddedChannel(
+        new MicroBlockSynchronizer(new TimeoutedFutureSemaphore, settings, history),
+        new ChannelInboundHandlerAdapter {
+          override def channelRead(ctx: ChannelHandlerContext, msg: Any): Unit = msg match {
+            case _: LocalScoreChanged => localScoreWasPropagated = true
+            case _ =>
+          }
+        }
+      )
+
+      channel.writeInbound(MicroBlockInv(nextBlockSig, lastBlockSig))
+      channel.writeInbound(LocalScoreChanged(1))
+      channel.flushInbound()
+
+      eventually(timeout(5.second)) {
+        localScoreWasPropagated shouldBe true
       }
     }
   }
