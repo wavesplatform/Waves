@@ -200,7 +200,6 @@ class MinerImpl(
     scheduledAttempts := CompositeCancelable.fromSet(
       wallet.privateKeyAccounts().map(generateBlockTask).map(_.runAsync).toSet)
     microBlockAttempt := SerialCancelable()
-    log.debug(s"Block mining scheduled")
   }
 
   private def startMicroBlockMining(account: PrivateKeyAccount, lastBlock: Block): Unit = {
