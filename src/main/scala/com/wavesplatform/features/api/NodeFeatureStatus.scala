@@ -1,6 +1,6 @@
 package com.wavesplatform.features.api
 
-trait NodeFeatureStatus
+sealed trait NodeFeatureStatus
 
 object NodeFeatureStatus{
   case object Unsupported extends NodeFeatureStatus

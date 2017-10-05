@@ -3,6 +3,7 @@ package com.wavesplatform.it.api
 import java.io.IOException
 import java.util.concurrent.TimeoutException
 
+import com.wavesplatform.features.api.ActivationStatus
 import com.wavesplatform.it.util._
 import com.wavesplatform.matcher.api.CancelOrderRequest
 import com.wavesplatform.state2.Portfolio
@@ -58,7 +59,6 @@ trait NodeApi {
   def getOrderBook(asset: String): Future[OrderBookResponse] =
     matcherGet(s"/matcher/orderbook/$asset/WAVES").as[OrderBookResponse]
 
-
   def get(path: String, f: RequestBuilder => RequestBuilder = identity): Future[Response] =
     retrying(f(_get(s"http://$restAddress:$nodeRestPort$path")).build())
 
@@ -108,6 +108,8 @@ trait NodeApi {
   def blockSeq(from: Int, to: Int) = get(s"/blocks/seq/$from/$to").as[Seq[Block]]
 
   def status: Future[Status] = get("/node/status").as[Status]
+
+  def activationStatus: Future[ActivationStatus] = get("/activation/status").as[ActivationStatus]
 
   def balance(address: String): Future[Balance] = get(s"/addresses/balance/$address").as[Balance]
 
@@ -177,8 +179,6 @@ trait NodeApi {
 
   def addressByAlias(targetAlias: String): Future[Address]=
     get(s"/alias/by-alias/$targetAlias").as[Address]
-
-
 
   def rollback(to: Int, returnToUTX: Boolean = true): Future[Unit] =
     postJson("/debug/rollback", RollbackParams(to, returnToUTX)).map(_ => ())
