@@ -3,7 +3,7 @@ package com.wavesplatform.features.api
 import javax.ws.rs.Path
 
 import akka.http.scaladsl.server.Route
-import com.wavesplatform.features.{BlockchainFeatures, FeatureProvider}
+import com.wavesplatform.features.{BlockchainFeatureStatus, BlockchainFeatures, FeatureProvider}
 import com.wavesplatform.settings.{FeaturesSettings, FunctionalitySettings, RestAPISettings}
 import io.swagger.annotations._
 import play.api.libs.json._
@@ -45,7 +45,7 @@ case class ActivationApiRoute(settings: RestAPISettings,
             status,
             if (featuresSettings.supported.contains(id)) NodeFeatureStatus.Supported else NodeFeatureStatus.Unsupported,
             featureProvider.featureActivatedHeight(id),
-            featureProvider.featureVotesCountWithinActivationWindow(height).get(id)
+            featureProvider.featureVotesCountWithinActivationWindow(height).get(id).orElse(if(status == BlockchainFeatureStatus.Undefined) Some(0) else None),
           )
         })))
     )
