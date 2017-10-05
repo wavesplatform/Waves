@@ -210,7 +210,7 @@ class NetworkServer(checkpointService: CheckpointService,
                 peerDatabase.suspend(remoteAddress.getAddress)
               }
             } else if (connFuture.isSuccess) {
-              log.info(s"${id(connFuture.channel())} Connection established")
+              log.trace(s"${id(connFuture.channel())} Connection established")
               peerDatabase.touch(remoteAddress)
               outgoingChannelCount.incrementAndGet()
               connFuture.channel().closeFuture().addListener { (closeFuture: ChannelFuture) =>
