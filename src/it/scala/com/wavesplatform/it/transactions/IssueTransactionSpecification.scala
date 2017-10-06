@@ -25,7 +25,7 @@ class IssueTransactionSpecification(override val allNodes: Seq[Node], override v
 
       issuedAssetId <- sender.issue(firstAddress, assetName, assetDescription, defaultQuantity, 2, reissuable = true, assetFee).map(_.id)
 
-      _ <- waitForHeightAraise(issuedAssetId, 1)
+      _ <- waitForHeightAraiseAndTxPresent(issuedAssetId, 1)
 
       _ <- assertBalances(firstAddress, firstAddressBalance - assetFee, firstAddressEffectiveBalance - assetFee)
       _ <- assertAssetBalance(firstAddress, issuedAssetId, defaultQuantity)
@@ -43,11 +43,11 @@ class IssueTransactionSpecification(override val allNodes: Seq[Node], override v
       firstAddressEffectiveBalance <- accountEffectiveBalance(firstAddress)
 
       issuedAssetId <- sender.issue(firstAddress, assetName, assetDescription, defaultQuantity, 2, reissuable = false, assetFee).map(_.id)
-      _ <- waitForHeightAraise(issuedAssetId, 1)
+      _ <- waitForHeightAraiseAndTxPresent(issuedAssetId, 1)
 
       issuedAssetId <- sender.issue(firstAddress, assetName, assetDescription, defaultQuantity, 2, reissuable = true, assetFee).map(_.id)
 
-      _ <- waitForHeightAraise(issuedAssetId, 1)
+      _ <- waitForHeightAraiseAndTxPresent(issuedAssetId, 1)
 
       _ <- assertAssetBalance(firstAddress, issuedAssetId, defaultQuantity)
       _ <- assertBalances(firstAddress, firstAddressBalance - 2 * assetFee, firstAddressBalance - 2 * assetFee)
