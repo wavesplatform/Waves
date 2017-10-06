@@ -11,7 +11,7 @@ class WavesSettingsSpecification extends FlatSpec with Matchers {
   private def config(configName: String) =
     WavesSettings.fromConfig(ConfigFactory.parseFile(new File(s"waves-$configName.conf")).withFallback(ConfigFactory.load()))
 
-  def testConfig(configName: String)(additionalChecks: WavesSettings => () = ()) {
+  def testConfig(configName: String)(additionalChecks: WavesSettings => Unit = _ => ()) {
     "WavesSettings" should s"read values from default config with $configName overrides" in {
       val settings = config(configName)
 
@@ -26,7 +26,7 @@ class WavesSettingsSpecification extends FlatSpec with Matchers {
       settings.restAPISettings should not be null
       settings.synchronizationSettings should not be null
       settings.utxSettings should not be null
-      additionalChecks()
+      additionalChecks(settings)
     }
   }
 
@@ -34,8 +34,8 @@ class WavesSettingsSpecification extends FlatSpec with Matchers {
     _.loggingLevel should be(LogLevel.INFO)
   }
 
-  testConfig("testnet")
-  testConfig("devnet")
+  testConfig("testnet")()
+  testConfig("devnet")()
 
   "WavesSettings" should "resolve folders correctly" in {
     val config = loadConfig(ConfigFactory.parseString(
