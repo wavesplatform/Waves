@@ -9,6 +9,7 @@ import org.influxdb.dto.Point
 import org.influxdb.{InfluxDB, InfluxDBFactory}
 import scorex.utils.ScorexLogging
 
+import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
 import scala.util.control.NonFatal
 
@@ -30,7 +31,7 @@ object Metrics extends ScorexLogging {
   private var settings: Settings = _
   private var db: Option[InfluxDB] = None
 
-  def start(config: Settings): Unit = Task {
+  def start(config: Settings): Future[Boolean] = Task {
     shutdown()
     settings = config
     if (settings.enable) {
@@ -58,6 +59,8 @@ object Metrics extends ScorexLogging {
           log.warn("Can't connect to InfluxDB", e)
       }
     }
+
+    db.nonEmpty
   }.runAsync
 
   def shutdown(): Unit = Task {
