@@ -10,10 +10,16 @@ import org.influxdb.{InfluxDB, InfluxDBFactory}
 import scorex.utils.ScorexLogging
 
 import scala.concurrent.duration.FiniteDuration
+import scala.util.control.NonFatal
 
 object Metrics extends ScorexLogging {
 
-  case class InfluxDbSettings(uri: URI, db: String, batchActions: Int, batchFlashDuration: FiniteDuration)
+  case class InfluxDbSettings(uri: URI,
+                              db: String,
+                              username: Option[String],
+                              password: Option[String],
+                              batchActions: Int,
+                              batchFlashDuration: FiniteDuration)
 
   case class Settings(enable: Boolean,
                       nodeId: Int,
@@ -28,12 +34,29 @@ object Metrics extends ScorexLogging {
     shutdown()
     settings = config
     if (settings.enable) {
-      log.info(s"Metrics are enabled and will be sent to ${settings.influxDb.uri}/${settings.influxDb.db}")
-      val x = InfluxDBFactory.connect(settings.influxDb.uri.toString)
-      x.setDatabase(settings.influxDb.db)
-      x.enableBatch(settings.influxDb.batchActions, settings.influxDb.batchFlashDuration.toSeconds.toInt, TimeUnit.SECONDS)
+      import config.{influxDb => dbSettings}
 
-      db = Some(x)
+      log.info(s"Metrics are enabled and will be sent to ${dbSettings.uri}/${dbSettings.db}")
+      val x = if (dbSettings.username.nonEmpty && dbSettings.password.nonEmpty) {
+        InfluxDBFactory.connect(
+          dbSettings.uri.toString,
+          dbSettings.username.getOrElse(""),
+          dbSettings.password.getOrElse("")
+        )
+      } else {
+        InfluxDBFactory.connect(dbSettings.uri.toString)
+      }
+      x.setDatabase(dbSettings.db)
+      x.enableBatch(dbSettings.batchActions, dbSettings.batchFlashDuration.toSeconds.toInt, TimeUnit.SECONDS)
+
+      try {
+        val pong = x.ping()
+        log.info(s"Metrics will be sent to ${dbSettings.uri}/${dbSettings.db}. Connected in ${pong.getResponseTime}ms.")
+        db = Some(x)
+      } catch {
+        case NonFatal(e) =>
+          log.warn("Can't connect to InfluxDB", e)
+      }
     }
   }.runAsync
 
