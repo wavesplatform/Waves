@@ -24,7 +24,7 @@ object BlockDiffer extends ScorexLogging with Instrumented {
     val stateHeight = s.height
 
     // height switch is next after activation
-    val ng4060switchHeight = featureProvider.featureActivatedHeight(BlockchainFeatures.NG.id).getOrElse(Int.MaxValue)
+    val ng4060switchHeight = featureProvider.featureActivationHeight(BlockchainFeatures.NG.id).getOrElse(Int.MaxValue)
 
     lazy val prevBlockFeeDistr: Option[Diff] =
       if (stateHeight > ng4060switchHeight)

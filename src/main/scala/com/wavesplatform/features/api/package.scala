@@ -1,6 +1,6 @@
 package com.wavesplatform.features
 
-import com.wavesplatform.features.BlockchainFeatureStatus.{Accepted, Activated, Undefined}
+import com.wavesplatform.features.BlockchainFeatureStatus.{Approved, Activated, Undefined}
 import com.wavesplatform.features.api.NodeFeatureStatus.{Supported, Unsupported}
 import play.api.libs.json._
 
@@ -28,13 +28,13 @@ package object api {
   implicit val blockchainFeatureStatusFormat: Format[BlockchainFeatureStatus] =
     new Format[BlockchainFeatureStatus] {
       private val undefined = "VOTING"
-      private val accepted = "ACCEPTED"
+      private val approved = "APPROVED"
       private val activated = "ACTIVATED"
 
       override def reads(json: JsValue): JsResult[BlockchainFeatureStatus] =
         json match {
           case JsString(`undefined`) => JsSuccess(Undefined)
-          case JsString(`accepted`) => JsSuccess(Accepted)
+          case JsString(`approved`) => JsSuccess(Approved)
           case JsString(`activated`) => JsSuccess(Activated)
           case _ => ???
         }
@@ -42,7 +42,7 @@ package object api {
       override def writes(o: BlockchainFeatureStatus): JsValue = {
         o match {
           case Undefined => JsString(undefined)
-          case Accepted => JsString(accepted)
+          case Approved => JsString(approved)
           case Activated => JsString(activated)
         }
       }

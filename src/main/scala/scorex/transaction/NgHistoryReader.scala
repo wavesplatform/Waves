@@ -86,9 +86,9 @@ class NgHistoryReader(ngState: () => Option[NgState], inner: History with Featur
       .orElse(inner.lastBlock.map(b => BlockMinerInfo(b.consensusData, b.timestamp, b.uniqueId)))
   }
 
-  override def acceptedFeatures(): Map[Short, Int] = {
+  override def approvedFeatures(): Map[Short, Int] = {
     lazy val h = height()
-    ngState().map(_.acceptedFeatures.map(_ -> h).toMap).getOrElse(Map.empty) ++ inner.acceptedFeatures()
+    ngState().map(_.acceptedFeatures.map(_ -> h).toMap).getOrElse(Map.empty) ++ inner.approvedFeatures()
   }
 
   override def featureVotesCountWithinActivationWindow(height: Int): Map[Short, Int] = read { implicit l =>

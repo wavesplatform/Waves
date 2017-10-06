@@ -77,7 +77,7 @@ class MinerImpl(
       s"BlockChain is too old (last block timestamp is $parentTimestamp generated $blockAge ago)"
     ))
 
-  private def ngEnabled : Boolean = featureProvider.featureActivatedHeight(BlockchainFeatures.NG.id).exists(history.height > _ + 1)
+  private def ngEnabled : Boolean = featureProvider.featureActivationHeight(BlockchainFeatures.NG.id).exists(history.height > _ + 1)
 
   private def generateOneBlockTask(version: Int, account: PrivateKeyAccount, parentHeight: Int,
                                    greatGrandParent: Option[Block], balance: Long)(delay: FiniteDuration): Task[Either[String, Block]] = Task {

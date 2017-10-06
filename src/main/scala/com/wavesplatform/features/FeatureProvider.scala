@@ -4,7 +4,7 @@ trait FeatureProvider {
 
   protected val activationWindowSize: Int
 
-  def acceptedFeatures() : Map[Short, Int]
+  def approvedFeatures() : Map[Short, Int]
 
   def featureVotesCountWithinActivationWindow(height: Int): Map[Short, Int]
 }
@@ -17,21 +17,21 @@ object FeatureProvider {
     }
 
     def featureStatus(feature: Short, height: Int): BlockchainFeatureStatus = {
-      featureAcceptedHeight(feature).getOrElse(Int.MaxValue) match {
+      featureApprovalHeight(feature).getOrElse(Int.MaxValue) match {
         case x if x <= height - provider.activationWindowSize => BlockchainFeatureStatus.Activated
-        case x if x <= height => BlockchainFeatureStatus.Accepted
+        case x if x <= height => BlockchainFeatureStatus.Approved
         case _ => BlockchainFeatureStatus.Undefined
       }
     }
 
-    def activatedFeatures(height: Int): Set[Short] = provider.acceptedFeatures()
+    def activatedFeatures(height: Int): Set[Short] = provider.approvedFeatures()
       .filter{case (_, acceptedHeight) => acceptedHeight <= height - provider.activationWindowSize}.keySet
 
-    def featureActivatedHeight(feature: Short): Option[Int] = {
-      featureAcceptedHeight(feature).map(h => h + provider.activationWindowSize)
+    def featureActivationHeight(feature: Short): Option[Int] = {
+      featureApprovalHeight(feature).map(h => h + provider.activationWindowSize)
     }
 
-    def featureAcceptedHeight(feature: Short): Option[Int] = provider.acceptedFeatures().get(feature)
+    def featureApprovalHeight(feature: Short): Option[Int] = provider.approvedFeatures().get(feature)
   }
 
   def activationWindowOpeningFromHeight(height: Int, activationWindowSize: Int): Int = {

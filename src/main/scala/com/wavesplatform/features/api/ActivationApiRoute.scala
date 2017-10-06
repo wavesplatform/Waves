@@ -44,7 +44,7 @@ case class ActivationApiRoute(settings: RestAPISettings,
           ActivationStatusFeature(id,
             status,
             if (featuresSettings.supported.contains(id)) NodeFeatureStatus.Supported else NodeFeatureStatus.Unsupported,
-            featureProvider.featureActivatedHeight(id),
+            featureProvider.featureActivationHeight(id),
             featureProvider.featureVotesCountWithinActivationWindow(height).get(id).orElse(if(status == BlockchainFeatureStatus.Undefined) Some(0) else None),
           )
         })))

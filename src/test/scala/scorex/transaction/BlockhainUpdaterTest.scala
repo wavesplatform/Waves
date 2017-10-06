@@ -62,7 +62,7 @@ class BlockhainUpdaterTest extends FunSuite with Matchers with HistoryTest {
     }
 
     h.height() shouldBe ApprovalPeriod
-    fp.featureStatus(1, ApprovalPeriod) shouldBe BlockchainFeatureStatus.Accepted
+    fp.featureStatus(1, ApprovalPeriod) shouldBe BlockchainFeatureStatus.Approved
     fp.featureStatus(2, ApprovalPeriod) shouldBe BlockchainFeatureStatus.Undefined
     fp.featureStatus(3, ApprovalPeriod) shouldBe BlockchainFeatureStatus.Undefined
 
@@ -72,7 +72,7 @@ class BlockhainUpdaterTest extends FunSuite with Matchers with HistoryTest {
 
     h.height() shouldBe 2 * ApprovalPeriod
     fp.featureStatus(1, 2 * ApprovalPeriod) shouldBe BlockchainFeatureStatus.Activated
-    fp.featureStatus(2, 2 * ApprovalPeriod) shouldBe BlockchainFeatureStatus.Accepted
+    fp.featureStatus(2, 2 * ApprovalPeriod) shouldBe BlockchainFeatureStatus.Approved
     fp.featureStatus(3, 2 * ApprovalPeriod) shouldBe BlockchainFeatureStatus.Undefined
 
     (1 to ApprovalPeriod).foreach { _ =>
@@ -98,7 +98,7 @@ class BlockhainUpdaterTest extends FunSuite with Matchers with HistoryTest {
     }
 
     h.height() shouldBe ApprovalPeriod
-    fp.featureStatus(1, ApprovalPeriod) shouldBe BlockchainFeatureStatus.Accepted
+    fp.featureStatus(1, ApprovalPeriod) shouldBe BlockchainFeatureStatus.Approved
     fp.featureStatus(2, ApprovalPeriod) shouldBe BlockchainFeatureStatus.Undefined
 
     bu.removeAfter(h.lastBlockIds(2).last).explicitGet()
@@ -113,12 +113,12 @@ class BlockhainUpdaterTest extends FunSuite with Matchers with HistoryTest {
 
     h.height() shouldBe 2 * ApprovalPeriod
     fp.featureStatus(1, 2 * ApprovalPeriod) shouldBe BlockchainFeatureStatus.Activated
-    fp.featureStatus(2, 2 * ApprovalPeriod) shouldBe BlockchainFeatureStatus.Accepted
+    fp.featureStatus(2, 2 * ApprovalPeriod) shouldBe BlockchainFeatureStatus.Approved
 
     bu.removeAfter(h.lastBlockIds(2).last).explicitGet()
 
     h.height() shouldBe 2 * ApprovalPeriod - 1
-    fp.featureStatus(1, 2 * ApprovalPeriod - 1) shouldBe BlockchainFeatureStatus.Accepted
+    fp.featureStatus(1, 2 * ApprovalPeriod - 1) shouldBe BlockchainFeatureStatus.Approved
     fp.featureStatus(2, 2 * ApprovalPeriod - 1) shouldBe BlockchainFeatureStatus.Undefined
 
     (1 to ApprovalPeriod).foreach { _ => bu.removeAfter(h.lastBlockIds(2).last).explicitGet() }
@@ -135,19 +135,19 @@ class BlockhainUpdaterTest extends FunSuite with Matchers with HistoryTest {
 
     fp.featureStatus(1, 1) shouldBe BlockchainFeatureStatus.Undefined
 
-    fp.featureActivatedHeight(1) shouldBe None
+    fp.featureActivationHeight(1) shouldBe None
 
     (1 until ApprovalPeriod).foreach { _ =>
       bu.processBlock(getNextTestBlockWithVotes(h, Set(1))).explicitGet()
     }
 
-    fp.featureActivatedHeight(1) shouldBe Some(ApprovalPeriod * 2)
+    fp.featureActivationHeight(1) shouldBe Some(ApprovalPeriod * 2)
 
     (1 to ApprovalPeriod).foreach { _ =>
       bu.processBlock(getNextTestBlockWithVotes(h, Set(1))).explicitGet()
     }
 
-    fp.featureActivatedHeight(1) shouldBe Some(ApprovalPeriod * 2)
+    fp.featureActivationHeight(1) shouldBe Some(ApprovalPeriod * 2)
   }
 
   test("feature activated only by 90% of blocks") {
@@ -165,7 +165,7 @@ class BlockhainUpdaterTest extends FunSuite with Matchers with HistoryTest {
     (1 to ApprovalPeriod).foreach { i =>
       bu.processBlock(getNextTestBlockWithVotes(h, if (i % 10 == 0) Set() else Set(1))).explicitGet()
     }
-    fp.featureStatus(1, ApprovalPeriod * 2) shouldBe BlockchainFeatureStatus.Accepted
+    fp.featureStatus(1, ApprovalPeriod * 2) shouldBe BlockchainFeatureStatus.Approved
 
     (1 to ApprovalPeriod).foreach { i =>
       bu.processBlock(getNextTestBlock(h)).explicitGet()
@@ -187,11 +187,11 @@ class BlockhainUpdaterTest extends FunSuite with Matchers with HistoryTest {
       fp.featureVotesCountWithinActivationWindow(h.height()) shouldBe Map(1.toShort -> i)
     }
 
-    fp.featureStatus(1, h.height()) shouldBe BlockchainFeatureStatus.Accepted
+    fp.featureStatus(1, h.height()) shouldBe BlockchainFeatureStatus.Approved
 
     bu.processBlock(getNextTestBlockWithVotes(h, Set(1)))
     fp.featureVotesCountWithinActivationWindow(h.height()) shouldBe Map(1.toShort -> 1)
 
-    fp.featureStatus(1, h.height()) shouldBe BlockchainFeatureStatus.Accepted
+    fp.featureStatus(1, h.height()) shouldBe BlockchainFeatureStatus.Approved
   }
 }

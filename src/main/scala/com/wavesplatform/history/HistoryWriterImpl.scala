@@ -41,7 +41,7 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
 
   private lazy val preAcceptedFeatures = functionalitySettings.preActivatedFeatures.mapValues(h => h - activationWindowSize)
 
-  override def acceptedFeatures(): Map[Short, Int] = read { implicit lock =>
+  override def approvedFeatures(): Map[Short, Int] = read { implicit lock =>
     preAcceptedFeatures ++ featuresState().asScala
   }
 
