@@ -56,16 +56,6 @@ class CoordinatorHandler(checkpointService: CheckpointService,
     allChannels.broadcast(LocalScoreChanged(score))
   }
 
-  private def processMicroBlockAndUpdateStats(m: MicroBlock): Either[_, Option[Unit]] = processMicroBlock(m) match {
-    case Right(_) =>
-      BlockStats.applied(m)
-      Right(Some(()))
-    case Left(l) =>
-      BlockStats.declined(m)
-      Left(l)
-  }
-
-
   private def processAndBlacklistOnFailure[A](src: Channel, start: => String, success: => String, errorPrefix: String,
                                               f: => Either[_, Option[A]],
                                               r: A => Unit): Unit = {
@@ -123,12 +113,19 @@ class CoordinatorHandler(checkpointService: CheckpointService,
       case Failure(t) => rethrow(s"Error appending block ${b.uniqueId}", t)
     }
 
-    case MicroBlockResponse(m) => processAndBlacklistOnFailure(ctx.channel(),
-      s"Attempting to append microblock ${m.totalResBlockSig}",
-      s"Successfully appended microblock ${m.totalResBlockSig}",
-      s"Error appending microblock ${m.totalResBlockSig}",
-      processMicroBlockAndUpdateStats(m),
-      (_: Unit) => allChannels.broadcast(MicroBlockInv(m.totalResBlockSig, m.prevResBlockSig), Some(ctx.channel())))
+    case MicroBlockResponse(m) => Future({
+      Signed.validateSignatures(m).flatMap(m => processMicroBlock(m))
+    }) onComplete {
+      case Success(Right(())) =>
+        allChannels.broadcast(MicroBlockInv(m.totalResBlockSig, m.prevResBlockSig), Some(ctx.channel()))
+        BlockStats.applied(m)
+      case Success(Left(is: InvalidSignature)) =>
+        warnAndBlacklist(s"Could not append microblock ${m.totalResBlockSig}: $is", ctx.channel())
+      case Success(Left(ve)) =>
+        BlockStats.declined(m)
+        log.debug(s"Could not append microblock ${m.totalResBlockSig}: $ve")
+      case Failure(t) => rethrow(s"Error appending microblock ${m.totalResBlockSig}", t)
+    }
   }
 }
 
