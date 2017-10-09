@@ -24,16 +24,12 @@ class TransferTransactionSpecification(override val allNodes: Seq[Node], overrid
       _ <- assertBalances(secondAddress, 100.waves, 100.waves)
 
       issuedAssetId <- sender.issue(firstAddress, "name", "description", defaultQuantity, 2, reissuable = false, fee = 10.waves).map(_.id)
-
       _ <- waitForHeightAraiseAndTxPresent(issuedAssetId, 1)
-
       _ <- assertBalances(firstAddress, 90.waves, 90.waves)
       _ <- assertAssetBalance(firstAddress, issuedAssetId, defaultQuantity)
 
       transferTransactionId <- sender.transfer(firstAddress, secondAddress, defaultQuantity, fee = 10.waves, Some(issuedAssetId)).map(_.id)
-
       _ <- waitForHeightAraiseAndTxPresent(transferTransactionId, 1)
-
       _ <- assertBalances(firstAddress, 80.waves, 80.waves)
       _ <- assertBalances(secondAddress, 100.waves, 100.waves)
 
@@ -50,9 +46,7 @@ class TransferTransactionSpecification(override val allNodes: Seq[Node], overrid
       _ <- assertBalances(secondAddress, 100.waves, 100.waves)
 
       transferId <- sender.transfer(firstAddress, secondAddress, 5.waves, fee = 5.waves).map(_.id)
-
       _ <- waitForHeightAraiseAndTxPresent(transferId, 1)
-
       _ <- assertBalances(firstAddress, 70.waves, 70.waves)
       _ <- assertBalances(secondAddress, 105.waves, 105.waves)
     } yield succeed

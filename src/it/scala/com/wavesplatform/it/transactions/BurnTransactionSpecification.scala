@@ -18,22 +18,16 @@ class BurnTransactionSpecification(override val allNodes: Seq[Node], override va
 
       issuedAssetId <- sender.issue(firstAddress, "name", "description", defaultQuantity, 2, reissuable = false, fee = 1.waves).map(_.id)
 
-      height <- traverse(allNodes)(_.height).map(_.max)
-      _ <- traverse(allNodes)(_.waitForHeight(height + 1))
-      _ <- traverse(allNodes)(_.waitForTransaction(issuedAssetId))
-
+      _ <- waitForHeightAraiseAndTxPresent(issuedAssetId, 1)
       _ <- assertBalances(firstAddress, 99.waves, 99.waves)
       _ <- assertAssetBalance(firstAddress, issuedAssetId, defaultQuantity)
 
       burnId <- sender.burn(firstAddress, issuedAssetId, defaultQuantity / 2, fee = 1.waves).map(_.id)
 
-      height <- traverse(allNodes)(_.height).map(_.max)
-      _ <- traverse(allNodes)(_.waitForHeight(height + 1))
-      _ <- traverse(allNodes)(_.waitForTransaction(burnId))
-
+      _ <- waitForHeightAraiseAndTxPresent(burnId, 1)
       _ <- assertBalances(firstAddress, 98.waves, 98.waves)
-
       _ <- assertAssetBalance(firstAddress, issuedAssetId, defaultQuantity / 2)
+
     } yield succeed
 
     Await.result(f, 1.minute)

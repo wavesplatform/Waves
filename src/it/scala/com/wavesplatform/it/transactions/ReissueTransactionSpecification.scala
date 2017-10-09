@@ -17,15 +17,12 @@ class ReissueTransactionSpecification(override val allNodes: Seq[Node], override
       _ <- assertBalances(firstAddress, 100.waves, 100.waves)
 
       issuedAssetId <- sender.issue(firstAddress, "name2", "description2", defaultQuantity, decimals = 2, reissuable = true, fee = 10.waves).map(_.id)
-
       _ <- waitForHeightAraiseAndTxPresent(issuedAssetId, 1)
-
       _ <- assertBalances(firstAddress, 90.waves, 90.waves)
       _ <- assertAssetBalance(firstAddress, issuedAssetId, defaultQuantity)
 
       reissueTxId <- sender.reissue(firstAddress, issuedAssetId, defaultQuantity, reissuable = true, fee = 10.waves).map(_.id)
       _ <- waitForHeightAraiseAndTxPresent(reissueTxId, 1)
-
       _ <- assertBalances(firstAddress, 80.waves, 80.waves)
       _ <- assertAssetBalance(firstAddress, issuedAssetId, 2 * defaultQuantity)
     } yield succeed
@@ -41,9 +38,7 @@ class ReissueTransactionSpecification(override val allNodes: Seq[Node], override
       firstAddressEffectiveBalance <- accountEffectiveBalance(firstAddress)
 
       issuedAssetId <- sender.issue(firstAddress, "name2", "description2", defaultQuantity, decimals = 2, reissuable = false, issueFee).map(_.id)
-
       _ <- waitForHeightAraiseAndTxPresent(issuedAssetId, 1)
-
       _ <- assertBalances(firstAddress, firstAddressBalance - issueFee, firstAddressEffectiveBalance - issueFee)
       _ <- assertAssetBalance(firstAddress, issuedAssetId, defaultQuantity)
 
