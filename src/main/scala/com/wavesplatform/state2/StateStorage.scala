@@ -15,7 +15,7 @@ class StateStorage private(file: Option[File]) extends VariablesStorage(createMV
 
   import StateStorage._
 
-  override protected val Version = 2
+  override protected val Version = Some(2)
 
   def getHeight: Int = getInt(heightKey).getOrElse(0)
 

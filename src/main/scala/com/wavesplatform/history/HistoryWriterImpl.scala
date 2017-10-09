@@ -21,7 +21,7 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
                                 functionalitySettings: FunctionalitySettings, featuresSettings: FeaturesSettings)
   extends VariablesStorage(createMVStore(file)) with VersionableStorage with History with FeatureProvider with ScorexLogging {
 
-  override protected val Version: Int = 1
+  override protected val Version: Option[Int] = None
 
   import HistoryWriterImpl._
 
