@@ -7,7 +7,6 @@ import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
 import com.wavesplatform.features.FeatureProvider
 import com.wavesplatform.metrics.Metrics
 import com.wavesplatform.mining.Miner
-import com.wavesplatform.network.PeerSynchronizer.NoopPeerSynchronizer
 import com.wavesplatform.settings._
 import com.wavesplatform.state2.reader.StateReader
 import com.wavesplatform.{UtxPool, Version}
