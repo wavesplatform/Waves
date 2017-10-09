@@ -120,6 +120,4 @@ object History {
 
     def genesis: Block = history.blockAt(1).get
   }
-
-
 }

@@ -4,6 +4,7 @@ import java.io.File
 import java.nio.file.Files
 
 import com.google.common.base.Throwables
+import com.wavesplatform.state2.VersionableStorage
 import monix.execution.UncaughtExceptionReporter
 import org.h2.mvstore.MVStore
 import scorex.utils.ScorexLogging
@@ -41,10 +42,10 @@ package object utils extends ScorexLogging {
     }
   }
 
-  def createWithStore[A <: AutoCloseable](storeFile: Option[File], f: => A, pred: A => Boolean, deleteExisting: Boolean = false): Try[A] = Try {
+  def createWithStore[A <: AutoCloseable with VersionableStorage](storeFile: Option[File], f: => A, pred: A => Boolean = (_: A) => true, deleteExisting: Boolean = false): Try[A] = Try {
     for (fileToDelete <- storeFile if deleteExisting) Files.delete(fileToDelete.toPath)
     val a = f
-    if (pred(a)) a else storeFile match {
+    if (a.isVersionValid && pred(a)) a else storeFile match {
       case Some(file) =>
         log.info(s"Re-creating file store at $file")
         a.close()

@@ -5,7 +5,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock
 
 import com.wavesplatform.features.FeatureProvider
 import com.wavesplatform.settings.{FeaturesSettings, FunctionalitySettings}
-import com.wavesplatform.state2.{BlockDiff, ByteStr, DataTypes}
+import com.wavesplatform.state2.{BlockDiff, ByteStr, DataTypes, VariablesStorage, VersionableStorage}
 import com.wavesplatform.utils._
 import kamon.Kamon
 import scorex.block.Block
@@ -19,14 +19,15 @@ import scala.util.Try
 
 class HistoryWriterImpl private(file: Option[File], val synchronizationToken: ReentrantReadWriteLock,
                                 functionalitySettings: FunctionalitySettings, featuresSettings: FeaturesSettings)
-  extends History with FeatureProvider with ScorexLogging {
+  extends VariablesStorage(createMVStore(file)) with VersionableStorage with History with FeatureProvider with ScorexLogging {
+
+  override protected val Version: Int = 1
 
   import HistoryWriterImpl._
 
   override val activationWindowSize: Int = functionalitySettings.featureCheckBlocksPeriod
   val MinVotesWithinWindowToActivateFeature: Int = functionalitySettings.blocksForFeatureActivation
 
-  private val db = createMVStore(file)
   private val blockBodyByHeight = Synchronized(db.openMap("blocks", new LogMVMapBuilder[Int, Array[Byte]]))
   private val blockIdByHeight = Synchronized(db.openMap("signatures", new LogMVMapBuilder[Int, ByteStr].valueType(DataTypes.byteStr)))
   private val heightByBlockId = Synchronized(db.openMap("signaturesReverse", new LogMVMapBuilder[ByteStr, Int].keyType(DataTypes.byteStr)))

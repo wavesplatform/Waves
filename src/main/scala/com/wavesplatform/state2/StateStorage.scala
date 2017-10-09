@@ -5,27 +5,21 @@ import java.io.File
 import com.google.common.primitives.Ints
 import com.wavesplatform.utils._
 import org.h2.mvstore.`type`.ObjectDataType
-import org.h2.mvstore.{MVMap, MVStore}
+import org.h2.mvstore.MVMap
 import scorex.account.Address
 import scorex.utils.LogMVMapBuilder
 
 import scala.util.Try
 
-class StateStorage private(file: Option[File]) extends AutoCloseable {
+class StateStorage private(file: Option[File]) extends VariablesStorage(createMVStore(file)) with VersionableStorage with AutoCloseable {
 
   import StateStorage._
 
-  private val db: MVStore = createMVStore(file)
+  override protected val Version = 2
 
-  private val variables: MVMap[String, Int] = db.openMap("variables")
+  def getHeight: Int = getInt(heightKey).getOrElse(0)
 
-  private def setPersistedVersion(version: Int) = variables.put(stateVersion, version)
-
-  private def persistedVersion: Option[Int] = Option(variables.get(stateVersion))
-
-  def getHeight: Int = variables.get(heightKey)
-
-  def setHeight(i: Int): Unit = variables.put(heightKey, i)
+  def setHeight(i: Int): Unit = putInt(heightKey, i)
 
   val transactions: MVMap[ByteStr, (Int, Array[Byte])] = db.openMap("txs", new LogMVMapBuilder[ByteStr, (Int, Array[Byte])]
     .keyType(DataTypes.byteStr).valueType(DataTypes.transactions))
@@ -34,7 +28,7 @@ class StateStorage private(file: Option[File]) extends AutoCloseable {
     new LogMVMapBuilder[ByteStr, (Long, Long, Long)]
       .keyType(DataTypes.byteStr).valueType(DataTypes.waves))
 
-  val assetBalance = new MultiKeyMap[Long](db,new ObjectDataType(),"assetBalance")
+  val assetBalance = new MultiKeyMap[Long](db, new ObjectDataType(), "assetBalance")
 
   val assets: MVMap[ByteStr, (Boolean, Long)] = db.openMap("assets",
     new LogMVMapBuilder[ByteStr, (Boolean, Long)].keyType(DataTypes.byteStr).valueType(DataTypes.assets))
@@ -74,29 +68,15 @@ class StateStorage private(file: Option[File]) extends AutoCloseable {
 }
 
 object StateStorage {
-  private val Version = 2
-
   private val CompactFillRate = 80
   private val CompactMemorySize = 19 * 1024 * 1024
 
   private val heightKey = "height"
-  private val stateVersion = "stateVersion"
-
-  private def validateVersion(ss: StateStorage): Boolean =
-    ss.persistedVersion match {
-      case None =>
-        ss.setPersistedVersion(Version)
-        ss.commit()
-        true
-      case Some(v) => v == Version
-
-    }
 
   def apply(file: Option[File], dropExisting: Boolean): Try[StateStorage] =
-    createWithStore(file, new StateStorage(file), validateVersion, dropExisting)
+    createWithStore(file, new StateStorage(file), deleteExisting = dropExisting)
 
   type AccountIdxKey = Array[Byte]
 
   def accountIndexKey(acc: Address, index: Int): AccountIdxKey = acc.bytes.arr ++ Ints.toByteArray(index)
-
 }
