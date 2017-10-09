@@ -56,8 +56,8 @@ class MicroBlockSynchronizer(settings: Settings, history: NgHistory) extends Cha
       Option(microBlockRecieveTime.getIfPresent(mb.totalResBlockSig)).foreach { created =>
         BlockStats.received(mb, ctx, propagationTime = System.currentTimeMillis() - created)
         microBlockRecieveTime.invalidate(mb.totalResBlockSig)
-        super.channelRead(ctx, msg)
       }
+      super.channelRead(ctx, msg)
     }.runAsync
     case mi@MicroBlockInv(totalResBlockSig, prevResBlockSig) => Task {
       log.trace(id(ctx) + "Received " + mi)
