@@ -12,7 +12,6 @@ class IssueTransactionSpecification(override val allNodes: Seq[Node], override v
   extends IntegrationSuiteWithThreeAddresses with TableDrivenPropertyChecks {
 
   private val defaultQuantity = 100000
-  //private val defaultTokenDecimals:Byte = 2
   private val assetFee = 5.waves
 
   test("asset issue changes issuer's asset balance; issuer's waves balance is decreased by fee") {
@@ -25,7 +24,7 @@ class IssueTransactionSpecification(override val allNodes: Seq[Node], override v
 
       issuedAssetId <- sender.issue(firstAddress, assetName, assetDescription, defaultQuantity, 2, reissuable = true, assetFee).map(_.id)
 
-      _ <- waitForHeightAraise(issuedAssetId, 1)
+      _ <- waitForHeightAraiseAndTxPresent(issuedAssetId, 1)
 
       _ <- assertBalances(firstAddress, firstAddressBalance - assetFee, firstAddressEffectiveBalance - assetFee)
       _ <- assertAssetBalance(firstAddress, issuedAssetId, defaultQuantity)
@@ -43,14 +42,14 @@ class IssueTransactionSpecification(override val allNodes: Seq[Node], override v
       firstAddressEffectiveBalance <- accountEffectiveBalance(firstAddress)
 
       issuedAssetId <- sender.issue(firstAddress, assetName, assetDescription, defaultQuantity, 2, reissuable = false, assetFee).map(_.id)
-      _ <- waitForHeightAraise(issuedAssetId, 1)
+      _ <- waitForHeightAraiseAndTxPresent(issuedAssetId, 1)
 
       issuedAssetId <- sender.issue(firstAddress, assetName, assetDescription, defaultQuantity, 2, reissuable = true, assetFee).map(_.id)
 
-      _ <- waitForHeightAraise(issuedAssetId, 1)
+      _ <- waitForHeightAraiseAndTxPresent(issuedAssetId, 1)
 
       _ <- assertAssetBalance(firstAddress, issuedAssetId, defaultQuantity)
-      _ <- assertBalances(firstAddress, firstAddressBalance - 2 * assetFee, firstAddressBalance - 2 * assetFee)
+      _ <- assertBalances(firstAddress, firstAddressBalance - 2 * assetFee, firstAddressEffectiveBalance - 2 * assetFee)
     } yield succeed
 
     Await.result(f, 1.minute)

@@ -216,7 +216,7 @@ object Miner {
   val MaxTransactionsPerMicroblock: Int = 5000
   val ClassicAmountOfTxsInBlock: Int = 100
 
-  val NopMiner = new Miner with MinerDebugInfo {
+  val Disabled = new Miner with MinerDebugInfo {
     override def scheduleMining(): Unit = ()
 
     override def collectNextBlockGenerationTimes: List[(Address, Long)] = List.empty

@@ -25,6 +25,7 @@ import io.netty.channel.Channel
 import io.netty.channel.group.DefaultChannelGroup
 import io.netty.util.concurrent.GlobalEventExecutor
 import kamon.Kamon
+import org.influxdb.dto.Point
 import scorex.account.AddressScheme
 import scorex.api.http._
 import scorex.api.http.alias.{AliasApiRoute, AliasBroadcastApiRoute}
@@ -72,7 +73,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
 
     val miner = if (settings.minerSettings.enable)
       new MinerImpl(allChannels, blockchainReadiness, blockchainUpdater, checkpointService, history, featureProvider, stateReader, settings, time, utxStorage, wallet)
-    else Miner.NopMiner
+    else Miner.Disabled
 
     val network = new NetworkServer(checkpointService, blockchainUpdater, time, miner, stateReader, settings,
       history, utxStorage, peerDatabase, allChannels, establishedConnections, blockchainReadiness, featureProvider)
@@ -241,7 +242,7 @@ object Application extends ScorexLogging {
     val config = readConfig(args.headOption)
     val settings = WavesSettings.fromConfig(config)
     Kamon.start(config)
-    Metrics.start(settings.metrics)
+    val isMetricsStarted = Metrics.start(settings.metrics)
 
     log.trace(s"System property sun.net.inetaddr.ttl=${System.getProperty("sun.net.inetaddr.ttl")}")
     log.trace(s"System property sun.net.inetaddr.negative.ttl=${System.getProperty("sun.net.inetaddr.negative.ttl")}")
@@ -249,6 +250,24 @@ object Application extends ScorexLogging {
     log.trace(s"Security property networkaddress.cache.negative.ttl=${Security.getProperty("networkaddress.cache.negative.ttl")}")
 
     RootActorSystem.start("wavesplatform", config) { actorSystem =>
+      import actorSystem.dispatcher
+      isMetricsStarted.foreach { started =>
+        if (started) {
+          import settings.{minerSettings => miner}
+          import settings.synchronizationSettings.microBlockSynchronizer
+
+          Metrics.write(
+            Point
+              .measurement("config")
+              .addField("miner-micro-block-interval", miner.microBlockInterval.toMillis)
+              .addField("miner-max-transactions-in-key-block", miner.maxTransactionsInKeyBlock)
+              .addField("miner-max-transactions-in-micro-block", miner.maxTransactionsInMicroBlock)
+              .addField("miner-min-micro-block-age", miner.minMicroBlockAge.toMillis)
+              .addField("mbs-wait-response-timeout", microBlockSynchronizer.waitResponseTimeout.toMillis)
+          )
+        }
+      }
+
       configureLogging(settings)
 
       // Initialize global var with actual address scheme

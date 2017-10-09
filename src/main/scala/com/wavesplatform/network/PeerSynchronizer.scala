@@ -2,6 +2,7 @@ package com.wavesplatform.network
 
 import java.net.InetSocketAddress
 
+import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel.{ChannelHandlerContext, ChannelInboundHandlerAdapter}
 import scorex.utils.ScorexLogging
 
@@ -51,4 +52,23 @@ class PeerSynchronizer(peerDatabase: PeerDatabase, peerRequestInterval: FiniteDu
         super.channelRead(ctx, msg)
     }
   }
+}
+
+object PeerSynchronizer {
+
+  @Sharable
+  class NoopPeerSynchronizer extends ChannelInboundHandlerAdapter {
+
+    override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = {
+      msg match {
+        case GetPeers =>
+        case KnownPeers(_) =>
+        case _ =>
+          super.channelRead(ctx, msg)
+      }
+    }
+  }
+
+  val Disabled = new NoopPeerSynchronizer()
+
 }
