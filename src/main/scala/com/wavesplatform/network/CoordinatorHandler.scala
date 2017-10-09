@@ -56,7 +56,7 @@ class CoordinatorHandler(checkpointService: CheckpointService,
     allChannels.broadcast(LocalScoreChanged(score))
   }
 
-  private def updateMicroBlockStats(m: MicroBlock): Either[_, Option[Unit]] = processMicroBlock(m) match {
+  private def processMicroBlockAndUpdateStats(m: MicroBlock): Either[_, Option[Unit]] = processMicroBlock(m) match {
     case Right(_) =>
       BlockStats.applied(m)
       Right(Some(()))
@@ -106,14 +106,14 @@ class CoordinatorHandler(checkpointService: CheckpointService,
       CoordinatorHandler.blockReceivingLag.safeRecord(System.currentTimeMillis() - b.timestamp)
       Signed.validateSignatures(b).flatMap(b => processBlock(b, false))
     }) onComplete {
-      case Success(Right(maybeNewScore)) =>
-        log.debug(s"Appended block ${b.uniqueId}")
-        if (b.transactionData.isEmpty)
-          allChannels.broadcast(BlockForged(b), Some(ctx.channel()))
-        maybeNewScore.foreach { newScore =>
+      case Success(Right(None)) =>
+        log.trace(s"Block ${b.uniqueId} already appended")
+      case Success(Right(Some(newScore))) =>
+          log.debug(s"Appended block ${b.uniqueId}")
+          if (b.transactionData.isEmpty)
+            allChannels.broadcast(BlockForged(b), Some(ctx.channel()))
           miner.scheduleMining()
-          allChannels.broadcast(newScore)
-        }
+          allChannels.broadcast(LocalScoreChanged(newScore))
       case Success(Left(is: InvalidSignature)) =>
         warnAndBlacklist(s"Could not append block ${b.uniqueId}: $is", ctx.channel())
       case Success(Left(ve)) =>
@@ -127,7 +127,7 @@ class CoordinatorHandler(checkpointService: CheckpointService,
       s"Attempting to append microblock ${m.totalResBlockSig}",
       s"Successfully appended microblock ${m.totalResBlockSig}",
       s"Error appending microblock ${m.totalResBlockSig}",
-      processMicroBlock(m).flatMap(_ => updateMicroBlockStats(m)),
+      processMicroBlockAndUpdateStats(m),
       (_: Unit) => allChannels.broadcast(MicroBlockInv(m.totalResBlockSig, m.prevResBlockSig), Some(ctx.channel())))
   }
 }
