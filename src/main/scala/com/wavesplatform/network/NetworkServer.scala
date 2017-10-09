@@ -96,7 +96,6 @@ class NetworkServer(checkpointService: CheckpointService,
     history
   )
 
-  private val noopHandler = new NoopHandler()
 
   private val serverChannel = settings.networkSettings.declaredAddress.map { _ =>
     new ServerBootstrap()
@@ -190,7 +189,7 @@ class NetworkServer(checkpointService: CheckpointService,
   private def peerSynchronizer: ChannelHandlerAdapter = {
     if (settings.networkSettings.enablePeersExchange) {
       new PeerSynchronizer(peerDatabase, settings.networkSettings.peersBroadcastInterval)
-    } else noopHandler
+    } else PeerSynchronizer.Disabled
   }
 
   def connect(remoteAddress: InetSocketAddress): Unit =
