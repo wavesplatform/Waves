@@ -73,7 +73,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
 
     val miner = if (settings.minerSettings.enable)
       new MinerImpl(allChannels, blockchainReadiness, blockchainUpdater, checkpointService, history, featureProvider, stateReader, settings, time, utxStorage, wallet)
-    else Miner.NopMiner
+    else Miner.Disabled
 
     val network = new NetworkServer(checkpointService, blockchainUpdater, time, miner, stateReader, settings,
       history, utxStorage, peerDatabase, allChannels, establishedConnections, blockchainReadiness, featureProvider)
