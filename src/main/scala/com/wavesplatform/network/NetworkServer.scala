@@ -134,7 +134,6 @@ class NetworkServer(checkpointService: CheckpointService,
   private val clientHandshakeHandler =
     new HandshakeHandler.Client(handshake, peerInfo, peerConnections, peerDatabase, allChannels)
 
-
   private val bootstrap = new Bootstrap()
     .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, settings.networkSettings.connectionTimeout.toMillis.toInt: Integer)
     .group(workerGroup)
@@ -218,7 +217,6 @@ class NetworkServer(checkpointService: CheckpointService,
           }
         }.channel()
     })
-
 
   def shutdown(): Unit = try {
     shutdownInitiated = true

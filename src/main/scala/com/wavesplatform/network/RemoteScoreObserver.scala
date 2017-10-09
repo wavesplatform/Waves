@@ -97,7 +97,7 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
       }
 
     case ExtensionBlocks(blocks) if pinnedChannel.get() == ctx.channel() =>
-      if (blocks.nonEmpty){
+      if (blocks.nonEmpty) {
         log.debug(s"${id(ctx)} ${pinnedChannelId}Receiving extension blocks ${formatBlocks(blocks)}")
         super.channelRead(ctx, msg)
       } else {
@@ -107,7 +107,6 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
 
     case ExtensionBlocks(blocks) =>
       log.debug(s"${id(ctx)} ${pinnedChannelId}Received blocks ${formatBlocks(blocks)} from non-pinned channel")
-      super.channelRead(ctx, msg)
 
     case _ => super.channelRead(ctx, msg)
   }
