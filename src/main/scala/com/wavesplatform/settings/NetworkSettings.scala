@@ -26,7 +26,6 @@ case class NetworkSettings(file: Option[File],
                            maxOutboundConnections: Int,
                            maxConnectionsPerHost: Int,
                            connectionTimeout: FiniteDuration,
-                           outboundBufferSize: Long,
                            maxUnverifiedPeers: Int,
                            enablePeersExchange: Boolean,
                            enableBlacklisting: Boolean,
@@ -59,7 +58,6 @@ object NetworkSettings {
     val maxOutboundConnections = config.as[Int]("max-outbound-connections")
     val maxConnectionsFromSingleHost = config.as[Int]("max-single-host-connections")
     val connectionTimeout = config.as[FiniteDuration]("connection-timeout")
-    val outboundBufferSize = config.getBytes("outbound-buffer-size")
     val maxUnverifiedPeers = config.as[Int]("max-unverified-peers")
     val enablePeersExchange = config.as[Boolean]("enable-peers-exchange")
     val enableBlacklisting = config.as[Boolean]("enable-blacklisting")
@@ -70,7 +68,7 @@ object NetworkSettings {
 
     NetworkSettings(file, bindAddress, declaredAddress, nodeName, nonce, knownPeers,
       peersDataResidenceTime, blackListResidenceTime, maxInboundConnections, maxOutboundConnections,
-      maxConnectionsFromSingleHost, connectionTimeout, outboundBufferSize, maxUnverifiedPeers, enablePeersExchange,
+      maxConnectionsFromSingleHost, connectionTimeout, maxUnverifiedPeers, enablePeersExchange,
       enableBlacklisting, peersBroadcastInterval, handshakeTimeout, suspensionResidenceTime, uPnPSettings)
   }
 
