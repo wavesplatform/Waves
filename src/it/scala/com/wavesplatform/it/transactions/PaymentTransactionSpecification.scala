@@ -16,11 +16,7 @@ class PaymentTransactionSpecification(override val allNodes: Seq[Node], override
       _ <- assertBalances(secondAddress, 100.waves, 100.waves)
 
       transferId <- sender.payment(firstAddress, secondAddress, 5.waves, fee = 5.waves)
-
-      height <- traverse(allNodes)(_.height).map(_.max)
-      _ <- traverse(allNodes)(_.waitForHeight(height + 1))
-      _ <- traverse(allNodes)(_.waitForTransaction(transferId))
-
+      _ <- waitForHeightAraiseAndTxPresent(transferId, 1)
       _ <- assertBalances(firstAddress, 90.waves, 90.waves)
       _ <- assertBalances(secondAddress, 105.waves, 105.waves)
     } yield succeed
