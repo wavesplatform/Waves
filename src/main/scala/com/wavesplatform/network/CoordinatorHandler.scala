@@ -13,7 +13,7 @@ import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel.group.ChannelGroup
 import io.netty.channel.{Channel, ChannelHandlerContext, ChannelInboundHandlerAdapter}
 import kamon.Kamon
-import scorex.block.{Block, MicroBlock}
+import scorex.block.Block
 import scorex.transaction.ValidationError.InvalidSignature
 import scorex.transaction._
 import scorex.utils.{ScorexLogging, Time}
@@ -99,11 +99,11 @@ class CoordinatorHandler(checkpointService: CheckpointService,
       case Success(Right(None)) =>
         log.trace(s"Block ${b.uniqueId} already appended")
       case Success(Right(Some(newScore))) =>
-          log.debug(s"Appended block ${b.uniqueId}")
-          if (b.transactionData.isEmpty)
-            allChannels.broadcast(BlockForged(b), Some(ctx.channel()))
-          miner.scheduleMining()
-          allChannels.broadcast(LocalScoreChanged(newScore))
+        log.debug(s"Appended block ${b.uniqueId}")
+        if (b.transactionData.isEmpty)
+          allChannels.broadcast(BlockForged(b), Some(ctx.channel()))
+        miner.scheduleMining()
+        allChannels.broadcast(LocalScoreChanged(newScore))
       case Success(Left(is: InvalidSignature)) =>
         warnAndBlacklist(s"Could not append block ${b.uniqueId}: $is", ctx.channel())
       case Success(Left(ve)) =>
