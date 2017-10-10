@@ -135,21 +135,35 @@ object StateReader {
 
       @tailrec
       def loop(deeperHeight: Int, list: Seq[Snapshot]): Seq[Snapshot] = {
-        if (deeperHeight == 0) list
-        else {
-          val snapshot = s.snapshotAtHeight(acc, deeperHeight).get
-          if (deeperHeight <= bottomNotIncluded)
-            snapshot +: list
-          else if (deeperHeight > atHeight && snapshot.prevHeight > atHeight) {
-            loop(snapshot.prevHeight, list)
-          } else
-            loop(snapshot.prevHeight, snapshot +: list)
+        if (deeperHeight == 0) {
+          s.snapshotAtHeight(acc, 1) match {
+            case Some(genesisSnapshot) =>
+              genesisSnapshot +: list
+            case None =>
+              Snapshot(0, 0, 0) +: list
+          }
+        } else {
+          s.snapshotAtHeight(acc, deeperHeight) match {
+            case Some(snapshot) =>
+              if (deeperHeight <= bottomNotIncluded)
+                snapshot +: list
+              else if (snapshot.prevHeight == deeperHeight) {
+                throw new Exception(s"CRITICAL: Infinite loop detected while calculating minBySnapshot: acc=$acc, atHeight=$atHeight, " +
+                  s"confirmations=$confirmations; lastUpdateHeight=${s.lastUpdateHeight(acc)}; current step: deeperHeight=$deeperHeight, list.size=${list.size}")
+              } else if (deeperHeight > atHeight && snapshot.prevHeight > atHeight) {
+                loop(snapshot.prevHeight, list)
+              } else
+                loop(snapshot.prevHeight, snapshot +: list)
+            case None =>
+              throw new Exception(s"CRITICAL: Cannot lookup referenced height: acc=$acc, atHeight=$atHeight, " +
+                s"confirmations=$confirmations; lastUpdateHeight=${s.lastUpdateHeight(acc)}; current step: deeperHeight=$deeperHeight, list.size=${list.size}")
+          }
         }
       }
 
       val snapshots: Seq[Snapshot] = s.lastUpdateHeight(acc) match {
         case None => Seq(Snapshot(0, 0, 0))
-        case Some(h) if h < atHeight - confirmations =>
+        case Some(h) if h < bottomNotIncluded =>
           val pf = s.accountPortfolio(acc)
           Seq(Snapshot(h, pf.balance, pf.effectiveBalance))
         case Some(h) => loop(h, Seq.empty)
