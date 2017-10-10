@@ -3,6 +3,7 @@ package com.wavesplatform.network
 import com.wavesplatform.TransactionGen
 import com.wavesplatform.state2.ByteStr
 import io.netty.channel.embedded.EmbeddedChannel
+import monix.reactive.subjects.{AsyncSubject, ConcurrentSubject}
 import org.mockito.Mockito
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.Eventually
@@ -13,6 +14,7 @@ import scorex.account.PublicKeyAccount
 import scorex.block.MicroBlock
 import scorex.lagonaki.mocks.TestBlock
 import scorex.transaction.NgHistory
+import monix.execution.Scheduler.Implicits.global
 
 import scala.concurrent.duration.DurationInt
 
@@ -40,10 +42,9 @@ class MicroBlockSynchronizerSpec extends FreeSpec
     val nextBlockSig = ByteStr("nextBlockId".getBytes)
 
     val history = Mockito.mock(classOf[NgHistory])
-    val peerDatabase = Mockito.mock(classOf[PeerDatabase])
     Mockito.doReturn(Some(lastBlockSig)).when(history).lastBlockId()
 
-    val channel = new EmbeddedChannel(new MicroBlockSynchronizer(settings, history, peerDatabase))
+    val channel = new EmbeddedChannel(new MicroBlockSynchronizer(settings, history, PeerDatabase.NoOp, AsyncSubject[ByteStr]))
     channel.writeInbound(MicroBlockInv(TestBlock.defaultSigner, nextBlockSig, lastBlockSig))
     channel.flushInbound()
 
@@ -60,10 +61,9 @@ class MicroBlockSynchronizerSpec extends FreeSpec
     val nextBlockSig = ByteStr("nextBlockId".getBytes)
 
     val history = Mockito.mock(classOf[NgHistory])
-    val peerDatabase = Mockito.mock(classOf[PeerDatabase])
     Mockito.doReturn(Some(lastBlockSig)).when(history).lastBlockId()
 
-    val synchronizer = new MicroBlockSynchronizer(settings, history, peerDatabase)
+    val synchronizer = new MicroBlockSynchronizer(settings, history, PeerDatabase.NoOp, AsyncSubject[ByteStr])
 
     val channel1 = new EmbeddedChannel(synchronizer)
     val channel2 = new EmbeddedChannel(synchronizer)
@@ -74,6 +74,7 @@ class MicroBlockSynchronizerSpec extends FreeSpec
     eventually {
       val request = channel1.readOutbound[MicroBlockRequest]()
       Option(request) shouldBe defined
+      request.totalBlockSig shouldBe nextBlockSig
       request
     }
 
@@ -95,6 +96,48 @@ class MicroBlockSynchronizerSpec extends FreeSpec
         val request = channel2.readOutbound[MicroBlockRequest]()
         Option(request) shouldBe defined
       }
+    }
+  }
+
+  "should remember MicroblockInv to make a request further" in {
+    val lastBlockSig = ByteStr("lastBlockId".getBytes)
+    val nextBlockSig1 = ByteStr("nextBlockId1".getBytes)
+    val nextBlockSig2 = ByteStr("nextBlockId2".getBytes)
+
+    val history = Mockito.mock(classOf[NgHistory])
+    Mockito.doReturn(Some(lastBlockSig)).when(history).lastBlockId()
+
+    val events = ConcurrentSubject.publish[ByteStr]
+    val synchronizer = new MicroBlockSynchronizer(settings, history, PeerDatabase.NoOp, events)
+
+    val channel = new EmbeddedChannel(synchronizer)
+
+    channel.writeInbound(MicroBlockInv(TestBlock.defaultSigner, nextBlockSig1, lastBlockSig))
+    channel.writeInbound(MicroBlockInv(TestBlock.defaultSigner, nextBlockSig2, nextBlockSig1))
+    channel.flushInbound()
+
+    eventually {
+      val request = channel.readOutbound[MicroBlockRequest]()
+      Option(request) shouldBe defined
+      request
+    }
+
+    channel.writeInbound(MicroBlockResponse(MicroBlock(
+      version = 1.toByte,
+      generator = PublicKeyAccount("pubkey".getBytes),
+      transactionData = Seq.empty,
+      prevResBlockSig = lastBlockSig,
+      totalResBlockSig = nextBlockSig1,
+      signature = nextBlockSig1
+    )))
+    channel.flushInbound()
+    events.onNext(nextBlockSig1)
+
+    eventually {
+      val request = channel.readOutbound[MicroBlockRequest]()
+      Option(request) shouldBe defined
+      request.totalBlockSig shouldBe nextBlockSig2
+      request
     }
   }
 

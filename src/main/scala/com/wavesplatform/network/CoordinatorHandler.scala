@@ -8,12 +8,14 @@ import com.wavesplatform.metrics.{BlockStats, HistogramExt}
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.network.MicroBlockSynchronizer.MicroblockData
 import com.wavesplatform.settings.WavesSettings
+import com.wavesplatform.state2.ByteStr
 import com.wavesplatform.state2.reader.StateReader
 import com.wavesplatform.{Coordinator, UtxPool}
 import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel.group.ChannelGroup
 import io.netty.channel.{Channel, ChannelHandlerContext, ChannelInboundHandlerAdapter}
 import kamon.Kamon
+import monix.reactive.Observer
 import scorex.block.Block
 import scorex.transaction.ValidationError.InvalidSignature
 import scorex.transaction._
@@ -35,7 +37,8 @@ class CoordinatorHandler(checkpointService: CheckpointService,
                          settings: WavesSettings,
                          peerDatabase: PeerDatabase,
                          allChannels: ChannelGroup,
-                         featureProvider: FeatureProvider)
+                         featureProvider: FeatureProvider,
+                         lastBlockId: Observer[ByteStr])
   extends ChannelInboundHandlerAdapter with ScorexLogging {
 
   private val counter = new AtomicInteger
@@ -81,11 +84,17 @@ class CoordinatorHandler(checkpointService: CheckpointService,
       s"Error processing checkpoint",
       processCheckpoint(c).map(Some(_)), scheduleMiningAndBroadcastScore)
 
-    case ExtensionBlocks(blocks) => processAndBlacklistOnFailure(ctx.channel,
-      s"Attempting to append extension ${formatBlocks(blocks)}",
-      s"Successfully appended extension ${formatBlocks(blocks)}",
-      s"Error appending extension ${formatBlocks(blocks)}",
-      processFork(blocks), scheduleMiningAndBroadcastScore)
+    case ExtensionBlocks(blocks) =>
+      blocks.foreach(BlockStats.received(_, BlockStats.Source.Ext, ctx))
+      processAndBlacklistOnFailure(ctx.channel,
+        s"Attempting to append extension ${formatBlocks(blocks)}",
+        s"Successfully appended extension ${formatBlocks(blocks)}",
+        s"Error appending extension ${formatBlocks(blocks)}",
+        processFork(blocks).right.map { x =>
+          lastBlockId.onNext(history.lastBlockId().get)
+          x
+        },
+        scheduleMiningAndBroadcastScore)
 
     case b: Block => Future({
       BlockStats.received(b, BlockStats.Source.Broadcast, ctx)
@@ -98,6 +107,7 @@ class CoordinatorHandler(checkpointService: CheckpointService,
         log.debug(s"Appended block ${b.uniqueId}")
         if (b.transactionData.isEmpty)
           allChannels.broadcast(BlockForged(b), Some(ctx.channel()))
+        lastBlockId.onNext(b.uniqueId)
         miner.scheduleMining()
         allChannels.broadcast(LocalScoreChanged(newScore))
       case Success(Left(is: InvalidSignature)) =>
@@ -108,23 +118,24 @@ class CoordinatorHandler(checkpointService: CheckpointService,
       // no need to push anything downstream in here, because channels are pinned only when handling extensions
       case Failure(t) => rethrow(s"Error appending block ${b.uniqueId}", t)
     }
+
     case md: MicroblockData =>
       val microBlock = md.microBlock
       val microblockTotalResBlockSig = microBlock.totalResBlockSig
-      Future(Signed.validateSignatures(microBlock).flatMap(processMicroBlock)) onComplete {
-        case Success(Right(())) =>
-          md.invOpt match {
-            case Some(mi) => allChannels.broadcast(mi, Some(ctx.channel()))
-            case None => log.warn("Not broadcasting MicroBlockInv")
-          }
-          BlockStats.applied(microBlock)
-        case Success(Left(is: InvalidSignature)) =>
-          peerDatabase.blacklistAndClose(ctx.channel(), s"Could not append microblock $microblockTotalResBlockSig: $is")
-        case Success(Left(ve)) =>
-          BlockStats.declined(microBlock)
-          log.debug(s"Could not append microblock $microblockTotalResBlockSig: $ve")
-        case Failure(t) => rethrow(s"Error appending microblock $microblockTotalResBlockSig", t)
-      }
+      Future(Signed.validateSignatures(microBlock).flatMap( processMicroBlock)) onComplete {
+      case Success(Right(())) =>
+        md.invOpt match {
+          case Some(mi) =>allChannels.broadcast(mi, Some(ctx.channel()))
+          case None => log.warn("Not broadcasting MicroBlockInv")
+        }
+        BlockStats.applied(microBlock)
+        lastBlockId.onNext(microBlock.totalResBlockSig)case Success(Left(is: InvalidSignature)) =>
+        peerDatabase.blacklistAndClose(ctx.channel(),s"Could not append microblock $microblockTotalResBlockSig: $is")
+      case Success(Left(ve)) =>
+        BlockStats.declined(microBlock)
+        log.debug(s"Could not append microblock $microblockTotalResBlockSig: $ve")
+      case Failure(t) => rethrow(s"Error appending microblock $microblockTotalResBlockSig", t)
+    }
   }
 }
 
