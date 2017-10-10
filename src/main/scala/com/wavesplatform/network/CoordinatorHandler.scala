@@ -108,11 +108,14 @@ class CoordinatorHandler(checkpointService: CheckpointService,
       case Failure(t) => rethrow(s"Error appending block ${b.uniqueId}", t)
     }
 
-    case (mi@MicroBlockInv(_, _, _, _), m: MicroBlock) => Future({
+    case (miOpt: Option[MicroBlockInv], m: MicroBlock) => Future({
       Signed.validateSignatures(m).flatMap(m => processMicroBlock(m))
     }) onComplete {
       case Success(Right(())) =>
-        allChannels.broadcast(mi, Some(ctx.channel()))
+        miOpt match {
+          case Some(mi) => allChannels.broadcast(mi, Some(ctx.channel()))
+          case None => log.warn("Not broadcasting MicroBlockInv")
+        }
         BlockStats.applied(m)
       case Success(Left(is: InvalidSignature)) =>
         peerDatabase.blacklistAndClose(ctx.channel(), s"Could not append microblock ${m.totalResBlockSig}: $is")

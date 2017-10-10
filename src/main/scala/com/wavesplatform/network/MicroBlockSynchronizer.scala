@@ -51,13 +51,12 @@ class MicroBlockSynchronizer(settings: Settings, history: NgHistory, peerDatabas
     case mbr@MicroBlockResponse(mb) => Task {
       log.trace(id(ctx) + "Received " + mbr)
       knownMicroBlockOwners.invalidate(mb.totalResBlockSig)
-      val invOpt = Option(awaitingMicroBlocks.getIfPresent(mb.totalResBlockSig))
       successfullyReceivedMicroBlocks.put(mb.totalResBlockSig, dummy)
 
       Option(microBlockRecieveTime.getIfPresent(mb.totalResBlockSig)).foreach { created =>
         BlockStats.received(mb, ctx, propagationTime = System.currentTimeMillis() - created)
         microBlockRecieveTime.invalidate(mb.totalResBlockSig)
-        invOpt.foreach { inv => super.channelRead(ctx, (inv, mb)) }
+        super.channelRead(ctx, (Option(awaitingMicroBlocks.getIfPresent(mb.totalResBlockSig)), mb))
       }
     }.runAsync
     case mi@MicroBlockInv(_, totalResBlockSig, prevResBlockSig, _) => Task {
