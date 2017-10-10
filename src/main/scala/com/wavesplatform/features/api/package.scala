@@ -1,26 +1,29 @@
 package com.wavesplatform.features
 
-import com.wavesplatform.features.BlockchainFeatureStatus.{Approved, Activated, Undefined}
-import com.wavesplatform.features.api.NodeFeatureStatus.{Supported, Unsupported}
+import com.wavesplatform.features.BlockchainFeatureStatus.{Activated, Approved, Undefined}
+import com.wavesplatform.features.api.NodeFeatureStatus.{Implemented, NotImplemented, Voted}
 import play.api.libs.json._
 
 package object api {
   implicit val nodeFeatureStatusFormat: Format[NodeFeatureStatus] =
     new Format[NodeFeatureStatus] {
-      private val unsupported = "UNSUPPORTED"
-      private val supported = "SUPPORTED"
+      private val notimplemented = "NOT_IMPLEMENTED"
+      private val implemented = "IMPLEMENTED"
+      private val voted = "VOTED"
 
       override def reads(json: JsValue): JsResult[NodeFeatureStatus] =
         json match {
-          case JsString(`unsupported`) => JsSuccess(Unsupported)
-          case JsString(`supported`) => JsSuccess(Supported)
+          case JsString(`notimplemented`) => JsSuccess(NotImplemented)
+          case JsString(`implemented`) => JsSuccess(Implemented)
+          case JsString(`voted`) => JsSuccess(Voted)
           case _ => ???
         }
 
       override def writes(o: NodeFeatureStatus): JsValue = {
         o match {
-          case Unsupported => JsString(unsupported)
-          case Supported => JsString(supported)
+          case NotImplemented => JsString(notimplemented)
+          case Implemented => JsString(implemented)
+          case Voted => JsString(voted)
         }
       }
     }

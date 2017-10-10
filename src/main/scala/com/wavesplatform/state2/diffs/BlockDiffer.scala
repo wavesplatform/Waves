@@ -10,6 +10,7 @@ import com.wavesplatform.state2.patch.LeasePatch
 import com.wavesplatform.state2.reader.{CompositeStateReader, StateReader}
 import scorex.account.Address
 import scorex.block.{Block, MicroBlock}
+import scorex.transaction.ValidationError.ActivationError
 import scorex.transaction.{Signed, Transaction, ValidationError}
 import scorex.utils.ScorexLogging
 
@@ -19,12 +20,12 @@ object BlockDiffer extends ScorexLogging with Instrumented {
 
   def right(diff: Diff): Either[ValidationError, Diff] = Right(diff)
 
-  def fromBlock(settings: FunctionalitySettings, featureProvider: FeatureProvider, s: StateReader, maybePrevBlock: Option[Block], block: Block): Either[ValidationError, BlockDiff] = {
+  def fromBlock(settings: FunctionalitySettings, fp: FeatureProvider, s: StateReader, maybePrevBlock: Option[Block], block: Block): Either[ValidationError, BlockDiff] = {
     val blockSigner = block.signerData.generator.toAddress
     val stateHeight = s.height
 
     // height switch is next after activation
-    val ng4060switchHeight = featureProvider.featureActivationHeight(BlockchainFeatures.NG.id).getOrElse(Int.MaxValue)
+    val ng4060switchHeight = fp.featureActivationHeight(BlockchainFeatures.NG.id).getOrElse(Int.MaxValue)
 
     lazy val prevBlockFeeDistr: Option[Diff] =
       if (stateHeight > ng4060switchHeight)
@@ -46,8 +47,10 @@ object BlockDiffer extends ScorexLogging with Instrumented {
     } yield r
   }
 
-  def fromMicroBlock(settings: FunctionalitySettings, s: StateReader, pervBlockTimestamp: Option[Long], micro: MicroBlock, timestamp: Long): Either[ValidationError, BlockDiff] = {
+  def fromMicroBlock(settings: FunctionalitySettings, fp: FeatureProvider, s: StateReader, pervBlockTimestamp: Option[Long], micro: MicroBlock, timestamp: Long): Either[ValidationError, BlockDiff] = {
     for {
+    // microblocks are processed within block which is next after 40-only-block which goes on top of activated height
+      _ <- Either.cond(fp.featureActivationHeight(BlockchainFeatures.NG.id).exists(s.height > _), (), ActivationError(s"MicroBlocks are not yet activated, current height=${s.height}"))
       _ <- Signed.validateSignatures(micro)
       r <- apply(settings, s, pervBlockTimestamp)(micro.generator, None, None, timestamp, micro.transactionData, 0)
     } yield r

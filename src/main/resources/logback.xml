@@ -10,6 +10,7 @@
 
     <logger name="io.netty" level="INFO"/>
     <logger name="io.swagger" level="INFO"/>
+    <logger name="org.asynchttpclient" level="INFO"/>
 
     <root level="INFO">
         <appender-ref ref="STDOUT" />

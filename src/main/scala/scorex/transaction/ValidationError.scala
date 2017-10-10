@@ -34,4 +34,6 @@ object ValidationError {
   case class MicroBlockAppendError(err: String, microBlock: MicroBlock) extends ValidationError {
     override def toString: String = s"MicroBlockAppendError($err, MicroBlockId=${microBlock.totalResBlockSig}[-->${microBlock.prevResBlockSig}])"
   }
+
+  case class ActivationError(err: String) extends ValidationError
 }

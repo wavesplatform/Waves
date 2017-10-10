@@ -7,9 +7,12 @@ object Dependencies {
   def akkaHttpModule(module: String) = "com.typesafe.akka" %% module % "10.0.9"
   def nettyModule(module: String) = "io.netty" % s"netty-$module" % "4.1.13.Final"
   def kamonModule(module: String) = "io.kamon" %% s"kamon-$module" % "0.6.7"
+  val asyncHttpClient = "org.asynchttpclient" % "async-http-client" % "2.1.0-alpha22"
 
   lazy val network = Seq("handler", "buffer", "codec").map(nettyModule) ++ Seq(
-    "org.bitlet" % "weupnp" % "0.1.4"
+    "org.bitlet" % "weupnp" % "0.1.4",
+    // Solves an issue with kamon-influxdb
+    asyncHttpClient
   )
 
   lazy val scalatest = Seq(
@@ -29,7 +32,7 @@ object Dependencies {
     // Swagger is using Jersey 1.1, hence the shading (https://github.com/spotify/docker-client#a-note-on-shading)
     "com.spotify" % "docker-client" % "8.8.2" classifier "shaded",
     "com.fasterxml.jackson.dataformat" % "jackson-dataformat-properties" % "2.8.9",
-    "org.asynchttpclient" % "async-http-client" % "2.1.0-alpha22"
+    asyncHttpClient
   )) map (_ % "it,test")
 
   lazy val serialization = Seq(
@@ -59,8 +62,9 @@ object Dependencies {
     "org.fusesource.leveldbjni" % "leveldbjni-all" % "1.8"
   )
 
-  lazy val metrics = Seq("core", "statsd", "system-metrics").map(kamonModule) ++ Seq(
-    "org.influxdb" % "influxdb-java" % "2.7"
+  lazy val metrics = Seq("core", "system-metrics").map(kamonModule) ++ Seq(
+    "org.influxdb" % "influxdb-java" % "2.7",
+    "io.kamon" %% "kamon-influxdb" % "0.6.8" exclude("org.asynchttpclient", "async-http-client")
   )
 
   lazy val fp = Seq(
