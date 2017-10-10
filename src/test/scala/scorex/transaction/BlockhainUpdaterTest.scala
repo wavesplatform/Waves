@@ -13,9 +13,9 @@ class BlockhainUpdaterTest extends FunSuite with Matchers with HistoryTest {
 
   private val ApprovalPeriod = 100
 
-  private val WavesSettings = RootDefaultSettings.copy(blockchainSettings =
-    RootDefaultSettings.blockchainSettings.copy(
-      functionalitySettings = RootDefaultSettings.blockchainSettings.functionalitySettings.copy(
+  private val WavesSettings = DefaultWavesSettings.copy(blockchainSettings =
+    DefaultWavesSettings.blockchainSettings.copy(
+      functionalitySettings = DefaultWavesSettings.blockchainSettings.functionalitySettings.copy(
         featureCheckBlocksPeriod = ApprovalPeriod,
         blocksForFeatureActivation = (ApprovalPeriod * 0.9).toInt
       )
@@ -171,5 +171,27 @@ class BlockhainUpdaterTest extends FunSuite with Matchers with HistoryTest {
       bu.processBlock(getNextTestBlock(h)).explicitGet()
     }
     fp.featureStatus(1, ApprovalPeriod * 3) shouldBe BlockchainFeatureStatus.Activated
+  }
+
+  test("features votes resets when voting window changes") {
+    val (h, fp, _, _, bu, _) = StorageFactory(WavesSettings, EmptyFeaturesSettings).get
+
+    bu.processBlock(genesisBlock)
+
+    fp.featureVotesCountWithinActivationWindow(h.height()) shouldBe Map.empty
+
+    fp.featureStatus(1, h.height()) shouldBe BlockchainFeatureStatus.Undefined
+
+    (1 until ApprovalPeriod).foreach { i =>
+      bu.processBlock(getNextTestBlockWithVotes(h, Set(1)))
+      fp.featureVotesCountWithinActivationWindow(h.height()) shouldBe Map(1.toShort -> i)
+    }
+
+    fp.featureStatus(1, h.height()) shouldBe BlockchainFeatureStatus.Accepted
+
+    bu.processBlock(getNextTestBlockWithVotes(h, Set(1)))
+    fp.featureVotesCountWithinActivationWindow(h.height()) shouldBe Map(1.toShort -> 1)
+
+    fp.featureStatus(1, h.height()) shouldBe BlockchainFeatureStatus.Accepted
   }
 }

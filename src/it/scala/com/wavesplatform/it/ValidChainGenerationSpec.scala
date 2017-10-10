@@ -48,13 +48,13 @@ class ValidChainGenerationSpec(override val nodes: Seq[Node]) extends FreeSpec w
         _ <- traverse(nodes)(_.waitForHeight(newHeight))
       } yield newHeight, 5.minutes)
 
-      val targetHeight = initialHeight + 5
+      val targetHeight = initialHeight + 2
       val rollbackNodes = Random.shuffle(nodes).take(n)
 
       rollbackNodes.foreach(_.rollback(1))
       val synchronizedBlocks = result(for {
         _ <- traverse(nodes)(_.waitForHeight(targetHeight))
-        blocks <- traverse(nodes)(_.blockAt(targetHeight))
+        blocks <- traverse(nodes)(_.blockAt(initialHeight))
       } yield blocks, 5.minutes)
 
       all(synchronizedBlocks) shouldEqual synchronizedBlocks.head

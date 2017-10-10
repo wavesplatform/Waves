@@ -1,6 +1,6 @@
 package com.wavesplatform.network
 
-import java.net.{InetSocketAddress, NetworkInterface, NoRouteToHostException}
+import java.net.{InetSocketAddress, NetworkInterface}
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
 
@@ -9,7 +9,6 @@ import com.wavesplatform.metrics.Metrics
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.settings._
 import com.wavesplatform.state2.reader.StateReader
-import com.wavesplatform.utils._
 import com.wavesplatform.{UtxPool, Version}
 import io.netty.bootstrap.{Bootstrap, ServerBootstrap}
 import io.netty.channel._
@@ -97,7 +96,6 @@ class NetworkServer(checkpointService: CheckpointService,
     history
   )
 
-  private val noopHandler = new NoopHandler()
 
   private val serverChannel = settings.networkSettings.declaredAddress.map { _ =>
     new ServerBootstrap()
@@ -134,7 +132,6 @@ class NetworkServer(checkpointService: CheckpointService,
 
   private val clientHandshakeHandler =
     new HandshakeHandler.Client(handshake, peerInfo, peerConnections, peerDatabase, allChannels)
-
 
   private val bootstrap = new Bootstrap()
     .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, settings.networkSettings.connectionTimeout.toMillis.toInt: Integer)
@@ -191,7 +188,7 @@ class NetworkServer(checkpointService: CheckpointService,
   private def peerSynchronizer: ChannelHandlerAdapter = {
     if (settings.networkSettings.enablePeersExchange) {
       new PeerSynchronizer(peerDatabase, settings.networkSettings.peersBroadcastInterval)
-    } else noopHandler
+    } else PeerSynchronizer.Disabled
   }
 
   def connect(remoteAddress: InetSocketAddress): Unit =
@@ -201,14 +198,9 @@ class NetworkServer(checkpointService: CheckpointService,
         .addListener { (connFuture: ChannelFuture) =>
           if (connFuture.isDone) {
             if (connFuture.cause() != null) {
-              if (connFuture.cause().isInstanceOf[NoRouteToHostException]) {
-                log.warn(s"${id(connFuture.channel())} Unrecoverable network issue has occurred, restarting", connFuture.cause())
-                forceStopApplication()
-              } else {
-                val reason = s"${id(connFuture.channel())} Connection failed, suspending $remoteAddress"
-                log.debug(reason, connFuture.cause())
-                peerDatabase.suspend(remoteAddress.getAddress)
-              }
+              val reason = s"${id(connFuture.channel())} Connection failed, suspending $remoteAddress"
+              log.debug(reason, connFuture.cause())
+              peerDatabase.suspend(remoteAddress.getAddress)
             } else if (connFuture.isSuccess) {
               log.trace(s"${id(connFuture.channel())} Connection established")
               peerDatabase.touch(remoteAddress)
@@ -224,7 +216,6 @@ class NetworkServer(checkpointService: CheckpointService,
           }
         }.channel()
     })
-
 
   def shutdown(): Unit = try {
     shutdownInitiated = true

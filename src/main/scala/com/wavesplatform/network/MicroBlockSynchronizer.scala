@@ -24,7 +24,7 @@ class MicroBlockSynchronizer(settings: Settings, history: NgHistory) extends Cha
   private val awaitingMicroBlocks = cache[MicroBlockSignature, Object](settings.invCacheTimeout)
   private val knownMicroBlockOwners = cache[MicroBlockSignature, MSet[ChannelHandlerContext]](settings.invCacheTimeout)
   private val successfullyReceivedMicroBlocks = cache[MicroBlockSignature, Object](settings.processedMicroBlocksCacheTimeout)
-  private val microBlockRecieveTime = cache[ByteStr, java.lang.Long](settings.invCacheTimeout)
+  private val microBlockRecieveTime = cache[MicroBlockSignature, java.lang.Long](settings.invCacheTimeout)
 
   private def alreadyRequested(microBlockSig: MicroBlockSignature): Boolean = Option(awaitingMicroBlocks.getIfPresent(microBlockSig)).isDefined
 

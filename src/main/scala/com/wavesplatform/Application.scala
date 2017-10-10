@@ -12,6 +12,7 @@ import akka.http.scaladsl.server.Route
 import akka.stream.ActorMaterializer
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.actor.RootActorSystem
+import com.wavesplatform.features.api.ActivationApiRoute
 import com.wavesplatform.history.{CheckpointServiceImpl, StorageFactory}
 import com.wavesplatform.http.NodeApiRoute
 import com.wavesplatform.matcher.Matcher
@@ -24,6 +25,7 @@ import io.netty.channel.Channel
 import io.netty.channel.group.DefaultChannelGroup
 import io.netty.util.concurrent.GlobalEventExecutor
 import kamon.Kamon
+import org.influxdb.dto.Point
 import scorex.account.AddressScheme
 import scorex.api.http._
 import scorex.api.http.alias.{AliasApiRoute, AliasBroadcastApiRoute}
@@ -71,7 +73,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
 
     val miner = if (settings.minerSettings.enable)
       new MinerImpl(allChannels, blockchainReadiness, blockchainUpdater, checkpointService, history, featureProvider, stateReader, settings, time, utxStorage, wallet)
-    else Miner.NopMiner
+    else Miner.Disabled
 
     val network = new NetworkServer(checkpointService, blockchainUpdater, time, miner, stateReader, settings,
       history, utxStorage, peerDatabase, allChannels, establishedConnections, blockchainReadiness, featureProvider)
@@ -90,7 +92,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
       DebugApiRoute(settings.restAPISettings, wallet, stateReader, history, peerDatabase, establishedConnections, blockchainUpdater, allChannels, utxStorage, blockchainDebugInfo, miner),
       WavesApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, time),
       AssetsApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, stateReader, time),
-      NodeApiRoute(settings.restAPISettings, () => this.shutdown()),
+      NodeApiRoute(settings.restAPISettings,() => this.shutdown()),
+      ActivationApiRoute(settings.restAPISettings, settings.blockchainSettings.functionalitySettings, settings.featuresSettings, history, featureProvider),
       AssetsBroadcastApiRoute(settings.restAPISettings, utxStorage, allChannels),
       LeaseApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, stateReader, time),
       LeaseBroadcastApiRoute(settings.restAPISettings, utxStorage, allChannels),
@@ -111,6 +114,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
       typeOf[WavesApiRoute],
       typeOf[AssetsApiRoute],
       typeOf[NodeApiRoute],
+      typeOf[ActivationApiRoute],
       typeOf[AssetsBroadcastApiRoute],
       typeOf[LeaseApiRoute],
       typeOf[LeaseBroadcastApiRoute],
@@ -228,17 +232,17 @@ object Application extends ScorexLogging {
   def main(args: Array[String]): Unit = {
     // prevents java from caching successful name resolutions, which is needed e.g. for proper NTP server rotation
     // http://stackoverflow.com/a/17219327
-    System.setProperty("sun.net.inetaddr.ttl", "15")
-    System.setProperty("sun.net.inetaddr.negative.ttl", "15")
-    Security.setProperty("networkaddress.cache.ttl", "15")
-    Security.setProperty("networkaddress.cache.negative.ttl", "15")
+    System.setProperty("sun.net.inetaddr.ttl", "0")
+    System.setProperty("sun.net.inetaddr.negative.ttl", "0")
+    Security.setProperty("networkaddress.cache.ttl", "0")
+    Security.setProperty("networkaddress.cache.negative.ttl", "0")
 
     log.info("Starting...")
 
     val config = readConfig(args.headOption)
     val settings = WavesSettings.fromConfig(config)
     Kamon.start(config)
-    Metrics.start(settings.metrics)
+    val isMetricsStarted = Metrics.start(settings.metrics)
 
     log.trace(s"System property sun.net.inetaddr.ttl=${System.getProperty("sun.net.inetaddr.ttl")}")
     log.trace(s"System property sun.net.inetaddr.negative.ttl=${System.getProperty("sun.net.inetaddr.negative.ttl")}")
@@ -246,6 +250,24 @@ object Application extends ScorexLogging {
     log.trace(s"Security property networkaddress.cache.negative.ttl=${Security.getProperty("networkaddress.cache.negative.ttl")}")
 
     RootActorSystem.start("wavesplatform", config) { actorSystem =>
+      import actorSystem.dispatcher
+      isMetricsStarted.foreach { started =>
+        if (started) {
+          import settings.{minerSettings => miner}
+          import settings.synchronizationSettings.microBlockSynchronizer
+
+          Metrics.write(
+            Point
+              .measurement("config")
+              .addField("miner-micro-block-interval", miner.microBlockInterval.toMillis)
+              .addField("miner-max-transactions-in-key-block", miner.maxTransactionsInKeyBlock)
+              .addField("miner-max-transactions-in-micro-block", miner.maxTransactionsInMicroBlock)
+              .addField("miner-min-micro-block-age", miner.minMicroBlockAge.toMillis)
+              .addField("mbs-wait-response-timeout", microBlockSynchronizer.waitResponseTimeout.toMillis)
+          )
+        }
+      }
+
       configureLogging(settings)
 
       // Initialize global var with actual address scheme

@@ -92,6 +92,7 @@ class NgHistoryReader(ngState: () => Option[NgState], inner: History with Featur
   }
 
   override def featureVotesCountWithinActivationWindow(height: Int): Map[Short, Int] = read { implicit l =>
-    inner.featureVotesCountWithinActivationWindow(height) |+| ngState().map(_.acceptedFeatures.map(_ -> 1).toMap).getOrElse(Map.empty)
+    val ngVotes = ngState().map(_.base.supportedFeaturesIds.map(_ -> 1).toMap).getOrElse(Map.empty)
+    inner.featureVotesCountWithinActivationWindow(height) |+| ngVotes
   }
 }

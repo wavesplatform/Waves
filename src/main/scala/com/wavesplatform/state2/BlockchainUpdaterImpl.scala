@@ -73,7 +73,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
 
   private def displayFeatures(s: Set[Short]): String = s"FEATURE${if (s.size > 1) "S"} ${s.mkString(", ")} ${if (s.size > 1) "WERE" else "WAS"}"
 
-  def featuresAcceptedWithBlock(block: Block): Set[Short] ={
+  def featuresAcceptedWithBlock(block: Block): Set[Short] = {
     val height = historyWriter.height() + 1
 
     if (height % settings.blockchainSettings.functionalitySettings.featureCheckBlocksPeriod == 0) {
@@ -142,7 +142,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
             microBlockForkStats.increment()
             microBlockForkHeightStats.record(discarded.size)
           }
-          historyWriter.appendBlock(referencedForgedBlock, ng.acceptedFeatures)(BlockDiffer.fromBlock(settings.blockchainSettings.functionalitySettings, featureProvider,
+          historyWriter.appendBlock(referencedForgedBlock, ng.acceptedFeatures)(BlockDiffer.fromBlock(settings.blockchainSettings.functionalitySettings, historyReader,
             composite(currentPersistedBlocksState, () => referencedLiquidDiff.copy(heightDiff = 1)),
             Some(referencedForgedBlock), block))
             .map { hardenedDiff =>
@@ -228,7 +228,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
           case _ =>
             for {
               _ <- Signed.validateSignatures(microBlock)
-              diff <- BlockDiffer.fromMicroBlock(settings.blockchainSettings.functionalitySettings, composite(currentPersistedBlocksState,
+              diff <- BlockDiffer.fromMicroBlock(settings.blockchainSettings.functionalitySettings, historyReader, composite(currentPersistedBlocksState,
                 () => ng.bestLiquidDiff.copy(snapshots = Map.empty)),
                 historyWriter.lastBlock.map(_.timestamp), microBlock, ng.base.timestamp)
             } yield {
