@@ -28,8 +28,6 @@ class NetworkSettingsSpecification extends FlatSpec with Matchers {
         |  max-outbound-connections = 20
         |  max-single-host-connections = 2
         |  connection-timeout: 30s
-        |  outbound-buffer-size: 1K
-        |  min-ephemeral-port-number: 35368
         |  max-unverified-peers: 0
         |  peers-broadcast-interval: 2m
         |  black-list-threshold: 50
@@ -54,7 +52,6 @@ class NetworkSettingsSpecification extends FlatSpec with Matchers {
     networkSettings.maxOutboundConnections should be(20)
     networkSettings.maxConnectionsPerHost should be(2)
     networkSettings.connectionTimeout should be(30.seconds)
-    networkSettings.outboundBufferSize should be(1024)
     networkSettings.maxUnverifiedPeers should be(0)
     networkSettings.peersBroadcastInterval should be(2.minutes)
     networkSettings.uPnPSettings.enable should be(true)

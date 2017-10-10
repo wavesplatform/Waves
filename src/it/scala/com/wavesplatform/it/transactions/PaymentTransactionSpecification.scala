@@ -5,7 +5,6 @@ import com.wavesplatform.it.{IntegrationSuiteWithThreeAddresses, Node}
 
 import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
 
 class PaymentTransactionSpecification(override val allNodes: Seq[Node], override val notMiner: Node)
