@@ -67,16 +67,11 @@ class CoordinatorHandler(checkpointService: CheckpointService,
       case Success(Left(ve)) =>
         log.warn(s"$errorPrefix: $ve")
         peerDatabase.blacklistAndClose(src, s"$errorPrefix: $ve")
-      case Failure(t) => rethrow(errorPrefix, t)
+      case Failure(t) => throw new Exception(errorPrefix, t)
     }
   }
 
   private def rethrow(msg: String, failure: Throwable) = throw new Exception(msg, failure.getCause)
-
-  private def warnAndBlacklist(msg: => String, ch: Channel): Unit = {
-    log.warn(msg)
-    peerDatabase.blacklistAndClose(ch, msg)
-  }
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
     case c: Checkpoint => processAndBlacklistOnFailure(ctx.channel,
@@ -105,7 +100,7 @@ class CoordinatorHandler(checkpointService: CheckpointService,
         miner.scheduleMining()
         allChannels.broadcast(LocalScoreChanged(newScore))
       case Success(Left(is: InvalidSignature)) =>
-        warnAndBlacklist(s"Could not append block ${b.uniqueId}: $is", ctx.channel())
+        peerDatabase.blacklistAndClose(ctx.channel(), s"Could not append block ${b.uniqueId}: $is")
       case Success(Left(ve)) =>
         BlockStats.declined(b, BlockStats.Source.Broadcast)
         log.debug(s"Could not append block ${b.uniqueId}: $ve")
@@ -113,14 +108,14 @@ class CoordinatorHandler(checkpointService: CheckpointService,
       case Failure(t) => rethrow(s"Error appending block ${b.uniqueId}", t)
     }
 
-    case MicroBlockResponse(m) => Future({
+    case (mi@MicroBlockInv, MicroBlockResponse(m)) => Future({
       Signed.validateSignatures(m).flatMap(m => processMicroBlock(m))
     }) onComplete {
       case Success(Right(())) =>
-        allChannels.broadcast(MicroBlockInv(m.totalResBlockSig, m.prevResBlockSig), Some(ctx.channel()))
+        allChannels.broadcast(mi, Some(ctx.channel()))
         BlockStats.applied(m)
       case Success(Left(is: InvalidSignature)) =>
-        warnAndBlacklist(s"Could not append microblock ${m.totalResBlockSig}: $is", ctx.channel())
+        peerDatabase.blacklistAndClose( ctx.channel(), s"Could not append microblock ${m.totalResBlockSig}: $is")
       case Success(Left(ve)) =>
         BlockStats.declined(m)
         log.debug(s"Could not append microblock ${m.totalResBlockSig}: $ve")

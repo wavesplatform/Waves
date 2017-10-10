@@ -6,6 +6,7 @@ import java.util
 import com.google.common.primitives.{Bytes, Ints}
 import com.wavesplatform.mining.Miner.MaxTransactionsPerMicroblock
 import com.wavesplatform.state2.ByteStr
+import scorex.account.PublicKeyAccount
 import scorex.block.{Block, MicroBlock}
 import scorex.crypto.signatures.SigningFunctions.Signature
 import scorex.network.message.Message._
@@ -76,6 +77,7 @@ trait SignaturesSeqSpec[A <: AnyRef] extends MessageSpec[A] {
   private val DataLength = 4
 
   def wrap(signatures: Seq[Signature]): A
+
   def unwrap(v: A): Seq[Signature]
 
 
@@ -105,6 +107,7 @@ trait SignaturesSeqSpec[A <: AnyRef] extends MessageSpec[A] {
 
 object GetSignaturesSpec extends SignaturesSeqSpec[GetSignatures] {
   override def wrap(signatures: Seq[Signature]) = GetSignatures(signatures.map(ByteStr(_)))
+
   override def unwrap(v: GetSignatures) = v.signatures.map(_.arr)
 
   override val messageCode: MessageCode = 20: Byte
@@ -113,6 +116,7 @@ object GetSignaturesSpec extends SignaturesSeqSpec[GetSignatures] {
 
 object SignaturesSpec extends SignaturesSeqSpec[Signatures] {
   override def wrap(signatures: Seq[Signature]) = Signatures(signatures.map(ByteStr(_)))
+
   override def unwrap(v: Signatures) = v.signatures.map(_.arr)
 
   override val messageCode: MessageCode = 21: Byte
@@ -218,15 +222,16 @@ object MicroBlockInvMessageSpec extends MessageSpec[MicroBlockInv] {
 
   override def deserializeData(bytes: Array[Byte]): Try[MicroBlockInv] =
     Try(MicroBlockInv(
-      totalBlockSig = ByteStr(bytes.take(SignatureLength)),
-      prevBlockSig = ByteStr(bytes.view.slice(SignatureLength, SignatureLength * 2).toArray),
-      unused = ByteStr(bytes.view.slice(SignatureLength * 2, SignatureLength * 3).toArray)))
+      sender = PublicKeyAccount.apply(bytes.take(KeyLength)),
+      totalBlockSig = ByteStr(bytes.view.slice(KeyLength, KeyLength + SignatureLength).toArray),
+      prevBlockSig = ByteStr(bytes.view.slice(KeyLength + SignatureLength, KeyLength + SignatureLength * 2).toArray),
+      signature = ByteStr(bytes.view.slice(KeyLength + SignatureLength * 2, KeyLength + SignatureLength * 3).toArray)))
 
   override def serializeData(inv: MicroBlockInv): Array[Byte] = {
-    inv.totalBlockSig.arr ++ inv.prevBlockSig.arr ++ inv.unused.arr
+    inv.sender.publicKey ++ inv.totalBlockSig.arr ++ inv.prevBlockSig.arr ++ inv.signature.arr
   }
 
-  override def maxLength = 500
+  override def maxLength = 300
 }
 
 object MicroBlockRequestMessageSpec extends MessageSpec[MicroBlockRequest] {
