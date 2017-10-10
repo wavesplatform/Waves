@@ -27,17 +27,12 @@ package object history {
   val config = ConfigFactory.load()
   val settings = WavesSettings.fromConfig(config)
 
-  val ApplyMinerFeeWithTransactionSettings: BlockchainSettings = DefaultBlockchainSettings.copy(
+  val MicroblocksActivatedAt0BlockchainSettings: BlockchainSettings = DefaultBlockchainSettings.copy(
     functionalitySettings = DefaultBlockchainSettings.functionalitySettings.copy(preActivatedFeatures = Map(BlockchainFeatures.NG.id -> 0)))
 
-  val RootApplyMinerFeeWithTransactionSettings: WavesSettings = settings.copy(blockchainSettings = ApplyMinerFeeWithTransactionSettings)
+  val MicroblocksActivatedAt0WavesSettings: WavesSettings = settings.copy(blockchainSettings = MicroblocksActivatedAt0BlockchainSettings)
 
-  val RootDefaultSettings: WavesSettings = settings.copy(blockchainSettings = DefaultBlockchainSettings)
-
-  val ApplyMinerFeeBeforeAllTransactionsSettings: BlockchainSettings = DefaultBlockchainSettings.copy(
-    functionalitySettings = DefaultBlockchainSettings.functionalitySettings.copy(preActivatedFeatures = Map.empty))
-
-  val RootApplyMinerFeeBeforeAllTransactionsSettings: WavesSettings = settings.copy(blockchainSettings = ApplyMinerFeeBeforeAllTransactionsSettings)
+  val DefaultWavesSettings: WavesSettings = settings.copy(blockchainSettings = DefaultBlockchainSettings)
 
   val EmptyFeaturesSettings = FeaturesSettings(autoShutdownOnUnsupportedFeature = false, List.empty)
 

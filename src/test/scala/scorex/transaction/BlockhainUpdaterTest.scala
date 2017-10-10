@@ -13,9 +13,9 @@ class BlockhainUpdaterTest extends FunSuite with Matchers with HistoryTest {
 
   private val ApprovalPeriod = 100
 
-  private val WavesSettings = RootDefaultSettings.copy(blockchainSettings =
-    RootDefaultSettings.blockchainSettings.copy(
-      functionalitySettings = RootDefaultSettings.blockchainSettings.functionalitySettings.copy(
+  private val WavesSettings = DefaultWavesSettings.copy(blockchainSettings =
+    DefaultWavesSettings.blockchainSettings.copy(
+      functionalitySettings = DefaultWavesSettings.blockchainSettings.functionalitySettings.copy(
         featureCheckBlocksPeriod = ApprovalPeriod,
         blocksForFeatureActivation = (ApprovalPeriod * 0.9).toInt
       )

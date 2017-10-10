@@ -32,7 +32,7 @@ object Coordinator extends ScorexLogging with Instrumented {
         def isForkValidWithCheckpoint(lastCommonHeight: Int): Boolean =
           extension.zipWithIndex.forall(p => checkpoint.isBlockValid(p._1.signerData.signature, lastCommonHeight + 1 + p._2))
 
-        def forkApplicationResultEi: Either[ValidationError, BigInt] = {
+        lazy val forkApplicationResultEi: Either[ValidationError, BigInt] = {
           val firstDeclined = extension.view
             .map { b =>
               b -> appendBlock(
