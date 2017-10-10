@@ -23,14 +23,14 @@ class BlockchainUpdaterGeneratorFeeSameBlockTest extends PropSpec with PropertyC
   } yield (genesis, payment, generatorPaymentOnFee)
 
   property("block generator can spend fee after transaction before applyMinerFeeWithTransactionAfter") {
-    scenario(preconditionsAndPayments, RootApplyMinerFeeBeforeAllTransactionsSettings) { case (domain, (genesis, somePayment, generatorPaymentOnFee)) =>
+    scenario(preconditionsAndPayments, DefaultWavesSettings) { case (domain, (genesis, somePayment, generatorPaymentOnFee)) =>
       val blocks = chainBlocks(Seq(Seq(genesis), Seq(generatorPaymentOnFee, somePayment)))
       all(blocks.map(block => domain.blockchainUpdater.processBlock(block))) shouldBe 'right
     }
   }
 
   property("block generator can't spend fee after transaction after applyMinerFeeWithTransactionAfter") {
-    scenario(preconditionsAndPayments, RootApplyMinerFeeWithTransactionSettings) { case (domain, (genesis, somePayment, generatorPaymentOnFee)) =>
+    scenario(preconditionsAndPayments, MicroblocksActivatedAt0WavesSettings) { case (domain, (genesis, somePayment, generatorPaymentOnFee)) =>
       val blocks = chainBlocks(Seq(Seq(genesis), Seq(generatorPaymentOnFee, somePayment)))
       blocks.init.foreach(block => domain.blockchainUpdater.processBlock(block).explicitGet())
       domain.blockchainUpdater.processBlock(blocks.last) should produce("unavailable funds")
