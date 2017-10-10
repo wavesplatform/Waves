@@ -13,7 +13,7 @@ import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel.group.ChannelGroup
 import io.netty.channel.{Channel, ChannelHandlerContext, ChannelInboundHandlerAdapter}
 import kamon.Kamon
-import scorex.block.Block
+import scorex.block.{Block, MicroBlock}
 import scorex.transaction.ValidationError.InvalidSignature
 import scorex.transaction._
 import scorex.utils.{ScorexLogging, Time}
@@ -108,7 +108,7 @@ class CoordinatorHandler(checkpointService: CheckpointService,
       case Failure(t) => rethrow(s"Error appending block ${b.uniqueId}", t)
     }
 
-    case (mi@MicroBlockInv(_, _, _, _), MicroBlockResponse(m)) => Future({
+    case (mi@MicroBlockInv(_, _, _, _), m: MicroBlock) => Future({
       Signed.validateSignatures(m).flatMap(m => processMicroBlock(m))
     }) onComplete {
       case Success(Right(())) =>
