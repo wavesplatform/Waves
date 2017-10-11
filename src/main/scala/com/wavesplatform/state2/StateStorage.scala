@@ -87,7 +87,7 @@ object StateStorage {
   private val heightKey = "height"
 
   def apply(file: Option[File], dropExisting: Boolean): Try[StateStorage] =
-    createWithStore(file, new StateStorage(file), pred = _ => true, deleteExisting = dropExisting)
+    createWithStore(file, new StateStorage(file), consistencyCheck = (_ :StateStorage) => true, deleteExisting = dropExisting)
 
   type AccountIdxKey = Array[Byte]
 
