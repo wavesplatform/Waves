@@ -100,8 +100,11 @@ class MinerImpl(
         val sortInBlock = history.height() <= blockchainSettings.functionalitySettings.dontRequireSortedTransactionsAfter
         val txAmount = if (ngEnabled) minerSettings.maxTransactionsInKeyBlock else ClassicAmountOfTxsInBlock
         val unconfirmed = utx.packUnconfirmed(txAmount, sortInBlock)
+
         val features = settings.featuresSettings.supported
-          .filter(featureProvider.featureStatus(_, parentHeight) == BlockchainFeatureStatus.Undefined).toSet
+          .filter(featureProvider.featureStatus(_, parentHeight) == BlockchainFeatureStatus.Undefined)
+          .toSet.intersect(BlockchainFeatures.implemented)
+
         log.debug(s"Adding ${unconfirmed.size} unconfirmed transaction(s) to new block")
         Block.buildAndSign(version.toByte, currentTime, referencedBlockInfo.blockId, consensusData, unconfirmed, account, features)
           .left.map(l => l.err)
