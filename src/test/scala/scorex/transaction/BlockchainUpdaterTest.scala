@@ -9,7 +9,7 @@ import scorex.block.Block
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
-class BlockhainUpdaterTest extends FunSuite with Matchers with HistoryTest {
+class BlockchainUpdaterTest extends FunSuite with Matchers with HistoryTest {
 
   private val ApprovalPeriod = 100
 
@@ -121,7 +121,19 @@ class BlockhainUpdaterTest extends FunSuite with Matchers with HistoryTest {
     fp.featureStatus(1, 2 * ApprovalPeriod - 1) shouldBe BlockchainFeatureStatus.Approved
     fp.featureStatus(2, 2 * ApprovalPeriod - 1) shouldBe BlockchainFeatureStatus.Undefined
 
-    (1 to ApprovalPeriod).foreach { _ => bu.removeAfter(h.lastBlockIds(2).last).explicitGet() }
+    bu.processBlock(getNextTestBlockWithVotes(h, Set.empty)).explicitGet()
+
+    h.height() shouldBe 2 * ApprovalPeriod
+    fp.featureStatus(1, 2 * ApprovalPeriod) shouldBe BlockchainFeatureStatus.Activated
+    fp.featureStatus(2, 2 * ApprovalPeriod) shouldBe BlockchainFeatureStatus.Accepted
+
+    bu.removeAfter(h.lastBlockIds(2).last).explicitGet()
+
+    h.height() shouldBe 2 * ApprovalPeriod - 1
+    fp.featureStatus(1, 2 * ApprovalPeriod - 1) shouldBe BlockchainFeatureStatus.Accepted
+    fp.featureStatus(2, 2 * ApprovalPeriod - 1) shouldBe BlockchainFeatureStatus.Undefined
+
+    bu.removeAfter(h.lastBlockIds(ApprovalPeriod + 1).last).explicitGet()
 
     h.height() shouldBe ApprovalPeriod - 1
     fp.featureStatus(1, ApprovalPeriod - 1) shouldBe BlockchainFeatureStatus.Undefined
