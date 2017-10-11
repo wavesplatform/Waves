@@ -87,17 +87,17 @@ class MicroBlockSynchronizer(settings: Settings,
           log.trace(id(ctx) + "Received " + mi)
           history.lastBlockId() match {
             case Some(lastBlockId) =>
-              knownNextMicroBlocks.put(prevResBlockSig, mi)
+              knownNextMicroBlocks.get(mi.prevBlockSig, () => mi)
               knownMicroBlockOwners.get(totalResBlockSig, () => MSet.empty) += ctx
 
               if (lastBlockId == prevResBlockSig) {
                 microBlockReceiveTime.put(totalResBlockSig, System.currentTimeMillis())
                 microBlockInvStats.increment()
 
-                if (alreadyRequested(totalResBlockSig)) Task.unit // !!!!
+                if (alreadyRequested(totalResBlockSig)) Task.unit
                 else {
                   BlockStats.inv(mi, ctx)
-                  tryDownloadNext(lastBlockId)
+                  tryDownloadNext(prevResBlockSig)
                 }
               } else {
                 notLastMicroblockStats.increment()
