@@ -66,7 +66,7 @@ object FunctionalitySettings {
     allowMultipleLeaseCancelTransactionUntilTimestamp = 1492560000000L,
     resetEffectiveBalancesAtHeight = 51500,
     allowLeasedBalanceTransferUntil = 1495238400000L,
-    blockVersion3After = Long.MaxValue,
+    blockVersion3After = 1507899600000L,
     preActivatedFeatures = Map.empty)
 
   val configPath = "waves.blockchain.custom.functionality"
