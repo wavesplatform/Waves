@@ -11,6 +11,7 @@ import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import org.scalatest.{FreeSpec, Matchers}
 import scorex.account.PublicKeyAccount
 import scorex.block.MicroBlock
+import scorex.lagonaki.mocks.TestBlock
 import scorex.transaction.NgHistory
 
 import scala.concurrent.duration.DurationInt
@@ -39,10 +40,11 @@ class MicroBlockSynchronizerSpec extends FreeSpec
     val nextBlockSig = ByteStr("nextBlockId".getBytes)
 
     val history = Mockito.mock(classOf[NgHistory])
+    val peerDatabase = Mockito.mock(classOf[PeerDatabase])
     Mockito.doReturn(Some(lastBlockSig)).when(history).lastBlockId()
 
-    val channel = new EmbeddedChannel(new MicroBlockSynchronizer(settings, history))
-    channel.writeInbound(MicroBlockInv(nextBlockSig, lastBlockSig))
+    val channel = new EmbeddedChannel(new MicroBlockSynchronizer(settings, history, peerDatabase))
+    channel.writeInbound(MicroBlockInv(TestBlock.defaultSigner, nextBlockSig, lastBlockSig))
     channel.flushInbound()
 
     val r = eventually {
@@ -58,14 +60,15 @@ class MicroBlockSynchronizerSpec extends FreeSpec
     val nextBlockSig = ByteStr("nextBlockId".getBytes)
 
     val history = Mockito.mock(classOf[NgHistory])
+    val peerDatabase = Mockito.mock(classOf[PeerDatabase])
     Mockito.doReturn(Some(lastBlockSig)).when(history).lastBlockId()
 
-    val synchronizer = new MicroBlockSynchronizer(settings, history)
+    val synchronizer = new MicroBlockSynchronizer(settings, history, peerDatabase)
 
     val channel1 = new EmbeddedChannel(synchronizer)
     val channel2 = new EmbeddedChannel(synchronizer)
 
-    channel1.writeInbound(MicroBlockInv(nextBlockSig, lastBlockSig))
+    channel1.writeInbound(MicroBlockInv(TestBlock.defaultSigner, nextBlockSig, lastBlockSig))
     channel1.flushInbound()
 
     eventually {
@@ -84,7 +87,7 @@ class MicroBlockSynchronizerSpec extends FreeSpec
     )))
     channel1.flushInbound()
 
-    channel2.writeInbound(MicroBlockInv(nextBlockSig, lastBlockSig))
+    channel2.writeInbound(MicroBlockInv(TestBlock.defaultSigner, nextBlockSig, lastBlockSig))
     channel2.flushInbound()
 
     intercept[TestFailedDueToTimeoutException] {

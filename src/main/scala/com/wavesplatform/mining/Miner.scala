@@ -142,7 +142,7 @@ class MinerImpl(
       } yield {
         BlockStats.mined(microBlock)
         log.trace(s"MicroBlock(id=${trim(microBlock.uniqueId)}) has been mined for $account}")
-        allChannels.broadcast(MicroBlockInv(microBlock.totalResBlockSig, microBlock.prevResBlockSig))
+        allChannels.broadcast(MicroBlockInv(account, microBlock.totalResBlockSig, microBlock.prevResBlockSig))
         Some(signedBlock)
       }
       block.left.map { err =>
