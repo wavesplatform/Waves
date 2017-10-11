@@ -170,9 +170,9 @@ object DataTypes {
     override def read(buff: ByteBuffer): AnyRef = {
       val n = readVarInt(buff)
       val m = Seq.fill(n) {
-        val feature = buff.getShort
-        val state = buff.get()
-        feature -> state.toInt
+        val short = buff.getShort()
+        val int = buff.getInt()
+        short -> int
       }.toMap[Short, Int]
       m
     }
