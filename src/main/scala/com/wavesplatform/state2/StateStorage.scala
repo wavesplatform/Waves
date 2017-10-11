@@ -11,14 +11,16 @@ import scorex.utils.LogMVMapBuilder
 
 import scala.util.Try
 
-class StateStorage private(file: Option[File]) extends VariablesStorage with AutoCloseable {
+class StateStorage private(file: Option[File]) extends AutoCloseable {
   import StateStorage._
 
   val db: MVStore = createMVStore(file)
 
-  def getHeight: Int = getInt(heightKey).getOrElse(0)
+  private lazy val variables: MVMap[String, Int] = db.openMap("variables")
 
-  def setHeight(i: Int): Unit = putInt(heightKey, i)
+  def getHeight: Int = Option(variables.get(heightKey)).getOrElse(0)
+
+  def setHeight(i: Int): Unit = variables.put(heightKey, i)
 
   val transactions: MVMap[ByteStr, (Int, Array[Byte])] = db.openMap("txs", new LogMVMapBuilder[ByteStr, (Int, Array[Byte])]
     .keyType(DataTypes.byteStr).valueType(DataTypes.transactions))
@@ -68,10 +70,15 @@ class StateStorage private(file: Option[File]) extends VariablesStorage with Aut
 
 object StateStorage {
 
+  private val versionFieldKey = "stateVersion"
 
   implicit val historyVersion = new Versioned[StateStorage] {
     override val codeVersion: Int = 2
-    override val versionFieldKey: String = "stateVersion"
+    override def readVersion(t: StateStorage): Option[Int] = Option(t.variables.get(versionFieldKey))
+    override def persistVersion(t: StateStorage, vesrion: Int): Unit = {
+      t.variables.put(versionFieldKey, vesrion)
+      t.db.commit()
+    }
   }
 
   private val CompactFillRate = 80
@@ -80,7 +87,7 @@ object StateStorage {
   private val heightKey = "height"
 
   def apply(file: Option[File], dropExisting: Boolean): Try[StateStorage] =
-    createWithStore(file, new StateStorage(file), deleteExisting = dropExisting)
+    createWithStore(file, new StateStorage(file), pred = _ => true, deleteExisting = dropExisting)
 
   type AccountIdxKey = Array[Byte]
 

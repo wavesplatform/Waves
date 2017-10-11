@@ -5,10 +5,10 @@ import java.util.concurrent.locks.ReentrantReadWriteLock
 
 import com.wavesplatform.features.FeatureProvider
 import com.wavesplatform.settings.{FeaturesSettings, FunctionalitySettings}
-import com.wavesplatform.state2.{BlockDiff, ByteStr, DataTypes, VariablesStorage, Versioned}
+import com.wavesplatform.state2.{BlockDiff, ByteStr, DataTypes, Versioned}
 import com.wavesplatform.utils._
 import kamon.Kamon
-import org.h2.mvstore.MVStore
+import org.h2.mvstore.{MVMap, MVStore}
 import scorex.block.Block
 import scorex.transaction.History.BlockchainScore
 import scorex.transaction.ValidationError.GenericError
@@ -20,11 +20,12 @@ import scala.util.Try
 
 class HistoryWriterImpl private(file: Option[File], val synchronizationToken: ReentrantReadWriteLock,
                                 functionalitySettings: FunctionalitySettings, featuresSettings: FeaturesSettings)
-  extends VariablesStorage with History with FeatureProvider with ScorexLogging {
-
-  val db: MVStore = createMVStore(file)
+  extends History with FeatureProvider with ScorexLogging {
 
   import HistoryWriterImpl._
+
+  private val db: MVStore = createMVStore(file)
+  private val variables: MVMap[String, Int] = db.openMap("variables")
 
   override val activationWindowSize: Int = functionalitySettings.featureCheckBlocksPeriod
   val MinVotesWithinWindowToActivateFeature: Int = functionalitySettings.blocksForFeatureActivation
@@ -139,9 +140,16 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
 
 object HistoryWriterImpl extends ScorexLogging {
 
+  private val versionFieldKey: String = "version"
   implicit val historyVersion = new Versioned[HistoryWriterImpl] {
     override val codeVersion: Int = 1
-    override val versionFieldKey: String = "version"
+
+    override def readVersion(t: HistoryWriterImpl): Option[Int] = Option(t.variables.get(versionFieldKey))
+
+    override def persistVersion(t: HistoryWriterImpl, vesrion: Int): Unit = {
+      t.variables.put(versionFieldKey, vesrion)
+      t.db.commit()
+    }
   }
 
   private val CompactFillRate = 90
@@ -149,7 +157,7 @@ object HistoryWriterImpl extends ScorexLogging {
 
   def apply(file: Option[File], synchronizationToken: ReentrantReadWriteLock, functionalitySettings: FunctionalitySettings,
             featuresSettings: FeaturesSettings): Try[HistoryWriterImpl] =
-    createWithStore[HistoryWriterImpl](file, new HistoryWriterImpl(file, synchronizationToken, functionalitySettings, featuresSettings), h => h.isConsistent)
+    createWithStore[HistoryWriterImpl](file, new HistoryWriterImpl(file, synchronizationToken, functionalitySettings, featuresSettings), _.isConsistent, deleteExisting = false)
 
   private val blockHeightStats = Kamon.metrics.histogram("block-height")
   private val blockSizeStats = Kamon.metrics.histogram("block-size-bytes")

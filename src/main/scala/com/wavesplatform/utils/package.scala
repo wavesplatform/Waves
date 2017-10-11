@@ -4,7 +4,7 @@ import java.io.File
 import java.nio.file.Files
 
 import com.google.common.base.Throwables
-import com.wavesplatform.state2.{VariablesStorage, Versioned}
+import com.wavesplatform.state2.Versioned
 import monix.execution.UncaughtExceptionReporter
 import org.h2.mvstore.MVStore
 import scorex.utils.ScorexLogging
@@ -42,18 +42,16 @@ package object utils extends ScorexLogging {
     }
   }
 
-  def isVersionValid[A <: VariablesStorage](vs: A)(implicit vr : Versioned[A]): Boolean =
-    vs.getInt(vr.versionFieldKey) match {
+  def isVersionValid[A](a: A)(implicit vr: Versioned[A]): Boolean =
+    vr.readVersion(a) match {
       case None =>
-        vs.putInt(vr.versionFieldKey, vr.codeVersion)
-        vs.db.commit()
+        vr.persistVersion(a, vr.codeVersion)
         true
       case Some(v) => v == vr.codeVersion
     }
 
-
-  def createWithStore[A <: AutoCloseable with VariablesStorage](storeFile: Option[File], f: => A, pred: A => Boolean = (_: A) => true, deleteExisting: Boolean = false)
-                                                                           (implicit vr : Versioned[A]): Try[A] = Try {
+  def createWithStore[A <: AutoCloseable](storeFile: Option[File], f: => A, pred: A => Boolean, deleteExisting: Boolean)
+                                         (implicit vr: Versioned[A]): Try[A] = Try {
     for (fileToDelete <- storeFile if deleteExisting) Files.delete(fileToDelete.toPath)
     val a = f
     if (isVersionValid(a) && pred(a)) a else storeFile match {
