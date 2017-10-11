@@ -5,17 +5,16 @@ import java.io.File
 import com.google.common.primitives.Ints
 import com.wavesplatform.utils._
 import org.h2.mvstore.`type`.ObjectDataType
-import org.h2.mvstore.MVMap
+import org.h2.mvstore.{MVMap, MVStore}
 import scorex.account.Address
 import scorex.utils.LogMVMapBuilder
 
 import scala.util.Try
 
-class StateStorage private(file: Option[File]) extends VariablesStorage(createMVStore(file)) with VersionableStorage with AutoCloseable {
-
+class StateStorage private(file: Option[File]) extends VariablesStorage with AutoCloseable {
   import StateStorage._
 
-  override protected val Version = Some(2)
+  val db: MVStore = createMVStore(file)
 
   def getHeight: Int = getInt(heightKey).getOrElse(0)
 
@@ -68,6 +67,13 @@ class StateStorage private(file: Option[File]) extends VariablesStorage(createMV
 }
 
 object StateStorage {
+
+
+  implicit val historyVersion = new Versioned[StateStorage] {
+    override val codeVersion: Int = 2
+    override val versionFieldKey: String = "stateVersion"
+  }
+
   private val CompactFillRate = 80
   private val CompactMemorySize = 19 * 1024 * 1024
 

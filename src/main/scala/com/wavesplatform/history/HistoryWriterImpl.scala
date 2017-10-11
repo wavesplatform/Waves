@@ -5,9 +5,10 @@ import java.util.concurrent.locks.ReentrantReadWriteLock
 
 import com.wavesplatform.features.FeatureProvider
 import com.wavesplatform.settings.{FeaturesSettings, FunctionalitySettings}
-import com.wavesplatform.state2.{BlockDiff, ByteStr, DataTypes, VariablesStorage, VersionableStorage}
+import com.wavesplatform.state2.{BlockDiff, ByteStr, DataTypes, VariablesStorage, Versioned}
 import com.wavesplatform.utils._
 import kamon.Kamon
+import org.h2.mvstore.MVStore
 import scorex.block.Block
 import scorex.transaction.History.BlockchainScore
 import scorex.transaction.ValidationError.GenericError
@@ -19,9 +20,9 @@ import scala.util.Try
 
 class HistoryWriterImpl private(file: Option[File], val synchronizationToken: ReentrantReadWriteLock,
                                 functionalitySettings: FunctionalitySettings, featuresSettings: FeaturesSettings)
-  extends VariablesStorage(createMVStore(file)) with VersionableStorage with History with FeatureProvider with ScorexLogging {
+  extends VariablesStorage with History with FeatureProvider with ScorexLogging {
 
-  override protected val Version: Option[Int] = None
+  val db: MVStore = createMVStore(file)
 
   import HistoryWriterImpl._
 
@@ -137,6 +138,12 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
 }
 
 object HistoryWriterImpl extends ScorexLogging {
+
+  implicit val historyVersion = new Versioned[HistoryWriterImpl] {
+    override val codeVersion: Int = 1
+    override val versionFieldKey: String = "version"
+  }
+
   private val CompactFillRate = 90
   private val CompactMemorySize = 10 * 1024 * 1024
 
