@@ -17,6 +17,7 @@ import com.wavesplatform.state2.reader.StateReader
 import com.wavesplatform.utils.{UnsupportedFeature, forceStopApplication}
 import kamon.Kamon
 import kamon.metric.instrument.Time
+import monix.reactive.subjects.AsyncSubject
 import scorex.account.Address
 import scorex.block.{Block, MicroBlock}
 import scorex.transaction.ValidationError.{BlockAppendError, GenericError, MicroBlockAppendError}
@@ -33,6 +34,8 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
   private val topMemoryDiff = Synchronized(Monoid[BlockDiff].empty)
   private val bottomMemoryDiff = Synchronized(Monoid[BlockDiff].empty)
   private val ngState = Synchronized(Option.empty[NgState])
+
+  override val lastBlockId: AsyncSubject[ByteStr] = AsyncSubject[ByteStr]
 
   private def unsafeDiffByRange(state: StateReader, from: Int, to: Int): BlockDiff = {
     val blocks = measureLog(s"Reading blocks from $from up to $to") {
@@ -160,6 +163,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
     }).map { case ((newBlockDiff, discacrded)) =>
       val height = historyWriter.height() + 1
       ngState.set(Some(NgState(block, newBlockDiff, 0L, featuresApprovedWithBlock(block))))
+      historyReader.lastBlockId().foreach(lastBlockId.onNext)
       log.info(s"Block ${block.uniqueId} -> ${trim(block.reference)} appended. New height: $height, transactions: ${block.transactionData.size})")
       discacrded
     }
@@ -178,9 +182,11 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
         case Some(height) =>
           val discardedTransactions = Seq.newBuilder[Transaction]
           discardedTransactions ++= ng.toSeq.flatMap(_.transactions)
+          val ngRolledBack = ngState().nonEmpty
           ngState.set(None)
 
-          if (height < historyWriter.height()) {
+          val baseRolledBack = height < historyWriter.height()
+          if (baseRolledBack) {
             logHeights(s"Rollback to h=$height started")
             while (historyWriter.height > height)
               discardedTransactions ++= historyWriter.discardBlock()
@@ -205,6 +211,8 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
           } else {
             log.debug(s"No rollback in history is necessary")
           }
+
+          if (baseRolledBack || ngRolledBack) lastBlockId.onNext(blockId)
 
           val r = discardedTransactions.result()
           TxsInBlockchainStats.record(-r.size)
@@ -236,6 +244,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
             } yield {
               log.info(s"MicroBlock ${trim(microBlock.totalResBlockSig)}~>${trim(microBlock.prevResBlockSig)} appended, tx count: ${microBlock.transactionData.size}")
               ngState.set(Some(ng + (microBlock, Monoid.combine(ng.bestLiquidDiff, diff), System.currentTimeMillis())))
+              lastBlockId.onNext(microBlock.totalResBlockSig)
             }
         }
     }

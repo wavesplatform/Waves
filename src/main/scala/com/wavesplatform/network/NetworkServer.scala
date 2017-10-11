@@ -8,7 +8,6 @@ import com.wavesplatform.features.FeatureProvider
 import com.wavesplatform.metrics.Metrics
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.settings._
-import com.wavesplatform.state2.ByteStr
 import com.wavesplatform.state2.reader.StateReader
 import com.wavesplatform.{UtxPool, Version}
 import io.netty.bootstrap.{Bootstrap, ServerBootstrap}
@@ -18,7 +17,6 @@ import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.channel.socket.SocketChannel
 import io.netty.channel.socket.nio.{NioServerSocketChannel, NioSocketChannel}
 import io.netty.handler.codec.{LengthFieldBasedFrameDecoder, LengthFieldPrepender}
-import monix.reactive.subjects.AsyncSubject
 import org.influxdb.dto.Point
 import scorex.transaction._
 import scorex.utils.{ScorexLogging, Time}
@@ -84,9 +82,8 @@ class NetworkServer(checkpointService: CheckpointService,
 
   private val coordinatorExecutor = new DefaultEventLoop
 
-  private val lastBlockId = AsyncSubject[ByteStr]()
   private val coordinatorHandler = new CoordinatorHandler(checkpointService, history, blockchainUpdater, time,
-    stateReader, utxPool, blockchainReadiness, miner, settings, peerDatabase, allChannels, featureProvider, lastBlockId)
+    stateReader, utxPool, blockchainReadiness, miner, settings, peerDatabase, allChannels, featureProvider)
 
   private val peerConnections = new ConcurrentHashMap[PeerKey, Channel](10, 0.9f, 10)
 
@@ -98,7 +95,7 @@ class NetworkServer(checkpointService: CheckpointService,
     settings.synchronizationSettings.microBlockSynchronizer,
     history,
     peerDatabase,
-    lastBlockId
+    blockchainUpdater.lastBlockId
   )
 
 
