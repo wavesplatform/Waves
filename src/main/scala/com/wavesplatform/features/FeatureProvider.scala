@@ -25,7 +25,7 @@ object FeatureProvider {
     }
 
     def activatedFeatures(height: Int): Set[Short] = provider.approvedFeatures()
-      .filter{case (_, acceptedHeight) => acceptedHeight <= height - provider.activationWindowSize}.keySet
+      .filter { case (_, acceptedHeight) => acceptedHeight <= height - provider.activationWindowSize }.keySet
 
     def featureActivationHeight(feature: Short): Option[Int] = {
       featureApprovalHeight(feature).map(h => h + provider.activationWindowSize)
@@ -34,8 +34,6 @@ object FeatureProvider {
     def featureApprovalHeight(feature: Short): Option[Int] = provider.approvedFeatures().get(feature)
   }
 
-  def activationWindowOpeningFromHeight(height: Int, activationWindowSize: Int): Int = {
-    val r = 1 + height - height % activationWindowSize
-    if (r <= height) r else r - activationWindowSize
-  }
+  def votingWindowOpeningFromHeight(height: Int, activationWindowSize: Int): Int =
+    ((height - 1) / activationWindowSize) * activationWindowSize + 1
 }

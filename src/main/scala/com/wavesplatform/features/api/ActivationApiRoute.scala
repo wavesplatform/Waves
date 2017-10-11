@@ -38,7 +38,7 @@ case class ActivationApiRoute(settings: RestAPISettings,
       ActivationStatus(height,
         activationInterval,
         functionalitySettings.blocksForFeatureActivation,
-        (FeatureProvider.activationWindowOpeningFromHeight(height, activationInterval) + activationInterval) - 1,
+        (FeatureProvider.votingWindowOpeningFromHeight(height, activationInterval) + activationInterval) - 1,
         (featureProvider.featureVotesCountWithinActivationWindow(height).keySet ++
           featureProvider.approvedFeatures().keySet ++
           BlockchainFeatures.implemented).map(id => {
