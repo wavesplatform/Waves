@@ -29,7 +29,7 @@ class MicroBlockSynchronizer(settings: Settings,
 
   private val awaitingMicroBlocks = cache[MicroBlockSignature, MicroBlockInv](settings.invCacheTimeout)
   private val knownMicroBlockOwners = cache[MicroBlockSignature, MSet[ChannelHandlerContext]](settings.invCacheTimeout)
-  private val knownNextMicroBlocks = cache[MicroBlockSignature, MicroBlockInv](settings.invCacheTimeout)
+  private val knownNextMicroBlocks = cache[MicroBlockSignature, MicroBlockInv](settings.nextInvCacheTimeout)
   private val successfullyReceivedMicroBlocks = cache[MicroBlockSignature, Object](settings.processedMicroBlocksCacheTimeout)
   private val microBlockReceiveTime = cache[MicroBlockSignature, java.lang.Long](settings.invCacheTimeout)
   private val downloading = new AtomicBoolean(false)
@@ -41,7 +41,7 @@ class MicroBlockSynchronizer(settings: Settings,
 
   private def alreadyProcessed(microBlockSig: MicroBlockSignature): Boolean = Option(successfullyReceivedMicroBlocks.getIfPresent(microBlockSig)).isDefined
 
-  def requestMicroBlockTask(microblockInv: MicroBlockInv, attemptsAllowed: Int): Task[Unit] = Task.unit.flatMap { _ =>
+  private def requestMicroBlockTask(microblockInv: MicroBlockInv, attemptsAllowed: Int): Task[Unit] = Task.unit.flatMap { _ =>
     val totalResBlockSig = microblockInv.totalBlockSig
     if (attemptsAllowed > 0 && !alreadyProcessed(totalResBlockSig)) {
       val knownChannels = knownMicroBlockOwners.get(totalResBlockSig, () => MSet.empty)
@@ -59,10 +59,7 @@ class MicroBlockSynchronizer(settings: Settings,
 
   private def tryDownloadNext(lastBlockId: ByteStr): Task[Unit] = {
     if (downloading.compareAndSet(false, true)) {
-      Option(knownNextMicroBlocks.getIfPresent(lastBlockId)) match {
-        case Some(nextMb) => requestMicroBlockTask(nextMb, 2)
-        case None => Task.unit
-      }
+      Option(knownNextMicroBlocks.getIfPresent(lastBlockId)).fold(Task.unit)(requestMicroBlockTask(_, 2))
     } else Task.unit
   }
 
@@ -128,7 +125,8 @@ object MicroBlockSynchronizer {
 
   case class Settings(waitResponseTimeout: FiniteDuration,
                       processedMicroBlocksCacheTimeout: FiniteDuration,
-                      invCacheTimeout: FiniteDuration)
+                      invCacheTimeout: FiniteDuration,
+                      nextInvCacheTimeout: FiniteDuration)
 
   def random[T](s: MSet[T]): Option[T] = {
     val n = util.Random.nextInt(s.size)

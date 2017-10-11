@@ -29,7 +29,8 @@ class MicroBlockSynchronizerSpec extends FreeSpec
   private val settings = MicroBlockSynchronizer.Settings(
     waitResponseTimeout = 500.millis,
     processedMicroBlocksCacheTimeout = 1.second,
-    invCacheTimeout = 1.second
+    invCacheTimeout = 1.second,
+    nextInvCacheTimeout = 5.minutes
   )
 
   private implicit val pc: PatienceConfig = PatienceConfig(

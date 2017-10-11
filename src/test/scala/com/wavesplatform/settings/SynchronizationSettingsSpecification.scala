@@ -20,6 +20,7 @@ class SynchronizationSettingsSpecification extends FlatSpec with Matchers {
         |      wait-response-timeout: 5s
         |      processed-micro-blocks-cache-timeout: 2s
         |      inv-cache-timeout: 3s
+        |      next-inv-cache-timeout: 5m
         |    }
         |  }
         |}
@@ -34,6 +35,7 @@ class SynchronizationSettingsSpecification extends FlatSpec with Matchers {
       waitResponseTimeout = 5.seconds,
       processedMicroBlocksCacheTimeout = 2.seconds,
       invCacheTimeout = 3.seconds,
+      nextInvCacheTimeout = 5.minutes,
     )
   }
 }
