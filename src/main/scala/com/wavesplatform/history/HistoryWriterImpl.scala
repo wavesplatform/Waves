@@ -41,16 +41,16 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
 
   private lazy val preAcceptedFeatures = functionalitySettings.preActivatedFeatures.mapValues(h => h - activationWindowSize)
 
-  override def acceptedFeatures(): Map[Short, Int] = read { implicit lock =>
+  override def approvedFeatures(): Map[Short, Int] = read { implicit lock =>
     preAcceptedFeatures ++ featuresState().asScala
   }
 
   override def featureVotesCountWithinActivationWindow(height: Int): Map[Short, Int] = read { implicit lock =>
-    featuresVotes().getOrDefault(FeatureProvider.activationWindowOpeningFromHeight(height, activationWindowSize), Map.empty)
+    featuresVotes().getOrDefault(FeatureProvider.votingWindowOpeningFromHeight(height, activationWindowSize), Map.empty)
   }
 
   private def alterVotes(height: Int, votes: Set[Short], voteMod: Int): Unit = write { implicit lock =>
-    val votingWindowOpening = FeatureProvider.activationWindowOpeningFromHeight(height, activationWindowSize)
+    val votingWindowOpening = FeatureProvider.votingWindowOpeningFromHeight(height, activationWindowSize)
     val votesWithinWindow = featuresVotes().getOrDefault(votingWindowOpening, Map.empty[Short, Int])
     val newVotes = votes.foldLeft(votesWithinWindow)((v, feature) => v + (feature -> (v.getOrElse(feature, 0) + voteMod)))
     featuresVotes.mutate(_.put(votingWindowOpening, newVotes))
@@ -69,7 +69,7 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
         blockIdByHeight.mutate(_.put(h, block.uniqueId))
         heightByBlockId.mutate(_.put(block.uniqueId, h))
         featuresState.mutate(_.putAll(acceptedFeatures.diff(featuresState().keySet.asScala).map(_ -> h).toMap.asJava))
-        alterVotes(h, block.supportedFeaturesIds, 1)
+        alterVotes(h, block.featureVotes, 1)
         db.commit()
         blockHeightStats.record(h)
         blockSizeStats.record(block.bytes.length)
@@ -88,7 +88,7 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
   def discardBlock(): Seq[Transaction] = write { implicit lock =>
     val h = height()
 
-    alterVotes(h, blockAt(h).map(b => b.supportedFeaturesIds).getOrElse(Set.empty), -1)
+    alterVotes(h, blockAt(h).map(b => b.featureVotes).getOrElse(Set.empty), -1)
 
     val transactions =
       Block.parseBytes(blockBodyByHeight.mutate(_.remove(h))).fold(_ => Seq.empty[Transaction], _.transactionData)

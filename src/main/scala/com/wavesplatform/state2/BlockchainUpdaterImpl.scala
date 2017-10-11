@@ -73,19 +73,21 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
 
   private def displayFeatures(s: Set[Short]): String = s"FEATURE${if (s.size > 1) "S"} ${s.mkString(", ")} ${if (s.size > 1) "WERE" else "WAS"}"
 
-  def featuresAcceptedWithBlock(block: Block): Set[Short] = {
+  private def featuresApprovedWithBlock(block: Block): Set[Short] = {
     val height = historyWriter.height() + 1
 
     if (height % settings.blockchainSettings.functionalitySettings.featureCheckBlocksPeriod == 0) {
 
-      val acceptedFeatures = historyWriter.featureVotesCountWithinActivationWindow(height)
-        .map { case (feature, votes) => feature -> (if (block.supportedFeaturesIds.contains(feature)) votes + 1 else votes) }
+      val approvedFeatures = historyWriter.featureVotesCountWithinActivationWindow(height)
+        .map { case (feature, votes) => feature -> (if (block.featureVotes.contains(feature)) votes + 1 else votes) }
         .filter { case (_, votes) => votes >= settings.blockchainSettings.functionalitySettings.blocksForFeatureActivation }
         .keySet
 
-      val unimplementedAccepted = acceptedFeatures.diff(BlockchainFeatures.implemented)
-      if (unimplementedAccepted.nonEmpty) {
-        log.warn(s"UNIMPLEMENTED ${displayFeatures(unimplementedAccepted)} ACCEPTED ON BLOCKCHAIN")
+      log.info(s"${displayFeatures(approvedFeatures)} APPROVED ON BLOCKCHAIN")
+
+      val unimplementedApproved = approvedFeatures.diff(BlockchainFeatures.implemented)
+      if (unimplementedApproved.nonEmpty) {
+        log.warn(s"UNIMPLEMENTED ${displayFeatures(unimplementedApproved)} APPROVED ON BLOCKCHAIN")
         log.warn("PLEASE, UPDATE THE NODE AS SOON AS POSSIBLE")
         log.warn("OTHERWISE THE NODE WILL BE STOPPED OR FORKED UPON FEATURE ACTIVATION")
       }
@@ -103,7 +105,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
         else log.error("OTHERWISE THE NODE WILL END UP ON A FORK")
       }
 
-      acceptedFeatures
+      approvedFeatures
     }
     else Set.empty
   }
@@ -157,7 +159,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
         }
     }).map { case ((newBlockDiff, discacrded)) =>
       val height = historyWriter.height() + 1
-      ngState.set(Some(NgState(block, newBlockDiff, 0L, featuresAcceptedWithBlock(block))))
+      ngState.set(Some(NgState(block, newBlockDiff, 0L, featuresApprovedWithBlock(block))))
       log.info(s"Block ${block.uniqueId} -> ${trim(block.reference)} appended. New height: $height, transactions: ${block.transactionData.size})")
       discacrded
     }
