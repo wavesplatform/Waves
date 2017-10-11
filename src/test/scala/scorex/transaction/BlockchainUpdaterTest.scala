@@ -125,12 +125,12 @@ class BlockchainUpdaterTest extends FunSuite with Matchers with HistoryTest {
 
     h.height() shouldBe 2 * ApprovalPeriod
     fp.featureStatus(1, 2 * ApprovalPeriod) shouldBe BlockchainFeatureStatus.Activated
-    fp.featureStatus(2, 2 * ApprovalPeriod) shouldBe BlockchainFeatureStatus.Accepted
+    fp.featureStatus(2, 2 * ApprovalPeriod) shouldBe BlockchainFeatureStatus.Approved
 
     bu.removeAfter(h.lastBlockIds(2).last).explicitGet()
 
     h.height() shouldBe 2 * ApprovalPeriod - 1
-    fp.featureStatus(1, 2 * ApprovalPeriod - 1) shouldBe BlockchainFeatureStatus.Accepted
+    fp.featureStatus(1, 2 * ApprovalPeriod - 1) shouldBe BlockchainFeatureStatus.Approved
     fp.featureStatus(2, 2 * ApprovalPeriod - 1) shouldBe BlockchainFeatureStatus.Undefined
 
     bu.removeAfter(h.lastBlockIds(ApprovalPeriod + 1).last).explicitGet()
