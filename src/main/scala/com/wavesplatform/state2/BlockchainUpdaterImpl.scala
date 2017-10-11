@@ -166,7 +166,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
   override def removeAfter(blockId: ByteStr): Either[ValidationError, Seq[Transaction]] = write { implicit l =>
     val ng = ngState()
     if (ng.exists(_.contains(blockId))) {
-      log.trace("No rollback necessary")
+      log.trace("Resetting liquid block, no rollback is necessary")
       Right(Seq.empty)
     } else {
       historyWriter.heightOf(blockId) match {
@@ -201,7 +201,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
             }
             logHeights(s"Rollback to h=$height completed:")
           } else {
-            log.debug(s"No rollback necessary")
+            log.debug(s"No rollback in history is necessary")
           }
 
           val r = discardedTransactions.result()
