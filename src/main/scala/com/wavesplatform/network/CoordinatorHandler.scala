@@ -91,7 +91,7 @@ class CoordinatorHandler(checkpointService: CheckpointService,
         s"Successfully appended extension ${formatBlocks(blocks)}",
         s"Error appending extension ${formatBlocks(blocks)}",
         processFork(blocks).right.map { x =>
-          lastBlockId.onNext(history.lastBlockId().get)
+          history.lastBlockId().foreach(lastBlockId.onNext)
           x
         },
         scheduleMiningAndBroadcastScore)
@@ -122,20 +122,21 @@ class CoordinatorHandler(checkpointService: CheckpointService,
     case md: MicroblockData =>
       val microBlock = md.microBlock
       val microblockTotalResBlockSig = microBlock.totalResBlockSig
-      Future(Signed.validateSignatures(microBlock).flatMap( processMicroBlock)) onComplete {
-      case Success(Right(())) =>
-        md.invOpt match {
-          case Some(mi) =>allChannels.broadcast(mi, Some(ctx.channel()))
-          case None => log.warn("Not broadcasting MicroBlockInv")
-        }
-        BlockStats.applied(microBlock)
-        lastBlockId.onNext(microBlock.totalResBlockSig)case Success(Left(is: InvalidSignature)) =>
-        peerDatabase.blacklistAndClose(ctx.channel(),s"Could not append microblock $microblockTotalResBlockSig: $is")
-      case Success(Left(ve)) =>
-        BlockStats.declined(microBlock)
-        log.debug(s"Could not append microblock $microblockTotalResBlockSig: $ve")
-      case Failure(t) => rethrow(s"Error appending microblock $microblockTotalResBlockSig", t)
-    }
+      Future(Signed.validateSignatures(microBlock).flatMap(processMicroBlock)) onComplete {
+        case Success(Right(())) =>
+          md.invOpt match {
+            case Some(mi) => allChannels.broadcast(mi, Some(ctx.channel()))
+            case None => log.warn("Not broadcasting MicroBlockInv")
+          }
+          BlockStats.applied(microBlock)
+          lastBlockId.onNext(microBlock.totalResBlockSig)
+        case Success(Left(is: InvalidSignature)) =>
+          peerDatabase.blacklistAndClose(ctx.channel(), s"Could not append microblock $microblockTotalResBlockSig: $is")
+        case Success(Left(ve)) =>
+          BlockStats.declined(microBlock)
+          log.debug(s"Could not append microblock $microblockTotalResBlockSig: $ve")
+        case Failure(t) => rethrow(s"Error appending microblock $microblockTotalResBlockSig", t)
+      }
   }
 }
 
