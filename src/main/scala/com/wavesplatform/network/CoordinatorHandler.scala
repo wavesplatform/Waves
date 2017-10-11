@@ -6,6 +6,7 @@ import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
 import com.wavesplatform.features.FeatureProvider
 import com.wavesplatform.metrics.{BlockStats, HistogramExt}
 import com.wavesplatform.mining.Miner
+import com.wavesplatform.network.MicroBlockSynchronizer.MicroblockData
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state2.reader.StateReader
 import com.wavesplatform.{Coordinator, UtxPool}
@@ -13,7 +14,7 @@ import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel.group.ChannelGroup
 import io.netty.channel.{Channel, ChannelHandlerContext, ChannelInboundHandlerAdapter}
 import kamon.Kamon
-import scorex.block.{Block, MicroBlock}
+import scorex.block.Block
 import scorex.transaction.ValidationError.InvalidSignature
 import scorex.transaction._
 import scorex.utils.{ScorexLogging, Time}
@@ -107,23 +108,23 @@ class CoordinatorHandler(checkpointService: CheckpointService,
       // no need to push anything downstream in here, because channels are pinned only when handling extensions
       case Failure(t) => rethrow(s"Error appending block ${b.uniqueId}", t)
     }
-
-    case (miOpt: Option[MicroBlockInv], m: MicroBlock) => Future({
-      Signed.validateSignatures(m).flatMap(m => processMicroBlock(m))
-    }) onComplete {
-      case Success(Right(())) =>
-        miOpt match {
-          case Some(mi) => allChannels.broadcast(mi, Some(ctx.channel()))
-          case None => log.warn("Not broadcasting MicroBlockInv")
-        }
-        BlockStats.applied(m)
-      case Success(Left(is: InvalidSignature)) =>
-        peerDatabase.blacklistAndClose(ctx.channel(), s"Could not append microblock ${m.totalResBlockSig}: $is")
-      case Success(Left(ve)) =>
-        BlockStats.declined(m)
-        log.debug(s"Could not append microblock ${m.totalResBlockSig}: $ve")
-      case Failure(t) => rethrow(s"Error appending microblock ${m.totalResBlockSig}", t)
-    }
+    case md: MicroblockData =>
+      val microBlock = md.microBlock
+      val microblockTotalResBlockSig = microBlock.totalResBlockSig
+      Future(Signed.validateSignatures(microBlock).flatMap(processMicroBlock)) onComplete {
+        case Success(Right(())) =>
+          md.invOpt match {
+            case Some(mi) => allChannels.broadcast(mi, Some(ctx.channel()))
+            case None => log.warn("Not broadcasting MicroBlockInv")
+          }
+          BlockStats.applied(microBlock)
+        case Success(Left(is: InvalidSignature)) =>
+          peerDatabase.blacklistAndClose(ctx.channel(), s"Could not append microblock $microblockTotalResBlockSig: $is")
+        case Success(Left(ve)) =>
+          BlockStats.declined(microBlock)
+          log.debug(s"Could not append microblock $microblockTotalResBlockSig: $ve")
+        case Failure(t) => rethrow(s"Error appending microblock $microblockTotalResBlockSig", t)
+      }
   }
 }
 

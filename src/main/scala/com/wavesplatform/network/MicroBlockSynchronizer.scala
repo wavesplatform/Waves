@@ -10,6 +10,7 @@ import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel._
 import monix.eval.Task
 import kamon.Kamon
+import scorex.block.MicroBlock
 import scorex.transaction.{NgHistory, Signed}
 import scorex.utils.ScorexLogging
 
@@ -56,7 +57,7 @@ class MicroBlockSynchronizer(settings: Settings, history: NgHistory, peerDatabas
       Option(microBlockRecieveTime.getIfPresent(mb.totalResBlockSig)).foreach { created =>
         BlockStats.received(mb, ctx, propagationTime = System.currentTimeMillis() - created)
         microBlockRecieveTime.invalidate(mb.totalResBlockSig)
-        super.channelRead(ctx, (Option(awaitingMicroBlocks.getIfPresent(mb.totalResBlockSig)), mb))
+        super.channelRead(ctx, MicroblockData(Option(awaitingMicroBlocks.getIfPresent(mb.totalResBlockSig)), mb))
       }
     }.runAsync
     case mi@MicroBlockInv(_, totalResBlockSig, prevResBlockSig, _) => Task {
@@ -92,6 +93,8 @@ class MicroBlockSynchronizer(settings: Settings, history: NgHistory, peerDatabas
 }
 
 object MicroBlockSynchronizer {
+
+  case class MicroblockData(invOpt: Option[MicroBlockInv], microBlock: MicroBlock)
 
   type MicroBlockSignature = ByteStr
 
