@@ -22,7 +22,7 @@ object TestBlock {
   private def sign(signer: PrivateKeyAccount, b: Block): Block = {
     Block.buildAndSign(version = b.version, timestamp = b.timestamp, reference = b.reference,
       consensusData = b.consensusData, transactionData = b.transactionData,
-      signer = signer, supportedFeaturesIds = b.supportedFeaturesIds).explicitGet()
+      signer = signer, featureVotes = b.featureVotes).explicitGet()
 
   }
 
@@ -37,7 +37,7 @@ object TestBlock {
     signerData = SignerData(signer, ByteStr.empty),
     consensusData = NxtLikeConsensusBlockData(1L, ByteStr(Array.fill(Block.GeneratorSignatureLength)(0: Byte))),
     transactionData = txs,
-    supportedFeaturesIds = Set.empty))
+    featureVotes = Set.empty))
 
   def withReference(ref: ByteStr): Block = sign(defaultSigner, Block(0, 1, ref, SignerData(defaultSigner, ByteStr.empty),
     NxtLikeConsensusBlockData(1L, randomOfLength(Block.GeneratorSignatureLength)), Seq.empty, Set.empty))

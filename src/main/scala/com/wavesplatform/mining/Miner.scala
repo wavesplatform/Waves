@@ -137,7 +137,8 @@ class MinerImpl(
           reference = accumulatedBlock.reference,
           consensusData = accumulatedBlock.consensusData,
           transactionData = accumulatedBlock.transactionData ++ unconfirmed,
-          signer = account
+          signer = account,
+          featureVotes = accumulatedBlock.featureVotes
         )
         microBlock <- MicroBlock.buildAndSign(account, unconfirmed, accumulatedBlock.signerData.signature, signedBlock.signerData.signature)
         _ = microBlockBuildTimeStats.safeRecord(System.currentTimeMillis() - start)

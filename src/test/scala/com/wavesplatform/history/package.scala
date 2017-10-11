@@ -56,7 +56,8 @@ package object history {
         baseTarget = bTarget,
         generationSignature = generationSignature),
       transactionData = txs,
-      signer = signer).explicitGet()
+      signer = signer,
+      Set.empty).explicitGet()
 
 
   def customBuildMicroBlockOfTxs(totalRefTo: ByteStr, prevTotal: Block, txs: Seq[Transaction],
@@ -98,7 +99,7 @@ package object history {
   }
 
   def chainBaseAndMicro(totalRefTo: ByteStr, base: Transaction, micros: Seq[Seq[Transaction]]): (Block, Seq[MicroBlock]) =
-    chainBaseAndMicro(totalRefTo, Seq(base), micros, defaultSigner, 1, 0L)
+    chainBaseAndMicro(totalRefTo, Seq(base), micros, defaultSigner, 3, 0L)
 
   def chainBaseAndMicro(totalRefTo: ByteStr, base: Seq[Transaction], micros: Seq[Seq[Transaction]],
                         signer: PrivateKeyAccount, version: Byte, timestamp: Long): (Block, Seq[MicroBlock]) = {

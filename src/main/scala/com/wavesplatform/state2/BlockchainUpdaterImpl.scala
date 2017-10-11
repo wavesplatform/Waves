@@ -79,7 +79,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
     if (height % settings.blockchainSettings.functionalitySettings.featureCheckBlocksPeriod == 0) {
 
       val approvedFeatures = historyWriter.featureVotesCountWithinActivationWindow(height)
-        .map { case (feature, votes) => feature -> (if (block.supportedFeaturesIds.contains(feature)) votes + 1 else votes) }
+        .map { case (feature, votes) => feature -> (if (block.featureVotes.contains(feature)) votes + 1 else votes) }
         .filter { case (_, votes) => votes >= settings.blockchainSettings.functionalitySettings.blocksForFeatureActivation }
         .keySet
 
