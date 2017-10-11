@@ -93,7 +93,10 @@ class NetworkServer(checkpointService: CheckpointService,
   private val utxPoolSynchronizer = new UtxPoolSynchronizer(utxPool, allChannels)
   private val microBlockSynchronizer = new MicroBlockSynchronizer(
     settings.synchronizationSettings.microBlockSynchronizer,
-    history, peerDatabase)
+    history,
+    peerDatabase,
+    blockchainUpdater.lastBlockId
+  )
 
 
   private val serverChannel = settings.networkSettings.declaredAddress.map { _ =>

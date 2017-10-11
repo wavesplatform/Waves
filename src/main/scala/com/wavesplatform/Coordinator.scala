@@ -42,20 +42,26 @@ object Coordinator extends ScorexLogging with Instrumented {
                 BlockStats.applied(b, BlockStats.Source.Ext, baseHeight)
               }
             }
-            .collectFirst { case (b, Left(e)) => b -> e }
+            .zipWithIndex
+            .collectFirst { case ((b, Left(e)), i) => (i, b, e) }
 
           firstDeclined.foreach {
-            case (declinedBlock, _) =>
+            case (_, declinedBlock, _) =>
               extension.view
                 .dropWhile(_ != declinedBlock)
                 .foreach(BlockStats.declined(_, BlockStats.Source.Ext))
           }
 
           firstDeclined
-            .fold[Either[ValidationError, BigInt]](Right(history.score())) {
-            case (b, e) =>
+            .foldLeft[Either[ValidationError, BigInt]](Right(history.score())) {
+            case (_, (i, b, e)) if i == 0 =>
               log.warn(s"Can't process fork starting with $lastCommonBlockId, error appending block ${b.uniqueId}: $e")
               Left(e)
+
+            case (r, (i, b, e)) =>
+              log.debug(s"Processed $i of ${newBlocks.size} blocks from extension")
+              log.warn(s"Can't process fork starting with $lastCommonBlockId, error appending block ${b.uniqueId}: $e")
+              r
           }
         }
 

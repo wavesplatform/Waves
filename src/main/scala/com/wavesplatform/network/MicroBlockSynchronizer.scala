@@ -1,6 +1,7 @@
 package com.wavesplatform.network
 
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 
 import com.google.common.cache.{Cache, CacheBuilder}
 import com.wavesplatform.metrics.BlockStats
@@ -11,6 +12,7 @@ import io.netty.channel._
 import monix.eval.Task
 import kamon.Kamon
 import scorex.block.MicroBlock
+import monix.reactive.Observable
 import scorex.transaction.{NgHistory, Signed}
 import scorex.utils.ScorexLogging
 
@@ -18,20 +20,28 @@ import scala.collection.mutable.{Set => MSet}
 import scala.concurrent.duration.FiniteDuration
 
 @Sharable
-class MicroBlockSynchronizer(settings: Settings, history: NgHistory, peerDatabase: PeerDatabase) extends ChannelInboundHandlerAdapter with ScorexLogging {
+class MicroBlockSynchronizer(settings: Settings,
+                             history: NgHistory,
+                             peerDatabase: PeerDatabase,
+                             lastBlockIdEvents: Observable[ByteStr]) extends ChannelInboundHandlerAdapter with ScorexLogging {
 
   private implicit val scheduler = monix.execution.Scheduler.singleThread("microblock-synchronizer", reporter = com.wavesplatform.utils.UncaughtExceptionsToLogReporter)
 
   private val awaitingMicroBlocks = cache[MicroBlockSignature, MicroBlockInv](settings.invCacheTimeout)
   private val knownMicroBlockOwners = cache[MicroBlockSignature, MSet[ChannelHandlerContext]](settings.invCacheTimeout)
+  private val knownNextMicroBlocks = cache[MicroBlockSignature, MicroBlockInv](settings.nextInvCacheTimeout)
   private val successfullyReceivedMicroBlocks = cache[MicroBlockSignature, Object](settings.processedMicroBlocksCacheTimeout)
-  private val microBlockRecieveTime = cache[MicroBlockSignature, java.lang.Long](settings.invCacheTimeout)
+  private val microBlockReceiveTime = cache[MicroBlockSignature, java.lang.Long](settings.invCacheTimeout)
+  private val downloading = new AtomicBoolean(false)
+  lastBlockIdEvents.foreach { lastBlockSig =>
+    tryDownloadNext(lastBlockSig).runAsync
+  }
 
   private def alreadyRequested(microBlockSig: MicroBlockSignature): Boolean = Option(awaitingMicroBlocks.getIfPresent(microBlockSig)).isDefined
 
   private def alreadyProcessed(microBlockSig: MicroBlockSignature): Boolean = Option(successfullyReceivedMicroBlocks.getIfPresent(microBlockSig)).isDefined
 
-  def requestMicroBlockTask(microblockInv: MicroBlockInv, attemptsAllowed: Int): Task[Unit] = Task {
+  private def requestMicroBlockTask(microblockInv: MicroBlockInv, attemptsAllowed: Int): Task[Unit] = Task.unit.flatMap { _ =>
     val totalResBlockSig = microblockInv.totalBlockSig
     if (attemptsAllowed > 0 && !alreadyProcessed(totalResBlockSig)) {
       val knownChannels = knownMicroBlockOwners.get(totalResBlockSig, () => MSet.empty)
@@ -45,49 +55,62 @@ class MicroBlockSynchronizer(settings: Settings, history: NgHistory, peerDatabas
         case None => Task.unit
       }
     } else Task.unit
-  }.flatten
+  }
 
+  private def tryDownloadNext(lastBlockId: ByteStr): Task[Unit] = Task.unit.flatMap { _ =>
+    if (downloading.compareAndSet(false, true)) {
+      Option(knownNextMicroBlocks.getIfPresent(lastBlockId)).fold(Task.unit)(requestMicroBlockTask(_, 2))
+    } else Task.unit
+  }
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
-    case mbr@MicroBlockResponse(mb) => Task {
-      log.trace(id(ctx) + "Received " + mbr)
-      knownMicroBlockOwners.invalidate(mb.totalResBlockSig)
-      successfullyReceivedMicroBlocks.put(mb.totalResBlockSig, dummy)
+    case mbr@MicroBlockResponse(mb) =>
+      downloading.set(false)
+      Task {
+        log.trace(id(ctx) + "Received " + mbr)
+        knownMicroBlockOwners.invalidate(mb.totalResBlockSig)
+        successfullyReceivedMicroBlocks.put(mb.totalResBlockSig, dummy)
 
-      Option(microBlockRecieveTime.getIfPresent(mb.totalResBlockSig)).foreach { created =>
-        BlockStats.received(mb, ctx, propagationTime = System.currentTimeMillis() - created)
-        microBlockRecieveTime.invalidate(mb.totalResBlockSig)
-        super.channelRead(ctx, MicroblockData(Option(awaitingMicroBlocks.getIfPresent(mb.totalResBlockSig)), mb))
-      }
-    }.runAsync
-    case mi@MicroBlockInv(_, totalResBlockSig, prevResBlockSig, _) => Task {
+        Option(microBlockReceiveTime.getIfPresent(mb.totalResBlockSig)) match {
+          case Some(created) =>
+            BlockStats.received(mb, ctx, propagationTime = System.currentTimeMillis() - created)
+            microBlockReceiveTime.invalidate(mb.totalResBlockSig)
+            super.channelRead(ctx, MicroblockData(Option(awaitingMicroBlocks.getIfPresent(mb.totalResBlockSig)), mb))
+          case None =>
+            BlockStats.received(mb, ctx)
+        }
+      }.runAsync
+    case mi@MicroBlockInv(_, totalResBlockSig, prevResBlockSig, _) => Task.unit.flatMap { _ =>
       Signed.validateSignatures(mi) match {
         case Left(err) => Task.now(peerDatabase.blacklistAndClose(ctx.channel(), err.toString))
         case Right(_) =>
           log.trace(id(ctx) + "Received " + mi)
           history.lastBlockId() match {
             case Some(lastBlockId) =>
+              knownNextMicroBlocks.get(mi.prevBlockSig, () => mi)
+              knownMicroBlockOwners.get(totalResBlockSig, () => MSet.empty) += ctx
+
               if (lastBlockId == prevResBlockSig) {
-                microBlockRecieveTime.put(totalResBlockSig, System.currentTimeMillis())
-                knownMicroBlockOwners.get(totalResBlockSig, () => MSet.empty) += ctx
+                microBlockReceiveTime.put(totalResBlockSig, System.currentTimeMillis())
                 microBlockInvStats.increment()
 
                 if (alreadyRequested(totalResBlockSig)) Task.unit
                 else {
                   BlockStats.inv(mi, ctx)
-                  requestMicroBlockTask(mi, 2)
+                  tryDownloadNext(prevResBlockSig)
                 }
               } else {
                 notLastMicroblockStats.increment()
                 log.trace(s"Discarding $mi because it doesn't match last (micro)block")
                 Task.unit
               }
+
             case None =>
               unknownMicroblockStats.increment()
               Task.unit
           }
       }
-    }.flatten.runAsync
+    }.runAsync
     case _ => super.channelRead(ctx, msg)
   }
 }
@@ -105,7 +128,8 @@ object MicroBlockSynchronizer {
 
   case class Settings(waitResponseTimeout: FiniteDuration,
                       processedMicroBlocksCacheTimeout: FiniteDuration,
-                      invCacheTimeout: FiniteDuration)
+                      invCacheTimeout: FiniteDuration,
+                      nextInvCacheTimeout: FiniteDuration)
 
   def random[T](s: MSet[T]): Option[T] = {
     val n = util.Random.nextInt(s.size)

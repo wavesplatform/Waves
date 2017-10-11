@@ -81,11 +81,14 @@ class CoordinatorHandler(checkpointService: CheckpointService,
       s"Error processing checkpoint",
       processCheckpoint(c).map(Some(_)), scheduleMiningAndBroadcastScore)
 
-    case ExtensionBlocks(blocks) => processAndBlacklistOnFailure(ctx.channel,
-      s"Attempting to append extension ${formatBlocks(blocks)}",
-      s"Successfully appended extension ${formatBlocks(blocks)}",
-      s"Error appending extension ${formatBlocks(blocks)}",
-      processFork(blocks), scheduleMiningAndBroadcastScore)
+    case ExtensionBlocks(blocks) =>
+      blocks.foreach(BlockStats.received(_, BlockStats.Source.Ext, ctx))
+      processAndBlacklistOnFailure(ctx.channel,
+        s"Attempting to append extension ${formatBlocks(blocks)}",
+        s"Successfully appended extension ${formatBlocks(blocks)}",
+        s"Error appending extension ${formatBlocks(blocks)}",
+        processFork(blocks),
+        scheduleMiningAndBroadcastScore)
 
     case b: Block => Future({
       BlockStats.received(b, BlockStats.Source.Broadcast, ctx)
@@ -108,6 +111,7 @@ class CoordinatorHandler(checkpointService: CheckpointService,
       // no need to push anything downstream in here, because channels are pinned only when handling extensions
       case Failure(t) => rethrow(s"Error appending block ${b.uniqueId}", t)
     }
+
     case md: MicroblockData =>
       val microBlock = md.microBlock
       val microblockTotalResBlockSig = microBlock.totalResBlockSig

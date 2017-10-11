@@ -92,6 +92,14 @@ object BlockStats {
     Seq.empty
   )
 
+  def received(m: MicroBlock, ctx: ChannelHandlerContext): Unit = write(
+    micro(m)
+      .tag("parent-id", id(m.prevResBlockSig))
+      .addField("from", nodeName(ctx)),
+    Event.Received,
+    Seq.empty
+  )
+
   def applied(m: MicroBlock): Unit = write(
     micro(m)
       .addField("txs", m.transactionData.size),
