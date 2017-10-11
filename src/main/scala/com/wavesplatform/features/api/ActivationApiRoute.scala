@@ -38,14 +38,20 @@ case class ActivationApiRoute(settings: RestAPISettings,
       ActivationStatus(height,
         activationInterval,
         functionalitySettings.blocksForFeatureActivation,
-        (FeatureProvider.activationWindowOpeningFromHeight(height, activationInterval) + activationInterval) - 1,
-        BlockchainFeatures.implemented.map(id => {
+        (FeatureProvider.votingWindowOpeningFromHeight(height, activationInterval) + activationInterval) - 1,
+        (featureProvider.featureVotesCountWithinActivationWindow(height).keySet ++
+          featureProvider.approvedFeatures().keySet ++
+          BlockchainFeatures.implemented).map(id => {
           val status = featureProvider.featureStatus(id, height)
           ActivationStatusFeature(id,
             status,
-            if (featuresSettings.supported.contains(id)) NodeFeatureStatus.Supported else NodeFeatureStatus.Unsupported,
-            featureProvider.featureActivatedHeight(id),
-            featureProvider.featureVotesCountWithinActivationWindow(height).get(id).orElse(if(status == BlockchainFeatureStatus.Undefined) Some(0) else None),
+            (BlockchainFeatures.implemented.contains(id), featuresSettings.supported.contains(id)) match {
+              case (false, _) => NodeFeatureStatus.NotImplemented
+              case (_, true) => NodeFeatureStatus.Voted
+              case _ => NodeFeatureStatus.Implemented
+            },
+            featureProvider.featureActivationHeight(id),
+            if(status == BlockchainFeatureStatus.Undefined) featureProvider.featureVotesCountWithinActivationWindow(height).get(id).orElse(Some(0)) else None
           )
         })))
     )

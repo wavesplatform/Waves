@@ -77,7 +77,7 @@ class MinerImpl(
       s"BlockChain is too old (last block timestamp is $parentTimestamp generated $blockAge ago)"
     ))
 
-  private def ngEnabled : Boolean = featureProvider.featureActivatedHeight(BlockchainFeatures.NG.id).exists(history.height > _ + 1)
+  private def ngEnabled : Boolean = featureProvider.featureActivationHeight(BlockchainFeatures.NG.id).exists(history.height > _ + 1)
 
   private def generateOneBlockTask(version: Int, account: PrivateKeyAccount, parentHeight: Int,
                                    greatGrandParent: Option[Block], balance: Long)(delay: FiniteDuration): Task[Either[String, Block]] = Task {
@@ -100,8 +100,11 @@ class MinerImpl(
         val sortInBlock = history.height() <= blockchainSettings.functionalitySettings.dontRequireSortedTransactionsAfter
         val txAmount = if (ngEnabled) minerSettings.maxTransactionsInKeyBlock else ClassicAmountOfTxsInBlock
         val unconfirmed = utx.packUnconfirmed(txAmount, sortInBlock)
+
         val features = settings.featuresSettings.supported
-          .filter(featureProvider.featureStatus(_, parentHeight) == BlockchainFeatureStatus.Undefined).toSet
+          .filter(featureProvider.featureStatus(_, parentHeight) == BlockchainFeatureStatus.Undefined)
+          .toSet.intersect(BlockchainFeatures.implemented)
+
         log.debug(s"Adding ${unconfirmed.size} unconfirmed transaction(s) to new block")
         Block.buildAndSign(version.toByte, currentTime, referencedBlockInfo.blockId, consensusData, unconfirmed, account, features)
           .left.map(l => l.err)
@@ -134,7 +137,8 @@ class MinerImpl(
           reference = accumulatedBlock.reference,
           consensusData = accumulatedBlock.consensusData,
           transactionData = accumulatedBlock.transactionData ++ unconfirmed,
-          signer = account
+          signer = account,
+          featureVotes = accumulatedBlock.featureVotes
         )
         microBlock <- MicroBlock.buildAndSign(account, unconfirmed, accumulatedBlock.signerData.signature, signedBlock.signerData.signature)
         _ = microBlockBuildTimeStats.safeRecord(System.currentTimeMillis() - start)
@@ -142,7 +146,7 @@ class MinerImpl(
       } yield {
         BlockStats.mined(microBlock)
         log.trace(s"MicroBlock(id=${trim(microBlock.uniqueId)}) has been mined for $account}")
-        allChannels.broadcast(MicroBlockInv(microBlock.totalResBlockSig, microBlock.prevResBlockSig))
+        allChannels.broadcast(MicroBlockInv(account, microBlock.totalResBlockSig, microBlock.prevResBlockSig))
         Some(signedBlock)
       }
       block.left.map { err =>
@@ -216,7 +220,7 @@ object Miner {
   val MaxTransactionsPerMicroblock: Int = 5000
   val ClassicAmountOfTxsInBlock: Int = 100
 
-  val NopMiner = new Miner with MinerDebugInfo {
+  val Disabled = new Miner with MinerDebugInfo {
     override def scheduleMining(): Unit = ()
 
     override def collectNextBlockGenerationTimes: List[(Address, Long)] = List.empty

@@ -42,12 +42,20 @@ trait IntegrationSuiteWithThreeAddresses extends FunSuite with BeforeAndAfterAll
     }
   }
 
-  protected def waitForHeightAraise(transactionId: String, heightIncreaseOn: Integer): Future[Unit] = for {
+  // if we first await tx and then height + 1, it could be gone with height + 1
+  // if we first await height + 1 and then tx, it could be gone with height + 2
+  // so we await tx twice
+  protected def waitForHeightAraiseAndTxPresent(transactionId: String, heightIncreaseOn: Integer): Future[Unit] = for {
     height <- traverse(allNodes)(_.height).map(_.max)
+    _ <- traverse(allNodes)(_.waitForTransaction(transactionId))
     _ <- traverse(allNodes)(_.waitForHeight(height + heightIncreaseOn))
     _ <- traverse(allNodes)(_.waitForTransaction(transactionId))
   } yield ()
 
+  protected def waitForHeightAraise(heightIncreaseOn: Integer): Future[Unit] = for {
+    height <- traverse(allNodes)(_.height).map(_.max)
+    _ <- traverse(allNodes)(_.waitForHeight(height + heightIncreaseOn))
+  } yield ()
 
 
   protected def assertAssetBalance(acc: String, assetIdString: String, balance: Long): Future[Unit] = {

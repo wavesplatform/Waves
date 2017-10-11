@@ -10,35 +10,37 @@ import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel._
 import monix.eval.Task
 import kamon.Kamon
-import scorex.transaction.NgHistory
+import scorex.block.MicroBlock
+import scorex.transaction.{NgHistory, Signed}
 import scorex.utils.ScorexLogging
 
 import scala.collection.mutable.{Set => MSet}
 import scala.concurrent.duration.FiniteDuration
 
 @Sharable
-class MicroBlockSynchronizer(settings: Settings, history: NgHistory) extends ChannelInboundHandlerAdapter with ScorexLogging {
+class MicroBlockSynchronizer(settings: Settings, history: NgHistory, peerDatabase: PeerDatabase) extends ChannelInboundHandlerAdapter with ScorexLogging {
 
   private implicit val scheduler = monix.execution.Scheduler.singleThread("microblock-synchronizer", reporter = com.wavesplatform.utils.UncaughtExceptionsToLogReporter)
 
-  private val awaitingMicroBlocks = cache[MicroBlockSignature, Object](settings.invCacheTimeout)
+  private val awaitingMicroBlocks = cache[MicroBlockSignature, MicroBlockInv](settings.invCacheTimeout)
   private val knownMicroBlockOwners = cache[MicroBlockSignature, MSet[ChannelHandlerContext]](settings.invCacheTimeout)
   private val successfullyReceivedMicroBlocks = cache[MicroBlockSignature, Object](settings.processedMicroBlocksCacheTimeout)
-  private val microBlockRecieveTime = cache[ByteStr, java.lang.Long](settings.invCacheTimeout)
+  private val microBlockRecieveTime = cache[MicroBlockSignature, java.lang.Long](settings.invCacheTimeout)
 
   private def alreadyRequested(microBlockSig: MicroBlockSignature): Boolean = Option(awaitingMicroBlocks.getIfPresent(microBlockSig)).isDefined
 
   private def alreadyProcessed(microBlockSig: MicroBlockSignature): Boolean = Option(successfullyReceivedMicroBlocks.getIfPresent(microBlockSig)).isDefined
 
-  def requestMicroBlockTask(microBlockSig: MicroBlockSignature, attemptsAllowed: Int): Task[Unit] = Task {
-    if (attemptsAllowed > 0 && !alreadyProcessed(microBlockSig)) {
-      val knownChannels = knownMicroBlockOwners.get(microBlockSig, () => MSet.empty)
+  def requestMicroBlockTask(microblockInv: MicroBlockInv, attemptsAllowed: Int): Task[Unit] = Task {
+    val totalResBlockSig = microblockInv.totalBlockSig
+    if (attemptsAllowed > 0 && !alreadyProcessed(totalResBlockSig)) {
+      val knownChannels = knownMicroBlockOwners.get(totalResBlockSig, () => MSet.empty)
       random(knownChannels) match {
         case Some(ctx) =>
           knownChannels -= ctx
-          ctx.writeAndFlush(MicroBlockRequest(microBlockSig))
-          awaitingMicroBlocks.put(microBlockSig, dummy)
-          requestMicroBlockTask(microBlockSig, attemptsAllowed - 1)
+          ctx.writeAndFlush(MicroBlockRequest(totalResBlockSig))
+          awaitingMicroBlocks.put(totalResBlockSig, microblockInv)
+          requestMicroBlockTask(microblockInv, attemptsAllowed - 1)
             .delayExecution(settings.waitResponseTimeout)
         case None => Task.unit
       }
@@ -50,38 +52,40 @@ class MicroBlockSynchronizer(settings: Settings, history: NgHistory) extends Cha
     case mbr@MicroBlockResponse(mb) => Task {
       log.trace(id(ctx) + "Received " + mbr)
       knownMicroBlockOwners.invalidate(mb.totalResBlockSig)
-      awaitingMicroBlocks.invalidate(mb.totalResBlockSig)
       successfullyReceivedMicroBlocks.put(mb.totalResBlockSig, dummy)
 
       Option(microBlockRecieveTime.getIfPresent(mb.totalResBlockSig)).foreach { created =>
         BlockStats.received(mb, ctx, propagationTime = System.currentTimeMillis() - created)
         microBlockRecieveTime.invalidate(mb.totalResBlockSig)
-        super.channelRead(ctx, msg)
+        super.channelRead(ctx, MicroblockData(Option(awaitingMicroBlocks.getIfPresent(mb.totalResBlockSig)), mb))
       }
     }.runAsync
-    case mi@MicroBlockInv(totalResBlockSig, prevResBlockSig) => Task {
-      log.trace(id(ctx) + "Received " + mi)
-      history.lastBlockId() match {
-        case Some(lastBlockId) =>
-          if (lastBlockId == prevResBlockSig) {
-            microBlockRecieveTime.put(totalResBlockSig, System.currentTimeMillis())
-            knownMicroBlockOwners.get(totalResBlockSig, () => MSet.empty) += ctx
-            microBlockInvStats.increment()
+    case mi@MicroBlockInv(_, totalResBlockSig, prevResBlockSig, _) => Task {
+      Signed.validateSignatures(mi) match {
+        case Left(err) => Task.now(peerDatabase.blacklistAndClose(ctx.channel(), err.toString))
+        case Right(_) =>
+          log.trace(id(ctx) + "Received " + mi)
+          history.lastBlockId() match {
+            case Some(lastBlockId) =>
+              if (lastBlockId == prevResBlockSig) {
+                microBlockRecieveTime.put(totalResBlockSig, System.currentTimeMillis())
+                knownMicroBlockOwners.get(totalResBlockSig, () => MSet.empty) += ctx
+                microBlockInvStats.increment()
 
-            if (alreadyRequested(totalResBlockSig)) Task.unit
-            else {
-              BlockStats.inv(mi, ctx)
-              requestMicroBlockTask(totalResBlockSig, 2)
-            }
-          } else {
-            notLastMicroblockStats.increment()
-            log.trace(s"Discarding $mi because it doesn't match last (micro)block")
-            Task.unit
+                if (alreadyRequested(totalResBlockSig)) Task.unit
+                else {
+                  BlockStats.inv(mi, ctx)
+                  requestMicroBlockTask(mi, 2)
+                }
+              } else {
+                notLastMicroblockStats.increment()
+                log.trace(s"Discarding $mi because it doesn't match last (micro)block")
+                Task.unit
+              }
+            case None =>
+              unknownMicroblockStats.increment()
+              Task.unit
           }
-
-        case None =>
-          unknownMicroblockStats.increment()
-          Task.unit
       }
     }.flatten.runAsync
     case _ => super.channelRead(ctx, msg)
@@ -89,6 +93,8 @@ class MicroBlockSynchronizer(settings: Settings, history: NgHistory) extends Cha
 }
 
 object MicroBlockSynchronizer {
+
+  case class MicroblockData(invOpt: Option[MicroBlockInv], microBlock: MicroBlock)
 
   type MicroBlockSignature = ByteStr
 

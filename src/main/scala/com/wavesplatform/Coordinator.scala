@@ -4,25 +4,24 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 import com.wavesplatform.features.{BlockchainFeatures, FeatureProvider}
 import com.wavesplatform.metrics._
-import com.wavesplatform.mining.Miner
 import com.wavesplatform.network.{BlockCheckpoint, Checkpoint}
 import com.wavesplatform.settings.{BlockchainSettings, FunctionalitySettings, WavesSettings}
-import com.wavesplatform.state2.reader.StateReader
 import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state2.reader.StateReader
 import kamon.Kamon
 import org.influxdb.dto.Point
 import scorex.block.{Block, MicroBlock}
 import scorex.consensus.TransactionsOrdering
+import scorex.transaction.PoSCalc._
 import scorex.transaction.ValidationError.{GenericError, MicroBlockAppendError}
 import scorex.transaction._
 import scorex.utils.{ScorexLogging, Time}
 
 import scala.concurrent.duration._
-import PoSCalc._
 
 object Coordinator extends ScorexLogging with Instrumented {
   def processFork(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater,
-                  stateReader: StateReader, utxStorage: UtxPool, time: Time, settings: WavesSettings, miner: Miner,
+                  stateReader: StateReader, utxStorage: UtxPool, time: Time, settings: WavesSettings,
                   blockchainReadiness: AtomicBoolean, featureProvider: FeatureProvider)
                  (newBlocks: Seq[Block]): Either[ValidationError, Option[BigInt]] = {
     val extension = newBlocks.dropWhile(history.contains)
@@ -33,7 +32,7 @@ object Coordinator extends ScorexLogging with Instrumented {
         def isForkValidWithCheckpoint(lastCommonHeight: Int): Boolean =
           extension.zipWithIndex.forall(p => checkpoint.isBlockValid(p._1.signerData.signature, lastCommonHeight + 1 + p._2))
 
-        def forkApplicationResultEi: Either[ValidationError, BigInt] = {
+        lazy val forkApplicationResultEi: Either[ValidationError, BigInt] = {
           val firstDeclined = extension.view
             .map { b =>
               b -> appendBlock(
@@ -77,7 +76,6 @@ object Coordinator extends ScorexLogging with Instrumented {
             )
           }
           droppedTransactions.foreach(utxStorage.putIfNew)
-          miner.scheduleMining()
           updateBlockchainReadinessFlag(history, time, blockchainReadiness, settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed)
           Some(score)
         }
@@ -126,7 +124,7 @@ object Coordinator extends ScorexLogging with Instrumented {
   private def validateEffectiveBalance(fp: FeatureProvider, fs: FunctionalitySettings, block: Block, baseHeight: Int)(effectiveBalance: Long): Either[String, Long] =
     Either.cond(block.timestamp < fs.minimalGeneratingBalanceAfter ||
       (block.timestamp >= fs.minimalGeneratingBalanceAfter && effectiveBalance >= MinimalEffectiveBalanceForGenerator1) ||
-      fp.featureActivatedHeight(BlockchainFeatures.SmallerMinimalGeneratingBalance.id).exists(baseHeight >= _)
+      fp.featureActivationHeight(BlockchainFeatures.SmallerMinimalGeneratingBalance.id).exists(baseHeight >= _)
         && effectiveBalance >= MinimalEffectiveBalanceForGenerator2, effectiveBalance,
       s"generator's effective balance $effectiveBalance is less that required for generation")
 

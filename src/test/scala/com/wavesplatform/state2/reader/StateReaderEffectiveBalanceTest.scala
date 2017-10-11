@@ -55,4 +55,14 @@ class StateReaderEffectiveBalanceTest extends fixture.FunSuite with Matchers {
 
     new StateReaderImpl(storage, new ReentrantReadWriteLock()).effectiveBalanceAtHeightWithConfirmations(acc, stateHeight, 50).get shouldBe 1
   }
+
+  test("exposes zero if record was made in past N blocks") { storage =>
+    storage.balanceSnapshots.put(accountIndexKey(acc, 70), (0, 0, 1000))
+    storage.lastBalanceSnapshotHeight.put(acc.bytes, 70)
+    new StateReaderImpl(storage, new ReentrantReadWriteLock()).effectiveBalanceAtHeightWithConfirmations(acc, stateHeight, 50).get shouldBe 0
+  }
+
+  test("exposes zero if no records was made at all") { storage =>
+    new StateReaderImpl(storage, new ReentrantReadWriteLock()).effectiveBalanceAtHeightWithConfirmations(acc, stateHeight, 50).get shouldBe 0
+  }
 }

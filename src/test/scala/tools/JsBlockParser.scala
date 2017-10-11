@@ -58,7 +58,7 @@ object JsBlockParser extends App {
     signer = TestBlock.defaultSigner,
     consensusData = NxtLikeConsensusBlockData(1,ByteStr.decodeBase58("D866WPMvdahU2BdLowfYY9m4GrqXfXSmFxFd4e6rKYTd").get),
     transactionData = Seq.empty,
-    supportedFeaturesIds = Set(2)).explicitGet()
+    featureVotes = Set(2)).explicitGet()
 
   println(goodBlock.signatureValid)
 
@@ -69,7 +69,7 @@ object JsBlockParser extends App {
     signerData=SignerData(PublicKeyAccount(ByteStr.decodeBase58("EENPV1mRhUD9gSKbcWt84cqnfSGQP5LkCu5gMBfAanYH").get.arr),
       ByteStr.decodeBase58("3DxYZjbzgkgad17JC25CUiYNCJPhBSgF6zunKy3RUDZzNoqWhyKoNihRjqkxPUx8ocTp3Qw6Nux7WH1w1CHwSwq4").get),
       consensusData=NxtLikeConsensusBlockData(1,ByteStr.decodeBase58("D866WPMvdahU2BdLowfYY9m4GrqXfXSmFxFd4e6rKYTd").get),
-        transactionData = Seq.empty, supportedFeaturesIds=Set(2))
+        transactionData = Seq.empty, featureVotes=Set(2))
 
   println(badBlock.signatureValid)
 

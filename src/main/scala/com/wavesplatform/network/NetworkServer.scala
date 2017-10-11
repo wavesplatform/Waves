@@ -93,10 +93,8 @@ class NetworkServer(checkpointService: CheckpointService,
   private val utxPoolSynchronizer = new UtxPoolSynchronizer(utxPool, allChannels)
   private val microBlockSynchronizer = new MicroBlockSynchronizer(
     settings.synchronizationSettings.microBlockSynchronizer,
-    history
-  )
+    history, peerDatabase)
 
-  private val noopHandler = new NoopHandler()
 
   private val serverChannel = settings.networkSettings.declaredAddress.map { _ =>
     new ServerBootstrap()
@@ -133,7 +131,6 @@ class NetworkServer(checkpointService: CheckpointService,
 
   private val clientHandshakeHandler =
     new HandshakeHandler.Client(handshake, peerInfo, peerConnections, peerDatabase, allChannels)
-
 
   private val bootstrap = new Bootstrap()
     .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, settings.networkSettings.connectionTimeout.toMillis.toInt: Integer)
@@ -190,7 +187,7 @@ class NetworkServer(checkpointService: CheckpointService,
   private def peerSynchronizer: ChannelHandlerAdapter = {
     if (settings.networkSettings.enablePeersExchange) {
       new PeerSynchronizer(peerDatabase, settings.networkSettings.peersBroadcastInterval)
-    } else noopHandler
+    } else PeerSynchronizer.Disabled
   }
 
   def connect(remoteAddress: InetSocketAddress): Unit =
@@ -218,7 +215,6 @@ class NetworkServer(checkpointService: CheckpointService,
           }
         }.channel()
     })
-
 
   def shutdown(): Unit = try {
     shutdownInitiated = true

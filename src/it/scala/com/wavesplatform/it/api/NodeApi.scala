@@ -20,8 +20,8 @@ import scorex.api.http.leasing.{LeaseCancelRequest, LeaseRequest}
 import scorex.api.http.PeersApiRoute.{ConnectReq, connectFormat}
 import scorex.transaction.assets.exchange.Order
 import scorex.utils.{LoggerFacade, ScorexLogging}
-import scorex.waves.http.RollbackParams
 import scorex.waves.http.DebugApiRoute.portfolioFormat
+import scorex.waves.http.RollbackParams
 
 import scala.compat.java8.FutureConverters._
 import scala.concurrent.ExecutionContext.Implicits.global

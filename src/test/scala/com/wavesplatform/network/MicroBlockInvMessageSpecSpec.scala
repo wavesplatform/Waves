@@ -6,7 +6,7 @@ import org.scalacheck.Gen
 import org.scalatest.concurrent.Eventually
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import org.scalatest.{FreeSpec, Matchers}
-import scorex.transaction.TransactionParser
+import scorex.transaction.{Signed, TransactionParser}
 
 class MicroBlockInvMessageSpecSpec extends FreeSpec
   with Matchers
@@ -16,15 +16,20 @@ class MicroBlockInvMessageSpecSpec extends FreeSpec
   with TransactionGen {
 
   private val microBlockInvGen: Gen[MicroBlockInv] = for {
+    acc <- accountGen
     totalSig <- byteArrayGen(TransactionParser.SignatureLength)
     prevBlockSig <- byteArrayGen(TransactionParser.SignatureLength)
-  } yield MicroBlockInv(ByteStr(totalSig), ByteStr(prevBlockSig))
+  } yield MicroBlockInv(acc, ByteStr(totalSig), ByteStr(prevBlockSig))
 
   "MicroBlockInvMessageSpec" - {
     import MicroBlockInvMessageSpec._
 
-    "deserializeData(serializedData(data)) == data" in forAll(microBlockInvGen) { microBlock =>
-      deserializeData(serializeData(microBlock)).toOption should contain(microBlock)
+    "deserializeData(serializedData(data)) == data" in forAll(microBlockInvGen) { inv =>
+      Signed.validateSignatures(inv) shouldBe 'right
+      val restoredInv = deserializeData(serializeData(inv)).get
+      Signed.validateSignatures(restoredInv) shouldBe 'right
+
+      restoredInv shouldBe inv
     }
   }
 

@@ -27,17 +27,12 @@ package object history {
   val config = ConfigFactory.load()
   val settings = WavesSettings.fromConfig(config)
 
-  val ApplyMinerFeeWithTransactionSettings: BlockchainSettings = DefaultBlockchainSettings.copy(
+  val MicroblocksActivatedAt0BlockchainSettings: BlockchainSettings = DefaultBlockchainSettings.copy(
     functionalitySettings = DefaultBlockchainSettings.functionalitySettings.copy(preActivatedFeatures = Map(BlockchainFeatures.NG.id -> 0)))
 
-  val RootApplyMinerFeeWithTransactionSettings: WavesSettings = settings.copy(blockchainSettings = ApplyMinerFeeWithTransactionSettings)
+  val MicroblocksActivatedAt0WavesSettings: WavesSettings = settings.copy(blockchainSettings = MicroblocksActivatedAt0BlockchainSettings)
 
-  val RootDefaultSettings: WavesSettings = settings.copy(blockchainSettings = DefaultBlockchainSettings)
-
-  val ApplyMinerFeeBeforeAllTransactionsSettings: BlockchainSettings = DefaultBlockchainSettings.copy(
-    functionalitySettings = DefaultBlockchainSettings.functionalitySettings.copy(preActivatedFeatures = Map.empty))
-
-  val RootApplyMinerFeeBeforeAllTransactionsSettings: WavesSettings = settings.copy(blockchainSettings = ApplyMinerFeeBeforeAllTransactionsSettings)
+  val DefaultWavesSettings: WavesSettings = settings.copy(blockchainSettings = DefaultBlockchainSettings)
 
   val EmptyFeaturesSettings = FeaturesSettings(autoShutdownOnUnsupportedFeature = false, List.empty)
 
@@ -61,7 +56,8 @@ package object history {
         baseTarget = bTarget,
         generationSignature = generationSignature),
       transactionData = txs,
-      signer = signer).explicitGet()
+      signer = signer,
+      Set.empty).explicitGet()
 
 
   def customBuildMicroBlockOfTxs(totalRefTo: ByteStr, prevTotal: Block, txs: Seq[Transaction],
@@ -103,7 +99,7 @@ package object history {
   }
 
   def chainBaseAndMicro(totalRefTo: ByteStr, base: Transaction, micros: Seq[Seq[Transaction]]): (Block, Seq[MicroBlock]) =
-    chainBaseAndMicro(totalRefTo, Seq(base), micros, defaultSigner, 1, 0L)
+    chainBaseAndMicro(totalRefTo, Seq(base), micros, defaultSigner, 3, 0L)
 
   def chainBaseAndMicro(totalRefTo: ByteStr, base: Seq[Transaction], micros: Seq[Seq[Transaction]],
                         signer: PrivateKeyAccount, version: Byte, timestamp: Long): (Block, Seq[MicroBlock]) = {
