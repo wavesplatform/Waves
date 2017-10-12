@@ -102,7 +102,7 @@ class MicroBlockSynchronizer(settings: MicroblockSynchronizerSettings,
                 else tryDownloadNext(prevResBlockSig)
               } else {
                 notLastMicroblockStats.increment()
-                log.trace(s"Discarding $mi because it doesn't match last (micro)block")
+                log.trace(s"Discarding $mi because it doesn't match last (micro)block $lastBlockId")
                 Task.unit
               }
 
