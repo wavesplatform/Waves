@@ -16,7 +16,7 @@ class WideStateGenerationSpec(override val nodes: Seq[Node]) extends FreeSpec wi
   "Generate a lot of transactions and synchronise" in {
     val targetBlocks = result(for {
       b <- traverse(nodes)(balanceForNode).map(_.toMap)
-      _ <- processRequests(generateTransfersToRandomAddresses(requestsCount, b))
+      _ <- processRequests(generateTransfersToRandomAddresses(requestsCount/2, b) ++ generateTransfersBetweenAccounts(requestsCount/2, b))
 
       height <- traverse(nodes)(_.height).map(_.max)
       _ <- traverse(nodes)(_.waitForHeight(height + 30))

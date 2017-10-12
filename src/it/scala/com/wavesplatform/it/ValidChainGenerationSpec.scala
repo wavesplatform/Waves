@@ -13,30 +13,6 @@ import scala.util.Random
 class ValidChainGenerationSpec(override val nodes: Seq[Node]) extends FreeSpec with ScalaFutures with IntegrationPatience
   with Matchers with TransferSending {
 
-  private val requestsCount = 1000
-
-  "Generate 30 blocks and synchronise" in {
-    val targetBlocks = result(for {
-      b <- traverse(nodes)(balanceForNode).map(_.toMap)
-
-      height <- traverse(nodes)(_.height).map(_.max)
-      _ <- traverse(nodes)(_.waitForHeight(height + 1))
-
-      _ <- processRequests(generateTransfersBetweenAccounts(requestsCount, b))
-
-      height <- traverse(nodes)(_.height).map(_.max)
-      _ <- traverse(nodes)(_.waitForHeight(height + 30))
-
-      signatures <- traverse(nodes)(_.blockAt(height + 25).map(_.signature))
-      eq = signatures.tail.forall(_ == signatures.head)
-      _ <- if (eq) Future.successful(()) else traverse(nodes)(_.waitForHeight(height + 40))
-
-      blocks <- traverse(nodes)(_.blockAt(height + 25))
-    } yield blocks.map(_.signature), 6.minutes)
-
-    all(targetBlocks) shouldEqual targetBlocks.head
-  }
-
   "Generate more blocks and resynchronise after rollback" - {
     "1 of N" in test(1)
     "N-1 of N" in test(nodes.size - 1)
