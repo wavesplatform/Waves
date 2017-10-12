@@ -4,4 +4,4 @@ case class ActivationStatus(height: Int,
                             votingInterval: Int,
                             votingThreshold: Int,
                             nextCheck: Int,
-                            features: Set[ActivationStatusFeature])
+                            features: Seq[ActivationStatusFeature])

@@ -41,7 +41,7 @@ case class ActivationApiRoute(settings: RestAPISettings,
         (FeatureProvider.votingWindowOpeningFromHeight(height, activationInterval) + activationInterval) - 1,
         (featureProvider.featureVotesCountWithinActivationWindow(height).keySet ++
           featureProvider.approvedFeatures().keySet ++
-          BlockchainFeatures.implemented).map(id => {
+          BlockchainFeatures.implemented).toSeq.sorted.map(id => {
           val status = featureProvider.featureStatus(id, height)
           ActivationStatusFeature(id,
             status,
