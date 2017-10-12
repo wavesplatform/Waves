@@ -17,7 +17,8 @@ import com.wavesplatform.state2.reader.StateReader
 import com.wavesplatform.utils.{UnsupportedFeature, forceStopApplication}
 import kamon.Kamon
 import kamon.metric.instrument.Time
-import monix.reactive.subjects.AsyncSubject
+import monix.execution.Scheduler.Implicits.global
+import monix.reactive.subjects.ConcurrentSubject
 import scorex.account.Address
 import scorex.block.{Block, MicroBlock}
 import scorex.transaction.ValidationError.{BlockAppendError, GenericError, MicroBlockAppendError}
@@ -35,7 +36,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
   private val bottomMemoryDiff = Synchronized(Monoid[BlockDiff].empty)
   private val ngState = Synchronized(Option.empty[NgState])
 
-  override val lastBlockId: AsyncSubject[ByteStr] = AsyncSubject[ByteStr]
+  override val lastBlockId: ConcurrentSubject[ByteStr, ByteStr] = ConcurrentSubject.publish[ByteStr]
 
   private def unsafeDiffByRange(state: StateReader, from: Int, to: Int): BlockDiff = {
     val blocks = measureLog(s"Reading blocks from $from up to $to") {
