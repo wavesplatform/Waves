@@ -75,7 +75,7 @@ class NetworkServer(checkpointService: CheckpointService,
   // application is terminated.
   private val writeErrorHandler = new WriteErrorHandler
   private val fatalErrorHandler = new FatalErrorHandler
-  private val historyReplier = new HistoryReplier(history, settings.synchronizationSettings.maxChainLength)
+  private val historyReplier = new HistoryReplier(history, settings.synchronizationSettings)
   private val inboundConnectionFilter: PipelineInitializer.HandlerWrapper = new InboundConnectionFilter(peerDatabase,
     settings.networkSettings.maxInboundConnections,
     settings.networkSettings.maxConnectionsPerHost)

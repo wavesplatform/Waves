@@ -6,6 +6,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import com.google.common.cache.{Cache, CacheBuilder}
 import com.wavesplatform.metrics.BlockStats
 import com.wavesplatform.network.MicroBlockSynchronizer._
+import com.wavesplatform.settings.SynchronizationSettings.MicroblockSynchronizerSettings
 import com.wavesplatform.state2.ByteStr
 import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel._
@@ -20,7 +21,7 @@ import scala.collection.mutable.{Set => MSet}
 import scala.concurrent.duration.FiniteDuration
 
 @Sharable
-class MicroBlockSynchronizer(settings: Settings,
+class MicroBlockSynchronizer(settings: MicroblockSynchronizerSettings,
                              history: NgHistory,
                              peerDatabase: PeerDatabase,
                              lastBlockIdEvents: Observable[ByteStr]) extends ChannelInboundHandlerAdapter with ScorexLogging {
@@ -125,11 +126,6 @@ object MicroBlockSynchronizer {
 
   private val notLastMicroblockStats = Kamon.metrics.registerCounter("micro-not-last")
   private val unknownMicroblockStats = Kamon.metrics.registerCounter("micro-unknown")
-
-  case class Settings(waitResponseTimeout: FiniteDuration,
-                      processedMicroBlocksCacheTimeout: FiniteDuration,
-                      invCacheTimeout: FiniteDuration,
-                      nextInvCacheTimeout: FiniteDuration)
 
   def random[T](s: MSet[T]): Option[T] = {
     val n = util.Random.nextInt(s.size)

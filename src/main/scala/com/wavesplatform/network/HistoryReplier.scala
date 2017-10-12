@@ -1,16 +1,35 @@
 package com.wavesplatform.network
 
+import com.google.common.cache.{Cache, CacheBuilder}
+import com.wavesplatform.network.MicroBlockSynchronizer.MicroBlockSignature
+import com.wavesplatform.settings.SynchronizationSettings
+import com.wavesplatform.state2.ByteStr
 import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel.{ChannelHandlerContext, ChannelInboundHandlerAdapter}
 import scorex.transaction.NgHistory
 import scorex.utils.ScorexLogging
 
 @Sharable
-class HistoryReplier(history: NgHistory, maxChainLength: Int) extends ChannelInboundHandlerAdapter with ScorexLogging {
-  override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
+class HistoryReplier(history: NgHistory, settings: SynchronizationSettings) extends ChannelInboundHandlerAdapter with ScorexLogging {
+  private lazy val historyReplierSettings = settings.historyReplierSettings
+
+  private val knownMicroBlocks: Cache[MicroBlockSignature, Array[Byte]] = CacheBuilder.newBuilder()
+    .maximumSize(historyReplierSettings.maxMicroBlockCacheSize)
+    .build[MicroBlockSignature, Array[Byte]]()
+
+  private val knownBlocks: Cache[ByteStr, Array[Byte]] = CacheBuilder.newBuilder()
+    .maximumSize(historyReplierSettings.maxBlockCacheSize)
+    .build[ByteStr, Array[Byte]]()
+
+  private def cachedBytes(cache: Cache[ByteStr, Array[Byte]], id: ByteStr, loader: => Option[Array[Byte]]): Option[Array[Byte]] =
+    Option(cache.getIfPresent(id)).orElse(loader.map(bytes => cache.get(id, () => bytes)))
+
+  override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit
+
+  = msg match {
     case GetSignatures(otherSigs) =>
       otherSigs.view
-        .map(parent => parent -> history.blockIdsAfter(parent, maxChainLength))
+        .map(parent => parent -> history.blockIdsAfter(parent, settings.maxChainLength))
         .find(_._2.nonEmpty) match {
         case Some((parent, extension)) =>
           log.debug(s"${id(ctx)} Got GetSignatures with ${otherSigs.length}, found common parent $parent and sending ${extension.length} more signatures")
@@ -24,14 +43,15 @@ class HistoryReplier(history: NgHistory, maxChainLength: Int) extends ChannelInb
       }
 
     case GetBlock(sig) =>
-      for (h <- history.heightOf(sig); bytes <- history.blockBytes(h)) {
+      cachedBytes(knownBlocks, sig, history.heightOf(sig).flatMap(history.blockBytes)).foreach { bytes =>
         ctx.writeAndFlush(RawBytes(BlockMessageSpec.messageCode, bytes))
       }
 
-    case mbr@MicroBlockRequest(sig) =>
+    case mbr@MicroBlockRequest(totalResBlockSig) =>
       log.debug(id(ctx) + "Received " + mbr)
-      history.microBlock(sig).foreach { h =>
-        ctx.writeAndFlush(MicroBlockResponse(h))
+      cachedBytes(knownMicroBlocks, totalResBlockSig,
+        history.microBlock(totalResBlockSig).map(m => MicroBlockResponseMessageSpec.serializeData(MicroBlockResponse(m)))).foreach { bytes =>
+        ctx.writeAndFlush(RawBytes(MicroBlockResponseMessageSpec.messageCode, bytes))
       }
 
     case _: Handshake =>
