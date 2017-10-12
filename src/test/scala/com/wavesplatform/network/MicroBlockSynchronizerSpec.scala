@@ -1,6 +1,7 @@
 package com.wavesplatform.network
 
 import com.wavesplatform.TransactionGen
+import com.wavesplatform.settings.SynchronizationSettings.MicroblockSynchronizerSettings
 import com.wavesplatform.state2.ByteStr
 import io.netty.channel.embedded.EmbeddedChannel
 import monix.reactive.subjects.{AsyncSubject, ConcurrentSubject}
@@ -26,7 +27,7 @@ class MicroBlockSynchronizerSpec extends FreeSpec
   with GeneratorDrivenPropertyChecks
   with TransactionGen {
 
-  private val settings = MicroBlockSynchronizer.Settings(
+  private val settings = MicroblockSynchronizerSettings(
     waitResponseTimeout = 500.millis,
     processedMicroBlocksCacheTimeout = 1.second,
     invCacheTimeout = 1.second,
