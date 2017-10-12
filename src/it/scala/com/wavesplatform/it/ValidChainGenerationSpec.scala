@@ -5,7 +5,6 @@ import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
 
 import scala.concurrent.Await.result
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
 import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
 import scala.util.Random
@@ -17,7 +16,7 @@ class ValidChainGenerationSpec(override val nodes: Seq[Node]) extends FreeSpec w
     "1 of N" in test(1)
     "N-1 of N" in test(nodes.size - 1)
 
-    def test(n: Int):Unit = {
+    def test(n: Int): Unit = {
       val initialHeight = result(for {
         height <- traverse(nodes)(_.height).map(_.max)
         newHeight = height + 5
