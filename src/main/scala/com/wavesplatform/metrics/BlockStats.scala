@@ -42,7 +42,7 @@ object BlockStats {
     block(b, source)
       .addField("from", nodeName(ctx))
       .addField("prop-time", System.currentTimeMillis() - b.timestamp)
-      .addField("score", b.blockScore)
+      .addField("score", b.blockScore.toString)
       .addField("bt", b.consensusData.baseTarget),
     Event.Received,
     Seq.empty
@@ -66,7 +66,7 @@ object BlockStats {
     block(b, Source.Broadcast)
       .tag("parent-id", id(b.reference))
       .addField("txs", b.transactionData.size)
-      .addField("score", b.blockScore)
+      .addField("score", b.blockScore.toString)
       .addField("bt", b.consensusData.baseTarget)
       .addField("height", baseHeight),
     Event.Mined,
