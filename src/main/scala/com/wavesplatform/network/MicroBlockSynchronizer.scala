@@ -30,7 +30,7 @@ class MicroBlockSynchronizer(settings: MicroblockSynchronizerSettings,
 
   private val awaitingMicroBlocks = cache[MicroBlockSignature, MicroBlockInv](settings.invCacheTimeout)
   private val knownMicroBlockOwners = cache[MicroBlockSignature, MSet[ChannelHandlerContext]](settings.invCacheTimeout)
-  private val knownNextMicroBlocks = cache[MicroBlockSignature, MicroBlockInv](settings.nextInvCacheTimeout)
+  private val knownNextMicroBlocks = cache[MicroBlockSignature, MicroBlockInv](settings.invCacheTimeout)
   private val successfullyReceivedMicroBlocks = cache[MicroBlockSignature, Object](settings.processedMicroBlocksCacheTimeout)
   private val microBlockReceiveTime = cache[MicroBlockSignature, java.lang.Long](settings.invCacheTimeout)
   private val downloading = new AtomicBoolean(false)
@@ -97,9 +97,9 @@ class MicroBlockSynchronizer(settings: MicroblockSynchronizerSettings,
                 mi
               })
               knownMicroBlockOwners.get(totalResBlockSig, () => MSet.empty) += ctx
+              microBlockReceiveTime.get(totalResBlockSig, () => System.currentTimeMillis())
 
               if (lastBlockId == prevResBlockSig) {
-                microBlockReceiveTime.put(totalResBlockSig, System.currentTimeMillis())
                 microBlockInvStats.increment()
 
                 if (alreadyRequested(totalResBlockSig)) Task.unit
