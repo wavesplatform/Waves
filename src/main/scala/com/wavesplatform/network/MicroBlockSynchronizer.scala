@@ -7,7 +7,7 @@ import com.google.common.cache.{Cache, CacheBuilder}
 import com.wavesplatform.metrics.BlockStats
 import com.wavesplatform.network.MicroBlockSynchronizer._
 import com.wavesplatform.settings.SynchronizationSettings.MicroblockSynchronizerSettings
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state2.{ByteStr, trim}
 import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel._
 import monix.eval.Task
@@ -59,9 +59,13 @@ class MicroBlockSynchronizer(settings: MicroblockSynchronizerSettings,
   }
 
   private def tryDownloadNext(lastBlockId: ByteStr): Task[Unit] = Task.unit.flatMap { _ =>
-    if (downloading.compareAndSet(false, true)) {
-      Option(knownNextMicroBlocks.getIfPresent(lastBlockId)).fold(Task.unit)(requestMicroBlockTask(_, 2))
-    } else Task.unit
+    Option(knownNextMicroBlocks.getIfPresent(lastBlockId)) match {
+      case Some(mb) =>
+        if (downloading.compareAndSet(false, true)) requestMicroBlockTask(mb, MicroBlockDownloadAttempts)
+        else Task.unit
+      case None =>
+        Task.unit
+    }
   }
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
@@ -88,7 +92,10 @@ class MicroBlockSynchronizer(settings: MicroblockSynchronizerSettings,
           log.trace(id(ctx) + "Received " + mi)
           history.lastBlockId() match {
             case Some(lastBlockId) =>
-              knownNextMicroBlocks.get(mi.prevBlockSig, () => mi)
+              knownNextMicroBlocks.get(mi.prevBlockSig, { () =>
+                BlockStats.inv(mi, ctx)
+                mi
+              })
               knownMicroBlockOwners.get(totalResBlockSig, () => MSet.empty) += ctx
 
               if (lastBlockId == prevResBlockSig) {
@@ -96,13 +103,10 @@ class MicroBlockSynchronizer(settings: MicroblockSynchronizerSettings,
                 microBlockInvStats.increment()
 
                 if (alreadyRequested(totalResBlockSig)) Task.unit
-                else {
-                  BlockStats.inv(mi, ctx)
-                  tryDownloadNext(prevResBlockSig)
-                }
+                else tryDownloadNext(prevResBlockSig)
               } else {
                 notLastMicroblockStats.increment()
-                log.trace(s"Discarding $mi because it doesn't match last (micro)block")
+                log.trace(s"Discarding $mi because it doesn't match last (micro)block ${trim(lastBlockId)}")
                 Task.unit
               }
 
@@ -121,6 +125,8 @@ object MicroBlockSynchronizer {
   case class MicroblockData(invOpt: Option[MicroBlockInv], microBlock: MicroBlock)
 
   type MicroBlockSignature = ByteStr
+
+  private val MicroBlockDownloadAttempts = 2
 
   private val microBlockInvStats = Kamon.metrics.registerCounter("micro-inv")
 

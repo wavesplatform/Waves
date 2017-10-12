@@ -29,6 +29,7 @@ case class ExtensionBlocks(extension: Seq[Block])
 
 case class MicroBlockInv(sender: PublicKeyAccount, totalBlockSig: ByteStr, prevBlockSig: ByteStr, signature: ByteStr) extends Message with Signed {
   override protected def signatureValid: Boolean = EllipticCurveImpl.verify(signature.arr, sender.toAddress.bytes.arr ++ totalBlockSig.arr ++ prevBlockSig.arr, sender.publicKey)
+  override def toString: String = s"MicroBlockInv(totalBlockSig=$totalBlockSig, prevBlockSig=${trim(prevBlockSig)})"
 }
 object MicroBlockInv{
 
