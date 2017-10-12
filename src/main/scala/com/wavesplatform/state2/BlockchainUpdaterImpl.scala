@@ -14,7 +14,6 @@ import com.wavesplatform.state2.NgState._
 import com.wavesplatform.state2.diffs.BlockDiffer
 import com.wavesplatform.state2.reader.CompositeStateReader.composite
 import com.wavesplatform.state2.reader.StateReader
-import com.wavesplatform.utils.{UnsupportedFeature, forceStopApplication}
 import kamon.Kamon
 import kamon.metric.instrument.Time
 import monix.reactive.subjects.AsyncSubject
