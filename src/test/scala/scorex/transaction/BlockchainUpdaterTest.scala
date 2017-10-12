@@ -3,13 +3,15 @@ package scorex.transaction
 import com.wavesplatform.features.BlockchainFeatureStatus
 import com.wavesplatform.state2._
 import com.wavesplatform.history._
+import com.wavesplatform.state2.diffs.produce
+import org.scalatest.words.ShouldVerb
 import org.scalatest.{FunSuite, Matchers}
 import scorex.block.Block
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
-class BlockchainUpdaterTest extends FunSuite with Matchers with HistoryTest {
+class BlockchainUpdaterTest extends FunSuite with Matchers with HistoryTest with ShouldVerb{
 
   private val ApprovalPeriod = 100
 
@@ -23,7 +25,7 @@ class BlockchainUpdaterTest extends FunSuite with Matchers with HistoryTest {
   )
 
   test("concurrent access to lastBlock doesn't throw any exception") {
-    val (h, fp, _, _, bu, _) = StorageFactory(WavesSettings, EmptyFeaturesSettings).get
+    val (h, fp, _, _, bu, _) = StorageFactory(WavesSettings, AutoShutdownFeatureSettings).get
 
     bu.processBlock(genesisBlock)
 
@@ -49,7 +51,7 @@ class BlockchainUpdaterTest extends FunSuite with Matchers with HistoryTest {
 
   test("features approved and accepted as height grows") {
 
-    val (h, fp, _, _, bu, _) = StorageFactory(WavesSettings, EmptyFeaturesSettings).get
+    val (h, fp, _, _, bu, _) = StorageFactory(WavesSettings, AutoShutdownFeatureSettings).get
 
     bu.processBlock(genesisBlock)
 
@@ -86,7 +88,7 @@ class BlockchainUpdaterTest extends FunSuite with Matchers with HistoryTest {
   }
 
   test("features rollback with block rollback") {
-    val (h, fp, _, _, bu, _) = StorageFactory(WavesSettings, EmptyFeaturesSettings).get
+    val (h, fp, _, _, bu, _) = StorageFactory(WavesSettings, AutoShutdownFeatureSettings).get
 
     bu.processBlock(genesisBlock)
 
@@ -141,7 +143,7 @@ class BlockchainUpdaterTest extends FunSuite with Matchers with HistoryTest {
   }
 
   test("feature activation height is not overrided with further periods") {
-    val (h, fp, _, _, bu, _) = StorageFactory(WavesSettings, EmptyFeaturesSettings).get
+    val (h, fp, _, _, bu, _) = StorageFactory(WavesSettings, AutoShutdownFeatureSettings).get
 
     bu.processBlock(genesisBlock)
 
@@ -163,7 +165,7 @@ class BlockchainUpdaterTest extends FunSuite with Matchers with HistoryTest {
   }
 
   test("feature activated only by 90% of blocks") {
-    val (h, fp, _, _, bu, _) = StorageFactory(WavesSettings, EmptyFeaturesSettings).get
+    val (h, fp, _, _, bu, _) = StorageFactory(WavesSettings, AutoShutdownFeatureSettings).get
 
     bu.processBlock(genesisBlock)
 
@@ -186,7 +188,7 @@ class BlockchainUpdaterTest extends FunSuite with Matchers with HistoryTest {
   }
 
   test("features votes resets when voting window changes") {
-    val (h, fp, _, _, bu, _) = StorageFactory(WavesSettings, EmptyFeaturesSettings).get
+    val (h, fp, _, _, bu, _) = StorageFactory(WavesSettings, AutoShutdownFeatureSettings).get
 
     bu.processBlock(genesisBlock)
 
@@ -205,5 +207,29 @@ class BlockchainUpdaterTest extends FunSuite with Matchers with HistoryTest {
     fp.featureVotesCountWithinActivationWindow(h.height()) shouldBe Map(1.toShort -> 1)
 
     fp.featureStatus(1, h.height()) shouldBe BlockchainFeatureStatus.Approved
+  }
+
+  test("block processing should fail if unimplemented feature was activated on blockchaing when autoShutdownOnUnsupportedFeature = yes") {
+    val (h, fp, _, _, bu, _) = StorageFactory(WavesSettings, AutoShutdownFeatureSettings).get
+    bu.processBlock(genesisBlock)
+
+    (1 to ApprovalPeriod * 2).foreach { i =>
+      bu.processBlock(getNextTestBlockWithVotes(h, Set(-1))).explicitGet()
+    }
+
+    bu.processBlock(getNextTestBlockWithVotes(h, Set(-1))) should produce("ACTIVATED ON BLOCKCHAIN")
+  }
+
+  test("sunny day test when known feature activated") {
+    val (h, fp, _, _, bu, _) = StorageFactory(WavesSettings, AutoShutdownFeatureSettings).get
+    bu.processBlock(genesisBlock)
+
+    (1 until ApprovalPeriod * 2 - 1).foreach { i =>
+      bu.processBlock(getNextTestBlockWithVotes(h, Set(1))).explicitGet()
+    }
+
+    fp.featureStatus(1, h.height()) should be(BlockchainFeatureStatus.Approved)
+    bu.processBlock(getNextTestBlockWithVotes(h, Set(1))).explicitGet()
+    fp.featureStatus(1, h.height()) should be(BlockchainFeatureStatus.Activated)
   }
 }

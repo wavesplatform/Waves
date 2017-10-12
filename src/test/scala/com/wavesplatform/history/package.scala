@@ -34,7 +34,7 @@ package object history {
 
   val DefaultWavesSettings: WavesSettings = settings.copy(blockchainSettings = DefaultBlockchainSettings)
 
-  val EmptyFeaturesSettings = FeaturesSettings(autoShutdownOnUnsupportedFeature = false, List.empty)
+  val AutoShutdownFeatureSettings = FeaturesSettings(autoShutdownOnUnsupportedFeature = true, List.empty)
 
   def domain(settings: WavesSettings, featuresSettings: FeaturesSettings): Domain = {
     val (history, _, _, stateReader, blockchainUpdater, _) = StorageFactory(settings, featuresSettings).get

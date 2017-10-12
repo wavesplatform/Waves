@@ -74,7 +74,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
     logHeights("State rebuild finished")
   }
 
-  private def displayFeatures(s: Set[Short]): String = s"FEATURE${if (s.size > 1) "S"} ${s.mkString(", ")} ${if (s.size > 1) "WERE" else "WAS"}"
+  private def displayFeatures(s: Set[Short]): String = s"FEATURE${if (s.size > 1) "S" else ""} ${s.mkString(", ")} ${if (s.size > 1) "WERE" else "WAS"}"
 
   private def featuresApprovedWithBlock(block: Block): Set[Short] = {
     val height = historyWriter.height() + 1
@@ -95,19 +95,6 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
         log.warn("OTHERWISE THE NODE WILL BE STOPPED OR FORKED UPON FEATURE ACTIVATION")
       }
 
-      val activatedFeatures = historyWriter.activatedFeatures(height)
-
-      val unimplementedActivated = activatedFeatures.diff(BlockchainFeatures.implemented)
-      if (unimplementedActivated.nonEmpty) {
-        log.error(s"UNIMPLEMENTED ${displayFeatures(unimplementedActivated)} ACTIVATED ON BLOCKCHAIN")
-        log.error("PLEASE, UPDATE THE NODE IMMEDIATELY")
-        if (settings.featuresSettings.autoShutdownOnUnsupportedFeature) {
-          log.error("FOR THIS REASON THE NODE WAS STOPPED AUTOMATICALLY")
-          forceStopApplication(UnsupportedFeature)
-        }
-        else log.error("OTHERWISE THE NODE WILL END UP ON A FORK")
-      }
-
       approvedFeatures
     }
     else Set.empty
@@ -119,7 +106,25 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
       bottomMemoryDiff.set(topMemoryDiff())
       topMemoryDiff.set(BlockDiff.empty)
     }
-    (ngState() match {
+
+    val height = historyWriter.height()
+    val notImplementedFeatures = featureProvider.activatedFeatures(height).diff(BlockchainFeatures.implemented)
+
+    for {
+      _ <- Either.cond(settings.featuresSettings.autoShutdownOnUnsupportedFeature && notImplementedFeatures.isEmpty, (),
+        GenericError(s"UNIMPLEMENTED ${displayFeatures(notImplementedFeatures)} ACTIVATED ON BLOCKCHAIN, UPDATE THE NODE IMMEDIATELY"))
+      ng <- processNg(block)
+      (newBlockDiff, discarded) = ng
+    } yield {
+      ngState.set(Some(NgState(block, newBlockDiff, 0L, featuresApprovedWithBlock(block))))
+      historyReader.lastBlockId().foreach(lastBlockId.onNext)
+      log.info(s"Block ${block.uniqueId} -> ${trim(block.reference)} appended. New height: ${height + 1}, transactions: ${block.transactionData.size})")
+      discarded
+    }
+  }
+
+  private def processNg(block: Block): Either[ValidationError, (BlockDiff, Seq[Transaction])] = write { implicit l =>
+    ngState() match {
       case None =>
         historyWriter.lastBlock match {
           case Some(lastInner) if lastInner.uniqueId != block.reference =>
@@ -160,12 +165,6 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
           log.error(errorText)
           Left(BlockAppendError(errorText, block))
         }
-    }).map { case ((newBlockDiff, discacrded)) =>
-      val height = historyWriter.height() + 1
-      ngState.set(Some(NgState(block, newBlockDiff, 0L, featuresApprovedWithBlock(block))))
-      historyReader.lastBlockId().foreach(lastBlockId.onNext)
-      log.info(s"Block ${block.uniqueId} -> ${trim(block.reference)} appended. New height: $height, transactions: ${block.transactionData.size})")
-      discacrded
     }
   }
 
@@ -294,5 +293,4 @@ object BlockchainUpdaterImpl {
       (from, from + by) #:: ranges(from + by, to, by)
     else
       (from, to) #:: Stream.empty[(Int, Int)]
-
 }
