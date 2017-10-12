@@ -59,9 +59,13 @@ class MicroBlockSynchronizer(settings: MicroblockSynchronizerSettings,
   }
 
   private def tryDownloadNext(lastBlockId: ByteStr): Task[Unit] = Task.unit.flatMap { _ =>
-    if (downloading.compareAndSet(false, true)) {
-      Option(knownNextMicroBlocks.getIfPresent(lastBlockId)).fold(Task.unit)(requestMicroBlockTask(_, 2))
-    } else Task.unit
+    Option(knownNextMicroBlocks.getIfPresent(lastBlockId)) match {
+      case Some(mb) =>
+        if (downloading.compareAndSet(false, true)) requestMicroBlockTask(mb, MicroBlockDownloadAttempts)
+        else Task.unit
+      case None =>
+        Task.unit
+    }
   }
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
@@ -121,6 +125,8 @@ object MicroBlockSynchronizer {
   case class MicroblockData(invOpt: Option[MicroBlockInv], microBlock: MicroBlock)
 
   type MicroBlockSignature = ByteStr
+
+  private val MicroBlockDownloadAttempts = 2
 
   private val microBlockInvStats = Kamon.metrics.registerCounter("micro-inv")
 
