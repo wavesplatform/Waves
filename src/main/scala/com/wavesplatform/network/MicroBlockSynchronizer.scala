@@ -88,7 +88,10 @@ class MicroBlockSynchronizer(settings: MicroblockSynchronizerSettings,
           log.trace(id(ctx) + "Received " + mi)
           history.lastBlockId() match {
             case Some(lastBlockId) =>
-              knownNextMicroBlocks.get(mi.prevBlockSig, () => mi)
+              knownNextMicroBlocks.get(mi.prevBlockSig, { () =>
+                BlockStats.inv(mi, ctx)
+                mi
+              })
               knownMicroBlockOwners.get(totalResBlockSig, () => MSet.empty) += ctx
 
               if (lastBlockId == prevResBlockSig) {
@@ -96,10 +99,7 @@ class MicroBlockSynchronizer(settings: MicroblockSynchronizerSettings,
                 microBlockInvStats.increment()
 
                 if (alreadyRequested(totalResBlockSig)) Task.unit
-                else {
-                  BlockStats.inv(mi, ctx)
-                  tryDownloadNext(prevResBlockSig)
-                }
+                else tryDownloadNext(prevResBlockSig)
               } else {
                 notLastMicroblockStats.increment()
                 log.trace(s"Discarding $mi because it doesn't match last (micro)block")
