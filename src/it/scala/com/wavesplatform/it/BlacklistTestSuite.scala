@@ -30,7 +30,7 @@ class BlacklistTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll w
     docker.close()
   }
 
-  "network should grow up to 30 blocks" in Await.result(richestNode.waitForHeight(30), 3.minutes)
+  "network should grow up to 10 blocks" in Await.result(richestNode.waitForHeight(10), 3.minutes)
 
   "richest node should blacklist other nodes" in {
     val test = for {
@@ -51,8 +51,8 @@ class BlacklistTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll w
   "and sync again" in {
     val targetBlocks = Await.result(for {
       baseHeight <- traverse(nodes)(_.height).map(_.max)
-      _ <- traverse(nodes)(_.waitForHeight(baseHeight + 30))
-      blocks <- traverse(nodes)(_.blockAt(baseHeight + 25))
+      _ <- traverse(nodes)(_.waitForHeight(baseHeight + 10))
+      blocks <- traverse(nodes)(_.blockAt(baseHeight + 5))
     } yield blocks.map(_.signature), 5.minutes)
     all(targetBlocks) shouldEqual targetBlocks.head
   }
