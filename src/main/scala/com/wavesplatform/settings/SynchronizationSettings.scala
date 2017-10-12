@@ -18,8 +18,7 @@ object SynchronizationSettings {
 
   case class MicroblockSynchronizerSettings(waitResponseTimeout: FiniteDuration,
                                             processedMicroBlocksCacheTimeout: FiniteDuration,
-                                            invCacheTimeout: FiniteDuration,
-                                            nextInvCacheTimeout: FiniteDuration)
+                                            invCacheTimeout: FiniteDuration)
 
   case class HistoryReplierSettings(maxMicroBlockCacheSize: Int,
                                     maxBlockCacheSize: Int)
