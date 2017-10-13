@@ -132,10 +132,10 @@ case class DebugApiRoute(settings: RestAPISettings,
 
   private def rollbackToBlock(blockId: ByteStr, returnTransactionsToUtx: Boolean): Future[ToResponseMarshallable] = Future {
     blockchainUpdater.removeAfter(blockId) match {
-      case Right(txs) =>
+      case Right(blocks) =>
         allChannels.broadcast(LocalScoreChanged(history.score()))
         if (returnTransactionsToUtx) {
-          txs.foreach(tx => utxStorage.putIfNew(tx))
+          blocks.flatMap(_.transactionData).foreach(tx => utxStorage.putIfNew(tx))
         }
         miner.scheduleMining()
         Json.obj("BlockId" -> blockId.toString): ToResponseMarshallable
