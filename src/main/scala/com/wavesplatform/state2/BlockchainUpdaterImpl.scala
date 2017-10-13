@@ -170,7 +170,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
     }
   }
 
-  override def removeAfter(blockId: ByteStr): Either[ValidationError, Seq[Transaction]] = write { implicit l =>
+  override def removeAfter(blockId: ByteStr): Either[ValidationError, Seq[Block]] = write { implicit l =>
     val ng = ngState()
     if (ng.exists(_.contains(blockId))) {
       log.trace("Resetting liquid block, no rollback is necessary")
@@ -181,8 +181,8 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
           log.warn(s"removeAfter nonexistent block $blockId")
           Left(GenericError(s"Failed to rollback to nonexistent block $blockId"))
         case Some(height) =>
-          val discardedTransactions = Seq.newBuilder[Transaction]
-          discardedTransactions ++= ng.toSeq.flatMap(_.transactions)
+          val discardedBlocks = Seq.newBuilder[Block]
+          discardedBlocks ++= ng.map(_.base).toSeq
           val ngRolledBack = ngState().nonEmpty
           ngState.set(None)
 
@@ -190,7 +190,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
           if (baseRolledBack) {
             logHeights(s"Rollback to h=$height started")
             while (historyWriter.height > height)
-              discardedTransactions ++= historyWriter.discardBlock()
+              discardedBlocks ++= historyWriter.discardBlock().toSeq
             if (height < persisted.height) {
               log.info(s"Rollback to h=$height requested. Persisted height=${persisted.height}, will drop state and reapply blockchain now")
               persisted.clear()
@@ -215,7 +215,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
 
           if (baseRolledBack || ngRolledBack) lastBlockId.onNext(blockId)
 
-          val r = discardedTransactions.result()
+          val r = discardedBlocks.result()
           TxsInBlockchainStats.record(-r.size)
           Right(r)
       }

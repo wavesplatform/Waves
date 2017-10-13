@@ -74,29 +74,27 @@ object Coordinator extends ScorexLogging with Instrumented {
           droppedBlocks <- blockchainUpdater.removeAfter(lastCommonBlockId)
         } yield (commonBlockHeight, droppedBlocks)).left.map((_, Seq.empty[Block]))
 
-        val fARE: Either[(ValidationError, Seq[Block]), (Int, DiscardedBlocks, BigInt)] = for {
-          (commonBlockHeight, droppedBlocks) <- droppedBlocksEi
+        (for {
+          commonHeightAndDroppedBlocks <- droppedBlocksEi
+          (commonBlockHeight, droppedBlocks) = commonHeightAndDroppedBlocks
           score <- forkApplicationResultEi.left.map((_, droppedBlocks))
-        } yield (commonBlockHeight, droppedBlocks, score)
-
-
-        fARE match {
-          case Right((commonBlockHeight, droppedBlocks, score)) =>
-            val depth = initalHeight - commonBlockHeight
-            if (depth > 0) {
-              Metrics.write(
-                Point
-                  .measurement("rollback")
-                  .addField("depth", initalHeight - commonBlockHeight)
-                  .addField("txs", droppedBlocks.size)
-              )
-            }
-            droppedBlocks.flatMap(_.transactionData).foreach(utxStorage.putIfNew)
-            updateBlockchainReadinessFlag(history, time, blockchainReadiness, settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed)
-            Right(Some(score))
-          case Left((err, droppedBlocks)) =>
-            droppedBlocks.foreach(blockchainUpdater.processBlock(_).explicitGet())
-            Left(err)
+        } yield (commonBlockHeight, droppedBlocks, score))
+          .right.map { case ((commonBlockHeight, droppedBlocks, score)) =>
+          val depth = initalHeight - commonBlockHeight
+          if (depth > 0) {
+            Metrics.write(
+              Point
+                .measurement("rollback")
+                .addField("depth", initalHeight - commonBlockHeight)
+                .addField("txs", droppedBlocks.size)
+            )
+          }
+          droppedBlocks.flatMap(_.transactionData).foreach(utxStorage.putIfNew)
+          updateBlockchainReadinessFlag(history, time, blockchainReadiness, settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed)
+          Some(score)
+        }.left.map { case ((err, droppedBlocks)) =>
+          droppedBlocks.foreach(blockchainUpdater.processBlock(_).explicitGet())
+          err
         }
       case None =>
         log.debug("No new blocks found in extension")
