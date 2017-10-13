@@ -48,24 +48,21 @@ class MicroBlockSynchronizer(settings: MicroblockSynchronizerSettings,
       val knownChannels = knownMicroBlockOwners.get(totalResBlockSig, () => MSet.empty)
       random(knownChannels) match {
         case Some(ctx) =>
-          knownChannels -= ctx
-          ctx.writeAndFlush(MicroBlockRequest(totalResBlockSig))
-          awaitingMicroBlocks.put(totalResBlockSig, microblockInv)
-          requestMicroBlockTask(microblockInv, attemptsAllowed - 1)
-            .delayExecution(settings.waitResponseTimeout)
+          if (downloading.compareAndSet(false, true)) {
+            knownChannels -= ctx
+            ctx.writeAndFlush(MicroBlockRequest(totalResBlockSig))
+            awaitingMicroBlocks.put(totalResBlockSig, microblockInv)
+            requestMicroBlockTask(microblockInv, attemptsAllowed - 1)
+              .delayExecution(settings.waitResponseTimeout)
+          } else Task.unit
         case None => Task.unit
       }
     } else Task.unit
   }
 
   private def tryDownloadNext(prevBlockId: ByteStr): Task[Unit] = Task.unit.flatMap { _ =>
-    Option(knownNextMicroBlocks.getIfPresent(prevBlockId)) match {
-      case Some(mb) =>
-        if (downloading.compareAndSet(false, true)) requestMicroBlockTask(mb, MicroBlockDownloadAttempts)
-        else Task.unit
-      case None =>
-        Task.unit
-    }
+    Option(knownNextMicroBlocks.getIfPresent(prevBlockId))
+      .fold(Task.unit)(requestMicroBlockTask(_, MicroBlockDownloadAttempts))
   }
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
