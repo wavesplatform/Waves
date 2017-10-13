@@ -77,39 +77,44 @@ class MinerImpl(
       s"BlockChain is too old (last block timestamp is $parentTimestamp generated $blockAge ago)"
     ))
 
-  private def ngEnabled : Boolean = featureProvider.featureActivationHeight(BlockchainFeatures.NG.id).exists(history.height > _ + 1)
+  private def ngEnabled: Boolean = featureProvider.featureActivationHeight(BlockchainFeatures.NG.id).exists(history.height > _ + 1)
 
-  private def generateOneBlockTask(version: Int, account: PrivateKeyAccount, parentHeight: Int,
-                                   greatGrandParent: Option[Block], balance: Long)(delay: FiniteDuration): Task[Either[String, Block]] = Task {
-    // should take last block right at the time of mining since microblocks might have been added
-    val referencedBlockInfo = history.bestLastBlockInfo(System.currentTimeMillis() - minMicroBlockDurationMills).get
-    val pc = allChannels.size()
-    lazy val currentTime = timeService.correctedTime()
-    lazy val h = calcHit(referencedBlockInfo.consensus, account)
-    lazy val t = calcTarget(referencedBlockInfo.timestamp, referencedBlockInfo.consensus.baseTarget, currentTime, balance)
-    measureSuccessful(blockBuildTimeStats, for {
-      _ <- Either.cond(pc >= minerSettings.quorum, (), s"Quorum not available ($pc/${minerSettings.quorum}, not forging block with ${account.address}")
-      _ <- Either.cond(h < t, (), s"${System.currentTimeMillis()}: Hit $h was NOT less than target $t, not forging block with ${account.address}")
-      _ = log.debug(s"Forging with ${account.address}, H $h < T $t, balance $balance, prev block ${referencedBlockInfo.blockId}")
-      _ = log.debug(s"Previous block ID ${referencedBlockInfo.blockId} at $parentHeight with target ${referencedBlockInfo.consensus.baseTarget}")
-      block <- {
-        val avgBlockDelay = blockchainSettings.genesisSettings.averageBlockDelay
-        val btg = calcBaseTarget(avgBlockDelay, parentHeight, referencedBlockInfo.consensus.baseTarget, referencedBlockInfo.timestamp, greatGrandParent.map(_.timestamp), currentTime)
-        val gs = calcGeneratorSignature(referencedBlockInfo.consensus, account)
-        val consensusData = NxtLikeConsensusBlockData(btg, ByteStr(gs))
-        val sortInBlock = history.height() <= blockchainSettings.functionalitySettings.dontRequireSortedTransactionsAfter
-        val txAmount = if (ngEnabled) minerSettings.maxTransactionsInKeyBlock else ClassicAmountOfTxsInBlock
-        val unconfirmed = utx.packUnconfirmed(txAmount, sortInBlock)
+  private def generateOneBlockTask(account: PrivateKeyAccount, balance: Long)(delay: FiniteDuration): Task[Either[String, Block]] = Task {
+    history.read { implicit l =>
+      // should take last block right at the time of mining since microblocks might have been added
+      val height = history.height()
+      val version = if (height <= blockchainSettings.functionalitySettings.blockVersion3After) PlainBlockVersion else NgBlockVersion
+      val lastBlock = history.lastBlock.get
+      val greatGrandParentTimestamp = history.parent(lastBlock, 2).map(_.timestamp)
+      val referencedBlockInfo = history.bestLastBlockInfo(System.currentTimeMillis() - minMicroBlockDurationMills).get
+      val pc = allChannels.size()
+      lazy val currentTime = timeService.correctedTime()
+      lazy val h = calcHit(referencedBlockInfo.consensus, account)
+      lazy val t = calcTarget(referencedBlockInfo.timestamp, referencedBlockInfo.consensus.baseTarget, currentTime, balance)
+      measureSuccessful(blockBuildTimeStats, for {
+        _ <- Either.cond(pc >= minerSettings.quorum, (), s"Quorum not available ($pc/${minerSettings.quorum}, not forging block with ${account.address}")
+        _ <- Either.cond(h < t, (), s"${System.currentTimeMillis()}: Hit $h was NOT less than target $t, not forging block with ${account.address}")
+        _ = log.debug(s"Forging with ${account.address}, H $h < T $t, balance $balance, prev block ${referencedBlockInfo.blockId}")
+        _ = log.debug(s"Previous block ID ${referencedBlockInfo.blockId} at $height with target ${referencedBlockInfo.consensus.baseTarget}")
+        block <- {
+          val avgBlockDelay = blockchainSettings.genesisSettings.averageBlockDelay
+          val btg = calcBaseTarget(avgBlockDelay, height, referencedBlockInfo.consensus.baseTarget, referencedBlockInfo.timestamp, greatGrandParentTimestamp, currentTime)
+          val gs = calcGeneratorSignature(referencedBlockInfo.consensus, account)
+          val consensusData = NxtLikeConsensusBlockData(btg, ByteStr(gs))
+          val sortInBlock = history.height() <= blockchainSettings.functionalitySettings.dontRequireSortedTransactionsAfter
+          val txAmount = if (ngEnabled) minerSettings.maxTransactionsInKeyBlock else ClassicAmountOfTxsInBlock
+          val unconfirmed = utx.packUnconfirmed(txAmount, sortInBlock)
 
-        val features = if(version > 2) settings.featuresSettings.supported
-          .filter(featureProvider.featureStatus(_, parentHeight) == BlockchainFeatureStatus.Undefined)
-          .toSet.intersect(BlockchainFeatures.implemented) else Set.empty[Short]
+          val features = if(version > 2) settings.featuresSettings.supported
+            .filter(featureProvider.featureStatus(_, height) == BlockchainFeatureStatus.Undefined)
+            .toSet.intersect(BlockchainFeatures.implemented) else Set.empty[Short]
 
-        log.debug(s"Adding ${unconfirmed.size} unconfirmed transaction(s) to new block")
-        Block.buildAndSign(version.toByte, currentTime, referencedBlockInfo.blockId, consensusData, unconfirmed, account, features)
-          .left.map(l => l.err)
-      }
-    } yield block)
+          log.debug(s"Adding ${unconfirmed.size} unconfirmed transaction(s) to new block")
+          Block.buildAndSign(version.toByte, currentTime, referencedBlockInfo.blockId, consensusData, unconfirmed, account, features)
+            .left.map(l => l.err)
+        }
+      } yield block)
+    }
   }.delayExecution(delay)
 
 
@@ -162,10 +167,9 @@ class MinerImpl(
       case Right(maybeNewTotal) => generateMicroBlockSequence(account, maybeNewTotal.getOrElse(accumulatedBlock))
     }
 
-  private def generateBlockTask(account: PrivateKeyAccount): Task[Unit] = {
+  private def generateBlockTask(account: PrivateKeyAccount): Task[Unit] = history.read { implicit l =>
     val height = history.height()
     val lastBlock = history.lastBlock.get
-    val grandParent = history.parent(lastBlock, 2)
     (for {
       _ <- checkAge(height, history.lastBlockTimestamp().get)
       ts <- nextBlockGenerationTime(height, stateReader, blockchainSettings.functionalitySettings, lastBlock, account, featureProvider)
@@ -174,9 +178,8 @@ class MinerImpl(
     } yield (offset, balance)) match {
       case Right((offset, balance)) =>
         log.debug(s"Next attempt for acc=$account in $offset")
-        val version = if (height <= blockchainSettings.functionalitySettings.blockVersion3After) PlainBlockVersion else NgBlockVersion
         nextBlockGenerationTimes += account.toAddress -> (System.currentTimeMillis() + offset.toMillis)
-        generateOneBlockTask(version, account, height, grandParent, balance)(offset).flatMap {
+        generateOneBlockTask(account, balance)(offset).flatMap {
           case Right(block) => Task.now {
             processBlock(block, true) match {
               case Left(err) => log.warn("Error mining Block: " + err.toString)
@@ -198,6 +201,7 @@ class MinerImpl(
         Task.unit
     }
   }
+
 
   def scheduleMining(): Unit = {
     Miner.blockMiningStarted.increment()
