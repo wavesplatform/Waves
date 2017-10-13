@@ -23,7 +23,7 @@ class BlockchainUpdaterTest extends FunSuite with Matchers with HistoryTest {
   )
 
   test("concurrent access to lastBlock doesn't throw any exception") {
-    val (h, fp, _, _, bu, _) = StorageFactory(WavesSettings, EmptyFeaturesSettings).get
+    val (h, fp, _, _, bu, _) = StorageFactory(WavesSettings).get
 
     bu.processBlock(genesisBlock)
 
@@ -49,7 +49,7 @@ class BlockchainUpdaterTest extends FunSuite with Matchers with HistoryTest {
 
   test("features approved and accepted as height grows") {
 
-    val (h, fp, _, _, bu, _) = StorageFactory(WavesSettings, EmptyFeaturesSettings).get
+    val (h, fp, _, _, bu, _) = StorageFactory(WavesSettings).get
 
     bu.processBlock(genesisBlock)
 
@@ -86,7 +86,7 @@ class BlockchainUpdaterTest extends FunSuite with Matchers with HistoryTest {
   }
 
   test("features rollback with block rollback") {
-    val (h, fp, _, _, bu, _) = StorageFactory(WavesSettings, EmptyFeaturesSettings).get
+    val (h, fp, _, _, bu, _) = StorageFactory(WavesSettings).get
 
     bu.processBlock(genesisBlock)
 
@@ -141,7 +141,7 @@ class BlockchainUpdaterTest extends FunSuite with Matchers with HistoryTest {
   }
 
   test("feature activation height is not overrided with further periods") {
-    val (h, fp, _, _, bu, _) = StorageFactory(WavesSettings, EmptyFeaturesSettings).get
+    val (h, fp, _, _, bu, _) = StorageFactory(WavesSettings).get
 
     bu.processBlock(genesisBlock)
 
@@ -163,7 +163,7 @@ class BlockchainUpdaterTest extends FunSuite with Matchers with HistoryTest {
   }
 
   test("feature activated only by 90% of blocks") {
-    val (h, fp, _, _, bu, _) = StorageFactory(WavesSettings, EmptyFeaturesSettings).get
+    val (h, fp, _, _, bu, _) = StorageFactory(WavesSettings).get
 
     bu.processBlock(genesisBlock)
 
@@ -186,7 +186,7 @@ class BlockchainUpdaterTest extends FunSuite with Matchers with HistoryTest {
   }
 
   test("features votes resets when voting window changes") {
-    val (h, fp, _, _, bu, _) = StorageFactory(WavesSettings, EmptyFeaturesSettings).get
+    val (h, fp, _, _, bu, _) = StorageFactory(WavesSettings).get
 
     bu.processBlock(genesisBlock)
 
