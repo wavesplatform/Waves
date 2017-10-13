@@ -170,7 +170,6 @@ class MinerImpl(
   private def generateBlockTask(account: PrivateKeyAccount): Task[Unit] = history.read { implicit l =>
     val height = history.height()
     val lastBlock = history.lastBlock.get
-    val grandParent = history.parent(lastBlock, 2)
     (for {
       _ <- checkAge(height, history.lastBlockTimestamp().get)
       ts <- nextBlockGenerationTime(height, stateReader, blockchainSettings.functionalitySettings, lastBlock, account, featureProvider)
