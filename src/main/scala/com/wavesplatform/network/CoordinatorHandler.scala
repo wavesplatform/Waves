@@ -1,7 +1,6 @@
 package com.wavesplatform.network
 
-import java.util.concurrent.Executors
-import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
+import java.util.concurrent.atomic.AtomicBoolean
 
 import com.wavesplatform.features.FeatureProvider
 import com.wavesplatform.metrics.{BlockStats, HistogramExt}
@@ -14,13 +13,11 @@ import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel.group.ChannelGroup
 import io.netty.channel.{Channel, ChannelHandlerContext, ChannelInboundHandlerAdapter}
 import kamon.Kamon
+import monix.eval.Task
 import scorex.block.Block
 import scorex.transaction.ValidationError.InvalidSignature
 import scorex.transaction._
 import scorex.utils.{ScorexLogging, Time}
-
-import scala.concurrent.{ExecutionContext, Future}
-import scala.util.{Failure, Success}
 
 @Sharable
 class CoordinatorHandler(checkpointService: CheckpointService,
@@ -38,13 +35,7 @@ class CoordinatorHandler(checkpointService: CheckpointService,
                          featureProvider: FeatureProvider)
   extends ChannelInboundHandlerAdapter with ScorexLogging {
 
-  private val counter = new AtomicInteger
-  private implicit val ec: ExecutionContext = ExecutionContext.fromExecutor(Executors.newSingleThreadExecutor { r =>
-    val t = new Thread(r)
-    t.setName(s"coordinator-handler-${counter.incrementAndGet()}")
-    t.setDaemon(true)
-    t
-  })
+  private implicit val scheduler = monix.execution.Scheduler.singleThread("microblock-synchronizer", reporter = com.wavesplatform.utils.UncaughtExceptionsToLogReporter)
 
   private val processCheckpoint = Coordinator.processCheckpoint(checkpointService, history, blockchainUpdater) _
   private val processFork = Coordinator.processFork(checkpointService, history, blockchainUpdater, stateReader, utxStorage, time, settings, blockchainReadiness, featureProvider) _
@@ -61,18 +52,15 @@ class CoordinatorHandler(checkpointService: CheckpointService,
                                               f: => Either[_, Option[A]],
                                               r: A => Unit): Unit = {
     log.debug(start)
-    Future(f) onComplete {
-      case Success(Right(maybeNewScore)) =>
+    Task(f).map {
+      case Right(maybeNewScore) =>
         log.debug(success)
         maybeNewScore.foreach(r)
-      case Success(Left(ve)) =>
+      case Left(ve) =>
         log.warn(s"$errorPrefix: $ve")
         peerDatabase.blacklistAndClose(src, s"$errorPrefix: $ve")
-      case Failure(t) => throw new Exception(errorPrefix, t)
-    }
+    }.runAsync
   }
-
-  private def rethrow(msg: String, failure: Throwable) = throw new Exception(msg, failure.getCause)
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
     case c: Checkpoint => processAndBlacklistOnFailure(ctx.channel,
@@ -90,45 +78,42 @@ class CoordinatorHandler(checkpointService: CheckpointService,
         processFork(blocks),
         scheduleMiningAndBroadcastScore)
 
-    case b: Block => Future({
+    case b: Block => (Task {
       BlockStats.received(b, BlockStats.Source.Broadcast, ctx)
       CoordinatorHandler.blockReceivingLag.safeRecord(System.currentTimeMillis() - b.timestamp)
       Signed.validateSignatures(b).flatMap(b => processBlock(b, false))
-    }) onComplete {
-      case Success(Right(None)) =>
+    } map {
+      case Right(None) =>
         log.trace(s"Block ${b.uniqueId} already appended")
-      case Success(Right(Some(newScore))) =>
+      case Right(Some(newScore)) =>
         log.debug(s"Appended block ${b.uniqueId}")
         if (b.transactionData.isEmpty)
           allChannels.broadcast(BlockForged(b), Some(ctx.channel()))
         miner.scheduleMining()
         allChannels.broadcast(LocalScoreChanged(newScore))
-      case Success(Left(is: InvalidSignature)) =>
+      case Left(is: InvalidSignature) =>
         peerDatabase.blacklistAndClose(ctx.channel(), s"Could not append block ${b.uniqueId}: $is")
-      case Success(Left(ve)) =>
+      case Left(ve) =>
         BlockStats.declined(b, BlockStats.Source.Broadcast)
         log.debug(s"Could not append block ${b.uniqueId}: $ve")
-      // no need to push anything downstream in here, because channels are pinned only when handling extensions
-      case Failure(t) => rethrow(s"Error appending block ${b.uniqueId}", t)
-    }
+    }).runAsync
 
     case md: MicroblockData =>
       val microBlock = md.microBlock
       val microblockTotalResBlockSig = microBlock.totalResBlockSig
-      Future(Signed.validateSignatures(microBlock).flatMap(processMicroBlock)) onComplete {
-        case Success(Right(())) =>
+      (Task(Signed.validateSignatures(microBlock).flatMap(processMicroBlock)) map {
+        case Right(()) =>
           md.invOpt match {
             case Some(mi) => allChannels.broadcast(mi, Some(ctx.channel()))
             case None => log.warn("Not broadcasting MicroBlockInv")
           }
           BlockStats.applied(microBlock)
-        case Success(Left(is: InvalidSignature)) =>
+        case Left(is: InvalidSignature) =>
           peerDatabase.blacklistAndClose(ctx.channel(), s"Could not append microblock $microblockTotalResBlockSig: $is")
-        case Success(Left(ve)) =>
+        case Left(ve) =>
           BlockStats.declined(microBlock)
           log.debug(s"Could not append microblock $microblockTotalResBlockSig: $ve")
-        case Failure(t) => rethrow(s"Error appending microblock $microblockTotalResBlockSig", t)
-      }
+      }).runAsync
   }
 }
 
