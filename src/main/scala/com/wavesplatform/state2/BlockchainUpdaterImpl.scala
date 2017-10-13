@@ -181,16 +181,18 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
           log.warn(s"removeAfter nonexistent block $blockId")
           Left(GenericError(s"Failed to rollback to nonexistent block $blockId"))
         case Some(height) =>
-          val discardedBlocks = Seq.newBuilder[Block]
-          discardedBlocks ++= ng.map(_.base).toSeq
-          val ngRolledBack = ngState().nonEmpty
+          val discardedNgBlock = ng.map(_.bestLiquidBlock)
           ngState.set(None)
 
           val baseRolledBack = height < historyWriter.height()
-          if (baseRolledBack) {
+          val discardedHistoryBlocks = if (baseRolledBack) {
             logHeights(s"Rollback to h=$height started")
-            while (historyWriter.height > height)
-              discardedBlocks ++= historyWriter.discardBlock().toSeq
+            val discarded = {
+              var buf = Seq.empty[Block]
+              while (historyWriter.height > height)
+                buf = historyWriter.discardBlock().toSeq ++ buf
+              buf
+            }
             if (height < persisted.height) {
               log.info(s"Rollback to h=$height requested. Persisted height=${persisted.height}, will drop state and reapply blockchain now")
               persisted.clear()
@@ -209,15 +211,16 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
               }
             }
             logHeights(s"Rollback to h=$height completed:")
+            discarded
           } else {
             log.debug(s"No rollback in history is necessary")
+            Seq.empty[Block]
           }
 
-          if (baseRolledBack || ngRolledBack) lastBlockId.onNext(blockId)
-
-          val r = discardedBlocks.result()
-          TxsInBlockchainStats.record(-r.size)
-          Right(r)
+          val totalDiscardedBlocks: Seq[Block] = discardedHistoryBlocks ++ discardedNgBlock.toSeq
+          if (totalDiscardedBlocks.nonEmpty) lastBlockId.onNext(blockId)
+          TxsInBlockchainStats.record(-totalDiscardedBlocks.size)
+          Right(totalDiscardedBlocks)
       }
     }
   }
