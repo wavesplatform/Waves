@@ -6,7 +6,7 @@ import com.wavesplatform.features.{BlockchainFeatures, FeatureProvider}
 import com.wavesplatform.metrics._
 import com.wavesplatform.network.{BlockCheckpoint, Checkpoint}
 import com.wavesplatform.settings.{BlockchainSettings, FunctionalitySettings, WavesSettings}
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state2._
 import com.wavesplatform.state2.reader.StateReader
 import kamon.Kamon
 import org.influxdb.dto.Point
@@ -18,6 +18,7 @@ import scorex.transaction._
 import scorex.utils.{ScorexLogging, Time}
 
 import scala.concurrent.duration._
+import scala.util.{Left, Right}
 
 object Coordinator extends ScorexLogging with Instrumented {
   def processFork(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater,
@@ -66,24 +67,36 @@ object Coordinator extends ScorexLogging with Instrumented {
         }
 
         val initalHeight = history.height()
-        for {
+
+        val droppedBlocksEi = (for {
           commonBlockHeight <- history.heightOf(lastCommonBlockId).toRight(GenericError("Fork contains no common parent"))
           _ <- Either.cond(isForkValidWithCheckpoint(commonBlockHeight), (), GenericError("Fork contains block that doesn't match checkpoint, declining fork"))
-          droppedTransactions <- blockchainUpdater.removeAfter(lastCommonBlockId)
-          score <- forkApplicationResultEi
-        } yield {
-          val depth = initalHeight - commonBlockHeight
-          if (depth > 0) {
-            Metrics.write(
-              Point
-                .measurement("rollback")
-                .addField("depth", initalHeight - commonBlockHeight)
-                .addField("txs", droppedTransactions.size)
-            )
-          }
-          droppedTransactions.foreach(utxStorage.putIfNew)
-          updateBlockchainReadinessFlag(history, time, blockchainReadiness, settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed)
-          Some(score)
+          droppedBlocks <- blockchainUpdater.removeAfter(lastCommonBlockId)
+        } yield (commonBlockHeight, droppedBlocks)).left.map((_, Seq.empty[Block]))
+
+        val fARE: Either[(ValidationError, Seq[Block]), (Int, DiscardedBlocks, BigInt)] = for {
+          (commonBlockHeight, droppedBlocks) <- droppedBlocksEi
+          score <- forkApplicationResultEi.left.map((_, droppedBlocks))
+        } yield (commonBlockHeight, droppedBlocks, score)
+
+
+        fARE match {
+          case Right((commonBlockHeight, droppedBlocks, score)) =>
+            val depth = initalHeight - commonBlockHeight
+            if (depth > 0) {
+              Metrics.write(
+                Point
+                  .measurement("rollback")
+                  .addField("depth", initalHeight - commonBlockHeight)
+                  .addField("txs", droppedBlocks.size)
+              )
+            }
+            droppedBlocks.flatMap(_.transactionData).foreach(utxStorage.putIfNew)
+            updateBlockchainReadinessFlag(history, time, blockchainReadiness, settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed)
+            Right(Some(score))
+          case Left((err, droppedBlocks)) =>
+            droppedBlocks.foreach(blockchainUpdater.processBlock(_).explicitGet())
+            Left(err)
         }
       case None =>
         log.debug("No new blocks found in extension")
