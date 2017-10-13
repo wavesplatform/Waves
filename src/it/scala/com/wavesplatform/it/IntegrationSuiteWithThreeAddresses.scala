@@ -95,13 +95,13 @@ trait IntegrationSuiteWithThreeAddresses extends FunSuite with BeforeAndAfterAll
       txs <- makeTransfers
 
       height <- traverse(allNodes)(_.height).map(_.max)
-      _ <- traverse(allNodes)(_.waitForHeight(height + 1))
+      _ <- traverse(allNodes)(_.waitForHeight(height + 2))
 
       _ <- waitForTxsToReachAllNodes(txs)
 
       _ <- Future.sequence(Seq(firstAddress, secondAddress, thirdAddress).map(address => assertBalances(address, defaultBalance, defaultBalance)))
     } yield succeed
 
-    Await.result(correctStartBalancesFuture, 2.minutes)
+    Await.result(correctStartBalancesFuture, 5.minutes)
   }
 }
