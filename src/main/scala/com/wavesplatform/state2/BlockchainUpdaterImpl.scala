@@ -127,13 +127,21 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
             val logDetails = s"The referenced block(${block.reference})" +
               s" ${if (historyWriter.contains(block.reference)) "exits, it's not last persisted" else "doesn't exist"}"
             Left(BlockAppendError(s"References incorrect or non-existing block: " + logDetails, block))
-          case _ => BlockDiffer.fromBlock(settings.blockchainSettings.functionalitySettings, featureProvider, currentPersistedBlocksState, historyWriter.lastBlock, block).map((_, Seq.empty[Transaction]))
+          case _ => BlockDiffer.fromBlock(settings.blockchainSettings.functionalitySettings, featureProvider, currentPersistedBlocksState, historyWriter.lastBlock, block).map(d => Some((d, Seq.empty[Transaction])))
         }
       case Some(ng) if ng.base.reference == block.reference =>
         if (block.blockScore > ng.base.blockScore) {
           BlockDiffer.fromBlock(settings.blockchainSettings.functionalitySettings, featureProvider, currentPersistedBlocksState, historyWriter.lastBlock, block).map { diff =>
             log.trace(s"Better liquid block(score=${block.blockScore}) received and applied instead of existing(score=${ng.base.blockScore})")
-            (diff, ng.transactions)
+            Some((diff, ng.transactions))
+          }
+        } else if (areVersionsOfSameBlock(block, ng.base)) {
+          if (block.transactionData.size <= ng.transactions.size) {
+            log.trace(s"Existing liquid block is better than exsting, discarding ${block.uniqueId}")
+            Right(None)
+          } else {
+            log.trace(s"Existing liquid block is better than exsting, discarding ${block.uniqueId}")
+            BlockDiffer.fromBlock(settings.blockchainSettings.functionalitySettings, featureProvider, currentPersistedBlocksState, historyWriter.lastBlock, block).map(d => Some((d, Seq.empty[Transaction])))
           }
         } else {
           Left(BlockAppendError(s"Competitor's liquid block(id=${trim(block.uniqueId)} score=${block.blockScore}) is not better than existing(ng.base.id=${trim(ng.base.uniqueId)} score=${ng.base.blockScore})", block))
@@ -154,19 +162,21 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
             .map { hardenedDiff =>
               TxsInBlockchainStats.record(ng.transactions.size)
               topMemoryDiff.transform(Monoid.combine(_, referencedLiquidDiff))
-              (hardenedDiff, discarded.flatMap(_.transactionData))
+              Some((hardenedDiff, discarded.flatMap(_.transactionData)))
             }
         } else {
           val errorText = s"Forged block has invalid signature: base: ${ng.base}, micros: ${ng.micros}, requested reference: ${block.reference}"
           log.error(errorText)
           Left(BlockAppendError(errorText, block))
         }
-    }).map { case ((newBlockDiff, discacrded)) =>
-      val height = historyWriter.height() + 1
-      ngState.set(Some(NgState(block, newBlockDiff, 0L, featuresApprovedWithBlock(block))))
-      historyReader.lastBlockId().foreach(lastBlockId.onNext)
-      log.info(s"Block ${block.uniqueId} -> ${trim(block.reference)} appended. New height: $height, transactions: ${block.transactionData.size})")
-      discacrded
+    }).map {
+      case Some((newBlockDiff, discacrded)) =>
+        val height = historyWriter.height() + 1
+        ngState.set(Some(NgState(block, newBlockDiff, 0L, featuresApprovedWithBlock(block))))
+        historyReader.lastBlockId().foreach(lastBlockId.onNext)
+        log.info(s"Block ${block.uniqueId} -> ${trim(block.reference)} appended. New height: $height, transactions: ${block.transactionData.size})")
+        discacrded
+      case None => Seq.empty
     }
   }
 
@@ -298,5 +308,11 @@ object BlockchainUpdaterImpl {
       (from, from + by) #:: ranges(from + by, to, by)
     else
       (from, to) #:: Stream.empty[(Int, Int)]
+
+  def areVersionsOfSameBlock(b1: Block, b2: Block): Boolean =
+    b1.signerData.generator == b2.signerData.generator &&
+      b1.consensusData.baseTarget == b2.consensusData.baseTarget &&
+      b1.reference == b2.reference &&
+      b1.timestamp == b2.timestamp
 
 }
