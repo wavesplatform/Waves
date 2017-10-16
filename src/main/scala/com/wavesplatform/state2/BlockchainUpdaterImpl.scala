@@ -136,7 +136,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
             (diff, ng.transactions)
           }
         } else {
-          Left(BlockAppendError(s"Competitor's liquid block(score=${block.blockScore}) is not better than existing(score=${ng.base.blockScore})", block))
+          Left(BlockAppendError(s"Competitor's liquid block(id=${trim(block.uniqueId)} score=${block.blockScore}) is not better than existing(ng.base.id=${trim(ng.base.uniqueId)} score=${ng.base.blockScore})", block))
         }
       case Some(ng) if !ng.contains(block.reference) =>
         Left(BlockAppendError(s"References incorrect or non-existing block", block))
