@@ -1,10 +1,8 @@
 package scorex.transaction
 
-import java.util.concurrent.locks.ReentrantReadWriteLock
-
 import com.wavesplatform.features.BlockchainFeatureStatus
-import com.wavesplatform.state2._
 import com.wavesplatform.history._
+import com.wavesplatform.state2._
 import org.scalatest.{FunSuite, Matchers}
 import scorex.block.Block
 
@@ -24,7 +22,7 @@ class BlockchainUpdaterTest extends FunSuite with Matchers with HistoryTest {
     )
   )
 
-  private def storageFactory() = StorageFactory(WavesSettings, new ReentrantReadWriteLock(true)).get
+  private def storageFactory() = StorageFactory(WavesSettings).get
 
   test("concurrent access to lastBlock doesn't throw any exception") {
     val (h, fp, _, _, bu, _) = storageFactory()

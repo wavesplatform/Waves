@@ -14,7 +14,7 @@ package object diffs {
 
   private val lock = new ReentrantReadWriteLock()
 
-  def newState(): StateWriterImpl = new StateWriterImpl(StateStorage(None, dropExisting = false).get, lock)
+  def newState(): StateWriterImpl = new StateWriterImpl(StateStorage(None, dropExisting = false).get, new ReentrantReadWriteLock())
 
   def newHistory(): History with FeatureProvider = HistoryWriterImpl(None, lock, TestFunctionalitySettings.Enabled, TestFunctionalitySettings.EmptyFeaturesSettings).get
 

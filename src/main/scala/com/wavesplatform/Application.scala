@@ -37,17 +37,15 @@ import scorex.transaction._
 import scorex.utils.{ScorexLogging, Time, TimeImpl}
 import scorex.wallet.Wallet
 import scorex.waves.http.{DebugApiRoute, WavesApiRoute}
-import java.util.concurrent.locks.{ReentrantReadWriteLock => RWL}
 import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.reflect.runtime.universe._
 import scala.util.Try
 
 class Application(val actorSystem: ActorSystem, val settings: WavesSettings) extends ScorexLogging {
-  private val lock = new RWL(true)
 
   private val checkpointService = new CheckpointServiceImpl(settings.blockchainSettings.checkpointFile, settings.checkpointsSettings)
-  private val (history, featureProvider, stateWriter, stateReader, blockchainUpdater, blockchainDebugInfo) = StorageFactory(settings, lock).get
+  private val (history, featureProvider, stateWriter, stateReader, blockchainUpdater, blockchainDebugInfo) = StorageFactory(settings).get
   private lazy val upnp = new UPnP(settings.networkSettings.uPnPSettings) // don't initialize unless enabled
   private val wallet: Wallet = Wallet(settings.walletSettings)
 
@@ -67,7 +65,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
     val establishedConnections = new ConcurrentHashMap[Channel, PeerInfo]
     val allChannels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
 
-    val utxStorage = new UtxPool(time, stateReader, history, feeCalculator, settings.blockchainSettings.functionalitySettings, settings.utxSettings, lock)
+    val utxStorage = new UtxPool(time, stateReader, history, feeCalculator, settings.blockchainSettings.functionalitySettings, settings.utxSettings)
 
     val blockchainReadiness = new AtomicBoolean(false)
 
