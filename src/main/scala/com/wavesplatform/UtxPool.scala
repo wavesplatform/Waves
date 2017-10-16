@@ -17,6 +17,7 @@ import scorex.account.Address
 import scorex.consensus.TransactionsOrdering
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction._
+import scorex.utils.Synchronized.ReadLock
 import scorex.utils.{ScorexLogging, Synchronized, Time}
 
 import scala.concurrent.duration._
@@ -41,18 +42,13 @@ class UtxPool(time: Time,
 
   private val pessimisticPortfolios = Synchronized(new PessimisticPortfolios)
 
-  private def measureSize(): Unit = read { implicit l =>
-    Metrics.write(
+  private def measureSize()(implicit l: ReadLock): Unit = Metrics.write(
       Point
         .measurement("utx-pool-size")
         .addField("n", transactions().size)
-    )
-  }
-
-  private val processingTimeStats = Kamon.metrics.histogram(
-    "utx-transaction-processing-time",
-    KamonTime.Milliseconds
   )
+
+  private val processingTimeStats = Kamon.metrics.histogram(    "utx-transaction-processing-time",    KamonTime.Milliseconds  )
   private val putRequestStats = Kamon.metrics.counter("utx-pool-put-if-new")
 
   private def removeExpired(currentTs: Long): Unit = write { implicit l =>
