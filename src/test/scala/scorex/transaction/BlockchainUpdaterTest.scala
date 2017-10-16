@@ -1,5 +1,8 @@
 package scorex.transaction
 
+import java.security.Permission
+import java.util.concurrent.{Semaphore, TimeUnit}
+
 import com.wavesplatform.features.BlockchainFeatureStatus
 import com.wavesplatform.state2._
 import com.wavesplatform.history._
@@ -7,6 +10,8 @@ import com.wavesplatform.state2.diffs.produce
 import org.scalatest.words.ShouldVerb
 import org.scalatest.{FunSuite, Matchers}
 import scorex.block.Block
+import scorex.transaction.ValidationError.GenericError
+import sun.misc.{Signal, SignalHandler}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -210,7 +215,25 @@ class BlockchainUpdaterTest extends FunSuite with Matchers with HistoryTest with
     fp.featureStatus(1, h.height()) shouldBe BlockchainFeatureStatus.Approved
   }
 
-  test("block processing should fail if unimplemented feature was activated on blockchaing when autoShutdownOnUnsupportedFeature = yes") {
+  test("block processing should fail if unimplemented feature was activated on blockchaing when autoShutdownOnUnsupportedFeature = yes and exit with code 38") {
+
+    val signal = new Semaphore(1)
+    signal.acquire()
+
+    System.setSecurityManager(new SecurityManager {
+      override def checkPermission(perm: Permission): Unit = {}
+
+      override def checkPermission(perm: Permission, context: Object): Unit = {}
+
+      override def checkExit(status: Int): Unit = signal.synchronized {
+        super.checkExit(status)
+        if(status == 38)
+          signal.release()
+        throw new SecurityException("System exit not allowed")
+      }
+    })
+
+
     val (h, fp, _, _, bu, _) = StorageFactory(WavesSettings).get
     bu.processBlock(genesisBlock)
 
@@ -219,6 +242,10 @@ class BlockchainUpdaterTest extends FunSuite with Matchers with HistoryTest with
     }
 
     bu.processBlock(getNextTestBlockWithVotes(h, Set(-1))) should produce("ACTIVATED ON BLOCKCHAIN")
+
+    signal.tryAcquire(10, TimeUnit.SECONDS)
+
+    System.setSecurityManager(null)
   }
 
   test("sunny day test when known feature activated") {
