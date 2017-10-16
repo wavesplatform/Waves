@@ -86,13 +86,13 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
       }
     }
 
-  def discardBlock(): Seq[Transaction] = write { implicit lock =>
+  def discardBlock(): Option[Block] = write { implicit lock =>
     val h = height()
 
     alterVotes(h, blockAt(h).map(b => b.featureVotes).getOrElse(Set.empty), -1)
 
-    val transactions =
-      Block.parseBytes(blockBodyByHeight.mutate(_.remove(h))).fold(_ => Seq.empty[Transaction], _.transactionData)
+    val removedBlockBytes = blockBodyByHeight.mutate(_.remove(h))
+    val maybeDiscardedBlock = Block.parseBytes(removedBlockBytes).toOption
     scoreByHeight.mutate(_.remove(h))
 
     if (h % activationWindowSize == 0) {
@@ -104,7 +104,7 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
     vOpt.map(v => heightByBlockId.mutate(_.remove(v)))
     db.commit()
 
-    transactions
+    maybeDiscardedBlock
   }
 
   override def lastBlockIds(howMany: Int): Seq[ByteStr] = read { implicit lock =>

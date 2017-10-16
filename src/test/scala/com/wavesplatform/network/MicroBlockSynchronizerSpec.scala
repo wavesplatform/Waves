@@ -4,7 +4,7 @@ import com.wavesplatform.TransactionGen
 import com.wavesplatform.settings.SynchronizationSettings.MicroblockSynchronizerSettings
 import com.wavesplatform.state2.ByteStr
 import io.netty.channel.embedded.EmbeddedChannel
-import monix.reactive.subjects.{AsyncSubject, ConcurrentSubject}
+import monix.reactive.subjects.ConcurrentSubject
 import org.mockito.Mockito
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.Eventually
@@ -45,7 +45,7 @@ class MicroBlockSynchronizerSpec extends FreeSpec
     val history = Mockito.mock(classOf[NgHistory])
     Mockito.doReturn(Some(lastBlockSig)).when(history).lastBlockId()
 
-    val channel = new EmbeddedChannel(new MicroBlockSynchronizer(settings, history, PeerDatabase.NoOp, AsyncSubject[ByteStr]))
+    val channel = new EmbeddedChannel(new MicroBlockSynchronizer(settings, history, PeerDatabase.NoOp, ConcurrentSubject.publish[ByteStr]))
     channel.writeInbound(MicroBlockInv(TestBlock.defaultSigner, nextBlockSig, lastBlockSig))
     channel.flushInbound()
 
@@ -64,7 +64,7 @@ class MicroBlockSynchronizerSpec extends FreeSpec
     val history = Mockito.mock(classOf[NgHistory])
     Mockito.doReturn(Some(lastBlockSig)).when(history).lastBlockId()
 
-    val synchronizer = new MicroBlockSynchronizer(settings, history, PeerDatabase.NoOp, AsyncSubject[ByteStr])
+    val synchronizer = new MicroBlockSynchronizer(settings, history, PeerDatabase.NoOp, ConcurrentSubject.publish[ByteStr])
     val channel1 = new EmbeddedChannel(synchronizer)
     val channel2 = new EmbeddedChannel(synchronizer)
 
@@ -107,7 +107,7 @@ class MicroBlockSynchronizerSpec extends FreeSpec
     val history = Mockito.mock(classOf[NgHistory])
     Mockito.doReturn(Some(lastBlockSig)).when(history).lastBlockId()
 
-    val synchronizer = new MicroBlockSynchronizer(settings, history, PeerDatabase.NoOp, AsyncSubject[ByteStr])
+    val synchronizer = new MicroBlockSynchronizer(settings, history, PeerDatabase.NoOp, ConcurrentSubject.publish[ByteStr])
     val channel = new EmbeddedChannel(synchronizer)
 
     channel.writeInbound(MicroBlockInv(TestBlock.defaultSigner, nextBlockSig1, lastBlockSig))

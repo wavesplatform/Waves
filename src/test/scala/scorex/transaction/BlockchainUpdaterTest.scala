@@ -21,11 +21,12 @@ class BlockchainUpdaterTest extends FunSuite with Matchers with HistoryTest with
         featureCheckBlocksPeriod = ApprovalPeriod,
         blocksForFeatureActivation = (ApprovalPeriod * 0.9).toInt
       )
-    )
+    ),
+    featuresSettings = DefaultWavesSettings.featuresSettings.copy(autoShutdownOnUnsupportedFeature = true)
   )
 
   test("concurrent access to lastBlock doesn't throw any exception") {
-    val (h, fp, _, _, bu, _) = StorageFactory(WavesSettings, AutoShutdownFeatureSettings).get
+    val (h, fp, _, _, bu, _) = StorageFactory(WavesSettings).get
 
     bu.processBlock(genesisBlock)
 
@@ -51,7 +52,7 @@ class BlockchainUpdaterTest extends FunSuite with Matchers with HistoryTest with
 
   test("features approved and accepted as height grows") {
 
-    val (h, fp, _, _, bu, _) = StorageFactory(WavesSettings, AutoShutdownFeatureSettings).get
+    val (h, fp, _, _, bu, _) = StorageFactory(WavesSettings).get
 
     bu.processBlock(genesisBlock)
 
@@ -88,7 +89,7 @@ class BlockchainUpdaterTest extends FunSuite with Matchers with HistoryTest with
   }
 
   test("features rollback with block rollback") {
-    val (h, fp, _, _, bu, _) = StorageFactory(WavesSettings, AutoShutdownFeatureSettings).get
+    val (h, fp, _, _, bu, _) = StorageFactory(WavesSettings).get
 
     bu.processBlock(genesisBlock)
 
@@ -143,7 +144,7 @@ class BlockchainUpdaterTest extends FunSuite with Matchers with HistoryTest with
   }
 
   test("feature activation height is not overrided with further periods") {
-    val (h, fp, _, _, bu, _) = StorageFactory(WavesSettings, AutoShutdownFeatureSettings).get
+    val (h, fp, _, _, bu, _) = StorageFactory(WavesSettings).get
 
     bu.processBlock(genesisBlock)
 
@@ -165,7 +166,7 @@ class BlockchainUpdaterTest extends FunSuite with Matchers with HistoryTest with
   }
 
   test("feature activated only by 90% of blocks") {
-    val (h, fp, _, _, bu, _) = StorageFactory(WavesSettings, AutoShutdownFeatureSettings).get
+    val (h, fp, _, _, bu, _) = StorageFactory(WavesSettings).get
 
     bu.processBlock(genesisBlock)
 
@@ -188,7 +189,7 @@ class BlockchainUpdaterTest extends FunSuite with Matchers with HistoryTest with
   }
 
   test("features votes resets when voting window changes") {
-    val (h, fp, _, _, bu, _) = StorageFactory(WavesSettings, AutoShutdownFeatureSettings).get
+    val (h, fp, _, _, bu, _) = StorageFactory(WavesSettings).get
 
     bu.processBlock(genesisBlock)
 
@@ -210,7 +211,7 @@ class BlockchainUpdaterTest extends FunSuite with Matchers with HistoryTest with
   }
 
   test("block processing should fail if unimplemented feature was activated on blockchaing when autoShutdownOnUnsupportedFeature = yes") {
-    val (h, fp, _, _, bu, _) = StorageFactory(WavesSettings, AutoShutdownFeatureSettings).get
+    val (h, fp, _, _, bu, _) = StorageFactory(WavesSettings).get
     bu.processBlock(genesisBlock)
 
     (1 to ApprovalPeriod * 2).foreach { i =>
@@ -221,7 +222,7 @@ class BlockchainUpdaterTest extends FunSuite with Matchers with HistoryTest with
   }
 
   test("sunny day test when known feature activated") {
-    val (h, fp, _, _, bu, _) = StorageFactory(WavesSettings, AutoShutdownFeatureSettings).get
+    val (h, fp, _, _, bu, _) = StorageFactory(WavesSettings).get
     bu.processBlock(genesisBlock)
 
     (1 until ApprovalPeriod * 2 - 1).foreach { i =>

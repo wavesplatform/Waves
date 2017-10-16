@@ -58,8 +58,8 @@ class MicroBlockSynchronizer(settings: MicroblockSynchronizerSettings,
     } else Task.unit
   }
 
-  private def tryDownloadNext(lastBlockId: ByteStr): Task[Unit] = Task.unit.flatMap { _ =>
-    Option(knownNextMicroBlocks.getIfPresent(lastBlockId)) match {
+  private def tryDownloadNext(prevBlockId: ByteStr): Task[Unit] = Task.unit.flatMap { _ =>
+    Option(knownNextMicroBlocks.getIfPresent(prevBlockId)) match {
       case Some(mb) =>
         if (downloading.compareAndSet(false, true)) requestMicroBlockTask(mb, MicroBlockDownloadAttempts)
         else Task.unit
@@ -103,7 +103,7 @@ class MicroBlockSynchronizer(settings: MicroblockSynchronizerSettings,
                 microBlockInvStats.increment()
 
                 if (alreadyRequested(totalResBlockSig)) Task.unit
-                else tryDownloadNext(prevResBlockSig)
+                else tryDownloadNext(mi.prevBlockSig)
               } else {
                 notLastMicroblockStats.increment()
                 log.trace(s"Discarding $mi because it doesn't match last (micro)block ${trim(lastBlockId)}")

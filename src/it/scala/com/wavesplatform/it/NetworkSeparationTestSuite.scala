@@ -21,17 +21,16 @@ class NetworkSeparationTestSuite extends FreeSpec with Matchers with BeforeAndAf
   private def validateBlocks(nodes: Seq[Node]): Unit = {
     val targetBlocks1 = result(for {
       height <- traverse(nodes)(_.height).map(_.max)
-      _ <- traverse(nodes)(_.waitForHeight(height + 20))
-      _ <- traverse(nodes)(_.waitForHeight(height + 15))
-      blocks <- traverse(nodes)(_.blockAt(height + 15))
+      _ <- traverse(nodes)(_.waitForHeight(height + 10))
+      blocks <- traverse(nodes)(_.blockAt(height + 8))
     } yield blocks.map(_.signature), 5.minutes)
     all(targetBlocks1) shouldEqual targetBlocks1.head
   }
 
-  "node should grow up to 30 blocks together" in {
+  "node should grow up to 10 blocks together" in {
     val richestNode = nodes.maxBy(n => Await.result(n.balance(n.address), 1.minute).balance)
-    Await.result(richestNode.waitForHeight(30), 5.minutes)
-    Await.result(richestNode.height, 1.minute) >= 30 shouldBe true
+    Await.result(richestNode.waitForHeight(10), 5.minutes)
+    Await.result(richestNode.height, 1.minute) >= 10 shouldBe true
   }
 
   "then we disconnect nodes from the network" in {
@@ -40,8 +39,8 @@ class NetworkSeparationTestSuite extends FreeSpec with Matchers with BeforeAndAf
 
   "and wait for another 10 blocks on one node" in {
     val richestNode = nodes.maxBy(n => Await.result(n.balance(n.address), 1.minute).balance)
-    Await.result(richestNode.waitForHeight(40), 5.minutes)
-    Await.result(richestNode.height, 1.minute) >= 40 shouldBe true
+    Await.result(richestNode.waitForHeight(20), 5.minutes)
+    Await.result(richestNode.height, 1.minute) >= 20 shouldBe true
   }
 
   "after that we connect nodes back to the network" in {

@@ -16,7 +16,8 @@ import com.wavesplatform.state2.reader.CompositeStateReader.composite
 import com.wavesplatform.state2.reader.StateReader
 import kamon.Kamon
 import kamon.metric.instrument.Time
-import monix.reactive.subjects.AsyncSubject
+import monix.execution.Scheduler.Implicits.global
+import monix.reactive.subjects.ConcurrentSubject
 import scorex.account.Address
 import scorex.block.{Block, MicroBlock}
 import scorex.transaction.ValidationError.{BlockAppendError, GenericError, MicroBlockAppendError}
@@ -34,7 +35,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
   private val bottomMemoryDiff = Synchronized(Monoid[BlockDiff].empty)
   private val ngState = Synchronized(Option.empty[NgState])
 
-  override val lastBlockId: AsyncSubject[ByteStr] = AsyncSubject[ByteStr]
+  override val lastBlockId: ConcurrentSubject[ByteStr, ByteStr] = ConcurrentSubject.publish[ByteStr]
 
   private def unsafeDiffByRange(state: StateReader, from: Int, to: Int): BlockDiff = {
     val blocks = measureLog(s"Reading blocks from $from up to $to") {
@@ -167,7 +168,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
     }
   }
 
-  override def removeAfter(blockId: ByteStr): Either[ValidationError, Seq[Transaction]] = write { implicit l =>
+  override def removeAfter(blockId: ByteStr): Either[ValidationError, Seq[Block]] = write { implicit l =>
     val ng = ngState()
     if (ng.exists(_.contains(blockId))) {
       log.trace("Resetting liquid block, no rollback is necessary")
@@ -178,16 +179,18 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
           log.warn(s"removeAfter nonexistent block $blockId")
           Left(GenericError(s"Failed to rollback to nonexistent block $blockId"))
         case Some(height) =>
-          val discardedTransactions = Seq.newBuilder[Transaction]
-          discardedTransactions ++= ng.toSeq.flatMap(_.transactions)
-          val ngRolledBack = ngState().nonEmpty
+          val discardedNgBlock = ng.map(_.bestLiquidBlock)
           ngState.set(None)
 
           val baseRolledBack = height < historyWriter.height()
-          if (baseRolledBack) {
+          val discardedHistoryBlocks = if (baseRolledBack) {
             logHeights(s"Rollback to h=$height started")
-            while (historyWriter.height > height)
-              discardedTransactions ++= historyWriter.discardBlock()
+            val discarded = {
+              var buf = Seq.empty[Block]
+              while (historyWriter.height > height)
+                buf = historyWriter.discardBlock().toSeq ++ buf
+              buf
+            }
             if (height < persisted.height) {
               log.info(s"Rollback to h=$height requested. Persisted height=${persisted.height}, will drop state and reapply blockchain now")
               persisted.clear()
@@ -206,15 +209,16 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
               }
             }
             logHeights(s"Rollback to h=$height completed:")
+            discarded
           } else {
             log.debug(s"No rollback in history is necessary")
+            Seq.empty[Block]
           }
 
-          if (baseRolledBack || ngRolledBack) lastBlockId.onNext(blockId)
-
-          val r = discardedTransactions.result()
-          TxsInBlockchainStats.record(-r.size)
-          Right(r)
+          val totalDiscardedBlocks: Seq[Block] = discardedHistoryBlocks ++ discardedNgBlock.toSeq
+          if (totalDiscardedBlocks.nonEmpty) lastBlockId.onNext(blockId)
+          TxsInBlockchainStats.record(-totalDiscardedBlocks.size)
+          Right(totalDiscardedBlocks)
       }
     }
   }

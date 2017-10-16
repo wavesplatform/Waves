@@ -16,7 +16,7 @@ class ValidChainGenerationSpec(override val nodes: Seq[Node]) extends FreeSpec w
     "1 of N" in test(1)
     "N-1 of N" in test(nodes.size - 1)
 
-    def test(n: Int):Unit = {
+    def test(n: Int): Unit = {
       val initialHeight = result(for {
         height <- traverse(nodes)(_.height).map(_.max)
         newHeight = height + 5
