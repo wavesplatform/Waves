@@ -42,7 +42,7 @@ class SynchronizedTest extends FunSuite {
       Thread.sleep(200)
     }
 
-    def lock(): Unit = read { _ =>
+    def deadlock(): Unit = read { _ =>
       write()
     }
   }
@@ -120,7 +120,7 @@ class SynchronizedTest extends FunSuite {
   }
   ignore("deadlock") {
     val a = new A()
-    a.lock()
+    a.deadlock()
     println("never happens")
   }
 }

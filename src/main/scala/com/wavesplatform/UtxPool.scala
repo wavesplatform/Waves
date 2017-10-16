@@ -5,8 +5,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock
 import cats._
 import com.google.common.cache.CacheBuilder
 import com.wavesplatform.UtxPool.PessimisticPortfolios
-import com.wavesplatform.metrics.Metrics
-import com.wavesplatform.metrics.Instrumented
+import com.wavesplatform.metrics.{Instrumented, Metrics}
 import com.wavesplatform.settings.{FunctionalitySettings, UtxSettings}
 import com.wavesplatform.state2.diffs.TransactionDiffer
 import com.wavesplatform.state2.reader.{CompositeStateReader, StateReader}
@@ -18,7 +17,6 @@ import scorex.account.Address
 import scorex.consensus.TransactionsOrdering
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction._
-import scorex.utils.Synchronized.ReadLock
 import scorex.utils.{ScorexLogging, Synchronized, Time}
 
 import scala.concurrent.duration._
@@ -29,9 +27,8 @@ class UtxPool(time: Time,
               history: History,
               feeCalculator: FeeCalculator,
               fs: FunctionalitySettings,
-              utxSettings: UtxSettings) extends Synchronized with ScorexLogging with Instrumented {
-
-  def synchronizationToken: ReentrantReadWriteLock = new ReentrantReadWriteLock()
+              utxSettings: UtxSettings,
+              val synchronizationToken: ReentrantReadWriteLock) extends Synchronized with ScorexLogging with Instrumented {
 
   private val transactions = Synchronized(Map.empty[ByteStr, Transaction])
 
@@ -44,11 +41,13 @@ class UtxPool(time: Time,
 
   private val pessimisticPortfolios = Synchronized(new PessimisticPortfolios)
 
-  private def measureSize()(implicit l: ReadLock): Unit = Metrics.write(
-    Point
-      .measurement("utx-pool-size")
-      .addField("n", transactions().size)
-  )
+  private def measureSize(): Unit = read { implicit l =>
+    Metrics.write(
+      Point
+        .measurement("utx-pool-size")
+        .addField("n", transactions().size)
+    )
+  }
 
   private val processingTimeStats = Kamon.metrics.histogram(
     "utx-transaction-processing-time",

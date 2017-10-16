@@ -21,8 +21,7 @@ object StorageFactory {
       }
     }
 
-  def apply(settings: WavesSettings): Try[(NgHistory with DebugNgHistory with AutoCloseable, FeatureProvider, AutoCloseable, StateReader, BlockchainUpdater, BlockchainDebugInfo)] = {
-    val lock = new RWL(true)
+  def apply(settings: WavesSettings, lock: RWL): Try[(NgHistory with DebugNgHistory with AutoCloseable, FeatureProvider, AutoCloseable, StateReader, BlockchainUpdater, BlockchainDebugInfo)] = {
 
     for {
       historyWriter <- HistoryWriterImpl(settings.blockchainSettings.blockchainFile, lock, settings.blockchainSettings.functionalitySettings, settings.featuresSettings)

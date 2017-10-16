@@ -1,5 +1,7 @@
 package com.wavesplatform
 
+import java.util.concurrent.locks.ReentrantReadWriteLock
+
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.settings.{BlockchainSettings, FeaturesSettings, WavesSettings}
@@ -37,7 +39,7 @@ package object history {
   val EmptyFeaturesSettings = FeaturesSettings(autoShutdownOnUnsupportedFeature = false, List.empty)
 
   def domain(settings: WavesSettings, featuresSettings: FeaturesSettings): Domain = {
-    val (history, _, _, stateReader, blockchainUpdater, _) = StorageFactory(settings).get
+    val (history, _, _, stateReader, blockchainUpdater, _) = StorageFactory(settings, new ReentrantReadWriteLock(true)).get
     Domain(history, stateReader, blockchainUpdater)
   }
 
