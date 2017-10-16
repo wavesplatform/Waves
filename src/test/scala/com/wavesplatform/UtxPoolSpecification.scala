@@ -48,6 +48,8 @@ class UtxPoolSpecification extends FreeSpec
     (state, history)
   }
 
+  def lock = new ReentrantReadWriteLock(true)
+
   private def transfer(sender: PrivateKeyAccount, maxAmount: Long, time: Time) = (for {
     amount <- chooseNum(1, (maxAmount * 0.9).toLong)
     recipient <- accountGen
@@ -76,7 +78,7 @@ class UtxPoolSpecification extends FreeSpec
     offset <- chooseNum(1000L, 2000L)
   } yield {
     val time = new TestTime()
-    val utx = new UtxPool(time, state, history, calculator, FunctionalitySettings.TESTNET, UtxSettings(10, 10.minutes))
+    val utx = new UtxPool(time, state, history, calculator, FunctionalitySettings.TESTNET, UtxSettings(10, 10.minutes), lock)
     val amountPart = (senderBalance - fee) / 2 - fee
     val txs = for (_ <- 1 to n) yield PaymentTransaction.create(sender, recipient, amountPart, fee, time.getTimestamp()).right.get
     (utx, time, txs, (offset + 1000).millis)
@@ -85,7 +87,7 @@ class UtxPoolSpecification extends FreeSpec
   private val emptyUtxPool = stateGen
     .map { case (sender, senderBalance, state, history) =>
       val time = new TestTime()
-      val utxPool = new UtxPool(time, state, history, calculator, FunctionalitySettings.TESTNET, UtxSettings(10, 1.minute))
+      val utxPool = new UtxPool(time, state, history, calculator, FunctionalitySettings.TESTNET, UtxSettings(10, 1.minute), lock)
       (sender, state, utxPool)
     }
     .label("emptyUtxPool")
@@ -97,7 +99,7 @@ class UtxPoolSpecification extends FreeSpec
     txs <- Gen.nonEmptyListOf(transferWithRecipient(sender, recipient, senderBalance / 10, time))
   } yield {
     val settings = UtxSettings(10, 1.minute)
-    val utxPool = new UtxPool(time, state, history, calculator, FunctionalitySettings.TESTNET, settings)
+    val utxPool = new UtxPool(time, state, history, calculator, FunctionalitySettings.TESTNET, settings, lock)
     txs.foreach(utxPool.putIfNew)
     (sender, state, utxPool, time, settings)
   }).label("withValidPayments")
@@ -109,7 +111,7 @@ class UtxPoolSpecification extends FreeSpec
     val time = new TestTime()
 
     forAll(listOfN(count, transfer(sender, senderBalance / 2, time))) { txs =>
-      val utx = new UtxPool(time, state, history, calculator, FunctionalitySettings.TESTNET, utxSettings)
+      val utx = new UtxPool(time, state, history, calculator, FunctionalitySettings.TESTNET, utxSettings, lock)
       f(txs, utx, time)
     }
   }
@@ -126,7 +128,7 @@ class UtxPoolSpecification extends FreeSpec
       val time = new TestTime()
       val history = HistoryWriterImpl(None, new ReentrantReadWriteLock(), TestFunctionalitySettings.Stub,
         TestFunctionalitySettings.EmptyFeaturesSettings).get
-      val utx = new UtxPool(time, state, history, calculator, FunctionalitySettings.TESTNET, UtxSettings(10, offset.millis))
+      val utx = new UtxPool(time, state, history, calculator, FunctionalitySettings.TESTNET, UtxSettings(10, offset.millis), lock)
       (utx, time, tx1, (offset + 1000).millis, tx2)
     }
 
