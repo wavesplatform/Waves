@@ -33,7 +33,7 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
         |        allow-multiple-lease-cancel-transaction-until-timestamp = 14
         |        reset-effective-balances-at-height = 15
         |        allow-leased-balance-transfer-until = 17
-        |        block-version-3-after = 18
+        |        block-version-3-after-height = 18
         |        pre-activated-features {
         |          19 = 100
         |          20 = 200
