@@ -137,10 +137,10 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
           }
         } else if (areVersionsOfSameBlock(block, ng.base)) {
           if (block.transactionData.size <= ng.transactions.size) {
-            log.trace(s"Existing liquid block is better than exsting, discarding ${block.uniqueId}")
+            log.trace(s"Existing liquid block is better than new one, discarding ${block.uniqueId}")
             Right(None)
           } else {
-            log.trace(s"Existing liquid block is better than exsting, discarding ${block.uniqueId}")
+            log.trace(s"New liquid block is better version of exsting, swapping")
             BlockDiffer.fromBlock(settings.blockchainSettings.functionalitySettings, featureProvider, currentPersistedBlocksState, historyWriter.lastBlock, block).map(d => Some((d, Seq.empty[Transaction])))
           }
         } else {
