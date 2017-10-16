@@ -1,7 +1,6 @@
 package com.wavesplatform.network
 
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicBoolean
 
 import com.google.common.cache.{Cache, CacheBuilder}
 import com.wavesplatform.metrics.BlockStats
@@ -33,7 +32,7 @@ class MicroBlockSynchronizer(settings: MicroblockSynchronizerSettings,
   private val knownNextMicroBlocks = cache[MicroBlockSignature, MicroBlockInv](settings.invCacheTimeout)
   private val successfullyReceivedMicroBlocks = cache[MicroBlockSignature, Object](settings.processedMicroBlocksCacheTimeout)
   private val microBlockReceiveTime = cache[MicroBlockSignature, java.lang.Long](settings.invCacheTimeout)
-  private val downloading = new AtomicBoolean(false)
+
   lastBlockIdEvents.foreach { lastBlockSig =>
     tryDownloadNext(lastBlockSig).runAsync
   }
@@ -59,18 +58,12 @@ class MicroBlockSynchronizer(settings: MicroblockSynchronizerSettings,
   }
 
   private def tryDownloadNext(prevBlockId: ByteStr): Task[Unit] = Task.unit.flatMap { _ =>
-    Option(knownNextMicroBlocks.getIfPresent(prevBlockId)) match {
-      case Some(mb) =>
-        if (downloading.compareAndSet(false, true)) requestMicroBlockTask(mb, MicroBlockDownloadAttempts)
-        else Task.unit
-      case None =>
-        Task.unit
-    }
+    Option(knownNextMicroBlocks.getIfPresent(prevBlockId))
+      .fold(Task.unit)(requestMicroBlockTask(_, MicroBlockDownloadAttempts))
   }
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
     case mbr@MicroBlockResponse(mb) =>
-      downloading.set(false)
       Task {
         log.trace(id(ctx) + "Received " + mbr)
         knownMicroBlockOwners.invalidate(mb.totalResBlockSig)
