@@ -15,5 +15,12 @@ class AccountSpecification extends PropSpec with PropertyChecks with GeneratorDr
       Address.fromString(addressVersion2).isRight shouldBe (AddressVersion2 == Address.AddressVersion)
     }
   }
+
+  property("PublicKeyAccount should return Address as it's string representation") {
+    forAll { bytes: Array[Byte] =>
+      val a = PublicKeyAccount.apply(bytes)
+      a.toString shouldBe a.toAddress.address
+    }
+  }
 }
 
