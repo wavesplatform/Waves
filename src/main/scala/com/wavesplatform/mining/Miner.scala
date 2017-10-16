@@ -96,25 +96,25 @@ class MinerImpl(
         _ <- Either.cond(h < t, (), s"${System.currentTimeMillis()}: Hit $h was NOT less than target $t, not forging block with ${account.address}")
         _ = log.debug(s"Forging with ${account.address}, H $h < T $t, balance $balance, prev block ${referencedBlockInfo.blockId}")
         _ = log.debug(s"Previous block ID ${referencedBlockInfo.blockId} at $height with target ${referencedBlockInfo.consensus.baseTarget}")
-      } yield {
-        val avgBlockDelay = blockchainSettings.genesisSettings.averageBlockDelay
-        val btg = calcBaseTarget(avgBlockDelay, height, referencedBlockInfo.consensus.baseTarget, referencedBlockInfo.timestamp, greatGrandParentTimestamp, currentTime)
-        val gs = calcGeneratorSignature(referencedBlockInfo.consensus, account)
-        val sortInBlock = history.height() <= blockchainSettings.functionalitySettings.dontRequireSortedTransactionsAfter
-        val txAmount = if (ngEnabled) minerSettings.maxTransactionsInKeyBlock else ClassicAmountOfTxsInBlock
-        val features = if (version > 2) settings.featuresSettings.supported
-          .filter(featureProvider.featureStatus(_, height) == BlockchainFeatureStatus.Undefined)
-          .toSet.intersect(BlockchainFeatures.implemented) else Set.empty[Short]
-        val consensusData = NxtLikeConsensusBlockData(btg, ByteStr(gs))
-        (txAmount, sortInBlock, consensusData, features, referencedBlockInfo.blockId, version, currentTime)
-      })
-    } flatMap { case ((txAmount, sortInBlock, consensusData, features, referencedBlockId, version, currentTime)) =>
-      val unconfirmed = utx.packUnconfirmed(txAmount, sortInBlock)
-      log.debug(s"Adding ${unconfirmed.size} unconfirmed transaction(s) to new block")
-      Block.buildAndSign(version.toByte, currentTime, referencedBlockId, consensusData, unconfirmed, account, features)
-        .left.map(l => l.err)
-    }
+        block <- {
+          val avgBlockDelay = blockchainSettings.genesisSettings.averageBlockDelay
+          val btg = calcBaseTarget(avgBlockDelay, height, referencedBlockInfo.consensus.baseTarget, referencedBlockInfo.timestamp, greatGrandParentTimestamp, currentTime)
+          val gs = calcGeneratorSignature(referencedBlockInfo.consensus, account)
+          val consensusData = NxtLikeConsensusBlockData(btg, ByteStr(gs))
+          val sortInBlock = history.height() <= blockchainSettings.functionalitySettings.dontRequireSortedTransactionsAfter
+          val txAmount = if (ngEnabled) minerSettings.maxTransactionsInKeyBlock else ClassicAmountOfTxsInBlock
+          val unconfirmed = utx.packUnconfirmed(txAmount, sortInBlock)
 
+          val features = if (version > 2) settings.featuresSettings.supported
+            .filter(featureProvider.featureStatus(_, height) == BlockchainFeatureStatus.Undefined)
+            .toSet.intersect(BlockchainFeatures.implemented) else Set.empty[Short]
+
+          log.debug(s"Adding ${unconfirmed.size} unconfirmed transaction(s) to new block")
+          Block.buildAndSign(version.toByte, currentTime, referencedBlockInfo.blockId, consensusData, unconfirmed, account, features)
+            .left.map(l => l.err)
+        }
+      } yield block)
+    }
   }.delayExecution(delay)
 
 
