@@ -10,8 +10,6 @@ import com.wavesplatform.state2.diffs.produce
 import org.scalatest.words.ShouldVerb
 import org.scalatest.{FunSuite, Matchers}
 import scorex.block.Block
-import scorex.transaction.ValidationError.GenericError
-import sun.misc.{Signal, SignalHandler}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
