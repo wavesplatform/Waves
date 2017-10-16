@@ -259,7 +259,6 @@ object Block extends ScorexLogging {
         transactionData = transactionGenesisData,
         featureVotes = Set.empty))
     else Left(GenericError("Passed genesis signature is not valid"))
-
   }
 
   val GenesisBlockVersion: Byte = 1
