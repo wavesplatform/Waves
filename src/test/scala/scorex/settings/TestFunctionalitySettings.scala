@@ -14,7 +14,7 @@ object TestFunctionalitySettings {
     allowInvalidReissueInSameBlockUntilTimestamp = 0L,
     allowMultipleLeaseCancelTransactionUntilTimestamp = 0L, resetEffectiveBalancesAtHeight = 0,
     allowLeasedBalanceTransferUntil = 0L,
-    blockVersion3After = 0L,
+    blockVersion3AfterHeight = 0L,
     preActivatedFeatures = Map.empty
   )
 

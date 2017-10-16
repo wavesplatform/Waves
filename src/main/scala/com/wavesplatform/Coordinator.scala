@@ -207,10 +207,10 @@ object Coordinator extends ScorexLogging with Instrumented {
 
     (for {
       height <- history.heightOf(block.reference).toRight(s"history does not contain parent ${block.reference}")
-      _ <- Either.cond(height > fs.blockVersion3After
+      _ <- Either.cond(height > fs.blockVersion3AfterHeight
         || block.version == Block.GenesisBlockVersion
         || block.version == Block.PlainBlockVersion,
-        (), s"Block Version 3 can only appear at height greater than ${fs.blockVersion3After}")
+        (), s"Block Version 3 can only appear at height greater than ${fs.blockVersion3AfterHeight}")
       _ <- Either.cond(blockTime - currentTs < MaxTimeDrift, (), s"timestamp $blockTime is from future")
       _ <- Either.cond(blockTime < fs.requireSortedTransactionsAfter
         || height > fs.dontRequireSortedTransactionsAfter

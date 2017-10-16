@@ -33,7 +33,7 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
         |        allow-multiple-lease-cancel-transaction-until-timestamp = 14
         |        reset-effective-balances-at-height = 15
         |        allow-leased-balance-transfer-until = 17
-        |        block-version-3-after = 18
+        |        block-version-3-after-height = 18
         |        pre-activated-features {
         |          19 = 100
         |          20 = 200
@@ -75,7 +75,7 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
     settings.functionalitySettings.allowMultipleLeaseCancelTransactionUntilTimestamp should be(14)
     settings.functionalitySettings.resetEffectiveBalancesAtHeight should be(15)
     settings.functionalitySettings.allowLeasedBalanceTransferUntil should be(17)
-    settings.functionalitySettings.blockVersion3After should be(18)
+    settings.functionalitySettings.blockVersion3AfterHeight should be(18)
     settings.functionalitySettings.preActivatedFeatures should be(Map(19 -> 100, 20 -> 200))
     settings.genesisSettings.blockTimestamp should be(1460678400000L)
     settings.genesisSettings.timestamp should be(1460678400000L)
