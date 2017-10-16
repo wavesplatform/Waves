@@ -2,7 +2,7 @@ package com.wavesplatform.network
 
 import java.net.{InetSocketAddress, NetworkInterface}
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
+import java.util.concurrent.atomic.AtomicBoolean
 
 import com.wavesplatform.features.FeatureProvider
 import com.wavesplatform.metrics.Metrics
@@ -128,8 +128,6 @@ class NetworkServer(checkpointService: CheckpointService,
       .channel()
   }
 
-  private val outgoingChannelCount = new AtomicInteger(0)
-
   private val outgoingChannels = new ConcurrentHashMap[InetSocketAddress, Channel]
 
   private val clientHandshakeHandler =
@@ -170,7 +168,7 @@ class NetworkServer(checkpointService: CheckpointService,
     val incomingStr = incoming.map(_.toString).sorted.mkString(", ")
 
     log.trace(s"Outgoing: $outgoingStr ++ incoming: $incomingStr")
-    val shouldConnect = outgoingChannelCount.get() < settings.networkSettings.maxOutboundConnections
+    val shouldConnect = outgoingChannels.size() < settings.networkSettings.maxOutboundConnections
     if (shouldConnect) {
       peerDatabase
         .randomPeer(excludedAddresses ++ outgoing ++ incoming)
@@ -203,12 +201,12 @@ class NetworkServer(checkpointService: CheckpointService,
               val reason = s"${id(connFuture.channel())} Connection failed, suspending $remoteAddress"
               log.debug(reason, connFuture.cause())
               peerDatabase.suspend(remoteAddress.getAddress)
+              outgoingChannels.remove(remoteAddress, connFuture.channel())
             } else if (connFuture.isSuccess) {
               log.trace(s"${id(connFuture.channel())} Connection established")
               peerDatabase.touch(remoteAddress)
-              outgoingChannelCount.incrementAndGet()
               connFuture.channel().closeFuture().addListener { (closeFuture: ChannelFuture) =>
-                val remainingCount = outgoingChannelCount.decrementAndGet()
+                val remainingCount = outgoingChannels.size()
                 val reason = s"${id(closeFuture.channel)} Connection closed, $remainingCount outgoing channel(s) remaining"
                 log.info(reason)
                 outgoingChannels.remove(remoteAddress, closeFuture.channel())
