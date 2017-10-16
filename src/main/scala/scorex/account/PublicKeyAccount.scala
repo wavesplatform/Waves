@@ -1,6 +1,5 @@
 package scorex.account
 
-import com.wavesplatform.state2.ByteStr
 import scorex.crypto.encode.Base58
 import scorex.transaction.ValidationError.InvalidAddress
 import scorex.transaction.{TransactionParser, ValidationError}
@@ -15,7 +14,7 @@ trait PublicKeyAccount {
 
   override def hashCode(): Int = publicKey.hashCode()
 
-  override lazy val toString: String = ByteStr.apply(this.publicKey).base58
+  override lazy val toString: String = this.toAddress.address
 }
 
 object PublicKeyAccount {
