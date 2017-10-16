@@ -83,7 +83,7 @@ class MinerImpl(
     history.read { implicit l =>
       // should take last block right at the time of mining since microblocks might have been added
       val height = history.height()
-      val version = if (height <= blockchainSettings.functionalitySettings.blockVersion3After) PlainBlockVersion else NgBlockVersion
+      val version = if (height <= blockchainSettings.functionalitySettings.blockVersion3AfterHeight) PlainBlockVersion else NgBlockVersion
       val lastBlock = history.lastBlock.get
       val greatGrandParentTimestamp = history.parent(lastBlock, 2).map(_.timestamp)
       val referencedBlockInfo = history.bestLastBlockInfo(System.currentTimeMillis() - minMicroBlockDurationMills).get
