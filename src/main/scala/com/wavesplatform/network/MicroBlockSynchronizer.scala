@@ -7,7 +7,7 @@ import com.google.common.cache.{Cache, CacheBuilder}
 import com.wavesplatform.metrics.BlockStats
 import com.wavesplatform.network.MicroBlockSynchronizer._
 import com.wavesplatform.settings.SynchronizationSettings.MicroblockSynchronizerSettings
-import com.wavesplatform.state2.{ByteStr, trim}
+import com.wavesplatform.state2.ByteStr
 import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel._
 import monix.eval.Task
@@ -106,7 +106,7 @@ class MicroBlockSynchronizer(settings: MicroblockSynchronizerSettings,
                 else tryDownloadNext(mi.prevBlockSig)
               } else {
                 notLastMicroblockStats.increment()
-                log.trace(s"Discarding $mi because it doesn't match last (micro)block ${trim(lastBlockId)}")
+                log.trace(s"Discarding $mi because it doesn't match last (micro)block ${lastBlockId.trim}")
                 Task.unit
               }
 

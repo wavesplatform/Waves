@@ -32,7 +32,7 @@ object ValidationError {
     override def toString: String = s"BlockAppendError($err, BlockId=${b.uniqueId}])"
   }
   case class MicroBlockAppendError(err: String, microBlock: MicroBlock) extends ValidationError {
-    override def toString: String = s"MicroBlockAppendError($err, MicroBlockId=${microBlock.totalResBlockSig}[-->${microBlock.prevResBlockSig}])"
+    override def toString: String = s"MicroBlockAppendError($err, ${microBlock.totalResBlockSig} ~> ${microBlock.prevResBlockSig.trim}])"
   }
 
   case class ActivationError(err: String) extends ValidationError

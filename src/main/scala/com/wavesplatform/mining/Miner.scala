@@ -150,7 +150,7 @@ class MinerImpl(
         _ <- Coordinator.processMicroBlock(checkpoint, history, blockchainUpdater, utx)(microBlock)
       } yield {
         BlockStats.mined(microBlock)
-        log.trace(s"MicroBlock(id=${trim(microBlock.uniqueId)}) has been mined for $account}")
+        log.trace(s"MicroBlock(id=${microBlock.uniqueId.trim}) has been mined for $account}")
         allChannels.broadcast(MicroBlockInv(account, microBlock.totalResBlockSig, microBlock.prevResBlockSig))
         Some(signedBlock)
       }
