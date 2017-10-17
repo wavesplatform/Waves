@@ -5,14 +5,13 @@ import java.util.concurrent.ConcurrentHashMap
 import cats._
 import com.google.common.cache.CacheBuilder
 import com.wavesplatform.UtxPool.PessimisticPortfolios
-import com.wavesplatform.metrics.{Instrumented, Metrics}
+import com.wavesplatform.metrics.Instrumented
 import com.wavesplatform.settings.{FunctionalitySettings, UtxSettings}
 import com.wavesplatform.state2.diffs.TransactionDiffer
 import com.wavesplatform.state2.reader.{CompositeStateReader, StateReader}
 import com.wavesplatform.state2.{ByteStr, Diff, Portfolio}
 import kamon.Kamon
 import kamon.metric.instrument.{Time => KamonTime}
-import org.influxdb.dto.Point
 import scorex.account.Address
 import scorex.consensus.TransactionsOrdering
 import scorex.transaction.ValidationError.GenericError
@@ -37,15 +36,9 @@ class UtxPool(time: Time,
     .maximumSize(utxSettings.maxSize * 2)
     .build[ByteStr, Either[ValidationError, Transaction]]()
 
-
   private val pessimisticPortfolios = new PessimisticPortfolios
 
-  private def measureSize(): Unit = Metrics.write(
-    Point
-      .measurement("utx-pool-size")
-      .addField("n", transactions.size)
-  )
-
+  private val utxPoolSizeStats = Kamon.metrics.minMaxCounter("utx-pool-size", 500.millis)
   private val processingTimeStats = Kamon.metrics.histogram("utx-transaction-processing-time", KamonTime.Milliseconds)
   private val putRequestStats = Kamon.metrics.counter("utx-pool-put-if-new")
 
@@ -59,9 +52,8 @@ class UtxPool(time: Time,
       .foreach { tx =>
         transactions.remove(tx.id)
         pessimisticPortfolios.remove(tx.id)
+        utxPoolSizeStats.decrement()
       }
-
-    measureSize()
   }
 
   def putIfNew(tx: Transaction): Either[ValidationError, Boolean] = {
@@ -76,6 +68,7 @@ class UtxPool(time: Time,
             _ <- feeCalculator.enoughFee(tx)
             diff <- TransactionDiffer(fs, history.lastBlockTimestamp(), time.correctedTime(), stateReader.height)(stateReader, tx)
           } yield {
+            utxPoolSizeStats.increment()
             pessimisticPortfolios.add(tx.id, diff)
             transactions.put(tx.id, tx)
             tx
@@ -89,7 +82,7 @@ class UtxPool(time: Time,
   def removeAll(txs: Traversable[Transaction]): Unit = {
     txs.view.map(_.id).foreach { id =>
       knownTransactions.invalidate(id)
-      transactions.remove(id)
+      Option(transactions.remove(id)).foreach(_ => utxPoolSizeStats.decrement())
       pessimisticPortfolios.remove(id)
     }
 
