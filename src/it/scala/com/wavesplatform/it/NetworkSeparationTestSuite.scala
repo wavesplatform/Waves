@@ -21,7 +21,7 @@ class NetworkSeparationTestSuite extends FreeSpec with Matchers with BeforeAndAf
   private def validateBlocks(nodes: Seq[Node]): Unit = {
     val targetBlocks1 = result(for {
       height <- traverse(nodes)(_.height).map(_.max)
-      _ <- traverse(nodes)(_.waitForHeight(height + 10))
+      _ <- traverse(nodes)(_.waitForHeight(height + 13))
       blocks <- traverse(nodes)(_.blockAt(height + 8))
     } yield blocks.map(_.signature), 5.minutes)
     all(targetBlocks1) shouldEqual targetBlocks1.head
