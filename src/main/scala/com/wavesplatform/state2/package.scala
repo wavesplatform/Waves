@@ -21,7 +21,4 @@ package object state2 {
       case Right(value) => value
     }
   }
-
-  def trim(s: ByteStr): String = s.toString.take(7) + "..."
-
 }
