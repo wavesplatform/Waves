@@ -2,7 +2,7 @@ package com.wavesplatform.network
 
 import java.net.InetSocketAddress
 
-import com.wavesplatform.state2.{ByteStr, trim}
+import com.wavesplatform.state2.{ByteStr}
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.block.{Block, MicroBlock}
 import scorex.crypto.EllipticCurveImpl
@@ -21,7 +21,7 @@ case class RawBytes(code: Byte, data: Array[Byte]) extends Message
 case class BlockForged(block: Block) extends Message
 case class MicroBlockRequest(totalBlockSig: ByteStr)  extends Message
 case class MicroBlockResponse(microblock: MicroBlock) extends Message {
-  override def toString: String = s"MicroBlockResponse(MicroBlock(${trim(microblock.totalResBlockSig)}~>${trim(microblock.prevResBlockSig)}))"
+  override def toString: String = s"MicroBlockResponse(MicroBlock(${microblock.totalResBlockSig.trim}~>${microblock.prevResBlockSig.trim}))"
 }
 case class LoadBlockchainExtension(lastBlockIds: Seq[ByteStr])
 case class ExtensionIds(lastCommonId: ByteStr, extensionIds: Seq[ByteStr])
@@ -29,7 +29,7 @@ case class ExtensionBlocks(extension: Seq[Block])
 
 case class MicroBlockInv(sender: PublicKeyAccount, totalBlockSig: ByteStr, prevBlockSig: ByteStr, signature: ByteStr) extends Message with Signed {
   override protected def signatureValid: Boolean = EllipticCurveImpl.verify(signature.arr, sender.toAddress.bytes.arr ++ totalBlockSig.arr ++ prevBlockSig.arr, sender.publicKey)
-  override def toString: String = s"MicroBlockInv(totalBlockSig=$totalBlockSig, prevBlockSig=${trim(prevBlockSig)})"
+  override def toString: String = s"MicroBlockInv(totalBlockSig=$totalBlockSig, prevBlockSig=${prevBlockSig.trim})"
 }
 object MicroBlockInv{
 

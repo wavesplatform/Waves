@@ -6,6 +6,7 @@ import com.wavesplatform.state2.diffs._
 import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
+import scorex.account.PrivateKeyAccount
 import scorex.transaction._
 
 class BlockchainUpdaterMicroblockSunnyDayTest extends PropSpec with PropertyChecks with DomainScenarioDrivenPropertyCheck with Matchers with TransactionGen {
@@ -103,7 +104,7 @@ class BlockchainUpdaterMicroblockSunnyDayTest extends PropSpec with PropertyChec
       domain.blockchainUpdater.processBlock(block0).explicitGet()
       domain.blockchainUpdater.processBlock(block1).explicitGet()
       domain.blockchainUpdater.processMicroBlock(microBlocks1(0)).explicitGet()
-      domain.blockchainUpdater.processBlock(block2) should produce("Competitor's liquid block")
+      domain.blockchainUpdater.processBlock(block2).explicitGet() // silently discards worse version
 
       domain.effBalance(genesis.recipient) > 0 shouldBe true
       domain.effBalance(masterToAlice.recipient) shouldBe 0
@@ -115,7 +116,8 @@ class BlockchainUpdaterMicroblockSunnyDayTest extends PropSpec with PropertyChec
     scenario(preconditionsAndPayments, MicroblocksActivatedAt0WavesSettings) { case (domain, (genesis, masterToAlice, aliceToBob, aliceToBob2)) =>
       val block0 = buildBlockOfTxs(randomSig, Seq(genesis))
       val (block1, microBlocks1) = chainBaseAndMicro(block0.uniqueId, masterToAlice, Seq(Seq(aliceToBob)))
-      val block2 = customBuildBlockOfTxs(block0.uniqueId, Seq(masterToAlice, aliceToBob2), defaultSigner, 1, 0L, DefaultBaseTarget / 2)
+      val otherSigner = PrivateKeyAccount(Array.fill(TransactionParser.KeyLength)(1))
+      val block2 = customBuildBlockOfTxs(block0.uniqueId, Seq(masterToAlice, aliceToBob2),  otherSigner, 1, 0L, DefaultBaseTarget / 2)
       domain.blockchainUpdater.processBlock(block0).explicitGet()
       domain.blockchainUpdater.processBlock(block1).explicitGet()
       domain.blockchainUpdater.processMicroBlock(microBlocks1(0)).explicitGet()

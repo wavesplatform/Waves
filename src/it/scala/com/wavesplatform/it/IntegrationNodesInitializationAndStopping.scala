@@ -24,6 +24,11 @@ trait IntegrationNodesInitializationAndStopping extends BeforeAndAfterAll { this
 
   override protected def afterAll(): Unit = {
     super.afterAll()
+    ensureNoDeadlock()
     docker.close()
+  }
+
+  private def ensureNoDeadlock() = {
+    Await.result(Future.traverse(nodes)(_.height), 7.seconds)
   }
 }

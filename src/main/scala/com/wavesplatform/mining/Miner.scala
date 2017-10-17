@@ -83,7 +83,7 @@ class MinerImpl(
     history.read { implicit l =>
       // should take last block right at the time of mining since microblocks might have been added
       val height = history.height()
-      val version = if (height <= blockchainSettings.functionalitySettings.blockVersion3After) PlainBlockVersion else NgBlockVersion
+      val version = if (height <= blockchainSettings.functionalitySettings.blockVersion3AfterHeight) PlainBlockVersion else NgBlockVersion
       val lastBlock = history.lastBlock.get
       val greatGrandParentTimestamp = history.parent(lastBlock, 2).map(_.timestamp)
       val referencedBlockInfo = history.bestLastBlockInfo(System.currentTimeMillis() - minMicroBlockDurationMills).get
@@ -105,7 +105,7 @@ class MinerImpl(
           val txAmount = if (ngEnabled) minerSettings.maxTransactionsInKeyBlock else ClassicAmountOfTxsInBlock
           val unconfirmed = utx.packUnconfirmed(txAmount, sortInBlock)
 
-          val features = if(version > 2) settings.featuresSettings.supported
+          val features = if (version > 2) settings.featuresSettings.supported
             .filter(featureProvider.featureStatus(_, height) == BlockchainFeatureStatus.Undefined)
             .toSet.intersect(BlockchainFeatures.implemented) else Set.empty[Short]
 
@@ -150,7 +150,7 @@ class MinerImpl(
         _ <- Coordinator.processMicroBlock(checkpoint, history, blockchainUpdater, utx)(microBlock)
       } yield {
         BlockStats.mined(microBlock)
-        log.trace(s"MicroBlock(id=${trim(microBlock.uniqueId)}) has been mined for $account}")
+        log.trace(s"MicroBlock(id=${microBlock.uniqueId.trim}) has been mined for $account}")
         allChannels.broadcast(MicroBlockInv(account, microBlock.totalResBlockSig, microBlock.prevResBlockSig))
         Some(signedBlock)
       }
@@ -167,15 +167,17 @@ class MinerImpl(
       case Right(maybeNewTotal) => generateMicroBlockSequence(account, maybeNewTotal.getOrElse(accumulatedBlock))
     }
 
-  private def generateBlockTask(account: PrivateKeyAccount): Task[Unit] = history.read { implicit l =>
-    val height = history.height()
-    val lastBlock = history.lastBlock.get
-    (for {
-      _ <- checkAge(height, history.lastBlockTimestamp().get)
-      ts <- nextBlockGenerationTime(height, stateReader, blockchainSettings.functionalitySettings, lastBlock, account, featureProvider)
-      offset = calcOffset(timeService, ts, minerSettings.minimalBlockGenerationOffset)
-      balance <- generatingBalance(stateReader, blockchainSettings.functionalitySettings, account, height).toEither.left.map(er => GenericError(er.getMessage))
-    } yield (offset, balance)) match {
+  private def generateBlockTask(account: PrivateKeyAccount): Task[Unit] = {
+    history.read { implicit l =>
+      val height = history.height()
+      val lastBlock = history.lastBlock.get
+      for {
+        _ <- checkAge(height, history.lastBlockTimestamp().get)
+        ts <- nextBlockGenerationTime(height, stateReader, blockchainSettings.functionalitySettings, lastBlock, account, featureProvider)
+        offset = calcOffset(timeService, ts, minerSettings.minimalBlockGenerationOffset)
+        balance <- generatingBalance(stateReader, blockchainSettings.functionalitySettings, account, height).toEither.left.map(er => GenericError(er.getMessage))
+      } yield (offset, balance)
+    } match {
       case Right((offset, balance)) =>
         log.debug(s"Next attempt for acc=$account in $offset")
         nextBlockGenerationTimes += account.toAddress -> (System.currentTimeMillis() + offset.toMillis)
@@ -201,7 +203,6 @@ class MinerImpl(
         Task.unit
     }
   }
-
 
   def scheduleMining(): Unit = {
     Miner.blockMiningStarted.increment()

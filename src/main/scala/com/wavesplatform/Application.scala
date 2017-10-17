@@ -37,7 +37,6 @@ import scorex.transaction._
 import scorex.utils.{ScorexLogging, Time, TimeImpl}
 import scorex.wallet.Wallet
 import scorex.waves.http.{DebugApiRoute, WavesApiRoute}
-
 import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.reflect.runtime.universe._

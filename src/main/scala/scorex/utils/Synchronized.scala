@@ -74,12 +74,11 @@ trait Synchronized extends ScorexLogging {
   def read[T](body: ReadLock => T): T =
     synchronizeOperation(instanceReadLock)(body)
 
-  protected def write[T](body: WriteLock => T): T =
+  def write[T](body: WriteLock => T): T =
     synchronizeOperation(instanceReadWriteLock)(body)
 
   protected def synchronizeOperation[T, L <: TypedLock](lock: L)(body: L => T): T = {
     lock.lock()
-//    log.trace(s"locked $lock")
     try {
       body(lock)
     } catch {
@@ -89,7 +88,6 @@ trait Synchronized extends ScorexLogging {
     }
     finally {
       lock.unlock()
-//      log.trace(s"unlocked $lock")
     }
   }
 }

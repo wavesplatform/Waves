@@ -4,10 +4,10 @@ import java.security.Permission
 import java.util.concurrent.{Semaphore, TimeUnit}
 
 import com.wavesplatform.features.BlockchainFeatureStatus
-import com.wavesplatform.state2._
 import com.wavesplatform.history._
 import com.wavesplatform.state2.diffs.produce
 import org.scalatest.words.ShouldVerb
+import com.wavesplatform.state2._
 import org.scalatest.{FunSuite, Matchers}
 import scorex.block.Block
 
@@ -28,8 +28,10 @@ class BlockchainUpdaterTest extends FunSuite with Matchers with HistoryTest with
     featuresSettings = DefaultWavesSettings.featuresSettings.copy(autoShutdownOnUnsupportedFeature = true)
   )
 
+  private def storageFactory() = StorageFactory(WavesSettings).get
+
   test("concurrent access to lastBlock doesn't throw any exception") {
-    val (h, fp, _, _, bu, _) = StorageFactory(WavesSettings).get
+    val (h, fp, _, _, bu, _) = storageFactory()
 
     bu.processBlock(genesisBlock)
 
@@ -55,7 +57,7 @@ class BlockchainUpdaterTest extends FunSuite with Matchers with HistoryTest with
 
   test("features approved and accepted as height grows") {
 
-    val (h, fp, _, _, bu, _) = StorageFactory(WavesSettings).get
+    val (h, fp, _, _, bu, _) = storageFactory()
 
     bu.processBlock(genesisBlock)
 
@@ -92,7 +94,7 @@ class BlockchainUpdaterTest extends FunSuite with Matchers with HistoryTest with
   }
 
   test("features rollback with block rollback") {
-    val (h, fp, _, _, bu, _) = StorageFactory(WavesSettings).get
+    val (h, fp, _, _, bu, _) = storageFactory()
 
     bu.processBlock(genesisBlock)
 
@@ -147,7 +149,7 @@ class BlockchainUpdaterTest extends FunSuite with Matchers with HistoryTest with
   }
 
   test("feature activation height is not overrided with further periods") {
-    val (h, fp, _, _, bu, _) = StorageFactory(WavesSettings).get
+    val (h, fp, _, _, bu, _) = storageFactory()
 
     bu.processBlock(genesisBlock)
 
@@ -169,7 +171,7 @@ class BlockchainUpdaterTest extends FunSuite with Matchers with HistoryTest with
   }
 
   test("feature activated only by 90% of blocks") {
-    val (h, fp, _, _, bu, _) = StorageFactory(WavesSettings).get
+    val (h, fp, _, _, bu, _) = storageFactory()
 
     bu.processBlock(genesisBlock)
 
@@ -192,7 +194,7 @@ class BlockchainUpdaterTest extends FunSuite with Matchers with HistoryTest with
   }
 
   test("features votes resets when voting window changes") {
-    val (h, fp, _, _, bu, _) = StorageFactory(WavesSettings).get
+    val (h, fp, _, _, bu, _) = storageFactory()
 
     bu.processBlock(genesisBlock)
 

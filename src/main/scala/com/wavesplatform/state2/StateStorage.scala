@@ -22,7 +22,7 @@ class StateStorage private(file: Option[File]) extends VariablesStorage(createMV
   def setHeight(i: Int): Unit = putInt(heightKey, i)
 
   val transactions: MVMap[ByteStr, (Int, Array[Byte])] = db.openMap("txs", new LogMVMapBuilder[ByteStr, (Int, Array[Byte])]
-    .keyType(DataTypes.byteStr).valueType(DataTypes.transactions))
+    .keyType(DataTypes.byteStr).valueType(DataTypes.tupleIntByteArray))
 
   val wavesBalance: MVMap[ByteStr, (Long, Long, Long)] = db.openMap("wavesBalance",
     new LogMVMapBuilder[ByteStr, (Long, Long, Long)]

@@ -24,7 +24,7 @@ object Coordinator extends ScorexLogging with Instrumented {
   def processFork(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater,
                   stateReader: StateReader, utxStorage: UtxPool, time: Time, settings: WavesSettings,
                   blockchainReadiness: AtomicBoolean, featureProvider: FeatureProvider)
-                 (newBlocks: Seq[Block]): Either[ValidationError, Option[BigInt]] = {
+                 (newBlocks: Seq[Block]): Either[ValidationError, Option[BigInt]] = history.write { implicit l =>
     val extension = newBlocks.dropWhile(history.contains)
 
     extension.headOption.map(_.reference) match {
@@ -111,7 +111,7 @@ object Coordinator extends ScorexLogging with Instrumented {
   def processSingleBlock(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater, time: Time,
                          stateReader: StateReader, utxStorage: UtxPool, blockchainReadiness: AtomicBoolean,
                          settings: WavesSettings, featureProvider: FeatureProvider)
-                        (newBlock: Block, local: Boolean): Either[ValidationError, Option[BigInt]] = measureSuccessful(blockProcessingTimeStats, {
+                        (newBlock: Block, local: Boolean): Either[ValidationError, Option[BigInt]] = measureSuccessful(blockProcessingTimeStats, history.write { implicit l =>
     if (history.contains(newBlock))
       Right(None)
     else {
@@ -207,10 +207,10 @@ object Coordinator extends ScorexLogging with Instrumented {
 
     (for {
       height <- history.heightOf(block.reference).toRight(s"history does not contain parent ${block.reference}")
-      _ <- Either.cond(height > fs.blockVersion3After
+      _ <- Either.cond(height > fs.blockVersion3AfterHeight
         || block.version == Block.GenesisBlockVersion
         || block.version == Block.PlainBlockVersion,
-        (), s"Block Version 3 can only appear at height greater than ${fs.blockVersion3After}")
+        (), s"Block Version 3 can only appear at height greater than ${fs.blockVersion3AfterHeight}")
       _ <- Either.cond(blockTime - currentTs < MaxTimeDrift, (), s"timestamp $blockTime is from future")
       _ <- Either.cond(blockTime < fs.requireSortedTransactionsAfter
         || height > fs.dontRequireSortedTransactionsAfter
