@@ -1,5 +1,6 @@
 package scorex.network.peer
 
+import java.io.File
 import java.net.{InetAddress, InetSocketAddress}
 import java.nio.file.Files
 
@@ -106,11 +107,11 @@ class PeerDatabaseImplSpecification extends path.FreeSpecLike with Matchers {
 
     "if blacklisting is disable" - {
       "should clear blacklist at start" in {
-        val databaseFile = Files.createTempFile("waves-tests", "PeerDatabaseImplSpecification-blacklisting-clear")
-
+        val databaseFile = Files.createTempFile("waves-tests", "PeerDatabaseImplSpecification-blacklisting-clear").toAbsolutePath.toString
+        val path = if (File.separatorChar == '\\') databaseFile.replace('\\', '/') else databaseFile
         val prevConfig = ConfigFactory.parseString(
           s"""waves.network {
-             |  file = ${databaseFile.toAbsolutePath}
+             |  file = "$path"
              |  known-peers = []
              |  peers-data-residence-time: 100s
              |}""".stripMargin).withFallback(ConfigFactory.load()).resolve()
@@ -121,11 +122,11 @@ class PeerDatabaseImplSpecification extends path.FreeSpecLike with Matchers {
 
         val config = ConfigFactory.parseString(
           s"""waves.network {
-            |  file = ${databaseFile.toAbsolutePath}
-            |  known-peers = []
-            |  peers-data-residence-time: 100s
-            |  enable-blacklisting = no
-            |}""".stripMargin).withFallback(ConfigFactory.load()).resolve()
+             |  file = "$path"
+             |  known-peers = []
+             |  peers-data-residence-time: 100s
+             |  enable-blacklisting = no
+             |}""".stripMargin).withFallback(ConfigFactory.load()).resolve()
         val settings = config.as[NetworkSettings]("waves.network")
         val database = new PeerDatabaseImpl(settings)
 
