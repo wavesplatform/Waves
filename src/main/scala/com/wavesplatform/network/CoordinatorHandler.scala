@@ -11,7 +11,7 @@ import com.wavesplatform.state2.reader.StateReader
 import com.wavesplatform.{Coordinator, UtxPool}
 import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel.group.ChannelGroup
-import io.netty.channel.{Channel, ChannelHandlerContext, ChannelInboundHandlerAdapter}
+import io.netty.channel.{ChannelHandlerContext, ChannelInboundHandlerAdapter}
 import kamon.Kamon
 import monix.eval.Task
 import scorex.block.Block
@@ -42,13 +42,12 @@ class CoordinatorHandler(checkpointService: CheckpointService,
   private val processBlock = Coordinator.processSingleBlock(checkpointService, history, blockchainUpdater, time, stateReader, utxStorage, blockchainReadiness, settings, featureProvider) _
   private val processMicroBlock = Coordinator.processMicroBlock(checkpointService, history, blockchainUpdater, utxStorage) _
 
-
   private def scheduleMiningAndBroadcastScore(score: BigInt): Unit = {
     miner.scheduleMining()
     allChannels.broadcast(LocalScoreChanged(score))
   }
 
-  private def processAndBlacklistOnFailure[A](src: Channel, start: => String, success: => String, errorPrefix: String,
+  private def processAndBlacklistOnFailure[A](ctx: ChannelHandlerContext, start: => String, success: => String, errorPrefix: String,
                                               f: => Either[_, Option[A]],
                                               r: A => Unit): Unit = {
     log.debug(start)
@@ -58,12 +57,12 @@ class CoordinatorHandler(checkpointService: CheckpointService,
         maybeNewScore.foreach(r)
       case Left(ve) =>
         log.warn(s"$errorPrefix: $ve")
-        peerDatabase.blacklistAndClose(src, s"$errorPrefix: $ve")
-    }.runAsync
+        peerDatabase.blacklistAndClose(ctx.channel(), s"$errorPrefix: $ve")
+    }.onErrorHandle(ctx.fireExceptionCaught).runAsync
   }
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
-    case c: Checkpoint => processAndBlacklistOnFailure(ctx.channel,
+    case c: Checkpoint => processAndBlacklistOnFailure(ctx,
       "Attempting to process checkpoint",
       "Successfully processed checkpoint",
       s"Error processing checkpoint",
@@ -71,7 +70,7 @@ class CoordinatorHandler(checkpointService: CheckpointService,
 
     case ExtensionBlocks(blocks) =>
       blocks.foreach(BlockStats.received(_, BlockStats.Source.Ext, ctx))
-      processAndBlacklistOnFailure(ctx.channel,
+      processAndBlacklistOnFailure(ctx,
         s"Attempting to append extension ${formatBlocks(blocks)}",
         s"Successfully appended extension ${formatBlocks(blocks)}",
         s"Error appending extension ${formatBlocks(blocks)}",
@@ -96,7 +95,7 @@ class CoordinatorHandler(checkpointService: CheckpointService,
       case Left(ve) =>
         BlockStats.declined(b, BlockStats.Source.Broadcast)
         log.debug(s"Could not append block ${b.uniqueId}: $ve")
-    }).runAsync
+    }).onErrorHandle(ctx.fireExceptionCaught).runAsync
 
     case md: MicroblockData =>
       val microBlock = md.microBlock
@@ -113,7 +112,7 @@ class CoordinatorHandler(checkpointService: CheckpointService,
         case Left(ve) =>
           BlockStats.declined(microBlock)
           log.debug(s"Could not append microblock $microblockTotalResBlockSig: $ve")
-      }).runAsync
+      }).onErrorHandle(ctx.fireExceptionCaught).runAsync
   }
 }
 
