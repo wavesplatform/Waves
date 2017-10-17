@@ -90,15 +90,12 @@ class PeersRouteSpec extends RouteSpec("/peers") with RestAPISettingsHelper with
       (responseAs[JsValue] \ "validationErrors").as[JsObject].keys should not be 'empty
     }
 
-    forAll(inetSocketAddressGen) { address =>
-      connectToPeer.expects(address).once
-
-      val result = Post(connectUri, ConnectReq(address.getHostName, address.getPort)) ~> api_key(apiKey) ~> route ~> runRoute
-
-      check {
-        responseAs[ConnectResp].hostname shouldEqual address.getHostName
-      }(result)
-    }
+    val address = inetSocketAddressGen.sample.get
+    connectToPeer.expects(address).once
+    val result = Post(connectUri, ConnectReq(address.getHostName, address.getPort)) ~> api_key(apiKey) ~> route ~> runRoute
+    check {
+      responseAs[ConnectResp].hostname shouldEqual address.getHostName
+    }(result)
   }
 
   routePath("/blacklisted") ignore {
