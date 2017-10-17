@@ -143,7 +143,7 @@ object DataTypes {
   }
 
   // (Int, Array[Byte])
-  val transactions: DataType = new DTTemplate {
+  val tupleIntByteArray: DataType = new DTTemplate {
     override def compare(a: scala.Any, b: scala.Any) = throw new UnsupportedOperationException
 
     override def read(buff: ByteBuffer) = {
