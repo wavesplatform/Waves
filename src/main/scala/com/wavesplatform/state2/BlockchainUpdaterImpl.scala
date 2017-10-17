@@ -125,7 +125,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
     val notImplementedFeatures = featureProvider.activatedFeatures(height).diff(BlockchainFeatures.implemented)
 
     for {
-      _ <- Either.cond(settings.featuresSettings.autoShutdownOnUnsupportedFeature && notImplementedFeatures.isEmpty, (),
+      _ <- Either.cond(!settings.featuresSettings.autoShutdownOnUnsupportedFeature || notImplementedFeatures.isEmpty, (),
         GenericError(s"UNIMPLEMENTED ${displayFeatures(notImplementedFeatures)} ACTIVATED ON BLOCKCHAIN, UPDATE THE NODE IMMEDIATELY"))
       ng <- blockConsensusValidation(block)
       (newBlockDiff, discarded) = ng
