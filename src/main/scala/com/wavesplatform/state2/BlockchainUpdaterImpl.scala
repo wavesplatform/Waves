@@ -127,7 +127,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
     for {
       _ <- Either.cond(settings.featuresSettings.autoShutdownOnUnsupportedFeature && notImplementedFeatures.isEmpty, (),
         GenericError(s"UNIMPLEMENTED ${displayFeatures(notImplementedFeatures)} ACTIVATED ON BLOCKCHAIN, UPDATE THE NODE IMMEDIATELY"))
-      ng <- processNg(block)
+      ng <- blockConsensusValidation(block)
       (newBlockDiff, discarded) = ng
     } yield {
       ngState.set(Some(NgState(block, newBlockDiff, 0L, featuresApprovedWithBlock(block))))
@@ -137,7 +137,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
     }
   }
 
-  private def processNg(block: Block): Either[ValidationError, (BlockDiff, Seq[Transaction])] = write { implicit l =>
+  private def blockConsensusValidation(block: Block): Either[ValidationError, (BlockDiff, Seq[Transaction])] = write { implicit l =>
     ngState() match {
       case None =>
         historyWriter.lastBlock match {
