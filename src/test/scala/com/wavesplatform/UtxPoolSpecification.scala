@@ -48,8 +48,6 @@ class UtxPoolSpecification extends FreeSpec
     (state, history)
   }
 
-  def lock = new ReentrantReadWriteLock(true)
-
   private def transfer(sender: PrivateKeyAccount, maxAmount: Long, time: Time) = (for {
     amount <- chooseNum(1, (maxAmount * 0.9).toLong)
     recipient <- accountGen
