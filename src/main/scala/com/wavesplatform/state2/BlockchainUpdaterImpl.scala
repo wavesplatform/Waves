@@ -120,6 +120,12 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
       bottomMemoryDiff.set(topMemoryDiff())
       topMemoryDiff.set(BlockDiff.empty)
     }
+
+    val height = historyWriter.height()
+    val notImplementedFeatures = featureProvider.activatedFeatures(height).diff(BlockchainFeatures.implemented)
+
+    Either.cond(!settings.featuresSettings.autoShutdownOnUnsupportedFeature || notImplementedFeatures.isEmpty, (),
+      GenericError(s"UNIMPLEMENTED ${displayFeatures(notImplementedFeatures)} ACTIVATED ON BLOCKCHAIN, UPDATE THE NODE IMMEDIATELY")).flatMap(_ =>
     (ngState() match {
       case None =>
         historyWriter.lastBlock match {
@@ -177,7 +183,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
         log.info(s"Block ${block.uniqueId} -> ${block.reference.trim} appended. New height: $height, transactions: ${block.transactionData.size})")
         discacrded
       case None => Seq.empty
-    }
+    })
   }
 
   override def removeAfter(blockId: ByteStr): Either[ValidationError, Seq[Block]] = write { implicit l =>

@@ -132,7 +132,7 @@ class BlockchainUpdaterMicroblockSunnyDayTest extends PropSpec with PropertyChec
   property("discarding some of microBlocks doesn't affect resulting state") {
     forAll(preconditionsAndPayments, accountGen) { case ((genesis, masterToAlice, aliceToBob, aliceToBob2), miner) =>
       val ts = genesis.timestamp
-      val da = domain(MicroblocksActivatedAt0WavesSettings, EmptyFeaturesSettings)
+      val da = domain(MicroblocksActivatedAt0WavesSettings)
       val block0a = customBuildBlockOfTxs(randomSig, Seq(genesis), miner, 3: Byte, ts)
       val (block1a, microBlocks1a) = chainBaseAndMicro(block0a.uniqueId, Seq(masterToAlice), Seq(Seq(aliceToBob)), miner, 3: Byte, ts)
       val block2a = customBuildBlockOfTxs(block1a.uniqueId, Seq(aliceToBob2), miner, 3: Byte, ts)
@@ -144,7 +144,7 @@ class BlockchainUpdaterMicroblockSunnyDayTest extends PropSpec with PropertyChec
       da.blockchainUpdater.processBlock(block3a).explicitGet()
 
 
-      val db = domain(MicroblocksActivatedAt0WavesSettings, EmptyFeaturesSettings)
+      val db = domain(MicroblocksActivatedAt0WavesSettings)
       val block0b = customBuildBlockOfTxs(randomSig, Seq(genesis), miner, 3: Byte, ts)
       val block1b = customBuildBlockOfTxs(block0b.uniqueId, Seq(masterToAlice), miner, 3: Byte, ts)
       val block2b = customBuildBlockOfTxs(block1b.uniqueId, Seq(aliceToBob2), miner, 3: Byte, ts)

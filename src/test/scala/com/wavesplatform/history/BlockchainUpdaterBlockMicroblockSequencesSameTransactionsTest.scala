@@ -22,7 +22,7 @@ class BlockchainUpdaterBlockMicroblockSequencesSameTransactionsTest extends Prop
   property("resulting miner balance should not depend on tx distribution among blocks and microblocks") {
     forAll(g(100,5)) { case ((gen, rest)) =>
       val finalMinerBalances = rest.map { case (a@(bmb: BlockAndMicroblockSequence, last: Block)) =>
-        val d = domain(MicroblocksActivatedAt0WavesSettings, EmptyFeaturesSettings)
+        val d = domain(MicroblocksActivatedAt0WavesSettings)
         d.blockchainUpdater.processBlock(gen).explicitGet()
         bmb.foreach { case ((b, mbs)) =>
           d.blockchainUpdater.processBlock(b).explicitGet()

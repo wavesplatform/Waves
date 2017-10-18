@@ -2,7 +2,7 @@ package com.wavesplatform
 
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.settings.{BlockchainSettings, FeaturesSettings, WavesSettings}
+import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
 import com.wavesplatform.state2._
 import scorex.account.PrivateKeyAccount
 import scorex.block.{Block, MicroBlock}
@@ -34,9 +34,7 @@ package object history {
 
   val DefaultWavesSettings: WavesSettings = settings.copy(blockchainSettings = DefaultBlockchainSettings)
 
-  val EmptyFeaturesSettings = FeaturesSettings(autoShutdownOnUnsupportedFeature = false, List.empty)
-
-  def domain(settings: WavesSettings, featuresSettings: FeaturesSettings): Domain = {
+  def domain(settings: WavesSettings): Domain = {
     val (history, _, _, stateReader, blockchainUpdater, _) = StorageFactory(settings).get
     Domain(history, stateReader, blockchainUpdater)
   }
