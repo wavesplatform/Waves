@@ -26,6 +26,7 @@ import io.netty.channel.group.DefaultChannelGroup
 import io.netty.util.concurrent.GlobalEventExecutor
 import kamon.Kamon
 import org.influxdb.dto.Point
+import org.slf4j.bridge.SLF4JBridgeHandler
 import scorex.account.AddressScheme
 import scorex.api.http._
 import scorex.api.http.alias.{AliasApiRoute, AliasBroadcastApiRoute}
@@ -228,6 +229,10 @@ object Application extends ScorexLogging {
   }
 
   def main(args: Array[String]): Unit = {
+    // j.u.l should log messages using the projects' conventions
+    SLF4JBridgeHandler.removeHandlersForRootLogger()
+    SLF4JBridgeHandler.install()
+
     // prevents java from caching successful name resolutions, which is needed e.g. for proper NTP server rotation
     // http://stackoverflow.com/a/17219327
     System.setProperty("sun.net.inetaddr.ttl", "0")
