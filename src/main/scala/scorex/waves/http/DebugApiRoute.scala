@@ -51,9 +51,8 @@ case class DebugApiRoute(settings: RestAPISettings,
                         ) extends ApiRoute {
 
   private lazy val configStr = configRoot.render(ConfigRenderOptions.concise().setJson(true).setFormatted(true))
-  private lazy val configJsValue: JsValue = Json.parse(configStr)
-  private lazy val fullConfigJsObject: JsObject = Json.obj("fullConfig" -> configJsValue)
-  private lazy val wavesConfigJsObject: JsObject = Json.obj("waves" -> (configJsValue \ "waves").get)
+  private lazy val fullConfig: JsValue = Json.parse(configStr)
+  private lazy val wavesConfig: JsObject = Json.obj("waves" -> (fullConfig \ "waves").get)
 
   override lazy val route: Route = pathPrefix("debug") {
     blocks ~ state ~ info ~ stateWaves ~ rollback ~ rollbackTo ~ blacklist ~ portfolios ~ minerInfo ~ topDiffAccountPortfolios ~ bottomDiffAccountPortfolios ~ historyInfo ~ configInfo
@@ -249,7 +248,7 @@ case class DebugApiRoute(settings: RestAPISettings,
     new ApiResponse(code = 200, message = "Json state")
   ))
   def configInfo: Route = (path("configInfo") & get & parameter('full.as[Boolean]) & withAuth) { full =>
-    complete(if (full) fullConfigJsObject else wavesConfigJsObject)
+    complete(if (full) fullConfig else wavesConfig)
   }
 
   @Path("/rollback-to/{signature}")
