@@ -28,6 +28,7 @@ import scala.concurrent.Future
 import scala.util.{Failure, Success}
 import scala.util.control.NonFatal
 import DebugApiRoute._
+import com.typesafe.config.{ConfigObject, ConfigRenderOptions}
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.mining.MinerDebugInfo
 import scorex.block.Block.BlockId
@@ -45,11 +46,17 @@ case class DebugApiRoute(settings: RestAPISettings,
                          allChannels: ChannelGroup,
                          utxStorage: UtxPool,
                          blockchainDebugInfo: BlockchainDebugInfo,
-                         miner: Miner with MinerDebugInfo
+                         miner: Miner with MinerDebugInfo,
+                         configRoot: ConfigObject
                         ) extends ApiRoute {
 
+  private lazy val configStr = configRoot.render(ConfigRenderOptions.concise().setJson(true).setFormatted(true))
+  private lazy val configJsValue: JsValue = Json.parse(configStr)
+  private lazy val fullConfigJsObject: JsObject = Json.obj("fullConfig" -> configJsValue)
+  private lazy val wavesConfigJsObject: JsObject = Json.obj("waves" -> (configJsValue \ "waves").get)
+
   override lazy val route: Route = pathPrefix("debug") {
-    blocks ~ state ~ info ~ stateWaves ~ rollback ~ rollbackTo ~ blacklist ~ portfolios ~ minerInfo ~ topDiffAccountPortfolios ~ bottomDiffAccountPortfolios ~ historyInfo
+    blocks ~ state ~ info ~ stateWaves ~ rollback ~ rollbackTo ~ blacklist ~ portfolios ~ minerInfo ~ topDiffAccountPortfolios ~ bottomDiffAccountPortfolios ~ historyInfo ~ configInfo
   }
 
   @Path("/blocks/{howMany}")
@@ -226,6 +233,24 @@ case class DebugApiRoute(settings: RestAPISettings,
 
   }
 
+
+  @Path("/configInfo")
+  @ApiOperation(value = "Config", notes = "Currently running node config", httpMethod = "GET")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(
+      name = "full",
+      value = "Exposes full typesafe config",
+      required = false,
+      dataType = "boolean",
+      paramType = "query",
+      defaultValue = "false"
+    )))
+  @ApiResponses(Array(
+    new ApiResponse(code = 200, message = "Json state")
+  ))
+  def configInfo: Route = (path("configInfo") & get & parameter('full.as[Boolean]) & withAuth) { full =>
+    complete(if (full) fullConfigJsObject else wavesConfigJsObject)
+  }
 
   @Path("/rollback-to/{signature}")
   @ApiOperation(value = "Block signature", notes = "Rollback the state to the block with a given signature", httpMethod = "DELETE")
