@@ -37,26 +37,7 @@ object Address extends ScorexLogging {
     new AddressImpl(ByteStr(bytes))
   }
 
-  def fromBytes(addressBytes: Array[Byte]): Either[InvalidAddress, Address] =
-    isByteArrayValid(addressBytes).map(_ => new AddressImpl(ByteStr(addressBytes)))
-
-
-  private def fromBase58String(address: String): Either[InvalidAddress, Address] =
-    for {
-      _ <- Either.cond(address.length <= AddressStringLength, (), InvalidAddress(s"Wrong address string length: max=$AddressStringLength, actual: address.length"))
-      byteArray <- Base58.decode(address).toEither.left.map(ex => InvalidAddress(s"Unable to decode base58: ${ex.getMessage}"))
-      address <- fromBytes(byteArray)
-    } yield  address
-
-  def fromString(address: String): Either[ValidationError, Address] = {
-    val base58String = if (address.startsWith(Prefix))
-      address.drop(Prefix.length)
-    else address
-    fromBase58String(base58String)
-  }
-
-
-  private def isByteArrayValid(addressBytes: Array[Byte]): Either[InvalidAddress, Unit] = {
+  def fromBytes(addressBytes: Array[Byte]): Either[InvalidAddress, Address] = {
     val version = addressBytes.head
     val network = addressBytes.tail.head
     (for {
@@ -66,7 +47,16 @@ object Address extends ScorexLogging {
       checkSum = addressBytes.takeRight(ChecksumLength)
       checkSumGenerated = calcCheckSum(addressBytes.dropRight(ChecksumLength))
       _ <- Either.cond(checkSum.sameElements(checkSumGenerated), (), s"Bad address checksum")
-    } yield ()).left.map(InvalidAddress)
+    } yield new AddressImpl(ByteStr(addressBytes))).left.map(InvalidAddress)
+  }
+
+  def fromString(addressStr: String): Either[ValidationError, Address] = {
+    val base58String = if (addressStr.startsWith(Prefix)) addressStr.drop(Prefix.length) else addressStr
+    for {
+      _ <- Either.cond(base58String.length <= AddressStringLength, (), InvalidAddress(s"Wrong address string length: max=$AddressStringLength, actual: address.length"))
+      byteArray <- Base58.decode(base58String).toEither.left.map(ex => InvalidAddress(s"Unable to decode base58: ${ex.getMessage}"))
+      address <- fromBytes(byteArray)
+    } yield address
   }
 
   private def calcCheckSum(withoutChecksum: Array[Byte]): Array[Byte] = hash(withoutChecksum).take(ChecksumLength)
