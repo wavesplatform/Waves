@@ -262,7 +262,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
                 () => ng.bestLiquidDiff.copy(snapshots = Map.empty)),
                 historyWriter.lastBlock.map(_.timestamp), microBlock, ng.base.timestamp)
             } yield {
-              log.info(s"MicroBlock ${microBlock.totalResBlockSig.trim}~>${microBlock.prevResBlockSig.trim} appended, tx count: ${microBlock.transactionData.size}")
+              log.info(s"$microBlock appended")
               ngState.set(Some(ng + (microBlock, Monoid.combine(ng.bestLiquidDiff, diff), System.currentTimeMillis())))
               lastBlockId.onNext(microBlock.totalResBlockSig)
             }

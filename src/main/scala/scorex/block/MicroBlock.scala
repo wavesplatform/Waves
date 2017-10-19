@@ -23,9 +23,6 @@ case class MicroBlock private(version: Byte, generator: PublicKeyAccount, transa
   private lazy val signerDataField: SignerDataBlockField = SignerDataBlockField("signature", SignerData(generator, signature))
   private lazy val transactionDataField = TransactionsBlockField(version.toInt, transactionData)
 
-  lazy val uniqueId: ByteStr = signature
-  lazy val encodedId: String = uniqueId.base58
-
   lazy val json: JsObject =
     versionField.json ++
       prevResBlockSigField.json ++
@@ -51,6 +48,8 @@ case class MicroBlock private(version: Byte, generator: PublicKeyAccount, transa
 
   override lazy val signatureValid: Boolean = EllipticCurveImpl.verify(signature.arr, bytesWithoutSignature, generator.publicKey)
   override lazy val signedDescendants: Seq[Signed] = transactionData
+
+  override def toString: String = s"MicroBlock(${totalResBlockSig.trim} ~> ${prevResBlockSig.trim}, txs=${transactionData.size})"
 }
 
 object MicroBlock extends ScorexLogging {

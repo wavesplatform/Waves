@@ -9,7 +9,7 @@ trait ValidationError
 
 object ValidationError {
 
-  case object InvalidAddress extends ValidationError
+  case class InvalidAddress(reason: String) extends ValidationError
   case object NegativeAmount extends ValidationError
   case object InsufficientFee extends ValidationError
   case object TooBigArray extends ValidationError

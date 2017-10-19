@@ -31,7 +31,7 @@ object AddressOrAlias {
       case Alias.AddressVersion =>
         val (_, aliasEnd) = Deser.parseArraySize(bytes, position + 2)
         Alias.fromBytes(bytes.slice(position, aliasEnd)).map((_, aliasEnd))
-      case _ => Left(ValidationError.InvalidAddress)
+      case _ => Left(ValidationError.InvalidAddress("Unknown address/alias version"))
     }
   }
 
