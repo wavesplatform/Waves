@@ -75,7 +75,7 @@ class ExtensionBlocksLoader(
           } else {
             newBlocks.par.find(!_.signatureValid) match {
               case Some(invalidBlock) =>
-                peerDatabase.blacklistAndClose(ctx.channel(),s"Got block ${invalidBlock.uniqueId} with invalid signature")
+                peerDatabase.blacklistAndClose(ctx.channel(),s"Got block $invalidBlock with invalid signature")
               case None =>
                 log.trace(s"${id(ctx)} Chain is valid, pre-check passed")
                 ctx.fireChannelRead(ExtensionBlocks(newBlocks))
