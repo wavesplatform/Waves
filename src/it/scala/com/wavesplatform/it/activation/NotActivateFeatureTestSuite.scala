@@ -12,12 +12,14 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.util.Random
 
-class NotActivateFeatureTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with CancelAfterFailure {
+class NotActivateFeatureTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with CancelAfterFailure with ActivationStatusRequest {
 
-  import ActivationFeatureTestSuite._
+  import NotActivateFeatureTestSuite._
 
   private val docker = Docker(getClass)
   private val nodes = Configs.map(docker.startNode)
+  private val votingFeatureNum: Short = 1
+  private val nonVotingFeatureNum: Short = 2
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
@@ -30,43 +32,45 @@ class NotActivateFeatureTestSuite extends FreeSpec with Matchers with BeforeAndA
   }
 
 
-  "check that voting starts and supported blocks increased" in {
+  "check that voting starts and supported blocks is not increased when nobody votes for feature" in {
 
-    val checkHeight: Int = checkPeriod * 2 / 3
-    Await.result(nodes.head.waitForHeight(checkHeight), 2.minute)
+    val checkHeight: Int = votingInterval - 1
+    val activationStatusInfo = activationStatus(nodes.head, checkHeight, votingFeatureNum, 2.minute)
 
     val result = Await.result(nodes.head.blockSeq(1, checkHeight), 2.minute)
+    val featuresMap = result.flatMap(b => b.features.getOrElse(Seq.empty)).groupBy(x => x)
+    val votesForFeature1 = featuresMap.getOrElse(votingFeatureNum, Seq.empty).length
 
-    val map = result.flatMap(b => b.features.getOrElse(Seq.empty)).groupBy(x => x)
-    val votesForFeature1 = map.getOrElse(1, Seq.empty).length
+    votesForFeature1 shouldBe 0
 
-    val activationStatusForNonSupportedNode = Await.result(nodes.head.activationStatus, 2.minute)
-    val activationFeatureNonSupportedNodeInfo = activationStatusForNonSupportedNode.features.find(_.id == 1).get
-    activationFeatureNonSupportedNodeInfo.supportedBlocks.get shouldBe votesForFeature1
-    activationFeatureNonSupportedNodeInfo.blockchainStatus shouldBe BlockchainFeatureStatus.Undefined
-    activationFeatureNonSupportedNodeInfo.nodeStatus shouldBe NodeFeatureStatus.Voted
-
-    val activationStatusForSupportedNode = Await.result(nodes.last.activationStatus, 2.minute)
-    val activationFeatureSupportedNodeInfo = activationStatusForSupportedNode.features.find(_.id == 1).get
-    activationFeatureSupportedNodeInfo.supportedBlocks.get shouldBe votesForFeature1
-    activationFeatureSupportedNodeInfo.blockchainStatus shouldBe BlockchainFeatureStatus.Undefined
-    activationFeatureSupportedNodeInfo.nodeStatus shouldBe NodeFeatureStatus.Voted
+    assertVotingStatus(activationStatusInfo, votesForFeature1,
+      BlockchainFeatureStatus.Undefined, NodeFeatureStatus.Implemented)
   }
 
 
-  object ActivationFeatureTestSuite {
+  "check that feature is still in Voting status on the next interval" in {
+
+    val checkHeight: Int = votingInterval + 1
+    val activationStatusInfo = activationStatus(nodes.head, checkHeight, votingFeatureNum, 2.minute)
+
+    assertVotingStatus(activationStatusInfo, 0,
+      BlockchainFeatureStatus.Undefined, NodeFeatureStatus.Implemented)
+  }
+
+
+  object NotActivateFeatureTestSuite {
 
     private val dockerConfigs = Docker.NodeConfigs.getConfigList("nodes").asScala
 
-    val checkPeriod = 30
-    val blocksForActivation = 25
+    val votingInterval = 16
+    val blocksForActivation = 16
 
-    private val supportedNodes = ConfigFactory.parseString(
+    private val nonSupportedNodes = ConfigFactory.parseString(
       s"""
          |waves.features{
-         |   supported=[1]
+         |   supported=[$nonVotingFeatureNum]
          |}
-         |waves.blockchain.custom.functionality.feature-check-blocks-period = $checkPeriod
+         |waves.blockchain.custom.functionality.feature-check-blocks-period = $votingInterval
          |waves.blockchain.custom.functionality.blocks-for-feature-activation = $blocksForActivation
          |waves {
          |   blockchain {
@@ -79,32 +83,10 @@ class NotActivateFeatureTestSuite extends FreeSpec with Matchers with BeforeAndA
          |}
       """.stripMargin
     )
-    private val nonSupportedNodes = ConfigFactory.parseString(
-      s"""
-         |waves.features{
-         | supported=[1]
-         |}
-         |waves.blockchain.custom.functionality.feature-check-blocks-period = $checkPeriod
-         |waves.blockchain.custom.functionality.blocks-for-feature-activation = $blocksForActivation
-         |
-        |waves {
-         |   blockchain {
-         |     custom {
-         |      functionality{
-         |       pre-activated-features = {}
-         |      }
-         |     }
-         |   }
-         |}
-      """.stripMargin
-
-    )
-
 
     val NodesCount: Int = 4
 
-    val Configs: Seq[Config] = Seq(nonSupportedNodes.withFallback(dockerConfigs.last)) ++
-      Random.shuffle(dockerConfigs.init).take(NodesCount - 1).map(supportedNodes.withFallback(_))
+    val Configs: Seq[Config] = Random.shuffle(dockerConfigs.init).take(NodesCount).map(nonSupportedNodes.withFallback(_))
 
   }
 
