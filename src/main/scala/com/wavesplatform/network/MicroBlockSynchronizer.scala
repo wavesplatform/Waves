@@ -9,7 +9,7 @@ import com.wavesplatform.settings.SynchronizationSettings.MicroblockSynchronizer
 import com.wavesplatform.state2.ByteStr
 import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel._
-import monix.eval.{MVar, Task}
+import monix.eval.Task
 import monix.execution.CancelableFuture
 import monix.execution.schedulers.SchedulerService
 import scorex.block.MicroBlock
@@ -38,13 +38,15 @@ class MicroBlockSynchronizer(settings: MicroblockSynchronizerSettings,
 
   lastBlockIdEvents.foreach(tryDownloadNext)
 
-  private def alreadyRequested(mbSig: MicroBlockSignature): Boolean = Option(awaiting.getIfPresent(mbSig)).isDefined
+  private def alreadyRequested(totalSig: MicroBlockSignature): Boolean = Option(awaiting.getIfPresent(totalSig)).isDefined
 
-  private def alreadyProcessed(mbSig: MicroBlockSignature): Boolean = Option(successfullyReceived.getIfPresent(mbSig)).isDefined
+  private def alreadyProcessed(totalSig: MicroBlockSignature): Boolean = Option(successfullyReceived.getIfPresent(totalSig)).isDefined
 
   private def requestMicroBlock(mbInv: MicroBlockInv): CancelableFuture[Unit] = {
+    import mbInv.totalBlockSig
+
     def pollOwner: Option[ChannelHandlerContext] = {
-      val owners = knownOwners.get(mbInv.totalBlockSig, () => MSet.empty)
+      val owners = knownOwners.get(totalBlockSig, () => MSet.empty)
       random(owners).map { ctx =>
         owners -= ctx
         ctx
@@ -52,20 +54,13 @@ class MicroBlockSynchronizer(settings: MicroblockSynchronizerSettings,
     }
 
     def task(attemptsAllowed: Int): Task[Unit] = Task.unit.flatMap { _ =>
-      import mbInv.totalBlockSig
       if (attemptsAllowed <= 0 || alreadyProcessed(totalBlockSig)) Task.unit
       else pollOwner.fold(Task.unit) { ownerCtx =>
-        val requestSent = MVar.empty[Boolean]
-        ownerCtx.writeAndFlush(MicroBlockRequest(totalBlockSig)).addListener { (sendFuture: ChannelFuture) =>
-          if (sendFuture.isDone) requestSent.put(sendFuture.isSuccess)
-        }
-
-        requestSent.take.flatMap {
-          case false => task(attemptsAllowed)
-          case true =>
-            awaiting.put(totalBlockSig, mbInv)
-            task(attemptsAllowed - 1).delayExecution(settings.waitResponseTimeout)
-        }
+        if (ownerCtx.channel().isOpen) {
+          ownerCtx.writeAndFlush(MicroBlockRequest(totalBlockSig))
+          awaiting.put(totalBlockSig, mbInv)
+          task(attemptsAllowed - 1).delayExecution(settings.waitResponseTimeout)
+        } else task(attemptsAllowed)
       }
     }
 
@@ -80,16 +75,13 @@ class MicroBlockSynchronizer(settings: MicroblockSynchronizerSettings,
 
       successfullyReceived.put(totalSig, dummy)
       knownOwners.invalidate(totalSig)
+      BlockStats.received(mb, ctx)
 
       Task {
         log.trace(s"${id(ctx)} Received $msg")
-        Option(awaiting.getIfPresent(totalSig)) match {
-          case Some(mi) =>
-            awaiting.invalidate(totalSig)
-            BlockStats.received(mb, ctx)
-            super.channelRead(ctx, MicroblockData(Option(mi), mb))
-          case None =>
-            BlockStats.received(mb, ctx)
+        Option(awaiting.getIfPresent(totalSig)).foreach { mi =>
+          awaiting.invalidate(totalSig)
+          super.channelRead(ctx, MicroblockData(Option(mi), mb))
         }
       }.runAsync
 
