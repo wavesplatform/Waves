@@ -81,15 +81,6 @@ object BlockStats {
     Seq.empty
   )
 
-  def received(m: MicroBlock, ctx: ChannelHandlerContext, propagationTime: Long): Unit = write(
-    micro(m)
-      .tag("parent-id", id(m.prevResBlockSig))
-      .addField("from", nodeName(ctx))
-      .addField("prop-time", propagationTime),
-    Event.Received,
-    Seq.empty
-  )
-
   def received(m: MicroBlock, ctx: ChannelHandlerContext): Unit = write(
     micro(m)
       .tag("parent-id", id(m.prevResBlockSig))

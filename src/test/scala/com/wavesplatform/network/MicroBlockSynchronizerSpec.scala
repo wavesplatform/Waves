@@ -57,6 +57,33 @@ class MicroBlockSynchronizerSpec extends FreeSpec
     r shouldBe MicroBlockRequest(nextBlockSig)
   }
 
+  "should re-request next block if a previous one was failed" in {
+    val lastBlockSig = ByteStr("0".getBytes)
+    val nextBlockSig = ByteStr("1".getBytes)
+
+    val history = Mockito.mock(classOf[NgHistory])
+    Mockito.doReturn(Some(lastBlockSig)).when(history).lastBlockId()
+
+    val synchronizer = new MicroBlockSynchronizer(settings, history, PeerDatabase.NoOp, ConcurrentSubject.publish[ByteStr])
+    val channel1 = new EmbeddedChannel(synchronizer)
+    val channel2 = new EmbeddedChannel(synchronizer)
+
+    val inv = MicroBlockInv(TestBlock.defaultSigner, nextBlockSig, lastBlockSig)
+    channel1.writeInbound(inv)
+    channel1.flushInbound()
+    channel1.close()
+
+    channel2.writeInbound(inv)
+    channel2.flushInbound()
+
+    val r = eventually {
+      val request = channel2.readOutbound[MicroBlockRequest]()
+      Option(request) shouldBe defined
+      request
+    }
+    r shouldBe MicroBlockRequest(nextBlockSig)
+  }
+
   "should not request the same block if it received before" - {
     "from same channel" in {
       val lastBlockSig = ByteStr("0".getBytes)
