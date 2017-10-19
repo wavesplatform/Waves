@@ -196,7 +196,7 @@ object Coordinator extends ScorexLogging with Instrumented {
     }
   }
 
-  val MaxTimeDrift: Long = 15.seconds.toMillis
+  val MaxTimeDrift: Long = 100 // millis
 
   private def blockConsensusValidation(history: History, fp: FeatureProvider, bcs: BlockchainSettings, currentTs: Long, block: Block)
                                       (genBalance: Int => Either[String, Long]): Either[ValidationError, Unit] = history.read { _ =>
