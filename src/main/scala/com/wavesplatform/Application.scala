@@ -229,16 +229,16 @@ object Application extends ScorexLogging {
   }
 
   def main(args: Array[String]): Unit = {
-    // j.u.l should log messages using the projects' conventions
-    SLF4JBridgeHandler.removeHandlersForRootLogger()
-    SLF4JBridgeHandler.install()
-
     // prevents java from caching successful name resolutions, which is needed e.g. for proper NTP server rotation
     // http://stackoverflow.com/a/17219327
     System.setProperty("sun.net.inetaddr.ttl", "0")
     System.setProperty("sun.net.inetaddr.negative.ttl", "0")
     Security.setProperty("networkaddress.cache.ttl", "0")
     Security.setProperty("networkaddress.cache.negative.ttl", "0")
+
+    // j.u.l should log messages using the projects' conventions
+    SLF4JBridgeHandler.removeHandlersForRootLogger()
+    SLF4JBridgeHandler.install()
 
     log.info("Starting...")
 
