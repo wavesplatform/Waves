@@ -8,8 +8,6 @@ import scorex.transaction.ValidationError
 import scorex.transaction.ValidationError.InvalidAddress
 import scorex.utils.ScorexLogging
 
-import scala.util.Success
-
 
 sealed trait Address extends AddressOrAlias {
   val bytes: ByteStr
@@ -39,48 +37,26 @@ object Address extends ScorexLogging {
     new AddressImpl(ByteStr(bytes))
   }
 
-  def fromBytes(addressBytes: Array[Byte]): Either[ValidationError, Address] = {
-    if (isByteArrayValid(addressBytes)) Right(new AddressImpl(ByteStr(addressBytes)))
-    else Left(InvalidAddress)
-  }
-
-  private def fromBase58String(address: String): Either[ValidationError, Address] =
-    if (address.length > AddressStringLength) {
-      Left(InvalidAddress)
-    } else {
-      Base58.decode(address) match {
-        case Success(byteArray) if isByteArrayValid(byteArray) => Right(new AddressImpl(ByteStr(byteArray)))
-        case _ => Left(InvalidAddress)
-      }
-    }
-
-  def fromString(address: String): Either[ValidationError, Address] = {
-    val base58String = if (address.startsWith(Prefix))
-      address.drop(Prefix.length)
-    else address
-    fromBase58String(base58String)
-  }
-
-
-  private def isByteArrayValid(addressBytes: Array[Byte]): Boolean = {
+  def fromBytes(addressBytes: Array[Byte]): Either[InvalidAddress, Address] = {
     val version = addressBytes.head
     val network = addressBytes.tail.head
-    if (version != AddressVersion) {
-      log.warn(s"Unknown address version: $version")
-      false
-    } else if (network != scheme.chainId) {
-      log.warn(s"~ Expected network: ${scheme.chainId}(${scheme.chainId.toChar}")
-      log.warn(s"~ Actual network: $network(${network.toChar}")
-      false
-    } else {
-      if (addressBytes.length != Address.AddressLength)
-        false
-      else {
-        val checkSum = addressBytes.takeRight(ChecksumLength)
-        val checkSumGenerated = calcCheckSum(addressBytes.dropRight(ChecksumLength))
-        checkSum.sameElements(checkSumGenerated)
-      }
-    }
+    (for {
+      _ <- Either.cond(version == AddressVersion, (), s"Unknown address version: $version")
+      _ <- Either.cond(network == scheme.chainId, (), s"Data from other network: expected: ${scheme.chainId}(${scheme.chainId.toChar}, actual: $network(${network.toChar}")
+      _ <- Either.cond(addressBytes.length == Address.AddressLength, (), s"Wrong addressBytes length: expected: ${Address.AddressLength}, actual: ${addressBytes.length}")
+      checkSum = addressBytes.takeRight(ChecksumLength)
+      checkSumGenerated = calcCheckSum(addressBytes.dropRight(ChecksumLength))
+      _ <- Either.cond(checkSum.sameElements(checkSumGenerated), (), s"Bad address checksum")
+    } yield new AddressImpl(ByteStr(addressBytes))).left.map(InvalidAddress)
+  }
+
+  def fromString(addressStr: String): Either[ValidationError, Address] = {
+    val base58String = if (addressStr.startsWith(Prefix)) addressStr.drop(Prefix.length) else addressStr
+    for {
+      _ <- Either.cond(base58String.length <= AddressStringLength, (), InvalidAddress(s"Wrong address string length: max=$AddressStringLength, actual: address.length"))
+      byteArray <- Base58.decode(base58String).toEither.left.map(ex => InvalidAddress(s"Unable to decode base58: ${ex.getMessage}"))
+      address <- fromBytes(byteArray)
+    } yield address
   }
 
   private def calcCheckSum(withoutChecksum: Array[Byte]): Array[Byte] = hash(withoutChecksum).take(ChecksumLength)
