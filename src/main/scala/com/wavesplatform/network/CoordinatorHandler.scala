@@ -84,18 +84,18 @@ class CoordinatorHandler(checkpointService: CheckpointService,
       Signed.validateSignatures(b).flatMap(b => processBlock(b, false))
     } map {
       case Right(None) =>
-        log.trace(s"Block $b already appended")
+        log.trace(s"$b already appended")
       case Right(Some(newScore)) =>
-        log.debug(s"Appended block $b")
+        log.debug(s"Appended $b")
         if (b.transactionData.isEmpty)
           allChannels.broadcast(BlockForged(b), Some(ctx.channel()))
         miner.scheduleMining()
         allChannels.broadcast(LocalScoreChanged(newScore))
       case Left(is: InvalidSignature) =>
-        peerDatabase.blacklistAndClose(ctx.channel(), s"Could not append block $b: $is")
+        peerDatabase.blacklistAndClose(ctx.channel(), s"Could not append $b: $is")
       case Left(ve) =>
         BlockStats.declined(b, BlockStats.Source.Broadcast)
-        log.debug(s"Could not append block $b: $ve")
+        log.debug(s"Could not append $b: $ve")
     }).onErrorHandle[Unit](ctx.fireExceptionCaught).runAsync
 
     case md: MicroblockData =>

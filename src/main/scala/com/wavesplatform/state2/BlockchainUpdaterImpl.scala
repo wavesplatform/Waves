@@ -180,7 +180,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
         val height = historyWriter.height() + 1
         ngState.set(Some(NgState(block, newBlockDiff, 0L, featuresApprovedWithBlock(block))))
         historyReader.lastBlockId().foreach(lastBlockId.onNext)
-        log.info(s"Block $block appended. New height: $height, transactions: ${block.transactionData.size})")
+        log.info(s"$block appended. New height: $height)")
         discacrded
       case None => Seq.empty
     })
