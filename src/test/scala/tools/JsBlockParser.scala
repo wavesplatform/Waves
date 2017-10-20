@@ -32,19 +32,19 @@ object JsBlockParser extends App {
 
   2017-08-04 12:57:41 TRACE [miner-pool-21] c.w.network.package$ - Broadcasting BlockForged(Block(1501851461300,3,
   4GkW491kuPtg3LDkCrXwBRASdQ7qUV2BNEFpM9XzD56JufSpmLqV9672wRQcSqJdxyEgq8nSQs2ogHit8Sr1ZtGT,
-  SignerData(3HiC9YuigWLcwy3RmxJjPj2cFFyNbf7W7jm,2S5A8DnwrqpxFv3cjYKJB8D86h4PS1tAy2Qaii1ntZhpiuj3bmTC8McES5XoBFj8z2yQn9yAxCPTxjsexjfjddXo),
+  SignerData(3HmFkAoQRs4Y3PE2uR6ohN7wS4VqPBGKv7k,2S5A8DnwrqpxFv3cjYKJB8D86h4PS1tAy2Qaii1ntZhpiuj3bmTC8McES5XoBFj8z2yQn9yAxCPTxjsexjfjddXo),
   NxtLikeConsensusBlockData(197518,96C1rM2CxoKEua8Ha1xdVEYmnsL3VB44Z2uVKmbXPV3D),List(..)))
 
-  account-seed = 4Go1R2JSbveVZLrhiYS2PTysTTpo7qkiMD1bb3t9rHwz   // recreated
-  private-key = 81Cfr86V8sWEpR5skuegDXCrMbuofHFDAQx11BFwkSWB
-  public-key = 1DV4udQonVAb452qm34wX39euJV3VhJcMLS29JFeurF   // actual public key, not address
-  address = 3HiC9YuigWLcwy3RmxJjPj2cFFyNbf7W7jm
+  account-seed = Co9cYj4YC15QWHZ3Ux8acv3Q2mVe3PzHucxuNWSRhpzj   // recreated
+  private-key = G6skvWMu6QLHVmM7Lo85Wq1GHdTPHzhyrPbsjkSWAYC6
+  public-key = FkV3y43B4SAXkSL31SXFZU5xm5bonRtRVNU1sQzwpVhm   // actual public key, not address
+  address = 3HmFkAoQRs4Y3PE2uR6ohN7wS4VqPBGKv7k
 
    */
 //
 //  val block = Block(timestamp = 1501851461300L, version = 3.toByte,
 //    reference = ByteStr.decodeBase58("4GkW491kuPtg3LDkCrXwBRASdQ7qUV2BNEFpM9XzD56JufSpmLqV9672wRQcSqJdxyEgq8nSQs2ogHit8Sr1ZtGT").get,
-//    signerData = SignerData(PublicKeyAccount(ByteStr.decodeBase58("1DV4udQonVAb452qm34wX39euJV3VhJcMLS29JFeurF").get.arr),
+//    signerData = SignerData(PublicKeyAccount(ByteStr.decodeBase58("FkV3y43B4SAXkSL31SXFZU5xm5bonRtRVNU1sQzwpVhm").get.arr),
 //      ByteStr.decodeBase58("2S5A8DnwrqpxFv3cjYKJB8D86h4PS1tAy2Qaii1ntZhpiuj3bmTC8McES5XoBFj8z2yQn9yAxCPTxjsexjfjddXo").get),
 //    consensusData = NxtLikeConsensusBlockData(197518, ByteStr.decodeBase58("96C1rM2CxoKEua8Ha1xdVEYmnsL3VB44Z2uVKmbXPV3D").get),
 //    transactionData = txs,
@@ -83,7 +83,7 @@ object JsBlockParser extends App {
 
 //  val recreated = Block.buildAndSign(3, 1501851461300L, ByteStr.decodeBase58("4GkW491kuPtg3LDkCrXwBRASdQ7qUV2BNEFpM9XzD56JufSpmLqV9672wRQcSqJdxyEgq8nSQs2ogHit8Sr1ZtGT").get,
 //    NxtLikeConsensusBlockData(197518, ByteStr.decodeBase58("96C1rM2CxoKEua8Ha1xdVEYmnsL3VB44Z2uVKmbXPV3D").get),txs.take(128),
-//    PrivateKeyAccount(ByteStr.decodeBase58("4Go1R2JSbveVZLrhiYS2PTysTTpo7qkiMD1bb3t9rHwz").get.arr)
+//    PrivateKeyAccount(ByteStr.decodeBase58("Co9cYj4YC15QWHZ3Ux8acv3Q2mVe3PzHucxuNWSRhpzj").get.arr)
 //  ).explicitGet()
 //
 //  println(Block.parseBytes(recreated.bytes).get.signatureValid)
