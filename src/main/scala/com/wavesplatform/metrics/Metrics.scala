@@ -7,7 +7,7 @@ import monix.eval.Task
 import monix.execution.schedulers.SchedulerService
 import org.influxdb.dto.Point
 import org.influxdb.{InfluxDB, InfluxDBFactory}
-import scorex.utils.ScorexLogging
+import scorex.utils.{NTP, ScorexLogging}
 
 import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
@@ -72,6 +72,7 @@ object Metrics extends ScorexLogging {
       // Should be a tag, but tags are the strings now
       // https://docs.influxdata.com/influxdb/v1.3/concepts/glossary/#tag-value
       .addField("node", settings.nodeId)
+      .time(NTP.correctedTime(), TimeUnit.MILLISECONDS)
       .build()
     ))
   }.runAsync

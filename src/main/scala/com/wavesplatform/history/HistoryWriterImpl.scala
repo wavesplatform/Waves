@@ -78,7 +78,7 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
 
         if (h % 100 == 0) db.compact(CompactFillRate, CompactMemorySize)
 
-        log.trace(s"Full Block(id=${block.uniqueId},txs_count=${block.transactionData.size}) persisted")
+        log.trace(s"Full Block $block(id=${block.uniqueId} persisted")
         blockDiff
       }
       else {

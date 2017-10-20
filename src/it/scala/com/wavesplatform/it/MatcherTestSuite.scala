@@ -349,7 +349,7 @@ object MatcherTestSuite {
     s"""
        |waves.matcher {
        |  enable=yes
-       |  account="3HevUqdcHuiLvpeVLo4sGVqxSsZczJuCYHo"
+       |  account="3Hm3LGoNPmw1VTZ3eRA2pAfeQPhnaBm6YFC"
        |  bind-address="0.0.0.0"
        |  order-match-tx-fee = 300000
        |  blacklisted-assets = [$ForbiddenAssetId]

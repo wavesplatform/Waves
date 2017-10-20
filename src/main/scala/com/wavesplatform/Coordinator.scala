@@ -56,12 +56,12 @@ object Coordinator extends ScorexLogging with Instrumented {
           firstDeclined
             .foldLeft[Either[ValidationError, BigInt]](Right(history.score())) {
             case (_, (i, b, e)) if i == 0 =>
-              log.warn(s"Can't process fork starting with $lastCommonBlockId, error appending block ${b.uniqueId}: $e")
+              log.warn(s"Can't process fork starting with $lastCommonBlockId, error appending block $b: $e")
               Left(e)
 
             case (r, (i, b, e)) =>
               log.debug(s"Processed $i of ${newBlocks.size} blocks from extension")
-              log.warn(s"Can't process fork starting with $lastCommonBlockId, error appending block ${b.uniqueId}: $e")
+              log.warn(s"Can't process fork starting with $lastCommonBlockId, error appending block $b: $e")
               r
           }
         }
@@ -150,7 +150,7 @@ object Coordinator extends ScorexLogging with Instrumented {
                           featureProvider: FeatureProvider)
                          (block: Block, local: Boolean): Either[ValidationError, Int] = for {
     _ <- Either.cond(checkpoint.isBlockValid(block.signerData.signature, history.height() + 1), (),
-      GenericError(s"Block ${block.uniqueId} at height ${history.height() + 1} is not valid w.r.t. checkpoint"))
+      GenericError(s"Block $block at height ${history.height() + 1} is not valid w.r.t. checkpoint"))
     _ <- blockConsensusValidation(history, featureProvider, settings, time.correctedTime(), block) { height =>
       PoSCalc.generatingBalance(stateReader, settings.functionalitySettings, block.signerData.generator, height).toEither.left.map(_.toString)
         .flatMap(validateEffectiveBalance(featureProvider, settings.functionalitySettings, block, height))
@@ -188,7 +188,7 @@ object Coordinator extends ScorexLogging with Instrumented {
       val hh = existingItems.map(_.height) :+ genesisBlockHeight
       history.blockAt(hh(fork.size)).foreach {
         lastValidBlock =>
-          log.warn(s"Fork detected (length = ${fork.size}), rollback to last valid block id [${lastValidBlock.uniqueId}]")
+          log.warn(s"Fork detected (length = ${fork.size}), rollback to last valid block $lastValidBlock]")
           blockBlockForkStats.increment()
           blockForkHeightStats.record(fork.size)
           blockchainUpdater.removeAfter(lastValidBlock.uniqueId)
@@ -196,7 +196,7 @@ object Coordinator extends ScorexLogging with Instrumented {
     }
   }
 
-  val MaxTimeDrift: Long = 15.seconds.toMillis
+  val MaxTimeDrift: Long = 100 // millis
 
   private def blockConsensusValidation(history: History, fp: FeatureProvider, bcs: BlockchainSettings, currentTs: Long, block: Block)
                                       (genBalance: Int => Either[String, Long]): Either[ValidationError, Unit] = history.read { _ =>
@@ -229,7 +229,7 @@ object Coordinator extends ScorexLogging with Instrumented {
       hit = calcHit(prevBlockData, generator)
       target = calcTarget(parent.consensusData.baseTarget, parent.timestamp, blockTime, effectiveBalance)
       _ <- Either.cond(hit < target, (), s"calculated hit $hit >= calculated target $target")
-    } yield ()).left.map(e => GenericError(s"Block ${block.uniqueId} is invalid: $e"))
+    } yield ()).left.map(e => GenericError(s"Block $block is invalid: $e"))
   }
 
   private val blockBlockForkStats = Kamon.metrics.counter("block-fork")

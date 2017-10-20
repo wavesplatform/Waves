@@ -67,6 +67,15 @@ By default, `it:test` will do the following:
   plugin. 
 * Run the test suites from `src/it/scala`, passing docker image ID via `docker.imageId` system property.
 
+### Logging
+
+By [default](src/main/resources/logback.xml) all logs are written to the STDOUT. If you want to write logs, for example,
+to JSON files, you should define your own logging configuration and specify a path to it in `conf/application.ini`:
+
+```
+-Dlogback.configurationFile=/path/to/your/logback.xml
+```  
+
 ### Debugging
 
 Integration tests run in a forked JVM. To debug test suite code launched by SBT, you will need to add remote debug 

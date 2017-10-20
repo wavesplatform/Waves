@@ -143,14 +143,14 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
           }
         } else if (areVersionsOfSameBlock(block, ng.base)) {
           if (block.transactionData.size <= ng.transactions.size) {
-            log.trace(s"Existing liquid block is better than new one, discarding ${block.uniqueId}")
+            log.trace(s"Existing liquid block is better than new one, discarding $block")
             Right(None)
           } else {
             log.trace(s"New liquid block is better version of exsting, swapping")
             BlockDiffer.fromBlock(settings.blockchainSettings.functionalitySettings, featureProvider, currentPersistedBlocksState, historyWriter.lastBlock, block).map(d => Some((d, Seq.empty[Transaction])))
           }
         } else {
-          Left(BlockAppendError(s"Competitor's liquid block(id=${block.uniqueId.trim} score=${block.blockScore}) is not better than existing(ng.base.id=${ng.base.uniqueId.trim} score=${ng.base.blockScore})", block))
+          Left(BlockAppendError(s"Competitor's liquid block $block(score=${block.blockScore}) is not better than existing (ng.base ${ng.base}(score=${ng.base.blockScore}))", block))
         }
       case Some(ng) if !ng.contains(block.reference) =>
         Left(BlockAppendError(s"References incorrect or non-existing block", block))
@@ -180,7 +180,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
         val height = historyWriter.height() + 1
         ngState.set(Some(NgState(block, newBlockDiff, 0L, featuresApprovedWithBlock(block))))
         historyReader.lastBlockId().foreach(lastBlockId.onNext)
-        log.info(s"Block ${block.uniqueId} -> ${block.reference.trim} appended. New height: $height, transactions: ${block.transactionData.size})")
+        log.info(s"Block $block appended. New height: $height, transactions: ${block.transactionData.size})")
         discacrded
       case None => Seq.empty
     })
@@ -262,7 +262,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
                 () => ng.bestLiquidDiff.copy(snapshots = Map.empty)),
                 historyWriter.lastBlock.map(_.timestamp), microBlock, ng.base.timestamp)
             } yield {
-              log.info(s"MicroBlock ${microBlock.totalResBlockSig.trim}~>${microBlock.prevResBlockSig.trim} appended, tx count: ${microBlock.transactionData.size}")
+              log.info(s"$microBlock appended")
               ngState.set(Some(ng + (microBlock, Monoid.combine(ng.bestLiquidDiff, diff), System.currentTimeMillis())))
               lastBlockId.onNext(microBlock.totalResBlockSig)
             }
