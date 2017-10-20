@@ -32,7 +32,8 @@ class CoordinatorHandler(checkpointService: CheckpointService,
                          settings: WavesSettings,
                          peerDatabase: PeerDatabase,
                          allChannels: ChannelGroup,
-                         featureProvider: FeatureProvider)
+                         featureProvider: FeatureProvider,
+                         microBlockOwners: MicroBlockOwners)
   extends ChannelInboundHandlerAdapter with ScorexLogging {
 
   private implicit val scheduler = monix.execution.Scheduler.singleThread("coordinator-handler", reporter = com.wavesplatform.utils.UncaughtExceptionsToLogReporter)
@@ -98,12 +99,12 @@ class CoordinatorHandler(checkpointService: CheckpointService,
     }).onErrorHandle[Unit](ctx.fireExceptionCaught).runAsync
 
     case md: MicroblockData =>
-      val microBlock = md.microBlock
+      import md.microBlock
       val microblockTotalResBlockSig = microBlock.totalResBlockSig
       (Task(Signed.validateSignatures(microBlock).flatMap(processMicroBlock)) map {
         case Right(()) =>
           md.invOpt match {
-            case Some(mi) => allChannels.broadcast(mi, Some(ctx.channel()))
+            case Some(mi) => allChannels.broadcast(mi, microBlockOwners.all(microBlock.totalResBlockSig).map(_.channel()))
             case None => log.warn("Not broadcasting MicroBlockInv")
           }
           BlockStats.applied(microBlock)

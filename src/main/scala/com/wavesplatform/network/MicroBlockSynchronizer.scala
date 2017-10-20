@@ -17,21 +17,20 @@ import monix.reactive.Observable
 import scorex.transaction.{NgHistory, Signed}
 import scorex.utils.ScorexLogging
 
-import scala.collection.mutable.{Set => MSet}
 import scala.concurrent.duration.FiniteDuration
 
 @Sharable
 class MicroBlockSynchronizer(settings: MicroblockSynchronizerSettings,
                              history: NgHistory,
                              peerDatabase: PeerDatabase,
-                             lastBlockIdEvents: Observable[ByteStr]) extends ChannelInboundHandlerAdapter with ScorexLogging {
+                             lastBlockIdEvents: Observable[ByteStr],
+                             microBlockOwners: MicroBlockOwners) extends ChannelInboundHandlerAdapter with ScorexLogging {
 
   private implicit val scheduler: SchedulerService = monix.execution.Scheduler.singleThread(
     "microblock-synchronizer",
     reporter = com.wavesplatform.utils.UncaughtExceptionsToLogReporter
   )
 
-  private val knownOwners = cache[MicroBlockSignature, MSet[ChannelHandlerContext]](settings.invCacheTimeout)
   private val nextInvs = cache[MicroBlockSignature, MicroBlockInv](settings.invCacheTimeout)
   private val awaiting = cache[MicroBlockSignature, MicroBlockInv](settings.invCacheTimeout)
   private val successfullyReceived = cache[MicroBlockSignature, Object](settings.processedMicroBlocksCacheTimeout)
@@ -45,26 +44,20 @@ class MicroBlockSynchronizer(settings: MicroblockSynchronizerSettings,
   private def requestMicroBlock(mbInv: MicroBlockInv): CancelableFuture[Unit] = {
     import mbInv.totalBlockSig
 
-    def pollOwner: Option[ChannelHandlerContext] = {
-      val owners = knownOwners.get(totalBlockSig, () => MSet.empty)
-      random(owners).map { ctx =>
-        owners -= ctx
-        ctx
-      }
-    }
+    def randomOwner(exclude: Set[ChannelHandlerContext]) = random(microBlockOwners.all(mbInv.totalBlockSig) -- exclude)
 
-    def task(attemptsAllowed: Int): Task[Unit] = Task.unit.flatMap { _ =>
+    def task(attemptsAllowed: Int, exclude: Set[ChannelHandlerContext]): Task[Unit] = Task.unit.flatMap { _ =>
       if (attemptsAllowed <= 0 || alreadyProcessed(totalBlockSig)) Task.unit
-      else pollOwner.fold(Task.unit) { ownerCtx =>
+      else randomOwner(exclude).fold(Task.unit) { ownerCtx =>
         if (ownerCtx.channel().isOpen) {
           ownerCtx.writeAndFlush(MicroBlockRequest(totalBlockSig))
           awaiting.put(totalBlockSig, mbInv)
-          task(attemptsAllowed - 1).delayExecution(settings.waitResponseTimeout)
-        } else task(attemptsAllowed)
+          task(attemptsAllowed - 1, exclude + ownerCtx).delayExecution(settings.waitResponseTimeout)
+        } else task(attemptsAllowed, exclude + ownerCtx)
       }
     }
 
-    task(MicroBlockDownloadAttempts).runAsync
+    task(MicroBlockDownloadAttempts, Set.empty).runAsync
   }
 
   private def tryDownloadNext(prevBlockId: ByteStr): Unit = Option(nextInvs.getIfPresent(prevBlockId)).foreach(requestMicroBlock)
@@ -74,7 +67,6 @@ class MicroBlockSynchronizer(settings: MicroblockSynchronizerSettings,
       import mb.{totalResBlockSig => totalSig}
 
       successfullyReceived.put(totalSig, dummy)
-      knownOwners.invalidate(totalSig)
       BlockStats.received(mb, ctx)
 
       Task {
@@ -90,7 +82,7 @@ class MicroBlockSynchronizer(settings: MicroblockSynchronizerSettings,
         case Left(err) => peerDatabase.blacklistAndClose(ctx.channel(), err.toString)
         case Right(_) =>
           log.trace(s"${id(ctx)} Received $msg")
-          knownOwners.get(totalSig, () => MSet.empty) += ctx
+          microBlockOwners.add(totalSig, ctx)
           nextInvs.get(prevSig, { () =>
             BlockStats.inv(mbInv, ctx)
             mbInv
@@ -114,7 +106,7 @@ object MicroBlockSynchronizer {
 
   private val MicroBlockDownloadAttempts = 2
 
-  def random[T](s: MSet[T]): Option[T] = {
+  def random[T](s: Set[T]): Option[T] = {
     val n = util.Random.nextInt(s.size)
     val ts = s.iterator.drop(n)
     if (ts.hasNext) Some(ts.next)

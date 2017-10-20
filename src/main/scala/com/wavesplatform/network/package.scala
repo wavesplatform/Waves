@@ -4,7 +4,7 @@ import java.net.{InetSocketAddress, SocketAddress, URI}
 import java.util.concurrent.Callable
 
 import com.wavesplatform.state2.ByteStr
-import io.netty.channel.group.{ChannelGroup, ChannelMatchers}
+import io.netty.channel.group.{ChannelGroup, ChannelGroupFuture}
 import io.netty.channel.local.LocalAddress
 import io.netty.channel.socket.SocketChannel
 import io.netty.channel.{Channel, ChannelHandlerContext}
@@ -33,8 +33,9 @@ package object network extends ScorexLogging {
 
   private def formatAddress(sa: SocketAddress) = sa match {
     case null => ""
-    case l: LocalAddress => s" ${l.toString}"
+    case l: LocalAddress => s" $l"
     case isa: InetSocketAddress => s" ${toSocketAddressString(isa)}"
+    case x => s" $x" // For EmbeddedSocketAddress
   }
 
   def id(ctx: ChannelHandlerContext): String = id(ctx.channel())
@@ -52,13 +53,17 @@ package object network extends ScorexLogging {
   }
 
   implicit class ChannelGroupExt(val allChannels: ChannelGroup) extends AnyVal {
-    def broadcast(message: AnyRef, except: Option[Channel] = None): Unit = {
+    def broadcast(message: AnyRef, except: Option[Channel] = None): Unit = broadcast(message, except.toSet)
+
+    def broadcast(message: AnyRef, except: Set[Channel]): ChannelGroupFuture = {
       message match {
         case RawBytes(TransactionMessageSpec.messageCode, _) =>
-        case _ => log.trace(s"Broadcasting $message to ${allChannels.size()} channels${except.fold("")(c => s" (except ${id(c)})")}")
-
+        case _ =>
+          val exceptMsg = if (except.isEmpty) "" else s" (except ${except.map(id(_)).mkString(", ")})"
+          log.trace(s"Broadcasting $message to ${allChannels.size()} channels$exceptMsg")
       }
-      allChannels.writeAndFlush(message, except.fold(ChannelMatchers.all())(ChannelMatchers.isNot))
+
+      allChannels.writeAndFlush(message, { (channel: Channel) => !except.contains(channel) })
     }
 
     def broadcastTx(tx: Transaction, except: Option[Channel] = None): Unit =
