@@ -57,7 +57,9 @@ class MicroBlockSynchronizer(settings: MicroblockSynchronizerSettings,
       if (attemptsAllowed <= 0 || alreadyProcessed(totalBlockSig)) Task.unit
       else pollOwner.fold(Task.unit) { ownerCtx =>
         if (ownerCtx.channel().isOpen) {
-          ownerCtx.writeAndFlush(MicroBlockRequest(totalBlockSig))
+          val request = MicroBlockRequest(totalBlockSig)
+          ownerCtx.writeAndFlush(request)
+          log.trace(s"${id(ownerCtx)} Sent $request")
           awaiting.put(totalBlockSig, mbInv)
           task(attemptsAllowed - 1).delayExecution(settings.waitResponseTimeout)
         } else task(attemptsAllowed)

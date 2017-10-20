@@ -24,9 +24,7 @@ class HistoryReplier(history: NgHistory, settings: SynchronizationSettings) exte
   private def cachedBytes(cache: Cache[ByteStr, Array[Byte]], id: ByteStr, loader: => Option[Array[Byte]]): Option[Array[Byte]] =
     Option(cache.getIfPresent(id)).orElse(loader.map(bytes => cache.get(id, () => bytes)))
 
-  override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit
-
-  = msg match {
+  override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
     case GetSignatures(otherSigs) =>
       otherSigs.view
         .map(parent => parent -> history.blockIdsAfter(parent, settings.maxChainLength))
@@ -48,10 +46,11 @@ class HistoryReplier(history: NgHistory, settings: SynchronizationSettings) exte
       }
 
     case mbr@MicroBlockRequest(totalResBlockSig) =>
-      log.debug(id(ctx) + "Received " + mbr)
+      log.trace(id(ctx) + "Received " + mbr)
       cachedBytes(knownMicroBlocks, totalResBlockSig,
         history.microBlock(totalResBlockSig).map(m => MicroBlockResponseMessageSpec.serializeData(MicroBlockResponse(m)))).foreach { bytes =>
         ctx.writeAndFlush(RawBytes(MicroBlockResponseMessageSpec.messageCode, bytes))
+        log.trace(id(ctx) + s"Sent MicroBlockResponse(total=${totalResBlockSig.trim})")
       }
 
     case _: Handshake =>
