@@ -18,8 +18,7 @@ class NotActivateFeatureTestSuite extends FreeSpec with Matchers with BeforeAndA
 
   private val docker = Docker(getClass)
   private val nodes = Configs.map(docker.startNode)
-  private val votingFeatureNum: Short = 1
-  private val nonVotingFeatureNum: Short = 2
+
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
@@ -83,6 +82,9 @@ class NotActivateFeatureTestSuite extends FreeSpec with Matchers with BeforeAndA
          |}
       """.stripMargin
     )
+
+    val votingFeatureNum: Short = 1
+    val nonVotingFeatureNum: Short = 2
 
     val NodesCount: Int = 4
 

@@ -17,14 +17,20 @@ trait ActivationStatusRequest extends Matchers {
   }
 
   def assertVotingStatus(activationStatusFeature: ActivationStatusFeature, supportedBlocks: Int, blockchainFeatureStatus: BlockchainFeatureStatus, nodeFeatureStatus: NodeFeatureStatus): Unit = {
-    activationStatusFeature.supportedBlocks shouldBe supportedBlocks
+    activationStatusFeature.supportedBlocks.get shouldBe supportedBlocks
     activationStatusFeature.blockchainStatus shouldBe blockchainFeatureStatus
     activationStatusFeature.nodeStatus shouldBe nodeFeatureStatus
   }
 
-  def assertApprovedStatus(activationStatusFeature: ActivationStatusFeature, height: Int, blockchainFeatureStatus: BlockchainFeatureStatus, nodeFeatureStatus: NodeFeatureStatus): Unit = {
-    activationStatusFeature.activationHeight shouldBe height
-    activationStatusFeature.blockchainStatus shouldBe blockchainFeatureStatus
+  def assertApprovedStatus(activationStatusFeature: ActivationStatusFeature, height: Int, nodeFeatureStatus: NodeFeatureStatus): Unit = {
+    activationStatusFeature.activationHeight.get shouldBe height
+    activationStatusFeature.blockchainStatus shouldBe BlockchainFeatureStatus.Approved
+    activationStatusFeature.nodeStatus shouldBe nodeFeatureStatus
+  }
+
+  def assertActivatedStatus(activationStatusFeature: ActivationStatusFeature, height: Int, nodeFeatureStatus: NodeFeatureStatus): Unit = {
+    activationStatusFeature.activationHeight.get shouldBe height
+    activationStatusFeature.blockchainStatus shouldBe BlockchainFeatureStatus.Activated
     activationStatusFeature.nodeStatus shouldBe nodeFeatureStatus
   }
 }

@@ -18,8 +18,7 @@ class VoteForFeatureByDefaultTestSuite extends FreeSpec with Matchers with Befor
 
   private val docker = Docker(getClass)
   private val nodes = Configs.map(docker.startNode)
-  private val defaultVotingFeatureNum: Short = 1
-  private val nonVotingFeatureNum: Short = 2
+
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
@@ -68,7 +67,7 @@ class VoteForFeatureByDefaultTestSuite extends FreeSpec with Matchers with Befor
     val featuresMap = result.flatMap(b => b.features.getOrElse(Seq.empty)).groupBy(x => x)
     val votesForFeature1 = featuresMap.getOrElse(defaultVotingFeatureNum, Seq.empty).length
 
-    assertApprovedStatus(supportedNodeActivationInfo, votingInterval * 2, BlockchainFeatureStatus.Approved, NodeFeatureStatus.Voted)
+    assertApprovedStatus(supportedNodeActivationInfo, votingInterval * 2, NodeFeatureStatus.Voted)
     //
     //    supportedNodeActivationInfo.blockchainStatus shouldBe BlockchainFeatureStatus.Approved
     //    supportedNodeActivationInfo.nodeStatus shouldBe NodeFeatureStatus.Voted
@@ -92,6 +91,10 @@ class VoteForFeatureByDefaultTestSuite extends FreeSpec with Matchers with Befor
 
     val votingInterval = 18
     val blocksForActivation = 18
+    val defaultVotingFeatureNum: Short = 1
+    val nonVotingFeatureNum: Short = 2
+
+    val NodesCount: Int = 4
 
 
     private val supportedNodes = ConfigFactory.parseString(
@@ -104,15 +107,22 @@ class VoteForFeatureByDefaultTestSuite extends FreeSpec with Matchers with Befor
          |        functionality{
          |          pre-activated-features = {}
          |        }
-         |        initial-balance = 1000000000000000
+         |
          |        genesis {
+         |          average-block-delay: 10000ms
+         |          initial-base-target: 200000
+         |          timestamp: 1489352400000
+         |          block-timestamp: 1489352400000
+         |          signature: "2ybcYqV9DB2xNK5zhUmij5Y2geiyDu8fUffnSSmMf2TQasMSHGJrHUQk84ttJ7jV1KQ6S8dT8WGf125WRzomhzj5"
+         |          initial-balance: 10000000000000000
          |          transactions = [
-         |            {recipient = 3HevUqdcHuiLvpeVLo4sGVqxSsZczJuCYHo, amount = 250000000000000}
-         |            {recipient = 3HWgKQ7SWT1HHxevxDFRGRN6wFKxvGeAjhm, amount = 250000000000000}
-         |            {recipient = 3HXnWmctGNQCqqV7gegzM7Xv7e6aMDSDpZC, amount = 250000000000000}
-         |            {recipient = 3HmYWqC4Q8GrAnyw3AJk1JmJT2Ch1ZSyX4b, amount = 250000000000000}
+         |            {recipient: "3FSXH1sG9Rx5pMkHdmMppTmtAGSCABBpYuV", amount: 250000000000000},
+         |            {recipient: "3FgbbKNWQEdcEoMPspDwLUD8sGQbP5SxPPo", amount: 250000000000000},
+         |            {recipient: "3FXKqpGC3WKzBrjdVR7zmJS3wY1kfeHLkk9", amount: 250000000000000},
+         |            {recipient: "3FfgMjbebfjckwCWHU5AXdwZd2uuEh5VsZS", amount: 250000000000000}
          |          ]
          |        }
+         |
          |      }
          |   }
          |}
@@ -132,15 +142,22 @@ class VoteForFeatureByDefaultTestSuite extends FreeSpec with Matchers with Befor
          |        functionality{
          |          pre-activated-features = {}
          |        }
-         |        initial-balance = 1000000000000000
          |        genesis {
+         |          average-block-delay: 10000ms
+         |          initial-base-target: 200000
+         |          timestamp: 1489352400000
+         |          block-timestamp: 1489352400000
+         |          signature: "2ybcYqV9DB2xNK5zhUmij5Y2geiyDu8fUffnSSmMf2TQasMSHGJrHUQk84ttJ7jV1KQ6S8dT8WGf125WRzomhzj5"
+         |          initial-balance: 10000000000000000
          |          transactions = [
-         |            {recipient = 3HevUqdcHuiLvpeVLo4sGVqxSsZczJuCYHo, amount = 250000000000000}
-         |            {recipient = 3HWgKQ7SWT1HHxevxDFRGRN6wFKxvGeAjhm, amount = 250000000000000}
-         |            {recipient = 3HXnWmctGNQCqqV7gegzM7Xv7e6aMDSDpZC, amount = 250000000000000}
-         |            {recipient = 3HmYWqC4Q8GrAnyw3AJk1JmJT2Ch1ZSyX4b, amount = 250000000000000}
+         |            {recipient: "3FSXH1sG9Rx5pMkHdmMppTmtAGSCABBpYuV", amount: 250000000000000},
+         |            {recipient: "3FgbbKNWQEdcEoMPspDwLUD8sGQbP5SxPPo", amount: 250000000000000},
+         |            {recipient: "3FXKqpGC3WKzBrjdVR7zmJS3wY1kfeHLkk9", amount: 250000000000000},
+         |            {recipient: "3FfgMjbebfjckwCWHU5AXdwZd2uuEh5VsZS", amount: 250000000000000}
          |          ]
          |        }
+         |
+
          |      }
          |   }
          |}
@@ -149,10 +166,8 @@ class VoteForFeatureByDefaultTestSuite extends FreeSpec with Matchers with Befor
     )
 
 
-    val NodesCount: Int = 4
-
-    val Configs: Seq[Config] = Seq(nonSupportedNodes.withFallback(dockerConfigs(0))) ++
-      Seq(supportedNodes.withFallback(dockerConfigs(1))) ++
+    val Configs: Seq[Config] = Seq(nonSupportedNodes.withFallback(dockerConfigs(1))) ++
+      Seq(supportedNodes.withFallback(dockerConfigs(0))) ++
       Seq(supportedNodes.withFallback(dockerConfigs(2))) ++
       Seq(supportedNodes.withFallback(dockerConfigs(3)))
 

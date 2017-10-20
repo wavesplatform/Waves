@@ -1,6 +1,6 @@
 package com.wavesplatform.it.activation
 
-import com.typesafe.config.{Config, ConfigFactory}
+import com.typesafe.config.{Config, ConfigFactory, ConfigRenderOptions}
 import com.wavesplatform.features.BlockchainFeatureStatus
 import com.wavesplatform.features.api.{ActivationStatusFeature, NodeFeatureStatus}
 import com.wavesplatform.it.{Docker, Node}
@@ -19,7 +19,7 @@ class ActivationFeatureTestSuite extends FreeSpec with Matchers with BeforeAndAf
 
   private val docker = Docker(getClass)
   private val nodes: Seq[Node] = Configs.map(docker.startNode)
-  private val featureNum: Short = 1
+
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
@@ -33,7 +33,9 @@ class ActivationFeatureTestSuite extends FreeSpec with Matchers with BeforeAndAf
 
 
   "check that voting starts and supported blocks increased" in {
-
+    println(Configs.head.resolve().root().render(ConfigRenderOptions.defaults().setComments(false).setOriginComments(false)))
+    println(Configs(1).resolve().root().render(ConfigRenderOptions.defaults().setComments(false).setOriginComments(false)))
+    println(Configs(2).resolve().root().render(ConfigRenderOptions.defaults().setComments(false).setOriginComments(false)))
     val checkHeight: Int = votingInterval * 2 / 3
 
     val activationStatusWhileVoting = activationStatus(nodes.head, checkHeight, featureNum, 2.minute)
@@ -66,16 +68,14 @@ class ActivationFeatureTestSuite extends FreeSpec with Matchers with BeforeAndAf
     val checkHeight: Int = votingInterval * 2
     val activationStatusInfo = activationStatus(nodes.last, checkHeight, featureNum, 5.minute)
 
-    assertVotingStatus(activationStatusInfo, votingInterval * 3,
-      BlockchainFeatureStatus.Approved, NodeFeatureStatus.Voted)
+    assertApprovedStatus(activationStatusInfo, votingInterval * 3, NodeFeatureStatus.Voted)
   }
 
   "check ACTIVATED status in second voting interval" in {
     val checkHeight: Int = votingInterval * 3
     val activationStatusInfo = activationStatus(nodes.last, checkHeight, featureNum, 2.minute)
 
-    assertVotingStatus(activationStatusInfo, checkHeight,
-      BlockchainFeatureStatus.Activated, NodeFeatureStatus.Voted)
+    assertActivatedStatus(activationStatusInfo, checkHeight, NodeFeatureStatus.Voted)
   }
 
 
@@ -83,8 +83,9 @@ class ActivationFeatureTestSuite extends FreeSpec with Matchers with BeforeAndAf
 
     private val dockerConfigs = Docker.NodeConfigs.getConfigList("nodes").asScala
 
-    val votingInterval = 15
-    val blocksForActivation = 15
+    val votingInterval = 14
+    val blocksForActivation = 14 //should be even
+    val featureNum: Short = 1
 
     private val supportedNodes = ConfigFactory.parseString(
       s"""
