@@ -10,7 +10,7 @@ import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
-import scala.util.Random
+
 
 class VoteForFeatureByDefaultTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with CancelAfterFailure with ActivationStatusRequest {
 
@@ -18,6 +18,7 @@ class VoteForFeatureByDefaultTestSuite extends FreeSpec with Matchers with Befor
 
   private val docker = Docker(getClass)
   private val nodes = Configs.map(docker.startNode)
+  val defaultVotingFeatureNum: Short = 1
 
 
   override protected def beforeAll(): Unit = {
@@ -32,11 +33,10 @@ class VoteForFeatureByDefaultTestSuite extends FreeSpec with Matchers with Befor
 
 
   "check that voting starts and supported blocks increased" in {
-
     val checkHeight: Int = votingInterval * 2 / 3
     val supportedNodeActivationInfo = activationStatus(nodes.last, checkHeight, defaultVotingFeatureNum, 2.minute)
 
-    val result = Await.result(nodes.head.blockSeq(1, checkHeight), 2.minute)
+    val result = Await.result(nodes.last.blockSeq(1, checkHeight), 2.minute)
     val featuresMap = result.flatMap(b => b.features.getOrElse(Seq.empty)).groupBy(x => x)
     val votesForFeature1 = featuresMap.getOrElse(defaultVotingFeatureNum, Seq.empty).length
 
@@ -44,38 +44,19 @@ class VoteForFeatureByDefaultTestSuite extends FreeSpec with Matchers with Befor
 
     val nonSupportedNodeActivationInfo = activationStatus(nodes.head, checkHeight, defaultVotingFeatureNum, 2.minute)
     assertVotingStatus(nonSupportedNodeActivationInfo, votesForFeature1, BlockchainFeatureStatus.Undefined, NodeFeatureStatus.Implemented)
-
   }
 
-  "check supported blocks counter resets on the next voting interval" in {
-    val checkHeight: Int = votingInterval * 2 - blocksForActivation / 2
-    val supportedNodeActivationInfo = activationStatus(nodes.last, checkHeight, defaultVotingFeatureNum, 2.minute)
-
-    val result = Await.result(nodes.head.blockSeq(1, checkHeight), 2.minute)
-    val featuresMap = result.flatMap(b => b.features.getOrElse(Seq.empty)).groupBy(x => x)
-    val votesForFeature1 = featuresMap.getOrElse(defaultVotingFeatureNum, Seq.empty).length
-
-    assertVotingStatus(supportedNodeActivationInfo, votesForFeature1, BlockchainFeatureStatus.Undefined, NodeFeatureStatus.Voted)
-  }
 
   "check APPROVED blockchain status in second voting interval" in {
 
-    val checkHeight: Int = votingInterval * 2
+    val checkHeight: Int = votingInterval * 2 - blocksForActivation / 2
 
-    val supportedNodeActivationInfo = activationStatus(nodes.last, checkHeight, defaultVotingFeatureNum, 2.minute)
-    val result = Await.result(nodes.head.blockSeq(1, checkHeight), 2.minute)
-    val featuresMap = result.flatMap(b => b.features.getOrElse(Seq.empty)).groupBy(x => x)
-    val votesForFeature1 = featuresMap.getOrElse(defaultVotingFeatureNum, Seq.empty).length
-
+    val supportedNodeActivationInfo = activationStatus(nodes.last, checkHeight, defaultVotingFeatureNum, 3.minute)
     assertApprovedStatus(supportedNodeActivationInfo, votingInterval * 2, NodeFeatureStatus.Voted)
-    //
-    //    supportedNodeActivationInfo.blockchainStatus shouldBe BlockchainFeatureStatus.Approved
-    //    supportedNodeActivationInfo.nodeStatus shouldBe NodeFeatureStatus.Voted
-    //    supportedNodeActivationInfo.activationHeight.get shouldBe votingInterval * 3
   }
 
   "check ACTIVATED status in second voting interval" in {
-    val checkHeight: Int = votingInterval * 3
+    val checkHeight: Int = votingInterval * 2
 
     val supportedNodeActivationInfo = activationStatus(nodes.last, checkHeight, defaultVotingFeatureNum, 2.minute)
 
@@ -89,8 +70,8 @@ class VoteForFeatureByDefaultTestSuite extends FreeSpec with Matchers with Befor
 
     private val dockerConfigs = Docker.NodeConfigs.getConfigList("nodes").asScala
 
-    val votingInterval = 18
-    val blocksForActivation = 18
+    val votingInterval = 20
+    val blocksForActivation = 15
     val defaultVotingFeatureNum: Short = 1
     val nonVotingFeatureNum: Short = 2
 
@@ -107,21 +88,16 @@ class VoteForFeatureByDefaultTestSuite extends FreeSpec with Matchers with Befor
          |        functionality{
          |          pre-activated-features = {}
          |        }
-         |
          |        genesis {
-         |          average-block-delay: 10000ms
-         |          initial-base-target: 200000
-         |          timestamp: 1489352400000
-         |          block-timestamp: 1489352400000
-         |          signature: "2ybcYqV9DB2xNK5zhUmij5Y2geiyDu8fUffnSSmMf2TQasMSHGJrHUQk84ttJ7jV1KQ6S8dT8WGf125WRzomhzj5"
-         |          initial-balance: 10000000000000000
+         |          signature: "zXBp6vpEHgtdsPjVHjSEwMeRiQTAu6DdX3qkJaCRKxgYJk26kazS2XguLYRvL9taHKxrZHNNA7X7LMVFavQzWpT"
          |          transactions = [
-         |            {recipient: "3FSXH1sG9Rx5pMkHdmMppTmtAGSCABBpYuV", amount: 250000000000000},
-         |            {recipient: "3FgbbKNWQEdcEoMPspDwLUD8sGQbP5SxPPo", amount: 250000000000000},
-         |            {recipient: "3FXKqpGC3WKzBrjdVR7zmJS3wY1kfeHLkk9", amount: 250000000000000},
-         |            {recipient: "3FfgMjbebfjckwCWHU5AXdwZd2uuEh5VsZS", amount: 250000000000000}
+         |            {recipient: "3Hm3LGoNPmw1VTZ3eRA2pAfeQPhnaBm6YFC", amount: 250000000000000},
+         |            {recipient: "3HZxhQhpSU4yEGJdGetncnHaiMnGmUusr9s", amount: 270000000000000},
+         |            {recipient: "3HPG313x548Z9kJa5XY4LVMLnUuF77chcnG", amount: 260000000000000},
+         |            {recipient: "3HVW7RDYVkcN5xFGBNAUnGirb5KaBSnbUyB", amount: 2000000000000}
          |          ]
-         |        }
+         |       }
+         |
          |
          |      }
          |   }
@@ -143,21 +119,14 @@ class VoteForFeatureByDefaultTestSuite extends FreeSpec with Matchers with Befor
          |          pre-activated-features = {}
          |        }
          |        genesis {
-         |          average-block-delay: 10000ms
-         |          initial-base-target: 200000
-         |          timestamp: 1489352400000
-         |          block-timestamp: 1489352400000
-         |          signature: "2ybcYqV9DB2xNK5zhUmij5Y2geiyDu8fUffnSSmMf2TQasMSHGJrHUQk84ttJ7jV1KQ6S8dT8WGf125WRzomhzj5"
-         |          initial-balance: 10000000000000000
+         |          signature: "zXBp6vpEHgtdsPjVHjSEwMeRiQTAu6DdX3qkJaCRKxgYJk26kazS2XguLYRvL9taHKxrZHNNA7X7LMVFavQzWpT"
          |          transactions = [
-         |            {recipient: "3FSXH1sG9Rx5pMkHdmMppTmtAGSCABBpYuV", amount: 250000000000000},
-         |            {recipient: "3FgbbKNWQEdcEoMPspDwLUD8sGQbP5SxPPo", amount: 250000000000000},
-         |            {recipient: "3FXKqpGC3WKzBrjdVR7zmJS3wY1kfeHLkk9", amount: 250000000000000},
-         |            {recipient: "3FfgMjbebfjckwCWHU5AXdwZd2uuEh5VsZS", amount: 250000000000000}
+         |            {recipient: "3Hm3LGoNPmw1VTZ3eRA2pAfeQPhnaBm6YFC", amount: 250000000000000},
+         |            {recipient: "3HZxhQhpSU4yEGJdGetncnHaiMnGmUusr9s", amount: 270000000000000},
+         |            {recipient: "3HPG313x548Z9kJa5XY4LVMLnUuF77chcnG", amount: 260000000000000},
+         |            {recipient: "3HVW7RDYVkcN5xFGBNAUnGirb5KaBSnbUyB", amount: 2000000000000}
          |          ]
-         |        }
-         |
-
+         |       }
          |      }
          |   }
          |}
@@ -166,10 +135,10 @@ class VoteForFeatureByDefaultTestSuite extends FreeSpec with Matchers with Befor
     )
 
 
-    val Configs: Seq[Config] = Seq(nonSupportedNodes.withFallback(dockerConfigs(1))) ++
-      Seq(supportedNodes.withFallback(dockerConfigs(0))) ++
+    val Configs: Seq[Config] = Seq(nonSupportedNodes.withFallback(dockerConfigs(3))) ++
+      Seq(supportedNodes.withFallback(dockerConfigs(1))) ++
       Seq(supportedNodes.withFallback(dockerConfigs(2))) ++
-      Seq(supportedNodes.withFallback(dockerConfigs(3)))
+      Seq(supportedNodes.withFallback(dockerConfigs.head))
 
   }
 

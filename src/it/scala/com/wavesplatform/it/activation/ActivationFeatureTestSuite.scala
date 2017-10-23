@@ -1,8 +1,8 @@
 package com.wavesplatform.it.activation
 
-import com.typesafe.config.{Config, ConfigFactory, ConfigRenderOptions}
+import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.features.BlockchainFeatureStatus
-import com.wavesplatform.features.api.{ActivationStatusFeature, NodeFeatureStatus}
+import com.wavesplatform.features.api.NodeFeatureStatus
 import com.wavesplatform.it.{Docker, Node}
 import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
 
@@ -33,9 +33,6 @@ class ActivationFeatureTestSuite extends FreeSpec with Matchers with BeforeAndAf
 
 
   "check that voting starts and supported blocks increased" in {
-    println(Configs.head.resolve().root().render(ConfigRenderOptions.defaults().setComments(false).setOriginComments(false)))
-    println(Configs(1).resolve().root().render(ConfigRenderOptions.defaults().setComments(false).setOriginComments(false)))
-    println(Configs(2).resolve().root().render(ConfigRenderOptions.defaults().setComments(false).setOriginComments(false)))
     val checkHeight: Int = votingInterval * 2 / 3
 
     val activationStatusWhileVoting = activationStatus(nodes.head, checkHeight, featureNum, 2.minute)
