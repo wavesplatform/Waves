@@ -114,7 +114,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
     else Set.empty
   }
 
-  override def processBlock(block: Block): Either[ValidationError, DiscardedTransactions] = write { implicit l =>
+  override def processBlock(block: Block): Either[ValidationError, Option[DiscardedTransactions]] = write { implicit l =>
     if (topMemoryDiff().heightDiff >= minimumInMemoryDiffSize) {
       persisted.applyBlockDiff(bottomMemoryDiff())
       bottomMemoryDiff.set(topMemoryDiff())
@@ -175,14 +175,13 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
           log.error(errorText)
           Left(BlockAppendError(errorText, block))
         }
-    }).map {
-      case Some((newBlockDiff, discacrded)) =>
+    }).map { _ map { case ((newBlockDiff, discacrded)) =>
         val height = historyWriter.height() + 1
         ngState.set(Some(NgState(block, newBlockDiff, 0L, featuresApprovedWithBlock(block))))
         historyReader.lastBlockId().foreach(lastBlockId.onNext)
         log.info(s"$block appended. New height: $height)")
         discacrded
-      case None => Seq.empty
+      }
     })
   }
 
