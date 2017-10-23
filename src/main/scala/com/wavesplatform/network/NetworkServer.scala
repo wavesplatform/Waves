@@ -82,8 +82,9 @@ class NetworkServer(checkpointService: CheckpointService,
 
   private val coordinatorExecutor = new DefaultEventLoop
 
+  private val microBlockOwners = new MicroBlockOwners(settings.synchronizationSettings.microBlockSynchronizer.invCacheTimeout)
   private val coordinatorHandler = new CoordinatorHandler(checkpointService, history, blockchainUpdater, time,
-    stateReader, utxPool, blockchainReadiness, miner, settings, peerDatabase, allChannels, featureProvider)
+    stateReader, utxPool, blockchainReadiness, miner, settings, peerDatabase, allChannels, featureProvider, microBlockOwners)
 
   private val peerConnections = new ConcurrentHashMap[PeerKey, Channel](10, 0.9f, 10)
 
@@ -95,7 +96,8 @@ class NetworkServer(checkpointService: CheckpointService,
     settings.synchronizationSettings.microBlockSynchronizer,
     history,
     peerDatabase,
-    blockchainUpdater.lastBlockId
+    blockchainUpdater.lastBlockId,
+    microBlockOwners
   )
 
 
