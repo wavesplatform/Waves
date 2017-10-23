@@ -40,7 +40,7 @@ class CoordinatorHandler(checkpointService: CheckpointService,
 
   private val processCheckpoint = Coordinator.processCheckpoint(checkpointService, history, blockchainUpdater) _
   private val processFork = Coordinator.processFork(checkpointService, history, blockchainUpdater, stateReader, utxStorage, time, settings, blockchainReadiness, featureProvider) _
-  private val processBlock = Coordinator.processSingleBlock(checkpointService, history, blockchainUpdater, time, stateReader, utxStorage, blockchainReadiness, settings, featureProvider) _
+  private val processBlock = Coordinator.processSingleBlock(checkpointService, history, blockchainUpdater, time, stateReader, utxStorage, settings.blockchainSettings, featureProvider) _
   private val processMicroBlock = Coordinator.processMicroBlock(checkpointService, history, blockchainUpdater, utxStorage) _
 
   private def scheduleMiningAndBroadcastScore(score: BigInt): Unit = {
@@ -81,11 +81,13 @@ class CoordinatorHandler(checkpointService: CheckpointService,
     case b: Block => (Task {
       BlockStats.received(b, BlockStats.Source.Broadcast, ctx)
       CoordinatorHandler.blockReceivingLag.safeRecord(System.currentTimeMillis() - b.timestamp)
-      Signed.validateSignatures(b).flatMap(b => processBlock(b, false))
+      Signed.validateSignatures(b).flatMap(b => processBlock(b))
     } map {
       case Right(None) =>
         log.trace(s"$b already appended")
       case Right(Some(newScore)) =>
+        BlockStats.applied(b, BlockStats.Source.Broadcast, history.height())
+        Coordinator.updateBlockchainReadinessFlag(history, time, blockchainReadiness, settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed)
         log.debug(s"Appended $b")
         if (b.transactionData.isEmpty)
           allChannels.broadcast(BlockForged(b), Some(ctx.channel()))

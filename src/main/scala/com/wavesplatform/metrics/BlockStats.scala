@@ -47,10 +47,10 @@ object BlockStats {
     Seq.empty
   )
 
-  def applied(b: Block, source: Source, baseHeight: Int): Unit = write(
+  def applied(b: Block, source: Source, newHeight: Int): Unit = write(
     block(b, source)
       .addField("txs", b.transactionData.size)
-      .addField("height", baseHeight),
+      .addField("height", newHeight),
     Event.Applied,
     Seq.empty
   )

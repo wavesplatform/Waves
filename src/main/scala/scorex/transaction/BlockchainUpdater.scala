@@ -8,7 +8,7 @@ import scorex.utils.Synchronized
 
 trait BlockchainUpdater extends Synchronized {
 
-  def processBlock(block: Block): Either[ValidationError, DiscardedTransactions]
+  def processBlock(block: Block): Either[ValidationError, Option[DiscardedTransactions]]
 
   def processMicroBlock(microBlock: MicroBlock): Either[ValidationError, Unit]
 
