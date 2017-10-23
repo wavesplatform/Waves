@@ -61,8 +61,8 @@ class NotActivateFeatureTestSuite extends FreeSpec with Matchers with BeforeAndA
 
     private val dockerConfigs = Docker.NodeConfigs.getConfigList("nodes").asScala
 
-    val votingInterval = 16
-    val blocksForActivation = 16
+    val votingInterval = 14
+    val blocksForActivation = 14
 
     private val nonSupportedNodes = ConfigFactory.parseString(
       s"""
