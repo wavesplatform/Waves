@@ -133,7 +133,7 @@ this automatically.
 
 # Acknowledgement
 
-[<img src="logo_yourkit.png">](http://www.yourkit.com/java/profiler/index.jsp)  
+[<img src="https://www.yourkit.com/images/yklogo.png">](http://www.yourkit.com/java/profiler/index.jsp)  
 We use YourKit full-featured Java Profiler to make Waves node faster. YourKit, LLC is the creator of innovative and intelligent tools for profiling Java and .NET applications.    
 Take a look at YourKit's leading software products: 
 <a href="http://www.yourkit.com/java/profiler/index.jsp">YourKit Java Profiler</a> and
