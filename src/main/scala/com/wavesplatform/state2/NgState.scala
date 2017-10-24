@@ -1,6 +1,5 @@
 package com.wavesplatform.state2
 
-
 import java.util.concurrent.TimeUnit
 
 import cats.kernel.Monoid
@@ -8,36 +7,42 @@ import com.google.common.cache.CacheBuilder
 import scorex.block.Block.BlockId
 import scorex.block.{Block, MicroBlock}
 import scorex.transaction.History.BlockMinerInfo
-import scorex.transaction.{AssetId, DiscardedMicroBlocks, Transaction}
-import scala.collection.mutable.{Map => MMap, ListBuffer => MList}
+import scorex.transaction.{DiscardedMicroBlocks, Transaction}
 
+import scala.collection.mutable.{ListBuffer => MList, Map => MMap}
 
 class NgState(val base: Block, val baseBlockDiff: BlockDiff, val acceptedFeatures: Set[Short]) {
 
+  private val MaxTotalDiffs = 3
+
   private val microDiffs: MMap[BlockId, (BlockDiff, Long)] = MMap.empty
-  private val micros: MList[MicroBlock] = MList.empty
+  private val micros: MList[MicroBlock] = MList.empty // fresh head
   private val totalBlockDiffCache = CacheBuilder.newBuilder()
-    .maximumSize(2L)
+    .maximumSize(MaxTotalDiffs)
     .expireAfterWrite(10, TimeUnit.MINUTES)
     .build[BlockId, BlockDiff]()
+
 
   def microBlockIds: Seq[BlockId] = micros.map(_.totalResBlockSig).toList
 
   private def diffFor(totalResBlockSig: BlockId): BlockDiff =
     if (totalResBlockSig == base.uniqueId)
       baseBlockDiff
-    else
-      totalBlockDiffCache.get(totalResBlockSig, () => {
+    else Option(totalBlockDiffCache.getIfPresent(totalResBlockSig)) match {
+      case Some(d) => d
+      case None =>
         val prevResBlockSig = micros.find(_.totalResBlockSig == totalResBlockSig).get.prevResBlockSig
         val prevResBlockDiff = totalBlockDiffCache.get(prevResBlockSig, () => diffFor(prevResBlockSig))
         val currentMicroDiff = microDiffs(totalResBlockSig)._1
-        Monoid.combine(prevResBlockDiff, currentMicroDiff)
-      })
+        val r = Monoid.combine(prevResBlockDiff, currentMicroDiff)
+        totalBlockDiffCache.put(totalResBlockSig, r)
+        r
+    }
 
-  def bestLiquidBlockId: AssetId =
+  def bestLiquidBlockId: BlockId =
     micros.headOption.map(_.totalResBlockSig).getOrElse(base.uniqueId)
 
-  def lastMicroBlock : Option[MicroBlock] = micros.headOption
+  def lastMicroBlock: Option[MicroBlock] = micros.headOption
 
   def transactions: Seq[Transaction] = base.transactionData ++ micros.map(_.transactionData).reverse.flatten
 

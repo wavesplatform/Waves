@@ -28,6 +28,7 @@ class NgStateTest extends PropSpec with GeneratorDrivenPropertyChecks with Prope
       val ng = new NgState(block, BlockDiff.empty, Set.empty[Short])
       microBlocks.foreach(m => ng.append(m, BlockDiff.empty, 0L))
 
+      ng.totalDiffOf(microBlocks.last.totalResBlockSig)
       microBlocks.foreach { m =>
         ng.totalDiffOf(m.totalResBlockSig).get match {
           case ((forged, _, _)) =>
@@ -35,6 +36,7 @@ class NgStateTest extends PropSpec with GeneratorDrivenPropertyChecks with Prope
           case _ => ???
         }
       }
+      Seq(microBlocks(4)).map(x => ng.totalDiffOf(x.totalResBlockSig))
     }
   }
   property("can resolve best liquid block") {

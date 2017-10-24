@@ -134,45 +134,45 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
             Left(BlockAppendError(s"References incorrect or non-existing block: " + logDetails, block))
           case _ => BlockDiffer.fromBlock(settings.blockchainSettings.functionalitySettings, featureProvider, currentPersistedBlocksState, historyWriter.lastBlock, block).map(d => Some((d, Seq.empty[Transaction])))
         }
-      case Some(ng) if ng.base.reference == block.reference =>
-        if (block.blockScore > ng.base.blockScore) {
-          BlockDiffer.fromBlock(settings.blockchainSettings.functionalitySettings, featureProvider, currentPersistedBlocksState, historyWriter.lastBlock, block).map { diff =>
-            log.trace(s"Better liquid block(score=${block.blockScore}) received and applied instead of existing(score=${ng.base.blockScore})")
-            Some((diff, ng.transactions))
-          }
-        } else if (areVersionsOfSameBlock(block, ng.base)) {
-          if (block.transactionData.size <= ng.transactions.size) {
-            log.trace(s"Existing liquid block is better than new one, discarding $block")
-            Right(None)
-          } else {
-            log.trace(s"New liquid block is better version of exsting, swapping")
-            BlockDiffer.fromBlock(settings.blockchainSettings.functionalitySettings, featureProvider, currentPersistedBlocksState, historyWriter.lastBlock, block).map(d => Some((d, Seq.empty[Transaction])))
-          }
-        } else {
-          Left(BlockAppendError(s"Competitor's liquid block $block(score=${block.blockScore}) is not better than existing (ng.base ${ng.base}(score=${ng.base.blockScore}))", block))
-        }
-      case Some(ng) if !ng.contains(block.reference) =>
-        Left(BlockAppendError(s"References incorrect or non-existing block", block))
       case Some(ng) =>
-        val (referencedForgedBlock, referencedLiquidDiff, discarded) = measureSuccessful(forgeBlockTimeStats, ng.totalDiffOf(block.reference)).get
-        if (referencedForgedBlock.signatureValid) {
-          if (discarded.nonEmpty) {
-            microBlockForkStats.increment()
-            microBlockForkHeightStats.record(discarded.size)
-          }
-          historyWriter.appendBlock(referencedForgedBlock, ng.acceptedFeatures)(BlockDiffer.fromBlock(settings.blockchainSettings.functionalitySettings, historyReader,
-            composite(currentPersistedBlocksState, () => referencedLiquidDiff.copy(heightDiff = 1)),
-            Some(referencedForgedBlock), block))
-            .map { hardenedDiff =>
-              TxsInBlockchainStats.record(ng.transactions.size)
-              topMemoryDiff.transform(Monoid.combine(_, referencedLiquidDiff))
-              Some((hardenedDiff, discarded.flatMap(_.transactionData)))
+        if (ng.base.reference == block.reference) {
+          if (block.blockScore > ng.base.blockScore) {
+            BlockDiffer.fromBlock(settings.blockchainSettings.functionalitySettings, featureProvider, currentPersistedBlocksState, historyWriter.lastBlock, block).map { diff =>
+              log.trace(s"Better liquid block(score=${block.blockScore}) received and applied instead of existing(score=${ng.base.blockScore})")
+              Some((diff, ng.transactions))
             }
-        } else {
-          val errorText = s"Forged block has invalid signature: base: ${ng.base}, requested reference: ${block.reference}"
-          log.error(errorText)
-          Left(BlockAppendError(errorText, block))
-        }
+          } else if (areVersionsOfSameBlock(block, ng.base)) {
+            if (block.transactionData.size <= ng.transactions.size) {
+              log.trace(s"Existing liquid block is better than new one, discarding $block")
+              Right(None)
+            } else {
+              log.trace(s"New liquid block is better version of exsting, swapping")
+              BlockDiffer.fromBlock(settings.blockchainSettings.functionalitySettings, featureProvider, currentPersistedBlocksState, historyWriter.lastBlock, block).map(d => Some((d, Seq.empty[Transaction])))
+            }
+          } else Left(BlockAppendError(s"Competitor's liquid block $block(score=${block.blockScore}) is not better than existing (ng.base ${ng.base}(score=${ng.base.blockScore}))", block))
+        } else
+          measureSuccessful(forgeBlockTimeStats, ng.totalDiffOf(block.reference)) match {
+            case None => Left(BlockAppendError(s"References incorrect or non-existing block", block))
+            case Some((referencedForgedBlock, referencedLiquidDiff, discarded)) =>
+              if (referencedForgedBlock.signatureValid) {
+                if (discarded.nonEmpty) {
+                  microBlockForkStats.increment()
+                  microBlockForkHeightStats.record(discarded.size)
+                }
+                historyWriter.appendBlock(referencedForgedBlock, ng.acceptedFeatures)(BlockDiffer.fromBlock(settings.blockchainSettings.functionalitySettings, historyReader,
+                  composite(currentPersistedBlocksState, () => referencedLiquidDiff.copy(heightDiff = 1)),
+                  Some(referencedForgedBlock), block))
+                  .map { hardenedDiff =>
+                    TxsInBlockchainStats.record(ng.transactions.size)
+                    topMemoryDiff.transform(Monoid.combine(_, referencedLiquidDiff))
+                    Some((hardenedDiff, discarded.flatMap(_.transactionData)))
+                  }
+              } else {
+                val errorText = s"Forged block has invalid signature: base: ${ng.base}, requested reference: ${block.reference}"
+                log.error(errorText)
+                Left(BlockAppendError(errorText, block))
+              }
+          }
     }).map { _ map { case ((newBlockDiff, discacrded)) =>
         val height = historyWriter.height() + 1
         ngState.set(Some(new NgState(block, newBlockDiff, featuresApprovedWithBlock(block))))
