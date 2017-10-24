@@ -147,10 +147,10 @@ class MicroblocksFeeTestSuite extends FreeSpec with Matchers with BeforeAndAfter
     )
 
 
-    val Configs: Seq[Config] = Seq(notMiner.withFallback(dockerConfigs.head)) ++
-      Seq(notMiner.withFallback(dockerConfigs(1))) ++
-      Seq(miner.withFallback(dockerConfigs(2))) ++
-      Seq(miner.withFallback(dockerConfigs(3)))
+    val Configs: Seq[Config] = Seq(notMiner.withFallback(dockerConfigs.head),
+      notMiner.withFallback(dockerConfigs(1)),
+      miner.withFallback(dockerConfigs(2)),
+      miner.withFallback(dockerConfigs(3)))
 
   }
 
