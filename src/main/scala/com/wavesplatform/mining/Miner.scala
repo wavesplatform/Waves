@@ -59,7 +59,7 @@ class MinerImpl(
   private lazy val minerSettings = settings.minerSettings
   private lazy val minMicroBlockDurationMills = minerSettings.minMicroBlockAge.toMillis
   private lazy val blockchainSettings = settings.blockchainSettings
-  private lazy val processBlock = Coordinator.processSingleBlock(checkpoint, history, blockchainUpdater, timeService, stateReader, utx, blockchainReadiness, settings, featureProvider) _
+  private lazy val processBlock = Coordinator.processSingleBlock(checkpoint, history, blockchainUpdater, timeService, stateReader, utx, settings.blockchainSettings, featureProvider) _
 
   private val scheduledAttempts = SerialCancelable()
   private val microBlockAttempt = SerialCancelable()
@@ -183,9 +183,11 @@ class MinerImpl(
         nextBlockGenerationTimes += account.toAddress -> (System.currentTimeMillis() + offset.toMillis)
         generateOneBlockTask(account, balance)(offset).flatMap {
           case Right(block) => Task.now {
-            processBlock(block, true) match {
+            processBlock(block) match {
               case Left(err) => log.warn("Error mining Block: " + err.toString)
               case Right(Some(score)) =>
+                BlockStats.mined(block, history.height())
+                Coordinator.updateBlockchainReadinessFlag(history, timeService, blockchainReadiness, settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed)
                 allChannels.broadcast(BlockForged(block))
                 allChannels.broadcast(LocalScoreChanged(score))
                 scheduleMining()
