@@ -67,15 +67,19 @@ object Metrics extends ScorexLogging {
     db.foreach(_.close())
   }.runAsync
 
-  def write(b: Point.Builder): Unit = Task {
-    db.foreach(_.write(b
-      // Should be a tag, but tags are the strings now
-      // https://docs.influxdata.com/influxdb/v1.3/concepts/glossary/#tag-value
-      .addField("node", settings.nodeId)
-      .time(NTP.correctedTime(), TimeUnit.MILLISECONDS)
-      .build()
-    ))
-  }.runAsync
+  def write(b: Point.Builder): Unit = {
+    val time = NTP.correctedTime()
+    Task {
+      db.foreach(_.write(b
+        // Should be a tag, but tags are the strings now
+        // https://docs.influxdata.com/influxdb/v1.3/concepts/glossary/#tag-value
+        .addField("node", settings.nodeId)
+        .tag("node", settings.nodeId.toString)
+        .time(time, TimeUnit.MILLISECONDS)
+        .build()
+      ))
+    }.runAsync
+  }
 
   def writeEvent(name: String): Unit = write(Point.measurement(name))
 
