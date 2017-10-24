@@ -11,7 +11,7 @@ import akka.stream.{ActorMaterializer, OverflowStrategy}
 import akka.stream.scaladsl.{Flow, Sink, Source}
 import com.wavesplatform.Version
 import com.wavesplatform.discovery.actors.MainActor.WebSocketConnected
-import com.wavesplatform.discovery.actors.{IOActor, MainActor}
+import com.wavesplatform.discovery.actors.MainActor
 import com.wavesplatform.network.{BasicMessagesRepo, BlockForged, BlockMessageSpec, GetBlock, GetBlockSpec, GetPeers, GetPeersSpec, GetSignatures, GetSignaturesSpec, Handshake, KnownPeers, LocalScoreChanged, Message, MicroBlockInv, MicroBlockInvMessageSpec, MicroBlockRequest, MicroBlockRequestMessageSpec, MicroBlockResponse, MicroBlockResponseMessageSpec, PeerDatabase, PeersSpec, PipelineInitializer, RawBytes, ScoreMessageSpec, Signatures, SignaturesSpec, id}
 import com.wavesplatform.settings.Constants
 import io.netty.buffer.ByteBuf
@@ -130,6 +130,7 @@ class HandshakeHandler() extends ReplayingDecoder[Void] with ScorexLogging {
 
 
 object DiscoveryApp extends App {
+  import io.netty.channel.nio.NioEventLoopGroup
 
   implicit val system = ActorSystem("Default")
   implicit val flowMaterializer = ActorMaterializer()
