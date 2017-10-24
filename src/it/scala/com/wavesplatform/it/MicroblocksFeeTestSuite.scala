@@ -53,26 +53,25 @@ class MicroblocksFeeTestSuite extends FreeSpec with Matchers with BeforeAndAfter
     steps.foldLeft(Future.successful(())) { (r, numRequests) => r.flatMap(_ => requests(numRequests)) }
   }
 
-  "microblockheightactivation  and fee" in {
-    val mActivationHeight = microblockActivationHeight + 1
+  "fee distribution when NG activates" in {
 
     val f = for {
       height <- traverse(allNodes)(_.height).map(_.max)
 
-      _ <- traverse(allNodes)(_.waitForHeight(mActivationHeight - 2))
+      _ <- traverse(allNodes)(_.waitForHeight(microblockActivationHeight - 1))
       _ <- txRequestsGen(200, 2.waves)
-      _ <- traverse(allNodes)(_.waitForHeight(mActivationHeight + 1))
+      _ <- traverse(allNodes)(_.waitForHeight(microblockActivationHeight + 2))
 
-      initialBalances <- notMiner.debugStateAt(mActivationHeight - 2) //100%
+      initialBalances <- notMiner.debugStateAt(microblockActivationHeight - 1) //100%
 
-      balancesBeforeActivation <- notMiner.debugStateAt(mActivationHeight - 1) // 100%
-      blockBeforeActivation <- notMiner.blockAt(mActivationHeight - 1)
+      balancesBeforeActivation <- notMiner.debugStateAt(microblockActivationHeight) // 100%
+      blockBeforeActivation <- notMiner.blockAt(microblockActivationHeight)
 
-      balancesOnActivation <- notMiner.debugStateAt(mActivationHeight) // 40%
-      blockOnActivation <- notMiner.blockAt(mActivationHeight)
+      balancesOnActivation <- notMiner.debugStateAt(microblockActivationHeight + 1) // 40%
+      blockOnActivation <- notMiner.blockAt(microblockActivationHeight + 1)
 
-      balancesAfterActivation <- notMiner.debugStateAt(mActivationHeight + 1) // 60% of previous + 40% of current
-      blockAfterActivation <- notMiner.blockAt(mActivationHeight + 1)
+      balancesAfterActivation <- notMiner.debugStateAt(microblockActivationHeight + 2) // 60% of previous + 40% of current
+      blockAfterActivation <- notMiner.blockAt(microblockActivationHeight + 2)
     } yield {
 
       balancesBeforeActivation(blockBeforeActivation.generator) shouldBe {
@@ -92,6 +91,7 @@ class MicroblocksFeeTestSuite extends FreeSpec with Matchers with BeforeAndAfter
     Await.result(f, 2.minute)
   }
 
+
   object MicroblocksFeeTestSuite {
 
     private val dockerConfigs = Docker.NodeConfigs.getConfigList("nodes").asScala
@@ -99,7 +99,7 @@ class MicroblocksFeeTestSuite extends FreeSpec with Matchers with BeforeAndAfter
     val NodesCount: Int = 3
 
     val microblockActivationHeight = 10
-    private val supportedNodes = ConfigFactory.parseString(
+    private val miner = ConfigFactory.parseString(
       s"""
          |waves {
          |   blockchain {
@@ -149,8 +149,8 @@ class MicroblocksFeeTestSuite extends FreeSpec with Matchers with BeforeAndAfter
 
     val Configs: Seq[Config] = Seq(notMiner.withFallback(dockerConfigs.head)) ++
       Seq(notMiner.withFallback(dockerConfigs(1))) ++
-      Seq(supportedNodes.withFallback(dockerConfigs(2))) ++
-      Seq(supportedNodes.withFallback(dockerConfigs(3)))
+      Seq(miner.withFallback(dockerConfigs(2))) ++
+      Seq(miner.withFallback(dockerConfigs(3)))
 
   }
 

@@ -32,13 +32,13 @@ class VoteForFeatureByDefaultTestSuite extends FreeSpec with Matchers with Befor
   }
 
 
-  "check that voting starts and supported blocks increased" in {
+  "supported blocks increased when voting starts, one node votes against, three by default" in {
     val checkHeight: Int = votingInterval * 2 / 3
     val supportedNodeActivationInfo = activationStatus(nodes.last, checkHeight, defaultVotingFeatureNum, 2.minute)
 
-    val result = Await.result(nodes.last.blockSeq(1, checkHeight), 2.minute)
-    val featuresMap = result.flatMap(b => b.features.getOrElse(Seq.empty)).groupBy(x => x)
-    val votesForFeature1 = featuresMap.getOrElse(defaultVotingFeatureNum, Seq.empty).length
+    val generatedBlocks = Await.result(nodes.last.blockSeq(1, checkHeight), 2.minute)
+    val featuresMapInGeneratedBlocks = generatedBlocks.flatMap(b => b.features.getOrElse(Seq.empty)).groupBy(x => x)
+    val votesForFeature1 = featuresMapInGeneratedBlocks.getOrElse(defaultVotingFeatureNum, Seq.empty).length
 
     assertVotingStatus(supportedNodeActivationInfo, votesForFeature1, BlockchainFeatureStatus.Undefined, NodeFeatureStatus.Voted)
 
@@ -47,7 +47,7 @@ class VoteForFeatureByDefaultTestSuite extends FreeSpec with Matchers with Befor
   }
 
 
-  "check APPROVED blockchain status in second voting interval" in {
+  "blockchain status is APPROVED in second voting interval, one node votes against, three by default" in {
 
     val checkHeight: Int = votingInterval * 2 - blocksForActivation / 2
 
@@ -55,7 +55,7 @@ class VoteForFeatureByDefaultTestSuite extends FreeSpec with Matchers with Befor
     assertApprovedStatus(supportedNodeActivationInfo, votingInterval * 2, NodeFeatureStatus.Voted)
   }
 
-  "check ACTIVATED status in second voting interval" in {
+  "blockchain status is ACTIVATED in the end of second voting interval, one node votes against, three by default" in {
     val checkHeight: Int = votingInterval * 2
 
     val supportedNodeActivationInfo = activationStatus(nodes.last, checkHeight, defaultVotingFeatureNum, 2.minute)

@@ -31,14 +31,14 @@ class NotActivateFeatureTestSuite extends FreeSpec with Matchers with BeforeAndA
   }
 
 
-  "check that voting starts and supported blocks is not increased when nobody votes for feature" in {
+  "supported blocks is not increased when nobody votes for feature" in {
 
     val checkHeight: Int = votingInterval - 1
     val activationStatusInfo = activationStatus(nodes.head, checkHeight, votingFeatureNum, 2.minute)
 
-    val result = Await.result(nodes.head.blockSeq(1, checkHeight), 2.minute)
-    val featuresMap = result.flatMap(b => b.features.getOrElse(Seq.empty)).groupBy(x => x)
-    val votesForFeature1 = featuresMap.getOrElse(votingFeatureNum, Seq.empty).length
+    val generatedBlocks = Await.result(nodes.head.blockSeq(1, checkHeight), 2.minute)
+    val featuresMapInGeneratedBlocks = generatedBlocks.flatMap(b => b.features.getOrElse(Seq.empty)).groupBy(x => x)
+    val votesForFeature1 = featuresMapInGeneratedBlocks.getOrElse(votingFeatureNum, Seq.empty).length
 
     votesForFeature1 shouldBe 0
 
@@ -47,7 +47,7 @@ class NotActivateFeatureTestSuite extends FreeSpec with Matchers with BeforeAndA
   }
 
 
-  "check that feature is still in Voting status on the next interval" in {
+  "feature is still in VOTING status on the next voting interval" in {
 
     val checkHeight: Int = votingInterval + 1
     val activationStatusInfo = activationStatus(nodes.head, checkHeight, votingFeatureNum, 2.minute)

@@ -32,14 +32,14 @@ class ActivationFeatureTestSuite extends FreeSpec with Matchers with BeforeAndAf
   }
 
 
-  "check that voting starts and supported blocks increased" in {
+  "supported blocks increased when voting starts" in {
     val checkHeight: Int = votingInterval * 2 / 3
 
     val activationStatusWhileVoting = activationStatus(nodes.head, checkHeight, featureNum, 2.minute)
 
-    val result = Await.result(nodes.head.blockSeq(1, checkHeight), 3.minute)
-    val map = result.flatMap(b => b.features.getOrElse(Seq.empty)).groupBy(x => x)
-    val votesForFeature1 = map.getOrElse(featureNum, Seq.empty).length
+    val generatedBlocks = Await.result(nodes.head.blockSeq(1, checkHeight), 3.minute)
+    val featuresMapInGeneratedBlocks = generatedBlocks.flatMap(b => b.features.getOrElse(Seq.empty)).groupBy(x => x)
+    val votesForFeature1 = featuresMapInGeneratedBlocks.getOrElse(featureNum, Seq.empty).length
 
     assertVotingStatus(activationStatusWhileVoting, votesForFeature1,
       BlockchainFeatureStatus.Undefined, NodeFeatureStatus.Voted)
@@ -52,7 +52,7 @@ class ActivationFeatureTestSuite extends FreeSpec with Matchers with BeforeAndAf
   }
 
 
-  "check supported blocks counter resets on the next voting interval" in {
+  "supported blocks counter resets on the next voting interval" in {
     val checkHeight: Int = votingInterval * 2 - blocksForActivation / 2
     val activationStatusInfo = activationStatus(nodes.last, checkHeight, featureNum, 3.minute)
 
@@ -60,7 +60,7 @@ class ActivationFeatureTestSuite extends FreeSpec with Matchers with BeforeAndAf
     activationStatusInfo.blockchainStatus shouldBe BlockchainFeatureStatus.Undefined
   }
 
-  "check APPROVED blockchain status in second voting interval" in {
+  "blockchain status is APPROVED in second voting interval" in {
 
     val checkHeight: Int = votingInterval * 2
     val activationStatusInfo = activationStatus(nodes.last, checkHeight, featureNum, 3.minute)
@@ -68,7 +68,7 @@ class ActivationFeatureTestSuite extends FreeSpec with Matchers with BeforeAndAf
     assertApprovedStatus(activationStatusInfo, votingInterval * 3, NodeFeatureStatus.Voted)
   }
 
-  "check ACTIVATED status in third voting interval" in {
+  "blockchain status is ACTIVATED in third voting interval" in {
     val checkHeight: Int = votingInterval * 3
     val activationStatusInfo = activationStatus(nodes.last, checkHeight, featureNum, 3.minute)
 
