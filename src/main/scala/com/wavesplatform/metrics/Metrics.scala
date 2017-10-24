@@ -68,7 +68,7 @@ object Metrics extends ScorexLogging {
   }.runAsync
 
   def write(b: Point.Builder): Unit = {
-    val time = NTP.correctedTime()
+    val time = NTP.getTimestamp()
     Task {
       db.foreach(_.write(b
         // Should be a tag, but tags are the strings now
