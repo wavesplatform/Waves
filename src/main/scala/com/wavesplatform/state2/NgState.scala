@@ -32,7 +32,7 @@ class NgState(val base: Block, val baseBlockDiff: BlockDiff, val acceptedFeature
       case Some(d) => d
       case None =>
         val prevResBlockSig = micros.find(_.totalResBlockSig == totalResBlockSig).get.prevResBlockSig
-        val prevResBlockDiff = totalBlockDiffCache.get(prevResBlockSig, () => diffFor(prevResBlockSig))
+        val prevResBlockDiff = Option(totalBlockDiffCache.getIfPresent(prevResBlockSig)).getOrElse(diffFor(prevResBlockSig))
         val currentMicroDiff = microDiffs(totalResBlockSig)._1
         val r = Monoid.combine(prevResBlockDiff, currentMicroDiff)
         totalBlockDiffCache.put(totalResBlockSig, r)
