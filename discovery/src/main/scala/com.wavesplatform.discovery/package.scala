@@ -2,6 +2,7 @@ package com.wavesplatform
 
 import java.net.InetSocketAddress
 
+import com.wavesplatform.discovery.network.{HandshakeHandler, LegacyFrameCodec, MessageCodec, MessageHandler}
 import com.wavesplatform.network.{GetPeers, Handshake, KnownPeers, PipelineInitializer}
 import io.netty.bootstrap.Bootstrap
 import io.netty.channel.EventLoopGroup
