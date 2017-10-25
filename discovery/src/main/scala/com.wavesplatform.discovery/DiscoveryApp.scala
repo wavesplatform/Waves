@@ -3,7 +3,7 @@ package com.wavesplatform.discovery
 import java.util.concurrent.TimeUnit
 
 import akka.NotUsed
-import akka.actor.{ActorSystem, Props}
+import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.ws.TextMessage
 import akka.stream.scaladsl.{Flow, Sink, Source}
@@ -11,7 +11,6 @@ import akka.stream.{ActorMaterializer, OverflowStrategy}
 import com.wavesplatform.discovery.actors.MainActor
 import com.wavesplatform.discovery.actors.MainActor.WebSocketConnected
 
-import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.FiniteDuration
 import scala.io.StdIn
 
@@ -19,15 +18,11 @@ object DiscoveryApp extends App {
   implicit val system: ActorSystem = ActorSystem("Default")
   implicit val flowMaterializer: ActorMaterializer = ActorMaterializer()
 
-  val mainActor = system.actorOf(Props[MainActor], name = "main")
+  val mainActor = MainActor(Settings.default.workersCount)
 
   mainActor ! MainActor.Peers(Settings.default.initialPeers.toSet)
 
-  implicit val ec: ExecutionContext = ExecutionContext.global
-  system.scheduler.schedule(FiniteDuration(1, TimeUnit.SECONDS),FiniteDuration(1, TimeUnit.SECONDS), mainActor, MainActor.Discover)
-
-  val interface = "localhost"
-  val port = 8080
+  system.scheduler.schedule(FiniteDuration(0, TimeUnit.SECONDS),FiniteDuration(500, TimeUnit.MILLISECONDS), mainActor, MainActor.Discover)
 
   import akka.http.scaladsl.server.Directives._
 
@@ -47,9 +42,8 @@ object DiscoveryApp extends App {
     }
   }
 
-
-  val binding = Http().bindAndHandle(route, interface, port)
-  println(s"Server is now online at http://$interface:$port\nPress RETURN to stop...")
+  val binding = Http().bindAndHandle(route, Settings.default.webSocketHost, Settings.default.webSocketPort)
+  println(s"Server is now online at http://${Settings.default.webSocketHost}:${Settings.default.webSocketPort}\nPress RETURN to stop...")
   StdIn.readLine()
   binding.flatMap(_.unbind()).onComplete(_ => {
     system.terminate()

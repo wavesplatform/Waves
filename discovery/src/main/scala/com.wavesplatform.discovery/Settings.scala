@@ -6,8 +6,11 @@ import net.ceedubs.ficus.Ficus._
 import com.typesafe.config.{Config, ConfigFactory}
 import net.ceedubs.ficus.readers.{NameMapper, ValueReader}
 
-case class Settings(chainId: Char, initialPeers: Seq[InetSocketAddress])
-
+case class Settings(chainId: Char,
+                    initialPeers: Seq[InetSocketAddress],
+                    webSocketHost: String,
+                    webSocketPort: Int,
+                    workersCount: Int)
 object Settings{
   implicit val readConfigInHyphen: NameMapper = net.ceedubs.ficus.readers.namemappers.implicits.hyphenCase // IDEA bug
 
