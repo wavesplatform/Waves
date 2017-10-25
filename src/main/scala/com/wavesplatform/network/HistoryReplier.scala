@@ -21,8 +21,9 @@ class HistoryReplier(history: NgHistory, settings: SynchronizationSettings) exte
     .maximumSize(historyReplierSettings.maxBlockCacheSize)
     .build[ByteStr, Array[Byte]]()
 
-  private def cachedBytes(cache: Cache[ByteStr, Array[Byte]], id: ByteStr, loader: => Option[Array[Byte]]): Option[Array[Byte]] =
+  private def cachedBytes(cache: Cache[ByteStr, Array[Byte]], id: ByteStr, loader: => Option[Array[Byte]]): Option[Array[Byte]] = {
     Option(cache.getIfPresent(id)).orElse(loader.map(bytes => cache.get(id, () => bytes)))
+  }
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
     case GetSignatures(otherSigs) =>
@@ -41,8 +42,9 @@ class HistoryReplier(history: NgHistory, settings: SynchronizationSettings) exte
       }
 
     case GetBlock(sig) =>
-      cachedBytes(knownBlocks, sig, history.heightOf(sig).flatMap(history.blockBytes)).foreach { bytes =>
-        ctx.writeAndFlush(RawBytes(BlockMessageSpec.messageCode, bytes))
+      cachedBytes(knownBlocks, sig, history.heightOf(sig).flatMap(history.blockBytes)) match {
+        case Some(bytes) => ctx.writeAndFlush(RawBytes(BlockMessageSpec.messageCode, bytes))
+        case None => log.trace(s"Does not have a block $sig")
       }
 
     case mbr@MicroBlockRequest(totalResBlockSig) =>
