@@ -52,7 +52,7 @@ class NgHistoryReader(ngState: () => Option[NgState], inner: History with Featur
   override def microBlock(id: BlockId): Option[MicroBlock] = read { implicit l =>
     for {
       ng <- ngState()
-      mb <- ng.micros.find(_.totalResBlockSig == id)
+      mb <- ng.microBlock(id)
     } yield mb
   }
 
@@ -78,7 +78,7 @@ class NgHistoryReader(ngState: () => Option[NgState], inner: History with Featur
   }
 
   override def microblockIds(): Seq[BlockId] = read { implicit l =>
-    ngState().toSeq.flatMap(ng => ng.micros.map(_.totalResBlockSig))
+    ngState().toSeq.flatMap(_.microBlockIds)
   }
 
   override def bestLastBlockInfo(maxTimestamp: Long): Option[BlockMinerInfo] = read { implicit l =>

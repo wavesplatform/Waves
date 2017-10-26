@@ -10,7 +10,6 @@ import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.metrics.TxsInBlockchainStats
 import com.wavesplatform.metrics.Instrumented
 import com.wavesplatform.state2.BlockchainUpdaterImpl._
-import com.wavesplatform.state2.NgState._
 import com.wavesplatform.state2.diffs.BlockDiffer
 import com.wavesplatform.state2.reader.CompositeStateReader.composite
 import com.wavesplatform.state2.reader.StateReader
@@ -135,49 +134,48 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
             Left(BlockAppendError(s"References incorrect or non-existing block: " + logDetails, block))
           case _ => BlockDiffer.fromBlock(settings.blockchainSettings.functionalitySettings, featureProvider, currentPersistedBlocksState, historyWriter.lastBlock, block).map(d => Some((d, Seq.empty[Transaction])))
         }
-      case Some(ng) if ng.base.reference == block.reference =>
-        if (block.blockScore > ng.base.blockScore) {
-          BlockDiffer.fromBlock(settings.blockchainSettings.functionalitySettings, featureProvider, currentPersistedBlocksState, historyWriter.lastBlock, block).map { diff =>
-            log.trace(s"Better liquid block(score=${block.blockScore}) received and applied instead of existing(score=${ng.base.blockScore})")
-            Some((diff, ng.transactions))
-          }
-        } else if (areVersionsOfSameBlock(block, ng.base)) {
-          if (block.transactionData.size <= ng.transactions.size) {
-            log.trace(s"Existing liquid block is better than new one, discarding $block")
-            Right(None)
-          } else {
-            log.trace(s"New liquid block is better version of exsting, swapping")
-            BlockDiffer.fromBlock(settings.blockchainSettings.functionalitySettings, featureProvider, currentPersistedBlocksState, historyWriter.lastBlock, block).map(d => Some((d, Seq.empty[Transaction])))
-          }
-        } else {
-          Left(BlockAppendError(s"Competitor's liquid block $block(score=${block.blockScore}) is not better than existing (ng.base ${ng.base}(score=${ng.base.blockScore}))", block))
-        }
-      case Some(ng) if !ng.contains(block.reference) =>
-        Left(BlockAppendError(s"References incorrect or non-existing block", block))
       case Some(ng) =>
-        val referencedLiquidDiff = ng.diffs(block.reference)._1
-        val (referencedForgedBlock, discarded) = measureSuccessful(forgeBlockTimeStats, ng.forgeBlock(block.reference)).get
-        if (referencedForgedBlock.signatureValid) {
-          if (discarded.nonEmpty) {
-            microBlockForkStats.increment()
-            microBlockForkHeightStats.record(discarded.size)
-          }
-          historyWriter.appendBlock(referencedForgedBlock, ng.acceptedFeatures)(BlockDiffer.fromBlock(settings.blockchainSettings.functionalitySettings, historyReader,
-            composite(currentPersistedBlocksState, () => referencedLiquidDiff.copy(heightDiff = 1)),
-            Some(referencedForgedBlock), block))
-            .map { hardenedDiff =>
-              TxsInBlockchainStats.record(ng.transactions.size)
-              topMemoryDiff.transform(Monoid.combine(_, referencedLiquidDiff))
-              Some((hardenedDiff, discarded.flatMap(_.transactionData)))
+        if (ng.base.reference == block.reference) {
+          if (block.blockScore > ng.base.blockScore) {
+            BlockDiffer.fromBlock(settings.blockchainSettings.functionalitySettings, featureProvider, currentPersistedBlocksState, historyWriter.lastBlock, block).map { diff =>
+              log.trace(s"Better liquid block(score=${block.blockScore}) received and applied instead of existing(score=${ng.base.blockScore})")
+              Some((diff, ng.transactions))
             }
-        } else {
-          val errorText = s"Forged block has invalid signature: base: ${ng.base}, micros: ${ng.micros}, requested reference: ${block.reference}"
-          log.error(errorText)
-          Left(BlockAppendError(errorText, block))
-        }
+          } else if (areVersionsOfSameBlock(block, ng.base)) {
+            if (block.transactionData.size <= ng.transactions.size) {
+              log.trace(s"Existing liquid block is better than new one, discarding $block")
+              Right(None)
+            } else {
+              log.trace(s"New liquid block is better version of exsting, swapping")
+              BlockDiffer.fromBlock(settings.blockchainSettings.functionalitySettings, featureProvider, currentPersistedBlocksState, historyWriter.lastBlock, block).map(d => Some((d, Seq.empty[Transaction])))
+            }
+          } else Left(BlockAppendError(s"Competitor's liquid block $block(score=${block.blockScore}) is not better than existing (ng.base ${ng.base}(score=${ng.base.blockScore}))", block))
+        } else
+          measureSuccessful(forgeBlockTimeStats, ng.totalDiffOf(block.reference)) match {
+            case None => Left(BlockAppendError(s"References incorrect or non-existing block", block))
+            case Some((referencedForgedBlock, referencedLiquidDiff, discarded)) =>
+              if (referencedForgedBlock.signatureValid) {
+                if (discarded.nonEmpty) {
+                  microBlockForkStats.increment()
+                  microBlockForkHeightStats.record(discarded.size)
+                }
+                historyWriter.appendBlock(referencedForgedBlock, ng.acceptedFeatures)(BlockDiffer.fromBlock(settings.blockchainSettings.functionalitySettings, historyReader,
+                  composite(currentPersistedBlocksState, () => referencedLiquidDiff.copy(heightDiff = 1)),
+                  Some(referencedForgedBlock), block))
+                  .map { hardenedDiff =>
+                    TxsInBlockchainStats.record(ng.transactions.size)
+                    topMemoryDiff.transform(Monoid.combine(_, referencedLiquidDiff))
+                    Some((hardenedDiff, discarded.flatMap(_.transactionData)))
+                  }
+              } else {
+                val errorText = s"Forged block has invalid signature: base: ${ng.base}, requested reference: ${block.reference}"
+                log.error(errorText)
+                Left(BlockAppendError(errorText, block))
+              }
+          }
     }).map { _ map { case ((newBlockDiff, discacrded)) =>
         val height = historyWriter.height() + 1
-        ngState.set(Some(NgState(block, newBlockDiff, 0L, featuresApprovedWithBlock(block))))
+        ngState.set(Some(new NgState(block, newBlockDiff, featuresApprovedWithBlock(block))))
         historyReader.lastBlockId().foreach(lastBlockId.onNext)
         log.info(s"$block appended. New height: $height)")
         discacrded
@@ -241,13 +239,13 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
   }
 
   override def processMicroBlock(microBlock: MicroBlock): Either[ValidationError, Unit] = write { implicit l =>
-    ngState() match {
+    ngState.mutate {
       case None =>
         Left(MicroBlockAppendError("No base block exists", microBlock))
       case Some(ng) if ng.base.signerData.generator.toAddress != microBlock.generator.toAddress =>
         Left(MicroBlockAppendError("Base block has been generated by another account", microBlock))
       case Some(ng) =>
-        ng.micros.headOption match {
+        ng.lastMicroBlock match {
           case None if ng.base.uniqueId != microBlock.prevResBlockSig =>
             blockMicroForkStats.increment()
             Left(MicroBlockAppendError("It's first micro and it doesn't reference base block(which exists)", microBlock))
@@ -262,7 +260,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
                 historyWriter.lastBlock.map(_.timestamp), microBlock, ng.base.timestamp)
             } yield {
               log.info(s"$microBlock appended")
-              ngState.set(Some(ng + (microBlock, Monoid.combine(ng.bestLiquidDiff, diff), System.currentTimeMillis())))
+              ng.append(microBlock, diff, System.currentTimeMillis())
               lastBlockId.onNext(microBlock.totalResBlockSig)
             }
         }
@@ -273,7 +271,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
     StateDebugInfo(persisted = HashInfo(height = persisted.height, hash = persisted.accountPortfoliosHash),
       top = HashInfo(height = topMemoryDiff().heightDiff, hash = Hash.accountPortfolios(topMemoryDiff().txsDiff.portfolios)),
       bottom = HashInfo(height = bottomMemoryDiff().heightDiff, hash = Hash.accountPortfolios(bottomMemoryDiff().txsDiff.portfolios)),
-      microBaseHash = ngState().map(ng => Hash.accountPortfolios(ng.diffs(ng.base.uniqueId)._1.txsDiff.portfolios))
+      microBaseHash = ngState().map(ng => Hash.accountPortfolios(ng.baseBlockDiff.txsDiff.portfolios))
     )
   }
 
