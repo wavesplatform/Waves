@@ -7,6 +7,7 @@ import com.wavesplatform.features.{BlockchainFeatures, FeatureProvider}
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.BlockDiff
 import com.wavesplatform.state2.reader.{CompositeStateReader, StateReader}
+import monix.eval.Coeval
 import org.scalatest.{FreeSpecLike, Matchers}
 import scorex.account.PrivateKeyAccount
 import scorex.block.Block
@@ -141,7 +142,7 @@ class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen {
     val preconditionDiff = BlockDiffer.unsafeDiffMany(fs, fp, newState(), None)(preconditions)
     val compositeState = new CompositeStateReader(newState(), preconditionDiff)
     val totalDiff2 = differ(compositeState, (preconditions.lastOption, block)).explicitGet()
-    assertion(totalDiff2, CompositeStateReader.composite(compositeState, () => totalDiff2))
+    assertion(totalDiff2, CompositeStateReader.composite(Coeval.now(compositeState), Coeval.now(totalDiff2)))
 
     assert(totalDiff1 == totalDiff2)
   }

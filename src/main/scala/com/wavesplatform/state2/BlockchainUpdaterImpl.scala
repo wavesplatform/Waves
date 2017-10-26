@@ -15,6 +15,7 @@ import com.wavesplatform.state2.reader.StateReader
 import com.wavesplatform.utils.{UnsupportedFeature, forceStopApplication}
 import kamon.Kamon
 import kamon.metric.instrument.Time
+import monix.eval.Coeval
 import monix.execution.Scheduler.Implicits.global
 import monix.reactive.subjects.ConcurrentSubject
 import scorex.account.Address
@@ -51,11 +52,12 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
   }
 
   private def currentPersistedBlocksState: StateReader = read { implicit l =>
-    composite(persisted, () => inMemDiffs().reverse.foldLeft(BlockDiff.empty){ case (old,nevv) => Monoid.combine(old, nevv)})
+    //    composite(composite(persisted, () => bottomMemoryDiff()), () => topMemoryDiff())
     //    inMemDiffs().reverse.foldLeft(persisted.asInstanceOf[StateReader]) { case (inner, d) => composite(inner, () => d) }
-      }
+    composite(Coeval.now(persisted), Coeval(inMemDiffs().reverse.foldLeft(BlockDiff.empty){ case (old,nevv) => Monoid.combine(old, nevv)}))
+  }
 
-  def bestLiquidState: StateReader = read { implicit l => composite(currentPersistedBlocksState, () => ngState().map(_.bestLiquidDiff).orEmpty) }
+  def bestLiquidState: StateReader = read { implicit l => composite(Coeval.now(currentPersistedBlocksState),Coeval(ngState().map(_.bestLiquidDiff).orEmpty)) }
 
   def historyReader: NgHistory with DebugNgHistory with FeatureProvider = read { implicit l => new NgHistoryReader(() => ngState(), historyWriter, settings.blockchainSettings.functionalitySettings) }
 
@@ -166,7 +168,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
                   microBlockForkHeightStats.record(discarded.size)
                 }
                 historyWriter.appendBlock(referencedForgedBlock, ng.acceptedFeatures)(BlockDiffer.fromBlock(settings.blockchainSettings.functionalitySettings, historyReader,
-                  composite(currentPersistedBlocksState, () => referencedLiquidDiff.copy(heightDiff = 1)),
+                  composite(Coeval.now(currentPersistedBlocksState), Coeval.now(referencedLiquidDiff.copy(heightDiff = 1))),
                   Some(referencedForgedBlock), block))
                   .map { hardenedDiff =>
                     TxsInBlockchainStats.record(ng.transactions.size)
@@ -260,8 +262,8 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with StateReader,
           case _ =>
             for {
               _ <- Signed.validateSignatures(microBlock)
-              diff <- BlockDiffer.fromMicroBlock(settings.blockchainSettings.functionalitySettings, historyReader, composite(currentPersistedBlocksState,
-                () => ng.bestLiquidDiff.copy(snapshots = Map.empty)),
+              diff <- BlockDiffer.fromMicroBlock(settings.blockchainSettings.functionalitySettings, historyReader, composite(Coeval.now(currentPersistedBlocksState),
+                Coeval.now(ng.bestLiquidDiff.copy(snapshots = Map.empty))),
                 historyWriter.lastBlock.map(_.timestamp), microBlock, ng.base.timestamp)
             } yield {
               log.info(s"$microBlock appended")
