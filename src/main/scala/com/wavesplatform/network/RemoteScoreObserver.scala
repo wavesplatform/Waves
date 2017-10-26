@@ -69,7 +69,7 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
       }
 
     case ExtensionBlocks(blocks) =>
-      log.debug(s"${id(ctx)} Received blocks ${formatBlocks(blocks)} from non-pinned channel")
+      log.debug(s"${id(ctx)} Received blocks ${formatBlocks(blocks)} from non-pinned channel (could be from expired channel)")
 
     case _ => super.channelRead(ctx, msg)
   }
