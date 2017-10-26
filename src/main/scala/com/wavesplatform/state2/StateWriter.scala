@@ -6,7 +6,6 @@ import cats.Monoid
 import cats.implicits._
 import com.wavesplatform.metrics.Instrumented
 import com.wavesplatform.state2.reader.StateReaderImpl
-import com.wavesplatform.state2.reader.StateReader._
 import scorex.utils.ScorexLogging
 
 trait StateWriter {

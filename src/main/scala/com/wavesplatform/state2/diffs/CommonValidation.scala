@@ -3,7 +3,6 @@ package com.wavesplatform.state2.diffs
 import cats._
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.reader.SnapshotStateReader
-import com.wavesplatform.state2.reader.StateReader._
 import com.wavesplatform.state2.{Portfolio, _}
 import scorex.account.Address
 import scorex.transaction.ValidationError.{GenericError, Mistiming}

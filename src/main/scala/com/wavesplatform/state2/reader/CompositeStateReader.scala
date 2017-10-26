@@ -5,13 +5,12 @@ import java.util.concurrent.locks.ReentrantReadWriteLock
 import cats.implicits._
 import cats.kernel.Monoid
 import com.wavesplatform.state2._
-import com.wavesplatform.state2.reader.StateReader._
 import monix.eval.Coeval
 import scorex.account.{Address, Alias}
 import scorex.transaction.Transaction
 import scorex.transaction.lease.LeaseTransaction
 
-class CompositeStateReader(inner: SnapshotStateReader, blockDiff: BlockDiff) extends SnapshotStateReader {
+class CompositeStateReader private(inner: SnapshotStateReader, blockDiff: BlockDiff) extends SnapshotStateReader {
 
   def synchronizationToken: ReentrantReadWriteLock = inner.synchronizationToken
 
@@ -84,8 +83,10 @@ class CompositeStateReader(inner: SnapshotStateReader, blockDiff: BlockDiff) ext
 }
 
 object CompositeStateReader {
+  def composite(inner: SnapshotStateReader, blockDiff: BlockDiff) : SnapshotStateReader = new CompositeStateReader(inner,blockDiff)
+
   def composite(inner: Coeval[SnapshotStateReader], blockDiff: Coeval[BlockDiff]): Coeval[SnapshotStateReader] = for {
     i <- inner
     b <- blockDiff
-  } yield new CompositeStateReader(i, b)
+  } yield composite(i, b)
 }

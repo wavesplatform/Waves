@@ -7,7 +7,6 @@ import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.settings.{FunctionalitySettings, RestAPISettings}
 import com.wavesplatform.state2.StateReader
-import com.wavesplatform.state2.reader.StateReader._
 import io.swagger.annotations._
 import play.api.libs.json._
 import scorex.account.{Address, PublicKeyAccount}

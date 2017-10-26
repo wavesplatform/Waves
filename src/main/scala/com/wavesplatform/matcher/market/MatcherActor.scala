@@ -9,7 +9,6 @@ import com.wavesplatform.matcher.api.{MatcherResponse, StatusCodeMatcherResponse
 import com.wavesplatform.matcher.market.OrderBookActor.{DeleteOrderBookRequest, GetOrderBookResponse, OrderBookRequest}
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.StateReader
-import com.wavesplatform.state2.reader.StateReader._
 import io.netty.channel.group.ChannelGroup
 import play.api.libs.json._
 import scorex.crypto.encode.Base58

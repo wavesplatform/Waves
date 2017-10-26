@@ -6,7 +6,6 @@ import akka.http.scaladsl.server.Route
 import com.wavesplatform.UtxPool
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state2.{ByteStr, StateReader}
-import com.wavesplatform.state2.reader.StateReader._
 import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
 import play.api.libs.json._

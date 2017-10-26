@@ -5,7 +5,6 @@ import cats.implicits._
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2._
 import com.wavesplatform.state2.reader.SnapshotStateReader
-import com.wavesplatform.state2.reader.StateReader._
 import scorex.account.Address
 import scorex.transaction.ValidationError
 import scorex.transaction.ValidationError.GenericError

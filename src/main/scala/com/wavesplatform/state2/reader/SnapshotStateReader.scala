@@ -50,8 +50,7 @@ trait SnapshotStateReader extends Synchronized {
   def filledVolumeAndFee(orderId: ByteStr): OrderFillInfo
 }
 
-object StateReader {
-
+object SnapshotStateReader {
 
   implicit class StateReaderExt(s: SnapshotStateReader) extends ScorexLogging {
     def assetDistribution(assetId: ByteStr): Map[Address, Long] =

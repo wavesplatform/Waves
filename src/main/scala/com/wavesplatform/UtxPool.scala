@@ -8,7 +8,7 @@ import com.wavesplatform.UtxPool.PessimisticPortfolios
 import com.wavesplatform.metrics.Instrumented
 import com.wavesplatform.settings.{FunctionalitySettings, UtxSettings}
 import com.wavesplatform.state2.diffs.TransactionDiffer
-import com.wavesplatform.state2.reader.CompositeStateReader
+import com.wavesplatform.state2.reader.CompositeStateReader.composite
 import com.wavesplatform.state2.{ByteStr, Diff, Portfolio, StateReader}
 import kamon.Kamon
 import kamon.metric.instrument.{Time => KamonTime}
@@ -116,7 +116,7 @@ class UtxPool(time: Time,
       .sorted(TransactionsOrdering.InUTXPool)
       .foldLeft((Seq.empty[ByteStr], Seq.empty[Transaction], Monoid[Diff].empty)) {
         case ((invalid, valid, diff), tx) if valid.size <= max =>
-          differ(new CompositeStateReader(s, diff.asBlockDiff), tx) match {
+          differ(composite(s, diff.asBlockDiff), tx) match {
             case Right(newDiff) if valid.size < max =>
               (invalid, tx +: valid, Monoid.combine(diff, newDiff))
             case Right(_) =>

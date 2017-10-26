@@ -11,8 +11,7 @@ import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state2.BlockchainUpdaterImpl._
 import com.wavesplatform.state2.diffs.BlockDiffer
 import com.wavesplatform.state2.reader.CompositeStateReader.composite
-import com.wavesplatform.state2.reader.StateReader._
-import com.wavesplatform.state2.reader.{CompositeStateReader, SnapshotStateReader}
+import com.wavesplatform.state2.reader.SnapshotStateReader
 import com.wavesplatform.utils.{UnsupportedFeature, forceStopApplication}
 import kamon.Kamon
 import kamon.metric.instrument.Time
@@ -169,7 +168,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
                   microBlockForkHeightStats.record(discarded.size)
                 }
                 historyWriter.appendBlock(referencedForgedBlock, ng.acceptedFeatures)(BlockDiffer.fromBlock(settings.blockchainSettings.functionalitySettings, historyReader,
-                  new CompositeStateReader(currentPersistedBlocksState(), referencedLiquidDiff.copy(heightDiff = 1)),
+                  composite(currentPersistedBlocksState(), referencedLiquidDiff.copy(heightDiff = 1)),
                   Some(referencedForgedBlock), block))
                   .map { hardenedDiff =>
                     TxsInBlockchainStats.record(ng.transactions.size)
@@ -263,7 +262,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
           case _ =>
             for {
               _ <- Signed.validateSignatures(microBlock)
-              diff <- BlockDiffer.fromMicroBlock(settings.blockchainSettings.functionalitySettings, historyReader, new CompositeStateReader(currentPersistedBlocksState(),
+              diff <- BlockDiffer.fromMicroBlock(settings.blockchainSettings.functionalitySettings, historyReader, composite(currentPersistedBlocksState(),
                 ng.bestLiquidDiff.copy(snapshots = Map.empty)),
                 historyWriter.lastBlock.map(_.timestamp), microBlock, ng.base.timestamp)
             } yield {

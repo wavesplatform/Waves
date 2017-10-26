@@ -2,7 +2,6 @@ package com.wavesplatform.history
 
 import com.wavesplatform.TransactionGen
 import com.wavesplatform.state2._
-import com.wavesplatform.state2.reader.StateReader._
 import com.wavesplatform.state2.diffs._
 import org.scalacheck.Gen
 import org.scalatest._

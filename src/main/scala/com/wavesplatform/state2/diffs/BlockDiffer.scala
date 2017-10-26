@@ -7,8 +7,8 @@ import com.wavesplatform.metrics.Instrumented
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2._
 import com.wavesplatform.state2.patch.LeasePatch
-import com.wavesplatform.state2.reader.StateReader._
-import com.wavesplatform.state2.reader.{CompositeStateReader, SnapshotStateReader}
+import com.wavesplatform.state2.reader.CompositeStateReader.composite
+import com.wavesplatform.state2.reader.SnapshotStateReader
 import scorex.account.Address
 import scorex.block.{Block, MicroBlock}
 import scorex.transaction.ValidationError.ActivationError
@@ -59,7 +59,7 @@ object BlockDiffer extends ScorexLogging with Instrumented {
 
   def unsafeDiffMany(settings: FunctionalitySettings, fp: FeatureProvider, s: SnapshotStateReader, prevBlock: Option[Block])(blocks: Seq[Block]): BlockDiff =
     blocks.foldLeft((Monoid[BlockDiff].empty, prevBlock)) { case ((diff, prev), block) =>
-      val blockDiff = fromBlock(settings, fp, new CompositeStateReader(s, diff), prev, block).explicitGet()
+      val blockDiff = fromBlock(settings, fp, composite(s, diff), prev, block).explicitGet()
       (Monoid[BlockDiff].combine(diff, blockDiff), Some(block))
     }._1
 
@@ -72,19 +72,19 @@ object BlockDiffer extends ScorexLogging with Instrumented {
     val txsDiffEi = currentBlockFeeDistr match {
       case Some(feedistr) =>
         txs.foldLeft(right(Monoid.combine(prevBlockFeeDistr.orEmpty, feedistr))) { case (ei, tx) => ei.flatMap(diff =>
-          txDiffer(new CompositeStateReader(s, diff.asBlockDiff), tx)
+          txDiffer(composite(s, diff.asBlockDiff), tx)
             .map(newDiff => diff.combine(newDiff)))
         }
       case None =>
         txs.foldLeft(right(prevBlockFeeDistr.orEmpty)) { case (ei, tx) => ei.flatMap(diff =>
-          txDiffer(new CompositeStateReader(s, diff.asBlockDiff), tx)
+          txDiffer(composite(s, diff.asBlockDiff), tx)
             .map(newDiff => diff.combine(newDiff.copy(portfolios = newDiff.portfolios.combine(Map(blockGenerator -> tx.feeDiff()).mapValues(_.multiply(Block.CurrentBlockFeePart)))))))
         }
     }
 
     txsDiffEi.map { d =>
       val diff = if (currentBlockHeight == settings.resetEffectiveBalancesAtHeight)
-        Monoid.combine(d, LeasePatch(new CompositeStateReader(s, d.asBlockDiff)))
+        Monoid.combine(d, LeasePatch(composite(s, d.asBlockDiff)))
       else d
       val newSnapshots = diff.portfolios
         .collect { case (acc, portfolioDiff) if portfolioDiff.balance != 0 || portfolioDiff.effectiveBalance != 0 =>

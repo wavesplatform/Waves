@@ -5,7 +5,6 @@ import com.wavesplatform.metrics.Instrumented
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.reader.SnapshotStateReader
 import com.wavesplatform.state2.{ByteStr, Diff, LeaseInfo, Portfolio}
-import com.wavesplatform.state2.reader.StateReader._
 import scorex.account.Address
 import scorex.transaction.Transaction
 import scorex.transaction.ValidationError.AccountBalanceError
