@@ -322,7 +322,7 @@ object NodeApi extends ScorexLogging {
   implicit val transactionFormat: Format[Transaction] = Json.format
 
   case class Block(signature: String, height: Int, timestamp: Long, generator: String, transactions: Seq[Transaction],
-                   fee: Long)
+                   fee: Long, features: Option[Seq[Short]])
 
   implicit val blockFormat: Format[Block] = Json.format
 
