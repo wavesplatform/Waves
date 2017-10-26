@@ -56,11 +56,9 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
     Coeval.unit.flatMap { _ =>
       inMemDiffs().reverse.foldLeft(Coeval.now(persisted.asInstanceOf[SnapshotStateReader])) { case (ci, b) => composite(ci, Coeval.now(b)) }
     }
-    //    Coeval(foldM[Coeval, Seq, BlockDiff, StateReader](inMemDiffs().reverse, persisted) { case (i, d) => Coeval(new CompositeStateReader(i, d)) }).flatten
-    //    composite(Coeval.now(persisted), Coeval(inMemDiffs().reverse.foldLeft(BlockDiff.empty){ case (old,nevv) => Monoid.combine(old, nevv)}))
   }
 
-  def bestLiquidState: Coeval[SnapshotStateReader] = read { implicit l => composite(currentPersistedBlocksState, Coeval(ngState().map(_.bestLiquidDiff).orEmpty)) }
+  def bestLiquidState: StateReader = read { implicit l => composite(currentPersistedBlocksState, Coeval(ngState().map(_.bestLiquidDiff).orEmpty)) }
 
   def historyReader: NgHistory with DebugNgHistory with FeatureProvider = read { implicit l => new NgHistoryReader(() => ngState(), historyWriter, settings.blockchainSettings.functionalitySettings) }
 
