@@ -85,6 +85,11 @@ object CompositeStateReader {
 
   class Proxy(val inner: StateReader, blockDiff: () => BlockDiff) extends StateReader {
 
+    override def toString: String = {
+      val bd = blockDiff()
+      s"proxy((dh=${bd.heightDiff}, dtx=${bd.txsDiff.transactions.values.map(_._2.transactionType)} | $inner)"
+    }
+
     override def synchronizationToken: ReentrantReadWriteLock = inner.synchronizationToken
 
     override def paymentTransactionIdByHash(hash: ByteStr): Option[ByteStr] =

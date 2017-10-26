@@ -39,7 +39,7 @@ class UtxPoolSpecification extends FreeSpec
 
     val config = ConfigFactory.load()
     val genesisSettings = TestHelpers.genesisSettings(Map(senderAccount -> senderBalance))
-    val settings = WavesSettings.fromConfig(config).copy(blockchainSettings = BlockchainSettings(None, None, None, 'T', 5, FunctionalitySettings.TESTNET, genesisSettings))
+    val settings = WavesSettings.fromConfig(config).copy(blockchainSettings = BlockchainSettings(None, None, None, 'T', 5, 5, FunctionalitySettings.TESTNET, genesisSettings))
 
     val (history, _, _, state, bcu, _) = StorageFactory(settings).get
 
