@@ -2,6 +2,7 @@ package com.wavesplatform.history
 
 import com.wavesplatform.TransactionGen
 import com.wavesplatform.state2._
+import com.wavesplatform.state2.reader.StateReader._
 import com.wavesplatform.state2.diffs._
 import org.scalacheck.{Gen, Shrink}
 import org.scalatest._
@@ -29,7 +30,7 @@ class BlockchainUpdaterBlockMicroblockSequencesSameTransactionsTest extends Prop
           mbs.foreach(mb => d.blockchainUpdater.processMicroBlock(mb).explicitGet())
         }
         d.blockchainUpdater.processBlock(last)
-        val r = d.stateReader.partialPortfolio(last.signerData.generator.toAddress).balance
+        val r = d.stateReader().partialPortfolio(last.signerData.generator.toAddress).balance
         r
       }
       finalMinerBalances.toSet.size shouldBe 1
@@ -55,7 +56,7 @@ class BlockchainUpdaterBlockMicroblockSequencesSameTransactionsTest extends Prop
       domain.blockchainUpdater.processMicroBlock(micros.head).explicitGet()
       domain.blockchainUpdater.processBlock(emptyBlock).explicitGet()
 
-      domain.stateReader.accountPortfolios.mapValues(_.balance).filter(_._2 != 0) shouldBe
+      domain.stateReader().accountPortfolios.mapValues(_.balance).filter(_._2 != 0) shouldBe
         Map(miner.toAddress -> payment.fee, genesis.recipient -> (genesis.amount - payment.fee))
     }
   }

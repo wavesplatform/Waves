@@ -5,8 +5,7 @@ import java.util.concurrent.locks.{ReentrantReadWriteLock => RWL}
 
 import com.wavesplatform.features.FeatureProvider
 import com.wavesplatform.settings.WavesSettings
-import com.wavesplatform.state2.reader.StateReader
-import com.wavesplatform.state2.{BlockchainUpdaterImpl, StateStorage, StateWriterImpl}
+import com.wavesplatform.state2._
 import scorex.transaction._
 
 import scala.util.{Success, Try}

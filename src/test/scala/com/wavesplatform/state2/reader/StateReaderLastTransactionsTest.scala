@@ -2,6 +2,7 @@ package com.wavesplatform.state2.reader
 
 import com.wavesplatform.TransactionGen
 import com.wavesplatform.state2.diffs._
+import com.wavesplatform.state2.reader.StateReader._
 import org.scalacheck.{Gen, Shrink}
 import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 import org.scalatest.{Matchers, PropSpec}

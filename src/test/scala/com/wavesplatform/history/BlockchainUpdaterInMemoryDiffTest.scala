@@ -28,18 +28,18 @@ class BlockchainUpdaterInMemoryDiffTest extends PropSpec with PropertyChecks wit
       val blockTriggersCompactification = buildBlockOfTxs(blocksWithoutCompactification.last.uniqueId, Seq(payment2))
 
       blocksWithoutCompactification.foreach(b => domain.blockchainUpdater.processBlock(b).explicitGet())
-      val mastersBalanceAfterPayment1 = domain.stateReader.accountPortfolio(genesis.recipient).balance
+      val mastersBalanceAfterPayment1 = domain.stateReader().accountPortfolio(genesis.recipient).balance
       mastersBalanceAfterPayment1 shouldBe (ENOUGH_AMT - payment1.amount - payment1.fee)
 
       domain.history.height() shouldBe MinInMemoryDiffSize * 2 + 1
-      domain.stateReader.height shouldBe MinInMemoryDiffSize * 2 + 1
+      domain.stateReader().height shouldBe MinInMemoryDiffSize * 2 + 1
 
       domain.blockchainUpdater.processBlock(blockTriggersCompactification).explicitGet()
 
       domain.history.height() shouldBe MinInMemoryDiffSize * 2 + 2
-      domain.stateReader.height shouldBe MinInMemoryDiffSize * 2 + 2
+      domain.stateReader().height shouldBe MinInMemoryDiffSize * 2 + 2
 
-      val mastersBalanceAfterPayment1AndPayment2 = domain.stateReader.accountPortfolio(genesis.recipient).balance
+      val mastersBalanceAfterPayment1AndPayment2 = domain.stateReader().accountPortfolio(genesis.recipient).balance
       mastersBalanceAfterPayment1AndPayment2 shouldBe (ENOUGH_AMT - payment1.amount - payment1.fee - payment2.amount - payment2.fee)
     }
   }
@@ -53,7 +53,7 @@ class BlockchainUpdaterInMemoryDiffTest extends PropSpec with PropertyChecks wit
       firstBlocks.foreach(b => domain.blockchainUpdater.processBlock(b).explicitGet())
       domain.blockchainUpdater.processBlock(payment1Block).explicitGet()
       domain.blockchainUpdater.processBlock(emptyBlock).explicitGet()
-      val mastersBalanceAfterPayment1 = domain.stateReader.accountPortfolio(genesis.recipient).balance
+      val mastersBalanceAfterPayment1 = domain.stateReader().accountPortfolio(genesis.recipient).balance
       mastersBalanceAfterPayment1 shouldBe (ENOUGH_AMT - payment1.amount - payment1.fee)
 
       // discard liquid block
@@ -61,9 +61,9 @@ class BlockchainUpdaterInMemoryDiffTest extends PropSpec with PropertyChecks wit
       domain.blockchainUpdater.processBlock(blockTriggersCompactification).explicitGet()
 
       domain.history.height() shouldBe MinInMemoryDiffSize * 2 + 1
-      domain.stateReader.height shouldBe MinInMemoryDiffSize * 2 + 1
+      domain.stateReader().height shouldBe MinInMemoryDiffSize * 2 + 1
 
-      val mastersBalanceAfterPayment1AndPayment2 = domain.stateReader.accountPortfolio(genesis.recipient).balance
+      val mastersBalanceAfterPayment1AndPayment2 = domain.stateReader().accountPortfolio(genesis.recipient).balance
       mastersBalanceAfterPayment1AndPayment2 shouldBe (ENOUGH_AMT - payment1.amount - payment1.fee - payment2.amount - payment2.fee)
     }
   }

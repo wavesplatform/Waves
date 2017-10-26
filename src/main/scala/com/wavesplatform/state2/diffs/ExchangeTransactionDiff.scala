@@ -3,7 +3,7 @@ package com.wavesplatform.state2.diffs
 import cats._
 import cats.implicits._
 import com.wavesplatform.state2._
-import com.wavesplatform.state2.reader.StateReader
+import com.wavesplatform.state2.reader.{SnapshotStateReader}
 import scorex.transaction.ValidationError
 import scorex.transaction.ValidationError.OrderValidationError
 import scorex.transaction.assets.exchange.ExchangeTransaction
@@ -12,7 +12,7 @@ import scala.util.Right
 
 object ExchangeTransactionDiff {
 
-  def apply(s: StateReader, height: Int)(tx: ExchangeTransaction): Either[ValidationError, Diff] = for {
+  def apply(s: SnapshotStateReader, height: Int)(tx: ExchangeTransaction): Either[ValidationError, Diff] = for {
     t <- enoughVolume(tx, s)
     buyPriceAssetChange <- t.buyOrder.getSpendAmount(t.price, t.amount).liftValidationError(tx).map(-_)
     buyAmountAssetChange <- t.buyOrder.getReceiveAmount(t.price, t.amount).liftValidationError(tx)
@@ -57,7 +57,7 @@ object ExchangeTransactionDiff {
   }
 
 
-  private def enoughVolume(exTrans: ExchangeTransaction, s: StateReader): Either[ValidationError, ExchangeTransaction] = {
+  private def enoughVolume(exTrans: ExchangeTransaction, s: SnapshotStateReader): Either[ValidationError, ExchangeTransaction] = {
     val filledBuy = s.filledVolumeAndFee(ByteStr(exTrans.buyOrder.id))
     val filledSell = s.filledVolumeAndFee(ByteStr(exTrans.sellOrder.id))
 

@@ -5,7 +5,7 @@ import javax.ws.rs.Path
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.UtxPool
 import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.state2.reader.StateReader
+import com.wavesplatform.state2.StateReader
 import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
 import play.api.libs.json.{Format, Json}
@@ -52,7 +52,7 @@ case class AliasApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPool
   def addressOfAlias: Route = (get & path("by-alias" / Segment)) { aliasName =>
     val result = Alias.buildWithCurrentNetworkByte(aliasName) match {
       case Right(alias) =>
-        state.resolveAlias(alias) match {
+        state().resolveAlias(alias) match {
           case Some(addr) => Right(Address(addr.stringRepr))
           case None => Left(AliasNotExists(alias))
         }
@@ -68,7 +68,7 @@ case class AliasApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPool
   ))
   def aliasOfAddress: Route = (get & path("by-address" / Segment)) { addressString =>
     val result: Either[ApiError, Seq[String]] = scorex.account.Address.fromString(addressString)
-      .map(acc => state.aliasesOfAddress(acc).map(_.stringRepr))
+      .map(acc => state().aliasesOfAddress(acc).map(_.stringRepr))
       .left.map(ApiError.fromValidationError)
     complete(result)
   }

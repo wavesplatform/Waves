@@ -5,7 +5,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock
 import com.wavesplatform.features.FeatureProvider
 import com.wavesplatform.history.HistoryWriterImpl
 import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state2.reader.{CompositeStateReader, StateReader}
+import com.wavesplatform.state2.reader.{CompositeStateReader, SnapshotStateReader}
 import scorex.block.Block
 import scorex.settings.TestFunctionalitySettings
 import scorex.transaction.{History, ValidationError}
@@ -23,7 +23,7 @@ package object diffs {
   def assertDiffEi(preconditions: Seq[Block], block: Block, fs: FunctionalitySettings = TestFunctionalitySettings.Enabled)(assertion: Either[ValidationError, BlockDiff] => Unit): Unit = {
     val fp = newHistory()
     val state = newState()
-    val differ: (StateReader, Block) => Either[ValidationError, BlockDiff] = (s, b) => BlockDiffer.fromBlock(fs, fp, s, None, b)
+    val differ: (SnapshotStateReader, Block) => Either[ValidationError, BlockDiff] = (s, b) => BlockDiffer.fromBlock(fs, fp, s, None, b)
 
     preconditions.foreach { precondition =>
       val preconditionDiff = differ(state, precondition).explicitGet()
@@ -40,11 +40,11 @@ package object diffs {
 
 
 
-  def assertDiffAndState(preconditions: Seq[Block], block: Block, fs: FunctionalitySettings = TestFunctionalitySettings.Enabled)(assertion: (BlockDiff, StateReader) => Unit): Unit = {
+  def assertDiffAndState(preconditions: Seq[Block], block: Block, fs: FunctionalitySettings = TestFunctionalitySettings.Enabled)(assertion: (BlockDiff, SnapshotStateReader) => Unit): Unit = {
     val fp = newHistory()
     val state = newState()
 
-    val differ: (StateReader, Block) => Either[ValidationError, BlockDiff] = (s, b) => BlockDiffer.fromBlock(fs, fp, s, None, b)
+    val differ: (SnapshotStateReader, Block) => Either[ValidationError, BlockDiff] = (s, b) => BlockDiffer.fromBlock(fs, fp, s, None, b)
 
     preconditions.foreach { precondition =>
       val preconditionDiff = differ(state, precondition).explicitGet()

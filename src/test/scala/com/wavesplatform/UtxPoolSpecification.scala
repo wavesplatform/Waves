@@ -182,7 +182,7 @@ class UtxPoolSpecification extends FreeSpec
 
     "portfolio" - {
       "returns a count of assets from the state if there is no transaction" in forAll(emptyUtxPool) { case (sender, state, utxPool) =>
-        val basePortfolio = state.accountPortfolio(sender)
+        val basePortfolio = state().accountPortfolio(sender)
 
         utxPool.size shouldBe 0
         val utxPortfolio = utxPool.portfolio(sender)
@@ -191,7 +191,7 @@ class UtxPoolSpecification extends FreeSpec
       }
 
       "taking into account unconfirmed transactions" in forAll(withValidPayments) { case (sender, state, utxPool, _, _) =>
-        val basePortfolio = state.accountPortfolio(sender)
+        val basePortfolio = state().accountPortfolio(sender)
 
         utxPool.size should be > 0
         val utxPortfolio = utxPool.portfolio(sender)

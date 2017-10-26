@@ -3,6 +3,7 @@ package com.wavesplatform.state2.reader
 import java.util.concurrent.locks.ReentrantReadWriteLock
 
 import com.wavesplatform.state2.StateStorage
+import com.wavesplatform.state2.reader.StateReader._
 import com.wavesplatform.state2.StateStorage._
 import org.scalatest.{Matchers, Outcome, fixture}
 import scorex.account.Address

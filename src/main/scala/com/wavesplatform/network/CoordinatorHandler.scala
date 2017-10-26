@@ -7,7 +7,7 @@ import com.wavesplatform.metrics.{BlockStats, HistogramExt}
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.network.MicroBlockSynchronizer.MicroblockData
 import com.wavesplatform.settings.WavesSettings
-import com.wavesplatform.state2.reader.StateReader
+import com.wavesplatform.state2.StateReader
 import com.wavesplatform.{Coordinator, UtxPool}
 import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel.group.ChannelGroup

@@ -13,7 +13,7 @@ import scala.annotation.tailrec
 import scala.reflect.ClassTag
 import scala.util.{Right, Try}
 
-trait StateReader extends Synchronized {
+trait SnapshotStateReader extends Synchronized {
 
   def accountPortfolios: Map[Address, Portfolio]
 
@@ -25,7 +25,7 @@ trait StateReader extends Synchronized {
 
   def assetInfo(id: ByteStr): Option[AssetInfo]
 
-  protected def wavesBalance(a: Address): (Long, LeaseInfo)
+  def wavesBalance(a: Address): (Long, LeaseInfo)
 
   def assetBalance(a: Address, asset: ByteStr): Long
 
@@ -52,7 +52,8 @@ trait StateReader extends Synchronized {
 
 object StateReader {
 
-  implicit class StateReaderExt(s: StateReader) extends ScorexLogging {
+
+  implicit class StateReaderExt(s: SnapshotStateReader) extends ScorexLogging {
     def assetDistribution(assetId: ByteStr): Map[Address, Long] =
       s.accountPortfolios
         .mapValues(portfolio => portfolio.assets.get(assetId))

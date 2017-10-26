@@ -2,6 +2,7 @@ package com.wavesplatform.history
 
 import com.wavesplatform.TransactionGen
 import com.wavesplatform.state2._
+import com.wavesplatform.state2.reader.StateReader._
 import com.wavesplatform.state2.diffs._
 import org.scalacheck.Gen
 import org.scalatest._
@@ -154,7 +155,7 @@ class BlockchainUpdaterMicroblockSunnyDayTest extends PropSpec with PropertyChec
       db.blockchainUpdater.processBlock(block2b).explicitGet()
       db.blockchainUpdater.processBlock(block3b).explicitGet()
 
-      da.stateReader.partialPortfolio(miner).balance shouldBe db.stateReader.partialPortfolio(miner).balance
+      da.stateReader().partialPortfolio(miner).balance shouldBe db.stateReader().partialPortfolio(miner).balance
     }
   }
 }
