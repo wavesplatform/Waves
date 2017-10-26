@@ -153,13 +153,8 @@ class RemoteScoreObserverSpec extends FreeSpec
     }
   }
 
-  // TODO
-  // "should stop abort downloading if the local score is better, than requested" in {
-  //
-  // }
-
-  "when the local score is changed" - {
-    "should re-request an extensions, but still worse than better" in {
+  "should re-request extensions" - {
+    "when the local score is changed but still worse than the better one" in {
       var currentLastSignatures = lastSignatures
 
       val channel = new EmbeddedChannel(new RemoteScoreObserver(1.minute, currentLastSignatures, 1))
@@ -181,6 +176,11 @@ class RemoteScoreObserverSpec extends FreeSpec
       }
     }
   }
+
+  // TODO
+  // "should stop abort downloading if the local score is better, than requested" in {
+  //
+  // }
 
   "should propagate blocks from an expected extensions" in {
     var wasExtensionPropagated = false
