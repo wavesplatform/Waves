@@ -7,7 +7,7 @@ import com.wavesplatform.features.{BlockchainFeatures, FeatureProvider}
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.BlockDiff
 import com.wavesplatform.state2.reader.CompositeStateReader.composite
-import com.wavesplatform.state2.reader.{CompositeStateReader, SnapshotStateReader}
+import com.wavesplatform.state2.reader.{SnapshotStateReader}
 import org.scalatest.{FreeSpecLike, Matchers}
 import scorex.account.PrivateKeyAccount
 import scorex.block.Block
