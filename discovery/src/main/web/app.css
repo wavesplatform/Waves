@@ -15,7 +15,7 @@ svg:not(.active):not(.ctrl) {
 path.link {
   fill: none;
   stroke: #000;
-  stroke-width: 2px;
+  stroke-width: 0.1px;
   cursor: default;
 }
 
@@ -46,7 +46,8 @@ circle.node.reflexive {
 }
 
 text {
-  font: 12px sans-serif;
+  font: 6px sans-serif;
+  font-weight:lighter;
   pointer-events: none;
 }
 
