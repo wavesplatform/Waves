@@ -59,22 +59,50 @@ class RemoteScoreObserverSpec extends FreeSpec
     //      }
     //    }
 
-    "from the second best channel if the connection with best one is dropped" in {
-      val scoreObserver = new RemoteScoreObserver(1.minute, lastSignatures, 1)
+    "from the second best channel" - {
+      "when the connection with best one is dropped" in {
+        val scoreObserver = new RemoteScoreObserver(1.minute, lastSignatures, 1)
 
-      val channel1 = new EmbeddedChannel(scoreObserver)
-      channel1.writeInbound(BigInt(3))
-      channel1.flushInbound()
+        val channel1 = new EmbeddedChannel(scoreObserver)
+        channel1.writeInbound(BigInt(3))
+        channel1.flushInbound()
 
-      val channel2 = new EmbeddedChannel(scoreObserver)
-      channel2.writeInbound(BigInt(2))
-      channel2.flushInbound()
+        val channel2 = new EmbeddedChannel(scoreObserver)
+        channel2.writeInbound(BigInt(2))
+        channel2.flushInbound()
 
-      channel1.close()
+        channel1.close()
 
-      eventually {
-        val actual = channel2.readOutbound[LoadBlockchainExtension]()
-        Option(actual) shouldBe defined
+        eventually {
+          val actual = channel2.readOutbound[LoadBlockchainExtension]()
+          Option(actual) shouldBe defined
+        }
+      }
+
+      "when the score of the best one is expired" in {
+        val scoreTtl = 500.millis
+
+        val scoreObserver = new RemoteScoreObserver(scoreTtl, lastSignatures, 1)
+        val channel1 = new EmbeddedChannel(scoreObserver)
+        channel1.writeInbound(BigInt(3))
+        channel1.flushInbound()
+
+        eventually {
+          val actual = channel1.readOutbound[LoadBlockchainExtension]()
+          Option(actual) shouldBe defined
+        }
+
+        val channel2 = new EmbeddedChannel(scoreObserver)
+        channel2.writeInbound(BigInt(2))
+        channel2.flushInbound()
+
+        Thread.sleep(scoreTtl.toMillis)
+        channel1.runPendingTasks()
+
+        eventually {
+          val actual = channel2.readOutbound[LoadBlockchainExtension]()
+          Option(actual) shouldBe defined
+        }
       }
     }
   }
@@ -131,7 +159,7 @@ class RemoteScoreObserverSpec extends FreeSpec
   // }
 
   "when the local score is changed" - {
-    "should re-request extensions, but still worse than better" in {
+    "should re-request an extensions, but still worse than better" in {
       var currentLastSignatures = lastSignatures
 
       val channel = new EmbeddedChannel(new RemoteScoreObserver(1.minute, currentLastSignatures, 1))
