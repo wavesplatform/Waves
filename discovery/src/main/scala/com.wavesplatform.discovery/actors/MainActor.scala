@@ -9,13 +9,12 @@ import com.wavesplatform.discovery.collections.{ExpirationSet, Pool}
 import com.wavesplatform.discovery.routers.SmallestMailboxWithThresholdRoutingLogic
 import play.api.libs.json._
 
-class MainActor(val workersCount: Int) extends Actor {
-
+class MainActor(chainId: Char, workersCount: Int) extends Actor {
   import MainActor._
 
   private val router = {
     val routes = Vector.fill(workersCount) {
-      ActorRefRoutee(context.actorOf(Props[PeerDiscoveryActor]))
+      ActorRefRoutee(context.actorOf(Props(classOf[PeerDiscoveryActor], chainId)))
     }
     Router(SmallestMailboxWithThresholdRoutingLogic(5), routes)
   }
@@ -57,7 +56,7 @@ class MainActor(val workersCount: Int) extends Actor {
     }
   }
 
-  private def jsonPeersData = peerResponses.foldLeft(Json.obj())((json, keyValue) => json.+(keyValue._1.getHostString, JsArray(keyValue._2.map(v => JsString(v.getHostString)).toSeq))).toString()
+  private def jsonPeersData = peerResponses.foldLeft(Json.obj())((json, keyValue) => json + (keyValue._1.getHostString, JsArray(keyValue._2.map(v => JsString(v.getHostString)).toSeq))).toString()
 
   private def broadcastPeerInfo(peer: InetSocketAddress, peers: Set[InetSocketAddress]): Unit = {
     val response = Json.obj(peer.getHostString -> JsArray(peers.map(p => JsString(p.getHostString)).toSeq)).toString()
@@ -77,7 +76,7 @@ object MainActor {
 
   case object Discover
 
-  def apply(workersCount: Int)(implicit system: ActorSystem): ActorRef = {
-    system.actorOf(Props(classOf[MainActor], workersCount), "main")
+  def apply(chainId: Char, workersCount: Int)(implicit system: ActorSystem): ActorRef = {
+    system.actorOf(Props(classOf[MainActor], chainId, workersCount))
   }
 }

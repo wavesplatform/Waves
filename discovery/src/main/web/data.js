@@ -3,74 +3,74 @@ Array.prototype.except = function(arr) {
     return this.filter(x => !arr.includes(x))
 }
 
-var peerSet = {}
-var peerStats = {}
-var peerHops = {}
-
-function peers(peer) {
-    if(!peerSet[peer])
-        return []
-
-    return peerSet[peer]
-}
-
-function addPeerWithPeers(peer, peers) {
-    peerSet[peer] = peers
-}
-
 function isEmpty(obj) {
     for(var key in obj) {
-        if(obj.hasOwnProperty(key))
-            return false;
+       if(obj.hasOwnProperty(key))
+           return false;
     }
     return true;
 }
 
-function calculateHops() {
-    var result = []
-    for(peer in peerSet) {
-       var byLevel = hopsByLevel(calculatePeerHops(peer, 0, 1, 4))
-       byLevel.peer = peer
-       result.push(byLevel)
-    }
+function PeersInfo()
+{
+   var peerSet = {}
+   var peerStats = {}
+   var peerHops = {}
 
-    return result
-}
+   this.peers = function(peer) {
+       if(!peerSet[peer])
+           return []
 
-function calculatePeerHops(peer, peerHops = {}, depth = 1, max = 1) {
+       return peerSet[peer]
+   }
 
-    if(depth > max)
-        return peerHops
 
-    if(isEmpty(peerHops)) {
-        peerHops = {}
-        peers(peer).forEach(hop => peerHops[hop] = depth)
-    } else {
-        for(hop in peerHops) {
-            if(peerHops[hop] == depth - 1) {
-                peers(hop).filter(p => peerHops[p] ? false : true).forEach(hop => peerHops[hop] = depth)
-            }
-        }
-    }
+   this.hopsByLevel = function(peerHops) {
+       byLevel = {}
+       for(hop in peerHops) {
+          var level = peerHops[hop]
 
-    return calculatePeerHops(peer, peerHops, depth + 1, max)
-}
+          if(!byLevel[level])
+            byLevel[level] = []
 
-function hopsByLevel(peerHops) {
-    byLevel = {}
-    for(hop in peerHops) {
-       var level = peerHops[hop]
+          byLevel[level].push(hop)
+       }
 
-       if(!byLevel[level])
-         byLevel[level] = []
+       return byLevel
+   }
 
-       byLevel[level].push(hop)
-    }
+   this.addPeerWithPeers = function(peer, peers) {
+       peerSet[peer] = peers
+   }
 
-    return byLevel
-}
+   this.calculatePeerHops = function(peer, peerHops = {}, depth = 1, max = 1) {
 
-function firstHopPeers(peer) {
-    return peers(peer).length
+       if(depth > max)
+           return peerHops
+
+       if(isEmpty(peerHops)) {
+           peerHops = {}
+           this.peers(peer).forEach(hop => peerHops[hop] = depth)
+       } else {
+           for(hop in peerHops) {
+               if(peerHops[hop] == depth - 1) {
+                   this.peers(hop).filter(p => peerHops[p] ? false : true).forEach(hop => peerHops[hop] = depth)
+               }
+           }
+       }
+
+       return this.calculatePeerHops(peer, peerHops, depth + 1, max)
+   }
+
+   this.calculateHops = function() {
+       var result = []
+       for(peer in peerSet) {
+          var byLevel = this.hopsByLevel(this.calculatePeerHops(peer, 0, 1, 6))
+          byLevel.peer = peer
+          result.push(byLevel)
+       }
+
+       return result
+   }
 }
 

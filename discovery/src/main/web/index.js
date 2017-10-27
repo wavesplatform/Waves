@@ -1,4 +1,3 @@
-var table
 
 function print(text) {
     var p = document.createElement("P")
@@ -7,29 +6,37 @@ function print(text) {
     //window.scrollTo(0,document.body.scrollHeight);
 }
 
-function WebSocketTest()
-{
+function Init(chainId) {
+    $(document).ready(function() {
+    var table = $('#' + chainId + 'Table').DataTable({
+          paging: false,
+          columnDefs: columnDefinitions
+        });
+
+        Connect(chainId, table, new PeersInfo())
+    });
+}
+
+function Connect(chainId, table, peersInfo) {
+
    if ("WebSocket" in window)
    {
-      var ws = new WebSocket("ws://localhost:8080/");
-      var wasConnected = false
+      var ws = new WebSocket("ws://localhost:8080/" + chainId);
 
-      ws.onopen = function()
-      {
+      ws.onopen = function() {
          wasConnected = true
-         print("WebSocket connected...")
+         print("WebSocket [" + chainId + "] connected...")
       };
 
-      ws.onmessage = function (evt)
-      {
+      ws.onmessage = function (evt) {
          var received_msg = evt.data
          var msg = JSON.parse(evt.data);
 
          for(var peer in msg) {
-            addPeerWithPeers(peer, msg[peer])
+            peersInfo.addPeerWithPeers(peer, msg[peer])
          }
 
-         var hops = calculateHops()
+         var hops = peersInfo.calculateHops()
 
          table.clear()
 
@@ -39,30 +46,18 @@ function WebSocketTest()
 
          table.draw()
 
-         $('.label')
-           .popup()
-         ;
-
-         print(received_msg)
+         print("[" + chainId + "]: " + received_msg)
       };
 
-      ws.onclose = function()
-      {
-         if(!wasConnected) {
-           WebSocketTest()
-         }
-         else {
-           print("WebSocket closed.")
-         }
+      ws.onclose = function() {
+         Connect(chainId, table, peersInfo)
       };
 
       window.onbeforeunload = function(event) {
          socket.close()
       };
    }
-
-   else
-   {
+   else {
       print("WebSocket NOT supported by your Browser!");
    }
 }
@@ -76,7 +71,7 @@ var columnDefinitions = [{
     }
 }]
 
-for(var i = 1; i <= 3; i++) {
+for(var i = 1; i <= 5; i++) {
     columnDefinitions.push({
         title: "hop#" + i,
         targets: i,
@@ -90,16 +85,7 @@ for(var i = 1; i <= 3; i++) {
 }
 
 
-$(document).ready(function() {
-table = $('#example').DataTable({
-                                  paging: false,
-                                  columnDefs: columnDefinitions
-                                });
+print("Waiting for hosts...")
 
-print("Waiting for host...")
-WebSocketTest();
-});
-
-
-
-
+Init("w");
+Init("t");

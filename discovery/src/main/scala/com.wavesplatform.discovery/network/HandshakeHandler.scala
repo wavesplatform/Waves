@@ -3,7 +3,6 @@ package com.wavesplatform.discovery.network
 import java.util
 
 import com.wavesplatform.Version
-import com.wavesplatform.discovery.Settings
 import com.wavesplatform.network.Handshake
 import com.wavesplatform.settings.Constants
 import io.netty.buffer.ByteBuf
@@ -13,9 +12,9 @@ import scorex.utils.ScorexLogging
 
 import scala.util.Random
 
-class HandshakeHandler() extends ReplayingDecoder[Void] with ScorexLogging {
+class HandshakeHandler(chainId: Char) extends ReplayingDecoder[Void] with ScorexLogging {
   private val handshake =
-    Handshake(Constants.ApplicationName + Settings.default.chainId, Version.VersionTuple,
+    Handshake(Constants.ApplicationName + chainId, Version.VersionTuple,
       "discovery", new Random().nextLong(), None)
 
   override def decode(ctx: ChannelHandlerContext, in: ByteBuf, out: util.List[AnyRef]): Unit = {

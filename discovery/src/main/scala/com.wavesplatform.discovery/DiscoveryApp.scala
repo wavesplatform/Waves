@@ -10,6 +10,7 @@ import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.stream.{ActorMaterializer, OverflowStrategy}
 import com.wavesplatform.discovery.actors.MainActor
 import com.wavesplatform.discovery.actors.MainActor.WebSocketConnected
+import com.wavesplatform.discovery.CancellableExt._
 
 import scala.concurrent.duration.FiniteDuration
 import scala.io.StdIn
@@ -17,35 +18,37 @@ import scala.io.StdIn
 object DiscoveryApp extends App {
   implicit val system: ActorSystem = ActorSystem("Default")
   implicit val flowMaterializer: ActorMaterializer = ActorMaterializer()
-
-  val mainActor = MainActor(Settings.default.workersCount)
-
-  mainActor ! MainActor.Peers(Settings.default.initialPeers.toSet)
-
-  system.scheduler.schedule(FiniteDuration(0, TimeUnit.SECONDS),FiniteDuration(500, TimeUnit.MILLISECONDS), mainActor, MainActor.Discover)
-
   import akka.http.scaladsl.server.Directives._
 
-  val route = get {
-    pathEndOrSingleSlash {
+  val (route, timer) = Settings.default.chains.map {cs =>
+    val mainActor = MainActor(cs.chainId, Settings.default.workersCount)
+    mainActor ! MainActor.Peers(cs.initialPeers.toSet)
 
-      val sink: Sink[akka.http.scaladsl.model.ws.Message, _] =  Sink.ignore
-      val source: Source[akka.http.scaladsl.model.ws.Message, NotUsed] =
-        Source.actorRef[String](1, OverflowStrategy.dropTail)
-          .mapMaterializedValue { actor =>
-            mainActor ! WebSocketConnected(actor)
-            NotUsed
-          }.map(
-          (outMsg: String) => TextMessage(outMsg))
+    val route = get {
+      path(cs.chainId.toLower.toString) {
 
-      handleWebSocketMessages(Flow.fromSinkAndSource(sink, source))
+        val sink: Sink[akka.http.scaladsl.model.ws.Message, _] = Sink.ignore
+        val source: Source[akka.http.scaladsl.model.ws.Message, NotUsed] =
+          Source.actorRef[String](1, OverflowStrategy.dropTail)
+            .mapMaterializedValue { actor =>
+              mainActor ! WebSocketConnected(actor)
+              NotUsed
+            }.map(
+            (outMsg: String) => TextMessage(outMsg))
+
+        handleWebSocketMessages(Flow.fromSinkAndSource(sink, source))
+      }
     }
-  }
+
+    (route, system.scheduler.schedule(FiniteDuration(0, TimeUnit.SECONDS), Settings.default.discoveryInterval, mainActor, MainActor.Discover))
+  }.reduce((a,b) => (a._1 ~ b._1, a._2.combine(b._2)))
 
   val binding = Http().bindAndHandle(route, Settings.default.webSocketHost, Settings.default.webSocketPort)
+
   println(s"Server is now online at http://${Settings.default.webSocketHost}:${Settings.default.webSocketPort}\nPress RETURN to stop...")
   StdIn.readLine()
   binding.flatMap(_.unbind()).onComplete(_ => {
+    timer.cancel()
     system.terminate()
     workerGroup.shutdownGracefully()
   })

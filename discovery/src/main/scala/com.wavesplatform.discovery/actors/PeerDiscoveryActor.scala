@@ -19,7 +19,7 @@ object PeerDiscoveryActor {
   case class GetPeersFrom(peer: InetSocketAddress)
 }
 
-class PeerDiscoveryActor extends Actor {
+class PeerDiscoveryActor(chainId: Char) extends Actor {
 
   import PeerDiscoveryActor._
 
@@ -37,7 +37,7 @@ class PeerDiscoveryActor extends Actor {
       .channel(classOf[NioSocketChannel])
       .handler(new PipelineInitializer[SocketChannel](Seq(
         exceptionHandler,
-        new HandshakeHandler(),
+        new HandshakeHandler(chainId),
         new LengthFieldPrepender(4),
         new LengthFieldBasedFrameDecoder(100 * 1024 * 1024, 0, 4, 0, 4),
         new LegacyFrameCodec(),
