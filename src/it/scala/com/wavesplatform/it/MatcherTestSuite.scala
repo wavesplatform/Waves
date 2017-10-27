@@ -8,7 +8,6 @@ import org.scalatest.{BeforeAndAfterAll, FreeSpec, Matchers}
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
-import scorex.utils.NTP
 
 import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -282,7 +281,7 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll {
   }
 
   private def prepareOrder(node: Node, pair: AssetPair, orderType: OrderType, price: Long, amount: Long): Order = {
-    val creationTime = NTP.correctedTime()
+    val creationTime = System.currentTimeMillis()
     val timeToLive = creationTime + Order.MaxLiveTime - 1000
 
     val privateKey = PrivateKeyAccount(Base58.decode(node.accountSeed).get)

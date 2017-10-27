@@ -40,7 +40,7 @@ object WavesSettings {
 
   def fromConfig(config: Config): WavesSettings = {
     val directory = config.as[String](s"$configPath.directory")
-    val pageSplitSize =config.as[Int](s"$configPath.mvstore-page-split-size")
+    val pageSplitSize = config.as[Int](s"$configPath.mvstore-page-split-size")
     val loggingLevel = config.as[LogLevel.Value](s"$configPath.logging-level")
 
     val networkSettings = config.as[NetworkSettings]("waves.network")
