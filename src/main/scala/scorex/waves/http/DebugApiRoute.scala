@@ -31,6 +31,7 @@ import com.typesafe.config.{ConfigObject, ConfigRenderOptions}
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.mining.MinerDebugInfo
 import scorex.block.Block.BlockId
+import scorex.utils.ScorexLogging
 
 
 @Path("/debug")
@@ -47,14 +48,14 @@ case class DebugApiRoute(settings: RestAPISettings,
                          blockchainDebugInfo: BlockchainDebugInfo,
                          miner: Miner with MinerDebugInfo,
                          configRoot: ConfigObject
-                        ) extends ApiRoute {
+                        ) extends ApiRoute with ScorexLogging {
 
   private lazy val configStr = configRoot.render(ConfigRenderOptions.concise().setJson(true).setFormatted(true))
   private lazy val fullConfig: JsValue = Json.parse(configStr)
   private lazy val wavesConfig: JsObject = Json.obj("waves" -> (fullConfig \ "waves").get)
 
   override lazy val route: Route = pathPrefix("debug") {
-    blocks ~ state ~ info ~ stateWaves ~ rollback ~ rollbackTo ~ blacklist ~ portfolios ~ minerInfo ~ topDiffAccountPortfolios ~ bottomDiffAccountPortfolios ~ historyInfo ~ configInfo
+    blocks ~ state ~ info ~ stateWaves ~ rollback ~ rollbackTo ~ blacklist ~ portfolios ~ minerInfo ~ topDiffAccountPortfolios ~ bottomDiffAccountPortfolios ~ historyInfo ~ configInfo ~ print
   }
 
   @Path("/blocks/{howMany}")
@@ -75,6 +76,30 @@ case class DebugApiRoute(settings: RestAPISettings,
       }))
     }
   }
+  @Path("/print")
+  @ApiOperation(
+    value = "Print",
+    notes = "Prints a string at DEBUG level, strips to 100 chars",
+    httpMethod = "POST"
+  )
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(
+      name = "body",
+      value = "Json with data",
+      required = true,
+      paramType = "body",
+      dataType = "scorex.waves.http.DebugMessage",
+      defaultValue = "{\n\t\"message\": \"foo\"\n}"
+    )
+  ))
+  @ApiResponses(Array(new ApiResponse(code = 200, message = "Json portfolio")))
+  def print: Route = (path("print") & post & withAuth) {
+    json[DebugMessage] { params =>
+      log.debug(params.message.take(100))
+      ""
+    }
+  }
+
 
   @Path("/state")
   @ApiOperation(value = "State", notes = "Get current state", httpMethod = "GET")
