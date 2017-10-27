@@ -18,7 +18,6 @@ import kamon.metric.instrument.Time
 import monix.eval.Coeval
 import monix.execution.Scheduler.Implicits.global
 import monix.reactive.subjects.ConcurrentSubject
-import scorex.account.Address
 import scorex.block.{Block, MicroBlock}
 import scorex.transaction.ValidationError.{BlockAppendError, GenericError, MicroBlockAppendError}
 import scorex.transaction._
@@ -127,7 +126,6 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
         }
       }
     }
-
     val height = historyWriter.height()
     val notImplementedFeatures = featureProvider.activatedFeatures(height).diff(BlockchainFeatures.implemented)
 
@@ -172,8 +170,9 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
                   Some(referencedForgedBlock), block))
                   .map { hardenedDiff =>
                     TxsInBlockchainStats.record(ng.transactions.size)
-                    inMemDiffs.transform { case (x :: xs) =>
-                      Monoid.combine(x, referencedLiquidDiff) +: xs
+                    inMemDiffs.transform {
+                      case (x :: xs) => Monoid.combine(x, referencedLiquidDiff) +: xs
+                      case Nil => Seq(referencedLiquidDiff)
                     }
                     Some((hardenedDiff, discarded.flatMap(_.transactionData)))
                   }
@@ -203,34 +202,38 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
         case None =>
           log.warn(s"removeAfter nonexistent block $blockId")
           Left(GenericError(s"Failed to rollback to nonexistent block $blockId"))
-        case Some(height) =>
+        case Some(requestedHeight) =>
           val discardedNgBlock = ng.map(_.bestLiquidBlock)
           ngState.set(None)
 
-          val baseRolledBack = height < historyWriter.height()
+          val baseRolledBack = requestedHeight < historyWriter.height()
           val discardedHistoryBlocks = if (baseRolledBack) {
-            logHeights(s"Rollback to h=$height started")
+            logHeights(s"Rollback to h=$requestedHeight started")
             val discarded = {
               var buf = Seq.empty[Block]
-              while (historyWriter.height > height)
+              while (historyWriter.height > requestedHeight)
                 buf = historyWriter.discardBlock().toSeq ++ buf
               buf
             }
-            if (height < persisted.height) {
-              log.info(s"Rollback to h=$height requested. Persisted height=${persisted.height}, will drop state and reapply blockchain now")
+            if (requestedHeight < persisted.height) {
+              log.info(s"Rollback to h=$requestedHeight requested. Persisted height=${persisted.height}, will drop state and reapply blockchain now")
               persisted.clear()
               syncPersistedAndInMemory()
             } else {
-              while (currentPersistedBlocksState().height > height) {
+              while (currentPersistedBlocksState().height > requestedHeight) {
                 inMemDiffs.transform(_.tail)
               }
-              val persistedPlusInMemHeight = persisted.height + inMemDiffs().map(_.heightDiff).sum
-              if (height > persistedPlusInMemHeight) {
-                val newTopDiff = unsafeDiffByRange(currentPersistedBlocksState(), persistedPlusInMemHeight + 1, height + 1)
-                inMemDiffs.transform(newTopDiff +: _)
+              inMemDiffs.transform { imd =>
+                val persistedPlusInMemHeight = persisted.height + inMemDiffs().map(_.heightDiff).sum
+                if (requestedHeight > persistedPlusInMemHeight) {
+                  val newTopDiff = unsafeDiffByRange(currentPersistedBlocksState(), persistedPlusInMemHeight + 1, requestedHeight + 1)
+                  newTopDiff +: imd
+                } else BlockDiff.empty +: imd
               }
+
+
             }
-            logHeights(s"Rollback to h=$height completed:")
+            logHeights(s"Rollback to h=$requestedHeight completed:")
             discarded
           } else {
             log.debug(s"No rollback in history is necessary")
@@ -284,14 +287,6 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
 
   override def persistedAccountPortfoliosHash(): Int = Hash.accountPortfolios(currentPersistedBlocksState().accountPortfolios)
 
-  override def topDiff(): Map[Address, Portfolio] = read { implicit l =>
-    inMemDiffs().lastOption.map(_.txsDiff.portfolios).getOrElse(Map.empty)
-  }
-
-  override def bottomDiff(): Map[Address, Portfolio] = read { implicit l =>
-    inMemDiffs().headOption.map(_.txsDiff.portfolios).getOrElse(Map.empty)
-
-  }
 }
 
 object BlockchainUpdaterImpl {

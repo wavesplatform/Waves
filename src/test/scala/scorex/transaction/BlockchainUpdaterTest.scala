@@ -30,7 +30,7 @@ class BlockchainUpdaterTest extends FunSuite with Matchers with HistoryTest with
 
   private def storageFactory() = StorageFactory(WavesSettings).get
 
-  ignore ("concurrent access to lastBlock doesn't throw any exception") {
+  test("concurrent access to lastBlock doesn't throw any exception") {
     val (h, fp, _, _, bu, _) = storageFactory()
 
     bu.processBlock(genesisBlock)

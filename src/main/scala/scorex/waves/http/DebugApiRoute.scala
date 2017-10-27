@@ -55,7 +55,7 @@ case class DebugApiRoute(settings: RestAPISettings,
   private lazy val wavesConfig: JsObject = Json.obj("waves" -> (fullConfig \ "waves").get)
 
   override lazy val route: Route = pathPrefix("debug") {
-    blocks ~ state ~ info ~ stateWaves ~ rollback ~ rollbackTo ~ blacklist ~ portfolios ~ minerInfo ~ topDiffAccountPortfolios ~ bottomDiffAccountPortfolios ~ historyInfo ~ configInfo ~ print
+    blocks ~ state ~ info ~ stateWaves ~ rollback ~ rollbackTo ~ blacklist ~ portfolios ~ minerInfo ~ historyInfo ~ configInfo ~ print
   }
 
   @Path("/blocks/{howMany}")
@@ -211,24 +211,6 @@ case class DebugApiRoute(settings: RestAPISettings,
       "stateHash" -> blockchainDebugInfo.persistedAccountPortfoliosHash,
       "blockchainDebugInfo" -> blockchainDebugInfo.debugInfo()
     ))
-  }
-
-  @Path("/topDiffAccountPortfolios")
-  @ApiOperation(value = "State", notes = "All top diff info you need to debug", httpMethod = "GET")
-  @ApiResponses(Array(
-    new ApiResponse(code = 200, message = "Json state")
-  ))
-  def topDiffAccountPortfolios: Route = (path("topDiffAccountPortfolios") & get & withAuth) {
-    complete(blockchainDebugInfo.topDiff())
-  }
-
-  @Path("/bottomDiffAccountPortfolios")
-  @ApiOperation(value = "State", notes = "All bottom diff info you need to debug", httpMethod = "GET")
-  @ApiResponses(Array(
-    new ApiResponse(code = 200, message = "Json state")
-  ))
-  def bottomDiffAccountPortfolios: Route = (path("bottomDiffAccountPortfolios") & get & withAuth) {
-    complete(blockchainDebugInfo.bottomDiff())
   }
 
   @Path("/minerInfo")
