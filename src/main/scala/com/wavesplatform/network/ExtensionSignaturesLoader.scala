@@ -36,9 +36,15 @@ class ExtensionSignaturesLoader(syncTimeout: FiniteDuration, peerDatabase: PeerD
   override def write(ctx: ChannelHandlerContext, msg: AnyRef, promise: ChannelPromise): Unit = msg match {
     case LoadBlockchainExtension(sigs) if currentTimeout.isEmpty =>
       lastKnownSignatures = sigs
-      currentTimeout = Some(ctx.executor().schedule(syncTimeout)(onResponseTimedOut(ctx)))
 
       log.debug(s"${id(ctx)} Loading extension, last ${sigs.length} are ${formatSignatures(sigs)}")
+
+      currentTimeout = Some(ctx.executor().schedule(syncTimeout) {
+        if (currentTimeout.nonEmpty && ctx.channel().isActive) {
+          peerDatabase.blacklistAndClose(ctx.channel(),"Timeout expired while loading extension")
+        }
+      })
+
       ctx.writeAndFlush(GetSignatures(sigs), promise)
 
     case LoadBlockchainExtension(_) =>
@@ -46,11 +52,5 @@ class ExtensionSignaturesLoader(syncTimeout: FiniteDuration, peerDatabase: PeerD
       promise.setSuccess()
 
     case _ => super.write(ctx, msg, promise)
-  }
-
-  protected def onResponseTimedOut(ctx: ChannelHandlerContext): Unit = {
-    if (currentTimeout.nonEmpty && ctx.channel().isActive) {
-      peerDatabase.blacklistAndClose(ctx.channel(),"Timeout expired while loading extension")
-    }
   }
 }

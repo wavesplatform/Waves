@@ -2,7 +2,7 @@ package com.wavesplatform.network
 
 import com.wavesplatform.TransactionGen
 import com.wavesplatform.state2.ByteStr
-import io.netty.channel.ChannelHandlerContext
+import io.netty.channel.Channel
 import io.netty.channel.embedded.EmbeddedChannel
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.Eventually
@@ -53,19 +53,21 @@ class ExtensionSignaturesLoaderSpec extends FreeSpec
     }
   }
 
-  "should timeout long requests" in {
-    var isTimedOut = false
-    val channel = new EmbeddedChannel(new ExtensionSignaturesLoader(100.millis, PeerDatabase.NoOp) {
-      override protected def onResponseTimedOut(ctx: ChannelHandlerContext): Unit = {
-        isTimedOut = true
+  "should blacklist a node if it responses too long" in {
+    var senderWasBlacklisted = false
+    val peerDatabase = new PeerDatabase.NoOp {
+      override def blacklistAndClose(channel: Channel, reason: String): Unit = {
+        senderWasBlacklisted = true
       }
-    })
+    }
+
+    val channel = new EmbeddedChannel(new ExtensionSignaturesLoader(100.millis, peerDatabase))
     channel.writeOutbound(LoadBlockchainExtension(localSignatures))
     channel.flushOutbound()
 
     intercept[TestFailedDueToTimeoutException] {
       eventually {
-        isTimedOut shouldBe true
+        senderWasBlacklisted shouldBe true
       }
     }
   }

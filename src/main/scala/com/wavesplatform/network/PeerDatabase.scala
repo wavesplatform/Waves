@@ -3,7 +3,6 @@ package com.wavesplatform.network
 import java.net.{InetAddress, InetSocketAddress}
 
 import io.netty.channel.Channel
-import io.netty.channel.socket.nio.NioSocketChannel
 import scorex.utils.ScorexLogging
 
 
@@ -28,21 +27,15 @@ trait PeerDatabase {
 
   def clearBlacklist(): Unit
 
-  def suspend(host: InetAddress)
+  def suspend(host: InetAddress): Unit
+
+  def blacklistAndClose(channel: Channel, reason: String): Unit
+
 }
 
 object PeerDatabase extends ScorexLogging {
 
-  implicit class PeerDatabaseExt(peerDatabase: PeerDatabase) {
-    def blacklistAndClose(channel: Channel, reason: String): Unit = {
-      val address = channel.asInstanceOf[NioSocketChannel].remoteAddress().getAddress
-      log.debug(s"Blacklisting ${id(channel)}: $reason")
-      peerDatabase.blacklist(address, reason)
-      channel.close()
-    }
-  }
-
-  val NoOp: PeerDatabase = new PeerDatabase {
+  trait NoOp extends PeerDatabase {
     override def addCandidate(socketAddress: InetSocketAddress): Unit = {}
 
     override def touch(socketAddress: InetSocketAddress): Unit = {}
@@ -61,9 +54,13 @@ object PeerDatabase extends ScorexLogging {
 
     override def suspend(host: InetAddress): Unit = {}
 
-    override def suspendedHosts = Set.empty
+    override val suspendedHosts: Set[InetAddress] = Set.empty
 
-    override def detailedSuspended = Map.empty
+    override val detailedSuspended: Map[InetAddress, Long] = Map.empty
+
+    override def blacklistAndClose(channel: Channel, reason: String): Unit = {}
   }
+
+  object NoOp extends NoOp
 
 }

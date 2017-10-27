@@ -22,20 +22,20 @@ class ExtensionBlocksLoader(
   private var blacklistingScheduledFuture = Option.empty[ScheduledFuture[_]]
   private val extensionsFetchingTimeStats = new LatencyHistogram(Kamon.metrics.histogram("extensions-fetching-time", instrument.Time.Milliseconds))
 
-  private def cancelBlaclkist(): Unit = {
+  private def cancelBlacklist(): Unit = {
     blacklistingScheduledFuture.foreach(_.cancel(false))
     blacklistingScheduledFuture = None
   }
 
   private def blacklistAfterTimeout(ctx: ChannelHandlerContext): Unit = {
-    cancelBlaclkist()
+    cancelBlacklist()
     blacklistingScheduledFuture = Some(ctx.executor().schedule(blockSyncTimeout) {
         peerDatabase.blacklistAndClose(ctx.channel(), "Timeout loading blocks")
     })
   }
 
   override def channelInactive(ctx: ChannelHandlerContext) = {
-    cancelBlaclkist()
+    cancelBlacklist()
     super.channelInactive(ctx)
   }
 
@@ -58,7 +58,7 @@ class ExtensionBlocksLoader(
       pendingSignatures -= b.uniqueId
       blacklistAfterTimeout(ctx)
       if (pendingSignatures.isEmpty) {
-        cancelBlaclkist()
+        cancelBlacklist()
         extensionsFetchingTimeStats.record()
         log.trace(s"${id(ctx)} Loaded all blocks, doing a pre-check")
 
