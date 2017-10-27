@@ -36,7 +36,7 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
 
       trySwitchToBestIf(s"switching to second best channel, because ${id(closedChannel)} was closed") {
         case Some((currChannel, _)) => currChannel == closedChannel
-        case None => false
+        case _ => false
       }
     }
   }
@@ -45,55 +45,60 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
     case LocalScoreChanged(newLocalScore) =>
       localScore = newLocalScore
       ctx.writeAndFlush(msg, promise)
-      trySwitchToBest("local score was updated because of internal updates")
+      trySwitchToBestIf("local score was updated because of internal updates")(_.isEmpty)
 
     case _ => ctx.write(msg, promise)
   }
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
     case newScore: History.BlockchainScore =>
-      ctx.executor().schedule(scoreTtl) {
-        if (scores.remove(ctx.channel(), newScore)) trySwitchToBest("score expired")
+      val previousScore = Option(scores.put(ctx.channel(), newScore)).getOrElse(BigInt(0))
+      if (previousScore != newScore) {
+        scheduleExpiration(ctx, newScore)
+        log.trace(s"${id(ctx)} New score: $newScore (diff: ${newScore - previousScore})")
+        trySwitchToBestIf("new connection")(_.isEmpty)
       }
 
-      val previousScore = scores.put(ctx.channel(), newScore)
-      if (previousScore != newScore) log.trace(s"${id(ctx)} New score: $newScore")
-
-      trySwitchToBestIf("new connection")(_.isEmpty)
-
-    case ExtensionBlocks(blocks) if currentRequest.get().exists(_._1 == ctx.channel()) =>
-      if (blocks.isEmpty) trySwitchToBest("blockchain is up to date")
-      else {
+    case ExtensionBlocks(blocks) =>
+      val isExpectedResponse = currentRequest.get().exists(_._1 == ctx.channel())
+      if (!isExpectedResponse) {
+        log.debug(s"${id(ctx)} Received blocks ${formatBlocks(blocks)} from non-pinned channel (could be from expired channel)")
+      } else if (blocks.isEmpty) {
+        trySwitchToBest("blockchain is up to date")
+      } else {
         log.debug(s"${id(ctx)} Receiving extension blocks ${formatBlocks(blocks)}")
         super.channelRead(ctx, msg)
       }
 
-    case ExtensionBlocks(blocks) =>
-      log.debug(s"${id(ctx)} Received blocks ${formatBlocks(blocks)} from non-pinned channel (could be from expired channel)")
-
     case _ => super.channelRead(ctx, msg)
+  }
+
+  private def scheduleExpiration(ctx: ChannelHandlerContext, score: BigInt): Unit = {
+    ctx.executor().schedule(scoreTtl) {
+      if (scores.remove(ctx.channel(), score)) trySwitchToBestIf("score expired") {
+        case Some((channel, _)) => channel == ctx.channel()
+        case _ => false
+      }
+    }
   }
 
   private def trySwitchToBest(reason: String): Unit = trySwitchToBestIf(reason) { _ => true }
 
   private def trySwitchToBestIf(reason: String)(cond: Option[ScorePair] => Boolean): Unit = bestForeignPair match {
     case None => currentRequest.set(None)
-
-    case Some(best) =>
-      val (bestForeignChannel, bestForeignScore) = best
-      val updated: Option[ScorePair] = currentRequest.updateAndGet { (orig: Option[ScorePair]) =>
-        if (bestForeignScore <= localScore) None
-        else if (cond(orig)) bestForeignPair
-        else orig
-      }
-
-      if (updated.contains(best)) {
-        val toId = Option(bestForeignChannel).map(id(_))
-        log.debug(s"A new pinned channel $toId has score $bestForeignScore: $reason, requesting an extension")
-        bestForeignChannel.writeAndFlush(LoadBlockchainExtension(lastSignatures))
-      } else {
-        log.trace(s"Pinned channel was not changed")
-      }
+    case Some(best@(bestForeignChannel, bestForeignScore)) =>
+      currentRequest
+        .updateAndGet { (orig: Option[ScorePair]) =>
+          if (bestForeignScore <= localScore) None
+          else if (cond(orig)) bestForeignPair
+          else orig
+        }
+        .filter(_ == best)
+        .foreach { _ =>
+          val toId = Option(bestForeignChannel).map(id(_))
+          log.debug(s"A new pinned channel $toId has score $bestForeignScore: $reason, requesting an extension")
+          bestForeignChannel.writeAndFlush(LoadBlockchainExtension(lastSignatures))
+        }
   }
 
 }
