@@ -61,7 +61,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
 
   def historyReader: NgHistory with DebugNgHistory with FeatureProvider = read { implicit l => new NgHistoryReader(() => ngState(), historyWriter, settings.blockchainSettings.functionalitySettings) }
 
-  private def syncPersistedAndInMemory(): Unit = read { implicit l =>
+  private def syncPersistedAndInMemory(): Unit = write { implicit l =>
     logHeights("State rebuild started")
     val persistFrom = persisted.height + 1
     val persistUpTo = historyWriter.height() - minimumInMemoryDiffSize + 1
