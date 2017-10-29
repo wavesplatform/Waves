@@ -33,7 +33,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
   private lazy val minimumInMemoryDiffSize = settings.blockchainSettings.minimumInMemoryDiffSize
   private lazy val inMemChunksAmount = settings.blockchainSettings.inMemChunksAmount
 
-  private lazy val inMemDiffs: Synchronized[NEL[BlockDiff]] = Synchronized(syncPersistedAndInMemory()) // fresh head
+  private lazy val inMemDiffs: Synchronized[NEL[BlockDiff]] = Synchronized(NEL.one(BlockDiff.empty)) // fresh head
   private lazy val ngState: Synchronized[Option[NgState]] = Synchronized(Option.empty[NgState])
 
   override val lastBlockId: ConcurrentSubject[ByteStr, ByteStr] = ConcurrentSubject.publish[ByteStr]
@@ -61,7 +61,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
 
   def historyReader: NgHistory with DebugNgHistory with FeatureProvider = read { implicit l => new NgHistoryReader(() => ngState(), historyWriter, settings.blockchainSettings.functionalitySettings) }
 
-  private def syncPersistedAndInMemory(): NEL[BlockDiff] = read { implicit l =>
+  private def syncPersistedAndInMemory(): Unit = read { implicit l =>
     logHeights("State rebuild started")
     val persistFrom = persisted.height + 1
     val persistUpTo = historyWriter.height() - minimumInMemoryDiffSize + 1
@@ -72,7 +72,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
     }
 
     logHeights("State rebuild finished")
-    NEL.one(unsafeDiffByRange(persisted, persisted.height + 1, historyWriter.height() + 1))
+    inMemDiffs.set(NEL.one(unsafeDiffByRange(persisted, persisted.height + 1, historyWriter.height() + 1)))
   }
 
   private def displayFeatures(s: Set[Short]): String = s"FEATURE${if (s.size > 1) "S"} ${s.mkString(", ")} ${if (s.size > 1) "WERE" else "WAS"}"
@@ -217,7 +217,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
             if (requestedHeight < persisted.height) {
               log.info(s"Rollback to h=$requestedHeight requested. Persisted height=${persisted.height}, will drop state and reapply blockchain now")
               persisted.clear()
-              inMemDiffs.set(syncPersistedAndInMemory())
+              syncPersistedAndInMemory()
             } else if (requestedHeight == persisted.height) {
               inMemDiffs.set(NEL.one(BlockDiff.empty))
             }
@@ -311,6 +311,7 @@ object BlockchainUpdaterImpl {
     val blockchainUpdater =
       new BlockchainUpdaterImpl(persistedState, settings, history, history, synchronizationToken)
     blockchainUpdater.logHeights("Constructing BlockchainUpdaterImpl")
+    blockchainUpdater.syncPersistedAndInMemory()
     blockchainUpdater
   }
 
