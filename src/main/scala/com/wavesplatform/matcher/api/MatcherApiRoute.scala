@@ -14,7 +14,6 @@ import com.wavesplatform.matcher.market.MatcherTransactionWriter.GetTransactions
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.market.OrderHistoryActor._
 import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.state2.reader.StateReader
 import io.swagger.annotations._
 import play.api.libs.json._
 import scorex.account.PublicKeyAccount
@@ -32,7 +31,7 @@ import scala.util.{Failure, Success, Try}
 
 @Path("/matcher")
 @Api(value = "/matcher/")
-case class MatcherApiRoute(wallet: Wallet,storedState: StateReader,
+case class MatcherApiRoute(wallet: Wallet,
                            matcher: ActorRef, orderHistory: ActorRef,
                            txWriter: ActorRef, settings: RestAPISettings, matcherSettings: MatcherSettings) extends ApiRoute {
   private implicit val timeout: Timeout = 5.seconds

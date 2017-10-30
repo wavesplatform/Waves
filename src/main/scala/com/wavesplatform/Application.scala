@@ -95,7 +95,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       NodeApiRoute(settings.restAPISettings, () => this.shutdown()),
       ActivationApiRoute(settings.restAPISettings, settings.blockchainSettings.functionalitySettings, settings.featuresSettings, history, featureProvider),
       AssetsBroadcastApiRoute(settings.restAPISettings, utxStorage, allChannels),
-      LeaseApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, stateReader, time),
+      LeaseApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, time),
       LeaseBroadcastApiRoute(settings.restAPISettings, utxStorage, allChannels),
       AliasApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, time, stateReader),
       AliasBroadcastApiRoute(settings.restAPISettings, utxStorage, allChannels)

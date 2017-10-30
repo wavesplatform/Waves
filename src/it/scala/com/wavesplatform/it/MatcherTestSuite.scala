@@ -15,13 +15,13 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.util.Random
 
-class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll {
+class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with ReportingTestName{
 
   import MatcherTestSuite._
 
   private val docker = Docker(getClass)
 
-  private val nodes = Configs.map(docker.startNode)
+  override val nodes = Configs.map(docker.startNode)
 
   private val matcherNode = nodes.head
   private val aliceNode = nodes(1)

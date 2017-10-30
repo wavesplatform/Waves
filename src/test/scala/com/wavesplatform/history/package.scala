@@ -12,7 +12,8 @@ import scorex.settings.TestFunctionalitySettings
 import scorex.transaction.{Transaction, TransactionParser}
 
 package object history {
-  val MinInMemoryDiffSize = 5
+  val InMemoryChunkSize = 5
+  val InMemChunks = 5
   val DefaultBaseTarget = 1000L
   val DefaultBlockchainSettings = BlockchainSettings(
     blockchainFile = None,
@@ -20,7 +21,8 @@ package object history {
     storeTransactionsInState = false,
     checkpointFile = None,
     addressSchemeCharacter = 'N',
-    minimumInMemoryDiffSize = MinInMemoryDiffSize,
+    inMemoryChunkSize = InMemoryChunkSize,
+    inMemChunksAmount = InMemChunks,
     functionalitySettings = TestFunctionalitySettings.Enabled,
     genesisSettings = null)
 

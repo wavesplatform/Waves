@@ -7,7 +7,7 @@ import com.wavesplatform.metrics._
 import com.wavesplatform.network.{BlockCheckpoint, Checkpoint}
 import com.wavesplatform.settings.{BlockchainSettings, FunctionalitySettings, WavesSettings}
 import com.wavesplatform.state2._
-import com.wavesplatform.state2.reader.StateReader
+import com.wavesplatform.state2.reader.SnapshotStateReader
 import kamon.Kamon
 import org.influxdb.dto.Point
 import scorex.block.{Block, MicroBlock}
@@ -35,7 +35,7 @@ object Coordinator extends ScorexLogging with Instrumented {
 
         lazy val forkApplicationResultEi: Either[ValidationError, BigInt] = {
           val firstDeclined = extension.view.map { b =>
-            b -> appendBlock(checkpoint, history, blockchainUpdater, stateReader, utxStorage, time, settings.blockchainSettings, featureProvider)(b).right.map {
+            b -> appendBlock(checkpoint, history, blockchainUpdater, stateReader(), utxStorage, time, settings.blockchainSettings, featureProvider)(b).right.map {
               _.foreach(bh => BlockStats.applied(b, BlockStats.Source.Ext, bh))
             }
           }
@@ -111,7 +111,7 @@ object Coordinator extends ScorexLogging with Instrumented {
     if (history.contains(newBlock)) Right(None)
     else for {
       _ <- Either.cond(history.heightOf(newBlock.reference).exists(_ >= history.height() - 1), (), GenericError("Can process either new top block or current top block's competitor"))
-      maybeBaseHeight <- appendBlock(checkpoint, history, blockchainUpdater, stateReader, utxStorage, time, settings, featureProvider)(newBlock)
+      maybeBaseHeight <- appendBlock(checkpoint, history, blockchainUpdater, stateReader(), utxStorage, time, settings, featureProvider)(newBlock)
     } yield maybeBaseHeight map (_ => history.score())
   })
 
@@ -130,7 +130,7 @@ object Coordinator extends ScorexLogging with Instrumented {
       s"generator's effective balance $effectiveBalance is less that required for generation")
 
   private def appendBlock(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater,
-                          stateReader: StateReader, utxStorage: UtxPool, time: Time, settings: BlockchainSettings,
+                          stateReader: SnapshotStateReader, utxStorage: UtxPool, time: Time, settings: BlockchainSettings,
                           featureProvider: FeatureProvider)(block: Block): Either[ValidationError, Option[Int]] = for {
     _ <- Either.cond(checkpoint.isBlockValid(block.signerData.signature, history.height() + 1), (),
       GenericError(s"Block $block at height ${history.height() + 1} is not valid w.r.t. checkpoint"))

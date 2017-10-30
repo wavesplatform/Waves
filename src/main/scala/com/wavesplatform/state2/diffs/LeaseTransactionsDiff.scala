@@ -4,7 +4,7 @@ import cats._
 import cats.implicits._
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2._
-import com.wavesplatform.state2.reader.StateReader
+import com.wavesplatform.state2.reader.SnapshotStateReader
 import scorex.account.Address
 import scorex.transaction.ValidationError
 import scorex.transaction.ValidationError.GenericError
@@ -14,7 +14,7 @@ import scala.util.{Left, Right}
 
 object LeaseTransactionsDiff {
 
-  def lease(s: StateReader, height: Int)(tx: LeaseTransaction): Either[ValidationError, Diff] = {
+  def lease(s: SnapshotStateReader, height: Int)(tx: LeaseTransaction): Either[ValidationError, Diff] = {
     val sender = Address.fromPublicKey(tx.sender.publicKey)
     s.resolveAliasEi(tx.recipient).flatMap { recipient =>
       if (recipient == sender)
@@ -35,7 +35,7 @@ object LeaseTransactionsDiff {
     }
   }
 
-  def leaseCancel(s: StateReader, settings: FunctionalitySettings, time: Long, height: Int)
+  def leaseCancel(s: SnapshotStateReader, settings: FunctionalitySettings, time: Long, height: Int)
                  (tx: LeaseCancelTransaction): Either[ValidationError, Diff] = {
     val leaseEi = s.findTransaction[LeaseTransaction](tx.leaseId) match {
       case None => Left(GenericError(s"Related LeaseTransaction not found"))

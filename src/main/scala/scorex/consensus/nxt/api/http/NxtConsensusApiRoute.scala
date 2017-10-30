@@ -4,7 +4,7 @@ import javax.ws.rs.Path
 
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.settings.{FunctionalitySettings, RestAPISettings}
-import com.wavesplatform.state2.reader.StateReader
+import com.wavesplatform.state2.StateReader
 import io.swagger.annotations._
 import play.api.libs.json.Json
 import scorex.account.Address
@@ -33,9 +33,10 @@ case class NxtConsensusApiRoute(
     Address.fromString(address) match {
       case Left(_) => complete(InvalidAddress)
       case Right(account) =>
+        val s = state()
         complete(Json.obj(
           "address" -> account.address,
-          "balance" -> PoSCalc.generatingBalance(state, fs, account, state.height).get))
+          "balance" -> PoSCalc.generatingBalance(s, fs, account, s.height).get))
     }
   }
 

@@ -14,9 +14,10 @@ import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.market.OrderHistoryActor.{ValidateOrder, ValidateOrderResult}
 import com.wavesplatform.matcher.model.LevelAgg
 import com.wavesplatform.settings.WalletSettings
-import com.wavesplatform.state2.reader.StateReader
+import com.wavesplatform.state2.reader.{SnapshotStateReader}
 import com.wavesplatform.state2.{AssetInfo, ByteStr, LeaseInfo, Portfolio}
 import io.netty.channel.group.ChannelGroup
+import monix.eval.Coeval
 import org.h2.mvstore.MVStore
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Matchers, WordSpecLike}
@@ -39,7 +40,7 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest2"
   with PathMockFactory {
 
   val db = new MVStore.Builder().compress().open()
-  val storedState: StateReader = stub[StateReader]
+  val storedState: SnapshotStateReader = stub[SnapshotStateReader]
 
   val settings = matcherSettings.copy(account = MatcherAccount.address)
   val history = stub[History]
@@ -53,7 +54,7 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest2"
       case _ =>
     }
   })
-  var actor: ActorRef = system.actorOf(Props(new MatcherActor(orderHistoryRef, storedState, wallet,
+  var actor: ActorRef = system.actorOf(Props(new MatcherActor(orderHistoryRef, Coeval.now(storedState), wallet,
     mock[UtxPool], mock[ChannelGroup], settings, history, functionalitySettings) with RestartableActor))
 
   (storedState.assetInfo _).when(*).returns(Some(AssetInfo(true, 10000000000L)))
@@ -69,7 +70,7 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest2"
     tp.expectMsg(akka.actor.Status.Success(""))
     super.beforeEach()
 
-    actor = system.actorOf(Props(new MatcherActor(orderHistoryRef, storedState, wallet, mock[UtxPool], mock[ChannelGroup],
+    actor = system.actorOf(Props(new MatcherActor(orderHistoryRef, Coeval.now(storedState), wallet, mock[UtxPool], mock[ChannelGroup],
       settings, history, functionalitySettings) with RestartableActor))
   }
 
