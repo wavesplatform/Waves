@@ -14,7 +14,7 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
       """waves {
         |  directory = "/waves"
         |  blockchain {
-        |    minimum-in-memory-diff-blocks = 201
+        |    in-memory-chunk-size = 201
         |    in-mem-chunks-amount = 202
         |    type = CUSTOM
         |    custom {
@@ -60,7 +60,7 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
     settings.blockchainFile should be(Some(new File("/waves/data/blockchain.dat")))
     settings.stateFile should be(Some(new File("/waves/data/state.dat")))
     settings.checkpointFile should be(Some(new File("/waves/data/checkpoint.dat")))
-    settings.minimumInMemoryDiffSize should be(201)
+    settings.inMemoryChunkSize should be(201)
     settings.inMemChunksAmount should be(202)
     settings.addressSchemeCharacter should be('C')
     settings.functionalitySettings.featureCheckBlocksPeriod should be(10000)
@@ -95,7 +95,7 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
       """waves {
         |  directory = "/waves"
         |  blockchain {
-        |    minimum-in-memory-diff-blocks = 202
+        |    in-memory-chunk-size = 202
         |    in-mem-chunks-amount = 203
         |    type = TESTNET
         |  }
@@ -105,7 +105,7 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
     settings.blockchainFile should be(Some(new File("/waves/data/blockchain.dat")))
     settings.stateFile should be(Some(new File("/waves/data/state.dat")))
     settings.checkpointFile should be(Some(new File("/waves/data/checkpoint.dat")))
-    settings.minimumInMemoryDiffSize should be(202)
+    settings.inMemoryChunkSize should be(202)
     settings.inMemChunksAmount should be(203)
     settings.addressSchemeCharacter should be('T')
     settings.functionalitySettings.allowTemporaryNegativeUntil should be(1477958400000L)
@@ -138,7 +138,7 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
       """waves {
         |  directory = "/waves"
         |  blockchain {
-        |    minimum-in-memory-diff-blocks = 203
+        |    in-memory-chunk-size = 203
         |    in-mem-chunks-amount = 204
         |    type = MAINNET
         |  }
@@ -148,7 +148,7 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
     settings.blockchainFile should be(Some(new File("/waves/data/blockchain.dat")))
     settings.stateFile should be(Some(new File("/waves/data/state.dat")))
     settings.checkpointFile should be(Some(new File("/waves/data/checkpoint.dat")))
-    settings.minimumInMemoryDiffSize should be(203)
+    settings.inMemoryChunkSize should be(203)
     settings.inMemChunksAmount should be(204)
     settings.addressSchemeCharacter should be('W')
     settings.functionalitySettings.allowTemporaryNegativeUntil should be(1479168000000L)

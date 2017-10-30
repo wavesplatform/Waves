@@ -30,7 +30,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
                                     historyWriter: HistoryWriterImpl,
                                     val synchronizationToken: ReentrantReadWriteLock) extends BlockchainUpdater with BlockchainDebugInfo with ScorexLogging with Instrumented {
 
-  private lazy val minimumInMemoryDiffSize = settings.blockchainSettings.minimumInMemoryDiffSize
+  private lazy val inMemoryChunkSize = settings.blockchainSettings.inMemoryChunkSize
   private lazy val inMemChunksAmount = settings.blockchainSettings.inMemChunksAmount
 
   private lazy val inMemDiffs: Synchronized[NEL[BlockDiff]] = Synchronized(NEL.one(BlockDiff.empty)) // fresh head
@@ -65,9 +65,9 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
   private def syncPersistedAndInMemory(): Unit = write { implicit l =>
     logHeights("State rebuild started")
     val persistFrom = persisted.height + 1
-    val persistUpTo = historyWriter.height() - minimumInMemoryDiffSize + 1
+    val persistUpTo = historyWriter.height() - inMemoryChunkSize + 1
 
-    ranges(persistFrom, persistUpTo, minimumInMemoryDiffSize).foreach { case (head, last) =>
+    ranges(persistFrom, persistUpTo, inMemoryChunkSize).foreach { case (head, last) =>
       val diffToBePersisted = unsafeDiffByRange(persisted, head, last)
       persisted.applyBlockDiff(diffToBePersisted)
     }
@@ -116,7 +116,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
   }
 
   override def processBlock(block: Block): Either[ValidationError, Option[DiscardedTransactions]] = write { implicit l =>
-    if (inMemDiffs().head.heightDiff >= minimumInMemoryDiffSize) {
+    if (inMemDiffs().head.heightDiff >= inMemoryChunkSize) {
       inMemDiffs.transform { imd =>
         if (imd.size < inMemChunksAmount)
           NEL(BlockDiff.empty, imd.toList)

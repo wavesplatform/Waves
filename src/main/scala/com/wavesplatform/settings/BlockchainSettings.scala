@@ -110,7 +110,7 @@ case class BlockchainSettings(blockchainFile: Option[File],
                               stateFile: Option[File],
                               checkpointFile: Option[File],
                               addressSchemeCharacter: Char,
-                              minimumInMemoryDiffSize: Int,
+                              inMemoryChunkSize: Int,
                               inMemChunksAmount: Int,
                               functionalitySettings: FunctionalitySettings,
                               genesisSettings: GenesisSettings)
@@ -143,7 +143,7 @@ object BlockchainSettings {
       stateFile = config.getAs[File](s"$configPath.state-file"),
       checkpointFile = config.getAs[File](s"$configPath.checkpoint-file"),
       addressSchemeCharacter = addressSchemeCharacter,
-      minimumInMemoryDiffSize = config.as[Int](s"$configPath.minimum-in-memory-diff-blocks"),
+      inMemoryChunkSize = config.as[Int](s"$configPath.in-memory-chunk-size"),
       inMemChunksAmount = config.as[Int](s"$configPath.in-mem-chunks-amount"),
       functionalitySettings = functionalitySettings,
       genesisSettings = genesisSettings)
