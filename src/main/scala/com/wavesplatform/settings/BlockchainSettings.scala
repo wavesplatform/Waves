@@ -108,6 +108,7 @@ object GenesisSettings {
 
 case class BlockchainSettings(blockchainFile: Option[File],
                               stateFile: Option[File],
+                              storeTransactionsInState: Boolean,
                               checkpointFile: Option[File],
                               addressSchemeCharacter: Char,
                               minimumInMemoryDiffSize: Int,
@@ -140,6 +141,7 @@ object BlockchainSettings {
     BlockchainSettings(
       blockchainFile = config.getAs[File](s"$configPath.blockchain-file"),
       stateFile = config.getAs[File](s"$configPath.state-file"),
+      storeTransactionsInState = config.getBoolean(s"$configPath.store-transactions-in-state"),
       checkpointFile = config.getAs[File](s"$configPath.checkpoint-file"),
       addressSchemeCharacter = addressSchemeCharacter,
       minimumInMemoryDiffSize = config.as[Int](s"$configPath.minimum-in-memory-diff-blocks"),

@@ -17,6 +17,7 @@ package object history {
   val DefaultBlockchainSettings = BlockchainSettings(
     blockchainFile = None,
     stateFile = None,
+    storeTransactionsInState = false,
     checkpointFile = None,
     addressSchemeCharacter = 'N',
     minimumInMemoryDiffSize = MinInMemoryDiffSize,

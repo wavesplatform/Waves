@@ -14,7 +14,8 @@ package object diffs {
 
   private val lock = new ReentrantReadWriteLock()
 
-  def newState(): StateWriterImpl = new StateWriterImpl(StateStorage(None, dropExisting = false).get, new ReentrantReadWriteLock())
+  def newState(storeTransactions: Boolean = true): StateWriterImpl =
+    new StateWriterImpl(StateStorage(None, dropExisting = false).get, storeTransactions, new ReentrantReadWriteLock())
 
   def newHistory(): History with FeatureProvider = HistoryWriterImpl(None, lock, TestFunctionalitySettings.Enabled, TestFunctionalitySettings.EmptyFeaturesSettings).get
 
@@ -37,8 +38,6 @@ package object diffs {
     val totalDiff2 = differ(compositeState, block)
     assertion(totalDiff2)
   }
-
-
 
   def assertDiffAndState(preconditions: Seq[Block], block: Block, fs: FunctionalitySettings = TestFunctionalitySettings.Enabled)(assertion: (BlockDiff, StateReader) => Unit): Unit = {
     val fp = newHistory()
