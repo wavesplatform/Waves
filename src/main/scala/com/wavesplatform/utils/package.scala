@@ -13,17 +13,20 @@ import scala.util.Try
 
 package object utils extends ScorexLogging {
 
+  private val DefaultPageSplitSize = 4 * 1024
+
   val UncaughtExceptionsToLogReporter = UncaughtExceptionReporter(exc => log.error(Throwables.getStackTraceAsString(exc)))
 
   def base58Length(byteArrayLength: Int): Int = math.ceil(math.log(256) / math.log(58) * byteArrayLength).toInt
 
-  def createMVStore(file: Option[File], encryptionKey: Option[Array[Char]] = None): MVStore = {
+  def createMVStore(file: Option[File], encryptionKey: Option[Array[Char]] = None, pageSplitSize: Int = DefaultPageSplitSize): MVStore = {
     val builder = file.fold(new MVStore.Builder) { p =>
       p.getParentFile.mkdirs()
 
       new MVStore.Builder()
         .fileName(p.getCanonicalPath)
         .autoCommitDisabled()
+        .pageSplitSize(pageSplitSize)
         .compress()
     }
 
