@@ -22,7 +22,7 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
   @volatile private var localScore = initialLocalScore
   private val currentRequest = new AtomicReference[Option[ScorePair]](None)
 
-  private def bestForeignPair: Option[ScorePair] = {
+  private def bestRemotePair: Option[ScorePair] = {
     Option(scores.reduceEntries(1000, (c1, c2) => if (c1.getValue > c2.getValue) c1 else c2))
       .map(e => e.getKey -> e.getValue)
   }
@@ -84,23 +84,23 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
 
   private def trySwitchToBest(reason: String): Unit = trySwitchToBestIf(reason) { _ => true }
 
-  private def trySwitchToBestIf(reason: String)(cond: Option[ScorePair] => Boolean): Unit = bestForeignPair match {
+  private def trySwitchToBestIf(reason: String)(cond: Option[ScorePair] => Boolean): Unit = bestRemotePair match {
     case None => currentRequest.set(None)
-    case Some(best@(bestForeignChannel, bestForeignScore)) =>
+    case Some(best@(bestRemoteChannel, bestRemoteScore)) =>
       currentRequest
         .updateAndGet { (orig: Option[ScorePair]) =>
-          if (bestForeignScore <= localScore) None
-          else if (cond(orig)) bestForeignPair
+          if (bestRemoteScore <= localScore) None
+          else if (cond(orig)) bestRemotePair
           else orig
         }
         .filter(_ == best)
         .foreach { _ =>
-          val toId = Option(bestForeignChannel).map(id(_))
+          val toId = Option(bestRemoteChannel).map(id(_))
           log.debug(
-            s"A new pinned channel $toId has score $bestForeignScore (diff with local: ${bestForeignScore - localScore}): " +
+            s"A new pinned channel $toId has score $bestRemoteScore (diff with local: ${bestRemoteScore - localScore}): " +
               s"$reason, requesting an extension"
           )
-          bestForeignChannel.writeAndFlush(LoadBlockchainExtension(lastSignatures))
+          bestRemoteChannel.writeAndFlush(LoadBlockchainExtension(lastSignatures))
         }
   }
 

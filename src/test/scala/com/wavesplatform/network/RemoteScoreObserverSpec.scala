@@ -33,32 +33,6 @@ class RemoteScoreObserverSpec extends FreeSpec
       }
     }
 
-    //   // Should?
-    //    "from the best channel, when a previous download from worse one is done" in {
-    //      val scoreObserver = new RemoteScoreObserver(1.minute, lastSignatures, 1)
-    //
-    //      val channel1 = new EmbeddedChannel(scoreObserver)
-    //      channel1.writeInbound(BigInt(2))
-    //      channel1.flushInbound()
-    //
-    //      eventually {
-    //        val actual = channel1.readOutbound[LoadBlockchainExtension]()
-    //        Option(actual) shouldBe defined
-    //      }
-    //
-    //      val channel2 = new EmbeddedChannel(scoreObserver)
-    //      channel2.writeInbound(BigInt(3))
-    //      channel2.flushInbound()
-    //
-    //      channel1.writeInbound(ExtensionBlocks(Seq(TestBlock.create(Seq(transferGen.sample.get)))))
-    //      channel1.flushInbound()
-    //
-    //      eventually {
-    //        val actual = channel2.readOutbound[LoadBlockchainExtension]()
-    //        Option(actual) shouldBe defined
-    //      }
-    //    }
-
     "from the second best channel" - {
       "when the connection with best one is dropped" - {
         def test(bestScore: BigInt, secondBestScore: BigInt): Unit = {
@@ -186,11 +160,6 @@ class RemoteScoreObserverSpec extends FreeSpec
       }
     }
   }
-
-  // TODO
-  // "should stop abort downloading if the local score is better, than requested" in {
-  //
-  // }
 
   "should propagate blocks from an expected extensions" in {
     var wasExtensionPropagated = false
