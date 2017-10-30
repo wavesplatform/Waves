@@ -36,7 +36,7 @@ class TimeImpl extends Time with ScorexLogging {
         client.open()
         val info = client.getTime(InetAddress.getByName(NtpServer))
         info.computeDetails()
-        Some(info.getOffset)
+        Option(info.getOffset)
       } catch {
         case t: Throwable =>
           log.warn("Problems with NTP: ", t)
