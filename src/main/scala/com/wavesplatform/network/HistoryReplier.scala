@@ -44,7 +44,7 @@ class HistoryReplier(history: NgHistory, settings: SynchronizationSettings) exte
     case GetBlock(sig) =>
       cachedBytes(knownBlocks, sig, history.heightOf(sig).flatMap(history.blockBytes)) match {
         case Some(bytes) => ctx.writeAndFlush(RawBytes(BlockMessageSpec.messageCode, bytes))
-        case None => log.trace(s"Does not have a block $sig")
+        case None => log.trace(s"Requested an unknown block $sig")
       }
 
     case mbr@MicroBlockRequest(totalResBlockSig) =>

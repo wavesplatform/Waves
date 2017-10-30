@@ -96,7 +96,10 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
         .filter(_ == best)
         .foreach { _ =>
           val toId = Option(bestForeignChannel).map(id(_))
-          log.debug(s"A new pinned channel $toId has score $bestForeignScore: $reason, requesting an extension")
+          log.debug(
+            s"A new pinned channel $toId has score $bestForeignScore (diff with local: ${bestForeignScore - localScore}): " +
+              s"$reason, requesting an extension"
+          )
           bestForeignChannel.writeAndFlush(LoadBlockchainExtension(lastSignatures))
         }
   }

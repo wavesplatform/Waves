@@ -34,12 +34,12 @@ class ExtensionBlocksLoader(
     })
   }
 
-  override def channelInactive(ctx: ChannelHandlerContext) = {
+  override def channelInactive(ctx: ChannelHandlerContext): Unit = {
     cancelBlacklist()
     super.channelInactive(ctx)
   }
 
-  override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef) = msg match {
+  override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
     case xid@ExtensionIds(_, newIds) if pendingSignatures.isEmpty =>
       val requestingIds = newIds.filterNot(history.contains)
       if (requestingIds.nonEmpty) {
@@ -64,18 +64,19 @@ class ExtensionBlocksLoader(
 
         val newBlocks = blockBuffer.values.toSeq
 
+        // TODO: What if score of extension is lower, than the score of blockchain
         for (tids <- targetExtensionIds) {
           if (tids.lastCommonId != newBlocks.head.reference) {
-            peerDatabase.blacklistAndClose(ctx.channel(),s"Extension head reference ${newBlocks.head.reference} differs from last common block id ${tids.lastCommonId}")
+            peerDatabase.blacklistAndClose(ctx.channel(), s"Extension head reference ${newBlocks.head.reference} differs from last common block id ${tids.lastCommonId}")
           } else if (!newBlocks.sliding(2).forall {
               case Seq(b1, b2) => b1.uniqueId == b2.reference
               case _ => true
             }) {
-            peerDatabase.blacklistAndClose(ctx.channel(),"Extension blocks are not contiguous, pre-check failed")
+            peerDatabase.blacklistAndClose(ctx.channel(), "Extension blocks are not contiguous, pre-check failed")
           } else {
             newBlocks.par.find(!_.signatureValid) match {
               case Some(invalidBlock) =>
-                peerDatabase.blacklistAndClose(ctx.channel(),s"Got block $invalidBlock with invalid signature")
+                peerDatabase.blacklistAndClose(ctx.channel(), s"Got block $invalidBlock with invalid signature")
               case None =>
                 log.trace(s"${id(ctx)} Chain is valid, pre-check passed")
                 ctx.fireChannelRead(ExtensionBlocks(newBlocks))

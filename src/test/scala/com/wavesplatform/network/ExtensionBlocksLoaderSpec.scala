@@ -8,7 +8,8 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.Eventually
 import org.scalatest.exceptions.TestFailedDueToTimeoutException
 import org.scalatest.{FreeSpec, Matchers}
-import scorex.block.Block
+import scorex.block.{Block, SignerData}
+import scorex.consensus.nxt.NxtLikeConsensusBlockData
 import scorex.lagonaki.mocks.TestBlock
 import scorex.transaction.NgHistory
 
@@ -21,10 +22,12 @@ class ExtensionBlocksLoaderSpec extends FreeSpec
   with Eventually
   with TransactionGen {
 
-  private val lastCommonSignature: ByteStr = TestBlock.randomSignature()
-  private val remoteExtensionBlocks: Seq[Block] = (1 to 3).scanLeft(createBlock(lastCommonSignature)) { (r, _) =>
-    createBlock(r.uniqueId)
-  }
+  private val lastCommonBlock = TestBlock.create(transferGen.sample.take(1).toSeq)
+  private val lastCommonSignature: ByteStr = lastCommonBlock.uniqueId
+  private val remoteExtensionBlocks: Seq[Block] = (1 to 3)
+    .scanLeft(lastCommonBlock) { (r, _) => createBlock(r.uniqueId) }
+    .tail // without a common block
+
   private val remoteExtensionSignatures: Seq[ByteStr] = remoteExtensionBlocks.map(_.uniqueId)
 
   "should request blocks" in {
@@ -40,34 +43,11 @@ class ExtensionBlocksLoaderSpec extends FreeSpec
     var rest = remoteExtensionSignatures.map(GetBlock).toSet
     eventually {
       val actual = channel.readOutbound[GetBlock]()
-      Option(actual).foreach { rest -= _ }
-      rest shouldBe empty
-    }
-  }
-
-  "should verify that blocks form a chain" in {
-    val remoteExtensionBlocks = Seq(createBlock(lastCommonSignature), createBlock(TestBlock.randomSignature()))
-    val remoteExtensionSignatures = remoteExtensionBlocks.map(_.uniqueId)
-
-    val history = mock[NgHistory]
-    (history.heightOf(_: ByteStr)).expects(*)
-      .onCall { _: ByteStr => None }
-      .repeat(remoteExtensionBlocks.size)
-
-    var senderWasBlacklisted = false
-    val peerDatabase = new PeerDatabase.NoOp {
-      override def blacklistAndClose(channel: Channel, reason: String): Unit = {
-        senderWasBlacklisted = true
+      Option(actual).foreach { x =>
+        if (rest.contains(x)) rest -= x
+        else fail(s"Unexpected block $x, expected: $rest")
       }
-    }
-
-    val channel = new EmbeddedChannel(new ExtensionBlocksLoader(1.minute, peerDatabase, history))
-    channel.writeInbound(ExtensionIds(lastCommonSignature, remoteExtensionSignatures))
-    remoteExtensionBlocks.foreach(channel.writeInbound(_))
-    channel.flushInbound()
-
-    eventually {
-      senderWasBlacklisted shouldBe true
+      rest shouldBe empty
     }
   }
 
@@ -140,61 +120,135 @@ class ExtensionBlocksLoaderSpec extends FreeSpec
     }
   }
 
-  "should ignore unexpected blocks" in {
-    val remoteUnexpectedBlocks = remoteExtensionBlocks
-    val remoteExtensionSignatures = remoteUnexpectedBlocks.map { _ => TestBlock.randomSignature() }
+  "should ignore" - {
+    "unexpected blocks" in {
+      val remoteUnexpectedBlocks = remoteExtensionBlocks
+      val remoteExtensionSignatures = remoteUnexpectedBlocks.map { _ => TestBlock.randomSignature() }
 
-    val history = mock[NgHistory]
-    (history.heightOf(_: ByteStr)).expects(*)
-      .onCall { _: ByteStr => None }
-      .repeat(remoteUnexpectedBlocks.size)
+      val history = mock[NgHistory]
+      (history.heightOf(_: ByteStr)).expects(*)
+        .onCall { _: ByteStr => None }
+        .repeat(remoteUnexpectedBlocks.size)
 
-    val channel = new EmbeddedChannel(new ExtensionBlocksLoader(1.minute, PeerDatabase.NoOp, history))
-    channel.writeInbound(ExtensionIds(lastCommonSignature, remoteExtensionSignatures))
-    channel.flushInbound()
+      val channel = new EmbeddedChannel(new ExtensionBlocksLoader(1.minute, PeerDatabase.NoOp, history))
+      channel.writeInbound(ExtensionIds(lastCommonSignature, remoteExtensionSignatures))
+      channel.flushInbound()
 
-    var rest = remoteUnexpectedBlocks.size
-    eventually {
-      channel.readOutbound[GetBlock]()
-      rest -= 1
-      rest shouldBe 0
-    }
-
-    remoteUnexpectedBlocks.foreach(channel.writeInbound(_))
-    channel.flushInbound()
-
-    intercept[TestFailedDueToTimeoutException] {
+      var rest = remoteUnexpectedBlocks.size
       eventually {
-        val actual = channel.readInbound[ExtensionBlocks]()
-        Option(actual) shouldBe defined
+        channel.readOutbound[GetBlock]()
+        rest -= 1
+        rest shouldBe 0
+      }
+
+      remoteUnexpectedBlocks.foreach(channel.writeInbound(_))
+      channel.flushInbound()
+
+      intercept[TestFailedDueToTimeoutException] {
+        eventually {
+          val actual = channel.readInbound[ExtensionBlocks]()
+          Option(actual) shouldBe defined
+        }
+      }
+    }
+
+    "new extension ids if the previous are downloading" in {
+      val remoteUnexpectedBlocks = remoteExtensionBlocks
+      val remoteUnexpectedExtensionSignatures = remoteUnexpectedBlocks.map { _ => TestBlock.randomSignature() }
+
+      val history = mock[NgHistory]
+      (history.heightOf(_: ByteStr)).expects(*)
+        .onCall { _: ByteStr => None }
+        .repeat(remoteExtensionSignatures.size)
+
+      val channel = new EmbeddedChannel(new ExtensionBlocksLoader(1.minute, PeerDatabase.NoOp, history))
+      channel.writeInbound(ExtensionIds(lastCommonSignature, remoteExtensionSignatures))
+      channel.writeInbound(ExtensionIds(lastCommonSignature, remoteUnexpectedExtensionSignatures))
+      channel.flushInbound()
+
+      val unexpected = remoteUnexpectedExtensionSignatures.toSet
+      eventually {
+        val blockRequest = channel.readOutbound[GetBlock]()
+        Option(blockRequest).foreach { x =>
+          unexpected shouldNot contain(x.signature)
+        }
       }
     }
   }
 
-  "blacklist a node that responses too long" in {
-    val history = mock[NgHistory]
-    (history.heightOf(_: ByteStr)).expects(*)
-      .onCall { _: ByteStr => None }
-      .repeat(remoteExtensionBlocks.size)
+  "blacklist a node" - {
+    "sends a chain does not reference to the common block" in chainTest(Seq(createBlock(TestBlock.randomSignature())))
 
-    var senderWasBlacklisted = false
-    val peerDatabase = new PeerDatabase.NoOp {
-      override def blacklistAndClose(channel: Channel, reason: String): Unit = {
-        senderWasBlacklisted = true
+    "sends an invalid chain" in chainTest(
+      createBlock(lastCommonSignature) +: (1 to 3).map(_ => createBlock(TestBlock.randomSignature()))
+    )
+
+    "sends an invalid blocks" in chainTest(
+      (1 to 3)
+        .scanLeft(lastCommonBlock) { (r, _) =>
+          Block(
+            timestamp = System.currentTimeMillis(),
+            version = 2,
+            reference = r.uniqueId,
+            signerData = SignerData(TestBlock.defaultSigner, TestBlock.randomSignature()),
+            consensusData = NxtLikeConsensusBlockData(1L, ByteStr(Array.fill(Block.GeneratorSignatureLength)(0: Byte))),
+            transactionData = transferGen.sample.take(3).toList,
+            featureVotes = Set.empty
+          )
+        }
+        .tail
+    )
+
+    "responses too long" in {
+      val history = mock[NgHistory]
+      (history.heightOf(_: ByteStr)).expects(*)
+        .onCall { _: ByteStr => None }
+        .repeat(remoteExtensionBlocks.size)
+
+      var senderWasBlacklisted = false
+      val peerDatabase = new PeerDatabase.NoOp {
+        override def blacklistAndClose(channel: Channel, reason: String): Unit = {
+          senderWasBlacklisted = true
+        }
       }
+
+      val blockSyncTimeout = 100.millis
+      val channel = new EmbeddedChannel(new ExtensionBlocksLoader(blockSyncTimeout, peerDatabase, history))
+      channel.writeInbound(ExtensionIds(lastCommonSignature, remoteExtensionSignatures))
+      channel.flushInbound()
+
+      Thread.sleep(blockSyncTimeout.toMillis + 1)
+      channel.runPendingTasks()
+      senderWasBlacklisted shouldBe true
     }
 
-    val blockSyncTimeout = 100.millis
-    val channel = new EmbeddedChannel(new ExtensionBlocksLoader(blockSyncTimeout, peerDatabase, history))
-    channel.writeInbound(ExtensionIds(lastCommonSignature, remoteExtensionSignatures))
-    channel.flushInbound()
+    def chainTest(remoteExtensionBlocks: Seq[Block]): Unit = {
+      val remoteExtensionSignatures = remoteExtensionBlocks.map(_.uniqueId)
 
-    Thread.sleep(blockSyncTimeout.toMillis + 1)
-    channel.runPendingTasks()
-    senderWasBlacklisted shouldBe true
+      val history = mock[NgHistory]
+      (history.heightOf(_: ByteStr)).expects(*)
+        .onCall { _: ByteStr => None }
+        .repeat(remoteExtensionBlocks.size)
+
+      var senderWasBlacklisted = false
+      val peerDatabase = new PeerDatabase.NoOp {
+        override def blacklistAndClose(channel: Channel, reason: String): Unit = {
+          senderWasBlacklisted = true
+        }
+      }
+
+      val channel = new EmbeddedChannel(new ExtensionBlocksLoader(1.minute, peerDatabase, history))
+      channel.writeInbound(ExtensionIds(lastCommonSignature, remoteExtensionSignatures))
+      remoteExtensionBlocks.foreach(channel.writeInbound(_))
+      channel.flushInbound()
+
+      eventually {
+        senderWasBlacklisted shouldBe true
+      }
+    }
   }
 
-  "should not blacklist slow node" in {
+  "should not blacklist slow (but acceptable) node" in {
     val history = mock[NgHistory]
     (history.heightOf(_: ByteStr)).expects(*)
       .onCall { _: ByteStr => None }
@@ -209,6 +263,7 @@ class ExtensionBlocksLoaderSpec extends FreeSpec
       Thread.sleep((blockSyncTimeout.toMillis / 1.2).toInt)
       channel.writeInbound(block)
       channel.flushInbound()
+      channel.runPendingTasks()
     }
 
     val expected = ExtensionBlocks(remoteExtensionBlocks)
@@ -221,7 +276,7 @@ class ExtensionBlocksLoaderSpec extends FreeSpec
   private def createBlock(ref: ByteStr) = TestBlock.create(
     time = System.currentTimeMillis(),
     ref = ref,
-    txs = Seq(transferGen.sample.get)
+    txs = transferGen.sample.take(3).toList
   )
 
 }
