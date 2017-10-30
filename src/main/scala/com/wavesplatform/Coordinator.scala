@@ -7,7 +7,6 @@ import com.wavesplatform.metrics._
 import com.wavesplatform.network.{BlockCheckpoint, Checkpoint}
 import com.wavesplatform.settings.{BlockchainSettings, FunctionalitySettings, WavesSettings}
 import com.wavesplatform.state2._
-import com.wavesplatform.state2.reader.StateReader
 import kamon.Kamon
 import org.influxdb.dto.Point
 import scorex.block.{Block, MicroBlock}

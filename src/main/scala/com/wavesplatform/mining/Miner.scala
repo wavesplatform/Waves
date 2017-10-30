@@ -2,13 +2,11 @@ package com.wavesplatform.mining
 
 import java.util.concurrent.atomic.AtomicBoolean
 
-import com.wavesplatform.features.{BlockchainFeatures, FeatureProvider, BlockchainFeatureStatus}
-import com.wavesplatform.metrics.{BlockStats, Instrumented}
-import com.wavesplatform.metrics.HistogramExt
+import com.wavesplatform.features.{BlockchainFeatureStatus, BlockchainFeatures, FeatureProvider}
+import com.wavesplatform.metrics.{BlockStats, HistogramExt, Instrumented}
 import com.wavesplatform.network._
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state2._
-import com.wavesplatform.state2.reader.StateReader
 import com.wavesplatform.{Coordinator, UtxPool}
 import io.netty.channel.group.ChannelGroup
 import kamon.Kamon

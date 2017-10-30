@@ -2,8 +2,9 @@ package com.wavesplatform.http
 
 import com.wavesplatform.TestWallet
 import com.wavesplatform.http.ApiMarshallers._
-import com.wavesplatform.state2.reader.StateReader
+import com.wavesplatform.state2.reader.{SnapshotStateReader}
 import com.wavesplatform.state2.{LeaseInfo, Portfolio}
+import monix.eval.Coeval
 import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.prop.PropertyChecks
@@ -26,7 +27,7 @@ class AddressRouteSpec
   private val allAccounts = testWallet.privateKeyAccounts()
   private val allAddresses = allAccounts.map(_.address)
 
-  private val route = AddressApiRoute(restAPISettings, testWallet, mock[StateReader], TestFunctionalitySettings.Stub).route
+  private val route = AddressApiRoute(restAPISettings, testWallet, Coeval.now(mock[SnapshotStateReader]), TestFunctionalitySettings.Stub).route
 
   private val generatedMessages = for {
     account <- Gen.oneOf(allAccounts).label("account")
@@ -78,9 +79,9 @@ class AddressRouteSpec
   }
 
   routePath("/balance/{address}") ignore {
-    val state = stub[StateReader]
+    val state = stub[SnapshotStateReader]
     (state.accountPortfolio _).when(*).returns(Portfolio(0, mock[LeaseInfo], Map.empty))
-    val route = AddressApiRoute(restAPISettings, testWallet, state, TestFunctionalitySettings.Stub).route
+    val route = AddressApiRoute(restAPISettings, testWallet, Coeval.now(state), TestFunctionalitySettings.Stub).route
     Get(routePath(s"/balance/${allAddresses.head}")) ~> route ~> check {
       val r = responseAs[AddressApiRoute.Balance]
       r.balance shouldEqual 0

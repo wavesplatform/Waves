@@ -8,7 +8,7 @@ import com.wavesplatform.features.FeatureProvider
 import com.wavesplatform.metrics.Metrics
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.settings._
-import com.wavesplatform.state2.reader.StateReader
+import com.wavesplatform.state2._
 import com.wavesplatform.{UtxPool, Version}
 import io.netty.bootstrap.{Bootstrap, ServerBootstrap}
 import io.netty.channel._

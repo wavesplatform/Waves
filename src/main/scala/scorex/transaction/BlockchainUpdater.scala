@@ -30,6 +30,5 @@ trait BlockchainDebugInfo {
 case class HashInfo(height: Int, hash: Int)
 
 case class StateDebugInfo(persisted: HashInfo,
-                          top: HashInfo,
-                          bottom: HashInfo,
+                          inMemory: Seq[HashInfo],
                           microBaseHash: Option[Int])

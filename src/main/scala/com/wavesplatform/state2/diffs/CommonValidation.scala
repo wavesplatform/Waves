@@ -2,7 +2,7 @@ package com.wavesplatform.state2.diffs
 
 import cats._
 import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state2.reader.StateReader
+import com.wavesplatform.state2.reader.SnapshotStateReader
 import com.wavesplatform.state2.{Portfolio, _}
 import scorex.account.Address
 import scorex.transaction.ValidationError.{GenericError, Mistiming}
@@ -19,7 +19,7 @@ object CommonValidation {
   val MaxTimeTransactionOverBlockDiff: FiniteDuration = 90.minutes
   val MaxTimePrevBlockOverTransactionDiff: FiniteDuration = 2.hours
 
-  def disallowSendingGreaterThanBalance[T <: Transaction](s: StateReader, settings: FunctionalitySettings, blockTime: Long, tx: T): Either[ValidationError, T] =
+  def disallowSendingGreaterThanBalance[T <: Transaction](s: SnapshotStateReader, settings: FunctionalitySettings, blockTime: Long, tx: T): Either[ValidationError, T] =
     if (blockTime >= settings.allowTemporaryNegativeUntil)
       tx match {
         case ptx: PaymentTransaction if s.partialPortfolio(ptx.sender).balance < (ptx.amount + ptx.fee) =>
@@ -53,7 +53,8 @@ object CommonValidation {
         case _ => Right(tx)
       } else Right(tx)
 
-  def disallowDuplicateIds[T <: Transaction](state: StateReader, settings: FunctionalitySettings, height: Int, tx: T): Either[ValidationError, T] = tx match {
+
+  def disallowDuplicateIds[T <: Transaction](state: SnapshotStateReader, settings: FunctionalitySettings, height: Int, tx: T): Either[ValidationError, T] = tx match {
     case ptx: PaymentTransaction if ptx.timestamp < settings.requirePaymentUniqueIdAfter => Right(tx)
     case _ =>
       if (state.containsTransaction(tx.id))

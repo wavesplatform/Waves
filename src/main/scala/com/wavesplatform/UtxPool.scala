@@ -8,8 +8,8 @@ import com.wavesplatform.UtxPool.PessimisticPortfolios
 import com.wavesplatform.metrics.Instrumented
 import com.wavesplatform.settings.{FunctionalitySettings, UtxSettings}
 import com.wavesplatform.state2.diffs.TransactionDiffer
-import com.wavesplatform.state2.reader.{CompositeStateReader, StateReader}
-import com.wavesplatform.state2.{ByteStr, Diff, Portfolio}
+import com.wavesplatform.state2.reader.CompositeStateReader.composite
+import com.wavesplatform.state2.{ByteStr, Diff, Portfolio, StateReader}
 import kamon.Kamon
 import kamon.metric.instrument.{Time => KamonTime}
 import scorex.account.Address
@@ -63,10 +63,11 @@ class UtxPool(time: Time,
         case Some(Right(_)) => Right(false)
         case Some(Left(er)) => Left(er)
         case None =>
+          val s = stateReader()
           val res = for {
             _ <- Either.cond(transactions.size < utxSettings.maxSize, (), GenericError("Transaction pool size limit is reached"))
             _ <- feeCalculator.enoughFee(tx)
-            diff <- TransactionDiffer(fs, history.lastBlockTimestamp(), time.correctedTime(), stateReader.height)(stateReader, tx)
+            diff <- TransactionDiffer(fs, history.lastBlockTimestamp(), time.correctedTime(), s.height)(s, tx)
           } yield {
             utxPoolSizeStats.increment()
             pessimisticPortfolios.add(tx.id, diff)
@@ -90,7 +91,7 @@ class UtxPool(time: Time,
   }
 
   def portfolio(addr: Address): Portfolio = {
-    val base = stateReader.accountPortfolio(addr)
+    val base = stateReader().accountPortfolio(addr)
     val foundInUtx = pessimisticPortfolios.getAggregated(addr)
 
     Monoid.combine(base, foundInUtx)
@@ -108,13 +109,14 @@ class UtxPool(time: Time,
   def packUnconfirmed(max: Int, sortInBlock: Boolean): Seq[Transaction] = {
     val currentTs = time.correctedTime()
     removeExpired(currentTs)
-    val differ = TransactionDiffer(fs, history.lastBlockTimestamp(), currentTs, stateReader.height) _
+    val s = stateReader()
+    val differ = TransactionDiffer(fs, history.lastBlockTimestamp(), currentTs, s.height) _
     val (invalidTxs, reversedValidTxs, _) = transactions
       .values.asScala.toSeq
       .sorted(TransactionsOrdering.InUTXPool)
       .foldLeft((Seq.empty[ByteStr], Seq.empty[Transaction], Monoid[Diff].empty)) {
         case ((invalid, valid, diff), tx) if valid.size <= max =>
-          differ(new CompositeStateReader(stateReader, diff.asBlockDiff), tx) match {
+          differ(composite(s, diff.asBlockDiff), tx) match {
             case Right(newDiff) if valid.size < max =>
               (invalid, tx +: valid, Monoid.combine(diff, newDiff))
             case Right(_) =>

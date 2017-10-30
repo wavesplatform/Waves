@@ -6,7 +6,7 @@ import javax.ws.rs.Path
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.settings.{FunctionalitySettings, RestAPISettings}
-import com.wavesplatform.state2.reader.StateReader
+import com.wavesplatform.state2.StateReader
 import io.swagger.annotations._
 import play.api.libs.json._
 import scorex.account.{Address, PublicKeyAccount}
@@ -234,7 +234,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
     Address.fromString(address).right.map(acc => ToResponseMarshallable(Balance(
       acc.address,
       confirmations,
-      state.balanceWithConfirmations(acc, confirmations)
+      state().balanceWithConfirmations(acc, confirmations)
     ))).getOrElse(InvalidAddress)
   }
 
@@ -242,28 +242,30 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
     Address.fromString(address).right.map(acc => ToResponseMarshallable(Balance(
       acc.address,
       0,
-      state.balance(acc)
+      state().balance(acc)
     ))).getOrElse(InvalidAddress)
   }
 
   private def balancesDetailsJson(account: Address): BalanceDetails = {
-    state.read { _ =>
-      val portfolio = state.accountPortfolio(account)
+    val s = state()
+    s.read { _ =>
+      val portfolio = s.accountPortfolio(account)
       BalanceDetails(
         account.address,
         portfolio.balance,
-        PoSCalc.generatingBalance(state, functionalitySettings, account, state.height).get,
+        PoSCalc.generatingBalance(state, functionalitySettings, account, s.height).get,
         portfolio.balance - portfolio.leaseInfo.leaseOut,
-        state.effectiveBalance(account))
+        s.effectiveBalance(account))
     }
   }
 
   private def effectiveBalanceJson(address: String, confirmations: Int): ToResponseMarshallable = {
-    state.read { _ =>
+    val s = state()
+    s.read  { _ =>
       Address.fromString(address).right.map(acc => ToResponseMarshallable(Balance(
         acc.address,
         confirmations,
-        state.effectiveBalanceAtHeightWithConfirmations(acc, state.height, confirmations).get)))
+        s.effectiveBalanceAtHeightWithConfirmations(acc, s.height, confirmations).get)))
         .getOrElse(InvalidAddress)
     }
   }

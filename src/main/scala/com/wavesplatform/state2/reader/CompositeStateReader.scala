@@ -5,11 +5,12 @@ import java.util.concurrent.locks.ReentrantReadWriteLock
 import cats.implicits._
 import cats.kernel.Monoid
 import com.wavesplatform.state2._
+import monix.eval.Coeval
 import scorex.account.{Address, Alias}
 import scorex.transaction.Transaction
 import scorex.transaction.lease.LeaseTransaction
 
-class CompositeStateReader(inner: StateReader, blockDiff: BlockDiff) extends StateReader {
+class CompositeStateReader private(inner: SnapshotStateReader, blockDiff: BlockDiff) extends SnapshotStateReader {
 
   def synchronizationToken: ReentrantReadWriteLock = inner.synchronizationToken
 
@@ -82,62 +83,10 @@ class CompositeStateReader(inner: StateReader, blockDiff: BlockDiff) extends Sta
 }
 
 object CompositeStateReader {
+  def composite(inner: SnapshotStateReader, blockDiff: BlockDiff) : SnapshotStateReader = new CompositeStateReader(inner,blockDiff)
 
-  class Proxy(val inner: StateReader, blockDiff: () => BlockDiff) extends StateReader {
-
-    override def synchronizationToken: ReentrantReadWriteLock = inner.synchronizationToken
-
-    override def paymentTransactionIdByHash(hash: ByteStr): Option[ByteStr] =
-      new CompositeStateReader(inner, blockDiff()).paymentTransactionIdByHash(hash)
-
-    override def aliasesOfAddress(a: Address): Seq[Alias] =
-      new CompositeStateReader(inner, blockDiff()).aliasesOfAddress(a)
-
-    override def accountPortfolio(a: Address): Portfolio =
-      new CompositeStateReader(inner, blockDiff()).accountPortfolio(a)
-
-    override def accountTransactionIds(a: Address, limit: Int): Seq[ByteStr] =
-      new CompositeStateReader(inner, blockDiff()).accountTransactionIds(a, limit)
-
-    override def accountPortfolios: Map[Address, Portfolio] =
-      new CompositeStateReader(inner, blockDiff()).accountPortfolios
-
-    override def transactionInfo(id: ByteStr): Option[(Int, Transaction)] =
-      new CompositeStateReader(inner, blockDiff()).transactionInfo(id)
-
-    override def resolveAlias(a: Alias): Option[Address] =
-      new CompositeStateReader(inner, blockDiff()).resolveAlias(a)
-
-    override def assetInfo(id: ByteStr): Option[AssetInfo] =
-      new CompositeStateReader(inner, blockDiff()).assetInfo(id)
-
-    override def height: Int =
-      new CompositeStateReader(inner, blockDiff()).height
-
-    override def isLeaseActive(leaseTx: LeaseTransaction): Boolean =
-      new CompositeStateReader(inner, blockDiff()).isLeaseActive(leaseTx)
-
-    override def activeLeases(): Seq[ByteStr] =
-      new CompositeStateReader(inner, blockDiff()).activeLeases()
-
-    override def lastUpdateHeight(acc: Address): Option[Int] =
-      new CompositeStateReader(inner, blockDiff()).lastUpdateHeight(acc)
-
-    override def snapshotAtHeight(acc: Address, h: Int): Option[Snapshot] =
-      new CompositeStateReader(inner, blockDiff()).snapshotAtHeight(acc, h)
-
-    override def containsTransaction(id: ByteStr): Boolean =
-      new CompositeStateReader(inner, blockDiff()).containsTransaction(id)
-
-    override def filledVolumeAndFee(orderId: ByteStr): OrderFillInfo =
-      new CompositeStateReader(inner, blockDiff()).filledVolumeAndFee(orderId)
-
-    override def wavesBalance(a: Address): (Long, LeaseInfo) =
-      new CompositeStateReader(inner, blockDiff()).wavesBalance(a)
-
-    override def assetBalance(a: Address, asset: ByteStr): Long =
-      new CompositeStateReader(inner, blockDiff()).assetBalance(a, asset)
-  }
-
-  def composite(inner: StateReader, blockDiff: () => BlockDiff): Proxy = new Proxy(inner, blockDiff)
+  def composite(inner: Coeval[SnapshotStateReader], blockDiff: Coeval[BlockDiff]): Coeval[SnapshotStateReader] = for {
+    i <- inner
+    b <- blockDiff
+  } yield composite(i, b)
 }

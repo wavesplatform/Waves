@@ -6,7 +6,8 @@ import com.wavesplatform.BlockGen
 import com.wavesplatform.features.{BlockchainFeatures, FeatureProvider}
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.BlockDiff
-import com.wavesplatform.state2.reader.{CompositeStateReader, StateReader}
+import com.wavesplatform.state2.reader.CompositeStateReader.composite
+import com.wavesplatform.state2.reader.{SnapshotStateReader}
 import org.scalatest.{FreeSpecLike, Matchers}
 import scorex.account.PrivateKeyAccount
 import scorex.block.Block
@@ -111,7 +112,7 @@ class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen {
   }
 
   private def assertDiff(blocks: Seq[Block], fs: FunctionalitySettings, ngAtHeight: Int)
-                        (assertion: (BlockDiff, StateReader) => Unit): Unit = {
+                        (assertion: (BlockDiff, SnapshotStateReader) => Unit): Unit = {
     val fp = new FeatureProvider {
 
       override val activationWindowSize: Int = ngAtHeight
@@ -123,10 +124,10 @@ class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen {
     assertDiffEiWithPrev(blocks.init, blocks.last,fp, fs)(assertion)
   }
 
-  private def assertDiffEiWithPrev(preconditions: Seq[Block], block: Block, fp: FeatureProvider, fs: FunctionalitySettings)(assertion: (BlockDiff, StateReader) => Unit): Unit = {
+  private def assertDiffEiWithPrev(preconditions: Seq[Block], block: Block, fp: FeatureProvider, fs: FunctionalitySettings)(assertion: (BlockDiff, SnapshotStateReader) => Unit): Unit = {
     val state = newState()
 
-    val differ: (StateReader, (Option[Block], Block)) => Either[ValidationError, BlockDiff] = {
+    val differ: (SnapshotStateReader, (Option[Block], Block)) => Either[ValidationError, BlockDiff] = {
       case (s, (prev, b)) => BlockDiffer.fromBlock(fs, fp, s, prev, b)
     }
     zipWithPrev(preconditions).foreach { wp =>
@@ -139,9 +140,9 @@ class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen {
     assertion(totalDiff1, state)
 
     val preconditionDiff = BlockDiffer.unsafeDiffMany(fs, fp, newState(), None)(preconditions)
-    val compositeState = new CompositeStateReader(newState(), preconditionDiff)
+    val compositeState = composite(newState(), preconditionDiff)
     val totalDiff2 = differ(compositeState, (preconditions.lastOption, block)).explicitGet()
-    assertion(totalDiff2, CompositeStateReader.composite(compositeState, () => totalDiff2))
+    assertion(totalDiff2, composite(compositeState, totalDiff2))
 
     assert(totalDiff1 == totalDiff2)
   }

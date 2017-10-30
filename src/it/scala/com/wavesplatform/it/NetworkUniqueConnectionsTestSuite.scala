@@ -10,7 +10,7 @@ import scala.concurrent._
 import scala.concurrent.duration.DurationInt
 import scala.util.Random
 
-class NetworkUniqueConnectionsTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll {
+class NetworkUniqueConnectionsTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll{
 
   private val docker = Docker(getClass)
 

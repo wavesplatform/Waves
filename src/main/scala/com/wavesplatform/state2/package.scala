@@ -1,11 +1,15 @@
 package com.wavesplatform
 
+import com.wavesplatform.state2.reader.SnapshotStateReader
+import monix.eval.Coeval
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction.{Transaction, ValidationError}
 
 import scala.util.{Left, Right, Try}
 
 package object state2 {
+
+  type StateReader = Coeval[SnapshotStateReader]
 
   def safeSum(x: Long, y: Long): Long = Try(Math.addExact(x, y)).getOrElse(Long.MinValue)
 

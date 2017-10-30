@@ -20,8 +20,9 @@ import scorex.api.http.leasing.{LeaseCancelRequest, LeaseRequest}
 import scorex.api.http.PeersApiRoute.{ConnectReq, connectFormat}
 import scorex.transaction.assets.exchange.Order
 import scorex.utils.{LoggerFacade, ScorexLogging}
-import scorex.waves.http.DebugApiRoute.portfolioFormat
-import scorex.waves.http.RollbackParams
+import scorex.waves.http.DebugApiRoute._
+import scorex.waves.http.{DebugMessage, RollbackParams}
+import scorex.waves.http.DebugMessage._
 
 import scala.compat.java8.FutureConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -68,11 +69,17 @@ trait NodeApi {
       .build()
   }
 
+  def postJsonWihApiKey[A: Writes](path: String, body: A): Future[Response] = retrying {
+    _post(s"http://$restAddress:$nodeRestPort$path")
+      .setHeader("api_key", "integration-test-rest-api")
+      .setHeader("Content-type", "application/json").setBody(stringify(toJson(body)))
+      .build()
+  }
+
   def post(url: String, port: Int, path: String, f: RequestBuilder => RequestBuilder = identity): Future[Response] =
     retrying(f(
       _post(s"$url:$port$path").setHeader("api_key", "integration-test-rest-api")
     ).build())
-
   def postJson[A: Writes](path: String, body: A): Future[Response] =
     post(path, stringify(toJson(body)))
 
@@ -82,6 +89,8 @@ trait NodeApi {
 
   def blacklist(networkIpAddress: String, hostNetworkPort: Int): Future[Unit] =
     post("/debug/blacklist", s"$networkIpAddress:$hostNetworkPort").map(_ => ())
+
+  def printDebugMessage(db: DebugMessage): Future[Response] = postJsonWihApiKey("/debug/print", db)
 
   def connectedPeers: Future[Seq[Peer]] = get("/peers/connected").map { r =>
     (Json.parse(r.getResponseBody) \ "peers").as[Seq[Peer]]
