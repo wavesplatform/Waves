@@ -26,7 +26,7 @@ object StorageFactory {
     for {
       historyWriter <- HistoryWriterImpl(settings.blockchainSettings.blockchainFile, lock, settings.blockchainSettings.functionalitySettings, settings.featuresSettings)
       ss <- createStateStorage(historyWriter, settings.blockchainSettings.stateFile, settings.mvstorePageSplitSize)
-      stateWriter = new StateWriterImpl(ss, lock)
+      stateWriter = new StateWriterImpl(ss, settings.blockchainSettings.storeTransactionsInState, lock)
     } yield {
       val bcu = BlockchainUpdaterImpl(stateWriter, historyWriter, settings, settings.blockchainSettings.minimumInMemoryDiffSize, lock)
       val history: NgHistory with DebugNgHistory with FeatureProvider = bcu.historyReader
