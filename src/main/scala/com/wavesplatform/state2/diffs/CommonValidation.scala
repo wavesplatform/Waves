@@ -58,7 +58,7 @@ object CommonValidation {
     case ptx: PaymentTransaction if ptx.timestamp < settings.requirePaymentUniqueIdAfter => Right(tx)
     case _ =>
       if (state.containsTransaction(tx.id))
-        Left(GenericError(s"Tx id(exc. for some PaymentTransactions) cannot be duplicated. Current height is: $height. Tx with such id aready present"))
+        Left(GenericError(s"Txs cannot be duplicated. Current height is: $height. Tx with such id aready present"))
       else Right(tx)
   }
 

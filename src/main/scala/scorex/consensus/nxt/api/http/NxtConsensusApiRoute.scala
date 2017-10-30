@@ -33,9 +33,10 @@ case class NxtConsensusApiRoute(
     Address.fromString(address) match {
       case Left(_) => complete(InvalidAddress)
       case Right(account) =>
+        val s = state()
         complete(Json.obj(
           "address" -> account.address,
-          "balance" -> PoSCalc.generatingBalance(state, fs, account, state().height).get))
+          "balance" -> PoSCalc.generatingBalance(s, fs, account, s.height).get))
     }
   }
 

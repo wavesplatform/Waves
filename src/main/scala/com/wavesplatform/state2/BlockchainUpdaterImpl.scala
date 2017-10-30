@@ -48,13 +48,14 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
   }
 
   private def logHeights(prefix: String): Unit = read { implicit l =>
-    log.info(s"$prefix, total blocks: ${historyWriter.height()}, persisted: ${persisted.height}, in-memory: " + inMemDiffs().map(_.heightDiff).toList.reverse.mkString(" | "))
+    log.info(s"$prefix, [ total persisted blocks: ${historyWriter.height()}, persisted: ${persisted.height}, " +
+      s"in-memory: " + inMemDiffs().map(_.heightDiff).toList.reverse.mkString(" | ") +
+      " ] + " + ngState().map(_ => "Some(ng state)"))
+
   }
 
   private def currentPersistedBlocksState: StateReader = read { implicit l =>
-    Coeval.unit.flatMap { _ =>
-      inMemDiffs().reverse.foldLeft(Coeval.now(persisted.asInstanceOf[SnapshotStateReader])) { case (ci, b) => composite(ci, Coeval.now(b)) }
-    }
+    Coeval(composite(persisted, inMemDiffs().toList))
   }
 
   def bestLiquidState: StateReader = read { implicit l => composite(currentPersistedBlocksState, Coeval(ngState().map(_.bestLiquidDiff).orEmpty)) }
@@ -220,10 +221,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
               syncPersistedAndInMemory()
             } else if (requestedHeight == persisted.height) {
               inMemDiffs.set(NEL.one(BlockDiff.empty))
-            }
-
-            else {
-
+            } else {
               val difference = persisted.height - requestedHeight
 
               def dropLeftIf[A](list: List[A])(cond: List[A] => Boolean): List[A] = list match {
@@ -235,7 +233,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
                 val remained = dropLeftIf(imd.toList)(_.map(bd => bd.heightDiff).sum > difference)
                 val persistedPlusInMemHeight = persisted.height + remained.map(_.heightDiff).sum
                 if (requestedHeight > persistedPlusInMemHeight) {
-                  val newTopDiff = unsafeDiffByRange(currentPersistedBlocksState(), persistedPlusInMemHeight + 1, requestedHeight + 1)
+                  val newTopDiff = unsafeDiffByRange(composite(persisted, remained), persistedPlusInMemHeight + 1, requestedHeight + 1)
                   NEL(newTopDiff, remained)
                 } else NEL(BlockDiff.empty, remained)
               }

@@ -83,7 +83,12 @@ class CompositeStateReader private(inner: SnapshotStateReader, blockDiff: BlockD
 }
 
 object CompositeStateReader {
-  def composite(inner: SnapshotStateReader, blockDiff: BlockDiff) : SnapshotStateReader = new CompositeStateReader(inner,blockDiff)
+  def composite(inner: SnapshotStateReader, blockDiff: BlockDiff): SnapshotStateReader = new CompositeStateReader(inner, blockDiff)
+
+  def composite(inner: SnapshotStateReader, blockDiff: Seq[BlockDiff]): SnapshotStateReader = blockDiff match {
+    case (x :: xs) => composite(composite(inner, xs), x)
+    case _ => inner
+  }
 
   def composite(inner: Coeval[SnapshotStateReader], blockDiff: Coeval[BlockDiff]): Coeval[SnapshotStateReader] = for {
     i <- inner

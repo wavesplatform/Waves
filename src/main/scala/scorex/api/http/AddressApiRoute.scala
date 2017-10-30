@@ -253,7 +253,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
       BalanceDetails(
         account.address,
         portfolio.balance,
-        PoSCalc.generatingBalance(state, functionalitySettings, account, s.height).get,
+        PoSCalc.generatingBalance(s, functionalitySettings, account, s.height).get,
         portfolio.balance - portfolio.leaseInfo.leaseOut,
         s.effectiveBalance(account))
     }
