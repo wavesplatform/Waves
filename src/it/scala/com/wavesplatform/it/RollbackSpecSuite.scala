@@ -67,9 +67,7 @@ class RollbackSpecSuite extends FreeSpec with ScalaFutures with IntegrationPatie
       _ <- processRequests(requests)
       _ <- nodes.head.waitFor[Int](_.utxSize, _ == 0, 1.second)
       _ <- traverse(nodes)(_.rollback(startHeight, returnToUTX = false))
-      _ <- traverse(nodes)(_.utx).map(utxs => {
-        all(utxs) shouldBe 'empty
-      })
+      _ <- nodes.head.utx.map( _ shouldBe 'empty )
 
       hashAfterApply <- nodes.head.waitForDebugInfoAt(startHeight + waitBlocks).map(_.stateHash)
     } yield {
