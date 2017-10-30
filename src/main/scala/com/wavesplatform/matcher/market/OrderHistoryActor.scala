@@ -55,6 +55,8 @@ class OrderHistoryActor(val settings: MatcherSettings, val utxPool: UtxPool, val
       sender() ! GetOrderStatusResponse(orderHistory.orderStatus(id))
     case GetTradableBalance(assetPair, addr, _) =>
       sender() ! getPairTradableBalance(assetPair, addr)
+    case OrdersCleanup(orderBook, ts) =>
+      sender() ! OrdersCleanupResult(ordersCleanup(orderBook, ts))
   }
 
   override def receive: Receive = {
@@ -114,6 +116,12 @@ class OrderHistoryActor(val settings: MatcherSettings, val utxPool: UtxPool, val
     }
   }
 
+  def ordersCleanup(orderBook: OrderBook, ts: Long): Either[GenericError, Seq[String]] = {
+    val result = orderBook.asks.values.++(orderBook.bids.values).flatten.filterNot(x => x.order.isValid(ts)).map(_.order.idStr).toSeq
+
+    Right(result)
+  }
+
   def recoverFromOrderBook(ob: OrderBook): Unit = {
     ob.asks.foreach{ case (_, orders) =>
       orders.foreach(o => orderHistory.orderAccepted(OrderAdded(o)))
@@ -144,6 +152,8 @@ object OrderHistoryActor {
   case class ValidateOrderResult(result: Either[GenericError, Order])
   case class ValidateCancelOrder(cancel: CancelOrder, ts: Long) extends ExpirableOrderHistoryRequest
   case class ValidateCancelResult(result: Either[GenericError, CancelOrder])
+  case class OrdersCleanup(orderBook: OrderBook, ts: Long) extends ExpirableOrderHistoryRequest
+  case class OrdersCleanupResult(result: Either[GenericError, Seq[String]])
   case class RecoverFromOrderBook(ob: OrderBook) extends OrderHistoryRequest
 
   case class OrderDeleted(orderId: String) extends MatcherResponse {
@@ -169,5 +179,5 @@ object OrderHistoryActor {
   case class GetTradableBalanceResponse(balances: Map[String, Long]) extends MatcherResponse {
     val json: JsObject = JsObject(balances.map{ case (k, v) => (k, JsNumber(v)) })
     val code = StatusCodes.OK
-  }
+}
 }

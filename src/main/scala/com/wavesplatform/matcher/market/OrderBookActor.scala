@@ -28,6 +28,8 @@ import scala.concurrent.duration._
 
 import com.wavesplatform.network._
 
+case class OrderCleanup()
+
 class OrderBookActor(assetPair: AssetPair,
                      val orderHistory: ActorRef,
                      val storedState: StateReader,
@@ -60,6 +62,8 @@ class OrderBookActor(assetPair: AssetPair,
       onAddOrder(order)
     case cancel: CancelOrder =>
       onCancelOrder(cancel)
+    case OrderCleanup  =>
+      onOrderCleanup(orderBook)
   }
 
   def snapshotsCommands: Receive = {
@@ -86,7 +90,10 @@ class OrderBookActor(assetPair: AssetPair,
       handleValidateOrderResult(res)
     case ValidateCancelResult(res) =>
       cancellable.foreach(_.cancel())
-      handleValidateCancelResult(res)
+      handleValidateCancelResult(res.map(x => x.orderId))
+    case OrdersCleanupResult(res) =>
+      cancellable.foreach(_.cancel())
+      handleOrderCleanupResult(res)
     case ev =>
       log.info("Stashed: " + ev)
       stash()
@@ -110,19 +117,36 @@ class OrderBookActor(assetPair: AssetPair,
     context.become(waitingValidation)
   }
 
-  def handleValidateCancelResult(res: Either[GenericError, CancelOrder]): Unit = {
+  def onOrderCleanup(orderBook: OrderBook): Unit = {
+    orderHistory ! OrdersCleanup(orderBook, NTP.correctedTime())
+    apiSender = None
+    cancellable = Some(context.system.scheduler.scheduleOnce(ValidationTimeout, self, ValidationTimeoutExceeded))
+    context.become(waitingValidation)
+  }
+
+  def handleValidateCancelResult(res: Either[GenericError, String]): Unit = {
     res match {
       case Left(err) =>
         apiSender.foreach(_ ! OrderCancelRejected(err.err))
-      case Right(cancel) =>
-        OrderBook.cancelOrder(orderBook, cancel.orderId) match {
+      case Right(orderIdToCancel) =>
+        OrderBook.cancelOrder(orderBook, orderIdToCancel) match {
           case Some(oc) =>
             persist(oc) { _ =>
               handleCancelEvent(oc)
-              apiSender.foreach(_ ! OrderCanceled(cancel.orderId))
+              apiSender.foreach(_ ! OrderCanceled(orderIdToCancel))
             }
           case _ => apiSender.foreach(_ ! OrderCancelRejected("Order not found"))
         }
+    }
+
+    becomeFullCommands()
+  }
+
+  def handleOrderCleanupResult(res: Either[GenericError, Seq[String]]): Unit = {
+    res match {
+      case Left(err) => //log
+      case Right(orderIdsToCancel) =>
+        orderIdsToCancel.foreach(x => handleValidateCancelResult(Right(x)))
     }
 
     becomeFullCommands()
