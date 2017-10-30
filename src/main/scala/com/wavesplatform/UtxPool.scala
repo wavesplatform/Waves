@@ -105,7 +105,6 @@ class UtxPool(time: Time,
 
   def transactionById(transactionId: ByteStr): Option[Transaction] = Option(transactions.get(transactionId))
 
-
   def packUnconfirmed(max: Int, sortInBlock: Boolean): Seq[Transaction] = {
     val currentTs = time.correctedTime()
     removeExpired(currentTs)
