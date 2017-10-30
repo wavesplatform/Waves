@@ -1,5 +1,7 @@
 package com.wavesplatform.network
 
+import java.util.concurrent.locks.ReentrantReadWriteLock
+
 import com.wavesplatform.TransactionGen
 import com.wavesplatform.state2.ByteStr
 import io.netty.channel.Channel
@@ -12,6 +14,8 @@ import scorex.block.{Block, SignerData}
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
 import scorex.lagonaki.mocks.TestBlock
 import scorex.transaction.NgHistory
+import scorex.utils.Synchronized
+import scorex.utils.Synchronized.ReadLock
 
 import scala.concurrent.duration.DurationInt
 import scala.util.Random
@@ -31,12 +35,7 @@ class ExtensionBlocksLoaderSpec extends FreeSpec
   private val remoteExtensionSignatures: Seq[ByteStr] = remoteExtensionBlocks.map(_.uniqueId)
 
   "should request blocks" in {
-    val history = mock[NgHistory]
-    (history.heightOf(_: ByteStr)).expects(*)
-      .onCall { _: ByteStr => None }
-      .repeat(remoteExtensionBlocks.size)
-
-    val channel = new EmbeddedChannel(new ExtensionBlocksLoader(1.minute, PeerDatabase.NoOp, history))
+    val channel = new EmbeddedChannel(new ExtensionBlocksLoader(1.minute, PeerDatabase.NoOp, newHistory()))
     channel.writeInbound(ExtensionIds(lastCommonSignature, remoteExtensionSignatures))
     channel.flushInbound()
 
@@ -52,12 +51,7 @@ class ExtensionBlocksLoaderSpec extends FreeSpec
   }
 
   "should propagate an extension after receiving all blocks" in {
-    val history = mock[NgHistory]
-    (history.heightOf(_: ByteStr)).expects(*)
-      .onCall { _: ByteStr => None }
-      .repeat(remoteExtensionBlocks.size)
-
-    val channel = new EmbeddedChannel(new ExtensionBlocksLoader(1.minute, PeerDatabase.NoOp, history))
+    val channel = new EmbeddedChannel(new ExtensionBlocksLoader(1.minute, PeerDatabase.NoOp, newHistory()))
     channel.writeInbound(ExtensionIds(lastCommonSignature, remoteExtensionSignatures))
     Random.shuffle(remoteExtensionBlocks).foreach(channel.writeInbound(_))
     channel.flushInbound()
@@ -125,12 +119,7 @@ class ExtensionBlocksLoaderSpec extends FreeSpec
       val remoteUnexpectedBlocks = remoteExtensionBlocks
       val remoteExtensionSignatures = remoteUnexpectedBlocks.map { _ => TestBlock.randomSignature() }
 
-      val history = mock[NgHistory]
-      (history.heightOf(_: ByteStr)).expects(*)
-        .onCall { _: ByteStr => None }
-        .repeat(remoteUnexpectedBlocks.size)
-
-      val channel = new EmbeddedChannel(new ExtensionBlocksLoader(1.minute, PeerDatabase.NoOp, history))
+      val channel = new EmbeddedChannel(new ExtensionBlocksLoader(1.minute, PeerDatabase.NoOp, newHistory()))
       channel.writeInbound(ExtensionIds(lastCommonSignature, remoteExtensionSignatures))
       channel.flushInbound()
 
@@ -156,12 +145,7 @@ class ExtensionBlocksLoaderSpec extends FreeSpec
       val remoteUnexpectedBlocks = remoteExtensionBlocks
       val remoteUnexpectedExtensionSignatures = remoteUnexpectedBlocks.map { _ => TestBlock.randomSignature() }
 
-      val history = mock[NgHistory]
-      (history.heightOf(_: ByteStr)).expects(*)
-        .onCall { _: ByteStr => None }
-        .repeat(remoteExtensionSignatures.size)
-
-      val channel = new EmbeddedChannel(new ExtensionBlocksLoader(1.minute, PeerDatabase.NoOp, history))
+      val channel = new EmbeddedChannel(new ExtensionBlocksLoader(1.minute, PeerDatabase.NoOp, newHistory()))
       channel.writeInbound(ExtensionIds(lastCommonSignature, remoteExtensionSignatures))
       channel.writeInbound(ExtensionIds(lastCommonSignature, remoteUnexpectedExtensionSignatures))
       channel.flushInbound()
@@ -171,6 +155,33 @@ class ExtensionBlocksLoaderSpec extends FreeSpec
         val blockRequest = channel.readOutbound[GetBlock]()
         Option(blockRequest).foreach { x =>
           unexpected shouldNot contain(x.signature)
+        }
+      }
+    }
+
+    "an extension if it has lower score than the local one" in {
+      val history = newHistory(TestBlock.sign(
+        signer = TestBlock.defaultSigner,
+        b = Block(
+          timestamp = System.currentTimeMillis(),
+          version = 2,
+          reference = TestBlock.randomSignature(),
+          signerData = SignerData(TestBlock.defaultSigner, TestBlock.randomSignature()),
+          consensusData = NxtLikeConsensusBlockData(1L, ByteStr(Array.fill(Block.GeneratorSignatureLength)(0: Byte))),
+          transactionData = transferGen.sample.take(3).toList,
+          featureVotes = Set.empty
+        )
+      ))
+
+      val channel = new EmbeddedChannel(new ExtensionBlocksLoader(1.minute, PeerDatabase.NoOp, history))
+      channel.writeInbound(ExtensionIds(lastCommonSignature, remoteExtensionSignatures))
+      remoteExtensionBlocks.foreach(channel.writeInbound(_))
+      channel.flushInbound()
+
+      intercept[TestFailedDueToTimeoutException] {
+        eventually {
+          val actual = channel.readInbound[ExtensionBlocks]()
+          Option(actual) shouldBe defined
         }
       }
     }
@@ -200,11 +211,6 @@ class ExtensionBlocksLoaderSpec extends FreeSpec
     )
 
     "responses too long" in {
-      val history = mock[NgHistory]
-      (history.heightOf(_: ByteStr)).expects(*)
-        .onCall { _: ByteStr => None }
-        .repeat(remoteExtensionBlocks.size)
-
       var senderWasBlacklisted = false
       val peerDatabase = new PeerDatabase.NoOp {
         override def blacklistAndClose(channel: Channel, reason: String): Unit = {
@@ -213,7 +219,7 @@ class ExtensionBlocksLoaderSpec extends FreeSpec
       }
 
       val blockSyncTimeout = 100.millis
-      val channel = new EmbeddedChannel(new ExtensionBlocksLoader(blockSyncTimeout, peerDatabase, history))
+      val channel = new EmbeddedChannel(new ExtensionBlocksLoader(blockSyncTimeout, peerDatabase, newHistory()))
       channel.writeInbound(ExtensionIds(lastCommonSignature, remoteExtensionSignatures))
       channel.flushInbound()
 
@@ -225,11 +231,6 @@ class ExtensionBlocksLoaderSpec extends FreeSpec
     def chainTest(remoteExtensionBlocks: Seq[Block]): Unit = {
       val remoteExtensionSignatures = remoteExtensionBlocks.map(_.uniqueId)
 
-      val history = mock[NgHistory]
-      (history.heightOf(_: ByteStr)).expects(*)
-        .onCall { _: ByteStr => None }
-        .repeat(remoteExtensionBlocks.size)
-
       var senderWasBlacklisted = false
       val peerDatabase = new PeerDatabase.NoOp {
         override def blacklistAndClose(channel: Channel, reason: String): Unit = {
@@ -237,7 +238,7 @@ class ExtensionBlocksLoaderSpec extends FreeSpec
         }
       }
 
-      val channel = new EmbeddedChannel(new ExtensionBlocksLoader(1.minute, peerDatabase, history))
+      val channel = new EmbeddedChannel(new ExtensionBlocksLoader(1.minute, peerDatabase, newHistory()))
       channel.writeInbound(ExtensionIds(lastCommonSignature, remoteExtensionSignatures))
       remoteExtensionBlocks.foreach(channel.writeInbound(_))
       channel.flushInbound()
@@ -249,13 +250,8 @@ class ExtensionBlocksLoaderSpec extends FreeSpec
   }
 
   "should not blacklist slow (but acceptable) node" in {
-    val history = mock[NgHistory]
-    (history.heightOf(_: ByteStr)).expects(*)
-      .onCall { _: ByteStr => None }
-      .repeat(remoteExtensionBlocks.size)
-
     val blockSyncTimeout = 100.millis
-    val channel = new EmbeddedChannel(new ExtensionBlocksLoader(blockSyncTimeout, PeerDatabase.NoOp, history))
+    val channel = new EmbeddedChannel(new ExtensionBlocksLoader(blockSyncTimeout, PeerDatabase.NoOp, newHistory()))
     channel.writeInbound(ExtensionIds(lastCommonSignature, remoteExtensionSignatures))
     channel.flushInbound()
 
@@ -278,5 +274,48 @@ class ExtensionBlocksLoaderSpec extends FreeSpec
     ref = ref,
     txs = transferGen.sample.take(3).toList
   )
+
+  private def newHistory(): NgHistory = newHistory(TestBlock.sign(
+    signer = TestBlock.defaultSigner,
+    b = Block(
+      timestamp = System.currentTimeMillis(),
+      version = 2,
+      reference = TestBlock.randomSignature(),
+      signerData = SignerData(TestBlock.defaultSigner, TestBlock.randomSignature()),
+      consensusData = NxtLikeConsensusBlockData(3L, ByteStr(Array.fill(Block.GeneratorSignatureLength)(0: Byte))),
+      transactionData = transferGen.sample.take(3).toList,
+      featureVotes = Set.empty
+    )
+  ))
+
+  private def newHistory(lastHistoryBlock: Block): NgHistory = {
+    val lastHistoryBlockHeight = 10
+    val history = mock[NgHistory]
+
+    (history.height _).expects().returning(lastHistoryBlockHeight).anyNumberOfTimes()
+
+    (history.blockAt _).expects(*)
+      .onCall { (x: Int) =>
+        if (x == lastHistoryBlockHeight) Some(lastHistoryBlock) else None
+      }
+      .anyNumberOfTimes()
+
+    (history.heightOf(_: ByteStr)).expects(*)
+      .onCall { (_: ByteStr) => None }
+      .anyNumberOfTimes()
+
+    (history.scoreOf _).expects(*)
+      .onCall { (x: ByteStr) =>
+        if (x == lastHistoryBlock.uniqueId) Some(lastHistoryBlock.blockScore)
+        else None
+      }
+      .anyNumberOfTimes()
+
+    (history.read(_: ReadLock => Any)).expects(*)
+      .onCall { (f: (ReadLock => Any)) => f(new Synchronized.ReadLock(new ReentrantReadWriteLock())) }
+      .anyNumberOfTimes()
+
+    history
+  }
 
 }

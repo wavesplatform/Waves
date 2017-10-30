@@ -64,9 +64,10 @@ class ExtensionBlocksLoader(
 
         val newBlocks = blockBuffer.values.toSeq
 
-        // TODO: What if score of extension is lower, than the score of blockchain
-        for (tids <- targetExtensionIds) {
-          if (tids.lastCommonId != newBlocks.head.reference) {
+        targetExtensionIds.foreach { tids =>
+          if (history.score() > newBlocks.last.blockScore) {
+            log.trace("Local chain has a better score")
+          } else if (tids.lastCommonId != newBlocks.head.reference) {
             peerDatabase.blacklistAndClose(ctx.channel(), s"Extension head reference ${newBlocks.head.reference} differs from last common block id ${tids.lastCommonId}")
           } else if (!newBlocks.sliding(2).forall {
               case Seq(b1, b2) => b1.uniqueId == b2.reference
