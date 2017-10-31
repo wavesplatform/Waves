@@ -286,7 +286,6 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
   }
 
   override def persistedAccountPortfoliosHash(): Int = Hash.accountPortfolios(currentPersistedBlocksState().accountPortfolios)
-
 }
 
 object BlockchainUpdaterImpl {
@@ -306,29 +305,6 @@ object BlockchainUpdaterImpl {
     blockchainUpdater.logHeights("Constructing BlockchainUpdaterImpl")
     blockchainUpdater.syncPersistedAndInMemory()
     blockchainUpdater
-  }
-
-  def ranges(from: Int, to: Int, by: Int): Stream[(Int, Int)] =
-    if (from + by < to)
-      (from, from + by) #:: ranges(from + by, to, by)
-    else
-      (from, to) #:: Stream.empty[(Int, Int)]
-
-  def dropLeftIf[A](list: List[A])(cond: List[A] => Boolean): List[A] = list match {
-    case l@(x :: xs) => if (cond(l)) dropLeftIf(xs)(cond) else l
-    case Nil => Nil
-  }
-
-  def splitAfterThreshold[A](list: List[A])(base: Int, count: A => Int, threshold: Int): (List[A], List[A]) = {
-    val splitIdx = list.zipWithIndex.foldLeft((base, Option.empty[Int])) { case ((collectedValue, maybeIdx), (item, idx)) =>
-      maybeIdx match {
-        case Some(_) => (collectedValue, maybeIdx)
-        case None =>
-          val tot = collectedValue + count(item)
-          if (tot >= threshold) (tot, Some(idx + 1)) else (tot, None)
-      }
-    }._2.getOrElse(Int.MaxValue)
-    list.splitAt(splitIdx)
   }
 
   def areVersionsOfSameBlock(b1: Block, b2: Block): Boolean =

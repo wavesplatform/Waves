@@ -29,13 +29,4 @@ object BlockDiff {
       snapshots = older.snapshots.combine(newer.snapshots))
   }
 
-  def compactDiffs(`new`: BlockDiff, existing: Seq[BlockDiff], maxTxsInChunk: Int): Seq[BlockDiff] = existing match {
-    case h0 :: tail =>
-      val newSize = `new`.txsDiff.transactions.size
-      val h0size = h0.txsDiff.transactions.size
-      if (newSize + h0size > maxTxsInChunk)
-        `new` +: existing
-      else Monoid.combine(h0, `new`) +: tail
-    case Nil => Seq(`new`)
-  }
 }
