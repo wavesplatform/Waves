@@ -57,10 +57,11 @@ object BlockDiffer extends ScorexLogging with Instrumented {
     } yield r
   }
 
-  def unsafeDiffMany(settings: FunctionalitySettings, fp: FeatureProvider, s: SnapshotStateReader, prevBlock: Option[Block])(blocks: Seq[Block]): BlockDiff =
-    blocks.foldLeft((Monoid[BlockDiff].empty, prevBlock)) { case ((diff, prev), block) =>
-      val blockDiff = fromBlock(settings, fp, composite(s, diff), prev, block).explicitGet()
-      (Monoid[BlockDiff].combine(diff, blockDiff), Some(block))
+  def unsafeDiffMany(settings: FunctionalitySettings, fp: FeatureProvider, s: SnapshotStateReader, prevBlock: Option[Block], maxTxsInChunk: Int)
+                    (blocks: Seq[Block]): Seq[BlockDiff] =
+    blocks.foldLeft((Seq.empty[BlockDiff], prevBlock)) { case ((diffs, prev), block) =>
+      val blockDiff = fromBlock(settings, fp, composite(s, diffs), prev, block).explicitGet()
+      (BlockDiff.compactDiffs(blockDiff, diffs, maxTxsInChunk), Some(block))
     }._1
 
   private def apply(settings: FunctionalitySettings, s: SnapshotStateReader, pervBlockTimestamp: Option[Long])

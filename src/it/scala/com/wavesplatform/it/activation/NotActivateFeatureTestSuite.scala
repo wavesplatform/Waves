@@ -63,6 +63,7 @@ class NotActivateFeatureTestSuite extends FreeSpec with Matchers with BeforeAndA
 
     val votingInterval = 14
     val blocksForActivation = 14
+    val nonVotingFeatureNum: Short = 2
 
     private val nonSupportedNodes = ConfigFactory.parseString(
       s"""
@@ -84,8 +85,6 @@ class NotActivateFeatureTestSuite extends FreeSpec with Matchers with BeforeAndA
     )
 
     val votingFeatureNum: Short = 1
-    val nonVotingFeatureNum: Short = 2
-
     val NodesCount: Int = 4
 
     val Configs: Seq[Config] = Random.shuffle(dockerConfigs.init).take(NodesCount).map(nonSupportedNodes.withFallback(_))

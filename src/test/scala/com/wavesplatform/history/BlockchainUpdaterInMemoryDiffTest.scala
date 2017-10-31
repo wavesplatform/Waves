@@ -23,7 +23,7 @@ class BlockchainUpdaterInMemoryDiffTest extends PropSpec with PropertyChecks wit
     scenario(preconditionsAndPayments) { case (domain, (genesis, payment1, payment2)) =>
       val blocksWithoutCompactification = chainBlocks(
         Seq(genesis) +:
-          Seq.fill(InMemoryChunkSize * 2 - 1)(Seq.empty[Transaction]) :+
+          Seq.fill(MaxTransactionsPerBlockDiff * 2 - 1)(Seq.empty[Transaction]) :+
           Seq(payment1))
       val blockTriggersCompactification = buildBlockOfTxs(blocksWithoutCompactification.last.uniqueId, Seq(payment2))
 
@@ -31,13 +31,13 @@ class BlockchainUpdaterInMemoryDiffTest extends PropSpec with PropertyChecks wit
       val mastersBalanceAfterPayment1 = domain.stateReader().accountPortfolio(genesis.recipient).balance
       mastersBalanceAfterPayment1 shouldBe (ENOUGH_AMT - payment1.amount - payment1.fee)
 
-      domain.history.height() shouldBe InMemoryChunkSize * 2 + 1
-      domain.stateReader().height shouldBe InMemoryChunkSize * 2 + 1
+      domain.history.height() shouldBe MaxTransactionsPerBlockDiff * 2 + 1
+      domain.stateReader().height shouldBe MaxTransactionsPerBlockDiff * 2 + 1
 
       domain.blockchainUpdater.processBlock(blockTriggersCompactification).explicitGet()
 
-      domain.history.height() shouldBe InMemoryChunkSize * 2 + 2
-      domain.stateReader().height shouldBe InMemoryChunkSize * 2 + 2
+      domain.history.height() shouldBe MaxTransactionsPerBlockDiff * 2 + 2
+      domain.stateReader().height shouldBe MaxTransactionsPerBlockDiff * 2 + 2
 
       val mastersBalanceAfterPayment1AndPayment2 = domain.stateReader().accountPortfolio(genesis.recipient).balance
       mastersBalanceAfterPayment1AndPayment2 shouldBe (ENOUGH_AMT - payment1.amount - payment1.fee - payment2.amount - payment2.fee)
@@ -45,7 +45,7 @@ class BlockchainUpdaterInMemoryDiffTest extends PropSpec with PropertyChecks wit
   }
   property("compactification without liquid block doesn't make liquid block affect state once") {
     scenario(preconditionsAndPayments) { case (domain, (genesis, payment1, payment2)) =>
-      val firstBlocks = chainBlocks(Seq(Seq(genesis)) ++ Seq.fill(InMemoryChunkSize * 2 - 2)(Seq.empty[Transaction]))
+      val firstBlocks = chainBlocks(Seq(Seq(genesis)) ++ Seq.fill(MaxTransactionsPerBlockDiff * 2 - 2)(Seq.empty[Transaction]))
       val payment1Block = buildBlockOfTxs(firstBlocks.last.uniqueId, Seq(payment1))
       val emptyBlock = buildBlockOfTxs(payment1Block.uniqueId, Seq.empty)
       val blockTriggersCompactification = buildBlockOfTxs(payment1Block.uniqueId, Seq(payment2))
@@ -60,8 +60,8 @@ class BlockchainUpdaterInMemoryDiffTest extends PropSpec with PropertyChecks wit
       domain.blockchainUpdater.removeAfter(payment1Block.uniqueId)
       domain.blockchainUpdater.processBlock(blockTriggersCompactification).explicitGet()
 
-      domain.history.height() shouldBe InMemoryChunkSize * 2 + 1
-      domain.stateReader().height shouldBe InMemoryChunkSize * 2 + 1
+      domain.history.height() shouldBe MaxTransactionsPerBlockDiff * 2 + 1
+      domain.stateReader().height shouldBe MaxTransactionsPerBlockDiff * 2 + 1
 
       val mastersBalanceAfterPayment1AndPayment2 = domain.stateReader().accountPortfolio(genesis.recipient).balance
       mastersBalanceAfterPayment1AndPayment2 shouldBe (ENOUGH_AMT - payment1.amount - payment1.fee - payment2.amount - payment2.fee)

@@ -139,7 +139,7 @@ class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen {
     state.applyBlockDiff(totalDiff1)
     assertion(totalDiff1, state)
 
-    val preconditionDiff = BlockDiffer.unsafeDiffMany(fs, fp, newState(), None)(preconditions)
+    val preconditionDiff = BlockDiffer.unsafeDiffMany(fs, fp, newState(), None, 5)(preconditions)
     val compositeState = composite(newState(), preconditionDiff)
     val totalDiff2 = differ(compositeState, (preconditions.lastOption, block)).explicitGet()
     assertion(totalDiff2, composite(compositeState, totalDiff2))

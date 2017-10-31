@@ -30,20 +30,21 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
                                     historyWriter: HistoryWriterImpl,
                                     val synchronizationToken: ReentrantReadWriteLock) extends BlockchainUpdater with BlockchainDebugInfo with ScorexLogging with Instrumented {
 
-  private lazy val inMemoryChunkSize = settings.blockchainSettings.inMemoryChunkSize
-  private lazy val inMemChunksAmount = settings.blockchainSettings.inMemChunksAmount
+  private lazy val maxTransactionsPerChunk = settings.blockchainSettings.maxTransactionsPerBlockDiff
+  private lazy val maxBlocksInMemory = settings.blockchainSettings.maxBlocksInMemory
+  private lazy val rebuildByBlocks = maxBlocksInMemory
 
   private lazy val inMemDiffs: Synchronized[NEL[BlockDiff]] = Synchronized(NEL.one(BlockDiff.empty)) // fresh head
   private lazy val ngState: Synchronized[Option[NgState]] = Synchronized(Option.empty[NgState])
 
   override val lastBlockId: ConcurrentSubject[ByteStr, ByteStr] = ConcurrentSubject.publish[ByteStr]
 
-  private def unsafeDiffByRange(state: SnapshotStateReader, from: Int, to: Int): BlockDiff = {
+  private def unsafeDiffByRange(state: SnapshotStateReader, from: Int, to: Int): Seq[BlockDiff] = {
     val blocks = measureLog(s"Reading blocks from $from up to $to") {
       Range(from, to).map(historyWriter.blockBytes).par.map(b => Block.parseBytes(b.get).get).seq
     }
     measureLog(s"Building diff from $from up to $to") {
-      BlockDiffer.unsafeDiffMany(settings.blockchainSettings.functionalitySettings, featureProvider, state, historyWriter.blockAt(from - 1))(blocks)
+      BlockDiffer.unsafeDiffMany(settings.blockchainSettings.functionalitySettings, featureProvider, state, historyWriter.blockAt(from - 1), maxTransactionsPerChunk)(blocks)
     }
   }
 
@@ -64,16 +65,21 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
 
   private def syncPersistedAndInMemory(): Unit = write { implicit l =>
     logHeights("State rebuild started")
-    val persistFrom = persisted.height + 1
-    val persistUpTo = historyWriter.height() - inMemoryChunkSize + 1
 
-    ranges(persistFrom, persistUpTo, inMemoryChunkSize).foreach { case (head, last) =>
-      val diffToBePersisted = unsafeDiffByRange(persisted, head, last)
-      persisted.applyBlockDiff(diffToBePersisted)
+    val notPersisted = historyWriter.height() - persisted.height
+    val inMemSize = Math.min(notPersisted, maxBlocksInMemory)
+    val persistUpTo = historyWriter.height() - inMemSize + 1
+
+    val persistFrom = persisted.height + 1
+    ranges(persistFrom, persistUpTo, rebuildByBlocks).foreach { case (head, last) =>
+      val diffs = unsafeDiffByRange(persisted, head, last)
+      log.debug(s"Diffs built for Range($persistFrom, $persistUpTo): ${diffs.map(_.txsDiff.transactions.size)}")
+      diffs.reverse.foreach(persisted.applyBlockDiff)
     }
 
+    val diffsToStoreInMemory = unsafeDiffByRange(persisted, persisted.height + 1, historyWriter.height() + 1)
+    inMemDiffs.set(NEL.fromList(diffsToStoreInMemory.toList).getOrElse(NEL.one(BlockDiff.empty)))
     logHeights("State rebuild finished")
-    inMemDiffs.set(NEL.one(unsafeDiffByRange(persisted, persisted.height + 1, historyWriter.height() + 1)))
   }
 
   private def displayFeatures(s: Set[Short]): String = s"FEATURE${if (s.size > 1) "S"} ${s.mkString(", ")} ${if (s.size > 1) "WERE" else "WAS"}"
@@ -116,9 +122,9 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
   }
 
   override def processBlock(block: Block): Either[ValidationError, Option[DiscardedTransactions]] = write { implicit l =>
-    if (inMemDiffs().head.heightDiff >= inMemoryChunkSize) {
+    if (inMemDiffs().head.txsDiff.transactions.size >= maxTransactionsPerChunk) {
       inMemDiffs.transform { imd =>
-        if (imd.size < inMemChunksAmount)
+        if (imd.map(_.heightDiff).toList.sum < maxBlocksInMemory)
           NEL(BlockDiff.empty, imd.toList)
         else {
           val shift = imd.init
@@ -223,17 +229,11 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
               inMemDiffs.set(NEL.one(BlockDiff.empty))
             } else {
               val difference = persisted.height - requestedHeight
-
-              def dropLeftIf[A](list: List[A])(cond: List[A] => Boolean): List[A] = list match {
-                case l@(x :: xs) => if (cond(l)) dropLeftIf(xs)(cond) else l
-                case Nil => Nil
-              }
-
               inMemDiffs.transform { imd =>
                 val remained = dropLeftIf(imd.toList)(_.map(bd => bd.heightDiff).sum > difference)
                 val persistedPlusInMemHeight = persisted.height + remained.map(_.heightDiff).sum
                 if (requestedHeight > persistedPlusInMemHeight) {
-                  val newTopDiff = unsafeDiffByRange(composite(persisted, remained), persistedPlusInMemHeight + 1, requestedHeight + 1)
+                  val newTopDiff = Monoid.combineAll(unsafeDiffByRange(composite(persisted, remained), persistedPlusInMemHeight + 1, requestedHeight + 1).reverse)
                   NEL(newTopDiff, remained)
                 } else NEL(BlockDiff.empty, remained)
               }
@@ -319,10 +319,14 @@ object BlockchainUpdaterImpl {
     else
       (from, to) #:: Stream.empty[(Int, Int)]
 
+  def dropLeftIf[A](list: List[A])(cond: List[A] => Boolean): List[A] = list match {
+    case l@(x :: xs) => if (cond(l)) dropLeftIf(xs)(cond) else l
+    case Nil => Nil
+  }
+
   def areVersionsOfSameBlock(b1: Block, b2: Block): Boolean =
     b1.signerData.generator == b2.signerData.generator &&
       b1.consensusData.baseTarget == b2.consensusData.baseTarget &&
       b1.reference == b2.reference &&
       b1.timestamp == b2.timestamp
-
 }
