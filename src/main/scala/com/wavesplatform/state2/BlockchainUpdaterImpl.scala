@@ -31,8 +31,8 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
                                     val synchronizationToken: ReentrantReadWriteLock) extends BlockchainUpdater with BlockchainDebugInfo with ScorexLogging with Instrumented {
 
   private lazy val maxTransactionsPerChunk = settings.blockchainSettings.maxTransactionsPerBlockDiff
-  private lazy val maxBlocksInMemory = settings.blockchainSettings.maxBlocksInMemory
-  private lazy val rebuildByBlocks = maxBlocksInMemory
+  private lazy val minBlocksInMemory = settings.blockchainSettings.maxBlocksInMemory
+  private lazy val rebuildByBlocks = minBlocksInMemory
 
   private lazy val inMemDiffs: Synchronized[NEL[BlockDiff]] = Synchronized(NEL.one(BlockDiff.empty)) // fresh head
   private lazy val ngState: Synchronized[Option[NgState]] = Synchronized(Option.empty[NgState])
@@ -67,7 +67,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
     logHeights("State rebuild started")
 
     val notPersisted = historyWriter.height() - persisted.height
-    val inMemSize = Math.min(notPersisted, maxBlocksInMemory)
+    val inMemSize = Math.min(notPersisted, minBlocksInMemory)
     val persistUpTo = historyWriter.height() - inMemSize + 1
 
     val persistFrom = persisted.height + 1
@@ -124,14 +124,9 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
   override def processBlock(block: Block): Either[ValidationError, Option[DiscardedTransactions]] = write { implicit l =>
     if (inMemDiffs().head.txsDiff.transactions.size >= maxTransactionsPerChunk) {
       inMemDiffs.transform { imd =>
-        if (imd.map(_.heightDiff).toList.sum < maxBlocksInMemory)
-          NEL(BlockDiff.empty, imd.toList)
-        else {
-          val shift = imd.init
-          val toPersist = imd.last
-          persisted.applyBlockDiff(toPersist)
-          NEL(BlockDiff.empty, shift)
-        }
+        val (inMemTail, toPersist) = splitAfterThreshold(imd.tail)(imd.head.heightDiff, _.heightDiff, minBlocksInMemory)
+        toPersist.reverse.foreach(persisted.applyBlockDiff)
+        NEL(BlockDiff.empty, imd.head +: inMemTail)
       }
     }
     val height = historyWriter.height()
@@ -322,6 +317,18 @@ object BlockchainUpdaterImpl {
   def dropLeftIf[A](list: List[A])(cond: List[A] => Boolean): List[A] = list match {
     case l@(x :: xs) => if (cond(l)) dropLeftIf(xs)(cond) else l
     case Nil => Nil
+  }
+
+  def splitAfterThreshold[A](list: List[A])(base: Int, count: A => Int, threshold: Int): (List[A], List[A]) = {
+    val splitIdx = list.zipWithIndex.foldLeft((base, Option.empty[Int])) { case ((collectedValue, maybeIdx), (item, idx)) =>
+      maybeIdx match {
+        case Some(_) => (collectedValue, maybeIdx)
+        case None =>
+          val tot = collectedValue + count(item)
+          if (tot >= threshold) (tot, Some(idx + 1)) else (tot, None)
+      }
+    }._2.getOrElse(Int.MaxValue)
+    list.splitAt(splitIdx)
   }
 
   def areVersionsOfSameBlock(b1: Block, b2: Block): Boolean =

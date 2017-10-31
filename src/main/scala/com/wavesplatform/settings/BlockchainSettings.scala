@@ -146,7 +146,7 @@ object BlockchainSettings {
       checkpointFile = config.getAs[File](s"$configPath.checkpoint-file"),
       addressSchemeCharacter = addressSchemeCharacter,
       maxTransactionsPerBlockDiff = config.as[Int](s"$configPath.max-transactions-per-block-diff"),
-      maxBlocksInMemory = config.as[Int](s"$configPath.max-blocks-in-memory"),
+      maxBlocksInMemory = config.as[Int](s"$configPath.min-blocks-in-memory"),
       functionalitySettings = functionalitySettings,
       genesisSettings = genesisSettings)
   }

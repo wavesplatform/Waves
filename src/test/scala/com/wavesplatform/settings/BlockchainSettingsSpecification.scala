@@ -15,7 +15,7 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
         |  directory = "/waves"
         |  blockchain {
         |    max-transactions-per-block-diff = 201
-        |    max-blocks-in-memory = 202
+        |    min-blocks-in-memory = 202
         |    type = CUSTOM
         |    custom {
         |      address-scheme-character = "C"
@@ -96,7 +96,7 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
         |  directory = "/waves"
         |  blockchain {
         |    max-transactions-per-block-diff = 202
-        |    max-blocks-in-memory = 203
+        |    min-blocks-in-memory = 203
         |    type = TESTNET
         |  }
         |}""".stripMargin))
@@ -139,7 +139,7 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
         |  directory = "/waves"
         |  blockchain {
         |    max-transactions-per-block-diff = 203
-        |    max-blocks-in-memory = 204
+        |    min-blocks-in-memory = 204
         |    type = MAINNET
         |  }
         |}""".stripMargin))
