@@ -35,7 +35,7 @@ import scorex.api.http.leasing.{LeaseApiRoute, LeaseBroadcastApiRoute}
 import scorex.block.Block
 import scorex.consensus.nxt.api.http.NxtConsensusApiRoute
 import scorex.transaction._
-import scorex.utils.{ScorexLogging, Time, TimeImpl}
+import scorex.utils.{NTP, ScorexLogging, Time}
 import scorex.wallet.Wallet
 import scorex.waves.http.{DebugApiRoute, WavesApiRoute}
 
@@ -61,7 +61,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       wallet.generateNewAccounts(1)
 
     val feeCalculator = new FeeCalculator(settings.feesSettings)
-    val time: Time = new TimeImpl()
+    val time: Time = NTP
 
     val peerDatabase = new PeerDatabaseImpl(settings.networkSettings)
     val establishedConnections = new ConcurrentHashMap[Channel, PeerInfo]

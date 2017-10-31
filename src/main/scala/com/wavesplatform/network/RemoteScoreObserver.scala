@@ -34,7 +34,7 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
         log.debug(s"${id(ctx)} Closed, removing score $removedScore")
       }
 
-      trySwitchToBestIf(s"switching to second best channel, because ${id(closedChannel)} was closed") {
+      trySwitchToBestIf(ctx, s"Switching to second best channel, because ${id(closedChannel)} was closed") {
         case Some((currChannel, _)) => currChannel == closedChannel
         case _ => false
       }
@@ -45,18 +45,18 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
     case LocalScoreChanged(newLocalScore) =>
       localScore = newLocalScore
       ctx.writeAndFlush(msg, promise)
-      trySwitchToBestIf("local score was updated because of internal updates")(_.isEmpty)
+      trySwitchToBestIf(ctx, "A local score was updated because of internal updates")(_.isEmpty)
 
     case _ => ctx.write(msg, promise)
   }
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
     case newScore: History.BlockchainScore =>
-      val previousScore = Option(scores.put(ctx.channel(), newScore)).getOrElse(BigInt(0))
-      if (previousScore != newScore) {
+      val diff = newScore - Option(scores.put(ctx.channel(), newScore)).getOrElse(BigInt(0))
+      if (diff != 0) {
         scheduleExpiration(ctx, newScore)
-        log.trace(s"${id(ctx)} New score: $newScore (diff: ${newScore - previousScore})")
-        trySwitchToBestIf("new connection")(_.isEmpty)
+        log.trace(s"${id(ctx)} New score: $newScore (diff: $diff)")
+        trySwitchToBestIf(ctx, "A new score")(_.isEmpty)
       }
 
     case ExtensionBlocks(blocks) =>
@@ -64,7 +64,7 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
       if (!isExpectedResponse) {
         log.debug(s"${id(ctx)} Received blocks ${formatBlocks(blocks)} from non-pinned channel (could be from expired channel)")
       } else if (blocks.isEmpty) {
-        trySwitchToBest("blockchain is up to date")
+        trySwitchToBestIf(ctx, "Blockchain is up to date with requested extension") { _ => true }
       } else {
         log.debug(s"${id(ctx)} Receiving extension blocks ${formatBlocks(blocks)}")
         super.channelRead(ctx, msg)
@@ -75,16 +75,15 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
 
   private def scheduleExpiration(ctx: ChannelHandlerContext, score: BigInt): Unit = {
     ctx.executor().schedule(scoreTtl) {
-      if (scores.remove(ctx.channel(), score)) trySwitchToBestIf("score expired") {
+      if (scores.remove(ctx.channel(), score)) trySwitchToBestIf(ctx, "score expired") {
         case Some((channel, _)) => channel == ctx.channel()
         case _ => false
       }
     }
   }
 
-  private def trySwitchToBest(reason: String): Unit = trySwitchToBestIf(reason) { _ => true }
-
-  private def trySwitchToBestIf(reason: String)(cond: Option[ScorePair] => Boolean): Unit = bestRemotePair match {
+  private def trySwitchToBestIf(initiatorCtx: ChannelHandlerContext, reason: String)
+                               (cond: Option[ScorePair] => Boolean): Unit = bestRemotePair match {
     case None => currentRequest.set(None)
     case Some(best@(bestRemoteChannel, bestRemoteScore)) =>
       currentRequest
@@ -97,8 +96,8 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
         .foreach { _ =>
           val toId = Option(bestRemoteChannel).map(id(_))
           log.debug(
-            s"A new pinned channel $toId has score $bestRemoteScore (diff with local: ${bestRemoteScore - localScore}): " +
-              s"$reason, requesting an extension"
+            s"${id(initiatorCtx)} A new pinned channel $toId has score $bestRemoteScore " +
+              s"(diff with local: ${bestRemoteScore - localScore}): requesting an extension. $reason"
           )
           bestRemoteChannel.writeAndFlush(LoadBlockchainExtension(lastSignatures))
         }

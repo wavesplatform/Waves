@@ -64,20 +64,18 @@ class ExtensionBlocksLoader(
 
         val newBlocks = blockBuffer.values.toSeq
 
-        targetExtensionIds.foreach { tids =>
-          if (history.score() > newBlocks.last.blockScore) {
-            log.trace("Local chain has a better score")
-          } else if (tids.lastCommonId != newBlocks.head.reference) {
-            peerDatabase.blacklistAndClose(ctx.channel(), s"Extension head reference ${newBlocks.head.reference} differs from last common block id ${tids.lastCommonId}")
+        for (tids <- targetExtensionIds) {
+          if (tids.lastCommonId != newBlocks.head.reference) {
+            peerDatabase.blacklistAndClose(ctx.channel(),s"Extension head reference ${newBlocks.head.reference} differs from last common block id ${tids.lastCommonId}")
           } else if (!newBlocks.sliding(2).forall {
               case Seq(b1, b2) => b1.uniqueId == b2.reference
               case _ => true
             }) {
-            peerDatabase.blacklistAndClose(ctx.channel(), "Extension blocks are not contiguous, pre-check failed")
+            peerDatabase.blacklistAndClose(ctx.channel(),"Extension blocks are not contiguous, pre-check failed")
           } else {
             newBlocks.par.find(!_.signatureValid) match {
               case Some(invalidBlock) =>
-                peerDatabase.blacklistAndClose(ctx.channel(), s"Got block $invalidBlock with invalid signature")
+                peerDatabase.blacklistAndClose(ctx.channel(),s"Got block $invalidBlock with invalid signature")
               case None =>
                 log.trace(s"${id(ctx)} Chain is valid, pre-check passed")
                 ctx.fireChannelRead(ExtensionBlocks(newBlocks))
