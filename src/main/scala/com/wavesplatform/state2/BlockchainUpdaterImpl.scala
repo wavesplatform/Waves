@@ -73,7 +73,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
     val persistFrom = persisted.height + 1
     ranges(persistFrom, persistUpTo, rebuildByBlocks).foreach { case (head, last) =>
       val diffs = unsafeDiffByRange(persisted, head, last)
-      log.debug(s"Diffs built for Range($persistFrom, $persistUpTo): ${diffs.map(_.txsDiff.transactions.size)}")
+      log.debug(s"Diffs built for Range($head, $last): ${diffs.map(_.txsDiff.transactions.size)}")
       diffs.reverse.foreach(persisted.applyBlockDiff)
     }
 
