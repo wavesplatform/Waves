@@ -56,4 +56,6 @@ package object state2 {
       else `new` +: existing
     case Nil => Seq(`new`)
   }
+
+  def sameQuotient(x: Int, y: Int, divisor: Int): Boolean = (x / divisor) == (y / divisor)
 }
