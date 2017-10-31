@@ -15,6 +15,7 @@ RestartPreventExitStatus=38
 SuccessExitStatus=143
 User=${{daemon_user}}
 PermissionsStartOnly=true
+TimeoutStopSec=300
 
 [Install]
 WantedBy=multi-user.target
