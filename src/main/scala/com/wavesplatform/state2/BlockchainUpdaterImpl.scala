@@ -31,7 +31,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
                                     val synchronizationToken: ReentrantReadWriteLock) extends BlockchainUpdater with BlockchainDebugInfo with ScorexLogging with Instrumented {
 
   private lazy val maxTransactionsPerChunk = settings.blockchainSettings.maxTransactionsPerBlockDiff
-  private lazy val minBlocksInMemory = settings.blockchainSettings.maxBlocksInMemory
+  private lazy val minBlocksInMemory = settings.blockchainSettings.minBlocksInMemory
   private lazy val rebuildByBlocks = minBlocksInMemory
 
   private lazy val inMemDiffs: Synchronized[NEL[BlockDiff]] = Synchronized(NEL.one(BlockDiff.empty)) // fresh head

@@ -22,7 +22,7 @@ package object history {
     checkpointFile = None,
     addressSchemeCharacter = 'N',
     maxTransactionsPerBlockDiff = MaxTransactionsPerBlockDiff,
-    maxBlocksInMemory = MaxBlocksInMemory,
+    minBlocksInMemory = MaxBlocksInMemory,
     functionalitySettings = TestFunctionalitySettings.Enabled,
     genesisSettings = null)
 
