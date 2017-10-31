@@ -103,13 +103,10 @@ class OrderBookActor(assetPair: AssetPair,
   }
 
   private def onOrderCleanup(orderBook: OrderBook, ts: Long): Unit = {
-    //context.become(waitingValidation)
     orderBook.asks.values.++(orderBook.bids.values).flatten.filterNot(x => {
       val validation = x.order.isValid(ts)
       validation
     }).map(_.order.idStr).foreach(x => handleValidateCancelResult(Right(x)))
-
-    //becomeFullCommands()
   }
 
   private def handleValidateCancelResult(res: Either[GenericError, String]): Unit = {
