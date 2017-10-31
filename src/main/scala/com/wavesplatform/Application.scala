@@ -95,7 +95,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       NodeApiRoute(settings.restAPISettings, () => this.shutdown()),
       ActivationApiRoute(settings.restAPISettings, settings.blockchainSettings.functionalitySettings, settings.featuresSettings, history, featureProvider),
       AssetsBroadcastApiRoute(settings.restAPISettings, utxStorage, allChannels),
-      LeaseApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, stateReader, time),
+      LeaseApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, time),
       LeaseBroadcastApiRoute(settings.restAPISettings, utxStorage, allChannels),
       AliasApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, time, stateReader),
       AliasBroadcastApiRoute(settings.restAPISettings, utxStorage, allChannels)
@@ -163,22 +163,33 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   @volatile var serverBinding: ServerBinding = _
 
   def shutdown(): Unit = {
+    val unbindTimeout = 2.minutes
+    val stopActorsTimeout = 1.minute
+
     if (!shutdownInProgress) {
       log.info("Stopping network services")
       shutdownInProgress = true
       if (settings.restAPISettings.enable) {
-        Try(Await.ready(serverBinding.unbind(), 60.seconds)).failed.map(e => log.error("Failed to unbind REST API port: " + e.getMessage))
+        Try(Await.ready(serverBinding.unbind(), unbindTimeout))
+          .failed.map(e => log.error("Failed to unbind REST API port", e))
       }
       for (addr <- settings.networkSettings.declaredAddress if settings.networkSettings.uPnPSettings.enable) {
         upnp.deletePort(addr.getPort)
       }
 
-      Try(Await.result(actorSystem.terminate(), 60.seconds))
-        .failed.map(e => log.error("Failed to terminate actor system: " + e.getMessage))
+      Try(Await.result(actorSystem.terminate(), stopActorsTimeout))
+        .failed.map(e => log.error("Failed to terminate actor system", e))
       log.debug("Closing storage")
+
+      log.debug("Closing wallet")
       wallet.close()
+
+      log.debug("Closing state")
       stateWriter.close()
+
+      log.debug("Closing history")
       history.close()
+
       log.info("Shutdown complete")
     }
   }

@@ -11,7 +11,7 @@ import scorex.transaction.{Transaction, TransactionParser}
 
 import scala.collection.JavaConverters._
 
-class StateReaderImpl(p: StateStorage, val synchronizationToken: ReentrantReadWriteLock) extends StateReader {
+class StateReaderImpl(p: StateStorage, val synchronizationToken: ReentrantReadWriteLock) extends SnapshotStateReader {
 
   val sp = Synchronized(p)
 

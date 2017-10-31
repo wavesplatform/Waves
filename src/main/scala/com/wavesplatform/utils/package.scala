@@ -64,5 +64,3 @@ package object utils extends ScorexLogging {
     System.exit(reason.code)
   }, "waves-platform-shutdown-thread").start()
 }
-
-

@@ -11,8 +11,9 @@ import com.wavesplatform.matcher.market.OrderHistoryActor._
 import com.wavesplatform.matcher.model.Events.{Event, ExchangeTransactionCreated, OrderAdded, OrderExecuted}
 import com.wavesplatform.matcher.model.MatcherModel._
 import com.wavesplatform.matcher.model._
+import com.wavesplatform.network._
 import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state2.reader.StateReader
+import com.wavesplatform.state2.StateReader
 import io.netty.channel.group.ChannelGroup
 import play.api.libs.json._
 import scorex.crypto.encode.Base58
@@ -25,8 +26,6 @@ import scorex.wallet.Wallet
 import scala.annotation.tailrec
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-
-import com.wavesplatform.network._
 
 class OrderBookActor(assetPair: AssetPair,
                      val orderHistory: ActorRef,

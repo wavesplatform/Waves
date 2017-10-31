@@ -3,7 +3,8 @@ package scorex.transaction
 import com.google.common.base.Throwables
 import com.wavesplatform.features.{BlockchainFeatures, FeatureProvider}
 import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state2.reader.StateReader
+import com.wavesplatform.state2.StateReader
+import com.wavesplatform.state2.reader.SnapshotStateReader
 import scorex.account.{Address, PublicKeyAccount}
 import scorex.block.Block
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
@@ -58,14 +59,14 @@ object PoSCalc extends ScorexLogging {
     }
   }
 
-  def generatingBalance(state: StateReader, fs: FunctionalitySettings, account: Address, atHeight: Int): Try[Long] = {
+  def generatingBalance(state: SnapshotStateReader, fs: FunctionalitySettings, account: Address, atHeight: Int): Try[Long] = {
     val generatingBalanceDepth = if (atHeight >= fs.generationBalanceDepthFrom50To1000AfterHeight) 1000 else 50
     state.effectiveBalanceAtHeightWithConfirmations(account, atHeight, generatingBalanceDepth)
   }
 
   def nextBlockGenerationTime(height: Int, state: StateReader, fs: FunctionalitySettings, block: Block,
-                              account: PublicKeyAccount, featureProvider: FeatureProvider): Either[String, Long] = {
-    generatingBalance(state, fs, account, height) match {
+                              account: PublicKeyAccount, featureProvider: FeatureProvider): Either[String, (Long, Long)] = {
+    generatingBalance(state(), fs, account, height) match {
       case Success(balance) => for {
         _ <- Either.cond((!featureProvider.isFeatureActivated(BlockchainFeatures.SmallerMinimalGeneratingBalance, height) && balance >= MinimalEffectiveBalanceForGenerator1) ||
           (featureProvider.isFeatureActivated(BlockchainFeatures.SmallerMinimalGeneratingBalance, height) && balance >= MinimalEffectiveBalanceForGenerator2), (),
@@ -75,7 +76,7 @@ object PoSCalc extends ScorexLogging {
         t = cData.baseTarget
         calculatedTs = (hit * 1000) / (BigInt(t) * balance) + block.timestamp
         _ <- Either.cond(0 < calculatedTs && calculatedTs < Long.MaxValue, (), s"Invalid next block generation time: $calculatedTs")
-      } yield calculatedTs.toLong
+      } yield (balance,calculatedTs.toLong)
       case Failure(exc) =>
         log.error("Critical error calculating nextBlockGenerationTime", exc)
         Left(Throwables.getStackTraceAsString(exc))

@@ -6,8 +6,7 @@ import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.UtxPool
 import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.state2.ByteStr
-import com.wavesplatform.state2.reader.StateReader
+import com.wavesplatform.state2.{ByteStr, StateReader}
 import io.swagger.annotations._
 import play.api.libs.json._
 import scorex.account.Address
@@ -53,7 +52,7 @@ case class TransactionsApiRoute(
               path(Segment) { limitStr =>
                 Exception.allCatch.opt(limitStr.toInt) match {
                   case Some(limit) if limit > 0 && limit <= MaxTransactionsPerRequest =>
-                    complete(Json.arr(JsArray(state.accountTransactions(a, limit).map(txToExtendedJson))))
+                    complete(Json.arr(JsArray(state().accountTransactions(a, limit).map(txToExtendedJson))))
                   case Some(limit) if limit > MaxTransactionsPerRequest =>
                     complete(TooBigArrayAllocation)
                   case _ =>
@@ -77,7 +76,7 @@ case class TransactionsApiRoute(
       path(Segment) { encoded =>
         ByteStr.decodeBase58(encoded) match {
           case Success(id) =>
-            state.transactionInfo(id) match {
+            state().transactionInfo(id) match {
               case Some((h, tx)) =>
                 complete(txToExtendedJson(tx) + ("height" -> JsNumber(h)))
               case None =>
@@ -128,7 +127,7 @@ case class TransactionsApiRoute(
   private def txToExtendedJson(tx: Transaction): JsObject = {
     tx match {
       case leaseCancel: LeaseCancelTransaction =>
-        leaseCancel.json ++ Json.obj("lease" -> state.findTransaction[LeaseTransaction](leaseCancel.leaseId).map(_.json).getOrElse[JsValue](JsNull))
+        leaseCancel.json ++ Json.obj("lease" -> state().findTransaction[LeaseTransaction](leaseCancel.leaseId).map(_.json).getOrElse[JsValue](JsNull))
       case t => t.json
     }
   }
