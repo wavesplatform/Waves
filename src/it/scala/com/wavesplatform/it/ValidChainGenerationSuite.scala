@@ -1,10 +1,10 @@
 package com.wavesplatform.it
 
+import com.wavesplatform.it.api._
 import org.scalatest._
 
 import scala.concurrent.Await.result
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
 import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
 import scala.util.Random
@@ -25,18 +25,7 @@ class ValidChainGenerationSuite extends FreeSpec with IntegrationNodesInitializa
 
       rollbackNodes = Random.shuffle(nodes).take(n)
       _ <- traverse(rollbackNodes)(_.rollback(1))
-      _ <- waitForSameBlocksAt(baseHeight, 3.seconds)
+      _ <- waitForSameBlocksAt(nodes)(baseHeight, 3.seconds)
     } yield (), 7.minutes)
-
-    def waitForSameBlocksAt(height: Int, delay: FiniteDuration): Future[Boolean] = {
-      traverse(nodes)(_.blockAt(height)).flatMap { blocks =>
-        if (blocks.forall(_ == blocks.head)) Future.successful(true)
-        else {
-          Future {
-            Thread.sleep(delay.toMillis)
-          }.flatMap(_ => waitForSameBlocksAt(height, delay))
-        }
-      }
-    }
   }
 }

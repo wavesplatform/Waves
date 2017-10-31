@@ -1,5 +1,6 @@
 package com.wavesplatform.it
 
+import com.wavesplatform.it.api._
 import org.scalatest._
 
 import scala.concurrent.Await.result
@@ -14,22 +15,19 @@ class WideStateGenerationSuite extends FreeSpec with IntegrationNodesInitializat
 
   private val requestsCount = 10000
 
-  "Generate a lot of transactions and synchronise" in {
-    val targetBlocks = result(for {
-      b <- traverse(nodes)(balanceForNode).map(_.toMap)
-      _ <- {
+  "Generate a lot of transactions and synchronise" in result(for {
+    b <- traverse(nodes)(balanceForNode).map(_.toMap)
+    _ <- {
         log.debug(
           s"""Balances:
              |${b.map { case (account, balance) => s"$account -> $balance" }.mkString("\n")}""".stripMargin)
         processRequests(generateTransfersToRandomAddresses(requestsCount / 2, b) ++ generateTransfersBetweenAccounts(requestsCount / 2, b))
       }
 
-      height <- traverse(nodes)(_.height).map(_.max)
-      _ <- traverse(nodes)(_.waitForHeight(height + 30))
+    height <- traverse(nodes)(_.height).map(_.max)
+    _ <- traverse(nodes)(_.waitForHeight(height + 30))
 
-      blocks <- traverse(nodes)(_.blockAt(height + 10))
-    } yield blocks.map(_.signature), 10.minutes)
+    _ <- waitForSameBlocksAt(nodes)(height + 10, 5.seconds)
+  } yield (), 10.minutes)
 
-    all(targetBlocks) shouldEqual targetBlocks.head
-  }
 }
