@@ -73,7 +73,7 @@ class ExtensionBlocksLoader(
             }) {
             peerDatabase.blacklistAndClose(ctx.channel(),"Extension blocks are not contiguous, pre-check failed")
           } else {
-            newBlocks.par.find(!_.signatureValid) match {
+            newBlocks.par.find(_.signaturesValid.isLeft) match {
               case Some(invalidBlock) =>
                 peerDatabase.blacklistAndClose(ctx.channel(),s"Got block $invalidBlock with invalid signature")
               case None =>

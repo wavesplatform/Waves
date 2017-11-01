@@ -162,7 +162,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
             measureSuccessful(forgeBlockTimeStats, ng.totalDiffOf(block.reference)) match {
               case None => Left(BlockAppendError(s"References incorrect or non-existing block", block))
               case Some((referencedForgedBlock, referencedLiquidDiff, discarded)) =>
-                if (referencedForgedBlock.signatureValid) {
+                if (referencedForgedBlock.signaturesValid.isRight) {
                   if (discarded.nonEmpty) {
                     microBlockForkStats.increment()
                     microBlockForkHeightStats.record(discarded.size)

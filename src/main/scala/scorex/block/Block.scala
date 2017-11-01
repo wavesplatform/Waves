@@ -96,8 +96,8 @@ case class Block(timestamp: Long,
 
   lazy val prevBlockFeePart: Portfolio = Monoid[Portfolio].combineAll(transactionData.map(tx => tx.feeDiff().minus(tx.feeDiff().multiply(CurrentBlockFeePart))))
 
-  override lazy val signatureValid: Boolean = EllipticCurveImpl.verify(signerData.signature.arr, bytesWithoutSignature, signerData.generator.publicKey)
-  override lazy val signedDescendants: Seq[Signed] = transactionData
+  protected override lazy val signatureValid: Boolean = EllipticCurveImpl.verify(signerData.signature.arr, bytesWithoutSignature, signerData.generator.publicKey)
+  protected override lazy val signedDescendants: Seq[Signed] = transactionData
 
   override def toString: String =
     s"Block(${signerData.signature} -> ${reference.trim}, txs=${transactionData.size}, feratures=$featureVotes) "
