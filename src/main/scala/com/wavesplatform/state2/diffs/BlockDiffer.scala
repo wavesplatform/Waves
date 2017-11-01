@@ -50,17 +50,18 @@ object BlockDiffer extends ScorexLogging with Instrumented {
 
   def fromMicroBlock(settings: FunctionalitySettings, fp: FeatureProvider, s: SnapshotStateReader, pervBlockTimestamp: Option[Long], micro: MicroBlock, timestamp: Long): Either[ValidationError, BlockDiff] = {
     for {
-    // microblocks are processed within block which is next after 40-only-block which goes on top of activated height
+      // microblocks are processed within block which is next after 40-only-block which goes on top of activated height
       _ <- Either.cond(fp.featureActivationHeight(BlockchainFeatures.NG.id).exists(s.height > _), (), ActivationError(s"MicroBlocks are not yet activated, current height=${s.height}"))
       _ <- Signed.validateSignatures(micro)
       r <- apply(settings, s, pervBlockTimestamp)(micro.generator, None, None, timestamp, micro.transactionData, 0)
     } yield r
   }
 
-  def unsafeDiffMany(settings: FunctionalitySettings, fp: FeatureProvider, s: SnapshotStateReader, prevBlock: Option[Block])(blocks: Seq[Block]): BlockDiff =
-    blocks.foldLeft((Monoid[BlockDiff].empty, prevBlock)) { case ((diff, prev), block) =>
-      val blockDiff = fromBlock(settings, fp, composite(s, diff), prev, block).explicitGet()
-      (Monoid[BlockDiff].combine(diff, blockDiff), Some(block))
+  def unsafeDiffMany(settings: FunctionalitySettings, fp: FeatureProvider, s: SnapshotStateReader, prevBlock: Option[Block], maxTxsInChunk: Int)
+                    (blocks: Seq[Block]): Seq[BlockDiff] =
+    blocks.foldLeft((Seq.empty[BlockDiff], prevBlock)) { case ((diffs, prev), block) =>
+      val blockDiff = fromBlock(settings, fp, composite(s, diffs), prev, block).explicitGet()
+      (perpendCompact(blockDiff, diffs) { case (x, y) => x.txsDiff.transactions.size + y.txsDiff.transactions.size <= maxTxsInChunk }, Some(block))
     }._1
 
   private def apply(settings: FunctionalitySettings, s: SnapshotStateReader, pervBlockTimestamp: Option[Long])

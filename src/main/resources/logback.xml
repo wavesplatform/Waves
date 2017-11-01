@@ -14,8 +14,8 @@
     <logger name="io.swagger" level="INFO"/>
     <logger name="org.asynchttpclient" level="INFO"/>
 
-    <logger name="sun.rmi.loader" level="INFO"/>
-    <logger name="sun.rmi.transport.tcp" level="INFO"/>
+    <logger name="sun.rmi" level="INFO"/>
+    <logger name="javax.management" level="INFO"/>
 
     <root level="INFO">
         <appender-ref ref="STDOUT" />

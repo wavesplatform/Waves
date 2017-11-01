@@ -59,9 +59,10 @@ class StateStorage private(file: Option[File]) extends VariablesStorage(createMV
   val lastBalanceSnapshotHeight: MVMap[ByteStr, Int] = db.openMap("lastUpdateHeight", new LogMVMapBuilder[ByteStr, Int]
     .keyType(DataTypes.byteStr))
 
-  def commit(): Unit = {
+  def commit(compact: Boolean): Unit = {
     db.commit()
-    db.compact(CompactFillRate, CompactMemorySize)
+    if (compact)
+      db.compact(CompactFillRate, CompactMemorySize)
   }
 
   override def close(): Unit = db.close()

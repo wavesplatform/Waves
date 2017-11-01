@@ -90,6 +90,7 @@ object CompositeStateReader {
     case _ => inner
   }
 
+  // fresh head
   def composite(inner: Coeval[SnapshotStateReader], blockDiff: Coeval[BlockDiff]): Coeval[SnapshotStateReader] = for {
     i <- inner
     b <- blockDiff

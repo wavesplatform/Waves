@@ -28,4 +28,5 @@ object BlockDiff {
       heightDiff = older.heightDiff + newer.heightDiff,
       snapshots = older.snapshots.combine(newer.snapshots))
   }
+
 }

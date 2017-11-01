@@ -34,7 +34,7 @@ package object diffs {
     val totalDiff1 = differ(state, block)
     assertion(totalDiff1)
 
-    val preconditionDiff = BlockDiffer.unsafeDiffMany(fs, fp, newState(), None)(preconditions)
+    val preconditionDiff = BlockDiffer.unsafeDiffMany(fs, fp, newState(), None, 6)(preconditions)
     val compositeState = composite(newState(), preconditionDiff)
     val totalDiff2 = differ(compositeState, block)
     assertion(totalDiff2)
@@ -54,7 +54,7 @@ package object diffs {
     state.applyBlockDiff(totalDiff1)
     assertion(totalDiff1, state)
 
-    val preconditionDiff = BlockDiffer.unsafeDiffMany(fs, fp, newState(), None)(preconditions)
+    val preconditionDiff = BlockDiffer.unsafeDiffMany(fs, fp, newState(), None, 7)(preconditions)
     val compositeState = composite(newState(), preconditionDiff)
     val totalDiff2 = differ(compositeState, block).explicitGet()
     assertion(totalDiff2, composite(compositeState, totalDiff2))
