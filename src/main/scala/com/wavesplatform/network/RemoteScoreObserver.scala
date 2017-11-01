@@ -15,12 +15,14 @@ import scala.concurrent.duration.FiniteDuration
 class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteStr], initialLocalScore: BigInt)
   extends ChannelDuplexHandler with ScorexLogging {
 
+  private type ScorePair = (Channel, BigInt)
+
   private val scores = new ConcurrentHashMap[Channel, BigInt]
 
   @volatile private var localScore = initialLocalScore
-  private val currentRequest = new AtomicReference[Option[Channel]](None)
+  private val currentRequest = new AtomicReference[Option[ScorePair]](None)
 
-  private def channelWithHighestScore: Option[(Channel, BigInt)] = {
+  private def channelWithHighestScore: Option[ScorePair] = {
     Option(scores.reduceEntries(1000, (c1, c2) => if (c1.getValue > c2.getValue) c1 else c2))
       .map(e => e.getKey -> e.getValue)
   }
@@ -55,7 +57,7 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
       }
 
     case ExtensionBlocks(blocks) =>
-      val isExpectedResponse = currentRequest.get().contains(ctx.channel())
+      val isExpectedResponse = currentRequest.get().exists(_._1 == ctx.channel())
       if (!isExpectedResponse) {
         log.debug(s"${id(ctx)} Received blocks ${formatBlocks(blocks)} from non-pinned channel (could be from expired channel)")
       } else if (blocks.isEmpty) {
@@ -77,14 +79,14 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
   private def trySwitchToBestIf(initiatorCtx: ChannelHandlerContext, reason: String)
                                (cond: Option[Channel] => Boolean): Unit = channelWithHighestScore match {
     case None => currentRequest.set(None)
-    case Some((bestRemoteChannel, bestRemoteScore)) =>
+    case best@Some((bestRemoteChannel, bestRemoteScore)) =>
       currentRequest
-        .updateAndGet { (orig: Option[Channel]) =>
+        .updateAndGet { (orig: Option[ScorePair]) =>
           if (bestRemoteScore <= localScore) None
-          else if (cond(orig)) Some(bestRemoteChannel)
+          else if (cond(orig.map(_._1))) best
           else orig
         }
-        .filter(_ == bestRemoteChannel)
+        .filter(best.contains)
         .foreach { _ =>
           log.debug(
             s"${id(initiatorCtx)} A new pinned channel ${id(bestRemoteChannel)} has score $bestRemoteScore " +
