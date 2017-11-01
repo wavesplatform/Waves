@@ -16,6 +16,7 @@ trait Time {
 
 class TimeImpl extends Time with ScorexLogging {
 
+  private val offsetPanicThreshold = 1000000
   private val ExpirationTimeout = 60.seconds
   private val RetryDelay = 10.seconds
   private val ResponseTimeout = 10.seconds
@@ -36,7 +37,7 @@ class TimeImpl extends Time with ScorexLogging {
         client.open()
         val info = client.getTime(InetAddress.getByName(NtpServer))
         info.computeDetails()
-        Option(info.getOffset)
+        Option(info.getOffset).map(offset => if(offset > offsetPanicThreshold) throw new Exception("Offset is suspiciously large") else offset)
       } catch {
         case t: Throwable =>
           log.warn("Problems with NTP: ", t)
