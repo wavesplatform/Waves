@@ -81,7 +81,7 @@ class CoordinatorHandler(checkpointService: CheckpointService,
     case b: Block => (Task {
       BlockStats.received(b, BlockStats.Source.Broadcast, ctx)
       CoordinatorHandler.blockReceivingLag.safeRecord(System.currentTimeMillis() - b.timestamp)
-      Signed.validateSignatures(b).flatMap(b => processBlock(b))
+      b.signaturesValid.flatMap(b => processBlock(b))
     } map {
       case Right(None) =>
         log.trace(s"$b already appended")
@@ -103,7 +103,7 @@ class CoordinatorHandler(checkpointService: CheckpointService,
     case md: MicroblockData =>
       import md.microBlock
       val microblockTotalResBlockSig = microBlock.totalResBlockSig
-      (Task(Signed.validateSignatures(microBlock).flatMap(processMicroBlock)) map {
+      (Task(microBlock.signaturesValid.flatMap(processMicroBlock)) map {
         case Right(()) =>
           md.invOpt match {
             case Some(mi) => allChannels.broadcast(mi, microBlockOwners.all(microBlock.totalResBlockSig).map(_.channel()))

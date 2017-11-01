@@ -44,7 +44,9 @@ object Transaction {
 trait Signed {
   protected def signatureValid: Boolean
 
-  def signedDescendants: Seq[Signed] = Seq.empty
+  protected def signedDescendants: Seq[Signed] = Seq.empty
+
+  lazy val signaturesValid: Either[InvalidSignature, this.type] = Signed.validateSignatures(this)
 }
 
 object Signed {
