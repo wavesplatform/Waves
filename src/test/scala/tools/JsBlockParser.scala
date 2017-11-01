@@ -60,7 +60,7 @@ object JsBlockParser extends App {
     transactionData = Seq.empty,
     featureVotes = Set(2)).explicitGet()
 
-  println(goodBlock.signatureValid)
+  println(goodBlock.signaturesValid)
 
   val badBlock = Block(
     timestamp=0,
@@ -71,7 +71,7 @@ object JsBlockParser extends App {
       consensusData=NxtLikeConsensusBlockData(1,ByteStr.decodeBase58("D866WPMvdahU2BdLowfYY9m4GrqXfXSmFxFd4e6rKYTd").get),
         transactionData = Seq.empty, featureVotes=Set(2))
 
-  println(badBlock.signatureValid)
+  println(badBlock.signaturesValid)
 
   println("GOOD")
   println(goodBlock.json)
@@ -79,7 +79,7 @@ object JsBlockParser extends App {
   println("BAD")
   println(badBlock.json)
 
-  println(Block.parseBytes(goodBlock.bytes).get.signatureValid)
+  println(Block.parseBytes(goodBlock.bytes).get.signaturesValid)
 
 //  val recreated = Block.buildAndSign(3, 1501851461300L, ByteStr.decodeBase58("4GkW491kuPtg3LDkCrXwBRASdQ7qUV2BNEFpM9XzD56JufSpmLqV9672wRQcSqJdxyEgq8nSQs2ogHit8Sr1ZtGT").get,
 //    NxtLikeConsensusBlockData(197518, ByteStr.decodeBase58("96C1rM2CxoKEua8Ha1xdVEYmnsL3VB44Z2uVKmbXPV3D").get),txs.take(128),

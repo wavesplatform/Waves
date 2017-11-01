@@ -44,14 +44,16 @@ object Transaction {
 trait Signed {
   protected def signatureValid: Boolean
 
-  def signedDescendants: Seq[Signed] = Seq.empty
+  protected def signedDescendants: Seq[Signed] = Seq.empty
+
+  lazy val signaturesValid: Either[InvalidSignature, this.type] = Signed.validateSignatures(this)
 }
 
 object Signed {
 
   type E[A] = Either[InvalidSignature, A]
 
-  def validateSignatures[S <: Signed](s: S): E[S] =
+  private def validateSignatures[S <: Signed](s: S): E[S] =
     if (!s.signatureValid) Left(InvalidSignature(s, None))
     else s.signedDescendants.par.find { descendant =>
       validateSignatures(descendant).isLeft

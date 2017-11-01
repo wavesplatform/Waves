@@ -60,7 +60,7 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
   def appendBlock(block: Block, acceptedFeatures: Set[Short])(consensusValidation: => Either[ValidationError, BlockDiff]): Either[ValidationError, BlockDiff] =
     write { implicit lock =>
 
-      assert(block.signatureValid)
+      assert(block.signaturesValid.isRight)
 
       if ((height() == 0) || (this.lastBlock.get.uniqueId == block.reference)) consensusValidation.map { blockDiff =>
         val h = height() + 1

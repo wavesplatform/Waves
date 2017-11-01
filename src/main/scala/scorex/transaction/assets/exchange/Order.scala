@@ -72,7 +72,7 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
   import Order._
 
   @ApiModelProperty(hidden = true)
-  lazy val signatureValid: Boolean = EllipticCurveImpl.verify(signature, toSign, senderPublicKey.publicKey)
+  protected lazy val signatureValid: Boolean = EllipticCurveImpl.verify(signature, toSign, senderPublicKey.publicKey)
 
   def isValid(atTime: Long): Validation = {
     isValidAmount(price, amount) &&
