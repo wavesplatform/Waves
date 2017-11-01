@@ -15,14 +15,12 @@ import scala.concurrent.duration.FiniteDuration
 class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteStr], initialLocalScore: BigInt)
   extends ChannelDuplexHandler with ScorexLogging {
 
-  private type ScorePair = (Channel, BigInt)
-
   private val scores = new ConcurrentHashMap[Channel, BigInt]
 
   @volatile private var localScore = initialLocalScore
-  private val currentRequest = new AtomicReference[Option[ScorePair]](None)
+  private val currentRequest = new AtomicReference[Option[Channel]](None)
 
-  private def bestRemotePair: Option[ScorePair] = {
+  private def channelWithHighestScore: Option[(Channel, BigInt)] = {
     Option(scores.reduceEntries(1000, (c1, c2) => if (c1.getValue > c2.getValue) c1 else c2))
       .map(e => e.getKey -> e.getValue)
   }
@@ -34,10 +32,7 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
         log.debug(s"${id(ctx)} Closed, removing score $removedScore")
       }
 
-      trySwitchToBestIf(ctx, s"Switching to second best channel, because ${id(closedChannel)} was closed") {
-        case Some((currChannel, _)) => currChannel == closedChannel
-        case _ => false
-      }
+      trySwitchToBestIf(ctx, s"Switching to second best channel, because ${id(closedChannel)} was closed")(_.contains(closedChannel))
     }
   }
 
@@ -60,7 +55,7 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
       }
 
     case ExtensionBlocks(blocks) =>
-      val isExpectedResponse = currentRequest.get().exists(_._1 == ctx.channel())
+      val isExpectedResponse = currentRequest.get().contains(ctx.channel())
       if (!isExpectedResponse) {
         log.debug(s"${id(ctx)} Received blocks ${formatBlocks(blocks)} from non-pinned channel (could be from expired channel)")
       } else if (blocks.isEmpty) {
@@ -75,28 +70,24 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
 
   private def scheduleExpiration(ctx: ChannelHandlerContext, score: BigInt): Unit = {
     ctx.executor().schedule(scoreTtl) {
-      if (scores.remove(ctx.channel(), score)) trySwitchToBestIf(ctx, "score expired") {
-        case Some((channel, _)) => channel == ctx.channel()
-        case _ => false
-      }
+      if (scores.remove(ctx.channel(), score)) trySwitchToBestIf(ctx, "score expired")(_.contains(ctx.channel()))
     }
   }
 
   private def trySwitchToBestIf(initiatorCtx: ChannelHandlerContext, reason: String)
-                               (cond: Option[ScorePair] => Boolean): Unit = bestRemotePair match {
+                               (cond: Option[Channel] => Boolean): Unit = channelWithHighestScore match {
     case None => currentRequest.set(None)
-    case Some(best@(bestRemoteChannel, bestRemoteScore)) =>
+    case Some((bestRemoteChannel, bestRemoteScore)) =>
       currentRequest
-        .updateAndGet { (orig: Option[ScorePair]) =>
+        .updateAndGet { (orig: Option[Channel]) =>
           if (bestRemoteScore <= localScore) None
-          else if (cond(orig)) bestRemotePair
+          else if (cond(orig)) Some(bestRemoteChannel)
           else orig
         }
-        .filter(_ == best)
+        .filter(_ == bestRemoteChannel)
         .foreach { _ =>
-          val toId = Option(bestRemoteChannel).map(id(_))
           log.debug(
-            s"${id(initiatorCtx)} A new pinned channel $toId has score $bestRemoteScore " +
+            s"${id(initiatorCtx)} A new pinned channel ${id(bestRemoteChannel)} has score $bestRemoteScore " +
               s"(diff with local: ${bestRemoteScore - localScore}): requesting an extension. $reason"
           )
           bestRemoteChannel.writeAndFlush(LoadBlockchainExtension(lastSignatures))
