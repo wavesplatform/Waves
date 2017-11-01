@@ -19,6 +19,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
         |    min-order-fee: 100000
         |    order-match-tx-fee: 100000
         |    snapshots-interval: 1d
+        |    order-cleanup-interval: 5m
         |    max-open-orders: 1000
         |    price-assets: [
         |      "WAVES",
@@ -46,6 +47,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
     settings.journalDataDir should be("/waves/matcher/journal")
     settings.snapshotsDataDir should be("/waves/matcher/snapshots")
     settings.snapshotsInterval should be(1.day)
+    settings.orderCleanupInterval should be(5.minute)
     settings.maxOpenOrders should be(1000)
     settings.priceAssets should be(Seq("WAVES", "8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS", "DHgwrRvVyqJsepd32YbBqUeDH4GJ1N984X8QoekjgH8J"))
     settings.predefinedPairs should be(Seq(
