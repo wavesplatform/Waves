@@ -12,7 +12,7 @@ import com.wavesplatform.state2.reader.SnapshotStateReader
 import scorex.account.Address
 import scorex.block.{Block, MicroBlock}
 import scorex.transaction.ValidationError.ActivationError
-import scorex.transaction.{Signed, Transaction, ValidationError}
+import scorex.transaction.{Transaction, ValidationError}
 import scorex.utils.ScorexLogging
 
 import scala.collection.SortedMap
@@ -43,7 +43,7 @@ object BlockDiffer extends ScorexLogging with Instrumented {
 
     val prevBlockTimestamp = maybePrevBlock.map(_.timestamp)
     for {
-      _ <- Signed.validateSignatures(block)
+      _ <- block.signaturesValid
       r <- apply(settings, s, prevBlockTimestamp)(block.signerData.generator, prevBlockFeeDistr, currentBlockFeeDistr, block.timestamp, block.transactionData, 1)
     } yield r
   }
@@ -52,7 +52,7 @@ object BlockDiffer extends ScorexLogging with Instrumented {
     for {
     // microblocks are processed within block which is next after 40-only-block which goes on top of activated height
       _ <- Either.cond(fp.featureActivationHeight(BlockchainFeatures.NG.id).exists(s.height > _), (), ActivationError(s"MicroBlocks are not yet activated, current height=${s.height}"))
-      _ <- Signed.validateSignatures(micro)
+      _ <- micro.signaturesValid
       r <- apply(settings, s, pervBlockTimestamp)(micro.generator, None, None, timestamp, micro.transactionData, 0)
     } yield r
   }

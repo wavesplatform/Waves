@@ -14,7 +14,7 @@ import monix.execution.CancelableFuture
 import monix.execution.schedulers.SchedulerService
 import scorex.block.MicroBlock
 import monix.reactive.Observable
-import scorex.transaction.{NgHistory, Signed}
+import scorex.transaction.NgHistory
 import scorex.utils.ScorexLogging
 
 import scala.concurrent.duration.FiniteDuration
@@ -80,7 +80,7 @@ class MicroBlockSynchronizer(settings: MicroblockSynchronizerSettings,
       }.runAsync
 
     case mbInv@MicroBlockInv(_, totalSig, prevSig, _) => Task {
-      Signed.validateSignatures(mbInv) match {
+      mbInv.signaturesValid match {
         case Left(err) => peerDatabase.blacklistAndClose(ctx.channel(), err.toString)
         case Right(_) =>
           log.trace(s"${id(ctx)} Received $msg")

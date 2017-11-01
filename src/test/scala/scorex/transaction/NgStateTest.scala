@@ -32,7 +32,7 @@ class NgStateTest extends PropSpec with GeneratorDrivenPropertyChecks with Prope
       microBlocks.foreach { m =>
         ng.totalDiffOf(m.totalResBlockSig).get match {
           case ((forged, _, _)) =>
-            Signed.validateSignatures(forged) shouldBe 'right
+            forged.signaturesValid shouldBe 'right
           case _ => ???
         }
       }
