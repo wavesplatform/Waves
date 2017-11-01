@@ -55,6 +55,7 @@ object Signed {
 
   private def validateSignatures[S <: Signed](s: S): E[S] =
     if (!s.signatureValid) Left(InvalidSignature(s, None))
+    else if (s.signedDescendants.isEmpty) Right(s)
     else s.signedDescendants.par.find { descendant =>
       validateSignatures(descendant).isLeft
     }.fold[E[S]](Right(s))(sd => Left(InvalidSignature(s, Some(validateSignatures(sd).left.get))))
