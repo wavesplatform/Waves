@@ -5,6 +5,8 @@ import java.net.{InetAddress, InetSocketAddress}
 import com.google.common.collect.EvictingQueue
 import com.wavesplatform.settings.NetworkSettings
 import com.wavesplatform.utils.createMVStore
+import io.netty.channel.Channel
+import io.netty.channel.socket.nio.NioSocketChannel
 import org.h2.mvstore.MVMap
 import scorex.utils.{LogMVMapBuilder, ScorexLogging}
 
@@ -125,4 +127,11 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Auto
   }
 
   override def close(): Unit = database.close()
+
+  override def blacklistAndClose(channel: Channel, reason: String): Unit = {
+    val address = channel.asInstanceOf[NioSocketChannel].remoteAddress().getAddress
+    log.debug(s"Blacklisting ${id(channel)}: $reason")
+    blacklist(address, reason)
+    channel.close()
+  }
 }

@@ -19,7 +19,7 @@ class OptimisticExtensionLoader extends ChannelDuplexHandler with ScorexLogging 
     ctx.writeAndFlush(LoadBlockchainExtension(hopefullyNextIds))
   }
 
-  override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef) = msg match {
+  override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
     case ExtensionBlocks(extension) if discardNextBlocks =>
       discardNextBlocks = false
       log.debug(s"${id(ctx)} discarding just-loaded ${extension.length} blocks as requested")

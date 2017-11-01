@@ -91,8 +91,7 @@ class CoordinatorHandler(checkpointService: CheckpointService,
         log.debug(s"Appended $b")
         if (b.transactionData.isEmpty)
           allChannels.broadcast(BlockForged(b), Some(ctx.channel()))
-        miner.scheduleMining()
-        allChannels.broadcast(LocalScoreChanged(newScore))
+        scheduleMiningAndBroadcastScore(newScore)
       case Left(is: InvalidSignature) =>
         peerDatabase.blacklistAndClose(ctx.channel(), s"Could not append $b: $is")
       case Left(ve) =>

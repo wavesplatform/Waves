@@ -85,6 +85,7 @@ class NotActivateFeatureTestSuite extends FreeSpec with Matchers with BeforeAndA
     )
 
     val votingFeatureNum: Short = 1
+
     val NodesCount: Int = 4
 
     val Configs: Seq[Config] = Random.shuffle(dockerConfigs.init).take(NodesCount).map(nonSupportedNodes.withFallback(_))
