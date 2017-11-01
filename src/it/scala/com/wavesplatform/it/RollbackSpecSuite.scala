@@ -18,7 +18,7 @@ class RollbackSpecSuite extends FreeSpec with ScalaFutures with IntegrationPatie
   with Matchers with TransferSending with IntegrationNodesInitializationAndStopping {
   override val docker = Docker(getClass)
   // there are nodes with big and small balances to reduce the number of forks
-  override val nodes: Seq[Node] = Configs.map(docker.startNode)
+  override val nodes: Seq[Node] = configs.map(docker.startNode)
 
   private val transactionsCount = 190
 
@@ -64,16 +64,10 @@ class RollbackSpecSuite extends FreeSpec with ScalaFutures with IntegrationPatie
         all(infos) shouldEqual infos.head
         infos.head
       })
-
       _ <- processRequests(requests)
-
-      _ <- traverse(nodes)(_.waitFor[Int](_.utxSize, _ == 0, 1.second))
-
+      _ <- nodes.head.waitFor[Int](_.utxSize, _ == 0, 1.second)
       _ <- traverse(nodes)(_.rollback(startHeight, returnToUTX = false))
-
-      _ <- traverse(nodes)(_.utx).map(utxs => {
-        all(utxs) shouldBe 'empty
-      })
+      _ <- nodes.head.utx.map( _ shouldBe 'empty )
 
       hashAfterApply <- nodes.head.waitForDebugInfoAt(startHeight + waitBlocks).map(_.stateHash)
     } yield {
@@ -108,6 +102,6 @@ object RollbackSpecSuite {
     """.stripMargin
   )
 
-  val Configs: Seq[Config] = Seq(dockerConfigs.last) :+
-    nonGeneratingNodesConfig.withFallback(Random.shuffle(dockerConfigs.init).head)
+  val configs: Seq[Config] = Seq(dockerConfigs.last,
+    nonGeneratingNodesConfig.withFallback(Random.shuffle(dockerConfigs.init).head))
 }

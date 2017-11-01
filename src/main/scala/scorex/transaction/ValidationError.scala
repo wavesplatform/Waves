@@ -9,7 +9,7 @@ trait ValidationError
 
 object ValidationError {
 
-  case object InvalidAddress extends ValidationError
+  case class InvalidAddress(reason: String) extends ValidationError
   case object NegativeAmount extends ValidationError
   case object InsufficientFee extends ValidationError
   case object TooBigArray extends ValidationError
@@ -28,9 +28,7 @@ object ValidationError {
   case class AliasNotExists(a: Alias) extends ValidationError
   case class OrderValidationError(order: Order, err: String) extends ValidationError
   case class Mistiming(err: String) extends ValidationError
-  case class BlockAppendError(err: String,b: Block)  extends ValidationError {
-    override def toString: String = s"BlockAppendError($err, BlockId=${b.uniqueId}])"
-  }
+  case class BlockAppendError(err: String,b: Block)  extends ValidationError
   case class MicroBlockAppendError(err: String, microBlock: MicroBlock) extends ValidationError {
     override def toString: String = s"MicroBlockAppendError($err, ${microBlock.totalResBlockSig} ~> ${microBlock.prevResBlockSig.trim}])"
   }

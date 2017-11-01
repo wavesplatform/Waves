@@ -10,8 +10,7 @@ import akka.http.scaladsl.server.Route
 import com.wavesplatform.UtxPool
 import com.wavesplatform.network.{LocalScoreChanged, PeerDatabase, PeerInfo, _}
 import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.state2.{ByteStr, LeaseInfo, Portfolio}
-import com.wavesplatform.state2.reader.StateReader
+import com.wavesplatform.state2.{ByteStr, LeaseInfo, Portfolio, StateReader}
 import io.netty.channel.Channel
 import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
@@ -28,9 +27,11 @@ import scala.concurrent.Future
 import scala.util.{Failure, Success}
 import scala.util.control.NonFatal
 import DebugApiRoute._
+import com.typesafe.config.{ConfigObject, ConfigRenderOptions}
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.mining.MinerDebugInfo
 import scorex.block.Block.BlockId
+import scorex.utils.ScorexLogging
 
 
 @Path("/debug")
@@ -45,11 +46,16 @@ case class DebugApiRoute(settings: RestAPISettings,
                          allChannels: ChannelGroup,
                          utxStorage: UtxPool,
                          blockchainDebugInfo: BlockchainDebugInfo,
-                         miner: Miner with MinerDebugInfo
-                        ) extends ApiRoute {
+                         miner: Miner with MinerDebugInfo,
+                         configRoot: ConfigObject
+                        ) extends ApiRoute with ScorexLogging {
+
+  private lazy val configStr = configRoot.render(ConfigRenderOptions.concise().setJson(true).setFormatted(true))
+  private lazy val fullConfig: JsValue = Json.parse(configStr)
+  private lazy val wavesConfig: JsObject = Json.obj("waves" -> (fullConfig \ "waves").get)
 
   override lazy val route: Route = pathPrefix("debug") {
-    blocks ~ state ~ info ~ stateWaves ~ rollback ~ rollbackTo ~ blacklist ~ portfolios ~ minerInfo ~ topDiffAccountPortfolios ~ bottomDiffAccountPortfolios ~ historyInfo
+    blocks ~ state ~ info ~ stateWaves ~ rollback ~ rollbackTo ~ blacklist ~ portfolios ~ minerInfo ~ historyInfo ~ configInfo ~ print
   }
 
   @Path("/blocks/{howMany}")
@@ -70,12 +76,36 @@ case class DebugApiRoute(settings: RestAPISettings,
       }))
     }
   }
+  @Path("/print")
+  @ApiOperation(
+    value = "Print",
+    notes = "Prints a string at DEBUG level, strips to 100 chars",
+    httpMethod = "POST"
+  )
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(
+      name = "body",
+      value = "Json with data",
+      required = true,
+      paramType = "body",
+      dataType = "scorex.waves.http.DebugMessage",
+      defaultValue = "{\n\t\"message\": \"foo\"\n}"
+    )
+  ))
+  @ApiResponses(Array(new ApiResponse(code = 200, message = "Json portfolio")))
+  def print: Route = (path("print") & post & withAuth) {
+    json[DebugMessage] { params =>
+      log.debug(params.message.take(100))
+      ""
+    }
+  }
+
 
   @Path("/state")
   @ApiOperation(value = "State", notes = "Get current state", httpMethod = "GET")
   @ApiResponses(Array(new ApiResponse(code = 200, message = "Json state")))
   def state: Route = (path("state") & get) {
-    complete(stateReader.accountPortfolios
+    complete(stateReader().accountPortfolios
       .map { case (k, v) =>
         k.address -> v.balance
       }
@@ -111,7 +141,7 @@ case class DebugApiRoute(settings: RestAPISettings,
       Address.fromString(rawAddress) match {
         case Left(_) => complete(InvalidAddress)
         case Right(address) =>
-          val portfolio = if (considerUnspent) utxStorage.portfolio(address) else stateReader.accountPortfolio(address)
+          val portfolio = if (considerUnspent) utxStorage.portfolio(address) else stateReader().accountPortfolio(address)
           complete(Json.toJson(portfolio))
       }
     }
@@ -123,8 +153,9 @@ case class DebugApiRoute(settings: RestAPISettings,
     new ApiImplicitParam(name = "height", value = "height", required = true, dataType = "integer", paramType = "path")
   ))
   def stateWaves: Route = (path("stateWaves" / IntNumber) & get) { height =>
-    val result = stateReader.accountPortfolios.keys
-      .map(acc => acc.stringRepr -> stateReader.balanceAtHeight(acc, height))
+    val s = stateReader()
+    val result = s.accountPortfolios.keys
+      .map(acc => acc.stringRepr -> s.balanceAtHeight(acc, height))
       .filter(_._2 != 0)
       .toMap
     complete(result)
@@ -176,28 +207,10 @@ case class DebugApiRoute(settings: RestAPISettings,
   ))
   def info: Route = (path("info") & get) {
     complete(Json.obj(
-      "stateHeight" -> stateReader.height,
+      "stateHeight" -> stateReader().height,
       "stateHash" -> blockchainDebugInfo.persistedAccountPortfoliosHash,
       "blockchainDebugInfo" -> blockchainDebugInfo.debugInfo()
     ))
-  }
-
-  @Path("/topDiffAccountPortfolios")
-  @ApiOperation(value = "State", notes = "All top diff info you need to debug", httpMethod = "GET")
-  @ApiResponses(Array(
-    new ApiResponse(code = 200, message = "Json state")
-  ))
-  def topDiffAccountPortfolios: Route = (path("topDiffAccountPortfolios") & get & withAuth) {
-    complete(blockchainDebugInfo.topDiff())
-  }
-
-  @Path("/bottomDiffAccountPortfolios")
-  @ApiOperation(value = "State", notes = "All bottom diff info you need to debug", httpMethod = "GET")
-  @ApiResponses(Array(
-    new ApiResponse(code = 200, message = "Json state")
-  ))
-  def bottomDiffAccountPortfolios: Route = (path("bottomDiffAccountPortfolios") & get & withAuth) {
-    complete(blockchainDebugInfo.bottomDiff())
   }
 
   @Path("/minerInfo")
@@ -207,8 +220,9 @@ case class DebugApiRoute(settings: RestAPISettings,
   ))
   def minerInfo: Route = (path("minerInfo") & get & withAuth) {
     complete(miner.collectNextBlockGenerationTimes.map { case (a, t) =>
+      val s = stateReader()
       AccountMiningInfo(a.stringRepr,
-        stateReader.effectiveBalanceAtHeightWithConfirmations(a, stateReader.height, 1000).get,
+        s.effectiveBalanceAtHeightWithConfirmations(a, s.height, 1000).get,
         t)
     })
   }
@@ -226,6 +240,24 @@ case class DebugApiRoute(settings: RestAPISettings,
 
   }
 
+
+  @Path("/configInfo")
+  @ApiOperation(value = "Config", notes = "Currently running node config", httpMethod = "GET")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(
+      name = "full",
+      value = "Exposes full typesafe config",
+      required = false,
+      dataType = "boolean",
+      paramType = "query",
+      defaultValue = "false"
+    )))
+  @ApiResponses(Array(
+    new ApiResponse(code = 200, message = "Json state")
+  ))
+  def configInfo: Route = (path("configInfo") & get & parameter('full.as[Boolean]) & withAuth) { full =>
+    complete(if (full) fullConfig else wavesConfig)
+  }
 
   @Path("/rollback-to/{signature}")
   @ApiOperation(value = "Block signature", notes = "Rollback the state to the block with a given signature", httpMethod = "DELETE")
@@ -274,7 +306,7 @@ case class DebugApiRoute(settings: RestAPISettings,
 
 object DebugApiRoute {
   implicit val assetsFormat: Format[Map[ByteStr, Long]] = Format[Map[ByteStr, Long]](
-    _ match {
+    {
       case JsObject(m) => m.foldLeft[JsResult[Map[ByteStr, Long]]](JsSuccess(Map.empty)) {
         case (e: JsError, _) => e
         case (JsSuccess(m, _), (rawAssetId, JsNumber(count))) =>

@@ -1,22 +1,52 @@
 package com.wavesplatform.state2
 
+import java.util.concurrent.TimeUnit
+
+import cats.kernel.Monoid
+import com.google.common.cache.CacheBuilder
 import scorex.block.Block.BlockId
 import scorex.block.{Block, MicroBlock}
 import scorex.transaction.History.BlockMinerInfo
-import scorex.transaction.{AssetId, DiscardedMicroBlocks, Transaction}
+import scorex.transaction.{DiscardedMicroBlocks, Transaction}
+
+import scala.collection.mutable.{ListBuffer => MList, Map => MMap}
+
+class NgState(val base: Block, val baseBlockDiff: BlockDiff, val acceptedFeatures: Set[Short]) {
+
+  private val MaxTotalDiffs = 3
+
+  private val microDiffs: MMap[BlockId, (BlockDiff, Long)] = MMap.empty
+  private val micros: MList[MicroBlock] = MList.empty // fresh head
+  private val totalBlockDiffCache = CacheBuilder.newBuilder()
+    .maximumSize(MaxTotalDiffs)
+    .expireAfterWrite(10, TimeUnit.MINUTES)
+    .build[BlockId, BlockDiff]()
 
 
-case class NgState private(base: Block, diffs: Map[BlockId, (BlockDiff, Long)], micros: List[MicroBlock], acceptedFeatures: Set[Short]) {
+  def microBlockIds: Seq[BlockId] = micros.map(_.totalResBlockSig).toList
 
-  lazy val lastMicroTotalSig: Option[ByteStr] =
-    micros.headOption.map(_.totalResBlockSig)
+  private def diffFor(totalResBlockSig: BlockId): BlockDiff =
+    if (totalResBlockSig == base.uniqueId)
+      baseBlockDiff
+    else Option(totalBlockDiffCache.getIfPresent(totalResBlockSig)) match {
+      case Some(d) => d
+      case None =>
+        val prevResBlockSig = micros.find(_.totalResBlockSig == totalResBlockSig).get.prevResBlockSig
+        val prevResBlockDiff = Option(totalBlockDiffCache.getIfPresent(prevResBlockSig)).getOrElse(diffFor(prevResBlockSig))
+        val currentMicroDiff = microDiffs(totalResBlockSig)._1
+        val r = Monoid.combine(prevResBlockDiff, currentMicroDiff)
+        totalBlockDiffCache.put(totalResBlockSig, r)
+        r
+    }
 
-  lazy val bestLiquidBlockId: AssetId =
-    lastMicroTotalSig.getOrElse(base.uniqueId)
+  def bestLiquidBlockId: BlockId =
+    micros.headOption.map(_.totalResBlockSig).getOrElse(base.uniqueId)
 
-  lazy val transactions: Seq[Transaction] = base.transactionData ++ micros.map(_.transactionData).reverse.flatten
+  def lastMicroBlock: Option[MicroBlock] = micros.headOption
 
-  lazy val bestLiquidBlock: Block =
+  def transactions: Seq[Transaction] = base.transactionData ++ micros.map(_.transactionData).reverse.flatten
+
+  def bestLiquidBlock: Block =
     if (micros.isEmpty) {
       base
     } else {
@@ -24,15 +54,16 @@ case class NgState private(base: Block, diffs: Map[BlockId, (BlockDiff, Long)], 
         transactionData = transactions)
     }
 
-  lazy val bestLiquidDiff: BlockDiff =
-    diffs(bestLiquidBlockId)._1
-      .copy(heightDiff = 1)
+  def totalDiffOf(id: BlockId): Option[(Block, BlockDiff, DiscardedMicroBlocks)] =
+    forgeBlock(id).map { case (b, txs) => (b, diffFor(id), txs) }
 
-  def contains(blockId: BlockId): Boolean = diffs.contains(blockId)
+  def bestLiquidDiff: BlockDiff = micros.headOption.map(m => totalDiffOf(m.totalResBlockSig).get._2).getOrElse(baseBlockDiff).copy(heightDiff = 1)
+
+  def contains(blockId: BlockId): Boolean = base.uniqueId == blockId || microDiffs.contains(blockId)
 
   def microBlock(id: BlockId): Option[MicroBlock] = micros.find(_.totalResBlockSig == id)
 
-  def forgeBlock(id: BlockId): Option[(Block, DiscardedMicroBlocks)] = {
+  private def forgeBlock(id: BlockId): Option[(Block, DiscardedMicroBlocks)] = {
     val ms = micros.reverse
     if (base.uniqueId == id) {
       Some((base, ms))
@@ -56,22 +87,14 @@ case class NgState private(base: Block, diffs: Map[BlockId, (BlockDiff, Long)], 
   }
 
   def bestLastBlockInfo(maxTimeStamp: Long): BlockMinerInfo = {
-    val blockId = micros.find(micro => diffs(micro.totalResBlockSig)._2 <= maxTimeStamp)
+    val blockId = micros.find(micro => microDiffs(micro.totalResBlockSig)._2 <= maxTimeStamp)
       .map(_.totalResBlockSig)
       .getOrElse(base.uniqueId)
     BlockMinerInfo(base.consensusData, base.timestamp, blockId)
   }
-}
 
-object NgState {
-
-  def apply(base: Block, diff: BlockDiff, timestamp: Long, acceptedFeatures: Set[Short]): NgState =
-    NgState(base, Map(base.uniqueId -> ((diff, timestamp))), List.empty, acceptedFeatures)
-
-  implicit class NgStateExt(n: NgState) {
-    def +(m: MicroBlock, diff: BlockDiff, timestamp: Long): NgState = NgState(n.base, n.diffs + (m.totalResBlockSig -> ((diff, timestamp))), m +: n.micros, n.acceptedFeatures)
+  def append(m: MicroBlock, diff: BlockDiff, timestamp: Long): Unit = {
+    microDiffs.put(m.totalResBlockSig, (diff, timestamp))
+    micros.prepend(m)
   }
-
-
 }
-

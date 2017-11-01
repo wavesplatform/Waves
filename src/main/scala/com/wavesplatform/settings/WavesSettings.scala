@@ -17,6 +17,7 @@ object LogLevel extends Enumeration {
 }
 
 case class WavesSettings(directory: String,
+                         mvstorePageSplitSize: Int,
                          loggingLevel: LogLevel.Value,
                          networkSettings: NetworkSettings,
                          walletSettings: WalletSettings,
@@ -32,11 +33,14 @@ case class WavesSettings(directory: String,
                          metrics: Metrics.Settings)
 
 object WavesSettings {
+
   import NetworkSettings.networkSettingsValueReader
 
   val configPath: String = "waves"
+
   def fromConfig(config: Config): WavesSettings = {
     val directory = config.as[String](s"$configPath.directory")
+    val pageSplitSize = config.as[Int](s"$configPath.mvstore-page-split-size")
     val loggingLevel = config.as[LogLevel.Value](s"$configPath.logging-level")
 
     val networkSettings = config.as[NetworkSettings]("waves.network")
@@ -52,7 +56,7 @@ object WavesSettings {
     val featuresSettings = config.as[FeaturesSettings]("waves.features")
     val metrics = config.as[Metrics.Settings]("metrics")
 
-    WavesSettings(directory, loggingLevel, networkSettings, walletSettings, blockchainSettings, checkpointsSettings,
+    WavesSettings(directory, pageSplitSize, loggingLevel, networkSettings, walletSettings, blockchainSettings, checkpointsSettings,
       feesSettings, matcherSettings, minerSettings, restAPISettings, synchronizationSettings, utxSettings,
       featuresSettings, metrics)
   }

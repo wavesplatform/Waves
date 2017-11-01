@@ -11,12 +11,12 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.util.Random
 
-class BlacklistTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with CancelAfterFailure {
+class BlacklistTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with CancelAfterFailure with ReportingTestName{
 
   import BlacklistTestSuite._
 
   private val docker = Docker(getClass)
-  private val nodes = Configs.map(docker.startNode)
+  override val nodes = Configs.map(docker.startNode)
   private val richestNode = nodes.head
   private val otherNodes = nodes.tail
 

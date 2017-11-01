@@ -7,7 +7,7 @@ import com.wavesplatform.metrics._
 import com.wavesplatform.network.{BlockCheckpoint, Checkpoint}
 import com.wavesplatform.settings.{BlockchainSettings, FunctionalitySettings, WavesSettings}
 import com.wavesplatform.state2._
-import com.wavesplatform.state2.reader.StateReader
+import com.wavesplatform.state2.reader.SnapshotStateReader
 import kamon.Kamon
 import org.influxdb.dto.Point
 import scorex.block.{Block, MicroBlock}
@@ -34,15 +34,11 @@ object Coordinator extends ScorexLogging with Instrumented {
           extension.zipWithIndex.forall(p => checkpoint.isBlockValid(p._1.signerData.signature, lastCommonHeight + 1 + p._2))
 
         lazy val forkApplicationResultEi: Either[ValidationError, BigInt] = {
-          val firstDeclined = extension.view
-            .map { b =>
-              b -> appendBlock(
-                checkpoint, history, blockchainUpdater, stateReader, utxStorage, time, settings.blockchainSettings,
-                featureProvider
-              )(b, local = false).right.map { baseHeight =>
-                BlockStats.applied(b, BlockStats.Source.Ext, baseHeight)
-              }
+          val firstDeclined = extension.view.map { b =>
+            b -> appendBlock(checkpoint, history, blockchainUpdater, stateReader(), utxStorage, time, settings.blockchainSettings, featureProvider)(b).right.map {
+              _.foreach(bh => BlockStats.applied(b, BlockStats.Source.Ext, bh))
             }
+          }
             .zipWithIndex
             .collectFirst { case ((b, Left(e)), i) => (i, b, e) }
 
@@ -56,12 +52,12 @@ object Coordinator extends ScorexLogging with Instrumented {
           firstDeclined
             .foldLeft[Either[ValidationError, BigInt]](Right(history.score())) {
             case (_, (i, b, e)) if i == 0 =>
-              log.warn(s"Can't process fork starting with $lastCommonBlockId, error appending block ${b.uniqueId}: $e")
+              log.warn(s"Can't process fork starting with $lastCommonBlockId, error appending block $b: $e")
               Left(e)
 
             case (r, (i, b, e)) =>
               log.debug(s"Processed $i of ${newBlocks.size} blocks from extension")
-              log.warn(s"Can't process fork starting with $lastCommonBlockId, error appending block ${b.uniqueId}: $e")
+              log.warn(s"Can't process fork starting with $lastCommonBlockId, error appending block $b: $e")
               r
           }
         }
@@ -103,32 +99,20 @@ object Coordinator extends ScorexLogging with Instrumented {
   }
 
 
-  private def updateBlockchainReadinessFlag(history: History, time: Time, blockchainReadiness: AtomicBoolean, maxBlockchainAge: FiniteDuration): Boolean = {
+  def updateBlockchainReadinessFlag(history: History, time: Time, blockchainReadiness: AtomicBoolean, maxBlockchainAge: FiniteDuration): Boolean = {
     val expired = time.correctedTime() - history.lastBlockTimestamp().get < maxBlockchainAge.toMillis
     blockchainReadiness.compareAndSet(expired, !expired)
   }
 
   def processSingleBlock(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater, time: Time,
-                         stateReader: StateReader, utxStorage: UtxPool, blockchainReadiness: AtomicBoolean,
-                         settings: WavesSettings, featureProvider: FeatureProvider)
-                        (newBlock: Block, local: Boolean): Either[ValidationError, Option[BigInt]] = measureSuccessful(blockProcessingTimeStats, history.write { implicit l =>
-    if (history.contains(newBlock))
-      Right(None)
-    else {
-      val newScore = for {
-        _ <- Either.cond(history.heightOf(newBlock.reference).exists(_ >= history.height() - 1), (), GenericError("Can process either new top block or current top block's competitor"))
-        baseHeight <- appendBlock(checkpoint, history, blockchainUpdater, stateReader, utxStorage, time, settings.blockchainSettings, featureProvider)(newBlock, local)
-      } yield {
-        if (local) BlockStats.mined(newBlock, baseHeight)
-        else BlockStats.applied(newBlock, BlockStats.Source.Broadcast, baseHeight)
-        history.score()
-      }
-
-      if (local || newScore.isRight) {
-        updateBlockchainReadinessFlag(history, time, blockchainReadiness, settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed)
-      }
-      newScore.right.map(Some(_))
-    }
+                         stateReader: StateReader, utxStorage: UtxPool,
+                         settings: BlockchainSettings, featureProvider: FeatureProvider)
+                        (newBlock: Block): Either[ValidationError, Option[BigInt]] = measureSuccessful(blockProcessingTimeStats, history.write { implicit l =>
+    if (history.contains(newBlock)) Right(None)
+    else for {
+      _ <- Either.cond(history.heightOf(newBlock.reference).exists(_ >= history.height() - 1), (), GenericError("Can process either new top block or current top block's competitor"))
+      maybeBaseHeight <- appendBlock(checkpoint, history, blockchainUpdater, stateReader(), utxStorage, time, settings, featureProvider)(newBlock)
+    } yield maybeBaseHeight map (_ => history.score())
   })
 
   def processMicroBlock(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater, utxStorage: UtxPool)
@@ -146,21 +130,20 @@ object Coordinator extends ScorexLogging with Instrumented {
       s"generator's effective balance $effectiveBalance is less that required for generation")
 
   private def appendBlock(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater,
-                          stateReader: StateReader, utxStorage: UtxPool, time: Time, settings: BlockchainSettings,
-                          featureProvider: FeatureProvider)
-                         (block: Block, local: Boolean): Either[ValidationError, Int] = for {
+                          stateReader: SnapshotStateReader, utxStorage: UtxPool, time: Time, settings: BlockchainSettings,
+                          featureProvider: FeatureProvider)(block: Block): Either[ValidationError, Option[Int]] = for {
     _ <- Either.cond(checkpoint.isBlockValid(block.signerData.signature, history.height() + 1), (),
-      GenericError(s"Block ${block.uniqueId} at height ${history.height() + 1} is not valid w.r.t. checkpoint"))
+      GenericError(s"Block $block at height ${history.height() + 1} is not valid w.r.t. checkpoint"))
     _ <- blockConsensusValidation(history, featureProvider, settings, time.correctedTime(), block) { height =>
       PoSCalc.generatingBalance(stateReader, settings.functionalitySettings, block.signerData.generator, height).toEither.left.map(_.toString)
         .flatMap(validateEffectiveBalance(featureProvider, settings.functionalitySettings, block, height))
     }
     baseHeight = history.height()
-    discardedTxs <- blockchainUpdater.processBlock(block)
+    maybeDiscardedTxs <- blockchainUpdater.processBlock(block)
   } yield {
     utxStorage.removeAll(block.transactionData)
-    discardedTxs.foreach(utxStorage.putIfNew)
-    baseHeight
+    maybeDiscardedTxs.toSeq.flatten.foreach(utxStorage.putIfNew)
+    maybeDiscardedTxs.map(_ => baseHeight)
   }
 
   def processCheckpoint(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater)
@@ -188,7 +171,7 @@ object Coordinator extends ScorexLogging with Instrumented {
       val hh = existingItems.map(_.height) :+ genesisBlockHeight
       history.blockAt(hh(fork.size)).foreach {
         lastValidBlock =>
-          log.warn(s"Fork detected (length = ${fork.size}), rollback to last valid block id [${lastValidBlock.uniqueId}]")
+          log.warn(s"Fork detected (length = ${fork.size}), rollback to last valid block $lastValidBlock]")
           blockBlockForkStats.increment()
           blockForkHeightStats.record(fork.size)
           blockchainUpdater.removeAfter(lastValidBlock.uniqueId)
@@ -196,7 +179,7 @@ object Coordinator extends ScorexLogging with Instrumented {
     }
   }
 
-  val MaxTimeDrift: Long = 15.seconds.toMillis
+  val MaxTimeDrift: Long = 100 // millis
 
   private def blockConsensusValidation(history: History, fp: FeatureProvider, bcs: BlockchainSettings, currentTs: Long, block: Block)
                                       (genBalance: Int => Either[String, Long]): Either[ValidationError, Unit] = history.read { _ =>
@@ -229,7 +212,7 @@ object Coordinator extends ScorexLogging with Instrumented {
       hit = calcHit(prevBlockData, generator)
       target = calcTarget(parent.consensusData.baseTarget, parent.timestamp, blockTime, effectiveBalance)
       _ <- Either.cond(hit < target, (), s"calculated hit $hit >= calculated target $target")
-    } yield ()).left.map(e => GenericError(s"Block ${block.uniqueId} is invalid: $e"))
+    } yield ()).left.map(e => GenericError(s"Block $block is invalid: $e"))
   }
 
   private val blockBlockForkStats = Kamon.metrics.counter("block-fork")

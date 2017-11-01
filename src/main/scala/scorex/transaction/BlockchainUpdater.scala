@@ -1,14 +1,13 @@
 package scorex.transaction
 
-import com.wavesplatform.state2.{ByteStr, Portfolio}
+import com.wavesplatform.state2.ByteStr
 import monix.reactive.Observable
-import scorex.account.Address
 import scorex.block.{Block, MicroBlock}
 import scorex.utils.Synchronized
 
 trait BlockchainUpdater extends Synchronized {
 
-  def processBlock(block: Block): Either[ValidationError, DiscardedTransactions]
+  def processBlock(block: Block): Either[ValidationError, Option[DiscardedTransactions]]
 
   def processMicroBlock(microBlock: MicroBlock): Either[ValidationError, Unit]
 
@@ -22,14 +21,10 @@ trait BlockchainDebugInfo {
 
   def persistedAccountPortfoliosHash(): Int
 
-  def topDiff(): Map[Address, Portfolio]
-
-  def bottomDiff(): Map[Address, Portfolio]
 }
 
 case class HashInfo(height: Int, hash: Int)
 
 case class StateDebugInfo(persisted: HashInfo,
-                          top: HashInfo,
-                          bottom: HashInfo,
+                          inMemory: Seq[HashInfo],
                           microBaseHash: Option[Int])

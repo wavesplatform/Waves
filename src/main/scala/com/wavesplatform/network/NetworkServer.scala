@@ -8,7 +8,7 @@ import com.wavesplatform.features.FeatureProvider
 import com.wavesplatform.metrics.Metrics
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.settings._
-import com.wavesplatform.state2.reader.StateReader
+import com.wavesplatform.state2._
 import com.wavesplatform.{UtxPool, Version}
 import io.netty.bootstrap.{Bootstrap, ServerBootstrap}
 import io.netty.channel._
@@ -82,8 +82,9 @@ class NetworkServer(checkpointService: CheckpointService,
 
   private val coordinatorExecutor = new DefaultEventLoop
 
+  private val microBlockOwners = new MicroBlockOwners(settings.synchronizationSettings.microBlockSynchronizer.invCacheTimeout)
   private val coordinatorHandler = new CoordinatorHandler(checkpointService, history, blockchainUpdater, time,
-    stateReader, utxPool, blockchainReadiness, miner, settings, peerDatabase, allChannels, featureProvider)
+    stateReader, utxPool, blockchainReadiness, miner, settings, peerDatabase, allChannels, featureProvider, microBlockOwners)
 
   private val peerConnections = new ConcurrentHashMap[PeerKey, Channel](10, 0.9f, 10)
 
@@ -95,7 +96,8 @@ class NetworkServer(checkpointService: CheckpointService,
     settings.synchronizationSettings.microBlockSynchronizer,
     history,
     peerDatabase,
-    blockchainUpdater.lastBlockId
+    blockchainUpdater.lastBlockId,
+    microBlockOwners
   )
 
 

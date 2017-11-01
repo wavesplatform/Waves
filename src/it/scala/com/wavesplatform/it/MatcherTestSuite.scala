@@ -8,7 +8,6 @@ import org.scalatest.{BeforeAndAfterAll, FreeSpec, Matchers}
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
-import scorex.utils.NTP
 
 import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -16,13 +15,13 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.util.Random
 
-class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll {
+class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with ReportingTestName{
 
   import MatcherTestSuite._
 
   private val docker = Docker(getClass)
 
-  private val nodes = Configs.map(docker.startNode)
+  override val nodes = Configs.map(docker.startNode)
 
   private val matcherNode = nodes.head
   private val aliceNode = nodes(1)
@@ -282,7 +281,7 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll {
   }
 
   private def prepareOrder(node: Node, pair: AssetPair, orderType: OrderType, price: Long, amount: Long): Order = {
-    val creationTime = NTP.correctedTime()
+    val creationTime = System.currentTimeMillis()
     val timeToLive = creationTime + Order.MaxLiveTime - 1000
 
     val privateKey = PrivateKeyAccount(Base58.decode(node.accountSeed).get)
@@ -349,7 +348,7 @@ object MatcherTestSuite {
     s"""
        |waves.matcher {
        |  enable=yes
-       |  account="3HevUqdcHuiLvpeVLo4sGVqxSsZczJuCYHo"
+       |  account="3Hm3LGoNPmw1VTZ3eRA2pAfeQPhnaBm6YFC"
        |  bind-address="0.0.0.0"
        |  order-match-tx-fee = 300000
        |  blacklisted-assets = [$ForbiddenAssetId]

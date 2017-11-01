@@ -7,7 +7,7 @@ import com.wavesplatform.metrics.{BlockStats, HistogramExt}
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.network.MicroBlockSynchronizer.MicroblockData
 import com.wavesplatform.settings.WavesSettings
-import com.wavesplatform.state2.reader.StateReader
+import com.wavesplatform.state2.StateReader
 import com.wavesplatform.{Coordinator, UtxPool}
 import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel.group.ChannelGroup
@@ -32,14 +32,15 @@ class CoordinatorHandler(checkpointService: CheckpointService,
                          settings: WavesSettings,
                          peerDatabase: PeerDatabase,
                          allChannels: ChannelGroup,
-                         featureProvider: FeatureProvider)
+                         featureProvider: FeatureProvider,
+                         microBlockOwners: MicroBlockOwners)
   extends ChannelInboundHandlerAdapter with ScorexLogging {
 
   private implicit val scheduler = monix.execution.Scheduler.singleThread("coordinator-handler", reporter = com.wavesplatform.utils.UncaughtExceptionsToLogReporter)
 
   private val processCheckpoint = Coordinator.processCheckpoint(checkpointService, history, blockchainUpdater) _
   private val processFork = Coordinator.processFork(checkpointService, history, blockchainUpdater, stateReader, utxStorage, time, settings, blockchainReadiness, featureProvider) _
-  private val processBlock = Coordinator.processSingleBlock(checkpointService, history, blockchainUpdater, time, stateReader, utxStorage, blockchainReadiness, settings, featureProvider) _
+  private val processBlock = Coordinator.processSingleBlock(checkpointService, history, blockchainUpdater, time, stateReader, utxStorage, settings.blockchainSettings, featureProvider) _
   private val processMicroBlock = Coordinator.processMicroBlock(checkpointService, history, blockchainUpdater, utxStorage) _
 
   private def scheduleMiningAndBroadcastScore(score: BigInt): Unit = {
@@ -80,30 +81,32 @@ class CoordinatorHandler(checkpointService: CheckpointService,
     case b: Block => (Task {
       BlockStats.received(b, BlockStats.Source.Broadcast, ctx)
       CoordinatorHandler.blockReceivingLag.safeRecord(System.currentTimeMillis() - b.timestamp)
-      Signed.validateSignatures(b).flatMap(b => processBlock(b, false))
+      Signed.validateSignatures(b).flatMap(b => processBlock(b))
     } map {
       case Right(None) =>
-        log.trace(s"Block ${b.uniqueId} already appended")
+        log.trace(s"$b already appended")
       case Right(Some(newScore)) =>
-        log.debug(s"Appended block ${b.uniqueId}")
+        BlockStats.applied(b, BlockStats.Source.Broadcast, history.height())
+        Coordinator.updateBlockchainReadinessFlag(history, time, blockchainReadiness, settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed)
+        log.debug(s"Appended $b")
         if (b.transactionData.isEmpty)
           allChannels.broadcast(BlockForged(b), Some(ctx.channel()))
         miner.scheduleMining()
         allChannels.broadcast(LocalScoreChanged(newScore))
       case Left(is: InvalidSignature) =>
-        peerDatabase.blacklistAndClose(ctx.channel(), s"Could not append block ${b.uniqueId}: $is")
+        peerDatabase.blacklistAndClose(ctx.channel(), s"Could not append $b: $is")
       case Left(ve) =>
         BlockStats.declined(b, BlockStats.Source.Broadcast)
-        log.debug(s"Could not append block ${b.uniqueId}: $ve")
+        log.debug(s"Could not append $b: $ve")
     }).onErrorHandle[Unit](ctx.fireExceptionCaught).runAsync
 
     case md: MicroblockData =>
-      val microBlock = md.microBlock
+      import md.microBlock
       val microblockTotalResBlockSig = microBlock.totalResBlockSig
       (Task(Signed.validateSignatures(microBlock).flatMap(processMicroBlock)) map {
         case Right(()) =>
           md.invOpt match {
-            case Some(mi) => allChannels.broadcast(mi, Some(ctx.channel()))
+            case Some(mi) => allChannels.broadcast(mi, microBlockOwners.all(microBlock.totalResBlockSig).map(_.channel()))
             case None => log.warn("Not broadcasting MicroBlockInv")
           }
           BlockStats.applied(microBlock)

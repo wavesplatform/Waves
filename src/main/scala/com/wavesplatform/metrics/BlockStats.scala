@@ -47,10 +47,10 @@ object BlockStats {
     Seq.empty
   )
 
-  def applied(b: Block, source: Source, baseHeight: Int): Unit = write(
+  def applied(b: Block, source: Source, newHeight: Int): Unit = write(
     block(b, source)
       .addField("txs", b.transactionData.size)
-      .addField("height", baseHeight),
+      .addField("height", newHeight),
     Event.Applied,
     Seq.empty
   )
@@ -78,15 +78,6 @@ object BlockStats {
       .tag("parent-id", id(m.prevBlockSig))
       .addField("from", nodeName(ctx)),
     Event.Inv,
-    Seq.empty
-  )
-
-  def received(m: MicroBlock, ctx: ChannelHandlerContext, propagationTime: Long): Unit = write(
-    micro(m)
-      .tag("parent-id", id(m.prevResBlockSig))
-      .addField("from", nodeName(ctx))
-      .addField("prop-time", propagationTime),
-    Event.Received,
     Seq.empty
   )
 

@@ -6,6 +6,9 @@ import cats.Monoid
 import cats.implicits._
 import com.wavesplatform.metrics.Instrumented
 import com.wavesplatform.state2.reader.StateReaderImpl
+import scorex.transaction.PaymentTransaction
+import scorex.transaction.assets.TransferTransaction
+import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.utils.ScorexLogging
 
 trait StateWriter {
@@ -14,7 +17,7 @@ trait StateWriter {
   def clear(): Unit
 }
 
-class StateWriterImpl(p: StateStorage, synchronizationToken: ReentrantReadWriteLock)
+class StateWriterImpl(p: StateStorage, storeTransactions: Boolean, synchronizationToken: ReentrantReadWriteLock)
   extends StateReaderImpl(p, synchronizationToken) with StateWriter with AutoCloseable with ScorexLogging with Instrumented {
 
   import StateStorage._
@@ -29,8 +32,10 @@ class StateWriterImpl(p: StateStorage, synchronizationToken: ReentrantReadWriteL
     log.debug(s"Starting persist from $oldHeight to $newHeight")
 
     measureSizeLog("transactions")(txsDiff.transactions) {
-      _.par.foreach { case (id, (h, tx, _)) =>
-        sp().transactions.put(id, (h, tx.bytes))
+      _.par.foreach {
+        case (id, (h, tx@(_: TransferTransaction | _: ExchangeTransaction | _: PaymentTransaction), _)) =>
+          sp().transactions.put(id, (h, if (storeTransactions) tx.bytes else Array.emptyByteArray))
+        case (id, (h, tx, _)) => sp().transactions.put(id, (h, tx.bytes))
       }
     }
 
@@ -55,7 +60,6 @@ class StateWriterImpl(p: StateStorage, synchronizationToken: ReentrantReadWriteL
       }
     }
 
-
     measureSizeLog("assets")(txsDiff.issuedAssets) {
       _.foreach { case (id, assetInfo) =>
         val updated = (Option(sp().assets.get(id)) match {
@@ -67,7 +71,7 @@ class StateWriterImpl(p: StateStorage, synchronizationToken: ReentrantReadWriteL
       }
     }
 
-    measureSizeLog("accountTransactionIds")(blockDiff.txsDiff.accountTransactionIds) {
+    if (storeTransactions) measureSizeLog("accountTransactionIds")(blockDiff.txsDiff.accountTransactionIds) {
       _.foreach { case (acc, txIds) =>
         val startIdxShift = sp().accountTransactionsLengths.getOrDefault(acc.bytes, 0)
         txIds.reverse.foldLeft(startIdxShift) { case (shift, txId) =>

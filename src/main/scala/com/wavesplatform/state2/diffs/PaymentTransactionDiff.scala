@@ -2,7 +2,7 @@ package com.wavesplatform.state2.diffs
 
 import cats.implicits._
 import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state2.reader.StateReader
+import com.wavesplatform.state2.reader.{SnapshotStateReader}
 import com.wavesplatform.state2.{ByteStr, Diff, LeaseInfo, Portfolio}
 import scorex.account.Address
 import scorex.transaction.ValidationError.GenericError
@@ -12,7 +12,7 @@ import scala.util.{Left, Right}
 
 object PaymentTransactionDiff {
 
-  def apply(stateReader: StateReader, height: Int, settings: FunctionalitySettings, blockTime: Long)
+  def apply(stateReader: SnapshotStateReader, height: Int, settings: FunctionalitySettings, blockTime: Long)
            (tx: PaymentTransaction): Either[ValidationError, Diff] = {
 
     stateReader.paymentTransactionIdByHash(ByteStr(tx.hash)) match {

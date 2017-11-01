@@ -154,7 +154,7 @@ class BlockchainUpdaterMicroblockSunnyDayTest extends PropSpec with PropertyChec
       db.blockchainUpdater.processBlock(block2b).explicitGet()
       db.blockchainUpdater.processBlock(block3b).explicitGet()
 
-      da.stateReader.partialPortfolio(miner).balance shouldBe db.stateReader.partialPortfolio(miner).balance
+      da.stateReader().partialPortfolio(miner).balance shouldBe db.stateReader().partialPortfolio(miner).balance
     }
   }
 }
