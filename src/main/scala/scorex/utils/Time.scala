@@ -16,7 +16,7 @@ trait Time {
 
 class TimeImpl extends Time with ScorexLogging {
 
-  private val offsetPanicThreshold = 1000000
+  private val offsetPanicThreshold = 1000000L
   private val ExpirationTimeout = 60.seconds
   private val RetryDelay = 10.seconds
   private val ResponseTimeout = 10.seconds
@@ -32,7 +32,7 @@ class TimeImpl extends Time with ScorexLogging {
 
   @volatile private var offset = 0L
   private val updateTask: Task[Unit] = {
-    def newOffsetTask: Task[Option[Long]] = Task {
+    def newOffsetTask: Task[Option[java.lang.Long]] = Task {
       try {
         client.open()
         val info = client.getTime(InetAddress.getByName(NtpServer))
