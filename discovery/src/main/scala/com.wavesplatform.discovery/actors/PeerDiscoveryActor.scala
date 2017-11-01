@@ -1,12 +1,12 @@
 package com.wavesplatform.discovery.actors
 
-import java.net.InetSocketAddress
+import java.net.{InetAddress, InetSocketAddress}
 import java.util.concurrent.TimeUnit
 
 import akka.actor.Actor
 import com.wavesplatform.discovery._
 import com.wavesplatform.discovery.network._
-import com.wavesplatform.network.{GetPeers, Handshake, KnownPeers, PipelineInitializer}
+import com.wavesplatform.network.{GetPeers, Handshake, KnownPeers, LegacyFrameCodec, PeerDatabase, PipelineInitializer}
 import io.netty.bootstrap.Bootstrap
 import io.netty.channel.socket.SocketChannel
 import io.netty.channel.socket.nio.NioSocketChannel
@@ -17,6 +17,29 @@ import scala.concurrent.duration.FiniteDuration
 
 object PeerDiscoveryActor {
   case class GetPeersFrom(peer: InetSocketAddress)
+
+  val peerDatabaseStub = new PeerDatabase {override def suspend(host: InetAddress): Unit = {}
+
+    override def knownPeers: Map[InetSocketAddress, Long] = Map.empty
+
+    override def randomPeer(excluded: Set[InetSocketAddress]): Option[InetSocketAddress] = None
+
+    override def blacklist(host: InetAddress, reason: String): Unit = {}
+
+    override def touch(socketAddress: InetSocketAddress): Unit = {}
+
+    override def suspendedHosts: Set[InetAddress] = Set.empty
+
+    override def blacklistedHosts: Set[InetAddress] = Set.empty
+
+    override def detailedBlacklist: Map[InetAddress, (Long, String)] = Map.empty
+
+    override def clearBlacklist(): Unit = {}
+
+    override def detailedSuspended: Map[InetAddress, Long] = Map.empty
+
+    override def addCandidate(socketAddress: InetSocketAddress): Unit = {}
+  }
 }
 
 class PeerDiscoveryActor(chainId: Char) extends Actor {
@@ -40,7 +63,7 @@ class PeerDiscoveryActor(chainId: Char) extends Actor {
         new HandshakeHandler(chainId),
         new LengthFieldPrepender(4),
         new LengthFieldBasedFrameDecoder(100 * 1024 * 1024, 0, 4, 0, 4),
-        new LegacyFrameCodec(),
+        new LegacyFrameCodec(peerDatabaseStub),
         new MessageCodec(),
         new MessageHandler({ case (msg, ctx) =>
           msg match {

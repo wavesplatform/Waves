@@ -11,11 +11,12 @@ import akka.stream.{ActorMaterializer, OverflowStrategy}
 import com.wavesplatform.discovery.actors.MainActor
 import com.wavesplatform.discovery.actors.MainActor.WebSocketConnected
 import com.wavesplatform.discovery.CancellableExt._
+import scorex.utils.ScorexLogging
 
 import scala.concurrent.duration.FiniteDuration
 import scala.io.StdIn
 
-object DiscoveryApp extends App {
+object DiscoveryApp extends App with ScorexLogging {
   implicit val system: ActorSystem = ActorSystem("Default")
   implicit val flowMaterializer: ActorMaterializer = ActorMaterializer()
   import akka.http.scaladsl.server.Directives._
@@ -45,7 +46,7 @@ object DiscoveryApp extends App {
 
   val binding = Http().bindAndHandle(route, Settings.default.webSocketHost, Settings.default.webSocketPort)
 
-  println(s"Server is now online at http://${Settings.default.webSocketHost}:${Settings.default.webSocketPort}\nPress RETURN to stop...")
+  log.info(s"Server is now online at http://${Settings.default.webSocketHost}:${Settings.default.webSocketPort}\nPress RETURN to stop...")
   StdIn.readLine()
   binding.flatMap(_.unbind()).onComplete(_ => {
     timer.cancel()
