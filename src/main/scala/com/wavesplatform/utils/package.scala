@@ -4,43 +4,25 @@ import java.io.File
 import java.nio.file.Files
 
 import com.wavesplatform.state2.VersionableStorage
-import org.h2.mvstore.MVStore
-import org.joda.time.Duration
-import org.joda.time.format.PeriodFormat
+import monix.execution.UncaughtExceptionReporter
+import org.fusesource.leveldbjni.JniDBFactory
+import org.iq80.leveldb.{DB, Options}
 import scorex.utils.ScorexLogging
 
 import scala.util.Try
 
 package object utils extends ScorexLogging {
 
-  private val DefaultPageSplitSize = 4 * 1024
 
   def base58Length(byteArrayLength: Int): Int = math.ceil(math.log(256) / math.log(58) * byteArrayLength).toInt
 
-  def createMVStore(file: Option[File], encryptionKey: Option[Array[Char]] = None, pageSplitSize: Int = DefaultPageSplitSize): MVStore = {
-    val builder = file.fold(new MVStore.Builder) { p =>
-      p.getParentFile.mkdirs()
+  def createStore(file: File): DB = {
+    val options = new Options()
+    options.createIfMissing(true)
 
-      new MVStore.Builder()
-        .fileName(p.getCanonicalPath)
-        .autoCommitDisabled()
-        .pageSplitSize(pageSplitSize)
-        .compress()
-    }
-
-    try {
-      val store = encryptionKey match {
-        case Some(key) => builder.encryptionKey(key).open()
-        case _ => builder.open()
-      }
-
-      store.rollback()
-      store
-    }
-    catch {
-      case e: IllegalStateException if e.getMessage.contains("corrupt") =>
-        throw new IllegalStateException("wallet.password is incorrect or " + e.getMessage)
-    }
+    file.getParentFile.mkdirs()
+    val db = JniDBFactory.factory.open(file, options)
+    db
   }
 
   def createWithStore[A <: AutoCloseable with VersionableStorage](storeFile: Option[File], f: => A, pred: A => Boolean = (_: A) => true, deleteExisting: Boolean = false): Try[A] = Try {

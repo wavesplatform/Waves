@@ -11,7 +11,7 @@ import scorex.utils.LogMVMapBuilder
 
 import scala.util.Try
 
-class StateStorage private(file: Option[File]) extends VariablesStorage(createMVStore(file)) with VersionableStorage with AutoCloseable {
+class StateStorage private(file: Option[File]) extends VariablesStorage(createStore(file)) with VersionableStorage with AutoCloseable {
 
   import StateStorage._
 

@@ -19,7 +19,7 @@ import scala.util.Try
 
 class HistoryWriterImpl private(file: Option[File], val synchronizationToken: ReentrantReadWriteLock,
                                 functionalitySettings: FunctionalitySettings, featuresSettings: FeaturesSettings)
-  extends VariablesStorage(createMVStore(file)) with VersionableStorage with History with FeatureProvider with ScorexLogging {
+  extends VariablesStorage with VersionableStorage with History with FeatureProvider with ScorexLogging {
 
   override protected val Version: Int = 1
 

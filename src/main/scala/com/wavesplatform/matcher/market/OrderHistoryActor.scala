@@ -25,7 +25,7 @@ import scala.language.postfixOps
 class OrderHistoryActor(val settings: MatcherSettings, val utxPool: UtxPool, val wallet: Wallet)
   extends Actor with OrderValidator {
 
-  val db: MVStore = utils.createMVStore(settings.orderHistoryFile)
+  val db: MVStore = utils.createStore(settings.orderHistoryFile)
   val storage = new OrderHistoryStorage(db)
   val orderHistory = OrderHistoryImpl(storage)
 

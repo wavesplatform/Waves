@@ -2,6 +2,7 @@ package com.wavesplatform.settings
 
 import java.io.File
 import java.net.{InetSocketAddress, URI}
+import java.nio.file.Path
 
 import com.google.common.base.Charsets
 import com.typesafe.config.Config
@@ -15,7 +16,7 @@ import scala.util.Random
 
 case class UPnPSettings(enable: Boolean, gatewayTimeout: FiniteDuration, discoverTimeout: FiniteDuration)
 
-case class NetworkSettings(file: Option[File],
+case class NetworkSettings(path: Path,
                            bindAddress: InetSocketAddress,
                            declaredAddress: Option[InetSocketAddress],
                            nodeName: String,
@@ -48,7 +49,7 @@ object NetworkSettings {
   }
 
   private def fromConfig(config: Config): NetworkSettings = {
-    val file = config.getAs[File]("file")
+    val path = config.getOrElse[Path]("path", new File("peers").toPath)
     val bindAddress = new InetSocketAddress(config.as[String]("bind-address"), config.as[Int]("port"))
     val nonce = config.getOrElse("nonce", randomNonce)
     val nodeName = config.getOrElse("node-name", s"Node-$nonce")
@@ -75,7 +76,7 @@ object NetworkSettings {
     val uPnPSettings = config.as[UPnPSettings]("upnp")
     val trafficLogger = config.as[TrafficLogger.Settings]("traffic-logger")
 
-    NetworkSettings(file, bindAddress, declaredAddress, nodeName, nonce, knownPeers,
+    NetworkSettings(path, bindAddress, declaredAddress, nodeName, nonce, knownPeers,
       peersDataResidenceTime, blackListResidenceTime, maxInboundConnections, maxOutboundConnections,
       maxConnectionsFromSingleHost, connectionTimeout, maxUnverifiedPeers, enablePeersExchange,
       enableBlacklisting, peersBroadcastInterval, handshakeTimeout, suspensionResidenceTime, uPnPSettings, trafficLogger)

@@ -10,7 +10,6 @@ trait VersionableStorage {
     getInt(stateVersion) match {
       case None =>
         putInt(stateVersion, Version)
-        db.commit()
         true
       case Some(v) => v == Version
     }

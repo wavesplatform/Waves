@@ -16,7 +16,7 @@ import scorex.transaction.assets.exchange.ExchangeTransaction
 class MatcherTransactionWriter(val settings: MatcherSettings)
   extends Actor {
 
-  val db: MVStore = utils.createMVStore(settings.txHistoryFile)
+  val db: MVStore = utils.createStore(settings.txHistoryFile)
   val transactions: util.Map[String, Array[Byte]] = db.openMap("transactions")
   val orderToTxIds: util.Map[String, Set[String]] = db.openMap("orderToTxIds")
 
