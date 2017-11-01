@@ -213,6 +213,7 @@ class OrderBookActor(assetPair: AssetPair,
       case OrderValidationError(order, _) if order == event.submitted.order => None
       case OrderValidationError(order, _) if order == event.counter.order => cancelCounterOrder()
       case AccountBalanceError(errs) =>
+        errs.foreach(e => log.error(s"Balance error: ${e._2}"))
         if (errs.contains(event.counter.order.senderPublicKey.toAddress)) {
           cancelCounterOrder()
         }
