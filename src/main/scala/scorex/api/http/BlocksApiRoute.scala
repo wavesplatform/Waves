@@ -14,7 +14,7 @@ import play.api.libs.json._
 import scorex.transaction.{BlockchainUpdater, CheckpointService, History, TransactionParser}
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
+import scala.concurrent._
 
 @Path("/blocks")
 @Api(value = "/blocks")
@@ -131,9 +131,12 @@ case class BlocksApiRoute(settings: RestAPISettings, checkpointsSettings: Checkp
   @Path("/last")
   @ApiOperation(value = "Last", notes = "Get last block data", httpMethod = "GET")
   def last: Route = (path("last") & get) {
-    val height = history.height()
-    val lastBlock = history.blockAt(height).get
-    complete(lastBlock.json + ("height" -> Json.toJson(height)))
+    complete(Future {
+      val height = blocking(history.height())
+      val lastBlock = blocking(history.blockAt(height)).get
+
+      lastBlock.json + ("height" -> Json.toJson(height))
+    })
   }
 
   @Path("/first")

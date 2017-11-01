@@ -9,7 +9,10 @@ import io.netty.channel._
 import scorex.transaction.History
 import scorex.utils.ScorexLogging
 
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.FiniteDuration
+import scala.concurrent.{Channel => _, _}
+import scala.util.{Failure, Success}
 
 @Sharable
 class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteStr], initialLocalScore: BigInt)
@@ -45,6 +48,11 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
       trySwitchToBestIf(ctx, "A local score was updated because of internal updates")(_.isEmpty)
 
     case _ => ctx.write(msg, promise)
+  }
+
+  private def requestExtension(channel: Channel): Unit = Future(blocking(lastSignatures)).onComplete {
+    case Success(sig) => channel.writeAndFlush(LoadBlockchainExtension(sig))
+    case Failure(e) => log.warn("Error getting last signatures", e)
   }
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
@@ -92,7 +100,7 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
             s"${id(initiatorCtx)} A new pinned channel ${id(bestRemoteChannel)} has score $bestRemoteScore " +
               s"(diff with local: ${bestRemoteScore - localScore}): requesting an extension. $reason"
           )
-          bestRemoteChannel.writeAndFlush(LoadBlockchainExtension(lastSignatures))
+          requestExtension(bestRemoteChannel)
         }
   }
 
