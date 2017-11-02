@@ -1,6 +1,7 @@
 package com.wavesplatform.state2.diffs
 
 import cats.Monoid
+import cats.data.{NonEmptyList => NEL}
 import cats.implicits._
 import com.wavesplatform.features.{BlockchainFeatures, FeatureProvider}
 import com.wavesplatform.metrics.Instrumented
@@ -12,7 +13,7 @@ import com.wavesplatform.state2.reader.SnapshotStateReader
 import scorex.account.Address
 import scorex.block.{Block, MicroBlock}
 import scorex.transaction.ValidationError.ActivationError
-import scorex.transaction.{Transaction, ValidationError}
+import scorex.transaction.{History, Transaction, ValidationError}
 import scorex.utils.ScorexLogging
 
 import scala.collection.SortedMap
@@ -58,11 +59,21 @@ object BlockDiffer extends ScorexLogging with Instrumented {
   }
 
   def unsafeDiffMany(settings: FunctionalitySettings, fp: FeatureProvider, s: SnapshotStateReader, prevBlock: Option[Block], maxTxsInChunk: Int)
-                    (blocks: Seq[Block]): Seq[BlockDiff] =
-    blocks.foldLeft((Seq.empty[BlockDiff], prevBlock)) { case ((diffs, prev), block) =>
+                    (blocks: Seq[Block]): NEL[BlockDiff] =
+    blocks.foldLeft((NEL.one(BlockDiff.empty), prevBlock)) { case ((diffs, prev), block) =>
       val blockDiff = fromBlock(settings, fp, composite(s, diffs), prev, block).explicitGet()
-      (perpendCompact(blockDiff, diffs) { case (x, y) => x.txsDiff.transactions.size + y.txsDiff.transactions.size <= maxTxsInChunk }, Some(block))
+      (prependCompactBlockDiff(blockDiff, diffs, maxTxsInChunk), Some(block))
     }._1
+
+  def unsafeDiffByRange(fs: FunctionalitySettings, fp: FeatureProvider, h: History, maxTransactionsPerChunk: Int)(state: SnapshotStateReader, upto: Int): NEL[BlockDiff] = {
+    val from = state.height + 1
+    val blocks = measureLog(s"Reading blocks from $from up upto $upto") {
+      Range(from, upto).map(h.blockBytes).par.map(b => Block.parseBytes(b.get).get).seq
+    }
+    measureLog(s"Building diff from $from up to $upto") {
+      BlockDiffer.unsafeDiffMany(fs, fp, state, h.blockAt(from - 1), maxTransactionsPerChunk)(blocks)
+    }
+  }
 
   private def apply(settings: FunctionalitySettings, s: SnapshotStateReader, pervBlockTimestamp: Option[Long])
                    (blockGenerator: Address, prevBlockFeeDistr: Option[Diff], currentBlockFeeDistr: Option[Diff],

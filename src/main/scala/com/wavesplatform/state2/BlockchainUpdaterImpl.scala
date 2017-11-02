@@ -2,7 +2,6 @@ package com.wavesplatform.state2
 
 import java.util.concurrent.locks.ReentrantReadWriteLock
 
-import cats._
 import cats.data.{NonEmptyList => NEL}
 import cats.implicits._
 import com.wavesplatform.features.{BlockchainFeatures, FeatureProvider}
@@ -39,25 +38,15 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
 
   override val lastBlockId: ConcurrentSubject[ByteStr, ByteStr] = ConcurrentSubject.publish[ByteStr]
 
-  private def unsafeDiffByRange(state: SnapshotStateReader, from: Int, to: Int): Seq[BlockDiff] = {
-    val blocks = measureLog(s"Reading blocks from $from up to $to") {
-      Range(from, to).map(historyWriter.blockBytes).par.map(b => Block.parseBytes(b.get).get).seq
-    }
-    measureLog(s"Building diff from $from up to $to") {
-      BlockDiffer.unsafeDiffMany(settings.blockchainSettings.functionalitySettings, featureProvider, state, historyWriter.blockAt(from - 1), maxTransactionsPerChunk)(blocks)
-    }
-  }
+  private val unsafeDiffByRange = BlockDiffer.unsafeDiffByRange(settings.blockchainSettings.functionalitySettings, featureProvider, historyWriter, maxTransactionsPerChunk) _
 
   private def logHeights(prefix: String): Unit = read { implicit l =>
     log.info(s"$prefix, [ total persisted blocks: ${historyWriter.height()}, persisted: ${persisted.height}, " +
-      s"in-memory: " + inMemDiffs().map(_.heightDiff).toList.reverse.mkString(" | ") +
+      s"in-memory: " + inMemDiffs().toList.reverse.mkString(" | ") +
       " ] + " + ngState().map(_ => "Some(ng state)"))
-
   }
 
-  private def currentPersistedBlocksState: StateReader = read { implicit l =>
-    Coeval(composite(persisted, inMemDiffs().toList))
-  }
+  private def currentPersistedBlocksState: StateReader = read { implicit l => Coeval(composite(persisted, inMemDiffs())) }
 
   def bestLiquidState: StateReader = read { implicit l => composite(currentPersistedBlocksState, Coeval(ngState().map(_.bestLiquidDiff).orEmpty)) }
 
@@ -71,14 +60,13 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
     val persistUpTo = historyWriter.height() - inMemSize + 1
 
     val persistFrom = persisted.height + 1
-    ranges(persistFrom, persistUpTo, rebuildByBlocks).foreach { case (head, last) =>
-      val diffs = unsafeDiffByRange(persisted, head, last)
-      log.debug(s"Diffs built for Range($head, $last): ${diffs.map(_.txsDiff.transactions.size)}")
-      diffs.reverse.foreach(persisted.applyBlockDiff)
+    ranges(persistFrom, persistUpTo, rebuildByBlocks).foreach { case (_, last) =>
+      val diffs = unsafeDiffByRange(persisted, last)
+      log.debug(s"Diffs built for Range(${persisted.height + 1}, $last): $diffs")
+      diffs.toList.reverse.foreach(persisted.applyBlockDiff)
     }
 
-    val diffsToStoreInMemory = unsafeDiffByRange(persisted, persisted.height + 1, historyWriter.height() + 1)
-    inMemDiffs.set(NEL.fromList(diffsToStoreInMemory.toList).getOrElse(NEL.one(BlockDiff.empty)))
+    inMemDiffs.set(unsafeDiffByRange(persisted, historyWriter.height() + 1))
     logHeights("State rebuild finished")
   }
 
@@ -122,18 +110,11 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
   }
 
   override def processBlock(block: Block): Either[ValidationError, Option[DiscardedTransactions]] = write { implicit l =>
-    if (inMemDiffs().head.txsDiff.transactions.size >= maxTransactionsPerChunk) {
-      inMemDiffs.transform { imd =>
-        val (inMemTail, toPersist) = splitAfterThreshold(imd.tail)(imd.head.heightDiff, _.heightDiff, minBlocksInMemory)
-        toPersist.reverse.foreach(persisted.applyBlockDiff)
-        NEL(BlockDiff.empty, imd.head +: inMemTail)
-      }
-    }
     val height = historyWriter.height()
     val notImplementedFeatures = featureProvider.activatedFeatures(height).diff(BlockchainFeatures.implemented)
 
     Either.cond(!settings.featuresSettings.autoShutdownOnUnsupportedFeature || notImplementedFeatures.isEmpty, (),
-      GenericError(s"UNIMPLEMENTED ${displayFeatures(notImplementedFeatures)} ACTIVATED ON BLOCKCHAIN, UPDATE THE NODE IMMEDIATELY")).flatMap(_ =>
+      GenericError(s"UNIMPLEMENTED ${displayFeatures(notImplementedFeatures)} ACTIVATED ON BLOCKCHAIN, UPDATE THE NODE IMMEDIATEL Y")).flatMap(_ =>
       (ngState() match {
         case None =>
           historyWriter.lastBlock match {
@@ -173,7 +154,12 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
                     Some(referencedForgedBlock), block))
                     .map { hardenedDiff =>
                       TxsInBlockchainStats.record(ng.transactions.size)
-                      inMemDiffs.transform(imd => NEL(Monoid.combine(imd.head, referencedLiquidDiff), imd.tail))
+                      inMemDiffs.transform { imd =>
+                        val withPrepended = prependCompactBlockDiff(referencedLiquidDiff, imd, maxTransactionsPerChunk)
+                        val (inMem, toPersist) = splitAfterThreshold(withPrepended, minBlocksInMemory)(_.heightDiff)
+                        toPersist.reverse.foreach(persisted.applyBlockDiff)
+                        inMem
+                      }
                       Some((hardenedDiff, discarded.flatMap(_.transactionData)))
                     }
                 } else {
@@ -226,11 +212,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
               val difference = persisted.height - requestedHeight
               inMemDiffs.transform { imd =>
                 val remained = dropLeftIf(imd.toList)(_.map(bd => bd.heightDiff).sum > difference)
-                val persistedPlusInMemHeight = persisted.height + remained.map(_.heightDiff).sum
-                if (requestedHeight > persistedPlusInMemHeight) {
-                  val newTopDiff = Monoid.combineAll(unsafeDiffByRange(composite(persisted, remained), persistedPlusInMemHeight + 1, requestedHeight + 1).reverse)
-                  NEL(newTopDiff, remained)
-                } else NEL(BlockDiff.empty, remained)
+                unsafeDiffByRange(composite(persisted, remained), requestedHeight + 1) ++ remained
               }
             }
             logHeights(s"Rollback to h=$requestedHeight completed:")
