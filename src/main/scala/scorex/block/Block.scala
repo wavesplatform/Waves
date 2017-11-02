@@ -59,6 +59,21 @@ case class Block(timestamp: Long,
         "blocksize" -> bytes.length
       )
 
+  lazy val jsonWithoutTransactionsPayload: JsObject =
+    versionField.json ++
+      timestampField.json ++
+      referenceField.json ++
+      consensusField.json ++
+      Json.obj("transactions" -> transactionField.value.size) ++
+      supportedFeaturesField.json ++
+      signerField.json ++
+      Json.obj(
+        "fee" -> fee,
+        "blocksize" -> bytes.length
+      )
+
+  def json(includeTransactions: Boolean): JsObject = if(includeTransactions) json else jsonWithoutTransactionsPayload
+
   lazy val bytes: Array[Byte] = {
     val txBytesSize = transactionField.bytes.length
     val txBytes = Bytes.ensureCapacity(Ints.toByteArray(txBytesSize), 4, 0) ++ transactionField.bytes
