@@ -73,12 +73,6 @@ object JsBlockParser extends App {
 
   println(badBlock.signaturesValid)
 
-  println("GOOD")
-  println(goodBlock.json)
-
-  println("BAD")
-  println(badBlock.json)
-
   println(Block.parseBytes(goodBlock.bytes).get.signaturesValid)
 
 //  val recreated = Block.buildAndSign(3, 1501851461300L, ByteStr.decodeBase58("4GkW491kuPtg3LDkCrXwBRASdQ7qUV2BNEFpM9XzD56JufSpmLqV9672wRQcSqJdxyEgq8nSQs2ogHit8Sr1ZtGT").get,
