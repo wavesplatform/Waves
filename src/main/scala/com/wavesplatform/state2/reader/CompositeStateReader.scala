@@ -3,6 +3,7 @@ package com.wavesplatform.state2.reader
 import java.util.concurrent.locks.ReentrantReadWriteLock
 
 import cats.implicits._
+import cats.data.{NonEmptyList => NEL}
 import cats.kernel.Monoid
 import com.wavesplatform.state2._
 import monix.eval.Coeval
@@ -88,6 +89,11 @@ object CompositeStateReader {
   def composite(inner: SnapshotStateReader, blockDiff: Seq[BlockDiff]): SnapshotStateReader = blockDiff match {
     case (x :: xs) => composite(composite(inner, xs), x)
     case _ => inner
+  }
+
+  def composite(inner: SnapshotStateReader, blockDiff: NEL[BlockDiff]): SnapshotStateReader = blockDiff.tail match {
+    case (x :: xs) => composite(composite(inner, NEL(x, xs)), blockDiff.head)
+    case Nil => composite(inner, blockDiff.head)
   }
 
   // fresh head
