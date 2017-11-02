@@ -13,10 +13,13 @@ import com.wavesplatform.discovery.actors.MainActor.WebSocketConnected
 import com.wavesplatform.discovery.CancellableExt._
 import scorex.utils.ScorexLogging
 
+import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.FiniteDuration
 import scala.io.StdIn
 
 object DiscoveryApp extends App with ScorexLogging {
+
+  implicit val ec: ExecutionContext = ExecutionContext.global
   implicit val system: ActorSystem = ActorSystem("Default")
   implicit val flowMaterializer: ActorMaterializer = ActorMaterializer()
   import akka.http.scaladsl.server.Directives._
@@ -51,6 +54,5 @@ object DiscoveryApp extends App with ScorexLogging {
   binding.flatMap(_.unbind()).onComplete(_ => {
     timer.cancel()
     system.terminate()
-    workerGroup.shutdownGracefully()
   })
 }

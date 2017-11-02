@@ -8,6 +8,7 @@ import com.wavesplatform.discovery._
 import com.wavesplatform.discovery.network._
 import com.wavesplatform.network.{GetPeers, Handshake, KnownPeers, LegacyFrameCodec, PeerDatabase, PipelineInitializer}
 import io.netty.bootstrap.Bootstrap
+import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.channel.socket.SocketChannel
 import io.netty.channel.socket.nio.NioSocketChannel
 import io.netty.handler.codec.{LengthFieldBasedFrameDecoder, LengthFieldPrepender}
@@ -50,10 +51,14 @@ class PeerDiscoveryActor(chainId: Char) extends Actor {
     case GetPeersFrom(peer) => context.parent ! MainActor.PeerInfo(peer, getPeersFromNode(peer))
   }
 
+  private val getPeersTimeout = 10
+
   private def getPeersFromNode(address: InetSocketAddress): Set[InetSocketAddress]= {
     var peers: Set[InetSocketAddress] = Set.empty
 
     val exceptionHandler = new ExceptionHandler()
+
+    implicit val workerGroup: NioEventLoopGroup = new NioEventLoopGroup
 
     new Bootstrap()
       .group(workerGroup)
@@ -76,8 +81,8 @@ class PeerDiscoveryActor(chainId: Char) extends Actor {
       .remoteAddress(address.getAddress, address.getPort)
       .connect()
 
-    Await.result(exceptionHandler.closed, new FiniteDuration(10, TimeUnit.SECONDS))
-
+    Await.result(exceptionHandler.closed, new FiniteDuration(getPeersTimeout, TimeUnit.SECONDS))
+    workerGroup.shutdownGracefully()
     peers
   }
 

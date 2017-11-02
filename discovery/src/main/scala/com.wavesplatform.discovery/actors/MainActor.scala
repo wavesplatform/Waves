@@ -12,14 +12,16 @@ import play.api.libs.json._
 class MainActor(chainId: Char, workersCount: Int) extends Actor {
   import MainActor._
 
+  private val mailboxThreshold = 5
   private val router = {
     val routes = Vector.fill(workersCount) {
       ActorRefRoutee(context.actorOf(Props(classOf[PeerDiscoveryActor], chainId)))
     }
-    Router(SmallestMailboxWithThresholdRoutingLogic(5), routes)
+    Router(SmallestMailboxWithThresholdRoutingLogic(mailboxThreshold), routes)
   }
 
   private val alivePeers = new Pool[InetSocketAddress]
+  private val deadPeersCacheTimeout = 5
   private val deadPeers = new ExpirationSet[InetSocketAddress](1000*60*60*1)
   private val peerResponses = scala.collection.mutable.Map.empty[InetSocketAddress, Set[InetSocketAddress]]
   private val connections = scala.collection.mutable.Set.empty[ActorRef]
