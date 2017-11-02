@@ -17,6 +17,7 @@ import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.channel.socket.SocketChannel
 import io.netty.channel.socket.nio.{NioServerSocketChannel, NioSocketChannel}
 import io.netty.handler.codec.{LengthFieldBasedFrameDecoder, LengthFieldPrepender}
+import io.netty.util.concurrent.DefaultThreadFactory
 import org.influxdb.dto.Point
 import scorex.transaction._
 import scorex.utils.{ScorexLogging, Time}
@@ -41,8 +42,8 @@ class NetworkServer(checkpointService: CheckpointService,
   @volatile
   private var shutdownInitiated = false
 
-  private val bossGroup = new NioEventLoopGroup()
-  private val workerGroup = new NioEventLoopGroup()
+  private val bossGroup = new NioEventLoopGroup(0, new DefaultThreadFactory("nio-boss-group", true))
+  private val workerGroup = new NioEventLoopGroup(0, new DefaultThreadFactory("nio-worker-group", true))
   private val handshake =
     Handshake(Constants.ApplicationName + settings.blockchainSettings.addressSchemeCharacter, Version.VersionTuple,
       settings.networkSettings.nodeName, settings.networkSettings.nonce, settings.networkSettings.declaredAddress)
@@ -79,8 +80,6 @@ class NetworkServer(checkpointService: CheckpointService,
   private val inboundConnectionFilter: PipelineInitializer.HandlerWrapper = new InboundConnectionFilter(peerDatabase,
     settings.networkSettings.maxInboundConnections,
     settings.networkSettings.maxConnectionsPerHost)
-
-  private val coordinatorExecutor = new DefaultEventLoop
 
   private val microBlockOwners = new MicroBlockOwners(settings.synchronizationSettings.microBlockSynchronizer.invCacheTimeout)
   private val coordinatorHandler = new CoordinatorHandler(checkpointService, history, blockchainUpdater, time,
@@ -229,6 +228,5 @@ class NetworkServer(checkpointService: CheckpointService,
   } finally {
     workerGroup.shutdownGracefully().await()
     bossGroup.shutdownGracefully().await()
-    coordinatorExecutor.shutdownGracefully().await()
   }
 }

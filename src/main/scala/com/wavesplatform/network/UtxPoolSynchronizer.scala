@@ -8,6 +8,7 @@ import com.wavesplatform.state2.diffs.TransactionDiffer.TransactionValidationErr
 import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel.group.ChannelGroup
 import io.netty.channel.{ChannelHandlerContext, ChannelInboundHandlerAdapter}
+import io.netty.util.concurrent.DefaultThreadFactory
 import scorex.transaction.Transaction
 import scorex.utils.ScorexLogging
 
@@ -17,7 +18,8 @@ import scala.concurrent.Future
 class UtxPoolSynchronizer(utx: UtxPool, allChannels: ChannelGroup)
   extends ChannelInboundHandlerAdapter with ScorexLogging {
 
-  private implicit val executor = ExecutionContexts.fromExecutor(Executors.newSingleThreadExecutor())
+  private implicit val executor = ExecutionContexts.fromExecutor(
+    Executors.newSingleThreadExecutor(new DefaultThreadFactory("utx-pool-synchronizer", true)))
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
     case t: Transaction => Future(utx.putIfNew(t) match {
