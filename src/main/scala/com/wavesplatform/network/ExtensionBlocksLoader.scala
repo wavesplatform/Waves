@@ -11,10 +11,8 @@ import scorex.transaction.NgHistory
 import scorex.utils.ScorexLogging
 
 import scala.collection.mutable
-import scala.concurrent.ExecutionContext.Implicits.global
+import scala.collection.parallel.ForkJoinTaskSupport
 import scala.concurrent.duration.FiniteDuration
-import scala.concurrent.{Future, blocking}
-import scala.util.{Failure, Success}
 
 class ExtensionBlocksLoader(
     blockSyncTimeout: FiniteDuration,
@@ -44,19 +42,17 @@ class ExtensionBlocksLoader(
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
     case xid@ExtensionIds(_, newIds) if pendingSignatures.isEmpty =>
-      Future(newIds.filterNot(id => blocking(history.contains(id)))).onComplete {
-        case Success(requestingIds) if requestingIds.nonEmpty => ctx.executor().execute { () =>
+      val requestingIds = newIds.filterNot(history.contains)
+      if (requestingIds.nonEmpty) {
             targetExtensionIds = Some(xid)
             pendingSignatures = newIds.zipWithIndex.toMap
             blacklistAfterTimeout(ctx)
             extensionsFetchingTimeStats.start()
             newIds.foreach(s => ctx.write(GetBlock(s)))
             ctx.flush()
-        }
-        case Success(_) =>
+        } else {
           log.debug(s"${id(ctx)} No new blocks to load")
           ctx.fireChannelRead(ExtensionBlocks(Seq.empty))
-        case Failure(e) => log.warn(s"${id(ctx)} Error checking extension response", e)
       }
     case b: Block if pendingSignatures.contains(b.uniqueId) =>
       blockBuffer += pendingSignatures(b.uniqueId) -> b
@@ -78,7 +74,9 @@ class ExtensionBlocksLoader(
             }) {
             peerDatabase.blacklistAndClose(ctx.channel(),"Extension blocks are not contiguous, pre-check failed")
           } else {
-            newBlocks.find(_.signaturesValid.isLeft) match {
+            val pnewBlocks = newBlocks.par
+            pnewBlocks.tasksupport = new ForkJoinTaskSupport()
+            pnewBlocks.find(_.signaturesValid.isLeft) match {
               case Some(invalidBlock) =>
                 peerDatabase.blacklistAndClose(ctx.channel(),s"Got block $invalidBlock with invalid signature")
               case None =>
