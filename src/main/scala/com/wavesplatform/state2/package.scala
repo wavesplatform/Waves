@@ -58,11 +58,6 @@ package object state2 {
     else `new` :: existing
   }
 
-  def perpendCompact[A](`new`: A, existing: List[A])(compactPred: (A, A) => Boolean)(implicit ma: Monoid[A]): NEL[A] = existing match {
-    case (x :: xs) => perpendCompact(`new`, NEL(x, xs))(compactPred)
-    case Nil => NEL.one(`new`)
-  }
-
   def prependCompactBlockDiff(`new`: BlockDiff, existing: NEL[BlockDiff], maxTxsInChunk: Int): NEL[BlockDiff] =
     perpendCompact[BlockDiff](`new`, existing) { case (x, y) => x.txsDiff.transactions.size + y.txsDiff.transactions.size <= maxTxsInChunk }
 
