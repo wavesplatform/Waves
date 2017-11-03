@@ -4,7 +4,7 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.api.NodeApi.{AssetBalance, LevelResponse, MatcherStatusResponse, OrderBookResponse, Transaction}
 import com.wavesplatform.matcher.api.CancelOrderRequest
 import com.wavesplatform.state2.ByteStr
-import org.scalatest.{BeforeAndAfterAll, FreeSpec, Matchers}
+import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
@@ -15,7 +15,7 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.util.Random
 
-class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with ReportingTestName{
+class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with CancelAfterFailure with ReportingTestName{
 
   import MatcherTestSuite._
 

@@ -1,5 +1,6 @@
 import com.typesafe.sbt.packager.archetypes.TemplateWriter
 import sbt.Keys._
+import sbt.Tests._
 import sbt._
 
 enablePlugins(sbtdocker.DockerPlugin, JavaServerAppPackaging, JDebPackaging, SystemdPlugin, GitVersioning)
@@ -71,15 +72,29 @@ inConfig(Test)(Seq(
   testOptions += Tests.Argument("-oIDOF", "-u", "target/test-reports")
 ))
 
-concurrentRestrictions in Global += Tags.limit(Tags.Test, 1)
-
 Defaults.itSettings
 configs(IntegrationTest)
-inConfig(IntegrationTest)(Seq(
-  parallelExecution := false,
-  test := (test dependsOn docker).value,
-  testOptions += Tests.Filter(_.endsWith("Suite"))
-))
+inConfig(IntegrationTest)({
+  val threads = 3
+
+  Seq(
+    parallelExecution := true,
+    fork := true,
+    testForkedParallel := true,
+    test := (test dependsOn docker).value,
+    testOptions += Tests.Filter(_.endsWith("Suite")),
+    concurrentRestrictions := Seq(Tags.limit(Tags.Test, threads)),
+    testGrouping := {
+      definedTests.value.filter(_.name.endsWith("Suite"))
+        .grouped(threads)
+        .zipWithIndex
+        .map {
+          case (tasks, i) => Group(i.toString, tasks, SubProcess(ForkOptions()))
+        }
+        .toSeq
+    }
+  )
+})
 
 dockerfile in docker := {
   val configTemplate = (resourceDirectory in IntegrationTest).value / "template.conf"
