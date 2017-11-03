@@ -14,8 +14,8 @@ class PackageTest extends FunSuite with Matchers {
       override def combine(x: Compactable, y: Compactable) = Compactable(x.i + y.i)
     }
 
-    val r = prependCompact(Compactable(8), NEL.of(Compactable(1), Compactable(1), Compactable(1))) { case (x, y) => x.i + y.i <= 10 }
-    r shouldBe NEL.of(Compactable(9), Compactable(1), Compactable(1))
+    val r = prependCompact(Compactable(8), NEL.of(Compactable(1), Compactable(2), Compactable(3))) { case (x, y) => x.i + y.i <= 10 }
+    r shouldBe NEL.of(Compactable(9), Compactable(2), Compactable(3))
   }
 
   test("splitAfterThreshold") {

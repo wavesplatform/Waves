@@ -44,9 +44,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
   private val unsafeDiffByRange = BlockDiffer.unsafeDiffByRange(settings.blockchainSettings.functionalitySettings, featureProvider, historyWriter, maxTransactionsPerChunk) _
 
   private def heights(prefix: String): String = read { implicit l =>
-    s"$prefix, [ total persisted blocks: ${historyWriter.height()}, persisted: ${persisted.height}, " +
-      s"in-memory: " + inMemDiffs().toList.reverse.mkString(" | ") +
-      " ] + " + ngState().map(_ => "Some(ng state)")
+    s"$prefix, total persisted blocks: ${historyWriter.height()}, [ in-memory: ${inMemDiffs().toList.mkString(" | ")} ] + persisted: h=${persisted.height}"
   }
 
   private def currentPersistedBlocksState: StateReader = read { implicit l => Coeval(composite(inMemDiffs(), persisted)) }
