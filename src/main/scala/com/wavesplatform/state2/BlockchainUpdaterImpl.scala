@@ -8,7 +8,6 @@ import com.wavesplatform.features.{BlockchainFeatures, FeatureProvider}
 import com.wavesplatform.history.HistoryWriterImpl
 import com.wavesplatform.metrics.{Instrumented, TxsInBlockchainStats}
 import com.wavesplatform.settings.WavesSettings
-import com.wavesplatform.state2.BlockchainUpdaterImpl._
 import com.wavesplatform.state2.diffs.BlockDiffer
 import com.wavesplatform.state2.reader.CompositeStateReader.composite
 import com.wavesplatform.state2.reader.SnapshotStateReader
@@ -23,11 +22,15 @@ import scorex.transaction.ValidationError.{BlockAppendError, GenericError, Micro
 import scorex.transaction._
 import scorex.utils.ScorexLogging
 
+import scala.collection.immutable
+
 class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateReader,
                                     settings: WavesSettings,
                                     featureProvider: FeatureProvider,
                                     historyWriter: HistoryWriterImpl,
                                     val synchronizationToken: ReentrantReadWriteLock) extends BlockchainUpdater with BlockchainDebugInfo with ScorexLogging with Instrumented {
+
+  import com.wavesplatform.state2.BlockchainUpdaterImpl._
 
   private lazy val maxTransactionsPerChunk = settings.blockchainSettings.maxTransactionsPerBlockDiff
   private lazy val minBlocksInMemory = settings.blockchainSettings.minBlocksInMemory
@@ -156,7 +159,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
                       TxsInBlockchainStats.record(ng.transactions.size)
                       inMemDiffs.transform { imd =>
                         val withPrepended = prependCompactBlockDiff(referencedLiquidDiff, imd, maxTransactionsPerChunk)
-                        val (inMem, toPersist) = splitAfterThreshold(withPrepended, minBlocksInMemory)(_.heightDiff)
+                        val (inMem, toPersist: immutable.Seq[BlockDiff]) = splitAfterThreshold(withPrepended, minBlocksInMemory)(_.heightDiff)
                         toPersist.reverse.foreach(persisted.applyBlockDiff)
                         inMem
                       }
@@ -283,8 +286,7 @@ object BlockchainUpdaterImpl extends ScorexLogging {
             history: HistoryWriterImpl,
             settings: WavesSettings,
             synchronizationToken: ReentrantReadWriteLock): BlockchainUpdaterImpl = {
-    val blockchainUpdater =
-      new BlockchainUpdaterImpl(persistedState, settings, history, history, synchronizationToken)
+    val blockchainUpdater = new BlockchainUpdaterImpl(persistedState, settings, history, history, synchronizationToken)
     log.info(blockchainUpdater.heights("Constructing BlockchainUpdaterImpl"))
     blockchainUpdater.syncPersistedAndInMemory()
     blockchainUpdater
