@@ -56,7 +56,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
   private val wavesNetwork = client.createNetwork(NetworkConfig.builder().driver("bridge").name(networkName).build())
 
   def startNode(nodeConfig: Config): Node = {
-    val configOverrides = s"$knownPeers ${renderProperties(asProperties(nodeConfig.withFallback(suiteConfig)))}"
+    val configOverrides = s"$JavaOptions $knownPeers ${renderProperties(asProperties(nodeConfig.withFallback(suiteConfig)))}"
     val actualConfig = nodeConfig
       .withFallback(suiteConfig)
       .withFallback(DefaultConfigTemplate)
@@ -163,6 +163,9 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
 }
 
 object Docker {
+  private val JavaOptions = Seq(
+    "-Xmx500m"
+  ).mkString(" ")
   private val jsonMapper = new ObjectMapper
   private val propsMapper = new JavaPropsMapper
 

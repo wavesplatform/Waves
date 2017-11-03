@@ -72,10 +72,12 @@ inConfig(Test)(Seq(
   testOptions += Tests.Argument("-oIDOF", "-u", "target/test-reports")
 ))
 
+concurrentRestrictions in Global += Tags.limit(Tags.Test, 1)
+
 Defaults.itSettings
 configs(IntegrationTest)
 inConfig(IntegrationTest)({
-  val threads = 3
+  val threads = 4
 
   Seq(
     parallelExecution := true,
