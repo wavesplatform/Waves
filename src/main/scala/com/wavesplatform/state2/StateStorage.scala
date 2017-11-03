@@ -11,7 +11,7 @@ import scorex.utils.LogMVMapBuilder
 
 import scala.util.Try
 
-class StateStorage private(file: Option[File]) extends VariablesStorage(createStore(file)) with VersionableStorage with AutoCloseable {
+class StateStorage private(file: Option[File]) extends VariablesStorage(createStore(file)) with VersionedStorage with AutoCloseable {
 
   import StateStorage._
 
@@ -75,7 +75,7 @@ object StateStorage {
   private val heightKey = "height"
 
   def apply(file: Option[File], dropExisting: Boolean): Try[StateStorage] =
-    createWithStore(file, new StateStorage(file), deleteExisting = dropExisting)
+    createWithVerification(file, new StateStorage(file), deleteExisting = dropExisting)
 
   type AccountIdxKey = Array[Byte]
 

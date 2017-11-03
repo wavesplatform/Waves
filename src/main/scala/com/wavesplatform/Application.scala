@@ -28,6 +28,7 @@ import io.netty.util.concurrent.GlobalEventExecutor
 import kamon.Kamon
 import monix.reactive.Observable
 import org.influxdb.dto.Point
+import org.iq80.leveldb.Options
 import org.slf4j.bridge.SLF4JBridgeHandler
 import scorex.account.AddressScheme
 import scorex.api.http._
@@ -195,6 +196,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
       Try(Await.result(actorSystem.terminate(), stopActorsTimeout))
         .failed.map(e => log.error("Failed to terminate actor system", e))
+
       log.debug("Closing storage")
 
       log.debug("Closing wallet")
@@ -241,6 +243,15 @@ object Application extends ScorexLogging {
     config
   }
 
+  private def openDB(path: String) = {
+    val options = new Options()
+    options.createIfMissing(true)
+
+    val file = new File(path)
+    file.getParentFile.mkdirs()
+    JniDBFactory.factory.open(file, options)
+  }
+
   def main(args: Array[String]): Unit = {
     // prevents java from caching successful name resolutions, which is needed e.g. for proper NTP server rotation
     // http://stackoverflow.com/a/17219327
@@ -265,6 +276,12 @@ object Application extends ScorexLogging {
     val settings = WavesSettings.fromConfig(config)
     Kamon.start(config)
     val isMetricsStarted = Metrics.start(settings.metrics)
+
+==== BASE ====
+    log.trace(s"System property sun.net.inetaddr.ttl=${System.getProperty("sun.net.inetaddr.ttl")}")
+    log.trace(s"System property sun.net.inetaddr.negative.ttl=${System.getProperty("sun.net.inetaddr.negative.ttl")}")
+    log.trace(s"Security property networkaddress.cache.ttl=${Security.getProperty("networkaddress.cache.ttl")}")
+    log.trace(s"Security property networkaddress.cache.negative.ttl=${Security.getProperty("networkaddress.cache.negative.ttl")}")
 
     RootActorSystem.start("wavesplatform", config) { actorSystem =>
       import actorSystem.dispatcher

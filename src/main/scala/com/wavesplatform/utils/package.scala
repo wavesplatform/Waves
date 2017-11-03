@@ -1,42 +1,30 @@
 package com.wavesplatform
 
-import java.io.File
-import java.nio.file.Files
-
-import com.wavesplatform.state2.VersionableStorage
+import com.google.common.base.Throwables
+import com.wavesplatform.db.Storage
 import monix.execution.UncaughtExceptionReporter
-import org.fusesource.leveldbjni.JniDBFactory
-import org.iq80.leveldb.{DB, Options}
 import scorex.utils.ScorexLogging
 
 import scala.util.Try
 
 package object utils extends ScorexLogging {
 
+  private val BytesMaxValue = 256
+  private val Base58MaxValue = 58
 
-  def base58Length(byteArrayLength: Int): Int = math.ceil(math.log(256) / math.log(58) * byteArrayLength).toInt
+  private val BytesLog = math.log(BytesMaxValue)
+  private val BaseLog = math.log(Base58MaxValue)
 
-  def createStore(file: File): DB = {
-    val options = new Options()
-    options.createIfMissing(true)
+  val UncaughtExceptionsToLogReporter = UncaughtExceptionReporter(exc => log.error(Throwables.getStackTraceAsString(exc)))
 
-    file.getParentFile.mkdirs()
-    val db = JniDBFactory.factory.open(file, options)
-    db
-  }
+  def base58Length(byteArrayLength: Int): Int = math.ceil(BytesLog / BaseLog * byteArrayLength).toInt
 
-  def createWithStore[A <: AutoCloseable with VersionableStorage](storeFile: Option[File], f: => A, pred: A => Boolean = (_: A) => true, deleteExisting: Boolean = false): Try[A] = Try {
-    for (fileToDelete <- storeFile if deleteExisting) Files.delete(fileToDelete.toPath)
-    val a = f
-    if (a.isVersionValid && pred(a)) a else storeFile match {
-      case Some(file) =>
-        log.info(s"Re-creating file store at $file")
-        a.close()
-        Files.delete(file.toPath)
-        val newA = f
-        require(pred(newA), "store is inconsistent")
-        newA
-      case None => throw new IllegalArgumentException("in-memory store is corrupted")
+  def createWithVerification[A <: Storage with VersionedStorage](storage: => A, consistencyCheck: A => Boolean = (_: A) => true): Try[A] = Try {
+    if (storage.isVersionValid && consistencyCheck(storage)) storage else {
+      log.info(s"Re-creating storage")
+      storage.removeEverything()
+      require(consistencyCheck(storage), "storage is inconsistent")
+      storage
     }
   }
 
