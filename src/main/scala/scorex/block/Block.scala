@@ -25,8 +25,7 @@ class BlockHeader(val timestamp: Long,
                           val signerData: SignerData,
                           val consensusData: NxtLikeConsensusBlockData,
                           val transactionsCount: Int,
-                          val featureVotes: Set[Short],
-                          val transactionBytesRaw: Array[Byte]) {
+                          val featureVotes: Set[Short]) {
 
   protected lazy val versionField: ByteBlockField = ByteBlockField("version", version)
   protected lazy val timestampField: LongBlockField = LongBlockField("timestamp", timestamp)
@@ -35,20 +34,7 @@ class BlockHeader(val timestamp: Long,
   protected lazy val consensusField = NxtConsensusBlockField(consensusData)
   protected lazy val supportedFeaturesField = FeaturesBlockField(version, featureVotes)
 
-  lazy val blockSize: Int = {
-    val txBytesSize = transactionBytesRaw.length
-    val cBytesSize = consensusField.bytes.length + 4
-
-    versionField.bytes.length +
-      timestampField.bytes.length +
-      referenceField.bytes.length +
-      cBytesSize +
-      txBytesSize +
-      supportedFeaturesField.bytes.length +
-      signerField.bytes.length
-  }
-
-  lazy val json: JsObject =
+  def json(blockSize: Int): JsObject =
     versionField.json ++
       timestampField.json ++
       referenceField.json ++
@@ -62,7 +48,7 @@ class BlockHeader(val timestamp: Long,
 }
 
 object BlockHeader extends ScorexLogging {
-  def parseBytes(bytes: Array[Byte]): Try[BlockHeader] = Try {
+  def parseBytes(bytes: Array[Byte]): Try[(BlockHeader, Array[Byte])] = Try {
 
     val version = bytes.head
 
@@ -110,7 +96,8 @@ object BlockHeader extends ScorexLogging {
     val signature = ByteStr(bytes.slice(position, position + SignatureLength))
     position += SignatureLength
 
-    new BlockHeader(timestamp, version, reference, SignerData(PublicKeyAccount(genPK), signature), consData, txCount, supportedFeaturesIds, tBytes)
+    val blockHeader = new BlockHeader(timestamp, version, reference, SignerData(PublicKeyAccount(genPK), signature), consData, txCount, supportedFeaturesIds)
+    (blockHeader, tBytes)
   }.recoverWith { case t: Throwable =>
     log.error("Error when parsing block", t)
     Failure(t)
@@ -130,7 +117,7 @@ case class Block private(override val timestamp: Long,
               signerData,
               consensusData,
               transactionData.length,
-              featureVotes, ) with Signed {
+              featureVotes) with Signed {
 
   import Block._
 
@@ -145,8 +132,8 @@ case class Block private(override val timestamp: Long,
       .mapValues(_.map(_._2).sum)
       .values.sum
 
-  override lazy val json: JsObject =
-    super.json ++ Json.obj("fee" -> fee) ++ transactionField.json
+  lazy val json: JsObject =
+    super.json(bytes.length) ++ Json.obj("fee" -> fee) ++ transactionField.json
 
   lazy val bytes: Array[Byte] = {
     val txBytesSize = transactionField.bytes.length
@@ -239,8 +226,8 @@ object Block extends ScorexLogging {
 
   def parseBytes(bytes: Array[Byte]): Try[Block] =
     for {
-      blockHeader <- BlockHeader.parseBytes(bytes)
-      transactionsData <- transParseBytes(blockHeader.version, blockHeader.transactionBytesRaw)
+      (blockHeader, transactionBytes) <- BlockHeader.parseBytes(bytes)
+      transactionsData <- transParseBytes(blockHeader.version, transactionBytes)
     } yield
       Block(blockHeader.timestamp,
         blockHeader.version,
