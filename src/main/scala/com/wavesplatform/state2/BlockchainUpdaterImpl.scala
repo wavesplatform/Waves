@@ -150,7 +150,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
                     microBlockForkHeightStats.record(discarded.size)
                   }
                   historyWriter.appendBlock(referencedForgedBlock, ng.acceptedFeatures)(BlockDiffer.fromBlock(settings.blockchainSettings.functionalitySettings, historyReader,
-                    composite(currentPersistedBlocksState(), referencedLiquidDiff.copy(heightDiff = 1)),
+                    composite(currentPersistedBlocksState(), referencedLiquidDiff),
                     Some(referencedForgedBlock), block))
                     .map { hardenedDiff =>
                       TxsInBlockchainStats.record(ng.transactions.size)

@@ -6,7 +6,7 @@ object Hash {
   def accountPortfolios(accountPortfolios: Map[Address, Portfolio]): Int = {
     def accountPortfolioHash(accP: (Address, Portfolio)): Int = {
       val (account, portfolio) = accP
-      val h = account.hashCode() + portfolio.balance.hashCode() + portfolio.leaseInfo.hashCode()
+      val h = if (portfolio.balance == 0 && portfolio.leaseInfo == LeaseInfo.empty) 0 else account.hashCode() + portfolio.balance.hashCode() + portfolio.leaseInfo.hashCode()
       portfolio.assets.foldLeft(h) {
         case (h, (acc, balance)) =>
           h + acc.hashCode() + balance.hashCode()
