@@ -3,14 +3,17 @@ package com.wavesplatform.network
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicReference
 
+import com.wavesplatform.network.LocalScoreChanged.Reason
 import com.wavesplatform.state2.ByteStr
 import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel._
 import scorex.transaction.History
 import scorex.utils.ScorexLogging
 
+import scala.concurrent.{Future, blocking}
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.FiniteDuration
-
+import scala.util.{Failure, Success}
 
 @Sharable
 class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteStr], initialLocalScore: BigInt)
@@ -39,7 +42,7 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
             case Some((secondBestChannel, secondBestScore))
               if secondBestScore > localScore && pinnedChannel.compareAndSet(bestChannel, secondBestChannel) =>
               log.debug(s"${id(ctx)} Switching to second best channel $pinnedChannelId")
-              secondBestChannel.writeAndFlush(LoadBlockchainExtension(lastSignatures))
+              requestExtension(secondBestChannel)
             case _ =>
               if (pinnedChannel.compareAndSet(f.channel(), null)) log.trace(s"${id(ctx)} Unpinning unconditionally")
           }
@@ -50,6 +53,8 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
       }
     }
 
+  private val stopExtProcessingReasons = Set(Reason.ForkApplied, Reason.Rollback, Reason.Checkpoint)
+
   override def write(ctx: ChannelHandlerContext, msg: AnyRef, promise: ChannelPromise): Unit = msg match {
     case LocalScoreChanged(newLocalScore, reason) =>
       // unconditionally update local score value and propagate this message downstream
@@ -57,11 +62,23 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
       ctx.write(msg, promise)
       log.debug(s"${id(ctx)} ${pinnedChannelId}New local score: $newLocalScore")
 
-      if (reason == LocalScoreChanged.Reason.ForkApplied && pinnedChannel.compareAndSet(ctx.channel(), null)) {
-        log.debug(s"${id(ctx)} Fork was applied")
+      if (stopExtProcessingReasons.contains(reason) && pinnedChannel.compareAndSet(ctx.channel(), null)) {
+        log.debug(s"${id(ctx)} Stop working with extensions, reason: $reason")
+        channelWithHighestScore match {
+          case Some((bestChannel, bestScore))
+            if bestScore > localScore && pinnedChannel.compareAndSet(null, bestChannel) =>
+            log.debug(s"${id(ctx)} Switching to second best channel $pinnedChannelId")
+            requestExtension(bestChannel)
+          case _ =>
+        }
       }
 
     case _ => ctx.write(msg, promise)
+  }
+
+  private def requestExtension(channel: Channel): Unit = Future(blocking(lastSignatures)).onComplete {
+    case Success(sig) => channel.writeAndFlush(LoadBlockchainExtension(sig))
+    case Failure(e) => log.warn("Error getting last signatures", e)
   }
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
@@ -86,7 +103,7 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
       } if (pinnedChannel.compareAndSet(null, ch)) {
         // we've finished to download blocks from previous high score channel
         log.debug(s"${id(ctx)} ${pinnedChannelId}New high score $highScore > $localScore, pinning and requesting extension")
-        ctx.writeAndFlush(LoadBlockchainExtension(lastSignatures))
+        requestExtension(ch)
       } else {
         log.trace(s"${id(ctx)} New high score $highScore")
       }

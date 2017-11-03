@@ -39,7 +39,7 @@ object MicroBlockInv{
 }
 
 object LocalScoreChanged {
-  sealed trait Reason
+  sealed trait Reason extends Product with Serializable
   object Reason {
     val All: Set[Reason] = Set(ForkApplied, Rollback, Checkpoint, Other)
 
