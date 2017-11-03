@@ -51,19 +51,14 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
     }
 
   override def write(ctx: ChannelHandlerContext, msg: AnyRef, promise: ChannelPromise): Unit = msg match {
-    case LocalScoreChanged(newLocalScore) =>
-      if (pinnedChannel.compareAndSet(ctx.channel(), null)) { // Fork applied
-        log.debug(s"${id(ctx)} ${pinnedChannelId}New local score: $newLocalScore")
-      }
+    case LocalScoreChanged(newLocalScore, reason) =>
       // unconditionally update local score value and propagate this message downstream
       localScore = newLocalScore
       ctx.write(msg, promise)
+      log.debug(s"${id(ctx)} ${pinnedChannelId}New local score: $newLocalScore")
 
-      // if this is the channel with the highest score and its score is higher than local, request extension
-      for ((chan, score) <- channelWithHighestScore if chan == ctx.channel() && score > newLocalScore) {
-        log.debug(s"${id(ctx)} ${pinnedChannelId}Pinning this channel")
-        pinnedChannel.set(chan)
-        chan.writeAndFlush(LoadBlockchainExtension(lastSignatures))
+      if (reason == LocalScoreChanged.Reason.ForkApplied && pinnedChannel.compareAndSet(ctx.channel(), null)) {
+        log.debug(s"${id(ctx)} Fork was applied")
       }
 
     case _ => ctx.write(msg, promise)

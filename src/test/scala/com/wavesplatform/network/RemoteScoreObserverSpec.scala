@@ -18,7 +18,7 @@ class RemoteScoreObserverSpec extends FreeSpec
   with Eventually
   with TransactionGen {
 
-  private val lastSignatures = Seq(ByteStr("1".getBytes), ByteStr("2".getBytes))
+  private val lastSignatures = Seq(ByteStr("1".getBytes), ByteStr("block#2".getBytes))
 
   "should request an extension" - {
     "when a new channel has the better score than the local one" in {
@@ -29,6 +29,32 @@ class RemoteScoreObserverSpec extends FreeSpec
       val expected = LoadBlockchainExtension(lastSignatures)
       eventually {
         val actual = channel.readOutbound[LoadBlockchainExtension]()
+        actual shouldBe expected
+      }
+    }
+
+    "when the previous extension was downloaded and there is a channel with the better score" in {
+      var currentLastSignatures = lastSignatures
+      val scoreObserver = new RemoteScoreObserver(1.minute, currentLastSignatures, 1)
+
+      val channel1 = new EmbeddedChannel(scoreObserver)
+      val channel1Score = BigInt(2)
+      channel1.writeInbound(channel1Score)
+      channel1.flushInbound()
+
+      channel1.writeInbound(ExtensionBlocks(Seq(TestBlock.create(Seq(transferGen.sample.get)))))
+      channel1.flushInbound()
+
+      currentLastSignatures :+= ByteStr("block#2".getBytes)
+      channel1.writeOutbound(LocalScoreChanged(channel1Score, LocalScoreChanged.Reason.ForkApplied))
+
+      val channel2 = new EmbeddedChannel(scoreObserver)
+      channel2.writeInbound(BigInt(3))
+      channel2.flushInbound()
+
+      val expected = LoadBlockchainExtension(currentLastSignatures)
+      eventually {
+        val actual = channel2.readOutbound[LoadBlockchainExtension]()
         actual shouldBe expected
       }
     }
@@ -63,32 +89,52 @@ class RemoteScoreObserverSpec extends FreeSpec
         }
       }
 
-//      "when the score of the best one is expired" in {
-//        val scoreTtl = 500.millis
-//
-//        val scoreObserver = new RemoteScoreObserver(scoreTtl, lastSignatures, 1)
-//        val channel1 = new EmbeddedChannel(scoreObserver)
-//        channel1.writeInbound(BigInt(3))
-//        channel1.flushInbound()
-//
-//        eventually {
-//          val actual = channel1.readOutbound[LoadBlockchainExtension]()
-//          Option(actual) shouldBe defined
-//        }
-//
-//        val channel2 = new EmbeddedChannel(scoreObserver)
-//        channel2.writeInbound(BigInt(2))
-//        channel2.flushInbound()
-//
-//        Thread.sleep(scoreTtl.toMillis)
-//        channel1.runPendingTasks()
-//
-//        eventually {
-//          val actual = channel2.readOutbound[LoadBlockchainExtension]()
-//          Option(actual) shouldBe defined
-//        }
-//      }
+      //      "when the score of the best one is expired" in {
+      //        val scoreTtl = 500.millis
+      //
+      //        val scoreObserver = new RemoteScoreObserver(scoreTtl, lastSignatures, 1)
+      //        val channel1 = new EmbeddedChannel(scoreObserver)
+      //        channel1.writeInbound(BigInt(3))
+      //        channel1.flushInbound()
+      //
+      //        eventually {
+      //          val actual = channel1.readOutbound[LoadBlockchainExtension]()
+      //          Option(actual) shouldBe defined
+      //        }
+      //
+      //        val channel2 = new EmbeddedChannel(scoreObserver)
+      //        channel2.writeInbound(BigInt(2))
+      //        channel2.flushInbound()
+      //
+      //        Thread.sleep(scoreTtl.toMillis)
+      //        channel1.runPendingTasks()
+      //
+      //        eventually {
+      //          val actual = channel2.readOutbound[LoadBlockchainExtension]()
+      //          Option(actual) shouldBe defined
+      //        }
+      //      }
     }
+
+    //    "immediately on rollback" in {
+    //      val scoreObserver = new RemoteScoreObserver(1.minute, lastSignatures, 1)
+    //
+    //      val channel1 = new EmbeddedChannel(scoreObserver)
+    //      channel1.writeInbound(BigInt(2))
+    //      channel1.flushInbound()
+    //
+    //      val channel2 = new EmbeddedChannel(scoreObserver)
+    //      channel2.writeInbound(BigInt(3))
+    //      channel2.flushInbound()
+    //
+    //      channel1.writeOutbound(LocalScoreChanged(BigInt(1), LocalScoreChanged.Reason.Rollback))
+    //
+    //      val expected = LoadBlockchainExtension(lastSignatures)
+    //      eventually {
+    //        val actual = channel2.readOutbound[LoadBlockchainExtension]()
+    //        actual shouldBe expected
+    //      }
+    //    }
   }
 
   "should not request a new extension if a previous one is not downloaded yet" - {
@@ -135,28 +181,32 @@ class RemoteScoreObserverSpec extends FreeSpec
         }
       }
     }
-  }
 
-  "should re-request extensions" - {
-    "when the local score is changed but still worse than the better one" in {
-      var currentLastSignatures = lastSignatures
+    "if the local score is changed for Other reason" - {
+      "new local score is still worse" in test(3, 2)
+      "new local score is better" in test(2, 3)
 
-      val channel = new EmbeddedChannel(new RemoteScoreObserver(1.minute, currentLastSignatures, 1))
-      channel.writeInbound(BigInt(3))
-      channel.flushInbound()
+      def test(remoteScore: BigInt, newLocalScore: BigInt): Unit = {
+        var currentLastSignatures = lastSignatures
 
-      eventually {
-        val actual = channel.readOutbound[LoadBlockchainExtension]()
-        Option(actual) shouldBe defined
-      }
+        val channel = new EmbeddedChannel(new RemoteScoreObserver(1.minute, currentLastSignatures, 1))
+        channel.writeInbound(remoteScore)
+        channel.flushInbound()
 
-      currentLastSignatures :+= ByteStr("3".getBytes)
-      channel.writeOutbound(LocalScoreChanged(2))
+        eventually {
+          val actual = channel.readOutbound[LoadBlockchainExtension]()
+          Option(actual) shouldBe defined
+        }
 
-      val expected = LoadBlockchainExtension(currentLastSignatures)
-      eventually {
-        val actual = channel.readOutbound[LoadBlockchainExtension]()
-        actual shouldBe expected
+        currentLastSignatures :+= ByteStr("block#2".getBytes)
+        channel.writeOutbound(LocalScoreChanged(newLocalScore, LocalScoreChanged.Reason.Other))
+
+        intercept[TestFailedDueToTimeoutException] {
+          eventually {
+            val actual = channel.readOutbound[LoadBlockchainExtension]()
+            Option(actual) shouldBe defined
+          }
+        }
       }
     }
   }
@@ -207,6 +257,35 @@ class RemoteScoreObserverSpec extends FreeSpec
       eventually {
         wasExtensionPropagated shouldBe true
       }
+    }
+  }
+
+  "should not break downloading an extension, if another channel was closed" in {
+    val scoreObserver = new RemoteScoreObserver(1.minute, lastSignatures, 1)
+    val channel1 = new EmbeddedChannel(scoreObserver)
+    channel1.writeInbound(BigInt(2))
+    channel1.flushInbound()
+
+    eventually {
+      val actual = channel1.readOutbound[LoadBlockchainExtension]()
+      Option(actual) shouldBe defined
+    }
+
+    val channel2 = new EmbeddedChannel(scoreObserver)
+    channel2.writeInbound(BigInt(3))
+    channel2.flushInbound()
+
+    val channel3 = new EmbeddedChannel(scoreObserver)
+    channel3.writeInbound(BigInt(4))
+    channel3.flushInbound()
+    channel3.close()
+
+    channel1.writeInbound(ExtensionBlocks(Seq(TestBlock.create(Seq(transferGen.sample.get)))))
+    channel1.flushInbound()
+
+    eventually {
+      val actual = channel1.readInbound[ExtensionBlocks]()
+      Option(actual) shouldBe defined
     }
   }
 

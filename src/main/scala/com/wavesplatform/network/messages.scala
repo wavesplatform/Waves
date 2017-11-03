@@ -17,7 +17,7 @@ case class KnownPeers(peers: Seq[InetSocketAddress]) extends Message
 case class GetSignatures(signatures: Seq[ByteStr]) extends Message
 case class Signatures(signatures: Seq[ByteStr]) extends Message
 case class GetBlock(signature: ByteStr) extends Message
-case class LocalScoreChanged(newLocalScore: History.BlockchainScore) extends Message
+case class LocalScoreChanged(newLocalScore: History.BlockchainScore, reason: LocalScoreChanged.Reason) extends Message
 case class RawBytes(code: Byte, data: Array[Byte]) extends Message
 case class BlockForged(block: Block) extends Message
 case class MicroBlockRequest(totalBlockSig: ByteStr)  extends Message
@@ -36,4 +36,18 @@ object MicroBlockInv{
     val signature = EllipticCurveImpl.sign(sender, sender.toAddress.bytes.arr ++ totalBlockSig.arr ++ prevBlockSig.arr)
     new MicroBlockInv(sender, totalBlockSig, prevBlockSig, ByteStr(signature))
   }
+}
+
+object LocalScoreChanged {
+  sealed trait Reason
+  object Reason {
+    val All: Set[Reason] = Set(ForkApplied, Rollback, Checkpoint, Other)
+
+    case object ForkApplied extends Reason
+    case object Rollback extends Reason
+    case object Checkpoint extends Reason
+    case object Other extends Reason
+  }
+
+  def apply(newLocalScore: History.BlockchainScore): LocalScoreChanged = LocalScoreChanged(newLocalScore, Reason.Other)
 }

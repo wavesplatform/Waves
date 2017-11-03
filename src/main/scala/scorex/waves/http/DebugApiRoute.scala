@@ -164,7 +164,7 @@ case class DebugApiRoute(settings: RestAPISettings,
   private def rollbackToBlock(blockId: ByteStr, returnTransactionsToUtx: Boolean): Future[ToResponseMarshallable] = Future {
     blockchainUpdater.removeAfter(blockId) match {
       case Right(blocks) =>
-        allChannels.broadcast(LocalScoreChanged(history.score()))
+        allChannels.broadcast(LocalScoreChanged(history.score(), LocalScoreChanged.Reason.Rollback))
         if (returnTransactionsToUtx) {
           blocks.flatMap(_.transactionData).foreach(tx => utxStorage.putIfNew(tx))
         }

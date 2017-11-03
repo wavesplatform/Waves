@@ -213,7 +213,7 @@ case class BlocksApiRoute(settings: RestAPISettings, checkpointsSettings: Checkp
     json[Checkpoint] { checkpoint =>
       Future {
         Coordinator.processCheckpoint(checkpointService, history, blockchainUpdater)(checkpoint)
-          .map(score => allChannels.broadcast(LocalScoreChanged(score)))
+          .map(score => allChannels.broadcast(LocalScoreChanged(score, LocalScoreChanged.Reason.Checkpoint)))
       }.map(_.fold(ApiError.fromValidationError,
         _ => Json.obj("" -> "")): ToResponseMarshallable)
     }
