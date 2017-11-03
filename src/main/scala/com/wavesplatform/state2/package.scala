@@ -1,14 +1,17 @@
 package com.wavesplatform
 
 import cats.Monoid
+import cats.data.{NonEmptyList => NEL}
 import com.wavesplatform.state2.reader.SnapshotStateReader
 import monix.eval.Coeval
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction.{Transaction, ValidationError}
 
+import scala.annotation.tailrec
 import scala.util.{Left, Right, Try}
 
 package object state2 {
+
 
   type StateReader = Coeval[SnapshotStateReader]
 
@@ -38,24 +41,26 @@ package object state2 {
     case Nil => Nil
   }
 
-  def splitAfterThreshold[A](list: List[A])(base: Int, count: A => Int, threshold: Int): (List[A], List[A]) = {
-    val splitIdx = list.zipWithIndex.foldLeft((base, Option.empty[Int])) { case ((collectedValue, maybeIdx), (item, idx)) =>
-      maybeIdx match {
-        case Some(_) => (collectedValue, maybeIdx)
-        case None =>
-          val tot = collectedValue + count(item)
-          if (tot >= threshold) (tot, Some(idx + 1)) else (tot, None)
+  def splitAfterThreshold[A](list: NEL[A], threshold: Int)(count: A => Int): (NEL[A], List[A]) = {
+    @tailrec
+    def r(agg: NEL[A], aggCount: Int, rest: List[A]): (NEL[A], List[A]) =
+      if (aggCount >= threshold) (agg, rest)
+      else rest match {
+        case Nil => (agg, rest)
+        case (x :: xs) => r(x :: agg, count(x) + aggCount, xs)
       }
-    }._2.getOrElse(Int.MaxValue)
-    list.splitAt(splitIdx)
+
+    r(NEL.one(list.head), count(list.head), list.tail)
   }
 
-  def perpendCompact[A](`new`: A, existing: Seq[A])(compactPred: (A, A) => Boolean)(implicit ma: Monoid[A]): Seq[A] = existing match {
-    case h0 :: tail =>
-      if (compactPred(`new`, h0)) Monoid.combine(h0, `new`) +: tail
-      else `new` +: existing
-    case Nil => Seq(`new`)
+  def perpendCompact[A](`new`: A, existing: NEL[A])(compactPred: (A, A) => Boolean)(implicit ma: Monoid[A]): NEL[A] = {
+    if (compactPred(`new`, existing.head)) NEL(Monoid.combine(existing.head, `new`), existing.tail)
+    else `new` :: existing
   }
+
+  def prependCompactBlockDiff(`new`: BlockDiff, existing: NEL[BlockDiff], maxTxsInChunk: Int): NEL[BlockDiff] =
+    perpendCompact[BlockDiff](`new`, existing) { case (x, y) => x.txsDiff.transactions.size + y.txsDiff.transactions.size <= maxTxsInChunk }
+
 
   def sameQuotient(x: Int, y: Int, divisor: Int): Boolean = (x / divisor) == (y / divisor)
 }
