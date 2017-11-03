@@ -57,7 +57,7 @@ class NgState(val base: Block, val baseBlockDiff: BlockDiff, val acceptedFeature
   def totalDiffOf(id: BlockId): Option[(Block, BlockDiff, DiscardedMicroBlocks)] =
     forgeBlock(id).map { case (b, txs) => (b, diffFor(id), txs) }
 
-  def bestLiquidDiff: BlockDiff = micros.headOption.map(m => totalDiffOf(m.totalResBlockSig).get._2).getOrElse(baseBlockDiff).copy(heightDiff = 1)
+  def bestLiquidDiff: BlockDiff = micros.headOption.map(m => totalDiffOf(m.totalResBlockSig).get._2).getOrElse(baseBlockDiff)
 
   def contains(blockId: BlockId): Boolean = base.uniqueId == blockId || microDiffs.contains(blockId)
 
