@@ -65,7 +65,7 @@ object BlockDiffer extends ScorexLogging with Instrumented {
   def unsafeDiffMany(settings: FunctionalitySettings, fp: FeatureProvider, s: SnapshotStateReader, prevBlock: Option[Block], maxTxsInChunk: Int)
                     (blocks: Seq[Block]): NEL[BlockDiff] =
     blocks.foldLeft((NEL.one(BlockDiff.empty), prevBlock)) { case ((diffs, prev), block) =>
-      val blockDiff = fromBlock(settings, fp, composite(s, diffs), prev, block).explicitGet()
+      val blockDiff = fromBlock(settings, fp, composite(diffs, s), prev, block).explicitGet()
       (prependCompactBlockDiff(blockDiff, diffs, maxTxsInChunk), Some(block))
     }._1
 
@@ -88,19 +88,19 @@ object BlockDiffer extends ScorexLogging with Instrumented {
     val txsDiffEi = currentBlockFeeDistr match {
       case Some(feedistr) =>
         txs.foldLeft(right(Monoid.combine(prevBlockFeeDistr.orEmpty, feedistr))) { case (ei, tx) => ei.flatMap(diff =>
-          txDiffer(composite(s, diff.asBlockDiff), tx)
+          txDiffer(composite(diff.asBlockDiff, s), tx)
             .map(newDiff => diff.combine(newDiff)))
         }
       case None =>
         txs.foldLeft(right(prevBlockFeeDistr.orEmpty)) { case (ei, tx) => ei.flatMap(diff =>
-          txDiffer(composite(s, diff.asBlockDiff), tx)
+          txDiffer(composite(diff.asBlockDiff, s), tx)
             .map(newDiff => diff.combine(newDiff.copy(portfolios = newDiff.portfolios.combine(Map(blockGenerator -> tx.feeDiff()).mapValues(_.multiply(Block.CurrentBlockFeePart)))))))
         }
     }
 
     txsDiffEi.map { d =>
       val diff = if (currentBlockHeight == settings.resetEffectiveBalancesAtHeight)
-        Monoid.combine(d, LeasePatch(composite(s, d.asBlockDiff)))
+        Monoid.combine(d, LeasePatch(composite(d.asBlockDiff, s)))
       else d
       val newSnapshots = diff.portfolios
         .collect { case (acc, portfolioDiff) if portfolioDiff.balance != 0 || portfolioDiff.effectiveBalance != 0 =>
