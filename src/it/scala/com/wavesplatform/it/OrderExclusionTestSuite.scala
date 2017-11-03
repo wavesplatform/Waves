@@ -85,7 +85,7 @@ class OrderExclusionTestSuite extends FreeSpec with Matchers with BeforeAndAfter
 
   "wait for expiration" in {
 
-    waitForOrderStatus(aliceAsset, aliceSell1, "Cancelled", 2.minutes)
+    waitForOrderStatus(aliceAsset, aliceSell1, "Cancelled", 3.minutes)
 
   }
 
@@ -151,7 +151,7 @@ class OrderExclusionTestSuite extends FreeSpec with Matchers with BeforeAndAfter
   }
 
   def waitForOrderStatus(asset: String, orderId: String, expectedStatus: String, timeout: Duration): Unit = Await.result(
-    matcherNode.waitFor[MatcherStatusResponse](_.getOrderStatus(asset, orderId), _.status == expectedStatus, 5.seconds),
+    matcherNode.waitFor[MatcherStatusResponse](_.getOrderStatus(asset, orderId), _.status == expectedStatus, 10.seconds),
     timeout
   )
 
@@ -190,13 +190,16 @@ object OrderExclusionTestSuite {
        |  bind-address="0.0.0.0"
        |  order-match-tx-fee = 300000
        |  blacklisted-assets = [$ForbiddenAssetId]
-       |  order-cleanup-interval = 90s
+       |  order-cleanup-interval = 30s
        |}
        |waves.miner.enable=no
       """.stripMargin)
 
   private val nonGeneratingPeersConfig = ConfigFactory.parseString(
     """
+      |waves.matcher {
+      | order-cleanup-interval = 30s
+      |}
       |waves.miner.enable=no
     """.stripMargin
   )
