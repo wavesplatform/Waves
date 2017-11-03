@@ -115,8 +115,8 @@ class StateWriterImpl(p: StateStorage, storeTransactions: Boolean, synchronizati
 
     sp().setHeight(newHeight)
     val nextChunkOfBlocks = !sameQuotient(newHeight, oldHeight, 2000)
-    sp().commit(compact = txsDiff.transactions.size > 10000 || nextChunkOfBlocks)
-    log.infoIf(nextChunkOfBlocks, s"BlockDiff commit complete. Persisted height = $newHeight")
+    sp().commit(nextChunkOfBlocks)
+    log.info(s"BlockDiff commit complete. Persisted height = $newHeight")
   }
 
   override def clear(): Unit = write { implicit l =>
