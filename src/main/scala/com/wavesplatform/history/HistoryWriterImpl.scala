@@ -8,7 +8,7 @@ import com.wavesplatform.settings.{FeaturesSettings, FunctionalitySettings}
 import com.wavesplatform.state2.{BlockDiff, ByteStr, DataTypes, VariablesStorage, VersionableStorage}
 import com.wavesplatform.utils._
 import kamon.Kamon
-import scorex.block.Block
+import scorex.block.{Block, BlockHeader}
 import scorex.transaction.History.BlockchainScore
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction._
@@ -134,6 +134,7 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
 
   override def blockAt(height: Int): Option[Block] = blockBytes(height).map(Block.parseBytes(_).get)
 
+  override def blockHeaderAt(height: Int): Option[BlockHeader] = ??? // blockBytes(height).map(Block.parseBytes(_).get)
 }
 
 object HistoryWriterImpl extends ScorexLogging {

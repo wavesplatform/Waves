@@ -95,4 +95,6 @@ class NgHistoryReader(ngState: () => Option[NgState], inner: History with Featur
     val ngVotes = ngState().map(_.base.featureVotes.map(_ -> 1).toMap).getOrElse(Map.empty)
     inner.featureVotesCountWithinActivationWindow(height) |+| ngVotes
   }
+
+  override def blockHeaderAt(height: Int) = ???
 }
