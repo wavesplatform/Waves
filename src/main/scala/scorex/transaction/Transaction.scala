@@ -1,6 +1,7 @@
 package scorex.transaction
 
-import com.wavesplatform.state2.{ByteStr, LeaseInfo, Portfolio}
+import com.wavesplatform.state2._
+import monix.execution.schedulers.SchedulerService
 import scorex.serialization.{BytesSerializable, JsonSerializable}
 import scorex.transaction.TransactionParser.TransactionType
 import scorex.transaction.ValidationError.InvalidSignature
@@ -53,6 +54,9 @@ trait Signed {
 
 object Signed {
 
+  private implicit val scheduler: SchedulerService = monix.execution.Scheduler.computation(name = "sig-validator",
+    reporter = com.wavesplatform.utils.UncaughtExceptionsToLogReporter)
+
   type E[A] = Either[InvalidSignature, A]
 
   private val taskSupport = new ForkJoinTaskSupport()
@@ -61,10 +65,9 @@ object Signed {
     if (!s.signatureValid) Left(InvalidSignature(s, None))
     else if (s.signedDescendants.isEmpty) Right(s)
     else {
-      val par = s.signedDescendants.par
-      par.tasksupport = taskSupport
-      par.find { descendant =>
-        validateSignatures(descendant).isLeft
-      }.fold[E[S]](Right(s))(sd => Left(InvalidSignature(s, Some(validateSignatures(sd).left.get))))
+      par(s.signedDescendants)(validateSignatures).find(_.isLeft) match {
+        case None => Right(s)
+        case Some(x) => Left(x.left.get)
+      }
     }
 }

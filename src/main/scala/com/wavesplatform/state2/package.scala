@@ -3,11 +3,14 @@ package com.wavesplatform
 import cats.Monoid
 import cats.data.{NonEmptyList => NEL}
 import com.wavesplatform.state2.reader.SnapshotStateReader
-import monix.eval.Coeval
+import monix.eval.{Coeval, Task}
+import monix.execution.Scheduler
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction.{Transaction, ValidationError}
 
 import scala.annotation.tailrec
+import scala.concurrent.Await
+import scala.concurrent.duration.Duration
 import scala.util.{Left, Right, Try}
 
 package object state2 {
@@ -63,4 +66,8 @@ package object state2 {
 
 
   def sameQuotient(x: Int, y: Int, divisor: Int): Boolean = (x / divisor) == (y / divisor)
+
+  def par[A, B](seq: Seq[A])(f: A => B)(implicit s: Scheduler): Seq[B] = {
+    Await.result(Task.gather(seq.map(a => Task(f(a)))).runAsync, Duration.Inf)
+  }
 }
