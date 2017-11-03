@@ -60,6 +60,9 @@ trait NodeApi {
   def getOrderBook(asset: String): Future[OrderBookResponse] =
     matcherGet(s"/matcher/orderbook/$asset/WAVES").as[OrderBookResponse]
 
+  def matcherOrdersByAddress(address: String): Future[MessageMatcherResponse] =
+    matcherGet(s"/matcher/orders/$address").as[MessageMatcherResponse]
+
   def get(path: String, f: RequestBuilder => RequestBuilder = identity): Future[Response] =
     retrying(f(_get(s"http://$restAddress:$nodeRestPort$path")).build())
 

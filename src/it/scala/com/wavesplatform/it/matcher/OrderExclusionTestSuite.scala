@@ -1,8 +1,8 @@
-package com.wavesplatform.it
+package com.wavesplatform.it.matcher
 
-
-import com.typesafe.config.{Config, ConfigFactory}
+import com.typesafe.config.{Config, ConfigFactory, ConfigRenderOptions}
 import com.wavesplatform.it.api.NodeApi.{AssetBalance, MatcherStatusResponse, OrderBookResponse, Transaction}
+import com.wavesplatform.it.{Docker, Node, ReportingTestName}
 import com.wavesplatform.matcher.api.CancelOrderRequest
 import com.wavesplatform.state2.ByteStr
 import org.scalatest.{BeforeAndAfterAll, FreeSpec, Matchers}
@@ -16,7 +16,7 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.util.Random
 
-class OrderExclusionTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with ReportingTestName {
+class OrderExclusionTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with ReportingTestName with OrderGenerator {
 
   import OrderExclusionTestSuite._
 
@@ -69,9 +69,14 @@ class OrderExclusionTestSuite extends FreeSpec with Matchers with BeforeAndAfter
   }
 
   "sell order could be placed" in {
+
+    println(Configs.head.resolve().root().render(ConfigRenderOptions.defaults().setComments(false).setOriginComments(false)))
+    println(Configs(1).resolve().root().render(ConfigRenderOptions.defaults().setComments(false).setOriginComments(false)))
+    println(Configs(2).resolve().root().render(ConfigRenderOptions.defaults().setComments(false).setOriginComments(false)))
+    println(Configs.last.resolve().root().render(ConfigRenderOptions.defaults().setComments(false).setOriginComments(false)))
     // Alice places sell order
     val (id, status) = matcherPlaceOrder(
-      prepareOrder(aliceNode, aliceWavesPair, OrderType.SELL, 2 * Waves * Order.PriceConstant, 500))
+      prepareOrder(aliceNode, matcherNode, aliceWavesPair, OrderType.SELL, 2 * Waves * Order.PriceConstant, 500, 70.seconds))
     status shouldBe "OrderAccepted"
     aliceSell1 = id
     // Alice checks that the order in order book
@@ -81,11 +86,13 @@ class OrderExclusionTestSuite extends FreeSpec with Matchers with BeforeAndAfter
     val orders = matcherGetOrderBook()
     orders.asks.head.amount shouldBe 500
     orders.asks.head.price shouldBe 2 * Waves * Order.PriceConstant
+
+    val aliceOrders = matcherNode.matcherOrdersByAddress(aliceNode.address)
   }
 
   "wait for expiration" in {
 
-    waitForOrderStatus(aliceAsset, aliceSell1, "Cancelled", 3.minutes)
+    waitForOrderStatus(aliceAsset, aliceSell1, "Canceled", 3.minutes)
 
   }
 
@@ -106,15 +113,6 @@ class OrderExclusionTestSuite extends FreeSpec with Matchers with BeforeAndAfter
     (balance, height)
   }
 
-  private def prepareOrder(node: Node, pair: AssetPair, orderType: OrderType, price: Long, amount: Long): Order = {
-    val creationTime = System.currentTimeMillis()
-    val timeToLive = creationTime + Order.MaxLiveTime - 1000
-
-    val privateKey = PrivateKeyAccount(Base58.decode(node.accountSeed).get)
-    val matcherPublicKey = PublicKeyAccount(Base58.decode(matcherNode.publicKey).get)
-
-    Order(privateKey, matcherPublicKey, pair, orderType, price, amount, creationTime, timeToLive, MatcherFee)
-  }
 
   private def matcherPlaceOrder(order: Order): (String, String) = {
     val futureResult = matcherNode.placeOrder(order)
@@ -190,7 +188,7 @@ object OrderExclusionTestSuite {
        |  bind-address="0.0.0.0"
        |  order-match-tx-fee = 300000
        |  blacklisted-assets = [$ForbiddenAssetId]
-       |  order-cleanup-interval = 30s
+       |  order-cleanup-interval = 20s
        |}
        |waves.miner.enable=no
       """.stripMargin)
