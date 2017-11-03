@@ -46,9 +46,9 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
       " ] + " + ngState().map(_ => "Some(ng state)"))
   }
 
-  private def currentPersistedBlocksState: StateReader = read { implicit l => Coeval(composite(persisted, inMemDiffs())) }
+  private def currentPersistedBlocksState: StateReader = read { implicit l => Coeval(composite(inMemDiffs(), persisted)) }
 
-  def bestLiquidState: StateReader = read { implicit l => composite(currentPersistedBlocksState, Coeval(ngState().map(_.bestLiquidDiff).orEmpty)) }
+  def bestLiquidState: StateReader = read { implicit l => composite(Coeval(ngState().map(_.bestLiquidDiff).orEmpty), currentPersistedBlocksState) }
 
   def historyReader: NgHistory with DebugNgHistory with FeatureProvider = read { implicit l => new NgHistoryReader(() => ngState(), historyWriter, settings.blockchainSettings.functionalitySettings) }
 
@@ -150,7 +150,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
                     microBlockForkHeightStats.record(discarded.size)
                   }
                   historyWriter.appendBlock(referencedForgedBlock, ng.acceptedFeatures)(BlockDiffer.fromBlock(settings.blockchainSettings.functionalitySettings, historyReader,
-                    composite(currentPersistedBlocksState(), referencedLiquidDiff),
+                    composite(referencedLiquidDiff, currentPersistedBlocksState()),
                     Some(referencedForgedBlock), block))
                     .map { hardenedDiff =>
                       TxsInBlockchainStats.record(ng.transactions.size)
@@ -212,7 +212,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
               val difference = persisted.height - requestedHeight
               inMemDiffs.transform { imd =>
                 val remained = dropLeftIf(imd.toList)(_.map(bd => bd.heightDiff).sum > difference)
-                unsafeDiffByRange(composite(persisted, remained), requestedHeight + 1) ++ remained
+                unsafeDiffByRange(composite(remained, persisted), requestedHeight + 1) ++ remained
               }
             }
             logHeights(s"Rollback to h=$requestedHeight completed:")
@@ -247,8 +247,8 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
           case _ =>
             for {
               _ <- microBlock.signaturesValid
-              diff <- BlockDiffer.fromMicroBlock(settings.blockchainSettings.functionalitySettings, historyReader, composite(currentPersistedBlocksState(),
-                ng.bestLiquidDiff.copy(snapshots = Map.empty)),
+              diff <- BlockDiffer.fromMicroBlock(settings.blockchainSettings.functionalitySettings, historyReader,
+                composite(ng.bestLiquidDiff.copy(snapshots = Map.empty), currentPersistedBlocksState()),
                 historyWriter.lastBlock.map(_.timestamp), microBlock, ng.base.timestamp)
             } yield {
               log.info(s"$microBlock appended")
