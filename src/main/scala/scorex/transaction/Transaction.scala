@@ -6,8 +6,6 @@ import scorex.serialization.{BytesSerializable, JsonSerializable}
 import scorex.transaction.TransactionParser.TransactionType
 import scorex.transaction.ValidationError.InvalidSignature
 
-import scala.collection.parallel.ForkJoinTaskSupport
-
 trait Transaction extends BytesSerializable with JsonSerializable with Signed {
   val id: ByteStr
 
@@ -58,8 +56,6 @@ object Signed {
     reporter = com.wavesplatform.utils.UncaughtExceptionsToLogReporter)
 
   type E[A] = Either[InvalidSignature, A]
-
-  private val taskSupport = new ForkJoinTaskSupport()
 
   private def validateSignatures[S <: Signed](s: S): E[S] =
     if (!s.signatureValid) Left(InvalidSignature(s, None))

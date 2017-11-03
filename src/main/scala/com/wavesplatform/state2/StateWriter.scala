@@ -12,8 +12,6 @@ import scorex.transaction.assets.TransferTransaction
 import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.utils.ScorexLogging
 
-import scala.collection.parallel.ForkJoinTaskSupport
-
 trait StateWriter {
   def applyBlockDiff(blockDiff: BlockDiff): Unit
 
@@ -28,8 +26,6 @@ class StateWriterImpl(p: StateStorage, storeTransactions: Boolean, synchronizati
     reporter = com.wavesplatform.utils.UncaughtExceptionsToLogReporter)
 
   import StateStorage._
-
-  private val fjts = new ForkJoinTaskSupport()
 
   override def close(): Unit = p.close()
 
