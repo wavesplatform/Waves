@@ -1,7 +1,6 @@
 package com.wavesplatform.it
 
 import org.scalatest._
-import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
 
 import scala.concurrent.Await.result
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -9,8 +8,11 @@ import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
 import scala.util.Random
 
-class ValidChainGenerationSpec(override val nodes: Seq[Node]) extends FreeSpec with ScalaFutures with IntegrationPatience
+class ValidChainGenerationSuite extends FreeSpec with IntegrationNodesInitializationAndStopping
   with Matchers with TransferSending {
+
+  override val docker = Docker(getClass)
+  override val nodes: Seq[Node] = NodeConfigs.default(3, 1).map(docker.startNode)
 
   "Generate more blocks and resynchronise after rollback" - {
     "1 of N" in test(1)

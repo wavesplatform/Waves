@@ -11,16 +11,16 @@ import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
-
-trait IntegrationSuiteWithThreeAddresses extends FunSuite with BeforeAndAfterAll with Matchers with ScalaFutures
+trait IntegrationSuiteWithThreeAddresses extends BeforeAndAfterAll with Matchers with ScalaFutures
   with IntegrationPatience with RecoverMethods with RequestErrorAssert with IntegrationTestsScheme {
+  this: Suite =>
 
   def allNodes: Seq[Node]
 
   def notMiner: Node
 
-  protected val sender: Node = notMiner
-  private val richAddress = sender.address
+  protected def sender: Node = notMiner
+  private def richAddress = sender.address
 
   protected val defaultBalance: Long = 100.waves
 
@@ -74,8 +74,7 @@ trait IntegrationSuiteWithThreeAddresses extends FunSuite with BeforeAndAfterAll
     })
   }
 
-
-  override def beforeAll(): Unit = {
+  abstract override def beforeAll(): Unit = {
     super.beforeAll()
 
     def waitForTxsToReachAllNodes(txIds: Seq[String]): Future[_] = {

@@ -1,22 +1,23 @@
 package com.wavesplatform.it
 
-import com.typesafe.config.{Config, ConfigFactory}
+import com.typesafe.config.ConfigFactory
 import org.scalatest.{BeforeAndAfterAll, FreeSpec, Matchers}
 
-import scala.collection.JavaConverters._
 import scala.concurrent.Await
 import scala.concurrent.Await.result
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
-import scala.util.Random
 
 class NetworkSeparationTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with IntegrationNodesInitializationAndStopping {
 
-  import NetworkSeparationTestSuite._
+  private val generatingNodeConfig = ConfigFactory.parseString(
+    """
+      |waves.miner.offline = yes
+    """.stripMargin)
 
   override val docker = Docker(getClass)
-  override val nodes = NodeConfigs.map(docker.startNode)
+  override val nodes: Seq[Node] = NodeConfigs.default(4).map(generatingNodeConfig.withFallback).map(docker.startNode)
 
   private def validateBlocks(nodes: Seq[Node]): Unit = {
     val targetBlocks1 = result(for {
@@ -50,19 +51,4 @@ class NetworkSeparationTestSuite extends FreeSpec with Matchers with BeforeAndAf
   "nodes should sync" in {
     validateBlocks(nodes)
   }
-}
-
-object NetworkSeparationTestSuite {
-
-  private val generatingNodeConfig = ConfigFactory.parseString(
-    """
-      |waves.miner.offline = yes
-    """.stripMargin)
-
-  private val configs = Docker.NodeConfigs.getConfigList("nodes").asScala
-
-  val NodesCount: Int = 4
-
-  val NodeConfigs: Seq[Config] = Random.shuffle(configs).take(NodesCount).map(generatingNodeConfig.withFallback(_))
-
 }
