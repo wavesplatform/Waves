@@ -12,7 +12,7 @@ class ValidChainGenerationSuite extends FreeSpec with IntegrationNodesInitializa
   with Matchers with TransferSending {
 
   override val docker = Docker(getClass)
-  override val nodes: Seq[Node] = NodeConfigs.default(3, 1).map(docker.startNode)
+  override val nodes: Seq[Node] = docker.startNodes(NodeConfigs.default(3, 1))
 
   "Generate more blocks and resynchronise after rollback" - {
     "1 of N" in test(1)

@@ -12,7 +12,6 @@ import scorex.account.{Address, PrivateKeyAccount}
 import scorex.crypto.encode.Base58
 import scorex.transaction.PaymentTransaction
 
-import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
@@ -25,7 +24,7 @@ class SimpleTransactionsSuite extends FunSuite with BeforeAndAfterAll with Match
 
   override val docker = Docker(getClass)
 
-  override val nodes = Docker.NodeConfigs.getConfigList("nodes").asScala.take(3).map(docker.startNode)
+  override val nodes = docker.startNodes(NodeConfigs.default.take(3))
   val node = nodes.head
 
   test("valid tx send by network to node should be in blockchain") {

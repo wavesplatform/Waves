@@ -11,8 +11,8 @@ class LeasingTransactionsSuite extends BaseTransactionSuite with IntegrationSuit
 
   test("leasing waves decreases lessor's eff.b. and increases lessee's eff.b.; lessor pays fee") {
     val f = for {
-      height <- traverse(allNodes)(_.height).map(_.max)
-      _ <- traverse(allNodes)(_.waitForHeight(height + 1))
+      height <- traverse(nodes)(_.height).map(_.max)
+      _ <- traverse(nodes)(_.waitForHeight(height + 1))
       _ <- assertBalances(firstAddress, 100.waves, 100.waves)
       _ <- assertBalances(secondAddress, 100.waves, 100.waves)
 
@@ -27,14 +27,14 @@ class LeasingTransactionsSuite extends BaseTransactionSuite with IntegrationSuit
 
   test("can not make leasing without having enough waves") {
     val f = for {
-      fb <- traverse(allNodes)(_.height).map(_.min)
+      fb <- traverse(nodes)(_.height).map(_.min)
 
       _ <- assertBalances(firstAddress, 90.waves, 80.waves)
       _ <- assertBalances(secondAddress, 100.waves, 110.waves)
 
       leaseFailureAssertion <- assertBadRequest(sender.lease(secondAddress, firstAddress, 111.waves, 10.waves))
 
-      _ <- traverse(allNodes)(_.waitForHeight(fb + 2))
+      _ <- traverse(nodes)(_.waitForHeight(fb + 2))
 
       _ <- assertBalances(firstAddress, 90.waves, 80.waves)
       _ <- assertBalances(secondAddress, 100.waves, 110.waves)
@@ -45,14 +45,14 @@ class LeasingTransactionsSuite extends BaseTransactionSuite with IntegrationSuit
 
   test("can not make leasing without having enough waves for fee") {
     val f = for {
-      fb <- traverse(allNodes)(_.height).map(_.min)
+      fb <- traverse(nodes)(_.height).map(_.min)
 
       _ <- assertBalances(firstAddress, 90.waves, 80.waves)
       _ <- assertBalances(secondAddress, 100.waves, 110.waves)
 
       transferFailureAssertion <- assertBadRequest(sender.lease(firstAddress, secondAddress, 90.waves, fee = 11.waves))
 
-      _ <- traverse(allNodes)(_.waitForHeight(fb + 2))
+      _ <- traverse(nodes)(_.waitForHeight(fb + 2))
 
       _ <- assertBalances(firstAddress, 90.waves, 80.waves)
       _ <- assertBalances(secondAddress, 100.waves, 110.waves)
@@ -109,9 +109,9 @@ class LeasingTransactionsSuite extends BaseTransactionSuite with IntegrationSuit
 
       createdLeaseTxId <- sender.lease(firstAddress, secondAddress, 5.waves, fee = 5.waves).map(_.id)
 
-      height <- traverse(allNodes)(_.height).map(_.max)
-      _ <- traverse(allNodes)(_.waitForHeight(height + 1))
-      _ <- traverse(allNodes)(_.waitForTransaction(createdLeaseTxId))
+      height <- traverse(nodes)(_.height).map(_.max)
+      _ <- traverse(nodes)(_.waitForHeight(height + 1))
+      _ <- traverse(nodes)(_.waitForTransaction(createdLeaseTxId))
 
       _ <- assertBalances(firstAddress, 65.waves, 50.waves)
       _ <- assertBalances(secondAddress, 100.waves, 115.waves)
@@ -124,13 +124,13 @@ class LeasingTransactionsSuite extends BaseTransactionSuite with IntegrationSuit
 
   test("can not make leasing without having enough your waves to self") {
     val f = for {
-      fb <- traverse(allNodes)(_.height).map(_.min)
+      fb <- traverse(nodes)(_.height).map(_.min)
 
       _ <- assertBalances(firstAddress, 65.waves, 50.waves)
 
       transferFailureAssertion <- assertBadRequest(sender.lease(firstAddress, firstAddress, 89.waves, fee = 1.waves))
 
-      _ <- traverse(allNodes)(_.waitForHeight(fb + 2))
+      _ <- traverse(nodes)(_.waitForHeight(fb + 2))
 
       _ <- assertBalances(firstAddress, 65.waves, 50.waves)
     } yield transferFailureAssertion

@@ -3,10 +3,9 @@ package com.wavesplatform.it.activation
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.features.BlockchainFeatureStatus
 import com.wavesplatform.features.api.NodeFeatureStatus
-import com.wavesplatform.it.Docker
+import com.wavesplatform.it.{Docker, NodeConfigs}
 import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
 
-import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
@@ -17,7 +16,7 @@ class VoteForFeatureByDefaultTestSuite extends FreeSpec with Matchers with Befor
   import VoteForFeatureByDefaultTestSuite._
 
   private val docker = Docker(getClass)
-  private val nodes = Configs.map(docker.startNode)
+  private val nodes = docker.startNodes(Configs)
   val defaultVotingFeatureNum: Short = 1
 
 
@@ -68,7 +67,7 @@ class VoteForFeatureByDefaultTestSuite extends FreeSpec with Matchers with Befor
 
   object VoteForFeatureByDefaultTestSuite {
 
-    private val dockerConfigs = Docker.NodeConfigs.getConfigList("nodes").asScala
+    import NodeConfigs.default
 
     val votingInterval = 20
     val blocksForActivation = 15
@@ -135,10 +134,10 @@ class VoteForFeatureByDefaultTestSuite extends FreeSpec with Matchers with Befor
     )
 
 
-    val Configs: Seq[Config] = Seq(nonSupportedNodes.withFallback(dockerConfigs(3))) ++
-      Seq(supportedNodes.withFallback(dockerConfigs(1))) ++
-      Seq(supportedNodes.withFallback(dockerConfigs(2))) ++
-      Seq(supportedNodes.withFallback(dockerConfigs.head))
+    val Configs: Seq[Config] = Seq(nonSupportedNodes.withFallback(default(3))) ++
+      Seq(supportedNodes.withFallback(default(1))) ++
+      Seq(supportedNodes.withFallback(default(2))) ++
+      Seq(supportedNodes.withFallback(default.head))
 
   }
 

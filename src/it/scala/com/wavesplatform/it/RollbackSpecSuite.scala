@@ -6,7 +6,6 @@ import com.wavesplatform.it.util._
 import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
 import org.scalatest.{FreeSpec, Matchers}
 
-import scala.collection.JavaConverters._
 import scala.concurrent.Await.result
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future.traverse
@@ -18,7 +17,7 @@ class RollbackSpecSuite extends FreeSpec with ScalaFutures with IntegrationPatie
   with Matchers with TransferSending with IntegrationNodesInitializationAndStopping {
   override val docker = Docker(getClass)
   // there are nodes with big and small balances to reduce the number of forks
-  override val nodes: Seq[Node] = configs.map(docker.startNode)
+  override val nodes: Seq[Node] = docker.startNodes(configs)
 
   private val transactionsCount = 190
 
@@ -94,7 +93,7 @@ class RollbackSpecSuite extends FreeSpec with ScalaFutures with IntegrationPatie
 }
 
 object RollbackSpecSuite {
-  private val dockerConfigs = Docker.NodeConfigs.getConfigList("nodes").asScala
+  import NodeConfigs.default
 
   private val nonGeneratingNodesConfig = ConfigFactory.parseString(
     """
@@ -102,6 +101,5 @@ object RollbackSpecSuite {
     """.stripMargin
   )
 
-  val configs: Seq[Config] = Seq(dockerConfigs.last,
-    nonGeneratingNodesConfig.withFallback(Random.shuffle(dockerConfigs.init).head))
+  val configs: Seq[Config] = Seq(default.last, nonGeneratingNodesConfig.withFallback(Random.shuffle(default.init).head))
 }

@@ -7,6 +7,8 @@ import scala.util.Random
 
 object NodeConfigs {
 
+  val default: Seq[Config] = Docker.NodeConfigs.getConfigList("nodes").asScala
+
   def default(miners: Int, nonMiners: Int = 0): Seq[Config] = {
     val nonGeneratingPeerConfig = ConfigFactory.parseString(
       """
@@ -14,7 +16,7 @@ object NodeConfigs {
       """.stripMargin
     )
 
-    val (minerConfigs: Seq[Config], nonMinerConfigs: Seq[Config]) = Random.shuffle(Docker.NodeConfigs.getConfigList("nodes").asScala)
+    val (minerConfigs: Seq[Config], nonMinerConfigs: Seq[Config]) = Random.shuffle(default)
       .take(miners + nonMiners)
       .splitAt(miners)
 

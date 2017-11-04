@@ -8,6 +8,7 @@ import scala.concurrent.Await.result
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
+import scala.util.Random
 
 class NetworkSeparationTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with IntegrationNodesInitializationAndStopping {
 
@@ -17,7 +18,7 @@ class NetworkSeparationTestSuite extends FreeSpec with Matchers with BeforeAndAf
     """.stripMargin)
 
   override val docker = Docker(getClass)
-  override val nodes: Seq[Node] = NodeConfigs.default(4).map(generatingNodeConfig.withFallback).map(docker.startNode)
+  override val nodes: Seq[Node] = docker.startNodes(Random.shuffle(NodeConfigs.default).take(4).map(generatingNodeConfig.withFallback))
 
   private def validateBlocks(nodes: Seq[Node]): Unit = {
     val targetBlocks1 = result(for {

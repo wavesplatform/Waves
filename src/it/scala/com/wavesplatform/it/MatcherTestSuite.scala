@@ -9,7 +9,6 @@ import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
 
-import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
@@ -21,7 +20,7 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
 
   private val docker = Docker(getClass)
 
-  override val nodes = Configs.map(docker.startNode)
+  override val nodes = docker.startNodes(Configs)
 
   private val matcherNode = nodes.head
   private val aliceNode = nodes(1)
@@ -340,9 +339,10 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
 }
 
 object MatcherTestSuite {
-  val ForbiddenAssetId = "FdbnAsset"
 
-  private val dockerConfigs = Docker.NodeConfigs.getConfigList("nodes").asScala
+  import NodeConfigs.default
+
+  val ForbiddenAssetId = "FdbnAsset"
 
   private val matcherConfig = ConfigFactory.parseString(
     s"""
@@ -369,7 +369,7 @@ object MatcherTestSuite {
 
   val Waves: Long = 100000000L
 
-  val Configs: Seq[Config] = Seq(matcherConfig.withFallback(dockerConfigs.head)) ++
-    Random.shuffle(dockerConfigs.tail.init).take(2).map(nonGeneratingPeersConfig.withFallback(_)) ++
-    Seq(dockerConfigs.last)
+  val Configs: Seq[Config] = Seq(matcherConfig.withFallback(default.head)) ++
+    Random.shuffle(default.tail.init).take(2).map(nonGeneratingPeersConfig.withFallback(_)) ++
+    Seq(default.last)
 }

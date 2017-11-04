@@ -1,14 +1,14 @@
 package com.wavesplatform.it
 
-import scala.collection.JavaConverters._
-import scala.concurrent.duration._
 import org.scalatest.{BeforeAndAfterAll, FreeSpec, Matchers}
 
 import scala.concurrent.Await
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration._
 
 class ActivationTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with IntegrationNodesInitializationAndStopping {
   override val docker = new Docker()
-  override val nodes = Docker.NodeConfigs.getConfigList("nodes").asScala.take(2).map(docker.startNode)
+  override val nodes = docker.startNodes(NodeConfigs.default.take(2))
 
   "api consuming example" in {
     Await.result(nodes.head.waitForHeight(5), 5.minute)

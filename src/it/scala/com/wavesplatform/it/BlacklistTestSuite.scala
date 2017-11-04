@@ -4,7 +4,6 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.api.NodeApi.BlacklistedPeer
 import org.scalatest._
 
-import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
@@ -16,7 +15,7 @@ class BlacklistTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll w
   import BlacklistTestSuite._
 
   private val docker = Docker(getClass)
-  override val nodes = Configs.map(docker.startNode)
+  override val nodes = docker.startNodes(Configs)
   private val richestNode = nodes.head
   private val otherNodes = nodes.tail
 
@@ -60,15 +59,15 @@ class BlacklistTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll w
 
 object BlacklistTestSuite {
 
+  import NodeConfigs.default
+
   private val generatingNodeConfig = ConfigFactory.parseString(
     """
       |waves.miner.offline = yes
     """.stripMargin)
 
-  private val dockerConfigs = Docker.NodeConfigs.getConfigList("nodes").asScala
-
   val NodesCount: Int = 4
 
-  val Configs: Seq[Config] = Seq(generatingNodeConfig.withFallback(dockerConfigs.last)) ++ Random.shuffle(dockerConfigs.init).take(NodesCount - 1)
+  val Configs: Seq[Config] = Seq(generatingNodeConfig.withFallback(default.last)) ++ Random.shuffle(default.init).take(NodesCount - 1)
 
 }

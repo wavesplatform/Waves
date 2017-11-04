@@ -3,10 +3,9 @@ package com.wavesplatform.it.activation
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.features.BlockchainFeatureStatus
 import com.wavesplatform.features.api.NodeFeatureStatus
-import com.wavesplatform.it.Docker
+import com.wavesplatform.it.{Docker, NodeConfigs}
 import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
 
-import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
@@ -17,7 +16,7 @@ class NotActivateFeatureTestSuite extends FreeSpec with Matchers with BeforeAndA
   import NotActivateFeatureTestSuite._
 
   private val docker = Docker(getClass)
-  private val nodes = Configs.map(docker.startNode)
+  private val nodes = docker.startNodes(Configs)
 
 
   override protected def beforeAll(): Unit = {
@@ -59,8 +58,6 @@ class NotActivateFeatureTestSuite extends FreeSpec with Matchers with BeforeAndA
 
   object NotActivateFeatureTestSuite {
 
-    private val dockerConfigs = Docker.NodeConfigs.getConfigList("nodes").asScala
-
     val votingInterval = 14
     val blocksForActivation = 14
     val nonVotingFeatureNum: Short = 2
@@ -88,7 +85,7 @@ class NotActivateFeatureTestSuite extends FreeSpec with Matchers with BeforeAndA
 
     val NodesCount: Int = 4
 
-    val Configs: Seq[Config] = Random.shuffle(dockerConfigs.init).take(NodesCount).map(nonSupportedNodes.withFallback(_))
+    val Configs: Seq[Config] = Random.shuffle(NodeConfigs.default.init).take(NodesCount).map(nonSupportedNodes.withFallback(_))
 
   }
 
