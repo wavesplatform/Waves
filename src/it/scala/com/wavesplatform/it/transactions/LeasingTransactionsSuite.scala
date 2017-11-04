@@ -1,22 +1,13 @@
 package com.wavesplatform.it.transactions
 
-import com.wavesplatform.it.util._
 import com.wavesplatform.it._
-import org.scalatest.FunSuite
+import com.wavesplatform.it.util._
 
 import scala.concurrent.Await
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
 
-class LeasingTransactionsSuite extends FunSuite with IntegrationNodesInitializationAndStopping
-  with IntegrationSuiteWithThreeAddresses {
-
-  override val docker = Docker(getClass)
-  override val nodes: Seq[Node] = NodeConfigs.default(3, 1).map(docker.startNode)
-
-  override val allNodes: Seq[Node] = nodes
-  override val notMiner: Node = allNodes.last
+class LeasingTransactionsSuite extends BaseTransactionSuite with IntegrationSuiteWithThreeAddresses {
 
   test("leasing waves decreases lessor's eff.b. and increases lessee's eff.b.; lessor pays fee") {
     val f = for {

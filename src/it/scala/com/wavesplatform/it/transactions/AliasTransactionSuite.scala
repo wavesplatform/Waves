@@ -1,22 +1,12 @@
 package com.wavesplatform.it.transactions
 
 import com.wavesplatform.it.util._
-import com.wavesplatform.it._
-import org.scalatest.FunSuite
 import org.scalatest.prop.TableDrivenPropertyChecks
 
 import scala.concurrent.Await
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 
-class AliasTransactionSuite extends FunSuite with IntegrationNodesInitializationAndStopping
-  with IntegrationSuiteWithThreeAddresses with TableDrivenPropertyChecks {
-
-  override val docker = Docker(getClass)
-  override val nodes: Seq[Node] = NodeConfigs.default(3, 1).map(docker.startNode)
-
-  override val allNodes: Seq[Node] = nodes
-  override val notMiner: Node = allNodes.last
+class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropertyChecks {
 
   private val aliasFee = 1.waves
   private val leasingFee = 0.001.waves
@@ -112,8 +102,6 @@ class AliasTransactionSuite extends FunSuite with IntegrationNodesInitialization
   }
 
 
-
-
   test("Able to get address by alias") {
     val alias = "test_alias_6"
     val f = for {
@@ -194,19 +182,19 @@ class AliasTransactionSuite extends FunSuite with IntegrationNodesInitialization
 
       _ <- assertBalances(firstAddress, firstAddressBalance - leasingFee,
         firstAddressEffectiveBalance - leasingAmount - leasingFee)
-      _ <- assertBalances(thirdAddress, thirdAddressBalance - aliasFee, thirdAddressEffectiveBalance -aliasFee + leasingAmount)
+      _ <- assertBalances(thirdAddress, thirdAddressBalance - aliasFee, thirdAddressEffectiveBalance - aliasFee + leasingAmount)
     } yield succeed
     Await.result(f, 1.minute)
   }
 
   //previous test should not be commented to run this one
-  test("Not able to create aliase when insufficient funds"){
+  test("Not able to create aliase when insufficient funds") {
     val alias = "test_alias7"
     val f = for {
       _ <- assertBadRequestAndMessage(sender.createAlias(firstAddress, alias, aliasFee),
         "State check failed. Reason: negative effective balance")
 
-    }yield succeed
+    } yield succeed
     Await.result(f, 1.minute)
   }
 }

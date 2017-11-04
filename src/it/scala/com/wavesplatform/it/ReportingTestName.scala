@@ -11,7 +11,7 @@ trait ReportingTestName extends SuiteMixin {
   th: Suite =>
   def nodes: Seq[Node]
 
-  abstract override def runTest(testName: String, args: Args): Status = {
+  abstract override protected def runTest(testName: String, args: Args): Status = {
     import scala.concurrent.ExecutionContext.Implicits.global
 
     Await.result(Future.traverse(nodes)(_.printDebugMessage(DebugMessage(s"---------- Test '$testName' started ----------"))), 10.seconds)
