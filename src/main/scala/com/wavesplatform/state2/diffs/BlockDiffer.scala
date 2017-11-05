@@ -10,6 +10,7 @@ import com.wavesplatform.state2._
 import com.wavesplatform.state2.patch.LeasePatch
 import com.wavesplatform.state2.reader.CompositeStateReader.composite
 import com.wavesplatform.state2.reader.SnapshotStateReader
+import monix.eval.Task
 import monix.execution.schedulers.SchedulerService
 import scorex.account.Address
 import scorex.block.{Block, MicroBlock}
@@ -18,6 +19,8 @@ import scorex.transaction.{History, Transaction, ValidationError}
 import scorex.utils.ScorexLogging
 
 import scala.collection.SortedMap
+import scala.concurrent.Await
+import scala.concurrent.duration.Duration
 
 object BlockDiffer extends ScorexLogging with Instrumented {
 
@@ -72,7 +75,7 @@ object BlockDiffer extends ScorexLogging with Instrumented {
   def unsafeDiffByRange(fs: FunctionalitySettings, fp: FeatureProvider, h: History, maxTransactionsPerChunk: Int)(state: SnapshotStateReader, upto: Int): NEL[BlockDiff] = {
     val from = state.height + 1
     val blocks = measureLog(s"Reading blocks from $from up upto $upto") {
-      par(Range(from, upto).map(h.blockBytes))(b => Block.parseBytes(b.get).get)
+      Await.result(Task.wander(Range(from, upto).map(h.blockBytes))(b => Task(Block.parseBytes(b.get).get)).runAsync, Duration.Inf)
     }
     measureLog(s"Building diff from $from up to $upto") {
       BlockDiffer.unsafeDiffMany(fs, fp, state, h.blockAt(from - 1), maxTransactionsPerChunk)(blocks)
