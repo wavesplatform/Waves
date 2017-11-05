@@ -51,7 +51,7 @@ trait Signed {
 
   protected def signedDescendants: Seq[Signed] = Seq.empty
 
-  val signaturesValid: Either[InvalidSignature, this.type] = Signed.validateSignatures(this)
+  lazy val signaturesValid: Either[InvalidSignature, this.type] = Signed.validateSignatures(this)
 }
 
 object Signed {
