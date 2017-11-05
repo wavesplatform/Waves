@@ -69,6 +69,6 @@ package object state2 {
   def sameQuotient(x: Int, y: Int, divisor: Int): Boolean = (x / divisor) == (y / divisor)
 
   def par[A, B](seq: Seq[A])(f: A => B)(implicit s: Scheduler): Seq[B] = {
-    Await.result(Task.gather(seq.map(a => Task(f(a)))).runAsync, Duration.Inf)
+    Await.result(Task.wander(seq)(a => Task(f(a))).runAsync, Duration.Inf)
   }
 }

@@ -1,10 +1,14 @@
 package scorex.transaction
 
 import com.wavesplatform.state2._
+import monix.eval.Task
 import monix.execution.schedulers.SchedulerService
 import scorex.serialization.{BytesSerializable, JsonSerializable}
 import scorex.transaction.TransactionParser.TransactionType
 import scorex.transaction.ValidationError.InvalidSignature
+
+import scala.concurrent.Await
+import scala.concurrent.duration.Duration
 
 trait Transaction extends BytesSerializable with JsonSerializable with Signed {
   val id: ByteStr
@@ -47,7 +51,7 @@ trait Signed {
 
   protected def signedDescendants: Seq[Signed] = Seq.empty
 
-  lazy val signaturesValid: Either[InvalidSignature, this.type] = Signed.validateSignatures(this)
+  val signaturesValid: Either[InvalidSignature, this.type] = Signed.validateSignatures(this)
 }
 
 object Signed {
@@ -57,13 +61,15 @@ object Signed {
 
   type E[A] = Either[InvalidSignature, A]
 
-  private def validateSignatures[S <: Signed](s: S): E[S] =
-    if (!s.signatureValid) Left(InvalidSignature(s, None))
-    else if (s.signedDescendants.isEmpty) Right(s)
-    else {
-      par(s.signedDescendants)(validateSignatures).find(_.isLeft) match {
+  def validateSignatures[S <: Signed](s: S): E[S] = Await.result(Signed.validateTask(s).runAsync, Duration.Inf)
+
+  private def validateTask[S <: Signed](s: S): Task[E[S]] =
+    if (!s.signatureValid) Task.now(Left(InvalidSignature(s, None)))
+    else if (s.signedDescendants.isEmpty) Task.now(Right(s))
+    else Task.wanderUnordered(s.signedDescendants)(s => validateTask(s)) map { l =>
+      l.find(_.isLeft) match {
+        case Some(e) => Left(e.left.get)
         case None => Right(s)
-        case Some(x) => Left(x.left.get)
       }
     }
 }
