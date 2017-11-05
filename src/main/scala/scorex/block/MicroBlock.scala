@@ -33,7 +33,7 @@ case class MicroBlock private(version: Byte, generator: PublicKeyAccount, transa
         "blocksize" -> bytes.length
       )
 
-  lazy val bytes: Array[Byte] = {
+  def bytes: Array[Byte] = {
     val txBytesSize = transactionDataField.bytes.length
     val txBytes = Bytes.ensureCapacity(Ints.toByteArray(txBytesSize), 4, 0) ++ transactionDataField.bytes
 
@@ -44,10 +44,10 @@ case class MicroBlock private(version: Byte, generator: PublicKeyAccount, transa
       signerDataField.bytes
   }
 
-  lazy val bytesWithoutSignature: Array[Byte] = bytes.dropRight(SignatureLength)
+  private def bytesWithoutSignature: Array[Byte] = bytes.dropRight(SignatureLength)
 
-  def signatureValid: Boolean = EllipticCurveImpl.verify(signature.arr, bytesWithoutSignature, generator.publicKey)
-  override lazy val signedDescendants: Seq[Signed] = transactionData
+  override def signatureValid: Boolean = EllipticCurveImpl.verify(signature.arr, bytesWithoutSignature, generator.publicKey)
+  override def signedDescendants: Seq[Signed] = transactionData
 
   override def toString: String = s"MicroBlock(${totalResBlockSig.trim} ~> ${prevResBlockSig.trim}, txs=${transactionData.size})"
 }
