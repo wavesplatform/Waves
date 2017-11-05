@@ -63,7 +63,7 @@ object Signed {
 
   type E[A] = Either[InvalidSignature, A]
 
-  private def validateTask[S <: Signed](s: S): Task[E[S]] = Task.unit.flatMap { _ =>
+  private def validateTask[S <: Signed](s: S): Task[E[S]] = Task {
     if (!s.signatureValid) Task.now(Left(InvalidSignature(s, None)))
     else if (s.signedDescendants.isEmpty) Task.now(Right(s))
     else Task.wanderUnordered(s.signedDescendants)(s => s.signaturesValidMemoized) map { l =>
@@ -72,5 +72,6 @@ object Signed {
         case None => Right(s)
       }
     }
-  }
+  }.flatten
+
 }

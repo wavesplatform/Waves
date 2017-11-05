@@ -46,7 +46,7 @@ case class MicroBlock private(version: Byte, generator: PublicKeyAccount, transa
 
   lazy val bytesWithoutSignature: Array[Byte] = bytes.dropRight(SignatureLength)
 
-  override lazy val signatureValid: Boolean = EllipticCurveImpl.verify(signature.arr, bytesWithoutSignature, generator.publicKey)
+  def signatureValid: Boolean = EllipticCurveImpl.verify(signature.arr, bytesWithoutSignature, generator.publicKey)
   override lazy val signedDescendants: Seq[Signed] = transactionData
 
   override def toString: String = s"MicroBlock(${totalResBlockSig.trim} ~> ${prevResBlockSig.trim}, txs=${transactionData.size})"

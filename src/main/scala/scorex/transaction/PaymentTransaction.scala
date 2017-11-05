@@ -47,7 +47,7 @@ case class PaymentTransaction private(sender: PublicKeyAccount,
 
   override lazy val bytes: Array[Byte] = Bytes.concat(hashBytes, signature.arr)
 
-  override lazy val signatureValid: Boolean = EllipticCurveImpl.verify(signature.arr,
+  def signatureValid: Boolean = EllipticCurveImpl.verify(signature.arr,
     signatureData(sender, recipient, amount, fee, timestamp), sender.publicKey)
 }
 
