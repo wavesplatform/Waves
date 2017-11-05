@@ -20,7 +20,7 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
 
   private val docker = Docker(getClass)
 
-  override val nodes = docker.startNodes(Configs)
+  override val nodes = docker.startNodesSync(Configs)
 
   private val matcherNode = nodes.head
   private val aliceNode = nodes(1)
@@ -340,7 +340,7 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
 
 object MatcherTestSuite {
 
-  import NodeConfigs.default
+  import NodeConfigs.Default
 
   val ForbiddenAssetId = "FdbnAsset"
 
@@ -369,7 +369,7 @@ object MatcherTestSuite {
 
   val Waves: Long = 100000000L
 
-  val Configs: Seq[Config] = Seq(matcherConfig.withFallback(default.head)) ++
-    Random.shuffle(default.tail.init).take(2).map(nonGeneratingPeersConfig.withFallback(_)) ++
-    Seq(default.last)
+  val Configs: Seq[Config] = Seq(matcherConfig.withFallback(Default.head)) ++
+    Random.shuffle(Default.tail.init).take(2).map(nonGeneratingPeersConfig.withFallback(_)) ++
+    Seq(Default.last)
 }

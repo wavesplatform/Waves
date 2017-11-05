@@ -14,7 +14,7 @@ class NetworkUniqueConnectionsTestSuite extends FreeSpec with Matchers with Befo
   private val docker = Docker(getClass)
 
   "nodes should up and connect with each other" in {
-    val firstNode = docker.startNode(FirstNodeConfig)
+    val firstNode = docker.startNodeSync(FirstNodeConfig)
     val prepare = for {
       _ <- firstNode.status
       secondNode = {
@@ -25,7 +25,7 @@ class NetworkUniqueConnectionsTestSuite extends FreeSpec with Matchers with Befo
              |]""".stripMargin
         )
 
-        docker.startNode(SecondNodeConfig.withFallback(peersConfig))
+        docker.startNodeSync(SecondNodeConfig.withFallback(peersConfig))
       }
       _ <- firstNode.waitForPeers(1)
 
@@ -53,7 +53,7 @@ class NetworkUniqueConnectionsTestSuite extends FreeSpec with Matchers with Befo
 
 private object NetworkUniqueConnectionsTestSuite {
 
-  private val configs = Random.shuffle(NodeConfigs.default).take(2)
+  private val configs = Random.shuffle(NodeConfigs.Default).take(2)
   val FirstNodeConfig: Config = configs.head
   val SecondNodeConfig: Config = configs.last
 

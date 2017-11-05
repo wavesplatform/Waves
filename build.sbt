@@ -77,7 +77,7 @@ concurrentRestrictions in Global += Tags.limit(Tags.Test, 1)
 Defaults.itSettings
 configs(IntegrationTest)
 inConfig(IntegrationTest)({
-  val threads = 4
+  val threads = 3
 
   Seq(
     parallelExecution := true,

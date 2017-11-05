@@ -11,7 +11,7 @@ class WideStateGenerationSuite extends FreeSpec with IntegrationNodesInitializat
   with Matchers with TransferSending {
 
   override val docker = Docker(getClass)
-  override val nodes: Seq[Node] = docker.startNodes(NodeConfigs.default(3, 1))
+  override val nodes: Seq[Node] = docker.startNodesSync(NodeConfigs.forTest(3, 1 -> "waves.miner.enable = no"))
 
   private val requestsCount = 10000
 

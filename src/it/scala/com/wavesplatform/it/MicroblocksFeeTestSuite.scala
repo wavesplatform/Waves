@@ -15,7 +15,7 @@ class MicroblocksFeeTestSuite extends FreeSpec with Matchers with BeforeAndAfter
   import MicroblocksFeeTestSuite._
 
   private val docker = Docker(getClass)
-  private val allNodes = docker.startNodes(Configs)
+  private val allNodes = docker.startNodesSync(Configs)
 
 
   private val notMiner = allNodes.head
@@ -92,7 +92,7 @@ class MicroblocksFeeTestSuite extends FreeSpec with Matchers with BeforeAndAfter
 
   object MicroblocksFeeTestSuite {
 
-    import NodeConfigs.default
+    import NodeConfigs.Default
 
     val NodesCount: Int = 3
 
@@ -145,10 +145,10 @@ class MicroblocksFeeTestSuite extends FreeSpec with Matchers with BeforeAndAfter
     )
 
 
-    val Configs: Seq[Config] = Seq(notMiner.withFallback(default.head),
-      notMiner.withFallback(default(1)),
-      miner.withFallback(default(2)),
-      miner.withFallback(default(3)))
+    val Configs: Seq[Config] = Seq(notMiner.withFallback(Default.head),
+      notMiner.withFallback(Default(1)),
+      miner.withFallback(Default(2)),
+      miner.withFallback(Default(3)))
 
   }
 

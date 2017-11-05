@@ -17,7 +17,7 @@ class RollbackSpecSuite extends FreeSpec with ScalaFutures with IntegrationPatie
   with Matchers with TransferSending with IntegrationNodesInitializationAndStopping {
   override val docker = Docker(getClass)
   // there are nodes with big and small balances to reduce the number of forks
-  override val nodes: Seq[Node] = docker.startNodes(configs)
+  override val nodes: Seq[Node] = docker.startNodesSync(configs)
 
   private val transactionsCount = 190
 
@@ -93,7 +93,7 @@ class RollbackSpecSuite extends FreeSpec with ScalaFutures with IntegrationPatie
 }
 
 object RollbackSpecSuite {
-  import NodeConfigs.default
+  import NodeConfigs.Default
 
   private val nonGeneratingNodesConfig = ConfigFactory.parseString(
     """
@@ -101,5 +101,5 @@ object RollbackSpecSuite {
     """.stripMargin
   )
 
-  val configs: Seq[Config] = Seq(default.last, nonGeneratingNodesConfig.withFallback(Random.shuffle(default.init).head))
+  val configs: Seq[Config] = Seq(Default.last, nonGeneratingNodesConfig.withFallback(Random.shuffle(Default.init).head))
 }

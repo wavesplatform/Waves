@@ -15,14 +15,7 @@ trait IntegrationNodesInitializationAndStopping extends BeforeAndAfterAll with S
 
   abstract override def beforeAll(): Unit = {
     super.beforeAll()
-    log.debug("Waiting for nodes to start")
-    Await.result(Future.traverse(nodes)(_.status), 1.minute)
-    log.debug("Waiting for nodes to connect")
-    Await.result(
-      for {
-        count <- Future.traverse(nodes)(_.waitForPeers(nodes.size - 1))
-      } yield count, 1.minute
-    )
+    waitNodesToConnect(nodes.size - 1)
   }
 
   abstract override def afterAll(): Unit = {
@@ -33,6 +26,16 @@ trait IntegrationNodesInitializationAndStopping extends BeforeAndAfterAll with S
 
   private def ensureNoDeadlock() = {
     Await.result(Future.traverse(nodes)(_.height), 7.seconds)
+  }
+
+  protected def waitNodesToConnect(targetPeersCount: Int): Unit = {
+    log.debug("Waiting for nodes to connect")
+    Await.result(
+      Future.traverse(nodes)(_.waitForPeers(targetPeersCount)).andThen { case _ =>
+        log.debug("Nodes are connected with each other")
+      },
+      1.minute
+    )
   }
 
 }

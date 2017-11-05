@@ -16,7 +16,7 @@ class NotActivateFeatureTestSuite extends FreeSpec with Matchers with BeforeAndA
   import NotActivateFeatureTestSuite._
 
   private val docker = Docker(getClass)
-  private val nodes = docker.startNodes(Configs)
+  private val nodes = docker.startNodesSync(Configs)
 
 
   override protected def beforeAll(): Unit = {
@@ -85,7 +85,7 @@ class NotActivateFeatureTestSuite extends FreeSpec with Matchers with BeforeAndA
 
     val NodesCount: Int = 4
 
-    val Configs: Seq[Config] = Random.shuffle(NodeConfigs.default.init).take(NodesCount).map(nonSupportedNodes.withFallback(_))
+    val Configs: Seq[Config] = Random.shuffle(NodeConfigs.Default.init).take(NodesCount).map(nonSupportedNodes.withFallback(_))
 
   }
 

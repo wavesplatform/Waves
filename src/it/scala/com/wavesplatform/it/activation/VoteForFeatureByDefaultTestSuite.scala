@@ -16,7 +16,7 @@ class VoteForFeatureByDefaultTestSuite extends FreeSpec with Matchers with Befor
   import VoteForFeatureByDefaultTestSuite._
 
   private val docker = Docker(getClass)
-  private val nodes = docker.startNodes(Configs)
+  private val nodes = docker.startNodesSync(Configs)
   val defaultVotingFeatureNum: Short = 1
 
 
@@ -67,7 +67,7 @@ class VoteForFeatureByDefaultTestSuite extends FreeSpec with Matchers with Befor
 
   object VoteForFeatureByDefaultTestSuite {
 
-    import NodeConfigs.default
+    import NodeConfigs.Default
 
     val votingInterval = 20
     val blocksForActivation = 15
@@ -134,10 +134,10 @@ class VoteForFeatureByDefaultTestSuite extends FreeSpec with Matchers with Befor
     )
 
 
-    val Configs: Seq[Config] = Seq(nonSupportedNodes.withFallback(default(3))) ++
-      Seq(supportedNodes.withFallback(default(1))) ++
-      Seq(supportedNodes.withFallback(default(2))) ++
-      Seq(supportedNodes.withFallback(default.head))
+    val Configs: Seq[Config] = Seq(nonSupportedNodes.withFallback(Default(3))) ++
+      Seq(supportedNodes.withFallback(Default(1))) ++
+      Seq(supportedNodes.withFallback(Default(2))) ++
+      Seq(supportedNodes.withFallback(Default.head))
 
   }
 

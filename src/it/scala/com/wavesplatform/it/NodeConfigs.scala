@@ -7,20 +7,17 @@ import scala.util.Random
 
 object NodeConfigs {
 
-  val default: Seq[Config] = Docker.NodeConfigs.getConfigList("nodes").asScala
+  val DefaultConfigTemplate: Config = ConfigFactory.parseResources("template.conf")
 
-  def default(miners: Int, nonMiners: Int = 0): Seq[Config] = {
-    val nonGeneratingPeerConfig = ConfigFactory.parseString(
-      """
-        |waves.miner.enable=no
-      """.stripMargin
-    )
+  val Default: Seq[Config] = ConfigFactory.parseResources("nodes.conf").getConfigList("nodes").asScala
 
-    val (minerConfigs: Seq[Config], nonMinerConfigs: Seq[Config]) = Random.shuffle(default)
-      .take(miners + nonMiners)
-      .splitAt(miners)
+  def forTest(defaultNumber: Int, special: (Int, String)): Seq[Config] = {
+    val specialConfig = ConfigFactory.parseString(special._2)
+    val (defaultNodes: Seq[Config], specialNodes: Seq[Config]) = Random.shuffle(Default)
+      .take(defaultNumber + special._1)
+      .splitAt(defaultNumber)
 
-    minerConfigs ++ nonMinerConfigs.map { orig => nonGeneratingPeerConfig.withFallback(orig) }
+    defaultNodes ++ specialNodes.map(specialConfig.withFallback)
   }
 
 }
