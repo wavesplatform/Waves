@@ -51,7 +51,9 @@ trait Signed {
 
   protected def signedDescendants: Seq[Signed] = Seq.empty
 
-  lazy val signaturesValid: Either[InvalidSignature, this.type] = Signed.validateSignatures(this)
+  protected val signaturesValidMemoized: Task[Either[InvalidSignature, this.type]] = Signed.validateTask[this.type](this).memoize
+
+  lazy val signaturesValid: Either[InvalidSignature, this.type] = Await.result(signaturesValidMemoized.runAsync(Signed.scheduler), Duration.Inf)
 }
 
 object Signed {
@@ -61,15 +63,14 @@ object Signed {
 
   type E[A] = Either[InvalidSignature, A]
 
-  def validateSignatures[S <: Signed](s: S): E[S] = Await.result(Signed.validateTask(s).runAsync, Duration.Inf)
-
-  private def validateTask[S <: Signed](s: S): Task[E[S]] =
+  private def validateTask[S <: Signed](s: S): Task[E[S]] = Task.unit.flatMap { _ =>
     if (!s.signatureValid) Task.now(Left(InvalidSignature(s, None)))
     else if (s.signedDescendants.isEmpty) Task.now(Right(s))
-    else Task.wanderUnordered(s.signedDescendants)(s => validateTask(s)) map { l =>
+    else Task.wanderUnordered(s.signedDescendants)(s => s.signaturesValidMemoized) map { l =>
       l.find(_.isLeft) match {
         case Some(e) => Left(e.left.get)
         case None => Right(s)
       }
     }
+  }
 }
