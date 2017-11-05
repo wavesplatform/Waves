@@ -74,8 +74,8 @@ object Signed {
     }
   }.flatten
 
-  def validateAll[S <: Signed](ss: Seq[S]): E[Seq[S]] = Await.result(
-    Task.wanderUnordered(ss)(s => s.signaturesValidMemoized).map { l =>
+  def validateOrdered[S <: Signed](ss: Seq[S]): E[Seq[S]] = Await.result(
+    Task.wander(ss)(s => s.signaturesValidMemoized).map { l =>
       l.find(_.isLeft) match {
         case Some(e) => Left(e.left.get)
         case None => Right(ss)
