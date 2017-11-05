@@ -17,11 +17,11 @@ import scala.util.{Failure, Try}
 case class MicroBlock private(version: Byte, generator: PublicKeyAccount, transactionData: Seq[Transaction], prevResBlockSig: BlockId,
                               totalResBlockSig: BlockId, signature: ByteStr) extends Signed {
 
-  private lazy val versionField: ByteBlockField = ByteBlockField("version", version)
-  private lazy val prevResBlockSigField: BlockIdField = BlockIdField("prevResBlockSig", prevResBlockSig.arr)
-  private lazy val totalResBlockSigField: BlockIdField = BlockIdField("totalResBlockSigField", totalResBlockSig.arr)
-  private lazy val signerDataField: SignerDataBlockField = SignerDataBlockField("signature", SignerData(generator, signature))
-  private lazy val transactionDataField = TransactionsBlockField(version.toInt, transactionData)
+  private val versionField: ByteBlockField = ByteBlockField("version", version)
+  private val prevResBlockSigField: BlockIdField = BlockIdField("prevResBlockSig", prevResBlockSig.arr)
+  private val totalResBlockSigField: BlockIdField = BlockIdField("totalResBlockSigField", totalResBlockSig.arr)
+  private val signerDataField: SignerDataBlockField = SignerDataBlockField("signature", SignerData(generator, signature))
+  private val transactionDataField = TransactionsBlockField(version.toInt, transactionData)
 
   lazy val json: JsObject =
     versionField.json ++
