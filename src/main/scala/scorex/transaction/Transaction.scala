@@ -58,10 +58,10 @@ trait Signed {
 
 object Signed {
 
+  type E[A] = Either[InvalidSignature, A]
   private implicit val scheduler: SchedulerService = monix.execution.Scheduler.computation(name = "sig-validator",
     reporter = com.wavesplatform.utils.UncaughtExceptionsToLogReporter)
 
-  type E[A] = Either[InvalidSignature, A]
 
   private def validateTask[S <: Signed](s: S): Task[E[S]] = Task {
     if (!s.signatureValid) Task.now(Left(InvalidSignature(s, None)))
@@ -73,5 +73,13 @@ object Signed {
       }
     }
   }.flatten
+
+  def validateAll[S <: Signed](ss: Seq[S]): E[Seq[S]] = Await.result(
+    Task.wanderUnordered(ss)(s => s.signaturesValidMemoized).map { l =>
+      l.find(_.isLeft) match {
+        case Some(e) => Left(e.left.get)
+        case None => Right(ss)
+      }
+    }.runAsync, Duration.Inf)
 
 }
