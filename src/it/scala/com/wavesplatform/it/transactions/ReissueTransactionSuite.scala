@@ -1,12 +1,11 @@
 package com.wavesplatform.it.transactions
 
-import com.wavesplatform.it._
 import com.wavesplatform.it.util._
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
 
-class ReissueTransactionSuite extends BaseTransactionSuite with IntegrationSuiteWithThreeAddresses {
+class ReissueTransactionSuite extends BaseTransactionSuite {
 
   private val defaultQuantity = 100000
 

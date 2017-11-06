@@ -20,7 +20,7 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
 
   private val docker = Docker(getClass)
 
-  override val nodes = docker.startNodesSync(Configs)
+  override val nodes = docker.startNodes(Configs)
 
   private val matcherNode = nodes.head
   private val aliceNode = nodes(1)

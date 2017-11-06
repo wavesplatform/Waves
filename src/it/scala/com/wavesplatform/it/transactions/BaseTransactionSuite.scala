@@ -10,8 +10,7 @@ abstract class BaseTransactionSuite extends FunSuite with IntegrationNodesInitia
 
   protected implicit val ec: ExecutionContext = ExecutionContext.Implicits.global
 
-  override val docker = Docker(getClass)
-  override val nodes: Seq[Node] = docker.startNodesSync(NodeConfigs.forTest(3, 1 -> "waves.miner.enable = no"))
+  override val nodes: Seq[Node] = docker.startNodes(NodeConfigs.forTest(3, 1 -> "waves.miner.enable = no"))
   override val notMiner: Node = nodes.last
 
 }

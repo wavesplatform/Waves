@@ -2,7 +2,7 @@ package com.wavesplatform.it
 
 import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers}
 
-import scala.concurrent.Await
+import scala.concurrent.{Await, Future}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
@@ -10,15 +10,13 @@ import scala.concurrent.duration._
 class NetworkSeparationTestSuite extends FreeSpec with Matchers with IntegrationNodesInitializationAndStopping
   with CancelAfterFailure with ReportingTestName {
 
-  override val docker = Docker(getClass)
-  override val nodes: Seq[Node] = docker.startNodesSync(NodeConfigs.forTest(3, 1 -> "waves.miner.quorum = 0"))
-  private val primaryNode: Node = nodes.last
+  override val nodes: Seq[Node] = docker.startNodes(NodeConfigs.forTest(3, 1 -> "waves.miner.quorum = 0"))
 
-  "node should grow up to 10 blocks together" in Await.result(primaryNode.waitForHeight(10), 5.minutes)
+  "node should grow up to 10 blocks together" in Await.result(richestNode.map(_.waitForHeight(10)), 5.minutes)
 
   "then we disconnect nodes from the network" in nodes.foreach(docker.disconnectFromNetwork)
 
-  "and wait for another 10 blocks on one node" in Await.result(primaryNode.waitForHeight(20), 5.minutes)
+  "and wait for another 10 blocks on one node" in Await.result(richestNode.map(_.waitForHeight(20)), 5.minutes)
 
   "after that we connect nodes back to the network" in nodes.foreach(docker.connectToNetwork)
 
@@ -33,5 +31,11 @@ class NetworkSeparationTestSuite extends FreeSpec with Matchers with Integration
     },
     5.minutes
   )
+
+  def richestNode: Future[Node] = traverse(nodes)(n => n.balance(n.address).map(r => n -> r.balance)).map { xs =>
+    xs
+      .maxBy { case (_, balance) => balance}
+      ._1
+  }
 
 }

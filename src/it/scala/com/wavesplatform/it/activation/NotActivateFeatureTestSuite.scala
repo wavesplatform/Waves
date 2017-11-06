@@ -16,7 +16,7 @@ class NotActivateFeatureTestSuite extends FreeSpec with Matchers with BeforeAndA
   import NotActivateFeatureTestSuite._
 
   private val docker = Docker(getClass)
-  private val nodes = docker.startNodesSync(Configs)
+  private val nodes = docker.startNodes(Configs)
 
 
   override protected def beforeAll(): Unit = {

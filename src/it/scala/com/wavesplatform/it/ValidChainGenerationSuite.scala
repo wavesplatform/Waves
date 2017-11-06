@@ -11,8 +11,7 @@ import scala.util.Random
 class ValidChainGenerationSuite extends FreeSpec with IntegrationNodesInitializationAndStopping
   with Matchers with TransferSending {
 
-  override val docker = Docker(getClass)
-  override val nodes: Seq[Node] = docker.startNodesSync(NodeConfigs.forTest(3, 1 -> "waves.miner.enable = no"))
+  override val nodes: Seq[Node] = docker.startNodes(NodeConfigs.forTest(3, 1 -> "waves.miner.enable = no"))
 
   "Generate more blocks and resynchronise after rollback" - {
     "1 of N" in test(1)

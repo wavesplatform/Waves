@@ -1,12 +1,11 @@
 package com.wavesplatform.it.transactions
 
-import com.wavesplatform.it._
 import com.wavesplatform.it.util._
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
 
-class PaymentTransactionSuite extends BaseTransactionSuite with IntegrationSuiteWithThreeAddresses {
+class PaymentTransactionSuite extends BaseTransactionSuite {
 
   test("waves payment changes waves balances and eff.b.") {
     val f = for {

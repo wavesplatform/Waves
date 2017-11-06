@@ -10,8 +10,7 @@ import scala.concurrent.duration._
 class WideStateGenerationSuite extends FreeSpec with IntegrationNodesInitializationAndStopping
   with Matchers with TransferSending {
 
-  override val docker = Docker(getClass)
-  override val nodes: Seq[Node] = docker.startNodesSync(NodeConfigs.forTest(3, 1 -> "waves.miner.enable = no"))
+  override val nodes: Seq[Node] = docker.startNodes(NodeConfigs.forTest(3, 1 -> "waves.miner.enable = no"))
 
   private val requestsCount = 10000
 

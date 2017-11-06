@@ -22,9 +22,7 @@ class SimpleTransactionsSuite extends FunSuite with BeforeAndAfterAll with Match
   with IntegrationPatience with RecoverMethods with RequestErrorAssert with IntegrationNodesInitializationAndStopping
   with IntegrationTestsScheme {
 
-  override val docker = Docker(getClass)
-
-  override val nodes = docker.startNodesSync(NodeConfigs.Default.take(3))
+  override val nodes = docker.startNodes(NodeConfigs.Default.take(3))
   val node = nodes.head
 
   test("valid tx send by network to node should be in blockchain") {

@@ -1,6 +1,5 @@
 package com.wavesplatform.it.transactions
 
-import com.wavesplatform.it._
 import com.wavesplatform.it.util._
 import scorex.account.{AddressOrAlias, PrivateKeyAccount}
 import scorex.api.http.Mistiming
@@ -12,7 +11,7 @@ import scala.concurrent.Await
 import scala.concurrent.Future.{sequence, traverse}
 import scala.concurrent.duration._
 
-class TransferTransactionSuite extends BaseTransactionSuite with IntegrationSuiteWithThreeAddresses {
+class TransferTransactionSuite extends BaseTransactionSuite {
 
   private val defaultQuantity = 100000
 

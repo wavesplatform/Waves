@@ -16,7 +16,7 @@ class VoteForFeatureByDefaultTestSuite extends FreeSpec with Matchers with Befor
   import VoteForFeatureByDefaultTestSuite._
 
   private val docker = Docker(getClass)
-  private val nodes = docker.startNodesSync(Configs)
+  private val nodes = docker.startNodes(Configs)
   val defaultVotingFeatureNum: Short = 1
 
 

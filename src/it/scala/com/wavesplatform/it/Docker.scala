@@ -17,10 +17,10 @@ import org.asynchttpclient.Dsl._
 import scorex.utils.ScorexLogging
 
 import scala.collection.JavaConverters._
-import scala.concurrent.duration._
-import scala.concurrent.{Await, Future, blocking}
-import scala.util.control.NonFatal
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration._
+import scala.concurrent.{Await, Future}
+import scala.util.control.NonFatal
 
 case class NodeInfo(hostRestApiPort: Int,
                     hostNetworkPort: Int,
@@ -30,7 +30,8 @@ case class NodeInfo(hostRestApiPort: Int,
                     containerId: String,
                     hostMatcherApiPort: Int)
 
-class Docker(suiteConfig: Config = ConfigFactory.empty, tag: String = "") extends AutoCloseable with ScorexLogging {
+class Docker(suiteConfig: Config = ConfigFactory.empty,
+             tag: String = "") extends AutoCloseable with ScorexLogging {
 
   import Docker._
 
@@ -41,12 +42,10 @@ class Docker(suiteConfig: Config = ConfigFactory.empty, tag: String = "") extend
     .setReadTimeout(10000)
     .setRequestTimeout(10000))
 
-  private val defaultClient = newClient
+  private val client = DefaultDockerClient.fromEnv().build()
 
-  private def newClient = DefaultDockerClient.fromEnv().build()
-
-  private val nodes = new ConcurrentHashMap[String, (DockerClient, Node)]
-  private val seedAddress = new AtomicReference[String]
+  private val nodes = new ConcurrentHashMap[String, Node]
+  private val seedAddress = new AtomicReference[String](null)
   private val isStopped = new AtomicBoolean(false)
 
   sys.addShutdownHook {
@@ -59,7 +58,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty, tag: String = "") extend
 
   private val wavesNetworkId: String = {
     def network: Option[Network] = try {
-      val networks = defaultClient.listNetworks(DockerClient.ListNetworksParam.byNetworkName(networkName))
+      val networks = client.listNetworks(DockerClient.ListNetworksParam.byNetworkName(networkName))
       if (networks.isEmpty) None else Some(networks.get(0))
     } catch {
       case NonFatal(_) => network
@@ -67,14 +66,12 @@ class Docker(suiteConfig: Config = ConfigFactory.empty, tag: String = "") extend
 
     def attempt(rest: Int): String = try {
       network match {
-        case Some(n) =>
-          n.id()
+        case Some(n) => n.id()
         case None =>
-          val r = defaultClient.createNetwork(NetworkConfig.builder()
+          val r = client.createNetwork(NetworkConfig.builder()
             .name(networkName)
             .driver("bridge")
             .checkDuplicate(true)
-            .internal(false)
             .build())
           Option(r.warnings()).foreach(log.warn(_))
           attempt(rest - 1)
@@ -88,20 +85,23 @@ class Docker(suiteConfig: Config = ConfigFactory.empty, tag: String = "") extend
     attempt(5)
   }
 
-  def startNodesSync(nodeConfigs: Seq[Config]): Seq[Node] = Await.result(
-    startNode(nodeConfigs.head).flatMap { head =>
-      Future.sequence(nodeConfigs.tail.map(startNode)).flatMap { tail =>
-        val all = head +: tail
-        log.debug("Wait nodes are up")
-        Future.traverse(all)(_.waitFor[Int](_.height, _ > 0, 1.second)).map(_ => all)
-      }
-    },
-    5.minute
-  )
+  def startNodes(nodeConfigs: Seq[Config]): Seq[Node] = {
+    val all = nodeConfigs.map(startNode)
+    Await.result(
+      Future.traverse(all)(waitNodeIsUp).map(_ => all),
+      5.minutes
+    )
+  }
 
-  def startNodeSync(nodeConfig: Config): Node = Await.result(startNode(nodeConfig), 1.minute)
+  def startNode(nodeConfig: Config): Node = {
+    val r = startNodeInternal(nodeConfig)
+    Await.result(waitNodeIsUp(r), 3.minutes)
+    r
+  }
 
-  def startNode(nodeConfig: Config): Future[Node] = Future(blocking {
+  private def waitNodeIsUp(node: Node): Future[Unit] = node.waitFor[Int](_.height, _ > 0, 1.second).map(_ => ())
+
+  private def startNodeInternal(nodeConfig: Config): Node = {
     val configOverrides = s"$JavaOptions $knownPeers ${renderProperties(asProperties(nodeConfig.withFallback(suiteConfig)))}"
     val actualConfig = nodeConfig
       .withFallback(suiteConfig)
@@ -131,12 +131,12 @@ class Docker(suiteConfig: Config = ConfigFactory.empty, tag: String = "") extend
       .env(s"WAVES_OPTS=$configOverrides", s"WAVES_PORT=$networkPort")
       .build()
 
-    val client = newClient
     val containerId = client.createContainer(containerConfig, s"$networkName-${actualConfig.getString("waves.network.node-name")}").id()
     client.connectToNetwork(containerId, wavesNetworkId)
 
     client.startContainer(containerId)
     val containerInfo = client.inspectContainer(containerId)
+
     val ports = containerInfo.networkSettings().ports()
 
     val nodeInfo = NodeInfo(
@@ -150,31 +150,23 @@ class Docker(suiteConfig: Config = ConfigFactory.empty, tag: String = "") extend
     seedAddress.compareAndSet(null, s"${nodeInfo.networkIpAddress}:${nodeInfo.containerNetworkPort}")
 
     val node = new Node(actualConfig, nodeInfo, http)
-    nodes.put(containerId, (client, node))
+    nodes.put(containerId, node)
     node
-  })
+  }
 
   override def close(): Unit = {
     if (isStopped.compareAndSet(false, true)) {
       log.info("Stopping containers")
-
-      def closeTask(client: DockerClient, node: Node) = Future(blocking {
+      nodes.values().asScala.foreach { node =>
         node.close()
         client.stopContainer(node.nodeInfo.containerId, 0)
         saveLog(client, node)
         client.removeContainer(node.nodeInfo.containerId, RemoveContainerParam.forceKill())
-        client.close()
-      })
+      }
 
-      def closeAllTask = Future
-        .sequence(nodes.values().asScala.map(Function.tupled(closeTask)))
-        .map { _ =>
-          http.close()
-          defaultClient.removeNetwork(wavesNetworkId)
-          defaultClient.close()
-        }
-
-      Await.result(closeAllTask, Duration.Inf)
+      http.close()
+      client.removeNetwork(wavesNetworkId)
+      client.close()
     }
   }
 
@@ -203,15 +195,15 @@ class Docker(suiteConfig: Config = ConfigFactory.empty, tag: String = "") extend
   }
 
   def disconnectFromNetwork(node: Node): Unit = disconnectFromNetwork(node.nodeInfo.containerId)
-  private def disconnectFromNetwork(containerId: String): Unit = defaultClient.disconnectFromNetwork(containerId, wavesNetworkId)
+  private def disconnectFromNetwork(containerId: String): Unit = client.disconnectFromNetwork(containerId, wavesNetworkId)
 
   def connectToNetwork(node: Node): Unit = connectToNetwork(node.nodeInfo.containerId)
-  private def connectToNetwork(containerId: String): Unit = defaultClient.connectToNetwork(containerId, wavesNetworkId)
+  private def connectToNetwork(containerId: String): Unit = client.connectToNetwork(containerId, wavesNetworkId)
 }
 
 object Docker {
   private val JavaOptions = Seq(
-    "-Xmx1024m"
+    "-Xmx750m"
   ).mkString(" ")
   private val jsonMapper = new ObjectMapper
   private val propsMapper = new JavaPropsMapper

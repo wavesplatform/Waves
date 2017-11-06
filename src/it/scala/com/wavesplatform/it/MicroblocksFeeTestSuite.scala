@@ -15,7 +15,7 @@ class MicroblocksFeeTestSuite extends FreeSpec with Matchers with BeforeAndAfter
   import MicroblocksFeeTestSuite._
 
   private val docker = Docker(getClass)
-  private val allNodes = docker.startNodesSync(Configs)
+  private val allNodes = docker.startNodes(Configs)
 
 
   private val notMiner = allNodes.head

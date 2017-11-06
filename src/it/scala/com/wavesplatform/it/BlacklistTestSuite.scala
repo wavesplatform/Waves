@@ -12,7 +12,7 @@ class BlacklistTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll w
 
   private val NodesCount: Int = 4
   private val docker = Docker(getClass)
-  override val nodes: Seq[Node] = docker.startNodesSync(NodeConfigs.forTest(3, 1 -> "waves.miner.quorum = 0"))
+  override val nodes: Seq[Node] = docker.startNodes(NodeConfigs.forTest(3, 1 -> "waves.miner.quorum = 0"))
 
   private val primaryNode: Node = nodes.last
   private val otherNodes = nodes.init

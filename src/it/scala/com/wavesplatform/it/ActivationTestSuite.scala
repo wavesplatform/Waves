@@ -6,8 +6,7 @@ import scala.concurrent.Await
 import scala.concurrent.duration._
 
 class ActivationTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with IntegrationNodesInitializationAndStopping {
-  override val docker = new Docker()
-  override val nodes = docker.startNodesSync(NodeConfigs.Default.take(2))
+  override val nodes = docker.startNodes(NodeConfigs.Default.take(2))
 
   "api consuming example" in {
     Await.result(nodes.head.waitForHeight(5), 5.minute)

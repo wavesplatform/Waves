@@ -1,13 +1,12 @@
 package com.wavesplatform.it.transactions
 
-import com.wavesplatform.it._
 import com.wavesplatform.it.util._
 
 import scala.concurrent.Await
 import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
 
-class LeasingTransactionsSuite extends BaseTransactionSuite with IntegrationSuiteWithThreeAddresses {
+class LeasingTransactionsSuite extends BaseTransactionSuite {
 
   test("leasing waves decreases lessor's eff.b. and increases lessee's eff.b.; lessor pays fee") {
     val f = for {

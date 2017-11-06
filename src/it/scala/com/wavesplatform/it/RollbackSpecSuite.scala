@@ -15,9 +15,8 @@ import scala.util.Random
 
 class RollbackSpecSuite extends FreeSpec with ScalaFutures with IntegrationPatience
   with Matchers with TransferSending with IntegrationNodesInitializationAndStopping {
-  override val docker = Docker(getClass)
   // there are nodes with big and small balances to reduce the number of forks
-  override val nodes: Seq[Node] = docker.startNodesSync(configs)
+  override val nodes: Seq[Node] = docker.startNodes(configs)
 
   private val transactionsCount = 190
 
