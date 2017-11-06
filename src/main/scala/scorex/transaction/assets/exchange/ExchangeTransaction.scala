@@ -40,7 +40,7 @@ case class ExchangeTransaction private(buyOrder: Order, sellOrder: Order, price:
     "sellMatcherFee" -> sellMatcherFee
   )
 
-  override lazy val signedDescendants: Seq[Signed] = Seq(buyOrder, sellOrder)
+  override def signedDescendants: Seq[Signed] = Seq(buyOrder, sellOrder)
 }
 
 object ExchangeTransaction {
