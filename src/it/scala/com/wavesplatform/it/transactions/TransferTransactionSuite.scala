@@ -34,7 +34,7 @@ class TransferTransactionSuite extends BaseTransactionSuite {
       _ <- assertAssetBalance(secondAddress, issuedAssetId, defaultQuantity)
     } yield succeed
 
-    Await.result(f, 1.minute)
+    Await.result(f, 2.minute)
   }
 
   test("waves transfer changes waves balances and eff.b.") {
@@ -48,7 +48,7 @@ class TransferTransactionSuite extends BaseTransactionSuite {
       _ <- assertBalances(secondAddress, 105.waves, 105.waves)
     } yield succeed
 
-    Await.result(f, 1.minute)
+    Await.result(f, 2.minute)
   }
 
   test("invalid signed waves transfer should not be in UTX or blockchain") {
@@ -88,7 +88,7 @@ class TransferTransactionSuite extends BaseTransactionSuite {
       _ <- sequence(nodes.map(_.ensureTxDoesntExist(invalidTxId.base58)))
     } yield succeed
 
-    Await.result(f, 1.minute)
+    Await.result(f, 2.minute)
   }
 
   test("can not make transfer without having enough of fee") {
@@ -106,7 +106,7 @@ class TransferTransactionSuite extends BaseTransactionSuite {
       _ <- assertBalances(secondAddress, 105.waves, 105.waves)
     } yield transferFailureAssertion
 
-    Await.result(f, 1.minute)
+    Await.result(f, 2.minute)
   }
 
 
@@ -125,7 +125,7 @@ class TransferTransactionSuite extends BaseTransactionSuite {
       _ <- assertBalances(secondAddress, 105.waves, 105.waves)
     } yield transferFailureAssertion
 
-    Await.result(f, 1.minute)
+    Await.result(f, 2.minute)
   }
 
   test("can not make transfer without having enough of effective balance") {
@@ -149,7 +149,7 @@ class TransferTransactionSuite extends BaseTransactionSuite {
       _ <- assertBalances(secondAddress, 105.waves, 110.waves)
     } yield transferFailureAssertion
 
-    Await.result(f, 1.minute)
+    Await.result(f, 2.minute)
   }
 
   test("can not make transfer without having enough of your own waves") {
@@ -174,7 +174,7 @@ class TransferTransactionSuite extends BaseTransactionSuite {
       _ <- assertBalances(secondAddress, 105.waves, 115.waves)
     } yield transferFailureAssertion
 
-    Await.result(f, 1.minute)
+    Await.result(f, 2.minute)
   }
 
   test("can forge block with sending majority of some asse to self and to other account") {
@@ -203,6 +203,6 @@ class TransferTransactionSuite extends BaseTransactionSuite {
       _ <- assertBalances(secondAddress, 105.waves, 115.waves)
     } yield succeed
 
-    Await.result(f, 1.minute)
+    Await.result(f, 2.minute)
   }
 }

@@ -2,7 +2,7 @@ package com.wavesplatform.it.activation
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.features.BlockchainFeatureStatus
-import com.wavesplatform.features.api.NodeFeatureStatus
+import com.wavesplatform.features.api.{ActivationStatusFeature, NodeFeatureStatus}
 import com.wavesplatform.it.{Docker, NodeConfigs}
 import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
 
@@ -17,7 +17,8 @@ class NotActivateFeatureTestSuite extends FreeSpec with Matchers with BeforeAndA
 
   private val docker = Docker(getClass)
   private val nodes = docker.startNodes(Configs)
-
+  private var activationStatusInfoBefore = Option.empty[ActivationStatusFeature]
+  private var activationStatusInfoAfter = Option.empty[ActivationStatusFeature]
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
@@ -29,32 +30,31 @@ class NotActivateFeatureTestSuite extends FreeSpec with Matchers with BeforeAndA
     docker.close()
   }
 
+  "wait nodes are synchronized" in Await.result(
+    for {
+      _ <- Future.traverse(nodes)(_.waitForHeight(votingInterval / 2))
+      blocks <- Future.traverse(nodes)(_.blockAt(votingInterval / 3))
+    } yield all(blocks.map(_.signature)) shouldBe blocks.head.signature,
+    5.minutes
+  )
+
+  "get activation status info" in {
+    activationStatusInfoBefore = Some(activationStatus(nodes.head, votingInterval - 1, votingFeatureNum, 2.minute))
+    activationStatusInfoAfter = Some(activationStatus(nodes.head, votingInterval + 1, votingFeatureNum, 2.minute))
+  }
 
   "supported blocks is not increased when nobody votes for feature" in {
-
-    val checkHeight: Int = votingInterval - 1
-    val activationStatusInfo = activationStatus(nodes.head, checkHeight, votingFeatureNum, 2.minute)
-
-    val generatedBlocks = Await.result(nodes.head.blockSeq(1, checkHeight), 2.minute)
+    val generatedBlocks = Await.result(nodes.head.blockSeq(1, votingInterval - 1), 2.minute)
     val featuresMapInGeneratedBlocks = generatedBlocks.flatMap(b => b.features.getOrElse(Seq.empty)).groupBy(x => x)
     val votesForFeature1 = featuresMapInGeneratedBlocks.getOrElse(votingFeatureNum, Seq.empty).length
 
     votesForFeature1 shouldBe 0
-
-    assertVotingStatus(activationStatusInfo, votesForFeature1,
-      BlockchainFeatureStatus.Undefined, NodeFeatureStatus.Implemented)
+    activationStatusInfoBefore.foreach(assertVotingStatus(_, votesForFeature1, BlockchainFeatureStatus.Undefined, NodeFeatureStatus.Implemented))
   }
-
 
   "feature is still in VOTING status on the next voting interval" in {
-
-    val checkHeight: Int = votingInterval + 1
-    val activationStatusInfo = activationStatus(nodes.head, checkHeight, votingFeatureNum, 2.minute)
-
-    assertVotingStatus(activationStatusInfo, 0,
-      BlockchainFeatureStatus.Undefined, NodeFeatureStatus.Implemented)
+    activationStatusInfoAfter.foreach(assertVotingStatus(_, 0, BlockchainFeatureStatus.Undefined, NodeFeatureStatus.Implemented))
   }
-
 
   object NotActivateFeatureTestSuite {
 
@@ -63,22 +63,18 @@ class NotActivateFeatureTestSuite extends FreeSpec with Matchers with BeforeAndA
     val nonVotingFeatureNum: Short = 2
 
     private val nonSupportedNodes = ConfigFactory.parseString(
-      s"""
-         |waves.features{
-         |   supported=[$nonVotingFeatureNum]
-         |}
-         |waves.blockchain.custom.functionality.feature-check-blocks-period = $votingInterval
-         |waves.blockchain.custom.functionality.blocks-for-feature-activation = $blocksForActivation
-         |waves {
-         |   blockchain {
-         |     custom {
-         |      functionality{
-         |       pre-activated-features = {}
+      s"""waves {
+         |  blockchain {
+         |    custom {
+         |      functionality {
+         |        pre-activated-features = {}
+         |        feature-check-blocks-period = $votingInterval
+         |        blocks-for-feature-activation = $blocksForActivation
          |      }
-         |     }
-         |   }
-         |}
-      """.stripMargin
+         |    }
+         |  }
+         |  features.supported=[$nonVotingFeatureNum]
+         |}""".stripMargin
     )
 
     val votingFeatureNum: Short = 1
