@@ -64,8 +64,8 @@ case class OrderHistoryImpl(p: OrderHistoryStorage) extends OrderHistory with Sc
   }
 
   def saveOrder(order: Order): Unit = {
-    if (!p.orders.containsKey(order.idStr)) {
-      p.orders.putIfAbsent(order.idStr, order.jsonStr)
+    if (!p.orders.containsKey(order.idStr())) {
+      p.orders.putIfAbsent(order.idStr(), order.jsonStr)
     }
   }
 
@@ -78,12 +78,12 @@ case class OrderHistoryImpl(p: OrderHistoryStorage) extends OrderHistory with Sc
     saveOrder(lo.order)
     saveOrdeInfo(event)
     saveOpenPortfolio(event)
-    savePairAddress(lo.order.assetPair, lo.order.senderPublicKey.address, lo.order.idStr)
+    savePairAddress(lo.order.assetPair, lo.order.senderPublicKey.address, lo.order.idStr())
   }
 
   override def orderExecuted(event: OrderExecuted): Unit = {
     saveOrder(event.submitted.order)
-    savePairAddress(event.submitted.order.assetPair, event.submitted.order.senderPublicKey.address, event.submitted.order.idStr)
+    savePairAddress(event.submitted.order.assetPair, event.submitted.order.senderPublicKey.address, event.submitted.order.idStr())
     saveOrdeInfo(event)
     saveOpenPortfolio(OrderAdded(event.submittedExecuted))
     saveOpenPortfolio(event)

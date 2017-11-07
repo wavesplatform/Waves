@@ -44,7 +44,7 @@ class TransactionSpecification extends PropSpec with PropertyChecks with Matcher
         val sender = PrivateKeyAccount(senderSeed)
         val recipient = PrivateKeyAccount(recipientSeed)
         val tx = PaymentTransaction.create(sender, recipient, amount, fee, time).right.get
-        val txAfter = parseBytes(tx.bytes).get
+        val txAfter = parseBytes(tx.bytes()).get
 
         txAfter.getClass.shouldBe(tx.getClass)
 
@@ -64,7 +64,7 @@ class TransactionSpecification extends PropSpec with PropertyChecks with Matcher
         val sender = PrivateKeyAccount(senderSeed)
         val recipient = PrivateKeyAccount(recipientSeed)
         val tx = PaymentTransaction.create(sender, recipient, amount, fee, time).right.get
-        val txAfter = TransactionParser.parseBytes(tx.bytes).get.asInstanceOf[PaymentTransaction]
+        val txAfter = TransactionParser.parseBytes(tx.bytes()).get.asInstanceOf[PaymentTransaction]
 
         txAfter.getClass.shouldBe(tx.getClass)
 

@@ -239,10 +239,10 @@ trait NodeApi {
     postJson("/assets/issue", IssueRequest(address, name, description, quantity, decimals, reissuable, fee)).as[Transaction]
 
   def placeOrder(order: Order): Future[MatcherResponse] =
-    matcherPost("/matcher/orderbook", order.json).as[MatcherResponse]
+    matcherPost("/matcher/orderbook", order.json()).as[MatcherResponse]
 
   def expectIncorrectOrderPlacement(order: Order, expectedStatusCode: Int, expectedStatus: String): Future[Boolean] =
-    matcherPost("/matcher/orderbook", order.json) transform {
+    matcherPost("/matcher/orderbook", order.json()) transform {
       case Failure(UnexpectedStatusCodeException(_, r)) if r.getStatusCode == expectedStatusCode =>
         Try(parse(r.getResponseBody).as[MatcherStatusResponse]) match {
           case Success(mr) if mr.status == expectedStatus => Success(true)

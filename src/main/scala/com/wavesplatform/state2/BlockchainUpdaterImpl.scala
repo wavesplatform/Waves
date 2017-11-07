@@ -127,9 +127,9 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
           }
         case Some(ng) =>
           if (ng.base.reference == block.reference) {
-            if (block.blockScore > ng.base.blockScore) {
+            if (block.blockScore() > ng.base.blockScore()) {
               BlockDiffer.fromBlock(settings.blockchainSettings.functionalitySettings, featureProvider, currentPersistedBlocksState(), historyWriter.lastBlock, block).map { diff =>
-                log.trace(s"Better liquid block(score=${block.blockScore}) received and applied instead of existing(score=${ng.base.blockScore})")
+                log.trace(s"Better liquid block(score=${block.blockScore()}) received and applied instead of existing(score=${ng.base.blockScore()})")
                 Some((diff, ng.transactions))
               }
             } else if (areVersionsOfSameBlock(block, ng.base)) {
@@ -140,7 +140,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
                 log.trace(s"New liquid block is better version of exsting, swapping")
                 BlockDiffer.fromBlock(settings.blockchainSettings.functionalitySettings, featureProvider, currentPersistedBlocksState(), historyWriter.lastBlock, block).map(d => Some((d, Seq.empty[Transaction])))
               }
-            } else Left(BlockAppendError(s"Competitor's liquid block $block(score=${block.blockScore}) is not better than existing (ng.base ${ng.base}(score=${ng.base.blockScore}))", block))
+            } else Left(BlockAppendError(s"Competitor's liquid block $block(score=${block.blockScore()}) is not better than existing (ng.base ${ng.base}(score=${ng.base.blockScore()}))", block))
           } else
             measureSuccessful(forgeBlockTimeStats, ng.totalDiffOf(block.reference)) match {
               case None => Left(BlockAppendError(s"References incorrect or non-existing block", block))

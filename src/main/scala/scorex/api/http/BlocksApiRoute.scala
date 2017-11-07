@@ -11,6 +11,7 @@ import com.wavesplatform.state2.ByteStr
 import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
 import play.api.libs.json._
+import scorex.block.BlockHeader
 import scorex.transaction.{BlockchainUpdater, CheckpointService, History, TransactionParser}
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -44,7 +45,7 @@ case class BlocksApiRoute(settings: RestAPISettings, checkpointsSettings: Checkp
         }.filter(_._1.isDefined)
           .map { pair => (pair._1.get, pair._2) }
           .filter(_._1.signerData.generator.address == address).map { pair =>
-          pair._1.json + ("height" -> Json.toJson(pair._2))
+          pair._1.json() + ("height" -> Json.toJson(pair._2))
         })
       complete(blocks)
     } else complete(TooBigArrayAllocation)
@@ -57,7 +58,7 @@ case class BlocksApiRoute(settings: RestAPISettings, checkpointsSettings: Checkp
   ))
   def child: Route = (path("child" / Segment) & get) { encodedSignature =>
     withBlock(history, encodedSignature) { block =>
-      complete(history.child(block).map(_.json).getOrElse[JsObject](
+      complete(history.child(block).map(_.json()).getOrElse[JsObject](
         Json.obj("status" -> "error", "details" -> "No child blocks")))
     }
   }
@@ -115,10 +116,10 @@ case class BlocksApiRoute(settings: RestAPISettings, checkpointsSettings: Checkp
 
   private def at(height: Int, includeTransactions: Boolean): StandardRoute = {
     (if (includeTransactions) {
-      history.blockAt(height).map(_.json)
+      history.blockAt(height).map(_.json())
     }
     else {
-      history.blockHeaderAndSizeAt(height).map(x => x._1.json(x._2))
+      history.blockHeaderAndSizeAt(height).map { case ((bh, s)) => BlockHeader.json(bh, s) }
     }) match {
       case Some(json) => complete(json + ("height" -> JsNumber(height)))
       case None => complete(Json.obj("status" -> "error", "details" -> "No block for this height"))
@@ -131,7 +132,7 @@ case class BlocksApiRoute(settings: RestAPISettings, checkpointsSettings: Checkp
     new ApiImplicitParam(name = "from", value = "Start block height", required = true, dataType = "integer", paramType = "path"),
     new ApiImplicitParam(name = "to", value = "End block height", required = true, dataType = "integer", paramType = "path")
   ))
-  def seq: Route = (path("seq" / IntNumber / IntNumber) & get) { (start, end) => seq(start, end, includeTransactions = true)}
+  def seq: Route = (path("seq" / IntNumber / IntNumber) & get) { (start, end) => seq(start, end, includeTransactions = true) }
 
   @Path("headers/seq/{from}/{to}")
   @ApiOperation(value = "Seq (Block header only)", notes = "Get block without transactions payload at specified heights", httpMethod = "GET")
@@ -139,16 +140,16 @@ case class BlocksApiRoute(settings: RestAPISettings, checkpointsSettings: Checkp
     new ApiImplicitParam(name = "from", value = "Start block height", required = true, dataType = "integer", paramType = "path"),
     new ApiImplicitParam(name = "to", value = "End block height", required = true, dataType = "integer", paramType = "path")
   ))
-  def seqHeaderOnly: Route = (path("headers" / "seq" / IntNumber / IntNumber) & get) { (start, end) => seq(start, end, includeTransactions = false)}
+  def seqHeaderOnly: Route = (path("headers" / "seq" / IntNumber / IntNumber) & get) { (start, end) => seq(start, end, includeTransactions = false) }
 
   private def seq(start: Int, end: Int, includeTransactions: Boolean): StandardRoute = {
     if (end >= 0 && start >= 0 && end - start >= 0 && end - start < MaxBlocksPerRequest) {
       val blocks = JsArray(
         (start to end).flatMap { height =>
           (if (includeTransactions) {
-            history.blockAt(height).map(_.json)
+            history.blockAt(height).map(_.json())
           } else {
-            history.blockHeaderAndSizeAt(height).map(x => x._1.json(x._2))
+            history.blockHeaderAndSizeAt(height).map { case ((bh, s)) => BlockHeader.json(bh, s) }
           }).map(_ + ("height" -> Json.toJson(height)))
         })
       complete(blocks)
@@ -157,21 +158,21 @@ case class BlocksApiRoute(settings: RestAPISettings, checkpointsSettings: Checkp
 
   @Path("/last")
   @ApiOperation(value = "Last", notes = "Get last block data", httpMethod = "GET")
-  def last: Route = (path("last") & get)(last(includeTransactions = true))
+  def last: Route = (path("last") & get) (last(includeTransactions = true))
 
   @Path("/headers/last")
   @ApiOperation(value = "Last", notes = "Get last block data without transactions payload", httpMethod = "GET")
-  def lastHeaderOnly: Route = (path("headers" / "last") & get)(last(includeTransactions = false))
+  def lastHeaderOnly: Route = (path("headers" / "last") & get) (last(includeTransactions = false))
 
   def last(includeTransactions: Boolean): StandardRoute = {
     complete(Future {
       val height = blocking(history.height())
 
-      (if(includeTransactions){
-        blocking(history.blockAt(height)).get.json
+      (if (includeTransactions) {
+        blocking(history.blockAt(height)).get.json()
       } else {
-        val blockHeaderAndSize = blocking(history.blockHeaderAndSizeAt(height)).get
-        blockHeaderAndSize._1.json(blockHeaderAndSize._2)
+        val bhs = blocking(history.blockHeaderAndSizeAt(height)).get
+        BlockHeader.json(bhs._1, bhs._2)
       }) + ("height" -> Json.toJson(height))
     })
   }
@@ -179,7 +180,7 @@ case class BlocksApiRoute(settings: RestAPISettings, checkpointsSettings: Checkp
   @Path("/first")
   @ApiOperation(value = "First", notes = "Get genesis block data", httpMethod = "GET")
   def first: Route = (path("first") & get) {
-    complete(history.genesis.json + ("height" -> Json.toJson(1)))
+    complete(history.genesis.json() + ("height" -> Json.toJson(1)))
   }
 
   @Path("/signature/{signature}")
@@ -191,7 +192,7 @@ case class BlocksApiRoute(settings: RestAPISettings, checkpointsSettings: Checkp
     if (encodedSignature.length > TransactionParser.SignatureStringLength) complete(InvalidSignature) else {
       ByteStr.decodeBase58(encodedSignature).toOption.toRight(InvalidSignature)
         .flatMap(s => history.blockById(s).toRight(BlockNotExists)) match {
-        case Right(block) => complete(block.json + ("height" -> history.heightOf(block.uniqueId).map(Json.toJson(_)).getOrElse(JsNull)))
+        case Right(block) => complete(block.json() + ("height" -> history.heightOf(block.uniqueId).map(Json.toJson(_)).getOrElse(JsNull)))
         case Left(e) => complete(e)
       }
     }

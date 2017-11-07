@@ -64,8 +64,8 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
 
       if ((height() == 0) || (this.lastBlock.get.uniqueId == block.reference)) consensusValidation.map { blockDiff =>
         val h = height() + 1
-        val score = (if (height() == 0) BigInt(0) else this.score()) + block.blockScore
-        blockBodyByHeight.mutate(_.put(h, block.bytes))
+        val score = (if (height() == 0) BigInt(0) else this.score()) + block.blockScore()
+        blockBodyByHeight.mutate(_.put(h, block.bytes()))
         scoreByHeight.mutate(_.put(h, score))
         blockIdByHeight.mutate(_.put(h, block.uniqueId))
         heightByBlockId.mutate(_.put(block.uniqueId, h))
@@ -73,7 +73,7 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
         alterVotes(h, block.featureVotes, 1)
         db.commit()
         blockHeightStats.record(h)
-        blockSizeStats.record(block.bytes.length)
+        blockSizeStats.record(block.bytes().length)
         transactionsInBlockStats.record(block.transactionData.size)
 
         if (h % 100 == 0) db.compact(CompactFillRate, CompactMemorySize)

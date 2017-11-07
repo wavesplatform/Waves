@@ -32,7 +32,7 @@ class MessageCodecSpec extends FreeSpec
     val codec = new SpiedMessageCodec
     val ch = new EmbeddedChannel(codec)
 
-    ch.writeInbound(RawBytes(TransactionMessageSpec.messageCode, origTx.bytes))
+    ch.writeInbound(RawBytes(TransactionMessageSpec.messageCode, origTx.bytes()))
     val decodedTx = ch.readInbound[Transaction]()
 
     decodedTx shouldBe origTx

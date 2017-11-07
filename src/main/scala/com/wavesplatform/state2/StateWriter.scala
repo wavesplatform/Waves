@@ -8,7 +8,7 @@ import com.wavesplatform.metrics.Instrumented
 import com.wavesplatform.state2.reader.StateReaderImpl
 import monix.eval.Task
 import monix.execution.Scheduler
-import monix.execution.schedulers.SchedulerService
+//import monix.execution.schedulers.SchedulerService
 import scorex.transaction.PaymentTransaction
 import scorex.transaction.assets.TransferTransaction
 import scorex.transaction.assets.exchange.ExchangeTransaction
@@ -26,12 +26,12 @@ trait StateWriter {
 class StateWriterImpl(p: StateStorage, storeTransactions: Boolean, synchronizationToken: ReentrantReadWriteLock)
   extends StateReaderImpl(p, synchronizationToken) with StateWriter with AutoCloseable with ScorexLogging with Instrumented {
 
-  private implicit val scheduler: SchedulerService = monix.execution.Scheduler.fixedPool(name = "state-writer",
-    poolSize = Runtime.getRuntime.availableProcessors(),
-    reporter = com.wavesplatform.utils.UncaughtExceptionsToLogReporter)
+//  private implicit val scheduler: SchedulerService = monix.execution.Scheduler.fixedPool(name = "state-writer",
+//    poolSize = Runtime.getRuntime.availableProcessors(),
+//    reporter = com.wavesplatform.utils.UncaughtExceptionsToLogReporter)
+//  import StateWriter._
 
   import StateStorage._
-  import StateWriter._
 
   override def close(): Unit = p.close()
 
@@ -43,21 +43,22 @@ class StateWriterImpl(p: StateStorage, storeTransactions: Boolean, synchronizati
     log.debug(s"Starting persist from $oldHeight to $newHeight")
 
     measureSizeLog("transactions")(txsDiff.transactions) { txs =>
-      par(txs.toSeq) {
+      txs.toSeq.foreach {
         case (id, (h, tx@(_: TransferTransaction | _: ExchangeTransaction | _: PaymentTransaction), _)) =>
-          sp().transactions.put(id, (h, if (storeTransactions) tx.bytes else Array.emptyByteArray))
-        case (id, (h, tx, _)) => sp().transactions.put(id, (h, tx.bytes))
+          sp().transactions.put(id, (h, if (storeTransactions) tx.bytes() else Array.emptyByteArray))
+        case (id, (h, tx, _)) => sp().transactions.put(id, (h, tx.bytes()))
       }
     }
 
     measureSizeLog("orderFills")(blockDiff.txsDiff.orderFills) { ofs =>
-      par(ofs.toSeq) { case (oid, orderFillInfo) =>
-        Option(sp().orderFills.get(oid)) match {
-          case Some(ll) =>
-            sp().orderFills.put(oid, (ll._1 + orderFillInfo.volume, ll._2 + orderFillInfo.fee))
-          case None =>
-            sp().orderFills.put(oid, (orderFillInfo.volume, orderFillInfo.fee))
-        }
+      ofs.toSeq.foreach {
+        case (oid, orderFillInfo) =>
+          Option(sp().orderFills.get(oid)) match {
+            case Some(ll) =>
+              sp().orderFills.put(oid, (ll._1 + orderFillInfo.volume, ll._2 + orderFillInfo.fee))
+            case None =>
+              sp().orderFills.put(oid, (orderFillInfo.volume, orderFillInfo.fee))
+          }
       }
     }
 

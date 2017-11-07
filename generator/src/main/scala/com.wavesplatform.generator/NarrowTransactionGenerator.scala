@@ -45,7 +45,7 @@ class NarrowTransactionGenerator(settings: Settings,
 
     val tradeAssetDistribution = {
       tradeAssetIssue +: accounts.map(acc => {
-        TransferTransaction.create(Some(tradeAssetIssue.id), issueTransactionSender, acc, 5, System.currentTimeMillis(), None, 100000, Array.fill(r.nextInt(100))(r.nextInt().toByte)).right.get
+        TransferTransaction.create(Some(tradeAssetIssue.id()), issueTransactionSender, acc, 5, System.currentTimeMillis(), None, 100000, Array.fill(r.nextInt(100))(r.nextInt().toByte)).right.get
       })
     }
 
@@ -86,7 +86,7 @@ class NarrowTransactionGenerator(settings: Settings,
               val asset = randomFrom(validIssueTxs)
               asset.map(issue => {
                 val pk = accounts.find(_ == issue.sender).get
-                (pk, Some(issue.id))
+                (pk, Some(issue.id()))
               })
             } else Some(randomFrom(accounts).get, None)
             senderAndAssetOpt.flatMap { case (sender, asset) =>
@@ -97,17 +97,17 @@ class NarrowTransactionGenerator(settings: Settings,
             val reissuable = r.nextBoolean()
             randomFrom(reissuableIssueTxs).flatMap(assetTx => {
               val sender = accounts.find(_.address == assetTx.sender.address).get
-              logOption(ReissueTransaction.create(sender, assetTx.id, Random.nextInt(Int.MaxValue), reissuable, moreThatStandartFee, ts))
+              logOption(ReissueTransaction.create(sender, assetTx.id(), Random.nextInt(Int.MaxValue), reissuable, moreThatStandartFee, ts))
             })
           case TransactionType.BurnTransaction =>
             randomFrom(validIssueTxs).flatMap(assetTx => {
               val sender = accounts.find(_.address == assetTx.sender.address).get
-              logOption(BurnTransaction.create(sender, assetTx.id, Random.nextInt(1000), moreThatStandartFee, ts))
+              logOption(BurnTransaction.create(sender, assetTx.id(), Random.nextInt(1000), moreThatStandartFee, ts))
             })
           case TransactionType.ExchangeTransaction =>
             val matcher = randomFrom(accounts).get
             val seller = randomFrom(accounts).get
-            val pair = AssetPair(None, Some(tradeAssetIssue.id))
+            val pair = AssetPair(None, Some(tradeAssetIssue.id()))
             val sellOrder = Order.sell(seller, matcher, pair, 100000000, 1, ts, ts + 30.days.toMillis, moreThatStandartFee * 3)
             val buyer = randomFrom(accounts).get
             val buyOrder = Order.buy(buyer, matcher, pair, 100000000, 1, ts, ts + 1.day.toMillis, moreThatStandartFee * 3)
@@ -121,7 +121,7 @@ class NarrowTransactionGenerator(settings: Settings,
           case TransactionType.LeaseCancelTransaction =>
             randomFrom(activeLeaseTransactions).flatMap(lease => {
               val sender = accounts.find(_.address == lease.sender.address).get
-              logOption(LeaseCancelTransaction.create(sender, lease.id, moreThatStandartFee * 3, ts))
+              logOption(LeaseCancelTransaction.create(sender, lease.id(), moreThatStandartFee * 3, ts))
             })
           case TransactionType.CreateAliasTransaction =>
             val sender = randomFrom(accounts).get

@@ -66,7 +66,7 @@ class LeaseTransactionsDiffTest extends PropSpec with PropertyChecks with Genera
     genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
     (lease, unlease) <- leaseAndCancelGeneratorP(master, recpient, master)
     fee2 <- smallFeeGen
-    unlease2 = LeaseCancelTransaction.create(master, lease.id, fee2, ts + 1).right.get
+    unlease2 = LeaseCancelTransaction.create(master, lease.id(), fee2, ts + 1).right.get
     // ensure recipient has enough effective balance
     payment <- paymentGeneratorP(master, recpient) suchThat (_.amount > lease.amount)
   } yield (genesis, payment, lease, unlease, unlease2)
@@ -117,7 +117,7 @@ class LeaseTransactionsDiffTest extends PropSpec with PropertyChecks with Genera
     genesis2: GenesisTransaction = GenesisTransaction.create(unleaser, ENOUGH_AMT, ts).right.get
     (lease, _) <- leaseAndCancelGeneratorP(master, recipient, master)
     fee2 <- smallFeeGen
-    unleaseOtherOrRecipient = LeaseCancelTransaction.create(unleaser, lease.id, fee2, ts + 1).right.get
+    unleaseOtherOrRecipient = LeaseCancelTransaction.create(unleaser, lease.id(), fee2, ts + 1).right.get
   } yield (genesis, genesis2, lease, unleaseOtherOrRecipient)
 
   property("cannot cancel lease of another sender after allowMultipleLeaseCancelTransactionUntilTimestamp") {

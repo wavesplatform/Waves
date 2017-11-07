@@ -52,7 +52,7 @@ class GenesisTransactionSpecification extends PropSpec with PropertyChecks with 
       (recipientSeed: Array[Byte], time: Long, amount: Long) =>
         val recipient = PrivateKeyAccount(recipientSeed)
         val source = GenesisTransaction.create(recipient, amount, time).right.get
-        val bytes = source.bytes
+        val bytes = source.bytes()
         val dest = parseBytes(bytes).get
 
         source should equal(dest)

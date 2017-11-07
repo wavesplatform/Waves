@@ -42,7 +42,7 @@ class LeaseBroadcastRouteSpec extends RouteSpec("/leasing/broadcast/") with Requ
     "when state validation fails" in {
       forAll(vt) { (url, gen, transform) =>
         forAll(gen) { (t: Transaction) =>
-          posting(url, transform(t.json)) should produce(StateCheckFailed(t, "foo"))
+          posting(url, transform(t.json())) should produce(StateCheckFailed(t, "foo"))
         }
       }
     }

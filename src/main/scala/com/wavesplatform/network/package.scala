@@ -67,7 +67,7 @@ package object network extends ScorexLogging {
     }
 
     def broadcastTx(tx: Transaction, except: Option[Channel] = None): Unit =
-      allChannels.broadcast(RawBytes(TransactionMessageSpec.messageCode, tx.bytes), except)
+      allChannels.broadcast(RawBytes(TransactionMessageSpec.messageCode, tx.bytes()), except)
   }
 
 }
