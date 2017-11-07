@@ -6,15 +6,10 @@ import cats.Monoid
 import cats.implicits._
 import com.wavesplatform.metrics.Instrumented
 import com.wavesplatform.state2.reader.StateReaderImpl
-import monix.eval.Task
-import monix.execution.Scheduler
 import scorex.transaction.PaymentTransaction
 import scorex.transaction.assets.TransferTransaction
 import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.utils.ScorexLogging
-
-import scala.concurrent.Await
-import scala.concurrent.duration.Duration
 
 trait StateWriter {
   def applyBlockDiff(blockDiff: BlockDiff): Unit
