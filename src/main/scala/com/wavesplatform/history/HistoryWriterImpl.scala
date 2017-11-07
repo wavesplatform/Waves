@@ -134,7 +134,8 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
 
   override def blockAt(height: Int): Option[Block] = blockBytes(height).map(Block.parseBytes(_).get)
 
-  override def blockHeaderAt(height: Int): Option[BlockHeader] = ??? // blockBytes(height).map(Block.parseBytes(_).get)
+  override def blockHeaderAndSizeAt(height: Int): Option[(BlockHeader, Int)] =
+    blockBytes(height).map(bytes => (BlockHeader.parseBytes(bytes).get._1, bytes.length))
 }
 
 object HistoryWriterImpl extends ScorexLogging {

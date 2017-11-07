@@ -16,7 +16,7 @@ trait History extends Synchronized with AutoCloseable {
 
   def blockAt(height: Int): Option[Block]
 
-  def blockHeaderAt(height: Int): Option[BlockHeader]
+  def blockHeaderAndSizeAt(height: Int): Option[(BlockHeader, Int)]
 
   def blockBytes(height: Int): Option[Array[Byte]]
 

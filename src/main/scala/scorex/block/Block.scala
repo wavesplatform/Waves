@@ -20,12 +20,12 @@ import scorex.utils.ScorexLogging
 import scala.util.{Failure, Try}
 
 class BlockHeader(val timestamp: Long,
-                          val version: Byte,
-                          val reference: ByteStr,
-                          val signerData: SignerData,
-                          val consensusData: NxtLikeConsensusBlockData,
-                          val transactionsCount: Int,
-                          val featureVotes: Set[Short]) {
+                  val version: Byte,
+                  val reference: ByteStr,
+                  val signerData: SignerData,
+                  val consensusData: NxtLikeConsensusBlockData,
+                  val transactionCount: Int,
+                  val featureVotes: Set[Short]) {
 
   protected lazy val versionField: ByteBlockField = ByteBlockField("version", version)
   protected lazy val timestampField: LongBlockField = LongBlockField("timestamp", timestamp)
@@ -43,7 +43,7 @@ class BlockHeader(val timestamp: Long,
       signerField.json ++
       Json.obj(
         "blocksize" -> blockSize,
-        "transactionsCount" -> transactionsCount
+        "transactionCount" -> transactionCount
       )
 }
 

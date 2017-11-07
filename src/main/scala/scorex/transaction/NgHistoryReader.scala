@@ -6,7 +6,7 @@ import com.wavesplatform.features.FeatureProvider
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2._
 import scorex.block.Block.BlockId
-import scorex.block.{Block, MicroBlock}
+import scorex.block.{Block, BlockHeader, MicroBlock}
 import scorex.transaction.History.{BlockMinerInfo, BlockchainScore}
 import cats.implicits._
 
@@ -96,5 +96,10 @@ class NgHistoryReader(ngState: () => Option[NgState], inner: History with Featur
     inner.featureVotesCountWithinActivationWindow(height) |+| ngVotes
   }
 
-  override def blockHeaderAt(height: Int) = ???
+  override def blockHeaderAndSizeAt(height: Int): Option[(BlockHeader, Int)] = read { implicit l =>
+    if (height == inner.height() + 1)
+      ngState().map(x => (x.bestLiquidBlock, x.bestLiquidBlock.bytes.length))
+    else
+      inner.blockHeaderAndSizeAt(height)
+  }
 }
