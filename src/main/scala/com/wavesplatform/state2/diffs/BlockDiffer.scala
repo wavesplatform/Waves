@@ -10,6 +10,8 @@ import com.wavesplatform.state2._
 import com.wavesplatform.state2.patch.LeasePatch
 import com.wavesplatform.state2.reader.CompositeStateReader.composite
 import com.wavesplatform.state2.reader.SnapshotStateReader
+import monix.eval.Task
+import monix.execution.schedulers.SchedulerService
 import scorex.account.Address
 import scorex.block.{Block, MicroBlock}
 import scorex.transaction.ValidationError.ActivationError
@@ -17,8 +19,13 @@ import scorex.transaction.{History, Transaction, ValidationError}
 import scorex.utils.ScorexLogging
 
 import scala.collection.SortedMap
+import scala.concurrent.Await
+import scala.concurrent.duration.Duration
 
 object BlockDiffer extends ScorexLogging with Instrumented {
+
+  private implicit val scheduler: SchedulerService = monix.execution.Scheduler.computation(name = "block-deser",
+    reporter = com.wavesplatform.utils.UncaughtExceptionsToLogReporter)
 
   def right(diff: Diff): Either[ValidationError, Diff] = Right(diff)
 
@@ -44,7 +51,7 @@ object BlockDiffer extends ScorexLogging with Instrumented {
 
     val prevBlockTimestamp = maybePrevBlock.map(_.timestamp)
     for {
-      _ <- block.signaturesValid
+      _ <- block.signaturesValid()
       r <- apply(settings, s, prevBlockTimestamp)(block.signerData.generator, prevBlockFeeDistr, currentBlockFeeDistr, block.timestamp, block.transactionData, 1)
     } yield r
   }
@@ -53,7 +60,7 @@ object BlockDiffer extends ScorexLogging with Instrumented {
     for {
       // microblocks are processed within block which is next after 40-only-block which goes on top of activated height
       _ <- Either.cond(fp.featureActivationHeight(BlockchainFeatures.NG.id).exists(s.height > _), (), ActivationError(s"MicroBlocks are not yet activated, current height=${s.height}"))
-      _ <- micro.signaturesValid
+      _ <- micro.signaturesValid()
       r <- apply(settings, s, pervBlockTimestamp)(micro.generator, None, None, timestamp, micro.transactionData, 0)
     } yield r
   }
@@ -68,7 +75,7 @@ object BlockDiffer extends ScorexLogging with Instrumented {
   def unsafeDiffByRange(fs: FunctionalitySettings, fp: FeatureProvider, h: History, maxTransactionsPerChunk: Int)(state: SnapshotStateReader, upto: Int): NEL[BlockDiff] = {
     val from = state.height + 1
     val blocks = measureLog(s"Reading blocks from $from up upto $upto") {
-      Range(from, upto).map(h.blockBytes).par.map(b => Block.parseBytes(b.get).get).seq
+      Await.result(Task.wander(Range(from, upto).map(h.blockBytes))(b => Task(Block.parseBytes(b.get).get)).runAsync, Duration.Inf)
     }
     measureLog(s"Building diff from $from up to $upto") {
       BlockDiffer.unsafeDiffMany(fs, fp, state, h.blockAt(from - 1), maxTransactionsPerChunk)(blocks)

@@ -24,7 +24,8 @@ object Coordinator extends ScorexLogging with Instrumented {
   def processFork(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater,
                   stateReader: StateReader, utxStorage: UtxPool, time: Time, settings: WavesSettings,
                   blockchainReadiness: AtomicBoolean, featureProvider: FeatureProvider)
-                 (newBlocks: Seq[Block]): Either[ValidationError, Option[BigInt]] = history.write { implicit l =>
+                 (blocks: Seq[Block]): Either[ValidationError, Option[BigInt]] =  Signed.validateOrdered(blocks).flatMap { newBlocks =>
+   history.write { implicit l =>
     val extension = newBlocks.dropWhile(history.contains)
 
     extension.headOption.map(_.reference) match {
@@ -97,6 +98,8 @@ object Coordinator extends ScorexLogging with Instrumented {
         Right(None)
     }
   }
+  }
+
 
 
   def updateBlockchainReadinessFlag(history: History, time: Time, blockchainReadiness: AtomicBoolean, maxBlockchainAge: FiniteDuration): Boolean = {

@@ -25,9 +25,9 @@ class MicroBlockInvMessageSpecSpec extends FreeSpec
     import MicroBlockInvMessageSpec._
 
     "deserializeData(serializedData(data)) == data" in forAll(microBlockInvGen) { inv =>
-      inv.signaturesValid shouldBe 'right
+      inv.signaturesValid()shouldBe 'right
       val restoredInv = deserializeData(serializeData(inv)).get
-      restoredInv.signaturesValid shouldBe 'right
+      restoredInv.signaturesValid() shouldBe 'right
 
       restoredInv shouldBe inv
     }

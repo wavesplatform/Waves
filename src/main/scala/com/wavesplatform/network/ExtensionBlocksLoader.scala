@@ -76,7 +76,7 @@ class ExtensionBlocksLoader(
           } else {
             val pnewBlocks = newBlocks.par
             pnewBlocks.tasksupport = new ForkJoinTaskSupport()
-            pnewBlocks.find(_.signaturesValid.isLeft) match {
+            pnewBlocks.find(_.signaturesValid().isLeft) match {
               case Some(invalidBlock) =>
                 peerDatabase.blacklistAndClose(ctx.channel(),s"Got block $invalidBlock with invalid signature")
               case None =>

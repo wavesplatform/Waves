@@ -145,7 +145,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
             measureSuccessful(forgeBlockTimeStats, ng.totalDiffOf(block.reference)) match {
               case None => Left(BlockAppendError(s"References incorrect or non-existing block", block))
               case Some((referencedForgedBlock, referencedLiquidDiff, discarded)) =>
-                if (referencedForgedBlock.signaturesValid.isRight) {
+                if (referencedForgedBlock.signaturesValid().isRight) {
                   if (discarded.nonEmpty) {
                     microBlockForkStats.increment()
                     microBlockForkHeightStats.record(discarded.size)
@@ -248,7 +248,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
             Left(MicroBlockAppendError("It doesn't reference last known microBlock(which exists)", microBlock))
           case _ =>
             for {
-              _ <- microBlock.signaturesValid
+              _ <- microBlock.signaturesValid()
               diff <- BlockDiffer.fromMicroBlock(settings.blockchainSettings.functionalitySettings, historyReader,
                 composite(ng.bestLiquidDiff.copy(snapshots = Map.empty), currentPersistedBlocksState()),
                 historyWriter.lastBlock.map(_.timestamp), microBlock, ng.base.timestamp)

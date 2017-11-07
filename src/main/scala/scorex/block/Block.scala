@@ -27,12 +27,12 @@ class BlockHeader(val timestamp: Long,
                   val transactionCount: Int,
                   val featureVotes: Set[Short]) {
 
-  protected lazy val versionField: ByteBlockField = ByteBlockField("version", version)
-  protected lazy val timestampField: LongBlockField = LongBlockField("timestamp", timestamp)
-  protected lazy val referenceField: BlockIdField = BlockIdField("reference", reference.arr)
-  protected lazy val signerField: SignerDataBlockField = SignerDataBlockField("signature", signerData)
-  protected lazy val consensusField = NxtConsensusBlockField(consensusData)
-  protected lazy val supportedFeaturesField = FeaturesBlockField(version, featureVotes)
+  protected val versionField: ByteBlockField = ByteBlockField("version", version)
+  protected val timestampField: LongBlockField = LongBlockField("timestamp", timestamp)
+  protected val referenceField: BlockIdField = BlockIdField("reference", reference.arr)
+  protected val signerField: SignerDataBlockField = SignerDataBlockField("signature", signerData)
+  protected val consensusField = NxtConsensusBlockField(consensusData)
+  protected val supportedFeaturesField = FeaturesBlockField(version, featureVotes)
 
   def json(blockSize: Int): JsObject =
     versionField.json ++
@@ -121,7 +121,7 @@ case class Block private(override val timestamp: Long,
 
   import Block._
 
-  private lazy val transactionField = TransactionsBlockField(version.toInt, transactionData)
+  private val transactionField = TransactionsBlockField(version.toInt, transactionData)
 
   lazy val uniqueId: ByteStr = signerData.signature
 
@@ -135,7 +135,7 @@ case class Block private(override val timestamp: Long,
   lazy val json: JsObject =
     super.json(bytes.length) ++ Json.obj("fee" -> fee) ++ transactionField.json
 
-  lazy val bytes: Array[Byte] = {
+  def bytes: Array[Byte] = {
     val txBytesSize = transactionField.bytes.length
     val txBytes = Bytes.ensureCapacity(Ints.toByteArray(txBytesSize), 4, 0) ++ transactionField.bytes
 
@@ -151,7 +151,7 @@ case class Block private(override val timestamp: Long,
       signerField.bytes
   }
 
-  lazy val bytesWithoutSignature: Array[Byte] = bytes.dropRight(SignatureLength)
+  def bytesWithoutSignature: Array[Byte] = bytes.dropRight(SignatureLength)
 
   lazy val blockScore: BigInt = (BigInt("18446744073709551616") / consensusData.baseTarget)
     .ensuring(_ > 0) // until we make smart-constructor validate consensusData.baseTarget to be positive
@@ -172,8 +172,8 @@ case class Block private(override val timestamp: Long,
 
   lazy val prevBlockFeePart: Portfolio = Monoid[Portfolio].combineAll(transactionData.map(tx => tx.feeDiff().minus(tx.feeDiff().multiply(CurrentBlockFeePart))))
 
-  protected override lazy val signatureValid: Boolean = EllipticCurveImpl.verify(signerData.signature.arr, bytesWithoutSignature, signerData.generator.publicKey)
-  protected override lazy val signedDescendants: Seq[Signed] = transactionData
+  protected override def signatureValid: Boolean = EllipticCurveImpl.verify(signerData.signature.arr, bytesWithoutSignature, signerData.generator.publicKey)
+  protected override def signedDescendants: Seq[Signed] = transactionData
 
   override def toString: String =
     s"Block(${signerData.signature} -> ${reference.trim}, txs=${transactionData.size}, features=$featureVotes) "
