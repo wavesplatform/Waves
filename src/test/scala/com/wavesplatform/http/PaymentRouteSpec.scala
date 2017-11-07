@@ -39,7 +39,7 @@ class PaymentRouteSpec extends RouteSpec("/payment")
         Post(routePath(""), req) ~> api_key(apiKey) ~> route ~> check {
           val resp = responseAs[JsObject]
 
-          (resp \ "id").as[String] shouldEqual tx.right.get.id.toString
+          (resp \ "id").as[String] shouldEqual tx.right.get.id().toString
           (resp \ "assetId").asOpt[String] shouldEqual None
           (resp \ "feeAsset").asOpt[String] shouldEqual None
           (resp \ "type").as[Int] shouldEqual 4

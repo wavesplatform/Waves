@@ -5,6 +5,7 @@ import java.nio.ByteBuffer
 
 import com.google.common.primitives.{Bytes, Ints}
 import com.wavesplatform.network.TransactionMessageSpec
+import monix.eval.Coeval
 import play.api.libs.json.{JsArray, JsObject, Json}
 import scorex.block.{Block, BlockField}
 
@@ -20,7 +21,7 @@ object TransactionsBlockField {
     val byteBuffer = new ByteArrayOutputStream(value.size * TransactionMessageSpec.maxLength / 2)
     byteBuffer.write(serTxCount, 0, serTxCount.length)
     value.foreach { tx =>
-      val txBytes = tx.bytes
+      val txBytes = tx.bytes()
       val txSize = Bytes.ensureCapacity(Ints.toByteArray(txBytes.length), 4, 0)
       byteBuffer.write(txSize, 0, txSize.length)
       byteBuffer.write(txBytes, 0, txBytes.length)
@@ -34,7 +35,7 @@ case class TransactionsBlockFieldVersion1or2(override val value: Seq[Transaction
 
   override lazy val json: JsObject = Json.obj(name -> JsArray(value.map(_.json)))
 
-  override lazy val bytes: Array[Byte] = {
+  override val bytes  = Coeval.evalOnce {
     val txCount = value.size.ensuring(_ <= Block.MaxTransactionsPerBlockVer1Ver2).toByte
     TransactionsBlockField.serTxs(value, Array(txCount))
   }
@@ -45,7 +46,7 @@ case class TransactionsBlockFieldVersion3(override val value: Seq[Transaction]) 
 
   override lazy val json: JsObject = Json.obj(name -> JsArray(value.map(_.json)))
 
-  override lazy val bytes: Array[Byte] = {
+  override val bytes  = Coeval.evalOnce {
     val txCount = value.size.ensuring(_ <= Block.MaxTransactionsPerBlockVer3)
     val bb = ByteBuffer.allocate(4)
     TransactionsBlockField.serTxs(value, bb.putInt(txCount).array)

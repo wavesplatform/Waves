@@ -57,8 +57,8 @@ object CommonValidation {
   def disallowDuplicateIds[T <: Transaction](state: SnapshotStateReader, settings: FunctionalitySettings, height: Int, tx: T): Either[ValidationError, T] = tx match {
     case ptx: PaymentTransaction if ptx.timestamp < settings.requirePaymentUniqueIdAfter => Right(tx)
     case _ =>
-      if (state.containsTransaction(tx.id)) {
-        val txHeight = state.transactionInfo(tx.id).map(_._1)
+      if (state.containsTransaction(tx.id())) {
+        val txHeight = state.transactionInfo(tx.id()).map(_._1)
         Left(GenericError(s"Txs cannot be duplicated. Target height is: $height, current height is: ${state.height}, existing tx height is: ${txHeight} Tx with such id aready present"))
       }
       else Right(tx)

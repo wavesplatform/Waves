@@ -80,7 +80,7 @@ class TransferTransactionSpecification(override val allNodes: Seq[Node], overrid
       Array.emptyByteArray
     ).right.get
 
-    val invalidTxId = invalidByTsTx.id
+    val invalidTxId = invalidByTsTx.id()
 
     val invalidByTsSignedRequest = createSignedTransferRequest(invalidByTsTx)
 

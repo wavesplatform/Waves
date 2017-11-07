@@ -1,10 +1,11 @@
 package scorex.serialization
 
 import com.google.common.primitives.Shorts
+import monix.eval.Coeval
 
 trait BytesSerializable {
 
-  def bytes: Array[Byte]
+  val bytes: Coeval[Array[Byte]]
 }
 
 object BytesSerializable {

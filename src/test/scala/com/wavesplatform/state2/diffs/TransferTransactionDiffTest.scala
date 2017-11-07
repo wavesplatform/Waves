@@ -25,7 +25,7 @@ class TransferTransactionDiffTest extends PropSpec with PropertyChecks with Gene
     maybeAsset <- Gen.option(issue1)
     maybeAsset2 <- Gen.option(issue2)
     maybeFeeAsset <- Gen.oneOf(maybeAsset, maybeAsset2)
-    transfer <- transferGeneratorP(master, recepient, maybeAsset.map(_.id), maybeFeeAsset.map(_.id))
+    transfer <- transferGeneratorP(master, recepient, maybeAsset.map(_.id()), maybeFeeAsset.map(_.id()))
   } yield (genesis, issue1, issue2, transfer)
 
   property("transfers assets to recipient preserving waves invariant") {

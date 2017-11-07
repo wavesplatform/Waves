@@ -4,6 +4,7 @@ import java.util
 
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import com.wavesplatform.state2.ByteStr
+import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.PublicKeyAccount._
 import scorex.account.{Address, PrivateKeyAccount, PublicKeyAccount}
@@ -23,11 +24,11 @@ case class PaymentTransaction private(sender: PublicKeyAccount,
                                       signature: ByteStr) extends Transaction {
   override val transactionType = TransactionType.PaymentTransaction
   override val assetFee: (Option[AssetId], Long) = (None, fee)
-  override val id: ByteStr = signature
+  override val id = Coeval(signature)
 
   override lazy val json: JsObject =
     Json.obj("type" -> transactionType.id,
-      "id" -> id.base58,
+      "id" -> id().base58,
       "fee" -> fee,
       "timestamp" -> timestamp,
       "signature" -> this.signature.base58,
@@ -36,19 +37,19 @@ case class PaymentTransaction private(sender: PublicKeyAccount,
       "recipient" -> recipient.address,
       "amount" -> amount)
 
-  lazy val hashBytes: Array[Byte] = {
+  private val hashBytes: Coeval[Array[Byte]] = Coeval.evalOnce {
     val timestampBytes = Longs.toByteArray(timestamp)
     val amountBytes = Longs.toByteArray(amount)
     val feeBytes = Longs.toByteArray(fee)
     Bytes.concat(Array(transactionType.id.toByte), timestampBytes, sender.publicKey, recipient.bytes.arr, amountBytes, feeBytes)
   }
 
-  lazy val hash = FastCryptographicHash(hashBytes)
+  val hash: Coeval[FastCryptographicHash.Digest] = Coeval.evalOnce(FastCryptographicHash(hashBytes()))
 
-  override lazy val bytes: Array[Byte] = Bytes.concat(hashBytes, signature.arr)
+  override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(hashBytes(), signature.arr))
 
-  def signatureValid: Boolean = EllipticCurveImpl.verify(signature.arr,
-    signatureData(sender, recipient, amount, fee, timestamp), sender.publicKey)
+  val signatureValid: Coeval[Boolean] = Coeval.evalOnce(EllipticCurveImpl.verify(signature.arr,
+    signatureData(sender, recipient, amount, fee, timestamp), sender.publicKey))
 }
 
 object PaymentTransaction {

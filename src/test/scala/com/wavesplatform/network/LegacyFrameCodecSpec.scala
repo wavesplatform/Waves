@@ -31,7 +31,7 @@ class LegacyFrameCodecSpec extends FreeSpec
     val decodedBytes = ch.readInbound[RawBytes]()
 
     decodedBytes.code shouldBe TransactionMessageSpec.messageCode
-    decodedBytes.data shouldEqual origTx.bytes
+    decodedBytes.data shouldEqual origTx.bytes()
   }
 
   "should handle multiple messages" in forAll(Gen.nonEmptyListOf(issueGen)) { origTxs =>
@@ -55,7 +55,7 @@ class LegacyFrameCodecSpec extends FreeSpec
   }
 
   private def write(buff: ByteBuf, tx: Transaction): Unit = {
-    val txBytes = tx.bytes
+    val txBytes = tx.bytes()
     val checkSum = wrappedBuffer(FastCryptographicHash.hash(txBytes), 0, ScorexMessage.ChecksumLength)
 
     buff.writeInt(LegacyFrameCodec.Magic)

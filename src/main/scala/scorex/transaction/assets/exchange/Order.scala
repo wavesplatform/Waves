@@ -3,6 +3,7 @@ package scorex.transaction.assets.exchange
 import com.google.common.primitives.Longs
 import com.wavesplatform.state2.ByteStr
 import io.swagger.annotations.ApiModelProperty
+import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
@@ -71,7 +72,7 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
 
   import Order._
 
-  def signatureValid: Boolean = EllipticCurveImpl.verify(signature, toSign, senderPublicKey.publicKey)
+  val signatureValid =Coeval.evalOnce(EllipticCurveImpl.verify(signature, toSign, senderPublicKey.publicKey))
 
   def isValid(atTime: Long): Validation = {
     isValidAmount(price, amount) &&
@@ -105,7 +106,7 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
   @ApiModelProperty(hidden = true)
   lazy val idStr: String = Base58.encode(id)
 
-  def bytes: Array[Byte] = toSign ++ signature
+  val bytes = Coeval.evalOnce(toSign ++ signature)
 
   @ApiModelProperty(hidden = true)
   def getReceiveAssetId: Option[AssetId] = orderType match {

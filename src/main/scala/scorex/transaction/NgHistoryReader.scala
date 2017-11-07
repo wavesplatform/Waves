@@ -21,7 +21,7 @@ class NgHistoryReader(ngState: () => Option[NgState], inner: History with Featur
   }
 
   override def blockBytes(height: Int): Option[Array[Byte]] = read { implicit l =>
-    inner.blockBytes(height).orElse(if (height == inner.height() + 1) ngState().map(_.bestLiquidBlock.bytes) else None)
+    inner.blockBytes(height).orElse(if (height == inner.height() + 1) ngState().map(_.bestLiquidBlock.bytes()) else None)
   }
 
   override def scoreOf(blockId: BlockId): Option[BlockchainScore] = read { implicit l =>

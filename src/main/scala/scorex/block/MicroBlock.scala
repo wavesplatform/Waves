@@ -3,6 +3,7 @@ package scorex.block
 import com.google.common.primitives.{Bytes, Ints}
 import com.wavesplatform.mining.Miner.MaxTransactionsPerMicroblock
 import com.wavesplatform.state2._
+import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.block.Block.{BlockId, transParseBytes}
@@ -30,24 +31,24 @@ case class MicroBlock private(version: Byte, generator: PublicKeyAccount, transa
       transactionDataField.json ++
       signerDataField.json ++
       Json.obj(
-        "blocksize" -> bytes.length
+        "blocksize" -> bytes().length
       )
 
-  def bytes: Array[Byte] = {
-    val txBytesSize = transactionDataField.bytes.length
-    val txBytes = Bytes.ensureCapacity(Ints.toByteArray(txBytesSize), 4, 0) ++ transactionDataField.bytes
+  val bytes: Coeval[Array[Byte]] = Coeval.evalOnce {
+    val txBytesSize = transactionDataField.bytes().length
+    val txBytes = Bytes.ensureCapacity(Ints.toByteArray(txBytesSize), 4, 0) ++ transactionDataField.bytes()
 
-    versionField.bytes ++
-      prevResBlockSigField.bytes ++
-      totalResBlockSigField.bytes ++
+    versionField.bytes() ++
+      prevResBlockSigField.bytes() ++
+      totalResBlockSigField.bytes() ++
       txBytes ++
-      signerDataField.bytes
+      signerDataField.bytes()
   }
 
-  private def bytesWithoutSignature: Array[Byte] = bytes.dropRight(SignatureLength)
+  private def bytesWithoutSignature: Array[Byte] = bytes().dropRight(SignatureLength)
 
-  override def signatureValid: Boolean = EllipticCurveImpl.verify(signature.arr, bytesWithoutSignature, generator.publicKey)
-  override def signedDescendants: Seq[Signed] = transactionData
+  override val signatureValid: Coeval[Boolean] = Coeval.evalOnce(EllipticCurveImpl.verify(signature.arr, bytesWithoutSignature, generator.publicKey))
+  override val signedDescendants: Coeval[Seq[Signed]] = Coeval.evalOnce(transactionData)
 
   override def toString: String = s"MicroBlock(${totalResBlockSig.trim} ~> ${prevResBlockSig.trim}, txs=${transactionData.size})"
 }
@@ -71,7 +72,7 @@ object MicroBlock extends ScorexLogging {
 
     create(version = 3: Byte, generator, transactionData, prevResBlockSig, totalResBlockSig, ByteStr.empty).map { nonSignedBlock =>
       val toSign = nonSignedBlock.bytes
-      val signature = EllipticCurveImpl.sign(generator, toSign)
+      val signature = EllipticCurveImpl.sign(generator, toSign())
       nonSignedBlock.copy(signature = ByteStr(signature))
     }
   }

@@ -11,7 +11,7 @@ import scala.concurrent.Await
 import scala.concurrent.duration.Duration
 
 trait Transaction extends BytesSerializable with JsonSerializable with Signed {
-  val id: ByteStr
+  val id: Coeval[ByteStr]
 
   val transactionType: TransactionType.Value
   val assetFee: (Option[AssetId], Long)
@@ -20,11 +20,11 @@ trait Transaction extends BytesSerializable with JsonSerializable with Signed {
   override def toString: String = json.toString()
 
   override def equals(other: Any): Boolean = other match {
-    case tx: Transaction => id == tx.id
+    case tx: Transaction => id() == tx.id()
     case _ => false
   }
 
-  override def hashCode(): Int = id.hashCode()
+  override def hashCode(): Int = id().hashCode()
 }
 
 object Transaction {
@@ -47,9 +47,9 @@ object Transaction {
 
 
 trait Signed {
-  protected def signatureValid: Boolean
+  protected val signatureValid: Coeval[Boolean]
 
-  protected def signedDescendants: Seq[Signed] = Seq.empty
+  protected val signedDescendants: Coeval[Seq[Signed]] =Coeval.evalOnce(Seq.empty)
 
   protected val signaturesValidMemoized: Task[Either[InvalidSignature, this.type]] = Signed.validateTask[this.type](this).memoize
 
@@ -64,9 +64,9 @@ object Signed {
 
 
   private def validateTask[S <: Signed](s: S): Task[E[S]] = Task {
-    if (!s.signatureValid) Task.now(Left(InvalidSignature(s, None)))
-    else if (s.signedDescendants.isEmpty) Task.now(Right(s))
-    else Task.wanderUnordered(s.signedDescendants)(s => s.signaturesValidMemoized) map { l =>
+    if (!s.signatureValid()) Task.now(Left(InvalidSignature(s, None)))
+    else if (s.signedDescendants().isEmpty) Task.now(Right(s))
+    else Task.wanderUnordered(s.signedDescendants())(s => s.signaturesValidMemoized) map { l =>
       l.find(_.isLeft) match {
         case Some(e) => Left(e.left.get)
         case None => Right(s)

@@ -34,8 +34,8 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Gene
       gen2: GenesisTransaction = GenesisTransaction.create(seller, ENOUGH_AMT, ts).right.get
       issue1: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, seller).map(_._1)
       issue2: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, buyer).map(_._1)
-      maybeAsset1 <- Gen.option(issue1.id)
-      maybeAsset2 <- Gen.option(issue2.id) suchThat (x => x != maybeAsset1)
+      maybeAsset1 <- Gen.option(issue1.id())
+      maybeAsset2 <- Gen.option(issue2.id()) suchThat (x => x != maybeAsset1)
       exchange <- exchangeGeneratorP(buyer, seller, maybeAsset1, maybeAsset2)
     } yield (gen1, gen2, issue1, issue2, exchange)
 
@@ -59,7 +59,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Gene
       gen1: GenesisTransaction = GenesisTransaction.create(buyer, 1 * Constants.UnitsInWave, ts).right.get
       gen2: GenesisTransaction = GenesisTransaction.create(seller, ENOUGH_AMT, ts).right.get
       issue1: IssueTransaction <- issueGen(buyer)
-      exchange <- exchangeGeneratorP(buyer, seller, None, Some(issue1.id), fixedMatcherFee = Some(300000))
+      exchange <- exchangeGeneratorP(buyer, seller, None, Some(issue1.id()), fixedMatcherFee = Some(300000))
     } yield (gen1, gen2, issue1, exchange)
 
     forAll(preconditions) { case ((gen1, gen2, issue1, exchange)) =>
@@ -105,7 +105,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Gene
     } yield (buyer, seller, matcher, gen1, gen2, issue1)
 
     forAll(preconditions, priceGen) { case ((buyer, seller, matcher, gen1, gen2, issue1), price) =>
-      val assetPair = AssetPair(Some(issue1.id), None)
+      val assetPair = AssetPair(Some(issue1.id()), None)
       val buy = Order.buy(buyer, matcher, assetPair, price, 1000000L, Ts, Ts + 1, MatcherFee)
       val sell = Order.sell(seller, matcher, assetPair, price, 1L, Ts, Ts + 1, MatcherFee)
       val tx = createExTx(buy, sell, price, matcher, Ts).explicitGet()
@@ -131,7 +131,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Gene
     } yield (buyer, seller, matcher, gen1, gen2, issue1)
 
     forAll(preconditions, priceGen) { case ((buyer, seller, matcher, gen1, gen2, issue1), price) =>
-      val assetPair = AssetPair(Some(issue1.id), None)
+      val assetPair = AssetPair(Some(issue1.id()), None)
       val buy = Order.buy(buyer, matcher, assetPair, price, issue1.quantity + 1, Ts, Ts + 1, MatcherFee)
       val sell = Order.sell(seller, matcher, assetPair, price, issue1.quantity + 1, Ts, Ts + 1, MatcherFee)
       val tx = createExTx(buy, sell, price, matcher, Ts).explicitGet()

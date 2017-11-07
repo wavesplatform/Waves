@@ -52,7 +52,7 @@ class UtxPool(time: Time,
       .filter(isExpired)
       .foreach { tx =>
         transactions.remove(tx.id)
-        pessimisticPortfolios.remove(tx.id)
+        pessimisticPortfolios.remove(tx.id())
         utxPoolSizeStats.decrement()
       }
   }
@@ -71,11 +71,11 @@ class UtxPool(time: Time,
             diff <- blocking(TransactionDiffer(fs, blocking(history.lastBlockTimestamp()), time.correctedTime(), s.height)(s, tx))
           } yield {
             utxPoolSizeStats.increment()
-            pessimisticPortfolios.add(tx.id, diff)
-            transactions.put(tx.id, tx)
+            pessimisticPortfolios.add(tx.id(), diff)
+            transactions.put(tx.id(), tx)
             tx
           }
-          knownTransactions.put(tx.id, res)
+          knownTransactions.put(tx.id(), res)
           res.right.map(_ => true)
       }
     })
@@ -85,7 +85,7 @@ class UtxPool(time: Time,
     txs.view.map(_.id).foreach { id =>
       knownTransactions.invalidate(id)
       Option(transactions.remove(id)).foreach(_ => utxPoolSizeStats.decrement())
-      pessimisticPortfolios.remove(id)
+      pessimisticPortfolios.remove(id())
     }
 
     removeExpired(time.correctedTime())
@@ -122,7 +122,7 @@ class UtxPool(time: Time,
             case Right(_) =>
               (invalid, valid, diff)
             case Left(_) =>
-              (tx.id +: invalid, valid, diff)
+              (tx.id() +: invalid, valid, diff)
           }
         case (r, _) => r
       }
