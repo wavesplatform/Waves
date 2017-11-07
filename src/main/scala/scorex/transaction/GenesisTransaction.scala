@@ -40,7 +40,7 @@ case class GenesisTransaction private(recipient: Address, amount: Long, timestam
     res
   }
 
-  override lazy val signatureValid: Boolean = true
+  def signatureValid: Boolean = true
 }
 
 

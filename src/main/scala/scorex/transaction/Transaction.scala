@@ -1,11 +1,14 @@
 package scorex.transaction
 
-import com.wavesplatform.state2.{ByteStr, LeaseInfo, Portfolio}
+import com.wavesplatform.state2._
+import monix.eval.{Coeval, Task}
+import monix.execution.schedulers.SchedulerService
 import scorex.serialization.{BytesSerializable, JsonSerializable}
 import scorex.transaction.TransactionParser.TransactionType
 import scorex.transaction.ValidationError.InvalidSignature
 
-import scala.collection.parallel.ForkJoinTaskSupport
+import scala.concurrent.Await
+import scala.concurrent.duration.Duration
 
 trait Transaction extends BytesSerializable with JsonSerializable with Signed {
   val id: ByteStr
@@ -48,23 +51,35 @@ trait Signed {
 
   protected def signedDescendants: Seq[Signed] = Seq.empty
 
-  lazy val signaturesValid: Either[InvalidSignature, this.type] = Signed.validateSignatures(this)
+  protected val signaturesValidMemoized: Task[Either[InvalidSignature, this.type]] = Signed.validateTask[this.type](this).memoize
+
+  val signaturesValid: Coeval[Either[InvalidSignature, this.type]] =  Coeval.evalOnce(Await.result(signaturesValidMemoized.runAsync(Signed.scheduler), Duration.Inf))
 }
 
 object Signed {
 
   type E[A] = Either[InvalidSignature, A]
+  private implicit val scheduler: SchedulerService = monix.execution.Scheduler.computation(name = "sig-validator",
+    reporter = com.wavesplatform.utils.UncaughtExceptionsToLogReporter)
 
-  private val taskSupport = new ForkJoinTaskSupport()
 
-  private def validateSignatures[S <: Signed](s: S): E[S] =
-    if (!s.signatureValid) Left(InvalidSignature(s, None))
-    else if (s.signedDescendants.isEmpty) Right(s)
-    else {
-      val par = s.signedDescendants.par
-      par.tasksupport = taskSupport
-      par.find { descendant =>
-        validateSignatures(descendant).isLeft
-      }.fold[E[S]](Right(s))(sd => Left(InvalidSignature(s, Some(validateSignatures(sd).left.get))))
+  private def validateTask[S <: Signed](s: S): Task[E[S]] = Task {
+    if (!s.signatureValid) Task.now(Left(InvalidSignature(s, None)))
+    else if (s.signedDescendants.isEmpty) Task.now(Right(s))
+    else Task.wanderUnordered(s.signedDescendants)(s => s.signaturesValidMemoized) map { l =>
+      l.find(_.isLeft) match {
+        case Some(e) => Left(e.left.get)
+        case None => Right(s)
+      }
     }
+  }.flatten
+
+  def validateOrdered[S <: Signed](ss: Seq[S]): E[Seq[S]] = Await.result(
+    Task.wander(ss)(s => s.signaturesValidMemoized).map { l =>
+      l.find(_.isLeft) match {
+        case Some(e) => Left(e.left.get)
+        case None => Right(ss)
+      }
+    }.runAsync, Duration.Inf)
+
 }

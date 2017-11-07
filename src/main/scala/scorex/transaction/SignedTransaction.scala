@@ -23,5 +23,5 @@ trait SignedTransaction extends Transaction with Signed {
     "signature" -> this.signature.base58
   )
 
-  lazy val signatureValid : Boolean = EllipticCurveImpl.verify(signature.arr, toSign, sender.publicKey)
+  def signatureValid : Boolean = EllipticCurveImpl.verify(signature.arr, toSign, sender.publicKey)
 }

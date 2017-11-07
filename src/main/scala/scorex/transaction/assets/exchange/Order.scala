@@ -71,8 +71,7 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
 
   import Order._
 
-  @ApiModelProperty(hidden = true)
-  protected lazy val signatureValid: Boolean = EllipticCurveImpl.verify(signature, toSign, senderPublicKey.publicKey)
+  def signatureValid: Boolean = EllipticCurveImpl.verify(signature, toSign, senderPublicKey.publicKey)
 
   def isValid(atTime: Long): Validation = {
     isValidAmount(price, amount) &&
@@ -94,8 +93,7 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
       (getReceiveAmount(matchPrice, matchAmount).getOrElse(0L) > 0) :| "ReceiveAmount should be > 0"
   }
 
-  @ApiModelProperty(hidden = true)
-  lazy val toSign: Array[Byte] = senderPublicKey.publicKey ++ matcherPublicKey.publicKey ++
+  def toSign: Array[Byte] = senderPublicKey.publicKey ++ matcherPublicKey.publicKey ++
     assetPair.bytes ++ orderType.bytes ++
     Longs.toByteArray(price) ++ Longs.toByteArray(amount) ++
     Longs.toByteArray(timestamp) ++ Longs.toByteArray(expiration) ++
@@ -107,8 +105,7 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
   @ApiModelProperty(hidden = true)
   lazy val idStr: String = Base58.encode(id)
 
-  @ApiModelProperty(hidden = true)
-  lazy val bytes: Array[Byte] = toSign ++ signature
+  def bytes: Array[Byte] = toSign ++ signature
 
   @ApiModelProperty(hidden = true)
   def getReceiveAssetId: Option[AssetId] = orderType match {

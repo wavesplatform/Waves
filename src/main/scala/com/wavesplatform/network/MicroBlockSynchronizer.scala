@@ -80,7 +80,7 @@ class MicroBlockSynchronizer(settings: MicroblockSynchronizerSettings,
       }.runAsync
 
     case mbInv@MicroBlockInv(_, totalSig, prevSig, _) => Task {
-      mbInv.signaturesValid match {
+      mbInv.signaturesValid() match {
         case Left(err) => peerDatabase.blacklistAndClose(ctx.channel(), err.toString)
         case Right(_) =>
           log.trace(s"${id(ctx)} Received $msg")
