@@ -116,7 +116,7 @@ class UtxPool(time: Time,
       .sorted(TransactionsOrdering.InUTXPool)
       .foldLeft((Seq.empty[ByteStr], Seq.empty[Transaction], Monoid[Diff].empty)) {
         case ((invalid, valid, diff), tx) if valid.size <= max =>
-          differ(composite(s, diff.asBlockDiff), tx) match {
+          differ(composite(diff.asBlockDiff, s), tx) match {
             case Right(newDiff) if valid.size < max =>
               (invalid, tx +: valid, Monoid.combine(diff, newDiff))
             case Right(_) =>
