@@ -5,13 +5,15 @@ import scala.collection.JavaConverters._
 
 import com.google.common.cache.CacheBuilder
 
-class ExpirationSet[T](expirationTimeMilis: Long) extends scala.collection.mutable.Set[T]{
+class ExpirationSet[T <: Object](expirationTimeMilis: Long) extends scala.collection.mutable.Set[T]{
+  private val emptyItem = new Object()
+
   private var inner =  CacheBuilder.newBuilder()
     .expireAfterWrite(expirationTimeMilis, TimeUnit.MILLISECONDS)
-    .build[T, Boolean]()
+    .build[T, Object]()
 
   override def +=(elem: T): ExpirationSet.this.type = {
-    inner.put(elem, true)
+    inner.put(elem, emptyItem)
     this
   }
 
