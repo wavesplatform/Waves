@@ -29,7 +29,7 @@ class ValidChainGenerationSuite extends FreeSpec with IntegrationNodesInitializa
 
       rollbackNodes.foreach(_.rollback(1))
       val synchronizedBlocks = result(for {
-        _ <- traverse(nodes)(_.waitForHeight(targetHeight))
+        _ <- traverse(nodes)(_.waitForHeight(targetHeight + 5))
         blocks <- traverse(nodes)(_.blockAt(initialHeight))
       } yield blocks, 5.minutes)
 
