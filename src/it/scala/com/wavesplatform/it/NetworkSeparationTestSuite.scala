@@ -12,11 +12,11 @@ class NetworkSeparationTestSuite extends FreeSpec with Matchers with Integration
 
   override val nodes: Seq[Node] = docker.startNodes(NodeConfigs.forTest(3, 1 -> "waves.miner.quorum = 0"))
 
-  "node should grow up to 10 blocks together" in Await.result(richestNode.map(_.waitForHeight(10)), 5.minutes)
+  "node should grow up to 10 blocks together" in Await.result(richestNode.flatMap(_.waitForHeight(10)), 5.minutes)
 
   "then we disconnect nodes from the network" in nodes.foreach(docker.disconnectFromNetwork)
 
-  "and wait for another 10 blocks on one node" in Await.result(richestNode.map(_.waitForHeight(20)), 5.minutes)
+  "and wait for another 10 blocks on one node" in Await.result(richestNode.flatMap(_.waitForHeight(20)), 5.minutes)
 
   "after that we connect nodes back to the network" in nodes.foreach(docker.connectToNetwork)
 

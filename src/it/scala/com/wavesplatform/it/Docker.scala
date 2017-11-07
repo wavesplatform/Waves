@@ -158,7 +158,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
       nodes.asScala.foreach { node =>
         node.close()
         client.stopContainer(node.nodeInfo.containerId, 0)
-        saveLog(client, node)
+        saveLog(node)
         client.removeContainer(node.nodeInfo.containerId, RemoveContainerParam.forceKill())
       }
 
@@ -168,7 +168,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
     }
   }
 
-  private def saveLog(client: DockerClient, node: Node): Unit = {
+  private def saveLog(node: Node): Unit = {
     val logDir = Paths.get(System.getProperty("user.dir"), "target", "logs")
     Files.createDirectories(logDir)
     import node.nodeInfo.containerId
