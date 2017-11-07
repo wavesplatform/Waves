@@ -3,7 +3,7 @@ package com.wavesplatform.it
 import java.io.FileOutputStream
 import java.nio.file.{Files, Paths}
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.{Collections, Properties, List => JList, Map => JMap}
 
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -44,15 +44,17 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
 
   private val client = DefaultDockerClient.fromEnv().build()
 
-  private val nodes = new ConcurrentHashMap[String, Node]
-  private val seedAddress = new AtomicReference[String](null)
+  private val nodes = ConcurrentHashMap.newKeySet[Node]()
+  private val seedAddress = ConcurrentHashMap.newKeySet[String]()
   private val isStopped = new AtomicBoolean(false)
 
   sys.addShutdownHook {
     close()
   }
 
-  private def knownPeers = Option(seedAddress.get()).fold("")(sa => s"-Dwaves.network.known-peers.0=$sa")
+  private def knownPeers = seedAddress.asScala.zipWithIndex
+    .map { case (seed, i) => s"-Dwaves.network.known-peers.$i=$seed" }
+    .mkString(" ")
 
   private val networkName = "waves" + this.##.toLong.toHexString
 
@@ -68,11 +70,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
       network match {
         case Some(n) => n.id()
         case None =>
-          val r = client.createNetwork(NetworkConfig.builder()
-            .name(networkName)
-            .driver("bridge")
-            .checkDuplicate(true)
-            .build())
+          val r = client.createNetwork(NetworkConfig.builder().name(networkName).driver("bridge").checkDuplicate(true).build())
           Option(r.warnings()).foreach(log.warn(_))
           attempt(rest - 1)
       }
@@ -147,17 +145,17 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
       containerInfo.networkSettings().networks().asScala(networkName).ipAddress(),
       containerId,
       extractHostPort(ports, matcherApiPort))
-    seedAddress.compareAndSet(null, s"${nodeInfo.networkIpAddress}:${nodeInfo.containerNetworkPort}")
+    seedAddress.add(s"${nodeInfo.networkIpAddress}:${nodeInfo.containerNetworkPort}")
 
     val node = new Node(actualConfig, nodeInfo, http)
-    nodes.put(containerId, node)
+    nodes.add(node)
     node
   }
 
   override def close(): Unit = {
     if (isStopped.compareAndSet(false, true)) {
       log.info("Stopping containers")
-      nodes.values().asScala.foreach { node =>
+      nodes.asScala.foreach { node =>
         node.close()
         client.stopContainer(node.nodeInfo.containerId, 0)
         saveLog(client, node)

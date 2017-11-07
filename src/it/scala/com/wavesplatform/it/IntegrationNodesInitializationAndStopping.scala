@@ -9,8 +9,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 trait IntegrationNodesInitializationAndStopping extends BeforeAndAfterAll with ScorexLogging with ReportingTestName {
   this: Suite =>
-  def docker: Docker = Docker(getClass)
-
+  val docker: Docker = Docker(getClass)
   def nodes: Seq[Node]
 
   abstract override def beforeAll(): Unit = {
