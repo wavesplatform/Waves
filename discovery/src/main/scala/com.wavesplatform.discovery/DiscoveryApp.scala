@@ -15,7 +15,6 @@ import scorex.utils.ScorexLogging
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.FiniteDuration
-import scala.io.StdIn
 
 object DiscoveryApp extends App with ScorexLogging {
 
@@ -49,10 +48,12 @@ object DiscoveryApp extends App with ScorexLogging {
 
   val binding = Http().bindAndHandle(route, Settings.default.webSocketHost, Settings.default.webSocketPort)
 
-  log.info(s"Server is now online at http://${Settings.default.webSocketHost}:${Settings.default.webSocketPort}\nPress RETURN to stop...")
-  StdIn.readLine()
-  binding.flatMap(_.unbind()).onComplete(_ => {
-    timer.cancel()
-    system.terminate()
-  })
+  sys.addShutdownHook {
+    binding.flatMap(_.unbind()).onComplete(_ => {
+      timer.cancel()
+      system.terminate()
+    })
+  }
+
+  log.info(s"Server is now online at http://${Settings.default.webSocketHost}:${Settings.default.webSocketPort}")
 }
