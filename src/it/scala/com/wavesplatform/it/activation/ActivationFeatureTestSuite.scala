@@ -11,14 +11,12 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.util.Random
 
-
 class ActivationFeatureTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with CancelAfterFailure with ActivationStatusRequest {
 
   import ActivationFeatureTestSuite._
 
   private val docker = Docker(getClass)
   private val nodes: Seq[Node] = docker.startNodes(Configs)
-
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
@@ -30,11 +28,13 @@ class ActivationFeatureTestSuite extends FreeSpec with Matchers with BeforeAndAf
     docker.close()
   }
 
+  "wait nodes are synchronized" in waitForSync(nodes, votingInterval / 3, votingInterval / 4)
 
   "supported blocks increased when voting starts" in {
     val checkHeight: Int = votingInterval * 2 / 3
 
     val activationStatusWhileVoting = activationStatus(nodes.head, checkHeight, featureNum, 2.minute)
+    val activationStatusIntervalLastVotingBlock = activationStatus(nodes.head, votingInterval, featureNum, 3.minute)
 
     val generatedBlocks = Await.result(nodes.head.blockSeq(1, checkHeight), 3.minute)
     val featuresMapInGeneratedBlocks = generatedBlocks.flatMap(b => b.features.getOrElse(Seq.empty)).groupBy(x => x)
@@ -43,13 +43,9 @@ class ActivationFeatureTestSuite extends FreeSpec with Matchers with BeforeAndAf
     assertVotingStatus(activationStatusWhileVoting, votesForFeature1,
       BlockchainFeatureStatus.Undefined, NodeFeatureStatus.Voted)
 
-    val activationStatusIntervalLastVotingBlock = activationStatus(nodes.head, votingInterval, featureNum, 3.minute)
     assertVotingStatus(activationStatusIntervalLastVotingBlock, blocksForActivation - 1,
       BlockchainFeatureStatus.Undefined, NodeFeatureStatus.Voted)
-
-
   }
-
 
   "supported blocks counter resets on the next voting interval" in {
     val checkHeight: Int = votingInterval * 2 - blocksForActivation / 2
@@ -60,7 +56,6 @@ class ActivationFeatureTestSuite extends FreeSpec with Matchers with BeforeAndAf
   }
 
   "blockchain status is APPROVED in second voting interval" in {
-
     val checkHeight: Int = votingInterval * 2
     val activationStatusInfo = activationStatus(nodes.last, checkHeight, featureNum, 3.minute)
 
@@ -78,26 +73,22 @@ class ActivationFeatureTestSuite extends FreeSpec with Matchers with BeforeAndAf
   object ActivationFeatureTestSuite {
 
     val votingInterval = 12
-    val blocksForActivation = 12 //should be even
+    val blocksForActivation = 12 // should be even
     val featureNum: Short = 1
 
     private val supportedNodes = ConfigFactory.parseString(
-      s"""
-         |waves.features{
-         |   supported=[$featureNum]
-         |}
-         |waves.blockchain.custom.functionality.feature-check-blocks-period = $votingInterval
-         |waves.blockchain.custom.functionality.blocks-for-feature-activation = $blocksForActivation
-         |waves {
-         |   blockchain {
-         |     custom {
-         |      functionality{
-         |       pre-activated-features = {}
+      s"""waves {
+         |  blockchain {
+         |    custom {
+         |      functionality {
+         |        pre-activated-features = {}
+         |        feature-check-blocks-period = $votingInterval
+         |        blocks-for-feature-activation = $blocksForActivation
          |      }
-         |     }
-         |   }
-         |}
-      """.stripMargin
+         |    }
+         |  }
+         |  features.supported = [$featureNum]
+         |}""".stripMargin
     )
 
 

@@ -29,18 +29,14 @@ class VoteForFeatureByDefaultTestSuite extends FreeSpec with Matchers with Befor
     docker.close()
   }
 
-  "wait nodes are synchronized" in Await.result(
-    for {
-      _ <- Future.traverse(nodes)(_.waitForHeight(votingInterval / 2))
-      blocks <- Future.traverse(nodes)(_.blockAt(votingInterval / 3))
-    } yield all(blocks.map(_.signature)) shouldBe blocks.head.signature,
-    5.minutes
-  )
+  "wait nodes are synchronized" in waitForSync(nodes, votingInterval / 3, votingInterval / 4)
 
   "supported blocks increased when voting starts, one node votes against, three by default" in {
     val checkHeight: Int = votingInterval * 2 / 3
-    val supportedNodeActivationInfo = activationStatus(nodes.last, checkHeight, defaultVotingFeatureNum, 4.minute)
-    val nonSupportedNodeActivationInfo = activationStatus(nodes.head, checkHeight, defaultVotingFeatureNum, 4.minute)
+
+    val activationInfo = activationStatus(Seq(nodes.last, nodes.head), checkHeight, defaultVotingFeatureNum, 4.minute)
+    val supportedNodeActivationInfo = activationInfo(nodes.last)
+    val nonSupportedNodeActivationInfo = activationInfo(nodes.head)
 
     val generatedBlocks = Await.result(nodes.last.blockSeq(1, checkHeight), 2.minute)
     val featuresMapInGeneratedBlocks = generatedBlocks.flatMap(b => b.features.getOrElse(Seq.empty)).groupBy(x => x)
