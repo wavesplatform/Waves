@@ -1,26 +1,26 @@
 package com.wavesplatform.discovery.collections
 
-class ExpirationSet[T](expirationTimeMilis: Long) extends scala.collection.mutable.Set[T]{
-  private var inner = Map.empty[T, Long]
-  private def freshInner = {
-    val time = System.currentTimeMillis()
-    inner = inner.filter({ case (k, v) =>
-      time - v > expirationTimeMilis })
+import java.util.concurrent.TimeUnit
+import scala.collection.JavaConverters._
 
-    inner
-  }
+import com.google.common.cache.CacheBuilder
+
+class ExpirationSet[T](expirationTimeMilis: Long) extends scala.collection.mutable.Set[T]{
+  private var inner =  CacheBuilder.newBuilder()
+    .expireAfterWrite(expirationTimeMilis, TimeUnit.MILLISECONDS)
+    .build[T, Boolean]()
 
   override def +=(elem: T): ExpirationSet.this.type = {
-    inner += ((elem, System.currentTimeMillis()))
+    inner.put(elem, true)
     this
   }
 
   override def -=(elem: T): ExpirationSet.this.type = {
-    inner = inner.-(elem)
+    inner.invalidate(elem)
     this
   }
 
-  override def contains(elem: T): Boolean = freshInner.contains(elem)
+  override def contains(elem: T): Boolean = inner.asMap().containsKey(elem)
 
-  override def iterator: Iterator[T] = freshInner.keys.iterator
+  override def iterator: Iterator[T] = inner.asMap().keySet().iterator().asScala
 }
