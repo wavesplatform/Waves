@@ -8,7 +8,6 @@ import com.wavesplatform.metrics.Instrumented
 import com.wavesplatform.state2.reader.StateReaderImpl
 import monix.eval.Task
 import monix.execution.Scheduler
-//import monix.execution.schedulers.SchedulerService
 import scorex.transaction.PaymentTransaction
 import scorex.transaction.assets.TransferTransaction
 import scorex.transaction.assets.exchange.ExchangeTransaction
@@ -25,11 +24,6 @@ trait StateWriter {
 
 class StateWriterImpl(p: StateStorage, storeTransactions: Boolean, synchronizationToken: ReentrantReadWriteLock)
   extends StateReaderImpl(p, synchronizationToken) with StateWriter with AutoCloseable with ScorexLogging with Instrumented {
-
-//  private implicit val scheduler: SchedulerService = monix.execution.Scheduler.fixedPool(name = "state-writer",
-//    poolSize = Runtime.getRuntime.availableProcessors(),
-//    reporter = com.wavesplatform.utils.UncaughtExceptionsToLogReporter)
-//  import StateWriter._
 
   import StateStorage._
 
@@ -138,11 +132,5 @@ class StateWriterImpl(p: StateStorage, storeTransactions: Boolean, synchronizati
     sp().lastBalanceSnapshotHeight.clear()
     sp().setHeight(0)
     sp().commit(compact = true)
-  }
-}
-
-object StateWriter {
-  def par[A, B](seq: Seq[A])(f: A => B)(implicit s: Scheduler): Seq[B] = {
-    Await.result(Task.wanderUnordered(seq)(a => Task(f(a))).runAsync, Duration.Inf)
   }
 }
