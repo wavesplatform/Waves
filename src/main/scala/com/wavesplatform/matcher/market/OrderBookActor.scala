@@ -106,7 +106,7 @@ class OrderBookActor(assetPair: AssetPair,
     orderBook.asks.values.++(orderBook.bids.values).flatten.filterNot(x => {
       val validation = x.order.isValid(ts)
       validation
-    }).map(_.order.idStr).foreach(x => handleValidateCancelResult(Right(x)))
+    }).map(_.order.idStr()).foreach(x => handleValidateCancelResult(Right(x)))
   }
 
   private def handleValidateCancelResult(res: Either[GenericError, String]): Unit = {
@@ -150,7 +150,7 @@ class OrderBookActor(assetPair: AssetPair,
         log.debug(s"Order rejected: $err.err")
         apiSender.foreach(_ ! OrderRejected(err.err))
       case Right(o) =>
-        log.debug(s"Order accepted: ${o.idStr}, trying to match ...")
+        log.debug(s"Order accepted: ${o.idStr()}, trying to match ...")
         apiSender.foreach(_ ! OrderAccepted(o))
         matchOrder(LimitOrder(o))
     }
@@ -229,7 +229,7 @@ class OrderBookActor(assetPair: AssetPair,
               Some(o.partial(event.submittedRemaining))
             else None
           case Left(ex) =>
-            log.info("Can't create tx for o1: " + Json.prettyPrint(o.order.json) + "\n, o2: " + Json.prettyPrint(c.order.json))
+            log.info("Can't create tx for o1: " + Json.prettyPrint(o.order.json()) + "\n, o2: " + Json.prettyPrint(c.order.json()))
             processInvalidTransaction(event, ex)
         }
       case _ => None
@@ -294,7 +294,7 @@ object OrderBookActor {
   case object OrderCleanup
 
   case class OrderAccepted(order: Order) extends MatcherResponse {
-    val json = Json.obj("status" -> "OrderAccepted", "message" -> order.json)
+    val json = Json.obj("status" -> "OrderAccepted", "message" -> order.json())
     val code = StatusCodes.OK
   }
 

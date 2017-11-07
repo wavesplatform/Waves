@@ -46,14 +46,13 @@ case class TransferTransaction private(assetId: Option[AssetId],
       BytesSerializable.arrayWithSize(attachment))
   }
 
-
-  override lazy val json: JsObject = jsonBase() ++ Json.obj(
+  override val json: Coeval[JsObject] = Coeval.evalOnce(jsonBase() ++ Json.obj(
     "recipient" -> recipient.stringRepr,
     "assetId" -> assetId.map(_.base58),
     "amount" -> amount,
     "feeAsset" -> feeAssetId.map(_.base58),
     "attachment" -> Base58.encode(attachment)
-  )
+  ))
 
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(transactionType.id.toByte), signature.arr, toSign()))
 

@@ -264,7 +264,7 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
 
       within(10.seconds) {
         actor ! GetOrdersRequest
-        expectMsgType[GetOrdersResponse].orders.map(_.order.id) should have size 100
+        expectMsgType[GetOrdersResponse].orders.map(_.order.id()) should have size 100
       }
 
     }
@@ -362,7 +362,7 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
       receiveN(1)
       getOrders(actor) shouldEqual Seq(BuyLimitOrder(price * Order.PriceConstant, amount, expiredOrder))
       actor ! OrderCleanup
-      expectMsg(OrderCanceled(expiredOrder.idStr))
+      expectMsg(OrderCanceled(expiredOrder.idStr()))
       getOrders(actor).size should be(0)
     }
 

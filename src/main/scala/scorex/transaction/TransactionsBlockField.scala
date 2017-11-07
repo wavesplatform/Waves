@@ -5,7 +5,6 @@ import java.nio.ByteBuffer
 
 import com.google.common.primitives.{Bytes, Ints}
 import com.wavesplatform.network.TransactionMessageSpec
-import monix.eval.Coeval
 import play.api.libs.json.{JsArray, JsObject, Json}
 import scorex.block.{Block, BlockField}
 
@@ -33,9 +32,9 @@ object TransactionsBlockField {
 case class TransactionsBlockFieldVersion1or2(override val value: Seq[Transaction]) extends TransactionsBlockField {
   override val name = "transactions"
 
-  override lazy val json: JsObject = Json.obj(name -> JsArray(value.map(_.json)))
+  override def j: JsObject = Json.obj(name -> JsArray(value.map(_.json())))
 
-  override val bytes  = Coeval.evalOnce {
+  override def b = {
     val txCount = value.size.ensuring(_ <= Block.MaxTransactionsPerBlockVer1Ver2).toByte
     TransactionsBlockField.serTxs(value, Array(txCount))
   }
@@ -44,9 +43,9 @@ case class TransactionsBlockFieldVersion1or2(override val value: Seq[Transaction
 case class TransactionsBlockFieldVersion3(override val value: Seq[Transaction]) extends TransactionsBlockField {
   override val name = "transactions"
 
-  override lazy val json: JsObject = Json.obj(name -> JsArray(value.map(_.json)))
+  override def j: JsObject = Json.obj(name -> JsArray(value.map(_.json())))
 
-  override val bytes  = Coeval.evalOnce {
+  override def b = {
     val txCount = value.size.ensuring(_ <= Block.MaxTransactionsPerBlockVer3)
     val bb = ByteBuffer.allocate(4)
     TransactionsBlockField.serTxs(value, bb.putInt(txCount).array)

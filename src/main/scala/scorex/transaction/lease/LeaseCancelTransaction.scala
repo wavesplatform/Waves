@@ -28,11 +28,11 @@ case class LeaseCancelTransaction private(sender: PublicKeyAccount,
     Longs.toByteArray(timestamp),
     leaseId.arr))
 
-  override lazy val json: JsObject = jsonBase() ++ Json.obj(
+  override val json: Coeval[JsObject] = Coeval.evalOnce(jsonBase() ++ Json.obj(
     "fee" -> fee,
     "timestamp" -> timestamp,
     "leaseId" -> leaseId.base58
-  )
+  ))
 
   override val assetFee: (Option[AssetId], Long) = (None, fee)
   override val bytes = Coeval.evalOnce(Bytes.concat(toSign(), signature.arr))

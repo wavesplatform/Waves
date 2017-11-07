@@ -38,14 +38,14 @@ case class IssueTransaction private(sender: PublicKeyAccount,
     Longs.toByteArray(fee),
     Longs.toByteArray(timestamp)))
 
-  override lazy val json: JsObject = jsonBase() ++ Json.obj(
+  override val json: Coeval[JsObject] = Coeval.evalOnce(jsonBase() ++ Json.obj(
     "assetId" -> assetId().base58,
     "name" -> new String(name, Charsets.UTF_8),
     "description" -> new String(description, Charsets.UTF_8),
     "quantity" -> quantity,
     "decimals" -> decimals,
     "reissuable" -> reissuable
-  )
+  ))
 
   override val bytes = Coeval(Bytes.concat(Array(transactionType.id.toByte), signature.arr, toSign()))
 

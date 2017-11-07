@@ -21,18 +21,20 @@ case class BurnTransaction private(sender: PublicKeyAccount,
 
   override val transactionType: TransactionType.Value = TransactionType.BurnTransaction
 
-  override val toSign: Coeval[Array[Byte]] =Coeval.evalOnce(Bytes.concat(Array(transactionType.id.toByte),
+  override val toSign: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(transactionType.id.toByte),
     sender.publicKey,
     assetId.arr,
     Longs.toByteArray(amount),
     Longs.toByteArray(fee),
     Longs.toByteArray(timestamp)))
 
-  override lazy val json: JsObject = jsonBase() ++ Json.obj(
-    "assetId" -> assetId.base58,
-    "amount" -> amount,
-    "fee" -> fee
-  )
+  override val json: Coeval[JsObject] = Coeval.evalOnce {
+    jsonBase() ++ Json.obj(
+      "assetId" -> assetId.base58,
+      "amount" -> amount,
+      "fee" -> fee
+    )
+  }
 
   override val assetFee: (Option[AssetId], Long) = (None, fee)
 

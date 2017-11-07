@@ -86,7 +86,7 @@ class TransactionsRouteSpec extends RouteSpec("/transactions")
         (state.transactionInfo _).expects(tx.id()).returning(Some((height, tx))).once()
         Get(routePath(s"/info/${tx.id().base58}")) ~> route ~> check {
           status shouldEqual StatusCodes.OK
-          responseAs[JsValue] shouldEqual tx.json + ("height" -> JsNumber(height))
+          responseAs[JsValue] shouldEqual tx.json() + ("height" -> JsNumber(height))
         }
       }
     }
@@ -143,7 +143,7 @@ class TransactionsRouteSpec extends RouteSpec("/transactions")
         (utx.transactionById _).expects(tx.id()).returns(Some(tx)).once()
         Get(routePath(s"/unconfirmed/info/${tx.id().base58}")) ~> route ~> check {
           status shouldEqual StatusCodes.OK
-          responseAs[JsValue] shouldEqual tx.json
+          responseAs[JsValue] shouldEqual tx.json()
         }
       }
     }

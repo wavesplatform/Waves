@@ -24,7 +24,7 @@ case class ExchangeTransaction private(buyOrder: Order, sellOrder: Order, price:
   @ApiModelProperty(hidden = true)
   override val sender: PublicKeyAccount = buyOrder.matcherPublicKey
 
-  lazy val toSign: Coeval[Array[Byte]] = Coeval.evalOnce(Array(transactionType.id.toByte) ++
+  override val toSign: Coeval[Array[Byte]] = Coeval.evalOnce(Array(transactionType.id.toByte) ++
     Ints.toByteArray(buyOrder.bytes().length) ++ Ints.toByteArray(sellOrder.bytes().length) ++
     buyOrder.bytes() ++ sellOrder.bytes() ++ Longs.toByteArray(price) ++ Longs.toByteArray(amount) ++
     Longs.toByteArray(buyMatcherFee) ++ Longs.toByteArray(sellMatcherFee) ++ Longs.toByteArray(fee) ++
@@ -32,14 +32,14 @@ case class ExchangeTransaction private(buyOrder: Order, sellOrder: Order, price:
 
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(toSign() ++ signature.arr)
 
-  override def json: JsObject = jsonBase() ++ Json.obj(
-    "order1" -> buyOrder.json,
-    "order2" -> sellOrder.json,
+  override val json: Coeval[JsObject] = Coeval.evalOnce(jsonBase() ++ Json.obj(
+    "order1" -> buyOrder.json(),
+    "order2" -> sellOrder.json(),
     "price" -> price,
     "amount" -> amount,
     "buyMatcherFee" -> buyMatcherFee,
     "sellMatcherFee" -> sellMatcherFee
-  )
+  ))
 
   override val signedDescendants: Coeval[Seq[Order]] = Coeval.evalOnce(Seq(buyOrder, sellOrder))
 }

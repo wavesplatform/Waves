@@ -31,11 +31,11 @@ case class CreateAliasTransaction private(sender: PublicKeyAccount,
     Longs.toByteArray(fee),
     Longs.toByteArray(timestamp)))
 
-  override lazy val json: JsObject = jsonBase() ++ Json.obj(
+  override val json: Coeval[JsObject] = Coeval.evalOnce(jsonBase() ++ Json.obj(
     "alias" -> alias.name,
     "fee" -> fee,
     "timestamp" -> timestamp
-  )
+  ))
 
   override val assetFee: (Option[AssetId], Long) = (None, fee)
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(toSign(), signature.arr))

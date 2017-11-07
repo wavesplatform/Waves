@@ -17,7 +17,7 @@ trait Transaction extends BytesSerializable with JsonSerializable with Signed {
   val assetFee: (Option[AssetId], Long)
   val timestamp: Long
 
-  override def toString: String = json.toString()
+  override def toString: String = json().toString()
 
   override def equals(other: Any): Boolean = other match {
     case tx: Transaction => id() == tx.id()

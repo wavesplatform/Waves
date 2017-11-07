@@ -4,7 +4,6 @@ import com.google.common.primitives.{Bytes, Ints}
 import com.wavesplatform.mining.Miner.MaxTransactionsPerMicroblock
 import com.wavesplatform.state2._
 import monix.eval.Coeval
-import play.api.libs.json.{JsObject, Json}
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.block.Block.{BlockId, transParseBytes}
 import scorex.crypto.EllipticCurveImpl
@@ -24,16 +23,6 @@ case class MicroBlock private(version: Byte, generator: PublicKeyAccount, transa
   private val signerDataField: SignerDataBlockField = SignerDataBlockField("signature", SignerData(generator, signature))
   private val transactionDataField = TransactionsBlockField(version.toInt, transactionData)
 
-  lazy val json: JsObject =
-    versionField.json ++
-      prevResBlockSigField.json ++
-      totalResBlockSigField.json ++
-      transactionDataField.json ++
-      signerDataField.json ++
-      Json.obj(
-        "blocksize" -> bytes().length
-      )
-
   val bytes: Coeval[Array[Byte]] = Coeval.evalOnce {
     val txBytesSize = transactionDataField.bytes().length
     val txBytes = Bytes.ensureCapacity(Ints.toByteArray(txBytesSize), 4, 0) ++ transactionDataField.bytes()
@@ -45,9 +34,9 @@ case class MicroBlock private(version: Byte, generator: PublicKeyAccount, transa
       signerDataField.bytes()
   }
 
-  private def bytesWithoutSignature: Array[Byte] = bytes().dropRight(SignatureLength)
+  private val bytesWithoutSignature: Coeval[Array[Byte]] =Coeval.evalOnce(bytes().dropRight(SignatureLength))
 
-  override val signatureValid: Coeval[Boolean] = Coeval.evalOnce(EllipticCurveImpl.verify(signature.arr, bytesWithoutSignature, generator.publicKey))
+  override val signatureValid: Coeval[Boolean] = Coeval.evalOnce(EllipticCurveImpl.verify(signature.arr, bytesWithoutSignature(), generator.publicKey))
   override val signedDescendants: Coeval[Seq[Signed]] = Coeval.evalOnce(transactionData)
 
   override def toString: String = s"MicroBlock(${totalResBlockSig.trim} ~> ${prevResBlockSig.trim}, txs=${transactionData.size})"

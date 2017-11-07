@@ -29,11 +29,11 @@ case class ReissueTransaction private(sender: PublicKeyAccount,
     Longs.toByteArray(fee),
     Longs.toByteArray(timestamp)))
 
-  override lazy val json: JsObject = jsonBase() ++ Json.obj(
+  override val json: Coeval[JsObject] = Coeval.evalOnce(jsonBase() ++ Json.obj(
     "assetId" -> assetId.base58,
     "quantity" -> quantity,
     "reissuable" -> reissuable
-  )
+  ))
 
   override val assetFee: (Option[AssetId], Long) = (None, fee)
 

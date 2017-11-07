@@ -27,7 +27,7 @@ class NgHistoryReader(ngState: () => Option[NgState], inner: History with Featur
   override def scoreOf(blockId: BlockId): Option[BlockchainScore] = read { implicit l =>
     inner.scoreOf(blockId)
       .orElse(ngState() match {
-        case Some(ng) if ng.contains(blockId) => Some(inner.score() + ng.base.blockScore)
+        case Some(ng) if ng.contains(blockId) => Some(inner.score() + ng.base.blockScore())
         case _ => None
       })
   }

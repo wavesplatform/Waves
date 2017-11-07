@@ -26,7 +26,7 @@ case class PaymentTransaction private(sender: PublicKeyAccount,
   override val assetFee: (Option[AssetId], Long) = (None, fee)
   override val id = Coeval(signature)
 
-  override lazy val json: JsObject =
+  override val json: Coeval[JsObject] = Coeval.evalOnce(
     Json.obj("type" -> transactionType.id,
       "id" -> id().base58,
       "fee" -> fee,
@@ -35,7 +35,7 @@ case class PaymentTransaction private(sender: PublicKeyAccount,
       "sender" -> sender.address,
       "senderPublicKey" -> Base58.encode(sender.publicKey),
       "recipient" -> recipient.address,
-      "amount" -> amount)
+      "amount" -> amount))
 
   private val hashBytes: Coeval[Array[Byte]] = Coeval.evalOnce {
     val timestampBytes = Longs.toByteArray(timestamp)

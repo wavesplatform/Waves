@@ -49,8 +49,8 @@ class MatcherTransactionWriter(val settings: MatcherSettings)
   private def saveExchangeTx(tx: ExchangeTransaction) = {
       val txId = tx.id().toString
       transactions.put(txId, tx.bytes())
-      saveOrder2TxId(tx.buyOrder.idStr, txId)
-      saveOrder2TxId(tx.sellOrder.idStr, txId)
+      saveOrder2TxId(tx.buyOrder.idStr(), txId)
+      saveOrder2TxId(tx.sellOrder.idStr(), txId)
   }
 }
 
@@ -60,7 +60,7 @@ object MatcherTransactionWriter {
 
   case class GetTransactionsByOrder(orderId: String)
   case class GetTransactionsResponse(txs: Seq[ExchangeTransaction]) extends MatcherResponse {
-    val json = JsArray(txs.map(_.json))
+    val json = JsArray(txs.map(_.json()))
     val code = StatusCodes.OK
   }
 }

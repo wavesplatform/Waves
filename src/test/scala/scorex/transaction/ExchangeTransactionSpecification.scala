@@ -15,7 +15,7 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
     forAll(exchangeTransactionGen) { om =>
       val recovered = ExchangeTransaction.parseBytes(om.bytes()).get
       om.id() shouldBe recovered.id()
-      om.buyOrder.id shouldBe recovered.buyOrder.id
+      om.buyOrder.id() shouldBe recovered.buyOrder.id()
       recovered.bytes() shouldEqual om.bytes()
     }
   }

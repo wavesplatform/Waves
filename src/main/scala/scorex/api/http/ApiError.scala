@@ -153,7 +153,7 @@ case class StateCheckFailed(tx: Transaction, err: String) extends ApiError {
   override val id: Int = 112
   override val message: String = s"State check failed. Reason: $err"
   override val code: StatusCode = StatusCodes.BadRequest
-  override lazy val json = Json.obj("error" -> id, "message" -> message, "tx" -> tx.json)
+  override lazy val json = Json.obj("error" -> id, "message" -> message, "tx" -> tx.json())
 }
 
 case object OverflowError extends ApiError {

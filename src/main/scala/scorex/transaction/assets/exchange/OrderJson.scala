@@ -78,6 +78,6 @@ object OrderJson {
     r(readOrder _)
   }
 
-  implicit val orderFormat: Format[Order] = Format(orderReads, Writes[Order](_.json))
+  implicit val orderFormat: Format[Order] = Format(orderReads, Writes[Order](_.json()))
 
 }

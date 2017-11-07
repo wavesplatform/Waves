@@ -72,7 +72,7 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
 
   import Order._
 
-  val signatureValid =Coeval.evalOnce(EllipticCurveImpl.verify(signature, toSign, senderPublicKey.publicKey))
+  val signatureValid = Coeval.evalOnce(EllipticCurveImpl.verify(signature, toSign, senderPublicKey.publicKey))
 
   def isValid(atTime: Long): Validation = {
     isValidAmount(price, amount) &&
@@ -101,12 +101,13 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
     Longs.toByteArray(matcherFee)
 
   @ApiModelProperty(hidden = true)
-  lazy val id: Array[Byte] = FastCryptographicHash(toSign)
+  val id: Coeval[Array[Byte]] = Coeval.evalOnce(FastCryptographicHash(toSign))
 
   @ApiModelProperty(hidden = true)
-  lazy val idStr: String = Base58.encode(id)
+  val idStr: Coeval[String] = Coeval.evalOnce(Base58.encode(id()))
 
-  val bytes = Coeval.evalOnce(toSign ++ signature)
+  @ApiModelProperty(hidden = true)
+  val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(toSign ++ signature)
 
   @ApiModelProperty(hidden = true)
   def getReceiveAssetId: Option[AssetId] = orderType match {
@@ -139,8 +140,8 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
     }
   }.toEither.left.map(x => GenericError(x.getMessage))
 
-  override def json: JsObject = Json.obj(
-    "id" -> Base58.encode(id),
+  override val json: Coeval[JsObject] = Coeval.evalOnce(Json.obj(
+    "id" -> Base58.encode(id()),
     "senderPublicKey" -> Base58.encode(senderPublicKey.publicKey),
     "matcherPublicKey" -> Base58.encode(matcherPublicKey.publicKey),
     "assetPair" -> assetPair.json,
@@ -151,9 +152,9 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
     "expiration" -> expiration,
     "matcherFee" -> matcherFee,
     "signature" -> Base58.encode(signature)
-  )
+  ))
 
-  def jsonStr: String = Json.stringify(json)
+  def jsonStr: String = Json.stringify(json())
 
   override def canEqual(that: Any): Boolean = that.isInstanceOf[Order]
 

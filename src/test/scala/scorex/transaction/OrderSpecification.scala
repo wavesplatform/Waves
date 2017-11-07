@@ -16,7 +16,7 @@ class OrderSpecification extends PropSpec with PropertyChecks with Matchers with
     forAll(orderGen) { order =>
       val recovered = Order.parseBytes(order.bytes()).get
       recovered.bytes() shouldEqual order.bytes()
-      recovered.id shouldBe order.id
+      recovered.id() shouldBe order.id()
       recovered.senderPublicKey.publicKey shouldBe order.senderPublicKey.publicKey
       recovered.matcherPublicKey shouldBe order.matcherPublicKey
       recovered.assetPair shouldBe order.assetPair

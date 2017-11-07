@@ -15,7 +15,7 @@ import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.hash.FastCryptographicHash.DigestSize
 import scorex.transaction.TransactionParser._
 import scorex.transaction.ValidationError.GenericError
-import scorex.transaction.{AssetAcc, _}
+import scorex.transaction._
 import scorex.utils.ScorexLogging
 
 import scala.util.{Failure, Try}
@@ -40,30 +40,23 @@ case class Block(timestamp: Long,
 
   val uniqueId: ByteStr = signerData.signature
 
-  lazy val fee: Long =
-    transactionData.map(_.assetFee)
-      .map(a => AssetAcc(signerData.generator, a._1) -> a._2)
-      .groupBy(a => a._1)
-      .mapValues(_.map(_._2).sum)
-      .values.sum
-
-  private lazy val jsonWithoutTransactionsPayload: JsObject =
-    versionField.json ++
-      timestampField.json ++
-      referenceField.json ++
-      consensusField.json ++
-      supportedFeaturesField.json ++
-      signerField.json ++
+  private val jsonWithoutTransactionsPayload = Coeval.evalOnce(
+    versionField.json() ++
+      timestampField.json() ++
+      referenceField.json() ++
+      consensusField.json() ++
+      supportedFeaturesField.json() ++
+      signerField.json() ++
       Json.obj(
-        "fee" -> fee,
+        "fee" -> 0,
         "blocksize" -> bytes().length,
         "transactionsCount" -> transactionField.value.size
-      )
+      ))
 
   def json(includeTransactions: Boolean): JsObject =
-    jsonWithoutTransactionsPayload ++ (if (includeTransactions) transactionField.json else JsObject.empty)
+    jsonWithoutTransactionsPayload() ++ (if (includeTransactions) transactionField.json() else JsObject.empty)
 
-  val bytes: Coeval[Array[Byte]] =Coeval.evalOnce {
+  val bytes: Coeval[Array[Byte]] = Coeval.evalOnce {
     val txBytesSize = transactionField.bytes().length
     val txBytes = Bytes.ensureCapacity(Ints.toByteArray(txBytesSize), 4, 0) ++ transactionField.bytes()
 
@@ -73,18 +66,17 @@ case class Block(timestamp: Long,
     versionField.bytes() ++
       timestampField.bytes() ++
       referenceField.bytes() ++
-      cBytes++
+      cBytes ++
       txBytes ++
       supportedFeaturesField.bytes() ++
       signerField.bytes()
   }
 
-  val bytesWithoutSignature: Coeval[Array[Byte]] =Coeval.evalOnce(bytes().dropRight(SignatureLength))
+  val bytesWithoutSignature: Coeval[Array[Byte]] = Coeval.evalOnce(bytes().dropRight(SignatureLength))
 
-  lazy val blockScore: BigInt = (BigInt("18446744073709551616") / consensusData.baseTarget)
-    .ensuring(_ > 0) // until we make smart-constructor validate consensusData.baseTarget to be positive
+  val blockScore: Coeval[BigInt] = Coeval.evalOnce((BigInt("18446744073709551616") / consensusData.baseTarget).ensuring(_ > 0))
 
-  lazy val feesPortfolio: Portfolio = Monoid[Portfolio].combineAll({
+  val feesPortfolio: Coeval[Portfolio] = Coeval.evalOnce(Monoid[Portfolio].combineAll({
     val assetFees: Seq[(Option[AssetId], Long)] = transactionData.map(_.assetFee)
     assetFees
       .map { case (maybeAssetId, vol) => maybeAssetId -> vol }
@@ -96,12 +88,12 @@ case class Block(timestamp: Long,
         case None => Portfolio(feeVolume, LeaseInfo.empty, Map.empty)
         case Some(assetId) => Portfolio(0L, LeaseInfo.empty, Map(assetId -> feeVolume))
       }
-  })
+  }))
 
-  lazy val prevBlockFeePart: Portfolio = Monoid[Portfolio].combineAll(transactionData.map(tx => tx.feeDiff().minus(tx.feeDiff().multiply(CurrentBlockFeePart))))
+  val prevBlockFeePart: Coeval[Portfolio] = Coeval.evalOnce(Monoid[Portfolio].combineAll(transactionData.map(tx => tx.feeDiff().minus(tx.feeDiff().multiply(CurrentBlockFeePart)))))
 
-  protected val signatureValid = Coeval.evalOnce(EllipticCurveImpl.verify(signerData.signature.arr, bytesWithoutSignature(), signerData.generator.publicKey))
-  protected override val signedDescendants =Coeval.evalOnce(transactionData)
+  protected val signatureValid: Coeval[Boolean] = Coeval.evalOnce(EllipticCurveImpl.verify(signerData.signature.arr, bytesWithoutSignature(), signerData.generator.publicKey))
+  protected override val signedDescendants: Coeval[Seq[Transaction]] = Coeval.evalOnce(transactionData)
 
   override def toString: String =
     s"Block(${signerData.signature} -> ${reference.trim}, txs=${transactionData.size}, features=$featureVotes) "

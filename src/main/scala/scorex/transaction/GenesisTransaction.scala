@@ -19,16 +19,14 @@ case class GenesisTransaction private(recipient: Address, amount: Long, timestam
 
   val transactionType = TransactionType.GenesisTransaction
 
-  lazy val creator: Option[Address] = None
-
-  lazy val json: JsObject =
+  override val json: Coeval[JsObject] = Coeval.evalOnce (
     Json.obj("type" -> transactionType.id,
       "id" -> id().base58,
       "fee" -> 0,
       "timestamp" -> timestamp,
       "signature" -> this.signature.base58,
       "recipient" -> recipient.address,
-      "amount" -> amount)
+      "amount" -> amount))
 
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce {
     val typeBytes = Array(transactionType.id.toByte)
