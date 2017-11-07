@@ -9,7 +9,7 @@ import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
 
 class WideStateGenerationSuite extends FreeSpec with IntegrationNodesInitializationAndStopping
-  with Matchers with TransferSending {
+  with Matchers with TransferSending with MultipleNodesApi {
 
   override lazy val nodes: Seq[Node] = docker.startNodes(NodeConfigs.forTest(3, 1 -> "waves.miner.enable = no"))
 

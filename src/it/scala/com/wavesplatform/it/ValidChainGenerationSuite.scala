@@ -10,7 +10,7 @@ import scala.concurrent.duration._
 import scala.util.Random
 
 class ValidChainGenerationSuite extends FreeSpec with IntegrationNodesInitializationAndStopping
-  with Matchers with TransferSending {
+  with Matchers with TransferSending with MultipleNodesApi {
 
   override lazy val nodes: Seq[Node] = docker.startNodes(NodeConfigs.forTest(3, 1 -> "waves.miner.enable = no"))
 
@@ -25,7 +25,7 @@ class ValidChainGenerationSuite extends FreeSpec with IntegrationNodesInitializa
 
       rollbackNodes = Random.shuffle(nodes).take(n)
       _ <- traverse(rollbackNodes)(_.rollback(1))
-      _ <- waitForSameBlocksAt(nodes)(baseHeight, 3.seconds)
+      _ <- waitForSameBlocksAt(nodes)(baseHeight, 5.seconds)
     } yield (), 7.minutes)
   }
 }
