@@ -51,7 +51,7 @@ object BlockDiffer extends ScorexLogging with Instrumented {
 
     val prevBlockTimestamp = maybePrevBlock.map(_.timestamp)
     for {
-      _ <- block.signaturesValid
+      _ <- block.signaturesValid()
       r <- apply(settings, s, prevBlockTimestamp)(block.signerData.generator, prevBlockFeeDistr, currentBlockFeeDistr, block.timestamp, block.transactionData, 1)
     } yield r
   }
@@ -60,7 +60,7 @@ object BlockDiffer extends ScorexLogging with Instrumented {
     for {
       // microblocks are processed within block which is next after 40-only-block which goes on top of activated height
       _ <- Either.cond(fp.featureActivationHeight(BlockchainFeatures.NG.id).exists(s.height > _), (), ActivationError(s"MicroBlocks are not yet activated, current height=${s.height}"))
-      _ <- micro.signaturesValid
+      _ <- micro.signaturesValid()
       r <- apply(settings, s, pervBlockTimestamp)(micro.generator, None, None, timestamp, micro.transactionData, 0)
     } yield r
   }

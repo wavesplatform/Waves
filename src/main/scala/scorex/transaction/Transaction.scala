@@ -1,7 +1,7 @@
 package scorex.transaction
 
 import com.wavesplatform.state2._
-import monix.eval.Task
+import monix.eval.{Coeval, Task}
 import monix.execution.schedulers.SchedulerService
 import scorex.serialization.{BytesSerializable, JsonSerializable}
 import scorex.transaction.TransactionParser.TransactionType
@@ -53,7 +53,7 @@ trait Signed {
 
   protected val signaturesValidMemoized: Task[Either[InvalidSignature, this.type]] = Signed.validateTask[this.type](this).memoize
 
-  lazy val signaturesValid: Either[InvalidSignature, this.type] = Await.result(signaturesValidMemoized.runAsync(Signed.scheduler), Duration.Inf)
+  val signaturesValid: Coeval[Either[InvalidSignature, this.type]] =  Coeval.evalOnce(Await.result(signaturesValidMemoized.runAsync(Signed.scheduler), Duration.Inf))
 }
 
 object Signed {
