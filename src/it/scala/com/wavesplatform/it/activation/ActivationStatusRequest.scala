@@ -1,20 +1,25 @@
 package com.wavesplatform.it.activation
 
 import com.wavesplatform.features.BlockchainFeatureStatus
-import com.wavesplatform.features.api.{ActivationStatusFeature, NodeFeatureStatus}
+import com.wavesplatform.features.api.{ActivationStatus, ActivationStatusFeature, NodeFeatureStatus}
 import com.wavesplatform.it.Node
 import org.scalatest.Matchers
 
 import scala.concurrent.duration._
-import scala.concurrent.Await
-
+import scala.concurrent.{Await, ExecutionContext}
 
 trait ActivationStatusRequest extends Matchers {
-  def activationStatus(node: Node, height: Int, featureNum: Short, timeout: Duration): ActivationStatusFeature = {
-    Await.result(node.waitForHeight(height), timeout)
-    val nodeActivationInfo = Await.result(node.activationStatus, timeout)
-    nodeActivationInfo.features.find(_.id == featureNum).get
-  }
+  def activationStatus(node: Node, height: Int, featureNum: Short, timeout: Duration)
+                      (implicit ec: ExecutionContext): ActivationStatusFeature = Await.result(
+    node
+      .waitFor[ActivationStatus](_.activationStatus, _.height >= height, 1.second)
+      .map { r =>
+        if (r.height > height) throw new IllegalStateException(s"Height (${r.height}) is more than expected")
+        r
+      }
+      .map(_.features.find(_.id == featureNum).get),
+    timeout
+  )
 
   def assertVotingStatus(activationStatusFeature: ActivationStatusFeature, supportedBlocks: Int, blockchainFeatureStatus: BlockchainFeatureStatus, nodeFeatureStatus: NodeFeatureStatus): Unit = {
     activationStatusFeature.supportedBlocks.get shouldBe supportedBlocks
