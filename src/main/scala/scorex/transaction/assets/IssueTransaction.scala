@@ -3,6 +3,7 @@ package scorex.transaction.assets
 import com.google.common.base.Charsets
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.state2.ByteStr
+import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
@@ -20,15 +21,14 @@ case class IssueTransaction private(sender: PublicKeyAccount,
                                     reissuable: Boolean,
                                     fee: Long,
                                     timestamp: Long,
-                                    signature: ByteStr)
-  extends AssetIssuance {
+                                    signature: ByteStr) extends SignedTransaction {
 
   override val assetFee: (Option[AssetId], Long) = (None, fee)
   override val transactionType: TransactionType.Value = TransactionType.IssueTransaction
 
-  override lazy val assetId = id
+  val assetId = id
 
-  lazy val toSign: Array[Byte] = Bytes.concat(Array(transactionType.id.toByte),
+  val toSign: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(transactionType.id.toByte),
     sender.publicKey,
     BytesSerializable.arrayWithSize(name),
     BytesSerializable.arrayWithSize(description),
@@ -36,18 +36,18 @@ case class IssueTransaction private(sender: PublicKeyAccount,
     Array(decimals),
     if (reissuable) Array(1: Byte) else Array(0: Byte),
     Longs.toByteArray(fee),
-    Longs.toByteArray(timestamp))
+    Longs.toByteArray(timestamp)))
 
-  override lazy val json: JsObject = jsonBase() ++ Json.obj(
-    "assetId" -> assetId.base58,
+  override val json: Coeval[JsObject] = Coeval.evalOnce(jsonBase() ++ Json.obj(
+    "assetId" -> assetId().base58,
     "name" -> new String(name, Charsets.UTF_8),
     "description" -> new String(description, Charsets.UTF_8),
     "quantity" -> quantity,
     "decimals" -> decimals,
     "reissuable" -> reissuable
-  )
+  ))
 
-  override lazy val bytes: Array[Byte] = Bytes.concat(Array(transactionType.id.toByte), signature.arr, toSign)
+  override val bytes = Coeval.evalOnce(Bytes.concat(Array(transactionType.id.toByte), signature.arr, toSign()))
 
 }
 
@@ -109,6 +109,6 @@ object IssueTransaction {
              fee: Long,
              timestamp: Long): Either[ValidationError, IssueTransaction] =
     create(sender, name, description, quantity, decimals, reissuable, fee, timestamp, ByteStr.empty).right.map { unverified =>
-      unverified.copy(signature = ByteStr(EllipticCurveImpl.sign(sender, unverified.toSign)))
+      unverified.copy(signature = ByteStr(EllipticCurveImpl.sign(sender, unverified.toSign())))
     }
 }

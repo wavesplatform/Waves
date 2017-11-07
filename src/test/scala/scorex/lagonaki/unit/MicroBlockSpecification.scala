@@ -32,7 +32,7 @@ class MicroBlockSpecification extends FunSuite with Matchers with MockFactory wi
     val transactions = Seq(tx, tr, tr2)
 
     val microBlock = MicroBlock.buildAndSign(sender, transactions, prevResBlockSig, totalResBlockSig).explicitGet()
-    val parsedBlock = MicroBlock.parseBytes(microBlock.bytes).get
+    val parsedBlock = MicroBlock.parseBytes(microBlock.bytes()).get
 
     assert(microBlock.signaturesValid().isRight)
     assert(parsedBlock.signaturesValid().isRight)

@@ -6,7 +6,7 @@ import com.wavesplatform.features.FeatureProvider
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2._
 import scorex.block.Block.BlockId
-import scorex.block.{Block, MicroBlock}
+import scorex.block.{Block, BlockHeader, MicroBlock}
 import scorex.transaction.History.{BlockMinerInfo, BlockchainScore}
 import cats.implicits._
 
@@ -21,13 +21,13 @@ class NgHistoryReader(ngState: () => Option[NgState], inner: History with Featur
   }
 
   override def blockBytes(height: Int): Option[Array[Byte]] = read { implicit l =>
-    inner.blockBytes(height).orElse(if (height == inner.height() + 1) ngState().map(_.bestLiquidBlock.bytes) else None)
+    inner.blockBytes(height).orElse(if (height == inner.height() + 1) ngState().map(_.bestLiquidBlock.bytes()) else None)
   }
 
   override def scoreOf(blockId: BlockId): Option[BlockchainScore] = read { implicit l =>
     inner.scoreOf(blockId)
       .orElse(ngState() match {
-        case Some(ng) if ng.contains(blockId) => Some(inner.score() + ng.base.blockScore)
+        case Some(ng) if ng.contains(blockId) => Some(inner.score() + ng.base.blockScore())
         case _ => None
       })
   }
@@ -94,5 +94,12 @@ class NgHistoryReader(ngState: () => Option[NgState], inner: History with Featur
   override def featureVotesCountWithinActivationWindow(height: Int): Map[Short, Int] = read { implicit l =>
     val ngVotes = ngState().map(_.base.featureVotes.map(_ -> 1).toMap).getOrElse(Map.empty)
     inner.featureVotesCountWithinActivationWindow(height) |+| ngVotes
+  }
+
+  override def blockHeaderAndSizeAt(height: Int): Option[(BlockHeader, Int)] = read { implicit l =>
+    if (height == inner.height() + 1)
+      ngState().map(x => (x.bestLiquidBlock, x.bestLiquidBlock.bytes().length))
+    else
+      inner.blockHeaderAndSizeAt(height)
   }
 }

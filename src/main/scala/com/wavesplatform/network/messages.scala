@@ -2,7 +2,8 @@ package com.wavesplatform.network
 
 import java.net.InetSocketAddress
 
-import com.wavesplatform.state2.{ByteStr}
+import com.wavesplatform.state2.ByteStr
+import monix.eval.Coeval
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.block.{Block, MicroBlock}
 import scorex.crypto.EllipticCurveImpl
@@ -26,7 +27,7 @@ case class ExtensionIds(lastCommonId: ByteStr, extensionIds: Seq[ByteStr])
 case class ExtensionBlocks(extension: Seq[Block])
 
 case class MicroBlockInv(sender: PublicKeyAccount, totalBlockSig: ByteStr, prevBlockSig: ByteStr, signature: ByteStr) extends Message with Signed {
-  override protected def signatureValid: Boolean = EllipticCurveImpl.verify(signature.arr, sender.toAddress.bytes.arr ++ totalBlockSig.arr ++ prevBlockSig.arr, sender.publicKey)
+  override protected val signatureValid = Coeval.evalOnce(EllipticCurveImpl.verify(signature.arr, sender.toAddress.bytes.arr ++ totalBlockSig.arr ++ prevBlockSig.arr, sender.publicKey))
   override def toString: String = s"MicroBlockInv(${totalBlockSig.trim} ~> ${prevBlockSig.trim})"
 }
 object MicroBlockInv{

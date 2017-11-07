@@ -14,9 +14,9 @@ class OrderSpecification extends PropSpec with PropertyChecks with Matchers with
 
   property("Order transaction serialization roundtrip") {
     forAll(orderGen) { order =>
-      val recovered = Order.parseBytes(order.bytes).get
-      recovered.bytes shouldEqual order.bytes
-      recovered.id shouldBe order.id
+      val recovered = Order.parseBytes(order.bytes()).get
+      recovered.bytes() shouldEqual order.bytes()
+      recovered.id() shouldBe order.id()
       recovered.senderPublicKey.publicKey shouldBe order.senderPublicKey.publicKey
       recovered.matcherPublicKey shouldBe order.matcherPublicKey
       recovered.assetPair shouldBe order.assetPair

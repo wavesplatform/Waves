@@ -10,15 +10,15 @@ class CreateAliasTransactionSpecification extends PropSpec with PropertyChecks w
 
   property("Transfer serialization roundtrip") {
     forAll(createAliasGen) { tx: CreateAliasTransaction =>
-      require(tx.bytes.head == TransactionType.CreateAliasTransaction.id)
-      val recovered = CreateAliasTransaction.parseTail(tx.bytes.tail).get
+      require(tx.bytes().head == TransactionType.CreateAliasTransaction.id)
+      val recovered = CreateAliasTransaction.parseTail(tx.bytes().tail).get
       assertTxs(recovered, tx)
     }
   }
 
   property("Transfer serialization from TypedTransaction") {
     forAll(createAliasGen) { tx: CreateAliasTransaction =>
-      val recovered = TransactionParser.parseBytes(tx.bytes).get
+      val recovered = TransactionParser.parseBytes(tx.bytes()).get
       assertTxs(recovered.asInstanceOf[CreateAliasTransaction], tx)
     }
   }
@@ -28,7 +28,7 @@ class CreateAliasTransactionSpecification extends PropSpec with PropertyChecks w
     forAll(accountGen, accountGen, aliasGen, timestampGen) { case (a1: PrivateKeyAccount, a2: PrivateKeyAccount, a: Alias, t: Long) =>
       val tx1 = CreateAliasTransaction.create(a1, a, MinIssueFee, t).right.get
       val tx2 = CreateAliasTransaction.create(a2, a, MinIssueFee, t).right.get
-      tx1.id shouldBe tx2.id
+      tx1.id() shouldBe tx2.id()
     }
   }
 
@@ -37,6 +37,6 @@ class CreateAliasTransactionSpecification extends PropSpec with PropertyChecks w
     first.timestamp shouldEqual second.timestamp
     first.fee shouldEqual second.fee
     first.alias.bytes shouldEqual second.alias.bytes
-    first.bytes shouldEqual second.bytes
+    first.bytes() shouldEqual second.bytes()
   }
 }

@@ -2,6 +2,7 @@ package scorex.transaction.assets
 
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.state2.ByteStr
+import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
@@ -20,22 +21,24 @@ case class BurnTransaction private(sender: PublicKeyAccount,
 
   override val transactionType: TransactionType.Value = TransactionType.BurnTransaction
 
-  lazy val toSign: Array[Byte] = Bytes.concat(Array(transactionType.id.toByte),
+  override val toSign: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(transactionType.id.toByte),
     sender.publicKey,
     assetId.arr,
     Longs.toByteArray(amount),
     Longs.toByteArray(fee),
-    Longs.toByteArray(timestamp))
+    Longs.toByteArray(timestamp)))
 
-  override lazy val json: JsObject = jsonBase() ++ Json.obj(
-    "assetId" -> assetId.base58,
-    "amount" -> amount,
-    "fee" -> fee
-  )
+  override val json: Coeval[JsObject] = Coeval.evalOnce {
+    jsonBase() ++ Json.obj(
+      "assetId" -> assetId.base58,
+      "amount" -> amount,
+      "fee" -> fee
+    )
+  }
 
   override val assetFee: (Option[AssetId], Long) = (None, fee)
 
-  override lazy val bytes: Array[Byte] = Bytes.concat(toSign, signature.arr)
+  override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(toSign(), signature.arr))
 
 }
 
@@ -82,6 +85,6 @@ object BurnTransaction {
              fee: Long,
              timestamp: Long): Either[ValidationError, BurnTransaction] =
     create(sender, assetId, quantity, fee, timestamp, ByteStr.empty).right.map { unverified =>
-      unverified.copy(signature = ByteStr(EllipticCurveImpl.sign(sender, unverified.toSign)))
+      unverified.copy(signature = ByteStr(EllipticCurveImpl.sign(sender, unverified.toSign())))
     }
 }

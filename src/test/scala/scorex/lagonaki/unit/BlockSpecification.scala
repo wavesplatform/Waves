@@ -50,7 +50,7 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
       forAll(blockGen) {
         case (baseTarget, reference, generationSignature, recipient, transactionData) =>
           val block = Block.buildAndSign(version, time, reference, NxtLikeConsensusBlockData(baseTarget, generationSignature), transactionData, recipient, Set.empty).explicitGet()
-          val parsedBlock = Block.parseBytes(block.bytes).get
+          val parsedBlock = Block.parseBytes(block.bytes()).get
           assert(block.signaturesValid().isRight)
           assert(parsedBlock.signaturesValid().isRight)
           assert(parsedBlock.consensusData.generationSignature == generationSignature)
@@ -95,7 +95,7 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
     forAll(blockGen, faetureSetGen) {
       case ((baseTarget, reference, generationSignature, recipient, transactionData), featureVotes) =>
         val block = Block.buildAndSign(version, time, reference, NxtLikeConsensusBlockData(baseTarget, generationSignature), transactionData, recipient, featureVotes).explicitGet()
-        val parsedBlock = Block.parseBytes(block.bytes).get
+        val parsedBlock = Block.parseBytes(block.bytes()).get
         assert(block.signaturesValid().isRight)
         assert(parsedBlock.signaturesValid().isRight)
         assert(parsedBlock.consensusData.generationSignature == generationSignature)
@@ -108,7 +108,7 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
   ignore("sign time for 60k txs") {
     forAll(randomTransactionsGen(60000), accountGen, byteArrayGen(Block.BlockIdLength), byteArrayGen(Block.GeneratorSignatureLength)) { case ((txs, acc, ref, gs)) =>
       val (block, t0) = Instrumented.withTime(Block.buildAndSign(3, 1, ByteStr(ref), NxtLikeConsensusBlockData(1, ByteStr(gs)), txs, acc, Set.empty).explicitGet())
-      val (bytes, t1) = Instrumented.withTime(block.bytesWithoutSignature)
+      val (bytes, t1) = Instrumented.withTime(block.bytesWithoutSignature())
       val (hash, t2) = Instrumented.withTime(FastCryptographicHash.hash(bytes))
       val (sig, t3) = Instrumented.withTime(EllipticCurveImpl.sign(acc, hash))
       println((t0, t1, t2, t3))
@@ -117,7 +117,7 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
 
   ignore("serialize and deserialize big block") {
     forAll(bigBlockGen(100 * 1000)) { case block =>
-      val parsedBlock = Block.parseBytes(block.bytes).get
+      val parsedBlock = Block.parseBytes(block.bytes()).get
       block.signaturesValid() shouldBe 'right
       parsedBlock.signaturesValid() shouldBe 'right
     }

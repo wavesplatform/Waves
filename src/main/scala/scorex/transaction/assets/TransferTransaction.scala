@@ -3,6 +3,7 @@ package scorex.transaction.assets
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.state2.ByteStr
 import com.wavesplatform.utils.base58Length
+import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.{AddressOrAlias, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
@@ -27,7 +28,7 @@ case class TransferTransaction private(assetId: Option[AssetId],
 
   override val assetFee: (Option[AssetId], Long) = (feeAssetId, fee)
 
-  lazy val toSign: Array[Byte] = {
+  val toSign: Coeval[Array[Byte]] = Coeval.evalOnce {
     val timestampBytes = Longs.toByteArray(timestamp)
     val assetIdBytes = assetId.map(a => (1: Byte) +: a.arr).getOrElse(Array(0: Byte))
     val amountBytes = Longs.toByteArray(amount)
@@ -45,16 +46,15 @@ case class TransferTransaction private(assetId: Option[AssetId],
       BytesSerializable.arrayWithSize(attachment))
   }
 
-
-  override lazy val json: JsObject = jsonBase() ++ Json.obj(
+  override val json: Coeval[JsObject] = Coeval.evalOnce(jsonBase() ++ Json.obj(
     "recipient" -> recipient.stringRepr,
     "assetId" -> assetId.map(_.base58),
     "amount" -> amount,
     "feeAsset" -> feeAssetId.map(_.base58),
     "attachment" -> Base58.encode(attachment)
-  )
+  ))
 
-  override lazy val bytes: Array[Byte] = Bytes.concat(Array(transactionType.id.toByte), signature.arr, toSign)
+  override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(transactionType.id.toByte), signature.arr, toSign()))
 
 }
 
@@ -116,7 +116,7 @@ object TransferTransaction {
              feeAmount: Long,
              attachment: Array[Byte]): Either[ValidationError, TransferTransaction] = {
     create(assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment, ByteStr.empty).right.map { unsigned =>
-      unsigned.copy(signature = ByteStr(EllipticCurveImpl.sign(sender, unsigned.toSign)))
+      unsigned.copy(signature = ByteStr(EllipticCurveImpl.sign(sender, unsigned.toSign())))
     }
   }
 }

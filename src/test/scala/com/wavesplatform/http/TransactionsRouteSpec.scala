@@ -55,9 +55,9 @@ class TransactionsRouteSpec extends RouteSpec("/transactions")
         accountGen,
         choose(1, MaxTransactionsPerRequest),
         randomTransactionsGen(transactionsCount)) { case (account, limit, txs) =>
-        (state.accountTransactionIds _).expects(account: Address, limit).returning(txs.map(_.id)).once()
+        (state.accountTransactionIds _).expects(account: Address, limit).returning(txs.map(_.id())).once()
         txs.foreach { tx =>
-          (state.transactionInfo _).expects(tx.id).returning(Some((1, tx))).once()
+          (state.transactionInfo _).expects(tx.id()).returning(Some((1, tx))).once()
         }
         Get(routePath(s"/address/${account.address}/limit/$limit")) ~> route ~> check {
           responseAs[Seq[JsValue]].length shouldEqual txs.length.min(limit)
@@ -83,10 +83,10 @@ class TransactionsRouteSpec extends RouteSpec("/transactions")
       } yield (tx, height)
 
       forAll(txAvailability) { case (tx, height) =>
-        (state.transactionInfo _).expects(tx.id).returning(Some((height, tx))).once()
-        Get(routePath(s"/info/${tx.id.base58}")) ~> route ~> check {
+        (state.transactionInfo _).expects(tx.id()).returning(Some((height, tx))).once()
+        Get(routePath(s"/info/${tx.id().base58}")) ~> route ~> check {
           status shouldEqual StatusCodes.OK
-          responseAs[JsValue] shouldEqual tx.json + ("height" -> JsNumber(height))
+          responseAs[JsValue] shouldEqual tx.json() + ("height" -> JsNumber(height))
         }
       }
     }
@@ -140,10 +140,10 @@ class TransactionsRouteSpec extends RouteSpec("/transactions")
 
     "working properly otherwise" in {
       forAll(randomTransactionGen) { tx =>
-        (utx.transactionById _).expects(tx.id).returns(Some(tx)).once()
-        Get(routePath(s"/unconfirmed/info/${tx.id.base58}")) ~> route ~> check {
+        (utx.transactionById _).expects(tx.id()).returns(Some(tx)).once()
+        Get(routePath(s"/unconfirmed/info/${tx.id().base58}")) ~> route ~> check {
           status shouldEqual StatusCodes.OK
-          responseAs[JsValue] shouldEqual tx.json
+          responseAs[JsValue] shouldEqual tx.json()
         }
       }
     }

@@ -51,8 +51,8 @@ class UtxPool(time: Time,
       .asScala
       .filter(isExpired)
       .foreach { tx =>
-        transactions.remove(tx.id)
-        pessimisticPortfolios.remove(tx.id)
+        transactions.remove(tx.id())
+        pessimisticPortfolios.remove(tx.id())
         utxPoolSizeStats.decrement()
       }
   }
@@ -60,7 +60,7 @@ class UtxPool(time: Time,
   def putIfNew(tx: Transaction): Either[ValidationError, Boolean] = {
     putRequestStats.increment()
     measureSuccessful(processingTimeStats, {
-      Option(knownTransactions.getIfPresent(tx.id)) match {
+      Option(knownTransactions.getIfPresent(tx.id())) match {
         case Some(Right(_)) => Right(false)
         case Some(Left(er)) => Left(er)
         case None =>
@@ -71,18 +71,18 @@ class UtxPool(time: Time,
             diff <- blocking(TransactionDiffer(fs, blocking(history.lastBlockTimestamp()), time.correctedTime(), s.height)(s, tx))
           } yield {
             utxPoolSizeStats.increment()
-            pessimisticPortfolios.add(tx.id, diff)
-            transactions.put(tx.id, tx)
+            pessimisticPortfolios.add(tx.id(), diff)
+            transactions.put(tx.id(), tx)
             tx
           }
-          knownTransactions.put(tx.id, res)
+          knownTransactions.put(tx.id(), res)
           res.right.map(_ => true)
       }
     })
   }
 
   def removeAll(txs: Traversable[Transaction]): Unit = {
-    txs.view.map(_.id).foreach { id =>
+    txs.view.map(_.id()).foreach { id =>
       knownTransactions.invalidate(id)
       Option(transactions.remove(id)).foreach(_ => utxPoolSizeStats.decrement())
       pessimisticPortfolios.remove(id)
@@ -122,7 +122,7 @@ class UtxPool(time: Time,
             case Right(_) =>
               (invalid, valid, diff)
             case Left(_) =>
-              (tx.id +: invalid, valid, diff)
+              (tx.id() +: invalid, valid, diff)
           }
         case (r, _) => r
       }

@@ -18,7 +18,7 @@ class LeaseTransactionSpecification extends PropSpec with PropertyChecks with Ma
 
   property("Lease transaction serialization roundtrip") {
     forAll(leaseGen) { tx: LeaseTransaction =>
-      val recovered = parseBytes(tx.bytes).get
+      val recovered = parseBytes(tx.bytes()).get
 
       assertTxs(recovered, tx)
     }
@@ -26,7 +26,7 @@ class LeaseTransactionSpecification extends PropSpec with PropertyChecks with Ma
 
   property("Lease transaction from TransactionParser") {
     forAll(leaseGen) { tx: LeaseTransaction =>
-      val recovered = TransactionParser.parseBytes(tx.bytes).get
+      val recovered = TransactionParser.parseBytes(tx.bytes()).get
 
       assertTxs(recovered.asInstanceOf[LeaseTransaction], tx)
     }
@@ -38,6 +38,6 @@ class LeaseTransactionSpecification extends PropSpec with PropertyChecks with Ma
     first.amount shouldEqual second.amount
     first.fee shouldEqual second.fee
     first.signature shouldEqual second.signature
-    first.bytes shouldEqual second.bytes
+    first.bytes() shouldEqual second.bytes()
   }
 }

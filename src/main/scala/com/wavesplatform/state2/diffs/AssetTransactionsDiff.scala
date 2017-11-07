@@ -20,8 +20,8 @@ object AssetTransactionsDiff {
       portfolios = Map(tx.sender.toAddress -> Portfolio(
         balance = -tx.fee,
         leaseInfo = LeaseInfo.empty,
-        assets = Map(tx.assetId -> tx.quantity))),
-      assetInfos = Map(tx.assetId -> info)))
+        assets = Map(tx.assetId() -> tx.quantity))),
+      assetInfos = Map(tx.assetId() -> info)))
   }
 
   def reissue(state: SnapshotStateReader, settings: FunctionalitySettings, blockTime: Long, height: Int)(tx: ReissueTransaction): Either[ValidationError, Diff] = {

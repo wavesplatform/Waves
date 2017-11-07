@@ -71,7 +71,7 @@ case class DebugApiRoute(settings: RestAPISettings,
   def blocks: Route = {
     (path("blocks" / IntNumber) & get) { howMany =>
       complete(JsArray(history.lastBlocks(howMany).map { block =>
-        val bytes = block.bytes
+        val bytes = block.bytes()
         Json.obj(bytes.length.toString -> Base58.encode(FastCryptographicHash(bytes)))
       }))
     }

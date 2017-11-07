@@ -36,7 +36,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Genera
 
         val totalAssetVolume = issue.quantity + reissue.quantity - burn.amount
         newState.accountPortfolio(issue.sender).assets shouldBe Map(reissue.assetId -> totalAssetVolume)
-        newState.assetInfo(issue.id) shouldBe Some(AssetInfo(reissue.reissuable, totalAssetVolume))
+        newState.assetInfo(issue.id()) shouldBe Some(AssetInfo(reissue.reissuable, totalAssetVolume))
       }
     }
   }
@@ -68,8 +68,8 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Genera
       reissuable2 <- Arbitrary.arbitrary[Boolean]
       fee <- Gen.choose(1L, 2000000L)
       timestamp <- timestampGen
-      reissue = ReissueTransaction.create(other, issue.assetId, quantity, reissuable2, fee, timestamp).right.get
-      burn = BurnTransaction.create(other, issue.assetId, quantity, fee, timestamp).right.get
+      reissue = ReissueTransaction.create(other, issue.assetId(), quantity, reissuable2, fee, timestamp).right.get
+      burn = BurnTransaction.create(other, issue.assetId(), quantity, fee, timestamp).right.get
     } yield ((gen, issue), reissue, burn)
 
     forAll(setup) { case ((gen, issue), reissue, burn) =>
