@@ -2,9 +2,11 @@ package com.wavesplatform.network
 
 import java.util
 
+import com.wavesplatform.metrics.Metrics
 import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel.ChannelHandlerContext
 import io.netty.handler.codec.MessageToMessageCodec
+import org.influxdb.dto.Point
 import scorex.network.message._
 import scorex.utils.ScorexLogging
 
@@ -30,8 +32,15 @@ class MessageCodec(peerDatabase: PeerDatabase) extends MessageToMessageCodec[Raw
   }
 
   override def decode(ctx: ChannelHandlerContext, msg: RawBytes, out: util.List[AnyRef]): Unit = {
-    specs(msg.code).deserializeData(msg.data) match {
-      case Success(x) => out.add(x)
+    val spec = specs(msg.code)
+    spec.deserializeData(msg.data) match {
+      case Success(x) =>
+        Metrics.write(Point.measurement("message")
+          .tag("type", spec.messageName)
+          .addField("type", spec.messageName)
+          .addField("bytes", msg.data.length))
+        out.add(x)
+
       case Failure(e) => block(ctx, e)
     }
   }
