@@ -66,6 +66,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     val feeCalculator = new FeeCalculator(settings.feesSettings)
     val time: Time = NTP
+
+    val peerDatabase = new PeerDatabaseImpl(db, settings.networkSettings)
     val establishedConnections = new ConcurrentHashMap[Channel, PeerInfo]
     val allChannels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
     val utxStorage = new UtxPoolImpl(time, stateReader, history, feeCalculator, settings.blockchainSettings.functionalitySettings, settings.utxSettings)
@@ -169,7 +171,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     }
 
     if (settings.matcherSettings.enable) {
-      val matcher = new Matcher(actorSystem, wallet, utxStorage, allChannels, stateReader, history, settings.blockchainSettings, settings.restAPISettings, settings.matcherSettings)
+      val matcher = new Matcher(actorSystem, wallet, utxStorage, allChannels, stateReader, history,
+        settings.blockchainSettings, settings.restAPISettings, settings.matcherSettings, db)
       matcher.runMatcher()
     }
   }
@@ -198,15 +201,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         .failed.map(e => log.error("Failed to terminate actor system", e))
 
       log.debug("Closing storage")
-
-      log.debug("Closing wallet")
-      wallet.close()
-
-      log.debug("Closing state")
-      stateWriter.close()
-
-      log.debug("Closing history")
-      history.close()
+      db.close()
 
       log.info("Shutdown complete")
     }

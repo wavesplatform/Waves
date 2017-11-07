@@ -1,7 +1,7 @@
 package com.wavesplatform
 
 import com.google.common.base.Throwables
-import com.wavesplatform.db.Storage
+import com.wavesplatform.db.{Storage, VersionedStorage}
 import monix.execution.UncaughtExceptionReporter
 import scorex.utils.ScorexLogging
 

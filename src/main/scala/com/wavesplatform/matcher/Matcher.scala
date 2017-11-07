@@ -12,6 +12,7 @@ import com.wavesplatform.matcher.market.{MatcherActor, MatcherTransactionWriter,
 import com.wavesplatform.settings.{BlockchainSettings, RestAPISettings}
 import com.wavesplatform.state2.StateReader
 import io.netty.channel.group.ChannelGroup
+import org.iq80.leveldb.DB
 import scorex.api.http.CompositeHttpService
 import scorex.transaction.History
 import scorex.utils.ScorexLogging
@@ -28,7 +29,7 @@ class Matcher(actorSystem: ActorSystem,
               stateReader: StateReader,
               history: History,
               blockchainSettings: BlockchainSettings,
-              restAPISettings: RestAPISettings, matcherSettings: MatcherSettings) extends ScorexLogging {
+              restAPISettings: RestAPISettings, matcherSettings: MatcherSettings, db: DB) extends ScorexLogging {
   lazy val matcherApiRoutes = Seq(
     MatcherApiRoute(wallet, matcher, orderHistory, txWriter, restAPISettings, matcherSettings)
   )
@@ -40,10 +41,10 @@ class Matcher(actorSystem: ActorSystem,
   lazy val matcher: ActorRef = actorSystem.actorOf(MatcherActor.props(orderHistory, stateReader, wallet, utx, allChannels,
     matcherSettings, history, blockchainSettings.functionalitySettings), MatcherActor.name)
 
-  lazy val orderHistory: ActorRef = actorSystem.actorOf(OrderHistoryActor.props(matcherSettings, utx, wallet),
+  lazy val orderHistory: ActorRef = actorSystem.actorOf(OrderHistoryActor.props(db, matcherSettings, utx, wallet),
     OrderHistoryActor.name)
 
-  lazy val txWriter: ActorRef = actorSystem.actorOf(MatcherTransactionWriter.props(matcherSettings),
+  lazy val txWriter: ActorRef = actorSystem.actorOf(MatcherTransactionWriter.props(db, matcherSettings),
     MatcherTransactionWriter.name)
 
   @volatile var matcherServerBinding: ServerBinding = _
@@ -68,8 +69,8 @@ class Matcher(actorSystem: ActorSystem,
 
     log.info(s"Starting matcher on: ${matcherSettings.bindAddress}:${matcherSettings.port} ...")
 
-    implicit val as = actorSystem
-    implicit val materializer = ActorMaterializer()
+    implicit val as: ActorSystem = actorSystem
+    implicit val materializer: ActorMaterializer = ActorMaterializer()
 
     val combinedRoute = CompositeHttpService(actorSystem, matcherApiTypes, matcherApiRoutes, restAPISettings).compositeRoute
     matcherServerBinding = Await.result(Http().bindAndHandle(combinedRoute, matcherSettings.bindAddress,

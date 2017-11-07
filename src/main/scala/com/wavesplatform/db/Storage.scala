@@ -63,7 +63,7 @@ abstract class Storage(private val db: DB) extends ScorexLogging with AutoClosea
     map
   }
 
-  abstract def removeEverything(): Unit
+  def removeEverything(): Unit
 
   protected def makePrefix(prefix: Array[Byte]): Array[Byte] = Bytes.concat(prefix, Separator)
 
