@@ -8,6 +8,7 @@ import scala.concurrent.duration._
 
 class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropertyChecks {
 
+  private val waitCompletion = 2.minutes
   private val aliasFee = 1.waves
   private val leasingFee = 0.001.waves
 
@@ -27,7 +28,7 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
       _ <- assertBalances(firstAddress, 98.waves, 98.waves)
     } yield succeed
 
-    Await.result(f, 1.minute)
+    Await.result(f, waitCompletion)
   }
 
   test("Not able to create same aliases to same address") {
@@ -47,7 +48,7 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
       _ <- assertBalances(firstAddress, newBalance, newEffectiveBalance)
     } yield succeed
 
-    Await.result(f, 1.minute)
+    Await.result(f, waitCompletion)
   }
 
 
@@ -66,7 +67,7 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
       _ <- assertBalances(firstAddress, balance - aliasFee, effectiveBalance - aliasFee)
     } yield succeed
 
-    Await.result(f, 1.minute)
+    Await.result(f, waitCompletion)
   }
 
   test("Able to create several different aliases to same addresses") {
@@ -98,7 +99,7 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
         .map(s => s"alias:${sender.settings.blockchainSettings.addressSchemeCharacter}:$s")
     }
 
-    Await.result(f, 1.minute)
+    Await.result(f, waitCompletion)
   }
 
 
@@ -113,7 +114,7 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
       addressByAlias should be(firstAddress)
     }
 
-    Await.result(f, 1.minute)
+    Await.result(f, waitCompletion)
   }
 
   val aliases_names =
@@ -135,7 +136,7 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
 
       } yield succeed
 
-      Await.result(f, 1.minute)
+      Await.result(f, waitCompletion)
     }
 
   }
@@ -156,7 +157,7 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
         _ <- assertBadRequestAndMessage(sender.createAlias(secondAddress, alias, aliasFee), message)
       } yield succeed
 
-      Await.result(f, 1.minute)
+      Await.result(f, waitCompletion)
     }
 
 
@@ -184,7 +185,7 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
         firstAddressEffectiveBalance - leasingAmount - leasingFee)
       _ <- assertBalances(thirdAddress, thirdAddressBalance - aliasFee, thirdAddressEffectiveBalance - aliasFee + leasingAmount)
     } yield succeed
-    Await.result(f, 1.minute)
+    Await.result(f, waitCompletion)
   }
 
   //previous test should not be commented to run this one
@@ -195,6 +196,6 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
         "State check failed. Reason: negative effective balance")
 
     } yield succeed
-    Await.result(f, 1.minute)
+    Await.result(f, waitCompletion)
   }
 }
