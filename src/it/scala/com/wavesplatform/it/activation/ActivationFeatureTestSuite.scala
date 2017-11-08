@@ -28,8 +28,6 @@ class ActivationFeatureTestSuite extends FreeSpec with Matchers with BeforeAndAf
     docker.close()
   }
 
-  "wait nodes are synchronized" in waitForSync(nodes, votingInterval / 3, votingInterval / 4)
-
   "supported blocks increased when voting starts" in {
     val checkHeight: Int = votingInterval * 2 / 3
 
@@ -72,8 +70,8 @@ class ActivationFeatureTestSuite extends FreeSpec with Matchers with BeforeAndAf
 
   object ActivationFeatureTestSuite {
 
-    val votingInterval = 12
-    val blocksForActivation = 12 // should be even
+    val votingInterval = 16
+    val blocksForActivation = 16 // should be even
     val featureNum: Short = 1
 
     private val supportedNodes = ConfigFactory.parseString(

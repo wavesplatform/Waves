@@ -31,12 +31,6 @@ class VoteForFeatureByDefaultTestSuite extends FreeSpec with Matchers with Befor
     docker.close()
   }
 
-  "wait nodes are synchronized" in {
-    waitForSync(nodes, votingInterval / 3, votingInterval / 4)
-    val heights = Await.result(Future.traverse(nodes)(n => n.height.map(h => n.nodeInfo.containerId -> h)), 1.minute)
-    log.debug(s"Heights after synchronization:\n${heights.mkString("\n")}")
-  }
-
   "supported blocks increased when voting starts, one node votes against, three by default" in {
     val checkHeight: Int = votingInterval * 2 / 3
 
@@ -71,8 +65,8 @@ class VoteForFeatureByDefaultTestSuite extends FreeSpec with Matchers with Befor
 
     import NodeConfigs.Default
 
-    val votingInterval = 20
-    val blocksForActivation = 15
+    val votingInterval = 25
+    val blocksForActivation = 18
     val defaultVotingFeatureNum: Short = 1
     val nonVotingFeatureNum: Short = 2
 

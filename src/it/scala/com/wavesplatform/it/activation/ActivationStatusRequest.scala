@@ -23,7 +23,9 @@ trait ActivationStatusRequest extends Matchers {
     node
       .waitFor[ActivationStatus](_.activationStatus, _.height >= height, 1.second)
       .map { r =>
-        if (r.height > height) throw new IllegalStateException(s"Height (${r.height}) is more than expected ($height)")
+        if (r.height > height) throw new IllegalStateException(
+          s"Height (${r.height}) is more than expected ($height) on ${node.settings.networkSettings.nodeName}"
+        )
         r
       }
       .map(_.features.find(_.id == featureNum).get),
@@ -37,7 +39,9 @@ trait ActivationStatusRequest extends Matchers {
         node
           .waitFor[ActivationStatus](_.activationStatus, _.height >= height, 1.second)
           .map { r =>
-            if (r.height > height) throw new IllegalStateException(s"Height (${r.height}) is more than expected ($height) on ${node.nodeInfo.containerId}")
+            if (r.height > height) throw new IllegalStateException(
+              s"Height (${r.height}) is more than expected ($height) on ${node.settings.networkSettings.nodeName}"
+            )
             r
           }
           .map { s =>

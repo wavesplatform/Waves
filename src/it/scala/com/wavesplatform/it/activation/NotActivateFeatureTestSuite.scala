@@ -30,8 +30,6 @@ class NotActivateFeatureTestSuite extends FreeSpec with Matchers with BeforeAndA
     docker.close()
   }
 
-  "wait nodes are synchronized" in waitForSync(nodes, votingInterval / 3, votingInterval / 4)
-
   "get activation status info" in {
     activationStatusInfoBefore = Some(activationStatus(nodes.head, votingInterval - 1, votingFeatureNum, 2.minute))
     activationStatusInfoAfter = Some(activationStatus(nodes.head, votingInterval + 1, votingFeatureNum, 2.minute))
