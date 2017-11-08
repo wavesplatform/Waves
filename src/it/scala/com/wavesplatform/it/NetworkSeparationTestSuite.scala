@@ -23,7 +23,7 @@ class NetworkSeparationTestSuite extends FreeSpec with Matchers with Integration
   "nodes should sync" in Await.result(
     for {
       height <- traverse(nodes)(_.height).map(_.max)
-      _ <- traverse(nodes)(_.waitForHeight(height + 13))
+      _ <- traverse(nodes)(_.waitForHeight(height + 15))
       blocks <- traverse(nodes)(_.blockAt(height + 8))
     } yield {
       val xs = blocks.map(_.signature)

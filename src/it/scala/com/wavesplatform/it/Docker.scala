@@ -102,7 +102,8 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
   private def waitNodeIsUp(node: Node): Future[Unit] = node.waitFor[Int](_.height, _ > 0, 1.second).map(_ => ())
 
   private def startNodeInternal(nodeConfig: Config): Node = {
-    val configOverrides = s"$JavaOptions $knownPeers ${renderProperties(asProperties(nodeConfig.withFallback(suiteConfig)))}"
+    val javaOptions = Option(System.getenv("CONTAINER_JAVA_OPTS")).getOrElse("")
+    val configOverrides = s"$javaOptions $knownPeers ${renderProperties(asProperties(nodeConfig.withFallback(suiteConfig)))}"
     val actualConfig = nodeConfig
       .withFallback(suiteConfig)
       .withFallback(NodeConfigs.DefaultConfigTemplate)
@@ -202,9 +203,6 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
 }
 
 object Docker {
-  private val JavaOptions = Seq(
-    "-Xmx750m"
-  ).mkString(" ")
   private val jsonMapper = new ObjectMapper
   private val propsMapper = new JavaPropsMapper
 

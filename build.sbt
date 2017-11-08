@@ -80,6 +80,8 @@ inConfig(IntegrationTest)({
   val threads = 4
 
   Seq(
+    envVars in test += "CONTAINER_JAVA_OPTS" -> "-Xmx1500",
+    envVars in testOnly := (envVars in test).value,
     parallelExecution := true,
     fork := true,
     testForkedParallel := true,
