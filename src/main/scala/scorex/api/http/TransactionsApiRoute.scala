@@ -91,7 +91,7 @@ case class TransactionsApiRoute(
   @ApiOperation(value = "Unconfirmed", notes = "Get list of unconfirmed transactions", httpMethod = "GET")
   def unconfirmed: Route = (pathPrefix("unconfirmed") & get) {
     pathEndOrSingleSlash {
-      complete(JsArray(utxPool.all().map(txToExtendedJson)))
+      complete(JsArray(utxPool.all.map(txToExtendedJson)))
     } ~ utxSize ~ utxTransactionInfo
   }
 

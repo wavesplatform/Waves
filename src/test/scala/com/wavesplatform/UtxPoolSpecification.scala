@@ -145,7 +145,7 @@ class UtxPoolSpecification extends FreeSpec
       all(txs1.map { t =>
         utx.putIfNew(t)
       }) shouldBe 'right
-      utx.all().size shouldEqual txs1.size
+      utx.all.size shouldEqual txs1.size
 
       time.advance(offset)
       utx.removeAll(Seq.empty)
@@ -153,31 +153,31 @@ class UtxPoolSpecification extends FreeSpec
       all(txs2.map { t =>
         utx.putIfNew(t)
       }) shouldBe 'right
-      utx.all().size shouldEqual txs2.size
+      utx.all.size shouldEqual txs2.size
     }
 
     "evicts expired transactions when packUnconfirmed is called" in forAll(dualTxGen) { case (utx, time, txs, offset, _) =>
       all(txs.map { t =>
         utx.putIfNew(t)
       }) shouldBe 'right
-      utx.all().size shouldEqual txs.size
+      utx.all.size shouldEqual txs.size
 
       time.advance(offset)
 
       utx.packUnconfirmed(100, false) shouldBe 'empty
-      utx.all() shouldBe 'empty
+      utx.all shouldBe 'empty
     }
 
     "evicts one of mutually invalid transactions when packUnconfirmed is called" in forAll(twoOutOfManyValidPayments) { case (utx, time, txs, offset) =>
       all(txs.map { t =>
         utx.putIfNew(t)
       }) shouldBe 'right
-      utx.all().size shouldEqual txs.size
+      utx.all.size shouldEqual txs.size
 
       time.advance(offset)
 
       utx.packUnconfirmed(100, false).size shouldBe 2
-      utx.all().size shouldBe 2
+      utx.all.size shouldBe 2
     }
 
     "portfolio" - {
