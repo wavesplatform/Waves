@@ -21,9 +21,9 @@ trait ActivationStatusRequest extends Matchers {
   def activationStatus(node: Node, height: Int, featureNum: Short, timeout: Duration)
                       (implicit ec: ExecutionContext): ActivationStatusFeature = Await.result(
     node
-      .waitFor[ActivationStatus](_.activationStatus, _.height >= height, 2.second)
+      .waitFor[ActivationStatus](_.activationStatus, _.height >= height, 1.second)
       .map { r =>
-        if (r.height > height) throw new IllegalStateException(s"Height (${r.height}) is more than expected")
+        if (r.height > height) throw new IllegalStateException(s"Height (${r.height}) is more than expected ($height)")
         r
       }
       .map(_.features.find(_.id == featureNum).get),
@@ -37,7 +37,7 @@ trait ActivationStatusRequest extends Matchers {
         node
           .waitFor[ActivationStatus](_.activationStatus, _.height >= height, 1.second)
           .map { r =>
-            if (r.height > height) throw new IllegalStateException(s"Height (${r.height}) is more than expected ($height)")
+            if (r.height > height) throw new IllegalStateException(s"Height (${r.height}) is more than expected ($height) on ${node.nodeInfo.containerId}")
             r
           }
           .map { s =>

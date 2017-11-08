@@ -3,6 +3,7 @@ package com.wavesplatform.it
 import com.wavesplatform.it.TransferSending.Req
 import com.wavesplatform.it.api.NodeApi.Transaction
 import scorex.account.{Address, AddressScheme}
+import scorex.utils.ScorexLogging
 
 import scala.concurrent.Future
 import scala.util.Random
@@ -11,7 +12,7 @@ object TransferSending {
   case class Req(source: String, targetAddress: String, amount: Long, fee: Long)
 }
 
-trait TransferSending {
+trait TransferSending extends ScorexLogging {
 
   import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -60,7 +61,10 @@ trait TransferSending {
 
   def balanceForNode(n: Node): Future[(String, Long)] = n.balance(n.address).map(b => b.address -> b.balance)
 
-  def makeTransfer(r: Req): Future[Transaction] = addressToNode(r.source).transfer(r.source, r.targetAddress, r.amount, r.fee)
+  def makeTransfer(r: Req): Future[Transaction] = {
+    log.trace(s"Sending request $r")
+    addressToNode(r.source).transfer(r.source, r.targetAddress, r.amount, r.fee)
+  }
 
   def processRequests(requests: Seq[Req]): Future[Unit] = if (requests.isEmpty) {
     Future.successful(())

@@ -68,7 +68,9 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
 
     def attempt(rest: Int): String = try {
       network match {
-        case Some(n) => n.id()
+        case Some(n) =>
+          log.info(s"Network ${n.name()} (id: ${n.id()}) is created")
+          n.id()
         case None =>
           val r = client.createNetwork(NetworkConfig.builder().name(networkName).driver("bridge").checkDuplicate(true).build())
           Option(r.warnings()).foreach(log.warn(_))

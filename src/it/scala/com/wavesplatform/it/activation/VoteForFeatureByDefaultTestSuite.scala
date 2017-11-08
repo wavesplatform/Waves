@@ -5,12 +5,14 @@ import com.wavesplatform.features.BlockchainFeatureStatus
 import com.wavesplatform.features.api.NodeFeatureStatus
 import com.wavesplatform.it.{Docker, NodeConfigs}
 import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
+import scorex.utils.ScorexLogging
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
-class VoteForFeatureByDefaultTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with CancelAfterFailure with ActivationStatusRequest {
+class VoteForFeatureByDefaultTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with CancelAfterFailure
+  with ActivationStatusRequest with ScorexLogging {
 
   import VoteForFeatureByDefaultTestSuite._
 
@@ -29,7 +31,11 @@ class VoteForFeatureByDefaultTestSuite extends FreeSpec with Matchers with Befor
     docker.close()
   }
 
-  "wait nodes are synchronized" in waitForSync(nodes, votingInterval / 3, votingInterval / 4)
+  "wait nodes are synchronized" in {
+    waitForSync(nodes, votingInterval / 3, votingInterval / 4)
+    val heights = Await.result(Future.traverse(nodes)(n => n.height.map(h => n.nodeInfo.containerId -> h)), 1.minute)
+    log.debug(s"Heights after synchronization:\n${heights.mkString("\n")}")
+  }
 
   "supported blocks increased when voting starts, one node votes against, three by default" in {
     val checkHeight: Int = votingInterval * 2 / 3
