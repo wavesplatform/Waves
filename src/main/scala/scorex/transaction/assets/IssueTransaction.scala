@@ -87,7 +87,7 @@ object IssueTransaction {
              fee: Long,
              timestamp: Long,
              signature: ByteStr): Either[ValidationError, IssueTransaction] = if (quantity <= 0) {
-    Left(ValidationError.NegativeAmount)
+    Left(ValidationError.NegativeAmount(quantity, "quantity of assets"))
   } else if (description.length > MaxDescriptionLength) {
     Left(ValidationError.TooBigArray)
   } else if (name.length < MinAssetNameLength || name.length > MaxAssetNameLength) {

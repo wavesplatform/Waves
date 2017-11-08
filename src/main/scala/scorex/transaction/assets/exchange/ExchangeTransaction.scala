@@ -59,7 +59,7 @@ object ExchangeTransaction {
     if (fee <= 0) {
       Left(ValidationError.InsufficientFee)
     } else if (amount <= 0) {
-      Left(ValidationError.NegativeAmount)
+      Left(ValidationError.NegativeAmount(amount, "amount of assets"))
     } else if (price <= 0) {
       Left(GenericError("price should be > 0"))
     } else if (price > Order.MaxAmount) {
