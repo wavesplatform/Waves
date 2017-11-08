@@ -184,15 +184,19 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
     log.info(s"Writing logs of $containerId to ${logFile.getAbsolutePath}")
 
     val fileStream = new FileOutputStream(logFile, false)
-    client
-      .logs(
-        containerId,
-        DockerClient.LogsParam.timestamps(),
-        DockerClient.LogsParam.follow(),
-        DockerClient.LogsParam.stdout(),
-        DockerClient.LogsParam.stderr()
-      )
-      .attach(fileStream, fileStream)
+    try {
+      client
+        .logs(
+          containerId,
+          DockerClient.LogsParam.timestamps(),
+          DockerClient.LogsParam.follow(),
+          DockerClient.LogsParam.stdout(),
+          DockerClient.LogsParam.stderr()
+        )
+        .attach(fileStream, fileStream)
+    } finally {
+      fileStream.close()
+    }
   }
 
   def disconnectFromNetwork(node: Node): Unit = disconnectFromNetwork(node.nodeInfo.containerId)
