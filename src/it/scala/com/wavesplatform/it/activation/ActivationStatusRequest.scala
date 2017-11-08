@@ -35,7 +35,7 @@ trait ActivationStatusRequest extends Matchers {
     Future
       .traverse(nodes) { node =>
         node
-          .waitFor[ActivationStatus](_.activationStatus, _.height >= height, 2.second)
+          .waitFor[ActivationStatus](_.activationStatus, _.height >= height, 1.second)
           .map { r =>
             if (r.height > height) throw new IllegalStateException(s"Height (${r.height}) is more than expected ($height)")
             r
