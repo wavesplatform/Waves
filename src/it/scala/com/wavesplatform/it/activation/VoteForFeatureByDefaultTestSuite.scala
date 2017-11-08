@@ -5,14 +5,12 @@ import com.wavesplatform.features.BlockchainFeatureStatus
 import com.wavesplatform.features.api.NodeFeatureStatus
 import com.wavesplatform.it.{Docker, NodeConfigs}
 import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
-import scorex.utils.ScorexLogging
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
-class VoteForFeatureByDefaultTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with CancelAfterFailure
-  with ActivationStatusRequest with ScorexLogging {
+class VoteForFeatureByDefaultTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with CancelAfterFailure with ActivationStatusRequest {
 
   import VoteForFeatureByDefaultTestSuite._
 

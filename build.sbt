@@ -77,10 +77,10 @@ concurrentRestrictions in Global += Tags.limit(Tags.Test, 1)
 Defaults.itSettings
 configs(IntegrationTest)
 inConfig(IntegrationTest)({
-  val threads = 4
+  val threads = 3
 
   Seq(
-    envVars in test += "CONTAINER_JAVA_OPTS" -> "-Xmx1500",
+    envVars in test += "CONTAINER_JAVA_OPTS" -> "-Xmx1500m",
     envVars in testOnly := (envVars in test).value,
     parallelExecution := true,
     fork := true,

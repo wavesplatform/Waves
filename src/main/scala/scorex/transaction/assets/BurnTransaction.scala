@@ -72,7 +72,7 @@ object BurnTransaction {
              timestamp: Long,
              signature: ByteStr): Either[ValidationError, BurnTransaction] =
     if (quantity < 0) {
-      Left(ValidationError.NegativeAmount(quantity, "quantity of assets"))
+      Left(ValidationError.NegativeAmount(quantity, "assets"))
     } else if (fee <= 0) {
       Left(ValidationError.InsufficientFee)
     } else {
