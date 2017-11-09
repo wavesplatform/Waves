@@ -11,16 +11,15 @@ import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
-
-trait IntegrationSuiteWithThreeAddresses extends FunSuite with BeforeAndAfterAll with Matchers with ScalaFutures
+trait IntegrationSuiteWithThreeAddresses extends BeforeAndAfterAll with Matchers with ScalaFutures
   with IntegrationPatience with RecoverMethods with RequestErrorAssert with IntegrationTestsScheme {
+  this: Suite =>
 
-  def allNodes: Seq[Node]
-
+  def nodes: Seq[Node]
   def notMiner: Node
 
-  protected val sender: Node = notMiner
-  private val richAddress = sender.address
+  protected def sender: Node = notMiner
+  private def richAddress = sender.address
 
   protected val defaultBalance: Long = 100.waves
 
@@ -46,15 +45,15 @@ trait IntegrationSuiteWithThreeAddresses extends FunSuite with BeforeAndAfterAll
   // if we first await height + 1 and then tx, it could be gone with height + 2
   // so we await tx twice
   protected def waitForHeightAraiseAndTxPresent(transactionId: String, heightIncreaseOn: Integer): Future[Unit] = for {
-    height <- traverse(allNodes)(_.height).map(_.max)
-    _ <- traverse(allNodes)(_.waitForTransaction(transactionId))
-    _ <- traverse(allNodes)(_.waitForHeight(height + heightIncreaseOn))
-    _ <- traverse(allNodes)(_.waitForTransaction(transactionId))
+    height <- traverse(nodes)(_.height).map(_.max)
+    _ <- traverse(nodes)(_.waitForTransaction(transactionId))
+    _ <- traverse(nodes)(_.waitForHeight(height + heightIncreaseOn))
+    _ <- traverse(nodes)(_.waitForTransaction(transactionId))
   } yield ()
 
   protected def waitForHeightAraise(heightIncreaseOn: Integer): Future[Unit] = for {
-    height <- traverse(allNodes)(_.height).map(_.max)
-    _ <- traverse(allNodes)(_.waitForHeight(height + heightIncreaseOn))
+    height <- traverse(nodes)(_.height).map(_.max)
+    _ <- traverse(nodes)(_.waitForHeight(height + heightIncreaseOn))
   } yield ()
 
 
@@ -74,14 +73,13 @@ trait IntegrationSuiteWithThreeAddresses extends FunSuite with BeforeAndAfterAll
     })
   }
 
-
-  override def beforeAll(): Unit = {
+  abstract override def beforeAll(): Unit = {
     super.beforeAll()
 
     def waitForTxsToReachAllNodes(txIds: Seq[String]): Future[_] = {
       val txNodePairs = for {
         txId <- txIds
-        node <- allNodes
+        node <- nodes
       } yield (node, txId)
       Future.traverse(txNodePairs) { case (node, tx) => node.waitForTransaction(tx) }
     }
@@ -94,8 +92,8 @@ trait IntegrationSuiteWithThreeAddresses extends FunSuite with BeforeAndAfterAll
     val correctStartBalancesFuture = for {
       txs <- makeTransfers
 
-      height <- traverse(allNodes)(_.height).map(_.max)
-      _ <- traverse(allNodes)(_.waitForHeight(height + 2))
+      height <- traverse(nodes)(_.height).map(_.max)
+      _ <- traverse(nodes)(_.waitForHeight(height + 2))
 
       _ <- waitForTxsToReachAllNodes(txs)
 

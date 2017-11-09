@@ -4,25 +4,21 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.util._
 import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
 
-import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.{Await, Future}
 import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
+import scala.concurrent.{Await, Future}
 import scala.util.Random
-
 
 class MicroblocksFeeTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with CancelAfterFailure {
 
   import MicroblocksFeeTestSuite._
 
-  private val docker = Docker(getClass)
-  private val allNodes = Configs.map(docker.startNode)
+  private lazy val docker = Docker(getClass)
+  private lazy val allNodes = docker.startNodes(Configs)
 
-
-  private val notMiner = allNodes.head
-  private val firstAddress = allNodes(1).address
-
+  private def notMiner = allNodes.head
+  private def firstAddress = allNodes(1).address
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
@@ -94,7 +90,7 @@ class MicroblocksFeeTestSuite extends FreeSpec with Matchers with BeforeAndAfter
 
   object MicroblocksFeeTestSuite {
 
-    private val dockerConfigs = Docker.NodeConfigs.getConfigList("nodes").asScala
+    import NodeConfigs.Default
 
     val NodesCount: Int = 3
 
@@ -147,10 +143,10 @@ class MicroblocksFeeTestSuite extends FreeSpec with Matchers with BeforeAndAfter
     )
 
 
-    val Configs: Seq[Config] = Seq(notMiner.withFallback(dockerConfigs.head),
-      notMiner.withFallback(dockerConfigs(1)),
-      miner.withFallback(dockerConfigs(2)),
-      miner.withFallback(dockerConfigs(3)))
+    val Configs: Seq[Config] = Seq(notMiner.withFallback(Default.head),
+      notMiner.withFallback(Default(1)),
+      miner.withFallback(Default(2)),
+      miner.withFallback(Default(3)))
 
   }
 

@@ -4,15 +4,14 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.NetworkUniqueConnectionsTestSuite._
 import org.scalatest.{BeforeAndAfterAll, FreeSpec, Matchers}
 
-import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent._
 import scala.concurrent.duration.DurationInt
 import scala.util.Random
 
-class NetworkUniqueConnectionsTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll{
+class NetworkUniqueConnectionsTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll {
 
-  private val docker = Docker(getClass)
+  private lazy val docker = Docker(getClass)
 
   "nodes should up and connect with each other" in {
     val firstNode = docker.startNode(FirstNodeConfig)
@@ -54,10 +53,8 @@ class NetworkUniqueConnectionsTestSuite extends FreeSpec with Matchers with Befo
 
 private object NetworkUniqueConnectionsTestSuite {
 
-  private val configs = Docker.NodeConfigs.getConfigList("nodes").asScala
-
-  val NodeConfigs: Seq[Config] = Random.shuffle(configs).take(2)
-  val FirstNodeConfig: Config = NodeConfigs.head
-  val SecondNodeConfig: Config = NodeConfigs.last
+  private val configs = Random.shuffle(NodeConfigs.Default).take(2)
+  val FirstNodeConfig: Config = configs.head
+  val SecondNodeConfig: Config = configs.last
 
 }

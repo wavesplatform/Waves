@@ -47,11 +47,13 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
     s"$prefix, total persisted blocks: ${historyWriter.height()}, [ in-memory: ${inMemDiffs().toList.mkString(" | ")} ] + persisted: h=${persisted.height}"
   }
 
-  private def currentPersistedBlocksState: StateReader = read { implicit l => Coeval(composite(inMemDiffs(), persisted)) }
+  private def currentPersistedBlocksState: StateReader = Coeval(read { implicit l => composite(inMemDiffs(), persisted) })
 
-  def bestLiquidState: StateReader = read { implicit l => composite(Coeval(ngState().map(_.bestLiquidDiff).orEmpty), currentPersistedBlocksState) }
+  def bestLiquidState: StateReader = composite(Coeval(read { implicit l => ngState().map(_.bestLiquidDiff).orEmpty}), currentPersistedBlocksState)
 
-  def historyReader: NgHistory with DebugNgHistory with FeatureProvider = read { implicit l => new NgHistoryReader(() => ngState(), historyWriter, settings.blockchainSettings.functionalitySettings) }
+  def historyReader: NgHistory with DebugNgHistory with FeatureProvider = {
+    new NgHistoryReader(() => read { implicit l => ngState() }, historyWriter, settings.blockchainSettings.functionalitySettings)
+  }
 
   private def syncPersistedAndInMemory(): Unit = write { implicit l =>
     log.info(heights("State rebuild started"))

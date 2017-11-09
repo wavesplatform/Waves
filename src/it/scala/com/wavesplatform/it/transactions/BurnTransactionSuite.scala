@@ -1,16 +1,14 @@
 package com.wavesplatform.it.transactions
 
 import com.wavesplatform.it.util._
-import com.wavesplatform.it.{IntegrationSuiteWithThreeAddresses, Node}
 
 import scala.concurrent.Await
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 
-class BurnTransactionSpecification(override val allNodes: Seq[Node], override val notMiner: Node)
-  extends IntegrationSuiteWithThreeAddresses {
+class BurnTransactionSuite extends BaseTransactionSuite {
 
   private val defaultQuantity = 100000
+
   test("burning assets changes issuer's asset balance; issuer's waves balance is decreased by fee") {
     val f = for {
       _ <- assertBalances(firstAddress, 100.waves, 100.waves)
