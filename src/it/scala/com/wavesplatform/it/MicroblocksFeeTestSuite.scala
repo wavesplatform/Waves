@@ -14,13 +14,11 @@ class MicroblocksFeeTestSuite extends FreeSpec with Matchers with BeforeAndAfter
 
   import MicroblocksFeeTestSuite._
 
-  private val docker = Docker(getClass)
-  private val allNodes = docker.startNodes(Configs)
+  private lazy val docker = Docker(getClass)
+  private lazy val allNodes = docker.startNodes(Configs)
 
-
-  private val notMiner = allNodes.head
-  private val firstAddress = allNodes(1).address
-
+  private def notMiner = allNodes.head
+  private def firstAddress = allNodes(1).address
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()

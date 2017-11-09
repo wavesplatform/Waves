@@ -62,8 +62,9 @@ trait TransferSending extends ScorexLogging {
   def balanceForNode(n: Node): Future[(String, Long)] = n.balance(n.address).map(b => b.address -> b.balance)
 
   def makeTransfer(r: Req): Future[Transaction] = {
-    log.trace(s"Sending request $r")
-    addressToNode(r.source).transfer(r.source, r.targetAddress, r.amount, r.fee)
+    val node = addressToNode(r.source)
+    log.trace(s"Sending request $r to ${node.settings.networkSettings.nodeName}")
+    node.transfer(r.source, r.targetAddress, r.amount, r.fee)
   }
 
   def processRequests(requests: Seq[Req]): Future[Unit] = if (requests.isEmpty) {

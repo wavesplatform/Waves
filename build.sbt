@@ -72,31 +72,20 @@ inConfig(Test)(Seq(
   testOptions += Tests.Argument("-oIDOF", "-u", "target/test-reports")
 ))
 
-concurrentRestrictions in Global += Tags.limit(Tags.Test, 1)
+concurrentRestrictions in Global := Seq(
+  Tags.limit(Tags.CPU, 5),
+  Tags.limit(Tags.Network, 5),
+  Tags.limit(Tags.Test, 5),
+  Tags.limitAll(5)
+)
 
 Defaults.itSettings
 configs(IntegrationTest)
 inConfig(IntegrationTest)({
-  val threads = 2
-
   Seq(
+    testForkedParallel in test := false,
     envVars in test += "CONTAINER_JAVA_OPTS" -> "-Xmx1500m",
-    envVars in testOnly := (envVars in test).value,
-    parallelExecution := true,
-    fork := true,
-    testForkedParallel := true,
-    test := (test dependsOn docker).value,
-    testOptions += Tests.Filter(_.endsWith("Suite")),
-    concurrentRestrictions := Seq(Tags.limit(Tags.Test, threads)),
-    testGrouping := {
-      definedTests.value.filter(_.name.endsWith("Suite"))
-        .grouped(threads)
-        .zipWithIndex
-        .map {
-          case (tasks, i) => Group(i.toString, tasks, SubProcess(ForkOptions()))
-        }
-        .toSeq
-    }
+    envVars in testOnly += "CONTAINER_JAVA_OPTS" -> "-Xmx512m"
   )
 })
 

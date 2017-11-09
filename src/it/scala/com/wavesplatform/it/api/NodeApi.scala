@@ -38,7 +38,7 @@ trait NodeApi {
   def matcherRestPort: Int
   def blockDelay: FiniteDuration
 
-  protected val client: AsyncHttpClient = new DefaultAsyncHttpClient
+  protected def client: AsyncHttpClient
 
   protected val timer: Timer = new HashedWheelTimer()
 

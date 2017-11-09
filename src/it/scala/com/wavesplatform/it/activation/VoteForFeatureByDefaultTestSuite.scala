@@ -14,10 +14,10 @@ class VoteForFeatureByDefaultTestSuite extends FreeSpec with Matchers with Befor
 
   import VoteForFeatureByDefaultTestSuite._
 
-  private val docker = Docker(getClass)
-  private val nodes = docker.startNodes(Configs)
-  val defaultVotingFeatureNum: Short = 1
+  private lazy val docker = Docker(getClass)
+  private lazy val nodes = docker.startNodes(Configs)
 
+  val defaultVotingFeatureNum: Short = 1
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()

@@ -15,8 +15,8 @@ class NotActivateFeatureTestSuite extends FreeSpec with Matchers with BeforeAndA
 
   import NotActivateFeatureTestSuite._
 
-  private val docker = Docker(getClass)
-  private val nodes = docker.startNodes(Configs)
+  private lazy val docker = Docker(getClass)
+  private lazy val nodes = docker.startNodes(Configs)
   private var activationStatusInfoBefore = Option.empty[ActivationStatusFeature]
   private var activationStatusInfoAfter = Option.empty[ActivationStatusFeature]
 

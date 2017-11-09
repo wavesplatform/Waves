@@ -16,8 +16,8 @@ class ActivationFeatureTestSuite extends FreeSpec with Matchers with BeforeAndAf
   import ActivationFeatureTestSuite._
 
   private val waitCompletion = 4.minutes
-  private val docker = Docker(getClass)
-  private val nodes: Seq[Node] = docker.startNodes(Configs)
+  private lazy val docker = Docker(getClass)
+  private lazy val nodes: Seq[Node] = docker.startNodes(Configs)
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()

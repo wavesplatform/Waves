@@ -36,29 +36,25 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
   import Docker._
 
   private val http = asyncHttpClient(config()
-    .setMaxConnections(50)
-    .setMaxConnectionsPerHost(10)
+    .setMaxConnections(18)
+    .setMaxConnectionsPerHost(3)
     .setMaxRequestRetry(1)
     .setReadTimeout(10000)
+    .setPooledConnectionIdleTimeout(2000)
     .setRequestTimeout(10000))
 
   private val client = DefaultDockerClient.fromEnv().build()
 
   private val nodes = ConcurrentHashMap.newKeySet[Node]()
-  private val seedAddress = ConcurrentHashMap.newKeySet[String]()
   private val isStopped = new AtomicBoolean(false)
 
   sys.addShutdownHook {
     close()
   }
 
-  private def knownPeers = seedAddress.asScala.zipWithIndex
-    .map { case (seed, i) => s"-Dwaves.network.known-peers.$i=$seed" }
-    .mkString(" ")
-
   private val networkName = "waves" + this.##.toLong.toHexString
 
-  private val wavesNetworkId: String = {
+  private lazy val wavesNetworkId: String = {
     def network: Option[Network] = try {
       val networks = client.listNetworks(DockerClient.ListNetworksParam.byNetworkName(networkName))
       if (networks.isEmpty) None else Some(networks.get(0))
@@ -69,7 +65,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
     def attempt(rest: Int): String = try {
       network match {
         case Some(n) =>
-          log.info(s"Network ${n.name()} (id: ${n.id()}) is created")
+          log.info(s"Network ${n.name()} (id: ${n.id()}) is created for $tag")
           n.id()
         case None =>
           val r = client.createNetwork(NetworkConfig.builder().name(networkName).driver("bridge").checkDuplicate(true).build())
@@ -78,7 +74,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
       }
     } catch {
       case NonFatal(e) =>
-        log.warn(s"Can not create a network", e)
+        log.warn(s"Can not create a network for $tag", e)
         if (rest == 0) throw e else attempt(rest - 1)
     }
 
@@ -88,22 +84,36 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
   def startNodes(nodeConfigs: Seq[Config]): Seq[Node] = {
     val all = nodeConfigs.map(startNode)
     Await.result(
-      Future.traverse(all)(waitNodeIsUp).map(_ => all),
+      for {
+        _ <- Future.traverse(all)(waitNodeIsUp)
+        _ <- Future.traverse(all)(connectToAll)
+      } yield (),
       5.minutes
     )
+    all
   }
 
   def startNode(nodeConfig: Config): Node = {
-    val r = startNodeInternal(nodeConfig)
-    Await.result(waitNodeIsUp(r), 3.minutes)
-    r
+    val node = startNodeInternal(nodeConfig)
+    Await.result(waitNodeIsUp(node).flatMap(_ => connectToAll(node)), 3.minutes)
+    node
+  }
+
+  private def connectToAll(node: Node): Future[Unit] = {
+    val seedAddresses = nodes.asScala.map { n => (n.nodeInfo.networkIpAddress, n.nodeInfo.containerNetworkPort) }
+
+    Future
+      .traverse(seedAddresses) { seed =>
+        node.connect(seed._1, seed._2)
+      }
+      .map(_ => ())
   }
 
   private def waitNodeIsUp(node: Node): Future[Unit] = node.waitFor[Int](_.height, _ > 0, 1.second).map(_ => ())
 
   private def startNodeInternal(nodeConfig: Config): Node = {
     val javaOptions = Option(System.getenv("CONTAINER_JAVA_OPTS")).getOrElse("")
-    val configOverrides = s"$javaOptions $knownPeers ${renderProperties(asProperties(nodeConfig.withFallback(suiteConfig)))}"
+    val configOverrides = s"$javaOptions ${renderProperties(asProperties(nodeConfig.withFallback(suiteConfig)))}"
     val actualConfig = nodeConfig
       .withFallback(suiteConfig)
       .withFallback(NodeConfigs.DefaultConfigTemplate)
@@ -148,8 +158,6 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
       containerInfo.networkSettings().networks().asScala(networkName).ipAddress(),
       containerId,
       extractHostPort(ports, matcherApiPort))
-    seedAddress.add(s"${nodeInfo.networkIpAddress}:${nodeInfo.containerNetworkPort}")
-
     val node = new Node(actualConfig, nodeInfo, http)
     nodes.add(node)
     node
@@ -161,12 +169,13 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
       nodes.asScala.foreach { node =>
         node.close()
         client.stopContainer(node.nodeInfo.containerId, 0)
+        client.disconnectFromNetwork(node.nodeInfo.containerId, wavesNetworkId)
         saveLog(node)
         client.removeContainer(node.nodeInfo.containerId, RemoveContainerParam.forceKill())
       }
 
-      http.close()
       client.removeNetwork(wavesNetworkId)
+      http.close()
       client.close()
     }
   }

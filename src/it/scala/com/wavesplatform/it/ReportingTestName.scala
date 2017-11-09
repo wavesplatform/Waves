@@ -6,7 +6,6 @@ import scorex.waves.http.DebugMessage
 import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
 
-
 trait ReportingTestName extends SuiteMixin {
   th: Suite =>
   def nodes: Seq[Node]

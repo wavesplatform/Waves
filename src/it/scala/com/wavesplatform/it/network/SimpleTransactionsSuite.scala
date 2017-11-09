@@ -22,8 +22,8 @@ class SimpleTransactionsSuite extends FunSuite with BeforeAndAfterAll with Match
   with IntegrationPatience with RecoverMethods with RequestErrorAssert with IntegrationNodesInitializationAndStopping
   with IntegrationTestsScheme {
 
-  override val nodes = docker.startNodes(NodeConfigs.Default.take(3))
-  val node = nodes.head
+  override lazy val nodes: Seq[Node] = docker.startNodes(NodeConfigs.Default.take(3))
+  private lazy val node = nodes.head
 
   test("valid tx send by network to node should be in blockchain") {
     val tx = PaymentTransaction.create(

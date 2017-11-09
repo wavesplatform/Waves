@@ -11,7 +11,7 @@ import scala.util.Random
 class ValidChainGenerationSuite extends FreeSpec with IntegrationNodesInitializationAndStopping
   with Matchers with TransferSending {
 
-  override val nodes: Seq[Node] = docker.startNodes(NodeConfigs.forTest(3, 1 -> "waves.miner.enable = no"))
+  override lazy val nodes: Seq[Node] = docker.startNodes(NodeConfigs.forTest(3, 1 -> "waves.miner.enable = no"))
 
   "Generate more blocks and resynchronise after rollback" - {
     "1 of N" in test(1)
@@ -24,12 +24,12 @@ class ValidChainGenerationSuite extends FreeSpec with IntegrationNodesInitializa
         _ <- traverse(nodes)(_.waitForHeight(newHeight))
       } yield newHeight, 5.minutes)
 
-      val targetHeight = initialHeight + 2
+      val targetHeight = initialHeight + 7
       val rollbackNodes = Random.shuffle(nodes).take(n)
 
       rollbackNodes.foreach(_.rollback(1))
       val synchronizedBlocks = result(for {
-        _ <- traverse(nodes)(_.waitForHeight(targetHeight + 5))
+        _ <- traverse(nodes)(_.waitForHeight(targetHeight))
         blocks <- traverse(nodes)(_.blockAt(initialHeight))
       } yield blocks, 5.minutes)
 
