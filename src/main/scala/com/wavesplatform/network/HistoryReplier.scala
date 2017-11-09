@@ -10,7 +10,7 @@ import scorex.transaction.NgHistory
 import scorex.utils.ScorexLogging
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.{Future, blocking}
+import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
 @Sharable
@@ -25,25 +25,25 @@ class HistoryReplier(history: NgHistory, settings: SynchronizationSettings) exte
     .maximumSize(historyReplierSettings.maxMicroBlockCacheSize)
     .build(new CacheLoader[MicroBlockSignature, Array[Byte]] {
       override def load(key: MicroBlockSignature) =
-        blocking(history.microBlock(key))
+        history.microBlock(key)
           .map(m => MicroBlockResponseMessageSpec.serializeData(MicroBlockResponse(m))).get
     })
 
   private val knownBlocks = CacheBuilder.newBuilder()
     .maximumSize(historyReplierSettings.maxBlockCacheSize)
     .build(new CacheLoader[ByteStr, Array[Byte]] {
-      override def load(key: ByteStr) = blocking(history.heightOf(key).flatMap(history.blockBytes)).get
+      override def load(key: ByteStr) = history.heightOf(key).flatMap(history.blockBytes).get
     })
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
     case GetSignatures(otherSigs) => Future {
       otherSigs.view
-        .map(parent => parent -> blocking(history.blockIdsAfter(parent, settings.maxChainLength)))
+        .map(parent => parent -> history.blockIdsAfter(parent, settings.maxChainLength))
         .find(_._2.nonEmpty) match {
         case Some((parent, extension)) =>
           log.debug(s"${id(ctx)} Got GetSignatures with ${otherSigs.length}, found common parent $parent and sending ${extension.length} more signatures")
           ctx.writeAndFlush(Signatures(parent +: extension))
-        case None if otherSigs.length == 1 && otherSigs.head == blocking(history.lastBlock).get.uniqueId =>
+        case None if otherSigs.length == 1 && otherSigs.head == history.lastBlock.get.uniqueId =>
           // this is the special case when both nodes only have genesis block
           log.debug(s"${id(ctx)} Both local and remote nodes only have genesis block")
           ctx.writeAndFlush(Signatures(otherSigs))
@@ -66,7 +66,7 @@ class HistoryReplier(history: NgHistory, settings: SynchronizationSettings) exte
       }
 
     case _: Handshake =>
-      Future(blocking(history.score())).onComplete {
+      Future(history.score()).onComplete {
         case Success(score) => ctx.writeAndFlush(LocalScoreChanged(score))
         case Failure(e) => ctx.fireExceptionCaught(e)
       }
