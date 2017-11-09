@@ -97,7 +97,7 @@ object TransferTransaction {
     if (attachment.length > TransferTransaction.MaxAttachmentSize) {
       Left(ValidationError.TooBigArray)
     } else if (amount <= 0) {
-      Left(ValidationError.NegativeAmount) //CHECK IF AMOUNT IS POSITIVE
+      Left(ValidationError.NegativeAmount(amount, "waves")) //CHECK IF AMOUNT IS POSITIVE
     } else if (Try(Math.addExact(amount, feeAmount)).isFailure) {
       Left(ValidationError.OverflowError) // CHECK THAT fee+amount won't overflow Long
     } else if (feeAmount <= 0) {

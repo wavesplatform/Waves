@@ -4,28 +4,26 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.api.NodeApi.{AssetBalance, LevelResponse, MatcherStatusResponse, OrderBookResponse, Transaction}
 import com.wavesplatform.matcher.api.CancelOrderRequest
 import com.wavesplatform.state2.ByteStr
-import org.scalatest.{BeforeAndAfterAll, FreeSpec, Matchers}
+import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
 
-import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.util.Random
 
-class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with ReportingTestName{
+class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with CancelAfterFailure with ReportingTestName{
 
   import MatcherTestSuite._
 
-  private val docker = Docker(getClass)
+  private lazy val docker = Docker(getClass)
+  override lazy val nodes: Seq[Node] = docker.startNodes(Configs)
 
-  override val nodes = Configs.map(docker.startNode)
-
-  private val matcherNode = nodes.head
-  private val aliceNode = nodes(1)
-  private val bobNode = nodes(2)
+  private def matcherNode = nodes.head
+  private def aliceNode = nodes(1)
+  private def bobNode = nodes(2)
 
   private var matcherBalance = (0L, 0L)
   private var aliceBalance = (0L, 0L)
@@ -340,9 +338,10 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
 }
 
 object MatcherTestSuite {
-  val ForbiddenAssetId = "FdbnAsset"
 
-  private val dockerConfigs = Docker.NodeConfigs.getConfigList("nodes").asScala
+  import NodeConfigs.Default
+
+  val ForbiddenAssetId = "FdbnAsset"
 
   private val matcherConfig = ConfigFactory.parseString(
     s"""
@@ -369,7 +368,7 @@ object MatcherTestSuite {
 
   val Waves: Long = 100000000L
 
-  val Configs: Seq[Config] = Seq(matcherConfig.withFallback(dockerConfigs.head)) ++
-    Random.shuffle(dockerConfigs.tail.init).take(2).map(nonGeneratingPeersConfig.withFallback(_)) ++
-    Seq(dockerConfigs.last)
+  val Configs: Seq[Config] = Seq(matcherConfig.withFallback(Default.head)) ++
+    Random.shuffle(Default.tail.init).take(2).map(nonGeneratingPeersConfig.withFallback(_)) ++
+    Seq(Default.last)
 }

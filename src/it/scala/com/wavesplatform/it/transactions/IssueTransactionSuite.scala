@@ -1,15 +1,12 @@
 package com.wavesplatform.it.transactions
 
 import com.wavesplatform.it.util._
-import com.wavesplatform.it.{IntegrationSuiteWithThreeAddresses, Node}
 import org.scalatest.prop.TableDrivenPropertyChecks
 
 import scala.concurrent.Await
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 
-class IssueTransactionSpecification(override val allNodes: Seq[Node], override val notMiner: Node)
-  extends IntegrationSuiteWithThreeAddresses with TableDrivenPropertyChecks {
+class IssueTransactionSuite extends BaseTransactionSuite with TableDrivenPropertyChecks {
 
   private val defaultQuantity = 100000
   private val assetFee = 5.waves
@@ -91,6 +88,5 @@ class IssueTransactionSpecification(override val allNodes: Seq[Node], override v
       Await.result(f, 1.minute)
     }
   }
-
 
 }
