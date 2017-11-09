@@ -9,6 +9,7 @@ import kamon.Kamon
 import kamon.metric.instrument
 import scorex.block.Block
 import scorex.block.Block.BlockId
+import scorex.block.Block.BlockId
 import scorex.transaction.NgHistory
 import scorex.utils.ScorexLogging
 
