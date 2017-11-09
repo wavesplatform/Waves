@@ -25,8 +25,11 @@ class PaymentRouteSpec extends RouteSpec("/payment")
       case (recipient, amount, fee) =>
 
         val timestamp = System.currentTimeMillis()
-        val time = mock[Time]
-        (time.getTimestamp _).expects().returns(timestamp).anyNumberOfTimes()
+
+        val time =  new Time {
+          override def correctedTime(): Long = timestamp
+          override def getTimestamp(): Long = timestamp
+        }
 
         val sender = testWallet.privateKeyAccounts().head
         val tx = TransferTransaction.create(None, sender, recipient, amount, timestamp, None, fee, Array())

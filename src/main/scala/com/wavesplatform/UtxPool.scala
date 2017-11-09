@@ -98,7 +98,7 @@ class UtxPool(time: Time,
     Monoid.combine(base, foundInUtx)
   }
 
-  def all(): Seq[Transaction] = {
+  def all: Seq[Transaction] = {
     transactions.values.asScala.toSeq.sorted(TransactionsOrdering.InUTXPool)
   }
 

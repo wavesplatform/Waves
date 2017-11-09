@@ -8,7 +8,7 @@ name := "waves"
 organization := "com.wavesplatform"
 git.useGitDescribe := true
 git.uncommittedSignifier := Some("DIRTY")
-scalaVersion in ThisBuild := "2.12.3"
+scalaVersion in ThisBuild := "2.12.4"
 crossPaths := false
 publishArtifact in (Compile, packageDoc) := false
 publishArtifact in (Compile, packageSrc) := false
@@ -44,10 +44,8 @@ libraryDependencies ++=
   Dependencies.fp ++
   Seq(
     "com.iheart" %% "ficus" % "1.4.2",
-    ("org.scorexfoundation" %% "scrypto" % "1.2.2")
-      .exclude("org.slf4j", "slf4j-api"),
-    "commons-net" % "commons-net" % "3.+",
-    "io.monix" %% "monix" % "2.3.0"
+    ("org.scorexfoundation" %% "scrypto" % "1.2.2").exclude("org.slf4j", "slf4j-api"),
+    "commons-net" % "commons-net" % "3.+"
   )
 
 sourceGenerators in Compile += Def.task {
