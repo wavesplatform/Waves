@@ -1,7 +1,6 @@
 package com.wavesplatform.it
 
 import org.scalatest._
-import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
 
 import scala.concurrent.Await.result
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -9,8 +8,10 @@ import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
 import scala.util.Random
 
-class ValidChainGenerationSpec(override val nodes: Seq[Node]) extends FreeSpec with ScalaFutures with IntegrationPatience
+class ValidChainGenerationSuite extends FreeSpec with IntegrationNodesInitializationAndStopping
   with Matchers with TransferSending {
+
+  override lazy val nodes: Seq[Node] = docker.startNodes(NodeConfigs.forTest(3, 1 -> "waves.miner.enable = no"))
 
   "Generate more blocks and resynchronise after rollback" - {
     "1 of N" in test(1)
@@ -23,7 +24,7 @@ class ValidChainGenerationSpec(override val nodes: Seq[Node]) extends FreeSpec w
         _ <- traverse(nodes)(_.waitForHeight(newHeight))
       } yield newHeight, 5.minutes)
 
-      val targetHeight = initialHeight + 2
+      val targetHeight = initialHeight + 7
       val rollbackNodes = Random.shuffle(nodes).take(n)
 
       rollbackNodes.foreach(_.rollback(1))

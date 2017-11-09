@@ -1,5 +1,6 @@
 import com.typesafe.sbt.packager.archetypes.TemplateWriter
 import sbt.Keys._
+import sbt.Tests._
 import sbt._
 
 enablePlugins(sbtdocker.DockerPlugin, JavaServerAppPackaging, JDebPackaging, SystemdPlugin, GitVersioning)
@@ -69,15 +70,22 @@ inConfig(Test)(Seq(
   testOptions += Tests.Argument("-oIDOF", "-u", "target/test-reports")
 ))
 
-concurrentRestrictions in Global += Tags.limit(Tags.Test, 1)
+concurrentRestrictions in Global := Seq(
+  Tags.limit(Tags.CPU, 5),
+  Tags.limit(Tags.Network, 5),
+  Tags.limit(Tags.Test, 5),
+  Tags.limitAll(5)
+)
 
 Defaults.itSettings
 configs(IntegrationTest)
-inConfig(IntegrationTest)(Seq(
-  parallelExecution := false,
-  test := (test dependsOn docker).value,
-  testOptions += Tests.Filter(_.endsWith("Suite"))
-))
+inConfig(IntegrationTest)({
+  Seq(
+    testForkedParallel in test := false,
+    envVars in test += "CONTAINER_JAVA_OPTS" -> "-Xmx1500m",
+    envVars in testOnly += "CONTAINER_JAVA_OPTS" -> "-Xmx512m"
+  )
+})
 
 dockerfile in docker := {
   val configTemplate = (resourceDirectory in IntegrationTest).value / "template.conf"

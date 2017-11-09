@@ -1,14 +1,11 @@
 package com.wavesplatform.it.transactions
 
 import com.wavesplatform.it.util._
-import com.wavesplatform.it.{IntegrationSuiteWithThreeAddresses, Node}
 
 import scala.concurrent.Await
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 
-class ReissueTransactionSpecification(override val allNodes: Seq[Node], override val notMiner: Node)
-  extends IntegrationSuiteWithThreeAddresses {
+class ReissueTransactionSuite extends BaseTransactionSuite {
 
   private val defaultQuantity = 100000
 

@@ -1,17 +1,14 @@
 package com.wavesplatform.it.transactions
 
 import com.wavesplatform.it.util._
-import com.wavesplatform.it.{IntegrationSuiteWithThreeAddresses, Node}
 import org.scalatest.prop.TableDrivenPropertyChecks
 
 import scala.concurrent.Await
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 
+class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropertyChecks {
 
-class AliasTransactionSpecification(override val allNodes: Seq[Node], override val notMiner: Node)
-  extends IntegrationSuiteWithThreeAddresses with TableDrivenPropertyChecks {
-
+  private val waitCompletion = 2.minutes
   private val aliasFee = 1.waves
   private val leasingFee = 0.001.waves
 
@@ -31,7 +28,7 @@ class AliasTransactionSpecification(override val allNodes: Seq[Node], override v
       _ <- assertBalances(firstAddress, 98.waves, 98.waves)
     } yield succeed
 
-    Await.result(f, 1.minute)
+    Await.result(f, waitCompletion)
   }
 
   test("Not able to create same aliases to same address") {
@@ -51,7 +48,7 @@ class AliasTransactionSpecification(override val allNodes: Seq[Node], override v
       _ <- assertBalances(firstAddress, newBalance, newEffectiveBalance)
     } yield succeed
 
-    Await.result(f, 1.minute)
+    Await.result(f, waitCompletion)
   }
 
 
@@ -70,7 +67,7 @@ class AliasTransactionSpecification(override val allNodes: Seq[Node], override v
       _ <- assertBalances(firstAddress, balance - aliasFee, effectiveBalance - aliasFee)
     } yield succeed
 
-    Await.result(f, 1.minute)
+    Await.result(f, waitCompletion)
   }
 
   test("Able to create several different aliases to same addresses") {
@@ -102,10 +99,8 @@ class AliasTransactionSpecification(override val allNodes: Seq[Node], override v
         .map(s => s"alias:${sender.settings.blockchainSettings.addressSchemeCharacter}:$s")
     }
 
-    Await.result(f, 1.minute)
+    Await.result(f, waitCompletion)
   }
-
-
 
 
   test("Able to get address by alias") {
@@ -119,7 +114,7 @@ class AliasTransactionSpecification(override val allNodes: Seq[Node], override v
       addressByAlias should be(firstAddress)
     }
 
-    Await.result(f, 1.minute)
+    Await.result(f, waitCompletion)
   }
 
   val aliases_names =
@@ -141,7 +136,7 @@ class AliasTransactionSpecification(override val allNodes: Seq[Node], override v
 
       } yield succeed
 
-      Await.result(f, 1.minute)
+      Await.result(f, waitCompletion)
     }
 
   }
@@ -162,7 +157,7 @@ class AliasTransactionSpecification(override val allNodes: Seq[Node], override v
         _ <- assertBadRequestAndMessage(sender.createAlias(secondAddress, alias, aliasFee), message)
       } yield succeed
 
-      Await.result(f, 1.minute)
+      Await.result(f, waitCompletion)
     }
 
 
@@ -188,19 +183,19 @@ class AliasTransactionSpecification(override val allNodes: Seq[Node], override v
 
       _ <- assertBalances(firstAddress, firstAddressBalance - leasingFee,
         firstAddressEffectiveBalance - leasingAmount - leasingFee)
-      _ <- assertBalances(thirdAddress, thirdAddressBalance - aliasFee, thirdAddressEffectiveBalance -aliasFee + leasingAmount)
+      _ <- assertBalances(thirdAddress, thirdAddressBalance - aliasFee, thirdAddressEffectiveBalance - aliasFee + leasingAmount)
     } yield succeed
-    Await.result(f, 1.minute)
+    Await.result(f, waitCompletion)
   }
 
   //previous test should not be commented to run this one
-  test("Not able to create aliase when insufficient funds"){
+  test("Not able to create aliase when insufficient funds") {
     val alias = "test_alias7"
     val f = for {
       _ <- assertBadRequestAndMessage(sender.createAlias(firstAddress, alias, aliasFee),
         "State check failed. Reason: negative effective balance")
 
-    }yield succeed
-    Await.result(f, 1.minute)
+    } yield succeed
+    Await.result(f, waitCompletion)
   }
 }
