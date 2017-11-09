@@ -8,6 +8,7 @@ import io.netty.util.concurrent.ScheduledFuture
 import kamon.Kamon
 import kamon.metric.instrument
 import scorex.block.Block
+import scorex.block.Block.BlockId
 import scorex.transaction.NgHistory
 import scorex.utils.ScorexLogging
 
@@ -15,9 +16,12 @@ import scala.collection.mutable
 import scala.collection.parallel.ForkJoinTaskSupport
 import scala.concurrent.duration.FiniteDuration
 
+
 class ExtensionHandler(syncTimeout: FiniteDuration,
                        peerDatabase: PeerDatabase, history: NgHistory)
   extends ChannelDuplexHandler with ScorexLogging {
+
+  import ExtensionHandler._
 
   // ExtensionSignaturesLoader
   private var currentTimeout = Option.empty[ScheduledFuture[Unit]]
@@ -36,20 +40,16 @@ class ExtensionHandler(syncTimeout: FiniteDuration,
 
   private val extensionsFetchingTimeStats = new LatencyHistogram(Kamon.metrics.histogram("extensions-fetching-time", instrument.Time.Milliseconds))
 
-  private def cancelBlacklist(): Unit = {
-    blacklistingScheduledFuture.foreach(_.cancel(false))
-    blacklistingScheduledFuture = None
-  }
-
   private def blacklistAfterTimeout(ctx: ChannelHandlerContext): Unit = {
-    cancelBlacklist()
+    blacklistingScheduledFuture.foreach(_.cancel(false))
     blacklistingScheduledFuture = Some(ctx.executor().schedule(syncTimeout) {
       peerDatabase.blacklistAndClose(ctx.channel(), "Timeout loading blocks")
     })
   }
 
   override def channelInactive(ctx: ChannelHandlerContext): Unit = {
-    cancelBlacklist()
+    blacklistingScheduledFuture.foreach(_.cancel(false))
+    blacklistingScheduledFuture = None
     currentTimeout.foreach(_.cancel(false))
     currentTimeout = None
     super.channelInactive(ctx)
@@ -86,7 +86,10 @@ class ExtensionHandler(syncTimeout: FiniteDuration,
       pendingSignatures -= b.uniqueId
       blacklistAfterTimeout(ctx)
       if (pendingSignatures.isEmpty) {
-        cancelBlacklist()
+        {
+          blacklistingScheduledFuture.foreach(_.cancel(false))
+          blacklistingScheduledFuture = None
+        }
         extensionsFetchingTimeStats.record()
         log.trace(s"${id(ctx)} Loaded all blocks, doing a pre-check")
 
@@ -125,7 +128,7 @@ class ExtensionHandler(syncTimeout: FiniteDuration,
     // didn't handle GetSignatures(lastBlockId) message properly, hence the check.
     log.trace(s"${id(ctx)} loading next part")
     hopefullyNextIds = blocks.view.map(_.uniqueId).reverseIterator.take(100).toSeq
-    ctx.writeAndFlush(LoadBlockchainExtension(hopefullyNextIds))
+    requestIfNotEmpty(ctx, hopefullyNextIds)
   }
 
   def handleExtensionBlocks(ctx: ChannelHandlerContext, extension: Seq[Block]): Unit = {
@@ -173,19 +176,31 @@ class ExtensionHandler(syncTimeout: FiniteDuration,
         hopefullyNextIds = Seq.empty
         nextExtensionBlocks = Seq.empty
       }
-      if (currentTimeout.isEmpty) {
-        lastKnownSignatures = localIds
-        log.debug(s"${id(ctx)} Loading extension, last ${localIds.length} are ${formatSignatures(localIds)}")
-        currentTimeout = Some(ctx.executor().schedule(syncTimeout) {
-          if (currentTimeout.nonEmpty && ctx.channel().isActive) {
-            peerDatabase.blacklistAndClose(ctx.channel(), "Timeout expired while loading extension")
-          }
-        })
-        ctx.writeAndFlush(GetSignatures(localIds), promise)
-      } else {
-        log.debug(s"${id(ctx)} Received request to load signatures while waiting for extension, ignoring for now")
-        promise.setSuccess()
-      }
+      requestIfNotEmpty(ctx, localIds)
     }
   }
+
+  def requestIfNotEmpty(ctx: ChannelHandlerContext, localIds: Seq[BlockId]): Unit = {
+    if (currentTimeout.isEmpty) {
+      lastKnownSignatures = localIds
+      log.debug(s"${id(ctx)} Loading extension, last ${localIds.length} are ${formatSignatures(localIds)}")
+      currentTimeout = Some(ctx.executor().schedule(syncTimeout) {
+        if (currentTimeout.nonEmpty && ctx.channel().isActive) {
+          peerDatabase.blacklistAndClose(ctx.channel(), "Timeout expired while loading extension")
+        }
+      })
+      ctx.requestSignatures(localIds)
+    } else {
+      log.debug(s"${id(ctx)} Received request to load signatures while waiting for extension, ignoring for now")
+    }
+  }
+}
+
+
+object ExtensionHandler {
+
+  implicit class ChannelHandlerContextExt(ctx: ChannelHandlerContext) {
+    def requestSignatures(lastIds: Seq[BlockId]): Unit = ctx.writeAndFlush(GetSignatures(lastIds))
+  }
+
 }
