@@ -52,18 +52,15 @@ class HistoryReplier(history: NgHistory, settings: SynchronizationSettings) exte
       }
     }.runAsync
 
-    case GetBlock(sig) => Task {
-      Option(knownBlocks.get(sig)).foreach(bytes =>
-        ctx.writeAndFlush(RawBytes(BlockMessageSpec.messageCode, bytes)))
-    }.runAsync
+    case GetBlock(sig) => Task(knownBlocks.get(sig)).map(bytes =>
+      ctx.writeAndFlush(RawBytes(BlockMessageSpec.messageCode, bytes)))
+      .runAsync
 
     case mbr@MicroBlockRequest(totalResBlockSig) =>
       log.trace(id(ctx) + "Received " + mbr)
-      Task {
-        Option(knownMicroBlocks.get(totalResBlockSig)).foreach { bytes =>
-          ctx.writeAndFlush(RawBytes(MicroBlockResponseMessageSpec.messageCode, bytes))
-          log.trace(id(ctx) + s"Sent MicroBlockResponse(total=${totalResBlockSig.trim})")
-        }
+      Task(knownMicroBlocks.get(totalResBlockSig)).map { bytes =>
+        ctx.writeAndFlush(RawBytes(MicroBlockResponseMessageSpec.messageCode, bytes))
+        log.trace(id(ctx) + s"Sent MicroBlockResponse(total=${totalResBlockSig.trim})")
       }.runAsync
 
     case _: Handshake => Task {
