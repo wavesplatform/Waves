@@ -11,7 +11,8 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.util.Random
 
-class ActivationFeatureTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with CancelAfterFailure with ActivationStatusRequest {
+class ActivationFeatureTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with CancelAfterFailure
+  with ActivationStatusRequest {
 
   import ActivationFeatureTestSuite._
 
@@ -93,7 +94,7 @@ class ActivationFeatureTestSuite extends FreeSpec with Matchers with BeforeAndAf
 
     val NodesCount: Int = 4
 
-    val Configs: Seq[Config] = Random.shuffle(NodeConfigs.Default.init).take(NodesCount).map(supportedNodes.withFallback(_))
+    val Configs: Seq[Config] = Random.shuffle(NodeConfigs.Default).take(NodesCount).map(supportedNodes.withFallback(_))
 
   }
 

@@ -1,10 +1,12 @@
 package com.wavesplatform.it
 
+import com.wavesplatform.it.api.MultipleNodesApi
 import com.wavesplatform.it.api.NodeApi.{AssetBalance, FullAssetInfo}
 import com.wavesplatform.it.util._
 import org.scalatest._
 import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
 import scorex.transaction.TransactionParser.TransactionType
+import scorex.utils.ScorexLogging
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future.traverse
@@ -12,7 +14,8 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
 trait IntegrationSuiteWithThreeAddresses extends BeforeAndAfterAll with Matchers with ScalaFutures
-  with IntegrationPatience with RecoverMethods with RequestErrorAssert with IntegrationTestsScheme {
+  with IntegrationPatience with RecoverMethods with RequestErrorAssert with IntegrationTestsScheme
+  with MultipleNodesApi with ScorexLogging {
   this: Suite =>
 
   def nodes: Seq[Node]
@@ -33,12 +36,31 @@ trait IntegrationSuiteWithThreeAddresses extends BeforeAndAfterAll with Matchers
 
   protected def assertBalances(acc: String, balance: Long, effectiveBalance: Long): Future[Unit] = {
     for {
-      newBalance <- sender.balance(acc).map(_.balance)
-      newEffectiveBalance <- sender.effectiveBalance(acc).map(_.balance)
+      newBalance <- accountBalance(acc)
+      newEffectiveBalance <- accountEffectiveBalance(acc)
     } yield {
-      newEffectiveBalance shouldBe effectiveBalance
-      newBalance shouldBe balance
+      withClue(s"effective balance of $acc") {
+        newEffectiveBalance shouldBe effectiveBalance
+      }
+      withClue(s"balance of $acc") {
+        newBalance shouldBe balance
+      }
     }
+  }
+
+  protected def dumpBalances(node: Node, accounts: Seq[String], label: String): Future[Unit] = {
+    Future
+      .traverse(accounts) { acc =>
+        accountBalance(acc).zip(accountEffectiveBalance(acc)).map(acc -> _)
+      }
+      .map { info =>
+        val formatted = info
+          .map { case (account, (balance, effectiveBalance)) =>
+            f"$account: balance = $balance, effective = $effectiveBalance"
+          }
+          .mkString("\n")
+        log.debug(s"$label:\n$formatted")
+      }
   }
 
   // if we first await tx and then height + 1, it could be gone with height + 1
@@ -81,23 +103,25 @@ trait IntegrationSuiteWithThreeAddresses extends BeforeAndAfterAll with Matchers
         txId <- txIds
         node <- nodes
       } yield (node, txId)
-      Future.traverse(txNodePairs) { case (node, tx) => node.waitForTransaction(tx) }
+      traverse(txNodePairs) { case (node, tx) => node.waitForTransaction(tx) }
     }
 
-    def makeTransfers: Future[Seq[String]] = Future.sequence(Seq(
-      sender.transfer(richAddress, firstAddress, defaultBalance, sender.fee(TransactionType.TransferTransaction)),
-      sender.transfer(richAddress, secondAddress, defaultBalance, sender.fee(TransactionType.TransferTransaction)),
-      sender.transfer(richAddress, thirdAddress, defaultBalance, sender.fee(TransactionType.TransferTransaction)))).map(_.map(_.id))
+    val accounts = Seq(firstAddress, secondAddress, thirdAddress)
+
+    def makeTransfers: Future[Seq[String]] = traverse(accounts) { acc =>
+      sender.transfer(richAddress, acc, defaultBalance, sender.fee(TransactionType.TransferTransaction)).map(_.id)
+    }
 
     val correctStartBalancesFuture = for {
+      _ <- dumpBalances(sender, accounts, "initial")
       txs <- makeTransfers
 
       height <- traverse(nodes)(_.height).map(_.max)
       _ <- traverse(nodes)(_.waitForHeight(height + 2))
 
       _ <- waitForTxsToReachAllNodes(txs)
-
-      _ <- Future.sequence(Seq(firstAddress, secondAddress, thirdAddress).map(address => assertBalances(address, defaultBalance, defaultBalance)))
+      _ <- dumpBalances(sender, accounts, "after transfer")
+      _ <- traverse(accounts)(assertBalances(_, defaultBalance, defaultBalance))
     } yield succeed
 
     Await.result(correctStartBalancesFuture, 5.minutes)

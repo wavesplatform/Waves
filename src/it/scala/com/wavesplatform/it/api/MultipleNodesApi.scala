@@ -9,12 +9,10 @@ import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{Future, Promise}
 
 trait MultipleNodesApi {
-  def waitFor[A](nodes: Iterable[NodeApi])
-                (request: NodeApi => Future[A],
-                 cond: Iterable[A] => Boolean,
-                 retryInterval: FiniteDuration): Future[Boolean] = {
+  def waitFor[A](nodes: Iterable[NodeApi], retryInterval: FiniteDuration)
+                (request: NodeApi => Future[A], cond: Iterable[A] => Boolean): Future[Boolean] = {
     def retry = sleep(retryInterval).flatMap { _ =>
-      waitFor(nodes)(request, cond, retryInterval)
+      waitFor(nodes, retryInterval)(request, cond)
     }
 
     Future.traverse(nodes)(request)
@@ -26,8 +24,11 @@ trait MultipleNodesApi {
       }
   }
 
-  def waitForSameBlocksAt(nodes: Iterable[NodeApi])(height: Int, retryInterval: FiniteDuration): Future[Boolean] = {
-    waitFor[NodeApi.Block](nodes)(_.blockAt(height), { blocks => blocks.forall(_ == blocks.head) }, retryInterval)
+  def waitForSameBlocksAt(nodes: Iterable[NodeApi], retryInterval: FiniteDuration, height: Int): Future[Boolean] = {
+    waitFor[NodeApi.Block](nodes, retryInterval)(_.blockAt(height), { blocks =>
+      val sig = blocks.map(_.signature)
+      sig.forall(_ == sig.head)
+    })
   }
 }
 

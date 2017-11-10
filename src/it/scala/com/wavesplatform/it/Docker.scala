@@ -160,6 +160,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
       extractHostPort(ports, matcherApiPort))
     val node = new Node(actualConfig, nodeInfo, http)
     nodes.add(node)
+    log.debug(s"Started $containerId -> ${node.settings.networkSettings.nodeName}")
     node
   }
 

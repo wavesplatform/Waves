@@ -27,7 +27,7 @@ class WideStateGenerationSuite extends FreeSpec with IntegrationNodesInitializat
     height <- traverse(nodes)(_.height).map(_.max)
     _ <- traverse(nodes)(_.waitForHeight(height + 30))
 
-    _ <- waitForSameBlocksAt(nodes)(height + 10, 5.seconds)
+    _ <- waitForSameBlocksAt(nodes, 5.seconds, height + 10)
   } yield (), 10.minutes)
 
 }

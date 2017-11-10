@@ -25,7 +25,7 @@ class ValidChainGenerationSuite extends FreeSpec with IntegrationNodesInitializa
 
       rollbackNodes = Random.shuffle(nodes).take(n)
       _ <- traverse(rollbackNodes)(_.rollback(1))
-      _ <- waitForSameBlocksAt(nodes)(baseHeight, 5.seconds)
+      _ <- waitForSameBlocksAt(nodes, 5.seconds, baseHeight)
     } yield (), 7.minutes)
   }
 }
