@@ -181,15 +181,13 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
   }
 
   private def saveLog(node: Node): Unit = {
-    val logDir = Paths.get(System.getProperty("user.dir"), "target", "logs")
+    val logDir = Option(System.getProperty("waves.it.logging.dir")).map(Paths.get(_))
+      .getOrElse(Paths.get(System.getProperty("user.dir"), "target", "logs"))
+
     Files.createDirectories(logDir)
     import node.nodeInfo.containerId
 
-    val logFile = {
-      val baseName = s"${this.##.toLong.toHexString}-${node.settings.networkSettings.nodeName}"
-      val fileName = if (tag.isEmpty) baseName else s"$tag-$baseName"
-      logDir.resolve(s"$fileName.log").toFile
-    }
+    val logFile = logDir.resolve(s"${node.settings.networkSettings.nodeName}.log").toFile
     log.info(s"Writing logs of $containerId to ${logFile.getAbsolutePath}")
 
     val fileStream = new FileOutputStream(logFile, false)
