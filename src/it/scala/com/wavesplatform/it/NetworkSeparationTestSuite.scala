@@ -1,5 +1,6 @@
 package com.wavesplatform.it
 
+import com.wavesplatform.it.api.MultipleNodesApi
 import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers}
 
 import scala.concurrent.{Await, Future}
@@ -8,7 +9,7 @@ import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
 
 class NetworkSeparationTestSuite extends FreeSpec with Matchers with IntegrationNodesInitializationAndStopping
-  with CancelAfterFailure with ReportingTestName {
+  with CancelAfterFailure with ReportingTestName with MultipleNodesApi {
 
   override lazy val nodes: Seq[Node] = docker.startNodes(
     NodeConfigs.newBuilder
@@ -29,12 +30,8 @@ class NetworkSeparationTestSuite extends FreeSpec with Matchers with Integration
   "nodes should sync" in Await.result(
     for {
       height <- traverse(nodes)(_.height).map(_.max)
-      _ <- traverse(nodes)(_.waitForHeight(height + 15))
-      blocks <- traverse(nodes)(_.blockAt(height + 8))
-    } yield {
-      val xs = blocks.map(_.signature)
-      all(xs) shouldEqual xs.head
-    },
+      _ <- waitForSameBlocksAt(nodes, 5.seconds, height + 8)
+    } yield (),
     5.minutes
   )
 
