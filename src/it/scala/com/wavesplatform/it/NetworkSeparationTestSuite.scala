@@ -10,7 +10,12 @@ import scala.concurrent.duration._
 class NetworkSeparationTestSuite extends FreeSpec with Matchers with IntegrationNodesInitializationAndStopping
   with CancelAfterFailure with ReportingTestName {
 
-  override lazy val nodes: Seq[Node] = docker.startNodes(NodeConfigs.forTest(3, 1 -> "waves.miner.quorum = 0"))
+  override lazy val nodes: Seq[Node] = docker.startNodes(
+    NodeConfigs.newBuilder
+      .withDefault(3)
+      .withSpecial(_.quorum(0))
+      .build
+  )
 
   "node should grow up to 10 blocks together" in Await.result(richestNode.flatMap(_.waitForHeight(10)), 5.minutes)
 

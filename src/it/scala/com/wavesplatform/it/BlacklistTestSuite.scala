@@ -11,7 +11,12 @@ import scala.concurrent.{Await, Future}
 class BlacklistTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with CancelAfterFailure with ReportingTestName {
   
   private lazy val docker = Docker(getClass)
-  override lazy val nodes: Seq[Node] = docker.startNodes(NodeConfigs.forTest(3, 1 -> "waves.miner.quorum = 0"))
+  override lazy val nodes: Seq[Node] = docker.startNodes(
+    NodeConfigs.newBuilder
+      .withDefault(3)
+      .withSpecial(_.quorum(0))
+      .build
+  )
 
   private def primaryNode = nodes.last
   private def otherNodes = nodes.init
