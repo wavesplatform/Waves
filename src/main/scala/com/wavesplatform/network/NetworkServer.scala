@@ -51,6 +51,7 @@ class NetworkServer(checkpointService: CheckpointService,
     settings.synchronizationSettings.scoreTTL,
     history.lastBlockIds(settings.synchronizationSettings.maxRollback), history.score())
 
+  private val trafficWatcher = new TrafficWatcher
   private val discardingHandler = new DiscardingHandler(blockchainReadiness)
   private val messageCodec = new MessageCodec(peerDatabase)
 
@@ -101,6 +102,7 @@ class NetworkServer(checkpointService: CheckpointService,
         lengthFieldPrepender,
         new LengthFieldBasedFrameDecoder(100 * 1024 * 1024, 0, 4, 0, 4),
         new LegacyFrameCodec(peerDatabase),
+        trafficWatcher,
         discardingHandler,
         messageCodec,
         peerSynchronizer,
@@ -134,6 +136,7 @@ class NetworkServer(checkpointService: CheckpointService,
       lengthFieldPrepender,
       new LengthFieldBasedFrameDecoder(100 * 1024 * 1024, 0, 4, 0, 4),
       new LegacyFrameCodec(peerDatabase),
+      trafficWatcher,
       discardingHandler,
       messageCodec,
       peerSynchronizer,
