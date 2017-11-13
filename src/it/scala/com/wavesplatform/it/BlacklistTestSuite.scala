@@ -1,5 +1,6 @@
 package com.wavesplatform.it
 
+import com.wavesplatform.it.api.MultipleNodesApi
 import com.wavesplatform.it.api.NodeApi.BlacklistedPeer
 import org.scalatest._
 
@@ -8,11 +9,13 @@ import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
-class BlacklistTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with CancelAfterFailure with ReportingTestName {
+class BlacklistTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with CancelAfterFailure
+  with ReportingTestName with MultipleNodesApi {
   
   private lazy val docker = Docker(getClass)
   override lazy val nodes: Seq[Node] = docker.startNodes(
     NodeConfigs.newBuilder
+      .overrideBase(_.quorum(2))
       .withDefault(3)
       .withSpecial(_.quorum(0))
       .build
@@ -46,12 +49,11 @@ class BlacklistTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll w
     primaryNode.settings.networkSettings.blackListResidenceTime + 5.seconds
   )
 
-  "and sync again" in {
-    val targetBlocks = Await.result(for {
+  "and sync again" in Await.result(
+    for {
       baseHeight <- traverse(nodes)(_.height).map(_.max)
-      _ <- traverse(nodes)(_.waitForHeight(baseHeight + 10))
-      blocks <- traverse(nodes)(_.blockAt(baseHeight + 5))
-    } yield blocks.map(_.signature), 5.minutes)
-    all(targetBlocks) shouldEqual targetBlocks.head
-  }
+      _ <- waitForSameBlocksAt(nodes, 5.seconds, baseHeight + 5)
+    } yield (),
+    5.minutes
+  )
 }
