@@ -1,6 +1,6 @@
 package com.wavesplatform.network
 
-import java.net.{InetSocketAddress, NetworkInterface}
+import java.net.InetSocketAddress
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -22,7 +22,6 @@ import org.influxdb.dto.Point
 import scorex.transaction._
 import scorex.utils.{ScorexLogging, Time}
 
-import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 
 class NetworkServer(checkpointService: CheckpointService,

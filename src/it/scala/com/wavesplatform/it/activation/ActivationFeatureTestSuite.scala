@@ -72,6 +72,8 @@ class ActivationFeatureTestSuite extends FreeSpec with Matchers with BeforeAndAf
 
   object ActivationFeatureTestSuite {
 
+    val NodesCount: Int = 4
+
     val votingInterval = 20
     val blocksForActivation = 20 // should be even
     val featureNum: Short = 1
@@ -88,13 +90,11 @@ class ActivationFeatureTestSuite extends FreeSpec with Matchers with BeforeAndAf
          |    }
          |  }
          |  features.supported = [$featureNum]
+         |  miner.quorum = ${NodesCount - 1}
          |}""".stripMargin
     )
 
-
-    val NodesCount: Int = 4
-
-    val Configs: Seq[Config] = Random.shuffle(NodeConfigs.Default).take(NodesCount).map(supportedNodes.withFallback(_))
+    val Configs: Seq[Config] = Random.shuffle(NodeConfigs.Default.init).take(NodesCount).map(supportedNodes.withFallback(_))
 
   }
 
