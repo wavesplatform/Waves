@@ -100,7 +100,9 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
   }
 
   private def connectToAll(node: Node): Future[Unit] = {
-    val seedAddresses = nodes.asScala.map { n => (n.nodeInfo.networkIpAddress, n.nodeInfo.containerNetworkPort) }
+    val seedAddresses = nodes.asScala
+      .filterNot(_ == node)
+      .map { n => (n.nodeInfo.networkIpAddress, n.nodeInfo.containerNetworkPort) }
 
     Future
       .traverse(seedAddresses) { seed =>
@@ -160,6 +162,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
       extractHostPort(ports, matcherApiPort))
     val node = new Node(actualConfig, nodeInfo, http)
     nodes.add(node)
+    log.debug(s"Started $containerId -> ${node.settings.networkSettings.nodeName}")
     node
   }
 
@@ -181,15 +184,13 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
   }
 
   private def saveLog(node: Node): Unit = {
-    val logDir = Paths.get(System.getProperty("user.dir"), "target", "logs")
+    val logDir = Option(System.getProperty("waves.it.logging.dir")).map(Paths.get(_))
+      .getOrElse(Paths.get(System.getProperty("user.dir"), "target", "logs"))
+
     Files.createDirectories(logDir)
     import node.nodeInfo.containerId
 
-    val logFile = {
-      val baseName = s"${this.##.toLong.toHexString}-${node.settings.networkSettings.nodeName}"
-      val fileName = if (tag.isEmpty) baseName else s"$tag-$baseName"
-      logDir.resolve(s"$fileName.log").toFile
-    }
+    val logFile = logDir.resolve(s"${node.settings.networkSettings.nodeName}.log").toFile
     log.info(s"Writing logs of $containerId to ${logFile.getAbsolutePath}")
 
     val fileStream = new FileOutputStream(logFile, false)

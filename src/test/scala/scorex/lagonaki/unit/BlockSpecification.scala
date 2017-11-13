@@ -1,22 +1,20 @@
 package scorex.lagonaki.unit
 
-import com.wavesplatform.TransactionGen
 import com.wavesplatform.metrics.Instrumented
-import org.scalatest.prop.PropertyChecks
-import org.scalatest._
+import com.wavesplatform.state2._
 import com.wavesplatform.state2.diffs.produce
+import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Arbitrary.arbitrary
-import org.scalacheck.{Gen, Shrink}
+import org.scalacheck.Gen
+import org.scalatest._
+import org.scalatest.prop.PropertyChecks
 import scorex.block.Block
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.hash.FastCryptographicHash
 import scorex.transaction._
-import com.wavesplatform.state2._
 
-class BlockSpecification extends PropSpec with PropertyChecks with TransactionGen with Matchers {
-
-  private implicit def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)
+class BlockSpecification extends PropSpec with PropertyChecks with TransactionGen with Matchers with NoShrink {
 
   val time = System.currentTimeMillis() - 5000
 

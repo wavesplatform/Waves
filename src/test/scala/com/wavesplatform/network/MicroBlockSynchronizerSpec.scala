@@ -4,18 +4,18 @@ import com.wavesplatform.TransactionGen
 import com.wavesplatform.settings.SynchronizationSettings.MicroblockSynchronizerSettings
 import com.wavesplatform.state2.ByteStr
 import io.netty.channel.embedded.EmbeddedChannel
+import monix.execution.Scheduler.Implicits.global
 import monix.reactive.subjects.ConcurrentSubject
 import org.mockito.Mockito
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.Eventually
 import org.scalatest.exceptions.TestFailedDueToTimeoutException
-import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
+import org.scalatest.prop.PropertyChecks
 import org.scalatest.{FreeSpec, Matchers}
 import scorex.account.PublicKeyAccount
 import scorex.block.MicroBlock
 import scorex.lagonaki.mocks.TestBlock
 import scorex.transaction.NgHistory
-import monix.execution.Scheduler.Implicits.global
 
 import scala.concurrent.duration.DurationInt
 
@@ -24,7 +24,6 @@ class MicroBlockSynchronizerSpec extends FreeSpec
   with MockFactory
   with PropertyChecks
   with Eventually
-  with GeneratorDrivenPropertyChecks
   with TransactionGen {
 
   private val settings = MicroblockSynchronizerSettings(

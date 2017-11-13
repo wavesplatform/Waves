@@ -38,21 +38,46 @@ trait ActivationStatusRequest extends Matchers {
       .map(_.features.find(_.id == featureNum).get)
   }
 
-  def assertVotingStatus(activationStatusFeature: ActivationStatusFeature, supportedBlocks: Int, blockchainFeatureStatus: BlockchainFeatureStatus, nodeFeatureStatus: NodeFeatureStatus): Unit = {
-    activationStatusFeature.supportedBlocks.get shouldBe supportedBlocks
-    activationStatusFeature.blockchainStatus shouldBe blockchainFeatureStatus
-    activationStatusFeature.nodeStatus shouldBe nodeFeatureStatus
+  def assertVotingStatus(activationStatusFeature: ActivationStatusFeature,
+                         supportedBlocks: Int,
+                         blockchainFeatureStatus: BlockchainFeatureStatus,
+                         nodeFeatureStatus: NodeFeatureStatus): Unit = {
+    withClue("supportedBlocks") {
+      activationStatusFeature.supportedBlocks.get shouldBe supportedBlocks
+    }
+    withClue("blockchainStatus") {
+      activationStatusFeature.blockchainStatus shouldBe blockchainFeatureStatus
+    }
+    withClue("nodeStatus") {
+      activationStatusFeature.nodeStatus shouldBe nodeFeatureStatus
+    }
   }
 
-  def assertApprovedStatus(activationStatusFeature: ActivationStatusFeature, height: Int, nodeFeatureStatus: NodeFeatureStatus): Unit = {
-    activationStatusFeature.activationHeight.get shouldBe height
-    activationStatusFeature.blockchainStatus shouldBe BlockchainFeatureStatus.Approved
-    activationStatusFeature.nodeStatus shouldBe nodeFeatureStatus
+  def assertApprovedStatus(activationStatusFeature: ActivationStatusFeature,
+                           height: Int,
+                           nodeFeatureStatus: NodeFeatureStatus): Unit = {
+    withClue("activationHeight") {
+      activationStatusFeature.activationHeight.get shouldBe height
+    }
+    withClue("blockchainStatus") {
+      activationStatusFeature.blockchainStatus shouldBe BlockchainFeatureStatus.Approved
+    }
+    withClue("nodeStatus") {
+      activationStatusFeature.nodeStatus shouldBe nodeFeatureStatus
+    }
   }
 
-  def assertActivatedStatus(activationStatusFeature: ActivationStatusFeature, height: Int, nodeFeatureStatus: NodeFeatureStatus): Unit = {
-    activationStatusFeature.activationHeight.get shouldBe height
-    activationStatusFeature.blockchainStatus shouldBe BlockchainFeatureStatus.Activated
-    activationStatusFeature.nodeStatus shouldBe nodeFeatureStatus
+  def assertActivatedStatus(activationStatusFeature: ActivationStatusFeature,
+                            height: Int,
+                            nodeFeatureStatus: NodeFeatureStatus): Unit = {
+    withClue("activationHeight") {
+      activationStatusFeature.activationHeight.get shouldBe height
+    }
+    withClue("blockchainStatus") {
+      activationStatusFeature.blockchainStatus shouldBe BlockchainFeatureStatus.Activated
+    }
+    withClue("nodeStatus") {
+      activationStatusFeature.nodeStatus shouldBe nodeFeatureStatus
+    }
   }
 }

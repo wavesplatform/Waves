@@ -84,6 +84,7 @@ class VoteForFeatureByDefaultTestSuite extends FreeSpec with Matchers with Befor
          |      {recipient: "3HVW7RDYVkcN5xFGBNAUnGirb5KaBSnbUyB", amount: 2000000000000}
          |    ]
          |  }
+         |  miner.quorum = 3
          |}""".stripMargin
     )
 
