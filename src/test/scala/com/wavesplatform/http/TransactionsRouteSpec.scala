@@ -2,11 +2,10 @@ package com.wavesplatform.http
 
 import akka.http.scaladsl.model.StatusCodes
 import com.wavesplatform.http.ApiMarshallers._
-import com.wavesplatform.state2.reader.{SnapshotStateReader}
-import com.wavesplatform.{BlockGen, TransactionGen, UtxPool}
+import com.wavesplatform.state2.reader.SnapshotStateReader
+import com.wavesplatform.{BlockGen, NoShrink, TransactionGen, UtxPool}
 import monix.eval.Coeval
 import org.scalacheck.Gen._
-import org.scalacheck.Shrink
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers
 import org.scalatest.prop.PropertyChecks
@@ -17,7 +16,13 @@ import scorex.crypto.encode.Base58
 import scorex.transaction._
 
 class TransactionsRouteSpec extends RouteSpec("/transactions")
-  with RestAPISettingsHelper with MockFactory with Matchers with TransactionGen with BlockGen with PropertyChecks {
+  with RestAPISettingsHelper
+  with MockFactory
+  with Matchers
+  with TransactionGen
+  with BlockGen
+  with PropertyChecks
+  with NoShrink {
 
   import TransactionsApiRoute.MaxTransactionsPerRequest
 
@@ -28,7 +33,6 @@ class TransactionsRouteSpec extends RouteSpec("/transactions")
   private val utx = mock[UtxPool]
   private val route = TransactionsApiRoute(restAPISettings, Coeval.now(state), history, utx).route
 
-  private implicit def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)
 
   routePath("/address/{address}/limit/{limit}") - {
     "handles invalid address" in {

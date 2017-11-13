@@ -9,56 +9,47 @@ class OptimisticExtensionLoader extends ChannelDuplexHandler with ScorexLogging 
 
   private var hopefullyNextIds = Seq.empty[ByteStr]
   private var nextExtensionBlocks = Seq.empty[Block]
-  private var discardNextBlocks = false
+  private var requestedLocalIds = Seq.empty[ByteStr]
 
   private def loadNextPart(ctx: ChannelHandlerContext, blocks: Seq[Block]): Unit = if (blocks.size > 1) {
-    // Receiving just one block usually means we've reached the end of blockchain. Pre-Netty nodes
-    // didn't handle GetSignatures(lastBlockId) message properly, hence the check.
-    log.trace(s"${id(ctx)} loading next part")
+    requestedLocalIds = Seq.empty
     hopefullyNextIds = blocks.view.map(_.uniqueId).reverseIterator.take(100).toSeq
+    log.debug(s"${id(ctx)} Loading next part, sending ${hopefullyNextIds.size} signatures")
     ctx.writeAndFlush(LoadBlockchainExtension(hopefullyNextIds))
   }
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
-    case ExtensionBlocks(extension) if discardNextBlocks =>
-      discardNextBlocks = false
-      log.debug(s"${id(ctx)} discarding just-loaded ${extension.length} blocks as requested")
     case ExtensionBlocks(extension) if extension.isEmpty =>
+      requestedLocalIds = Seq.empty
       log.debug(s"${id(ctx)} Blockchain is up to date")
-      hopefullyNextIds = Seq.empty
       super.channelRead(ctx, msg)
-    case ExtensionBlocks(extension) if hopefullyNextIds.isEmpty =>
+    case ExtensionBlocks(extension) if requestedLocalIds.isEmpty =>
+      nextExtensionBlocks = extension
+      log.debug(s"${id(ctx)} Loaded new extension with ${extension.size} blocks, keeping for now")
+    case ExtensionBlocks(extension) if requestedLocalIds.contains(extension.head.reference) =>
       loadNextPart(ctx, extension)
-      log.trace(s"${id(ctx)} Passing extension with ${extension.length} blocks upstream")
+      log.debug(s"${id(ctx)} Passing extension with ${extension.size} signatures upstream")
       super.channelRead(ctx, msg)
     case ExtensionBlocks(extension) =>
-      nextExtensionBlocks = extension
+      log.debug(s"${id(ctx)} Discarding ${extension.size} blocks")
     case _ => super.channelRead(ctx, msg)
   }
 
-  override def write(ctx: ChannelHandlerContext, msg: AnyRef, promise: ChannelPromise) = msg match {
-    case LoadBlockchainExtension(localIds) if hopefullyNextIds == localIds =>
-      if (nextExtensionBlocks.isEmpty) {
-        log.debug(s"${id(ctx)} Still waiting for extension to load")
-        hopefullyNextIds = Seq.empty
-      } else {
-        log.debug(s"${id(ctx)} Extension already loaded")
-        ctx.fireChannelRead(ExtensionBlocks(nextExtensionBlocks))
-        loadNextPart(ctx, nextExtensionBlocks)
-        nextExtensionBlocks = Seq.empty
-      }
-    case _: LoadBlockchainExtension if hopefullyNextIds.isEmpty =>
-      super.write(ctx, msg, promise)
+  override def write(ctx: ChannelHandlerContext, msg: AnyRef, promise: ChannelPromise): Unit = msg match {
     case LoadBlockchainExtension(localIds) =>
-      val notYetRequestedIds = hopefullyNextIds.dropWhile(_ != localIds.head)
-      if (notYetRequestedIds.isEmpty || !hopefullyNextIds.containsSlice(notYetRequestedIds)) {
-//        log.debug(s"${fmt("LOCAL IDS", localIds)}${fmt("HOPEFULLY NEXT", hopefullyNextIds)}${fmt("DIFF", notYetRequestedIds)}")
-        discardNextBlocks = nextExtensionBlocks.isEmpty
-        log.debug(s"${id(ctx)} Got unexpected known block ids${if (discardNextBlocks) ", will discard extension once ready" else ""}")
+      requestedLocalIds = localIds
+
+      if (nextExtensionBlocks.nonEmpty && localIds.contains(nextExtensionBlocks.head.reference)) {
+        loadNextPart(ctx, nextExtensionBlocks)
+        ctx.fireChannelRead(ExtensionBlocks(nextExtensionBlocks))
+      } else if (hopefullyNextIds.exists(localIds.contains)) {
+        log.debug(s"${id(ctx)} Still waiting for extension to load")
+      } else {
+        super.write(ctx, msg, promise)
       }
-      hopefullyNextIds = Seq.empty
+
       nextExtensionBlocks = Seq.empty
-      super.write(ctx, msg, promise)
+
     case _ => super.write(ctx, msg, promise)
   }
 }

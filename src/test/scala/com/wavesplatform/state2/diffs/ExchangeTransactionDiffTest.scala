@@ -1,12 +1,12 @@
 package com.wavesplatform.state2.diffs
 
 import cats._
-import com.wavesplatform.TransactionGen
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.state2._
 import com.wavesplatform.state2.diffs.TransactionDiffer.TransactionValidationError
-import org.scalacheck.{Gen, Shrink}
-import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
+import com.wavesplatform.{NoShrink, TransactionGen}
+import org.scalacheck.Gen
+import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Inside, Matchers, PropSpec}
 import scorex.account.PrivateKeyAccount
 import scorex.lagonaki.mocks.TestBlock
@@ -15,14 +15,12 @@ import scorex.transaction.assets.IssueTransaction
 import scorex.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
 import scorex.transaction.{GenesisTransaction, ValidationError}
 
-class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks
-  with Matchers with TransactionGen with Inside {
+class ExchangeTransactionDiffTest
+  extends PropSpec with PropertyChecks with Matchers with TransactionGen with Inside with NoShrink {
 
   // This might fail from time to time.
   // The logic defining max matched amount is a bit complex
   // so it's not easy to setup 100% correct pair of orders
-
-  private implicit def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)
 
   property("preserves waves invariant, stores match info, rewards matcher") {
 

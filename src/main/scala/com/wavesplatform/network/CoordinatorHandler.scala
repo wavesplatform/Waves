@@ -64,17 +64,17 @@ class CoordinatorHandler(checkpointService: CheckpointService,
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
     case c: Checkpoint => processAndBlacklistOnFailure(ctx,
-      "Attempting to process checkpoint",
-      "Successfully processed checkpoint",
-      s"Error processing checkpoint",
+      s"${id(ctx)} Attempting to process checkpoint",
+      s"${id(ctx)} Successfully processed checkpoint",
+      s"${id(ctx)} Error processing checkpoint",
       processCheckpoint(c).map(Some(_)), scheduleMiningAndBroadcastScore)
 
     case ExtensionBlocks(blocks) =>
       blocks.foreach(BlockStats.received(_, BlockStats.Source.Ext, ctx))
       processAndBlacklistOnFailure(ctx,
-        s"Attempting to append extension ${formatBlocks(blocks)}",
-        s"Successfully appended extension ${formatBlocks(blocks)}",
-        s"Error appending extension ${formatBlocks(blocks)}",
+        s"${id(ctx)} Attempting to append extension ${formatBlocks(blocks)}",
+        s"${id(ctx)} Successfully appended extension ${formatBlocks(blocks)}",
+        s"${id(ctx)} Error appending extension ${formatBlocks(blocks)}",
         processFork(blocks),
         scheduleMiningAndBroadcastScore)
 
@@ -84,11 +84,11 @@ class CoordinatorHandler(checkpointService: CheckpointService,
       b.signaturesValid().flatMap(b => processBlock(b))
     } map {
       case Right(None) =>
-        log.trace(s"$b already appended")
+        log.trace(s"${id(ctx)} $b already appended")
       case Right(Some(newScore)) =>
         BlockStats.applied(b, BlockStats.Source.Broadcast, history.height())
         Coordinator.updateBlockchainReadinessFlag(history, time, blockchainReadiness, settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed)
-        log.debug(s"Appended $b")
+        log.debug(s"${id(ctx)} Appended $b")
         if (b.transactionData.isEmpty)
           allChannels.broadcast(BlockForged(b), Some(ctx.channel()))
         scheduleMiningAndBroadcastScore(newScore)
@@ -96,7 +96,7 @@ class CoordinatorHandler(checkpointService: CheckpointService,
         peerDatabase.blacklistAndClose(ctx.channel(), s"Could not append $b: $is")
       case Left(ve) =>
         BlockStats.declined(b, BlockStats.Source.Broadcast)
-        log.debug(s"Could not append $b: $ve")
+        log.debug(s"${id(ctx)} Could not append $b: $ve")
     }).onErrorHandle[Unit](ctx.fireExceptionCaught).runAsync
 
     case md: MicroblockData =>
@@ -106,28 +106,18 @@ class CoordinatorHandler(checkpointService: CheckpointService,
         case Right(()) =>
           md.invOpt match {
             case Some(mi) => allChannels.broadcast(mi, microBlockOwners.all(microBlock.totalResBlockSig).map(_.channel()))
-            case None => log.warn("Not broadcasting MicroBlockInv")
+            case None => log.warn(s"${id(ctx)} Not broadcasting MicroBlockInv")
           }
           BlockStats.applied(microBlock)
         case Left(is: InvalidSignature) =>
           peerDatabase.blacklistAndClose(ctx.channel(), s"Could not append microblock $microblockTotalResBlockSig: $is")
         case Left(ve) =>
           BlockStats.declined(microBlock)
-          log.debug(s"Could not append microblock $microblockTotalResBlockSig: $ve")
+          log.debug(s"${id(ctx)} Could not append microblock $microblockTotalResBlockSig: $ve")
       }).onErrorHandle[Unit](ctx.fireExceptionCaught).runAsync
   }
 }
 
 object CoordinatorHandler extends ScorexLogging {
   private val blockReceivingLag = Kamon.metrics.histogram("block-receiving-lag")
-
-  def loggingResult[R](idCtx: String, msg: String, f: => Either[ValidationError, R]): Either[ValidationError, R] = {
-    log.debug(s"$idCtx Starting $msg processing")
-    val result = f
-    result match {
-      case Left(error) => log.warn(s"$idCtx Error processing $msg: $error")
-      case Right(newScore) => log.debug(s"$idCtx Finished $msg processing, new local score is $newScore")
-    }
-    result
-  }
 }
