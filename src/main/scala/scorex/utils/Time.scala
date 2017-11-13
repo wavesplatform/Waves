@@ -22,7 +22,7 @@ class TimeImpl extends Time with ScorexLogging {
   private val ResponseTimeout = 10.seconds
   private val NtpServer = "pool.ntp.org"
 
-  private val scheduler = Scheduler.singleThread(name = "time-impl")
+  private implicit val scheduler = Scheduler.singleThread(name = "time-impl")
 
   private val client = new NTPUDPClient()
   client.setDefaultTimeout(ResponseTimeout.toMillis.toInt)
@@ -62,7 +62,7 @@ class TimeImpl extends Time with ScorexLogging {
     txTime
   }
 
-  updateTask.runAsyncLogErr(scheduler)
+  updateTask.runAsyncLogErr
 
 }
 

@@ -49,11 +49,11 @@ object Transaction {
 trait Signed {
   protected val signatureValid: Coeval[Boolean]
 
-  protected val signedDescendants: Coeval[Seq[Signed]] =Coeval.evalOnce(Seq.empty)
+  protected val signedDescendants: Coeval[Seq[Signed]] = Coeval.evalOnce(Seq.empty)
 
   protected val signaturesValidMemoized: Task[Either[InvalidSignature, this.type]] = Signed.validateTask[this.type](this).memoize
 
-  val signaturesValid: Coeval[Either[InvalidSignature, this.type]] =  Coeval.evalOnce(Await.result(signaturesValidMemoized.runAsyncLogErr(Signed.scheduler), Duration.Inf))
+  val signaturesValid: Coeval[Either[InvalidSignature, this.type]] = Coeval.evalOnce(Await.result(signaturesValidMemoized.runAsync(Signed.scheduler), Duration.Inf))
 }
 
 object Signed {
@@ -79,6 +79,6 @@ object Signed {
         case Some(e) => Left(e.left.get)
         case None => Right(ss)
       }
-    }.runAsyncLogErr, Duration.Inf)
+    }.runAsync, Duration.Inf)
 
 }
