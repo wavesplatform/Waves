@@ -53,7 +53,7 @@ class NetworkUniqueConnectionsTestSuite extends FreeSpec with Matchers with Befo
 
 private object NetworkUniqueConnectionsTestSuite {
 
-  private val configs = Random.shuffle(NodeConfigs.Default).take(2)
+  private val configs = NodeConfigs.newBuilder.withDefault(2).build
   val FirstNodeConfig: Config = configs.head
   val SecondNodeConfig: Config = configs.last
 
