@@ -80,6 +80,7 @@ Defaults.itSettings
 configs(IntegrationTest)
 inConfig(IntegrationTest)({
   Seq(
+    test := (test dependsOn docker).value,
     envVars in test += "CONTAINER_JAVA_OPTS" -> "-Xmx1500m",
     envVars in testOnly += "CONTAINER_JAVA_OPTS" -> "-Xmx512m",
     testOptions in test += Tests.Argument(

@@ -8,6 +8,8 @@ import scala.concurrent.duration._
 
 class LeasingTransactionsSuite extends BaseTransactionSuite {
 
+  private val waitCompletion = 2.minutes
+
   test("leasing waves decreases lessor's eff.b. and increases lessee's eff.b.; lessor pays fee") {
     val f = for {
       height <- traverse(nodes)(_.height).map(_.max)
@@ -21,7 +23,7 @@ class LeasingTransactionsSuite extends BaseTransactionSuite {
       _ <- assertBalances(secondAddress, 100.waves, 110.waves)
     } yield succeed
 
-    Await.result(f, 1.minute)
+    Await.result(f, waitCompletion)
   }
 
   test("can not make leasing without having enough waves") {
@@ -39,7 +41,7 @@ class LeasingTransactionsSuite extends BaseTransactionSuite {
       _ <- assertBalances(secondAddress, 100.waves, 110.waves)
     } yield leaseFailureAssertion
 
-    Await.result(f, 1.minute)
+    Await.result(f, waitCompletion)
   }
 
   test("can not make leasing without having enough waves for fee") {
@@ -57,7 +59,7 @@ class LeasingTransactionsSuite extends BaseTransactionSuite {
       _ <- assertBalances(secondAddress, 100.waves, 110.waves)
     } yield transferFailureAssertion
 
-    Await.result(f, 1.minute)
+    Await.result(f, waitCompletion)
   }
 
 
@@ -78,7 +80,7 @@ class LeasingTransactionsSuite extends BaseTransactionSuite {
       _ <- assertBalances(secondAddress, 100.waves, 110.waves)
     } yield succeed
 
-    Await.result(f, 1.minute)
+    Await.result(f, waitCompletion)
   }
 
   test("lease cancellation can be done only once") {
@@ -98,7 +100,7 @@ class LeasingTransactionsSuite extends BaseTransactionSuite {
       _ <- assertBalances(secondAddress, 100.waves, 110.waves)
     } yield succeed
 
-    Await.result(f, 1.minute)
+    Await.result(f, waitCompletion)
   }
 
   test("only sender can cancel lease transaction") {
@@ -118,7 +120,7 @@ class LeasingTransactionsSuite extends BaseTransactionSuite {
       _ <- assertBadRequest(sender.cancelLease(thirdAddress, createdLeaseTxId, fee = 1.waves))
     } yield succeed
 
-    Await.result(f, 1.minute)
+    Await.result(f, waitCompletion)
   }
 
   test("can not make leasing without having enough your waves to self") {
@@ -134,6 +136,6 @@ class LeasingTransactionsSuite extends BaseTransactionSuite {
       _ <- assertBalances(firstAddress, 65.waves, 50.waves)
     } yield transferFailureAssertion
 
-    Await.result(f, 1.minute)
+    Await.result(f, waitCompletion)
   }
 }
