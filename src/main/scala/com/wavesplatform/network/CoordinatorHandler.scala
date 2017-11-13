@@ -36,7 +36,7 @@ class CoordinatorHandler(checkpointService: CheckpointService,
                          microBlockOwners: MicroBlockOwners)
   extends ChannelInboundHandlerAdapter with ScorexLogging {
 
-  private implicit val scheduler = monix.execution.Scheduler.singleThread("coordinator-handler", reporter = com.wavesplatform.utils.UncaughtExceptionsToLogReporter)
+  private implicit val scheduler = monix.execution.Scheduler.singleThread("coordinator-handler")
 
   private val processCheckpoint = Coordinator.processCheckpoint(checkpointService, history, blockchainUpdater) _
   private val processFork = Coordinator.processFork(checkpointService, history, blockchainUpdater, stateReader, utxStorage, time, settings, blockchainReadiness, featureProvider) _

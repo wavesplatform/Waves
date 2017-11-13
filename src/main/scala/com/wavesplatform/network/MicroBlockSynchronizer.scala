@@ -26,10 +26,7 @@ class MicroBlockSynchronizer(settings: MicroblockSynchronizerSettings,
                              lastBlockIdEvents: Observable[ByteStr],
                              microBlockOwners: MicroBlockOwners) extends ChannelInboundHandlerAdapter with ScorexLogging {
 
-  private implicit val scheduler: SchedulerService = monix.execution.Scheduler.singleThread(
-    "microblock-synchronizer",
-    reporter = com.wavesplatform.utils.UncaughtExceptionsToLogReporter
-  )
+  private implicit val scheduler: SchedulerService = monix.execution.Scheduler.singleThread("microblock-synchronizer")
 
   private val nextInvs = cache[MicroBlockSignature, MicroBlockInv](settings.invCacheTimeout)
   private val awaiting = cache[MicroBlockSignature, MicroBlockInv](settings.invCacheTimeout)

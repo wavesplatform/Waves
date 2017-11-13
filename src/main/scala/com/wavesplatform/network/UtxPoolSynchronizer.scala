@@ -15,9 +15,7 @@ import scorex.utils.ScorexLogging
 class UtxPoolSynchronizer(utx: UtxPool, allChannels: ChannelGroup)
   extends ChannelInboundHandlerAdapter with ScorexLogging {
 
-  private implicit val scheduler: SchedulerService = monix.execution.Scheduler.singleThread(
-    "utx-pool-synchronizer",
-    reporter = com.wavesplatform.utils.UncaughtExceptionsToLogReporter)
+  private implicit val scheduler: SchedulerService = monix.execution.Scheduler.singleThread("utx-pool-synchronizer")
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
     case t: Transaction => Task(utx.putIfNew(t) match {
@@ -26,7 +24,7 @@ class UtxPoolSynchronizer(utx: UtxPool, allChannels: ChannelGroup)
       case Left(TransactionValidationError(e, _)) =>  // log.trace(s"${id(ctx)} Error processing transaction ${t.id}: $e")
       case Left(e) =>                                 // log.trace(s"${id(ctx)} Error processing transaction ${t.id}: $e")
       case Right(false) =>                            // log.trace(s"${id(ctx)} TX ${t.id} already known")
-    }).runAsync
+    }).runAsyncLogErr
     case _ => super.channelRead(ctx, msg)
   }
 }

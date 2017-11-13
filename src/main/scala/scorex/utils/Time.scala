@@ -1,7 +1,6 @@
 package scorex.utils
 
 import java.net.InetAddress
-import java.util.concurrent.ThreadLocalRandom
 
 import monix.eval.Task
 import monix.execution.Scheduler
@@ -11,7 +10,8 @@ import scala.concurrent.duration.DurationInt
 
 trait Time {
   def correctedTime(): Long
-  def getTimestamp() : Long
+
+  def getTimestamp(): Long
 }
 
 class TimeImpl extends Time with ScorexLogging {
@@ -22,10 +22,7 @@ class TimeImpl extends Time with ScorexLogging {
   private val ResponseTimeout = 10.seconds
   private val NtpServer = "pool.ntp.org"
 
-  private val scheduler = Scheduler.singleThread(
-    name = s"time-impl-${ThreadLocalRandom.current().nextLong(Long.MaxValue)}",
-    reporter = com.wavesplatform.utils.UncaughtExceptionsToLogReporter
-  )
+  private val scheduler = Scheduler.singleThread(name = "time-impl")
 
   private val client = new NTPUDPClient()
   client.setDefaultTimeout(ResponseTimeout.toMillis.toInt)
@@ -37,7 +34,7 @@ class TimeImpl extends Time with ScorexLogging {
         client.open()
         val info = client.getTime(InetAddress.getByName(NtpServer))
         info.computeDetails()
-        Option(info.getOffset).map(offset => if(offset > offsetPanicThreshold) throw new Exception("Offset is suspiciously large") else offset)
+        Option(info.getOffset).map(offset => if (offset > offsetPanicThreshold) throw new Exception("Offset is suspiciously large") else offset)
       } catch {
         case t: Throwable =>
           log.warn("Problems with NTP: ", t)
@@ -59,6 +56,7 @@ class TimeImpl extends Time with ScorexLogging {
   def correctedTime(): Long = System.currentTimeMillis() + offset
 
   private var txTime: Long = 0
+
   def getTimestamp(): Long = {
     txTime = Math.max(correctedTime(), txTime + 1)
     txTime

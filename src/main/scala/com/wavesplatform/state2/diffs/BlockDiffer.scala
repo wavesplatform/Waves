@@ -24,8 +24,7 @@ import scala.concurrent.duration.Duration
 
 object BlockDiffer extends ScorexLogging with Instrumented {
 
-  private implicit val scheduler: SchedulerService = monix.execution.Scheduler.computation(name = "block-deser",
-    reporter = com.wavesplatform.utils.UncaughtExceptionsToLogReporter)
+  private implicit val scheduler: SchedulerService = monix.execution.Scheduler.computation(name = "block-deser")
 
   def right(diff: Diff): Either[ValidationError, Diff] = Right(diff)
 
