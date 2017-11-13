@@ -1,6 +1,7 @@
 package com.wavesplatform.network
 
 import java.net.InetSocketAddress
+import java.nio.channels.ClosedChannelException
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -94,7 +95,6 @@ class NetworkServer(checkpointService: CheckpointService,
       .channel(classOf[NioServerSocketChannel])
       .childHandler(new PipelineInitializer[SocketChannel](Seq(
         inboundConnectionFilter,
-        writeErrorHandler,
         new HandshakeDecoder(peerDatabase),
         new HandshakeTimeoutHandler(settings.networkSettings.handshakeTimeout),
         serverHandshakeHandler,
@@ -103,6 +103,7 @@ class NetworkServer(checkpointService: CheckpointService,
         new LegacyFrameCodec(peerDatabase),
         discardingHandler,
         messageCodec,
+        writeErrorHandler,
         peerSynchronizer,
         historyReplier,
         microBlockSynchronizer,
@@ -127,7 +128,6 @@ class NetworkServer(checkpointService: CheckpointService,
     .group(workerGroup)
     .channel(classOf[NioSocketChannel])
     .handler(new PipelineInitializer[SocketChannel](Seq(
-      writeErrorHandler,
       new HandshakeDecoder(peerDatabase),
       new HandshakeTimeoutHandler(settings.networkSettings.handshakeTimeout),
       clientHandshakeHandler,
@@ -136,6 +136,7 @@ class NetworkServer(checkpointService: CheckpointService,
       new LegacyFrameCodec(peerDatabase),
       discardingHandler,
       messageCodec,
+      writeErrorHandler,
       peerSynchronizer,
       historyReplier,
       microBlockSynchronizer,
@@ -151,10 +152,10 @@ class NetworkServer(checkpointService: CheckpointService,
     import scala.collection.JavaConverters._
 
     val outgoing = outgoingChannels.keySet.iterator().asScala.toVector
-    val outgoingStr = outgoing.map(_.toString).sorted.mkString(", ")
+    def outgoingStr = outgoing.map(_.toString).sorted.mkString("[", ", ", "]")
 
     val incoming = peerInfo.values().iterator().asScala.flatMap(_.declaredAddress).toVector
-    val incomingStr = incoming.map(_.toString).sorted.mkString(", ")
+    def incomingStr = incoming.map(_.toString).sorted.mkString("[", ", ", "]")
 
     log.trace(s"Outgoing: $outgoingStr ++ incoming: $incomingStr")
     val shouldConnect = outgoingChannels.size() < settings.networkSettings.maxOutboundConnections
@@ -180,32 +181,43 @@ class NetworkServer(checkpointService: CheckpointService,
     } else PeerSynchronizer.Disabled
   }
 
-  def connect(remoteAddress: InetSocketAddress): Unit = {
-    outgoingChannels.computeIfAbsent(remoteAddress, _ => {
-      log.debug(s"Connecting to $remoteAddress")
-      bootstrap.connect(remoteAddress)
-        .addListener { (connFuture: ChannelFuture) =>
-          if (connFuture.isDone) {
-            if (connFuture.cause() != null) {
-              val reason = s"${id(connFuture.channel())} Connection failed, suspending $remoteAddress"
-              log.debug(reason, connFuture.cause())
-              peerDatabase.suspend(remoteAddress.getAddress)
-              outgoingChannels.remove(remoteAddress, connFuture.channel())
-            } else if (connFuture.isSuccess) {
-              log.trace(s"${id(connFuture.channel())} Connection established")
-              peerDatabase.touch(remoteAddress)
-              connFuture.channel().closeFuture().addListener { (closeFuture: ChannelFuture) =>
-                val remainingCount = outgoingChannels.size()
-                val reason = s"${id(closeFuture.channel)} Connection closed, $remainingCount outgoing channel(s) remaining"
-                log.info(reason)
-                outgoingChannels.remove(remoteAddress, closeFuture.channel())
-                if (!shutdownInitiated) peerDatabase.suspend(remoteAddress.getAddress)
-              }
-            }
-          }
-        }.channel()
-    })
+  private def handleChannelClosed(remoteAddress: InetSocketAddress)(closeFuture: ChannelFuture): Unit = {
+    outgoingChannels.remove(remoteAddress, closeFuture.channel())
+    if (!shutdownInitiated) peerDatabase.suspend(remoteAddress.getAddress)
+
+    if (closeFuture.isSuccess) {
+      log.trace(formatOutgoingChannelEvent(closeFuture.channel(), "Channel closed"))
+    } else {
+      log.debug(formatOutgoingChannelEvent(closeFuture.channel(), "Channel closed"))
+    }
   }
+
+  private def formatOutgoingChannelEvent(channel: Channel, event: String) =
+    s"${id(channel)} $event, outgoing channel count: ${outgoingChannels.size()}"
+
+  private def handleConnectionAttempt(remoteAddress: InetSocketAddress)(thisConnFuture: ChannelFuture): Unit =
+    if (thisConnFuture.isSuccess) {
+      log.trace(formatOutgoingChannelEvent(thisConnFuture.channel(), "Connection established"))
+      peerDatabase.touch(remoteAddress)
+      thisConnFuture.channel().closeFuture().addListener(handleChannelClosed(remoteAddress))
+    } else if (thisConnFuture.cause() != null) {
+      peerDatabase.suspend(remoteAddress.getAddress)
+      outgoingChannels.remove(remoteAddress, thisConnFuture.channel())
+      thisConnFuture.cause() match {
+        case _: ClosedChannelException =>
+          // this can happen when the node is shut down before connection attempt succeeds
+          log.trace(formatOutgoingChannelEvent(thisConnFuture.channel(), "Channel closed"))
+        case other => log.debug(formatOutgoingChannelEvent(thisConnFuture.channel(), other.getMessage))
+      }
+    }
+
+  def connect(remoteAddress: InetSocketAddress): Unit =
+    outgoingChannels.computeIfAbsent(remoteAddress, _ => {
+      val newConnFuture = bootstrap.connect(remoteAddress)
+
+      log.trace(s"${id(newConnFuture.channel())} Connecting to $remoteAddress")
+      newConnFuture.addListener(handleConnectionAttempt(remoteAddress)).channel()
+    })
 
   def shutdown(): Unit = try {
     shutdownInitiated = true
@@ -214,6 +226,7 @@ class NetworkServer(checkpointService: CheckpointService,
     log.debug("Unbound server")
     allChannels.close().await()
     log.debug("Closed all channels")
+    coordinatorHandler.shutdown()
   } finally {
     workerGroup.shutdownGracefully().await()
     bossGroup.shutdownGracefully().await()

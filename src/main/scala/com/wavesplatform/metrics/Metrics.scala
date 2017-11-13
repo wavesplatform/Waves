@@ -4,6 +4,7 @@ import java.net.URI
 import java.util.concurrent.TimeUnit
 
 import monix.eval.Task
+import monix.execution.Scheduler
 import monix.execution.schedulers.SchedulerService
 import org.influxdb.dto.Point
 import org.influxdb.{InfluxDB, InfluxDBFactory}
@@ -26,7 +27,7 @@ object Metrics extends ScorexLogging {
                       nodeId: Int,
                       influxDb: InfluxDbSettings)
 
-  private implicit val scheduler: SchedulerService = monix.execution.Scheduler.singleThread("metrics", reporter = com.wavesplatform.utils.UncaughtExceptionsToLogReporter)
+  private implicit val scheduler: SchedulerService = Scheduler.singleThread("metrics")
 
   private var settings: Settings = _
   private var db: Option[InfluxDB] = None

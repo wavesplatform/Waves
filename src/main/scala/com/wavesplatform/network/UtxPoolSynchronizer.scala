@@ -6,6 +6,7 @@ import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel.group.ChannelGroup
 import io.netty.channel.{ChannelHandlerContext, ChannelInboundHandlerAdapter}
 import monix.eval.Task
+import monix.execution.Scheduler
 import monix.execution.schedulers.SchedulerService
 import scorex.transaction.Transaction
 import scorex.utils.ScorexLogging
@@ -15,9 +16,7 @@ import scorex.utils.ScorexLogging
 class UtxPoolSynchronizer(utx: UtxPool, allChannels: ChannelGroup)
   extends ChannelInboundHandlerAdapter with ScorexLogging {
 
-  private implicit val scheduler: SchedulerService = monix.execution.Scheduler.singleThread(
-    "utx-pool-synchronizer",
-    reporter = com.wavesplatform.utils.UncaughtExceptionsToLogReporter)
+  private implicit val scheduler: SchedulerService = Scheduler.singleThread("utx-pool-synchronizer")
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
     case t: Transaction => Task(utx.putIfNew(t) match {

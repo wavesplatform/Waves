@@ -2,6 +2,7 @@ package scorex.transaction
 
 import com.wavesplatform.state2._
 import monix.eval.{Coeval, Task}
+import monix.execution.Scheduler
 import monix.execution.schedulers.SchedulerService
 import scorex.serialization.{BytesSerializable, JsonSerializable}
 import scorex.transaction.TransactionParser.TransactionType
@@ -59,8 +60,7 @@ trait Signed {
 object Signed {
 
   type E[A] = Either[InvalidSignature, A]
-  private implicit val scheduler: SchedulerService = monix.execution.Scheduler.computation(name = "sig-validator",
-    reporter = com.wavesplatform.utils.UncaughtExceptionsToLogReporter)
+  private implicit val scheduler: SchedulerService = Scheduler.computation(name = "sig-validator")
 
 
   private def validateTask[S <: Signed](s: S): Task[E[S]] = Task {

@@ -10,10 +10,10 @@ import com.wavesplatform.state2.ByteStr
 import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel._
 import monix.eval.Task
-import monix.execution.CancelableFuture
 import monix.execution.schedulers.SchedulerService
-import scorex.block.MicroBlock
+import monix.execution.{CancelableFuture, Scheduler}
 import monix.reactive.Observable
+import scorex.block.MicroBlock
 import scorex.transaction.NgHistory
 import scorex.utils.ScorexLogging
 
@@ -26,10 +26,7 @@ class MicroBlockSynchronizer(settings: MicroblockSynchronizerSettings,
                              lastBlockIdEvents: Observable[ByteStr],
                              microBlockOwners: MicroBlockOwners) extends ChannelInboundHandlerAdapter with ScorexLogging {
 
-  private implicit val scheduler: SchedulerService = monix.execution.Scheduler.singleThread(
-    "microblock-synchronizer",
-    reporter = com.wavesplatform.utils.UncaughtExceptionsToLogReporter
-  )
+  private implicit val scheduler: SchedulerService = Scheduler.singleThread("microblock-synchronizer")
 
   private val nextInvs = cache[MicroBlockSignature, MicroBlockInv](settings.invCacheTimeout)
   private val awaiting = cache[MicroBlockSignature, MicroBlockInv](settings.invCacheTimeout)

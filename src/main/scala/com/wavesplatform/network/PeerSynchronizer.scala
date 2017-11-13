@@ -40,14 +40,14 @@ class PeerSynchronizer(peerDatabase: PeerDatabase, peerRequestInterval: FiniteDu
         requestPeers(ctx)
         super.channelRead(ctx, msg)
       case GetPeers =>
-        log.debug(s"${id(ctx)} Sending known peers: ${peerDatabase.knownPeers.mkString("[", ", ", "]")}")
+        log.trace(s"${id(ctx)} Sending known peers: ${peerDatabase.knownPeers.mkString("[", ", ", "]")}")
         ctx.writeAndFlush(KnownPeers(peerDatabase.knownPeers.keys.toSeq))
       case KnownPeers(peers) if peersRequested =>
         peersRequested = false
         log.trace(s"${id(ctx)} Got known peers: ${peers.mkString("[", ", ", "]")}")
         peers.foreach(peerDatabase.addCandidate)
       case KnownPeers(peers) =>
-        log.debug(s"${id(ctx)} Got unexpected list of known peers containing ${peers.size} entries")
+        log.trace(s"${id(ctx)} Got unexpected list of known peers containing ${peers.size} entries")
       case _ =>
         super.channelRead(ctx, msg)
     }
