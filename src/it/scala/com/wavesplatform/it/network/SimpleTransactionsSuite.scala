@@ -22,6 +22,7 @@ class SimpleTransactionsSuite extends FunSuite with BeforeAndAfterAll with Match
   with IntegrationPatience with RecoverMethods with RequestErrorAssert with IntegrationNodesInitializationAndStopping
   with IntegrationTestsScheme {
 
+  private val waitCompletion = 2.minutes
   override lazy val nodes: Seq[Node] = docker.startNodes(
     NodeConfigs.newBuilder
       .overrideBase(_.quorum(2))
@@ -48,7 +49,7 @@ class SimpleTransactionsSuite extends FunSuite with BeforeAndAfterAll with Match
     } yield {
       tx shouldBe NodeApi.Transaction(tx.`type`, tx.id, tx.fee, tx.timestamp)
     }
-    Await.result(f, 60.seconds)
+    Await.result(f, waitCompletion)
   }
 
   test("invalid tx send by network to node should be not in UTX or blockchain") {
@@ -63,7 +64,7 @@ class SimpleTransactionsSuite extends FunSuite with BeforeAndAfterAll with Match
       _ <- Future.successful(Thread.sleep(2000))
       _ <- Future.sequence(nodes.map(_.ensureTxDoesntExist(tx.id().base58)))
     } yield ()
-    Await.result(f, 60.seconds)
+    Await.result(f, waitCompletion)
   }
 
   test("should blacklist senders of non-parsable transactions") {
@@ -72,6 +73,6 @@ class SimpleTransactionsSuite extends FunSuite with BeforeAndAfterAll with Match
       _ <- node.sendByNetwork(RawBytes(TransactionMessageSpec.messageCode, "foobar".getBytes(StandardCharsets.UTF_8)))
       _ <- node.waitFor[Seq[BlacklistedPeer]](_.blacklistedPeers, _.size > blacklistBefore.size, 500.millis)
     } yield ()
-    Await.result(f, 60.seconds)
+    Await.result(f, waitCompletion)
   }
 }
