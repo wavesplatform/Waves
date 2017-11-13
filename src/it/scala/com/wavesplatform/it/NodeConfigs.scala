@@ -41,7 +41,7 @@ object NodeConfigs {
   }
 
   object Templates {
-    def quorum(n: Int): String = "waves.miner.quorum = 3"
+    def quorum(n: Int): String = s"waves.miner.quorum = $n"
     val nonMiner: String = "waves.miner.enable = no"
   }
 
