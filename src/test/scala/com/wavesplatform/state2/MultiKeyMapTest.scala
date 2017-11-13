@@ -4,10 +4,10 @@ import com.wavesplatform.TransactionGen
 import org.h2.mvstore.MVStore
 import org.h2.mvstore.`type`.ObjectDataType
 import org.scalacheck.Gen
-import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
+import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 
-class MultiKeyMapTest extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with TransactionGen with Matchers {
+class MultiKeyMapTest extends PropSpec with PropertyChecks with TransactionGen with Matchers {
   def newMap() = new MultiKeyMap[Long](new MVStore.Builder().open(), new ObjectDataType(), "p")
 
   val addressByteStr: Gen[ByteStr] = accountGen.map(_.toAddress.bytes)

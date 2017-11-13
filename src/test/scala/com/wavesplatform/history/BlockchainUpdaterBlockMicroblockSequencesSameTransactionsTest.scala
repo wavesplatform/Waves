@@ -1,22 +1,27 @@
 package com.wavesplatform.history
 
-import com.wavesplatform.TransactionGen
 import com.wavesplatform.state2._
 import com.wavesplatform.state2.diffs._
-import org.scalacheck.{Gen, Shrink}
+import com.wavesplatform.{NoShrink, TransactionGen}
+import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 import scorex.account.PrivateKeyAccount
 import scorex.block.{Block, MicroBlock}
 import scorex.transaction._
 
-class BlockchainUpdaterBlockMicroblockSequencesSameTransactionsTest extends PropSpec with PropertyChecks with DomainScenarioDrivenPropertyCheck with Matchers with TransactionGen {
+class BlockchainUpdaterBlockMicroblockSequencesSameTransactionsTest
+  extends PropSpec
+    with PropertyChecks
+    with DomainScenarioDrivenPropertyCheck
+    with Matchers
+    with TransactionGen
+    with NoShrink {
 
   import BlockchainUpdaterBlockMicroblockSequencesSameTransactionsTest._
 
   type Setup = (GenesisTransaction, PaymentTransaction, PaymentTransaction, PaymentTransaction)
 
-  private implicit def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)
 
 
   property("resulting miner balance should not depend on tx distribution among blocks and microblocks") {

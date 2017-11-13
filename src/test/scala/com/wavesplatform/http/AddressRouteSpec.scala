@@ -1,9 +1,9 @@
 package com.wavesplatform.http
 
-import com.wavesplatform.TestWallet
 import com.wavesplatform.http.ApiMarshallers._
-import com.wavesplatform.state2.reader.{SnapshotStateReader}
+import com.wavesplatform.state2.reader.SnapshotStateReader
 import com.wavesplatform.state2.{LeaseInfo, Portfolio}
+import com.wavesplatform.{NoShrink, TestWallet}
 import monix.eval.Coeval
 import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
@@ -19,10 +19,8 @@ class AddressRouteSpec
     with PathMockFactory
     with PropertyChecks
     with RestAPISettingsHelper
-    with TestWallet {
-  import org.scalacheck.Shrink
-
-  implicit val noShrink: Shrink[String] = Shrink.shrinkAny
+    with TestWallet
+    with NoShrink {
 
   private val allAccounts = testWallet.privateKeyAccounts()
   private val allAddresses = allAccounts.map(_.address)

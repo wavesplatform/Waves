@@ -6,10 +6,10 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.history.{HistoryWriterImpl, StorageFactory}
 import com.wavesplatform.settings.{BlockchainSettings, FeeSettings, FeesSettings, FunctionalitySettings, UtxSettings, WavesSettings}
 import com.wavesplatform.state2.diffs._
+import org.scalacheck.Gen
 import org.scalacheck.Gen._
-import org.scalacheck.{Gen, Shrink}
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
+import org.scalatest.prop.PropertyChecks
 import org.scalatest.{FreeSpec, Matchers}
 import scorex.account.{Address, PrivateKeyAccount, PublicKeyAccount}
 import scorex.block.Block
@@ -24,10 +24,8 @@ class UtxPoolSpecification extends FreeSpec
   with Matchers
   with MockFactory
   with PropertyChecks
-  with GeneratorDrivenPropertyChecks
-  with TransactionGen {
-
-  private implicit def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)
+  with TransactionGen
+  with NoShrink {
 
   private val calculator = new FeeCalculator(FeesSettings(Map(
     1 -> List(FeeSettings("", 0)),

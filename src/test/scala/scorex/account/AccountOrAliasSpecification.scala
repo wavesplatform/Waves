@@ -1,10 +1,10 @@
 package scorex.account
 
 import com.wavesplatform.TransactionGen
-import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
+import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 
-class AccountOrAliasSpecification extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers with TransactionGen {
+class AccountOrAliasSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 
   property("Account serialization round trip") {
     forAll(accountGen) { account: PrivateKeyAccount =>

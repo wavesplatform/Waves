@@ -6,7 +6,7 @@ import io.netty.buffer.{ByteBuf, Unpooled}
 import io.netty.channel.embedded.EmbeddedChannel
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
+import org.scalatest.prop.PropertyChecks
 import org.scalatest.{FreeSpec, Matchers}
 import scorex.crypto.hash.FastCryptographicHash
 import scorex.network.message.{Message => ScorexMessage}
@@ -16,7 +16,6 @@ class LegacyFrameCodecSpec extends FreeSpec
   with Matchers
   with MockFactory
   with PropertyChecks
-  with GeneratorDrivenPropertyChecks
   with TransactionGen {
 
   "should handle one message" in forAll(issueGen) { origTx =>

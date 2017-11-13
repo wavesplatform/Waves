@@ -1,12 +1,13 @@
 package com.wavesplatform.matcher.model
 
+import com.wavesplatform.NoShrink
 import com.wavesplatform.matcher.MatcherTestData
 import com.wavesplatform.matcher.market.MatcherActor.OrderBookCreated
 import com.wavesplatform.matcher.market.OrderBookActor.Snapshot
 import com.wavesplatform.matcher.model.MatcherModel.{Level, Price}
 import com.wavesplatform.matcher.model.MatcherSerializer._
 import com.wavesplatform.state2.ByteStr
-import org.scalacheck.{Gen, Shrink}
+import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import play.api.libs.json.Json
@@ -17,9 +18,8 @@ import scala.collection.immutable.TreeMap
 class EventJsonSpecification extends PropSpec
   with PropertyChecks
   with Matchers
-  with MatcherTestData {
-
-  private implicit def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)
+  with MatcherTestData
+  with NoShrink {
 
   val pair = AssetPair(Some(ByteStr("BTC".getBytes)), Some(ByteStr("WAVES".getBytes)))
 
