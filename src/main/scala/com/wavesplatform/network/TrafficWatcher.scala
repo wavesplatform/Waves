@@ -30,7 +30,7 @@ class TrafficWatcher extends ChannelDuplexHandler {
   }
 
   protected def measure(spec: MessageSpec[_], msg: RawBytes, dir: String): Unit = {
-    Metrics.write(Point.measurement("message")
+    Metrics.write(Point.measurement("traffic")
       .tag("dir", dir)
       .tag("type", spec.messageName)
       .addField("type", spec.messageName)
