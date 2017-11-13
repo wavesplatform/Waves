@@ -86,7 +86,7 @@ case class OrderHistoryImpl(db: DB) extends SubStorage(db: DB, "matcher") with O
   }
 
   def saveOrder(order: Order): Unit = {
-    val key = makeKey(OrdersPrefix, order.idStr)
+    val key = makeKey(OrdersPrefix, order.idStr())
     if (get(key).isEmpty)
       put(key, order.jsonStr.getBytes(Charset))
   }
@@ -105,7 +105,7 @@ case class OrderHistoryImpl(db: DB) extends SubStorage(db: DB, "matcher") with O
 
   override def orderExecuted(event: OrderExecuted): Unit = {
     saveOrder(event.submitted.order)
-    savePairAddress(event.submitted.order.assetPair, event.submitted.order.senderPublicKey.address, event.submitted.order.idStr)
+    savePairAddress(event.submitted.order.assetPair, event.submitted.order.senderPublicKey.address, event.submitted.order.idStr())
     saveOrderInfo(event)
     saveOpenPortfolio(OrderAdded(event.submittedExecuted))
     saveOpenPortfolio(event)

@@ -70,8 +70,8 @@ class HistoryWriterImpl private(db: DB, val synchronizationToken: ReentrantReadW
 
       if ((height() == 0) || (this.lastBlock.get.uniqueId == block.reference)) consensusValidation.map { blockDiff =>
         val h = height() + 1
-        val score = (if (height() == 0) BigInt(0) else this.score()) + block.blockScore
-        put(makeKey(BlockAtHeightPrefix, h), block.bytes)
+        val score = (if (height() == 0) BigInt(0) else this.score()) + block.blockScore()
+        put(makeKey(BlockAtHeightPrefix, h), block.bytes())
         put(makeKey(ScoreAtHeightPrefix, h), score.toByteArray)
         put(makeKey(SignatureAtHeightPrefix, h), block.uniqueId.arr)
         put(makeKey(HeightBySignaturePrefix, block.uniqueId.arr), Ints.toByteArray(h))
