@@ -166,14 +166,16 @@ case class BlocksApiRoute(settings: RestAPISettings, checkpointsSettings: Checkp
 
   def last(includeTransactions: Boolean): StandardRoute = {
     complete(Future {
-      val height = blocking(history.height())
+      history.read { _ =>
+        val height = history.height()
 
-      (if (includeTransactions) {
-        blocking(history.blockAt(height)).get.json()
-      } else {
-        val bhs = blocking(history.blockHeaderAndSizeAt(height)).get
-        BlockHeader.json(bhs._1, bhs._2)
-      }) + ("height" -> Json.toJson(height))
+        (if (includeTransactions) {
+          history.blockAt(height).get.json()
+        } else {
+          val bhs = history.blockHeaderAndSizeAt(height).get
+          BlockHeader.json(bhs._1, bhs._2)
+        }) + ("height" -> Json.toJson(height))
+      }
     })
   }
 
