@@ -56,7 +56,7 @@ class MicroBlockSynchronizer(settings: MicroblockSynchronizerSettings,
       }
     }
 
-    task(MicroBlockDownloadAttempts, Set.empty).runAsync
+    task(MicroBlockDownloadAttempts, Set.empty).runAsyncLogErr
   }
 
   private def tryDownloadNext(prevBlockId: ByteStr): Unit = Option(nextInvs.getIfPresent(prevBlockId)).foreach(requestMicroBlock)
@@ -74,7 +74,7 @@ class MicroBlockSynchronizer(settings: MicroblockSynchronizerSettings,
           awaiting.invalidate(totalSig)
           super.channelRead(ctx, MicroblockData(Option(mi), mb))
         }
-      }.runAsync
+      }.runAsyncLogErr
 
     case mbInv@MicroBlockInv(_, totalSig, prevSig, _) => Task {
       mbInv.signaturesValid() match {
@@ -91,7 +91,7 @@ class MicroBlockSynchronizer(settings: MicroblockSynchronizerSettings,
             .filter(_ == prevSig && !alreadyRequested(totalSig))
             .foreach(tryDownloadNext)
       }
-    }.runAsync
+    }.runAsyncLogErr
 
     case _ => super.channelRead(ctx, msg)
   }

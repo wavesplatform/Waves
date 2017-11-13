@@ -53,7 +53,7 @@ trait Signed {
 
   protected val signaturesValidMemoized: Task[Either[InvalidSignature, this.type]] = Signed.validateTask[this.type](this).memoize
 
-  val signaturesValid: Coeval[Either[InvalidSignature, this.type]] =  Coeval.evalOnce(Await.result(signaturesValidMemoized.runAsync(Signed.scheduler), Duration.Inf))
+  val signaturesValid: Coeval[Either[InvalidSignature, this.type]] =  Coeval.evalOnce(Await.result(signaturesValidMemoized.runAsyncLogErr(Signed.scheduler), Duration.Inf))
 }
 
 object Signed {
@@ -79,6 +79,6 @@ object Signed {
         case Some(e) => Left(e.left.get)
         case None => Right(ss)
       }
-    }.runAsync, Duration.Inf)
+    }.runAsyncLogErr, Duration.Inf)
 
 }

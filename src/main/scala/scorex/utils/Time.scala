@@ -62,7 +62,7 @@ class TimeImpl extends Time with ScorexLogging {
     txTime
   }
 
-  updateTask.runAsync(scheduler)
+  updateTask.runAsyncLogErr(scheduler)
 
 }
 

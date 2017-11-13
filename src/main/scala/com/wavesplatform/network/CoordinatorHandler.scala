@@ -59,7 +59,7 @@ class CoordinatorHandler(checkpointService: CheckpointService,
       case Left(ve) =>
         log.warn(s"$errorPrefix: $ve")
         peerDatabase.blacklistAndClose(ctx.channel(), s"$errorPrefix: $ve")
-    }.onErrorHandle[Unit](ctx.fireExceptionCaught).runAsync
+    }.onErrorHandle[Unit](ctx.fireExceptionCaught).runAsyncLogErr
   }
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
@@ -97,7 +97,7 @@ class CoordinatorHandler(checkpointService: CheckpointService,
       case Left(ve) =>
         BlockStats.declined(b, BlockStats.Source.Broadcast)
         log.debug(s"${id(ctx)} Could not append $b: $ve")
-    }).onErrorHandle[Unit](ctx.fireExceptionCaught).runAsync
+    }).onErrorHandle[Unit](ctx.fireExceptionCaught).runAsyncLogErr
 
     case md: MicroblockData =>
       import md.microBlock
@@ -114,7 +114,7 @@ class CoordinatorHandler(checkpointService: CheckpointService,
         case Left(ve) =>
           BlockStats.declined(microBlock)
           log.debug(s"${id(ctx)} Could not append microblock $microblockTotalResBlockSig: $ve")
-      }).onErrorHandle[Unit](ctx.fireExceptionCaught).runAsync
+      }).onErrorHandle[Unit](ctx.fireExceptionCaught).runAsyncLogErr
   }
 }
 

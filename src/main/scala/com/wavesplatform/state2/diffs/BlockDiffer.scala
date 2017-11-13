@@ -74,7 +74,7 @@ object BlockDiffer extends ScorexLogging with Instrumented {
   def unsafeDiffByRange(fs: FunctionalitySettings, fp: FeatureProvider, h: History, maxTransactionsPerChunk: Int)(state: SnapshotStateReader, upto: Int): NEL[BlockDiff] = {
     val from = state.height + 1
     val blocks = measureLog(s"Reading blocks from $from up upto $upto") {
-      Await.result(Task.wander(Range(from, upto).map(h.blockBytes))(b => Task(Block.parseBytes(b.get).get)).runAsync, Duration.Inf)
+      Await.result(Task.wander(Range(from, upto).map(h.blockBytes))(b => Task(Block.parseBytes(b.get).get)).runAsyncLogErr, Duration.Inf)
     }
     measureLog(s"Building diff from $from up to $upto") {
       BlockDiffer.unsafeDiffMany(fs, fp, state, h.blockAt(from - 1), maxTransactionsPerChunk)(blocks)
