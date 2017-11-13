@@ -20,6 +20,6 @@
     <logger name="io.swagger" level="OFF"/>
 
     <root level="DEBUG">
-        <appender-ref ref="${waves.it.logging.appender}"/>
+        <appender-ref ref="${waves.it.logging.appender:-STDOUT}"/>
     </root>
 </configuration>

@@ -11,11 +11,12 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.util.Random
 
-class ActivationFeatureTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with CancelAfterFailure with ActivationStatusRequest {
+class ActivationFeatureTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with CancelAfterFailure
+  with ActivationStatusRequest {
 
   import ActivationFeatureTestSuite._
 
-  private val waitCompletion = 4.minutes
+  private val waitCompletion = 6.minutes
   private lazy val docker = Docker(getClass)
   private lazy val nodes: Seq[Node] = docker.startNodes(Configs)
 
@@ -71,6 +72,8 @@ class ActivationFeatureTestSuite extends FreeSpec with Matchers with BeforeAndAf
 
   object ActivationFeatureTestSuite {
 
+    val NodesCount: Int = 4
+
     val votingInterval = 20
     val blocksForActivation = 20 // should be even
     val featureNum: Short = 1
@@ -87,11 +90,9 @@ class ActivationFeatureTestSuite extends FreeSpec with Matchers with BeforeAndAf
          |    }
          |  }
          |  features.supported = [$featureNum]
+         |  miner.quorum = ${NodesCount - 1}
          |}""".stripMargin
     )
-
-
-    val NodesCount: Int = 4
 
     val Configs: Seq[Config] = Random.shuffle(NodeConfigs.Default.init).take(NodesCount).map(supportedNodes.withFallback(_))
 

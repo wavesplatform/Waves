@@ -1,6 +1,6 @@
 package com.wavesplatform.network
 
-import java.net.{InetSocketAddress, NetworkInterface}
+import java.net.InetSocketAddress
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -22,7 +22,6 @@ import org.influxdb.dto.Point
 import scorex.transaction._
 import scorex.utils.{ScorexLogging, Time}
 
-import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 
 class NetworkServer(checkpointService: CheckpointService,
@@ -54,17 +53,6 @@ class NetworkServer(checkpointService: CheckpointService,
 
   private val discardingHandler = new DiscardingHandler(blockchainReadiness)
   private val messageCodec = new MessageCodec(peerDatabase)
-
-  private val excludedAddresses: Set[InetSocketAddress] = {
-    val localAddresses = if (settings.networkSettings.bindAddress.getAddress.isAnyLocalAddress) {
-      NetworkInterface.getNetworkInterfaces.asScala
-        .flatMap(_.getInetAddresses.asScala
-          .map(a => new InetSocketAddress(a, settings.networkSettings.bindAddress.getPort)))
-        .toSet
-    } else Set(settings.networkSettings.bindAddress)
-
-    localAddresses ++ settings.networkSettings.declaredAddress.toSet
-  }
 
   private val lengthFieldPrepender = new LengthFieldPrepender(4)
 
@@ -172,7 +160,7 @@ class NetworkServer(checkpointService: CheckpointService,
     val shouldConnect = outgoingChannels.size() < settings.networkSettings.maxOutboundConnections
     if (shouldConnect) {
       peerDatabase
-        .randomPeer(excludedAddresses ++ outgoing ++ incoming)
+        .randomPeer(outgoing.toSet ++ incoming)
         .foreach(connect)
     }
 
@@ -192,7 +180,7 @@ class NetworkServer(checkpointService: CheckpointService,
     } else PeerSynchronizer.Disabled
   }
 
-  def connect(remoteAddress: InetSocketAddress): Unit =
+  def connect(remoteAddress: InetSocketAddress): Unit = {
     outgoingChannels.computeIfAbsent(remoteAddress, _ => {
       log.debug(s"Connecting to $remoteAddress")
       bootstrap.connect(remoteAddress)
@@ -217,6 +205,7 @@ class NetworkServer(checkpointService: CheckpointService,
           }
         }.channel()
     })
+  }
 
   def shutdown(): Unit = try {
     shutdownInitiated = true

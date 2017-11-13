@@ -100,7 +100,9 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
   }
 
   private def connectToAll(node: Node): Future[Unit] = {
-    val seedAddresses = nodes.asScala.map { n => (n.nodeInfo.networkIpAddress, n.nodeInfo.containerNetworkPort) }
+    val seedAddresses = nodes.asScala
+      .filterNot(_ == node)
+      .map { n => (n.nodeInfo.networkIpAddress, n.nodeInfo.containerNetworkPort) }
 
     Future
       .traverse(seedAddresses) { seed =>
@@ -160,6 +162,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
       extractHostPort(ports, matcherApiPort))
     val node = new Node(actualConfig, nodeInfo, http)
     nodes.add(node)
+    log.debug(s"Started $containerId -> ${node.settings.networkSettings.nodeName}")
     node
   }
 

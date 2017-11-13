@@ -50,6 +50,8 @@ class NotActivateFeatureTestSuite extends FreeSpec with Matchers with BeforeAndA
 
   object NotActivateFeatureTestSuite {
 
+    val NodesCount: Int = 4
+
     val votingInterval = 14
     val blocksForActivation = 14
     val nonVotingFeatureNum: Short = 2
@@ -66,12 +68,11 @@ class NotActivateFeatureTestSuite extends FreeSpec with Matchers with BeforeAndA
          |    }
          |  }
          |  features.supported=[$nonVotingFeatureNum]
+         |  miner.quorum = ${NodesCount - 1}
          |}""".stripMargin
     )
 
     val votingFeatureNum: Short = 1
-
-    val NodesCount: Int = 4
 
     val Configs: Seq[Config] = Random.shuffle(NodeConfigs.Default.init).take(NodesCount).map(nonSupportedNodes.withFallback(_))
 
