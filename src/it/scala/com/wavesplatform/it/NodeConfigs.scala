@@ -16,19 +16,15 @@ object NodeConfigs {
   case class Builder(baseConfigs: Seq[Config],
                      defaultEntities: Int,
                      specialsConfigs: Seq[Config]) {
-    def overrideBase(f: Templates.type => String): Builder = overrideBase(f(Templates))
-
-    def overrideBase(config: String): Builder = {
-      val priorityConfig = ConfigFactory.parseString(config)
+    def overrideBase(f: Templates.type => String): Builder = {
+      val priorityConfig = ConfigFactory.parseString(f(Templates))
       copy(baseConfigs = baseConfigs.map(priorityConfig.withFallback))
     }
 
     def withDefault(entitiesNumber: Int): Builder = copy(defaultEntities = entitiesNumber)
 
-    def withSpecial(f: Templates.type => String): Builder = withSpecial(f(Templates))
-
-    def withSpecial(config: String): Builder = {
-      copy(specialsConfigs = specialsConfigs :+ ConfigFactory.parseString(config))
+    def withSpecial(f: Templates.type => String): Builder = {
+      copy(specialsConfigs = specialsConfigs :+ ConfigFactory.parseString(f(Templates)))
     }
 
     def build: Seq[Config] = {

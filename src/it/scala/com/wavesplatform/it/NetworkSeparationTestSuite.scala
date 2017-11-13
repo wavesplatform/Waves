@@ -12,6 +12,7 @@ class NetworkSeparationTestSuite extends FreeSpec with Matchers with Integration
 
   override lazy val nodes: Seq[Node] = docker.startNodes(
     NodeConfigs.newBuilder
+      .overrideBase(_.quorum(3))
       .withDefault(3)
       .withSpecial(_.quorum(0))
       .build
