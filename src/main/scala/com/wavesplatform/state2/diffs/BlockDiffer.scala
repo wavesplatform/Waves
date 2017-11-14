@@ -11,6 +11,7 @@ import com.wavesplatform.state2.patch.LeasePatch
 import com.wavesplatform.state2.reader.CompositeStateReader.composite
 import com.wavesplatform.state2.reader.SnapshotStateReader
 import monix.eval.Task
+import monix.execution.Scheduler
 import monix.execution.schedulers.SchedulerService
 import scorex.account.Address
 import scorex.block.{Block, MicroBlock}
@@ -24,7 +25,7 @@ import scala.concurrent.duration.Duration
 
 object BlockDiffer extends ScorexLogging with Instrumented {
 
-  private implicit val scheduler: SchedulerService = monix.execution.Scheduler.computation(name = "block-deser")
+  private implicit val scheduler: SchedulerService = Scheduler.computation(name = "block-deser")
 
   def right(diff: Diff): Either[ValidationError, Diff] = Right(diff)
 
