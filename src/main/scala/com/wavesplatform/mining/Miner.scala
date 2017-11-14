@@ -156,13 +156,14 @@ class MinerImpl(
         err
       }
     }
-  }.delayExecution(minerSettings.microBlockInterval)
+  }
 
-  private def generateMicroBlockSequence(account: PrivateKeyAccount, accumulatedBlock: Block): Task[Unit] =
-    generateOneMicroBlockTask(account, accumulatedBlock).flatMap {
+  private def generateMicroBlockSequence(account: PrivateKeyAccount, accumulatedBlock: Block, delay: FiniteDuration): Task[Unit] = {
+    generateOneMicroBlockTask(account, accumulatedBlock).delayExecution(delay).flatMap {
       case Left(err) => Task(log.warn("Error mining MicroBlock: " + err.toString))
-      case Right(maybeNewTotal) => generateMicroBlockSequence(account, maybeNewTotal.getOrElse(accumulatedBlock))
+      case Right(maybeNewTotal) => generateMicroBlockSequence(account, maybeNewTotal.getOrElse(accumulatedBlock), minerSettings.microBlockInterval)
     }
+  }
 
   private def generateBlockTask(account: PrivateKeyAccount): Task[Unit] = {
     history.read { implicit l =>
@@ -212,7 +213,7 @@ class MinerImpl(
 
   private def startMicroBlockMining(account: PrivateKeyAccount, lastBlock: Block): Unit = {
     Miner.microMiningStarted.increment()
-    microBlockAttempt := generateMicroBlockSequence(account, lastBlock).runAsync
+    microBlockAttempt := generateMicroBlockSequence(account, lastBlock, Duration.Zero).runAsync
     log.trace(s"MicroBlock mining scheduled for $account")
   }
 }
