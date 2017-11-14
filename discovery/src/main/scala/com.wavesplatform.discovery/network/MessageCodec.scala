@@ -14,7 +14,7 @@ import scala.util.{Failure, Success}
 @Sharable
 class MessageCodec() extends MessageToMessageCodec[RawBytes, Message] with ScorexLogging {
 
-  private val specs: Map[Byte, MessageSpec[_ <: AnyRef]] = BasicMessagesRepo.specs.map(s => s.messageCode -> s).toMap
+  import BasicMessagesRepo.specsByCodes
 
   override def encode(ctx: ChannelHandlerContext, msg: Message, out: util.List[AnyRef]): Unit = msg match {
     case GetPeers => out.add(RawBytes(GetPeersSpec.messageCode, Array[Byte]()))
@@ -23,7 +23,7 @@ class MessageCodec() extends MessageToMessageCodec[RawBytes, Message] with Score
   }
 
   override def decode(ctx: ChannelHandlerContext, msg: RawBytes, out: util.List[AnyRef]): Unit = {
-    specs(msg.code).deserializeData(msg.data) match {
+    specsByCodes(msg.code).deserializeData(msg.data) match {
       case Success(x) => out.add(x)
       case Failure(e) => log.error(e.getMessage)
     }

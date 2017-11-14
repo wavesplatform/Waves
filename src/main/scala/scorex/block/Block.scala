@@ -189,7 +189,7 @@ object Block extends ScorexLogging {
   type BlockId = ByteStr
 
   val MaxTransactionsPerBlockVer1Ver2: Int = 100
-  val MaxTransactionsPerBlockVer3: Int = 65535
+  val MaxTransactionsPerBlockVer3: Int = 6000
   val MaxFeaturesInBlock: Int = 64
   val BaseTargetLength: Int = 8
   val GeneratorSignatureLength: Int = 32
