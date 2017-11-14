@@ -30,7 +30,7 @@ class OptimisticExtensionLoaderSpec extends FreeSpec with Matchers with BlockGen
   } yield ExtensionBlocks(head :: blocks)
 
   "Discards loaded extension when" - {
-    "new one is already requested (and keeps the correct one)" ignore {
+    "new one is already requested (and keeps the correct one)" in {
       val droppingOnce = for {
         ls1 <- localSignaturesGen
         p1 <- Gen.oneOf(ls1)
@@ -59,7 +59,7 @@ class OptimisticExtensionLoaderSpec extends FreeSpec with Matchers with BlockGen
   }
 
   "Keeps loaded extension when" - {
-    "previous one should've been dropped" ignore {
+    "previous one should've been dropped" in {
       val notDroppingWhenNotNeeded = for {
         ls1 <- localSignaturesGen
         p1 <- Gen.oneOf(ls1)
@@ -110,6 +110,32 @@ class OptimisticExtensionLoaderSpec extends FreeSpec with Matchers with BlockGen
         ch.writeInbound(ext2)
 
         ch.readInbound[ExtensionBlocks]() shouldEqual ext2
+      }
+    }
+  }
+
+  "Does not stall" - {
+    "when blockchain was completely loaded before" in {
+      val g = for {
+        ls <- localSignaturesGen
+        ext1 <- extensionBlocksGen(ls.last)
+      } yield (LoadBlockchainExtension(ls), ext1)
+
+      forAll(g) { case (ls, ext) =>
+        val ch = new EmbeddedChannel(new OptimisticExtensionLoader)
+
+        ch.writeAndFlush(ls)
+        ch.writeInbound(ext)
+
+        val loadedExtension = ch.readInbound[ExtensionBlocks]()
+
+        ch.releaseOutbound()
+
+        ch.writeInbound(ExtensionBlocks(Seq.empty))
+        val lbe = LoadBlockchainExtension(loadedExtension.extension.map(_.uniqueId))
+        ch.writeAndFlush(lbe)
+
+        ch.readOutbound[LoadBlockchainExtension]() shouldEqual lbe
       }
     }
   }

@@ -105,11 +105,9 @@ object MicroBlockSynchronizer {
 
   private val MicroBlockDownloadAttempts = 2
 
-  def random[T](s: Set[T]): Option[T] = {
+  def random[T](s: Set[T]): Option[T] = if (s.isEmpty) None else {
     val n = util.Random.nextInt(s.size)
-    val ts = s.iterator.drop(n)
-    if (ts.hasNext) Some(ts.next)
-    else None
+    s.drop(n).headOption
   }
 
   def cache[K <: AnyRef, V <: AnyRef](timeout: FiniteDuration): Cache[K, V] = CacheBuilder.newBuilder()
