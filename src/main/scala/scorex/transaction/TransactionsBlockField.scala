@@ -6,7 +6,7 @@ import java.nio.ByteBuffer
 import com.google.common.primitives.{Bytes, Ints}
 import com.wavesplatform.network.TransactionMessageSpec
 import play.api.libs.json.{JsArray, JsObject, Json}
-import scorex.block.{Block, BlockField}
+import scorex.block.BlockField
 
 trait TransactionsBlockField extends BlockField[Seq[Transaction]]
 
@@ -34,10 +34,8 @@ case class TransactionsBlockFieldVersion1or2(override val value: Seq[Transaction
 
   override def j: JsObject = Json.obj(name -> JsArray(value.map(_.json())))
 
-  override def b = {
-    val txCount = value.size.ensuring(_ <= Block.MaxTransactionsPerBlockVer1Ver2).toByte
-    TransactionsBlockField.serTxs(value, Array(txCount))
-  }
+  override def b = TransactionsBlockField.serTxs(value, Array(value.size.toByte))
+
 }
 
 case class TransactionsBlockFieldVersion3(override val value: Seq[Transaction]) extends TransactionsBlockField {
@@ -46,7 +44,7 @@ case class TransactionsBlockFieldVersion3(override val value: Seq[Transaction]) 
   override def j: JsObject = Json.obj(name -> JsArray(value.map(_.json())))
 
   override def b = {
-    val txCount = value.size.ensuring(_ <= Block.MaxTransactionsPerBlockVer3)
+    val txCount = value.size
     val bb = ByteBuffer.allocate(4)
     TransactionsBlockField.serTxs(value, bb.putInt(txCount).array)
   }

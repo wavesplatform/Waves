@@ -240,14 +240,18 @@ object Block extends ScorexLogging {
             consensusData: NxtLikeConsensusBlockData,
             transactionData: Seq[Transaction],
             signerData: SignerData,
-            featureVotes: Set[Short]): Either[GenericError, Block] = (for {
-    _ <- Either.cond(transactionData.size <= MaxTransactionsPerBlockVer3, (), s"Too many transactions in Block: allowed: $MaxTransactionsPerBlockVer3, actual: ${transactionData.size}")
-    _ <- Either.cond(reference.arr.length == SignatureLength, (), "Incorrect reference")
-    _ <- Either.cond(consensusData.generationSignature.arr.length == GeneratorSignatureLength, (), "Incorrect consensusData.generationSignature")
-    _ <- Either.cond(signerData.generator.publicKey.length == KeyLength, (), "Incorrect signer.publicKey")
-    _ <- Either.cond(version > 2 || featureVotes.isEmpty, (), s"Block version $version could not contain feature votes")
-    _ <- Either.cond(featureVotes.size <= MaxFeaturesInBlock, (), s"Block could not contain more than $MaxFeaturesInBlock feature votes")
-  } yield Block(timestamp, version, reference, signerData, consensusData, transactionData, featureVotes)).left.map(GenericError)
+            featureVotes: Set[Short]): Either[GenericError, Block] = {
+    val txsCount = transactionData.size
+    (for {
+      _ <- Either.cond((version == 3 && txsCount <= MaxTransactionsPerBlockVer3) || (version <= 2 || txsCount <= MaxTransactionsPerBlockVer1Ver2), (),
+        s"Too many transactions in Block version ${version.toInt}: $txsCount")
+      _ <- Either.cond(reference.arr.length == SignatureLength, (), "Incorrect reference")
+      _ <- Either.cond(consensusData.generationSignature.arr.length == GeneratorSignatureLength, (), "Incorrect consensusData.generationSignature")
+      _ <- Either.cond(signerData.generator.publicKey.length == KeyLength, (), "Incorrect signer.publicKey")
+      _ <- Either.cond(version > 2 || featureVotes.isEmpty, (), s"Block version $version could not contain feature votes")
+      _ <- Either.cond(featureVotes.size <= MaxFeaturesInBlock, (), s"Block could not contain more than $MaxFeaturesInBlock feature votes")
+    } yield Block(timestamp, version, reference, signerData, consensusData, transactionData, featureVotes)).left.map(GenericError)
+  }
 
   def buildAndSign(version: Byte,
                    timestamp: Long,
