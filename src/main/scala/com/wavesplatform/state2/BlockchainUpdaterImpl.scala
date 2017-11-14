@@ -49,7 +49,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
 
   private def currentPersistedBlocksState: StateReader = Coeval(read { implicit l => composite(inMemDiffs(), persisted) })
 
-  def bestLiquidState: StateReader = composite(Coeval(read { implicit l => ngState().map(_.bestLiquidDiff).orEmpty}), currentPersistedBlocksState)
+  def bestLiquidState: StateReader = composite(Coeval(read { implicit l => ngState().map(_.bestLiquidDiff).orEmpty }), currentPersistedBlocksState)
 
   def historyReader: NgHistory with DebugNgHistory with FeatureProvider = {
     new NgHistoryReader(() => read { implicit l => ngState() }, historyWriter, settings.blockchainSettings.functionalitySettings)
@@ -73,7 +73,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
     log.info(heights("State rebuild finished"))
   }
 
-  private def displayFeatures(s: Set[Short]): String = s"FEATURE${if (s.size > 1) "S"} ${s.mkString(", ")} ${if (s.size > 1) "WERE" else "WAS"}"
+  private def displayFeatures(s: Set[Short]): String = s"FEATURE${if (s.size > 1) "S"} ${s.mkString(", ")}${if (s.size > 1) "HAVE BEEN" else "HAS BEEN"}"
 
   private def featuresApprovedWithBlock(block: Block): Set[Short] = {
     val height = historyWriter.height() + 1
@@ -85,7 +85,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
         .filter { case (_, votes) => votes >= settings.blockchainSettings.functionalitySettings.blocksForFeatureActivation }
         .keySet
 
-      log.info(s"${displayFeatures(approvedFeatures)} APPROVED ON BLOCKCHAIN")
+      if (approvedFeatures.nonEmpty) log.info(s"${displayFeatures(approvedFeatures)} APPROVED ON BLOCKCHAIN")
 
       val unimplementedApproved = approvedFeatures.diff(BlockchainFeatures.implemented)
       if (unimplementedApproved.nonEmpty) {
