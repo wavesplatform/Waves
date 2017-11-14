@@ -66,7 +66,7 @@ class MinerImpl(
 
   private val nextBlockGenerationTimes: MMap[Address, Long] = MMap.empty
 
-  def collectNextBlockGenerationTimes: List[(Address, Long)] = Await.result(Task.now(nextBlockGenerationTimes.toList).runAsync, Duration.Inf)
+  def collectNextBlockGenerationTimes: List[(Address, Long)] = Await.result(Task.now(nextBlockGenerationTimes.toList).runAsyncLogErr, Duration.Inf)
 
   private def checkAge(parentHeight: Int, parentTimestamp: Long): Either[String, Unit] =
     Either.cond(parentHeight == 1, (), (timeService.correctedTime() - parentTimestamp).millis)
@@ -156,13 +156,14 @@ class MinerImpl(
         err
       }
     }
-  }.delayExecution(minerSettings.microBlockInterval)
+  }
 
-  private def generateMicroBlockSequence(account: PrivateKeyAccount, accumulatedBlock: Block): Task[Unit] =
-    generateOneMicroBlockTask(account, accumulatedBlock).flatMap {
+  private def generateMicroBlockSequence(account: PrivateKeyAccount, accumulatedBlock: Block, delay: FiniteDuration): Task[Unit] = {
+    generateOneMicroBlockTask(account, accumulatedBlock).delayExecution(delay).flatMap {
       case Left(err) => Task(log.warn("Error mining MicroBlock: " + err.toString))
-      case Right(maybeNewTotal) => generateMicroBlockSequence(account, maybeNewTotal.getOrElse(accumulatedBlock))
+      case Right(maybeNewTotal) => generateMicroBlockSequence(account, maybeNewTotal.getOrElse(accumulatedBlock), minerSettings.microBlockInterval)
     }
+  }
 
   private def generateBlockTask(account: PrivateKeyAccount): Task[Unit] = {
     history.read { implicit l =>
@@ -206,13 +207,13 @@ class MinerImpl(
   def scheduleMining(): Unit = {
     Miner.blockMiningStarted.increment()
     scheduledAttempts := CompositeCancelable.fromSet(
-      wallet.privateKeyAccounts().map(generateBlockTask).map(_.runAsync).toSet)
+      wallet.privateKeyAccounts().map(generateBlockTask).map(_.runAsyncLogErr).toSet)
     microBlockAttempt := SerialCancelable()
   }
 
   private def startMicroBlockMining(account: PrivateKeyAccount, lastBlock: Block): Unit = {
     Miner.microMiningStarted.increment()
-    microBlockAttempt := generateMicroBlockSequence(account, lastBlock).runAsync
+    microBlockAttempt := generateMicroBlockSequence(account, lastBlock, Duration.Zero).runAsyncLogErr
     log.trace(s"MicroBlock mining scheduled for $account")
   }
 }
@@ -221,7 +222,7 @@ object Miner {
   val blockMiningStarted = Kamon.metrics.counter("block-mining-started")
   val microMiningStarted = Kamon.metrics.counter("micro-mining-started")
 
-  val MaxTransactionsPerMicroblock: Int = 5000
+  val MaxTransactionsPerMicroblock: Int = 500
   val ClassicAmountOfTxsInBlock: Int = 100
 
   val Disabled = new Miner with MinerDebugInfo {

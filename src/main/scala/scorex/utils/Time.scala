@@ -10,7 +10,8 @@ import scala.concurrent.duration.DurationInt
 
 trait Time {
   def correctedTime(): Long
-  def getTimestamp() : Long
+
+  def getTimestamp(): Long
 }
 
 class TimeImpl extends Time with ScorexLogging {
@@ -21,7 +22,7 @@ class TimeImpl extends Time with ScorexLogging {
   private val ResponseTimeout = 10.seconds
   private val NtpServer = "pool.ntp.org"
 
-  private val scheduler = Scheduler.singleThread("time-impl")
+  private implicit val scheduler = Scheduler.singleThread(name = "time-impl")
 
   private val client = new NTPUDPClient()
   client.setDefaultTimeout(ResponseTimeout.toMillis.toInt)
@@ -57,12 +58,13 @@ class TimeImpl extends Time with ScorexLogging {
   def correctedTime(): Long = System.currentTimeMillis() + offset
 
   private var txTime: Long = 0
+
   def getTimestamp(): Long = {
     txTime = Math.max(correctedTime(), txTime + 1)
     txTime
   }
 
-  updateTask.runAsync(scheduler)
+  updateTask.runAsyncLogErr
 
 }
 

@@ -19,6 +19,7 @@ import io.netty.channel.socket.SocketChannel
 import io.netty.channel.socket.nio.{NioServerSocketChannel, NioSocketChannel}
 import io.netty.handler.codec.{LengthFieldBasedFrameDecoder, LengthFieldPrepender}
 import io.netty.util.concurrent.DefaultThreadFactory
+import org.asynchttpclient.netty.channel.NoopHandler
 import org.influxdb.dto.Point
 import scorex.transaction._
 import scorex.utils.{ScorexLogging, Time}
@@ -52,6 +53,7 @@ class NetworkServer(checkpointService: CheckpointService,
     settings.synchronizationSettings.scoreTTL,
     history.lastBlockIds(settings.synchronizationSettings.maxRollback), history.score())
 
+  private val trafficWatcher = if (settings.metrics.enable) new TrafficWatcher else new NoopHandler
   private val discardingHandler = new DiscardingHandler(blockchainReadiness)
   private val messageCodec = new MessageCodec(peerDatabase)
 
@@ -101,6 +103,7 @@ class NetworkServer(checkpointService: CheckpointService,
         lengthFieldPrepender,
         new LengthFieldBasedFrameDecoder(100 * 1024 * 1024, 0, 4, 0, 4),
         new LegacyFrameCodec(peerDatabase),
+        trafficWatcher,
         discardingHandler,
         messageCodec,
         writeErrorHandler,
@@ -134,6 +137,7 @@ class NetworkServer(checkpointService: CheckpointService,
       lengthFieldPrepender,
       new LengthFieldBasedFrameDecoder(100 * 1024 * 1024, 0, 4, 0, 4),
       new LegacyFrameCodec(peerDatabase),
+      trafficWatcher,
       discardingHandler,
       messageCodec,
       writeErrorHandler,

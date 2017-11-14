@@ -263,7 +263,11 @@ object MicroBlockResponseMessageSpec extends MessageSpec[MicroBlockResponse] {
 
 
 object BasicMessagesRepo {
-  val specs: Seq[MessageSpec[_ <: AnyRef]] = Seq(GetPeersSpec, PeersSpec, GetSignaturesSpec, SignaturesSpec,
+  private type Spec = MessageSpec[_ <: AnyRef]
+
+  val specs: Seq[Spec] = Seq(GetPeersSpec, PeersSpec, GetSignaturesSpec, SignaturesSpec,
     GetBlockSpec, BlockMessageSpec, ScoreMessageSpec, CheckpointMessageSpec, TransactionMessageSpec,
     MicroBlockInvMessageSpec, MicroBlockRequestMessageSpec, MicroBlockResponseMessageSpec)
+
+  val specsByCodes: Map[Byte, Spec] = specs.map(s => s.messageCode -> s).toMap
 }

@@ -62,11 +62,11 @@ object Metrics extends ScorexLogging {
     }
 
     db.nonEmpty
-  }.runAsync
+  }.runAsyncLogErr
 
   def shutdown(): Unit = Task {
     db.foreach(_.close())
-  }.runAsync
+  }.runAsyncLogErr
 
   def write(b: Point.Builder): Unit = {
     val time = NTP.getTimestamp()
@@ -79,7 +79,7 @@ object Metrics extends ScorexLogging {
         .time(time, TimeUnit.MILLISECONDS)
         .build()
       ))
-    }.runAsync
+    }.runAsyncLogErr
   }
 
   def writeEvent(name: String): Unit = write(Point.measurement(name))

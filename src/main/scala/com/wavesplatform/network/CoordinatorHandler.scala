@@ -15,7 +15,6 @@ import io.netty.channel.{ChannelHandlerContext, ChannelInboundHandlerAdapter}
 import kamon.Kamon
 import monix.eval.Task
 import monix.execution.Scheduler
-import monix.execution.schedulers.SchedulerService
 import scorex.block.Block
 import scorex.transaction.ValidationError.InvalidSignature
 import scorex.transaction._
@@ -38,7 +37,7 @@ class CoordinatorHandler(checkpointService: CheckpointService,
                          microBlockOwners: MicroBlockOwners)
   extends ChannelInboundHandlerAdapter with ScorexLogging {
 
-  private implicit val scheduler: SchedulerService = Scheduler.singleThread("coordinator-handler")
+  private implicit val scheduler = Scheduler.singleThread("coordinator-handler")
 
   private val processCheckpoint = Coordinator.processCheckpoint(checkpointService, history, blockchainUpdater) _
   private val processFork = Coordinator.processFork(checkpointService, history, blockchainUpdater, stateReader, utxStorage, time, settings, blockchainReadiness, featureProvider) _

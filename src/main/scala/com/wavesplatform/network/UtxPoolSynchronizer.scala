@@ -25,7 +25,7 @@ class UtxPoolSynchronizer(utx: UtxPool, allChannels: ChannelGroup)
       case Left(TransactionValidationError(e, _)) =>  // log.trace(s"${id(ctx)} Error processing transaction ${t.id}: $e")
       case Left(e) =>                                 // log.trace(s"${id(ctx)} Error processing transaction ${t.id}: $e")
       case Right(false) =>                            // log.trace(s"${id(ctx)} TX ${t.id} already known")
-    }).runAsync
+    }).runAsyncLogErr
     case _ => super.channelRead(ctx, msg)
   }
 }
