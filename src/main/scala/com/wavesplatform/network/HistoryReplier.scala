@@ -7,6 +7,7 @@ import com.wavesplatform.state2.ByteStr
 import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel.{ChannelHandlerContext, ChannelInboundHandlerAdapter}
 import monix.eval.Task
+import monix.execution.Scheduler
 import monix.execution.schedulers.SchedulerService
 import scorex.transaction.NgHistory
 import scorex.utils.ScorexLogging
@@ -15,11 +16,7 @@ import scorex.utils.ScorexLogging
 class HistoryReplier(history: NgHistory, settings: SynchronizationSettings) extends ChannelInboundHandlerAdapter with ScorexLogging {
   private lazy val historyReplierSettings = settings.historyReplierSettings
 
-  private implicit val scheduler: SchedulerService = monix.execution.Scheduler.fixedPool(
-    name = "history-replier",
-    reporter = com.wavesplatform.utils.UncaughtExceptionsToLogReporter,
-    poolSize = 2
-  )
+  private implicit val scheduler: SchedulerService = Scheduler.fixedPool(name = "history-replier", poolSize = 2)
 
   private val knownMicroBlocks = CacheBuilder.newBuilder()
     .maximumSize(historyReplierSettings.maxMicroBlockCacheSize)
@@ -50,22 +47,22 @@ class HistoryReplier(history: NgHistory, settings: SynchronizationSettings) exte
         case _ =>
           log.debug(s"${id(ctx)} Got GetSignatures with ${otherSigs.length} signatures, but could not find an extension")
       }
-    }.runAsync
+    }.runAsyncLogErr
 
     case GetBlock(sig) => Task(knownBlocks.get(sig)).map(bytes =>
       ctx.writeAndFlush(RawBytes(BlockMessageSpec.messageCode, bytes)))
-      .runAsync
+      .runAsyncLogErr
 
     case mbr@MicroBlockRequest(totalResBlockSig) =>
       log.trace(id(ctx) + "Received " + mbr)
       Task(knownMicroBlocks.get(totalResBlockSig)).map { bytes =>
         ctx.writeAndFlush(RawBytes(MicroBlockResponseMessageSpec.messageCode, bytes))
         log.trace(id(ctx) + s"Sent MicroBlockResponse(total=${totalResBlockSig.trim})")
-      }.runAsync
+      }.runAsyncLogErr
 
     case _: Handshake => Task {
       ctx.writeAndFlush(LocalScoreChanged(history.score()))
-    }.runAsync
+    }.runAsyncLogErr
 
     case _ => super.channelRead(ctx, msg)
   }

@@ -2,6 +2,7 @@ package scorex.transaction
 
 import com.wavesplatform.state2._
 import monix.eval.{Coeval, Task}
+import monix.execution.Scheduler
 import monix.execution.schedulers.SchedulerService
 import scorex.serialization.{BytesSerializable, JsonSerializable}
 import scorex.transaction.TransactionParser.TransactionType
@@ -49,18 +50,17 @@ object Transaction {
 trait Signed {
   protected val signatureValid: Coeval[Boolean]
 
-  protected val signedDescendants: Coeval[Seq[Signed]] =Coeval.evalOnce(Seq.empty)
+  protected val signedDescendants: Coeval[Seq[Signed]] = Coeval.evalOnce(Seq.empty)
 
   protected val signaturesValidMemoized: Task[Either[InvalidSignature, this.type]] = Signed.validateTask[this.type](this).memoize
 
-  val signaturesValid: Coeval[Either[InvalidSignature, this.type]] =  Coeval.evalOnce(Await.result(signaturesValidMemoized.runAsync(Signed.scheduler), Duration.Inf))
+  val signaturesValid: Coeval[Either[InvalidSignature, this.type]] = Coeval.evalOnce(Await.result(signaturesValidMemoized.runAsync(Signed.scheduler), Duration.Inf))
 }
 
 object Signed {
 
   type E[A] = Either[InvalidSignature, A]
-  private implicit val scheduler: SchedulerService = monix.execution.Scheduler.computation(name = "sig-validator",
-    reporter = com.wavesplatform.utils.UncaughtExceptionsToLogReporter)
+  private implicit val scheduler: SchedulerService = Scheduler.computation(name = "sig-validator")
 
 
   private def validateTask[S <: Signed](s: S): Task[E[S]] = Task {

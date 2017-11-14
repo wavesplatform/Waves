@@ -51,7 +51,7 @@ class MinerImpl(
 
   import Miner._
 
-  private implicit val scheduler: SchedulerService = Scheduler.fixedPool(name = "miner-pool", poolSize = 2, reporter = com.wavesplatform.utils.UncaughtExceptionsToLogReporter)
+  private implicit val scheduler: SchedulerService = Scheduler.fixedPool(name = "miner-pool", poolSize = 2)
 
   private lazy val minerSettings = settings.minerSettings
   private lazy val minMicroBlockDurationMills = minerSettings.minMicroBlockAge.toMillis
@@ -66,7 +66,7 @@ class MinerImpl(
 
   private val nextBlockGenerationTimes: MMap[Address, Long] = MMap.empty
 
-  def collectNextBlockGenerationTimes: List[(Address, Long)] = Await.result(Task.now(nextBlockGenerationTimes.toList).runAsync, Duration.Inf)
+  def collectNextBlockGenerationTimes: List[(Address, Long)] = Await.result(Task.now(nextBlockGenerationTimes.toList).runAsyncLogErr, Duration.Inf)
 
   private def checkAge(parentHeight: Int, parentTimestamp: Long): Either[String, Unit] =
     Either.cond(parentHeight == 1, (), (timeService.correctedTime() - parentTimestamp).millis)
@@ -207,13 +207,13 @@ class MinerImpl(
   def scheduleMining(): Unit = {
     Miner.blockMiningStarted.increment()
     scheduledAttempts := CompositeCancelable.fromSet(
-      wallet.privateKeyAccounts().map(generateBlockTask).map(_.runAsync).toSet)
+      wallet.privateKeyAccounts().map(generateBlockTask).map(_.runAsyncLogErr).toSet)
     microBlockAttempt := SerialCancelable()
   }
 
   private def startMicroBlockMining(account: PrivateKeyAccount, lastBlock: Block): Unit = {
     Miner.microMiningStarted.increment()
-    microBlockAttempt := generateMicroBlockSequence(account, lastBlock, Duration.Zero).runAsync
+    microBlockAttempt := generateMicroBlockSequence(account, lastBlock, Duration.Zero).runAsyncLogErr
     log.trace(s"MicroBlock mining scheduled for $account")
   }
 }

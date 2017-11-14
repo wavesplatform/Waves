@@ -11,6 +11,7 @@ import com.wavesplatform.state2.patch.LeasePatch
 import com.wavesplatform.state2.reader.CompositeStateReader.composite
 import com.wavesplatform.state2.reader.SnapshotStateReader
 import monix.eval.Task
+import monix.execution.Scheduler
 import monix.execution.schedulers.SchedulerService
 import scorex.account.Address
 import scorex.block.{Block, MicroBlock}
@@ -24,8 +25,7 @@ import scala.concurrent.duration.Duration
 
 object BlockDiffer extends ScorexLogging with Instrumented {
 
-  private implicit val scheduler: SchedulerService = monix.execution.Scheduler.computation(name = "block-deser",
-    reporter = com.wavesplatform.utils.UncaughtExceptionsToLogReporter)
+  private implicit val scheduler: SchedulerService = Scheduler.computation(name = "block-deser")
 
   def right(diff: Diff): Either[ValidationError, Diff] = Right(diff)
 
@@ -75,7 +75,7 @@ object BlockDiffer extends ScorexLogging with Instrumented {
   def unsafeDiffByRange(fs: FunctionalitySettings, fp: FeatureProvider, h: History, maxTransactionsPerChunk: Int)(state: SnapshotStateReader, upto: Int): NEL[BlockDiff] = {
     val from = state.height + 1
     val blocks = measureLog(s"Reading blocks from $from up upto $upto") {
-      Await.result(Task.wander(Range(from, upto).map(h.blockBytes))(b => Task(Block.parseBytes(b.get).get)).runAsync, Duration.Inf)
+      Await.result(Task.wander(Range(from, upto).map(h.blockBytes))(b => Task(Block.parseBytes(b.get).get)).runAsyncLogErr, Duration.Inf)
     }
     measureLog(s"Building diff from $from up to $upto") {
       BlockDiffer.unsafeDiffMany(fs, fp, state, h.blockAt(from - 1), maxTransactionsPerChunk)(blocks)
