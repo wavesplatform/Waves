@@ -221,7 +221,7 @@ object Miner {
   val blockMiningStarted = Kamon.metrics.counter("block-mining-started")
   val microMiningStarted = Kamon.metrics.counter("micro-mining-started")
 
-  val MaxTransactionsPerMicroblock: Int = 5000
+  val MaxTransactionsPerMicroblock: Int = 500
   val ClassicAmountOfTxsInBlock: Int = 100
 
   val Disabled = new Miner with MinerDebugInfo {
