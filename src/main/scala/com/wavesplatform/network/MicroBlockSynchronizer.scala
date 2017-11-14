@@ -10,10 +10,10 @@ import com.wavesplatform.state2.ByteStr
 import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel._
 import monix.eval.Task
-import monix.execution.{CancelableFuture, Scheduler}
 import monix.execution.schedulers.SchedulerService
-import scorex.block.MicroBlock
+import monix.execution.{CancelableFuture, Scheduler}
 import monix.reactive.Observable
+import scorex.block.MicroBlock
 import scorex.transaction.NgHistory
 import scorex.utils.ScorexLogging
 

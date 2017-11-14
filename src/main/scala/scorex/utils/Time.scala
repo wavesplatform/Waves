@@ -1,6 +1,6 @@
 package scorex.utils
 
-import java.net.InetAddress
+import java.net.{InetAddress, SocketTimeoutException}
 
 import monix.eval.Task
 import monix.execution.Scheduler
@@ -36,6 +36,8 @@ class TimeImpl extends Time with ScorexLogging {
         info.computeDetails()
         Option(info.getOffset).map(offset => if (offset > offsetPanicThreshold) throw new Exception("Offset is suspiciously large") else offset)
       } catch {
+        case _: SocketTimeoutException =>
+          None
         case t: Throwable =>
           log.warn("Problems with NTP: ", t)
           None
@@ -47,7 +49,7 @@ class TimeImpl extends Time with ScorexLogging {
     newOffsetTask.flatMap {
       case None => updateTask.delayExecution(RetryDelay)
       case Some(newOffset) =>
-        log.info(s"Adjusting time with $newOffset milliseconds.")
+        log.trace(s"Adjusting time with $newOffset milliseconds.")
         offset = newOffset
         updateTask.delayExecution(ExpirationTimeout)
     }

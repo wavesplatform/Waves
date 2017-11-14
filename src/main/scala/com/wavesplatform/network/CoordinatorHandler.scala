@@ -63,6 +63,8 @@ class CoordinatorHandler(checkpointService: CheckpointService,
     }.onErrorHandle[Unit](ctx.fireExceptionCaught).runAsync
   }
 
+  def shutdown(): Unit = scheduler.shutdown()
+
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
     case c: Checkpoint => processAndBlacklistOnFailure(ctx,
       s"${id(ctx)} Attempting to process checkpoint",
