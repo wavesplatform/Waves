@@ -33,40 +33,51 @@ class ActivationFeatureTestSuite extends FreeSpec with Matchers with BeforeAndAf
   "supported blocks increased when voting starts" in {
     val checkHeight: Int = votingInterval * 2 / 3
 
-    val activationStatusWhileVoting = activationStatus(nodes.head, checkHeight, featureNum, waitCompletion)
-    val activationStatusIntervalLastVotingBlock = activationStatus(nodes.head, votingInterval, featureNum, waitCompletion)
+    val activationStatusWhileVoting = activationStatus(nodes, checkHeight, featureNum, waitCompletion)
+    val activationStatusIntervalLastVotingBlock = activationStatus(nodes, votingInterval, featureNum, waitCompletion)
 
     val generatedBlocks = Await.result(nodes.head.blockSeq(1, checkHeight), waitCompletion)
     val featuresMapInGeneratedBlocks = generatedBlocks.flatMap(b => b.features.getOrElse(Seq.empty)).groupBy(x => x)
     val votesForFeature1 = featuresMapInGeneratedBlocks.getOrElse(featureNum, Seq.empty).length
 
-    assertVotingStatus(activationStatusWhileVoting, votesForFeature1,
-      BlockchainFeatureStatus.Undefined, NodeFeatureStatus.Voted)
+    activationStatusWhileVoting.foreach { case (n, info) =>
+      withClue(n.settings.networkSettings.nodeName) {
+        assertVotingStatus(info, votesForFeature1, BlockchainFeatureStatus.Undefined, NodeFeatureStatus.Voted)
+      }
+    }
 
-    assertVotingStatus(activationStatusIntervalLastVotingBlock, blocksForActivation - 1,
-      BlockchainFeatureStatus.Undefined, NodeFeatureStatus.Voted)
+    activationStatusIntervalLastVotingBlock.foreach { case (n, info) =>
+      assertVotingStatus(info, blocksForActivation - 1, BlockchainFeatureStatus.Undefined, NodeFeatureStatus.Voted)
+    }
   }
 
   "supported blocks counter resets on the next voting interval" in {
     val checkHeight: Int = votingInterval * 2 - blocksForActivation / 2
-    val activationStatusInfo = activationStatus(nodes.last, checkHeight, featureNum, waitCompletion)
-
-    activationStatusInfo.supportedBlocks.get shouldBe blocksForActivation / 2
-    activationStatusInfo.blockchainStatus shouldBe BlockchainFeatureStatus.Undefined
+    activationStatus(nodes, checkHeight, featureNum, waitCompletion).foreach { case (n, info) =>
+      withClue(n.settings.networkSettings.nodeName) {
+        info.supportedBlocks.get shouldBe blocksForActivation / 2
+        info.blockchainStatus shouldBe BlockchainFeatureStatus.Undefined
+      }
+    }
   }
 
   "blockchain status is APPROVED in second voting interval" in {
     val checkHeight: Int = votingInterval * 2
-    val activationStatusInfo = activationStatus(nodes.last, checkHeight, featureNum, waitCompletion)
-
-    assertApprovedStatus(activationStatusInfo, votingInterval * 3, NodeFeatureStatus.Voted)
+    activationStatus(nodes, checkHeight, featureNum, waitCompletion).foreach { case (n, info) =>
+      withClue(n.settings.networkSettings.nodeName) {
+        // Activation will be on a next voting interval
+        assertApprovedStatus(info, checkHeight + votingInterval, NodeFeatureStatus.Voted)
+      }
+    }
   }
 
   "blockchain status is ACTIVATED in third voting interval" in {
     val checkHeight: Int = votingInterval * 3
-    val activationStatusInfo = activationStatus(nodes.last, checkHeight, featureNum, waitCompletion)
-
-    assertActivatedStatus(activationStatusInfo, checkHeight, NodeFeatureStatus.Voted)
+    activationStatus(nodes, checkHeight, featureNum, waitCompletion).foreach { case (n, info) =>
+      withClue(n.settings.networkSettings.nodeName) {
+        assertActivatedStatus(info, checkHeight, NodeFeatureStatus.Voted)
+      }
+    }
   }
 
 
@@ -74,8 +85,8 @@ class ActivationFeatureTestSuite extends FreeSpec with Matchers with BeforeAndAf
 
     val NodesCount: Int = 4
 
-    val votingInterval = 20
-    val blocksForActivation = 20 // should be even
+    val votingInterval = 12
+    val blocksForActivation = 12 // should be even
     val featureNum: Short = 1
 
     private val supportedNodes = ConfigFactory.parseString(
