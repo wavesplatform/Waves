@@ -21,6 +21,7 @@ class OptimisticExtensionLoader extends ChannelDuplexHandler with ScorexLogging 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
     case ExtensionBlocks(extension) if extension.isEmpty =>
       requestedLocalIds = Seq.empty
+      hopefullyNextIds = Seq.empty
       log.debug(s"${id(ctx)} Blockchain is up to date")
       super.channelRead(ctx, msg)
     case ExtensionBlocks(extension) if requestedLocalIds.isEmpty =>
@@ -28,7 +29,7 @@ class OptimisticExtensionLoader extends ChannelDuplexHandler with ScorexLogging 
       log.debug(s"${id(ctx)} Loaded new extension with ${extension.size} blocks, keeping for now")
     case ExtensionBlocks(extension) if requestedLocalIds.contains(extension.head.reference) =>
       loadNextPart(ctx, extension)
-      log.debug(s"${id(ctx)} Passing extension with ${extension.size} signatures upstream")
+      log.debug(s"${id(ctx)} Passing extension with ${extension.size} blocks upstream")
       super.channelRead(ctx, msg)
     case ExtensionBlocks(extension) =>
       log.debug(s"${id(ctx)} Discarding ${extension.size} blocks")
