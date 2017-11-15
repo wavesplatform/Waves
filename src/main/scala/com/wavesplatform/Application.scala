@@ -139,6 +139,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     //on unexpected shutdown
     sys.addShutdownHook {
+      utxStorage.close()
       network.shutdown()
       shutdown()
     }

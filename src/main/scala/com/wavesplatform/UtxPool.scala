@@ -12,6 +12,9 @@ import com.wavesplatform.state2.reader.CompositeStateReader.composite
 import com.wavesplatform.state2.{ByteStr, Diff, Portfolio, StateReader}
 import kamon.Kamon
 import kamon.metric.instrument.{Time => KamonTime}
+import monix.eval.{Callback, Task}
+import monix.execution.Scheduler
+import monix.execution.schedulers.SchedulerService
 import scorex.account.Address
 import scorex.consensus.TransactionsOrdering
 import scorex.transaction.ValidationError.GenericError
@@ -27,9 +30,22 @@ class UtxPool(time: Time,
               history: History,
               feeCalculator: FeeCalculator,
               fs: FunctionalitySettings,
-              utxSettings: UtxSettings) extends ScorexLogging with Instrumented {
+              utxSettings: UtxSettings) extends ScorexLogging with Instrumented with AutoCloseable {
 
   private val transactions = new ConcurrentHashMap[ByteStr, Transaction]()
+
+  private implicit val scheduler: Scheduler = Scheduler.global
+
+  private val cleanupTask = Task.eval(removeInvalid())
+  private val cleanup = cleanupTask.flatMap(_ => cleanupTask.delayExecution(utxSettings.cleanupInterval)).runAsync
+
+  private def removeInvalid(): Unit = {
+    val state = stateReader()
+    val transactionsToRemove = transactions.values.asScala.flatMap(t => state.transactionInfo(t.id())).map(_._2)
+    removeAll(transactionsToRemove)
+  }
+
+  override def close(): Unit = cleanup.cancel()
 
   private lazy val knownTransactions = CacheBuilder
     .newBuilder()
@@ -134,6 +150,7 @@ class UtxPool(time: Time,
       reversedValidTxs.sorted(TransactionsOrdering.InBlock)
     else reversedValidTxs.reverse
   }
+
 }
 
 object UtxPool {
