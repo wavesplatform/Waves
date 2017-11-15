@@ -67,7 +67,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     val establishedConnections = new ConcurrentHashMap[Channel, PeerInfo]
     val allChannels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
 
-    val utxStorage = new UtxPool(time, stateReader, history, feeCalculator, settings.blockchainSettings.functionalitySettings, settings.utxSettings)
+    val utxStorage = new UtxPoolImpl(time, stateReader, history, feeCalculator, settings.blockchainSettings.functionalitySettings, settings.utxSettings)
 
     val blockchainReadiness = new AtomicBoolean(false)
 
