@@ -34,16 +34,15 @@ class UtxPool(time: Time,
 
   private val transactions = new ConcurrentHashMap[ByteStr, Transaction]()
 
-  private implicit val scheduler: Scheduler = Scheduler.global
+  private implicit val scheduler: Scheduler = Scheduler.singleThread("utx-pool-cleanup")
 
-  private val cleanupTask = Task.eval(removeInvalid())
-  private val cleanup = cleanupTask.flatMap(_ => cleanupTask.delayExecution(utxSettings.cleanupInterval)).runAsync
-
-  private def removeInvalid(): Unit = {
+  private val removeInvalid = Task {
     val state = stateReader()
-    val transactionsToRemove = transactions.values.asScala.flatMap(t => state.transactionInfo(t.id())).map(_._2)
+    val transactionsToRemove = transactions.values.asScala.filter(t => state.containsTransaction(t.id()))
     removeAll(transactionsToRemove)
   }
+
+  private val cleanup = removeInvalid.flatMap(_ => removeInvalid.delayExecution(utxSettings.cleanupInterval)).runAsync
 
   override def close(): Unit = cleanup.cancel()
 
