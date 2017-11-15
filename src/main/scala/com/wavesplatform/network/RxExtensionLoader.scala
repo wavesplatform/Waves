@@ -1,39 +1,94 @@
 package com.wavesplatform.network
 
-import java.util.concurrent.TimeUnit
-
-import cats.implicits._
-import com.google.common.cache.CacheBuilder
 import com.wavesplatform.network.RxScoreObserver.SyncWith
+import com.wavesplatform.settings.SynchronizationSettings
 import io.netty.channel._
 import monix.eval.Task
-import monix.execution.Scheduler
-import monix.execution.schedulers.SchedulerService
 import monix.reactive.Observable
-import monix.reactive.subjects.ConcurrentSubject
+import monix.reactive.subjects.PublishSubject
 import scorex.block.Block
-import scorex.transaction.History.BlockchainScore
+import scorex.block.Block.BlockId
 import scorex.transaction.NgHistory
 import scorex.utils.ScorexLogging
 
-import scala.collection.JavaConverters._
-import scala.concurrent.duration.FiniteDuration
-
 object RxExtensionLoader extends ScorexLogging {
 
-  def filter(allBlocks: Observable[(Channel, Block)],
+  sealed trait ExtensionLoaderState
+
+  sealed trait WithPeer extends ExtensionLoaderState {
+    def c: Channel
+  }
+
+  case object Still extends ExtensionLoaderState
+
+  case class ExpectingSignatures(c: Channel, known: Seq[BlockId]) extends WithPeer
+
+  case class ExpectingBlocks(c: Channel, allBlocks: Seq[BlockId],
+                             expected: Set[BlockId],
+                             recieved: Set[Block]) extends WithPeer
 
 
-            ): (Observable[(Channel, Block)]) = ???
-
-
-  def apply(history: NgHistory,
-            syncRequests: Observable[SyncWith],
+  def apply(ss: SynchronizationSettings,
+            history: NgHistory,
+            bestChannel: Observable[SyncWith],
             blocks: Observable[(Channel, Block)],
-            sigs: Observable[(Channel, Signatures)]): Observable[ExtensionBlocks] = {
+            signatures: Observable[(Channel, Signatures)],
+            channelClosed: Observable[Channel]): (Observable[ExtensionBlocks], Observable[Block]) = {
 
+    val extensionBlocks = PublishSubject[ExtensionBlocks]()
+    val simpleBlocks = PublishSubject[Block]()
 
-    ???
+    var innerState: ExtensionLoaderState = Still
+
+    channelClosed.mapTask { ch =>
+      innerState match {
+        case wp: WithPeer if wp.c == ch => Task {
+          innerState = Still
+        }
+        case _ => Task.unit
+      }
+
+    }
+
+    bestChannel.mapTask { case SyncWith(ch, _) => innerState match {
+      case Still => Task {
+        val knownSigs = history.lastBlockIds(ss.maxRollback)
+        ch.writeAndFlush(LoadBlockchainExtension(knownSigs))
+        innerState = ExpectingSignatures(ch, knownSigs)
+      }
+      case _ => Task.unit
+    }
+    }
+
+    signatures.mapTask { case ((ch, sigs)) => innerState match {
+      case ExpectingSignatures(c, known) if c == ch => Task {
+        val (_, unknown) = sigs.signatures.span(id => known.contains(id))
+        if (unknown.isEmpty)
+          innerState = Still
+        else {
+          unknown.foreach(s => ch.write(GetBlock(s)))
+          innerState = ExpectingBlocks(ch, unknown, unknown.toSet, Set.empty)
+        }
+      }
+      case _ => Task.unit
+    }
+    }
+
+    blocks.mapTask { case ((ch, block)) => Task {
+      innerState match {
+        case ExpectingBlocks(c, requested, expected, recieved) if c == ch && expected.contains(block.uniqueId) => Task {
+          if (expected == Set(block.uniqueId)) {
+            val blockById = (recieved + block).map(b => b.uniqueId -> b).toMap
+            val ext = requested.map(blockById)
+            extensionBlocks.onNext(ExtensionBlocks(ext))
+          }
+        }
+        case _ => simpleBlocks.onNext(block)
+      }
+    }
+    }
+
+    (extensionBlocks, simpleBlocks)
   }
 
 

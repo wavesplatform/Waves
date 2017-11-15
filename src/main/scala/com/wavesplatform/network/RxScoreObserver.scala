@@ -6,10 +6,7 @@ import cats.implicits._
 import com.google.common.cache.CacheBuilder
 import io.netty.channel._
 import monix.eval.Task
-import monix.execution.Scheduler
-import monix.execution.schedulers.SchedulerService
 import monix.reactive.Observable
-import monix.reactive.subjects.ConcurrentSubject
 import scorex.transaction.History.BlockchainScore
 import scorex.utils.ScorexLogging
 
@@ -20,13 +17,11 @@ object RxScoreObserver extends ScorexLogging {
 
   case class SyncWith(c: Channel, score: BlockchainScore)
 
-  implicit val scheduler: SchedulerService = Scheduler.singleThread("rx-score-observer")
+  //  implicit val scheduler: SchedulerService = Scheduler.singleThread("rx-score-observer")
 
   def apply(scoreTtl: FiniteDuration, localScores: Observable[BlockchainScore],
             remoteScores: Observable[(Channel, BlockchainScore)],
-            closedChannels: Observable[Channel]): Observable[SyncWith] = {
-
-    val subject: ConcurrentSubject[SyncWith, SyncWith] = ConcurrentSubject.publish[SyncWith]
+            channelClosed: Observable[Channel]): Observable[SyncWith] = {
 
     var localScore: BlockchainScore = 0
     var pinned: Option[Channel] = None
@@ -36,7 +31,7 @@ object RxScoreObserver extends ScorexLogging {
 
     def newBestChannel(): Option[SyncWith] = {
       val betterChannels = scores.asMap().asScala.filter(_._2 > localScore)
-      if (betterChannels isEmpty) {
+      if (betterChannels.isEmpty) {
         log.debug("No better scores of remote peers, sync complete")
         None
       } else {
@@ -53,26 +48,24 @@ object RxScoreObserver extends ScorexLogging {
       }
     }
 
-    val maybePublish = Task {
-      newBestChannel().map(subject.onNext)
-    }
-
-    localScores.foreach(newLocalScore => (Task {
+    val x = localScores.mapTask(newLocalScore => Task {
       localScore = newLocalScore
-    } >> maybePublish).runAsyncLogErr)
+    })
 
-    closedChannels.foreach(ch => (Task {
+    val y = channelClosed.mapTask(ch => Task {
       scores.invalidate(ch)
       if (pinned.contains(ch))
         pinned = None
-    } >> maybePublish).runAsyncLogErr)
+    })
 
-    remoteScores.foreach { case ((ch, score)) => (Task {
+    val z = remoteScores.mapTask { case ((ch, score)) => Task {
       scores.put(ch, score)
       log.trace(s"${id(ch)} New score $scores")
-    } >> maybePublish).runAsyncLogErr
+    }
     }
 
-    subject
+    Observable.merge(x, y, z).map(_ => newBestChannel())
+      .filter(_.isDefined)
+      .map(_.get)
   }
 }
