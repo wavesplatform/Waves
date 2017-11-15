@@ -12,9 +12,8 @@ import com.wavesplatform.state2.reader.CompositeStateReader.composite
 import com.wavesplatform.state2.{ByteStr, Diff, Portfolio, StateReader}
 import kamon.Kamon
 import kamon.metric.instrument.{Time => KamonTime}
-import monix.eval.{Callback, Task}
+import monix.eval.Task
 import monix.execution.Scheduler
-import monix.execution.schedulers.SchedulerService
 import scorex.account.Address
 import scorex.consensus.TransactionsOrdering
 import scorex.transaction.ValidationError.GenericError
@@ -40,9 +39,9 @@ class UtxPool(time: Time,
     val state = stateReader()
     val transactionsToRemove = transactions.values.asScala.filter(t => state.containsTransaction(t.id()))
     removeAll(transactionsToRemove)
-  }
+  }.delayExecution(utxSettings.cleanupInterval)
 
-  private val cleanup = removeInvalid.flatMap(_ => removeInvalid.delayExecution(utxSettings.cleanupInterval)).runAsync
+  private val cleanup = removeInvalid.flatMap(_ => removeInvalid).runAsync
 
   override def close(): Unit = cleanup.cancel()
 
