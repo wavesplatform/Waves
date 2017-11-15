@@ -6,6 +6,8 @@ import cats.implicits._
 import com.google.common.cache.CacheBuilder
 import io.netty.channel._
 import monix.eval.Task
+import monix.execution.Scheduler
+import monix.execution.schedulers.SchedulerService
 import monix.reactive.Observable
 import scorex.transaction.History.BlockchainScore
 import scorex.utils.ScorexLogging
@@ -17,7 +19,7 @@ object RxScoreObserver extends ScorexLogging {
 
   case class SyncWith(c: Channel, score: BlockchainScore)
 
-  //  implicit val scheduler: SchedulerService = Scheduler.singleThread("rx-score-observer")
+  val scheduler: SchedulerService = Scheduler.singleThread("rx-score-observer")
 
   def apply(scoreTtl: FiniteDuration, localScores: Observable[BlockchainScore],
             remoteScores: Observable[(Channel, BlockchainScore)],
@@ -48,17 +50,17 @@ object RxScoreObserver extends ScorexLogging {
       }
     }
 
-    val x = localScores.mapTask(newLocalScore => Task {
+    val x = localScores.executeOn(scheduler).mapTask(newLocalScore => Task {
       localScore = newLocalScore
     })
 
-    val y = channelClosed.mapTask(ch => Task {
+    val y = channelClosed.executeOn(scheduler).mapTask(ch => Task {
       scores.invalidate(ch)
       if (pinned.contains(ch))
         pinned = None
     })
 
-    val z = remoteScores.mapTask { case ((ch, score)) => Task {
+    val z = remoteScores.executeOn(scheduler).mapTask { case ((ch, score)) => Task {
       scores.put(ch, score)
       log.trace(s"${id(ch)} New score $scores")
     }

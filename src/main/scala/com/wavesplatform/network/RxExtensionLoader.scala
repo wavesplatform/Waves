@@ -4,6 +4,8 @@ import com.wavesplatform.network.RxScoreObserver.SyncWith
 import com.wavesplatform.settings.SynchronizationSettings
 import io.netty.channel._
 import monix.eval.Task
+import monix.execution.Scheduler
+import monix.execution.schedulers.SchedulerService
 import monix.reactive.Observable
 import monix.reactive.subjects.PublishSubject
 import scorex.block.Block
@@ -35,12 +37,17 @@ object RxExtensionLoader extends ScorexLogging {
             signatures: Observable[(Channel, Signatures)],
             channelClosed: Observable[Channel]): (Observable[ExtensionBlocks], Observable[Block]) = {
 
+    /* To put it in other words, in Monix it's usually the consumer and
+     * not the producer that specifies the scheduler and this operator
+     * allows for a different behavior. */
+    val scheduler: SchedulerService = Scheduler.singleThread("rx-block-loader")
+
     val extensionBlocks = PublishSubject[ExtensionBlocks]()
     val simpleBlocks = PublishSubject[Block]()
 
     var innerState: ExtensionLoaderState = Still
 
-    channelClosed.mapTask { ch =>
+    channelClosed.executeOn(scheduler).mapTask { ch =>
       innerState match {
         case wp: WithPeer if wp.c == ch => Task {
           innerState = Still
@@ -50,7 +57,7 @@ object RxExtensionLoader extends ScorexLogging {
 
     }
 
-    bestChannel.mapTask { case SyncWith(ch, _) => innerState match {
+    bestChannel.executeOn(scheduler).mapTask { case SyncWith(ch, _) => innerState match {
       case Still => Task {
         val knownSigs = history.lastBlockIds(ss.maxRollback)
         ch.writeAndFlush(LoadBlockchainExtension(knownSigs))
@@ -60,7 +67,7 @@ object RxExtensionLoader extends ScorexLogging {
     }
     }
 
-    signatures.mapTask { case ((ch, sigs)) => innerState match {
+    signatures.executeOn(scheduler).mapTask { case ((ch, sigs)) => innerState match {
       case ExpectingSignatures(c, known) if c == ch => Task {
         val (_, unknown) = sigs.signatures.span(id => known.contains(id))
         if (unknown.isEmpty)
@@ -74,7 +81,7 @@ object RxExtensionLoader extends ScorexLogging {
     }
     }
 
-    blocks.mapTask { case ((ch, block)) => Task {
+    blocks.executeOn(scheduler).mapTask { case ((ch, block)) => Task {
       innerState match {
         case ExpectingBlocks(c, requested, expected, recieved) if c == ch && expected.contains(block.uniqueId) => Task {
           if (expected == Set(block.uniqueId)) {
