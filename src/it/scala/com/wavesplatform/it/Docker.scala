@@ -198,7 +198,6 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
       client
         .logs(
           containerId,
-          DockerClient.LogsParam.timestamps(),
           DockerClient.LogsParam.follow(),
           DockerClient.LogsParam.stdout(),
           DockerClient.LogsParam.stderr()

@@ -173,7 +173,7 @@ case class Block private(override val timestamp: Long,
   protected override val signedDescendants: Coeval[Seq[Transaction]] = Coeval.evalOnce(transactionData)
 
   override def toString: String =
-    s"Block(${signerData.signature} -> ${reference.trim}, txs=${transactionData.size}, features=$featureVotes) "
+    s"Block(${signerData.signature} -> ${reference.trim}, txs=${transactionData.size}, features=$featureVotes)"
 
 }
 
