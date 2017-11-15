@@ -74,7 +74,7 @@ class UtxPoolSpecification extends FreeSpec
     offset <- chooseNum(1000L, 2000L)
   } yield {
     val time = new TestTime()
-    val utx = new UtxPool(time, state, history, calculator, FunctionalitySettings.TESTNET, UtxSettings(10, 10.minutes))
+    val utx = new UtxPoolImpl(time, state, history, calculator, FunctionalitySettings.TESTNET, UtxSettings(10, 10.minutes, 10.minutes))
     val amountPart = (senderBalance - fee) / 2 - fee
     val txs = for (_ <- 1 to n) yield PaymentTransaction.create(sender, recipient, amountPart, fee, time.getTimestamp()).right.get
     (utx, time, txs, (offset + 1000).millis)
@@ -83,7 +83,7 @@ class UtxPoolSpecification extends FreeSpec
   private val emptyUtxPool = stateGen
     .map { case (sender, senderBalance, state, history) =>
       val time = new TestTime()
-      val utxPool = new UtxPool(time, state, history, calculator, FunctionalitySettings.TESTNET, UtxSettings(10, 1.minute))
+      val utxPool = new UtxPoolImpl(time, state, history, calculator, FunctionalitySettings.TESTNET, UtxSettings(10, 1.minute, 10.minutes))
       (sender, state, utxPool)
     }
     .label("emptyUtxPool")
@@ -94,20 +94,20 @@ class UtxPoolSpecification extends FreeSpec
     time = new TestTime()
     txs <- Gen.nonEmptyListOf(transferWithRecipient(sender, recipient, senderBalance / 10, time))
   } yield {
-    val settings = UtxSettings(10, 1.minute)
-    val utxPool = new UtxPool(time, state, history, calculator, FunctionalitySettings.TESTNET, settings)
+    val settings = UtxSettings(10, 1.minute, 10.minutes)
+    val utxPool = new UtxPoolImpl(time, state, history, calculator, FunctionalitySettings.TESTNET, settings)
     txs.foreach(utxPool.putIfNew)
     (sender, state, utxPool, time, settings)
   }).label("withValidPayments")
 
-  private def utxTest(utxSettings: UtxSettings = UtxSettings(20, 5.seconds), txCount: Int = 10)
+  private def utxTest(utxSettings: UtxSettings = UtxSettings(20, 5.seconds, 10.minutes), txCount: Int = 10)
                      (f: (Seq[TransferTransaction], UtxPool, TestTime) => Unit): Unit = forAll(
     stateGen,
     chooseNum(2, txCount).label("txCount")) { case ((sender, senderBalance, state, history), count) =>
     val time = new TestTime()
 
     forAll(listOfN(count, transfer(sender, senderBalance / 2, time))) { txs =>
-      val utx = new UtxPool(time, state, history, calculator, FunctionalitySettings.TESTNET, utxSettings)
+      val utx = new UtxPoolImpl(time, state, history, calculator, FunctionalitySettings.TESTNET, utxSettings)
       f(txs, utx, time)
     }
   }
@@ -124,12 +124,12 @@ class UtxPoolSpecification extends FreeSpec
       val time = new TestTime()
       val history = HistoryWriterImpl(None, new ReentrantReadWriteLock(), TestFunctionalitySettings.Stub,
         TestFunctionalitySettings.EmptyFeaturesSettings).get
-      val utx = new UtxPool(time, state, history, calculator, FunctionalitySettings.TESTNET, UtxSettings(10, offset.millis))
+      val utx = new UtxPoolImpl(time, state, history, calculator, FunctionalitySettings.TESTNET, UtxSettings(10, offset.millis, 10.minutes))
       (utx, time, tx1, (offset + 1000).millis, tx2)
     }
 
   "UTX Pool" - {
-    "does not add new transactions when full" in utxTest(UtxSettings(1, 5.seconds)) { (txs, utx, _) =>
+    "does not add new transactions when full" in utxTest(UtxSettings(1, 5.seconds, 10.minutes)) { (txs, utx, _) =>
       utx.putIfNew(txs.head) shouldBe 'right
       all(txs.tail.map(t => utx.putIfNew(t))) should produce("pool size limit")
     }
