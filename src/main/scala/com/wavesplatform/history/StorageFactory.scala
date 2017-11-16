@@ -14,8 +14,8 @@ import scala.util.{Success, Try}
 
 object StorageFactory {
 
-  private def createStateStorage(history: History with FeatureProvider, stateFile: Option[File], pageSplitSize: Int): Try[StateStorage] =
-    StateStorage(stateFile, dropExisting = false).flatMap { ss =>
+  private def createStateStorage(history: History with FeatureProvider, db: DB): Try[StateStorage] =
+    StateStorage(db).flatMap { ss =>
       if (ss.getHeight <= history.height()) Success(ss) else {
         ss.close()
         StateStorage(stateFile, dropExisting = true)
@@ -26,7 +26,7 @@ object StorageFactory {
     val lock = new RWL(true)
     for {
       historyWriter <- HistoryWriterImpl(db, lock, settings.blockchainSettings.functionalitySettings, settings.featuresSettings)
-      ss <- createStateStorage(historyWriter, settings.blockchainSettings.stateFile, settings.mvstorePageSplitSize)
+      ss <- createStateStorage(historyWriter, settings.blockchainSettings.stateFile)
       stateWriter = new StateWriterImpl(ss, settings.blockchainSettings.storeTransactionsInState, lock)
     } yield {
       val bcu = BlockchainUpdaterImpl(stateWriter, historyWriter, settings, lock)

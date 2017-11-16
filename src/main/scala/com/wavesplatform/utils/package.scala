@@ -22,7 +22,9 @@ package object utils extends ScorexLogging {
   def createWithVerification[A <: Storage with VersionedStorage](storage: => A, consistencyCheck: A => Boolean = (_: A) => true): Try[A] = Try {
     if (storage.isVersionValid && consistencyCheck(storage)) storage else {
       log.info(s"Re-creating storage")
-      storage.removeEverything()
+      val b = storage.createBatch()
+      storage.removeEverything(b)
+      storage.commit(b)
       require(consistencyCheck(storage), "storage is inconsistent")
       storage
     }

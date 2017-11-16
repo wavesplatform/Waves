@@ -4,7 +4,7 @@ import java.nio.charset.{Charset, StandardCharsets}
 
 import com.google.common.primitives.{Bytes, Ints}
 import com.wavesplatform.utils.forceStopApplication
-import org.iq80.leveldb.DB
+import org.iq80.leveldb.{DB, WriteBatch}
 import scorex.utils.ScorexLogging
 
 import scala.util.control.NonFatal
@@ -36,14 +36,49 @@ abstract class Storage(private val db: DB) extends ScorexLogging with AutoClosea
     }
   }
 
-  def delete(key: Array[Byte]): Unit = {
+  def createBatch(): Option[WriteBatch] = {
     try {
-      db.delete(key)
+      Some(db.createWriteBatch())
+    } catch {
+      case NonFatal(t) =>
+        log.error("LevelDB create batch error", t)
+        forceStopApplication()
+        throw t
+    }
+  }
+
+  def put(key: Array[Byte], value: Array[Byte], batch: Option[WriteBatch] = None): Unit = {
+    try {
+      batch.fold(db.put(key, value)) { b => b.put(key, value) }
+    } catch {
+      case NonFatal(t) =>
+        log.error("LevelDB batch put error", t)
+        forceStopApplication()
+        throw t
+    }
+  }
+
+  def delete(key: Array[Byte], batch: Option[WriteBatch] = None): Unit = {
+    try {
+      batch.fold(db.delete(key)) { b => b.delete(key) }
     } catch {
       case NonFatal(t) =>
         log.error("LevelDB delete error", t)
         forceStopApplication()
         throw t
+    }
+  }
+
+  def commit(batch: Option[WriteBatch]): Unit = {
+    batch.foreach { b =>
+      try {
+        db.write(b)
+      } catch {
+        case NonFatal(t) =>
+          log.error("LevelDB write batch error", t)
+          forceStopApplication()
+          throw t
+      }
     }
   }
 
@@ -63,7 +98,7 @@ abstract class Storage(private val db: DB) extends ScorexLogging with AutoClosea
     map
   }
 
-  def removeEverything(): Unit
+  def removeEverything(b: Option[WriteBatch]): Unit
 
   protected def makePrefix(prefix: Array[Byte]): Array[Byte] = Bytes.concat(prefix, Separator)
 

@@ -11,7 +11,7 @@ import com.wavesplatform.state2.{BlockDiff, ByteStr}
 import com.wavesplatform.utils._
 import kamon.Kamon
 import org.iq80.leveldb.DB
-import scorex.block.Block
+import scorex.block.{Block, BlockHeader}
 import scorex.transaction.History.BlockchainScore
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction._
@@ -37,7 +37,7 @@ class HistoryWriterImpl private(db: DB, val synchronizationToken: ReentrantReadW
   private val VotesAtHeightPrefix = "votes".getBytes(Charset)
   private val FeatureStatePrefix = "features".getBytes(Charset)
 
-  private val HeightProperty = "height"
+  private val HeightProperty = "history-height"
 
   private[HistoryWriterImpl] def isConsistent: Boolean = read { implicit l =>
     true
@@ -151,8 +151,10 @@ class HistoryWriterImpl private(db: DB, val synchronizationToken: ReentrantReadW
 
   override def blockAt(height: Int): Option[Block] = blockBytes(height).map(Block.parseBytes(_).get)
 
-  private def getBlockSignature(height: Int): Option[ByteStr] = get(makeKey(SignatureAtHeightPrefix, height)).map(ByteStr.apply)
+  override def blockHeaderAndSizeAt(height: Int): Option[(BlockHeader, Int)] =
+    blockBytes(height).map(bytes => (BlockHeader.parseBytes(bytes).get._1, bytes.length))
 
+  private def getBlockSignature(height: Int): Option[ByteStr] = get(makeKey(SignatureAtHeightPrefix, height)).map(ByteStr.apply)
 }
 
 object HistoryWriterImpl extends ScorexLogging {

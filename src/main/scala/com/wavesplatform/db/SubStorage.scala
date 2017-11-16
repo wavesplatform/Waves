@@ -1,7 +1,7 @@
 package com.wavesplatform.db
 
 import com.google.common.primitives.{Bytes, Ints}
-import org.iq80.leveldb.DB
+import org.iq80.leveldb.{DB, WriteBatch}
 
 class SubStorage(db: DB, name: String) extends Storage(db) {
 
@@ -13,6 +13,8 @@ class SubStorage(db: DB, name: String) extends Storage(db) {
 
   override protected def makeKey(prefix: Array[Byte], key: Int): Array[Byte] = makeKey(prefix, Ints.toByteArray(key))
 
-  override def removeEverything(): Unit = map(makePrefix(subPrefix), stripPrefix = false).keys.foreach(delete)
+  override def removeEverything(b: Option[WriteBatch]): Unit = {
+    map(makePrefix(subPrefix), stripPrefix = false).foreach(e => delete(e._1, b))
+  }
 
 }
