@@ -84,31 +84,36 @@ configs(IntegrationTest)
 
 lazy val itTestsCommonSettings: Seq[Def.Setting[_]] = Seq(
   testOptions += Tests.Argument(TestFrameworks.ScalaTest, "-fW", (logDirectory.value / "summary.log").toString),
-  testGrouping := testGrouping.value.flatMap { group =>
-    group.tests.map { suite =>
-      val fileName = {
-        val parts = suite.name.split('.')
-        (parts.init.map(_.substring(0, 1)) :+ parts.last).mkString(".")
+  testGrouping := {
+    var i = 0
+    testGrouping.value.flatMap { group =>
+      group.tests.map { suite =>
+        i += 1
+        val fileName = {
+          val parts = suite.name.split('.')
+          (parts.init.map(_.substring(0, 1)) :+ parts.last).mkString(".")
+        }
+
+        val forkOptions = ForkOptions(
+          bootJars = Nil,
+          javaHome = javaHome.value,
+          connectInput = connectInput.value,
+          outputStrategy = outputStrategy.value,
+          runJVMOptions = javaOptions.value ++ Seq(
+            "-Dwaves.it.logging.appender=FILE",
+            s"-Dwaves.it.logging.dir=${logDirectory.value / fileName}",
+            s"-Dwaves.it.index=$i"
+          ),
+          workingDirectory = Some(baseDirectory.value),
+          envVars = envVars.value
+        )
+
+        group.copy(
+          name = suite.name,
+          runPolicy = Tests.SubProcess(forkOptions),
+          tests = Seq(suite)
+        )
       }
-
-      val forkOptions = ForkOptions(
-        bootJars = Nil,
-        javaHome = javaHome.value,
-        connectInput = connectInput.value,
-        outputStrategy = outputStrategy.value,
-        runJVMOptions = javaOptions.value ++ Seq(
-          "-Dwaves.it.logging.appender=FILE",
-          s"-Dwaves.it.logging.dir=${logDirectory.value / fileName}"
-        ),
-        workingDirectory = Some(baseDirectory.value),
-        envVars = envVars.value
-      )
-
-      group.copy(
-        name = suite.name,
-        runPolicy = Tests.SubProcess(forkOptions),
-        tests = Seq(suite)
-      )
     }
   }
 )
