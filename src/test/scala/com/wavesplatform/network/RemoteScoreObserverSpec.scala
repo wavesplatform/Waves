@@ -46,7 +46,7 @@ class RemoteScoreObserverSpec extends FreeSpec
       channel1.flushInbound()
 
       currentLastSignatures :+= ByteStr("block#2".getBytes)
-      channel1.writeOutbound(LocalScoreChanged(channel1Score, LocalScoreChanged.Reason.ForkApplied))
+      channel1.writeOutbound(LocalScoreChanged(channel1Score, breakExtLoading = true))
 
       val channel2 = new EmbeddedChannel(scoreObserver)
       channel2.writeInbound(BigInt(3))
@@ -86,26 +86,6 @@ class RemoteScoreObserverSpec extends FreeSpec
           3 -> 4
         ).foreach { case (best, secondBest) =>
           s"$best then $secondBest" in test(best, secondBest)
-        }
-      }
-
-      "immediately on rollback" in {
-        val scoreObserver = new RemoteScoreObserver(1.minute, lastSignatures, 1)
-
-        val channel1 = new EmbeddedChannel(scoreObserver)
-        channel1.writeInbound(BigInt(2))
-        channel1.flushInbound()
-
-        val channel2 = new EmbeddedChannel(scoreObserver)
-        channel2.writeInbound(BigInt(3))
-        channel2.flushInbound()
-
-        channel1.writeOutbound(LocalScoreChanged(BigInt(1), LocalScoreChanged.Reason.Rollback))
-
-        val expected = LoadBlockchainExtension(lastSignatures)
-        eventually {
-          val actual = channel2.readOutbound[LoadBlockchainExtension]()
-          actual shouldBe expected
         }
       }
     }
@@ -156,7 +136,7 @@ class RemoteScoreObserverSpec extends FreeSpec
       }
     }
 
-    "if the local score is changed for Other reason" - {
+    "if the local score is changed for other reason" - {
       "new local score is still worse" in test(3, 2)
       "new local score is better" in test(2, 3)
 
@@ -173,7 +153,7 @@ class RemoteScoreObserverSpec extends FreeSpec
         }
 
         currentLastSignatures :+= ByteStr("block#2".getBytes)
-        channel.writeOutbound(LocalScoreChanged(newLocalScore, LocalScoreChanged.Reason.Other))
+        channel.writeOutbound(LocalScoreChanged(newLocalScore, breakExtLoading = false))
 
         intercept[TestFailedDueToTimeoutException] {
           eventually {

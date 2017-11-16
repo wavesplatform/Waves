@@ -3,7 +3,6 @@ package com.wavesplatform.network
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicReference
 
-import com.wavesplatform.network.LocalScoreChanged.Reason
 import com.wavesplatform.state2.ByteStr
 import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel._
@@ -53,17 +52,16 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
       }
     }
 
-  private val stopExtProcessingReasons = Set(Reason.ForkApplied, Reason.Rollback, Reason.Checkpoint)
-
   override def write(ctx: ChannelHandlerContext, msg: AnyRef, promise: ChannelPromise): Unit = msg match {
-    case LocalScoreChanged(newLocalScore, reason) =>
+    case LocalScoreChanged(newLocalScore, breakExtLoading) =>
       // unconditionally update local score value and propagate this message downstream
       localScore = newLocalScore
       ctx.write(msg, promise)
       log.debug(s"${id(ctx)} ${pinnedChannelId}New local score: $newLocalScore")
 
-      if (stopExtProcessingReasons.contains(reason) && pinnedChannel.compareAndSet(ctx.channel(), null)) {
-        log.debug(s"${id(ctx)} Stop working with extensions, reason: $reason")
+      if (breakExtLoading) {
+        log.debug(s"${id(ctx)} Stop processing an extension")
+        pinnedChannel.compareAndSet(ctx.channel(), null)
         channelWithHighestScore match {
           case Some((bestChannel, bestScore))
             if bestScore > localScore && pinnedChannel.compareAndSet(null, bestChannel) =>

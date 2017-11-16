@@ -188,7 +188,7 @@ class MinerImpl(
                 BlockStats.mined(block, history.height())
                 Coordinator.updateBlockchainReadinessFlag(history, timeService, blockchainReadiness, settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed)
                 allChannels.broadcast(BlockForged(block))
-                allChannels.broadcast(LocalScoreChanged(score))
+                allChannels.broadcast(LocalScoreChanged(score, breakExtLoading = false))
                 scheduleMining()
                 if (ngEnabled)
                   startMicroBlockMining(account, block)
