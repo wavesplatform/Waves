@@ -355,11 +355,7 @@ object MatcherTestSuite {
        |waves.miner.enable=no
       """.stripMargin)
 
-  private val nonGeneratingPeersConfig = ConfigFactory.parseString(
-    """
-      |waves.miner.enable=no
-    """.stripMargin
-  )
+  private val nonGeneratingPeersConfig = ConfigFactory.parseString("waves.miner.enable=no")
 
   val AssetQuantity: Long = 1000
 

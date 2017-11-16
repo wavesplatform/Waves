@@ -1,3 +1,6 @@
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
+
 import com.typesafe.sbt.packager.archetypes.TemplateWriter
 import sbt.Keys._
 import sbt._
@@ -78,16 +81,14 @@ concurrentRestrictions in Global := Seq(
 
 Defaults.itSettings
 configs(IntegrationTest)
-inConfig(IntegrationTest)({
-  Seq(
-    test := (test dependsOn docker).value,
-    envVars in test += "CONTAINER_JAVA_OPTS" -> "-Xmx1500m",
-    envVars in testOnly += "CONTAINER_JAVA_OPTS" -> "-Xmx512m",
-    testOptions in test += Tests.Argument(
-      TestFrameworks.ScalaTest, "-fW", (logDirectory.value / "summary.log").toString
-    ),
-    testGrouping in test := testGrouping.value.flatMap { group =>
+
+lazy val itTestsCommonSettings: Seq[Def.Setting[_]] = Seq(
+  testOptions += Tests.Argument(TestFrameworks.ScalaTest, "-fW", (logDirectory.value / "summary.log").toString),
+  testGrouping := {
+    var i = 0
+    testGrouping.value.flatMap { group =>
       group.tests.map { suite =>
+        i += 1
         val fileName = {
           val parts = suite.name.split('.')
           (parts.init.map(_.substring(0, 1)) :+ parts.last).mkString(".")
@@ -100,7 +101,8 @@ inConfig(IntegrationTest)({
           outputStrategy = outputStrategy.value,
           runJVMOptions = javaOptions.value ++ Seq(
             "-Dwaves.it.logging.appender=FILE",
-            s"-Dwaves.it.logging.dir=${logDirectory.value / fileName}"
+            s"-Dwaves.it.logging.dir=${logDirectory.value / fileName}",
+            s"-Dwaves.it.index=$i"
           ),
           workingDirectory = Some(baseDirectory.value),
           envVars = envVars.value
@@ -113,8 +115,16 @@ inConfig(IntegrationTest)({
         )
       }
     }
-  )
-})
+  }
+)
+
+inConfig(IntegrationTest)(
+  Seq(
+    test := (test dependsOn docker).value,
+    envVars in test += "CONTAINER_JAVA_OPTS" -> "-Xmx1500m",
+    envVars in testOnly += "CONTAINER_JAVA_OPTS" -> "-Xmx512m"
+  ) ++ inTask(test)(itTestsCommonSettings) ++ inTask(testOnly)(itTestsCommonSettings)
+)
 
 dockerfile in docker := {
   val configTemplate = (resourceDirectory in IntegrationTest).value / "template.conf"
@@ -215,7 +225,10 @@ lazy val generator = project.in(file("generator"))
 
 lazy val logDirectory = taskKey[File]("A directory for logs")
 logDirectory := {
-  val runId = Option(System.getenv("RUN_ID")).getOrElse("default")
+  val runId = Option(System.getenv("RUN_ID")).getOrElse {
+    val formatter = DateTimeFormatter.ofPattern("MM-dd--HH_mm_ss")
+    s"local-${formatter.format(LocalDateTime.now())}"
+  }
   val r = target.value / "logs" / runId
   IO.createDirectory(r)
   r

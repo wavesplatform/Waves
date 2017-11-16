@@ -8,7 +8,7 @@
     </appender>
 
     <appender name="FILE" class="ch.qos.logback.core.FileAppender">
-        <file>${waves.it.logging.dir}/test.log</file>
+        <file>${waves.it.logging.dir:-target/logs}/test.log</file>
         <append>false</append>
         <encoder>
             <pattern>%date{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] %logger{26} - %msg%n</pattern>

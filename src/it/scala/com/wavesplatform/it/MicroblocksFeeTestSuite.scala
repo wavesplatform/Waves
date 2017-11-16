@@ -114,13 +114,12 @@ class MicroblocksFeeTestSuite extends FreeSpec with Matchers with BeforeAndAfter
          |       }
          |      }
          |   }
+         |   miner.quorum = 3
          |}
       """.stripMargin
     )
     private val notMiner = ConfigFactory.parseString(
-      s"""
-         |waves.miner.enable=no
-         |waves {
+      s"""waves {
          |   blockchain {
          |     custom {
          |        functionality{
@@ -137,6 +136,7 @@ class MicroblocksFeeTestSuite extends FreeSpec with Matchers with BeforeAndAfter
          |       }
          |      }
          |   }
+         |   miner.enable = no
          |}
       """.stripMargin
 

@@ -2,7 +2,7 @@ package com.wavesplatform.it
 
 import java.io.FileOutputStream
 import java.nio.file.{Files, Paths}
-import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.{ConcurrentHashMap, ThreadLocalRandom}
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.{Collections, Properties, List => JList, Map => JMap}
 
@@ -52,7 +52,9 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
     close()
   }
 
-  private val networkName = "waves" + this.##.toLong.toHexString
+  private val environmentId = Option(System.getProperty("waves.it.index")).map(_.toInt)
+    .getOrElse(ThreadLocalRandom.current().nextInt(1, 120))
+  private val networkName = s"waves$environmentId"
 
   private lazy val wavesNetworkId: String = {
     def network: Option[Network] = try {
@@ -68,7 +70,16 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
           log.info(s"Network ${n.name()} (id: ${n.id()}) is created for $tag")
           n.id()
         case None =>
-          val r = client.createNetwork(NetworkConfig.builder().name(networkName).driver("bridge").checkDuplicate(true).build())
+          // Specify the network manually because of race conditions: https://github.com/moby/moby/issues/20648
+          val network1Byte = environmentId + 17
+          val r = client.createNetwork(NetworkConfig.builder()
+            .name(networkName)
+            .driver("bridge")
+            .addOption("subnet", s"172.$network1Byte.0.0/16")
+            .addOption("ip-range", s"172.$network1Byte.5.0/24")
+            .addOption("gateway", s"172.$network1Byte.5.254")
+            .checkDuplicate(true)
+            .build())
           Option(r.warnings()).foreach(log.warn(_))
           attempt(rest - 1)
       }
@@ -198,7 +209,6 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
       client
         .logs(
           containerId,
-          DockerClient.LogsParam.timestamps(),
           DockerClient.LogsParam.follow(),
           DockerClient.LogsParam.stdout(),
           DockerClient.LogsParam.stderr()
@@ -210,9 +220,11 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
   }
 
   def disconnectFromNetwork(node: Node): Unit = disconnectFromNetwork(node.nodeInfo.containerId)
+
   private def disconnectFromNetwork(containerId: String): Unit = client.disconnectFromNetwork(containerId, wavesNetworkId)
 
   def connectToNetwork(node: Node): Unit = connectToNetwork(node.nodeInfo.containerId)
+
   private def connectToNetwork(containerId: String): Unit = client.connectToNetwork(containerId, wavesNetworkId)
 }
 

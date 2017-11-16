@@ -7,7 +7,6 @@ import org.scalatest.{BeforeAndAfterAll, FreeSpec, Matchers}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent._
 import scala.concurrent.duration.DurationInt
-import scala.util.Random
 
 class NetworkUniqueConnectionsTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll {
 
@@ -53,7 +52,7 @@ class NetworkUniqueConnectionsTestSuite extends FreeSpec with Matchers with Befo
 
 private object NetworkUniqueConnectionsTestSuite {
 
-  private val configs = Random.shuffle(NodeConfigs.Default).take(2)
+  private val configs = NodeConfigs.newBuilder.withDefault(2).build
   val FirstNodeConfig: Config = configs.head
   val SecondNodeConfig: Config = configs.last
 

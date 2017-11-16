@@ -94,11 +94,7 @@ class RollbackSpecSuite extends FreeSpec with ScalaFutures with IntegrationPatie
 object RollbackSpecSuite {
   import NodeConfigs.Default
 
-  private val nonGeneratingNodesConfig = ConfigFactory.parseString(
-    """
-      |waves.miner.enable=no
-    """.stripMargin
-  )
+  private val nonGeneratingNodesConfig = ConfigFactory.parseString("waves.miner.enable = no")
 
   val configs: Seq[Config] = Seq(Default.last, nonGeneratingNodesConfig.withFallback(Random.shuffle(Default.init).head))
 }
