@@ -22,7 +22,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future, blocking}
 import scala.util.control.NonFatal
-import scala.util.{Failure, Random, Try}
+import scala.util.Random
 
 case class NodeInfo(hostRestApiPort: Int,
                     hostNetworkPort: Int,
@@ -250,6 +250,14 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
         client.stopContainer(node.nodeInfo.containerId, 0)
         disconnectFromNetwork(node)
         saveLog(node)
+        val containerInfo = client.inspectContainer(node.nodeInfo.containerId)
+        log.debug(
+          s"""Container information for ${node.settings.networkSettings.nodeName}:
+             |Exit code: ${containerInfo.state().exitCode()}
+             |Error: ${containerInfo.state().error()}
+             |Status: ${containerInfo.state().status()}
+             |OOM killed: ${containerInfo.state().oomKilled()}""".stripMargin)
+
         client.removeContainer(node.nodeInfo.containerId, RemoveContainerParam.forceKill())
       }
 
@@ -318,9 +326,9 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
     val ip = s"$networkPrefix.$nodeNumber"
 
     EndpointConfig.builder()
-        .ipAddress(ip)
-        .ipamConfig(EndpointIpamConfig.builder().ipv4Address(ip).build())
-        .build()
+      .ipAddress(ip)
+      .ipamConfig(EndpointIpamConfig.builder().ipv4Address(ip).build())
+      .build()
   }
 
   private def dumpContainers(containers: java.util.List[Container], label: String = "Containers"): Unit = {
