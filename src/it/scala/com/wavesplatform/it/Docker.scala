@@ -101,7 +101,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
   }
 
   def startNodes(nodeConfigs: Seq[Config]): Seq[Node] = {
-    val all = nodeConfigs.map(startNode)
+    val all = nodeConfigs.map(startNodeInternal)
     Await.result(
       for {
         _ <- Future.traverse(all)(waitNodeIsUp)
