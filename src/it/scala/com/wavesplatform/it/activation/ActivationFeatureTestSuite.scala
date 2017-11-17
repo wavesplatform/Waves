@@ -3,7 +3,7 @@ package com.wavesplatform.it.activation
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.features.BlockchainFeatureStatus
 import com.wavesplatform.features.api.NodeFeatureStatus
-import com.wavesplatform.it.{Docker, Node, NodeConfigs}
+import com.wavesplatform.it.{Docker, Node, NodeConfigs, ReportingTestName}
 import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -12,13 +12,13 @@ import scala.concurrent.{Await, Future}
 import scala.util.Random
 
 class ActivationFeatureTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with CancelAfterFailure
-  with ActivationStatusRequest {
+  with ActivationStatusRequest with ReportingTestName {
 
   import ActivationFeatureTestSuite._
 
   private val waitCompletion = 6.minutes
   private lazy val docker = Docker(getClass)
-  private lazy val nodes: Seq[Node] = docker.startNodes(Configs)
+  override lazy val nodes: Seq[Node] = docker.startNodes(Configs)
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()

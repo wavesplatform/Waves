@@ -3,7 +3,7 @@ package com.wavesplatform.it.activation
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.features.BlockchainFeatureStatus
 import com.wavesplatform.features.api.{ActivationStatusFeature, NodeFeatureStatus}
-import com.wavesplatform.it.{Docker, NodeConfigs}
+import com.wavesplatform.it.{Docker, Node, NodeConfigs, ReportingTestName}
 import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -11,12 +11,13 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.util.Random
 
-class NotActivateFeatureTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with CancelAfterFailure with ActivationStatusRequest {
+class NotActivateFeatureTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with CancelAfterFailure
+  with ActivationStatusRequest with ReportingTestName {
 
   import NotActivateFeatureTestSuite._
 
   private lazy val docker = Docker(getClass)
-  private lazy val nodes = docker.startNodes(Configs)
+  override lazy val nodes: Seq[Node] = docker.startNodes(Configs)
   private var activationStatusInfoBefore = Option.empty[ActivationStatusFeature]
   private var activationStatusInfoAfter = Option.empty[ActivationStatusFeature]
 

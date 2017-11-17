@@ -3,19 +3,20 @@ package com.wavesplatform.it.activation
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.features.BlockchainFeatureStatus
 import com.wavesplatform.features.api.NodeFeatureStatus
-import com.wavesplatform.it.{Docker, NodeConfigs}
+import com.wavesplatform.it.{Docker, Node, NodeConfigs, ReportingTestName}
 import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
-class VoteForFeatureByDefaultTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with CancelAfterFailure with ActivationStatusRequest {
+class VoteForFeatureByDefaultTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with CancelAfterFailure
+  with ActivationStatusRequest with ReportingTestName {
 
   import VoteForFeatureByDefaultTestSuite._
 
   private lazy val docker = Docker(getClass)
-  private lazy val nodes = docker.startNodes(Configs)
+  override lazy val nodes: Seq[Node] = docker.startNodes(Configs)
 
   val defaultVotingFeatureNum: Short = 1
 
