@@ -2,14 +2,15 @@ package com.wavesplatform.it
 
 import java.io.FileOutputStream
 import java.nio.file.{Files, Paths}
-import java.util.concurrent.{ConcurrentHashMap, ThreadLocalRandom}
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.{ConcurrentHashMap, ThreadLocalRandom}
 import java.util.{Collections, Properties, List => JList, Map => JMap}
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.dataformat.javaprop.JavaPropsMapper
-import com.google.common.collect.{ImmutableMap, Lists}
+import com.google.common.collect.ImmutableMap
 import com.spotify.docker.client.DockerClient.RemoveContainerParam
+import com.spotify.docker.client.messages.EndpointConfig.EndpointIpamConfig
 import com.spotify.docker.client.messages._
 import com.spotify.docker.client.{DefaultDockerClient, DockerClient}
 import com.typesafe.config.{Config, ConfigFactory, ConfigRenderOptions}
@@ -20,8 +21,8 @@ import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
-import scala.util.{Failure, Try}
 import scala.util.control.NonFatal
+import scala.util.{Failure, Try}
 
 case class NodeInfo(hostRestApiPort: Int,
                     hostNetworkPort: Int,
@@ -56,6 +57,9 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
   private val environmentId = Option(System.getProperty("waves.it.index")).map(_.toInt)
     .getOrElse(ThreadLocalRandom.current().nextInt(1, 120))
 
+  // Specify the network manually because of race conditions: https://github.com/moby/moby/issues/20648
+  private val network1Byte = environmentId + 17
+
   private lazy val wavesNetwork: Network = {
     val networkName = s"waves$environmentId"
 
@@ -72,16 +76,14 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
           log.info(s"Network ${n.name()} (id: ${n.id()}) is created for $tag")
           n
         case None =>
-          // Specify the network manually because of race conditions: https://github.com/moby/moby/issues/20648
-          val network1Byte = environmentId + 17
           val r = client.createNetwork(NetworkConfig.builder()
             .name(networkName)
             .ipam(
               Ipam.builder()
                 .driver("default")
-                .config(Lists.newArrayList(
+                .config(List(
                   IpamConfig.create(s"172.16.$network1Byte.0/24", s"172.16.$network1Byte.0/24", s"172.16.$network1Byte.254")
-                ))
+                ).asJava)
                 .build()
             )
             .checkDuplicate(true)
@@ -154,14 +156,25 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
       .portBindings(portBindings)
       .build()
 
+    val nodeNumber = actualConfig.getString("waves.network.node-name").replace("node", "").toInt
+    val ip = s"172.16.$network1Byte.$nodeNumber"
     val containerConfig = ContainerConfig.builder()
       .image("com.wavesplatform/waves:latest")
       .exposedPorts(restApiPort, networkPort, matcherApiPort)
+      .networkingConfig(ContainerConfig.NetworkingConfig.create(Map(
+        wavesNetwork.name() -> EndpointConfig.builder()
+          .ipamConfig(EndpointIpamConfig.builder().ipv4Address(ip).build())
+          .build()
+      ).asJava))
       .hostConfig(hostConfig)
-      .env(s"WAVES_OPTS=$configOverrides", s"WAVES_PORT=$networkPort")
+      .env(s"WAVES_OPTS=$configOverrides", s"WAVES_NET_IP=$ip", s"WAVES_PORT=$networkPort")
       .build()
 
-    val containerId = client.createContainer(containerConfig, s"${wavesNetwork.name()}-${actualConfig.getString("waves.network.node-name")}").id()
+    val containerId = {
+      val r = client.createContainer(containerConfig, s"${wavesNetwork.name()}-${actualConfig.getString("waves.network.node-name")}")
+      Option(r.warnings().asScala).toSeq.flatten.foreach(log.warn(_))
+      r.id()
+    }
     connectToNetwork(containerId)
 
     client.startContainer(containerId)
