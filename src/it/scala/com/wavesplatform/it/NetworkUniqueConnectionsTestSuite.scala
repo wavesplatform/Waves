@@ -24,7 +24,7 @@ class NetworkUniqueConnectionsTestSuite extends FreeSpec with Matchers with Befo
              |]""".stripMargin
         )
 
-        docker.startNode(SecondNodeConfig.withFallback(peersConfig))
+        docker.startNode(peersConfig.withFallback(SecondNodeConfig), autoConnect = false)
       }
       _ <- firstNode.waitForPeers(1)
 

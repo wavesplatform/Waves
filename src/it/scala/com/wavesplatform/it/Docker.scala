@@ -76,6 +76,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
           log.info(s"Network ${n.name()} (id: ${n.id()}) is created for $tag")
           n
         case None =>
+          log.debug(s"Creating network $networkName for $tag")
           val r = client.createNetwork(NetworkConfig.builder()
             .name(networkName)
             .ipam(
@@ -112,9 +113,12 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
     all
   }
 
-  def startNode(nodeConfig: Config): Node = {
+  def startNode(nodeConfig: Config, autoConnect: Boolean = true): Node = {
     val node = startNodeInternal(nodeConfig)
-    Await.result(waitNodeIsUp(node).flatMap(_ => connectToAll(node)), 3.minutes)
+    Await.result(
+      waitNodeIsUp(node).flatMap(_ => if (autoConnect) connectToAll(node) else Future.successful(())),
+      3.minutes
+    )
     node
   }
 

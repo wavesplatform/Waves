@@ -1,5 +1,6 @@
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
+import java.util.concurrent.atomic.AtomicInteger
 
 import com.typesafe.sbt.packager.archetypes.TemplateWriter
 import sbt.Keys._
@@ -85,10 +86,10 @@ configs(IntegrationTest)
 lazy val itTestsCommonSettings: Seq[Def.Setting[_]] = Seq(
   testOptions += Tests.Argument(TestFrameworks.ScalaTest, "-fW", (logDirectory.value / "summary.log").toString),
   testGrouping := {
-    var i = 0
+    val idGenerator = new AtomicInteger(0)
     testGrouping.value.flatMap { group =>
       group.tests.map { suite =>
-        i += 1
+        val i = idGenerator.incrementAndGet()
         val fileName = {
           val parts = suite.name.split('.')
           (parts.init.map(_.substring(0, 1)) :+ parts.last).mkString(".")
