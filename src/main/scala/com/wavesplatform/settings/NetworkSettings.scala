@@ -32,7 +32,9 @@ case class NetworkSettings(file: Option[File],
                            peersBroadcastInterval: FiniteDuration,
                            handshakeTimeout: FiniteDuration,
                            suspensionResidenceTime: FiniteDuration,
-                           uPnPSettings: UPnPSettings)
+                           uPnPSettings: UPnPSettings) {
+  val maxConnections: Int = maxInboundConnections + maxOutboundConnections
+}
 
 object NetworkSettings {
   private val MaxNodeNameBytesLength = 127

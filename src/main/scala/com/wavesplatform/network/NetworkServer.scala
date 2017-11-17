@@ -167,17 +167,21 @@ class NetworkServer(checkpointService: CheckpointService,
   private val connectTask = workerGroup.scheduleWithFixedDelay(1.second, 5.seconds) {
     import scala.collection.JavaConverters._
 
-    val outgoing = outgoingChannels.keySet.iterator().asScala.toVector
-    def outgoingStr = outgoing.map(_.toString).sorted.mkString("[", ", ", "]")
+    val outgoing = outgoingChannels.keySet.iterator().asScala.toSet
+    def outgoingStr = outgoing.toVector.map(_.toString).sorted.mkString("[", ", ", "]")
 
-    val incoming = peerInfo.values().iterator().asScala.flatMap(_.declaredAddress).toVector
-    def incomingStr = incoming.map(_.toString).sorted.mkString("[", ", ", "]")
+    val all = peerInfo.values().iterator().asScala.flatMap(_.declaredAddress).toSet
+
+    val incoming = all -- outgoing
+    def incomingStr = incoming.map(_.toString).toVector.sorted.mkString("[", ", ", "]")
 
     log.trace(s"Outgoing: $outgoingStr ++ incoming: $incomingStr")
-    val shouldConnect = outgoingChannels.size() < settings.networkSettings.maxOutboundConnections
-    if (shouldConnect) {
+
+    if (allChannels.size() < settings.networkSettings.maxConnections &&
+      outgoingChannels.size() < settings.networkSettings.maxOutboundConnections) {
+
       peerDatabase
-        .randomPeer(excluded = excludedAddresses ++ outgoing ++ incoming)
+        .randomPeer(excluded = excludedAddresses ++ all)
         .foreach(connect)
     }
 
@@ -186,8 +190,7 @@ class NetworkServer(checkpointService: CheckpointService,
         .measurement("connections")
         .addField("outgoing", outgoingStr)
         .addField("incoming", incomingStr)
-        .addField("n", outgoingChannels.keySet.size() + incoming.size)
-        .addField("connecting", shouldConnect)
+        .addField("n", all.size)
     )
   }
 
