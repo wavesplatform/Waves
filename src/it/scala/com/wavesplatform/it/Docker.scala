@@ -123,7 +123,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
 
   private def connectToAll(node: Node): Future[Unit] = {
     val seedAddresses = nodes.asScala
-      .filterNot(_ == node)
+      .filterNot(_.nodeName == node.nodeName)
       .map { n => (n.nodeInfo.networkIpAddress, n.nodeInfo.containerNetworkPort) }
 
     Future
