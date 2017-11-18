@@ -50,15 +50,16 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
   private val nodes = ConcurrentHashMap.newKeySet[Node]()
   private val isStopped = new AtomicBoolean(false)
 
+  dumpContainers(client.listContainers())
   sys.addShutdownHook {
-    log.trace("Shutdown hook")
+    log.debug("Shutdown hook")
     close()
   }
 
   // Specify the network manually because of race conditions: https://github.com/moby/moby/issues/20648
   private val network1Byte = {
     val environmentId = Option(System.getProperty("waves.it.index")).map(_.toInt)
-      .getOrElse(ThreadLocalRandom.current().nextInt(1, 120))
+      .getOrElse(throw new IllegalArgumentException(s"waves.it.index is not specified for $tag"))
     environmentId
   }
 
@@ -97,6 +98,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
     } catch {
       case NonFatal(e) =>
         log.warn(s"Can not create a network for $tag", e)
+        dumpContainers(client.listContainers())
         if (rest == 0) throw e else attempt(rest - 1)
     }
 
@@ -178,7 +180,12 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
 
     val containerId = {
       val containerName = s"${wavesNetwork.name()}-${actualConfig.getString("waves.network.node-name")}"
-      log.trace(s"Creating container $containerName at $ip with options: $javaOptions")
+      dumpContainers(
+        client.listContainers(DockerClient.ListContainersParam.filter("name", containerName)),
+        "Containers with same name:"
+      )
+
+      log.debug(s"Creating container $containerName at $ip with options: $javaOptions")
       val r = client.createContainer(containerConfig, containerName)
       Option(r.warnings().asScala).toSeq.flatten.foreach(log.warn(_))
       r.id()
@@ -273,6 +280,14 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
   def connectToNetwork(node: Node): Unit = connectToNetwork(node.nodeInfo.containerId)
 
   private def connectToNetwork(containerId: String): Unit = client.connectToNetwork(containerId, wavesNetwork.id())
+
+  private def dumpContainers(containers: java.util.List[Container], label: String = "Containers"): Unit = {
+    val x = if (containers.isEmpty) "No" else containers.asScala
+      .map { x => s"Container(${x.id()}, status: ${x.status()}, names: ${x.names().asScala.mkString(", ")})" }
+      .mkString("\n")
+
+    log.debug(s"$label:$x")
+  }
 }
 
 object Docker {
