@@ -51,17 +51,19 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
   private val isStopped = new AtomicBoolean(false)
 
   sys.addShutdownHook {
+    log.trace("Shutdown hook")
     close()
   }
 
-  private val environmentId = Option(System.getProperty("waves.it.index")).map(_.toInt)
-    .getOrElse(ThreadLocalRandom.current().nextInt(1, 120))
-
   // Specify the network manually because of race conditions: https://github.com/moby/moby/issues/20648
-  private val network1Byte = environmentId + 17
+  private val network1Byte = {
+    val environmentId = Option(System.getProperty("waves.it.index")).map(_.toInt)
+      .getOrElse(ThreadLocalRandom.current().nextInt(1, 120))
+    environmentId
+  }
 
   private lazy val wavesNetwork: Network = {
-    val networkName = s"waves$environmentId"
+    val networkName = s"waves$network1Byte"
 
     def network: Option[Network] = try {
       val networks = client.listNetworks(DockerClient.ListNetworksParam.byNetworkName(networkName))

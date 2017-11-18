@@ -19,9 +19,11 @@ trait IntegrationSuiteWithThreeAddresses extends BeforeAndAfterAll with Matchers
   this: Suite =>
 
   def nodes: Seq[Node]
+
   def notMiner: Node
 
   protected def sender: Node = notMiner
+
   private def richAddress = sender.address
 
   protected val defaultBalance: Long = 100.waves
@@ -117,13 +119,19 @@ trait IntegrationSuiteWithThreeAddresses extends BeforeAndAfterAll with Matchers
       txs <- makeTransfers
 
       height <- traverse(nodes)(_.height).map(_.max)
-      _ <- traverse(nodes)(_.waitForHeight(height + 2))
+      _ <- withClue(s"waitForHeight(${height + 2})") {
+        Await.ready(traverse(nodes)(_.waitForHeight(height + 2)), 3.minutes)
+      }
 
-      _ <- waitForTxsToReachAllNodes(txs)
+      _ <- withClue("waitForTxsToReachAllNodes") {
+        Await.ready(waitForTxsToReachAllNodes(txs), 1.minute)
+      }
       _ <- dumpBalances(sender, accounts, "after transfer")
       _ <- traverse(accounts)(assertBalances(_, defaultBalance, defaultBalance))
     } yield succeed
 
-    Await.result(correctStartBalancesFuture, 5.minutes)
+    withClue("beforeAll") {
+      Await.result(correctStartBalancesFuture, 5.minutes)
+    }
   }
 }
