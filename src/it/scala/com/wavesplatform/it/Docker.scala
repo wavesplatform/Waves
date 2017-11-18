@@ -10,7 +10,6 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.dataformat.javaprop.JavaPropsMapper
 import com.google.common.collect.ImmutableMap
 import com.spotify.docker.client.DockerClient.RemoveContainerParam
-import com.spotify.docker.client.messages.EndpointConfig.EndpointIpamConfig
 import com.spotify.docker.client.messages._
 import com.spotify.docker.client.{DefaultDockerClient, DockerClient}
 import com.typesafe.config.{Config, ConfigFactory, ConfigRenderOptions}
@@ -22,7 +21,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.util.control.NonFatal
-import scala.util.{Failure, Try}
+import scala.util.{Failure, Random, Try}
 
 case class NodeInfo(hostRestApiPort: Int,
                     hostNetworkPort: Int,
@@ -56,15 +55,10 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
     close()
   }
 
-  // Specify the network manually because of race conditions: https://github.com/moby/moby/issues/20648
-  private val network1Byte = {
-    val environmentId = Option(System.getProperty("waves.it.index")).map(_.toInt)
-      .getOrElse(throw new IllegalArgumentException(s"waves.it.index is not specified for $tag"))
-    environmentId
-  }
+  private val networkPrefix = s"172.${125 + Random.nextInt(75)}.${1 + Random.nextInt(125)}"
 
   private lazy val wavesNetwork: Network = {
-    val networkName = s"waves$network1Byte"
+    val networkName = s"waves-${hashCode().toLong.toHexString}"
 
     def network: Option[Network] = try {
       val networks = client.listNetworks(DockerClient.ListNetworksParam.byNetworkName(networkName))
@@ -87,7 +81,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
               Ipam.builder()
                 .driver("default")
                 .config(List(
-                  IpamConfig.create(s"172.150.$network1Byte.0/24", s"172.150.$network1Byte.0/24", s"172.150.$network1Byte.254")
+                  IpamConfig.create(s"$networkPrefix.0/24", s"$networkPrefix.0/24", s"$networkPrefix.254")
                 ).asJava)
                 .build()
             )
@@ -166,14 +160,14 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
       .build()
 
     val nodeNumber = actualConfig.getString("waves.network.node-name").replace("node", "").toInt
-    val ip = s"172.150.$network1Byte.$nodeNumber"
+    val ip = s"$networkPrefix.$nodeNumber"
     val containerConfig = ContainerConfig.builder()
       .image("com.wavesplatform/waves:latest")
       .exposedPorts(restApiPort, networkPort, matcherApiPort)
       .networkingConfig(ContainerConfig.NetworkingConfig.create(Map(
         wavesNetwork.name() -> EndpointConfig.builder()
           .ipAddress(ip)
-          .ipamConfig(EndpointIpamConfig.builder().ipv4Address(ip).build())
+          //.ipamConfig(EndpointIpamConfig.builder().ipv4Address(ip).build())
           .build()
       ).asJava))
       .hostConfig(hostConfig)
@@ -184,7 +178,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
       val containerName = s"${wavesNetwork.name()}-${actualConfig.getString("waves.network.node-name")}"
       dumpContainers(
         client.listContainers(DockerClient.ListContainersParam.filter("name", containerName)),
-        "Containers with same name:"
+        "Containers with same name"
       )
 
       log.debug(s"Creating container $containerName at $ip with options: $javaOptions")
@@ -192,7 +186,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
       Option(r.warnings().asScala).toSeq.flatten.foreach(log.warn(_))
       r.id()
     }
-    connectToNetwork(containerId)
+    // connectToNetwork(containerId)
 
     client.startContainer(containerId)
     val containerInfo = inspectContainer(containerId)

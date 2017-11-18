@@ -89,8 +89,6 @@ lazy val itTestsCommonSettings: Seq[Def.Setting[_]] = Seq(
     val suites = definedTestNames.value.sorted
     testGrouping.value.flatMap { group =>
       group.tests.map { suite =>
-        val i = suites.indexOf(suite.name)
-        if (i < 0) throw new IllegalStateException(s"Unknown suite: ${suite.name}")
         val fileName = {
           val parts = suite.name.split('.')
           (parts.init.map(_.substring(0, 1)) :+ parts.last).mkString(".")
@@ -103,8 +101,7 @@ lazy val itTestsCommonSettings: Seq[Def.Setting[_]] = Seq(
           outputStrategy = outputStrategy.value,
           runJVMOptions = javaOptions.value ++ Seq(
             "-Dwaves.it.logging.appender=FILE",
-            s"-Dwaves.it.logging.dir=${logDirectory.value / fileName}",
-            s"-Dwaves.it.index=${i + 1}" // Exclude 0
+            s"-Dwaves.it.logging.dir=${logDirectory.value / fileName}"
           ),
           workingDirectory = Some(baseDirectory.value),
           envVars = envVars.value
@@ -123,7 +120,7 @@ lazy val itTestsCommonSettings: Seq[Def.Setting[_]] = Seq(
 inConfig(IntegrationTest)(
   Seq(
     test := (test dependsOn docker).value,
-    envVars in test += "CONTAINER_JAVA_OPTS" -> "-Xmx1248m",
+    envVars in test += "CONTAINER_JAVA_OPTS" -> "-Xmx1500m",
     envVars in testOnly += "CONTAINER_JAVA_OPTS" -> "-Xmx512m"
   ) ++ inTask(test)(itTestsCommonSettings) ++ inTask(testOnly)(itTestsCommonSettings)
 )
