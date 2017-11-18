@@ -138,7 +138,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
 
   private def waitNodeIsUp(node: Node): Future[Unit] = node.waitFor[Int](_.height, _ > 0, 1.second).map(_ => ())
 
-  private def startNodeInternal(nodeConfig: Config): Node = {
+  private def startNodeInternal(nodeConfig: Config): Node = try {
     val javaOptions = Option(System.getenv("CONTAINER_JAVA_OPTS")).getOrElse("")
     val configOverrides = s"$javaOptions ${renderProperties(asProperties(nodeConfig.withFallback(suiteConfig)))}"
     val actualConfig = nodeConfig
@@ -177,7 +177,9 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
       .build()
 
     val containerId = {
-      val r = client.createContainer(containerConfig, s"${wavesNetwork.name()}-${actualConfig.getString("waves.network.node-name")}")
+      val containerName = s"${wavesNetwork.name()}-${actualConfig.getString("waves.network.node-name")}"
+      log.trace(s"Creating container $containerName at $ip with options: $javaOptions")
+      val r = client.createContainer(containerConfig, containerName)
       Option(r.warnings().asScala).toSeq.flatten.foreach(log.warn(_))
       r.id()
     }
@@ -200,6 +202,10 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
     nodes.add(node)
     log.debug(s"Started $containerId -> ${node.settings.networkSettings.nodeName}")
     node
+  } catch {
+    case NonFatal(e) =>
+      log.error("Can't start a container", e)
+      throw e
   }
 
   private def inspectContainer(containerId: String): ContainerInfo = {
