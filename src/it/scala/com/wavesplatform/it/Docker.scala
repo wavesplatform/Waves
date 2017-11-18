@@ -3,7 +3,7 @@ package com.wavesplatform.it
 import java.io.FileOutputStream
 import java.nio.file.{Files, Paths}
 import java.util.concurrent.atomic.AtomicBoolean
-import java.util.concurrent.{ConcurrentHashMap, ThreadLocalRandom}
+import java.util.concurrent.ConcurrentHashMap
 import java.util.{Collections, Properties, List => JList, Map => JMap}
 
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -76,7 +76,8 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
     def attempt(rest: Int): Network = try {
       network match {
         case Some(n) =>
-          log.info(s"Network ${n.name()} (id: ${n.id()}) is created for $tag")
+          val ipam = s"ipam: ${n.ipam().config().asScala.map { n => s"subnet=${n.subnet()}, ip range=${n.ipRange()}" }.mkString(", ")}"
+          log.info(s"Network ${n.name()} (id: ${n.id()}) is created for $tag, $ipam")
           n
         case None =>
           log.debug(s"Creating network $networkName for $tag")
@@ -86,7 +87,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
               Ipam.builder()
                 .driver("default")
                 .config(List(
-                  IpamConfig.create(s"172.16.$network1Byte.0/24", s"172.16.$network1Byte.0/24", s"172.16.$network1Byte.254")
+                  IpamConfig.create(s"172.150.$network1Byte.0/24", s"172.150.$network1Byte.0/24", s"172.150.$network1Byte.254")
                 ).asJava)
                 .build()
             )
@@ -165,12 +166,13 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
       .build()
 
     val nodeNumber = actualConfig.getString("waves.network.node-name").replace("node", "").toInt
-    val ip = s"172.16.$network1Byte.$nodeNumber"
+    val ip = s"172.150.$network1Byte.$nodeNumber"
     val containerConfig = ContainerConfig.builder()
       .image("com.wavesplatform/waves:latest")
       .exposedPorts(restApiPort, networkPort, matcherApiPort)
       .networkingConfig(ContainerConfig.NetworkingConfig.create(Map(
         wavesNetwork.name() -> EndpointConfig.builder()
+          .ipAddress(ip)
           .ipamConfig(EndpointIpamConfig.builder().ipv4Address(ip).build())
           .build()
       ).asJava))
@@ -212,6 +214,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
   } catch {
     case NonFatal(e) =>
       log.error("Can't start a container", e)
+      dumpContainers(client.listContainers())
       throw e
   }
 
@@ -283,10 +286,10 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
 
   private def dumpContainers(containers: java.util.List[Container], label: String = "Containers"): Unit = {
     val x = if (containers.isEmpty) "No" else containers.asScala
-      .map { x => s"Container(${x.id()}, status: ${x.status()}, names: ${x.names().asScala.mkString(", ")})" }
+      .map { x => s"\nContainer(${x.id()}, status: ${x.status()}, names: ${x.names().asScala.mkString(", ")})" }
       .mkString("\n")
 
-    log.debug(s"$label:$x")
+    log.debug(s"$label: $x")
   }
 }
 
