@@ -187,29 +187,10 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
       Option(r.warnings().asScala).toSeq.flatten.foreach(log.warn(_))
       r.id()
     }
-    // connectToNetwork(containerId)
 
     client.startContainer(containerId)
-    val containerInfo = inspectContainer(containerId)
-    val networksSettingsStr = containerInfo.networkSettings().networks().asScala
-      .map { case (name, x) => s"$name -> ${x.ipAddress()}" }
-      .mkString(", ")
-    log.debug(
-      s"""Container ${containerInfo.name()} info:
-         |IP: ${containerInfo.networkSettings().ipAddress()}
-         |Networks: $networksSettingsStr""".stripMargin)
 
-    val ports = containerInfo.networkSettings().ports()
-
-    val nodeInfo = NodeInfo(
-      extractHostPort(ports, restApiPort),
-      extractHostPort(ports, networkPort),
-      networkPort.toInt,
-      containerInfo.networkSettings().ipAddress(),
-      containerInfo.networkSettings().networks().asScala(wavesNetwork.name()).ipAddress(),
-      containerId,
-      extractHostPort(ports, matcherApiPort))
-    val node = new Node(actualConfig, nodeInfo, http)
+    val node = new Node(actualConfig, getNodeInfo(containerId, actualConfig), http)
     nodes.add(node)
     log.debug(s"Started $containerId -> ${node.settings.networkSettings.nodeName}")
     node
@@ -218,6 +199,27 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
       log.error("Can't start a container", e)
       dumpContainers(client.listContainers())
       throw e
+  }
+
+  private def getNodeInfo(node: Node): NodeInfo = getNodeInfo(node.nodeInfo.containerId, node.config)
+
+  private def getNodeInfo(containerId: String, config: Config): NodeInfo = {
+    val restApiPort = config.getString("waves.rest-api.port")
+    val networkPort = config.getString("waves.network.port")
+    val matcherApiPort = config.getString("waves.matcher.port")
+
+    val containerInfo = inspectContainer(containerId)
+    val ports = containerInfo.networkSettings().ports()
+
+    NodeInfo(
+      extractHostPort(ports, restApiPort),
+      extractHostPort(ports, networkPort),
+      networkPort.toInt,
+      containerInfo.networkSettings().ipAddress(),
+      containerInfo.networkSettings().networks().asScala(wavesNetwork.name()).ipAddress(),
+      containerId,
+      extractHostPort(ports, matcherApiPort)
+    )
   }
 
   private def inspectContainer(containerId: String): ContainerInfo = {
@@ -258,7 +260,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
       .getOrElse(Paths.get(System.getProperty("user.dir"), "target", "logs"))
 
     Files.createDirectories(logDir)
-    import node.nodeInfo.containerId
+    val containerId = node.nodeInfo.containerId
 
     val logFile = logDir.resolve(s"${node.settings.networkSettings.nodeName}.log").toFile
     log.info(s"Writing logs of $containerId to ${logFile.getAbsolutePath}")
@@ -282,7 +284,11 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
 
   private def disconnectFromNetwork(containerId: String): Unit = client.disconnectFromNetwork(containerId, wavesNetwork.id())
 
-  def connectToNetwork(node: Node): Unit = connectToNetwork(node.nodeInfo.containerId)
+  def connectToNetwork(node: Node): Unit = {
+    connectToNetwork(node.nodeInfo.containerId)
+    node.nodeInfo = getNodeInfo(node)
+    log.debug(s"New ${node.settings.networkSettings.nodeName} settings: ${node.nodeInfo}")
+  }
 
   private def connectToNetwork(containerId: String): Unit = client.connectToNetwork(containerId, wavesNetwork.id())
 

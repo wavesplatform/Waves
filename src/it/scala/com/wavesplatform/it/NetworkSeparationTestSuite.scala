@@ -19,25 +19,22 @@ class NetworkSeparationTestSuite extends FreeSpec with Matchers with Integration
       .build
   )
 
-  private val primaryMiner = nodes.last
-
   "node should grow up to 10 blocks together and sync" in Await.result(
-    Await.ready(waitForSameBlocksAt(nodes, 5.seconds, 10), 3.minutes),
+    Await.ready(waitForSameBlocksAt(nodes, 5.seconds, 5), 3.minutes),
     5.minutes
   )
 
-  "then we disconnect nodes from the network" in nodes.foreach(docker.disconnectFromNetwork)
+  // Doing all work in one step, because nodes will not be available for requests and ReportingTestName fails here
+  "then we disconnect nodes from the network, wait some time and connect them again" in {
+    def maxHeight: Int = Await.result(traverse(nodes)(_.height).map(_.max), 12.seconds)
 
-  "and wait for another 10 blocks on one node" in Await.result(
-    for {
-      height <- primaryMiner.height
-      _ = log.debug(s"Primary node ${primaryMiner.settings.networkSettings.nodeName} is on $height block")
-      _ <- primaryMiner.waitForHeight(height + 10)
-    } yield (),
-    3.minutes
-  )
+    val lastMaxHeight = maxHeight
+    nodes.foreach(docker.disconnectFromNetwork)
+    Thread.sleep(1.minute.toMillis) // ≈ 10 blocks, because a new block appears every 6 seconds
+    nodes.foreach(docker.connectToNetwork)
 
-  "after that we connect nodes back to the network" in nodes.foreach(docker.connectToNetwork)
+    maxHeight shouldBe >=(lastMaxHeight + 6)
+  }
 
   "nodes should sync" in Await.result(
     for {
