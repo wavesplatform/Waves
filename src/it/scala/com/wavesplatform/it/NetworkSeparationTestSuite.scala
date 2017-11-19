@@ -22,10 +22,7 @@ class NetworkSeparationTestSuite extends FreeSpec with Matchers with Integration
   private val primaryMiner = nodes.last
 
   "node should grow up to 10 blocks together and sync" in Await.result(
-    for {
-      maxHeight <- traverse(nodes)(_.height).map(_.max)
-      _ <- Await.ready(waitForSameBlocksAt(nodes, 5.seconds, maxHeight), 3.minutes)
-    } yield (),
+    Await.ready(waitForSameBlocksAt(nodes, 5.seconds, 10), 3.minutes),
     5.minutes
   )
 
@@ -34,6 +31,7 @@ class NetworkSeparationTestSuite extends FreeSpec with Matchers with Integration
   "and wait for another 10 blocks on one node" in Await.result(
     for {
       height <- primaryMiner.height
+      _ = log.debug(s"Primary node ${primaryMiner.settings.networkSettings.nodeName} is on $height block")
       _ <- primaryMiner.waitForHeight(height + 10)
     } yield (),
     3.minutes
@@ -44,6 +42,7 @@ class NetworkSeparationTestSuite extends FreeSpec with Matchers with Integration
   "nodes should sync" in Await.result(
     for {
       maxHeight <- traverse(nodes)(_.height).map(_.max)
+      _ = log.debug(s"Max height is $maxHeight")
       _ <- waitForSameBlocksAt(nodes, 5.seconds, maxHeight + 5)
     } yield (),
     6.minutes

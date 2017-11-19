@@ -10,6 +10,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.dataformat.javaprop.JavaPropsMapper
 import com.google.common.collect.ImmutableMap
 import com.spotify.docker.client.DockerClient.RemoveContainerParam
+import com.spotify.docker.client.messages.EndpointConfig.EndpointIpamConfig
 import com.spotify.docker.client.messages._
 import com.spotify.docker.client.{DefaultDockerClient, DockerClient}
 import com.typesafe.config.{Config, ConfigFactory, ConfigRenderOptions}
@@ -167,7 +168,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
       .networkingConfig(ContainerConfig.NetworkingConfig.create(Map(
         wavesNetwork.name() -> EndpointConfig.builder()
           .ipAddress(ip)
-          //.ipamConfig(EndpointIpamConfig.builder().ipv4Address(ip).build())
+          .ipamConfig(EndpointIpamConfig.builder().ipv4Address(ip).build())
           .build()
       ).asJava))
       .hostConfig(hostConfig)
@@ -190,6 +191,13 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
 
     client.startContainer(containerId)
     val containerInfo = inspectContainer(containerId)
+    val networksSettingsStr = containerInfo.networkSettings().networks().asScala
+      .map { case (name, x) => s"$name -> ${x.ipAddress()}" }
+      .mkString(", ")
+    log.debug(
+      s"""Container ${containerInfo.name()} info:
+         |IP: ${containerInfo.networkSettings().ipAddress()}
+         |Networks: $networksSettingsStr""".stripMargin)
 
     val ports = containerInfo.networkSettings().ports()
 
