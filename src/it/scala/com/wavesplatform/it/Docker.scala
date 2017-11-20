@@ -76,14 +76,13 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
           n
         case None =>
           log.debug(s"Creating network $networkName for $tag")
+          // Specify the network manually because of race conditions: https://github.com/moby/moby/issues/20648
           val r = client.createNetwork(NetworkConfig.builder()
             .name(networkName)
             .ipam(
               Ipam.builder()
                 .driver("default")
-                .config(List(
-                  IpamConfig.create(s"$networkPrefix.0/24", s"$networkPrefix.0/24", s"$networkPrefix.254")
-                ).asJava)
+                .config(List(IpamConfig.create(s"$networkPrefix.0/24", s"$networkPrefix.0/24", s"$networkPrefix.254")).asJava)
                 .build()
             )
             .checkDuplicate(true)
@@ -94,7 +93,6 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
     } catch {
       case NonFatal(e) =>
         log.warn(s"Can not create a network for $tag", e)
-        dumpContainers(client.listContainers())
         if (rest == 0) throw e else attempt(rest - 1)
     }
 
@@ -166,10 +164,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
       .image("com.wavesplatform/waves:latest")
       .exposedPorts(restApiPort, networkPort, matcherApiPort)
       .networkingConfig(ContainerConfig.NetworkingConfig.create(Map(
-        wavesNetwork.name() -> EndpointConfig.builder()
-          .ipAddress(ip)
-          .ipamConfig(EndpointIpamConfig.builder().ipv4Address(ip).build())
-          .build()
+        wavesNetwork.name() -> endpointConfigFor(actualConfig.getString("waves.network.node-name"))
       ).asJava))
       .hostConfig(hostConfig)
       .env(s"WAVES_OPTS=$configOverrides", s"WAVES_NET_IP=$ip", s"WAVES_PORT=$networkPort")
@@ -285,12 +280,27 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
   private def disconnectFromNetwork(containerId: String): Unit = client.disconnectFromNetwork(containerId, wavesNetwork.id())
 
   def connectToNetwork(node: Node): Unit = {
-    connectToNetwork(node.nodeInfo.containerId)
+    client.connectToNetwork(
+      wavesNetwork.id(),
+      NetworkConnection.builder()
+        .containerId(node.nodeInfo.containerId)
+        .endpointConfig(endpointConfigFor(node.settings.networkSettings.nodeName))
+        .build()
+    )
+
     node.nodeInfo = getNodeInfo(node)
     log.debug(s"New ${node.settings.networkSettings.nodeName} settings: ${node.nodeInfo}")
   }
 
-  private def connectToNetwork(containerId: String): Unit = client.connectToNetwork(containerId, wavesNetwork.id())
+  private def endpointConfigFor(nodeName: String): EndpointConfig = {
+    val nodeNumber = nodeName.replace("node", "").toInt
+    val ip = s"$networkPrefix.$nodeNumber"
+
+    EndpointConfig.builder()
+        .ipAddress(ip)
+        .ipamConfig(EndpointIpamConfig.builder().ipv4Address(ip).build())
+        .build()
+  }
 
   private def dumpContainers(containers: java.util.List[Container], label: String = "Containers"): Unit = {
     val x = if (containers.isEmpty) "No" else containers.asScala

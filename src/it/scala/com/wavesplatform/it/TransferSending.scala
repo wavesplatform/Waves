@@ -70,6 +70,9 @@ trait TransferSending extends ScorexLogging {
     node.transfer(r.source, r.targetAddress, r.amount, r.fee)
   }
 
+  /**
+    * @return Last transaction
+    */
   def processRequests(requests: Seq[Req]): Future[Option[Transaction]] = {
     def aux(rest: Seq[Req], lastTx: Option[Transaction]): Future[Option[Transaction]] = {
       if (rest.isEmpty) Future.successful(lastTx)

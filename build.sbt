@@ -1,6 +1,5 @@
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
-import java.util.concurrent.atomic.AtomicInteger
 
 import com.typesafe.sbt.packager.archetypes.TemplateWriter
 import sbt.Keys._
@@ -86,7 +85,6 @@ configs(IntegrationTest)
 lazy val itTestsCommonSettings: Seq[Def.Setting[_]] = Seq(
   testOptions += Tests.Argument(TestFrameworks.ScalaTest, "-fW", (logDirectory.value / "summary.log").toString),
   testGrouping := {
-    val suites = definedTestNames.value.sorted
     testGrouping.value.flatMap { group =>
       group.tests.map { suite =>
         val fileName = {

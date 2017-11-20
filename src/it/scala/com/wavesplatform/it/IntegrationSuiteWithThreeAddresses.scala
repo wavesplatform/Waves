@@ -19,11 +19,9 @@ trait IntegrationSuiteWithThreeAddresses extends BeforeAndAfterAll with Matchers
   this: Suite =>
 
   def nodes: Seq[Node]
-
   def notMiner: Node
 
   protected def sender: Node = notMiner
-
   private def richAddress = sender.address
 
   protected val defaultBalance: Long = 100.waves

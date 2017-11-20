@@ -11,6 +11,7 @@ import scala.concurrent.duration._
 class NetworkSeparationTestSuite extends FreeSpec with Matchers with IntegrationNodesInitializationAndStopping
   with CancelAfterFailure with ReportingTestName with MultipleNodesApi {
 
+  // @TODO: Will fail, if there is two miners with quorum = 0
   override lazy val nodes: Seq[Node] = docker.startNodes(
     NodeConfigs.newBuilder
       .overrideBase(_.quorum(3))
@@ -20,7 +21,7 @@ class NetworkSeparationTestSuite extends FreeSpec with Matchers with Integration
   )
 
   "node should grow up to 10 blocks together and sync" in Await.result(
-    Await.ready(waitForSameBlocksAt(nodes, 5.seconds, 5), 3.minutes),
+    Await.ready(waitForSameBlocksAt(nodes, 5.seconds, 10), 3.minutes),
     5.minutes
   )
 
@@ -30,7 +31,7 @@ class NetworkSeparationTestSuite extends FreeSpec with Matchers with Integration
 
     val lastMaxHeight = maxHeight
     nodes.foreach(docker.disconnectFromNetwork)
-    Thread.sleep(1.minute.toMillis) // ≈ 10 blocks, because a new block appears every 6 seconds
+    Thread.sleep(80.seconds.toMillis) // >= 10 blocks, because a new block appears every 6 seconds
     nodes.foreach(docker.connectToNetwork)
 
     maxHeight shouldBe >=(lastMaxHeight + 6)
