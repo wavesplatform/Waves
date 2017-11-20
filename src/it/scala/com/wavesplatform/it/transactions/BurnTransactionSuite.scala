@@ -17,13 +17,13 @@ class BurnTransactionSuite extends BaseTransactionSuite {
 
       _ <- waitForHeightAraiseAndTxPresent(issuedAssetId, 1)
       _ <- assertBalances(firstAddress, 99.waves, 99.waves)
-      _ <- assertAssetBalance(firstAddress, issuedAssetId, defaultQuantity)
+        .zip(assertAssetBalance(firstAddress, issuedAssetId, defaultQuantity))
 
       burnId <- sender.burn(firstAddress, issuedAssetId, defaultQuantity / 2, fee = 1.waves).map(_.id)
 
       _ <- waitForHeightAraiseAndTxPresent(burnId, 1)
       _ <- assertBalances(firstAddress, 98.waves, 98.waves)
-      _ <- assertAssetBalance(firstAddress, issuedAssetId, defaultQuantity / 2)
+        .zip(assertAssetBalance(firstAddress, issuedAssetId, defaultQuantity / 2))
 
     } yield succeed
 

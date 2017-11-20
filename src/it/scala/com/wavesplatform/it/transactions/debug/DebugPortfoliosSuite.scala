@@ -10,8 +10,7 @@ class DebugPortfoliosSuite extends BaseTransactionSuite  {
 
   test("getting a balance considering pessimistic transactions from UTX pool - changed after UTX") {
     val f = for {
-      portfolioBefore <- sender.debugPortfoliosFor(firstAddress, considerUnspent = true)
-      utxSizeBefore <- sender.utxSize
+      (portfolioBefore, utxSizeBefore) <- sender.debugPortfoliosFor(firstAddress, considerUnspent = true).zip(sender.utxSize)
 
       _ <- sender.payment(firstAddress, secondAddress, 5.waves, fee = 5.waves)
       _ <- sender.payment(secondAddress, firstAddress, 7.waves, 5.waves)
@@ -28,8 +27,7 @@ class DebugPortfoliosSuite extends BaseTransactionSuite  {
 
   test("getting a balance without pessimistic transactions from UTX pool - not changed after UTX") {
     val f = for {
-      portfolioBefore <- sender.debugPortfoliosFor(firstAddress, considerUnspent = false)
-      utxSizeBefore <- sender.utxSize
+      (portfolioBefore, utxSizeBefore) <- sender.debugPortfoliosFor(firstAddress, considerUnspent = false).zip(sender.utxSize)
 
       _ <- sender.payment(firstAddress, secondAddress, 5.waves, fee = 5.waves)
       _ <- sender.waitForUtxIncreased(utxSizeBefore)

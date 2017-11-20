@@ -16,15 +16,14 @@ class IssueTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
     val assetDescription = "my asset description"
     val f = for {
 
-      firstAddressBalance <- accountBalance(firstAddress)
-      firstAddressEffectiveBalance <- accountEffectiveBalance(firstAddress)
+      (firstAddressBalance, firstAddressEffectiveBalance) <- accountBalance(firstAddress).zip(accountEffectiveBalance(firstAddress))
 
       issuedAssetId <- sender.issue(firstAddress, assetName, assetDescription, defaultQuantity, 2, reissuable = true, assetFee).map(_.id)
 
       _ <- waitForHeightAraiseAndTxPresent(issuedAssetId, 1)
 
       _ <- assertBalances(firstAddress, firstAddressBalance - assetFee, firstAddressEffectiveBalance - assetFee)
-      _ <- assertAssetBalance(firstAddress, issuedAssetId, defaultQuantity)
+        .zip(assertAssetBalance(firstAddress, issuedAssetId, defaultQuantity))
     } yield succeed
 
     Await.result(f, 1.minute)
@@ -35,8 +34,7 @@ class IssueTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
     val assetDescription = "my asset description"
     val f = for {
 
-      firstAddressBalance <- accountBalance(firstAddress)
-      firstAddressEffectiveBalance <- accountEffectiveBalance(firstAddress)
+      (firstAddressBalance, firstAddressEffectiveBalance) <- accountBalance(firstAddress).zip(accountEffectiveBalance(firstAddress))
 
       issuedAssetId <- sender.issue(firstAddress, assetName, assetDescription, defaultQuantity, 2, reissuable = false, assetFee).map(_.id)
       _ <- waitForHeightAraiseAndTxPresent(issuedAssetId, 1)
@@ -46,7 +44,7 @@ class IssueTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
       _ <- waitForHeightAraiseAndTxPresent(issuedAssetId, 1)
 
       _ <- assertAssetBalance(firstAddress, issuedAssetId, defaultQuantity)
-      _ <- assertBalances(firstAddress, firstAddressBalance - 2 * assetFee, firstAddressEffectiveBalance - 2 * assetFee)
+        .zip(assertBalances(firstAddress, firstAddressBalance - 2 * assetFee, firstAddressEffectiveBalance - 2 * assetFee))
     } yield succeed
 
     Await.result(f, 1.minute)
