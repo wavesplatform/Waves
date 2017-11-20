@@ -20,7 +20,7 @@ import scorex.utils.ScorexLogging
 import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.concurrent.{Await, Future}
+import scala.concurrent.{Await, Future, blocking}
 import scala.util.control.NonFatal
 import scala.util.{Failure, Random, Try}
 
@@ -121,14 +121,29 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
   }
 
   private def connectToAll(node: Node): Future[Unit] = {
+    def connectToOne(host: String, port: Int): Future[Unit] = {
+      for {
+        _ <- node.connect(host, port)
+        _ <- Future(blocking(Thread.sleep(3.seconds.toMillis)))
+        connectedPeers <- node.connectedPeers
+        _ <- {
+          val connectedAddresses = connectedPeers.map(_.address.replaceAll("""^.*/([\d\.]+).+$""", "$1")).sorted
+          log.debug(s"See for $host in $connectedAddresses")
+          if (connectedAddresses.contains(host)) Future.successful(())
+          else {
+            log.debug(s"Not Found $host, retry")
+            connectToOne(host, port)
+          }
+        }
+      } yield ()
+    }
+
     val seedAddresses = nodes.asScala
       .filterNot(_.nodeName == node.nodeName)
       .map { n => (n.nodeInfo.networkIpAddress, n.nodeInfo.containerNetworkPort) }
 
     Future
-      .traverse(seedAddresses) { seed =>
-        node.connect(seed._1, seed._2)
-      }
+      .traverse(seedAddresses)(Function.tupled(connectToOne))
       .map(_ => ())
   }
 
@@ -303,8 +318,8 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
   }
 
   private def dumpContainers(containers: java.util.List[Container], label: String = "Containers"): Unit = {
-    val x = if (containers.isEmpty) "No" else containers.asScala
-      .map { x => s"\nContainer(${x.id()}, status: ${x.status()}, names: ${x.names().asScala.mkString(", ")})" }
+    val x = if (containers.isEmpty) "No" else "\n" + containers.asScala
+      .map { x => s"Container(${x.id()}, status: ${x.status()}, names: ${x.names().asScala.mkString(", ")})" }
       .mkString("\n")
 
     log.debug(s"$label: $x")
