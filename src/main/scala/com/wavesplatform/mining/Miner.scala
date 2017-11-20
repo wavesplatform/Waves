@@ -1,7 +1,5 @@
 package com.wavesplatform.mining
 
-import java.util.concurrent.atomic.AtomicBoolean
-
 import com.wavesplatform.features.{BlockchainFeatureStatus, BlockchainFeatures, FeatureProvider}
 import com.wavesplatform.metrics.{BlockStats, HistogramExt, Instrumented}
 import com.wavesplatform.network._
@@ -38,7 +36,6 @@ trait MinerDebugInfo {
 
 class MinerImpl(
                    allChannels: ChannelGroup,
-                   blockchainReadiness: AtomicBoolean,
                    blockchainUpdater: BlockchainUpdater,
                    checkpoint: CheckpointService,
                    history: NgHistory,
@@ -185,7 +182,6 @@ class MinerImpl(
               case Left(err) => log.warn("Error mining Block: " + err.toString)
               case Right(Some(score)) =>
                 BlockStats.mined(block, history.height())
-                Coordinator.updateBlockchainReadinessFlag(history, timeService, blockchainReadiness, settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed)
                 allChannels.broadcast(BlockForged(block))
                 allChannels.broadcast(LocalScoreChanged(score))
                 scheduleMining()

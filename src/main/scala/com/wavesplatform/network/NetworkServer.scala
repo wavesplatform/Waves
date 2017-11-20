@@ -3,7 +3,6 @@ package com.wavesplatform.network
 import java.net.{InetSocketAddress, NetworkInterface}
 import java.nio.channels.ClosedChannelException
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.AtomicBoolean
 
 import com.wavesplatform.features.FeatureProvider
 import com.wavesplatform.metrics.Metrics
@@ -38,7 +37,6 @@ class NetworkServer(checkpointService: CheckpointService,
                     peerDatabase: PeerDatabase,
                     allChannels: ChannelGroup,
                     peerInfo: ConcurrentHashMap[Channel, PeerInfo],
-                    blockchainReadiness: AtomicBoolean,
                     featureProvider: FeatureProvider) extends ScorexLogging {
 
   @volatile
@@ -51,7 +49,6 @@ class NetworkServer(checkpointService: CheckpointService,
       settings.networkSettings.nodeName, settings.networkSettings.nonce, settings.networkSettings.declaredAddress)
 
   private val trafficWatcher = if (settings.metrics.enable) new TrafficWatcher else new NoopHandler
-  private val discardingHandler = new DiscardingHandler(blockchainReadiness)
   private val messageCodec = new MessageCodec(peerDatabase)
 
   private val excludedAddresses: Set[InetSocketAddress] = {
@@ -83,11 +80,12 @@ class NetworkServer(checkpointService: CheckpointService,
   private val microBlockOwners = new MicroBlockOwners(settings.synchronizationSettings.microBlockSynchronizer.invCacheTimeout)
 
   private val (mesageObserver, signatures, blocks, remoteScores, checkpoints) = MessageObserver()
-  private val syncWith = RxScoreObserver(settings.synchronizationSettings.scoreTTL, blockchainUpdater.lastBlockId.map(_._2), remoteScores, ???)
+  private val syncWith = RxScoreObserver(settings.synchronizationSettings.scoreTTL, blockchainUpdater.lastBlockInfo.map(_.score), remoteScores, ???)
 
   private val (extensions, newBlocks) = RxExtensionLoader(settings.synchronizationSettings, history, peerDatabase, syncWith, blocks, signatures, ???)
   private val sink: Unit = CoordinatorHandler(checkpointService, history, blockchainUpdater, time,
-    stateReader, utxPool, blockchainReadiness, miner, settings, peerDatabase, allChannels, featureProvider, microBlockOwners)(newBlocks, checkpoints, extensions, ???)
+    stateReader, utxPool, miner, settings, peerDatabase, allChannels, featureProvider, microBlockOwners)(newBlocks, checkpoints, extensions, ???)
+  private val discardingHandler = new DiscardingHandler(blockchainUpdater.lastBlockInfo.map(_.ready))
 
   private val peerConnections = new ConcurrentHashMap[PeerKey, Channel](10, 0.9f, 10)
 
@@ -99,7 +97,7 @@ class NetworkServer(checkpointService: CheckpointService,
     settings.synchronizationSettings.microBlockSynchronizer,
     history,
     peerDatabase,
-    blockchainUpdater.lastBlockId.map(_._1),
+    blockchainUpdater.lastBlockInfo.map(_.id),
     microBlockOwners
   )
 

@@ -3,7 +3,6 @@ package com.wavesplatform
 import java.io.File
 import java.security.Security
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.AtomicBoolean
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
@@ -69,14 +68,12 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     val utxStorage = new UtxPool(time, stateReader, history, feeCalculator, settings.blockchainSettings.functionalitySettings, settings.utxSettings)
 
-    val blockchainReadiness = new AtomicBoolean(false)
-
     val miner = if (settings.minerSettings.enable)
-      new MinerImpl(allChannels, blockchainReadiness, blockchainUpdater, checkpointService, history, featureProvider, stateReader, settings, time, utxStorage, wallet)
+      new MinerImpl(allChannels, blockchainUpdater, checkpointService, history, featureProvider, stateReader, settings, time, utxStorage, wallet)
     else Miner.Disabled
 
     val network = new NetworkServer(checkpointService, blockchainUpdater, time, miner, stateReader, settings,
-      history, utxStorage, peerDatabase, allChannels, establishedConnections, blockchainReadiness, featureProvider)
+      history, utxStorage, peerDatabase, allChannels, establishedConnections, featureProvider)
 
     miner.scheduleMining()
 

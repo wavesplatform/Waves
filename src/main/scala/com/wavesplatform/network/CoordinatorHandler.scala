@@ -1,11 +1,8 @@
 package com.wavesplatform.network
 
-import java.util.concurrent.atomic.AtomicBoolean
-
 import com.wavesplatform.features.FeatureProvider
-import com.wavesplatform.metrics.BlockStats
+import com.wavesplatform.metrics.{BlockStats, _}
 import com.wavesplatform.mining.Miner
-import com.wavesplatform.metrics._
 import com.wavesplatform.network.MicroBlockSynchronizer.MicroblockData
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state2.StateReader
@@ -30,8 +27,6 @@ object CoordinatorHandler extends ScorexLogging {
             time: Time,
             stateReader: StateReader,
             utxStorage: UtxPool,
-            blockchainReadiness:
-            AtomicBoolean,
             miner: Miner,
             settings: WavesSettings,
             peerDatabase: PeerDatabase,
@@ -41,12 +36,12 @@ object CoordinatorHandler extends ScorexLogging {
            )(blocks: ChannelObservable[Block],
              checkpoints: ChannelObservable[Checkpoint],
              extensions: ChannelObservable[ExtensionBlocks],
-             microblocks: ChannelObservable[MicroblockData]) : Unit = {
+             microblocks: ChannelObservable[MicroblockData]): Unit = {
     val scheduler = Scheduler.singleThread("coordinator-handler")
 
     val processBlock = Coordinator.processSingleBlock(checkpointService, history, blockchainUpdater, time, stateReader, utxStorage, settings.blockchainSettings, featureProvider) _
     val processCheckpoint = Coordinator.processCheckpoint(checkpointService, history, blockchainUpdater) _
-    val processFork = Coordinator.processFork(checkpointService, history, blockchainUpdater, stateReader, utxStorage, time, settings, blockchainReadiness, featureProvider) _
+    val processFork = Coordinator.processFork(checkpointService, history, blockchainUpdater, stateReader, utxStorage, time, settings, featureProvider) _
     val processMicroBlock = Coordinator.processMicroBlock(checkpointService, history, blockchainUpdater, utxStorage) _
 
     def scheduleMiningAndBroadcastScore(score: BigInt): Unit = {
@@ -76,7 +71,6 @@ object CoordinatorHandler extends ScorexLogging {
           log.trace(s"${id(ch)} $b already appended")
         case Right(Some(newScore)) =>
           BlockStats.applied(b, BlockStats.Source.Broadcast, history.height())
-          Coordinator.updateBlockchainReadinessFlag(history, time, blockchainReadiness, settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed)
           log.debug(s"${id(ch)} Appended $b")
           if (b.transactionData.isEmpty)
             allChannels.broadcast(BlockForged(b), Some(ch))

@@ -17,7 +17,6 @@ import kamon.metric.instrument.Time
 import monix.eval.Coeval
 import monix.reactive.subjects.PublishSubject
 import scorex.block.{Block, MicroBlock}
-import scorex.transaction.History.BlockchainScore
 import scorex.transaction.ValidationError.{BlockAppendError, GenericError, MicroBlockAppendError}
 import scorex.transaction._
 import scorex.utils.ScorexLogging
@@ -26,6 +25,7 @@ import scala.collection.immutable
 
 class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateReader,
                                     settings: WavesSettings,
+                                    time: scorex.utils.Time,
                                     featureProvider: FeatureProvider,
                                     historyWriter: HistoryWriterImpl,
                                     val synchronizationToken: ReentrantReadWriteLock) extends BlockchainUpdater with BlockchainDebugInfo with ScorexLogging with Instrumented {
@@ -39,7 +39,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
   private lazy val inMemDiffs: Synchronized[NEL[BlockDiff]] = Synchronized(NEL.one(BlockDiff.empty)) // fresh head
   private lazy val ngState: Synchronized[Option[NgState]] = Synchronized(Option.empty[NgState])
 
-  override val lastBlockId = PublishSubject[(ByteStr, BlockchainScore)]
+  override val lastBlockInfo = PublishSubject[LastBlockInfo]
 
   private val unsafeDiffByRange = BlockDiffer.unsafeDiffByRange(settings.blockchainSettings.functionalitySettings, featureProvider, historyWriter, maxTransactionsPerChunk) _
 
@@ -50,6 +50,8 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
   private def currentPersistedBlocksState: StateReader = Coeval(read { implicit l => composite(inMemDiffs(), persisted) })
 
   def bestLiquidState: StateReader = composite(Coeval(read { implicit l => ngState().map(_.bestLiquidDiff).orEmpty }), currentPersistedBlocksState)
+
+  def blockchainReady: Boolean = time.correctedTime() - historyReader.lastBlockTimestamp().get < settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed.toMillis
 
   def historyReader: NgHistory with DebugNgHistory with FeatureProvider = {
     new NgHistoryReader(() => read { implicit l => ngState() }, historyWriter, settings.blockchainSettings.functionalitySettings)
@@ -176,7 +178,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
         _ map { case ((newBlockDiff, discacrded)) =>
           val height = historyWriter.height() + 1
           ngState.set(Some(new NgState(block, newBlockDiff, featuresApprovedWithBlock(block))))
-          historyReader.lastBlockId().foreach(lastBlockId.onNext((_, historyReader.score())))
+          historyReader.lastBlockId().foreach(id => lastBlockInfo.onNext(LastBlockInfo(id, historyReader.score(), blockchainReady)))
           log.info(s"$block appended. New height: $height)")
           discacrded
         }
@@ -227,7 +229,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
           }
 
           val totalDiscardedBlocks: Seq[Block] = discardedHistoryBlocks ++ discardedNgBlock.toSeq
-          if (totalDiscardedBlocks.nonEmpty) lastBlockId.onNext((blockId, historyReader.score()))
+          if (totalDiscardedBlocks.nonEmpty) lastBlockInfo.onNext(LastBlockInfo(blockId, historyReader.score(), blockchainReady))
           TxsInBlockchainStats.record(-totalDiscardedBlocks.size)
           Right(totalDiscardedBlocks)
       }
@@ -257,7 +259,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
             } yield {
               log.info(s"$microBlock appended")
               ng.append(microBlock, diff, System.currentTimeMillis())
-              lastBlockId.onNext((microBlock.totalResBlockSig, historyReader.score()))
+              lastBlockInfo.onNext(LastBlockInfo(microBlock.totalResBlockSig, historyReader.score(), true))
             }
         }
     }
@@ -285,8 +287,9 @@ object BlockchainUpdaterImpl extends ScorexLogging {
   def apply(persistedState: StateWriter with SnapshotStateReader,
             history: HistoryWriterImpl,
             settings: WavesSettings,
+            time: scorex.utils.Time,
             synchronizationToken: ReentrantReadWriteLock): BlockchainUpdaterImpl = {
-    val blockchainUpdater = new BlockchainUpdaterImpl(persistedState, settings, history, history, synchronizationToken)
+    val blockchainUpdater = new BlockchainUpdaterImpl(persistedState, settings, time, history, history, synchronizationToken)
     log.info(blockchainUpdater.heights("Constructing BlockchainUpdaterImpl"))
     blockchainUpdater.syncPersistedAndInMemory()
     blockchainUpdater
