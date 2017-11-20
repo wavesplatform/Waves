@@ -7,6 +7,7 @@ import com.wavesplatform.features.FeatureProvider
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state2._
 import scorex.transaction._
+import scorex.utils.NTP
 
 import scala.util.{Success, Try}
 
@@ -20,14 +21,14 @@ object StorageFactory {
       }
     }
 
-  def apply(settings: WavesSettings): Try[(NgHistory with DebugNgHistory with AutoCloseable, FeatureProvider, AutoCloseable, StateReader, BlockchainUpdater, BlockchainDebugInfo)] = {
+  def apply(settings: WavesSettings, time: scorex.utils.Time = NTP): Try[(NgHistory with DebugNgHistory with AutoCloseable, FeatureProvider, AutoCloseable, StateReader, BlockchainUpdater, BlockchainDebugInfo)] = {
     val lock = new RWL(true)
     for {
       historyWriter <- HistoryWriterImpl(settings.blockchainSettings.blockchainFile, lock, settings.blockchainSettings.functionalitySettings, settings.featuresSettings)
       ss <- createStateStorage(historyWriter, settings.blockchainSettings.stateFile, settings.mvstorePageSplitSize)
       stateWriter = new StateWriterImpl(ss, settings.blockchainSettings.storeTransactionsInState, lock)
     } yield {
-      val bcu = BlockchainUpdaterImpl(stateWriter, historyWriter, settings, lock)
+      val bcu = BlockchainUpdaterImpl(stateWriter, historyWriter, settings, time, lock)
       val history: NgHistory with DebugNgHistory with FeatureProvider = bcu.historyReader
       (history, history, stateWriter, bcu.bestLiquidState, bcu, bcu)
     }

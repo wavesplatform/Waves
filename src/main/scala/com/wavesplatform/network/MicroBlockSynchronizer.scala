@@ -4,100 +4,99 @@ import java.util.concurrent.TimeUnit
 
 import com.google.common.cache.{Cache, CacheBuilder}
 import com.wavesplatform.metrics.BlockStats
-import com.wavesplatform.network.MicroBlockSynchronizer._
 import com.wavesplatform.settings.SynchronizationSettings.MicroblockSynchronizerSettings
 import com.wavesplatform.state2.ByteStr
-import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel._
 import monix.eval.Task
 import monix.execution.schedulers.SchedulerService
 import monix.execution.{CancelableFuture, Scheduler}
 import monix.reactive.Observable
+import monix.reactive.subjects.PublishSubject
 import scorex.block.MicroBlock
 import scorex.transaction.NgHistory
 import scorex.utils.ScorexLogging
 
 import scala.concurrent.duration.FiniteDuration
 
-@Sharable
-class MicroBlockSynchronizer(settings: MicroblockSynchronizerSettings,
-                             history: NgHistory,
-                             peerDatabase: PeerDatabase,
-                             lastBlockIdEvents: Observable[ByteStr],
-                             microBlockOwners: MicroBlockOwners) extends ChannelInboundHandlerAdapter with ScorexLogging {
+object MicroBlockSynchronizer extends ScorexLogging {
 
-  private implicit val scheduler: SchedulerService = Scheduler.singleThread("microblock-synchronizer")
+  def apply(settings: MicroblockSynchronizerSettings,
+            history: NgHistory,
+            peerDatabase: PeerDatabase,
+            lastBlockIdEvents: Observable[ByteStr],
+            microBlockOwners: MicroBlockOwners)
+           (microblockInvs: ChannelObservable[MicroBlockInv],
+            microblockResponses: ChannelObservable[MicroBlockResponse]): ChannelObservable[MicroblockData] = {
 
-  private val nextInvs = cache[MicroBlockSignature, MicroBlockInv](settings.invCacheTimeout)
-  private val awaiting = cache[MicroBlockSignature, MicroBlockInv](settings.invCacheTimeout)
-  private val successfullyReceived = cache[MicroBlockSignature, Object](settings.processedMicroBlocksCacheTimeout)
+    val microblockDatas = PublishSubject[(Channel, MicroblockData)]
 
-  lastBlockIdEvents.foreach(tryDownloadNext)
+    val scheduler: SchedulerService = Scheduler.singleThread("microblock-synchronizer")
 
-  private def alreadyRequested(totalSig: MicroBlockSignature): Boolean = Option(awaiting.getIfPresent(totalSig)).isDefined
+    val nextInvs = cache[MicroBlockSignature, MicroBlockInv](settings.invCacheTimeout)
+    val awaiting = cache[MicroBlockSignature, MicroBlockInv](settings.invCacheTimeout)
+    val successfullyReceived = cache[MicroBlockSignature, Object](settings.processedMicroBlocksCacheTimeout)
 
-  private def alreadyProcessed(totalSig: MicroBlockSignature): Boolean = Option(successfullyReceived.getIfPresent(totalSig)).isDefined
+    lastBlockIdEvents.foreach(tryDownloadNext)(scheduler)
 
-  private def requestMicroBlock(mbInv: MicroBlockInv): CancelableFuture[Unit] = {
-    import mbInv.totalBlockSig
+    def alreadyRequested(totalSig: MicroBlockSignature): Boolean = Option(awaiting.getIfPresent(totalSig)).isDefined
 
-    def randomOwner(exclude: Set[ChannelHandlerContext]) = random(microBlockOwners.all(mbInv.totalBlockSig) -- exclude)
+    def alreadyProcessed(totalSig: MicroBlockSignature): Boolean = Option(successfullyReceived.getIfPresent(totalSig)).isDefined
 
-    def task(attemptsAllowed: Int, exclude: Set[ChannelHandlerContext]): Task[Unit] = Task.unit.flatMap { _ =>
-      if (attemptsAllowed <= 0 || alreadyProcessed(totalBlockSig)) Task.unit
-      else randomOwner(exclude).fold(Task.unit) { ownerCtx =>
-        if (ownerCtx.channel().isOpen) {
-          val request = MicroBlockRequest(totalBlockSig)
-          ownerCtx.writeAndFlush(request)
-          log.trace(s"${id(ownerCtx)} Sent $request")
-          awaiting.put(totalBlockSig, mbInv)
-          task(attemptsAllowed - 1, exclude + ownerCtx).delayExecution(settings.waitResponseTimeout)
-        } else task(attemptsAllowed, exclude + ownerCtx)
+    def requestMicroBlock(mbInv: MicroBlockInv): CancelableFuture[Unit] = {
+      import mbInv.totalBlockSig
+
+      def randomOwner(exclude: Set[Channel]) = random(microBlockOwners.all(mbInv.totalBlockSig) -- exclude)
+
+      def task(attemptsAllowed: Int, exclude: Set[Channel]): Task[Unit] = Task.unit.flatMap { _ =>
+        if (attemptsAllowed <= 0 || alreadyProcessed(totalBlockSig)) Task.unit
+        else randomOwner(exclude).fold(Task.unit) { channel =>
+          if (channel.isOpen) {
+            val request = MicroBlockRequest(totalBlockSig)
+            channel.writeAndFlush(request)
+            log.trace(s"${id(channel)} Sent $request")
+            awaiting.put(totalBlockSig, mbInv)
+            task(attemptsAllowed - 1, exclude + channel).delayExecution(settings.waitResponseTimeout)
+          } else task(attemptsAllowed, exclude + channel)
+        }
       }
+
+      task(MicroBlockDownloadAttempts, Set.empty).runAsyncLogErr(scheduler)
     }
 
-    task(MicroBlockDownloadAttempts, Set.empty).runAsyncLogErr
-  }
+    def tryDownloadNext(prevBlockId: ByteStr): Unit = Option(nextInvs.getIfPresent(prevBlockId)).foreach(requestMicroBlock)
 
-  private def tryDownloadNext(prevBlockId: ByteStr): Unit = Option(nextInvs.getIfPresent(prevBlockId)).foreach(requestMicroBlock)
-
-  override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
-    case MicroBlockResponse(mb) =>
+    microblockResponses.executeOn(scheduler).mapTask { case ((ch, msg@MicroBlockResponse(mb))) => Task {
       import mb.{totalResBlockSig => totalSig}
-
       successfullyReceived.put(totalSig, dummy)
-      BlockStats.received(mb, ctx.channel())
+      BlockStats.received(mb, ch)
+      log.trace(s"${id(ch)} Received $msg")
+      Option(awaiting.getIfPresent(totalSig)).foreach { mi =>
+        awaiting.invalidate(totalSig)
+        microblockDatas.onNext((ch, MicroblockData(Option(mi), mb)))
+      }
+    }.logErr
+    }
 
-      Task {
-        log.trace(s"${id(ctx)} Received $msg")
-        Option(awaiting.getIfPresent(totalSig)).foreach { mi =>
-          awaiting.invalidate(totalSig)
-          super.channelRead(ctx, MicroblockData(Option(mi), mb))
-        }
-      }.runAsyncLogErr
-
-    case mbInv@MicroBlockInv(_, totalSig, prevSig, _) => Task {
+    microblockInvs.executeOn(scheduler).mapTask { case ((ch, mbInv@MicroBlockInv(_, totalSig, prevSig, _))) => Task {
       mbInv.signaturesValid() match {
-        case Left(err) => peerDatabase.blacklistAndClose(ctx.channel(), err.toString)
+        case Left(err) =>
+          peerDatabase.blacklistAndClose(ch, err.toString)
         case Right(_) =>
-          log.trace(s"${id(ctx)} Received $msg")
-          microBlockOwners.add(totalSig, ctx)
+          log.trace(s"${id(ch)} Received $mbInv")
+          microBlockOwners.add(totalSig, ch)
           nextInvs.get(prevSig, { () =>
-            BlockStats.inv(mbInv, ctx.channel())
+            BlockStats.inv(mbInv, ch)
             mbInv
           })
-
           history.lastBlockId()
             .filter(_ == prevSig && !alreadyRequested(totalSig))
             .foreach(tryDownloadNext)
       }
-    }.runAsyncLogErr
+    }.logErr
+    }
 
-    case _ => super.channelRead(ctx, msg)
+    microblockDatas
   }
-}
-
-object MicroBlockSynchronizer {
 
   case class MicroblockData(invOpt: Option[MicroBlockInv], microBlock: MicroBlock)
 

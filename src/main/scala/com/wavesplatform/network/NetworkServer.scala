@@ -79,12 +79,13 @@ class NetworkServer(checkpointService: CheckpointService,
 
   private val microBlockOwners = new MicroBlockOwners(settings.synchronizationSettings.microBlockSynchronizer.invCacheTimeout)
 
-  private val (mesageObserver, signatures, blocks, remoteScores, checkpoints) = MessageObserver()
+  private val (mesageObserver, signatures, blocks, remoteScores, checkpoints, microInvs, micros) = MessageObserver()
   private val syncWith = RxScoreObserver(settings.synchronizationSettings.scoreTTL, blockchainUpdater.lastBlockInfo.map(_.score), remoteScores, ???)
-
+  private val microblockDatas = MicroBlockSynchronizer(settings.synchronizationSettings.microBlockSynchronizer, history, peerDatabase, blockchainUpdater.lastBlockInfo.map(_.id),
+    microBlockOwners)(microInvs, micros)
   private val (extensions, newBlocks) = RxExtensionLoader(settings.synchronizationSettings, history, peerDatabase, syncWith, blocks, signatures, ???)
   private val sink: Unit = CoordinatorHandler(checkpointService, history, blockchainUpdater, time,
-    stateReader, utxPool, miner, settings, peerDatabase, allChannels, featureProvider, microBlockOwners)(newBlocks, checkpoints, extensions, ???)
+    stateReader, utxPool, miner, settings, peerDatabase, allChannels, featureProvider, microBlockOwners)(newBlocks, checkpoints, extensions, microblockDatas)
   private val discardingHandler = new DiscardingHandler(blockchainUpdater.lastBlockInfo.map(_.ready))
 
   private val peerConnections = new ConcurrentHashMap[PeerKey, Channel](10, 0.9f, 10)
@@ -93,13 +94,6 @@ class NetworkServer(checkpointService: CheckpointService,
     new HandshakeHandler.Server(handshake, peerInfo, peerConnections, peerDatabase, allChannels)
 
   private val utxPoolSynchronizer = new UtxPoolSynchronizer(utxPool, allChannels)
-  private val microBlockSynchronizer = new MicroBlockSynchronizer(
-    settings.synchronizationSettings.microBlockSynchronizer,
-    history,
-    peerDatabase,
-    blockchainUpdater.lastBlockInfo.map(_.id),
-    microBlockOwners
-  )
 
 
   private val serverChannel = settings.networkSettings.declaredAddress.map { _ =>
@@ -120,7 +114,6 @@ class NetworkServer(checkpointService: CheckpointService,
         writeErrorHandler,
         peerSynchronizer,
         historyReplier,
-        microBlockSynchronizer,
         utxPoolSynchronizer,
         mesageObserver,
         fatalErrorHandler)))
@@ -150,7 +143,6 @@ class NetworkServer(checkpointService: CheckpointService,
       writeErrorHandler,
       peerSynchronizer,
       historyReplier,
-      microBlockSynchronizer,
       utxPoolSynchronizer,
       mesageObserver,
       fatalErrorHandler)))
