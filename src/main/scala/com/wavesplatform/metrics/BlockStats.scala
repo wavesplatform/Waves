@@ -2,7 +2,7 @@ package com.wavesplatform.metrics
 
 import com.wavesplatform.network.{HandshakeHandler, MicroBlockInv}
 import com.wavesplatform.state2.ByteStr
-import io.netty.channel.ChannelHandlerContext
+import io.netty.channel.Channel
 import org.influxdb.dto.Point
 import scorex.block.{Block, MicroBlock}
 
@@ -18,29 +18,44 @@ object BlockStats {
   }
 
   private sealed abstract class Event extends Named
+
   private object Event {
+
     case object Inv extends Event
+
     case object Received extends Event
+
     case object Applied extends Event
+
     case object Declined extends Event
+
     case object Mined extends Event
+
   }
 
   private sealed abstract class Type extends Named
+
   private object Type {
+
     case object Block extends Type
+
     case object Micro extends Type
+
   }
 
   sealed abstract class Source extends Named
+
   object Source {
+
     case object Broadcast extends Source
+
     case object Ext extends Source
+
   }
 
-  def received(b: Block, source: Source, ctx: ChannelHandlerContext): Unit = write(
+  def received(b: Block, source: Source, ch: Channel): Unit = write(
     block(b, source)
-      .addField("from", nodeName(ctx))
+      .addField("from", nodeName(ch))
       .addField("prop-time", System.currentTimeMillis() - b.timestamp)
       .addField("bt", b.consensusData.baseTarget),
     Event.Received,
@@ -72,19 +87,19 @@ object BlockStats {
   )
 
 
-  def inv(m: MicroBlockInv, ctx: ChannelHandlerContext): Unit = write(
+  def inv(m: MicroBlockInv, ch: Channel): Unit = write(
     measurement(Type.Micro)
       .tag("id", id(m.totalBlockSig))
       .tag("parent-id", id(m.prevBlockSig))
-      .addField("from", nodeName(ctx)),
+      .addField("from", nodeName(ch)),
     Event.Inv,
     Seq.empty
   )
 
-  def received(m: MicroBlock, ctx: ChannelHandlerContext): Unit = write(
+  def received(m: MicroBlock, ch: Channel): Unit = write(
     micro(m)
       .tag("parent-id", id(m.prevResBlockSig))
-      .addField("from", nodeName(ctx)),
+      .addField("from", nodeName(ch)),
     Event.Received,
     Seq.empty
   )
@@ -119,8 +134,8 @@ object BlockStats {
 
   private def measurement(t: Type): Point.Builder = Point.measurement("block").tag("type", t.toString)
 
-  private def nodeName(ctx: ChannelHandlerContext): String = {
-    Option(ctx.channel().attr(HandshakeHandler.NodeNameAttributeKey).get()).getOrElse("")
+  private def nodeName(ch: Channel): String = {
+    Option(ch.attr(HandshakeHandler.NodeNameAttributeKey).get()).getOrElse("")
   }
 
   private def id(x: ByteStr): String = x.toString.take(StringIdLength)

@@ -96,7 +96,7 @@ object RxExtensionLoader extends ScorexLogging {
     }
     }
 
-    blocks.executeOn(scheduler).map { case ((ch, block)) => Task {
+    blocks.executeOn(scheduler).mapTask { case ((ch, block)) => Task {
       innerState match {
         case ExpectingBlocks(c, requested, expected, recieved, timeout) if c == ch && expected.contains(block.uniqueId) => {
           timeout.cancel()
@@ -112,7 +112,6 @@ object RxExtensionLoader extends ScorexLogging {
           } else {
             innerState = ExpectingBlocks(c, requested, expected - block.uniqueId, recieved + block, blacklistOnTimeout(ch, "Timeout loading blocks"))
           }
-
         }
         case _ => simpleBlocks.onNext((ch, block))
       }

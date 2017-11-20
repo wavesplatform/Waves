@@ -15,9 +15,9 @@ import com.wavesplatform.utils.{UnsupportedFeature, forceStopApplication}
 import kamon.Kamon
 import kamon.metric.instrument.Time
 import monix.eval.Coeval
-import monix.execution.Scheduler.Implicits.global
-import monix.reactive.subjects.ConcurrentSubject
+import monix.reactive.subjects.PublishSubject
 import scorex.block.{Block, MicroBlock}
+import scorex.transaction.History.BlockchainScore
 import scorex.transaction.ValidationError.{BlockAppendError, GenericError, MicroBlockAppendError}
 import scorex.transaction._
 import scorex.utils.ScorexLogging
@@ -39,7 +39,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
   private lazy val inMemDiffs: Synchronized[NEL[BlockDiff]] = Synchronized(NEL.one(BlockDiff.empty)) // fresh head
   private lazy val ngState: Synchronized[Option[NgState]] = Synchronized(Option.empty[NgState])
 
-  override val lastBlockId: ConcurrentSubject[ByteStr, ByteStr] = ConcurrentSubject.publish[ByteStr]
+  override val lastBlockId = PublishSubject[(ByteStr, BlockchainScore)]
 
   private val unsafeDiffByRange = BlockDiffer.unsafeDiffByRange(settings.blockchainSettings.functionalitySettings, featureProvider, historyWriter, maxTransactionsPerChunk) _
 
@@ -176,7 +176,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
         _ map { case ((newBlockDiff, discacrded)) =>
           val height = historyWriter.height() + 1
           ngState.set(Some(new NgState(block, newBlockDiff, featuresApprovedWithBlock(block))))
-          historyReader.lastBlockId().foreach(lastBlockId.onNext)
+          historyReader.lastBlockId().foreach(lastBlockId.onNext((_, historyReader.score())))
           log.info(s"$block appended. New height: $height)")
           discacrded
         }
@@ -227,7 +227,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
           }
 
           val totalDiscardedBlocks: Seq[Block] = discardedHistoryBlocks ++ discardedNgBlock.toSeq
-          if (totalDiscardedBlocks.nonEmpty) lastBlockId.onNext(blockId)
+          if (totalDiscardedBlocks.nonEmpty) lastBlockId.onNext((blockId, historyReader.score()))
           TxsInBlockchainStats.record(-totalDiscardedBlocks.size)
           Right(totalDiscardedBlocks)
       }
@@ -257,7 +257,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
             } yield {
               log.info(s"$microBlock appended")
               ng.append(microBlock, diff, System.currentTimeMillis())
-              lastBlockId.onNext(microBlock.totalResBlockSig)
+              lastBlockId.onNext((microBlock.totalResBlockSig, historyReader.score()))
             }
         }
     }

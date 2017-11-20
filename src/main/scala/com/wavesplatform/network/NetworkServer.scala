@@ -50,10 +50,6 @@ class NetworkServer(checkpointService: CheckpointService,
     Handshake(Constants.ApplicationName + settings.blockchainSettings.addressSchemeCharacter, Version.VersionTuple,
       settings.networkSettings.nodeName, settings.networkSettings.nonce, settings.networkSettings.declaredAddress)
 
-  private val scoreObserver = new RemoteScoreObserver(
-    settings.synchronizationSettings.scoreTTL,
-    history.lastBlockIds(settings.synchronizationSettings.maxRollback), history.score())
-
   private val trafficWatcher = if (settings.metrics.enable) new TrafficWatcher else new NoopHandler
   private val discardingHandler = new DiscardingHandler(blockchainReadiness)
   private val messageCodec = new MessageCodec(peerDatabase)
@@ -85,8 +81,13 @@ class NetworkServer(checkpointService: CheckpointService,
     settings.networkSettings.maxConnectionsPerHost)
 
   private val microBlockOwners = new MicroBlockOwners(settings.synchronizationSettings.microBlockSynchronizer.invCacheTimeout)
-  private val coordinatorHandler = new CoordinatorHandler(checkpointService, history, blockchainUpdater, time,
-    stateReader, utxPool, blockchainReadiness, miner, settings, peerDatabase, allChannels, featureProvider, microBlockOwners)
+
+  private val (mesageObserver, signatures, blocks, remoteScores, checkpoints) = MessageObserver()
+  private val syncWith = RxScoreObserver(settings.synchronizationSettings.scoreTTL, blockchainUpdater.lastBlockId.map(_._2), remoteScores, ???)
+
+  private val (extensions, newBlocks) = RxExtensionLoader(settings.synchronizationSettings, history, peerDatabase, syncWith, blocks, signatures, ???)
+  private val sink: Unit = CoordinatorHandler(checkpointService, history, blockchainUpdater, time,
+    stateReader, utxPool, blockchainReadiness, miner, settings, peerDatabase, allChannels, featureProvider, microBlockOwners)(newBlocks, checkpoints, extensions, ???)
 
   private val peerConnections = new ConcurrentHashMap[PeerKey, Channel](10, 0.9f, 10)
 
@@ -98,7 +99,7 @@ class NetworkServer(checkpointService: CheckpointService,
     settings.synchronizationSettings.microBlockSynchronizer,
     history,
     peerDatabase,
-    blockchainUpdater.lastBlockId,
+    blockchainUpdater.lastBlockId.map(_._1),
     microBlockOwners
   )
 
@@ -122,12 +123,8 @@ class NetworkServer(checkpointService: CheckpointService,
         peerSynchronizer,
         historyReplier,
         microBlockSynchronizer,
-        new ExtensionSignaturesLoader(settings.synchronizationSettings.synchronizationTimeout, peerDatabase),
-        new ExtensionBlocksLoader(settings.synchronizationSettings.synchronizationTimeout, peerDatabase, history),
-        new OptimisticExtensionLoader,
         utxPoolSynchronizer,
-        scoreObserver,
-        coordinatorHandler,
+        mesageObserver,
         fatalErrorHandler)))
       .bind(settings.networkSettings.bindAddress)
       .channel()
@@ -156,21 +153,19 @@ class NetworkServer(checkpointService: CheckpointService,
       peerSynchronizer,
       historyReplier,
       microBlockSynchronizer,
-      new ExtensionSignaturesLoader(settings.synchronizationSettings.synchronizationTimeout, peerDatabase),
-      new ExtensionBlocksLoader(settings.synchronizationSettings.synchronizationTimeout, peerDatabase, history),
-      new OptimisticExtensionLoader,
       utxPoolSynchronizer,
-      scoreObserver,
-      coordinatorHandler,
+      mesageObserver,
       fatalErrorHandler)))
 
   private val connectTask = workerGroup.scheduleWithFixedDelay(1.second, 5.seconds) {
     import scala.collection.JavaConverters._
 
     val outgoing = outgoingChannels.keySet.iterator().asScala.toVector
+
     def outgoingStr = outgoing.map(_.toString).sorted.mkString("[", ", ", "]")
 
     val incoming = peerInfo.values().iterator().asScala.flatMap(_.declaredAddress).toVector
+
     def incomingStr = incoming.map(_.toString).sorted.mkString("[", ", ", "]")
 
     log.trace(s"Outgoing: $outgoingStr ++ incoming: $incomingStr")
@@ -242,7 +237,6 @@ class NetworkServer(checkpointService: CheckpointService,
     log.debug("Unbound server")
     allChannels.close().await()
     log.debug("Closed all channels")
-    coordinatorHandler.shutdown()
   } finally {
     workerGroup.shutdownGracefully().await()
     bossGroup.shutdownGracefully().await()

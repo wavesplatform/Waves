@@ -66,7 +66,7 @@ class MicroBlockSynchronizer(settings: MicroblockSynchronizerSettings,
       import mb.{totalResBlockSig => totalSig}
 
       successfullyReceived.put(totalSig, dummy)
-      BlockStats.received(mb, ctx)
+      BlockStats.received(mb, ctx.channel())
 
       Task {
         log.trace(s"${id(ctx)} Received $msg")
@@ -83,7 +83,7 @@ class MicroBlockSynchronizer(settings: MicroblockSynchronizerSettings,
           log.trace(s"${id(ctx)} Received $msg")
           microBlockOwners.add(totalSig, ctx)
           nextInvs.get(prevSig, { () =>
-            BlockStats.inv(mbInv, ctx)
+            BlockStats.inv(mbInv, ctx.channel())
             mbInv
           })
 
