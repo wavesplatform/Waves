@@ -52,7 +52,7 @@ class NetworkUniqueConnectionsTestSuite extends FreeSpec with Matchers with Befo
 
 private object NetworkUniqueConnectionsTestSuite {
 
-  private val configs = NodeConfigs.newBuilder.withDefault(2).build
+  private val configs = NodeConfigs.newBuilder.withDefault(0).withSpecial(2, _.nonMiner).build
   val FirstNodeConfig: Config = configs.head
   val SecondNodeConfig: Config = configs.last
 

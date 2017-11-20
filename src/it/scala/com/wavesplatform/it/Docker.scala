@@ -294,7 +294,12 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
 
   private def disconnectFromNetwork(containerId: String): Unit = client.disconnectFromNetwork(containerId, wavesNetwork.id())
 
-  def connectToNetwork(node: Node): Unit = {
+  def connectToNetwork(nodes: Seq[Node]): Unit = {
+    nodes.foreach(connectToNetwork)
+    Await.result(Future.traverse(nodes)(connectToAll), 1.minute)
+  }
+
+  private def connectToNetwork(node: Node): Unit = {
     client.connectToNetwork(
       wavesNetwork.id(),
       NetworkConnection.builder()

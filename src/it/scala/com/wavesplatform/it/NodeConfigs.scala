@@ -23,8 +23,11 @@ object NodeConfigs {
 
     def withDefault(entitiesNumber: Int): Builder = copy(defaultEntities = entitiesNumber)
 
-    def withSpecial(f: Templates.type => String): Builder = {
-      copy(specialsConfigs = specialsConfigs :+ ConfigFactory.parseString(f(Templates)))
+    def withSpecial(f: Templates.type => String): Builder = withSpecial(1, f)
+
+    def withSpecial(entitiesNumber: Int, f: Templates.type => String): Builder = {
+      val newSpecialConfig = ConfigFactory.parseString(f(Templates))
+      copy(specialsConfigs = specialsConfigs ++ (1 to entitiesNumber).map( _ => newSpecialConfig))
     }
 
     def build: Seq[Config] = {

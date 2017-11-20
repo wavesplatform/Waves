@@ -32,7 +32,7 @@ class NetworkSeparationTestSuite extends FreeSpec with Matchers with Integration
     val lastMaxHeight = maxHeight
     nodes.foreach(docker.disconnectFromNetwork)
     Thread.sleep(80.seconds.toMillis) // >= 10 blocks, because a new block appears every 6 seconds
-    nodes.foreach(docker.connectToNetwork)
+    docker.connectToNetwork(nodes)
 
     maxHeight shouldBe >=(lastMaxHeight + 6)
   }
