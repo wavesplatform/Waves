@@ -18,6 +18,6 @@ class PaymentTransactionSuite extends BaseTransactionSuite {
         .zip(assertBalances(secondAddress, 105.waves, 105.waves))
     } yield succeed
 
-    Await.result(f, 1.minute)
+    Await.result(f, 2.minute)
   }
 }

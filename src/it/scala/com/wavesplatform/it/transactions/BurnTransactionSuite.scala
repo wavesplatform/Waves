@@ -27,6 +27,6 @@ class BurnTransactionSuite extends BaseTransactionSuite {
 
     } yield succeed
 
-    Await.result(f, 1.minute)
+    Await.result(f, 2.minute)
   }
 }

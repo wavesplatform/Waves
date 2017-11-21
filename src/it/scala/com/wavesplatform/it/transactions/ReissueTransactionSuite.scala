@@ -7,6 +7,7 @@ import scala.concurrent.duration._
 
 class ReissueTransactionSuite extends BaseTransactionSuite {
 
+  private val waitCompletion = 2.minutes
   private val defaultQuantity = 100000
 
   test("asset reissue changes issuer's asset balance; issuer's waves balance is decreased by fee") {
@@ -23,7 +24,7 @@ class ReissueTransactionSuite extends BaseTransactionSuite {
         .zip(assertAssetBalance(firstAddress, issuedAssetId, 2 * defaultQuantity))
     } yield succeed
 
-    Await.result(f, 1.minute)
+    Await.result(f, waitCompletion)
   }
 
   test("can't reissue not reissuable asset") {
@@ -47,7 +48,7 @@ class ReissueTransactionSuite extends BaseTransactionSuite {
 
     } yield succeed
 
-    Await.result(f, 1.minute)
+    Await.result(f, waitCompletion)
   }
 
   test("not able to reissue if cannot pay fee - insufficient funds") {
@@ -69,7 +70,7 @@ class ReissueTransactionSuite extends BaseTransactionSuite {
         .zip(assertBalances(firstAddress, firstAddressBalance - issueFee, firstAddressEffectiveBalance - issueFee))
     } yield succeed
 
-    Await.result(f, 1.minute)
+    Await.result(f, waitCompletion)
   }
 
 

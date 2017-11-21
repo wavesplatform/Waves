@@ -8,6 +8,7 @@ import scala.concurrent.duration._
 
 class IssueTransactionSuite extends BaseTransactionSuite with TableDrivenPropertyChecks {
 
+  private val waitCompletion = 2.minutes
   private val defaultQuantity = 100000
   private val assetFee = 5.waves
 
@@ -26,7 +27,7 @@ class IssueTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
         .zip(assertAssetBalance(firstAddress, issuedAssetId, defaultQuantity))
     } yield succeed
 
-    Await.result(f, 1.minute)
+    Await.result(f, waitCompletion)
   }
 
   test("Able to create asset with the same name") {
@@ -47,7 +48,7 @@ class IssueTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
         .zip(assertBalances(firstAddress, firstAddressBalance - 2 * assetFee, firstAddressEffectiveBalance - 2 * assetFee))
     } yield succeed
 
-    Await.result(f, 1.minute)
+    Await.result(f, waitCompletion)
   }
 
   test("Not able to create asset when insufficient funds") {
@@ -62,7 +63,7 @@ class IssueTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
         "negative waves balance")
     } yield succeed
 
-    Await.result(f, 1.minute)
+    Await.result(f, waitCompletion)
   }
 
   val invalidAssetValue =
@@ -78,12 +79,11 @@ class IssueTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
       val assetDescription = "my asset description 2"
       val decimalBytes: Byte = decimals.toByte
       val f = for {
-
         _ <- assertBadRequestAndMessage(sender.issue(firstAddress, assetName, assetDescription, assetVal, decimalBytes, reissuable = false, assetFee),
           message)
       } yield succeed
 
-      Await.result(f, 1.minute)
+      Await.result(f, waitCompletion)
     }
   }
 

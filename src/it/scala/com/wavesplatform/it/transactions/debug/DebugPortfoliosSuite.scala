@@ -6,7 +6,9 @@ import com.wavesplatform.it.util._
 import scala.concurrent.Await
 import scala.concurrent.duration._
 
-class DebugPortfoliosSuite extends BaseTransactionSuite  {
+class DebugPortfoliosSuite extends BaseTransactionSuite {
+
+  private val waitCompletion = 2.minutes
 
   test("getting a balance considering pessimistic transactions from UTX pool - changed after UTX") {
     val f = for {
@@ -22,7 +24,7 @@ class DebugPortfoliosSuite extends BaseTransactionSuite  {
       assert(portfolioAfter.balance == expectedBalance)
     }
 
-    Await.result(f, 1.minute)
+    Await.result(f, waitCompletion)
   }
 
   test("getting a balance without pessimistic transactions from UTX pool - not changed after UTX") {
@@ -37,6 +39,6 @@ class DebugPortfoliosSuite extends BaseTransactionSuite  {
       assert(portfolioAfter.balance == portfolioBefore.balance)
     }
 
-    Await.result(f, 1.minute)
+    Await.result(f, waitCompletion)
   }
 }

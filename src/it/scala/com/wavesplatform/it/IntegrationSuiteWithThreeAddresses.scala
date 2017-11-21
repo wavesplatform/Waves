@@ -123,7 +123,7 @@ trait IntegrationSuiteWithThreeAddresses extends BeforeAndAfterAll with Matchers
       }
 
       _ <- withClue("waitForTxsToReachAllNodes") {
-        Await.ready(waitForTxsToReachAllNodes(txs), 1.minute)
+        Await.ready(waitForTxsToReachAllNodes(txs), 2.minute)
       }
       _ <- dumpBalances(sender, accounts, "after transfer")
       _ <- traverse(accounts)(assertBalances(_, defaultBalance, defaultBalance))
