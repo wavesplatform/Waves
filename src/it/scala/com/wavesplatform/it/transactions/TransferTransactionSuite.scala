@@ -1,6 +1,7 @@
 package com.wavesplatform.it.transactions
 
 import com.wavesplatform.it.util._
+import org.scalatest.CancelAfterFailure
 import scorex.account.{AddressOrAlias, PrivateKeyAccount}
 import scorex.api.http.Mistiming
 import scorex.api.http.assets.SignedTransferRequest
@@ -11,7 +12,7 @@ import scala.concurrent.Await
 import scala.concurrent.Future.{sequence, traverse}
 import scala.concurrent.duration._
 
-class TransferTransactionSuite extends BaseTransactionSuite {
+class TransferTransactionSuite extends BaseTransactionSuite with CancelAfterFailure {
 
   private val waitCompletion = 2.minutes
   private val defaultQuantity = 100000

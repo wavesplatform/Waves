@@ -3,7 +3,7 @@ package com.wavesplatform.it.transactions.debug
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 
-import scala.concurrent.Await
+import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
 
 class DebugPortfoliosSuite extends BaseTransactionSuite {
@@ -23,6 +23,15 @@ class DebugPortfoliosSuite extends BaseTransactionSuite {
       val expectedBalance = portfolioBefore.balance - 10.waves // withdraw + fee
       assert(portfolioAfter.balance == expectedBalance)
     }
+
+    Await.result(f, waitCompletion)
+  }
+
+  test("prepare for next test - wait all previous transactions are processed") {
+    val f = for {
+      height <- Future.traverse(nodes)(_.height).map(_.max)
+      _ <- waitForSameBlocksAt(nodes, 5.seconds, height + 1)
+    } yield ()
 
     Await.result(f, waitCompletion)
   }
