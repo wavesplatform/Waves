@@ -55,9 +55,11 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
   override def write(ctx: ChannelHandlerContext, msg: AnyRef, promise: ChannelPromise): Unit = msg match {
     case LocalScoreChanged(newLocalScore, breakExtLoading) =>
       // unconditionally update local score value and propagate this message downstream
-      localScore = newLocalScore
-      ctx.write(msg, promise)
-      log.debug(s"${id(ctx)} ${pinnedChannelId}New local score: $newLocalScore")
+      if (newLocalScore != localScore) {
+        localScore = newLocalScore
+        ctx.write(msg, promise)
+        log.debug(s"${id(ctx)} ${pinnedChannelId}New local score: $newLocalScore")
+      }
 
       if (breakExtLoading) {
         log.debug(s"${id(ctx)} Stop processing an extension")
@@ -103,7 +105,7 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
         log.debug(s"${id(ctx)} ${pinnedChannelId}New high score $highScore > $localScore, pinning and requesting extension")
         requestExtension(ch)
       } else {
-        log.trace(s"${id(ctx)} New high score $highScore")
+        log.trace(s"${id(ctx)} New high score $highScore, but we are processing a score from $pinnedChannelId for now")
       }
 
     case ExtensionBlocks(blocks) if pinnedChannel.get() == ctx.channel() =>
@@ -112,7 +114,8 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
         super.channelRead(ctx, msg)
       } else {
         log.debug(s"${id(ctx)} ${pinnedChannelId}Blockchain is up to date")
-        pinnedChannel.compareAndSet(ctx.channel(), null)
+        if (pinnedChannel.compareAndSet(ctx.channel(), null)) log.debug(s"${id(ctx)} Successfully reset pinned channel")
+        else log.debug(s"${id(ctx)} The pinned channel is unchanged, $pinnedChannelId")
       }
 
     case ExtensionBlocks(blocks) =>
