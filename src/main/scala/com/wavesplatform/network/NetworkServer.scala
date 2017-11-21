@@ -84,7 +84,7 @@ class NetworkServer(checkpointService: CheckpointService,
   private val syncWith = RxScoreObserver(settings.synchronizationSettings.scoreTTL, blockchainUpdater.lastBlockInfo.map(_.score), remoteScores, closedChannels)
   private val microblockDatas = MicroBlockSynchronizer(settings.synchronizationSettings.microBlockSynchronizer, history, peerDatabase, blockchainUpdater.lastBlockInfo.map(_.id))(microInvs, micros)
   private val (extensions, newBlocks) = RxExtensionLoader(settings.synchronizationSettings, history, peerDatabase, syncWith, blocks, signatures, closedChannels)
-  private val sink: Unit = CoordinatorHandler(checkpointService, history, blockchainUpdater, time,
+  private val sink = CoordinatorHandler(checkpointService, history, blockchainUpdater, time,
     stateReader, utxPool, miner, settings, peerDatabase, allChannels, featureProvider)(newBlocks, checkpoints, extensions, microblockDatas)
   private val discardingHandler = new DiscardingHandler(blockchainUpdater.lastBlockInfo.map(_.ready))
 
