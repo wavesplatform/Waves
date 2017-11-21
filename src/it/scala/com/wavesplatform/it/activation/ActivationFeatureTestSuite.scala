@@ -22,7 +22,7 @@ class ActivationFeatureTestSuite extends FreeSpec with Matchers with BeforeAndAf
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-    nodes.foreach(_.status) // Initialize
+    log.debug(s"There are ${nodes.size} in tests") // Initializing of a lazy variable
   }
 
   override protected def afterAll(): Unit = {

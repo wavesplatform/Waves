@@ -38,7 +38,7 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-    nodes.foreach(_.status) // Initialize
+    log.debug(s"There are ${nodes.size} in tests") // Initializing of a lazy variable
 
     // Store initial balances of participants
     matcherBalance = getBalance(matcherNode)

@@ -97,7 +97,7 @@ trait IntegrationSuiteWithThreeAddresses extends BeforeAndAfterAll with Matchers
 
   abstract override def beforeAll(): Unit = {
     super.beforeAll()
-    nodes.foreach(_.status) // Initialize
+    log.debug(s"There are ${nodes.size} in tests") // Initializing of a lazy variable
 
     def waitForTxsToReachAllNodes(txIds: Seq[String]): Future[_] = {
       val txNodePairs = for {

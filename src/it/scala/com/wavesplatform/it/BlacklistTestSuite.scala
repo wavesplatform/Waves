@@ -26,7 +26,7 @@ class BlacklistTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll w
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-    nodes.foreach(_.status) // Initialize
+    log.debug(s"There are ${nodes.size} in tests") // Initializing of a lazy variable
   }
 
   override protected def afterAll(): Unit = {

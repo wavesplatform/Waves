@@ -3,6 +3,7 @@ package com.wavesplatform.it
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.util._
 import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
+import scorex.utils.ScorexLogging
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future.traverse
@@ -10,7 +11,8 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.util.Random
 
-class MicroblocksFeeTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with CancelAfterFailure {
+class MicroblocksFeeTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with CancelAfterFailure
+  with ScorexLogging {
 
   import MicroblocksFeeTestSuite._
 
@@ -22,7 +24,7 @@ class MicroblocksFeeTestSuite extends FreeSpec with Matchers with BeforeAndAfter
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-    nodes.foreach(_.status) // Initialize
+    log.debug(s"There are ${nodes.size} in tests") // Initializing of a lazy variable
   }
 
   override protected def afterAll(): Unit = {

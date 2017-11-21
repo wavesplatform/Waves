@@ -14,7 +14,7 @@ trait IntegrationNodesInitializationAndStopping extends BeforeAndAfterAll with S
 
   abstract override def beforeAll(): Unit = {
     super.beforeAll()
-    nodes.foreach(_.status) // Initialize
+    log.debug(s"There are ${nodes.size} in tests") // Initializing of a lazy variable
   }
 
   abstract override def afterAll(): Unit = {

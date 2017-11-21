@@ -253,11 +253,12 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
         client.removeContainer(node.nodeInfo.containerId, RemoveContainerParam.forceKill())
       }
 
-      Try(client.removeNetwork(wavesNetwork.id)) match {
-        case Failure(e) =>
+      try {
+        client.removeNetwork(wavesNetwork.id)
+      } catch {
+        case NonFatal(e) =>
           // https://github.com/moby/moby/issues/17217
           log.warn(s"Can not remove network ${wavesNetwork.name()}", e)
-        case _ =>
       }
 
       http.close()
