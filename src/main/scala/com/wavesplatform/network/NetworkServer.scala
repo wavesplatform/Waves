@@ -18,6 +18,7 @@ import io.netty.channel.socket.SocketChannel
 import io.netty.channel.socket.nio.{NioServerSocketChannel, NioSocketChannel}
 import io.netty.handler.codec.{LengthFieldBasedFrameDecoder, LengthFieldPrepender}
 import io.netty.util.concurrent.DefaultThreadFactory
+import monix.reactive.subjects.PublishSubject
 import org.asynchttpclient.netty.channel.NoopHandler
 import org.influxdb.dto.Point
 import scorex.transaction._
@@ -78,12 +79,13 @@ class NetworkServer(checkpointService: CheckpointService,
     settings.networkSettings.maxConnectionsPerHost)
 
   private val microBlockOwners = new MicroBlockOwners(settings.synchronizationSettings.microBlockSynchronizer.invCacheTimeout)
+  private val closedChannels = PublishSubject[Channel]
 
   private val (mesageObserver, signatures, blocks, remoteScores, checkpoints, microInvs, micros) = MessageObserver()
-  private val syncWith = RxScoreObserver(settings.synchronizationSettings.scoreTTL, blockchainUpdater.lastBlockInfo.map(_.score), remoteScores, ???)
+  private val syncWith = RxScoreObserver(settings.synchronizationSettings.scoreTTL, blockchainUpdater.lastBlockInfo.map(_.score), remoteScores, closedChannels)
   private val microblockDatas = MicroBlockSynchronizer(settings.synchronizationSettings.microBlockSynchronizer, history, peerDatabase, blockchainUpdater.lastBlockInfo.map(_.id),
     microBlockOwners)(microInvs, micros)
-  private val (extensions, newBlocks) = RxExtensionLoader(settings.synchronizationSettings, history, peerDatabase, syncWith, blocks, signatures, ???)
+  private val (extensions, newBlocks) = RxExtensionLoader(settings.synchronizationSettings, history, peerDatabase, syncWith, blocks, signatures, closedChannels)
   private val sink: Unit = CoordinatorHandler(checkpointService, history, blockchainUpdater, time,
     stateReader, utxPool, miner, settings, peerDatabase, allChannels, featureProvider, microBlockOwners)(newBlocks, checkpoints, extensions, microblockDatas)
   private val discardingHandler = new DiscardingHandler(blockchainUpdater.lastBlockInfo.map(_.ready))
@@ -183,6 +185,7 @@ class NetworkServer(checkpointService: CheckpointService,
   }
 
   private def handleChannelClosed(remoteAddress: InetSocketAddress)(closeFuture: ChannelFuture): Unit = {
+    closedChannels.onNext(closeFuture.channel())
     outgoingChannels.remove(remoteAddress, closeFuture.channel())
     if (!shutdownInitiated) peerDatabase.suspend(remoteAddress.getAddress)
 

@@ -36,7 +36,7 @@ object CoordinatorHandler extends ScorexLogging {
            )(blocks: ChannelObservable[Block],
              checkpoints: ChannelObservable[Checkpoint],
              extensions: ChannelObservable[ExtensionBlocks],
-             microblocks: ChannelObservable[MicroblockData]): Unit = {
+             microblockDatas: ChannelObservable[MicroblockData]): Unit = {
     val scheduler = Scheduler.singleThread("coordinator-handler")
 
     val processBlock = Coordinator.processSingleBlock(checkpointService, history, blockchainUpdater, time, stateReader, utxStorage, settings.blockchainSettings, featureProvider) _
@@ -101,13 +101,13 @@ object CoordinatorHandler extends ScorexLogging {
         scheduleMiningAndBroadcastScore)
     }
 
-    microblocks.executeOn(scheduler).mapTask { case ((ch, md)) =>
+    microblockDatas.executeOn(scheduler).mapTask { case ((ch, md)) =>
       import md.microBlock
       val microblockTotalResBlockSig = microBlock.totalResBlockSig
       Task(microBlock.signaturesValid().flatMap(processMicroBlock) match {
         case Right(()) =>
           md.invOpt match {
-            case Some(mi) => allChannels.broadcast(mi, microBlockOwners.all(microBlock.totalResBlockSig))
+            case Some(mi) => allChannels.broadcast(mi, except = microBlockOwners.all(microBlock.totalResBlockSig))
             case None => log.warn(s"${id(ch)} Not broadcasting MicroBlockInv")
           }
           BlockStats.applied(microBlock)
