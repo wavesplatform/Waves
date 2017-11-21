@@ -39,7 +39,7 @@ case class MicroBlock private(version: Byte, generator: PublicKeyAccount, transa
   override val signatureValid: Coeval[Boolean] = Coeval.evalOnce(EllipticCurveImpl.verify(signature.arr, bytesWithoutSignature(), generator.publicKey))
   override val signedDescendants: Coeval[Seq[Signed]] = Coeval.evalOnce(transactionData)
 
-  override def toString: String = s"MicroBlock(${totalResBlockSig.trim} ~> ${prevResBlockSig.trim}, txs=${transactionData.size})"
+  override def toString: String = s"MicroBlock(${totalResBlockSig.trim} -> ${prevResBlockSig.trim}, txs=${transactionData.size})"
 }
 
 object MicroBlock extends ScorexLogging {

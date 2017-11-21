@@ -8,6 +8,7 @@ import scala.concurrent.duration._
 
 class IssueTransactionSuite extends BaseTransactionSuite with TableDrivenPropertyChecks {
 
+  private val waitCompletion = 2.minutes
   private val defaultQuantity = 100000
   private val assetFee = 5.waves
 
@@ -16,18 +17,17 @@ class IssueTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
     val assetDescription = "my asset description"
     val f = for {
 
-      firstAddressBalance <- accountBalance(firstAddress)
-      firstAddressEffectiveBalance <- accountEffectiveBalance(firstAddress)
+      (firstAddressBalance, firstAddressEffectiveBalance) <- accountBalance(firstAddress).zip(accountEffectiveBalance(firstAddress))
 
       issuedAssetId <- sender.issue(firstAddress, assetName, assetDescription, defaultQuantity, 2, reissuable = true, assetFee).map(_.id)
 
       _ <- waitForHeightAraiseAndTxPresent(issuedAssetId, 1)
 
       _ <- assertBalances(firstAddress, firstAddressBalance - assetFee, firstAddressEffectiveBalance - assetFee)
-      _ <- assertAssetBalance(firstAddress, issuedAssetId, defaultQuantity)
+        .zip(assertAssetBalance(firstAddress, issuedAssetId, defaultQuantity))
     } yield succeed
 
-    Await.result(f, 1.minute)
+    Await.result(f, waitCompletion)
   }
 
   test("Able to create asset with the same name") {
@@ -35,8 +35,7 @@ class IssueTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
     val assetDescription = "my asset description"
     val f = for {
 
-      firstAddressBalance <- accountBalance(firstAddress)
-      firstAddressEffectiveBalance <- accountEffectiveBalance(firstAddress)
+      (firstAddressBalance, firstAddressEffectiveBalance) <- accountBalance(firstAddress).zip(accountEffectiveBalance(firstAddress))
 
       issuedAssetId <- sender.issue(firstAddress, assetName, assetDescription, defaultQuantity, 2, reissuable = false, assetFee).map(_.id)
       _ <- waitForHeightAraiseAndTxPresent(issuedAssetId, 1)
@@ -46,10 +45,10 @@ class IssueTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
       _ <- waitForHeightAraiseAndTxPresent(issuedAssetId, 1)
 
       _ <- assertAssetBalance(firstAddress, issuedAssetId, defaultQuantity)
-      _ <- assertBalances(firstAddress, firstAddressBalance - 2 * assetFee, firstAddressEffectiveBalance - 2 * assetFee)
+        .zip(assertBalances(firstAddress, firstAddressBalance - 2 * assetFee, firstAddressEffectiveBalance - 2 * assetFee))
     } yield succeed
 
-    Await.result(f, 1.minute)
+    Await.result(f, waitCompletion)
   }
 
   test("Not able to create asset when insufficient funds") {
@@ -64,7 +63,7 @@ class IssueTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
         "negative waves balance")
     } yield succeed
 
-    Await.result(f, 1.minute)
+    Await.result(f, waitCompletion)
   }
 
   val invalidAssetValue =
@@ -80,12 +79,11 @@ class IssueTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
       val assetDescription = "my asset description 2"
       val decimalBytes: Byte = decimals.toByte
       val f = for {
-
         _ <- assertBadRequestAndMessage(sender.issue(firstAddress, assetName, assetDescription, assetVal, decimalBytes, reissuable = false, assetFee),
           message)
       } yield succeed
 
-      Await.result(f, 1.minute)
+      Await.result(f, waitCompletion)
     }
   }
 

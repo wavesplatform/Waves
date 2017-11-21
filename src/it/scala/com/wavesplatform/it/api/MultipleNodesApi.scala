@@ -3,12 +3,13 @@ package com.wavesplatform.it.api
 import java.util.{Timer, TimerTask}
 
 import com.wavesplatform.it.api.MultipleNodesApi._
+import scorex.utils.ScorexLogging
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{Future, Promise}
 
-trait MultipleNodesApi {
+trait MultipleNodesApi extends ScorexLogging {
   def waitFor[A](nodes: Iterable[NodeApi], retryInterval: FiniteDuration)
                 (request: NodeApi => Future[A], cond: Iterable[A] => Boolean): Future[Boolean] = {
     def retry = sleep(retryInterval).flatMap { _ =>
@@ -25,10 +26,17 @@ trait MultipleNodesApi {
   }
 
   def waitForSameBlocksAt(nodes: Iterable[NodeApi], retryInterval: FiniteDuration, height: Int): Future[Boolean] = {
-    waitFor[NodeApi.Block](nodes, retryInterval)(_.blockAt(height), { blocks =>
+    def waitHeight = waitFor[Int](nodes, retryInterval)(_.height, _.forall(_ >= height))
+    def waitSameBlocks = waitFor[NodeApi.Block](nodes, retryInterval)(_.blockAt(height), { blocks =>
       val sig = blocks.map(_.signature)
       sig.forall(_ == sig.head)
     })
+
+    for {
+      _ <- waitHeight
+      _ = log.debug(s"All nodes reached height $height")
+      r <- waitSameBlocks
+    } yield r
   }
 }
 

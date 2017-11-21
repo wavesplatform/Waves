@@ -178,6 +178,7 @@ class MinerImpl(
         nextBlockGenerationTimes += account.toAddress -> (System.currentTimeMillis() + offset.toMillis)
         generateOneBlockTask(account, balance)(offset).flatMap {
           case Right(block) => Task.now {
+            log.debug(s"Forged $block by ${account.address}")
             processBlock(block) match {
               case Left(err) => log.warn("Error mining Block: " + err.toString)
               case Right(Some(score)) =>

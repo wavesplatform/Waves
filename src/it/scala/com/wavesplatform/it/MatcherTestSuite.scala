@@ -14,7 +14,8 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.util.Random
 
-class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with CancelAfterFailure with ReportingTestName{
+class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with CancelAfterFailure
+  with ReportingTestName {
 
   import MatcherTestSuite._
 
@@ -37,6 +38,7 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
+    log.debug(s"There are ${nodes.size} in tests") // Initializing of a lazy variable
 
     // Store initial balances of participants
     matcherBalance = getBalance(matcherNode)
@@ -355,11 +357,7 @@ object MatcherTestSuite {
        |waves.miner.enable=no
       """.stripMargin)
 
-  private val nonGeneratingPeersConfig = ConfigFactory.parseString(
-    """
-      |waves.miner.enable=no
-    """.stripMargin
-  )
+  private val nonGeneratingPeersConfig = ConfigFactory.parseString("waves.miner.enable=no")
 
   val AssetQuantity: Long = 1000
 

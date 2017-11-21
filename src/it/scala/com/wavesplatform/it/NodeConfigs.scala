@@ -11,13 +11,41 @@ object NodeConfigs {
 
   val Default: Seq[Config] = ConfigFactory.parseResources("nodes.conf").getConfigList("nodes").asScala
 
-  def forTest(defaultNumber: Int, special: (Int, String)): Seq[Config] = {
-    val specialConfig = ConfigFactory.parseString(special._2)
-    val (defaultNodes: Seq[Config], specialNodes: Seq[Config]) = Random.shuffle(Default)
-      .take(defaultNumber + special._1)
-      .splitAt(defaultNumber)
+  def newBuilder: Builder = Builder(Default, Default.size, Seq.empty)
 
-    defaultNodes ++ specialNodes.map(specialConfig.withFallback)
+  case class Builder(baseConfigs: Seq[Config],
+                     defaultEntities: Int,
+                     specialsConfigs: Seq[Config]) {
+    def overrideBase(f: Templates.type => String): Builder = {
+      val priorityConfig = ConfigFactory.parseString(f(Templates))
+      copy(baseConfigs = baseConfigs.map(priorityConfig.withFallback))
+    }
+
+    def withDefault(entitiesNumber: Int): Builder = copy(defaultEntities = entitiesNumber)
+
+    def withSpecial(f: Templates.type => String): Builder = withSpecial(1, f)
+
+    def withSpecial(entitiesNumber: Int, f: Templates.type => String): Builder = {
+      val newSpecialConfig = ConfigFactory.parseString(f(Templates))
+      copy(specialsConfigs = specialsConfigs ++ (1 to entitiesNumber).map( _ => newSpecialConfig))
+    }
+
+    def build: Seq[Config] = {
+      val totalEntities = defaultEntities + specialsConfigs.size
+      require(totalEntities < baseConfigs.size)
+
+      val (defaultNodes: Seq[Config], specialNodes: Seq[Config]) = Random.shuffle(baseConfigs)
+        .take(totalEntities)
+        .splitAt(defaultEntities)
+
+      specialNodes.zip(specialsConfigs)
+        .foldLeft(defaultNodes) { case (r, (base, special)) => r :+ special.withFallback(base) }
+    }
+  }
+
+  object Templates {
+    def quorum(n: Int): String = s"waves.miner.quorum = $n"
+    val nonMiner: String = "waves.miner.enable = no"
   }
 
 }

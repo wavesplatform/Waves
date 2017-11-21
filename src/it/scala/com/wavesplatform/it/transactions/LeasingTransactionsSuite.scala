@@ -15,12 +15,12 @@ class LeasingTransactionsSuite extends BaseTransactionSuite {
       height <- traverse(nodes)(_.height).map(_.max)
       _ <- traverse(nodes)(_.waitForHeight(height + 1))
       _ <- assertBalances(firstAddress, 100.waves, 100.waves)
-      _ <- assertBalances(secondAddress, 100.waves, 100.waves)
+        .zip(assertBalances(secondAddress, 100.waves, 100.waves))
 
       createdLeaseTxId <- sender.lease(firstAddress, secondAddress, 10.waves, fee = 10.waves).map(_.id)
       _ <- waitForHeightAraiseAndTxPresent(createdLeaseTxId, 1)
       _ <- assertBalances(firstAddress, 90.waves, 80.waves)
-      _ <- assertBalances(secondAddress, 100.waves, 110.waves)
+        .zip(assertBalances(secondAddress, 100.waves, 110.waves))
     } yield succeed
 
     Await.result(f, waitCompletion)
@@ -31,14 +31,14 @@ class LeasingTransactionsSuite extends BaseTransactionSuite {
       fb <- traverse(nodes)(_.height).map(_.min)
 
       _ <- assertBalances(firstAddress, 90.waves, 80.waves)
-      _ <- assertBalances(secondAddress, 100.waves, 110.waves)
+        .zip(assertBalances(secondAddress, 100.waves, 110.waves))
 
       leaseFailureAssertion <- assertBadRequest(sender.lease(secondAddress, firstAddress, 111.waves, 10.waves))
 
       _ <- traverse(nodes)(_.waitForHeight(fb + 2))
 
       _ <- assertBalances(firstAddress, 90.waves, 80.waves)
-      _ <- assertBalances(secondAddress, 100.waves, 110.waves)
+        .zip(assertBalances(secondAddress, 100.waves, 110.waves))
     } yield leaseFailureAssertion
 
     Await.result(f, waitCompletion)
@@ -49,14 +49,14 @@ class LeasingTransactionsSuite extends BaseTransactionSuite {
       fb <- traverse(nodes)(_.height).map(_.min)
 
       _ <- assertBalances(firstAddress, 90.waves, 80.waves)
-      _ <- assertBalances(secondAddress, 100.waves, 110.waves)
+        .zip(assertBalances(secondAddress, 100.waves, 110.waves))
 
       transferFailureAssertion <- assertBadRequest(sender.lease(firstAddress, secondAddress, 90.waves, fee = 11.waves))
 
       _ <- traverse(nodes)(_.waitForHeight(fb + 2))
 
       _ <- assertBalances(firstAddress, 90.waves, 80.waves)
-      _ <- assertBalances(secondAddress, 100.waves, 110.waves)
+        .zip(assertBalances(secondAddress, 100.waves, 110.waves))
     } yield transferFailureAssertion
 
     Await.result(f, waitCompletion)
@@ -66,18 +66,18 @@ class LeasingTransactionsSuite extends BaseTransactionSuite {
   test("lease cancellation reverts eff.b. changes; lessor pays fee for both lease and cancellation") {
     val f = for {
       _ <- assertBalances(firstAddress, 90.waves, 80.waves)
-      _ <- assertBalances(secondAddress, 100.waves, 110.waves)
+        .zip(assertBalances(secondAddress, 100.waves, 110.waves))
 
       createdLeaseTxId <- sender.lease(firstAddress, secondAddress, 70.waves, fee = 5.waves).map(_.id)
 
       _ <- waitForHeightAraiseAndTxPresent(createdLeaseTxId, 1)
       _ <- assertBalances(firstAddress, 85.waves, 5.waves)
-      _ <- assertBalances(secondAddress, 100.waves, 180.waves)
+        .zip(assertBalances(secondAddress, 100.waves, 180.waves))
 
       createdCancelLeaseTxId <- sender.cancelLease(firstAddress, createdLeaseTxId, fee = 5.waves).map(_.id)
       _ <- waitForHeightAraiseAndTxPresent(createdCancelLeaseTxId, 1)
       _ <- assertBalances(firstAddress, 80.waves, 70.waves)
-      _ <- assertBalances(secondAddress, 100.waves, 110.waves)
+        .zip(assertBalances(secondAddress, 100.waves, 110.waves))
     } yield succeed
 
     Await.result(f, waitCompletion)
@@ -86,18 +86,18 @@ class LeasingTransactionsSuite extends BaseTransactionSuite {
   test("lease cancellation can be done only once") {
     val f = for {
       _ <- assertBalances(firstAddress, 80.waves, 70.waves)
-      _ <- assertBalances(secondAddress, 100.waves, 110.waves)
+        .zip(assertBalances(secondAddress, 100.waves, 110.waves))
 
       createdLeaseTxId <- sender.lease(firstAddress, secondAddress, 5.waves, fee = 5.waves).map(_.id)
       _ <- waitForHeightAraiseAndTxPresent(createdLeaseTxId, 1)
       _ <- assertBalances(firstAddress, 75.waves, 60.waves)
-      _ <- assertBalances(secondAddress, 100.waves, 115.waves)
+        .zip(assertBalances(secondAddress, 100.waves, 115.waves))
 
       createdCancelLeaseTxId <- sender.cancelLease(firstAddress, createdLeaseTxId, fee = 5.waves).map(_.id)
       _ <- waitForHeightAraiseAndTxPresent(createdCancelLeaseTxId, 1)
       _ <- assertBadRequest(sender.cancelLease(firstAddress, createdLeaseTxId, fee = 5.waves).map(_.id))
       _ <- assertBalances(firstAddress, 70.waves, 60.waves)
-      _ <- assertBalances(secondAddress, 100.waves, 110.waves)
+        .zip(assertBalances(secondAddress, 100.waves, 110.waves))
     } yield succeed
 
     Await.result(f, waitCompletion)
@@ -106,7 +106,7 @@ class LeasingTransactionsSuite extends BaseTransactionSuite {
   test("only sender can cancel lease transaction") {
     val f = for {
       _ <- assertBalances(firstAddress, 70.waves, 60.waves)
-      _ <- assertBalances(secondAddress, 100.waves, 110.waves)
+        .zip(assertBalances(secondAddress, 100.waves, 110.waves))
 
       createdLeaseTxId <- sender.lease(firstAddress, secondAddress, 5.waves, fee = 5.waves).map(_.id)
 
@@ -115,7 +115,7 @@ class LeasingTransactionsSuite extends BaseTransactionSuite {
       _ <- traverse(nodes)(_.waitForTransaction(createdLeaseTxId))
 
       _ <- assertBalances(firstAddress, 65.waves, 50.waves)
-      _ <- assertBalances(secondAddress, 100.waves, 115.waves)
+        .zip(assertBalances(secondAddress, 100.waves, 115.waves))
 
       _ <- assertBadRequest(sender.cancelLease(thirdAddress, createdLeaseTxId, fee = 1.waves))
     } yield succeed

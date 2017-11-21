@@ -66,7 +66,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     val establishedConnections = new ConcurrentHashMap[Channel, PeerInfo]
     val allChannels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
 
-    val utxStorage = new UtxPool(time, stateReader, history, feeCalculator, settings.blockchainSettings.functionalitySettings, settings.utxSettings)
+    val utxStorage = new UtxPoolImpl(time, stateReader, history, feeCalculator, settings.blockchainSettings.functionalitySettings, settings.utxSettings)
 
     val miner = if (settings.minerSettings.enable)
       new MinerImpl(allChannels, blockchainUpdater, checkpointService, history, featureProvider, stateReader, settings, time, utxStorage, wallet)
@@ -136,6 +136,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     //on unexpected shutdown
     sys.addShutdownHook {
+      utxStorage.close()
       network.shutdown()
       shutdown()
     }

@@ -1,11 +1,11 @@
 package com.wavesplatform.it
 
-import org.scalatest.{BeforeAndAfterAll, FreeSpec, Matchers}
+import org.scalatest.{FreeSpec, Matchers}
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
 
-class ActivationTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with IntegrationNodesInitializationAndStopping {
+class ActivationTestSuite extends FreeSpec with Matchers with IntegrationNodesInitializationAndStopping {
   override lazy val nodes: Seq[Node] = docker.startNodes(NodeConfigs.Default.take(2))
 
   "api consuming example" in {
