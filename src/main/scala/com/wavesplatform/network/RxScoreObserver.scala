@@ -21,11 +21,13 @@ object RxScoreObserver extends ScorexLogging {
 
   type SyncWith = Option[BestChannel]
 
-  val scheduler: SchedulerService = Scheduler.singleThread("rx-score-observer")
 
   def apply(scoreTtl: FiniteDuration, localScores: Observable[BlockchainScore],
             remoteScores: Observable[(Channel, BlockchainScore)],
             channelClosed: Observable[Channel]): Observable[SyncWith] = {
+
+    val scheduler: SchedulerService = Scheduler.singleThread("rx-score-observer")
+
 
     var localScore: BlockchainScore = 0
     var currentBestChannel: Option[Channel] = None
@@ -37,29 +39,35 @@ object RxScoreObserver extends ScorexLogging {
       val betterChannels = scores.asMap().asScala.filter(_._2 > localScore)
       if (betterChannels.isEmpty) {
         log.debug("No better scores of remote peers, sync complete")
-        Some(None) // sync finished
+        Some(None)
       } else {
         val groupedByScore = betterChannels.toList.groupBy(_._2)
         val bestScore = groupedByScore.keySet.max
         val bestChannels = groupedByScore(bestScore).map(_._1)
         currentBestChannel match {
-          case Some(c) if bestChannels contains c => None // best channel not changed
+          case Some(c) if bestChannels contains c =>
+            log.trace("Best channel not changed")
+            None
           case _ =>
             val head = bestChannels.head
             currentBestChannel = Some(head)
-            Some(Some(BestChannel(head, bestScore))) // new best channel
+            log.trace(s"New best channel score=$bestScore > localScore $localScore")
+            Some(Some(BestChannel(head, bestScore)))
         }
       }
     }
 
     val x = localScores.executeOn(scheduler).mapTask(newLocalScore => Task {
+      log.debug(s"New local score = $newLocalScore observed")
       localScore = newLocalScore
     })
 
     val y = channelClosed.executeOn(scheduler).mapTask(ch => Task {
       scores.invalidate(ch)
       if (currentBestChannel.contains(ch))
-        currentBestChannel = None
+        log.debug(s"Best channel $ch has been closed")
+
+      currentBestChannel = None
     })
 
     val z = remoteScores.executeOn(scheduler).mapTask { case ((ch, score)) => Task {
