@@ -7,7 +7,7 @@ import org.scalatest._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
-import scala.concurrent.{Await, Future}
+import scala.concurrent.Await
 
 class BlacklistTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with CancelAfterFailure
   with ReportingTestName with MultipleNodesApi {
@@ -26,7 +26,7 @@ class BlacklistTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll w
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-    Await.result(Future.traverse(nodes)(_.waitForPeers(nodes.size - 1)), 2.minute)
+    nodes.foreach(_.status) // Initialize
   }
 
   override protected def afterAll(): Unit = {

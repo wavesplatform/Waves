@@ -35,7 +35,7 @@ class NetworkUniqueConnectionsTestSuite extends FreeSpec with Matchers with Befo
       )
     } yield ()
 
-    Await.ready(prepare, 1.minute)
+    Await.ready(prepare, 2.minute)
     withClue("Should fail with TimeoutException, because the connectionAttempt should fail") {
       intercept[TimeoutException] {
         Await.ready(firstNode.waitForPeers(2), 10.seconds)

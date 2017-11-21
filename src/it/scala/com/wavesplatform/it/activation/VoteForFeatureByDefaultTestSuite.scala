@@ -8,7 +8,7 @@ import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.concurrent.{Await, Future}
+import scala.concurrent.Await
 
 class VoteForFeatureByDefaultTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with CancelAfterFailure
   with ActivationStatusRequest with ReportingTestName {
@@ -22,7 +22,7 @@ class VoteForFeatureByDefaultTestSuite extends FreeSpec with Matchers with Befor
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-    Await.result(Future.traverse(nodes)(_.waitForPeers(NodesCount - 1)), 2.minute)
+    nodes.foreach(_.status) // Initialize
   }
 
   override protected def afterAll(): Unit = {

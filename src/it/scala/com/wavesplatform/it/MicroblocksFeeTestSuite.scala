@@ -15,14 +15,14 @@ class MicroblocksFeeTestSuite extends FreeSpec with Matchers with BeforeAndAfter
   import MicroblocksFeeTestSuite._
 
   private lazy val docker = Docker(getClass)
-  private lazy val allNodes = docker.startNodes(Configs)
+  private lazy val nodes = docker.startNodes(Configs)
 
-  private def notMiner = allNodes.head
-  private def firstAddress = allNodes(1).address
+  private def notMiner = nodes.head
+  private def firstAddress = nodes(1).address
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-    Await.result(Future.traverse(allNodes)(_.waitForPeers(NodesCount - 1)), 2.minute)
+    nodes.foreach(_.status) // Initialize
   }
 
   override protected def afterAll(): Unit = {
@@ -52,11 +52,11 @@ class MicroblocksFeeTestSuite extends FreeSpec with Matchers with BeforeAndAfter
   "fee distribution when NG activates" in {
 
     val f = for {
-      height <- traverse(allNodes)(_.height).map(_.max)
+      height <- traverse(nodes)(_.height).map(_.max)
 
-      _ <- traverse(allNodes)(_.waitForHeight(microblockActivationHeight - 1))
+      _ <- traverse(nodes)(_.waitForHeight(microblockActivationHeight - 1))
       _ <- txRequestsGen(200, 2.waves)
-      _ <- traverse(allNodes)(_.waitForHeight(microblockActivationHeight + 2))
+      _ <- traverse(nodes)(_.waitForHeight(microblockActivationHeight + 2))
 
       initialBalances <- notMiner.debugStateAt(microblockActivationHeight - 1) //100%
 

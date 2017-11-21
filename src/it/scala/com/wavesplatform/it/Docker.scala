@@ -131,7 +131,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
           log.debug(s"See for $host in $connectedAddresses")
           if (connectedAddresses.contains(host)) Future.successful(())
           else {
-            log.debug(s"Not Found $host, retry")
+            log.debug(s"Not found $host, retry")
             connectToOne(host, port)
           }
         }
