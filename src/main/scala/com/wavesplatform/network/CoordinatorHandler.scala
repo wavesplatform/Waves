@@ -31,8 +31,7 @@ object CoordinatorHandler extends ScorexLogging {
             settings: WavesSettings,
             peerDatabase: PeerDatabase,
             allChannels: ChannelGroup,
-            featureProvider: FeatureProvider,
-            microBlockOwners: MicroBlockOwners,
+            featureProvider: FeatureProvider
            )(blocks: ChannelObservable[Block],
              checkpoints: ChannelObservable[Checkpoint],
              extensions: ChannelObservable[ExtensionBlocks],
@@ -107,7 +106,7 @@ object CoordinatorHandler extends ScorexLogging {
       Task(microBlock.signaturesValid().flatMap(processMicroBlock) match {
         case Right(()) =>
           md.invOpt match {
-            case Some(mi) => allChannels.broadcast(mi, except = microBlockOwners.all(microBlock.totalResBlockSig))
+            case Some(mi) => allChannels.broadcast(mi, except = md.microblockOwners())
             case None => log.warn(s"${id(ch)} Not broadcasting MicroBlockInv")
           }
           BlockStats.applied(microBlock)

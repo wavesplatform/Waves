@@ -7,15 +7,17 @@ import com.wavesplatform.metrics.BlockStats
 import com.wavesplatform.settings.SynchronizationSettings.MicroblockSynchronizerSettings
 import com.wavesplatform.state2.ByteStr
 import io.netty.channel._
-import monix.eval.Task
+import monix.eval.{Coeval, Task}
 import monix.execution.schedulers.SchedulerService
 import monix.execution.{CancelableFuture, Scheduler}
 import monix.reactive.Observable
 import monix.reactive.subjects.PublishSubject
+import scorex.block.Block.BlockId
 import scorex.block.MicroBlock
 import scorex.transaction.NgHistory
 import scorex.utils.ScorexLogging
 
+import scala.collection.mutable.{Set => MSet}
 import scala.concurrent.duration.FiniteDuration
 
 object MicroBlockSynchronizer extends ScorexLogging {
@@ -23,14 +25,17 @@ object MicroBlockSynchronizer extends ScorexLogging {
   def apply(settings: MicroblockSynchronizerSettings,
             history: NgHistory,
             peerDatabase: PeerDatabase,
-            lastBlockIdEvents: Observable[ByteStr],
-            microBlockOwners: MicroBlockOwners)
+            lastBlockIdEvents: Observable[ByteStr])
            (microblockInvs: ChannelObservable[MicroBlockInv],
             microblockResponses: ChannelObservable[MicroBlockResponse]): ChannelObservable[MicroblockData] = {
 
     val microblockDatas = PublishSubject[(Channel, MicroblockData)]
 
     val scheduler: SchedulerService = Scheduler.singleThread("microblock-synchronizer")
+
+    val microBlockOwners = cache[MicroBlockSignature, MSet[Channel]](settings.invCacheTimeout)
+
+    def owners(totalResBlockSig: BlockId): Set[Channel] = Option(microBlockOwners.getIfPresent(totalResBlockSig)).getOrElse(MSet.empty).toSet
 
     val nextInvs = cache[MicroBlockSignature, MicroBlockInv](settings.invCacheTimeout)
     val awaiting = cache[MicroBlockSignature, MicroBlockInv](settings.invCacheTimeout)
@@ -45,7 +50,7 @@ object MicroBlockSynchronizer extends ScorexLogging {
     def requestMicroBlock(mbInv: MicroBlockInv): CancelableFuture[Unit] = {
       import mbInv.totalBlockSig
 
-      def randomOwner(exclude: Set[Channel]) = random(microBlockOwners.all(mbInv.totalBlockSig) -- exclude)
+      def randomOwner(exclude: Set[Channel]) = random(owners(mbInv.totalBlockSig) -- exclude)
 
       def task(attemptsAllowed: Int, exclude: Set[Channel]): Task[Unit] = Task.unit.flatMap { _ =>
         if (attemptsAllowed <= 0 || alreadyProcessed(totalBlockSig)) Task.unit
@@ -72,7 +77,7 @@ object MicroBlockSynchronizer extends ScorexLogging {
       log.trace(s"${id(ch)} Received $msg")
       Option(awaiting.getIfPresent(totalSig)).foreach { mi =>
         awaiting.invalidate(totalSig)
-        microblockDatas.onNext((ch, MicroblockData(Option(mi), mb)))
+        microblockDatas.onNext((ch, MicroblockData(Option(mi), mb, Coeval.evalOnce(owners(totalSig)))))
       }
     }.logErr
     }
@@ -83,7 +88,7 @@ object MicroBlockSynchronizer extends ScorexLogging {
           peerDatabase.blacklistAndClose(ch, err.toString)
         case Right(_) =>
           log.trace(s"${id(ch)} Received $mbInv")
-          microBlockOwners.add(totalSig, ch)
+          microBlockOwners.get(totalSig, () => MSet.empty) += ch
           nextInvs.get(prevSig, { () =>
             BlockStats.inv(mbInv, ch)
             mbInv
@@ -98,7 +103,7 @@ object MicroBlockSynchronizer extends ScorexLogging {
     microblockDatas
   }
 
-  case class MicroblockData(invOpt: Option[MicroBlockInv], microBlock: MicroBlock)
+  case class MicroblockData(invOpt: Option[MicroBlockInv], microBlock: MicroBlock, microblockOwners: Coeval[Set[Channel]])
 
   type MicroBlockSignature = ByteStr
 
