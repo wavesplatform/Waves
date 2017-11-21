@@ -18,6 +18,7 @@ import io.netty.channel.socket.SocketChannel
 import io.netty.channel.socket.nio.{NioServerSocketChannel, NioSocketChannel}
 import io.netty.handler.codec.{LengthFieldBasedFrameDecoder, LengthFieldPrepender}
 import io.netty.util.concurrent.DefaultThreadFactory
+import monix.reactive.Observable
 import monix.reactive.subjects.PublishSubject
 import org.asynchttpclient.netty.channel.NoopHandler
 import org.influxdb.dto.Point
@@ -84,7 +85,7 @@ class NetworkServer(checkpointService: CheckpointService,
   private val syncWith = RxScoreObserver(settings.synchronizationSettings.scoreTTL, blockchainUpdater.lastBlockInfo.map(_.score), remoteScores, closedChannels)
   private val microblockDatas = MicroBlockSynchronizer(settings.synchronizationSettings.microBlockSynchronizer, history, peerDatabase, blockchainUpdater.lastBlockInfo.map(_.id))(microInvs, micros)
   private val (extensions, newBlocks) = RxExtensionLoader(settings.synchronizationSettings, history, peerDatabase, syncWith, blocks, signatures, closedChannels)
-  private val sink = CoordinatorHandler(checkpointService, history, blockchainUpdater, time,
+  private val sink: Observable[Unit] = CoordinatorHandler(checkpointService, history, blockchainUpdater, time,
     stateReader, utxPool, miner, settings, peerDatabase, allChannels, featureProvider)(newBlocks, checkpoints, extensions, microblockDatas)
   private val discardingHandler = new DiscardingHandler(blockchainUpdater.lastBlockInfo.map(_.ready))
 
@@ -93,6 +94,8 @@ class NetworkServer(checkpointService: CheckpointService,
   private val serverHandshakeHandler = new HandshakeHandler.Server(handshake, peerInfo, peerConnections, peerDatabase, allChannels)
 
   private val utxPoolSynchronizer = new UtxPoolSynchronizer(utxPool, allChannels)
+
+  sink.subscribe()(monix.execution.Scheduler.Implicits.global)
 
 
   private val serverChannel = settings.networkSettings.declaredAddress.map { _ =>
@@ -155,6 +158,7 @@ class NetworkServer(checkpointService: CheckpointService,
 
     val all = peerInfo.values().iterator().asScala.flatMap(_.declaredAddress).toVector
     val incoming = all.filterNot(outgoing.contains)
+
     def incomingStr = incoming.map(_.toString).sorted.mkString("[", ", ", "]")
 
     log.trace(s"Outgoing: $outgoingStr ++ incoming: $incomingStr")
