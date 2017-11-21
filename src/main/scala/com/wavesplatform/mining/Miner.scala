@@ -78,6 +78,7 @@ class MinerImpl(
 
   private def generateOneBlockTask(account: PrivateKeyAccount, balance: Long)(delay: FiniteDuration): Task[Either[String, Block]] = Task {
     history.read { implicit l =>
+      microBlockAttempt.cancel()
       // should take last block right at the time of mining since microblocks might have been added
       val height = history.height()
       val version = if (height <= blockchainSettings.functionalitySettings.blockVersion3AfterHeight) PlainBlockVersion else NgBlockVersion
@@ -181,10 +182,10 @@ class MinerImpl(
         nextBlockGenerationTimes += account.toAddress -> (System.currentTimeMillis() + offset.toMillis)
         generateOneBlockTask(account, balance)(offset).flatMap {
           case Right(block) => Task.now {
-            log.debug(s"Forged $block by ${account.address}")
             processBlock(block) match {
               case Left(err) => log.warn("Error mining Block: " + err.toString)
               case Right(Some(score)) =>
+                log.debug(s"Forged and applied $block by ${account.address} with cumulative score $score")
                 BlockStats.mined(block, history.height())
                 Coordinator.updateBlockchainReadinessFlag(history, timeService, blockchainReadiness, settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed)
                 allChannels.broadcast(BlockForged(block))
