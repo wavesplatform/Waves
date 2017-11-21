@@ -1,21 +1,27 @@
 package com.wavesplatform.it
 
 import org.scalatest.{Args, Status, Suite, SuiteMixin}
+import scorex.utils.ScorexLogging
 import scorex.waves.http.DebugMessage
 
 import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
 
-trait ReportingTestName extends SuiteMixin {
+trait ReportingTestName extends SuiteMixin with ScorexLogging {
   th: Suite =>
   def nodes: Seq[Node]
 
   abstract override protected def runTest(testName: String, args: Args): Status = {
-    import scala.concurrent.ExecutionContext.Implicits.global
-
-    Await.result(Future.traverse(nodes)(_.printDebugMessage(DebugMessage(s"---------- Test '$testName' started ----------"))), 10.seconds)
+    print(s"Test '$testName' started")
     val r = super.runTest(testName, args)
-    Await.result(Future.traverse(nodes)(_.printDebugMessage(DebugMessage(s"---------- Test `$testName` finished ----------"))), 10.seconds)
+    print(s"Test `$testName` finished")
     r
+  }
+
+  private def print(text: String): Unit = {
+    import scala.concurrent.ExecutionContext.Implicits.global
+    val formatted = s"---------- $text ----------"
+    log.debug(formatted)
+    Await.result(Future.traverse(nodes)(_.printDebugMessage(DebugMessage(formatted))), 10.seconds)
   }
 }

@@ -3,7 +3,7 @@ package com.wavesplatform.it
 import com.wavesplatform.it.api.MultipleNodesApi
 import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers}
 
-import scala.concurrent.{Await, Future}
+import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
@@ -11,6 +11,7 @@ import scala.concurrent.duration._
 class NetworkSeparationTestSuite extends FreeSpec with Matchers with IntegrationNodesInitializationAndStopping
   with CancelAfterFailure with ReportingTestName with MultipleNodesApi {
 
+  // @TODO: Will fail, if there is two miners with quorum = 0
   override lazy val nodes: Seq[Node] = docker.startNodes(
     NodeConfigs.newBuilder
       .overrideBase(_.quorum(3))
@@ -19,26 +20,30 @@ class NetworkSeparationTestSuite extends FreeSpec with Matchers with Integration
       .build
   )
 
-  "node should grow up to 10 blocks together" in Await.result(richestNode.flatMap(_.waitForHeight(10)), 5.minutes)
-
-  "then we disconnect nodes from the network" in nodes.foreach(docker.disconnectFromNetwork)
-
-  "and wait for another 10 blocks on one node" in Await.result(richestNode.flatMap(_.waitForHeight(20)), 5.minutes)
-
-  "after that we connect nodes back to the network" in nodes.foreach(docker.connectToNetwork)
-
-  "nodes should sync" in Await.result(
-    for {
-      height <- traverse(nodes)(_.height).map(_.max)
-      _ <- waitForSameBlocksAt(nodes, 5.seconds, height + 8)
-    } yield (),
+  "node should grow up to 10 blocks together and sync" in Await.result(
+    Await.ready(waitForSameBlocksAt(nodes, 5.seconds, 10), 3.minutes),
     5.minutes
   )
 
-  def richestNode: Future[Node] = traverse(nodes)(n => n.balance(n.address).map(r => n -> r.balance)).map { xs =>
-    xs
-      .maxBy { case (_, balance) => balance}
-      ._1
+  // Doing all work in one step, because nodes will not be available for requests and ReportingTestName fails here
+  "then we disconnect nodes from the network, wait some time and connect them again" in {
+    def maxHeight: Int = Await.result(traverse(nodes)(_.height).map(_.max), 12.seconds)
+
+    val lastMaxHeight = maxHeight
+    nodes.foreach(docker.disconnectFromNetwork)
+    Thread.sleep(80.seconds.toMillis) // >= 10 blocks, because a new block appears every 6 seconds
+    docker.connectToNetwork(nodes)
+
+    maxHeight shouldBe >=(lastMaxHeight + 6)
   }
+
+  "nodes should sync" in Await.result(
+    for {
+      maxHeight <- traverse(nodes)(_.height).map(_.max)
+      _ = log.debug(s"Max height is $maxHeight")
+      _ <- waitForSameBlocksAt(nodes, 5.seconds, maxHeight + 5)
+    } yield (),
+    6.minutes
+  )
 
 }

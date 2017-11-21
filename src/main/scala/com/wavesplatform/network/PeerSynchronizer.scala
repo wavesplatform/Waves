@@ -34,7 +34,7 @@ class PeerSynchronizer(peerDatabase: PeerDatabase, peerRequestInterval: FiniteDu
             peerDatabase.touch(rda)
             declaredAddress = Some(rda)
           } else {
-            log.debug(s"${id(ctx)} Declared address $rda does not match actual remote address")
+            log.debug(s"${id(ctx)} Declared address $rda does not match actual remote address ${ctx.remoteAddress.getAddress}")
           }
         }
         requestPeers(ctx)

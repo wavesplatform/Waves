@@ -170,14 +170,15 @@ class NetworkServer(checkpointService: CheckpointService,
     val outgoing = outgoingChannels.keySet.iterator().asScala.toVector
     def outgoingStr = outgoing.map(_.toString).sorted.mkString("[", ", ", "]")
 
-    val incoming = peerInfo.values().iterator().asScala.flatMap(_.declaredAddress).toVector
+    val all = peerInfo.values().iterator().asScala.flatMap(_.declaredAddress).toVector
+
+    val incoming = all.filterNot(outgoing.contains)
     def incomingStr = incoming.map(_.toString).sorted.mkString("[", ", ", "]")
 
     log.trace(s"Outgoing: $outgoingStr ++ incoming: $incomingStr")
-    val shouldConnect = outgoingChannels.size() < settings.networkSettings.maxOutboundConnections
-    if (shouldConnect) {
+    if (outgoingChannels.size() < settings.networkSettings.maxOutboundConnections) {
       peerDatabase
-        .randomPeer(excluded = excludedAddresses ++ outgoing ++ incoming)
+        .randomPeer(excluded = excludedAddresses ++ all)
         .foreach(connect)
     }
 
@@ -186,8 +187,7 @@ class NetworkServer(checkpointService: CheckpointService,
         .measurement("connections")
         .addField("outgoing", outgoingStr)
         .addField("incoming", incomingStr)
-        .addField("n", outgoingChannels.keySet.size() + incoming.size)
-        .addField("connecting", shouldConnect)
+        .addField("n", all.size)
     )
   }
 

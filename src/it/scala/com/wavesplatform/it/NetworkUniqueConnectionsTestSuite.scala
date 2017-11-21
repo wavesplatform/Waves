@@ -24,7 +24,7 @@ class NetworkUniqueConnectionsTestSuite extends FreeSpec with Matchers with Befo
              |]""".stripMargin
         )
 
-        docker.startNode(SecondNodeConfig.withFallback(peersConfig))
+        docker.startNode(peersConfig.withFallback(SecondNodeConfig), autoConnect = false)
       }
       _ <- firstNode.waitForPeers(1)
 
@@ -35,7 +35,7 @@ class NetworkUniqueConnectionsTestSuite extends FreeSpec with Matchers with Befo
       )
     } yield ()
 
-    Await.ready(prepare, 1.minute)
+    Await.ready(prepare, 2.minute)
     withClue("Should fail with TimeoutException, because the connectionAttempt should fail") {
       intercept[TimeoutException] {
         Await.ready(firstNode.waitForPeers(2), 10.seconds)
@@ -52,7 +52,7 @@ class NetworkUniqueConnectionsTestSuite extends FreeSpec with Matchers with Befo
 
 private object NetworkUniqueConnectionsTestSuite {
 
-  private val configs = NodeConfigs.newBuilder.withDefault(2).build
+  private val configs = NodeConfigs.newBuilder.withDefault(0).withSpecial(2, _.nonMiner).build
   val FirstNodeConfig: Config = configs.head
   val SecondNodeConfig: Config = configs.last
 

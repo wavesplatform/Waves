@@ -3,25 +3,26 @@ package com.wavesplatform.it.activation
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.features.BlockchainFeatureStatus
 import com.wavesplatform.features.api.NodeFeatureStatus
-import com.wavesplatform.it.{Docker, NodeConfigs}
+import com.wavesplatform.it.{Docker, Node, NodeConfigs, ReportingTestName}
 import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.concurrent.{Await, Future}
+import scala.concurrent.Await
 
-class VoteForFeatureByDefaultTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with CancelAfterFailure with ActivationStatusRequest {
+class VoteForFeatureByDefaultTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with CancelAfterFailure
+  with ActivationStatusRequest with ReportingTestName {
 
   import VoteForFeatureByDefaultTestSuite._
 
   private lazy val docker = Docker(getClass)
-  private lazy val nodes = docker.startNodes(Configs)
+  override lazy val nodes: Seq[Node] = docker.startNodes(Configs)
 
   val defaultVotingFeatureNum: Short = 1
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-    Await.result(Future.traverse(nodes)(_.waitForPeers(NodesCount - 1)), 2.minute)
+    log.debug(s"There are ${nodes.size} in tests") // Initializing of a lazy variable
   }
 
   override protected def afterAll(): Unit = {
@@ -69,20 +70,22 @@ class VoteForFeatureByDefaultTestSuite extends FreeSpec with Matchers with Befor
     val nonVotingFeatureNum: Short = 2
 
     private val baseConfig = ConfigFactory.parseString(
-      s"""waves.blockchain.custom {
-         |  functionality {
-         |    pre-activated-features = {}
-         |    feature-check-blocks-period = $votingInterval
-         |    blocks-for-feature-activation = $blocksForActivation
-         |  }
-         |  genesis {
-         |    signature: "zXBp6vpEHgtdsPjVHjSEwMeRiQTAu6DdX3qkJaCRKxgYJk26kazS2XguLYRvL9taHKxrZHNNA7X7LMVFavQzWpT"
-         |    transactions = [
-         |      {recipient: "3Hm3LGoNPmw1VTZ3eRA2pAfeQPhnaBm6YFC", amount: 250000000000000},
-         |      {recipient: "3HZxhQhpSU4yEGJdGetncnHaiMnGmUusr9s", amount: 270000000000000},
-         |      {recipient: "3HPG313x548Z9kJa5XY4LVMLnUuF77chcnG", amount: 260000000000000},
-         |      {recipient: "3HVW7RDYVkcN5xFGBNAUnGirb5KaBSnbUyB", amount: 2000000000000}
-         |    ]
+      s"""waves {
+         |  blockchain.custom {
+         |    functionality {
+         |      pre-activated-features = {}
+         |      feature-check-blocks-period = $votingInterval
+         |      blocks-for-feature-activation = $blocksForActivation
+         |    }
+         |    genesis {
+         |      signature: "zXBp6vpEHgtdsPjVHjSEwMeRiQTAu6DdX3qkJaCRKxgYJk26kazS2XguLYRvL9taHKxrZHNNA7X7LMVFavQzWpT"
+         |      transactions = [
+         |        {recipient: "3Hm3LGoNPmw1VTZ3eRA2pAfeQPhnaBm6YFC", amount: 250000000000000},
+         |        {recipient: "3HZxhQhpSU4yEGJdGetncnHaiMnGmUusr9s", amount: 270000000000000},
+         |        {recipient: "3HPG313x548Z9kJa5XY4LVMLnUuF77chcnG", amount: 260000000000000},
+         |        {recipient: "3HVW7RDYVkcN5xFGBNAUnGirb5KaBSnbUyB", amount: 2000000000000}
+         |      ]
+         |    }
          |  }
          |  miner.quorum = 3
          |}""".stripMargin
