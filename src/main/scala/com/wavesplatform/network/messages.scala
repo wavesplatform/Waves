@@ -22,8 +22,6 @@ case class RawBytes(code: Byte, data: Array[Byte]) extends Message
 case class BlockForged(block: Block) extends Message
 case class MicroBlockRequest(totalBlockSig: ByteStr)  extends Message
 case class MicroBlockResponse(microblock: MicroBlock) extends Message
-case class LoadBlockchainExtension(lastBlockIds: Seq[ByteStr])
-case class ExtensionIds(lastCommonId: ByteStr, extensionIds: Seq[ByteStr])
 case class ExtensionBlocks(extension: Seq[Block])
 
 case class MicroBlockInv(sender: PublicKeyAccount, totalBlockSig: ByteStr, prevBlockSig: ByteStr, signature: ByteStr) extends Message with Signed {

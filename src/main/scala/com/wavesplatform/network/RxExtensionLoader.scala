@@ -53,7 +53,7 @@ object RxExtensionLoader extends ScorexLogging {
 
 
     def requestExtension(ch: Channel, knownSigs: Seq[BlockId]): Unit = {
-      ch.writeAndFlush(LoadBlockchainExtension(knownSigs))
+      ch.writeAndFlush(Signatures(knownSigs))
       innerState = ExpectingSignatures(ch, knownSigs, blacklistOnTimeout(ch, "Timeout expired while loading extension"))
     }
 
