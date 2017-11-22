@@ -57,7 +57,7 @@ object RxExtensionLoader extends ScorexLogging {
 
 
     def requestExtension(ch: Channel, knownSigs: Seq[BlockId], reason: String): Unit = {
-      ch.writeAndFlush(Signatures(knownSigs))
+      ch.writeAndFlush(GetSignatures(knownSigs))
       log.debug(s"${id(ch)} Requesting extension sigs because $reason, last ${knownSigs.length} are ${formatSignatures(knownSigs)}")
       innerState = ExpectingSignatures(ch, knownSigs, blacklistOnTimeout(ch, s"Timeout loading extension(request reason = '$reason'"))
     }
@@ -108,6 +108,7 @@ object RxExtensionLoader extends ScorexLogging {
           if (expected == Set(block.uniqueId)) {
             val blockById = (recieved + block).map(b => b.uniqueId -> b).toMap
             val ext = requested.map(blockById)
+            log.debug(s"${id(ch)} Extension successfully received, blocks=${ext.size}")
             extensionBlocks.onNext((ch, ExtensionBlocks(ext)))
             bestChannel.lastOptionL map { // optimistic loader
               case None => innerState = Idle
