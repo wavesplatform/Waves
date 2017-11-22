@@ -76,7 +76,7 @@ object RxExtensionLoader extends ScorexLogging {
         }.flatten
         case _ => Task.unit
       }
-    }
+    }.subscribe()(scheduler)
 
 
     bestChannel.executeOn(scheduler).mapTask {
@@ -122,7 +122,7 @@ object RxExtensionLoader extends ScorexLogging {
             extensionBlocks.onNext((ch, ExtensionBlocks(ext)))
             newStateTask
           } else Task {
-            innerState = ExpectingBlocks(c, requested, expected - block.uniqueId, recieved + block, blacklistOnTimeout(ch, "Timeout loading one of reqested blocks"))
+            innerState = ExpectingBlocks(c, requested, expected - block.uniqueId, recieved + block, blacklistOnTimeout(ch, s"Timeout loading one of requested blocks while state=$innerState"))
           }
         case _ => Task {
           simpleBlocks.onNext((ch, block))
