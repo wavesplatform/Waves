@@ -63,10 +63,10 @@ object RxScoreObserver extends ScorexLogging {
 
     val y = channelClosed.executeOn(scheduler).mapTask(ch => Task {
       scores.invalidate(ch)
-      if (currentBestChannel.contains(ch))
+      if (currentBestChannel.contains(ch)) {
         log.debug(s"Best channel $ch has been closed")
-
-      currentBestChannel = None
+        currentBestChannel = None
+      }
     })
 
     val z = remoteScores.executeOn(scheduler).mapTask { case ((ch, score)) => Task {
