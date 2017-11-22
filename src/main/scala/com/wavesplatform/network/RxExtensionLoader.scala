@@ -94,11 +94,11 @@ object RxExtensionLoader extends ScorexLogging {
       }
       case _ => Task.unit
     }
-    }
+    }.subscribe()(scheduler)
 
     blocks.executeOn(scheduler).mapTask { case ((ch, block)) => Task {
       innerState match {
-        case ExpectingBlocks(c, requested, expected, recieved, timeout) if c == ch && expected.contains(block.uniqueId) => {
+        case ExpectingBlocks(c, requested, expected, recieved, timeout) if c == ch && expected.contains(block.uniqueId) =>
           timeout.cancel()
           if (expected == Set(block.uniqueId)) {
             val blockById = (recieved + block).map(b => b.uniqueId -> b).toMap
@@ -112,11 +112,10 @@ object RxExtensionLoader extends ScorexLogging {
           } else {
             innerState = ExpectingBlocks(c, requested, expected - block.uniqueId, recieved + block, blacklistOnTimeout(ch, "Timeout loading blocks"))
           }
-        }
         case _ => simpleBlocks.onNext((ch, block))
       }
     }
-    }
+    }.subscribe()(scheduler)
     (extensionBlocks, simpleBlocks)
   }
 }
