@@ -22,7 +22,6 @@ case class RawBytes(code: Byte, data: Array[Byte]) extends Message
 case class BlockForged(block: Block) extends Message
 case class MicroBlockRequest(totalBlockSig: ByteStr)  extends Message
 case class MicroBlockResponse(microblock: MicroBlock) extends Message
-case class ExtensionBlocks(extension: Seq[Block])
 
 case class MicroBlockInv(sender: PublicKeyAccount, totalBlockSig: ByteStr, prevBlockSig: ByteStr, signature: ByteStr) extends Message with Signed {
   override protected val signatureValid = Coeval.evalOnce(EllipticCurveImpl.verify(signature.arr, sender.toAddress.bytes.arr ++ totalBlockSig.arr ++ prevBlockSig.arr, sender.publicKey))

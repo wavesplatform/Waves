@@ -36,6 +36,7 @@ object RxExtensionLoader extends ScorexLogging {
     override def toString: String = s"ExpectingBlocks(channel=$channel, totalBlocks=${allBlocks.size}, received=${received.size}, expected=${expected.size}"
   }
 
+  case class ExtensionBlocks(extension: Seq[Block])
 
   def apply(ss: SynchronizationSettings,
             history: NgHistory,

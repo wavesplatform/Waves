@@ -1,9 +1,10 @@
 package com.wavesplatform.network
 
 import com.wavesplatform.features.FeatureProvider
-import com.wavesplatform.metrics.{BlockStats, _}
+import com.wavesplatform.metrics._
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.network.MicroBlockSynchronizer.MicroblockData
+import com.wavesplatform.network.RxExtensionLoader.ExtensionBlocks
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state2.StateReader
 import com.wavesplatform.{Coordinator, UtxPool}
@@ -119,6 +120,6 @@ object CoordinatorHandler extends ScorexLogging {
       }).onErrorHandle[Unit]((t: Throwable) => log.debug(s"${id(ch)} Exception caught", t))
     }
 
-    Observable.merge(a,b,c,d)
+    Observable.merge(a, b, c, d)
   }
 }

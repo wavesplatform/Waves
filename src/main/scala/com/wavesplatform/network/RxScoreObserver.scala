@@ -21,13 +21,11 @@ object RxScoreObserver extends ScorexLogging {
 
   type SyncWith = Option[BestChannel]
 
-
   def apply(scoreTtl: FiniteDuration, localScores: Observable[BlockchainScore],
             remoteScores: Observable[(Channel, BlockchainScore)],
             channelClosed: Observable[Channel]): Observable[SyncWith] = {
 
     val scheduler: SchedulerService = Scheduler.singleThread("rx-score-observer")
-
 
     var localScore: BlockchainScore = 0
     var currentBestChannel: Option[Channel] = None
@@ -35,11 +33,12 @@ object RxScoreObserver extends ScorexLogging {
       .expireAfterWrite(scoreTtl.toMillis, TimeUnit.MILLISECONDS)
       .build[Channel, BlockchainScore]()
 
-    def newBestChannel(): Option[SyncWith] = {
+    def newBestChannel(): Observable[SyncWith] = {
       val betterChannels = scores.asMap().asScala.filter(_._2 > localScore)
       if (betterChannels.isEmpty) {
         log.debug("No better scores of remote peers, sync complete")
-        Some(None)
+        currentBestChannel = None
+        Observable(None)
       } else {
         val groupedByScore = betterChannels.toList.groupBy(_._2)
         val bestScore = groupedByScore.keySet.max
@@ -47,12 +46,12 @@ object RxScoreObserver extends ScorexLogging {
         currentBestChannel match {
           case Some(c) if bestChannels contains c =>
             log.trace("Best channel not changed")
-            None
+            Observable.empty
           case _ =>
             val head = bestChannels.head
             currentBestChannel = Some(head)
             log.trace(s"New best channel score=$bestScore > localScore $localScore")
-            Some(Some(BestChannel(head, bestScore)))
+            Observable(Some(BestChannel(head, bestScore)))
         }
       }
     }
@@ -76,8 +75,6 @@ object RxScoreObserver extends ScorexLogging {
     }
     }
 
-    Observable.merge(x, y, z).map(_ => newBestChannel())
-      .filter(_.isDefined)
-      .map(_.get)
+    Observable.merge(x, y, z).flatMap(_ => newBestChannel())
   }
 }
