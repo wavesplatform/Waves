@@ -51,6 +51,13 @@ class OptimisticExtensionLoader extends ChannelDuplexHandler with ScorexLogging 
 
       nextExtensionBlocks = Seq.empty
 
+    case LocalScoreChanged(_, true) =>
+      // Could be an additional condition
+      hopefullyNextIds = Seq.empty
+      nextExtensionBlocks = Seq.empty
+      requestedLocalIds = Seq.empty
+      super.write(ctx, msg, promise) // could be unnecessary
+
     case _ => super.write(ctx, msg, promise)
   }
 }
