@@ -25,12 +25,16 @@ object RxExtensionLoader extends ScorexLogging {
 
   case object Idle extends ExtensionLoaderState
 
-  case class ExpectingSignatures(channel: Channel, known: Seq[BlockId], timeout: CancelableFuture[Unit]) extends WithPeer
+  case class ExpectingSignatures(channel: Channel, known: Seq[BlockId], timeout: CancelableFuture[Unit]) extends WithPeer {
+    override def toString: String = s"ExpectingSignatures(channel=$channel)"
+  }
 
   case class ExpectingBlocks(channel: Channel, allBlocks: Seq[BlockId],
                              expected: Set[BlockId],
-                             recieved: Set[Block],
-                             timeout: CancelableFuture[Unit]) extends WithPeer
+                             received: Set[Block],
+                             timeout: CancelableFuture[Unit]) extends WithPeer {
+    override def toString: String = s"ExpectingBlocks(channel=$channel, totalBlocks=${allBlocks.size}, received=${received.size}, expected=${expected.size}"
+  }
 
 
   def apply(ss: SynchronizationSettings,
@@ -52,9 +56,10 @@ object RxExtensionLoader extends ScorexLogging {
     }.delayExecution(ss.synchronizationTimeout).runAsync(scheduler)
 
 
-    def requestExtension(ch: Channel, knownSigs: Seq[BlockId]): Unit = {
+    def requestExtension(ch: Channel, knownSigs: Seq[BlockId], reason: String): Unit = {
       ch.writeAndFlush(Signatures(knownSigs))
-      innerState = ExpectingSignatures(ch, knownSigs, blacklistOnTimeout(ch, "Timeout expired while loading extension"))
+      log.debug(s"${id(ch)} Requesting extension sigs because $reason, last ${knownSigs.length} are ${formatSignatures(knownSigs)}")
+      innerState = ExpectingSignatures(ch, knownSigs, blacklistOnTimeout(ch, s"Timeout loading extension(request reason = '$reason'"))
     }
 
     channelClosed.executeOn(scheduler).mapTask { ch =>
@@ -64,7 +69,7 @@ object RxExtensionLoader extends ScorexLogging {
           bestChannel.lastOptionL.map {
             _.flatten match {
               case None => innerState = Idle
-              case Some(bestChannel: BestChannel) => requestExtension(bestChannel.channel, history.lastBlockIds(ss.maxRollback))
+              case Some(bestChannel: BestChannel) => requestExtension(bestChannel.channel, history.lastBlockIds(ss.maxRollback), s"current channel has been closed while state=$wp")
             }
           }
         }.flatten
@@ -75,7 +80,7 @@ object RxExtensionLoader extends ScorexLogging {
 
     bestChannel.executeOn(scheduler).mapTask {
       case Some(BestChannel(ch, _)) => innerState match {
-        case Idle => Task(requestExtension(ch, history.lastBlockIds(ss.maxRollback)))
+        case Idle => Task(requestExtension(ch, history.lastBlockIds(ss.maxRollback), "Idle and channel with better score detected"))
         case _ => Task.unit
       }
       case None => Task.unit
@@ -88,8 +93,8 @@ object RxExtensionLoader extends ScorexLogging {
         if (unknown.isEmpty)
           innerState = Idle
         else {
-          unknown.foreach(s => ch.write(GetBlock(s)))
-          innerState = ExpectingBlocks(ch, unknown, unknown.toSet, Set.empty, blacklistOnTimeout(ch, "Timeout loading blocks"))
+          unknown.foreach(s => ch.writeAndFlush(GetBlock(s)))
+          innerState = ExpectingBlocks(ch, unknown, unknown.toSet, Set.empty, blacklistOnTimeout(ch, "Timeout loading first requested block"))
         }
       }
       case _ => Task.unit
@@ -106,11 +111,11 @@ object RxExtensionLoader extends ScorexLogging {
             extensionBlocks.onNext((ch, ExtensionBlocks(ext)))
             bestChannel.lastOptionL map { // optimistic loader
               case None => innerState = Idle
-              case Some(None) => requestExtension(ch, history.lastBlockIds(ss.maxRollback))
-              case Some(Some(bestChannel: BestChannel)) => requestExtension(bestChannel.channel, history.lastBlockIds(ss.maxRollback))
+              case Some(None) => requestExtension(ch, history.lastBlockIds(ss.maxRollback), "Optimistic loader, same channel")
+              case Some(Some(bestChannel: BestChannel)) => requestExtension(bestChannel.channel, history.lastBlockIds(ss.maxRollback), "Optimistic loader, better channel")
             }
           } else {
-            innerState = ExpectingBlocks(c, requested, expected - block.uniqueId, recieved + block, blacklistOnTimeout(ch, "Timeout loading blocks"))
+            innerState = ExpectingBlocks(c, requested, expected - block.uniqueId, recieved + block, blacklistOnTimeout(ch, "Timeout loading one of reqested blocks"))
           }
         case _ => simpleBlocks.onNext((ch, block))
       }
