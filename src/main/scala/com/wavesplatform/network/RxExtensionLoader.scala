@@ -110,18 +110,25 @@ object RxExtensionLoader extends ScorexLogging {
             val blockById = (recieved + block).map(b => b.uniqueId -> b).toMap
             val ext = requested.map(blockById)
             log.debug(s"${id(ch)} Extension successfully received, blocks=${ext.size}")
-            extensionBlocks.onNext((ch, ExtensionBlocks(ext)))
-            bestChannel.lastOptionL map { // optimistic loader
+            val newStateTask = bestChannel.lastOptionL map {
               case None => innerState = Idle
-              case Some(None) => requestExtension(ch, history.lastBlockIds(ss.maxRollback), "Optimistic loader, same channel")
-              case Some(Some(bestChannel: BestChannel)) => requestExtension(bestChannel.channel, history.lastBlockIds(ss.maxRollback), "Optimistic loader, better channel")
+              case Some(maybeBestChannel) =>
+                val optimisticLastBlocks = history.lastBlockIds(ss.maxRollback - ext.size) ++ ext.map(_.uniqueId)
+                maybeBestChannel match {
+                  case None => requestExtension(ch, optimisticLastBlocks, "Optimistic loader, same channel")
+                  case Some(bestChannel: BestChannel) => requestExtension(bestChannel.channel, optimisticLastBlocks, "Optimistic loader, better channel")
+                }
             }
-          } else {
+            extensionBlocks.onNext((ch, ExtensionBlocks(ext)))
+            newStateTask
+          } else Task {
             innerState = ExpectingBlocks(c, requested, expected - block.uniqueId, recieved + block, blacklistOnTimeout(ch, "Timeout loading one of reqested blocks"))
           }
-        case _ => simpleBlocks.onNext((ch, block))
+        case _ => Task {
+          simpleBlocks.onNext((ch, block))
+        }
       }
-    }
+    }.flatten
     }.subscribe()(scheduler)
     (extensionBlocks, simpleBlocks)
   }
