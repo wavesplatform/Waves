@@ -80,7 +80,7 @@ object MicroBlockSynchronizer extends ScorexLogging {
         microblockDatas.onNext((ch, MicroblockData(Option(mi), mb, Coeval.evalOnce(owners(totalSig)))))
       }
     }.logErr
-    }
+    }.subscribe()(scheduler)
 
     microblockInvs.executeOn(scheduler).mapTask { case ((ch, mbInv@MicroBlockInv(_, totalSig, prevSig, _))) => Task {
       mbInv.signaturesValid() match {
@@ -98,7 +98,7 @@ object MicroBlockSynchronizer extends ScorexLogging {
             .foreach(tryDownloadNext)
       }
     }.logErr
-    }
+    }.subscribe()(scheduler)
 
     microblockDatas
   }

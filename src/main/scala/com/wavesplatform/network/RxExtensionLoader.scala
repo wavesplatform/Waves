@@ -79,7 +79,7 @@ object RxExtensionLoader extends ScorexLogging {
         case _ => Task.unit
       }
       case None => Task.unit
-    }
+    }.subscribe()(scheduler)
 
     signatures.executeOn(scheduler).mapTask { case ((ch, sigs)) => innerState match {
       case ExpectingSignatures(c, known, timeout) if c == ch => Task {
