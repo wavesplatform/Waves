@@ -80,6 +80,4 @@ trait ScorexLogging {
       })
     }
   }
-
-
 }
