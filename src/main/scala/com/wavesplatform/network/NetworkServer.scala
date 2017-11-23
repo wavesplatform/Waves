@@ -18,8 +18,9 @@ import io.netty.channel.socket.SocketChannel
 import io.netty.channel.socket.nio.{NioServerSocketChannel, NioSocketChannel}
 import io.netty.handler.codec.{LengthFieldBasedFrameDecoder, LengthFieldPrepender}
 import io.netty.util.concurrent.DefaultThreadFactory
+import monix.execution.Scheduler
 import monix.reactive.Observable
-import monix.reactive.subjects.PublishSubject
+import monix.reactive.subjects.{ConcurrentSubject}
 import org.asynchttpclient.netty.channel.NoopHandler
 import org.influxdb.dto.Point
 import scorex.transaction._
@@ -79,7 +80,7 @@ class NetworkServer(checkpointService: CheckpointService,
     settings.networkSettings.maxInboundConnections,
     settings.networkSettings.maxConnectionsPerHost)
 
-  private val closedChannels = PublishSubject[Channel]
+  private val closedChannels = ConcurrentSubject.publish[Channel]( Scheduler.singleThread("closed-channels"))
 
   private val (mesageObserver, signatures, blocks, remoteScores, checkpoints, microInvs, micros) = MessageObserver()
   private val syncWith = RxScoreObserver(settings.synchronizationSettings.scoreTTL, blockchainUpdater.lastBlockInfo.map(_.score), remoteScores, closedChannels)

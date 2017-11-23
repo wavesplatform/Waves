@@ -7,7 +7,7 @@ import monix.eval.Task
 import monix.execution.{CancelableFuture, Scheduler}
 import monix.execution.schedulers.SchedulerService
 import monix.reactive.Observable
-import monix.reactive.subjects.PublishSubject
+import monix.reactive.subjects.{ConcurrentSubject}
 import scorex.block.Block
 import scorex.block.Block.BlockId
 import scorex.transaction.NgHistory
@@ -45,10 +45,11 @@ object RxExtensionLoader extends ScorexLogging {
             blocks: Observable[(Channel, Block)],
             signatures: Observable[(Channel, Signatures)],
             channelClosed: Observable[Channel]): (Observable[(Channel, ExtensionBlocks)], Observable[(Channel, Block)]) = {
-    val scheduler: SchedulerService = Scheduler.singleThread("rx-block-loader")
+    implicit val scheduler: SchedulerService = Scheduler.singleThread("rx-block-loader")
 
-    val extensionBlocks = PublishSubject[(Channel, ExtensionBlocks)]()
-    val simpleBlocks = PublishSubject[(Channel, Block)]()
+    val extensionBlocks = ConcurrentSubject.publish[(Channel, ExtensionBlocks)]
+    val simpleBlocks = ConcurrentSubject.publish[(Channel, Block)]
+
     var innerState: ExtensionLoaderState = Idle
 
 

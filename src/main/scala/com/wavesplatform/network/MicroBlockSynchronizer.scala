@@ -11,7 +11,7 @@ import monix.eval.{Coeval, Task}
 import monix.execution.schedulers.SchedulerService
 import monix.execution.{CancelableFuture, Scheduler}
 import monix.reactive.Observable
-import monix.reactive.subjects.PublishSubject
+import monix.reactive.subjects.{ConcurrentSubject}
 import scorex.block.Block.BlockId
 import scorex.block.MicroBlock
 import scorex.transaction.NgHistory
@@ -29,9 +29,9 @@ object MicroBlockSynchronizer extends ScorexLogging {
            (microblockInvs: ChannelObservable[MicroBlockInv],
             microblockResponses: ChannelObservable[MicroBlockResponse]): ChannelObservable[MicroblockData] = {
 
-    val microblockDatas = PublishSubject[(Channel, MicroblockData)]
+    implicit val scheduler: SchedulerService = Scheduler.singleThread("microblock-synchronizer")
 
-    val scheduler: SchedulerService = Scheduler.singleThread("microblock-synchronizer")
+    val microblockDatas = ConcurrentSubject.publish[(Channel, MicroblockData)]
 
     val microBlockOwners = cache[MicroBlockSignature, MSet[Channel]](settings.invCacheTimeout)
 
