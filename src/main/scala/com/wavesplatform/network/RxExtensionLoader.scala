@@ -73,10 +73,12 @@ object RxExtensionLoader extends ScorexLogging {
         case wp: WithPeer if wp.channel == ch => Task {
           wp.timeout.cancel()
           bestChannel.lastOptionL.map {
-            _.flatten match {
-              case None => become(Idle)
-              case Some(bestChannel: BestChannel) => requestExtension(bestChannel.channel, history.lastBlockIds(ss.maxRollback), s"current channel has been closed while state=$wp")
-            }
+            case None =>
+              log.error(s"While $innerState, bestChannel.lastOption is Nonem should never happen")
+            case Some(None) =>
+              log.trace("bestChannel is empty, state is up to date")
+              become(Idle)
+            case Some(Some(bestChannel: BestChannel)) => requestExtension(bestChannel.channel, history.lastBlockIds(ss.maxRollback), s"current channel has been closed while state=$wp")
           }
         }.flatten
         case _ => Task.unit
@@ -105,7 +107,9 @@ object RxExtensionLoader extends ScorexLogging {
           become(ExpectingBlocks(ch, unknown, unknown.toSet, Set.empty, blacklistOnTimeout(ch, "Timeout loading first requested block")))
         }
       }
-      case _ => Task.unit
+      case _ => Task {
+        log.trace(s"${id(ch)} Received unexpected signatures, ignoring")
+      }
     }
     }.subscribe()(scheduler)
 
@@ -117,16 +121,13 @@ object RxExtensionLoader extends ScorexLogging {
             val blockById = (recieved + block).map(b => b.uniqueId -> b).toMap
             val ext = requested.map(blockById)
             log.debug(s"${id(ch)} Extension successfully received, blocks=${ext.size}")
+            lazy val optimisticLastBlocks = history.lastBlockIds(ss.maxRollback - ext.size) ++ ext.map(_.uniqueId)
             val newStateTask = bestChannel.lastOptionL map {
-              case None =>
-                log.trace("Best channel is empty, sync complete")
+              case None => become(Idle)
+              case Some(None) =>
+                log.trace("bestChannel is empty, state is up to date")
                 become(Idle)
-              case Some(maybeBestChannel) =>
-                val optimisticLastBlocks = history.lastBlockIds(ss.maxRollback - ext.size) ++ ext.map(_.uniqueId)
-                maybeBestChannel match {
-                  case None => requestExtension(ch, optimisticLastBlocks, "Optimistic loader, same channel")
-                  case Some(bestChannel: BestChannel) => requestExtension(bestChannel.channel, optimisticLastBlocks, "Optimistic loader, better channel")
-                }
+              case Some(Some(bestChannel: BestChannel)) => requestExtension(bestChannel.channel, optimisticLastBlocks, "Optimistic loader, better channel")
             }
             extensionBlocks.onNext((ch, ExtensionBlocks(ext)))
             newStateTask

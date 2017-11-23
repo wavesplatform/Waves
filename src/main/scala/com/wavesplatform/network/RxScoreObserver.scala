@@ -45,12 +45,12 @@ object RxScoreObserver extends ScorexLogging {
         val bestChannels = groupedByScore(bestScore).map(_._1)
         currentBestChannel match {
           case Some(c) if bestChannels contains c =>
-            log.trace(s"Publishing same best channel ${id(c)}")
+            log.trace(s"${id(c)} Publishing same best channel")
             Observable(Some(BestChannel(c, bestScore)))
           case _ =>
             val head = bestChannels.head
             currentBestChannel = Some(head)
-            log.trace(s"${id(head)} New best channel score=$bestScore > localScore $localScore")
+            log.trace(s"${id(head)} Publishing new best channel with score=$bestScore > localScore $localScore")
             Observable(Some(BestChannel(head, bestScore)))
         }
       }
