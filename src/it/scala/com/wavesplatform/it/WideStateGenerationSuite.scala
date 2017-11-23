@@ -25,11 +25,11 @@ class WideStateGenerationSuite extends FreeSpec with IntegrationNodesInitializat
   "Generate a lot of transactions and synchronise" in result(for {
     b <- traverse(nodes)(balanceForNode).map(_.toMap)
     lastTx <- {
-        log.debug(
-          s"""Balances:
-             |${b.map { case (account, balance) => s"$account -> $balance" }.mkString("\n")}""".stripMargin)
-        processRequests(generateTransfersToRandomAddresses(requestsCount / 2, b) ++ generateTransfersBetweenAccounts(requestsCount / 2, b))
-      }
+      log.debug(
+        s"""Balances:
+           |${b.map { case (account, balance) => s"$account -> $balance" }.mkString("\n")}""".stripMargin)
+      processRequests(generateTransfersToRandomAddresses(requestsCount / 2, b) ++ generateTransfersBetweenAccounts(requestsCount / 2, b))
+    }
 
     _ <- traverse(nodes)(_.waitForTransaction(lastTx.get.id))
     height <- traverse(nodes)(_.height).map(_.max)
