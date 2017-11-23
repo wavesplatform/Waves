@@ -7,7 +7,7 @@ import monix.eval.Task
 import monix.execution.{CancelableFuture, Scheduler}
 import monix.execution.schedulers.SchedulerService
 import monix.reactive.Observable
-import monix.reactive.subjects.{ConcurrentSubject}
+import monix.reactive.subjects.ConcurrentSubject
 import scorex.block.Block
 import scorex.block.Block.BlockId
 import scorex.transaction.NgHistory
@@ -52,6 +52,10 @@ object RxExtensionLoader extends ScorexLogging {
 
     var innerState: ExtensionLoaderState = Idle
 
+    def become(s: ExtensionLoaderState) = {
+      innerState = s
+      log.trace(s"changing state to $s")
+    }
 
     def blacklistOnTimeout(ch: Channel, reason: String): CancelableFuture[Unit] = Task {
       peerDatabase.blacklistAndClose(ch, reason)
@@ -61,7 +65,7 @@ object RxExtensionLoader extends ScorexLogging {
     def requestExtension(ch: Channel, knownSigs: Seq[BlockId], reason: String): Unit = {
       ch.writeAndFlush(GetSignatures(knownSigs))
       log.debug(s"${id(ch)} Requesting extension sigs because $reason, last ${knownSigs.length} are ${formatSignatures(knownSigs)}")
-      innerState = ExpectingSignatures(ch, knownSigs, blacklistOnTimeout(ch, s"Timeout loading extension(request reason = '$reason'"))
+      become(ExpectingSignatures(ch, knownSigs, blacklistOnTimeout(ch, s"Timeout loading extension(request reason = '$reason'")))
     }
 
     channelClosed.executeOn(scheduler).mapTask { ch =>
@@ -70,7 +74,7 @@ object RxExtensionLoader extends ScorexLogging {
           wp.timeout.cancel()
           bestChannel.lastOptionL.map {
             _.flatten match {
-              case None => innerState = Idle
+              case None => become(Idle)
               case Some(bestChannel: BestChannel) => requestExtension(bestChannel.channel, history.lastBlockIds(ss.maxRollback), s"current channel has been closed while state=$wp")
             }
           }
@@ -92,11 +96,13 @@ object RxExtensionLoader extends ScorexLogging {
       case ExpectingSignatures(c, known, timeout) if c == ch => Task {
         timeout.cancel()
         val (_, unknown) = sigs.signatures.span(id => known.contains(id))
-        if (unknown.isEmpty)
-          innerState = Idle
+        if (unknown.isEmpty) {
+          log.trace(s"${id(ch)}, Received empty extension signatures list, sync with node complete")
+          become(Idle)
+        }
         else {
           unknown.foreach(s => ch.writeAndFlush(GetBlock(s)))
-          innerState = ExpectingBlocks(ch, unknown, unknown.toSet, Set.empty, blacklistOnTimeout(ch, "Timeout loading first requested block"))
+          become(ExpectingBlocks(ch, unknown, unknown.toSet, Set.empty, blacklistOnTimeout(ch, "Timeout loading first requested block")))
         }
       }
       case _ => Task.unit
@@ -114,7 +120,7 @@ object RxExtensionLoader extends ScorexLogging {
             val newStateTask = bestChannel.lastOptionL map {
               case None =>
                 log.trace("Best channel is empty, sync complete")
-                innerState = Idle
+                become(Idle)
               case Some(maybeBestChannel) =>
                 val optimisticLastBlocks = history.lastBlockIds(ss.maxRollback - ext.size) ++ ext.map(_.uniqueId)
                 maybeBestChannel match {
@@ -125,7 +131,7 @@ object RxExtensionLoader extends ScorexLogging {
             extensionBlocks.onNext((ch, ExtensionBlocks(ext)))
             newStateTask
           } else Task {
-            innerState = ExpectingBlocks(c, requested, expected - block.uniqueId, recieved + block, blacklistOnTimeout(ch, s"Timeout loading one of requested blocks while state=$innerState"))
+            become(ExpectingBlocks(c, requested, expected - block.uniqueId, recieved + block, blacklistOnTimeout(ch, s"Timeout loading one of requested blocks; prev state=$innerState")))
           }
         case _ => Task {
           simpleBlocks.onNext((ch, block))
