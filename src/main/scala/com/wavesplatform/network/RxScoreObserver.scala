@@ -5,7 +5,6 @@ import java.util.concurrent.TimeUnit
 import cats.implicits._
 import com.google.common.cache.CacheBuilder
 import io.netty.channel._
-import monix.eval.Task
 import monix.execution.Scheduler
 import monix.execution.schedulers.SchedulerService
 import monix.reactive.Observable

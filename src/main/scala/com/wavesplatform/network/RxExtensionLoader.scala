@@ -87,7 +87,7 @@ object RxExtensionLoader extends ScorexLogging {
 
 
     bestChannel.executeOn(scheduler).map {
-      case Some(BestChannel(ch, _)) if innerState == Idle => requestExtension(ch, history.lastBlockIds(ss.maxRollback), "Idle and channel with better score detected"))
+      case Some(BestChannel(ch, _)) if innerState == Idle => requestExtension(ch, history.lastBlockIds(ss.maxRollback), "Idle and channel with better score detected")
       case _ =>
 
     }.subscribe()(scheduler)
@@ -109,7 +109,7 @@ object RxExtensionLoader extends ScorexLogging {
     }
     }.subscribe()(scheduler)
 
-    blocks.executeOn(scheduler).map { case ((ch, block)) => {
+    blocks.executeOn(scheduler).map { case ((ch, block)) =>
       innerState match {
         case ExpectingBlocks(c, requested, expected, recieved, timeout) if c == ch && expected.contains(block.uniqueId) =>
           timeout.cancel()
@@ -131,7 +131,6 @@ object RxExtensionLoader extends ScorexLogging {
         case _ => simpleBlocks.onNext((ch, block))
 
       }
-    }
     }.subscribe()(scheduler)
     (extensionBlocks, simpleBlocks)
   }
