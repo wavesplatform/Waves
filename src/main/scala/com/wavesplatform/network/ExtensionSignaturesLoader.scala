@@ -35,11 +35,6 @@ class ExtensionSignaturesLoader(syncTimeout: FiniteDuration, peerDatabase: PeerD
 
   override def write(ctx: ChannelHandlerContext, msg: AnyRef, promise: ChannelPromise): Unit = msg match {
     case LoadBlockchainExtension(Seq()) =>
-      log.debug(
-        s"""breakExtensionLoading! LoadBlockchainExtension(Seq.empty) of ${id(ctx)}:
-           |currentTimeout: $currentTimeout
-           |lastKnownSignatures: $lastKnownSignatures
-         """.stripMargin)
       currentTimeout.foreach(_.cancel(false))
       currentTimeout = None
       lastKnownSignatures = Seq.empty

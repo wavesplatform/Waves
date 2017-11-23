@@ -20,12 +20,6 @@ class OptimisticExtensionLoader extends ChannelDuplexHandler with ScorexLogging 
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
     case ExtensionBlocks(extension) if extension.isEmpty =>
-      log.debug(
-        s"""ExtensionBlocks(Seq.empty) ${id(ctx)}:
-           |hopefullyNextIds = ${hopefullyNextIds.mkString(", ")}
-           |nextExtensionBlocks = ${nextExtensionBlocks.map(_.uniqueId).mkString(", ")}
-           |requestedLocalIds = ${requestedLocalIds.mkString(", ")}
-         """.stripMargin)
       stopLoading(ctx)
       log.debug(s"${id(ctx)} Blockchain is up to date")
       super.channelRead(ctx, msg)
@@ -43,12 +37,6 @@ class OptimisticExtensionLoader extends ChannelDuplexHandler with ScorexLogging 
 
   override def write(ctx: ChannelHandlerContext, msg: AnyRef, promise: ChannelPromise): Unit = msg match {
     case LoadBlockchainExtension(Seq()) =>
-      log.debug(
-        s"""breakExtensionLoading! LoadBlockchainExtension(Seq.empty) ${id(ctx)}:
-           |hopefullyNextIds = ${hopefullyNextIds.mkString(", ")}
-           |nextExtensionBlocks = ${nextExtensionBlocks.map(_.uniqueId).mkString(", ")}
-           |requestedLocalIds = ${requestedLocalIds.mkString(", ")}
-         """.stripMargin)
       stopLoading(ctx)
       super.write(ctx, msg, promise)
 

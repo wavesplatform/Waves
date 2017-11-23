@@ -61,9 +61,6 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
       }
 
       if (breakExtLoading) {
-        log.debug(
-          s"""breakExtensionLoading! ocalScoreChanged(_, true) of ${id(ctx)}:
-             |pinnedChannel: $pinnedChannel""".stripMargin)
         ctx.write(LoadBlockchainExtension(Seq.empty))
         if (pinnedChannel.compareAndSet(ctx.channel(), null)) log.debug(s"${id(ctx)} Stop processing an extension")
         channelWithHighestScore match {
