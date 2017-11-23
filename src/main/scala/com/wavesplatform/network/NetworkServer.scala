@@ -20,7 +20,7 @@ import io.netty.handler.codec.{LengthFieldBasedFrameDecoder, LengthFieldPrepende
 import io.netty.util.concurrent.DefaultThreadFactory
 import monix.execution.Scheduler
 import monix.reactive.Observable
-import monix.reactive.subjects.{ConcurrentSubject}
+import monix.reactive.subjects.ConcurrentSubject
 import org.asynchttpclient.netty.channel.NoopHandler
 import org.influxdb.dto.Point
 import scorex.transaction._
@@ -80,11 +80,11 @@ class NetworkServer(checkpointService: CheckpointService,
     settings.networkSettings.maxInboundConnections,
     settings.networkSettings.maxConnectionsPerHost)
 
-  private val closedChannels = ConcurrentSubject.publish[Channel]( Scheduler.singleThread("closed-channels"))
+  private val closedChannels = ConcurrentSubject.publish[Channel](Scheduler.singleThread("closed-channels"))
 
   private val (mesageObserver, signatures, blocks, remoteScores, checkpoints, microInvs, micros) = MessageObserver()
   private val syncWith = RxScoreObserver(settings.synchronizationSettings.scoreTTL, blockchainUpdater.lastBlockInfo.map(_.score), remoteScores, closedChannels)
-  private val microblockDatas = MicroBlockSynchronizer(settings.synchronizationSettings.microBlockSynchronizer, history, peerDatabase, blockchainUpdater.lastBlockInfo.map(_.id))(microInvs, micros)
+  private val microblockDatas = MicroBlockSynchronizer(settings.synchronizationSettings.microBlockSynchronizer, history, peerDatabase)(blockchainUpdater.lastBlockInfo.map(_.id), microInvs, micros)
   private val (extensions, newBlocks) = RxExtensionLoader(settings.synchronizationSettings, history, peerDatabase, syncWith, blocks, signatures, closedChannels)
   private val sink: Observable[Unit] = CoordinatorHandler(checkpointService, history, blockchainUpdater, time,
     stateReader, utxPool, miner, settings, peerDatabase, allChannels, featureProvider)(newBlocks, checkpoints, extensions, microblockDatas)
