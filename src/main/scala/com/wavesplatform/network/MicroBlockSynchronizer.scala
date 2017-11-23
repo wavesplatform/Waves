@@ -11,7 +11,6 @@ import monix.eval.{Coeval, Task}
 import monix.execution.schedulers.SchedulerService
 import monix.execution.{CancelableFuture, Scheduler}
 import monix.reactive.Observable
-import monix.reactive.subjects.ConcurrentSubject
 import scorex.block.Block.BlockId
 import scorex.block.MicroBlock
 import scorex.transaction.NgHistory
