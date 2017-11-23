@@ -11,7 +11,7 @@ import scala.concurrent.{Await, ExecutionContext, Future}
 trait ActivationStatusRequest extends Matchers {
   def activationStatus(node: Node, height: Int, featureNum: Short, timeout: Duration)
                       (implicit ec: ExecutionContext): ActivationStatusFeature = Await.result(
-    activationStatusInternal(node, height, featureNum, timeout),
+    activationStatusInternal(node, height).map(_.features.find(_.id == featureNum).get),
     timeout
   )
 
@@ -19,17 +19,20 @@ trait ActivationStatusRequest extends Matchers {
                       (implicit ec: ExecutionContext): Map[Node, ActivationStatusFeature] = Await.result(
     Future
       .traverse(nodes) { node =>
-        activationStatusInternal(node, height, featureNum, timeout).map(node -> _)
+        activationStatusInternal(node, height).map(node -> _)
       }
-      .map(_.toMap),
+      .map { xs =>
+        xs
+          .collect {
+            case (n, status) if status.height == height => n -> status.features.find(_.id == featureNum).get
+          }
+          .toMap
+      },
     timeout
   )
 
-  private def activationStatusInternal(node: Node, height: Int, featureNum: Short, timeout: Duration)
-                                      (implicit ec: ExecutionContext): Future[ActivationStatusFeature] = {
-    node
-      .waitFor[ActivationStatus](_.activationStatus, _.height >= height, 1.second)
-      .map(_.features.find(_.id == featureNum).get)
+  private def activationStatusInternal(node: Node, height: Int): Future[ActivationStatus] = {
+    node.waitFor[ActivationStatus](_.activationStatus, _.height >= height, 1.second)
   }
 
   def assertVotingStatus(activationStatusFeature: ActivationStatusFeature,
