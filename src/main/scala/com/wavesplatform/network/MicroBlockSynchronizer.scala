@@ -32,11 +32,11 @@ object MicroBlockSynchronizer extends ScorexLogging {
 
     val microBlockOwners = cache[MicroBlockSignature, MSet[Channel]](settings.invCacheTimeout)
 
-    def owners(totalResBlockSig: BlockId): Set[Channel] = Option(microBlockOwners.getIfPresent(totalResBlockSig)).getOrElse(MSet.empty).toSet
-
     val nextInvs = cache[MicroBlockSignature, MicroBlockInv](settings.invCacheTimeout)
     val awaiting = cache[MicroBlockSignature, MicroBlockInv](settings.invCacheTimeout)
     val successfullyReceived = cache[MicroBlockSignature, Object](settings.processedMicroBlocksCacheTimeout)
+
+    def owners(totalResBlockSig: BlockId): Set[Channel] = Option(microBlockOwners.getIfPresent(totalResBlockSig)).getOrElse(MSet.empty).toSet
 
     def alreadyRequested(totalSig: MicroBlockSignature): Boolean = Option(awaiting.getIfPresent(totalSig)).isDefined
 
@@ -60,14 +60,14 @@ object MicroBlockSynchronizer extends ScorexLogging {
         }
       }
 
-      task(MicroBlockDownloadAttempts, Set.empty).runAsyncLogErr(scheduler)
+      task(MicroBlockDownloadAttempts, Set.empty).runAsyncLogErr
     }
 
     def tryDownloadNext(prevBlockId: ByteStr): Unit = Option(nextInvs.getIfPresent(prevBlockId)).foreach(requestMicroBlock)
 
-    lastBlockIdEvents.executeOn(scheduler).map(tryDownloadNext).logErr.subscribe()(scheduler)
+    lastBlockIdEvents.mapTask(f => Task(tryDownloadNext(f))).logErr.subscribe()
 
-    microblockInvs.executeOn(scheduler).map { case ((ch, mbInv@MicroBlockInv(_, totalSig, prevSig, _))) =>
+    microblockInvs.mapTask { case ((ch, mbInv@MicroBlockInv(_, totalSig, prevSig, _))) => Task {
       mbInv.signaturesValid() match {
         case Left(err) =>
           peerDatabase.blacklistAndClose(ch, err.toString)
@@ -82,9 +82,10 @@ object MicroBlockSynchronizer extends ScorexLogging {
             .filter(_ == prevSig && !alreadyRequested(totalSig))
             .foreach(tryDownloadNext)
       }
-    }.logErr.subscribe()(scheduler)
+    }
+    }.logErr.subscribe()
 
-    microblockResponses.executeOn(scheduler).flatMap { case ((ch, msg@MicroBlockResponse(mb))) =>
+    microblockResponses.flatMap { case ((ch, msg@MicroBlockResponse(mb))) =>
       import mb.{totalResBlockSig => totalSig}
       successfullyReceived.put(totalSig, dummy)
       BlockStats.received(mb, ch)
@@ -95,7 +96,7 @@ object MicroBlockSynchronizer extends ScorexLogging {
           awaiting.invalidate(totalSig)
           Observable((ch, MicroblockData(Option(mi), mb, Coeval.evalOnce(owners(totalSig)))))
       }
-    }
+    }.executeOn(scheduler)
   }
 
   case class MicroblockData(invOpt: Option[MicroBlockInv], microBlock: MicroBlock, microblockOwners: Coeval[Set[Channel]])

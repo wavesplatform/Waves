@@ -46,7 +46,7 @@ object RxExtensionLoader extends ScorexLogging {
       become(ExpectingSignatures(ch, knownSigs, blacklistOnTimeout(ch, s"Timeout loading extension(request reason = '$reason'")))
     }
 
-    channelClosed.executeOn(scheduler).map { ch =>
+    channelClosed.mapTask(ch => Task {
       innerState match {
         case wp: WithPeer if wp.channel == ch =>
           wp.timeout.cancel()
@@ -60,33 +60,35 @@ object RxExtensionLoader extends ScorexLogging {
           }
         case _ =>
       }
-    }.logErr.subscribe()(scheduler)
+    }).logErr.subscribe()
 
 
-    bestChannel.executeOn(scheduler).map {
-      case Some(BestChannel(ch, _)) if innerState == Idle => requestExtension(ch, history.lastBlockIds(ss.maxRollback), "Idle and channel with better score detected")
-      case _ =>
+    bestChannel.mapTask(c => Task {
+      c match {
+        case Some(BestChannel(ch, _)) if innerState == Idle => requestExtension(ch, history.lastBlockIds(ss.maxRollback), "Idle and channel with better score detected")
+        case _ =>
+      }
+    }).logErr.subscribe()
 
-    }.logErr.subscribe()(scheduler)
-
-    signatures.executeOn(scheduler).map { case ((ch, sigs)) => innerState match {
-      case ExpectingSignatures(c, known, timeout) if c == ch =>
-        timeout.cancel()
-        val (_, unknown) = sigs.signatures.span(id => known.contains(id))
-        if (unknown.isEmpty) {
-          log.trace(s"${id(ch)} Received empty extension signatures list, sync with node complete")
-          become(Idle)
-        }
-        else {
-          unknown.foreach(s => ch.writeAndFlush(GetBlock(s)))
-          become(ExpectingBlocks(ch, unknown, unknown.toSet, Set.empty, blacklistOnTimeout(ch, "Timeout loading first requested block")))
-        }
-      case _ => log.trace(s"${id(ch)} Received unexpected signatures, ignoring")
-
+    signatures.mapTask { case ((ch, sigs)) => Task {
+      innerState match {
+        case ExpectingSignatures(c, known, timeout) if c == ch =>
+          timeout.cancel()
+          val (_, unknown) = sigs.signatures.span(id => known.contains(id))
+          if (unknown.isEmpty) {
+            log.trace(s"${id(ch)} Received empty extension signatures list, sync with node complete")
+            become(Idle)
+          }
+          else {
+            unknown.foreach(s => ch.writeAndFlush(GetBlock(s)))
+            become(ExpectingBlocks(ch, unknown, unknown.toSet, Set.empty, blacklistOnTimeout(ch, "Timeout loading first requested block")))
+          }
+        case _ => log.trace(s"${id(ch)} Received unexpected signatures, ignoring")
+      }
     }
-    }.logErr.subscribe()(scheduler)
+    }.logErr.subscribe()
 
-    blocks.executeOn(scheduler).map { case ((ch, block)) =>
+    blocks.mapTask { case ((ch, block)) => Task {
       innerState match {
         case ExpectingBlocks(c, requested, expected, recieved, timeout) if c == ch && expected.contains(block.uniqueId) =>
           timeout.cancel()
@@ -108,7 +110,8 @@ object RxExtensionLoader extends ScorexLogging {
         case _ => simpleBlocks.onNext((ch, block))
 
       }
-    }.logErr.subscribe()(scheduler)
+    }
+    }.logErr.subscribe()
     (extensionBlocks, simpleBlocks)
   }
 

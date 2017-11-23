@@ -5,6 +5,7 @@ import java.util.concurrent.TimeUnit
 import cats.implicits._
 import com.google.common.cache.CacheBuilder
 import io.netty.channel._
+import monix.eval.Task
 import monix.execution.Scheduler
 import monix.execution.schedulers.SchedulerService
 import monix.reactive.Observable
@@ -51,12 +52,12 @@ object RxScoreObserver extends ScorexLogging {
       }
     }
 
-    val x = localScores.executeOn(scheduler).map(newLocalScore => {
+    val x = localScores.mapTask(newLocalScore => Task {
       log.debug(s"New local score = $newLocalScore observed")
       localScore = newLocalScore
     })
 
-    val y = channelClosed.executeOn(scheduler).map(ch => {
+    val y = channelClosed.mapTask(ch => Task {
       scores.invalidate(ch)
       if (currentBestChannel.contains(ch)) {
         log.debug(s"${id(ch)} Best channel has been closed")
@@ -64,12 +65,13 @@ object RxScoreObserver extends ScorexLogging {
       }
     })
 
-    val z = remoteScores.executeOn(scheduler).map { case ((ch, score)) =>
+    val z = remoteScores.mapTask { case ((ch, score)) => Task {
       scores.put(ch, score)
       log.trace(s"${id(ch)} New score $score")
     }
+    }
 
-    Observable.merge(x, y, z).flatMap(_ => newBestChannel())
+    Observable.merge(x, y, z).executeOn(scheduler).flatMap(_ => newBestChannel()).executeOn(scheduler)
   }
 
   type SyncWith = Option[BestChannel]

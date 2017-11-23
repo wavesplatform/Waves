@@ -11,6 +11,7 @@ import com.wavesplatform.{Coordinator, UtxPool}
 import io.netty.channel.Channel
 import io.netty.channel.group.ChannelGroup
 import kamon.Kamon
+import monix.eval.Task
 import monix.execution.Scheduler
 import monix.reactive.Observable
 import scorex.block.Block
@@ -62,7 +63,7 @@ object CoordinatorHandler extends ScorexLogging {
       }
     }
 
-    val a = blocks.executeOn(scheduler).map { case ((ch, b)) =>
+    val a = blocks.mapTask { case ((ch, b)) => Task {
       BlockStats.received(b, BlockStats.Source.Broadcast, ch)
       blockReceivingLag.safeRecord(System.currentTimeMillis() - b.timestamp)
       b.signaturesValid().flatMap(b => processBlock(b)) match {
@@ -81,15 +82,18 @@ object CoordinatorHandler extends ScorexLogging {
           log.debug(s"${id(ch)} Could not append $b: $ve")
       }
     }
-
-    val b = checkpoints.executeOn(scheduler).map { case ((ch, c)) => processAndBlacklistOnFailure(ch,
-      s"${id(ch)} Attempting to process checkpoint",
-      s"${id(ch)} Successfully processed checkpoint",
-      s"${id(ch)} Error processing checkpoint",
-      processCheckpoint(c).map(Some(_)), scheduleMiningAndBroadcastScore)
     }
 
-    val c = extensions.executeOn(scheduler).map { case ((ch, ExtensionBlocks(extensionBlocks))) =>
+    val b = checkpoints.mapTask { case ((ch, c)) => Task {
+      processAndBlacklistOnFailure(ch,
+        s"${id(ch)} Attempting to process checkpoint",
+        s"${id(ch)} Successfully processed checkpoint",
+        s"${id(ch)} Error processing checkpoint",
+        processCheckpoint(c).map(Some(_)), scheduleMiningAndBroadcastScore)
+    }
+    }
+
+    val c = extensions.mapTask { case ((ch, ExtensionBlocks(extensionBlocks))) => Task {
       extensionBlocks.foreach(BlockStats.received(_, BlockStats.Source.Ext, ch))
       processAndBlacklistOnFailure(ch,
         s"${id(ch)} Attempting to append extension ${formatBlocks(extensionBlocks)}",
@@ -98,8 +102,10 @@ object CoordinatorHandler extends ScorexLogging {
         processFork(extensionBlocks),
         scheduleMiningAndBroadcastScore)
     }
+    }
 
-    val d = microblockDatas.executeOn(scheduler).map { case ((ch, md)) =>
+
+    val d = microblockDatas.mapTask { case ((ch, md)) => Task {
       import md.microBlock
       val microblockTotalResBlockSig = microBlock.totalResBlockSig
       microBlock.signaturesValid().flatMap(processMicroBlock) match {
@@ -116,7 +122,8 @@ object CoordinatorHandler extends ScorexLogging {
           log.debug(s"${id(ch)} Could not append microblock $microblockTotalResBlockSig: $ve")
       }
     }
+    }
 
-    Observable.merge(a, b, c, d).logErr
+    Observable.merge(a, b, c, d).executeOn(scheduler).logErr
   }
 }
