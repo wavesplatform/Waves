@@ -112,7 +112,9 @@ object RxExtensionLoader extends ScorexLogging {
             val ext = requested.map(blockById)
             log.debug(s"${id(ch)} Extension successfully received, blocks=${ext.size}")
             val newStateTask = bestChannel.lastOptionL map {
-              case None => innerState = Idle
+              case None =>
+                log.trace("Best channel is empty, sync complete")
+                innerState = Idle
               case Some(maybeBestChannel) =>
                 val optimisticLastBlocks = history.lastBlockIds(ss.maxRollback - ext.size) ++ ext.map(_.uniqueId)
                 maybeBestChannel match {

@@ -36,7 +36,7 @@ object RxScoreObserver extends ScorexLogging {
     def newBestChannel(): Observable[SyncWith] = {
       val betterChannels = scores.asMap().asScala.filter(_._2 > localScore)
       if (betterChannels.isEmpty) {
-        log.debug("No better scores of remote peers, sync complete")
+        log.debug(s"No better scores of remote peers, sync complete. Current local score = $localScore")
         currentBestChannel = None
         Observable(None)
       } else {
@@ -45,12 +45,12 @@ object RxScoreObserver extends ScorexLogging {
         val bestChannels = groupedByScore(bestScore).map(_._1)
         currentBestChannel match {
           case Some(c) if bestChannels contains c =>
-            log.trace("Best channel not changed")
-            Observable.empty
+            log.trace(s"Publishing same best channel ${id(c)}")
+            Observable(Some(BestChannel(c, bestScore)))
           case _ =>
             val head = bestChannels.head
             currentBestChannel = Some(head)
-            log.trace(s"New best channel score=$bestScore > localScore $localScore")
+            log.trace(s"${id(head)} New best channel score=$bestScore > localScore $localScore")
             Observable(Some(BestChannel(head, bestScore)))
         }
       }
@@ -64,7 +64,7 @@ object RxScoreObserver extends ScorexLogging {
     val y = channelClosed.executeOn(scheduler).mapTask(ch => Task {
       scores.invalidate(ch)
       if (currentBestChannel.contains(ch)) {
-        log.debug(s"Best channel $ch has been closed")
+        log.debug(s"${id(ch)} Best channel has been closed")
         currentBestChannel = None
       }
     })
