@@ -61,7 +61,7 @@ class HistoryReplier(history: NgHistory, settings: SynchronizationSettings) exte
       }.runAsyncLogErr
 
     case _: Handshake => Task {
-      ctx.writeAndFlush(LocalScoreChanged(history.score()))
+      ctx.writeAndFlush(LocalScoreChanged(history.score(), breakExtLoading = false))
     }.runAsyncLogErr
 
     case _ => super.channelRead(ctx, msg)
