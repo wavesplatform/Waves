@@ -245,10 +245,11 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
   override def close(): Unit = {
     if (isStopped.compareAndSet(false, true)) {
       log.info("Stopping containers")
+
       nodes.asScala.foreach { node =>
         node.close()
         client.stopContainer(node.nodeInfo.containerId, 0)
-        disconnectFromNetwork(node)
+
         saveLog(node)
         val containerInfo = client.inspectContainer(node.nodeInfo.containerId)
         log.debug(
@@ -258,7 +259,11 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
              |Status: ${containerInfo.state().status()}
              |OOM killed: ${containerInfo.state().oomKilled()}""".stripMargin)
 
-        client.removeContainer(node.nodeInfo.containerId, RemoveContainerParam.forceKill())
+        try {
+          client.removeContainer(node.nodeInfo.containerId)
+        } catch {
+          case NonFatal(e) => log.warn(s"Can't remove a container of ${node.settings.networkSettings.nodeName}", e)
+        }
       }
 
       try {

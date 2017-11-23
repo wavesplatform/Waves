@@ -54,17 +54,17 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
 
   override def write(ctx: ChannelHandlerContext, msg: AnyRef, promise: ChannelPromise): Unit = msg match {
     case LocalScoreChanged(newLocalScore, breakExtLoading) =>
-      // unconditionally update local score value and propagate this message downstream
-      if (newLocalScore != localScore || breakExtLoading) {
-        ctx.write(msg, promise)
-      }
-
       if (newLocalScore != localScore) {
         localScore = newLocalScore
         log.debug(s"${id(ctx)} $pinnedChannelId New local score: $newLocalScore")
+        ctx.write(msg, promise)
       }
 
       if (breakExtLoading) {
+        log.debug(
+          s"""breakExtensionLoading! ocalScoreChanged(_, true) of ${id(ctx)}:
+             |pinnedChannel: $pinnedChannel""".stripMargin)
+        ctx.write(LoadBlockchainExtension(Seq.empty))
         if (pinnedChannel.compareAndSet(ctx.channel(), null)) log.debug(s"${id(ctx)} Stop processing an extension")
         channelWithHighestScore match {
           case Some((bestChannel, bestScore))
