@@ -20,37 +20,25 @@ object BlockStats {
   private sealed abstract class Event extends Named
 
   private object Event {
-
     case object Inv extends Event
-
     case object Received extends Event
-
     case object Applied extends Event
-
     case object Declined extends Event
-
     case object Mined extends Event
-
   }
 
   private sealed abstract class Type extends Named
 
   private object Type {
-
     case object Block extends Type
-
     case object Micro extends Type
-
   }
 
   sealed abstract class Source extends Named
 
   object Source {
-
     case object Broadcast extends Source
-
     case object Ext extends Source
-
   }
 
   def received(b: Block, source: Source, ch: Channel): Unit = write(

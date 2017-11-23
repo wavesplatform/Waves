@@ -16,10 +16,6 @@ import scala.concurrent.duration.FiniteDuration
 
 object RxScoreObserver extends ScorexLogging {
 
-  case class BestChannel(channel: Channel, score: BlockchainScore)
-
-  type SyncWith = Option[BestChannel]
-
   def apply(scoreTtl: FiniteDuration, localScores: Observable[BlockchainScore],
             remoteScores: Observable[(Channel, BlockchainScore)],
             channelClosed: Observable[Channel]): Observable[SyncWith] = {
@@ -75,4 +71,9 @@ object RxScoreObserver extends ScorexLogging {
 
     Observable.merge(x, y, z).flatMap(_ => newBestChannel())
   }
+
+  type SyncWith = Option[BestChannel]
+
+  case class BestChannel(channel: Channel, score: BlockchainScore)
+
 }

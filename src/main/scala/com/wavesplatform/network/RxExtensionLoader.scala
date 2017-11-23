@@ -15,29 +15,6 @@ import scorex.utils.ScorexLogging
 
 object RxExtensionLoader extends ScorexLogging {
 
-  sealed trait ExtensionLoaderState
-
-  sealed trait WithPeer extends ExtensionLoaderState {
-    def channel: Channel
-
-    def timeout: CancelableFuture[Unit]
-  }
-
-  case object Idle extends ExtensionLoaderState
-
-  case class ExpectingSignatures(channel: Channel, known: Seq[BlockId], timeout: CancelableFuture[Unit]) extends WithPeer {
-    override def toString: String = s"ExpectingSignatures(channel=$channel)"
-  }
-
-  case class ExpectingBlocks(channel: Channel, allBlocks: Seq[BlockId],
-                             expected: Set[BlockId],
-                             received: Set[Block],
-                             timeout: CancelableFuture[Unit]) extends WithPeer {
-    override def toString: String = s"ExpectingBlocks(channel=$channel, totalBlocks=${allBlocks.size}, received=${received.size}, expected=${expected.size}"
-  }
-
-  case class ExtensionBlocks(extension: Seq[Block])
-
   def apply(ss: SynchronizationSettings,
             history: NgHistory,
             peerDatabase: PeerDatabase,
@@ -134,4 +111,28 @@ object RxExtensionLoader extends ScorexLogging {
     }.subscribe()(scheduler)
     (extensionBlocks, simpleBlocks)
   }
+
+  sealed trait ExtensionLoaderState
+
+  sealed trait WithPeer extends ExtensionLoaderState {
+    def channel: Channel
+
+    def timeout: CancelableFuture[Unit]
+  }
+
+  case object Idle extends ExtensionLoaderState
+
+  case class ExpectingSignatures(channel: Channel, known: Seq[BlockId], timeout: CancelableFuture[Unit]) extends WithPeer {
+    override def toString: String = s"ExpectingSignatures(channel=$channel)"
+  }
+
+  case class ExpectingBlocks(channel: Channel, allBlocks: Seq[BlockId],
+                             expected: Set[BlockId],
+                             received: Set[Block],
+                             timeout: CancelableFuture[Unit]) extends WithPeer {
+    override def toString: String = s"ExpectingBlocks(channel=$channel, totalBlocks=${allBlocks.size}, received=${received.size}, expected=${expected.size}"
+  }
+
+  case class ExtensionBlocks(extension: Seq[Block])
+
 }
