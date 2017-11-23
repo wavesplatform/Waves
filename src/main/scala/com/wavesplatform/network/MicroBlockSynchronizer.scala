@@ -31,8 +31,6 @@ object MicroBlockSynchronizer extends ScorexLogging {
 
     implicit val scheduler: SchedulerService = Scheduler.singleThread("microblock-synchronizer")
 
-    val microblockDatas = ConcurrentSubject.publish[(Channel, MicroblockData)]
-
     val microBlockOwners = cache[MicroBlockSignature, MSet[Channel]](settings.invCacheTimeout)
 
     def owners(totalResBlockSig: BlockId): Set[Channel] = Option(microBlockOwners.getIfPresent(totalResBlockSig)).getOrElse(MSet.empty).toSet
@@ -70,17 +68,6 @@ object MicroBlockSynchronizer extends ScorexLogging {
 
     lastBlockIdEvents.executeOn(scheduler).map(tryDownloadNext).subscribe()(scheduler)
 
-    microblockResponses.executeOn(scheduler).map { case ((ch, msg@MicroBlockResponse(mb))) =>
-      import mb.{totalResBlockSig => totalSig}
-      successfullyReceived.put(totalSig, dummy)
-      BlockStats.received(mb, ch)
-      log.trace(s"${id(ch)} Received $msg")
-      Option(awaiting.getIfPresent(totalSig)).foreach { mi =>
-        awaiting.invalidate(totalSig)
-        microblockDatas.onNext((ch, MicroblockData(Option(mi), mb, Coeval.evalOnce(owners(totalSig)))))
-      }
-    }.subscribe()(scheduler)
-
     microblockInvs.executeOn(scheduler).map { case ((ch, mbInv@MicroBlockInv(_, totalSig, prevSig, _))) =>
       mbInv.signaturesValid() match {
         case Left(err) =>
@@ -98,7 +85,18 @@ object MicroBlockSynchronizer extends ScorexLogging {
       }
     }.subscribe()(scheduler)
 
-    microblockDatas
+    microblockResponses.executeOn(scheduler).flatMap { case ((ch, msg@MicroBlockResponse(mb))) =>
+      import mb.{totalResBlockSig => totalSig}
+      successfullyReceived.put(totalSig, dummy)
+      BlockStats.received(mb, ch)
+      log.trace(s"${id(ch)} Received $msg")
+      Option(awaiting.getIfPresent(totalSig)) match {
+        case None => Observable.empty
+        case Some(mi) =>
+          awaiting.invalidate(totalSig)
+          Observable((ch, MicroblockData(Option(mi), mb, Coeval.evalOnce(owners(totalSig)))))
+      }
+    }
   }
 
   case class MicroblockData(invOpt: Option[MicroBlockInv], microBlock: MicroBlock, microblockOwners: Coeval[Set[Channel]])
