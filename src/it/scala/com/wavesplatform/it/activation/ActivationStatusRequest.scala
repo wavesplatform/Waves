@@ -29,12 +29,6 @@ trait ActivationStatusRequest extends Matchers {
                                       (implicit ec: ExecutionContext): Future[ActivationStatusFeature] = {
     node
       .waitFor[ActivationStatus](_.activationStatus, _.height >= height, 1.second)
-      .map { r =>
-        if (r.height > height) throw new IllegalStateException(
-          s"Height (${r.height}) is more than expected ($height) on ${node.settings.networkSettings.nodeName}"
-        )
-        r
-      }
       .map(_.features.find(_.id == featureNum).get)
   }
 

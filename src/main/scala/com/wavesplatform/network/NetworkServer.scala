@@ -190,16 +190,19 @@ class NetworkServer(checkpointService: CheckpointService,
     if (!shutdownInitiated) peerDatabase.suspend(remoteAddress.getAddress)
 
     if (closeFuture.isSuccess) {
-      log.trace(formatOutgoingChannelEvent(closeFuture.channel(), "Channel closed"))
+      log.trace(formatOutgoingChannelEvent(closeFuture.channel(), "Channel closed (expected)"))
     } else {
-      log.debug(formatOutgoingChannelEvent(closeFuture.channel(), "Channel closed"))
+      log.debug(formatOutgoingChannelEvent(
+        closeFuture.channel(),
+        s"Channel closed: ${Option(closeFuture.cause()).map(_.getMessage).getOrElse("no message")}"
+      ))
     }
   }
 
   private def formatOutgoingChannelEvent(channel: Channel, event: String) =
     s"${id(channel)} $event, outgoing channel count: ${outgoingChannels.size()}"
 
-  private def handleConnectionAttempt(remoteAddress: InetSocketAddress)(thisConnFuture: ChannelFuture): Unit =
+  private def handleConnectionAttempt(remoteAddress: InetSocketAddress)(thisConnFuture: ChannelFuture): Unit = {
     if (thisConnFuture.isSuccess) {
       log.trace(formatOutgoingChannelEvent(thisConnFuture.channel(), "Connection established"))
       peerDatabase.touch(remoteAddress)
@@ -208,12 +211,16 @@ class NetworkServer(checkpointService: CheckpointService,
       peerDatabase.suspend(remoteAddress.getAddress)
       outgoingChannels.remove(remoteAddress, thisConnFuture.channel())
       thisConnFuture.cause() match {
-        case _: ClosedChannelException =>
+        case e: ClosedChannelException =>
           // this can happen when the node is shut down before connection attempt succeeds
-          log.trace(formatOutgoingChannelEvent(thisConnFuture.channel(), "Channel closed"))
+          log.trace(formatOutgoingChannelEvent(
+            thisConnFuture.channel(),
+            s"Channel closed by connection issue: ${Option(e.getMessage).getOrElse("no message")}"
+          ))
         case other => log.debug(formatOutgoingChannelEvent(thisConnFuture.channel(), other.getMessage))
       }
     }
+  }
 
   def connect(remoteAddress: InetSocketAddress): Unit =
     outgoingChannels.computeIfAbsent(remoteAddress, _ => {

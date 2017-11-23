@@ -9,7 +9,6 @@ import java.util.{Collections, Properties, List => JList, Map => JMap}
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.dataformat.javaprop.JavaPropsMapper
 import com.google.common.collect.ImmutableMap
-import com.spotify.docker.client.DockerClient.RemoveContainerParam
 import com.spotify.docker.client.messages.EndpointConfig.EndpointIpamConfig
 import com.spotify.docker.client.messages._
 import com.spotify.docker.client.{DefaultDockerClient, DockerClient}
@@ -22,7 +21,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future, blocking}
 import scala.util.control.NonFatal
-import scala.util.{Failure, Random, Try}
+import scala.util.Random
 
 case class NodeInfo(hostRestApiPort: Int,
                     hostNetworkPort: Int,
@@ -245,12 +244,25 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
   override def close(): Unit = {
     if (isStopped.compareAndSet(false, true)) {
       log.info("Stopping containers")
+
       nodes.asScala.foreach { node =>
         node.close()
         client.stopContainer(node.nodeInfo.containerId, 0)
-        disconnectFromNetwork(node)
+
         saveLog(node)
-        client.removeContainer(node.nodeInfo.containerId, RemoveContainerParam.forceKill())
+        val containerInfo = client.inspectContainer(node.nodeInfo.containerId)
+        log.debug(
+          s"""Container information for ${node.settings.networkSettings.nodeName}:
+             |Exit code: ${containerInfo.state().exitCode()}
+             |Error: ${containerInfo.state().error()}
+             |Status: ${containerInfo.state().status()}
+             |OOM killed: ${containerInfo.state().oomKilled()}""".stripMargin)
+
+        try {
+          client.removeContainer(node.nodeInfo.containerId)
+        } catch {
+          case NonFatal(e) => log.warn(s"Can't remove a container of ${node.settings.networkSettings.nodeName}", e)
+        }
       }
 
       try {
@@ -318,9 +330,9 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
     val ip = s"$networkPrefix.$nodeNumber"
 
     EndpointConfig.builder()
-        .ipAddress(ip)
-        .ipamConfig(EndpointIpamConfig.builder().ipv4Address(ip).build())
-        .build()
+      .ipAddress(ip)
+      .ipamConfig(EndpointIpamConfig.builder().ipv4Address(ip).build())
+      .build()
   }
 
   private def dumpContainers(containers: java.util.List[Container], label: String = "Containers"): Unit = {
