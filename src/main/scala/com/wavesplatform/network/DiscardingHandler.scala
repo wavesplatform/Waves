@@ -6,10 +6,14 @@ import monix.reactive.Observable
 import scorex.utils.ScorexLogging
 
 @Sharable
-class DiscardingHandler(blockchainReadiness : Observable[Boolean]) extends ChannelDuplexHandler with ScorexLogging {
-  override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef) = msg match {
-//    case RawBytes(code, _) if code == TransactionMessageSpec.messageCode && blockchainReadiness.lastOptionL =>
-//      log.trace(s"${id(ctx)} Discarding incoming message $code")
+class DiscardingHandler(blockchainReadiness: Observable[Boolean]) extends ChannelDuplexHandler with ScorexLogging {
+
+  private val scheduler = monix.execution.Scheduler.fixedPool("discarding-handler", 4)
+  private val lastReadiness = lastSeen(blockchainReadiness)
+
+  override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
+    case RawBytes(code, _) if code == TransactionMessageSpec.messageCode && lastReadiness().contains(true) =>
+      log.trace(s"${id(ctx)} Discarding incoming message $code")
     case _ => super.channelRead(ctx, msg)
   }
 }
