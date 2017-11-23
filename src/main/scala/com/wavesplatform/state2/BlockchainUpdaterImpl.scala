@@ -15,7 +15,7 @@ import com.wavesplatform.utils.{UnsupportedFeature, forceStopApplication}
 import kamon.Kamon
 import kamon.metric.instrument.Time
 import monix.eval.Coeval
-import monix.reactive.subjects.{ConcurrentSubject}
+import monix.reactive.subjects.ConcurrentSubject
 import scorex.block.{Block, MicroBlock}
 import scorex.transaction.ValidationError.{BlockAppendError, GenericError, MicroBlockAppendError}
 import scorex.transaction._
@@ -259,7 +259,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
             } yield {
               log.info(s"$microBlock appended")
               ng.append(microBlock, diff, System.currentTimeMillis())
-              lastBlockInfo.onNext(LastBlockInfo(microBlock.totalResBlockSig, historyReader.score(), true))
+              lastBlockInfo.onNext(LastBlockInfo(microBlock.totalResBlockSig, historyReader.score(), ready = true))
             }
         }
     }

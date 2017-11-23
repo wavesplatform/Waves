@@ -11,7 +11,6 @@ import com.wavesplatform.{Coordinator, UtxPool}
 import io.netty.channel.Channel
 import io.netty.channel.group.ChannelGroup
 import kamon.Kamon
-import monix.eval.Task
 import monix.execution.Scheduler
 import monix.reactive.Observable
 import scorex.block.Block
@@ -51,20 +50,19 @@ object CoordinatorHandler extends ScorexLogging {
     }
 
     def processAndBlacklistOnFailure[A](ch: Channel, start: => String, success: => String, errorPrefix: String,
-                                        f: => Either[_, Option[A]], r: A => Unit): Task[Unit] = {
+                                        f: => Either[_, Option[A]], r: A => Unit): Unit = {
       log.debug(start)
-      Task(f).map {
+      f match {
         case Right(maybeNewScore) =>
           log.debug(success)
           maybeNewScore.foreach(r)
         case Left(ve) =>
           log.warn(s"$errorPrefix: $ve")
           peerDatabase.blacklistAndClose(ch, s"$errorPrefix: $ve")
-      }.onErrorHandle[Unit]((t: Throwable) => log.debug(s"${id(ch)} Exception caught", t))
+      }
     }
 
-
-    val a = blocks.executeOn(scheduler).mapTask { case ((ch, b)) => Task {
+    val a = blocks.executeOn(scheduler).map { case ((ch, b)) =>
       BlockStats.received(b, BlockStats.Source.Broadcast, ch)
       blockReceivingLag.safeRecord(System.currentTimeMillis() - b.timestamp)
       b.signaturesValid().flatMap(b => processBlock(b)) match {
@@ -82,17 +80,16 @@ object CoordinatorHandler extends ScorexLogging {
           BlockStats.declined(b, BlockStats.Source.Broadcast)
           log.debug(s"${id(ch)} Could not append $b: $ve")
       }
-    }.onErrorHandle[Unit]((t: Throwable) => log.debug(s"${id(ch)} Exception caught", t))
     }
 
-    val b = checkpoints.executeOn(scheduler).mapTask { case ((ch, c)) => processAndBlacklistOnFailure(ch,
+    val b = checkpoints.executeOn(scheduler).map { case ((ch, c)) => processAndBlacklistOnFailure(ch,
       s"${id(ch)} Attempting to process checkpoint",
       s"${id(ch)} Successfully processed checkpoint",
       s"${id(ch)} Error processing checkpoint",
       processCheckpoint(c).map(Some(_)), scheduleMiningAndBroadcastScore)
     }
 
-    val c = extensions.executeOn(scheduler).mapTask { case ((ch, ExtensionBlocks(extensionBlocks))) =>
+    val c = extensions.executeOn(scheduler).map { case ((ch, ExtensionBlocks(extensionBlocks))) =>
       extensionBlocks.foreach(BlockStats.received(_, BlockStats.Source.Ext, ch))
       processAndBlacklistOnFailure(ch,
         s"${id(ch)} Attempting to append extension ${formatBlocks(extensionBlocks)}",
@@ -102,10 +99,10 @@ object CoordinatorHandler extends ScorexLogging {
         scheduleMiningAndBroadcastScore)
     }
 
-    val d = microblockDatas.executeOn(scheduler).mapTask { case ((ch, md)) =>
+    val d = microblockDatas.executeOn(scheduler).map { case ((ch, md)) =>
       import md.microBlock
       val microblockTotalResBlockSig = microBlock.totalResBlockSig
-      Task(microBlock.signaturesValid().flatMap(processMicroBlock) match {
+      microBlock.signaturesValid().flatMap(processMicroBlock) match {
         case Right(()) =>
           md.invOpt match {
             case Some(mi) => allChannels.broadcast(mi, except = md.microblockOwners())
@@ -117,9 +114,9 @@ object CoordinatorHandler extends ScorexLogging {
         case Left(ve) =>
           BlockStats.declined(microBlock)
           log.debug(s"${id(ch)} Could not append microblock $microblockTotalResBlockSig: $ve")
-      }).onErrorHandle[Unit]((t: Throwable) => log.debug(s"${id(ch)} Exception caught", t))
+      }
     }
 
-    Observable.merge(a, b, c, d)
+    Observable.merge(a, b, c, d).logErr
   }
 }

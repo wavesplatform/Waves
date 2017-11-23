@@ -60,14 +60,14 @@ object RxExtensionLoader extends ScorexLogging {
           }
         case _ =>
       }
-    }.subscribe()(scheduler)
+    }.logErr.subscribe()(scheduler)
 
 
     bestChannel.executeOn(scheduler).map {
       case Some(BestChannel(ch, _)) if innerState == Idle => requestExtension(ch, history.lastBlockIds(ss.maxRollback), "Idle and channel with better score detected")
       case _ =>
 
-    }.subscribe()(scheduler)
+    }.logErr.subscribe()(scheduler)
 
     signatures.executeOn(scheduler).map { case ((ch, sigs)) => innerState match {
       case ExpectingSignatures(c, known, timeout) if c == ch =>
@@ -84,7 +84,7 @@ object RxExtensionLoader extends ScorexLogging {
       case _ => log.trace(s"${id(ch)} Received unexpected signatures, ignoring")
 
     }
-    }.subscribe()(scheduler)
+    }.logErr.subscribe()(scheduler)
 
     blocks.executeOn(scheduler).map { case ((ch, block)) =>
       innerState match {
@@ -108,7 +108,7 @@ object RxExtensionLoader extends ScorexLogging {
         case _ => simpleBlocks.onNext((ch, block))
 
       }
-    }.subscribe()(scheduler)
+    }.logErr.subscribe()(scheduler)
     (extensionBlocks, simpleBlocks)
   }
 
