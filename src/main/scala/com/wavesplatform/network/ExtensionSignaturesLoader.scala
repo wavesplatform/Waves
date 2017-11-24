@@ -8,7 +8,9 @@ import scorex.utils.ScorexLogging
 
 import scala.concurrent.duration.FiniteDuration
 
-class ExtensionSignaturesLoader(syncTimeout: FiniteDuration, peerDatabase: PeerDatabase)
+class ExtensionSignaturesLoader(syncTimeout: FiniteDuration,
+                                peerDatabase: PeerDatabase,
+                                knownInvalidBlocks: InvalidBlockStorage)
   extends ChannelDuplexHandler with ScorexLogging {
 
   private var currentTimeout = Option.empty[ScheduledFuture[Unit]]
@@ -16,6 +18,10 @@ class ExtensionSignaturesLoader(syncTimeout: FiniteDuration, peerDatabase: PeerD
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
     case s: Signatures =>
+      s.signatures.find(knownInvalidBlocks.contains).foreach { invalidBlockId =>
+        peerDatabase.blacklistAndClose(ctx.channel(), s"Has known invalid block: $invalidBlockId")
+      }
+
       val (known, unknown) = s.signatures.span(id => lastKnownSignatures.contains(id))
       currentTimeout.foreach(_.cancel(true))
       currentTimeout = None

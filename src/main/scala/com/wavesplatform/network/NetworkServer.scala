@@ -84,9 +84,13 @@ class NetworkServer(checkpointService: CheckpointService,
     settings.networkSettings.maxInboundConnections,
     settings.networkSettings.maxConnectionsPerHost)
 
+  private val knownInvalidBlocks = new InvalidBlockStorageImpl(settings.synchronizationSettings.invalidBlocksStorage)
+
   private val microBlockOwners = new MicroBlockOwners(settings.synchronizationSettings.microBlockSynchronizer.invCacheTimeout)
-  private val coordinatorHandler = new CoordinatorHandler(checkpointService, history, blockchainUpdater, time,
-    stateReader, utxPool, blockchainReadiness, miner, settings, peerDatabase, allChannels, featureProvider, microBlockOwners)
+  private val coordinatorHandler = new CoordinatorHandler(
+    checkpointService, history, blockchainUpdater, time, stateReader, utxPool, blockchainReadiness, miner, settings,
+    peerDatabase, allChannels, featureProvider, microBlockOwners, knownInvalidBlocks
+  )
 
   private val peerConnections = new ConcurrentHashMap[PeerKey, Channel](10, 0.9f, 10)
 
@@ -122,7 +126,7 @@ class NetworkServer(checkpointService: CheckpointService,
         peerSynchronizer,
         historyReplier,
         microBlockSynchronizer,
-        new ExtensionSignaturesLoader(settings.synchronizationSettings.synchronizationTimeout, peerDatabase),
+        new ExtensionSignaturesLoader(settings.synchronizationSettings.synchronizationTimeout, peerDatabase, knownInvalidBlocks),
         new ExtensionBlocksLoader(settings.synchronizationSettings.synchronizationTimeout, peerDatabase, history),
         new OptimisticExtensionLoader,
         utxPoolSynchronizer,
@@ -156,7 +160,7 @@ class NetworkServer(checkpointService: CheckpointService,
       peerSynchronizer,
       historyReplier,
       microBlockSynchronizer,
-      new ExtensionSignaturesLoader(settings.synchronizationSettings.synchronizationTimeout, peerDatabase),
+      new ExtensionSignaturesLoader(settings.synchronizationSettings.synchronizationTimeout, peerDatabase, knownInvalidBlocks),
       new ExtensionBlocksLoader(settings.synchronizationSettings.synchronizationTimeout, peerDatabase, history),
       new OptimisticExtensionLoader,
       utxPoolSynchronizer,

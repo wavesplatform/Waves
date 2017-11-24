@@ -34,13 +34,14 @@ class CoordinatorHandler(checkpointService: CheckpointService,
                          peerDatabase: PeerDatabase,
                          allChannels: ChannelGroup,
                          featureProvider: FeatureProvider,
-                         microBlockOwners: MicroBlockOwners)
+                         microBlockOwners: MicroBlockOwners,
+                         invalidBlocks: InvalidBlockStorage)
   extends ChannelInboundHandlerAdapter with ScorexLogging {
 
   private implicit val scheduler = Scheduler.singleThread("coordinator-handler")
 
   private val processCheckpoint = Coordinator.processCheckpoint(checkpointService, history, blockchainUpdater) _
-  private val processFork = Coordinator.processFork(checkpointService, history, blockchainUpdater, stateReader, utxStorage, time, settings, blockchainReadiness, featureProvider) _
+  private val processFork = Coordinator.processFork(checkpointService, history, blockchainUpdater, stateReader, utxStorage, time, settings, blockchainReadiness, featureProvider, invalidBlocks) _
   private val processBlock = Coordinator.processSingleBlock(checkpointService, history, blockchainUpdater, time, stateReader, utxStorage, settings.blockchainSettings, featureProvider) _
   private val processMicroBlock = Coordinator.processMicroBlock(checkpointService, history, blockchainUpdater, utxStorage) _
 
