@@ -2,26 +2,26 @@ package com.wavesplatform.it
 
 import java.io.FileOutputStream
 import java.nio.file.{Files, Paths}
-import java.util.concurrent.atomic.AtomicBoolean
-import java.util.concurrent.ConcurrentHashMap
 import java.util.{Collections, Properties, List => JList, Map => JMap}
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicBoolean
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.dataformat.javaprop.JavaPropsMapper
 import com.google.common.collect.ImmutableMap
-import com.spotify.docker.client.messages.EndpointConfig.EndpointIpamConfig
-import com.spotify.docker.client.messages._
 import com.spotify.docker.client.{DefaultDockerClient, DockerClient}
+import com.spotify.docker.client.messages._
+import com.spotify.docker.client.messages.EndpointConfig.EndpointIpamConfig
 import com.typesafe.config.{Config, ConfigFactory, ConfigRenderOptions}
 import org.asynchttpclient.Dsl._
 import scorex.utils.ScorexLogging
 
 import scala.collection.JavaConverters._
+import scala.concurrent.{blocking, Await, Future}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.concurrent.{Await, Future, blocking}
-import scala.util.control.NonFatal
 import scala.util.Random
+import scala.util.control.NonFatal
 
 case class NodeInfo(hostRestApiPort: Int,
                     hostNetworkPort: Int,

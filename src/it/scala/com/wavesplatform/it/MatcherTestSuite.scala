@@ -1,11 +1,15 @@
 package com.wavesplatform.it
 
+import com.google.common.primitives.Longs
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.api.NodeApi.{AssetBalance, LevelResponse, MatcherStatusResponse, OrderBookResponse, Transaction}
 import com.wavesplatform.matcher.api.CancelOrderRequest
 import com.wavesplatform.state2.ByteStr
 import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
+import play.api.libs.json.{JsArray, JsString}
+import play.api.libs.json.Json.parse
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
+import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
 
@@ -80,6 +84,20 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
     val orders = matcherGetOrderBook()
     orders.asks.head.amount shouldBe 500
     orders.asks.head.price shouldBe 2 * Waves * Order.PriceConstant
+  }
+
+  "and should be listed by trader's publiс key via REST" in {
+    val ts = System.currentTimeMillis()
+    val privateKey = PrivateKeyAccount(Base58.decode(aliceNode.accountSeed).get)
+
+    val pk = Base58.decode(aliceNode.publicKey).get
+    val signature = Base58.encode(EllipticCurveImpl.sign(privateKey, pk ++ Longs.toByteArray(ts)))
+
+    val json = parse(Await.result(matcherNode.matcherGet(s"/matcher/orderbook/${aliceNode.publicKey}", _
+      .addHeader("Timestamp", ts)
+      .addHeader("Signature", signature)), 1.minute).getResponseBody)
+
+    (json.as[JsArray].value.head \ "id").get shouldBe JsString(aliceSell1)
   }
 
   "and should match with buy order" in {

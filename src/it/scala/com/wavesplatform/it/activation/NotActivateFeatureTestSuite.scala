@@ -32,8 +32,8 @@ class NotActivateFeatureTestSuite extends FreeSpec with Matchers with BeforeAndA
   }
 
   "get activation status info" in {
-    activationStatusInfoBefore = Some(activationStatus(nodes.head, votingInterval - 1, votingFeatureNum, 2.minute))
-    activationStatusInfoAfter = Some(activationStatus(nodes.head, votingInterval + 1, votingFeatureNum, 2.minute))
+    activationStatusInfoBefore = Some(activationStatus(nodes, votingInterval - 1, votingFeatureNum, 4.minute))
+    activationStatusInfoAfter = Some(activationStatus(nodes, votingInterval + 1, votingFeatureNum, 4.minute))
   }
 
   "supported blocks is not increased when nobody votes for feature" in {
