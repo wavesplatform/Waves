@@ -11,25 +11,29 @@ import scala.concurrent.{Await, ExecutionContext, Future}
 trait ActivationStatusRequest extends Matchers {
   def activationStatus(node: Node, height: Int, featureNum: Short, timeout: Duration)
                       (implicit ec: ExecutionContext): ActivationStatusFeature = Await.result(
-    activationStatusInternal(node, height, featureNum, timeout),
+    activationStatusInternal(node, height).map(_.features.find(_.id == featureNum).get),
     timeout
   )
 
   def activationStatus(nodes: Seq[Node], height: Int, featureNum: Short, timeout: Duration)
-                      (implicit ec: ExecutionContext): Map[Node, ActivationStatusFeature] = Await.result(
-    Future
-      .traverse(nodes) { node =>
-        activationStatusInternal(node, height, featureNum, timeout).map(node -> _)
-      }
-      .map(_.toMap),
-    timeout
-  )
+                      (implicit ec: ExecutionContext): ActivationStatusFeature = {
+    Await.result(
+      Future
+        .traverse(nodes)(activationStatusInternal(_, height))
+        .map { xs =>
+          xs
+            .collectFirst {
+              case x if x.height == height => x
+            }
+            .flatMap(_.features.find(_.id == featureNum))
+            .getOrElse(throw new NoSuchElementException("Impossible: all nodes is on higher height"))
+        },
+      timeout
+    )
+  }
 
-  private def activationStatusInternal(node: Node, height: Int, featureNum: Short, timeout: Duration)
-                                      (implicit ec: ExecutionContext): Future[ActivationStatusFeature] = {
-    node
-      .waitFor[ActivationStatus](_.activationStatus, _.height >= height, 1.second)
-      .map(_.features.find(_.id == featureNum).get)
+  private def activationStatusInternal(node: Node, height: Int): Future[ActivationStatus] = {
+    node.waitFor[ActivationStatus](_.activationStatus, _.height >= height, 1.second)
   }
 
   def assertVotingStatus(activationStatusFeature: ActivationStatusFeature,
