@@ -1,17 +1,21 @@
 package com.wavesplatform.it
 
+import com.google.common.primitives.Longs
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.api.NodeApi.{AssetBalance, LevelResponse, MatcherStatusResponse, OrderBookResponse, Transaction}
 import com.wavesplatform.matcher.api.CancelOrderRequest
 import com.wavesplatform.state2.ByteStr
 import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
+import scorex.crypto.EllipticCurveImpl
+import play.api.libs.json.{JsArray, JsNumber, JsString}
+import play.api.libs.json.Json.parse
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
 
+import scala.concurrent.{Await, Future}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.concurrent.{Await, Future}
 import scala.util.Random
 
 class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with CancelAfterFailure
@@ -30,6 +34,7 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
   private var aliceBalance = (0L, 0L)
   private var bobBalance = (0L, 0L)
 
+  private val aliceSellAmount = 500
   private var aliceSell1 = ""
   private var bobBuy1 = ""
 
@@ -70,7 +75,7 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
   "sell order could be placed" in {
     // Alice places sell order
     val (id, status) = matcherPlaceOrder(
-      prepareOrder(aliceNode, aliceWavesPair, OrderType.SELL, 2 * Waves * Order.PriceConstant, 500))
+      prepareOrder(aliceNode, aliceWavesPair, OrderType.SELL, 2 * Waves * Order.PriceConstant, aliceSellAmount))
     status shouldBe "OrderAccepted"
     aliceSell1 = id
     // Alice checks that the order in order book
@@ -78,8 +83,36 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
 
     // Alice check that order is correct
     val orders = matcherGetOrderBook()
-    orders.asks.head.amount shouldBe 500
+    orders.asks.head.amount shouldBe aliceSellAmount
     orders.asks.head.price shouldBe 2 * Waves * Order.PriceConstant
+  }
+
+  "froze amount should be listed via matcherBalance REST endpoint" in {
+    val ts = System.currentTimeMillis()
+    val privateKey = PrivateKeyAccount(Base58.decode(aliceNode.accountSeed).get)
+
+    val pk = Base58.decode(aliceNode.publicKey).get
+    val signature = Base58.encode(EllipticCurveImpl.sign(privateKey, pk ++ Longs.toByteArray(ts)))
+
+    val json = parse(Await.result(matcherNode.matcherGet(s"/matcher/matcherBalance/${aliceNode.publicKey}", _
+      .addHeader("Timestamp", ts)
+      .addHeader("Signature", signature)), 1.minute).getResponseBody)
+
+    (json \ aliceAsset).get shouldBe JsNumber(aliceSellAmount)
+  }
+
+  "and should be listed by trader's publiс key via REST" in {
+    val ts = System.currentTimeMillis()
+    val privateKey = PrivateKeyAccount(Base58.decode(aliceNode.accountSeed).get)
+
+    val pk = Base58.decode(aliceNode.publicKey).get
+    val signature = Base58.encode(EllipticCurveImpl.sign(privateKey, pk ++ Longs.toByteArray(ts)))
+
+    val json = parse(Await.result(matcherNode.matcherGet(s"/matcher/orderbook/${aliceNode.publicKey}", _
+      .addHeader("Timestamp", ts)
+      .addHeader("Signature", signature)), 1.minute).getResponseBody)
+
+    (json.as[JsArray].value.head \ "id").get shouldBe JsString(aliceSell1)
   }
 
   "and should match with buy order" in {
