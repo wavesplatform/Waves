@@ -16,20 +16,21 @@ trait ActivationStatusRequest extends Matchers {
   )
 
   def activationStatus(nodes: Seq[Node], height: Int, featureNum: Short, timeout: Duration)
-                      (implicit ec: ExecutionContext): Map[Node, ActivationStatusFeature] = Await.result(
-    Future
-      .traverse(nodes) { node =>
-        activationStatusInternal(node, height).map(node -> _)
-      }
-      .map { xs =>
-        xs
-          .collect {
-            case (n, status) if status.height == height => n -> status.features.find(_.id == featureNum).get
-          }
-          .toMap
-      },
-    timeout
-  )
+                      (implicit ec: ExecutionContext): ActivationStatusFeature = {
+    Await.result(
+      Future
+        .traverse(nodes)(activationStatusInternal(_, height))
+        .map { xs =>
+          xs
+            .collectFirst {
+              case x if x.height == height => x
+            }
+            .flatMap(_.features.find(_.id == featureNum))
+            .getOrElse(throw new NoSuchElementException("Impossible: all nodes is on higher height"))
+        },
+      timeout
+    )
+  }
 
   private def activationStatusInternal(node: Node, height: Int): Future[ActivationStatus] = {
     node.waitFor[ActivationStatus](_.activationStatus, _.height >= height, 1.second)
