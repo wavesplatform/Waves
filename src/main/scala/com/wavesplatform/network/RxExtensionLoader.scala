@@ -113,7 +113,9 @@ object RxExtensionLoader extends ScorexLogging {
                 val optimisticLastBlocks = history.lastBlockIds(ss.maxRollback - ext.size) ++ ext.map(_.uniqueId)
                 requestExtension(bestChannel.channel, optimisticLastBlocks, "Optimistic loader, better channel")
             }
-            extensionBlocks.onNext((ch, ExtensionBlocks(ext)))
+            val extension = ExtensionBlocks(ext)
+            log.debug(s"${id(ch)} Extension $extension fully recieved")
+            extensionBlocks.onNext((ch, extension))
           } else become(ExpectingBlocks(c, requested, expected - block.uniqueId, recieved + block, blacklistOnTimeout(ch, s"Timeout loading one of requested blocks; prev state=$innerState")))
         case _ => simpleBlocks.onNext((ch, block))
 
@@ -134,16 +136,18 @@ object RxExtensionLoader extends ScorexLogging {
   case object Idle extends ExtensionLoaderState
 
   case class ExpectingSignatures(channel: Channel, known: Seq[BlockId], timeout: CancelableFuture[Unit]) extends WithPeer {
-    override def toString: String = s"ExpectingSignatures(channel=$channel)"
+    override def toString: String = s"ExpectingSignatures(channel=${id(channel)})"
   }
 
   case class ExpectingBlocks(channel: Channel, allBlocks: Seq[BlockId],
                              expected: Set[BlockId],
                              received: Set[Block],
                              timeout: CancelableFuture[Unit]) extends WithPeer {
-    override def toString: String = s"ExpectingBlocks(channel=$channel, totalBlocks=${allBlocks.size}, received=${received.size}, expected=${expected.size}"
+    override def toString: String = s"ExpectingBlocks(channel=${id(channel)}, totalBlocks=${allBlocks.size}, received=${received.size}, expected=${expected.size})"
   }
 
-  case class ExtensionBlocks(extension: Seq[Block])
+  case class ExtensionBlocks(extension: Seq[Block]) {
+    override def toString: String = if(extension.isEmpty) "ExtensionBlocks()" else s"ExtensionBlocks(size =${extension.size}, [${extension.head.uniqueId.trim}..${extension.last.uniqueId.trim}])"
+  }
 
 }

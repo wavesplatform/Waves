@@ -17,13 +17,14 @@ import scala.concurrent.duration.FiniteDuration
 
 object RxScoreObserver extends ScorexLogging {
 
-  def apply(scoreTtl: FiniteDuration, localScores: Observable[BlockchainScore],
+  def apply(scoreTtl: FiniteDuration, initalLocalScore: BigInt,
+            localScores: Observable[BlockchainScore],
             remoteScores: Observable[(Channel, BlockchainScore)],
             channelClosed: Observable[Channel]): Observable[SyncWith] = {
 
     val scheduler: SchedulerService = Scheduler.singleThread("rx-score-observer")
 
-    var localScore: BlockchainScore = 0
+    var localScore: BlockchainScore = initalLocalScore
     var currentBestChannel: Option[Channel] = None
     val scores = CacheBuilder.newBuilder()
       .expireAfterWrite(scoreTtl.toMillis, TimeUnit.MILLISECONDS)

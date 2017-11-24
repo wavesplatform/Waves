@@ -85,7 +85,7 @@ class NetworkServer(checkpointService: CheckpointService,
   private val closedChannels = ConcurrentSubject.publish[Channel](Scheduler.singleThread("closed-channels"))
 
   private val (mesageObserver, signatures, blocks, remoteScores, checkpoints, microInvs, micros) = MessageObserver()
-  private val syncWith = RxScoreObserver(settings.synchronizationSettings.scoreTTL, blockchainUpdater.lastBlockInfo.map(_.score), remoteScores, closedChannels)
+  private val syncWith = RxScoreObserver(settings.synchronizationSettings.scoreTTL, history.score(), blockchainUpdater.lastBlockInfo.map(_.score), remoteScores, closedChannels)
   private val microblockDatas = MicroBlockSynchronizer(settings.synchronizationSettings.microBlockSynchronizer, history, peerDatabase)(blockchainUpdater.lastBlockInfo.map(_.id), microInvs, micros)
   private val (extensions, newBlocks) = RxExtensionLoader(settings.synchronizationSettings, history, peerDatabase, knownInvalidBlocks, syncWith, blocks, signatures, closedChannels)
   private val sink: Observable[Unit] = CoordinatorHandler(checkpointService, history, blockchainUpdater, time,

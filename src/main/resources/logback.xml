@@ -11,6 +11,9 @@
     </appender>
 
     <logger name="io.netty" level="INFO"/>
+    <logger name="com.wavesplatform.network.PeerDatabaseImpl" level="DEBUG"/>
+    <logger name="com.wavesplatform.network.PeerSynchronizer" level="DEBUG"/>
+
     <logger name="io.swagger" level="INFO"/>
     <logger name="org.asynchttpclient" level="INFO"/>
 
