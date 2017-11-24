@@ -33,7 +33,7 @@ trait ActivationStatusRequest extends Matchers {
   }
 
   private def activationStatusInternal(node: Node, height: Int): Future[ActivationStatus] = {
-    node.waitFor[ActivationStatus](_.activationStatus, _.height >= height, 1.second)
+    node.waitFor[ActivationStatus](s"activationStatusInternal: height should be >= $height")(_.activationStatus, _.height >= height, 1.second)
   }
 
   def assertVotingStatus(activationStatusFeature: ActivationStatusFeature,
