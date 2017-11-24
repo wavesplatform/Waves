@@ -4,7 +4,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 import com.wavesplatform.features.{BlockchainFeatures, FeatureProvider}
 import com.wavesplatform.metrics._
-import com.wavesplatform.network.{BlockCheckpoint, Checkpoint}
+import com.wavesplatform.network.{BlockCheckpoint, Checkpoint, InvalidBlockStorage}
 import com.wavesplatform.settings.{BlockchainSettings, FunctionalitySettings, WavesSettings}
 import com.wavesplatform.state2._
 import com.wavesplatform.state2.reader.SnapshotStateReader
@@ -24,7 +24,7 @@ import scala.util.{Left, Right}
 object Coordinator extends ScorexLogging with Instrumented {
   def processFork(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater,
                   stateReader: StateReader, utxStorage: UtxPool, time: Time, settings: WavesSettings,
-                  blockchainReadiness: AtomicBoolean, featureProvider: FeatureProvider, storeInvalidBlock: ByteStr => Unit)
+                  blockchainReadiness: AtomicBoolean, featureProvider: FeatureProvider, invalidBlocks: InvalidBlockStorage)
                  (blocks: Seq[Block]): Either[ValidationError, Option[BigInt]] =  Signed.validateOrdered(blocks).flatMap { newBlocks =>
    history.write { implicit l =>
     val extension = newBlocks.dropWhile(history.contains)
@@ -47,7 +47,7 @@ object Coordinator extends ScorexLogging with Instrumented {
 
           firstDeclined.foreach {
             case (_, declinedBlock, _) =>
-              storeInvalidBlock(declinedBlock.uniqueId)
+              invalidBlocks.add(declinedBlock.uniqueId)
               extension.view
                 .dropWhile(_ != declinedBlock)
                 .foreach(BlockStats.declined(_, BlockStats.Source.Ext))
