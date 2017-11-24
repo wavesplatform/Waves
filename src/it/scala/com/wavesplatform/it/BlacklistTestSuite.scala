@@ -39,13 +39,14 @@ class BlacklistTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll w
   "primary node should blacklist other nodes" in Await.result(
     for {
       _ <- traverse(otherNodes) { n => primaryNode.blacklist(n.nodeInfo.networkIpAddress, n.nodeInfo.hostNetworkPort) }
-      _ <- primaryNode.waitFor[Seq[BlacklistedPeer]](_.blacklistedPeers, _.size == nodes.size - 1, 1.second)
+      expectedBlacklistedPeers = nodes.size - 1
+      _ <- primaryNode.waitFor[Seq[BlacklistedPeer]](s"blacklistedPeers.size == $expectedBlacklistedPeers")(_.blacklistedPeers, _.size == expectedBlacklistedPeers, 1.second)
     } yield (),
     1.minute
   )
 
   "sleep while nodes are blocked" in Await.result(
-    primaryNode.waitFor[Seq[BlacklistedPeer]](_.blacklistedPeers, _.isEmpty, 5.second),
+    primaryNode.waitFor[Seq[BlacklistedPeer]](s"blacklistedPeers is empty")(_.blacklistedPeers, _.isEmpty, 5.second),
     primaryNode.settings.networkSettings.blackListResidenceTime + 5.seconds
   )
 
