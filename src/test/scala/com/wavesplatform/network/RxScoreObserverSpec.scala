@@ -1,14 +1,20 @@
 package com.wavesplatform.network
 
 import com.wavesplatform.TransactionGen
+import com.wavesplatform.network.RxScoreObserver.BestChannel
 import io.netty.channel.Channel
+import io.netty.channel.local.LocalChannel
+import monix.reactive.Observable
 import monix.reactive.subjects.PublishSubject
 import org.scalatest.{FreeSpec, Matchers}
 import scorex.transaction.History.BlockchainScore
 
+import scala.concurrent.Await
 import scala.concurrent.duration._
 
 class RxScoreObserverSpec extends FreeSpec with Matchers with TransactionGen {
+
+  implicit val scheduler = monix.execution.Scheduler.singleThread("rx-score-observer-test")
 
   def buildObserver() = {
     val localScores = PublishSubject[BlockchainScore]
@@ -19,14 +25,22 @@ class RxScoreObserverSpec extends FreeSpec with Matchers with TransactionGen {
     (syncWith, localScores, remoteScores, channelClosed)
   }
 
+  def listen[T](o : Observable[T]): Unit = {
+
+  }
+
   "should emit better channel" - {
     "when a new channel has the better score than the local one" in {
-//      val (syncWith, localScores, remoteScores, _) = buildObserver()
-//      val ch = new LocalChannel()
-//      val sub = syncWith.firstL.runAsync
-//      localScores.onNext(1)
-//      remoteScores.onNext((ch, 2))
-//      Await.result(sub, Duration.Inf) shouldBe Some(BestChannel(ch, 2))
+      val (syncWith, localScores, remoteScores, _) = buildObserver()
+
+      val secondEvent = syncWith.drop(1).runAsyncGetFirst
+
+      val ch = new LocalChannel()
+      localScores.onNext(1)
+      remoteScores.onNext((ch, 2))
+
+      //wait for secont event from observable
+      Await.result(secondEvent, 10.seconds).get shouldBe Some(BestChannel(ch, 2))
     }
 
     "when the connection with the best one is dropped" in {
