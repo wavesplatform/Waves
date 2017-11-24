@@ -17,6 +17,7 @@ trait OrderHistory {
   def orderStatus(id: String): OrderStatus
   def orderInfo(id: String): OrderInfo
   def openVolume(assetAcc: AssetAcc): Long
+  def openVolumes(address: String): Option[Map[String, Long]]
   def ordersByPairAndAddress(assetPair: AssetPair, address: String): Set[String]
   def getAllOrdersByAddress(address: String): Stream[String]
   def deleteOrder(assetPair: AssetPair, address: String, orderId: String): Boolean
@@ -111,6 +112,8 @@ case class OrderHistoryImpl(p: OrderHistoryStorage) extends OrderHistory with Sc
     Option(p.addressToOrderPortfolio.get(assetAcc.account.address)).flatMap(_.get(asset)).map(math.max(0L, _)).getOrElse(0L)
   }
 
+  override def openVolumes(address: String): Option[Map[String, Long]] = Option(p.addressToOrderPortfolio.get(address))
+
   override def ordersByPairAndAddress(assetPair: AssetPair, address: String): Set[String] = {
     val pairAddressKey = OrderHistoryStorage.assetPairAddressKey(assetPair, address)
     Option(p.pairAddressToOrderIds.get(pairAddressKey)).map(_.takeRight(MaxOrdersPerRequest).toSet).getOrElse(Set())
@@ -119,7 +122,6 @@ case class OrderHistoryImpl(p: OrderHistoryStorage) extends OrderHistory with Sc
   override def getAllOrdersByAddress(address: String): Stream[String] = {
     p.pairAddressToOrderIds.asScala.toStream.filter(_._1.endsWith(address)).flatMap(_._2)
   }
-
 
   private def deleteFromOrdersInfo(orderId: String): Unit = {
     p.ordersInfo.remove(orderId)

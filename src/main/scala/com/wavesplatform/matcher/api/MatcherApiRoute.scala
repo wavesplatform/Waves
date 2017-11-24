@@ -38,7 +38,7 @@ case class MatcherApiRoute(wallet: Wallet,
 
   override lazy val route: Route =
     pathPrefix("matcher") {
-      matcherPublicKey ~ orderBook ~ place ~ getAssetPairAndPublicKeyOrderHistory ~ getPublicKeyOrderHistory ~ getAllOrderHistory ~ getTradableBalance ~ orderStatus ~
+      matcherPublicKey ~ orderBook ~ place ~ getAssetPairAndPublicKeyOrderHistory ~ getPublicKeyOrderHistory ~ getAllOrderHistory ~ getTradableBalance ~ getPublicKeyMatcherBalance ~ orderStatus ~
         historyDelete ~ cancel ~ orderbooks ~ orderBookDelete ~ getTransactionsByOrder
     }
 
@@ -212,9 +212,9 @@ case class MatcherApiRoute(wallet: Wallet,
     (headerValueByName("Timestamp") & headerValueByName("Signature")) { (ts, sig) =>
       checkGetSignature(publicKey, ts, sig) match {
         case Success(address) =>
-            complete((orderHistory ? GetAllOrderHistory(address, NTP.correctedTime()))
-              .mapTo[MatcherResponse]
-              .map(r => r.code -> r.json))
+          complete((orderHistory ? GetAllOrderHistory(address, NTP.correctedTime()))
+            .mapTo[MatcherResponse]
+            .map(r => r.code -> r.json))
         case Failure(ex) =>
           complete(StatusCodes.BadRequest -> Json.obj("message" -> ex.getMessage))
       }
@@ -249,6 +249,28 @@ case class MatcherApiRoute(wallet: Wallet,
       complete((orderHistory ? GetTradableBalance(pair, address, NTP.correctedTime()))
         .mapTo[MatcherResponse]
         .map(r => r.code -> r.json))
+    }
+  }
+
+  @Path("/matcherBalance/{publicKey}")
+  @ApiOperation(value = "Matcher Balance by Public Key",
+    notes = "Get Matcher Balance for a given Public Key",
+    httpMethod = "GET")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(name = "publicKey", value = "Public Key", required = true, dataType = "string", paramType = "path"),
+    new ApiImplicitParam(name = "Timestamp", value = "Timestamp", required = true, dataType = "integer", paramType = "header"),
+    new ApiImplicitParam(name = "Signature", value = "Signature of [Public Key ++ Timestamp] bytes", required = true, dataType = "string", paramType = "header")
+  ))
+  def getPublicKeyMatcherBalance: Route = (path("matcherBalance" / Segment) & get) { publicKey =>
+    (headerValueByName("Timestamp") & headerValueByName("Signature")) { (ts, sig) =>
+      checkGetSignature(publicKey, ts, sig) match {
+        case Success(address) =>
+          complete((orderHistory ? GetMatcherBalance(address, NTP.correctedTime()))
+            .mapTo[MatcherResponse]
+            .map(r => r.code -> r.json))
+        case Failure(ex) =>
+          complete(StatusCodes.BadRequest -> Json.obj("message" -> ex.getMessage))
+      }
     }
   }
 
