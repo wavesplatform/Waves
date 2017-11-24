@@ -28,7 +28,8 @@ case class MatcherSettings(enable: Boolean,
                            isMigrateToNewOrderHistoryStorage: Boolean,
                            blacklistedAssets: Set[String],
                            blacklistedNames: Seq[Regex],
-                           txHistoryFile: Option[File]
+                           txHistoryFile: Option[File],
+                           restOrderLimit: Int,
                           )
 
 
@@ -48,6 +49,7 @@ object MatcherSettings {
     val snapshotsInterval = config.as[FiniteDuration](s"$configPath.snapshots-interval")
     val orderCleanupInterval = config.as[FiniteDuration](s"$configPath.order-cleanup-interval")
     val maxOpenOrders = config.as[Int](s"$configPath.max-open-orders")
+    val restOrderLimit = config.as[Int](s"$configPath.rest-order-limit")
     val baseAssets = config.as[List[String]](s"$configPath.price-assets")
     val basePairs: Seq[AssetPair] = config.getConfigList(s"$configPath.predefined-pairs").asScala.map { p: Config =>
       AssetPair.createAssetPair(p.as[String]("amountAsset"), p.as[String]("priceAsset")).get
@@ -64,6 +66,6 @@ object MatcherSettings {
 
     MatcherSettings(enabled, account, bindAddress, port, minOrderFee, orderMatchTxFee, journalDirectory,
       snapshotsDirectory, snapshotsInterval, orderCleanupInterval, maxOpenOrders, baseAssets, basePairs, maxTimestampDiff,
-      orderHistoryFile, isMigrateToNewOrderHistoryStorage, blacklistedAssets.toSet, blacklistedNames, txHistoryFile)
+      orderHistoryFile, isMigrateToNewOrderHistoryStorage, blacklistedAssets.toSet, blacklistedNames, txHistoryFile, restOrderLimit)
   }
 }

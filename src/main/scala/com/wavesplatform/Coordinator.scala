@@ -99,12 +99,6 @@ object Coordinator extends ScorexLogging with Instrumented {
     }
   }
 
-
-  def updateBlockchainReadinessFlag(history: History, time: Time, blockchainReadiness: AtomicBoolean, maxBlockchainAge: FiniteDuration): Boolean = {
-    val expired = time.correctedTime() - history.lastBlockTimestamp().get < maxBlockchainAge.toMillis
-    blockchainReadiness.compareAndSet(expired, !expired)
-  }
-
   def processSingleBlock(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater, time: Time,
                          stateReader: StateReader, utxStorage: UtxPool,
                          settings: BlockchainSettings, featureProvider: FeatureProvider)
