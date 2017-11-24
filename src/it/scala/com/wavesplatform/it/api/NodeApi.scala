@@ -31,14 +31,18 @@ import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 
 trait NodeApi {
+
   import NodeApi._
 
   def restAddress: String
+
   def nodeRestPort: Int
+
   def matcherRestPort: Int
+
   def blockDelay: FiniteDuration
 
-  protected val client: AsyncHttpClient = new DefaultAsyncHttpClient
+  protected def client: AsyncHttpClient
 
   protected val timer: Timer = new HashedWheelTimer()
 
@@ -80,6 +84,7 @@ trait NodeApi {
     retrying(f(
       _post(s"$url:$port$path").setHeader("api_key", "integration-test-rest-api")
     ).build())
+
   def postJson[A: Writes](path: String, body: A): Future[Response] =
     post(path, stringify(toJson(body)))
 
@@ -102,7 +107,7 @@ trait NodeApi {
 
   def connect(host: String, port: Int): Future[Unit] = postJson("/peers/connect", ConnectReq(host, port)).map(_ => ())
 
-  def waitForPeers(targetPeersCount: Int): Future[Seq[Peer]] = waitFor[Seq[Peer]](_.connectedPeers, _.length >= targetPeersCount, 1.second)
+  def waitForPeers(targetPeersCount: Int): Future[Seq[Peer]] = waitFor[Seq[Peer]](s"connectedPeers.size >= $targetPeersCount")(_.connectedPeers, _.size >= targetPeersCount, 1.second)
 
   def height: Future[Int] = get("/blocks/height").as[JsValue].map(v => (v \ "height").as[Int])
 
@@ -134,19 +139,19 @@ trait NodeApi {
     case Failure(ex) => Failure(ex)
   }
 
-  def waitForTransaction(txId: String): Future[Transaction] = waitFor[Option[Transaction]](_.transactionInfo(txId).transform {
+  def waitForTransaction(txId: String): Future[Transaction] = waitFor[Option[Transaction]](s"transaction $txId")(_.transactionInfo(txId).transform {
     case Success(tx) => Success(Some(tx))
     case Failure(UnexpectedStatusCodeException(_, r)) if r.getStatusCode == 404 => Success(None)
     case Failure(ex) => Failure(ex)
   }, tOpt => tOpt.exists(_.id == txId), 1.second).map(_.get)
 
-  def waitForUtxIncreased(fromSize: Int): Future[Int] = waitFor[Int](
+  def waitForUtxIncreased(fromSize: Int): Future[Int] = waitFor[Int](s"utxSize > $fromSize")(
     _.utxSize,
     _ > fromSize,
     100.millis
   )
 
-  def waitForHeight(expectedHeight: Int): Future[Int] = waitFor[Int](_.height, h => h >= expectedHeight, 1.second)
+  def waitForHeight(expectedHeight: Int): Future[Int] = waitFor[Int](s"height >= $expectedHeight")(_.height, h => h >= expectedHeight, 1.second)
 
   def transactionInfo(txId: String): Future[Transaction] = get(s"/transactions/info/$txId").as[Transaction]
 
@@ -192,7 +197,7 @@ trait NodeApi {
   def aliasByAddress(targetAddress: String) =
     get(s"/alias/by-address/$targetAddress").as[Seq[String]]
 
-  def addressByAlias(targetAlias: String): Future[Address]=
+  def addressByAlias(targetAlias: String): Future[Address] =
     get(s"/alias/by-alias/$targetAlias").as[Address]
 
   def rollback(to: Int, returnToUTX: Boolean = true): Future[Unit] =
@@ -208,8 +213,14 @@ trait NodeApi {
         Future.successful(())
     })
 
-  def waitFor[A](f: this.type => Future[A], cond: A => Boolean, retryInterval: FiniteDuration): Future[A] =
+  def waitFor[A](desc: String)(f: this.type => Future[A], cond: A => Boolean, retryInterval: FiniteDuration): Future[A] = {
+    log.debug(s"Awaiting condition '$desc'")
     timer.retryUntil(f(this), cond, retryInterval)
+      .map(a => {
+        log.debug(s"Condition '$desc' met")
+        a
+      })
+  }
 
   def createAddress: Future[String] =
     post(s"http://$restAddress", nodeRestPort, "/addresses").as[JsValue].map(v => (v \ "address").as[String])
@@ -245,10 +256,10 @@ trait NodeApi {
     postJson("/assets/issue", IssueRequest(address, name, description, quantity, decimals, reissuable, fee)).as[Transaction]
 
   def placeOrder(order: Order): Future[MatcherResponse] =
-    matcherPost("/matcher/orderbook", order.json).as[MatcherResponse]
+    matcherPost("/matcher/orderbook", order.json()).as[MatcherResponse]
 
   def expectIncorrectOrderPlacement(order: Order, expectedStatusCode: Int, expectedStatus: String): Future[Boolean] =
-    matcherPost("/matcher/orderbook", order.json) transform {
+    matcherPost("/matcher/orderbook", order.json()) transform {
       case Failure(UnexpectedStatusCodeException(_, r)) if r.getStatusCode == expectedStatusCode =>
         Try(parse(r.getResponseBody).as[MatcherStatusResponse]) match {
           case Success(mr) if mr.status == expectedStatus => Success(true)
@@ -289,7 +300,7 @@ trait NodeApi {
     executeRequest
   }
 
-  def waitForDebugInfoAt(height: Long): Future[DebugInfo] = waitFor[DebugInfo](_.get("/debug/info").as[DebugInfo], _.stateHeight >= height, 1.seconds)
+  def waitForDebugInfoAt(height: Long): Future[DebugInfo] = waitFor[DebugInfo](s"debug info at height >= $height")(_.get("/debug/info").as[DebugInfo], _.stateHeight >= height, 1.seconds)
 
   def debugStateAt(height: Long): Future[Map[String, Long]] = get(s"/debug/stateWaves/$height").as[Map[String, Long]]
 
@@ -312,7 +323,7 @@ object NodeApi extends ScorexLogging {
 
   implicit val peerFormat: Format[Peer] = Json.format
 
-  case class Address(address:String)
+  case class Address(address: String)
 
   implicit val addressFormat: Format[Address] = Json.format
 
@@ -379,7 +390,8 @@ object NodeApi extends ScorexLogging {
   implicit val debugInfoFormat: Format[DebugInfo] = Json.format
 
 
-  case class BlacklistedPeer(hostname : String, timestamp: Long, reason: String)
+  case class BlacklistedPeer(hostname: String, timestamp: Long, reason: String)
+
   implicit val blacklistedPeerFormat: Format[BlacklistedPeer] = Json.format
 
 }

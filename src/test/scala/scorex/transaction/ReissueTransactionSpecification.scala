@@ -18,15 +18,15 @@ class ReissueTransactionSpecification extends PropSpec with PropertyChecks with 
 
   property("Reissue serialization roundtrip") {
     forAll(reissueGen) { issue: ReissueTransaction =>
-      val recovered = parseBytes(issue.bytes).get
-      recovered.bytes shouldEqual issue.bytes
+      val recovered = parseBytes(issue.bytes()).get
+      recovered.bytes() shouldEqual issue.bytes()
     }
   }
 
   property("Reissue serialization from TypedTransaction") {
     forAll(reissueGen) { issue: ReissueTransaction =>
-      val recovered = TransactionParser.parseBytes(issue.bytes).get
-      recovered.bytes shouldEqual issue.bytes
+      val recovered = TransactionParser.parseBytes(issue.bytes()).get
+      recovered.bytes() shouldEqual issue.bytes()
     }
   }
 

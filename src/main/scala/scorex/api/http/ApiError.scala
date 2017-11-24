@@ -24,7 +24,7 @@ trait ApiError {
 object ApiError {
   def fromValidationError(e: ValidationError): ApiError = e match {
     case ValidationError.InvalidAddress(_) => InvalidAddress
-    case ValidationError.NegativeAmount => NegativeAmount
+    case ValidationError.NegativeAmount(x, of) => NegativeAmount(s"$x of $of")
     case ValidationError.InsufficientFee => InsufficientFee
     case ValidationError.InvalidName => InvalidName
     case ValidationError.InvalidSignature(_, _) => InvalidSignature
@@ -153,7 +153,7 @@ case class StateCheckFailed(tx: Transaction, err: String) extends ApiError {
   override val id: Int = 112
   override val message: String = s"State check failed. Reason: $err"
   override val code: StatusCode = StatusCodes.BadRequest
-  override lazy val json = Json.obj("error" -> id, "message" -> message, "tx" -> tx.json)
+  override lazy val json = Json.obj("error" -> id, "message" -> message, "tx" -> tx.json())
 }
 
 case object OverflowError extends ApiError {

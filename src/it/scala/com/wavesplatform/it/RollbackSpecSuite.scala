@@ -6,7 +6,6 @@ import com.wavesplatform.it.util._
 import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
 import org.scalatest.{FreeSpec, Matchers}
 
-import scala.collection.JavaConverters._
 import scala.concurrent.Await.result
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future.traverse
@@ -16,9 +15,8 @@ import scala.util.Random
 
 class RollbackSpecSuite extends FreeSpec with ScalaFutures with IntegrationPatience
   with Matchers with TransferSending with IntegrationNodesInitializationAndStopping {
-  override val docker = Docker(getClass)
   // there are nodes with big and small balances to reduce the number of forks
-  override val nodes: Seq[Node] = configs.map(docker.startNode)
+  override lazy val nodes: Seq[Node] = docker.startNodes(configs)
 
   private val transactionsCount = 190
 
@@ -65,7 +63,7 @@ class RollbackSpecSuite extends FreeSpec with ScalaFutures with IntegrationPatie
         infos.head
       })
       _ <- processRequests(requests)
-      _ <- nodes.head.waitFor[Int](_.utxSize, _ == 0, 1.second)
+      _ <- nodes.head.waitFor[Int]("empty utx")(_.utxSize, _ == 0, 1.second)
       _ <- traverse(nodes)(_.rollback(startHeight, returnToUTX = false))
       _ <- nodes.head.utx.map( _ shouldBe 'empty )
 
@@ -94,14 +92,9 @@ class RollbackSpecSuite extends FreeSpec with ScalaFutures with IntegrationPatie
 }
 
 object RollbackSpecSuite {
-  private val dockerConfigs = Docker.NodeConfigs.getConfigList("nodes").asScala
+  import NodeConfigs.Default
 
-  private val nonGeneratingNodesConfig = ConfigFactory.parseString(
-    """
-      |waves.miner.enable=no
-    """.stripMargin
-  )
+  private val nonGeneratingNodesConfig = ConfigFactory.parseString("waves.miner.enable = no")
 
-  val configs: Seq[Config] = Seq(dockerConfigs.last,
-    nonGeneratingNodesConfig.withFallback(Random.shuffle(dockerConfigs.init).head))
+  val configs: Seq[Config] = Seq(Default.last, nonGeneratingNodesConfig.withFallback(Random.shuffle(Default.init).head))
 }

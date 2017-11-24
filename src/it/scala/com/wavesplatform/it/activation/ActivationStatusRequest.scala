@@ -1,36 +1,81 @@
 package com.wavesplatform.it.activation
 
 import com.wavesplatform.features.BlockchainFeatureStatus
-import com.wavesplatform.features.api.{ActivationStatusFeature, NodeFeatureStatus}
+import com.wavesplatform.features.api.{ActivationStatus, ActivationStatusFeature, NodeFeatureStatus}
 import com.wavesplatform.it.Node
 import org.scalatest.Matchers
 
 import scala.concurrent.duration._
-import scala.concurrent.Await
-
+import scala.concurrent.{Await, ExecutionContext, Future}
 
 trait ActivationStatusRequest extends Matchers {
-  def activationStatus(node: Node, height: Int, featureNum: Short, timeout: Duration): ActivationStatusFeature = {
-    Await.result(node.waitForHeight(height), timeout)
-    val nodeActivationInfo = Await.result(node.activationStatus, timeout)
-    nodeActivationInfo.features.find(_.id == featureNum).get
+  def activationStatus(node: Node, height: Int, featureNum: Short, timeout: Duration)
+                      (implicit ec: ExecutionContext): ActivationStatusFeature = Await.result(
+    activationStatusInternal(node, height).map(_.features.find(_.id == featureNum).get),
+    timeout
+  )
+
+  def activationStatus(nodes: Seq[Node], height: Int, featureNum: Short, timeout: Duration)
+                      (implicit ec: ExecutionContext): ActivationStatusFeature = {
+    Await.result(
+      Future
+        .traverse(nodes)(activationStatusInternal(_, height))
+        .map { xs =>
+          xs
+            .collectFirst {
+              case x if x.height == height => x
+            }
+            .flatMap(_.features.find(_.id == featureNum))
+            .getOrElse(throw new NoSuchElementException("Impossible: all nodes is on higher height"))
+        },
+      timeout
+    )
   }
 
-  def assertVotingStatus(activationStatusFeature: ActivationStatusFeature, supportedBlocks: Int, blockchainFeatureStatus: BlockchainFeatureStatus, nodeFeatureStatus: NodeFeatureStatus): Unit = {
-    activationStatusFeature.supportedBlocks.get shouldBe supportedBlocks
-    activationStatusFeature.blockchainStatus shouldBe blockchainFeatureStatus
-    activationStatusFeature.nodeStatus shouldBe nodeFeatureStatus
+  private def activationStatusInternal(node: Node, height: Int): Future[ActivationStatus] = {
+    node.waitFor[ActivationStatus](s"activationStatusInternal: height should be >= $height")(_.activationStatus, _.height >= height, 1.second)
   }
 
-  def assertApprovedStatus(activationStatusFeature: ActivationStatusFeature, height: Int, nodeFeatureStatus: NodeFeatureStatus): Unit = {
-    activationStatusFeature.activationHeight.get shouldBe height
-    activationStatusFeature.blockchainStatus shouldBe BlockchainFeatureStatus.Approved
-    activationStatusFeature.nodeStatus shouldBe nodeFeatureStatus
+  def assertVotingStatus(activationStatusFeature: ActivationStatusFeature,
+                         supportedBlocks: Int,
+                         blockchainFeatureStatus: BlockchainFeatureStatus,
+                         nodeFeatureStatus: NodeFeatureStatus): Unit = {
+    withClue("supportedBlocks") {
+      activationStatusFeature.supportedBlocks.get shouldBe supportedBlocks
+    }
+    withClue("blockchainStatus") {
+      activationStatusFeature.blockchainStatus shouldBe blockchainFeatureStatus
+    }
+    withClue("nodeStatus") {
+      activationStatusFeature.nodeStatus shouldBe nodeFeatureStatus
+    }
   }
 
-  def assertActivatedStatus(activationStatusFeature: ActivationStatusFeature, height: Int, nodeFeatureStatus: NodeFeatureStatus): Unit = {
-    activationStatusFeature.activationHeight.get shouldBe height
-    activationStatusFeature.blockchainStatus shouldBe BlockchainFeatureStatus.Activated
-    activationStatusFeature.nodeStatus shouldBe nodeFeatureStatus
+  def assertApprovedStatus(activationStatusFeature: ActivationStatusFeature,
+                           height: Int,
+                           nodeFeatureStatus: NodeFeatureStatus): Unit = {
+    withClue("activationHeight") {
+      activationStatusFeature.activationHeight.get shouldBe height
+    }
+    withClue("blockchainStatus") {
+      activationStatusFeature.blockchainStatus shouldBe BlockchainFeatureStatus.Approved
+    }
+    withClue("nodeStatus") {
+      activationStatusFeature.nodeStatus shouldBe nodeFeatureStatus
+    }
+  }
+
+  def assertActivatedStatus(activationStatusFeature: ActivationStatusFeature,
+                            height: Int,
+                            nodeFeatureStatus: NodeFeatureStatus): Unit = {
+    withClue("activationHeight") {
+      activationStatusFeature.activationHeight.get shouldBe height
+    }
+    withClue("blockchainStatus") {
+      activationStatusFeature.blockchainStatus shouldBe BlockchainFeatureStatus.Activated
+    }
+    withClue("nodeStatus") {
+      activationStatusFeature.nodeStatus shouldBe nodeFeatureStatus
+    }
   }
 }

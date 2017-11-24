@@ -1,22 +1,20 @@
 package scorex.lagonaki.unit
 
-import com.wavesplatform.TransactionGen
 import com.wavesplatform.metrics.Instrumented
-import org.scalatest.prop.PropertyChecks
-import org.scalatest._
+import com.wavesplatform.state2._
 import com.wavesplatform.state2.diffs.produce
+import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Arbitrary.arbitrary
-import org.scalacheck.{Gen, Shrink}
+import org.scalacheck.Gen
+import org.scalatest._
+import org.scalatest.prop.PropertyChecks
 import scorex.block.Block
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.hash.FastCryptographicHash
 import scorex.transaction._
-import com.wavesplatform.state2._
 
-class BlockSpecification extends PropSpec with PropertyChecks with TransactionGen with Matchers {
-
-  private implicit def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)
+class BlockSpecification extends PropSpec with PropertyChecks with TransactionGen with Matchers with NoShrink {
 
   val time = System.currentTimeMillis() - 5000
 
@@ -50,9 +48,9 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
       forAll(blockGen) {
         case (baseTarget, reference, generationSignature, recipient, transactionData) =>
           val block = Block.buildAndSign(version, time, reference, NxtLikeConsensusBlockData(baseTarget, generationSignature), transactionData, recipient, Set.empty).explicitGet()
-          val parsedBlock = Block.parseBytes(block.bytes).get
-          assert(block.signaturesValid.isRight)
-          assert(parsedBlock.signaturesValid.isRight)
+          val parsedBlock = Block.parseBytes(block.bytes()).get
+          assert(block.signaturesValid().isRight)
+          assert(parsedBlock.signaturesValid().isRight)
           assert(parsedBlock.consensusData.generationSignature == generationSignature)
           assert(parsedBlock.version.toInt == version)
           assert(parsedBlock.signerData.generator.publicKey.sameElements(recipient.publicKey))
@@ -95,9 +93,9 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
     forAll(blockGen, faetureSetGen) {
       case ((baseTarget, reference, generationSignature, recipient, transactionData), featureVotes) =>
         val block = Block.buildAndSign(version, time, reference, NxtLikeConsensusBlockData(baseTarget, generationSignature), transactionData, recipient, featureVotes).explicitGet()
-        val parsedBlock = Block.parseBytes(block.bytes).get
-        assert(block.signaturesValid.isRight)
-        assert(parsedBlock.signaturesValid.isRight)
+        val parsedBlock = Block.parseBytes(block.bytes()).get
+        assert(block.signaturesValid().isRight)
+        assert(parsedBlock.signaturesValid().isRight)
         assert(parsedBlock.consensusData.generationSignature == generationSignature)
         assert(parsedBlock.version.toInt == version)
         assert(parsedBlock.signerData.generator.publicKey.sameElements(recipient.publicKey))
@@ -108,7 +106,7 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
   ignore("sign time for 60k txs") {
     forAll(randomTransactionsGen(60000), accountGen, byteArrayGen(Block.BlockIdLength), byteArrayGen(Block.GeneratorSignatureLength)) { case ((txs, acc, ref, gs)) =>
       val (block, t0) = Instrumented.withTime(Block.buildAndSign(3, 1, ByteStr(ref), NxtLikeConsensusBlockData(1, ByteStr(gs)), txs, acc, Set.empty).explicitGet())
-      val (bytes, t1) = Instrumented.withTime(block.bytesWithoutSignature)
+      val (bytes, t1) = Instrumented.withTime(block.bytesWithoutSignature())
       val (hash, t2) = Instrumented.withTime(FastCryptographicHash.hash(bytes))
       val (sig, t3) = Instrumented.withTime(EllipticCurveImpl.sign(acc, hash))
       println((t0, t1, t2, t3))
@@ -117,9 +115,9 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
 
   ignore("serialize and deserialize big block") {
     forAll(bigBlockGen(100 * 1000)) { case block =>
-      val parsedBlock = Block.parseBytes(block.bytes).get
-      block.signaturesValid shouldBe 'right
-      parsedBlock.signaturesValid shouldBe 'right
+      val parsedBlock = Block.parseBytes(block.bytes()).get
+      block.signaturesValid() shouldBe 'right
+      parsedBlock.signaturesValid() shouldBe 'right
     }
   }
 }

@@ -145,7 +145,7 @@ object BlockMessageSpec extends MessageSpec[Block] {
 
   override def maxLength = 271 + TransactionMessageSpec.maxLength * Block.MaxTransactionsPerBlockVer3
 
-  override def serializeData(block: Block): Array[Byte] = block.bytes
+  override def serializeData(block: Block): Array[Byte] = block.bytes()
 
   override def deserializeData(bytes: Array[Byte]): Try[Block] = Block.parseBytes(bytes)
 }
@@ -212,7 +212,7 @@ object TransactionMessageSpec extends MessageSpec[Transaction] {
   override def deserializeData(bytes: Array[Byte]): Try[Transaction] =
     TransactionParser.parseBytes(bytes)
 
-  override def serializeData(tx: Transaction): Array[Byte] = tx.bytes
+  override def serializeData(tx: Transaction): Array[Byte] = tx.bytes()
 }
 
 object MicroBlockInvMessageSpec extends MessageSpec[MicroBlockInv] {
@@ -255,7 +255,7 @@ object MicroBlockResponseMessageSpec extends MessageSpec[MicroBlockResponse] {
   override def deserializeData(bytes: Array[Byte]): Try[MicroBlockResponse] =
     MicroBlock.parseBytes(bytes).map(MicroBlockResponse)
 
-  override def serializeData(resp: MicroBlockResponse): Array[Byte] = resp.microblock.bytes
+  override def serializeData(resp: MicroBlockResponse): Array[Byte] = resp.microblock.bytes()
 
   override def maxLength = 271 + TransactionMessageSpec.maxLength * MaxTransactionsPerMicroblock
 
@@ -263,7 +263,11 @@ object MicroBlockResponseMessageSpec extends MessageSpec[MicroBlockResponse] {
 
 
 object BasicMessagesRepo {
-  val specs: Seq[MessageSpec[_ <: AnyRef]] = Seq(GetPeersSpec, PeersSpec, GetSignaturesSpec, SignaturesSpec,
+  private type Spec = MessageSpec[_ <: AnyRef]
+
+  val specs: Seq[Spec] = Seq(GetPeersSpec, PeersSpec, GetSignaturesSpec, SignaturesSpec,
     GetBlockSpec, BlockMessageSpec, ScoreMessageSpec, CheckpointMessageSpec, TransactionMessageSpec,
     MicroBlockInvMessageSpec, MicroBlockRequestMessageSpec, MicroBlockResponseMessageSpec)
+
+  val specsByCodes: Map[Byte, Spec] = specs.map(s => s.messageCode -> s).toMap
 }

@@ -1,15 +1,22 @@
 package com.wavesplatform.network
 
+import java.nio.channels.ClosedChannelException
+
 import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel._
 import scorex.utils.ScorexLogging
 
 @Sharable
 class WriteErrorHandler extends ChannelOutboundHandlerAdapter with ScorexLogging {
-  override def write(ctx: ChannelHandlerContext, msg: AnyRef, promise: ChannelPromise) =
+  override def write(ctx: ChannelHandlerContext, msg: AnyRef, promise: ChannelPromise): Unit =
     ctx.write(msg, promise.unvoid().addListener { (chf: ChannelFuture) =>
       if (!chf.isSuccess) {
-        log.debug(s"${id(ctx.channel())} Write failed (${msg.getClass.getCanonicalName})", chf.cause())
+        chf.cause() match {
+          case _: ClosedChannelException =>
+            log.trace(s"${id(ctx.channel())} Channel closed while writing (${msg.getClass.getCanonicalName})")
+          case other =>
+            log.debug(s"${id(ctx.channel())} Write failed (${msg.getClass.getCanonicalName})", other)
+        }
       }
     })
 }

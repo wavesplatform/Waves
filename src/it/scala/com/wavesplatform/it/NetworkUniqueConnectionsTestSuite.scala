@@ -4,15 +4,13 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.NetworkUniqueConnectionsTestSuite._
 import org.scalatest.{BeforeAndAfterAll, FreeSpec, Matchers}
 
-import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent._
 import scala.concurrent.duration.DurationInt
-import scala.util.Random
 
-class NetworkUniqueConnectionsTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll{
+class NetworkUniqueConnectionsTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll {
 
-  private val docker = Docker(getClass)
+  private lazy val docker = Docker(getClass)
 
   "nodes should up and connect with each other" in {
     val firstNode = docker.startNode(FirstNodeConfig)
@@ -26,7 +24,7 @@ class NetworkUniqueConnectionsTestSuite extends FreeSpec with Matchers with Befo
              |]""".stripMargin
         )
 
-        docker.startNode(SecondNodeConfig.withFallback(peersConfig))
+        docker.startNode(peersConfig.withFallback(SecondNodeConfig), autoConnect = false)
       }
       _ <- firstNode.waitForPeers(1)
 
@@ -37,7 +35,7 @@ class NetworkUniqueConnectionsTestSuite extends FreeSpec with Matchers with Befo
       )
     } yield ()
 
-    Await.ready(prepare, 1.minute)
+    Await.ready(prepare, 2.minute)
     withClue("Should fail with TimeoutException, because the connectionAttempt should fail") {
       intercept[TimeoutException] {
         Await.ready(firstNode.waitForPeers(2), 10.seconds)
@@ -54,10 +52,8 @@ class NetworkUniqueConnectionsTestSuite extends FreeSpec with Matchers with Befo
 
 private object NetworkUniqueConnectionsTestSuite {
 
-  private val configs = Docker.NodeConfigs.getConfigList("nodes").asScala
-
-  val NodeConfigs: Seq[Config] = Random.shuffle(configs).take(2)
-  val FirstNodeConfig: Config = NodeConfigs.head
-  val SecondNodeConfig: Config = NodeConfigs.last
+  private val configs = NodeConfigs.newBuilder.withDefault(0).withSpecial(2, _.nonMiner).build
+  val FirstNodeConfig: Config = configs.head
+  val SecondNodeConfig: Config = configs.last
 
 }

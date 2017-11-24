@@ -13,7 +13,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
 
   property("TransactionsOrdering.InBlock should sort correctly") {
     val txsDifferentById = (0 to 3).map(i =>
-      TransferTransaction.create(None, PrivateKeyAccount(Array.fill(32)(0)), Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").right.get, 100000, 5, None, 125L, Array(i.toByte)).right.get).sortBy(t => t.id.base58)
+      TransferTransaction.create(None, PrivateKeyAccount(Array.fill(32)(0)), Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").right.get, 100000, 5, None, 125L, Array(i.toByte)).right.get).sortBy(t => t.id().base58)
 
     val correctSeq = txsDifferentById ++ Seq(
       TransferTransaction.create(None, PrivateKeyAccount(Array.fill(32)(0)), Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").right.get, 100000, 1, None, 125L, Array.empty).right.get,
@@ -29,7 +29,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
 
   property("TransactionsOrdering.InUTXPool should sort correctly") {
     val txsDifferentById = (0 to 3).map(i =>
-      TransferTransaction.create(None, PrivateKeyAccount(Array.fill(32)(0)),Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").right.get, 100000, 5, None, 125L, Array(i.toByte)).right.get).sortBy(t => t.id.base58)
+      TransferTransaction.create(None, PrivateKeyAccount(Array.fill(32)(0)),Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").right.get, 100000, 5, None, 125L, Array(i.toByte)).right.get).sortBy(t => t.id().base58)
 
     val correctSeq = txsDifferentById ++ Seq(
       TransferTransaction.create(None, PrivateKeyAccount(Array.fill(32)(0)), Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").right.get, 100000, 1, None, 124L, Array.empty).right.get,

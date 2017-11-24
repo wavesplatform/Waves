@@ -11,8 +11,6 @@ import scorex.transaction.assets.TransferTransaction
 import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.utils.ScorexLogging
 
-import scala.collection.parallel.ForkJoinTaskSupport
-
 trait StateWriter {
   def applyBlockDiff(blockDiff: BlockDiff): Unit
 
@@ -24,8 +22,6 @@ class StateWriterImpl(p: StateStorage, storeTransactions: Boolean, synchronizati
 
   import StateStorage._
 
-  private val fjts = new ForkJoinTaskSupport()
-
   override def close(): Unit = p.close()
 
   override def applyBlockDiff(blockDiff: BlockDiff): Unit = write { implicit l =>
@@ -36,25 +32,22 @@ class StateWriterImpl(p: StateStorage, storeTransactions: Boolean, synchronizati
     log.debug(s"Starting persist from $oldHeight to $newHeight")
 
     measureSizeLog("transactions")(txsDiff.transactions) { txs =>
-      val ptxs = txs.par
-      ptxs.tasksupport = fjts
-      ptxs.foreach {
+      txs.toSeq.foreach {
         case (id, (h, tx@(_: TransferTransaction | _: ExchangeTransaction | _: PaymentTransaction), _)) =>
-          sp().transactions.put(id, (h, if (storeTransactions) tx.bytes else Array.emptyByteArray))
-        case (id, (h, tx, _)) => sp().transactions.put(id, (h, tx.bytes))
+          sp().transactions.put(id, (h, if (storeTransactions) tx.bytes() else Array.emptyByteArray))
+        case (id, (h, tx, _)) => sp().transactions.put(id, (h, tx.bytes()))
       }
     }
 
     measureSizeLog("orderFills")(blockDiff.txsDiff.orderFills) { ofs =>
-      val pofs = ofs.par
-      pofs.tasksupport = fjts
-      pofs.foreach { case (oid, orderFillInfo) =>
-        Option(sp().orderFills.get(oid)) match {
-          case Some(ll) =>
-            sp().orderFills.put(oid, (ll._1 + orderFillInfo.volume, ll._2 + orderFillInfo.fee))
-          case None =>
-            sp().orderFills.put(oid, (orderFillInfo.volume, orderFillInfo.fee))
-        }
+      ofs.toSeq.foreach {
+        case (oid, orderFillInfo) =>
+          Option(sp().orderFills.get(oid)) match {
+            case Some(ll) =>
+              sp().orderFills.put(oid, (ll._1 + orderFillInfo.volume, ll._2 + orderFillInfo.fee))
+            case None =>
+              sp().orderFills.put(oid, (orderFillInfo.volume, orderFillInfo.fee))
+          }
       }
     }
 
@@ -114,7 +107,7 @@ class StateWriterImpl(p: StateStorage, storeTransactions: Boolean, synchronizati
       _.foreach { case (id, isActive) => sp().leaseState.put(id, isActive) })
 
     sp().setHeight(newHeight)
-    val nextChunkOfBlocks = !sameQuotient(newHeight, oldHeight, 2000)
+    val nextChunkOfBlocks = !sameQuotient(newHeight, oldHeight, 1000)
     sp().commit(nextChunkOfBlocks)
     log.info(s"BlockDiff commit complete. Persisted height = $newHeight")
   }

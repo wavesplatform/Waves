@@ -10,8 +10,8 @@ class TransferTransactionSpecification extends PropSpec with PropertyChecks with
 
   property("Transfer serialization roundtrip") {
     forAll(transferGen) { transfer: TransferTransaction =>
-      require(transfer.bytes.head == TransactionType.TransferTransaction.id)
-      val recovered = TransferTransaction.parseTail(transfer.bytes.tail).get
+      require(transfer.bytes().head == TransactionType.TransferTransaction.id)
+      val recovered = TransferTransaction.parseTail(transfer.bytes().tail).get
 
       recovered.sender.address shouldEqual transfer.sender.address
       recovered.assetId.map(_ == transfer.assetId.get).getOrElse(transfer.assetId.isEmpty) shouldBe true
@@ -21,14 +21,14 @@ class TransferTransactionSpecification extends PropSpec with PropertyChecks with
       recovered.fee shouldEqual transfer.fee
       recovered.recipient.stringRepr shouldEqual transfer.recipient.stringRepr
 
-      recovered.bytes shouldEqual transfer.bytes
+      recovered.bytes() shouldEqual transfer.bytes()
     }
   }
 
   property("Transfer serialization from TypedTransaction") {
     forAll(transferGen) { tx: TransferTransaction =>
-      val recovered = TransactionParser.parseBytes(tx.bytes).get
-      recovered.bytes shouldEqual tx.bytes
+      val recovered = TransactionParser.parseBytes(tx.bytes()).get
+      recovered.bytes() shouldEqual tx.bytes()
     }
   }
 

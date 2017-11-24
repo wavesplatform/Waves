@@ -1,7 +1,8 @@
 package com.wavesplatform.settings
 
 import com.typesafe.config.Config
-import com.wavesplatform.settings.SynchronizationSettings.{HistoryReplierSettings, MicroblockSynchronizerSettings}
+import com.wavesplatform.network.InvalidBlockStorageImpl.InvalidBlockStorageSettings
+import com.wavesplatform.settings.SynchronizationSettings._
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 
@@ -11,6 +12,7 @@ case class SynchronizationSettings(maxRollback: Int,
                                    maxChainLength: Int,
                                    synchronizationTimeout: FiniteDuration,
                                    scoreTTL: FiniteDuration,
+                                   invalidBlocksStorage: InvalidBlockStorageSettings,
                                    microBlockSynchronizer: MicroblockSynchronizerSettings,
                                    historyReplierSettings: HistoryReplierSettings)
 
@@ -30,9 +32,11 @@ object SynchronizationSettings {
     val maxChainLength = config.as[Int](s"$configPath.max-chain-length")
     val synchronizationTimeout = config.as[FiniteDuration](s"$configPath.synchronization-timeout")
     val scoreTTL = config.as[FiniteDuration](s"$configPath.score-ttl")
+    val invalidBlocksStorage = config.as[InvalidBlockStorageSettings](s"$configPath.invalid-blocks-storage")
     val microBlockSynchronizer = config.as[MicroblockSynchronizerSettings](s"$configPath.micro-block-synchronizer")
     val historyReplierSettings = config.as[HistoryReplierSettings](s"$configPath.history-replier")
 
-    SynchronizationSettings(maxRollback, maxChainLength, synchronizationTimeout, scoreTTL, microBlockSynchronizer, historyReplierSettings)
+    SynchronizationSettings(maxRollback, maxChainLength, synchronizationTimeout, scoreTTL, invalidBlocksStorage,
+      microBlockSynchronizer, historyReplierSettings)
   }
 }

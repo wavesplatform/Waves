@@ -168,7 +168,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPoo
         "balance" -> JsNumber(balance),
         "reissuable" -> JsBoolean(reissuable),
         "quantity" -> JsNumber(quantity),
-        "issueTransaction" -> issueTx.json
+        "issueTransaction" -> issueTx.json()
       ))
     }.toSeq
     Json.obj(

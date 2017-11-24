@@ -4,16 +4,14 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.TransactionGen
 import com.wavesplatform.settings.FeesSettings
 import com.wavesplatform.state2.ByteStr
-import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
+import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Assertion, Matchers, PropSpec}
 import scorex.account.{Address, PrivateKeyAccount}
 import scorex.transaction.assets._
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 
 
-class FeeCalculatorSpecification extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks
-  with Matchers with TransactionGen {
-
+class FeeCalculatorSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 
   private val configString =
     """waves {

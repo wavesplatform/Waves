@@ -50,9 +50,9 @@ case object NoBalance extends ApiError {
   override val code: StatusCode = StatusCodes.BadRequest
 }
 
-case object NegativeAmount extends ApiError {
+case class NegativeAmount(msg: String) extends ApiError {
   override val id: Int = 111
-  override val message: String = "negative amount"
+  override val message: String = s"negative amount: $msg"
   override val code: StatusCode = StatusCodes.BadRequest
 }
 

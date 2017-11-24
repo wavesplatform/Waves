@@ -57,7 +57,7 @@ class CompositeStateReader private(inner: SnapshotStateReader, blockDiff: BlockD
   override def accountPortfolios: Map[Address, Portfolio] = Monoid.combine(inner.accountPortfolios, txDiff.portfolios)
 
   override def isLeaseActive(leaseTx: LeaseTransaction): Boolean =
-    blockDiff.txsDiff.leaseState.getOrElse(leaseTx.id, inner.isLeaseActive(leaseTx))
+    blockDiff.txsDiff.leaseState.getOrElse(leaseTx.id(), inner.isLeaseActive(leaseTx))
 
   override def activeLeases(): Seq[ByteStr] = {
     blockDiff.txsDiff.leaseState.collect { case (id, isActive) if isActive => id }.toSeq ++ inner.activeLeases()

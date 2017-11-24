@@ -64,4 +64,5 @@ package object state2 {
 
 
   def sameQuotient(x: Int, y: Int, divisor: Int): Boolean = (x / divisor) == (y / divisor)
+
 }
