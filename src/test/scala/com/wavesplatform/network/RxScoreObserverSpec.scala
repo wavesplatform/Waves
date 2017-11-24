@@ -4,12 +4,11 @@ import com.wavesplatform.TransactionGen
 import com.wavesplatform.network.RxScoreObserver.BestChannel
 import io.netty.channel.Channel
 import io.netty.channel.local.LocalChannel
-import monix.reactive.Observable
 import monix.reactive.subjects.PublishSubject
 import org.scalatest.{FreeSpec, Matchers}
 import scorex.transaction.History.BlockchainScore
 
-import scala.concurrent.Await
+import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
 
 class RxScoreObserverSpec extends FreeSpec with Matchers with TransactionGen {
@@ -25,22 +24,24 @@ class RxScoreObserverSpec extends FreeSpec with Matchers with TransactionGen {
     (syncWith, localScores, remoteScores, channelClosed)
   }
 
-  def listen[T](o : Observable[T]): Unit = {
-
+  def test[T](future: Future[T]): Unit = {
+    Await.result(future, 10.seconds)
   }
 
   "should emit better channel" - {
     "when a new channel has the better score than the local one" in {
       val (syncWith, localScores, remoteScores, _) = buildObserver()
+      val testChannel = new LocalChannel()
 
-      val secondEvent = syncWith.drop(1).runAsyncGetFirst
+      val subscription = syncWith.drop(1).runAsyncGetFirst
 
-      val ch = new LocalChannel()
-      localScores.onNext(1)
-      remoteScores.onNext((ch, 2))
-
-      //wait for secont event from observable
-      Await.result(secondEvent, 10.seconds).get shouldBe Some(BestChannel(ch, 2))
+      test {
+        for {
+          _ <- localScores.onNext(1)
+          _ <- remoteScores.onNext((testChannel, 2))
+          result <- subscription
+        } yield result.get shouldBe Some(BestChannel(testChannel, 2))
+      }
     }
 
     "when the connection with the best one is dropped" in {
