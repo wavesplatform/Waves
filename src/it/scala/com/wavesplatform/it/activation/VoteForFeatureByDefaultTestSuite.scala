@@ -18,6 +18,8 @@ class VoteForFeatureByDefaultTestSuite extends FreeSpec with Matchers with Befor
   private lazy val docker = Docker(getClass)
   override lazy val nodes: Seq[Node] = docker.startNodes(Configs)
 
+  private lazy val notSupportedNode +: supportedNodes = nodes
+
   val defaultVotingFeatureNum: Short = 1
 
   override protected def beforeAll(): Unit = {
@@ -33,29 +35,32 @@ class VoteForFeatureByDefaultTestSuite extends FreeSpec with Matchers with Befor
   "supported blocks increased when voting starts, one node votes against, three by default" in {
     val checkHeight: Int = votingInterval * 2 / 3
 
-    val activationInfo = activationStatus(Seq(nodes.last, nodes.head), checkHeight, defaultVotingFeatureNum, 4.minute)
-    val supportedNodeActivationInfo = activationInfo(nodes.last)
-    val nonSupportedNodeActivationInfo = activationInfo(nodes.head)
+    val supportedNodeActivationInfo = activationStatus(supportedNodes, checkHeight, defaultVotingFeatureNum, 4.minute)
+    val nonSupportedNodeActivationInfo = Await
+      .result(notSupportedNode.activationStatus, 1.minute)
+      .features
+      .find(_.id == defaultVotingFeatureNum)
+      .get
 
     val generatedBlocks = Await.result(nodes.last.blockSeq(1, checkHeight), 2.minute)
     val featuresMapInGeneratedBlocks = generatedBlocks.flatMap(b => b.features.getOrElse(Seq.empty)).groupBy(x => x)
     val votesForFeature1 = featuresMapInGeneratedBlocks.getOrElse(defaultVotingFeatureNum, Seq.empty).length
 
     assertVotingStatus(supportedNodeActivationInfo, votesForFeature1, BlockchainFeatureStatus.Undefined, NodeFeatureStatus.Voted)
-    assertVotingStatus(nonSupportedNodeActivationInfo, votesForFeature1, BlockchainFeatureStatus.Undefined, NodeFeatureStatus.Implemented)
+    nonSupportedNodeActivationInfo.nodeStatus shouldBe NodeFeatureStatus.Implemented
   }
 
   "blockchain status is APPROVED in second voting interval, one node votes against, three by default" in {
     val checkHeight: Int = votingInterval * 2 - blocksForActivation / 2
 
-    val supportedNodeActivationInfo = activationStatus(nodes.last, checkHeight, defaultVotingFeatureNum, 3.minute)
+    val supportedNodeActivationInfo = activationStatus(supportedNodes, checkHeight, defaultVotingFeatureNum, 3.minute)
     assertApprovedStatus(supportedNodeActivationInfo, votingInterval * 2, NodeFeatureStatus.Voted)
   }
 
   "blockchain status is ACTIVATED in the end of second voting interval, one node votes against, three by default" in {
     val checkHeight: Int = votingInterval * 2
 
-    val supportedNodeActivationInfo = activationStatus(nodes.last, checkHeight, defaultVotingFeatureNum, 2.minute)
+    val supportedNodeActivationInfo = activationStatus(supportedNodes, checkHeight, defaultVotingFeatureNum, 2.minute)
     assertActivatedStatus(supportedNodeActivationInfo, checkHeight, NodeFeatureStatus.Voted)
   }
 
