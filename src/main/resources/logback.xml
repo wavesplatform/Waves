@@ -20,4 +20,6 @@
     <root level="INFO">
         <appender-ref ref="STDOUT" />
     </root>
+
+    <include optional="TRUE" file="${logback.overrides}"/>
 </configuration>

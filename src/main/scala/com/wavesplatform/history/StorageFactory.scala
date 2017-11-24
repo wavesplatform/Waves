@@ -23,7 +23,7 @@ object StorageFactory {
   def apply(settings: WavesSettings): Try[(NgHistory with DebugNgHistory with AutoCloseable, FeatureProvider, AutoCloseable, StateReader, BlockchainUpdater, BlockchainDebugInfo)] = {
     val lock = new RWL(true)
     for {
-      historyWriter <- HistoryWriterImpl(settings.blockchainSettings.blockchainFile, lock, settings.blockchainSettings.functionalitySettings, settings.featuresSettings)
+      historyWriter <- HistoryWriterImpl(settings.blockchainSettings.blockchainFile, new RWL(true), settings.blockchainSettings.functionalitySettings, settings.featuresSettings)
       ss <- createStateStorage(historyWriter, settings.blockchainSettings.stateFile, settings.mvstorePageSplitSize)
       stateWriter = new StateWriterImpl(ss, settings.blockchainSettings.storeTransactionsInState, lock)
     } yield {

@@ -45,17 +45,18 @@ class ExtensionBlocksLoader(blockSyncTimeout: FiniteDuration,
     case xid@ExtensionIds(_, newIds) if pendingSignatures.isEmpty =>
       val requestingIds = newIds.filterNot(history.contains)
       if (requestingIds.nonEmpty) {
-          targetExtensionIds = Some(xid)
+          log.trace(s"${id(ctx)} About to load ${requestingIds.size} blocks")  targetExtensionIds = Some(xid)
           pendingSignatures = newIds.zipWithIndex.toMap
           blacklistAfterTimeout(ctx)
           extensionsFetchingTimeStats.start()
           newIds.foreach(s => ctx.write(GetBlock(s)))
           ctx.flush()
-      } else {
-        log.debug(s"${id(ctx)} No new blocks to load")
-        ctx.fireChannelRead(ExtensionBlocks(Seq.empty))
+        } else {
+          log.debug(s"${id(ctx)} No new blocks to load")
+          ctx.fireChannelRead(ExtensionBlocks(Seq.empty))
       }
     case b: Block if pendingSignatures.contains(b.uniqueId) =>
+      log.trace(s"${id(ctx)} Received expected block ${b.uniqueId}")
       blockBuffer += pendingSignatures(b.uniqueId) -> b
       pendingSignatures -= b.uniqueId
       blacklistAfterTimeout(ctx)
@@ -75,6 +76,7 @@ class ExtensionBlocksLoader(blockSyncTimeout: FiniteDuration,
             }) {
             peerDatabase.blacklistAndClose(ctx.channel(),"Extension blocks are not contiguous, pre-check failed")
           } else {
+            log.trace(s"${id(ctx)} Checking extension block signatures")
             val pnewBlocks = newBlocks.par
             pnewBlocks.tasksupport = new ForkJoinTaskSupport()
             pnewBlocks.find(_.signaturesValid().isLeft) match {

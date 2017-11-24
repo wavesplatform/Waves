@@ -118,7 +118,7 @@ lazy val itTestsCommonSettings: Seq[Def.Setting[_]] = Seq(
 inConfig(IntegrationTest)(
   Seq(
     test := (test dependsOn docker).value,
-    envVars in test += "CONTAINER_JAVA_OPTS" -> "-Xmx1500m",
+    envVars in test += "CONTAINER_JAVA_OPTS" -> "-Xmx512m",
     envVars in testOnly += "CONTAINER_JAVA_OPTS" -> "-Xmx512m"
   ) ++ inTask(test)(itTestsCommonSettings) ++ inTask(testOnly)(itTestsCommonSettings)
 )
@@ -126,11 +126,12 @@ inConfig(IntegrationTest)(
 dockerfile in docker := {
   val configTemplate = (resourceDirectory in IntegrationTest).value / "template.conf"
   val startWaves = (sourceDirectory in IntegrationTest).value / "container" / "start-waves.sh"
+  val logbackConfig = (resourceDirectory in IntegrationTest).value / "logback-docker.xml"
 
   new Dockerfile {
     from("anapsix/alpine-java:8_server-jre")
     add(assembly.value, "/opt/waves/waves.jar")
-    add(Seq(configTemplate, startWaves), "/opt/waves/")
+    add(Seq(configTemplate, startWaves, logbackConfig), "/opt/waves/")
     run("chmod", "+x", "/opt/waves/start-waves.sh")
     entryPoint("/opt/waves/start-waves.sh")
   }

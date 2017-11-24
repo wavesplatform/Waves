@@ -35,10 +35,9 @@ class CoordinatorHandler(checkpointService: CheckpointService,
                          allChannels: ChannelGroup,
                          featureProvider: FeatureProvider,
                          microBlockOwners: MicroBlockOwners,
-                         invalidBlocks: InvalidBlockStorage)
+                         invalidBlocks: InvalidBlockStorage,
+                         scheduler: Scheduler)
   extends ChannelInboundHandlerAdapter with ScorexLogging {
-
-  private implicit val scheduler = Scheduler.singleThread("coordinator-handler")
 
   private val processCheckpoint = Coordinator.processCheckpoint(checkpointService, history, blockchainUpdater) _
   private val processFork = Coordinator.processFork(checkpointService, history, blockchainUpdater, stateReader, utxStorage, time, settings, blockchainReadiness, featureProvider, invalidBlocks) _
@@ -63,10 +62,8 @@ class CoordinatorHandler(checkpointService: CheckpointService,
       case Left(ve) =>
         log.warn(s"${id(ctx)} $errorPrefix: $ve")
         peerDatabase.blacklistAndClose(ctx.channel(), s"$errorPrefix: $ve")
-    }.onErrorHandle[Unit](ctx.fireExceptionCaught).runAsync
+    }.onErrorHandle[Unit](ctx.fireExceptionCaught).runAsync(scheduler)
   }
-
-  def shutdown(): Unit = scheduler.shutdown()
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
     case c: Checkpoint => processAndBlacklistOnFailure(ctx,
@@ -102,7 +99,7 @@ class CoordinatorHandler(checkpointService: CheckpointService,
       case Left(ve) =>
         BlockStats.declined(b, BlockStats.Source.Broadcast)
         log.debug(s"${id(ctx)} Could not append $b: $ve")
-    }).onErrorHandle[Unit](ctx.fireExceptionCaught).runAsync
+    }).onErrorHandle[Unit](ctx.fireExceptionCaught).runAsync(scheduler)
 
     case md: MicroblockData =>
       import md.microBlock
@@ -119,7 +116,7 @@ class CoordinatorHandler(checkpointService: CheckpointService,
         case Left(ve) =>
           BlockStats.declined(microBlock)
           log.debug(s"${id(ctx)} Could not append microblock $microblockTotalResBlockSig: $ve")
-      }).onErrorHandle[Unit](ctx.fireExceptionCaught).runAsync
+      }).onErrorHandle[Unit](ctx.fireExceptionCaught).runAsync(scheduler)
   }
 }
 
