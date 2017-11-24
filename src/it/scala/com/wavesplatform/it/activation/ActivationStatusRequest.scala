@@ -28,7 +28,7 @@ trait ActivationStatusRequest extends Matchers {
   private def activationStatusInternal(node: Node, height: Int, featureNum: Short, timeout: Duration)
                                       (implicit ec: ExecutionContext): Future[ActivationStatusFeature] = {
     node
-      .waitFor[ActivationStatus](_.activationStatus, _.height >= height, 1.second)(s"activationStatusInternal: height should be >= $height")
+      .waitFor[ActivationStatus](s"activationStatusInternal: height should be >= $height")(_.activationStatus, _.height >= height, 1.second)
       .map(_.features.find(_.id == featureNum).get)
   }
 
