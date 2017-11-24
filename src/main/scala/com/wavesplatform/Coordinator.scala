@@ -1,10 +1,8 @@
 package com.wavesplatform
 
-import java.util.concurrent.atomic.AtomicBoolean
-
 import com.wavesplatform.features.{BlockchainFeatures, FeatureProvider}
 import com.wavesplatform.metrics._
-import com.wavesplatform.network.{BlockCheckpoint, Checkpoint}
+import com.wavesplatform.network.{BlockCheckpoint, Checkpoint, InvalidBlockStorage}
 import com.wavesplatform.settings.{BlockchainSettings, FunctionalitySettings, WavesSettings}
 import com.wavesplatform.state2._
 import com.wavesplatform.state2.reader.SnapshotStateReader
@@ -18,13 +16,12 @@ import scorex.transaction.ValidationError.{GenericError, MicroBlockAppendError}
 import scorex.transaction._
 import scorex.utils.{ScorexLogging, Time}
 
-import scala.concurrent.duration._
 import scala.util.{Left, Right}
 
 object Coordinator extends ScorexLogging with Instrumented {
   def processFork(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater,
                   stateReader: StateReader, utxStorage: UtxPool, time: Time, settings: WavesSettings,
-                  featureProvider: FeatureProvider)(blocks: Seq[Block]): Either[ValidationError, Option[BigInt]] = Signed.validateOrdered(blocks).flatMap { newBlocks =>
+                  featureProvider: FeatureProvider, invalidBlocks: InvalidBlockStorage)(blocks: Seq[Block]): Either[ValidationError, Option[BigInt]] = Signed.validateOrdered(blocks).flatMap { newBlocks =>
     history.write { implicit l =>
       val extension = newBlocks.dropWhile(history.contains)
 
@@ -35,7 +32,8 @@ object Coordinator extends ScorexLogging with Instrumented {
             extension.zipWithIndex.forall(p => checkpoint.isBlockValid(p._1.signerData.signature, lastCommonHeight + 1 + p._2))
 
           val forkApplicationResultEi = Coeval.evalOnce {
-            val firstDeclined = extension.view.map { b =>
+            val firstDeclined = extension.view
+            .map { b =>
               b -> appendBlock(checkpoint, history, blockchainUpdater, stateReader(), utxStorage, time, settings.blockchainSettings, featureProvider)(b).right.map {
                 _.foreach(bh => BlockStats.applied(b, BlockStats.Source.Ext, bh))
               }
@@ -43,12 +41,13 @@ object Coordinator extends ScorexLogging with Instrumented {
               .zipWithIndex
               .collectFirst { case ((b, Left(e)), i) => (i, b, e) }
 
-            firstDeclined.foreach {
-              case (_, declinedBlock, _) =>
-                extension.view
-                  .dropWhile(_ != declinedBlock)
-                  .foreach(BlockStats.declined(_, BlockStats.Source.Ext))
-            }
+          firstDeclined.foreach {
+            case (_, declinedBlock, _) =>
+              invalidBlocks.add(declinedBlock.uniqueId)
+              extension.view
+                .dropWhile(_ != declinedBlock)
+                .foreach(BlockStats.declined(_, BlockStats.Source.Ext))
+          }
 
             firstDeclined
               .foldLeft[Either[ValidationError, BigInt]](Right(history.score())) {

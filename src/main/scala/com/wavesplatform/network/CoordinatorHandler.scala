@@ -33,7 +33,8 @@ object CoordinatorHandler extends ScorexLogging {
             settings: WavesSettings,
             peerDatabase: PeerDatabase,
             allChannels: ChannelGroup,
-            featureProvider: FeatureProvider
+            featureProvider: FeatureProvider,
+            invalidBlocks: InvalidBlockStorage
            )(blocks: ChannelObservable[Block],
              checkpoints: ChannelObservable[Checkpoint],
              extensions: ChannelObservable[ExtensionBlocks],
@@ -42,7 +43,7 @@ object CoordinatorHandler extends ScorexLogging {
 
     val processBlock = Coordinator.processSingleBlock(checkpointService, history, blockchainUpdater, time, stateReader, utxStorage, settings.blockchainSettings, featureProvider) _
     val processCheckpoint = Coordinator.processCheckpoint(checkpointService, history, blockchainUpdater) _
-    val processFork = Coordinator.processFork(checkpointService, history, blockchainUpdater, stateReader, utxStorage, time, settings, featureProvider) _
+    val processFork = Coordinator.processFork(checkpointService, history, blockchainUpdater, stateReader, utxStorage, time, settings, featureProvider, invalidBlocks) _
     val processMicroBlock = Coordinator.processMicroBlock(checkpointService, history, blockchainUpdater, utxStorage) _
 
     def scheduleMiningAndBroadcastScore(score: BigInt): Unit = {

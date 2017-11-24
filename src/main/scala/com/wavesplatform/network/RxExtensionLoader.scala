@@ -18,6 +18,7 @@ object RxExtensionLoader extends ScorexLogging {
   def apply(ss: SynchronizationSettings,
             history: NgHistory,
             peerDatabase: PeerDatabase,
+            invalidBlocks: InvalidBlockStorage,
             bestChannel: Observable[SyncWith],
             blocks: Observable[(Channel, Block)],
             signatures: Observable[(Channel, Signatures)],
@@ -52,7 +53,8 @@ object RxExtensionLoader extends ScorexLogging {
           wp.timeout.cancel()
           lastBestChannel() match {
             case None =>
-              log.error(s"While $innerState, bestChannel.lastOption is Nonem should never happen")
+              log.error(s"While $innerState, bestChannel.lastOption is None, should never happen")
+              become(Idle)
             case Some(None) =>
               log.trace("Last bestChannel is None, state is up to date")
               become(Idle)
@@ -61,7 +63,6 @@ object RxExtensionLoader extends ScorexLogging {
         case _ =>
       }
     }).logErr.subscribe()
-
 
     bestChannel.mapTask(c => Task {
       c match {
@@ -75,13 +76,18 @@ object RxExtensionLoader extends ScorexLogging {
         case ExpectingSignatures(c, known, timeout) if c == ch =>
           timeout.cancel()
           val (_, unknown) = sigs.signatures.span(id => known.contains(id))
-          if (unknown.isEmpty) {
-            log.trace(s"${id(ch)} Received empty extension signatures list, sync with node complete")
-            become(Idle)
-          }
-          else {
-            unknown.foreach(s => ch.writeAndFlush(GetBlock(s)))
-            become(ExpectingBlocks(ch, unknown, unknown.toSet, Set.empty, blacklistOnTimeout(ch, "Timeout loading first requested block")))
+          sigs.signatures.find(invalidBlocks.contains) match {
+            case Some(invalidBlock) =>
+              peerDatabase.blacklistAndClose(ch, s"Signatures contain invalid block(s): $invalidBlock")
+              become(Idle)
+            case None =>
+              if (unknown.isEmpty) {
+                log.trace(s"${id(ch)} Received empty extension signatures list, sync with node complete")
+                become(Idle)
+              } else {
+                unknown.foreach(s => ch.writeAndFlush(GetBlock(s)))
+                become(ExpectingBlocks(ch, unknown, unknown.toSet, Set.empty, blacklistOnTimeout(ch, "Timeout loading first requested block")))
+              }
           }
         case _ => log.trace(s"${id(ch)} Received unexpected signatures, ignoring")
       }
@@ -97,7 +103,9 @@ object RxExtensionLoader extends ScorexLogging {
             val ext = requested.map(blockById)
             log.debug(s"${id(ch)} Extension(blocks=${ext.size}) successfully received")
             lastBestChannel() match {
-              case None => become(Idle)
+              case None =>
+                log.error(s"While $innerState, and last block from extension recieved, bestChannel.lastOption is None, should never happen")
+                become(Idle)
               case Some(None) =>
                 log.trace("Last bestChannel is None, state is up to date")
                 become(Idle)

@@ -1,6 +1,7 @@
 package com.wavesplatform.settings
 
 import com.typesafe.config.ConfigFactory
+import com.wavesplatform.network.InvalidBlockStorageImpl.InvalidBlockStorageSettings
 import com.wavesplatform.settings.SynchronizationSettings.{HistoryReplierSettings, MicroblockSynchronizerSettings}
 import org.scalatest.{FlatSpec, Matchers}
 
@@ -16,6 +17,12 @@ class SynchronizationSettingsSpecification extends FlatSpec with Matchers {
         |    max-chain-length: 101
         |    synchronization-timeout: 30s
         |    score-ttl: 90s
+        |
+        |    invalid-blocks-storage {
+        |      max-size = 40000
+        |      timeout = 2d
+        |    }
+        |
         |    history-replier {
         |      max-micro-block-cache-size = 5
         |      max-block-cache-size = 2
@@ -35,6 +42,10 @@ class SynchronizationSettingsSpecification extends FlatSpec with Matchers {
     settings.maxChainLength should be(101)
     settings.synchronizationTimeout should be(30.seconds)
     settings.scoreTTL should be(90.seconds)
+    settings.invalidBlocksStorage shouldBe InvalidBlockStorageSettings(
+      maxSize = 40000,
+      timeout = 2.days
+    )
     settings.microBlockSynchronizer shouldBe MicroblockSynchronizerSettings(
       waitResponseTimeout = 5.seconds,
       processedMicroBlocksCacheTimeout = 2.seconds,
