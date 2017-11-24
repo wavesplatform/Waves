@@ -37,13 +37,13 @@ object Dependencies {
 
   lazy val serialization = Seq(
     "com.google.guava" % "guava" % "21.0",
-    "com.typesafe.play" %% "play-json" % "2.6.2",
-    "com.twitter" % "chill_2.12" % "0.9.2"
+    "com.typesafe.play" %% "play-json" % "2.6.2"
   )
   lazy val akka = Seq("actor", "slf4j").map(akkaModule)
 
   lazy val db = Seq(
-    "org.fusesource.leveldbjni" % "leveldbjni-all" % "1.8"
+    "org.fusesource.leveldbjni" % "leveldbjni-all" % "1.8",
+    "org.iq80.leveldb" % "leveldb" % "0.9"
   )
 
   lazy val logging = Seq(

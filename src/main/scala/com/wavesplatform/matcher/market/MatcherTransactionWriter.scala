@@ -2,11 +2,11 @@ package com.wavesplatform.matcher.market
 
 import akka.actor.{Actor, Props}
 import akka.http.scaladsl.model.StatusCodes
-import com.twitter.chill.{KryoInstantiator, KryoPool}
-import com.wavesplatform.db.SubStorage
+import com.wavesplatform.db.{OrderToTxIdsCodec, SubStorage}
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.api.MatcherResponse
 import com.wavesplatform.matcher.model.Events._
+import com.wavesplatform.state2._
 import org.iq80.leveldb.DB
 import play.api.libs.json.JsArray
 import scorex.transaction.assets.exchange.ExchangeTransaction
@@ -31,7 +31,8 @@ class MatcherTransactionWriter(db: DB, val settings: MatcherSettings)
   }
 
   def fetchTransactionsByOrder(orderId: String): Unit = {
-    val txs = get(makeKey(OrdersToTxIdsPrefix, orderId)).map(decodeOrderToTxIdsValue).getOrElse(Set())
+    val txs = get(makeKey(OrdersToTxIdsPrefix, orderId))
+      .map(OrderToTxIdsCodec.decode).map(_.explicitGet().value).getOrElse(Set())
       .flatMap(id => get(makeKey(TransactionsPrefix, id)))
       .flatMap(b => ExchangeTransaction.parseBytes(b).toOption)
 
@@ -42,9 +43,9 @@ class MatcherTransactionWriter(db: DB, val settings: MatcherSettings)
     val key = makeKey(OrdersToTxIdsPrefix, orderId)
     get(key) match {
       case Some(bytes) =>
-        val prev = decodeOrderToTxIdsValue(bytes)
-        put(key, encodeOrderToTxIdsValue(prev + txId))
-      case _ => put(key, encodeOrderToTxIdsValue(Set(txId)))
+        val prev = OrderToTxIdsCodec.decode(bytes).explicitGet().value
+        put(key, OrderToTxIdsCodec.encode(prev + txId))
+      case _ => put(key, OrderToTxIdsCodec.encode(Set(txId)))
     }
   }
 
@@ -57,12 +58,6 @@ class MatcherTransactionWriter(db: DB, val settings: MatcherSettings)
 }
 
 object MatcherTransactionWriter {
-  private val PoolSize = 10
-  private val kryo = KryoPool.withByteArrayOutputStream(PoolSize, new KryoInstantiator())
-
-  def encodeOrderToTxIdsValue(value: Set[String]): Array[Byte] = kryo.toBytesWithClass(value)
-
-  def decodeOrderToTxIdsValue(arr: Array[Byte]): Set[String] = kryo.fromBytes(arr, classOf[Set[String]])
 
   def name: String = "MatcherTransactionWriter"
 

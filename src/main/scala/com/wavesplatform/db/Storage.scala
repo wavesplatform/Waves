@@ -9,7 +9,7 @@ import scorex.utils.ScorexLogging
 
 import scala.util.control.NonFatal
 
-abstract class Storage(private val db: DB) extends ScorexLogging with AutoCloseable {
+abstract class Storage(private val db: DB) extends ScorexLogging {
   protected val Charset: Charset = StandardCharsets.UTF_8
 
   protected val Separator: Array[Byte] = Array[Byte](':')
@@ -49,7 +49,7 @@ abstract class Storage(private val db: DB) extends ScorexLogging with AutoClosea
 
   def put(key: Array[Byte], value: Array[Byte], batch: Option[WriteBatch] = None): Unit = {
     try {
-      batch.fold(db.put(key, value)) { b => b.put(key, value) }
+      if (batch.isDefined) batch.get.put(key, value) else db.put(key, value)
     } catch {
       case NonFatal(t) =>
         log.error("LevelDB batch put error", t)
@@ -60,7 +60,7 @@ abstract class Storage(private val db: DB) extends ScorexLogging with AutoClosea
 
   def delete(key: Array[Byte], batch: Option[WriteBatch] = None): Unit = {
     try {
-      batch.fold(db.delete(key)) { b => b.delete(key) }
+      if (batch.isDefined) batch.get.delete(key) else db.delete(key)
     } catch {
       case NonFatal(t) =>
         log.error("LevelDB delete error", t)
@@ -78,6 +78,8 @@ abstract class Storage(private val db: DB) extends ScorexLogging with AutoClosea
           log.error("LevelDB write batch error", t)
           forceStopApplication()
           throw t
+      } finally {
+        b.close()
       }
     }
   }
@@ -87,12 +89,18 @@ abstract class Storage(private val db: DB) extends ScorexLogging with AutoClosea
     val it = db.iterator()
     var map = Map.empty[Array[Byte], Array[Byte]]
 
-    while (it.hasNext) {
-      val e = it.next()
-      if (e.getKey.startsWith(p)) {
-        val k = if (stripPrefix) e.getKey.drop(p.length) else e.getKey
-        map = map.updated(k, e.getValue)
+    try {
+      it.seekToFirst()
+      while (it.hasNext) {
+        val e = it.peekNext()
+        if (e.getKey.startsWith(p)) {
+          val k = if (stripPrefix) e.getKey.drop(p.length) else e.getKey
+          map = map.updated(k, e.getValue)
+        }
+        it.next()
       }
+    } finally {
+      it.close()
     }
 
     map
@@ -107,8 +115,4 @@ abstract class Storage(private val db: DB) extends ScorexLogging with AutoClosea
   protected def makeKey(prefix: Array[Byte], key: String): Array[Byte] = makeKey(prefix, key.getBytes(Charset))
 
   protected def makeKey(prefix: Array[Byte], key: Int): Array[Byte] = makeKey(prefix, Ints.toByteArray(key))
-
-  override def close(): Unit = {
-    db.close()
-  }
 }

@@ -1,6 +1,5 @@
 package com.wavesplatform.history
 
-import java.io.File
 import java.util.concurrent.locks.{ReentrantReadWriteLock => RWL}
 
 import com.wavesplatform.features.FeatureProvider
@@ -15,10 +14,9 @@ import scala.util.{Success, Try}
 object StorageFactory {
 
   private def createStateStorage(history: History with FeatureProvider, db: DB): Try[StateStorage] =
-    StateStorage(db).flatMap { ss =>
+    StateStorage(db, dropExisting = false).flatMap { ss =>
       if (ss.getHeight <= history.height()) Success(ss) else {
-        ss.close()
-        StateStorage(stateFile, dropExisting = true)
+        StateStorage(db, dropExisting = true)
       }
     }
 
@@ -26,8 +24,8 @@ object StorageFactory {
     val lock = new RWL(true)
     for {
       historyWriter <- HistoryWriterImpl(db, lock, settings.blockchainSettings.functionalitySettings, settings.featuresSettings)
-      ss <- createStateStorage(historyWriter, settings.blockchainSettings.stateFile)
-      stateWriter = new StateWriterImpl(ss, settings.blockchainSettings.storeTransactionsInState, lock)
+      ss <- createStateStorage(historyWriter, db)
+      stateWriter = new StateWriterImpl(ss, lock)
     } yield {
       val bcu = BlockchainUpdaterImpl(stateWriter, historyWriter, settings, lock)
       val history: NgHistory with DebugNgHistory with FeatureProvider = bcu.historyReader

@@ -1,10 +1,10 @@
 package com.wavesplatform.matcher.model
 
 import cats.implicits._
-import com.twitter.chill.{KryoInstantiator, KryoPool}
-import com.wavesplatform.db.SubStorage
+import com.wavesplatform.db.{OrderIdsCodec, PortfolioCodec, SubStorage}
 import com.wavesplatform.matcher.model.Events.{Event, OrderAdded, OrderCanceled, OrderExecuted}
 import com.wavesplatform.matcher.model.LimitOrder.{Filled, OrderStatus}
+import com.wavesplatform.state2._
 import org.iq80.leveldb.DB
 import play.api.libs.json.Json
 import scorex.transaction.AssetAcc
@@ -37,7 +37,6 @@ trait OrderHistory {
 
 case class OrderHistoryImpl(db: DB) extends SubStorage(db: DB, "matcher") with OrderHistory with ScorexLogging {
 
-  import OrderHistoryImpl._
 
   val MaxOrdersPerAddress = 1000
   val MaxOrdersPerRequest = 100
@@ -51,16 +50,16 @@ case class OrderHistoryImpl(db: DB) extends SubStorage(db: DB, "matcher") with O
     val pairAddress = assetPairAddressKey(assetPair, address)
     get(makeKey(PairToOrdersPrefix, pairAddress)) match {
       case Some(valueBytes) =>
-        val prev = decodeOrderIdsValue(valueBytes)
+        val prev = OrderIdsCodec.decode(valueBytes).explicitGet().value
         var r = prev
         if (prev.length >= MaxOrdersPerAddress) {
           val (p1, p2) = prev.span(!orderStatus(_).isInstanceOf[LimitOrder.Cancelled])
           r = if (p2.isEmpty) p1 else p1 ++ p2.tail
 
         }
-        put(makeKey(PairToOrdersPrefix, pairAddress), encodeOrderIdsValue(r :+ orderId))
+        put(makeKey(PairToOrdersPrefix, pairAddress), OrderIdsCodec.encode(r :+ orderId))
       case _ =>
-        put(makeKey(PairToOrdersPrefix, pairAddress), encodeOrderIdsValue(Array(orderId)))
+        put(makeKey(PairToOrdersPrefix, pairAddress), OrderIdsCodec.encode(Array(orderId)))
     }
   }
 
@@ -72,15 +71,16 @@ case class OrderHistoryImpl(db: DB) extends SubStorage(db: DB, "matcher") with O
   }
 
   def openPortfolio(address: String): OpenPortfolio = {
-    get(makeKey(AddressPortfolioPrefix, address)).map(b => OpenPortfolio(decodePortfolioValue(b))).orEmpty
+    get(makeKey(AddressPortfolioPrefix, address)).map(PortfolioCodec.decode).map(_.explicitGet().value)
+      .map(OpenPortfolio.apply).getOrElse(OpenPortfolio.empty)
   }
 
   def saveOpenPortfolio(event: Event): Unit = {
     Events.createOpenPortfolio(event).foreach { case (address, op) =>
       val key = makeKey(AddressPortfolioPrefix, address)
-      val prev = get(key).map(b => OpenPortfolio(decodePortfolioValue(b))).getOrElse(OpenPortfolio.empty)
+      val prev = get(key).map(PortfolioCodec.decode).map(_.explicitGet().value).map(OpenPortfolio.apply).getOrElse(OpenPortfolio.empty)
       val updatedPortfolios = prev.combine(op)
-      put(key, encodePortfolioValue(updatedPortfolios.orders))
+      put(key, PortfolioCodec.encode(updatedPortfolios.orders))
       log.debug(s"Changed OpenPortfolio for: $address -> " + updatedPortfolios.toString)
     }
   }
@@ -130,7 +130,7 @@ case class OrderHistoryImpl(db: DB) extends SubStorage(db: DB, "matcher") with O
 
   override def openVolume(assetAcc: AssetAcc): Long = {
     val asset = assetAcc.assetId.map(_.base58).getOrElse(AssetPair.WavesName)
-    get(makeKey(AddressPortfolioPrefix, assetAcc.account.address)).map(decodePortfolioValue)
+    get(makeKey(AddressPortfolioPrefix, assetAcc.account.address)).map(PortfolioCodec.decode).map(_.explicitGet().value)
       .flatMap(_.get(asset)).map(math.max(0L, _)).getOrElse(0L)
   }
 
@@ -138,12 +138,12 @@ case class OrderHistoryImpl(db: DB) extends SubStorage(db: DB, "matcher") with O
 
   override def ordersByPairAndAddress(assetPair: AssetPair, address: String): Set[String] = {
     val pairAddressKey = assetPairAddressKey(assetPair, address)
-    get(makeKey(PairToOrdersPrefix, pairAddressKey)).map(decodeOrderIdsValue)
+    get(makeKey(PairToOrdersPrefix, pairAddressKey)).map(OrderIdsCodec.decode).map(_.explicitGet().value)
       .map(_.takeRight(MaxOrdersPerRequest).toSet).getOrElse(Set())
   }
 
   override def getAllOrdersByAddress(address: String): Set[String] = {
-    map(PairToOrdersPrefix).mapValues(decodeOrderIdsValue).filter(_._1.endsWith(address)).values.flatten.toSet
+    map(PairToOrdersPrefix).mapValues(OrderIdsCodec.decode).filter(_._1.endsWith(address)).values.flatMap(_.explicitGet().value).toSet
   }
 
 
@@ -154,8 +154,8 @@ case class OrderHistoryImpl(db: DB) extends SubStorage(db: DB, "matcher") with O
     val key = makeKey(PairToOrdersPrefix, pairAddress)
     get(key) match {
       case Some(bytes) =>
-        val prev = decodeOrderIdsValue(bytes)
-        if (prev.contains(orderId)) put(key, encodeOrderIdsValue(prev.filterNot(_ == orderId)))
+        val prev = OrderIdsCodec.decode(bytes).explicitGet().value
+        if (prev.contains(orderId)) put(key, OrderIdsCodec.encode(prev.filterNot(_ == orderId)))
       case _ =>
     }
   }
@@ -171,21 +171,6 @@ case class OrderHistoryImpl(db: DB) extends SubStorage(db: DB, "matcher") with O
         false
     }
   }
-}
 
-object OrderHistoryImpl {
-
-  private val PoolSize = 10
-  private val kryo = KryoPool.withByteArrayOutputStream(PoolSize, new KryoInstantiator())
-
-  def encodeOrderIdsValue(value: Array[String]): Array[Byte] = kryo.toBytesWithClass(value)
-
-  def decodeOrderIdsValue(arr: Array[Byte]): Array[String] = kryo.fromBytes(arr, classOf[Array[String]])
-
-  def encodePortfolioValue(value: Map[String, Long]): Array[Byte] = kryo.toBytesWithClass(value)
-
-  def decodePortfolioValue(arr: Array[Byte]): Map[String, Long] = kryo.fromBytes(arr, classOf[Map[String, Long]])
-
-  def assetPairAddressKey(assetPair: AssetPair, address: String): String = assetPair.key + address
-
+  private def assetPairAddressKey(assetPair: AssetPair, address: String): String = assetPair.key + address
 }

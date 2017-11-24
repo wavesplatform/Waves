@@ -38,9 +38,11 @@ class UtxPoolSpecification extends FreeSpec
 
     val config = ConfigFactory.load()
     val genesisSettings = TestHelpers.genesisSettings(Map(senderAccount -> senderBalance))
-    val settings = WavesSettings.fromConfig(config).copy(blockchainSettings = BlockchainSettings(None, None, false, None, 'T', 5, 5, FunctionalitySettings.TESTNET, genesisSettings))
+    val settings = WavesSettings.fromConfig(config).copy(blockchainSettings = BlockchainSettings('T', 5, 5, FunctionalitySettings.TESTNET, genesisSettings))
 
-    val (history, _, _, state, bcu, _) = StorageFactory(settings).get
+    val db = open()
+
+    val (history, _, state, bcu, _) = StorageFactory(db, settings).get
 
     bcu.processBlock(Block.genesis(genesisSettings).right.get)
 
@@ -145,7 +147,7 @@ class UtxPoolSpecification extends FreeSpec
       tx2 <- listOfN(count1, transfer(sender, senderBalance / 2, new TestTime(ts + offset + 1000)))
     } yield {
       val time = new TestTime()
-      val history = HistoryWriterImpl(None, new ReentrantReadWriteLock(), TestFunctionalitySettings.Stub,
+      val history = HistoryWriterImpl(open(), new ReentrantReadWriteLock(), TestFunctionalitySettings.Stub,
         TestFunctionalitySettings.EmptyFeaturesSettings).get
       val utx = new UtxPoolImpl(time, state, history, calculator, FunctionalitySettings.TESTNET, UtxSettings(10, offset.millis, Set.empty, Set.empty, 5.minutes))
       (utx, time, tx1, (offset + 1000).millis, tx2)

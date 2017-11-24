@@ -1,7 +1,5 @@
 package com.wavesplatform.matcher
 
-import java.io.File
-
 import com.typesafe.config.Config
 import net.ceedubs.ficus.Ficus._
 import scorex.transaction.assets.exchange.AssetPair
@@ -24,8 +22,6 @@ case class MatcherSettings(enable: Boolean,
                            priceAssets: Seq[String],
                            predefinedPairs: Seq[AssetPair],
                            maxTimestampDiff: FiniteDuration,
-                           orderHistoryFile: Option[File],
-                           isMigrateToNewOrderHistoryStorage: Boolean,
                            blacklistedAssets: Set[String],
                            blacklistedNames: Seq[Regex],
                            txHistoryFile: Option[File],
@@ -36,7 +32,6 @@ case class MatcherSettings(enable: Boolean,
 
 object MatcherSettings {
   val configPath: String = "waves.matcher"
-  import com.wavesplatform.settings.fileReader
 
   def fromConfig(config: Config): MatcherSettings = {
     val enabled = config.as[Boolean](s"$configPath.enable")
@@ -56,11 +51,6 @@ object MatcherSettings {
       AssetPair.createAssetPair(p.as[String]("amountAsset"), p.as[String]("priceAsset")).get
     }
     val maxTimestampDiff = config.as[FiniteDuration](s"$configPath.max-timestamp-diff")
-
-    val orderHistoryFile = config.getAs[File](s"$configPath.order-history-file")
-    val txHistoryFile = config.getAs[File](s"$configPath.tx-history-file")
-
-    val isMigrateToNewOrderHistoryStorage = !orderHistoryFile.exists(_.exists())
 
     val blacklistedAssets = config.as[List[String]](s"$configPath.blacklisted-assets")
     val blacklistedNames = config.as[List[String]](s"$configPath.blacklisted-names").map(_.r)

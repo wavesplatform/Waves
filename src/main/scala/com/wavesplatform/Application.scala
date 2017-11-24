@@ -12,6 +12,7 @@ import akka.stream.ActorMaterializer
 import cats.instances.all._
 import com.typesafe.config._
 import com.wavesplatform.actor.RootActorSystem
+import com.wavesplatform.db.LevelDBFactory
 import com.wavesplatform.features.api.ActivationApiRoute
 import com.wavesplatform.history.{CheckpointServiceImpl, StorageFactory}
 import com.wavesplatform.http.NodeApiRoute
@@ -48,7 +49,7 @@ import scala.util.Try
 
 class Application(val actorSystem: ActorSystem, val settings: WavesSettings, configRoot: ConfigObject) extends ScorexLogging {
 
-  import monix.execution.Scheduler.Implicits.{global => scheduler}
+  private val db = Application.openDB(settings.dataDirectory)
 
   private val LocalScoreBroadcastDebounce = 1.second
 
@@ -244,7 +245,7 @@ object Application extends ScorexLogging {
 
     val file = new File(path)
     file.getParentFile.mkdirs()
-    JniDBFactory.factory.open(file, options)
+    LevelDBFactory.factory.open(file, options)
   }
 
   def main(args: Array[String]): Unit = {

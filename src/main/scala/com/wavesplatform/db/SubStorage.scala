@@ -7,7 +7,9 @@ class SubStorage(db: DB, name: String) extends Storage(db) {
 
   private val subPrefix: Array[Byte] = name.getBytes(Charset)
 
-  override protected def makeKey(prefix: Array[Byte], key: Array[Byte]): Array[Byte] = Bytes.concat(subPrefix, Separator, prefix, Separator, key, Separator)
+  override protected def makePrefix(prefix: Array[Byte]): Array[Byte] = Bytes.concat(subPrefix, Separator, prefix, Separator)
+
+  override protected def makeKey(prefix: Array[Byte], key: Array[Byte]): Array[Byte] = Bytes.concat(subPrefix, Separator, prefix, Separator, key)
 
   override protected def makeKey(prefix: Array[Byte], key: String): Array[Byte] = makeKey(prefix, key.getBytes(Charset))
 

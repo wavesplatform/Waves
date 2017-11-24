@@ -3,11 +3,10 @@ package com.wavesplatform.history
 import java.util.concurrent.locks.ReentrantReadWriteLock
 
 import com.google.common.primitives.{Ints, Shorts}
-import com.twitter.chill.{KryoInstantiator, KryoPool}
-import com.wavesplatform.db.{PropertiesStorage, SubStorage, VersionedStorage}
+import com.wavesplatform.db._
 import com.wavesplatform.features.FeatureProvider
 import com.wavesplatform.settings.{FeaturesSettings, FunctionalitySettings}
-import com.wavesplatform.state2.{BlockDiff, ByteStr}
+import com.wavesplatform.state2._
 import com.wavesplatform.utils._
 import kamon.Kamon
 import org.iq80.leveldb.DB
@@ -41,6 +40,7 @@ class HistoryWriterImpl private(db: DB, val synchronizationToken: ReentrantReadW
 
   private[HistoryWriterImpl] def isConsistent: Boolean = read { implicit l =>
     true
+    //TODO: replcate with implementation
     // check if all maps have same size
     //    Set(blockBodyByHeight().size(), blockIdByHeight().size(), heightByBlockId().size(), scoreByHeight().size()).size == 1
   }
@@ -53,14 +53,14 @@ class HistoryWriterImpl private(db: DB, val synchronizationToken: ReentrantReadW
 
   override def featureVotesCountWithinActivationWindow(height: Int): Map[Short, Int] = read { implicit lock =>
     val votingWindowOpening = FeatureProvider.votingWindowOpeningFromHeight(height, activationWindowSize)
-    get(makeKey(VotesAtHeightPrefix, votingWindowOpening)).fold(Map.empty[Short, Int])(decodeVotesValue)
+    get(makeKey(VotesAtHeightPrefix, votingWindowOpening)).map(VotesMapCodec.decode).map(_.explicitGet().value).getOrElse(Map.empty)
   }
 
   private def alterVotes(height: Int, votes: Set[Short], voteMod: Int): Unit = write { implicit lock =>
     val votingWindowOpening = FeatureProvider.votingWindowOpeningFromHeight(height, activationWindowSize)
     val votesWithinWindow = featureVotesCountWithinActivationWindow(height)
     val newVotes = votes.foldLeft(votesWithinWindow)((v, feature) => v + (feature -> (v.getOrElse(feature, 0) + voteMod)))
-    put(makeKey(VotesAtHeightPrefix, votingWindowOpening), encodeVotesValue(newVotes))
+    put(makeKey(VotesAtHeightPrefix, votingWindowOpening), VotesMapCodec.encode(newVotes))
   }
 
   def appendBlock(block: Block, acceptedFeatures: Set[Short])(consensusValidation: => Either[ValidationError, BlockDiff]): Either[ValidationError, BlockDiff] =
@@ -77,7 +77,7 @@ class HistoryWriterImpl private(db: DB, val synchronizationToken: ReentrantReadW
         put(makeKey(HeightBySignaturePrefix, block.uniqueId.arr), Ints.toByteArray(h))
         putInt(HeightProperty, h)
 
-        val presentFeatures = map(FeatureStatePrefix).keySet.map(Shorts.fromByteArray)
+        val presentFeatures = map(FeatureStatePrefix, stripPrefix = true).keySet.map(Shorts.fromByteArray)
         val newFeatures = acceptedFeatures.diff(presentFeatures)
         newFeatures.foreach(f => put(makeKey(FeatureStatePrefix, Shorts.toByteArray(f)), Ints.toByteArray(h)))
         alterVotes(h, block.featureVotes, 1)
@@ -100,7 +100,10 @@ class HistoryWriterImpl private(db: DB, val synchronizationToken: ReentrantReadW
     alterVotes(h, blockAt(h).map(b => b.featureVotes).getOrElse(Set.empty), -1)
 
     val key = makeKey(BlockAtHeightPrefix, h)
-    val maybeDiscardedBlock = get(key).flatMap(b => Block.parseBytes(b).toOption)
+    val maybeBlockBytes = get(key)
+    val tryDiscardedBlock = maybeBlockBytes.map(b => Block.parseBytes(b))
+    val maybeDiscardedBlock = tryDiscardedBlock.flatMap(_.toOption)
+
 
     delete(key)
     delete(makeKey(ScoreAtHeightPrefix, h))
@@ -114,6 +117,8 @@ class HistoryWriterImpl private(db: DB, val synchronizationToken: ReentrantReadW
     val signatureKey = makeKey(SignatureAtHeightPrefix, h)
     get(signatureKey).foreach(b => delete(makeKey(HeightBySignaturePrefix, b)))
     delete(signatureKey)
+
+    putInt(HeightProperty, h - 1)
 
     maybeDiscardedBlock
   }
@@ -158,14 +163,6 @@ class HistoryWriterImpl private(db: DB, val synchronizationToken: ReentrantReadW
 }
 
 object HistoryWriterImpl extends ScorexLogging {
-
-  private val PoolSize = 10
-  private val kryo = KryoPool.withByteArrayOutputStream(PoolSize, new KryoInstantiator())
-
-  def encodeVotesValue(value: Map[Short, Int]): Array[Byte] = kryo.toBytesWithClass(value)
-
-  def decodeVotesValue(arr: Array[Byte]): Map[Short, Int] = kryo.fromBytes(arr, classOf[Map[Short, Int]])
-
   def apply(db: DB, synchronizationToken: ReentrantReadWriteLock, functionalitySettings: FunctionalitySettings,
             featuresSettings: FeaturesSettings): Try[HistoryWriterImpl] =
     createWithVerification[HistoryWriterImpl](new HistoryWriterImpl(db, synchronizationToken, functionalitySettings, featuresSettings), h => h.isConsistent)

@@ -13,9 +13,7 @@ trait StateWriter {
 }
 
 class StateWriterImpl(p: StateStorage, synchronizationToken: ReentrantReadWriteLock)
-  extends StateReaderImpl(p, synchronizationToken) with StateWriter with AutoCloseable with ScorexLogging with Instrumented {
-
-  override def close(): Unit = p.close()
+  extends StateReaderImpl(p, synchronizationToken) with StateWriter with ScorexLogging with Instrumented {
 
   override def applyBlockDiff(blockDiff: BlockDiff): Unit = write { implicit l =>
     val oldHeight = p.getHeight

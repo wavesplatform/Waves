@@ -1,7 +1,5 @@
 package com.wavesplatform.settings
 
-import java.io.File
-
 import com.typesafe.config.Config
 import com.wavesplatform.state2.ByteStr
 import net.ceedubs.ficus.Ficus._
@@ -73,13 +71,13 @@ object FunctionalitySettings {
 case class GenesisTransactionSettings(recipient: String, amount: Long)
 
 case class GenesisSettings(
-                              blockTimestamp: Long,
-                              timestamp: Long,
-                              initialBalance: Long,
-                              signature: Option[ByteStr],
-                              transactions: Seq[GenesisTransactionSettings],
-                              initialBaseTarget: Long,
-                              averageBlockDelay: FiniteDuration)
+                            blockTimestamp: Long,
+                            timestamp: Long,
+                            initialBalance: Long,
+                            signature: Option[ByteStr],
+                            transactions: Seq[GenesisTransactionSettings],
+                            initialBaseTarget: Long,
+                            averageBlockDelay: FiniteDuration)
 
 object GenesisSettings {
   val MAINNET = GenesisSettings(1460678400000L, 1465742577614L, Constants.UnitsInWave * Constants.TotalWaves,
@@ -104,11 +102,7 @@ object GenesisSettings {
     153722867L, 60.seconds)
 }
 
-case class BlockchainSettings(blockchainFile: Option[File],
-                              stateFile: Option[File],
-                              storeTransactionsInState: Boolean,
-                              checkpointFile: Option[File],
-                              addressSchemeCharacter: Char,
+case class BlockchainSettings(addressSchemeCharacter: Char,
                               maxTransactionsPerBlockDiff: Int,
                               minBlocksInMemory: Int,
                               functionalitySettings: FunctionalitySettings,
@@ -138,10 +132,6 @@ object BlockchainSettings {
     }
 
     BlockchainSettings(
-      blockchainFile = config.getAs[File](s"$configPath.blockchain-file"),
-      stateFile = config.getAs[File](s"$configPath.state-file"),
-      storeTransactionsInState = config.getBoolean(s"$configPath.store-transactions-in-state"),
-      checkpointFile = config.getAs[File](s"$configPath.checkpoint-file"),
       addressSchemeCharacter = addressSchemeCharacter,
       maxTransactionsPerBlockDiff = config.as[Int](s"$configPath.max-transactions-per-block-diff"),
       minBlocksInMemory = config.as[Int](s"$configPath.min-blocks-in-memory"),

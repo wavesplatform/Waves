@@ -3,12 +3,13 @@ package scorex.network
 import java.net.{InetAddress, InetSocketAddress}
 
 import com.typesafe.config.ConfigFactory
+import com.wavesplatform.TestDB
 import com.wavesplatform.network.PeerDatabaseImpl
 import com.wavesplatform.settings.NetworkSettings
 import net.ceedubs.ficus.Ficus._
 import org.scalatest.{FeatureSpec, GivenWhenThen}
 
-class BlacklistSpecification extends FeatureSpec with GivenWhenThen {
+class BlacklistSpecification extends FeatureSpec with GivenWhenThen with TestDB {
   private val config = ConfigFactory.parseString(
     """waves.network {
       |  known-peers = []
@@ -18,6 +19,8 @@ class BlacklistSpecification extends FeatureSpec with GivenWhenThen {
 
   private val networkSettings = config.as[NetworkSettings]("waves.network")
 
+  private val db = open()
+
   info("As a Peer")
   info("I want to blacklist other peers for certain time")
   info("So I can give them another chance after")
@@ -26,7 +29,7 @@ class BlacklistSpecification extends FeatureSpec with GivenWhenThen {
     scenario("Peer blacklist another peer") {
 
       Given("Peer database is empty")
-      val peerDatabase = new PeerDatabaseImpl(networkSettings)
+      val peerDatabase = new PeerDatabaseImpl(db, networkSettings)
 
       def isBlacklisted(address: InetSocketAddress) = peerDatabase.blacklistedHosts.contains(address.getAddress)
 
