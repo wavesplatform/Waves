@@ -1,7 +1,5 @@
 package com.wavesplatform
 
-import java.util.concurrent.atomic.AtomicBoolean
-
 import com.wavesplatform.features.{BlockchainFeatures, FeatureProvider}
 import com.wavesplatform.metrics._
 import com.wavesplatform.network.{BlockCheckpoint, Checkpoint}
@@ -17,8 +15,6 @@ import scorex.transaction.PoSCalc._
 import scorex.transaction.ValidationError.{GenericError, MicroBlockAppendError}
 import scorex.transaction._
 import scorex.utils.{ScorexLogging, Time}
-
-import scala.concurrent.duration._
 import scala.util.{Left, Right}
 
 object Coordinator extends ScorexLogging with Instrumented {
