@@ -95,7 +95,7 @@ case class DebugApiRoute(settings: RestAPISettings,
   @ApiResponses(Array(new ApiResponse(code = 200, message = "Json portfolio")))
   def print: Route = (path("print") & post & withAuth) {
     json[DebugMessage] { params =>
-      log.debug(params.message.take(100))
+      log.debug(params.message.take(250))
       ""
     }
   }
