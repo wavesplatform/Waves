@@ -98,7 +98,7 @@ object Coordinator extends ScorexLogging with Instrumented {
         }
       case None =>
         log.debug("No new blocks found in extension")
-        Right(Some(history.score()))
+        Right(None)
     }
   }
   }
