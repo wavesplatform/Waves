@@ -19,7 +19,7 @@ trait OrderHistory {
   def openVolume(assetAcc: AssetAcc): Long
   def openVolumes(address: String): Option[Map[String, Long]]
   def ordersByPairAndAddress(assetPair: AssetPair, address: String): Set[String]
-  def getAllOrdersByAddress(address: String): Set[String]
+  def getAllOrdersByAddress(address: String): Stream[String]
   def deleteOrder(assetPair: AssetPair, address: String, orderId: String): Boolean
   def order(id: String): Option[Order]
   def openPortfolio(address: String): OpenPortfolio
@@ -119,8 +119,8 @@ case class OrderHistoryImpl(p: OrderHistoryStorage) extends OrderHistory with Sc
     Option(p.pairAddressToOrderIds.get(pairAddressKey)).map(_.takeRight(MaxOrdersPerRequest).toSet).getOrElse(Set())
   }
 
-  override def getAllOrdersByAddress(address: String): Set[String] = {
-    p.pairAddressToOrderIds.asScala.filter(_._1.endsWith(address)).values.flatten.toSet
+  override def getAllOrdersByAddress(address: String): Stream[String] = {
+    p.pairAddressToOrderIds.asScala.toStream.filter(_._1.endsWith(address)).flatMap(_._2)
   }
 
   private def deleteFromOrdersInfo(orderId: String): Unit = {

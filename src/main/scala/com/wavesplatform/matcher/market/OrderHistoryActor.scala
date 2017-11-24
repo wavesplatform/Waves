@@ -84,7 +84,7 @@ class OrderHistoryActor(val settings: MatcherSettings, val utxPool: UtxPool, val
   def fetchAllOrderHistory(req: GetAllOrderHistory): Unit = {
     val res: Seq[(String, OrderInfo, Option[Order])] =
       orderHistory.getAllOrdersByAddress(req.address)
-        .map(id => (id, orderHistory.orderInfo(id), orderHistory.order(id))).toSeq.sortBy(_._3.map(_.timestamp).getOrElse(-1L))
+        .map(id => (id, orderHistory.orderInfo(id), orderHistory.order(id))).sortBy(_._3.map(_.timestamp).getOrElse(-1L)).take(settings.restOrderLimit)
     sender() ! GetOrderHistoryResponse(res)
   }
 

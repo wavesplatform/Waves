@@ -8,8 +8,10 @@ import com.wavesplatform.state2.ByteStr
 import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
 import scorex.crypto.EllipticCurveImpl
 import play.api.libs.json.{JsArray, JsNumber, JsString}
+import play.api.libs.json.{JsArray, JsString}
 import play.api.libs.json.Json.parse
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
+import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
 
