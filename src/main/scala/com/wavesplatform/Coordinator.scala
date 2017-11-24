@@ -24,7 +24,7 @@ import scala.util.{Left, Right}
 object Coordinator extends ScorexLogging with Instrumented {
   def processFork(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater,
                   stateReader: StateReader, utxStorage: UtxPool, time: Time, settings: WavesSettings,
-                  blockchainReadiness: AtomicBoolean, featureProvider: FeatureProvider)
+                  blockchainReadiness: AtomicBoolean, featureProvider: FeatureProvider, storeInvalidBlock: ByteStr => Unit)
                  (blocks: Seq[Block]): Either[ValidationError, Option[BigInt]] =  Signed.validateOrdered(blocks).flatMap { newBlocks =>
    history.write { implicit l =>
     val extension = newBlocks.dropWhile(history.contains)
@@ -36,16 +36,18 @@ object Coordinator extends ScorexLogging with Instrumented {
           extension.zipWithIndex.forall(p => checkpoint.isBlockValid(p._1.signerData.signature, lastCommonHeight + 1 + p._2))
 
         val forkApplicationResultEi = Coeval.evalOnce {
-          val firstDeclined = extension.view.map { b =>
-            b -> appendBlock(checkpoint, history, blockchainUpdater, stateReader(), utxStorage, time, settings.blockchainSettings, featureProvider)(b).right.map {
-              _.foreach(bh => BlockStats.applied(b, BlockStats.Source.Ext, bh))
+          val firstDeclined = extension.view
+            .map { b =>
+              b -> appendBlock(checkpoint, history, blockchainUpdater, stateReader(), utxStorage, time, settings.blockchainSettings, featureProvider)(b).right.map {
+                _.foreach(bh => BlockStats.applied(b, BlockStats.Source.Ext, bh))
+              }
             }
-          }
             .zipWithIndex
             .collectFirst { case ((b, Left(e)), i) => (i, b, e) }
 
           firstDeclined.foreach {
             case (_, declinedBlock, _) =>
+              storeInvalidBlock(declinedBlock.uniqueId)
               extension.view
                 .dropWhile(_ != declinedBlock)
                 .foreach(BlockStats.declined(_, BlockStats.Source.Ext))

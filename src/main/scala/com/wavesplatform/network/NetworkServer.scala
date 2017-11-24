@@ -5,6 +5,7 @@ import java.nio.channels.ClosedChannelException
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 
+import com.google.common.cache.CacheBuilder
 import com.wavesplatform.features.FeatureProvider
 import com.wavesplatform.metrics.Metrics
 import com.wavesplatform.mining.Miner
@@ -84,9 +85,25 @@ class NetworkServer(checkpointService: CheckpointService,
     settings.networkSettings.maxInboundConnections,
     settings.networkSettings.maxConnectionsPerHost)
 
+  private val knownInvalidBlocks = {
+    val residenceTime = 1.day
+
+    CacheBuilder
+      .newBuilder()
+      .expireAfterWrite(residenceTime.length, residenceTime.unit)
+      .build[ByteStr, Object]()
+  }
+
+  private def isInvalidBlock(id: ByteStr): Boolean = knownInvalidBlocks.getIfPresent(id) != null
+
   private val microBlockOwners = new MicroBlockOwners(settings.synchronizationSettings.microBlockSynchronizer.invCacheTimeout)
-  private val coordinatorHandler = new CoordinatorHandler(checkpointService, history, blockchainUpdater, time,
-    stateReader, utxPool, blockchainReadiness, miner, settings, peerDatabase, allChannels, featureProvider, microBlockOwners)
+  private val coordinatorHandler = {
+    val dummy = new Object()
+    new CoordinatorHandler(
+      checkpointService, history, blockchainUpdater, time, stateReader, utxPool, blockchainReadiness, miner, settings,
+      peerDatabase, allChannels, featureProvider, microBlockOwners, knownInvalidBlocks.put(_, dummy)
+    )
+  }
 
   private val peerConnections = new ConcurrentHashMap[PeerKey, Channel](10, 0.9f, 10)
 
@@ -122,7 +139,7 @@ class NetworkServer(checkpointService: CheckpointService,
         peerSynchronizer,
         historyReplier,
         microBlockSynchronizer,
-        new ExtensionSignaturesLoader(settings.synchronizationSettings.synchronizationTimeout, peerDatabase),
+        new ExtensionSignaturesLoader(settings.synchronizationSettings.synchronizationTimeout, peerDatabase, isInvalidBlock),
         new ExtensionBlocksLoader(settings.synchronizationSettings.synchronizationTimeout, peerDatabase, history),
         new OptimisticExtensionLoader,
         utxPoolSynchronizer,
@@ -156,7 +173,7 @@ class NetworkServer(checkpointService: CheckpointService,
       peerSynchronizer,
       historyReplier,
       microBlockSynchronizer,
-      new ExtensionSignaturesLoader(settings.synchronizationSettings.synchronizationTimeout, peerDatabase),
+      new ExtensionSignaturesLoader(settings.synchronizationSettings.synchronizationTimeout, peerDatabase, isInvalidBlock),
       new ExtensionBlocksLoader(settings.synchronizationSettings.synchronizationTimeout, peerDatabase, history),
       new OptimisticExtensionLoader,
       utxPoolSynchronizer,

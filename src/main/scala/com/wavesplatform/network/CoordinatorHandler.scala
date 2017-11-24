@@ -7,7 +7,7 @@ import com.wavesplatform.metrics.{BlockStats, HistogramExt}
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.network.MicroBlockSynchronizer.MicroblockData
 import com.wavesplatform.settings.WavesSettings
-import com.wavesplatform.state2.StateReader
+import com.wavesplatform.state2.{ByteStr, StateReader}
 import com.wavesplatform.{Coordinator, UtxPool}
 import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel.group.ChannelGroup
@@ -34,13 +34,14 @@ class CoordinatorHandler(checkpointService: CheckpointService,
                          peerDatabase: PeerDatabase,
                          allChannels: ChannelGroup,
                          featureProvider: FeatureProvider,
-                         microBlockOwners: MicroBlockOwners)
+                         microBlockOwners: MicroBlockOwners,
+                         storeInvalidBlock: ByteStr => Unit)
   extends ChannelInboundHandlerAdapter with ScorexLogging {
 
   private implicit val scheduler = Scheduler.singleThread("coordinator-handler")
 
   private val processCheckpoint = Coordinator.processCheckpoint(checkpointService, history, blockchainUpdater) _
-  private val processFork = Coordinator.processFork(checkpointService, history, blockchainUpdater, stateReader, utxStorage, time, settings, blockchainReadiness, featureProvider) _
+  private val processFork = Coordinator.processFork(checkpointService, history, blockchainUpdater, stateReader, utxStorage, time, settings, blockchainReadiness, featureProvider, storeInvalidBlock) _
   private val processBlock = Coordinator.processSingleBlock(checkpointService, history, blockchainUpdater, time, stateReader, utxStorage, settings.blockchainSettings, featureProvider) _
   private val processMicroBlock = Coordinator.processMicroBlock(checkpointService, history, blockchainUpdater, utxStorage) _
 
