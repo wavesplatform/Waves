@@ -45,24 +45,21 @@ class CoordinatorHandler(checkpointService: CheckpointService,
   private val processBlock = Coordinator.processSingleBlock(checkpointService, history, blockchainUpdater, time, stateReader, utxStorage, settings.blockchainSettings, featureProvider) _
   private val processMicroBlock = Coordinator.processMicroBlock(checkpointService, history, blockchainUpdater, utxStorage) _
 
-  private def scheduleMiningAndBroadcastScore(score: BigInt, breakExtLoading: Boolean): Unit = {
+  private def scheduleMiningAndBroadcastScore(score: BigInt, breakExtProcessing: Boolean): Unit = {
     miner.scheduleMining()
-    allChannels.broadcast(LocalScoreChanged(score, breakExtLoading))
+    allChannels.broadcast(LocalScoreChanged(score, breakExtProcessing))
   }
 
   private def processAndBlacklistOnFailure(ctx: ChannelHandlerContext,
                                            start: => String,
                                            success: => String,
                                            errorPrefix: String,
-                                           f: => Either[_, Option[BigInt]]): Unit = {
+                                           f: => Either[_, BigInt]): Unit = {
     log.debug(s"${id(ctx)} $start")
     Task(f).map {
-      case Right(None) =>
-        log.debug(s"${id(ctx)} Score was not changed")
-        scheduleMiningAndBroadcastScore(history.score(), breakExtLoading = true)
-      case Right(Some(newScore)) =>
+      case Right(newScore) =>
         log.debug(s"${id(ctx)} $success")
-        scheduleMiningAndBroadcastScore(newScore, breakExtLoading = false)
+        scheduleMiningAndBroadcastScore(newScore, breakExtProcessing = true)
       case Left(ve) =>
         log.warn(s"${id(ctx)} $errorPrefix: $ve")
         peerDatabase.blacklistAndClose(ctx.channel(), s"$errorPrefix: $ve")
@@ -76,7 +73,7 @@ class CoordinatorHandler(checkpointService: CheckpointService,
       "Attempting to process checkpoint",
       "Successfully processed checkpoint",
       "Error processing checkpoint",
-      processCheckpoint(c).map(Some(_)))
+      processCheckpoint(c))
 
     case ExtensionBlocks(blocks) =>
       blocks.foreach(BlockStats.received(_, BlockStats.Source.Ext, ctx))
@@ -99,7 +96,7 @@ class CoordinatorHandler(checkpointService: CheckpointService,
         log.debug(s"${id(ctx)} Appended $b")
         if (b.transactionData.isEmpty)
           allChannels.broadcast(BlockForged(b), Some(ctx.channel()))
-        scheduleMiningAndBroadcastScore(newScore, breakExtLoading = false)
+        scheduleMiningAndBroadcastScore(newScore, breakExtProcessing = false)
       case Left(is: InvalidSignature) =>
         peerDatabase.blacklistAndClose(ctx.channel(), s"Could not append $b: $is")
       case Left(ve) =>

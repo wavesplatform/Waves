@@ -53,13 +53,12 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
     }
 
   override def write(ctx: ChannelHandlerContext, msg: AnyRef, promise: ChannelPromise): Unit = msg match {
-    case LocalScoreChanged(newLocalScore, breakExtLoading) =>
+    case LocalScoreChanged(newLocalScore, breakExtProcessing) =>
       localScore = newLocalScore
       log.debug(s"${id(ctx)} $pinnedChannelId New local score: $newLocalScore")
       ctx.write(msg, promise)
 
-      if (breakExtLoading) {
-        ctx.write(LoadBlockchainExtension(Seq.empty))
+      if (breakExtProcessing) {
         if (pinnedChannel.compareAndSet(ctx.channel(), null)) log.debug(s"${id(ctx)} Stop processing an extension")
         channelWithHighestScore match {
           case Some((bestChannel, bestScore))
@@ -67,6 +66,7 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
             log.debug(s"${id(ctx)} Switching to second best channel $pinnedChannelId")
             requestExtension(bestChannel)
           case _ =>
+            ctx.write(LoadBlockchainExtension(Seq.empty))
         }
       }
 
@@ -102,7 +102,7 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
         log.debug(s"${id(ctx)} ${pinnedChannelId}New high score $highScore > $localScore, pinning and requesting extension")
         requestExtension(ch)
       } else {
-        log.trace(s"${id(ctx)} New high score $highScore, but we are processing a score from $pinnedChannelId for now")
+        log.trace(s"${id(ctx)} New high score $highScore, but we are processing a score from ${pinnedChannelId}for now")
       }
 
     case ExtensionBlocks(blocks) if pinnedChannel.get() == ctx.channel() =>
