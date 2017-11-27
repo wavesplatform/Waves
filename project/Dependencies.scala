@@ -25,7 +25,8 @@ object Dependencies {
     "org.scalacheck" %% "scalacheck" % "1.13.5",
     "org.mockito" % "mockito-all" % "1.10.19",
     "org.scalamock" %% "scalamock-scalatest-support" % "3.6.0",
-    akkaHttpModule("akka-http-testkit")
+    "org.iq80.leveldb" % "leveldb" % "0.9",
+      akkaHttpModule("akka-http-testkit")
   )) map (_ % "test")
 
   lazy val itKit = (scalatest ++ Seq(
@@ -42,8 +43,7 @@ object Dependencies {
   lazy val akka = Seq("actor", "slf4j").map(akkaModule)
 
   lazy val db = Seq(
-    "org.fusesource.leveldbjni" % "leveldbjni-all" % "1.8",
-    "org.iq80.leveldb" % "leveldb" % "0.9"
+    "org.fusesource.leveldbjni" % "leveldbjni-all" % "1.8"
   )
 
   lazy val logging = Seq(

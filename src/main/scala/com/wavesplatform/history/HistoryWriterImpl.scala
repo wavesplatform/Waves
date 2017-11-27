@@ -35,6 +35,7 @@ class HistoryWriterImpl private(db: DB, val synchronizationToken: ReentrantReadW
   private val ScoreAtHeightPrefix = "scores".getBytes(Charset)
   private val VotesAtHeightPrefix = "votes".getBytes(Charset)
   private val FeatureStatePrefix = "features".getBytes(Charset)
+  private val FeaturesIndexKey = makeKey("feature-index".getBytes(Charset), 0)
 
   private val HeightProperty = "history-height"
 
@@ -48,7 +49,7 @@ class HistoryWriterImpl private(db: DB, val synchronizationToken: ReentrantReadW
   private lazy val preAcceptedFeatures = functionalitySettings.preActivatedFeatures.mapValues(h => h - activationWindowSize)
 
   override def approvedFeatures(): Map[Short, Int] = read { implicit lock =>
-    preAcceptedFeatures ++ map(FeatureStatePrefix).map(e => Shorts.fromByteArray(e._1) -> Ints.fromByteArray(e._2))
+    preAcceptedFeatures ++ getFeaturesState
   }
 
   override def featureVotesCountWithinActivationWindow(height: Int): Map[Short, Int] = read { implicit lock =>
@@ -77,9 +78,9 @@ class HistoryWriterImpl private(db: DB, val synchronizationToken: ReentrantReadW
         put(makeKey(HeightBySignaturePrefix, block.uniqueId.arr), Ints.toByteArray(h))
         putInt(HeightProperty, h)
 
-        val presentFeatures = map(FeatureStatePrefix, stripPrefix = true).keySet.map(Shorts.fromByteArray)
+        val presentFeatures = allFeatures().toSet
         val newFeatures = acceptedFeatures.diff(presentFeatures)
-        newFeatures.foreach(f => put(makeKey(FeatureStatePrefix, Shorts.toByteArray(f)), Ints.toByteArray(h)))
+        newFeatures.foreach(f => addFeature(f, h))
         alterVotes(h, block.featureVotes, 1)
 
         blockHeightStats.record(h)
@@ -93,6 +94,32 @@ class HistoryWriterImpl private(db: DB, val synchronizationToken: ReentrantReadW
         Left(GenericError(s"Parent ${block.reference} of block ${block.uniqueId} does not match last block ${this.lastBlock.map(_.uniqueId)}"))
       }
     }
+
+  private def allFeatures(): Seq[Short] = read { implicit lock =>
+    get(FeaturesIndexKey).map(ShortSeqCodec.decode).map(_.explicitGet().value).getOrElse(Seq.empty[Short])
+  }
+
+  private def addFeature(featureId: Short, height: Int): Unit = {
+    val features = (allFeatures() :+ featureId).distinct
+    put(makeKey(FeatureStatePrefix, Shorts.toByteArray(featureId)), Ints.toByteArray(height))
+    put(FeaturesIndexKey, ShortSeqCodec.encode(features))
+  }
+
+  private def deleteFeature(featureId: Short): Unit = {
+    val features = allFeatures().filterNot(f => f == featureId).distinct
+    delete(makeKey(FeatureStatePrefix, Shorts.toByteArray(featureId)))
+    put(FeaturesIndexKey, ShortSeqCodec.encode(features))
+  }
+
+  private def getFeatureHeight(featureId: Short): Option[Int] =
+    get(makeKey(FeatureStatePrefix, Shorts.toByteArray(featureId))).flatMap(b => Try(Ints.fromByteArray(b)).toOption)
+
+  private def getFeaturesState(): Map[Short, Int] = {
+    allFeatures().foldLeft(Map.empty[Short, Int]) { (r, f) =>
+      val h = getFeatureHeight(f)
+      if (h.isDefined) r.updated(f, h.get) else r
+    }
+  }
 
   def discardBlock(): Option[Block] = write { implicit lock =>
     val h = height()
@@ -109,8 +136,9 @@ class HistoryWriterImpl private(db: DB, val synchronizationToken: ReentrantReadW
     delete(makeKey(ScoreAtHeightPrefix, h))
 
     if (h % activationWindowSize == 0) {
-      map(FeatureStatePrefix, stripPrefix = false).foreach { e =>
-        if (Ints.fromByteArray(e._2) == h) delete(e._1)
+      allFeatures().foreach { f =>
+        val featureHeight = getFeatureHeight(f)
+        if (featureHeight.isDefined && featureHeight.get == h) deleteFeature(f)
       }
     }
 

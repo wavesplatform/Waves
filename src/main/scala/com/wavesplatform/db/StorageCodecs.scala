@@ -343,3 +343,21 @@ object ByteStrSeqCodec extends Codec[Seq[ByteStr]] {
 
   override def decode(bytes: Array[Byte]): Either[CodecFailure, DecodeResult[Seq[ByteStr]]] = itemsCodec.decode(bytes)
 }
+
+object ShortCodec extends Codec[Short] {
+  override def encode(value: Short): Array[Byte] = Shorts.toByteArray(value)
+
+  override def decode(bytes: Array[Byte]): Either[CodecFailure, DecodeResult[Short]] = {
+    for {
+      v <- Try(Shorts.fromByteArray(bytes.take(Shorts.BYTES))).toEither.left.map(e => CodecFailure(e.getMessage))
+    } yield DecodeResult(Shorts.BYTES, v)
+  }
+}
+
+object ShortSeqCodec extends Codec[Seq[Short]] {
+  private val itemsCodec = SeqCodec(ShortCodec)
+
+  override def encode(value: Seq[Short]): Array[Byte] = itemsCodec.encode(value)
+
+  override def decode(bytes: Array[Byte]): Either[CodecFailure, DecodeResult[Seq[Short]]] = itemsCodec.decode(bytes)
+}
