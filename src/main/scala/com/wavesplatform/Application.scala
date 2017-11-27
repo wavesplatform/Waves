@@ -26,6 +26,7 @@ import io.netty.channel.Channel
 import io.netty.channel.group.DefaultChannelGroup
 import io.netty.util.concurrent.GlobalEventExecutor
 import kamon.Kamon
+import monix.eval.Task
 import monix.reactive.Observable
 import org.influxdb.dto.Point
 import org.slf4j.bridge.SLF4JBridgeHandler
@@ -104,7 +105,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     if (settings.restAPISettings.enable) {
       val apiRoutes = Seq(
-        BlocksApiRoute(settings.restAPISettings, history, allChannels, ???),
+        BlocksApiRoute(settings.restAPISettings, history, allChannels, c=>Task{???}),
         TransactionsApiRoute(settings.restAPISettings, stateReader, history, utxStorage),
         NxtConsensusApiRoute(settings.restAPISettings, stateReader, history, settings.blockchainSettings.functionalitySettings),
         WalletApiRoute(settings.restAPISettings, wallet),
