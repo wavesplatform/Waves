@@ -5,6 +5,7 @@ import java.net.{InetSocketAddress, URI}
 
 import com.google.common.base.Charsets
 import com.typesafe.config.Config
+import com.wavesplatform.network.TrafficLogger
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 import net.ceedubs.ficus.readers.ValueReader
@@ -32,12 +33,19 @@ case class NetworkSettings(file: Option[File],
                            peersBroadcastInterval: FiniteDuration,
                            handshakeTimeout: FiniteDuration,
                            suspensionResidenceTime: FiniteDuration,
-                           uPnPSettings: UPnPSettings)
+                           uPnPSettings: UPnPSettings,
+                           trafficLogger: TrafficLogger.Settings)
 
 object NetworkSettings {
   private val MaxNodeNameBytesLength = 127
   implicit val networkSettingsValueReader: ValueReader[NetworkSettings] =
     (cfg: Config, path: String) => fromConfig(cfg.getConfig(path))
+
+  implicit val byteReader: ValueReader[Byte] = { (cfg: Config, path: String) =>
+    val x = cfg.getInt(path)
+    if (x.isValidByte) x.toByte
+    else throw new IllegalArgumentException(s"$path has an invalid value: '$x' expected to be a byte")
+  }
 
   private def fromConfig(config: Config): NetworkSettings = {
     val file = config.getAs[File]("file")
@@ -65,11 +73,12 @@ object NetworkSettings {
     val handshakeTimeout = config.as[FiniteDuration]("handshake-timeout")
     val suspensionResidenceTime = config.as[FiniteDuration]("suspension-residence-time")
     val uPnPSettings = config.as[UPnPSettings]("upnp")
+    val trafficLogger = config.as[TrafficLogger.Settings]("traffic-logger")
 
     NetworkSettings(file, bindAddress, declaredAddress, nodeName, nonce, knownPeers,
       peersDataResidenceTime, blackListResidenceTime, maxInboundConnections, maxOutboundConnections,
       maxConnectionsFromSingleHost, connectionTimeout, maxUnverifiedPeers, enablePeersExchange,
-      enableBlacklisting, peersBroadcastInterval, handshakeTimeout, suspensionResidenceTime, uPnPSettings)
+      enableBlacklisting, peersBroadcastInterval, handshakeTimeout, suspensionResidenceTime, uPnPSettings, trafficLogger)
   }
 
   private def randomNonce: Long = {

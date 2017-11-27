@@ -270,4 +270,5 @@ object BasicMessagesRepo {
     MicroBlockInvMessageSpec, MicroBlockRequestMessageSpec, MicroBlockResponseMessageSpec)
 
   val specsByCodes: Map[Byte, Spec] = specs.map(s => s.messageCode -> s).toMap
+  val specsByClasses: Map[Class[_], Spec] = specs.map(s => s.contentClass -> s).toMap
 }

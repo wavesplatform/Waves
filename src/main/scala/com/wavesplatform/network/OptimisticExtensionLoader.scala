@@ -14,13 +14,14 @@ class OptimisticExtensionLoader extends ChannelDuplexHandler with ScorexLogging 
   private def loadNextPart(ctx: ChannelHandlerContext, blocks: Seq[Block]): Unit = if (blocks.size > 1) {
     requestedLocalIds = Seq.empty
     hopefullyNextIds = blocks.view.map(_.uniqueId).reverseIterator.take(100).toSeq
-    log.debug(s"${id(ctx)} Loading next part, sending ${hopefullyNextIds.size} signatures")
+    log.debug(s"${id(ctx)} Loading next part, sending ${hopefullyNextIds.size} signatures: ${formatSignatures(hopefullyNextIds)}")
     ctx.writeAndFlush(LoadBlockchainExtension(hopefullyNextIds))
   }
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
     case ExtensionBlocks(extension) if extension.isEmpty =>
-      stopLoading(ctx)
+      requestedLocalIds = Seq.empty
+      hopefullyNextIds = Seq.empty
       log.debug(s"${id(ctx)} Blockchain is up to date")
       super.channelRead(ctx, msg)
     case ExtensionBlocks(extension) if requestedLocalIds.isEmpty =>
@@ -37,7 +38,9 @@ class OptimisticExtensionLoader extends ChannelDuplexHandler with ScorexLogging 
 
   override def write(ctx: ChannelHandlerContext, msg: AnyRef, promise: ChannelPromise): Unit = msg match {
     case LoadBlockchainExtension(Seq()) =>
-      stopLoading(ctx)
+      hopefullyNextIds = Seq.empty
+      nextExtensionBlocks = Seq.empty
+      requestedLocalIds = Seq.empty
       super.write(ctx, msg, promise)
 
     case LoadBlockchainExtension(localIds) =>
@@ -55,11 +58,5 @@ class OptimisticExtensionLoader extends ChannelDuplexHandler with ScorexLogging 
       nextExtensionBlocks = Seq.empty
 
     case _ => super.write(ctx, msg, promise)
-  }
-
-  private def stopLoading(ctx: ChannelHandlerContext): Unit = {
-    hopefullyNextIds = Seq.empty
-    nextExtensionBlocks = Seq.empty
-    requestedLocalIds = Seq.empty
   }
 }

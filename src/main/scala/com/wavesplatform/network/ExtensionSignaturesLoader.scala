@@ -28,7 +28,7 @@ class ExtensionSignaturesLoader(syncTimeout: FiniteDuration,
       known.lastOption match {
         case None => log.warn(s"Got unknown extensions from ${id(ctx)}: ${s.signatures.map(_.trim).mkString(",")}")
         case Some(lastKnown) =>
-          log.debug(s"${id(ctx)} Got extension with ${known.length}/${s.signatures.length} known signatures")
+          log.debug(s"${id(ctx)} Got extension with ${known.length}/${s.signatures.length} known signatures, unknown: ${formatSignatures(unknown)}")
           ctx.fireChannelRead(ExtensionIds(lastKnown, unknown))
       }
     case _ => super.channelRead(ctx, msg)

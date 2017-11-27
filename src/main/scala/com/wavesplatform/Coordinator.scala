@@ -54,7 +54,7 @@ object Coordinator extends ScorexLogging with Instrumented {
           }
 
           firstDeclined
-            .foldLeft[Either[ValidationError, BigInt]](Right(history.score())) {
+            .foldLeft[Either[ValidationError, Option[BigInt]]](Right(None)) {
             case (_, (i, b, e)) if i == 0 =>
               log.warn(s"Can't process fork starting with $lastCommonBlockId, error appending block $b: $e")
               Left(e)
@@ -91,14 +91,14 @@ object Coordinator extends ScorexLogging with Instrumented {
           }
           droppedBlocks.flatMap(_.transactionData).foreach(utxStorage.putIfNew)
           updateBlockchainReadinessFlag(history, time, blockchainReadiness, settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed)
-          Some(score)
+          score
         }.left.map { case ((err, droppedBlocks)) =>
           droppedBlocks.foreach(blockchainUpdater.processBlock(_).explicitGet())
           err
         }
       case None =>
         log.debug("No new blocks found in extension")
-        Right(Some(history.score()))
+        Right(None)
     }
   }
   }

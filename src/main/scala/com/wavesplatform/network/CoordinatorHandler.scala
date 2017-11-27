@@ -45,21 +45,26 @@ class CoordinatorHandler(checkpointService: CheckpointService,
   private val processBlock = Coordinator.processSingleBlock(checkpointService, history, blockchainUpdater, time, stateReader, utxStorage, settings.blockchainSettings, featureProvider) _
   private val processMicroBlock = Coordinator.processMicroBlock(checkpointService, history, blockchainUpdater, utxStorage) _
 
-  private def scheduleMiningAndBroadcastScore(breakExtLoading: Boolean)(score: BigInt): Unit = {
+  private def scheduleMiningAndBroadcastScore(score: BigInt, breakExtLoading: Boolean): Unit = {
     miner.scheduleMining()
     allChannels.broadcast(LocalScoreChanged(score, breakExtLoading))
   }
 
-  private def processAndBlacklistOnFailure[A](ctx: ChannelHandlerContext, start: => String, success: => String, errorPrefix: String,
-                                              f: => Either[_, Option[A]],
-                                              r: A => Unit): Unit = {
-    log.debug(start)
+  private def processAndBlacklistOnFailure(ctx: ChannelHandlerContext,
+                                           start: => String,
+                                           success: => String,
+                                           errorPrefix: String,
+                                           f: => Either[_, Option[BigInt]]): Unit = {
+    log.debug(s"${id(ctx)} $start")
     Task(f).map {
-      case Right(maybeNewScore) =>
-        log.debug(success)
-        maybeNewScore.foreach(r)
+      case Right(None) =>
+        log.debug(s"${id(ctx)} Score was not changed or an error occurred")
+        scheduleMiningAndBroadcastScore(history.score(), breakExtLoading = true)
+      case Right(Some(newScore)) =>
+        log.debug(s"${id(ctx)} $success")
+        scheduleMiningAndBroadcastScore(newScore, breakExtLoading = false)
       case Left(ve) =>
-        log.warn(s"$errorPrefix: $ve")
+        log.warn(s"${id(ctx)} $errorPrefix: $ve")
         peerDatabase.blacklistAndClose(ctx.channel(), s"$errorPrefix: $ve")
     }.onErrorHandle[Unit](ctx.fireExceptionCaught).runAsync
   }
@@ -68,19 +73,18 @@ class CoordinatorHandler(checkpointService: CheckpointService,
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
     case c: Checkpoint => processAndBlacklistOnFailure(ctx,
-      s"${id(ctx)} Attempting to process checkpoint",
-      s"${id(ctx)} Successfully processed checkpoint",
-      s"${id(ctx)} Error processing checkpoint",
-      processCheckpoint(c).map(Some(_)), scheduleMiningAndBroadcastScore(breakExtLoading = true))
+      "Attempting to process checkpoint",
+      "Successfully processed checkpoint",
+      "Error processing checkpoint",
+      processCheckpoint(c).map(Some(_)))
 
     case ExtensionBlocks(blocks) =>
       blocks.foreach(BlockStats.received(_, BlockStats.Source.Ext, ctx))
       processAndBlacklistOnFailure(ctx,
-        s"${id(ctx)} Attempting to append extension ${formatBlocks(blocks)}",
-        s"${id(ctx)} Successfully appended extension ${formatBlocks(blocks)}",
-        s"${id(ctx)} Error appending extension ${formatBlocks(blocks)}",
-        processFork(blocks),
-        scheduleMiningAndBroadcastScore(breakExtLoading = true))
+        s"Attempting to append extension ${formatBlocks(blocks)}",
+        s"Successfully appended extension ${formatBlocks(blocks)}",
+        s"Error appending extension ${formatBlocks(blocks)}",
+        processFork(blocks))
 
     case b: Block => (Task {
       BlockStats.received(b, BlockStats.Source.Broadcast, ctx)
@@ -95,7 +99,7 @@ class CoordinatorHandler(checkpointService: CheckpointService,
         log.debug(s"${id(ctx)} Appended $b")
         if (b.transactionData.isEmpty)
           allChannels.broadcast(BlockForged(b), Some(ctx.channel()))
-        scheduleMiningAndBroadcastScore(breakExtLoading = false)(newScore)
+        scheduleMiningAndBroadcastScore(newScore, breakExtLoading = false)
       case Left(is: InvalidSignature) =>
         peerDatabase.blacklistAndClose(ctx.channel(), s"Could not append $b: $is")
       case Left(ve) =>
