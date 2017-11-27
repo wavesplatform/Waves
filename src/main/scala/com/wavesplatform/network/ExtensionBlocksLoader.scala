@@ -31,7 +31,7 @@ class ExtensionBlocksLoader(
   private def blacklistAfterTimeout(ctx: ChannelHandlerContext): Unit = {
     cancelBlacklist()
     blacklistingScheduledFuture = Some(ctx.executor().schedule(blockSyncTimeout) {
-        peerDatabase.blacklistAndClose(ctx.channel(), "Timeout loading blocks")
+      peerDatabase.blacklistAndClose(ctx.channel(), "Timeout loading blocks")
     })
   }
 
@@ -44,15 +44,15 @@ class ExtensionBlocksLoader(
     case xid@ExtensionIds(_, newIds) if pendingSignatures.isEmpty =>
       val requestingIds = newIds.filterNot(history.contains)
       if (requestingIds.nonEmpty) {
-            targetExtensionIds = Some(xid)
-            pendingSignatures = newIds.zipWithIndex.toMap
-            blacklistAfterTimeout(ctx)
-            extensionsFetchingTimeStats.start()
-            newIds.foreach(s => ctx.write(GetBlock(s)))
-            ctx.flush()
-        } else {
-          log.debug(s"${id(ctx)} No new blocks to load")
-          ctx.fireChannelRead(ExtensionBlocks(Seq.empty))
+          targetExtensionIds = Some(xid)
+          pendingSignatures = newIds.zipWithIndex.toMap
+          blacklistAfterTimeout(ctx)
+          extensionsFetchingTimeStats.start()
+          newIds.foreach(s => ctx.write(GetBlock(s)))
+          ctx.flush()
+      } else {
+        log.debug(s"${id(ctx)} No new blocks to load")
+        ctx.fireChannelRead(ExtensionBlocks(Seq.empty))
       }
     case b: Block if pendingSignatures.contains(b.uniqueId) =>
       blockBuffer += pendingSignatures(b.uniqueId) -> b

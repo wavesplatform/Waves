@@ -55,6 +55,11 @@ class NetworkServer(checkpointService: CheckpointService,
     history.lastBlockIds(settings.synchronizationSettings.maxRollback), history.score())
 
   private val trafficWatcher = if (settings.metrics.enable) new TrafficWatcher else new NoopHandler
+  private val trafficLogger = {
+    if (settings.networkSettings.trafficLogger.enable) new TrafficLogger(settings.networkSettings.trafficLogger)
+    else new NoopHandler
+  }
+
   private val discardingHandler = new DiscardingHandler(blockchainReadiness)
   private val messageCodec = new MessageCodec(peerDatabase)
 
@@ -122,6 +127,7 @@ class NetworkServer(checkpointService: CheckpointService,
         trafficWatcher,
         discardingHandler,
         messageCodec,
+        trafficLogger,
         writeErrorHandler,
         peerSynchronizer,
         historyReplier,
@@ -156,6 +162,7 @@ class NetworkServer(checkpointService: CheckpointService,
       trafficWatcher,
       discardingHandler,
       messageCodec,
+      trafficLogger,
       writeErrorHandler,
       peerSynchronizer,
       historyReplier,
