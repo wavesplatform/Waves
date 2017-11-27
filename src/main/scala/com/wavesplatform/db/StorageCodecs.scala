@@ -87,7 +87,7 @@ case class SeqCodec[A](valueCodec: Codec[A]) extends Codec[Seq[A]] {
     val n = Try(Ints.fromByteArray(bytes.take(Ints.BYTES))).toEither.left.map(e => CodecFailure(e.getMessage))
     if (n.isRight) {
       val expectedLength = n.right.get
-      var result = Seq.empty[A]
+      val builder = Seq.newBuilder[A]
       var i = Ints.BYTES
       var error = false
       while (i < bytes.length && !error) {
@@ -95,12 +95,13 @@ case class SeqCodec[A](valueCodec: Codec[A]) extends Codec[Seq[A]] {
         if (r.isRight) {
           val rr = r.right.get
           i = i + rr.length
-          result = result :+ rr.value
+          builder.+=(rr.value)
         } else {
           println(r.left.get.reason)
           error = true
         }
       }
+      val result = builder.result()
       Either.cond(!error && expectedLength == result.length, DecodeResult(i, result), CodecFailure(s"failed to deserialize $expectedLength items"))
     } else Left(n.left.get)
   }
