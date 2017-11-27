@@ -9,27 +9,29 @@ import scorex.utils.ScorexLogging
 class TrafficLogger(settings: TrafficLogger.Settings) extends ChannelDuplexHandler with ScorexLogging {
 
   import BasicMessagesRepo.specsByClasses
-  import settings.{ignoreMessages => shouldIgnore}
 
   override def write(ctx: ChannelHandlerContext, msg: AnyRef, promise: ChannelPromise): Unit = {
-    val ignore = msg match {
-      case x: RawBytes => shouldIgnore(x.code)
-      case x: Message => shouldIgnore(specsByClasses(x.getClass).messageCode)
-      case _ => true
-    }
-
-    if (!ignore) log.trace(s"${id(ctx)} <-- $msg")
+    if (!shouldIgnore(msg)) log.trace(s"${id(ctx)} <-- $msg")
     super.write(ctx, msg, promise)
   }
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = {
-    val ignore = msg match {
-      case x: Message => shouldIgnore(specsByClasses(x.getClass).messageCode)
+    if (!shouldIgnore(msg)) log.trace(s"${id(ctx)} --> $msg")
+    super.channelRead(ctx, msg)
+  }
+
+  private def shouldIgnore(msg: AnyRef): Boolean = {
+    import settings.ignoreMessages
+
+    msg match {
+      // Have no spec
+      case x: RawBytes => ignoreMessages(x.code)
+      case _: LocalScoreChanged => ignoreMessages(ScoreMessageSpec.messageCode)
+      case BlockForged(b) => ignoreMessages(BlockMessageSpec.messageCode)
+
+      case x: Message => ignoreMessages(specsByClasses(x.getClass).messageCode)
       case _ => true
     }
-
-    if (!ignore) log.trace(s"${id(ctx)} --> $msg")
-    super.channelRead(ctx, msg)
   }
 
 }
