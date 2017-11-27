@@ -4,6 +4,7 @@ import com.wavesplatform.TransactionGen
 import com.wavesplatform.network.RxScoreObserver.BestChannel
 import io.netty.channel.Channel
 import io.netty.channel.local.LocalChannel
+import monix.reactive.Observable
 import monix.reactive.subjects.PublishSubject
 import org.scalatest.{FreeSpec, Matchers}
 import scorex.transaction.History.BlockchainScore
@@ -24,8 +25,14 @@ class RxScoreObserverSpec extends FreeSpec with Matchers with TransactionGen {
     (syncWith, localScores, remoteScores, channelClosed)
   }
 
-  def test[T](future: Future[T]): Unit = {
-    Await.result(future, 10.seconds)
+
+  def test[T](target: Observable[T])(testBody: (() => T) => Future[Any]): Unit = {
+    val replay = target.replay(1)
+    replay.connect()
+
+    //replay.take(1).lastL.coeval.value.fold(x => x, x => Future(x)).flatMap(x => f(Success(x)))
+
+    Await.result(testBody(() => replay.take(1).lastL.coeval.value.right.get), 10.seconds)
   }
 
   "should emit better channel" - {
@@ -33,14 +40,15 @@ class RxScoreObserverSpec extends FreeSpec with Matchers with TransactionGen {
       val (syncWith, localScores, remoteScores, _) = buildObserver()
       val testChannel = new LocalChannel()
 
-      val subscription = syncWith.drop(1).runAsyncGetFirst
-
-      test {
+      test(syncWith) { recent =>
         for {
           _ <- localScores.onNext(1)
+          recent().isEmpty shouldBe true
+
           _ <- remoteScores.onNext((testChannel, 2))
-          result <- subscription
-        } yield result.get shouldBe Some(BestChannel(testChannel, 2))
+          recent() shouldBe BestChannel(testChannel, 2)
+
+        } yield {}
       }
     }
 
