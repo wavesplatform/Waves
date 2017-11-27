@@ -1,5 +1,6 @@
 package com.wavesplatform.network
 
+import cats.data.EitherT
 import com.wavesplatform.features.FeatureProvider
 import com.wavesplatform.metrics._
 import com.wavesplatform.mining.Miner
@@ -52,9 +53,9 @@ object CoordinatorHandler extends ScorexLogging {
     }
 
     def processAndBlacklistOnFailure[A](ch: Channel, start: => String, success: => String, errorPrefix: String,
-                                        f: => Either[_, Option[A]], r: A => Unit): Unit = {
+                                        f: => Task[Either[_, Option[A]]], r: A => Unit): Task[Unit] = {
       log.debug(start)
-      f match {
+      f map {
         case Right(maybeNewScore) =>
           log.debug(success)
           maybeNewScore.foreach(r)
@@ -64,10 +65,13 @@ object CoordinatorHandler extends ScorexLogging {
       }
     }
 
-    val a = blocks.mapTask { case ((ch, b)) => Task {
+    val a = blocks.mapTask { case ((ch, b)) =>
       BlockStats.received(b, BlockStats.Source.Broadcast, ch)
       blockReceivingLag.safeRecord(System.currentTimeMillis() - b.timestamp)
-      b.signaturesValid().flatMap(b => processBlock(b)) match {
+      (for {
+        _ <- EitherT(Task.now(b.signaturesValid()))
+        validApplication <- EitherT(processBlock(b))
+      } yield validApplication).value.map {
         case Right(None) =>
           log.trace(s"${id(ch)} $b already appended")
         case Right(Some(newScore)) =>
@@ -83,18 +87,16 @@ object CoordinatorHandler extends ScorexLogging {
           log.debug(s"${id(ch)} Could not append $b: $ve")
       }
     }
-    }
 
-    val b = checkpoints.mapTask { case ((ch, c)) => Task {
+    val b = checkpoints.mapTask { case ((ch, c)) =>
       processAndBlacklistOnFailure(ch,
         s"${id(ch)} Attempting to process checkpoint",
         s"${id(ch)} Successfully processed checkpoint",
         s"${id(ch)} Error processing checkpoint",
-        processCheckpoint(c).map(Some(_)), scheduleMiningAndBroadcastScore)
-    }
+        processCheckpoint(c).map(_.map(Some(_))), scheduleMiningAndBroadcastScore)
     }
 
-    val c = extensions.mapTask { case ((ch, ExtensionBlocks(extensionBlocks))) => Task {
+    val c = extensions.mapTask { case ((ch, ExtensionBlocks(extensionBlocks))) =>
       extensionBlocks.foreach(BlockStats.received(_, BlockStats.Source.Ext, ch))
       processAndBlacklistOnFailure(ch,
         s"${id(ch)} Attempting to append extension ${formatBlocks(extensionBlocks)}",
@@ -103,13 +105,15 @@ object CoordinatorHandler extends ScorexLogging {
         processFork(extensionBlocks),
         scheduleMiningAndBroadcastScore)
     }
-    }
 
 
-    val d = microblockDatas.mapTask { case ((ch, md)) => Task {
+    val d = microblockDatas.mapTask { case ((ch, md)) =>
       import md.microBlock
       val microblockTotalResBlockSig = microBlock.totalResBlockSig
-      microBlock.signaturesValid().flatMap(processMicroBlock) match {
+      (for {
+        _ <- EitherT(Task.now(microBlock.signaturesValid()))
+        validApplication <- EitherT(processMicroBlock(microBlock))
+      } yield validApplication).value.map {
         case Right(()) =>
           md.invOpt match {
             case Some(mi) => allChannels.broadcast(mi, except = md.microblockOwners())
@@ -122,7 +126,6 @@ object CoordinatorHandler extends ScorexLogging {
           BlockStats.declined(microBlock)
           log.debug(s"${id(ch)} Could not append microblock $microblockTotalResBlockSig: $ve")
       }
-    }
     }
 
     Observable.merge(a, b, c, d).executeOn(scheduler).logErr

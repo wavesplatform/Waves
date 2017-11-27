@@ -24,6 +24,8 @@ case class BlocksApiRoute(settings: RestAPISettings, checkpointsSettings: Checkp
 
   // todo: make this configurable and fix integration tests
   val MaxBlocksPerRequest = 100
+  val rollbackExecutor = monix.execution.Scheduler.singleThread(name = "debug-rollback")
+
 
   override lazy val route =
     pathPrefix("blocks") {
@@ -211,9 +213,8 @@ case class BlocksApiRoute(settings: RestAPISettings, checkpointsSettings: Checkp
   ))
   def checkpoint: Route = (path("checkpoint") & post) {
     json[Checkpoint] { checkpoint =>
-      Future {
-        Coordinator.processCheckpoint(checkpointService, history, blockchainUpdater)(checkpoint)
-          .map(score => allChannels.broadcast(LocalScoreChanged(score)))
+      Coordinator.processCheckpoint(checkpointService, history, blockchainUpdater)(checkpoint).runAsync(rollbackExecutor).map {
+        _.map(score => allChannels.broadcast(LocalScoreChanged(score)))
       }.map(_.fold(ApiError.fromValidationError,
         _ => Json.obj("" -> "")): ToResponseMarshallable)
     }

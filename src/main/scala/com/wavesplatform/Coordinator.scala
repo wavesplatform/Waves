@@ -7,7 +7,7 @@ import com.wavesplatform.settings.{BlockchainSettings, FunctionalitySettings, Wa
 import com.wavesplatform.state2._
 import com.wavesplatform.state2.reader.SnapshotStateReader
 import kamon.Kamon
-import monix.eval.Coeval
+import monix.eval.{Coeval, Task}
 import org.influxdb.dto.Point
 import scorex.block.{Block, MicroBlock}
 import scorex.consensus.TransactionsOrdering
@@ -19,9 +19,12 @@ import scorex.utils.{ScorexLogging, Time}
 import scala.util.{Left, Right}
 
 object Coordinator extends ScorexLogging with Instrumented {
+
+  val scheduler = monix.execution.Scheduler.singleThread("coordinator")
+
   def processFork(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater,
                   stateReader: StateReader, utxStorage: UtxPool, time: Time, settings: WavesSettings,
-                  featureProvider: FeatureProvider, invalidBlocks: InvalidBlockStorage)(blocks: Seq[Block]): Either[ValidationError, Option[BigInt]] = Signed.validateOrdered(blocks).flatMap { newBlocks =>
+                  featureProvider: FeatureProvider, invalidBlocks: InvalidBlockStorage)(blocks: Seq[Block]): Task[Either[ValidationError, Option[BigInt]]] = Task(Signed.validateOrdered(blocks).flatMap { newBlocks =>
     history.write { implicit l =>
       val extension = newBlocks.dropWhile(history.contains)
 
@@ -96,25 +99,25 @@ object Coordinator extends ScorexLogging with Instrumented {
           Right(None)
       }
     }
-  }
+  }).executeOn(scheduler)
 
   def processSingleBlock(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater, time: Time,
                          stateReader: StateReader, utxStorage: UtxPool,
                          settings: BlockchainSettings, featureProvider: FeatureProvider)
-                        (newBlock: Block): Either[ValidationError, Option[BigInt]] = measureSuccessful(blockProcessingTimeStats, history.write { implicit l =>
+                        (newBlock: Block): Task[Either[ValidationError, Option[BigInt]]] = Task(measureSuccessful(blockProcessingTimeStats, history.write { implicit l =>
     if (history.contains(newBlock)) Right(None)
     else for {
       _ <- Either.cond(history.heightOf(newBlock.reference).exists(_ >= history.height() - 1), (), GenericError("Can process either new top block or current top block's competitor"))
       maybeBaseHeight <- appendBlock(checkpoint, history, blockchainUpdater, stateReader(), utxStorage, time, settings, featureProvider)(newBlock)
     } yield maybeBaseHeight map (_ => history.score())
-  })
+  })).executeOn(scheduler)
 
   def processMicroBlock(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater, utxStorage: UtxPool)
-                       (microBlock: MicroBlock): Either[ValidationError, Unit] = measureSuccessful(microblockProcessingTimeStats, for {
+                       (microBlock: MicroBlock): Task[Either[ValidationError, Unit]] = Task(measureSuccessful(microblockProcessingTimeStats, for {
     _ <- Either.cond(checkpoint.isBlockValid(microBlock.totalResBlockSig, history.height() + 1), (),
       MicroBlockAppendError(s"[h = ${history.height() + 1}] is not valid with respect to checkpoint", microBlock))
     _ <- blockchainUpdater.processMicroBlock(microBlock)
-  } yield utxStorage.removeAll(microBlock.transactionData))
+  } yield utxStorage.removeAll(microBlock.transactionData))).executeOn(scheduler)
 
   private def validateEffectiveBalance(fp: FeatureProvider, fs: FunctionalitySettings, block: Block, baseHeight: Int)(effectiveBalance: Long): Either[String, Long] =
     Either.cond(block.timestamp < fs.minimalGeneratingBalanceAfter ||
@@ -141,12 +144,12 @@ object Coordinator extends ScorexLogging with Instrumented {
   }
 
   def processCheckpoint(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater)
-                       (newCheckpoint: Checkpoint): Either[ValidationError, BigInt] =
-    checkpoint.set(newCheckpoint).map { _ =>
+                       (newCheckpoint: Checkpoint): Task[Either[ValidationError, BigInt]] =
+    Task(checkpoint.set(newCheckpoint).map { _ =>
       log.info(s"Processing checkpoint $checkpoint")
       makeBlockchainCompliantWith(history, blockchainUpdater)(newCheckpoint)
       history.score()
-    }
+    }).executeOn(scheduler)
 
 
   private def makeBlockchainCompliantWith(history: History, blockchainUpdater: BlockchainUpdater)(checkpoint: Checkpoint): Unit = {
