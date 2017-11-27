@@ -80,4 +80,14 @@ package object network extends ScorexLogging {
     o.foreach(a => last = Some(a))
     Coeval(last)
   }
+
+  def newItems[A](o: Observable[A])(implicit s: Scheduler): Coeval[Seq[A]] = {
+    @volatile var collected = Seq.empty[A]
+    o.foreach(a => collected = collected :+ a)
+    Coeval {
+      val r = collected
+      collected = Seq.empty
+      r
+    }
+  }
 }

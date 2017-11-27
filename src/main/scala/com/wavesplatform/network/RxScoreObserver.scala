@@ -2,6 +2,7 @@ package com.wavesplatform.network
 
 import java.util.concurrent.TimeUnit
 
+import cats._
 import cats.implicits._
 import com.google.common.cache.CacheBuilder
 import io.netty.channel._
@@ -15,6 +16,13 @@ import scala.collection.JavaConverters._
 import scala.concurrent.duration.FiniteDuration
 
 object RxScoreObserver extends ScorexLogging {
+
+  case class BestChannel(channel: Channel, score: BlockchainScore)
+
+  implicit val bestChannelEq = new Eq[BestChannel] {
+    override def eqv(x: BestChannel, y: BestChannel) = x.channel == y.channel && x.score == y.score
+  }
+
   type SyncWith = Option[BestChannel]
 
   def apply(scoreTtl: FiniteDuration, initalLocalScore: BigInt,
@@ -66,14 +74,12 @@ object RxScoreObserver extends ScorexLogging {
       }
     })
 
-    val z = remoteScores.observeOn(scheduler).map { case ((ch, score)) => {
+    val z = remoteScores.observeOn(scheduler).map { case ((ch, score)) =>
       scores.put(ch, score)
-
       log.trace(s"${id(ch)} New remote score $score")
-    }}
+    }
 
-    Observable.merge(x, y, z).map(_ => newBestChannel())
+    Observable.merge(x, y, z).map(_ => newBestChannel()).distinctUntilChanged
   }
 
-  case class BestChannel(channel: Channel, score: BlockchainScore)
 }

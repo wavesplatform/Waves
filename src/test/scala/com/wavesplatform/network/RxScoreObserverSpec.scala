@@ -4,17 +4,17 @@ import com.wavesplatform.TransactionGen
 import com.wavesplatform.network.RxScoreObserver.BestChannel
 import io.netty.channel.Channel
 import io.netty.channel.local.LocalChannel
-import monix.reactive.Observable
+import monix.execution.Ack
 import monix.reactive.subjects.PublishSubject
 import org.scalatest.{FreeSpec, Matchers}
 import scorex.transaction.History.BlockchainScore
 
-import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
+import scala.concurrent.{Await, Future}
 
 class RxScoreObserverSpec extends FreeSpec with Matchers with TransactionGen {
 
-  implicit val scheduler = monix.execution.Scheduler.singleThread("rx-score-observer-test")
+  implicit val scheduler = monix.execution.Scheduler.singleThread("cf")
 
   def buildObserver() = {
     val localScores = PublishSubject[BlockchainScore]
@@ -25,62 +25,141 @@ class RxScoreObserverSpec extends FreeSpec with Matchers with TransactionGen {
     (syncWith, localScores, remoteScores, channelClosed)
   }
 
+  def test[A](f: => Future[A]): A = Await.result(f, 10.seconds)
 
-  def test[T](target: Observable[T])(testBody: (() => T) => Future[Any]): Unit = {
-    val replay = target.replay(1)
-    replay.connect()
+  def send[A](p: PublishSubject[A])(a: A): Future[Ack] = p.onNext(a).map(ack => {
+    Thread.sleep(500)
+    ack
+  })
 
-    //replay.take(1).lastL.coeval.value.fold(x => x, x => Future(x)).flatMap(x => f(Success(x)))
-
-    Await.result(testBody(() => replay.take(1).lastL.coeval.value.right.get), 10.seconds)
-  }
 
   "should emit better channel" - {
     "when a new channel has the better score than the local one" in {
       val (syncWith, localScores, remoteScores, _) = buildObserver()
       val testChannel = new LocalChannel()
+      val newSyncWith = newItems(syncWith)
 
-      test(syncWith) { recent =>
+      test(
         for {
-          _ <- localScores.onNext(1)
-          recent().isEmpty shouldBe true
+          _ <- send(localScores)(1)
+          _ = newSyncWith() shouldBe List(None)
+          _ <- send(remoteScores)((testChannel, 2))
+          _ = newSyncWith() shouldBe List(Some(BestChannel(testChannel, 2)))
+        } yield ())
+    }
 
-          _ <- remoteScores.onNext((testChannel, 2))
-          recent() shouldBe BestChannel(testChannel, 2)
+    "when the connection with the best one is closed" in {
+      val (syncWith, localScores, remoteScores, closed) = buildObserver()
+      val ch100 = new LocalChannel()
+      val ch200 = new LocalChannel()
+      val newSyncWith = newItems(syncWith)
 
-        } yield {}
+      test(
+        for {
+          _ <- send(localScores)(1)
+          _ <- send(remoteScores)(ch200, 200)
+          _ = newSyncWith().last shouldBe Some(BestChannel(ch200, 200))
+          _ <- send(remoteScores)(ch100, 100)
+          _ <- send(closed)(ch200)
+          _ = newSyncWith().last shouldBe Some(BestChannel(ch100, 100))
+        } yield ())
+    }
+
+    "when the best channel upgrades score" in {
+      val (syncWith, localScores, remoteScores, _) = buildObserver()
+      val testChannel = new LocalChannel()
+      val newSyncWith = newItems(syncWith)
+
+      test(
+        for {
+          _ <- send(localScores)(1)
+          _ = newSyncWith() shouldBe List(None)
+          _ <- send(remoteScores)((testChannel, 2))
+          _ = newSyncWith() shouldBe List(Some(BestChannel(testChannel, 2)))
+          _ <- send(remoteScores)((testChannel, 3))
+          _ = newSyncWith() shouldBe List(Some(BestChannel(testChannel, 3)))
+        } yield ())
+    }
+
+
+    "when the best channel downgrades score" in {
+      val (syncWith, localScores, remoteScores, _) = buildObserver()
+      val testChannel = new LocalChannel()
+      val newSyncWith = newItems(syncWith)
+
+      test(
+        for {
+          _ <- send(localScores)(1)
+          _ = newSyncWith() shouldBe List(None)
+          _ <- send(remoteScores)((testChannel, 3))
+          _ = newSyncWith() shouldBe List(Some(BestChannel(testChannel, 3)))
+          _ <- send(remoteScores)((testChannel, 2))
+          _ = newSyncWith() shouldBe List(Some(BestChannel(testChannel, 2)))
+        } yield ())
+    }
+
+
+  }
+  "should emit None" - {
+    "stop when local score is as good as network's" in {
+      val (syncWith, localScores, remoteScores, closed) = buildObserver()
+      val ch100 = new LocalChannel()
+      val newSyncWith = newItems(syncWith)
+
+      test(for {
+        _ <- send(localScores)(1)
+        _ <- send(remoteScores)(ch100, 100)
+        _ = newSyncWith()
+        _ <- send(localScores)(100)
+        _ = newSyncWith().last shouldBe None
+      } yield ())
+    }
+
+    "stop when local score is better than network's" in {
+      val (syncWith, localScores, remoteScores, closed) = buildObserver()
+      val ch100 = new LocalChannel()
+      val newSyncWith = newItems(syncWith)
+
+      test(for {
+        _ <- send(localScores)(1)
+        _ <- send(remoteScores)(ch100, 100)
+        _ = newSyncWith()
+        _ <- send(localScores)(101)
+        _ = newSyncWith().last shouldBe None
+      } yield ())
+    }
+  }
+
+  "should not emit anything" - {
+    "when current best channel is not changed and its score is not changed" - {
+
+      "directly" in {
+        val (syncWith, localScores, remoteScores, closed) = buildObserver()
+        val ch100 = new LocalChannel()
+        val newSyncWith = newItems(syncWith)
+
+        test(for {
+          _ <- send(localScores)(1)
+          _ <- send(remoteScores)(ch100, 100)
+          _ = newSyncWith()
+          _ <- send(remoteScores)(ch100, 100)
+          _ = newSyncWith() shouldBe 'empty
+        } yield ())
+      }
+
+      "indirectly" in {
+        val (syncWith, localScores, remoteScores, closed) = buildObserver()
+        val ch100 = new LocalChannel()
+        val newSyncWith = newItems(syncWith)
+
+        test(for {
+          _ <- send(localScores)(1)
+          _ <- send(remoteScores)(ch100, 100)
+          _ = newSyncWith()
+          _ <- send(localScores)(2)
+          _ = newSyncWith() shouldBe 'empty
+        } yield ())
       }
     }
-
-    "when the connection with the best one is dropped" in {
-//      val (syncWith, localScores, remoteScores, cc) = buildObserver()
-//      val ch100 = new LocalChannel()
-//      val ch200 = new LocalChannel()
-//      val sub = syncWith.firstL.runAsync
-//      localScores.onNext(1)
-//      remoteScores.onNext((ch200, 200))
-//      remoteScores.onNext((ch100, 100))
-//      cc.onNext(ch200)
-//      Await.result(sub, Duration.Inf) shouldBe Some(BestChannel(ch100, 100))
-    }
   }
-
-  "should not request a new extension if a previous one is not downloaded yet" ignore {
-    "when the score of the best channel was changed" in {
-
-    }
-    "when new connection" - {
-
-    }
-  }
-
-  "should re-request extensions" ignore {
-    "when the local score is changed but still worse than the better one" in {
-
-    }
-  }
-
-  "should propagate blocks from an expected extensions" ignore {}
-
-  "should ignore blocks from an unexpected extensions" ignore {}
 }
