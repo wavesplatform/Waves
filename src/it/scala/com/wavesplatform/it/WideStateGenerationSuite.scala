@@ -3,7 +3,6 @@ package com.wavesplatform.it
 import com.wavesplatform.it.api._
 import org.scalatest._
 
-import scala.concurrent.Await
 import scala.concurrent.Await.result
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future.traverse

@@ -36,7 +36,7 @@ object Coordinator extends ScorexLogging with Instrumented {
           extension.zipWithIndex.forall(p => checkpoint.isBlockValid(p._1.signerData.signature, lastCommonHeight + 1 + p._2))
 
         val forkApplicationResultEi = Coeval.evalOnce {
-          val firstDeclined = extension.view
+          extension.view
             .map { b =>
               b -> appendBlock(checkpoint, history, blockchainUpdater, stateReader(), utxStorage, time, settings.blockchainSettings, featureProvider)(b).right.map {
                 _.foreach(bh => BlockStats.applied(b, BlockStats.Source.Ext, bh))
@@ -44,26 +44,18 @@ object Coordinator extends ScorexLogging with Instrumented {
             }
             .zipWithIndex
             .collectFirst { case ((b, Left(e)), i) => (i, b, e) }
+            .fold[Either[ValidationError, Option[BigInt]]](Right(Some(history.score()))) {
+              case (i, declinedBlock, e) =>
+                invalidBlocks.add(declinedBlock.uniqueId)
+                extension.view
+                  .dropWhile(_ != declinedBlock)
+                  .foreach(BlockStats.declined(_, BlockStats.Source.Ext))
 
-          firstDeclined.foreach {
-            case (_, declinedBlock, _) =>
-              invalidBlocks.add(declinedBlock.uniqueId)
-              extension.view
-                .dropWhile(_ != declinedBlock)
-                .foreach(BlockStats.declined(_, BlockStats.Source.Ext))
-          }
+                if (i == 0) log.warn(s"Can't process fork starting with $lastCommonBlockId, error appending block $declinedBlock: $e")
+                else log.warn(s"Processed only ${i + 1} of ${newBlocks.size} blocks from extension, error appending next block $declinedBlock: $e")
 
-          firstDeclined
-            .foldLeft[Either[ValidationError, Option[BigInt]]](Right(None)) {
-            case (_, (i, b, e)) if i == 0 =>
-              log.warn(s"Can't process fork starting with $lastCommonBlockId, error appending block $b: $e")
-              Left(e)
-
-            case (r, (i, b, e)) =>
-              log.debug(s"Processed $i of ${newBlocks.size} blocks from extension")
-              log.warn(s"Can't process fork starting with $lastCommonBlockId, error appending block $b: $e")
-              r
-          }
+                Left(e)
+            }
         }
 
         val initalHeight = history.height()
@@ -93,6 +85,7 @@ object Coordinator extends ScorexLogging with Instrumented {
           updateBlockchainReadinessFlag(history, time, blockchainReadiness, settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed)
           score
         }.left.map { case ((err, droppedBlocks)) =>
+          blockchainUpdater.removeAfter(lastCommonBlockId).explicitGet()
           droppedBlocks.foreach(blockchainUpdater.processBlock(_).explicitGet())
           err
         }
