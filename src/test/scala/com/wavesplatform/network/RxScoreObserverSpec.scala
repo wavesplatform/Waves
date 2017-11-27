@@ -9,12 +9,11 @@ import monix.reactive.subjects.PublishSubject
 import org.scalatest.{FreeSpec, Matchers}
 import scorex.transaction.History.BlockchainScore
 
-import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
 
 class RxScoreObserverSpec extends FreeSpec with Matchers with TransactionGen {
 
-  implicit val scheduler = monix.execution.Scheduler.singleThread("rx-score-observer-test")
+  implicit val scheduler = monix.execution.Scheduler.singleThread("test-worker")
 
   def buildObserver() = {
     val localScores = PublishSubject[BlockchainScore]
@@ -25,14 +24,35 @@ class RxScoreObserverSpec extends FreeSpec with Matchers with TransactionGen {
     (syncWith, localScores, remoteScores, channelClosed)
   }
 
+  trait Context[T] {
+    def waitFor(desiredCount:Int):Seq[T]
+    def waitForNext:T = waitFor(1).head
+  }
 
-  def test[T](target: Observable[T])(testBody: (() => T) => Future[Any]): Unit = {
-    val replay = target.replay(1)
-    replay.connect()
+  def test[T](target: Observable[T])(testBody: Context[T] => Any): Unit = {
+    val l = new Object()
+    @volatile var collected = Seq.empty[T]
+    target.foreach(i => {
+      collected :+= i
+      l.synchronized {
+        l.notifyAll()
+      }
+    })
 
-    //replay.take(1).lastL.coeval.value.fold(x => x, x => Future(x)).flatMap(x => f(Success(x)))
+    val context = new Context[T] {
+      def waitFor(desiredCount:Int):Seq[T] = {
+        l.synchronized {
+          while (collected.length < desiredCount) {
+            l.wait(1000*10)
+          }
+          val result = collected
+          collected = Seq.empty
+          result
+        }
+      }
+    }
 
-    Await.result(testBody(() => replay.take(1).lastL.coeval.value.right.get), 10.seconds)
+    testBody(context)
   }
 
   "should emit better channel" - {
@@ -40,15 +60,11 @@ class RxScoreObserverSpec extends FreeSpec with Matchers with TransactionGen {
       val (syncWith, localScores, remoteScores, _) = buildObserver()
       val testChannel = new LocalChannel()
 
-      test(syncWith) { recent =>
-        for {
-          _ <- localScores.onNext(1)
-          recent().isEmpty shouldBe true
-
-          _ <- remoteScores.onNext((testChannel, 2))
-          recent() shouldBe BestChannel(testChannel, 2)
-
-        } yield {}
+      test(syncWith) { context =>
+          localScores.onNext(1)
+          context.waitForNext shouldBe None
+          remoteScores.onNext((testChannel, 2))
+          context.waitForNext shouldBe Some(BestChannel(testChannel, 2))
       }
     }
 
