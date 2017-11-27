@@ -54,16 +54,21 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
 
   override def write(ctx: ChannelHandlerContext, msg: AnyRef, promise: ChannelPromise): Unit = msg match {
     case LocalScoreChanged(newLocalScore, breakExtProcessing) =>
+      if (localScore != newLocalScore) log.debug(s"${id(ctx)} $pinnedChannelId New local score: $newLocalScore")
       localScore = newLocalScore
-      log.debug(s"${id(ctx)} $pinnedChannelId New local score: $newLocalScore")
       ctx.write(msg, promise)
 
-      if (breakExtProcessing) {
-        if (pinnedChannel.compareAndSet(ctx.channel(), null)) log.debug(s"${id(ctx)} Stop processing an extension")
+      if (breakExtProcessing && pinnedChannel.compareAndSet(ctx.channel(), null)) {
+        log.debug(s"${id(ctx)} Stop processing an extension")
         channelWithHighestScore match {
           case Some((bestChannel, bestScore))
             if bestScore > localScore && pinnedChannel.compareAndSet(null, bestChannel) =>
-            log.debug(s"${id(ctx)} Switching to second best channel $pinnedChannelId")
+            if (ctx.channel() != bestChannel) {
+              log.debug(s"${id(ctx)} Stopping an optimistically loading of extension, because the channel ${id(ctx.channel())} will be outdated")
+              ctx.write(LoadBlockchainExtension(Seq.empty))
+            }
+
+            log.debug(s"${id(ctx)} Switching to next best channel ${id(bestChannel)}")
             requestExtension(bestChannel)
           case _ =>
             ctx.write(LoadBlockchainExtension(Seq.empty))
