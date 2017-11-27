@@ -58,7 +58,7 @@ class CoordinatorHandler(checkpointService: CheckpointService,
     log.debug(s"${id(ctx)} $start")
     Task(f).map {
       case Right(None) =>
-        log.debug(s"${id(ctx)} Score was not changed")
+        log.debug(s"${id(ctx)} Score was not changed or an error occurred")
         scheduleMiningAndBroadcastScore(history.score(), breakExtLoading = true)
       case Right(Some(newScore)) =>
         log.debug(s"${id(ctx)} $success")
