@@ -8,6 +8,7 @@ import InvalidBlockStorageImpl._
 
 trait InvalidBlockStorage {
   def add(blockId: ByteStr): Unit
+
   def contains(blockId: ByteStr): Boolean
 }
 
@@ -15,6 +16,7 @@ object InvalidBlockStorage {
 
   object Empty extends InvalidBlockStorage {
     override def add(blockId: ByteStr): Unit = {}
+
     override def contains(blockId: ByteStr): Boolean = false
   }
 

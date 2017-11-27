@@ -25,8 +25,11 @@ class Node(val config: Config, var nodeInfo: NodeInfo, override val client: Asyn
   override val nodeName: String = s"it-test-client-to-${nodeInfo.networkIpAddress}"
   override val restAddress: String = "localhost"
   override val networkAddress: String = "localhost"
+
   override def nodeRestPort: Int = nodeInfo.hostRestApiPort
+
   override def matcherRestPort: Int = nodeInfo.hostMatcherApiPort
+
   override def networkPort: Int = nodeInfo.hostNetworkPort
   override val blockDelay: FiniteDuration = settings.blockchainSettings.genesisSettings.averageBlockDelay
 

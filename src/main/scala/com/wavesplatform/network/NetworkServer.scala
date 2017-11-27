@@ -172,11 +172,13 @@ class NetworkServer(checkpointService: CheckpointService,
     import scala.collection.JavaConverters._
 
     val outgoing = outgoingChannels.keySet.iterator().asScala.toVector
+
     def outgoingStr = outgoing.map(_.toString).sorted.mkString("[", ", ", "]")
 
     val all = peerInfo.values().iterator().asScala.flatMap(_.declaredAddress).toVector
 
     val incoming = all.filterNot(outgoing.contains)
+
     def incomingStr = incoming.map(_.toString).sorted.mkString("[", ", ", "]")
 
     log.trace(s"Outgoing: $outgoingStr ++ incoming: $incomingStr")

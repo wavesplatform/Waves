@@ -350,8 +350,7 @@ object NodeApi extends ScorexLogging {
   case class Block(signature: String, height: Int, timestamp: Long, generator: String, transactions: Seq[Transaction],
                    fee: Long, features: Option[Seq[Short]])
 
-  case class BlockHeaders(signature: String, height: Int, timestamp: Long, generator: String, transactionsCount: Int, blocksize: Int,
-                          fee: Long)
+  case class BlockHeaders(signature: String, height: Int, timestamp: Long, generator: String, transactionCount: Int, blocksize: Int)
 
   implicit val blockHeadersFormat: Format[BlockHeaders] = Json.format
 

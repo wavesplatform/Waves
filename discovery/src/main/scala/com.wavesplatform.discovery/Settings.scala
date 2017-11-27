@@ -16,7 +16,7 @@ case class Settings(chains: Seq[ChainSettings],
                     workersCount: Int,
                     discoveryInterval: FiniteDuration)
 
-object Settings{
+object Settings {
   implicit val readConfigInHyphen: NameMapper = net.ceedubs.ficus.readers.namemappers.implicits.hyphenCase // IDEA bug
 
   implicit val inetSocketAddressReader: ValueReader[InetSocketAddress] = { (config: Config, path: String) =>
