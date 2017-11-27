@@ -1,5 +1,7 @@
 package com.wavesplatform.network
 
+import java.util.concurrent.atomic.AtomicBoolean
+
 import com.wavesplatform.TransactionGen
 import com.wavesplatform.state2.ByteStr
 import io.netty.channel.Channel
@@ -31,7 +33,7 @@ class ExtensionBlocksLoaderSpec extends FreeSpec
   private val remoteExtensionSignatures: Seq[ByteStr] = remoteExtensionBlocks.map(_.uniqueId)
 
   "should request blocks" in {
-    val channel = new EmbeddedChannel(new ExtensionBlocksLoader(1.minute, PeerDatabase.NoOp, defaultHistory, InvalidBlockStorage.Empty))
+    val channel = new EmbeddedChannel(new ExtensionBlocksLoader(1.minute, PeerDatabase.NoOp, defaultHistory, InvalidBlockStorage.Empty, new AtomicBoolean(true)))
     channel.writeInbound(ExtensionIds(lastCommonSignature, remoteExtensionSignatures))
     channel.flushInbound()
 
@@ -47,7 +49,7 @@ class ExtensionBlocksLoaderSpec extends FreeSpec
   }
 
   "should propagate an extension after receiving all blocks" in {
-    val channel = new EmbeddedChannel(new ExtensionBlocksLoader(1.minute, PeerDatabase.NoOp, defaultHistory, InvalidBlockStorage.Empty))
+    val channel = new EmbeddedChannel(new ExtensionBlocksLoader(1.minute, PeerDatabase.NoOp, defaultHistory, InvalidBlockStorage.Empty, new AtomicBoolean(true)))
     channel.writeInbound(ExtensionIds(lastCommonSignature, remoteExtensionSignatures))
     Random.shuffle(remoteExtensionBlocks).foreach(channel.writeInbound(_))
     channel.flushInbound()
@@ -62,7 +64,7 @@ class ExtensionBlocksLoaderSpec extends FreeSpec
   "when signatures are already in blockchain" - {
     "should propagate an empty extensions" - {
       "0" in {
-        val channel = new EmbeddedChannel(new ExtensionBlocksLoader(1.minute, PeerDatabase.NoOp, mock[NgHistory], InvalidBlockStorage.Empty))
+        val channel = new EmbeddedChannel(new ExtensionBlocksLoader(1.minute, PeerDatabase.NoOp, mock[NgHistory], InvalidBlockStorage.Empty, new AtomicBoolean(true)))
         channel.writeInbound(ExtensionIds(lastCommonSignature, Seq.empty))
         channel.flushInbound()
 
@@ -79,7 +81,7 @@ class ExtensionBlocksLoaderSpec extends FreeSpec
           .onCall { _: ByteStr => Some(1) }
           .repeat(remoteExtensionBlocks.size)
 
-        val channel = new EmbeddedChannel(new ExtensionBlocksLoader(1.minute, PeerDatabase.NoOp, history, InvalidBlockStorage.Empty))
+        val channel = new EmbeddedChannel(new ExtensionBlocksLoader(1.minute, PeerDatabase.NoOp, history, InvalidBlockStorage.Empty, new AtomicBoolean(true)))
         channel.writeInbound(ExtensionIds(lastCommonSignature, remoteExtensionSignatures))
         channel.flushInbound()
 
@@ -97,7 +99,7 @@ class ExtensionBlocksLoaderSpec extends FreeSpec
         .onCall { _: ByteStr => Some(1) }
         .repeat(remoteExtensionBlocks.size)
 
-      val channel = new EmbeddedChannel(new ExtensionBlocksLoader(1.minute, PeerDatabase.NoOp, history, InvalidBlockStorage.Empty))
+      val channel = new EmbeddedChannel(new ExtensionBlocksLoader(1.minute, PeerDatabase.NoOp, history, InvalidBlockStorage.Empty, new AtomicBoolean(true)))
       channel.writeInbound(ExtensionIds(lastCommonSignature, remoteExtensionSignatures))
       channel.flushInbound()
 
@@ -115,7 +117,7 @@ class ExtensionBlocksLoaderSpec extends FreeSpec
       val remoteUnexpectedBlocks = remoteExtensionBlocks
       val remoteExtensionSignatures = remoteUnexpectedBlocks.map { _ => TestBlock.randomSignature() }
 
-      val channel = new EmbeddedChannel(new ExtensionBlocksLoader(1.minute, PeerDatabase.NoOp, defaultHistory, InvalidBlockStorage.Empty))
+      val channel = new EmbeddedChannel(new ExtensionBlocksLoader(1.minute, PeerDatabase.NoOp, defaultHistory, InvalidBlockStorage.Empty, new AtomicBoolean(true)))
       channel.writeInbound(ExtensionIds(lastCommonSignature, remoteExtensionSignatures))
       channel.flushInbound()
 
@@ -141,7 +143,7 @@ class ExtensionBlocksLoaderSpec extends FreeSpec
       val remoteUnexpectedBlocks = remoteExtensionBlocks
       val remoteUnexpectedExtensionSignatures = remoteUnexpectedBlocks.map { _ => TestBlock.randomSignature() }
 
-      val channel = new EmbeddedChannel(new ExtensionBlocksLoader(1.minute, PeerDatabase.NoOp, defaultHistory, InvalidBlockStorage.Empty))
+      val channel = new EmbeddedChannel(new ExtensionBlocksLoader(1.minute, PeerDatabase.NoOp, defaultHistory, InvalidBlockStorage.Empty, new AtomicBoolean(true)))
       channel.writeInbound(ExtensionIds(lastCommonSignature, remoteExtensionSignatures))
       channel.writeInbound(ExtensionIds(lastCommonSignature, remoteUnexpectedExtensionSignatures))
       channel.flushInbound()
@@ -188,7 +190,7 @@ class ExtensionBlocksLoaderSpec extends FreeSpec
       }
 
       val blockSyncTimeout = 100.millis
-      val channel = new EmbeddedChannel(new ExtensionBlocksLoader(blockSyncTimeout, peerDatabase, defaultHistory, InvalidBlockStorage.Empty))
+      val channel = new EmbeddedChannel(new ExtensionBlocksLoader(blockSyncTimeout, peerDatabase, defaultHistory, InvalidBlockStorage.Empty, new AtomicBoolean(true)))
       channel.writeInbound(ExtensionIds(lastCommonSignature, remoteExtensionSignatures))
       channel.flushInbound()
 
@@ -207,7 +209,7 @@ class ExtensionBlocksLoaderSpec extends FreeSpec
         }
       }
 
-      val channel = new EmbeddedChannel(new ExtensionBlocksLoader(1.minute, peerDatabase, defaultHistory, InvalidBlockStorage.Empty))
+      val channel = new EmbeddedChannel(new ExtensionBlocksLoader(1.minute, peerDatabase, defaultHistory, InvalidBlockStorage.Empty, new AtomicBoolean(true)))
       channel.writeInbound(ExtensionIds(lastCommonSignature, remoteExtensionSignatures))
       remoteExtensionBlocks.foreach(channel.writeInbound(_))
       channel.flushInbound()
@@ -220,7 +222,7 @@ class ExtensionBlocksLoaderSpec extends FreeSpec
 
   "should not blacklist slow (but acceptable) node" in {
     val blockSyncTimeout = 100.millis
-    val channel = new EmbeddedChannel(new ExtensionBlocksLoader(blockSyncTimeout, PeerDatabase.NoOp, defaultHistory, InvalidBlockStorage.Empty))
+    val channel = new EmbeddedChannel(new ExtensionBlocksLoader(blockSyncTimeout, PeerDatabase.NoOp, defaultHistory, InvalidBlockStorage.Empty, new AtomicBoolean(true)))
     channel.writeInbound(ExtensionIds(lastCommonSignature, remoteExtensionSignatures))
     channel.flushInbound()
 
