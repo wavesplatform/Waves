@@ -77,7 +77,7 @@ class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxP
   def fetchAllOrderHistory(req: GetAllOrderHistory): Unit = {
     val res: Seq[(String, OrderInfo, Option[Order])] =
       orderHistory.getAllOrdersByAddress(req.address)
-        .map(id => (id, orderHistory.orderInfo(id), orderHistory.order(id))).sortBy(_._3.map(_.timestamp).getOrElse(-1L)).take(settings.restOrderLimit)
+        .map(id => (id, orderHistory.orderInfo(id), orderHistory.order(id))).toSeq.sortBy(_._3.map(_.timestamp).getOrElse(-1L)).take(settings.restOrderLimit)
     sender() ! GetOrderHistoryResponse(res)
   }
 
@@ -112,10 +112,10 @@ class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxP
   }
 
   def recoverFromOrderBook(ob: OrderBook): Unit = {
-    ob.asks.foreach{ case (_, orders) =>
+    ob.asks.foreach { case (_, orders) =>
       orders.foreach(o => orderHistory.orderAccepted(OrderAdded(o)))
     }
-    ob.bids.foreach{ case (_, orders) =>
+    ob.bids.foreach { case (_, orders) =>
       orders.foreach(o => orderHistory.orderAccepted(OrderAdded(o)))
     }
   }
@@ -191,4 +191,5 @@ object OrderHistoryActor {
     val json: JsObject = JsObject(balances.getOrElse(Map.empty).mapValues(JsNumber(_)))
     val code = balances.map(_ => StatusCodes.OK).getOrElse(StatusCodes.NotFound)
   }
+
 }

@@ -25,9 +25,11 @@ trait OrderHistory {
   def openVolume(assetAcc: AssetAcc): Long
 
   def openVolumes(address: String): Option[Map[String, Long]]
+
   def ordersByPairAndAddress(assetPair: AssetPair, address: String): Set[String]
 
   def getAllOrdersByAddress(address: String): Stream[String]
+
   def deleteOrder(assetPair: AssetPair, address: String, orderId: String): Boolean
 
   def order(id: String): Option[Order]
@@ -134,7 +136,9 @@ case class OrderHistoryImpl(db: DB) extends SubStorage(db: DB, "matcher") with O
       .flatMap(_.get(asset)).map(math.max(0L, _)).getOrElse(0L)
   }
 
-  override def openVolumes(address: String): Option[Map[String, Long]] = Option(p.addressToOrderPortfolio.get(address))
+  override def openVolumes(address: String): Option[Map[String, Long]] = {
+    get(makeKey(AddressPortfolioPrefix, address)).map(PortfolioCodec.decode).map(_.explicitGet().value)
+  }
 
   override def ordersByPairAndAddress(assetPair: AssetPair, address: String): Set[String] = {
     val pairAddressKey = assetPairAddressKey(assetPair, address)
@@ -142,8 +146,8 @@ case class OrderHistoryImpl(db: DB) extends SubStorage(db: DB, "matcher") with O
       .map(_.takeRight(MaxOrdersPerRequest).toSet).getOrElse(Set())
   }
 
-  override def getAllOrdersByAddress(address: String): Set[String] = {
-    map(PairToOrdersPrefix).mapValues(OrderIdsCodec.decode).filter(_._1.endsWith(address)).values.flatMap(_.explicitGet().value).toSet
+  override def getAllOrdersByAddress(address: String): Stream[String] = {
+    map(PairToOrdersPrefix).mapValues(OrderIdsCodec.decode).filter(_._1.endsWith(address)).values.flatMap(_.explicitGet().value).toStream
   }
 
 
