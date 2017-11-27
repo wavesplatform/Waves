@@ -90,7 +90,7 @@ object NetworkServer extends ScorexLogging {
     val serverHandshakeHandler = new HandshakeHandler.Server(handshake, peerInfo, peerConnections, peerDatabase, allChannels)
     val utxPoolSynchronizer = new UtxPoolSynchronizer(utxPool, allChannels)
 
-    val peerSynchronizer: ChannelHandlerAdapter = {
+    def peerSynchronizer: ChannelHandlerAdapter = {
       if (settings.networkSettings.enablePeersExchange) {
         new PeerSynchronizer(peerDatabase, settings.networkSettings.peersBroadcastInterval)
       } else PeerSynchronizer.Disabled
