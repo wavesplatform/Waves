@@ -54,11 +54,9 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
 
   override def write(ctx: ChannelHandlerContext, msg: AnyRef, promise: ChannelPromise): Unit = msg match {
     case LocalScoreChanged(newLocalScore, breakExtLoading) =>
-      if (newLocalScore != localScore) {
-        localScore = newLocalScore
-        log.debug(s"${id(ctx)} $pinnedChannelId New local score: $newLocalScore")
-        ctx.write(msg, promise)
-      }
+      localScore = newLocalScore
+      log.debug(s"${id(ctx)} $pinnedChannelId New local score: $newLocalScore")
+      ctx.write(msg, promise)
 
       if (breakExtLoading) {
         ctx.write(LoadBlockchainExtension(Seq.empty))
