@@ -1,12 +1,13 @@
 package com.wavesplatform.mining
 
 import cats.data.EitherT
+import com.wavesplatform.UtxPool
 import com.wavesplatform.features.{BlockchainFeatureStatus, BlockchainFeatures, FeatureProvider}
 import com.wavesplatform.metrics.{BlockStats, HistogramExt, Instrumented}
 import com.wavesplatform.network._
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state2._
-import com.wavesplatform.{Coordinator, UtxPool}
+import com.wavesplatform.state2.appender.{BlockAppender, MicroblockAppender}
 import io.netty.channel.group.ChannelGroup
 import kamon.Kamon
 import kamon.metric.instrument
@@ -54,7 +55,6 @@ class MinerImpl(
   private lazy val minerSettings = settings.minerSettings
   private lazy val minMicroBlockDurationMills = minerSettings.minMicroBlockAge.toMillis
   private lazy val blockchainSettings = settings.blockchainSettings
-  private lazy val processBlock = Coordinator.processSingleBlock(checkpoint, history, blockchainUpdater, timeService, stateReader, utx, settings.blockchainSettings, featureProvider) _
 
   private val scheduledAttempts = SerialCancelable()
   private val microBlockAttempt = SerialCancelable()
@@ -143,7 +143,7 @@ class MinerImpl(
         )))
         microBlock <- EitherT(Task.now(MicroBlock.buildAndSign(account, unconfirmed, accumulatedBlock.signerData.signature, signedBlock.signerData.signature)))
         _ = microBlockBuildTimeStats.safeRecord(System.currentTimeMillis() - start)
-        _ <- EitherT(Coordinator.processMicroBlock(checkpoint, history, blockchainUpdater, utx)(microBlock))
+        _ <- EitherT(MicroblockAppender(checkpoint, history, blockchainUpdater, utx)(microBlock))
       } yield {
         BlockStats.mined(microBlock)
         log.trace(s"$microBlock has been mined for $account}")
@@ -181,7 +181,7 @@ class MinerImpl(
         nextBlockGenerationTimes += account.toAddress -> (System.currentTimeMillis() + offset.toMillis)
         generateOneBlockTask(account, balance)(offset).flatMap {
           case Right(block) =>
-            processBlock(block) map {
+            BlockAppender(checkpoint, history, blockchainUpdater, timeService, stateReader, utx, settings.blockchainSettings, featureProvider)(block) map {
               case Left(err) => log.warn("Error mining Block: " + err.toString)
               case Right(Some(score)) =>
                 log.debug(s"Forged and applied $block by ${account.address} with cumulative score $score")

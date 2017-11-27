@@ -17,13 +17,16 @@ import com.wavesplatform.http.NodeApiRoute
 import com.wavesplatform.matcher.Matcher
 import com.wavesplatform.metrics.Metrics
 import com.wavesplatform.mining.{Miner, MinerImpl}
-import com.wavesplatform.network.{NetworkServer, PeerDatabaseImpl, PeerInfo, UPnP}
+import com.wavesplatform.network.RxScoreObserver.SyncWith
+import com.wavesplatform.network.{InvalidBlockStorageImpl, MicroBlockSynchronizer, NetworkServer, PeerDatabaseImpl, PeerInfo, RxExtensionLoader, RxScoreObserver, UPnP}
 import com.wavesplatform.settings._
+import com.wavesplatform.state2.appender.{BlockAppender, CheckpointAppender, ExtensionAppender, MicroblockAppender}
 import com.wavesplatform.utils.forceStopApplication
 import io.netty.channel.Channel
 import io.netty.channel.group.DefaultChannelGroup
 import io.netty.util.concurrent.GlobalEventExecutor
 import kamon.Kamon
+import monix.reactive.Observable
 import org.influxdb.dto.Point
 import org.slf4j.bridge.SLF4JBridgeHandler
 import scorex.account.AddressScheme
@@ -61,73 +64,86 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     val feeCalculator = new FeeCalculator(settings.feesSettings)
     val time: Time = NTP
-
     val peerDatabase = new PeerDatabaseImpl(settings.networkSettings)
     val establishedConnections = new ConcurrentHashMap[Channel, PeerInfo]
     val allChannels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
-
     val utxStorage = new UtxPoolImpl(time, stateReader, history, feeCalculator, settings.blockchainSettings.functionalitySettings, settings.utxSettings)
-
+    val knownInvalidBlocks = new InvalidBlockStorageImpl(settings.synchronizationSettings.invalidBlocksStorage)
     val miner = if (settings.minerSettings.enable)
       new MinerImpl(allChannels, blockchainUpdater, checkpointService, history, featureProvider, stateReader, settings, time, utxStorage, wallet)
     else Miner.Disabled
 
-    val network = new NetworkServer(checkpointService, blockchainUpdater, time, miner, stateReader, settings,
-      history, utxStorage, peerDatabase, allChannels, establishedConnections, featureProvider)
+    val processBlock = BlockAppender(checkpointService, history, blockchainUpdater, time, stateReader, utxStorage, settings.blockchainSettings, featureProvider, allChannels, peerDatabase, miner) _
+    val processCheckpoint = CheckpointAppender(checkpointService, history, blockchainUpdater, peerDatabase, miner, allChannels) _
+    val processFork = ExtensionAppender(checkpointService, history, blockchainUpdater, stateReader, utxStorage, time, settings, featureProvider, knownInvalidBlocks, peerDatabase, miner, allChannels) _
+    val processMicroBlock = MicroblockAppender(checkpointService, history, blockchainUpdater, utxStorage, allChannels, peerDatabase) _
 
+    val network = NetworkServer(settings, blockchainUpdater.lastBlockInfo, history, utxStorage, peerDatabase, allChannels, establishedConnections)
+    val (signatures, blocks, blockchainScores, checkpoints, microblockInvs, microblockResponses) = network.messages
+
+    val lastBlockInfos = blockchainUpdater.lastBlockInfo
+    val syncWith: Observable[SyncWith] = RxScoreObserver(settings.synchronizationSettings.scoreTTL, history.score(), lastBlockInfos.map(_.score), blockchainScores, network.closedChannels)
+    val microblockDatas = MicroBlockSynchronizer(settings.synchronizationSettings.microBlockSynchronizer, history, peerDatabase)(lastBlockInfos.map(_.id), microblockInvs, microblockResponses) _
+    val (extensions, newBlocks) = RxExtensionLoader(settings.synchronizationSettings, history, peerDatabase, knownInvalidBlocks, syncWith, blocks, signatures, network.closedChannels)
+
+
+    val microblockSink = microblockDatas(processMicroBlock)
+    val blockSink = newBlocks.mapTask { case ((c, b)) => processBlock(b, c) }
+    val extensionSink = extensions.mapTask { case ((c, b)) => processFork(c, b.extension) }
+    val checkpointSink = checkpoints.mapTask { case ((c, cp)) => processCheckpoint(c, cp) }
+
+    Observable.merge(microblockSink, blockSink, extensionSink, checkpointSink).subscribe()(monix.execution.Scheduler.Implicits.global)
     miner.scheduleMining()
-
-    val apiRoutes = Seq(
-      BlocksApiRoute(settings.restAPISettings, settings.checkpointsSettings, history, allChannels, checkpointService, blockchainUpdater),
-      TransactionsApiRoute(settings.restAPISettings, stateReader, history, utxStorage),
-      NxtConsensusApiRoute(settings.restAPISettings, stateReader, history, settings.blockchainSettings.functionalitySettings),
-      WalletApiRoute(settings.restAPISettings, wallet),
-      PaymentApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, time),
-      UtilsApiRoute(settings.restAPISettings),
-      PeersApiRoute(settings.restAPISettings, network.connect, peerDatabase, establishedConnections),
-      AddressApiRoute(settings.restAPISettings, wallet, stateReader, settings.blockchainSettings.functionalitySettings),
-      DebugApiRoute(settings.restAPISettings, wallet, stateReader, history, peerDatabase, establishedConnections, blockchainUpdater, allChannels, utxStorage, blockchainDebugInfo, miner, configRoot),
-      WavesApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, time),
-      AssetsApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, stateReader, time),
-      NodeApiRoute(settings.restAPISettings, () => this.shutdown()),
-      ActivationApiRoute(settings.restAPISettings, settings.blockchainSettings.functionalitySettings, settings.featuresSettings, history, featureProvider),
-      AssetsBroadcastApiRoute(settings.restAPISettings, utxStorage, allChannels),
-      LeaseApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, time),
-      LeaseBroadcastApiRoute(settings.restAPISettings, utxStorage, allChannels),
-      AliasApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, time, stateReader),
-      AliasBroadcastApiRoute(settings.restAPISettings, utxStorage, allChannels)
-    )
-
-    val apiTypes = Seq(
-      typeOf[BlocksApiRoute],
-      typeOf[TransactionsApiRoute],
-      typeOf[NxtConsensusApiRoute],
-      typeOf[WalletApiRoute],
-      typeOf[PaymentApiRoute],
-      typeOf[UtilsApiRoute],
-      typeOf[PeersApiRoute],
-      typeOf[AddressApiRoute],
-      typeOf[DebugApiRoute],
-      typeOf[WavesApiRoute],
-      typeOf[AssetsApiRoute],
-      typeOf[NodeApiRoute],
-      typeOf[ActivationApiRoute],
-      typeOf[AssetsBroadcastApiRoute],
-      typeOf[LeaseApiRoute],
-      typeOf[LeaseBroadcastApiRoute],
-      typeOf[AliasApiRoute],
-      typeOf[AliasBroadcastApiRoute]
-    )
 
     for (addr <- settings.networkSettings.declaredAddress if settings.networkSettings.uPnPSettings.enable) {
       upnp.addPort(addr.getPort)
     }
 
-
-    implicit val as = actorSystem
-    implicit val materializer = ActorMaterializer()
+    implicit val as: ActorSystem = actorSystem
+    implicit val materializer: ActorMaterializer = ActorMaterializer()
 
     if (settings.restAPISettings.enable) {
+      val apiRoutes = Seq(
+        BlocksApiRoute(settings.restAPISettings, history, allChannels, ???),
+        TransactionsApiRoute(settings.restAPISettings, stateReader, history, utxStorage),
+        NxtConsensusApiRoute(settings.restAPISettings, stateReader, history, settings.blockchainSettings.functionalitySettings),
+        WalletApiRoute(settings.restAPISettings, wallet),
+        PaymentApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, time),
+        UtilsApiRoute(settings.restAPISettings),
+        PeersApiRoute(settings.restAPISettings, network.connect, peerDatabase, establishedConnections),
+        AddressApiRoute(settings.restAPISettings, wallet, stateReader, settings.blockchainSettings.functionalitySettings),
+        DebugApiRoute(settings.restAPISettings, wallet, stateReader, history, peerDatabase, establishedConnections, blockchainUpdater, allChannels, utxStorage, blockchainDebugInfo, miner, configRoot),
+        WavesApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, time),
+        AssetsApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, stateReader, time),
+        NodeApiRoute(settings.restAPISettings, () => this.shutdown()),
+        ActivationApiRoute(settings.restAPISettings, settings.blockchainSettings.functionalitySettings, settings.featuresSettings, history, featureProvider),
+        AssetsBroadcastApiRoute(settings.restAPISettings, utxStorage, allChannels),
+        LeaseApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, time),
+        LeaseBroadcastApiRoute(settings.restAPISettings, utxStorage, allChannels),
+        AliasApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, time, stateReader),
+        AliasBroadcastApiRoute(settings.restAPISettings, utxStorage, allChannels)
+      )
+
+      val apiTypes = Seq(
+        typeOf[BlocksApiRoute],
+        typeOf[TransactionsApiRoute],
+        typeOf[NxtConsensusApiRoute],
+        typeOf[WalletApiRoute],
+        typeOf[PaymentApiRoute],
+        typeOf[UtilsApiRoute],
+        typeOf[PeersApiRoute],
+        typeOf[AddressApiRoute],
+        typeOf[DebugApiRoute],
+        typeOf[WavesApiRoute],
+        typeOf[AssetsApiRoute],
+        typeOf[NodeApiRoute],
+        typeOf[ActivationApiRoute],
+        typeOf[AssetsBroadcastApiRoute],
+        typeOf[LeaseApiRoute],
+        typeOf[LeaseBroadcastApiRoute],
+        typeOf[AliasApiRoute],
+        typeOf[AliasBroadcastApiRoute]
+      )
       val combinedRoute: Route = CompositeHttpService(actorSystem, apiTypes, apiRoutes, settings.restAPISettings).compositeRoute
       val httpFuture = Http().bindAndHandle(combinedRoute, settings.restAPISettings.bindAddress, settings.restAPISettings.port)
       serverBinding = Await.result(httpFuture, 10.seconds)

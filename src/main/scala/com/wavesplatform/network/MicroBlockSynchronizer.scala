@@ -26,7 +26,8 @@ object MicroBlockSynchronizer extends ScorexLogging {
             peerDatabase: PeerDatabase)
            (lastBlockIdEvents: Observable[ByteStr],
             microblockInvs: ChannelObservable[MicroBlockInv],
-            microblockResponses: ChannelObservable[MicroBlockResponse]): ChannelObservable[MicroblockData] = {
+            microblockResponses: ChannelObservable[MicroBlockResponse])
+           (processMicroBlock: (Channel, MicroblockData) => Task[Unit]): Observable[Unit] = {
 
     implicit val scheduler: SchedulerService = Scheduler.singleThread("microblock-synchronizer")
 
@@ -97,6 +98,7 @@ object MicroBlockSynchronizer extends ScorexLogging {
           Observable((ch, MicroblockData(Option(mi), mb, Coeval.evalOnce(owners(totalSig)))))
       }
     }.executeOn(scheduler)
+      .mapTask { case ((ch, md)) => processMicroBlock(ch, md) }
   }
 
   case class MicroblockData(invOpt: Option[MicroBlockInv], microBlock: MicroBlock, microblockOwners: Coeval[Set[Channel]])

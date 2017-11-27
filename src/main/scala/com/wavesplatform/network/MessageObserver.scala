@@ -2,7 +2,7 @@ package com.wavesplatform.network
 
 import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel.{Channel, ChannelHandlerContext, ChannelInboundHandlerAdapter}
-import monix.reactive.subjects.{ConcurrentSubject}
+import monix.reactive.subjects.ConcurrentSubject
 import scorex.block.Block
 import scorex.transaction.History
 import scorex.transaction.History.BlockchainScore
@@ -33,8 +33,10 @@ class MessageObserver extends ChannelInboundHandlerAdapter with ScorexLogging {
 }
 
 object MessageObserver {
-  def apply(): (MessageObserver, ChannelObservable[Signatures], ChannelObservable[Block], ChannelObservable[BlockchainScore], ChannelObservable[Checkpoint], ChannelObservable[MicroBlockInv], ChannelObservable[MicroBlockResponse]) = {
+  type Messages = (ChannelObservable[Signatures], ChannelObservable[Block], ChannelObservable[BlockchainScore], ChannelObservable[Checkpoint], ChannelObservable[MicroBlockInv], ChannelObservable[MicroBlockResponse])
+
+  def apply(): (MessageObserver, Messages) = {
     val mo = new MessageObserver()
-    (mo, mo.signatures, mo.blocks, mo.blockchainScores, mo.checkpoints, mo.microblockInvs, mo.microblockResponses)
+    (mo, (mo.signatures, mo.blocks, mo.blockchainScores, mo.checkpoints, mo.microblockInvs, mo.microblockResponses))
   }
 }
