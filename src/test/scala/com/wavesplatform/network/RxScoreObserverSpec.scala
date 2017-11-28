@@ -45,9 +45,9 @@ class RxScoreObserverSpec extends FreeSpec with Matchers with TransactionGen wit
       test(
         for {
           _ <- send(localScores)(1)
-          _ <- send(remoteScores)(ch200, 200)
+          _ <- send(remoteScores)((ch200, 200))
           _ = newSyncWith().last shouldBe Some(BestChannel(ch200, 200))
-          _ <- send(remoteScores)(ch100, 100)
+          _ <- send(remoteScores)((ch100, 100))
           _ <- send(closed)(ch200)
           _ = newSyncWith().last shouldBe Some(BestChannel(ch100, 100))
         } yield ())
@@ -96,7 +96,7 @@ class RxScoreObserverSpec extends FreeSpec with Matchers with TransactionGen wit
 
       test(for {
         _ <- send(localScores)(1)
-        _ <- send(remoteScores)(ch100, 100)
+        _ <- send(remoteScores)((ch100, 100))
         _ = newSyncWith()
         _ <- send(localScores)(100)
         _ = newSyncWith().last shouldBe None
@@ -110,7 +110,7 @@ class RxScoreObserverSpec extends FreeSpec with Matchers with TransactionGen wit
 
       test(for {
         _ <- send(localScores)(1)
-        _ <- send(remoteScores)(ch100, 100)
+        _ <- send(remoteScores)((ch100, 100))
         _ = newSyncWith()
         _ <- send(localScores)(101)
         _ = newSyncWith().last shouldBe None
@@ -128,9 +128,9 @@ class RxScoreObserverSpec extends FreeSpec with Matchers with TransactionGen wit
 
         test(for {
           _ <- send(localScores)(1)
-          _ <- send(remoteScores)(ch100, 100)
+          _ <- send(remoteScores)((ch100, 100))
           _ = newSyncWith()
-          _ <- send(remoteScores)(ch100, 100)
+          _ <- send(remoteScores)((ch100, 100))
           _ = newSyncWith() shouldBe 'empty
         } yield ())
       }
@@ -142,7 +142,7 @@ class RxScoreObserverSpec extends FreeSpec with Matchers with TransactionGen wit
 
         test(for {
           _ <- send(localScores)(1)
-          _ <- send(remoteScores)(ch100, 100)
+          _ <- send(remoteScores)((ch100, 100))
           _ = newSyncWith()
           _ <- send(localScores)(2)
           _ = newSyncWith() shouldBe 'empty

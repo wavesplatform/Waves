@@ -85,7 +85,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     val lastBlockInfos = blockchainUpdater.lastBlockInfo
     val syncWith: Observable[SyncWith] = RxScoreObserver(settings.synchronizationSettings.scoreTTL, history.score(), lastBlockInfos.map(_.score), blockchainScores, network.closedChannels)
     val microblockDatas = MicroBlockSynchronizer(settings.synchronizationSettings.microBlockSynchronizer, history, peerDatabase)(lastBlockInfos.map(_.id), microblockInvs, microblockResponses) _
-    val newBlocks = RxExtensionLoader(settings.synchronizationSettings, history, peerDatabase, knownInvalidBlocks, syncWith, blocks, signatures, network.closedChannels) { case ((c, b)) => processFork(c, b.blocks) }
+    val newBlocks = RxExtensionLoader(settings.synchronizationSettings.maxRollback, settings.synchronizationSettings.synchronizationTimeout,
+      history, peerDatabase, knownInvalidBlocks, syncWith, blocks, signatures, network.closedChannels) { case ((c, b)) => processFork(c, b.blocks) }
 
 
     val microblockSink = microblockDatas(processMicroBlock)
@@ -104,7 +105,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     if (settings.restAPISettings.enable) {
       val apiRoutes = Seq(
-        BlocksApiRoute(settings.restAPISettings, history, allChannels, c=>Task{???}),
+        BlocksApiRoute(settings.restAPISettings, history, allChannels, c => Task(???)),
         TransactionsApiRoute(settings.restAPISettings, stateReader, history, utxStorage),
         NxtConsensusApiRoute(settings.restAPISettings, stateReader, history, settings.blockchainSettings.functionalitySettings),
         WalletApiRoute(settings.restAPISettings, wallet),
