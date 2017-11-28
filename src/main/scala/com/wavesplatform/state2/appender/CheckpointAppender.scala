@@ -13,7 +13,7 @@ import scorex.utils.ScorexLogging
 object CheckpointAppender extends ScorexLogging {
 
   def apply(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater
-                        )(newCheckpoint: Checkpoint): Task[Either[ValidationError, BigInt]] =
+           )(newCheckpoint: Checkpoint): Task[Either[ValidationError, BigInt]] =
     Task(checkpoint.set(newCheckpoint).map { _ =>
       log.info(s"Processing checkpoint $checkpoint")
       makeBlockchainCompliantWith(history, blockchainUpdater)(newCheckpoint)
@@ -22,13 +22,13 @@ object CheckpointAppender extends ScorexLogging {
 
 
   def apply(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater,
-                        peerDatabase: PeerDatabase, miner: Miner, allChannels: ChannelGroup
-                       )(ch: Channel, c: Checkpoint): Task[Unit] =
-    processAndBlacklistOnFailure(ch, peerDatabase,
+            peerDatabase: PeerDatabase, miner: Miner, allChannels: ChannelGroup
+           )(ch: Channel, c: Checkpoint): Task[Either[ValidationError, Option[BigInt]]] =
+    processAndBlacklistOnFailure(ch, peerDatabase, miner, allChannels,
       s"${id(ch)} Attempting to process checkpoint",
       s"${id(ch)} Successfully processed checkpoint",
-      s"${id(ch)} Error processing checkpoint",
-      apply(checkpoint, history, blockchainUpdater)(c).map(_.map(Some(_))), scheduleMiningAndBroadcastScore(miner, allChannels))
+      s"${id(ch)} Error processing checkpoint"
+    )(apply(checkpoint, history, blockchainUpdater)(c).map(_.map(Some(_))))
 
 
   private def makeBlockchainCompliantWith(history: History, blockchainUpdater: BlockchainUpdater)(checkpoint: Checkpoint): Unit = {

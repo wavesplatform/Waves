@@ -21,10 +21,10 @@ import scala.util.{Left, Right}
 object ExtensionAppender extends ScorexLogging with Instrumented {
 
   def apply(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater,
-                  stateReader: StateReader, utxStorage: UtxPool, time: Time, settings: WavesSettings,
-                  featureProvider: FeatureProvider, invalidBlocks: InvalidBlockStorage,
-                  peerDatabase: PeerDatabase, miner: Miner, allChannels: ChannelGroup
-                 )(ch: Channel, extensionBlocks: Seq[Block]): Task[Unit] = {
+            stateReader: StateReader, utxStorage: UtxPool, time: Time, settings: WavesSettings,
+            featureProvider: FeatureProvider, invalidBlocks: InvalidBlockStorage,
+            peerDatabase: PeerDatabase, miner: Miner, allChannels: ChannelGroup
+           )(ch: Channel, extensionBlocks: Seq[Block]): Task[Either[ValidationError, Option[BigInt]]] = {
     def p(blocks: Seq[Block]): Task[Either[ValidationError, Option[BigInt]]] = Task(Signed.validateOrdered(blocks).flatMap { newBlocks =>
       history.write { implicit l =>
         val extension = newBlocks.dropWhile(history.contains)
@@ -103,11 +103,10 @@ object ExtensionAppender extends ScorexLogging with Instrumented {
     }).executeOn(scheduler)
 
     extensionBlocks.foreach(BlockStats.received(_, BlockStats.Source.Ext, ch))
-    processAndBlacklistOnFailure(ch, peerDatabase,
+    processAndBlacklistOnFailure(ch, peerDatabase, miner, allChannels,
       s"${id(ch)} Attempting to append extension ${formatBlocks(extensionBlocks)}",
       s"${id(ch)} Successfully appended extension ${formatBlocks(extensionBlocks)}",
-      s"${id(ch)} Error appending extension ${formatBlocks(extensionBlocks)}",
-      p(extensionBlocks),
-      scheduleMiningAndBroadcastScore(miner, allChannels))
+      s"${id(ch)} Error appending extension ${formatBlocks(extensionBlocks)}"
+    )(p(extensionBlocks))
   }
 }

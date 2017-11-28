@@ -25,20 +25,24 @@ package object appender extends ScorexLogging {
 
   private[appender] val scheduler = monix.execution.Scheduler.singleThread("appender")
 
-  private[appender] def processAndBlacklistOnFailure[A](ch: Channel, peerDatabase: PeerDatabase, start: => String, success: => String, errorPrefix: String,
-                                      f: => Task[Either[_, Option[A]]], r: A => Unit): Task[Unit] = {
+  private[appender] def processAndBlacklistOnFailure[A, B](ch: Channel, peerDatabase: PeerDatabase, miner: Miner, allChannels: ChannelGroup,
+                                                           start: => String, success: => String, errorPrefix: String)(
+                                                              f: => Task[Either[B, Option[BigInt]]]): Task[Either[B, Option[BigInt]]] = {
+
     log.debug(start)
     f map {
       case Right(maybeNewScore) =>
         log.debug(success)
-        maybeNewScore.foreach(r)
+        maybeNewScore.foreach(scheduleMiningAndBroadcastScore(miner, allChannels))
+        Right(maybeNewScore)
       case Left(ve) =>
         log.warn(s"$errorPrefix: $ve")
         peerDatabase.blacklistAndClose(ch, s"$errorPrefix: $ve")
+        Left(ve)
     }
   }
 
-  def scheduleMiningAndBroadcastScore(miner: Miner,allChannels: ChannelGroup)(score: BigInt): Unit = {
+  def scheduleMiningAndBroadcastScore(miner: Miner, allChannels: ChannelGroup)(score: BigInt): Unit = {
     miner.scheduleMining()
     allChannels.broadcast(LocalScoreChanged(score))
   }
@@ -51,8 +55,8 @@ package object appender extends ScorexLogging {
       s"generator's effective balance $effectiveBalance is less that required for generation")
 
   private[appender] def appendBlock(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater,
-                          stateReader: SnapshotStateReader, utxStorage: UtxPool, time: Time, settings: BlockchainSettings,
-                          featureProvider: FeatureProvider)(block: Block): Either[ValidationError, Option[Int]] = for {
+                                    stateReader: SnapshotStateReader, utxStorage: UtxPool, time: Time, settings: BlockchainSettings,
+                                    featureProvider: FeatureProvider)(block: Block): Either[ValidationError, Option[Int]] = for {
     _ <- Either.cond(checkpoint.isBlockValid(block.signerData.signature, history.height() + 1), (),
       GenericError(s"Block $block at height ${history.height() + 1} is not valid w.r.t. checkpoint"))
     _ <- blockConsensusValidation(history, featureProvider, settings, time.correctedTime(), block) { height =>

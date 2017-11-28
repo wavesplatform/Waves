@@ -85,15 +85,14 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     val lastBlockInfos = blockchainUpdater.lastBlockInfo
     val syncWith: Observable[SyncWith] = RxScoreObserver(settings.synchronizationSettings.scoreTTL, history.score(), lastBlockInfos.map(_.score), blockchainScores, network.closedChannels)
     val microblockDatas = MicroBlockSynchronizer(settings.synchronizationSettings.microBlockSynchronizer, history, peerDatabase)(lastBlockInfos.map(_.id), microblockInvs, microblockResponses) _
-    val (extensions, newBlocks) = RxExtensionLoader(settings.synchronizationSettings, history, peerDatabase, knownInvalidBlocks, syncWith, blocks, signatures, network.closedChannels)
+    val newBlocks = RxExtensionLoader(settings.synchronizationSettings, history, peerDatabase, knownInvalidBlocks, syncWith, blocks, signatures, network.closedChannels) { case ((c, b)) => processFork(c, b.blocks) }
 
 
     val microblockSink = microblockDatas(processMicroBlock)
     val blockSink = newBlocks.mapTask { case ((c, b)) => processBlock(b, c) }
-    val extensionSink = extensions.mapTask { case ((c, b)) => processFork(c, b.extension) }
     val checkpointSink = checkpoints.mapTask { case ((c, cp)) => processCheckpoint(c, cp) }
 
-    Observable.merge(microblockSink, blockSink, extensionSink, checkpointSink).subscribe()(monix.execution.Scheduler.Implicits.global)
+    Observable.merge(microblockSink, blockSink, checkpointSink).subscribe()(monix.execution.Scheduler.Implicits.global)
     miner.scheduleMining()
 
     for (addr <- settings.networkSettings.declaredAddress if settings.networkSettings.uPnPSettings.enable) {

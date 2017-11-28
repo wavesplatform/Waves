@@ -1,5 +1,6 @@
 package com.wavesplatform.network
 
+import com.wavesplatform.network.RxExtensionLoader.ApplierState.{Applying, ApplyingAndNext, Idle}
 import com.wavesplatform.network.RxScoreObserver.{BestChannel, SyncWith}
 import com.wavesplatform.settings.SynchronizationSettings
 import io.netty.channel._
@@ -10,7 +11,8 @@ import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
 import scorex.block.Block
 import scorex.block.Block.BlockId
-import scorex.transaction.NgHistory
+import scorex.transaction.History.BlockchainScore
+import scorex.transaction.{NgHistory, ValidationError}
 import scorex.utils.ScorexLogging
 
 object RxExtensionLoader extends ScorexLogging {
@@ -22,71 +24,114 @@ object RxExtensionLoader extends ScorexLogging {
             bestChannel: Observable[SyncWith],
             blocks: Observable[(Channel, Block)],
             signatures: Observable[(Channel, Signatures)],
-            channelClosed: Observable[Channel]): (Observable[(Channel, ExtensionBlocks)], Observable[(Channel, Block)]) = {
+            channelClosed: Observable[Channel]
+           )(extensionApplier: (Channel, ExtensionBlocks) => Task[Either[ValidationError, Option[BlockchainScore]]]): Observable[(Channel, Block)] = {
+
     implicit val scheduler: SchedulerService = Scheduler.singleThread("rx-block-loader")
 
-    val extensionBlocks = ConcurrentSubject.publish[(Channel, ExtensionBlocks)]
     val simpleBlocks = ConcurrentSubject.publish[(Channel, Block)]
-
-    var innerState: ExtensionLoaderState = Idle
+    var state: State = State(LoaderState.Idle, ApplierState.Idle)
     val lastBestChannel: Coeval[Option[SyncWith]] = lastSeen(bestChannel)
 
-    def become(s: ExtensionLoaderState): Unit = {
-      innerState = s
-      log.trace(s"changing state to $s")
+    def loaderBecome(s: LoaderState): Unit = {
+      state = state.copy(extensionLoaderState = s)
+      log.trace(s"changing loader state to $state")
+    }
+
+    def applierBecome(s: ApplierState): Unit = {
+      state = state.copy(extensionApplierState = s)
+      log.trace(s"changing applier state to $state")
     }
 
     def blacklistOnTimeout(ch: Channel, reason: String): CancelableFuture[Unit] = Task {
       peerDatabase.blacklistAndClose(ch, reason)
     }.delayExecution(ss.synchronizationTimeout).runAsync(scheduler)
 
+    def tryRequestNextExt(): Unit = {
+      lastBestChannel().get match {
+        case None =>
+          log.trace("Last bestChannel is None, state is up to date")
+          loaderBecome(LoaderState.Idle)
+        case Some(best) =>
+          val lastBlockIds = state.extensionApplierState match {
+            case Idle => Some(history.lastBlockIds(ss.maxRollback))
+            case Applying(ext) => Some(history.lastBlockIds(ss.maxRollback - ext.blocks.size) ++ ext.blocks.map(_.uniqueId))
+            case ApplyingAndNext(_, _, _) => None
+          }
+          lastBlockIds match {
+            case Some(knownSigs) =>
+              val ch = best.channel
+              ch.writeAndFlush(GetSignatures(knownSigs))
+              log.debug(s"${id(ch)} Requesting extension sigs, last ${knownSigs.length} are ${formatSignatures(knownSigs)}")
+              loaderBecome(LoaderState.ExpectingSignatures(ch, knownSigs, blacklistOnTimeout(ch, s"Timeout loading extension")))
 
-    def requestExtension(ch: Channel, knownSigs: Seq[BlockId], reason: String): Unit = {
-      ch.writeAndFlush(GetSignatures(knownSigs))
-      log.debug(s"${id(ch)} Requesting extension sigs because $reason, last ${knownSigs.length} are ${formatSignatures(knownSigs)}")
-      become(ExpectingSignatures(ch, knownSigs, blacklistOnTimeout(ch, s"Timeout loading extension(request reason = '$reason'")))
+            case None =>
+              loaderBecome(LoaderState.Idle)
+          }
+      }
     }
 
-    channelClosed.mapTask(ch => Task {
-      innerState match {
-        case wp: WithPeer if wp.channel == ch =>
-          wp.timeout.cancel()
-          lastBestChannel() match {
-            case None =>
-              log.error(s"While $innerState, bestChannel.lastOption is None, should never happen")
-              become(Idle)
-            case Some(None) =>
-              log.trace("Last bestChannel is None, state is up to date")
-              become(Idle)
-            case Some(Some(bestChannel: BestChannel)) => requestExtension(bestChannel.channel, history.lastBlockIds(ss.maxRollback), s"current channel has been closed while state=$wp")
+    def processExtensionRecieved(ch: Channel, ext: ExtensionBlocks): Task[Unit] = Task {
+      state.extensionApplierState match {
+        case Idle =>
+          applierBecome(Applying(ext))
+          extensionApplier(ch, ext).flatMap {
+            case Left(err) => Task {
+              log.warn(s"Failed to apply $ext because $err, discarding next extension if exists")
+              applierBecome(Idle)
+            }
+            case Right(_) => Task {
+              log.trace(s"Extension $ext successfully applied")
+              state.extensionApplierState match {
+                case Applying(app) if app == ext =>
+                  applierBecome(Idle)
+                  tryRequestNextExt()
+                case ApplyingAndNext(app, next, nextChannel) if app == ext =>
+                  applierBecome(Applying(next))
+                  extensionApplier(nextChannel, next)
+                  tryRequestNextExt()
+              }
+            }
           }
+        case Applying(extension) =>
+          Task(applierBecome(ApplyingAndNext(extension, next = ext, nextChannel = ch)))
+      }
+    }.flatten
+
+
+    channelClosed.mapTask(ch => Task {
+      state.extensionLoaderState match {
+        case wp: LoaderState.WithPeer if wp.channel == ch =>
+          wp.timeout.cancel()
+          tryRequestNextExt()
         case _ =>
       }
     }).logErr.subscribe()
 
     bestChannel.mapTask(c => Task {
+      log.trace(s"New bestChannel: $c, currentState = $state")
       c match {
-        case Some(BestChannel(ch, _)) if innerState == Idle => requestExtension(ch, history.lastBlockIds(ss.maxRollback), "Idle and channel with better score detected")
+        case Some(BestChannel(ch, _)) if state.extensionLoaderState == LoaderState.Idle => tryRequestNextExt()
         case _ =>
       }
     }).logErr.subscribe()
 
     signatures.mapTask { case ((ch, sigs)) => Task {
-      innerState match {
-        case ExpectingSignatures(c, known, timeout) if c == ch =>
+      state.extensionLoaderState match {
+        case LoaderState.ExpectingSignatures(c, known, timeout) if c == ch =>
           timeout.cancel()
           val (_, unknown) = sigs.signatures.span(id => known.contains(id))
           sigs.signatures.find(invalidBlocks.contains) match {
             case Some(invalidBlock) =>
               peerDatabase.blacklistAndClose(ch, s"Signatures contain invalid block(s): $invalidBlock")
-              become(Idle)
+              loaderBecome(LoaderState.Idle)
             case None =>
               if (unknown.isEmpty) {
                 log.trace(s"${id(ch)} Received empty extension signatures list, sync with node complete")
-                become(Idle)
+                loaderBecome(LoaderState.Idle)
               } else {
                 unknown.foreach(s => ch.writeAndFlush(GetBlock(s)))
-                become(ExpectingBlocks(ch, unknown, unknown.toSet, Set.empty, blacklistOnTimeout(ch, "Timeout loading first requested block")))
+                loaderBecome(LoaderState.ExpectingBlocks(ch, unknown, unknown.toSet, Set.empty, blacklistOnTimeout(ch, "Timeout loading first requested block")))
               }
           }
         case _ => log.trace(s"${id(ch)} Received unexpected signatures, ignoring")
@@ -95,59 +140,71 @@ object RxExtensionLoader extends ScorexLogging {
     }.logErr.subscribe()
 
     blocks.mapTask { case ((ch, block)) => Task {
-      innerState match {
-        case ExpectingBlocks(c, requested, expected, recieved, timeout) if c == ch && expected.contains(block.uniqueId) =>
+      state.extensionLoaderState match {
+        case LoaderState.ExpectingBlocks(c, requested, expected, recieved, timeout) if c == ch && expected.contains(block.uniqueId) =>
           timeout.cancel()
           if (expected == Set(block.uniqueId)) {
+            log.debug(s"${id(ch)} Extension(blocks=${expected.size}) successfully received")
             val blockById = (recieved + block).map(b => b.uniqueId -> b).toMap
             val ext = requested.map(blockById)
-            log.debug(s"${id(ch)} Extension(blocks=${ext.size}) successfully received")
-            lastBestChannel() match {
-              case None =>
-                log.error(s"While $innerState, and last block from extension recieved, bestChannel.lastOption is None, should never happen")
-                become(Idle)
-              case Some(None) =>
-                log.trace("Last bestChannel is None, state is up to date")
-                become(Idle)
-              case Some(Some(bestChannel: BestChannel)) =>
-                val optimisticLastBlocks = history.lastBlockIds(ss.maxRollback - ext.size) ++ ext.map(_.uniqueId)
-                requestExtension(bestChannel.channel, optimisticLastBlocks, "Optimistic loader, better channel")
-            }
-            val extension = ExtensionBlocks(ext)
-            log.debug(s"${id(ch)} Extension $extension fully recieved")
-            extensionBlocks.onNext((ch, extension))
-          } else become(ExpectingBlocks(c, requested, expected - block.uniqueId, recieved + block, blacklistOnTimeout(ch, s"Timeout loading one of requested blocks; prev state=$innerState")))
-        case _ => simpleBlocks.onNext((ch, block))
+            tryRequestNextExt()
+            processExtensionRecieved(ch, ExtensionBlocks(ext)).runAsync(scheduler)
 
+          } else {
+            loaderBecome(LoaderState.ExpectingBlocks(c, requested, expected - block.uniqueId, recieved + block, blacklistOnTimeout(ch,
+              s"Timeout loading one of requested blocks; prev state=${state.extensionLoaderState}")))
+          }
+        case _ => simpleBlocks.onNext((ch, block))
       }
     }
     }.logErr.subscribe()
-    (extensionBlocks, simpleBlocks)
+
+    simpleBlocks
   }
 
-  sealed trait ExtensionLoaderState
+  sealed trait LoaderState
 
-  sealed trait WithPeer extends ExtensionLoaderState {
-    def channel: Channel
+  object LoaderState {
 
-    def timeout: CancelableFuture[Unit]
+    sealed trait WithPeer extends LoaderState {
+      def channel: Channel
+
+      def timeout: CancelableFuture[Unit]
+    }
+
+    case object Idle extends LoaderState
+
+    case class ExpectingSignatures(channel: Channel, known: Seq[BlockId], timeout: CancelableFuture[Unit]) extends WithPeer {
+      override def toString: String = s"ExpectingSignatures(channel=${id(channel)})"
+    }
+
+    case class ExpectingBlocks(channel: Channel, allBlocks: Seq[BlockId],
+                               expected: Set[BlockId],
+                               received: Set[Block],
+                               timeout: CancelableFuture[Unit]) extends WithPeer {
+      override def toString: String = s"ExpectingBlocks(channel=${id(channel)}, totalBlocks=${allBlocks.size}, " +
+        s"received=${received.size}, expected=${expected.size})"
+    }
+
   }
 
-  case object Idle extends ExtensionLoaderState
-
-  case class ExpectingSignatures(channel: Channel, known: Seq[BlockId], timeout: CancelableFuture[Unit]) extends WithPeer {
-    override def toString: String = s"ExpectingSignatures(channel=${id(channel)})"
+  case class ExtensionBlocks(blocks: Seq[Block]) {
+    override def toString: String = if (blocks.isEmpty) "ExtensionBlocks()" else s"ExtensionBlocks(size =${blocks.size}," +
+      s" [${blocks.head.uniqueId.trim}..${blocks.last.uniqueId.trim}])"
   }
 
-  case class ExpectingBlocks(channel: Channel, allBlocks: Seq[BlockId],
-                             expected: Set[BlockId],
-                             received: Set[Block],
-                             timeout: CancelableFuture[Unit]) extends WithPeer {
-    override def toString: String = s"ExpectingBlocks(channel=${id(channel)}, totalBlocks=${allBlocks.size}, received=${received.size}, expected=${expected.size})"
+  sealed trait ApplierState
+
+  object ApplierState {
+
+    case object Idle extends ApplierState
+
+    case class Applying(extension: ExtensionBlocks) extends ApplierState
+
+    case class ApplyingAndNext(extension: ExtensionBlocks, next: ExtensionBlocks, nextChannel: Channel) extends ApplierState
+
   }
 
-  case class ExtensionBlocks(extension: Seq[Block]) {
-    override def toString: String = if(extension.isEmpty) "ExtensionBlocks()" else s"ExtensionBlocks(size =${extension.size}, [${extension.head.uniqueId.trim}..${extension.last.uniqueId.trim}])"
-  }
+  case class State(extensionLoaderState: LoaderState, extensionApplierState: ApplierState)
 
 }
