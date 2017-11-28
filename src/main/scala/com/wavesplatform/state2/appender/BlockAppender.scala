@@ -14,7 +14,7 @@ import kamon.Kamon
 import monix.eval.Task
 import scorex.block.Block
 import scorex.transaction.History.BlockchainScore
-import scorex.transaction.ValidationError.{GenericError, InvalidSignature}
+import scorex.transaction.ValidationError.{BlockAppendError, InvalidSignature}
 import scorex.transaction.{BlockchainUpdater, CheckpointService, History, ValidationError}
 import scorex.utils.{ScorexLogging, Time}
 
@@ -23,21 +23,21 @@ import scala.util.Right
 object BlockAppender extends ScorexLogging with Instrumented {
 
   def apply(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater, time: Time,
-                         stateReader: StateReader, utxStorage: UtxPool, settings: BlockchainSettings,
-                         featureProvider: FeatureProvider)(newBlock: Block): Task[Either[ValidationError, Option[BlockchainScore]]] = Task {
+            stateReader: StateReader, utxStorage: UtxPool, settings: BlockchainSettings,
+            featureProvider: FeatureProvider)(newBlock: Block): Task[Either[ValidationError, Option[BlockchainScore]]] = Task {
     measureSuccessful(blockProcessingTimeStats, history.write { implicit l =>
       if (history.contains(newBlock)) Right(None)
       else for {
-        _ <- Either.cond(history.heightOf(newBlock.reference).exists(_ >= history.height() - 1), (), GenericError("Can process either new top block or current top block's competitor"))
+        _ <- Either.cond(history.heightOf(newBlock.reference).exists(_ >= history.height() - 1), (), BlockAppendError("Irrelevant block", newBlock))
         maybeBaseHeight <- appendBlock(checkpoint, history, blockchainUpdater, stateReader(), utxStorage, time, settings, featureProvider)(newBlock)
       } yield maybeBaseHeight map (_ => history.score())
     })
   }.executeOn(scheduler)
 
   def apply(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater, time: Time,
-                         stateReader: StateReader, utxStorage: UtxPool, settings: BlockchainSettings,
-                         featureProvider: FeatureProvider, allChannels: ChannelGroup, peerDatabase: PeerDatabase, miner: Miner
-                        )(newBlock: Block, ch: Channel): Task[Unit] = {
+            stateReader: StateReader, utxStorage: UtxPool, settings: BlockchainSettings,
+            featureProvider: FeatureProvider, allChannels: ChannelGroup, peerDatabase: PeerDatabase, miner: Miner
+           )(newBlock: Block, ch: Channel): Task[Unit] = {
     BlockStats.received(newBlock, BlockStats.Source.Broadcast, ch)
     blockReceivingLag.safeRecord(System.currentTimeMillis() - newBlock.timestamp)
     (for {
