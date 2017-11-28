@@ -27,7 +27,7 @@ class TrafficLogger(settings: TrafficLogger.Settings) extends ChannelDuplexHandl
       // Have no spec
       case x: RawBytes => ignoreMessages(x.code)
       case _: LocalScoreChanged => ignoreMessages(ScoreMessageSpec.messageCode)
-      case BlockForged(b) => ignoreMessages(BlockMessageSpec.messageCode)
+      case _: BlockForged => ignoreMessages(BlockMessageSpec.messageCode)
 
       case x: Message => ignoreMessages(specsByClasses(x.getClass).messageCode)
       case _ => true

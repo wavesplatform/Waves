@@ -54,7 +54,7 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
 
   override def write(ctx: ChannelHandlerContext, msg: AnyRef, promise: ChannelPromise): Unit = msg match {
     case LocalScoreChanged(newLocalScore, breakExtProcessing) =>
-      if (localScore != newLocalScore) log.debug(s"${id(ctx)} $pinnedChannelId New local score: $newLocalScore")
+      if (localScore != newLocalScore) log.debug(s"${id(ctx)} ${pinnedChannelId}New local score: $newLocalScore")
       localScore = newLocalScore
       ctx.write(msg, promise)
 

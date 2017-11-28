@@ -20,19 +20,20 @@ class OptimisticExtensionLoader extends ChannelDuplexHandler with ScorexLogging 
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
     // RemoteScoreObserver requested an extension
-
-    case ExtensionBlocks(extension) if extension.isEmpty && requestedLocalIds.nonEmpty =>
-      stop()
-      log.debug(s"${id(ctx)} Blockchain is up to date")
-      super.channelRead(ctx, msg)
-
-    case ExtensionBlocks(extension) if requestedLocalIds.contains(extension.head.reference) =>
-      loadNextPart(ctx, extension)
-      log.debug(s"${id(ctx)} Passing extension with ${extension.size} blocks upstream")
-      super.channelRead(ctx, msg)
+    case ExtensionBlocks(extension) if requestedLocalIds.nonEmpty =>
+      if (extension.isEmpty) {
+        stop()
+        log.debug(s"${id(ctx)} Blockchain is up to date")
+        super.channelRead(ctx, msg)
+      } else if (requestedLocalIds.contains(extension.head.reference)) {
+        loadNextPart(ctx, extension)
+        log.debug(s"${id(ctx)} Passing extension with ${extension.size} blocks upstream")
+        super.channelRead(ctx, msg)
+      } else {
+        log.warn(s"${id(ctx)} Discarding ${extension.size} blocks") // Could lead to hangs
+      }
 
     // We are optimistically requested blocks
-
     case ext@ExtensionBlocks(extension) if hopefullyNextIds.nonEmpty =>
       if (extension.isEmpty) {
         log.debug(s"${id(ctx)} An optimistically loaded extension has no blocks (blockchain is up to date), stopping the process")
@@ -50,9 +51,7 @@ class OptimisticExtensionLoader extends ChannelDuplexHandler with ScorexLogging 
 
   override def write(ctx: ChannelHandlerContext, msg: AnyRef, promise: ChannelPromise): Unit = msg match {
     case LoadBlockchainExtension(Seq()) =>
-      hopefullyNextIds = Seq.empty
-      nextExtensionBlocks = None
-      requestedLocalIds = Seq.empty
+      stop()
       super.write(ctx, msg, promise)
 
     case LoadBlockchainExtension(localIds) =>
