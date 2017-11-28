@@ -22,7 +22,7 @@ class ExtensionSignaturesLoaderSpec extends FreeSpec
   private val remoteSignatures = Seq(lastCommonSignature, ByteStr("3".getBytes))
 
   "should request signatures on an extension request" in {
-    val channel = new EmbeddedChannel(new ExtensionSignaturesLoader(1.minute, PeerDatabase.NoOp))
+    val channel = new EmbeddedChannel(new ExtensionSignaturesLoader(1.minute, PeerDatabase.NoOp, InvalidBlockStorage.Empty))
     channel.writeOutbound(LoadBlockchainExtension(localSignatures))
     channel.flushOutbound()
 
@@ -34,7 +34,7 @@ class ExtensionSignaturesLoaderSpec extends FreeSpec
   }
 
   "should send extension's ids down to the channel when signatures are came" in {
-    val channel = new EmbeddedChannel(new ExtensionSignaturesLoader(1.minute, PeerDatabase.NoOp))
+    val channel = new EmbeddedChannel(new ExtensionSignaturesLoader(1.minute, PeerDatabase.NoOp, InvalidBlockStorage.Empty))
     channel.writeOutbound(LoadBlockchainExtension(localSignatures))
     channel.flushOutbound()
 
@@ -61,7 +61,7 @@ class ExtensionSignaturesLoaderSpec extends FreeSpec
       }
     }
 
-    val channel = new EmbeddedChannel(new ExtensionSignaturesLoader(100.millis, peerDatabase))
+    val channel = new EmbeddedChannel(new ExtensionSignaturesLoader(100.millis, peerDatabase, InvalidBlockStorage.Empty))
     channel.writeOutbound(LoadBlockchainExtension(localSignatures))
     channel.flushOutbound()
 

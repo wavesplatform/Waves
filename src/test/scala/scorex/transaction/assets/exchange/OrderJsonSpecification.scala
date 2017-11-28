@@ -108,14 +108,14 @@ class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers 
 
   property("Parse signed Order") {
     forAll(orderGen) { order =>
-      val json = order.json
+      val json = order.json()
       json.validate[Order] match {
         case e: JsError =>
           fail("Error: " + JsError.toJson(e).toString())
         case s: JsSuccess[Order] =>
           val o = s.get
-          o.json.toString() should be (json.toString())
-          o.signaturesValid.isRight should be(true)
+          o.json().toString() should be (json.toString())
+          o.signaturesValid().isRight should be(true)
       }
     }
   }

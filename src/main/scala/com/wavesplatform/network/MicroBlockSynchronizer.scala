@@ -10,10 +10,10 @@ import com.wavesplatform.state2.ByteStr
 import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel._
 import monix.eval.Task
-import monix.execution.CancelableFuture
 import monix.execution.schedulers.SchedulerService
-import scorex.block.MicroBlock
+import monix.execution.{CancelableFuture, Scheduler}
 import monix.reactive.Observable
+import scorex.block.MicroBlock
 import scorex.transaction.NgHistory
 import scorex.utils.ScorexLogging
 
@@ -26,10 +26,7 @@ class MicroBlockSynchronizer(settings: MicroblockSynchronizerSettings,
                              lastBlockIdEvents: Observable[ByteStr],
                              microBlockOwners: MicroBlockOwners) extends ChannelInboundHandlerAdapter with ScorexLogging {
 
-  private implicit val scheduler: SchedulerService = monix.execution.Scheduler.singleThread(
-    "microblock-synchronizer",
-    reporter = com.wavesplatform.utils.UncaughtExceptionsToLogReporter
-  )
+  private implicit val scheduler: SchedulerService = Scheduler.singleThread("microblock-synchronizer")
 
   private val nextInvs = cache[MicroBlockSignature, MicroBlockInv](settings.invCacheTimeout)
   private val awaiting = cache[MicroBlockSignature, MicroBlockInv](settings.invCacheTimeout)
@@ -59,7 +56,7 @@ class MicroBlockSynchronizer(settings: MicroblockSynchronizerSettings,
       }
     }
 
-    task(MicroBlockDownloadAttempts, Set.empty).runAsync
+    task(MicroBlockDownloadAttempts, Set.empty).runAsyncLogErr
   }
 
   private def tryDownloadNext(prevBlockId: ByteStr): Unit = Option(nextInvs.getIfPresent(prevBlockId)).foreach(requestMicroBlock)
@@ -77,10 +74,10 @@ class MicroBlockSynchronizer(settings: MicroblockSynchronizerSettings,
           awaiting.invalidate(totalSig)
           super.channelRead(ctx, MicroblockData(Option(mi), mb))
         }
-      }.runAsync
+      }.runAsyncLogErr
 
     case mbInv@MicroBlockInv(_, totalSig, prevSig, _) => Task {
-      mbInv.signaturesValid match {
+      mbInv.signaturesValid() match {
         case Left(err) => peerDatabase.blacklistAndClose(ctx.channel(), err.toString)
         case Right(_) =>
           log.trace(s"${id(ctx)} Received $msg")
@@ -94,7 +91,7 @@ class MicroBlockSynchronizer(settings: MicroblockSynchronizerSettings,
             .filter(_ == prevSig && !alreadyRequested(totalSig))
             .foreach(tryDownloadNext)
       }
-    }.runAsync
+    }.runAsyncLogErr
 
     case _ => super.channelRead(ctx, msg)
   }
@@ -108,11 +105,9 @@ object MicroBlockSynchronizer {
 
   private val MicroBlockDownloadAttempts = 2
 
-  def random[T](s: Set[T]): Option[T] = {
+  def random[T](s: Set[T]): Option[T] = if (s.isEmpty) None else {
     val n = util.Random.nextInt(s.size)
-    val ts = s.iterator.drop(n)
-    if (ts.hasNext) Some(ts.next)
-    else None
+    s.drop(n).headOption
   }
 
   def cache[K <: AnyRef, V <: AnyRef](timeout: FiniteDuration): Cache[K, V] = CacheBuilder.newBuilder()

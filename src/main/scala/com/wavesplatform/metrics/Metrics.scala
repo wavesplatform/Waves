@@ -4,6 +4,7 @@ import java.net.URI
 import java.util.concurrent.TimeUnit
 
 import monix.eval.Task
+import monix.execution.Scheduler
 import monix.execution.schedulers.SchedulerService
 import org.influxdb.dto.Point
 import org.influxdb.{InfluxDB, InfluxDBFactory}
@@ -26,7 +27,7 @@ object Metrics extends ScorexLogging {
                       nodeId: Int,
                       influxDb: InfluxDbSettings)
 
-  private implicit val scheduler: SchedulerService = monix.execution.Scheduler.singleThread("metrics", reporter = com.wavesplatform.utils.UncaughtExceptionsToLogReporter)
+  private implicit val scheduler: SchedulerService = Scheduler.singleThread("metrics")
 
   private var settings: Settings = _
   private var db: Option[InfluxDB] = None
@@ -61,11 +62,11 @@ object Metrics extends ScorexLogging {
     }
 
     db.nonEmpty
-  }.runAsync
+  }.runAsyncLogErr
 
   def shutdown(): Unit = Task {
     db.foreach(_.close())
-  }.runAsync
+  }.runAsyncLogErr
 
   def write(b: Point.Builder): Unit = {
     val time = NTP.getTimestamp()
@@ -78,7 +79,7 @@ object Metrics extends ScorexLogging {
         .time(time, TimeUnit.MILLISECONDS)
         .build()
       ))
-    }.runAsync
+    }.runAsyncLogErr
   }
 
   def writeEvent(name: String): Unit = write(Point.measurement(name))

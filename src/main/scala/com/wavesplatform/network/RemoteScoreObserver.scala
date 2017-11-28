@@ -9,8 +9,10 @@ import io.netty.channel._
 import scorex.transaction.History
 import scorex.utils.ScorexLogging
 
+import scala.concurrent.{Future, blocking}
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.FiniteDuration
-
+import scala.util.{Failure, Success}
 
 @Sharable
 class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteStr], initialLocalScore: BigInt)
@@ -39,9 +41,9 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
             case Some((secondBestChannel, secondBestScore))
               if secondBestScore > localScore && pinnedChannel.compareAndSet(bestChannel, secondBestChannel) =>
               log.debug(s"${id(ctx)} Switching to second best channel $pinnedChannelId")
-              secondBestChannel.writeAndFlush(LoadBlockchainExtension(lastSignatures))
+              requestExtension(secondBestChannel)
             case _ =>
-              if (pinnedChannel.compareAndSet(f.channel(), null)) log.debug(s"${id(ctx)} Unpinning unconditionally")
+              if (pinnedChannel.compareAndSet(f.channel(), null)) log.trace(s"${id(ctx)} Unpinning unconditionally")
           }
         } else {
           if (pinnedChannel.compareAndSet(ctx.channel(), null))
@@ -51,22 +53,29 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
     }
 
   override def write(ctx: ChannelHandlerContext, msg: AnyRef, promise: ChannelPromise): Unit = msg match {
-    case LocalScoreChanged(newLocalScore) =>
-      if (pinnedChannel.compareAndSet(ctx.channel(), null)) { // Fork applied
-        log.debug(s"${id(ctx)} ${pinnedChannelId}New local score: $newLocalScore")
-      }
-      // unconditionally update local score value and propagate this message downstream
+    case LocalScoreChanged(newLocalScore, breakExtLoading) =>
       localScore = newLocalScore
+      log.debug(s"${id(ctx)} $pinnedChannelId New local score: $newLocalScore")
       ctx.write(msg, promise)
 
-      // if this is the channel with the highest score and its score is higher than local, request extension
-      for ((chan, score) <- channelWithHighestScore if chan == ctx.channel() && score > newLocalScore) {
-        log.debug(s"${id(ctx)} ${pinnedChannelId}Pinning this channel")
-        pinnedChannel.set(chan)
-        chan.writeAndFlush(LoadBlockchainExtension(lastSignatures))
+      if (breakExtLoading) {
+        ctx.write(LoadBlockchainExtension(Seq.empty))
+        if (pinnedChannel.compareAndSet(ctx.channel(), null)) log.debug(s"${id(ctx)} Stop processing an extension")
+        channelWithHighestScore match {
+          case Some((bestChannel, bestScore))
+            if bestScore > localScore && pinnedChannel.compareAndSet(null, bestChannel) =>
+            log.debug(s"${id(ctx)} Switching to second best channel $pinnedChannelId")
+            requestExtension(bestChannel)
+          case _ =>
+        }
       }
 
     case _ => ctx.write(msg, promise)
+  }
+
+  private def requestExtension(channel: Channel): Unit = Future(blocking(lastSignatures)).onComplete {
+    case Success(sig) => channel.writeAndFlush(LoadBlockchainExtension(sig))
+    case Failure(e) => log.warn("Error getting last signatures", e)
   }
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
@@ -90,10 +99,10 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
           highScore > localScore // remote score is higher than local
       } if (pinnedChannel.compareAndSet(null, ch)) {
         // we've finished to download blocks from previous high score channel
-        log.debug(s"${id(ctx)} ${pinnedChannelId}New high score $highScore > $localScore, requesting extension")
-        ctx.writeAndFlush(LoadBlockchainExtension(lastSignatures))
+        log.debug(s"${id(ctx)} ${pinnedChannelId}New high score $highScore > $localScore, pinning and requesting extension")
+        requestExtension(ch)
       } else {
-        log.trace(s"${id(ctx)} New high score $highScore")
+        log.trace(s"${id(ctx)} New high score $highScore, but we are processing a score from $pinnedChannelId for now")
       }
 
     case ExtensionBlocks(blocks) if pinnedChannel.get() == ctx.channel() =>
@@ -102,7 +111,8 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
         super.channelRead(ctx, msg)
       } else {
         log.debug(s"${id(ctx)} ${pinnedChannelId}Blockchain is up to date")
-        pinnedChannel.compareAndSet(ctx.channel(), null)
+        if (pinnedChannel.compareAndSet(ctx.channel(), null)) log.debug(s"${id(ctx)} Successfully reset pinned channel")
+        else log.debug(s"${id(ctx)} The pinned channel is unchanged, $pinnedChannelId")
       }
 
     case ExtensionBlocks(blocks) =>

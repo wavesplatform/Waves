@@ -60,7 +60,7 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest2"
   (storedState.assetInfo _).when(*).returns(Some(AssetInfo(true, 10000000000L)))
   val i1 = IssueTransaction.create(PrivateKeyAccount(Array.empty), "Unknown".getBytes(), Array.empty, 10000000000L, 8.toByte, true, 100000L, 10000L).right.get
   val i2 = IssueTransaction.create(PrivateKeyAccount(Array.empty), "ForbiddenName".getBytes(), Array.empty, 10000000000L, 8.toByte, true, 100000L, 10000L).right.get
-  (storedState.transactionInfo _).when(i2.id).returns(Some((1, i2)))
+  (storedState.transactionInfo _).when(i2.id()).returns(Some((1, i2)))
   (storedState.transactionInfo _).when(*).returns(Some((1, i1)))
   (storedState.accountPortfolio _).when(*).returns(Portfolio(Long.MaxValue, LeaseInfo.empty, Map(ByteStr("123".getBytes) -> Long.MaxValue)))
 
@@ -172,7 +172,7 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest2"
       actor ! GetOrderBookRequest(pair, None)
       expectMsg(StatusCodeMatcherResponse(StatusCodes.NotFound, "Invalid Asset ID: BLACKLST"))
 
-      def fbdnNamePair = AssetPair(Some(i2.assetId), ByteStr.decodeBase58("BASE1").toOption)
+      def fbdnNamePair = AssetPair(Some(i2.assetId()), ByteStr.decodeBase58("BASE1").toOption)
       actor ! GetOrderBookRequest(fbdnNamePair, None)
       expectMsg(StatusCodeMatcherResponse(StatusCodes.NotFound, "Invalid Asset Name: ForbiddenName"))
     }

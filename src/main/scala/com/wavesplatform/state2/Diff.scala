@@ -67,7 +67,7 @@ object Diff {
             orderFills: Map[ByteStr, OrderFillInfo] = Map.empty,
             paymentTransactionIdsByHashes: Map[ByteStr, ByteStr] = Map.empty,
             leaseState: Map[ByteStr, Boolean] = Map.empty): Diff = Diff(
-    transactions = Map((tx.id, (height, tx, portfolios.keys.toSet))),
+    transactions = Map((tx.id(), (height, tx, portfolios.keys.toSet))),
     portfolios = portfolios,
     issuedAssets = assetInfos,
     aliases = aliases,

@@ -57,7 +57,7 @@ class CompositeStateReader private(inner: SnapshotStateReader, blockDiff: BlockD
   override def accountPortfolios: Map[Address, Portfolio] = Monoid.combine(inner.accountPortfolios, txDiff.portfolios)
 
   override def isLeaseActive(leaseTx: LeaseTransaction): Boolean =
-    blockDiff.txsDiff.leaseState.getOrElse(leaseTx.id, inner.isLeaseActive(leaseTx))
+    blockDiff.txsDiff.leaseState.getOrElse(leaseTx.id(), inner.isLeaseActive(leaseTx))
 
   override def activeLeases(): Seq[ByteStr] = {
     blockDiff.txsDiff.leaseState.collect { case (id, isActive) if isActive => id }.toSeq ++ inner.activeLeases()
@@ -84,21 +84,21 @@ class CompositeStateReader private(inner: SnapshotStateReader, blockDiff: BlockD
 }
 
 object CompositeStateReader {
-  def composite(inner: SnapshotStateReader, blockDiff: BlockDiff): SnapshotStateReader = new CompositeStateReader(inner, blockDiff)
+  def composite(blockDiff: BlockDiff, inner: SnapshotStateReader): SnapshotStateReader = new CompositeStateReader(inner, blockDiff)
 
-  def composite(inner: SnapshotStateReader, blockDiff: Seq[BlockDiff]): SnapshotStateReader = blockDiff match {
-    case (x :: xs) => composite(composite(inner, xs), x)
+  def composite(blockDiff: Seq[BlockDiff], inner: SnapshotStateReader): SnapshotStateReader = blockDiff match {
+    case (x :: xs) => composite(x, composite(xs, inner))
     case _ => inner
   }
 
-  def composite(inner: SnapshotStateReader, blockDiff: NEL[BlockDiff]): SnapshotStateReader = blockDiff.tail match {
-    case (x :: xs) => composite(composite(inner, NEL(x, xs)), blockDiff.head)
-    case Nil => composite(inner, blockDiff.head)
+  def composite(blockDiffs: NEL[BlockDiff], inner: SnapshotStateReader): SnapshotStateReader = blockDiffs.tail match {
+    case (x :: xs) => composite(blockDiffs.head, composite(NEL(x, xs), inner))
+    case Nil => composite(blockDiffs.head, inner)
   }
 
   // fresh head
-  def composite(inner: Coeval[SnapshotStateReader], blockDiff: Coeval[BlockDiff]): Coeval[SnapshotStateReader] = for {
+  def composite(blockDiff: Coeval[BlockDiff], inner: Coeval[SnapshotStateReader]): Coeval[SnapshotStateReader] = for {
     i <- inner
     b <- blockDiff
-  } yield composite(i, b)
+  } yield composite(b, i)
 }

@@ -8,7 +8,7 @@ import com.wavesplatform.settings.{FeaturesSettings, FunctionalitySettings}
 import com.wavesplatform.state2.{BlockDiff, ByteStr, DataTypes, VariablesStorage, VersionableStorage}
 import com.wavesplatform.utils._
 import kamon.Kamon
-import scorex.block.Block
+import scorex.block.{Block, BlockHeader}
 import scorex.transaction.History.BlockchainScore
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction._
@@ -60,12 +60,12 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
   def appendBlock(block: Block, acceptedFeatures: Set[Short])(consensusValidation: => Either[ValidationError, BlockDiff]): Either[ValidationError, BlockDiff] =
     write { implicit lock =>
 
-      assert(block.signaturesValid.isRight)
+      assert(block.signaturesValid().isRight)
 
       if ((height() == 0) || (this.lastBlock.get.uniqueId == block.reference)) consensusValidation.map { blockDiff =>
         val h = height() + 1
-        val score = (if (height() == 0) BigInt(0) else this.score()) + block.blockScore
-        blockBodyByHeight.mutate(_.put(h, block.bytes))
+        val score = (if (height() == 0) BigInt(0) else this.score()) + block.blockScore()
+        blockBodyByHeight.mutate(_.put(h, block.bytes()))
         scoreByHeight.mutate(_.put(h, score))
         blockIdByHeight.mutate(_.put(h, block.uniqueId))
         heightByBlockId.mutate(_.put(block.uniqueId, h))
@@ -73,7 +73,7 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
         alterVotes(h, block.featureVotes, 1)
         db.commit()
         blockHeightStats.record(h)
-        blockSizeStats.record(block.bytes.length)
+        blockSizeStats.record(block.bytes().length)
         transactionsInBlockStats.record(block.transactionData.size)
 
         if (h % 100 == 0) db.compact(CompactFillRate, CompactMemorySize)
@@ -134,6 +134,8 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
 
   override def blockAt(height: Int): Option[Block] = blockBytes(height).map(Block.parseBytes(_).get)
 
+  override def blockHeaderAndSizeAt(height: Int): Option[(BlockHeader, Int)] =
+    blockBytes(height).map(bytes => (BlockHeader.parseBytes(bytes).get._1, bytes.length))
 }
 
 object HistoryWriterImpl extends ScorexLogging {

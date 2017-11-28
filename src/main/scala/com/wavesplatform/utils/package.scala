@@ -3,9 +3,7 @@ package com.wavesplatform
 import java.io.File
 import java.nio.file.Files
 
-import com.google.common.base.Throwables
 import com.wavesplatform.state2.VersionableStorage
-import monix.execution.UncaughtExceptionReporter
 import org.h2.mvstore.MVStore
 import scorex.utils.ScorexLogging
 
@@ -14,8 +12,6 @@ import scala.util.Try
 package object utils extends ScorexLogging {
 
   private val DefaultPageSplitSize = 4 * 1024
-
-  val UncaughtExceptionsToLogReporter = UncaughtExceptionReporter(exc => log.error(Throwables.getStackTraceAsString(exc)))
 
   def base58Length(byteArrayLength: Int): Int = math.ceil(math.log(256) / math.log(58) * byteArrayLength).toInt
 

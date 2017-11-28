@@ -43,24 +43,26 @@ package object state2 {
 
   def splitAfterThreshold[A](list: NEL[A], threshold: Int)(count: A => Int): (NEL[A], List[A]) = {
     @tailrec
-    def r(agg: NEL[A], aggCount: Int, rest: List[A]): (NEL[A], List[A]) =
+    def splitR(agg: NEL[A], aggCount: Int, rest: List[A]): (NEL[A], List[A]) =
       if (aggCount >= threshold) (agg, rest)
       else rest match {
         case Nil => (agg, rest)
-        case (x :: xs) => r(x :: agg, count(x) + aggCount, xs)
+        case (x :: xs) => splitR(x :: agg, count(x) + aggCount, xs)
       }
 
-    r(NEL.one(list.head), count(list.head), list.tail)
+    val r = splitR(NEL.one(list.head), count(list.head), list.tail)
+    (r._1.reverse,r._2)
   }
 
-  def perpendCompact[A](`new`: A, existing: NEL[A])(compactPred: (A, A) => Boolean)(implicit ma: Monoid[A]): NEL[A] = {
+  def prependCompact[A](`new`: A, existing: NEL[A])(compactPred: (A, A) => Boolean)(implicit ma: Monoid[A]): NEL[A] = {
     if (compactPred(`new`, existing.head)) NEL(Monoid.combine(existing.head, `new`), existing.tail)
     else `new` :: existing
   }
 
   def prependCompactBlockDiff(`new`: BlockDiff, existing: NEL[BlockDiff], maxTxsInChunk: Int): NEL[BlockDiff] =
-    perpendCompact[BlockDiff](`new`, existing) { case (x, y) => x.txsDiff.transactions.size + y.txsDiff.transactions.size <= maxTxsInChunk }
+    prependCompact[BlockDiff](`new`, existing) { case (x, y) => x.txsDiff.transactions.size + y.txsDiff.transactions.size <= maxTxsInChunk }
 
 
   def sameQuotient(x: Int, y: Int, divisor: Int): Boolean = (x / divisor) == (y / divisor)
+
 }

@@ -48,7 +48,7 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
     "when state validation fails" in {
       forAll(vt) { (url, gen, transform) =>
         forAll(gen) { (t: Transaction) =>
-          posting(url, transform(t.json)) should produce(StateCheckFailed(t, "foo"))
+          posting(url, transform(t.json())) should produce(StateCheckFailed(t, "foo"))
         }
       }
     }
@@ -61,7 +61,7 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
       def posting[A: Writes](v: A): RouteTestResult = Post(routePath("issue"), v) ~> route
 
       forAll(nonPositiveLong) { q => posting(ir.copy(fee = q)) should produce(InsufficientFee) }
-      forAll(nonPositiveLong) { q => posting(ir.copy(quantity = q)) should produce(NegativeAmount) }
+      forAll(nonPositiveLong) { q => posting(ir.copy(quantity = q)) should produce(NegativeAmount(s"$q of assets")) }
       forAll(invalidDecimals) { d => posting(ir.copy(decimals = d)) should produce(TooBigArrayAllocation) }
       forAll(longDescription) { d => posting(ir.copy(description = d)) should produce(TooBigArrayAllocation) }
       forAll(invalidName) { name => posting(ir.copy(name = name)) should produce(InvalidName) }
@@ -73,7 +73,7 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
       def posting[A: Writes](v: A): RouteTestResult = Post(routePath("reissue"), v) ~> route
 
       // todo: invalid sender
-      forAll(nonPositiveLong) { q => posting(rr.copy(quantity = q)) should produce(NegativeAmount) }
+      forAll(nonPositiveLong) { q => posting(rr.copy(quantity = q)) should produce(NegativeAmount(s"$q of assets")) }
       forAll(nonPositiveLong) { fee => posting(rr.copy(fee = fee)) should produce(InsufficientFee) }
     }
 
@@ -81,14 +81,14 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
       def posting[A: Writes](v: A): RouteTestResult = Post(routePath("burn"), v) ~> route
 
       forAll(invalidBase58) { pk => posting(br.copy(senderPublicKey = pk)) should produce(InvalidAddress) }
-      forAll(nonPositiveLong) { q => posting(br.copy(quantity = q)) should produce(NegativeAmount) }
+      forAll(nonPositiveLong) { q => posting(br.copy(quantity = q)) should produce(NegativeAmount(s"$q of assets")) }
       forAll(nonPositiveLong) { fee => posting(br.copy(fee = fee)) should produce(InsufficientFee) }
     }
 
     "transfer transaction" in forAll(broadcastTransferReq) { tr =>
       def posting[A: Writes](v: A): RouteTestResult = Post(routePath("transfer"), v) ~> route
 
-      forAll(nonPositiveLong) { q => posting(tr.copy(amount = q)) should produce(NegativeAmount) }
+      forAll(nonPositiveLong) { q => posting(tr.copy(amount = q)) should produce(NegativeAmount(s"$q of waves")) }
       forAll(invalidBase58) { pk => posting(tr.copy(senderPublicKey = pk)) should produce(InvalidAddress) }
       forAll(invalidBase58) { a => posting(tr.copy(recipient = a)) should produce(InvalidAddress) }
       forAll(invalidBase58) { a => posting(tr.copy(assetId = Some(a))) should produce(CustomValidationError("invalid.assetId")) }

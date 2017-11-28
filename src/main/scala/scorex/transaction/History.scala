@@ -3,9 +3,9 @@ package scorex.transaction
 import com.wavesplatform.network.{BlockCheckpoint, Checkpoint}
 import com.wavesplatform.state2.ByteStr
 import scorex.block.Block.BlockId
-import scorex.block.{Block, MicroBlock}
+import scorex.block.{Block, BlockHeader, MicroBlock}
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
-import scorex.transaction.History.{BlockchainScore, BlockMinerInfo}
+import scorex.transaction.History.{BlockMinerInfo, BlockchainScore}
 import scorex.utils.Synchronized
 
 import scala.util.Try
@@ -15,6 +15,8 @@ trait History extends Synchronized with AutoCloseable {
   def height(): Int
 
   def blockAt(height: Int): Option[Block]
+
+  def blockHeaderAndSizeAt(height: Int): Option[(BlockHeader, Int)]
 
   def blockBytes(height: Int): Option[Array[Byte]]
 

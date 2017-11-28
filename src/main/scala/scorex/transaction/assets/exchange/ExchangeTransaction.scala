@@ -3,6 +3,7 @@ package scorex.transaction.assets.exchange
 import com.google.common.primitives.{Ints, Longs}
 import com.wavesplatform.state2.ByteStr
 import io.swagger.annotations.ApiModelProperty
+import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
@@ -13,7 +14,7 @@ import scorex.transaction.{ValidationError, _}
 import scala.util.{Failure, Success, Try}
 
 case class ExchangeTransaction private(buyOrder: Order, sellOrder: Order, price: Long, amount: Long, buyMatcherFee: Long,
-                                           sellMatcherFee: Long, fee: Long, timestamp: Long, signature: ByteStr)
+                                       sellMatcherFee: Long, fee: Long, timestamp: Long, signature: ByteStr)
   extends SignedTransaction {
 
   override val transactionType: TransactionType.Value = TransactionType.ExchangeTransaction
@@ -23,31 +24,31 @@ case class ExchangeTransaction private(buyOrder: Order, sellOrder: Order, price:
   @ApiModelProperty(hidden = true)
   override val sender: PublicKeyAccount = buyOrder.matcherPublicKey
 
-  lazy val toSign: Array[Byte] = Array(transactionType.id.toByte) ++
-    Ints.toByteArray(buyOrder.bytes.length) ++ Ints.toByteArray(sellOrder.bytes.length) ++
-    buyOrder.bytes ++ sellOrder.bytes ++ Longs.toByteArray(price) ++ Longs.toByteArray(amount) ++
+  override val toSign: Coeval[Array[Byte]] = Coeval.evalOnce(Array(transactionType.id.toByte) ++
+    Ints.toByteArray(buyOrder.bytes().length) ++ Ints.toByteArray(sellOrder.bytes().length) ++
+    buyOrder.bytes() ++ sellOrder.bytes() ++ Longs.toByteArray(price) ++ Longs.toByteArray(amount) ++
     Longs.toByteArray(buyMatcherFee) ++ Longs.toByteArray(sellMatcherFee) ++ Longs.toByteArray(fee) ++
-    Longs.toByteArray(timestamp)
+    Longs.toByteArray(timestamp))
 
-  override def bytes: Array[Byte] = toSign ++ signature.arr
+  override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(toSign() ++ signature.arr)
 
-  override def json: JsObject = jsonBase() ++ Json.obj(
-    "order1" -> buyOrder.json,
-    "order2" -> sellOrder.json,
+  override val json: Coeval[JsObject] = Coeval.evalOnce(jsonBase() ++ Json.obj(
+    "order1" -> buyOrder.json(),
+    "order2" -> sellOrder.json(),
     "price" -> price,
     "amount" -> amount,
     "buyMatcherFee" -> buyMatcherFee,
     "sellMatcherFee" -> sellMatcherFee
-  )
+  ))
 
-  override lazy val signedDescendants: Seq[Signed] = Seq(buyOrder, sellOrder)
+  override val signedDescendants: Coeval[Seq[Order]] = Coeval.evalOnce(Seq(buyOrder, sellOrder))
 }
 
 object ExchangeTransaction {
   def create(matcher: PrivateKeyAccount, buyOrder: Order, sellOrder: Order, price: Long, amount: Long,
              buyMatcherFee: Long, sellMatcherFee: Long, fee: Long, timestamp: Long): Either[ValidationError, ExchangeTransaction] = {
     create(buyOrder, sellOrder, price, amount, buyMatcherFee, sellMatcherFee, fee, timestamp, ByteStr.empty).right.map { unverified =>
-      unverified.copy(signature = ByteStr(EllipticCurveImpl.sign(matcher.privateKey, unverified.toSign)))
+      unverified.copy(signature = ByteStr(EllipticCurveImpl.sign(matcher.privateKey, unverified.toSign())))
     }
   }
 
@@ -58,7 +59,7 @@ object ExchangeTransaction {
     if (fee <= 0) {
       Left(ValidationError.InsufficientFee)
     } else if (amount <= 0) {
-      Left(ValidationError.NegativeAmount)
+      Left(ValidationError.NegativeAmount(amount, "assets"))
     } else if (price <= 0) {
       Left(GenericError("price should be > 0"))
     } else if (price > Order.MaxAmount) {

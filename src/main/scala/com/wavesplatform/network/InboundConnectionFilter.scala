@@ -26,12 +26,17 @@ class InboundConnectionFilter(peerDatabase: PeerDatabase, maxInboundConnections:
     val newCountPerHost = perHostConnectionCount.compute(remoteAddress.getAddress, (_, cnt) => Option(cnt).fold(1)(_ + 1))
     val isBlacklisted = peerDatabase.blacklistedHosts.contains(remoteAddress.getAddress)
 
-    log.trace(s"Check inbound connection from $remoteAddress: new inbound total = $newTotal, " +
-      s"connections with this host = $newCountPerHost, address ${if (isBlacklisted) "IS" else "is not"} blacklisted")
-
-    newTotal <= maxInboundConnections &&
+    val accepted = newTotal <= maxInboundConnections &&
       newCountPerHost <= maxConnectionsPerHost &&
       !isBlacklisted
+
+    log.trace(
+      s"Check inbound connection from $remoteAddress: new inbound total = $newTotal, " +
+      s"connections with this host = $newCountPerHost, address ${if (isBlacklisted) "IS" else "is not"} blacklisted, " +
+      s"${if (accepted) "is" else "is not"} accepted"
+    )
+
+    accepted
   }
 
   override def channelAccepted(ctx: ChannelHandlerContext, remoteAddress: InetSocketAddress) =

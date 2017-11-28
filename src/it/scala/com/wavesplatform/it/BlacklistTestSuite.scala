@@ -1,28 +1,32 @@
 package com.wavesplatform.it
 
-import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.it.api.MultipleNodesApi
 import com.wavesplatform.it.api.NodeApi.BlacklistedPeer
 import org.scalatest._
 
-import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
-import scala.concurrent.{Await, Future}
-import scala.util.Random
+import scala.concurrent.Await
 
-class BlacklistTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with CancelAfterFailure with ReportingTestName{
+class BlacklistTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with CancelAfterFailure
+  with ReportingTestName with MultipleNodesApi {
+  
+  private lazy val docker = Docker(getClass)
+  override lazy val nodes: Seq[Node] = docker.startNodes(
+    NodeConfigs.newBuilder
+      .overrideBase(_.quorum(2))
+      .withDefault(3)
+      .withSpecial(_.quorum(0))
+      .build
+  )
 
-  import BlacklistTestSuite._
-
-  private val docker = Docker(getClass)
-  override val nodes = Configs.map(docker.startNode)
-  private val richestNode = nodes.head
-  private val otherNodes = nodes.tail
+  private def primaryNode = nodes.last
+  private def otherNodes = nodes.init
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-    Await.result(Future.traverse(nodes)(_.waitForPeers(NodesCount - 1)), 2.minute)
+    log.debug(s"There are ${nodes.size} in tests") // Initializing of a lazy variable
   }
 
   override protected def afterAll(): Unit = {
@@ -30,45 +34,27 @@ class BlacklistTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll w
     docker.close()
   }
 
-  "network should grow up to 10 blocks" in Await.result(richestNode.waitForHeight(10), 3.minutes)
+  "network should grow up to 10 blocks" in Await.result(primaryNode.waitForHeight(10), 3.minutes)
 
-  "richest node should blacklist other nodes" in {
-    val test = for {
-      _ <- traverse(otherNodes) { n => richestNode.blacklist(n.nodeInfo.networkIpAddress, n.nodeInfo.hostNetworkPort) }
-      blacklisted <- richestNode.blacklistedPeers
-    } yield {
-      blacklisted.length should be(NodesCount - 1)
-    }
-
-    Await.result(test, 1.minute)
-  }
-
-  "sleep while nodes are blocked" in Await.result(
-    richestNode.waitFor[Seq[BlacklistedPeer]](_.blacklistedPeers, _.isEmpty, 5.second),
-    richestNode.settings.networkSettings.blackListResidenceTime + 5.seconds
+  "primary node should blacklist other nodes" in Await.result(
+    for {
+      _ <- traverse(otherNodes) { n => primaryNode.blacklist(n.nodeInfo.networkIpAddress, n.nodeInfo.hostNetworkPort) }
+      expectedBlacklistedPeers = nodes.size - 1
+      _ <- primaryNode.waitFor[Seq[BlacklistedPeer]](s"blacklistedPeers.size == $expectedBlacklistedPeers")(_.blacklistedPeers, _.size == expectedBlacklistedPeers, 1.second)
+    } yield (),
+    1.minute
   )
 
-  "and sync again" in {
-    val targetBlocks = Await.result(for {
+  "sleep while nodes are blocked" in Await.result(
+    primaryNode.waitFor[Seq[BlacklistedPeer]](s"blacklistedPeers is empty")(_.blacklistedPeers, _.isEmpty, 5.second),
+    primaryNode.settings.networkSettings.blackListResidenceTime + 5.seconds
+  )
+
+  "and sync again" in Await.result(
+    for {
       baseHeight <- traverse(nodes)(_.height).map(_.max)
-      _ <- traverse(nodes)(_.waitForHeight(baseHeight + 10))
-      blocks <- traverse(nodes)(_.blockAt(baseHeight + 5))
-    } yield blocks.map(_.signature), 5.minutes)
-    all(targetBlocks) shouldEqual targetBlocks.head
-  }
-}
-
-object BlacklistTestSuite {
-
-  private val generatingNodeConfig = ConfigFactory.parseString(
-    """
-      |waves.miner.offline = yes
-    """.stripMargin)
-
-  private val dockerConfigs = Docker.NodeConfigs.getConfigList("nodes").asScala
-
-  val NodesCount: Int = 4
-
-  val Configs: Seq[Config] = Seq(generatingNodeConfig.withFallback(dockerConfigs.last)) ++ Random.shuffle(dockerConfigs.init).take(NodesCount - 1)
-
+      _ <- waitForSameBlocksAt(nodes, 5.seconds, baseHeight + 5)
+    } yield (),
+    5.minutes
+  )
 }

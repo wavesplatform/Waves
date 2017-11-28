@@ -1,6 +1,7 @@
 package com.wavesplatform.network
 
 import java.net.{InetSocketAddress, NetworkInterface}
+import java.nio.channels.ClosedChannelException
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -18,6 +19,7 @@ import io.netty.channel.socket.SocketChannel
 import io.netty.channel.socket.nio.{NioServerSocketChannel, NioSocketChannel}
 import io.netty.handler.codec.{LengthFieldBasedFrameDecoder, LengthFieldPrepender}
 import io.netty.util.concurrent.DefaultThreadFactory
+import org.asynchttpclient.netty.channel.NoopHandler
 import org.influxdb.dto.Point
 import scorex.transaction._
 import scorex.utils.{ScorexLogging, Time}
@@ -52,6 +54,12 @@ class NetworkServer(checkpointService: CheckpointService,
     settings.synchronizationSettings.scoreTTL,
     history.lastBlockIds(settings.synchronizationSettings.maxRollback), history.score())
 
+  private val trafficWatcher = if (settings.metrics.enable) new TrafficWatcher else new NoopHandler
+  private val trafficLogger = {
+    if (settings.networkSettings.trafficLogger.enable) new TrafficLogger(settings.networkSettings.trafficLogger)
+    else new NoopHandler
+  }
+
   private val discardingHandler = new DiscardingHandler(blockchainReadiness)
   private val messageCodec = new MessageCodec(peerDatabase)
 
@@ -81,9 +89,13 @@ class NetworkServer(checkpointService: CheckpointService,
     settings.networkSettings.maxInboundConnections,
     settings.networkSettings.maxConnectionsPerHost)
 
+  private val knownInvalidBlocks = new InvalidBlockStorageImpl(settings.synchronizationSettings.invalidBlocksStorage)
+
   private val microBlockOwners = new MicroBlockOwners(settings.synchronizationSettings.microBlockSynchronizer.invCacheTimeout)
-  private val coordinatorHandler = new CoordinatorHandler(checkpointService, history, blockchainUpdater, time,
-    stateReader, utxPool, blockchainReadiness, miner, settings, peerDatabase, allChannels, featureProvider, microBlockOwners)
+  private val coordinatorHandler = new CoordinatorHandler(
+    checkpointService, history, blockchainUpdater, time, stateReader, utxPool, blockchainReadiness, miner, settings,
+    peerDatabase, allChannels, featureProvider, microBlockOwners, knownInvalidBlocks
+  )
 
   private val peerConnections = new ConcurrentHashMap[PeerKey, Channel](10, 0.9f, 10)
 
@@ -106,19 +118,21 @@ class NetworkServer(checkpointService: CheckpointService,
       .channel(classOf[NioServerSocketChannel])
       .childHandler(new PipelineInitializer[SocketChannel](Seq(
         inboundConnectionFilter,
-        writeErrorHandler,
         new HandshakeDecoder(peerDatabase),
         new HandshakeTimeoutHandler(settings.networkSettings.handshakeTimeout),
         serverHandshakeHandler,
         lengthFieldPrepender,
         new LengthFieldBasedFrameDecoder(100 * 1024 * 1024, 0, 4, 0, 4),
         new LegacyFrameCodec(peerDatabase),
+        trafficWatcher,
         discardingHandler,
         messageCodec,
+        trafficLogger,
+        writeErrorHandler,
         peerSynchronizer,
         historyReplier,
         microBlockSynchronizer,
-        new ExtensionSignaturesLoader(settings.synchronizationSettings.synchronizationTimeout, peerDatabase),
+        new ExtensionSignaturesLoader(settings.synchronizationSettings.synchronizationTimeout, peerDatabase, knownInvalidBlocks),
         new ExtensionBlocksLoader(settings.synchronizationSettings.synchronizationTimeout, peerDatabase, history),
         new OptimisticExtensionLoader,
         utxPoolSynchronizer,
@@ -139,19 +153,21 @@ class NetworkServer(checkpointService: CheckpointService,
     .group(workerGroup)
     .channel(classOf[NioSocketChannel])
     .handler(new PipelineInitializer[SocketChannel](Seq(
-      writeErrorHandler,
       new HandshakeDecoder(peerDatabase),
       new HandshakeTimeoutHandler(settings.networkSettings.handshakeTimeout),
       clientHandshakeHandler,
       lengthFieldPrepender,
       new LengthFieldBasedFrameDecoder(100 * 1024 * 1024, 0, 4, 0, 4),
       new LegacyFrameCodec(peerDatabase),
+      trafficWatcher,
       discardingHandler,
       messageCodec,
+      trafficLogger,
+      writeErrorHandler,
       peerSynchronizer,
       historyReplier,
       microBlockSynchronizer,
-      new ExtensionSignaturesLoader(settings.synchronizationSettings.synchronizationTimeout, peerDatabase),
+      new ExtensionSignaturesLoader(settings.synchronizationSettings.synchronizationTimeout, peerDatabase, knownInvalidBlocks),
       new ExtensionBlocksLoader(settings.synchronizationSettings.synchronizationTimeout, peerDatabase, history),
       new OptimisticExtensionLoader,
       utxPoolSynchronizer,
@@ -163,16 +179,17 @@ class NetworkServer(checkpointService: CheckpointService,
     import scala.collection.JavaConverters._
 
     val outgoing = outgoingChannels.keySet.iterator().asScala.toVector
-    val outgoingStr = outgoing.map(_.toString).sorted.mkString(", ")
+    def outgoingStr = outgoing.map(_.toString).sorted.mkString("[", ", ", "]")
 
-    val incoming = peerInfo.values().iterator().asScala.flatMap(_.declaredAddress).toVector
-    val incomingStr = incoming.map(_.toString).sorted.mkString(", ")
+    val all = peerInfo.values().iterator().asScala.flatMap(_.declaredAddress).toVector
+
+    val incoming = all.filterNot(outgoing.contains)
+    def incomingStr = incoming.map(_.toString).sorted.mkString("[", ", ", "]")
 
     log.trace(s"Outgoing: $outgoingStr ++ incoming: $incomingStr")
-    val shouldConnect = outgoingChannels.size() < settings.networkSettings.maxOutboundConnections
-    if (shouldConnect) {
+    if (outgoingChannels.size() < settings.networkSettings.maxOutboundConnections) {
       peerDatabase
-        .randomPeer(excludedAddresses ++ outgoing ++ incoming)
+        .randomPeer(excluded = excludedAddresses ++ all)
         .foreach(connect)
     }
 
@@ -181,8 +198,7 @@ class NetworkServer(checkpointService: CheckpointService,
         .measurement("connections")
         .addField("outgoing", outgoingStr)
         .addField("incoming", incomingStr)
-        .addField("n", outgoingChannels.keySet.size() + incoming.size)
-        .addField("connecting", shouldConnect)
+        .addField("n", all.size)
     )
   }
 
@@ -192,30 +208,49 @@ class NetworkServer(checkpointService: CheckpointService,
     } else PeerSynchronizer.Disabled
   }
 
+  private def handleChannelClosed(remoteAddress: InetSocketAddress)(closeFuture: ChannelFuture): Unit = {
+    outgoingChannels.remove(remoteAddress, closeFuture.channel())
+    if (!shutdownInitiated) peerDatabase.suspend(remoteAddress.getAddress)
+
+    if (closeFuture.isSuccess) {
+      log.trace(formatOutgoingChannelEvent(closeFuture.channel(), "Channel closed (expected)"))
+    } else {
+      log.debug(formatOutgoingChannelEvent(
+        closeFuture.channel(),
+        s"Channel closed: ${Option(closeFuture.cause()).map(_.getMessage).getOrElse("no message")}"
+      ))
+    }
+  }
+
+  private def formatOutgoingChannelEvent(channel: Channel, event: String) =
+    s"${id(channel)} $event, outgoing channel count: ${outgoingChannels.size()}"
+
+  private def handleConnectionAttempt(remoteAddress: InetSocketAddress)(thisConnFuture: ChannelFuture): Unit = {
+    if (thisConnFuture.isSuccess) {
+      log.trace(formatOutgoingChannelEvent(thisConnFuture.channel(), "Connection established"))
+      peerDatabase.touch(remoteAddress)
+      thisConnFuture.channel().closeFuture().addListener(handleChannelClosed(remoteAddress))
+    } else if (thisConnFuture.cause() != null) {
+      peerDatabase.suspend(remoteAddress.getAddress)
+      outgoingChannels.remove(remoteAddress, thisConnFuture.channel())
+      thisConnFuture.cause() match {
+        case e: ClosedChannelException =>
+          // this can happen when the node is shut down before connection attempt succeeds
+          log.trace(formatOutgoingChannelEvent(
+            thisConnFuture.channel(),
+            s"Channel closed by connection issue: ${Option(e.getMessage).getOrElse("no message")}"
+          ))
+        case other => log.debug(formatOutgoingChannelEvent(thisConnFuture.channel(), other.getMessage))
+      }
+    }
+  }
+
   def connect(remoteAddress: InetSocketAddress): Unit =
     outgoingChannels.computeIfAbsent(remoteAddress, _ => {
-      log.debug(s"Connecting to $remoteAddress")
-      bootstrap.connect(remoteAddress)
-        .addListener { (connFuture: ChannelFuture) =>
-          if (connFuture.isDone) {
-            if (connFuture.cause() != null) {
-              val reason = s"${id(connFuture.channel())} Connection failed, suspending $remoteAddress"
-              log.debug(reason, connFuture.cause())
-              peerDatabase.suspend(remoteAddress.getAddress)
-              outgoingChannels.remove(remoteAddress, connFuture.channel())
-            } else if (connFuture.isSuccess) {
-              log.trace(s"${id(connFuture.channel())} Connection established")
-              peerDatabase.touch(remoteAddress)
-              connFuture.channel().closeFuture().addListener { (closeFuture: ChannelFuture) =>
-                val remainingCount = outgoingChannels.size()
-                val reason = s"${id(closeFuture.channel)} Connection closed, $remainingCount outgoing channel(s) remaining"
-                log.info(reason)
-                outgoingChannels.remove(remoteAddress, closeFuture.channel())
-                if (!shutdownInitiated) peerDatabase.suspend(remoteAddress.getAddress)
-              }
-            }
-          }
-        }.channel()
+      val newConnFuture = bootstrap.connect(remoteAddress)
+
+      log.trace(s"${id(newConnFuture.channel())} Connecting to $remoteAddress")
+      newConnFuture.addListener(handleConnectionAttempt(remoteAddress)).channel()
     })
 
   def shutdown(): Unit = try {
@@ -225,6 +260,7 @@ class NetworkServer(checkpointService: CheckpointService,
     log.debug("Unbound server")
     allChannels.close().await()
     log.debug("Closed all channels")
+    coordinatorHandler.shutdown()
   } finally {
     workerGroup.shutdownGracefully().await()
     bossGroup.shutdownGracefully().await()

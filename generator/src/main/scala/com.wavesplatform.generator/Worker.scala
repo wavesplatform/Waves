@@ -55,7 +55,7 @@ class Worker(settings: Settings,
   private def sendTransactions(startStep: Int, channel: Channel): Result[Unit] = {
     def loop(step: Int): Result[Unit] = {
       log.info(s"[$node] Iteration $step")
-      val messages: Seq[RawBytes] = generator.next.map(tx => RawBytes(25.toByte, tx.bytes)).toSeq
+      val messages: Seq[RawBytes] = generator.next.map(tx => RawBytes(25.toByte, tx.bytes())).toSeq
 
       def trySend: Result[Unit] = EitherT {
         sender

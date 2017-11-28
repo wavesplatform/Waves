@@ -51,15 +51,15 @@ object ExchangeTransactionDiff {
     val portfolios = Monoid.combineAll(Seq(feeDiff, priceDiff, amountDiff))
 
     Diff(height, tx, portfolios = portfolios, orderFills = Map(
-      ByteStr(tx.buyOrder.id) -> OrderFillInfo(tx.amount, tx.buyMatcherFee),
-      ByteStr(tx.sellOrder.id) -> OrderFillInfo(tx.amount, tx.sellMatcherFee)
+      ByteStr(tx.buyOrder.id()) -> OrderFillInfo(tx.amount, tx.buyMatcherFee),
+      ByteStr(tx.sellOrder.id()) -> OrderFillInfo(tx.amount, tx.sellMatcherFee)
     ))
   }
 
 
   private def enoughVolume(exTrans: ExchangeTransaction, s: SnapshotStateReader): Either[ValidationError, ExchangeTransaction] = {
-    val filledBuy = s.filledVolumeAndFee(ByteStr(exTrans.buyOrder.id))
-    val filledSell = s.filledVolumeAndFee(ByteStr(exTrans.sellOrder.id))
+    val filledBuy = s.filledVolumeAndFee(ByteStr(exTrans.buyOrder.id()))
+    val filledSell = s.filledVolumeAndFee(ByteStr(exTrans.sellOrder.id()))
 
     val buyTotal = filledBuy.volume + exTrans.amount
     val sellTotal = filledSell.volume + exTrans.amount

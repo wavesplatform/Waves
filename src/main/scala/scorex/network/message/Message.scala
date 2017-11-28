@@ -1,6 +1,7 @@
 package scorex.network.message
 
 import com.google.common.primitives.{Bytes, Ints}
+import monix.eval.Coeval
 import scorex.crypto.hash.FastCryptographicHash._
 import scorex.serialization.BytesSerializable
 
@@ -23,7 +24,7 @@ case class Message[Content <: AnyRef](spec: MessageSpec[Content],
 
   lazy val dataLength: Int = dataBytes.length
 
-  lazy val bytes: Array[Byte] = {
+  val bytes =Coeval.evalOnce {
     val dataWithChecksum = if (dataLength > 0) {
       val checksum = hash(dataBytes).take(ChecksumLength)
       Bytes.concat(checksum, dataBytes)

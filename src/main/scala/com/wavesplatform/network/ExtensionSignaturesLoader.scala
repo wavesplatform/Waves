@@ -8,7 +8,9 @@ import scorex.utils.ScorexLogging
 
 import scala.concurrent.duration.FiniteDuration
 
-class ExtensionSignaturesLoader(syncTimeout: FiniteDuration, peerDatabase: PeerDatabase)
+class ExtensionSignaturesLoader(syncTimeout: FiniteDuration,
+                                peerDatabase: PeerDatabase,
+                                knownInvalidBlocks: InvalidBlockStorage)
   extends ChannelDuplexHandler with ScorexLogging {
 
   private var currentTimeout = Option.empty[ScheduledFuture[Unit]]
@@ -16,13 +18,17 @@ class ExtensionSignaturesLoader(syncTimeout: FiniteDuration, peerDatabase: PeerD
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
     case s: Signatures =>
+      s.signatures.find(knownInvalidBlocks.contains).foreach { invalidBlockId =>
+        peerDatabase.blacklistAndClose(ctx.channel(), s"Has known invalid block: $invalidBlockId")
+      }
+
       val (known, unknown) = s.signatures.span(id => lastKnownSignatures.contains(id))
       currentTimeout.foreach(_.cancel(true))
       currentTimeout = None
       known.lastOption match {
         case None => log.warn(s"Got unknown extensions from ${id(ctx)}: ${s.signatures.map(_.trim).mkString(",")}")
         case Some(lastKnown) =>
-          log.debug(s"${id(ctx)} Got extension with ${known.length}/${s.signatures.length} known signatures")
+          log.debug(s"${id(ctx)} Got extension with ${known.length}/${s.signatures.length} known signatures, unknown: ${formatSignatures(unknown)}")
           ctx.fireChannelRead(ExtensionIds(lastKnown, unknown))
       }
     case _ => super.channelRead(ctx, msg)
@@ -34,6 +40,11 @@ class ExtensionSignaturesLoader(syncTimeout: FiniteDuration, peerDatabase: PeerD
   }
 
   override def write(ctx: ChannelHandlerContext, msg: AnyRef, promise: ChannelPromise): Unit = msg match {
+    case LoadBlockchainExtension(Seq()) =>
+      currentTimeout.foreach(_.cancel(false))
+      currentTimeout = None
+      lastKnownSignatures = Seq.empty
+
     case LoadBlockchainExtension(sigs) if currentTimeout.isEmpty =>
       lastKnownSignatures = sigs
 

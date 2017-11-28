@@ -35,7 +35,7 @@ package object diffs {
     assertion(totalDiff1)
 
     val preconditionDiff = BlockDiffer.unsafeDiffMany(fs, fp, newState(), None, 6)(preconditions)
-    val compositeState = composite(newState(), preconditionDiff)
+    val compositeState = composite(preconditionDiff,newState())
     val totalDiff2 = differ(compositeState, block)
     assertion(totalDiff2)
   }
@@ -55,9 +55,9 @@ package object diffs {
     assertion(totalDiff1, state)
 
     val preconditionDiff = BlockDiffer.unsafeDiffMany(fs, fp, newState(), None, 7)(preconditions)
-    val compositeState = composite(newState(), preconditionDiff)
+    val compositeState = composite(preconditionDiff, newState())
     val totalDiff2 = differ(compositeState, block).explicitGet()
-    assertion(totalDiff2, composite(compositeState, totalDiff2))
+    assertion(totalDiff2, composite(totalDiff2, compositeState))
   }
 
   def produce(errorMessage: String): ProduceError = new ProduceError(errorMessage)
