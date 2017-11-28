@@ -1,49 +1,41 @@
 package com.wavesplatform.it.matcher
 
-import com.typesafe.config.{Config, ConfigFactory, ConfigRenderOptions}
+import com.google.common.primitives.Longs
+import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.api.NodeApi.{AssetBalance, MatcherStatusResponse, OrderBookResponse, Transaction}
-import com.wavesplatform.it.{Docker, Node, ReportingTestName}
-import com.wavesplatform.matcher.api.CancelOrderRequest
+import com.wavesplatform.it.{Docker, Node, NodeConfigs, ReportingTestName}
 import com.wavesplatform.state2.ByteStr
-import org.scalatest.{BeforeAndAfterAll, FreeSpec, Matchers}
-import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
+import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
+import scorex.account.PrivateKeyAccount
+import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
 
-import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.util.Random
 
-class OrderExclusionTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with ReportingTestName with OrderGenerator {
+class OrderExclusionTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with CancelAfterFailure
+  with ReportingTestName with OrderGenerator {
 
   import OrderExclusionTestSuite._
 
-  private val docker = Docker(getClass)
+  private lazy val docker = Docker(getClass)
+  override lazy val nodes: Seq[Node] = docker.startNodes(Configs)
 
-  override val nodes = Configs.map(docker.startNode)
+  private def matcherNode = nodes.head
 
-  private val matcherNode = nodes.head
-  private val aliceNode = nodes(1)
-  private val bobNode = nodes(2)
-
-  private var matcherBalance = (0L, 0L)
-  private var aliceBalance = (0L, 0L)
-  private var bobBalance = (0L, 0L)
+  private def aliceNode = nodes(1)
 
   private var aliceSell1 = ""
-  private var bobBuy1 = ""
+
 
   private var aliceAsset: String = ""
   private var aliceWavesPair: AssetPair = AssetPair(None, None)
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-
-    // Store initial balances of participants
-    matcherBalance = getBalance(matcherNode)
-    bobBalance = getBalance(bobNode)
 
     // Alice issues new asset
     aliceAsset = issueAsset(aliceNode, "AliceCoin", AssetQuantity)
@@ -52,10 +44,6 @@ class OrderExclusionTestSuite extends FreeSpec with Matchers with BeforeAndAfter
     // Wait for balance on Alice's account
     waitForAssetBalance(aliceNode, aliceAsset, AssetQuantity)
     waitForAssetBalance(matcherNode, aliceAsset, 0)
-    waitForAssetBalance(bobNode, aliceAsset, 0)
-
-    // Alice spent 1 Wave to issue the asset
-    aliceBalance = getBalance(aliceNode)
   }
 
   override protected def afterAll(): Unit = {
@@ -69,11 +57,6 @@ class OrderExclusionTestSuite extends FreeSpec with Matchers with BeforeAndAfter
   }
 
   "sell order could be placed" in {
-
-    println(Configs.head.resolve().root().render(ConfigRenderOptions.defaults().setComments(false).setOriginComments(false)))
-    println(Configs(1).resolve().root().render(ConfigRenderOptions.defaults().setComments(false).setOriginComments(false)))
-    println(Configs(2).resolve().root().render(ConfigRenderOptions.defaults().setComments(false).setOriginComments(false)))
-    println(Configs.last.resolve().root().render(ConfigRenderOptions.defaults().setComments(false).setOriginComments(false)))
     // Alice places sell order
     val (id, status) = matcherPlaceOrder(
       prepareOrder(aliceNode, matcherNode, aliceWavesPair, OrderType.SELL, 2 * Waves * Order.PriceConstant, 500, 70.seconds))
@@ -86,22 +69,36 @@ class OrderExclusionTestSuite extends FreeSpec with Matchers with BeforeAndAfter
     val orders = matcherGetOrderBook()
     orders.asks.head.amount shouldBe 500
     orders.asks.head.price shouldBe 2 * Waves * Order.PriceConstant
+  }
 
-    val aliceOrders = matcherNode.matcherOrdersByAddress(aliceNode.address)
+  "sell order should be in the aliceNode orderbook" in {
+    orderStatus(aliceNode) shouldBe "Accepted"
   }
 
   "wait for expiration" in {
-
-    waitForOrderStatus(aliceAsset, aliceSell1, "Canceled", 3.minutes)
-
+    waitForOrderStatus(aliceAsset, aliceSell1, "Cancelled", 3.minutes)
+    orderStatus(aliceNode) shouldBe "Cancelled"
   }
 
+  private def orderStatus(node: Node) = {
+    val ts = System.currentTimeMillis()
+    val privateKey = PrivateKeyAccount(Base58.decode(aliceNode.accountSeed).get)
+
+    val pk = Base58.decode(node.publicKey).get
+    val signature = ByteStr(EllipticCurveImpl.sign(privateKey, pk ++ Longs.toByteArray(ts)))
+
+    val orderhistory = Await.result(matcherNode.getOrderbookByPublicKey(node.publicKey, ts, signature), 1.minute)
+    orderhistory.seq(0).status
+  }
 
   private def waitForAssetBalance(node: Node, asset: String, expectedBalance: Long): Unit =
     Await.result(
-      node.waitFor[AssetBalance](_.assetBalance(node.address, asset), _.balance >= expectedBalance, 5.seconds),
+      node.waitFor[AssetBalance](s"asset($asset) balance of ${node.address} >= $expectedBalance")
+        (_.assetBalance(node.address, asset),
+          _.balance >= expectedBalance, 5.seconds),
       3.minute
     )
+
 
   private def getBalance(node: Node): (Long, Long) = {
     val initialHeight = Await.result(node.height, 1.minute)
@@ -134,12 +131,6 @@ class OrderExclusionTestSuite extends FreeSpec with Matchers with BeforeAndAfter
     issueTransaction.id
   }
 
-  private def matcherExpectOrderPlacementRejected(order: Order, expectedStatusCode: Int, expectedStatus: String): Boolean = {
-    val futureResult = matcherNode.expectIncorrectOrderPlacement(order, expectedStatusCode, expectedStatus)
-
-    Await.result(futureResult, 1.minute)
-  }
-
   def matcherCheckOrderStatus(id: String): String = {
     val futureResult = matcherNode.getOrderStatus(aliceAsset, id)
 
@@ -149,7 +140,9 @@ class OrderExclusionTestSuite extends FreeSpec with Matchers with BeforeAndAfter
   }
 
   def waitForOrderStatus(asset: String, orderId: String, expectedStatus: String, timeout: Duration): Unit = Await.result(
-    matcherNode.waitFor[MatcherStatusResponse](_.getOrderStatus(asset, orderId), _.status == expectedStatus, 10.seconds),
+    matcherNode.waitFor[MatcherStatusResponse](s"order(asset=$asset, orderId=$orderId) status == $expectedStatus")
+      (_.getOrderStatus(asset, orderId),
+        _.status == expectedStatus, 5.seconds),
     timeout
   )
 
@@ -161,24 +154,12 @@ class OrderExclusionTestSuite extends FreeSpec with Matchers with BeforeAndAfter
     result
   }
 
-  private def matcherCancelOrder(node: Node, pair: AssetPair, orderId: String): String = {
-    val privateKey = PrivateKeyAccount(Base58.decode(node.accountSeed).get)
-    val publicKey = PublicKeyAccount(Base58.decode(node.publicKey).get)
-    val request = CancelOrderRequest(publicKey, Base58.decode(orderId).get, Array.emptyByteArray)
-    val signedRequest = CancelOrderRequest.sign(request, privateKey)
-    val futureResult = matcherNode.cancelOrder(pair.amountAssetStr, pair.priceAssetStr, signedRequest)
-
-    val result = Await.result(futureResult, 1.minute)
-
-    result.status
-  }
-
 }
 
 object OrderExclusionTestSuite {
   val ForbiddenAssetId = "FdbnAsset"
 
-  private val dockerConfigs = Docker.NodeConfigs.getConfigList("nodes").asScala
+  import NodeConfigs.Default
 
   private val matcherConfig = ConfigFactory.parseString(
     s"""
@@ -189,6 +170,10 @@ object OrderExclusionTestSuite {
        |  order-match-tx-fee = 300000
        |  blacklisted-assets = [$ForbiddenAssetId]
        |  order-cleanup-interval = 20s
+       |}
+       |waves.rest-api {
+       |    enable = yes
+       |    api-key-hash = 7L6GpLHhA5KyJTAVc8WFHwEcyTY8fC8rRbyMCiFnM4i
        |}
        |waves.miner.enable=no
       """.stripMargin)
@@ -209,9 +194,9 @@ object OrderExclusionTestSuite {
 
   val Waves: Long = 100000000L
 
-  val Configs: Seq[Config] = Seq(matcherConfig.withFallback(dockerConfigs.head)) ++
-    Random.shuffle(dockerConfigs.tail.init).take(2).map(nonGeneratingPeersConfig.withFallback(_)) ++
-    Seq(dockerConfigs.last)
+  val Configs: Seq[Config] = Seq(matcherConfig.withFallback(Default.head)) ++
+    Random.shuffle(Default.tail.init).take(2).map(nonGeneratingPeersConfig.withFallback(_)) ++
+    Seq(Default.last)
 
 
 }

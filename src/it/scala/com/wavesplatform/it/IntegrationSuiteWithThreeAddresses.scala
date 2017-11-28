@@ -22,6 +22,7 @@ trait IntegrationSuiteWithThreeAddresses extends BeforeAndAfterAll with Matchers
   def notMiner: Node
 
   protected def sender: Node = notMiner
+
   private def richAddress = sender.address
 
   protected val defaultBalance: Long = 100.waves

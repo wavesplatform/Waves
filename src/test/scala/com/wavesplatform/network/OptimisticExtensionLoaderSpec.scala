@@ -16,6 +16,7 @@ class OptimisticExtensionLoaderSpec extends FreeSpec with Matchers with BlockGen
   } yield signatures
 
   val emptyBlockGen = accountGen.flatMap(signer => versionedBlockGen(Seq.empty, signer, 2))
+
   def blockWithRefGen(reference: ByteStr) = accountGen.flatMap(signer => versionedBlockGen(reference, Seq.empty, signer, 2))
 
   val randomExtensionBlocksGen = for {

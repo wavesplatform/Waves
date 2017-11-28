@@ -44,12 +44,12 @@ class ExtensionBlocksLoader(
     case xid@ExtensionIds(_, newIds) if pendingSignatures.isEmpty =>
       val requestingIds = newIds.filterNot(history.contains)
       if (requestingIds.nonEmpty) {
-          targetExtensionIds = Some(xid)
-          pendingSignatures = newIds.zipWithIndex.toMap
-          blacklistAfterTimeout(ctx)
-          extensionsFetchingTimeStats.start()
-          newIds.foreach(s => ctx.write(GetBlock(s)))
-          ctx.flush()
+        targetExtensionIds = Some(xid)
+        pendingSignatures = newIds.zipWithIndex.toMap
+        blacklistAfterTimeout(ctx)
+        extensionsFetchingTimeStats.start()
+        newIds.foreach(s => ctx.write(GetBlock(s)))
+        ctx.flush()
       } else {
         log.debug(s"${id(ctx)} No new blocks to load")
         ctx.fireChannelRead(ExtensionBlocks(Seq.empty))

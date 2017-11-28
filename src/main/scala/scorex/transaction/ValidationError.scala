@@ -10,6 +10,7 @@ trait ValidationError
 object ValidationError {
 
   case class InvalidAddress(reason: String) extends ValidationError
+
   case class NegativeAmount(amount: Long, of: String) extends ValidationError
   case object InsufficientFee extends ValidationError
   case object TooBigArray extends ValidationError

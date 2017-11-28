@@ -92,6 +92,7 @@ class RollbackSpecSuite extends FreeSpec with ScalaFutures with IntegrationPatie
 }
 
 object RollbackSpecSuite {
+
   import NodeConfigs.Default
 
   private val nonGeneratingNodesConfig = ConfigFactory.parseString("waves.miner.enable = no")

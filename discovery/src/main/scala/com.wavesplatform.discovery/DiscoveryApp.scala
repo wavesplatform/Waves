@@ -21,9 +21,10 @@ object DiscoveryApp extends App with ScorexLogging {
   implicit val ec: ExecutionContext = ExecutionContext.global
   implicit val system: ActorSystem = ActorSystem("Default")
   implicit val flowMaterializer: ActorMaterializer = ActorMaterializer()
+
   import akka.http.scaladsl.server.Directives._
 
-  val (route, timer) = Settings.default.chains.map {cs =>
+  val (route, timer) = Settings.default.chains.map { cs =>
     val mainActor = MainActor(cs.chainId, Settings.default.workersCount)
     mainActor ! MainActor.Peers(cs.initialPeers.toSet)
 
@@ -44,7 +45,7 @@ object DiscoveryApp extends App with ScorexLogging {
     }
 
     (route, system.scheduler.schedule(FiniteDuration(0, TimeUnit.SECONDS), Settings.default.discoveryInterval, mainActor, MainActor.Discover))
-  }.reduce((a,b) => (a._1 ~ b._1, a._2.combine(b._2)))
+  }.reduce((a, b) => (a._1 ~ b._1, a._2.combine(b._2)))
 
   val binding = Http().bindAndHandle(route, Settings.default.webSocketHost, Settings.default.webSocketPort)
 

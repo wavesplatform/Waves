@@ -13,6 +13,7 @@ import scorex.utils.ScorexLogging
 import scala.util.control.NonFatal
 
 class LegacyFrameCodec(peerDatabase: PeerDatabase) extends ByteToMessageCodec[RawBytes] with ScorexLogging {
+
   import BasicMessagesRepo.specsByCodes
   import LegacyFrameCodec._
 
