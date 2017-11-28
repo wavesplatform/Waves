@@ -85,15 +85,11 @@ object CheckpointCodec extends Codec[Checkpoint] {
 
 case class SeqCodec[A](valueCodec: Codec[A]) extends Codec[Seq[A]] {
   override def encode(value: Seq[A]): Array[Byte] = {
-    val bytes = value.foldLeft(Array.emptyByteArray) { (a, i) =>
-      val len1 = a.length
-      val r = valueCodec.encode(i)
-      val len2 = r.length
-      val result = new Array[Byte](len1 + len2)
-      System.arraycopy(a, 0, result, 0, len1)
-      System.arraycopy(r, 0, result, len1, len2)
-      result
+    val builder = Array.newBuilder[Byte]
+    value.foreach { item =>
+      builder.++=(valueCodec.encode(item))
     }
+    val bytes = builder.result()
     val len = bytes.length
     val result = new Array[Byte](Ints.BYTES + len)
     System.arraycopy(Ints.toByteArray(value.length), 0, result, 0, Ints.BYTES)
