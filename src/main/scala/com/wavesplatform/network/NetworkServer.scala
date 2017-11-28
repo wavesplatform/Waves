@@ -52,7 +52,7 @@ class NetworkServer(checkpointService: CheckpointService,
 
   private val scoreObserver = new RemoteScoreObserver(
     settings.synchronizationSettings.scoreTTL,
-    history.lastBlockIds(settings.synchronizationSettings.maxRollback), history.score())
+    history.lastBlockIds(settings.synchronizationSettings.maxRollback), history.score(), allChannels)
 
   private val trafficWatcher = if (settings.metrics.enable) {
     log.debug("Watching and reporting of traffic is enabled")

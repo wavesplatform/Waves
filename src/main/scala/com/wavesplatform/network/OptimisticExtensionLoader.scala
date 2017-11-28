@@ -51,6 +51,7 @@ class OptimisticExtensionLoader extends ChannelDuplexHandler with ScorexLogging 
 
   override def write(ctx: ChannelHandlerContext, msg: AnyRef, promise: ChannelPromise): Unit = msg match {
     case LoadBlockchainExtension(Seq()) =>
+      log.debug(s"${id(ctx)} Stopping an optimistically loading of extension")
       stop()
       super.write(ctx, msg, promise)
 

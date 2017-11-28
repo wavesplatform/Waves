@@ -3,7 +3,9 @@ package com.wavesplatform.network
 import com.wavesplatform.TransactionGen
 import com.wavesplatform.state2.ByteStr
 import io.netty.channel.embedded.EmbeddedChannel
+import io.netty.channel.group.DefaultChannelGroup
 import io.netty.channel.{ChannelHandlerContext, ChannelInboundHandlerAdapter}
+import io.netty.util.concurrent.GlobalEventExecutor
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.Eventually
 import org.scalatest.exceptions.TestFailedDueToTimeoutException
@@ -22,7 +24,7 @@ class RemoteScoreObserverSpec extends FreeSpec
 
   "should request an extension" - {
     "when a new channel has the better score than the local one" in {
-      val channel = new EmbeddedChannel(new RemoteScoreObserver(1.minute, lastSignatures, 1))
+      val channel = new EmbeddedChannel(new RemoteScoreObserver(1.minute, lastSignatures, 1, new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)))
       channel.writeInbound(BigInt(2))
       channel.flushInbound()
 
@@ -35,7 +37,7 @@ class RemoteScoreObserverSpec extends FreeSpec
 
     "when the previous extension was downloaded and there is a channel with the better score" in {
       var currentLastSignatures = lastSignatures
-      val scoreObserver = new RemoteScoreObserver(1.minute, currentLastSignatures, 1)
+      val scoreObserver = new RemoteScoreObserver(1.minute, currentLastSignatures, 1, new DefaultChannelGroup(GlobalEventExecutor.INSTANCE))
 
       val channel1 = new EmbeddedChannel(scoreObserver)
       val channel1Score = BigInt(2)
@@ -62,7 +64,7 @@ class RemoteScoreObserverSpec extends FreeSpec
     "from the second best channel" - {
       "when the connection with best one is dropped" - {
         def test(bestScore: BigInt, secondBestScore: BigInt): Unit = {
-          val scoreObserver = new RemoteScoreObserver(1.minute, lastSignatures, 1)
+          val scoreObserver = new RemoteScoreObserver(1.minute, lastSignatures, 1, new DefaultChannelGroup(GlobalEventExecutor.INSTANCE))
 
           val channel1 = new EmbeddedChannel(scoreObserver)
           channel1.writeInbound(BigInt(3))
@@ -93,7 +95,7 @@ class RemoteScoreObserverSpec extends FreeSpec
 
   "should not request a new extension if a previous one is not downloaded yet" - {
     "when the score of the best channel was changed" in {
-      val channel = new EmbeddedChannel(new RemoteScoreObserver(1.minute, lastSignatures, 1))
+      val channel = new EmbeddedChannel(new RemoteScoreObserver(1.minute, lastSignatures, 1, new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)))
       channel.writeInbound(BigInt(2))
       channel.flushInbound()
 
@@ -114,7 +116,7 @@ class RemoteScoreObserverSpec extends FreeSpec
     }
 
     "when new connection" in {
-      val scoreObserver = new RemoteScoreObserver(1.minute, lastSignatures, 1)
+      val scoreObserver = new RemoteScoreObserver(1.minute, lastSignatures, 1, new DefaultChannelGroup(GlobalEventExecutor.INSTANCE))
       val channel1 = new EmbeddedChannel(scoreObserver)
       channel1.writeInbound(BigInt(2))
       channel1.flushInbound()
@@ -143,7 +145,7 @@ class RemoteScoreObserverSpec extends FreeSpec
       def test(remoteScore: BigInt, newLocalScore: BigInt): Unit = {
         var currentLastSignatures = lastSignatures
 
-        val channel = new EmbeddedChannel(new RemoteScoreObserver(1.minute, currentLastSignatures, 1))
+        val channel = new EmbeddedChannel(new RemoteScoreObserver(1.minute, currentLastSignatures, 1, new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)))
         channel.writeInbound(remoteScore)
         channel.flushInbound()
 
@@ -169,7 +171,7 @@ class RemoteScoreObserverSpec extends FreeSpec
     var wasExtensionPropagated = false
 
     val channel = new EmbeddedChannel(
-      new RemoteScoreObserver(1.minute, lastSignatures, 1),
+      new RemoteScoreObserver(1.minute, lastSignatures, 1, new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)),
       new ChannelInboundHandlerAdapter {
         override def channelRead(ctx: ChannelHandlerContext, msg: Any): Unit = {
           wasExtensionPropagated = msg.isInstanceOf[ExtensionBlocks]
@@ -197,7 +199,7 @@ class RemoteScoreObserverSpec extends FreeSpec
     var wasExtensionPropagated = false
 
     val channel = new EmbeddedChannel(
-      new RemoteScoreObserver(1.minute, lastSignatures, 1),
+      new RemoteScoreObserver(1.minute, lastSignatures, 1, new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)),
       new ChannelInboundHandlerAdapter {
         override def channelRead(ctx: ChannelHandlerContext, msg: Any): Unit = {
           wasExtensionPropagated = msg.isInstanceOf[ExtensionBlocks]
@@ -215,7 +217,7 @@ class RemoteScoreObserverSpec extends FreeSpec
   }
 
   "should not break downloading an extension, if another channel was closed" in {
-    val scoreObserver = new RemoteScoreObserver(1.minute, lastSignatures, 1)
+    val scoreObserver = new RemoteScoreObserver(1.minute, lastSignatures, 1, new DefaultChannelGroup(GlobalEventExecutor.INSTANCE))
     val channel1 = new EmbeddedChannel(scoreObserver)
     channel1.writeInbound(BigInt(2))
     channel1.flushInbound()
