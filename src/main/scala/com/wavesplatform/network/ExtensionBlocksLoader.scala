@@ -14,9 +14,10 @@ import scala.collection.mutable
 import scala.collection.parallel.ForkJoinTaskSupport
 import scala.concurrent.duration.FiniteDuration
 
-class ExtensionBlocksLoader(
-    blockSyncTimeout: FiniteDuration,
-    peerDatabase: PeerDatabase, history: NgHistory) extends ChannelInboundHandlerAdapter with ScorexLogging {
+class ExtensionBlocksLoader(blockSyncTimeout: FiniteDuration,
+                            peerDatabase: PeerDatabase,
+                            history: NgHistory,
+                            invalidBlocks: InvalidBlockStorage) extends ChannelInboundHandlerAdapter with ScorexLogging {
   private var pendingSignatures = Map.empty[ByteStr, Int]
   private var targetExtensionIds = Option.empty[ExtensionIds]
   private val blockBuffer = mutable.TreeMap.empty[Int, Block]
@@ -78,6 +79,7 @@ class ExtensionBlocksLoader(
             pnewBlocks.tasksupport = new ForkJoinTaskSupport()
             pnewBlocks.find(_.signaturesValid().isLeft) match {
               case Some(invalidBlock) =>
+                invalidBlocks.add(invalidBlock.uniqueId)
                 peerDatabase.blacklistAndClose(ctx.channel(),s"Got block $invalidBlock with invalid signature")
               case None =>
                 log.trace(s"${id(ctx)} Chain is valid, pre-check passed")
