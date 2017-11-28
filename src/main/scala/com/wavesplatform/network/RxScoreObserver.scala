@@ -25,9 +25,10 @@ object RxScoreObserver extends ScorexLogging {
 
   type SyncWith = Option[BestChannel]
 
-  def apply(scoreTtl: FiniteDuration, initalLocalScore: BigInt,
+  def apply(scoreTtl: FiniteDuration,
+            initalLocalScore: BigInt,
             localScores: Observable[BlockchainScore],
-            remoteScores: Observable[(Channel, BlockchainScore)],
+            remoteScores: ChannelObservable[BlockchainScore],
             channelClosed: Observable[Channel]): Observable[SyncWith] = {
 
     val scheduler: SchedulerService = Scheduler.singleThread("rx-score-observer")

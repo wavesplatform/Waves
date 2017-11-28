@@ -1,20 +1,16 @@
 package com.wavesplatform.network
 
-import com.wavesplatform.TransactionGen
 import com.wavesplatform.network.RxScoreObserver.BestChannel
+import com.wavesplatform.{RxScheduler, TransactionGen}
 import io.netty.channel.Channel
 import io.netty.channel.local.LocalChannel
-import monix.execution.Ack
 import monix.reactive.subjects.PublishSubject
 import org.scalatest.{FreeSpec, Matchers}
 import scorex.transaction.History.BlockchainScore
 
 import scala.concurrent.duration._
-import scala.concurrent.{Await, Future}
 
-class RxScoreObserverSpec extends FreeSpec with Matchers with TransactionGen {
-
-  implicit val scheduler = monix.execution.Scheduler.singleThread("cf")
+class RxScoreObserverSpec extends FreeSpec with Matchers with TransactionGen with RxScheduler{
 
   def buildObserver() = {
     val localScores = PublishSubject[BlockchainScore]
@@ -24,14 +20,6 @@ class RxScoreObserverSpec extends FreeSpec with Matchers with TransactionGen {
 
     (syncWith, localScores, remoteScores, channelClosed)
   }
-
-  def test[A](f: => Future[A]): A = Await.result(f, 10.seconds)
-
-  def send[A](p: PublishSubject[A])(a: A): Future[Ack] = p.onNext(a).map(ack => {
-    Thread.sleep(500)
-    ack
-  })
-
 
   "should emit better channel" - {
     "when a new channel has the better score than the local one" in {

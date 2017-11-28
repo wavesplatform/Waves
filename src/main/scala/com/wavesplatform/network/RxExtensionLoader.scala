@@ -2,7 +2,6 @@ package com.wavesplatform.network
 
 import com.wavesplatform.network.RxExtensionLoader.ApplierState.{Applying, ApplyingAndNext, Idle}
 import com.wavesplatform.network.RxScoreObserver.{BestChannel, SyncWith}
-import com.wavesplatform.settings.SynchronizationSettings
 import io.netty.channel._
 import monix.eval.{Coeval, Task}
 import monix.execution.{CancelableFuture, Scheduler}
@@ -15,9 +14,11 @@ import scorex.transaction.History.BlockchainScore
 import scorex.transaction.{NgHistory, ValidationError}
 import scorex.utils.ScorexLogging
 
+import scala.concurrent.duration.FiniteDuration
+
 object RxExtensionLoader extends ScorexLogging {
 
-  def apply(ss: SynchronizationSettings,
+  def apply(maxRollback: Int, syncTimeOut: FiniteDuration,
             history: NgHistory,
             peerDatabase: PeerDatabase,
             invalidBlocks: InvalidBlockStorage,
@@ -45,7 +46,7 @@ object RxExtensionLoader extends ScorexLogging {
 
     def blacklistOnTimeout(ch: Channel, reason: String): CancelableFuture[Unit] = Task {
       peerDatabase.blacklistAndClose(ch, reason)
-    }.delayExecution(ss.synchronizationTimeout).runAsync(scheduler)
+    }.delayExecution(syncTimeOut).runAsync(scheduler)
 
     def tryRequestNextExt(): Unit = {
       lastBestChannel().get match {
@@ -54,8 +55,8 @@ object RxExtensionLoader extends ScorexLogging {
           loaderBecome(LoaderState.Idle)
         case Some(best) =>
           val lastBlockIds = state.extensionApplierState match {
-            case Idle => Some(history.lastBlockIds(ss.maxRollback))
-            case Applying(ext) => Some(history.lastBlockIds(ss.maxRollback - ext.blocks.size) ++ ext.blocks.map(_.uniqueId))
+            case Idle => Some(history.lastBlockIds(maxRollback))
+            case Applying(ext) => Some(history.lastBlockIds(maxRollback - ext.blocks.size) ++ ext.blocks.map(_.uniqueId))
             case ApplyingAndNext(_, _, _) => None
           }
           lastBlockIds match {
@@ -64,7 +65,6 @@ object RxExtensionLoader extends ScorexLogging {
               ch.writeAndFlush(GetSignatures(knownSigs))
               log.debug(s"${id(ch)} Requesting extension sigs, last ${knownSigs.length} are ${formatSignatures(knownSigs)}")
               loaderBecome(LoaderState.ExpectingSignatures(ch, knownSigs, blacklistOnTimeout(ch, s"Timeout loading extension")))
-
             case None =>
               loaderBecome(LoaderState.Idle)
           }
@@ -147,6 +147,7 @@ object RxExtensionLoader extends ScorexLogging {
             log.debug(s"${id(ch)} Extension(blocks=${expected.size}) successfully received")
             val blockById = (recieved + block).map(b => b.uniqueId -> b).toMap
             val ext = requested.map(blockById)
+            loaderBecome(LoaderState.Idle)
             tryRequestNextExt()
             processExtensionRecieved(ch, ExtensionBlocks(ext)).runAsync(scheduler)
 
