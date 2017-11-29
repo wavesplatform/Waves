@@ -16,9 +16,7 @@ import io.netty.channel.socket.SocketChannel
 import io.netty.channel.socket.nio.{NioServerSocketChannel, NioSocketChannel}
 import io.netty.handler.codec.{LengthFieldBasedFrameDecoder, LengthFieldPrepender}
 import io.netty.util.concurrent.DefaultThreadFactory
-import monix.execution.Scheduler
 import monix.reactive.Observable
-import monix.reactive.subjects.ConcurrentSubject
 import org.asynchttpclient.netty.channel.NoopHandler
 import org.influxdb.dto.Point
 import scorex.transaction._
@@ -33,6 +31,7 @@ trait NS {
   def shutdown(): Unit
 
   val messages: Messages
+
   val closedChannels: Observable[Channel]
 }
 
@@ -91,8 +90,9 @@ object NetworkServer extends ScorexLogging {
       settings.networkSettings.maxInboundConnections,
       settings.networkSettings.maxConnectionsPerHost)
 
-    val closedChannelsSubject = ConcurrentSubject.publish[Channel](Scheduler.singleThread("closed-channels"))
+
     val (mesageObserver, newtworkMessages) = MessageObserver()
+    val (channelClosedHandler, closedChannelsSubject) = ChannelClosedHandler()
     val discardingHandler = new DiscardingHandler(lastBlockInfos.map(_.ready))
     val peerConnections = new ConcurrentHashMap[PeerKey, Channel](10, 0.9f, 10)
     val serverHandshakeHandler = new HandshakeHandler.Server(handshake, peerInfo, peerConnections, peerDatabase, allChannels)
@@ -116,6 +116,7 @@ object NetworkServer extends ScorexLogging {
           lengthFieldPrepender,
           new LengthFieldBasedFrameDecoder(100 * 1024 * 1024, 0, 4, 0, 4),
           new LegacyFrameCodec(peerDatabase),
+          channelClosedHandler,
           trafficWatcher,
           discardingHandler,
           messageCodec,
@@ -145,6 +146,7 @@ object NetworkServer extends ScorexLogging {
         lengthFieldPrepender,
         new LengthFieldBasedFrameDecoder(100 * 1024 * 1024, 0, 4, 0, 4),
         new LegacyFrameCodec(peerDatabase),
+        channelClosedHandler,
         trafficWatcher,
         discardingHandler,
         messageCodec,
@@ -158,8 +160,7 @@ object NetworkServer extends ScorexLogging {
 
     def formatOutgoingChannelEvent(channel: Channel, event: String) = s"${id(channel)} $event, outgoing channel count: ${outgoingChannels.size()}"
 
-    def handleChannelClosed(remoteAddress: InetSocketAddress)(closeFuture: ChannelFuture): Unit = {
-      closedChannelsSubject.onNext(closeFuture.channel())
+    def handleOutgoingChannelClosed(remoteAddress: InetSocketAddress)(closeFuture: ChannelFuture): Unit = {
       outgoingChannels.remove(remoteAddress, closeFuture.channel())
       if (!shutdownInitiated) peerDatabase.suspend(remoteAddress.getAddress)
 
@@ -174,7 +175,7 @@ object NetworkServer extends ScorexLogging {
       if (thisConnFuture.isSuccess) {
         log.trace(formatOutgoingChannelEvent(thisConnFuture.channel(), "Connection established"))
         peerDatabase.touch(remoteAddress)
-        thisConnFuture.channel().closeFuture().addListener(handleChannelClosed(remoteAddress))
+        thisConnFuture.channel().closeFuture().addListener(handleOutgoingChannelClosed(remoteAddress))
       } else if (thisConnFuture.cause() != null) {
         peerDatabase.suspend(remoteAddress.getAddress)
         outgoingChannels.remove(remoteAddress, thisConnFuture.channel())

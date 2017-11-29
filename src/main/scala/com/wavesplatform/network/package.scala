@@ -47,9 +47,9 @@ package object network extends ScorexLogging {
 
   def formatBlocks(blocks: Seq[Block]): String = formatSignatures(blocks.view.map(_.uniqueId))
 
-  def formatSignatures(signatures: Seq[ByteStr]): String = if (signatures.isEmpty) ""
+  def formatSignatures(signatures: Seq[ByteStr]): String = if (signatures.isEmpty) "[Empty]"
   else if (signatures.size == 1) s"[${signatures.head}]"
-  else s"[${signatures.head}..${signatures.last}]"
+  else s"[${signatures.head} -- ${signatures.last}]"
 
   implicit class ChannelHandlerContextExt(val ctx: ChannelHandlerContext) extends AnyVal {
     def remoteAddress: InetSocketAddress = ctx.channel().asInstanceOf[SocketChannel].remoteAddress()

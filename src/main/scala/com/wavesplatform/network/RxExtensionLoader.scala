@@ -121,7 +121,11 @@ object RxExtensionLoader extends ScorexLogging {
             extensionLoadingFinished(state.copy(loaderState = LoaderState.Idle), ext, ch)
           } else {
             state.copy(loaderState = LoaderState.ExpectingBlocks(c, requested, expected - block.uniqueId, recieved + block,
-              blacklistOnTimeout(ch, s"Timeout loading one of requested blocks; prev state=${state.loaderState}")))
+              blacklistOnTimeout(ch, s"Timeout loading one of requested blocks, non-received: ${
+                val s = expected.size
+                if (s == 1) "one=" + requested.last.trim
+                else "total=" + s.toString
+              }")))
           }
         case _ =>
           simpleBlocks.onNext((ch, block))
@@ -207,7 +211,7 @@ object RxExtensionLoader extends ScorexLogging {
                                received: Set[Block],
                                timeout: CancelableFuture[Unit]) extends WithPeer {
       override def toString: String = s"ExpectingBlocks(channel=${id(channel)}, totalBlocks=${allBlocks.size}, " +
-        s"received=${received.size}, expected=${expected.size})"
+        s"received=${received.size}, expected=${if (expected.size == 1) expected.head.trim else expected.size})"
     }
 
   }
