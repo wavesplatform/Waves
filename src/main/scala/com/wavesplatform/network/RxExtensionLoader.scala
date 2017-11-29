@@ -36,7 +36,8 @@ object RxExtensionLoader extends ScorexLogging {
 
     def blacklistOnTimeout(ch: Channel, reason: String): CancelableFuture[Unit] = Task {
       peerDatabase.blacklistAndClose(ch, reason)
-    }.delayExecution(syncTimeOut).runAsync(scheduler)
+    }.delayExecution(syncTimeOut)
+      .runAsync(scheduler)
 
     def requestNext(state: State): State = {
       lastBestChannel().get match {
@@ -65,16 +66,19 @@ object RxExtensionLoader extends ScorexLogging {
     def onChannelClosed(state: State, ch: Channel): State = {
       state.loaderState match {
         case wp: LoaderState.WithPeer if wp.channel == ch =>
+          log.debug(s"Current channel ${id(ch)} has been closed while $state")
           wp.timeout.cancel()
           requestNext(state.copy(loaderState = LoaderState.Idle))
-        case _ => state
+        case _ =>
+          log.trace(s"Unrelated channel ${id(ch)} has been closed while $state")
+          state
       }
     }
 
     def onNewSyncWith(state: State, sw: SyncWith): State = {
       log.trace(s"New SyncWith: $sw, currentState = $state")
       sw match {
-        case Some(BestChannel(ch, _)) if state.loaderState == LoaderState.Idle =>
+        case Some(_) if state.loaderState == LoaderState.Idle =>
           requestNext(state)
         case _ => state
       }
@@ -143,9 +147,10 @@ object RxExtensionLoader extends ScorexLogging {
 
     def applyExtension(extensionBlocks: ExtensionBlocks, ch: Channel): Unit = {
       extensionApplier(ch, extensionBlocks).flatMap {
-        ar => Task {
-          s = onExetensionApplied(s, extensionBlocks, ch, ar)
-        }.executeOn(scheduler)
+        ar =>
+          Task {
+            s = onExetensionApplied(s, extensionBlocks, ch, ar)
+          }.executeOn(scheduler)
       }.runAsync(scheduler)
     }
 
