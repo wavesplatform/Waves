@@ -39,8 +39,10 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Auto
 
   settings.file.foreach(f => {
     try {
-      JsonFileStorage.load[PeersPersistenceType](f.getCanonicalPath).foreach(a => touch(a))
-      log.info(s"${f.getName} loaded, total peers: ${peersPersistence.size()}")
+      if(f.exists()) {
+        JsonFileStorage.load[PeersPersistenceType](f.getCanonicalPath).foreach(a => touch(a))
+        log.info(s"${f.getName} loaded, total peers: ${peersPersistence.size()}")
+      }
     }
     catch {
       case _: MalformedInputException | _: JsonMappingException =>
