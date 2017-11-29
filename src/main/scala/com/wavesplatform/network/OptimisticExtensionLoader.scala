@@ -13,6 +13,7 @@ class OptimisticExtensionLoader extends ChannelDuplexHandler with ScorexLogging 
 
   private def loadNextPart(ctx: ChannelHandlerContext, blocks: Seq[Block]): Unit = if (blocks.size > 1) {
     requestedLocalIds = Seq.empty
+    nextExtensionBlocks = None
     hopefullyNextIds = blocks.view.map(_.uniqueId).reverseIterator.take(100).toSeq
     log.debug(s"${id(ctx)} Loading next part, sending ${hopefullyNextIds.size} signatures: ${formatSignatures(hopefullyNextIds)}")
     ctx.writeAndFlush(LoadBlockchainExtension(hopefullyNextIds))
