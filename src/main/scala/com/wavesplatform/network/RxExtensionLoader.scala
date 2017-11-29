@@ -46,14 +46,14 @@ object RxExtensionLoader extends ScorexLogging {
           state.copy(loaderState = LoaderState.Idle)
         case Some(best) =>
           val maybeKnownSigs = state.applierState match {
-            case ApplierState.Idle => Some(history.lastBlockIds(maxRollback))
-            case ApplierState.Applying(ext) => Some(history.lastBlockIds(maxRollback - ext.blocks.size) ++ ext.blocks.map(_.uniqueId))
+            case ApplierState.Idle => Some((history.lastBlockIds(maxRollback), false))
+            case ApplierState.Applying(ext) => Some((history.lastBlockIds(maxRollback - ext.blocks.size) ++ ext.blocks.map(_.uniqueId), true))
             case _ => None
           }
           maybeKnownSigs match {
-            case Some(knownSigs) =>
+            case Some((knownSigs, optimistic)) =>
               val ch = best.channel
-              log.debug(s"${id(ch)} Requesting extension sigs, last ${knownSigs.length} are ${formatSignatures(knownSigs)}")
+              log.debug(s"${id(ch)} Requesting extension signatures ${if (optimistic) "optimistically" else ""}, last ${knownSigs.length} are ${formatSignatures(knownSigs)}")
               Task(ch.writeAndFlush(GetSignatures(knownSigs))).runAsync
               state.copy(loaderState = LoaderState.ExpectingSignatures(ch, knownSigs, blacklistOnTimeout(ch, s"Timeout loading extension")))
             case None =>
@@ -165,7 +165,7 @@ object RxExtensionLoader extends ScorexLogging {
         case Applying(_) =>
           log.trace(s"Applying $extension finished with $applicationResult, no cached")
           requestNext(state.copy(applierState = ApplierState.Idle))
-        case Buffered(nextChannel, nextExtension, applying) => applicationResult match {
+        case Buffered(nextChannel, nextExtension, _) => applicationResult match {
           case Left(_) =>
             log.debug(s"Falied to apply $extension, discarding cached as well")
             requestNext(state.copy(applierState = ApplierState.Idle))
