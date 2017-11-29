@@ -25,6 +25,7 @@ import io.netty.channel.Channel
 import io.netty.channel.group.DefaultChannelGroup
 import io.netty.util.concurrent.GlobalEventExecutor
 import kamon.Kamon
+import monix.execution.Scheduler
 import org.influxdb.dto.Point
 import org.slf4j.bridge.SLF4JBridgeHandler
 import scorex.account.AddressScheme
@@ -71,12 +72,16 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     val blockchainReadiness = new AtomicBoolean(false)
 
+    val scheduler = Scheduler.singleThread("coordinator")
+
     val miner = if (settings.minerSettings.enable)
-      new MinerImpl(allChannels, blockchainReadiness, blockchainUpdater, checkpointService, history, featureProvider, stateReader, settings, time, utxStorage, wallet)
+      new MinerImpl(allChannels, blockchainReadiness, blockchainUpdater, checkpointService, history, featureProvider,
+        stateReader, settings, time, utxStorage, wallet, scheduler)
     else Miner.Disabled
 
     val network = new NetworkServer(checkpointService, blockchainUpdater, time, miner, stateReader, settings,
-      history, utxStorage, peerDatabase, allChannels, establishedConnections, blockchainReadiness, featureProvider)
+      history, utxStorage, peerDatabase, allChannels, establishedConnections, blockchainReadiness, featureProvider,
+      scheduler)
 
     miner.scheduleMining()
 
@@ -89,7 +94,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       UtilsApiRoute(settings.restAPISettings),
       PeersApiRoute(settings.restAPISettings, network.connect, peerDatabase, establishedConnections),
       AddressApiRoute(settings.restAPISettings, wallet, stateReader, settings.blockchainSettings.functionalitySettings),
-      DebugApiRoute(settings.restAPISettings, wallet, stateReader, history, peerDatabase, establishedConnections, blockchainUpdater, allChannels, utxStorage, blockchainDebugInfo, miner, configRoot),
+      DebugApiRoute(settings.restAPISettings, wallet, stateReader, history, peerDatabase, establishedConnections, blockchainUpdater, allChannels, utxStorage, blockchainDebugInfo, miner, configRoot, scheduler),
       WavesApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, time),
       AssetsApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, stateReader, time),
       NodeApiRoute(settings.restAPISettings, () => this.shutdown()),

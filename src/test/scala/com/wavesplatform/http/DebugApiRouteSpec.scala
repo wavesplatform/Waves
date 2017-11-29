@@ -2,6 +2,7 @@ package com.wavesplatform.http
 
 import com.wavesplatform.TestWallet
 import com.wavesplatform.settings.WavesSettings
+import monix.execution.Scheduler
 import scorex.api.http.ApiKeyNotValid
 import scorex.waves.http.DebugApiRoute
 
@@ -9,7 +10,7 @@ class DebugApiRouteSpec extends RouteSpec("/debug") with RestAPISettingsHelper w
   private val sampleConfig = com.typesafe.config.ConfigFactory.load()
   private val wavesSettings = WavesSettings.fromConfig(sampleConfig)
   private val configObject = sampleConfig.root()
-  private val route = DebugApiRoute(wavesSettings.restAPISettings, null, null, null, null, null, null, null, null, null, null, configObject).route
+  private val route = DebugApiRoute(wavesSettings.restAPISettings, null, null, null, null, null, null, null, null, null, null, configObject, Scheduler.global).route
 
   routePath("/configInfo") - {
     "requires api_key header" in {

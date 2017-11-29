@@ -178,7 +178,7 @@ class TransferTransactionSuite extends BaseTransactionSuite with CancelAfterFail
     Await.result(f, waitCompletion)
   }
 
-  test("can forge block with sending majority of some asse to self and to other account") {
+  test("can forge block with sending majority of some asset to self and to other account") {
     val f = for {
       _ <- assertBalances(firstAddress, 60.waves, 50.waves)
         .zip(assertBalances(secondAddress, 105.waves, 115.waves))

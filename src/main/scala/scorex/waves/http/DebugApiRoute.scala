@@ -30,6 +30,8 @@ import DebugApiRoute._
 import com.typesafe.config.{ConfigObject, ConfigRenderOptions}
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.mining.MinerDebugInfo
+import monix.eval.Task
+import monix.execution.Scheduler
 import scorex.block.Block.BlockId
 import scorex.utils.ScorexLogging
 
@@ -47,7 +49,8 @@ case class DebugApiRoute(settings: RestAPISettings,
                          utxStorage: UtxPool,
                          blockchainDebugInfo: BlockchainDebugInfo,
                          miner: Miner with MinerDebugInfo,
-                         configRoot: ConfigObject
+                         configRoot: ConfigObject,
+                         coordinatorScheduler: Scheduler,
                         ) extends ApiRoute with ScorexLogging {
 
   private lazy val configStr = configRoot.render(ConfigRenderOptions.concise().setJson(true).setFormatted(true))
@@ -161,8 +164,8 @@ case class DebugApiRoute(settings: RestAPISettings,
     complete(result)
   }
 
-  private def rollbackToBlock(blockId: ByteStr, returnTransactionsToUtx: Boolean): Future[ToResponseMarshallable] = Future {
-    blockchainUpdater.removeAfter(blockId) match {
+  private def rollbackToBlock(blockId: ByteStr, returnTransactionsToUtx: Boolean): Future[ToResponseMarshallable] =
+    Task(blockchainUpdater.removeAfter(blockId)).runAsync(coordinatorScheduler).map {
       case Right(blocks) =>
         allChannels.broadcast(LocalScoreChanged(history.score(), breakExtLoading = true))
         if (returnTransactionsToUtx) {
@@ -172,7 +175,6 @@ case class DebugApiRoute(settings: RestAPISettings,
         Json.obj("BlockId" -> blockId.toString): ToResponseMarshallable
       case Left(error) => ApiError.fromValidationError(error)
     }
-  }
 
   @Path("/rollback")
   @ApiOperation(value = "Rollback to height", notes = "Removes all blocks after given height", httpMethod = "POST")

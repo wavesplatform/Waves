@@ -19,6 +19,7 @@ import io.netty.channel.socket.SocketChannel
 import io.netty.channel.socket.nio.{NioServerSocketChannel, NioSocketChannel}
 import io.netty.handler.codec.{LengthFieldBasedFrameDecoder, LengthFieldPrepender}
 import io.netty.util.concurrent.DefaultThreadFactory
+import monix.execution.Scheduler
 import org.asynchttpclient.netty.channel.NoopHandler
 import org.influxdb.dto.Point
 import scorex.transaction._
@@ -39,7 +40,8 @@ class NetworkServer(checkpointService: CheckpointService,
                     allChannels: ChannelGroup,
                     peerInfo: ConcurrentHashMap[Channel, PeerInfo],
                     blockchainReadiness: AtomicBoolean,
-                    featureProvider: FeatureProvider) extends ScorexLogging {
+                    featureProvider: FeatureProvider,
+                    scheduler: Scheduler) extends ScorexLogging {
 
   @volatile
   private var shutdownInitiated = false
@@ -98,7 +100,7 @@ class NetworkServer(checkpointService: CheckpointService,
   private val microBlockOwners = new MicroBlockOwners(settings.synchronizationSettings.microBlockSynchronizer.invCacheTimeout)
   private val coordinatorHandler = new CoordinatorHandler(
     checkpointService, history, blockchainUpdater, time, stateReader, utxPool, blockchainReadiness, miner, settings,
-    peerDatabase, allChannels, featureProvider, microBlockOwners, knownInvalidBlocks
+    peerDatabase, allChannels, featureProvider, microBlockOwners, knownInvalidBlocks, scheduler
   )
 
   private val peerConnections = new ConcurrentHashMap[PeerKey, Channel](10, 0.9f, 10)
@@ -137,7 +139,7 @@ class NetworkServer(checkpointService: CheckpointService,
         historyReplier,
         microBlockSynchronizer,
         new ExtensionSignaturesLoader(settings.synchronizationSettings.synchronizationTimeout, peerDatabase, knownInvalidBlocks),
-        new ExtensionBlocksLoader(settings.synchronizationSettings.synchronizationTimeout, peerDatabase, history, knownInvalidBlocks),
+        new ExtensionBlocksLoader(settings.synchronizationSettings.synchronizationTimeout, peerDatabase, history, knownInvalidBlocks, blockchainReadiness),
         new OptimisticExtensionLoader,
         utxPoolSynchronizer,
         scoreObserver,
@@ -172,7 +174,7 @@ class NetworkServer(checkpointService: CheckpointService,
       historyReplier,
       microBlockSynchronizer,
       new ExtensionSignaturesLoader(settings.synchronizationSettings.synchronizationTimeout, peerDatabase, knownInvalidBlocks),
-      new ExtensionBlocksLoader(settings.synchronizationSettings.synchronizationTimeout, peerDatabase, history, knownInvalidBlocks),
+      new ExtensionBlocksLoader(settings.synchronizationSettings.synchronizationTimeout, peerDatabase, history, knownInvalidBlocks, blockchainReadiness),
       new OptimisticExtensionLoader,
       utxPoolSynchronizer,
       scoreObserver,
@@ -264,7 +266,6 @@ class NetworkServer(checkpointService: CheckpointService,
     log.debug("Unbound server")
     allChannels.close().await()
     log.debug("Closed all channels")
-    coordinatorHandler.shutdown()
   } finally {
     workerGroup.shutdownGracefully().await()
     bossGroup.shutdownGracefully().await()

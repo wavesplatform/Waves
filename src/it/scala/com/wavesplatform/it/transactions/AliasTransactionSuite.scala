@@ -144,9 +144,9 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
       ("", "Alias '' length should be between 4 and 30"),
       ("abc", "Alias 'abc' length should be between 4 and 30"),
       (null, "failed to parse json message"),
-      ("morethen_thirtycharactersinline", "Alias 'morethen_thirtycharactersinline' length should be between 4 and 30"),
+      ("morethan_thirtycharactersinline", "Alias 'morethan_thirtycharactersinline' length should be between 4 and 30"),
       ("~!|#$%^&*()_+=\";:/?><|\\][{}", "Alias should contain only following characters: -.0123456789@_abcdefghijklmnopqrstuvwxyz"),
-      ("multilnetest\ntest", "Alias should contain only following characters: -.0123456789@_abcdefghijklmnopqrstuvwxyz"),
+      ("multilinetest\ntest", "Alias should contain only following characters: -.0123456789@_abcdefghijklmnopqrstuvwxyz"),
       ("UpperCaseAliase", "Alias should contain only following characters: -.0123456789@_abcdefghijklmnopqrstuvwxyz"))
 
   forAll(invalid_aliases_names) { (alias: String, message: String) =>
@@ -157,8 +157,6 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
 
       Await.result(f, waitCompletion)
     }
-
-
   }
 
   test("Able to lease by alias") {

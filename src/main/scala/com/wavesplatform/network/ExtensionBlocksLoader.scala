@@ -1,5 +1,7 @@
 package com.wavesplatform.network
 
+import java.util.concurrent.atomic.AtomicBoolean
+
 import com.wavesplatform.metrics.LatencyHistogram
 import com.wavesplatform.state2.ByteStr
 import io.netty.channel.{ChannelHandlerContext, ChannelInboundHandlerAdapter}
@@ -17,7 +19,8 @@ import scala.concurrent.duration.FiniteDuration
 class ExtensionBlocksLoader(blockSyncTimeout: FiniteDuration,
                             peerDatabase: PeerDatabase,
                             history: NgHistory,
-                            invalidBlocks: InvalidBlockStorage) extends ChannelInboundHandlerAdapter with ScorexLogging {
+                            invalidBlocks: InvalidBlockStorage,
+                            blockchainReadiness: AtomicBoolean) extends ChannelInboundHandlerAdapter with ScorexLogging {
   private var pendingSignatures = Map.empty[ByteStr, Int]
   private var targetExtensionIds = Option.empty[ExtensionIds]
   private val blockBuffer = mutable.TreeMap.empty[Int, Block]
@@ -45,17 +48,19 @@ class ExtensionBlocksLoader(blockSyncTimeout: FiniteDuration,
     case xid@ExtensionIds(_, newIds) if pendingSignatures.isEmpty =>
       val requestingIds = newIds.filterNot(history.contains)
       if (requestingIds.nonEmpty) {
-          targetExtensionIds = Some(xid)
-          pendingSignatures = newIds.zipWithIndex.toMap
-          blacklistAfterTimeout(ctx)
-          extensionsFetchingTimeStats.start()
-          newIds.foreach(s => ctx.write(GetBlock(s)))
-          ctx.flush()
+        log.trace(s"${id(ctx)} About to load ${requestingIds.size} blocks")
+        targetExtensionIds = Some(xid)
+        pendingSignatures = newIds.zipWithIndex.toMap
+        blacklistAfterTimeout(ctx)
+        extensionsFetchingTimeStats.start()
+        newIds.foreach(s => ctx.write(GetBlock(s)))
+        ctx.flush()
       } else {
         log.debug(s"${id(ctx)} No new blocks to load")
         ctx.fireChannelRead(ExtensionBlocks(Seq.empty))
       }
     case b: Block if pendingSignatures.contains(b.uniqueId) =>
+      log.trace(s"${id(ctx)} Received expected block ${b.uniqueId}")
       blockBuffer += pendingSignatures(b.uniqueId) -> b
       pendingSignatures -= b.uniqueId
       blacklistAfterTimeout(ctx)
@@ -75,6 +80,7 @@ class ExtensionBlocksLoader(blockSyncTimeout: FiniteDuration,
             }) {
             peerDatabase.blacklistAndClose(ctx.channel(),"Extension blocks are not contiguous, pre-check failed")
           } else {
+            log.trace(s"${id(ctx)} Checking extension block signatures")
             val pnewBlocks = newBlocks.par
             pnewBlocks.tasksupport = new ForkJoinTaskSupport()
             pnewBlocks.find(_.signaturesValid().isLeft) match {
@@ -82,7 +88,7 @@ class ExtensionBlocksLoader(blockSyncTimeout: FiniteDuration,
                 invalidBlocks.add(invalidBlock.uniqueId)
                 peerDatabase.blacklistAndClose(ctx.channel(),s"Got block $invalidBlock with invalid signature")
               case None =>
-                log.trace(s"${id(ctx)} Chain is valid, pre-check passed")
+                log.debug(s"${id(ctx)} Successfully loaded extension blocks ${formatSignatures(newBlocks.map(_.signerData.signature))}")
                 ctx.fireChannelRead(ExtensionBlocks(newBlocks))
             }
           }
@@ -92,8 +98,15 @@ class ExtensionBlocksLoader(blockSyncTimeout: FiniteDuration,
         blockBuffer.clear()
       }
 
-    case _: ExtensionIds =>
-      log.warn(s"${id(ctx)} Received unexpected extension ids while loading blocks, ignoring")
+    case _: Block =>
+      if (blockchainReadiness.get) {
+        log.trace(s"${id(ctx)} Discarding block because blockchain is too old")
+      } else {
+        log.trace(s"${id(ctx)} Passing block upstream: ${blockchainReadiness.get()}")
+      }
+
+    case ExtensionIds(_, sigs) =>
+      log.warn(s"${id(ctx)} Waiting for ${pendingSignatures.size} more blocks(s), ignoring new signatures ${formatSignatures(sigs)}")
     case _ => super.channelRead(ctx, msg)
   }
 }
