@@ -1,6 +1,6 @@
 package com.wavesplatform.network
 
-import com.wavesplatform.network.RxExtensionLoader.{ExtensionBlocks, LoaderState, State}
+import com.wavesplatform.network.RxExtensionLoader.{ApplierState, ExtensionBlocks, LoaderState, State}
 import com.wavesplatform.network.RxScoreObserver.{BestChannel, SyncWith}
 import com.wavesplatform.state2.ByteStr
 import com.wavesplatform.{BlockGen, RxScheduler, TransactionGen}
@@ -24,7 +24,7 @@ class RxExtensionLoaderSpec extends FreeSpec with Matchers with TransactionGen w
 
   def genBlocks(amt: Int) = Gen.listOfN(amt, randomSignerBlockGen).sample.get
 
-  val Idle = State(LoaderState.Idle)
+  val Idle = State(LoaderState.Idle, ApplierState.Idle)
 
   val MaxRollback = 10
   val simpleApplier: (Channel, ExtensionBlocks) => Task[Either[ValidationError, Option[BlockchainScore]]] = (_, _) => Task(Right(Some(0)))
@@ -51,7 +51,7 @@ class RxExtensionLoaderSpec extends FreeSpec with Matchers with TransactionGen w
     test(for {
       _ <- send(blocks)((ch, block))
     } yield {
-      newSingleBlocks().last shouldBe((ch, block))
+      newSingleBlocks().last shouldBe ((ch, block))
     })
   }
 
@@ -86,7 +86,7 @@ class RxExtensionLoaderSpec extends FreeSpec with Matchers with TransactionGen w
     Range(0, totalBlocksInHistory).map(bs).foreach(history.appendId)
     test(for {
       _ <- send(bestChannels)(Some(BestChannel(ch, 1: BigInt)))
-      _ <- send(sigs)(ch, ???)
+      _ <- send(sigs)((ch, ???))
     } yield {
       ch.isOpen shouldBe false
     })
