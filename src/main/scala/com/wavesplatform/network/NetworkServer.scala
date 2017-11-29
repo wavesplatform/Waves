@@ -53,7 +53,15 @@ object NetworkServer extends ScorexLogging {
     val handshake = Handshake(Constants.ApplicationName + settings.blockchainSettings.addressSchemeCharacter, Version.VersionTuple,
       settings.networkSettings.nodeName, settings.networkSettings.nonce, settings.networkSettings.declaredAddress)
 
-    val trafficWatcher = if (settings.metrics.enable) new TrafficWatcher else new NoopHandler
+    val trafficWatcher = if (settings.metrics.enable) {
+      log.debug("Watching and reporting of traffic is enabled")
+      new TrafficWatcher
+    } else new NoopHandler
+
+    val trafficLogger = if (settings.networkSettings.trafficLogger.enable) {
+      log.debug("Logging of traffic is enabled")
+      new TrafficLogger(settings.networkSettings.trafficLogger)
+    } else new NoopHandler
     val messageCodec = new MessageCodec(peerDatabase)
 
     val excludedAddresses: Set[InetSocketAddress] = {
@@ -111,6 +119,7 @@ object NetworkServer extends ScorexLogging {
           trafficWatcher,
           discardingHandler,
           messageCodec,
+          trafficLogger,
           writeErrorHandler,
           peerSynchronizer,
           historyReplier,
@@ -139,6 +148,7 @@ object NetworkServer extends ScorexLogging {
         trafficWatcher,
         discardingHandler,
         messageCodec,
+        trafficLogger,
         writeErrorHandler,
         peerSynchronizer,
         historyReplier,
