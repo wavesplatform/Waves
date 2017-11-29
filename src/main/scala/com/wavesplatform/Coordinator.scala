@@ -68,6 +68,7 @@ object Coordinator extends ScorexLogging with Instrumented {
             case (commonBlockHeight, droppedBlocks) =>
               forkApplicationResultEi match {
                 case Left(e) =>
+                  blockchainUpdater.removeAfter(lastCommonBlockId).explicitGet()
                   droppedBlocks.foreach(blockchainUpdater.processBlock(_).explicitGet())
                   Left(e)
 
