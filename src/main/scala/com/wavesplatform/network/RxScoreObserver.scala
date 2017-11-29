@@ -74,6 +74,8 @@ object RxScoreObserver extends ScorexLogging {
       if (currentBestChannel.contains(ch)) {
         log.debug(s"${id(ch)} Best channel has been closed")
         currentBestChannel = None
+      } else {
+        log.trace(s"${id(ch)} Some channel has been closed")
       }
     })
 

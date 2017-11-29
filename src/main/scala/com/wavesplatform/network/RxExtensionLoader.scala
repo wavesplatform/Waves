@@ -1,7 +1,7 @@
 package com.wavesplatform.network
 
 import com.wavesplatform.network.RxExtensionLoader.ApplierState.{Applying, Buffered, Idle}
-import com.wavesplatform.network.RxScoreObserver.{BestChannel, SyncWith}
+import com.wavesplatform.network.RxScoreObserver.SyncWith
 import io.netty.channel._
 import monix.eval.{Coeval, Task}
 import monix.execution.schedulers.SchedulerService
@@ -146,11 +146,10 @@ object RxExtensionLoader extends ScorexLogging {
     }
 
     def applyExtension(extensionBlocks: ExtensionBlocks, ch: Channel): Unit = {
-      extensionApplier(ch, extensionBlocks).flatMap {
-        ar =>
-          Task {
-            s = onExetensionApplied(s, extensionBlocks, ch, ar)
-          }.executeOn(scheduler)
+      extensionApplier(ch, extensionBlocks).flatMap { ar =>
+        Task {
+          s = onExetensionApplied(s, extensionBlocks, ch, ar)
+        }.executeOn(scheduler)
       }.runAsync(scheduler)
     }
 
@@ -175,11 +174,14 @@ object RxExtensionLoader extends ScorexLogging {
       }
     }
 
-
-    syncWith.mapTask(c => Task(onNewSyncWith(s, c)).map(s = _)).logErr.subscribe()
-    signatures.mapTask { case ((ch, sigs)) => Task(onNewSignatures(s, ch, sigs)).map(s = _) }.logErr.subscribe()
-    blocks.mapTask { case ((ch, block)) => Task(onBlock(s, ch, block)).map(s = _) }.logErr.subscribe()
-    channelClosed.mapTask(ch => Task(onChannelClosed(s, ch)).map(s = _)).logErr.subscribe()
+    Observable.merge(
+      syncWith.map(c => onNewSyncWith(s, c)),
+      signatures.map { case ((ch, sigs)) => onNewSignatures(s, ch, sigs) },
+      blocks.map { case ((ch, block)) => onBlock(s, ch, block) },
+      channelClosed.map(ch => onChannelClosed(s, ch)))
+      .map(s = _)
+      .logErr
+      .subscribe()
 
     simpleBlocks
   }
