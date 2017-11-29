@@ -104,7 +104,7 @@ object RxExtensionLoader extends ScorexLogging {
               }
           }
         case _ =>
-          log.trace(s"${id(ch)} Received unexpected signatures, ignoring at $state")
+          log.trace(s"${id(ch)} Received unexpected signatures ${formatSignatures(sigs.signatures)}, ignoring at $state")
           state
 
       }
@@ -122,9 +122,9 @@ object RxExtensionLoader extends ScorexLogging {
           } else {
             state.copy(loaderState = LoaderState.ExpectingBlocks(c, requested, expected - block.uniqueId, recieved + block,
               blacklistOnTimeout(ch, s"Timeout loading one of requested blocks, non-received: ${
-                val s = expected.size
-                if (s == 1) "one=" + requested.last.trim
-                else "total=" + s.toString
+                val totalleft = expected.size - 1
+                if (totalleft == 1) "one=" + requested.last.trim
+                else "total=" + totalleft.toString
               }")))
           }
         case _ =>
@@ -217,8 +217,7 @@ object RxExtensionLoader extends ScorexLogging {
   }
 
   case class ExtensionBlocks(blocks: Seq[Block]) {
-    override def toString: String = if (blocks.isEmpty) "ExtensionBlocks()" else s"ExtensionBlocks(size =${blocks.size}," +
-      s" [${blocks.head.uniqueId.trim} -- ${blocks.last.uniqueId.trim}])"
+    override def toString: String = s"ExtensionBlocks(${formatSignatures(blocks.map(_.uniqueId))}"
   }
 
   case class State(loaderState: LoaderState, applierState: ApplierState)

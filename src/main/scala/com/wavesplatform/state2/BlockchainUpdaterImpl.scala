@@ -144,7 +144,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
                 log.trace(s"New liquid block is better version of exsting, swapping")
                 BlockDiffer.fromBlock(settings.blockchainSettings.functionalitySettings, featureProvider, currentPersistedBlocksState(), historyWriter.lastBlock, block).map(d => Some((d, Seq.empty[Transaction])))
               }
-            } else Left(BlockAppendError(s"Competitor's liquid block $block(score=${block.blockScore()}) is not better than existing (ng.base ${ng.base}(score=${ng.base.blockScore()}))", block))
+            } else Left(BlockAppendError(s"Competitors liquid block $block(score=${block.blockScore()}) is not better than existing (ng.base ${ng.base}(score=${ng.base.blockScore()}))", block))
           } else
             measureSuccessful(forgeBlockTimeStats, ng.totalDiffOf(block.reference)) match {
               case None => Left(BlockAppendError(s"References incorrect or non-existing block", block))

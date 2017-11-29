@@ -18,7 +18,7 @@ import scala.concurrent.duration.FiniteDuration
 object RxScoreObserver extends ScorexLogging {
 
   case class BestChannel(channel: Channel, score: BlockchainScore) {
-    override def toString: String = s"BestChannel(${id(channel)},score: $score}"
+    override def toString: String = s"BestChannel(${id(channel)},score: $score)"
   }
 
   implicit val bestChannelEq = new Eq[BestChannel] {
