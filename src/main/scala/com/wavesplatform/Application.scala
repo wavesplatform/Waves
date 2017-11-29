@@ -12,7 +12,7 @@ import akka.stream.ActorMaterializer
 import cats.instances.all._
 import com.typesafe.config._
 import com.wavesplatform.actor.RootActorSystem
-import com.wavesplatform.db.LevelDBFactory
+import com.wavesplatform.db.openDB
 import com.wavesplatform.features.api.ActivationApiRoute
 import com.wavesplatform.history.{CheckpointServiceImpl, StorageFactory}
 import com.wavesplatform.http.NodeApiRoute
@@ -29,7 +29,6 @@ import io.netty.util.concurrent.GlobalEventExecutor
 import kamon.Kamon
 import monix.reactive.Observable
 import org.influxdb.dto.Point
-import org.iq80.leveldb.Options
 import org.slf4j.bridge.SLF4JBridgeHandler
 import scorex.account.AddressScheme
 import scorex.api.http._
@@ -49,7 +48,7 @@ import scala.util.Try
 
 class Application(val actorSystem: ActorSystem, val settings: WavesSettings, configRoot: ConfigObject) extends ScorexLogging {
 
-  private val db = Application.openDB(settings.dataDirectory)
+  private val db = openDB(settings.dataDirectory)
 
   private val LocalScoreBroadcastDebounce = 1.second
 
@@ -237,15 +236,6 @@ object Application extends ScorexLogging {
     }
 
     config
-  }
-
-  private def openDB(path: String) = {
-    val options = new Options()
-    options.createIfMissing(true)
-
-    val file = new File(path)
-    file.getParentFile.mkdirs()
-    LevelDBFactory.factory.open(file, options)
   }
 
   def main(args: Array[String]): Unit = {
