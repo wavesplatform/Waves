@@ -1,10 +1,11 @@
 package com.wavesplatform.network
 
+import com.wavesplatform.network.RxExtensionLoader.ApplierState.{Applying, Buffered, Idle}
 import com.wavesplatform.network.RxScoreObserver.{BestChannel, SyncWith}
 import io.netty.channel._
 import monix.eval.{Coeval, Task}
-import monix.execution.{CancelableFuture, Scheduler}
 import monix.execution.schedulers.SchedulerService
+import monix.execution.{CancelableFuture, Scheduler}
 import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
 import scorex.block.Block
@@ -21,7 +22,7 @@ object RxExtensionLoader extends ScorexLogging {
             history: NgHistory,
             peerDatabase: PeerDatabase,
             invalidBlocks: InvalidBlockStorage,
-            bestChannel: Observable[SyncWith],
+            syncWith: Observable[SyncWith],
             blocks: Observable[(Channel, Block)],
             signatures: Observable[(Channel, Signatures)],
             channelClosed: Observable[Channel]
@@ -30,98 +31,144 @@ object RxExtensionLoader extends ScorexLogging {
     implicit val scheduler: SchedulerService = Scheduler.singleThread("rx-block-loader")
 
     val simpleBlocks = ConcurrentSubject.publish[(Channel, Block)]
-    var state: State = State(LoaderState.Idle)
-    val lastBestChannel: Coeval[Option[SyncWith]] = lastSeen(bestChannel)
-
-    def loaderBecome(s: LoaderState): Unit = {
-      state = state.copy(loaderState = s)
-      log.trace(s"changing loader state to $state")
-    }
+    var s: State = State(LoaderState.Idle, ApplierState.Idle)
+    val lastBestChannel: Coeval[Option[SyncWith]] = lastSeen(syncWith)
 
     def blacklistOnTimeout(ch: Channel, reason: String): CancelableFuture[Unit] = Task {
       peerDatabase.blacklistAndClose(ch, reason)
     }.delayExecution(syncTimeOut).runAsync(scheduler)
 
-    def requestNextExt(): Unit = {
+    def requestNext(state: State): State = {
       lastBestChannel().get match {
         case None =>
           log.trace("Last bestChannel is None, state is up to date")
-          loaderBecome(LoaderState.Idle)
+          state.copy(loaderState = LoaderState.Idle)
         case Some(best) =>
-          val knownSigs = history.lastBlockIds(maxRollback)
-          val ch = best.channel
-          ch.writeAndFlush(GetSignatures(knownSigs))
-          log.debug(s"${id(ch)} Requesting extension sigs, last ${knownSigs.length} are ${formatSignatures(knownSigs)}")
-          loaderBecome(LoaderState.ExpectingSignatures(ch, knownSigs, blacklistOnTimeout(ch, s"Timeout loading extension")))
+          val maybeKnownSigs = state.applierState match {
+            case ApplierState.Idle => Some(history.lastBlockIds(maxRollback))
+            case ApplierState.Applying(ext) => Some(history.lastBlockIds(maxRollback - ext.size) ++ ext)
+            case _ => None
+          }
+          maybeKnownSigs match {
+            case Some(knownSigs) =>
+              val ch = best.channel
+              ch.writeAndFlush(GetSignatures(knownSigs))
+              log.debug(s"${id(ch)} Requesting extension sigs, last ${knownSigs.length} are ${formatSignatures(knownSigs)}")
+              state.copy(loaderState = LoaderState.ExpectingSignatures(ch, knownSigs, blacklistOnTimeout(ch, s"Timeout loading extension")))
+            case None =>
+              state
+          }
       }
     }
 
-    channelClosed.mapTask(ch => Task {
+    def onChannelClosed(state: State, ch: Channel): State = {
       state.loaderState match {
         case wp: LoaderState.WithPeer if wp.channel == ch =>
           wp.timeout.cancel()
-          requestNextExt()
-        case _ =>
+          requestNext(state.copy(loaderState = LoaderState.Idle))
+        case _ => state
       }
-    }).logErr.subscribe()
+    }
 
-    bestChannel.mapTask(c => Task {
-      log.trace(s"New bestChannel: $c, currentState = $state")
-      c match {
-        case Some(BestChannel(ch, _)) if state.loaderState == LoaderState.Idle => requestNextExt()
-        case _ =>
+    def onNewSyncWith(state: State, sw: SyncWith): State = {
+      log.trace(s"New SyncWith: $sw, currentState = $state")
+      sw match {
+        case Some(BestChannel(ch, _)) if state.loaderState == LoaderState.Idle =>
+          requestNext(state)
+        case _ => state
       }
-    }).logErr.subscribe()
+    }
 
-    signatures.mapTask { case ((ch, sigs)) => Task {
-      state.loaderState match {
+    def onNewSignatures(state: LoaderState, ch: Channel, sigs: Signatures): LoaderState = {
+      state match {
         case LoaderState.ExpectingSignatures(c, known, timeout) if c == ch =>
           timeout.cancel()
           val (_, unknown) = sigs.signatures.span(id => known.contains(id))
           sigs.signatures.find(invalidBlocks.contains) match {
             case Some(invalidBlock) =>
               peerDatabase.blacklistAndClose(ch, s"Signatures contain invalid block(s): $invalidBlock")
-              loaderBecome(LoaderState.Idle)
+              LoaderState.Idle
             case None =>
               if (unknown.isEmpty) {
                 log.trace(s"${id(ch)} Received empty extension signatures list, sync with node complete")
-                loaderBecome(LoaderState.Idle)
+                LoaderState.Idle
               } else {
                 unknown.foreach(s => ch.writeAndFlush(GetBlock(s)))
-                loaderBecome(LoaderState.ExpectingBlocks(ch, unknown, unknown.toSet, Set.empty, blacklistOnTimeout(ch, "Timeout loading first requested block")))
+                LoaderState.ExpectingBlocks(ch, unknown, unknown.toSet, Set.empty, blacklistOnTimeout(ch, "Timeout loading first requested block"))
               }
           }
-        case _ => log.trace(s"${id(ch)} Received unexpected signatures, ignoring")
+        case _ =>
+          log.trace(s"${id(ch)} Received unexpected signatures, ignoring")
+          state
+
       }
     }
-    }.logErr.subscribe()
 
-    blocks.mapTask { case ((ch, block)) => Task {
+    def onBlock(state: State, ch: Channel, block: Block): State = {
       state.loaderState match {
         case LoaderState.ExpectingBlocks(c, requested, expected, recieved, timeout) if c == ch && expected.contains(block.uniqueId) =>
           timeout.cancel()
           if (expected == Set(block.uniqueId)) {
             log.debug(s"${id(ch)} Extension(blocks=${requested.size}) successfully received")
             val blockById = (recieved + block).map(b => b.uniqueId -> b).toMap
-            val ext = requested.map(blockById)
-            loaderBecome(LoaderState.Idle)
-            val extension = ExtensionBlocks(ext)
-            extensionApplier(ch, extension) map {
-              case Left(err) =>
-                peerDatabase.blacklistAndClose(ch, s"${id(ch)} Error applying $extension: $err")
-              case Right(_) =>
-                requestNextExt()
-            }
-          } else Task.now {
-            loaderBecome(LoaderState.ExpectingBlocks(c, requested, expected - block.uniqueId, recieved + block, blacklistOnTimeout(ch,
-              s"Timeout loading one of requested blocks; prev state=${state.loaderState}")))
+            val ext = ExtensionBlocks(requested.map(blockById))
+            extensionLoadingFinished(state.copy(loaderState = LoaderState.Idle), ext, ch)
+          } else {
+            state.copy(loaderState = LoaderState.ExpectingBlocks(c, requested, expected - block.uniqueId, recieved + block,
+              blacklistOnTimeout(ch, s"Timeout loading one of requested blocks; prev state=${state.loaderState}")))
           }
-        case _ => Task.now {
+        case _ =>
           simpleBlocks.onNext((ch, block))
+          state
+
+      }
+    }
+
+    def extensionLoadingFinished(state: State, extensionBlocks: ExtensionBlocks, ch: Channel): State = {
+      state.applierState match {
+        case Idle =>
+            applyExtension(extensionBlocks,ch)
+            state.copy(applierState = Applying(extensionBlocks.blocks.map(_.uniqueId)))
+        case Applying(applying) =>
+          log.trace(s"Caching recieved $extensionBlocks until prev is executed")
+          state.copy(applierState = Buffered(ch, extensionBlocks, applying))
+        case Buffered(_, _, _) =>
+          log.warn(s"Overflow, discaring $extensionBlocks")
+          state
+      }
+    }
+
+    def applyExtension(extensionBlocks: ExtensionBlocks, ch: Channel): Unit = {
+      extensionApplier(ch, extensionBlocks).map {
+        ar => onExetensionApplied(s, extensionBlocks, ch, ar)
+      }.runAsync(scheduler)
+    }
+
+    def onExetensionApplied(state: State, extensionBlocks: ExtensionBlocks, ch: Channel, applicationResult: Either[ValidationError, Option[BlockchainScore]]): State = {
+      state.applierState match {
+        case Idle =>
+          log.warn(s"Applying $extensionBlocks finished with $applicationResult, but applierState is Idle")
+          state
+        case Applying(_) =>
+          log.trace(s"Applying $extensionBlocks finished with $applicationResult, no cached")
+          requestNext(state.copy(applierState = ApplierState.Idle))
+        case Buffered(nextChannel, nextExtension, applying) => applicationResult match {
+          case Left(_) =>
+            log.debug(s"Falied to apply $extensionBlocks, discarding cached as well")
+            requestNext(state.copy(applierState = ApplierState.Idle))
+          case Right(_) =>
+            log.trace(s"Successfully applied $extensionBlocks, staring to apply cached")
+            applyExtension(nextExtension, nextChannel)
+            requestNext(state.copy(applierState = Applying(nextExtension.blocks.map(_.uniqueId))))
         }
       }
-    }.flatten
-    }.logErr.subscribe()
+    }
+
+
+    syncWith.mapTask(c => Task(onNewSyncWith(s, c)).map(s = _)).logErr.subscribe()
+    signatures.mapTask { case ((ch, sigs)) => Task(onNewSignatures(s.loaderState, ch, sigs)).map(ls => s = s.copy(loaderState = ls)) }.logErr.subscribe()
+    blocks.mapTask { case ((ch, block)) => Task(onBlock(s, ch, block)).map(s = _) }.logErr.subscribe()
+    channelClosed.mapTask(ch => Task(onChannelClosed(s, ch)).map(s = _)).logErr.subscribe()
 
     simpleBlocks
   }
@@ -157,6 +204,18 @@ object RxExtensionLoader extends ScorexLogging {
       s" [${blocks.head.uniqueId.trim}..${blocks.last.uniqueId.trim}])"
   }
 
-  case class State(loaderState: LoaderState)
+  case class State(loaderState: LoaderState, applierState: ApplierState)
+
+  sealed trait ApplierState
+
+  case object ApplierState {
+
+    case object Idle extends ApplierState
+
+    case class Applying(applying: Seq[BlockId]) extends ApplierState
+
+    case class Buffered(nextChannel: Channel, nextExtension: ExtensionBlocks, applying: Seq[BlockId]) extends ApplierState
+
+  }
 
 }
