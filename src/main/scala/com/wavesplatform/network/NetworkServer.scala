@@ -35,7 +35,7 @@ class NetworkServer(checkpointService: CheckpointService,
                     settings: WavesSettings,
                     history: NgHistory,
                     utxPool: UtxPool,
-                    peerDatabase: PeerDatabase,
+                    peerDatabase: PeerDatabase with AutoCloseable,
                     allChannels: ChannelGroup,
                     peerInfo: ConcurrentHashMap[Channel, PeerInfo],
                     blockchainReadiness: AtomicBoolean,
@@ -261,6 +261,7 @@ class NetworkServer(checkpointService: CheckpointService,
     shutdownInitiated = true
     connectTask.cancel(false)
     serverChannel.foreach(_.close().await())
+    peerDatabase.close()
     log.debug("Unbound server")
     allChannels.close().await()
     log.debug("Closed all channels")
