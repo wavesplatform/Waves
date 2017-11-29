@@ -85,6 +85,7 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration,
 
   private def requestExtension(channel: Channel): Unit = Future(blocking(lastSignatures)).onComplete {
     case Success(sig) =>
+      log.trace(s"Stopping an optimistically loading of extension from all channels except ${id(channel)}")
       allChannels.broadcast(LoadBlockchainExtension(Seq.empty), Some(channel))
       channel.writeAndFlush(LoadBlockchainExtension(sig))
     case Failure(e) => log.warn("Error getting last signatures", e)
