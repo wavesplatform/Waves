@@ -64,7 +64,6 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration,
 
       val currChannel = ctx.channel()
       if (breakExtProcessing && pinnedChannel.compareAndSet(ctx.channel(), null)) {
-        log.debug(s"${id(ctx)} Stop processing an extension")
         channelWithHighestScore match {
           case Some((bestChannel, bestChannelScore)) if bestChannelScore > localScore =>
             val currChannelScore = Option(scores.get(currChannel)).getOrElse(BigInt(0))
@@ -72,10 +71,12 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration,
 
             if (pinnedChannel.compareAndSet(null, nextChannel)) {
               if (nextChannel == currChannel) log.debug(s"${id(ctx)} Staying on this channel, it has the best score")
-              else log.debug(s"${id(ctx)} Switching to best channel ${id(nextChannel)}")
+              else log.debug(s"${id(ctx)} Switching to best channel ${id(nextChannel)}, diff: ${bestChannelScore - currChannelScore}")
               requestExtension(nextChannel)
             }
           case _ =>
+            log.debug(s"Node catched up the blockchain")
+            allChannels.broadcast(LoadBlockchainExtension(Seq.empty))
         }
       }
 
