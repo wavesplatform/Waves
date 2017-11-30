@@ -12,7 +12,6 @@ import scorex.utils.{LogMVMapBuilder, ScorexLogging}
 import scala.collection.concurrent.TrieMap
 import scala.collection.JavaConverters._
 
-@deprecated("This is the old wallet version used for migration", "0.8.6")
 class WalletObsolete (file: Option[File], password: Array[Char], s: Option[Array[Byte]]) extends AutoCloseable with ScorexLogging {
 
   private val NonceFieldName = "nonce"
