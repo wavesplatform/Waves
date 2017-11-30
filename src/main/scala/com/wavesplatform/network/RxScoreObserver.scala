@@ -6,6 +6,7 @@ import cats._
 import cats.implicits._
 import com.google.common.cache.CacheBuilder
 import io.netty.channel._
+import monix.eval.Task
 import monix.execution.Scheduler
 import monix.execution.schedulers.SchedulerService
 import monix.reactive.Observable
@@ -68,19 +69,20 @@ object RxScoreObserver extends ScorexLogging {
       .expireAfterWrite(scoreTtl.toMillis, TimeUnit.MILLISECONDS)
       .build[Channel, BlockchainScore]()
 
-    val ls: Observable[Option[Channel]] = localScores.observeOn(scheduler).map(newLocalScore => {
+    val ls: Observable[Option[Channel]] = localScores.mapTask(newLocalScore => Task {
       log.debug(s"New local score = $newLocalScore observed")
       localScore = newLocalScore
       None
     })
 
-    val rs: Observable[Option[Channel]] = remoteScores.observeOn(scheduler).map { case ((ch, score)) =>
+    val rs: Observable[Option[Channel]] = remoteScores.mapTask { case ((ch, score)) => Task {
       scores.put(ch, score)
       log.trace(s"${id(ch)} New remote score $score")
       None
     }
+    }
 
-    val cc: Observable[Option[Channel]] = channelClosed.observeOn(scheduler).map(ch => {
+    val cc: Observable[Option[Channel]] = channelClosed.mapTask(ch => Task {
       scores.invalidate(ch)
       if (currentBestChannel.contains(ch)) {
         log.debug(s"${id(ch)} Best channel has been closed")

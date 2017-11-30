@@ -32,7 +32,6 @@ object MicroBlockSynchronizer extends ScorexLogging {
     implicit val scheduler: SchedulerService = Scheduler.singleThread("microblock-synchronizer")
 
     val microBlockOwners = cache[MicroBlockSignature, MSet[Channel]](settings.invCacheTimeout)
-
     val nextInvs = cache[MicroBlockSignature, MicroBlockInv](settings.invCacheTimeout)
     val awaiting = cache[MicroBlockSignature, MicroBlockInv](settings.invCacheTimeout)
     val successfullyReceived = cache[MicroBlockSignature, Object](settings.processedMicroBlocksCacheTimeout)
@@ -86,7 +85,7 @@ object MicroBlockSynchronizer extends ScorexLogging {
     }
     }.logErr.subscribe()
 
-    microblockResponses.flatMap { case ((ch, msg@MicroBlockResponse(mb))) =>
+    microblockResponses.executeOn(scheduler).flatMap { case ((ch, msg@MicroBlockResponse(mb))) =>
       import mb.{totalResBlockSig => totalSig}
       successfullyReceived.put(totalSig, dummy)
       BlockStats.received(mb, ch)
@@ -97,8 +96,7 @@ object MicroBlockSynchronizer extends ScorexLogging {
           awaiting.invalidate(totalSig)
           Observable((ch, MicroblockData(Option(mi), mb, Coeval.evalOnce(owners(totalSig)))))
       }
-    }.executeOn(scheduler)
-      .mapTask { case ((ch, md)) => processMicroBlock(ch, md) }
+    }.mapTask { case ((ch, md)) => processMicroBlock(ch, md) }
   }
 
   case class MicroblockData(invOpt: Option[MicroBlockInv], microBlock: MicroBlock, microblockOwners: Coeval[Set[Channel]])
