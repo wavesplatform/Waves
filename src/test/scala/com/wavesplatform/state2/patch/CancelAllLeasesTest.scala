@@ -12,13 +12,13 @@ import scorex.transaction.GenesisTransaction
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 
 
-class LeasePatchTest extends PropSpec
+class CancelAllLeasesTest extends PropSpec
   with PropertyChecks with Matchers with TransactionGen with NoShrink {
 
   private val settings = TestFunctionalitySettings.Enabled.copy(
     resetEffectiveBalancesAtHeight = 5, allowMultipleLeaseCancelTransactionUntilTimestamp = Long.MaxValue / 2)
 
-  property("LeasePatch cancels all active leases and its effects including those in the block") {
+  property("CancelAllLeases cancels all active leases and its effects including those in the block") {
     val setupAndLeaseInResetBlock: Gen[(GenesisTransaction, GenesisTransaction, LeaseTransaction, LeaseCancelTransaction, LeaseTransaction)] = for {
       master <- accountGen
       recipient <- accountGen suchThat (_ != master)
@@ -47,6 +47,4 @@ class LeasePatchTest extends PropSpec
         }
     }
   }
-
-
 }

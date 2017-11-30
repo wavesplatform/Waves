@@ -3,7 +3,7 @@ package com.wavesplatform.state2.patch
 import com.wavesplatform.state2.reader.SnapshotStateReader
 import com.wavesplatform.state2.{Diff, LeaseInfo, Portfolio}
 
-object LeasePatch {
+object CancelAllLeases {
   def apply(s: SnapshotStateReader): Diff = {
 
     def invertLeaseInfo(l: LeaseInfo): LeaseInfo = LeaseInfo(-l.leaseIn, -l.leaseOut )
