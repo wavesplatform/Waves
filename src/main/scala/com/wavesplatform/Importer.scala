@@ -31,6 +31,8 @@ object Importer extends ScorexLogging {
         log.info(s"Loading file '$filename")
         createInputStream(filename) match {
           case Success(inputStream) =>
+            deleteFile(settings.blockchainSettings.blockchainFile)
+            deleteFile(settings.blockchainSettings.stateFile)
             val (history, _, stateWriter, _, blockchainUpdater, _) = StorageFactory(settings).get
             checkGenesis(history, settings, blockchainUpdater)
             val bis = new BufferedInputStream(inputStream)
@@ -66,4 +68,7 @@ object Importer extends ScorexLogging {
       new FileInputStream(filename)
     }
 
+  def deleteFile(maybeFile: Option[File]): Unit = maybeFile.foreach { f =>
+    f.delete()
+  }
 }
