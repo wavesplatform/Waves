@@ -16,7 +16,7 @@ import scala.collection._
 import scala.collection.JavaConverters._
 import scala.util.Random
 
-class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with AutoCloseable with ScorexLogging {
+class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with ScorexLogging {
 
   implicit val inetSocketAddressRW: OFormat[InetSocketAddress] = OFormat.apply[InetSocketAddress](jsValue => {
     val j = jsValue.as[JsObject]
