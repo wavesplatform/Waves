@@ -33,10 +33,10 @@ object RxExtensionLoader extends ScorexLogging {
     var s: State = State(LoaderState.Idle, ApplierState.Idle)
     val lastSyncWith: Coeval[Option[SyncWith]] = lastObserved(syncWithChannelClosed.map(_.syncWith))
 
-    def blacklistOnTimeout(ch: Channel, reason: String): CancelableFuture[Unit] = Task {
+    def blacklistOnTimeout(ch: Channel, reason: String): Task[Unit] = Task {
       peerDatabase.blacklistAndClose(ch, reason)
     }.delayExecution(syncTimeOut)
-      .runAsync(scheduler)
+
 
     def syncNext(state: State): State =
       lastSyncWith().flatten match {
@@ -56,9 +56,9 @@ object RxExtensionLoader extends ScorexLogging {
         case Some((knownSigs, optimistic)) =>
           val ch = best.channel
           log.debug(s"${id(ch)} Requesting extension signatures ${if (optimistic) "optimistically" else ""}, last ${knownSigs.length} are ${formatSignatures(knownSigs)}")
-          val newState = state.withLoaderState(LoaderState.ExpectingSignatures(ch, knownSigs, blacklistOnTimeout(ch, s"Timeout loading extension")))
+          val blacklisting = blacklistOnTimeout(ch, s"Timeout loading extension").runAsync
           Task(ch.writeAndFlush(GetSignatures(knownSigs))).runAsync
-          newState
+          state.withLoaderState(LoaderState.ExpectingSignatures(ch, knownSigs, blacklisting))
         case None =>
           log.trace(s"Holding on requesting next sigs, $state")
           state
@@ -99,9 +99,9 @@ object RxExtensionLoader extends ScorexLogging {
                 state.withIdleLoader
               } else {
                 log.trace(s"${id(ch)} Requesting all required blocks(size=${unknown.size})")
-                val newState = state.withLoaderState(LoaderState.ExpectingBlocks(ch, unknown, unknown.toSet, Set.empty, blacklistOnTimeout(ch, "Timeout loading first requested block")))
+                val blacklistingAsync = blacklistOnTimeout(ch, "Timeout loading first requested block").runAsync
                 Task(unknown.foreach(s => ch.writeAndFlush(GetBlock(s)))).runAsync
-                newState
+                state.withLoaderState(LoaderState.ExpectingBlocks(ch, unknown, unknown.toSet, Set.empty, blacklistingAsync))
               }
           }
         case _ =>
@@ -119,12 +119,12 @@ object RxExtensionLoader extends ScorexLogging {
             log.debug(s"${id(ch)} $ext successfully received")
             extensionLoadingFinished(state.withIdleLoader, ext, ch)
           } else {
-            state.withLoaderState(LoaderState.ExpectingBlocks(c, requested, expected - block.uniqueId, recieved + block,
-              blacklistOnTimeout(ch, s"Timeout loading one of requested blocks, non-received: ${
-                val totalleft = expected.size - 1
-                if (totalleft == 1) "one=" + requested.last.trim
-                else "total=" + totalleft.toString
-              }")))
+            val blacklistAsync = blacklistOnTimeout(ch, s"Timeout loading one of requested blocks, non-received: ${
+              val totalleft = expected.size - 1
+              if (totalleft == 1) "one=" + requested.last.trim
+              else "total=" + totalleft.toString
+            }").runAsync
+            state.withLoaderState(LoaderState.ExpectingBlocks(c, requested, expected - block.uniqueId, recieved + block, blacklistAsync))
           }
         case _ =>
           simpleBlocks.onNext((ch, block))
