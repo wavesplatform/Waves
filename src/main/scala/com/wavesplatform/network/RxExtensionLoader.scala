@@ -139,7 +139,7 @@ object RxExtensionLoader extends ScorexLogging {
           scheduleApplyExtension(extension, ch)
           syncNext(state.copy(applierState = ApplierState.Applying(extension)))
         case ApplierState.Applying(applying) =>
-          log.trace(s"Caching recieved $extension until $applying is executed")
+          log.trace(s"Caching received $extension until $applying is executed")
           state.copy(applierState = ApplierState.Buffered(ch, extension, applying))
         case ApplierState.Buffered(_, _, _) =>
           log.warn(s"Overflow, discarding $extension")
@@ -151,6 +151,7 @@ object RxExtensionLoader extends ScorexLogging {
       extensionApplier(ch, extensionBlocks).flatMap { ar =>
         Task {
           s = onExetensionApplied(s, extensionBlocks, ch, ar)
+          log.trace(s"New state(after apply) $s")
         }.executeOn(scheduler)
       }.runAsync(scheduler)
     }
@@ -179,7 +180,10 @@ object RxExtensionLoader extends ScorexLogging {
       signatures.map { case ((ch, sigs)) => onNewSignatures(s, ch, sigs) },
       blocks.map { case ((ch, block)) => onBlock(s, ch, block) },
       syncWithChannelClosed.map(ch => onNewSyncWithChannelClosed(s, ch)))
-      .map(s = _)
+      .map { ns =>
+        s = ns
+        log.trace(s"New state $ns")
+      }
       .logErr
       .subscribe()
 
