@@ -6,19 +6,20 @@ import com.wavesplatform.state2.diffs._
 import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
-import scorex.transaction.{GenesisTransaction, PaymentTransaction}
+import scorex.transaction.GenesisTransaction
+import scorex.transaction.assets.TransferTransaction
 
 class BlockchainUpdaterBadReferencesTest extends PropSpec with PropertyChecks with
   DomainScenarioDrivenPropertyCheck with Matchers with TransactionGen {
 
-  val preconditionsAndPayments: Gen[(GenesisTransaction, PaymentTransaction, PaymentTransaction, PaymentTransaction)] = for {
+  val preconditionsAndPayments: Gen[(GenesisTransaction, TransferTransaction, TransferTransaction, TransferTransaction)] = for {
     master <- accountGen
     recipient <- accountGen
     ts <- positiveIntGen
     genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
-    payment: PaymentTransaction <- paymentGeneratorP(master, recipient)
-    payment2: PaymentTransaction <- paymentGeneratorP(master, recipient)
-    payment3: PaymentTransaction <- paymentGeneratorP(master, recipient)
+    payment: TransferTransaction <- wavesTransferGeneratorP(master, recipient)
+    payment2: TransferTransaction <- wavesTransferGeneratorP(master, recipient)
+    payment3: TransferTransaction <- wavesTransferGeneratorP(master, recipient)
   } yield (genesis, payment, payment2, payment3)
 
 

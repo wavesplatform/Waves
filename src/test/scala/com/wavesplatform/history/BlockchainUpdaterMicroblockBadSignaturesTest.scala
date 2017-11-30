@@ -8,18 +8,19 @@ import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 import scorex.account.PrivateKeyAccount
 import scorex.lagonaki.mocks.TestBlock
-import scorex.transaction.{GenesisTransaction, PaymentTransaction, TransactionParser}
+import scorex.transaction.assets.TransferTransaction
+import scorex.transaction.{GenesisTransaction, TransactionParser}
 
 class BlockchainUpdaterMicroblockBadSignaturesTest extends PropSpec with PropertyChecks
   with DomainScenarioDrivenPropertyCheck with Matchers with TransactionGen {
 
-  val preconditionsAndPayments: Gen[(GenesisTransaction, PaymentTransaction, PaymentTransaction)] = for {
+  val preconditionsAndPayments: Gen[(GenesisTransaction, TransferTransaction, TransferTransaction)] = for {
     master <- accountGen
     recipient <- accountGen
     ts <- positiveIntGen
     genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
-    payment: PaymentTransaction <- paymentGeneratorP(master, recipient)
-    payment2: PaymentTransaction <- paymentGeneratorP(master, recipient)
+    payment: TransferTransaction <- wavesTransferGeneratorP(master, recipient)
+    payment2: TransferTransaction <- wavesTransferGeneratorP(master, recipient)
   } yield (genesis, payment, payment2)
 
   property("bad total resulting block signature") {

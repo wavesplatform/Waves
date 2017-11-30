@@ -14,8 +14,8 @@ class DebugPortfoliosSuite extends BaseTransactionSuite {
     val f = for {
       (portfolioBefore, utxSizeBefore) <- sender.debugPortfoliosFor(firstAddress, considerUnspent = true).zip(sender.utxSize)
 
-      _ <- sender.payment(firstAddress, secondAddress, 5.waves, fee = 5.waves)
-      _ <- sender.payment(secondAddress, firstAddress, 7.waves, 5.waves)
+      _ <- sender.transfer(firstAddress, secondAddress, 5.waves, fee = 5.waves)
+      _ <- sender.transfer(secondAddress, firstAddress, 7.waves, 5.waves)
       _ <- sender.waitForUtxIncreased(utxSizeBefore)
 
       portfolioAfter <- sender.debugPortfoliosFor(firstAddress, considerUnspent = true)
@@ -40,7 +40,7 @@ class DebugPortfoliosSuite extends BaseTransactionSuite {
     val f = for {
       (portfolioBefore, utxSizeBefore) <- sender.debugPortfoliosFor(firstAddress, considerUnspent = false).zip(sender.utxSize)
 
-      _ <- sender.payment(firstAddress, secondAddress, 5.waves, fee = 5.waves)
+      _ <- sender.transfer(firstAddress, secondAddress, 5.waves, fee = 5.waves)
       _ <- sender.waitForUtxIncreased(utxSizeBefore)
 
       portfolioAfter <- sender.debugPortfoliosFor(firstAddress, considerUnspent = false)

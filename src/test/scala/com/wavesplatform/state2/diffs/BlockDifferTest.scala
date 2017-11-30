@@ -7,13 +7,13 @@ import com.wavesplatform.features.{BlockchainFeatures, FeatureProvider}
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.BlockDiff
 import com.wavesplatform.state2.reader.CompositeStateReader.composite
-import com.wavesplatform.state2.reader.{SnapshotStateReader}
+import com.wavesplatform.state2.reader.SnapshotStateReader
 import org.scalatest.{FreeSpecLike, Matchers}
 import scorex.account.PrivateKeyAccount
 import scorex.block.Block
 import scorex.lagonaki.mocks.TestBlock
 import scorex.settings.TestFunctionalitySettings
-import scorex.transaction.{GenesisTransaction, PaymentTransaction, TransactionParser, ValidationError}
+import scorex.transaction.{GenesisTransaction, TransactionParser, ValidationError}
 
 class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen {
 
@@ -154,7 +154,7 @@ class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen {
     val genesisTx = GenesisTransaction.create(from, Long.MaxValue - 1, ts).right.get
 
     val paymentTxs = (1 to numPayments).map { i =>
-      PaymentTransaction.create(
+      createWavesTransfer(
         from,
         to,
         amount = 10000,

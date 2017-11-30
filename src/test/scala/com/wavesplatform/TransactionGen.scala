@@ -151,6 +151,16 @@ trait TransactionGen {
     (_, _, _, amount, _, _, feeAmount, attachment) <- transferParamGen
   } yield TransferTransaction.create(assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment).right.get
 
+  def wavesTransferGeneratorP(sender: PrivateKeyAccount, recipient: AddressOrAlias): Gen[TransferTransaction] =
+    transferGeneratorP(sender, recipient, None, None)
+
+  def wavesTransferGeneratorP(timestamp: Long, sender: PrivateKeyAccount, recipient: AddressOrAlias): Gen[TransferTransaction] =
+    transferGeneratorP(timestamp, sender, recipient, None, None)
+
+  def createWavesTransfer(sender: PrivateKeyAccount, recipient: Address,
+                          amount: Long, fee: Long, timestamp: Long): Either[ValidationError, TransferTransaction] =
+    TransferTransaction.create(None, sender, recipient, amount, timestamp, None, fee, Array())
+
   val transferGen = (for {
     (assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment) <- transferParamGen
   } yield TransferTransaction.create(assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment).right.get)

@@ -24,12 +24,11 @@ class MicroBlockSpecification extends FunSuite with Matchers with MockFactory wi
   test("MicroBlock with txs bytes/parse roundtrip") {
 
     val ts = System.currentTimeMillis() - 5000
-    val tx: Transaction = PaymentTransaction.create(sender, gen, 5, 1000, ts).right.get
     val tr: TransferTransaction = TransferTransaction.create(None, sender, gen, 5, ts + 1, None, 2, Array()).right.get
     val assetId = Some(ByteStr(Array.fill(AssetIdLength)(Random.nextInt(100).toByte)))
     val tr2: TransferTransaction = TransferTransaction.create(assetId, sender, gen, 5, ts + 2, None, 2, Array()).right.get
 
-    val transactions = Seq(tx, tr, tr2)
+    val transactions = Seq(tr, tr2)
 
     val microBlock = MicroBlock.buildAndSign(sender, transactions, prevResBlockSig, totalResBlockSig).explicitGet()
     val parsedBlock = MicroBlock.parseBytes(microBlock.bytes()).get
@@ -47,7 +46,7 @@ class MicroBlockSpecification extends FunSuite with Matchers with MockFactory wi
 
   test("MicroBlock cannot be created with zero transactions") {
 
-    val transactions = Seq.empty[PaymentTransaction]
+    val transactions = Seq.empty[TransferTransaction]
     val eitherBlockOrError = MicroBlock.buildAndSign(sender, transactions, prevResBlockSig, totalResBlockSig)
 
     eitherBlockOrError should produce("cannot create empty MicroBlock")
@@ -55,7 +54,7 @@ class MicroBlockSpecification extends FunSuite with Matchers with MockFactory wi
 
   test("MicroBlock cannot contain more than Miner.MaxTransactionsPerMicroblock") {
 
-    val transaction = PaymentTransaction.create(sender, gen, 5, 1000, System.currentTimeMillis()).right.get
+    val transaction = TransferTransaction.create(None, sender, gen, 5, System.currentTimeMillis(), None, 1000, Array()).right.get
     val transactions = Seq.fill(Miner.MaxTransactionsPerMicroblock + 1)(transaction)
 
     val eitherBlockOrError = MicroBlock.buildAndSign(sender, transactions, prevResBlockSig, totalResBlockSig)
