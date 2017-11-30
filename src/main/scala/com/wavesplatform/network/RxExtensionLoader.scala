@@ -1,5 +1,6 @@
 package com.wavesplatform.network
 
+import com.wavesplatform.network.RxExtensionLoader.LoaderState.WithPeer
 import com.wavesplatform.network.RxScoreObserver.{BestChannel, ChannelClosedAndSyncWith, SyncWith}
 import io.netty.channel._
 import monix.eval.{Coeval, Task}
@@ -37,11 +38,11 @@ object RxExtensionLoader extends ScorexLogging {
     }.delayExecution(syncTimeOut)
       .runAsync(scheduler)
 
-    def syncNext(state: State, syncWith: SyncWith): State =
-      syncWith match {
+    def syncNext(state: State): State =
+      lastSyncWith().flatten match {
         case None =>
           log.trace("Last bestChannel is None, state is up to date")
-          state.copy(loaderState = LoaderState.Idle)
+          state.withIdleLoader
         case Some(best) => sync(state, best)
       }
 
@@ -56,7 +57,7 @@ object RxExtensionLoader extends ScorexLogging {
           val ch = best.channel
           log.debug(s"${id(ch)} Requesting extension signatures ${if (optimistic) "optimistically" else ""}, last ${knownSigs.length} are ${formatSignatures(knownSigs)}")
           Task(ch.writeAndFlush(GetSignatures(knownSigs))).runAsync
-          state.copy(loaderState = LoaderState.ExpectingSignatures(ch, knownSigs, blacklistOnTimeout(ch, s"Timeout loading extension")))
+          state.withLoaderState(LoaderState.ExpectingSignatures(ch, knownSigs, blacklistOnTimeout(ch, s"Timeout loading extension")))
         case None =>
           log.trace(s"Holding on requesting next sigs, $state")
           state
@@ -68,24 +69,17 @@ object RxExtensionLoader extends ScorexLogging {
       cc match {
         case ChannelClosedAndSyncWith(_, None) =>
           state.loaderState match {
-            case wp: LoaderState.WithPeer =>
-              wp.timeout.cancel()
-              state.copy(loaderState = LoaderState.Idle)
+            case wp: LoaderState.WithPeer => state.withIdleLoader
             case _ => state
           }
         case ChannelClosedAndSyncWith(None, Some(bestChannel)) =>
           log.trace(s"New SyncWith: $bestChannel, currentState = $state")
-          if (state.loaderState == LoaderState.Idle)
-            sync(state, bestChannel)
+          if (state.loaderState == LoaderState.Idle) sync(state, bestChannel)
           else state
         case ChannelClosedAndSyncWith(Some(closedChannel), Some(bestChannel)) =>
           state.loaderState match {
-            case wp: LoaderState.WithPeer if closedChannel == wp.channel =>
-              wp.timeout.cancel()
-              sync(state.copy(loaderState = LoaderState.Idle), bestChannel)
-            case LoaderState.Idle =>
-              sync(state, bestChannel)
-            case _ => state
+            case wp: LoaderState.WithPeer if closedChannel != wp.channel => state
+            case _ => sync(state.withIdleLoader, bestChannel)
           }
       }
     }
@@ -93,20 +87,19 @@ object RxExtensionLoader extends ScorexLogging {
     def onNewSignatures(state: State, ch: Channel, sigs: Signatures): State = {
       state.loaderState match {
         case LoaderState.ExpectingSignatures(c, known, timeout) if c == ch =>
-          timeout.cancel()
           val (_, unknown) = sigs.signatures.span(id => known.contains(id))
           sigs.signatures.find(invalidBlocks.contains) match {
             case Some(invalidBlock) =>
               peerDatabase.blacklistAndClose(ch, s"Signatures contain invalid block(s): $invalidBlock")
-              syncNext(state.copy(loaderState = LoaderState.Idle), lastSyncWith().flatten)
+              syncNext(state.withIdleLoader)
             case None =>
               if (unknown.isEmpty) {
                 log.trace(s"${id(ch)} Received empty extension signatures list, sync with node complete")
-                state.copy(loaderState = LoaderState.Idle)
+                state.withIdleLoader
               } else {
                 log.trace(s"${id(ch)} Requesting all required blocks(size=${unknown.size})")
                 Task(unknown.foreach(s => ch.writeAndFlush(GetBlock(s)))).runAsync
-                state.copy(loaderState = LoaderState.ExpectingBlocks(ch, unknown, unknown.toSet, Set.empty, blacklistOnTimeout(ch, "Timeout loading first requested block")))
+                state.withLoaderState(LoaderState.ExpectingBlocks(ch, unknown, unknown.toSet, Set.empty, blacklistOnTimeout(ch, "Timeout loading first requested block")))
               }
           }
         case _ =>
@@ -117,15 +110,14 @@ object RxExtensionLoader extends ScorexLogging {
 
     def onBlock(state: State, ch: Channel, block: Block): State = {
       state.loaderState match {
-        case LoaderState.ExpectingBlocks(c, requested, expected, recieved, timeout) if c == ch && expected.contains(block.uniqueId) =>
-          timeout.cancel()
+        case LoaderState.ExpectingBlocks(c, requested, expected, recieved, _) if c == ch && expected.contains(block.uniqueId) =>
           if (expected == Set(block.uniqueId)) {
             val blockById = (recieved + block).map(b => b.uniqueId -> b).toMap
             val ext = ExtensionBlocks(requested.map(blockById))
             log.debug(s"${id(ch)} $ext successfully received")
-            extensionLoadingFinished(state.copy(loaderState = LoaderState.Idle), ext, ch)
+            extensionLoadingFinished(state.withIdleLoader, ext, ch)
           } else {
-            state.copy(loaderState = LoaderState.ExpectingBlocks(c, requested, expected - block.uniqueId, recieved + block,
+            state.withLoaderState(LoaderState.ExpectingBlocks(c, requested, expected - block.uniqueId, recieved + block,
               blacklistOnTimeout(ch, s"Timeout loading one of requested blocks, non-received: ${
                 val totalleft = expected.size - 1
                 if (totalleft == 1) "one=" + requested.last.trim
@@ -142,9 +134,8 @@ object RxExtensionLoader extends ScorexLogging {
     def extensionLoadingFinished(state: State, extension: ExtensionBlocks, ch: Channel): State = {
       state.applierState match {
         case ApplierState.Idle =>
-          val newState = state.copy(applierState = ApplierState.Applying(extension))
-          applyExtension(extension, ch)
-          newState
+          scheduleApplyExtension(extension, ch)
+          syncNext(state.copy(applierState = ApplierState.Applying(extension)))
         case ApplierState.Applying(applying) =>
           log.trace(s"Caching recieved $extension until $applying is executed")
           state.copy(applierState = ApplierState.Buffered(ch, extension, applying))
@@ -154,7 +145,7 @@ object RxExtensionLoader extends ScorexLogging {
       }
     }
 
-    def applyExtension(extensionBlocks: ExtensionBlocks, ch: Channel): Unit = {
+    def scheduleApplyExtension(extensionBlocks: ExtensionBlocks, ch: Channel): Unit = {
       extensionApplier(ch, extensionBlocks).flatMap { ar =>
         Task {
           s = onExetensionApplied(s, extensionBlocks, ch, ar)
@@ -169,16 +160,15 @@ object RxExtensionLoader extends ScorexLogging {
           state
         case ApplierState.Applying(_) =>
           log.trace(s"Applying $extension finished with $applicationResult, no cached")
-          syncNext(state.copy(applierState = ApplierState.Idle), lastSyncWith().flatten)
+          syncNext(state.copy(applierState = ApplierState.Idle))
         case ApplierState.Buffered(nextChannel, nextExtension, _) => applicationResult match {
           case Left(_) =>
             log.debug(s"Falied to apply $extension, discarding cached as well")
-            syncNext(state.copy(applierState = ApplierState.Idle), lastSyncWith().flatten)
+            syncNext(state.copy(applierState = ApplierState.Idle))
           case Right(_) =>
             log.trace(s"Successfully applied $extension, staring to apply cached")
-            val newState = syncNext(state.copy(applierState = ApplierState.Applying(nextExtension)), lastSyncWith().flatten)
-            applyExtension(nextExtension, nextChannel)
-            newState
+            scheduleApplyExtension(nextExtension, nextChannel)
+            syncNext(state.copy(applierState = ApplierState.Applying(nextExtension)))
         }
       }
     }
@@ -224,7 +214,17 @@ object RxExtensionLoader extends ScorexLogging {
     override def toString: String = s"ExtensionBlocks(${formatSignatures(blocks.map(_.uniqueId))}"
   }
 
-  case class State(loaderState: LoaderState, applierState: ApplierState)
+  case class State(loaderState: LoaderState, applierState: ApplierState) {
+    def withLoaderState(newLoaderState: LoaderState): State = {
+      loaderState match {
+        case wp: WithPeer => wp.timeout.cancel()
+        case _ =>
+      }
+      State(newLoaderState, applierState)
+    }
+
+    def withIdleLoader: State = withIdleLoader
+  }
 
   sealed trait ApplierState
 
