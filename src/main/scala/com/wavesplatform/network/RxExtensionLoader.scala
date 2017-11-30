@@ -223,7 +223,7 @@ object RxExtensionLoader extends ScorexLogging {
       State(newLoaderState, applierState)
     }
 
-    def withIdleLoader: State = withIdleLoader
+    def withIdleLoader: State = withLoaderState(LoaderState.Idle)
   }
 
   sealed trait ApplierState
