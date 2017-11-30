@@ -10,7 +10,7 @@ import scorex.utils.ScorexLogging
 class DiscardingHandler(blockchainReadiness: Observable[Boolean]) extends ChannelDuplexHandler with ScorexLogging {
 
   private implicit val scheduler: SchedulerService = monix.execution.Scheduler.fixedPool("discarding-handler", 2)
-  private val lastReadiness = lastSeen(blockchainReadiness)
+  private val lastReadiness = lastObserved(blockchainReadiness)
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
     case RawBytes(code, _) if code == TransactionMessageSpec.messageCode && !lastReadiness().contains(true) =>

@@ -75,7 +75,7 @@ package object network extends ScorexLogging {
 
   type ChannelObservable[A] = Observable[(Channel, A)]
 
-  def lastSeen[A](o: Observable[A])(implicit s: Scheduler): Coeval[Option[A]] = {
+  def lastObserved[A](o: Observable[A])(implicit s: Scheduler): Coeval[Option[A]] = {
     @volatile var last = Option.empty[A]
     o.foreach(a => last = Some(a))
     Coeval(last)

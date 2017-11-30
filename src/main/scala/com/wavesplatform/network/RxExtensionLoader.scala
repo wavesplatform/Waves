@@ -1,7 +1,6 @@
 package com.wavesplatform.network
 
-import com.wavesplatform.network.RxExtensionLoader.ApplierState.{Applying, Buffered, Idle}
-import com.wavesplatform.network.RxScoreObserver.SyncWith
+import com.wavesplatform.network.RxScoreObserver.{BestChannel, ChannelClosedAndSyncWith, SyncWith}
 import io.netty.channel._
 import monix.eval.{Coeval, Task}
 import monix.execution.schedulers.SchedulerService
@@ -22,65 +21,72 @@ object RxExtensionLoader extends ScorexLogging {
             history: NgHistory,
             peerDatabase: PeerDatabase,
             invalidBlocks: InvalidBlockStorage,
-            syncWith: Observable[SyncWith],
             blocks: Observable[(Channel, Block)],
             signatures: Observable[(Channel, Signatures)],
-            channelClosed: Observable[Channel]
+            syncWithChannelClosed: Observable[ChannelClosedAndSyncWith]
            )(extensionApplier: (Channel, ExtensionBlocks) => Task[Either[ValidationError, Option[BlockchainScore]]]): Observable[(Channel, Block)] = {
 
     implicit val scheduler: SchedulerService = Scheduler.singleThread("rx-extension-loader")
 
     val simpleBlocks = ConcurrentSubject.publish[(Channel, Block)]
     var s: State = State(LoaderState.Idle, ApplierState.Idle)
-    val lastBestChannel: Coeval[Option[SyncWith]] = lastSeen(syncWith)
+    val lastSyncWith: Coeval[Option[SyncWith]] = lastObserved(syncWithChannelClosed.map(_.syncWith))
 
     def blacklistOnTimeout(ch: Channel, reason: String): CancelableFuture[Unit] = Task {
       peerDatabase.blacklistAndClose(ch, reason)
     }.delayExecution(syncTimeOut)
       .runAsync(scheduler)
 
-    def requestNext(state: State): State = {
-      lastBestChannel().get match {
+    def syncNext(state: State, syncWith: SyncWith): State =
+      syncWith match {
         case None =>
           log.trace("Last bestChannel is None, state is up to date")
           state.copy(loaderState = LoaderState.Idle)
-        case Some(best) =>
-          val maybeKnownSigs = state.applierState match {
-            case ApplierState.Idle => Some((history.lastBlockIds(maxRollback), false))
-            case ApplierState.Applying(ext) => Some((history.lastBlockIds(maxRollback - ext.blocks.size) ++ ext.blocks.map(_.uniqueId), true))
-            case _ => None
-          }
-          maybeKnownSigs match {
-            case Some((knownSigs, optimistic)) =>
-              val ch = best.channel
-              log.debug(s"${id(ch)} Requesting extension signatures ${if (optimistic) "optimistically" else ""}, last ${knownSigs.length} are ${formatSignatures(knownSigs)}")
-              Task(ch.writeAndFlush(GetSignatures(knownSigs))).runAsync
-              state.copy(loaderState = LoaderState.ExpectingSignatures(ch, knownSigs, blacklistOnTimeout(ch, s"Timeout loading extension")))
-            case None =>
-              log.trace(s"Holding on requesting next sigs, $state")
-              state
-          }
+        case Some(best) => sync(state, best)
       }
-    }
 
-    def onChannelClosed(state: State, ch: Channel): State = {
-      state.loaderState match {
-        case wp: LoaderState.WithPeer if wp.channel == ch =>
-          log.debug(s"Current channel ${id(ch)} has been closed while $state")
-          wp.timeout.cancel()
-          requestNext(state.copy(loaderState = LoaderState.Idle))
-        case _ =>
-          log.trace(s"Unrelated channel ${id(ch)} has been closed while $state")
+    def sync(state: State, best: BestChannel): State = {
+      val maybeKnownSigs = state.applierState match {
+        case ApplierState.Idle => Some((history.lastBlockIds(maxRollback), false))
+        case ApplierState.Applying(ext) => Some((history.lastBlockIds(maxRollback - ext.blocks.size) ++ ext.blocks.map(_.uniqueId), true))
+        case _ => None
+      }
+      maybeKnownSigs match {
+        case Some((knownSigs, optimistic)) =>
+          val ch = best.channel
+          log.debug(s"${id(ch)} Requesting extension signatures ${if (optimistic) "optimistically" else ""}, last ${knownSigs.length} are ${formatSignatures(knownSigs)}")
+          Task(ch.writeAndFlush(GetSignatures(knownSigs))).runAsync
+          state.copy(loaderState = LoaderState.ExpectingSignatures(ch, knownSigs, blacklistOnTimeout(ch, s"Timeout loading extension")))
+        case None =>
+          log.trace(s"Holding on requesting next sigs, $state")
           state
       }
     }
 
-    def onNewSyncWith(state: State, sw: SyncWith): State = {
-      log.trace(s"New SyncWith: $sw, currentState = $state")
-      sw match {
-        case Some(_) if state.loaderState == LoaderState.Idle =>
-          requestNext(state)
-        case _ => state
+
+    def onNewSyncWithChannelClosed(state: State, cc: ChannelClosedAndSyncWith): State = {
+      cc match {
+        case ChannelClosedAndSyncWith(_, None) =>
+          state.loaderState match {
+            case wp: LoaderState.WithPeer =>
+              wp.timeout.cancel()
+              state.copy(loaderState = LoaderState.Idle)
+            case _ => state
+          }
+        case ChannelClosedAndSyncWith(None, Some(bestChannel)) =>
+          log.trace(s"New SyncWith: $bestChannel, currentState = $state")
+          if (state.loaderState == LoaderState.Idle)
+            sync(state, bestChannel)
+          else state
+        case ChannelClosedAndSyncWith(Some(closedChannel), Some(bestChannel)) =>
+          state.loaderState match {
+            case wp: LoaderState.WithPeer if closedChannel == wp.channel =>
+              wp.timeout.cancel()
+              sync(state.copy(loaderState = LoaderState.Idle), bestChannel)
+            case LoaderState.Idle =>
+              sync(state, bestChannel)
+            case _ => state
+          }
       }
     }
 
@@ -92,7 +98,7 @@ object RxExtensionLoader extends ScorexLogging {
           sigs.signatures.find(invalidBlocks.contains) match {
             case Some(invalidBlock) =>
               peerDatabase.blacklistAndClose(ch, s"Signatures contain invalid block(s): $invalidBlock")
-              requestNext(state.copy(loaderState = LoaderState.Idle))
+              syncNext(state.copy(loaderState = LoaderState.Idle), lastSyncWith().flatten)
             case None =>
               if (unknown.isEmpty) {
                 log.trace(s"${id(ch)} Received empty extension signatures list, sync with node complete")
@@ -106,7 +112,6 @@ object RxExtensionLoader extends ScorexLogging {
         case _ =>
           log.trace(s"${id(ch)} Received unexpected signatures ${formatSignatures(sigs.signatures)}, ignoring at $state")
           state
-
       }
     }
 
@@ -136,14 +141,14 @@ object RxExtensionLoader extends ScorexLogging {
 
     def extensionLoadingFinished(state: State, extension: ExtensionBlocks, ch: Channel): State = {
       state.applierState match {
-        case Idle =>
-          val newState = state.copy(applierState = Applying(extension))
+        case ApplierState.Idle =>
+          val newState = state.copy(applierState = ApplierState.Applying(extension))
           applyExtension(extension, ch)
           newState
-        case Applying(applying) =>
+        case ApplierState.Applying(applying) =>
           log.trace(s"Caching recieved $extension until $applying is executed")
-          state.copy(applierState = Buffered(ch, extension, applying))
-        case Buffered(_, _, _) =>
+          state.copy(applierState = ApplierState.Buffered(ch, extension, applying))
+        case ApplierState.Buffered(_, _, _) =>
           log.warn(s"Overflow, discarding $extension")
           state
       }
@@ -159,19 +164,19 @@ object RxExtensionLoader extends ScorexLogging {
 
     def onExetensionApplied(state: State, extension: ExtensionBlocks, ch: Channel, applicationResult: Either[ValidationError, Option[BlockchainScore]]): State = {
       state.applierState match {
-        case Idle =>
+        case ApplierState.Idle =>
           log.warn(s"Applying $extension finished with $applicationResult, but applierState is Idle")
           state
-        case Applying(_) =>
+        case ApplierState.Applying(_) =>
           log.trace(s"Applying $extension finished with $applicationResult, no cached")
-          requestNext(state.copy(applierState = ApplierState.Idle))
-        case Buffered(nextChannel, nextExtension, _) => applicationResult match {
+          syncNext(state.copy(applierState = ApplierState.Idle), lastSyncWith().flatten)
+        case ApplierState.Buffered(nextChannel, nextExtension, _) => applicationResult match {
           case Left(_) =>
             log.debug(s"Falied to apply $extension, discarding cached as well")
-            requestNext(state.copy(applierState = ApplierState.Idle))
+            syncNext(state.copy(applierState = ApplierState.Idle), lastSyncWith().flatten)
           case Right(_) =>
             log.trace(s"Successfully applied $extension, staring to apply cached")
-            val newState = requestNext(state.copy(applierState = Applying(nextExtension)))
+            val newState = syncNext(state.copy(applierState = ApplierState.Applying(nextExtension)), lastSyncWith().flatten)
             applyExtension(nextExtension, nextChannel)
             newState
         }
@@ -179,10 +184,9 @@ object RxExtensionLoader extends ScorexLogging {
     }
 
     Observable.merge(
-      syncWith.map(c => onNewSyncWith(s, c)),
       signatures.map { case ((ch, sigs)) => onNewSignatures(s, ch, sigs) },
       blocks.map { case ((ch, block)) => onBlock(s, ch, block) },
-      channelClosed.map(ch => onChannelClosed(s, ch)))
+      syncWithChannelClosed.map(ch => onNewSyncWithChannelClosed(s, ch)))
       .map(s = _)
       .logErr
       .subscribe()

@@ -17,7 +17,6 @@ import com.wavesplatform.http.NodeApiRoute
 import com.wavesplatform.matcher.Matcher
 import com.wavesplatform.metrics.Metrics
 import com.wavesplatform.mining.{Miner, MinerImpl}
-import com.wavesplatform.network.RxScoreObserver.SyncWith
 import com.wavesplatform.network.{InvalidBlockStorageImpl, MicroBlockSynchronizer, NetworkServer, PeerDatabaseImpl, PeerInfo, RxExtensionLoader, RxScoreObserver, UPnP}
 import com.wavesplatform.settings._
 import com.wavesplatform.state2.appender.{BlockAppender, CheckpointAppender, ExtensionAppender, MicroblockAppender}
@@ -83,10 +82,10 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     val (signatures, blocks, blockchainScores, checkpoints, microblockInvs, microblockResponses) = network.messages
 
     val lastBlockInfos = blockchainUpdater.lastBlockInfo
-    val syncWith: Observable[SyncWith] = RxScoreObserver(settings.synchronizationSettings.scoreTTL, history.score(), lastBlockInfos.map(_.score), blockchainScores, network.closedChannels)
+    val syncWithChannelClosed = RxScoreObserver(settings.synchronizationSettings.scoreTTL, history.score(), lastBlockInfos.map(_.score), blockchainScores, network.closedChannels)
     val microblockDatas = MicroBlockSynchronizer(settings.synchronizationSettings.microBlockSynchronizer, history, peerDatabase)(lastBlockInfos.map(_.id), microblockInvs, microblockResponses) _
     val newBlocks = RxExtensionLoader(settings.synchronizationSettings.maxRollback, settings.synchronizationSettings.synchronizationTimeout,
-      history, peerDatabase, knownInvalidBlocks, syncWith, blocks, signatures, network.closedChannels) { case ((c, b)) => processFork(c, b.blocks) }
+      history, peerDatabase, knownInvalidBlocks, blocks, signatures, syncWithChannelClosed) { case ((c, b)) => processFork(c, b.blocks) }
 
 
     val microblockSink = microblockDatas(processMicroBlock)
