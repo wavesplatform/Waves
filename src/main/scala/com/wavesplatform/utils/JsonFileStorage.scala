@@ -6,7 +6,6 @@ import javax.crypto.spec.SecretKeySpec
 
 import play.api.libs.json.{Json, Reads, Writes}
 import scorex.crypto.encode.Base64
-import scorex.crypto.hash.Sha256
 
 import scala.io.{BufferedSource, Source}
 
@@ -15,12 +14,26 @@ object JsonFileStorage {
   private val keySalt = "0495c728-1614-41f6-8ac3-966c22b4a62d"
   private val aes = "AES"
   private val algorithm = aes + "/ECB/PKCS5Padding"
+  private val hashing = "PBKDF2WithHmacSHA512"
 
-  private def keyToSpec(key: String): SecretKeySpec = {
-    var keyBytes: Array[Byte] = (keySalt + key).getBytes(encoding)
-    keyBytes = Sha256.hash(keyBytes)
-    new SecretKeySpec(keyBytes.drop(keyBytes.length - 16), aes)
+  import java.security.NoSuchAlgorithmException
+  import java.security.spec.InvalidKeySpecException
+  import javax.crypto.SecretKeyFactory
+  import javax.crypto.spec.PBEKeySpec
+
+  private def hashPassword(password: Array[Char], salt: Array[Byte], iterations: Int, keyLength: Int): Array[Byte] = try {
+    val skf = SecretKeyFactory.getInstance(hashing)
+    val spec = new PBEKeySpec(password, salt, iterations, keyLength)
+    val key = skf.generateSecret(spec)
+    val res = key.getEncoded
+    res
+  } catch {
+    case e@(_: NoSuchAlgorithmException | _: InvalidKeySpecException) =>
+      throw new RuntimeException(e)
   }
+
+  private def keyToSpec(key: String) =
+    new SecretKeySpec(hashPassword(key.toCharArray, keySalt.getBytes(encoding), 999999, 128), aes)
 
   private def encrypt(key: String, value: String): String = {
     val cipher: Cipher = Cipher.getInstance(algorithm)

@@ -37,12 +37,10 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Auto
     doTouch(a, Long.MaxValue)
   }
 
-  settings.file.foreach(f => {
+  settings.file.filter(_.exists()).foreach(f => {
     try {
-      if(f.exists()) {
-        JsonFileStorage.load[PeersPersistenceType](f.getCanonicalPath).foreach(a => touch(a))
-        log.info(s"${f.getName} loaded, total peers: ${peersPersistence.size()}")
-      }
+      JsonFileStorage.load[PeersPersistenceType](f.getCanonicalPath).foreach(a => touch(a))
+      log.info(s"${f.getName} loaded, total peers: ${peersPersistence.size()}")
     }
     catch {
       case _: MalformedInputException | _: JsonMappingException =>
@@ -87,28 +85,28 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Auto
     }
   }
 
-  override def knownPeers: scala.collection.immutable.Map[InetSocketAddress, Long] = {
+  override def knownPeers: immutable.Map[InetSocketAddress, Long] = {
     ((x: Map[InetSocketAddress, Long]) =>
       if(settings.enableBlacklisting) x.filterKeys(address => !blacklistedHosts.contains(address.getAddress))
       else x)(removeObsoleteRecords(peersPersistence, settings.peersDataResidenceTime.toMillis).asScala).toMap
   }
 
-  override def blacklistedHosts: scala.collection.immutable.Set[InetAddress] =
+  override def blacklistedHosts: immutable.Set[InetAddress] =
     removeObsoleteRecords(blacklist, settings.blackListResidenceTime.toMillis).keySet().asScala.toSet
 
-  override def suspendedHosts: scala.collection.immutable.Set[InetAddress] =
+  override def suspendedHosts: immutable.Set[InetAddress] =
     removeObsoleteRecords(suspension, settings.suspensionResidenceTime.toMillis).keySet().asScala.toSet
 
-  override def detailedBlacklist: scala.collection.immutable.Map[InetAddress, (Long, String)] =
+  override def detailedBlacklist: immutable.Map[InetAddress, (Long, String)] =
     removeObsoleteRecords(blacklist, settings.blackListResidenceTime.toMillis)
       .asScala
       .toMap
       .map { case ((h, t)) => h -> ((t, Option(reasons.get(h)).getOrElse(""))) }
 
-  override def detailedSuspended: scala.collection.immutable.Map[InetAddress, Long] =
+  override def detailedSuspended: immutable.Map[InetAddress, Long] =
     removeObsoleteRecords(suspension, settings.suspensionResidenceTime.toMillis).asScala.toMap
 
-  override def randomPeer(excluded: scala.collection.immutable.Set[InetSocketAddress]): Option[InetSocketAddress] = unverifiedPeers.synchronized {
+  override def randomPeer(excluded: immutable.Set[InetSocketAddress]): Option[InetSocketAddress] = unverifiedPeers.synchronized {
     //    log.trace(s"Excluding: $excluded")
     def excludeAddress(isa: InetSocketAddress) = excluded(isa) || blacklistedHosts(isa.getAddress) || suspendedHosts(isa.getAddress)
 

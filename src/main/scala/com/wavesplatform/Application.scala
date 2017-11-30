@@ -57,7 +57,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     checkGenesis()
 
-    if (wallet.privateKeyAccounts().isEmpty)
+    if (wallet.privateKeyAccounts.isEmpty)
       wallet.generateNewAccounts(1)
 
     val feeCalculator = new FeeCalculator(settings.feesSettings)

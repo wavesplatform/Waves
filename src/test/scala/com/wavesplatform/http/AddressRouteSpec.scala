@@ -22,7 +22,7 @@ class AddressRouteSpec
     with TestWallet
     with NoShrink {
 
-  private val allAccounts = testWallet.privateKeyAccounts()
+  private val allAccounts = testWallet.privateKeyAccounts
   private val allAddresses = allAccounts.map(_.address)
 
   private val route = AddressApiRoute(restAPISettings, testWallet, Coeval.now(mock[SnapshotStateReader]), TestFunctionalitySettings.Stub).route
