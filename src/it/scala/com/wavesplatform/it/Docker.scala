@@ -141,7 +141,8 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
       .filterNot(_.nodeName == node.nodeName)
       .map { n => (n.nodeInfo.networkIpAddress, n.nodeInfo.containerNetworkPort) }
 
-    Future
+    if (seedAddresses.isEmpty) Future.successful(())
+    else Future
       .traverse(seedAddresses)(Function.tupled(connectToOne))
       .map(_ => ())
   }

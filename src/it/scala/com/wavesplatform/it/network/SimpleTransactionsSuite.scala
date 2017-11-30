@@ -27,7 +27,7 @@ class SimpleTransactionsSuite extends FunSuite with BeforeAndAfterAll with Match
     NodeConfigs.newBuilder
       .overrideBase(_.quorum(2))
       .withDefault(3)
-      .build
+      .build()
   )
 
   private lazy val node = nodes.head
