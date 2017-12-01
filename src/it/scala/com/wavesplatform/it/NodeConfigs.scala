@@ -30,11 +30,12 @@ object NodeConfigs {
       copy(specialsConfigs = specialsConfigs ++ (1 to entitiesNumber).map( _ => newSpecialConfig))
     }
 
-    def build: Seq[Config] = {
+    def build(shuffling: Boolean = true): Seq[Config] = {
       val totalEntities = defaultEntities + specialsConfigs.size
       require(totalEntities < baseConfigs.size)
 
-      val (defaultNodes: Seq[Config], specialNodes: Seq[Config]) = Random.shuffle(baseConfigs)
+      val baseConfigsShuffled = if (shuffling) Random.shuffle(baseConfigs) else baseConfigs
+      val (defaultNodes: Seq[Config], specialNodes: Seq[Config]) = baseConfigsShuffled
         .take(totalEntities)
         .splitAt(defaultEntities)
 
