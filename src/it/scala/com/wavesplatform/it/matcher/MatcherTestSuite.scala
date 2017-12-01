@@ -29,7 +29,9 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
   override lazy val nodes: Seq[Node] = docker.startNodes(Configs)
 
   private def matcherNode = nodes.head
+
   private def aliceNode = nodes(1)
+
   private def bobNode = nodes(2)
 
   private var matcherBalance = (0L, 0L)

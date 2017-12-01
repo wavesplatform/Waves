@@ -17,8 +17,10 @@ trait OrderHistory {
   def orderStatus(id: String): OrderStatus
   def orderInfo(id: String): OrderInfo
   def openVolume(assetAcc: AssetAcc): Long
+
   def openVolumes(address: String): Option[Map[String, Long]]
   def ordersByPairAndAddress(assetPair: AssetPair, address: String): Set[String]
+
   def getAllOrdersByAddress(address: String): Stream[String]
   def deleteOrder(assetPair: AssetPair, address: String, orderId: String): Boolean
   def order(id: String): Option[Order]

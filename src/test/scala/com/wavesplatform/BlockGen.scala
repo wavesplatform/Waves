@@ -25,13 +25,13 @@ trait BlockGen extends TransactionGen {
     generationSignature <- byteArrayGen(Block.GeneratorSignatureLength)
     timestamp <- timestampGen
   } yield Block.buildAndSign(
-      version,
-      if (txs.isEmpty) timestamp else txs.map(_.timestamp).max,
-      reference,
-      NxtLikeConsensusBlockData(baseTarget, ByteStr(generationSignature)),
-      txs,
-      signer,
-      Set.empty)
+    version,
+    if (txs.isEmpty) timestamp else txs.map(_.timestamp).max,
+    reference,
+    NxtLikeConsensusBlockData(baseTarget, ByteStr(generationSignature)),
+    txs,
+    signer,
+    Set.empty)
     .explicitGet()
 
   def blockGen(txs: Seq[Transaction], signer: PrivateKeyAccount): Gen[Block] = versionedBlockGen(txs, signer, 1)

@@ -16,7 +16,7 @@ class WideStateGenerationSuite extends FreeSpec with IntegrationNodesInitializat
       .overrideBase(_.quorum(3))
       .withDefault(3)
       .withSpecial(_.nonMiner)
-      .build
+      .build()
   )
 
   private val requestsCount = 10000

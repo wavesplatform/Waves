@@ -17,6 +17,7 @@ object InvalidBlockStorage {
   object Empty extends InvalidBlockStorage {
     var s: Set[ByteStr] = Set.empty[ByteStr]
     override def add(blockId: ByteStr): Unit = s += blockId
+
     override def contains(blockId: ByteStr): Boolean = s.contains(blockId)
   }
 

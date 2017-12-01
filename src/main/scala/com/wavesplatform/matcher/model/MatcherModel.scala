@@ -117,7 +117,7 @@ object Events {
   def createOrderInfo(event: Event): Map[String, OrderInfo] = {
     event match {
       case OrderAdded(lo) =>
-        Map(lo.order.idStr()->
+        Map(lo.order.idStr() ->
           OrderInfo(lo.order.amount, 0L, false))
       case oe: OrderExecuted =>
         val (o1, o2) = (oe.submittedExecuted, oe.counterExecuted)
@@ -125,7 +125,7 @@ object Events {
           o2.order.idStr() -> OrderInfo(o2.order.amount, o2.amount, false)
         )
       case OrderCanceled(lo) =>
-        Map(lo.order.idStr()->
+        Map(lo.order.idStr() ->
           OrderInfo(lo.order.amount, 0, true))
     }
   }

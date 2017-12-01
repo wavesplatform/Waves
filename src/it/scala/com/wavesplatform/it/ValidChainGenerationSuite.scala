@@ -17,7 +17,7 @@ class ValidChainGenerationSuite extends FreeSpec with IntegrationNodesInitializa
       .overrideBase(_.quorum(3))
       .withDefault(3)
       .withSpecial(_.nonMiner)
-      .build
+      .build()
   )
 
   "Generate more blocks and resynchronise after rollback" - {

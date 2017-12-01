@@ -29,7 +29,7 @@ object PaymentTransactionDiff {
             LeaseInfo.empty,
             assets = Map.empty
           )),
-      paymentTransactionIdsByHashes = Map(ByteStr(tx.hash()) -> tx.id())
+        paymentTransactionIdsByHashes = Map(ByteStr(tx.hash()) -> tx.id())
       ))
     }
   }

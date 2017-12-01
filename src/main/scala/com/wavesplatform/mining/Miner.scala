@@ -76,7 +76,6 @@ class MinerImpl(
 
   private def generateOneBlockTask(account: PrivateKeyAccount, balance: Long)(delay: FiniteDuration): Task[Either[String, Block]] = Task {
     history.read { implicit l =>
-      microBlockAttempt.cancel()
       // should take last block right at the time of mining since microblocks might have been added
       val height = history.height()
       val version = if (height <= blockchainSettings.functionalitySettings.blockVersion3AfterHeight) PlainBlockVersion else NgBlockVersion

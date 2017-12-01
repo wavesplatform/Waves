@@ -30,8 +30,9 @@ class PaymentRouteSpec
 
         val timestamp = System.currentTimeMillis()
 
-        val time =  new Time {
+        val time = new Time {
           override def correctedTime(): Long = timestamp
+
           override def getTimestamp(): Long = timestamp
         }
 

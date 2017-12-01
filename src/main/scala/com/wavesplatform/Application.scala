@@ -34,7 +34,6 @@ import scorex.api.http._
 import scorex.api.http.alias.{AliasApiRoute, AliasBroadcastApiRoute}
 import scorex.api.http.assets.{AssetsApiRoute, AssetsBroadcastApiRoute}
 import scorex.api.http.leasing.{LeaseApiRoute, LeaseBroadcastApiRoute}
-import scorex.block.Block
 import scorex.consensus.nxt.api.http.NxtConsensusApiRoute
 import scorex.transaction._
 import scorex.utils.{NTP, ScorexLogging, Time}
@@ -57,7 +56,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     log.debug(s"Available processors: ${Runtime.getRuntime.availableProcessors}")
     log.debug(s"Max memory available: ${Runtime.getRuntime.maxMemory}")
 
-    checkGenesis()
+    checkGenesis(history, settings, blockchainUpdater)
 
     if (wallet.privateKeyAccounts().isEmpty)
       wallet.generateNewAccounts(1)
@@ -162,16 +161,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       val matcher = new Matcher(actorSystem, wallet, utxStorage, allChannels, stateReader, history, settings.blockchainSettings, settings.restAPISettings, settings.matcherSettings)
       matcher.runMatcher()
     }
-  }
-
-  def checkGenesis(): Unit = if (history.isEmpty) {
-    Block.genesis(settings.blockchainSettings.genesisSettings).flatMap(blockchainUpdater.processBlock)
-      .left.foreach { value =>
-      log.error(value.toString)
-      forceStopApplication()
-    }
-
-    log.info("Genesis block has been added to the state")
   }
 
   @volatile var shutdownInProgress = false

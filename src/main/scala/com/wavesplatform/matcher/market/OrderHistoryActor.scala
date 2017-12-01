@@ -176,6 +176,7 @@ object OrderHistoryActor {
   }
 
   case class GetMatcherBalance(address: String, ts: Long) extends ExpirableOrderHistoryRequest
+
   case class GetMatcherBalanceResponse(balances: Option[Map[String, Long]]) extends MatcherResponse {
 
     //val json = Json.obj("status" -> "OrderCancelRejected", "message" -> message)

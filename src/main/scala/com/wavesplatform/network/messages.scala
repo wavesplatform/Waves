@@ -19,6 +19,7 @@ case class GetSignatures(signatures: Seq[ByteStr]) extends Message {
 }
 case class Signatures(signatures: Seq[ByteStr]) extends Message
 case class GetBlock(signature: ByteStr) extends Message
+
 case class LocalScoreChanged(newLocalScore: History.BlockchainScore) extends Message
 case class RawBytes(code: Byte, data: Array[Byte]) extends Message
 case class BlockForged(block: Block) extends Message

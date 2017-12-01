@@ -7,14 +7,13 @@ object TestFunctionalitySettings {
     featureCheckBlocksPeriod = 10000,
     blocksForFeatureActivation = 9000,
     allowTemporaryNegativeUntil = 0L, allowInvalidPaymentTransactionsByTimestamp = 0L,
-    requireSortedTransactionsAfter = 0L, generationBalanceDepthFrom50To1000AfterHeight = 0L,
+    requireSortedTransactionsAfter = 0L, generationBalanceDepthFrom50To1000AfterHeight = 0,
     minimalGeneratingBalanceAfter = 0L,
     allowTransactionsFromFutureUntil = Long.MaxValue, allowUnissuedAssetsUntil = 0L,
     requirePaymentUniqueIdAfter = 0L,
     allowInvalidReissueInSameBlockUntilTimestamp = 0L,
     allowMultipleLeaseCancelTransactionUntilTimestamp = 0L, resetEffectiveBalancesAtHeight = 0,
-    allowLeasedBalanceTransferUntil = 0L,
-    blockVersion3AfterHeight = 0L,
+    blockVersion3AfterHeight = 0,
     preActivatedFeatures = Map.empty
   )
 
