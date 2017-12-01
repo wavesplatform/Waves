@@ -27,6 +27,7 @@ trait MultipleNodesApi extends ScorexLogging {
 
   def waitForSameBlocksAt(nodes: Iterable[NodeApi], retryInterval: FiniteDuration, height: Int): Future[Boolean] = {
     def waitHeight = waitFor[Int](nodes, retryInterval)(_.height, _.forall(_ >= height))
+
     def waitSameBlocks = waitFor[NodeApi.Block](nodes, retryInterval)(_.blockAt(height), { blocks =>
       val sig = blocks.map(_.signature)
       sig.forall(_ == sig.head)

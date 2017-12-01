@@ -24,7 +24,7 @@ case class Message[Content <: AnyRef](spec: MessageSpec[Content],
 
   lazy val dataLength: Int = dataBytes.length
 
-  val bytes =Coeval.evalOnce {
+  val bytes = Coeval.evalOnce {
     val dataWithChecksum = if (dataLength > 0) {
       val checksum = hash(dataBytes).take(ChecksumLength)
       Bytes.concat(checksum, dataBytes)

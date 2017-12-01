@@ -10,6 +10,7 @@ trait ValidationError
 object ValidationError {
 
   case class InvalidAddress(reason: String) extends ValidationError
+
   case class NegativeAmount(amount: Long, of: String) extends ValidationError
   case object InsufficientFee extends ValidationError
   case object TooBigArray extends ValidationError
@@ -19,6 +20,7 @@ object ValidationError {
   case object MissingSenderPrivateKey extends ValidationError
   case object UnsupportedTransactionType extends ValidationError
   case object InvalidRequestSignature extends ValidationError
+
   case class BlockFromFuture(ts: Long) extends ValidationError
   case class InvalidSignature(s: Signed, details: Option[InvalidSignature] = None) extends ValidationError {
     override def toString: String = s"InvalidSignature(${s.toString + " reason: " + details})"

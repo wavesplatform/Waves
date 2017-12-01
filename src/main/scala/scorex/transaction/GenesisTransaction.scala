@@ -19,7 +19,7 @@ case class GenesisTransaction private(recipient: Address, amount: Long, timestam
 
   val transactionType = TransactionType.GenesisTransaction
 
-  override val json: Coeval[JsObject] = Coeval.evalOnce (
+  override val json: Coeval[JsObject] = Coeval.evalOnce(
     Json.obj("type" -> transactionType.id,
       "id" -> id().base58,
       "fee" -> 0,

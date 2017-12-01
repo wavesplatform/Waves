@@ -78,6 +78,7 @@ trait TransferSending extends ScorexLogging {
       if (rest.isEmpty) Future.successful(lastTx)
       else makeTransfer(rest.head).flatMap(tx => aux(rest.tail, Some(tx)))
     }
+
     aux(requests, None)
   }
 
