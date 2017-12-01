@@ -42,6 +42,10 @@ case class LeaseTransaction private(sender: PublicKeyAccount,
 
 object LeaseTransaction {
 
+  object Status extends Enumeration {
+    val Active, Canceled = Value
+  }
+
   def parseTail(bytes: Array[Byte]): Try[LeaseTransaction] = Try {
     import EllipticCurveImpl._
     val sender = PublicKeyAccount(bytes.slice(0, KeyLength))

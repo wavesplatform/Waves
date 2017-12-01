@@ -126,6 +126,9 @@ case class TransactionsApiRoute(
 
   private def txToExtendedJson(tx: Transaction): JsObject = {
     tx match {
+      case lease: LeaseTransaction =>
+        import LeaseTransaction.Status._
+        lease.json() ++ Json.obj("status" -> (if (state().isLeaseActive(lease)) Active else Canceled))
       case leaseCancel: LeaseCancelTransaction =>
         leaseCancel.json() ++ Json.obj("lease" -> state().findTransaction[LeaseTransaction](leaseCancel.leaseId).map(_.json()).getOrElse[JsValue](JsNull))
       case t => t.json()
