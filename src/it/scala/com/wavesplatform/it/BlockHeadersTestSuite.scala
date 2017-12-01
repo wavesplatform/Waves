@@ -22,7 +22,7 @@ class BlockHeadersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAl
       .overrideBase(_.quorum(2))
       .withDefault(2)
       .withSpecial(_.nonMiner)
-      .build
+      .build()
   )
 
   private lazy val notMiner: Node = nodes.last
