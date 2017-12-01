@@ -18,7 +18,7 @@ case class GetSignatures(signatures: Seq[ByteStr]) extends Message {
   override def toString: String = s"GetSignatures(${formatSignatures(signatures)})"
 }
 case class Signatures(signatures: Seq[ByteStr]) extends Message {
-  override def toString: String = s"GetSignatures(${formatSignatures(signatures)})"
+  override def toString: String = s"Signatures(${formatSignatures(signatures)})"
 }
 case class GetBlock(signature: ByteStr) extends Message
 
