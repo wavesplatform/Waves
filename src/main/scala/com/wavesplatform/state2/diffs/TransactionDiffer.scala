@@ -35,7 +35,7 @@ object TransactionDiffer {
         case atx: CreateAliasTransaction => CreateAliasTransactionDiff(currentBlockHeight)(atx)
         case _ => Left(UnsupportedTransactionType)
       }
-      positiveDiff <- BalanceDiffValidation(s, currentBlockTimestamp, settings)(diff)
+      positiveDiff <- BalanceDiffValidation(s, settings)(diff)
     } yield positiveDiff
   }.left.map(TransactionValidationError(_, tx))
 }

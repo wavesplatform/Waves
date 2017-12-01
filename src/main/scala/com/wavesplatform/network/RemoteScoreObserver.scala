@@ -6,6 +6,7 @@ import java.util.concurrent.atomic.AtomicReference
 import com.wavesplatform.state2.ByteStr
 import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel._
+import io.netty.channel.group.ChannelGroup
 import scorex.transaction.History
 import scorex.utils.ScorexLogging
 
@@ -15,7 +16,10 @@ import scala.concurrent.duration.FiniteDuration
 import scala.util.{Failure, Success}
 
 @Sharable
-class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteStr], initialLocalScore: BigInt)
+class RemoteScoreObserver(scoreTtl: FiniteDuration,
+                          lastSignatures: => Seq[ByteStr],
+                          initialLocalScore: BigInt,
+                          allChannels: ChannelGroup)
   extends ChannelDuplexHandler with ScorexLogging {
 
   private val pinnedChannel = new AtomicReference[Channel]()
@@ -53,20 +57,26 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
     }
 
   override def write(ctx: ChannelHandlerContext, msg: AnyRef, promise: ChannelPromise): Unit = msg match {
-    case LocalScoreChanged(newLocalScore, breakExtLoading) =>
+    case LocalScoreChanged(newLocalScore, breakExtProcessing) =>
+      if (localScore != newLocalScore) log.debug(s"${id(ctx)} ${pinnedChannelId}New local score: $newLocalScore")
       localScore = newLocalScore
-      log.debug(s"${id(ctx)} $pinnedChannelId New local score: $newLocalScore")
       ctx.write(msg, promise)
 
-      if (breakExtLoading) {
-        ctx.write(LoadBlockchainExtension(Seq.empty))
-        if (pinnedChannel.compareAndSet(ctx.channel(), null)) log.debug(s"${id(ctx)} Stop processing an extension")
+      val currChannel = ctx.channel()
+      if (breakExtProcessing && pinnedChannel.compareAndSet(ctx.channel(), null)) {
         channelWithHighestScore match {
-          case Some((bestChannel, bestScore))
-            if bestScore > localScore && pinnedChannel.compareAndSet(null, bestChannel) =>
-            log.debug(s"${id(ctx)} Switching to second best channel $pinnedChannelId")
-            requestExtension(bestChannel)
+          case Some((bestChannel, bestChannelScore)) if bestChannelScore > localScore =>
+            val currChannelScore = Option(scores.get(currChannel)).getOrElse(BigInt(0))
+            val nextChannel = if (bestChannelScore > currChannelScore) bestChannel else currChannel
+
+            if (pinnedChannel.compareAndSet(null, nextChannel)) {
+              if (nextChannel == currChannel) log.debug(s"${id(ctx)} Staying on this channel, it has the best score")
+              else log.debug(s"${id(ctx)} Switching to best channel ${id(nextChannel)}, diff: ${bestChannelScore - currChannelScore}")
+              requestExtension(nextChannel)
+            }
           case _ =>
+            log.debug(s"Node catched up the blockchain")
+            allChannels.broadcast(LoadBlockchainExtension(Seq.empty))
         }
       }
 
@@ -74,7 +84,10 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
   }
 
   private def requestExtension(channel: Channel): Unit = Future(blocking(lastSignatures)).onComplete {
-    case Success(sig) => channel.writeAndFlush(LoadBlockchainExtension(sig))
+    case Success(sig) =>
+      log.trace(s"Stopping an optimistically loading of extension from all channels except ${id(channel)}")
+      allChannels.broadcast(LoadBlockchainExtension(Seq.empty), Some(channel))
+      channel.writeAndFlush(LoadBlockchainExtension(sig))
     case Failure(e) => log.warn("Error getting last signatures", e)
   }
 
@@ -102,7 +115,7 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
         log.debug(s"${id(ctx)} ${pinnedChannelId}New high score $highScore > $localScore, pinning and requesting extension")
         requestExtension(ch)
       } else {
-        log.trace(s"${id(ctx)} New high score $highScore, but we are processing a score from $pinnedChannelId for now")
+        log.trace(s"${id(ctx)} New high score $highScore, but we are processing a score from ${pinnedChannelId}for now")
       }
 
     case ExtensionBlocks(blocks) if pinnedChannel.get() == ctx.channel() =>

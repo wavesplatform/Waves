@@ -5,6 +5,8 @@ import java.nio.file.Files
 
 import com.wavesplatform.state2.VersionableStorage
 import org.h2.mvstore.MVStore
+import org.joda.time.Duration
+import org.joda.time.format.PeriodFormat
 import scorex.utils.ScorexLogging
 
 import scala.util.Try
@@ -59,4 +61,30 @@ package object utils extends ScorexLogging {
   def forceStopApplication(reason: ApplicationStopReason = Default): Unit = new Thread(() => {
     System.exit(reason.code)
   }, "waves-platform-shutdown-thread").start()
+
+  def humanReadableSize(bytes: Long, si: Boolean = true): String = {
+    val (baseValue, unitStrings) =
+      if (si)
+        (1000, Vector("B", "kB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"))
+      else
+        (1024, Vector("B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB"))
+
+    def getExponent(curBytes: Long, baseValue: Int, curExponent: Int = 0): Int =
+      if (curBytes < baseValue) curExponent
+      else {
+        val newExponent = 1 + curExponent
+        getExponent(curBytes / (baseValue * newExponent), baseValue, newExponent)
+      }
+
+    val exponent = getExponent(bytes, baseValue)
+    val divisor = Math.pow(baseValue, exponent)
+    val unitString = unitStrings(exponent)
+
+    f"${bytes / divisor}%.1f $unitString"
+  }
+
+  def humanReadableDuration(duration: Long): String = {
+    val d = new Duration(duration)
+    PeriodFormat.getDefault.print(d.toPeriod)
+  }
 }

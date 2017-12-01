@@ -34,7 +34,7 @@ class TimeImpl extends Time with ScorexLogging {
         client.open()
         val info = client.getTime(InetAddress.getByName(NtpServer))
         info.computeDetails()
-        Option(info.getOffset).map(offset => if (offset > offsetPanicThreshold) throw new Exception("Offset is suspiciously large") else offset)
+        Option(info.getOffset).map(offset => if (Math.abs(offset) > offsetPanicThreshold) throw new Exception("Offset is suspiciously large") else offset)
       } catch {
         case _: SocketTimeoutException =>
           None
