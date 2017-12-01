@@ -35,30 +35,23 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration,
 
   override def handlerAdded(ctx: ChannelHandlerContext): Unit =
     ctx.channel().closeFuture().addListener { f: ChannelFuture =>
-      for ((bestChannel, _) <- channelWithHighestScore) {
-        // having no channel with highest score means scores map is empty, so it's ok to attempt to remove this channel
-        // from the map only when there is one.
-        Option(scores.remove(ctx.channel())).foreach(removedScore => log.debug(s"${id(ctx)} Closed, removing score $removedScore"))
-        if (bestChannel == f.channel()) {
-          // this channel had the highest score, so we should request extension from second-best channel, just in case
-          channelWithHighestScore match {
-            case Some((secondBestChannel, secondBestScore))
-              if secondBestScore > localScore && pinnedChannel.compareAndSet(bestChannel, secondBestChannel) =>
-              log.debug(s"${id(ctx)} Switching to second best channel $pinnedChannelId")
-              requestExtension(secondBestChannel)
-            case _ =>
-              if (pinnedChannel.compareAndSet(f.channel(), null)) log.trace(s"${id(ctx)} Unpinning unconditionally")
-          }
-        } else {
-          if (pinnedChannel.compareAndSet(ctx.channel(), null))
-            log.debug(s"${id(ctx)} ${pinnedChannelId}Closing channel and unpinning")
+      scores.remove(ctx.channel())
+      if (pinnedChannel.compareAndSet(ctx.channel(), null)) {
+        channelWithHighestScore match {
+          case Some((bestChannel, bestChannelScore)) if bestChannelScore > localScore && pinnedChannel.compareAndSet(null, bestChannel) =>
+            log.debug(s"${id(ctx)} ${pinnedChannelId}Closing channel, pinned to the second best")
+            requestExtension(bestChannel)
+          case _ =>
+            log.debug(s"${id(ctx)} ${pinnedChannelId}Closing channel")
         }
       }
     }
 
   override def write(ctx: ChannelHandlerContext, msg: AnyRef, promise: ChannelPromise): Unit = msg match {
     case LocalScoreChanged(newLocalScore, breakExtProcessing) =>
-      if (localScore != newLocalScore) log.debug(s"${id(ctx)} ${pinnedChannelId}New local score: $newLocalScore")
+      Option(pinnedChannel.get()).filter(_ == ctx.channel()).foreach { _ =>
+        log.debug(s"${id(ctx)} ${pinnedChannelId}New local score: $newLocalScore")
+      }
       localScore = newLocalScore
       ctx.write(msg, promise)
 
