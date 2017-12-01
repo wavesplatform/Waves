@@ -2,7 +2,6 @@ package com.wavesplatform.it.api
 
 import java.io.IOException
 import java.util.concurrent.TimeoutException
-import javassist.bytecode.ByteArray
 
 import com.wavesplatform.features.api.ActivationStatus
 import com.wavesplatform.it.util._

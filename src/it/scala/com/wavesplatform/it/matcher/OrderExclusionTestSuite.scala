@@ -100,17 +100,6 @@ class OrderExclusionTestSuite extends FreeSpec with Matchers with BeforeAndAfter
     )
 
 
-  private def getBalance(node: Node): (Long, Long) = {
-    val initialHeight = Await.result(node.height, 1.minute)
-    Await.result(node.waitForHeight(initialHeight + 2), 2.minute)
-
-    val balance = Await.result(node.balance(node.address), 1.minute).balance
-    val height = Await.result(node.height, 1.minute)
-
-    (balance, height)
-  }
-
-
   private def matcherPlaceOrder(order: Order): (String, String) = {
     val futureResult = matcherNode.placeOrder(order)
 

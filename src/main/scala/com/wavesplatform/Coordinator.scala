@@ -43,21 +43,21 @@ object Coordinator extends ScorexLogging with Instrumented {
               .zipWithIndex
               .collectFirst { case ((b, Left(e)), i) => (i, b, e) }
               .fold[Either[ValidationError, Unit]](Right(())) {
-                case (i, declinedBlock, e) =>
-                  e match {
-                    case _: ValidationError.BlockFromFuture =>
-                    case _ => invalidBlocks.add(declinedBlock.uniqueId)
-                  }
+              case (i, declinedBlock, e) =>
+                e match {
+                  case _: ValidationError.BlockFromFuture =>
+                  case _ => invalidBlocks.add(declinedBlock.uniqueId)
+                }
 
-                  extension.view
-                    .dropWhile(_ != declinedBlock)
-                    .foreach(BlockStats.declined(_, BlockStats.Source.Ext))
+                extension.view
+                  .dropWhile(_ != declinedBlock)
+                  .foreach(BlockStats.declined(_, BlockStats.Source.Ext))
 
-                  if (i == 0) log.warn(s"Can't process fork starting with $lastCommonBlockId, error appending block $declinedBlock: $e")
-                  else log.warn(s"Processed only ${i + 1} of ${newBlocks.size} blocks from extension, error appending next block $declinedBlock: $e")
+                if (i == 0) log.warn(s"Can't process fork starting with $lastCommonBlockId, error appending block $declinedBlock: $e")
+                else log.warn(s"Processed only ${i + 1} of ${newBlocks.size} blocks from extension, error appending next block $declinedBlock: $e")
 
-                  Left(e)
-              }
+                Left(e)
+            }
           }
 
           val initalHeight = history.height()
