@@ -94,19 +94,15 @@ class MatcherActor(orderHistory: ActorRef, storedState: StateReader, wallet: Wal
   def forwardReq(req: Any)(orderBook: ActorRef): Unit = orderBook forward req
 
   def checkAssetPair[A <: {def assetPair : AssetPair}](msg: A)(f: => Unit): Unit = {
-    if (tradedPairs.contains(msg.assetPair)) {
-      f
+    val v =  checkBlacklistId(msg.assetPair) && basicValidation(msg) && checkBlacklistRegex(msg.assetPair)
+    if (!v) {
+      sender() ! StatusCodeMatcherResponse(StatusCodes.NotFound, v.messages())
     } else {
-      val v =  checkBlacklistId(msg.assetPair) && basicValidation(msg) && checkBlacklistRegex(msg.assetPair)
-      if (!v) {
-        sender() ! StatusCodeMatcherResponse(StatusCodes.NotFound, v.messages())
+      val ov = checkPairOrdering(msg.assetPair)
+      if (!ov) {
+        sender() ! StatusCodeMatcherResponse(StatusCodes.Found, ov.messages())
       } else {
-        val ov = checkPairOrdering(msg.assetPair)
-        if (!ov) {
-          sender() ! StatusCodeMatcherResponse(StatusCodes.Found, ov.messages())
-        } else {
-          f
-        }
+        f
       }
     }
   }
