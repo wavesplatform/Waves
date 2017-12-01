@@ -52,13 +52,17 @@ class NetworkServer(checkpointService: CheckpointService,
 
   private val scoreObserver = new RemoteScoreObserver(
     settings.synchronizationSettings.scoreTTL,
-    history.lastBlockIds(settings.synchronizationSettings.maxRollback), history.score())
+    history.lastBlockIds(settings.synchronizationSettings.maxRollback), history.score(), allChannels)
 
-  private val trafficWatcher = if (settings.metrics.enable) new TrafficWatcher else new NoopHandler
-  private val trafficLogger = {
-    if (settings.networkSettings.trafficLogger.enable) new TrafficLogger(settings.networkSettings.trafficLogger)
-    else new NoopHandler
-  }
+  private val trafficWatcher = if (settings.metrics.enable) {
+    log.debug("Watching and reporting of traffic is enabled")
+    new TrafficWatcher
+  } else new NoopHandler
+
+  private val trafficLogger = if (settings.networkSettings.trafficLogger.enable) {
+    log.debug("Logging of traffic is enabled")
+    new TrafficLogger(settings.networkSettings.trafficLogger)
+  } else new NoopHandler
 
   private val discardingHandler = new DiscardingHandler(blockchainReadiness)
   private val messageCodec = new MessageCodec(peerDatabase)
@@ -133,7 +137,7 @@ class NetworkServer(checkpointService: CheckpointService,
         historyReplier,
         microBlockSynchronizer,
         new ExtensionSignaturesLoader(settings.synchronizationSettings.synchronizationTimeout, peerDatabase, knownInvalidBlocks),
-        new ExtensionBlocksLoader(settings.synchronizationSettings.synchronizationTimeout, peerDatabase, history),
+        new ExtensionBlocksLoader(settings.synchronizationSettings.synchronizationTimeout, peerDatabase, history, knownInvalidBlocks),
         new OptimisticExtensionLoader,
         utxPoolSynchronizer,
         scoreObserver,
@@ -168,7 +172,7 @@ class NetworkServer(checkpointService: CheckpointService,
       historyReplier,
       microBlockSynchronizer,
       new ExtensionSignaturesLoader(settings.synchronizationSettings.synchronizationTimeout, peerDatabase, knownInvalidBlocks),
-      new ExtensionBlocksLoader(settings.synchronizationSettings.synchronizationTimeout, peerDatabase, history),
+      new ExtensionBlocksLoader(settings.synchronizationSettings.synchronizationTimeout, peerDatabase, history, knownInvalidBlocks),
       new OptimisticExtensionLoader,
       utxPoolSynchronizer,
       scoreObserver,

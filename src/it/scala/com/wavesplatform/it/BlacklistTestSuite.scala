@@ -48,7 +48,7 @@ class BlacklistTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll w
 
   "sleep while nodes are blocked" in Await.result(
     primaryNode.waitFor[Seq[BlacklistedPeer]](s"blacklistedPeers is empty")(_.blacklistedPeers, _.isEmpty, 5.second),
-    primaryNode.settings.networkSettings.blackListResidenceTime + 5.seconds
+    primaryNode.settings.networkSettings.blackListResidenceTime + 10.seconds
   )
 
   "and sync again" in Await.result(

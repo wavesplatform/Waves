@@ -7,7 +7,7 @@ import com.wavesplatform.features.{BlockchainFeatures, FeatureProvider}
 import com.wavesplatform.metrics.Instrumented
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2._
-import com.wavesplatform.state2.patch.LeasePatch
+import com.wavesplatform.state2.patch.{CancelAllLeases, CancelLeaseOverflow}
 import com.wavesplatform.state2.reader.CompositeStateReader.composite
 import com.wavesplatform.state2.reader.SnapshotStateReader
 import monix.eval.Task
@@ -102,10 +102,15 @@ object BlockDiffer extends ScorexLogging with Instrumented {
     }
 
     txsDiffEi.map { d =>
-      val diff = if (currentBlockHeight == settings.resetEffectiveBalancesAtHeight)
-        Monoid.combine(d, LeasePatch(composite(d.asBlockDiff, s)))
+      val diffWithCancelledLeases = if (currentBlockHeight == settings.resetEffectiveBalancesAtHeight)
+        Monoid.combine(d, CancelAllLeases(composite(d.asBlockDiff, s)))
       else d
-      val newSnapshots = diff.portfolios
+
+      val diffWithLeasePatches = if (currentBlockHeight == settings.blockVersion3AfterHeight)
+        Monoid.combine(diffWithCancelledLeases, CancelLeaseOverflow(composite(diffWithCancelledLeases.asBlockDiff, s)))
+      else diffWithCancelledLeases
+
+      val newSnapshots = diffWithLeasePatches.portfolios
         .collect { case (acc, portfolioDiff) if portfolioDiff.balance != 0 || portfolioDiff.effectiveBalance != 0 =>
           val oldPortfolio = s.partialPortfolio(acc, Set.empty[ByteStr])
           if (s.lastUpdateHeight(acc).contains(currentBlockHeight)) {
@@ -117,7 +122,7 @@ object BlockDiffer extends ScorexLogging with Instrumented {
             balance = oldPortfolio.balance + portfolioDiff.balance,
             effectiveBalance = oldPortfolio.effectiveBalance + portfolioDiff.effectiveBalance))
         }
-      BlockDiff(diff, heightDiff, newSnapshots)
+      BlockDiff(diffWithLeasePatches, heightDiff, newSnapshots)
     }
   }
 }
