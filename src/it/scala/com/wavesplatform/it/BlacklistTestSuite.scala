@@ -18,7 +18,7 @@ class BlacklistTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll w
       .overrideBase(_.quorum(2))
       .withDefault(3)
       .withSpecial(_.quorum(0))
-      .build
+      .build()
   )
 
   private def primaryNode = nodes.last
