@@ -13,15 +13,17 @@ class MicroblocksGenerationSuite extends FreeSpec with IntegrationNodesInitializ
   with Matchers with TransferSending with MultipleNodesApi {
 
   private val txsInMicroBlock = 200
-  private val maxTxs = 1800
+  private val maxTxs = 1000 // Increase after batch transactions
 
   private val config = ConfigFactory
     .parseString(
       s"""waves {
+         |  network.enable-peers-exchange = no
+         |
          |  miner {
          |    quorum = 0
          |    minimal-block-generation-offset = 60000ms
-         |    micro-block-interval = 5s
+         |    micro-block-interval = 3s
          |    max-transactions-in-key-block = 0
          |    max-transactions-in-micro-block = $txsInMicroBlock
          |  }
