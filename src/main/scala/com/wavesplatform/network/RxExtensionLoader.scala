@@ -33,7 +33,7 @@ object RxExtensionLoader extends ScorexLogging {
     var s: State = State(LoaderState.Idle, ApplierState.Idle)
     val lastSyncWith: Coeval[Option[SyncWith]] = lastObserved(syncWithChannelClosed.map(_.syncWith))
 
-    def blacklistOnTimeout(ch: Channel, reason: String): Task[Unit] = Task {
+    def scheduleBlacklist(ch: Channel, reason: String): Task[Unit] = Task {
       peerDatabase.blacklistAndClose(ch, reason)
     }.delayExecution(syncTimeOut)
 
@@ -56,7 +56,7 @@ object RxExtensionLoader extends ScorexLogging {
         case Some((knownSigs, optimistic)) =>
           val ch = best.channel
           log.debug(s"${id(ch)} Requesting extension signatures ${if (optimistic) "optimistically" else ""}, last ${knownSigs.length} are ${formatSignatures(knownSigs)}")
-          val blacklisting = blacklistOnTimeout(ch, s"Timeout loading extension").runAsync
+          val blacklisting = scheduleBlacklist(ch, s"Timeout loading extension").runAsync
           Task(ch.writeAndFlush(GetSignatures(knownSigs))).runAsync
           state.withLoaderState(LoaderState.ExpectingSignatures(ch, knownSigs, blacklisting))
         case None =>
@@ -70,7 +70,7 @@ object RxExtensionLoader extends ScorexLogging {
       cc match {
         case ChannelClosedAndSyncWith(_, None) =>
           state.loaderState match {
-            case wp: LoaderState.WithPeer => state.withIdleLoader
+            case _: LoaderState.WithPeer => state.withIdleLoader
             case _ => state
           }
         case ChannelClosedAndSyncWith(None, Some(bestChannel)) =>
@@ -87,7 +87,7 @@ object RxExtensionLoader extends ScorexLogging {
 
     def onNewSignatures(state: State, ch: Channel, sigs: Signatures): State = {
       state.loaderState match {
-        case LoaderState.ExpectingSignatures(c, known, timeout) if c == ch =>
+        case LoaderState.ExpectingSignatures(c, known, _) if c == ch =>
           val (_, unknown) = sigs.signatures.span(id => known.contains(id))
           sigs.signatures.find(invalidBlocks.contains) match {
             case Some(invalidBlock) =>
@@ -99,7 +99,7 @@ object RxExtensionLoader extends ScorexLogging {
                 state.withIdleLoader
               } else {
                 log.trace(s"${id(ch)} Requesting all required blocks(size=${unknown.size})")
-                val blacklistingAsync = blacklistOnTimeout(ch, "Timeout loading first requested block").runAsync
+                val blacklistingAsync = scheduleBlacklist(ch, "Timeout loading first requested block").runAsync
                 Task(unknown.foreach(s => ch.writeAndFlush(GetBlock(s)))).runAsync
                 state.withLoaderState(LoaderState.ExpectingBlocks(ch, unknown, unknown.toSet, Set.empty, blacklistingAsync))
               }
@@ -119,7 +119,7 @@ object RxExtensionLoader extends ScorexLogging {
             log.debug(s"${id(ch)} $ext successfully received")
             extensionLoadingFinished(state.withIdleLoader, ext, ch)
           } else {
-            val blacklistAsync = blacklistOnTimeout(ch, s"Timeout loading one of requested blocks, non-received: ${
+            val blacklistAsync = scheduleBlacklist(ch, s"Timeout loading one of requested blocks, non-received: ${
               val totalleft = expected.size - 1
               if (totalleft == 1) "one=" + requested.last.trim
               else "total=" + totalleft.toString
@@ -151,13 +151,12 @@ object RxExtensionLoader extends ScorexLogging {
       extensionApplier(ch, extensionBlocks).flatMap { ar =>
         Task {
           s = onExetensionApplied(s, extensionBlocks, ch, ar)
-          log.trace(s"New state(after apply) $s")
         }.executeOn(scheduler)
       }.runAsync(scheduler)
     }
 
     def onExetensionApplied(state: State, extension: ExtensionBlocks, ch: Channel, applicationResult: Either[ValidationError, Option[BlockchainScore]]): State = {
-      state.applierState match {
+      val ns = state.applierState match {
         case ApplierState.Idle =>
           log.warn(s"Applying $extension finished with $applicationResult, but applierState is Idle")
           state
@@ -174,16 +173,15 @@ object RxExtensionLoader extends ScorexLogging {
             syncNext(state.copy(applierState = ApplierState.Applying(nextExtension)))
         }
       }
+      log.trace(s"State after application: $s")
+      ns
     }
 
     Observable.merge(
-      signatures.mapTask { case ((ch, sigs)) => Task(onNewSignatures(s, ch, sigs)) },
-      blocks.mapTask { case ((ch, block)) => Task(onBlock(s, ch, block)) },
-      syncWithChannelClosed.mapTask(ch => Task(onNewSyncWithChannelClosed(s, ch))))
-      .map { ns =>
-        s = ns
-        log.trace(s"New state $ns")
-      }
+      signatures.mapTask { case ((ch, sigs)) => Task(s = onNewSignatures(s, ch, sigs)) },
+      blocks.mapTask { case ((ch, block)) => Task(s = onBlock(s, ch, block)) },
+      syncWithChannelClosed.mapTask(ch => Task(s = onNewSyncWithChannelClosed(s, ch))))
+      .map { _ => log.trace(s"Current state: $s") }
       .executeOn(scheduler)
       .logErr
       .subscribe()

@@ -17,7 +17,9 @@ case class KnownPeers(peers: Seq[InetSocketAddress]) extends Message
 case class GetSignatures(signatures: Seq[ByteStr]) extends Message {
   override def toString: String = s"GetSignatures(${formatSignatures(signatures)})"
 }
-case class Signatures(signatures: Seq[ByteStr]) extends Message
+case class Signatures(signatures: Seq[ByteStr]) extends Message {
+  override def toString: String = s"GetSignatures(${formatSignatures(signatures)})"
+}
 case class GetBlock(signature: ByteStr) extends Message
 
 case class LocalScoreChanged(newLocalScore: History.BlockchainScore) extends Message
@@ -27,7 +29,8 @@ case class MicroBlockRequest(totalBlockSig: ByteStr)  extends Message
 case class MicroBlockResponse(microblock: MicroBlock) extends Message
 
 case class MicroBlockInv(sender: PublicKeyAccount, totalBlockSig: ByteStr, prevBlockSig: ByteStr, signature: ByteStr) extends Message with Signed {
-  override protected val signatureValid = Coeval.evalOnce(EllipticCurveImpl.verify(signature.arr, sender.toAddress.bytes.arr ++ totalBlockSig.arr ++ prevBlockSig.arr, sender.publicKey))
+  override protected val signatureValid: Coeval[Boolean] = Coeval.evalOnce(
+    EllipticCurveImpl.verify(signature.arr, sender.toAddress.bytes.arr ++ totalBlockSig.arr ++ prevBlockSig.arr, sender.publicKey))
   override def toString: String = s"MicroBlockInv(${totalBlockSig.trim} ~> ${prevBlockSig.trim})"
 }
 object MicroBlockInv{
