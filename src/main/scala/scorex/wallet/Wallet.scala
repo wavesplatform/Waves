@@ -1,5 +1,6 @@
 package scorex.wallet
 
+import java.io.File
 import java.nio.charset.MalformedInputException
 
 import com.fasterxml.jackson.databind.JsonMappingException
@@ -63,14 +64,12 @@ object Wallet extends ScorexLogging {
       val randomSeed = ByteStr(randomBytes(SeedSize))
       log.info(s"You random generated seed is ${randomSeed.base58}")
       Some(randomSeed)
-    }
+    }.get.arr
 
-    new WalletImpl(settings.copy(seed = seed))
+    new WalletImpl(settings.file, settings.password, seed)
   }
 
-  class WalletImpl private[Wallet](ws: WalletSettings) extends ScorexLogging with Wallet {
-    require(ws.seed.nonEmpty)
-
+  class WalletImpl private[Wallet](file: Option[File], password: String, s: Array[Byte]) extends ScorexLogging with Wallet {
     private type AccountSeed = Array[Byte]
 
     private case class WalletData(seed: AccountSeed,
@@ -83,15 +82,15 @@ object Wallet extends ScorexLogging {
     )
     private implicit val format: OFormat[WalletData] = Json.format[WalletData]
 
-    private var walletData = ws.file.filter(_.exists()).flatMap(f =>
-      try Some(JsonFileStorage.load[WalletData](f.getCanonicalPath, Option(ws.password)))
+    private var walletData = file.filter(_.exists()).flatMap(f =>
+      try Some(JsonFileStorage.load[WalletData](f.getCanonicalPath, Option(password)))
       catch {
         case _: MalformedInputException | _: JsonMappingException => Option(migrateFromOldWallet())
       }
-    ).getOrElse(WalletData(ws.seed.get.arr, Set.empty, 0))
+    ).getOrElse(WalletData(s, Set.empty, 0))
 
     private def migrateFromOldWallet(): WalletData = {
-      val oldWallet = new WalletObsolete(ws.file, ws.password.toCharArray, ws.seed.map(_.arr))
+      val oldWallet = new WalletObsolete(file, password.toCharArray, Some(s))
       val walletData = WalletData(oldWallet.seed, oldWallet.privateKeyAccounts().map(a => a.seed).toSet, oldWallet.nonce())
       oldWallet.close()
       walletData
@@ -106,7 +105,7 @@ object Wallet extends ScorexLogging {
       TrieMap(accounts.map(acc => acc.address -> acc).toSeq: _*)
     }
 
-    private def save(): Unit = ws.file.foreach(f => JsonFileStorage.save(walletData, f.getCanonicalPath, Option(ws.password)))
+    private def save(): Unit = file.foreach(f => JsonFileStorage.save(walletData, f.getCanonicalPath, Option(password)))
 
     override def seed: Array[Byte] = walletData.seed
 
