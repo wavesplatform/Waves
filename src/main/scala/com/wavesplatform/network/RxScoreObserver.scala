@@ -93,10 +93,12 @@ object RxScoreObserver extends ScorexLogging {
       Option(ch)
     })
 
-    Observable.merge(ls, rs, cc).map { maybeClosedChannel =>
-      val sw = calcSyncWith(currentBestChannel, localScore, scores.asMap().asScala)
-      currentBestChannel = sw.map(_.channel)
-      ChannelClosedAndSyncWith(maybeClosedChannel, sw)
-    }.distinctUntilChanged
+    Observable.merge(ls, rs, cc).mapTask { maybeClosedChannel =>
+      Task {
+        val sw = calcSyncWith(currentBestChannel, localScore, scores.asMap().asScala)
+        currentBestChannel = sw.map(_.channel)
+        ChannelClosedAndSyncWith(maybeClosedChannel, sw)
+      }
+    }.executeOn(scheduler).logErr.distinctUntilChanged
   }
 }

@@ -65,7 +65,7 @@ object MicroBlockSynchronizer extends ScorexLogging {
 
     def tryDownloadNext(prevBlockId: ByteStr): Unit = Option(nextInvs.getIfPresent(prevBlockId)).foreach(requestMicroBlock)
 
-    lastBlockIdEvents.mapTask(f => Task(tryDownloadNext(f))).logErr.subscribe()
+    lastBlockIdEvents.mapTask(f => Task(tryDownloadNext(f))).executeOn(scheduler).logErr.subscribe()
 
     microblockInvs.mapTask { case ((ch, mbInv@MicroBlockInv(_, totalSig, prevSig, _))) => Task {
       mbInv.signaturesValid() match {
@@ -83,9 +83,9 @@ object MicroBlockSynchronizer extends ScorexLogging {
             .foreach(tryDownloadNext)
       }
     }
-    }.logErr.subscribe()
+    }.executeOn(scheduler).logErr.subscribe()
 
-    microblockResponses.executeOn(scheduler).flatMap { case ((ch, msg@MicroBlockResponse(mb))) =>
+    microblockResponses.observeOn(scheduler).flatMap { case ((ch, msg@MicroBlockResponse(mb))) =>
       import mb.{totalResBlockSig => totalSig}
       successfullyReceived.put(totalSig, dummy)
       BlockStats.received(mb, ch)

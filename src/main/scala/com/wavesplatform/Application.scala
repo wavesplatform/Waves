@@ -78,10 +78,11 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     val processFork = ExtensionAppender(checkpointService, history, blockchainUpdater, stateReader, utxStorage, time, settings, featureProvider, knownInvalidBlocks, peerDatabase, miner, allChannels) _
     val processMicroBlock = MicroblockAppender(checkpointService, history, blockchainUpdater, utxStorage, allChannels, peerDatabase) _
 
-    val network = NetworkServer(settings, blockchainUpdater.lastBlockInfo, history, utxStorage, peerDatabase, allChannels, establishedConnections)
+    val lastBlockInfos = blockchainUpdater.lastBlockInfo
+
+    val network = NetworkServer(settings, lastBlockInfos, history, utxStorage, peerDatabase, allChannels, establishedConnections)
     val (signatures, blocks, blockchainScores, checkpoints, microblockInvs, microblockResponses) = network.messages
 
-    val lastBlockInfos = blockchainUpdater.lastBlockInfo
     val syncWithChannelClosed = RxScoreObserver(settings.synchronizationSettings.scoreTTL, history.score(), lastBlockInfos.map(_.score), blockchainScores, network.closedChannels)
     val microblockDatas = MicroBlockSynchronizer(settings.synchronizationSettings.microBlockSynchronizer, history, peerDatabase)(lastBlockInfos.map(_.id), microblockInvs, microblockResponses) _
     val newBlocks = RxExtensionLoader(settings.synchronizationSettings.maxRollback, settings.synchronizationSettings.synchronizationTimeout,

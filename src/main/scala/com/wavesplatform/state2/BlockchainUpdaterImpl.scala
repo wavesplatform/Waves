@@ -51,7 +51,14 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
 
   def bestLiquidState: StateReader = composite(Coeval(read { implicit l => ngState().map(_.bestLiquidDiff).orEmpty }), currentPersistedBlocksState)
 
-  def blockchainReady: Boolean = time.correctedTime() - historyReader.lastBlockTimestamp().get < settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed.toMillis
+  def blockchainReady: Boolean = {
+    val ts = time.correctedTime()
+    val lastBlock = historyReader.lastBlockTimestamp().get
+    val maxDelta = settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed.toMillis
+    val r = ts - lastBlock < maxDelta
+    if (!r) log.trace(s"Blockchain not ready: Now=$ts, lastBlock: $lastBlock, maxDelta=$maxDelta")
+    r
+  }
 
   def historyReader: NgHistory with DebugNgHistory with FeatureProvider = {
     new NgHistoryReader(() => read { implicit l => ngState() }, historyWriter, settings.blockchainSettings.functionalitySettings)

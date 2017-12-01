@@ -177,13 +177,14 @@ object RxExtensionLoader extends ScorexLogging {
     }
 
     Observable.merge(
-      signatures.observeOn(scheduler).mapTask { case ((ch, sigs)) => Task(onNewSignatures(s, ch, sigs)) },
-      blocks.observeOn(scheduler).mapTask { case ((ch, block)) => Task(onBlock(s, ch, block)) },
-      syncWithChannelClosed.observeOn(scheduler).mapTask(ch => Task(onNewSyncWithChannelClosed(s, ch))))
+      signatures.mapTask { case ((ch, sigs)) => Task(onNewSignatures(s, ch, sigs)) },
+      blocks.mapTask { case ((ch, block)) => Task(onBlock(s, ch, block)) },
+      syncWithChannelClosed.mapTask(ch => Task(onNewSyncWithChannelClosed(s, ch))))
       .map { ns =>
         s = ns
         log.trace(s"New state $ns")
       }
+      .executeOn(scheduler)
       .logErr
       .subscribe()
 
