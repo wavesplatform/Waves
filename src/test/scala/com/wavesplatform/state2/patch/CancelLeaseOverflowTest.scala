@@ -40,8 +40,8 @@ class CancelLeaseOverflowTest extends PropSpec
         TestBlock.create(Seq.empty)),
         TestBlock.create(Seq.empty),
         settings) { case (_, newState) =>
-          newState.isLeaseActive(lease2) shouldBe false
-          newState.isLeaseActive(lease1) shouldBe true
+        newState.isLeaseActive(lease2) shouldBe false
+        newState.isLeaseActive(lease1) shouldBe true
       }
     }
   }

@@ -4,7 +4,7 @@ import com.wavesplatform.it.api.NodeApi.{Block, BlockHeaders}
 
 import scala.concurrent.{Await, Future}
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future.{sequence, traverse}
+import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
 import com.wavesplatform.it.util._
 import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
