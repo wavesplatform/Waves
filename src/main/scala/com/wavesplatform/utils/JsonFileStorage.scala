@@ -1,6 +1,6 @@
 package com.wavesplatform.utils
 
-import java.io.PrintWriter
+import java.io.{FileOutputStream, PrintWriter}
 import javax.crypto.Cipher
 import javax.crypto.spec.SecretKeySpec
 
@@ -50,7 +50,7 @@ object JsonFileStorage {
   def save[T](value: T, path: String, key: Option[String] = None)(implicit w: Writes[T]): Unit = {
     var file: Option[PrintWriter] = None
     try {
-      file = Option(new PrintWriter(path))
+      file = Option(new PrintWriter(new FileOutputStream(path), true))
       file.foreach {
         val json = Json.toJson(value).toString()
         val data = key.fold(json)(k => encrypt(k, json))
