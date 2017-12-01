@@ -54,10 +54,7 @@ class NetworkServer(checkpointService: CheckpointService,
     settings.synchronizationSettings.scoreTTL,
     history.lastBlockIds(settings.synchronizationSettings.maxRollback), history.score(), allChannels)
 
-  private val trafficWatcher = if (settings.metrics.enable) {
-    log.debug("Watching and reporting of traffic is enabled")
-    new TrafficWatcher
-  } else new NoopHandler
+  private val trafficWatcher = new NoopHandler
 
   private val trafficLogger = if (settings.networkSettings.trafficLogger.enable) {
     log.debug("Logging of traffic is enabled")
