@@ -213,7 +213,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
             } else if (requestedHeight == persisted.height) {
               inMemDiffs.set(NEL.one(BlockDiff.empty))
             } else {
-              val difference = persisted.height - requestedHeight
+              val difference = requestedHeight - persisted.height
               inMemDiffs.transform { imd =>
                 val remained = dropLeftIf(imd.toList)(_.map(bd => bd.heightDiff).sum > difference)
                 unsafeDiffByRange(composite(remained, persisted), requestedHeight + 1) ++ remained
