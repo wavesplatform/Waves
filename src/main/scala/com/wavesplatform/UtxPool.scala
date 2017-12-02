@@ -14,6 +14,7 @@ import scorex.account.Address
 import scorex.consensus.TransactionsOrdering
 import scorex.transaction.ValidationError.{GenericError, SenderIsBlacklisted}
 import scorex.transaction._
+import scorex.transaction.assets.TransferTransaction
 import scorex.utils.{ScorexLogging, Synchronized, Time}
 
 import scala.concurrent.duration._
@@ -79,18 +80,24 @@ class UtxPool(time: Time,
   }
 
   private def checkNotBlacklisted(tx: Transaction): Either[ValidationError, Unit] = {
-    val address: Option[String] = tx match {
+    val sender: Option[String] = tx match {
       case x: SignedTransaction => Some(x.sender.address)
       case x: PaymentTransaction => Some(x.sender.address)
       case x: GenesisTransaction => x.creator.map(_.address)
       case _ => None
     }
 
-    address match {
+    val recipient: Option[String] = tx match {
+      case x: TransferTransaction => Some(x.recipient.stringRepr)
+      case _ => None
+    }
+
+    sender match {
       case None => Right(())
       case Some(addr) =>
         val blacklist = utxSettings.blacklistSrcAddresses.contains(addr)
-        if (blacklist) Left(SenderIsBlacklisted(addr)) else Right(())
+        val allowBlacklisted = recipient.exists(utxSettings.allowBlacklistedTransferTo.contains)
+        if (blacklist && !allowBlacklisted) Left(SenderIsBlacklisted(addr)) else Right(())
     }
   }
 
