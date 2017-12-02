@@ -22,5 +22,6 @@ object ValidationError {
   case class OrderValidationError(order: Order, err: String) extends ValidationError
   case class AccountBalanceError(errs: Map[Address, String]) extends ValidationError
   case class GenericError(err: String) extends ValidationError
+  case class SenderIsBlacklisted(addr: String) extends ValidationError
   case class Mistiming(err: String) extends ValidationError
 }

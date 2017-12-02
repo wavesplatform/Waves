@@ -12,7 +12,7 @@ import com.wavesplatform.state2.{ByteStr, Diff, Portfolio}
 import kamon.Kamon
 import scorex.account.Address
 import scorex.consensus.TransactionsOrdering
-import scorex.transaction.ValidationError.GenericError
+import scorex.transaction.ValidationError.{GenericError, SenderIsBlacklisted}
 import scorex.transaction._
 import scorex.utils.{ScorexLogging, Synchronized, Time}
 
@@ -64,6 +64,7 @@ class UtxPool(time: Time,
         case None =>
           val res = for {
             _ <- Either.cond(transactions().size < utxSettings.maxSize, (), GenericError("Transaction pool size limit is reached"))
+            _ <- checkNotBlacklisted(tx)
             _ <- feeCalculator.enoughFee(tx)
             diff <- TransactionDiffer(fs, history.lastBlock.map(_.timestamp), time.correctedTime(), stateReader.height)(stateReader, tx)
           } yield {
@@ -75,6 +76,22 @@ class UtxPool(time: Time,
           sizeStats.record(transactions().size)
           res.right.map(_ => true)
       })
+  }
+
+  private def checkNotBlacklisted(tx: Transaction): Either[ValidationError, Unit] = {
+    val address: Option[String] = tx match {
+      case x: SignedTransaction => Some(x.sender.address)
+      case x: PaymentTransaction => Some(x.sender.address)
+      case x: GenesisTransaction => x.creator.map(_.address)
+      case _ => None
+    }
+
+    address match {
+      case None => Right(())
+      case Some(addr) =>
+        val blacklist = utxSettings.blacklistSrcAddresses.contains(addr)
+        if (blacklist) Left(SenderIsBlacklisted(addr)) else Right(())
+    }
   }
 
   def removeAll(tx: Traversable[Transaction]): Unit = write { implicit l =>
