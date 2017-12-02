@@ -103,7 +103,7 @@ class UtxPoolSpecification extends FreeSpec
     time = new TestTime()
     txs <- Gen.nonEmptyListOf(transferWithRecipient(sender, recipient, senderBalance / 10, time)) // @TODO: Random transactions
   } yield {
-    val settings = UtxSettings(10, 1.minute, Set(sender.address), Set.empty)
+    val settings = UtxSettings(txs.length, 1.minute, Set(sender.address), Set.empty)
     val utxPool = new UtxPool(time, state, history, calculator, FunctionalitySettings.TESTNET, settings)
     (sender, utxPool, txs)
   }).label("withBlacklisted")
@@ -114,7 +114,7 @@ class UtxPoolSpecification extends FreeSpec
     time = new TestTime()
     txs <- Gen.nonEmptyListOf(transferWithRecipient(sender, recipient, senderBalance / 10, time)) // @TODO: Random transactions
   } yield {
-    val settings = UtxSettings(10, 1.minute, Set(sender.address), Set(recipient.address))
+    val settings = UtxSettings(txs.length, 1.minute, Set(sender.address), Set(recipient.address))
     val utxPool = new UtxPool(time, state, history, calculator, FunctionalitySettings.TESTNET, settings)
     (sender, utxPool, txs)
   }).label("withBlacklistedAndAllowedByRule")
@@ -249,17 +249,14 @@ class UtxPoolSpecification extends FreeSpec
         }
 
         r shouldBe true
+        utxPool.all().size shouldEqual 0
       }
 
-      "allow a transaction from blacklisted address to specific addresses" in forAll(withBlacklistedAndAllowedByRule) { case (sender: PrivateKeyAccount, utxPool: UtxPool, txs: Seq[Transaction]) =>
-        val r = txs.forall { tx =>
-          utxPool.putIfNew(tx) match {
-            case Right(true) => true
-            case _ => false
-          }
-        }
-
-        r shouldBe true
+      "allow a transfer transaction from blacklisted address to specific addresses" in forAll(withBlacklistedAndAllowedByRule) { case (sender: PrivateKeyAccount, utxPool: UtxPool, txs: Seq[Transaction]) =>
+        all(txs.map { t =>
+          utxPool.putIfNew(t)
+        }) shouldBe 'right
+        utxPool.all().size shouldEqual txs.size
       }
     }
   }
