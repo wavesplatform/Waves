@@ -71,7 +71,7 @@ class UtxPoolSpecification extends FreeSpec
     offset <- chooseNum(1000L, 2000L)
   } yield {
     val time = new TestTime()
-    val utx = new UtxPool(time, state, history, calculator, FunctionalitySettings.TESTNET, UtxSettings(10, 10.minutes, Set.empty))
+    val utx = new UtxPool(time, state, history, calculator, FunctionalitySettings.TESTNET, UtxSettings(10, 10.minutes, Set.empty, Set.empty))
     val amountPart = (senderBalance - fee) / 2 - fee
     val txs = for (_ <- 1 to n) yield PaymentTransaction.create(sender, recipient, amountPart, fee, time.getTimestamp()).right.get
     (utx, time, txs, (offset + 1000).millis)
@@ -80,7 +80,7 @@ class UtxPoolSpecification extends FreeSpec
   private val emptyUtxPool = stateGen
     .map { case (sender, senderBalance, state, history) =>
       val time = new TestTime()
-      val utxPool = new UtxPool(time, state, history, calculator, FunctionalitySettings.TESTNET, UtxSettings(10, 1.minute, Set.empty))
+      val utxPool = new UtxPool(time, state, history, calculator, FunctionalitySettings.TESTNET, UtxSettings(10, 1.minute, Set.empty, Set.empty))
       (sender, state, utxPool)
     }
     .label("emptyUtxPool")
@@ -91,7 +91,7 @@ class UtxPoolSpecification extends FreeSpec
     time = new TestTime()
     txs <- Gen.nonEmptyListOf(transferWithRecipient(sender, recipient, senderBalance / 10, time))
   } yield {
-    val settings = UtxSettings(10, 1.minute, Set.empty)
+    val settings = UtxSettings(10, 1.minute, Set.empty, Set.empty)
     val utxPool = new UtxPool(time, state, history, calculator, FunctionalitySettings.TESTNET, settings)
     txs.foreach(utxPool.putIfNew)
     (sender, state, utxPool, time, settings)
@@ -103,12 +103,23 @@ class UtxPoolSpecification extends FreeSpec
     time = new TestTime()
     txs <- Gen.nonEmptyListOf(transferWithRecipient(sender, recipient, senderBalance / 10, time)) // @TODO: Random transactions
   } yield {
-    val settings = UtxSettings(10, 1.minute, Set(sender.address))
+    val settings = UtxSettings(10, 1.minute, Set(sender.address), Set.empty)
     val utxPool = new UtxPool(time, state, history, calculator, FunctionalitySettings.TESTNET, settings)
     (sender, utxPool, txs)
   }).label("withBlacklisted")
 
-  private def utxTest(utxSettings: UtxSettings = UtxSettings(20, 5.seconds, Set.empty), txCount: Int = 10)
+  private val withBlacklistedAndAllowedByRule = (for {
+    (sender, senderBalance, state, history) <- stateGen
+    recipient <- accountGen
+    time = new TestTime()
+    txs <- Gen.nonEmptyListOf(transferWithRecipient(sender, recipient, senderBalance / 10, time)) // @TODO: Random transactions
+  } yield {
+    val settings = UtxSettings(10, 1.minute, Set(sender.address), Set(recipient.address))
+    val utxPool = new UtxPool(time, state, history, calculator, FunctionalitySettings.TESTNET, settings)
+    (sender, utxPool, txs)
+  }).label("withBlacklistedAndAllowedByRule")
+
+  private def utxTest(utxSettings: UtxSettings = UtxSettings(20, 5.seconds, Set.empty, Set.empty), txCount: Int = 10)
                      (f: (Seq[TransferTransaction], UtxPool, TestTime) => Unit): Unit = forAll(
     stateGen,
     chooseNum(2, txCount).label("txCount")) { case ((sender, senderBalance, state, history), count) =>
@@ -131,12 +142,12 @@ class UtxPoolSpecification extends FreeSpec
     } yield {
       val time = new TestTime()
       val history = HistoryWriterImpl(None, new ReentrantReadWriteLock()).get
-      val utx = new UtxPool(time, state, history, calculator, FunctionalitySettings.TESTNET, UtxSettings(10, offset.millis, Set.empty))
+      val utx = new UtxPool(time, state, history, calculator, FunctionalitySettings.TESTNET, UtxSettings(10, offset.millis, Set.empty, Set.empty))
       (utx, time, tx1, (offset + 1000).millis, tx2)
     }
 
   "UTX Pool" - {
-    "does not add new transactions when full" in utxTest(UtxSettings(1, 5.seconds, Set.empty)) { (txs, utx, _) =>
+    "does not add new transactions when full" in utxTest(UtxSettings(1, 5.seconds, Set.empty, Set.empty)) { (txs, utx, _) =>
       utx.putIfNew(txs.head) shouldBe 'right
       all(txs.tail.map(t => utx.putIfNew(t))) shouldBe 'left
     }
@@ -233,6 +244,17 @@ class UtxPoolSpecification extends FreeSpec
         val r = txs.forall { tx =>
           utxPool.putIfNew(tx) match {
             case Left(SenderIsBlacklisted(x)) => true
+            case _ => false
+          }
+        }
+
+        r shouldBe true
+      }
+
+      "allow a transaction from blacklisted address to specific addresses" in forAll(withBlacklistedAndAllowedByRule) { case (sender: PrivateKeyAccount, utxPool: UtxPool, txs: Seq[Transaction]) =>
+        val r = txs.forall { tx =>
+          utxPool.putIfNew(tx) match {
+            case Right(true) => true
             case _ => false
           }
         }

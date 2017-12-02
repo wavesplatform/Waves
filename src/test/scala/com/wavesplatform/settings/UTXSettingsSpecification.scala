@@ -8,7 +8,7 @@ import org.scalatest.{FlatSpec, Matchers}
 import scala.concurrent.duration._
 
 class UTXSettingsSpecification extends FlatSpec with Matchers {
-  "UTXSettins" should "read values" in {
+  "UTXSettings" should "read values" in {
     val config = ConfigFactory.parseString(
       """waves {
         |  utx {
