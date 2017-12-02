@@ -27,7 +27,8 @@ case class MatcherSettings(enable: Boolean,
                            isMigrateToNewOrderHistoryStorage: Boolean,
                            blacklistedAssets: Set[String],
                            blacklistedNames: Seq[Regex],
-                           txHistoryFile: Option[File]
+                           txHistoryFile: Option[File],
+                           blacklistedAdresses: Set[String]
                           )
 
 
@@ -60,8 +61,10 @@ object MatcherSettings {
     val blacklistedAssets = config.as[List[String]](s"$configPath.blacklisted-assets")
     val blacklistedNames = config.as[List[String]](s"$configPath.blacklisted-names").map(_.r)
 
+    val blacklistedAddresses = config.as[List[String]](s"$configPath.blacklisted-addresses")
+
     MatcherSettings(enabled, account, bindAddress, port, minOrderFee, orderMatchTxFee, journalDirectory,
       snapshotsDirectory, snapshotsInterval, maxOpenOrders, baseAssets, basePairs, maxTimestampDiff,
-      orderHistoryFile, isMigrateToNewOrderHistoryStorage, blacklistedAssets.toSet, blacklistedNames, txHistoryFile)
+      orderHistoryFile, isMigrateToNewOrderHistoryStorage, blacklistedAssets.toSet, blacklistedNames, txHistoryFile, blacklistedAddresses.toSet)
   }
 }
