@@ -435,3 +435,41 @@ object ShortSeqCodec extends Codec[Seq[Short]] {
 
   override def decode(bytes: Array[Byte]): Either[CodecFailure, DecodeResult[Seq[Short]]] = itemsCodec.decode(bytes)
 }
+
+object KeyCodec extends Codec[ByteStr] {
+  private val KeySize = 8
+
+  override def encode(value: ByteStr): Array[Byte] = value.arr.take(KeySize)
+
+  override def decode(bytes: Array[Byte]): Either[CodecFailure, DecodeResult[ByteStr]] = {
+    val a = bytes.take(KeySize)
+    Either.cond(a.length == KeySize, DecodeResult(KeySize, ByteStr(a)), CodecFailure("incorrect key size"))
+  }
+}
+
+object KeySeqCodec extends Codec[Seq[ByteStr]] {
+  val itemsCodec = SeqCodec(KeyCodec)
+
+  override def encode(value: Seq[ByteStr]): Array[Byte] = itemsCodec.encode(value)
+
+  override def decode(bytes: Array[Byte]): Either[CodecFailure, DecodeResult[Seq[ByteStr]]] = itemsCodec.decode(bytes)
+}
+
+object Id32Codec extends Codec[ByteStr] {
+  private val IdSize = 32
+
+  override def encode(value: ByteStr): Array[Byte] = value.arr.take(IdSize)
+
+  override def decode(bytes: Array[Byte]): Either[CodecFailure, DecodeResult[ByteStr]] = {
+    val a = bytes.take(IdSize)
+    Either.cond(a.length == IdSize, DecodeResult(IdSize, ByteStr(a)), CodecFailure("incorrect id32 size"))
+  }
+}
+
+object Id32SeqCodec extends Codec[Seq[ByteStr]] {
+  val itemsCodec = SeqCodec(Id32Codec)
+
+  override def encode(value: Seq[ByteStr]): Array[Byte] = itemsCodec.encode(value)
+
+  override def decode(bytes: Array[Byte]): Either[CodecFailure, DecodeResult[Seq[ByteStr]]] = itemsCodec.decode(bytes)
+}

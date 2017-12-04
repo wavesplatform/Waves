@@ -10,7 +10,8 @@ import scorex.account.{Address, Alias}
 
 import scala.util.Try
 
-class StateStorage private(db: DB) extends SubStorage(db, "state") with PropertiesStorage with VersionedStorage {
+class StateStorage private(db: DB) extends SubStorage(db, "state") with PropertiesStorage with VersionedStorage
+  with Index32Support {
 
   import StateStorage._
 
@@ -31,7 +32,7 @@ class StateStorage private(db: DB) extends SubStorage(db, "state") with Properti
   private val AliasToAddressPrefix = "alias-address".getBytes(Charset)
   private val AddressToAliasPrefix = "address-alias".getBytes(Charset)
   private val LeaseStatePrefix = "lease-state".getBytes(Charset)
-  private val ActiveLeasesPrefix = "active-leases".getBytes(Charset)
+  private val LeaseIndexPrefix = "lease-idx".getBytes(Charset)
 
   def getHeight: Int = get(makeKey(HeightPrefix, 0)).map(Ints.fromByteArray).getOrElse(0)
 
@@ -97,8 +98,10 @@ class StateStorage private(db: DB) extends SubStorage(db, "state") with Properti
 
   def getLeaseState(id: ByteStr): Option[Boolean] = get(makeKey(LeaseStatePrefix, id.arr)).map(b => b.head == 1.toByte)
 
-  def getActiveLeases: Option[Seq[ByteStr]] =
-    get(makeKey(ActiveLeasesPrefix, 0)).map(ByteStrSeqCodec.decode).map(_.explicitGet().value)
+  def getActiveLeases: Option[Seq[ByteStr]] = {
+    val result = allIndex32(LeaseIndexPrefix)
+    if (result.isEmpty) None else Some(result)
+  }
 
   def getLastBalanceSnapshotHeight(address: Address): Option[Int] =
     get(makeKey(LastBalanceHeightPrefix, address.bytes.arr)).map(Ints.fromByteArray)
@@ -113,7 +116,7 @@ class StateStorage private(db: DB) extends SubStorage(db, "state") with Properti
   def allAssetsBalances: Map[Address, Map[ByteStr, Long]] =
     map(AddressAssetsPrefix).map { case (addressBytes, assetsBytes) =>
       val address = Address.fromBytes(addressBytes).explicitGet()
-      val assets = ByteStrSeqCodec.decode(assetsBytes).explicitGet().value
+      val assets = Id32SeqCodec.decode(assetsBytes).explicitGet().value
       val assetsBalances = assets.foldLeft(Map.empty[ByteStr, Long]) { (m, a) =>
         val key = makeKey(AssetBalancePrefix, Bytes.concat(addressBytes, a.arr))
         val balance = get(key).map(Longs.fromByteArray).getOrElse(0L)
@@ -123,7 +126,7 @@ class StateStorage private(db: DB) extends SubStorage(db, "state") with Properti
     }
 
   def getAssetBalanceMap(address: Address): Option[Map[ByteStr, Long]] = {
-    val assets = get(makeKey(AddressAssetsPrefix, address.bytes.arr)).map(ByteStrSeqCodec.decode).map(_.explicitGet().value)
+    val assets = get(makeKey(AddressAssetsPrefix, address.bytes.arr)).map(Id32SeqCodec.decode).map(_.explicitGet().value)
     if (assets.isDefined) {
       val result = assets.get.foldLeft(Map.empty[ByteStr, Long]) { (m, a) =>
         val key = makeKey(AssetBalancePrefix, Bytes.concat(address.bytes.arr, a.arr))
@@ -156,9 +159,9 @@ class StateStorage private(db: DB) extends SubStorage(db, "state") with Properti
       put(wavesKey, WavesBalanceValueCodec.encode(wavesBalanceValue), b)
 
       val addressKey = makeKey(AddressAssetsPrefix, addressBytes)
-      val existingAssets = get(addressKey).map(ByteStrSeqCodec.decode).map(_.explicitGet().value).getOrElse(Seq.empty[ByteStr])
+      val existingAssets = get(addressKey).map(Id32SeqCodec.decode).map(_.explicitGet().value).getOrElse(Seq.empty[ByteStr])
       val updatedAssets = existingAssets ++ d.assets.keySet
-      put(addressKey, ByteStrSeqCodec.encode(updatedAssets.distinct))
+      put(addressKey, Id32SeqCodec.encode(updatedAssets.distinct))
 
       d.assets.foreach { case (as, df) =>
         val addressAssetKey = makeKey(AssetBalancePrefix, Bytes.concat(addressBytes, as.arr))
@@ -202,14 +205,12 @@ class StateStorage private(db: DB) extends SubStorage(db, "state") with Properti
   }
 
   private def putLeases(b: Option[WriteBatch], leases: Map[ByteStr, Boolean]): Unit = {
-    val initial = get(makeKey(ActiveLeasesPrefix, 0)).map(ByteStrSeqCodec.decode).map(_.explicitGet().value).getOrElse(Seq.empty[ByteStr])
-
-    val active = leases.foldLeft(initial) { (a, e) =>
+    leases.foreach { e =>
       put(makeKey(LeaseStatePrefix, e._1.arr), if (e._2) Codec.TrueBytes else Codec.FalseBytes, b)
-      if (e._2) a :+ e._1 else a
+      if (e._2) addToIndex32(b, LeaseIndexPrefix, e._1) else removeFromIndex32(b, LeaseIndexPrefix, e._1)
     }
-    put(makeKey(ActiveLeasesPrefix, 0), ByteStrSeqCodec.encode(active.distinct), b)
   }
+
 }
 
 object StateStorage {

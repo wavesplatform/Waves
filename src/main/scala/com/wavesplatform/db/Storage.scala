@@ -84,7 +84,7 @@ abstract class Storage(private val db: DB) extends ScorexLogging {
     }
   }
 
-  def map(prefix: Array[Byte], stripPrefix: Boolean = true): Map[Array[Byte], Array[Byte]] = {
+  protected def map(prefix: Array[Byte], stripPrefix: Boolean = true): Map[Array[Byte], Array[Byte]] = {
     val p = makePrefix(prefix)
     val it = db.iterator()
     var map = Map.empty[Array[Byte], Array[Byte]]
