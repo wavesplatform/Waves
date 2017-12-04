@@ -70,7 +70,7 @@ object Dependencies {
   )
 
   lazy val fp = Seq(
-    "org.typelevel" %% "cats-core" % "1.0.0-MF",
-    "io.monix" %% "monix" % "3.0.0-M1"
+    "org.typelevel" %% "cats-core" % "1.0.0-RC1",
+    "io.monix" %% "monix" % "3.0.0-M2"
   )
 }

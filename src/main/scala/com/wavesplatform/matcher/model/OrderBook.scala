@@ -36,8 +36,8 @@ object OrderBook {
   }
 
   def cancelOrder(ob: OrderBook, orderId: String): Option[OrderCanceled] = {
-    ob.bids.find { case (_, v) => v.exists(_.order.idStr() == orderId)}
-        .orElse(ob.asks.find { case (_, v) => v.exists(_.order.idStr() == orderId)})
+    ob.bids.find { case (_, v) => v.exists(_.order.idStr() == orderId) }
+      .orElse(ob.asks.find { case (_, v) => v.exists(_.order.idStr() == orderId) })
       .fold(Option.empty[OrderCanceled]) {
         case (_, v) =>
           Some(OrderCanceled(v.find(_.order.idStr() == orderId).get))

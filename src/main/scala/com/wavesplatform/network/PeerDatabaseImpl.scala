@@ -104,17 +104,13 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Scor
   override def detailedSuspended: immutable.Map[InetAddress, Long] = suspension.asMap().asScala.mapValues(_.toLong).toMap
 
   override def randomPeer(excluded: immutable.Set[InetSocketAddress]): Option[InetSocketAddress] = unverifiedPeers.synchronized {
-    //    log.trace(s"Excluding: $excluded")
     def excludeAddress(isa: InetSocketAddress) = excluded(isa) || blacklistedHosts(isa.getAddress) || suspendedHosts(isa.getAddress)
-
     // excluded only contains local addresses, our declared address, and external declared addresses we already have
     // connection to, so it's safe to filter out all matching candidates
     unverifiedPeers.removeIf(isa => excluded(isa))
-    //    log.trace(s"Evicting queue: $unverifiedPeers")
     val unverified = Option(unverifiedPeers.peek()).filterNot(excludeAddress)
     val verified = Random.shuffle(knownPeers.keySet.diff(excluded).toSeq).headOption.filterNot(excludeAddress)
 
-    //    log.trace(s"Unverified: $unverified; Verified: $verified")
     (unverified, verified) match {
       case (Some(_), v@Some(_)) => if (Random.nextBoolean()) Some(unverifiedPeers.poll()) else v
       case (Some(_), None) => Some(unverifiedPeers.poll())

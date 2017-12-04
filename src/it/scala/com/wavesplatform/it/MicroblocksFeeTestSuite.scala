@@ -20,6 +20,7 @@ class MicroblocksFeeTestSuite extends FreeSpec with Matchers with BeforeAndAfter
   private lazy val nodes = docker.startNodes(Configs)
 
   private def notMiner = nodes.head
+
   private def firstAddress = nodes(1).address
 
   override protected def beforeAll(): Unit = {

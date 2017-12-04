@@ -6,7 +6,7 @@ import java.util.concurrent.TimeoutException
 import com.wavesplatform.features.api.ActivationStatus
 import com.wavesplatform.it.util._
 import com.wavesplatform.matcher.api.CancelOrderRequest
-import com.wavesplatform.state2.Portfolio
+import com.wavesplatform.state2.{ByteStr, Portfolio}
 import io.netty.util.{HashedWheelTimer, Timer}
 import org.asynchttpclient.Dsl.{get => _get, post => _post}
 import org.asynchttpclient._
@@ -51,6 +51,13 @@ trait NodeApi {
   def matcherGet(path: String, f: RequestBuilder => RequestBuilder = identity, statusCode: Int = HttpConstants.ResponseStatusCodes.OK_200): Future[Response] =
     retrying(f(_get(s"http://$restAddress:$matcherRestPort$path")).build(), statusCode = statusCode)
 
+  def matcherGetWithSignature(path: String, ts: Long, signature: ByteStr, f: RequestBuilder => RequestBuilder = identity): Future[Response] = retrying {
+    _get(s"http://$restAddress:$matcherRestPort$path")
+      .setHeader("Timestamp", ts)
+      .setHeader("Signature", signature)
+      .build()
+  }
+
   def matcherGetStatusCode(path: String, statusCode: Int): Future[MessageMatcherResponse] =
     matcherGet(path, statusCode = statusCode).as[MessageMatcherResponse]
 
@@ -63,6 +70,9 @@ trait NodeApi {
 
   def getOrderBook(asset: String): Future[OrderBookResponse] =
     matcherGet(s"/matcher/orderbook/$asset/WAVES").as[OrderBookResponse]
+
+  def getOrderbookByPublicKey(publicKey: String, timestamp: Long, signature: ByteStr): Future[Seq[OrderbookHistory]] =
+    matcherGetWithSignature(s"/matcher/orderbook/$publicKey", timestamp, signature).as[Seq[OrderbookHistory]]
 
   def get(path: String, f: RequestBuilder => RequestBuilder = identity): Future[Response] =
     retrying(f(_get(s"http://$restAddress:$nodeRestPort$path")).build())
@@ -120,6 +130,12 @@ trait NodeApi {
   def lastBlock: Future[Block] = get("/blocks/last").as[Block]
 
   def blockSeq(from: Int, to: Int) = get(s"/blocks/seq/$from/$to").as[Seq[Block]]
+
+  def blockHeadersAt(height: Int) = get(s"/blocks/headers/at/$height").as[BlockHeaders]
+
+  def blockHeadersSeq(from: Int, to: Int) = get(s"/blocks/headers/seq/$from/$to").as[Seq[BlockHeaders]]
+
+  def lastBlockHeaders: Future[BlockHeaders] = get("/blocks/headers/last").as[BlockHeaders]
 
   def status: Future[Status] = get("/node/status").as[Status]
 
@@ -344,6 +360,10 @@ object NodeApi extends ScorexLogging {
   case class Block(signature: String, height: Int, timestamp: Long, generator: String, transactions: Seq[Transaction],
                    fee: Long, features: Option[Seq[Short]])
 
+  case class BlockHeaders(signature: String, height: Int, timestamp: Long, generator: String, transactionCount: Int, blocksize: Int)
+
+  implicit val blockHeadersFormat: Format[BlockHeaders] = Json.format
+
   implicit val blockFormat: Format[Block] = Json.format
 
   case class MatcherMessage(id: String)
@@ -361,6 +381,13 @@ object NodeApi extends ScorexLogging {
   case class MessageMatcherResponse(message: String)
 
   implicit val messageMatcherResponseFormat: Format[MessageMatcherResponse] = Json.format
+
+  case class OrderbookHistory(id: String, `type`: String, amount: Long, price: Long, timestamp: Long, filled: Int,
+                              status: String)
+
+  //, assetPair: PairResponse)
+
+  implicit val orderbookHistory: Format[OrderbookHistory] = Json.format
 
   case class PairResponse(amountAsset: String, priceAsset: String)
 

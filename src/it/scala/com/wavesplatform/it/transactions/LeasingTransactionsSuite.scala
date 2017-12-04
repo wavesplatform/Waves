@@ -1,12 +1,13 @@
 package com.wavesplatform.it.transactions
 
 import com.wavesplatform.it.util._
+import org.scalatest.CancelAfterFailure
 
 import scala.concurrent.Await
 import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
 
-class LeasingTransactionsSuite extends BaseTransactionSuite {
+class LeasingTransactionsSuite extends BaseTransactionSuite with CancelAfterFailure {
 
   private val waitCompletion = 2.minutes
 

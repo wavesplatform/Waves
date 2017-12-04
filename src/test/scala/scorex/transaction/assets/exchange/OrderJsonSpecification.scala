@@ -114,7 +114,7 @@ class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers 
           fail("Error: " + JsError.toJson(e).toString())
         case s: JsSuccess[Order] =>
           val o = s.get
-          o.json().toString() should be (json.toString())
+          o.json().toString() should be(json.toString())
           o.signaturesValid().isRight should be(true)
       }
     }

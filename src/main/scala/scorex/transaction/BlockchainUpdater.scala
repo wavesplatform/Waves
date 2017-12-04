@@ -2,7 +2,9 @@ package scorex.transaction
 
 import com.wavesplatform.state2.ByteStr
 import monix.reactive.Observable
+import scorex.block.Block.BlockId
 import scorex.block.{Block, MicroBlock}
+import scorex.transaction.History.BlockchainScore
 import scorex.utils.Synchronized
 
 trait BlockchainUpdater extends Synchronized {
@@ -13,7 +15,7 @@ trait BlockchainUpdater extends Synchronized {
 
   def removeAfter(blockId: ByteStr): Either[ValidationError, DiscardedBlocks]
 
-  def lastBlockId: Observable[ByteStr]
+  def lastBlockInfo: Observable[LastBlockInfo]
 }
 
 trait BlockchainDebugInfo {
@@ -22,6 +24,8 @@ trait BlockchainDebugInfo {
   def persistedAccountPortfoliosHash(): Int
 
 }
+
+case class LastBlockInfo(id: BlockId, score: BlockchainScore, ready: Boolean)
 
 case class HashInfo(height: Int, hash: Int)
 

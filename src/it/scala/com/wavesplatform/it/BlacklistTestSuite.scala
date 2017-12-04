@@ -11,17 +11,18 @@ import scala.concurrent.Await
 
 class BlacklistTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with CancelAfterFailure
   with ReportingTestName with MultipleNodesApi {
-  
+
   private lazy val docker = Docker(getClass)
   override lazy val nodes: Seq[Node] = docker.startNodes(
     NodeConfigs.newBuilder
       .overrideBase(_.quorum(2))
       .withDefault(3)
       .withSpecial(_.quorum(0))
-      .build
+      .build()
   )
 
   private def primaryNode = nodes.last
+
   private def otherNodes = nodes.init
 
   override protected def beforeAll(): Unit = {
@@ -47,7 +48,7 @@ class BlacklistTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll w
 
   "sleep while nodes are blocked" in Await.result(
     primaryNode.waitFor[Seq[BlacklistedPeer]](s"blacklistedPeers is empty")(_.blacklistedPeers, _.isEmpty, 5.second),
-    primaryNode.settings.networkSettings.blackListResidenceTime + 5.seconds
+    primaryNode.settings.networkSettings.blackListResidenceTime + 10.seconds
   )
 
   "and sync again" in Await.result(
