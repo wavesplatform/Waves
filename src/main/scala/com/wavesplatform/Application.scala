@@ -25,7 +25,6 @@ import io.netty.channel.Channel
 import io.netty.channel.group.DefaultChannelGroup
 import io.netty.util.concurrent.GlobalEventExecutor
 import kamon.Kamon
-import monix.eval.Task
 import monix.reactive.Observable
 import org.influxdb.dto.Point
 import org.slf4j.bridge.SLF4JBridgeHandler
@@ -89,7 +88,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     val microblockSink = microblockDatas(processMicroBlock)
     val blockSink = newBlocks.mapTask(scala.Function.tupled(processBlock))
-    val checkpointSink = checkpoints.mapTask(scala.Function.tupled(processCheckpoint))
+    val checkpointSink = checkpoints.mapTask { case ((s, c)) => processCheckpoint(Some(s), c) }
 
     Observable.merge(microblockSink, blockSink, checkpointSink).subscribe()(monix.execution.Scheduler.Implicits.global)
     miner.scheduleMining()
@@ -103,7 +102,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     if (settings.restAPISettings.enable) {
       val apiRoutes = Seq(
-        BlocksApiRoute(settings.restAPISettings, history, allChannels, c => Task(???)),
+        BlocksApiRoute(settings.restAPISettings, history, allChannels, c => processCheckpoint(None, c)),
         TransactionsApiRoute(settings.restAPISettings, stateReader, history, utxStorage),
         NxtConsensusApiRoute(settings.restAPISettings, stateReader, history, settings.blockchainSettings.functionalitySettings),
         WalletApiRoute(settings.restAPISettings, wallet),
