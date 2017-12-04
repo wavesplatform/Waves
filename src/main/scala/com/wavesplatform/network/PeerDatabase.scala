@@ -31,8 +31,6 @@ trait PeerDatabase extends AutoCloseable {
   def suspend(host: InetAddress): Unit
 
   def blacklistAndClose(channel: Channel, reason: String): Unit
-
-  override def close(): Unit = {}
 }
 
 object PeerDatabase extends ScorexLogging {
@@ -61,6 +59,8 @@ object PeerDatabase extends ScorexLogging {
     override val detailedSuspended: Map[InetAddress, Long] = Map.empty
 
     override def blacklistAndClose(channel: Channel, reason: String): Unit = {}
+
+    override def close(): Unit = {}
   }
 
   object NoOp extends NoOp
