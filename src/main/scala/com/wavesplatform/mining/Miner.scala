@@ -205,7 +205,7 @@ class MinerImpl(
   def scheduleMining(): Unit = {
     Miner.blockMiningStarted.increment()
     scheduledAttempts := CompositeCancelable.fromSet(
-      wallet.privateKeyAccounts().map(generateBlockTask).map(_.runAsyncLogErr).toSet)
+      wallet.privateKeyAccounts.map(generateBlockTask).map(_.runAsyncLogErr).toSet)
     microBlockAttempt := SerialCancelable()
   }
 

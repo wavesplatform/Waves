@@ -1,25 +1,38 @@
 package com.wavesplatform.network
 
 import java.net.{InetAddress, InetSocketAddress}
+import java.nio.charset.MalformedInputException
+import java.util.concurrent.TimeUnit
 
+import com.fasterxml.jackson.databind.JsonMappingException
+import com.google.common.cache.CacheBuilder
 import com.google.common.collect.EvictingQueue
 import com.wavesplatform.settings.NetworkSettings
-import com.wavesplatform.utils.createMVStore
+import com.wavesplatform.utils.JsonFileStorage
 import io.netty.channel.Channel
 import io.netty.channel.socket.nio.NioSocketChannel
-import org.h2.mvstore.MVMap
-import scorex.utils.{LogMVMapBuilder, ScorexLogging}
+import play.api.libs.json._
+import scorex.utils.ScorexLogging
 
+import scala.collection._
 import scala.collection.JavaConverters._
+import scala.concurrent.duration.FiniteDuration
 import scala.util.Random
 
-class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with AutoCloseable with ScorexLogging {
+class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with ScorexLogging {
 
-  private val database = createMVStore(settings.file)
-  private val peersPersistence = database.openMap("peers", new LogMVMapBuilder[InetSocketAddress, Long])
-  private val blacklist = database.openMap("blacklist", new LogMVMapBuilder[InetAddress, Long])
-  private val suspension = database.openMap("suspension", new LogMVMapBuilder[InetAddress, Long])
-  private val reasons = database.openMap("reasons", new LogMVMapBuilder[InetAddress, String])
+  private def cache[T <: AnyRef](timeout: FiniteDuration) = CacheBuilder.newBuilder()
+    .expireAfterWrite(timeout.toMillis, TimeUnit.MILLISECONDS)
+    .build[T, java.lang.Long]()
+
+  case class Peer(hostname: String, port: Int)
+  implicit val format: OFormat[Peer] = Json.format[Peer]
+
+  private type PeersPersistenceType = Set[Peer]
+  private val peersPersistence = cache[InetSocketAddress](settings.peersDataResidenceTime)
+  private val blacklist = cache[InetAddress](settings.blackListResidenceTime)
+  private val suspension = cache[InetAddress](settings.suspensionResidenceTime)
+  private val reasons = mutable.Map.empty[InetAddress, String]
   private val unverifiedPeers = EvictingQueue.create[InetSocketAddress](settings.maxUnverifiedPeers)
 
   for (a <- settings.knownPeers.view.map(inetSocketAddress(_, 6863))) {
@@ -27,12 +40,23 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Auto
     doTouch(a, Long.MaxValue)
   }
 
+  settings.file.filter(_.exists()).foreach(f => {
+    try {
+      JsonFileStorage.load[PeersPersistenceType](f.getCanonicalPath).foreach(a => touch(new InetSocketAddress(a.hostname, a.port)))
+      log.info(s"${f.getName} loaded, total peers: ${peersPersistence.size}")
+    }
+    catch {
+      case _: MalformedInputException | _: JsonMappingException =>
+        log.info("Old version peers.dat, ignoring, starting all over from known-peers...")
+    }
+  })
+
   if (!settings.enableBlacklisting) {
     clearBlacklist()
   }
 
   override def addCandidate(socketAddress: InetSocketAddress): Unit = unverifiedPeers.synchronized {
-    if (!peersPersistence.containsKey(socketAddress) && !unverifiedPeers.contains(socketAddress)) {
+    if (Option(peersPersistence.getIfPresent(socketAddress)).isEmpty && !unverifiedPeers.contains(socketAddress)) {
       log.trace(s"Adding candidate $socketAddress")
       unverifiedPeers.add(socketAddress)
     } else {
@@ -42,8 +66,7 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Auto
 
   private def doTouch(socketAddress: InetSocketAddress, timestamp: Long): Unit = unverifiedPeers.synchronized {
     unverifiedPeers.removeIf(_ == socketAddress)
-    peersPersistence.compute(socketAddress, (_, prevTs) => Option(prevTs).fold(timestamp)(_.max(timestamp)))
-    database.commit()
+    peersPersistence.put(socketAddress, Option(peersPersistence.getIfPresent(socketAddress)).fold(timestamp)(_.toLong.max(timestamp)))
   }
 
   override def touch(socketAddress: InetSocketAddress): Unit = doTouch(socketAddress, System.currentTimeMillis())
@@ -54,7 +77,6 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Auto
         unverifiedPeers.removeIf(_.getAddress == address)
         blacklist.put(address, System.currentTimeMillis())
         reasons.put(address, reason)
-        database.commit()
       }
     }
   }
@@ -63,31 +85,25 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Auto
     unverifiedPeers.synchronized {
       unverifiedPeers.removeIf(_.getAddress == address)
       suspension.put(address, System.currentTimeMillis())
-      database.commit()
     }
   }
 
-  override def knownPeers: Map[InetSocketAddress, Long] = {
-    removeObsoleteRecords(peersPersistence, settings.peersDataResidenceTime.toMillis)
-      .asScala.toMap.filterKeys(address => !blacklistedHosts.contains(address.getAddress))
+  override def knownPeers: immutable.Map[InetSocketAddress, Long] = {
+    ((x: Map[InetSocketAddress, Long]) =>
+      if(settings.enableBlacklisting) x.filterKeys(address => !blacklistedHosts.contains(address.getAddress))
+      else x)(peersPersistence.asMap().asScala.mapValues(_.toLong)).toMap
   }
 
-  override def blacklistedHosts: Set[InetAddress] =
-    removeObsoleteRecords(blacklist, settings.blackListResidenceTime.toMillis).keySet().asScala.toSet
+  override def blacklistedHosts: immutable.Set[InetAddress] = blacklist.asMap().asScala.keys.toSet
 
-  override def suspendedHosts: Set[InetAddress] =
-    removeObsoleteRecords(suspension, settings.suspensionResidenceTime.toMillis).keySet().asScala.toSet
+  override def suspendedHosts: immutable.Set[InetAddress] = suspension.asMap().asScala.keys.toSet
 
-  override def detailedBlacklist: Map[InetAddress, (Long, String)] =
-    removeObsoleteRecords(blacklist, settings.blackListResidenceTime.toMillis)
-      .asScala
-      .toMap
-      .map { case ((h, t)) => h -> ((t, Option(reasons.get(h)).getOrElse(""))) }
+  override def detailedBlacklist: immutable.Map[InetAddress, (Long, String)] = blacklist.asMap().asScala.mapValues(_.toLong)
+      .map { case ((h, t)) => h -> ((t, Option(reasons(h)).getOrElse(""))) }.toMap
 
-  override def detailedSuspended: Map[InetAddress, Long] =
-    removeObsoleteRecords(suspension, settings.suspensionResidenceTime.toMillis).asScala.toMap
+  override def detailedSuspended: immutable.Map[InetAddress, Long] = suspension.asMap().asScala.mapValues(_.toLong).toMap
 
-  override def randomPeer(excluded: Set[InetSocketAddress]): Option[InetSocketAddress] = unverifiedPeers.synchronized {
+  override def randomPeer(excluded: immutable.Set[InetSocketAddress]): Option[InetSocketAddress] = unverifiedPeers.synchronized {
     def excludeAddress(isa: InetSocketAddress) = excluded(isa) || blacklistedHosts(isa.getAddress) || suspendedHosts(isa.getAddress)
     // excluded only contains local addresses, our declared address, and external declared addresses we already have
     // connection to, so it's safe to filter out all matching candidates
@@ -103,26 +119,17 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Auto
     }
   }
 
-  private def removeObsoleteRecords[T](map: MVMap[T, Long], maxAge: Long): MVMap[T, Long] = {
-    val earliestValidTs = System.currentTimeMillis() - maxAge
-
-    map.entrySet().asScala.collect {
-      case e if e.getValue < earliestValidTs => e.getKey
-    }.foreach(map.remove)
-
-    database.commit()
-
-    map
-  }
-
   def clearBlacklist(): Unit = {
-    blacklist.clear()
+    blacklist.invalidateAll()
     reasons.clear()
-
-    database.commit()
   }
 
-  override def close(): Unit = database.close()
+  override def close(): Unit = {
+    settings.file.foreach(f => {
+      log.info(s"Saving ${f.getName}, total peers: ${peersPersistence.size}")
+      JsonFileStorage.save[PeersPersistenceType](knownPeers.keySet.map(i => Peer(i.getHostName, i.getPort)), f.getCanonicalPath)
+    })
+  }
 
   override def blacklistAndClose(channel: Channel, reason: String): Unit = {
     val address = channel.asInstanceOf[NioSocketChannel].remoteAddress().getAddress

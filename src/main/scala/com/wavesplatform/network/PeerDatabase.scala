@@ -6,7 +6,8 @@ import io.netty.channel.Channel
 import scorex.utils.ScorexLogging
 
 
-trait PeerDatabase {
+trait PeerDatabase extends AutoCloseable {
+
   def addCandidate(socketAddress: InetSocketAddress)
 
   def touch(socketAddress: InetSocketAddress)
@@ -30,7 +31,6 @@ trait PeerDatabase {
   def suspend(host: InetAddress): Unit
 
   def blacklistAndClose(channel: Channel, reason: String): Unit
-
 }
 
 object PeerDatabase extends ScorexLogging {
@@ -59,6 +59,8 @@ object PeerDatabase extends ScorexLogging {
     override val detailedSuspended: Map[InetAddress, Long] = Map.empty
 
     override def blacklistAndClose(channel: Channel, reason: String): Unit = channel.close()
+
+    override def close(): Unit = {}
   }
 
   object NoOp extends NoOp

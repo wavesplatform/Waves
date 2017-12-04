@@ -51,6 +51,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   private val (history, featureProvider, stateWriter, stateReader, blockchainUpdater, blockchainDebugInfo) = StorageFactory(settings).get
   private lazy val upnp = new UPnP(settings.networkSettings.uPnPSettings) // don't initialize unless enabled
   private val wallet: Wallet = Wallet(settings.walletSettings)
+  private val peerDatabase = new PeerDatabaseImpl(settings.networkSettings)
 
   def run(): Unit = {
     log.debug(s"Available processors: ${Runtime.getRuntime.availableProcessors}")
@@ -58,12 +59,11 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     checkGenesis(history, settings, blockchainUpdater)
 
-    if (wallet.privateKeyAccounts().isEmpty)
+    if (wallet.privateKeyAccounts.isEmpty)
       wallet.generateNewAccounts(1)
 
     val feeCalculator = new FeeCalculator(settings.feesSettings)
     val time: Time = NTP
-    val peerDatabase = new PeerDatabaseImpl(settings.networkSettings)
     val establishedConnections = new ConcurrentHashMap[Channel, PeerInfo]
     val allChannels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
     val utxStorage = new UtxPoolImpl(time, stateReader, history, feeCalculator, settings.blockchainSettings.functionalitySettings, settings.utxSettings)
@@ -179,6 +179,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       for (addr <- settings.networkSettings.declaredAddress if settings.networkSettings.uPnPSettings.enable) {
         upnp.deletePort(addr.getPort)
       }
+
+      peerDatabase.close()
 
       Try(Await.result(actorSystem.terminate(), stopActorsTimeout))
         .failed.map(e => log.error("Failed to terminate actor system", e))
