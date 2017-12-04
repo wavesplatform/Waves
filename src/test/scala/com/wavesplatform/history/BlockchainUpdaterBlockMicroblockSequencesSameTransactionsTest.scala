@@ -41,6 +41,7 @@ class BlockchainUpdaterBlockMicroblockSequencesSameTransactionsTest
     }
   }
 
+  //
   property("Miner fee from microblock [Genesis] <- [Empty] <~ (Micro with tx) <- [Empty]") {
     val preconditionsAndPayments: Gen[(PrivateKeyAccount, GenesisTransaction, PaymentTransaction, Int)] = for {
       master <- accountGen

@@ -131,6 +131,12 @@ trait NodeApi {
 
   def blockSeq(from: Int, to: Int) = get(s"/blocks/seq/$from/$to").as[Seq[Block]]
 
+  def blockHeadersAt(height: Int) = get(s"/blocks/headers/at/$height").as[BlockHeaders]
+
+  def blockHeadersSeq(from: Int, to: Int) = get(s"/blocks/headers/seq/$from/$to").as[Seq[BlockHeaders]]
+
+  def lastBlockHeaders: Future[BlockHeaders] = get("/blocks/headers/last").as[BlockHeaders]
+
   def status: Future[Status] = get("/node/status").as[Status]
 
   def activationStatus: Future[ActivationStatus] = get("/activation/status").as[ActivationStatus]
@@ -353,6 +359,10 @@ object NodeApi extends ScorexLogging {
 
   case class Block(signature: String, height: Int, timestamp: Long, generator: String, transactions: Seq[Transaction],
                    fee: Long, features: Option[Seq[Short]])
+
+  case class BlockHeaders(signature: String, height: Int, timestamp: Long, generator: String, transactionCount: Int, blocksize: Int)
+
+  implicit val blockHeadersFormat: Format[BlockHeaders] = Json.format
 
   implicit val blockFormat: Format[Block] = Json.format
 
