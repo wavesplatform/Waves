@@ -51,7 +51,7 @@ object RxExtensionLoader extends ScorexLogging {
             case LoaderState.Idle =>
               val maybeKnownSigs = state.applierState match {
                 case ApplierState.Idle => Some((history.lastBlockIds(maxRollback), false))
-                case ApplierState.Applying(ext) => Some(ext.blocks.map(_.uniqueId), true)
+                case ApplierState.Applying(ext) => Some((ext.blocks.map(_.uniqueId), true))
                 case _ => None
               }
               maybeKnownSigs match {

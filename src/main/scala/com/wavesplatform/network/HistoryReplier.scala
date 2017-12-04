@@ -54,7 +54,6 @@ class HistoryReplier(history: NgHistory, settings: SynchronizationSettings) exte
       .runAsyncLogErr
 
     case mbr@MicroBlockRequest(totalResBlockSig) =>
-      log.trace(id(ctx) + "Received " + mbr)
       Task(knownMicroBlocks.get(totalResBlockSig)).map { bytes =>
         ctx.writeAndFlush(RawBytes(MicroBlockResponseMessageSpec.messageCode, bytes))
         log.trace(id(ctx) + s"Sent MicroBlockResponse(total=${totalResBlockSig.trim})")

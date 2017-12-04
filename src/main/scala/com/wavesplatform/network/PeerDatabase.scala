@@ -8,11 +8,11 @@ import scorex.utils.ScorexLogging
 
 trait PeerDatabase extends AutoCloseable {
 
-  def addCandidate(socketAddress: InetSocketAddress)
+  def addCandidate(socketAddress: InetSocketAddress): Boolean
 
-  def touch(socketAddress: InetSocketAddress)
+  def touch(socketAddress: InetSocketAddress): Unit
 
-  def blacklist(host: InetAddress, reason: String)
+  def blacklist(host: InetAddress, reason: String): Unit
 
   def knownPeers: Map[InetSocketAddress, Long]
 
@@ -36,7 +36,7 @@ trait PeerDatabase extends AutoCloseable {
 object PeerDatabase extends ScorexLogging {
 
   trait NoOp extends PeerDatabase {
-    override def addCandidate(socketAddress: InetSocketAddress): Unit = {}
+    override def addCandidate(socketAddress: InetSocketAddress): Boolean = true
 
     override def touch(socketAddress: InetSocketAddress): Unit = {}
 

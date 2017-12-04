@@ -12,34 +12,40 @@ class TrafficLogger(settings: TrafficLogger.Settings) extends ChannelDuplexHandl
 
   import BasicMessagesRepo.specsByClasses
 
+  private val codeOf: AnyRef => Option[Byte] = {
+    val aux: PartialFunction[AnyRef, Byte] = {
+      case x: RawBytes => x.code
+      case _: Transaction => TransactionMessageSpec.messageCode
+      case _: BigInt | _: LocalScoreChanged => ScoreMessageSpec.messageCode
+      case _: Block | _: BlockForged => BlockMessageSpec.messageCode
+      case x: Message => specsByClasses(x.getClass).messageCode
+      case _: Handshake => HandshakeMessageSpec.messageCode
+    }
+
+    aux.lift
+  }
+
   override def write(ctx: ChannelHandlerContext, msg: AnyRef, promise: ChannelPromise): Unit = {
-    if (!shouldIgnore(msg)) log.trace(s"${id(ctx)} <-- $msg")
+    codeOf(msg).filterNot(settings.ignoreTxMessages).foreach { code =>
+      log.trace(s"${id(ctx)} <-- transmitted($code): $msg")
+    }
+
     super.write(ctx, msg, promise)
   }
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = {
-    if (!shouldIgnore(msg)) log.trace(s"${id(ctx)} --> $msg")
-    super.channelRead(ctx, msg)
-  }
-
-  private def shouldIgnore(msg: AnyRef): Boolean = {
-    import settings.ignoreMessages
-
-    msg match {
-      case x: RawBytes => ignoreMessages(x.code)
-      case _: Transaction => ignoreMessages(TransactionMessageSpec.messageCode)
-      case _: BigInt | _: LocalScoreChanged => ignoreMessages(ScoreMessageSpec.messageCode)
-      case _: Block | _: BlockForged => ignoreMessages(BlockMessageSpec.messageCode)
-      case x: Message => ignoreMessages(specsByClasses(x.getClass).messageCode)
-      // case _: Handshake => ignoreMessages(HandshakeMessageSpec.messageCode)
-      case x => true
+    codeOf(msg).filterNot(settings.ignoreRxMessages).foreach { code =>
+      log.trace(s"${id(ctx)} --> received($code): $msg")
     }
+
+    super.channelRead(ctx, msg)
   }
 
 }
 
 object TrafficLogger {
 
-  case class Settings(enable: Boolean, ignoreMessages: Set[ScorexMessage.MessageCode])
+  case class Settings(ignoreTxMessages: Set[ScorexMessage.MessageCode],
+                      ignoreRxMessages: Set[ScorexMessage.MessageCode])
 
 }

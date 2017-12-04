@@ -54,10 +54,7 @@ object NetworkServer extends ScorexLogging {
 
     val trafficWatcher = new NoopHandler
 
-    val trafficLogger = if (settings.networkSettings.trafficLogger.enable) {
-      log.debug("Logging of traffic is enabled")
-      new TrafficLogger(settings.networkSettings.trafficLogger)
-    } else new NoopHandler
+    val trafficLogger = new TrafficLogger(settings.networkSettings.trafficLogger)
     val messageCodec = new MessageCodec(peerDatabase)
 
     val excludedAddresses: Set[InetSocketAddress] = {

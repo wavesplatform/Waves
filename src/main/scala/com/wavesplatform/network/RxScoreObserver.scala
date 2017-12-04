@@ -77,7 +77,6 @@ object RxScoreObserver extends ScorexLogging {
 
     val rs: Observable[Option[Channel]] = remoteScores.mapTask { case ((ch, score)) => Task {
       scores.put(ch, score)
-      log.trace(s"${id(ch)} New remote score $score")
       None
     }
     }
