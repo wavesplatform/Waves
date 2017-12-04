@@ -45,7 +45,6 @@ object RxScoreObserver extends ScorexLogging {
       val bestChannels = groupedByScore(bestScore).map(_._1)
       bestChannel match {
         case Some(c) if bestChannels contains c =>
-          log.trace(s"${id(c)} Publishing same best channel with score $bestScore")
           Some(BestChannel(c, bestScore))
         case _ =>
           val head = bestChannels.head
@@ -86,8 +85,6 @@ object RxScoreObserver extends ScorexLogging {
       if (currentBestChannel.contains(ch)) {
         log.debug(s"${id(ch)} Best channel has been closed")
         currentBestChannel = None
-      } else {
-        log.trace(s"${id(ch)} Some channel has been closed")
       }
       Option(ch)
     })

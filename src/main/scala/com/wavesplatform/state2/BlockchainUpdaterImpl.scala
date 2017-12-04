@@ -35,6 +35,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
   private lazy val maxTransactionsPerChunk = settings.blockchainSettings.maxTransactionsPerBlockDiff
   private lazy val minBlocksInMemory = settings.blockchainSettings.minBlocksInMemory
   private lazy val rebuildByBlocks = minBlocksInMemory
+  private lazy val maxBlockReadinessAge = settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed.toMillis
 
   private lazy val inMemDiffs: Synchronized[NEL[BlockDiff]] = Synchronized(NEL.one(BlockDiff.empty)) // fresh head
   private lazy val ngState: Synchronized[Option[NgState]] = Synchronized(Option.empty[NgState])
@@ -52,12 +53,8 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
   def bestLiquidState: StateReader = composite(Coeval(read { implicit l => ngState().map(_.bestLiquidDiff).orEmpty }), currentPersistedBlocksState)
 
   def blockchainReady: Boolean = {
-    val ts = time.correctedTime()
     val lastBlock = historyReader.lastBlockTimestamp().get
-    val maxDelta = settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed.toMillis
-    val r = ts - lastBlock < maxDelta
-    if (!r) log.trace(s"Blockchain not ready: Now=$ts, lastBlock: $lastBlock, maxDelta=$maxDelta")
-    r
+    lastBlock + maxBlockReadinessAge > time.correctedTime()
   }
 
   def historyReader: NgHistory with DebugNgHistory with FeatureProvider = {
