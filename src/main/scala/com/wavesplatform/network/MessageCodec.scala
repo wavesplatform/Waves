@@ -17,7 +17,7 @@ class MessageCodec(peerDatabase: PeerDatabase) extends MessageToMessageCodec[Raw
   override def encode(ctx: ChannelHandlerContext, msg: Message, out: util.List[AnyRef]) = msg match {
     // Have no spec
     case r: RawBytes => out.add(r)
-    case LocalScoreChanged(score, _) => out.add(RawBytes(ScoreMessageSpec.messageCode, ScoreMessageSpec.serializeData(score)))
+    case LocalScoreChanged(score) => out.add(RawBytes(ScoreMessageSpec.messageCode, ScoreMessageSpec.serializeData(score)))
     case BlockForged(b) => out.add(RawBytes(BlockMessageSpec.messageCode, b.bytes()))
 
     // With a spec

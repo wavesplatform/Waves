@@ -4,26 +4,27 @@ import javax.ws.rs.Path
 
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server.{Route, StandardRoute}
-import com.wavesplatform.Coordinator
 import com.wavesplatform.network._
-import com.wavesplatform.settings.{CheckpointsSettings, RestAPISettings}
+import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state2.ByteStr
 import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
+import monix.eval.Task
 import play.api.libs.json._
 import scorex.block.BlockHeader
-import scorex.transaction.{BlockchainUpdater, CheckpointService, History, TransactionParser}
+import scorex.transaction._
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent._
 
 @Path("/blocks")
 @Api(value = "/blocks")
-case class BlocksApiRoute(settings: RestAPISettings, checkpointsSettings: CheckpointsSettings, history: History, allChannels: ChannelGroup,
-                          checkpointService: CheckpointService, blockchainUpdater: BlockchainUpdater) extends ApiRoute {
+case class BlocksApiRoute(settings: RestAPISettings, history: History, allChannels: ChannelGroup, checkpointProc: Checkpoint => Task[Either[ValidationError, BigInt]]) extends ApiRoute {
 
   // todo: make this configurable and fix integration tests
   val MaxBlocksPerRequest = 100
+  val rollbackExecutor = monix.execution.Scheduler.singleThread(name = "debug-rollback")
+
 
   override lazy val route =
     pathPrefix("blocks") {
@@ -211,9 +212,8 @@ case class BlocksApiRoute(settings: RestAPISettings, checkpointsSettings: Checkp
   ))
   def checkpoint: Route = (path("checkpoint") & post) {
     json[Checkpoint] { checkpoint =>
-      Future {
-        Coordinator.processCheckpoint(checkpointService, history, blockchainUpdater)(checkpoint)
-          .map(score => allChannels.broadcast(LocalScoreChanged(score, breakExtLoading = true)))
+      checkpointProc(checkpoint).runAsync(rollbackExecutor).map {
+        _.map(score => allChannels.broadcast(LocalScoreChanged(score)))
       }.map(_.fold(ApiError.fromValidationError,
         _ => Json.obj("" -> "")): ToResponseMarshallable)
     }

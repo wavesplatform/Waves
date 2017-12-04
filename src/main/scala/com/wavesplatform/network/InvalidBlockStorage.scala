@@ -12,13 +12,13 @@ trait InvalidBlockStorage {
   def contains(blockId: ByteStr): Boolean
 }
 
-object InvalidBlockStorage {
+class InMemoryInvalidBlockStorage extends InvalidBlockStorage {
 
-  object Empty extends InvalidBlockStorage {
-    override def add(blockId: ByteStr): Unit = {}
+  var s: Set[ByteStr] = Set.empty[ByteStr]
 
-    override def contains(blockId: ByteStr): Boolean = false
-  }
+  override def add(blockId: ByteStr): Unit = s += blockId
+
+  override def contains(blockId: ByteStr): Boolean = s.contains(blockId)
 
 }
 

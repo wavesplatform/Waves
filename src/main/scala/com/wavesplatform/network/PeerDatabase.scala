@@ -58,7 +58,7 @@ object PeerDatabase extends ScorexLogging {
 
     override val detailedSuspended: Map[InetAddress, Long] = Map.empty
 
-    override def blacklistAndClose(channel: Channel, reason: String): Unit = {}
+    override def blacklistAndClose(channel: Channel, reason: String): Unit = channel.close()
   }
 
   object NoOp extends NoOp

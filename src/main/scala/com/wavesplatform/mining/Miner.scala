@@ -1,13 +1,13 @@
 package com.wavesplatform.mining
 
-import java.util.concurrent.atomic.AtomicBoolean
-
+import cats.data.EitherT
+import com.wavesplatform.UtxPool
 import com.wavesplatform.features.{BlockchainFeatureStatus, BlockchainFeatures, FeatureProvider}
 import com.wavesplatform.metrics.{BlockStats, HistogramExt, Instrumented}
 import com.wavesplatform.network._
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state2._
-import com.wavesplatform.{Coordinator, UtxPool}
+import com.wavesplatform.state2.appender.{BlockAppender, MicroblockAppender}
 import io.netty.channel.group.ChannelGroup
 import kamon.Kamon
 import kamon.metric.instrument
@@ -38,7 +38,6 @@ trait MinerDebugInfo {
 
 class MinerImpl(
                    allChannels: ChannelGroup,
-                   blockchainReadiness: AtomicBoolean,
                    blockchainUpdater: BlockchainUpdater,
                    checkpoint: CheckpointService,
                    history: NgHistory,
@@ -56,7 +55,6 @@ class MinerImpl(
   private lazy val minerSettings = settings.minerSettings
   private lazy val minMicroBlockDurationMills = minerSettings.minMicroBlockAge.toMillis
   private lazy val blockchainSettings = settings.blockchainSettings
-  private lazy val processBlock = Coordinator.processSingleBlock(checkpoint, history, blockchainUpdater, timeService, stateReader, utx, settings.blockchainSettings, featureProvider) _
 
   private val scheduledAttempts = SerialCancelable()
   private val microBlockAttempt = SerialCancelable()
@@ -123,17 +121,17 @@ class MinerImpl(
     }
     if (pc < minerSettings.quorum) {
       log.trace(s"Quorum not available ($pc/${minerSettings.quorum}, not forging microblock with ${account.address}")
-      Right(None)
+      Task.now(Right(None))
     }
     else if (unconfirmed.isEmpty) {
       log.trace("skipping microBlock because no txs in utx pool")
-      Right(None)
+      Task.now(Right(None))
     }
     else {
       log.trace(s"Accumulated ${unconfirmed.size} txs for microblock")
       val start = System.currentTimeMillis()
-      val block = for {
-        signedBlock <- Block.buildAndSign(
+      (for {
+        signedBlock <- EitherT(Task.now(Block.buildAndSign(
           version = 3,
           timestamp = accumulatedBlock.timestamp,
           reference = accumulatedBlock.reference,
@@ -141,22 +139,23 @@ class MinerImpl(
           transactionData = accumulatedBlock.transactionData ++ unconfirmed,
           signer = account,
           featureVotes = accumulatedBlock.featureVotes
-        )
-        microBlock <- MicroBlock.buildAndSign(account, unconfirmed, accumulatedBlock.signerData.signature, signedBlock.signerData.signature)
+        )))
+        microBlock <- EitherT(Task.now(MicroBlock.buildAndSign(account, unconfirmed, accumulatedBlock.signerData.signature, signedBlock.signerData.signature)))
         _ = microBlockBuildTimeStats.safeRecord(System.currentTimeMillis() - start)
-        _ <- Coordinator.processMicroBlock(checkpoint, history, blockchainUpdater, utx)(microBlock)
+        _ <- EitherT(MicroblockAppender(checkpoint, history, blockchainUpdater, utx)(microBlock))
       } yield {
         BlockStats.mined(microBlock)
         log.trace(s"$microBlock has been mined for $account}")
         allChannels.broadcast(MicroBlockInv(account, microBlock.totalResBlockSig, microBlock.prevResBlockSig))
         Some(signedBlock)
-      }
-      block.left.map { err =>
-        log.trace(s"MicroBlock has NOT been mined for $account} because $err")
-        err
+      }).value.map {
+        _.left.map { err =>
+          log.trace(s"MicroBlock has NOT been mined for $account} because $err")
+          err
+        }
       }
     }
-  }
+  }.flatten
 
   private def generateMicroBlockSequence(account: PrivateKeyAccount, accumulatedBlock: Block, delay: FiniteDuration): Task[Unit] = {
     generateOneMicroBlockTask(account, accumulatedBlock).delayExecution(delay).flatMap {
@@ -180,21 +179,19 @@ class MinerImpl(
         log.debug(s"Next attempt for acc=$account in $offset")
         nextBlockGenerationTimes += account.toAddress -> (System.currentTimeMillis() + offset.toMillis)
         generateOneBlockTask(account, balance)(offset).flatMap {
-          case Right(block) => Task.now {
-            processBlock(block) match {
+          case Right(block) =>
+            BlockAppender(checkpoint, history, blockchainUpdater, timeService, stateReader, utx, settings.blockchainSettings, featureProvider)(block) map {
               case Left(err) => log.warn("Error mining Block: " + err.toString)
               case Right(Some(score)) =>
                 log.debug(s"Forged and applied $block by ${account.address} with cumulative score $score")
                 BlockStats.mined(block, history.height())
-                Coordinator.updateBlockchainReadinessFlag(history, timeService, blockchainReadiness, settings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed)
                 allChannels.broadcast(BlockForged(block))
-                allChannels.broadcast(LocalScoreChanged(score, breakExtLoading = false))
+                allChannels.broadcast(LocalScoreChanged(score))
                 scheduleMining()
                 if (ngEnabled)
                   startMicroBlockMining(account, block)
               case Right(None) => log.warn("Newly created block has already been appended, should not happen")
             }
-          }
           case Left(err) =>
             log.debug(s"No block generated because $err, retrying")
             generateBlockTask(account)

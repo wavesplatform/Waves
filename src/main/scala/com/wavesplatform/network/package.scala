@@ -10,6 +10,9 @@ import io.netty.channel.socket.SocketChannel
 import io.netty.channel.{Channel, ChannelHandlerContext}
 import io.netty.util.NetUtil.toSocketAddressString
 import io.netty.util.concurrent.{EventExecutorGroup, ScheduledFuture}
+import monix.eval.Coeval
+import monix.execution.Scheduler
+import monix.reactive.Observable
 import scorex.block.Block
 import scorex.transaction.Transaction
 import scorex.utils.ScorexLogging
@@ -44,9 +47,9 @@ package object network extends ScorexLogging {
 
   def formatBlocks(blocks: Seq[Block]): String = formatSignatures(blocks.view.map(_.uniqueId))
 
-  def formatSignatures(signatures: Seq[ByteStr]): String = if (signatures.isEmpty) ""
-  else if (signatures.size == 1) s"[${signatures.head}]"
-  else s"[${signatures.head}..${signatures.last}]"
+  def formatSignatures(signatures: Seq[ByteStr]): String = if (signatures.isEmpty) "[Empty]"
+  else if (signatures.size == 1) s"[${signatures.head.trim}]"
+  else s"(total=${signatures.size}) [${signatures.head.trim} -- ${signatures.last.trim}]"
 
   implicit class ChannelHandlerContextExt(val ctx: ChannelHandlerContext) extends AnyVal {
     def remoteAddress: InetSocketAddress = ctx.channel().asInstanceOf[SocketChannel].remoteAddress()
@@ -70,4 +73,21 @@ package object network extends ScorexLogging {
       allChannels.broadcast(RawBytes(TransactionMessageSpec.messageCode, tx.bytes()), except)
   }
 
+  type ChannelObservable[A] = Observable[(Channel, A)]
+
+  def lastObserved[A](o: Observable[A])(implicit s: Scheduler): Coeval[Option[A]] = {
+    @volatile var last = Option.empty[A]
+    o.foreach(a => last = Some(a))
+    Coeval(last)
+  }
+
+  def newItems[A](o: Observable[A])(implicit s: Scheduler): Coeval[Seq[A]] = {
+    @volatile var collected = Seq.empty[A]
+    o.foreach(a => collected = collected :+ a)
+    Coeval {
+      val r = collected
+      collected = Seq.empty
+      r
+    }
+  }
 }
