@@ -11,25 +11,22 @@ import scorex.transaction.{BlockchainUpdater, CheckpointService, History, Valida
 import scorex.utils.ScorexLogging
 
 object CheckpointAppender extends ScorexLogging {
-
-  def apply(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater
-           )(newCheckpoint: Checkpoint): Task[Either[ValidationError, BigInt]] =
-    Task(checkpoint.set(newCheckpoint).map { _ =>
-      log.info(s"Processing checkpoint $checkpoint")
-      makeBlockchainCompliantWith(history, blockchainUpdater)(newCheckpoint)
-      history.score()
-    }).executeOn(scheduler)
-
-
-  def apply(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater,
+  def apply(checkpointService: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater,
             peerDatabase: PeerDatabase, miner: Miner, allChannels: ChannelGroup
-           )(ch: Channel, c: Checkpoint): Task[Either[ValidationError, Option[BigInt]]] =
-    processAndBlacklistOnFailure(ch, peerDatabase, miner, allChannels,
-      s"${id(ch)} Attempting to process checkpoint",
-      s"${id(ch)} Successfully processed checkpoint",
-      s"${id(ch)} Error processing checkpoint"
-    )(apply(checkpoint, history, blockchainUpdater)(c).map(_.map(Some(_))))
-
+           )(maybeChannel: Option[Channel], c: Checkpoint): Task[Either[ValidationError, Option[BigInt]]] = {
+    val t = Task(checkpointService.set(c).map { _ =>
+      log.info(s"Processing checkpoint $c")
+      makeBlockchainCompliantWith(history, blockchainUpdater)(c)
+      history.score()
+    }).executeOn(scheduler).map(_.map(Some(_)))
+    maybeChannel match {
+      case None => t
+      case Some(ch) => processAndBlacklistOnFailure(ch, peerDatabase, miner, allChannels,
+        s"${id(ch)} Attempting to process checkpoint",
+        s"${id(ch)} Successfully processed checkpoint",
+        s"${id(ch)} Error processing checkpoint")(t)
+    }
+  }
 
   private def makeBlockchainCompliantWith(history: History, blockchainUpdater: BlockchainUpdater)(checkpoint: Checkpoint): Unit = {
     val existingItems = checkpoint.items.filter {

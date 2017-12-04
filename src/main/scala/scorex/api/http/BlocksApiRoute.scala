@@ -19,7 +19,7 @@ import scala.concurrent._
 
 @Path("/blocks")
 @Api(value = "/blocks")
-case class BlocksApiRoute(settings: RestAPISettings, history: History, allChannels: ChannelGroup, checkpointProc: Checkpoint => Task[Either[ValidationError, BigInt]]) extends ApiRoute {
+case class BlocksApiRoute(settings: RestAPISettings, history: History, allChannels: ChannelGroup, checkpointProc: Checkpoint => Task[Either[ValidationError, Option[BigInt]]]) extends ApiRoute {
 
   // todo: make this configurable and fix integration tests
   val MaxBlocksPerRequest = 100
@@ -213,7 +213,7 @@ case class BlocksApiRoute(settings: RestAPISettings, history: History, allChanne
   def checkpoint: Route = (path("checkpoint") & post) {
     json[Checkpoint] { checkpoint =>
       checkpointProc(checkpoint).runAsync(rollbackExecutor).map {
-        _.map(score => allChannels.broadcast(LocalScoreChanged(score)))
+        _.map(score => allChannels.broadcast(LocalScoreChanged(score.getOrElse(history.score()))))
       }.map(_.fold(ApiError.fromValidationError,
         _ => Json.obj("" -> "")): ToResponseMarshallable)
     }
