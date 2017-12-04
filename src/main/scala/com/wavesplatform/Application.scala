@@ -87,10 +87,9 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     val newBlocks = RxExtensionLoader(settings.synchronizationSettings.maxRollback, settings.synchronizationSettings.synchronizationTimeout,
       history, peerDatabase, knownInvalidBlocks, blocks, signatures, syncWithChannelClosed) { case ((c, b)) => processFork(c, b.blocks) }
 
-
     val microblockSink = microblockDatas(processMicroBlock)
-    val blockSink = newBlocks.mapTask { case ((c, b)) => processBlock(b, c) }
-    val checkpointSink = checkpoints.mapTask { case ((c, cp)) => processCheckpoint(c, cp) }
+    val blockSink = newBlocks.mapTask(scala.Function.tupled(processBlock))
+    val checkpointSink = checkpoints.mapTask(scala.Function.tupled(processCheckpoint))
 
     Observable.merge(microblockSink, blockSink, checkpointSink).subscribe()(monix.execution.Scheduler.Implicits.global)
     miner.scheduleMining()

@@ -37,7 +37,7 @@ object BlockAppender extends ScorexLogging with Instrumented {
   def apply(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater, time: Time,
             stateReader: StateReader, utxStorage: UtxPool, settings: BlockchainSettings,
             featureProvider: FeatureProvider, allChannels: ChannelGroup, peerDatabase: PeerDatabase, miner: Miner
-           )(newBlock: Block, ch: Channel): Task[Unit] = {
+           )(ch: Channel, newBlock: Block): Task[Unit] = {
     BlockStats.received(newBlock, BlockStats.Source.Broadcast, ch)
     blockReceivingLag.safeRecord(System.currentTimeMillis() - newBlock.timestamp)
     (for {
