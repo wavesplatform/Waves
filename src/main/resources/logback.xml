@@ -14,7 +14,7 @@
     <logger name="com.wavesplatform.network.PeerDatabaseImpl" level="DEBUG"/>
     <logger name="com.wavesplatform.network.PeerSynchronizer" level="DEBUG"/>
     <logger name="com.wavesplatform.state2.StateWriterImpl" level="DEBUG"/>
-
+    <logger name="com.wavesplatform.network.RxScoreObserver" level="DEBUG"/>
     <logger name="io.swagger" level="INFO"/>
     <logger name="org.asynchttpclient" level="INFO"/>
 
