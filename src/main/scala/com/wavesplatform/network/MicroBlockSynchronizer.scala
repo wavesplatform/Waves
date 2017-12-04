@@ -14,12 +14,11 @@ import monix.reactive.Observable
 import scorex.block.Block.BlockId
 import scorex.block.MicroBlock
 import scorex.transaction.NgHistory
-import scorex.utils.ScorexLogging
 
 import scala.collection.mutable.{Set => MSet}
 import scala.concurrent.duration.FiniteDuration
 
-object MicroBlockSynchronizer extends ScorexLogging {
+object MicroBlockSynchronizer {
 
   def apply(settings: MicroblockSynchronizerSettings,
             history: NgHistory,
@@ -53,7 +52,6 @@ object MicroBlockSynchronizer extends ScorexLogging {
           if (channel.isOpen) {
             val request = MicroBlockRequest(totalBlockSig)
             channel.writeAndFlush(request)
-            log.trace(s"${id(channel)} Sent $request")
             awaiting.put(totalBlockSig, mbInv)
             task(attemptsAllowed - 1, exclude + channel).delayExecution(settings.waitResponseTimeout)
           } else task(attemptsAllowed, exclude + channel)
@@ -72,7 +70,6 @@ object MicroBlockSynchronizer extends ScorexLogging {
         case Left(err) =>
           peerDatabase.blacklistAndClose(ch, err.toString)
         case Right(_) =>
-          log.trace(s"${id(ch)} Received $mbInv")
           microBlockOwners.get(totalSig, () => MSet.empty) += ch
           nextInvs.get(prevSig, { () =>
             BlockStats.inv(mbInv, ch)
@@ -89,7 +86,6 @@ object MicroBlockSynchronizer extends ScorexLogging {
       import mb.{totalResBlockSig => totalSig}
       successfullyReceived.put(totalSig, dummy)
       BlockStats.received(mb, ch)
-      log.trace(s"${id(ch)} Received $msg")
       Option(awaiting.getIfPresent(totalSig)) match {
         case None => Observable.empty
         case Some(mi) =>

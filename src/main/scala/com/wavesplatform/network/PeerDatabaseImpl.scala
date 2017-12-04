@@ -55,13 +55,10 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Scor
     clearBlacklist()
   }
 
-  override def addCandidate(socketAddress: InetSocketAddress): Unit = unverifiedPeers.synchronized {
-    if (Option(peersPersistence.getIfPresent(socketAddress)).isEmpty && !unverifiedPeers.contains(socketAddress)) {
-      log.trace(s"Adding candidate $socketAddress")
-      unverifiedPeers.add(socketAddress)
-    } else {
-      log.trace(s"NOT adding candidate $socketAddress")
-    }
+  override def addCandidate(socketAddress: InetSocketAddress): Boolean = unverifiedPeers.synchronized {
+    val r = Option(peersPersistence.getIfPresent(socketAddress)).isEmpty && !unverifiedPeers.contains(socketAddress)
+    if (r) unverifiedPeers.add(socketAddress)
+    r
   }
 
   private def doTouch(socketAddress: InetSocketAddress, timestamp: Long): Unit = unverifiedPeers.synchronized {

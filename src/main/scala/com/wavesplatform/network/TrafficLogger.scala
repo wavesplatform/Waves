@@ -13,26 +13,26 @@ class TrafficLogger(settings: TrafficLogger.Settings) extends ChannelDuplexHandl
   import BasicMessagesRepo.specsByClasses
 
   override def write(ctx: ChannelHandlerContext, msg: AnyRef, promise: ChannelPromise): Unit = {
-    if (!shouldIgnore(msg)) log.trace(s"${id(ctx)} <-- $msg")
+    if (!shouldIgnore(msg, settings.ignoreTxMessages)) log.trace(s"${id(ctx)} tx: $msg")
     super.write(ctx, msg, promise)
   }
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = {
-    if (!shouldIgnore(msg)) log.trace(s"${id(ctx)} --> $msg")
+    if (!shouldIgnore(msg, settings.ignoreRxMessages)) log.trace(s"${id(ctx)} rx: $msg")
     super.channelRead(ctx, msg)
   }
 
-  private def shouldIgnore(msg: AnyRef): Boolean = {
-    import settings.ignoreMessages
-
+  private def shouldIgnore(msg: AnyRef, ignoreMessages: Set[ScorexMessage.MessageCode]): Boolean = {
     msg match {
       case x: RawBytes => ignoreMessages(x.code)
       case _: Transaction => ignoreMessages(TransactionMessageSpec.messageCode)
       case _: BigInt | _: LocalScoreChanged => ignoreMessages(ScoreMessageSpec.messageCode)
       case _: Block | _: BlockForged => ignoreMessages(BlockMessageSpec.messageCode)
       case x: Message => ignoreMessages(specsByClasses(x.getClass).messageCode)
-      // case _: Handshake => ignoreMessages(HandshakeMessageSpec.messageCode)
-      case x => true
+      case _: Handshake => ignoreMessages(HandshakeMessageSpec.messageCode)
+      case x =>
+        log.warn(s"Unknown ${x.getClass}: $x")
+        true
     }
   }
 
@@ -40,6 +40,8 @@ class TrafficLogger(settings: TrafficLogger.Settings) extends ChannelDuplexHandl
 
 object TrafficLogger {
 
-  case class Settings(enable: Boolean, ignoreMessages: Set[ScorexMessage.MessageCode])
+  case class Settings(enable: Boolean,
+                      ignoreTxMessages: Set[ScorexMessage.MessageCode],
+                      ignoreRxMessages: Set[ScorexMessage.MessageCode])
 
 }

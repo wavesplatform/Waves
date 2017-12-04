@@ -62,7 +62,7 @@ class NetworkSettingsSpecification extends FlatSpec with Matchers {
     networkSettings.uPnPSettings.gatewayTimeout should be(10.seconds)
     networkSettings.uPnPSettings.discoverTimeout should be(10.seconds)
     networkSettings.trafficLogger.enable should be(false)
-    networkSettings.trafficLogger.ignoreMessages should be(Set(23))
+    networkSettings.trafficLogger.ignoreRxMessages should be(Set(23))
   }
 
   it should "generate random nonce" in {

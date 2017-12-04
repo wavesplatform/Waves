@@ -9,7 +9,6 @@ import scorex.block.{Block, MicroBlock}
 import scorex.crypto.EllipticCurveImpl
 import scorex.transaction.{History, Signed}
 
-
 sealed trait Message
 
 case object GetPeers extends Message
