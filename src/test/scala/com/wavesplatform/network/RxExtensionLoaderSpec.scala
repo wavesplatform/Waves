@@ -33,7 +33,7 @@ class RxExtensionLoaderSpec extends FreeSpec with Matchers with TransactionGen w
     val channelClosed = PublishSubject[ChannelClosedAndSyncWith]
     val history = new TestHistory
     val op = PeerDatabase.NoOp
-    val invBlockStorage = InvalidBlockStorage.Empty
+    val invBlockStorage = new InMemoryInvalidBlockStorage
     val singleBlocks = RxExtensionLoader(MaxRollback, timeOut, history, op, invBlockStorage, blocks, sigs, channelClosed)(simpleApplier)
 
     (history, invBlockStorage, blocks, sigs, channelClosed, singleBlocks)
