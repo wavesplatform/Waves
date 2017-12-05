@@ -64,7 +64,7 @@ class OrderBookActor(assetPair: AssetPair,
       log.error(s"Failed to save snapshot: $metadata, $reason.")
     case DeleteOrderBookRequest(pair) =>
       orderBook.asks.values.++(orderBook.bids.values).flatten.map(_.order.idStr)
-        .foreach(x => context.system.eventStream.publish(OrderCanceled(x)))
+        .foreach(x => context.system.eventStream.publish(OrderCanceled(x())))
       deleteMessages(lastSequenceNr)
       deleteSnapshots(SnapshotSelectionCriteria.Latest)
       context.stop(self)
