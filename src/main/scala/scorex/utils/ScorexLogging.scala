@@ -1,5 +1,8 @@
 package scorex.utils
 
+import monix.eval.Task
+import monix.execution.{CancelableFuture, Scheduler}
+import monix.reactive.Observable
 import org.slf4j.{Logger, LoggerFactory}
 
 case class LoggerFacade(logger: Logger) {
@@ -56,4 +59,25 @@ case class LoggerFacade(logger: Logger) {
 
 trait ScorexLogging {
   protected def log = LoggerFacade(LoggerFactory.getLogger(this.getClass))
+
+  implicit class TaskExt[A](t: Task[A]) {
+    def runAsyncLogErr(implicit s: Scheduler): CancelableFuture[A] = logErr.runAsync
+
+    def logErr: Task[A] = {
+      t.onErrorHandleWith(ex => {
+        log.error(s"Error executing task", ex)
+        Task.raiseError[A](ex)
+      })
+    }
+  }
+
+  implicit class ObservableExt[A](o: Observable[A]) {
+
+    def logErr: Observable[A] = {
+      o.onErrorHandleWith(ex => {
+        log.error(s"Error observing item", ex)
+        Observable.raiseError[A](ex)
+      })
+    }
+  }
 }

@@ -1,16 +1,15 @@
 package com.wavesplatform.state2.reader
 
-import com.wavesplatform.TransactionGen
 import com.wavesplatform.state2.diffs._
-import org.scalacheck.{Gen, Shrink}
-import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
+import com.wavesplatform.{NoShrink, TransactionGen}
+import org.scalacheck.Gen
+import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import scorex.lagonaki.mocks.TestBlock
 import scorex.transaction.{GenesisTransaction, PaymentTransaction, Transaction}
 
-class StateReaderLastTransactionsTest extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers with TransactionGen {
-
-  private implicit def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)
+class StateReaderLastTransactionsTest extends PropSpec
+  with PropertyChecks with Matchers with TransactionGen with NoShrink {
 
   val preconditionsAndPayment: Gen[(Seq[Transaction], PaymentTransaction)] = for {
     master <- accountGen
@@ -35,6 +34,7 @@ class StateReaderLastTransactionsTest extends PropSpec with PropertyChecks with 
         val tx2 = pre(2)
         newState.accountTransactions(payment.sender, 3) shouldBe Seq(payment, tx2, tx1)
         newState.accountTransactions(payment.sender, 10) shouldBe Seq(payment, tx2, tx1, g)
+        newState.accountTransactionIds(TestBlock.defaultSigner, 10).size shouldBe 0
       }
     }
   }

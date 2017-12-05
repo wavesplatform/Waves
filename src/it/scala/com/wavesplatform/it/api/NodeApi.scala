@@ -3,9 +3,10 @@ package com.wavesplatform.it.api
 import java.io.IOException
 import java.util.concurrent.TimeoutException
 
+import com.wavesplatform.features.api.ActivationStatus
 import com.wavesplatform.it.util._
 import com.wavesplatform.matcher.api.CancelOrderRequest
-import com.wavesplatform.state2.Portfolio
+import com.wavesplatform.state2.{ByteStr, Portfolio}
 import io.netty.util.{HashedWheelTimer, Timer}
 import org.asynchttpclient.Dsl.{get => _get, post => _post}
 import org.asynchttpclient._
@@ -16,10 +17,12 @@ import play.api.libs.json._
 import scorex.api.http.alias.CreateAliasRequest
 import scorex.api.http.assets._
 import scorex.api.http.leasing.{LeaseCancelRequest, LeaseRequest}
+import scorex.api.http.PeersApiRoute.{ConnectReq, connectFormat}
 import scorex.transaction.assets.exchange.Order
 import scorex.utils.{LoggerFacade, ScorexLogging}
-import scorex.waves.http.DebugApiRoute.portfolioFormat
-import scorex.waves.http.RollbackParams
+import scorex.waves.http.DebugApiRoute._
+import scorex.waves.http.{DebugMessage, RollbackParams}
+import scorex.waves.http.DebugMessage._
 
 import scala.compat.java8.FutureConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -28,14 +31,18 @@ import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 
 trait NodeApi {
+
   import NodeApi._
 
   def restAddress: String
+
   def nodeRestPort: Int
+
   def matcherRestPort: Int
+
   def blockDelay: FiniteDuration
 
-  protected val client: AsyncHttpClient = new DefaultAsyncHttpClient
+  protected def client: AsyncHttpClient
 
   protected val timer: Timer = new HashedWheelTimer()
 
@@ -43,6 +50,13 @@ trait NodeApi {
 
   def matcherGet(path: String, f: RequestBuilder => RequestBuilder = identity, statusCode: Int = HttpConstants.ResponseStatusCodes.OK_200): Future[Response] =
     retrying(f(_get(s"http://$restAddress:$matcherRestPort$path")).build(), statusCode = statusCode)
+
+  def matcherGetWithSignature(path: String, ts: Long, signature: ByteStr, f: RequestBuilder => RequestBuilder = identity): Future[Response] = retrying {
+    _get(s"http://$restAddress:$matcherRestPort$path")
+      .setHeader("Timestamp", ts)
+      .setHeader("Signature", signature)
+      .build()
+  }
 
   def matcherGetStatusCode(path: String, statusCode: Int): Future[MessageMatcherResponse] =
     matcherGet(path, statusCode = statusCode).as[MessageMatcherResponse]
@@ -57,6 +71,8 @@ trait NodeApi {
   def getOrderBook(asset: String): Future[OrderBookResponse] =
     matcherGet(s"/matcher/orderbook/$asset/WAVES").as[OrderBookResponse]
 
+  def getOrderbookByPublicKey(publicKey: String, timestamp: Long, signature: ByteStr): Future[Seq[OrderbookHistory]] =
+    matcherGetWithSignature(s"/matcher/orderbook/$publicKey", timestamp, signature).as[Seq[OrderbookHistory]]
 
   def get(path: String, f: RequestBuilder => RequestBuilder = identity): Future[Response] =
     retrying(f(_get(s"http://$restAddress:$nodeRestPort$path")).build())
@@ -64,6 +80,13 @@ trait NodeApi {
   def getWihApiKey(path: String, f: RequestBuilder => RequestBuilder = identity): Future[Response] = retrying {
     _get(s"http://$restAddress:$nodeRestPort$path")
       .setHeader("api_key", "integration-test-rest-api")
+      .build()
+  }
+
+  def postJsonWihApiKey[A: Writes](path: String, body: A): Future[Response] = retrying {
+    _post(s"http://$restAddress:$nodeRestPort$path")
+      .setHeader("api_key", "integration-test-rest-api")
+      .setHeader("Content-type", "application/json").setBody(stringify(toJson(body)))
       .build()
   }
 
@@ -82,15 +105,19 @@ trait NodeApi {
   def blacklist(networkIpAddress: String, hostNetworkPort: Int): Future[Unit] =
     post("/debug/blacklist", s"$networkIpAddress:$hostNetworkPort").map(_ => ())
 
+  def printDebugMessage(db: DebugMessage): Future[Response] = postJsonWihApiKey("/debug/print", db)
+
   def connectedPeers: Future[Seq[Peer]] = get("/peers/connected").map { r =>
     (Json.parse(r.getResponseBody) \ "peers").as[Seq[Peer]]
   }
 
-  def blacklistedPeers: Future[Seq[String]] = get("/peers/blacklisted").map { r =>
-    Json.parse(r.getResponseBody).as[Seq[String]]
+  def blacklistedPeers: Future[Seq[BlacklistedPeer]] = get("/peers/blacklisted").map { r =>
+    Json.parse(r.getResponseBody).as[Seq[BlacklistedPeer]]
   }
 
-  def waitForPeers(targetPeersCount: Int): Future[Seq[Peer]] = waitFor[Seq[Peer]](connectedPeers, _.length >= targetPeersCount, 1.second)
+  def connect(host: String, port: Int): Future[Unit] = postJson("/peers/connect", ConnectReq(host, port)).map(_ => ())
+
+  def waitForPeers(targetPeersCount: Int): Future[Seq[Peer]] = waitFor[Seq[Peer]](s"connectedPeers.size >= $targetPeersCount")(_.connectedPeers, _.size >= targetPeersCount, 1.second)
 
   def height: Future[Int] = get("/blocks/height").as[JsValue].map(v => (v \ "height").as[Int])
 
@@ -104,7 +131,15 @@ trait NodeApi {
 
   def blockSeq(from: Int, to: Int) = get(s"/blocks/seq/$from/$to").as[Seq[Block]]
 
+  def blockHeadersAt(height: Int) = get(s"/blocks/headers/at/$height").as[BlockHeaders]
+
+  def blockHeadersSeq(from: Int, to: Int) = get(s"/blocks/headers/seq/$from/$to").as[Seq[BlockHeaders]]
+
+  def lastBlockHeaders: Future[BlockHeaders] = get("/blocks/headers/last").as[BlockHeaders]
+
   def status: Future[Status] = get("/node/status").as[Status]
+
+  def activationStatus: Future[ActivationStatus] = get("/activation/status").as[ActivationStatus]
 
   def balance(address: String): Future[Balance] = get(s"/addresses/balance/$address").as[Balance]
 
@@ -114,19 +149,19 @@ trait NodeApi {
     case Failure(ex) => Failure(ex)
   }
 
-  def waitForTransaction(txId: String): Future[Transaction] = waitFor[Option[Transaction]](transactionInfo(txId).transform {
+  def waitForTransaction(txId: String): Future[Transaction] = waitFor[Option[Transaction]](s"transaction $txId")(_.transactionInfo(txId).transform {
     case Success(tx) => Success(Some(tx))
     case Failure(UnexpectedStatusCodeException(_, r)) if r.getStatusCode == 404 => Success(None)
     case Failure(ex) => Failure(ex)
   }, tOpt => tOpt.exists(_.id == txId), 1.second).map(_.get)
 
-  def waitForUtxIncreased(fromSize: Int): Future[Int] = waitFor[Int](
-    utxSize,
+  def waitForUtxIncreased(fromSize: Int): Future[Int] = waitFor[Int](s"utxSize > $fromSize")(
+    _.utxSize,
     _ > fromSize,
     100.millis
   )
 
-  def waitForHeight(expectedHeight: Int): Future[Int] = waitFor[Int](height, h => h >= expectedHeight, 1.second)
+  def waitForHeight(expectedHeight: Int): Future[Int] = waitFor[Int](s"height >= $expectedHeight")(_.height, h => h >= expectedHeight, 1.second)
 
   def transactionInfo(txId: String): Future[Transaction] = get(s"/transactions/info/$txId").as[Transaction]
 
@@ -169,6 +204,12 @@ trait NodeApi {
   def createAlias(targetAddress: String, alias: String, fee: Long): Future[Transaction] =
     postJson("/alias/create", CreateAliasRequest(targetAddress, alias, fee)).as[Transaction]
 
+  def aliasByAddress(targetAddress: String) =
+    get(s"/alias/by-address/$targetAddress").as[Seq[String]]
+
+  def addressByAlias(targetAlias: String): Future[Address] =
+    get(s"/alias/by-alias/$targetAlias").as[Address]
+
   def rollback(to: Int, returnToUTX: Boolean = true): Future[Unit] =
     postJson("/debug/rollback", RollbackParams(to, returnToUTX)).map(_ => ())
 
@@ -182,8 +223,14 @@ trait NodeApi {
         Future.successful(())
     })
 
-  def waitFor[A](f: => Future[A], cond: A => Boolean, retryInterval: FiniteDuration): Future[A] =
-    timer.retryUntil(f, cond, retryInterval)
+  def waitFor[A](desc: String)(f: this.type => Future[A], cond: A => Boolean, retryInterval: FiniteDuration): Future[A] = {
+    log.debug(s"Awaiting condition '$desc'")
+    timer.retryUntil(f(this), cond, retryInterval)
+      .map(a => {
+        log.debug(s"Condition '$desc' met")
+        a
+      })
+  }
 
   def createAddress: Future[String] =
     post(s"http://$restAddress", nodeRestPort, "/addresses").as[JsValue].map(v => (v \ "address").as[String])
@@ -219,10 +266,10 @@ trait NodeApi {
     postJson("/assets/issue", IssueRequest(address, name, description, quantity, decimals, reissuable, fee)).as[Transaction]
 
   def placeOrder(order: Order): Future[MatcherResponse] =
-    matcherPost("/matcher/orderbook", order.json).as[MatcherResponse]
+    matcherPost("/matcher/orderbook", order.json()).as[MatcherResponse]
 
   def expectIncorrectOrderPlacement(order: Order, expectedStatusCode: Int, expectedStatus: String): Future[Boolean] =
-    matcherPost("/matcher/orderbook", order.json) transform {
+    matcherPost("/matcher/orderbook", order.json()) transform {
       case Failure(UnexpectedStatusCodeException(_, r)) if r.getStatusCode == expectedStatusCode =>
         Try(parse(r.getResponseBody).as[MatcherStatusResponse]) match {
           case Success(mr) if mr.status == expectedStatus => Success(true)
@@ -263,7 +310,7 @@ trait NodeApi {
     executeRequest
   }
 
-  def waitForDebugInfoAt(height: Long): Future[DebugInfo] = waitFor[DebugInfo](get("/debug/info").as[DebugInfo], _.stateHeight >= height, 1.seconds)
+  def waitForDebugInfoAt(height: Long): Future[DebugInfo] = waitFor[DebugInfo](s"debug info at height >= $height")(_.get("/debug/info").as[DebugInfo], _.stateHeight >= height, 1.seconds)
 
   def debugStateAt(height: Long): Future[Map[String, Long]] = get(s"/debug/stateWaves/$height").as[Map[String, Long]]
 
@@ -286,6 +333,10 @@ object NodeApi extends ScorexLogging {
 
   implicit val peerFormat: Format[Peer] = Json.format
 
+  case class Address(address: String)
+
+  implicit val addressFormat: Format[Address] = Json.format
+
   case class Balance(address: String, confirmations: Int, balance: Long)
 
   implicit val balanceFormat: Format[Balance] = Json.format
@@ -307,7 +358,11 @@ object NodeApi extends ScorexLogging {
   implicit val transactionFormat: Format[Transaction] = Json.format
 
   case class Block(signature: String, height: Int, timestamp: Long, generator: String, transactions: Seq[Transaction],
-                   fee: Long)
+                   fee: Long, features: Option[Seq[Short]])
+
+  case class BlockHeaders(signature: String, height: Int, timestamp: Long, generator: String, transactionCount: Int, blocksize: Int)
+
+  implicit val blockHeadersFormat: Format[BlockHeaders] = Json.format
 
   implicit val blockFormat: Format[Block] = Json.format
 
@@ -327,6 +382,13 @@ object NodeApi extends ScorexLogging {
 
   implicit val messageMatcherResponseFormat: Format[MessageMatcherResponse] = Json.format
 
+  case class OrderbookHistory(id: String, `type`: String, amount: Long, price: Long, timestamp: Long, filled: Int,
+                              status: String)
+
+  //, assetPair: PairResponse)
+
+  implicit val orderbookHistory: Format[OrderbookHistory] = Json.format
+
   case class PairResponse(amountAsset: String, priceAsset: String)
 
   implicit val pairResponseFormat: Format[PairResponse] = Json.format
@@ -343,14 +405,9 @@ object NodeApi extends ScorexLogging {
 
   implicit val debugInfoFormat: Format[DebugInfo] = Json.format
 
-  def create(_restAddress: String,
-             _nodeRestPort: Int,
-             _matcherRestPort: Int,
-             _blockDelay: FiniteDuration
-            ): NodeApi = new NodeApi{
-    override def restAddress: String = _restAddress
-    override def nodeRestPort: Int = _nodeRestPort
-    override def matcherRestPort: Int = _matcherRestPort
-    override def blockDelay: FiniteDuration = _blockDelay
-  }
+
+  case class BlacklistedPeer(hostname: String, timestamp: Long, reason: String)
+
+  implicit val blacklistedPeerFormat: Format[BlacklistedPeer] = Json.format
+
 }

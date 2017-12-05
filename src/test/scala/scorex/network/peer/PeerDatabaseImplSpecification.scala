@@ -1,6 +1,8 @@
 package scorex.network.peer
 
+import java.io.File
 import java.net.{InetAddress, InetSocketAddress}
+import java.nio.file.Files
 
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.network.PeerDatabaseImpl
@@ -72,12 +74,12 @@ class PeerDatabaseImplSpecification extends path.FreeSpecLike with Matchers {
       database.knownPeers.keys should contain(address1)
       database.knownPeers.keys should not contain address2
 
-      database.blacklist(InetAddress.getByName(host1))
+      database.blacklist(InetAddress.getByName(host1), "")
       database.knownPeers.keys should not contain address1
       database.knownPeers should be(empty)
 
       database.randomPeer(Set()) should contain(address2)
-      database.blacklist(InetAddress.getByName(host2))
+      database.blacklist(InetAddress.getByName(host2), "")
       database.randomPeer(Set()) should not contain address2
       database.randomPeer(Set()) should be(empty)
     }
@@ -101,6 +103,50 @@ class PeerDatabaseImplSpecification extends path.FreeSpecLike with Matchers {
       database.addCandidate(address2)
 
       database.randomPeer(Set(address1)) should contain(address2)
+    }
+
+    "if blacklisting is disable" - {
+      "should clear blacklist at start" in {
+        val databaseFile = Files.createTempFile("waves-tests", "PeerDatabaseImplSpecification-blacklisting-clear").toAbsolutePath.toString
+        val path = if (File.separatorChar == '\\') databaseFile.replace('\\', '/') else databaseFile
+        val prevConfig = ConfigFactory.parseString(
+          s"""waves.network {
+             |  file = "$path"
+             |  known-peers = []
+             |  peers-data-residence-time: 100s
+             |}""".stripMargin).withFallback(ConfigFactory.load()).resolve()
+        val prevSettings = prevConfig.as[NetworkSettings]("waves.network")
+        val prevDatabase = new PeerDatabaseImpl(prevSettings)
+        prevDatabase.blacklist(address1.getAddress, "I don't like it")
+        prevDatabase.close()
+
+        val config = ConfigFactory.parseString(
+          s"""waves.network {
+             |  file = "$path"
+             |  known-peers = []
+             |  peers-data-residence-time: 100s
+             |  enable-blacklisting = no
+             |}""".stripMargin).withFallback(ConfigFactory.load()).resolve()
+        val settings = config.as[NetworkSettings]("waves.network")
+        val database = new PeerDatabaseImpl(settings)
+
+        database.blacklistedHosts shouldBe empty
+      }
+
+      "should not add nodes to the blacklist" in {
+        val config = ConfigFactory.parseString(
+          s"""waves.network {
+             |  file = null
+             |  known-peers = []
+             |  peers-data-residence-time: 100s
+             |  enable-blacklisting = no
+             |}""".stripMargin).withFallback(ConfigFactory.load()).resolve()
+        val settings = config.as[NetworkSettings]("waves.network")
+        val database = new PeerDatabaseImpl(settings)
+        database.blacklist(address1.getAddress, "I don't like it")
+
+        database.blacklistedHosts shouldBe empty
+      }
     }
   }
 

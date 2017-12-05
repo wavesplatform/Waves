@@ -4,7 +4,7 @@ import cats._
 import cats.implicits._
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2._
-import com.wavesplatform.state2.reader.StateReader
+import com.wavesplatform.state2.reader.SnapshotStateReader
 import scorex.account.Address
 import scorex.transaction.ValidationError
 import scorex.transaction.ValidationError.GenericError
@@ -14,13 +14,13 @@ import scala.util.{Left, Right}
 
 object LeaseTransactionsDiff {
 
-  def lease(s: StateReader, height: Int)(tx: LeaseTransaction): Either[ValidationError, Diff] = {
+  def lease(s: SnapshotStateReader, height: Int)(tx: LeaseTransaction): Either[ValidationError, Diff] = {
     val sender = Address.fromPublicKey(tx.sender.publicKey)
     s.resolveAliasEi(tx.recipient).flatMap { recipient =>
       if (recipient == sender)
         Left(GenericError("Cannot lease to self"))
       else {
-        val ap = s.accountPortfolio(tx.sender)
+        val ap = s.partialPortfolio(tx.sender)
         if (ap.balance - ap.leaseInfo.leaseOut < tx.amount) {
           Left(GenericError(s"Cannot lease more than own: Balance:${ap.balance}, already leased: ${ap.leaseInfo.leaseOut}"))
         }
@@ -29,13 +29,13 @@ object LeaseTransactionsDiff {
             sender -> Portfolio(-tx.fee, LeaseInfo(0, tx.amount), Map.empty),
             recipient -> Portfolio(0, LeaseInfo(tx.amount, 0), Map.empty)
           )
-          Right(Diff(height = height, tx = tx, portfolios = portfolioDiff, leaseState = Map(tx.id -> true)))
+          Right(Diff(height = height, tx = tx, portfolios = portfolioDiff, leaseState = Map(tx.id() -> true)))
         }
       }
     }
   }
 
-  def leaseCancel(s: StateReader, settings: FunctionalitySettings, time: Long, height: Int)
+  def leaseCancel(s: SnapshotStateReader, settings: FunctionalitySettings, time: Long, height: Int)
                  (tx: LeaseCancelTransaction): Either[ValidationError, Diff] = {
     val leaseEi = s.findTransaction[LeaseTransaction](tx.leaseId) match {
       case None => Left(GenericError(s"Related LeaseTransaction not found"))
@@ -59,7 +59,7 @@ object LeaseTransactionsDiff {
       } else Left(GenericError(s"LeaseTransaction was leased by other sender " +
         s"and time=$time > allowMultipleLeaseCancelTransactionUntilTimestamp=${settings.allowMultipleLeaseCancelTransactionUntilTimestamp}"))
 
-    } yield Diff(height = height, tx = tx, portfolios = portfolioDiff, leaseState = Map(lease.id -> false))
+    } yield Diff(height = height, tx = tx, portfolios = portfolioDiff, leaseState = Map(lease.id() -> false))
   }
 }
 

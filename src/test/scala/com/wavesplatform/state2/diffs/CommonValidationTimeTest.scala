@@ -1,16 +1,15 @@
 package com.wavesplatform.state2.diffs
 
-import com.wavesplatform.TransactionGen
 import com.wavesplatform.state2._
-import org.scalacheck.{Gen, Shrink}
-import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
+import com.wavesplatform.{NoShrink, TransactionGen}
+import org.scalacheck.Gen
+import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import scorex.settings.TestFunctionalitySettings
 import scorex.transaction.PaymentTransaction
 
-class CommonValidationTimeTest extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers with TransactionGen {
-
-  private implicit def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)
+class CommonValidationTimeTest extends PropSpec
+  with PropertyChecks with Matchers with TransactionGen with NoShrink {
 
   property("disallows too old transacions") {
     forAll(for {

@@ -2,7 +2,7 @@ package com.wavesplatform.state2.diffs
 
 import cats._
 import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state2.reader.StateReader
+import com.wavesplatform.state2.reader.SnapshotStateReader
 import com.wavesplatform.state2.{Portfolio, _}
 import scorex.account.Address
 import scorex.transaction.ValidationError.{GenericError, Mistiming}
@@ -19,12 +19,12 @@ object CommonValidation {
   val MaxTimeTransactionOverBlockDiff: FiniteDuration = 90.minutes
   val MaxTimePrevBlockOverTransactionDiff: FiniteDuration = 2.hours
 
-  def disallowSendingGreaterThanBalance[T <: Transaction](s: StateReader, settings: FunctionalitySettings, blockTime: Long, tx: T): Either[ValidationError, T] =
+  def disallowSendingGreaterThanBalance[T <: Transaction](s: SnapshotStateReader, settings: FunctionalitySettings, blockTime: Long, tx: T): Either[ValidationError, T] =
     if (blockTime >= settings.allowTemporaryNegativeUntil)
       tx match {
-        case ptx: PaymentTransaction if s.accountPortfolio(ptx.sender).balance < (ptx.amount + ptx.fee) =>
+        case ptx: PaymentTransaction if s.partialPortfolio(ptx.sender).balance < (ptx.amount + ptx.fee) =>
           Left(GenericError(s"Attempt to pay unavailable funds: balance " +
-            s"${s.accountPortfolio(ptx.sender).balance} is less than ${ptx.amount + ptx.fee}"))
+            s"${s.partialPortfolio(ptx.sender).balance} is less than ${ptx.amount + ptx.fee}"))
         case ttx: TransferTransaction =>
           val sender: Address = ttx.sender
 
@@ -37,8 +37,8 @@ object CommonValidation {
             case None => Portfolio(-ttx.fee, LeaseInfo.empty, Map.empty)
           }
 
-          val accountPortfolio = s.accountPortfolio(sender)
           val spendings = Monoid.combine(amountDiff, feeDiff)
+          val accountPortfolio = s.partialPortfolio(sender, spendings.assets.keySet)
 
           lazy val negativeAsset = spendings.assets.find { case (id, amt) => (accountPortfolio.assets.getOrElse(id, 0L) + amt) < 0L }.map { case (id, amt) => (id, accountPortfolio.assets.getOrElse(id, 0L), amt, accountPortfolio.assets.getOrElse(id, 0L) + amt) }
           lazy val newWavesBalance = accountPortfolio.balance + spendings.balance
@@ -53,26 +53,19 @@ object CommonValidation {
         case _ => Right(tx)
       } else Right(tx)
 
-  def disallowDuplicateIds[T <: Transaction](state: StateReader, settings: FunctionalitySettings, height: Int, tx: T): Either[ValidationError, T] = tx match {
+
+  def disallowDuplicateIds[T <: Transaction](state: SnapshotStateReader, settings: FunctionalitySettings, height: Int, tx: T): Either[ValidationError, T] = tx match {
     case ptx: PaymentTransaction if ptx.timestamp < settings.requirePaymentUniqueIdAfter => Right(tx)
     case _ =>
-      if (state.containsTransaction(tx.id))
-        Left(GenericError(s"Tx id(exc. for some PaymentTransactions) cannot be duplicated. Current height is: $height. Tx with such id aready present"))
+      if (state.containsTransaction(tx.id())) {
+        val txHeight = state.transactionInfo(tx.id()).map(_._1)
+        Left(GenericError(s"Txs cannot be duplicated. Target height is: $height, current height is: ${state.height}, existing tx height is: $txHeight Tx with such id already present"))
+      }
       else Right(tx)
   }
 
   def disallowBeforeActivationTime[T <: Transaction](settings: FunctionalitySettings, tx: T): Either[ValidationError, T] =
     tx match {
-      case tx: BurnTransaction if tx.timestamp <= settings.allowBurnTransactionAfter =>
-        Left(GenericError(s"must not appear before time=${settings.allowBurnTransactionAfter}"))
-      case tx: LeaseTransaction if tx.timestamp <= settings.allowLeaseTransactionAfter =>
-        Left(GenericError(s"must not appear before time=${settings.allowLeaseTransactionAfter}"))
-      case tx: LeaseCancelTransaction if tx.timestamp <= settings.allowLeaseTransactionAfter =>
-        Left(GenericError(s"must not appear before time=${settings.allowLeaseTransactionAfter}"))
-      case tx: ExchangeTransaction if tx.timestamp <= settings.allowExchangeTransactionAfter =>
-        Left(GenericError(s"must not appear before time=${settings.allowExchangeTransactionAfter}"))
-      case tx: CreateAliasTransaction if tx.timestamp <= settings.allowCreatealiasTransactionAfter =>
-        Left(GenericError(s"must not appear before time=${settings.allowCreatealiasTransactionAfter}"))
       case _: BurnTransaction => Right(tx)
       case _: PaymentTransaction => Right(tx)
       case _: GenesisTransaction => Right(tx)

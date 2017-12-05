@@ -13,14 +13,16 @@ import com.wavesplatform.matcher.market.MatcherActor.{GetMarkets, GetMarketsResp
 import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.matcher.market.OrderHistoryActor.{ValidateOrder, ValidateOrderResult}
 import com.wavesplatform.matcher.model.LevelAgg
-import com.wavesplatform.settings.{FunctionalitySettings, WalletSettings}
-import com.wavesplatform.state2.reader.StateReader
+import com.wavesplatform.settings.WalletSettings
+import com.wavesplatform.state2.reader.{SnapshotStateReader}
 import com.wavesplatform.state2.{AssetInfo, ByteStr, LeaseInfo, Portfolio}
 import io.netty.channel.group.ChannelGroup
+import monix.eval.Coeval
 import org.h2.mvstore.MVStore
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Matchers, WordSpecLike}
 import scorex.account.PrivateKeyAccount
+import scorex.settings.TestFunctionalitySettings
 import scorex.transaction.assets.IssueTransaction
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import scorex.transaction.{AssetId, History}
@@ -38,11 +40,11 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest2"
   with PathMockFactory {
 
   val db = new MVStore.Builder().compress().open()
-  val storedState: StateReader = stub[StateReader]
+  val storedState: SnapshotStateReader = stub[SnapshotStateReader]
 
   val settings = matcherSettings.copy(account = MatcherAccount.address)
   val history = stub[History]
-  val functionalitySettings = stub[FunctionalitySettings]
+  val functionalitySettings = TestFunctionalitySettings.Stub
   val wallet = Wallet(WalletSettings(None, "matcher", Some(WalletSeed)))
   wallet.generateNewAccount()
 
@@ -52,13 +54,13 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest2"
       case _ =>
     }
   })
-  var actor: ActorRef = system.actorOf(Props(new MatcherActor(orderHistoryRef, storedState, wallet,
+  var actor: ActorRef = system.actorOf(Props(new MatcherActor(orderHistoryRef, Coeval.now(storedState), wallet,
     mock[UtxPool], mock[ChannelGroup], settings, history, functionalitySettings) with RestartableActor))
 
   (storedState.assetInfo _).when(*).returns(Some(AssetInfo(true, 10000000000L)))
   val i1 = IssueTransaction.create(PrivateKeyAccount(Array.empty), "Unknown".getBytes(), Array.empty, 10000000000L, 8.toByte, true, 100000L, 10000L).right.get
   val i2 = IssueTransaction.create(PrivateKeyAccount(Array.empty), "ForbiddenName".getBytes(), Array.empty, 10000000000L, 8.toByte, true, 100000L, 10000L).right.get
-  (storedState.transactionInfo _).when(i2.id).returns(Some((1, i2)))
+  (storedState.transactionInfo _).when(i2.id()).returns(Some((1, i2)))
   (storedState.transactionInfo _).when(*).returns(Some((1, i1)))
   (storedState.accountPortfolio _).when(*).returns(Portfolio(Long.MaxValue, LeaseInfo.empty, Map(ByteStr("123".getBytes) -> Long.MaxValue)))
 
@@ -68,7 +70,7 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest2"
     tp.expectMsg(akka.actor.Status.Success(""))
     super.beforeEach()
 
-    actor = system.actorOf(Props(new MatcherActor(orderHistoryRef, storedState, wallet, mock[UtxPool], mock[ChannelGroup],
+    actor = system.actorOf(Props(new MatcherActor(orderHistoryRef, Coeval.now(storedState), wallet, mock[UtxPool], mock[ChannelGroup],
       settings, history, functionalitySettings) with RestartableActor))
   }
 
@@ -170,7 +172,7 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest2"
       actor ! GetOrderBookRequest(pair, None)
       expectMsg(StatusCodeMatcherResponse(StatusCodes.NotFound, "Invalid Asset ID: BLACKLST"))
 
-      def fbdnNamePair = AssetPair(Some(i2.assetId), ByteStr.decodeBase58("BASE1").toOption)
+      def fbdnNamePair = AssetPair(Some(i2.assetId()), ByteStr.decodeBase58("BASE1").toOption)
       actor ! GetOrderBookRequest(fbdnNamePair, None)
       expectMsg(StatusCodeMatcherResponse(StatusCodes.NotFound, "Invalid Asset Name: ForbiddenName"))
     }

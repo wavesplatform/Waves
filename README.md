@@ -67,6 +67,15 @@ By default, `it:test` will do the following:
   plugin. 
 * Run the test suites from `src/it/scala`, passing docker image ID via `docker.imageId` system property.
 
+### Logging
+
+By [default](src/main/resources/logback.xml) all logs are written to the STDOUT. If you want to write logs, for example,
+to JSON files, you should define your own logging configuration and specify a path to it in `conf/application.ini`:
+
+```
+-Dlogback.configurationFile=/path/to/your/logback.xml
+```  
+
 ### Debugging
 
 Integration tests run in a forked JVM. To debug test suite code launched by SBT, you will need to add remote debug 
@@ -121,3 +130,12 @@ this automatically.
     * `-Dkamon.modules.kamon-system-metrics.auto-start=yes` enables metrics of _CPU_, _Memory_ and others;
     * See [application.conf](https://github.com/wavesplatform/Waves/blob/master/src/main/resources/application.conf)
       for more options.
+
+# Acknowledgement
+
+[<img src="https://www.yourkit.com/images/yklogo.png">](http://www.yourkit.com/java/profiler/index.jsp)  
+We use YourKit full-featured Java Profiler to make Waves node faster. YourKit, LLC is the creator of innovative and intelligent tools for profiling Java and .NET applications.    
+Take a look at YourKit's leading software products: 
+<a href="http://www.yourkit.com/java/profiler/index.jsp">YourKit Java Profiler</a> and
+<a href="http://www.yourkit.com/.net/profiler/index.jsp">YourKit .NET Profiler</a>.
+

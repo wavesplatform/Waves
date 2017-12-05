@@ -4,10 +4,12 @@ import java.util.concurrent.locks.ReentrantReadWriteLock
 
 import cats.Monoid
 import cats.implicits._
+import com.wavesplatform.metrics.Instrumented
 import com.wavesplatform.state2.reader.StateReaderImpl
+import scorex.transaction.PaymentTransaction
+import scorex.transaction.assets.TransferTransaction
+import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.utils.ScorexLogging
-
-import scala.language.higherKinds
 
 trait StateWriter {
   def applyBlockDiff(blockDiff: BlockDiff): Unit
@@ -15,46 +17,49 @@ trait StateWriter {
   def clear(): Unit
 }
 
-class StateWriterImpl(p: StateStorage, synchronizationToken: ReentrantReadWriteLock)
-  extends StateReaderImpl(p, synchronizationToken) with StateWriter with AutoCloseable with ScorexLogging {
+class StateWriterImpl(p: StateStorage, storeTransactions: Boolean, synchronizationToken: ReentrantReadWriteLock)
+  extends StateReaderImpl(p, synchronizationToken) with StateWriter with AutoCloseable with ScorexLogging with Instrumented {
 
   import StateStorage._
-  import StateWriterImpl._
 
   override def close(): Unit = p.close()
 
   override def applyBlockDiff(blockDiff: BlockDiff): Unit = write { implicit l =>
     val txsDiff = blockDiff.txsDiff
 
-    log.debug(s"Starting persist from ${sp().getHeight} to ${sp().getHeight + blockDiff.heightDiff}")
+    val oldHeight = sp().getHeight
+    val newHeight = oldHeight + blockDiff.heightDiff
+    log.debug(s"Starting persist from $oldHeight to $newHeight")
 
-    measureSizeLog("transactions")(txsDiff.transactions) {
-      _.par.foreach { case (id, (h, tx, _)) =>
-        sp().transactions.put(id, (h, tx.bytes))
+    measureSizeLog("transactions")(txsDiff.transactions) { txs =>
+      txs.toSeq.foreach {
+        case (id, (h, tx@(_: TransferTransaction | _: ExchangeTransaction | _: PaymentTransaction), _)) =>
+          sp().transactions.put(id, (h, if (storeTransactions) tx.bytes() else Array.emptyByteArray))
+        case (id, (h, tx, _)) => sp().transactions.put(id, (h, tx.bytes()))
       }
     }
 
-    measureSizeLog("orderFills")(blockDiff.txsDiff.orderFills) {
-      _.par.foreach { case (oid, orderFillInfo) =>
-        Option(sp().orderFills.get(oid)) match {
-          case Some(ll) =>
-            sp().orderFills.put(oid, (ll._1 + orderFillInfo.volume, ll._2 + orderFillInfo.fee))
-          case None =>
-            sp().orderFills.put(oid, (orderFillInfo.volume, orderFillInfo.fee))
-        }
+    measureSizeLog("orderFills")(blockDiff.txsDiff.orderFills) { ofs =>
+      ofs.toSeq.foreach {
+        case (oid, orderFillInfo) =>
+          Option(sp().orderFills.get(oid)) match {
+            case Some(ll) =>
+              sp().orderFills.put(oid, (ll._1 + orderFillInfo.volume, ll._2 + orderFillInfo.fee))
+            case None =>
+              sp().orderFills.put(oid, (orderFillInfo.volume, orderFillInfo.fee))
+          }
       }
     }
 
     measureSizeLog("portfolios")(txsDiff.portfolios) {
       _.foreach { case (account, portfolioDiff) =>
-        val updatedPortfolio = accountPortfolio(account).combine(portfolioDiff)
-        sp().portfolios.put(account.bytes,
-          (updatedPortfolio.balance,
-            (updatedPortfolio.leaseInfo.leaseIn, updatedPortfolio.leaseInfo.leaseOut),
-            updatedPortfolio.assets.map { case (k, v) => k.arr -> v }))
+        val updatedPortfolio = this.partialPortfolio(account, portfolioDiff.assets.keySet).combine(portfolioDiff)
+        sp().wavesBalance.put(account.bytes, (updatedPortfolio.balance, updatedPortfolio.leaseInfo.leaseIn, updatedPortfolio.leaseInfo.leaseOut))
+        updatedPortfolio.assets.foreach { case (asset, amt) =>
+          sp().assetBalance.put(account.bytes, asset, amt)
+        }
       }
     }
-
 
     measureSizeLog("assets")(txsDiff.issuedAssets) {
       _.foreach { case (id, assetInfo) =>
@@ -67,7 +72,7 @@ class StateWriterImpl(p: StateStorage, synchronizationToken: ReentrantReadWriteL
       }
     }
 
-    measureSizeLog("accountTransactionIds")(blockDiff.txsDiff.accountTransactionIds) {
+    if (storeTransactions) measureSizeLog("accountTransactionIds")(blockDiff.txsDiff.accountTransactionIds) {
       _.foreach { case (acc, txIds) =>
         val startIdxShift = sp().accountTransactionsLengths.getOrDefault(acc.bytes, 0)
         txIds.reverse.foldLeft(startIdxShift) { case (shift, txId) =>
@@ -101,16 +106,16 @@ class StateWriterImpl(p: StateStorage, synchronizationToken: ReentrantReadWriteL
     measureSizeLog("lease info")(blockDiff.txsDiff.leaseState)(
       _.foreach { case (id, isActive) => sp().leaseState.put(id, isActive) })
 
-
-    sp().setHeight(sp().getHeight + blockDiff.heightDiff)
-    sp().commit()
-
-    log.debug("BlockDiff commit complete")
+    sp().setHeight(newHeight)
+    val nextChunkOfBlocks = !sameQuotient(newHeight, oldHeight, 1000)
+    sp().commit(nextChunkOfBlocks)
+    log.info(s"BlockDiff commit complete. Persisted height = $newHeight")
   }
 
   override def clear(): Unit = write { implicit l =>
     sp().transactions.clear()
-    sp().portfolios.clear()
+    sp().wavesBalance.clear()
+    sp().assetBalance.clear()
     sp().assets.clear()
     sp().accountTransactionIds.clear()
     sp().accountTransactionsLengths.clear()
@@ -121,29 +126,6 @@ class StateWriterImpl(p: StateStorage, synchronizationToken: ReentrantReadWriteL
     sp().leaseState.clear()
     sp().lastBalanceSnapshotHeight.clear()
     sp().setHeight(0)
-    sp().commit()
+    sp().commit(compact = true)
   }
 }
-
-object StateWriterImpl extends ScorexLogging {
-
-  private def withTime[R](f: => R): (R, Long) = {
-    val t0 = System.currentTimeMillis()
-    val r: R = f
-    val t1 = System.currentTimeMillis()
-    (r, t1 - t0)
-  }
-
-  def measureSizeLog[F[_] <: TraversableOnce[_], A, R](s: String)(fa: => F[A])(f: F[A] => R): R = {
-    val (r, time) = withTime(f(fa))
-    log.trace(s"processing of ${fa.size} $s took ${time}ms")
-    r
-  }
-
-  def measureLog[R](s: String)(f: => R): R = {
-    val (r, time) = withTime(f)
-    log.trace(s"$s took ${time}ms")
-    r
-  }
-}
-

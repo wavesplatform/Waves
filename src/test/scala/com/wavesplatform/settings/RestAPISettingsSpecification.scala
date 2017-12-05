@@ -14,6 +14,7 @@ class RestAPISettingsSpecification extends FlatSpec with Matchers {
         |    port: 6869
         |    api-key-hash: "BASE58APIKEYHASH"
         |    cors: yes
+        |    api-key-different-host: yes
         |  }
         |}
       """.stripMargin)
@@ -24,6 +25,7 @@ class RestAPISettingsSpecification extends FlatSpec with Matchers {
     settings.port should be(6869)
     settings.apiKeyHash should be ("BASE58APIKEYHASH")
     settings.cors should be(true)
+    settings.apiKeyDifferentHost should be(true)
   }
 
 }

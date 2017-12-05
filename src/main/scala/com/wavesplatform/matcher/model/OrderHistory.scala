@@ -17,8 +17,11 @@ trait OrderHistory {
   def orderStatus(id: String): OrderStatus
   def orderInfo(id: String): OrderInfo
   def openVolume(assetAcc: AssetAcc): Long
+
+  def openVolumes(address: String): Option[Map[String, Long]]
   def ordersByPairAndAddress(assetPair: AssetPair, address: String): Set[String]
-  def getAllOrdersByAddress(address: String): Set[String]
+
+  def getAllOrdersByAddress(address: String): Stream[String]
   def deleteOrder(assetPair: AssetPair, address: String, orderId: String): Boolean
   def order(id: String): Option[Order]
   def openPortfolio(address: String): OpenPortfolio
@@ -64,8 +67,8 @@ case class OrderHistoryImpl(p: OrderHistoryStorage) extends OrderHistory with Sc
   }
 
   def saveOrder(order: Order): Unit = {
-    if (!p.orders.containsKey(order.idStr)) {
-      p.orders.putIfAbsent(order.idStr, order.jsonStr)
+    if (!p.orders.containsKey(order.idStr())) {
+      p.orders.putIfAbsent(order.idStr(), order.jsonStr)
     }
   }
 
@@ -78,12 +81,12 @@ case class OrderHistoryImpl(p: OrderHistoryStorage) extends OrderHistory with Sc
     saveOrder(lo.order)
     saveOrdeInfo(event)
     saveOpenPortfolio(event)
-    savePairAddress(lo.order.assetPair, lo.order.senderPublicKey.address, lo.order.idStr)
+    savePairAddress(lo.order.assetPair, lo.order.senderPublicKey.address, lo.order.idStr())
   }
 
   override def orderExecuted(event: OrderExecuted): Unit = {
     saveOrder(event.submitted.order)
-    savePairAddress(event.submitted.order.assetPair, event.submitted.order.senderPublicKey.address, event.submitted.order.idStr)
+    savePairAddress(event.submitted.order.assetPair, event.submitted.order.senderPublicKey.address, event.submitted.order.idStr())
     saveOrdeInfo(event)
     saveOpenPortfolio(OrderAdded(event.submittedExecuted))
     saveOpenPortfolio(event)
@@ -111,15 +114,16 @@ case class OrderHistoryImpl(p: OrderHistoryStorage) extends OrderHistory with Sc
     Option(p.addressToOrderPortfolio.get(assetAcc.account.address)).flatMap(_.get(asset)).map(math.max(0L, _)).getOrElse(0L)
   }
 
+  override def openVolumes(address: String): Option[Map[String, Long]] = Option(p.addressToOrderPortfolio.get(address))
+
   override def ordersByPairAndAddress(assetPair: AssetPair, address: String): Set[String] = {
     val pairAddressKey = OrderHistoryStorage.assetPairAddressKey(assetPair, address)
     Option(p.pairAddressToOrderIds.get(pairAddressKey)).map(_.takeRight(MaxOrdersPerRequest).toSet).getOrElse(Set())
   }
 
-  override def getAllOrdersByAddress(address: String): Set[String] = {
-    p.pairAddressToOrderIds.asScala.filter(_._1.endsWith(address)).values.flatten.toSet
+  override def getAllOrdersByAddress(address: String): Stream[String] = {
+    p.pairAddressToOrderIds.asScala.toStream.filter(_._1.endsWith(address)).flatMap(_._2)
   }
-
 
   private def deleteFromOrdersInfo(orderId: String): Unit = {
     p.ordersInfo.remove(orderId)

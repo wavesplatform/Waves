@@ -6,7 +6,6 @@ import com.wavesplatform.it.util._
 import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
 import org.scalatest.{FreeSpec, Matchers}
 
-import scala.collection.JavaConverters._
 import scala.concurrent.Await.result
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future.traverse
@@ -16,9 +15,8 @@ import scala.util.Random
 
 class RollbackSpecSuite extends FreeSpec with ScalaFutures with IntegrationPatience
   with Matchers with TransferSending with IntegrationNodesInitializationAndStopping {
-  override val docker = new Docker()
   // there are nodes with big and small balances to reduce the number of forks
-  override val nodes: Seq[Node] = Configs.map(docker.startNode)
+  override lazy val nodes: Seq[Node] = docker.startNodes(configs)
 
   private val transactionsCount = 190
 
@@ -29,7 +27,7 @@ class RollbackSpecSuite extends FreeSpec with ScalaFutures with IntegrationPatie
 
       b <- traverse(nodes)(balanceForNode).map(_.toMap)
 
-      requests = generateRequests(transactionsCount, b)
+      requests = generateTransfersBetweenAccounts(transactionsCount, b)
       _ <- processRequests(requests)
 
       hashAfterFirstTry <- traverse(nodes)(_.waitForDebugInfoAt(startHeight + waitBlocks).map(_.stateHash)).map(infos => {
@@ -58,22 +56,16 @@ class RollbackSpecSuite extends FreeSpec with ScalaFutures with IntegrationPatie
       startHeight <- Future.traverse(nodes)(_.height).map(_.min)
 
       b <- traverse(nodes)(balanceForNode).map(_.toMap)
-      requests = generateRequests(transactionsCount, b)
+      requests = generateTransfersBetweenAccounts(transactionsCount, b)
 
       hashBeforeApply <- traverse(nodes)(_.waitForDebugInfoAt(startHeight + waitBlocks).map(_.stateHash)).map(infos => {
         all(infos) shouldEqual infos.head
         infos.head
       })
-
       _ <- processRequests(requests)
-
-      _ <- traverse(nodes)(n => n.waitFor[Int](n.utxSize, _ == 0, 1.second))
-
+      _ <- nodes.head.waitFor[Int]("empty utx")(_.utxSize, _ == 0, 1.second)
       _ <- traverse(nodes)(_.rollback(startHeight, returnToUTX = false))
-
-      _ <- traverse(nodes)(_.utx).map(utxs => {
-        all(utxs) shouldBe 'empty
-      })
+      _ <- nodes.head.utx.map( _ shouldBe 'empty )
 
       hashAfterApply <- nodes.head.waitForDebugInfoAt(startHeight + waitBlocks).map(_.stateHash)
     } yield {
@@ -81,14 +73,16 @@ class RollbackSpecSuite extends FreeSpec with ScalaFutures with IntegrationPatie
     }, 5.minutes)
   }
 
-  "Alias transaction rollback should works fine" in {
+  "Alias transaction rollback should work fine" in {
     val alias = "test_alias4"
 
     val f = for {
-      startHeight <- Future.traverse(nodes)(_.height).map(_.min)
+      startHeight <- Future.traverse(nodes)(_.height).map(_.max)
       aliasTxId <- nodes.head.createAlias(nodes.head.address, alias, 1.waves).map(_.id)
       _ <- Future.traverse(nodes)(_.waitForTransaction(aliasTxId))
-      _ <- Future.traverse(nodes)(_.rollback(startHeight, returnToUTX = false))
+      _ <- Future.traverse(nodes)(_.waitForHeight(startHeight + 1))
+      _ <- Future.traverse(nodes)(_.rollback(startHeight - 1, returnToUTX = false))
+      _ <- Future.traverse(nodes)(_.waitForHeight(startHeight + 1))
       secondAliasTxId <- nodes.head.createAlias(nodes.head.address, alias, 1.waves).map(_.id)
       _ <- Future.traverse(nodes)(_.waitForTransaction(secondAliasTxId))
     } yield succeed
@@ -98,14 +92,10 @@ class RollbackSpecSuite extends FreeSpec with ScalaFutures with IntegrationPatie
 }
 
 object RollbackSpecSuite {
-  private val dockerConfigs = Docker.NodeConfigs.getConfigList("nodes").asScala
 
-  private val nonGeneratingNodesConfig = ConfigFactory.parseString(
-    """
-      |waves.miner.enable=no
-    """.stripMargin
-  )
+  import NodeConfigs.Default
 
-  val Configs: Seq[Config] = Seq(dockerConfigs.last) :+
-    nonGeneratingNodesConfig.withFallback(Random.shuffle(dockerConfigs.init).head)
+  private val nonGeneratingNodesConfig = ConfigFactory.parseString("waves.miner.enable = no")
+
+  val configs: Seq[Config] = Seq(Default.last, nonGeneratingNodesConfig.withFallback(Random.shuffle(Default.init).head))
 }
