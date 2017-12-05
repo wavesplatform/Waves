@@ -44,11 +44,11 @@ trait UtxPool {
 }
 
 class UtxPoolImpl(time: Time,
-              stateReader: StateReader,
-              history: History,
-              feeCalculator: FeeCalculator,
-              fs: FunctionalitySettings,
-              utxSettings: UtxSettings) extends ScorexLogging with Instrumented with AutoCloseable with UtxPool {
+                  stateReader: StateReader,
+                  history: History,
+                  feeCalculator: FeeCalculator,
+                  fs: FunctionalitySettings,
+                  utxSettings: UtxSettings) extends ScorexLogging with Instrumented with AutoCloseable with UtxPool {
 
   private val transactions = new ConcurrentHashMap[ByteStr, Transaction]()
 

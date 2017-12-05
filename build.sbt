@@ -84,10 +84,8 @@ configs(IntegrationTest)
 lazy val itTestsCommonSettings: Seq[Def.Setting[_]] = Seq(
   testOptions += Tests.Argument(TestFrameworks.ScalaTest, "-fW", (logDirectory.value / "summary.log").toString),
   testGrouping := {
-    var i = 0
     testGrouping.value.flatMap { group =>
       group.tests.map { suite =>
-        i += 1
         val fileName = {
           val parts = suite.name.split('.')
           (parts.init.map(_.substring(0, 1)) :+ parts.last).mkString(".")
@@ -100,8 +98,7 @@ lazy val itTestsCommonSettings: Seq[Def.Setting[_]] = Seq(
           outputStrategy = outputStrategy.value,
           runJVMOptions = javaOptions.value ++ Seq(
             "-Dwaves.it.logging.appender=FILE",
-            s"-Dwaves.it.logging.dir=${logDirectory.value / fileName}",
-            s"-Dwaves.it.index=$i"
+            s"-Dwaves.it.logging.dir=${logDirectory.value / fileName}"
           ),
           workingDirectory = Some(baseDirectory.value),
           envVars = envVars.value
@@ -166,7 +163,7 @@ normalizedName := network.value.name
 javaOptions in Universal ++= Seq(
   // -J prefix is required by the bash script
   "-J-server",
-  // JVM memory tuning for 1g ram
+  // JVM memory tuning for 2g ram
   "-J-Xms128m",
   "-J-Xmx2g",
   "-J-XX:+ExitOnOutOfMemoryError",

@@ -22,6 +22,7 @@ trait IntegrationSuiteWithThreeAddresses extends BeforeAndAfterAll with Matchers
   def notMiner: Node
 
   protected def sender: Node = notMiner
+
   private def richAddress = sender.address
 
   protected val defaultBalance: Long = 100.waves
@@ -97,6 +98,7 @@ trait IntegrationSuiteWithThreeAddresses extends BeforeAndAfterAll with Matchers
 
   abstract override def beforeAll(): Unit = {
     super.beforeAll()
+    log.debug(s"There are ${nodes.size} in tests") // Initializing of a lazy variable
 
     def waitForTxsToReachAllNodes(txIds: Seq[String]): Future[_] = {
       val txNodePairs = for {
@@ -117,13 +119,19 @@ trait IntegrationSuiteWithThreeAddresses extends BeforeAndAfterAll with Matchers
       txs <- makeTransfers
 
       height <- traverse(nodes)(_.height).map(_.max)
-      _ <- traverse(nodes)(_.waitForHeight(height + 2))
+      _ <- withClue(s"waitForHeight(${height + 2})") {
+        Await.ready(traverse(nodes)(_.waitForHeight(height + 2)), 3.minutes)
+      }
 
-      _ <- waitForTxsToReachAllNodes(txs)
+      _ <- withClue("waitForTxsToReachAllNodes") {
+        Await.ready(waitForTxsToReachAllNodes(txs), 2.minute)
+      }
       _ <- dumpBalances(sender, accounts, "after transfer")
       _ <- traverse(accounts)(assertBalances(_, defaultBalance, defaultBalance))
     } yield succeed
 
-    Await.result(correctStartBalancesFuture, 5.minutes)
+    withClue("beforeAll") {
+      Await.result(correctStartBalancesFuture, 5.minutes)
+    }
   }
 }

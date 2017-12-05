@@ -34,7 +34,7 @@ case class MicroBlock private(version: Byte, generator: PublicKeyAccount, transa
       signerDataField.bytes()
   }
 
-  private val bytesWithoutSignature: Coeval[Array[Byte]] =Coeval.evalOnce(bytes().dropRight(SignatureLength))
+  private val bytesWithoutSignature: Coeval[Array[Byte]] = Coeval.evalOnce(bytes().dropRight(SignatureLength))
 
   override val signatureValid: Coeval[Boolean] = Coeval.evalOnce(EllipticCurveImpl.verify(signature.arr, bytesWithoutSignature(), generator.publicKey))
   override val signedDescendants: Coeval[Seq[Signed]] = Coeval.evalOnce(transactionData)

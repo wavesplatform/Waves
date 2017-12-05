@@ -27,7 +27,7 @@ class SimpleTransactionsSuite extends FunSuite with BeforeAndAfterAll with Match
     NodeConfigs.newBuilder
       .overrideBase(_.quorum(2))
       .withDefault(3)
-      .build
+      .build()
   )
 
   private lazy val node = nodes.head
@@ -71,7 +71,7 @@ class SimpleTransactionsSuite extends FunSuite with BeforeAndAfterAll with Match
     val f = for {
       blacklistBefore <- node.blacklistedPeers
       _ <- node.sendByNetwork(RawBytes(TransactionMessageSpec.messageCode, "foobar".getBytes(StandardCharsets.UTF_8)))
-      _ <- node.waitFor[Seq[BlacklistedPeer]](_.blacklistedPeers, _.size > blacklistBefore.size, 500.millis)
+      _ <- node.waitFor[Seq[BlacklistedPeer]](s"blacklistedPeers > ${blacklistBefore.size}")(_.blacklistedPeers, _.size > blacklistBefore.size, 500.millis)
     } yield ()
     Await.result(f, waitCompletion)
   }

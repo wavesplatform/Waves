@@ -3,26 +3,26 @@ package com.wavesplatform.it.activation
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.features.BlockchainFeatureStatus
 import com.wavesplatform.features.api.NodeFeatureStatus
-import com.wavesplatform.it.{Docker, Node, NodeConfigs}
+import com.wavesplatform.it.{Docker, Node, NodeConfigs, ReportingTestName}
 import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.concurrent.{Await, Future}
+import scala.concurrent.Await
 import scala.util.Random
 
 class ActivationFeatureTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with CancelAfterFailure
-  with ActivationStatusRequest {
+  with ActivationStatusRequest with ReportingTestName {
 
   import ActivationFeatureTestSuite._
 
   private val waitCompletion = 6.minutes
   private lazy val docker = Docker(getClass)
-  private lazy val nodes: Seq[Node] = docker.startNodes(Configs)
+  override lazy val nodes: Seq[Node] = docker.startNodes(Configs)
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-    Await.result(Future.traverse(nodes)(_.waitForPeers(NodesCount - 1)), waitCompletion)
+    log.debug(s"There are ${nodes.size} in tests") // Initializing of a lazy variable
   }
 
   override protected def afterAll(): Unit = {
@@ -40,44 +40,29 @@ class ActivationFeatureTestSuite extends FreeSpec with Matchers with BeforeAndAf
     val featuresMapInGeneratedBlocks = generatedBlocks.flatMap(b => b.features.getOrElse(Seq.empty)).groupBy(x => x)
     val votesForFeature1 = featuresMapInGeneratedBlocks.getOrElse(featureNum, Seq.empty).length
 
-    activationStatusWhileVoting.foreach { case (n, info) =>
-      withClue(n.settings.networkSettings.nodeName) {
-        assertVotingStatus(info, votesForFeature1, BlockchainFeatureStatus.Undefined, NodeFeatureStatus.Voted)
-      }
-    }
-
-    activationStatusIntervalLastVotingBlock.foreach { case (n, info) =>
-      assertVotingStatus(info, blocksForActivation - 1, BlockchainFeatureStatus.Undefined, NodeFeatureStatus.Voted)
-    }
+    assertVotingStatus(activationStatusWhileVoting, votesForFeature1, BlockchainFeatureStatus.Undefined, NodeFeatureStatus.Voted)
+    assertVotingStatus(activationStatusIntervalLastVotingBlock, blocksForActivation - 1, BlockchainFeatureStatus.Undefined, NodeFeatureStatus.Voted)
   }
 
   "supported blocks counter resets on the next voting interval" in {
     val checkHeight: Int = votingInterval * 2 - blocksForActivation / 2
-    activationStatus(nodes, checkHeight, featureNum, waitCompletion).foreach { case (n, info) =>
-      withClue(n.settings.networkSettings.nodeName) {
-        info.supportedBlocks.get shouldBe blocksForActivation / 2
-        info.blockchainStatus shouldBe BlockchainFeatureStatus.Undefined
-      }
-    }
+    val info = activationStatus(nodes, checkHeight, featureNum, waitCompletion)
+    info.supportedBlocks.get shouldBe blocksForActivation / 2
+    info.blockchainStatus shouldBe BlockchainFeatureStatus.Undefined
   }
 
   "blockchain status is APPROVED in second voting interval" in {
     val checkHeight: Int = votingInterval * 2
-    activationStatus(nodes, checkHeight, featureNum, waitCompletion).foreach { case (n, info) =>
-      withClue(n.settings.networkSettings.nodeName) {
-        // Activation will be on a next voting interval
-        assertApprovedStatus(info, checkHeight + votingInterval, NodeFeatureStatus.Voted)
-      }
-    }
+    val info = activationStatus(nodes, checkHeight, featureNum, waitCompletion)
+
+    // Activation will be on a next voting interval
+    assertApprovedStatus(info, checkHeight + votingInterval, NodeFeatureStatus.Voted)
   }
 
   "blockchain status is ACTIVATED in third voting interval" in {
     val checkHeight: Int = votingInterval * 3
-    activationStatus(nodes, checkHeight, featureNum, waitCompletion).foreach { case (n, info) =>
-      withClue(n.settings.networkSettings.nodeName) {
-        assertActivatedStatus(info, checkHeight, NodeFeatureStatus.Voted)
-      }
-    }
+    val info = activationStatus(nodes, checkHeight, featureNum, waitCompletion)
+    assertActivatedStatus(info, checkHeight, NodeFeatureStatus.Voted)
   }
 
 

@@ -11,7 +11,7 @@ import scorex.utils.LoggerFacade
 import scala.concurrent.duration.FiniteDuration
 
 
-class Node(config: Config, val nodeInfo: NodeInfo, override val client: AsyncHttpClient)
+class Node(val config: Config, var nodeInfo: NodeInfo, override val client: AsyncHttpClient)
   extends NodeApi with NetworkNodeApi {
   val privateKey: String = config.getString("private-key")
   val publicKey: String = config.getString("public-key")
@@ -25,9 +25,12 @@ class Node(config: Config, val nodeInfo: NodeInfo, override val client: AsyncHtt
   override val nodeName: String = s"it-test-client-to-${nodeInfo.networkIpAddress}"
   override val restAddress: String = "localhost"
   override val networkAddress: String = "localhost"
-  override val nodeRestPort: Int = nodeInfo.hostRestApiPort
-  override val matcherRestPort: Int = nodeInfo.hostMatcherApiPort
-  override val networkPort: Int = nodeInfo.hostNetworkPort
+
+  override def nodeRestPort: Int = nodeInfo.hostRestApiPort
+
+  override def matcherRestPort: Int = nodeInfo.hostMatcherApiPort
+
+  override def networkPort: Int = nodeInfo.hostNetworkPort
   override val blockDelay: FiniteDuration = settings.blockchainSettings.genesisSettings.averageBlockDelay
 
   def fee(txValue: TransactionType.Value, asset: String = "WAVES"): Long =

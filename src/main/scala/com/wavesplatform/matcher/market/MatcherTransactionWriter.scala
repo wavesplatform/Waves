@@ -47,10 +47,10 @@ class MatcherTransactionWriter(val settings: MatcherSettings)
   }
 
   private def saveExchangeTx(tx: ExchangeTransaction) = {
-      val txId = tx.id().toString
-      transactions.put(txId, tx.bytes())
-      saveOrder2TxId(tx.buyOrder.idStr(), txId)
-      saveOrder2TxId(tx.sellOrder.idStr(), txId)
+    val txId = tx.id().toString
+    transactions.put(txId, tx.bytes())
+    saveOrder2TxId(tx.buyOrder.idStr(), txId)
+    saveOrder2TxId(tx.sellOrder.idStr(), txId)
   }
 }
 

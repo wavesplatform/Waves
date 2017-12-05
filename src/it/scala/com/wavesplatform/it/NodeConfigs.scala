@@ -23,15 +23,19 @@ object NodeConfigs {
 
     def withDefault(entitiesNumber: Int): Builder = copy(defaultEntities = entitiesNumber)
 
-    def withSpecial(f: Templates.type => String): Builder = {
-      copy(specialsConfigs = specialsConfigs :+ ConfigFactory.parseString(f(Templates)))
+    def withSpecial(f: Templates.type => String): Builder = withSpecial(1, f)
+
+    def withSpecial(entitiesNumber: Int, f: Templates.type => String): Builder = {
+      val newSpecialConfig = ConfigFactory.parseString(f(Templates))
+      copy(specialsConfigs = specialsConfigs ++ (1 to entitiesNumber).map(_ => newSpecialConfig))
     }
 
-    def build: Seq[Config] = {
+    def build(shuffling: Boolean = true): Seq[Config] = {
       val totalEntities = defaultEntities + specialsConfigs.size
       require(totalEntities < baseConfigs.size)
 
-      val (defaultNodes: Seq[Config], specialNodes: Seq[Config]) = Random.shuffle(baseConfigs)
+      val baseConfigsShuffled = if (shuffling) Random.shuffle(baseConfigs) else baseConfigs
+      val (defaultNodes: Seq[Config], specialNodes: Seq[Config]) = baseConfigsShuffled
         .take(totalEntities)
         .splitAt(defaultEntities)
 
@@ -42,6 +46,7 @@ object NodeConfigs {
 
   object Templates {
     def quorum(n: Int): String = s"waves.miner.quorum = $n"
+
     val nonMiner: String = "waves.miner.enable = no"
   }
 

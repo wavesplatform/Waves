@@ -3,25 +3,28 @@ package com.wavesplatform.it.activation
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.features.BlockchainFeatureStatus
 import com.wavesplatform.features.api.NodeFeatureStatus
-import com.wavesplatform.it.{Docker, NodeConfigs}
+import com.wavesplatform.it.{Docker, Node, NodeConfigs, ReportingTestName}
 import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.concurrent.{Await, Future}
+import scala.concurrent.Await
 
-class VoteForFeatureByDefaultTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with CancelAfterFailure with ActivationStatusRequest {
+class VoteForFeatureByDefaultTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with CancelAfterFailure
+  with ActivationStatusRequest with ReportingTestName {
 
   import VoteForFeatureByDefaultTestSuite._
 
   private lazy val docker = Docker(getClass)
-  private lazy val nodes = docker.startNodes(Configs)
+  override lazy val nodes: Seq[Node] = docker.startNodes(Configs)
+
+  private lazy val notSupportedNode +: supportedNodes = nodes
 
   val defaultVotingFeatureNum: Short = 1
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-    Await.result(Future.traverse(nodes)(_.waitForPeers(NodesCount - 1)), 2.minute)
+    log.debug(s"There are ${nodes.size} in tests") // Initializing of a lazy variable
   }
 
   override protected def afterAll(): Unit = {
@@ -32,29 +35,32 @@ class VoteForFeatureByDefaultTestSuite extends FreeSpec with Matchers with Befor
   "supported blocks increased when voting starts, one node votes against, three by default" in {
     val checkHeight: Int = votingInterval * 2 / 3
 
-    val activationInfo = activationStatus(Seq(nodes.last, nodes.head), checkHeight, defaultVotingFeatureNum, 4.minute)
-    val supportedNodeActivationInfo = activationInfo(nodes.last)
-    val nonSupportedNodeActivationInfo = activationInfo(nodes.head)
+    val supportedNodeActivationInfo = activationStatus(supportedNodes, checkHeight, defaultVotingFeatureNum, 4.minute)
+    val nonSupportedNodeActivationInfo = Await
+      .result(notSupportedNode.activationStatus, 1.minute)
+      .features
+      .find(_.id == defaultVotingFeatureNum)
+      .get
 
     val generatedBlocks = Await.result(nodes.last.blockSeq(1, checkHeight), 2.minute)
     val featuresMapInGeneratedBlocks = generatedBlocks.flatMap(b => b.features.getOrElse(Seq.empty)).groupBy(x => x)
     val votesForFeature1 = featuresMapInGeneratedBlocks.getOrElse(defaultVotingFeatureNum, Seq.empty).length
 
     assertVotingStatus(supportedNodeActivationInfo, votesForFeature1, BlockchainFeatureStatus.Undefined, NodeFeatureStatus.Voted)
-    assertVotingStatus(nonSupportedNodeActivationInfo, votesForFeature1, BlockchainFeatureStatus.Undefined, NodeFeatureStatus.Implemented)
+    nonSupportedNodeActivationInfo.nodeStatus shouldBe NodeFeatureStatus.Implemented
   }
 
   "blockchain status is APPROVED in second voting interval, one node votes against, three by default" in {
     val checkHeight: Int = votingInterval * 2 - blocksForActivation / 2
 
-    val supportedNodeActivationInfo = activationStatus(nodes.last, checkHeight, defaultVotingFeatureNum, 3.minute)
+    val supportedNodeActivationInfo = activationStatus(supportedNodes, checkHeight, defaultVotingFeatureNum, 3.minute)
     assertApprovedStatus(supportedNodeActivationInfo, votingInterval * 2, NodeFeatureStatus.Voted)
   }
 
   "blockchain status is ACTIVATED in the end of second voting interval, one node votes against, three by default" in {
     val checkHeight: Int = votingInterval * 2
 
-    val supportedNodeActivationInfo = activationStatus(nodes.last, checkHeight, defaultVotingFeatureNum, 2.minute)
+    val supportedNodeActivationInfo = activationStatus(supportedNodes, checkHeight, defaultVotingFeatureNum, 2.minute)
     assertActivatedStatus(supportedNodeActivationInfo, checkHeight, NodeFeatureStatus.Voted)
   }
 
@@ -69,20 +75,22 @@ class VoteForFeatureByDefaultTestSuite extends FreeSpec with Matchers with Befor
     val nonVotingFeatureNum: Short = 2
 
     private val baseConfig = ConfigFactory.parseString(
-      s"""waves.blockchain.custom {
-         |  functionality {
-         |    pre-activated-features = {}
-         |    feature-check-blocks-period = $votingInterval
-         |    blocks-for-feature-activation = $blocksForActivation
-         |  }
-         |  genesis {
-         |    signature: "zXBp6vpEHgtdsPjVHjSEwMeRiQTAu6DdX3qkJaCRKxgYJk26kazS2XguLYRvL9taHKxrZHNNA7X7LMVFavQzWpT"
-         |    transactions = [
-         |      {recipient: "3Hm3LGoNPmw1VTZ3eRA2pAfeQPhnaBm6YFC", amount: 250000000000000},
-         |      {recipient: "3HZxhQhpSU4yEGJdGetncnHaiMnGmUusr9s", amount: 270000000000000},
-         |      {recipient: "3HPG313x548Z9kJa5XY4LVMLnUuF77chcnG", amount: 260000000000000},
-         |      {recipient: "3HVW7RDYVkcN5xFGBNAUnGirb5KaBSnbUyB", amount: 2000000000000}
-         |    ]
+      s"""waves {
+         |  blockchain.custom {
+         |    functionality {
+         |      pre-activated-features = {}
+         |      feature-check-blocks-period = $votingInterval
+         |      blocks-for-feature-activation = $blocksForActivation
+         |    }
+         |    genesis {
+         |      signature: "zXBp6vpEHgtdsPjVHjSEwMeRiQTAu6DdX3qkJaCRKxgYJk26kazS2XguLYRvL9taHKxrZHNNA7X7LMVFavQzWpT"
+         |      transactions = [
+         |        {recipient: "3Hm3LGoNPmw1VTZ3eRA2pAfeQPhnaBm6YFC", amount: 250000000000000},
+         |        {recipient: "3HZxhQhpSU4yEGJdGetncnHaiMnGmUusr9s", amount: 270000000000000},
+         |        {recipient: "3HPG313x548Z9kJa5XY4LVMLnUuF77chcnG", amount: 260000000000000},
+         |        {recipient: "3HVW7RDYVkcN5xFGBNAUnGirb5KaBSnbUyB", amount: 2000000000000}
+         |      ]
+         |    }
          |  }
          |  miner.quorum = 3
          |}""".stripMargin

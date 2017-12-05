@@ -59,7 +59,7 @@ object CommonValidation {
     case _ =>
       if (state.containsTransaction(tx.id())) {
         val txHeight = state.transactionInfo(tx.id()).map(_._1)
-        Left(GenericError(s"Txs cannot be duplicated. Target height is: $height, current height is: ${state.height}, existing tx height is: ${txHeight} Tx with such id aready present"))
+        Left(GenericError(s"Txs cannot be duplicated. Target height is: $height, current height is: ${state.height}, existing tx height is: $txHeight Tx with such id already present"))
       }
       else Right(tx)
   }

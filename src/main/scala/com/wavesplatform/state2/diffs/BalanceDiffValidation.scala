@@ -14,7 +14,7 @@ import scala.util.{Left, Right}
 
 object BalanceDiffValidation extends ScorexLogging with Instrumented {
 
-  def apply[T <: Transaction](s: SnapshotStateReader, time: Long, fs: FunctionalitySettings)(d: Diff): Either[AccountBalanceError, Diff] = {
+  def apply[T <: Transaction](s: SnapshotStateReader, fs: FunctionalitySettings)(d: Diff): Either[AccountBalanceError, Diff] = {
 
     val changedAccounts = d.portfolios.keySet
 
@@ -30,7 +30,7 @@ object BalanceDiffValidation extends ScorexLogging with Instrumented {
         Some(s"negative asset balance: $acc, new portfolio: ${negativeAssetsInfo(newPortfolio)}")
       } else if (newPortfolio.effectiveBalance < 0) {
         Some(s"negative effective balance: $acc, old: ${leaseWavesInfo(oldPortfolio)}, new: ${leaseWavesInfo(newPortfolio)}")
-      } else if (newPortfolio.balance < newPortfolio.leaseInfo.leaseOut && time > fs.allowLeasedBalanceTransferUntil) {
+      } else if (newPortfolio.balance < newPortfolio.leaseInfo.leaseOut && s.height > fs.allowLeasedBalanceTransferUntilHeight) {
         Some(s"leased being more than own: $acc, old: ${leaseWavesInfo(oldPortfolio)}, new: ${leaseWavesInfo(newPortfolio)}")
       } else None
       err.map(acc -> _)

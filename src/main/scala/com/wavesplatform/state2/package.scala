@@ -51,7 +51,7 @@ package object state2 {
       }
 
     val r = splitR(NEL.one(list.head), count(list.head), list.tail)
-    (r._1.reverse,r._2)
+    (r._1.reverse, r._2)
   }
 
   def prependCompact[A](`new`: A, existing: NEL[A])(compactPred: (A, A) => Boolean)(implicit ma: Monoid[A]): NEL[A] = {

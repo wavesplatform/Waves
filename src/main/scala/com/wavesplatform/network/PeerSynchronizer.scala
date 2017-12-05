@@ -15,7 +15,6 @@ class PeerSynchronizer(peerDatabase: PeerDatabase, peerRequestInterval: FiniteDu
   private var declaredAddress = Option.empty[InetSocketAddress]
 
   def requestPeers(ctx: ChannelHandlerContext): Unit = if (ctx.channel().isActive) {
-    log.trace(s"${id(ctx)} Requesting peers")
     peersRequested = true
     ctx.writeAndFlush(GetPeers)
 
@@ -34,24 +33,25 @@ class PeerSynchronizer(peerDatabase: PeerDatabase, peerRequestInterval: FiniteDu
             peerDatabase.touch(rda)
             declaredAddress = Some(rda)
           } else {
-            log.debug(s"${id(ctx)} Declared address $rda does not match actual remote address")
+            log.debug(s"${id(ctx)} Declared address $rda does not match actual remote address ${ctx.remoteAddress.getAddress}")
           }
         }
         requestPeers(ctx)
         super.channelRead(ctx, msg)
       case GetPeers =>
-        log.trace(s"${id(ctx)} Sending known peers: ${peerDatabase.knownPeers.mkString("[", ", ", "]")}")
         ctx.writeAndFlush(KnownPeers(peerDatabase.knownPeers.keys.toSeq))
       case KnownPeers(peers) if peersRequested =>
         peersRequested = false
-        log.trace(s"${id(ctx)} Got known peers: ${peers.mkString("[", ", ", "]")}")
-        peers.foreach(peerDatabase.addCandidate)
+        val (added, notAdded) = peers.partition(peerDatabase.addCandidate)
+        log.trace(s"${id(ctx)} Added peers: ${format(added)}, not added peers: ${format(notAdded)}")
       case KnownPeers(peers) =>
         log.trace(s"${id(ctx)} Got unexpected list of known peers containing ${peers.size} entries")
       case _ =>
         super.channelRead(ctx, msg)
     }
   }
+
+  private def format[T](xs: Iterable[T]): String = xs.mkString("[", ", ", "]")
 }
 
 object PeerSynchronizer {

@@ -15,18 +15,18 @@ case class FunctionalitySettings(featureCheckBlocksPeriod: Int,
                                  allowTemporaryNegativeUntil: Long,
                                  allowInvalidPaymentTransactionsByTimestamp: Long,
                                  requireSortedTransactionsAfter: Long,
-                                 generationBalanceDepthFrom50To1000AfterHeight: Long,
+                                 generationBalanceDepthFrom50To1000AfterHeight: Int,
                                  minimalGeneratingBalanceAfter: Long,
                                  allowTransactionsFromFutureUntil: Long,
                                  allowUnissuedAssetsUntil: Long,
                                  requirePaymentUniqueIdAfter: Long,
                                  allowInvalidReissueInSameBlockUntilTimestamp: Long,
                                  allowMultipleLeaseCancelTransactionUntilTimestamp: Long,
-                                 resetEffectiveBalancesAtHeight: Long,
-                                 allowLeasedBalanceTransferUntil: Long,
-                                 blockVersion3AfterHeight: Long,
+                                 resetEffectiveBalancesAtHeight: Int,
+                                 blockVersion3AfterHeight: Int,
                                  preActivatedFeatures: Map[Short, Int]) {
-  val dontRequireSortedTransactionsAfter: Long = blockVersion3AfterHeight
+  val dontRequireSortedTransactionsAfter = blockVersion3AfterHeight
+  val allowLeasedBalanceTransferUntilHeight = blockVersion3AfterHeight
 
   require(featureCheckBlocksPeriod > 0, "featureCheckBlocksPeriod must be greater than 0")
   require((blocksForFeatureActivation > 0) && (blocksForFeatureActivation <= featureCheckBlocksPeriod), s"blocksForFeatureActivation must be in range 1 to $featureCheckBlocksPeriod")
@@ -39,7 +39,7 @@ object FunctionalitySettings {
     allowTemporaryNegativeUntil = 1479168000000L,
     allowInvalidPaymentTransactionsByTimestamp = 1479168000000L,
     requireSortedTransactionsAfter = 1479168000000L,
-    generationBalanceDepthFrom50To1000AfterHeight = 232000L,
+    generationBalanceDepthFrom50To1000AfterHeight = 232000,
     minimalGeneratingBalanceAfter = 1479168000000L,
     allowTransactionsFromFutureUntil = 1479168000000L,
     allowUnissuedAssetsUntil = 1479416400000L,
@@ -47,8 +47,7 @@ object FunctionalitySettings {
     allowInvalidReissueInSameBlockUntilTimestamp = 1492768800000L,
     allowMultipleLeaseCancelTransactionUntilTimestamp = 1492768800000L,
     resetEffectiveBalancesAtHeight = 462000,
-    allowLeasedBalanceTransferUntil = Long.MaxValue,
-    blockVersion3AfterHeight = Long.MaxValue,
+    blockVersion3AfterHeight = Int.MaxValue,
     preActivatedFeatures = Map.empty)
 
   val TESTNET = apply(
@@ -57,15 +56,14 @@ object FunctionalitySettings {
     allowTemporaryNegativeUntil = 1477958400000L,
     allowInvalidPaymentTransactionsByTimestamp = 1477958400000L,
     requireSortedTransactionsAfter = 1477958400000L,
-    generationBalanceDepthFrom50To1000AfterHeight = Long.MinValue,
-    minimalGeneratingBalanceAfter = Long.MinValue,
+    generationBalanceDepthFrom50To1000AfterHeight = 0,
+    minimalGeneratingBalanceAfter = 0,
     allowTransactionsFromFutureUntil = 1478100000000L,
     allowUnissuedAssetsUntil = 1479416400000L,
     requirePaymentUniqueIdAfter = 1485942685000L,
     allowInvalidReissueInSameBlockUntilTimestamp = 1492560000000L,
     allowMultipleLeaseCancelTransactionUntilTimestamp = 1492560000000L,
     resetEffectiveBalancesAtHeight = 51500,
-    allowLeasedBalanceTransferUntil = 1495238400000L,
     blockVersion3AfterHeight = 161700,
     preActivatedFeatures = Map.empty)
 

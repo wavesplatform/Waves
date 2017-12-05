@@ -261,6 +261,10 @@ object MicroBlockResponseMessageSpec extends MessageSpec[MicroBlockResponse] {
 
 }
 
+// Virtual, only for logs
+object HandshakeMessageSpec {
+  val messageCode: MessageCode = 101: Byte
+}
 
 object BasicMessagesRepo {
   private type Spec = MessageSpec[_ <: AnyRef]
@@ -270,4 +274,5 @@ object BasicMessagesRepo {
     MicroBlockInvMessageSpec, MicroBlockRequestMessageSpec, MicroBlockResponseMessageSpec)
 
   val specsByCodes: Map[Byte, Spec] = specs.map(s => s.messageCode -> s).toMap
+  val specsByClasses: Map[Class[_], Spec] = specs.map(s => s.contentClass -> s).toMap
 }

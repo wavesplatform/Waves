@@ -62,8 +62,7 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
       aliasTxId <- sender.createAlias(firstAddress, alias, aliasFee).map(_.id)
 
       _ <- waitForHeightAraiseAndTxPresent(aliasTxId, 1)
-      _ <- assertBadRequest(sender.createAlias(secondAddress, alias, aliasFee))
-      _ <- assertBadRequestAndMessage(sender.createAlias(secondAddress, alias, aliasFee), "Tx with such id aready present")
+      _ <- assertBadRequestAndMessage(sender.createAlias(secondAddress, alias, aliasFee), "Tx with such id already present")
       _ <- assertBalances(firstAddress, balance - aliasFee, effectiveBalance - aliasFee)
     } yield succeed
 
@@ -76,8 +75,7 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
 
     val f = for {
 
-      balance <- accountBalance(secondAddress)
-      effectiveBalance <- accountEffectiveBalance(secondAddress)
+      (balance, effectiveBalance) <- accountBalance(secondAddress).zip(accountEffectiveBalance(secondAddress))
 
       aliasFirstTxId <- sender.createAlias(secondAddress, firstAlias, aliasFee).map(_.id)
       _ <- waitForHeightAraiseAndTxPresent(aliasFirstTxId, 1)
@@ -168,10 +166,11 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
     val buildedThirdAddressAlias = s"alias:${sender.settings.blockchainSettings.addressSchemeCharacter}:$thirdAddressAlias"
 
     val f = for {
-      firstAddressBalance <- accountBalance(firstAddress)
-      firstAddressEffectiveBalance <- accountEffectiveBalance(firstAddress)
-      thirdAddressBalance <- accountBalance(thirdAddress)
-      thirdAddressEffectiveBalance <- accountEffectiveBalance(thirdAddress)
+      (((firstAddressBalance, firstAddressEffectiveBalance), thirdAddressBalance), thirdAddressEffectiveBalance) <- accountBalance(firstAddress)
+        .zip(accountEffectiveBalance(firstAddress))
+        .zip(accountBalance(thirdAddress))
+        .zip(accountEffectiveBalance(thirdAddress))
+
       aliasTxId <- sender.createAlias(thirdAddress, thirdAddressAlias, aliasFee).map(_.id)
       _ <- waitForHeightAraiseAndTxPresent(aliasTxId, 1)
 
@@ -181,9 +180,8 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
       leasingTx <- sender.lease(firstAddress, buildedThirdAddressAlias, leasingAmount, leasingFee).map(_.id)
       _ <- waitForHeightAraiseAndTxPresent(leasingTx, 1)
 
-      _ <- assertBalances(firstAddress, firstAddressBalance - leasingFee,
-        firstAddressEffectiveBalance - leasingAmount - leasingFee)
-      _ <- assertBalances(thirdAddress, thirdAddressBalance - aliasFee, thirdAddressEffectiveBalance - aliasFee + leasingAmount)
+      _ <- assertBalances(firstAddress, firstAddressBalance - leasingFee, firstAddressEffectiveBalance - leasingAmount - leasingFee)
+        .zip(assertBalances(thirdAddress, thirdAddressBalance - aliasFee, thirdAddressEffectiveBalance - aliasFee + leasingAmount))
     } yield succeed
     Await.result(f, waitCompletion)
   }
@@ -194,7 +192,6 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
     val f = for {
       _ <- assertBadRequestAndMessage(sender.createAlias(firstAddress, alias, aliasFee),
         "State check failed. Reason: negative effective balance")
-
     } yield succeed
     Await.result(f, waitCompletion)
   }

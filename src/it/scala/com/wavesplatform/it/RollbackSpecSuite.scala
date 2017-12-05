@@ -63,7 +63,7 @@ class RollbackSpecSuite extends FreeSpec with ScalaFutures with IntegrationPatie
         infos.head
       })
       _ <- processRequests(requests)
-      _ <- nodes.head.waitFor[Int](_.utxSize, _ == 0, 1.second)
+      _ <- nodes.head.waitFor[Int]("empty utx")(_.utxSize, _ == 0, 1.second)
       _ <- traverse(nodes)(_.rollback(startHeight, returnToUTX = false))
       _ <- nodes.head.utx.map( _ shouldBe 'empty )
 
@@ -92,6 +92,7 @@ class RollbackSpecSuite extends FreeSpec with ScalaFutures with IntegrationPatie
 }
 
 object RollbackSpecSuite {
+
   import NodeConfigs.Default
 
   private val nonGeneratingNodesConfig = ConfigFactory.parseString("waves.miner.enable = no")

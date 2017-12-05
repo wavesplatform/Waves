@@ -37,6 +37,10 @@ class NetworkSettingsSpecification extends FlatSpec with Matchers {
         |    gateway-timeout: 10s
         |    discover-timeout: 10s
         |  }
+        |  traffic-logger {
+        |    ignore-tx-messages = [28]
+        |    ignore-rx-messages = [23]
+        |  }
         |}""".stripMargin))
     val networkSettings = config.as[NetworkSettings]("waves.network")
 
@@ -57,6 +61,8 @@ class NetworkSettingsSpecification extends FlatSpec with Matchers {
     networkSettings.uPnPSettings.enable should be(true)
     networkSettings.uPnPSettings.gatewayTimeout should be(10.seconds)
     networkSettings.uPnPSettings.discoverTimeout should be(10.seconds)
+    networkSettings.trafficLogger.ignoreTxMessages should be(Set(28))
+    networkSettings.trafficLogger.ignoreRxMessages should be(Set(23))
   }
 
   it should "generate random nonce" in {

@@ -30,12 +30,13 @@ class PaymentRouteSpec
 
         val timestamp = System.currentTimeMillis()
 
-        val time =  new Time {
+        val time = new Time {
           override def correctedTime(): Long = timestamp
+
           override def getTimestamp(): Long = timestamp
         }
 
-        val sender = testWallet.privateKeyAccounts().head
+        val sender = testWallet.privateKeyAccounts.head
         val tx = TransferTransaction.create(None, sender, recipient, amount, timestamp, None, fee, Array())
 
         val route = PaymentApiRoute(restAPISettings, testWallet, utx, allChannels, time).route

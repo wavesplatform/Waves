@@ -80,6 +80,6 @@ object JsBlockParser extends App {
 //    PrivateKeyAccount(ByteStr.decodeBase58("Co9cYj4YC15QWHZ3Ux8acv3Q2mVe3PzHucxuNWSRhpzj").get.arr)
 //  ).explicitGet()
 //
-//  println(Block.parseBytes(recreated.bytes()).get.signatureValid)
+  //  println(Block.parseBytes(recreated.bytes()).get.signatureValid)
 
 }

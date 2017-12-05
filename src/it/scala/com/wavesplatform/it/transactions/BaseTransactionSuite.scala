@@ -15,7 +15,7 @@ abstract class BaseTransactionSuite extends FunSuite with IntegrationNodesInitia
       .overrideBase(_.quorum(3))
       .withDefault(3)
       .withSpecial(_.nonMiner)
-      .build
+      .build()
   )
 
   override lazy val notMiner: Node = nodes.last

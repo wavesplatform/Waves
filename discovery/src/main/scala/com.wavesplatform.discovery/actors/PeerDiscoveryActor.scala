@@ -18,9 +18,11 @@ import scala.concurrent.Await
 import scala.concurrent.duration.FiniteDuration
 
 object PeerDiscoveryActor {
+
   case class GetPeersFrom(peer: InetSocketAddress)
 
-  val peerDatabaseStub = new PeerDatabase {override def suspend(host: InetAddress): Unit = {}
+  val peerDatabaseStub = new PeerDatabase {
+    override def suspend(host: InetAddress): Unit = {}
 
     override def knownPeers: Map[InetSocketAddress, Long] = Map.empty
 
@@ -56,7 +58,7 @@ class PeerDiscoveryActor(chainId: Char) extends Actor {
 
   private val getPeersTimeout = 10
 
-  private def getPeersFromNode(address: InetSocketAddress): Set[InetSocketAddress]= {
+  private def getPeersFromNode(address: InetSocketAddress): Set[InetSocketAddress] = {
     var peers: Set[InetSocketAddress] = Set.empty
 
     val exceptionHandler = new ExceptionHandler()
