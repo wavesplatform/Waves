@@ -116,7 +116,7 @@ class UtxPoolImpl(time: Time,
 
   private def checkNotBlacklisted(tx: Transaction): Either[ValidationError, Unit] = {
     if (utxSettings.blacklistSenderAddresses.isEmpty) {
-      Right()
+      Right(())
     } else {
       val sender: Option[String] = tx match {
         case x: SignedTransaction => Some(x.sender.address)
