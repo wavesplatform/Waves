@@ -1,10 +1,8 @@
 package com.wavesplatform.network
 
 import java.net.{InetAddress, InetSocketAddress}
-import java.nio.charset.MalformedInputException
 import java.util.concurrent.TimeUnit
 
-import com.fasterxml.jackson.databind.JsonMappingException
 import com.google.common.cache.CacheBuilder
 import com.google.common.collect.EvictingQueue
 import com.wavesplatform.settings.NetworkSettings
@@ -18,6 +16,7 @@ import scala.collection._
 import scala.collection.JavaConverters._
 import scala.concurrent.duration.FiniteDuration
 import scala.util.Random
+import scala.util.control.NonFatal
 
 class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with ScorexLogging {
 
@@ -46,8 +45,8 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Scor
       log.info(s"${f.getName} loaded, total peers: ${peersPersistence.size}")
     }
     catch {
-      case _: MalformedInputException | _: JsonMappingException =>
-        log.info("Old version peers.dat, ignoring, starting all over from known-peers...")
+      case NonFatal(e) =>
+        log.warn("Old or invalid version peers.dat, ignoring, starting all over from known-peers...", e)
     }
   })
 

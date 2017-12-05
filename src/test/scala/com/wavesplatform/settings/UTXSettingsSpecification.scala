@@ -15,7 +15,7 @@ class UTXSettingsSpecification extends FlatSpec with Matchers {
         |    max-size = 100
         |    max-transaction-age = 100m
         |    cleanup-interval = 10m
-        |    blacklisted-sender-addresses = ["a"]
+        |    blacklist-sender-addresses = ["a"]
         |    allow-blacklisted-transfer-to = ["b"]
         |  }
         |}""".stripMargin).resolve()

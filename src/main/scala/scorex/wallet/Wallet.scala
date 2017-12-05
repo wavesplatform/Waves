@@ -1,9 +1,7 @@
 package scorex.wallet
 
 import java.io.File
-import java.nio.charset.MalformedInputException
 
-import com.fasterxml.jackson.databind.JsonMappingException
 import com.google.common.primitives.{Bytes, Ints}
 import com.wavesplatform.settings.WalletSettings
 import com.wavesplatform.state2.ByteStr
@@ -14,9 +12,10 @@ import scorex.crypto.encode.Base64
 import scorex.crypto.hash.SecureCryptographicHash
 import scorex.transaction.ValidationError
 import scorex.transaction.ValidationError.MissingSenderPrivateKey
-import scorex.utils.{randomBytes, ScorexLogging}
+import scorex.utils.{ScorexLogging, randomBytes}
 
 import scala.collection.concurrent.TrieMap
+import scala.util.control.NonFatal
 
 trait Wallet extends AutoCloseable{
 
@@ -85,7 +84,9 @@ object Wallet extends ScorexLogging {
     private var walletData = file.filter(_.exists()).flatMap(f =>
       try Some(JsonFileStorage.load[WalletData](f.getCanonicalPath, Option(password)))
       catch {
-        case _: MalformedInputException | _: JsonMappingException => Option(migrateFromOldWallet())
+        case NonFatal(e) =>
+          log.warn("Can't read wallet data", e)
+          Option(migrateFromOldWallet())
       }
     ).getOrElse(WalletData(s, Set.empty, 0))
 
