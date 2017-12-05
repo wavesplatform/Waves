@@ -17,7 +17,7 @@ import com.wavesplatform.http.NodeApiRoute
 import com.wavesplatform.matcher.Matcher
 import com.wavesplatform.metrics.Metrics
 import com.wavesplatform.mining.{Miner, MinerImpl}
-import com.wavesplatform.network.{InvalidBlockStorageImpl, MicroBlockSynchronizer, NetworkServer, PeerDatabaseImpl, PeerInfo, RxExtensionLoader, RxScoreObserver, UPnP}
+import com.wavesplatform.network.{InvalidBlockStorageImpl, LocalScoreChanged, MicroBlockSynchronizer, NetworkServer, PeerDatabaseImpl, PeerInfo, RxExtensionLoader, RxScoreObserver, UPnP}
 import com.wavesplatform.settings._
 import com.wavesplatform.state2.appender.{BlockAppender, CheckpointAppender, ExtensionAppender, MicroblockAppender}
 import com.wavesplatform.utils.forceStopApplication
@@ -38,6 +38,7 @@ import scorex.transaction._
 import scorex.utils.{NTP, ScorexLogging, Time}
 import scorex.wallet.Wallet
 import scorex.waves.http.{DebugApiRoute, WavesApiRoute}
+import cats.instances.all._
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
@@ -77,11 +78,17 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     val processMicroBlock = MicroblockAppender(checkpointService, history, blockchainUpdater, utxStorage, allChannels, peerDatabase) _
 
     import blockchainUpdater.lastBlockInfo
+    // @TODO: throttle or debounce
+    val lastScore = lastBlockInfo.map(_.score).distinctUntilChanged.share(monix.execution.Scheduler.Implicits.global)
+    lastScore.foreach { x =>
+      import com.wavesplatform.network.ChannelGroupExt
+      allChannels.broadcast(LocalScoreChanged(x))
+    }(monix.execution.Scheduler.Implicits.global)
 
     val network = NetworkServer(settings, lastBlockInfo, history, utxStorage, peerDatabase, allChannels, establishedConnections)
     val (signatures, blocks, blockchainScores, checkpoints, microblockInvs, microblockResponses) = network.messages
 
-    val syncWithChannelClosed = RxScoreObserver(settings.synchronizationSettings.scoreTTL, history.score(), lastBlockInfo.map(_.score), blockchainScores, network.closedChannels)
+    val syncWithChannelClosed = RxScoreObserver(settings.synchronizationSettings.scoreTTL, history.score(), lastScore, blockchainScores, network.closedChannels)
     val microblockDatas = MicroBlockSynchronizer(settings.synchronizationSettings.microBlockSynchronizer, history, peerDatabase)(lastBlockInfo.map(_.id), microblockInvs, microblockResponses) _
     val newBlocks = RxExtensionLoader(settings.synchronizationSettings.maxRollback, settings.synchronizationSettings.synchronizationTimeout,
       history, peerDatabase, knownInvalidBlocks, blocks, signatures, syncWithChannelClosed) { case ((c, b)) => processFork(c, b.blocks) }
