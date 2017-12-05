@@ -1,0 +1,42 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+    <!--<link rel="stylesheet" href="app.css">-->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/semantic-ui/2.2.13/semantic.min.css">
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.10.16/css/dataTables.semanticui.min.css">
+</head>
+<body>
+<!--<svg width="960" height="600"></svg>-->
+<div class="ui top attached tabular menu">
+    <a class="item active" data-tab="first">Main</a>
+    <a class="item" data-tab="second">Test</a>
+    <a class="item" data-tab="third">Logs</a>
+</div>
+<div class="ui bottom attached tab segment" data-tab="first">
+    <table id="wTable" class="ui celled table" cellspacing="0" width="100%"></table>
+</div>
+<div class="ui bottom attached tab segment" data-tab="second">
+    <table id="tTable" class="ui celled table" cellspacing="0" width="100%"></table>
+</div>
+<div class="ui bottom attached tab segment active" data-tab="third">
+    <div id="root" style="font-size:15px;"></div>
+</div>
+</body>
+
+<script src="https://code.jquery.com/jquery-1.12.4.js"></script>
+<script src="https://cdn.datatables.net/1.10.16/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.10.16/js/dataTables.semanticui.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/semantic-ui/2.2.13/semantic.min.js"></script>
+<script src="https://d3js.org/d3.v3.min.js"></script>
+<!--<script type="text/javascript" src="graph.js"></script>-->
+<script type="text/javascript" src="data.js"></script>
+<script type="text/javascript" src="index.js"></script>
+<script type="text/javascript">
+$( document ).ready(function() {
+    $('.menu .item').tab();
+});
+
+
+
+</script>
+</html>

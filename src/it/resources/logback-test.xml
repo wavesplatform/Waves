@@ -3,7 +3,15 @@
     <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
         <target>System.out</target>
         <encoder>
-            <pattern>%date{yyyy-MM-dd HH:mm:ss} %-5level [%thread] %logger{26} - %msg%n</pattern>
+            <pattern>%date{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] %logger{26} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <appender name="FILE" class="ch.qos.logback.core.FileAppender">
+        <file>${waves.it.logging.dir:-target/logs}/test.log</file>
+        <append>false</append>
+        <encoder>
+            <pattern>%date{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] %logger{26} - %msg%n</pattern>
         </encoder>
     </appender>
 
@@ -12,6 +20,6 @@
     <logger name="io.swagger" level="OFF"/>
 
     <root level="DEBUG">
-        <appender-ref ref="STDOUT" />
+        <appender-ref ref="${waves.it.logging.appender:-STDOUT}"/>
     </root>
 </configuration>

@@ -14,6 +14,8 @@ case class ByteStr(arr: Array[Byte]) {
 
   lazy val base58: String = Base58.encode(arr)
 
+  lazy val trim: String = base58.toString.take(7) + "..."
+
   override lazy val toString: String = base58
 }
 

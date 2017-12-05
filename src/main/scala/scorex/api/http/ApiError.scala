@@ -23,8 +23,8 @@ trait ApiError {
 
 object ApiError {
   def fromValidationError(e: ValidationError): ApiError = e match {
-    case ValidationError.InvalidAddress => InvalidAddress
-    case ValidationError.NegativeAmount => NegativeAmount
+    case ValidationError.InvalidAddress(_) => InvalidAddress
+    case ValidationError.NegativeAmount(x, of) => NegativeAmount(s"$x of $of")
     case ValidationError.InsufficientFee => InsufficientFee
     case ValidationError.InvalidName => InvalidName
     case ValidationError.InvalidSignature(_, _) => InvalidSignature
@@ -34,15 +34,17 @@ object ApiError {
     case ValidationError.ToSelf => ToSelfError
     case ValidationError.MissingSenderPrivateKey => MissingSenderPrivateKey
     case ValidationError.GenericError(ge) => CustomValidationError(ge)
-    case ValidationError.AliasNotExists(tx) => AliasNotExists(tx)
-    case ValidationError.UnsupportedTransactionType => CustomValidationError("UnsupportedTransactionType")
+    case ValidationError.AlreadyInThePool(tx) => CustomValidationError(s"Transaction $tx already in the pool")
     case ValidationError.AccountBalanceError(errs) => CustomValidationError(errs.values.mkString(", "))
+    case ValidationError.AliasNotExists(tx) => AliasNotExists(tx)
     case ValidationError.OrderValidationError(_, m) => CustomValidationError(m)
+    case ValidationError.UnsupportedTransactionType => CustomValidationError("UnsupportedTransactionType")
     case ValidationError.Mistiming(err) => Mistiming(err)
     case TransactionValidationError(error, tx) => error match {
       case ValidationError.Mistiming(errorMessage) => Mistiming(errorMessage)
       case _ => StateCheckFailed(tx, fromValidationError(error).message)
     }
+    case error => CustomValidationError(error.toString)
   }
 }
 
@@ -71,6 +73,12 @@ case object ApiKeyNotValid extends ApiError {
   override val id = 2
   override val code = StatusCodes.Forbidden
   override val message: String = "Provided API key is not correct"
+}
+
+case object DiscontinuedApi extends ApiError {
+  override val id = 3
+  override val code = StatusCodes.BadRequest
+  override val message = "This API is no longer supported"
 }
 
 case object TooBigArrayAllocation extends ApiError {
@@ -151,7 +159,7 @@ case class StateCheckFailed(tx: Transaction, err: String) extends ApiError {
   override val id: Int = 112
   override val message: String = s"State check failed. Reason: $err"
   override val code: StatusCode = StatusCodes.BadRequest
-  override lazy val json = Json.obj("error" -> id, "message" -> message, "tx" -> tx.json)
+  override lazy val json = Json.obj("error" -> id, "message" -> message, "tx" -> tx.json())
 }
 
 case object OverflowError extends ApiError {

@@ -6,7 +6,7 @@ import com.github.swagger.akka.model.{Info, License}
 import com.github.swagger.akka.{HasActorSystem, SwaggerHttpService}
 import com.wavesplatform.Version
 import com.wavesplatform.settings.RestAPISettings
-import io.swagger.models.Swagger
+import io.swagger.models.{Scheme, Swagger}
 
 import scala.reflect.runtime.universe.Type
 
@@ -23,5 +23,9 @@ class SwaggerDocService(val actorSystem: ActorSystem, val materializer: ActorMat
   )
 
   //Let swagger-ui determine the host and port
-  override val swaggerConfig: Swagger = new Swagger().basePath(prependSlashIfNecessary(basePath)).info(info).scheme(scheme)
+  override val swaggerConfig: Swagger = new Swagger()
+    .basePath(prependSlashIfNecessary(basePath))
+    .info(info)
+    .scheme(Scheme.HTTP)
+    .scheme(Scheme.HTTPS)
 }

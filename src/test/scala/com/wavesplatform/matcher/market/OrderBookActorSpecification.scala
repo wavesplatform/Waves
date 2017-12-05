@@ -1,6 +1,6 @@
 package com.wavesplatform.matcher.market
 
-import akka.actor.{Actor, ActorSystem, Props}
+import akka.actor.{Actor, ActorRef, ActorSystem, Props}
 import akka.persistence.inmemory.extension.{InMemoryJournalStorage, InMemorySnapshotStorage, StorageExtension}
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
 import com.wavesplatform.UtxPool
@@ -12,17 +12,19 @@ import com.wavesplatform.matcher.market.OrderHistoryActor.{ValidateOrder, Valida
 import com.wavesplatform.matcher.model.Events.Event
 import com.wavesplatform.matcher.model.{BuyLimitOrder, LimitOrder, SellLimitOrder}
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, WalletSettings}
-import com.wavesplatform.state2.reader.StateReader
+import com.wavesplatform.state2.reader.{SnapshotStateReader}
 import com.wavesplatform.state2.{ByteStr, LeaseInfo, Portfolio}
 import io.netty.channel.group.ChannelGroup
+import monix.eval.Coeval
 import org.h2.mvstore.MVStore
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest._
 import scorex.account.PrivateKeyAccount
+import scorex.settings.TestFunctionalitySettings
 import scorex.transaction._
 import scorex.transaction.assets.IssueTransaction
 import scorex.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
-import scorex.utils.ScorexLogging
+import scorex.utils.{NTP, ScorexLogging}
 import scorex.wallet.Wallet
 
 import scala.concurrent.duration._
@@ -45,7 +47,7 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
 
   val pair = AssetPair(Some(ByteStr("BTC".getBytes)), Some(ByteStr("WAVES".getBytes)))
   val db = new MVStore.Builder().compress().open()
-  val storedState: StateReader = stub[StateReader]
+  val storedState: SnapshotStateReader = stub[SnapshotStateReader]
   val hugeAmount = Long.MaxValue / 2
   (storedState.accountPortfolio _).when(*).returns(Portfolio(hugeAmount, LeaseInfo.empty, Map(
     ByteStr("BTC".getBytes) -> hugeAmount,
@@ -75,9 +77,13 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
     }
   })
 
-  var actor = system.actorOf(Props(new OrderBookActor(pair, orderHistoryRef, storedState,
+  var actor: ActorRef = system.actorOf(Props(new OrderBookActor(pair, orderHistoryRef, Coeval.now(storedState),
     wallet, stub[UtxPool], stub[ChannelGroup], settings, stub[History], FunctionalitySettings.TESTNET) with RestartableActor))
 
+  private def getOrders(actor: ActorRef) = {
+    actor ! GetOrdersRequest
+    receiveN(1).head.asInstanceOf[GetOrdersResponse].orders
+  }
 
   override protected def beforeEach() = {
     val tp = TestProbe()
@@ -88,12 +94,12 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
     super.beforeEach()
 
     val history = stub[History]
-    val functionalitySettings = stub[FunctionalitySettings]
+    val functionalitySettings = TestFunctionalitySettings.Stub
 
     val utx = stub[UtxPool]
     (utx.putIfNew _).when(*).onCall((tx: Transaction) => Right(true))
     val allChannels = stub[ChannelGroup]
-    actor = system.actorOf(Props(new OrderBookActor(pair, orderHistoryRef, storedState,
+    actor = system.actorOf(Props(new OrderBookActor(pair, orderHistoryRef, Coeval.now(storedState),
       wallet, utx, allChannels, settings, history, functionalitySettings) with RestartableActor))
 
     eventsProbe = TestProbe()
@@ -258,14 +264,14 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
 
       within(10.seconds) {
         actor ! GetOrdersRequest
-        expectMsgType[GetOrdersResponse].orders.map(_.order.id) should have size 100
+        expectMsgType[GetOrdersResponse].orders.map(_.order.id()) should have size 100
       }
 
     }
 
     "order matched with invalid order should keep matching with others, invalid is removed" in {
       val history = stub[History]
-      val functionalitySettings = stub[FunctionalitySettings]
+      val functionalitySettings = TestFunctionalitySettings.Stub
       val ord1 = buy(pair, 100, 20 * Order.PriceConstant)
       val ord2 = buy(pair, 5000, 1000 * Order.PriceConstant)
       // should be invalid
@@ -279,7 +285,7 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
         }
       }
       val allChannels = stub[ChannelGroup]
-      actor = system.actorOf(Props(new OrderBookActor(pair, orderHistoryRef, storedState,
+      actor = system.actorOf(Props(new OrderBookActor(pair, orderHistoryRef, Coeval.now(storedState),
         wallet, pool, allChannels, settings, history, functionalitySettings) with RestartableActor))
 
       actor ! ord1
@@ -344,6 +350,34 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
       actor ! GetAskOrdersRequest
       expectMsg(GetOrdersResponse(Seq(SellLimitOrder(1850 * Order.PriceConstant,
         ((0.1 - (0.0100001 - 0.01))*Constants.UnitsInWave).toLong, ord1))))
+    }
+
+    "cancel expired orders after OrderCleanup command" in {
+      val time = NTP.correctedTime()
+      val price = 34118
+      val amount = 1
+
+      val expiredOrder = buy(pair, price, amount).copy(expiration = time)
+      actor ! expiredOrder
+      receiveN(1)
+      getOrders(actor) shouldEqual Seq(BuyLimitOrder(price * Order.PriceConstant, amount, expiredOrder))
+      actor ! OrderCleanup
+      expectMsg(OrderCanceled(expiredOrder.idStr()))
+      getOrders(actor).size should be(0)
+    }
+
+    "preserve valid orders after OrderCleanup command" in {
+      val price = 34118
+      val amount = 1
+
+      val order = buy(pair, price, amount)
+      val expectedOrders = Seq(BuyLimitOrder(price * Order.PriceConstant, amount, order))
+
+      actor ! order
+      receiveN(1)
+      getOrders(actor) shouldEqual expectedOrders
+      actor ! OrderCleanup
+      getOrders(actor) shouldEqual expectedOrders
     }
   }
 

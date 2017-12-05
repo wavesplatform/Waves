@@ -1,29 +1,32 @@
 package com.wavesplatform.it
 
-import org.scalatest.{BeforeAndAfterAll, Suite}
+import org.scalatest._
+import scorex.utils.ScorexLogging
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.concurrent.ExecutionContext.Implicits.global
 
-trait IntegrationNodesInitializationAndStopping extends BeforeAndAfterAll { this: Suite =>
-  def docker: Docker
+trait IntegrationNodesInitializationAndStopping extends BeforeAndAfterAll with ScorexLogging with ReportingTestName {
+  this: Suite =>
+  protected lazy val docker: Docker = Docker(getClass)
   def nodes: Seq[Node]
 
-  override protected def beforeAll(): Unit = {
+  abstract override def beforeAll(): Unit = {
     super.beforeAll()
-
-    Await.result(Future.traverse(nodes)(_.status), 1.minute)
-
-    Await.result(
-      for {
-        count <- Future.traverse(nodes)(_.waitForPeers(nodes.size - 1))
-      } yield count, 1.minute
-    )
+    log.debug(s"There are ${nodes.size} in tests") // Initializing of a lazy variable
   }
 
-  override protected def afterAll(): Unit = {
+  abstract override def afterAll(): Unit = {
     super.afterAll()
+    ensureNoDeadlock()
     docker.close()
   }
+
+  private def ensureNoDeadlock() = {
+    Await.result(Future.traverse(nodes)(_.height), 7.seconds)
+  }
+
 }
+
+

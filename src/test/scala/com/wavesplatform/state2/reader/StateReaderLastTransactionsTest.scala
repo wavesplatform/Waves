@@ -1,27 +1,27 @@
 package com.wavesplatform.state2.reader
 
-import com.wavesplatform.TransactionGen
 import com.wavesplatform.state2.diffs._
-import org.scalacheck.{Gen, Shrink}
-import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
+import com.wavesplatform.{NoShrink, TransactionGen}
+import org.scalacheck.Gen
+import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import scorex.lagonaki.mocks.TestBlock
-import scorex.transaction.{GenesisTransaction, PaymentTransaction, Transaction}
+import scorex.transaction.assets.TransferTransaction
+import scorex.transaction.{GenesisTransaction, Transaction}
 
-class StateReaderLastTransactionsTest extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers with TransactionGen {
+class StateReaderLastTransactionsTest extends PropSpec
+  with PropertyChecks with Matchers with TransactionGen with NoShrink {
 
-  private implicit def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)
-
-  val preconditionsAndPayment: Gen[(Seq[Transaction], PaymentTransaction)] = for {
+  val preconditionsAndPayment: Gen[(Seq[Transaction], TransferTransaction)] = for {
     master <- accountGen
     recipient <- accountGen
     ts <- timestampGen
     genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
-    transfer1: PaymentTransaction <- paymentGeneratorP(ts + 1, master, recipient)
-    transfer2: PaymentTransaction <- paymentGeneratorP(ts + 2, master, recipient)
+    transfer1: TransferTransaction <- wavesTransferGeneratorP(ts + 1, master, recipient)
+    transfer2: TransferTransaction <- wavesTransferGeneratorP(ts + 2, master, recipient)
     preconditions: Seq[Transaction] = Seq(genesis, transfer1, transfer2)
 
-    transfer3: PaymentTransaction <- paymentGeneratorP(ts + 3, master, recipient)
+    transfer3: TransferTransaction <- wavesTransferGeneratorP(ts + 3, master, recipient)
   } yield (preconditions, transfer3)
 
 
@@ -35,6 +35,7 @@ class StateReaderLastTransactionsTest extends PropSpec with PropertyChecks with 
         val tx2 = pre(2)
         newState.accountTransactions(payment.sender, 3) shouldBe Seq(payment, tx2, tx1)
         newState.accountTransactions(payment.sender, 10) shouldBe Seq(payment, tx2, tx1, g)
+        newState.accountTransactionIds(TestBlock.defaultSigner, 10).size shouldBe 0
       }
     }
   }

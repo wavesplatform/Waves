@@ -8,9 +8,10 @@ import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.api.{MatcherResponse, StatusCodeMatcherResponse}
 import com.wavesplatform.matcher.market.OrderBookActor.{DeleteOrderBookRequest, GetOrderBookResponse, OrderBookRequest}
 import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state2.reader.StateReader
+import com.wavesplatform.state2.StateReader
 import io.netty.channel.group.ChannelGroup
 import play.api.libs.json._
+import scorex.account.Address
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange.Validation.booleanOperators
 import scorex.transaction.assets.exchange.{AssetPair, Order, Validation}
@@ -30,14 +31,15 @@ class MatcherActor(orderHistory: ActorRef, storedState: StateReader, wallet: Wal
   val tradedPairs = mutable.Map.empty[AssetPair, MarketData]
 
   def getAssetName(asset: Option[AssetId]): String =
-    asset.map(storedState.getAssetName).getOrElse(AssetPair.WavesName)
+    asset.map(storedState().getAssetName).getOrElse(AssetPair.WavesName)
 
   def createOrderBook(pair: AssetPair): ActorRef = {
-    def getAssetName(asset: Option[AssetId]): String = asset.map(storedState.getAssetName).getOrElse(AssetPair.WavesName)
+    val s = storedState()
+    def getAssetName(asset: Option[AssetId]): String = asset.map(s.getAssetName).getOrElse(AssetPair.WavesName)
 
     val md = MarketData(pair, getAssetName(pair.amountAsset), getAssetName(pair.priceAsset), NTP.correctedTime(),
-      pair.amountAsset.flatMap(storedState.getIssueTransaction).map(t => AssetInfo(t.decimals)),
-      pair.priceAsset.flatMap(storedState.getIssueTransaction).map(t => AssetInfo(t.decimals)))
+      pair.amountAsset.flatMap(s.getIssueTransaction).map(t => AssetInfo(t.decimals)),
+      pair.priceAsset.flatMap(s.getIssueTransaction).map(t => AssetInfo(t.decimals)))
     tradedPairs += pair -> md
 
     context.actorOf(OrderBookActor.props(pair, orderHistory, storedState, settings, wallet, utx, allChannels, history, functionalitySettings),
@@ -45,10 +47,11 @@ class MatcherActor(orderHistory: ActorRef, storedState: StateReader, wallet: Wal
   }
 
   def basicValidation(msg: {def assetPair: AssetPair}): Validation = {
+    val s = storedState()
     def isAssetsExist: Validation = {
-      msg.assetPair.priceAsset.forall(storedState.assetExists(_)) :|
+      msg.assetPair.priceAsset.forall(s.assetExists(_)) :|
         s"Unknown Asset ID: ${msg.assetPair.priceAssetStr}" &&
-        msg.assetPair.amountAsset.forall(storedState.assetExists(_)) :|
+        msg.assetPair.amountAsset.forall(s.assetExists(_)) :|
           s"Unknown Asset ID: ${msg.assetPair.amountAssetStr}"
     }
 
@@ -60,10 +63,11 @@ class MatcherActor(orderHistory: ActorRef, storedState: StateReader, wallet: Wal
 
     val isCorrectOrder = if (tradedPairs.contains(aPair)) true
     else if (tradedPairs.contains(reversePair)) false
-    else if (settings.priceAssets.contains(aPair.priceAssetStr) &&
-      !settings.priceAssets.contains(aPair.amountAssetStr)) true
-    else if (settings.priceAssets.contains(reversePair.priceAssetStr) &&
-      !settings.priceAssets.contains(reversePair.amountAssetStr)) false
+    else if (settings.priceAssets.contains(aPair.priceAssetStr) && settings.priceAssets.contains(aPair.amountAssetStr)) {
+      settings.priceAssets.indexOf(aPair.priceAssetStr) < settings.priceAssets.indexOf(aPair.amountAssetStr)
+    }
+    else if (settings.priceAssets.contains(aPair.priceAssetStr)) true
+    else if (settings.priceAssets.contains(reversePair.priceAssetStr)) false
     else compare(aPair.priceAsset.map(_.arr), aPair.amountAsset.map(_.arr)) < 0
 
     isCorrectOrder :| s"Invalid AssetPair ordering, should be reversed: $reversePair"
@@ -80,6 +84,15 @@ class MatcherActor(orderHistory: ActorRef, storedState: StateReader, wallet: Wal
       !settings.blacklistedAssets.contains(aPair.amountAssetStr) :| s"Invalid Asset ID: ${aPair.amountAssetStr}"
   }
 
+  def checkBlacklistedAddress(address: Address)(f: => Unit): Unit = {
+    val v =  !settings.blacklistedAdresses.contains(address.address) :| s"Invalid Address: ${address.address}"
+    if (!v) {
+      sender() ! StatusCodeMatcherResponse(StatusCodes.Forbidden, v.messages())
+    } else {
+      f
+    }
+  }
+
   def createAndForward(order: Order): Unit = {
     val orderBook = createOrderBook(order.assetPair)
     persistAsync(OrderBookCreated(order.assetPair)) { _ =>
@@ -94,19 +107,15 @@ class MatcherActor(orderHistory: ActorRef, storedState: StateReader, wallet: Wal
   def forwardReq(req: Any)(orderBook: ActorRef): Unit = orderBook forward req
 
   def checkAssetPair[A <: {def assetPair : AssetPair}](msg: A)(f: => Unit): Unit = {
-    if (tradedPairs.contains(msg.assetPair)) {
-      f
+    val v =  checkBlacklistId(msg.assetPair) && basicValidation(msg) && checkBlacklistRegex(msg.assetPair)
+    if (!v) {
+      sender() ! StatusCodeMatcherResponse(StatusCodes.NotFound, v.messages())
     } else {
-      val v =  checkBlacklistId(msg.assetPair) && basicValidation(msg) && checkBlacklistRegex(msg.assetPair)
-      if (!v) {
-        sender() ! StatusCodeMatcherResponse(StatusCodes.NotFound, v.messages())
+      val ov = checkPairOrdering(msg.assetPair)
+      if (!ov) {
+        sender() ! StatusCodeMatcherResponse(StatusCodes.Found, ov.messages())
       } else {
-        val ov = checkPairOrdering(msg.assetPair)
-        if (!ov) {
-          sender() ! StatusCodeMatcherResponse(StatusCodes.Found, ov.messages())
-        } else {
-          f
-        }
+        f
       }
     }
   }
@@ -120,8 +129,10 @@ class MatcherActor(orderHistory: ActorRef, storedState: StateReader, wallet: Wal
       sender() ! GetMarketsResponse(getMatcherPublicKey, tradedPairs.values.toSeq)
     case order: Order =>
       checkAssetPair(order) {
-        context.child(OrderBookActor.name(order.assetPair))
-          .fold(createAndForward(order))(forwardReq(order))
+        checkBlacklistedAddress(order.senderPublicKey) {
+          context.child(OrderBookActor.name(order.assetPair))
+            .fold(createAndForward(order))(forwardReq(order))
+        }
       }
     case ob: DeleteOrderBookRequest =>
       checkAssetPair(ob) {

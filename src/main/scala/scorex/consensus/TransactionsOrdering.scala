@@ -8,7 +8,7 @@ object TransactionsOrdering {
     private def orderBy(t: Transaction): (Long, Long, String) = {
       val byFee = if (t.assetFee._1.nonEmpty) 0 else -t.assetFee._2
       val byTimestamp = txTimestampOrder(t.timestamp)
-      val byTxId = t.id.base58
+      val byTxId = t.id().base58
 
       (byFee, byTimestamp, byTxId)
     }

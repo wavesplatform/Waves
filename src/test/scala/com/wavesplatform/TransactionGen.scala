@@ -14,7 +14,7 @@ import scorex.utils.NTP
 
 trait TransactionGen {
 
-  def byteArrayGen(length: Int): Gen[Array[Byte]] = Gen.listOfN(length, Arbitrary.arbitrary[Byte]).map(_.toArray)
+  def byteArrayGen(length: Int): Gen[Array[Byte]] = Gen.containerOfN[Array, Byte](length, Arbitrary.arbitrary[Byte])
 
   val bytes32gen: Gen[Array[Byte]] = byteArrayGen(32)
   val bytes64gen: Gen[Array[Byte]] = byteArrayGen(64)
@@ -102,13 +102,13 @@ trait TransactionGen {
     (sender, amount, fee, timestamp, recipient) <- leaseParamGen
     lease = LeaseTransaction.create(sender, amount, fee, timestamp, recipient).right.get
     cancelFee <- smallFeeGen
-  } yield (lease, LeaseCancelTransaction.create(sender, lease.id, cancelFee, timestamp + 1).right.get)
+  } yield (lease, LeaseCancelTransaction.create(sender, lease.id(), cancelFee, timestamp + 1).right.get)
 
   def leaseAndCancelGeneratorP(leaseSender: PrivateKeyAccount, recipient: AddressOrAlias, unleaseSender: PrivateKeyAccount): Gen[(LeaseTransaction, LeaseCancelTransaction)] = for {
     (_, amount, fee, timestamp, _) <- leaseParamGen
     lease = LeaseTransaction.create(leaseSender, amount, fee, timestamp, recipient).right.get
     fee2 <- smallFeeGen
-    unlease = LeaseCancelTransaction.create(unleaseSender, lease.id, fee2, timestamp + 1).right.get
+    unlease = LeaseCancelTransaction.create(unleaseSender, lease.id(), fee2, timestamp + 1).right.get
   } yield (lease, unlease)
 
   val twoLeasesGen: Gen[(LeaseTransaction, LeaseTransaction)] = for {
@@ -125,7 +125,7 @@ trait TransactionGen {
     lease = LeaseTransaction.create(sender, amount, fee, timestamp, recipient).right.get
     fee2 <- smallFeeGen
     timestamp2 <- positiveLongGen
-  } yield (lease, LeaseCancelTransaction.create(otherSender, lease.id, fee2, timestamp2).right.get)
+  } yield (lease, LeaseCancelTransaction.create(otherSender, lease.id(), fee2, timestamp2).right.get)
 
   val leaseGen: Gen[LeaseTransaction] = leaseAndCancelGen.map(_._1)
   val leaseCancelGen: Gen[LeaseCancelTransaction] = leaseAndCancelGen.map(_._2)
@@ -146,6 +146,20 @@ trait TransactionGen {
     (_, _, _, amount, timestamp, _, feeAmount, attachment) <- transferParamGen
   } yield TransferTransaction.create(assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment).right.get
 
+  def transferGeneratorP(timestamp: Long, sender: PrivateKeyAccount, recipient: AddressOrAlias,
+                         assetId: Option[AssetId], feeAssetId: Option[AssetId]): Gen[TransferTransaction]  = for {
+    (_, _, _, amount, _, _, feeAmount, attachment) <- transferParamGen
+  } yield TransferTransaction.create(assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment).right.get
+
+  def wavesTransferGeneratorP(sender: PrivateKeyAccount, recipient: AddressOrAlias): Gen[TransferTransaction] =
+    transferGeneratorP(sender, recipient, None, None)
+
+  def wavesTransferGeneratorP(timestamp: Long, sender: PrivateKeyAccount, recipient: AddressOrAlias): Gen[TransferTransaction] =
+    transferGeneratorP(timestamp, sender, recipient, None, None)
+
+  def createWavesTransfer(sender: PrivateKeyAccount, recipient: Address,
+                          amount: Long, fee: Long, timestamp: Long): Either[ValidationError, TransferTransaction] =
+    TransferTransaction.create(None, sender, recipient, amount, timestamp, None, fee, Array())
 
   val transferGen = (for {
     (assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment) <- transferParamGen
@@ -199,8 +213,8 @@ trait TransactionGen {
     fee <- smallFeeGen
   } yield {
     val issue = IssueTransaction.create(sender, assetName, description, issueQuantity, decimals, reissuable, iFee, timestamp).right.get
-    val reissue = ReissueTransaction.create(sender, issue.assetId, reissueQuantity, reissuable2, fee, timestamp).right.get
-    val burn = BurnTransaction.create(sender, issue.assetId, burnAmount, fee, timestamp).right.get
+    val reissue = ReissueTransaction.create(sender, issue.assetId(), reissueQuantity, reissuable2, fee, timestamp).right.get
+    val burn = BurnTransaction.create(sender, issue.assetId(), burnAmount, fee, timestamp).right.get
     (issue, reissue, burn)
   }
 
@@ -209,8 +223,8 @@ trait TransactionGen {
     fee <- smallFeeGen
   } yield {
     val issue = IssueTransaction.create(sender, assetName, description, quantity, decimals, reissuable = true, iFee, timestamp).right.get
-    val reissue1 = ReissueTransaction.create(sender, issue.assetId, quantity, reissuable = false, fee, timestamp).right.get
-    val reissue2 = ReissueTransaction.create(sender, issue.assetId, quantity, reissuable = true, fee, timestamp + 1).right.get
+    val reissue1 = ReissueTransaction.create(sender, issue.assetId(), quantity, reissuable = false, fee, timestamp).right.get
+    val reissue2 = ReissueTransaction.create(sender, issue.assetId(), quantity, reissuable = true, fee, timestamp + 1).right.get
     (issue, reissue1, reissue2)
   }
 

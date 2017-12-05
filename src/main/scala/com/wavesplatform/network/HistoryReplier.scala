@@ -1,16 +1,41 @@
 package com.wavesplatform.network
 
+import com.google.common.cache.{CacheBuilder, CacheLoader}
+import com.wavesplatform.network.MicroBlockSynchronizer.MicroBlockSignature
+import com.wavesplatform.settings.SynchronizationSettings
+import com.wavesplatform.state2.ByteStr
 import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel.{ChannelHandlerContext, ChannelInboundHandlerAdapter}
-import scorex.transaction.{History}
+import monix.eval.Task
+import monix.execution.Scheduler
+import monix.execution.schedulers.SchedulerService
+import scorex.transaction.NgHistory
 import scorex.utils.ScorexLogging
 
 @Sharable
-class HistoryReplier(history: History, maxChainLength: Int) extends ChannelInboundHandlerAdapter with ScorexLogging {
+class HistoryReplier(history: NgHistory, settings: SynchronizationSettings) extends ChannelInboundHandlerAdapter with ScorexLogging {
+  private lazy val historyReplierSettings = settings.historyReplierSettings
+
+  private implicit val scheduler: SchedulerService = Scheduler.fixedPool(name = "history-replier", poolSize = 2)
+
+  private val knownMicroBlocks = CacheBuilder.newBuilder()
+    .maximumSize(historyReplierSettings.maxMicroBlockCacheSize)
+    .build(new CacheLoader[MicroBlockSignature, Array[Byte]] {
+      override def load(key: MicroBlockSignature) =
+        history.microBlock(key)
+          .map(m => MicroBlockResponseMessageSpec.serializeData(MicroBlockResponse(m))).get
+    })
+
+  private val knownBlocks = CacheBuilder.newBuilder()
+    .maximumSize(historyReplierSettings.maxBlockCacheSize)
+    .build(new CacheLoader[ByteStr, Array[Byte]] {
+      override def load(key: ByteStr) = history.heightOf(key).flatMap(history.blockBytes).get
+    })
+
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
-    case GetSignatures(otherSigs) =>
+    case GetSignatures(otherSigs) => Task {
       otherSigs.view
-        .map(parent => parent -> history.blockIdsAfter(parent, maxChainLength))
+        .map(parent => parent -> history.blockIdsAfter(parent, settings.maxChainLength))
         .find(_._2.nonEmpty) match {
         case Some((parent, extension)) =>
           log.debug(s"${id(ctx)} Got GetSignatures with ${otherSigs.length}, found common parent $parent and sending ${extension.length} more signatures")
@@ -22,14 +47,21 @@ class HistoryReplier(history: History, maxChainLength: Int) extends ChannelInbou
         case _ =>
           log.debug(s"${id(ctx)} Got GetSignatures with ${otherSigs.length} signatures, but could not find an extension")
       }
+    }.runAsyncLogErr
 
-    case GetBlock(sig) =>
-      for (h <- history.heightOf(sig); bytes <- history.blockBytes(h)) {
-        ctx.writeAndFlush(RawBytes(BlockMessageSpec.messageCode, bytes))
-      }
+    case GetBlock(sig) => Task(knownBlocks.get(sig)).map(bytes =>
+      ctx.writeAndFlush(RawBytes(BlockMessageSpec.messageCode, bytes)))
+      .runAsyncLogErr
 
-    case _: Handshake =>
+    case mbr@MicroBlockRequest(totalResBlockSig) =>
+      Task(knownMicroBlocks.get(totalResBlockSig)).map { bytes =>
+        ctx.writeAndFlush(RawBytes(MicroBlockResponseMessageSpec.messageCode, bytes))
+        log.trace(id(ctx) + s"Sent MicroBlockResponse(total=${totalResBlockSig.trim})")
+      }.runAsyncLogErr
+
+    case _: Handshake => Task {
       ctx.writeAndFlush(LocalScoreChanged(history.score()))
+    }.runAsyncLogErr
 
     case _ => super.channelRead(ctx, msg)
   }

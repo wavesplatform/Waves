@@ -3,7 +3,7 @@ package com.wavesplatform.state2.diffs
 
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.Diff
-import com.wavesplatform.state2.reader.StateReader
+import com.wavesplatform.state2.reader.SnapshotStateReader
 import scorex.transaction.ValidationError.UnsupportedTransactionType
 import scorex.transaction._
 import scorex.transaction.assets._
@@ -14,9 +14,9 @@ object TransactionDiffer {
 
   case class TransactionValidationError(cause: ValidationError,tx: Transaction) extends ValidationError
 
-  def apply(settings: FunctionalitySettings, prevBlockTimestamp: Option[Long], currentBlockTimestamp: Long, currentBlockHeight: Int)(s: StateReader, tx: Transaction): Either[ValidationError, Diff] = {
+  def apply(settings: FunctionalitySettings, prevBlockTimestamp: Option[Long], currentBlockTimestamp: Long, currentBlockHeight: Int)(s: SnapshotStateReader, tx: Transaction): Either[ValidationError, Diff] = {
     for {
-      t0 <- Signed.validateSignatures(tx)
+      t0 <- tx.signaturesValid()
       t1 <- CommonValidation.disallowTxFromFuture(settings, currentBlockTimestamp, t0)
       t2 <- CommonValidation.disallowTxFromPast(prevBlockTimestamp, t1)
       t3 <- CommonValidation.disallowBeforeActivationTime(settings, t2)
@@ -35,7 +35,7 @@ object TransactionDiffer {
         case atx: CreateAliasTransaction => CreateAliasTransactionDiff(currentBlockHeight)(atx)
         case _ => Left(UnsupportedTransactionType)
       }
-      positiveDiff <- BalanceDiffValidation(s, currentBlockTimestamp, settings)(diff)
+      positiveDiff <- BalanceDiffValidation(s, settings)(diff)
     } yield positiveDiff
   }.left.map(TransactionValidationError(_, tx))
 }

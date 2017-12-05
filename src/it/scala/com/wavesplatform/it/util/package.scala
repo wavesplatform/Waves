@@ -22,7 +22,7 @@ package object util {
                      (implicit ec: ExecutionContext): Future[A] =
       f.flatMap(v => if (cond(v)) Future.successful(v) else schedule(retryUntil(f, cond, retryInterval), retryInterval))
   }
-  implicit class LongExt(val l: Long) extends AnyVal {
-    def waves: Long = l * Constants.UnitsInWave
+  implicit class DoubleExt(val d: Double) extends AnyVal {
+    def waves: Long = (d * Constants.UnitsInWave).toLong
   }
 }

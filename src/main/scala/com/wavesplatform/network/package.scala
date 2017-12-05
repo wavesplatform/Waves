@@ -3,13 +3,17 @@ package com.wavesplatform
 import java.net.{InetSocketAddress, SocketAddress, URI}
 import java.util.concurrent.Callable
 
+import cats.Eq
 import com.wavesplatform.state2.ByteStr
-import io.netty.channel.group.{ChannelGroup, ChannelMatchers}
+import io.netty.channel.group.{ChannelGroup, ChannelGroupFuture}
 import io.netty.channel.local.LocalAddress
 import io.netty.channel.socket.SocketChannel
 import io.netty.channel.{Channel, ChannelHandlerContext}
 import io.netty.util.NetUtil.toSocketAddressString
 import io.netty.util.concurrent.{EventExecutorGroup, ScheduledFuture}
+import monix.eval.Coeval
+import monix.execution.Scheduler
+import monix.reactive.Observable
 import scorex.block.Block
 import scorex.transaction.Transaction
 import scorex.utils.ScorexLogging
@@ -33,8 +37,9 @@ package object network extends ScorexLogging {
 
   private def formatAddress(sa: SocketAddress) = sa match {
     case null => ""
-    case l: LocalAddress => s" ${l.toString}"
+    case l: LocalAddress => s" $l"
     case isa: InetSocketAddress => s" ${toSocketAddressString(isa)}"
+    case x => s" $x" // For EmbeddedSocketAddress
   }
 
   def id(ctx: ChannelHandlerContext): String = id(ctx.channel())
@@ -43,21 +48,49 @@ package object network extends ScorexLogging {
 
   def formatBlocks(blocks: Seq[Block]): String = formatSignatures(blocks.view.map(_.uniqueId))
 
-  def formatSignatures(signatures: Seq[ByteStr]): String = if (signatures.isEmpty) ""
-    else if (signatures.size == 1) s"[${signatures.head}]"
-    else s"[${signatures.head}..${signatures.last}]"
+  def formatSignatures(signatures: Seq[ByteStr]): String = if (signatures.isEmpty) "[Empty]"
+  else if (signatures.size == 1) s"[${signatures.head.trim}]"
+  else s"(total=${signatures.size}) [${signatures.head.trim} -- ${signatures.last.trim}]"
+
+  implicit val channelEq: Eq[Channel] = Eq.fromUniversalEquals
 
   implicit class ChannelHandlerContextExt(val ctx: ChannelHandlerContext) extends AnyVal {
     def remoteAddress: InetSocketAddress = ctx.channel().asInstanceOf[SocketChannel].remoteAddress()
   }
 
   implicit class ChannelGroupExt(val allChannels: ChannelGroup) extends AnyVal {
-    def broadcast(message: AnyRef, except: Option[Channel] = None): Unit = {
-      log.trace(s"Broadcasting $message to ${allChannels.size()} channels${except.fold("")(c => s" (except ${id(c)})")}")
-      allChannels.writeAndFlush(message, except.fold(ChannelMatchers.all())(ChannelMatchers.isNot))
+    def broadcast(message: AnyRef, except: Option[Channel] = None): Unit = broadcast(message, except.toSet)
+
+    def broadcast(message: AnyRef, except: Set[Channel]): ChannelGroupFuture = {
+      message match {
+        case RawBytes(TransactionMessageSpec.messageCode, _) =>
+        case _ =>
+          val exceptMsg = if (except.isEmpty) "" else s" (except ${except.map(id(_)).mkString(", ")})"
+          log.trace(s"Broadcasting $message to ${allChannels.size()} channels$exceptMsg")
+      }
+
+      allChannels.writeAndFlush(message, { (channel: Channel) => !except.contains(channel) })
     }
 
-    def broadcastTx(tx:Transaction, except: Option[Channel] = None): Unit =
-      allChannels.broadcast(RawBytes(TransactionMessageSpec.messageCode, tx.bytes), except)
+    def broadcastTx(tx: Transaction, except: Option[Channel] = None): Unit =
+      allChannels.broadcast(RawBytes(TransactionMessageSpec.messageCode, tx.bytes()), except)
+  }
+
+  type ChannelObservable[A] = Observable[(Channel, A)]
+
+  def lastObserved[A](o: Observable[A])(implicit s: Scheduler): Coeval[Option[A]] = {
+    @volatile var last = Option.empty[A]
+    o.foreach(a => last = Some(a))
+    Coeval(last)
+  }
+
+  def newItems[A](o: Observable[A])(implicit s: Scheduler): Coeval[Seq[A]] = {
+    @volatile var collected = Seq.empty[A]
+    o.foreach(a => collected = collected :+ a)
+    Coeval {
+      val r = collected
+      collected = Seq.empty
+      r
+    }
   }
 }

@@ -1,7 +1,7 @@
 package com.wavesplatform.state2.diffs
 
 import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state2.reader.StateReader
+import com.wavesplatform.state2.reader.SnapshotStateReader
 import com.wavesplatform.state2.{AssetInfo, Diff, LeaseInfo, Portfolio}
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction}
@@ -20,11 +20,11 @@ object AssetTransactionsDiff {
       portfolios = Map(tx.sender.toAddress -> Portfolio(
         balance = -tx.fee,
         leaseInfo = LeaseInfo.empty,
-        assets = Map(tx.assetId -> tx.quantity))),
-      assetInfos = Map(tx.assetId -> info)))
+        assets = Map(tx.assetId() -> tx.quantity))),
+      assetInfos = Map(tx.assetId() -> info)))
   }
 
-  def reissue(state: StateReader, settings: FunctionalitySettings, blockTime: Long, height: Int)(tx: ReissueTransaction): Either[ValidationError, Diff] = {
+  def reissue(state: SnapshotStateReader, settings: FunctionalitySettings, blockTime: Long, height: Int)(tx: ReissueTransaction): Either[ValidationError, Diff] = {
     findReferencedAsset(tx, state, tx.assetId).flatMap(itx => {
       val oldInfo = state.assetInfo(tx.assetId).get
       if (oldInfo.isReissuable || blockTime <= settings.allowInvalidReissueInSameBlockUntilTimestamp) {
@@ -44,7 +44,7 @@ object AssetTransactionsDiff {
     })
   }
 
-  def burn(state: StateReader, height: Int)(tx: BurnTransaction): Either[ValidationError, Diff] = {
+  def burn(state: SnapshotStateReader, height: Int)(tx: BurnTransaction): Either[ValidationError, Diff] = {
     findReferencedAsset(tx, state, tx.assetId).map(itx => {
       Diff(height = height,
         tx = tx,
@@ -56,7 +56,7 @@ object AssetTransactionsDiff {
     })
   }
 
-  private def findReferencedAsset(tx: SignedTransaction, state: StateReader, assetId: AssetId): Either[ValidationError, IssueTransaction] = {
+  private def findReferencedAsset(tx: SignedTransaction, state: SnapshotStateReader, assetId: AssetId): Either[ValidationError, IssueTransaction] = {
     state.findTransaction[IssueTransaction](assetId) match {
       case None => Left(GenericError("Referenced assetId not found"))
       case Some(itx) if !(itx.sender equals tx.sender) => Left(GenericError("Asset was issued by other address"))

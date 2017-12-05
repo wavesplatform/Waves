@@ -2,6 +2,7 @@ package scorex.transaction
 
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import com.wavesplatform.state2.ByteStr
+import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.Address
 import scorex.crypto.hash.FastCryptographicHash._
@@ -14,22 +15,20 @@ case class GenesisTransaction private(recipient: Address, amount: Long, timestam
   import GenesisTransaction._
 
   override val assetFee: (Option[AssetId], Long) = (None, 0)
-  override val id: ByteStr = signature
+  override val id: Coeval[AssetId] = Coeval.evalOnce(signature)
 
   val transactionType = TransactionType.GenesisTransaction
 
-  lazy val creator: Option[Address] = None
-
-  lazy val json: JsObject =
+  override val json: Coeval[JsObject] = Coeval.evalOnce(
     Json.obj("type" -> transactionType.id,
-      "id" -> id.base58,
+      "id" -> id().base58,
       "fee" -> 0,
       "timestamp" -> timestamp,
       "signature" -> this.signature.base58,
       "recipient" -> recipient.address,
-      "amount" -> amount)
+      "amount" -> amount))
 
-  lazy val bytes: Array[Byte] = {
+  override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce {
     val typeBytes = Array(transactionType.id.toByte)
     val timestampBytes = Bytes.ensureCapacity(Longs.toByteArray(timestamp), TimestampLength, 0)
     val amountBytes = Bytes.ensureCapacity(Longs.toByteArray(amount), AmountLength, 0)
@@ -40,7 +39,7 @@ case class GenesisTransaction private(recipient: Address, amount: Long, timestam
     res
   }
 
-  override lazy val signatureValid: Boolean = true
+  val signatureValid: Coeval[Boolean] = Coeval.evalOnce(true)
 }
 
 
@@ -84,7 +83,7 @@ object GenesisTransaction extends {
 
   def create(recipient: Address, amount: Long, timestamp: Long): Either[ValidationError, GenesisTransaction] = {
     if (amount < 0) {
-      Left(ValidationError.NegativeAmount)
+      Left(ValidationError.NegativeAmount(amount, "waves"))
     } else {
       val signature = ByteStr(GenesisTransaction.generateSignature(recipient, amount, timestamp))
       Right(GenesisTransaction(recipient, amount, timestamp, signature))

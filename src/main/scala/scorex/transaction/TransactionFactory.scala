@@ -11,16 +11,8 @@ import scorex.transaction.assets._
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.utils.Time
 import scorex.wallet.Wallet
-import scorex.waves.transaction.SignedPaymentRequest
 
 object TransactionFactory {
-
-  def createPayment(request: PaymentRequest, wallet: Wallet, time: Time): Either[ValidationError, PaymentTransaction] = for {
-    pk <- wallet.findWallet(request.sender)
-    rec <- Address.fromString(request.recipient)
-    tx <- PaymentTransaction.create(pk, rec, request.amount, request.fee, time.getTimestamp())
-  } yield tx
-
 
   def transferAsset(request: TransferRequest, wallet: Wallet, time: Time): Either[ValidationError, TransferTransaction] =
     for {
@@ -75,12 +67,4 @@ object TransactionFactory {
     pk <- wallet.findWallet(request.sender)
     tx <- BurnTransaction.create(pk, ByteStr.decodeBase58(request.assetId).get, request.quantity, request.fee, time.getTimestamp())
   } yield tx
-
-  def broadcastPayment(payment: SignedPaymentRequest): Either[ValidationError, PaymentTransaction] =
-    for {
-      _signature <- ByteStr.decodeBase58(payment.signature).toOption.toRight(ValidationError.InvalidRequestSignature)
-      _sender <- PublicKeyAccount.fromBase58String(payment.senderPublicKey)
-      _recipient <- Address.fromString(payment.recipient)
-      tx <- PaymentTransaction.create(_sender, _recipient, payment.amount, payment.fee, payment.timestamp, _signature)
-    } yield tx
 }

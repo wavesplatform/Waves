@@ -55,6 +55,8 @@ class OrderHistoryActor(val settings: MatcherSettings, val utxPool: UtxPool, val
       sender() ! GetOrderStatusResponse(orderHistory.orderStatus(id))
     case GetTradableBalance(assetPair, addr, _) =>
       sender() ! getPairTradableBalance(assetPair, addr)
+    case GetMatcherBalance(addr, _) =>
+      sender() ! getMatcherBalance(addr)
   }
 
   override def receive: Receive = {
@@ -82,7 +84,7 @@ class OrderHistoryActor(val settings: MatcherSettings, val utxPool: UtxPool, val
   def fetchAllOrderHistory(req: GetAllOrderHistory): Unit = {
     val res: Seq[(String, OrderInfo, Option[Order])] =
       orderHistory.getAllOrdersByAddress(req.address)
-        .map(id => (id, orderHistory.orderInfo(id), orderHistory.order(id))).toSeq.sortBy(_._3.map(_.timestamp).getOrElse(-1L))
+        .map(id => (id, orderHistory.orderInfo(id), orderHistory.order(id))).sortBy(_._3.map(_.timestamp).getOrElse(-1L)).take(settings.restOrderLimit)
     sender() ! GetOrderHistoryResponse(res)
   }
 
@@ -103,6 +105,8 @@ class OrderHistoryActor(val settings: MatcherSettings, val utxPool: UtxPool, val
       assetPair.priceAssetStr -> bal._2
     ))
   }
+
+  def getMatcherBalance(addr: String): GetMatcherBalanceResponse = GetMatcherBalanceResponse(orderHistory.openVolumes(addr))
 
   def deleteFromOrderHistory(req: DeleteOrderFromHistory): Unit = {
     orderHistory.orderStatus(req.id) match {
@@ -169,5 +173,16 @@ object OrderHistoryActor {
   case class GetTradableBalanceResponse(balances: Map[String, Long]) extends MatcherResponse {
     val json: JsObject = JsObject(balances.map{ case (k, v) => (k, JsNumber(v)) })
     val code = StatusCodes.OK
+  }
+
+  case class GetMatcherBalance(address: String, ts: Long) extends ExpirableOrderHistoryRequest
+
+  case class GetMatcherBalanceResponse(balances: Option[Map[String, Long]]) extends MatcherResponse {
+
+    //val json = Json.obj("status" -> "OrderCancelRejected", "message" -> message)
+    //val code = StatusCodes.BadRequest
+
+    val json: JsObject = JsObject(balances.getOrElse(Map.empty).mapValues(JsNumber(_)))
+    val code = balances.map(_ => StatusCodes.OK).getOrElse(StatusCodes.NotFound)
   }
 }

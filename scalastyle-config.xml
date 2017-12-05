@@ -68,7 +68,7 @@
     </check>
     <check level="warning" class="org.scalastyle.scalariform.CyclomaticComplexityChecker" enabled="true">
         <parameters>
-            <parameter name="maximum"><![CDATA[10]]></parameter>
+            <parameter name="maximum"><![CDATA[30]]></parameter>
         </parameters>
     </check>
     <check level="warning" class="org.scalastyle.scalariform.UppercaseLChecker" enabled="true"></check>
@@ -81,7 +81,7 @@
     </check>
     <check level="warning" class="org.scalastyle.scalariform.MethodLengthChecker" enabled="true">
         <parameters>
-            <parameter name="maxLength"><![CDATA[50]]></parameter>
+            <parameter name="maxLength"><![CDATA[300]]></parameter>
         </parameters>
     </check>
     <check level="warning" class="org.scalastyle.scalariform.MethodNamesChecker" enabled="true">
