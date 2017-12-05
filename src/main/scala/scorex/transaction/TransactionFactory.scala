@@ -14,13 +14,6 @@ import scorex.wallet.Wallet
 
 object TransactionFactory {
 
-  def createPayment(request: PaymentRequest, wallet: Wallet, time: Time): Either[ValidationError, PaymentTransaction] = for {
-    pk <- wallet.findWallet(request.sender)
-    rec <- Address.fromString(request.recipient)
-    tx <- PaymentTransaction.create(pk, rec, request.amount, request.fee, time.getTimestamp())
-  } yield tx
-
-
   def transferAsset(request: TransferRequest, wallet: Wallet, time: Time): Either[ValidationError, TransferTransaction] =
     for {
       senderPrivateKey <- wallet.findWallet(request.sender)

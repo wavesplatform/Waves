@@ -33,7 +33,7 @@ case class PaymentApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPo
       value = "Json with data",
       required = true,
       paramType = "body",
-      dataType = "scorex.api.http.assets.PaymentRequest",
+      dataType = "scorex.api.http.assets.TransferRequest",
       defaultValue = "{\n\t\"amount\":400,\n\t\"fee\":1,\n\t\"sender\":\"senderId\",\n\t\"recipient\":\"recipientId\"\n}"
     )
   ))

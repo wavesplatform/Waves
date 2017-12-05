@@ -410,4 +410,10 @@ object NodeApi extends ScorexLogging {
 
   implicit val blacklistedPeerFormat: Format[BlacklistedPeer] = Json.format
 
+  // Obsolete payment request
+  case class PaymentRequest(amount: Long, fee: Long, sender: String, recipient: String)
+
+  object PaymentRequest {
+    implicit val paymentFormat: Format[PaymentRequest] = Json.format
+  }
 }
