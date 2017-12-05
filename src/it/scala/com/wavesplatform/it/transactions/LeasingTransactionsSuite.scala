@@ -2,6 +2,8 @@ package com.wavesplatform.it.transactions
 
 import com.wavesplatform.it.util._
 import org.scalatest.CancelAfterFailure
+import play.api.libs.json.Json
+import scorex.transaction.lease.LeaseTransaction
 
 import scala.concurrent.Await
 import scala.concurrent.Future.traverse
@@ -65,6 +67,11 @@ class LeasingTransactionsSuite extends BaseTransactionSuite with CancelAfterFail
 
 
   test("lease cancellation reverts eff.b. changes; lessor pays fee for both lease and cancellation") {
+    import LeaseTransaction.Status._
+    def status(txId: String) = sender.get(s"/transactions/info/$txId").map { r =>
+      (Json.parse(r.getResponseBody) \ "status").as[String]
+    }
+
     val f = for {
       _ <- assertBalances(firstAddress, 90.waves, 80.waves)
         .zip(assertBalances(secondAddress, 100.waves, 110.waves))
@@ -75,10 +82,16 @@ class LeasingTransactionsSuite extends BaseTransactionSuite with CancelAfterFail
       _ <- assertBalances(firstAddress, 85.waves, 5.waves)
         .zip(assertBalances(secondAddress, 100.waves, 180.waves))
 
+      status1 <- status(createdLeaseTxId)
+      _ = assert(status1 == Active.toString)
+
       createdCancelLeaseTxId <- sender.cancelLease(firstAddress, createdLeaseTxId, fee = 5.waves).map(_.id)
       _ <- waitForHeightAraiseAndTxPresent(createdCancelLeaseTxId, 1)
       _ <- assertBalances(firstAddress, 80.waves, 70.waves)
         .zip(assertBalances(secondAddress, 100.waves, 110.waves))
+
+      status2 <- status(createdLeaseTxId)
+      _ = assert(status2 == Canceled.toString)
     } yield succeed
 
     Await.result(f, waitCompletion)
