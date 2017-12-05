@@ -33,8 +33,9 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
         |      {amountAsset = "DHgwrRvVyqJsepd32YbBqUeDH4GJ1N984X8QoekjgH8J", priceAsset = "8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS"},
         |    ]
         |    max-timestamp-diff = 3h
-        |    blacklisted-assets: []
-        |    blacklisted-names: []
+        |    blacklisted-assets: ["a"]
+        |    blacklisted-names: ["b"]
+        |    blacklisted-addresses: ["c"]
         |  }
         |}""".stripMargin))
 
@@ -57,5 +58,8 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
       AssetPair.createAssetPair("DHgwrRvVyqJsepd32YbBqUeDH4GJ1N984X8QoekjgH8J", "WAVES").get,
       AssetPair.createAssetPair("DHgwrRvVyqJsepd32YbBqUeDH4GJ1N984X8QoekjgH8J", "8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS").get
     ))
+    settings.blacklistedAssets shouldBe Set("a")
+    settings.blacklistedNames.map(_.pattern.pattern()) shouldBe Seq("b")
+    settings.blacklistedAdresses shouldBe Set("c")
   }
 }

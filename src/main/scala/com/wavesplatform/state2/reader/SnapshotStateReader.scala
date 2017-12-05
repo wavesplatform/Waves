@@ -139,8 +139,7 @@ object SnapshotStateReader {
             case None =>
               Snapshot(0, 0, 0) +: list
           }
-        }
-        else {
+        } else {
           s.snapshotAtHeight(acc, deeperHeight) match {
             case Some(snapshot) =>
               if (deeperHeight <= bottomNotIncluded)

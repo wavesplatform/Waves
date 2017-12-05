@@ -16,8 +16,9 @@ import monix.eval.Task
 import monix.execution.Scheduler
 import scorex.account.Address
 import scorex.consensus.TransactionsOrdering
-import scorex.transaction.ValidationError.GenericError
+import scorex.transaction.ValidationError.{GenericError, SenderIsBlacklisted}
 import scorex.transaction._
+import scorex.transaction.assets.TransferTransaction
 import scorex.utils.{ScorexLogging, Time}
 
 import scala.collection.JavaConverters._
@@ -98,6 +99,7 @@ class UtxPoolImpl(time: Time,
           val s = stateReader()
           val res = for {
             _ <- Either.cond(transactions.size < utxSettings.maxSize, (), GenericError("Transaction pool size limit is reached"))
+            _ <- checkNotBlacklisted(tx)
             _ <- feeCalculator.enoughFee(tx)
             diff <- TransactionDiffer(fs, history.lastBlockTimestamp(), time.correctedTime(), s.height)(s, tx)
           } yield {
@@ -110,6 +112,31 @@ class UtxPoolImpl(time: Time,
           res.right.map(_ => true)
       }
     })
+  }
+
+  private def checkNotBlacklisted(tx: Transaction): Either[ValidationError, Unit] = {
+    if (utxSettings.blacklistSenderAddresses.isEmpty) {
+      Right(())
+    } else {
+      val sender: Option[String] = tx match {
+        case x: SignedTransaction => Some(x.sender.address)
+        case x: PaymentTransaction => Some(x.sender.address)
+        case _ => None
+      }
+
+      val recipient: Option[String] = tx match {
+        case x: TransferTransaction => Some(x.recipient.stringRepr)
+        case _ => None
+      }
+
+      sender match {
+        case None => Right(())
+        case Some(addr) =>
+          val blacklist = utxSettings.blacklistSenderAddresses.contains(addr)
+          lazy val allowBlacklisted = recipient.exists(utxSettings.allowBlacklistedTransferTo.contains)
+          if (blacklist && !allowBlacklisted) Left(SenderIsBlacklisted(addr)) else Right(())
+      }
+    }
   }
 
   override def removeAll(txs: Traversable[Transaction]): Unit = {
