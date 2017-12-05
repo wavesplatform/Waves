@@ -80,24 +80,27 @@ class UtxPool(time: Time,
   }
 
   private def checkNotBlacklisted(tx: Transaction): Either[ValidationError, Unit] = {
-    val sender: Option[String] = tx match {
-      case x: SignedTransaction => Some(x.sender.address)
-      case x: PaymentTransaction => Some(x.sender.address)
-      case x: GenesisTransaction => x.creator.map(_.address)
-      case _ => None
-    }
+    if (utxSettings.blacklistSenderAddresses.isEmpty) {
+      Right()
+    } else {
+      val sender: Option[String] = tx match {
+        case x: SignedTransaction => Some(x.sender.address)
+        case x: PaymentTransaction => Some(x.sender.address)
+        case _ => None
+      }
 
-    val recipient: Option[String] = tx match {
-      case x: TransferTransaction => Some(x.recipient.stringRepr)
-      case _ => None
-    }
+      val recipient: Option[String] = tx match {
+        case x: TransferTransaction => Some(x.recipient.stringRepr)
+        case _ => None
+      }
 
-    sender match {
-      case None => Right(())
-      case Some(addr) =>
-        val blacklist = utxSettings.blacklistSrcAddresses.contains(addr)
-        val allowBlacklisted = recipient.exists(utxSettings.allowBlacklistedTransferTo.contains)
-        if (blacklist && !allowBlacklisted) Left(SenderIsBlacklisted(addr)) else Right(())
+      sender match {
+        case None => Right(())
+        case Some(addr) =>
+          val blacklist = utxSettings.blacklistSenderAddresses.contains(addr)
+          lazy val allowBlacklisted = recipient.exists(utxSettings.allowBlacklistedTransferTo.contains)
+          if (blacklist && !allowBlacklisted) Left(SenderIsBlacklisted(addr)) else Right(())
+      }
     }
   }
 
