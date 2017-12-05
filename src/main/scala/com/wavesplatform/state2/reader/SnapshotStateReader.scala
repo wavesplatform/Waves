@@ -135,22 +135,23 @@ object SnapshotStateReader {
         if (deeperHeight == 0) {
           s.snapshotAtHeight(acc, 1) match {
             case Some(genesisSnapshot) =>
-              genesisSnapshot +:list
-        case None =>
+              genesisSnapshot +: list
+            case None =>
               Snapshot(0, 0, 0) +: list
           }
         } else {
-           s.snapshotAtHeight(acc, deeperHeight)match {
+          s.snapshotAtHeight(acc, deeperHeight) match {
             case Some(snapshot) =>
-          if (deeperHeight <= bottomNotIncluded)
-            snapshot +: list
-          else if (snapshot.prevHeight == deeperHeight) {
+              if (deeperHeight <= bottomNotIncluded)
+                snapshot +: list
+              else if (snapshot.prevHeight == deeperHeight) {
                 throw new Exception(s"CRITICAL: Infinite loop detected while calculating minBySnapshot: acc=$acc, atHeight=$atHeight, " +
                   s"confirmations=$confirmations; lastUpdateHeight=${s.lastUpdateHeight(acc)}; current step: deeperHeight=$deeperHeight, list.size=${list.size}")
               } else if (deeperHeight > atHeight && snapshot.prevHeight > atHeight) {
-            loop(snapshot.prevHeight, list)
-          } else
-            loop(snapshot.prevHeight, snapshot +: list)case None =>
+                loop(snapshot.prevHeight, list)
+              } else
+                loop(snapshot.prevHeight, snapshot +: list)
+            case None =>
               throw new Exception(s"CRITICAL: Cannot lookup referenced height: acc=$acc, atHeight=$atHeight, " +
                 s"confirmations=$confirmations; lastUpdateHeight=${s.lastUpdateHeight(acc)}; current step: deeperHeight=$deeperHeight, list.size=${list.size}")
           }
