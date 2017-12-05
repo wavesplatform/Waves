@@ -6,9 +6,7 @@ import cats._
 import cats.implicits._
 import com.google.common.cache.CacheBuilder
 import io.netty.channel._
-import monix.eval.Task
 import monix.execution.Scheduler
-import monix.execution.schedulers.SchedulerService
 import monix.reactive.Observable
 import scorex.transaction.History.BlockchainScore
 import scorex.utils.ScorexLogging
@@ -60,7 +58,7 @@ object RxScoreObserver extends ScorexLogging {
             remoteScores: ChannelObservable[BlockchainScore],
             channelClosed: Observable[Channel]): Observable[ChannelClosedAndSyncWith] = {
 
-    val scheduler: SchedulerService = Scheduler.singleThread("rx-score-observer")
+    val scheduler = Scheduler.singleThread("rx-score-observer")
 
     var localScore: BlockchainScore = initalLocalScore
     var currentBestChannel: Option[Channel] = None
@@ -68,33 +66,48 @@ object RxScoreObserver extends ScorexLogging {
       .expireAfterWrite(scoreTtl.toMillis, TimeUnit.MILLISECONDS)
       .build[Channel, BlockchainScore]()
 
-    val ls: Observable[Option[Channel]] = localScores.mapTask(newLocalScore => Task {
-      log.debug(s"New local score = $newLocalScore observed")
-      localScore = newLocalScore
-      None
-    })
-
-    val rs: Observable[Option[Channel]] = remoteScores.mapTask { case ((ch, score)) => Task {
-      scores.put(ch, score)
-      None
-    }
-    }
-
-    val cc: Observable[Option[Channel]] = channelClosed.mapTask(ch => Task {
-      scores.invalidate(ch)
-      if (currentBestChannel.contains(ch)) {
-        log.debug(s"${id(ch)} Best channel has been closed")
-        currentBestChannel = None
+    def ls: Observable[Option[Channel]] = localScores
+      .observeOn(scheduler)
+      .distinctUntilChanged
+      .map { x =>
+        log.debug(s"New local score: $x - $localScore = ${x - localScore}")
+        localScore = x
+        None
       }
-      Option(ch)
-    })
 
-    Observable.merge(ls, rs, cc).mapTask { maybeClosedChannel =>
-      Task {
+    // Make a stream of unique scores in each channel
+    def rs: Observable[Option[Channel]] = remoteScores
+      .observeOn(scheduler)
+      .groupBy(_._1)
+      .map(_.distinctUntilChanged)
+      .merge
+      .map { case ((ch, score)) =>
+        scores.put(ch, score)
+        log.trace(s"${id(ch)} New remote score $score")
+        None
+      }
+
+    def cc: Observable[Option[Channel]] = channelClosed
+      .observeOn(scheduler)
+      .map { ch =>
+        scores.invalidate(ch)
+        if (currentBestChannel.contains(ch)) {
+          log.debug(s"${id(ch)} Best channel has been closed")
+          currentBestChannel = None
+        }
+        Option(ch)
+      }
+
+    Observable
+      .merge(ls, rs, cc)
+      .map { maybeClosedChannel =>
         val sw = calcSyncWith(currentBestChannel, localScore, scores.asMap().asScala)
         currentBestChannel = sw.map(_.channel)
         ChannelClosedAndSyncWith(maybeClosedChannel, sw)
       }
-    }.executeOn(scheduler).logErr.distinctUntilChanged
+      .logErr
+      .distinctUntilChanged
+      .share(scheduler)
   }
+
 }

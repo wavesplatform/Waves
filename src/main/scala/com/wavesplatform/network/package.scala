@@ -3,6 +3,7 @@ package com.wavesplatform
 import java.net.{InetSocketAddress, SocketAddress, URI}
 import java.util.concurrent.Callable
 
+import cats.Eq
 import com.wavesplatform.state2.ByteStr
 import io.netty.channel.group.{ChannelGroup, ChannelGroupFuture}
 import io.netty.channel.local.LocalAddress
@@ -50,6 +51,8 @@ package object network extends ScorexLogging {
   def formatSignatures(signatures: Seq[ByteStr]): String = if (signatures.isEmpty) "[Empty]"
   else if (signatures.size == 1) s"[${signatures.head.trim}]"
   else s"(total=${signatures.size}) [${signatures.head.trim} -- ${signatures.last.trim}]"
+
+  implicit val channelEq: Eq[Channel] = Eq.fromUniversalEquals
 
   implicit class ChannelHandlerContextExt(val ctx: ChannelHandlerContext) extends AnyVal {
     def remoteAddress: InetSocketAddress = ctx.channel().asInstanceOf[SocketChannel].remoteAddress()

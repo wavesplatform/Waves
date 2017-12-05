@@ -76,13 +76,13 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     val processFork = ExtensionAppender(checkpointService, history, blockchainUpdater, stateReader, utxStorage, time, settings, featureProvider, knownInvalidBlocks, peerDatabase, miner, allChannels) _
     val processMicroBlock = MicroblockAppender(checkpointService, history, blockchainUpdater, utxStorage, allChannels, peerDatabase) _
 
-    val lastBlockInfos = blockchainUpdater.lastBlockInfo
+    import blockchainUpdater.lastBlockInfo
 
-    val network = NetworkServer(settings, lastBlockInfos, history, utxStorage, peerDatabase, allChannels, establishedConnections)
+    val network = NetworkServer(settings, lastBlockInfo, history, utxStorage, peerDatabase, allChannels, establishedConnections)
     val (signatures, blocks, blockchainScores, checkpoints, microblockInvs, microblockResponses) = network.messages
 
-    val syncWithChannelClosed = RxScoreObserver(settings.synchronizationSettings.scoreTTL, history.score(), lastBlockInfos.map(_.score), blockchainScores, network.closedChannels)
-    val microblockDatas = MicroBlockSynchronizer(settings.synchronizationSettings.microBlockSynchronizer, history, peerDatabase)(lastBlockInfos.map(_.id), microblockInvs, microblockResponses) _
+    val syncWithChannelClosed = RxScoreObserver(settings.synchronizationSettings.scoreTTL, history.score(), lastBlockInfo.map(_.score), blockchainScores, network.closedChannels)
+    val microblockDatas = MicroBlockSynchronizer(settings.synchronizationSettings.microBlockSynchronizer, history, peerDatabase)(lastBlockInfo.map(_.id), microblockInvs, microblockResponses) _
     val newBlocks = RxExtensionLoader(settings.synchronizationSettings.maxRollback, settings.synchronizationSettings.synchronizationTimeout,
       history, peerDatabase, knownInvalidBlocks, blocks, signatures, syncWithChannelClosed) { case ((c, b)) => processFork(c, b.blocks) }
 
