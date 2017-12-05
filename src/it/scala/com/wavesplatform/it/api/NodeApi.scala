@@ -170,8 +170,8 @@ trait NodeApi {
   def transfer(sourceAddress: String, recipient: String, amount: Long, fee: Long, assetId: Option[String] = None): Future[Transaction] =
     postJson("/assets/transfer", TransferRequest(assetId, None, amount, fee, sourceAddress, None, recipient)).as[Transaction]
 
-  def payment(sourceAddress: String, recipient: String, amount: Long, fee: Long): Future[String] =
-    postJson("/waves/payment", PaymentRequest(amount, fee, sourceAddress, recipient)).as[JsValue].map(v => (v \ "signature").as[String])
+  def payment(sourceAddress: String, recipient: String, amount: Long, fee: Long): Future[Transaction] =
+    postJson("/waves/payment", PaymentRequest(amount, fee, sourceAddress, recipient)).as[Transaction]
 
   def lease(sourceAddress: String, recipient: String, amount: Long, fee: Long): Future[Transaction] =
     postJson("/leasing/lease", LeaseRequest(sourceAddress, amount, fee, recipient)).as[Transaction]
@@ -410,4 +410,10 @@ object NodeApi extends ScorexLogging {
 
   implicit val blacklistedPeerFormat: Format[BlacklistedPeer] = Json.format
 
+  // Obsolete payment request
+  case class PaymentRequest(amount: Long, fee: Long, sender: String, recipient: String)
+
+  object PaymentRequest {
+    implicit val paymentFormat: Format[PaymentRequest] = Json.format
+  }
 }

@@ -6,11 +6,12 @@ import com.wavesplatform.state2.diffs._
 import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
-import scorex.transaction.{GenesisTransaction, PaymentTransaction}
+import scorex.transaction.GenesisTransaction
+import scorex.transaction.assets.TransferTransaction
 
 class BlockchainUpdaterGeneratorFeeSameBlockTest extends PropSpec with PropertyChecks with DomainScenarioDrivenPropertyCheck with Matchers with TransactionGen {
 
-  type Setup = (GenesisTransaction, PaymentTransaction, PaymentTransaction)
+  type Setup = (GenesisTransaction, TransferTransaction, TransferTransaction)
 
   val preconditionsAndPayments: Gen[Setup] = for {
     sender <- accountGen
@@ -18,8 +19,8 @@ class BlockchainUpdaterGeneratorFeeSameBlockTest extends PropSpec with PropertyC
     fee <- smallFeeGen
     ts <- positiveIntGen
     genesis: GenesisTransaction = GenesisTransaction.create(sender, ENOUGH_AMT, ts).right.get
-    payment: PaymentTransaction <- paymentGeneratorP(sender, recipient)
-    generatorPaymentOnFee: PaymentTransaction = PaymentTransaction.create(defaultSigner, recipient, payment.fee, fee, ts + 1).right.get
+    payment: TransferTransaction <- wavesTransferGeneratorP(sender, recipient)
+    generatorPaymentOnFee: TransferTransaction = createWavesTransfer(defaultSigner, recipient, payment.fee, fee, ts + 1).right.get
   } yield (genesis, payment, generatorPaymentOnFee)
 
   property("block generator can spend fee after transaction before applyMinerFeeWithTransactionAfter") {

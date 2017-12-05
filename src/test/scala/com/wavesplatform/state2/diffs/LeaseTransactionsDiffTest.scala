@@ -9,8 +9,9 @@ import org.scalatest.{Matchers, PropSpec}
 import scorex.account.Address
 import scorex.lagonaki.mocks.TestBlock
 import scorex.settings.TestFunctionalitySettings
+import scorex.transaction.GenesisTransaction
+import scorex.transaction.assets.TransferTransaction
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import scorex.transaction.{GenesisTransaction, PaymentTransaction}
 
 class LeaseTransactionsDiffTest extends PropSpec
   with PropertyChecks with Matchers with TransactionGen with NoShrink {
@@ -58,7 +59,7 @@ class LeaseTransactionsDiffTest extends PropSpec
     }
   }
 
-  val cancelLeaseTwice: Gen[(GenesisTransaction, PaymentTransaction, LeaseTransaction, LeaseCancelTransaction, LeaseCancelTransaction)] = for {
+  val cancelLeaseTwice: Gen[(GenesisTransaction, TransferTransaction, LeaseTransaction, LeaseCancelTransaction, LeaseCancelTransaction)] = for {
     master <- accountGen
     recpient <- accountGen suchThat (_ != master)
     ts <- timestampGen
@@ -67,7 +68,7 @@ class LeaseTransactionsDiffTest extends PropSpec
     fee2 <- smallFeeGen
     unlease2 = LeaseCancelTransaction.create(master, lease.id(), fee2, ts + 1).right.get
     // ensure recipient has enough effective balance
-    payment <- paymentGeneratorP(master, recpient) suchThat (_.amount > lease.amount)
+    payment <- wavesTransferGeneratorP(master, recpient) suchThat (_.amount > lease.amount)
   } yield (genesis, payment, lease, unlease, unlease2)
 
   property("cannot cancel lease twice after allowMultipleLeaseCancelTransactionUntilTimestamp") {

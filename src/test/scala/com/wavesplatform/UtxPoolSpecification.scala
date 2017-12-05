@@ -15,7 +15,7 @@ import scorex.account.{Address, PrivateKeyAccount, PublicKeyAccount}
 import scorex.block.Block
 import scorex.settings.TestFunctionalitySettings
 import scorex.transaction.assets.TransferTransaction
-import scorex.transaction.{FeeCalculator, PaymentTransaction, Transaction}
+import scorex.transaction.{FeeCalculator, Transaction}
 import scorex.utils.Time
 
 import scala.concurrent.duration._
@@ -76,7 +76,7 @@ class UtxPoolSpecification extends FreeSpec
     val time = new TestTime()
     val utx = new UtxPoolImpl(time, state, history, calculator, FunctionalitySettings.TESTNET, UtxSettings(10, 10.minutes, 10.minutes))
     val amountPart = (senderBalance - fee) / 2 - fee
-    val txs = for (_ <- 1 to n) yield PaymentTransaction.create(sender, recipient, amountPart, fee, time.getTimestamp()).right.get
+    val txs = for (_ <- 1 to n) yield createWavesTransfer(sender, recipient, amountPart, fee, time.getTimestamp()).right.get
     (utx, time, txs, (offset + 1000).millis)
   }).label("twoOutOfManyValidPayments")
 

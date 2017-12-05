@@ -4,7 +4,6 @@ import com.wavesplatform.state2.ByteStr
 import org.scalatest.{Assertions, Matchers, PropSpec}
 import scorex.account.{Address, PrivateKeyAccount}
 import scorex.consensus.TransactionsOrdering
-import scorex.transaction.PaymentTransaction
 import scorex.transaction.assets.TransferTransaction
 
 import scala.util.Random
@@ -45,16 +44,20 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
 
   property("TransactionsOrdering.InBlock should sort txs by decreasing block timestamp") {
     val correctSeq = Seq(
-      PaymentTransaction.create(PrivateKeyAccount(Array.fill(32)(0)), Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").right.get, 100000, 1, 124L).right.get,
-      PaymentTransaction.create(PrivateKeyAccount(Array.fill(32)(0)), Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").right.get, 100000, 1, 123L).right.get)
+      TransferTransaction.create(None, PrivateKeyAccount(Array.fill(32)(0)), Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").right.get,
+        100000, 124L, None, 1, Array()).right.get,
+      TransferTransaction.create(None, PrivateKeyAccount(Array.fill(32)(0)), Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").right.get,
+        100000, 123L, None, 1, Array()).right.get)
 
     Random.shuffle(correctSeq).sorted(TransactionsOrdering.InBlock) shouldBe correctSeq
   }
 
   property("TransactionsOrdering.InUTXPool should sort txs by ascending block timestamp") {
     val correctSeq = Seq(
-      PaymentTransaction.create(PrivateKeyAccount(Array.fill(32)(0)), Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").right.get, 100000, 1, 123L).right.get,
-      PaymentTransaction.create(PrivateKeyAccount(Array.fill(32)(0)), Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").right.get, 100000, 1, 124L).right.get)
+      TransferTransaction.create(None, PrivateKeyAccount(Array.fill(32)(0)), Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").right.get,
+        100000, 123L, None, 1, Array()).right.get,
+      TransferTransaction.create(None, PrivateKeyAccount(Array.fill(32)(0)), Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").right.get,
+        100000, 124L, None, 1, Array()).right.get)
     Random.shuffle(correctSeq).sorted(TransactionsOrdering.InUTXPool) shouldBe correctSeq
   }
 }

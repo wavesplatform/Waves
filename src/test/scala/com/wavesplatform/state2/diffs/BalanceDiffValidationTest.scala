@@ -6,13 +6,14 @@ import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import scorex.lagonaki.mocks.TestBlock
 import scorex.settings.TestFunctionalitySettings
+import scorex.transaction.GenesisTransaction
+import scorex.transaction.assets.TransferTransaction
 import scorex.transaction.lease.LeaseTransaction
-import scorex.transaction.{GenesisTransaction, PaymentTransaction}
 
 class BalanceDiffValidationTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
 
   property("disallows overflow") {
-    val preconditionsAndPayment: Gen[(GenesisTransaction, GenesisTransaction, PaymentTransaction, PaymentTransaction)] = for {
+    val preconditionsAndPayment: Gen[(GenesisTransaction, GenesisTransaction, TransferTransaction, TransferTransaction)] = for {
       master <- accountGen
       master2 <- accountGen
       recipient <- otherAccountGen(candidate = master)
@@ -21,8 +22,8 @@ class BalanceDiffValidationTest extends PropSpec with PropertyChecks with Matche
       gen2: GenesisTransaction = GenesisTransaction.create(master2, Long.MaxValue - 1, ts).right.get
       fee <- smallFeeGen
       amount <- Gen.choose(Long.MaxValue / 2, Long.MaxValue - fee - 1)
-      transfer1 = PaymentTransaction.create(master, recipient, amount, fee, ts).right.get
-      transfer2 = PaymentTransaction.create(master2, recipient, amount, fee, ts).right.get
+      transfer1 = createWavesTransfer(master, recipient, amount, fee, ts).right.get
+      transfer2 = createWavesTransfer(master2, recipient, amount, fee, ts).right.get
     } yield (gen1, gen2, transfer1, transfer2)
 
 
@@ -54,7 +55,7 @@ class BalanceDiffValidationTest extends PropSpec with PropertyChecks with Matche
     }
   }
 
-  val ownLessThatLeaseOut: Gen[(GenesisTransaction, PaymentTransaction, LeaseTransaction, LeaseTransaction, PaymentTransaction)] = for {
+  val ownLessThatLeaseOut: Gen[(GenesisTransaction, TransferTransaction, LeaseTransaction, LeaseTransaction, TransferTransaction)] = for {
     master <- accountGen
     alice <- accountGen
     bob <- accountGen
@@ -63,11 +64,11 @@ class BalanceDiffValidationTest extends PropSpec with PropertyChecks with Matche
     amt <- positiveLongGen
     fee <- smallFeeGen
     genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
-    masterTransfersToAlice: PaymentTransaction = PaymentTransaction.create(master, alice, amt, fee, ts).right.get
+    masterTransfersToAlice: TransferTransaction = createWavesTransfer(master, alice, amt, fee, ts).right.get
     (aliceLeasesToBob, _) <- leaseAndCancelGeneratorP(alice, bob, alice) suchThat (_._1.amount < amt)
     (masterLeasesToAlice, _) <- leaseAndCancelGeneratorP(master, alice, master) suchThat (_._1.amount > aliceLeasesToBob.amount)
     transferAmt <- Gen.choose(amt - fee - aliceLeasesToBob.amount, amt - fee)
-    aliceTransfersMoreThanOwnsMinusLeaseOut = PaymentTransaction.create(alice, cooper, transferAmt, fee, ts).right.get
+    aliceTransfersMoreThanOwnsMinusLeaseOut = createWavesTransfer(alice, cooper, transferAmt, fee, ts).right.get
 
   } yield (genesis, masterTransfersToAlice, aliceLeasesToBob, masterLeasesToAlice, aliceTransfersMoreThanOwnsMinusLeaseOut)
 

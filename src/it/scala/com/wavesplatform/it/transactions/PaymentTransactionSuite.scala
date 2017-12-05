@@ -1,5 +1,6 @@
 package com.wavesplatform.it.transactions
 
+import com.wavesplatform.it.api.NodeApi
 import com.wavesplatform.it.util._
 
 import scala.concurrent.Await
@@ -12,12 +13,25 @@ class PaymentTransactionSuite extends BaseTransactionSuite {
       _ <- assertBalances(firstAddress, 100.waves, 100.waves)
         .zip(assertBalances(secondAddress, 100.waves, 100.waves))
 
-      transferId <- sender.payment(firstAddress, secondAddress, 5.waves, fee = 5.waves)
+      transferId <- sender.payment(firstAddress, secondAddress, 5.waves, fee = 5.waves).map(_.id)
       _ <- waitForHeightAraiseAndTxPresent(transferId, 1)
       _ <- assertBalances(firstAddress, 90.waves, 90.waves)
         .zip(assertBalances(secondAddress, 105.waves, 105.waves))
     } yield succeed
 
     Await.result(f, 2.minute)
+  }
+
+  test("obsolete endpoints respond with BadRequest") {
+    val payment = NodeApi.PaymentRequest(5.waves, 1.waves, firstAddress, secondAddress)
+    val errorMessage = "This API is no longer supported"
+    val f = for {
+      _ <- assertBadRequestAndMessage(sender.postJson("/waves/payment/signature", payment), errorMessage)
+      _ <- assertBadRequestAndMessage(sender.postJson("/waves/create-signed-payment", payment), errorMessage)
+      _ <- assertBadRequestAndMessage(sender.postJson("/waves/external-payment", payment), errorMessage)
+      _ <- assertBadRequestAndMessage(sender.postJson("/waves/broadcast-signed-payment", payment), errorMessage)
+    } yield succeed
+
+    Await.result(f, 1.minute)
   }
 }

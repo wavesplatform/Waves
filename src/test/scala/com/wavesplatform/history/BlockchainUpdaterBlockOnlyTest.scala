@@ -6,16 +6,17 @@ import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 import scorex.transaction._
+import scorex.transaction.assets.TransferTransaction
 
 class BlockchainUpdaterBlockOnlyTest extends PropSpec with PropertyChecks with DomainScenarioDrivenPropertyCheck with Matchers with TransactionGen {
 
 
-  def preconditionsAndPayments(paymentsAmt: Int): Gen[(GenesisTransaction, Seq[PaymentTransaction])] = for {
+  def preconditionsAndPayments(paymentsAmt: Int): Gen[(GenesisTransaction, Seq[TransferTransaction])] = for {
     master <- accountGen
     recipient <- accountGen
     ts <- positiveIntGen
     genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
-    payments <- Gen.listOfN(paymentsAmt,paymentGeneratorP(master, recipient))
+    payments <- Gen.listOfN(paymentsAmt,wavesTransferGeneratorP(master, recipient))
   } yield (genesis, payments)
 
   property("can apply valid blocks") {

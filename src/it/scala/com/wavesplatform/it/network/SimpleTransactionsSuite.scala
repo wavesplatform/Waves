@@ -10,7 +10,7 @@ import org.scalatest._
 import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
 import scorex.account.{Address, PrivateKeyAccount}
 import scorex.crypto.encode.Base58
-import scorex.transaction.PaymentTransaction
+import scorex.transaction.assets.TransferTransaction
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future.traverse
@@ -33,12 +33,14 @@ class SimpleTransactionsSuite extends FunSuite with BeforeAndAfterAll with Match
   private lazy val node = nodes.head
 
   test("valid tx send by network to node should be in blockchain") {
-    val tx = PaymentTransaction.create(
+    val tx = TransferTransaction.create(None,
       PrivateKeyAccount(Base58.decode(node.accountSeed).get),
       Address.fromString(node.address).right.get,
       1L,
+      System.currentTimeMillis(),
+      None,
       100000L,
-      System.currentTimeMillis()).right.get
+      Array()).right.get
     val f = for {
       _ <- node.sendByNetwork(RawBytes(TransactionMessageSpec.messageCode, tx.bytes()))
       _ <- Future.successful(Thread.sleep(2000))
@@ -53,12 +55,14 @@ class SimpleTransactionsSuite extends FunSuite with BeforeAndAfterAll with Match
   }
 
   test("invalid tx send by network to node should be not in UTX or blockchain") {
-    val tx = PaymentTransaction.create(
+    val tx = TransferTransaction.create(None,
       PrivateKeyAccount(Base58.decode(node.accountSeed).get),
       Address.fromString(node.address).right.get,
       1L,
+      System.currentTimeMillis() + (1 days).toMillis,
+      None,
       100000L,
-      System.currentTimeMillis() + (1 days).toMillis).right.get
+      Array()).right.get
     val f = for {
       _ <- node.sendByNetwork(RawBytes(TransactionMessageSpec.messageCode, tx.bytes()))
       _ <- Future.successful(Thread.sleep(2000))

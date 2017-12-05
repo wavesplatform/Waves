@@ -75,6 +75,12 @@ case object ApiKeyNotValid extends ApiError {
   override val message: String = "Provided API key is not correct"
 }
 
+case object DiscontinuedApi extends ApiError {
+  override val id = 3
+  override val code = StatusCodes.BadRequest
+  override val message = "This API is no longer supported"
+}
+
 case object TooBigArrayAllocation extends ApiError {
   override val id: Int = 10
   override val message: String = "Too big sequences requested"

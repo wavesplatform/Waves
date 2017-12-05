@@ -6,7 +6,6 @@ import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import scorex.settings.TestFunctionalitySettings
-import scorex.transaction.PaymentTransaction
 
 class CommonValidationTimeTest extends PropSpec
   with PropertyChecks with Matchers with TransactionGen with NoShrink {
@@ -20,7 +19,7 @@ class CommonValidationTimeTest extends PropSpec
       recipient <- accountGen
       amount <- positiveLongGen
       fee <- smallFeeGen
-      transfer1 = PaymentTransaction.create(master, recipient, amount, fee, prevBlockTs - CommonValidation.MaxTimePrevBlockOverTransactionDiff.toMillis - 1).explicitGet()
+      transfer1 = createWavesTransfer(master, recipient, amount, fee, prevBlockTs - CommonValidation.MaxTimePrevBlockOverTransactionDiff.toMillis - 1).explicitGet()
     } yield (prevBlockTs, blockTs, height, transfer1)) { case (prevBlockTs, blockTs, height, transfer1) =>
       TransactionDiffer(TestFunctionalitySettings.Enabled, Some(prevBlockTs), blockTs, height)(newState(), transfer1) should produce("too old")
     }
@@ -35,7 +34,7 @@ class CommonValidationTimeTest extends PropSpec
       recipient <- accountGen
       amount <- positiveLongGen
       fee <- smallFeeGen
-      transfer1 = PaymentTransaction.create(master, recipient, amount, fee, blockTs + CommonValidation.MaxTimeTransactionOverBlockDiff.toMillis + 1).explicitGet()
+      transfer1 = createWavesTransfer(master, recipient, amount, fee, blockTs + CommonValidation.MaxTimeTransactionOverBlockDiff.toMillis + 1).explicitGet()
     } yield (prevBlockTs, blockTs, height, transfer1)) { case (prevBlockTs, blockTs, height, transfer1) =>
       val functionalitySettings = TestFunctionalitySettings.Enabled.copy(allowTransactionsFromFutureUntil = blockTs - 1)
       TransactionDiffer(functionalitySettings, Some(prevBlockTs), blockTs, height)(newState(), transfer1) should produce("far future")

@@ -6,12 +6,13 @@ import com.wavesplatform.state2.diffs._
 import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
-import scorex.account.PrivateKeyAccount
+import scorex.account.{Address, AddressOrAlias, PrivateKeyAccount}
 import scorex.transaction._
+import scorex.transaction.assets.TransferTransaction
 
 class BlockchainUpdaterMicroblockSunnyDayTest extends PropSpec with PropertyChecks with DomainScenarioDrivenPropertyCheck with Matchers with TransactionGen {
 
-  type Setup = (GenesisTransaction, PaymentTransaction, PaymentTransaction, PaymentTransaction)
+  type Setup = (GenesisTransaction, TransferTransaction, TransferTransaction, TransferTransaction)
   val preconditionsAndPayments: Gen[Setup] = for {
     master <- accountGen
     alice <- accountGen
@@ -19,9 +20,9 @@ class BlockchainUpdaterMicroblockSunnyDayTest extends PropSpec with PropertyChec
     ts <- positiveIntGen
     fee <- smallFeeGen
     genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
-    masterToAlice: PaymentTransaction <- paymentGeneratorP(master, alice)
-    aliceToBob = PaymentTransaction.create(alice, bob, masterToAlice.amount - fee - 1, fee, ts).right.get
-    aliceToBob2 = PaymentTransaction.create(alice, bob, masterToAlice.amount - fee - 1, fee, ts + 1).right.get
+    masterToAlice: TransferTransaction <- wavesTransferGeneratorP(master, alice)
+    aliceToBob = createWavesTransfer(alice, bob, masterToAlice.amount - fee - 1, fee, ts).right.get
+    aliceToBob2 = createWavesTransfer(alice, bob, masterToAlice.amount - fee - 1, fee, ts + 1).right.get
   } yield (genesis, masterToAlice, aliceToBob, aliceToBob2)
 
   property("all txs in different blocks: B0 <- B1 <- B2 <- B3!") {
@@ -30,9 +31,9 @@ class BlockchainUpdaterMicroblockSunnyDayTest extends PropSpec with PropertyChec
       blocks.init.foreach(block => domain.blockchainUpdater.processBlock(block).explicitGet())
       domain.blockchainUpdater.processBlock(blocks.last) should produce("unavailable funds")
 
-      domain.effBalance(genesis.recipient) > 0 shouldBe true
-      domain.effBalance(masterToAlice.recipient) shouldBe 0L
-      domain.effBalance(aliceToBob.recipient) shouldBe 0L
+      effBalance(genesis.recipient, domain) > 0 shouldBe true
+      effBalance(masterToAlice.recipient, domain) shouldBe 0L
+      effBalance(aliceToBob.recipient, domain) shouldBe 0L
     }
   }
 
@@ -45,9 +46,9 @@ class BlockchainUpdaterMicroblockSunnyDayTest extends PropSpec with PropertyChec
       domain.blockchainUpdater.processMicroBlock(microBlocks(2)) should produce("unavailable funds")
       domain.history.lastBlock.get.transactionData shouldBe Seq(genesis, masterToAlice, aliceToBob)
 
-      domain.effBalance(genesis.recipient) > 0 shouldBe true
-      domain.effBalance(masterToAlice.recipient) > 0 shouldBe true
-      domain.effBalance(aliceToBob.recipient) > 0 shouldBe true
+      effBalance(genesis.recipient, domain) > 0 shouldBe true
+      effBalance(masterToAlice.recipient, domain) > 0 shouldBe true
+      effBalance(aliceToBob.recipient, domain) > 0 shouldBe true
     }
   }
 
@@ -59,9 +60,9 @@ class BlockchainUpdaterMicroblockSunnyDayTest extends PropSpec with PropertyChec
       domain.blockchainUpdater.processMicroBlock(microBlocks(1)).explicitGet()
       domain.blockchainUpdater.processMicroBlock(microBlocks(2)) should produce("unavailable funds")
 
-      domain.effBalance(genesis.recipient) > 0 shouldBe true
-      domain.effBalance(masterToAlice.recipient) > 0 shouldBe true
-      domain.effBalance(aliceToBob.recipient) > 0 shouldBe true
+      effBalance(genesis.recipient, domain) > 0 shouldBe true
+      effBalance(masterToAlice.recipient, domain) > 0 shouldBe true
+      effBalance(aliceToBob.recipient, domain) > 0 shouldBe true
     }
   }
 
@@ -74,9 +75,9 @@ class BlockchainUpdaterMicroblockSunnyDayTest extends PropSpec with PropertyChec
       domain.blockchainUpdater.processMicroBlock(microBlocks0(1)).explicitGet()
       domain.blockchainUpdater.processBlock(block1) shouldBe 'right
 
-      domain.effBalance(genesis.recipient) > 0 shouldBe true
-      domain.effBalance(masterToAlice.recipient) > 0 shouldBe true
-      domain.effBalance(aliceToBob.recipient) shouldBe 0
+      effBalance(genesis.recipient, domain) > 0 shouldBe true
+      effBalance(masterToAlice.recipient, domain) > 0 shouldBe true
+      effBalance(aliceToBob.recipient, domain) shouldBe 0
     }
   }
 
@@ -90,9 +91,9 @@ class BlockchainUpdaterMicroblockSunnyDayTest extends PropSpec with PropertyChec
       domain.blockchainUpdater.processMicroBlock(microBlocks1.head).explicitGet()
       domain.blockchainUpdater.processBlock(block2) shouldBe 'right
 
-      domain.effBalance(genesis.recipient) > 0 shouldBe true
-      domain.effBalance(masterToAlice.recipient) shouldBe 0
-      domain.effBalance(aliceToBob.recipient) shouldBe 0
+      effBalance(genesis.recipient, domain) > 0 shouldBe true
+      effBalance(masterToAlice.recipient, domain) shouldBe 0
+      effBalance(aliceToBob.recipient, domain) shouldBe 0
     }
   }
 
@@ -106,9 +107,9 @@ class BlockchainUpdaterMicroblockSunnyDayTest extends PropSpec with PropertyChec
       domain.blockchainUpdater.processMicroBlock(microBlocks1(0)).explicitGet()
       domain.blockchainUpdater.processBlock(block2).explicitGet() // silently discards worse version
 
-      domain.effBalance(genesis.recipient) > 0 shouldBe true
-      domain.effBalance(masterToAlice.recipient) shouldBe 0
-      domain.effBalance(aliceToBob.recipient) shouldBe 0
+      effBalance(genesis.recipient, domain) > 0 shouldBe true
+      effBalance(masterToAlice.recipient, domain) shouldBe 0
+      effBalance(aliceToBob.recipient, domain) shouldBe 0
     }
   }
 
@@ -123,9 +124,9 @@ class BlockchainUpdaterMicroblockSunnyDayTest extends PropSpec with PropertyChec
       domain.blockchainUpdater.processMicroBlock(microBlocks1(0)).explicitGet()
       domain.blockchainUpdater.processBlock(block2) shouldBe 'right
 
-      domain.effBalance(genesis.recipient) > 0 shouldBe true
-      domain.effBalance(masterToAlice.recipient) shouldBe 0
-      domain.effBalance(aliceToBob.recipient) shouldBe 0
+      effBalance(genesis.recipient, domain) > 0 shouldBe true
+      effBalance(masterToAlice.recipient, domain) shouldBe 0
+      effBalance(aliceToBob.recipient, domain) shouldBe 0
     }
   }
 
@@ -156,5 +157,10 @@ class BlockchainUpdaterMicroblockSunnyDayTest extends PropSpec with PropertyChec
 
       da.stateReader().partialPortfolio(miner).balance shouldBe db.stateReader().partialPortfolio(miner).balance
     }
+  }
+
+  private def effBalance(aa: AddressOrAlias, domain: Domain): Long = aa match {
+    case address: Address => domain.effBalance(address)
+    case _ => fail("Unexpected address object")
   }
 }
