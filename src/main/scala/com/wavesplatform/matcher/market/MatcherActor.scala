@@ -63,10 +63,11 @@ class MatcherActor(orderHistory: ActorRef, storedState: StateReader, wallet: Wal
 
     val isCorrectOrder = if (tradedPairs.contains(aPair)) true
     else if (tradedPairs.contains(reversePair)) false
-    else if (settings.priceAssets.contains(aPair.priceAssetStr) &&
-      !settings.priceAssets.contains(aPair.amountAssetStr)) true
-    else if (settings.priceAssets.contains(reversePair.priceAssetStr) &&
-      !settings.priceAssets.contains(reversePair.amountAssetStr)) false
+    else if (settings.priceAssets.contains(aPair.priceAssetStr) && settings.priceAssets.contains(aPair.amountAssetStr)) {
+      settings.priceAssets.indexOf(aPair.priceAssetStr) < settings.priceAssets.indexOf(aPair.amountAssetStr)
+    }
+    else if (settings.priceAssets.contains(aPair.priceAssetStr)) true
+    else if (settings.priceAssets.contains(reversePair.priceAssetStr)) false
     else compare(aPair.priceAsset.map(_.arr), aPair.amountAsset.map(_.arr)) < 0
 
     isCorrectOrder :| s"Invalid AssetPair ordering, should be reversed: $reversePair"
