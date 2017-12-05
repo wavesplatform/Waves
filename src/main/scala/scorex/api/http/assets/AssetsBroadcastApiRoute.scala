@@ -111,7 +111,7 @@ case class AssetsBroadcastApiRoute(
     json[Seq[SignedTransferRequest]] { reqs =>
       Future
         .sequence(reqs.map(r => doBroadcast(r.toTx)))
-        .map(_.map(_.fold(_.json, _.json)))
+        .map(_.map(_.fold(_.json, _.json())))
     }
   }
 

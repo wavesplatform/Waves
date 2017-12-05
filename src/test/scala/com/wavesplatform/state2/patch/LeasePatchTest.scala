@@ -1,10 +1,10 @@
 package com.wavesplatform.state2.patch
 
-import com.wavesplatform.TransactionGen
 import com.wavesplatform.state2.LeaseInfo
 import com.wavesplatform.state2.diffs._
-import org.scalacheck.{Gen, Shrink}
-import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
+import com.wavesplatform.{NoShrink, TransactionGen}
+import org.scalacheck.Gen
+import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import scorex.lagonaki.mocks.TestBlock
 import scorex.settings.TestFunctionalitySettings
@@ -12,9 +12,8 @@ import scorex.transaction.GenesisTransaction
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 
 
-class LeasePatchTest extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers with TransactionGen {
-
-  private implicit def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)
+class LeasePatchTest extends PropSpec
+  with PropertyChecks with Matchers with TransactionGen with NoShrink {
 
   private val settings = TestFunctionalitySettings.Enabled.copy(
     resetEffectiveBalancesAtHeight = 5, allowMultipleLeaseCancelTransactionUntilTimestamp = Long.MaxValue / 2)
@@ -30,7 +29,7 @@ class LeasePatchTest extends PropSpec with PropertyChecks with GeneratorDrivenPr
       genesis2: GenesisTransaction = GenesisTransaction.create(otherAccount, ENOUGH_AMT, ts).right.get
       (lease, _) <- leaseAndCancelGeneratorP(master, recipient, master)
       fee2 <- smallFeeGen
-      unleaseOther = LeaseCancelTransaction.create(otherAccount, lease.id, fee2, ts + 1).right.get
+      unleaseOther = LeaseCancelTransaction.create(otherAccount, lease.id(), fee2, ts + 1).right.get
       (lease2, _) <- leaseAndCancelGeneratorP(master, otherAccount2, master)
     } yield (genesis, genesis2, lease, unleaseOther, lease2)
 

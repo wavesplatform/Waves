@@ -1,55 +1,66 @@
 package com.wavesplatform.network
 
+import com.wavesplatform.metrics.LatencyHistogram
 import com.wavesplatform.state2.ByteStr
 import io.netty.channel.{ChannelHandlerContext, ChannelInboundHandlerAdapter}
 import io.netty.util.concurrent.ScheduledFuture
+import kamon.Kamon
+import kamon.metric.instrument
 import scorex.block.Block
+import scorex.transaction.NgHistory
 import scorex.utils.ScorexLogging
 
 import scala.collection.mutable
+import scala.collection.parallel.ForkJoinTaskSupport
 import scala.concurrent.duration.FiniteDuration
 
 class ExtensionBlocksLoader(
     blockSyncTimeout: FiniteDuration,
-    peerDatabase: PeerDatabase) extends ChannelInboundHandlerAdapter with ScorexLogging {
+    peerDatabase: PeerDatabase, history: NgHistory) extends ChannelInboundHandlerAdapter with ScorexLogging {
   private var pendingSignatures = Map.empty[ByteStr, Int]
   private var targetExtensionIds = Option.empty[ExtensionIds]
   private val blockBuffer = mutable.TreeMap.empty[Int, Block]
-  private var currentTimeout = Option.empty[ScheduledFuture[_]]
+  private var blacklistingScheduledFuture = Option.empty[ScheduledFuture[_]]
+  private val extensionsFetchingTimeStats = new LatencyHistogram(Kamon.metrics.histogram("extensions-fetching-time", instrument.Time.Milliseconds))
 
-  private def cancelTimeout(): Unit = {
-    currentTimeout.foreach(_.cancel(false))
-    currentTimeout = None
+  private def cancelBlacklist(): Unit = {
+    blacklistingScheduledFuture.foreach(_.cancel(false))
+    blacklistingScheduledFuture = None
   }
 
-  override def channelInactive(ctx: ChannelHandlerContext) = {
-    cancelTimeout()
+  private def blacklistAfterTimeout(ctx: ChannelHandlerContext): Unit = {
+    cancelBlacklist()
+    blacklistingScheduledFuture = Some(ctx.executor().schedule(blockSyncTimeout) {
+        peerDatabase.blacklistAndClose(ctx.channel(), "Timeout loading blocks")
+    })
+  }
+
+  override def channelInactive(ctx: ChannelHandlerContext): Unit = {
+    cancelBlacklist()
     super.channelInactive(ctx)
   }
 
-  override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef) = msg match {
+  override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
     case xid@ExtensionIds(_, newIds) if pendingSignatures.isEmpty =>
-      if (newIds.nonEmpty) {
-        targetExtensionIds = Some(xid)
-        pendingSignatures = newIds.zipWithIndex.toMap
-        cancelTimeout()
-        currentTimeout = Some(ctx.executor().schedule(blockSyncTimeout) {
-          if (targetExtensionIds.contains(xid)) {
-            peerDatabase.blacklistAndClose(ctx.channel(), "Timeout loading blocks")
-          }
-        })
-        newIds.foreach(s => ctx.write(GetBlock(s)))
-        ctx.flush()
-      } else {
-        log.debug(s"${id(ctx)} No new blocks to load")
-        ctx.fireChannelRead(ExtensionBlocks(Seq.empty))
+      val requestingIds = newIds.filterNot(history.contains)
+      if (requestingIds.nonEmpty) {
+            targetExtensionIds = Some(xid)
+            pendingSignatures = newIds.zipWithIndex.toMap
+            blacklistAfterTimeout(ctx)
+            extensionsFetchingTimeStats.start()
+            newIds.foreach(s => ctx.write(GetBlock(s)))
+            ctx.flush()
+        } else {
+          log.debug(s"${id(ctx)} No new blocks to load")
+          ctx.fireChannelRead(ExtensionBlocks(Seq.empty))
       }
-
     case b: Block if pendingSignatures.contains(b.uniqueId) =>
       blockBuffer += pendingSignatures(b.uniqueId) -> b
       pendingSignatures -= b.uniqueId
+      blacklistAfterTimeout(ctx)
       if (pendingSignatures.isEmpty) {
-        cancelTimeout()
+        cancelBlacklist()
+        extensionsFetchingTimeStats.record()
         log.trace(s"${id(ctx)} Loaded all blocks, doing a pre-check")
 
         val newBlocks = blockBuffer.values.toSeq
@@ -63,9 +74,11 @@ class ExtensionBlocksLoader(
             }) {
             peerDatabase.blacklistAndClose(ctx.channel(),"Extension blocks are not contiguous, pre-check failed")
           } else {
-            newBlocks.par.find(!_.signatureValid) match {
+            val pnewBlocks = newBlocks.par
+            pnewBlocks.tasksupport = new ForkJoinTaskSupport()
+            pnewBlocks.find(_.signaturesValid().isLeft) match {
               case Some(invalidBlock) =>
-                peerDatabase.blacklistAndClose(ctx.channel(),s"Got block ${invalidBlock.uniqueId} with invalid signature")
+                peerDatabase.blacklistAndClose(ctx.channel(),s"Got block $invalidBlock with invalid signature")
               case None =>
                 log.trace(s"${id(ctx)} Chain is valid, pre-check passed")
                 ctx.fireChannelRead(ExtensionBlocks(newBlocks))

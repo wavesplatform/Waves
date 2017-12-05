@@ -8,7 +8,7 @@ import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.api.{MatcherResponse, StatusCodeMatcherResponse}
 import com.wavesplatform.matcher.market.OrderBookActor.{DeleteOrderBookRequest, GetOrderBookResponse, OrderBookRequest}
 import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state2.reader.StateReader
+import com.wavesplatform.state2.StateReader
 import io.netty.channel.group.ChannelGroup
 import play.api.libs.json._
 import scorex.account.Address
@@ -31,14 +31,15 @@ class MatcherActor(orderHistory: ActorRef, storedState: StateReader, wallet: Wal
   val tradedPairs = mutable.Map.empty[AssetPair, MarketData]
 
   def getAssetName(asset: Option[AssetId]): String =
-    asset.map(storedState.getAssetName).getOrElse(AssetPair.WavesName)
+    asset.map(storedState().getAssetName).getOrElse(AssetPair.WavesName)
 
   def createOrderBook(pair: AssetPair): ActorRef = {
-    def getAssetName(asset: Option[AssetId]): String = asset.map(storedState.getAssetName).getOrElse(AssetPair.WavesName)
+    val s = storedState()
+    def getAssetName(asset: Option[AssetId]): String = asset.map(s.getAssetName).getOrElse(AssetPair.WavesName)
 
     val md = MarketData(pair, getAssetName(pair.amountAsset), getAssetName(pair.priceAsset), NTP.correctedTime(),
-      pair.amountAsset.flatMap(storedState.getIssueTransaction).map(t => AssetInfo(t.decimals)),
-      pair.priceAsset.flatMap(storedState.getIssueTransaction).map(t => AssetInfo(t.decimals)))
+      pair.amountAsset.flatMap(s.getIssueTransaction).map(t => AssetInfo(t.decimals)),
+      pair.priceAsset.flatMap(s.getIssueTransaction).map(t => AssetInfo(t.decimals)))
     tradedPairs += pair -> md
 
     context.actorOf(OrderBookActor.props(pair, orderHistory, storedState, settings, wallet, utx, allChannels, history, functionalitySettings),
@@ -46,10 +47,11 @@ class MatcherActor(orderHistory: ActorRef, storedState: StateReader, wallet: Wal
   }
 
   def basicValidation(msg: {def assetPair: AssetPair}): Validation = {
+    val s = storedState()
     def isAssetsExist: Validation = {
-      msg.assetPair.priceAsset.forall(storedState.assetExists(_)) :|
+      msg.assetPair.priceAsset.forall(s.assetExists(_)) :|
         s"Unknown Asset ID: ${msg.assetPair.priceAssetStr}" &&
-        msg.assetPair.amountAsset.forall(storedState.assetExists(_)) :|
+        msg.assetPair.amountAsset.forall(s.assetExists(_)) :|
           s"Unknown Asset ID: ${msg.assetPair.amountAssetStr}"
     }
 

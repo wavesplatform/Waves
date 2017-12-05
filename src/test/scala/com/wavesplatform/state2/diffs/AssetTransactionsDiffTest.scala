@@ -1,18 +1,17 @@
 package com.wavesplatform.state2.diffs
 
 import cats._
-import com.wavesplatform.TransactionGen
 import com.wavesplatform.state2._
-import org.scalacheck.{Arbitrary, Gen, Shrink}
-import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
+import com.wavesplatform.{NoShrink, TransactionGen}
+import org.scalacheck.{Arbitrary, Gen}
+import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import scorex.lagonaki.mocks.TestBlock
 import scorex.transaction.GenesisTransaction
 import scorex.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction}
 
-class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers with TransactionGen {
-
-  private implicit def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)
+class AssetTransactionsDiffTest extends PropSpec
+  with PropertyChecks with Matchers with TransactionGen with NoShrink {
 
   def issueReissueBurnTxs(isReissuable: Boolean): Gen[((GenesisTransaction, IssueTransaction), (ReissueTransaction, BurnTransaction))] = for {
     master <- accountGen
@@ -36,7 +35,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Genera
 
         val totalAssetVolume = issue.quantity + reissue.quantity - burn.amount
         newState.accountPortfolio(issue.sender).assets shouldBe Map(reissue.assetId -> totalAssetVolume)
-        newState.assetInfo(issue.id) shouldBe Some(AssetInfo(reissue.reissuable, totalAssetVolume))
+        newState.assetInfo(issue.id()) shouldBe Some(AssetInfo(reissue.reissuable, totalAssetVolume))
       }
     }
   }
@@ -68,8 +67,8 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Genera
       reissuable2 <- Arbitrary.arbitrary[Boolean]
       fee <- Gen.choose(1L, 2000000L)
       timestamp <- timestampGen
-      reissue = ReissueTransaction.create(other, issue.assetId, quantity, reissuable2, fee, timestamp).right.get
-      burn = BurnTransaction.create(other, issue.assetId, quantity, fee, timestamp).right.get
+      reissue = ReissueTransaction.create(other, issue.assetId(), quantity, reissuable2, fee, timestamp).right.get
+      burn = BurnTransaction.create(other, issue.assetId(), quantity, fee, timestamp).right.get
     } yield ((gen, issue), reissue, burn)
 
     forAll(setup) { case ((gen, issue), reissue, burn) =>

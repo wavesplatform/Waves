@@ -1,6 +1,6 @@
 package com.wavesplatform
 
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state2._
 import org.scalacheck.Gen
 import scorex.account.PrivateKeyAccount
 import scorex.block.Block
@@ -17,11 +17,24 @@ trait BlockGen extends TransactionGen {
     signer <- accountGen
   } yield (transactions, signer)
 
-  def blockGen(txs: Seq[Transaction], signer: PrivateKeyAccount): Gen[Block] = for {
-    reference <- byteArrayGen(Block.BlockIdLength)
+  def versionedBlockGen(txs: Seq[Transaction], signer: PrivateKeyAccount, version: Byte): Gen[Block] =
+    byteArrayGen(Block.BlockIdLength).flatMap(ref => versionedBlockGen(ByteStr(ref), txs, signer, version))
+
+  def versionedBlockGen(reference: ByteStr, txs: Seq[Transaction], signer: PrivateKeyAccount, version: Byte): Gen[Block] = for {
     baseTarget <- Gen.posNum[Long]
     generationSignature <- byteArrayGen(Block.GeneratorSignatureLength)
-  } yield Block.buildAndSign(1, txs.map(_.timestamp).max, ByteStr(reference), NxtLikeConsensusBlockData(baseTarget, generationSignature), txs, signer)
+    timestamp <- timestampGen
+  } yield Block.buildAndSign(
+      version,
+      if (txs.isEmpty) timestamp else txs.map(_.timestamp).max,
+      reference,
+      NxtLikeConsensusBlockData(baseTarget, ByteStr(generationSignature)),
+      txs,
+      signer,
+      Set.empty)
+    .explicitGet()
+
+  def blockGen(txs: Seq[Transaction], signer: PrivateKeyAccount): Gen[Block] = versionedBlockGen(txs, signer, 1)
 
   val randomSignerBlockGen: Gen[Block] = for {
     (transactions, signer) <- blockParamGen
@@ -38,19 +51,16 @@ trait BlockGen extends TransactionGen {
     block <- Gen.oneOf(randomSignerBlockGen, predefinedSignerBlockGen)
   } yield block
 
-  val randomBlocksSeqGen: Gen[(Int, Int, Seq[Block])] = for {
+  def blocksSeqGen(blockGen: Gen[Block]): Gen[(Int, Int, Seq[Block])] = for {
     start <- Gen.posNum[Int].label("from")
     end <- Gen.chooseNum(start, start + 20).label("to")
     blockCount <- Gen.choose(0, end - start + 1).label("actualBlockCount")
-    blocks <- Gen.listOfN(blockCount, randomSignerBlockGen).label("blocks")
+    blocks <- Gen.listOfN(blockCount, blockGen).label("blocks")
   } yield (start, end, blocks)
 
-  val mixedBlocksSeqGen: Gen[(Int, Int, Seq[Block])] = for {
-    start <- Gen.posNum[Int].label("from")
-    end <- Gen.chooseNum(start, start + 20).label("to")
-    blockCount <- Gen.choose(0, end - start + 1).label("actualBlockCount")
-    blocks <- Gen.listOfN(blockCount, mixedBlockGen).label("blocks")
-  } yield (start, end, blocks)
+  val randomBlocksSeqGen: Gen[(Int, Int, Seq[Block])] = blocksSeqGen(randomSignerBlockGen)
+
+  val mixedBlocksSeqGen: Gen[(Int, Int, Seq[Block])] = blocksSeqGen(mixedBlockGen)
 
 }
 

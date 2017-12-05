@@ -1,69 +1,43 @@
 package com.wavesplatform.generator
 
-import java.io.File
 import java.net.InetSocketAddress
 
-import com.google.common.base.CaseFormat
-import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.settings.loadConfig
-import net.ceedubs.ficus.Ficus._
-import org.slf4j.LoggerFactory
+import cats.Show
+import cats.implicits.showInterpolator
 import scorex.account.PrivateKeyAccount
 import scorex.crypto.encode.Base58
-import scorex.transaction.TransactionParser
-import scorex.transaction.TransactionParser.TransactionType
-import scorex.utils.LoggerFacade
 
-import scala.concurrent.duration.FiniteDuration
-
-case class GeneratorSettings(chainId: Char,
-                             accounts: Seq[PrivateKeyAccount],
-                             n: Int,
-                             every: FiniteDuration,
-                             txProbabilities: Map[TransactionParser.TransactionType.Value, Float],
-                             sendTo: InetSocketAddress)
+case class GeneratorSettings(chainId: String,
+                             accounts: Seq[String],
+                             sendTo: Seq[InetSocketAddress],
+                             worker: Worker.Settings,
+                             mode: Mode.Value,
+                             narrow: NarrowTransactionGenerator.Settings,
+                             wide: WideTransactionGenerator.Settings,
+                             dynWide: DynamicWideTransactionGenerator.Settings) {
+  val addressScheme: Char = chainId.head
+  val privateKeyAccounts: Seq[PrivateKeyAccount] = accounts.map(s => PrivateKeyAccount(Base58.decode(s).get))
+}
 
 object GeneratorSettings {
-  val configPath: String = "generator"
+  implicit val toPrintable: Show[GeneratorSettings] = { x =>
+    import x._
 
-  def fromConfig(config: Config): GeneratorSettings = {
-    val converter = CaseFormat.LOWER_HYPHEN.converterTo(CaseFormat.UPPER_CAMEL)
-    def toTxType(key: String): TransactionType.Value =
-      TransactionType.withName(s"${converter.convert(key)}Transaction")
+    val modeSettings: String = (mode match {
+      case Mode.NARROW => show"$narrow"
+      case Mode.WIDE => show"$wide"
+      case Mode.DYN_WIDE => show"$dynWide"
+    }).toString
 
-    val chainId = config.as[String](s"$configPath.chainId").head
-    val accounts = config.as[List[String]](s"$configPath.accounts").map(s => PrivateKeyAccount(Base58.decode(s).get))
-    val n = config.as[Int](s"$configPath.n")
-    val every = config.as[FiniteDuration](s"$configPath.every")
-    val txProbabilities = config.as[Map[String, Double]](s"$configPath.probabilities").map(kv => toTxType(kv._1) -> kv._2.toFloat)
-    val sendTo = new InetSocketAddress(config.as[String](s"$configPath.send-to.address"), config.as[Int](s"$configPath.send-to.port"))
-
-    GeneratorSettings(chainId, accounts, n, every, txProbabilities, sendTo)
-  }
-
-  private val log = LoggerFacade(LoggerFactory.getLogger(getClass))
-
-  def readConfig(userConfigPath: Option[String]): Config = {
-    val maybeConfigFile = for {
-      maybeFilename <- userConfigPath
-      file = new File(maybeFilename)
-      if file.exists
-    } yield file
-
-    val config = maybeConfigFile match {
-      // if no user config is supplied, the library will handle overrides/application/reference automatically
-      case None =>
-        ConfigFactory.load()
-      // application config needs to be resolved wrt both system properties *and* user-supplied config.
-      case Some(file) =>
-        val cfg = ConfigFactory.parseFile(file)
-        if (!cfg.hasPath("generator")) {
-          log.error("Malformed configuration file was provided! Aborting!")
-          System.exit(1)
-        }
-        loadConfig(cfg)
-    }
-
-    config
+    s"""network byte: $chainId
+       |rich accounts:
+       |  ${accounts.mkString("\n  ")}
+       |recipient nodes:
+       |  ${sendTo.mkString("\n  ")}
+       |worker:
+       |  ${show"$worker".split('\n').mkString("\n  ")}
+       |mode: $mode
+       |$mode settings:
+       |  ${modeSettings.split('\n').mkString("\n  ")}""".stripMargin
   }
 }

@@ -2,6 +2,7 @@ package com.wavesplatform.network
 
 import java.net.InetSocketAddress
 
+import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel.{ChannelHandlerContext, ChannelInboundHandlerAdapter}
 import scorex.utils.ScorexLogging
 
@@ -39,16 +40,35 @@ class PeerSynchronizer(peerDatabase: PeerDatabase, peerRequestInterval: FiniteDu
         requestPeers(ctx)
         super.channelRead(ctx, msg)
       case GetPeers =>
-        log.debug(s"${id(ctx)} Sending known peers: ${peerDatabase.knownPeers.mkString("[", ", ", "]")}")
+        log.trace(s"${id(ctx)} Sending known peers: ${peerDatabase.knownPeers.mkString("[", ", ", "]")}")
         ctx.writeAndFlush(KnownPeers(peerDatabase.knownPeers.keys.toSeq))
       case KnownPeers(peers) if peersRequested =>
         peersRequested = false
         log.trace(s"${id(ctx)} Got known peers: ${peers.mkString("[", ", ", "]")}")
         peers.foreach(peerDatabase.addCandidate)
       case KnownPeers(peers) =>
-        log.debug(s"${id(ctx)} Got unexpected list of known peers containing ${peers.size} entries")
+        log.trace(s"${id(ctx)} Got unexpected list of known peers containing ${peers.size} entries")
       case _ =>
         super.channelRead(ctx, msg)
     }
   }
+}
+
+object PeerSynchronizer {
+
+  @Sharable
+  class NoopPeerSynchronizer extends ChannelInboundHandlerAdapter {
+
+    override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = {
+      msg match {
+        case GetPeers =>
+        case KnownPeers(_) =>
+        case _ =>
+          super.channelRead(ctx, msg)
+      }
+    }
+  }
+
+  val Disabled = new NoopPeerSynchronizer()
+
 }

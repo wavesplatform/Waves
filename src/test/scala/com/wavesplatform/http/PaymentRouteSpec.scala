@@ -1,9 +1,8 @@
 package com.wavesplatform.http
 
 import com.wavesplatform.http.ApiMarshallers._
-import com.wavesplatform.{TestWallet, TransactionGen, UtxPool}
+import com.wavesplatform.{NoShrink, TestWallet, TransactionGen, UtxPool}
 import io.netty.channel.group.ChannelGroup
-import org.scalacheck.Shrink
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json.{JsObject, Json}
@@ -12,21 +11,29 @@ import scorex.transaction.Transaction
 import scorex.transaction.assets.TransferTransaction
 import scorex.utils.Time
 
-class PaymentRouteSpec extends RouteSpec("/payment")
-  with MockFactory with PropertyChecks with RestAPISettingsHelper with TestWallet with TransactionGen {
+class PaymentRouteSpec
+  extends RouteSpec("/payment")
+    with MockFactory
+    with PropertyChecks
+    with RestAPISettingsHelper
+    with TestWallet
+    with TransactionGen
+    with NoShrink {
 
   private val utx = stub[UtxPool]
   (utx.putIfNew _).when(*).onCall((t: Transaction) => Right(true)).anyNumberOfTimes()
   private val allChannels = stub[ChannelGroup]
-  private implicit def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)
 
   "accepts payments" in {
     forAll(accountOrAliasGen.label("recipient"), positiveLongGen.label("amount"), smallFeeGen.label("fee")) {
       case (recipient, amount, fee) =>
 
         val timestamp = System.currentTimeMillis()
-        val time = mock[Time]
-        (time.getTimestamp _).expects().returns(timestamp).anyNumberOfTimes()
+
+        val time =  new Time {
+          override def correctedTime(): Long = timestamp
+          override def getTimestamp(): Long = timestamp
+        }
 
         val sender = testWallet.privateKeyAccounts().head
         val tx = TransferTransaction.create(None, sender, recipient, amount, timestamp, None, fee, Array())
@@ -39,7 +46,7 @@ class PaymentRouteSpec extends RouteSpec("/payment")
         Post(routePath(""), req) ~> api_key(apiKey) ~> route ~> check {
           val resp = responseAs[JsObject]
 
-          (resp \ "id").as[String] shouldEqual tx.right.get.id.toString
+          (resp \ "id").as[String] shouldEqual tx.right.get.id().toString
           (resp \ "assetId").asOpt[String] shouldEqual None
           (resp \ "feeAsset").asOpt[String] shouldEqual None
           (resp \ "type").as[Int] shouldEqual 4

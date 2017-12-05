@@ -26,10 +26,12 @@ case class NetworkSettings(file: Option[File],
                            maxOutboundConnections: Int,
                            maxConnectionsPerHost: Int,
                            connectionTimeout: FiniteDuration,
-                           outboundBufferSize: Long,
                            maxUnverifiedPeers: Int,
+                           enablePeersExchange: Boolean,
+                           enableBlacklisting: Boolean,
                            peersBroadcastInterval: FiniteDuration,
                            handshakeTimeout: FiniteDuration,
+                           suspensionResidenceTime: FiniteDuration,
                            uPnPSettings: UPnPSettings)
 
 object NetworkSettings {
@@ -56,16 +58,18 @@ object NetworkSettings {
     val maxOutboundConnections = config.as[Int]("max-outbound-connections")
     val maxConnectionsFromSingleHost = config.as[Int]("max-single-host-connections")
     val connectionTimeout = config.as[FiniteDuration]("connection-timeout")
-    val outboundBufferSize = config.getBytes("outbound-buffer-size")
     val maxUnverifiedPeers = config.as[Int]("max-unverified-peers")
+    val enablePeersExchange = config.as[Boolean]("enable-peers-exchange")
+    val enableBlacklisting = config.as[Boolean]("enable-blacklisting")
     val peersBroadcastInterval = config.as[FiniteDuration]("peers-broadcast-interval")
     val handshakeTimeout = config.as[FiniteDuration]("handshake-timeout")
+    val suspensionResidenceTime = config.as[FiniteDuration]("suspension-residence-time")
     val uPnPSettings = config.as[UPnPSettings]("upnp")
 
     NetworkSettings(file, bindAddress, declaredAddress, nodeName, nonce, knownPeers,
       peersDataResidenceTime, blackListResidenceTime, maxInboundConnections, maxOutboundConnections,
-      maxConnectionsFromSingleHost, connectionTimeout, outboundBufferSize, maxUnverifiedPeers,
-      peersBroadcastInterval, handshakeTimeout, uPnPSettings)
+      maxConnectionsFromSingleHost, connectionTimeout, maxUnverifiedPeers, enablePeersExchange,
+      enableBlacklisting, peersBroadcastInterval, handshakeTimeout, suspensionResidenceTime, uPnPSettings)
   }
 
   private def randomNonce: Long = {

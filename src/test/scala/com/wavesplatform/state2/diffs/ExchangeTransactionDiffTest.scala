@@ -1,12 +1,12 @@
 package com.wavesplatform.state2.diffs
 
 import cats._
-import com.wavesplatform.TransactionGen
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.state2._
 import com.wavesplatform.state2.diffs.TransactionDiffer.TransactionValidationError
-import org.scalacheck.{Gen, Shrink}
-import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
+import com.wavesplatform.{NoShrink, TransactionGen}
+import org.scalacheck.Gen
+import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Inside, Matchers, PropSpec}
 import scorex.account.PrivateKeyAccount
 import scorex.lagonaki.mocks.TestBlock
@@ -15,14 +15,12 @@ import scorex.transaction.assets.IssueTransaction
 import scorex.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
 import scorex.transaction.{GenesisTransaction, ValidationError}
 
-class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks
-  with Matchers with TransactionGen with Inside {
+class ExchangeTransactionDiffTest
+  extends PropSpec with PropertyChecks with Matchers with TransactionGen with Inside with NoShrink {
 
   // This might fail from time to time.
   // The logic defining max matched amount is a bit complex
   // so it's not easy to setup 100% correct pair of orders
-
-  private implicit def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)
 
   property("preserves waves invariant, stores match info, rewards matcher") {
 
@@ -34,8 +32,8 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Gene
       gen2: GenesisTransaction = GenesisTransaction.create(seller, ENOUGH_AMT, ts).right.get
       issue1: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, seller).map(_._1)
       issue2: IssueTransaction <- issueReissueBurnGeneratorP(ENOUGH_AMT, buyer).map(_._1)
-      maybeAsset1 <- Gen.option(issue1.id)
-      maybeAsset2 <- Gen.option(issue2.id) suchThat (x => x != maybeAsset1)
+      maybeAsset1 <- Gen.option(issue1.id())
+      maybeAsset2 <- Gen.option(issue2.id()) suchThat (x => x != maybeAsset1)
       exchange <- exchangeGeneratorP(buyer, seller, maybeAsset1, maybeAsset2)
     } yield (gen1, gen2, issue1, issue2, exchange)
 
@@ -59,7 +57,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Gene
       gen1: GenesisTransaction = GenesisTransaction.create(buyer, 1 * Constants.UnitsInWave, ts).right.get
       gen2: GenesisTransaction = GenesisTransaction.create(seller, ENOUGH_AMT, ts).right.get
       issue1: IssueTransaction <- issueGen(buyer)
-      exchange <- exchangeGeneratorP(buyer, seller, None, Some(issue1.id), fixedMatcherFee = Some(300000))
+      exchange <- exchangeGeneratorP(buyer, seller, None, Some(issue1.id()), fixedMatcherFee = Some(300000))
     } yield (gen1, gen2, issue1, exchange)
 
     forAll(preconditions) { case ((gen1, gen2, issue1, exchange)) =>
@@ -105,7 +103,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Gene
     } yield (buyer, seller, matcher, gen1, gen2, issue1)
 
     forAll(preconditions, priceGen) { case ((buyer, seller, matcher, gen1, gen2, issue1), price) =>
-      val assetPair = AssetPair(Some(issue1.id), None)
+      val assetPair = AssetPair(Some(issue1.id()), None)
       val buy = Order.buy(buyer, matcher, assetPair, price, 1000000L, Ts, Ts + 1, MatcherFee)
       val sell = Order.sell(seller, matcher, assetPair, price, 1L, Ts, Ts + 1, MatcherFee)
       val tx = createExTx(buy, sell, price, matcher, Ts).explicitGet()
@@ -131,7 +129,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Gene
     } yield (buyer, seller, matcher, gen1, gen2, issue1)
 
     forAll(preconditions, priceGen) { case ((buyer, seller, matcher, gen1, gen2, issue1), price) =>
-      val assetPair = AssetPair(Some(issue1.id), None)
+      val assetPair = AssetPair(Some(issue1.id()), None)
       val buy = Order.buy(buyer, matcher, assetPair, price, issue1.quantity + 1, Ts, Ts + 1, MatcherFee)
       val sell = Order.sell(seller, matcher, assetPair, price, issue1.quantity + 1, Ts, Ts + 1, MatcherFee)
       val tx = createExTx(buy, sell, price, matcher, Ts).explicitGet()

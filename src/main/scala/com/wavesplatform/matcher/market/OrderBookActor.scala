@@ -11,8 +11,9 @@ import com.wavesplatform.matcher.market.OrderHistoryActor._
 import com.wavesplatform.matcher.model.Events.{Event, ExchangeTransactionCreated, OrderAdded, OrderExecuted}
 import com.wavesplatform.matcher.model.MatcherModel._
 import com.wavesplatform.matcher.model._
+import com.wavesplatform.network._
 import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state2.reader.StateReader
+import com.wavesplatform.state2.StateReader
 import io.netty.channel.group.ChannelGroup
 import play.api.libs.json._
 import scorex.crypto.encode.Base58
@@ -26,8 +27,6 @@ import scala.annotation.tailrec
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 
-import com.wavesplatform.network._
-
 class OrderBookActor(assetPair: AssetPair,
                      val orderHistory: ActorRef,
                      val storedState: StateReader,
@@ -39,30 +38,23 @@ class OrderBookActor(assetPair: AssetPair,
                      val functionalitySettings: FunctionalitySettings)
   extends PersistentActor with Stash with ScorexLogging with ExchangeTransactionCreator {
   override def persistenceId: String = OrderBookActor.name(assetPair)
-
+  private val snapshotCancellable = context.system.scheduler.schedule(settings.snapshotsInterval, settings.snapshotsInterval, self, SaveSnapshot)
+  private val cleanupCancellable = context.system.scheduler.schedule(settings.orderCleanupInterval, settings.orderCleanupInterval, self, OrderCleanup)
   private var orderBook = OrderBook.empty
+  private var apiSender = Option.empty[ActorRef]
+  private var cancellable = Option.empty[Cancellable]
+  private def fullCommands: Receive = readOnlyCommands orElse snapshotsCommands orElse executeCommands
 
-  context.system.scheduler.schedule(settings.snapshotsInterval, settings.snapshotsInterval, self, SaveSnapshot)
-
-  override def postStop(): Unit = {
-    log.info(context.self.toString() + " - postStop method")
-  }
-
-  var apiSender = Option.empty[ActorRef]
-  var cancellable = Option.empty[Cancellable]
-
-  override def receiveCommand: Receive = fullCommands
-
-  def fullCommands: Receive = readOnlyCommands orElse snapshotsCommands orElse executeCommands
-
-  def executeCommands: Receive = {
+  private def executeCommands: Receive = {
     case order: Order =>
       onAddOrder(order)
     case cancel: CancelOrder =>
       onCancelOrder(cancel)
+    case OrderCleanup =>
+      onOrderCleanup(orderBook, NTP.correctedTime())
   }
 
-  def snapshotsCommands: Receive = {
+  private def snapshotsCommands: Receive = {
     case SaveSnapshot =>
       deleteSnapshots(SnapshotSelectionCriteria.Latest)
       saveSnapshot(Snapshot(orderBook))
@@ -79,7 +71,7 @@ class OrderBookActor(assetPair: AssetPair,
       sender() ! GetOrderBookResponse(pair, Seq(), Seq())
   }
 
-  def waitingValidation: Receive = readOnlyCommands orElse {
+  private def waitingValidation: Receive = readOnlyCommands orElse {
     case ValidationTimeoutExceeded =>
       log.warn("Validation timeout exceeded, skip incoming request")
       becomeFullCommands()
@@ -88,13 +80,13 @@ class OrderBookActor(assetPair: AssetPair,
       handleValidateOrderResult(res)
     case ValidateCancelResult(res) =>
       cancellable.foreach(_.cancel())
-      handleValidateCancelResult(res)
+      handleValidateCancelResult(res.map(x => x.orderId))
     case ev =>
       log.info("Stashed: " + ev)
       stash()
   }
 
-  def readOnlyCommands: Receive = {
+  private def readOnlyCommands: Receive = {
     case GetOrdersRequest =>
       sender() ! GetOrdersResponse(orderBook.asks.values.flatten.toSeq ++ orderBook.bids.values.flatten.toSeq)
     case GetAskOrdersRequest =>
@@ -105,23 +97,30 @@ class OrderBookActor(assetPair: AssetPair,
       handleGetOrderBook(pair, depth)
   }
 
-  def onCancelOrder(cancel: CancelOrder): Unit = {
+  private def onCancelOrder(cancel: CancelOrder): Unit = {
     orderHistory ! ValidateCancelOrder(cancel, NTP.correctedTime())
     apiSender = Some(sender())
     cancellable = Some(context.system.scheduler.scheduleOnce(ValidationTimeout, self, ValidationTimeoutExceeded))
     context.become(waitingValidation)
   }
 
-  def handleValidateCancelResult(res: Either[GenericError, CancelOrder]): Unit = {
+  private def onOrderCleanup(orderBook: OrderBook, ts: Long): Unit = {
+    orderBook.asks.values.++(orderBook.bids.values).flatten.filterNot(x => {
+      val validation = x.order.isValid(ts)
+      validation
+    }).map(_.order.idStr()).foreach(x => handleValidateCancelResult(Right(x)))
+  }
+
+  private def handleValidateCancelResult(res: Either[GenericError, String]): Unit = {
     res match {
       case Left(err) =>
         apiSender.foreach(_ ! OrderCancelRejected(err.err))
-      case Right(cancel) =>
-        OrderBook.cancelOrder(orderBook, cancel.orderId) match {
+      case Right(orderIdToCancel) =>
+        OrderBook.cancelOrder(orderBook, orderIdToCancel) match {
           case Some(oc) =>
             persist(oc) { _ =>
               handleCancelEvent(oc)
-              apiSender.foreach(_ ! OrderCanceled(cancel.orderId))
+              apiSender.foreach(_ ! OrderCanceled(orderIdToCancel))
             }
           case _ => apiSender.foreach(_ ! OrderCancelRejected("Order not found"))
         }
@@ -130,7 +129,7 @@ class OrderBookActor(assetPair: AssetPair,
     becomeFullCommands()
   }
 
-  def handleGetOrderBook(pair: AssetPair, depth: Option[Int]): Unit = {
+  private def handleGetOrderBook(pair: AssetPair, depth: Option[Int]): Unit = {
     def aggregateLevel(l: (Price, Level[LimitOrder])) = LevelAgg(l._1, l._2.foldLeft(0L)((b, o) => b + o.amount))
 
     if (pair == assetPair) {
@@ -140,36 +139,20 @@ class OrderBookActor(assetPair: AssetPair,
     } else sender() ! GetOrderBookResponse(pair, Seq(), Seq())
   }
 
-  override def receiveRecover: Receive = {
-    case evt: Event =>
-      log.debug("Event: {}", evt)
-      applyEvent(evt)
-      if (settings.isMigrateToNewOrderHistoryStorage) {
-        orderHistory ! evt
-      }
-    case RecoveryCompleted => log.info(assetPair.toString() + " - Recovery completed!");
-    case SnapshotOffer(_, snapshot: Snapshot) =>
-      orderBook = snapshot.orderBook
-      if (settings.isMigrateToNewOrderHistoryStorage) {
-        orderHistory ! RecoverFromOrderBook(orderBook)
-      }
-      log.debug(s"Recovering OrderBook from snapshot: $snapshot for $persistenceId")
-  }
-
-  def onAddOrder(order: Order): Unit = {
+  private def onAddOrder(order: Order): Unit = {
     orderHistory ! ValidateOrder(order, NTP.correctedTime())
     apiSender = Some(sender())
     cancellable = Some(context.system.scheduler.scheduleOnce(ValidationTimeout, self, ValidationTimeoutExceeded))
     context.become(waitingValidation)
   }
 
-  def handleValidateOrderResult(res: Either[GenericError, Order]): Unit = {
+  private def handleValidateOrderResult(res: Either[GenericError, Order]): Unit = {
     res match {
       case Left(err) =>
         log.debug(s"Order rejected: $err.err")
         apiSender.foreach(_ ! OrderRejected(err.err))
       case Right(o) =>
-        log.debug(s"Order accepted: ${o.idStr}, trying to match ...")
+        log.debug(s"Order accepted: ${o.idStr()}, trying to match ...")
         apiSender.foreach(_ ! OrderAccepted(o))
         matchOrder(LimitOrder(o))
     }
@@ -177,12 +160,12 @@ class OrderBookActor(assetPair: AssetPair,
     becomeFullCommands()
   }
 
-  def becomeFullCommands(): Unit = {
+  private def becomeFullCommands(): Unit = {
     unstashAll()
     context.become(fullCommands)
   }
 
-  def applyEvent(e: Event): Unit = {
+  private def applyEvent(e: Event): Unit = {
     orderBook = OrderBook.updateState(orderBook, e)
   }
 
@@ -205,7 +188,7 @@ class OrderBookActor(assetPair: AssetPair,
     context.system.eventStream.publish(e)
   }
 
-  def processInvalidTransaction(event: OrderExecuted, err: ValidationError): Option[LimitOrder] = {
+  private def processInvalidTransaction(event: OrderExecuted, err: ValidationError): Option[LimitOrder] = {
     def cancelCounterOrder(): Option[LimitOrder] = {
       processEvent(Events.OrderCanceled(event.counter))
       Some(event.submitted)
@@ -216,6 +199,7 @@ class OrderBookActor(assetPair: AssetPair,
       case OrderValidationError(order, _) if order == event.submitted.order => None
       case OrderValidationError(order, _) if order == event.counter.order => cancelCounterOrder()
       case AccountBalanceError(errs) =>
+        errs.foreach(e => log.error(s"Balance error: ${e._2}"))
         if (errs.contains(event.counter.order.senderPublicKey.toAddress)) {
           cancelCounterOrder()
         }
@@ -228,7 +212,7 @@ class OrderBookActor(assetPair: AssetPair,
     }
   }
 
-  def handleMatchEvent(e: Event): Option[LimitOrder] = {
+  private def handleMatchEvent(e: Event): Option[LimitOrder] = {
     e match {
       case e: OrderAdded =>
         processEvent(e)
@@ -240,25 +224,49 @@ class OrderBookActor(assetPair: AssetPair,
           _ <- utx.putIfNew(tx)
         } yield tx) match {
           case Right(tx) if tx.isInstanceOf[ExchangeTransaction] =>
-            allChannels.broadcast(RawBytes(TransactionMessageSpec.messageCode, tx.bytes))
+            allChannels.broadcast(RawBytes(TransactionMessageSpec.messageCode, tx.bytes()))
             processEvent(event)
             context.system.eventStream.publish(ExchangeTransactionCreated(tx.asInstanceOf[ExchangeTransaction]))
             if (event.submittedRemaining > 0)
               Some(o.partial(event.submittedRemaining))
             else None
           case Left(ex) =>
-            log.info("Can't create tx for o1: " + Json.prettyPrint(o.order.json) + "\n, o2: " + Json.prettyPrint(c.order.json))
+            log.info("Can't create tx for o1: " + Json.prettyPrint(o.order.json()) + "\n, o2: " + Json.prettyPrint(c.order.json()))
             processInvalidTransaction(event, ex)
         }
       case _ => None
     }
   }
 
-  def handleCancelEvent(e: Event): Unit = {
+  private def handleCancelEvent(e: Event): Unit = {
     applyEvent(e)
     context.system.eventStream.publish(e)
   }
 
+  override def receiveCommand: Receive = fullCommands
+
+  override def receiveRecover: Receive = {
+    case evt: Event =>
+      log.debug("Event: {}", evt)
+      applyEvent(evt)
+      if (settings.isMigrateToNewOrderHistoryStorage) {
+        orderHistory ! evt
+      }
+    case RecoveryCompleted => log.info(assetPair.toString() + " - Recovery completed!");
+    case SnapshotOffer(_, snapshot: Snapshot) =>
+      orderBook = snapshot.orderBook
+      if (settings.isMigrateToNewOrderHistoryStorage) {
+        orderHistory ! RecoverFromOrderBook(orderBook)
+      }
+      log.debug(s"Recovering OrderBook from snapshot: $snapshot for $persistenceId")
+  }
+
+  override def postStop(): Unit = {
+    log.info(context.self.toString() + " - postStop method")
+    snapshotCancellable.cancel()
+    cleanupCancellable.cancel()
+    cancellable.foreach(_.cancel())
+  }
 }
 
 object OrderBookActor {
@@ -285,8 +293,10 @@ object OrderBookActor {
     def orderId: String = Base58.encode(req.orderId)
   }
 
+  case object OrderCleanup
+
   case class OrderAccepted(order: Order) extends MatcherResponse {
-    val json = Json.obj("status" -> "OrderAccepted", "message" -> order.json)
+    val json = Json.obj("status" -> "OrderAccepted", "message" -> order.json())
     val code = StatusCodes.OK
   }
 

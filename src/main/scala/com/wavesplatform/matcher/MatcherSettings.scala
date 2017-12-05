@@ -19,6 +19,7 @@ case class MatcherSettings(enable: Boolean,
                            journalDataDir: String,
                            snapshotsDataDir: String,
                            snapshotsInterval: FiniteDuration,
+                           orderCleanupInterval: FiniteDuration,
                            maxOpenOrders: Int,
                            priceAssets: Seq[String],
                            predefinedPairs: Seq[AssetPair],
@@ -46,6 +47,7 @@ object MatcherSettings {
     val journalDirectory = config.as[String](s"$configPath.journal-directory")
     val snapshotsDirectory = config.as[String](s"$configPath.snapshots-directory")
     val snapshotsInterval = config.as[FiniteDuration](s"$configPath.snapshots-interval")
+    val orderCleanupInterval = config.as[FiniteDuration](s"$configPath.order-cleanup-interval")
     val maxOpenOrders = config.as[Int](s"$configPath.max-open-orders")
     val baseAssets = config.as[List[String]](s"$configPath.price-assets")
     val basePairs: Seq[AssetPair] = config.getConfigList(s"$configPath.predefined-pairs").asScala.map { p: Config =>
@@ -64,7 +66,7 @@ object MatcherSettings {
     val blacklistedAddresses = config.as[List[String]](s"$configPath.blacklisted-addresses")
 
     MatcherSettings(enabled, account, bindAddress, port, minOrderFee, orderMatchTxFee, journalDirectory,
-      snapshotsDirectory, snapshotsInterval, maxOpenOrders, baseAssets, basePairs, maxTimestampDiff,
+      snapshotsDirectory, snapshotsInterval, orderCleanupInterval, maxOpenOrders, baseAssets, basePairs, maxTimestampDiff,
       orderHistoryFile, isMigrateToNewOrderHistoryStorage, blacklistedAssets.toSet, blacklistedNames, txHistoryFile, blacklistedAddresses.toSet)
   }
 }

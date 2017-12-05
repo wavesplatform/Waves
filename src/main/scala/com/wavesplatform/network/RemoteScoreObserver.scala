@@ -41,7 +41,7 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
               log.debug(s"${id(ctx)} Switching to second best channel $pinnedChannelId")
               secondBestChannel.writeAndFlush(LoadBlockchainExtension(lastSignatures))
             case _ =>
-              if (pinnedChannel.compareAndSet(f.channel(), null)) log.debug(s"${id(ctx)} Unpinning unconditionally")
+              if (pinnedChannel.compareAndSet(f.channel(), null)) log.trace(s"${id(ctx)} Unpinning unconditionally")
           }
         } else {
           if (pinnedChannel.compareAndSet(ctx.channel(), null))
@@ -90,7 +90,7 @@ class RemoteScoreObserver(scoreTtl: FiniteDuration, lastSignatures: => Seq[ByteS
           highScore > localScore // remote score is higher than local
       } if (pinnedChannel.compareAndSet(null, ch)) {
         // we've finished to download blocks from previous high score channel
-        log.debug(s"${id(ctx)} ${pinnedChannelId}New high score $highScore > $localScore, requesting extension")
+        log.debug(s"${id(ctx)} ${pinnedChannelId}New high score $highScore > $localScore, pinning and requesting extension")
         ctx.writeAndFlush(LoadBlockchainExtension(lastSignatures))
       } else {
         log.trace(s"${id(ctx)} New high score $highScore")

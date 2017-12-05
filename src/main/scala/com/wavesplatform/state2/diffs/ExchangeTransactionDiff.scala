@@ -3,7 +3,7 @@ package com.wavesplatform.state2.diffs
 import cats._
 import cats.implicits._
 import com.wavesplatform.state2._
-import com.wavesplatform.state2.reader.StateReader
+import com.wavesplatform.state2.reader.{SnapshotStateReader}
 import scorex.transaction.ValidationError
 import scorex.transaction.ValidationError.OrderValidationError
 import scorex.transaction.assets.exchange.ExchangeTransaction
@@ -12,7 +12,7 @@ import scala.util.Right
 
 object ExchangeTransactionDiff {
 
-  def apply(s: StateReader, height: Int)(tx: ExchangeTransaction): Either[ValidationError, Diff] = for {
+  def apply(s: SnapshotStateReader, height: Int)(tx: ExchangeTransaction): Either[ValidationError, Diff] = for {
     t <- enoughVolume(tx, s)
     buyPriceAssetChange <- t.buyOrder.getSpendAmount(t.price, t.amount).liftValidationError(tx).map(-_)
     buyAmountAssetChange <- t.buyOrder.getReceiveAmount(t.price, t.amount).liftValidationError(tx)
@@ -51,15 +51,15 @@ object ExchangeTransactionDiff {
     val portfolios = Monoid.combineAll(Seq(feeDiff, priceDiff, amountDiff))
 
     Diff(height, tx, portfolios = portfolios, orderFills = Map(
-      ByteStr(tx.buyOrder.id) -> OrderFillInfo(tx.amount, tx.buyMatcherFee),
-      ByteStr(tx.sellOrder.id) -> OrderFillInfo(tx.amount, tx.sellMatcherFee)
+      ByteStr(tx.buyOrder.id()) -> OrderFillInfo(tx.amount, tx.buyMatcherFee),
+      ByteStr(tx.sellOrder.id()) -> OrderFillInfo(tx.amount, tx.sellMatcherFee)
     ))
   }
 
 
-  private def enoughVolume(exTrans: ExchangeTransaction, s: StateReader): Either[ValidationError, ExchangeTransaction] = {
-    val filledBuy = s.filledVolumeAndFee(ByteStr(exTrans.buyOrder.id))
-    val filledSell = s.filledVolumeAndFee(ByteStr(exTrans.sellOrder.id))
+  private def enoughVolume(exTrans: ExchangeTransaction, s: SnapshotStateReader): Either[ValidationError, ExchangeTransaction] = {
+    val filledBuy = s.filledVolumeAndFee(ByteStr(exTrans.buyOrder.id()))
+    val filledSell = s.filledVolumeAndFee(ByteStr(exTrans.sellOrder.id()))
 
     val buyTotal = filledBuy.volume + exTrans.amount
     val sellTotal = filledSell.volume + exTrans.amount

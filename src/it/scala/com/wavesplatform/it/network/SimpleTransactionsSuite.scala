@@ -4,6 +4,7 @@ import java.nio.charset.StandardCharsets
 
 import com.wavesplatform.it._
 import com.wavesplatform.it.api.NodeApi
+import com.wavesplatform.it.api.NodeApi.BlacklistedPeer
 import com.wavesplatform.network.{RawBytes, TransactionMessageSpec}
 import org.scalatest._
 import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
@@ -11,7 +12,6 @@ import scorex.account.{Address, PrivateKeyAccount}
 import scorex.crypto.encode.Base58
 import scorex.transaction.PaymentTransaction
 
-import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
@@ -22,10 +22,15 @@ class SimpleTransactionsSuite extends FunSuite with BeforeAndAfterAll with Match
   with IntegrationPatience with RecoverMethods with RequestErrorAssert with IntegrationNodesInitializationAndStopping
   with IntegrationTestsScheme {
 
-  override val docker = new Docker()
+  private val waitCompletion = 2.minutes
+  override lazy val nodes: Seq[Node] = docker.startNodes(
+    NodeConfigs.newBuilder
+      .overrideBase(_.quorum(2))
+      .withDefault(3)
+      .build
+  )
 
-  override val nodes = Docker.NodeConfigs.getConfigList("nodes").asScala.take(3).map(docker.startNode)
-  val node = nodes.head
+  private lazy val node = nodes.head
 
   test("valid tx send by network to node should be in blockchain") {
     val tx = PaymentTransaction.create(
@@ -35,16 +40,16 @@ class SimpleTransactionsSuite extends FunSuite with BeforeAndAfterAll with Match
       100000L,
       System.currentTimeMillis()).right.get
     val f = for {
-      _ <- node.sendByNetwork(RawBytes(TransactionMessageSpec.messageCode, tx.bytes))
+      _ <- node.sendByNetwork(RawBytes(TransactionMessageSpec.messageCode, tx.bytes()))
       _ <- Future.successful(Thread.sleep(2000))
 
       height <- traverse(nodes)(_.height).map(_.max)
       _ <- traverse(nodes)(_.waitForHeight(height + 1))
-      tx <- node.waitForTransaction(tx.id.base58)
+      tx <- node.waitForTransaction(tx.id().base58)
     } yield {
       tx shouldBe NodeApi.Transaction(tx.`type`, tx.id, tx.fee, tx.timestamp)
     }
-    Await.result(f, 60.seconds)
+    Await.result(f, waitCompletion)
   }
 
   test("invalid tx send by network to node should be not in UTX or blockchain") {
@@ -55,20 +60,19 @@ class SimpleTransactionsSuite extends FunSuite with BeforeAndAfterAll with Match
       100000L,
       System.currentTimeMillis() + (1 days).toMillis).right.get
     val f = for {
-      _ <- node.sendByNetwork(RawBytes(TransactionMessageSpec.messageCode, tx.bytes))
+      _ <- node.sendByNetwork(RawBytes(TransactionMessageSpec.messageCode, tx.bytes()))
       _ <- Future.successful(Thread.sleep(2000))
-      _ <- Future.sequence(nodes.map(_.ensureTxDoesntExist(tx.id.base58)))
+      _ <- Future.sequence(nodes.map(_.ensureTxDoesntExist(tx.id().base58)))
     } yield ()
-    Await.result(f, 60.seconds)
+    Await.result(f, waitCompletion)
   }
 
   test("should blacklist senders of non-parsable transactions") {
     val f = for {
       blacklistBefore <- node.blacklistedPeers
       _ <- node.sendByNetwork(RawBytes(TransactionMessageSpec.messageCode, "foobar".getBytes(StandardCharsets.UTF_8)))
-      _ <- Future.successful(Thread.sleep(2000))
-      blacklistAfter <- node.blacklistedPeers
-    } yield blacklistAfter.size should be > blacklistBefore.size
-    Await.result(f, 60.seconds)
+      _ <- node.waitFor[Seq[BlacklistedPeer]](_.blacklistedPeers, _.size > blacklistBefore.size, 500.millis)
+    } yield ()
+    Await.result(f, waitCompletion)
   }
 }

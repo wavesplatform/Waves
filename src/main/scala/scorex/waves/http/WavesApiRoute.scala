@@ -47,15 +47,13 @@ case class WavesApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPool
     )
   ))
   @ApiResponses(Array(new ApiResponse(code = 200, message = "Json with response or error")))
-  def payment: Route = withAuth {
-    (path("payment") & post) {
-      json[PaymentRequest] { payment =>
-        doBroadcast(TransactionFactory.createPayment(payment, wallet, time)) map { f =>
-          f.map { t =>
-            val tx = t.asInstanceOf[PaymentTransaction]
-            SignedPaymentRequest(tx.timestamp, tx.amount, tx.fee, tx.recipient.address,
-              Base58.encode(tx.sender.publicKey), tx.sender.address, tx.signature.base58)
-          }
+  def payment: Route = (path("payment") & post & withAuth) {
+    json[PaymentRequest] { payment =>
+      doBroadcast(TransactionFactory.createPayment(payment, wallet, time)) map { f =>
+        f.map { t =>
+          val tx = t.asInstanceOf[PaymentTransaction]
+          SignedPaymentRequest(tx.timestamp, tx.amount, tx.fee, tx.recipient.address,
+            Base58.encode(tx.sender.publicKey), tx.sender.address, tx.signature.base58)
         }
       }
     }

@@ -1,9 +1,9 @@
 package com.wavesplatform.network
 
-import java.net.InetSocketAddress
+import java.net.{InetSocketAddress, SocketAddress}
 
 case class PeerInfo(
-    remoteAddress: InetSocketAddress,
+    remoteAddress: SocketAddress,
     declaredAddress: Option[InetSocketAddress],
     applicationName: String,
     applicationVersion: (Int, Int, Int),

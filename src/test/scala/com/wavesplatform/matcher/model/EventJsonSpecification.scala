@@ -1,5 +1,6 @@
 package com.wavesplatform.matcher.model
 
+import com.wavesplatform.NoShrink
 import com.wavesplatform.matcher.MatcherTestData
 import com.wavesplatform.matcher.market.MatcherActor.OrderBookCreated
 import com.wavesplatform.matcher.market.OrderBookActor.Snapshot
@@ -17,7 +18,8 @@ import scala.collection.immutable.TreeMap
 class EventJsonSpecification extends PropSpec
   with PropertyChecks
   with Matchers
-  with MatcherTestData {
+  with MatcherTestData
+  with NoShrink {
 
   val pair = AssetPair(Some(ByteStr("BTC".getBytes)), Some(ByteStr("WAVES".getBytes)))
 

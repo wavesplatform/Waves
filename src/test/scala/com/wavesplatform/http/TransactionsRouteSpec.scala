@@ -2,10 +2,10 @@ package com.wavesplatform.http
 
 import akka.http.scaladsl.model.StatusCodes
 import com.wavesplatform.http.ApiMarshallers._
-import com.wavesplatform.state2.reader.StateReader
-import com.wavesplatform.{BlockGen, TransactionGen, UtxPool}
+import com.wavesplatform.state2.reader.SnapshotStateReader
+import com.wavesplatform.{BlockGen, NoShrink, TransactionGen, UtxPool}
+import monix.eval.Coeval
 import org.scalacheck.Gen._
-import org.scalacheck.Shrink
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers
 import org.scalatest.prop.PropertyChecks
@@ -16,18 +16,23 @@ import scorex.crypto.encode.Base58
 import scorex.transaction._
 
 class TransactionsRouteSpec extends RouteSpec("/transactions")
-  with RestAPISettingsHelper with MockFactory with Matchers with TransactionGen with BlockGen with PropertyChecks {
+  with RestAPISettingsHelper
+  with MockFactory
+  with Matchers
+  with TransactionGen
+  with BlockGen
+  with PropertyChecks
+  with NoShrink {
 
   import TransactionsApiRoute.MaxTransactionsPerRequest
 
   private val transactionsCount = 10
 
   private val history = mock[History]
-  private val state = mock[StateReader]
+  private val state = mock[SnapshotStateReader]
   private val utx = mock[UtxPool]
-  private val route = TransactionsApiRoute(restAPISettings, state, history, utx).route
+  private val route = TransactionsApiRoute(restAPISettings, Coeval.now(state), history, utx).route
 
-  private implicit def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)
 
   routePath("/address/{address}/limit/{limit}") - {
     "handles invalid address" in {
@@ -54,9 +59,9 @@ class TransactionsRouteSpec extends RouteSpec("/transactions")
         accountGen,
         choose(1, MaxTransactionsPerRequest),
         randomTransactionsGen(transactionsCount)) { case (account, limit, txs) =>
-        (state.accountTransactionIds _).expects(account: Address, limit).returning(txs.map(_.id)).once()
+        (state.accountTransactionIds _).expects(account: Address, limit).returning(txs.map(_.id())).once()
         txs.foreach { tx =>
-          (state.transactionInfo _).expects(tx.id).returning(Some((1, tx))).once()
+          (state.transactionInfo _).expects(tx.id()).returning(Some((1, tx))).once()
         }
         Get(routePath(s"/address/${account.address}/limit/$limit")) ~> route ~> check {
           responseAs[Seq[JsValue]].length shouldEqual txs.length.min(limit)
@@ -82,10 +87,10 @@ class TransactionsRouteSpec extends RouteSpec("/transactions")
       } yield (tx, height)
 
       forAll(txAvailability) { case (tx, height) =>
-        (state.transactionInfo _).expects(tx.id).returning(Some((height, tx))).once()
-        Get(routePath(s"/info/${tx.id.base58}")) ~> route ~> check {
+        (state.transactionInfo _).expects(tx.id()).returning(Some((height, tx))).once()
+        Get(routePath(s"/info/${tx.id().base58}")) ~> route ~> check {
           status shouldEqual StatusCodes.OK
-          responseAs[JsValue] shouldEqual tx.json + ("height" -> JsNumber(height))
+          responseAs[JsValue] shouldEqual tx.json() + ("height" -> JsNumber(height))
         }
       }
     }
@@ -139,10 +144,10 @@ class TransactionsRouteSpec extends RouteSpec("/transactions")
 
     "working properly otherwise" in {
       forAll(randomTransactionGen) { tx =>
-        (utx.transactionById _).expects(tx.id).returns(Some(tx)).once()
-        Get(routePath(s"/unconfirmed/info/${tx.id.base58}")) ~> route ~> check {
+        (utx.transactionById _).expects(tx.id()).returns(Some(tx)).once()
+        Get(routePath(s"/unconfirmed/info/${tx.id().base58}")) ~> route ~> check {
           status shouldEqual StatusCodes.OK
-          responseAs[JsValue] shouldEqual tx.json
+          responseAs[JsValue] shouldEqual tx.json()
         }
       }
     }
