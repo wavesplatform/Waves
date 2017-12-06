@@ -11,6 +11,7 @@ import monix.reactive.subjects.ConcurrentSubject
 import scorex.block.Block
 import scorex.block.Block.BlockId
 import scorex.transaction.History.BlockchainScore
+import scorex.transaction.ValidationError.GenericError
 import scorex.transaction.{NgHistory, ValidationError}
 import scorex.utils.ScorexLogging
 
@@ -149,11 +150,16 @@ object RxExtensionLoader extends ScorexLogging {
     }
 
     def applyExtension(extensionBlocks: ExtensionBlocks, ch: Channel): CancelableFuture[Unit] = {
-      extensionApplier(ch, extensionBlocks).flatMap { ar =>
-        Task {
-          s = onExetensionApplied(s, extensionBlocks, ch, ar)
-        }.executeOn(scheduler)
-      }.runAsync(scheduler)
+      extensionApplier(ch, extensionBlocks)
+        .onErrorHandle(err => {
+          log.error("Error applying extension", err)
+          Left(GenericError(err))
+        })
+        .flatMap { ar =>
+          Task {
+            s = onExetensionApplied(s, extensionBlocks, ch, ar)
+          }.executeOn(scheduler)
+        }.runAsync(scheduler)
     }
 
     def onExetensionApplied(state: State, extension: ExtensionBlocks, ch: Channel, applicationResult: Either[ValidationError, Option[BlockchainScore]]): State = {
