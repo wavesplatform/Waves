@@ -6,16 +6,17 @@ import akka.persistence.inmemory.extension.{InMemoryJournalStorage, StorageExten
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
 import com.wavesplatform.UtxPool
 import com.wavesplatform.matcher.MatcherTestData
-import com.wavesplatform.matcher.api.StatusCodeMatcherResponse
+import com.wavesplatform.matcher.api.{CancelOrderRequest, StatusCodeMatcherResponse}
+import com.wavesplatform.matcher.api.CancelOrderRequest._
 import com.wavesplatform.matcher.fixtures.RestartableActor
 import com.wavesplatform.matcher.fixtures.RestartableActor.RestartActor
 import com.wavesplatform.matcher.market.MatcherActor.{GetMarkets, GetMarketsResponse, MarketData}
 import com.wavesplatform.matcher.market.OrderBookActor._
-import com.wavesplatform.matcher.market.OrderHistoryActor.{ValidateOrder, ValidateOrderResult}
+import com.wavesplatform.matcher.market.OrderHistoryActor._
 import com.wavesplatform.matcher.model.LevelAgg
 import com.wavesplatform.settings.WalletSettings
-import com.wavesplatform.state2.reader.{SnapshotStateReader}
 import com.wavesplatform.state2.{AssetInfo, ByteStr, LeaseInfo, Portfolio}
+import com.wavesplatform.state2.reader.SnapshotStateReader
 import io.netty.channel.group.ChannelGroup
 import monix.eval.Coeval
 import org.h2.mvstore.MVStore
@@ -23,9 +24,9 @@ import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Matchers, WordSpecLike}
 import scorex.account.PrivateKeyAccount
 import scorex.settings.TestFunctionalitySettings
+import scorex.transaction.{AssetId, History}
 import scorex.transaction.assets.IssueTransaction
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
-import scorex.transaction.{AssetId, History}
 import scorex.utils.{NTP, ScorexLogging}
 import scorex.wallet.Wallet
 
@@ -49,9 +50,16 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest2"
   wallet.generateNewAccount()
 
   val orderHistoryRef = TestActorRef(new Actor {
+    var orders = Map.empty[String, Order]
     def receive: Receive = {
-      case ValidateOrder(o, _) => sender() ! ValidateOrderResult(Right(o))
+      case ValidateOrder(o, _) => {
+        orders += (o.idStr.value -> o)
+        sender() ! ValidateOrderResult(Right(o))
+      }
+      case GetOrder(id) => sender() ! orders.get(id)
+      case ValidateCancelOrder(cancel, _) => sender() ! ValidateCancelResult(Right(cancel))
       case _ =>
+
     }
   })
   var actor: ActorRef = system.actorOf(Props(new MatcherActor(orderHistoryRef, Coeval.now(storedState), wallet,
@@ -159,7 +167,6 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest2"
     "return all open markets" in {
       val a1 = strToSomeAssetId("123")
       val a2 = strToSomeAssetId("234")
-
       val pair = AssetPair(a2, a1)
       val order = buy(pair, 1, 2000)
 
@@ -176,6 +183,20 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest2"
         MarketData(_, "Unknown", "Unknown", _, _, _))) =>
           publicKey shouldBe MatcherAccount.publicKey
       }
+    }
+
+    "Cancel order by id" in {
+      val a1 = strToSomeAssetId("123")
+      val a2 = strToSomeAssetId("234")
+      val pair = AssetPair(a2, a1)
+      val sender = PrivateKeyAccount(scorex.utils.randomBytes())
+      val order = buy(pair, 1, 2000, Some(sender))
+      val cancel = CancelOrderRequest.sign(CancelOrderRequest(sender, order.id.value, Array.emptyByteArray), sender)
+
+      actor ! order
+      expectMsg(OrderAccepted(order))
+      actor ! MatcherActor.CancelOrder(order.idStr.value, cancel)
+      expectMsg(OrderCanceled(order.idStr.value))
     }
 
     "GetOrderBookRequest to the blacklisted asset" in {

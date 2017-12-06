@@ -9,6 +9,7 @@ import akka.pattern.ask
 import akka.util.Timeout
 import com.google.common.primitives.Longs
 import com.wavesplatform.matcher.MatcherSettings
+import com.wavesplatform.matcher.market.MatcherActor
 import com.wavesplatform.matcher.market.MatcherActor.{GetMarkets, GetMarketsResponse}
 import com.wavesplatform.matcher.market.MatcherTransactionWriter.GetTransactionsByOrder
 import com.wavesplatform.matcher.market.OrderBookActor._
@@ -127,6 +128,29 @@ case class MatcherApiRoute(wallet: Wallet,
           .mapTo[MatcherResponse]
           .map(r => r.code -> r.json)
       }
+    }
+  }
+
+  @Path("/orderbook/{orderId}/cancel")
+  @ApiOperation(value = "Cancel order",
+    notes = "Cancel previously submitted order if it's not already filled completely",
+    httpMethod = "POST",
+    produces = "application/json",
+    consumes = "application/json")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(
+      name = "body",
+      value = "Json with data",
+      required = true,
+      paramType = "body",
+      dataType = "com.wavesplatform.matcher.api.CancelOrderRequest"
+    )
+  ))
+  def cancelById: Route = (path("orderbook" / Segment / "cancel") & post) { orderId =>
+    json[CancelOrderRequest] { req =>
+      (matcher ? MatcherActor.CancelOrder(orderId, req))
+        .mapTo[MatcherResponse]
+        .map(r => r.code -> r.json)
     }
   }
 
