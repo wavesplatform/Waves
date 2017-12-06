@@ -214,21 +214,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
 object Application extends ScorexLogging {
 
-  private def configureLogging(settings: WavesSettings): Unit = {
-    import ch.qos.logback.classic.{Level, LoggerContext}
-    import org.slf4j._
-
-    val lc = LoggerFactory.getILoggerFactory.asInstanceOf[LoggerContext]
-    val rootLogger = lc.getLogger(Logger.ROOT_LOGGER_NAME)
-    settings.loggingLevel match {
-      case LogLevel.TRACE => rootLogger.setLevel(Level.TRACE)
-      case LogLevel.DEBUG => rootLogger.setLevel(Level.DEBUG)
-      case LogLevel.INFO => rootLogger.setLevel(Level.INFO)
-      case LogLevel.WARN => rootLogger.setLevel(Level.WARN)
-      case LogLevel.ERROR => rootLogger.setLevel(Level.ERROR)
-    }
-  }
-
   private def readConfig(userConfigPath: Option[String]): Config = {
     val maybeConfigFile = for {
       maybeFilename <- userConfigPath
@@ -268,9 +253,11 @@ object Application extends ScorexLogging {
     SLF4JBridgeHandler.removeHandlersForRootLogger()
     SLF4JBridgeHandler.install()
 
-    log.info("Starting...")
-
     val config = readConfig(args.headOption)
+
+    // DO NOT LOG BEFORE THIS LINE, THIS PROPERTY IS USED IN logback.xml
+    System.setProperty("waves.directory", config.getString("waves.directory"))
+
     val configForLogs = Seq(
       "awt",
       "ftp",
@@ -293,6 +280,7 @@ object Application extends ScorexLogging {
       "Configuration" -> s"\n===\n${configForLogs.root().render(ConfigRenderOptions.defaults().setOriginComments(false).setComments(false))}\n==="
     )
 
+    log.info("Starting...")
     log.debug(logInfo.map { case (n, v) => s"$n: $v" }.mkString("\n"))
 
     val settings = WavesSettings.fromConfig(config)
@@ -317,8 +305,6 @@ object Application extends ScorexLogging {
           )
         }
       }
-
-      configureLogging(settings)
 
       // Initialize global var with actual address scheme
       AddressScheme.current = new AddressScheme {

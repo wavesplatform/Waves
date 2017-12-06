@@ -1,6 +1,5 @@
 package com.wavesplatform.matcher.model
 
-import ch.qos.logback.classic.Level
 import com.wavesplatform.matcher.MatcherTestData
 import com.wavesplatform.matcher.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
 import com.wavesplatform.state2.ByteStr
@@ -21,8 +20,6 @@ class OrderHistorySpecification extends PropSpec
   val pair = AssetPair(Some(ByteStr("WCT".getBytes)), Some(ByteStr("BTC".getBytes)))
   var storage = new OrderHistoryStorage(new MVStore.Builder().open())
   var oh = OrderHistoryImpl(storage)
-
-  var prevLogLevel = Level.INFO
 
   override protected def beforeEach(): Unit = {
     storage = new OrderHistoryStorage(new MVStore.Builder().open())
