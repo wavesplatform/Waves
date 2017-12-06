@@ -33,23 +33,20 @@ object RxScoreObserver extends ScorexLogging {
   }
 
   private def calcSyncWith(bestChannel: Option[Channel], localScore: BlockchainScore, scoreMap: scala.collection.Map[Channel, BlockchainScore]): SyncWith = {
-    val betterChannels = scoreMap.filter(_._2 > localScore)
-    if (betterChannels.isEmpty) {
-      log.debug(s"No better scores of remote peers, sync complete. Current local score = $localScore")
-      None
-    } else {
-      val groupedByScore = betterChannels.toList.groupBy(_._2)
-      val bestScore = groupedByScore.keySet.max
-      val bestChannels = groupedByScore(bestScore).map(_._1)
-      bestChannel match {
-        case Some(c) if bestChannels contains c =>
-          Some(BestChannel(c, bestScore))
-        case _ =>
-          val head = bestChannels.head
-          log.trace(s"${id(head)} Publishing new best channel with score=$bestScore > localScore $localScore")
-          Some(BestChannel(head, bestScore))
-      }
+    val (bestScore, bestScoreChannels) = scoreMap.foldLeft(BigInt(0) -> List.empty[Channel]) {
+      case (r@(maxScore, maxScoreChannels), (currScoreChannel, currScore)) =>
+        if (currScore > maxScore) currScore -> List(currScoreChannel)
+        else if (currScore == maxScore) maxScore -> (currScoreChannel :: maxScoreChannels)
+        else r
     }
+
+    if (bestScore > localScore && bestScoreChannels.nonEmpty) bestChannel match {
+      case Some(c) if bestScoreChannels.contains(c) => Some(BestChannel(c, bestScore))
+      case _ =>
+        val head = bestScoreChannels.head
+        log.trace(s"${id(head)} Publishing new best channel with score=$bestScore > localScore $localScore")
+        Some(BestChannel(head, bestScore))
+    } else None
   }
 
   def apply(scoreTtl: FiniteDuration,
@@ -70,7 +67,7 @@ object RxScoreObserver extends ScorexLogging {
       .observeOn(scheduler)
       .distinctUntilChanged
       .map { x =>
-        log.debug(s"New local score: $x - $localScore = ${x - localScore}")
+        log.debug(s"New local score: $x, old: $localScore, Δ${x - localScore}")
         localScore = x
         None
       }
