@@ -83,7 +83,7 @@ class LeasingTransactionsSuite extends BaseTransactionSuite with CancelAfterFail
         .zip(assertBalances(secondAddress, 100.waves, 180.waves))
 
       status1 <- status(createdLeaseTxId)
-      _ = assert(status1 == Active.toString)
+      _ = assert(status1 == Active)
 
       createdCancelLeaseTxId <- sender.cancelLease(firstAddress, createdLeaseTxId, fee = 5.waves).map(_.id)
       _ <- waitForHeightAraiseAndTxPresent(createdCancelLeaseTxId, 1)
@@ -91,7 +91,7 @@ class LeasingTransactionsSuite extends BaseTransactionSuite with CancelAfterFail
         .zip(assertBalances(secondAddress, 100.waves, 110.waves))
 
       status2 <- status(createdLeaseTxId)
-      _ = assert(status2 == Canceled.toString)
+      _ = assert(status2 == Canceled)
     } yield succeed
 
     Await.result(f, waitCompletion)
