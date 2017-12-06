@@ -7,7 +7,6 @@ import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
 import com.wavesplatform.UtxPool
 import com.wavesplatform.matcher.MatcherTestData
 import com.wavesplatform.matcher.api.{CancelOrderRequest, StatusCodeMatcherResponse}
-import com.wavesplatform.matcher.api.CancelOrderRequest._
 import com.wavesplatform.matcher.fixtures.RestartableActor
 import com.wavesplatform.matcher.fixtures.RestartableActor.RestartActor
 import com.wavesplatform.matcher.market.MatcherActor.{GetMarkets, GetMarketsResponse, MarketData}
