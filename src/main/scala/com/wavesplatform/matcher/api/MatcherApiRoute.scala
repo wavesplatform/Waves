@@ -221,6 +221,20 @@ case class MatcherApiRoute(wallet: Wallet,
     }
   }
 
+  @Path("/orders/cancel/{orderId}")
+  @ApiOperation(value = "Cancel Order by ID without signature",
+    notes = "Cancel Order by ID without signature",
+    httpMethod = "POST")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(name = "orderId", value = "Order Id", required = true, dataType = "string", paramType = "path")
+  ))
+  def forceCancelOrder: Route = (path("orders" / "cancel" / Segment) & post & withAuth) { orderId =>
+    implicit val timeout = Timeout(10.seconds)
+    complete((orderHistory ? ForceCancelOrder(orderId))
+      .mapTo[MatcherResponse]
+      .map(r => r.code -> r.json))
+  }
+
   @Path("/orders/{address}")
   @ApiOperation(value = "All Order History by address",
     notes = "Get All Order History for a given address",
