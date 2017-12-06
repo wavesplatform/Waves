@@ -9,11 +9,10 @@ import com.wavesplatform.settings.NetworkSettings
 import com.wavesplatform.utils.JsonFileStorage
 import io.netty.channel.Channel
 import io.netty.channel.socket.nio.NioSocketChannel
-import play.api.libs.json._
 import scorex.utils.ScorexLogging
 
-import scala.collection._
 import scala.collection.JavaConverters._
+import scala.collection._
 import scala.concurrent.duration.FiniteDuration
 import scala.util.Random
 import scala.util.control.NonFatal
@@ -24,10 +23,7 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Scor
     .expireAfterWrite(timeout.toMillis, TimeUnit.MILLISECONDS)
     .build[T, java.lang.Long]()
 
-  case class Peer(hostname: String, port: Int)
-  implicit val format: OFormat[Peer] = Json.format[Peer]
-
-  private type PeersPersistenceType = Set[Peer]
+  private type PeersPersistenceType = Set[String]
   private val peersPersistence = cache[InetSocketAddress](settings.peersDataResidenceTime)
   private val blacklist = cache[InetAddress](settings.blackListResidenceTime)
   private val suspension = cache[InetAddress](settings.suspensionResidenceTime)
@@ -39,19 +35,11 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Scor
     doTouch(a, Long.MaxValue)
   }
 
-  settings.file.filter(_.exists()).foreach(f => {
-    try {
-      JsonFileStorage.load[PeersPersistenceType](f.getCanonicalPath).foreach(a => touch(new InetSocketAddress(a.hostname, a.port)))
-      log.info(s"${f.getName} loaded, total peers: ${peersPersistence.size}")
-    }
-    catch {
-      case NonFatal(e) =>
-        log.warn("Old or invalid version peers.dat, ignoring, starting all over from known-peers...", e)
-    }
-  })
-
-  if (!settings.enableBlacklisting) {
-    clearBlacklist()
+  for (f <- settings.file if f.exists()) try {
+    JsonFileStorage.load[PeersPersistenceType](f.getCanonicalPath).foreach(a => touch(inetSocketAddress(a, 6863)))
+    log.info(s"Loaded ${peersPersistence.size} known peer(s) from ${f.getName}")
+  } catch {
+    case NonFatal(_) => log.info("Legacy or corrupted peers.dat, ignoring, starting all over from known-peers...")
   }
 
   override def addCandidate(socketAddress: InetSocketAddress): Boolean = unverifiedPeers.synchronized {
@@ -84,11 +72,9 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Scor
     }
   }
 
-  override def knownPeers: immutable.Map[InetSocketAddress, Long] = {
-    ((x: Map[InetSocketAddress, Long]) =>
-      if(settings.enableBlacklisting) x.filterKeys(address => !blacklistedHosts.contains(address.getAddress))
-      else x)(peersPersistence.asMap().asScala.mapValues(_.toLong)).toMap
-  }
+  override def knownPeers: immutable.Map[InetSocketAddress, Long] = peersPersistence.asMap().asScala.collect {
+    case (addr, ts) if !(settings.enableBlacklisting && blacklistedHosts.contains(addr.getAddress)) => addr -> ts.toLong
+  }.toMap
 
   override def blacklistedHosts: immutable.Set[InetAddress] = blacklist.asMap().asScala.keys.toSet
 
@@ -120,11 +106,11 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Scor
     reasons.clear()
   }
 
-  override def close(): Unit = {
-    settings.file.foreach(f => {
-      log.info(s"Saving ${f.getName}, total peers: ${peersPersistence.size}")
-      JsonFileStorage.save[PeersPersistenceType](knownPeers.keySet.map(i => Peer(i.getHostName, i.getPort)), f.getCanonicalPath)
-    })
+  override def close(): Unit = settings.file.foreach { f =>
+    log.info(s"Saving ${knownPeers.size} known peer(s) to ${f.getName}")
+    JsonFileStorage.save[PeersPersistenceType](
+      knownPeers.keySet.map(i => s"${i.getAddress.getHostAddress}:${i.getPort}"),
+      f.getCanonicalPath)
   }
 
   override def blacklistAndClose(channel: Channel, reason: String): Unit = {
