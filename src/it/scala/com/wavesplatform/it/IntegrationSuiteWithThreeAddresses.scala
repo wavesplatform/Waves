@@ -27,9 +27,9 @@ trait IntegrationSuiteWithThreeAddresses extends BeforeAndAfterAll with Matchers
 
   protected val defaultBalance: Long = 100.waves
 
-  protected lazy val firstAddress: String = Await.result(sender.createAddress, 1.minutes)
-  protected lazy val secondAddress: String = Await.result(sender.createAddress, 1.minutes)
-  protected lazy val thirdAddress: String = Await.result(sender.createAddress, 1.minutes)
+  protected lazy val firstAddress: String = Await.result(sender.createAddress, 2.minutes)
+  protected lazy val secondAddress: String = Await.result(sender.createAddress, 2.minutes)
+  protected lazy val thirdAddress: String = Await.result(sender.createAddress, 2.minutes)
 
   protected def accountEffectiveBalance(acc: String): Future[Long] = sender.effectiveBalance(acc).map(_.balance)
 
@@ -69,6 +69,7 @@ trait IntegrationSuiteWithThreeAddresses extends BeforeAndAfterAll with Matchers
   // so we await tx twice
   protected def waitForHeightAraiseAndTxPresent(transactionId: String, heightIncreaseOn: Integer): Future[Unit] = for {
     height <- traverse(nodes)(_.height).map(_.max)
+    _ <- waitForSameBlocksAt(nodes, 2.seconds, height)
     _ <- traverse(nodes)(_.waitForTransaction(transactionId))
     _ <- traverse(nodes)(_.waitForHeight(height + heightIncreaseOn))
     _ <- traverse(nodes)(_.waitForTransaction(transactionId))

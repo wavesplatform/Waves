@@ -9,7 +9,8 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
 import akka.http.scaladsl.server.Route
 import akka.stream.ActorMaterializer
-import com.typesafe.config.{Config, ConfigFactory, ConfigObject}
+import cats.instances.all._
+import com.typesafe.config.{Config, ConfigFactory, ConfigObject, ConfigRenderOptions}
 import com.wavesplatform.actor.RootActorSystem
 import com.wavesplatform.features.api.ActivationApiRoute
 import com.wavesplatform.history.{CheckpointServiceImpl, StorageFactory}
@@ -17,7 +18,7 @@ import com.wavesplatform.http.NodeApiRoute
 import com.wavesplatform.matcher.Matcher
 import com.wavesplatform.metrics.Metrics
 import com.wavesplatform.mining.{Miner, MinerImpl}
-import com.wavesplatform.network.{InvalidBlockStorageImpl, MicroBlockSynchronizer, NetworkServer, PeerDatabaseImpl, PeerInfo, RxExtensionLoader, RxScoreObserver, UPnP}
+import com.wavesplatform.network.{ChannelGroupExt, InvalidBlockStorageImpl, LocalScoreChanged, MicroBlockSynchronizer, NetworkServer, PeerDatabaseImpl, PeerInfo, RxExtensionLoader, RxScoreObserver, UPnP}
 import com.wavesplatform.settings._
 import com.wavesplatform.state2.appender.{BlockAppender, CheckpointAppender, ExtensionAppender, MicroblockAppender}
 import com.wavesplatform.utils.forceStopApplication
@@ -46,6 +47,10 @@ import scala.util.Try
 
 class Application(val actorSystem: ActorSystem, val settings: WavesSettings, configRoot: ConfigObject) extends ScorexLogging {
 
+  import monix.execution.Scheduler.Implicits.{global => scheduler}
+
+  private val LocalScoreBroadcastDebounce = 1.second
+
   private val checkpointService = new CheckpointServiceImpl(settings.blockchainSettings.checkpointFile, settings.checkpointsSettings)
   private val (history, featureProvider, stateWriter, stateReader, blockchainUpdater, blockchainDebugInfo) = StorageFactory(settings).get
   private lazy val upnp = new UPnP(settings.networkSettings.uPnPSettings) // don't initialize unless enabled
@@ -53,9 +58,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   private val peerDatabase = new PeerDatabaseImpl(settings.networkSettings)
 
   def run(): Unit = {
-    log.debug(s"Available processors: ${Runtime.getRuntime.availableProcessors}")
-    log.debug(s"Max memory available: ${Runtime.getRuntime.maxMemory}")
-
     checkGenesis(history, settings, blockchainUpdater)
 
     if (wallet.privateKeyAccounts.isEmpty)
@@ -78,10 +80,20 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     import blockchainUpdater.lastBlockInfo
 
+    val lastScore = lastBlockInfo
+      .map(_.score)
+      .distinctUntilChanged
+      .debounce(LocalScoreBroadcastDebounce)
+      .share(scheduler)
+
+    lastScore.foreach { x =>
+      allChannels.broadcast(LocalScoreChanged(x))
+    }(scheduler)
+
     val network = NetworkServer(settings, lastBlockInfo, history, utxStorage, peerDatabase, allChannels, establishedConnections)
     val (signatures, blocks, blockchainScores, checkpoints, microblockInvs, microblockResponses) = network.messages
 
-    val syncWithChannelClosed = RxScoreObserver(settings.synchronizationSettings.scoreTTL, history.score(), lastBlockInfo.map(_.score), blockchainScores, network.closedChannels)
+    val syncWithChannelClosed = RxScoreObserver(settings.synchronizationSettings.scoreTTL, history.score(), lastScore, blockchainScores, network.closedChannels)
     val microblockDatas = MicroBlockSynchronizer(settings.synchronizationSettings.microBlockSynchronizer, history, peerDatabase)(lastBlockInfo.map(_.id), microblockInvs, microblockResponses) _
     val newBlocks = RxExtensionLoader(settings.synchronizationSettings.maxRollback, settings.synchronizationSettings.synchronizationTimeout,
       history, peerDatabase, knownInvalidBlocks, blocks, signatures, syncWithChannelClosed) { case ((c, b)) => processFork(c, b.blocks) }
@@ -259,14 +271,33 @@ object Application extends ScorexLogging {
     log.info("Starting...")
 
     val config = readConfig(args.headOption)
+    val configForLogs = Seq(
+      "awt",
+      "ftp",
+      "gopherProxySet",
+      "java.awt",
+      "jline",
+      "waves.wallet",
+      "waves.rest-api.api-key-hash",
+      "kamon.influxdb.authentication",
+      "metrics.influx-db",
+    ).foldLeft(config.resolve())(_.withoutPath(_))
+
+    val logInfo: Seq[(String, Any)] = Seq(
+      "Available processors" -> Runtime.getRuntime.availableProcessors,
+      "Max memory available" -> Runtime.getRuntime.maxMemory,
+    ) ++ Seq(
+      "networkaddress.cache.ttl",
+      "networkaddress.cache.negative.ttl"
+    ).map { x => s"System property $x" -> System.getProperty(x) } ++ Seq(
+      "Configuration" -> s"\n===\n${configForLogs.root().render(ConfigRenderOptions.defaults().setOriginComments(false).setComments(false))}\n==="
+    )
+
+    log.debug(logInfo.map { case (n, v) => s"$n: $v" }.mkString("\n"))
+
     val settings = WavesSettings.fromConfig(config)
     Kamon.start(config)
     val isMetricsStarted = Metrics.start(settings.metrics)
-
-    log.trace(s"System property sun.net.inetaddr.ttl=${System.getProperty("sun.net.inetaddr.ttl")}")
-    log.trace(s"System property sun.net.inetaddr.negative.ttl=${System.getProperty("sun.net.inetaddr.negative.ttl")}")
-    log.trace(s"Security property networkaddress.cache.ttl=${Security.getProperty("networkaddress.cache.ttl")}")
-    log.trace(s"Security property networkaddress.cache.negative.ttl=${Security.getProperty("networkaddress.cache.negative.ttl")}")
 
     RootActorSystem.start("wavesplatform", config) { actorSystem =>
       import actorSystem.dispatcher

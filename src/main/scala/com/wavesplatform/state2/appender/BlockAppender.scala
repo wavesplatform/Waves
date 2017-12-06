@@ -46,12 +46,12 @@ object BlockAppender extends ScorexLogging with Instrumented {
     } yield validApplication).value.map {
       case Right(None) =>
         log.trace(s"${id(ch)} $newBlock already appended")
-      case Right(Some(newScore)) =>
+      case Right(Some(_)) =>
         BlockStats.applied(newBlock, BlockStats.Source.Broadcast, history.height())
         log.debug(s"${id(ch)} Appended $newBlock")
         if (newBlock.transactionData.isEmpty)
           allChannels.broadcast(BlockForged(newBlock), Some(ch))
-        scheduleMiningAndBroadcastScore(miner, allChannels)(newScore)
+        miner.scheduleMining()
       case Left(is: InvalidSignature) =>
         peerDatabase.blacklistAndClose(ch, s"Could not append $newBlock: $is")
       case Left(ve) =>
