@@ -186,7 +186,6 @@ class MinerImpl(
                 log.debug(s"Forged and applied $block by ${account.address} with cumulative score $score")
                 BlockStats.mined(block, history.height())
                 allChannels.broadcast(BlockForged(block))
-                allChannels.broadcast(LocalScoreChanged(score))
                 scheduleMining()
                 if (ngEnabled)
                   startMicroBlockMining(account, block)

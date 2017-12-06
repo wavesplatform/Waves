@@ -9,6 +9,7 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
 import akka.http.scaladsl.server.Route
 import akka.stream.ActorMaterializer
+import cats.instances.all._
 import com.typesafe.config.{Config, ConfigFactory, ConfigObject}
 import com.wavesplatform.actor.RootActorSystem
 import com.wavesplatform.features.api.ActivationApiRoute
@@ -17,7 +18,7 @@ import com.wavesplatform.http.NodeApiRoute
 import com.wavesplatform.matcher.Matcher
 import com.wavesplatform.metrics.Metrics
 import com.wavesplatform.mining.{Miner, MinerImpl}
-import com.wavesplatform.network.{InvalidBlockStorageImpl, MicroBlockSynchronizer, NetworkServer, PeerDatabaseImpl, PeerInfo, RxExtensionLoader, RxScoreObserver, UPnP}
+import com.wavesplatform.network.{ChannelGroupExt, InvalidBlockStorageImpl, LocalScoreChanged, MicroBlockSynchronizer, NetworkServer, PeerDatabaseImpl, PeerInfo, RxExtensionLoader, RxScoreObserver, UPnP}
 import com.wavesplatform.settings._
 import com.wavesplatform.state2.appender.{BlockAppender, CheckpointAppender, ExtensionAppender, MicroblockAppender}
 import com.wavesplatform.utils.forceStopApplication
@@ -45,6 +46,10 @@ import scala.reflect.runtime.universe._
 import scala.util.Try
 
 class Application(val actorSystem: ActorSystem, val settings: WavesSettings, configRoot: ConfigObject) extends ScorexLogging {
+
+  import monix.execution.Scheduler.Implicits.{global => scheduler}
+
+  private val LocalScoreBroadcastDebounce = 1.second
 
   private val checkpointService = new CheckpointServiceImpl(settings.blockchainSettings.checkpointFile, settings.checkpointsSettings)
   private val (history, featureProvider, stateWriter, stateReader, blockchainUpdater, blockchainDebugInfo) = StorageFactory(settings).get
@@ -78,10 +83,20 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     import blockchainUpdater.lastBlockInfo
 
+    val lastScore = lastBlockInfo
+      .map(_.score)
+      .distinctUntilChanged
+      .debounce(LocalScoreBroadcastDebounce)
+      .share(scheduler)
+
+    lastScore.foreach { x =>
+      allChannels.broadcast(LocalScoreChanged(x))
+    }(scheduler)
+
     val network = NetworkServer(settings, lastBlockInfo, history, utxStorage, peerDatabase, allChannels, establishedConnections)
     val (signatures, blocks, blockchainScores, checkpoints, microblockInvs, microblockResponses) = network.messages
 
-    val syncWithChannelClosed = RxScoreObserver(settings.synchronizationSettings.scoreTTL, history.score(), lastBlockInfo.map(_.score), blockchainScores, network.closedChannels)
+    val syncWithChannelClosed = RxScoreObserver(settings.synchronizationSettings.scoreTTL, history.score(), lastScore, blockchainScores, network.closedChannels)
     val microblockDatas = MicroBlockSynchronizer(settings.synchronizationSettings.microBlockSynchronizer, history, peerDatabase)(lastBlockInfo.map(_.id), microblockInvs, microblockResponses) _
     val newBlocks = RxExtensionLoader(settings.synchronizationSettings.maxRollback, settings.synchronizationSettings.synchronizationTimeout,
       history, peerDatabase, knownInvalidBlocks, blocks, signatures, syncWithChannelClosed) { case ((c, b)) => processFork(c, b.blocks) }
