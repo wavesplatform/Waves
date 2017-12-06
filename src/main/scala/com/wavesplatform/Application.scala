@@ -10,7 +10,7 @@ import akka.http.scaladsl.Http.ServerBinding
 import akka.http.scaladsl.server.Route
 import akka.stream.ActorMaterializer
 import cats.instances.all._
-import com.typesafe.config.{Config, ConfigFactory, ConfigObject}
+import com.typesafe.config.{Config, ConfigFactory, ConfigObject, ConfigRenderOptions}
 import com.wavesplatform.actor.RootActorSystem
 import com.wavesplatform.features.api.ActivationApiRoute
 import com.wavesplatform.history.{CheckpointServiceImpl, StorageFactory}
@@ -58,9 +58,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   private val peerDatabase = new PeerDatabaseImpl(settings.networkSettings)
 
   def run(): Unit = {
-    log.debug(s"Available processors: ${Runtime.getRuntime.availableProcessors}")
-    log.debug(s"Max memory available: ${Runtime.getRuntime.maxMemory}")
-
     checkGenesis(history, settings, blockchainUpdater)
 
     if (wallet.privateKeyAccounts.isEmpty)
@@ -274,14 +271,33 @@ object Application extends ScorexLogging {
     log.info("Starting...")
 
     val config = readConfig(args.headOption)
+    val configForLogs = Seq(
+      "awt",
+      "ftp",
+      "gopherProxySet",
+      "java.awt",
+      "jline",
+      "waves.wallet",
+      "waves.rest-api.api-key-hash",
+      "kamon.influxdb.authentication",
+      "metrics.influx-db",
+    ).foldLeft(config.resolve())(_.withoutPath(_))
+
+    val logInfo: Seq[(String, Any)] = Seq(
+      "Available processors" -> Runtime.getRuntime.availableProcessors,
+      "Max memory available" -> Runtime.getRuntime.maxMemory,
+    ) ++ Seq(
+      "networkaddress.cache.ttl",
+      "networkaddress.cache.negative.ttl"
+    ).map { x => s"System property $x" -> System.getProperty(x) } ++ Seq(
+      "Configuration" -> s"\n===\n${configForLogs.root().render(ConfigRenderOptions.defaults().setOriginComments(false).setComments(false))}\n==="
+    )
+
+    log.debug(logInfo.map { case (n, v) => s"$n: $v" }.mkString("\n"))
+
     val settings = WavesSettings.fromConfig(config)
     Kamon.start(config)
     val isMetricsStarted = Metrics.start(settings.metrics)
-
-    log.trace(s"System property sun.net.inetaddr.ttl=${System.getProperty("sun.net.inetaddr.ttl")}")
-    log.trace(s"System property sun.net.inetaddr.negative.ttl=${System.getProperty("sun.net.inetaddr.negative.ttl")}")
-    log.trace(s"Security property networkaddress.cache.ttl=${Security.getProperty("networkaddress.cache.ttl")}")
-    log.trace(s"Security property networkaddress.cache.negative.ttl=${Security.getProperty("networkaddress.cache.negative.ttl")}")
 
     RootActorSystem.start("wavesplatform", config) { actorSystem =>
       import actorSystem.dispatcher
