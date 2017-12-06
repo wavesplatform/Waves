@@ -160,7 +160,7 @@ object RxExtensionLoader extends ScorexLogging {
           Task {
             s = onExtensionApplied(s, extensionBlocks, ch, ar)
           }.executeOn(scheduler)
-        }.runAsync(scheduler)
+        }.logErr.runAsync(scheduler)
     }
 
     def onExtensionApplied(state: State, extension: ExtensionBlocks, ch: Channel, applicationResult: Either[ValidationError, Option[BlockchainScore]]): State = {
