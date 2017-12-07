@@ -67,8 +67,8 @@ class MicroblocksGenerationSuite extends FreeSpec with BeforeAndAfterAll
     .map { x => x.recipient -> x.amount }
     .toMap
 
-  protected lazy val docker: Docker = Docker(getClass)
-  protected lazy val nodes: Seq[Node] = docker.startNodes(Seq(config))
+  lazy val docker: Docker = Docker(getClass)
+  lazy val nodes: Seq[Node] = docker.startNodes(Seq(config))
   private lazy val miner = nodes.head
 
   s"Generate transactions and wait for one block with $maxTxs txs" in result(for {

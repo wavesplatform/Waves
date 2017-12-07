@@ -109,17 +109,16 @@ trait IntegrationSuiteWithThreeAddresses extends BeforeAndAfterAll with Matchers
       traverse(txNodePairs) { case (node, tx) => node.waitForTransaction(tx) }
     }
 
-    val accounts = Seq(firstAddress, secondAddress, thirdAddress)
-
-    def makeTransfers: Future[Seq[String]] = traverse(accounts) { acc =>
+    def makeTransfers(accounts: Seq[String]): Future[Seq[String]] = traverse(accounts) { acc =>
       sender.transfer(richAddress, acc, defaultBalance, sender.fee(TransactionType.TransferTransaction)).map(_.id)
     }
 
     val correctStartBalancesFuture = for {
       _ <- traverse(nodes)(_.waitForHeight(2))
+      accounts = Seq(firstAddress, secondAddress, thirdAddress)
 
       _ <- dumpBalances(sender, accounts, "initial")
-      txs <- makeTransfers
+      txs <- makeTransfers(accounts)
 
       height <- traverse(nodes)(_.height).map(_.max)
       _ <- withClue(s"waitForHeight(${height + 2})") {
