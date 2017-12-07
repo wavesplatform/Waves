@@ -61,7 +61,7 @@ object RxExtensionLoader extends ScorexLogging {
                   val ch = best.channel
                   log.debug(s"${id(ch)} Requesting extension signatures ${if (optimistic) "optimistically" else ""}, last ${knownSigs.length} are ${formatSignatures(knownSigs)}")
                   val blacklisting = scheduleBlacklist(ch, s"Timeout loading extension").runAsync
-                  Task(ch.writeAndFlush(GetSignatures(knownSigs))).runAsync
+                  Task(ch.writeAndFlush(GetSignatures(knownSigs))).logErr.runAsync
                   state.withLoaderState(LoaderState.ExpectingSignatures(ch, knownSigs, blacklisting))
                 case None =>
                   log.trace(s"Holding on requesting next sigs, $state")
@@ -109,7 +109,7 @@ object RxExtensionLoader extends ScorexLogging {
               } else {
                 log.trace(s"${id(ch)} Requesting all required blocks(size=${unknown.size})")
                 val blacklistingAsync = scheduleBlacklist(ch, "Timeout loading first requested block").runAsync
-                Task(unknown.foreach(s => ch.writeAndFlush(GetBlock(s)))).runAsync
+                Task(unknown.foreach(s => ch.writeAndFlush(GetBlock(s)))).logErr.runAsync
                 state.withLoaderState(LoaderState.ExpectingBlocks(ch, unknown, unknown.toSet, Set.empty, blacklistingAsync))
               }
           }
