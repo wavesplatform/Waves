@@ -25,8 +25,7 @@ object MicroBlockSynchronizer {
             peerDatabase: PeerDatabase)
            (lastBlockIdEvents: Observable[ByteStr],
             microblockInvs: ChannelObservable[MicroBlockInv],
-            microblockResponses: ChannelObservable[MicroBlockResponse])
-           (processMicroBlock: (Channel, MicroblockData) => Task[Unit]): Observable[Unit] = {
+            microblockResponses: ChannelObservable[MicroBlockResponse]): Observable[(Channel,MicroblockData)] = {
 
     implicit val scheduler: SchedulerService = Scheduler.singleThread("microblock-synchronizer")
 
@@ -82,7 +81,7 @@ object MicroBlockSynchronizer {
     }
     }.executeOn(scheduler).logErr.subscribe()
 
-    microblockResponses.observeOn(scheduler).flatMap { case ((ch, msg@MicroBlockResponse(mb))) =>
+    microblockResponses.observeOn(scheduler).flatMap { case ((ch, MicroBlockResponse(mb))) =>
       import mb.{totalResBlockSig => totalSig}
       successfullyReceived.put(totalSig, dummy)
       BlockStats.received(mb, ch)
@@ -92,7 +91,7 @@ object MicroBlockSynchronizer {
           awaiting.invalidate(totalSig)
           Observable((ch, MicroblockData(Option(mi), mb, Coeval.evalOnce(owners(totalSig)))))
       }
-    }.mapTask { case ((ch, md)) => processMicroBlock(ch, md) }
+    }
   }
 
   case class MicroblockData(invOpt: Option[MicroBlockInv], microBlock: MicroBlock, microblockOwners: Coeval[Set[Channel]])

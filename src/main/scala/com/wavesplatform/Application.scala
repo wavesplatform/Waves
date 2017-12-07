@@ -94,11 +94,11 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     val (signatures, blocks, blockchainScores, checkpoints, microblockInvs, microblockResponses) = network.messages
 
     val syncWithChannelClosed = RxScoreObserver(settings.synchronizationSettings.scoreTTL, history.score(), lastScore, blockchainScores, network.closedChannels)
-    val microblockDatas = MicroBlockSynchronizer(settings.synchronizationSettings.microBlockSynchronizer, history, peerDatabase)(lastBlockInfo.map(_.id), microblockInvs, microblockResponses) _
+    val microblockDatas = MicroBlockSynchronizer(settings.synchronizationSettings.microBlockSynchronizer, history, peerDatabase)(lastBlockInfo.map(_.id), microblockInvs, microblockResponses)
     val newBlocks = RxExtensionLoader(settings.synchronizationSettings.maxRollback, settings.synchronizationSettings.synchronizationTimeout,
       history, peerDatabase, knownInvalidBlocks, blocks, signatures, syncWithChannelClosed) { case ((c, b)) => processFork(c, b.blocks) }
 
-    val microblockSink = microblockDatas(processMicroBlock)
+    val microblockSink = microblockDatas.mapTask(scala.Function.tupled(processMicroBlock))
     val blockSink = newBlocks.mapTask(scala.Function.tupled(processBlock))
     val checkpointSink = checkpoints.mapTask { case ((s, c)) => processCheckpoint(Some(s), c) }
 
@@ -214,7 +214,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
 object Application extends ScorexLogging {
 
-  private def configureLogging(settings: WavesSettings) = {
+  private def configureLogging(settings: WavesSettings): Unit = {
     import ch.qos.logback.classic.{Level, LoggerContext}
     import org.slf4j._
 
