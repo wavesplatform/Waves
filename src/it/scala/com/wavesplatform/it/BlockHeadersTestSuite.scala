@@ -13,11 +13,11 @@ import scorex.utils.ScorexLogging
 import scala.util.Random
 
 class BlockHeadersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with CancelAfterFailure
-  with ScorexLogging {
+  with ReportingTestName with ScorexLogging {
 
   private lazy val docker = Docker(getClass)
 
-  private lazy val nodes: Seq[Node] = docker.startNodes(
+  lazy val nodes: Seq[Node] = docker.startNodes(
     NodeConfigs.newBuilder
       .overrideBase(_.quorum(2))
       .withDefault(2)
