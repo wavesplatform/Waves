@@ -33,18 +33,13 @@ package object appender extends ScorexLogging {
     f map {
       case Right(maybeNewScore) =>
         log.debug(success)
-        maybeNewScore.foreach(scheduleMiningAndBroadcastScore(miner, allChannels))
+        maybeNewScore.foreach(_ => miner.scheduleMining())
         Right(maybeNewScore)
       case Left(ve) =>
         log.warn(s"$errorPrefix: $ve")
         peerDatabase.blacklistAndClose(ch, s"$errorPrefix: $ve")
         Left(ve)
     }
-  }
-
-  def scheduleMiningAndBroadcastScore(miner: Miner, allChannels: ChannelGroup)(score: BigInt): Unit = {
-    miner.scheduleMining()
-    allChannels.broadcast(LocalScoreChanged(score))
   }
 
   private def validateEffectiveBalance(fp: FeatureProvider, fs: FunctionalitySettings, block: Block, baseHeight: Int)(effectiveBalance: Long): Either[String, Long] =
