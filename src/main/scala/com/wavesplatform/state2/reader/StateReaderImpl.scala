@@ -15,9 +15,9 @@ class StateReaderImpl(p: StateStorage, val synchronizationToken: ReentrantReadWr
 
   val sp = Synchronized(p)
 
-  override def transactionInfo(id: ByteStr): Option[(Int, Transaction)] = read { implicit l =>
+  override def transactionInfo(id: ByteStr): Option[(Int, Option[Transaction])] = read { implicit l =>
     Option(sp().transactions.get(id)).map {
-      case (h, bytes) => (h, TransactionParser.parseBytes(bytes).get)
+      case (h, bytes) => (h, if (bytes.length == 0) None else TransactionParser.parseBytes(bytes).toOption)
     }
   }
 
