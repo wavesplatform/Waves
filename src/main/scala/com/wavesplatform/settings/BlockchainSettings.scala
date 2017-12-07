@@ -47,7 +47,7 @@ object FunctionalitySettings {
     allowInvalidReissueInSameBlockUntilTimestamp = 1492768800000L,
     allowMultipleLeaseCancelTransactionUntilTimestamp = 1492768800000L,
     resetEffectiveBalancesAtHeight = 462000,
-    blockVersion3AfterHeight = Int.MaxValue,
+    blockVersion3AfterHeight = 795000,
     preActivatedFeatures = Map.empty)
 
   val TESTNET = apply(
