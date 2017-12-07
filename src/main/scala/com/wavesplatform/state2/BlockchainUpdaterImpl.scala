@@ -182,7 +182,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
         _ map { case ((newBlockDiff, discacrded)) =>
           val height = historyWriter.height() + 1
           ngState.set(Some(new NgState(block, newBlockDiff, featuresApprovedWithBlock(block))))
-          historyReader.lastBlockId().foreach(id => lastBlockInfo.onNext(LastBlockInfo(id, historyReader.score(), blockchainReady)))
+          historyReader.lastBlockId().foreach(id => lastBlockInfo.onNext(LastBlockInfo(id, historyReader.height(), historyReader.score(), blockchainReady)))
           log.info(s"$block appended. New height: $height)")
           discacrded
         }
@@ -233,7 +233,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
           }
 
           val totalDiscardedBlocks: Seq[Block] = discardedHistoryBlocks ++ discardedNgBlock.toSeq
-          if (totalDiscardedBlocks.nonEmpty) lastBlockInfo.onNext(LastBlockInfo(blockId, historyReader.score(), blockchainReady))
+          if (totalDiscardedBlocks.nonEmpty) lastBlockInfo.onNext(LastBlockInfo(blockId, historyReader.height(), historyReader.score(), blockchainReady))
           TxsInBlockchainStats.record(-totalDiscardedBlocks.size)
           Right(totalDiscardedBlocks)
       }
@@ -263,7 +263,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
             } yield {
               log.info(s"$microBlock appended")
               ng.append(microBlock, diff, System.currentTimeMillis())
-              lastBlockInfo.onNext(LastBlockInfo(microBlock.totalResBlockSig, historyReader.score(), ready = true))
+              lastBlockInfo.onNext(LastBlockInfo(microBlock.totalResBlockSig, historyReader.height(), historyReader.score(), ready = true))
             }
         }
     }

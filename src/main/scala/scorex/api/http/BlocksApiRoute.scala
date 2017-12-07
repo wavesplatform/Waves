@@ -9,17 +9,21 @@ import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state2.ByteStr
 import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
-import monix.eval.Task
+import monix.eval.{Coeval, Task}
+import monix.execution.Scheduler.Implicits.global
 import play.api.libs.json._
 import scorex.block.BlockHeader
 import scorex.transaction._
 
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent._
 
 @Path("/blocks")
 @Api(value = "/blocks")
-case class BlocksApiRoute(settings: RestAPISettings, history: History, allChannels: ChannelGroup, checkpointProc: Checkpoint => Task[Either[ValidationError, Option[BigInt]]]) extends ApiRoute {
+case class BlocksApiRoute(settings: RestAPISettings,
+                          history: History,
+                          blockchainUpdater: BlockchainUpdater,
+                          allChannels: ChannelGroup,
+                          checkpointProc: Checkpoint => Task[Either[ValidationError, Option[BigInt]]]) extends ApiRoute {
 
   // todo: make this configurable and fix integration tests
   val MaxBlocksPerRequest = 100
@@ -95,10 +99,13 @@ case class BlocksApiRoute(settings: RestAPISettings, history: History, allChanne
     }
   }
 
+  private val lastHeight: Coeval[Option[Int]] = lastObserved(blockchainUpdater.lastBlockInfo.map(_.height))
+
   @Path("/height")
   @ApiOperation(value = "Height", notes = "Get blockchain height", httpMethod = "GET")
   def height: Route = (path("height") & get) {
-    complete(Json.obj("height" -> history.height()))
+    val x = lastHeight().getOrElse(0)
+    complete(Json.obj("height" -> x))
   }
 
   @Path("/at/{height}")
@@ -135,7 +142,7 @@ case class BlocksApiRoute(settings: RestAPISettings, history: History, allChanne
   ))
   def seq: Route = (path("seq" / IntNumber / IntNumber) & get) { (start, end) => seq(start, end, includeTransactions = true) }
 
-  @Path("headers/seq/{from}/{to}")
+  @Path("/headers/seq/{from}/{to}")
   @ApiOperation(value = "Seq (Block header only)", notes = "Get block without transactions payload at specified heights", httpMethod = "GET")
   @ApiImplicitParams(Array(
     new ApiImplicitParam(name = "from", value = "Start block height", required = true, dataType = "integer", paramType = "path"),
