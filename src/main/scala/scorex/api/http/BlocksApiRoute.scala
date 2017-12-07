@@ -29,6 +29,7 @@ case class BlocksApiRoute(settings: RestAPISettings,
   val MaxBlocksPerRequest = 100
   val rollbackExecutor = monix.execution.Scheduler.singleThread(name = "debug-rollback")
 
+  private val lastHeight: Coeval[Option[Int]] = lastObserved(blockchainUpdater.lastBlockInfo.map(_.height))
 
   override lazy val route =
     pathPrefix("blocks") {
@@ -98,8 +99,6 @@ case class BlocksApiRoute(settings: RestAPISettings,
       }
     }
   }
-
-  private val lastHeight: Coeval[Option[Int]] = lastObserved(blockchainUpdater.lastBlockInfo.map(_.height))
 
   @Path("/height")
   @ApiOperation(value = "Height", notes = "Get blockchain height", httpMethod = "GET")
