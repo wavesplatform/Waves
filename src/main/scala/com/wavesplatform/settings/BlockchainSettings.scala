@@ -34,7 +34,7 @@ case class FunctionalitySettings(featureCheckBlocksPeriod: Int,
 
 object FunctionalitySettings {
   val MAINNET = apply(
-    featureCheckBlocksPeriod = 10000,
+    featureCheckBlocksPeriod = 5000,
     blocksForFeatureActivation = 9000,
     allowTemporaryNegativeUntil = 1479168000000L,
     allowInvalidPaymentTransactionsByTimestamp = 1479168000000L,
