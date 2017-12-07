@@ -10,7 +10,7 @@ import akka.http.scaladsl.Http.ServerBinding
 import akka.http.scaladsl.server.Route
 import akka.stream.ActorMaterializer
 import cats.instances.all._
-import com.typesafe.config.{Config, ConfigFactory, ConfigObject, ConfigRenderOptions}
+import com.typesafe.config._
 import com.wavesplatform.actor.RootActorSystem
 import com.wavesplatform.features.api.ActivationApiRoute
 import com.wavesplatform.history.{CheckpointServiceImpl, StorageFactory}
@@ -18,10 +18,10 @@ import com.wavesplatform.http.NodeApiRoute
 import com.wavesplatform.matcher.Matcher
 import com.wavesplatform.metrics.Metrics
 import com.wavesplatform.mining.{Miner, MinerImpl}
-import com.wavesplatform.network.{ChannelGroupExt, InvalidBlockStorageImpl, LocalScoreChanged, MicroBlockSynchronizer, NetworkServer, PeerDatabaseImpl, PeerInfo, RxExtensionLoader, RxScoreObserver, UPnP}
+import com.wavesplatform.network._
 import com.wavesplatform.settings._
 import com.wavesplatform.state2.appender.{BlockAppender, CheckpointAppender, ExtensionAppender, MicroblockAppender}
-import com.wavesplatform.utils.forceStopApplication
+import com.wavesplatform.utils.{SystemInformationReporter, forceStopApplication}
 import io.netty.channel.Channel
 import io.netty.channel.group.DefaultChannelGroup
 import io.netty.util.concurrent.GlobalEventExecutor
@@ -214,21 +214,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
 object Application extends ScorexLogging {
 
-  private def configureLogging(settings: WavesSettings): Unit = {
-    import ch.qos.logback.classic.{Level, LoggerContext}
-    import org.slf4j._
-
-    val lc = LoggerFactory.getILoggerFactory.asInstanceOf[LoggerContext]
-    val rootLogger = lc.getLogger(Logger.ROOT_LOGGER_NAME)
-    settings.loggingLevel match {
-      case LogLevel.TRACE => rootLogger.setLevel(Level.TRACE)
-      case LogLevel.DEBUG => rootLogger.setLevel(Level.DEBUG)
-      case LogLevel.INFO => rootLogger.setLevel(Level.INFO)
-      case LogLevel.WARN => rootLogger.setLevel(Level.WARN)
-      case LogLevel.ERROR => rootLogger.setLevel(Level.ERROR)
-    }
-  }
-
   private def readConfig(userConfigPath: Option[String]): Config = {
     val maybeConfigFile = for {
       maybeFilename <- userConfigPath
@@ -268,32 +253,14 @@ object Application extends ScorexLogging {
     SLF4JBridgeHandler.removeHandlersForRootLogger()
     SLF4JBridgeHandler.install()
 
-    log.info("Starting...")
-
     val config = readConfig(args.headOption)
-    val configForLogs = Seq(
-      "awt",
-      "ftp",
-      "gopherProxySet",
-      "java.awt",
-      "jline",
-      "waves.wallet",
-      "waves.rest-api.api-key-hash",
-      "kamon.influxdb.authentication",
-      "metrics.influx-db",
-    ).foldLeft(config.resolve())(_.withoutPath(_))
 
-    val logInfo: Seq[(String, Any)] = Seq(
-      "Available processors" -> Runtime.getRuntime.availableProcessors,
-      "Max memory available" -> Runtime.getRuntime.maxMemory,
-    ) ++ Seq(
-      "networkaddress.cache.ttl",
-      "networkaddress.cache.negative.ttl"
-    ).map { x => s"System property $x" -> System.getProperty(x) } ++ Seq(
-      "Configuration" -> s"\n===\n${configForLogs.root().render(ConfigRenderOptions.defaults().setOriginComments(false).setComments(false))}\n==="
-    )
-
-    log.debug(logInfo.map { case (n, v) => s"$n: $v" }.mkString("\n"))
+    // DO NOT LOG BEFORE THIS LINE, THIS PROPERTY IS USED IN logback.xml
+    System.setProperty("waves.directory", config.getString("waves.directory"))
+    log.info("Starting...")
+    sys.addShutdownHook {
+      SystemInformationReporter.report(config)
+    }
 
     val settings = WavesSettings.fromConfig(config)
     Kamon.start(config)
@@ -317,8 +284,6 @@ object Application extends ScorexLogging {
           )
         }
       }
-
-      configureLogging(settings)
 
       // Initialize global var with actual address scheme
       AddressScheme.current = new AddressScheme {
