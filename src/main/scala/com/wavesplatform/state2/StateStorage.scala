@@ -10,8 +10,7 @@ import scorex.account.{Address, Alias}
 
 import scala.util.Try
 
-class StateStorage private(db: DB) extends SubStorage(db, "state") with PropertiesStorage with VersionedStorage
-  with Index32Support {
+class StateStorage private(db: DB) extends SubStorage(db, "state") with PropertiesStorage with VersionedStorage {
 
   import StateStorage._
 
@@ -21,6 +20,7 @@ class StateStorage private(db: DB) extends SubStorage(db, "state") with Properti
   private val TransactionsPrefix = "txs".getBytes(Charset)
   private val AccountTransactionsLengthsPrefix = "acc-txs-len".getBytes(Charset)
   private val WavesBalancePrefix = "waves-bal".getBytes(Charset)
+  private val AddressesIndexPrefix = "add-idx".getBytes(Charset)
   private val AssetBalancePrefix = "asset-bal".getBytes(Charset)
   private val AddressAssetsPrefix = "address-assets".getBytes(Charset)
   private val AssetsPrefix = "assets".getBytes(Charset)
@@ -33,6 +33,8 @@ class StateStorage private(db: DB) extends SubStorage(db, "state") with Properti
   private val AddressToAliasPrefix = "address-alias".getBytes(Charset)
   private val LeaseStatePrefix = "lease-state".getBytes(Charset)
   private val LeaseIndexPrefix = "lease-idx".getBytes(Charset)
+  private val MaxAddress = "max-address"
+  private val LeasesCount = "leases-count"
 
   def getHeight: Int = get(makeKey(HeightPrefix, 0)).map(Ints.fromByteArray).getOrElse(0)
 
@@ -81,8 +83,10 @@ class StateStorage private(db: DB) extends SubStorage(db, "state") with Properti
   def putBalanceSnapshots(b: Option[WriteBatch], address: Address, height: Int, value: (Int, Long, Long)): Unit =
     put(makeKey(BalanceSnapshotsPrefix, accountIntKey(address, height)), BalanceSnapshotValueCodec.encode(value), b)
 
-  def putWavesBalance(b: Option[WriteBatch], address: Address, value: (Long, Long, Long)): Unit =
+  def putWavesBalance(b: Option[WriteBatch], address: Address, value: (Long, Long, Long)): Unit = {
+    updateAddressesIndex(Seq(address.bytes.arr), b)
     put(makeKey(WavesBalancePrefix, address.bytes.arr), WavesBalanceValueCodec.encode(value), b)
+  }
 
   def getPaymentTransactionHashes(hash: ByteStr): Option[ByteStr] =
     get(makeKey(PaymentTransactionHashesPrefix, hash.arr)).map(b => ByteStr(b))
@@ -99,7 +103,12 @@ class StateStorage private(db: DB) extends SubStorage(db, "state") with Properti
   def getLeaseState(id: ByteStr): Option[Boolean] = get(makeKey(LeaseStatePrefix, id.arr)).map(b => b.head == 1.toByte)
 
   def getActiveLeases: Option[Seq[ByteStr]] = {
-    val result = allIndex32(LeaseIndexPrefix)
+    val count = getIntProperty(LeasesCount).getOrElse(0)
+    val result = (0 until count).foldLeft(Seq.empty[ByteStr]) { (r, i) =>
+      val maybeLease = get(makeKey(LeaseIndexPrefix, i))
+      val maybeLeaseState = maybeLease.flatMap(l => get(makeKey(LeaseStatePrefix, l)).map(b => b.head == 1.toByte))
+      if (maybeLeaseState.contains(true)) r :+ ByteStr(maybeLease.get) else r
+    }
     if (result.isEmpty) None else Some(result)
   }
 
@@ -109,21 +118,44 @@ class StateStorage private(db: DB) extends SubStorage(db, "state") with Properti
   def putLastBalanceSnapshotHeight(b: Option[WriteBatch], address: Address, height: Int): Unit =
     put(makeKey(LastBalanceHeightPrefix, address.bytes.arr), Ints.toByteArray(height), b)
 
-  def allWavesBalances: Map[Address, (Long, Long, Long)] = map(WavesBalancePrefix).map { e =>
-    Address.fromBytes(e._1).explicitGet() -> WavesBalanceValueCodec.decode(e._2).explicitGet().value
+  def allWavesBalances: Map[Address, (Long, Long, Long)] = {
+    val maxAddressIndex = getIntProperty(MaxAddress).getOrElse(0)
+    log.info(s"Accounts count: $maxAddressIndex")
+    (0 until maxAddressIndex).flatMap({ i =>
+      val maybeAddressBytes = get(makeKey(AddressesIndexPrefix, i))
+      val maybeAddress = maybeAddressBytes.flatMap { addressBytes => Address.fromBytes(addressBytes).toOption }
+      val maybeBalances = maybeAddressBytes.flatMap { addressBytes =>
+        get(makeKey(WavesBalancePrefix, addressBytes)).map(WavesBalanceValueCodec.decode).map(_.explicitGet().value)
+      }
+      (maybeAddress, maybeBalances) match {
+        case (Some(a), Some(b)) => Some(a -> b)
+        case _ => None
+      }
+    })(scala.collection.breakOut)
   }
 
-  def allAssetsBalances: Map[Address, Map[ByteStr, Long]] =
-    map(AddressAssetsPrefix).map { case (addressBytes, assetsBytes) =>
-      val address = Address.fromBytes(addressBytes).explicitGet()
-      val assets = Id32SeqCodec.decode(assetsBytes).explicitGet().value
-      val assetsBalances = assets.foldLeft(Map.empty[ByteStr, Long]) { (m, a) =>
-        val key = makeKey(AssetBalancePrefix, Bytes.concat(addressBytes, a.arr))
-        val balance = get(key).map(Longs.fromByteArray).getOrElse(0L)
-        m.updated(a, balance)
+  def allAssetsBalances: Map[Address, Map[ByteStr, Long]] = {
+    val maxAddressIndex = getIntProperty(MaxAddress).getOrElse(0)
+    log.info(s"Accounts count: $maxAddressIndex")
+    (0 until maxAddressIndex).flatMap { i =>
+      val maybeAddressBytes = get(makeKey(AddressesIndexPrefix, i))
+      val maybeAddress = maybeAddressBytes.flatMap { addressBytes => Address.fromBytes(addressBytes).toOption }
+      val maybeBalances = maybeAddressBytes.flatMap { addressBytes =>
+        val maybeAssets = get(makeKey(AddressAssetsPrefix, addressBytes)).map(Id32SeqCodec.decode).map(_.explicitGet().value)
+        maybeAssets.map { assets =>
+          assets.foldLeft(Map.empty[ByteStr, Long]) { (m, a) =>
+            val key = makeKey(AssetBalancePrefix, Bytes.concat(addressBytes, a.arr))
+            val balance = get(key).map(Longs.fromByteArray).getOrElse(0L)
+            m.updated(a, balance)
+          }
+        }
       }
-      address -> assetsBalances
-    }
+      (maybeAddress, maybeBalances) match {
+        case (Some(a), Some(b)) => Some(a -> b)
+        case _ => None
+      }
+    }.toMap
+  }
 
   def getAssetBalanceMap(address: Address): Option[Map[ByteStr, Long]] = {
     val assets = get(makeKey(AddressAssetsPrefix, address.bytes.arr)).map(Id32SeqCodec.decode).map(_.explicitGet().value)
@@ -145,7 +177,20 @@ class StateStorage private(db: DB) extends SubStorage(db, "state") with Properti
       put(key, OrderFillInfoValueCodec.encode(updated), b)
     }
 
-  private def putPortfolios(b: Option[WriteBatch], portfolios: Map[Address, Portfolio]): Unit =
+  private def updateAddressesIndex(addresses: Iterable[Array[Byte]], b: Option[WriteBatch]): Unit = {
+    val n = getIntProperty(MaxAddress).getOrElse(0)
+    val newAddresses = addresses.foldLeft(n) { (c, a) =>
+      val key = makeKey(WavesBalancePrefix, a)
+      if (get(key).isEmpty) {
+        put(makeKey(AddressesIndexPrefix, c), a)
+        c + 1
+      } else c
+    }
+    putIntProperty(MaxAddress, newAddresses, b)
+  }
+
+  private def putPortfolios(b: Option[WriteBatch], portfolios: Map[Address, Portfolio]): Unit = {
+    updateAddressesIndex(portfolios.keys.map(_.bytes.arr), b)
     portfolios.foreach { case (a, d) =>
       val addressBytes = a.bytes.arr
 
@@ -170,6 +215,7 @@ class StateStorage private(db: DB) extends SubStorage(db, "state") with Properti
         put(addressAssetKey, Longs.toByteArray(updatedValue), b)
       }
     }
+  }
 
   private def putIssuedAssets(b: Option[WriteBatch], issues: Map[ByteStr, AssetInfo]): Unit =
     issues.foreach { case (id, info) =>
@@ -205,12 +251,20 @@ class StateStorage private(db: DB) extends SubStorage(db, "state") with Properti
   }
 
   private def putLeases(b: Option[WriteBatch], leases: Map[ByteStr, Boolean]): Unit = {
-    leases.foreach { e =>
-      put(makeKey(LeaseStatePrefix, e._1.arr), if (e._2) Codec.TrueBytes else Codec.FalseBytes, b)
-      if (e._2) addToIndex32(b, LeaseIndexPrefix, e._1) else removeFromIndex32(b, LeaseIndexPrefix, e._1)
+    val n = getIntProperty(LeasesCount).getOrElse(0)
+    val count = leases.foldLeft(n) { (c, e) =>
+      val key = makeKey(LeaseStatePrefix, e._1.arr)
+      if (get(key).isDefined) {
+        put(key, if (e._2) Codec.TrueBytes else Codec.FalseBytes, b)
+        c
+      } else {
+        put(key, if (e._2) Codec.TrueBytes else Codec.FalseBytes, b)
+        put(makeKey(LeaseIndexPrefix, c), e._1.arr, b)
+        c + 1
+      }
     }
+    putIntProperty(LeasesCount, count, b)
   }
-
 }
 
 object StateStorage {

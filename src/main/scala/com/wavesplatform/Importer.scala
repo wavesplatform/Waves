@@ -10,7 +10,6 @@ import com.wavesplatform.history.HistoryWriterImpl
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
 import com.wavesplatform.state2.{BlockchainUpdaterImpl, StateStorage, StateWriterImpl}
 import com.wavesplatform.utils._
-import org.slf4j.bridge.SLF4JBridgeHandler
 import scorex.account.AddressScheme
 import scorex.block.Block
 import scorex.utils.ScorexLogging
@@ -19,9 +18,6 @@ import scala.util.{Failure, Success, Try}
 
 object Importer extends ScorexLogging {
   def main(args: Array[String]): Unit = {
-
-    SLF4JBridgeHandler.removeHandlersForRootLogger()
-    SLF4JBridgeHandler.install()
 
     val configFilename = Try(args(0)).toOption.getOrElse("waves-testnet.conf")
     val settings = WavesSettings.fromConfig(loadConfig(ConfigFactory.parseFile(new File(configFilename))))
@@ -46,14 +42,18 @@ object Importer extends ScorexLogging {
             val lenBytes = new Array[Byte](Ints.BYTES)
             val start = System.currentTimeMillis()
             while (!quit) {
-              val red = bis.read(lenBytes)
-              if (red == Ints.BYTES) {
+              val s1 = bis.read(lenBytes)
+              if (s1 == Ints.BYTES) {
                 val len = Ints.fromByteArray(lenBytes)
                 val buffer = new Array[Byte](len)
                 val s2 = bis.read(buffer)
                 if (s2 == len) {
                   val block = Block.parseBytes(buffer).get
-                  blockchainUpdater.processBlock(block)
+                  val result = blockchainUpdater.processBlock(block)
+                  if (result.isLeft) {
+                    log.error(s"Error applying block: ${result.left}")
+                    quit = true
+                  }
                 } else quit = true
               } else quit = true
             }

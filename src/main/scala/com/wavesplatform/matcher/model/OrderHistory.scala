@@ -147,6 +147,7 @@ case class OrderHistoryImpl(db: DB) extends SubStorage(db: DB, "matcher") with O
   }
 
   override def getAllOrdersByAddress(address: String): Stream[String] = {
+    // TODO: get rid of map
     map(PairToOrdersPrefix).mapValues(OrderIdsCodec.decode).filter(_._1.endsWith(address)).values.flatMap(_.explicitGet().value).toStream
   }
 

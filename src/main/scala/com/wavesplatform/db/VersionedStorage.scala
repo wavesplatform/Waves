@@ -7,9 +7,9 @@ trait VersionedStorage {
 
   protected val Version: Int
 
-  def isVersionValid: Boolean = getInt(VersionProperty) match {
+  def isVersionValid: Boolean = getIntProperty(VersionProperty) match {
     case None =>
-      putInt(VersionProperty, Version)
+      putIntProperty(VersionProperty, Version)
       true
     case Some(v) => v == Version
   }

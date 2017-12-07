@@ -3,18 +3,21 @@ package com.wavesplatform.db
 import java.nio.charset.StandardCharsets
 
 import com.google.common.primitives.Ints
+import org.iq80.leveldb.WriteBatch
 
 trait PropertiesStorage {
   this: Storage =>
 
   private val PropertiesPrefix: Array[Byte] = "prop".getBytes(StandardCharsets.UTF_8)
 
-  def putInt(property: String, value: Int): Unit = put(makeKey(PropertiesPrefix, property), Ints.toByteArray(value))
+  def putIntProperty(property: String, value: Int, batch: Option[WriteBatch] = None): Unit =
+    put(makeKey(PropertiesPrefix, property), Ints.toByteArray(value), batch)
 
-  def getInt(property: String): Option[Int] = get(makeKey(PropertiesPrefix, property)).map(Ints.fromByteArray)
+  def getIntProperty(property: String): Option[Int] = get(makeKey(PropertiesPrefix, property)).map(Ints.fromByteArray)
 
-  def get(property: String): Option[Array[Byte]] = get(makeKey(PropertiesPrefix, property))
+  def getProperty(property: String): Option[Array[Byte]] = get(makeKey(PropertiesPrefix, property))
 
-  def put(property: String, value: Array[Byte]): Unit = put(makeKey(PropertiesPrefix, property), value)
+  def putProperty(property: String, value: Array[Byte], batch: Option[WriteBatch] = None): Unit =
+    put(makeKey(PropertiesPrefix, property), value, batch)
 }
 

@@ -41,7 +41,7 @@ class HistoryWriterImpl private(db: DB, val synchronizationToken: ReentrantReadW
 
   private[HistoryWriterImpl] def isConsistent: Boolean = read { implicit l =>
     true
-    //TODO: replcate with implementation
+    //TODO: replace with implementation
     // check if all maps have same size
     //    Set(blockBodyByHeight().size(), blockIdByHeight().size(), heightByBlockId().size(), scoreByHeight().size()).size == 1
   }
@@ -76,7 +76,7 @@ class HistoryWriterImpl private(db: DB, val synchronizationToken: ReentrantReadW
         put(makeKey(ScoreAtHeightPrefix, h), score.toByteArray)
         put(makeKey(SignatureAtHeightPrefix, h), block.uniqueId.arr)
         put(makeKey(HeightBySignaturePrefix, block.uniqueId.arr), Ints.toByteArray(h))
-        putInt(HeightProperty, h)
+        putIntProperty(HeightProperty, h)
 
         val presentFeatures = allFeatures().toSet
         val newFeatures = acceptedFeatures.diff(presentFeatures)
@@ -146,7 +146,7 @@ class HistoryWriterImpl private(db: DB, val synchronizationToken: ReentrantReadW
     get(signatureKey).foreach(b => delete(makeKey(HeightBySignaturePrefix, b)))
     delete(signatureKey)
 
-    putInt(HeightProperty, h - 1)
+    putIntProperty(HeightProperty, h - 1)
 
     maybeDiscardedBlock
   }
@@ -157,7 +157,7 @@ class HistoryWriterImpl private(db: DB, val synchronizationToken: ReentrantReadW
   }
 
   override def height(): Int = read { implicit lock =>
-    getInt(HeightProperty).getOrElse(0)
+    getIntProperty(HeightProperty).getOrElse(0)
   }
 
   override def scoreOf(id: ByteStr): Option[BlockchainScore] = read { implicit lock =>

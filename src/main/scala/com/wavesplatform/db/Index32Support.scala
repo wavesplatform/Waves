@@ -6,8 +6,8 @@ import org.iq80.leveldb.WriteBatch
 trait Index32Support {
   this: Storage =>
 
-  private val SubKeyLength = 8
-  private val SubKeysNumber = 4
+  protected val SubKeyLength = 8
+  protected val SubKeysNumber = 4
 
   def addToIndex32(batch: Option[WriteBatch], indexPrefix: Array[Byte], id: ByteStr): Unit = {
     require(id.arr.length == SubKeysNumber * SubKeyLength, "incorrect id length")
@@ -67,7 +67,7 @@ trait Index32Support {
   def isIndexed(indexPrefix: Array[Byte], id: ByteStr): Boolean = {
     require(id.arr.length == SubKeysNumber * SubKeyLength, "incorrect id length")
 
-    val (part1, part2, part3, part4) = splitId(id)
+    val (part1, part2, part3, _) = splitId(id)
 
     val key0 = makeIndexKey(indexPrefix)
     val key1 = makeIndexKey(indexPrefix, part1)
@@ -86,7 +86,7 @@ trait Index32Support {
     if (seq.nonEmpty) put(key, KeySeqCodec.encode(seq), batch) else delete(key, batch)
 
   private def getLevel(indexPrefix: Array[Byte], parts: ByteStr*): Seq[ByteStr] =
-    get(makeIndexKey(indexPrefix, parts:_*)).map(KeySeqCodec.decode).map(_.explicitGet().value).getOrElse(Seq.empty)
+    get(makeIndexKey(indexPrefix, parts: _*)).map(KeySeqCodec.decode).map(_.explicitGet().value).getOrElse(Seq.empty)
 
   private def combineId(p1: ByteStr, p2: ByteStr, p3: ByteStr, p4: ByteStr): ByteStr = {
     val result = new Array[Byte](SubKeyLength * SubKeysNumber)
