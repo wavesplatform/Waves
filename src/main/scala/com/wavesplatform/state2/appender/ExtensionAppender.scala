@@ -45,7 +45,11 @@ object ExtensionAppender extends ScorexLogging with Instrumented {
                 .collectFirst { case ((b, Left(e)), i) => (i, b, e) }
                 .fold[Either[ValidationError, Unit]](Right(())) {
                 case (i, declinedBlock, e) =>
-                  invalidBlocks.add(declinedBlock.uniqueId)
+                  e match {
+                    case _: ValidationError.BlockFromFuture =>
+                    case _ => invalidBlocks.add(declinedBlock.uniqueId, e)
+                  }
+
                   extension.view
                     .dropWhile(_ != declinedBlock)
                     .foreach(BlockStats.declined(_, BlockStats.Source.Ext))
