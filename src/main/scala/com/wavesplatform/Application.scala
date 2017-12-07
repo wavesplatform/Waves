@@ -257,31 +257,12 @@ object Application extends ScorexLogging {
 
     // DO NOT LOG BEFORE THIS LINE, THIS PROPERTY IS USED IN logback.xml
     System.setProperty("waves.directory", config.getString("waves.directory"))
-
-    val configForLogs = Seq(
-      "awt",
-      "ftp",
-      "gopherProxySet",
-      "java.awt",
-      "jline",
-      "waves.wallet",
-      "waves.rest-api.api-key-hash",
-      "kamon.influxdb.authentication",
-      "metrics.influx-db",
-    ).foldLeft(config.resolve())(_.withoutPath(_))
-
-    val logInfo: Seq[(String, Any)] = Seq(
-      "Available processors" -> Runtime.getRuntime.availableProcessors,
-      "Max memory available" -> Runtime.getRuntime.maxMemory,
-    ) ++ Seq(
-      "networkaddress.cache.ttl",
-      "networkaddress.cache.negative.ttl"
-    ).map { x => s"System property $x" -> System.getProperty(x) } ++ Seq(
-      "Configuration" -> s"\n===\n${configForLogs.root().render(ConfigRenderOptions.defaults().setOriginComments(false).setComments(false))}\n==="
-    )
-
     log.info("Starting...")
-    log.debug(logInfo.map { case (n, v) => s"$n: $v" }.mkString("\n"))
+
+    reportSystemInformation(config)
+    sys.addShutdownHook {
+      reportSystemInformation(config)
+    }
 
     val settings = WavesSettings.fromConfig(config)
     Kamon.start(config)
@@ -321,5 +302,51 @@ object Application extends ScorexLogging {
         }
       }.run()
     }
+  }
+
+  private def reportSystemInformation(config: Config): Unit = {
+    val configForLogs = Seq(
+      "akka",
+      "awt",
+      "ftp",
+      "gopherProxySet",
+      "java",
+      "jline",
+      "os",
+      "sun",
+      "waves.custom.genesis",
+      "waves.wallet",
+      "waves.rest-api.api-key-hash",
+      "kamon.influxdb.authentication",
+      "kamon.influxdb.subscriptions",
+      "kamon.internal-config",
+      "kamon.metric",
+      "kamon.metrics",
+      "kamon.system-metrics",
+      "kamon.trace",
+      "metrics.influx-db",
+    ).foldLeft(config.resolve())(_.withoutPath(_))
+
+    val logInfo: Seq[(String, Any)] = Seq(
+      "Available processors" -> Runtime.getRuntime.availableProcessors,
+      "Max memory available" -> Runtime.getRuntime.maxMemory,
+    ) ++ Seq(
+      "os.name",
+      "os.version",
+      "os.arch",
+      "java.version",
+      "java.vendor",
+      "java.home",
+      "java.class.path",
+      "user.dir",
+      "sun.net.inetaddr.ttl",
+      "sun.net.inetaddr.negative.ttl",
+      "networkaddress.cache.ttl",
+      "networkaddress.cache.negative.ttl"
+    ).map { x => x -> System.getProperty(x) } ++ Seq(
+      "Configuration" -> s"\n===\n${configForLogs.root().render(ConfigRenderOptions.defaults().setOriginComments(false).setComments(false))}\n==="
+    )
+
+    log.debug(logInfo.map { case (n, v) => s"$n: $v" }.mkString("\n"))
   }
 }
