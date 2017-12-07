@@ -10,7 +10,7 @@ import akka.http.scaladsl.Http.ServerBinding
 import akka.http.scaladsl.server.Route
 import akka.stream.ActorMaterializer
 import cats.instances.all._
-import com.typesafe.config.{Config, ConfigFactory, ConfigObject, ConfigRenderOptions}
+import com.typesafe.config._
 import com.wavesplatform.actor.RootActorSystem
 import com.wavesplatform.features.api.ActivationApiRoute
 import com.wavesplatform.history.{CheckpointServiceImpl, StorageFactory}
@@ -18,10 +18,10 @@ import com.wavesplatform.http.NodeApiRoute
 import com.wavesplatform.matcher.Matcher
 import com.wavesplatform.metrics.Metrics
 import com.wavesplatform.mining.{Miner, MinerImpl}
-import com.wavesplatform.network.{ChannelGroupExt, InvalidBlockStorageImpl, LocalScoreChanged, MicroBlockSynchronizer, NetworkServer, PeerDatabaseImpl, PeerInfo, RxExtensionLoader, RxScoreObserver, UPnP}
+import com.wavesplatform.network._
 import com.wavesplatform.settings._
 import com.wavesplatform.state2.appender.{BlockAppender, CheckpointAppender, ExtensionAppender, MicroblockAppender}
-import com.wavesplatform.utils.forceStopApplication
+import com.wavesplatform.utils.{SystemInformationReporter, forceStopApplication}
 import io.netty.channel.Channel
 import io.netty.channel.group.DefaultChannelGroup
 import io.netty.util.concurrent.GlobalEventExecutor
@@ -258,10 +258,8 @@ object Application extends ScorexLogging {
     // DO NOT LOG BEFORE THIS LINE, THIS PROPERTY IS USED IN logback.xml
     System.setProperty("waves.directory", config.getString("waves.directory"))
     log.info("Starting...")
-
-    reportSystemInformation(config)
     sys.addShutdownHook {
-      reportSystemInformation(config)
+      SystemInformationReporter.report(config)
     }
 
     val settings = WavesSettings.fromConfig(config)
@@ -302,51 +300,5 @@ object Application extends ScorexLogging {
         }
       }.run()
     }
-  }
-
-  private def reportSystemInformation(config: Config): Unit = {
-    val configForLogs = Seq(
-      "akka",
-      "awt",
-      "ftp",
-      "gopherProxySet",
-      "java",
-      "jline",
-      "os",
-      "sun",
-      "waves.custom.genesis",
-      "waves.wallet",
-      "waves.rest-api.api-key-hash",
-      "kamon.influxdb.authentication",
-      "kamon.influxdb.subscriptions",
-      "kamon.internal-config",
-      "kamon.metric",
-      "kamon.metrics",
-      "kamon.system-metrics",
-      "kamon.trace",
-      "metrics.influx-db",
-    ).foldLeft(config.resolve())(_.withoutPath(_))
-
-    val logInfo: Seq[(String, Any)] = Seq(
-      "Available processors" -> Runtime.getRuntime.availableProcessors,
-      "Max memory available" -> Runtime.getRuntime.maxMemory,
-    ) ++ Seq(
-      "os.name",
-      "os.version",
-      "os.arch",
-      "java.version",
-      "java.vendor",
-      "java.home",
-      "java.class.path",
-      "user.dir",
-      "sun.net.inetaddr.ttl",
-      "sun.net.inetaddr.negative.ttl",
-      "networkaddress.cache.ttl",
-      "networkaddress.cache.negative.ttl"
-    ).map { x => x -> System.getProperty(x) } ++ Seq(
-      "Configuration" -> s"\n===\n${configForLogs.root().render(ConfigRenderOptions.defaults().setOriginComments(false).setComments(false))}\n==="
-    )
-
-    log.debug(logInfo.map { case (n, v) => s"$n: $v" }.mkString("\n"))
   }
 }

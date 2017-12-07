@@ -22,7 +22,7 @@
         <file>${logback.file.final-directory}/waves.log</file>
         <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
             <!-- daily rollover -->
-            <fileNamePattern>${logback.file.final-directory}/waves.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+            <fileNamePattern>${logback.file.final-directory}/waves.%d{yyyy-MM-dd}.log.gz</fileNamePattern>
 
             <!-- keep 30 days' worth of history capped at 1GB total size -->
             <maxHistory>30</maxHistory>
