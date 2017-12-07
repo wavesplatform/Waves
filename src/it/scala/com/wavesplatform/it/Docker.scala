@@ -147,7 +147,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
       .map(_ => ())
   }
 
-  private def waitNodeIsUp(node: Node): Future[Unit] = node.waitFor[Int]("node is up")(_.height, _ > 0, 1.second).map(_ => ())
+  private def waitNodeIsUp(node: Node): Future[Unit] = node.waitFor[Int]("node is up")(_.height, _ >= 0, 1.second).map(_ => ())
 
   private def startNodeInternal(nodeConfig: Config): Node = try {
     val javaOptions = Option(System.getenv("CONTAINER_JAVA_OPTS")).getOrElse("")
