@@ -32,6 +32,7 @@ class BlockHeadersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAl
   override protected def beforeAll(): Unit = {
     super.beforeAll()
     log.debug(s"There are ${nodes.size} in tests") // Initializing of a lazy variable
+    Await.result(traverse(nodes)(_.waitForHeight(2)), 1.minute)
   }
 
   override protected def afterAll(): Unit = {

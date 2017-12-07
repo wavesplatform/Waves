@@ -116,6 +116,8 @@ trait IntegrationSuiteWithThreeAddresses extends BeforeAndAfterAll with Matchers
     }
 
     val correctStartBalancesFuture = for {
+      _ <- traverse(nodes)(_.waitForHeight(2))
+
       _ <- dumpBalances(sender, accounts, "initial")
       txs <- makeTransfers
 
