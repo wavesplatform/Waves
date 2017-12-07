@@ -17,6 +17,7 @@ import scorex.block.{Block, SignerData}
 import scorex.lagonaki.mocks.TestBlock
 import scorex.transaction.History.BlockchainScore
 import scorex.transaction.ValidationError
+import scorex.transaction.ValidationError.GenericError
 
 import scala.concurrent.duration._
 
@@ -88,7 +89,7 @@ class RxExtensionLoaderSpec extends FreeSpec with Matchers with TransactionGen w
 
   "should blacklist if received Signatures contains banned id" in {
     val (history, invBlockStorage, blocks, sigs, ccsw, singleBlocks) = buildExtensionLoader(1.millis)
-    invBlockStorage.add(byteStr(105))
+    invBlockStorage.add(byteStr(105), GenericError("Some error"))
     val ch = new EmbeddedChannel()
     val totalBlocksInHistory = 100
     Range(0, totalBlocksInHistory).map(byteStr).foreach(history.appendId)

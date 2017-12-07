@@ -5,33 +5,36 @@ import com.wavesplatform.state2.ByteStr
 
 import scala.concurrent.duration.FiniteDuration
 import InvalidBlockStorageImpl._
+import scorex.transaction.ValidationError
+import scorex.transaction.ValidationError.GenericError
 
 trait InvalidBlockStorage {
-  def add(blockId: ByteStr): Unit
+  def add(blockId: ByteStr, validationError: ValidationError): Unit
 
-  def contains(blockId: ByteStr): Boolean
+  def find(blockId: ByteStr): Option[ValidationError]
 }
 
 class InMemoryInvalidBlockStorage extends InvalidBlockStorage {
 
   var s: Set[ByteStr] = Set.empty[ByteStr]
 
-  override def add(blockId: ByteStr): Unit = s += blockId
+  override def add(blockId: ByteStr, validationError: ValidationError): Unit = s += blockId
 
-  override def contains(blockId: ByteStr): Boolean = s.contains(blockId)
+  override def find(blockId: ByteStr): Option[ValidationError] = {
+    if (s.contains(blockId)) Some(GenericError("Unknown")) else None
+  }
 
 }
 
 class InvalidBlockStorageImpl(settings: InvalidBlockStorageSettings) extends InvalidBlockStorage {
-  private val dummy = new Object
   private val cache = CacheBuilder
     .newBuilder()
     .expireAfterWrite(settings.timeout.length, settings.timeout.unit)
-    .build[ByteStr, Object]()
+    .build[ByteStr, ValidationError]()
 
-  override def add(blockId: ByteStr): Unit = cache.put(blockId, dummy)
+  override def add(blockId: ByteStr, validationError: ValidationError): Unit = cache.put(blockId, validationError)
 
-  override def contains(blockId: ByteStr): Boolean = cache.getIfPresent(blockId) != null
+  override def find(blockId: ByteStr): Option[ValidationError] = Option(cache.getIfPresent(blockId))
 }
 
 object InvalidBlockStorageImpl {

@@ -47,7 +47,7 @@ object ExtensionAppender extends ScorexLogging with Instrumented {
                 case (i, declinedBlock, e) =>
                   e match {
                     case _: ValidationError.BlockFromFuture =>
-                    case _ => invalidBlocks.add(declinedBlock.uniqueId)
+                    case _ => invalidBlocks.add(declinedBlock.uniqueId, e)
                   }
 
                   extension.view

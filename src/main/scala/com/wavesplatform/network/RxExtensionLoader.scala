@@ -92,9 +92,15 @@ object RxExtensionLoader extends ScorexLogging {
       state.loaderState match {
         case LoaderState.ExpectingSignatures(c, known, _) if c == ch =>
           val (_, unknown) = sigs.signatures.span(id => known.contains(id))
-          sigs.signatures.find(invalidBlocks.contains) match {
-            case Some(invalidBlock) =>
-              peerDatabase.blacklistAndClose(ch, s"Signatures contain invalid block(s): $invalidBlock")
+
+          val firstInvalid = sigs.signatures
+            .view
+            .flatMap { sig => invalidBlocks.find(sig).map(sig -> _) }
+            .headOption
+
+          firstInvalid match {
+            case Some((invalidBlock, reason)) =>
+              peerDatabase.blacklistAndClose(ch, s"Signatures contain invalid block(s): $invalidBlock, $reason")
               syncNext(state.withIdleLoader)
             case None =>
               if (unknown.isEmpty) {
