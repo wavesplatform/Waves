@@ -35,7 +35,7 @@ class OrderValidatorSpecification extends WordSpec
   (ss.transactionInfo _).when(*).returns(Some((1, Some(i1))))
 
   val s: MatcherSettings = matcherSettings.copy(account = MatcherAccount.address)
-  val w = Wallet(db, WalletSettings("matcher", Some(WalletSeed)))
+  val w = Wallet(WalletSettings(None, "matcher", Some(WalletSeed)))
   val acc: Option[PrivateKeyAccount] = w.generateNewAccount()
 
   val matcherPubKey: PublicKeyAccount = w.findWallet(s.account).right.get

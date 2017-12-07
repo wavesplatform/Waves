@@ -3,8 +3,7 @@ package scorex.lagonaki.unit
 import com.wavesplatform.settings.WalletSettings
 import com.wavesplatform.state2.ByteStr
 import org.scalatest.{FunSuite, Matchers}
-import scorex.utils.randomBytes
-import scorex.wallet.{Wallet, WalletObsolete}
+import scorex.wallet.Wallet
 
 class WalletSpecification extends FunSuite with Matchers {
 
@@ -45,26 +44,5 @@ class WalletSpecification extends FunSuite with Matchers {
     w2.privateKeyAccounts.nonEmpty shouldBe true
     w2.privateKeyAccounts shouldEqual w1privateKeyAccounts
     w2.nonce shouldBe w1nonce
-  }
-
-  test("wallet migration") {
-    val walletFile = Some(scorex.createTestTemporaryFile("wallet", ".dat"))
-    val seed = randomBytes(64)
-    val accountsCount = 10
-
-    val w1 = new WalletObsolete(walletFile, "cookies".toCharArray, Option(seed))
-    w1.generateNewAccounts(accountsCount)
-    val w1privateKeyAccounts = w1.privateKeyAccounts()
-    val w1Seed = w1.seed
-    val w1nonce = w1.nonce()
-    w1.close()
-
-    val w2 = Wallet(WalletSettings(walletFile, "cookies", None))
-    w2.privateKeyAccounts.nonEmpty shouldBe true
-    w2.privateKeyAccounts shouldEqual w1privateKeyAccounts
-    w2.seed shouldEqual seed
-    w2.seed shouldEqual w1Seed
-    w2.nonce shouldBe w1nonce
-    w2.nonce shouldBe accountsCount
   }
 }

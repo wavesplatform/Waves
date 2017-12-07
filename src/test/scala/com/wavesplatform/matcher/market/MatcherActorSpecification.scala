@@ -45,7 +45,7 @@ with TestDB
   val settings = matcherSettings.copy(account = MatcherAccount.address)
   val history = stub[History]
   val functionalitySettings = TestFunctionalitySettings.Stub
-  val wallet = Wallet(db, WalletSettings("matcher", Some(WalletSeed)))
+  val wallet = Wallet(WalletSettings(None, "matcher", Some(WalletSeed)))
   wallet.generateNewAccount()
 
   val orderHistoryRef = TestActorRef(new Actor {

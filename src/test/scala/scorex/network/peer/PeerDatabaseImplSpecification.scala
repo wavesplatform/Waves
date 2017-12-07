@@ -1,7 +1,7 @@
 package scorex.network.peer
 
 import java.io.File
-import java.net.InetSocketAddress
+import java.net.{InetAddress, InetSocketAddress}
 import java.nio.file.Files
 
 import com.typesafe.config.ConfigFactory
@@ -74,12 +74,12 @@ class PeerDatabaseImplSpecification extends path.FreeSpecLike with Matchers {
       database.knownPeers.keys should contain(address1)
       database.knownPeers.keys should not contain address2
 
-      database.blacklist(address1, "")
+      database.blacklist(InetAddress.getByName(host1), "")
       database.knownPeers.keys should not contain address1
       database.knownPeers should be(empty)
 
       database.randomPeer(Set()) should contain(address2)
-      database.blacklist(address2, "")
+      database.blacklist(InetAddress.getByName(host2), "")
       database.randomPeer(Set()) should not contain address2
       database.randomPeer(Set()) should be(empty)
     }
@@ -117,7 +117,7 @@ class PeerDatabaseImplSpecification extends path.FreeSpecLike with Matchers {
              |}""".stripMargin).withFallback(ConfigFactory.load()).resolve()
         val prevSettings = prevConfig.as[NetworkSettings]("waves.network")
         val prevDatabase = new PeerDatabaseImpl(prevSettings)
-        prevDatabase.blacklist(address1, "I don't like it")
+        prevDatabase.blacklist(address1.getAddress, "I don't like it")
         prevDatabase.close()
 
         val config = ConfigFactory.parseString(
@@ -143,7 +143,7 @@ class PeerDatabaseImplSpecification extends path.FreeSpecLike with Matchers {
              |}""".stripMargin).withFallback(ConfigFactory.load()).resolve()
         val settings = config.as[NetworkSettings]("waves.network")
         val database = new PeerDatabaseImpl(settings)
-        database.blacklist(address1, "I don't like it")
+        database.blacklist(address1.getAddress, "I don't like it")
 
         database.blacklistedHosts shouldBe empty
       }

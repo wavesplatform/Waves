@@ -48,12 +48,14 @@ import scala.util.Try
 
 class Application(val actorSystem: ActorSystem, val settings: WavesSettings, configRoot: ConfigObject) extends ScorexLogging {
 
+  import monix.execution.Scheduler.Implicits.{global => scheduler}
+
   private val db = openDB(settings.dataDirectory)
 
   private val LocalScoreBroadcastDebounce = 1.second
 
-  private val checkpointService = new CheckpointServiceImpl(settings.blockchainSettings.checkpointFile, settings.checkpointsSettings)
-  private val (history, featureProvider, stateWriter, stateReader, blockchainUpdater, blockchainDebugInfo) = StorageFactory(settings).get
+  private val checkpointService = new CheckpointServiceImpl(db, settings.checkpointsSettings)
+  private val (history, featureProvider, stateReader, blockchainUpdater, blockchainDebugInfo) = StorageFactory(db, settings).get
   private lazy val upnp = new UPnP(settings.networkSettings.uPnPSettings) // don't initialize unless enabled
   private val wallet: Wallet = Wallet(settings.walletSettings)
   private val peerDatabase = new PeerDatabaseImpl(settings.networkSettings)
@@ -66,8 +68,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     val feeCalculator = new FeeCalculator(settings.feesSettings)
     val time: Time = NTP
-
-    val peerDatabase = new PeerDatabaseImpl(db, settings.networkSettings)
     val establishedConnections = new ConcurrentHashMap[Channel, PeerInfo]
     val allChannels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
     val utxStorage = new UtxPoolImpl(time, stateReader, history, feeCalculator, settings.blockchainSettings.functionalitySettings, settings.utxSettings)
@@ -199,9 +199,14 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
       Try(Await.result(actorSystem.terminate(), stopActorsTimeout))
         .failed.map(e => log.error("Failed to terminate actor system", e))
-
       log.debug("Closing storage")
       db.close()
+
+      log.debug("Closing wallet")
+      wallet.close()
+
+      log.debug("Closing history")
+      history.close()
 
       log.info("Shutdown complete")
     }
@@ -262,12 +267,6 @@ object Application extends ScorexLogging {
     val settings = WavesSettings.fromConfig(config)
     Kamon.start(config)
     val isMetricsStarted = Metrics.start(settings.metrics)
-
-==== BASE ====
-    log.trace(s"System property sun.net.inetaddr.ttl=${System.getProperty("sun.net.inetaddr.ttl")}")
-    log.trace(s"System property sun.net.inetaddr.negative.ttl=${System.getProperty("sun.net.inetaddr.negative.ttl")}")
-    log.trace(s"Security property networkaddress.cache.ttl=${Security.getProperty("networkaddress.cache.ttl")}")
-    log.trace(s"Security property networkaddress.cache.negative.ttl=${Security.getProperty("networkaddress.cache.negative.ttl")}")
 
     RootActorSystem.start("wavesplatform", config) { actorSystem =>
       import actorSystem.dispatcher

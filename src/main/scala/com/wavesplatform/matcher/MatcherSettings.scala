@@ -25,7 +25,7 @@ case class MatcherSettings(enable: Boolean,
                            blacklistedAssets: Set[String],
                            blacklistedNames: Seq[Regex],
                            restOrderLimit: Int,
-                           blacklistedAdresses: Set[String]
+                           blacklistedAddresses: Set[String]
                           )
 
 
@@ -58,6 +58,6 @@ object MatcherSettings {
 
     MatcherSettings(enabled, account, bindAddress, port, minOrderFee, orderMatchTxFee, journalDirectory,
       snapshotsDirectory, snapshotsInterval, orderCleanupInterval, maxOpenOrders, baseAssets, basePairs, maxTimestampDiff,
-      blacklistedAssets.toSet, blacklistedNames, restOrderLimit)
+      blacklistedAssets.toSet, blacklistedNames, restOrderLimit, blacklistedAddresses.toSet)
   }
 }

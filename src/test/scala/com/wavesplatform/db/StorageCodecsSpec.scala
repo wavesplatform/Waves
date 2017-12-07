@@ -1,7 +1,5 @@
 package com.wavesplatform.db
 
-import java.net.{InetAddress, InetSocketAddress}
-
 import com.wavesplatform.network.{BlockCheckpoint, Checkpoint}
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{FreeSpec, Matchers}
@@ -50,44 +48,6 @@ class StorageCodecsSpec extends FreeSpec with Matchers with PropertyChecks {
 
     val r2 = CheckpointCodec.decode(bytes.slice(2, bytes.length))
     r2.isLeft shouldBe true
-  }
-
-  "InetSocketAddress round trip" in {
-    val ia = InetAddress.getByName("8.8.8.8")
-    val isa = new InetSocketAddress(ia, 1)
-    val bytes = InetSocketAddressCodec.encode(isa)
-    val r = InetSocketAddressCodec.decode(bytes)
-
-    r.isRight shouldBe true
-    r.right.get.value shouldBe isa
-  }
-
-
-  "InetAddress round trip" in {
-    val ia = InetAddress.getByName("8.8.8.8")
-    val bytes = InetAddressCodec.encode(ia)
-    val r = InetAddressCodec.decode(bytes)
-
-    r.isRight shouldBe true
-    r.right.get.value shouldBe ia
-  }
-
-  "InetSocketAddress sequence round trip" in {
-    val s = Seq(new InetSocketAddress(InetAddress.getByName("8.8.8.8"), 1), new InetSocketAddress(InetAddress.getByName("8.8.4.4"), 2))
-    val bytes = InetSocketAddressSeqCodec.encode(s)
-    val r = InetSocketAddressSeqCodec.decode(bytes)
-
-    r.isRight shouldBe true
-    r.right.get.value.length shouldBe 2
-  }
-
-  "InetAddress sequence round trip" in {
-    val s = Seq(InetAddress.getByName("8.8.8.8"), InetAddress.getByName("8.8.4.4"))
-    val bytes = InetAddressSeqCodec.encode(s)
-    val r = InetAddressSeqCodec.decode(bytes)
-
-    r.isRight shouldBe true
-    r.right.get.value.length shouldBe 2
   }
 
 }

@@ -60,6 +60,6 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
     ))
     settings.blacklistedAssets shouldBe Set("a")
     settings.blacklistedNames.map(_.pattern.pattern()) shouldBe Seq("b")
-    settings.blacklistedAdresses shouldBe Set("c")
+    settings.blacklistedAddresses shouldBe Set("c")
   }
 }

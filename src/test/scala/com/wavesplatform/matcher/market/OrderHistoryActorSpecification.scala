@@ -32,7 +32,7 @@ class OrderHistoryActorSpecification extends TestKit(ActorSystem("MatcherTest"))
   val pair = AssetPair(Some(ByteStr("BTC".getBytes)), Some(ByteStr("WAVES".getBytes)))
   val utxPool: UtxPool = stub[UtxPool]
   val db = open()
-  val wallet = Wallet(db, WalletSettings("matcher", Some(WalletSeed)))
+  val wallet = Wallet(WalletSettings(None, "matcher", Some(WalletSeed)))
   wallet.generateNewAccount()
 
   var actor: ActorRef = system.actorOf(Props(new OrderHistoryActor(db, settings, utxPool, wallet)))

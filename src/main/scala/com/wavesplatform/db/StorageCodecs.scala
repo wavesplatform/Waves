@@ -1,7 +1,5 @@
 package com.wavesplatform.db
 
-import java.net.{InetAddress, InetSocketAddress}
-
 import com.google.common.base.Charsets
 import com.google.common.primitives.{Ints, Longs, Shorts}
 import com.wavesplatform.network.{BlockCheckpoint, Checkpoint}
@@ -117,81 +115,6 @@ case class SeqCodec[A](valueCodec: Codec[A]) extends Codec[Seq[A]] {
       val result = builder.result()
       Either.cond(!error && expectedLength == result.length, DecodeResult(i, result), CodecFailure(s"failed to deserialize $expectedLength items"))
     } else Left(n.left.get)
-  }
-}
-
-object InetAddressCodec extends Codec[InetAddress] {
-  override def encode(value: InetAddress): Array[Byte] = {
-    val a = value.getAddress
-    val len = a.length
-    val result = new Array[Byte](Ints.BYTES + len)
-    System.arraycopy(Ints.toByteArray(len), 0, result, 0, Ints.BYTES)
-    System.arraycopy(a, 0, result, Ints.BYTES, len)
-    result
-  }
-
-  override def decode(bytes: Array[Byte]): Either[CodecFailure, DecodeResult[InetAddress]] = {
-    for {
-      l <- decodeInt(bytes.take(Ints.BYTES))
-      a = bytes.slice(Ints.BYTES, Ints.BYTES + l)
-      _ <- Either.cond(a.length == l, (), CodecFailure("incorrect ip address length"))
-      address <- Try(InetAddress.getByAddress(a)).toEither.left.map(e => CodecFailure(e.getMessage))
-    } yield DecodeResult(Ints.BYTES + l, address)
-  }
-}
-
-object InetSocketAddressCodec extends Codec[InetSocketAddress] {
-  override def encode(value: InetSocketAddress): Array[Byte] = {
-    val a = InetAddressCodec.encode(value.getAddress)
-    val len = a.length
-    val result = new Array[Byte](Ints.BYTES + len)
-    System.arraycopy(Ints.toByteArray(value.getPort), 0, result, 0, Ints.BYTES)
-    System.arraycopy(a, 0, result, Ints.BYTES, a.length)
-    result
-  }
-
-  override def decode(bytes: Array[Byte]): Either[CodecFailure, DecodeResult[InetSocketAddress]] = {
-    for {
-      port <- decodeInt(bytes.take(Ints.BYTES))
-      r <- InetAddressCodec.decode(bytes.slice(Ints.BYTES, bytes.length))
-    } yield DecodeResult(Ints.BYTES + r.length, new InetSocketAddress(r.value, port))
-  }
-}
-
-object InetSocketAddressSeqCodec extends Codec[Seq[InetSocketAddress]] {
-  private val itemsCodec = SeqCodec(InetSocketAddressCodec)
-
-  override def encode(value: Seq[InetSocketAddress]): Array[Byte] = itemsCodec.encode(value)
-
-  override def decode(bytes: Array[Byte]): Either[CodecFailure, DecodeResult[Seq[InetSocketAddress]]] =
-    itemsCodec.decode(bytes)
-}
-
-object InetAddressSeqCodec extends Codec[Seq[InetAddress]] {
-  private val itemsCodec = SeqCodec(InetAddressCodec)
-
-  override def encode(value: Seq[InetAddress]): Array[Byte] = itemsCodec.encode(value)
-
-  override def decode(bytes: Array[Byte]): Either[CodecFailure, DecodeResult[Seq[InetAddress]]] =
-    itemsCodec.decode(bytes)
-}
-
-object BlackListValueCodec extends Codec[(Long, String)] {
-  override def encode(value: (Long, String)): Array[Byte] = {
-    val a = value._2.getBytes(Charsets.UTF_8)
-    val len = a.length
-    val result = new Array[Byte](Longs.BYTES + len)
-    System.arraycopy(Longs.toByteArray(value._1), 0, result, 0, Longs.BYTES)
-    System.arraycopy(a, 0, result, Longs.BYTES, len)
-    result
-  }
-
-  override def decode(bytes: Array[Byte]): Either[CodecFailure, DecodeResult[(Long, String)]] = {
-    for {
-      ts <- Try(Longs.fromByteArray(bytes.take(Longs.BYTES))).toEither.left.map(e => CodecFailure(e.getMessage))
-      a = bytes.slice(Longs.BYTES, bytes.length)
-      msg <- Try(new String(a, Charsets.UTF_8)).toEither.left.map(e => CodecFailure(e.getMessage))
-    } yield DecodeResult(Longs.BYTES + a.length, (ts, msg))
   }
 }
 
@@ -408,14 +331,6 @@ object ByteStrCodec extends Codec[ByteStr] {
       _ <- Either.cond(a.length == l, (), CodecFailure("incorrect ByteStr length"))
     } yield DecodeResult(Ints.BYTES + l, ByteStr(a))
   }
-}
-
-object ByteStrSeqCodec extends Codec[Seq[ByteStr]] {
-  private val itemsCodec = SeqCodec(ByteStrCodec)
-
-  override def encode(value: Seq[ByteStr]): Array[Byte] = itemsCodec.encode(value)
-
-  override def decode(bytes: Array[Byte]): Either[CodecFailure, DecodeResult[Seq[ByteStr]]] = itemsCodec.decode(bytes)
 }
 
 object ShortCodec extends Codec[Short] {

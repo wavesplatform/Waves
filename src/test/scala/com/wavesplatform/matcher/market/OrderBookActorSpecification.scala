@@ -67,7 +67,7 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
 
   val settings = matcherSettings.copy(account = MatcherAccount.address)
 
-  val wallet = Wallet(db, WalletSettings("matcher", Some(WalletSeed)))
+  val wallet = Wallet(WalletSettings(None, "matcher", Some(WalletSeed)))
   wallet.generateNewAccount()
 
   val orderHistoryRef = TestActorRef(new Actor {

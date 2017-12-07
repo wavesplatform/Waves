@@ -12,7 +12,7 @@ import com.wavesplatform.state2.{BlockchainUpdaterImpl, StateStorage, StateWrite
 import com.wavesplatform.utils._
 import scorex.account.AddressScheme
 import scorex.block.Block
-import scorex.utils.ScorexLogging
+import scorex.utils.{NTP, ScorexLogging}
 
 import scala.util.{Failure, Success, Try}
 
@@ -35,7 +35,7 @@ object Importer extends ScorexLogging {
             val storage = StateStorage(db, dropExisting = false).get
             val state = new StateWriterImpl(storage, lock)
             val history = HistoryWriterImpl(db, lock, settings.blockchainSettings.functionalitySettings, settings.featuresSettings).get
-            val blockchainUpdater = BlockchainUpdaterImpl(state, history, settings, lock)
+            val blockchainUpdater = BlockchainUpdaterImpl(state, history, settings, NTP, lock)
             checkGenesis(history, settings, blockchainUpdater)
             val bis = new BufferedInputStream(inputStream)
             var quit = false
