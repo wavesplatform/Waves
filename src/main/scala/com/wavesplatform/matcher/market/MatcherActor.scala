@@ -2,24 +2,28 @@ package com.wavesplatform.matcher.market
 
 import akka.actor.{ActorRef, Props}
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
+import akka.pattern.ask
 import akka.persistence.{PersistentActor, RecoveryCompleted}
+import akka.util.Timeout
 import com.wavesplatform.UtxPool
 import com.wavesplatform.matcher.MatcherSettings
-import com.wavesplatform.matcher.api.{MatcherResponse, StatusCodeMatcherResponse}
-import com.wavesplatform.matcher.market.OrderBookActor.{DeleteOrderBookRequest, GetOrderBookResponse, OrderBookRequest}
+import com.wavesplatform.matcher.api.{BadMatcherResponse, CancelOrderRequest, MatcherResponse, StatusCodeMatcherResponse}
+import com.wavesplatform.matcher.market.OrderBookActor._
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.StateReader
 import io.netty.channel.group.ChannelGroup
 import play.api.libs.json._
 import scorex.account.Address
 import scorex.crypto.encode.Base58
-import scorex.transaction.assets.exchange.Validation.booleanOperators
-import scorex.transaction.assets.exchange.{AssetPair, Order, Validation}
 import scorex.transaction.{AssetId, History}
+import scorex.transaction.assets.exchange.{AssetPair, Order, Validation}
+import scorex.transaction.assets.exchange.Validation.booleanOperators
 import scorex.utils._
 import scorex.wallet.Wallet
+import akka.pattern.pipe
 
 import scala.collection.{immutable, mutable}
+import scala.concurrent.duration._
 import scala.language.reflectiveCalls
 
 class MatcherActor(orderHistory: ActorRef, storedState: StateReader, wallet: Wallet, utx: UtxPool, allChannels: ChannelGroup,
@@ -107,15 +111,19 @@ class MatcherActor(orderHistory: ActorRef, storedState: StateReader, wallet: Wal
   def forwardReq(req: Any)(orderBook: ActorRef): Unit = orderBook forward req
 
   def checkAssetPair[A <: {def assetPair : AssetPair}](msg: A)(f: => Unit): Unit = {
-    val v =  checkBlacklistId(msg.assetPair) && basicValidation(msg) && checkBlacklistRegex(msg.assetPair)
-    if (!v) {
-      sender() ! StatusCodeMatcherResponse(StatusCodes.NotFound, v.messages())
+    if (tradedPairs.contains(msg.assetPair)) {
+      f
     } else {
-      val ov = checkPairOrdering(msg.assetPair)
-      if (!ov) {
-        sender() ! StatusCodeMatcherResponse(StatusCodes.Found, ov.messages())
+      val v = checkBlacklistId(msg.assetPair) && basicValidation(msg) && checkBlacklistRegex(msg.assetPair)
+      if (!v) {
+        sender() ! StatusCodeMatcherResponse(StatusCodes.NotFound, v.messages())
       } else {
-        f
+        val ov = checkPairOrdering(msg.assetPair)
+        if (!ov) {
+          sender() ! StatusCodeMatcherResponse(StatusCodes.Found, ov.messages())
+        } else {
+          f
+        }
       }
     }
   }
@@ -124,9 +132,12 @@ class MatcherActor(orderHistory: ActorRef, storedState: StateReader, wallet: Wal
     wallet.findWallet(settings.account).map(_.publicKey).getOrElse(Array())
   }
 
+  implicit val c = context.dispatcher
+
   def forwardToOrderBook: Receive = {
     case GetMarkets =>
       sender() ! GetMarketsResponse(getMatcherPublicKey, tradedPairs.values.toSeq)
+
     case order: Order =>
       checkAssetPair(order) {
         checkBlacklistedAddress(order.senderPublicKey) {
@@ -145,7 +156,17 @@ class MatcherActor(orderHistory: ActorRef, storedState: StateReader, wallet: Wal
         context.child(OrderBookActor.name(ob.assetPair))
           .fold(returnEmptyOrderBook(ob.assetPair))(forwardReq(ob))
       }
+    case r: UnresolvedRequest =>
+      val s = sender()
+      orderHistory.ask(OrderHistoryActor.GetOrder(r.orderId))(Timeout(5.seconds)).map {
+        case Some(order: Order) => r match {
+          case CancelOrder(_, cancel) => OrderBookActor.CancelOrder(order.assetPair, cancel)
+        }
+        case None => s ! BadMatcherResponse(StatusCodes.BadRequest, "Order not found")
+      }.pipeTo(self)(s)
   }
+
+  //def forward
 
   def initPredefinedPairs(): Unit = {
     settings.predefinedPairs.diff(tradedPairs.keys.toSeq).foreach(pair =>
@@ -185,6 +206,12 @@ object MatcherActor {
   case class OrderBookCreated(pair: AssetPair)
 
   case object GetMarkets
+
+  trait UnresolvedRequest {
+    def orderId: String
+  }
+
+  case class CancelOrder(orderId: String, cancelOrderRequest: CancelOrderRequest) extends UnresolvedRequest
 
   case class GetMarketsResponse(publicKey: Array[Byte], markets: Seq[MarketData]) extends MatcherResponse {
     def getMarketsJs: JsValue = JsArray(markets.map(m => Json.obj(

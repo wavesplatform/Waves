@@ -108,7 +108,6 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
   "and should be listed by trader's publiс key via REST" in {
     val ts = System.currentTimeMillis()
     val privateKey = PrivateKeyAccount(Base58.decode(aliceNode.accountSeed).get)
-
     val pk = Base58.decode(aliceNode.publicKey).get
     val signature = Base58.encode(EllipticCurveImpl.sign(privateKey, pk ++ Longs.toByteArray(ts)))
 

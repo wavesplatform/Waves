@@ -2,14 +2,14 @@ package com.wavesplatform.matcher.market
 
 import akka.actor.{Actor, Props}
 import akka.http.scaladsl.model.StatusCodes
+import com.wavesplatform.{utils, UtxPool}
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.api.{BadMatcherResponse, MatcherResponse}
 import com.wavesplatform.matcher.market.OrderBookActor.{CancelOrder, GetOrderStatusResponse}
 import com.wavesplatform.matcher.market.OrderHistoryActor._
+import com.wavesplatform.matcher.model._
 import com.wavesplatform.matcher.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
 import com.wavesplatform.matcher.model.LimitOrder.Filled
-import com.wavesplatform.matcher.model._
-import com.wavesplatform.{UtxPool, utils}
 import org.h2.mvstore.MVStore
 import play.api.libs.json._
 import scorex.account.Address
@@ -60,6 +60,7 @@ class OrderHistoryActor(val settings: MatcherSettings, val utxPool: UtxPool, val
   }
 
   override def receive: Receive = {
+    case GetOrder(id) => sender() ! orderHistory.order(id)
     case req: ExpirableOrderHistoryRequest =>
       if (NTP.correctedTime() - req.ts < RequestTTL) {
         processExpirableRequest(req)
@@ -143,6 +144,7 @@ object OrderHistoryActor {
   case class GetOrderHistory(assetPair: AssetPair, address: String, ts: Long) extends ExpirableOrderHistoryRequest
   case class GetAllOrderHistory(address: String, ts: Long) extends ExpirableOrderHistoryRequest
   case class GetOrderStatus(assetPair: AssetPair, id: String, ts: Long) extends ExpirableOrderHistoryRequest
+  case class GetOrder(id: String)
   case class DeleteOrderFromHistory(assetPair: AssetPair, address: String, id: String, ts: Long) extends ExpirableOrderHistoryRequest
   case class ValidateOrder(order: Order, ts: Long) extends ExpirableOrderHistoryRequest
   case class ValidateOrderResult(result: Either[GenericError, Order])
