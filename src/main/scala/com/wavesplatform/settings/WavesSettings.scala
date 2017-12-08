@@ -8,7 +8,6 @@ import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 
 case class WavesSettings(directory: String,
                          dataDirectory: String,
-                         loggingLevel: LogLevel.Value,
                          networkSettings: NetworkSettings,
                          walletSettings: WalletSettings,
                          blockchainSettings: BlockchainSettings,
@@ -31,7 +30,6 @@ object WavesSettings {
   def fromConfig(config: Config): WavesSettings = {
     val directory = config.as[String](s"$configPath.directory")
     val dataDirectory = config.as[String](s"$configPath.data-directory")
-    val loggingLevel = config.as[LogLevel.Value](s"$configPath.logging-level")
     val networkSettings = config.as[NetworkSettings]("waves.network")
     val walletSettings = config.as[WalletSettings]("waves.wallet")
     val blockchainSettings = BlockchainSettings.fromConfig(config)
@@ -45,7 +43,7 @@ object WavesSettings {
     val featuresSettings = config.as[FeaturesSettings]("waves.features")
     val metrics = config.as[Metrics.Settings]("metrics")
 
-    WavesSettings(directory, dataDirectory, loggingLevel, networkSettings, walletSettings, blockchainSettings, checkpointsSettings,
+    WavesSettings(directory, dataDirectory, networkSettings, walletSettings, blockchainSettings, checkpointsSettings,
       feesSettings, matcherSettings, minerSettings, restAPISettings, synchronizationSettings, utxSettings,
       featuresSettings, metrics)
   }

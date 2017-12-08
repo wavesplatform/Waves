@@ -1,6 +1,5 @@
 package com.wavesplatform.matcher.model
 
-import ch.qos.logback.classic.Level
 import com.wavesplatform.TestDB
 import com.wavesplatform.matcher.MatcherTestData
 import com.wavesplatform.matcher.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
