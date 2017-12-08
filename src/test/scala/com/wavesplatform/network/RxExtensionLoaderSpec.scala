@@ -23,12 +23,6 @@ import scala.concurrent.duration._
 
 class RxExtensionLoaderSpec extends FreeSpec with Matchers with TransactionGen with RxScheduler with MockFactory with BlockGen {
 
-  def byteStr(id: Int): ByteStr = ByteStr(Array(id.toByte))
-
-  def block(id: Int): Block = TestBlock.create(Seq.empty).copy(signerData = SignerData(TestBlock.defaultSigner, byteStr(id)))
-
-  def genBlocks(amt: Int): List[Block] = Gen.listOfN(amt, randomSignerBlockGen).sample.get
-
   val MaxRollback = 10
   type Applier = (Channel, ExtensionBlocks) => Task[Either[ValidationError, Option[BlockchainScore]]]
   val simpleApplier: Applier = (_, _) => Task(Right(Some(0)))

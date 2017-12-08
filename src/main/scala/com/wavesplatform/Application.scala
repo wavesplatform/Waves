@@ -94,7 +94,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     val (signatures, blocks, blockchainScores, checkpoints, microblockInvs, microblockResponses) = network.messages
 
     val syncWithChannelClosed = RxScoreObserver(settings.synchronizationSettings.scoreTTL, history.score(), lastScore, blockchainScores, network.closedChannels)
-    val microblockDatas = MicroBlockSynchronizer(settings.synchronizationSettings.microBlockSynchronizer, history, peerDatabase)(lastBlockInfo.map(_.id), microblockInvs, microblockResponses)
+    val microblockDatas = MicroBlockSynchronizer(settings.synchronizationSettings.microBlockSynchronizer, peerDatabase, lastBlockInfo.map(_.id), microblockInvs, microblockResponses)
     val newBlocks = RxExtensionLoader(settings.synchronizationSettings.maxRollback, settings.synchronizationSettings.synchronizationTimeout,
       history, peerDatabase, knownInvalidBlocks, blocks, signatures, syncWithChannelClosed) { case ((c, b)) => processFork(c, b.blocks) }
 
