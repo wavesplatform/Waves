@@ -2,8 +2,8 @@ package com.wavesplatform.state2.reader
 
 import java.util.concurrent.locks.ReentrantReadWriteLock
 
-import cats.implicits._
 import cats.data.{NonEmptyList => NEL}
+import cats.implicits._
 import cats.kernel.Monoid
 import com.wavesplatform.state2._
 import monix.eval.Coeval
@@ -17,9 +17,9 @@ class CompositeStateReader private(inner: SnapshotStateReader, blockDiff: BlockD
 
   private val txDiff = blockDiff.txsDiff
 
-  override def transactionInfo(id: ByteStr): Option[(Int, Transaction)] =
+  override def transactionInfo(id: ByteStr): Option[(Int, Option[Transaction])] =
     txDiff.transactions.get(id)
-      .map(t => (t._1, t._2))
+      .map(t => (t._1, Some(t._2)))
       .orElse(inner.transactionInfo(id))
 
   override def accountPortfolio(a: Address): Portfolio =

@@ -42,8 +42,9 @@ case class LeaseTransaction private(sender: PublicKeyAccount,
 
 object LeaseTransaction {
 
-  object Status extends Enumeration {
-    val Active, Canceled = Value
+  object Status {
+    val Active = "active"
+    val Canceled = "canceled"
   }
 
   def parseTail(bytes: Array[Byte]): Try[LeaseTransaction] = Try {

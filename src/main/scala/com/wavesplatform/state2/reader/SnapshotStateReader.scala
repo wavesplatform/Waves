@@ -17,7 +17,7 @@ trait SnapshotStateReader extends Synchronized {
 
   def accountPortfolios: Map[Address, Portfolio]
 
-  def transactionInfo(id: ByteStr): Option[(Int, Transaction)]
+  def transactionInfo(id: ByteStr): Option[(Int, Option[Transaction])]
 
   def containsTransaction(id: ByteStr): Boolean
 
@@ -58,13 +58,11 @@ object SnapshotStateReader {
         .mapValues(portfolio => portfolio.assets.get(assetId))
         .collect { case (acc, Some(amt)) => acc -> amt }
 
-    def findTransaction[T <: Transaction](signature: ByteStr)(implicit ct: ClassTag[T]): Option[T]
-    = s.transactionInfo(signature).map(_._2)
-      .flatMap(tx => {
-        if (ct.runtimeClass.isAssignableFrom(tx.getClass))
-          Some(tx.asInstanceOf[T])
-        else None
-      })
+    def findTransaction[T <: Transaction : ClassTag](signature: ByteStr): Option[T] =
+      s.transactionInfo(signature) match {
+        case Some((_, Some(t: T))) => Some(t)
+        case _ => None
+      }
 
     def resolveAliasEi[T <: Transaction](aoa: AddressOrAlias): Either[ValidationError, Address] = {
       aoa match {
@@ -79,7 +77,7 @@ object SnapshotStateReader {
     def included(signature: ByteStr): Option[Int] = s.transactionInfo(signature).map(_._1)
 
     def accountTransactions(account: Address, limit: Int): Seq[_ <: Transaction] = s.read { _ =>
-      s.accountTransactionIds(account, limit).flatMap(s.transactionInfo).map(_._2)
+      s.accountTransactionIds(account, limit).flatMap(s.transactionInfo).flatMap(_._2)
     }
 
     def balance(account: Address): Long = s.wavesBalance(account)._1

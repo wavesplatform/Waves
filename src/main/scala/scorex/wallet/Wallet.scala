@@ -8,7 +8,6 @@ import com.wavesplatform.state2.ByteStr
 import com.wavesplatform.utils.JsonFileStorage
 import play.api.libs.json._
 import scorex.account.{Address, PrivateKeyAccount}
-import scorex.crypto.encode.Base64
 import scorex.crypto.hash.SecureCryptographicHash
 import scorex.transaction.ValidationError
 import scorex.transaction.ValidationError.MissingSenderPrivateKey
@@ -48,6 +47,10 @@ object Wallet extends ScorexLogging {
     def exportAccountSeed(account: Address): Either[ValidationError, Array[Byte]] = w.privateKeyAccount(account).map(_.seed)
   }
 
+  private case class WalletData(seed: ByteStr, accountSeeds: Set[ByteStr], nonce: Int)
+
+  private implicit val walletFormat: Format[WalletData] = Json.format
+
   def generateNewAccount(seed: Array[Byte], nonce: Int): PrivateKeyAccount = {
     val accountSeed = generateAccountSeed(seed, nonce)
     PrivateKeyAccount(accountSeed)
@@ -56,43 +59,31 @@ object Wallet extends ScorexLogging {
   def generateAccountSeed(seed: Array[Byte], nonce: Int): Array[Byte] =
     SecureCryptographicHash(Bytes.concat(Ints.toByteArray(nonce), seed))
 
-  def apply(settings: WalletSettings): Wallet = {
+  def apply(settings: WalletSettings): Wallet = new WalletImpl(settings.file, settings.password, settings.seed)
 
-    val seed = settings.seed.flatMap(bytes => if (bytes.arr.isEmpty) None else Some(bytes)).orElse {
-      val SeedSize = 64
-      val randomSeed = ByteStr(randomBytes(SeedSize))
-      log.info(s"You random generated seed is ${randomSeed.base58}")
-      Some(randomSeed)
-    }.get.arr
+  private class WalletImpl(file: Option[File], password: String, seedFromConfig: Option[ByteStr])
+    extends ScorexLogging with Wallet {
 
-    new WalletImpl(settings.file, settings.password, seed)
-  }
+    private def loadOrImport(f: File) = try {
+      Some(JsonFileStorage.load[WalletData](f.getCanonicalPath, Some(password)))
+    } catch {
+      case NonFatal(_) => importLegacyWallet()
+    }
 
-  class WalletImpl private[Wallet](file: Option[File], password: String, s: Array[Byte]) extends ScorexLogging with Wallet {
-    private type AccountSeed = Array[Byte]
+    private lazy val actualSeed = seedFromConfig.getOrElse {
+      val randomSeed = ByteStr(randomBytes(64))
+      log.info(s"Your randomly generated seed is ${randomSeed.base58}")
+      randomSeed
+    }
 
-    private case class WalletData(seed: AccountSeed,
-                                  accountSeeds: Set[AccountSeed],
-                                  nonce: Int)
+    private var walletData = file.flatMap(loadOrImport).getOrElse(WalletData(actualSeed, Set.empty, 0))
 
-    implicit val arrFormat: Format[AccountSeed] = Format[AccountSeed](
-      js => JsSuccess(Base64.decode(js.as[JsString].value)),
-      array => JsString(Base64.encode(array))
-    )
-    private implicit val format: OFormat[WalletData] = Json.format[WalletData]
-
-    private var walletData = file.filter(_.exists()).flatMap(f =>
-      try Some(JsonFileStorage.load[WalletData](f.getCanonicalPath, Option(password)))
-      catch {
-        case NonFatal(e) =>
-          log.warn("Can't read wallet data", e)
-          Option(migrateFromOldWallet())
-      }
-    ).getOrElse(WalletData(s, Set.empty, 0))
-
-    private def migrateFromOldWallet(): WalletData = {
-      val oldWallet = new WalletObsolete(file, password.toCharArray, Some(s))
-      val walletData = WalletData(oldWallet.seed, oldWallet.privateKeyAccounts().map(a => a.seed).toSet, oldWallet.nonce())
+    private def importLegacyWallet(): Option[WalletData] = file.map { _ =>
+      val oldWallet = new WalletObsolete(file, password.toCharArray, None)
+      val walletData = WalletData(
+        Option(oldWallet.seed).fold(actualSeed)(ByteStr(_)),
+        oldWallet.privateKeyAccounts().map(a => ByteStr(a.seed)).toSet,
+        oldWallet.nonce())
       oldWallet.close()
       walletData
     }
@@ -102,13 +93,13 @@ object Wallet extends ScorexLogging {
     private def lock[T](f: => T): T = l.synchronized(f)
 
     private val accountsCache: TrieMap[String, PrivateKeyAccount] = {
-      val accounts = walletData.accountSeeds.map(seed => PrivateKeyAccount(seed))
+      val accounts = walletData.accountSeeds.map(seed => PrivateKeyAccount(seed.arr))
       TrieMap(accounts.map(acc => acc.address -> acc).toSeq: _*)
     }
 
     private def save(): Unit = file.foreach(f => JsonFileStorage.save(walletData, f.getCanonicalPath, Option(password)))
 
-    override def seed: Array[Byte] = walletData.seed
+    override def seed: Array[Byte] = walletData.seed.arr
 
     override def privateKeyAccounts: List[PrivateKeyAccount] = accountsCache.values.toList
 
@@ -122,7 +113,7 @@ object Wallet extends ScorexLogging {
       val address = account.address
       val created = if (!accountsCache.contains(address)) {
         accountsCache += account.address -> account
-        walletData = walletData.copy(accountSeeds = walletData.accountSeeds + account.seed)
+        walletData = walletData.copy(accountSeeds = walletData.accountSeeds + ByteStr(account.seed))
         save()
         true
       } else false
@@ -135,7 +126,7 @@ object Wallet extends ScorexLogging {
 
     override def deleteAccount(account: PrivateKeyAccount): Boolean = lock {
       val before = walletData.accountSeeds.size
-      walletData = walletData.copy(accountSeeds = walletData.accountSeeds - account.seed)
+      walletData = walletData.copy(accountSeeds = walletData.accountSeeds - ByteStr(account.seed))
       accountsCache -= account.address
       save()
       before > walletData.accountSeeds.size
@@ -144,10 +135,7 @@ object Wallet extends ScorexLogging {
     override def privateKeyAccount(account: Address): Either[ValidationError, PrivateKeyAccount] =
       accountsCache.get(account.address).toRight[ValidationError](MissingSenderPrivateKey)
 
-    override def close(): Unit = {
-      save()
-      accountsCache.clear()
-    }
+    override def close(): Unit = save()
 
     override def nonce: Int = walletData.nonce
 

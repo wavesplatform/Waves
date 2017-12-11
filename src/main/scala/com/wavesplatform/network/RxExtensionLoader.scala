@@ -1,5 +1,6 @@
 package com.wavesplatform.network
 
+import com.wavesplatform.network.RxExtensionLoader.ApplierState.Buffer
 import com.wavesplatform.network.RxExtensionLoader.LoaderState.WithPeer
 import com.wavesplatform.network.RxScoreObserver.{ChannelClosedAndSyncWith, SyncWith}
 import io.netty.channel._
@@ -11,6 +12,7 @@ import monix.reactive.subjects.ConcurrentSubject
 import scorex.block.Block
 import scorex.block.Block.BlockId
 import scorex.transaction.History.BlockchainScore
+import scorex.transaction.ValidationError.GenericError
 import scorex.transaction.{NgHistory, ValidationError}
 import scorex.utils.ScorexLogging
 
@@ -51,7 +53,7 @@ object RxExtensionLoader extends ScorexLogging {
             case LoaderState.Idle =>
               val maybeKnownSigs = state.applierState match {
                 case ApplierState.Idle => Some((history.lastBlockIds(maxRollback), false))
-                case ApplierState.Applying(ext) => Some((ext.blocks.map(_.uniqueId), true))
+                case ApplierState.Applying(None, ext) => Some((ext.blocks.map(_.uniqueId), true))
                 case _ => None
               }
               maybeKnownSigs match {
@@ -59,7 +61,7 @@ object RxExtensionLoader extends ScorexLogging {
                   val ch = best.channel
                   log.debug(s"${id(ch)} Requesting extension signatures ${if (optimistic) "optimistically" else ""}, last ${knownSigs.length} are ${formatSignatures(knownSigs)}")
                   val blacklisting = scheduleBlacklist(ch, s"Timeout loading extension").runAsync
-                  Task(ch.writeAndFlush(GetSignatures(knownSigs))).runAsync
+                  Task(ch.writeAndFlush(GetSignatures(knownSigs))).logErr.runAsync
                   state.withLoaderState(LoaderState.ExpectingSignatures(ch, knownSigs, blacklisting))
                 case None =>
                   log.trace(s"Holding on requesting next sigs, $state")
@@ -90,9 +92,15 @@ object RxExtensionLoader extends ScorexLogging {
       state.loaderState match {
         case LoaderState.ExpectingSignatures(c, known, _) if c == ch =>
           val (_, unknown) = sigs.signatures.span(id => known.contains(id))
-          sigs.signatures.find(invalidBlocks.contains) match {
-            case Some(invalidBlock) =>
-              peerDatabase.blacklistAndClose(ch, s"Signatures contain invalid block(s): $invalidBlock")
+
+          val firstInvalid = sigs.signatures
+            .view
+            .flatMap { sig => invalidBlocks.find(sig).map(sig -> _) }
+            .headOption
+
+          firstInvalid match {
+            case Some((invalidBlock, reason)) =>
+              peerDatabase.blacklistAndClose(ch, s"Signatures contain invalid block(s): $invalidBlock, $reason")
               syncNext(state.withIdleLoader)
             case None =>
               if (unknown.isEmpty) {
@@ -101,7 +109,7 @@ object RxExtensionLoader extends ScorexLogging {
               } else {
                 log.trace(s"${id(ch)} Requesting all required blocks(size=${unknown.size})")
                 val blacklistingAsync = scheduleBlacklist(ch, "Timeout loading first requested block").runAsync
-                Task(unknown.foreach(s => ch.writeAndFlush(GetBlock(s)))).runAsync
+                Task(unknown.foreach(s => ch.writeAndFlush(GetBlock(s)))).logErr.runAsync
                 state.withLoaderState(LoaderState.ExpectingBlocks(ch, unknown, unknown.toSet, Set.empty, blacklistingAsync))
               }
           }
@@ -138,45 +146,51 @@ object RxExtensionLoader extends ScorexLogging {
       state.applierState match {
         case ApplierState.Idle =>
           applyExtension(extension, ch)
-          syncNext(state.copy(applierState = ApplierState.Applying(extension)))
-        case ApplierState.Applying(applying) =>
+          syncNext(state.copy(applierState = ApplierState.Applying(None, extension)))
+        case ApplierState.Applying(None, applying) =>
           log.trace(s"Caching received $extension until $applying is executed")
-          state.copy(applierState = ApplierState.Buffered(ch, extension, applying))
-        case ApplierState.Buffered(_, _, _) =>
+          state.copy(applierState = ApplierState.Applying(Some(Buffer(ch, extension)), applying))
+        case _ =>
           log.warn(s"Overflow, discarding $extension")
           state
       }
     }
 
     def applyExtension(extensionBlocks: ExtensionBlocks, ch: Channel): CancelableFuture[Unit] = {
-      extensionApplier(ch, extensionBlocks).flatMap { ar =>
-        Task {
-          s = onExetensionApplied(s, extensionBlocks, ch, ar)
-        }.executeOn(scheduler)
-      }.runAsync(scheduler)
+      extensionApplier(ch, extensionBlocks)
+        .onErrorHandle(err => {
+          log.error("Error applying extension", err)
+          Left(GenericError(err))
+        })
+        .flatMap { ar =>
+          Task {
+            s = onExtensionApplied(s, extensionBlocks, ch, ar)
+          }.executeOn(scheduler)
+        }.logErr.runAsync(scheduler)
     }
 
-    def onExetensionApplied(state: State, extension: ExtensionBlocks, ch: Channel, applicationResult: Either[ValidationError, Option[BlockchainScore]]): State = {
-      val ns = state.applierState match {
+    def onExtensionApplied(state: State, extension: ExtensionBlocks, ch: Channel, applicationResult: Either[ValidationError, Option[BlockchainScore]]): State = {
+      log.trace(s"Applying $extension finished with $applicationResult")
+      state.applierState match {
         case ApplierState.Idle =>
-          log.warn(s"Applying $extension finished with $applicationResult, but applierState is Idle")
+          log.warn(s"Applied $extension but ApplierState is Idle")
           state
-        case ApplierState.Applying(_) =>
-          log.trace(s"Applying $extension finished with $applicationResult, no cached")
-          syncNext(state.copy(applierState = ApplierState.Idle))
-        case ApplierState.Buffered(nextChannel, nextExtension, _) => applicationResult match {
-          case Left(_) =>
-            log.debug(s"Falied to apply $extension, discarding cached as well")
-            syncNext(state.copy(applierState = ApplierState.Idle))
-          case Right(_) =>
-            log.trace(s"Successfully applied $extension, staring to apply cached")
-            applyExtension(nextExtension, nextChannel)
-            syncNext(state.copy(applierState = ApplierState.Applying(nextExtension)))
-        }
+        case ApplierState.Applying(maybeBuffer, applying) =>
+          if (applying != extension) log.warn(s"Applied $extension doesn't match expected $applying")
+          maybeBuffer match {
+            case None => syncNext(state.copy(applierState = ApplierState.Idle))
+            case Some(Buffer(nextChannel, nextExtension)) => applicationResult match {
+              case Left(_) =>
+                log.debug(s"Failed to apply $extension, discarding cached as well")
+                syncNext(state.copy(applierState = ApplierState.Idle))
+              case Right(_) =>
+                log.trace(s"Successfully applied $extension, staring to apply cached")
+                applyExtension(nextExtension, nextChannel)
+                syncNext(state.copy(applierState = ApplierState.Applying(None, nextExtension)))
+            }
+          }
       }
-      log.trace(s"State after application: $ns")
-      ns
-    }
+    } tap (ns => log.trace(s"State after application: $ns"))
 
     Observable
       .merge(
@@ -235,15 +249,15 @@ object RxExtensionLoader extends ScorexLogging {
 
   sealed trait ApplierState
 
-  case object ApplierState {
+  object ApplierState {
 
     case object Idle extends ApplierState
 
-    case class Applying(applying: ExtensionBlocks) extends ApplierState
-
-    case class Buffered(nextChannel: Channel, nextExtension: ExtensionBlocks, applying: ExtensionBlocks) extends ApplierState {
-      override def toString: String = s"Buffered(nextChannel: ${id(nextChannel)}, nextExtension: $nextExtension, applying: $applying)"
+    case class Buffer(ch: Channel, ext: ExtensionBlocks) {
+      override def toString: String = s"Buffer($ext from ${id(ch)})"
     }
+
+    case class Applying(buf: Option[Buffer], applying: ExtensionBlocks) extends ApplierState
 
   }
 
