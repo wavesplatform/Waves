@@ -10,22 +10,30 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
 
   private val waitCompletion = 2.minutes
   private val aliasFee = 1.waves
+  private val transferFee = 1.waves
   private val leasingFee = 0.001.waves
+  private val transferAmount = 1.waves
 
   test("Able to send money to an alias") {
     val alias = "test_alias"
 
     val f = for {
-      _ <- assertBalances(firstAddress, 100.waves, 100.waves)
+      (balance, effectiveBalance) <- accountBalances(firstAddress)
       aliasTxId <- sender.createAlias(firstAddress, alias, aliasFee).map(_.id)
+
 
       _ <- waitForHeightAraiseAndTxPresent(aliasTxId, 1)
 
-      _ <- assertBalances(firstAddress, 99.waves, 99.waves)
-      transferId <- sender.transfer(firstAddress, s"alias:${sender.settings.blockchainSettings.addressSchemeCharacter}:$alias", 1.waves, 1.waves).map(_.id)
+      _ <- assertBalances(firstAddress, balance - aliasFee, effectiveBalance - aliasFee)
+      transferId <- sender.transfer(firstAddress
+        , s"alias:${sender.settings.blockchainSettings.addressSchemeCharacter}:$alias"
+        , transferAmount, transferFee).map(_.id)
 
       _ <- waitForHeightAraiseAndTxPresent(transferId, 1)
-      _ <- assertBalances(firstAddress, 98.waves, 98.waves)
+
+      _ <- assertBalances(firstAddress
+        , balance - transferFee - aliasFee
+        , effectiveBalance - transferFee - aliasFee)
     } yield succeed
 
     Await.result(f, waitCompletion)
@@ -34,9 +42,7 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
   test("Not able to create same aliases to same address") {
     val alias = "test_alias2"
     val f = for {
-      balance <- accountBalance(firstAddress)
-      effectiveBalance <- accountEffectiveBalance(firstAddress)
-
+      (balance, effectiveBalance) <- accountBalances(firstAddress)
       aliasTxId <- sender.createAlias(firstAddress, alias, aliasFee).map(_.id)
 
       _ <- waitForHeightAraiseAndTxPresent(aliasTxId, 1)
@@ -56,8 +62,7 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
     val alias = "test_alias3"
 
     val f = for {
-      balance <- accountBalance(firstAddress)
-      effectiveBalance <- accountEffectiveBalance(firstAddress)
+      (balance, effectiveBalance) <- accountBalances(firstAddress)
 
       aliasTxId <- sender.createAlias(firstAddress, alias, aliasFee).map(_.id)
 
@@ -75,7 +80,7 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
 
     val f = for {
 
-      (balance, effectiveBalance) <- accountBalance(secondAddress).zip(accountEffectiveBalance(secondAddress))
+      (balance, effectiveBalance) <- accountBalances(secondAddress)
 
       aliasFirstTxId <- sender.createAlias(secondAddress, firstAlias, aliasFee).map(_.id)
       _ <- waitForHeightAraiseAndTxPresent(aliasFirstTxId, 1)
@@ -126,8 +131,7 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
   aliases_names.foreach { alias =>
     test(s"create alias named $alias") {
       val f = for {
-        balance <- accountBalance(secondAddress)
-        effectiveBalance <- accountEffectiveBalance(secondAddress)
+        (balance, effectiveBalance) <- accountBalances(secondAddress)
         aliasTxId <- sender.createAlias(secondAddress, alias, aliasFee).map(_.id)
         _ <- waitForHeightAraiseAndTxPresent(aliasTxId, 1)
         _ <- assertBalances(secondAddress, balance - aliasFee, effectiveBalance - aliasFee)
@@ -157,8 +161,6 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
 
       Await.result(f, waitCompletion)
     }
-
-
   }
 
   test("Able to lease by alias") {
@@ -166,10 +168,13 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
     val buildedThirdAddressAlias = s"alias:${sender.settings.blockchainSettings.addressSchemeCharacter}:$thirdAddressAlias"
 
     val f = for {
-      (((firstAddressBalance, firstAddressEffectiveBalance), thirdAddressBalance), thirdAddressEffectiveBalance) <- accountBalance(firstAddress)
-        .zip(accountEffectiveBalance(firstAddress))
-        .zip(accountBalance(thirdAddress))
-        .zip(accountEffectiveBalance(thirdAddress))
+    //      (((firstAddressBalance, firstAddressEffectiveBalance), thirdAddressBalance), thirdAddressEffectiveBalance) <- accountBalance(firstAddress)
+    //        .zip(accountEffectiveBalance(firstAddress))
+    //        .zip(accountBalance(thirdAddress))
+    //        .zip(accountEffectiveBalance(thirdAddress))
+
+      ((firstAddressBalance, firstAddressEffectiveBalance), (thirdAddressBalance, thirdAddressEffectiveBalance)) <- accountBalances(firstAddress)
+        .zip(accountBalances(thirdAddress))
 
       aliasTxId <- sender.createAlias(thirdAddress, thirdAddressAlias, aliasFee).map(_.id)
       _ <- waitForHeightAraiseAndTxPresent(aliasTxId, 1)
