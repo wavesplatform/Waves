@@ -50,9 +50,7 @@ class StateReaderImpl(p: StateStorage, val synchronizationToken: ReentrantReadWr
   }
 
   override def accountPortfolios: Map[Address, Portfolio] = read { implicit l =>
-    val waves = p.allWavesBalances.map { e => e._1 -> Portfolio(e._2._1, LeaseInfo(e._2._2, e._2._3), Map.empty) }
-    val assets = p.allAssetsBalances.map { e => e._1 -> Portfolio(0, LeaseInfo.empty, e._2) }
-    Monoid.combine(assets, waves)
+    p.allPortfolios
   }
 
   override def isLeaseActive(leaseTx: LeaseTransaction): Boolean = read { implicit l =>

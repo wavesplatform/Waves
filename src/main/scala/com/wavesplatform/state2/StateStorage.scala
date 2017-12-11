@@ -118,43 +118,21 @@ class StateStorage private(db: DB) extends SubStorage(db, "state") with Properti
   def putLastBalanceSnapshotHeight(b: Option[WriteBatch], address: Address, height: Int): Unit =
     put(makeKey(LastBalanceHeightPrefix, address.bytes.arr), Ints.toByteArray(height), b)
 
-  def allWavesBalances: Map[Address, (Long, Long, Long)] = {
+  def allPortfolios: Map[Address, Portfolio] = {
     val maxAddressIndex = getIntProperty(MaxAddress).getOrElse(0)
     log.info(s"Accounts count: $maxAddressIndex")
     (0 until maxAddressIndex).flatMap({ i =>
       val maybeAddressBytes = get(makeKey(AddressesIndexPrefix, i))
       val maybeAddress = maybeAddressBytes.flatMap { addressBytes => Address.fromBytes(addressBytes).toOption }
-      val maybeBalances = maybeAddressBytes.flatMap { addressBytes =>
-        get(makeKey(WavesBalancePrefix, addressBytes)).map(WavesBalanceValueCodec.decode).map(_.explicitGet().value)
-      }
-      (maybeAddress, maybeBalances) match {
-        case (Some(a), Some(b)) => Some(a -> b)
+      val maybeBalances = maybeAddress.flatMap { address => getWavesBalance(address) }
+      val maybeAssetsBalances = maybeAddress.flatMap { address => getAssetBalanceMap(address) }
+
+      (maybeAddress, maybeBalances, maybeAssetsBalances) match {
+        case (Some(a), Some(b), Some(c)) =>
+          Some(a -> Portfolio(b._1, LeaseInfo(b._2, b._3), c))
         case _ => None
       }
     })(scala.collection.breakOut)
-  }
-
-  def allAssetsBalances: Map[Address, Map[ByteStr, Long]] = {
-    val maxAddressIndex = getIntProperty(MaxAddress).getOrElse(0)
-    log.info(s"Accounts count: $maxAddressIndex")
-    (0 until maxAddressIndex).flatMap { i =>
-      val maybeAddressBytes = get(makeKey(AddressesIndexPrefix, i))
-      val maybeAddress = maybeAddressBytes.flatMap { addressBytes => Address.fromBytes(addressBytes).toOption }
-      val maybeBalances = maybeAddressBytes.flatMap { addressBytes =>
-        val maybeAssets = get(makeKey(AddressAssetsPrefix, addressBytes)).map(Id32SeqCodec.decode).map(_.explicitGet().value)
-        maybeAssets.map { assets =>
-          assets.foldLeft(Map.empty[ByteStr, Long]) { (m, a) =>
-            val key = makeKey(AssetBalancePrefix, Bytes.concat(addressBytes, a.arr))
-            val balance = get(key).map(Longs.fromByteArray).getOrElse(0L)
-            m.updated(a, balance)
-          }
-        }
-      }
-      (maybeAddress, maybeBalances) match {
-        case (Some(a), Some(b)) => Some(a -> b)
-        case _ => None
-      }
-    }.toMap
   }
 
   def getAssetBalanceMap(address: Address): Option[Map[ByteStr, Long]] = {
