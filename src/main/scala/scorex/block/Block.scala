@@ -250,7 +250,7 @@ object Block extends ScorexLogging {
       _ <- Either.cond(signerData.generator.publicKey.length == KeyLength, (), "Incorrect signer.publicKey")
       _ <- Either.cond(version > 2 || featureVotes.isEmpty, (), s"Block version $version could not contain feature votes")
       _ <- Either.cond(featureVotes.size <= MaxFeaturesInBlock, (), s"Block could not contain more than $MaxFeaturesInBlock feature votes")
-    } yield Block(timestamp, version, reference, signerData, consensusData, transactionData, featureVotes)).left.map(GenericError)
+    } yield Block(timestamp, version, reference, signerData, consensusData, transactionData, featureVotes)).left.map(GenericError(_))
   }
 
   def buildAndSign(version: Byte,

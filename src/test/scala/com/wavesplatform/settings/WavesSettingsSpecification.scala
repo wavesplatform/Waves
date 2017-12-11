@@ -30,26 +30,17 @@ class WavesSettingsSpecification extends FlatSpec with Matchers {
     }
   }
 
-  testConfig("mainnet") {
-    _.loggingLevel should be(LogLevel.INFO)
-  }
-
+  testConfig("mainnet")()
   testConfig("testnet")()
   testConfig("devnet")()
 
   "WavesSettings" should "resolve folders correctly" in {
-    val config = loadConfig(ConfigFactory.parseString(
-      """waves {
-        |  logging-level = TRACE
-        |  directory = "/xxx"
-        |}""".stripMargin))
-
+    val config = loadConfig(ConfigFactory.parseString("""waves.directory = "/xxx""""))
     val settings = WavesSettings.fromConfig(config.resolve())
 
     settings.directory should be("/xxx")
     settings.networkSettings.file should be(Some(new File("/xxx/data/peers.dat")))
     settings.walletSettings.file should be(Some(new File("/xxx/wallet/wallet.dat")))
-    settings.loggingLevel should be(LogLevel.TRACE)
     settings.blockchainSettings.blockchainFile should be(Some(new File("/xxx/data/blockchain.dat")))
     settings.blockchainSettings.stateFile should be(Some(new File("/xxx/data/state.dat")))
     settings.blockchainSettings.checkpointFile should be(Some(new File("/xxx/data/checkpoint.dat")))

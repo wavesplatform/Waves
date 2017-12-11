@@ -12,7 +12,7 @@ import com.wavesplatform.matcher.market.OrderHistoryActor.{ValidateOrder, Valida
 import com.wavesplatform.matcher.model.Events.Event
 import com.wavesplatform.matcher.model.{BuyLimitOrder, LimitOrder, SellLimitOrder}
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, WalletSettings}
-import com.wavesplatform.state2.reader.{SnapshotStateReader}
+import com.wavesplatform.state2.reader.SnapshotStateReader
 import com.wavesplatform.state2.{ByteStr, LeaseInfo, Portfolio}
 import io.netty.channel.group.ChannelGroup
 import monix.eval.Coeval
@@ -63,7 +63,7 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
     100000L,
     10000L).right.get
 
-  (storedState.transactionInfo _).when(*).returns(Some((1, issueTransaction)))
+  (storedState.transactionInfo _).when(*).returns(Some((1, Some(issueTransaction))))
 
   val settings = matcherSettings.copy(account = MatcherAccount.address)
 

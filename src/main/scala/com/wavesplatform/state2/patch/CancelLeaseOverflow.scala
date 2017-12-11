@@ -19,7 +19,7 @@ object CancelLeaseOverflow {
       a <- portfolioUpd.keys
       txId <- s.accountTransactionIds(a, Int.MaxValue)
       leaseId <- s.transactionInfo(txId).collect {
-        case (_, l: LeaseTransaction) if (l.sender: Address) == a => l.id()
+        case (_, Some(l: LeaseTransaction)) if (l.sender: Address) == a => l.id()
       }
     } yield (leaseId, false)
 

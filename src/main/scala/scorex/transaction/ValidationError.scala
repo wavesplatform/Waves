@@ -1,5 +1,6 @@
 package scorex.transaction
 
+import com.google.common.base.Throwables
 import com.wavesplatform.state2.ByteStr
 import scorex.account.{Address, Alias}
 import scorex.block.{Block, MicroBlock}
@@ -26,6 +27,9 @@ object ValidationError {
     override def toString: String = s"InvalidSignature(${s.toString + " reason: " + details})"
   }
   case class GenericError(err: String) extends ValidationError
+  object GenericError {
+    def apply(ex: Throwable): GenericError = new GenericError(Throwables.getStackTraceAsString(ex))
+  }
   case class AlreadyInThePool(txId: ByteStr) extends ValidationError
   case class AccountBalanceError(errs: Map[Address, String]) extends ValidationError
   case class AliasNotExists(a: Alias) extends ValidationError

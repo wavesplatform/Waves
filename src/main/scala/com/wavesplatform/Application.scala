@@ -9,7 +9,8 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
 import akka.http.scaladsl.server.Route
 import akka.stream.ActorMaterializer
-import com.typesafe.config.{Config, ConfigFactory, ConfigObject}
+import cats.instances.all._
+import com.typesafe.config._
 import com.wavesplatform.actor.RootActorSystem
 import com.wavesplatform.features.api.ActivationApiRoute
 import com.wavesplatform.history.{CheckpointServiceImpl, StorageFactory}
@@ -17,10 +18,10 @@ import com.wavesplatform.http.NodeApiRoute
 import com.wavesplatform.matcher.Matcher
 import com.wavesplatform.metrics.Metrics
 import com.wavesplatform.mining.{Miner, MinerImpl}
-import com.wavesplatform.network.{InvalidBlockStorageImpl, MicroBlockSynchronizer, NetworkServer, PeerDatabaseImpl, PeerInfo, RxExtensionLoader, RxScoreObserver, UPnP}
+import com.wavesplatform.network._
 import com.wavesplatform.settings._
 import com.wavesplatform.state2.appender.{BlockAppender, CheckpointAppender, ExtensionAppender, MicroblockAppender}
-import com.wavesplatform.utils.forceStopApplication
+import com.wavesplatform.utils.{SystemInformationReporter, forceStopApplication}
 import io.netty.channel.Channel
 import io.netty.channel.group.DefaultChannelGroup
 import io.netty.util.concurrent.GlobalEventExecutor
@@ -46,6 +47,10 @@ import scala.util.Try
 
 class Application(val actorSystem: ActorSystem, val settings: WavesSettings, configRoot: ConfigObject) extends ScorexLogging {
 
+  import monix.execution.Scheduler.Implicits.{global => scheduler}
+
+  private val LocalScoreBroadcastDebounce = 1.second
+
   private val checkpointService = new CheckpointServiceImpl(settings.blockchainSettings.checkpointFile, settings.checkpointsSettings)
   private val (history, featureProvider, stateWriter, stateReader, blockchainUpdater, blockchainDebugInfo) = StorageFactory(settings).get
   private lazy val upnp = new UPnP(settings.networkSettings.uPnPSettings) // don't initialize unless enabled
@@ -53,9 +58,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   private val peerDatabase = new PeerDatabaseImpl(settings.networkSettings)
 
   def run(): Unit = {
-    log.debug(s"Available processors: ${Runtime.getRuntime.availableProcessors}")
-    log.debug(s"Max memory available: ${Runtime.getRuntime.maxMemory}")
-
     checkGenesis(history, settings, blockchainUpdater)
 
     if (wallet.privateKeyAccounts.isEmpty)
@@ -78,15 +80,25 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     import blockchainUpdater.lastBlockInfo
 
+    val lastScore = lastBlockInfo
+      .map(_.score)
+      .distinctUntilChanged
+      .debounce(LocalScoreBroadcastDebounce)
+      .share(scheduler)
+
+    lastScore.foreach { x =>
+      allChannels.broadcast(LocalScoreChanged(x))
+    }(scheduler)
+
     val network = NetworkServer(settings, lastBlockInfo, history, utxStorage, peerDatabase, allChannels, establishedConnections)
     val (signatures, blocks, blockchainScores, checkpoints, microblockInvs, microblockResponses) = network.messages
 
-    val syncWithChannelClosed = RxScoreObserver(settings.synchronizationSettings.scoreTTL, history.score(), lastBlockInfo.map(_.score), blockchainScores, network.closedChannels)
-    val microblockDatas = MicroBlockSynchronizer(settings.synchronizationSettings.microBlockSynchronizer, history, peerDatabase)(lastBlockInfo.map(_.id), microblockInvs, microblockResponses) _
+    val syncWithChannelClosed = RxScoreObserver(settings.synchronizationSettings.scoreTTL, history.score(), lastScore, blockchainScores, network.closedChannels)
+    val microblockDatas = MicroBlockSynchronizer(settings.synchronizationSettings.microBlockSynchronizer, history, peerDatabase)(lastBlockInfo.map(_.id), microblockInvs, microblockResponses)
     val newBlocks = RxExtensionLoader(settings.synchronizationSettings.maxRollback, settings.synchronizationSettings.synchronizationTimeout,
       history, peerDatabase, knownInvalidBlocks, blocks, signatures, syncWithChannelClosed) { case ((c, b)) => processFork(c, b.blocks) }
 
-    val microblockSink = microblockDatas(processMicroBlock)
+    val microblockSink = microblockDatas.mapTask(scala.Function.tupled(processMicroBlock))
     val blockSink = newBlocks.mapTask(scala.Function.tupled(processBlock))
     val checkpointSink = checkpoints.mapTask { case ((s, c)) => processCheckpoint(Some(s), c) }
 
@@ -102,7 +114,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     if (settings.restAPISettings.enable) {
       val apiRoutes = Seq(
-        BlocksApiRoute(settings.restAPISettings, history, allChannels, c => processCheckpoint(None, c)),
+        BlocksApiRoute(settings.restAPISettings, history, blockchainUpdater, allChannels, c => processCheckpoint(None, c)),
         TransactionsApiRoute(settings.restAPISettings, stateReader, history, utxStorage),
         NxtConsensusApiRoute(settings.restAPISettings, stateReader, history, settings.blockchainSettings.functionalitySettings),
         WalletApiRoute(settings.restAPISettings, wallet),
@@ -202,21 +214,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
 object Application extends ScorexLogging {
 
-  private def configureLogging(settings: WavesSettings) = {
-    import ch.qos.logback.classic.{Level, LoggerContext}
-    import org.slf4j._
-
-    val lc = LoggerFactory.getILoggerFactory.asInstanceOf[LoggerContext]
-    val rootLogger = lc.getLogger(Logger.ROOT_LOGGER_NAME)
-    settings.loggingLevel match {
-      case LogLevel.TRACE => rootLogger.setLevel(Level.TRACE)
-      case LogLevel.DEBUG => rootLogger.setLevel(Level.DEBUG)
-      case LogLevel.INFO => rootLogger.setLevel(Level.INFO)
-      case LogLevel.WARN => rootLogger.setLevel(Level.WARN)
-      case LogLevel.ERROR => rootLogger.setLevel(Level.ERROR)
-    }
-  }
-
   private def readConfig(userConfigPath: Option[String]): Config = {
     val maybeConfigFile = for {
       maybeFilename <- userConfigPath
@@ -256,17 +253,18 @@ object Application extends ScorexLogging {
     SLF4JBridgeHandler.removeHandlersForRootLogger()
     SLF4JBridgeHandler.install()
 
-    log.info("Starting...")
-
     val config = readConfig(args.headOption)
+
+    // DO NOT LOG BEFORE THIS LINE, THIS PROPERTY IS USED IN logback.xml
+    System.setProperty("waves.directory", config.getString("waves.directory"))
+    log.info("Starting...")
+    sys.addShutdownHook {
+      SystemInformationReporter.report(config)
+    }
+
     val settings = WavesSettings.fromConfig(config)
     Kamon.start(config)
     val isMetricsStarted = Metrics.start(settings.metrics)
-
-    log.trace(s"System property sun.net.inetaddr.ttl=${System.getProperty("sun.net.inetaddr.ttl")}")
-    log.trace(s"System property sun.net.inetaddr.negative.ttl=${System.getProperty("sun.net.inetaddr.negative.ttl")}")
-    log.trace(s"Security property networkaddress.cache.ttl=${Security.getProperty("networkaddress.cache.ttl")}")
-    log.trace(s"Security property networkaddress.cache.negative.ttl=${Security.getProperty("networkaddress.cache.negative.ttl")}")
 
     RootActorSystem.start("wavesplatform", config) { actorSystem =>
       import actorSystem.dispatcher
@@ -286,8 +284,6 @@ object Application extends ScorexLogging {
           )
         }
       }
-
-      configureLogging(settings)
 
       // Initialize global var with actual address scheme
       AddressScheme.current = new AddressScheme {

@@ -168,11 +168,6 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
     val buildedThirdAddressAlias = s"alias:${sender.settings.blockchainSettings.addressSchemeCharacter}:$thirdAddressAlias"
 
     val f = for {
-    //      (((firstAddressBalance, firstAddressEffectiveBalance), thirdAddressBalance), thirdAddressEffectiveBalance) <- accountBalance(firstAddress)
-    //        .zip(accountEffectiveBalance(firstAddress))
-    //        .zip(accountBalance(thirdAddress))
-    //        .zip(accountEffectiveBalance(thirdAddress))
-
       ((firstAddressBalance, firstAddressEffectiveBalance), (thirdAddressBalance, thirdAddressEffectiveBalance)) <- accountBalances(firstAddress)
         .zip(accountBalances(thirdAddress))
 

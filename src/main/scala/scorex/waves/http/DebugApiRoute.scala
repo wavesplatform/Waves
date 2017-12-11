@@ -7,7 +7,9 @@ import javax.ws.rs.Path
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
+import com.typesafe.config.{ConfigObject, ConfigRenderOptions}
 import com.wavesplatform.UtxPool
+import com.wavesplatform.mining.{Miner, MinerDebugInfo}
 import com.wavesplatform.network.{LocalScoreChanged, PeerDatabase, PeerInfo, _}
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state2.{ByteStr, LeaseInfo, Portfolio, StateReader}
@@ -17,21 +19,18 @@ import io.swagger.annotations._
 import play.api.libs.json._
 import scorex.account.Address
 import scorex.api.http._
+import scorex.block.Block.BlockId
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash
 import scorex.transaction._
+import scorex.utils.ScorexLogging
 import scorex.wallet.Wallet
+import scorex.waves.http.DebugApiRoute._
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
-import scala.util.{Failure, Success}
 import scala.util.control.NonFatal
-import DebugApiRoute._
-import com.typesafe.config.{ConfigObject, ConfigRenderOptions}
-import com.wavesplatform.mining.Miner
-import com.wavesplatform.mining.MinerDebugInfo
-import scorex.block.Block.BlockId
-import scorex.utils.ScorexLogging
+import scala.util.{Failure, Success}
 
 
 @Path("/debug")
@@ -336,12 +335,6 @@ object DebugApiRoute {
     override def writes(o: Address): JsValue = JsString(o.stringRepr)
 
     override def reads(json: JsValue): JsResult[Address] = ???
-  }
-
-  implicit val byteStrWrites: Format[ByteStr] = new Format[ByteStr] {
-    override def writes(o: AssetId): JsValue = JsString(o.base58)
-
-    override def reads(json: JsValue): JsResult[BlockId] = ???
   }
 
   case class HistoryInfo(lastBlockIds: Seq[BlockId], microBlockIds: Seq[BlockId])

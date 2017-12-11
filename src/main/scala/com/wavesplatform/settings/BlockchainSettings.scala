@@ -34,8 +34,8 @@ case class FunctionalitySettings(featureCheckBlocksPeriod: Int,
 
 object FunctionalitySettings {
   val MAINNET = apply(
-    featureCheckBlocksPeriod = 10000,
-    blocksForFeatureActivation = 9000,
+    featureCheckBlocksPeriod = 5000,
+    blocksForFeatureActivation = 4000,
     allowTemporaryNegativeUntil = 1479168000000L,
     allowInvalidPaymentTransactionsByTimestamp = 1479168000000L,
     requireSortedTransactionsAfter = 1479168000000L,
@@ -47,7 +47,7 @@ object FunctionalitySettings {
     allowInvalidReissueInSameBlockUntilTimestamp = 1492768800000L,
     allowMultipleLeaseCancelTransactionUntilTimestamp = 1492768800000L,
     resetEffectiveBalancesAtHeight = 462000,
-    blockVersion3AfterHeight = Int.MaxValue,
+    blockVersion3AfterHeight = 795000,
     preActivatedFeatures = Map.empty)
 
   val TESTNET = apply(
