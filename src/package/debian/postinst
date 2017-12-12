@@ -46,7 +46,6 @@ if [ "$1" = configure ]; then
         addService ${{app_name}}
     elif is_upstart; then
         echo Installing upstart service ...
-        ln -s /usr/share/${{app_name}}/conf/upstart.conf /etc/init/${{app_name}}.conf
         initctl reload-configuration
     fi
 fi
