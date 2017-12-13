@@ -130,4 +130,11 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Scor
     blacklist(address, reason)
     channel.close()
   }
+
+  override def suspendAndClose(channel: Channel): Unit = {
+    val address = channel.asInstanceOf[NioSocketChannel].remoteAddress()
+    log.debug(s"Suspending ${id(channel)}")
+    suspend(address)
+    channel.close()
+  }
 }

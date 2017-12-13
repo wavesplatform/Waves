@@ -23,7 +23,7 @@ class InboundConnectionFilter(peerDatabase: PeerDatabase, maxInboundConnections:
 
   override def accept(ctx: ChannelHandlerContext, remoteAddress: InetSocketAddress): Boolean = Option(remoteAddress.getAddress) match {
     case None =>
-      log.debug(s"Can't obtain address from $remoteAddress")
+      log.debug(s"Can't obtain an address from $remoteAddress")
       false
 
     case Some(address) =>
