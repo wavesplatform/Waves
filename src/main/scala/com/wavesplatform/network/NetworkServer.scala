@@ -156,14 +156,13 @@ object NetworkServer extends ScorexLogging {
 
 
     def handleOutgoingChannelClosed(remoteAddress: InetSocketAddress)(closeFuture: ChannelFuture): Unit = {
-    outgoingChannels.remove(remoteAddress, closeFuture.channel())
-    if (!shutdownInitiated) peerDatabase.suspend(remoteAddress.getAddress)
+      outgoingChannels.remove(remoteAddress, closeFuture.channel())
+      if (!shutdownInitiated) peerDatabase.suspend(remoteAddress)
 
       if (closeFuture.isSuccess)
         log.trace(formatOutgoingChannelEvent(closeFuture.channel(), "Channel closed (expected)"))
       else
         log.debug(formatOutgoingChannelEvent(closeFuture.channel(), s"Channel closed: ${Option(closeFuture.cause()).map(_.getMessage).getOrElse("no message")}"))
-
     }
 
     def handleConnectionAttempt(remoteAddress: InetSocketAddress)(thisConnFuture: ChannelFuture): Unit = {
@@ -172,7 +171,7 @@ object NetworkServer extends ScorexLogging {
         peerDatabase.touch(remoteAddress)
         thisConnFuture.channel().closeFuture().addListener(handleOutgoingChannelClosed(remoteAddress))
       } else if (thisConnFuture.cause() != null) {
-        peerDatabase.suspend(remoteAddress.getAddress)
+        peerDatabase.suspend(remoteAddress)
         outgoingChannels.remove(remoteAddress, thisConnFuture.channel())
         thisConnFuture.cause() match {
           case e: ClosedChannelException =>

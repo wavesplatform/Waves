@@ -12,7 +12,7 @@ trait PeerDatabase extends AutoCloseable {
 
   def touch(socketAddress: InetSocketAddress): Unit
 
-  def blacklist(host: InetAddress, reason: String): Unit
+  def blacklist(host: InetSocketAddress, reason: String): Unit
 
   def knownPeers: Map[InetSocketAddress, Long]
 
@@ -28,7 +28,7 @@ trait PeerDatabase extends AutoCloseable {
 
   def clearBlacklist(): Unit
 
-  def suspend(host: InetAddress): Unit
+  def suspend(host: InetSocketAddress): Unit
 
   def blacklistAndClose(channel: Channel, reason: String): Unit
 }
@@ -40,7 +40,7 @@ object PeerDatabase extends ScorexLogging {
 
     override def touch(socketAddress: InetSocketAddress): Unit = {}
 
-    override def blacklist(host: InetAddress, reason: String): Unit = {}
+    override def blacklist(host: InetSocketAddress, reason: String): Unit = {}
 
     override def knownPeers: Map[InetSocketAddress, Long] = Map.empty
 
@@ -52,7 +52,7 @@ object PeerDatabase extends ScorexLogging {
 
     override def clearBlacklist(): Unit = ()
 
-    override def suspend(host: InetAddress): Unit = {}
+    override def suspend(host: InetSocketAddress): Unit = {}
 
     override val suspendedHosts: Set[InetAddress] = Set.empty
 
