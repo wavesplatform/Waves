@@ -102,7 +102,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
     val all = nodeConfigs.map(startNodeInternal)
     Await.result(
       for {
-        _ <- Future.traverse(all)(waitNodeIsUp)
+        _ <- Future.traverse(all)(_.waitForStartup())
         _ <- Future.traverse(all)(connectToAll)
       } yield (),
       5.minutes
@@ -113,7 +113,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
   def startNode(nodeConfig: Config, autoConnect: Boolean = true): Node = {
     val node = startNodeInternal(nodeConfig)
     Await.result(
-      waitNodeIsUp(node).flatMap(_ => if (autoConnect) connectToAll(node) else Future.successful(())),
+      node.waitForStartup().flatMap(_ => if (autoConnect) connectToAll(node) else Future.successful(())),
       3.minutes
     )
     node
@@ -146,8 +146,6 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
       .traverse(seedAddresses)(Function.tupled(connectToOne))
       .map(_ => ())
   }
-
-  private def waitNodeIsUp(node: Node): Future[Unit] = node.waitFor[Int]("node is up")(_.height, _ >= 0, 1.second).map(_ => ())
 
   private def startNodeInternal(nodeConfig: Config): Node = try {
     val javaOptions = Option(System.getenv("CONTAINER_JAVA_OPTS")).getOrElse("")
