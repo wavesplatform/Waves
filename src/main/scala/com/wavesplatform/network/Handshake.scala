@@ -27,16 +27,21 @@ case class Handshake(
     out.writeBytes(nodeNameBytes)
 
     out.writeLong(nodeNonce)
-    declaredAddress match {
+
+    val peer = for {
+      inetAddress <- declaredAddress
+      address <- Option(inetAddress.getAddress)
+    } yield (address.getAddress, inetAddress.getPort)
+
+    peer match {
       case None => out.writeInt(0)
-      case Some(addr) =>
-        val addressBytes = addr.getAddress.getAddress
+      case Some((addressBytes, peerPort)) =>
         out.writeInt(addressBytes.length + Integer.BYTES)
         out.writeBytes(addressBytes)
-        out.writeInt(addr.getPort)
+        out.writeInt(peerPort)
     }
-    out.writeLong(System.currentTimeMillis() / 1000)
 
+    out.writeLong(System.currentTimeMillis() / 1000)
     out
   }
 }

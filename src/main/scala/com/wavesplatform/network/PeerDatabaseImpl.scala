@@ -55,21 +55,27 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Scor
 
   override def touch(socketAddress: InetSocketAddress): Unit = doTouch(socketAddress, System.currentTimeMillis())
 
-  override def blacklist(address: InetAddress, reason: String): Unit = {
+  override def blacklist(socketAddress: InetSocketAddress, reason: String): Unit = getAddress(socketAddress).foreach { address =>
     if (settings.enableBlacklisting) {
       unverifiedPeers.synchronized {
-        unverifiedPeers.removeIf(_.getAddress == address)
+        unverifiedPeers.removeIf { x => Option(x.getAddress).contains(address) }
         blacklist.put(address, System.currentTimeMillis())
         reasons.put(address, reason)
       }
     }
   }
 
-  override def suspend(address: InetAddress): Unit = {
+  override def suspend(socketAddress: InetSocketAddress): Unit = getAddress(socketAddress).foreach { address =>
     unverifiedPeers.synchronized {
-      unverifiedPeers.removeIf(_.getAddress == address)
+      unverifiedPeers.removeIf { x => Option(x.getAddress).contains(address) }
       suspension.put(address, System.currentTimeMillis())
     }
+  }
+
+  private def getAddress(socketAddress: InetSocketAddress): Option[InetAddress] = {
+    val r = Option(socketAddress.getAddress)
+    if (r.isEmpty) log.debug(s"Can't obtain an address from $socketAddress")
+    r
   }
 
   override def knownPeers: immutable.Map[InetSocketAddress, Long] = peersPersistence.asMap().asScala.collect {
@@ -81,15 +87,17 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Scor
   override def suspendedHosts: immutable.Set[InetAddress] = suspension.asMap().asScala.keys.toSet
 
   override def detailedBlacklist: immutable.Map[InetAddress, (Long, String)] = blacklist.asMap().asScala.mapValues(_.toLong)
-      .map { case ((h, t)) => h -> ((t, Option(reasons(h)).getOrElse(""))) }.toMap
+    .map { case ((h, t)) => h -> ((t, Option(reasons(h)).getOrElse(""))) }.toMap
 
   override def detailedSuspended: immutable.Map[InetAddress, Long] = suspension.asMap().asScala.mapValues(_.toLong).toMap
 
   override def randomPeer(excluded: immutable.Set[InetSocketAddress]): Option[InetSocketAddress] = unverifiedPeers.synchronized {
-    def excludeAddress(isa: InetSocketAddress) = excluded(isa) || blacklistedHosts(isa.getAddress) || suspendedHosts(isa.getAddress)
+    def excludeAddress(isa: InetSocketAddress): Boolean = {
+      excluded(isa) || Option(isa.getAddress).exists(blacklistedHosts) || suspendedHosts(isa.getAddress)
+    }
     // excluded only contains local addresses, our declared address, and external declared addresses we already have
     // connection to, so it's safe to filter out all matching candidates
-    unverifiedPeers.removeIf(isa => excluded(isa))
+    unverifiedPeers.removeIf(excluded(_))
     val unverified = Option(unverifiedPeers.peek()).filterNot(excludeAddress)
     val verified = Random.shuffle(knownPeers.keySet.diff(excluded).toSeq).headOption.filterNot(excludeAddress)
 
@@ -108,15 +116,25 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Scor
 
   override def close(): Unit = settings.file.foreach { f =>
     log.info(s"Saving ${knownPeers.size} known peer(s) to ${f.getName}")
-    JsonFileStorage.save[PeersPersistenceType](
-      knownPeers.keySet.map(i => s"${i.getAddress.getHostAddress}:${i.getPort}"),
-      f.getCanonicalPath)
+    val rawPeers = for {
+      inetAddress <- knownPeers.keySet
+      address <- Option(inetAddress.getAddress)
+    } yield s"${address.getHostAddress}:${inetAddress.getPort}"
+
+    JsonFileStorage.save[PeersPersistenceType](rawPeers, f.getCanonicalPath)
   }
 
   override def blacklistAndClose(channel: Channel, reason: String): Unit = {
-    val address = channel.asInstanceOf[NioSocketChannel].remoteAddress().getAddress
+    val address = channel.asInstanceOf[NioSocketChannel].remoteAddress()
     log.debug(s"Blacklisting ${id(channel)}: $reason")
     blacklist(address, reason)
+    channel.close()
+  }
+
+  override def suspendAndClose(channel: Channel): Unit = {
+    val address = channel.asInstanceOf[NioSocketChannel].remoteAddress()
+    log.debug(s"Suspending ${id(channel)}")
+    suspend(address)
     channel.close()
   }
 }

@@ -58,12 +58,13 @@ object NetworkServer extends ScorexLogging {
     val messageCodec = new MessageCodec(peerDatabase)
 
     val excludedAddresses: Set[InetSocketAddress] = {
-      val localAddresses = if (settings.networkSettings.bindAddress.getAddress.isAnyLocalAddress) {
+      val bindAddress = settings.networkSettings.bindAddress
+      val isLocal = Option(bindAddress.getAddress).exists(_.isAnyLocalAddress)
+      val localAddresses = if (isLocal) {
         NetworkInterface.getNetworkInterfaces.asScala
-          .flatMap(_.getInetAddresses.asScala
-            .map(a => new InetSocketAddress(a, settings.networkSettings.bindAddress.getPort)))
+          .flatMap(_.getInetAddresses.asScala.map(a => new InetSocketAddress(a, bindAddress.getPort)))
           .toSet
-      } else Set(settings.networkSettings.bindAddress)
+      } else Set(bindAddress)
 
       localAddresses ++ settings.networkSettings.declaredAddress.toSet
     }
@@ -156,14 +157,13 @@ object NetworkServer extends ScorexLogging {
 
 
     def handleOutgoingChannelClosed(remoteAddress: InetSocketAddress)(closeFuture: ChannelFuture): Unit = {
-    outgoingChannels.remove(remoteAddress, closeFuture.channel())
-    if (!shutdownInitiated) peerDatabase.suspend(remoteAddress.getAddress)
+      outgoingChannels.remove(remoteAddress, closeFuture.channel())
+      if (!shutdownInitiated) peerDatabase.suspendAndClose(closeFuture.channel())
 
       if (closeFuture.isSuccess)
         log.trace(formatOutgoingChannelEvent(closeFuture.channel(), "Channel closed (expected)"))
       else
         log.debug(formatOutgoingChannelEvent(closeFuture.channel(), s"Channel closed: ${Option(closeFuture.cause()).map(_.getMessage).getOrElse("no message")}"))
-
     }
 
     def handleConnectionAttempt(remoteAddress: InetSocketAddress)(thisConnFuture: ChannelFuture): Unit = {
@@ -172,7 +172,7 @@ object NetworkServer extends ScorexLogging {
         peerDatabase.touch(remoteAddress)
         thisConnFuture.channel().closeFuture().addListener(handleOutgoingChannelClosed(remoteAddress))
       } else if (thisConnFuture.cause() != null) {
-        peerDatabase.suspend(remoteAddress.getAddress)
+        peerDatabase.suspendAndClose(thisConnFuture.channel())
         outgoingChannels.remove(remoteAddress, thisConnFuture.channel())
         thisConnFuture.cause() match {
           case e: ClosedChannelException =>
@@ -221,8 +221,6 @@ object NetworkServer extends ScorexLogging {
           .addField("n", all.size)
       )
     }
-
-
 
 
     def doShutdown(): Unit = try {
