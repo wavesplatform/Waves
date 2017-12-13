@@ -21,27 +21,32 @@ class InboundConnectionFilter(peerDatabase: PeerDatabase, maxInboundConnections:
     null.asInstanceOf[ChannelFuture]
   }
 
-  override def accept(ctx: ChannelHandlerContext, remoteAddress: InetSocketAddress) = {
-    val newTotal = inboundConnectionCount.incrementAndGet()
-    val newCountPerHost = perHostConnectionCount.compute(remoteAddress.getAddress, (_, cnt) => Option(cnt).fold(1)(_ + 1))
-    val isBlacklisted = peerDatabase.blacklistedHosts.contains(remoteAddress.getAddress)
+  override def accept(ctx: ChannelHandlerContext, remoteAddress: InetSocketAddress): Boolean = Option(remoteAddress.getAddress) match {
+    case None =>
+      log.debug(s"Can't obtain address from $remoteAddress")
+      false
 
-    val accepted = newTotal <= maxInboundConnections &&
-      newCountPerHost <= maxConnectionsPerHost &&
-      !isBlacklisted
+    case Some(address) =>
+      val newTotal = inboundConnectionCount.incrementAndGet()
+      val newCountPerHost = perHostConnectionCount.compute(address, (_, cnt) => Option(cnt).fold(1)(_ + 1))
+      val isBlacklisted = peerDatabase.blacklistedHosts.contains(address)
 
-    log.trace(
-      s"Check inbound connection from $remoteAddress: new inbound total = $newTotal, " +
-        s"connections with this host = $newCountPerHost, address ${if (isBlacklisted) "IS" else "is not"} blacklisted, " +
-        s"${if (accepted) "is" else "is not"} accepted"
-    )
+      val accepted = newTotal <= maxInboundConnections &&
+        newCountPerHost <= maxConnectionsPerHost &&
+        !isBlacklisted
 
-    accepted
+      log.trace(
+        s"Check inbound connection from $remoteAddress: new inbound total = $newTotal, " +
+          s"connections with this host = $newCountPerHost, address ${if (isBlacklisted) "IS" else "is not"} blacklisted, " +
+          s"${if (accepted) "is" else "is not"} accepted"
+      )
+
+      accepted
   }
 
-  override def channelAccepted(ctx: ChannelHandlerContext, remoteAddress: InetSocketAddress) =
+  override def channelAccepted(ctx: ChannelHandlerContext, remoteAddress: InetSocketAddress): Unit =
     ctx.channel().closeFuture().addListener((_: ChannelFuture) => dec(remoteAddress.getAddress))
 
-  override def channelRejected(ctx: ChannelHandlerContext, remoteAddress: InetSocketAddress) =
+  override def channelRejected(ctx: ChannelHandlerContext, remoteAddress: InetSocketAddress): ChannelFuture =
     dec(remoteAddress.getAddress)
 }

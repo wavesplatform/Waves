@@ -58,12 +58,13 @@ object NetworkServer extends ScorexLogging {
     val messageCodec = new MessageCodec(peerDatabase)
 
     val excludedAddresses: Set[InetSocketAddress] = {
-      val localAddresses = if (settings.networkSettings.bindAddress.getAddress.isAnyLocalAddress) {
+      val bindAddress = settings.networkSettings.bindAddress
+      val isLocal = Option(bindAddress.getAddress).exists(_.isAnyLocalAddress)
+      val localAddresses = if (isLocal) {
         NetworkInterface.getNetworkInterfaces.asScala
-          .flatMap(_.getInetAddresses.asScala
-            .map(a => new InetSocketAddress(a, settings.networkSettings.bindAddress.getPort)))
+          .flatMap(_.getInetAddresses.asScala.map(a => new InetSocketAddress(a, bindAddress.getPort)))
           .toSet
-      } else Set(settings.networkSettings.bindAddress)
+      } else Set(bindAddress)
 
       localAddresses ++ settings.networkSettings.declaredAddress.toSet
     }
@@ -220,8 +221,6 @@ object NetworkServer extends ScorexLogging {
           .addField("n", all.size)
       )
     }
-
-
 
 
     def doShutdown(): Unit = try {
