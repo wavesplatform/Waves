@@ -14,11 +14,12 @@ class InboundConnectionFilter(peerDatabase: PeerDatabase, maxInboundConnections:
   extends AbstractRemoteAddressFilter[InetSocketAddress] with ScorexLogging {
   private val inboundConnectionCount = new AtomicInteger(0)
   private val perHostConnectionCount = new ConcurrentHashMap[InetAddress, Int]
+  private val emptyChannelFuture = null.asInstanceOf[ChannelFuture]
 
   private def dec(remoteAddress: InetAddress) = {
     inboundConnectionCount.decrementAndGet()
     perHostConnectionCount.compute(remoteAddress, (_, cnt) => cnt - 1)
-    null.asInstanceOf[ChannelFuture]
+    emptyChannelFuture
   }
 
   override def accept(ctx: ChannelHandlerContext, remoteAddress: InetSocketAddress): Boolean = Option(remoteAddress.getAddress) match {
@@ -45,8 +46,8 @@ class InboundConnectionFilter(peerDatabase: PeerDatabase, maxInboundConnections:
   }
 
   override def channelAccepted(ctx: ChannelHandlerContext, remoteAddress: InetSocketAddress): Unit =
-    ctx.channel().closeFuture().addListener((_: ChannelFuture) => dec(remoteAddress.getAddress))
+    ctx.channel().closeFuture().addListener((_: ChannelFuture) => Option(remoteAddress.getAddress).foreach(dec))
 
   override def channelRejected(ctx: ChannelHandlerContext, remoteAddress: InetSocketAddress): ChannelFuture =
-    dec(remoteAddress.getAddress)
+    Option(remoteAddress.getAddress).fold(emptyChannelFuture)(dec)
 }

@@ -11,8 +11,9 @@ case object PeerKey {
   case class InetPeerKey(host: InetAddress, nonce: Long) extends PeerKey
   case class SocketPeerKey(host: SocketAddress, nonce: Long) extends PeerKey
 
-  def apply(ctx: ChannelHandlerContext, nodeNonce: Long): PeerKey = ctx.channel() match {
-    case x: SocketChannel => PeerKey.InetPeerKey(x.remoteAddress().getAddress, nodeNonce)
-    case x: EmbeddedChannel => PeerKey.SocketPeerKey(x.remoteAddress(), nodeNonce)
+  def apply(ctx: ChannelHandlerContext, nodeNonce: Long): Option[PeerKey] = ctx.channel() match {
+    case x: SocketChannel => Option(x.remoteAddress()).map(_.getAddress).map(PeerKey.InetPeerKey(_, nodeNonce))
+    case x: EmbeddedChannel => Option(x.remoteAddress()).map(PeerKey.SocketPeerKey(_, nodeNonce))
+    case x => throw new IllegalArgumentException(s"Can't get PeerKey from ${id(ctx)}, $x")
   }
 }

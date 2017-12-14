@@ -30,12 +30,12 @@ class PeerSynchronizer(peerDatabase: PeerDatabase, peerRequestInterval: FiniteDu
         val rda = for {
           rda <- hs.declaredAddress
           rdaAddress <- Option(rda.getAddress)
-          ctxAddress <- Option(ctx.remoteAddress.getAddress)
+          ctxAddress <- ctx.remoteAddress.map(_.getAddress)
           if rdaAddress == ctxAddress
         } yield rda
 
         rda match {
-          case None => log.debug(s"${id(ctx)} Declared address $rda does not match actual remote address ${ctx.remoteAddress.getAddress}")
+          case None => log.debug(s"${id(ctx)} Declared address $rda does not match actual remote address ${ctx.remoteAddress.map(_.getAddress)}")
           case Some(x) =>
             log.trace(s"${id(ctx)} Touching declared address")
             peerDatabase.touch(x)
