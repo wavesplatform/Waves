@@ -72,12 +72,6 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Scor
     }
   }
 
-  private def getAddress(socketAddress: InetSocketAddress): Option[InetAddress] = {
-    val r = Option(socketAddress.getAddress)
-    if (r.isEmpty) log.debug(s"Can't obtain an address from $socketAddress")
-    r
-  }
-
   override def knownPeers: immutable.Map[InetSocketAddress, Long] = peersPersistence.asMap().asScala.collect {
     case (addr, ts) if !(settings.enableBlacklisting && blacklistedHosts.contains(addr.getAddress)) => addr -> ts.toLong
   }.toMap
@@ -124,17 +118,28 @@ class PeerDatabaseImpl(settings: NetworkSettings) extends PeerDatabase with Scor
     JsonFileStorage.save[PeersPersistenceType](rawPeers, f.getCanonicalPath)
   }
 
-  override def blacklistAndClose(channel: Channel, reason: String): Unit = {
-    val address = channel.asInstanceOf[NioSocketChannel].remoteAddress()
+  override def blacklistAndClose(channel: Channel, reason: String): Unit = getRemoteAddress(channel).foreach { x =>
     log.debug(s"Blacklisting ${id(channel)}: $reason")
-    blacklist(address, reason)
+    blacklist(x, reason)
     channel.close()
   }
 
-  override def suspendAndClose(channel: Channel): Unit = {
-    val address = channel.asInstanceOf[NioSocketChannel].remoteAddress()
+  override def suspendAndClose(channel: Channel): Unit = getRemoteAddress(channel).foreach { x =>
     log.debug(s"Suspending ${id(channel)}")
-    suspend(address)
+    suspend(x)
     channel.close()
+  }
+
+  private def getAddress(socketAddress: InetSocketAddress): Option[InetAddress] = {
+    val r = Option(socketAddress.getAddress)
+    if (r.isEmpty) log.debug(s"Can't obtain an address from $socketAddress")
+    r
+  }
+
+  private def getRemoteAddress(channel: Channel): Option[InetSocketAddress] = channel match {
+    case x: NioSocketChannel => Option(x.remoteAddress())
+    case x =>
+      log.debug(s"Doesn't know how to get a remoteAddress from $x")
+      None
   }
 }

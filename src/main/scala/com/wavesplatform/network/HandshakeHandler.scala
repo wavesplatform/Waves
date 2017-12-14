@@ -76,24 +76,31 @@ abstract class HandshakeHandler(
        else if (!versionIsSupported(remoteHandshake.applicationVersion))
         peerDatabase.blacklistAndClose(ctx.channel(),s"Remote application version ${remoteHandshake.applicationVersion } is not supported")
        else {
-        val key = PeerKey(ctx, remoteHandshake.nodeNonce)
-        val previousPeer = peerConnections.putIfAbsent(key, ctx.channel())
-        if (previousPeer != null) {
-          log.debug(s"${id(ctx)} Already connected to peer ${ctx.remoteAddress.getAddress} with nonce ${remoteHandshake.nodeNonce} on channel ${id(previousPeer)}")
-          ctx.close()
-        } else {
-          log.info(s"${id(ctx)} Accepted handshake $remoteHandshake")
-          removeHandshakeHandlers(ctx, this)
-          establishedConnections.put(ctx.channel(), peerInfo(remoteHandshake, ctx.channel()))
+        PeerKey(ctx, remoteHandshake.nodeNonce) match {
+          case None =>
+            log.warn(s"Can't get PeerKey from ${id(ctx)}")
+            ctx.close()
 
-          ctx.channel().attr(NodeNameAttributeKey).set(remoteHandshake.nodeName)
-          ctx.channel().closeFuture().addListener { f: ChannelFuture =>
-            peerConnections.remove(key, f.channel())
-            establishedConnections.remove(ctx.channel())
-          }
+          case Some(key) =>
+            val previousPeer = peerConnections.putIfAbsent(key, ctx.channel())
+            if (previousPeer == null) {
+              log.info(s"${id(ctx)} Accepted handshake $remoteHandshake")
+              removeHandshakeHandlers(ctx, this)
+              establishedConnections.put(ctx.channel(), peerInfo(remoteHandshake, ctx.channel()))
 
-          connectionNegotiated(ctx)
-          ctx.fireChannelRead(msg)
+              ctx.channel().attr(NodeNameAttributeKey).set(remoteHandshake.nodeName)
+              ctx.channel().closeFuture().addListener { f: ChannelFuture =>
+                peerConnections.remove(key, f.channel())
+                establishedConnections.remove(ctx.channel())
+              }
+
+              connectionNegotiated(ctx)
+              ctx.fireChannelRead(msg)
+            } else {
+              val peerAddress = ctx.remoteAddress.getOrElse("unknown")
+              log.debug(s"${id(ctx)} Already connected to peer $peerAddress with nonce ${remoteHandshake.nodeNonce} on channel ${id(previousPeer)}")
+              ctx.close()
+            }
         }
       }
     case _ => super.channelRead(ctx, msg)
