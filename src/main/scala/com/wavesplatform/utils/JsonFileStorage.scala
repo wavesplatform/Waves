@@ -15,6 +15,8 @@ object JsonFileStorage {
   private val aes = "AES"
   private val algorithm = aes + "/ECB/PKCS5Padding"
   private val hashing = "PBKDF2WithHmacSHA512"
+  private val hashingIterations = 999999
+  private val keyLength = 128
 
   import java.security.NoSuchAlgorithmException
   import java.security.spec.InvalidKeySpecException
@@ -32,22 +34,22 @@ object JsonFileStorage {
       throw new RuntimeException(e)
   }
 
-  private def keyToSpec(key: String) =
-    new SecretKeySpec(hashPassword(key.toCharArray, keySalt.getBytes(encoding), 999999, 128), aes)
+  def prepareKey(key: String): SecretKeySpec =
+    new SecretKeySpec(hashPassword(key.toCharArray, keySalt.getBytes(encoding), hashingIterations, keyLength), aes)
 
-  private def encrypt(key: String, value: String): String = {
+  private def encrypt(key: SecretKeySpec, value: String): String = {
     val cipher: Cipher = Cipher.getInstance(algorithm)
-    cipher.init(Cipher.ENCRYPT_MODE, keyToSpec(key))
+    cipher.init(Cipher.ENCRYPT_MODE, key)
     Base64.encode(cipher.doFinal(value.getBytes(encoding)))
   }
 
-  private def decrypt(key: String, encryptedValue: String): String = {
+  private def decrypt(key: SecretKeySpec, encryptedValue: String): String = {
     val cipher: Cipher = Cipher.getInstance(algorithm)
-    cipher.init(Cipher.DECRYPT_MODE, keyToSpec(key))
+    cipher.init(Cipher.DECRYPT_MODE, key)
     new String(cipher.doFinal(Base64.decode(encryptedValue)))
   }
 
-  def save[T](value: T, path: String, key: Option[String] = None)(implicit w: Writes[T]): Unit = {
+  def save[T](value: T, path: String, key: Option[SecretKeySpec])(implicit w: Writes[T]): Unit = {
     var file: Option[PrintWriter] = None
     try {
       val folder = new File(path).getParentFile
@@ -65,7 +67,10 @@ object JsonFileStorage {
     }
   }
 
-  def load[T](path: String, key: Option[String] = None)(implicit r: Reads[T]): T = {
+  def save[T](value: T, path: String)(implicit w: Writes[T]): Unit =
+    save(value, path, None)
+
+  def load[T](path: String, key: Option[SecretKeySpec] = None)(implicit r: Reads[T]): T = {
     var file: Option[BufferedSource] = None
     try {
       file = Option(Source.fromFile(path))
@@ -76,4 +81,7 @@ object JsonFileStorage {
       file.foreach(_.close())
     }
   }
+
+  def load[T](path: String)(implicit r: Reads[T]): T =
+    load(path, None)
 }
