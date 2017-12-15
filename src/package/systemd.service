@@ -7,7 +7,7 @@ Type=simple
 EnvironmentFile=${{env_config}}
 ExecStart=/usr/share/${{app_name}}/bin/${{exec}} \
   -Dwaves.directory=/var/lib/${{app_name}} \
-  -Dlogback.file.directory=/var/log/waves \
+  -Dlogback.file.directory=/var/log/${{app_name}} \
   -Dlogback.pattern="%%-5level %%logger{26} - %%msg%%n" \
   -- /etc/${{app_name}}/waves.conf
 Restart=always
