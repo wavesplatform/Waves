@@ -76,8 +76,10 @@ object SnapshotStateReader {
 
     def included(signature: ByteStr): Option[Int] = s.transactionInfo(signature).map(_._1)
 
-    def accountTransactions(account: Address, limit: Int): Seq[_ <: Transaction] = s.read { _ =>
-      s.accountTransactionIds(account, limit).flatMap(s.transactionInfo).flatMap(_._2)
+    def accountTransactions(account: Address, limit: Int): Seq[(Int, _ <: Transaction)] = s.read { _ =>
+      s.accountTransactionIds(account, limit)
+        .flatMap(s.transactionInfo)
+        .flatMap { case (h, txopt) => txopt.map((h, _)) }
     }
 
     def balance(account: Address): Long = s.wavesBalance(account)._1
