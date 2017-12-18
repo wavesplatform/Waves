@@ -75,7 +75,6 @@ class MicroBlockSynchronizerSpec extends FreeSpec with Matchers with Transaction
 
   "should not request forked microblocks" in {
     val (lastBlockIds, microInvs, microResponses, r) = buildMs()
-    val microblockDatas = newItems(r)
     val ch = new EmbeddedChannel()
     val ch2 = new EmbeddedChannel()
     test(
