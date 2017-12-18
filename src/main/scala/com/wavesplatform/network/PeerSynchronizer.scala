@@ -27,15 +27,21 @@ class PeerSynchronizer(peerDatabase: PeerDatabase, peerRequestInterval: FiniteDu
     declaredAddress.foreach(peerDatabase.touch)
     msg match {
       case hs: Handshake =>
-        hs.declaredAddress.foreach { rda =>
-          if (rda.getAddress == ctx.remoteAddress.getAddress) {
+        val rda = for {
+          rda <- hs.declaredAddress
+          rdaAddress <- Option(rda.getAddress)
+          ctxAddress <- ctx.remoteAddress.map(_.getAddress)
+          if rdaAddress == ctxAddress
+        } yield rda
+
+        rda match {
+          case None => log.debug(s"${id(ctx)} Declared address $rda does not match actual remote address ${ctx.remoteAddress.map(_.getAddress)}")
+          case Some(x) =>
             log.trace(s"${id(ctx)} Touching declared address")
-            peerDatabase.touch(rda)
-            declaredAddress = Some(rda)
-          } else {
-            log.debug(s"${id(ctx)} Declared address $rda does not match actual remote address ${ctx.remoteAddress.getAddress}")
-          }
+            peerDatabase.touch(x)
+            declaredAddress = Some(x)
         }
+
         requestPeers(ctx)
         super.channelRead(ctx, msg)
       case GetPeers =>

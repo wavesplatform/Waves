@@ -50,7 +50,7 @@ class BlacklistParallelSpecification extends FeatureSpec with GivenWhenThen with
 
       And("Peer blacklists another peer")
       val reason = "because"
-      peerDatabase.blacklist(host1, reason)
+      peerDatabase.blacklist(address1, reason)
       assert(isBlacklisted(address1))
       assert(peerDatabase.blacklistedHosts.contains(host1))
       assert(peerDatabase.detailedBlacklist(host1)._2 == reason)
@@ -82,9 +82,9 @@ class BlacklistParallelSpecification extends FeatureSpec with GivenWhenThen with
       assert(!isBlacklisted(address3))
 
       And("Peer blacklists other peers")
-      peerDatabase.blacklist(address1.getAddress,"")
-      peerDatabase.blacklist(address2.getAddress,"")
-      peerDatabase.blacklist(address3.getAddress,"")
+      peerDatabase.blacklist(address1,"")
+      peerDatabase.blacklist(address2,"")
+      peerDatabase.blacklist(address3,"")
       assert(isBlacklisted(address1))
       assert(isBlacklisted(address2))
       assert(isBlacklisted(address3))
@@ -93,7 +93,7 @@ class BlacklistParallelSpecification extends FeatureSpec with GivenWhenThen with
       Thread.sleep(networkSettings.blackListResidenceTime.toMillis / 2)
 
       And("Adds one peer to blacklist one more time")
-      peerDatabase.blacklist(address2.getAddress,"")
+      peerDatabase.blacklist(address2,"")
 
       And("Waits another half of period")
       Thread.sleep((networkSettings.blackListResidenceTime.toMillis / 1.9).toLong)

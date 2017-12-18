@@ -7,7 +7,7 @@ import cats.Eq
 import com.wavesplatform.state2.ByteStr
 import io.netty.channel.group.{ChannelGroup, ChannelGroupFuture}
 import io.netty.channel.local.LocalAddress
-import io.netty.channel.socket.SocketChannel
+import io.netty.channel.socket.nio.NioSocketChannel
 import io.netty.channel.{Channel, ChannelHandlerContext}
 import io.netty.util.NetUtil.toSocketAddressString
 import io.netty.util.concurrent.{EventExecutorGroup, ScheduledFuture}
@@ -55,7 +55,12 @@ package object network extends ScorexLogging {
   implicit val channelEq: Eq[Channel] = Eq.fromUniversalEquals
 
   implicit class ChannelHandlerContextExt(val ctx: ChannelHandlerContext) extends AnyVal {
-    def remoteAddress: InetSocketAddress = ctx.channel().asInstanceOf[SocketChannel].remoteAddress()
+    def remoteAddress: Option[InetSocketAddress] = ctx.channel() match {
+      case x: NioSocketChannel => Option(x.remoteAddress())
+      case x =>
+        log.debug(s"Doesn't know how to get a remoteAddress from ${id(ctx)}, $x")
+        None
+    }
   }
 
   implicit class ChannelGroupExt(val allChannels: ChannelGroup) extends AnyVal {

@@ -192,8 +192,8 @@ upstartScript := {
   dest
 }
 linuxPackageMappings ++= Seq(
-  packageMapping((upstartScript.value, s"/usr/share/${packageName.value}/conf/upstart.conf"))
-).map(_.withConfig().withPerms("644").withUser(packageName.value).withGroup(packageName.value))
+  (upstartScript.value, s"/etc/init/${packageName.value}.conf")
+).map(packageMapping(_).withConfig().withPerms("644"))
 
 linuxStartScriptTemplate in Debian := (packageSource.value / "systemd.service").toURI.toURL
 linuxScriptReplacements += "detect-loader" ->

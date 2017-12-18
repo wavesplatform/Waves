@@ -1,5 +1,6 @@
 package com.wavesplatform.it
 
+import com.wavesplatform.it.api.MultipleNodesApi
 import com.wavesplatform.it.api.NodeApi.{Block, BlockHeaders}
 
 import scala.concurrent.{Await, Future}
@@ -13,11 +14,11 @@ import scorex.utils.ScorexLogging
 import scala.util.Random
 
 class BlockHeadersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with CancelAfterFailure
-  with ScorexLogging {
+  with MultipleNodesApi with ReportingTestName with ScorexLogging {
 
   private lazy val docker = Docker(getClass)
 
-  private lazy val nodes: Seq[Node] = docker.startNodes(
+  lazy val nodes: Seq[Node] = docker.startNodes(
     NodeConfigs.newBuilder
       .overrideBase(_.quorum(2))
       .withDefault(2)
@@ -32,6 +33,7 @@ class BlockHeadersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAl
   override protected def beforeAll(): Unit = {
     super.beforeAll()
     log.debug(s"There are ${nodes.size} in tests") // Initializing of a lazy variable
+    Await.result(traverse(nodes)(_.waitForHeight(2)), 1.minute)
   }
 
   override protected def afterAll(): Unit = {
@@ -93,7 +95,7 @@ class BlockHeadersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAl
     val f = for {
       baseHeight <- traverse(nodes)(_.height).map(_.max)
       _ <- txRequestsGen(30, 2.waves)
-      _ <- traverse(nodes)(_.waitForHeight(baseHeight + 10))
+      _ <- waitForSameBlocksAt(nodes, 3.seconds, baseHeight + 3)
       blocks <- nodes.head.blockSeq(baseHeight + 1, baseHeight + 3)
       blockHeaders <- nodes.head.blockHeadersSeq(baseHeight + 1, baseHeight + 3)
     } yield {

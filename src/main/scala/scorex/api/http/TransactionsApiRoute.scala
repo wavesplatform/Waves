@@ -73,18 +73,17 @@ case class TransactionsApiRoute(
     pathEndOrSingleSlash {
       complete(InvalidSignature)
     } ~
-      path(Segment) { encoded =>
-        ByteStr.decodeBase58(encoded) match {
-          case Success(id) =>
-            state().transactionInfo(id) match {
-              case Some((h, tx)) =>
-                complete(txToExtendedJson(tx) + ("height" -> JsNumber(h)))
-              case None =>
-                complete(StatusCodes.NotFound -> Json.obj("status" -> "error", "details" -> "Transaction is not in blockchain"))
-            }
-          case _ => complete(InvalidSignature)
-        }
+    path(Segment) { encoded =>
+      ByteStr.decodeBase58(encoded) match {
+        case Success(id) =>
+          state().transactionInfo(id) match {
+            case Some((h, Some(tx))) => complete(txToExtendedJson(tx) + ("height" -> JsNumber(h)))
+            case Some((h, None)) => complete(Json.obj("height" -> JsNumber(h)))
+            case None => complete(StatusCodes.NotFound -> Json.obj("status" -> "error", "details" -> "Transaction is not in blockchain"))
+          }
+        case _ => complete(InvalidSignature)
       }
+    }
   }
 
   @Path("/unconfirmed")

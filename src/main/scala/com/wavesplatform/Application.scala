@@ -10,7 +10,7 @@ import akka.http.scaladsl.Http.ServerBinding
 import akka.http.scaladsl.server.Route
 import akka.stream.ActorMaterializer
 import cats.instances.all._
-import com.typesafe.config.{Config, ConfigFactory, ConfigObject, ConfigRenderOptions}
+import com.typesafe.config._
 import com.wavesplatform.actor.RootActorSystem
 import com.wavesplatform.features.api.ActivationApiRoute
 import com.wavesplatform.history.{CheckpointServiceImpl, StorageFactory}
@@ -18,10 +18,11 @@ import com.wavesplatform.http.NodeApiRoute
 import com.wavesplatform.matcher.Matcher
 import com.wavesplatform.metrics.Metrics
 import com.wavesplatform.mining.{Miner, MinerImpl}
-import com.wavesplatform.network.{ChannelGroupExt, InvalidBlockStorageImpl, LocalScoreChanged, MicroBlockSynchronizer, NetworkServer, PeerDatabaseImpl, PeerInfo, RxExtensionLoader, RxScoreObserver, UPnP}
+import com.wavesplatform.network._
 import com.wavesplatform.settings._
+import com.wavesplatform.state2.StateWriter
 import com.wavesplatform.state2.appender.{BlockAppender, CheckpointAppender, ExtensionAppender, MicroblockAppender}
-import com.wavesplatform.utils.forceStopApplication
+import com.wavesplatform.utils.{SystemInformationReporter, forceStopApplication}
 import io.netty.channel.Channel
 import io.netty.channel.group.DefaultChannelGroup
 import io.netty.util.concurrent.GlobalEventExecutor
@@ -51,8 +52,23 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
   private val LocalScoreBroadcastDebounce = 1.second
 
+  // Start /node API right away
+  private implicit val as: ActorSystem = actorSystem
+  private implicit val materializer: ActorMaterializer = ActorMaterializer()
+
+  private val nodeApiLauncher = (bcu: BlockchainUpdater, state: StateWriter) =>
+    Option(settings.restAPISettings.enable).collect { case true =>
+      val tags = Seq(typeOf[NodeApiRoute])
+      val routes = Seq(NodeApiRoute(settings.restAPISettings, bcu, state, () => this.shutdown()))
+      val combinedRoute: Route = CompositeHttpService(actorSystem, tags, routes, settings.restAPISettings).compositeRoute
+      val httpFuture = Http().bindAndHandle(combinedRoute, settings.restAPISettings.bindAddress, settings.restAPISettings.port)
+      serverBinding = Await.result(httpFuture, 10.seconds)
+      log.info(s"Node REST API was bound on ${settings.restAPISettings.bindAddress}:${settings.restAPISettings.port}")
+      (tags, routes)
+    }
+
   private val checkpointService = new CheckpointServiceImpl(settings.blockchainSettings.checkpointFile, settings.checkpointsSettings)
-  private val (history, featureProvider, stateWriter, stateReader, blockchainUpdater, blockchainDebugInfo) = StorageFactory(settings).get
+  private val (history, featureProvider, stateWriter, stateReader, blockchainUpdater, blockchainDebugInfo, nodeApi) = StorageFactory(settings, nodeApiLauncher).get
   private lazy val upnp = new UPnP(settings.networkSettings.uPnPSettings) // don't initialize unless enabled
   private val wallet: Wallet = Wallet(settings.walletSettings)
   private val peerDatabase = new PeerDatabaseImpl(settings.networkSettings)
@@ -109,12 +125,10 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       upnp.addPort(addr.getPort)
     }
 
-    implicit val as: ActorSystem = actorSystem
-    implicit val materializer: ActorMaterializer = ActorMaterializer()
-
-    if (settings.restAPISettings.enable) {
-      val apiRoutes = Seq(
-        BlocksApiRoute(settings.restAPISettings, history, allChannels, c => processCheckpoint(None, c)),
+    // Start complete REST API. Node API is already running, so we need to re-bind
+    nodeApi.foreach { case (tags, routes) =>
+      val apiRoutes = routes ++ Seq(
+        BlocksApiRoute(settings.restAPISettings, history, blockchainUpdater, allChannels, c => processCheckpoint(None, c)),
         TransactionsApiRoute(settings.restAPISettings, stateReader, history, utxStorage),
         NxtConsensusApiRoute(settings.restAPISettings, stateReader, history, settings.blockchainSettings.functionalitySettings),
         WalletApiRoute(settings.restAPISettings, wallet),
@@ -125,7 +139,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         DebugApiRoute(settings.restAPISettings, wallet, stateReader, history, peerDatabase, establishedConnections, blockchainUpdater, allChannels, utxStorage, blockchainDebugInfo, miner, configRoot),
         WavesApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, time),
         AssetsApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, stateReader, time),
-        NodeApiRoute(settings.restAPISettings, () => this.shutdown()),
         ActivationApiRoute(settings.restAPISettings, settings.blockchainSettings.functionalitySettings, settings.featuresSettings, history, featureProvider),
         AssetsBroadcastApiRoute(settings.restAPISettings, utxStorage, allChannels),
         LeaseApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, time),
@@ -134,7 +147,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         AliasBroadcastApiRoute(settings.restAPISettings, utxStorage, allChannels)
       )
 
-      val apiTypes = Seq(
+      val apiTypes = tags ++ Seq(
         typeOf[BlocksApiRoute],
         typeOf[TransactionsApiRoute],
         typeOf[NxtConsensusApiRoute],
@@ -146,7 +159,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         typeOf[DebugApiRoute],
         typeOf[WavesApiRoute],
         typeOf[AssetsApiRoute],
-        typeOf[NodeApiRoute],
         typeOf[ActivationApiRoute],
         typeOf[AssetsBroadcastApiRoute],
         typeOf[LeaseApiRoute],
@@ -155,8 +167,10 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         typeOf[AliasBroadcastApiRoute]
       )
       val combinedRoute: Route = CompositeHttpService(actorSystem, apiTypes, apiRoutes, settings.restAPISettings).compositeRoute
-      val httpFuture = Http().bindAndHandle(combinedRoute, settings.restAPISettings.bindAddress, settings.restAPISettings.port)
-      serverBinding = Await.result(httpFuture, 10.seconds)
+      val httpFuture = serverBinding.unbind().flatMap { _ =>
+        Http().bindAndHandle(combinedRoute, settings.restAPISettings.bindAddress, settings.restAPISettings.port)
+      }
+      serverBinding = Await.result(httpFuture, 20.seconds)
       log.info(s"REST API was bound on ${settings.restAPISettings.bindAddress}:${settings.restAPISettings.port}")
     }
 
@@ -214,21 +228,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
 object Application extends ScorexLogging {
 
-  private def configureLogging(settings: WavesSettings): Unit = {
-    import ch.qos.logback.classic.{Level, LoggerContext}
-    import org.slf4j._
-
-    val lc = LoggerFactory.getILoggerFactory.asInstanceOf[LoggerContext]
-    val rootLogger = lc.getLogger(Logger.ROOT_LOGGER_NAME)
-    settings.loggingLevel match {
-      case LogLevel.TRACE => rootLogger.setLevel(Level.TRACE)
-      case LogLevel.DEBUG => rootLogger.setLevel(Level.DEBUG)
-      case LogLevel.INFO => rootLogger.setLevel(Level.INFO)
-      case LogLevel.WARN => rootLogger.setLevel(Level.WARN)
-      case LogLevel.ERROR => rootLogger.setLevel(Level.ERROR)
-    }
-  }
-
   private def readConfig(userConfigPath: Option[String]): Config = {
     val maybeConfigFile = for {
       maybeFilename <- userConfigPath
@@ -268,32 +267,14 @@ object Application extends ScorexLogging {
     SLF4JBridgeHandler.removeHandlersForRootLogger()
     SLF4JBridgeHandler.install()
 
-    log.info("Starting...")
-
     val config = readConfig(args.headOption)
-    val configForLogs = Seq(
-      "awt",
-      "ftp",
-      "gopherProxySet",
-      "java.awt",
-      "jline",
-      "waves.wallet",
-      "waves.rest-api.api-key-hash",
-      "kamon.influxdb.authentication",
-      "metrics.influx-db",
-    ).foldLeft(config.resolve())(_.withoutPath(_))
 
-    val logInfo: Seq[(String, Any)] = Seq(
-      "Available processors" -> Runtime.getRuntime.availableProcessors,
-      "Max memory available" -> Runtime.getRuntime.maxMemory,
-    ) ++ Seq(
-      "networkaddress.cache.ttl",
-      "networkaddress.cache.negative.ttl"
-    ).map { x => s"System property $x" -> System.getProperty(x) } ++ Seq(
-      "Configuration" -> s"\n===\n${configForLogs.root().render(ConfigRenderOptions.defaults().setOriginComments(false).setComments(false))}\n==="
-    )
-
-    log.debug(logInfo.map { case (n, v) => s"$n: $v" }.mkString("\n"))
+    // DO NOT LOG BEFORE THIS LINE, THIS PROPERTY IS USED IN logback.xml
+    System.setProperty("waves.directory", config.getString("waves.directory"))
+    log.info("Starting...")
+    sys.addShutdownHook {
+      SystemInformationReporter.report(config)
+    }
 
     val settings = WavesSettings.fromConfig(config)
     Kamon.start(config)
@@ -317,8 +298,6 @@ object Application extends ScorexLogging {
           )
         }
       }
-
-      configureLogging(settings)
 
       // Initialize global var with actual address scheme
       AddressScheme.current = new AddressScheme {

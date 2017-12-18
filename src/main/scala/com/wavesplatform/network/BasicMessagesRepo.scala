@@ -64,8 +64,13 @@ object PeersSpec extends MessageSpec[KnownPeers] {
     val length = peers.peers.size
     val lengthBytes = Ints.toByteArray(length)
 
-    peers.peers.foldLeft(lengthBytes) { case (bs, peer) =>
-      Bytes.concat(bs, peer.getAddress.getAddress, Ints.toByteArray(peer.getPort))
+    val xs = for {
+      inetAddress <- peers.peers
+      address <- Option(inetAddress.getAddress)
+    } yield (address.getAddress, inetAddress.getPort)
+
+    xs.foldLeft(lengthBytes) { case (bs, (peerAddress, peerPort)) =>
+      Bytes.concat(bs, peerAddress, Ints.toByteArray(peerPort))
     }
   }
 }
