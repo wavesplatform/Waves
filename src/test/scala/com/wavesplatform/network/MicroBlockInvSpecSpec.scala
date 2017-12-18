@@ -8,7 +8,7 @@ import org.scalatest.prop.PropertyChecks
 import org.scalatest.{FreeSpec, Matchers}
 import scorex.transaction.TransactionParser
 
-class MicroBlockInvMessageSpecSpec extends FreeSpec
+class MicroBlockInvSpecSpec extends FreeSpec
   with Matchers
   with PropertyChecks
   with Eventually
@@ -21,7 +21,7 @@ class MicroBlockInvMessageSpecSpec extends FreeSpec
   } yield MicroBlockInv(acc, ByteStr(totalSig), ByteStr(prevBlockSig))
 
   "MicroBlockInvMessageSpec" - {
-    import MicroBlockInvMessageSpec._
+    import MicroBlockInvSpec._
 
     "deserializeData(serializedData(data)) == data" in forAll(microBlockInvGen) { inv =>
       inv.signaturesValid() shouldBe 'right
