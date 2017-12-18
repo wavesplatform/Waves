@@ -15,11 +15,11 @@ class TrafficLogger(settings: TrafficLogger.Settings) extends ChannelDuplexHandl
   private val codeOf: AnyRef => Option[Byte] = {
     val aux: PartialFunction[AnyRef, Byte] = {
       case x: RawBytes => x.code
-      case _: Transaction => TransactionMessageSpec.messageCode
-      case _: BigInt | _: LocalScoreChanged => ScoreMessageSpec.messageCode
-      case _: Block | _: BlockForged => BlockMessageSpec.messageCode
+      case _: Transaction => TransactionSpec.messageCode
+      case _: BigInt | _: LocalScoreChanged => ScoreSpec.messageCode
+      case _: Block | _: BlockForged => BlockSpec.messageCode
       case x: Message => specsByClasses(x.getClass).messageCode
-      case _: Handshake => HandshakeMessageSpec.messageCode
+      case _: Handshake => HandshakeSpec.messageCode
     }
 
     aux.lift

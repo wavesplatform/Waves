@@ -64,8 +64,10 @@ object Wallet extends ScorexLogging {
   private class WalletImpl(file: Option[File], password: String, seedFromConfig: Option[ByteStr])
     extends ScorexLogging with Wallet {
 
+    private val key = JsonFileStorage.prepareKey(password)
+
     private def loadOrImport(f: File) = try {
-      Some(JsonFileStorage.load[WalletData](f.getCanonicalPath, Some(password)))
+      Some(JsonFileStorage.load[WalletData](f.getCanonicalPath, Some(key)))
     } catch {
       case NonFatal(_) => importLegacyWallet()
     }
@@ -97,7 +99,7 @@ object Wallet extends ScorexLogging {
       TrieMap(accounts.map(acc => acc.address -> acc).toSeq: _*)
     }
 
-    private def save(): Unit = file.foreach(f => JsonFileStorage.save(walletData, f.getCanonicalPath, Option(password)))
+    private def save(): Unit = file.foreach(f => JsonFileStorage.save(walletData, f.getCanonicalPath, Some(key)))
 
     override def seed: Array[Byte] = walletData.seed.arr
 

@@ -7,7 +7,7 @@ import cats.Eq
 import com.wavesplatform.state2.ByteStr
 import io.netty.channel.group.{ChannelGroup, ChannelGroupFuture}
 import io.netty.channel.local.LocalAddress
-import io.netty.channel.socket.SocketChannel
+import io.netty.channel.socket.nio.NioSocketChannel
 import io.netty.channel.{Channel, ChannelHandlerContext}
 import io.netty.util.NetUtil.toSocketAddressString
 import io.netty.util.concurrent.{EventExecutorGroup, ScheduledFuture}
@@ -55,7 +55,12 @@ package object network extends ScorexLogging {
   implicit val channelEq: Eq[Channel] = Eq.fromUniversalEquals
 
   implicit class ChannelHandlerContextExt(val ctx: ChannelHandlerContext) extends AnyVal {
-    def remoteAddress: InetSocketAddress = ctx.channel().asInstanceOf[SocketChannel].remoteAddress()
+    def remoteAddress: Option[InetSocketAddress] = ctx.channel() match {
+      case x: NioSocketChannel => Option(x.remoteAddress())
+      case x =>
+        log.debug(s"Doesn't know how to get a remoteAddress from ${id(ctx)}, $x")
+        None
+    }
   }
 
   implicit class ChannelGroupExt(val allChannels: ChannelGroup) extends AnyVal {
@@ -63,7 +68,7 @@ package object network extends ScorexLogging {
 
     def broadcast(message: AnyRef, except: Set[Channel]): ChannelGroupFuture = {
       message match {
-        case RawBytes(TransactionMessageSpec.messageCode, _) =>
+        case RawBytes(TransactionSpec.messageCode, _) =>
         case _ =>
           val exceptMsg = if (except.isEmpty) "" else s" (except ${except.map(id(_)).mkString(", ")})"
           log.trace(s"Broadcasting $message to ${allChannels.size()} channels$exceptMsg")
@@ -73,7 +78,7 @@ package object network extends ScorexLogging {
     }
 
     def broadcastTx(tx: Transaction, except: Option[Channel] = None): Unit =
-      allChannels.broadcast(RawBytes(TransactionMessageSpec.messageCode, tx.bytes()), except)
+      allChannels.broadcast(RawBytes(TransactionSpec.messageCode, tx.bytes()), except)
   }
 
   type ChannelObservable[A] = Observable[(Channel, A)]

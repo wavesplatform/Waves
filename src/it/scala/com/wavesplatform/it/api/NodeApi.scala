@@ -8,7 +8,7 @@ import com.wavesplatform.it.util._
 import com.wavesplatform.matcher.api.CancelOrderRequest
 import com.wavesplatform.state2.{ByteStr, Portfolio}
 import io.netty.util.{HashedWheelTimer, Timer}
-import org.asynchttpclient.Dsl.{get => _get, post => _post}
+import org.asynchttpclient.Dsl.{asyncHttpClient, get => _get, post => _post}
 import org.asynchttpclient._
 import org.asynchttpclient.util.HttpConstants
 import org.slf4j.LoggerFactory
@@ -116,6 +116,19 @@ trait NodeApi {
   }
 
   def connect(host: String, port: Int): Future[Unit] = postJson("/peers/connect", ConnectReq(host, port)).map(_ => ())
+
+  def waitForStartup(): Future[Option[Response]] = {
+    def send(n: NodeApi) = asyncHttpClient()
+      .executeRequest(_get(s"http://$restAddress:$nodeRestPort/blocks/height")).toCompletableFuture.toScala
+      .map(Option(_))
+      .recoverWith {
+        case e@(_: IOException | _: TimeoutException) => Future(None)
+      }
+    def cond(ropt: Option[Response]) = ropt.exists { r =>
+      r.getStatusCode == HttpConstants.ResponseStatusCodes.OK_200 && (Json.parse(r.getResponseBody) \ "height").as[Int] > 0
+    }
+    waitFor("node is up")(send, cond, 1.second)
+  }
 
   def waitForPeers(targetPeersCount: Int): Future[Seq[Peer]] = waitFor[Seq[Peer]](s"connectedPeers.size >= $targetPeersCount")(_.connectedPeers, _.size >= targetPeersCount, 1.second)
 
@@ -325,7 +338,7 @@ object NodeApi extends ScorexLogging {
   case class UnexpectedStatusCodeException(request: Request, response: Response) extends Exception(s"Request: ${request.getUrl}\n" +
     s"Unexpected status code (${response.getStatusCode}): ${response.getResponseBody}")
 
-  case class Status(blockGeneratorStatus: Option[String], historySynchronizationStatus: Option[String])
+  case class Status(blockchainHeight: Int, stateHeight: Int, updatedTimestamp: Long, updatedDate: String)
 
   implicit val statusFormat: Format[Status] = Json.format
 

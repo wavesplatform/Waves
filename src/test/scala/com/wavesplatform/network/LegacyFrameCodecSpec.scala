@@ -29,7 +29,7 @@ class LegacyFrameCodecSpec extends FreeSpec
 
     val decodedBytes = ch.readInbound[RawBytes]()
 
-    decodedBytes.code shouldBe TransactionMessageSpec.messageCode
+    decodedBytes.code shouldBe TransactionSpec.messageCode
     decodedBytes.data shouldEqual origTx.bytes()
   }
 
@@ -47,7 +47,7 @@ class LegacyFrameCodecSpec extends FreeSpec
     }
 
     val decodedTxs = decoded.map { x =>
-      TransactionMessageSpec.deserializeData(x.data).get
+      TransactionSpec.deserializeData(x.data).get
     }
 
     decodedTxs shouldEqual origTxs
@@ -58,7 +58,7 @@ class LegacyFrameCodecSpec extends FreeSpec
     val checkSum = wrappedBuffer(FastCryptographicHash.hash(txBytes), 0, ScorexMessage.ChecksumLength)
 
     buff.writeInt(LegacyFrameCodec.Magic)
-    buff.writeByte(TransactionMessageSpec.messageCode)
+    buff.writeByte(TransactionSpec.messageCode)
     buff.writeInt(txBytes.length)
     buff.writeBytes(checkSum)
     buff.writeBytes(txBytes)
