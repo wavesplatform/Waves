@@ -61,7 +61,6 @@ class MicroBlockSynchronizerSpec extends FreeSpec with Matchers with Transaction
 
   "should not request the same micro if received before" in {
     val (lastBlockIds, microInvs, microResponses, r) = buildMs()
-    val microblockDatas = newItems(r)
     val ch = new EmbeddedChannel()
     test(
       for {
@@ -90,7 +89,6 @@ class MicroBlockSynchronizerSpec extends FreeSpec with Matchers with Transaction
 
   "should remember inv to make a request later" in {
     val (lastBlockIds, microInvs, microResponses, r) = buildMs()
-    val microblockDatas = newItems(r)
     val ch = new EmbeddedChannel()
     val ch2 = new EmbeddedChannel()
     test(
