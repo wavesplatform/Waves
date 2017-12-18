@@ -162,11 +162,11 @@ trait NodeApi {
     case Failure(ex) => Failure(ex)
   }
 
-  def waitForTransaction(txId: String): Future[Transaction] = waitFor[Option[Transaction]](s"transaction $txId")(_.transactionInfo(txId).transform {
+  def waitForTransaction(txId: String, retryInterval: FiniteDuration = 1.second): Future[Transaction] = waitFor[Option[Transaction]](s"transaction $txId")(_.transactionInfo(txId).transform {
     case Success(tx) => Success(Some(tx))
     case Failure(UnexpectedStatusCodeException(_, r)) if r.getStatusCode == 404 => Success(None)
     case Failure(ex) => Failure(ex)
-  }, tOpt => tOpt.exists(_.id == txId), 1.second).map(_.get)
+  }, tOpt => tOpt.exists(_.id == txId), retryInterval).map(_.get)
 
   def waitForUtxIncreased(fromSize: Int): Future[Int] = waitFor[Int](s"utxSize > $fromSize")(
     _.utxSize,
@@ -207,12 +207,23 @@ trait NodeApi {
   def assetsBalance(address: String): Future[FullAssetsInfo] =
     get(s"/assets/balance/$address").as[FullAssetsInfo]
 
-
   def transfer(sourceAddress: String, recipient: String, amount: Long, fee: Long): Future[Transaction] =
     postJson("/assets/transfer", TransferRequest(None, None, amount, fee, sourceAddress, None, recipient)).as[Transaction]
 
   def signedTransfer(transfer: SignedTransferRequest): Future[Transaction] =
     postJson("/assets/broadcast/transfer", transfer).as[Transaction]
+
+  def batchSignedTransfer(transfers: Seq[SignedTransferRequest], timeout: FiniteDuration = 1.minute): Future[Seq[Transaction]] = {
+    once(
+      _post(s"http://$restAddress:$nodeRestPort/assets/broadcast/batch-transfer")
+        .setHeader("Content-type", "application/json")
+        .setHeader("api_key", "integration-test-rest-api")
+        .setReadTimeout(timeout.toMillis.toInt)
+        .setRequestTimeout(timeout.toMillis.toInt)
+        .setBody(stringify(toJson(transfers)))
+        .build()
+    ).as[Seq[Transaction]]
+  }
 
   def createAlias(targetAddress: String, alias: String, fee: Long): Future[Transaction] =
     postJson("/alias/create", CreateAliasRequest(targetAddress, alias, fee)).as[Transaction]
@@ -321,6 +332,19 @@ trait NodeApi {
     }
 
     executeRequest
+  }
+
+  def once(r: Request): Future[Response] = {
+    log.trace(s"Executing request '$r'")
+    client
+      .executeRequest(r, new AsyncCompletionHandler[Response] {
+        override def onCompleted(response: Response): Response = {
+          log.debug(s"Request: ${r.getUrl} \n Response ${response.getStatusCode}: ${response.getResponseBody}")
+          response
+        }
+      })
+      .toCompletableFuture
+      .toScala
   }
 
   def waitForDebugInfoAt(height: Long): Future[DebugInfo] = waitFor[DebugInfo](s"debug info at height >= $height")(_.get("/debug/info").as[DebugInfo], _.stateHeight >= height, 1.seconds)

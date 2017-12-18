@@ -3,22 +3,26 @@ package scorex.api.http.assets
 import javax.ws.rs.Path
 
 import akka.http.scaladsl.server.Route
+import cats.data.EitherT
+import cats.implicits.catsStdInstancesForList
 import com.wavesplatform.UtxPool
+import com.wavesplatform.network._
 import com.wavesplatform.settings.RestAPISettings
 import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
 import scorex.BroadcastRoute
 import scorex.api.http._
+import scorex.transaction.ValidationError
+import scorex.transaction.assets.TransferTransaction
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
 @Path("/assets/broadcast")
 @Api(value = "assets")
-case class AssetsBroadcastApiRoute(
-    settings: RestAPISettings,
-    utx: UtxPool,
-    allChannels: ChannelGroup) extends ApiRoute with BroadcastRoute {
+case class AssetsBroadcastApiRoute(settings: RestAPISettings,
+                                   utx: UtxPool,
+                                   allChannels: ChannelGroup) extends ApiRoute with BroadcastRoute {
 
   override val route: Route = pathPrefix("assets" / "broadcast") {
     issue ~ reissue ~ transfer ~ burnRoute ~ batchTransfer ~ exchange
@@ -108,10 +112,11 @@ case class AssetsBroadcastApiRoute(
     )
   ))
   def batchTransfer: Route = (path("batch-transfer") & post) {
-    json[Seq[SignedTransferRequest]] { reqs =>
-      Future
-        .sequence(reqs.map(r => doBroadcast(r.toTx)))
-        .map(_.map(_.fold(_.json, _.json())))
+    json[List[SignedTransferRequest]] { reqs =>
+      Future(processRequests(reqs)).map { xs =>
+        networkBroadcast(xs)
+        toResponse(xs)
+      }
     }
   }
 
@@ -157,5 +162,22 @@ case class AssetsBroadcastApiRoute(
     json[SignedExchangeRequest] { req =>
       doBroadcast(req.toTx)
     }
+  }
+
+  private type ProcessRequestsT = EitherT[List, ValidationError, (TransferTransaction, Boolean)]
+
+  private def processRequests(rs: List[SignedTransferRequest]): ProcessRequestsT = for {
+    req <- EitherT.right(rs)
+    tx <- EitherT.fromEither(req.toTx)
+    added <- EitherT.fromEither(utx.putIfNew(tx))
+  } yield (tx, added)
+
+  private def networkBroadcast(xs: ProcessRequestsT): Unit = allChannels.broadcastTx(xs.value.collect {
+    case Right((tx, true)) => tx
+  })
+
+  private def toResponse(xs: ProcessRequestsT) = xs.value.map {
+    case Left(e) => ApiError.fromValidationError(e).json
+    case Right((tx, _)) => tx.json()
   }
 }

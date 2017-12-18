@@ -1,5 +1,6 @@
 package com.wavesplatform.it
 
+import com.typesafe.config.ConfigFactory
 import com.wavesplatform.it.api._
 import org.scalatest._
 
@@ -10,6 +11,11 @@ import scala.concurrent.duration._
 
 class WideStateGenerationSuite extends FreeSpec with IntegrationNodesInitializationAndStopping
   with Matchers with TransferSending with MultipleNodesApi {
+
+  override protected lazy val docker = new Docker(
+    suiteConfig = ConfigFactory.parseString("akka.http.server.parsing.max-content-length = 3737439"),
+    tag = getClass.getSimpleName
+  )
 
   override lazy val nodes: Seq[Node] = docker.startNodes(
     NodeConfigs.newBuilder
@@ -22,7 +28,7 @@ class WideStateGenerationSuite extends FreeSpec with IntegrationNodesInitializat
   private val requestsCount = 10000
 
   "Generate a lot of transactions and synchronise" in result(for {
-    b <- traverse(nodes)(balanceForNode).map(_.toMap)
+    b <- traverse(nodes)(balanceForNode1).map(_.toMap)
     lastTx <- {
       log.debug(
         s"""Balances:
@@ -34,7 +40,7 @@ class WideStateGenerationSuite extends FreeSpec with IntegrationNodesInitializat
 
     _ <- {
       log.debug(s"Wait a transaction ${lastTx.get.id} is in blockchain")
-      traverse(nodes)(_.waitForTransaction(lastTx.get.id))
+      traverse(nodes)(_.waitForTransaction(lastTx.get.id, retryInterval = 10.seconds))
     }
 
     height <- traverse(nodes)(_.height).map(_.max)
@@ -43,6 +49,6 @@ class WideStateGenerationSuite extends FreeSpec with IntegrationNodesInitializat
       log.debug(s"waitForSameBlocksAt($height)")
       waitForSameBlocksAt(nodes, 5.seconds, height)
     }
-  } yield (), 15.minutes)
+  } yield (), 7.minutes)
 
 }

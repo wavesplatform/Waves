@@ -21,7 +21,7 @@ class UtxPoolSynchronizer(utx: UtxPool, allChannels: ChannelGroup)
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
     case t: Transaction => Task(utx.putIfNew(t) match {
       case Right(true) => // log.trace(s"${id(ctx)} Added transaction ${t.id} to UTX pool")
-        allChannels.broadcast(RawBytes(TransactionSpec.messageCode, t.bytes()), Some(ctx.channel()))
+        allChannels.broadcastTx(t, Some(ctx.channel()))
       case Left(TransactionValidationError(e, _)) => // log.trace(s"${id(ctx)} Error processing transaction ${t.id}: $e")
       case Left(e) => // log.trace(s"${id(ctx)} Error processing transaction ${t.id}: $e")
       case Right(false) => // log.trace(s"${id(ctx)} TX ${t.id} already known")
