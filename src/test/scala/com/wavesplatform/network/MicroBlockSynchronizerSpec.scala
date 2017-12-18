@@ -88,9 +88,21 @@ class MicroBlockSynchronizerSpec extends FreeSpec with Matchers with Transaction
       } yield Option(ch2.readOutbound[MicroBlockRequest]) shouldBe None)
   }
 
-  "should remember inv to make a request later" in {}
-
-  "should request multiple microblocks from the chain of invs" in {}
+  "should remember inv to make a request later" in {
+    val (lastBlockIds, microInvs, microResponses, r) = buildMs()
+    val microblockDatas = newItems(r)
+    val ch = new EmbeddedChannel()
+    val ch2 = new EmbeddedChannel()
+    test(
+      for {
+        _ <- send(lastBlockIds)(byteStr(0))
+        _ <- send(microInvs)((ch, MicroBlockInv(signer, byteStr(1), byteStr(0))))
+        _ = ch.readOutbound[MicroBlockRequest] shouldBe MicroBlockRequest(byteStr(1))
+        _ <- send(microInvs)((ch2, MicroBlockInv(signer, byteStr(2), byteStr(1))))
+        _ <- send(microResponses)((ch, MicroBlockResponse(microBlock(1, 0))))
+        _ <- send(lastBlockIds)(byteStr(1))
+      } yield ch2.readOutbound[MicroBlockRequest] shouldBe MicroBlockRequest(byteStr(2)))
+  }
 
 }
 
