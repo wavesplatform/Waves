@@ -52,7 +52,10 @@ case class TransactionsApiRoute(
               path(Segment) { limitStr =>
                 Exception.allCatch.opt(limitStr.toInt) match {
                   case Some(limit) if limit > 0 && limit <= MaxTransactionsPerRequest =>
-                    complete(Json.arr(JsArray(state().accountTransactions(a, limit).map(txToExtendedJson))))
+                    complete(Json.arr(JsArray(
+                      state().accountTransactions(a, limit).map { case (h, tx) =>
+                        txToExtendedJson(tx) + ("height" -> JsNumber(h))
+                    })))
                   case Some(limit) if limit > MaxTransactionsPerRequest =>
                     complete(TooBigArrayAllocation)
                   case _ =>

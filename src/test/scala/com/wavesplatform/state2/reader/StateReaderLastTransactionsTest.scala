@@ -29,12 +29,14 @@ class StateReaderLastTransactionsTest extends PropSpec
     forAll(preconditionsAndPayment) { case ((pre, payment)) =>
       assertDiffAndState(Seq(TestBlock.create(pre)), TestBlock.create(Seq(payment))) { (blockDiff, newState) =>
 
-        newState.accountTransactions(payment.sender, 1) shouldBe Seq(payment)
+        def transactions(count: Int) = newState.accountTransactions(payment.sender, count).map(_._2)
+
+        transactions(1) shouldBe Seq(payment)
         val g = pre.head
         val tx1 = pre(1)
         val tx2 = pre(2)
-        newState.accountTransactions(payment.sender, 3) shouldBe Seq(payment, tx2, tx1)
-        newState.accountTransactions(payment.sender, 10) shouldBe Seq(payment, tx2, tx1, g)
+        transactions(3) shouldBe Seq(payment, tx2, tx1)
+        transactions(10) shouldBe Seq(payment, tx2, tx1, g)
         newState.accountTransactionIds(TestBlock.defaultSigner, 10).size shouldBe 0
       }
     }
