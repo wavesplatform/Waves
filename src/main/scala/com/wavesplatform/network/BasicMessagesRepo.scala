@@ -272,7 +272,7 @@ object HandshakeMessageSpec {
 }
 
 object BasicMessagesRepo {
-  private type Spec = MessageSpec[_ <: AnyRef]
+  type Spec = MessageSpec[_ <: AnyRef]
 
   val specs: Seq[Spec] = Seq(GetPeersSpec, PeersSpec, GetSignaturesSpec, SignaturesSpec,
     GetBlockSpec, BlockMessageSpec, ScoreMessageSpec, CheckpointMessageSpec, TransactionMessageSpec,
