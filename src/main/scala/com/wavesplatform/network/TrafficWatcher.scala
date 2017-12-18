@@ -20,7 +20,7 @@ class TrafficWatcher extends ChannelDuplexHandler {
   }
 
   private def createHistogram(dir: String, spec: BasicMessagesRepo.Spec) = Kamon.metrics.histogram("traffic", Map(
-    "type" -> spec.messageName.replace("message", "").trim,
+    "type" -> spec.messageName,
     "dir" -> dir
   ), Memory.Bytes)
 

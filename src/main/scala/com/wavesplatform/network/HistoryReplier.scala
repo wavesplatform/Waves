@@ -23,7 +23,7 @@ class HistoryReplier(history: NgHistory, settings: SynchronizationSettings) exte
     .build(new CacheLoader[MicroBlockSignature, Array[Byte]] {
       override def load(key: MicroBlockSignature) =
         history.microBlock(key)
-          .map(m => MicroBlockResponseMessageSpec.serializeData(MicroBlockResponse(m))).get
+          .map(m => MicroBlockResponseSpec.serializeData(MicroBlockResponse(m))).get
     })
 
   private val knownBlocks = CacheBuilder.newBuilder()
@@ -50,12 +50,12 @@ class HistoryReplier(history: NgHistory, settings: SynchronizationSettings) exte
     }.runAsyncLogErr
 
     case GetBlock(sig) => Task(knownBlocks.get(sig)).map(bytes =>
-      ctx.writeAndFlush(RawBytes(BlockMessageSpec.messageCode, bytes)))
+      ctx.writeAndFlush(RawBytes(BlockSpec.messageCode, bytes)))
       .runAsyncLogErr
 
     case mbr@MicroBlockRequest(totalResBlockSig) =>
       Task(knownMicroBlocks.get(totalResBlockSig)).map { bytes =>
-        ctx.writeAndFlush(RawBytes(MicroBlockResponseMessageSpec.messageCode, bytes))
+        ctx.writeAndFlush(RawBytes(MicroBlockResponseSpec.messageCode, bytes))
         log.trace(id(ctx) + s"Sent MicroBlockResponse(total=${totalResBlockSig.trim})")
       }.runAsyncLogErr
 

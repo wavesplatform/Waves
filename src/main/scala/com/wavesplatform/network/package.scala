@@ -68,7 +68,7 @@ package object network extends ScorexLogging {
 
     def broadcast(message: AnyRef, except: Set[Channel]): ChannelGroupFuture = {
       message match {
-        case RawBytes(TransactionMessageSpec.messageCode, _) =>
+        case RawBytes(TransactionSpec.messageCode, _) =>
         case _ =>
           val exceptMsg = if (except.isEmpty) "" else s" (except ${except.map(id(_)).mkString(", ")})"
           log.trace(s"Broadcasting $message to ${allChannels.size()} channels$exceptMsg")
@@ -78,7 +78,7 @@ package object network extends ScorexLogging {
     }
 
     def broadcastTx(tx: Transaction, except: Option[Channel] = None): Unit =
-      allChannels.broadcast(RawBytes(TransactionMessageSpec.messageCode, tx.bytes()), except)
+      allChannels.broadcast(RawBytes(TransactionSpec.messageCode, tx.bytes()), except)
   }
 
   type ChannelObservable[A] = Observable[(Channel, A)]
