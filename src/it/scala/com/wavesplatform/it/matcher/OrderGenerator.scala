@@ -15,7 +15,7 @@ trait OrderGenerator {
     val creationTime = System.currentTimeMillis()
     val timeToLiveTimestamp = creationTime + timeToLive.toMillis
 
-    val privateKey = PrivateKeyAccount(Base58.decode(node.accountSeed).get)
+    val privateKey = PrivateKeyAccount.fromSeed(node.accountSeed).right.get
     val matcherPublicKey = PublicKeyAccount(Base58.decode(matcherNode.publicKey).get)
 
     Order(privateKey, matcherPublicKey, pair, orderType, price, amount, creationTime, timeToLiveTimestamp, MatcherFee)

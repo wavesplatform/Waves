@@ -71,7 +71,7 @@ class TransferTransactionSuite extends BaseTransactionSuite with CancelAfterFail
     }
 
     val invalidByTsTx = TransferTransaction.create(None,
-      PrivateKeyAccount(Base58.decode(sender.accountSeed).get),
+      PrivateKeyAccount.fromSeed(sender.accountSeed).right.get,
       AddressOrAlias.fromString(sender.address).right.get,
       1,
       System.currentTimeMillis() + 1.day.toMillis,

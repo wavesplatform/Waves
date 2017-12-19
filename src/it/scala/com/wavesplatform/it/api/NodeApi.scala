@@ -214,20 +214,26 @@ trait NodeApi {
     postJson("/assets/broadcast/transfer", transfer).as[Transaction]
 
   def batchSignedTransfer(transfers: Seq[SignedTransferRequest], timeout: FiniteDuration = 1.minute): Future[Seq[Transaction]] = {
-    def request: Future[Response] = once(
-      _post(s"http://$restAddress:$nodeRestPort/assets/broadcast/batch-transfer")
-        .setHeader("Content-type", "application/json")
-        .setHeader("api_key", "integration-test-rest-api")
-        .setReadTimeout(timeout.toMillis.toInt)
-        .setRequestTimeout(timeout.toMillis.toInt)
-        .setBody(stringify(toJson(transfers)))
-        .build()
-    ).flatMap { response =>
-      if (response.getStatusCode == 503) request
-      else Future.successful(response)
-    }
+    val request = _post(s"http://$restAddress:$nodeRestPort/assets/broadcast/batch-transfer")
+      .setHeader("Content-type", "application/json")
+      .setHeader("api_key", "integration-test-rest-api")
+      .setReadTimeout(timeout.toMillis.toInt)
+      .setRequestTimeout(timeout.toMillis.toInt)
+      .setBody(stringify(toJson(transfers)))
+      .build()
 
-    request.as[Seq[Transaction]]
+    def aux: Future[Response] = once(request)
+      .flatMap { response =>
+        if (response.getStatusCode == 503) aux
+        else Future.successful(response)
+      }
+      .recoverWith {
+        case e@(_: IOException | _: TimeoutException) =>
+          log.debug(s"Failed to execute request '$request' with error: ${e.getMessage}")
+          aux
+      }
+
+    aux.as[Seq[Transaction]]
   }
 
   def createAlias(targetAddress: String, alias: String, fee: Long): Future[Transaction] =

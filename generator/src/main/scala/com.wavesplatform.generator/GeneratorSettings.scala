@@ -16,7 +16,7 @@ case class GeneratorSettings(chainId: String,
                              wide: WideTransactionGenerator.Settings,
                              dynWide: DynamicWideTransactionGenerator.Settings) {
   val addressScheme: Char = chainId.head
-  val privateKeyAccounts: Seq[PrivateKeyAccount] = accounts.map(s => PrivateKeyAccount(Base58.decode(s).get))
+  val privateKeyAccounts: Seq[PrivateKeyAccount] = accounts.map(s => PrivateKeyAccount.fromSeed(s).right.get)
 }
 
 object GeneratorSettings {

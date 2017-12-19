@@ -30,7 +30,7 @@ trait TransferSending extends ScorexLogging {
     val privateKeys = nodes.map(_.accountSeed)
     val sourceAndDest = (1 to n).map { _ =>
       val Seq(srcSeed, destSeed) = Random.shuffle(privateKeys).take(2)
-      (srcSeed, PrivateKeyAccount.fromBase58Seed(destSeed).right.get.address)
+      (srcSeed, PrivateKeyAccount.fromSeed(destSeed).right.get.address)
     }
     val requests = sourceAndDest.foldLeft(List.empty[Req]) {
       case (rs, (src, dest)) =>
@@ -76,7 +76,7 @@ trait TransferSending extends ScorexLogging {
       createSignedTransferRequest(TransferTransaction
         .create(
           assetId = None,
-          sender = PrivateKeyAccount.fromBase58Seed(x.senderSeed).right.get,
+          sender = PrivateKeyAccount.fromSeed(x.senderSeed).right.get,
           recipient = AddressOrAlias.fromString(x.targetAddress).right.get,
           amount = x.amount,
           timestamp = start + i,

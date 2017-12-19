@@ -34,7 +34,6 @@ class WideStateGenerationSuite extends FreeSpec with IntegrationNodesInitializat
         s"""Balances:
            |${b.map { case (account, balance) => s"$account -> $balance" }.mkString("\n")}""".stripMargin)
 
-      // Can take up to 10 minutes!
       processRequests(generateTransfersToRandomAddresses(requestsCount / 2, b) ++ generateTransfersBetweenAccounts(requestsCount / 2, b))
     }
 
@@ -49,6 +48,6 @@ class WideStateGenerationSuite extends FreeSpec with IntegrationNodesInitializat
       log.debug(s"waitForSameBlocksAt($height)")
       waitForSameBlocksAt(nodes, 5.seconds, height)
     }
-  } yield (), 7.minutes)
+  } yield (), 15.minutes)
 
 }

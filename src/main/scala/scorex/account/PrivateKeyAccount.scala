@@ -2,7 +2,6 @@ package scorex.account
 
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
-import scorex.transaction.TransactionParser
 import scorex.transaction.ValidationError.GenericError
 
 sealed trait PrivateKeyAccount extends PublicKeyAccount {
@@ -20,10 +19,9 @@ object PrivateKeyAccount {
     PrivateKeyAccountImpl(seed, pair._1, pair._2)
   }
 
-  def fromBase58Seed(s: String): Either[GenericError, PrivateKeyAccount] =
-    (for {
-      _ <- Either.cond(s.length <= TransactionParser.KeyStringLength, (), "Bad private key string length")
-      bytes <- Base58.decode(s).toEither.left.map(ex => s"Unable to decode base58: ${ex.getMessage}")
-    } yield PrivateKeyAccount(bytes)).left.map(err => GenericError(s"Can't parse '$s' as private key: $err"))
+  def fromSeed(s: String): Either[GenericError, PrivateKeyAccount] = Base58.decode(s)
+    .toEither
+    .right.map(PrivateKeyAccount(_))
+    .left.map(ex => GenericError(s"Unable to get a private key from the seed '$s': ${ex.getMessage}"))
 
 }

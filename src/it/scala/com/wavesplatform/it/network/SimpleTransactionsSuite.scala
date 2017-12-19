@@ -34,7 +34,7 @@ class SimpleTransactionsSuite extends FunSuite with BeforeAndAfterAll with Match
 
   test("valid tx send by network to node should be in blockchain") {
     val tx = TransferTransaction.create(None,
-      PrivateKeyAccount(Base58.decode(node.accountSeed).get),
+      PrivateKeyAccount.fromSeed(node.accountSeed).right.get,
       Address.fromString(node.address).right.get,
       1L,
       System.currentTimeMillis(),
@@ -56,7 +56,7 @@ class SimpleTransactionsSuite extends FunSuite with BeforeAndAfterAll with Match
 
   test("invalid tx send by network to node should be not in UTX or blockchain") {
     val tx = TransferTransaction.create(None,
-      PrivateKeyAccount(Base58.decode(node.accountSeed).get),
+      PrivateKeyAccount.fromSeed(node.accountSeed).right.get,
       Address.fromString(node.address).right.get,
       1L,
       System.currentTimeMillis() + (1 days).toMillis,
