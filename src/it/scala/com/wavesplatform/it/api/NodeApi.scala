@@ -75,13 +75,13 @@ trait NodeApi {
   def get(path: String, f: RequestBuilder => RequestBuilder = identity): Future[Response] =
     retrying(f(_get(s"http://$restAddress:$nodeRestPort$path")).build())
 
-  def getWihApiKey(path: String, f: RequestBuilder => RequestBuilder = identity): Future[Response] = retrying {
+  def getWithApiKey(path: String, f: RequestBuilder => RequestBuilder = identity): Future[Response] = retrying {
     _get(s"http://$restAddress:$nodeRestPort$path")
       .setHeader("api_key", "integration-test-rest-api")
       .build()
   }
 
-  def postJsonWihApiKey[A: Writes](path: String, body: A): Future[Response] = retrying {
+  def postJsonWithApiKey[A: Writes](path: String, body: A): Future[Response] = retrying {
     _post(s"http://$restAddress:$nodeRestPort$path")
       .setHeader("api_key", "integration-test-rest-api")
       .setHeader("Content-type", "application/json").setBody(stringify(toJson(body)))
@@ -103,7 +103,7 @@ trait NodeApi {
   def blacklist(networkIpAddress: String, hostNetworkPort: Int): Future[Unit] =
     post("/debug/blacklist", s"$networkIpAddress:$hostNetworkPort").map(_ => ())
 
-  def printDebugMessage(db: DebugMessage): Future[Response] = postJsonWihApiKey("/debug/print", db)
+  def printDebugMessage(db: DebugMessage): Future[Response] = postJsonWithApiKey("/debug/print", db)
 
   def connectedPeers: Future[Seq[Peer]] = get("/peers/connected").map { r =>
     (Json.parse(r.getResponseBody) \ "peers").as[Seq[Peer]]
@@ -357,7 +357,7 @@ trait NodeApi {
   def debugStateAt(height: Long): Future[Map[String, Long]] = get(s"/debug/stateWaves/$height").as[Map[String, Long]]
 
   def debugPortfoliosFor(address: String, considerUnspent: Boolean) = {
-    getWihApiKey(s"/debug/portfolios/$address?considerUnspent=$considerUnspent")
+    getWithApiKey(s"/debug/portfolios/$address?considerUnspent=$considerUnspent")
   }.as[Portfolio]
 
 }

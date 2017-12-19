@@ -129,7 +129,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     nodeApi.foreach { case (tags, routes) =>
       val apiRoutes = routes ++ Seq(
         BlocksApiRoute(settings.restAPISettings, history, blockchainUpdater, allChannels, c => processCheckpoint(None, c)),
-        TransactionsApiRoute(settings.restAPISettings, stateReader, history, utxStorage),
+        TransactionsApiRoute(settings.restAPISettings, wallet, stateReader, history, utxStorage, allChannels, time),
         NxtConsensusApiRoute(settings.restAPISettings, stateReader, history, settings.blockchainSettings.functionalitySettings),
         WalletApiRoute(settings.restAPISettings, wallet),
         PaymentApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, time),

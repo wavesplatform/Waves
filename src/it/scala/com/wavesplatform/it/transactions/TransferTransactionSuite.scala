@@ -1,10 +1,8 @@
 package com.wavesplatform.it.transactions
 
 import com.wavesplatform.it.TransferSending
-import com.wavesplatform.it.api._
 import com.wavesplatform.it.util._
 import org.scalatest.CancelAfterFailure
-import play.api.libs.json.{JsArray, JsValue}
 import scorex.account.{AddressOrAlias, PrivateKeyAccount}
 import scorex.api.http.Mistiming
 import scorex.transaction.assets.TransferTransaction
@@ -190,23 +188,5 @@ class TransferTransactionSuite extends BaseTransactionSuite with TransferSending
     } yield succeed
 
     Await.result(f, waitCompletion)
-  }
-
-  // probably should be moved elsewhere, just don't see any suite that fits the purpose right now
-  test("height should be reported for transactions") {
-    val f = for {
-      txId <- sender.transfer(firstAddress, secondAddress, 1.waves, fee = 1.waves).map(_.id)
-      _ <- waitForHeightAraiseAndTxPresent(txId, 1)
-
-      jsv1 <- sender.get(s"/transactions/info/$txId").as[JsValue]
-      hasPositiveHeight1 = (jsv1 \ "height").asOpt[Int].map(_ > 0)
-      _ = assert(hasPositiveHeight1.getOrElse(false))
-
-      jsv2 <- sender.get(s"/transactions/address/$firstAddress/limit/1").as[JsArray]
-      hasPositiveHeight2 = (jsv2(0)(0) \ "height").asOpt[Int].map(_ > 0)
-      _ = assert(hasPositiveHeight2.getOrElse(false))
-    } yield succeed
-
-    Await.result(f, 2.minutes)
   }
 }
