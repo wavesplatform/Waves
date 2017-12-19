@@ -2,18 +2,18 @@ package com.wavesplatform.it
 
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.it.api._
-import com.wavesplatform.settings.BlockchainSettings
 import org.scalatest._
 
 import scala.concurrent.Await.result
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 import scala.concurrent.duration._
 
 class MicroblocksGenerationSuite extends FreeSpec with BeforeAndAfterAll
   with Matchers with TransferSending with MultipleNodesApi {
 
   private val txsInMicroBlock = 200
-  private val maxTxs = 1000 // Increase after batch transactions
+  private val maxTxs = 2000
 
   private val config = ConfigFactory
     .parseString(
@@ -55,23 +55,12 @@ class MicroblocksGenerationSuite extends FreeSpec with BeforeAndAfterAll
          |}""".stripMargin)
     .withFallback(NodeConfigs.Default.head)
 
-  private val settings = BlockchainSettings.fromConfig(config
-    .withFallback(NodeConfigs.DefaultConfigTemplate)
-    .withFallback(ConfigFactory.empty)
-    .withFallback(ConfigFactory.defaultApplication())
-    .withFallback(ConfigFactory.defaultReference())
-    .resolve())
-
-  private val richAccountsWithBalance = settings.genesisSettings.transactions
-    .tail
-    .map { x => x.recipient -> x.amount }
-    .toMap
-
   lazy val docker: Docker = Docker(getClass)
   lazy val nodes: Seq[Node] = docker.startNodes(Seq(config))
   private lazy val miner = nodes.head
 
   s"Generate transactions and wait for one block with $maxTxs txs" in result(for {
+    richAccountsWithBalance <- Future.traverse(nodes)(balanceForNode).map(_.toMap)
     _ <- processRequests(generateTransfersToRandomAddresses(maxTxs, richAccountsWithBalance))
     _ <- miner.waitForHeight(3)
     block <- miner.blockAt(2)

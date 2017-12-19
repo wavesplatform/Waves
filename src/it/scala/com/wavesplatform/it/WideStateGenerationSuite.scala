@@ -28,7 +28,7 @@ class WideStateGenerationSuite extends FreeSpec with IntegrationNodesInitializat
   private val requestsCount = 10000
 
   "Generate a lot of transactions and synchronise" in result(for {
-    b <- traverse(nodes)(balanceForNode1).map(_.toMap)
+    b <- traverse(nodes)(balanceForNode).map(_.toMap)
     lastTx <- {
       log.debug(
         s"""Balances:

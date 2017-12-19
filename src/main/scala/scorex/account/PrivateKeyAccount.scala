@@ -20,7 +20,7 @@ object PrivateKeyAccount {
     PrivateKeyAccountImpl(seed, pair._1, pair._2)
   }
 
-  def fromBase58String(s: String): Either[GenericError, PrivateKeyAccount] =
+  def fromBase58Seed(s: String): Either[GenericError, PrivateKeyAccount] =
     (for {
       _ <- Either.cond(s.length <= TransactionParser.KeyStringLength, (), "Bad private key string length")
       bytes <- Base58.decode(s).toEither.left.map(ex => s"Unable to decode base58: ${ex.getMessage}")

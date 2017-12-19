@@ -214,7 +214,7 @@ trait NodeApi {
     postJson("/assets/broadcast/transfer", transfer).as[Transaction]
 
   def batchSignedTransfer(transfers: Seq[SignedTransferRequest], timeout: FiniteDuration = 1.minute): Future[Seq[Transaction]] = {
-    once(
+    def request: Future[Response] = once(
       _post(s"http://$restAddress:$nodeRestPort/assets/broadcast/batch-transfer")
         .setHeader("Content-type", "application/json")
         .setHeader("api_key", "integration-test-rest-api")
@@ -222,7 +222,12 @@ trait NodeApi {
         .setRequestTimeout(timeout.toMillis.toInt)
         .setBody(stringify(toJson(transfers)))
         .build()
-    ).as[Seq[Transaction]]
+    ).flatMap { response =>
+      if (response.getStatusCode == 503) request
+      else Future.successful(response)
+    }
+
+    request.as[Seq[Transaction]]
   }
 
   def createAlias(targetAddress: String, alias: String, fee: Long): Future[Transaction] =

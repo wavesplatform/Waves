@@ -12,7 +12,7 @@ import scala.concurrent.Future
 import scala.util.Random
 
 object TransferSending {
-  case class Req(senderPrivateKey: String, targetAddress: String, amount: Long, fee: Long)
+  case class Req(senderSeed: String, targetAddress: String, amount: Long, fee: Long)
 }
 
 trait TransferSending extends ScorexLogging {
@@ -29,8 +29,8 @@ trait TransferSending extends ScorexLogging {
     val fee = 100000
     val privateKeys = nodes.map(_.accountSeed)
     val sourceAndDest = (1 to n).map { _ =>
-      val Seq(srcPrivateKey, destPrivateKey) = Random.shuffle(privateKeys).take(2)
-      (srcPrivateKey, PrivateKeyAccount.fromBase58String(destPrivateKey).right.get.address)
+      val Seq(srcSeed, destSeed) = Random.shuffle(privateKeys).take(2)
+      (srcSeed, PrivateKeyAccount.fromBase58Seed(destSeed).right.get.address)
     }
     val requests = sourceAndDest.foldLeft(List.empty[Req]) {
       case (rs, (src, dest)) =>
@@ -47,10 +47,10 @@ trait TransferSending extends ScorexLogging {
   def generateTransfersToRandomAddresses(n: Int, balances: Map[String, Long]): Seq[Req] = {
     val fee = 100000
     val seedSize = 32
-    val privateKeys = nodes.map(_.accountSeed)
+    val seeds = nodes.map(_.accountSeed)
 
     val sourceAndDest = (1 to n).map { _ =>
-      val src = Random.shuffle(privateKeys).head
+      val src = Random.shuffle(seeds).head
       val pk = Array.fill[Byte](seedSize)(Random.nextInt(Byte.MaxValue).toByte)
       val dst = Address.fromPublicKey(pk).address
 
@@ -64,9 +64,7 @@ trait TransferSending extends ScorexLogging {
     requests
   }
 
-  def balanceForNode(n: Node): Future[(String, Long)] = n.balance(n.address).map(b => b.address -> b.balance)
-
-  def balanceForNode1(n: Node): Future[(String, Long)] = n.balance(n.address).map(b => n.accountSeed -> b.balance)
+  def balanceForNode(n: Node): Future[(String, Long)] = n.balance(n.address).map(b => n.accountSeed -> b.balance)
 
   /**
     * @return Last transaction
@@ -78,7 +76,7 @@ trait TransferSending extends ScorexLogging {
       createSignedTransferRequest(TransferTransaction
         .create(
           assetId = None,
-          sender = PrivateKeyAccount.fromBase58String(x.senderPrivateKey).right.get,
+          sender = PrivateKeyAccount.fromBase58Seed(x.senderSeed).right.get,
           recipient = AddressOrAlias.fromString(x.targetAddress).right.get,
           amount = x.amount,
           timestamp = start + i,
