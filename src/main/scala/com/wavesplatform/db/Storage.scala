@@ -4,9 +4,10 @@ import java.nio.charset.{Charset, StandardCharsets}
 
 import com.google.common.primitives.{Bytes, Ints}
 import com.wavesplatform.utils.forceStopApplication
-import org.iq80.leveldb.{DB, WriteBatch}
+import org.iq80.leveldb.{DB, DBIterator, WriteBatch}
 import scorex.utils.ScorexLogging
 
+import scala.collection.AbstractIterator
 import scala.util.control.NonFatal
 
 abstract class Storage(private val db: DB) extends ScorexLogging {
@@ -82,6 +83,18 @@ abstract class Storage(private val db: DB) extends ScorexLogging {
         b.close()
       }
     }
+  }
+
+  class KeysIterator(val it: DBIterator) extends AbstractIterator[Array[Byte]] {
+    override def hasNext: Boolean = it.hasNext
+
+    override def next(): Array[Byte] = it.next().getKey
+  }
+
+  protected def allKeys: Iterator[Array[Byte]] = {
+    val it: DBIterator = db.iterator()
+    it.seekToFirst()
+    new KeysIterator(it)
   }
 
   protected def map(prefix: Array[Byte], stripPrefix: Boolean = true): Map[Array[Byte], Array[Byte]] = {

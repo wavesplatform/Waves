@@ -16,7 +16,11 @@ class SubStorage(db: DB, name: String) extends Storage(db) {
   override protected def makeKey(prefix: Array[Byte], key: Int): Array[Byte] = makeKey(prefix, Ints.toByteArray(key))
 
   override def removeEverything(b: Option[WriteBatch]): Unit = {
-    map(makePrefix(subPrefix), stripPrefix = false).foreach(e => delete(e._1, b))
+    val it = allKeys
+    while (it.hasNext) {
+      val key = it.next()
+      if (key.startsWith(subPrefix)) delete(key, b)
+    }
   }
 
 }

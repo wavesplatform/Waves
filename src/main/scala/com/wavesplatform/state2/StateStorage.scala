@@ -147,6 +147,13 @@ class StateStorage private(db: DB) extends SubStorage(db, "state") with Properti
     } else None
   }
 
+
+  override def removeEverything(b: Option[WriteBatch]): Unit = {
+    putIntProperty(MaxAddress, 0, b)
+    putIntProperty(LeasesCount, 0, b)
+    super.removeEverything(b)
+  }
+
   private def putOrderFills(b: Option[WriteBatch], fills: Map[ByteStr, OrderFillInfo]): Unit =
     fills.foreach { case (id, info) =>
       val key = makeKey(OrderFillsPrefix, id.arr)

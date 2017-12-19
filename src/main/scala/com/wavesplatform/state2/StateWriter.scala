@@ -16,33 +16,33 @@ class StateWriterImpl(p: StateStorage, synchronizationToken: ReentrantReadWriteL
   extends StateReaderImpl(p, synchronizationToken) with StateWriter with ScorexLogging with Instrumented {
 
   override def applyBlockDiff(blockDiff: BlockDiff): Unit = write { implicit l =>
-    val oldHeight = p.getHeight
+    val oldHeight = sp().getHeight
     val newHeight = oldHeight + blockDiff.heightDiff
     log.debug(s"Starting persist from $oldHeight to $newHeight")
 
-    val b = p.createBatch()
+    val b = sp().createBatch()
 
-    measureLog("transactions")(p.putTransactions(b, blockDiff.txsDiff))
+    measureLog("transactions")(sp().putTransactions(b, blockDiff.txsDiff))
 
     measureSizeLog("snapshots")(blockDiff.snapshots)(
       _.foreach { case (acc, snapshotsByHeight) =>
         snapshotsByHeight.foreach { case (h, snapshot) =>
-          p.putBalanceSnapshots(b, acc, h, (snapshot.prevHeight, snapshot.balance, snapshot.effectiveBalance))
+          sp().putBalanceSnapshots(b, acc, h, (snapshot.prevHeight, snapshot.balance, snapshot.effectiveBalance))
         }
-        p.putLastBalanceSnapshotHeight(b, acc, snapshotsByHeight.keys.max)
+        sp().putLastBalanceSnapshotHeight(b, acc, snapshotsByHeight.keys.max)
       })
 
-    p.setHeight(b, newHeight)
+    sp().setHeight(b, newHeight)
 
-    p.commit(b)
+    sp().commit(b)
 
     log.info(s"BlockDiff commit complete. Persisted height = $newHeight")
   }
 
   override def clear(): Unit = write { implicit l =>
-    val b = p.createBatch()
-    p.removeEverything(b)
-    p.setHeight(b, 0)
-    p.commit(b)
+    val b = sp().createBatch()
+    sp().removeEverything(b)
+    sp().setHeight(b, 0)
+    sp().commit(b)
   }
 }
