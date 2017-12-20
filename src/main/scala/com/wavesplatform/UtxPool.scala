@@ -111,7 +111,7 @@ class UtxPoolImpl(time: Time,
           }
 
           val r: Either[ValidationError, Boolean] = added match {
-            case Left(_: ValidationError.AlreadyInThePool) => Option(knownTransactions.getIfPresent(tx.id())).getOrElse(Right(true))
+            case Left(_: ValidationError.AlreadyInTheState) => Option(knownTransactions.getIfPresent(tx.id())).getOrElse(Right(true))
             case Left(e) => Left(e)
             case Right(x) => Right(x)
           }
