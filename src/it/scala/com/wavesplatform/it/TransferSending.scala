@@ -27,9 +27,9 @@ trait TransferSending extends ScorexLogging {
 
   def generateTransfersBetweenAccounts(n: Int, balances: Map[String, Long]): Seq[Req] = {
     val fee = 100000
-    val privateKeys = nodes.map { x => (x.accountSeed, PrivateKeyAccount.fromSeed(x.accountSeed).right.get) }
+    val srcDest = nodes.map { x => (x.accountSeed, PrivateKeyAccount.fromSeed(x.accountSeed).right.get) }
     val sourceAndDest = (1 to n).map { _ =>
-      val Seq((srcSeed, _), (_, destPrivateKey)) = Random.shuffle(privateKeys).take(2)
+      val Seq((srcSeed, _), (_, destPrivateKey)) = Random.shuffle(srcDest).take(2)
       (srcSeed, destPrivateKey.address)
     }
     val requests = sourceAndDest.foldLeft(List.empty[Req]) {
@@ -90,7 +90,7 @@ trait TransferSending extends ScorexLogging {
     nodes.head.batchSignedTransfer(xs).map(_.lastOption)
   }
 
-  private def createSignedTransferRequest(tx: TransferTransaction): SignedTransferRequest = {
+  protected def createSignedTransferRequest(tx: TransferTransaction): SignedTransferRequest = {
     import tx._
     SignedTransferRequest(
       Base58.encode(tx.sender.publicKey),
