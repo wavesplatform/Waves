@@ -5,7 +5,7 @@ import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.reader.SnapshotStateReader
 import com.wavesplatform.state2.{Portfolio, _}
 import scorex.account.Address
-import scorex.transaction.ValidationError.{GenericError, Mistiming}
+import scorex.transaction.ValidationError.{AlreadyInThePool, GenericError, Mistiming}
 import scorex.transaction._
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.ExchangeTransaction
@@ -59,7 +59,7 @@ object CommonValidation {
     case _ =>
       if (state.containsTransaction(tx.id())) {
         val txHeight = state.transactionInfo(tx.id()).map(_._1)
-        Left(GenericError(s"Txs cannot be duplicated. Target height is: $height, current height is: ${state.height}, existing tx height is: $txHeight Tx with such id already present"))
+        Left(AlreadyInThePool(tx.id(), s"Txs cannot be duplicated. Target height is: $height, current height is: ${state.height}, existing tx height is: $txHeight Tx with such id already present"))
       }
       else Right(tx)
   }

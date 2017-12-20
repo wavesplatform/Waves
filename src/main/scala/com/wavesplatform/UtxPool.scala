@@ -108,8 +108,13 @@ class UtxPoolImpl(time: Time,
             transactions.put(tx.id(), tx)
             tx
           }
-          knownTransactions.put(tx.id(), res)
-          res.right.map(_ => true)
+
+          val finalRes = res match {
+            case Left(_: ValidationError.AlreadyInThePool) => Option(knownTransactions.getIfPresent(tx.id())).getOrElse(res)
+            case _ => res
+          }
+          knownTransactions.put(tx.id(), finalRes)
+          finalRes.right.map(_ => true)
       }
     })
   }
@@ -210,8 +215,8 @@ object UtxPoolImpl {
           case (_, portfolio) => portfolio.isEmpty
         }
 
-      if (nonEmptyPessimisticPortfolios.nonEmpty) {
-        transactionPortfolios.put(txId, nonEmptyPessimisticPortfolios)
+      if (nonEmptyPessimisticPortfolios.nonEmpty &&
+        Option(transactionPortfolios.put(txId, nonEmptyPessimisticPortfolios)).isEmpty) {
         nonEmptyPessimisticPortfolios.keys.foreach { address =>
           transactions.put(address, transactions.getOrDefault(address, Set.empty) + txId)
         }
@@ -229,9 +234,10 @@ object UtxPoolImpl {
     }
 
     def remove(txId: ByteStr): Unit = {
-      transactionPortfolios.remove(txId)
-      transactions.keySet().asScala.foreach { addr =>
-        transactions.put(addr, transactions.getOrDefault(addr, Set.empty) - txId)
+      if (Option(transactionPortfolios.remove(txId)).isDefined) {
+        transactions.keySet().asScala.foreach { addr =>
+          transactions.put(addr, transactions.getOrDefault(addr, Set.empty) - txId)
+        }
       }
     }
   }

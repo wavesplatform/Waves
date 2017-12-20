@@ -34,7 +34,7 @@ object ApiError {
     case ValidationError.ToSelf => ToSelfError
     case ValidationError.MissingSenderPrivateKey => MissingSenderPrivateKey
     case ValidationError.GenericError(ge) => CustomValidationError(ge)
-    case ValidationError.AlreadyInThePool(tx) => CustomValidationError(s"Transaction $tx already in the pool")
+    case ValidationError.AlreadyInThePool(tx, _) => CustomValidationError(s"Transaction $tx already in the pool")
     case ValidationError.AccountBalanceError(errs) => CustomValidationError(errs.values.mkString(", "))
     case ValidationError.AliasNotExists(tx) => AliasNotExists(tx)
     case ValidationError.OrderValidationError(_, m) => CustomValidationError(m)

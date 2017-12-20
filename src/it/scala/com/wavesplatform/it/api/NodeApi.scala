@@ -230,7 +230,7 @@ trait NodeApi {
       .recoverWith {
         case e@(_: IOException | _: TimeoutException) =>
           log.debug(s"Failed to execute request '$request' with error: ${e.getMessage}")
-          aux
+          timer.schedule(aux, 20.seconds)
       }
 
     aux.as[Seq[Transaction]]

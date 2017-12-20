@@ -30,7 +30,7 @@ object ValidationError {
   object GenericError {
     def apply(ex: Throwable): GenericError = new GenericError(Throwables.getStackTraceAsString(ex))
   }
-  case class AlreadyInThePool(txId: ByteStr) extends ValidationError
+  case class AlreadyInThePool(txId: ByteStr, details: String = "") extends ValidationError
   case class AccountBalanceError(errs: Map[Address, String]) extends ValidationError
   case class AliasNotExists(a: Alias) extends ValidationError
   case class OrderValidationError(order: Order, err: String) extends ValidationError
