@@ -3,7 +3,9 @@ package scorex
 import com.wavesplatform.UtxPool
 import com.wavesplatform.network._
 import io.netty.channel.group.ChannelGroup
+import play.api.libs.json.JsObject
 import scorex.api.http.ApiError
+import scorex.api.http.assets.SignedTransferRequest
 import scorex.transaction.{Transaction, ValidationError}
 
 import scala.concurrent.Future
@@ -25,6 +27,19 @@ trait BroadcastRoute {
       }
       tx
     }).left.map(ApiError.fromValidationError)
+  }
 
+  protected def addToUtx(req: SignedTransferRequest): Either[ApiError, (Transaction, Boolean)] = {
+    val r = for {
+      tx <- req.toTx
+      added <- utx.putIfNew(tx)
+    } yield (tx, added)
+
+    r.left.map(ApiError.fromValidationError)
+  }
+
+  protected def toResponse(x: Either[ValidationError, Transaction]): JsObject = x match {
+    case Left(e) => ApiError.fromValidationError(e).json
+    case Right(tx) => tx.json()
   }
 }

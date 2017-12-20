@@ -3,8 +3,6 @@ package scorex.api.http.assets
 import javax.ws.rs.Path
 
 import akka.http.scaladsl.server.Route
-import cats.data.EitherT
-import cats.implicits.catsStdInstancesForList
 import com.wavesplatform.UtxPool
 import com.wavesplatform.network._
 import com.wavesplatform.settings.RestAPISettings
@@ -12,8 +10,6 @@ import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
 import scorex.BroadcastRoute
 import scorex.api.http._
-import scorex.transaction.ValidationError
-import scorex.transaction.assets.TransferTransaction
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -113,9 +109,18 @@ case class AssetsBroadcastApiRoute(settings: RestAPISettings,
   ))
   def batchTransfer: Route = (path("batch-transfer") & post) {
     json[List[SignedTransferRequest]] { reqs =>
-      val r = Future(processRequests(reqs))
-      r.foreach(networkBroadcast)
-      r.map(toResponse)
+      val r = Future.traverse(reqs)(x => Future(addToUtx(x)))
+      r.foreach { xs =>
+        val txs = xs.collect { case Right((tx, true)) => tx }
+        allChannels.broadcastTx(txs)
+      }
+
+      r.map { xs =>
+        xs.map {
+          case Left(e) => e.json
+          case Right((tx, _)) => tx.json()
+        }
+      }
     }
   }
 
@@ -161,22 +166,5 @@ case class AssetsBroadcastApiRoute(settings: RestAPISettings,
     json[SignedExchangeRequest] { req =>
       doBroadcast(req.toTx)
     }
-  }
-
-  private type ProcessRequestsT = EitherT[List, ValidationError, (TransferTransaction, Boolean)]
-
-  private def processRequests(rs: List[SignedTransferRequest]): ProcessRequestsT = for {
-    req <- EitherT.right(rs)
-    tx <- EitherT.fromEither(req.toTx)
-    added <- EitherT.fromEither(utx.putIfNew(tx))
-  } yield (tx, added)
-
-  private def networkBroadcast(xs: ProcessRequestsT): Unit = allChannels.broadcastTx(xs.value.collect {
-    case Right((tx, true)) => tx
-  })
-
-  private def toResponse(xs: ProcessRequestsT) = xs.value.map {
-    case Left(e) => ApiError.fromValidationError(e).json
-    case Right((tx, _)) => tx.json()
   }
 }

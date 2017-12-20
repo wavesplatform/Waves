@@ -105,7 +105,7 @@ class UtxPoolImpl(time: Time,
           } yield {
             utxPoolSizeStats.increment()
             pessimisticPortfolios.add(tx.id(), diff)
-            transactions.put(tx.id(), tx)
+            transactions.putIfAbsent(tx.id(), tx)
             tx
           }
 
