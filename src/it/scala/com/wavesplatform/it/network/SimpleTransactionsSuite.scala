@@ -9,7 +9,6 @@ import com.wavesplatform.network.{RawBytes, TransactionSpec}
 import org.scalatest._
 import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
 import scorex.account.{Address, PrivateKeyAccount}
-import scorex.crypto.encode.Base58
 import scorex.transaction.assets.TransferTransaction
 
 import scala.concurrent.ExecutionContext.Implicits.global

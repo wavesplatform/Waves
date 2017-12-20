@@ -113,10 +113,9 @@ case class AssetsBroadcastApiRoute(settings: RestAPISettings,
   ))
   def batchTransfer: Route = (path("batch-transfer") & post) {
     json[List[SignedTransferRequest]] { reqs =>
-      Future(processRequests(reqs)).map { xs =>
-        networkBroadcast(xs)
-        toResponse(xs)
-      }
+      val r = Future(processRequests(reqs))
+      r.foreach(networkBroadcast)
+      r.map(toResponse)
     }
   }
 

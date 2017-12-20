@@ -4,6 +4,8 @@ import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.transaction.ValidationError.GenericError
 
+import scala.util.{Failure, Success}
+
 sealed trait PrivateKeyAccount extends PublicKeyAccount {
   def seed: Array[Byte]
 
@@ -19,9 +21,9 @@ object PrivateKeyAccount {
     PrivateKeyAccountImpl(seed, pair._1, pair._2)
   }
 
-  def fromSeed(s: String): Either[GenericError, PrivateKeyAccount] = Base58.decode(s)
-    .toEither
-    .right.map(PrivateKeyAccount(_))
-    .left.map(ex => GenericError(s"Unable to get a private key from the seed '$s': ${ex.getMessage}"))
+  def fromSeed(s: String): Either[GenericError, PrivateKeyAccount] = Base58.decode(s) match {
+    case Success(x) => Right(PrivateKeyAccount(x))
+    case Failure(e) => Left(GenericError(s"Unable to get a private key from the seed '$s': ${e.getMessage}"))
+  }
 
 }

@@ -27,18 +27,18 @@ trait TransferSending extends ScorexLogging {
 
   def generateTransfersBetweenAccounts(n: Int, balances: Map[String, Long]): Seq[Req] = {
     val fee = 100000
-    val privateKeys = nodes.map(_.accountSeed)
+    val privateKeys = nodes.map { x => (x.accountSeed, PrivateKeyAccount.fromSeed(x.accountSeed).right.get) }
     val sourceAndDest = (1 to n).map { _ =>
-      val Seq(srcSeed, destSeed) = Random.shuffle(privateKeys).take(2)
-      (srcSeed, PrivateKeyAccount.fromSeed(destSeed).right.get.address)
+      val Seq((srcSeed, _), (_, destPrivateKey)) = Random.shuffle(privateKeys).take(2)
+      (srcSeed, destPrivateKey.address)
     }
     val requests = sourceAndDest.foldLeft(List.empty[Req]) {
-      case (rs, (src, dest)) =>
+      case (rs, (srcSeed, destAddr)) =>
         val a = Random.nextDouble()
-        val b = balances(src)
+        val b = balances(srcSeed)
         val transferAmount = (1e-8 + a * 1e-9 * b).toLong
         if (transferAmount < 0) log.warn(s"Negative amount: (1e-8 + $a * 1e-8 * $b) = $transferAmount")
-        rs :+ Req(src, dest, Math.max(transferAmount, 1L), fee)
+        rs :+ Req(srcSeed, destAddr, Math.max(transferAmount, 1L), fee)
     }
 
     requests
@@ -50,15 +50,15 @@ trait TransferSending extends ScorexLogging {
     val seeds = nodes.map(_.accountSeed)
 
     val sourceAndDest = (1 to n).map { _ =>
-      val src = Random.shuffle(seeds).head
-      val pk = Array.fill[Byte](seedSize)(Random.nextInt(Byte.MaxValue).toByte)
-      val dst = Address.fromPublicKey(pk).address
+      val srcSeed = Random.shuffle(seeds).head
+      val destPk = Array.fill[Byte](seedSize)(Random.nextInt(Byte.MaxValue).toByte)
+      val destAddr = Address.fromPublicKey(destPk).address
 
-      (src, dst)
+      (srcSeed, destAddr)
     }
     val requests = sourceAndDest.foldLeft(List.empty[Req]) {
-      case (rs, (src, dst)) =>
-        rs :+ Req(src, dst, fee, fee)
+      case (rs, (srcSeed, dstAddr)) =>
+        rs :+ Req(srcSeed, dstAddr, fee, fee)
     }
 
     requests
