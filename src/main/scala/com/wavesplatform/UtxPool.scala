@@ -67,7 +67,7 @@ class UtxPoolImpl(time: Time,
   private lazy val knownTransactions = CacheBuilder
     .newBuilder()
     .maximumSize(utxSettings.maxSize * 2)
-    .build[ByteStr, Either[ValidationError, Transaction]]()
+    .build[ByteStr, Either[ValidationError, Boolean]]()
 
   private val pessimisticPortfolios = new PessimisticPortfolios
 
@@ -97,24 +97,27 @@ class UtxPoolImpl(time: Time,
         case Some(Left(er)) => Left(er)
         case None =>
           val s = stateReader()
-          val res = for {
+          val added = for {
             _ <- Either.cond(transactions.size < utxSettings.maxSize, (), GenericError("Transaction pool size limit is reached"))
             _ <- checkNotBlacklisted(tx)
             _ <- feeCalculator.enoughFee(tx)
             diff <- TransactionDiffer(fs, history.lastBlockTimestamp(), time.correctedTime(), s.height)(s, tx)
-          } yield {
-            utxPoolSizeStats.increment()
-            pessimisticPortfolios.add(tx.id(), diff)
-            transactions.putIfAbsent(tx.id(), tx)
-            tx
+          } yield Option(transactions.putIfAbsent(tx.id(), tx)) match {
+            case Some(_) => false
+            case None =>
+              utxPoolSizeStats.increment()
+              pessimisticPortfolios.add(tx.id(), diff)
+              true
           }
 
-          val finalRes = res match {
-            case Left(_: ValidationError.AlreadyInThePool) => Option(knownTransactions.getIfPresent(tx.id())).getOrElse(res)
-            case _ => res
+          val r: Either[ValidationError, Boolean] = added match {
+            case Left(_: ValidationError.AlreadyInThePool) => Option(knownTransactions.getIfPresent(tx.id())).getOrElse(Right(true))
+            case Left(e) => Left(e)
+            case Right(x) => Right(x)
           }
-          knownTransactions.put(tx.id(), finalRes)
-          finalRes.right.map(_ => true)
+
+          knownTransactions.put(tx.id(), r)
+          r
       }
     })
   }
