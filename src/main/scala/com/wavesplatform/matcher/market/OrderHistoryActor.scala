@@ -4,7 +4,7 @@ import akka.actor.{Actor, Props}
 import akka.http.scaladsl.model.StatusCodes
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.api.{BadMatcherResponse, MatcherResponse}
-import com.wavesplatform.matcher.market.OrderBookActor.{CancelOrder, GetOrderStatusResponse, OrderCancelRejected}
+import com.wavesplatform.matcher.market.OrderBookActor.{CancelOrder, GetOrderStatusResponse}
 import com.wavesplatform.matcher.market.OrderHistoryActor._
 import com.wavesplatform.matcher.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
 import com.wavesplatform.matcher.model.LimitOrder.Filled
@@ -72,7 +72,7 @@ class OrderHistoryActor(val settings: MatcherSettings, val utxPool: UtxPool, val
       orderHistory.orderCanceled(ev)
     case RecoverFromOrderBook(ob) =>
       recoverFromOrderBook(ob)
-    case ForceCancelOrder(id) =>
+    case ForceCancelOrderFromHistory(id) =>
       forceCancelOrder(id)
   }
 
@@ -94,9 +94,9 @@ class OrderHistoryActor(val settings: MatcherSettings, val utxPool: UtxPool, val
     orderHistory.order(id).map((_, orderHistory.orderInfo(id))) match {
       case Some((o, oi)) =>
         orderHistory.orderCanceled(OrderCanceled(LimitOrder.limitOrder(o.price, oi.remaining, o)))
-        sender() ! OrderBookActor.OrderCanceled(id)
+        sender() ! o
       case None =>
-        sender() ! OrderCancelRejected("Order not found")
+        sender() ! None
     }
   }
 
@@ -161,7 +161,8 @@ object OrderHistoryActor {
   case class ValidateCancelOrder(cancel: CancelOrder, ts: Long) extends ExpirableOrderHistoryRequest
   case class ValidateCancelResult(result: Either[GenericError, CancelOrder])
   case class RecoverFromOrderBook(ob: OrderBook) extends OrderHistoryRequest
-  case class ForceCancelOrder(orderId: String) extends OrderHistoryRequest
+  case class ForceCancelOrderFromHistory(orderId: String) extends OrderHistoryRequest
+  case class AssetPairAwareResponse(assetPair: AssetPair)
 
   case class OrderDeleted(orderId: String) extends MatcherResponse {
     val json = Json.obj("status" -> "OrderDeleted", "orderId" -> orderId)

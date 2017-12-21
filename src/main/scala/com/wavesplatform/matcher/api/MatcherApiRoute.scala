@@ -26,6 +26,7 @@ import scorex.utils.NTP
 import scorex.wallet.Wallet
 
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 
@@ -230,9 +231,12 @@ case class MatcherApiRoute(wallet: Wallet,
   ))
   def forceCancelOrder: Route = (path("orders" / "cancel" / Segment) & post & withAuth) { orderId =>
     implicit val timeout = Timeout(10.seconds)
-    complete((orderHistory ? ForceCancelOrder(orderId))
-      .mapTo[MatcherResponse]
-      .map(r => r.code -> r.json))
+    val resp: Future[MatcherResponse] = (orderHistory ? ForceCancelOrderFromHistory(orderId)).flatMap {
+      case Some(order: Order) => (matcher ? ForceCancelOrder(order.assetPair, orderId)).mapTo[MatcherResponse]
+      case None => Future { OrderCancelRejected("Order not found") }
+    }
+
+    complete(resp.map(r => r.code -> r.json))
   }
 
   @Path("/orders/{address}")
