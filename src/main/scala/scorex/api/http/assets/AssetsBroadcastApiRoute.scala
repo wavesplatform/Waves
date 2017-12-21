@@ -113,7 +113,14 @@ case class AssetsBroadcastApiRoute(settings: RestAPISettings,
   def batchTransfer: Route = (path("batch-transfer") & post) {
     json[List[SignedTransferRequest]] { reqs =>
       val r = Future
-        .traverse(reqs)(x => Future(addToUtx(x)))
+        .traverse(reqs) { x =>
+          Future {
+            for {
+              tx <- x.toTx
+              added <- utx.putIfNew(tx)
+            } yield (tx, added)
+          }
+        }
         .map { xs =>
           xs.map {
             case Left(TransactionValidationError(_: ValidationError.AlreadyInTheState, tx)) => Right(tx -> false)
@@ -123,8 +130,8 @@ case class AssetsBroadcastApiRoute(settings: RestAPISettings,
         }
 
       r.foreach { xs =>
-        val txs = xs.collect { case Right((tx, true)) => tx }
-        allChannels.broadcastTx(txs)
+        val newTxs = xs.collect { case Right((tx, true)) => tx }
+        allChannels.broadcastTx(newTxs)
       }
 
       r.map { xs =>

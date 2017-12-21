@@ -57,11 +57,10 @@ object CommonValidation {
   def disallowDuplicateIds[T <: Transaction](state: SnapshotStateReader, settings: FunctionalitySettings, height: Int, tx: T): Either[ValidationError, T] = tx match {
     case ptx: PaymentTransaction if ptx.timestamp < settings.requirePaymentUniqueIdAfter => Right(tx)
     case _ =>
-      if (state.containsTransaction(tx.id())) {
-        val txHeight = state.transactionInfo(tx.id()).map(_._1)
-        Left(AlreadyInTheState(tx.id(), s"Txs cannot be duplicated. Target height is: $height, current height is: ${state.height}, existing tx height is: $txHeight Tx with such id already present"))
+      state.transactionInfo(tx.id()) match {
+        case Some((txHeight, _)) => Left(AlreadyInTheState(tx.id(), txHeight))
+        case None => Right(tx)
       }
-      else Right(tx)
   }
 
   def disallowBeforeActivationTime[T <: Transaction](settings: FunctionalitySettings, tx: T): Either[ValidationError, T] =
