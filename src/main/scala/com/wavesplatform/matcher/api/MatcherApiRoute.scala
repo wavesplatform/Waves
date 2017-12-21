@@ -40,7 +40,7 @@ case class MatcherApiRoute(wallet: Wallet,
   override lazy val route: Route =
     pathPrefix("matcher") {
       matcherPublicKey ~ orderBook ~ place ~ getAssetPairAndPublicKeyOrderHistory ~ getPublicKeyOrderHistory ~ getAllOrderHistory ~ getTradableBalance ~ getPublicKeyMatcherBalance ~ orderStatus ~
-        historyDelete ~ cancel ~ orderbooks ~ orderBookDelete ~ getTransactionsByOrder
+        historyDelete ~ cancel ~ orderbooks ~ orderBookDelete ~ getTransactionsByOrder ~ forceCancelOrder
     }
 
   def withAssetPair(a1: String, a2: String): Directive1[AssetPair] = {
