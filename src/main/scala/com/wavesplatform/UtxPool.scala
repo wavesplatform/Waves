@@ -8,6 +8,7 @@ import com.wavesplatform.UtxPoolImpl.PessimisticPortfolios
 import com.wavesplatform.metrics.Instrumented
 import com.wavesplatform.settings.{FunctionalitySettings, UtxSettings}
 import com.wavesplatform.state2.diffs.TransactionDiffer
+import com.wavesplatform.state2.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.state2.reader.CompositeStateReader.composite
 import com.wavesplatform.state2.{ByteStr, Diff, Portfolio, StateReader}
 import kamon.Kamon
@@ -113,7 +114,7 @@ class UtxPoolImpl(time: Time,
           }
 
           val r: Either[ValidationError, Boolean] = added match {
-            case Left(_: ValidationError.AlreadyInTheState) => Right(false)
+            case Left(TransactionValidationError(_: ValidationError.AlreadyInTheState, _)) => Right(false)
             case Left(e) => Left(e)
             case Right(x) => Right(x)
           }
