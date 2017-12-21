@@ -6,13 +6,16 @@ import akka.http.scaladsl.server.Route
 import com.wavesplatform.UtxPool
 import com.wavesplatform.network._
 import com.wavesplatform.settings.RestAPISettings
+import com.wavesplatform.state2.diffs.TransactionDiffer.TransactionValidationError
 import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
 import scorex.BroadcastRoute
 import scorex.api.http._
+import scorex.transaction.ValidationError
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
+import scala.util.{Left, Right}
 
 @Path("/assets/broadcast")
 @Api(value = "assets")
@@ -109,7 +112,16 @@ case class AssetsBroadcastApiRoute(settings: RestAPISettings,
   ))
   def batchTransfer: Route = (path("batch-transfer") & post) {
     json[List[SignedTransferRequest]] { reqs =>
-      val r = Future.traverse(reqs)(x => Future(addToUtx(x)))
+      val r = Future
+        .traverse(reqs)(x => Future(addToUtx(x)))
+        .map { xs =>
+          xs.map {
+            case Left(TransactionValidationError(_: ValidationError.AlreadyInTheState, tx)) => Right(tx -> false)
+            case Left(e) => Left(ApiError.fromValidationError(e))
+            case Right(x) => Right(x)
+          }
+        }
+
       r.foreach { xs =>
         val txs = xs.collect { case Right((tx, true)) => tx }
         allChannels.broadcastTx(txs)

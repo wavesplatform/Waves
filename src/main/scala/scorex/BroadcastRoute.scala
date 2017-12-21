@@ -29,14 +29,10 @@ trait BroadcastRoute {
     }).left.map(ApiError.fromValidationError)
   }
 
-  protected def addToUtx(req: SignedTransferRequest): Either[ApiError, (Transaction, Boolean)] = {
-    val r = for {
-      tx <- req.toTx
-      added <- utx.putIfNew(tx)
-    } yield (tx, added)
-
-    r.left.map(ApiError.fromValidationError)
-  }
+  protected def addToUtx(req: SignedTransferRequest): Either[ValidationError, (Transaction, Boolean)] = for {
+    tx <- req.toTx
+    added <- utx.putIfNew(tx)
+  } yield (tx, added)
 
   protected def toResponse(x: Either[ValidationError, Transaction]): JsObject = x match {
     case Left(e) => ApiError.fromValidationError(e).json
