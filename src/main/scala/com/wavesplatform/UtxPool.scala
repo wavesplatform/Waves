@@ -96,12 +96,14 @@ class UtxPoolImpl(time: Time,
         case Some(Right(_)) => Right(false)
         case Some(Left(er)) => Left(er)
         case None =>
-          val s = stateReader()
           val added = for {
             _ <- Either.cond(transactions.size < utxSettings.maxSize, (), GenericError("Transaction pool size limit is reached"))
             _ <- checkNotBlacklisted(tx)
             _ <- feeCalculator.enoughFee(tx)
-            diff <- TransactionDiffer(fs, history.lastBlockTimestamp(), time.correctedTime(), s.height)(s, tx)
+            diff <- {
+              val s = stateReader()
+              TransactionDiffer(fs, history.lastBlockTimestamp(), time.correctedTime(), s.height)(s, tx)
+            }
           } yield Option(transactions.putIfAbsent(tx.id(), tx)) match {
             case Some(_) => false
             case None =>
@@ -111,7 +113,7 @@ class UtxPoolImpl(time: Time,
           }
 
           val r: Either[ValidationError, Boolean] = added match {
-            case Left(_: ValidationError.AlreadyInTheState) => Option(knownTransactions.getIfPresent(tx.id())).getOrElse(Right(true))
+            case Left(_: ValidationError.AlreadyInTheState) => Right(false)
             case Left(e) => Left(e)
             case Right(x) => Right(x)
           }
