@@ -4,25 +4,25 @@ import java.io.IOException
 import java.util.concurrent.TimeoutException
 
 import com.wavesplatform.features.api.ActivationStatus
+import com.wavesplatform.it.util.GlobalTimer.{instance => timer}
 import com.wavesplatform.it.util._
 import com.wavesplatform.matcher.api.CancelOrderRequest
 import com.wavesplatform.state2.{ByteStr, Portfolio}
-import io.netty.util.{HashedWheelTimer, Timer}
 import org.asynchttpclient.Dsl.{asyncHttpClient, get => _get, post => _post}
 import org.asynchttpclient._
 import org.asynchttpclient.util.HttpConstants
 import org.slf4j.LoggerFactory
 import play.api.libs.json.Json.{parse, stringify, toJson}
 import play.api.libs.json._
+import scorex.api.http.PeersApiRoute.{ConnectReq, connectFormat}
 import scorex.api.http.alias.CreateAliasRequest
 import scorex.api.http.assets._
 import scorex.api.http.leasing.{LeaseCancelRequest, LeaseRequest}
-import scorex.api.http.PeersApiRoute.{ConnectReq, connectFormat}
 import scorex.transaction.assets.exchange.Order
 import scorex.utils.{LoggerFacade, ScorexLogging}
 import scorex.waves.http.DebugApiRoute._
-import scorex.waves.http.{DebugMessage, RollbackParams}
 import scorex.waves.http.DebugMessage._
+import scorex.waves.http.{DebugMessage, RollbackParams}
 
 import scala.compat.java8.FutureConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -43,8 +43,6 @@ trait NodeApi {
   def blockDelay: FiniteDuration
 
   protected def client: AsyncHttpClient
-
-  protected val timer: Timer = new HashedWheelTimer()
 
   protected val log: LoggerFacade = LoggerFacade(LoggerFactory.getLogger(s"${getClass.getName} $restAddress"))
 
@@ -316,10 +314,6 @@ trait NodeApi {
 
   def cancelOrder(amountAsset: String, priceAsset: String, request: CancelOrderRequest): Future[MatcherStatusResponse] =
     matcherPost(s"/matcher/orderbook/$amountAsset/$priceAsset/cancel", request.json).as[MatcherStatusResponse]
-
-  def close(): Unit = {
-    timer.stop()
-  }
 
   def retrying(r: Request, interval: FiniteDuration = 1.second, statusCode: Int = HttpConstants.ResponseStatusCodes.OK_200): Future[Response] = {
     def executeRequest: Future[Response] = {
