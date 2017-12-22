@@ -67,7 +67,7 @@ class UtxPoolImpl(time: Time,
   private lazy val knownTransactions = CacheBuilder
     .newBuilder()
     .maximumSize(utxSettings.maxSize * 2)
-    .build[ByteStr, Either[ValidationError, Transaction]]()
+    .build[ByteStr, Either[ValidationError, Boolean]]()
 
   private val pessimisticPortfolios = new PessimisticPortfolios
 
@@ -96,20 +96,24 @@ class UtxPoolImpl(time: Time,
         case Some(Right(_)) => Right(false)
         case Some(Left(er)) => Left(er)
         case None =>
-          val s = stateReader()
-          val res = for {
+          val added = for {
             _ <- Either.cond(transactions.size < utxSettings.maxSize, (), GenericError("Transaction pool size limit is reached"))
             _ <- checkNotBlacklisted(tx)
             _ <- feeCalculator.enoughFee(tx)
-            diff <- TransactionDiffer(fs, history.lastBlockTimestamp(), time.correctedTime(), s.height)(s, tx)
-          } yield {
-            utxPoolSizeStats.increment()
-            pessimisticPortfolios.add(tx.id(), diff)
-            transactions.put(tx.id(), tx)
-            tx
+            diff <- {
+              val s = stateReader()
+              TransactionDiffer(fs, history.lastBlockTimestamp(), time.correctedTime(), s.height)(s, tx)
+            }
+          } yield Option(transactions.putIfAbsent(tx.id(), tx)) match {
+            case Some(_) => false
+            case None =>
+              utxPoolSizeStats.increment()
+              pessimisticPortfolios.add(tx.id(), diff)
+              true
           }
-          knownTransactions.put(tx.id(), res)
-          res.right.map(_ => true)
+
+          knownTransactions.put(tx.id(), added)
+          added
       }
     })
   }
@@ -210,8 +214,8 @@ object UtxPoolImpl {
           case (_, portfolio) => portfolio.isEmpty
         }
 
-      if (nonEmptyPessimisticPortfolios.nonEmpty) {
-        transactionPortfolios.put(txId, nonEmptyPessimisticPortfolios)
+      if (nonEmptyPessimisticPortfolios.nonEmpty &&
+        Option(transactionPortfolios.put(txId, nonEmptyPessimisticPortfolios)).isEmpty) {
         nonEmptyPessimisticPortfolios.keys.foreach { address =>
           transactions.put(address, transactions.getOrDefault(address, Set.empty) + txId)
         }
@@ -229,9 +233,10 @@ object UtxPoolImpl {
     }
 
     def remove(txId: ByteStr): Unit = {
-      transactionPortfolios.remove(txId)
-      transactions.keySet().asScala.foreach { addr =>
-        transactions.put(addr, transactions.getOrDefault(addr, Set.empty) - txId)
+      if (Option(transactionPortfolios.remove(txId)).isDefined) {
+        transactions.keySet().asScala.foreach { addr =>
+          transactions.put(addr, transactions.getOrDefault(addr, Set.empty) - txId)
+        }
       }
     }
   }

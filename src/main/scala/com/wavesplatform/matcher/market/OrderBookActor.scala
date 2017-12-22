@@ -224,7 +224,7 @@ class OrderBookActor(assetPair: AssetPair,
           _ <- utx.putIfNew(tx)
         } yield tx) match {
           case Right(tx) if tx.isInstanceOf[ExchangeTransaction] =>
-            allChannels.broadcast(RawBytes(TransactionSpec.messageCode, tx.bytes()))
+            allChannels.broadcastTx(tx)
             processEvent(event)
             context.system.eventStream.publish(ExchangeTransactionCreated(tx.asInstanceOf[ExchangeTransaction]))
             if (event.submittedRemaining > 0)

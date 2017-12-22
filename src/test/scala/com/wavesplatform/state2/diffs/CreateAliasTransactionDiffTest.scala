@@ -48,11 +48,11 @@ class CreateAliasTransactionDiffTest extends PropSpec
   property("cannot recreate existing alias") {
     forAll(preconditionsAndAliasCreations) { case (gen, aliasTx, sameAliasTx, sameAliasOtherSenderTx, _) =>
       assertDiffEi(Seq(TestBlock.create(Seq(gen, aliasTx))), TestBlock.create(Seq(sameAliasTx))) { blockDiffEi =>
-        blockDiffEi should produce("Tx with such id already present")
+        blockDiffEi should produce("AlreadyInTheState")
       }
 
       assertDiffEi(Seq(TestBlock.create(Seq(gen, aliasTx))), TestBlock.create(Seq(sameAliasOtherSenderTx))) { blockDiffEi =>
-        blockDiffEi should produce("Tx with such id already present")
+        blockDiffEi should produce("AlreadyInTheState")
       }
     }
   }

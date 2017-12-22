@@ -5,7 +5,7 @@ import java.util.concurrent.Callable
 
 import cats.Eq
 import com.wavesplatform.state2.ByteStr
-import io.netty.channel.group.{ChannelGroup, ChannelGroupFuture}
+import io.netty.channel.group.{ChannelGroup, ChannelGroupFuture, ChannelMatcher}
 import io.netty.channel.local.LocalAddress
 import io.netty.channel.socket.nio.NioSocketChannel
 import io.netty.channel.{Channel, ChannelHandlerContext}
@@ -67,18 +67,32 @@ package object network extends ScorexLogging {
     def broadcast(message: AnyRef, except: Option[Channel] = None): Unit = broadcast(message, except.toSet)
 
     def broadcast(message: AnyRef, except: Set[Channel]): ChannelGroupFuture = {
-      message match {
-        case RawBytes(TransactionSpec.messageCode, _) =>
-        case _ =>
-          val exceptMsg = if (except.isEmpty) "" else s" (except ${except.map(id(_)).mkString(", ")})"
-          log.trace(s"Broadcasting $message to ${allChannels.size()} channels$exceptMsg")
+      logBroadcast(message, except)
+      allChannels.writeAndFlush(message, { (channel: Channel) => !except.contains(channel) })
+    }
+
+    def broadcastMany(messages: Seq[AnyRef], except: Set[Channel] = Set.empty): Unit = {
+      val channelMatcher: ChannelMatcher = { (channel: Channel) => !except.contains(channel) }
+      messages.foreach { message =>
+        logBroadcast(message, except)
+        allChannels.write(message, channelMatcher)
       }
 
-      allChannels.writeAndFlush(message, { (channel: Channel) => !except.contains(channel) })
+      allChannels.flush(channelMatcher)
     }
 
     def broadcastTx(tx: Transaction, except: Option[Channel] = None): Unit =
       allChannels.broadcast(RawBytes(TransactionSpec.messageCode, tx.bytes()), except)
+
+    def broadcastTx(txs: Seq[Transaction]): Unit =
+      allChannels.broadcastMany(txs.map(tx => RawBytes(TransactionSpec.messageCode, tx.bytes())))
+
+    private def logBroadcast(message: AnyRef, except: Set[Channel]): Unit = message match {
+      case RawBytes(TransactionSpec.messageCode, _) =>
+      case _ =>
+        val exceptMsg = if (except.isEmpty) "" else s" (except ${except.map(id(_)).mkString(", ")})"
+        log.trace(s"Broadcasting $message to ${allChannels.size()} channels$exceptMsg")
+    }
   }
 
   type ChannelObservable[A] = Observable[(Channel, A)]
