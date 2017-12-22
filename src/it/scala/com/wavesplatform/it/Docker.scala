@@ -101,6 +101,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
   }
 
   def startNodes(nodeConfigs: Seq[Config]): Seq[Node] = {
+    log.trace(s"Starting ${nodeConfigs.size} containers")
     val all = nodeConfigs.map(startNodeInternal)
     Await.result(
       for {
