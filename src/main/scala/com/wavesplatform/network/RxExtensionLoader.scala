@@ -61,7 +61,7 @@ object RxExtensionLoader extends ScorexLogging {
                   val ch = best.channel
                   log.debug(s"${id(ch)} Requesting extension signatures ${if (optimistic) "optimistically" else ""}, last ${knownSigs.length} are ${formatSignatures(knownSigs)}")
                   val blacklisting = scheduleBlacklist(ch, s"Timeout loading extension").runAsync
-                  Task(ch.writeAndFlush(GetSignatures(knownSigs))).logErr.runAsync
+                  ch.writeAndFlush(GetSignatures(knownSigs))
                   state.withLoaderState(LoaderState.ExpectingSignatures(ch, knownSigs, blacklisting))
                 case None =>
                   log.trace(s"Holding on requesting next sigs, $state")
@@ -109,7 +109,8 @@ object RxExtensionLoader extends ScorexLogging {
               } else {
                 log.trace(s"${id(ch)} Requesting all required blocks(size=${unknown.size})")
                 val blacklistingAsync = scheduleBlacklist(ch, "Timeout loading first requested block").runAsync
-                Task(unknown.foreach(s => ch.writeAndFlush(GetBlock(s)))).logErr.runAsync
+                unknown.foreach(s => ch.write(GetBlock(s)))
+                ch.flush()
                 state.withLoaderState(LoaderState.ExpectingBlocks(ch, unknown, unknown.toSet, Set.empty, blacklistingAsync))
               }
           }
@@ -162,11 +163,9 @@ object RxExtensionLoader extends ScorexLogging {
           log.error("Error applying extension", err)
           Left(GenericError(err))
         })
-        .flatMap { ar =>
-          Task {
-            s = onExtensionApplied(s, extensionBlocks, ch, ar)
-          }.executeOn(scheduler)
-        }.logErr.runAsync(scheduler)
+        .map { ar => s = onExtensionApplied(s, extensionBlocks, ch, ar) }
+        .logErr
+        .runAsync(scheduler)
     }
 
     def onExtensionApplied(state: State, extension: ExtensionBlocks, ch: Channel, applicationResult: Either[ValidationError, Option[BlockchainScore]]): State = {
@@ -178,7 +177,7 @@ object RxExtensionLoader extends ScorexLogging {
         case ApplierState.Applying(maybeBuffer, applying) =>
           if (applying != extension) log.warn(s"Applied $extension doesn't match expected $applying")
           maybeBuffer match {
-            case None => syncNext(state.copy(applierState = ApplierState.Idle))
+            case None => state.copy(applierState = ApplierState.Idle)
             case Some(Buffer(nextChannel, nextExtension)) => applicationResult match {
               case Left(_) =>
                 log.debug(s"Failed to apply $extension, discarding cached as well")
