@@ -2,7 +2,7 @@ package com.wavesplatform.settings
 
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.network.InvalidBlockStorageImpl.InvalidBlockStorageSettings
-import com.wavesplatform.settings.SynchronizationSettings.{HistoryReplierSettings, MicroblockSynchronizerSettings}
+import com.wavesplatform.settings.SynchronizationSettings.{HistoryReplierSettings, MicroblockSynchronizerSettings, UtxSynchronizerSettings}
 import org.scalatest.{FlatSpec, Matchers}
 
 import scala.concurrent.duration._
@@ -26,6 +26,15 @@ class SynchronizationSettingsSpecification extends FlatSpec with Matchers {
         |    history-replier {
         |      max-micro-block-cache-size = 5
         |      max-block-cache-size = 2
+        |    }
+        |
+        |    # History replier caching settings
+        |    utx-synchronizer {
+        |      # Max microblocks to cache
+        |      network-tx-cache-size = 7000000
+        |
+        |      # Max blocks to cache
+        |      network-tx-cache-time = 70s
         |    }
         |
         |    micro-block-synchronizer {
@@ -55,5 +64,8 @@ class SynchronizationSettingsSpecification extends FlatSpec with Matchers {
       maxMicroBlockCacheSize = 5,
       maxBlockCacheSize = 2
     )
+
+    settings.utxSynchronizerSettings shouldBe UtxSynchronizerSettings(7000000, 70.seconds)
+
   }
 }
