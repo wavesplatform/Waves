@@ -42,6 +42,22 @@ object NodeConfigs {
       specialNodes.zip(specialsConfigs)
         .foldLeft(defaultNodes) { case (r, (base, special)) => r :+ special.withFallback(base) }
     }
+
+    /**
+      * @param nodeNumbers XX in nodeXX
+      */
+    def build(nodeNumbers: Set[Int]): Seq[Config] = {
+      val totalEntities = defaultEntities + specialsConfigs.size
+      require(totalEntities <= nodeNumbers.size)
+
+      val (defaultNodes: Seq[Config], specialNodes: Seq[Config]) = baseConfigs
+        .zipWithIndex
+        .collect { case (x, i) if nodeNumbers.contains(i + 1) => x }
+        .splitAt(defaultEntities)
+
+      specialNodes.zip(specialsConfigs)
+        .foldLeft(defaultNodes) { case (r, (base, special)) => r :+ special.withFallback(base) }
+    }
   }
 
   object Templates {
