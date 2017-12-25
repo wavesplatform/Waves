@@ -2,6 +2,7 @@ package com.wavesplatform.it
 
 import com.wavesplatform.it.TransferSending.Req
 import com.wavesplatform.it.api.NodeApi.Transaction
+import org.scalatest.Suite
 import scorex.account.{Address, AddressOrAlias, AddressScheme, PrivateKeyAccount}
 import scorex.api.http.assets.SignedTransferRequest
 import scorex.crypto.encode.Base58
@@ -15,15 +16,14 @@ object TransferSending {
   case class Req(senderSeed: String, targetAddress: String, amount: Long, fee: Long)
 }
 
-trait TransferSending extends ScorexLogging {
+trait TransferSending extends HasNodes with ScorexLogging {
+  this: Suite =>
 
   import scala.concurrent.ExecutionContext.Implicits.global
 
   AddressScheme.current = new AddressScheme {
     override val chainId: Byte = 'I'.toByte
   }
-
-  def nodes: Seq[Node]
 
   def generateTransfersBetweenAccounts(n: Int, balances: Map[String, Long]): Seq[Req] = {
     val fee = 100000

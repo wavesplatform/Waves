@@ -3,7 +3,7 @@ package com.wavesplatform.it.matcher
 import com.google.common.primitives.Longs
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.api.NodeApi.{AssetBalance, MatcherStatusResponse, OrderBookResponse, Transaction}
-import com.wavesplatform.it.{Docker, Node, NodeConfigs, ReportingTestName}
+import com.wavesplatform.it._
 import com.wavesplatform.state2.ByteStr
 import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
 import scorex.account.PrivateKeyAccount
@@ -21,15 +21,13 @@ class OrderExclusionTestSuite extends FreeSpec with Matchers with BeforeAndAfter
 
   import OrderExclusionTestSuite._
 
-  private lazy val docker = Docker(getClass)
-  override lazy val nodes: Seq[Node] = docker.startNodes(Configs)
+  override protected def nodeConfigs: Seq[Config] = Configs
 
   private def matcherNode = nodes.head
 
   private def aliceNode = nodes(1)
 
   private var aliceSell1 = ""
-
 
   private var aliceAsset: String = ""
   private var aliceWavesPair: AssetPair = AssetPair(None, None)
@@ -44,11 +42,6 @@ class OrderExclusionTestSuite extends FreeSpec with Matchers with BeforeAndAfter
     // Wait for balance on Alice's account
     waitForAssetBalance(aliceNode, aliceAsset, AssetQuantity)
     waitForAssetBalance(matcherNode, aliceAsset, 0)
-  }
-
-  override protected def afterAll(): Unit = {
-    super.afterAll()
-    docker.close()
   }
 
   "matcher should respond with Public key" in {

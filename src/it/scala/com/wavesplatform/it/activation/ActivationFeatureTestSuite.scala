@@ -1,34 +1,24 @@
-package com.wavesplatform.it.activation
+package com.wavesplatform.it
+package activation
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.features.BlockchainFeatureStatus
 import com.wavesplatform.features.api.NodeFeatureStatus
-import com.wavesplatform.it.{Docker, Node, NodeConfigs, ReportingTestName}
-import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
+import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers}
 
+import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.concurrent.Await
 import scala.util.Random
 
-class ActivationFeatureTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with CancelAfterFailure
+class ActivationFeatureTestSuite extends FreeSpec with Matchers with CancelAfterFailure
   with ActivationStatusRequest with ReportingTestName {
 
   import ActivationFeatureTestSuite._
 
   private val waitCompletion = 6.minutes
-  private lazy val docker = Docker(getClass)
-  override lazy val nodes: Seq[Node] = docker.startNodes(Configs)
 
-  override protected def beforeAll(): Unit = {
-    super.beforeAll()
-    log.debug(s"There are ${nodes.size} in tests") // Initializing of a lazy variable
-  }
-
-  override protected def afterAll(): Unit = {
-    super.afterAll()
-    docker.close()
-  }
+  override protected def nodeConfigs: Seq[Config] = Configs
 
   "supported blocks increased when voting starts" in {
     val checkHeight: Int = votingInterval * 2 / 3

@@ -1,6 +1,6 @@
 package com.wavesplatform.it
 
-import com.typesafe.config.ConfigFactory
+import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.api._
 import org.scalatest._
 
@@ -12,18 +12,16 @@ import scala.concurrent.duration._
 class WideStateGenerationSuite extends FreeSpec with IntegrationNodesInitializationAndStopping
   with Matchers with TransferSending with MultipleNodesApi {
 
-  override protected lazy val docker = new Docker(
+  override protected def createDocker: Docker = new Docker(
     suiteConfig = ConfigFactory.parseString("akka.http.server.parsing.max-content-length = 3737439"),
     tag = getClass.getSimpleName
   )
 
-  override lazy val nodes: Seq[Node] = docker.startNodes(
-    NodeConfigs.newBuilder
-      .overrideBase(_.quorum(3))
-      .withDefault(3)
-      .withSpecial(_.nonMiner)
-      .build()
-  )
+  override protected def nodeConfigs: Seq[Config] = NodeConfigs.newBuilder
+    .overrideBase(_.quorum(3))
+    .withDefault(3)
+    .withSpecial(_.nonMiner)
+    .build(Set(1, 7, 10, 2)) // To eliminate a race of miners
 
   private val requestsCount = 10000
 

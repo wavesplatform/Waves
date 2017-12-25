@@ -1,35 +1,24 @@
-package com.wavesplatform.it.activation
+package com.wavesplatform.it
+package activation
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.features.BlockchainFeatureStatus
 import com.wavesplatform.features.api.{ActivationStatusFeature, NodeFeatureStatus}
-import com.wavesplatform.it.{Docker, Node, NodeConfigs, ReportingTestName}
-import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
+import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers}
 
+import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.concurrent.Await
 import scala.util.Random
 
-class NotActivateFeatureTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with CancelAfterFailure
+class NotActivateFeatureTestSuite extends FreeSpec with Matchers with CancelAfterFailure
   with ActivationStatusRequest with ReportingTestName {
 
   import NotActivateFeatureTestSuite._
 
-  private lazy val docker = Docker(getClass)
-  override lazy val nodes: Seq[Node] = docker.startNodes(Configs)
+  override protected def nodeConfigs: Seq[Config] = Configs
   private var activationStatusInfoBefore = Option.empty[ActivationStatusFeature]
   private var activationStatusInfoAfter = Option.empty[ActivationStatusFeature]
-
-  override protected def beforeAll(): Unit = {
-    super.beforeAll()
-    log.debug(s"There are ${nodes.size} in tests") // Initializing of a lazy variable
-  }
-
-  override protected def afterAll(): Unit = {
-    super.afterAll()
-    docker.close()
-  }
 
   "get activation status info" in {
     activationStatusInfoBefore = Some(activationStatus(nodes, votingInterval - 1, votingFeatureNum, 4.minute))

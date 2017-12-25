@@ -1,16 +1,14 @@
 package com.wavesplatform.it
 
 import com.wavesplatform.it.NodeApiTestSuite._
-import org.scalatest.{BeforeAndAfterAll, FreeSpec, Matchers}
+import org.scalatest.{FreeSpec, Matchers}
 import scorex.utils.ScorexLogging
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent._
 import scala.concurrent.duration.DurationInt
 
-class NodeApiTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with ScorexLogging {
-
-  private lazy val docker = Docker(getClass)
+class NodeApiTestSuite extends FreeSpec with Matchers with HasDocker with ScorexLogging {
 
   "/node/status should report status" in {
     val node = docker.startNode(NodeConfig)
@@ -23,10 +21,6 @@ class NodeApiTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
     Await.ready(f, 2.minute)
   }
 
-  override protected def afterAll(): Unit = {
-    super.afterAll()
-    docker.close()
-  }
 }
 
 private object NodeApiTestSuite {

@@ -1,5 +1,6 @@
 package com.wavesplatform.it.transactions
 
+import com.typesafe.config.Config
 import com.wavesplatform.it._
 import org.scalatest.FunSuite
 
@@ -10,13 +11,11 @@ abstract class BaseTransactionSuite extends FunSuite with IntegrationNodesInitia
 
   protected implicit val ec: ExecutionContext = ExecutionContext.Implicits.global
 
-  override lazy val nodes: Seq[Node] = docker.startNodes(
-    NodeConfigs.newBuilder
-      .overrideBase(_.quorum(3))
-      .withDefault(3)
-      .withSpecial(_.nonMiner)
-      .build()
-  )
+  override protected def nodeConfigs: Seq[Config] = NodeConfigs.newBuilder
+    .overrideBase(_.quorum(3))
+    .withDefault(3)
+    .withSpecial(_.nonMiner)
+    .build()
 
   override def notMiner: Node = nodes.last
 
