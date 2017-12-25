@@ -43,7 +43,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
     .setMaxConnectionsPerHost(3)
     .setMaxRequestRetry(1)
     .setReadTimeout(10000)
-    .setPooledConnectionIdleTimeout(2000)
+    .setKeepAlive(false)
     .setRequestTimeout(10000))
 
   private val client = DefaultDockerClient.fromEnv().build()
@@ -205,7 +205,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
 
     val node = new Node(actualConfig, getNodeInfo(containerId, actualConfig), http)
     nodes.add(node)
-    log.debug(s"Started $containerId -> ${node.settings.networkSettings.nodeName}")
+    log.debug(s"Started $containerId -> ${node.settings.networkSettings.nodeName}: ${node.nodeInfo}")
     node
   } catch {
     case NonFatal(e) =>
