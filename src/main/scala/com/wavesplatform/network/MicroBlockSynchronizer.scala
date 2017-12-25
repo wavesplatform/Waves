@@ -70,7 +70,7 @@ object MicroBlockSynchronizer {
           peerDatabase.blacklistAndClose(ch, err.toString)
         case Right(_) =>
           microBlockOwners.get(totalSig, () => MSet.empty) += ch
-          nextInvs.get(prevSig, { () =>
+          nextInvs. get(prevSig, { () =>
             BlockStats.inv(mbInv, ch)
             mbInv
           })
