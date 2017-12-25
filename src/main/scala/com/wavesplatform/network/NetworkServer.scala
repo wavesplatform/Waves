@@ -39,6 +39,7 @@ object NetworkServer extends ScorexLogging {
   def apply(settings: WavesSettings,
             lastBlockInfos: Observable[LastBlockInfo],
             history: NgHistory,
+            historyReplier: HistoryReplier,
             utxPool: UtxPool,
             peerDatabase: PeerDatabase,
             allChannels: ChannelGroup,
@@ -78,7 +79,6 @@ object NetworkServer extends ScorexLogging {
     val writeErrorHandler = new WriteErrorHandler
     val fatalErrorHandler = new FatalErrorHandler
 
-    val historyReplier = new HistoryReplier(history, settings.synchronizationSettings)
     val inboundConnectionFilter: PipelineInitializer.HandlerWrapper = new InboundConnectionFilter(peerDatabase,
       settings.networkSettings.maxInboundConnections,
       settings.networkSettings.maxConnectionsPerHost)

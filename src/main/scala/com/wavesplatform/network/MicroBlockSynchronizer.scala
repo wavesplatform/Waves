@@ -23,7 +23,7 @@ object MicroBlockSynchronizer {
             peerDatabase: PeerDatabase,
             lastBlockIdEvents: Observable[ByteStr],
             microblockInvs: ChannelObservable[MicroBlockInv],
-            microblockResponses: ChannelObservable[MicroBlockResponse]): Observable[(Channel, MicroblockData)] = {
+            microblockResponses: ChannelObservable[MicroBlockResponse]): (Observable[(Channel, MicroblockData)], () => CacheSizes) = {
 
     implicit val scheduler: SchedulerService = Scheduler.singleThread("microblock-synchronizer")
 
@@ -39,6 +39,8 @@ object MicroBlockSynchronizer {
     def alreadyRequested(totalSig: MicroBlockSignature): Boolean = Option(awaiting.getIfPresent(totalSig)).isDefined
 
     def alreadyProcessed(totalSig: MicroBlockSignature): Boolean = Option(successfullyReceived.getIfPresent(totalSig)).isDefined
+
+    val cacheSizesReporter = () => CacheSizes(microBlockOwners.size(), nextInvs.size(), awaiting.size(), successfullyReceived.size())
 
     def requestMicroBlock(mbInv: MicroBlockInv): CancelableFuture[Unit] = {
       import mbInv.totalBlockSig
@@ -81,7 +83,7 @@ object MicroBlockSynchronizer {
     }
     }.executeOn(scheduler).logErr.subscribe()
 
-    microblockResponses.observeOn(scheduler).flatMap { case ((ch, MicroBlockResponse(mb))) =>
+    val observable = microblockResponses.observeOn(scheduler).flatMap { case ((ch, MicroBlockResponse(mb))) =>
       import mb.{totalResBlockSig => totalSig}
       successfullyReceived.put(totalSig, dummy)
       BlockStats.received(mb, ch)
@@ -92,10 +94,10 @@ object MicroBlockSynchronizer {
           Observable((ch, MicroblockData(Option(mi), mb, Coeval.evalOnce(owners(totalSig)))))
       }
     }
+    (observable, cacheSizesReporter)
   }
 
   case class MicroblockData(invOpt: Option[MicroBlockInv], microBlock: MicroBlock, microblockOwners: Coeval[Set[Channel]])
-
   type MicroBlockSignature = ByteStr
 
   private val MicroBlockDownloadAttempts = 2
@@ -108,6 +110,8 @@ object MicroBlockSynchronizer {
   def cache[K <: AnyRef, V <: AnyRef](timeout: FiniteDuration): Cache[K, V] = CacheBuilder.newBuilder()
     .expireAfterWrite(timeout.toMillis, TimeUnit.MILLISECONDS)
     .build[K, V]()
+
+  case class CacheSizes(microBlockOwners: Long, nextInvs: Long, awaiting: Long, successfullyReceived: Long)
 
   private val dummy = new Object()
 }

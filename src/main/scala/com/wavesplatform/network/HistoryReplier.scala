@@ -11,6 +11,7 @@ import monix.execution.Scheduler
 import monix.execution.schedulers.SchedulerService
 import scorex.transaction.NgHistory
 import scorex.utils.ScorexLogging
+import HistoryReplier._
 
 @Sharable
 class HistoryReplier(history: NgHistory, settings: SynchronizationSettings) extends ChannelInboundHandlerAdapter with ScorexLogging {
@@ -65,4 +66,10 @@ class HistoryReplier(history: NgHistory, settings: SynchronizationSettings) exte
 
     case _ => super.channelRead(ctx, msg)
   }
+
+  def cacheSizes: CacheSizes = CacheSizes(knownBlocks.size(), knownMicroBlocks.size())
+}
+
+object HistoryReplier {
+  case class CacheSizes(blocks: Long, microBlocks: Long)
 }

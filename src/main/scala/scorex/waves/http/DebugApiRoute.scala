@@ -46,6 +46,10 @@ case class DebugApiRoute(settings: RestAPISettings,
                          utxStorage: UtxPool,
                          blockchainDebugInfo: BlockchainDebugInfo,
                          miner: Miner with MinerDebugInfo,
+                         historyReplier: HistoryReplier,
+                         extLoaderStateReporter: () => RxExtensionLoader.State,
+                         mbsCacheSizesReporter: () => MicroBlockSynchronizer.CacheSizes,
+                         scoreReporter: () => RxScoreObserver.Stats,
                          configRoot: ConfigObject
                         ) extends ApiRoute with ScorexLogging {
 
@@ -208,7 +212,12 @@ case class DebugApiRoute(settings: RestAPISettings,
     complete(Json.obj(
       "stateHeight" -> stateReader().height,
       "stateHash" -> blockchainDebugInfo.persistedAccountPortfoliosHash,
-      "blockchainDebugInfo" -> blockchainDebugInfo.debugInfo()
+      "blockchainDebugInfo" -> blockchainDebugInfo.debugInfo(),
+      "extensionLoaderState" -> extLoaderStateReporter().toString,
+      "historyReplierCacheSizes" -> Json.toJson(historyReplier.cacheSizes),
+      "microBlockSynchronizerCacheSizes" -> Json.toJson(mbsCacheSizesReporter()),
+      "scoreObserverStats" -> Json.toJson(scoreReporter()),
+      "minerState" -> miner.state
     ))
   }
 
@@ -341,5 +350,8 @@ object DebugApiRoute {
 
   implicit val historyInfoFormat: Format[HistoryInfo] = Json.format
 
-
+  implicit val hrCacheSizesFormat: Format[HistoryReplier.CacheSizes] = Json.format
+  implicit val mbsCacheSizesFormat: Format[MicroBlockSynchronizer.CacheSizes] = Json.format
+  implicit val BigIntWrite: Writes[BigInt] = (bigInt: BigInt) => JsNumber(BigDecimal(bigInt))
+  implicit val scoreReporterStatsWrite: Writes[RxScoreObserver.Stats] = Json.writes[RxScoreObserver.Stats]
 }
