@@ -1,17 +1,26 @@
 package scorex.api.http
 
+import java.util.NoSuchElementException
 import javax.ws.rs.Path
 
 import akka.http.scaladsl.model.StatusCodes
-import akka.http.scaladsl.server.Route
+import akka.http.scaladsl.server.{ExceptionHandler, Route}
 import com.wavesplatform.UtxPool
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state2.{ByteStr, StateReader}
+import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
 import play.api.libs.json._
+import scorex.BroadcastRoute
 import scorex.account.Address
-import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import scorex.transaction.{History, Transaction}
+import scorex.api.http.alias.{CreateAliasRequest, SignedCreateAliasRequest}
+import scorex.api.http.assets._
+import scorex.api.http.leasing.{LeaseCancelRequest, LeaseRequest, SignedLeaseCancelRequest, SignedLeaseRequest}
+import scorex.transaction.TransactionParser.TransactionType
+import scorex.transaction.ValidationError.GenericError
+import scorex.transaction.{History, Transaction, TransactionFactory}
+import scorex.utils.Time
+import scorex.wallet.Wallet
 
 import scala.util.Success
 import scala.util.control.Exception
@@ -20,15 +29,18 @@ import scala.util.control.Exception
 @Api(value = "/transactions", description = "Information about transactions")
 case class TransactionsApiRoute(
     settings: RestAPISettings,
+    wallet: Wallet,
     state: StateReader,
     history: History,
-    utxPool: UtxPool) extends ApiRoute with CommonApiFunctions {
+    utx: UtxPool,
+    allChannels: ChannelGroup,
+    time: Time) extends ApiRoute with BroadcastRoute with CommonApiFunctions {
 
   import TransactionsApiRoute.MaxTransactionsPerRequest
 
   override lazy val route =
     pathPrefix("transactions") {
-      unconfirmed ~ addressLimit ~ info
+      unconfirmed ~ addressLimit ~ info ~ sign ~ broadcast
     }
 
   private val invalidLimit = StatusCodes.BadRequest -> Json.obj("message" -> "invalid.limit")
@@ -93,14 +105,14 @@ case class TransactionsApiRoute(
   @ApiOperation(value = "Unconfirmed", notes = "Get list of unconfirmed transactions", httpMethod = "GET")
   def unconfirmed: Route = (pathPrefix("unconfirmed") & get) {
     pathEndOrSingleSlash {
-      complete(JsArray(utxPool.all.map(txToExtendedJson)))
+      complete(JsArray(utx.all.map(txToExtendedJson)))
     } ~ utxSize ~ utxTransactionInfo
   }
 
   @Path("/unconfirmed/size")
   @ApiOperation(value = "Size of UTX pool", notes = "Get number of unconfirmed transactions in the UTX pool", httpMethod = "GET")
   def utxSize: Route = (pathPrefix("size") & get) {
-    complete(Json.obj("size" -> JsNumber(utxPool.size)))
+    complete(Json.obj("size" -> JsNumber(utx.size)))
   }
 
   @Path("/unconfirmed/info/{id}")
@@ -115,7 +127,7 @@ case class TransactionsApiRoute(
       path(Segment) { encoded =>
         ByteStr.decodeBase58(encoded) match {
           case Success(id) =>
-            utxPool.transactionById(id) match {
+            utx.transactionById(id) match {
               case Some(tx) =>
                 complete(txToExtendedJson(tx))
               case None =>
@@ -126,7 +138,60 @@ case class TransactionsApiRoute(
       }
   }
 
+  @Path("/sign")
+  @ApiOperation(value = "Sign a transaction", notes = "Sign a transaction", httpMethod = "POST")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(name = "json", required = true, dataType = "string", paramType = "body",
+                         value = "Transaction data including type and optional timestamp in milliseconds")
+  ))
+  def sign: Route = (pathPrefix("sign") & post & withAuth) {
+    handleExceptions(jsonExceptionHandler) {
+      json[JsObject] { jsv =>
+        import TransactionType._
+        val txEi = TransactionType((jsv \ "type").as[Int]) match {
+          case IssueTransaction => TransactionFactory.issueAsset(jsv.as[IssueRequest], wallet, time)
+          case TransferTransaction => TransactionFactory.transferAsset(jsv.as[TransferRequest], wallet, time)
+          case ReissueTransaction => TransactionFactory.reissueAsset(jsv.as[ReissueRequest], wallet, time)
+          case BurnTransaction => TransactionFactory.burnAsset(jsv.as[BurnRequest], wallet, time)
+          case LeaseTransaction => TransactionFactory.lease(jsv.as[LeaseRequest], wallet, time)
+          case LeaseCancelTransaction => TransactionFactory.leaseCancel(jsv.as[LeaseCancelRequest], wallet, time)
+          case CreateAliasTransaction => TransactionFactory.alias(jsv.as[CreateAliasRequest], wallet, time)
+          case t => Left(GenericError(s"Bad transaction type: $t"))
+        }
+        txEi match {
+          case Right(tx) => Json.toJson(tx)
+          case Left(err) => ApiError.fromValidationError(err)
+        }
+      }
+    }
+  }
+
+  @Path("/broadcast")
+  @ApiOperation(value = "Broadcasts a signed transaction", notes = "Broadcasts a signed transaction", httpMethod = "POST")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(name = "json", value = "Transaction data including type and signature", required = true, dataType = "string", paramType = "body")
+  ))
+  def broadcast: Route = (pathPrefix("broadcast") & post) {
+    handleExceptions(jsonExceptionHandler) {
+      json[JsObject] { jsv =>
+        import TransactionType._
+        val req = TransactionType((jsv \ "type").as[Int]) match {
+          case IssueTransaction => jsv.as[SignedIssueRequest].toTx
+          case TransferTransaction => jsv.as[SignedTransferRequest].toTx
+          case ReissueTransaction => jsv.as[SignedReissueRequest].toTx
+          case BurnTransaction => jsv.as[SignedBurnRequest].toTx
+          case LeaseTransaction => jsv.as[SignedLeaseRequest].toTx
+          case LeaseCancelTransaction => jsv.as[SignedLeaseCancelRequest].toTx
+          case CreateAliasTransaction => jsv.as[SignedCreateAliasRequest].toTx
+          case t => Left(GenericError(s"Bad transaction type: $t"))
+        }
+        doBroadcast(req)
+      }
+    }
+  }
+
   private def txToExtendedJson(tx: Transaction): JsObject = {
+    import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
     tx match {
       case lease: LeaseTransaction =>
         import LeaseTransaction.Status._
@@ -135,6 +200,11 @@ case class TransactionsApiRoute(
         leaseCancel.json() ++ Json.obj("lease" -> state().findTransaction[LeaseTransaction](leaseCancel.leaseId).map(_.json()).getOrElse[JsValue](JsNull))
       case t => t.json()
     }
+  }
+
+  private val jsonExceptionHandler = ExceptionHandler {
+    case JsResultException(err) => complete(WrongJson(errors = err))
+    case e: NoSuchElementException => complete(WrongJson(Some(e)))
   }
 }
 

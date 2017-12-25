@@ -18,7 +18,8 @@ class VoteForFeatureByDefaultTestSuite extends FreeSpec with Matchers with Befor
   private lazy val docker = Docker(getClass)
   override lazy val nodes: Seq[Node] = docker.startNodes(Configs)
 
-  private lazy val notSupportedNode +: supportedNodes = nodes
+  private def notSupportedNode = nodes.head
+  private def supportedNodes = nodes.tail
 
   val defaultVotingFeatureNum: Short = 1
 

@@ -4,25 +4,25 @@ import java.io.IOException
 import java.util.concurrent.TimeoutException
 
 import com.wavesplatform.features.api.ActivationStatus
+import com.wavesplatform.it.util.GlobalTimer.{instance => timer}
 import com.wavesplatform.it.util._
 import com.wavesplatform.matcher.api.CancelOrderRequest
 import com.wavesplatform.state2.{ByteStr, Portfolio}
-import io.netty.util.{HashedWheelTimer, Timer}
 import org.asynchttpclient.Dsl.{asyncHttpClient, get => _get, post => _post}
 import org.asynchttpclient._
 import org.asynchttpclient.util.HttpConstants
 import org.slf4j.LoggerFactory
 import play.api.libs.json.Json.{parse, stringify, toJson}
 import play.api.libs.json._
+import scorex.api.http.PeersApiRoute.{ConnectReq, connectFormat}
 import scorex.api.http.alias.CreateAliasRequest
 import scorex.api.http.assets._
 import scorex.api.http.leasing.{LeaseCancelRequest, LeaseRequest}
-import scorex.api.http.PeersApiRoute.{ConnectReq, connectFormat}
 import scorex.transaction.assets.exchange.Order
 import scorex.utils.{LoggerFacade, ScorexLogging}
 import scorex.waves.http.DebugApiRoute._
-import scorex.waves.http.{DebugMessage, RollbackParams}
 import scorex.waves.http.DebugMessage._
+import scorex.waves.http.{DebugMessage, RollbackParams}
 
 import scala.compat.java8.FutureConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -43,8 +43,6 @@ trait NodeApi {
   def blockDelay: FiniteDuration
 
   protected def client: AsyncHttpClient
-
-  protected val timer: Timer = new HashedWheelTimer()
 
   protected val log: LoggerFacade = LoggerFacade(LoggerFactory.getLogger(s"${getClass.getName} $restAddress"))
 
@@ -77,13 +75,13 @@ trait NodeApi {
   def get(path: String, f: RequestBuilder => RequestBuilder = identity): Future[Response] =
     retrying(f(_get(s"http://$restAddress:$nodeRestPort$path")).build())
 
-  def getWihApiKey(path: String, f: RequestBuilder => RequestBuilder = identity): Future[Response] = retrying {
+  def getWithApiKey(path: String, f: RequestBuilder => RequestBuilder = identity): Future[Response] = retrying {
     _get(s"http://$restAddress:$nodeRestPort$path")
       .setHeader("api_key", "integration-test-rest-api")
       .build()
   }
 
-  def postJsonWihApiKey[A: Writes](path: String, body: A): Future[Response] = retrying {
+  def postJsonWithApiKey[A: Writes](path: String, body: A): Future[Response] = retrying {
     _post(s"http://$restAddress:$nodeRestPort$path")
       .setHeader("api_key", "integration-test-rest-api")
       .setHeader("Content-type", "application/json").setBody(stringify(toJson(body)))
@@ -105,7 +103,7 @@ trait NodeApi {
   def blacklist(networkIpAddress: String, hostNetworkPort: Int): Future[Unit] =
     post("/debug/blacklist", s"$networkIpAddress:$hostNetworkPort").map(_ => ())
 
-  def printDebugMessage(db: DebugMessage): Future[Response] = postJsonWihApiKey("/debug/print", db)
+  def printDebugMessage(db: DebugMessage): Future[Response] = postJsonWithApiKey("/debug/print", db)
 
   def connectedPeers: Future[Seq[Peer]] = get("/peers/connected").map { r =>
     (Json.parse(r.getResponseBody) \ "peers").as[Seq[Peer]]
@@ -162,11 +160,11 @@ trait NodeApi {
     case Failure(ex) => Failure(ex)
   }
 
-  def waitForTransaction(txId: String): Future[Transaction] = waitFor[Option[Transaction]](s"transaction $txId")(_.transactionInfo(txId).transform {
+  def waitForTransaction(txId: String, retryInterval: FiniteDuration = 1.second): Future[Transaction] = waitFor[Option[Transaction]](s"transaction $txId")(_.transactionInfo(txId).transform {
     case Success(tx) => Success(Some(tx))
     case Failure(UnexpectedStatusCodeException(_, r)) if r.getStatusCode == 404 => Success(None)
     case Failure(ex) => Failure(ex)
-  }, tOpt => tOpt.exists(_.id == txId), 1.second).map(_.get)
+  }, tOpt => tOpt.exists(_.id == txId), retryInterval).map(_.get)
 
   def waitForUtxIncreased(fromSize: Int): Future[Int] = waitFor[Int](s"utxSize > $fromSize")(
     _.utxSize,
@@ -207,12 +205,34 @@ trait NodeApi {
   def assetsBalance(address: String): Future[FullAssetsInfo] =
     get(s"/assets/balance/$address").as[FullAssetsInfo]
 
-
   def transfer(sourceAddress: String, recipient: String, amount: Long, fee: Long): Future[Transaction] =
     postJson("/assets/transfer", TransferRequest(None, None, amount, fee, sourceAddress, None, recipient)).as[Transaction]
 
   def signedTransfer(transfer: SignedTransferRequest): Future[Transaction] =
     postJson("/assets/broadcast/transfer", transfer).as[Transaction]
+
+  def batchSignedTransfer(transfers: Seq[SignedTransferRequest], timeout: FiniteDuration = 1.minute): Future[Seq[Transaction]] = {
+    val request = _post(s"http://$restAddress:$nodeRestPort/assets/broadcast/batch-transfer")
+      .setHeader("Content-type", "application/json")
+      .setHeader("api_key", "integration-test-rest-api")
+      .setReadTimeout(timeout.toMillis.toInt)
+      .setRequestTimeout(timeout.toMillis.toInt)
+      .setBody(stringify(toJson(transfers)))
+      .build()
+
+    def aux: Future[Response] = once(request)
+      .flatMap { response =>
+        if (response.getStatusCode == 503) aux
+        else Future.successful(response)
+      }
+      .recoverWith {
+        case e@(_: IOException | _: TimeoutException) =>
+          log.debug(s"Failed to execute request '$request' with error: ${e.getMessage}")
+          timer.schedule(aux, 20.seconds)
+      }
+
+    aux.as[Seq[Transaction]]
+  }
 
   def createAlias(targetAddress: String, alias: String, fee: Long): Future[Transaction] =
     postJson("/alias/create", CreateAliasRequest(targetAddress, alias, fee)).as[Transaction]
@@ -295,10 +315,6 @@ trait NodeApi {
   def cancelOrder(amountAsset: String, priceAsset: String, request: CancelOrderRequest): Future[MatcherStatusResponse] =
     matcherPost(s"/matcher/orderbook/$amountAsset/$priceAsset/cancel", request.json).as[MatcherStatusResponse]
 
-  def close(): Unit = {
-    timer.stop()
-  }
-
   def retrying(r: Request, interval: FiniteDuration = 1.second, statusCode: Int = HttpConstants.ResponseStatusCodes.OK_200): Future[Response] = {
     def executeRequest: Future[Response] = {
       log.trace(s"Executing request '$r'")
@@ -323,12 +339,25 @@ trait NodeApi {
     executeRequest
   }
 
+  def once(r: Request): Future[Response] = {
+    log.trace(s"Executing request '$r'")
+    client
+      .executeRequest(r, new AsyncCompletionHandler[Response] {
+        override def onCompleted(response: Response): Response = {
+          log.debug(s"Request: ${r.getUrl} \n Response ${response.getStatusCode}: ${response.getResponseBody}")
+          response
+        }
+      })
+      .toCompletableFuture
+      .toScala
+  }
+
   def waitForDebugInfoAt(height: Long): Future[DebugInfo] = waitFor[DebugInfo](s"debug info at height >= $height")(_.get("/debug/info").as[DebugInfo], _.stateHeight >= height, 1.seconds)
 
   def debugStateAt(height: Long): Future[Map[String, Long]] = get(s"/debug/stateWaves/$height").as[Map[String, Long]]
 
   def debugPortfoliosFor(address: String, considerUnspent: Boolean) = {
-    getWihApiKey(s"/debug/portfolios/$address?considerUnspent=$considerUnspent")
+    getWithApiKey(s"/debug/portfolios/$address?considerUnspent=$considerUnspent")
   }.as[Portfolio]
 
 }

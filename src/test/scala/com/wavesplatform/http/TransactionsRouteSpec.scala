@@ -2,8 +2,10 @@ package com.wavesplatform.http
 
 import akka.http.scaladsl.model.StatusCodes
 import com.wavesplatform.http.ApiMarshallers._
+import com.wavesplatform.settings.WalletSettings
 import com.wavesplatform.state2.reader.SnapshotStateReader
-import com.wavesplatform.{BlockGen, NoShrink, TransactionGen, UtxPool}
+import com.wavesplatform.{BlockGen, NoShrink, TestTime, TransactionGen, UtxPool}
+import io.netty.channel.group.ChannelGroup
 import monix.eval.Coeval
 import org.scalacheck.Gen._
 import org.scalamock.scalatest.MockFactory
@@ -14,6 +16,7 @@ import scorex.account.Address
 import scorex.api.http.{InvalidAddress, InvalidSignature, TooBigArrayAllocation, TransactionsApiRoute}
 import scorex.crypto.encode.Base58
 import scorex.transaction._
+import scorex.wallet.Wallet
 
 class TransactionsRouteSpec extends RouteSpec("/transactions")
   with RestAPISettingsHelper
@@ -28,10 +31,12 @@ class TransactionsRouteSpec extends RouteSpec("/transactions")
 
   private val transactionsCount = 10
 
+  private val wallet = Wallet(WalletSettings(None, "qwerty", None))
   private val history = mock[History]
   private val state = mock[SnapshotStateReader]
   private val utx = mock[UtxPool]
-  private val route = TransactionsApiRoute(restAPISettings, Coeval.now(state), history, utx).route
+  private val allChannels = mock[ChannelGroup]
+  private val route = TransactionsApiRoute(restAPISettings, wallet, Coeval.now(state), history, utx, allChannels, new TestTime).route
 
 
   routePath("/address/{address}/limit/{limit}") - {

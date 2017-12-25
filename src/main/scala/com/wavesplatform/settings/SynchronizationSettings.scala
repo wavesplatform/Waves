@@ -14,7 +14,8 @@ case class SynchronizationSettings(maxRollback: Int,
                                    scoreTTL: FiniteDuration,
                                    invalidBlocksStorage: InvalidBlockStorageSettings,
                                    microBlockSynchronizer: MicroblockSynchronizerSettings,
-                                   historyReplierSettings: HistoryReplierSettings)
+                                   historyReplierSettings: HistoryReplierSettings,
+                                   utxSynchronizerSettings: UtxSynchronizerSettings)
 
 object SynchronizationSettings {
 
@@ -24,6 +25,9 @@ object SynchronizationSettings {
 
   case class HistoryReplierSettings(maxMicroBlockCacheSize: Int,
                                     maxBlockCacheSize: Int)
+
+  case class UtxSynchronizerSettings(networkTxCacheSize: Int,
+                                     networkTxCacheTime: FiniteDuration)
 
   val configPath: String = "waves.synchronization"
 
@@ -35,8 +39,9 @@ object SynchronizationSettings {
     val invalidBlocksStorage = config.as[InvalidBlockStorageSettings](s"$configPath.invalid-blocks-storage")
     val microBlockSynchronizer = config.as[MicroblockSynchronizerSettings](s"$configPath.micro-block-synchronizer")
     val historyReplierSettings = config.as[HistoryReplierSettings](s"$configPath.history-replier")
+    val utxSynchronizerSettings = config.as[UtxSynchronizerSettings](s"$configPath.utx-synchronizer")
 
     SynchronizationSettings(maxRollback, maxChainLength, synchronizationTimeout, scoreTTL, invalidBlocksStorage,
-      microBlockSynchronizer, historyReplierSettings)
+      microBlockSynchronizer, historyReplierSettings, utxSynchronizerSettings)
   }
 }

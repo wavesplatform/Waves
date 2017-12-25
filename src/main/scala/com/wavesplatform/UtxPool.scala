@@ -3,7 +3,6 @@ package com.wavesplatform
 import java.util.concurrent.ConcurrentHashMap
 
 import cats._
-import com.google.common.cache.CacheBuilder
 import com.wavesplatform.UtxPoolImpl.PessimisticPortfolios
 import com.wavesplatform.metrics.Instrumented
 import com.wavesplatform.settings.{FunctionalitySettings, UtxSettings}
@@ -28,7 +27,7 @@ import scala.util.{Left, Right}
 
 trait UtxPool {
 
-  def putIfNew(tx: Transaction): Either[ValidationError, Boolean]
+  def putIfNew(tx: Transaction): Either[ValidationError, Transaction]
 
   def removeAll(txs: Traversable[Transaction]): Unit
 
@@ -50,9 +49,10 @@ class UtxPoolImpl(time: Time,
                   fs: FunctionalitySettings,
                   utxSettings: UtxSettings) extends ScorexLogging with Instrumented with AutoCloseable with UtxPool {
 
-  private val transactions = new ConcurrentHashMap[ByteStr, Transaction]()
-
   private implicit val scheduler: Scheduler = Scheduler.singleThread("utx-pool-cleanup")
+
+  private val transactions = new ConcurrentHashMap[ByteStr, Transaction]()
+  private val pessimisticPortfolios = new PessimisticPortfolios
 
   private val removeInvalid = Task {
     val state = stateReader()
@@ -60,16 +60,9 @@ class UtxPoolImpl(time: Time,
     removeAll(transactionsToRemove)
   }.delayExecution(utxSettings.cleanupInterval)
 
-  private val cleanup = removeInvalid.flatMap(_ => removeInvalid).runAsync
+  private val cleanup = removeInvalid.flatMap(_ => removeInvalid).runAsyncLogErr
 
   override def close(): Unit = cleanup.cancel()
-
-  private lazy val knownTransactions = CacheBuilder
-    .newBuilder()
-    .maximumSize(utxSettings.maxSize * 2)
-    .build[ByteStr, Either[ValidationError, Transaction]]()
-
-  private val pessimisticPortfolios = new PessimisticPortfolios
 
   private val utxPoolSizeStats = Kamon.metrics.minMaxCounter("utx-pool-size", 500.millis)
   private val processingTimeStats = Kamon.metrics.histogram("utx-transaction-processing-time", KamonTime.Milliseconds)
@@ -89,27 +82,20 @@ class UtxPoolImpl(time: Time,
       }
   }
 
-  override def putIfNew(tx: Transaction): Either[ValidationError, Boolean] = {
+  override def putIfNew(tx: Transaction): Either[ValidationError, Transaction] = {
     putRequestStats.increment()
     measureSuccessful(processingTimeStats, {
-      Option(knownTransactions.getIfPresent(tx.id())) match {
-        case Some(Right(_)) => Right(false)
-        case Some(Left(er)) => Left(er)
-        case None =>
-          val s = stateReader()
-          val res = for {
-            _ <- Either.cond(transactions.size < utxSettings.maxSize, (), GenericError("Transaction pool size limit is reached"))
-            _ <- checkNotBlacklisted(tx)
-            _ <- feeCalculator.enoughFee(tx)
-            diff <- TransactionDiffer(fs, history.lastBlockTimestamp(), time.correctedTime(), s.height)(s, tx)
-          } yield {
-            utxPoolSizeStats.increment()
-            pessimisticPortfolios.add(tx.id(), diff)
-            transactions.put(tx.id(), tx)
-            tx
-          }
-          knownTransactions.put(tx.id(), res)
-          res.right.map(_ => true)
+      val s = stateReader()
+      for {
+        _ <- Either.cond(transactions.size < utxSettings.maxSize, (), GenericError("Transaction pool size limit is reached"))
+        _ <- checkNotBlacklisted(tx)
+        _ <- feeCalculator.enoughFee(tx)
+        diff <- TransactionDiffer(fs, history.lastBlockTimestamp(), time.correctedTime(), s.height)(s, tx)
+      } yield {
+        utxPoolSizeStats.increment()
+        pessimisticPortfolios.add(tx.id(), diff)
+        transactions.put(tx.id(), tx)
+        tx
       }
     })
   }
@@ -141,7 +127,6 @@ class UtxPoolImpl(time: Time,
 
   override def removeAll(txs: Traversable[Transaction]): Unit = {
     txs.view.map(_.id()).foreach { id =>
-      knownTransactions.invalidate(id)
       Option(transactions.remove(id)).foreach(_ => utxPoolSizeStats.decrement())
       pessimisticPortfolios.remove(id)
     }
@@ -210,8 +195,8 @@ object UtxPoolImpl {
           case (_, portfolio) => portfolio.isEmpty
         }
 
-      if (nonEmptyPessimisticPortfolios.nonEmpty) {
-        transactionPortfolios.put(txId, nonEmptyPessimisticPortfolios)
+      if (nonEmptyPessimisticPortfolios.nonEmpty &&
+        Option(transactionPortfolios.put(txId, nonEmptyPessimisticPortfolios)).isEmpty) {
         nonEmptyPessimisticPortfolios.keys.foreach { address =>
           transactions.put(address, transactions.getOrDefault(address, Set.empty) + txId)
         }
@@ -229,9 +214,10 @@ object UtxPoolImpl {
     }
 
     def remove(txId: ByteStr): Unit = {
-      transactionPortfolios.remove(txId)
-      transactions.keySet().asScala.foreach { addr =>
-        transactions.put(addr, transactions.getOrDefault(addr, Set.empty) - txId)
+      if (Option(transactionPortfolios.remove(txId)).isDefined) {
+        transactions.keySet().asScala.foreach { addr =>
+          transactions.put(addr, transactions.getOrDefault(addr, Set.empty) - txId)
+        }
       }
     }
   }

@@ -89,7 +89,6 @@ object NetworkServer extends ScorexLogging {
     val discardingHandler = new DiscardingHandler(lastBlockInfos.map(_.ready))
     val peerConnections = new ConcurrentHashMap[PeerKey, Channel](10, 0.9f, 10)
     val serverHandshakeHandler = new HandshakeHandler.Server(handshake, peerInfo, peerConnections, peerDatabase, allChannels)
-    val utxPoolSynchronizer = new UtxPoolSynchronizer(utxPool, allChannels)
 
     def peerSynchronizer: ChannelHandlerAdapter = {
       if (settings.networkSettings.enablePeersExchange) {
@@ -117,7 +116,6 @@ object NetworkServer extends ScorexLogging {
           writeErrorHandler,
           peerSynchronizer,
           historyReplier,
-          utxPoolSynchronizer,
           mesageObserver,
           fatalErrorHandler)))
         .bind(settings.networkSettings.bindAddress)
@@ -147,7 +145,6 @@ object NetworkServer extends ScorexLogging {
         writeErrorHandler,
         peerSynchronizer,
         historyReplier,
-        utxPoolSynchronizer,
         mesageObserver,
         fatalErrorHandler)))
 

@@ -62,7 +62,7 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
       aliasTxId <- sender.createAlias(firstAddress, alias, aliasFee).map(_.id)
 
       _ <- waitForHeightAraiseAndTxPresent(aliasTxId, 1)
-      _ <- assertBadRequestAndMessage(sender.createAlias(secondAddress, alias, aliasFee), "Tx with such id already present")
+      _ <- assertBadRequestAndMessage(sender.createAlias(secondAddress, alias, aliasFee), "already in the state")
       _ <- assertBalances(firstAddress, balance - aliasFee, effectiveBalance - aliasFee)
     } yield succeed
 
