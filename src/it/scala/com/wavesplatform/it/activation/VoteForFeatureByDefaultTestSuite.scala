@@ -1,7 +1,7 @@
 package com.wavesplatform.it
 package activation
 
-import com.typesafe.config.{Config, ConfigFactory}
+import com.typesafe.config.Config
 import com.wavesplatform.features.BlockchainFeatureStatus
 import com.wavesplatform.features.api.NodeFeatureStatus
 import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers}
@@ -13,14 +13,40 @@ import scala.concurrent.duration._
 class VoteForFeatureByDefaultTestSuite extends FreeSpec with Matchers with CancelAfterFailure
   with ActivationStatusRequest with ReportingTestName {
 
-  import VoteForFeatureByDefaultTestSuite._
+  private val votingInterval = 25
+  private val blocksForActivation = 18
+  private val defaultVotingFeatureNum: Short = 1
+  private val nonVotingFeatureNum: Short = 2
 
-  override protected def nodeConfigs: Seq[Config] = Configs
+  override protected def nodeConfigs: Seq[Config] = NodeConfigs.newBuilder
+    .overrideBase(_.raw(
+      s"""waves {
+         |  blockchain.custom {
+         |    functionality {
+         |      pre-activated-features = {}
+         |      feature-check-blocks-period = $votingInterval
+         |      blocks-for-feature-activation = $blocksForActivation
+         |    }
+         |    genesis {
+         |      signature: "zXBp6vpEHgtdsPjVHjSEwMeRiQTAu6DdX3qkJaCRKxgYJk26kazS2XguLYRvL9taHKxrZHNNA7X7LMVFavQzWpT"
+         |      transactions = [
+         |        {recipient: "3Hm3LGoNPmw1VTZ3eRA2pAfeQPhnaBm6YFC", amount: 250000000000000},
+         |        {recipient: "3HZxhQhpSU4yEGJdGetncnHaiMnGmUusr9s", amount: 270000000000000},
+         |        {recipient: "3HPG313x548Z9kJa5XY4LVMLnUuF77chcnG", amount: 260000000000000},
+         |        {recipient: "3HVW7RDYVkcN5xFGBNAUnGirb5KaBSnbUyB", amount: 2000000000000}
+         |      ]
+         |    }
+         |  }
+         |  waves.features.supported=[$defaultVotingFeatureNum]
+         |  miner.quorum = 3
+         |}""".stripMargin
+    ))
+    .withDefault(3)
+    .withSpecial(_.raw(s"waves.features.supported=[$nonVotingFeatureNum]"))
+    .build()
 
-  private def notSupportedNode = nodes.head
-  private def supportedNodes = nodes.tail
-
-  val defaultVotingFeatureNum: Short = 1
+  private def supportedNodes = nodes.init
+  private def notSupportedNode = nodes.last
 
   "supported blocks increased when voting starts, one node votes against, three by default" in {
     val checkHeight: Int = votingInterval * 2 / 3
@@ -52,57 +78,6 @@ class VoteForFeatureByDefaultTestSuite extends FreeSpec with Matchers with Cance
 
     val supportedNodeActivationInfo = activationStatus(supportedNodes, checkHeight, defaultVotingFeatureNum, 2.minute)
     assertActivatedStatus(supportedNodeActivationInfo, checkHeight, NodeFeatureStatus.Voted)
-  }
-
-
-  object VoteForFeatureByDefaultTestSuite {
-
-    import NodeConfigs.Default
-
-    val votingInterval = 25
-    val blocksForActivation = 18
-    val defaultVotingFeatureNum: Short = 1
-    val nonVotingFeatureNum: Short = 2
-
-    private val baseConfig = ConfigFactory.parseString(
-      s"""waves {
-         |  blockchain.custom {
-         |    functionality {
-         |      pre-activated-features = {}
-         |      feature-check-blocks-period = $votingInterval
-         |      blocks-for-feature-activation = $blocksForActivation
-         |    }
-         |    genesis {
-         |      signature: "zXBp6vpEHgtdsPjVHjSEwMeRiQTAu6DdX3qkJaCRKxgYJk26kazS2XguLYRvL9taHKxrZHNNA7X7LMVFavQzWpT"
-         |      transactions = [
-         |        {recipient: "3Hm3LGoNPmw1VTZ3eRA2pAfeQPhnaBm6YFC", amount: 250000000000000},
-         |        {recipient: "3HZxhQhpSU4yEGJdGetncnHaiMnGmUusr9s", amount: 270000000000000},
-         |        {recipient: "3HPG313x548Z9kJa5XY4LVMLnUuF77chcnG", amount: 260000000000000},
-         |        {recipient: "3HVW7RDYVkcN5xFGBNAUnGirb5KaBSnbUyB", amount: 2000000000000}
-         |      ]
-         |    }
-         |  }
-         |  miner.quorum = 3
-         |}""".stripMargin
-    )
-
-    private val supportedNodes = ConfigFactory
-      .parseString(s"waves.features.supported=[$defaultVotingFeatureNum]")
-      .withFallback(baseConfig)
-
-    private val nonSupportedNodes = ConfigFactory
-      .parseString(s"waves.features.supported=[$nonVotingFeatureNum]")
-      .withFallback(baseConfig)
-
-    val Configs: Seq[Config] = Seq(
-      nonSupportedNodes.withFallback(Default(3)),
-      supportedNodes.withFallback(Default(1)),
-      supportedNodes.withFallback(Default(2)),
-      supportedNodes.withFallback(Default.head)
-    )
-
-    val NodesCount: Int = Configs.length
-
   }
 
 }

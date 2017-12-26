@@ -1,7 +1,7 @@
 package com.wavesplatform.it
 package activation
 
-import com.typesafe.config.{Config, ConfigFactory}
+import com.typesafe.config.Config
 import com.wavesplatform.features.BlockchainFeatureStatus
 import com.wavesplatform.features.api.{ActivationStatusFeature, NodeFeatureStatus}
 import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers}
@@ -9,14 +9,34 @@ import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers}
 import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.util.Random
 
 class NotActivateFeatureTestSuite extends FreeSpec with Matchers with CancelAfterFailure
   with ActivationStatusRequest with ReportingTestName {
 
-  import NotActivateFeatureTestSuite._
+  private val votingInterval = 14
+  private val blocksForActivation = 14
+  private val votingFeatureNum: Short = 1
+  private val nonVotingFeatureNum: Short = 2
 
-  override protected def nodeConfigs: Seq[Config] = Configs
+  override protected def nodeConfigs: Seq[Config] = NodeConfigs.newBuilder
+    .overrideBase(_.raw(
+      s"""waves {
+         |  blockchain {
+         |    custom {
+         |      functionality {
+         |        pre-activated-features = {}
+         |        feature-check-blocks-period = $votingInterval
+         |        blocks-for-feature-activation = $blocksForActivation
+         |      }
+         |    }
+         |  }
+         |  features.supported=[$nonVotingFeatureNum]
+         |  miner.quorum = 3
+         |}""".stripMargin
+    ))
+    .withDefault(4)
+    .build()
+
   private var activationStatusInfoBefore = Option.empty[ActivationStatusFeature]
   private var activationStatusInfoAfter = Option.empty[ActivationStatusFeature]
 
@@ -36,36 +56,6 @@ class NotActivateFeatureTestSuite extends FreeSpec with Matchers with CancelAfte
 
   "feature is still in VOTING status on the next voting interval" in {
     activationStatusInfoAfter.foreach(assertVotingStatus(_, 0, BlockchainFeatureStatus.Undefined, NodeFeatureStatus.Implemented))
-  }
-
-  object NotActivateFeatureTestSuite {
-
-    val NodesCount: Int = 4
-
-    val votingInterval = 14
-    val blocksForActivation = 14
-    val nonVotingFeatureNum: Short = 2
-
-    private val nonSupportedNodes = ConfigFactory.parseString(
-      s"""waves {
-         |  blockchain {
-         |    custom {
-         |      functionality {
-         |        pre-activated-features = {}
-         |        feature-check-blocks-period = $votingInterval
-         |        blocks-for-feature-activation = $blocksForActivation
-         |      }
-         |    }
-         |  }
-         |  features.supported=[$nonVotingFeatureNum]
-         |  miner.quorum = ${NodesCount - 1}
-         |}""".stripMargin
-    )
-
-    val votingFeatureNum: Short = 1
-
-    val Configs: Seq[Config] = Random.shuffle(NodeConfigs.Default.init).take(NodesCount).map(nonSupportedNodes.withFallback(_))
-
   }
 
 }
