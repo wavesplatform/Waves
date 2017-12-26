@@ -32,7 +32,7 @@ class StateWriterImpl(p: StateStorage, storeTransactions: Boolean, synchronizati
 
   import StateStorage._
 
-  override val status = read { implicit l =>
+  override val status = lockfree { implicit l =>
     BehaviorSubject(Status(sp().getHeight, System.currentTimeMillis))
   }
 

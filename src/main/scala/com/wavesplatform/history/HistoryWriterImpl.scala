@@ -111,17 +111,17 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
       .reverse
   }
 
-  override def height(): Int = read { implicit lock => blockIdByHeight().size() }
+  override def height(): Int = lockfree { implicit lock => blockIdByHeight().size() }
 
   override def scoreOf(id: ByteStr): Option[BlockchainScore] = read { implicit lock =>
     heightOf(id).map(scoreByHeight().get(_))
   }
 
-  override def heightOf(blockSignature: ByteStr): Option[Int] = read { implicit lock =>
+  override def heightOf(blockSignature: ByteStr): Option[Int] = lockfree { implicit lock =>
     Option(heightByBlockId().get(blockSignature))
   }
 
-  override def blockBytes(height: Int): Option[Array[Byte]] = read { implicit lock =>
+  override def blockBytes(height: Int): Option[Array[Byte]] = lockfree { implicit lock =>
     Option(blockBodyByHeight().get(height))
   }
 
