@@ -25,7 +25,7 @@ object UtxPoolSynchronizer {
       .build[ByteStr, Object]
 
     txs.observeOn(scheduler).map { case (channel, tx) => knownTransactions.get(tx.id(), () => {
-      utx.putIfNew(tx).map(_ => allChannels.broadcast(tx, Some(channel)))
+      utx.putIfNew(tx).map(_ => allChannels.broadcastTx(tx, Some(channel)))
       dummy
     })
     }
