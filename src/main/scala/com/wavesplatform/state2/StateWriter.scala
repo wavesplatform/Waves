@@ -5,22 +5,18 @@ import java.util.concurrent.locks.ReentrantReadWriteLock
 import cats.Monoid
 import cats.implicits._
 import com.wavesplatform.metrics.Instrumented
-import com.wavesplatform.state2.StateWriter.Status
 import com.wavesplatform.state2.reader.StateReaderImpl
-import monix.reactive.Observable
-import monix.reactive.subjects.BehaviorSubject
 import scorex.transaction.PaymentTransaction
 import scorex.transaction.assets.TransferTransaction
 import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.utils.ScorexLogging
-import scorex.utils.Synchronized.ReadLock
 
 trait StateWriter {
   def applyBlockDiff(blockDiff: BlockDiff): Unit
 
   def clear(): Unit
 
-  def status: Observable[Status]
+  def lastUpdated: Long
 }
 
 object StateWriter {
@@ -32,9 +28,7 @@ class StateWriterImpl(p: StateStorage, storeTransactions: Boolean, synchronizati
 
   import StateStorage._
 
-  override val status = read { implicit l =>
-    BehaviorSubject(Status(sp().getHeight, System.currentTimeMillis))
-  }
+  def lastUpdated: Long = p.lastUpdated
 
   override def close(): Unit = p.close()
 
@@ -120,7 +114,7 @@ class StateWriterImpl(p: StateStorage, storeTransactions: Boolean, synchronizati
     measureSizeLog("lease info")(blockDiff.txsDiff.leaseState)(
       _.foreach { case (id, isActive) => sp().leaseState.put(id, isActive) })
 
-    setHeight(newHeight)
+    sp().setHeight(newHeight)
 
     val nextChunkOfBlocks = !sameQuotient(newHeight, oldHeight, 1000)
     sp().commit(nextChunkOfBlocks)
@@ -140,12 +134,7 @@ class StateWriterImpl(p: StateStorage, storeTransactions: Boolean, synchronizati
     sp().aliasToAddress.clear()
     sp().leaseState.clear()
     sp().lastBalanceSnapshotHeight.clear()
-    setHeight(0)
+    sp().setHeight(0)
     sp().commit(compact = true)
-  }
-
-  private def setHeight(newHeight: Int)(implicit lock: ReadLock) = {
-    sp().setHeight(newHeight)
-    status.onNext(Status(newHeight, System.currentTimeMillis))
   }
 }

@@ -7,7 +7,7 @@ import akka.http.scaladsl.server.Route
 import com.wavesplatform.Shutdownable
 import com.wavesplatform.network.lastObserved
 import com.wavesplatform.settings.{Constants, RestAPISettings}
-import com.wavesplatform.state2.StateWriter
+import com.wavesplatform.state2.{StateReader, StateWriter}
 import io.swagger.annotations._
 import monix.eval.Coeval
 import monix.execution.Scheduler.Implicits.global
@@ -18,11 +18,11 @@ import scorex.utils.ScorexLogging
 
 @Path("/node")
 @Api(value = "node")
-case class NodeApiRoute(settings: RestAPISettings, blockchainUpdater: BlockchainUpdater, state: StateWriter, application: Shutdownable)
+case class NodeApiRoute(settings: RestAPISettings, blockchainUpdater: BlockchainUpdater,
+                        stateReader: StateReader, stateWriter: StateWriter, application: Shutdownable)
   extends ApiRoute with CommonApiFunctions with ScorexLogging {
 
   private val lastHeight: Coeval[Option[LastBlockInfo]] = lastObserved(blockchainUpdater.lastBlockInfo)
-  private val lastState: Coeval[Option[StateWriter.Status]] = lastObserved(state.status)
 
   override lazy val route = pathPrefix("node") {
     stop ~ status ~ version
@@ -49,7 +49,7 @@ case class NodeApiRoute(settings: RestAPISettings, blockchainUpdater: Blockchain
   @ApiOperation(value = "Status", notes = "Get status of the running core", httpMethod = "GET")
   def status: Route = (get & path("status")) {
     val (bcHeight, bcTime) = lastHeight().map { case LastBlockInfo(_, h, _, _, t) => (h, t) }.getOrElse((0, 0L))
-    val (stHeight, stTime) = lastState().map { case StateWriter.Status(h, t) => (h, t) }.getOrElse((0, 0L))
+    val (stHeight, stTime) = (stateReader().height, stateWriter.lastUpdated)
     val lastUpdated = bcTime max stTime
     complete(Json.obj(
       "blockchainHeight" -> bcHeight,

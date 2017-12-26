@@ -16,7 +16,6 @@ class NodeApiTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
     val node = docker.startNode(NodeConfig)
     val f = for {
       status <- node.status
-      _ = log.trace(s"#### $status")
       _ = assert(status.blockchainHeight >= status.stateHeight)
     } yield succeed
 

@@ -17,9 +17,14 @@ class StateStorage private(file: Option[File]) extends VariablesStorage(createMV
 
   override protected val Version = 2
 
+  @volatile private[state2] var lastUpdated: Long = 0L
+
   def getHeight: Int = getInt(heightKey).getOrElse(0)
 
-  def setHeight(i: Int): Unit = putInt(heightKey, i)
+  def setHeight(i: Int): Unit = {
+    putInt(heightKey, i)
+    lastUpdated = System.currentTimeMillis
+  }
 
   val transactions: MVMap[ByteStr, (Int, Array[Byte])] = db.openMap("txs", new LogMVMapBuilder[ByteStr, (Int, Array[Byte])]
     .keyType(DataTypes.byteStr).valueType(DataTypes.tupleIntByteArray))

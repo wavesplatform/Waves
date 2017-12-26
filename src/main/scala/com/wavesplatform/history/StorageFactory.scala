@@ -22,7 +22,7 @@ object StorageFactory {
     }
 
   def apply[T](settings: WavesSettings,
-               beforeStateUpdate: (BlockchainUpdater, StateWriter) => T = (_: BlockchainUpdater, _: StateWriter) => (),
+               beforeStateUpdate: (BlockchainUpdater, StateReader, StateWriter) => T = (_: BlockchainUpdater, _: StateReader, _: StateWriter) => (),
                time: scorex.utils.Time = NTP):
     Try[(NgHistory with DebugNgHistory with AutoCloseable, FeatureProvider, AutoCloseable, StateReader, BlockchainUpdater, BlockchainDebugInfo, T)] =
   {
@@ -32,11 +32,12 @@ object StorageFactory {
       ss <- createStateStorage(historyWriter, settings.blockchainSettings.stateFile, settings.mvstorePageSplitSize)
       stateWriter = new StateWriterImpl(ss, settings.blockchainSettings.storeTransactionsInState, lock)
       bcu = BlockchainUpdaterImpl(stateWriter, historyWriter, settings, time, lock)
-      callbackResult = beforeStateUpdate(bcu, stateWriter)
+      stateReader = bcu.bestLiquidState
+      callbackResult = beforeStateUpdate(bcu, stateReader, stateWriter)
     } yield {
       bcu.syncPersistedAndInMemory()
       val history: NgHistory with DebugNgHistory with FeatureProvider = bcu.historyReader
-      (history, history, stateWriter, bcu.bestLiquidState, bcu, bcu, callbackResult)
+      (history, history, stateWriter, stateReader, bcu, bcu, callbackResult)
     }
   }
 }
