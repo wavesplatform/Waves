@@ -13,7 +13,14 @@ class WideStateGenerationSuite extends FreeSpec with IntegrationNodesInitializat
   with Matchers with TransferSending with MultipleNodesApi {
 
   override protected def createDocker: Docker = new Docker(
-    suiteConfig = ConfigFactory.parseString("akka.http.server.parsing.max-content-length = 3737439"),
+    suiteConfig = ConfigFactory.parseString(
+      """akka.http.server.parsing.max-content-length = 3737439
+        |waves.network.traffic-logger {
+        |  ignore-tx-messages = [1, 2, 23]
+        |  ignore-rx-messages = [1, 2]
+        |}
+      """.stripMargin
+    ),
     tag = getClass.getSimpleName
   )
 
@@ -38,6 +45,22 @@ class WideStateGenerationSuite extends FreeSpec with IntegrationNodesInitializat
     _ <- {
       log.debug(s"Wait a transaction ${lastTx.get.id} is in blockchain")
       traverse(nodes)(_.waitForTransaction(lastTx.get.id, retryInterval = 10.seconds))
+        .recoverWith {
+          case e =>
+            log.error(s"Can't find transaction ${lastTx.get.id} in blockchain", e)
+            val node = nodes.head
+            for {
+              utxSize <- node.utxSize
+              blockHeaders <- node.blockHeadersSeq(2, 102)
+            } yield {
+              log.debug(
+                s"""UTX size of one node: $utxSize
+                   |Block headers from 2 to 102:
+                   |${blockHeaders.mkString("\n")}
+                 """.stripMargin)
+              throw e
+            }
+        }
     }
 
     height <- traverse(nodes)(_.height).map(_.max)
