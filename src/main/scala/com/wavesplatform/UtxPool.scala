@@ -27,7 +27,7 @@ import scala.util.{Left, Right}
 
 trait UtxPool {
 
-  def putIfNew(tx: Transaction): Either[ValidationError, Transaction]
+  def putIfNew(tx: Transaction): Either[ValidationError, Boolean]
 
   def removeAll(txs: Traversable[Transaction]): Unit
 
@@ -82,7 +82,7 @@ class UtxPoolImpl(time: Time,
       }
   }
 
-  override def putIfNew(tx: Transaction): Either[ValidationError, Transaction] = {
+  override def putIfNew(tx: Transaction): Either[ValidationError, Boolean] = {
     putRequestStats.increment()
     measureSuccessful(processingTimeStats, {
       val s = stateReader()
@@ -94,8 +94,7 @@ class UtxPoolImpl(time: Time,
       } yield {
         utxPoolSizeStats.increment()
         pessimisticPortfolios.add(tx.id(), diff)
-        transactions.put(tx.id(), tx)
-        tx
+        Option(transactions.put(tx.id(), tx)).isEmpty
       }
     })
   }

@@ -39,7 +39,6 @@ object RxExtensionLoader extends ScorexLogging {
       peerDatabase.blacklistAndClose(ch, reason)
     }.delayExecution(syncTimeOut)
 
-
     def syncNext(state: State, syncWith: SyncWith = lastSyncWith().flatten): State =
       syncWith match {
         case None =>
@@ -159,13 +158,14 @@ object RxExtensionLoader extends ScorexLogging {
 
     def applyExtension(extensionBlocks: ExtensionBlocks, ch: Channel): CancelableFuture[Unit] = {
       extensionApplier(ch, extensionBlocks)
+        .asyncBoundary(scheduler)
         .onErrorHandle(err => {
           log.error("Error applying extension", err)
           Left(GenericError(err))
         })
         .map { ar => s = onExtensionApplied(s, extensionBlocks, ch, ar) }
         .logErr
-        .runAsync(scheduler)
+        .runAsync
     }
 
     def onExtensionApplied(state: State, extension: ExtensionBlocks, ch: Channel, applicationResult: Either[ValidationError, Option[BlockchainScore]]): State = {
@@ -199,7 +199,7 @@ object RxExtensionLoader extends ScorexLogging {
       )
       .map { _ => log.trace(s"Current state: $s") }
       .logErr
-      .subscribe()(scheduler)
+      .subscribe()
 
     simpleBlocks
   }
