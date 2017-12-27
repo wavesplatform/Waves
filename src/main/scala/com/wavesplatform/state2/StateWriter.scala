@@ -14,21 +14,15 @@ import scorex.utils.ScorexLogging
 trait StateWriter {
   def applyBlockDiff(blockDiff: BlockDiff): Unit
 
+  def timestamp: Long
+
   def clear(): Unit
-
-  def lastUpdated: Long
-}
-
-object StateWriter {
-  case class Status(height: Int, lastUpdated: Long)
 }
 
 class StateWriterImpl(p: StateStorage, storeTransactions: Boolean, synchronizationToken: ReentrantReadWriteLock)
   extends StateReaderImpl(p, synchronizationToken) with StateWriter with AutoCloseable with ScorexLogging with Instrumented {
 
   import StateStorage._
-
-  def lastUpdated: Long = p.lastUpdated
 
   override def close(): Unit = p.close()
 
@@ -120,6 +114,8 @@ class StateWriterImpl(p: StateStorage, storeTransactions: Boolean, synchronizati
     sp().commit(nextChunkOfBlocks)
     log.info(s"BlockDiff commit complete. Persisted height = $newHeight")
   }
+
+  override def timestamp: Long = read { implicit l => sp().getTimestamp }
 
   override def clear(): Unit = write { implicit l =>
     sp().transactions.clear()

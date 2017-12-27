@@ -25,10 +25,9 @@ trait BlockchainDebugInfo {
 
 }
 
-case class LastBlockInfo(id: BlockId, height: Int, score: BlockchainScore, ready: Boolean, lastUpdated: Long)
+case class LastBlockInfo(id: BlockId, height: Int, score: BlockchainScore, ready: Boolean)
 
 case class HashInfo(height: Int, hash: Int)
 
-case class StateDebugInfo(persisted: HashInfo,
-                          inMemory: Seq[HashInfo],
-                          microBaseHash: Option[Int])
+case class StateDebugInfo(historyHeight: Int, historyTimestamp: Long, stateTimestamp: Long,
+                          persisted: HashInfo, inMemory: Seq[HashInfo], microBaseHash: Option[Int])

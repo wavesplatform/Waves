@@ -5,24 +5,17 @@ import javax.ws.rs.Path
 
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.Shutdownable
-import com.wavesplatform.network.lastObserved
 import com.wavesplatform.settings.{Constants, RestAPISettings}
-import com.wavesplatform.state2.{StateReader, StateWriter}
 import io.swagger.annotations._
-import monix.eval.Coeval
-import monix.execution.Scheduler.Implicits.global
 import play.api.libs.json.Json
 import scorex.api.http.{ApiRoute, CommonApiFunctions}
-import scorex.transaction.{BlockchainUpdater, LastBlockInfo}
+import scorex.transaction.BlockchainDebugInfo
 import scorex.utils.ScorexLogging
 
 @Path("/node")
 @Api(value = "node")
-case class NodeApiRoute(settings: RestAPISettings, blockchainUpdater: BlockchainUpdater,
-                        stateReader: StateReader, stateWriter: StateWriter, application: Shutdownable)
+case class NodeApiRoute(settings: RestAPISettings, debugInfo: BlockchainDebugInfo, application: Shutdownable)
   extends ApiRoute with CommonApiFunctions with ScorexLogging {
-
-  private val lastHeight: Coeval[Option[LastBlockInfo]] = lastObserved(blockchainUpdater.lastBlockInfo)
 
   override lazy val route = pathPrefix("node") {
     stop ~ status ~ version
@@ -48,14 +41,14 @@ case class NodeApiRoute(settings: RestAPISettings, blockchainUpdater: Blockchain
   @Path("/status")
   @ApiOperation(value = "Status", notes = "Get status of the running core", httpMethod = "GET")
   def status: Route = (get & path("status")) {
-    val (bcHeight, bcTime) = lastHeight().map { case LastBlockInfo(_, h, _, _, t) => (h, t) }.getOrElse((0, 0L))
-    val (stHeight, stTime) = (stateReader().height, stateWriter.lastUpdated)
-    val lastUpdated = bcTime max stTime
+    val info = debugInfo.debugInfo()
+    val stateHeight = info.persisted.height + info.inMemory.map(_.height).sum
+    val timestamp = info.historyTimestamp max info.stateTimestamp
     complete(Json.obj(
-      "blockchainHeight" -> bcHeight,
-      "stateHeight" -> stHeight,
-      "updatedTimestamp" -> lastUpdated,
-      "updatedDate" -> Instant.ofEpochMilli(lastUpdated).toString
+      "blockchainHeight" -> info.historyHeight,
+      "stateHeight" -> stateHeight,
+      "updatedTimestamp" -> timestamp,
+      "updatedDate" -> Instant.ofEpochMilli(timestamp).toString
     ))
   }
 }
