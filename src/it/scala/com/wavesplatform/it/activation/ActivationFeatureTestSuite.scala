@@ -36,7 +36,7 @@ class ActivationFeatureTestSuite extends FreeSpec with Matchers with CancelAfter
          |}""".stripMargin
     ))
     .withDefault(4)
-    .build()
+    .buildNonConflicting()
 
   "supported blocks increased when voting starts" in {
     val checkHeight: Int = votingInterval * 2 / 3

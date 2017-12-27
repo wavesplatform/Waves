@@ -4,6 +4,7 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.api._
 import org.scalatest._
 
+import scala.concurrent.Await
 import scala.concurrent.Await.result
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future.traverse
@@ -15,11 +16,13 @@ class WideStateGenerationSuite extends FreeSpec with IntegrationNodesInitializat
   override protected def createDocker: Docker = new Docker(
     suiteConfig = ConfigFactory.parseString(
       """akka.http.server.parsing.max-content-length = 3737439
-        |waves.network.traffic-logger {
-        |  ignore-tx-messages = [1, 2, 23]
-        |  ignore-rx-messages = [1, 2]
-        |}
-      """.stripMargin
+        |waves {
+        |  network.traffic-logger {
+        |    ignore-tx-messages = [1, 2, 23, 25]
+        |    ignore-rx-messages = [1, 2, 25]
+        |  }
+        |  miner.minimal-block-generation-offset = 10s
+        |}""".stripMargin
     ),
     tag = getClass.getSimpleName
   )
@@ -28,7 +31,7 @@ class WideStateGenerationSuite extends FreeSpec with IntegrationNodesInitializat
     .overrideBase(_.quorum(3))
     .withDefault(3)
     .withSpecial(_.nonMiner)
-    .build(Set(1, 7, 10, 2)) // To eliminate a race of miners
+    .buildNonConflicting()
 
   private val requestsCount = 10000
 
@@ -44,23 +47,7 @@ class WideStateGenerationSuite extends FreeSpec with IntegrationNodesInitializat
 
     _ <- {
       log.debug(s"Wait a transaction ${lastTx.get.id} is in blockchain")
-      traverse(nodes)(_.waitForTransaction(lastTx.get.id, retryInterval = 10.seconds))
-        .recoverWith {
-          case e =>
-            log.error(s"Can't find transaction ${lastTx.get.id} in blockchain", e)
-            val node = nodes.head
-            for {
-              utxSize <- node.utxSize
-              blockHeaders <- node.blockHeadersSeq(2, 102)
-            } yield {
-              log.debug(
-                s"""UTX size of one node: $utxSize
-                   |Block headers from 2 to 102:
-                   |${blockHeaders.mkString("\n")}
-                 """.stripMargin)
-              throw e
-            }
-        }
+      Await.ready(traverse(nodes)(_.waitForTransaction(lastTx.get.id, retryInterval = 10.seconds)), 9.minutes)
     }
 
     height <- traverse(nodes)(_.height).map(_.max)

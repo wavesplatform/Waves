@@ -8,7 +8,7 @@ import scala.concurrent.duration._
 
 class ActivationTestSuite extends FreeSpec with Matchers with IntegrationNodesInitializationAndStopping {
 
-  override protected def nodeConfigs: Seq[Config] = NodeConfigs.Default.take(2)
+  override protected def nodeConfigs: Seq[Config] = NodeConfigs.newBuilder.withDefault(2).buildNonConflicting()
 
   "api consuming example" in {
     Await.result(nodes.head.waitForHeight(5), 5.minute)

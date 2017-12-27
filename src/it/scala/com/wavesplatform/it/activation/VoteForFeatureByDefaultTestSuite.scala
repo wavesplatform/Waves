@@ -43,7 +43,7 @@ class VoteForFeatureByDefaultTestSuite extends FreeSpec with Matchers with Cance
     ))
     .withDefault(3)
     .withSpecial(_.raw(s"waves.features.supported=[$nonVotingFeatureNum]"))
-    .build()
+    .buildNonConflicting()
 
   private def supportedNodes = nodes.init
   private def notSupportedNode = nodes.last

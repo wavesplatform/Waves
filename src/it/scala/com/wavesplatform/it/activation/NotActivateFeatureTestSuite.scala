@@ -35,7 +35,7 @@ class NotActivateFeatureTestSuite extends FreeSpec with Matchers with CancelAfte
          |}""".stripMargin
     ))
     .withDefault(4)
-    .build()
+    .buildNonConflicting()
 
   private var activationStatusInfoBefore = Option.empty[ActivationStatusFeature]
   private var activationStatusInfoAfter = Option.empty[ActivationStatusFeature]

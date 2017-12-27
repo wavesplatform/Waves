@@ -16,7 +16,7 @@ class NetworkSeparationTestSuite extends FreeSpec with Matchers with Integration
     .overrideBase(_.quorum(3))
     .withDefault(3)
     .withSpecial(_.quorum(0))
-    .build()
+    .buildNonConflicting()
 
   "node should grow up to 10 blocks together and sync" in Await.result(
     Await.ready(waitForSameBlocksAt(nodes, 5.seconds, 10), 3.minutes),
