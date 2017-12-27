@@ -9,6 +9,7 @@ import scorex.transaction._
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
+import scorex.transaction.smart.ScriptValidator
 
 object TransactionDiffer {
 
@@ -16,7 +17,14 @@ object TransactionDiffer {
 
   def apply(settings: FunctionalitySettings, prevBlockTimestamp: Option[Long], currentBlockTimestamp: Long, currentBlockHeight: Int)(s: SnapshotStateReader, tx: Transaction): Either[ValidationError, Diff] = {
     for {
-      t0 <- tx.cast[SignedTransaction].map(_.signaturesValid()).getOrElse(Right(tx))
+      t0 <- tx match {
+        case t: ProvenTransaction => s.accountScript(t.sender) match {
+          case Some(script) => ScriptValidator.verify(script, tx)
+          case None => ScriptValidator.verifyEllipticCurveSignature(t) // proven tx from non-scrpted address, treating proof as signature
+        }
+        case s: Signed => s.signaturesValid()
+        case _: GenesisTransaction => Right(tx)
+      }
       t1 <- CommonValidation.disallowTxFromFuture(settings, currentBlockTimestamp, t0)
       t2 <- CommonValidation.disallowTxFromPast(prevBlockTimestamp, t1)
       t3 <- CommonValidation.disallowBeforeActivationTime(settings, t2)

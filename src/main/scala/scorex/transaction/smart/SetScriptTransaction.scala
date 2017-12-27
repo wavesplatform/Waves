@@ -6,15 +6,14 @@ import play.api.libs.json.Json
 import scorex.account._
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash
-import scorex.transaction.Transaction
+import scorex.transaction.{ProvenTransaction, Transaction}
 import scorex.transaction.TransactionParser.TransactionType
 
 case class SetScriptTransaction private(sender: PublicKeyAccount,
                                         script: Script,
                                         fee: Long,
                                         timestamp: Long,
-                                        proof: ByteStr) extends Transaction {
-
+                                        proof: ByteStr) extends Transaction with ProvenTransaction {
 
   override val id = Coeval.evalOnce(ByteStr(FastCryptographicHash(this.toString)))
   override val transactionType = TransactionType.SetScriptTransaction
@@ -28,5 +27,6 @@ case class SetScriptTransaction private(sender: PublicKeyAccount,
     "script" -> script.text,
     "proof" -> proof.base58)
   )
+  val toSign: Coeval[Array[Byte]] = ???
   override val bytes = ???
 }

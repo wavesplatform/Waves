@@ -72,6 +72,7 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
 
   import Order._
 
+  val sender = senderPublicKey
   val signatureValid = Coeval.evalOnce(EllipticCurveImpl.verify(signature, toSign, senderPublicKey.publicKey))
 
   def isValid(atTime: Long): Validation = {

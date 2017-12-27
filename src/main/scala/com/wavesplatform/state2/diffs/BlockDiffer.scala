@@ -61,7 +61,7 @@ object BlockDiffer extends ScorexLogging with Instrumented {
       // microblocks are processed within block which is next after 40-only-block which goes on top of activated height
       _ <- Either.cond(fp.featureActivationHeight(BlockchainFeatures.NG.id).exists(s.height > _), (), ActivationError(s"MicroBlocks are not yet activated, current height=${s.height}"))
       _ <- micro.signaturesValid()
-      r <- apply(settings, s, pervBlockTimestamp)(micro.generator, None, None, timestamp, micro.transactionData, 0)
+      r <- apply(settings, s, pervBlockTimestamp)(micro.sender, None, None, timestamp, micro.transactionData, 0)
     } yield r
   }
 

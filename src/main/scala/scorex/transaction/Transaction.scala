@@ -4,6 +4,7 @@ import com.wavesplatform.state2._
 import monix.eval.{Coeval, Task}
 import monix.execution.Scheduler
 import monix.execution.schedulers.SchedulerService
+import scorex.account.PublicKeyAccount
 import scorex.serialization.{BytesSerializable, JsonSerializable}
 import scorex.transaction.TransactionParser.TransactionType
 import scorex.transaction.ValidationError.InvalidSignature
@@ -47,7 +48,11 @@ object Transaction {
 }
 
 
-trait Signed {
+trait Authorized {
+  val sender: PublicKeyAccount
+}
+
+trait Signed extends Authorized {
   protected val signatureValid: Coeval[Boolean]
 
   protected val signedDescendants: Coeval[Seq[Signed]] = Coeval.evalOnce(Seq.empty)
@@ -55,6 +60,10 @@ trait Signed {
   protected val signaturesValidMemoized: Task[Either[InvalidSignature, this.type]] = Signed.validateTask[this.type](this).memoize
 
   val signaturesValid: Coeval[Either[InvalidSignature, this.type]] = Coeval.evalOnce(Await.result(signaturesValidMemoized.runAsync(Signed.scheduler), Duration.Inf))
+}
+
+trait ProvenTransaction extends Transaction with Authorized {
+  val proof: ByteStr
 }
 
 object Signed {

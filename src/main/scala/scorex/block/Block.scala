@@ -27,7 +27,6 @@ class BlockHeader(val timestamp: Long,
                   val consensusData: NxtLikeConsensusBlockData,
                   val transactionCount: Int,
                   val featureVotes: Set[Short]) {
-
   protected val versionField: ByteBlockField = ByteBlockField("version", version)
   protected val timestampField: LongBlockField = LongBlockField("timestamp", timestamp)
   protected val referenceField: BlockIdField = BlockIdField("reference", reference.arr)
@@ -124,6 +123,8 @@ case class Block private(override val timestamp: Long,
     featureVotes) with Signed {
 
   import Block._
+
+  val sender = signerData.generator
 
   private val transactionField = TransactionsBlockField(version.toInt, transactionData)
 

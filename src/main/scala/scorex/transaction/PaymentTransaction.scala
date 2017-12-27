@@ -21,7 +21,7 @@ case class PaymentTransaction private(sender: PublicKeyAccount,
                                       amount: Long,
                                       fee: Long,
                                       timestamp: Long,
-                                      signature: ByteStr) extends Transaction {
+                                      signature: ByteStr) extends Transaction with Signed {
   override val transactionType = TransactionType.PaymentTransaction
   override val assetFee: (Option[AssetId], Long) = (None, fee)
   override val id = Coeval.evalOnce(signature)
