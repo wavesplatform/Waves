@@ -209,5 +209,5 @@ case class TransactionsApiRoute(
 }
 
 object TransactionsApiRoute {
-  val MaxTransactionsPerRequest = 200000
+  val MaxTransactionsPerRequest = 10000
 }

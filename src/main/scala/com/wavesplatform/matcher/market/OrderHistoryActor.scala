@@ -66,14 +66,19 @@ class OrderHistoryActor(val settings: MatcherSettings, val utxPool: UtxPool, val
       }
     case ev: OrderAdded =>
       orderHistory.orderAccepted(ev)
+      db.commit()
     case ev: OrderExecuted =>
       orderHistory.orderExecuted(ev)
+      db.commit()
     case ev: OrderCanceled =>
       orderHistory.orderCanceled(ev)
+      db.commit()
     case RecoverFromOrderBook(ob) =>
       recoverFromOrderBook(ob)
+      db.commit()
     case ForceCancelOrderFromHistory(id) =>
       forceCancelOrder(id)
+      db.commit()
   }
 
   def fetchOrderHistory(req: GetOrderHistory): Unit = {
