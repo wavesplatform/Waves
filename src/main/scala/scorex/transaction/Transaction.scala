@@ -11,7 +11,7 @@ import scorex.transaction.ValidationError.InvalidSignature
 import scala.concurrent.Await
 import scala.concurrent.duration.Duration
 
-trait Transaction extends BytesSerializable with JsonSerializable with Signed {
+trait Transaction extends BytesSerializable with JsonSerializable {
   val id: Coeval[ByteStr]
 
   val transactionType: TransactionType.Value
