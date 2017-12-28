@@ -8,7 +8,9 @@ import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 import scorex.account.PrivateKeyAccount
 import scorex.transaction.AssetAcc
-import scorex.transaction.assets.exchange.AssetPair
+import scorex.transaction.assets.exchange.{AssetPair, Order}
+
+import scala.collection.mutable
 
 class OrderHistorySpecification extends PropSpec
   with PropertyChecks
@@ -18,12 +20,14 @@ class OrderHistorySpecification extends PropSpec
   with BeforeAndAfterEach {
 
   val pair = AssetPair(Some(ByteStr("WCT".getBytes)), Some(ByteStr("BTC".getBytes)))
+  var db = new MVStore.Builder().fileName("db1.txt").open()
   var storage = new OrderHistoryStorage(new MVStore.Builder().open())
-  var oh = OrderHistoryImpl(storage)
+  var oh = OrderHistoryImpl(storage, matcherSettings)
 
   override protected def beforeEach(): Unit = {
-    storage = new OrderHistoryStorage(new MVStore.Builder().open())
-    oh = OrderHistoryImpl(storage)
+    db = new MVStore.Builder().open()
+    storage = new OrderHistoryStorage(db)
+    oh = OrderHistoryImpl(storage, matcherSettings)
   }
 
   property("New buy order added") {
@@ -262,6 +266,42 @@ class OrderHistorySpecification extends PropSpec
     oh.deleteOrder(ord2.assetPair, ord2.senderPublicKey.address, ord2.idStr()) shouldBe true
 
     oh.ordersByPairAndAddress(pair, ord1.senderPublicKey.address) shouldBe Set(ord1.idStr())
+  }
+
+  property("Sorting by status then timestamp") {
+    val pk = PrivateKeyAccount("private".getBytes("utf-8"))
+    val pair = AssetPair(None, Some(ByteStr("BTC".getBytes)))
+    val ord1 = buy(pair, 0.0008, 110000000, Some(pk), Some(300000L), Some(1L))
+    val ord2 = buy(pair, 0.0006, 120000000, Some(pk), Some(300000L), Some(2L))
+    val ord3 = buy(pair, 0.0005, 130000000, Some(pk), Some(300000L), Some(3L))
+    val ord4 = buy(pair, 0.0004, 130000000, Some(pk), Some(300000L), Some(3L))
+    val ord5 = sell(pair, 0.00079, 2100000000, Some(pk), Some(300000L), Some(4L))
+
+    oh.orderAccepted(OrderAdded(LimitOrder(ord1)))
+    oh.orderAccepted(OrderAdded(LimitOrder(ord2)))
+    oh.orderAccepted(OrderAdded(LimitOrder(ord3)))
+    oh.orderExecuted(OrderExecuted(LimitOrder(ord5), LimitOrder(ord1)))
+    oh.orderCanceled(OrderCanceled(LimitOrder(ord3)))
+    oh.orderAccepted(OrderAdded(LimitOrder(ord4)))
+    oh.orderAccepted(OrderAdded(LimitOrder.limitOrder(ord5.price, 1000000000, ord5)))
+
+    oh.fetchAllOrderHistory(ord1.senderPublicKey.address).map(_._1) shouldBe Seq(ord5.idStr(),  ord4.idStr(), ord2.idStr(), ord1.idStr(), ord3.idStr())
+  }
+
+  property("History with more than max limit") {
+    val pk = PrivateKeyAccount("private".getBytes("utf-8"))
+    val pair = AssetPair(None, Some(ByteStr("BTC".getBytes)))
+    val orders = mutable.Buffer.empty[Order]
+    (0 until matcherSettings.maxOrdersPerRequest).foreach { i =>
+      val o = buy(pair, 0.0008 + 0.00001*i, 100000000, Some(pk), Some(300000L), Some(100L + i))
+      orders += o
+      oh.orderAccepted(OrderAdded(LimitOrder(o)))
+    }
+
+    oh.orderCanceled(OrderCanceled(LimitOrder(orders.last)))
+    val newOrder = buy(pair, 0.001, 100000000, Some(pk), Some(300000L), Some(1L))
+    oh.orderAccepted(OrderAdded(LimitOrder(newOrder)))
+    oh.fetchAllOrderHistory(pk.address).map(_._1) shouldBe orders.reverse.tail.map(_.idStr()) :+ newOrder.idStr()
   }
 }
 

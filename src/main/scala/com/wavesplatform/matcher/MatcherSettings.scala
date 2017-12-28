@@ -20,6 +20,7 @@ case class MatcherSettings(enable: Boolean,
                            snapshotsDataDir: String,
                            snapshotsInterval: FiniteDuration,
                            orderCleanupInterval: FiniteDuration,
+                           orderHistoryCommitInterval: FiniteDuration,
                            maxOpenOrders: Int,
                            priceAssets: Seq[String],
                            predefinedPairs: Seq[AssetPair],
@@ -29,8 +30,9 @@ case class MatcherSettings(enable: Boolean,
                            blacklistedAssets: Set[String],
                            blacklistedNames: Seq[Regex],
                            txHistoryFile: Option[File],
-                           restOrderLimit: Int,
-                           blacklistedAdresses: Set[String]
+                           maxOrdersPerRequest: Int,
+                           blacklistedAdresses: Set[String],
+                           maxOrdersPerAddress: Int,
                           )
 
 
@@ -49,8 +51,10 @@ object MatcherSettings {
     val snapshotsDirectory = config.as[String](s"$configPath.snapshots-directory")
     val snapshotsInterval = config.as[FiniteDuration](s"$configPath.snapshots-interval")
     val orderCleanupInterval = config.as[FiniteDuration](s"$configPath.order-cleanup-interval")
+    val orderHistoryCommitInterval = config.as[FiniteDuration](s"$configPath.order-history-commit-interval")
     val maxOpenOrders = config.as[Int](s"$configPath.max-open-orders")
-    val restOrderLimit = config.as[Int](s"$configPath.rest-order-limit")
+    val maxOrdersPerRequest = config.as[Int](s"$configPath.rest-order-limit")
+    val maxOrdersPerAddress = config.as[Int](s"$configPath.max-orders-per-address")
     val baseAssets = config.as[List[String]](s"$configPath.price-assets")
     val basePairs: Seq[AssetPair] = config.getConfigList(s"$configPath.predefined-pairs").asScala.map { p: Config =>
       AssetPair.createAssetPair(p.as[String]("amountAsset"), p.as[String]("priceAsset")).get
@@ -68,8 +72,8 @@ object MatcherSettings {
     val blacklistedAddresses = config.as[List[String]](s"$configPath.blacklisted-addresses")
 
     MatcherSettings(enabled, account, bindAddress, port, minOrderFee, orderMatchTxFee, journalDirectory,
-      snapshotsDirectory, snapshotsInterval, orderCleanupInterval, maxOpenOrders, baseAssets, basePairs, maxTimestampDiff,
+      snapshotsDirectory, snapshotsInterval, orderCleanupInterval, orderHistoryCommitInterval, maxOpenOrders, baseAssets, basePairs, maxTimestampDiff,
       orderHistoryFile, isMigrateToNewOrderHistoryStorage, blacklistedAssets.toSet, blacklistedNames, txHistoryFile,
-      restOrderLimit, blacklistedAddresses.toSet)
+      maxOrdersPerRequest, blacklistedAddresses.toSet, maxOrdersPerAddress)
   }
 }
