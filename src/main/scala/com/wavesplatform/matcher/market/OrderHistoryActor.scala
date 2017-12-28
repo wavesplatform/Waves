@@ -28,7 +28,7 @@ class OrderHistoryActor(val settings: MatcherSettings, val utxPool: UtxPool, val
 
   val db: MVStore = utils.createMVStore(settings.orderHistoryFile)
   val storage = new OrderHistoryStorage(db)
-  val orderHistory = OrderHistoryImpl(storage)
+  val orderHistory = OrderHistoryImpl(storage, settings)
 
   override def preStart(): Unit = {
     context.system.eventStream.subscribe(self, classOf[OrderAdded])
@@ -82,17 +82,11 @@ class OrderHistoryActor(val settings: MatcherSettings, val utxPool: UtxPool, val
   }
 
   def fetchOrderHistory(req: GetOrderHistory): Unit = {
-    val res: Seq[(String, OrderInfo, Option[Order])] =
-      orderHistory.ordersByPairAndAddress(req.assetPair, req.address)
-        .map(id => (id, orderHistory.orderInfo(id), orderHistory.order(id))).toSeq.sortBy(_._3.map(_.timestamp).getOrElse(-1L))
-    sender() ! GetOrderHistoryResponse(res)
+    sender() ! GetOrderHistoryResponse(orderHistory.fetchOrderHistoryByPair(req.assetPair, req.address))
   }
 
   def fetchAllOrderHistory(req: GetAllOrderHistory): Unit = {
-    val res: Seq[(String, OrderInfo, Option[Order])] =
-      orderHistory.getAllOrdersByAddress(req.address)
-        .map(id => (id, orderHistory.orderInfo(id), orderHistory.order(id))).sortBy(_._3.map(_.timestamp).getOrElse(-1L)).take(settings.restOrderLimit)
-    sender() ! GetOrderHistoryResponse(res)
+    sender() ! GetOrderHistoryResponse(orderHistory.fetchAllOrderHistory(req.address))
   }
 
   def forceCancelOrder(id: String): Unit = {
