@@ -234,7 +234,7 @@ trait NodeApi {
       }
       .recoverWith {
         case e@(_: IOException | _: TimeoutException) =>
-          log.debug(s"Failed to execute request '$request' with error: ${e.getMessage}")
+          log.debug(s"Failed to send ${transfers.size} txs: ${e.getMessage}")
           timer.schedule(aux, 20.seconds)
       }
 
@@ -347,11 +347,11 @@ trait NodeApi {
   }
 
   def once(r: Request): Future[Response] = {
-    log.trace(s"Executing request '$r'")
+    log.debug(s"Request: ${r.getUrl}")
     client
       .executeRequest(r, new AsyncCompletionHandler[Response] {
         override def onCompleted(response: Response): Response = {
-          log.debug(s"Request: ${r.getUrl} \n Response ${response.getStatusCode}: ${response.getResponseBody}")
+          log.debug(s"Response for ${r.getUrl} is ${response.getStatusCode}")
           response
         }
       })
