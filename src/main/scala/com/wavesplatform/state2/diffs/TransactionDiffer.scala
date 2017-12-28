@@ -18,11 +18,12 @@ object TransactionDiffer {
   def apply(settings: FunctionalitySettings, prevBlockTimestamp: Option[Long], currentBlockTimestamp: Long, currentBlockHeight: Int)(s: SnapshotStateReader, tx: Transaction): Either[ValidationError, Diff] = {
     for {
       t0 <- tx match {
-        case t: ProvenTransaction => s.accountScript(t.sender) match {
-          case Some(script) => ScriptValidator.verify(script, tx)
-          case None => ScriptValidator.verifyEllipticCurveSignature(t) // proven tx from non-scrpted address, treating proof as signature
+        case at: AuthorizedTransaction => (at, s.accountScript(at.sender)) match {
+          case (stx: SignedTransaction, None) => stx.signaturesValid()
+          case (ptx: ProvenTransaction, None) => ScriptValidator.verifyAsEllipticCurveSignature(ptx)
+          case (_, Some(script)) => ScriptValidator.verify(script, tx)
+          case _ => ??? // workaround for 'match may not be exhaustive'
         }
-        case s: Signed => s.signaturesValid()
         case _: GenesisTransaction => Right(tx)
       }
       t1 <- CommonValidation.disallowTxFromFuture(settings, currentBlockTimestamp, t0)

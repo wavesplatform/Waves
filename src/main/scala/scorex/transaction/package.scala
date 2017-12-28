@@ -13,4 +13,6 @@ package object transaction {
   type DiscardedBlocks = Seq[Block]
   type DiscardedMicroBlocks = Seq[MicroBlock]
 
+  type AuthorizedTransaction = Authorized with Transaction
+  type ProvenTransaction = Proven with Transaction
 }

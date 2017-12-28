@@ -11,9 +11,6 @@ import com.wavesplatform.state2._
 import org.scalatest.{FunSuite, Matchers}
 import scorex.block.Block
 
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
-
 class BlockchainUpdaterTest extends FunSuite with Matchers with HistoryTest with ShouldVerb{
 
   private val ApprovalPeriod = 100
@@ -29,27 +26,6 @@ class BlockchainUpdaterTest extends FunSuite with Matchers with HistoryTest with
   )
 
   private def storageFactory() = StorageFactory(WavesSettings).get
-
-  ignore ("concurrent access to lastBlock doesn't throw any exception") {
-    val (h, fp, _, _, bu, _, _) = storageFactory()
-
-    bu.processBlock(genesisBlock)
-
-    (1 to 1000).foreach { _ =>
-      bu.processBlock(getNextTestBlock(h))
-    }
-
-    @volatile var failed = false
-
-    (1 to 1000).foreach { _ =>
-      Future(bu.processBlock(getNextTestBlock(h))).recover[Any] { case e => e.printStackTrace(); failed = true }
-      Future(bu.removeAfter(h.lastBlockIds(2).last)).recover[Any] { case e => e.printStackTrace(); failed = true }
-    }
-
-    Thread.sleep(1000)
-
-    failed shouldBe false
-  }
 
   def appendBlock(block: Block, blockchainUpdater: BlockchainUpdater): Unit = {
     blockchainUpdater.processBlock(block)

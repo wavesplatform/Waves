@@ -7,7 +7,7 @@ import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash
 
-trait SignedTransaction extends Transaction with Signed with Authorized {
+trait SignedTransaction extends Transaction with Signed {
   val toSign: Coeval[Array[Byte]]
 
   val signature: ByteStr

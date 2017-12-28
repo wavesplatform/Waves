@@ -62,7 +62,7 @@ trait Signed extends Authorized {
   val signaturesValid: Coeval[Either[InvalidSignature, this.type]] = Coeval.evalOnce(Await.result(signaturesValidMemoized.runAsync(Signed.scheduler), Duration.Inf))
 }
 
-trait ProvenTransaction extends Transaction with Authorized {
+trait Proven extends Authorized {
   val proof: ByteStr
 }
 

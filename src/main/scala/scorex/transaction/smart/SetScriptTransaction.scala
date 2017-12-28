@@ -19,7 +19,7 @@ case class SetScriptTransaction private(version: Byte,
                                         script: Script,
                                         fee: Long,
                                         timestamp: Long,
-                                        proof: ByteStr) extends Transaction with ProvenTransaction {
+                                        proof: ByteStr) extends Transaction with Proven {
 
   val toSign: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(version),
     sender.publicKey,
