@@ -52,27 +52,34 @@ class TransferTransactionSuite extends BaseTransactionSuite with TransferSending
   }
 
   test("invalid signed waves transfer should not be in UTX or blockchain") {
-    val invalidByTsTx = TransferTransaction.create(None,
+    def invalidByTsTx(ts: Long) = TransferTransaction.create(None,
       PrivateKeyAccount.fromSeed(sender.accountSeed).right.get,
       AddressOrAlias.fromString(sender.address).right.get,
       1,
-      System.currentTimeMillis() + 1.day.toMillis,
+      ts,
       None,
       1.waves,
       Array.emptyByteArray
     ).right.get
 
-    val invalidTxId = invalidByTsTx.id()
-    val invalidByTsSignedRequest = createSignedTransferRequest(invalidByTsTx)
+    val invalidTimestamps: Seq[Long] = Seq(
+      System.currentTimeMillis() + 1.day.toMillis,
+      1e15.toLong // NODE-416
+    )
 
-    val f = for {
-      _ <- expectErrorResponse(sender.signedTransfer(invalidByTsSignedRequest)) { x =>
-        x.error == Mistiming.Id
-      }
-      _ <- sequence(nodes.map(_.ensureTxDoesntExist(invalidTxId.base58)))
-    } yield succeed
+    for (timestamp <- invalidTimestamps) {
+      val tx = invalidByTsTx(timestamp)
+      val id = tx.id()
+      val req = createSignedTransferRequest(tx)
+      val f = for {
+        _ <- expectErrorResponse(sender.signedTransfer(req)) { x =>
+          x.error == Mistiming.Id
+        }
+        _ <- sequence(nodes.map(_.ensureTxDoesntExist(id.base58)))
+      } yield succeed
 
-    Await.result(f, waitCompletion)
+      Await.result(f, waitCompletion)
+    }
   }
 
   test("can not make transfer without having enough of fee") {
