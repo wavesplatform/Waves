@@ -17,7 +17,11 @@ class WideStateGenerationSuite extends FreeSpec with IntegrationNodesInitializat
 
   override protected def createDocker: Docker = new Docker(
     suiteConfig = ConfigFactory.parseString(
-      """akka.http.server.parsing.max-content-length = 3737439
+      """akka.http.server {
+        |  parsing.max-content-length = 3737439
+        |  request-timeout = 60s
+        |}
+        |
         |waves {
         |  network.traffic-logger {
         |    ignore-tx-messages = [1, 2, 23, 25]
@@ -39,14 +43,8 @@ class WideStateGenerationSuite extends FreeSpec with IntegrationNodesInitializat
 
   "Generate a lot of transactions and synchronise" in {
     val test = for {
-      b <- traverse(nodes)(balanceForNode).map(_.toMap)
-      lastTx <- {
-        log.debug(
-          s"""Balances:
-             |${b.map { case (account, balance) => s"$account -> $balance" }.mkString("\n")}""".stripMargin)
-
-        processRequests(generateTransfersToRandomAddresses(requestsCount / 2, b) ++ generateTransfersBetweenAccounts(requestsCount / 2, b))
-      }
+      b <- dumpBalances()
+      lastTx <- processRequests(generateTransfersToRandomAddresses(requestsCount / 2, b) ++ generateTransfersBetweenAccounts(requestsCount / 2, b))
 
       _ <- {
         log.debug(s"Wait a transaction ${lastTx.get.id} is in blockchain")
@@ -64,7 +62,10 @@ class WideStateGenerationSuite extends FreeSpec with IntegrationNodesInitializat
     val limit = GlobalTimer.instance.schedule(Future.failed(new TimeoutException("Time is out for test")), 15.minutes)
     val testWithDumps = Future.firstCompletedOf(Seq(test, limit)).recoverWith {
       case e =>
-        traverse(nodes)(dump).map { dumps =>
+        for {
+          _ <- dumpBalances()
+          dumps <- traverse(nodes)(dumpBlockChain)
+        } yield {
           log.debug(dumps.mkString("Dumps:\n", "\n\n", "\n"))
           throw e
         }
@@ -73,7 +74,14 @@ class WideStateGenerationSuite extends FreeSpec with IntegrationNodesInitializat
     Await.result(testWithDumps, 16.minutes)
   }
 
-  private def dump(node: Node): Future[String] = {
+  private def dumpBalances(): Future[Map[String, Long]] = traverse(nodes)(balanceForNode).map(_.toMap).map { r =>
+    log.debug(
+      s"""Balances:
+         |${r.map { case (account, balance) => s"$account -> $balance" }.mkString("\n")}""".stripMargin)
+    r
+  }
+
+  private def dumpBlockChain(node: Node): Future[String] = {
     val maxRequestSize = 100
 
     for {

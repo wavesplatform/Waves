@@ -229,7 +229,7 @@ trait NodeApi {
 
     def aux: Future[Response] = once(request)
       .flatMap { response =>
-        if (response.getStatusCode == 503) aux
+        if (response.getStatusCode == 503) throw new IOException(s"Unexpected status code: 503")
         else Future.successful(response)
       }
       .recoverWith {
