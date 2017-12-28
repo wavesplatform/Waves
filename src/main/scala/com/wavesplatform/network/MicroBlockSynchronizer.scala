@@ -23,7 +23,7 @@ object MicroBlockSynchronizer {
             peerDatabase: PeerDatabase,
             lastBlockIdEvents: Observable[ByteStr],
             microblockInvs: ChannelObservable[MicroBlockInv],
-            microblockResponses: ChannelObservable[MicroBlockResponse]): (Observable[(Channel, MicroblockData)], () => CacheSizes) = {
+            microblockResponses: ChannelObservable[MicroBlockResponse]): (Observable[(Channel, MicroblockData)], Coeval[CacheSizes]) = {
 
     implicit val scheduler: SchedulerService = Scheduler.singleThread("microblock-synchronizer")
 
@@ -40,7 +40,9 @@ object MicroBlockSynchronizer {
 
     def alreadyProcessed(totalSig: MicroBlockSignature): Boolean = Option(successfullyReceived.getIfPresent(totalSig)).isDefined
 
-    val cacheSizesReporter = () => CacheSizes(microBlockOwners.size(), nextInvs.size(), awaiting.size(), successfullyReceived.size())
+    val cacheSizesReporter = Coeval.eval {
+      CacheSizes(microBlockOwners.size(), nextInvs.size(), awaiting.size(), successfullyReceived.size())
+    }
 
     def requestMicroBlock(mbInv: MicroBlockInv): CancelableFuture[Unit] = {
       import mbInv.totalBlockSig

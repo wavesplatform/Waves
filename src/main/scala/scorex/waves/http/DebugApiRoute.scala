@@ -16,6 +16,7 @@ import com.wavesplatform.state2.{ByteStr, LeaseInfo, Portfolio, StateReader}
 import io.netty.channel.Channel
 import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
+import monix.eval.Coeval
 import play.api.libs.json._
 import scorex.account.Address
 import scorex.api.http._
@@ -47,9 +48,9 @@ case class DebugApiRoute(settings: RestAPISettings,
                          blockchainDebugInfo: BlockchainDebugInfo,
                          miner: Miner with MinerDebugInfo,
                          historyReplier: HistoryReplier,
-                         extLoaderStateReporter: () => RxExtensionLoader.State,
-                         mbsCacheSizesReporter: () => MicroBlockSynchronizer.CacheSizes,
-                         scoreReporter: () => RxScoreObserver.Stats,
+                         extLoaderStateReporter: Coeval[RxExtensionLoader.State],
+                         mbsCacheSizesReporter: Coeval[MicroBlockSynchronizer.CacheSizes],
+                         scoreReporter: Coeval[RxScoreObserver.Stats],
                          configRoot: ConfigObject
                         ) extends ApiRoute with ScorexLogging {
 
@@ -217,7 +218,7 @@ case class DebugApiRoute(settings: RestAPISettings,
       "historyReplierCacheSizes" -> Json.toJson(historyReplier.cacheSizes),
       "microBlockSynchronizerCacheSizes" -> Json.toJson(mbsCacheSizesReporter()),
       "scoreObserverStats" -> Json.toJson(scoreReporter()),
-      "minerState" -> miner.state
+      "minerState" -> Json.toJson(miner.state)
     ))
   }
 
@@ -354,4 +355,16 @@ object DebugApiRoute {
   implicit val mbsCacheSizesFormat: Format[MicroBlockSynchronizer.CacheSizes] = Json.format
   implicit val BigIntWrite: Writes[BigInt] = (bigInt: BigInt) => JsNumber(BigDecimal(bigInt))
   implicit val scoreReporterStatsWrite: Writes[RxScoreObserver.Stats] = Json.writes[RxScoreObserver.Stats]
+
+  implicit object MinerStateWrites extends Writes[MinerDebugInfo.State] {
+    import MinerDebugInfo._
+    def writes(state: MinerDebugInfo.State) = Json.toJson(
+      state match {
+        case MiningBlocks => "mining blocks"
+        case MiningMicroblocks => "mining microblocks"
+        case Disabled => "disabled"
+        case Error(err) => s"error: $err"
+      }
+    )
+  }
 }

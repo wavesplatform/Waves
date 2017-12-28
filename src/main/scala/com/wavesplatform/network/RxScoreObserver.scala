@@ -6,6 +6,7 @@ import cats._
 import cats.implicits._
 import com.google.common.cache.CacheBuilder
 import io.netty.channel._
+import monix.eval.Coeval
 import monix.execution.Scheduler
 import monix.reactive.Observable
 import scorex.transaction.History.BlockchainScore
@@ -53,7 +54,7 @@ object RxScoreObserver extends ScorexLogging {
             initalLocalScore: BigInt,
             localScores: Observable[BlockchainScore],
             remoteScores: ChannelObservable[BlockchainScore],
-            channelClosed: Observable[Channel]): (Observable[ChannelClosedAndSyncWith], () => Stats) = {
+            channelClosed: Observable[Channel]): (Observable[ChannelClosedAndSyncWith], Coeval[Stats]) = {
 
     val scheduler = Scheduler.singleThread("rx-score-observer")
 
@@ -62,7 +63,9 @@ object RxScoreObserver extends ScorexLogging {
     val scores = CacheBuilder.newBuilder()
       .expireAfterWrite(scoreTtl.toMillis, TimeUnit.MILLISECONDS)
       .build[Channel, BlockchainScore]()
-    val statsReporter = () => Stats(localScore, currentBestChannel.toString, scores.size())
+    val statsReporter = Coeval.eval {
+      Stats(localScore, currentBestChannel.toString, scores.size())
+    }
 
     def ls: Observable[Option[Channel]] = localScores
       .observeOn(scheduler)

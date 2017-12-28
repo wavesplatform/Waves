@@ -27,24 +27,22 @@ import scorex.wallet.Wallet
 import scala.collection.mutable.{Map => MMap}
 import scala.concurrent.Await
 import scala.concurrent.duration._
-import MinerDebugInfo.State
 
 trait Miner {
   def scheduleMining(): Unit
 }
 
 trait MinerDebugInfo {
-  def state: State.Value
+  def state: MinerDebugInfo.State
   def collectNextBlockGenerationTimes: List[(Address, Long)]
 }
 
 object MinerDebugInfo {
-  object State extends Enumeration {
-    val Disabled = Value("disabled")
-    val Error = Value("error")
-    val Mining_Blocks = Value("mining blocks")
-    val Mining_Micros = Value("mining microblocks")
-  }
+  sealed trait State
+  case object MiningBlocks extends State
+  case object MiningMicroblocks extends State
+  case object Disabled extends State
+  case class Error(error: String) extends State
 }
 
 class MinerImpl(
@@ -75,7 +73,7 @@ class MinerImpl(
 
   private val nextBlockGenerationTimes: MMap[Address, Long] = MMap.empty
 
-  @volatile private var debugState: State.Value = State.Disabled
+  @volatile private var debugState: MinerDebugInfo.State = MinerDebugInfo.Disabled
 
   def collectNextBlockGenerationTimes: List[(Address, Long)] = Await.result(Task.now(nextBlockGenerationTimes.toList).runAsyncLogErr, Duration.Inf)
 
@@ -171,10 +169,10 @@ class MinerImpl(
   }.flatten
 
   private def generateMicroBlockSequence(account: PrivateKeyAccount, accumulatedBlock: Block, delay: FiniteDuration): Task[Unit] = {
-    debugState = State.Mining_Micros
+    debugState = MinerDebugInfo.MiningMicroblocks
     generateOneMicroBlockTask(account, accumulatedBlock).delayExecution(delay).flatMap {
       case Left(err) => Task {
-        debugState = State.Mining_Blocks
+        debugState = MinerDebugInfo.MiningBlocks
         log.warn("Error mining MicroBlock: " + err.toString)
       }
       case Right(maybeNewTotal) => generateMicroBlockSequence(account, maybeNewTotal.getOrElse(accumulatedBlock), minerSettings.microBlockInterval)
@@ -214,7 +212,7 @@ class MinerImpl(
         }
       case Left(err) =>
         log.debug(s"Not scheduling block mining because $err")
-        debugState = State.Error
+        debugState = MinerDebugInfo.Error(err)
         Task.unit
     }
   }
@@ -224,7 +222,7 @@ class MinerImpl(
     scheduledAttempts := CompositeCancelable.fromSet(
       wallet.privateKeyAccounts.map(generateBlockTask).map(_.runAsyncLogErr).toSet)
     microBlockAttempt := SerialCancelable()
-    debugState = State.Mining_Blocks
+    debugState = MinerDebugInfo.MiningBlocks
   }
 
   private def startMicroBlockMining(account: PrivateKeyAccount, lastBlock: Block): Unit = {
@@ -233,7 +231,7 @@ class MinerImpl(
     log.trace(s"MicroBlock mining scheduled for $account")
   }
 
-  override def state: MinerDebugInfo.State.Value = debugState
+  override def state: MinerDebugInfo.State = debugState
 }
 
 object Miner {
@@ -248,7 +246,7 @@ object Miner {
 
     override def collectNextBlockGenerationTimes: List[(Address, Long)] = List.empty
 
-    override val state = MinerDebugInfo.State.Disabled
+    override val state = MinerDebugInfo.Disabled
   }
 
   def calcOffset(timeService: Time, calculatedTimestamp: Long, minimalBlockGenerationOffset: FiniteDuration): FiniteDuration = {

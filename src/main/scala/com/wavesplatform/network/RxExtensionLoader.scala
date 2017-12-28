@@ -28,7 +28,7 @@ object RxExtensionLoader extends ScorexLogging {
             signatures: Observable[(Channel, Signatures)],
             syncWithChannelClosed: Observable[ChannelClosedAndSyncWith]
            )(extensionApplier: (Channel, ExtensionBlocks) => Task[Either[ValidationError, Option[BlockchainScore]]])
-    : (Observable[(Channel, Block)], () => State) = {
+    : (Observable[(Channel, Block)], Coeval[State]) = {
 
     implicit val scheduler: SchedulerService = Scheduler.singleThread("rx-extension-loader")
 
@@ -203,7 +203,7 @@ object RxExtensionLoader extends ScorexLogging {
       .logErr
       .subscribe()(scheduler)
 
-    (simpleBlocks, () => s)
+    (simpleBlocks, Coeval.eval(s))
   }
 
   sealed trait LoaderState
