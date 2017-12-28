@@ -11,13 +11,13 @@ import scala.concurrent.duration._
 import scala.util.Random
 
 class ValidChainGenerationSuite extends FreeSpec with IntegrationNodesInitializationAndStopping
-  with TransferSending with MultipleNodesApi {
+  with TransferSending with MultipleNodesApi with CancelAfterFailure {
 
   override protected def nodeConfigs: Seq[Config] = NodeConfigs.newBuilder
     .overrideBase(_.quorum(3))
     .withDefault(3)
     .withSpecial(_.nonMiner)
-    .build()
+    .buildNonConflicting()
 
   "Generate more blocks and resynchronise after rollback" - {
     "1 of N" in test(1)
