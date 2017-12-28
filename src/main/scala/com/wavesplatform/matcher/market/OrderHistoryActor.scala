@@ -19,6 +19,7 @@ import scorex.transaction.assets.exchange.{AssetPair, Order}
 import scorex.utils.NTP
 import scorex.wallet.Wallet
 
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
@@ -33,6 +34,8 @@ class OrderHistoryActor(val settings: MatcherSettings, val utxPool: UtxPool, val
     context.system.eventStream.subscribe(self, classOf[OrderAdded])
     context.system.eventStream.subscribe(self, classOf[OrderExecuted])
     context.system.eventStream.subscribe(self, classOf[OrderCanceled])
+
+    context.system.scheduler.schedule(settings.orderHistoryCommitInterval, settings.orderHistoryCommitInterval, self, DbCommit)
   }
 
   override def postStop(): Unit = {
@@ -66,18 +69,15 @@ class OrderHistoryActor(val settings: MatcherSettings, val utxPool: UtxPool, val
       }
     case ev: OrderAdded =>
       orderHistory.orderAccepted(ev)
-      db.commit()
     case ev: OrderExecuted =>
       orderHistory.orderExecuted(ev)
-      db.commit()
     case ev: OrderCanceled =>
       orderHistory.orderCanceled(ev)
-      db.commit()
     case RecoverFromOrderBook(ob) =>
       recoverFromOrderBook(ob)
-      db.commit()
     case ForceCancelOrderFromHistory(id) =>
       forceCancelOrder(id)
+    case DbCommit =>
       db.commit()
   }
 
@@ -168,6 +168,7 @@ object OrderHistoryActor {
   case class RecoverFromOrderBook(ob: OrderBook) extends OrderHistoryRequest
   case class ForceCancelOrderFromHistory(orderId: String) extends OrderHistoryRequest
   case class AssetPairAwareResponse(assetPair: AssetPair)
+  case object DbCommit
 
   case class OrderDeleted(orderId: String) extends MatcherResponse {
     val json = Json.obj("status" -> "OrderDeleted", "orderId" -> orderId)
