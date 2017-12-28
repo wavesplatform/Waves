@@ -2,7 +2,6 @@ package com.wavesplatform.http
 
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.state2.reader.SnapshotStateReader
-import com.wavesplatform.state2.{LeaseInfo, Portfolio}
 import com.wavesplatform.{NoShrink, TestWallet}
 import monix.eval.Coeval
 import org.scalacheck.Gen
