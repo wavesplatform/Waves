@@ -4,6 +4,7 @@ import com.wavesplatform.utils.base58Length
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
+import scorex.transaction.smart.SetScriptTransaction
 
 import scala.util.{Failure, Try}
 
@@ -64,7 +65,7 @@ object TransactionParser {
         CreateAliasTransaction.parseTail(data.tail)
 
       case txType: Byte if txType == TransactionType.SetScriptTransaction.id =>
-        ???
+        SetScriptTransaction.parseTail(data.tail)
 
       case txType => Failure(new Exception(s"Invalid transaction type: $txType"))
     }

@@ -28,6 +28,7 @@ object ValidationError {
   }
 
   case class InvalidProof(p: ProvenTransaction) extends ValidationError
+  case class ScriptParseError(m: String) extends ValidationError
   case class GenericError(err: String) extends ValidationError
   object GenericError {
     def apply(ex: Throwable): GenericError = new GenericError(Throwables.getStackTraceAsString(ex))
