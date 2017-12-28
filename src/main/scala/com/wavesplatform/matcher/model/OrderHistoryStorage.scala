@@ -5,7 +5,6 @@ import java.util
 import com.wavesplatform.matcher.model.OrderHistoryStorage.AddressKey
 import com.wavesplatform.matcher.util.MatcherDataTypes
 import org.h2.mvstore.MVStore
-import scorex.transaction.assets.exchange.AssetPair
 import scorex.utils.LogMVMapBuilder
 
 class OrderHistoryStorage(db: MVStore) {
