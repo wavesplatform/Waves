@@ -44,7 +44,7 @@ case class OrderHistoryImpl(p: OrderHistoryStorage, settings: MatcherSettings) e
     Option(p.addressToOrderIds.get(address)) match {
       case Some(prev) =>
         var r = prev
-        if (prev.length >= settings.maxOrdersPerAddress) {
+        if (prev.length >= settings.maxOrdersPerRequest) {
           val (p1, p2) = prev.span(!orderStatus(_).isInstanceOf[LimitOrder.Cancelled])
           r = if (p2.isEmpty) p1 else p1 ++ p2.tail
         }
@@ -137,7 +137,7 @@ case class OrderHistoryImpl(p: OrderHistoryStorage, settings: MatcherSettings) e
   }
 
   override def getAllOrdersByAddress(address: String): Set[String] = {
-    Option(p.addressToOrderIds.get(address)).map(_.toSet).getOrElse(Set())
+    Option(p.addressToOrderIds.get(address)).map(_.takeRight(settings.maxOrdersPerRequest).toSet).getOrElse(Set())
   }
 
   override def fetchAllOrderHistory(address: String): Seq[(String, OrderInfo, Option[Order])] = {
