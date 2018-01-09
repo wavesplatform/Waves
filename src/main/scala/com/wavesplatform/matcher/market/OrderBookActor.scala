@@ -3,6 +3,7 @@ package com.wavesplatform.matcher.market
 import akka.actor.{ActorRef, Cancellable, Props, Stash}
 import akka.http.scaladsl.model.StatusCodes
 import akka.persistence._
+import com.google.common.cache.CacheBuilder
 import com.wavesplatform.UtxPool
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.api.{CancelOrderRequest, MatcherResponse}
@@ -45,6 +46,19 @@ class OrderBookActor(assetPair: AssetPair,
   private var apiSender = Option.empty[ActorRef]
   private var cancellable = Option.empty[Cancellable]
 
+  private lazy val alreadyCanceledOrders = CacheBuilder
+    .newBuilder()
+    .maximumSize(AlreadyCanceledCacheSize)
+    .build[String, java.lang.Boolean]()
+
+  private lazy val cancelInProgressOrders = CacheBuilder
+    .newBuilder()
+    .maximumSize(AlreadyCanceledCacheSize)
+    .build[String, java.lang.Boolean]()
+
+  val okCancel: java.lang.Boolean = Boolean.box(true)
+  val failedCancel: java.lang.Boolean = Boolean.box(false)
+
   private def fullCommands: Receive = readOnlyCommands orElse snapshotsCommands orElse executeCommands
 
   private def executeCommands: Receive = {
@@ -85,6 +99,9 @@ class OrderBookActor(assetPair: AssetPair,
     case ValidateCancelResult(res) =>
       cancellable.foreach(_.cancel())
       handleValidateCancelResult(res.map(x => x.orderId))
+    case cancel: CancelOrder if Option(cancelInProgressOrders.getIfPresent(cancel.orderId)).nonEmpty =>
+      log.info(s"Order($assetPair, ${cancel.orderId}) is already being canceled")
+      sender() ! OrderCancelRejected("Order is already being canceled")
     case ev =>
       log.info("Stashed: " + ev)
       stash()
@@ -102,10 +119,20 @@ class OrderBookActor(assetPair: AssetPair,
   }
 
   private def onCancelOrder(cancel: CancelOrder): Unit = {
-    orderHistory ! ValidateCancelOrder(cancel, NTP.correctedTime())
-    apiSender = Some(sender())
-    cancellable = Some(context.system.scheduler.scheduleOnce(ValidationTimeout, self, ValidationTimeoutExceeded))
-    context.become(waitingValidation)
+    Option(alreadyCanceledOrders.getIfPresent(cancel.orderId)) match {
+      case Some(`okCancel`) =>
+        log.info(s"Order($assetPair, ${cancel.orderId}) is already canceled")
+        sender() ! OrderCanceled(cancel.orderId)
+      case Some(_) =>
+        log.info(s"Order($assetPair, ${cancel.orderId}) is already not found")
+        sender() ! OrderCancelRejected("Order not found")
+      case None =>
+        orderHistory ! ValidateCancelOrder(cancel, NTP.correctedTime())
+        apiSender = Some(sender())
+        cancellable = Some(context.system.scheduler.scheduleOnce(ValidationTimeout, self, ValidationTimeoutExceeded))
+        context.become(waitingValidation)
+        cancelInProgressOrders.put(cancel.orderId, okCancel)
+    }
   }
 
   private def onForceCancelOrder(orderIdToCancel: String): Unit = {
@@ -131,13 +158,17 @@ class OrderBookActor(assetPair: AssetPair,
       case Left(err) =>
         apiSender.foreach(_ ! OrderCancelRejected(err.err))
       case Right(orderIdToCancel) =>
+        cancelInProgressOrders.invalidate(orderIdToCancel)
         OrderBook.cancelOrder(orderBook, orderIdToCancel) match {
           case Some(oc) =>
+            alreadyCanceledOrders.put(orderIdToCancel, okCancel)
             persist(oc) { _ =>
               handleCancelEvent(oc)
               apiSender.foreach(_ ! OrderCanceled(orderIdToCancel))
             }
-          case _ => apiSender.foreach(_ ! OrderCancelRejected("Order not found"))
+          case _ =>
+            alreadyCanceledOrders.put(orderIdToCancel, failedCancel)
+            apiSender.foreach(_ ! OrderCancelRejected("Order not found"))
         }
     }
 
@@ -297,6 +328,7 @@ object OrderBookActor {
 
   val MaxDepth = 50
   val ValidationTimeout: FiniteDuration = 5.seconds
+  val AlreadyCanceledCacheSize = 10000L
 
   //protocol
   sealed trait OrderBookRequest {
@@ -308,7 +340,8 @@ object OrderBookActor {
   case class DeleteOrderBookRequest(assetPair: AssetPair) extends OrderBookRequest
 
   case class CancelOrder(assetPair: AssetPair, req: CancelOrderRequest) extends OrderBookRequest {
-    def orderId: String = Base58.encode(req.orderId)
+    lazy val orderId: String = Base58.encode(req.orderId)
+    override lazy val toString: String = s"CancelOrder($assetPair, ${req.senderPublicKey}, $orderId)"
   }
 
   case class ForceCancelOrder(assetPair: AssetPair, orderId: String) extends OrderBookRequest

@@ -109,12 +109,13 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       allChannels.broadcast(LocalScoreChanged(x))
     }(scheduler)
 
-    val network = NetworkServer(settings, lastBlockInfo, history, utxStorage, peerDatabase, allChannels, establishedConnections)
+    val historyReplier = new HistoryReplier(history, settings.synchronizationSettings)
+    val network = NetworkServer(settings, lastBlockInfo, history, historyReplier, utxStorage, peerDatabase, allChannels, establishedConnections)
     val (signatures, blocks, blockchainScores, checkpoints, microblockInvs, microblockResponses, transactions) = network.messages
 
-    val syncWithChannelClosed = RxScoreObserver(settings.synchronizationSettings.scoreTTL, history.score(), lastScore, blockchainScores, network.closedChannels)
-    val microblockDatas = MicroBlockSynchronizer(settings.synchronizationSettings.microBlockSynchronizer, peerDatabase, lastBlockInfo.map(_.id), microblockInvs, microblockResponses)
-    val newBlocks = RxExtensionLoader(settings.synchronizationSettings.maxRollback, settings.synchronizationSettings.synchronizationTimeout,
+    val (syncWithChannelClosed, scoreStatsReporter) = RxScoreObserver(settings.synchronizationSettings.scoreTTL, history.score(), lastScore, blockchainScores, network.closedChannels)
+    val (microblockDatas, mbSyncCacheSizes) = MicroBlockSynchronizer(settings.synchronizationSettings.microBlockSynchronizer, peerDatabase, lastBlockInfo.map(_.id), microblockInvs, microblockResponses)
+    val (newBlocks, extLoaderState) = RxExtensionLoader(settings.synchronizationSettings.maxRollback, settings.synchronizationSettings.synchronizationTimeout,
       history, peerDatabase, knownInvalidBlocks, blocks, signatures, syncWithChannelClosed) { case ((c, b)) => processFork(c, b.blocks) }
 
     val utxSink = UtxPoolSynchronizer(utxStorage, settings.synchronizationSettings.utxSynchronizerSettings, allChannels, transactions)
@@ -140,7 +141,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         UtilsApiRoute(settings.restAPISettings),
         PeersApiRoute(settings.restAPISettings, network.connect, peerDatabase, establishedConnections),
         AddressApiRoute(settings.restAPISettings, wallet, stateReader, settings.blockchainSettings.functionalitySettings),
-        DebugApiRoute(settings.restAPISettings, wallet, stateReader, history, peerDatabase, establishedConnections, blockchainUpdater, allChannels, utxStorage, blockchainDebugInfo, miner, configRoot),
+        DebugApiRoute(settings.restAPISettings, wallet, stateReader, history, peerDatabase, establishedConnections, blockchainUpdater, allChannels,
+          utxStorage, blockchainDebugInfo, miner, historyReplier, extLoaderState, mbSyncCacheSizes, scoreStatsReporter, configRoot),
         WavesApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, time),
         AssetsApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, stateReader, time),
         ActivationApiRoute(settings.restAPISettings, settings.blockchainSettings.functionalitySettings, settings.featuresSettings, history, featureProvider),

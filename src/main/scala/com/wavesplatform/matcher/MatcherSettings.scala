@@ -26,9 +26,7 @@ case class MatcherSettings(enable: Boolean,
                            blacklistedAssets: Set[String],
                            blacklistedNames: Seq[Regex],
                            maxOrdersPerRequest: Int,
-                           blacklistedAddresses: Set[String],
-                           maxOrdersPerAddress: Int,
-                          )
+                           blacklistedAddresses: Set[String])
 
 
 object MatcherSettings {
@@ -48,7 +46,6 @@ object MatcherSettings {
     val orderHistoryCommitInterval = config.as[FiniteDuration](s"$configPath.order-history-commit-interval")
     val maxOpenOrders = config.as[Int](s"$configPath.max-open-orders")
     val maxOrdersPerRequest = config.as[Int](s"$configPath.rest-order-limit")
-    val maxOrdersPerAddress = config.as[Int](s"$configPath.max-orders-per-address")
     val baseAssets = config.as[List[String]](s"$configPath.price-assets")
     val basePairs: Seq[AssetPair] = config.getConfigList(s"$configPath.predefined-pairs").asScala.map { p: Config =>
       AssetPair.createAssetPair(p.as[String]("amountAsset"), p.as[String]("priceAsset")).get
@@ -62,6 +59,6 @@ object MatcherSettings {
 
     MatcherSettings(enabled, account, bindAddress, port, minOrderFee, orderMatchTxFee, journalDirectory,
       snapshotsDirectory, snapshotsInterval, orderCleanupInterval, orderHistoryCommitInterval, maxOpenOrders, baseAssets, basePairs, maxTimestampDiff,
-      blacklistedAssets.toSet, blacklistedNames, maxOrdersPerRequest, blacklistedAddresses.toSet, maxOrdersPerAddress)
+      blacklistedAssets.toSet, blacklistedNames, maxOrdersPerRequest, blacklistedAddresses.toSet)
   }
 }

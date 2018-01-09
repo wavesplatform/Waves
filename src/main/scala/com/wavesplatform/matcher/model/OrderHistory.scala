@@ -72,7 +72,7 @@ case class OrderHistoryImpl(db: DB, settings: MatcherSettings) extends SubStorag
       case Some(valueBytes) =>
         val prev = OrderIdsCodec.decode(valueBytes).explicitGet().value
         var r = prev
-        if (prev.length >= settings.maxOrdersPerAddress) {
+        if (prev.length >= settings.maxOrdersPerRequest) {
           val (p1, p2) = prev.span(!orderStatus(_).isInstanceOf[LimitOrder.Cancelled])
           r = if (p2.isEmpty) p1 else p1 ++ p2.tail
         }
