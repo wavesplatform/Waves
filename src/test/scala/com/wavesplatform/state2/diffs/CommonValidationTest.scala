@@ -21,11 +21,11 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
 
     forAll(preconditionsAndPayment) { case ((genesis, transfer)) =>
       assertDiffEi(Seq(TestBlock.create(Seq(genesis, transfer))), TestBlock.create(Seq(transfer))) { blockDiffEi =>
-        blockDiffEi should produce("Tx with such id already present")
+        blockDiffEi should produce("AlreadyInTheState")
       }
 
       assertDiffEi(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(transfer, transfer))) { blockDiffEi =>
-        blockDiffEi should produce("Tx with such id already present")
+        blockDiffEi should produce("AlreadyInTheState")
       }
     }
   }

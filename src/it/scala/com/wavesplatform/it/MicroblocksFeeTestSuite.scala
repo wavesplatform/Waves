@@ -78,12 +78,12 @@ class MicroblocksFeeTestSuite extends FreeSpec with Matchers with BeforeAndAfter
       }
 
       balancesOnActivation(blockOnActivation.generator) shouldBe {
-        balancesBeforeActivation(blockOnActivation.generator) + blockOnActivation.fee * 0.4
+        balancesBeforeActivation(blockOnActivation.generator) + blockOnActivation.fee * 4 / 10
       }
 
       balancesAfterActivation(blockAfterActivation.generator) shouldBe {
-        balancesOnActivation(blockAfterActivation.generator) +
-          blockOnActivation.fee * 0.6 + blockAfterActivation.fee * 0.4
+        balancesOnActivation(blockAfterActivation.generator) + blockOnActivation.fee * 6 / 10 +
+          blockAfterActivation.fee * 4 / 10
       }
     }
 

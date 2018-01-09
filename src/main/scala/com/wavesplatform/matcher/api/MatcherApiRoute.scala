@@ -26,6 +26,7 @@ import scorex.utils.NTP
 import scorex.wallet.Wallet
 
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 
@@ -39,7 +40,7 @@ case class MatcherApiRoute(wallet: Wallet,
   override lazy val route: Route =
     pathPrefix("matcher") {
       matcherPublicKey ~ orderBook ~ place ~ getAssetPairAndPublicKeyOrderHistory ~ getPublicKeyOrderHistory ~ getAllOrderHistory ~ getTradableBalance ~ getPublicKeyMatcherBalance ~ orderStatus ~
-        historyDelete ~ cancel ~ orderbooks ~ orderBookDelete ~ getTransactionsByOrder
+        historyDelete ~ cancel ~ orderbooks ~ orderBookDelete ~ getTransactionsByOrder ~ forceCancelOrder
     }
 
   def withAssetPair(a1: String, a2: String): Directive1[AssetPair] = {
@@ -219,6 +220,23 @@ case class MatcherApiRoute(wallet: Wallet,
           complete(StatusCodes.BadRequest -> Json.obj("message" -> ex.getMessage))
       }
     }
+  }
+
+  @Path("/orders/cancel/{orderId}")
+  @ApiOperation(value = "Cancel Order by ID without signature",
+    notes = "Cancel Order by ID without signature",
+    httpMethod = "POST")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(name = "orderId", value = "Order Id", required = true, dataType = "string", paramType = "path")
+  ))
+  def forceCancelOrder: Route = (path("orders" / "cancel" / Segment) & post & withAuth) { orderId =>
+    implicit val timeout = Timeout(10.seconds)
+    val resp: Future[MatcherResponse] = (orderHistory ? ForceCancelOrderFromHistory(orderId)).flatMap {
+      case Some(order: Order) => (matcher ? ForceCancelOrder(order.assetPair, orderId)).mapTo[MatcherResponse]
+      case None => Future { OrderCancelRejected("Order not found") }
+    }
+
+    complete(resp.map(r => r.code -> r.json))
   }
 
   @Path("/orders/{address}")

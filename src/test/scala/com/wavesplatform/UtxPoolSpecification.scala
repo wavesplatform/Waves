@@ -42,7 +42,7 @@ class UtxPoolSpecification extends FreeSpec
 
     val db = open()
 
-    val (history, _, state, bcu, _) = StorageFactory(db, settings).get
+    val (history, _, state, bcu, _, _) = StorageFactory(db, settings).get
 
     bcu.processBlock(Block.genesis(genesisSettings).right.get)
 

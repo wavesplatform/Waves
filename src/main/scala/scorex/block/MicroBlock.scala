@@ -54,17 +54,17 @@ object MicroBlock extends ScorexLogging {
   }
 
   def buildAndSign(generator: PrivateKeyAccount, transactionData: Seq[Transaction], prevResBlockSig: BlockId,
-                   totalResBlockSig: BlockId): Either[ValidationError, MicroBlock] = {
-    require(prevResBlockSig.arr.length == SignatureLength, "Incorrect prevResBlockSig")
-    require(totalResBlockSig.arr.length == SignatureLength, "Incorrect totalResBlockSig")
-    require(generator.publicKey.length == TransactionParser.KeyLength, "Incorrect generator.publicKey")
-
-    create(version = 3: Byte, generator, transactionData, prevResBlockSig, totalResBlockSig, ByteStr.empty).map { nonSignedBlock =>
-      val toSign = nonSignedBlock.bytes
-      val signature = EllipticCurveImpl.sign(generator, toSign())
-      nonSignedBlock.copy(signature = ByteStr(signature))
-    }
+                   totalResBlockSig: BlockId): Either[ValidationError, MicroBlock] = for {
+    _ <- Either.cond(prevResBlockSig.arr.length == SignatureLength, (), GenericError(s"Incorrect prevResBlockSig: ${prevResBlockSig.arr.length}"))
+    _ <- Either.cond(totalResBlockSig.arr.length == SignatureLength, (), GenericError(s"Incorrect totalResBlockSig: ${totalResBlockSig.arr.length}"))
+    _ <- Either.cond(generator.publicKey.length == TransactionParser.KeyLength, (), GenericError(s"Incorrect generator.publicKey: ${generator.publicKey.length}"))
+    nonSigned <- create(version = 3: Byte, generator, transactionData, prevResBlockSig, totalResBlockSig, ByteStr.empty)
+  } yield {
+    val toSign = nonSigned.bytes
+    val signature = EllipticCurveImpl.sign(generator, toSign())
+    nonSigned.copy(signature = ByteStr(signature))
   }
+
 
   def parseBytes(bytes: Array[Byte]): Try[MicroBlock] = Try {
 

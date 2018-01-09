@@ -3,17 +3,32 @@ package com.wavesplatform.state2
 import java.util.concurrent.locks.ReentrantReadWriteLock
 
 import com.wavesplatform.metrics.Instrumented
+import com.wavesplatform.state2.StateWriter.Status
 import com.wavesplatform.state2.reader.StateReaderImpl
+import monix.reactive.Observable
+import monix.reactive.subjects.BehaviorSubject
 import scorex.utils.ScorexLogging
 
 trait StateWriter {
   def applyBlockDiff(blockDiff: BlockDiff): Unit
 
   def clear(): Unit
+
+  def status: Observable[Status]
+}
+
+object StateWriter {
+
+  case class Status(height: Int, lastUpdated: Long)
+
 }
 
 class StateWriterImpl(p: StateStorage, synchronizationToken: ReentrantReadWriteLock)
   extends StateReaderImpl(p, synchronizationToken) with StateWriter with ScorexLogging with Instrumented {
+
+  override val status = read { implicit l =>
+    BehaviorSubject(Status(sp().getHeight, System.currentTimeMillis))
+  }
 
   override def applyBlockDiff(blockDiff: BlockDiff): Unit = write { implicit l =>
     val oldHeight = sp().getHeight

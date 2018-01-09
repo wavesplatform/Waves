@@ -1,7 +1,7 @@
 package com.wavesplatform.matcher.market
 
 import akka.actor.{Actor, Props}
-import akka.http.scaladsl.model.StatusCodes
+import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import com.wavesplatform.UtxPool
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.api.{BadMatcherResponse, MatcherResponse}
@@ -25,7 +25,7 @@ import scala.language.postfixOps
 class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxPool, val wallet: Wallet)
   extends Actor with OrderValidator {
 
-  val orderHistory = OrderHistoryImpl(db)
+  val orderHistory = OrderHistoryImpl(db, settings)
 
   override def preStart(): Unit = {
     context.system.eventStream.subscribe(self, classOf[OrderAdded])
@@ -65,20 +65,26 @@ class OrderHistoryActor(db: DB, val settings: MatcherSettings, val utxPool: UtxP
       orderHistory.orderCanceled(ev)
     case RecoverFromOrderBook(ob) =>
       recoverFromOrderBook(ob)
+    case ForceCancelOrderFromHistory(id) =>
+      forceCancelOrder(id)
   }
 
   def fetchOrderHistory(req: GetOrderHistory): Unit = {
-    val res: Seq[(String, OrderInfo, Option[Order])] =
-      orderHistory.ordersByPairAndAddress(req.assetPair, req.address)
-        .map(id => (id, orderHistory.orderInfo(id), orderHistory.order(id))).toSeq.sortBy(_._3.map(_.timestamp).getOrElse(-1L))
-    sender() ! GetOrderHistoryResponse(res)
+    sender() ! GetOrderHistoryResponse(orderHistory.fetchOrderHistoryByPair(req.assetPair, req.address))
   }
 
   def fetchAllOrderHistory(req: GetAllOrderHistory): Unit = {
-    val res: Seq[(String, OrderInfo, Option[Order])] =
-      orderHistory.getAllOrdersByAddress(req.address)
-        .map(id => (id, orderHistory.orderInfo(id), orderHistory.order(id))).toSeq.sortBy(_._3.map(_.timestamp).getOrElse(-1L)).take(settings.restOrderLimit)
-    sender() ! GetOrderHistoryResponse(res)
+    sender() ! GetOrderHistoryResponse(orderHistory.fetchAllOrderHistory(req.address))
+  }
+
+  def forceCancelOrder(id: String): Unit = {
+    orderHistory.order(id).map((_, orderHistory.orderInfo(id))) match {
+      case Some((o, oi)) =>
+        orderHistory.orderCanceled(OrderCanceled(LimitOrder.limitOrder(o.price, oi.remaining, o)))
+        sender() ! o
+      case None =>
+        sender() ! None
+    }
   }
 
   def getPairTradableBalance(assetPair: AssetPair, address: String): GetTradableBalanceResponse = {
@@ -155,6 +161,12 @@ object OrderHistoryActor {
 
   case class RecoverFromOrderBook(ob: OrderBook) extends OrderHistoryRequest
 
+  case class ForceCancelOrderFromHistory(orderId: String) extends OrderHistoryRequest
+
+  case class AssetPairAwareResponse(assetPair: AssetPair)
+
+  case object DbCommit
+
   case class OrderDeleted(orderId: String) extends MatcherResponse {
     val json: JsObject = Json.obj("status" -> "OrderDeleted", "orderId" -> orderId)
     val code: StatusCodes.Success = StatusCodes.OK
@@ -171,25 +183,21 @@ object OrderHistoryActor {
       "status" -> h._2.status.name,
       "assetPair" -> h._3.map(_.assetPair.json)
     )))
-    val code: StatusCodes.Success = StatusCodes.OK
+    val code: StatusCode = StatusCodes.OK
   }
 
   case class GetTradableBalance(assetPair: AssetPair, address: String, ts: Long) extends ExpirableOrderHistoryRequest
 
   case class GetTradableBalanceResponse(balances: Map[String, Long]) extends MatcherResponse {
     val json: JsObject = JsObject(balances.map { case (k, v) => (k, JsNumber(v)) })
-    val code: StatusCodes.Success = StatusCodes.OK
+    val code: StatusCode = StatusCodes.OK
   }
 
   case class GetMatcherBalance(address: String, ts: Long) extends ExpirableOrderHistoryRequest
 
   case class GetMatcherBalanceResponse(balances: Option[Map[String, Long]]) extends MatcherResponse {
-
-    //val json = Json.obj("status" -> "OrderCancelRejected", "message" -> message)
-    //val code = StatusCodes.BadRequest
-
     val json: JsObject = JsObject(balances.getOrElse(Map.empty).mapValues(JsNumber(_)))
-    val code = balances.map(_ => StatusCodes.OK).getOrElse(StatusCodes.NotFound)
+    val code: StatusCode = balances.map(_ => StatusCodes.OK).getOrElse(StatusCodes.NotFound)
   }
 
 }

@@ -25,7 +25,7 @@ class OrderValidatorSpecification extends WordSpec
   with PathMockFactory {
 
   val db = open()
-  var oh = OrderHistoryImpl(db)
+  var oh = OrderHistoryImpl(db, matcherSettings)
 
   val utxPool: UtxPool = stub[UtxPool]
 

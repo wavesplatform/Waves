@@ -13,7 +13,6 @@ import monix.execution.{CancelableFuture, Scheduler}
 import monix.reactive.Observable
 import scorex.block.Block.BlockId
 import scorex.block.MicroBlock
-import scorex.transaction.NgHistory
 
 import scala.collection.mutable.{Set => MSet}
 import scala.concurrent.duration.FiniteDuration
@@ -21,11 +20,10 @@ import scala.concurrent.duration.FiniteDuration
 object MicroBlockSynchronizer {
 
   def apply(settings: MicroblockSynchronizerSettings,
-            history: NgHistory,
-            peerDatabase: PeerDatabase)
-           (lastBlockIdEvents: Observable[ByteStr],
+            peerDatabase: PeerDatabase,
+            lastBlockIdEvents: Observable[ByteStr],
             microblockInvs: ChannelObservable[MicroBlockInv],
-            microblockResponses: ChannelObservable[MicroBlockResponse]): Observable[(Channel,MicroblockData)] = {
+            microblockResponses: ChannelObservable[MicroBlockResponse]): Observable[(Channel, MicroblockData)] = {
 
     implicit val scheduler: SchedulerService = Scheduler.singleThread("microblock-synchronizer")
 
@@ -33,6 +31,8 @@ object MicroBlockSynchronizer {
     val nextInvs = cache[MicroBlockSignature, MicroBlockInv](settings.invCacheTimeout)
     val awaiting = cache[MicroBlockSignature, MicroBlockInv](settings.invCacheTimeout)
     val successfullyReceived = cache[MicroBlockSignature, Object](settings.processedMicroBlocksCacheTimeout)
+
+    val lastBlockId = lastObserved(lastBlockIdEvents)
 
     def owners(totalResBlockSig: BlockId): Set[Channel] = Option(microBlockOwners.getIfPresent(totalResBlockSig)).getOrElse(MSet.empty).toSet
 
@@ -74,7 +74,7 @@ object MicroBlockSynchronizer {
             BlockStats.inv(mbInv, ch)
             mbInv
           })
-          history.lastBlockId()
+          lastBlockId()
             .filter(_ == prevSig && !alreadyRequested(totalSig))
             .foreach(tryDownloadNext)
       }

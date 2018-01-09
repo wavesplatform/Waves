@@ -2,7 +2,7 @@ package com.wavesplatform.discovery.network
 
 import java.util
 
-import com.wavesplatform.network.{BasicMessagesRepo, BlockForged, BlockMessageSpec, GetBlock, GetBlockSpec, GetPeers, GetPeersSpec, GetSignatures, GetSignaturesSpec, KnownPeers, LocalScoreChanged, Message, MicroBlockInv, MicroBlockInvMessageSpec, MicroBlockRequest, MicroBlockRequestMessageSpec, MicroBlockResponse, MicroBlockResponseMessageSpec, PeersSpec, RawBytes, ScoreMessageSpec, Signatures, SignaturesSpec}
+import com.wavesplatform.network.{BasicMessagesRepo, BlockForged, BlockSpec, GetBlock, GetBlockSpec, GetPeers, GetPeersSpec, GetSignatures, GetSignaturesSpec, KnownPeers, LocalScoreChanged, Message, MicroBlockInv, MicroBlockInvSpec, MicroBlockRequest, MicroBlockRequestSpec, MicroBlockResponse, MicroBlockResponseSpec, PeersSpec, RawBytes, ScoreSpec, Signatures, SignaturesSpec}
 import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel.ChannelHandlerContext
 import io.netty.handler.codec.MessageToMessageCodec

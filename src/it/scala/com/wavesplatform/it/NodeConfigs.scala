@@ -18,7 +18,7 @@ object NodeConfigs {
                      specialsConfigs: Seq[Config]) {
     def overrideBase(f: Templates.type => String): Builder = {
       val priorityConfig = ConfigFactory.parseString(f(Templates))
-      copy(baseConfigs = baseConfigs.map(priorityConfig.withFallback))
+      copy(baseConfigs = this.baseConfigs.map(priorityConfig.withFallback))
     }
 
     def withDefault(entitiesNumber: Int): Builder = copy(defaultEntities = entitiesNumber)
@@ -27,14 +27,14 @@ object NodeConfigs {
 
     def withSpecial(entitiesNumber: Int, f: Templates.type => String): Builder = {
       val newSpecialConfig = ConfigFactory.parseString(f(Templates))
-      copy(specialsConfigs = specialsConfigs ++ (1 to entitiesNumber).map(_ => newSpecialConfig))
+      copy(specialsConfigs = this.specialsConfigs ++ (1 to entitiesNumber).map(_ => newSpecialConfig))
     }
 
-    def build(shuffling: Boolean = true): Seq[Config] = {
+    def build(shuffleNodes: Boolean = true): Seq[Config] = {
       val totalEntities = defaultEntities + specialsConfigs.size
       require(totalEntities < baseConfigs.size)
 
-      val baseConfigsShuffled = if (shuffling) Random.shuffle(baseConfigs) else baseConfigs
+      val baseConfigsShuffled = if (shuffleNodes) Random.shuffle(baseConfigs) else baseConfigs
       val (defaultNodes: Seq[Config], specialNodes: Seq[Config]) = baseConfigsShuffled
         .take(totalEntities)
         .splitAt(defaultEntities)

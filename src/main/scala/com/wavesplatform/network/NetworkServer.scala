@@ -17,7 +17,6 @@ import io.netty.channel.socket.nio.{NioServerSocketChannel, NioSocketChannel}
 import io.netty.handler.codec.{LengthFieldBasedFrameDecoder, LengthFieldPrepender}
 import io.netty.util.concurrent.DefaultThreadFactory
 import monix.reactive.Observable
-import org.asynchttpclient.netty.channel.NoopHandler
 import org.influxdb.dto.Point
 import scorex.transaction._
 import scorex.utils.ScorexLogging
@@ -52,8 +51,7 @@ object NetworkServer extends ScorexLogging {
     val handshake = Handshake(Constants.ApplicationName + settings.blockchainSettings.addressSchemeCharacter, Version.VersionTuple,
       settings.networkSettings.nodeName, settings.networkSettings.nonce, settings.networkSettings.declaredAddress)
 
-    val trafficWatcher = new NoopHandler
-
+    val trafficWatcher = new TrafficWatcher
     val trafficLogger = new TrafficLogger(settings.networkSettings.trafficLogger)
     val messageCodec = new MessageCodec(peerDatabase)
 
@@ -91,7 +89,6 @@ object NetworkServer extends ScorexLogging {
     val discardingHandler = new DiscardingHandler(lastBlockInfos.map(_.ready))
     val peerConnections = new ConcurrentHashMap[PeerKey, Channel](10, 0.9f, 10)
     val serverHandshakeHandler = new HandshakeHandler.Server(handshake, peerInfo, peerConnections, peerDatabase, allChannels)
-    val utxPoolSynchronizer = new UtxPoolSynchronizer(utxPool, allChannels)
 
     def peerSynchronizer: ChannelHandlerAdapter = {
       if (settings.networkSettings.enablePeersExchange) {
@@ -119,7 +116,6 @@ object NetworkServer extends ScorexLogging {
           writeErrorHandler,
           peerSynchronizer,
           historyReplier,
-          utxPoolSynchronizer,
           mesageObserver,
           fatalErrorHandler)))
         .bind(settings.networkSettings.bindAddress)
@@ -149,7 +145,6 @@ object NetworkServer extends ScorexLogging {
         writeErrorHandler,
         peerSynchronizer,
         historyReplier,
-        utxPoolSynchronizer,
         mesageObserver,
         fatalErrorHandler)))
 

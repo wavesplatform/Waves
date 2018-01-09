@@ -21,6 +21,7 @@ import com.wavesplatform.metrics.Metrics
 import com.wavesplatform.mining.{Miner, MinerImpl}
 import com.wavesplatform.network._
 import com.wavesplatform.settings._
+import com.wavesplatform.state2.StateWriter
 import com.wavesplatform.state2.appender.{BlockAppender, CheckpointAppender, ExtensionAppender, MicroblockAppender}
 import com.wavesplatform.utils.{SystemInformationReporter, forceStopApplication}
 import io.netty.channel.Channel
@@ -54,8 +55,23 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
   private val LocalScoreBroadcastDebounce = 1.second
 
+  // Start /node API right away
+  private implicit val as: ActorSystem = actorSystem
+  private implicit val materializer: ActorMaterializer = ActorMaterializer()
+
+  private val nodeApiLauncher = (bcu: BlockchainUpdater, state: StateWriter) =>
+    Option(settings.restAPISettings.enable).collect { case true =>
+      val tags = Seq(typeOf[NodeApiRoute])
+      val routes = Seq(NodeApiRoute(settings.restAPISettings, bcu, state, () => this.shutdown()))
+      val combinedRoute: Route = CompositeHttpService(actorSystem, tags, routes, settings.restAPISettings).compositeRoute
+      val httpFuture = Http().bindAndHandle(combinedRoute, settings.restAPISettings.bindAddress, settings.restAPISettings.port)
+      serverBinding = Await.result(httpFuture, 10.seconds)
+      log.info(s"Node REST API was bound on ${settings.restAPISettings.bindAddress}:${settings.restAPISettings.port}")
+      (tags, routes)
+    }
+
   private val checkpointService = new CheckpointServiceImpl(db, settings.checkpointsSettings)
-  private val (history, featureProvider, stateReader, blockchainUpdater, blockchainDebugInfo) = StorageFactory(db, settings).get
+  private val (history, featureProvider, stateReader, blockchainUpdater, blockchainDebugInfo, nodeApi) = StorageFactory(db, settings, nodeApiLauncher).get
   private lazy val upnp = new UPnP(settings.networkSettings.uPnPSettings) // don't initialize unless enabled
   private val wallet: Wallet = Wallet(settings.walletSettings)
   private val peerDatabase = new PeerDatabaseImpl(settings.networkSettings)
@@ -94,31 +110,30 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     }(scheduler)
 
     val network = NetworkServer(settings, lastBlockInfo, history, utxStorage, peerDatabase, allChannels, establishedConnections)
-    val (signatures, blocks, blockchainScores, checkpoints, microblockInvs, microblockResponses) = network.messages
+    val (signatures, blocks, blockchainScores, checkpoints, microblockInvs, microblockResponses, transactions) = network.messages
 
     val syncWithChannelClosed = RxScoreObserver(settings.synchronizationSettings.scoreTTL, history.score(), lastScore, blockchainScores, network.closedChannels)
-    val microblockDatas = MicroBlockSynchronizer(settings.synchronizationSettings.microBlockSynchronizer, history, peerDatabase)(lastBlockInfo.map(_.id), microblockInvs, microblockResponses)
+    val microblockDatas = MicroBlockSynchronizer(settings.synchronizationSettings.microBlockSynchronizer, peerDatabase, lastBlockInfo.map(_.id), microblockInvs, microblockResponses)
     val newBlocks = RxExtensionLoader(settings.synchronizationSettings.maxRollback, settings.synchronizationSettings.synchronizationTimeout,
       history, peerDatabase, knownInvalidBlocks, blocks, signatures, syncWithChannelClosed) { case ((c, b)) => processFork(c, b.blocks) }
 
-    val microblockSink = microblockDatas.mapTask(scala.Function.tupled(processMicroBlock))
+    val utxSink = UtxPoolSynchronizer(utxStorage, settings.synchronizationSettings.utxSynchronizerSettings, allChannels, transactions)
+    val microBlockSink = microblockDatas.mapTask(scala.Function.tupled(processMicroBlock))
     val blockSink = newBlocks.mapTask(scala.Function.tupled(processBlock))
     val checkpointSink = checkpoints.mapTask { case ((s, c)) => processCheckpoint(Some(s), c) }
 
-    Observable.merge(microblockSink, blockSink, checkpointSink).subscribe()(monix.execution.Scheduler.Implicits.global)
+    Observable.merge(microBlockSink, blockSink, checkpointSink, utxSink).subscribe()(monix.execution.Scheduler.Implicits.global)
     miner.scheduleMining()
 
     for (addr <- settings.networkSettings.declaredAddress if settings.networkSettings.uPnPSettings.enable) {
       upnp.addPort(addr.getPort)
     }
 
-    implicit val as: ActorSystem = actorSystem
-    implicit val materializer: ActorMaterializer = ActorMaterializer()
-
-    if (settings.restAPISettings.enable) {
-      val apiRoutes = Seq(
+    // Start complete REST API. Node API is already running, so we need to re-bind
+    nodeApi.foreach { case (tags, routes) =>
+      val apiRoutes = routes ++ Seq(
         BlocksApiRoute(settings.restAPISettings, history, blockchainUpdater, allChannels, c => processCheckpoint(None, c)),
-        TransactionsApiRoute(settings.restAPISettings, stateReader, history, utxStorage),
+        TransactionsApiRoute(settings.restAPISettings, wallet, stateReader, history, utxStorage, allChannels, time),
         NxtConsensusApiRoute(settings.restAPISettings, stateReader, history, settings.blockchainSettings.functionalitySettings),
         WalletApiRoute(settings.restAPISettings, wallet),
         PaymentApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, time),
@@ -128,7 +143,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         DebugApiRoute(settings.restAPISettings, wallet, stateReader, history, peerDatabase, establishedConnections, blockchainUpdater, allChannels, utxStorage, blockchainDebugInfo, miner, configRoot),
         WavesApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, time),
         AssetsApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, stateReader, time),
-        NodeApiRoute(settings.restAPISettings, () => this.shutdown()),
         ActivationApiRoute(settings.restAPISettings, settings.blockchainSettings.functionalitySettings, settings.featuresSettings, history, featureProvider),
         AssetsBroadcastApiRoute(settings.restAPISettings, utxStorage, allChannels),
         LeaseApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, time),
@@ -137,7 +151,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         AliasBroadcastApiRoute(settings.restAPISettings, utxStorage, allChannels)
       )
 
-      val apiTypes = Seq(
+      val apiTypes = tags ++ Seq(
         typeOf[BlocksApiRoute],
         typeOf[TransactionsApiRoute],
         typeOf[NxtConsensusApiRoute],
@@ -149,7 +163,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         typeOf[DebugApiRoute],
         typeOf[WavesApiRoute],
         typeOf[AssetsApiRoute],
-        typeOf[NodeApiRoute],
         typeOf[ActivationApiRoute],
         typeOf[AssetsBroadcastApiRoute],
         typeOf[LeaseApiRoute],
@@ -158,8 +171,10 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         typeOf[AliasBroadcastApiRoute]
       )
       val combinedRoute: Route = CompositeHttpService(actorSystem, apiTypes, apiRoutes, settings.restAPISettings).compositeRoute
-      val httpFuture = Http().bindAndHandle(combinedRoute, settings.restAPISettings.bindAddress, settings.restAPISettings.port)
-      serverBinding = Await.result(httpFuture, 10.seconds)
+      val httpFuture = serverBinding.unbind().flatMap { _ =>
+        Http().bindAndHandle(combinedRoute, settings.restAPISettings.bindAddress, settings.restAPISettings.port)
+      }
+      serverBinding = Await.result(httpFuture, 20.seconds)
       log.info(s"REST API was bound on ${settings.restAPISettings.bindAddress}:${settings.restAPISettings.port}")
     }
 

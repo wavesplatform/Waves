@@ -8,7 +8,8 @@ case class CreateAliasRequest(@ApiModelProperty(value = "Base58 encoded sender p
                               @ApiModelProperty(value = "Alias", required = true)
                               alias: String,
                               @ApiModelProperty(required = true)
-                              fee: Long)
+                              fee: Long,
+                              timestamp: Option[Long] = None)
 
 object CreateAliasRequest {
   implicit val aliasRequestFormat: Format[CreateAliasRequest] = Json.format

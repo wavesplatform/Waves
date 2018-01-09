@@ -25,7 +25,7 @@ class LegacyFrameCodec(peerDatabase: PeerDatabase) extends ByteToMessageCodec[Ra
 
     val spec = specsByCodes(code)
     val length = in.readInt()
-    require(length <= spec.maxLength, s"${spec.messageName} length $length exceeds ${spec.maxLength}")
+    require(length <= spec.maxLength, s"${spec.messageName} message length $length exceeds ${spec.maxLength}")
 
     val dataBytes = new Array[Byte](length)
     if (length > 0) {
