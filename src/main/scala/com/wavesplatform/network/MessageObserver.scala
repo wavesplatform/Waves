@@ -4,7 +4,7 @@ import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel.{Channel, ChannelHandlerContext, ChannelInboundHandlerAdapter}
 import monix.reactive.subjects.ConcurrentSubject
 import scorex.block.Block
-import scorex.transaction.History
+import scorex.transaction.{History, Transaction}
 import scorex.transaction.History.BlockchainScore
 import scorex.utils.ScorexLogging
 
@@ -19,6 +19,7 @@ class MessageObserver extends ChannelInboundHandlerAdapter with ScorexLogging {
   private val blockchainScores = ConcurrentSubject.publish[(Channel, BlockchainScore)]
   private val microblockInvs = ConcurrentSubject.publish[(Channel, MicroBlockInv)]
   private val microblockResponses = ConcurrentSubject.publish[(Channel, MicroBlockResponse)]
+  private val transactions = ConcurrentSubject.publish[(Channel, Transaction)]
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
     case b: Block => blocks.onNext((ctx.channel(), b))
@@ -27,16 +28,17 @@ class MessageObserver extends ChannelInboundHandlerAdapter with ScorexLogging {
     case c: Checkpoint => checkpoints.onNext((ctx.channel(), c))
     case mbInv: MicroBlockInv => microblockInvs.onNext((ctx.channel(), mbInv))
     case mb: MicroBlockResponse => microblockResponses.onNext((ctx.channel(), mb))
+    case tx: Transaction => transactions.onNext((ctx.channel(), tx))
     case _ => super.channelRead(ctx, msg)
 
   }
 }
 
 object MessageObserver {
-  type Messages = (ChannelObservable[Signatures], ChannelObservable[Block], ChannelObservable[BlockchainScore], ChannelObservable[Checkpoint], ChannelObservable[MicroBlockInv], ChannelObservable[MicroBlockResponse])
+  type Messages = (ChannelObservable[Signatures], ChannelObservable[Block], ChannelObservable[BlockchainScore], ChannelObservable[Checkpoint], ChannelObservable[MicroBlockInv], ChannelObservable[MicroBlockResponse], ChannelObservable[Transaction])
 
   def apply(): (MessageObserver, Messages) = {
     val mo = new MessageObserver()
-    (mo, (mo.signatures, mo.blocks, mo.blockchainScores, mo.checkpoints, mo.microblockInvs, mo.microblockResponses))
+    (mo, (mo.signatures, mo.blocks, mo.blockchainScores, mo.checkpoints, mo.microblockInvs, mo.microblockResponses, mo.transactions))
   }
 }

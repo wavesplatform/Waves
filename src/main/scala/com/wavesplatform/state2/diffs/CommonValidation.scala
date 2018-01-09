@@ -5,7 +5,7 @@ import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.reader.SnapshotStateReader
 import com.wavesplatform.state2.{Portfolio, _}
 import scorex.account.Address
-import scorex.transaction.ValidationError.{GenericError, Mistiming}
+import scorex.transaction.ValidationError.{AlreadyInTheState, GenericError, Mistiming}
 import scorex.transaction._
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.ExchangeTransaction
@@ -57,11 +57,10 @@ object CommonValidation {
   def disallowDuplicateIds[T <: Transaction](state: SnapshotStateReader, settings: FunctionalitySettings, height: Int, tx: T): Either[ValidationError, T] = tx match {
     case ptx: PaymentTransaction if ptx.timestamp < settings.requirePaymentUniqueIdAfter => Right(tx)
     case _ =>
-      if (state.containsTransaction(tx.id())) {
-        val txHeight = state.transactionInfo(tx.id()).map(_._1)
-        Left(GenericError(s"Txs cannot be duplicated. Target height is: $height, current height is: ${state.height}, existing tx height is: $txHeight Tx with such id already present"))
+      state.transactionInfo(tx.id()) match {
+        case Some((txHeight, _)) => Left(AlreadyInTheState(tx.id(), txHeight))
+        case None => Right(tx)
       }
-      else Right(tx)
   }
 
   def disallowBeforeActivationTime[T <: Transaction](settings: FunctionalitySettings, tx: T): Either[ValidationError, T] =
@@ -81,7 +80,7 @@ object CommonValidation {
 
   def disallowTxFromFuture[T <: Transaction](settings: FunctionalitySettings, time: Long, tx: T): Either[ValidationError, T] = {
     val allowTransactionsFromFutureByTimestamp = tx.timestamp < settings.allowTransactionsFromFutureUntil
-    if (!allowTransactionsFromFutureByTimestamp && (tx.timestamp - time).millis > MaxTimeTransactionOverBlockDiff)
+    if (!allowTransactionsFromFutureByTimestamp && tx.timestamp - time > MaxTimeTransactionOverBlockDiff.toMillis)
       Left(Mistiming(s"Transaction ts ${tx.timestamp} is from far future. BlockTime: $time"))
     else Right(tx)
   }

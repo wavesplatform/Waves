@@ -1,18 +1,17 @@
 package com.wavesplatform.it.transactions
 
+import com.wavesplatform.it.TransferSending
 import com.wavesplatform.it.util._
 import org.scalatest.CancelAfterFailure
 import scorex.account.{AddressOrAlias, PrivateKeyAccount}
 import scorex.api.http.Mistiming
-import scorex.api.http.assets.SignedTransferRequest
-import scorex.crypto.encode.Base58
 import scorex.transaction.assets.TransferTransaction
 
 import scala.concurrent.Await
 import scala.concurrent.Future.{sequence, traverse}
 import scala.concurrent.duration._
 
-class TransferTransactionSuite extends BaseTransactionSuite with CancelAfterFailure {
+class TransferTransactionSuite extends BaseTransactionSuite with TransferSending with CancelAfterFailure {
 
   private val waitCompletion = 2.minutes
   private val defaultAssetQuantity = 100000
@@ -58,43 +57,34 @@ class TransferTransactionSuite extends BaseTransactionSuite with CancelAfterFail
   }
 
   test("invalid signed waves transfer should not be in UTX or blockchain") {
-    def createSignedTransferRequest(tx: TransferTransaction): SignedTransferRequest = {
-      import tx._
-      SignedTransferRequest(
-        Base58.encode(tx.sender.publicKey),
-        assetId.map(_.base58),
-        recipient.stringRepr,
-        amount,
-        fee,
-        feeAssetId.map(_.base58),
-        timestamp,
-        attachment.headOption.map(_ => Base58.encode(attachment)),
-        signature.base58
-      )
-    }
-
-    val invalidByTsTx = TransferTransaction.create(None,
-      PrivateKeyAccount(Base58.decode(sender.accountSeed).get),
+    def invalidByTsTx(ts: Long) = TransferTransaction.create(None,
+      PrivateKeyAccount.fromSeed(sender.accountSeed).right.get,
       AddressOrAlias.fromString(sender.address).right.get,
       1,
-      System.currentTimeMillis() + 1.day.toMillis,
+      ts,
       None,
       1.waves,
       Array.emptyByteArray
     ).right.get
 
-    val invalidTxId = invalidByTsTx.id()
+    val invalidTimestamps: Seq[Long] = Seq(
+      System.currentTimeMillis() + 1.day.toMillis,
+      1e15.toLong // NODE-416
+    )
 
-    val invalidByTsSignedRequest = createSignedTransferRequest(invalidByTsTx)
+    for (timestamp <- invalidTimestamps) {
+      val tx = invalidByTsTx(timestamp)
+      val id = tx.id()
+      val req = createSignedTransferRequest(tx)
+      val f = for {
+        _ <- expectErrorResponse(sender.signedTransfer(req)) { x =>
+          x.error == Mistiming.Id
+        }
+        _ <- sequence(nodes.map(_.ensureTxDoesntExist(id.base58)))
+      } yield succeed
 
-    val f = for {
-      _ <- expectErrorResponse(sender.signedTransfer(invalidByTsSignedRequest)) { x =>
-        x.error == Mistiming.Id
-      }
-      _ <- sequence(nodes.map(_.ensureTxDoesntExist(invalidTxId.base58)))
-    } yield succeed
-
-    Await.result(f, waitCompletion)
+      Await.result(f, waitCompletion)
+    }
   }
 
   test("can not make transfer without having enough of fee") {

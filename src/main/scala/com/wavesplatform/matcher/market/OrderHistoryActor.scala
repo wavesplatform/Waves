@@ -19,6 +19,7 @@ import scorex.transaction.assets.exchange.{AssetPair, Order}
 import scorex.utils.NTP
 import scorex.wallet.Wallet
 
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
@@ -27,12 +28,14 @@ class OrderHistoryActor(val settings: MatcherSettings, val utxPool: UtxPool, val
 
   val db: MVStore = utils.createMVStore(settings.orderHistoryFile)
   val storage = new OrderHistoryStorage(db)
-  val orderHistory = OrderHistoryImpl(storage)
+  val orderHistory = OrderHistoryImpl(storage, settings)
 
   override def preStart(): Unit = {
     context.system.eventStream.subscribe(self, classOf[OrderAdded])
     context.system.eventStream.subscribe(self, classOf[OrderExecuted])
     context.system.eventStream.subscribe(self, classOf[OrderCanceled])
+
+    context.system.scheduler.schedule(settings.orderHistoryCommitInterval, settings.orderHistoryCommitInterval, self, DbCommit)
   }
 
   override def postStop(): Unit = {
@@ -72,20 +75,28 @@ class OrderHistoryActor(val settings: MatcherSettings, val utxPool: UtxPool, val
       orderHistory.orderCanceled(ev)
     case RecoverFromOrderBook(ob) =>
       recoverFromOrderBook(ob)
+    case ForceCancelOrderFromHistory(id) =>
+      forceCancelOrder(id)
+    case DbCommit =>
+      db.commit()
   }
 
   def fetchOrderHistory(req: GetOrderHistory): Unit = {
-    val res: Seq[(String, OrderInfo, Option[Order])] =
-      orderHistory.ordersByPairAndAddress(req.assetPair, req.address)
-        .map(id => (id, orderHistory.orderInfo(id), orderHistory.order(id))).toSeq.sortBy(_._3.map(_.timestamp).getOrElse(-1L))
-    sender() ! GetOrderHistoryResponse(res)
+    sender() ! GetOrderHistoryResponse(orderHistory.fetchOrderHistoryByPair(req.assetPair, req.address))
   }
 
   def fetchAllOrderHistory(req: GetAllOrderHistory): Unit = {
-    val res: Seq[(String, OrderInfo, Option[Order])] =
-      orderHistory.getAllOrdersByAddress(req.address)
-        .map(id => (id, orderHistory.orderInfo(id), orderHistory.order(id))).sortBy(_._3.map(_.timestamp).getOrElse(-1L)).take(settings.restOrderLimit)
-    sender() ! GetOrderHistoryResponse(res)
+    sender() ! GetOrderHistoryResponse(orderHistory.fetchAllOrderHistory(req.address))
+  }
+
+  def forceCancelOrder(id: String): Unit = {
+    orderHistory.order(id).map((_, orderHistory.orderInfo(id))) match {
+      case Some((o, oi)) =>
+        orderHistory.orderCanceled(OrderCanceled(LimitOrder.limitOrder(o.price, oi.remaining, o)))
+        sender() ! o
+      case None =>
+        sender() ! None
+    }
   }
 
   def getPairTradableBalance(assetPair: AssetPair, address: String): GetTradableBalanceResponse = {
@@ -149,6 +160,9 @@ object OrderHistoryActor {
   case class ValidateCancelOrder(cancel: CancelOrder, ts: Long) extends ExpirableOrderHistoryRequest
   case class ValidateCancelResult(result: Either[GenericError, CancelOrder])
   case class RecoverFromOrderBook(ob: OrderBook) extends OrderHistoryRequest
+  case class ForceCancelOrderFromHistory(orderId: String) extends OrderHistoryRequest
+  case class AssetPairAwareResponse(assetPair: AssetPair)
+  case object DbCommit
 
   case class OrderDeleted(orderId: String) extends MatcherResponse {
     val json = Json.obj("status" -> "OrderDeleted", "orderId" -> orderId)

@@ -26,7 +26,7 @@ class BlockHeadersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAl
       .build()
   )
 
-  private lazy val notMiner: Node = nodes.last
+  private def notMiner: Node = nodes.last
 
   private def firstAddress = nodes(1).address
 

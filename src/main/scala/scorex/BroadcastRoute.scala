@@ -16,15 +16,11 @@ trait BroadcastRoute {
   import scala.concurrent.ExecutionContext.Implicits.global
 
   protected def doBroadcast(v: Either[ValidationError, Transaction]): Future[Either[ApiError, Transaction]] = Future {
-    (for {
-      tx <- v
-      utxResult <- utx.putIfNew(tx)
-    } yield {
-      if (utxResult) {
-        allChannels.broadcastTx(tx, None)
-      }
+    v.flatMap(utx.putIfNew)
+      .left.map(ApiError.fromValidationError)
+      .right.map { tx =>
+      allChannels.broadcastTx(tx, None)
       tx
-    }).left.map(ApiError.fromValidationError)
-
+    }
   }
 }

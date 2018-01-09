@@ -2,14 +2,17 @@ package com.wavesplatform.it
 
 import com.wavesplatform.it.TransferSending.Req
 import com.wavesplatform.it.api.NodeApi.Transaction
-import scorex.account.{Address, AddressScheme}
+import scorex.account.{Address, AddressOrAlias, AddressScheme, PrivateKeyAccount}
+import scorex.api.http.assets.SignedTransferRequest
+import scorex.crypto.encode.Base58
+import scorex.transaction.assets.TransferTransaction
 import scorex.utils.ScorexLogging
 
 import scala.concurrent.Future
 import scala.util.Random
 
 object TransferSending {
-  case class Req(source: String, targetAddress: String, amount: Long, fee: Long)
+  case class Req(senderSeed: String, targetAddress: String, amount: Long, fee: Long)
 }
 
 trait TransferSending extends ScorexLogging {
@@ -21,22 +24,21 @@ trait TransferSending extends ScorexLogging {
   }
 
   def nodes: Seq[Node]
-  private lazy val addressToNode = nodes.map(n => n.address -> n).toMap
 
   def generateTransfersBetweenAccounts(n: Int, balances: Map[String, Long]): Seq[Req] = {
     val fee = 100000
-    val addresses = nodes.map(_.address)
+    val srcDest = nodes.map { x => (x.accountSeed, PrivateKeyAccount.fromSeed(x.accountSeed).right.get) }
     val sourceAndDest = (1 to n).map { _ =>
-      val Seq(src, dest) = Random.shuffle(addresses).take(2)
-      (src, dest)
+      val Seq((srcSeed, _), (_, destPrivateKey)) = Random.shuffle(srcDest).take(2)
+      (srcSeed, destPrivateKey.address)
     }
     val requests = sourceAndDest.foldLeft(List.empty[Req]) {
-      case (rs, (src, dest)) =>
+      case (rs, (srcSeed, destAddr)) =>
         val a = Random.nextDouble()
-        val b = balances(src)
+        val b = balances(srcSeed)
         val transferAmount = (1e-8 + a * 1e-9 * b).toLong
         if (transferAmount < 0) log.warn(s"Negative amount: (1e-8 + $a * 1e-8 * $b) = $transferAmount")
-        rs :+ Req(src, dest, Math.max(transferAmount, 1L), fee)
+        rs :+ Req(srcSeed, destAddr, Math.max(transferAmount, 1L), fee)
     }
 
     requests
@@ -45,41 +47,62 @@ trait TransferSending extends ScorexLogging {
   def generateTransfersToRandomAddresses(n: Int, balances: Map[String, Long]): Seq[Req] = {
     val fee = 100000
     val seedSize = 32
-    val addresses = nodes.map(_.address)
+    val seeds = nodes.map(_.accountSeed)
 
     val sourceAndDest = (1 to n).map { _ =>
-      val src = Random.shuffle(addresses).head
-      val pk = Array.fill[Byte](seedSize)(Random.nextInt(Byte.MaxValue).toByte)
-      val dst = Address.fromPublicKey(pk).address
+      val srcSeed = Random.shuffle(seeds).head
+      val destPk = Array.fill[Byte](seedSize)(Random.nextInt(Byte.MaxValue).toByte)
+      val destAddr = Address.fromPublicKey(destPk).address
 
-      (src, dst)
+      (srcSeed, destAddr)
     }
     val requests = sourceAndDest.foldLeft(List.empty[Req]) {
-      case (rs, (src, dst)) =>
-        rs :+ Req(src, dst, fee, fee)
+      case (rs, (srcSeed, dstAddr)) =>
+        rs :+ Req(srcSeed, dstAddr, fee, fee)
     }
 
     requests
   }
 
-  def balanceForNode(n: Node): Future[(String, Long)] = n.balance(n.address).map(b => b.address -> b.balance)
-
-  def makeTransfer(r: Req): Future[Transaction] = {
-    val node = addressToNode(r.source)
-    log.trace(s"Sending request $r to ${node.settings.networkSettings.nodeName}")
-    node.transfer(r.source, r.targetAddress, r.amount, r.fee)
-  }
+  def balanceForNode(n: Node): Future[(String, Long)] = n.balance(n.address).map(b => n.accountSeed -> b.balance)
 
   /**
     * @return Last transaction
     */
   def processRequests(requests: Seq[Req]): Future[Option[Transaction]] = {
-    def aux(rest: Seq[Req], lastTx: Option[Transaction]): Future[Option[Transaction]] = {
-      if (rest.isEmpty) Future.successful(lastTx)
-      else makeTransfer(rest.head).flatMap(tx => aux(rest.tail, Some(tx)))
+    val n = requests.size
+    val start = System.currentTimeMillis() - n
+    val xs = requests.zipWithIndex.map { case (x, i) =>
+      createSignedTransferRequest(TransferTransaction
+        .create(
+          assetId = None,
+          sender = PrivateKeyAccount.fromSeed(x.senderSeed).right.get,
+          recipient = AddressOrAlias.fromString(x.targetAddress).right.get,
+          amount = x.amount,
+          timestamp = start + i,
+          feeAssetId = None,
+          feeAmount = x.fee,
+          attachment = Array.emptyByteArray
+        )
+        .right.get)
     }
 
-    aux(requests, None)
+    nodes.head.batchSignedTransfer(xs).map(_.lastOption)
+  }
+
+  protected def createSignedTransferRequest(tx: TransferTransaction): SignedTransferRequest = {
+    import tx._
+    SignedTransferRequest(
+      Base58.encode(tx.sender.publicKey),
+      assetId.map(_.base58),
+      recipient.stringRepr,
+      amount,
+      fee,
+      feeAssetId.map(_.base58),
+      timestamp,
+      attachment.headOption.map(_ => Base58.encode(attachment)),
+      signature.base58
+    )
   }
 
 }

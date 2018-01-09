@@ -55,32 +55,38 @@ object LimitOrder {
     def name: String
     def json: JsValue
     def isFinal: Boolean
+    def ordering: Int
   }
 
   case object Accepted extends OrderStatus {
     val name = "Accepted"
     def json: JsObject = Json.obj("status" -> name)
     val isFinal: Boolean = false
+    val ordering = 2
   }
   case object NotFound extends OrderStatus {
     val name = "NotFound"
     def json: JsObject = Json.obj("status" -> name)
     val isFinal: Boolean = true
+    val ordering = 5
   }
   case class PartiallyFilled(filled: Long) extends OrderStatus {
     val name = "PartiallyFilled"
     def json: JsObject = Json.obj("status" -> name, "filledAmount" -> filled)
     val isFinal: Boolean = false
+    val ordering = 1
   }
   case object Filled extends OrderStatus {
     val name = "Filled"
     def json = Json.obj("status" -> name)
     val isFinal: Boolean = true
+    val ordering = 3
   }
   case class Cancelled(filled: Long) extends OrderStatus {
     val name = "Cancelled"
     def json = Json.obj("status" -> name, "filledAmount" -> filled)
     val isFinal: Boolean = true
+    val ordering = 4
   }
 
   def apply(o: Order): LimitOrder = o.orderType match {

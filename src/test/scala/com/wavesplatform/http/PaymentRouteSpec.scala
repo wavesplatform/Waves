@@ -21,7 +21,7 @@ class PaymentRouteSpec
     with NoShrink {
 
   private val utx = stub[UtxPool]
-  (utx.putIfNew _).when(*).onCall((t: Transaction) => Right(true)).anyNumberOfTimes()
+  (utx.putIfNew _).when(*).onCall((t: Transaction) => Right(t)).anyNumberOfTimes()
   private val allChannels = stub[ChannelGroup]
 
   "accepts payments" in {

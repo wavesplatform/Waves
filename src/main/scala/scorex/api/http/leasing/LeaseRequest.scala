@@ -10,7 +10,8 @@ case class LeaseRequest(@ApiModelProperty(value = "Base58 encoded sender public 
                         @ApiModelProperty(required = true)
                         fee: Long,
                         @ApiModelProperty(value = "Recipient address", required = true)
-                        recipient: String)
+                        recipient: String,
+                        timestamp: Option[Long] = None)
 
 object LeaseRequest {
   implicit val leaseCancelRequestFormat: Format[LeaseRequest] = Json.format

@@ -50,6 +50,8 @@ class OrderBookActor(assetPair: AssetPair,
       onAddOrder(order)
     case cancel: CancelOrder =>
       onCancelOrder(cancel)
+    case ForceCancelOrder(_, orderId) =>
+      onForceCancelOrder(orderId)
     case OrderCleanup =>
       onOrderCleanup(orderBook, NTP.correctedTime())
   }
@@ -63,8 +65,8 @@ class OrderBookActor(assetPair: AssetPair,
     case SaveSnapshotFailure(metadata, reason) =>
       log.error(s"Failed to save snapshot: $metadata, $reason.")
     case DeleteOrderBookRequest(pair) =>
-      orderBook.asks.values.++(orderBook.bids.values).flatten.map(_.order.idStr)
-        .foreach(x => context.system.eventStream.publish(OrderCanceled(x())))
+      orderBook.asks.values.++(orderBook.bids.values).flatten
+        .foreach(x => context.system.eventStream.publish(Events.OrderCanceled(x)))
       deleteMessages(lastSequenceNr)
       deleteSnapshots(SnapshotSelectionCriteria.Latest)
       context.stop(self)
@@ -102,6 +104,17 @@ class OrderBookActor(assetPair: AssetPair,
     apiSender = Some(sender())
     cancellable = Some(context.system.scheduler.scheduleOnce(ValidationTimeout, self, ValidationTimeoutExceeded))
     context.become(waitingValidation)
+  }
+
+  private def onForceCancelOrder(orderIdToCancel: String): Unit = {
+    OrderBook.cancelOrder(orderBook, orderIdToCancel) match {
+      case Some(oc) =>
+        persist(oc) { _ =>
+          applyEvent(oc)
+          sender() ! OrderCanceled(orderIdToCancel)
+        }
+      case _ => sender() ! OrderCancelRejected("Order not found")
+    }
   }
 
   private def onOrderCleanup(orderBook: OrderBook, ts: Long): Unit = {
@@ -224,7 +237,7 @@ class OrderBookActor(assetPair: AssetPair,
           _ <- utx.putIfNew(tx)
         } yield tx) match {
           case Right(tx) if tx.isInstanceOf[ExchangeTransaction] =>
-            allChannels.broadcast(RawBytes(TransactionSpec.messageCode, tx.bytes()))
+            allChannels.broadcastTx(tx)
             processEvent(event)
             context.system.eventStream.publish(ExchangeTransactionCreated(tx.asInstanceOf[ExchangeTransaction]))
             if (event.submittedRemaining > 0)
@@ -292,6 +305,8 @@ object OrderBookActor {
   case class CancelOrder(assetPair: AssetPair, req: CancelOrderRequest) extends OrderBookRequest {
     def orderId: String = Base58.encode(req.orderId)
   }
+
+  case class ForceCancelOrder(assetPair: AssetPair, orderId: String) extends OrderBookRequest
 
   case object OrderCleanup
 

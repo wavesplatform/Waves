@@ -8,7 +8,8 @@ case class LeaseCancelRequest(@ApiModelProperty(value = "Base58 encoded sender p
                               @ApiModelProperty(value = "Base58 encoded lease transaction id", required = true)
                               txId: String,
                               @ApiModelProperty(required = true)
-                              fee: Long)
+                              fee: Long,
+                              timestamp: Option[Long] = None)
 
 object LeaseCancelRequest {
   implicit val leaseCancelRequestFormat: Format[LeaseCancelRequest] = Json.format

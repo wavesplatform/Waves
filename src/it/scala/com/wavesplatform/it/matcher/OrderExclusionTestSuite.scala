@@ -82,7 +82,7 @@ class OrderExclusionTestSuite extends FreeSpec with Matchers with BeforeAndAfter
 
   private def orderStatus(node: Node) = {
     val ts = System.currentTimeMillis()
-    val privateKey = PrivateKeyAccount(Base58.decode(aliceNode.accountSeed).get)
+    val privateKey = PrivateKeyAccount.fromSeed(aliceNode.accountSeed).right.get
 
     val pk = Base58.decode(node.publicKey).get
     val signature = ByteStr(EllipticCurveImpl.sign(privateKey, pk ++ Longs.toByteArray(ts)))

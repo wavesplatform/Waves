@@ -2,24 +2,25 @@ package com.wavesplatform.it
 
 import java.io.FileOutputStream
 import java.nio.file.{Files, Paths}
-import java.util.{Collections, Properties, List => JList, Map => JMap}
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.{Collections, Properties, List => JList, Map => JMap}
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.dataformat.javaprop.JavaPropsMapper
 import com.google.common.collect.ImmutableMap
-import com.spotify.docker.client.{DefaultDockerClient, DockerClient}
-import com.spotify.docker.client.messages._
 import com.spotify.docker.client.messages.EndpointConfig.EndpointIpamConfig
+import com.spotify.docker.client.messages._
+import com.spotify.docker.client.{DefaultDockerClient, DockerClient}
 import com.typesafe.config.{Config, ConfigFactory, ConfigRenderOptions}
+import com.wavesplatform.it.util.GlobalTimer.{instance => timer}
 import org.asynchttpclient.Dsl._
 import scorex.utils.ScorexLogging
 
 import scala.collection.JavaConverters._
-import scala.concurrent.{blocking, Await, Future}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
+import scala.concurrent.{Await, Future, blocking}
 import scala.util.Random
 import scala.util.control.NonFatal
 
@@ -37,6 +38,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
   import Docker._
 
   private val http = asyncHttpClient(config()
+    .setNettyTimer(timer)
     .setMaxConnections(18)
     .setMaxConnectionsPerHost(3)
     .setMaxRequestRetry(1)
@@ -99,6 +101,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
   }
 
   def startNodes(nodeConfigs: Seq[Config]): Seq[Node] = {
+    log.trace(s"Starting ${nodeConfigs.size} containers")
     val all = nodeConfigs.map(startNodeInternal)
     Await.result(
       for {
@@ -247,7 +250,6 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
       log.info("Stopping containers")
 
       nodes.asScala.foreach { node =>
-        node.close()
         client.stopContainer(node.nodeInfo.containerId, 0)
 
         saveLog(node)
