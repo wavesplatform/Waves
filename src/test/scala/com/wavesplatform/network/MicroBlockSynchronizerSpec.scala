@@ -20,7 +20,7 @@ class MicroBlockSynchronizerSpec extends FreeSpec with Matchers with Transaction
     val lastBlockIds = PublishSubject[ByteStr]
     val microInvs = PublishSubject[(Channel, MicroBlockInv)]
     val microResponses = PublishSubject[(Channel, MicroBlockResponse)]
-    val r = MicroBlockSynchronizer(ms, peers, lastBlockIds, microInvs, microResponses)
+    val (r, _) = MicroBlockSynchronizer(ms, peers, lastBlockIds, microInvs, microResponses)
     (lastBlockIds, microInvs, microResponses, r)
   }
 
