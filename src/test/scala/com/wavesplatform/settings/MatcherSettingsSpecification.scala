@@ -51,7 +51,7 @@ class MatcherSettingsSpecification extends FlatSpec with Matchers {
     settings.snapshotsInterval should be(1.day)
     settings.orderCleanupInterval should be(5.minute)
     settings.maxOpenOrders should be(1000)
-    settings.restOrderLimit should be(100)
+    settings.maxOrdersPerRequest should be(100)
     settings.priceAssets should be(Seq("WAVES", "8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS", "DHgwrRvVyqJsepd32YbBqUeDH4GJ1N984X8QoekjgH8J"))
     settings.predefinedPairs should be(Seq(
       AssetPair.createAssetPair("WAVES", "8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS").get,

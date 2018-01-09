@@ -41,6 +41,10 @@ object OrderInfo {
   }
 
   implicit val orderInfoFormat: Format[OrderInfo] = Json.format[OrderInfo]
+
+  implicit val orderStatusOrdering: Ordering[LimitOrder.OrderStatus] = (first: LimitOrder.OrderStatus, second: LimitOrder.OrderStatus) => {
+    implicitly[Ordering[Int]].compare(first.ordering, second.ordering)
+  }
 }
 
 case class OpenPortfolio(orders: Map[String, Long])
