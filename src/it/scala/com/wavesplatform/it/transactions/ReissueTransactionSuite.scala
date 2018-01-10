@@ -9,18 +9,19 @@ class ReissueTransactionSuite extends BaseTransactionSuite {
 
   private val waitCompletion = 2.minutes
   private val defaultQuantity = 100000
+  private val issueFee = 3.waves
 
   test("asset reissue changes issuer's asset balance; issuer's waves balance is decreased by fee") {
     val f = for {
-      _ <- assertBalances(firstAddress, 100.waves, 100.waves)
+      (balance, effectiveBalance) <- accountBalances(firstAddress)
 
-      issuedAssetId <- sender.issue(firstAddress, "name2", "description2", defaultQuantity, decimals = 2, reissuable = true, fee = 10.waves).map(_.id)
+      issuedAssetId <- sender.issue(firstAddress, "name2", "description2", defaultQuantity, decimals = 2, reissuable = true, fee = issueFee).map(_.id)
       _ <- waitForHeightAraiseAndTxPresent(issuedAssetId, 1)
-      _ <- assertBalances(firstAddress, 90.waves, 90.waves) zip assertAssetBalance(firstAddress, issuedAssetId, defaultQuantity)
+      _ <- assertBalances(firstAddress, balance - issueFee, effectiveBalance - issueFee) zip assertAssetBalance(firstAddress, issuedAssetId, defaultQuantity)
 
-      reissueTxId <- sender.reissue(firstAddress, issuedAssetId, defaultQuantity, reissuable = true, fee = 10.waves).map(_.id)
+      reissueTxId <- sender.reissue(firstAddress, issuedAssetId, defaultQuantity, reissuable = true, fee = issueFee).map(_.id)
       _ <- waitForHeightAraiseAndTxPresent(reissueTxId, 1)
-      _ <- assertBalances(firstAddress, 80.waves, 80.waves)
+      _ <- assertBalances(firstAddress, balance - 2 * issueFee, effectiveBalance - 2 * issueFee)
         .zip(assertAssetBalance(firstAddress, issuedAssetId, 2 * defaultQuantity))
     } yield succeed
 
@@ -28,15 +29,12 @@ class ReissueTransactionSuite extends BaseTransactionSuite {
   }
 
   test("can't reissue not reissuable asset") {
-    val issueFee = 10.waves
     val f = for {
-
-      firstAddressBalance <- accountBalance(firstAddress)
-      firstAddressEffectiveBalance <- accountEffectiveBalance(firstAddress)
+      (balance, effectiveBalance) <- accountBalances(firstAddress)
 
       issuedAssetId <- sender.issue(firstAddress, "name2", "description2", defaultQuantity, decimals = 2, reissuable = false, issueFee).map(_.id)
       _ <- waitForHeightAraiseAndTxPresent(issuedAssetId, 1)
-      _ <- assertBalances(firstAddress, firstAddressBalance - issueFee, firstAddressEffectiveBalance - issueFee)
+      _ <- assertBalances(firstAddress, balance - issueFee, effectiveBalance - issueFee)
         .zip(assertAssetBalance(firstAddress, issuedAssetId, defaultQuantity))
 
       _ <- assertBadRequestAndMessage(
@@ -44,7 +42,7 @@ class ReissueTransactionSuite extends BaseTransactionSuite {
       _ <- waitForHeightAraise(1)
 
       _ <- assertAssetBalance(firstAddress, issuedAssetId, defaultQuantity)
-        .zip(assertBalances(firstAddress, firstAddressBalance - issueFee, firstAddressEffectiveBalance - issueFee))
+        .zip(assertBalances(firstAddress, balance - issueFee, effectiveBalance - issueFee))
 
     } yield succeed
 
@@ -53,10 +51,8 @@ class ReissueTransactionSuite extends BaseTransactionSuite {
 
   test("not able to reissue if cannot pay fee - insufficient funds") {
     val f = for {
-      firstAddressBalance <- accountBalance(firstAddress)
-      firstAddressEffectiveBalance <- accountEffectiveBalance(firstAddress)
-      issueFee = 10.waves
-      reissueFee = firstAddressEffectiveBalance + 1.waves
+      (balance, effectiveBalance) <- accountBalances(firstAddress)
+      reissueFee = effectiveBalance + 1.waves
 
       issuedAssetId <- sender.issue(firstAddress, "name3", "description3", defaultQuantity, decimals = 2, reissuable = true, issueFee).map(_.id)
 
@@ -67,7 +63,7 @@ class ReissueTransactionSuite extends BaseTransactionSuite {
       _ <- waitForHeightAraise(1)
 
       _ <- assertAssetBalance(firstAddress, issuedAssetId, defaultQuantity)
-        .zip(assertBalances(firstAddress, firstAddressBalance - issueFee, firstAddressEffectiveBalance - issueFee))
+        .zip(assertBalances(firstAddress, balance - issueFee, effectiveBalance - issueFee))
     } yield succeed
 
     Await.result(f, waitCompletion)

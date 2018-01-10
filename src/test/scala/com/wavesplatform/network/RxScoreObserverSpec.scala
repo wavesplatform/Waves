@@ -16,7 +16,7 @@ class RxScoreObserverSpec extends FreeSpec with Matchers with TransactionGen wit
     val localScores = PublishSubject[BlockchainScore]
     val remoteScores = PublishSubject[(Channel, BlockchainScore)]
     val channelClosed = PublishSubject[Channel]
-    val syncWith = RxScoreObserver(1.minute, 0.seconds, 0, localScores, remoteScores, channelClosed)
+    val (syncWith, _) = RxScoreObserver(1.minute, 0.seconds, 0, localScores, remoteScores, channelClosed)
 
     (newItems(syncWith.map(_.syncWith)), localScores, remoteScores, channelClosed)
   }

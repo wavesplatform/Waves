@@ -1,14 +1,14 @@
 package com.wavesplatform.matcher.model
 
 import cats.implicits._
+import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.model.Events.{Event, OrderAdded, OrderCanceled, OrderExecuted}
 import com.wavesplatform.matcher.model.LimitOrder.{Filled, OrderStatus}
+import com.wavesplatform.matcher.model.OrderHistory.OrderHistoryOrdering
 import play.api.libs.json.Json
 import scorex.transaction.AssetAcc
 import scorex.transaction.assets.exchange.{AssetPair, Order}
 import scorex.utils.ScorexLogging
-
-import scala.collection.JavaConverters._
 
 trait OrderHistory {
   def orderAccepted(event: OrderAdded): Unit
@@ -20,36 +20,43 @@ trait OrderHistory {
 
   def openVolumes(address: String): Option[Map[String, Long]]
   def ordersByPairAndAddress(assetPair: AssetPair, address: String): Set[String]
-
-  def getAllOrdersByAddress(address: String): Stream[String]
+  def getAllOrdersByAddress(address: String): Set[String]
+  def fetchOrderHistoryByPair(assetPair: AssetPair, address: String): Seq[(String, OrderInfo, Option[Order])]
+  def fetchAllOrderHistory(address: String): Seq[(String, OrderInfo, Option[Order])]
   def deleteOrder(assetPair: AssetPair, address: String, orderId: String): Boolean
   def order(id: String): Option[Order]
   def openPortfolio(address: String): OpenPortfolio
 }
 
-case class OrderHistoryImpl(p: OrderHistoryStorage) extends OrderHistory with ScorexLogging {
-  val MaxOrdersPerAddress = 1000
-  val MaxOrdersPerRequest = 100
+object OrderHistory {
+  import OrderInfo.orderStatusOrdering
+  object OrderHistoryOrdering extends Ordering[(String, OrderInfo, Option[Order])] {
+    def orderBy(oh: (String, OrderInfo, Option[Order])): (OrderStatus, Long) = (oh._2.status, -oh._3.map(_.timestamp).getOrElse(0L))
+    override def compare(first: (String, OrderInfo, Option[Order]), second: (String, OrderInfo, Option[Order])): Int = {
+      implicitly[Ordering[(OrderStatus, Long)]].compare(orderBy(first), orderBy(second))
+    }
+  }
+}
+
+case class OrderHistoryImpl(p: OrderHistoryStorage, settings: MatcherSettings) extends OrderHistory with ScorexLogging {
 
   def savePairAddress(assetPair: AssetPair, address: String, orderId: String): Unit = {
-    val pairAddress = OrderHistoryStorage.assetPairAddressKey(assetPair, address)
-    Option(p.pairAddressToOrderIds.get(pairAddress)) match {
+    Option(p.addressToOrderIds.get(address)) match {
       case Some(prev) =>
         var r = prev
-        if (prev.length >= MaxOrdersPerAddress) {
+        if (prev.length >= settings.maxOrdersPerRequest) {
           val (p1, p2) = prev.span(!orderStatus(_).isInstanceOf[LimitOrder.Cancelled])
           r = if (p2.isEmpty) p1 else p1 ++ p2.tail
-
         }
-        p.pairAddressToOrderIds.put(pairAddress, r :+ orderId)
+        p.addressToOrderIds.put(address, r :+ orderId)
       case _ =>
-        p.pairAddressToOrderIds.put(pairAddress, Array(orderId))
+        p.addressToOrderIds.put(address, Array(orderId))
     }
   }
 
   def saveOrdeInfo(event: Event): Unit = {
     Events.createOrderInfo(event).foreach{ case(orderId, oi) =>
-      p.ordersInfo.put(orderId, orderInfo(orderId).combine(oi).jsonStr)
+      p.ordersInfo.put(orderId, orderInfo(orderId).combine(oi))
       log.debug(s"Changed OrderInfo for: $orderId -> " + orderInfo(orderId))
     }
   }
@@ -98,7 +105,7 @@ case class OrderHistoryImpl(p: OrderHistoryStorage) extends OrderHistory with Sc
   }
 
   override def orderInfo(id: String): OrderInfo =
-    Option(p.ordersInfo.get(id)).map(Json.parse).flatMap(_.validate[OrderInfo].asOpt).getOrElse(OrderInfo.empty)
+    Option(p.ordersInfo.get(id)).getOrElse(OrderInfo.empty)
 
   override def order(id: String): Option[Order] = {
     import scorex.transaction.assets.exchange.OrderJson.orderFormat
@@ -117,12 +124,31 @@ case class OrderHistoryImpl(p: OrderHistoryStorage) extends OrderHistory with Sc
   override def openVolumes(address: String): Option[Map[String, Long]] = Option(p.addressToOrderPortfolio.get(address))
 
   override def ordersByPairAndAddress(assetPair: AssetPair, address: String): Set[String] = {
-    val pairAddressKey = OrderHistoryStorage.assetPairAddressKey(assetPair, address)
-    Option(p.pairAddressToOrderIds.get(pairAddressKey)).map(_.takeRight(MaxOrdersPerRequest).toSet).getOrElse(Set())
+    Option(p.addressToOrderIds.get(address)).map(_.toSet).getOrElse(Set())
   }
 
-  override def getAllOrdersByAddress(address: String): Stream[String] = {
-    p.pairAddressToOrderIds.asScala.toStream.filter(_._1.endsWith(address)).flatMap(_._2)
+  override def fetchOrderHistoryByPair(assetPair: AssetPair, address: String): Seq[(String, OrderInfo, Option[Order])] = {
+    getAllOrdersByAddress(address)
+      .toSeq
+      .map(id => (id, orderInfo(id), order(id)))
+      .filter(_._3.exists(_.assetPair == assetPair))
+      .sorted(OrderHistoryOrdering)
+      .take(settings.maxOrdersPerRequest)
+  }
+
+  override def getAllOrdersByAddress(address: String): Set[String] = {
+    Option(p.addressToOrderIds.get(address)).map(_.takeRight(settings.maxOrdersPerRequest).toSet).getOrElse(Set())
+  }
+
+  override def fetchAllOrderHistory(address: String): Seq[(String, OrderInfo, Option[Order])] = {
+    import OrderInfo.orderStatusOrdering
+    getAllOrdersByAddress(address)
+      .toSeq
+      .map(id => (id, orderInfo(id)))
+      .sortBy(_._2.status)
+      .take(settings.maxOrdersPerRequest)
+      .map(p => (p._1, p._2, order(p._1)))
+      .sorted(OrderHistoryOrdering)
   }
 
   private def deleteFromOrdersInfo(orderId: String): Unit = {
@@ -130,10 +156,9 @@ case class OrderHistoryImpl(p: OrderHistoryStorage) extends OrderHistory with Sc
   }
 
   private def deleteFromPairAddress(assetPair: AssetPair, address: String, orderId: String): Unit = {
-    val pairAddress = OrderHistoryStorage.assetPairAddressKey(assetPair, address)
-    Option(p.pairAddressToOrderIds.get(pairAddress)) match {
+    Option(p.addressToOrderIds.get(address)) match {
       case Some(prev) =>
-        if (prev.contains(orderId)) p.pairAddressToOrderIds.put(pairAddress, prev.filterNot(_ == orderId))
+        if (prev.contains(orderId)) p.addressToOrderIds.put(address, prev.filterNot(_ == orderId))
       case _ =>
     }
   }

@@ -34,6 +34,10 @@ trait IntegrationSuiteWithThreeAddresses extends BeforeAndAfterAll with Matchers
 
   protected def accountBalance(acc: String): Future[Long] = sender.balance(acc).map(_.balance)
 
+  protected def accountBalances(acc: String): Future[(Long, Long)] = {
+    sender.balance(acc).map(_.balance).zip(sender.effectiveBalance(acc).map(_.balance))
+  }
+
   protected def assertBalances(acc: String, balance: Long, effectiveBalance: Long): Future[Unit] = {
     for {
       newBalance <- accountBalance(acc)

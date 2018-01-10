@@ -27,12 +27,13 @@ object RxExtensionLoader extends ScorexLogging {
             blocks: Observable[(Channel, Block)],
             signatures: Observable[(Channel, Signatures)],
             syncWithChannelClosed: Observable[ChannelClosedAndSyncWith]
-           )(extensionApplier: (Channel, ExtensionBlocks) => Task[Either[ValidationError, Option[BlockchainScore]]]): Observable[(Channel, Block)] = {
+           )(extensionApplier: (Channel, ExtensionBlocks) => Task[Either[ValidationError, Option[BlockchainScore]]])
+    : (Observable[(Channel, Block)], Coeval[State]) = {
 
     implicit val scheduler: SchedulerService = Scheduler.singleThread("rx-extension-loader")
 
     val simpleBlocks = ConcurrentSubject.publish[(Channel, Block)]
-    var s: State = State(LoaderState.Idle, ApplierState.Idle)
+    @volatile var s: State = State(LoaderState.Idle, ApplierState.Idle)
     val lastSyncWith: Coeval[Option[SyncWith]] = lastObserved(syncWithChannelClosed.map(_.syncWith))
 
     def scheduleBlacklist(ch: Channel, reason: String): Task[Unit] = Task {
@@ -201,7 +202,7 @@ object RxExtensionLoader extends ScorexLogging {
       .logErr
       .subscribe()
 
-    simpleBlocks
+    (simpleBlocks, Coeval.eval(s))
   }
 
   sealed trait LoaderState
