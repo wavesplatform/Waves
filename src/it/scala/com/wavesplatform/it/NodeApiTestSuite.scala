@@ -15,7 +15,6 @@ class NodeApiTestSuite extends FreeSpec with Matchers with HasDocker with Scorex
     val node = docker.startNode(nodeConfig)
     val f = for {
       status <- node.status
-      _ = log.trace(s"#### $status")
       _ = assert(status.blockchainHeight >= status.stateHeight)
     } yield succeed
 

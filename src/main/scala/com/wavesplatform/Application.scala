@@ -20,7 +20,6 @@ import com.wavesplatform.metrics.Metrics
 import com.wavesplatform.mining.{Miner, MinerImpl}
 import com.wavesplatform.network._
 import com.wavesplatform.settings._
-import com.wavesplatform.state2.StateWriter
 import com.wavesplatform.state2.appender.{BlockAppender, CheckpointAppender, ExtensionAppender, MicroblockAppender}
 import com.wavesplatform.utils.{SystemInformationReporter, forceStopApplication}
 import io.netty.channel.Channel
@@ -56,10 +55,10 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   private implicit val as: ActorSystem = actorSystem
   private implicit val materializer: ActorMaterializer = ActorMaterializer()
 
-  private val nodeApiLauncher = (bcu: BlockchainUpdater, state: StateWriter) =>
+  private val nodeApiLauncher = (bcu: BlockchainDebugInfo) =>
     Option(settings.restAPISettings.enable).collect { case true =>
       val tags = Seq(typeOf[NodeApiRoute])
-      val routes = Seq(NodeApiRoute(settings.restAPISettings, bcu, state, () => this.shutdown()))
+      val routes = Seq(NodeApiRoute(settings.restAPISettings, bcu, () => this.shutdown()))
       val combinedRoute: Route = CompositeHttpService(actorSystem, tags, routes, settings.restAPISettings).compositeRoute
       val httpFuture = Http().bindAndHandle(combinedRoute, settings.restAPISettings.bindAddress, settings.restAPISettings.port)
       serverBinding = Await.result(httpFuture, 10.seconds)
