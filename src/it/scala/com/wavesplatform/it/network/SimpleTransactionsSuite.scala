@@ -2,6 +2,7 @@ package com.wavesplatform.it.network
 
 import java.nio.charset.StandardCharsets
 
+import com.typesafe.config.Config
 import com.wavesplatform.it._
 import com.wavesplatform.it.api.NodeApi
 import com.wavesplatform.it.api.NodeApi.BlacklistedPeer
@@ -17,19 +18,18 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.language.postfixOps
 
-class SimpleTransactionsSuite extends FunSuite with BeforeAndAfterAll with Matchers with ScalaFutures
+class SimpleTransactionsSuite extends FunSuite with Matchers with ScalaFutures
   with IntegrationPatience with RecoverMethods with RequestErrorAssert with IntegrationNodesInitializationAndStopping
   with IntegrationTestsScheme {
 
   private val waitCompletion = 2.minutes
-  override lazy val nodes: Seq[Node] = docker.startNodes(
-    NodeConfigs.newBuilder
-      .overrideBase(_.quorum(2))
-      .withDefault(3)
-      .build()
-  )
 
-  private lazy val node = nodes.head
+  override protected def nodeConfigs: Seq[Config] = NodeConfigs.newBuilder
+    .overrideBase(_.quorum(2))
+    .withDefault(3)
+    .build()
+
+  private def node = nodes.head
 
   test("valid tx send by network to node should be in blockchain") {
     val tx = TransferTransaction.create(None,

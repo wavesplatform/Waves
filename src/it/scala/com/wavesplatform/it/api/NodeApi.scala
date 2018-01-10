@@ -8,7 +8,7 @@ import com.wavesplatform.it.util.GlobalTimer.{instance => timer}
 import com.wavesplatform.it.util._
 import com.wavesplatform.matcher.api.CancelOrderRequest
 import com.wavesplatform.state2.{ByteStr, Portfolio}
-import org.asynchttpclient.Dsl.{asyncHttpClient, get => _get, post => _post}
+import org.asynchttpclient.Dsl.{get => _get, post => _post}
 import org.asynchttpclient._
 import org.asynchttpclient.util.HttpConstants
 import org.slf4j.LoggerFactory
@@ -116,8 +116,15 @@ trait NodeApi {
   def connect(host: String, port: Int): Future[Unit] = postJson("/peers/connect", ConnectReq(host, port)).map(_ => ())
 
   def waitForStartup(): Future[Option[Response]] = {
-    def send(n: NodeApi) = asyncHttpClient()
-      .executeRequest(_get(s"http://$restAddress:$nodeRestPort/blocks/height")).toCompletableFuture.toScala
+    val timeout = 500
+
+    val request = _get(s"http://$restAddress:$nodeRestPort/blocks/height")
+      .setReadTimeout(timeout)
+      .setRequestTimeout(timeout)
+      .build()
+
+    def send(n: NodeApi) = client
+      .executeRequest(request).toCompletableFuture.toScala
       .map(Option(_))
       .recoverWith {
         case e@(_: IOException | _: TimeoutException) => Future(None)
@@ -222,12 +229,12 @@ trait NodeApi {
 
     def aux: Future[Response] = once(request)
       .flatMap { response =>
-        if (response.getStatusCode == 503) aux
+        if (response.getStatusCode == 503) throw new IOException(s"Unexpected status code: 503")
         else Future.successful(response)
       }
       .recoverWith {
         case e@(_: IOException | _: TimeoutException) =>
-          log.debug(s"Failed to execute request '$request' with error: ${e.getMessage}")
+          log.debug(s"Failed to send ${transfers.size} txs: ${e.getMessage}")
           timer.schedule(aux, 20.seconds)
       }
 
@@ -340,11 +347,11 @@ trait NodeApi {
   }
 
   def once(r: Request): Future[Response] = {
-    log.trace(s"Executing request '$r'")
+    log.debug(s"Request: ${r.getUrl}")
     client
       .executeRequest(r, new AsyncCompletionHandler[Response] {
         override def onCompleted(response: Response): Response = {
-          log.debug(s"Request: ${r.getUrl} \n Response ${response.getStatusCode}: ${response.getResponseBody}")
+          log.debug(s"Response for ${r.getUrl} is ${response.getStatusCode}")
           response
         }
       })

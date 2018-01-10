@@ -10,7 +10,6 @@ import scorex.utils.LoggerFacade
 
 import scala.concurrent.duration.FiniteDuration
 
-
 class Node(val config: Config, var nodeInfo: NodeInfo, override val client: AsyncHttpClient)
   extends NodeApi with NetworkNodeApi {
   val privateKey: String = config.getString("private-key")

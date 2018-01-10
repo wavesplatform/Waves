@@ -15,10 +15,8 @@ import scala.concurrent.{Await, Future}
 
 trait IntegrationSuiteWithThreeAddresses extends BeforeAndAfterAll with Matchers with ScalaFutures
   with IntegrationPatience with RecoverMethods with RequestErrorAssert with IntegrationTestsScheme
-  with MultipleNodesApi with ScorexLogging {
+  with MultipleNodesApi with HasNodes with ScorexLogging {
   this: Suite =>
-
-  def nodes: Seq[Node]
 
   def notMiner: Node
 
@@ -104,7 +102,6 @@ trait IntegrationSuiteWithThreeAddresses extends BeforeAndAfterAll with Matchers
 
   abstract override def beforeAll(): Unit = {
     super.beforeAll()
-    log.debug(s"There are ${nodes.size} in tests") // Initializing of a lazy variable
 
     def waitForTxsToReachAllNodes(txIds: Seq[String]): Future[_] = {
       val txNodePairs = for {

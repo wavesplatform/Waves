@@ -1,4 +1,5 @@
 package com.wavesplatform.it
+package matcher
 
 import com.google.common.primitives.Longs
 import com.typesafe.config.{Config, ConfigFactory}
@@ -6,18 +7,16 @@ import com.wavesplatform.it.api.NodeApi.{AssetBalance, LevelResponse, MatcherSta
 import com.wavesplatform.matcher.api.CancelOrderRequest
 import com.wavesplatform.state2.ByteStr
 import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
-import scorex.crypto.EllipticCurveImpl
-import play.api.libs.json.{JsArray, JsNumber, JsString}
-import play.api.libs.json.{JsArray, JsString}
 import play.api.libs.json.Json.parse
+import play.api.libs.json.{JsArray, JsNumber, JsString}
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
 
-import scala.concurrent.{Await, Future}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
+import scala.concurrent.{Await, Future}
 import scala.util.Random
 
 class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with CancelAfterFailure
@@ -25,8 +24,7 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
 
   import MatcherTestSuite._
 
-  private lazy val docker = Docker(getClass)
-  override lazy val nodes: Seq[Node] = docker.startNodes(Configs)
+  override protected def nodeConfigs: Seq[Config] = Configs
 
   private def matcherNode = nodes.head
 
@@ -47,7 +45,6 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-    log.debug(s"There are ${nodes.size} in tests") // Initializing of a lazy variable
 
     // Store initial balances of participants
     matcherBalance = getBalance(matcherNode)
@@ -64,11 +61,6 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
 
     // Alice spent 1 Wave to issue the asset
     aliceBalance = getBalance(aliceNode)
-  }
-
-  override protected def afterAll(): Unit = {
-    super.afterAll()
-    docker.close()
   }
 
   "matcher should respond with Public key" in {

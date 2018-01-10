@@ -1,5 +1,6 @@
 package com.wavesplatform.it
 
+import com.typesafe.config.Config
 import com.wavesplatform.it.api.MultipleNodesApi
 import com.wavesplatform.it.api.NodeApi.{Block, BlockHeaders}
 
@@ -16,15 +17,11 @@ import scala.util.Random
 class BlockHeadersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with CancelAfterFailure
   with MultipleNodesApi with ReportingTestName with ScorexLogging {
 
-  private lazy val docker = Docker(getClass)
-
-  lazy val nodes: Seq[Node] = docker.startNodes(
-    NodeConfigs.newBuilder
-      .overrideBase(_.quorum(2))
-      .withDefault(2)
-      .withSpecial(_.nonMiner)
-      .build()
-  )
+  override protected def nodeConfigs: Seq[Config] = NodeConfigs.newBuilder
+    .overrideBase(_.quorum(2))
+    .withDefault(2)
+    .withSpecial(_.nonMiner)
+    .buildNonConflicting()
 
   private def notMiner: Node = nodes.last
 
@@ -32,13 +29,7 @@ class BlockHeadersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAl
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-    log.debug(s"There are ${nodes.size} in tests") // Initializing of a lazy variable
     Await.result(traverse(nodes)(_.waitForHeight(2)), 1.minute)
-  }
-
-  override protected def afterAll(): Unit = {
-    super.afterAll()
-    docker.close()
   }
 
   private def txRequestsGen(n: Int, fee: Long): Future[Unit] = {

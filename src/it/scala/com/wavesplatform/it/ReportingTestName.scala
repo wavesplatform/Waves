@@ -4,12 +4,11 @@ import org.scalatest.{Args, Status, Suite, SuiteMixin}
 import scorex.utils.ScorexLogging
 import scorex.waves.http.DebugMessage
 
-import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
+import scala.concurrent.{Await, Future}
 
-trait ReportingTestName extends SuiteMixin with ScorexLogging {
+trait ReportingTestName extends SuiteMixin with HasNodes with ScorexLogging {
   th: Suite =>
-  def nodes: Seq[Node]
 
   abstract override protected def runTest(testName: String, args: Args): Status = {
     print(s"Test '$testName' started")

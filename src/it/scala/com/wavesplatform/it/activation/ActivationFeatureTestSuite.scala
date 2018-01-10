@@ -1,34 +1,42 @@
-package com.wavesplatform.it.activation
+package com.wavesplatform.it
+package activation
 
-import com.typesafe.config.{Config, ConfigFactory}
+import com.typesafe.config.Config
 import com.wavesplatform.features.BlockchainFeatureStatus
 import com.wavesplatform.features.api.NodeFeatureStatus
-import com.wavesplatform.it.{Docker, Node, NodeConfigs, ReportingTestName}
-import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
+import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers}
 
+import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.concurrent.Await
-import scala.util.Random
 
-class ActivationFeatureTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with CancelAfterFailure
+class ActivationFeatureTestSuite extends FreeSpec with Matchers with CancelAfterFailure
   with ActivationStatusRequest with ReportingTestName {
 
-  import ActivationFeatureTestSuite._
-
   private val waitCompletion = 6.minutes
-  private lazy val docker = Docker(getClass)
-  override lazy val nodes: Seq[Node] = docker.startNodes(Configs)
 
-  override protected def beforeAll(): Unit = {
-    super.beforeAll()
-    log.debug(s"There are ${nodes.size} in tests") // Initializing of a lazy variable
-  }
+  private val votingInterval = 12
+  private val blocksForActivation = 12 // should be even
+  private val featureNum: Short = 1
 
-  override protected def afterAll(): Unit = {
-    super.afterAll()
-    docker.close()
-  }
+  override protected def nodeConfigs: Seq[Config] = NodeConfigs.newBuilder
+    .overrideBase(_.raw(
+      s"""waves {
+         |  blockchain {
+         |    custom {
+         |      functionality {
+         |        pre-activated-features = {}
+         |        feature-check-blocks-period = $votingInterval
+         |        blocks-for-feature-activation = $blocksForActivation
+         |      }
+         |    }
+         |  }
+         |  features.supported = [$featureNum]
+         |  miner.quorum = 3
+         |}""".stripMargin
+    ))
+    .withDefault(4)
+    .buildNonConflicting()
 
   "supported blocks increased when voting starts" in {
     val checkHeight: Int = votingInterval * 2 / 3
@@ -63,35 +71,6 @@ class ActivationFeatureTestSuite extends FreeSpec with Matchers with BeforeAndAf
     val checkHeight: Int = votingInterval * 3
     val info = activationStatus(nodes, checkHeight, featureNum, waitCompletion)
     assertActivatedStatus(info, checkHeight, NodeFeatureStatus.Voted)
-  }
-
-
-  object ActivationFeatureTestSuite {
-
-    val NodesCount: Int = 4
-
-    val votingInterval = 12
-    val blocksForActivation = 12 // should be even
-    val featureNum: Short = 1
-
-    private val supportedNodes = ConfigFactory.parseString(
-      s"""waves {
-         |  blockchain {
-         |    custom {
-         |      functionality {
-         |        pre-activated-features = {}
-         |        feature-check-blocks-period = $votingInterval
-         |        blocks-for-feature-activation = $blocksForActivation
-         |      }
-         |    }
-         |  }
-         |  features.supported = [$featureNum]
-         |  miner.quorum = ${NodesCount - 1}
-         |}""".stripMargin
-    )
-
-    val Configs: Seq[Config] = Random.shuffle(NodeConfigs.Default.init).take(NodesCount).map(supportedNodes.withFallback(_))
-
   }
 
 }

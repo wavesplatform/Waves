@@ -9,8 +9,8 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration._
 
-class MicroblocksGenerationSuite extends FreeSpec with BeforeAndAfterAll
-  with Matchers with TransferSending with MultipleNodesApi {
+class MicroblocksGenerationSuite extends FreeSpec with Matchers with TransferSending with MultipleNodesApi
+  with HasDocker with HasNodes {
 
   private val txsInMicroBlock = 200
   private val maxTxs = 2000
@@ -55,8 +55,7 @@ class MicroblocksGenerationSuite extends FreeSpec with BeforeAndAfterAll
          |}""".stripMargin)
     .withFallback(NodeConfigs.Default.head)
 
-  lazy val docker: Docker = Docker(getClass)
-  lazy val nodes: Seq[Node] = docker.startNodes(Seq(config))
+  override protected def nodeConfigs = Seq(config)
   private def miner = nodes.head
 
   s"Generate transactions and wait for one block with $maxTxs txs" in result(for {
@@ -65,15 +64,5 @@ class MicroblocksGenerationSuite extends FreeSpec with BeforeAndAfterAll
     _ <- miner.waitForHeight(3)
     block <- miner.blockAt(2)
   } yield block.transactions.size shouldBe maxTxs, 3.minutes)
-
-  override def beforeAll(): Unit = {
-    super.beforeAll()
-    log.debug(s"There are ${nodes.size} in tests") // Initializing of a lazy variable
-  }
-
-  override def afterAll(): Unit = {
-    super.afterAll()
-    docker.close()
-  }
 
 }
