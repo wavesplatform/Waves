@@ -127,15 +127,17 @@ class MinerImpl(
   private def generateOneMicroBlockTask(account: PrivateKeyAccount, accumulatedBlock: Block): Task[Either[ValidationError, Option[Block]]] = Task {
     log.trace(s"Generating microblock for $account")
     val pc = allChannels.size()
+    val accumulatedCount = accumulatedBlock.transactionCount
     lazy val unconfirmed = measureLog("packing unconfirmed transactions for microblock") {
-      utx.packUnconfirmed(settings.minerSettings.maxTransactionsInMicroBlock, sortInBlock = false)
+      val maxTxsForMicroblock = Math.min(MaxTransactionsPerBlockVer3 - accumulatedCount, settings.minerSettings.maxTransactionsInMicroBlock)
+      utx.packUnconfirmed(maxTxsForMicroblock, sortInBlock = false)
     }
     if (pc < minerSettings.quorum) {
       log.trace(s"Quorum not available ($pc/${minerSettings.quorum}, not forging microblock with ${account.address}")
       Task.now(Right(None))
     }
     else if (unconfirmed.isEmpty) {
-      log.trace("skipping microBlock because no txs in utx pool")
+      log.trace(s"Skipping microBlock because no txs packed(already accumulated in block: $accumulatedCount)")
       Task.now(Right(None))
     }
     else {
