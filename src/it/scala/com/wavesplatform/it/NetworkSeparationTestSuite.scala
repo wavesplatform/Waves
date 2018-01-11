@@ -1,5 +1,6 @@
 package com.wavesplatform.it
 
+import com.typesafe.config.Config
 import com.wavesplatform.it.api.MultipleNodesApi
 import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers}
 
@@ -11,14 +12,11 @@ import scala.concurrent.duration._
 class NetworkSeparationTestSuite extends FreeSpec with Matchers with IntegrationNodesInitializationAndStopping
   with CancelAfterFailure with ReportingTestName with MultipleNodesApi {
 
-  // @TODO: Will fail, if there is two miners with quorum = 0
-  override lazy val nodes: Seq[Node] = docker.startNodes(
-    NodeConfigs.newBuilder
-      .overrideBase(_.quorum(3))
-      .withDefault(3)
-      .withSpecial(_.quorum(0))
-      .build()
-  )
+  override protected def nodeConfigs: Seq[Config] = NodeConfigs.newBuilder
+    .overrideBase(_.quorum(3))
+    .withDefault(3)
+    .withSpecial(_.quorum(0))
+    .buildNonConflicting()
 
   "node should grow up to 10 blocks together and sync" in Await.result(
     Await.ready(waitForSameBlocksAt(nodes, 5.seconds, 10), 3.minutes),

@@ -1,8 +1,9 @@
 package com.wavesplatform.it
 
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.it.NodeConfigs.Default
 import com.wavesplatform.it.util._
-import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
+import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers}
 import scorex.utils.ScorexLogging
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -11,28 +12,12 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.util.Random
 
-class MicroblocksFeeTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with CancelAfterFailure
-  with ScorexLogging {
-
-  import MicroblocksFeeTestSuite._
-
-  private lazy val docker = Docker(getClass)
-  private lazy val nodes = docker.startNodes(Configs)
+class MicroblocksFeeTestSuite extends FreeSpec with Matchers with CancelAfterFailure
+  with HasDocker with HasNodes with ScorexLogging {
 
   private def notMiner = nodes.head
 
   private def firstAddress = nodes(1).address
-
-  override protected def beforeAll(): Unit = {
-    super.beforeAll()
-    log.debug(s"There are ${nodes.size} in tests") // Initializing of a lazy variable
-  }
-
-  override protected def afterAll(): Unit = {
-    super.afterAll()
-    docker.close()
-  }
-
 
   private def txRequestsGen(n: Int, fee: Long): Future[Unit] = {
     val parallelRequests = 1
@@ -53,7 +38,6 @@ class MicroblocksFeeTestSuite extends FreeSpec with Matchers with BeforeAndAfter
   }
 
   "fee distribution when NG activates" in {
-
     val f = for {
       height <- traverse(nodes)(_.height).map(_.max)
 
@@ -90,67 +74,59 @@ class MicroblocksFeeTestSuite extends FreeSpec with Matchers with BeforeAndAfter
     Await.result(f, 2.minute)
   }
 
-
-  object MicroblocksFeeTestSuite {
-
-    import NodeConfigs.Default
-
-    val NodesCount: Int = 3
-
-    val microblockActivationHeight = 10
-    private val miner = ConfigFactory.parseString(
-      s"""
-         |waves {
-         |   blockchain {
-         |     custom {
-         |        functionality{
-         |          pre-activated-features = {2=$microblockActivationHeight}
-         |        }
-         |        genesis {
-         |          signature: "gC84PYfvJRdLpUKDXNddTcWmH3wWhhKD4W9d2Z1HY46xkvgAdqoksknXHKzCBe2PEhzmDW49VKxfWeyzoMB4LKi"
-         |          transactions = [
-         |            {recipient: "3Hm3LGoNPmw1VTZ3eRA2pAfeQPhnaBm6YFC", amount: 250000000000000},
-         |            {recipient: "3HPG313x548Z9kJa5XY4LVMLnUuF77chcnG", amount: 250000000000000},
-         |            {recipient: "3HZxhQhpSU4yEGJdGetncnHaiMnGmUusr9s", amount: 250000000000000},
-         |            {recipient: "3HVW7RDYVkcN5xFGBNAUnGirb5KaBSnbUyB", amount: 250000000000000}
-         |          ]
-         |       }
-         |      }
-         |   }
-         |   miner.quorum = 3
-         |}
+  private val microblockActivationHeight = 10
+  private val minerConfig = ConfigFactory.parseString(
+    s"""
+       |waves {
+       |   blockchain {
+       |     custom {
+       |        functionality{
+       |          pre-activated-features = {2=$microblockActivationHeight}
+       |        }
+       |        genesis {
+       |          signature: "gC84PYfvJRdLpUKDXNddTcWmH3wWhhKD4W9d2Z1HY46xkvgAdqoksknXHKzCBe2PEhzmDW49VKxfWeyzoMB4LKi"
+       |          transactions = [
+       |            {recipient: "3Hm3LGoNPmw1VTZ3eRA2pAfeQPhnaBm6YFC", amount: 250000000000000},
+       |            {recipient: "3HPG313x548Z9kJa5XY4LVMLnUuF77chcnG", amount: 250000000000000},
+       |            {recipient: "3HZxhQhpSU4yEGJdGetncnHaiMnGmUusr9s", amount: 250000000000000},
+       |            {recipient: "3HVW7RDYVkcN5xFGBNAUnGirb5KaBSnbUyB", amount: 250000000000000}
+       |          ]
+       |       }
+       |      }
+       |   }
+       |   miner.quorum = 3
+       |}
       """.stripMargin
-    )
-    private val notMiner = ConfigFactory.parseString(
-      s"""waves {
-         |   blockchain {
-         |     custom {
-         |        functionality{
-         |          pre-activated-features = {2=$microblockActivationHeight}
-         |        }
-         |        genesis {
-         |          signature: "gC84PYfvJRdLpUKDXNddTcWmH3wWhhKD4W9d2Z1HY46xkvgAdqoksknXHKzCBe2PEhzmDW49VKxfWeyzoMB4LKi"
-         |          transactions = [
-         |            {recipient: "3Hm3LGoNPmw1VTZ3eRA2pAfeQPhnaBm6YFC", amount: 250000000000000},
-         |            {recipient: "3HPG313x548Z9kJa5XY4LVMLnUuF77chcnG", amount: 250000000000000},
-         |            {recipient: "3HZxhQhpSU4yEGJdGetncnHaiMnGmUusr9s", amount: 250000000000000},
-         |            {recipient: "3HVW7RDYVkcN5xFGBNAUnGirb5KaBSnbUyB", amount: 250000000000000}
-         |          ]
-         |       }
-         |      }
-         |   }
-         |   miner.enable = no
-         |}
+  )
+
+  private val notMinerConfig = ConfigFactory.parseString(
+    s"""waves {
+       |   blockchain {
+       |     custom {
+       |        functionality{
+       |          pre-activated-features = {2=$microblockActivationHeight}
+       |        }
+       |        genesis {
+       |          signature: "gC84PYfvJRdLpUKDXNddTcWmH3wWhhKD4W9d2Z1HY46xkvgAdqoksknXHKzCBe2PEhzmDW49VKxfWeyzoMB4LKi"
+       |          transactions = [
+       |            {recipient: "3Hm3LGoNPmw1VTZ3eRA2pAfeQPhnaBm6YFC", amount: 250000000000000},
+       |            {recipient: "3HPG313x548Z9kJa5XY4LVMLnUuF77chcnG", amount: 250000000000000},
+       |            {recipient: "3HZxhQhpSU4yEGJdGetncnHaiMnGmUusr9s", amount: 250000000000000},
+       |            {recipient: "3HVW7RDYVkcN5xFGBNAUnGirb5KaBSnbUyB", amount: 250000000000000}
+       |          ]
+       |       }
+       |      }
+       |   }
+       |   miner.enable = no
+       |}
       """.stripMargin
+  )
 
-    )
-
-
-    val Configs: Seq[Config] = Seq(notMiner.withFallback(Default.head),
-      notMiner.withFallback(Default(1)),
-      miner.withFallback(Default(2)),
-      miner.withFallback(Default(3)))
-
-  }
+  override protected def nodeConfigs: Seq[Config] = Seq(
+    notMinerConfig.withFallback(Default.head),
+    notMinerConfig.withFallback(Default(1)),
+    minerConfig.withFallback(Default(2)),
+    minerConfig.withFallback(Default(3))
+  )
 
 }

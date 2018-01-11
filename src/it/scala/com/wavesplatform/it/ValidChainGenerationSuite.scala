@@ -1,5 +1,6 @@
 package com.wavesplatform.it
 
+import com.typesafe.config.Config
 import com.wavesplatform.it.api._
 import org.scalatest._
 
@@ -10,15 +11,13 @@ import scala.concurrent.duration._
 import scala.util.Random
 
 class ValidChainGenerationSuite extends FreeSpec with IntegrationNodesInitializationAndStopping
-  with Matchers with TransferSending with MultipleNodesApi {
+  with TransferSending with MultipleNodesApi with CancelAfterFailure {
 
-  override lazy val nodes: Seq[Node] = docker.startNodes(
-    NodeConfigs.newBuilder
-      .overrideBase(_.quorum(3))
-      .withDefault(3)
-      .withSpecial(_.nonMiner)
-      .build()
-  )
+  override protected def nodeConfigs: Seq[Config] = NodeConfigs.newBuilder
+    .overrideBase(_.quorum(3))
+    .withDefault(3)
+    .withSpecial(_.nonMiner)
+    .buildNonConflicting()
 
   "Generate more blocks and resynchronise after rollback" - {
     "1 of N" in test(1)

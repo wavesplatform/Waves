@@ -21,16 +21,14 @@ object RxScoreObserver extends ScorexLogging {
     override def toString: String = s"BestChannel(${id(channel)},score: $score)"
   }
 
-  implicit val bestChannelEq = new Eq[BestChannel] {
-    override def eqv(x: BestChannel, y: BestChannel) = x.channel == y.channel && x.score == y.score
-  }
+  implicit val bestChannelEq: Eq[BestChannel] = { (x, y) => x.channel == y.channel && x.score == y.score }
 
   type SyncWith = Option[BestChannel]
 
   case class ChannelClosedAndSyncWith(closed: Option[Channel], syncWith: SyncWith)
 
-  implicit val channelClosedAndSyncWith = new Eq[ChannelClosedAndSyncWith] {
-    override def eqv(x: ChannelClosedAndSyncWith, y: ChannelClosedAndSyncWith) = x.closed == y.closed && x.syncWith == y.syncWith
+  implicit val channelClosedAndSyncWith: Eq[ChannelClosedAndSyncWith] = { (x, y) =>
+    x.closed == y.closed && x.syncWith == y.syncWith
   }
 
   private def calcSyncWith(bestChannel: Option[Channel], localScore: BlockchainScore, scoreMap: scala.collection.Map[Channel, BlockchainScore]): SyncWith = {
@@ -51,6 +49,7 @@ object RxScoreObserver extends ScorexLogging {
   }
 
   def apply(scoreTtl: FiniteDuration,
+            remoteScoreDebounce: FiniteDuration,
             initalLocalScore: BigInt,
             localScores: Observable[BlockchainScore],
             remoteScores: ChannelObservable[BlockchainScore],
@@ -81,6 +80,7 @@ object RxScoreObserver extends ScorexLogging {
       .observeOn(scheduler)
       .groupBy(_._1)
       .map(_.distinctUntilChanged)
+      .debounce(remoteScoreDebounce)
       .merge
       .map { case ((ch, score)) =>
         scores.put(ch, score)

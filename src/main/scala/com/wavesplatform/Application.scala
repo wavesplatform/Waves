@@ -102,18 +102,19 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     val lastScore = lastBlockInfo
       .map(_.score)
       .distinctUntilChanged
-      .debounce(LocalScoreBroadcastDebounce)
       .share(scheduler)
 
-    lastScore.foreach { x =>
-      allChannels.broadcast(LocalScoreChanged(x))
-    }(scheduler)
+    lastScore
+      .debounce(LocalScoreBroadcastDebounce)
+      .foreach { x =>
+        allChannels.broadcast(LocalScoreChanged(x))
+      }(scheduler)
 
     val historyReplier = new HistoryReplier(history, settings.synchronizationSettings)
     val network = NetworkServer(settings, lastBlockInfo, history, historyReplier, utxStorage, peerDatabase, allChannels, establishedConnections)
     val (signatures, blocks, blockchainScores, checkpoints, microblockInvs, microblockResponses, transactions) = network.messages
 
-    val (syncWithChannelClosed, scoreStatsReporter) = RxScoreObserver(settings.synchronizationSettings.scoreTTL, history.score(), lastScore, blockchainScores, network.closedChannels)
+    val (syncWithChannelClosed, scoreStatsReporter) = RxScoreObserver(settings.synchronizationSettings.scoreTTL, 1.second, history.score(), lastScore, blockchainScores, network.closedChannels)
     val (microblockDatas, mbSyncCacheSizes) = MicroBlockSynchronizer(settings.synchronizationSettings.microBlockSynchronizer, peerDatabase, lastBlockInfo.map(_.id), microblockInvs, microblockResponses)
     val (newBlocks, extLoaderState) = RxExtensionLoader(settings.synchronizationSettings.maxRollback, settings.synchronizationSettings.synchronizationTimeout,
       history, peerDatabase, knownInvalidBlocks, blocks, signatures, syncWithChannelClosed) { case ((c, b)) => processFork(c, b.blocks) }

@@ -2,15 +2,13 @@ package com.wavesplatform.it
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.NetworkUniqueConnectionsTestSuite._
-import org.scalatest.{BeforeAndAfterAll, FreeSpec, Matchers}
+import org.scalatest.{FreeSpec, Matchers}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent._
 import scala.concurrent.duration.DurationInt
 
-class NetworkUniqueConnectionsTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll {
-
-  private lazy val docker = Docker(getClass)
+class NetworkUniqueConnectionsTestSuite extends FreeSpec with Matchers with HasDocker {
 
   "nodes should up and connect with each other" in {
     val firstNode = docker.startNode(FirstNodeConfig)
@@ -41,11 +39,6 @@ class NetworkUniqueConnectionsTestSuite extends FreeSpec with Matchers with Befo
         Await.ready(firstNode.waitForPeers(2), 10.seconds)
       }
     }
-  }
-
-  override protected def afterAll(): Unit = {
-    super.afterAll()
-    docker.close()
   }
 
 }

@@ -7,6 +7,8 @@ import scala.util.Random
 
 object NodeConfigs {
 
+  private val NonConflictingNodes = Set(1, 4, 6, 7) //Set(1, 7, 10, 2)
+
   val DefaultConfigTemplate: Config = ConfigFactory.parseResources("template.conf")
 
   val Default: Seq[Config] = ConfigFactory.parseResources("nodes.conf").getConfigList("nodes").asScala
@@ -42,9 +44,24 @@ object NodeConfigs {
       specialNodes.zip(specialsConfigs)
         .foldLeft(defaultNodes) { case (r, (base, special)) => r :+ special.withFallback(base) }
     }
+
+    // To eliminate a race of miners
+    def buildNonConflicting(): Seq[Config] = {
+      val totalEntities = defaultEntities + specialsConfigs.size
+      require(totalEntities <= NonConflictingNodes.size)
+
+      val (defaultNodes: Seq[Config], specialNodes: Seq[Config]) = baseConfigs
+        .zipWithIndex
+        .collect { case (x, i) if NonConflictingNodes.contains(i + 1) => x }
+        .splitAt(defaultEntities)
+
+      specialNodes.zip(specialsConfigs)
+        .foldLeft(defaultNodes) { case (r, (base, special)) => r :+ special.withFallback(base) }
+    }
   }
 
   object Templates {
+    def raw(x: String): String = x
     def quorum(n: Int): String = s"waves.miner.quorum = $n"
 
     val nonMiner: String = "waves.miner.enable = no"

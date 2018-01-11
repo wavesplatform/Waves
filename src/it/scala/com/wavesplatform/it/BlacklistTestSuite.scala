@@ -1,5 +1,6 @@
 package com.wavesplatform.it
 
+import com.typesafe.config.Config
 import com.wavesplatform.it.api.MultipleNodesApi
 import com.wavesplatform.it.api.NodeApi.BlacklistedPeer
 import org.scalatest._
@@ -9,31 +10,18 @@ import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
 import scala.concurrent.Await
 
-class BlacklistTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with CancelAfterFailure
-  with ReportingTestName with MultipleNodesApi {
+class BlacklistTestSuite extends FreeSpec with Matchers with CancelAfterFailure with ReportingTestName
+  with MultipleNodesApi {
 
-  private lazy val docker = Docker(getClass)
-  override lazy val nodes: Seq[Node] = docker.startNodes(
-    NodeConfigs.newBuilder
-      .overrideBase(_.quorum(2))
-      .withDefault(3)
-      .withSpecial(_.quorum(0))
-      .build()
-  )
+  override protected def nodeConfigs: Seq[Config] = NodeConfigs.newBuilder
+    .overrideBase(_.quorum(2))
+    .withDefault(3)
+    .withSpecial(_.quorum(0))
+    .buildNonConflicting()
 
   private def primaryNode = nodes.last
 
   private def otherNodes = nodes.init
-
-  override protected def beforeAll(): Unit = {
-    super.beforeAll()
-    log.debug(s"There are ${nodes.size} in tests") // Initializing of a lazy variable
-  }
-
-  override protected def afterAll(): Unit = {
-    super.afterAll()
-    docker.close()
-  }
 
   "network should grow up to 10 blocks" in Await.result(primaryNode.waitForHeight(10), 3.minutes)
 
