@@ -13,6 +13,8 @@ import scala.util.Try
 
 package object utils extends ScorexLogging {
 
+  type HeightInfo = (Int, Long)
+
   private val DefaultPageSplitSize = 4 * 1024
 
   def base58Length(byteArrayLength: Int): Int = math.ceil(math.log(256) / math.log(58) * byteArrayLength).toInt

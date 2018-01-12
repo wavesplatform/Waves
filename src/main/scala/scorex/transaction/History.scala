@@ -2,6 +2,7 @@ package scorex.transaction
 
 import com.wavesplatform.network.{BlockCheckpoint, Checkpoint}
 import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.utils.HeightInfo
 import scorex.block.Block.BlockId
 import scorex.block.{Block, BlockHeader, MicroBlock}
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
@@ -29,6 +30,8 @@ trait History extends Synchronized with AutoCloseable {
   def lastBlockTimestamp(): Option[Long]
 
   def lastBlockId(): Option[ByteStr]
+
+  def debugInfo: HeightInfo
 }
 
 trait NgHistory extends History {

@@ -7,11 +7,11 @@ import com.wavesplatform.utils._
 import org.h2.mvstore.`type`.ObjectDataType
 import org.h2.mvstore.MVMap
 import scorex.account.Address
-import scorex.utils.LogMVMapBuilder
+import scorex.utils.{LogMVMapBuilder, NTP, Time}
 
 import scala.util.Try
 
-class StateStorage private(file: Option[File]) extends VariablesStorage(createMVStore(file)) with VersionableStorage with AutoCloseable {
+class StateStorage private(file: Option[File], time: Time) extends VariablesStorage(createMVStore(file)) with VersionableStorage with AutoCloseable {
 
   import StateStorage._
 
@@ -19,7 +19,10 @@ class StateStorage private(file: Option[File]) extends VariablesStorage(createMV
 
   def getHeight: Int = getInt(heightKey).getOrElse(0)
 
-  def setHeight(i: Int): Unit = putInt(heightKey, i)
+  def setHeight(i: Int): Unit = {
+    putInt(heightKey, i)
+    heightTimestamp = time.getTimestamp()
+  }
 
   val transactions: MVMap[ByteStr, (Int, Array[Byte])] = db.openMap("txs", new LogMVMapBuilder[ByteStr, (Int, Array[Byte])]
     .keyType(DataTypes.byteStr).valueType(DataTypes.tupleIntByteArray))
@@ -66,6 +69,10 @@ class StateStorage private(file: Option[File]) extends VariablesStorage(createMV
   }
 
   override def close(): Unit = db.close()
+
+  private var heightTimestamp: Long = time.getTimestamp()
+
+  def debugInfo: HeightInfo = (getHeight, heightTimestamp)
 }
 
 object StateStorage {
@@ -74,8 +81,8 @@ object StateStorage {
 
   private val heightKey = "height"
 
-  def apply(file: Option[File], dropExisting: Boolean): Try[StateStorage] =
-    createWithStore(file, new StateStorage(file), deleteExisting = dropExisting)
+  def apply(file: Option[File], dropExisting: Boolean, time: Time = NTP): Try[StateStorage] =
+    createWithStore(file, new StateStorage(file, time), deleteExisting = dropExisting)
 
   type AccountIdxKey = Array[Byte]
 
