@@ -9,7 +9,7 @@ import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
 
 trait IntegrationNodesInitializationAndStopping extends BeforeAndAfterAll with ScorexLogging
-  with ReportingTestName {
+  with ReportingTestName with AsyncNodes {
   this: Suite =>
 
   abstract override def beforeAll(): Unit = {

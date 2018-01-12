@@ -1,7 +1,6 @@
 package com.wavesplatform.it
 
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.it.api._
 import org.scalatest._
 
 import scala.concurrent.Await.result
@@ -9,8 +8,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration._
 
-class MicroblocksGenerationSuite extends FreeSpec with Matchers with TransferSending with MultipleNodesApi
-  with HasDocker with HasNodes {
+class MicroblocksGenerationSuite extends FreeSpec with Matchers with TransferSending with AsyncNodes {
 
   private val txsInMicroBlock = 200
   private val maxTxs = 2000

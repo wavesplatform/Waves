@@ -10,7 +10,7 @@ import scorex.utils.LoggerFacade
 
 import scala.concurrent.duration.FiniteDuration
 
-class AsyncDockerNode(val config: Config, var nodeInfo: NodeInfo, override val client: AsyncHttpClient)
+class AsyncNode(val config: Config, var nodeInfo: NodeInfo, override val client: AsyncHttpClient)
   extends Node with AsyncNodeHttpApi with AsyncNetworkNodeApi {
   val privateKey: String = config.getString("private-key")
   val publicKey: String = config.getString("public-key")

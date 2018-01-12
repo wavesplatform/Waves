@@ -19,7 +19,7 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.util.Random
 
-class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with CancelAfterFailure
+class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with CancelAfterFailure with AsyncNodes
   with ReportingTestName {
 
   import MatcherTestSuite._
@@ -277,7 +277,7 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
     )
   }
 
-  private def issueAsset(node: AsyncDockerNode, name: String, amount: Long): String = {
+  private def issueAsset(node: AsyncNode, name: String, amount: Long): String = {
     val description = "asset for integration tests of matcher"
     val fee = 100000000L
     val futureIssueTransaction: Future[Transaction] = for {
@@ -289,13 +289,13 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
     issueTransaction.id
   }
 
-  private def waitForAssetBalance(node: AsyncDockerNode, asset: String, expectedBalance: Long): Unit =
+  private def waitForAssetBalance(node: AsyncNode, asset: String, expectedBalance: Long): Unit =
     Await.result(
       node.waitFor[AssetBalance](s"asset($asset) balance of ${node.address} >= $expectedBalance")(_.assetBalance(node.address, asset), _.balance >= expectedBalance, 5.seconds),
       3.minute
     )
 
-  private def getBalance(node: AsyncDockerNode): (Long, Long) = {
+  private def getBalance(node: AsyncNode): (Long, Long) = {
     val initialHeight = Await.result(node.height, 1.minute)
     Await.result(node.waitForHeight(initialHeight + 2), 2.minute)
 
@@ -305,7 +305,7 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
     (balance, height)
   }
 
-  private def prepareOrder(node: AsyncDockerNode, pair: AssetPair, orderType: OrderType, price: Long, amount: Long): Order = {
+  private def prepareOrder(node: AsyncNode, pair: AssetPair, orderType: OrderType, price: Long, amount: Long): Order = {
     val creationTime = System.currentTimeMillis()
     val timeToLive = creationTime + Order.MaxLiveTime - 1000
 
@@ -350,7 +350,7 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
     result
   }
 
-  private def matcherCancelOrder(node: AsyncDockerNode, pair: AssetPair, orderId: String): String = {
+  private def matcherCancelOrder(node: AsyncNode, pair: AssetPair, orderId: String): String = {
     val privateKey = PrivateKeyAccount.fromSeed(node.accountSeed).right.get
     val publicKey = PublicKeyAccount(privateKey.publicKey)
     val request = CancelOrderRequest(publicKey, Base58.decode(orderId).get, Array.emptyByteArray)

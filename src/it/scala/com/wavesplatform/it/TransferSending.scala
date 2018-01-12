@@ -16,8 +16,8 @@ object TransferSending {
   case class Req(senderSeed: String, targetAddress: String, amount: Long, fee: Long)
 }
 
-trait TransferSending extends HasNodes with ScorexLogging {
-  this: Suite =>
+trait TransferSending extends ScorexLogging {
+  this: Suite with AsyncNodes =>
 
   import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -64,7 +64,7 @@ trait TransferSending extends HasNodes with ScorexLogging {
     requests
   }
 
-  def balanceForNode(n: AsyncDockerNode): Future[(String, Long)] = n.balance(n.address).map(b => n.accountSeed -> b.balance)
+  def balanceForNode(n: AsyncNode): Future[(String, Long)] = n.balance(n.address).map(b => n.accountSeed -> b.balance)
 
   /**
     * @return Last transaction

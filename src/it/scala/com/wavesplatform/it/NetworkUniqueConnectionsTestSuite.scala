@@ -8,7 +8,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent._
 import scala.concurrent.duration.DurationInt
 
-class NetworkUniqueConnectionsTestSuite extends FreeSpec with Matchers with HasDocker {
+class NetworkUniqueConnectionsTestSuite extends FreeSpec with Matchers with DockerBased {
 
   "nodes should up and connect with each other" in {
     val firstNode = docker.startNode(FirstNodeConfig)

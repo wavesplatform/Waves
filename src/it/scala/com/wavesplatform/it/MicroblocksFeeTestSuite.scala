@@ -13,7 +13,7 @@ import scala.concurrent.{Await, Future}
 import scala.util.Random
 
 class MicroblocksFeeTestSuite extends FreeSpec with Matchers with CancelAfterFailure
-  with HasDocker with HasNodes with ScorexLogging {
+  with AsyncNodes with ScorexLogging {
 
   private def notMiner = nodes.head
 

@@ -17,7 +17,7 @@ import scala.concurrent.{Await, Future}
 import scala.util.Random
 
 class OrderExclusionTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with CancelAfterFailure
-  with ReportingTestName with OrderGenerator {
+  with ReportingTestName with OrderGenerator with AsyncNodes {
 
   import OrderExclusionTestSuite._
 
@@ -73,7 +73,7 @@ class OrderExclusionTestSuite extends FreeSpec with Matchers with BeforeAndAfter
     orderStatus(aliceNode) shouldBe "Cancelled"
   }
 
-  private def orderStatus(node: AsyncDockerNode) = {
+  private def orderStatus(node: AsyncNode) = {
     val ts = System.currentTimeMillis()
     val privateKey = PrivateKeyAccount.fromSeed(aliceNode.accountSeed).right.get
 
@@ -84,7 +84,7 @@ class OrderExclusionTestSuite extends FreeSpec with Matchers with BeforeAndAfter
     orderhistory.seq(0).status
   }
 
-  private def waitForAssetBalance(node: AsyncDockerNode, asset: String, expectedBalance: Long): Unit =
+  private def waitForAssetBalance(node: AsyncNode, asset: String, expectedBalance: Long): Unit =
     Await.result(
       node.waitFor[AssetBalance](s"asset($asset) balance of ${node.address} >= $expectedBalance")
         (_.assetBalance(node.address, asset),
@@ -101,7 +101,7 @@ class OrderExclusionTestSuite extends FreeSpec with Matchers with BeforeAndAfter
     (result.message.id, result.status)
   }
 
-  private def issueAsset(node: AsyncDockerNode, name: String, amount: Long): String = {
+  private def issueAsset(node: AsyncNode, name: String, amount: Long): String = {
     val description = "asset for integration tests of matcher"
     val fee = 100000000L
     val futureIssueTransaction: Future[Transaction] = for {

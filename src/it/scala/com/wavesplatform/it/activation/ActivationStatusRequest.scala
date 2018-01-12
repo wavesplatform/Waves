@@ -2,20 +2,20 @@ package com.wavesplatform.it.activation
 
 import com.wavesplatform.features.BlockchainFeatureStatus
 import com.wavesplatform.features.api.{ActivationStatus, ActivationStatusFeature, NodeFeatureStatus}
-import com.wavesplatform.it.AsyncDockerNode
+import com.wavesplatform.it.AsyncNode
 import org.scalatest.Matchers
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future}
 
 trait ActivationStatusRequest extends Matchers {
-  def activationStatus(node: AsyncDockerNode, height: Int, featureNum: Short, timeout: Duration)
+  def activationStatus(node: AsyncNode, height: Int, featureNum: Short, timeout: Duration)
                       (implicit ec: ExecutionContext): ActivationStatusFeature = Await.result(
     activationStatusInternal(node, height).map(_.features.find(_.id == featureNum).get),
     timeout
   )
 
-  def activationStatus(nodes: Seq[AsyncDockerNode], height: Int, featureNum: Short, timeout: Duration)
+  def activationStatus(nodes: Seq[AsyncNode], height: Int, featureNum: Short, timeout: Duration)
                       (implicit ec: ExecutionContext): ActivationStatusFeature = {
     Await.result(
       Future
@@ -32,7 +32,7 @@ trait ActivationStatusRequest extends Matchers {
     )
   }
 
-  private def activationStatusInternal(node: AsyncDockerNode, height: Int): Future[ActivationStatus] = {
+  private def activationStatusInternal(node: AsyncNode, height: Int): Future[ActivationStatus] = {
     node.waitFor[ActivationStatus](s"activationStatusInternal: height should be >= $height")(_.activationStatus, _.height >= height, 1.second)
   }
 

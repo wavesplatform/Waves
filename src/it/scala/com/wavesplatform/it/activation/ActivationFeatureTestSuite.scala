@@ -10,7 +10,7 @@ import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 
-class ActivationFeatureTestSuite extends FreeSpec with Matchers with CancelAfterFailure
+class ActivationFeatureTestSuite extends FreeSpec with Matchers with CancelAfterFailure with AsyncNodes
   with ActivationStatusRequest with ReportingTestName {
 
   private val waitCompletion = 6.minutes

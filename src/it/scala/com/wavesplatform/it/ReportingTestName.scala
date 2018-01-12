@@ -7,8 +7,8 @@ import scorex.waves.http.DebugMessage
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
-trait ReportingTestName extends SuiteMixin with HasNodes with ScorexLogging {
-  th: Suite =>
+trait ReportingTestName extends SuiteMixin with ScorexLogging {
+  th: Suite with AsyncNodes =>
 
   abstract override protected def runTest(testName: String, args: Args): Status = {
     print(s"Test '$testName' started")

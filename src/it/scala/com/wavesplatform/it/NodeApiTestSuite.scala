@@ -7,7 +7,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent._
 import scala.concurrent.duration.DurationInt
 
-class NodeApiTestSuite extends FreeSpec with Matchers with HasDocker with ScorexLogging {
+class NodeApiTestSuite extends FreeSpec with Matchers with DockerBased with ScorexLogging {
 
   private val nodeConfig = NodeConfigs.newBuilder.withDefault(1).build().head
 

@@ -1,6 +1,6 @@
 package com.wavesplatform.it
 
-import com.wavesplatform.it.api.MultipleNodesApi
+import com.wavesplatform.it.api.AsyncNodeHttpApi
 import com.wavesplatform.it.api.Node.{AssetBalance, FullAssetInfo}
 import com.wavesplatform.it.util._
 import org.scalatest._
@@ -15,12 +15,12 @@ import scala.concurrent.{Await, Future}
 
 trait IntegrationSuiteWithThreeAddresses extends BeforeAndAfterAll with Matchers with ScalaFutures
   with IntegrationPatience with RecoverMethods with RequestErrorAssert with IntegrationTestsScheme
-  with MultipleNodesApi with HasNodes with ScorexLogging {
+  with AsyncNodes with ScorexLogging {
   this: Suite =>
 
-  def notMiner: AsyncDockerNode
+  def notMiner: AsyncNode
 
-  protected def sender: AsyncDockerNode = notMiner
+  protected def sender: AsyncNode = notMiner
 
   private def richAddress = sender.address
 
@@ -52,7 +52,7 @@ trait IntegrationSuiteWithThreeAddresses extends BeforeAndAfterAll with Matchers
     }
   }
 
-  protected def dumpBalances(node: AsyncDockerNode, accounts: Seq[String], label: String): Future[Unit] = {
+  protected def dumpBalances(node: AsyncNode, accounts: Seq[String], label: String): Future[Unit] = {
     Future
       .traverse(accounts) { acc =>
         accountBalance(acc).zip(accountEffectiveBalance(acc)).map(acc -> _)
@@ -72,7 +72,7 @@ trait IntegrationSuiteWithThreeAddresses extends BeforeAndAfterAll with Matchers
   // so we await tx twice
   protected def waitForHeightAraiseAndTxPresent(transactionId: String, heightIncreaseOn: Integer): Future[Unit] = for {
     height <- traverse(nodes)(_.height).map(_.max)
-    _ <- waitForSameBlocksAt(nodes, 2.seconds, height)
+    _ <- AsyncNodeHttpApi.waitForSameBlocksAt(nodes, 2.seconds, height)
     _ <- traverse(nodes)(_.waitForTransaction(transactionId))
     _ <- traverse(nodes)(_.waitForHeight(height + heightIncreaseOn))
     _ <- traverse(nodes)(_.waitForTransaction(transactionId))

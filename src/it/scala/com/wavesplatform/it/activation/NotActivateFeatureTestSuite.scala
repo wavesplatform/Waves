@@ -11,7 +11,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 
 class NotActivateFeatureTestSuite extends FreeSpec with Matchers with CancelAfterFailure
-  with ActivationStatusRequest with ReportingTestName {
+  with ActivationStatusRequest with ReportingTestName with AsyncNodes {
 
   private val votingInterval = 14
   private val blocksForActivation = 14

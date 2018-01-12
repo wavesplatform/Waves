@@ -11,7 +11,7 @@ import scala.concurrent.duration._
 import scala.util.Random
 
 class ValidChainGenerationSuite extends FreeSpec with IntegrationNodesInitializationAndStopping
-  with TransferSending with MultipleNodesApi with CancelAfterFailure {
+  with TransferSending with CancelAfterFailure {
 
   override protected def nodeConfigs: Seq[Config] = NodeConfigs.newBuilder
     .overrideBase(_.quorum(3))
@@ -30,7 +30,7 @@ class ValidChainGenerationSuite extends FreeSpec with IntegrationNodesInitializa
 
       rollbackNodes = Random.shuffle(nodes).take(n)
       _ <- traverse(rollbackNodes)(_.rollback(1))
-      _ <- waitForSameBlocksAt(nodes, 5.seconds, baseHeight)
+      _ <- AsyncNodeHttpApi.waitForSameBlocksAt(nodes, 5.seconds, baseHeight)
     } yield (), 7.minutes)
   }
 }

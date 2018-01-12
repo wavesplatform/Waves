@@ -13,7 +13,7 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
 class WideStateGenerationSuite extends FreeSpec with IntegrationNodesInitializationAndStopping
-  with Matchers with TransferSending with MultipleNodesApi {
+  with Matchers with TransferSending with DockerBased {
 
   override protected def createDocker: Docker = new Docker(
     suiteConfig = ConfigFactory.parseString(
@@ -55,7 +55,7 @@ class WideStateGenerationSuite extends FreeSpec with IntegrationNodesInitializat
 
       _ <- {
         log.debug(s"waitForSameBlocksAt($height)")
-        Await.ready(waitForSameBlocksAt(nodes, 5.seconds, height), 5.minutes)
+        Await.ready(AsyncNodeHttpApi.waitForSameBlocksAt(nodes, 5.seconds, height), 5.minutes)
       }
     } yield ()
 
@@ -81,7 +81,7 @@ class WideStateGenerationSuite extends FreeSpec with IntegrationNodesInitializat
     r
   }
 
-  private def dumpBlockChain(node: AsyncDockerNode): Future[String] = {
+  private def dumpBlockChain(node: AsyncNode): Future[String] = {
     val maxRequestSize = 100
 
     for {
