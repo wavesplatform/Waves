@@ -2,35 +2,42 @@ package com.wavesplatform.http
 
 import akka.http.scaladsl.model.StatusCodes
 import com.wavesplatform.http.ApiMarshallers._
-import com.wavesplatform.state2.EqByteArray
-import com.wavesplatform.state2.reader.StateReader
-import com.wavesplatform.{BlockGen, TransactionGen}
+import com.wavesplatform.settings.WalletSettings
+import com.wavesplatform.state2.reader.SnapshotStateReader
+import com.wavesplatform.{BlockGen, NoShrink, TestTime, TransactionGen, UtxPool}
+import io.netty.channel.group.ChannelGroup
+import monix.eval.Coeval
 import org.scalacheck.Gen._
-import org.scalacheck.Shrink
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json._
-import scorex.account.Account
+import scorex.account.Address
 import scorex.api.http.{InvalidAddress, InvalidSignature, TooBigArrayAllocation, TransactionsApiRoute}
 import scorex.crypto.encode.Base58
 import scorex.transaction._
-
-import scala.util.Random
+import scorex.wallet.Wallet
 
 class TransactionsRouteSpec extends RouteSpec("/transactions")
-  with RestAPISettingsHelper with MockFactory with Matchers with TransactionGen with BlockGen with PropertyChecks {
+  with RestAPISettingsHelper
+  with MockFactory
+  with Matchers
+  with TransactionGen
+  with BlockGen
+  with PropertyChecks
+  with NoShrink {
 
   import TransactionsApiRoute.MaxTransactionsPerRequest
 
   private val transactionsCount = 10
 
+  private val wallet = Wallet(WalletSettings(None, "qwerty", None))
   private val history = mock[History]
-  private val state = mock[StateReader]
-  private val stm = mock[UnconfirmedTransactionsStorage]
-  private val route = TransactionsApiRoute(restAPISettings, state, history, stm).route
+  private val state = mock[SnapshotStateReader]
+  private val utx = mock[UtxPool]
+  private val allChannels = mock[ChannelGroup]
+  private val route = TransactionsApiRoute(restAPISettings, wallet, Coeval.now(state), history, utx, allChannels, new TestTime).route
 
-  private implicit def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)
 
   routePath("/address/{address}/limit/{limit}") - {
     "handles invalid address" in {
@@ -57,9 +64,9 @@ class TransactionsRouteSpec extends RouteSpec("/transactions")
         accountGen,
         choose(1, MaxTransactionsPerRequest),
         randomTransactionsGen(transactionsCount)) { case (account, limit, txs) =>
-        (state.accountTransactionIds _).expects(account: Account).returning(txs.map(_.id).map(EqByteArray)).once()
+        (state.accountTransactionIds _).expects(account: Address, limit).returning(txs.map(_.id())).once()
         txs.foreach { tx =>
-          (state.transactionInfo _).expects(EqByteArray(tx.id)).returning(Some(1,tx)).once()
+          (state.transactionInfo _).expects(tx.id()).returning(Some((1, Some(tx)))).once()
         }
         Get(routePath(s"/address/${account.address}/limit/$limit")) ~> route ~> check {
           responseAs[Seq[JsValue]].length shouldEqual txs.length.min(limit)
@@ -81,22 +88,14 @@ class TransactionsRouteSpec extends RouteSpec("/transactions")
     "working properly otherwise" in {
       val txAvailability = for {
         tx <- randomTransactionGen
-        txList <- listOfN(99, tx)
-        signer <- accountGen
-        blk <- blockGen(Random.shuffle(tx :: txList), signer)
-        height <- option(posNum[Int])
-      } yield (tx, height, blk)
+        height <- posNum[Int]
+      } yield (tx, height)
 
-      forAll(txAvailability) { case (tx, height, block) =>
-        (state.transactionInfo _).expects(EqByteArray(tx.id)).returning(height.map((_, tx))).once()
-        height.foreach { h => (history.blockAt _).expects(h).returning(Some(block)).once() }
-        Get(routePath(s"/info/${Base58.encode(tx.id)}")) ~> route ~> check {
-          height match {
-            case None => status shouldEqual StatusCodes.NotFound
-            case Some(h) =>
-              status shouldEqual StatusCodes.OK
-              responseAs[JsValue] shouldEqual (tx.json + ("height" -> JsNumber(h)))
-          }
+      forAll(txAvailability) { case (tx, height) =>
+        (state.transactionInfo _).expects(tx.id()).returning(Some((height, Some(tx)))).once()
+        Get(routePath(s"/info/${tx.id().base58}")) ~> route ~> check {
+          status shouldEqual StatusCodes.OK
+          responseAs[JsValue] shouldEqual tx.json() + ("height" -> JsNumber(height))
         }
       }
     }
@@ -110,12 +109,50 @@ class TransactionsRouteSpec extends RouteSpec("/transactions")
       } yield t
 
       forAll(g) { txs =>
-        (stm.all _).expects().returning(txs).once()
+        (utx.all _).expects().returns(txs).once()
         Get(routePath("/unconfirmed")) ~> route ~> check {
           val resp = responseAs[Seq[JsValue]]
           for ((r, t) <- resp.zip(txs)) {
-            (r \ "signature").as[String] shouldEqual Base58.encode(t.signature)
+            (r \ "signature").as[String] shouldEqual t.signature.base58
           }
+        }
+      }
+    }
+  }
+
+  routePath("/unconfirmed/size") - {
+    "returns the size of unconfirmed transactions" in {
+      val g = for {
+        i <- chooseNum(0, 20)
+        t <- listOfN(i, randomTransactionGen)
+      } yield t
+
+      forAll(g) { txs =>
+        (utx.size _).expects().returns(txs.size).once()
+        Get(routePath("/unconfirmed/size")) ~> route ~> check {
+          status shouldEqual StatusCodes.OK
+          responseAs[JsValue] shouldEqual Json.obj("size" -> JsNumber(txs.size))
+        }
+      }
+    }
+  }
+
+  routePath("/unconfirmed/info/{signature}") - {
+    "handles invalid signature" in {
+      forAll(alphaNumStr.map(_ + "O")) { invalidBase58 =>
+        Get(routePath(s"/unconfirmed/info/$invalidBase58")) ~> route should produce(InvalidSignature)
+      }
+
+      Get(routePath(s"/unconfirmed/info/")) ~> route should produce(InvalidSignature)
+      Get(routePath(s"/unconfirmed/info")) ~> route should produce(InvalidSignature)
+    }
+
+    "working properly otherwise" in {
+      forAll(randomTransactionGen) { tx =>
+        (utx.transactionById _).expects(tx.id()).returns(Some(tx)).once()
+        Get(routePath(s"/unconfirmed/info/${tx.id().base58}")) ~> route ~> check {
+          status shouldEqual StatusCodes.OK
+          responseAs[JsValue] shouldEqual tx.json()
         }
       }
     }

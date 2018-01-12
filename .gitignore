@@ -20,6 +20,7 @@ target
 
 # local settings
 localsettings.json
+local.conf
 
 # Text files
 *.txt
@@ -35,3 +36,4 @@ Dockerfile
 
 package
 !src/package
+native

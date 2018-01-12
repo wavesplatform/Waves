@@ -11,7 +11,8 @@ case class IssueRequest(sender: String,
   @ApiModelProperty(allowableValues = "range[0,8]", example = "8", dataType = "integer", required = true)
   decimals: Byte,
   reissuable: Boolean,
-  fee: Long)
+  fee: Long,
+  timestamp: Option[Long] = None)
 
 object IssueRequest {
   implicit val issueFormat: Format[IssueRequest] = Json.format

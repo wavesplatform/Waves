@@ -1,15 +1,14 @@
 package scorex.network.message
 
 import com.google.common.primitives.{Bytes, Ints}
+import monix.eval.Coeval
 import scorex.crypto.hash.FastCryptographicHash._
-import scorex.network.ConnectedPeer
 import scorex.serialization.BytesSerializable
 
 import scala.util.{Success, Try}
 
-case class Message[Content](spec: MessageSpec[Content],
-                            input: Either[Array[Byte], Content],
-                            source: Option[ConnectedPeer]) extends BytesSerializable {
+case class Message[Content <: AnyRef](spec: MessageSpec[Content],
+                            input: Either[Array[Byte], Content]) extends BytesSerializable {
 
   import Message.{ChecksumLength, MAGIC}
 
@@ -25,7 +24,7 @@ case class Message[Content](spec: MessageSpec[Content],
 
   lazy val dataLength: Int = dataBytes.length
 
-  lazy val bytes: Array[Byte] = {
+  val bytes = Coeval.evalOnce {
     val dataWithChecksum = if (dataLength > 0) {
       val checksum = hash(dataBytes).take(ChecksumLength)
       Bytes.concat(checksum, dataBytes)

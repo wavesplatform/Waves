@@ -1,14 +1,29 @@
 package scorex
 
-import scorex.api.http.{ApiError, StateCheckFailed}
-import scorex.transaction.{Transaction, NewTransactionHandler, ValidationError}
+import com.wavesplatform.UtxPool
+import com.wavesplatform.network._
+import io.netty.channel.group.ChannelGroup
+import scorex.api.http.ApiError
+import scorex.transaction.{Transaction, ValidationError}
+
+import scala.concurrent.Future
 
 trait BroadcastRoute {
-  def transactionModule: NewTransactionHandler
+  def utx: UtxPool
 
-  protected def doBroadcast[A <: Transaction](v: Either[ValidationError, A]): Either[ApiError, A] =
-    (for {
+  def allChannels: ChannelGroup
+
+  import scala.concurrent.ExecutionContext.Implicits.global
+
+  protected def doBroadcast(v: Either[ValidationError, Transaction]): Future[Either[ApiError, Transaction]] = Future {
+    val r = for {
       tx <- v
-      r <- transactionModule.onNewOffchainTransaction(tx)
-    } yield r).left.map(ApiError.fromValidationError)
+      added <- utx.putIfNew(tx)
+    } yield {
+      if (added) allChannels.broadcastTx(tx, None)
+      tx
+    }
+
+    r.left.map(ApiError.fromValidationError)
+  }
 }

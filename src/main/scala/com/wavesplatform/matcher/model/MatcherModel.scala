@@ -1,8 +1,13 @@
 package com.wavesplatform.matcher.model
 
+import cats.Monoid
+import cats.implicits._
 import com.wavesplatform.matcher.model.MatcherModel.Price
-import play.api.libs.json.{JsValue, Json}
-import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
+import play.api.libs.json.{JsObject, JsValue, Json}
+import scorex.transaction.AssetAcc
+import scorex.transaction.assets.exchange._
+
+import scala.util.Try
 
 object MatcherModel {
   type Price = Long
@@ -20,39 +25,68 @@ sealed trait  LimitOrder {
 
   def getSpendAmount: Long
   def getReceiveAmount: Long
-  def feeAmount: Long = (BigInt(amount) * order.matcherFee  / order.amount).toLong
+  def feeAmount: Long = Try((BigInt(amount) * order.matcherFee  / order.amount).bigInteger.longValueExact()).getOrElse(Long.MaxValue)
+  def remainingAmount: Long = order.amount - amount
+  val remainingFee: Long = order.matcherFee - Try((BigInt(remainingAmount) * order.matcherFee  / order.amount).bigInteger.longValueExact()).getOrElse(0L)
+
+  def spentAcc: AssetAcc = AssetAcc(order.senderPublicKey, order.getSpendAssetId)
+  def rcvAcc: AssetAcc = AssetAcc(order.senderPublicKey, order.getReceiveAssetId)
+  def feeAcc: AssetAcc = AssetAcc(order.senderPublicKey, None)
+
+  def spentAsset: String = order.getSpendAssetId.map(_.base58).getOrElse(AssetPair.WavesName)
+  def rcvAsset: String = order.getReceiveAssetId.map(_.base58).getOrElse(AssetPair.WavesName)
+  def feeAsset: String = AssetPair.WavesName
 }
 
 case class BuyLimitOrder(price: Price, amount: Long, order: Order) extends LimitOrder {
   def partial(amount: Price): LimitOrder = copy(amount = amount)
   def getReceiveAmount: Long = amount
-  def getSpendAmount: Long = (BigInt(amount) * price / Order.PriceConstant ).bigInteger.longValueExact()
+  def getSpendAmount: Long = Try((BigInt(amount) * price / Order.PriceConstant ).bigInteger.longValueExact()).getOrElse(Long.MaxValue)
 }
 case class SellLimitOrder(price: Price, amount: Long, order: Order) extends LimitOrder {
   def partial(amount: Price): LimitOrder = copy(amount = amount)
   def getSpendAmount: Long = amount
-  def getReceiveAmount: Long = (BigInt(amount) * price / Order.PriceConstant).bigInteger.longValueExact()
+  def getReceiveAmount: Long = Try((BigInt(amount) * price / Order.PriceConstant).bigInteger.longValueExact()).getOrElse(Long.MaxValue)
 }
 
 
 object LimitOrder {
   sealed trait OrderStatus {
+    def name: String
     def json: JsValue
+    def isFinal: Boolean
+    def ordering: Int
   }
+
   case object Accepted extends OrderStatus {
-    def json = Json.obj("status" -> "Accepted")
+    val name = "Accepted"
+    def json: JsObject = Json.obj("status" -> name)
+    val isFinal: Boolean = false
+    val ordering = 2
   }
   case object NotFound extends OrderStatus {
-    def json = Json.obj("status" -> "NotFound")
+    val name = "NotFound"
+    def json: JsObject = Json.obj("status" -> name)
+    val isFinal: Boolean = true
+    val ordering = 5
   }
   case class PartiallyFilled(filled: Long) extends OrderStatus {
-    def json = Json.obj("status" -> "PartiallyFilled", "filledAmount" -> filled)
+    val name = "PartiallyFilled"
+    def json: JsObject = Json.obj("status" -> name, "filledAmount" -> filled)
+    val isFinal: Boolean = false
+    val ordering = 1
   }
   case object Filled extends OrderStatus {
-    def json = Json.obj("status" -> "Filled")
+    val name = "Filled"
+    def json = Json.obj("status" -> name)
+    val isFinal: Boolean = true
+    val ordering = 3
   }
   case class Cancelled(filled: Long) extends OrderStatus {
-    def json = Json.obj("status" -> "Cancelled", "filledAmount" -> filled)
+    val name = "Cancelled"
+    def json = Json.obj("status" -> name, "filledAmount" -> filled)
+    val isFinal: Boolean = true
+    val ordering = 4
   }
 
   def apply(o: Order): LimitOrder = o.orderType match {
@@ -65,13 +99,16 @@ object LimitOrder {
     case OrderType.SELL => SellLimitOrder(price, amount, o)
   }
 
+  def validateAmount(lo: LimitOrder): Validation = lo.order.isValidAmount(lo.price, lo.amount)
 }
 
 object Events {
   sealed trait Event
   case class OrderExecuted(submitted: LimitOrder, counter: LimitOrder) extends Event {
     def counterRemaining: Long = math.max(counter.amount - submitted.amount, 0)
+    def counterRemainingOrder: LimitOrder = counter.partial(counterRemaining)
     def submittedRemaining: Long = math.max(submitted.amount - counter.amount, 0)
+    def submittedRemainingOrder: LimitOrder = submitted.partial(submittedRemaining)
     def executedAmount: Long = math.min(submitted.amount, counter.amount)
     def submittedExecuted = submitted.partial(amount = executedAmount)
     def counterExecuted = counter.partial(amount = executedAmount)
@@ -81,4 +118,56 @@ object Events {
   case class OrderAdded(order: LimitOrder) extends Event
   case class OrderCanceled(limitOrder: LimitOrder) extends Event
 
+  case class ExchangeTransactionCreated(tx: ExchangeTransaction)
+
+  def createOrderInfo(event: Event): Map[String, OrderInfo] = {
+    event match {
+      case OrderAdded(lo) =>
+        Map(lo.order.idStr() ->
+          OrderInfo(lo.order.amount, 0L, false))
+      case oe: OrderExecuted =>
+        val (o1, o2) = (oe.submittedExecuted, oe.counterExecuted)
+        Map(o1.order.idStr() -> OrderInfo(o1.order.amount, o1.amount, false),
+          o2.order.idStr() -> OrderInfo(o2.order.amount, o2.amount, false)
+        )
+      case OrderCanceled(lo) =>
+        Map(lo.order.idStr() ->
+          OrderInfo(lo.order.amount, 0, true))
+    }
+  }
+
+  def createOpenPortfolio(event: Event): Map[String, OpenPortfolio] = {
+    def overdraftFee(lo: LimitOrder): Long = {
+      if (lo.feeAcc == lo.rcvAcc) math.max(lo.feeAmount - lo.getReceiveAmount, 0L) else lo.feeAmount
+    }
+
+    event match {
+      case OrderAdded(lo) =>
+        Map(lo.order.senderPublicKey.address -> OpenPortfolio(Monoid.combine(
+          Map(lo.spentAsset -> lo.getSpendAmount),
+          Map(lo.feeAsset -> overdraftFee(lo))
+        )))
+      case oe: OrderExecuted =>
+        val (o1, o2) = (oe.submittedExecuted, oe.counterExecuted)
+        val op1 = OpenPortfolio(Monoid.combine(
+          Map(o1.spentAsset -> -o1.getSpendAmount),
+          Map(o1.feeAsset -> -overdraftFee(o1))
+        ))
+        val op2 = OpenPortfolio(Monoid.combine(
+          Map(o2.spentAsset -> -o2.getSpendAmount),
+          Map(o2.feeAsset -> -overdraftFee(o2))
+        ))
+        Monoid.combine(
+          Map(o1.order.senderPublicKey.address -> op1),
+          Map(o2.order.senderPublicKey.address -> op2)
+        )
+      case OrderCanceled(lo) =>
+        val feeDiff = if (lo.feeAcc == lo.rcvAcc) math.max(lo.remainingFee - lo.getReceiveAmount, 0L) else lo.remainingFee
+        Map(lo.order.senderPublicKey.address ->
+          OpenPortfolio(Monoid.combine(
+            Map(lo.spentAsset -> -lo.getSpendAmount),
+            Map(lo.feeAsset -> -feeDiff)
+          )))
+    }
+  }
 }

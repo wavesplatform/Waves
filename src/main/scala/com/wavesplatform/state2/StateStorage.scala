@@ -1,88 +1,83 @@
 package com.wavesplatform.state2
 
-import com.google.common.primitives.Ints
-import com.wavesplatform.state2.StateStorage.SnapshotKey
-import org.h2.mvstore.{MVMap, MVStore}
-import scorex.account.Account
+import java.io.File
 
-class StateStorage private(db: MVStore) {
+import com.google.common.primitives.Ints
+import com.wavesplatform.utils._
+import org.h2.mvstore.`type`.ObjectDataType
+import org.h2.mvstore.MVMap
+import scorex.account.Address
+import scorex.utils.LogMVMapBuilder
+
+import scala.util.Try
+
+class StateStorage private(file: Option[File]) extends VariablesStorage(createMVStore(file)) with VersionableStorage with AutoCloseable {
 
   import StateStorage._
 
-  private val variables: MVMap[String, Int] = db.openMap("variables")
+  override protected val Version = 2
 
-  private def setPersistedVersion(version: Int) = variables.put(stateVersion, version)
+  def getHeight: Int = getInt(heightKey).getOrElse(0)
 
-  private def persistedVersion: Option[Int] = Option(variables.get(stateVersion))
+  def setHeight(i: Int): Unit = putInt(heightKey, i)
 
-  private def setDirty(isDirty: Boolean): Unit = variables.put(isDirtyFlag, if (isDirty) 1 else 0)
+  val transactions: MVMap[ByteStr, (Int, Array[Byte])] = db.openMap("txs", new LogMVMapBuilder[ByteStr, (Int, Array[Byte])]
+    .keyType(DataTypes.byteStr).valueType(DataTypes.tupleIntByteArray))
 
-  private def dirty(): Boolean = variables.get(isDirtyFlag) == 1
+  val wavesBalance: MVMap[ByteStr, (Long, Long, Long)] = db.openMap("wavesBalance",
+    new LogMVMapBuilder[ByteStr, (Long, Long, Long)]
+      .keyType(DataTypes.byteStr).valueType(DataTypes.waves))
 
-  def getHeight: Int = variables.get(heightKey)
+  val assetBalance = new MultiKeyMap[Long](db, new ObjectDataType(), "assetBalance")
 
-  def setHeight(i: Int): Unit = variables.put(heightKey, i)
+  val assets: MVMap[ByteStr, (Boolean, Long)] = db.openMap("assets",
+    new LogMVMapBuilder[ByteStr, (Boolean, Long)].keyType(DataTypes.byteStr).valueType(DataTypes.assets))
 
-  val transactions: MVMap[Array[Byte], (Int, Array[Byte])] = db.openMap("txs")
+  val accountTransactionIds: MVMap[AccountIdxKey, ByteStr] = db.openMap("accountTransactionIds",
+    new LogMVMapBuilder[AccountIdxKey, ByteStr].valueType(DataTypes.byteStr))
 
-  val portfolios: MVMap[Array[Byte], (Long, (Long, Long), Map[Array[Byte], Long])] = db.openMap("portfolios")
+  val accountTransactionsLengths: MVMap[ByteStr, Int] = db.openMap("accountTransactionsLengths",
+    new LogMVMapBuilder[ByteStr, Int].keyType(DataTypes.byteStr))
 
-  val assets: MVMap[Array[Byte], (Boolean, Long)] = db.openMap("assets")
+  val balanceSnapshots: MVMap[AccountIdxKey, (Int, Long, Long)] = db.openMap("balanceSnapshots",
+    new LogMVMapBuilder[AccountIdxKey, (Int, Long, Long)].valueType(DataTypes.balanceSnapshots))
 
-  val accountTransactionIds: MVMap[Array[Byte], List[Array[Byte]]] = db.openMap("accountTransactionIds")
+  val paymentTransactionHashes: MVMap[ByteStr, ByteStr] = db.openMap("paymentTransactionHashes",
+    new LogMVMapBuilder[ByteStr, ByteStr]
+      .keyType(DataTypes.byteStr)
+      .valueType(DataTypes.byteStr))
 
-  val balanceSnapshots: MVMap[SnapshotKey, (Int, Long, Long)] = db.openMap("balanceSnapshots")
+  val aliasToAddress: MVMap[String, ByteStr] = db.openMap("aliasToAddress", new LogMVMapBuilder[String, ByteStr]
+    .valueType(DataTypes.byteStr))
 
-  val paymentTransactionHashes: MVMap[Array[Byte], Array[Byte]] = db.openMap("paymentTransactionHashes")
+  val orderFills: MVMap[ByteStr, (Long, Long)] = db.openMap("orderFills", new LogMVMapBuilder[ByteStr, (Long, Long)]
+    .keyType(DataTypes.byteStr).valueType(DataTypes.orderFills))
 
-  val aliasToAddress: MVMap[String, Array[Byte]] = db.openMap("aliasToAddress")
+  val leaseState: MVMap[ByteStr, Boolean] = db.openMap("leaseState", new LogMVMapBuilder[ByteStr, Boolean]
+    .keyType(DataTypes.byteStr))
 
-  val orderFills: MVMap[Array[Byte], (Long, Long)] = db.openMap("orderFills")
+  val lastBalanceSnapshotHeight: MVMap[ByteStr, Int] = db.openMap("lastUpdateHeight", new LogMVMapBuilder[ByteStr, Int]
+    .keyType(DataTypes.byteStr))
 
-  val leaseState: MVMap[Array[Byte], Boolean] = db.openMap("leaseState")
+  def commit(compact: Boolean): Unit = {
+    db.commit()
+    if (compact)
+      db.compact(CompactFillRate, CompactMemorySize)
+  }
 
-  val lastUpdateHeight: MVMap[Array[Byte], Int] = db.openMap("lastUpdateHeight")
-
-  val uniqueAssets: MVMap[Array[Byte], Array[Byte]] = db.openMap("uniqueAssets")
-
-  def commit(): Unit = db.commit()
-
+  override def close(): Unit = db.close()
 }
 
 object StateStorage {
-
-  private val VERSION = 1
+  private val CompactFillRate = 80
+  private val CompactMemorySize = 19 * 1024 * 1024
 
   private val heightKey = "height"
-  private val isDirtyFlag = "isDirty"
-  private val stateVersion = "stateVersion"
 
-  def apply(db: MVStore): Either[String, StateStorage] = {
-    val s = new StateStorage(db)
+  def apply(file: Option[File], dropExisting: Boolean): Try[StateStorage] =
+    createWithStore(file, new StateStorage(file), deleteExisting = dropExisting)
 
-    if (s.dirty())
-      Left("Persisted state is corrupt")
-    else {
-      s.persistedVersion match {
-        case None =>
-          s.setPersistedVersion(VERSION)
-          s.commit()
-          Right(s)
-        case Some(`VERSION`) => Right(s)
-        case Some(pv) => Left(s"Persisted state has version $pv, current scheme version is $VERSION")
+  type AccountIdxKey = Array[Byte]
 
-      }
-    }
-  }
-
-  type SnapshotKey = Array[Byte]
-
-  def snapshotKey(acc: Account, height: Int): SnapshotKey = acc.bytes ++ Ints.toByteArray(height)
-
-  def dirty[R](p: StateStorage)(f: => R): R = {
-    p.setDirty(true)
-    val r = f
-    p.setDirty(false)
-    r
-  }
+  def accountIndexKey(acc: Address, index: Int): AccountIdxKey = acc.bytes.arr ++ Ints.toByteArray(index)
 }

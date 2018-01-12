@@ -1,7 +1,8 @@
 package scorex.utils
 
-import java.util.concurrent.locks.{Lock, ReentrantReadWriteLock}
+import java.util.concurrent.locks.ReentrantReadWriteLock
 
+import com.google.common.base.Throwables
 import scorex.utils.Synchronized.{ReadLock, _}
 
 // http://vlkan.com/blog/post/2015/09/09/enforce-locking/
@@ -58,6 +59,11 @@ trait Synchronized extends ScorexLogging {
       f(value)
     }
 
+    def transform(newVal: T => T)(implicit readWriteLock: WriteLock): T = {
+      value = newVal(value)
+      value
+    }
+
     def set(newVal: => T)(implicit readWriteLock: WriteLock): T = {
       val oldVal = value
       value = newVal
@@ -65,21 +71,27 @@ trait Synchronized extends ScorexLogging {
     }
   }
 
-  protected def read[T](body: ReadLock => T): T =
+  def read[T](body: ReadLock => T): T =
     synchronizeOperation(instanceReadLock)(body)
 
-  protected def write[T](body: WriteLock => T): T =
+  def write[T](body: WriteLock => T): T =
     synchronizeOperation(instanceReadWriteLock)(body)
 
   protected def synchronizeOperation[T, L <: TypedLock](lock: L)(body: L => T): T = {
     lock.lock()
-    log.trace(s"locked $lock")
     try {
       body(lock)
+    } catch {
+      case e: Throwable =>
+        log.error(Throwables.getStackTraceAsString(e))
+        throw e
     }
     finally {
       lock.unlock()
-      log.trace(s"unlocked $lock")
     }
   }
+}
+
+trait SynchronizedOne extends Synchronized {
+  val synchronizationToken: ReentrantReadWriteLock = new ReentrantReadWriteLock()
 }

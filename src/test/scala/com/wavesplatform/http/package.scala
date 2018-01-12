@@ -1,16 +1,11 @@
 package com.wavesplatform
 
-import java.util.concurrent.locks.ReentrantReadWriteLock
-
 import org.scalatest.matchers.{HavePropertyMatchResult, HavePropertyMatcher}
 import play.api.libs.json.{JsValue, Reads}
-import scorex.utils.Synchronized
 
 import scala.reflect.ClassTag
 
 package object http {
-
-  import scala.language.implicitConversions
 
   def sameSignature(target: Array[Byte])(actual: Array[Byte]): Boolean = target sameElements actual
 
@@ -26,10 +21,4 @@ package object http {
       val actualFieldValue = (json \ v._1).as[JsValue]
       HavePropertyMatchResult(actualFieldValue == v._2, v._1, v._2, actualFieldValue)
     }
-
-//  def sync[A <: Synchronized](a: A): A = {
-//    val r = new ReentrantReadWriteLock()
-//    (a.synchronizationToken _).expects().returns(r).anyNumberOfTimes()
-//    a
-//  }
 }

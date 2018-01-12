@@ -2,7 +2,7 @@ package scorex.api.http.leasing
 
 import io.swagger.annotations.ApiModelProperty
 import play.api.libs.json.{Format, Json}
-import scorex.account.{AccountOrAlias, PublicKeyAccount}
+import scorex.account.{AddressOrAlias, PublicKeyAccount}
 import scorex.api.http.BroadcastRequest
 import scorex.transaction.TransactionParser.SignatureStringLength
 import scorex.transaction.ValidationError
@@ -23,7 +23,7 @@ case class SignedLeaseRequest(@ApiModelProperty(value = "Base58 encoded sender p
   def toTx: Either[ValidationError, LeaseTransaction] = for {
     _sender <- PublicKeyAccount.fromBase58String(senderPublicKey)
     _signature <- parseBase58(signature, "invalid.signature", SignatureStringLength)
-    _recipient <- AccountOrAlias.fromString(recipient)
+    _recipient <- AddressOrAlias.fromString(recipient)
     _t <- LeaseTransaction.create(_sender, amount, fee, timestamp, _recipient, _signature)
   } yield _t
 }

@@ -1,32 +1,32 @@
 package scorex.account
 
 import com.wavesplatform.TransactionGen
+import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
-import org.scalatest.prop.{GeneratorDrivenPropertyChecks, PropertyChecks}
 
-class AccountOrAliasSpecification extends PropSpec with PropertyChecks with GeneratorDrivenPropertyChecks with Matchers with TransactionGen {
+class AccountOrAliasSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 
-  property("Account serialization roundtrip") {
-    forAll(accountGen) { acc: PrivateKeyAccount =>
-      val ser = acc.bytes
-      val deser = Account.fromBytes(ser).right.get
-      deser.stringRepr shouldBe acc.stringRepr
+  property("Account serialization round trip") {
+    forAll(accountGen) { account: PrivateKeyAccount =>
+      val bytes = account.bytes.arr
+      val address = Address.fromBytes(bytes).right.get
+      address.stringRepr shouldBe account.stringRepr
     }
   }
 
-  property("Alias serialization roundtrip") {
+  property("Alias serialization round trip") {
     forAll(aliasGen) { alias: Alias =>
-      val ser = alias.bytes
-      val deser = Alias.fromBytes(ser).right.get
-      deser.stringRepr shouldBe alias.stringRepr
+      val bytes = alias.bytes.arr
+      val representation = Alias.fromBytes(bytes).right.get
+      representation.stringRepr shouldBe representation.stringRepr
     }
   }
 
-  property("AccountOrAlias serialization roundtrip") {
-    forAll(accountOrAliasGen) { aoa: AccountOrAlias =>
-      val ser = aoa.bytes
-      val deser = AccountOrAlias.fromBytes(ser, 0).right.get
-      deser._1.stringRepr shouldBe aoa.stringRepr
+  property("AccountOrAlias serialization round trip") {
+    forAll(accountOrAliasGen) { aoa: AddressOrAlias =>
+      val bytes = aoa.bytes.arr
+      val addressOrAlias = AddressOrAlias.fromBytes(bytes, 0).right.get
+      addressOrAlias._1.stringRepr shouldBe aoa.stringRepr
     }
   }
 }

@@ -1,13 +1,15 @@
 package com.wavesplatform.matcher.model
 
+import com.wavesplatform.NoShrink
 import com.wavesplatform.matcher.MatcherTestData
-import com.wavesplatform.matcher.market.OrderBookActor.Snapshot
 import com.wavesplatform.matcher.market.MatcherActor.OrderBookCreated
-import com.wavesplatform.matcher.model.MatcherSerializer._
+import com.wavesplatform.matcher.market.OrderBookActor.Snapshot
 import com.wavesplatform.matcher.model.MatcherModel.{Level, Price}
+import com.wavesplatform.matcher.model.MatcherSerializer._
+import com.wavesplatform.state2.ByteStr
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
-import org.scalatest.{DoNotDiscover, Matchers, PropSpec}
+import org.scalatest.{Matchers, PropSpec}
 import play.api.libs.json.Json
 import scorex.transaction.assets.exchange.AssetPair
 
@@ -16,9 +18,10 @@ import scala.collection.immutable.TreeMap
 class EventJsonSpecification extends PropSpec
   with PropertyChecks
   with Matchers
-  with MatcherTestData {
+  with MatcherTestData
+  with NoShrink {
 
-  val pair = AssetPair(Some("BTC".getBytes), Some("WAVES".getBytes))
+  val pair = AssetPair(Some(ByteStr("BTC".getBytes)), Some(ByteStr("WAVES".getBytes)))
 
   val buyLevelGen: Gen[Vector[BuyLimitOrder]] =
     Gen.containerOf[Vector, BuyLimitOrder](buyLimitOrderGenerator)
@@ -57,8 +60,7 @@ class EventJsonSpecification extends PropSpec
       val res = j.validate[OrderBook]
       res.get should === (ob)
 
-      val cache = Map[String, (Long, Long)]("account1" -> (100L, 0L), "account2" -> (105L, 30L))
-      val s = Snapshot(ob, cache)
+      val s = Snapshot(ob)
 
       val js = Json.toJson(s)
       val restored = js.validate[Snapshot]

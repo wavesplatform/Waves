@@ -1,77 +1,84 @@
 package com.wavesplatform.settings
 
+import java.io.File
+import java.net.{InetSocketAddress, URI}
+
+import com.google.common.base.Charsets
 import com.typesafe.config.Config
+import com.wavesplatform.network.TrafficLogger
 import net.ceedubs.ficus.Ficus._
+import net.ceedubs.ficus.readers.ArbitraryTypeReader._
+import net.ceedubs.ficus.readers.ValueReader
 
 import scala.concurrent.duration.FiniteDuration
 import scala.util.Random
 
 case class UPnPSettings(enable: Boolean, gatewayTimeout: FiniteDuration, discoverTimeout: FiniteDuration)
 
-object UPnPSettings {
-  val configPath: String = "waves.network.upnp"
-
-  def fromConfig(config: Config): UPnPSettings = {
-    val enable = config.as[Boolean](s"$configPath.enable")
-    val gatewayTimeout = config.as[FiniteDuration](s"$configPath.gateway-timeout")
-    val discoverTimeout = config.as[FiniteDuration](s"$configPath.discover-timeout")
-
-    UPnPSettings(enable, gatewayTimeout, discoverTimeout)
-  }
-}
-
-case class NetworkSettings(file: String,
-                           bindAddress: String,
-                           port: Int,
+case class NetworkSettings(file: Option[File],
+                           bindAddress: InetSocketAddress,
+                           declaredAddress: Option[InetSocketAddress],
                            nodeName: String,
-                           declaredAddress: String,
                            nonce: Long,
-                           knownPeers: List[String],
-                           localOnly: Boolean,
+                           knownPeers: Seq[String],
                            peersDataResidenceTime: FiniteDuration,
                            blackListResidenceTime: FiniteDuration,
                            maxInboundConnections: Int,
                            maxOutboundConnections: Int,
-                           maxConnectionsWithSingleHost: Int,
+                           maxConnectionsPerHost: Int,
                            connectionTimeout: FiniteDuration,
-                           outboundBufferSize: Long,
-                           minEphemeralPortNumber: Int,
                            maxUnverifiedPeers: Int,
+                           enablePeersExchange: Boolean,
+                           enableBlacklisting: Boolean,
                            peersBroadcastInterval: FiniteDuration,
-                           blackListThreshold: Int,
-                           unrequestedPacketsThreshold: Int,
-                           uPnPSettings: UPnPSettings)
+                           handshakeTimeout: FiniteDuration,
+                           suspensionResidenceTime: FiniteDuration,
+                           uPnPSettings: UPnPSettings,
+                           trafficLogger: TrafficLogger.Settings)
 
 object NetworkSettings {
-  val configPath: String = "waves.network"
+  private val MaxNodeNameBytesLength = 127
+  implicit val networkSettingsValueReader: ValueReader[NetworkSettings] =
+    (cfg: Config, path: String) => fromConfig(cfg.getConfig(path))
 
-  def fromConfig(config: Config): NetworkSettings = {
-    val file = config.as[String](s"$configPath.file")
-    val bindAddress = config.as[String](s"$configPath.bind-address")
-    val port = config.as[Int](s"$configPath.port")
-    val nonce = if (config.hasPath(s"$configPath.nonce")) config.as[Long](s"$configPath.nonce") else randomNonce
-    val nodeName = if (config.hasPath(s"$configPath.node-name")) config.as[String](s"$configPath.node-name") else s"Node-$nonce"
-    val declaredAddress = config.as[String](s"$configPath.declared-address")
-    val knownPeers = config.as[List[String]](s"$configPath.known-peers")
-    val localOnly = config.as[Boolean](s"$configPath.local-only")
-    val peersDataResidenceTime = config.as[FiniteDuration](s"$configPath.peers-data-residence-time")
-    val blackListResidenceTime = config.as[FiniteDuration](s"$configPath.black-list-residence-time")
-    val maxInboundConnections = config.as[Int](s"$configPath.max-inbound-connections")
-    val maxOutboundConnections = config.as[Int](s"$configPath.max-outbound-connections")
-    val maxConnectionsFromSingleHost = config.as[Int](s"$configPath.max-single-host-connections")
-    val connectionTimeout = config.as[FiniteDuration](s"$configPath.connection-timeout")
-    val outboundBufferSize = config.getBytes(s"$configPath.outbound-buffer-size")
-    val minEphemeralPortNumber = config.as[Int](s"$configPath.min-ephemeral-port-number")
-    val maxUnverifiedPeers = config.as[Int](s"$configPath.max-unverified-peers")
-    val peersBroadcastInterval = config.as[FiniteDuration](s"$configPath.peers-broadcast-interval")
-    val blackListThreshold = config.as[Int](s"$configPath.black-list-threshold")
-    val unrequestedPacketsThreshold = config.as[Int](s"$configPath.unrequested-packets-threshold")
-    val uPnPSettings = UPnPSettings.fromConfig(config)
+  implicit val byteReader: ValueReader[Byte] = { (cfg: Config, path: String) =>
+    val x = cfg.getInt(path)
+    if (x.isValidByte) x.toByte
+    else throw new IllegalArgumentException(s"$path has an invalid value: '$x' expected to be a byte")
+  }
 
-    NetworkSettings(file, bindAddress, port, nodeName, declaredAddress, nonce, knownPeers, localOnly,
+  private def fromConfig(config: Config): NetworkSettings = {
+    val file = config.getAs[File]("file")
+    val bindAddress = new InetSocketAddress(config.as[String]("bind-address"), config.as[Int]("port"))
+    val nonce = config.getOrElse("nonce", randomNonce)
+    val nodeName = config.getOrElse("node-name", s"Node-$nonce")
+    require(nodeName.getBytes(Charsets.UTF_8).length <= MaxNodeNameBytesLength,
+      s"Node name should have length less than $MaxNodeNameBytesLength bytes")
+    val declaredAddress = config.getAs[String]("declared-address").map { address =>
+      val uri = new URI(s"my://$address")
+      new InetSocketAddress(uri.getHost, uri.getPort)
+    }
+
+    val knownPeers = config.as[Seq[String]]("known-peers")
+    val peersDataResidenceTime = config.as[FiniteDuration]("peers-data-residence-time")
+    val blackListResidenceTime = config.as[FiniteDuration]("black-list-residence-time")
+    val maxInboundConnections = config.as[Int]("max-inbound-connections")
+    val maxOutboundConnections = config.as[Int]("max-outbound-connections")
+    val maxConnectionsFromSingleHost = config.as[Int]("max-single-host-connections")
+    val connectionTimeout = config.as[FiniteDuration]("connection-timeout")
+    val maxUnverifiedPeers = config.as[Int]("max-unverified-peers")
+    val enablePeersExchange = config.as[Boolean]("enable-peers-exchange")
+    val enableBlacklisting = config.as[Boolean]("enable-blacklisting")
+    val peersBroadcastInterval = config.as[FiniteDuration]("peers-broadcast-interval")
+    val handshakeTimeout = config.as[FiniteDuration]("handshake-timeout")
+    val suspensionResidenceTime = config.as[FiniteDuration]("suspension-residence-time")
+    val uPnPSettings = config.as[UPnPSettings]("upnp")
+    val trafficLogger = config.as[TrafficLogger.Settings]("traffic-logger")
+
+    NetworkSettings(file, bindAddress, declaredAddress, nodeName, nonce, knownPeers,
       peersDataResidenceTime, blackListResidenceTime, maxInboundConnections, maxOutboundConnections,
-      maxConnectionsFromSingleHost, connectionTimeout, outboundBufferSize, minEphemeralPortNumber, maxUnverifiedPeers,
-      peersBroadcastInterval, blackListThreshold, unrequestedPacketsThreshold, uPnPSettings)
+      maxConnectionsFromSingleHost, connectionTimeout, maxUnverifiedPeers, enablePeersExchange,
+      enableBlacklisting, peersBroadcastInterval, handshakeTimeout, suspensionResidenceTime, uPnPSettings, trafficLogger)
   }
 
   private def randomNonce: Long = {

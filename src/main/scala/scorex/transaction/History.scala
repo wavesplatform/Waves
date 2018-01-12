@@ -1,92 +1,120 @@
 package scorex.transaction
 
-import scorex.account.Account
-import scorex.block.Block
+import com.wavesplatform.network.{BlockCheckpoint, Checkpoint}
+import com.wavesplatform.state2.ByteStr
 import scorex.block.Block.BlockId
-import scorex.crypto.encode.Base58
-import scorex.network.Checkpoint
+import scorex.block.{Block, BlockHeader, MicroBlock}
+import scorex.consensus.nxt.NxtLikeConsensusBlockData
+import scorex.transaction.History.{BlockMinerInfo, BlockchainScore}
+import scorex.utils.Synchronized
 
 import scala.util.Try
-import scorex.transaction.History.BlockchainScore
-import scorex.utils.{ Synchronized}
 
-trait History extends Synchronized {
+trait History extends Synchronized with AutoCloseable {
 
   def height(): Int
 
   def blockAt(height: Int): Option[Block]
 
-  def blockBytes (height: Int): Option[Array[Byte]]
+  def blockHeaderAndSizeAt(height: Int): Option[(BlockHeader, Int)]
 
-  def score(): BlockchainScore
+  def blockBytes(height: Int): Option[Array[Byte]]
 
-  def scoreOf(id: BlockId): BlockchainScore
+  def scoreOf(id: ByteStr): Option[BlockchainScore]
 
-  def heightOf(blockId: BlockId): Option[Int]
+  def heightOf(blockId: ByteStr): Option[Int]
 
-  def generatedBy(account: Account, from: Int, to: Int): Seq[Block]
+  def lastBlockIds(howMany: Int): Seq[ByteStr]
 
-  def lastBlockIds(howMany: Int): Seq[BlockId]
+  def lastBlockTimestamp(): Option[Long]
+
+  def lastBlockId(): Option[ByteStr]
 }
 
-trait HistoryWriter extends History {
-  def appendBlock(block: Block): Either[ValidationError, Unit]
+trait NgHistory extends History {
+  def microBlock(id: ByteStr): Option[MicroBlock]
 
-  def discardBlock(): Unit
+  def bestLastBlockInfo(maxTimestamp: Long): Option[BlockMinerInfo]
+}
+
+trait DebugNgHistory {
+  def lastPersistedBlockIds(count: Int): Seq[BlockId]
+
+  def microblockIds(): Seq[BlockId]
 }
 
 trait CheckpointService {
 
-  def set(checkpoint: Option[Checkpoint])
+  def set(checkpoint: Checkpoint): Either[ValidationError, Unit]
 
   def get: Option[Checkpoint]
 }
 
+object CheckpointService {
+
+  implicit class CheckpointServiceExt(cs: CheckpointService) {
+    def isBlockValid(candidateSignature: ByteStr, estimatedHeight: Int): Boolean =
+      !cs.get.exists {
+        _.items.exists { case BlockCheckpoint(h, sig) =>
+          h == estimatedHeight && candidateSignature != ByteStr(sig)
+        }
+      }
+  }
+
+}
 
 object History {
+
   type BlockchainScore = BigInt
 
+  case class BlockMinerInfo(consensus: NxtLikeConsensusBlockData, timestamp: Long, blockId: BlockId)
+
   implicit class HistoryExt(history: History) {
+
+    def score(): BlockchainScore = history.read { implicit lock =>
+      history.lastBlock.flatMap(last => history.scoreOf(last.uniqueId)).getOrElse(0)
+    }
+
     def isEmpty: Boolean = history.height() == 0
 
     def contains(block: Block): Boolean = history.contains(block.uniqueId)
 
-    def contains(signature: Array[Byte]): Boolean = history.heightOf(signature).isDefined
+    def contains(signature: ByteStr): Boolean = history.heightOf(signature).isDefined
 
-    def blockById(blockId: BlockId): Option[Block] = history.read { implicit lock =>
+    def blockById(blockId: ByteStr): Option[Block] = history.read { _ =>
       history.heightOf(blockId).flatMap(history.blockAt)
     }
 
-    def blockById(blockId: String): Option[Block] = Base58.decode(blockId).toOption.flatMap(history.blockById)
+    def blockById(blockId: String): Option[Block] = ByteStr.decodeBase58(blockId).toOption.flatMap(history.blockById)
 
     def heightOf(block: Block): Option[Int] = history.heightOf(block.uniqueId)
 
-    def confirmations(block: Block): Option[Int] = history.read { implicit lock =>
+    def confirmations(block: Block): Option[Int] = history.read { _ =>
       heightOf(block).map(history.height() - _)
     }
 
-    def lastBlock: Block = history.read { implicit lock =>
-      history.blockAt(history.height()).get
+    def lastBlock: Option[Block] = history.read { _ =>
+      history.blockAt(history.height())
     }
 
     def averageDelay(block: Block, blockNum: Int): Try[Long] = Try {
       (block.timestamp - parent(block, blockNum).get.timestamp) / blockNum
     }
 
-    def parent(block: Block, back: Int = 1): Option[Block] = history.read { implicit lock =>
+    def parent(block: Block, back: Int = 1): Option[Block] = history.read { _ =>
       require(back > 0)
       history.heightOf(block.reference).flatMap(referenceHeight => history.blockAt(referenceHeight - back + 1))
     }
 
-    def child(block: Block): Option[Block] = history.read { implicit lock =>
+    def child(block: Block): Option[Block] = history.read { _ =>
       history.heightOf(block.uniqueId).flatMap(h => history.blockAt(h + 1))
     }
 
-    def lastBlocks(howMany: Int): Seq[Block] = history.read { implicit lock =>
+    def lastBlocks(howMany: Int): Seq[Block] = history.read { _ =>
       (Math.max(1, history.height() - howMany + 1) to history.height()).flatMap(history.blockAt).reverse
     }
 
-    def blockIdsAfter(parentSignature: BlockId, howMany: Int): Seq[BlockId] = history.read { implicit lock =>
+    def blockIdsAfter(parentSignature: ByteStr, howMany: Int): Seq[ByteStr] = history.read { _ =>
       history.heightOf(parentSignature).map { h =>
         (h + 1).to(Math.min(history.height(), h + howMany: Int)).flatMap(history.blockAt).map(_.uniqueId)
       }.getOrElse(Seq())
@@ -94,5 +122,4 @@ object History {
 
     def genesis: Block = history.blockAt(1).get
   }
-
 }

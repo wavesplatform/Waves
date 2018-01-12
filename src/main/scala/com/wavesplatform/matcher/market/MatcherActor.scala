@@ -3,48 +3,59 @@ package com.wavesplatform.matcher.market
 import akka.actor.{ActorRef, Props}
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import akka.persistence.{PersistentActor, RecoveryCompleted}
+import com.wavesplatform.UtxPool
 import com.wavesplatform.matcher.MatcherSettings
 import com.wavesplatform.matcher.api.{MatcherResponse, StatusCodeMatcherResponse}
 import com.wavesplatform.matcher.market.OrderBookActor.{DeleteOrderBookRequest, GetOrderBookResponse, OrderBookRequest}
 import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state2.reader.StateReader
-import play.api.libs.json.{JsArray, JsValue, Json}
+import com.wavesplatform.state2.StateReader
+import io.netty.channel.group.ChannelGroup
+import play.api.libs.json._
+import scorex.account.Address
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange.Validation.booleanOperators
 import scorex.transaction.assets.exchange.{AssetPair, Order, Validation}
-import scorex.transaction.{AssetId, History, NewTransactionHandler}
-import scorex.utils.{ByteArrayExtension, NTP, ScorexLogging, Time}
+import scorex.transaction.{AssetId, History}
+import scorex.utils._
 import scorex.wallet.Wallet
 
 import scala.collection.{immutable, mutable}
 import scala.language.reflectiveCalls
 
-class MatcherActor(storedState: StateReader, wallet: Wallet, settings: MatcherSettings, history: History,
-                   functionalitySettings: FunctionalitySettings,
-                   transactionModule: NewTransactionHandler
-                  ) extends PersistentActor with ScorexLogging {
+class MatcherActor(orderHistory: ActorRef, storedState: StateReader, wallet: Wallet, utx: UtxPool, allChannels: ChannelGroup,
+                   settings: MatcherSettings, history: History, functionalitySettings: FunctionalitySettings)
+  extends PersistentActor with ScorexLogging {
 
   import MatcherActor._
 
-  val openMarkets: mutable.Buffer[MarketData] = mutable.Buffer.empty[MarketData]
-  val tradedPairs: mutable.Buffer[AssetPair] = mutable.Buffer.empty[AssetPair]
+  val tradedPairs = mutable.Map.empty[AssetPair, MarketData]
+
+  def getAssetName(asset: Option[AssetId]): String =
+    asset.map(storedState().getAssetName).getOrElse(AssetPair.WavesName)
 
   def createOrderBook(pair: AssetPair): ActorRef = {
-    def getAssetName(asset: Option[AssetId]): String = asset.map(storedState.getAssetName).getOrElse(AssetPair.WavesName)
+    val s = storedState()
+    def getAssetName(asset: Option[AssetId]): String = asset.map(s.getAssetName).getOrElse(AssetPair.WavesName)
 
-    openMarkets += MarketData(pair, getAssetName(pair.amountAsset), getAssetName(pair.priceAsset), NTP.correctedTime())
-    tradedPairs += pair
+    val md = MarketData(pair, getAssetName(pair.amountAsset), getAssetName(pair.priceAsset), NTP.correctedTime(),
+      pair.amountAsset.flatMap(s.getIssueTransaction).map(t => AssetInfo(t.decimals)),
+      pair.priceAsset.flatMap(s.getIssueTransaction).map(t => AssetInfo(t.decimals)))
+    tradedPairs += pair -> md
 
-    context.actorOf(OrderBookActor.props(pair, storedState, wallet, settings, transactionModule, history, functionalitySettings),
+    context.actorOf(OrderBookActor.props(pair, orderHistory, storedState, settings, wallet, utx, allChannels, history, functionalitySettings),
       OrderBookActor.name(pair))
   }
 
   def basicValidation(msg: {def assetPair: AssetPair}): Validation = {
-    msg.assetPair.isValid :| "Invalid AssetPair" &&
-      msg.assetPair.priceAsset.map(storedState.totalAssetQuantity).forall(_ > 0) :|
+    val s = storedState()
+    def isAssetsExist: Validation = {
+      msg.assetPair.priceAsset.forall(s.assetExists(_)) :|
         s"Unknown Asset ID: ${msg.assetPair.priceAssetStr}" &&
-      msg.assetPair.amountAsset.map(storedState.totalAssetQuantity).forall(_ > 0) :|
-        s"Unknown Asset ID: ${msg.assetPair.amountAssetStr}"
+        msg.assetPair.amountAsset.forall(s.assetExists(_)) :|
+          s"Unknown Asset ID: ${msg.assetPair.amountAssetStr}"
+    }
+
+    msg.assetPair.isValid :| "Invalid AssetPair" && isAssetsExist
   }
 
   def checkPairOrdering(aPair: AssetPair): Validation = {
@@ -52,13 +63,34 @@ class MatcherActor(storedState: StateReader, wallet: Wallet, settings: MatcherSe
 
     val isCorrectOrder = if (tradedPairs.contains(aPair)) true
     else if (tradedPairs.contains(reversePair)) false
-    else if (settings.priceAssets.contains(aPair.priceAssetStr) &&
-      !settings.priceAssets.contains(aPair.amountAssetStr)) true
-    else if (settings.priceAssets.contains(reversePair.priceAssetStr) &&
-      !settings.priceAssets.contains(reversePair.amountAssetStr)) false
-    else ByteArrayExtension.compare(aPair.priceAsset, aPair.amountAsset) < 0
+    else if (settings.priceAssets.contains(aPair.priceAssetStr) && settings.priceAssets.contains(aPair.amountAssetStr)) {
+      settings.priceAssets.indexOf(aPair.priceAssetStr) < settings.priceAssets.indexOf(aPair.amountAssetStr)
+    }
+    else if (settings.priceAssets.contains(aPair.priceAssetStr)) true
+    else if (settings.priceAssets.contains(reversePair.priceAssetStr)) false
+    else compare(aPair.priceAsset.map(_.arr), aPair.amountAsset.map(_.arr)) < 0
 
     isCorrectOrder :| s"Invalid AssetPair ordering, should be reversed: $reversePair"
+  }
+
+  def checkBlacklistRegex(aPair: AssetPair): Validation = {
+      val (amountName, priceName) = (getAssetName(aPair.amountAsset), getAssetName(aPair.priceAsset))
+      settings.blacklistedNames.forall(_.findFirstIn(amountName).isEmpty) :| s"Invalid Asset Name: $amountName" &&
+        settings.blacklistedNames.forall(_.findFirstIn(priceName).isEmpty) :| s"Invalid Asset Name: $priceName"
+  }
+
+  def checkBlacklistId(aPair: AssetPair): Validation = {
+    !settings.blacklistedAssets.contains(aPair.priceAssetStr) :| s"Invalid Asset ID: ${aPair.priceAssetStr}" &&
+      !settings.blacklistedAssets.contains(aPair.amountAssetStr) :| s"Invalid Asset ID: ${aPair.amountAssetStr}"
+  }
+
+  def checkBlacklistedAddress(address: Address)(f: => Unit): Unit = {
+    val v =  !settings.blacklistedAdresses.contains(address.address) :| s"Invalid Address: ${address.address}"
+    if (!v) {
+      sender() ! StatusCodeMatcherResponse(StatusCodes.Forbidden, v.messages())
+    } else {
+      f
+    }
   }
 
   def createAndForward(order: Order): Unit = {
@@ -75,7 +107,7 @@ class MatcherActor(storedState: StateReader, wallet: Wallet, settings: MatcherSe
   def forwardReq(req: Any)(orderBook: ActorRef): Unit = orderBook forward req
 
   def checkAssetPair[A <: {def assetPair : AssetPair}](msg: A)(f: => Unit): Unit = {
-    val v = basicValidation(msg)
+    val v =  checkBlacklistId(msg.assetPair) && basicValidation(msg) && checkBlacklistRegex(msg.assetPair)
     if (!v) {
       sender() ! StatusCodeMatcherResponse(StatusCodes.NotFound, v.messages())
     } else {
@@ -94,11 +126,13 @@ class MatcherActor(storedState: StateReader, wallet: Wallet, settings: MatcherSe
 
   def forwardToOrderBook: Receive = {
     case GetMarkets =>
-      sender() ! GetMarketsResponse(getMatcherPublicKey, openMarkets)
+      sender() ! GetMarketsResponse(getMatcherPublicKey, tradedPairs.values.toSeq)
     case order: Order =>
       checkAssetPair(order) {
-        context.child(OrderBookActor.name(order.assetPair))
-          .fold(createAndForward(order))(forwardReq(order))
+        checkBlacklistedAddress(order.senderPublicKey) {
+          context.child(OrderBookActor.name(order.assetPair))
+            .fold(createAndForward(order))(forwardReq(order))
+        }
       }
     case ob: DeleteOrderBookRequest =>
       checkAssetPair(ob) {
@@ -114,18 +148,16 @@ class MatcherActor(storedState: StateReader, wallet: Wallet, settings: MatcherSe
   }
 
   def initPredefinedPairs(): Unit = {
-    settings.predefinedPairs.diff(tradedPairs).foreach(pair =>
+    settings.predefinedPairs.diff(tradedPairs.keys.toSeq).foreach(pair =>
       createOrderBook(pair)
     )
   }
 
   private def removeOrderBook(pair: AssetPair): Unit = {
-    val i = tradedPairs.indexOf(pair)
-    if (i >= 0) {
-      openMarkets.remove(i)
-      tradedPairs.remove(i)
+    if (tradedPairs.contains(pair)) {
+      tradedPairs -= pair
       deleteMessages(lastSequenceNr)
-      persistAll(tradedPairs.map(OrderBookCreated).to[immutable.Seq]) { _ => }
+      persistAll(tradedPairs.map(v => OrderBookCreated(v._1)).to[immutable.Seq]) { _ => }
     }
   }
 
@@ -146,10 +178,9 @@ class MatcherActor(storedState: StateReader, wallet: Wallet, settings: MatcherSe
 object MatcherActor {
   def name = "matcher"
 
-  def props(storedState: StateReader, wallet: Wallet, settings: MatcherSettings,
-            transactionModule: NewTransactionHandler, time: Time, history: History,
-            functionalitySettings: FunctionalitySettings): Props =
-    Props(new MatcherActor(storedState, wallet, settings, history, functionalitySettings, transactionModule))
+  def props(orderHistoryActor: ActorRef, storedState: StateReader, wallet: Wallet, utx: UtxPool, allChannels: ChannelGroup,
+            settings: MatcherSettings, history: History, functionalitySettings: FunctionalitySettings): Props =
+    Props(new MatcherActor(orderHistoryActor, storedState, wallet, utx, allChannels,settings, history, functionalitySettings))
 
   case class OrderBookCreated(pair: AssetPair)
 
@@ -159,8 +190,10 @@ object MatcherActor {
     def getMarketsJs: JsValue = JsArray(markets.map(m => Json.obj(
       "amountAsset" -> m.pair.amountAssetStr,
       "amountAssetName" -> m.amountAssetName,
+      "amountAssetInfo" -> m.amountAssetInfo,
       "priceAsset" -> m.pair.priceAssetStr,
       "priceAssetName" -> m.priceAssetName,
+      "priceAssetInfo" -> m.priceAssetinfo,
       "created" -> m.created
     ))
     )
@@ -173,6 +206,16 @@ object MatcherActor {
     def code: StatusCode = StatusCodes.OK
   }
 
-  case class MarketData(pair: AssetPair, amountAssetName: String, priceAssetName: String, created: Long)
+  case class AssetInfo(decimals: Int)
+  implicit val assetInfoFormat: Format[AssetInfo] = Json.format[AssetInfo]
 
+  case class MarketData(pair: AssetPair, amountAssetName: String, priceAssetName: String, created: Long,
+                        amountAssetInfo: Option[AssetInfo], priceAssetinfo: Option[AssetInfo])
+
+  def compare(buffer1: Option[Array[Byte]], buffer2: Option[Array[Byte]]): Int = {
+    if (buffer1.isEmpty && buffer2.isEmpty) 0
+    else if (buffer1.isEmpty) -1
+    else if (buffer2.isEmpty) 1
+    else ByteArray.compare(buffer1.get, buffer2.get)
+  }
 }

@@ -1,44 +1,46 @@
 package scorex.transaction
 
+import com.google.common.base.Throwables
+import com.wavesplatform.features.{BlockchainFeatures, FeatureProvider}
 import com.wavesplatform.settings.FunctionalitySettings
-import com.wavesplatform.state2.reader.StateReader
-import scorex.account.{Account, PublicKeyAccount}
+import com.wavesplatform.state2.StateReader
+import com.wavesplatform.state2.reader.SnapshotStateReader
+import scorex.account.{Address, PublicKeyAccount}
 import scorex.block.Block
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
 import scorex.crypto.hash.FastCryptographicHash
 import scorex.crypto.hash.FastCryptographicHash.hash
-import scorex.utils.{ScorexLogging, Time}
+import scorex.utils.ScorexLogging
 
 import scala.concurrent.duration.FiniteDuration
+import scala.util.{Failure, Success, Try}
 
 object PoSCalc extends ScorexLogging {
 
-  val MinimalEffectiveBalanceForGenerator: Long = 1000000000000L
+  val MinimalEffectiveBalanceForGenerator1: Long = 1000000000000L
+  val MinimalEffectiveBalanceForGenerator2: Long = 100000000000L
   val AvgBlockTimeDepth: Int = 3
 
-  def calcTarget(prevBlock: Block, timestamp: Long, balance: Long): BigInt = {
-    val eta = (timestamp - prevBlock.timestamp) / 1000
-    BigInt(prevBlock.consensusData.baseTarget) * eta * balance
+  def calcTarget(prevBlockTimestamp: Long, prevBlockBaseTarget: Long, timestamp: Long, balance: Long): BigInt = {
+    val eta = (timestamp - prevBlockTimestamp) / 1000
+    BigInt(prevBlockBaseTarget) * eta * balance
   }
 
   def calcHit(lastBlockData: NxtLikeConsensusBlockData, generator: PublicKeyAccount): BigInt =
     BigInt(1, calcGeneratorSignature(lastBlockData, generator).take(8).reverse)
 
   def calcGeneratorSignature(lastBlockData: NxtLikeConsensusBlockData, generator: PublicKeyAccount): FastCryptographicHash.Digest =
-    hash(lastBlockData.generationSignature ++ generator.publicKey)
+    hash(lastBlockData.generationSignature.arr ++ generator.publicKey)
 
-  def calcBaseTarget(history: History)(avgBlockDelay: FiniteDuration, prevBlock: Block, timestamp: Long): Long = {
+  def calcBaseTarget(avgBlockDelay: FiniteDuration, parentHeight: Int, parentBaseTarget: Long,
+                     parentTimestamp: Long, maybeGreatGrandParentTimestamp: Option[Long], timestamp: Long): Long = {
     val avgDelayInSeconds = avgBlockDelay.toSeconds
 
     def normalize(value: Long): Double = value * avgDelayInSeconds / (60: Double)
 
-    val height = history.heightOf(prevBlock).get
-    val prevBaseTarget = prevBlock.consensusData.baseTarget
-    if (height % 2 == 0) {
-      val blocktimeAverage = history.parent(prevBlock, AvgBlockTimeDepth - 1)
-        .map(b => (timestamp - b.timestamp) / AvgBlockTimeDepth)
-        .getOrElse(timestamp - prevBlock.timestamp) / 1000
-
+    val prevBaseTarget = parentBaseTarget
+    if (parentHeight % 2 == 0) {
+      val blocktimeAverage = maybeGreatGrandParentTimestamp.fold(timestamp - parentTimestamp)(ggpts => (timestamp - ggpts) / AvgBlockTimeDepth) / 1000
       val minBlocktimeLimit = normalize(53)
       val maxBlocktimeLimit = normalize(67)
       val baseTargetGamma = normalize(64)
@@ -57,49 +59,28 @@ object PoSCalc extends ScorexLogging {
     }
   }
 
-  def blockOrdering(history: History, state: StateReader, fs: FunctionalitySettings, time: Time): Ordering[Block] = Ordering.by {
-    block =>
-      val parent = history.blockById(block.reference).get
-      val blockCreationTime = nextBlockGenerationTime(history, state, fs, time: Time)(parent, block.signerData.generator)
-        .getOrElse(block.timestamp)
-      (block.blockScore, -blockCreationTime)
-  }
-
-  def generatingBalance(state: StateReader, fs: FunctionalitySettings)(account: Account, atHeight: Int): Long = {
-    val generatingBalanceDepth = if (atHeight >= fs.generatingBalanceDepthFrom50To1000AfterHeight) 1000 else 50
+  def generatingBalance(state: SnapshotStateReader, fs: FunctionalitySettings, account: Address, atHeight: Int): Try[Long] = {
+    val generatingBalanceDepth = if (atHeight >= fs.generationBalanceDepthFrom50To1000AfterHeight) 1000 else 50
     state.effectiveBalanceAtHeightWithConfirmations(account, atHeight, generatingBalanceDepth)
   }
 
-  def nextBlockGenerationTime(history: History, state: StateReader, fs: FunctionalitySettings, time: Time)(block: Block, account: PublicKeyAccount): Option[Long] = {
-    history.heightOf(block.uniqueId)
-      .map(height => (height, generatingBalance(state, fs)(account, height))).filter(_._2 > 0)
-      .flatMap {
-        case (height, balance) =>
-          val cData = block.consensusData
-          val hit = calcHit(cData, account)
-          val t = cData.baseTarget
-
-          val result =
-            Some((hit * 1000) / (BigInt(t) * balance) + block.timestamp)
-              .filter(_ > 0).filter(_ < Long.MaxValue)
-              .map(_.toLong)
-
-          log.debug({
-            val currentTime = time.correctedTime()
-            s"Next block gen time: $result " +
-              s"in ${
-                result.map(t => (t - currentTime) / 1000)
-              } seconds, " +
-              s"hit: $hit, target: $t, " +
-              s"account:  $account, account balance: $balance " +
-              s"last block id: ${
-                block.encodedId
-              }, " +
-              s"height: $height"
-          })
-
-          result
-      }
+  def nextBlockGenerationTime(height: Int, state: StateReader, fs: FunctionalitySettings, block: Block,
+                              account: PublicKeyAccount, featureProvider: FeatureProvider): Either[String, (Long, Long)] = {
+    generatingBalance(state(), fs, account, height) match {
+      case Success(balance) => for {
+        _ <- Either.cond((!featureProvider.isFeatureActivated(BlockchainFeatures.SmallerMinimalGeneratingBalance, height) && balance >= MinimalEffectiveBalanceForGenerator1) ||
+          (featureProvider.isFeatureActivated(BlockchainFeatures.SmallerMinimalGeneratingBalance, height) && balance >= MinimalEffectiveBalanceForGenerator2), (),
+          s"Balance $balance of ${account.address} is lower than required for generation")
+        cData = block.consensusData
+        hit = calcHit(cData, account)
+        t = cData.baseTarget
+        calculatedTs = (hit * 1000) / (BigInt(t) * balance) + block.timestamp
+        _ <- Either.cond(0 < calculatedTs && calculatedTs < Long.MaxValue, (), s"Invalid next block generation time: $calculatedTs")
+      } yield (balance,calculatedTs.toLong)
+      case Failure(exc) =>
+        log.error("Critical error calculating nextBlockGenerationTime", exc)
+        Left(Throwables.getStackTraceAsString(exc))
+    }
   }
 
 }

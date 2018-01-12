@@ -1,31 +1,32 @@
 package scorex.api.http
 
 import java.net.{InetAddress, InetSocketAddress}
+import java.util.concurrent.ConcurrentMap
+import java.util.stream.Collectors
 import javax.ws.rs.Path
 
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration._
-import akka.actor.ActorRef
 import akka.http.scaladsl.server.Route
-import akka.pattern.ask
-import akka.util.Timeout
+import com.wavesplatform.network.{PeerDatabase, PeerInfo}
 import com.wavesplatform.settings.RestAPISettings
+import io.netty.channel.Channel
 import io.swagger.annotations._
 import play.api.libs.json._
-import scorex.network.Handshake
-import scorex.network.NetworkController.ConnectTo
-import scorex.network.peer.{PeerInfo, PeerManager}
+
+import scala.collection.JavaConverters._
 
 @Path("/peers")
 @Api(value = "/peers", description = "Get info about peers", position = 2)
-case class PeersApiRoute(settings: RestAPISettings, peerManager: ActorRef, networkController: ActorRef) extends ApiRoute {
-  import PeersApiRoute._
+case class PeersApiRoute(
+                          settings: RestAPISettings,
+                          connectToPeer: InetSocketAddress => Unit,
+                          peerDatabase: PeerDatabase,
+                          establishedConnections: ConcurrentMap[Channel, PeerInfo]) extends ApiRoute {
 
-  private implicit val timeout: Timeout = 5.seconds
+  import PeersApiRoute._
 
   override lazy val route =
     pathPrefix("peers") {
-      allPeers ~ connectedPeers ~ blacklistedPeers ~ connect
+      allPeers ~ connectedPeers ~ blacklistedPeers ~ suspendedPeers ~ connect ~ clearBlacklist
     }
 
   @Path("/all")
@@ -34,19 +35,13 @@ case class PeersApiRoute(settings: RestAPISettings, peerManager: ActorRef, netwo
     new ApiResponse(code = 200, message = "Json with peer list or error")
   ))
   def allPeers: Route = (path("all") & get) {
-    complete((peerManager ? PeerManager.GetAllPeers)
-      .mapTo[Map[InetSocketAddress, PeerInfo]]
-      .map { peers =>
-        Json.obj("peers" ->
-          JsArray(peers.take(MaxPeersInResponse).map { case (address, peerInfo) =>
-            Json.obj(
-              "address" -> address.toString,
-              "nodeName" -> peerInfo.nodeName,
-              "nodeNonce" -> peerInfo.nonce,
-              "lastSeen" -> peerInfo.timestamp
-            )
-          }.toList))
-      })
+    complete(Json.obj("peers" ->
+      JsArray(peerDatabase.knownPeers.take(MaxPeersInResponse).map { case (address, timestamp) =>
+        Json.obj(
+          "address" -> address.toString,
+          "lastSeen" -> timestamp
+        )
+      }.toList)))
   }
 
   @Path("/connected")
@@ -55,19 +50,16 @@ case class PeersApiRoute(settings: RestAPISettings, peerManager: ActorRef, netwo
     new ApiResponse(code = 200, message = "Json with connected peers or error")
   ))
   def connectedPeers: Route = (path("connected") & get) {
-    complete((peerManager ? PeerManager.GetConnectedPeers)
-      .mapTo[List[(InetSocketAddress, Handshake)]]
-      .map { connectedPeers =>
-        Json.obj("peers" ->
-        JsArray(connectedPeers.take(MaxPeersInResponse).map { peer =>
-          Json.obj(
-            "address" -> peer._1.toString,
-            "declaredAddress" -> (peer._2.declaredAddress.map(_.toString).getOrElse("N/A"): String),
-            "peerName" -> peer._2.nodeName,
-            "peerNonce" -> peer._2.nodeNonce
-          )
-        }))
-      })
+    val peers = establishedConnections.values().stream().map[JsValue](pi => Json.obj(
+      "address" -> pi.remoteAddress.toString,
+      "declaredAddress" -> pi.declaredAddress.fold("N/A")(_.toString),
+      "peerName" -> pi.nodeName,
+      "peerNonce" -> pi.nodeNonce,
+      "applicationName" -> pi.applicationName,
+      "applicationVersion" -> s"${pi.applicationVersion._1}.${pi.applicationVersion._2}.${pi.applicationVersion._3}"
+    )).collect(Collectors.toList()).asScala
+
+    complete(Json.obj("peers" -> JsArray(peers)))
   }
 
   @Path("/connect")
@@ -85,21 +77,42 @@ case class PeersApiRoute(settings: RestAPISettings, peerManager: ActorRef, netwo
   def connect: Route = (path("connect") & post & withAuth) {
     json[ConnectReq] { req =>
       val add: InetSocketAddress = new InetSocketAddress(InetAddress.getByName(req.host), req.port)
-      networkController ! ConnectTo(add)
+      connectToPeer(add)
 
       Json.obj("hostname" -> add.getHostName, "status" -> "Trying to connect")
     }
   }
 
   @Path("/blacklisted")
-  @ApiOperation(value = "Blacklisted peers list", notes = "Connected peers list", httpMethod = "GET")
+  @ApiOperation(value = "Blacklisted peers list", notes = "Blacklisted peers list", httpMethod = "GET")
   @ApiResponses(Array(
-    new ApiResponse(code = 200, message = "Json with connected peers or error")
+    new ApiResponse(code = 200, message = "Json with blacklisted peers or error")
   ))
   def blacklistedPeers: Route = (path("blacklisted") & get) {
-    complete((peerManager ? PeerManager.GetBlacklistedPeers)
-      .mapTo[Set[String]]
-      .map { peers => JsArray(peers.take(MaxPeersInResponse).map(JsString).toSeq) })
+    complete(JsArray(peerDatabase.detailedBlacklist.take(MaxPeersInResponse)
+      .map { case (h, (t, r)) => Json.obj("hostname" -> h.toString, "timestamp" -> t, "reason" -> r) }
+      .toList))
+  }
+
+  @Path("/suspended")
+  @ApiOperation(value = "Suspended peers list", notes = "Suspended peers list", httpMethod = "GET")
+  @ApiResponses(Array(
+    new ApiResponse(code = 200, message = "JSON with suspended peers or error")
+  ))
+  def suspendedPeers: Route = (path("suspended") & get) {
+    complete(JsArray(peerDatabase.detailedSuspended.take(MaxPeersInResponse)
+      .map { case (h, t) => Json.obj("hostname" -> h.toString, "timestamp" -> t) }
+      .toList))
+  }
+
+  @Path("/clearblacklist")
+  @ApiOperation(value = "Remove all blacklisted peers", notes = "Clear blacklist", httpMethod = "POST")
+  @ApiResponses(Array(
+    new ApiResponse(code = 200, message = "200")
+  ))
+  def clearBlacklist: Route = (path("clearblacklist") & post & withAuth) {
+    peerDatabase.clearBlacklist()
+    complete(Json.obj("result" -> "blacklist cleared"))
   }
 }
 
@@ -107,5 +120,6 @@ object PeersApiRoute {
   val MaxPeersInResponse = 1000
 
   case class ConnectReq(host: String, port: Int)
+
   implicit val connectFormat: Format[ConnectReq] = Json.format
 }

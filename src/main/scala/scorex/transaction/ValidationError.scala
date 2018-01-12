@@ -1,27 +1,45 @@
 package scorex.transaction
 
-import scorex.account.{AccountOrAlias, Alias}
+import com.google.common.base.Throwables
+import com.wavesplatform.state2.ByteStr
+import scorex.account.{Address, Alias}
+import scorex.block.{Block, MicroBlock}
+import scorex.transaction.assets.exchange.Order
 
-sealed trait ValidationError
-
-sealed trait StateValidationError extends ValidationError
+trait ValidationError
 
 object ValidationError {
 
-  case object InvalidAddress extends ValidationError
-  case object NegativeAmount extends ValidationError
+  case class InvalidAddress(reason: String) extends ValidationError
+
+  case class NegativeAmount(amount: Long, of: String) extends ValidationError
   case object InsufficientFee extends ValidationError
   case object TooBigArray extends ValidationError
-  case object InvalidSignature extends ValidationError
   case object InvalidName extends ValidationError
   case object OverflowError extends ValidationError
   case object ToSelf extends ValidationError
   case object MissingSenderPrivateKey extends ValidationError
-  case class TransactionParameterValidationError(err: String) extends ValidationError
-  case class CustomError(s: String) extends ValidationError
+  case object UnsupportedTransactionType extends ValidationError
+  case object InvalidRequestSignature extends ValidationError
 
-  case class UnsupportedTransactionType(tx:Transaction) extends ValidationError
-  case class AliasNotExists(a : Alias) extends StateValidationError
-  case class TransactionValidationError(tx: Transaction, err: String) extends StateValidationError
+  case class BlockFromFuture(ts: Long) extends ValidationError
+  case class InvalidSignature(s: Signed, details: Option[InvalidSignature] = None) extends ValidationError {
+    override def toString: String = s"InvalidSignature(${s.toString + " reason: " + details})"
+  }
+  case class GenericError(err: String) extends ValidationError
+  object GenericError {
+    def apply(ex: Throwable): GenericError = new GenericError(Throwables.getStackTraceAsString(ex))
+  }
+  case class AlreadyInTheState(txId: ByteStr, txHeight: Int) extends ValidationError
+  case class AccountBalanceError(errs: Map[Address, String]) extends ValidationError
+  case class AliasNotExists(a: Alias) extends ValidationError
+  case class OrderValidationError(order: Order, err: String) extends ValidationError
+  case class SenderIsBlacklisted(addr: String) extends ValidationError
+  case class Mistiming(err: String) extends ValidationError
+  case class BlockAppendError(err: String,b: Block)  extends ValidationError
+  case class MicroBlockAppendError(err: String, microBlock: MicroBlock) extends ValidationError {
+    override def toString: String = s"MicroBlockAppendError($err, ${microBlock.totalResBlockSig} ~> ${microBlock.prevResBlockSig.trim}])"
+  }
 
+  case class ActivationError(err: String) extends ValidationError
 }

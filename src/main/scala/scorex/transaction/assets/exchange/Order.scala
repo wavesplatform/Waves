@@ -1,7 +1,9 @@
 package scorex.transaction.assets.exchange
 
-import com.google.common.primitives.{Ints, Longs}
+import com.google.common.primitives.Longs
+import com.wavesplatform.state2.ByteStr
 import io.swagger.annotations.ApiModelProperty
+import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
@@ -9,7 +11,7 @@ import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash
 import scorex.serialization.{BytesSerializable, Deser, JsonSerializable}
 import scorex.transaction.TransactionParser._
-import scorex.transaction.ValidationError.CustomError
+import scorex.transaction.ValidationError.GenericError
 import scorex.transaction._
 import scorex.transaction.assets.exchange.Validation.booleanOperators
 
@@ -66,45 +68,46 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
                  @ApiModelProperty(example = "100000") matcherFee: Long,
                  @ApiModelProperty(dataType = "java.lang.String") signature: Array[Byte])
   extends BytesSerializable
-    with JsonSerializable {
+    with JsonSerializable with Signed {
 
   import Order._
 
-  @ApiModelProperty(hidden = true)
-  lazy val signatureValid = EllipticCurveImpl.verify(signature, toSign, senderPublicKey.publicKey)
+  val signatureValid = Coeval.evalOnce(EllipticCurveImpl.verify(signature, toSign, senderPublicKey.publicKey))
 
   def isValid(atTime: Long): Validation = {
-    (amount > 0) :| "amount should be > 0" &&
-      (price > 0) :| "price should be > 0" &&
+    isValidAmount(price, amount) &&
       assetPair.isValid &&
-      (amount < MaxAmount) :| "amount too large" &&
-      getSpendAmount(price, amount).isRight :| "SpendAmount too large" &&
-      (getSpendAmount(price, amount).getOrElse(0L) > 0) :| "SpendAmount should be > 0" &&
-      getReceiveAmount(price, amount).isRight :| "ReceiveAmount too large" &&
-      (getReceiveAmount(price, amount).getOrElse(0L) > 0) :| "ReceiveAmount should be > 0" &&
       (matcherFee > 0) :| "matcherFee should be > 0" &&
       (matcherFee < MaxAmount) :| "matcherFee too large" &&
       (timestamp > 0) :| "timestamp should be > 0" &&
       (expiration - atTime <= MaxLiveTime) :| "expiration should be earlier than 30 days" &&
-      (expiration >= atTime) :| "expiration should be > currentTime" &&
-      signatureValid :| "signature should be valid"
+      (expiration >= atTime) :| "expiration should be > currentTime"
   }
 
-  @ApiModelProperty(hidden = true)
-  lazy val toSign: Array[Byte] = senderPublicKey.publicKey ++ matcherPublicKey.publicKey ++
+  def isValidAmount(matchPrice: Long, matchAmount: Long): Validation = {
+    (matchAmount > 0) :| "amount should be > 0" &&
+      (matchPrice > 0) :| "price should be > 0" &&
+      (matchAmount < MaxAmount) :| "amount too large" &&
+      getSpendAmount(matchPrice, matchAmount).isRight :| "SpendAmount too large" &&
+      (getSpendAmount(matchPrice, matchAmount).getOrElse(0L) > 0) :| "SpendAmount should be > 0" &&
+      getReceiveAmount(matchPrice, matchAmount).isRight :| "ReceiveAmount too large" &&
+      (getReceiveAmount(matchPrice, matchAmount).getOrElse(0L) > 0) :| "ReceiveAmount should be > 0"
+  }
+
+  def toSign: Array[Byte] = senderPublicKey.publicKey ++ matcherPublicKey.publicKey ++
     assetPair.bytes ++ orderType.bytes ++
     Longs.toByteArray(price) ++ Longs.toByteArray(amount) ++
     Longs.toByteArray(timestamp) ++ Longs.toByteArray(expiration) ++
     Longs.toByteArray(matcherFee)
 
   @ApiModelProperty(hidden = true)
-  lazy val id: Array[Byte] = FastCryptographicHash(toSign)
+  val id: Coeval[Array[Byte]] = Coeval.evalOnce(FastCryptographicHash(toSign))
 
   @ApiModelProperty(hidden = true)
-  lazy val idStr: String = Base58.encode(id)
+  val idStr: Coeval[String] = Coeval.evalOnce(Base58.encode(id()))
 
   @ApiModelProperty(hidden = true)
-  lazy val bytes: Array[Byte] = toSign ++ signature
+  val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(toSign ++ signature)
 
   @ApiModelProperty(hidden = true)
   def getReceiveAssetId: Option[AssetId] = orderType match {
@@ -127,7 +130,7 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
         throw new ArithmeticException("BigInteger out of long range")
       } else spend.bigInteger.longValueExact()
     }
-  }.toEither.left.map(x => CustomError(x.getMessage))
+  }.toEither.left.map(x => GenericError(x.getMessage))
 
   @ApiModelProperty(hidden = true)
   def getReceiveAmount(matchPrice: Long, matchAmount: Long): Either[ValidationError, Long] = Try {
@@ -135,10 +138,10 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
     else {
       (BigInt(matchAmount) * matchPrice / PriceConstant).bigInteger.longValueExact()
     }
-  }.toEither.left.map(x => CustomError(x.getMessage))
+  }.toEither.left.map(x => GenericError(x.getMessage))
 
-  override def json: JsObject = Json.obj(
-    "id" -> Base58.encode(id),
+  override val json: Coeval[JsObject] = Coeval.evalOnce(Json.obj(
+    "id" -> Base58.encode(id()),
     "senderPublicKey" -> Base58.encode(senderPublicKey.publicKey),
     "matcherPublicKey" -> Base58.encode(matcherPublicKey.publicKey),
     "assetPair" -> assetPair.json,
@@ -149,7 +152,9 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
     "expiration" -> expiration,
     "matcherFee" -> matcherFee,
     "signature" -> Base58.encode(signature)
-  )
+  ))
+
+  def jsonStr: String = Json.stringify(json())
 
   override def canEqual(that: Any): Boolean = that.isInstanceOf[Order]
 
@@ -225,7 +230,7 @@ object Order {
     from += 8
     val signature = bytes.slice(from, from + SignatureLength)
     from += SignatureLength
-    Order(sender, matcher, AssetPair(amountAssetId, priceAssetId), OrderType(orderType), price, amount, timestamp, expiration, matcherFee, signature)
+    Order(sender, matcher, AssetPair(amountAssetId.map(ByteStr(_)), priceAssetId.map(ByteStr(_))), OrderType(orderType), price, amount, timestamp, expiration, matcherFee, signature)
   }
 
   def sign(unsigned: Order, sender: PrivateKeyAccount): Order = {
@@ -241,6 +246,6 @@ object Order {
   }
 
   def assetIdBytes(assetId: Option[AssetId]): Array[Byte] = {
-    assetId.map(a => (1: Byte) +: a).getOrElse(Array(0: Byte))
+    assetId.map(a => (1: Byte) +: a.arr).getOrElse(Array(0: Byte))
   }
 }

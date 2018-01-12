@@ -64,9 +64,6 @@ object TransactionParser {
       case txType: Byte if txType == TransactionType.CreateAliasTransaction.id =>
         CreateAliasTransaction.parseTail(data.tail)
 
-      case txType: Byte if txType == TransactionType.MakeAssetNameUniqueTransaction.id =>
-        MakeAssetNameUniqueTransaction.parseTail(data.tail)
-
       case txType => Failure(new Exception(s"Invalid transaction type: $txType"))
     }
 }

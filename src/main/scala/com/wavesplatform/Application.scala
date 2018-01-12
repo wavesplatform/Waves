@@ -2,162 +2,192 @@ package com.wavesplatform
 
 import java.io.File
 import java.security.Security
+import java.util.concurrent.ConcurrentHashMap
 
-import akka.actor.{ActorRef, ActorSystem, Props}
+import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
 import akka.http.scaladsl.server.Route
-import akka.pattern.ask
 import akka.stream.ActorMaterializer
-import akka.util.Timeout
-import com.typesafe.config.{Config, ConfigFactory}
+import cats.instances.all._
+import com.typesafe.config._
 import com.wavesplatform.actor.RootActorSystem
-import com.wavesplatform.history.BlockStorageImpl
+import com.wavesplatform.features.api.ActivationApiRoute
+import com.wavesplatform.history.{CheckpointServiceImpl, StorageFactory}
 import com.wavesplatform.http.NodeApiRoute
 import com.wavesplatform.matcher.Matcher
+import com.wavesplatform.metrics.Metrics
+import com.wavesplatform.mining.{Miner, MinerImpl}
+import com.wavesplatform.network._
 import com.wavesplatform.settings._
-import scorex.account.{Account, AddressScheme}
+import com.wavesplatform.state2.StateWriter
+import com.wavesplatform.state2.appender.{BlockAppender, CheckpointAppender, ExtensionAppender, MicroblockAppender}
+import com.wavesplatform.utils.{SystemInformationReporter, forceStopApplication}
+import io.netty.channel.Channel
+import io.netty.channel.group.DefaultChannelGroup
+import io.netty.util.concurrent.GlobalEventExecutor
+import kamon.Kamon
+import monix.reactive.Observable
+import org.influxdb.dto.Point
+import org.slf4j.bridge.SLF4JBridgeHandler
+import scorex.account.AddressScheme
 import scorex.api.http._
 import scorex.api.http.alias.{AliasApiRoute, AliasBroadcastApiRoute}
 import scorex.api.http.assets.{AssetsApiRoute, AssetsBroadcastApiRoute}
 import scorex.api.http.leasing.{LeaseApiRoute, LeaseBroadcastApiRoute}
-import scorex.block.Block
-import scorex.consensus.mining.BlockGeneratorController
-import scorex.consensus.nxt.NxtLikeConsensusBlockData
 import scorex.consensus.nxt.api.http.NxtConsensusApiRoute
-import scorex.crypto.encode.Base58
-import scorex.crypto.hash.FastCryptographicHash.DigestSize
-import scorex.network._
-import scorex.network.message.{BasicMessagesRepo, MessageHandler}
-import scorex.network.peer.PeerManager
 import scorex.transaction._
-import scorex.transaction.state.database.UnconfirmedTransactionsDatabaseImpl
-import scorex.utils.{ScorexLogging, Time, TimeImpl}
+import scorex.utils.{NTP, ScorexLogging, Time}
 import scorex.wallet.Wallet
 import scorex.waves.http.{DebugApiRoute, WavesApiRoute}
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.reflect.runtime.universe._
-import scala.util.{Left, Try}
+import scala.util.Try
 
-class Application(val actorSystem: ActorSystem, val settings: WavesSettings) extends ScorexLogging {
+class Application(val actorSystem: ActorSystem, val settings: WavesSettings, configRoot: ConfigObject) extends ScorexLogging {
 
-  lazy val upnp = new UPnP(settings.networkSettings.uPnPSettings)
+  import monix.execution.Scheduler.Implicits.{global => scheduler}
 
-  val messagesHandler = MessageHandler(BasicMessagesRepo.specs ++ TransactionalMessagesRepo.specs)
-  val feeCalculator = new FeeCalculator(settings.feesSettings)
-  val (checkpoints, history, stateReader, blockchainUpdater) = BlockStorageImpl(settings.blockchainSettings)
-  val time: Time = new TimeImpl()
-  val wallet: Wallet = {
-    val maybeWalletFilename = Option(settings.walletSettings.file).filter(_.trim.nonEmpty)
-    val seed = Base58.decode(settings.walletSettings.seed).toOption
-    new Wallet(maybeWalletFilename, settings.walletSettings.password, seed)
-  }
-  val utxStorage: UnconfirmedTransactionsStorage = new UnconfirmedTransactionsDatabaseImpl(settings.utxSettings.size)
-  val newTransactionHandler = new NewTransactionHandlerImpl(settings.blockchainSettings.functionalitySettings,
-    networkController, time, feeCalculator, utxStorage, stateReader)
+  private val LocalScoreBroadcastDebounce = 1.second
 
-  lazy val apiRoutes = Seq(
-    BlocksApiRoute(settings.restAPISettings, settings.checkpointsSettings, history, coordinator),
-    TransactionsApiRoute(settings.restAPISettings, stateReader, history, utxStorage),
-    NxtConsensusApiRoute(settings.restAPISettings, stateReader, history, settings.blockchainSettings.functionalitySettings),
-    WalletApiRoute(settings.restAPISettings, wallet),
-    PaymentApiRoute(settings.restAPISettings, wallet, newTransactionHandler, time),
-    UtilsApiRoute(settings.restAPISettings),
-    PeersApiRoute(settings.restAPISettings, peerManager, networkController),
-    AddressApiRoute(settings.restAPISettings, wallet, stateReader, settings.blockchainSettings.functionalitySettings),
-    DebugApiRoute(settings.restAPISettings, wallet, stateReader, blockchainUpdater, history),
-    WavesApiRoute(settings.restAPISettings, wallet, newTransactionHandler, time),
-    AssetsApiRoute(settings.restAPISettings, wallet, stateReader, newTransactionHandler, time),
-    NodeApiRoute(settings.restAPISettings, () => this.shutdown(), blockGenerator, coordinator),
-    AssetsBroadcastApiRoute(settings.restAPISettings, newTransactionHandler),
-    LeaseApiRoute(settings.restAPISettings, wallet, stateReader, newTransactionHandler, time),
-    LeaseBroadcastApiRoute(settings.restAPISettings, newTransactionHandler),
-    AliasApiRoute(settings.restAPISettings, wallet, newTransactionHandler, time, stateReader),
-    AliasBroadcastApiRoute(settings.restAPISettings, newTransactionHandler)
-  )
+  // Start /node API right away
+  private implicit val as: ActorSystem = actorSystem
+  private implicit val materializer: ActorMaterializer = ActorMaterializer()
 
-  lazy val apiTypes = Seq(
-    typeOf[BlocksApiRoute],
-    typeOf[TransactionsApiRoute],
-    typeOf[NxtConsensusApiRoute],
-    typeOf[WalletApiRoute],
-    typeOf[PaymentApiRoute],
-    typeOf[UtilsApiRoute],
-    typeOf[PeersApiRoute],
-    typeOf[AddressApiRoute],
-    typeOf[DebugApiRoute],
-    typeOf[WavesApiRoute],
-    typeOf[AssetsApiRoute],
-    typeOf[NodeApiRoute],
-    typeOf[AssetsBroadcastApiRoute],
-    typeOf[LeaseApiRoute],
-    typeOf[LeaseBroadcastApiRoute],
-    typeOf[AliasApiRoute],
-    typeOf[AliasBroadcastApiRoute]
-  )
-
-  lazy val networkController: ActorRef = actorSystem.actorOf(Props(new NetworkController(settings.networkSettings, upnp, peerManager, messagesHandler)), "NetworkController")
-  lazy val peerManager: ActorRef = actorSystem.actorOf(PeerManager.props(settings.networkSettings, networkController, settings.blockchainSettings.addressSchemeCharacter), "PeerManager")
-  lazy val unconfirmedPoolSynchronizer: ActorRef = actorSystem.actorOf(Props(new UnconfirmedPoolSynchronizer(newTransactionHandler, settings.utxSettings, networkController, utxStorage)))
-  lazy val coordinator: ActorRef = actorSystem.actorOf(Props(new Coordinator(networkController, blockchainSynchronizer, blockGenerator, peerManager, scoreObserver, blockchainUpdater, time, utxStorage, history, stateReader, checkpoints, settings)), "Coordinator")
-  lazy val scoreObserver: ActorRef = actorSystem.actorOf(Props(new ScoreObserver(networkController, coordinator, settings.synchronizationSettings)), "ScoreObserver")
-  lazy val historyReplier: ActorRef = actorSystem.actorOf(Props(new HistoryReplier(networkController, history: History, settings.synchronizationSettings.maxChainLength: Int)), "HistoryReplier")
-  lazy val blockGenerator: ActorRef = actorSystem.actorOf(Props(new BlockGeneratorController(settings.minerSettings, history, time, peerManager,
-    wallet, stateReader, settings.blockchainSettings, utxStorage, coordinator)), "BlockGenerator")
-  lazy val blockchainSynchronizer: ActorRef = actorSystem.actorOf(Props(new BlockchainSynchronizer(networkController, coordinator, history, settings.synchronizationSettings)), "BlockchainSynchronizer")
-  lazy val peerSynchronizer: ActorRef = actorSystem.actorOf(Props(new PeerSynchronizer(networkController, peerManager, settings.networkSettings)), "PeerSynchronizer")
-
-  def run(): Unit = {
-    log.debug(s"Available processors: ${Runtime.getRuntime.availableProcessors}")
-    log.debug(s"Max memory available: ${Runtime.getRuntime.maxMemory}")
-
-    checkGenesis()
-
-    if (settings.networkSettings.uPnPSettings.enable) upnp.addPort(settings.networkSettings.port)
-
-
-    implicit val as = actorSystem
-    implicit val materializer = ActorMaterializer()
-
-    if (settings.restAPISettings.enable) {
-      val combinedRoute: Route = CompositeHttpService(actorSystem, apiTypes, apiRoutes, settings.restAPISettings).compositeRoute
+  private val nodeApiLauncher = (bcu: BlockchainUpdater, state: StateWriter) =>
+    Option(settings.restAPISettings.enable).collect { case true =>
+      val tags = Seq(typeOf[NodeApiRoute])
+      val routes = Seq(NodeApiRoute(settings.restAPISettings, bcu, state, () => this.shutdown()))
+      val combinedRoute: Route = CompositeHttpService(actorSystem, tags, routes, settings.restAPISettings).compositeRoute
       val httpFuture = Http().bindAndHandle(combinedRoute, settings.restAPISettings.bindAddress, settings.restAPISettings.port)
       serverBinding = Await.result(httpFuture, 10.seconds)
+      log.info(s"Node REST API was bound on ${settings.restAPISettings.bindAddress}:${settings.restAPISettings.port}")
+      (tags, routes)
+    }
+
+  private val checkpointService = new CheckpointServiceImpl(settings.blockchainSettings.checkpointFile, settings.checkpointsSettings)
+  private val (history, featureProvider, stateWriter, stateReader, blockchainUpdater, blockchainDebugInfo, nodeApi) = StorageFactory(settings, nodeApiLauncher).get
+  private lazy val upnp = new UPnP(settings.networkSettings.uPnPSettings) // don't initialize unless enabled
+  private val wallet: Wallet = Wallet(settings.walletSettings)
+  private val peerDatabase = new PeerDatabaseImpl(settings.networkSettings)
+
+  def run(): Unit = {
+    checkGenesis(history, settings, blockchainUpdater)
+
+    if (wallet.privateKeyAccounts.isEmpty)
+      wallet.generateNewAccounts(1)
+
+    val feeCalculator = new FeeCalculator(settings.feesSettings)
+    val time: Time = NTP
+    val establishedConnections = new ConcurrentHashMap[Channel, PeerInfo]
+    val allChannels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
+    val utxStorage = new UtxPoolImpl(time, stateReader, history, feeCalculator, settings.blockchainSettings.functionalitySettings, settings.utxSettings)
+    val knownInvalidBlocks = new InvalidBlockStorageImpl(settings.synchronizationSettings.invalidBlocksStorage)
+    val miner = if (settings.minerSettings.enable)
+      new MinerImpl(allChannels, blockchainUpdater, checkpointService, history, featureProvider, stateReader, settings, time, utxStorage, wallet)
+    else Miner.Disabled
+
+    val processBlock = BlockAppender(checkpointService, history, blockchainUpdater, time, stateReader, utxStorage, settings.blockchainSettings, featureProvider, allChannels, peerDatabase, miner) _
+    val processCheckpoint = CheckpointAppender(checkpointService, history, blockchainUpdater, peerDatabase, miner, allChannels) _
+    val processFork = ExtensionAppender(checkpointService, history, blockchainUpdater, stateReader, utxStorage, time, settings, featureProvider, knownInvalidBlocks, peerDatabase, miner, allChannels) _
+    val processMicroBlock = MicroblockAppender(checkpointService, history, blockchainUpdater, utxStorage, allChannels, peerDatabase) _
+
+    import blockchainUpdater.lastBlockInfo
+
+    val lastScore = lastBlockInfo
+      .map(_.score)
+      .distinctUntilChanged
+      .share(scheduler)
+
+    lastScore
+      .debounce(LocalScoreBroadcastDebounce)
+      .foreach { x =>
+        allChannels.broadcast(LocalScoreChanged(x))
+      }(scheduler)
+
+    val historyReplier = new HistoryReplier(history, settings.synchronizationSettings)
+    val network = NetworkServer(settings, lastBlockInfo, history, historyReplier, utxStorage, peerDatabase, allChannels, establishedConnections)
+    val (signatures, blocks, blockchainScores, checkpoints, microblockInvs, microblockResponses, transactions) = network.messages
+
+    val (syncWithChannelClosed, scoreStatsReporter) = RxScoreObserver(settings.synchronizationSettings.scoreTTL, 1.second, history.score(), lastScore, blockchainScores, network.closedChannels)
+    val (microblockDatas, mbSyncCacheSizes) = MicroBlockSynchronizer(settings.synchronizationSettings.microBlockSynchronizer, peerDatabase, lastBlockInfo.map(_.id), microblockInvs, microblockResponses)
+    val (newBlocks, extLoaderState) = RxExtensionLoader(settings.synchronizationSettings.maxRollback, settings.synchronizationSettings.synchronizationTimeout,
+      history, peerDatabase, knownInvalidBlocks, blocks, signatures, syncWithChannelClosed) { case ((c, b)) => processFork(c, b.blocks) }
+
+    val utxSink = UtxPoolSynchronizer(utxStorage, settings.synchronizationSettings.utxSynchronizerSettings, allChannels, transactions)
+    val microBlockSink = microblockDatas.mapTask(scala.Function.tupled(processMicroBlock))
+    val blockSink = newBlocks.mapTask(scala.Function.tupled(processBlock))
+    val checkpointSink = checkpoints.mapTask { case ((s, c)) => processCheckpoint(Some(s), c) }
+
+    Observable.merge(microBlockSink, blockSink, checkpointSink, utxSink).subscribe()(monix.execution.Scheduler.Implicits.global)
+    miner.scheduleMining()
+
+    for (addr <- settings.networkSettings.declaredAddress if settings.networkSettings.uPnPSettings.enable) {
+      upnp.addPort(addr.getPort)
+    }
+
+    // Start complete REST API. Node API is already running, so we need to re-bind
+    nodeApi.foreach { case (tags, routes) =>
+      val apiRoutes = routes ++ Seq(
+        BlocksApiRoute(settings.restAPISettings, history, blockchainUpdater, allChannels, c => processCheckpoint(None, c)),
+        TransactionsApiRoute(settings.restAPISettings, wallet, stateReader, history, utxStorage, allChannels, time),
+        NxtConsensusApiRoute(settings.restAPISettings, stateReader, history, settings.blockchainSettings.functionalitySettings),
+        WalletApiRoute(settings.restAPISettings, wallet),
+        PaymentApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, time),
+        UtilsApiRoute(settings.restAPISettings),
+        PeersApiRoute(settings.restAPISettings, network.connect, peerDatabase, establishedConnections),
+        AddressApiRoute(settings.restAPISettings, wallet, stateReader, settings.blockchainSettings.functionalitySettings),
+        DebugApiRoute(settings.restAPISettings, wallet, stateReader, history, peerDatabase, establishedConnections, blockchainUpdater, allChannels,
+          utxStorage, blockchainDebugInfo, miner, historyReplier, extLoaderState, mbSyncCacheSizes, scoreStatsReporter, configRoot),
+        WavesApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, time),
+        AssetsApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, stateReader, time),
+        ActivationApiRoute(settings.restAPISettings, settings.blockchainSettings.functionalitySettings, settings.featuresSettings, history, featureProvider),
+        AssetsBroadcastApiRoute(settings.restAPISettings, utxStorage, allChannels),
+        LeaseApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, time),
+        LeaseBroadcastApiRoute(settings.restAPISettings, utxStorage, allChannels),
+        AliasApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, time, stateReader),
+        AliasBroadcastApiRoute(settings.restAPISettings, utxStorage, allChannels)
+      )
+
+      val apiTypes = tags ++ Seq(
+        typeOf[BlocksApiRoute],
+        typeOf[TransactionsApiRoute],
+        typeOf[NxtConsensusApiRoute],
+        typeOf[WalletApiRoute],
+        typeOf[PaymentApiRoute],
+        typeOf[UtilsApiRoute],
+        typeOf[PeersApiRoute],
+        typeOf[AddressApiRoute],
+        typeOf[DebugApiRoute],
+        typeOf[WavesApiRoute],
+        typeOf[AssetsApiRoute],
+        typeOf[ActivationApiRoute],
+        typeOf[AssetsBroadcastApiRoute],
+        typeOf[LeaseApiRoute],
+        typeOf[LeaseBroadcastApiRoute],
+        typeOf[AliasApiRoute],
+        typeOf[AliasBroadcastApiRoute]
+      )
+      val combinedRoute: Route = CompositeHttpService(actorSystem, apiTypes, apiRoutes, settings.restAPISettings).compositeRoute
+      val httpFuture = serverBinding.unbind().flatMap { _ =>
+        Http().bindAndHandle(combinedRoute, settings.restAPISettings.bindAddress, settings.restAPISettings.port)
+      }
+      serverBinding = Await.result(httpFuture, 20.seconds)
       log.info(s"REST API was bound on ${settings.restAPISettings.bindAddress}:${settings.restAPISettings.port}")
     }
 
-    Seq(scoreObserver, blockGenerator, blockchainSynchronizer, historyReplier, coordinator, unconfirmedPoolSynchronizer, peerSynchronizer) foreach {
-      _ => // de-lazyning process :-)
-    }
-
-
     //on unexpected shutdown
     sys.addShutdownHook {
+      utxStorage.close()
+      network.shutdown()
       shutdown()
     }
 
     if (settings.matcherSettings.enable) {
-      val matcher = new Matcher(actorSystem, wallet, newTransactionHandler, stateReader, time, history, settings.blockchainSettings, settings.restAPISettings, settings.matcherSettings)
+      val matcher = new Matcher(actorSystem, wallet, utxStorage, allChannels, stateReader, history, settings.blockchainSettings, settings.restAPISettings, settings.matcherSettings)
       matcher.runMatcher()
-    }
-  }
-
-  def checkGenesis(): Unit = {
-    if (history.isEmpty) {
-      val maybeGenesisSignature = Option(settings.blockchainSettings.genesisSettings.signature).filter(_.trim.nonEmpty)
-      blockchainUpdater.processBlock(Block.genesis(
-        NxtLikeConsensusBlockData(settings.blockchainSettings.genesisSettings.initialBaseTarget, Array.fill(DigestSize)(0: Byte)),
-        Application.genesisTransactions(settings.blockchainSettings.genesisSettings),
-        settings.blockchainSettings.genesisSettings.blockTimestamp, maybeGenesisSignature)) match {
-        case Left(value) =>
-          log.error(value.toString)
-          System.exit(1)
-        case _ =>
-      }
-
-      log.info("Genesis block has been added to the state")
     }
   }
 
@@ -165,21 +195,35 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
   @volatile var serverBinding: ServerBinding = _
 
   def shutdown(): Unit = {
+    val unbindTimeout = 2.minutes
+    val stopActorsTimeout = 1.minute
+
     if (!shutdownInProgress) {
       log.info("Stopping network services")
       shutdownInProgress = true
       if (settings.restAPISettings.enable) {
-        Try(Await.ready(serverBinding.unbind(), 60.seconds)).failed.map(e => log.error("Failed to unbind REST API port: " + e.getMessage))
+        Try(Await.ready(serverBinding.unbind(), unbindTimeout))
+          .failed.map(e => log.error("Failed to unbind REST API port", e))
       }
-      if (settings.networkSettings.uPnPSettings.enable) upnp.deletePort(settings.networkSettings.port)
+      for (addr <- settings.networkSettings.declaredAddress if settings.networkSettings.uPnPSettings.enable) {
+        upnp.deletePort(addr.getPort)
+      }
 
-      implicit val askTimeout = Timeout(60.seconds)
-      Try(Await.result(networkController ? NetworkController.ShutdownNetwork, 60.seconds))
-        .failed.map(e => log.error("Failed to shutdown network: " + e.getMessage))
-      Try(Await.result(actorSystem.terminate(), 60.seconds))
-        .failed.map(e => log.error("Failed to terminate actor system: " + e.getMessage))
+      peerDatabase.close()
+
+      Try(Await.result(actorSystem.terminate(), stopActorsTimeout))
+        .failed.map(e => log.error("Failed to terminate actor system", e))
+      log.debug("Closing storage")
+
       log.debug("Closing wallet")
       wallet.close()
+
+      log.debug("Closing state")
+      stateWriter.close()
+
+      log.debug("Closing history")
+      history.close()
+
       log.info("Shutdown complete")
     }
   }
@@ -187,21 +231,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings) ext
 }
 
 object Application extends ScorexLogging {
-
-  private def configureLogging(settings: WavesSettings) = {
-    import ch.qos.logback.classic.{Level, LoggerContext}
-    import org.slf4j._
-
-    val lc = LoggerFactory.getILoggerFactory.asInstanceOf[LoggerContext]
-    val rootLogger = lc.getLogger(Logger.ROOT_LOGGER_NAME)
-    settings.loggingLevel match {
-      case LogLevel.TRACE => rootLogger.setLevel(Level.TRACE)
-      case LogLevel.DEBUG => rootLogger.setLevel(Level.DEBUG)
-      case LogLevel.INFO => rootLogger.setLevel(Level.INFO)
-      case LogLevel.WARN => rootLogger.setLevel(Level.WARN)
-      case LogLevel.ERROR => rootLogger.setLevel(Level.ERROR)
-    }
-  }
 
   private def readConfig(userConfigPath: Option[String]): Config = {
     val maybeConfigFile = for {
@@ -222,14 +251,9 @@ object Application extends ScorexLogging {
           log.error("Malformed configuration file was provided! Aborting!")
           log.error("Please, read following article about configuration file format:")
           log.error("https://github.com/wavesplatform/Waves/wiki/Waves-Node-configuration-file")
-          System.exit(1)
+          forceStopApplication()
         }
-        ConfigFactory
-          .defaultOverrides()
-          .withFallback(cfg)
-          .withFallback(ConfigFactory.defaultApplication())
-          .withFallback(ConfigFactory.defaultReference())
-          .resolve()
+        loadConfig(cfg)
     }
 
     config
@@ -238,15 +262,46 @@ object Application extends ScorexLogging {
   def main(args: Array[String]): Unit = {
     // prevents java from caching successful name resolutions, which is needed e.g. for proper NTP server rotation
     // http://stackoverflow.com/a/17219327
+    System.setProperty("sun.net.inetaddr.ttl", "0")
+    System.setProperty("sun.net.inetaddr.negative.ttl", "0")
     Security.setProperty("networkaddress.cache.ttl", "0")
+    Security.setProperty("networkaddress.cache.negative.ttl", "0")
 
-    log.info("Starting...")
+    // j.u.l should log messages using the projects' conventions
+    SLF4JBridgeHandler.removeHandlersForRootLogger()
+    SLF4JBridgeHandler.install()
 
     val config = readConfig(args.headOption)
-    val settings = WavesSettings.fromConfig(config)
 
-    RootActorSystem.start("wavesplatform", settings.matcherSettings) { actorSystem =>
-      configureLogging(settings)
+    // DO NOT LOG BEFORE THIS LINE, THIS PROPERTY IS USED IN logback.xml
+    System.setProperty("waves.directory", config.getString("waves.directory"))
+    log.info("Starting...")
+    sys.addShutdownHook {
+      SystemInformationReporter.report(config)
+    }
+
+    val settings = WavesSettings.fromConfig(config)
+    Kamon.start(config)
+    val isMetricsStarted = Metrics.start(settings.metrics)
+
+    RootActorSystem.start("wavesplatform", config) { actorSystem =>
+      import actorSystem.dispatcher
+      isMetricsStarted.foreach { started =>
+        if (started) {
+          import settings.synchronizationSettings.microBlockSynchronizer
+          import settings.{minerSettings => miner}
+
+          Metrics.write(
+            Point
+              .measurement("config")
+              .addField("miner-micro-block-interval", miner.microBlockInterval.toMillis)
+              .addField("miner-max-transactions-in-key-block", miner.maxTransactionsInKeyBlock)
+              .addField("miner-max-transactions-in-micro-block", miner.maxTransactionsInMicroBlock)
+              .addField("miner-min-micro-block-age", miner.minMicroBlockAge.toMillis)
+              .addField("mbs-wait-response-timeout", microBlockSynchronizer.waitResponseTimeout.toMillis)
+          )
+        }
+      }
 
       // Initialize global var with actual address scheme
       AddressScheme.current = new AddressScheme {
@@ -255,19 +310,13 @@ object Application extends ScorexLogging {
 
       log.info(s"${Constants.AgentName} Blockchain Id: ${settings.blockchainSettings.addressSchemeCharacter}")
 
-      val application = new Application(actorSystem, settings)
-      application.run()
-
-      if (application.wallet.privateKeyAccounts().isEmpty)
-        application.wallet.generateNewAccounts(1)
+      new Application(actorSystem, settings, config.root()) {
+        override def shutdown(): Unit = {
+          Kamon.shutdown()
+          Metrics.shutdown()
+          super.shutdown()
+        }
+      }.run()
     }
   }
-
-  def genesisTransactions(gs: GenesisSettings): Seq[GenesisTransaction] = {
-    gs.transactions.map { ts =>
-      val acc = Account.fromString(ts.recipient).right.get
-      GenesisTransaction.create(acc, ts.amount, gs.transactionsTimestamp).right.get
-    }
-  }
-
 }

@@ -2,19 +2,21 @@ package scorex.transaction
 
 import com.wavesplatform.TransactionGen
 import com.wavesplatform.matcher.ValidationMatcher
+import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state2.diffs.produce
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
-import scorex.utils.{ByteArrayExtension, NTP}
+import scorex.utils.NTP
 
 class OrderSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen with ValidationMatcher {
 
 
   property("Order transaction serialization roundtrip") {
     forAll(orderGen) { order =>
-      val recovered = Order.parseBytes(order.bytes).get
-      recovered.bytes shouldEqual order.bytes
-      recovered.id shouldBe order.id
+      val recovered = Order.parseBytes(order.bytes()).get
+      recovered.bytes() shouldEqual order.bytes()
+      recovered.id() shouldBe order.id()
       recovered.senderPublicKey.publicKey shouldBe order.senderPublicKey.publicKey
       recovered.matcherPublicKey shouldBe order.matcherPublicKey
       recovered.assetPair shouldBe order.assetPair
@@ -77,20 +79,18 @@ class OrderSpecification extends PropSpec with PropertyChecks with Matchers with
 
   property("Order signature validation") {
     forAll(orderGen, accountGen) { case (order, pka) =>
-      order.isValid(NTP.correctedTime()) shouldBe valid
-      order.copy(senderPublicKey = pka).isValid(NTP.correctedTime()) should contain("signature should be valid")
-      order.copy(matcherPublicKey = pka).isValid(NTP.correctedTime()) should contain("signature should be valid")
+      order.signaturesValid() shouldBe an[Right[_, _]]
+      order.copy(senderPublicKey = pka).signaturesValid() should produce("InvalidSignature")
+      order.copy(matcherPublicKey = pka).signaturesValid() should produce("InvalidSignature")
       val assetPair = order.assetPair
-      order.copy(assetPair = assetPair.copy(amountAsset = assetPair.amountAsset.map(Array(0: Byte) ++ _).orElse(Some(Array(0: Byte))))).
-        isValid(NTP.correctedTime()) should contain("signature should be valid")
-      order.copy(assetPair = assetPair.copy(priceAsset = assetPair.priceAsset.map(Array(0: Byte) ++ _).orElse(Some(Array(0: Byte))))).
-        isValid(NTP.correctedTime()) should contain("signature should be valid")
-      order.copy(orderType = OrderType.reverse(order.orderType)).isValid(NTP.correctedTime()) should contain("signature should be valid")
-      order.copy(price = order.price + 1).isValid(NTP.correctedTime()) should contain("signature should be valid")
-      order.copy(amount = order.amount + 1).isValid(NTP.correctedTime()) should contain("signature should be valid")
-      order.copy(expiration = order.expiration + 1).isValid(NTP.correctedTime()) should contain("signature should be valid")
-      order.copy(matcherFee = order.matcherFee + 1).isValid(NTP.correctedTime()) should contain("signature should be valid")
-      order.copy(signature = pka.publicKey ++ pka.publicKey).isValid(NTP.correctedTime()) should contain("signature should be valid")
+      order.copy(assetPair = assetPair.copy(amountAsset = assetPair.amountAsset.map(Array(0: Byte) ++ _.arr).orElse(Some(Array(0: Byte))).map(ByteStr(_)))).signaturesValid() should produce("InvalidSignature")
+      order.copy(assetPair = assetPair.copy(priceAsset = assetPair.priceAsset.map(Array(0: Byte) ++ _.arr).orElse(Some(Array(0: Byte))).map(ByteStr(_)))).signaturesValid() should produce("InvalidSignature")
+      order.copy(orderType = OrderType.reverse(order.orderType)).signaturesValid() should produce("InvalidSignature")
+      order.copy(price = order.price + 1).signaturesValid() should produce("InvalidSignature")
+      order.copy(amount = order.amount + 1).signaturesValid() should produce("InvalidSignature")
+      order.copy(expiration = order.expiration + 1).signaturesValid() should produce("InvalidSignature")
+      order.copy(matcherFee = order.matcherFee + 1).signaturesValid() should produce("InvalidSignature")
+      order.copy(signature = pka.publicKey ++ pka.publicKey).signaturesValid() should produce("InvalidSignature")
     }
   }
 
@@ -108,7 +108,7 @@ class OrderSpecification extends PropSpec with PropertyChecks with Matchers with
 
   property("AssetPair test") {
     forAll(assetIdGen, assetIdGen) { (assetA: Option[AssetId], assetB: Option[AssetId]) =>
-      whenever(!ByteArrayExtension.sameOption(assetA, assetB)) {
+      whenever(assetA != assetB) {
         val pair = AssetPair(assetA, assetB)
         pair.isValid shouldBe valid
       }

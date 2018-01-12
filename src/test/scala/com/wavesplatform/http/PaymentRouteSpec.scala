@@ -1,59 +1,59 @@
 package com.wavesplatform.http
 
 import com.wavesplatform.http.ApiMarshallers._
-import com.wavesplatform.{TestWallet, TransactionGen}
-import org.scalacheck.Shrink
+import com.wavesplatform.{NoShrink, TestWallet, TransactionGen, UtxPool}
+import io.netty.channel.group.ChannelGroup
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json.{JsObject, Json}
-import scorex.api.http.assets.TransferRequest
 import scorex.api.http.{ApiKeyNotValid, PaymentApiRoute}
-import scorex.crypto.encode.Base58
-import scorex.network.ConnectedPeer
+import scorex.transaction.Transaction
 import scorex.transaction.assets.TransferTransaction
-import scorex.transaction.{NewTransactionHandler, Transaction, ValidationError}
-import scorex.utils.NTP
+import scorex.utils.Time
 
-class PaymentRouteSpec extends RouteSpec("/payment")
-  with MockFactory with PropertyChecks with RestAPISettingsHelper with TestWallet with TransactionGen {
+class PaymentRouteSpec
+  extends RouteSpec("/payment")
+    with MockFactory
+    with PropertyChecks
+    with RestAPISettingsHelper
+    with TestWallet
+    with TransactionGen
+    with NoShrink {
 
-
-  private implicit def noShrink[A]: Shrink[A] = Shrink(_ => Stream.empty)
+  private val utx = stub[UtxPool]
+  (utx.putIfNew _).when(*).onCall((t: Transaction) => Right(true)).anyNumberOfTimes()
+  private val allChannels = stub[ChannelGroup]
 
   "accepts payments" in {
     forAll(accountOrAliasGen.label("recipient"), positiveLongGen.label("amount"), smallFeeGen.label("fee")) {
       case (recipient, amount, fee) =>
 
-        val sender = testWallet.privateKeyAccounts().head
-        val tx = TransferTransaction.create(None, sender, recipient, amount, System.currentTimeMillis(), None, fee, Array())
-        val stmMock: NewTransactionHandler = {
+        val timestamp = System.currentTimeMillis()
 
-          def alwaysTx(t: Transaction, maybePeer: Option[ConnectedPeer]): Either[ValidationError, Transaction] = tx
+        val time = new Time {
+          override def correctedTime(): Long = timestamp
 
-          val m = mock[NewTransactionHandler]
-          (m.onNewOffchainTransactionExcept(_: Transaction, _: Option[ConnectedPeer]))
-            .expects(*, *)
-            .onCall(alwaysTx _)
-            .anyNumberOfTimes()
-          m
+          override def getTimestamp(): Long = timestamp
         }
 
-        val route = PaymentApiRoute(restAPISettings, testWallet, stmMock, NTP).route
+        val sender = testWallet.privateKeyAccounts.head
+        val tx = TransferTransaction.create(None, sender, recipient, amount, timestamp, None, fee, Array())
+
+        val route = PaymentApiRoute(restAPISettings, testWallet, utx, allChannels, time).route
 
         val req = Json.obj("sender" -> sender.address, "recipient" -> recipient.stringRepr, "amount" -> amount, "fee" -> fee)
-        val transferReq = TransferRequest(None, None, amount, fee, sender.address, None, recipient.stringRepr)
 
         Post(routePath(""), req) ~> route should produce(ApiKeyNotValid)
         Post(routePath(""), req) ~> api_key(apiKey) ~> route ~> check {
           val resp = responseAs[JsObject]
 
+          (resp \ "id").as[String] shouldEqual tx.right.get.id().toString
           (resp \ "assetId").asOpt[String] shouldEqual None
           (resp \ "feeAsset").asOpt[String] shouldEqual None
           (resp \ "type").as[Int] shouldEqual 4
           (resp \ "fee").as[Int] shouldEqual fee
           (resp \ "amount").as[Long] shouldEqual amount
           (resp \ "timestamp").as[Long] shouldEqual tx.right.get.timestamp
-          (resp \ "signature").as[String] shouldEqual Base58.encode(tx.right.get.signature)
           (resp \ "sender").as[String] shouldEqual sender.address
           (resp \ "recipient").as[String] shouldEqual recipient.stringRepr
         }

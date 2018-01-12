@@ -19,21 +19,24 @@ case class CompositeHttpService(system: ActorSystem, apiTypes: Seq[Type], routes
   def withCors: Directive0 = if (settings.cors)
     respondWithHeader(`Access-Control-Allow-Origin`.*) else pass
 
+  private val headers: scala.collection.immutable.Seq[String] = scala.collection.immutable.Seq("Authorization", "Content-Type", "X-Requested-With", "Timestamp", "Signature") ++
+    (if (settings.apiKeyDifferentHost) Seq("api_key") else Seq.empty[String])
+
   val compositeRoute =
     withCors(routes.map(_.route).reduce(_ ~ _)) ~
-    swaggerService.routes ~
-    (pathEndOrSingleSlash | path("swagger")) {
-      redirect("/api-docs/index.html", StatusCodes.PermanentRedirect)
-    } ~
-    pathPrefix("api-docs") {
-      pathEndOrSingleSlash {
+      swaggerService.routes ~
+      (pathEndOrSingleSlash | path("swagger")) {
         redirect("/api-docs/index.html", StatusCodes.PermanentRedirect)
       } ~
-      getFromResourceDirectory("swagger-ui")
-    } ~ options {
+      pathPrefix("api-docs") {
+        pathEndOrSingleSlash {
+          redirect("/api-docs/index.html", StatusCodes.PermanentRedirect)
+        } ~
+          getFromResourceDirectory("swagger-ui")
+      } ~ options {
       respondWithDefaultHeaders(
         `Access-Control-Allow-Credentials`(true),
-        `Access-Control-Allow-Headers`("Authorization", "Content-Type", "X-Requested-With"),
+        `Access-Control-Allow-Headers`(headers),
         `Access-Control-Allow-Methods`(OPTIONS, POST, PUT, GET, DELETE))(withCors(complete(StatusCodes.OK)))
     } ~ complete(StatusCodes.NotFound)
 }

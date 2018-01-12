@@ -3,21 +3,20 @@ package scorex.network
 import java.net.{InetAddress, InetSocketAddress}
 
 import com.typesafe.config.ConfigFactory
+import com.wavesplatform.network.PeerDatabaseImpl
 import com.wavesplatform.settings.NetworkSettings
+import net.ceedubs.ficus.Ficus._
 import org.scalatest.{FeatureSpec, GivenWhenThen}
-import scorex.network.peer.PeerDatabaseImpl
 
 class BlacklistSpecification extends FeatureSpec with GivenWhenThen {
   private val config = ConfigFactory.parseString(
-    """
-      |waves {
-      |  network {
-      |    black-list-residence-time: 1s
-      |  }
-      |}
-    """.stripMargin).withFallback(ConfigFactory.load()).resolve()
+    """waves.network {
+      |  known-peers = []
+      |  file = null
+      |  black-list-residence-time: 1s
+      |}""".stripMargin).withFallback(ConfigFactory.load()).resolve()
 
-  private val networkSettings = NetworkSettings.fromConfig(config)
+  private val networkSettings = config.as[NetworkSettings]("waves.network")
 
   info("As a Peer")
   info("I want to blacklist other peers for certain time")
@@ -27,32 +26,32 @@ class BlacklistSpecification extends FeatureSpec with GivenWhenThen {
     scenario("Peer blacklist another peer") {
 
       Given("Peer database is empty")
-      val peerDatabase = new PeerDatabaseImpl(networkSettings, None)
+      val peerDatabase = new PeerDatabaseImpl(networkSettings)
 
-      def isBlacklisted(address: InetSocketAddress) = peerDatabase.getBlacklist.contains(address.getHostName)
+      def isBlacklisted(address: InetSocketAddress) = peerDatabase.blacklistedHosts.contains(address.getAddress)
 
-      assert(peerDatabase.getKnownPeers.isEmpty)
-      assert(peerDatabase.getBlacklist.isEmpty)
+      assert(peerDatabase.knownPeers.isEmpty)
+      assert(peerDatabase.blacklistedHosts.isEmpty)
 
       When("Peer adds another peer to knownPeers")
       val address = new InetSocketAddress(InetAddress.getByName("localhost"), 1234)
-      peerDatabase.addPeer(address, Some(0), None)
-      assert(peerDatabase.getKnownPeers.contains(address))
+      peerDatabase.touch(address)
+      assert(peerDatabase.knownPeers.contains(address))
       assert(!isBlacklisted(address))
 
       And("Peer blacklists another peer")
-      peerDatabase.blacklistHost(address.getHostName)
+      peerDatabase.blacklist(address, "")
       assert(isBlacklisted(address))
-      assert(!peerDatabase.getKnownPeers.contains(address))
+      assert(!peerDatabase.knownPeers.contains(address))
 
       And("Peer waits for some time")
-      Thread.sleep(networkSettings.blackListResidenceTime.toMillis)
+      Thread.sleep(networkSettings.blackListResidenceTime.toMillis + 500)
 
       Then("Another peer disappear from blacklist")
       assert(!isBlacklisted(address))
 
       And("Another peer became known")
-      assert(peerDatabase.getKnownPeers.contains(address))
+      assert(peerDatabase.knownPeers.contains(address))
     }
   }
 }

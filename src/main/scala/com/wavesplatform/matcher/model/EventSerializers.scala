@@ -126,8 +126,7 @@ object MatcherSerializer {
       JsSuccess(jv.as[Map[String, (Long, Long)]])
   }
 
-  implicit val snapshotFormat: Format[Snapshot] = (
-    (JsPath \ "o").format[OrderBook] and
-      (JsPath \ "h").format[Map[String, (Long, Long)]]
-    )(Snapshot.apply, unlift(Snapshot.unapply))
+  implicit val snapshotFormat: Format[Snapshot] = Format(
+    (JsPath \ "o").read[OrderBook].map(Snapshot),
+    Writes[Snapshot](s => Json.obj("o" -> s.orderBook)))
 }

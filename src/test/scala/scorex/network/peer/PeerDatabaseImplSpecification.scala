@@ -1,41 +1,35 @@
 package scorex.network.peer
 
+import java.io.File
 import java.net.InetSocketAddress
+import java.nio.file.Files
 
 import com.typesafe.config.ConfigFactory
+import com.wavesplatform.network.PeerDatabaseImpl
 import com.wavesplatform.settings.NetworkSettings
+import net.ceedubs.ficus.Ficus._
 import org.scalatest.{Matchers, path}
-
-import scala.language.{implicitConversions, postfixOps}
 
 class PeerDatabaseImplSpecification extends path.FreeSpecLike with Matchers {
 
   private val config1 = ConfigFactory.parseString(
-    """
-      |waves {
-      |  network {
-      |    file: ""
-      |    known-peers = []
-      |    peers-data-residence-time: 2s
-      |  }
-      |}
-    """.stripMargin).withFallback(ConfigFactory.load()).resolve()
-  private val settings1 = NetworkSettings.fromConfig(config1)
+    """waves.network {
+      |  file = null
+      |  known-peers = []
+      |  peers-data-residence-time: 2s
+      |}""".stripMargin).withFallback(ConfigFactory.load()).resolve()
+  private val settings1 = config1.as[NetworkSettings]("waves.network")
 
   private val config2 = ConfigFactory.parseString(
-    """
-      |waves {
-      |  network {
-      |    file: ""
-      |    known-peers = []
-      |    peers-data-residence-time: 10s
-      |  }
-      |}
-    """.stripMargin).withFallback(ConfigFactory.load()).resolve()
-  private val settings2 = NetworkSettings.fromConfig(config2)
+    """waves.network {
+      |  file = null
+      |  known-peers = []
+      |  peers-data-residence-time: 10s
+      |}""".stripMargin).withFallback(ConfigFactory.load()).resolve()
+  private val settings2 = config2.as[NetworkSettings]("waves.network")
 
-  val database = new PeerDatabaseImpl(settings1, None)
-  val database2 = new PeerDatabaseImpl(settings2, None)
+  val database = new PeerDatabaseImpl(settings1)
+  val database2 = new PeerDatabaseImpl(settings2)
   val host1 = "1.1.1.1"
   val host2 = "2.2.2.2"
   val address1 = new InetSocketAddress(host1, 1)
@@ -43,81 +37,116 @@ class PeerDatabaseImplSpecification extends path.FreeSpecLike with Matchers {
 
   "Peer database" - {
     "new peer should not appear in internal buffer but does not appear in database" in {
-      database.getKnownPeers shouldBe empty
-      database.addPeer(address1, None, None)
-      database.getRandomPeer(Set()) should contain(address1)
-      database.getKnownPeers shouldBe empty
+      database.knownPeers shouldBe empty
+      database.addCandidate(address1)
+      database.randomPeer(Set()) should contain(address1)
+      database.knownPeers shouldBe empty
     }
 
     "new peer should move from internal buffer to database" in {
-      database.getKnownPeers shouldBe empty
-      database.addPeer(address1, None, None)
-      database.getKnownPeers shouldBe empty
-      database.addPeer(address1, Some(0), None)
-      database.getKnownPeers.keys should contain(address1)
+      database.knownPeers shouldBe empty
+      database.addCandidate(address1)
+      database.knownPeers shouldBe empty
+      database.touch(address1)
+      database.knownPeers.keys should contain(address1)
     }
 
     "peer should should became obsolete after time" in {
-      database.addPeer(address1, Some(0), None)
-      database.getKnownPeers.keys should contain(address1)
+      database.touch(address1)
+      database.knownPeers.keys should contain(address1)
       sleepLong()
-      database.getKnownPeers shouldBe empty
-      database.getRandomPeer(Set()) shouldBe empty
+      database.knownPeers shouldBe empty
+      database.randomPeer(Set()) shouldBe empty
     }
 
     "touching peer prevent it from obsoleting" in {
-      database.addPeer(address1, None, None)
-      database.addPeer(address1, Some(0), None)
+      database.addCandidate(address1)
+      database.touch(address1)
       sleepLong()
       database.touch(address1)
       sleepShort()
-      database.getKnownPeers.keys should contain(address1)
-    }
-
-    "removing peer removes it from internal buffer" in {
-      database.addPeer(address1, None, None)
-      database.getRandomPeer(Set()) should contain(address1)
-      database.removePeer(address1)
-      database.getRandomPeer(Set()) shouldBe empty
-    }
-
-    "removing peer removes it also from database" in {
-      database.addPeer(address1, Some(0), None)
-      database.getKnownPeers.keys should contain(address1)
-      database.removePeer(address1)
-      database.getKnownPeers.keys should be(empty)
+      database.knownPeers.keys should contain(address1)
     }
 
     "blacklisted peer should disappear from internal buffer and database" in {
-      database.addPeer(address1, Some(0), None)
-      database.addPeer(address2, None, None)
-      database.getKnownPeers.keys should contain(address1)
-      database.getKnownPeers.keys should not contain address2
+      database.touch(address1)
+      database.addCandidate(address2)
+      database.knownPeers.keys should contain(address1)
+      database.knownPeers.keys should not contain address2
 
-      database.blacklistHost(host1)
-      database.getKnownPeers.keys should not contain address1
-      database.getKnownPeers should be(empty)
+      database.blacklist(address1, "")
+      database.knownPeers.keys should not contain address1
+      database.knownPeers should be(empty)
 
-      database.getRandomPeer(Set()) should contain(address2)
-      database.blacklistHost(host2)
-      database.getRandomPeer(Set()) should not contain address2
-      database.getRandomPeer(Set()) should be(empty)
+      database.randomPeer(Set()) should contain(address2)
+      database.blacklist(address2, "")
+      database.randomPeer(Set()) should not contain address2
+      database.randomPeer(Set()) should be(empty)
     }
 
-  }
-
-  "Peer database2" - {
     "random peer should return peers from both from database and buffer" in {
-      database2.addPeer(address1, Some(0), None)
-      database2.addPeer(address2, None, None)
-      val keys = database2.getKnownPeers.keys
+      database2.touch(address1)
+      database2.addCandidate(address2)
+      val keys = database2.knownPeers.keys
       keys should contain(address1)
       keys should not contain address2
 
-      val set = (1 to 10).flatMap(i => database2.getRandomPeer(Set())).toSet
+      val set = (1 to 10).flatMap(i => database2.randomPeer(Set())).toSet
 
       set should contain(address1)
       set should contain(address2)
+    }
+
+    "filters out excluded candidates" in {
+      database.addCandidate(address1)
+      database.addCandidate(address1)
+      database.addCandidate(address2)
+
+      database.randomPeer(Set(address1)) should contain(address2)
+    }
+
+    "if blacklisting is disable" - {
+      "should clear blacklist at start" in {
+        val databaseFile = Files.createTempFile("waves-tests", "PeerDatabaseImplSpecification-blacklisting-clear").toAbsolutePath.toString
+        val path = if (File.separatorChar == '\\') databaseFile.replace('\\', '/') else databaseFile
+        val prevConfig = ConfigFactory.parseString(
+          s"""waves.network {
+             |  file = "$path"
+             |  known-peers = []
+             |  peers-data-residence-time: 100s
+             |}""".stripMargin).withFallback(ConfigFactory.load()).resolve()
+        val prevSettings = prevConfig.as[NetworkSettings]("waves.network")
+        val prevDatabase = new PeerDatabaseImpl(prevSettings)
+        prevDatabase.blacklist(address1, "I don't like it")
+        prevDatabase.close()
+
+        val config = ConfigFactory.parseString(
+          s"""waves.network {
+             |  file = "$path"
+             |  known-peers = []
+             |  peers-data-residence-time: 100s
+             |  enable-blacklisting = no
+             |}""".stripMargin).withFallback(ConfigFactory.load()).resolve()
+        val settings = config.as[NetworkSettings]("waves.network")
+        val database = new PeerDatabaseImpl(settings)
+
+        database.blacklistedHosts shouldBe empty
+      }
+
+      "should not add nodes to the blacklist" in {
+        val config = ConfigFactory.parseString(
+          s"""waves.network {
+             |  file = null
+             |  known-peers = []
+             |  peers-data-residence-time: 100s
+             |  enable-blacklisting = no
+             |}""".stripMargin).withFallback(ConfigFactory.load()).resolve()
+        val settings = config.as[NetworkSettings]("waves.network")
+        val database = new PeerDatabaseImpl(settings)
+        database.blacklist(address1, "I don't like it")
+
+        database.blacklistedHosts shouldBe empty
+      }
     }
   }
 

@@ -1,6 +1,7 @@
 package scorex.transaction.assets.exchange
 
 import com.wavesplatform.TransactionGen
+import com.wavesplatform.state2.ByteStr
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import play.api.libs.json._
@@ -39,8 +40,8 @@ class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers 
         val o = s.get
         o.senderPublicKey shouldBe PublicKeyAccount(pk.publicKey)
         o.matcherPublicKey shouldBe PublicKeyAccount(Base58.decode("DZUxn4pC7QdYrRqacmaAJghatvnn1Kh1mkE2scZoLuGJ").get)
-        o.assetPair.amountAsset.get shouldBe Base58.decode("29ot86P3HoUZXH1FCoyvff7aeZ3Kt7GqPwBWXncjRF2b").get
-        o.assetPair.priceAsset.get shouldBe Base58.decode("GEtBMkg419zhDiYRXKwn2uPcabyXKqUqj4w3Gcs1dq44").get
+        o.assetPair.amountAsset.get shouldBe ByteStr.decodeBase58("29ot86P3HoUZXH1FCoyvff7aeZ3Kt7GqPwBWXncjRF2b").get
+        o.assetPair.priceAsset.get shouldBe ByteStr.decodeBase58("GEtBMkg419zhDiYRXKwn2uPcabyXKqUqj4w3Gcs1dq44").get
         o.price shouldBe 0
         o.amount shouldBe 0
         o.matcherFee shouldBe 0
@@ -107,14 +108,14 @@ class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers 
 
   property("Parse signed Order") {
     forAll(orderGen) { order =>
-      val json = order.json
+      val json = order.json()
       json.validate[Order] match {
         case e: JsError =>
           fail("Error: " + JsError.toJson(e).toString())
         case s: JsSuccess[Order] =>
           val o = s.get
-          o.json.toString() should be (json.toString())
-          o.signatureValid should be(true)
+          o.json().toString() should be(json.toString())
+          o.signaturesValid().isRight should be(true)
       }
     }
   }

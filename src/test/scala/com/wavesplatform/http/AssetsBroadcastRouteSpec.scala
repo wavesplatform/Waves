@@ -1,9 +1,11 @@
 package com.wavesplatform.http
 
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.RequestGen
+import com.wavesplatform.{RequestGen, UtxPool}
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.settings.RestAPISettings
+import com.wavesplatform.state2.diffs.TransactionDiffer.TransactionValidationError
+import io.netty.channel.group.ChannelGroup
 import org.scalacheck.Gen._
 import org.scalacheck.{Gen => G}
 import org.scalamock.scalatest.PathMockFactory
@@ -11,29 +13,20 @@ import org.scalatest.prop.PropertyChecks
 import play.api.libs.json.{JsObject, JsValue, Json, Writes}
 import scorex.api.http._
 import scorex.api.http.assets.AssetsBroadcastApiRoute
-import scorex.network.ConnectedPeer
-import scorex.transaction.{Transaction, NewTransactionHandler, ValidationError}
+import scorex.transaction.ValidationError.GenericError
+import scorex.transaction.Transaction
 
 
 class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with RequestGen with PathMockFactory with PropertyChecks {
   private val settings = RestAPISettings.fromConfig(ConfigFactory.load())
+  private val utx = stub[UtxPool]
+  private val allChannels = stub[ChannelGroup]
+
+  (utx.putIfNew _).when(*).onCall((t: Transaction) => Left(TransactionValidationError(GenericError("foo"), t))).anyNumberOfTimes()
 
   "returns StateCheckFiled" - {
 
-    val stmMock = {
-
-      def alwaysError(t: Transaction, maybePeer: Option[ConnectedPeer]): Either[ValidationError, Transaction] =
-        Left[ValidationError, Transaction](scorex.transaction.ValidationError.TransactionValidationError(t, "foo"))
-
-      val m = mock[NewTransactionHandler]
-      (m.onNewOffchainTransactionExcept(_: Transaction, _: Option[ConnectedPeer]))
-        .expects(*, *)
-        .onCall(alwaysError _)
-        .anyNumberOfTimes()
-      m
-    }
-
-    val route = AssetsBroadcastApiRoute(settings, stmMock).route
+    val route = AssetsBroadcastApiRoute(settings, utx, allChannels).route
 
     val vt = Table[String, G[_ <: Transaction], (JsValue) => JsValue](
       ("url", "generator", "transform"),
@@ -50,25 +43,25 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
       })
     )
 
-    def posting(url: String, v: JsValue) = Post(routePath(url), v) ~> route
+    def posting(url: String, v: JsValue): RouteTestResult = Post(routePath(url), v) ~> route
 
     "when state validation fails" in {
       forAll(vt) { (url, gen, transform) =>
         forAll(gen) { (t: Transaction) =>
-          posting(url, transform(t.json)) should produce(StateCheckFailed(t, "foo"))
+          posting(url, transform(t.json())) should produce(StateCheckFailed(t, "foo"))
         }
       }
     }
   }
 
   "returns appropriate error code when validation fails for" - {
-    val route = AssetsBroadcastApiRoute(settings, mock[NewTransactionHandler]).route
+    val route = AssetsBroadcastApiRoute(settings, utx, allChannels).route
 
     "issue transaction" in forAll(broadcastIssueReq) { ir =>
-      def posting[A: Writes](v: A) = Post(routePath("issue"), v) ~> route
+      def posting[A: Writes](v: A): RouteTestResult = Post(routePath("issue"), v) ~> route
 
       forAll(nonPositiveLong) { q => posting(ir.copy(fee = q)) should produce(InsufficientFee) }
-      forAll(nonPositiveLong) { q => posting(ir.copy(quantity = q)) should produce(NegativeAmount) }
+      forAll(nonPositiveLong) { q => posting(ir.copy(quantity = q)) should produce(NegativeAmount(s"$q of assets")) }
       forAll(invalidDecimals) { d => posting(ir.copy(decimals = d)) should produce(TooBigArrayAllocation) }
       forAll(longDescription) { d => posting(ir.copy(description = d)) should produce(TooBigArrayAllocation) }
       forAll(invalidName) { name => posting(ir.copy(name = name)) should produce(InvalidName) }
@@ -77,34 +70,27 @@ class AssetsBroadcastRouteSpec extends RouteSpec("/assets/broadcast/") with Requ
     }
 
     "reissue transaction" in forAll(broadcastReissueReq) { rr =>
-      def posting[A: Writes](v: A) = Post(routePath("reissue"), v) ~> route
+      def posting[A: Writes](v: A): RouteTestResult = Post(routePath("reissue"), v) ~> route
 
       // todo: invalid sender
-      forAll(nonPositiveLong) { q => posting(rr.copy(quantity = q)) should produce(NegativeAmount) }
+      forAll(nonPositiveLong) { q => posting(rr.copy(quantity = q)) should produce(NegativeAmount(s"$q of assets")) }
       forAll(nonPositiveLong) { fee => posting(rr.copy(fee = fee)) should produce(InsufficientFee) }
     }
 
     "burn transaction" in forAll(broadcastBurnReq) { br =>
-      def posting[A: Writes](v: A) = Post(routePath("burn"), v) ~> route
+      def posting[A: Writes](v: A): RouteTestResult = Post(routePath("burn"), v) ~> route
 
       forAll(invalidBase58) { pk => posting(br.copy(senderPublicKey = pk)) should produce(InvalidAddress) }
-      forAll(nonPositiveLong) { q => posting(br.copy(quantity = q)) should produce(NegativeAmount) }
+      forAll(nonPositiveLong) { q => posting(br.copy(quantity = q)) should produce(NegativeAmount(s"$q of assets")) }
       forAll(nonPositiveLong) { fee => posting(br.copy(fee = fee)) should produce(InsufficientFee) }
     }
 
     "transfer transaction" in forAll(broadcastTransferReq) { tr =>
-      def posting[A: Writes](v: A) = Post(routePath("transfer"), v) ~> route
+      def posting[A: Writes](v: A): RouteTestResult = Post(routePath("transfer"), v) ~> route
 
-      posting(tr.copy(attachment = Some(""))) should produce(InvalidSignature)
-      posting(tr.copy(attachment = None)) should produce(InvalidSignature)
-      posting(tr.copy(assetId = Some(""))) should produce(InvalidSignature)
-      posting(tr.copy(assetId = None)) should produce(InvalidSignature)
-      posting(tr.copy(feeAssetId = Some(""))) should produce(InvalidSignature)
-      posting(tr.copy(feeAssetId = None)) should produce(InvalidSignature)
-
-      forAll(nonPositiveLong) { q => posting(tr.copy(amount = q)) should produce(NegativeAmount) }
+      forAll(nonPositiveLong) { q => posting(tr.copy(amount = q)) should produce(NegativeAmount(s"$q of waves")) }
       forAll(invalidBase58) { pk => posting(tr.copy(senderPublicKey = pk)) should produce(InvalidAddress) }
-      forAll(invalidBase58) { a => posting(tr.copy(recipient = a)) should produce (InvalidAddress) }
+      forAll(invalidBase58) { a => posting(tr.copy(recipient = a)) should produce(InvalidAddress) }
       forAll(invalidBase58) { a => posting(tr.copy(assetId = Some(a))) should produce(CustomValidationError("invalid.assetId")) }
       forAll(invalidBase58) { a => posting(tr.copy(feeAssetId = Some(a))) should produce(CustomValidationError("invalid.feeAssetId")) }
       forAll(longAttachment) { a => posting(tr.copy(attachment = Some(a))) should produce(CustomValidationError("invalid.attachment")) }

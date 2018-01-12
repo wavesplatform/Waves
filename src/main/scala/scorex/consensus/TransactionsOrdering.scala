@@ -1,18 +1,14 @@
 package scorex.consensus
 
-import scorex.crypto.encode.Base58
 import scorex.transaction.Transaction
 
 object TransactionsOrdering {
   trait WavesOrdering extends Ordering[Transaction] {
     def txTimestampOrder(ts: Long): Long
     private def orderBy(t: Transaction): (Long, Long, String) = {
-      val byFee = t.assetFee._1 match {
-        case Some(assetId) => 0
-        case None => -t.assetFee._2
-      }
+      val byFee = if (t.assetFee._1.nonEmpty) 0 else -t.assetFee._2
       val byTimestamp = txTimestampOrder(t.timestamp)
-      val byTxId = Base58.encode(t.id)
+      val byTxId = t.id().base58
 
       (byFee, byTimestamp, byTxId)
     }

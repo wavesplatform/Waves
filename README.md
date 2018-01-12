@@ -36,12 +36,21 @@ sbt packageAll
 .deb and .jar packages will be in /package folder. To build testnet packages use
 
 ```
-sbt packageAll -Dnetwork=testnet
+sbt -Dnetwork=testnet packageAll
 ```
 
 # Running Tests
 
 `sbt test`
+
+**Note**
+
+If you prefer to work with _SBT_ in the interactive mode, open it with settings:
+```bash
+SBT_OPTS="${SBT_OPTS} -Xms512M -Xmx1536M -Xss1M -XX:+CMSClassUnloadingEnabled" sbt
+```
+
+to solve the `Metaspace error` problem.
 
 # Running Integration Tests
 
@@ -57,6 +66,15 @@ By default, `it:test` will do the following:
   will be registered with the local Docker daemon. This image is built with [sbt-docker](https://github.com/marcuslonnberg/sbt-docker)
   plugin. 
 * Run the test suites from `src/it/scala`, passing docker image ID via `docker.imageId` system property.
+
+### Logging
+
+By [default](src/main/resources/logback.xml) all logs are written to the STDOUT. If you want to write logs, for example,
+to JSON files, you should define your own logging configuration and specify a path to it in `conf/application.ini`:
+
+```
+-Dlogback.configurationFile=/path/to/your/logback.xml
+```  
 
 ### Debugging
 
@@ -89,3 +107,35 @@ have `docker.imageId` system property defined for the run configuration. The eas
 In this example, `e243fa08d496` is the image ID you need. Make sure to re-build the image whenever the node code (not 
 the tests) is changed. If you run the tests from SBT, there's no need to manually rebuild the image, SBT will handle
 this automatically.
+
+# Collecting performance metrics
+
+**Note**: all required tools will be installed though [Docker](https://docs.docker.com) for simplicity.
+
+1. Install [Graphite](https://graphite.readthedocs.io/en/latest/install.html#docker), a service for collecting metrics.
+2. Install [Grafana](https://grafana.com/grafana/download?platform=docker) for beautiful graphs.
+3. By default all metrics are disabled. So specify _Kamon_ settings through _Java Properties_ and run the node 
+   with a desired config. For example, we ran _Graphite_ locally and it accepts _StatsD_ information on the `9999` port:
+
+    ```bash
+    SBT_OPTS="${SBT_OPTS} -Xms512M -Xmx1536M -Xss1M -XX:+CMSClassUnloadingEnabled \
+    -Dkamon.modules.kamon-statsd.auto-start=yes \
+    -Dkamon.modules.kamon-system-metrics.auto-start=yes \
+    -Dkamon.statsd.hostname=localhost \
+    -Dkamon.statsd.port=9999" sbt waves-testnet.conf
+    ``` 
+
+    Here:
+    * `-Dkamon.modules.kamon-statsd.auto-start=yes` enables custom metrics;
+    * `-Dkamon.modules.kamon-system-metrics.auto-start=yes` enables metrics of _CPU_, _Memory_ and others;
+    * See [application.conf](https://github.com/wavesplatform/Waves/blob/master/src/main/resources/application.conf)
+      for more options.
+
+# Acknowledgement
+
+[<img src="https://www.yourkit.com/images/yklogo.png">](http://www.yourkit.com/java/profiler/index.jsp)  
+We use YourKit full-featured Java Profiler to make Waves node faster. YourKit, LLC is the creator of innovative and intelligent tools for profiling Java and .NET applications.    
+Take a look at YourKit's leading software products: 
+<a href="http://www.yourkit.com/java/profiler/index.jsp">YourKit Java Profiler</a> and
+<a href="http://www.yourkit.com/.net/profiler/index.jsp">YourKit .NET Profiler</a>.
+

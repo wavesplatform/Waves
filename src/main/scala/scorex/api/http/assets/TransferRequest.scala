@@ -8,7 +8,8 @@ case class TransferRequest(assetId: Option[String],
                            fee: Long,
                            sender: String,
                            attachment: Option[String],
-                           recipient: String)
+                           recipient: String,
+                           timestamp: Option[Long] = None)
 
 object TransferRequest {
   implicit val transferFormat: Format[TransferRequest] = Json.format

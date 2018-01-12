@@ -1,41 +1,88 @@
 package com.wavesplatform.it
 
-import com.wavesplatform.it.Node.{AssetBalance, FullAssetInfo}
+import com.wavesplatform.it.api.MultipleNodesApi
+import com.wavesplatform.it.api.NodeApi.{AssetBalance, FullAssetInfo}
 import com.wavesplatform.it.util._
 import org.scalatest._
 import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
 import scorex.transaction.TransactionParser.TransactionType
+import scorex.utils.ScorexLogging
 
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
-import scala.util.Random
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.language.postfixOps
 
+trait IntegrationSuiteWithThreeAddresses extends BeforeAndAfterAll with Matchers with ScalaFutures
+  with IntegrationPatience with RecoverMethods with RequestErrorAssert with IntegrationTestsScheme
+  with MultipleNodesApi with HasNodes with ScorexLogging {
+  this: Suite =>
 
-trait IntegrationSuiteWithThreeAddresses extends FunSuite with BeforeAndAfterAll with Matchers with ScalaFutures
-  with IntegrationPatience with RecoverMethods with RequestErrorAssert {
+  def notMiner: Node
 
-  def allNodes: Seq[Node]
+  protected def sender: Node = notMiner
 
-  protected val sender = Random.shuffle(allNodes).head
-  private val richAddress = sender.address
+  private def richAddress = sender.address
 
-  protected val defaultBalance: Long = 100 waves
+  protected val defaultBalance: Long = 100.waves
 
-  protected lazy val firstAddress: String = Await.result(sender.createAddress, 1.minutes)
-  protected lazy val secondAddress: String = Await.result(sender.createAddress, 1.minutes)
-  protected lazy val thirdAddress: String = Await.result(sender.createAddress, 1.minutes)
+  protected lazy val firstAddress: String = Await.result(sender.createAddress, 2.minutes)
+  protected lazy val secondAddress: String = Await.result(sender.createAddress, 2.minutes)
+  protected lazy val thirdAddress: String = Await.result(sender.createAddress, 2.minutes)
+
+  protected def accountEffectiveBalance(acc: String): Future[Long] = sender.effectiveBalance(acc).map(_.balance)
+
+  protected def accountBalance(acc: String): Future[Long] = sender.balance(acc).map(_.balance)
+
+  protected def accountBalances(acc: String): Future[(Long, Long)] = {
+    sender.balance(acc).map(_.balance).zip(sender.effectiveBalance(acc).map(_.balance))
+  }
 
   protected def assertBalances(acc: String, balance: Long, effectiveBalance: Long): Future[Unit] = {
     for {
-      newBalance <- sender.balance(acc).map(_.balance)
-      newEffectiveBalance <- sender.effectiveBalance(acc).map(_.balance)
+      newBalance <- accountBalance(acc)
+      newEffectiveBalance <- accountEffectiveBalance(acc)
     } yield {
-      newEffectiveBalance shouldBe effectiveBalance
-      newBalance shouldBe balance
+      withClue(s"effective balance of $acc") {
+        newEffectiveBalance shouldBe effectiveBalance
+      }
+      withClue(s"balance of $acc") {
+        newBalance shouldBe balance
+      }
     }
   }
+
+  protected def dumpBalances(node: Node, accounts: Seq[String], label: String): Future[Unit] = {
+    Future
+      .traverse(accounts) { acc =>
+        accountBalance(acc).zip(accountEffectiveBalance(acc)).map(acc -> _)
+      }
+      .map { info =>
+        val formatted = info
+          .map { case (account, (balance, effectiveBalance)) =>
+            f"$account: balance = $balance, effective = $effectiveBalance"
+          }
+          .mkString("\n")
+        log.debug(s"$label:\n$formatted")
+      }
+  }
+
+  // if we first await tx and then height + 1, it could be gone with height + 1
+  // if we first await height + 1 and then tx, it could be gone with height + 2
+  // so we await tx twice
+  protected def waitForHeightAraiseAndTxPresent(transactionId: String, heightIncreaseOn: Integer): Future[Unit] = for {
+    height <- traverse(nodes)(_.height).map(_.max)
+    _ <- waitForSameBlocksAt(nodes, 2.seconds, height)
+    _ <- traverse(nodes)(_.waitForTransaction(transactionId))
+    _ <- traverse(nodes)(_.waitForHeight(height + heightIncreaseOn))
+    _ <- traverse(nodes)(_.waitForTransaction(transactionId))
+  } yield ()
+
+  protected def waitForHeightAraise(heightIncreaseOn: Integer): Future[Unit] = for {
+    height <- traverse(nodes)(_.height).map(_.max)
+    _ <- traverse(nodes)(_.waitForHeight(height + heightIncreaseOn))
+  } yield ()
+
 
   protected def assertAssetBalance(acc: String, assetIdString: String, balance: Long): Future[Unit] = {
     assertAsset(acc, assetIdString)(_.balance shouldBe balance)
@@ -53,31 +100,42 @@ trait IntegrationSuiteWithThreeAddresses extends FunSuite with BeforeAndAfterAll
     })
   }
 
-
-  override def beforeAll(): Unit = {
+  abstract override def beforeAll(): Unit = {
     super.beforeAll()
 
     def waitForTxsToReachAllNodes(txIds: Seq[String]): Future[_] = {
       val txNodePairs = for {
         txId <- txIds
-        node <- allNodes
+        node <- nodes
       } yield (node, txId)
-      Future.traverse(txNodePairs) { case (node, tx) => node.waitForTransaction(tx) }
+      traverse(txNodePairs) { case (node, tx) => node.waitForTransaction(tx) }
     }
 
-    def makeTransfers: Future[Seq[String]] = Future.sequence(Seq(
-      sender.transfer(richAddress, firstAddress, defaultBalance, sender.fee(TransactionType.TransferTransaction)),
-      sender.transfer(richAddress, secondAddress, defaultBalance, sender.fee(TransactionType.TransferTransaction)),
-      sender.transfer(richAddress, thirdAddress, defaultBalance, sender.fee(TransactionType.TransferTransaction)))).map(_.map(_.id))
+    def makeTransfers(accounts: Seq[String]): Future[Seq[String]] = traverse(accounts) { acc =>
+      sender.transfer(richAddress, acc, defaultBalance, sender.fee(TransactionType.TransferTransaction)).map(_.id)
+    }
 
     val correctStartBalancesFuture = for {
-      txs <- makeTransfers
+      _ <- traverse(nodes)(_.waitForHeight(2))
+      accounts = Seq(firstAddress, secondAddress, thirdAddress)
 
-      _ <- waitForTxsToReachAllNodes(txs)
+      _ <- dumpBalances(sender, accounts, "initial")
+      txs <- makeTransfers(accounts)
 
-      _ <- Future.sequence(Seq(firstAddress, secondAddress, thirdAddress).map(address => assertBalances(address, defaultBalance, defaultBalance)))
+      height <- traverse(nodes)(_.height).map(_.max)
+      _ <- withClue(s"waitForHeight(${height + 2})") {
+        Await.ready(traverse(nodes)(_.waitForHeight(height + 2)), 3.minutes)
+      }
+
+      _ <- withClue("waitForTxsToReachAllNodes") {
+        Await.ready(waitForTxsToReachAllNodes(txs), 2.minute)
+      }
+      _ <- dumpBalances(sender, accounts, "after transfer")
+      _ <- traverse(accounts)(assertBalances(_, defaultBalance, defaultBalance))
     } yield succeed
 
-    Await.result(correctStartBalancesFuture, 90 seconds)
+    withClue("beforeAll") {
+      Await.result(correctStartBalancesFuture, 5.minutes)
+    }
   }
 }

@@ -22,7 +22,7 @@ trait ApiMarshallers {
   implicit val aem: TRM[ApiError] = fromStatusCodeAndValue[StatusCode, JsValue].compose { ae => ae.code -> ae.json }
   implicit val vem: TRM[ValidationError] = aem.compose(ve => ApiError.fromValidationError(ve))
 
-  implicit val tw: Writes[Transaction] = Writes(_.json)
+  implicit val tw: Writes[Transaction] = Writes(_.json())
 
   private val jsonStringUnmarshaller =
     Unmarshaller.byteStringUnmarshaller

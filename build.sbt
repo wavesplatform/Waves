@@ -1,25 +1,40 @@
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
+
 import com.typesafe.sbt.packager.archetypes.TemplateWriter
 import sbt.Keys._
 import sbt._
 
-enablePlugins(sbtdocker.DockerPlugin, JavaServerAppPackaging, JDebPackaging, SystemdPlugin)
+enablePlugins(sbtdocker.DockerPlugin, JavaServerAppPackaging, JDebPackaging, SystemdPlugin, GitVersioning)
 
 name := "waves"
 organization := "com.wavesplatform"
-version := "0.7.2-SNAPSHOT"
-scalaVersion := "2.12.1"
+git.useGitDescribe := true
+git.uncommittedSignifier := Some("DIRTY")
+scalaVersion in ThisBuild := "2.12.4"
 crossPaths := false
 publishArtifact in (Compile, packageDoc) := false
 publishArtifact in (Compile, packageSrc) := false
 mainClass in Compile := Some("com.wavesplatform.Application")
-scalacOptions ++= Seq("-feature", "-deprecation", "-Xmax-classfile-name", "128")
+scalacOptions ++= Seq(
+  "-feature",
+  "-deprecation",
+  "-language:higherKinds",
+  "-language:implicitConversions",
+  "-Ywarn-unused:-implicits",
+  "-Xlint")
 logBuffered := false
 
 //assembly settings
 assemblyJarName in assembly := s"waves-all-${version.value}.jar"
+assemblyMergeStrategy in assembly := {
+  case PathList("META-INF", "io.netty.versions.properties") => MergeStrategy.concat
+  case other => (assemblyMergeStrategy in assembly).value(other)
+}
 test in assembly := {}
 
 libraryDependencies ++=
+  Dependencies.network ++
   Dependencies.db ++
   Dependencies.http ++
   Dependencies.akka ++
@@ -28,12 +43,12 @@ libraryDependencies ++=
   Dependencies.itKit ++
   Dependencies.logging ++
   Dependencies.matcher ++
-  Dependencies.p2p ++
+  Dependencies.metrics ++
+  Dependencies.fp ++
   Seq(
-    "com.iheart" %% "ficus" % "1.4.0",
-    "org.scorexfoundation" %% "scrypto" % "1.2.0",
-    "commons-net" % "commons-net" % "3.+",
-    "org.typelevel" %% "cats-core" % "0.9.0"
+    "com.iheart" %% "ficus" % "1.4.2",
+    ("org.scorexfoundation" %% "scrypto" % "1.2.2").exclude("org.slf4j", "slf4j-api"),
+    "commons-net" % "commons-net" % "3.+"
   )
 
 sourceGenerators in Compile += Def.task {
@@ -57,15 +72,56 @@ inConfig(Test)(Seq(
   testOptions += Tests.Argument("-oIDOF", "-u", "target/test-reports")
 ))
 
-concurrentRestrictions in Global += Tags.limit(Tags.Test, 1)
+concurrentRestrictions in Global := Seq(
+  Tags.limit(Tags.CPU, 5),
+  Tags.limit(Tags.Network, 5),
+  Tags.limit(Tags.Test, 5),
+  Tags.limitAll(5)
+)
 
 Defaults.itSettings
 configs(IntegrationTest)
-inConfig(IntegrationTest)(Seq(
-  parallelExecution := false,
-  test := (test dependsOn docker).value,
-  testOptions += Tests.Filter(_.endsWith("Suite"))
-))
+
+lazy val itTestsCommonSettings: Seq[Def.Setting[_]] = Seq(
+  testOptions += Tests.Argument(TestFrameworks.ScalaTest, "-fW", (logDirectory.value / "summary.log").toString),
+  testGrouping := {
+    testGrouping.value.flatMap { group =>
+      group.tests.map { suite =>
+        val fileName = {
+          val parts = suite.name.split('.')
+          (parts.init.map(_.substring(0, 1)) :+ parts.last).mkString(".")
+        }
+
+        val forkOptions = ForkOptions(
+          bootJars = Nil,
+          javaHome = javaHome.value,
+          connectInput = connectInput.value,
+          outputStrategy = outputStrategy.value,
+          runJVMOptions = javaOptions.value ++ Seq(
+            "-Dwaves.it.logging.appender=FILE",
+            s"-Dwaves.it.logging.dir=${logDirectory.value / fileName}"
+          ),
+          workingDirectory = Some(baseDirectory.value),
+          envVars = envVars.value
+        )
+
+        group.copy(
+          name = suite.name,
+          runPolicy = Tests.SubProcess(forkOptions),
+          tests = Seq(suite)
+        )
+      }
+    }
+  }
+)
+
+inConfig(IntegrationTest)(
+  Seq(
+    test := (test dependsOn docker).value,
+    envVars in test += "CONTAINER_JAVA_OPTS" -> "-Xmx1500m",
+    envVars in testOnly += "CONTAINER_JAVA_OPTS" -> "-Xmx512m"
+  ) ++ inTask(test)(itTestsCommonSettings) ++ inTask(testOnly)(itTestsCommonSettings)
+)
 
 dockerfile in docker := {
   val configTemplate = (resourceDirectory in IntegrationTest).value / "template.conf"
@@ -79,6 +135,10 @@ dockerfile in docker := {
     entryPoint("/opt/waves/start-waves.sh")
   }
 }
+
+buildOptions in docker := BuildOptions(
+  removeIntermediateContainers = BuildOptions.Remove.OnSuccess
+)
 
 // packaging settings
 val upstartScript = TaskKey[File]("upstartScript")
@@ -104,9 +164,13 @@ normalizedName := network.value.name
 javaOptions in Universal ++= Seq(
   // -J prefix is required by the bash script
   "-J-server",
-  // JVM memory tuning for 1g ram
+  // JVM memory tuning for 2g ram
   "-J-Xms128m",
-  "-J-Xmx1g",
+  "-J-Xmx2g",
+  "-J-XX:+ExitOnOutOfMemoryError",
+  // Java 9 support
+  "-J-XX:+IgnoreUnrecognizedVMOptions",
+  "-J--add-modules=java.xml.bind",
 
   // from https://groups.google.com/d/msg/akka-user/9s4Yl7aEz3E/zfxmdc0cGQAJ
   "-J-XX:+UseG1GC",
@@ -128,8 +192,8 @@ upstartScript := {
   dest
 }
 linuxPackageMappings ++= Seq(
-  packageMapping((upstartScript.value, s"/usr/share/${packageName.value}/conf/upstart.conf"))
-).map(_.withConfig().withPerms("644").withUser(packageName.value).withGroup(packageName.value))
+  (upstartScript.value, s"/etc/init/${packageName.value}.conf")
+).map(packageMapping(_).withConfig().withPerms("644"))
 
 linuxStartScriptTemplate in Debian := (packageSource.value / "systemd.service").toURI.toURL
 linuxScriptReplacements += "detect-loader" ->
@@ -147,3 +211,25 @@ inConfig(Debian)(Seq(
   serviceAutostart := false,
   maintainerScripts := maintainerScriptsFromDirectory(packageSource.value / "debian", Seq("preinst", "postinst", "postrm", "prerm"))
 ))
+
+lazy val node = project.in(file("."))
+lazy val generator = project.in(file("generator"))
+  .dependsOn(node % "compile->it")
+  .settings(
+    libraryDependencies ++=
+      Dependencies.fp ++
+      Seq(
+        "com.github.scopt" %% "scopt" % "3.6.0"
+      )
+  )
+
+lazy val logDirectory = taskKey[File]("A directory for logs")
+logDirectory := {
+  val runId = Option(System.getenv("RUN_ID")).getOrElse {
+    val formatter = DateTimeFormatter.ofPattern("MM-dd--HH_mm_ss")
+    s"local-${formatter.format(LocalDateTime.now())}"
+  }
+  val r = target.value / "logs" / runId
+  IO.createDirectory(r)
+  r
+}

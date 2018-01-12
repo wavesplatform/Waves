@@ -1,23 +1,16 @@
 package scorex.account
 
+import com.wavesplatform.state2.ByteStr
 import scorex.serialization.BytesSerializable
 import scorex.transaction.ValidationError
-import scorex.transaction.ValidationError.TransactionParameterValidationError
+import scorex.transaction.ValidationError.GenericError
 
-sealed trait Alias extends AccountOrAlias {
+sealed trait Alias extends AddressOrAlias {
   lazy val stringRepr: String = Alias.Prefix + networkByte.toChar + ":" + name
-  lazy val bytes: Array[Byte] = Alias.AddressVersion +: networkByte +: BytesSerializable.arrayWithSize(name.getBytes("UTF-8"))
+  lazy val bytes: ByteStr = ByteStr(Alias.AddressVersion +: networkByte +: BytesSerializable.arrayWithSize(name.getBytes("UTF-8")))
 
   val name: String
   val networkByte: Byte
-
-
-  override def equals(obj: scala.Any): Boolean = obj match {
-    case a: Alias => name.equals(a.name)
-    case _ => false
-  }
-
-  override def hashCode(): Int = name.hashCode
 }
 
 object Alias {
@@ -28,22 +21,25 @@ object Alias {
   val MinLength = 4
   val MaxLength = 30
 
+  val aliasAlphabet = "-.0123456789@_abcdefghijklmnopqrstuvwxyz"
+
   private val AliasPatternInfo = "Alias string pattern is 'alias:<chain-id>:<address-alias>"
 
   private def schemeByte: Byte = AddressScheme.current.chainId
+
+  private def validAliasChar(c: Char): Boolean =
+    ('0' <= c && c <= '9') || ('a' <= c && c <= 'z') || c == '_' || c == '@' || c == '-' || c == '.'
 
   private def buildAlias(networkByte: Byte, name: String): Either[ValidationError, Alias] = {
 
     case class AliasImpl(networkByte: Byte, name: String) extends Alias
 
-    if (name contains "\n") {
-      Left(TransactionParameterValidationError("Alias cannot be multiline"))
-    } else if (name.trim() != name) {
-      Left(TransactionParameterValidationError("Alias cannot contain leading or trailing whitespaces"))
-    } else if (!(MinLength to MaxLength contains name.length))
-      Left(TransactionParameterValidationError(s"Alias '$name' length should be between $MinLength and $MaxLength"))
+    if (name.length < MinLength || MaxLength < name.length)
+      Left(GenericError(s"Alias '$name' length should be between $MinLength and $MaxLength"))
+    else if (!name.forall(validAliasChar))
+      Left(GenericError(s"Alias should contain only following characters: $aliasAlphabet"))
     else if (networkByte != schemeByte)
-      Left(TransactionParameterValidationError("Alias network char doesn't match current scheme"))
+      Left(GenericError("Alias network char doesn't match current scheme"))
     else
       Right(AliasImpl(networkByte, name))
   }
@@ -53,13 +49,13 @@ object Alias {
 
   def fromString(str: String): Either[ValidationError, Alias] =
     if (!str.startsWith(Prefix)) {
-      Left(TransactionParameterValidationError(AliasPatternInfo))
+      Left(GenericError(AliasPatternInfo))
     } else {
       val charSemicolonAlias = str.drop(Prefix.length)
       val networkByte = charSemicolonAlias(0).toByte
       val name = charSemicolonAlias.drop(2)
       if (charSemicolonAlias(1) != ':') {
-        Left(TransactionParameterValidationError(AliasPatternInfo))
+        Left(GenericError(AliasPatternInfo))
       } else {
         buildAlias(networkByte, name)
       }
@@ -70,10 +66,10 @@ object Alias {
       case Some(AddressVersion) =>
         val networkChar = bytes.tail.head
         if (networkChar != schemeByte) {
-          Left(TransactionParameterValidationError("Alias network byte doesn't match current scheme"))
+          Left(GenericError("Alias network byte doesn't match current scheme"))
         } else
           buildAlias(networkChar, new String(bytes.drop(4), "UTF-8"))
-      case _ => Left(TransactionParameterValidationError("Bad alias bytes"))
+      case _ => Left(GenericError("Bad alias bytes"))
     }
   }
 }

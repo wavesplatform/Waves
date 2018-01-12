@@ -3,109 +3,86 @@ package scorex.transaction
 import java.util
 
 import com.google.common.primitives.{Bytes, Ints, Longs}
+import com.wavesplatform.state2.ByteStr
+import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
-import scorex.account.{Account, PrivateKeyAccount, PublicKeyAccount}
+import scorex.account.PublicKeyAccount._
+import scorex.account.{Address, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
-import scorex.transaction.TransactionParser._
-import scorex.account.PublicKeyAccount._
 import scorex.crypto.hash.FastCryptographicHash
+import scorex.transaction.PaymentTransaction.signatureData
+import scorex.transaction.TransactionParser._
 
 import scala.util.{Failure, Success, Try}
 
-sealed trait PaymentTransaction extends Transaction {
-  def sender: PublicKeyAccount
+case class PaymentTransaction private(sender: PublicKeyAccount,
+                                      recipient: Address,
+                                      amount: Long,
+                                      fee: Long,
+                                      timestamp: Long,
+                                      signature: ByteStr) extends Transaction {
+  override val transactionType = TransactionType.PaymentTransaction
+  override val assetFee: (Option[AssetId], Long) = (None, fee)
+  override val id = Coeval.evalOnce(signature)
 
-  def recipient: Account
+  override val json: Coeval[JsObject] = Coeval.evalOnce(
+    Json.obj("type" -> transactionType.id,
+      "id" -> id().base58,
+      "fee" -> fee,
+      "timestamp" -> timestamp,
+      "signature" -> this.signature.base58,
+      "sender" -> sender.address,
+      "senderPublicKey" -> Base58.encode(sender.publicKey),
+      "recipient" -> recipient.address,
+      "amount" -> amount))
 
-  def amount: Long
+  private val hashBytes: Coeval[Array[Byte]] = Coeval.evalOnce {
+    val timestampBytes = Longs.toByteArray(timestamp)
+    val amountBytes = Longs.toByteArray(amount)
+    val feeBytes = Longs.toByteArray(fee)
+    Bytes.concat(Array(transactionType.id.toByte), timestampBytes, sender.publicKey, recipient.bytes.arr, amountBytes, feeBytes)
+  }
 
-  def fee: Long
+  val hash: Coeval[FastCryptographicHash.Digest] = Coeval.evalOnce(FastCryptographicHash(hashBytes()))
 
-  def signature: Array[Byte]
+  override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(hashBytes(), signature.arr))
 
-  def hash: Array[Byte]
+  val signatureValid: Coeval[Boolean] = Coeval.evalOnce(EllipticCurveImpl.verify(signature.arr,
+    signatureData(sender, recipient, amount, fee, timestamp), sender.publicKey))
 }
 
 object PaymentTransaction {
 
-  private case class PaymentTransactionImpl(sender: PublicKeyAccount,
-                                            recipient: Account,
-                                            amount: Long,
-                                            fee: Long,
-                                            timestamp: Long,
-                                            signature: Array[Byte])
-    extends PaymentTransaction {
-    override val transactionType = TransactionType.PaymentTransaction
-    override val assetFee: (Option[AssetId], Long) = (None, fee)
-    override val id: Array[Byte] = signature
 
-    override lazy val json: JsObject =
-      Json.obj("type" -> transactionType.id,
-        "id" -> Base58.encode(id),
-        "fee" -> fee,
-        "timestamp" -> timestamp,
-        "signature" -> Base58.encode(this.signature),
-        "sender" -> sender.address,
-        "senderPublicKey" -> Base58.encode(sender.publicKey),
-        "recipient" -> recipient.address,
-        "amount" -> amount)
-
-    lazy val hashBytes: Array[Byte] = {
-      val timestampBytes = Longs.toByteArray(timestamp)
-      val amountBytes = Longs.toByteArray(amount)
-      val feeBytes = Longs.toByteArray(fee)
-      Bytes.concat(Array(transactionType.id.toByte), timestampBytes, sender.publicKey, recipient.bytes, amountBytes, feeBytes)
-    }
-
-    override lazy val hash = FastCryptographicHash(hashBytes)
-
-    override lazy val bytes: Array[Byte] = Bytes.concat(hashBytes, signature)
-
-  }
-
-  val RecipientLength = Account.AddressLength
+  val RecipientLength = Address.AddressLength
 
   private val SenderLength = 32
   private val FeeLength = 8
   private val BaseLength = TimestampLength + SenderLength + RecipientLength + AmountLength + FeeLength + SignatureLength
 
-  def create(sender: PrivateKeyAccount, recipient: Account, amount: Long, fee: Long, timestamp: Long): Either[ValidationError, PaymentTransaction] = {
-    if (amount <= 0) {
-      Left(ValidationError.NegativeAmount) //CHECK IF AMOUNT IS POSITIVE
-    } else if (fee <= 0) {
-      Left(ValidationError.InsufficientFee) //CHECK IF FEE IS POSITIVE
-    } else if (Try(Math.addExact(amount, fee)).isFailure) {
-      Left(ValidationError.OverflowError) // CHECK THAT fee+amount won't overflow Long
-    } else {
-      val signature = EllipticCurveImpl.sign(sender, signatureData(sender, recipient, amount, fee, timestamp))
-      Right(PaymentTransactionImpl(sender, recipient, amount, fee, timestamp, signature))
-    }
+  def create(sender: PrivateKeyAccount, recipient: Address, amount: Long, fee: Long, timestamp: Long): Either[ValidationError, PaymentTransaction] = {
+    create(sender, recipient, amount, fee, timestamp, ByteStr.empty).right.map(unsigned => {
+      unsigned.copy(signature = ByteStr(EllipticCurveImpl.sign(sender, signatureData(sender, recipient, amount, fee, timestamp))))
+    })
   }
 
   def create(sender: PublicKeyAccount,
-             recipient: Account,
+             recipient: Address,
              amount: Long,
              fee: Long,
              timestamp: Long,
-             signature: Array[Byte]): Either[ValidationError, PaymentTransaction] = {
+             signature: ByteStr): Either[ValidationError, PaymentTransaction] = {
     if (amount <= 0) {
-      Left(ValidationError.NegativeAmount) //CHECK IF AMOUNT IS POSITIVE
+      Left(ValidationError.NegativeAmount(amount, "waves")) //CHECK IF AMOUNT IS POSITIVE
     } else if (fee <= 0) {
       Left(ValidationError.InsufficientFee) //CHECK IF FEE IS POSITIVE
     } else if (Try(Math.addExact(amount, fee)).isFailure) {
       Left(ValidationError.OverflowError) // CHECK THAT fee+amount won't overflow Long
     } else {
-      val sigData = signatureData(sender, recipient, amount, fee, timestamp)
-      if (EllipticCurveImpl.verify(signature, sigData, sender.publicKey)) {
-        Right(PaymentTransactionImpl(sender, recipient, amount, fee, timestamp, signature))
-      } else {
-        Left(ValidationError.InvalidSignature)
-      }
-
+      Right(PaymentTransaction(sender, recipient, amount, fee, timestamp, signature))
     }
   }
-
 
   def parseTail(data: Array[Byte]): Try[PaymentTransaction] = Try {
     require(data.length >= BaseLength, "Data does not match base length")
@@ -124,7 +101,7 @@ object PaymentTransaction {
 
     //READ RECIPIENT
     val recipientBytes = util.Arrays.copyOfRange(data, position, position + RecipientLength)
-    val recipient = Account.fromBytes(recipientBytes).right.get
+    val recipient = Address.fromBytes(recipientBytes).right.get
     position += RecipientLength
 
     //READ AMOUNT
@@ -141,16 +118,16 @@ object PaymentTransaction {
     val signatureBytes = util.Arrays.copyOfRange(data, position, position + SignatureLength)
 
     PaymentTransaction
-      .create(sender, recipient, amount, fee, timestamp, signatureBytes)
+      .create(sender, recipient, amount, fee, timestamp, ByteStr(signatureBytes))
       .fold(left => Failure(new Exception(left.toString)), right => Success(right))
   }.flatten
 
-  private def signatureData(sender: PublicKeyAccount, recipient: Account, amount: Long, fee: Long, timestamp: Long): Array[Byte] = {
+  private def signatureData(sender: PublicKeyAccount, recipient: Address, amount: Long, fee: Long, timestamp: Long): Array[Byte] = {
     val typeBytes = Ints.toByteArray(TransactionType.PaymentTransaction.id)
     val timestampBytes = Longs.toByteArray(timestamp)
     val amountBytes = Longs.toByteArray(amount)
     val feeBytes = Longs.toByteArray(fee)
 
-    Bytes.concat(typeBytes, timestampBytes, sender.publicKey, recipient.bytes, amountBytes, feeBytes)
+    Bytes.concat(typeBytes, timestampBytes, sender.publicKey, recipient.bytes.arr, amountBytes, feeBytes)
   }
 }

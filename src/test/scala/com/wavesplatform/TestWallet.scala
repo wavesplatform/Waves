@@ -1,11 +1,11 @@
 package com.wavesplatform
 
+import com.wavesplatform.settings.WalletSettings
 import scorex.wallet.Wallet
 
 trait TestWallet {
   protected val testWallet = {
-    val file = scorex.createTestTemporaryFile("wallet", ".dat")
-    val wallet = new Wallet(Some(file.getCanonicalPath), "123", None)
+    val wallet = Wallet(WalletSettings(None, "123", None))
     wallet.generateNewAccounts(10)
     wallet
   }

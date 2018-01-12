@@ -22,22 +22,23 @@ if [ "$1" = configure ]; then
 
     # ensure home directory ownership
     mkdir -p /var/lib/${{app_name}}
-    chown ${{app_name}}:${{app_name}} /var/lib/${{app_name}}
-    chown ${{app_name}}:${{app_name}} /usr/share/${{app_name}}
+    chown -R ${{app_name}}:${{app_name}} /var/lib/${{app_name}}
+    chown -R ${{app_name}}:${{app_name}} /usr/share/${{app_name}}
 
     # nicer log directory permissions
     mkdir -p /var/log/${{app_name}}
-    chmod 1775 /var/log/${{app_name}}
+    chmod 770 /var/log/${{app_name}}
     chown root:${{app_name}} /var/log/${{app_name}}
 
     if [ -f /etc/${{app_name}}/waves.json ]; then
-        su -s /bin/sh ${{app_name}} -c "legacy-config-transformer /etc/${{app_name}}/waves.json" > "$config_file"
-        chown ${{app_name}}:${{app_name}} "$config_file"
         mv /etc/${{app_name}}/waves.json /etc/${{app_name}}/waves.json.bak
     fi
 
     if [ ! -f "$config_file" ]; then
+        echo Creating default config file ...
         cp /usr/share/${{app_name}}/doc/waves.conf.sample "$config_file"
+        chmod 600 "$config_file"
+        chown ${{app_name}}:${{app_name}} "$config_file"
     fi
 
     if is_systemd; then
@@ -45,7 +46,6 @@ if [ "$1" = configure ]; then
         addService ${{app_name}}
     elif is_upstart; then
         echo Installing upstart service ...
-        ln -s /usr/share/${{app_name}}/conf/upstart.conf /etc/init/${{app_name}}.conf
         initctl reload-configuration
     fi
 fi

@@ -1,11 +1,16 @@
 package scorex.api.http
 
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
+import com.wavesplatform.state2.diffs.TransactionDiffer.TransactionValidationError
 import play.api.libs.json._
-import scorex.account.{Account, AccountOrAlias, Alias}
+import scorex.account.{Address, AddressOrAlias, Alias}
 import scorex.transaction.{Transaction, ValidationError}
 
 case class ApiErrorResponse(error: Int, message: String)
+
+object ApiErrorResponse {
+  implicit val toFormat: Reads[ApiErrorResponse] = Json.reads[ApiErrorResponse]
+}
 
 trait ApiError {
   val id: Int
@@ -18,20 +23,28 @@ trait ApiError {
 
 object ApiError {
   def fromValidationError(e: ValidationError): ApiError = e match {
-    case ValidationError.InvalidAddress => InvalidAddress
-    case ValidationError.NegativeAmount => NegativeAmount
+    case ValidationError.InvalidAddress(_) => InvalidAddress
+    case ValidationError.NegativeAmount(x, of) => NegativeAmount(s"$x of $of")
     case ValidationError.InsufficientFee => InsufficientFee
     case ValidationError.InvalidName => InvalidName
-    case ValidationError.InvalidSignature => InvalidSignature
+    case ValidationError.InvalidSignature(_, _) => InvalidSignature
+    case ValidationError.InvalidRequestSignature => InvalidSignature
     case ValidationError.TooBigArray => TooBigArrayAllocation
     case ValidationError.OverflowError => OverflowError
     case ValidationError.ToSelf => ToSelfError
     case ValidationError.MissingSenderPrivateKey => MissingSenderPrivateKey
-    case ValidationError.CustomError(e) => CustomValidationError(e)
+    case ValidationError.GenericError(ge) => CustomValidationError(ge)
+    case ValidationError.AlreadyInTheState(tx, txHeight) => CustomValidationError(s"Transaction $tx is already in the state on a height of $txHeight")
+    case ValidationError.AccountBalanceError(errs) => CustomValidationError(errs.values.mkString(", "))
     case ValidationError.AliasNotExists(tx) => AliasNotExists(tx)
-    case ValidationError.UnsupportedTransactionType(tx) => CustomValidationError(s"UnsupportedTransactionType: ${tx.json}")
-    case ValidationError.TransactionParameterValidationError(m) => CustomValidationError(m)
-    case ValidationError.TransactionValidationError(tx, err) => StateCheckFailed(tx, err)
+    case ValidationError.OrderValidationError(_, m) => CustomValidationError(m)
+    case ValidationError.UnsupportedTransactionType => CustomValidationError("UnsupportedTransactionType")
+    case ValidationError.Mistiming(err) => Mistiming(err)
+    case TransactionValidationError(error, tx) => error match {
+      case ValidationError.Mistiming(errorMessage) => Mistiming(errorMessage)
+      case _ => StateCheckFailed(tx, fromValidationError(error).message)
+    }
+    case error => CustomValidationError(error.toString)
   }
 }
 
@@ -60,6 +73,12 @@ case object ApiKeyNotValid extends ApiError {
   override val id = 2
   override val code = StatusCodes.Forbidden
   override val message: String = "Provided API key is not correct"
+}
+
+case object DiscontinuedApi extends ApiError {
+  override val id = 3
+  override val code = StatusCodes.BadRequest
+  override val message = "This API is no longer supported"
 }
 
 case object TooBigArrayAllocation extends ApiError {
@@ -140,7 +159,7 @@ case class StateCheckFailed(tx: Transaction, err: String) extends ApiError {
   override val id: Int = 112
   override val message: String = s"State check failed. Reason: $err"
   override val code: StatusCode = StatusCodes.BadRequest
-  override lazy val json = Json.obj("error" -> id, "message" -> message, "tx" -> tx.json)
+  override lazy val json = Json.obj("error" -> id, "message" -> message, "tx" -> tx.json())
 }
 
 case object OverflowError extends ApiError {
@@ -163,7 +182,7 @@ case object MissingSenderPrivateKey extends ApiError {
 
 case class CustomValidationError(errorMessage: String) extends ApiError {
   override val id: Int = 199
-  override val message: String = s"validation error: $errorMessage"
+  override val message: String = errorMessage
   override val code: StatusCode = StatusCodes.BadRequest
 }
 
@@ -173,12 +192,22 @@ case object BlockNotExists extends ApiError {
   override val message: String = "block does not exist"
 }
 
-case class AliasNotExists(aoa: AccountOrAlias) extends ApiError {
-  override val id: Int = 301
+case class AliasNotExists(aoa: AddressOrAlias) extends ApiError {
+  override val id: Int = 302
   override val code = StatusCodes.NotFound
   private lazy val msgReason = aoa match {
-    case a: Account => s"for address '${a.stringRepr}'"
+    case a: Address => s"for address '${a.stringRepr}'"
     case a: Alias => s"'${a.stringRepr}'"
   }
   override val message: String = s"alias $msgReason doesn't exist"
+}
+
+case class Mistiming(errorMessage: String) extends ApiError {
+  override val id: Int = Mistiming.Id
+  override val message: String = errorMessage
+  override val code: StatusCode = StatusCodes.BadRequest
+}
+
+object Mistiming {
+  val Id = 303
 }

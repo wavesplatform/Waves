@@ -2,97 +2,102 @@ package com.wavesplatform.state2.reader
 
 import java.util.concurrent.locks.ReentrantReadWriteLock
 
+import cats._
 import cats.implicits._
 import com.wavesplatform.state2._
-import scorex.account.{Account, Alias}
-import scorex.transaction.assets.exchange.ExchangeTransaction
+import scorex.account.{Address, Alias}
 import scorex.transaction.lease.LeaseTransaction
 import scorex.transaction.{Transaction, TransactionParser}
 
 import scala.collection.JavaConverters._
 
-class StateReaderImpl(p: StateStorage, val synchronizationToken: ReentrantReadWriteLock) extends StateReader {
+class StateReaderImpl(p: StateStorage, val synchronizationToken: ReentrantReadWriteLock) extends SnapshotStateReader {
 
   val sp = Synchronized(p)
 
-  override def transactionInfo(id: ByteArray): Option[(Int, Transaction)] = read { implicit l =>
-    Option(sp().transactions.get(id.arr)).map {
-      case (h, bytes) => (h, TransactionParser.parseBytes(bytes).get)
+  override def transactionInfo(id: ByteStr): Option[(Int, Option[Transaction])] = read { implicit l =>
+    Option(sp().transactions.get(id)).map {
+      case (h, bytes) => (h, if (bytes.length == 0) None else TransactionParser.parseBytes(bytes).toOption)
     }
   }
 
-  override def accountPortfolio(a: Account): Portfolio = read { implicit l =>
-    Option(sp().portfolios.get(a.bytes)).map { case (b, (i, o), as) => Portfolio(b, LeaseInfo(i, o), as.map { case (k, v) => EqByteArray(k) -> v }) }.orEmpty
+  override def accountPortfolio(a: Address): Portfolio = read { implicit l =>
+    val waves = Option(sp().wavesBalance.get(a.bytes)).map { case (b, li, lo) => Portfolio(b, LeaseInfo(li, lo), Map.empty) }.orEmpty
+    val assets = Portfolio(0, LeaseInfo.empty, sp().assetBalance.getMap(a.bytes))
+    Monoid.combine(waves, assets)
   }
 
-  override def assetInfo(id: ByteArray): Option[AssetInfo] = read { implicit l =>
-    Option(sp().assets.get(id.arr)).map {
+  override def assetInfo(id: ByteStr): Option[AssetInfo] = read { implicit l =>
+    Option(sp().assets.get(id)).map {
       case (is, amt) => AssetInfo(is, amt)
     }
   }
 
-
   override def height: Int = read { implicit l => sp().getHeight }
 
-  override def accountTransactionIds(a: Account): Seq[ByteArray] = read { implicit l =>
-    Option(sp().accountTransactionIds.get(a.bytes))
-      .map(_.toSeq)
-      .getOrElse(Seq.empty)
-      .map(EqByteArray)
+  override def accountTransactionIds(a: Address, limit: Int): Seq[ByteStr] = read { implicit l =>
+    val totalRecords = sp().accountTransactionsLengths.getOrDefault(a.bytes, 0)
+    Range(Math.max(0, totalRecords - limit), totalRecords)
+      .map(n => sp().accountTransactionIds.get(StateStorage.accountIndexKey(a, n)))
+      .reverse
   }
 
-  override def paymentTransactionIdByHash(hash: ByteArray): Option[ByteArray] = read { implicit l =>
-    Option(sp().paymentTransactionHashes.get(hash)).map(EqByteArray)
+  override def paymentTransactionIdByHash(hash: ByteStr): Option[ByteStr] = read { implicit l =>
+    Option(sp().paymentTransactionHashes.get(hash))
   }
 
-  override def aliasesOfAddress(a: Account): Seq[Alias] = read { implicit l =>
+  override def aliasesOfAddress(a: Address): Seq[Alias] = read { implicit l =>
     sp().aliasToAddress.asScala
-      .collect { case (aliasName, addressBytes) if addressBytes sameElements a.bytes =>
+      .collect { case (aliasName, addressBytes) if addressBytes == a.bytes =>
         Alias.buildWithCurrentNetworkByte(aliasName).explicitGet()
       }.toSeq
   }
 
-  override def resolveAlias(a: Alias): Option[Account] = read { implicit l =>
+  override def resolveAlias(a: Alias): Option[Address] = read { implicit l =>
     Option(sp().aliasToAddress.get(a.name))
-      .map(b => Account.fromBytes(b).explicitGet())
+      .map(b => Address.fromBytes(b.arr).explicitGet())
   }
 
-  override def accountPortfolios: Map[Account, Portfolio] = read { implicit l =>
-    sp().portfolios.asScala.map {
-      case (acc, (b, (i, o), as)) => Account.fromBytes(acc).explicitGet() -> Portfolio(b, LeaseInfo(i, o), as.map {
-        case (k, v) => EqByteArray(k) -> v
-      })
-    }.toMap
+  override def accountPortfolios: Map[Address, Portfolio] = read { implicit l =>
+    val waves = sp()
+      .wavesBalance.asScala.toMap.map { case (k, (b, li, lo)) => Address.fromBytes(k.arr).explicitGet() -> Portfolio(b, LeaseInfo(li, lo), Map.empty) }
+    val assets = sp().assetBalance.all()
+      .map { case (k, v) => Address.fromBytes(k.arr).explicitGet() -> Portfolio(0, LeaseInfo.empty, v) }
+    Monoid.combine(assets, waves)
   }
 
   override def isLeaseActive(leaseTx: LeaseTransaction): Boolean = read { implicit l =>
-    sp().leaseState.getOrDefault(leaseTx.id, false)
+    sp().leaseState.getOrDefault(leaseTx.id(), false)
   }
 
-  override def activeLeases(): Seq[ByteArray] = read { implicit l =>
+  override def activeLeases(): Seq[ByteStr] = read { implicit l =>
     sp().leaseState
       .asScala
-      .collect { case (leaseId, isActive) if isActive => EqByteArray(leaseId) }
+      .collect { case (leaseId, isActive) if isActive => leaseId }
       .toSeq
   }
 
-  override def lastUpdateHeight(acc: Account): Option[Int] = read { implicit l =>
-    Option(sp().lastUpdateHeight.get(acc.bytes))
+  override def lastUpdateHeight(acc: Address): Option[Int] = read { implicit l =>
+    Option(sp().lastBalanceSnapshotHeight.get(acc.bytes))
   }
 
-  override def snapshotAtHeight(acc: Account, h: Int): Option[Snapshot] = read { implicit l =>
-    Option(sp().balanceSnapshots.get(StateStorage.snapshotKey(acc, h)))
+  override def snapshotAtHeight(acc: Address, h: Int): Option[Snapshot] = read { implicit l =>
+    Option(sp().balanceSnapshots.get(StateStorage.accountIndexKey(acc, h)))
       .map { case (ph, b, eb) => Snapshot(ph, b, eb) }
   }
 
-  override def containsTransaction(id: ByteArray): Boolean = read { implicit l =>
-    sp().transactions.containsKey(id.arr)
-  }
-  override def getAssetIdByUniqueName(assetName: ByteArray): Option[ByteArray] =read { implicit l =>
-    Option(p.uniqueAssets.get(assetName.arr)).map(EqByteArray)
+  override def containsTransaction(id: ByteStr): Boolean = read { implicit l =>
+    sp().transactions.containsKey(id)
   }
 
-  override def filledVolumeAndFee(orderId: ByteArray): OrderFillInfo =read { implicit l =>
-    Option(p.orderFills.get(orderId.arr)).map(oi => OrderFillInfo(oi._1, oi._2)).orEmpty
+  override def filledVolumeAndFee(orderId: ByteStr): OrderFillInfo = read { _ =>
+    Option(p.orderFills.get(orderId)).map(oi => OrderFillInfo(oi._1, oi._2)).orEmpty
   }
+
+  override def wavesBalance(a: Address): (Long, LeaseInfo) =
+    Option(p.wavesBalance.get(a.bytes))
+      .map { case (v1, v2, v3) => (v1, LeaseInfo(v2, v3)) }
+      .getOrElse((0L, LeaseInfo(0L, 0L)))
+
+  override def assetBalance(a: Address, asset: ByteStr): Long = p.assetBalance.get(a.bytes, asset).getOrElse(0L)
 }

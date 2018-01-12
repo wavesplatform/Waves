@@ -11,7 +11,7 @@
     <check level="warning" class="org.scalastyle.scalariform.SpacesBeforePlusChecker" enabled="true"></check>
     <check level="warning" class="org.scalastyle.file.FileLineLengthChecker" enabled="true">
         <parameters>
-            <parameter name="maxLineLength"><![CDATA[160]]></parameter>
+            <parameter name="maxLineLength"><![CDATA[200]]></parameter>
             <parameter name="tabSize"><![CDATA[4]]></parameter>
         </parameters>
     </check>
@@ -38,7 +38,7 @@
     </check>
     <check level="warning" class="org.scalastyle.scalariform.ParameterNumberChecker" enabled="true">
         <parameters>
-            <parameter name="maxParameters"><![CDATA[8]]></parameter>
+            <parameter name="maxParameters"><![CDATA[15]]></parameter>
         </parameters>
     </check>
     <check level="warning" class="org.scalastyle.scalariform.MagicNumberChecker" enabled="true">
@@ -68,7 +68,7 @@
     </check>
     <check level="warning" class="org.scalastyle.scalariform.CyclomaticComplexityChecker" enabled="true">
         <parameters>
-            <parameter name="maximum"><![CDATA[10]]></parameter>
+            <parameter name="maximum"><![CDATA[30]]></parameter>
         </parameters>
     </check>
     <check level="warning" class="org.scalastyle.scalariform.UppercaseLChecker" enabled="true"></check>
@@ -81,7 +81,7 @@
     </check>
     <check level="warning" class="org.scalastyle.scalariform.MethodLengthChecker" enabled="true">
         <parameters>
-            <parameter name="maxLength"><![CDATA[50]]></parameter>
+            <parameter name="maxLength"><![CDATA[300]]></parameter>
         </parameters>
     </check>
     <check level="warning" class="org.scalastyle.scalariform.MethodNamesChecker" enabled="true">

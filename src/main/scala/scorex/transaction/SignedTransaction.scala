@@ -1,35 +1,28 @@
 package scorex.transaction
 
+import com.wavesplatform.state2.ByteStr
+import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.PublicKeyAccount
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash
 
-trait SignedTransaction extends Transaction {
-  def toSign: Array[Byte]
+trait SignedTransaction extends Transaction with Signed {
+  val toSign: Coeval[Array[Byte]]
 
-  val signature: Array[Byte]
+  val signature: ByteStr
   val sender: PublicKeyAccount
-  override lazy val id: Array[Byte] = FastCryptographicHash(toSign)
+  override val id: Coeval[AssetId] = Coeval.evalOnce(ByteStr(FastCryptographicHash(toSign())))
 
   protected def jsonBase(): JsObject = Json.obj("type" -> transactionType.id,
-    "id" -> Base58.encode(id),
+    "id" -> id().base58,
     "sender" -> sender.address,
     "senderPublicKey" -> Base58.encode(sender.publicKey),
     "fee" -> assetFee._2,
     "timestamp" -> timestamp,
-    "signature" -> Base58.encode(this.signature)
+    "signature" -> this.signature.base58
   )
-}
 
-object SignedTransaction {
-  def verify[A <: SignedTransaction](t: A): Either[ValidationError, A] =
-    {
-      if (EllipticCurveImpl.verify(t.signature, t.toSign, t.sender.publicKey)) {
-        Right(t)
-      } else {
-        Left(ValidationError.InvalidSignature)
-      }
-    }
+  val signatureValid: Coeval[Boolean] = Coeval.evalOnce(EllipticCurveImpl.verify(signature.arr, toSign(), sender.publicKey))
 }
