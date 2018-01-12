@@ -10,8 +10,8 @@ import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{Future, Promise}
 
 trait MultipleNodesApi extends ScorexLogging {
-  def waitFor[A](desc: String)(nodes: Iterable[NodeApi], retryInterval: FiniteDuration)
-                (request: NodeApi => Future[A], cond: Iterable[A] => Boolean): Future[Boolean] = {
+  def waitFor[A](desc: String)(nodes: Iterable[AsyncNodeHttpApi], retryInterval: FiniteDuration)
+                (request: AsyncNodeHttpApi => Future[A], cond: Iterable[A] => Boolean): Future[Boolean] = {
     def retry = sleep(retryInterval).flatMap { _ =>
       waitFor(desc)(nodes, retryInterval)(request, cond)
     }
@@ -25,10 +25,10 @@ trait MultipleNodesApi extends ScorexLogging {
       }
   }
 
-  def waitForSameBlocksAt(nodes: Iterable[NodeApi], retryInterval: FiniteDuration, height: Int): Future[Boolean] = {
+  def waitForSameBlocksAt(nodes: Iterable[AsyncNodeHttpApi], retryInterval: FiniteDuration, height: Int): Future[Boolean] = {
     def waitHeight = waitFor[Int](s"all heights >= $height")(nodes, retryInterval)(_.height, _.forall(_ >= height))
 
-    def waitSameBlocks = waitFor[NodeApi.Block](s"same blocks at height = $height")(nodes, retryInterval)(_.blockAt(height), { blocks =>
+    def waitSameBlocks = waitFor[Node.Block](s"same blocks at height = $height")(nodes, retryInterval)(_.blockAt(height), { blocks =>
       val sig = blocks.map(_.signature)
       sig.forall(_ == sig.head)
     })

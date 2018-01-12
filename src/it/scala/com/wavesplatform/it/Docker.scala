@@ -48,7 +48,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
 
   private val client = DefaultDockerClient.fromEnv().build()
 
-  private val nodes = ConcurrentHashMap.newKeySet[Node]()
+  private val nodes = ConcurrentHashMap.newKeySet[AsyncDockerNode]()
   private val isStopped = new AtomicBoolean(false)
 
   dumpContainers(client.listContainers())
@@ -100,7 +100,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
     attempt(5)
   }
 
-  def startNodes(nodeConfigs: Seq[Config]): Seq[Node] = {
+  def startNodes(nodeConfigs: Seq[Config]): Seq[AsyncDockerNode] = {
     log.trace(s"Starting ${nodeConfigs.size} containers")
     val all = nodeConfigs.map(startNodeInternal)
     Await.result(
@@ -113,7 +113,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
     all
   }
 
-  def startNode(nodeConfig: Config, autoConnect: Boolean = true): Node = {
+  def startNode(nodeConfig: Config, autoConnect: Boolean = true): AsyncDockerNode = {
     val node = startNodeInternal(nodeConfig)
     Await.result(
       node.waitForStartup().flatMap(_ => if (autoConnect) connectToAll(node) else Future.successful(())),
@@ -122,7 +122,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
     node
   }
 
-  private def connectToAll(node: Node): Future[Unit] = {
+  private def connectToAll(node: AsyncDockerNode): Future[Unit] = {
     def connectToOne(host: String, port: Int): Future[Unit] = {
       for {
         _ <- node.connect(host, port)
@@ -150,7 +150,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
       .map(_ => ())
   }
 
-  private def startNodeInternal(nodeConfig: Config): Node = try {
+  private def startNodeInternal(nodeConfig: Config): AsyncDockerNode = try {
     val javaOptions = Option(System.getenv("CONTAINER_JAVA_OPTS")).getOrElse("")
     val configOverrides = s"$javaOptions ${renderProperties(asProperties(nodeConfig.withFallback(suiteConfig)))} " +
       s"-Dlogback.stdout.level=TRACE -Dlogback.file.level=OFF"
@@ -203,7 +203,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
 
     client.startContainer(containerId)
 
-    val node = new Node(actualConfig, getNodeInfo(containerId, actualConfig), http)
+    val node = new AsyncDockerNode(actualConfig, getNodeInfo(containerId, actualConfig), http)
     nodes.add(node)
     log.debug(s"Started $containerId -> ${node.settings.networkSettings.nodeName}: ${node.nodeInfo}")
     node
@@ -214,7 +214,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
       throw e
   }
 
-  private def getNodeInfo(node: Node): NodeInfo = getNodeInfo(node.nodeInfo.containerId, node.config)
+  private def getNodeInfo(node: AsyncDockerNode): NodeInfo = getNodeInfo(node.nodeInfo.containerId, node.config)
 
   private def getNodeInfo(containerId: String, config: Config): NodeInfo = {
     val restApiPort = config.getString("waves.rest-api.port")
@@ -281,7 +281,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
     }
   }
 
-  private def saveLog(node: Node): Unit = {
+  private def saveLog(node: AsyncDockerNode): Unit = {
     val logDir = Option(System.getProperty("waves.it.logging.dir")).map(Paths.get(_))
       .getOrElse(Paths.get(System.getProperty("user.dir"), "target", "logs"))
 
@@ -306,16 +306,16 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
     }
   }
 
-  def disconnectFromNetwork(node: Node): Unit = disconnectFromNetwork(node.nodeInfo.containerId)
+  def disconnectFromNetwork(node: AsyncDockerNode): Unit = disconnectFromNetwork(node.nodeInfo.containerId)
 
   private def disconnectFromNetwork(containerId: String): Unit = client.disconnectFromNetwork(containerId, wavesNetwork.id())
 
-  def connectToNetwork(nodes: Seq[Node]): Unit = {
+  def connectToNetwork(nodes: Seq[AsyncDockerNode]): Unit = {
     nodes.foreach(connectToNetwork)
     Await.result(Future.traverse(nodes)(connectToAll), 1.minute)
   }
 
-  private def connectToNetwork(node: Node): Unit = {
+  private def connectToNetwork(node: AsyncDockerNode): Unit = {
     client.connectToNetwork(
       wavesNetwork.id(),
       NetworkConnection.builder()

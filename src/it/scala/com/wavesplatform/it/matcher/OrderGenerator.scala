@@ -1,6 +1,6 @@
 package com.wavesplatform.it.matcher
 
-import com.wavesplatform.it.Node
+import com.wavesplatform.it.AsyncDockerNode
 import com.wavesplatform.it.matcher.OrderExclusionTestSuite.MatcherFee
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.encode.Base58
@@ -10,7 +10,7 @@ import scala.concurrent.duration._
 
 trait OrderGenerator {
 
-  def prepareOrder(node: Node, matcherNode: Node, pair: AssetPair, orderType: OrderType, price: Long, amount: Long,
+  def prepareOrder(node: AsyncDockerNode, matcherNode: AsyncDockerNode, pair: AssetPair, orderType: OrderType, price: Long, amount: Long,
                    timeToLive: Duration = 30.days - 1.seconds): Order = {
     val creationTime = System.currentTimeMillis()
     val timeToLiveTimestamp = creationTime + timeToLive.toMillis

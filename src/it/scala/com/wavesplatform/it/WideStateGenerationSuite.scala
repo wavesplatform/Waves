@@ -81,7 +81,7 @@ class WideStateGenerationSuite extends FreeSpec with IntegrationNodesInitializat
     r
   }
 
-  private def dumpBlockChain(node: Node): Future[String] = {
+  private def dumpBlockChain(node: AsyncDockerNode): Future[String] = {
     val maxRequestSize = 100
 
     for {

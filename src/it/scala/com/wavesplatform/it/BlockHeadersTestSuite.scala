@@ -2,7 +2,7 @@ package com.wavesplatform.it
 
 import com.typesafe.config.Config
 import com.wavesplatform.it.api.MultipleNodesApi
-import com.wavesplatform.it.api.NodeApi.{Block, BlockHeaders}
+import com.wavesplatform.it.api.Node.{Block, BlockHeaders}
 
 import scala.concurrent.{Await, Future}
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -23,7 +23,7 @@ class BlockHeadersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAl
     .withSpecial(_.nonMiner)
     .buildNonConflicting()
 
-  private def notMiner: Node = nodes.last
+  private def notMiner: AsyncDockerNode = nodes.last
 
   private def firstAddress = nodes(1).address
 

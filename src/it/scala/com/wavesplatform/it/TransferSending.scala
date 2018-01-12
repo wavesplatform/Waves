@@ -1,7 +1,7 @@
 package com.wavesplatform.it
 
 import com.wavesplatform.it.TransferSending.Req
-import com.wavesplatform.it.api.NodeApi.Transaction
+import com.wavesplatform.it.api.Node.Transaction
 import org.scalatest.Suite
 import scorex.account.{Address, AddressOrAlias, AddressScheme, PrivateKeyAccount}
 import scorex.api.http.assets.SignedTransferRequest
@@ -64,7 +64,7 @@ trait TransferSending extends HasNodes with ScorexLogging {
     requests
   }
 
-  def balanceForNode(n: Node): Future[(String, Long)] = n.balance(n.address).map(b => n.accountSeed -> b.balance)
+  def balanceForNode(n: AsyncDockerNode): Future[(String, Long)] = n.balance(n.address).map(b => n.accountSeed -> b.balance)
 
   /**
     * @return Last transaction

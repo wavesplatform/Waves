@@ -2,7 +2,7 @@ package com.wavesplatform.it.matcher
 
 import com.google.common.primitives.Longs
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.it.api.NodeApi.{AssetBalance, MatcherStatusResponse, OrderBookResponse, Transaction}
+import com.wavesplatform.it.api.Node.{AssetBalance, MatcherStatusResponse, OrderBookResponse, Transaction}
 import com.wavesplatform.it._
 import com.wavesplatform.state2.ByteStr
 import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
@@ -73,7 +73,7 @@ class OrderExclusionTestSuite extends FreeSpec with Matchers with BeforeAndAfter
     orderStatus(aliceNode) shouldBe "Cancelled"
   }
 
-  private def orderStatus(node: Node) = {
+  private def orderStatus(node: AsyncDockerNode) = {
     val ts = System.currentTimeMillis()
     val privateKey = PrivateKeyAccount.fromSeed(aliceNode.accountSeed).right.get
 
@@ -84,7 +84,7 @@ class OrderExclusionTestSuite extends FreeSpec with Matchers with BeforeAndAfter
     orderhistory.seq(0).status
   }
 
-  private def waitForAssetBalance(node: Node, asset: String, expectedBalance: Long): Unit =
+  private def waitForAssetBalance(node: AsyncDockerNode, asset: String, expectedBalance: Long): Unit =
     Await.result(
       node.waitFor[AssetBalance](s"asset($asset) balance of ${node.address} >= $expectedBalance")
         (_.assetBalance(node.address, asset),
@@ -101,7 +101,7 @@ class OrderExclusionTestSuite extends FreeSpec with Matchers with BeforeAndAfter
     (result.message.id, result.status)
   }
 
-  private def issueAsset(node: Node, name: String, amount: Long): String = {
+  private def issueAsset(node: AsyncDockerNode, name: String, amount: Long): String = {
     val description = "asset for integration tests of matcher"
     val fee = 100000000L
     val futureIssueTransaction: Future[Transaction] = for {

@@ -1,7 +1,7 @@
 package com.wavesplatform.it
 
 import com.wavesplatform.it.api.MultipleNodesApi
-import com.wavesplatform.it.api.NodeApi.{AssetBalance, FullAssetInfo}
+import com.wavesplatform.it.api.Node.{AssetBalance, FullAssetInfo}
 import com.wavesplatform.it.util._
 import org.scalatest._
 import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
@@ -18,9 +18,9 @@ trait IntegrationSuiteWithThreeAddresses extends BeforeAndAfterAll with Matchers
   with MultipleNodesApi with HasNodes with ScorexLogging {
   this: Suite =>
 
-  def notMiner: Node
+  def notMiner: AsyncDockerNode
 
-  protected def sender: Node = notMiner
+  protected def sender: AsyncDockerNode = notMiner
 
   private def richAddress = sender.address
 
@@ -52,7 +52,7 @@ trait IntegrationSuiteWithThreeAddresses extends BeforeAndAfterAll with Matchers
     }
   }
 
-  protected def dumpBalances(node: Node, accounts: Seq[String], label: String): Future[Unit] = {
+  protected def dumpBalances(node: AsyncDockerNode, accounts: Seq[String], label: String): Future[Unit] = {
     Future
       .traverse(accounts) { acc =>
         accountBalance(acc).zip(accountEffectiveBalance(acc)).map(acc -> _)

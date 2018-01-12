@@ -4,8 +4,8 @@ import java.nio.charset.StandardCharsets
 
 import com.typesafe.config.Config
 import com.wavesplatform.it._
-import com.wavesplatform.it.api.NodeApi
-import com.wavesplatform.it.api.NodeApi.BlacklistedPeer
+import com.wavesplatform.it.api.Node
+import com.wavesplatform.it.api.Node.BlacklistedPeer
 import com.wavesplatform.network.{RawBytes, TransactionSpec}
 import org.scalatest._
 import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
@@ -48,7 +48,7 @@ class SimpleTransactionsSuite extends FunSuite with Matchers with ScalaFutures
       _ <- traverse(nodes)(_.waitForHeight(height + 1))
       tx <- node.waitForTransaction(tx.id().base58)
     } yield {
-      tx shouldBe NodeApi.Transaction(tx.`type`, tx.id, tx.fee, tx.timestamp)
+      tx shouldBe Node.Transaction(tx.`type`, tx.id, tx.fee, tx.timestamp)
     }
     Await.result(f, waitCompletion)
   }

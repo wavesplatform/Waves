@@ -1,5 +1,4 @@
 package com.wavesplatform.it.api
-
 import java.io.IOException
 import java.util.concurrent.TimeoutException
 
@@ -11,7 +10,6 @@ import com.wavesplatform.state2.{ByteStr, Portfolio}
 import org.asynchttpclient.Dsl.{get => _get, post => _post}
 import org.asynchttpclient._
 import org.asynchttpclient.util.HttpConstants
-import org.slf4j.LoggerFactory
 import play.api.libs.json.Json.{parse, stringify, toJson}
 import play.api.libs.json._
 import scorex.api.http.PeersApiRoute.{ConnectReq, connectFormat}
@@ -19,7 +17,6 @@ import scorex.api.http.alias.CreateAliasRequest
 import scorex.api.http.assets._
 import scorex.api.http.leasing.{LeaseCancelRequest, LeaseRequest}
 import scorex.transaction.assets.exchange.Order
-import scorex.utils.{LoggerFacade, ScorexLogging}
 import scorex.waves.http.DebugApiRoute._
 import scorex.waves.http.DebugMessage._
 import scorex.waves.http.{DebugMessage, RollbackParams}
@@ -30,21 +27,10 @@ import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 
-trait NodeApi {
 
-  import NodeApi._
+trait AsyncNodeHttpApi { this : Node =>
 
-  def restAddress: String
-
-  def nodeRestPort: Int
-
-  def matcherRestPort: Int
-
-  def blockDelay: FiniteDuration
-
-  protected def client: AsyncHttpClient
-
-  protected val log: LoggerFacade = LoggerFacade(LoggerFactory.getLogger(s"${getClass.getName} $restAddress"))
+  import Node._
 
   def matcherGet(path: String, f: RequestBuilder => RequestBuilder = identity, statusCode: Int = HttpConstants.ResponseStatusCodes.OK_200): Future[Response] =
     retrying(f(_get(s"http://$restAddress:$matcherRestPort$path")).build(), statusCode = statusCode)
@@ -123,7 +109,7 @@ trait NodeApi {
       .setRequestTimeout(timeout)
       .build()
 
-    def send(n: NodeApi) = client
+    def send(): Future[Option[Response]] = client
       .executeRequest(request).toCompletableFuture.toScala
       .map(Option(_))
       .recoverWith {
@@ -132,7 +118,7 @@ trait NodeApi {
     def cond(ropt: Option[Response]) = ropt.exists { r =>
       r.getStatusCode == HttpConstants.ResponseStatusCodes.OK_200 && (Json.parse(r.getResponseBody) \ "height").as[Int] > 0
     }
-    waitFor("node is up")(send, cond, 1.second)
+    waitFor("node is up")(_ => send(), cond, 1.second)
   }
 
   def waitForPeers(targetPeersCount: Int): Future[Seq[Peer]] = waitFor[Seq[Peer]](s"connectedPeers.size >= $targetPeersCount")(_.connectedPeers, _.size >= targetPeersCount, 1.second)
@@ -282,7 +268,7 @@ trait NodeApi {
 
   def findBlock(cond: Block => Boolean, from: Int = 1, to: Int = Int.MaxValue): Future[Block] = {
     def load(_from: Int, _to: Int): Future[Block] = blockSeq(_from, _to).flatMap { blocks =>
-      blocks.find(cond).fold[Future[NodeApi.Block]] {
+      blocks.find(cond).fold[Future[Node.Block]] {
         val maybeLastBlock = blocks.lastOption
         if (maybeLastBlock.exists(_.height >= to)) {
           Future.failed(new NoSuchElementException)
@@ -367,102 +353,4 @@ trait NodeApi {
     getWithApiKey(s"/debug/portfolios/$address?considerUnspent=$considerUnspent")
   }.as[Portfolio]
 
-}
-
-object NodeApi extends ScorexLogging {
-
-  case class UnexpectedStatusCodeException(request: Request, response: Response) extends Exception(s"Request: ${request.getUrl}\n" +
-    s"Unexpected status code (${response.getStatusCode}): ${response.getResponseBody}")
-
-  case class Status(blockchainHeight: Int, stateHeight: Int, updatedTimestamp: Long, updatedDate: String)
-
-  implicit val statusFormat: Format[Status] = Json.format
-
-  case class Peer(address: String, declaredAddress: String, peerName: String)
-
-  implicit val peerFormat: Format[Peer] = Json.format
-
-  case class Address(address: String)
-
-  implicit val addressFormat: Format[Address] = Json.format
-
-  case class Balance(address: String, confirmations: Int, balance: Long)
-
-  implicit val balanceFormat: Format[Balance] = Json.format
-
-  case class AssetBalance(address: String, assetId: String, balance: Long)
-
-  implicit val assetBalanceFormat: Format[AssetBalance] = Json.format
-
-  case class FullAssetInfo(assetId: String, balance: Long, reissuable: Boolean, quantity: Long)
-
-  implicit val fullAssetInfoFormat: Format[FullAssetInfo] = Json.format
-
-  case class FullAssetsInfo(address: String, balances: List[FullAssetInfo])
-
-  implicit val fullAssetsInfoFormat: Format[FullAssetsInfo] = Json.format
-
-  case class Transaction(`type`: Int, id: String, fee: Long, timestamp: Long)
-
-  implicit val transactionFormat: Format[Transaction] = Json.format
-
-  case class Block(signature: String, height: Int, timestamp: Long, generator: String, transactions: Seq[Transaction],
-                   fee: Long, features: Option[Seq[Short]])
-
-  case class BlockHeaders(signature: String, height: Int, timestamp: Long, generator: String, transactionCount: Int, blocksize: Int)
-
-  implicit val blockHeadersFormat: Format[BlockHeaders] = Json.format
-
-  implicit val blockFormat: Format[Block] = Json.format
-
-  case class MatcherMessage(id: String)
-
-  implicit val matcherMessageFormat: Format[MatcherMessage] = Json.format
-
-  case class MatcherResponse(status: String, message: MatcherMessage)
-
-  implicit val matcherResponseFormat: Format[MatcherResponse] = Json.format
-
-  case class MatcherStatusResponse(status: String)
-
-  implicit val matcherStatusResponseFormat: Format[MatcherStatusResponse] = Json.format
-
-  case class MessageMatcherResponse(message: String)
-
-  implicit val messageMatcherResponseFormat: Format[MessageMatcherResponse] = Json.format
-
-  case class OrderbookHistory(id: String, `type`: String, amount: Long, price: Long, timestamp: Long, filled: Int,
-                              status: String)
-
-  //, assetPair: PairResponse)
-
-  implicit val orderbookHistory: Format[OrderbookHistory] = Json.format
-
-  case class PairResponse(amountAsset: String, priceAsset: String)
-
-  implicit val pairResponseFormat: Format[PairResponse] = Json.format
-
-  case class LevelResponse(price: Long, amount: Long)
-
-  implicit val levelResponseFormat: Format[LevelResponse] = Json.format
-
-  case class OrderBookResponse(timestamp: Long, pair: PairResponse, bids: List[LevelResponse], asks: List[LevelResponse])
-
-  implicit val orderBookResponseFormat: Format[OrderBookResponse] = Json.format
-
-  case class DebugInfo(stateHeight: Long, stateHash: Long)
-
-  implicit val debugInfoFormat: Format[DebugInfo] = Json.format
-
-
-  case class BlacklistedPeer(hostname: String, timestamp: Long, reason: String)
-
-  implicit val blacklistedPeerFormat: Format[BlacklistedPeer] = Json.format
-
-  // Obsolete payment request
-  case class PaymentRequest(amount: Long, fee: Long, sender: String, recipient: String)
-
-  object PaymentRequest {
-    implicit val paymentFormat: Format[PaymentRequest] = Json.format
-  }
 }

@@ -17,6 +17,6 @@ abstract class BaseTransactionSuite extends FunSuite with IntegrationNodesInitia
     .withSpecial(_.nonMiner)
     .buildNonConflicting()
 
-  override def notMiner: Node = nodes.last
+  override def notMiner: AsyncDockerNode = nodes.last
 
 }
