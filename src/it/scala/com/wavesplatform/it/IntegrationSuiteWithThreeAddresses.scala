@@ -101,7 +101,7 @@ trait IntegrationSuiteWithThreeAddresses extends BeforeAndAfterAll with Matchers
     })
   }
 
-  abstract override def beforeAll(): Unit = {
+  abstract protected override def beforeAll(): Unit = {
     super.beforeAll()
 
     def waitForTxsToReachAllNodes(txIds: Seq[String]): Future[_] = {

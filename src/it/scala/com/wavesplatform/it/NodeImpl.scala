@@ -4,9 +4,7 @@ import com.typesafe.config.Config
 import com.wavesplatform.it.api._
 import com.wavesplatform.settings.WavesSettings
 import org.asynchttpclient._
-import org.slf4j.LoggerFactory
 import scorex.transaction.TransactionParser.TransactionType
-import scorex.utils.LoggerFacade
 
 import scala.concurrent.duration.FiniteDuration
 
@@ -17,20 +15,36 @@ class NodeImpl(val config: Config, var nodeInfo: NodeInfo, override val client: 
   val accountSeed: String = config.getString("account-seed")
   val settings: WavesSettings = WavesSettings.fromConfig(config)
 
-  override val log = LoggerFacade(LoggerFactory.getLogger(s"${getClass.getName}.${settings.networkSettings.nodeName}"))
+  val chainId: Char = 'I'
+  val nodeName: String = s"it-test-client-to-${nodeInfo.networkIpAddress}"
+  val restAddress: String = "localhost"
 
-  override val chainId: Char = 'I'
-  override val nodeName: String = s"it-test-client-to-${nodeInfo.networkIpAddress}"
-  override val restAddress: String = "localhost"
+  def nodeRestPort: Int = nodeInfo.hostRestApiPort
 
-  override def nodeRestPort: Int = nodeInfo.hostRestApiPort
+  def matcherRestPort: Int = nodeInfo.hostMatcherApiPort
 
-  override def matcherRestPort: Int = nodeInfo.hostMatcherApiPort
+  def networkPort: Int = nodeInfo.hostNetworkPort
 
-  override def networkPort: Int = nodeInfo.hostNetworkPort
-
-  override val blockDelay: FiniteDuration = settings.blockchainSettings.genesisSettings.averageBlockDelay
+  val blockDelay: FiniteDuration = settings.blockchainSettings.genesisSettings.averageBlockDelay
 
   def fee(txValue: TransactionType.Value, asset: String): Long =
     settings.feesSettings.fees(txValue.id).find(_.asset == asset).get.fee
+}
+
+object NodeImpl {
+  def apply(config: Config): Node = new NodeImpl(
+    config,
+    NodeInfo(
+      config.getInt("rest-api-port"),
+      config.getInt("network-port"),
+      config.getInt("network-port"),
+      config.getString("hostname"),
+      config.getString("hostname"),
+      "",
+      config.getInt("matcher-api-port")
+    ),
+    Dsl.asyncHttpClient()
+  ) {
+    override val restAddress: String = config.getString("hostname")
+  }
 }

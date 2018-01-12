@@ -1,15 +1,18 @@
 package com.wavesplatform.it.transactions
 
-import com.typesafe.config.Config
+import java.io.File
+
+import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it._
 import com.wavesplatform.it.api.Node
 import monix.eval.Coeval
-import org.scalatest.{FunSuite, Suite}
+import org.scalatest.FunSuite
 
+import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext
 
-class BaseTransactionSuite extends FunSuite with IntegrationNodesInitializationAndStopping
-  with IntegrationSuiteWithThreeAddresses {
+abstract class BaseTransactionSuite extends FunSuite with IntegrationNodesInitializationAndStopping
+  with IntegrationSuiteWithThreeAddresses with NodesFromDocker {
 
   protected implicit val ec: ExecutionContext = ExecutionContext.Implicits.global
 
@@ -21,20 +24,17 @@ class BaseTransactionSuite extends FunSuite with IntegrationNodesInitializationA
 
   override def notMiner: Node = nodes.last
 
-  override protected def nodes: Seq[Node] = ??? // if(command ) else AsyncFromDocker
-}
-
-trait NodesFromDocker extends Suite with Nodes with DockerBased {
-  protected def nodeConfigs: Seq[Config]
-
-  protected val nodesSingleton: Coeval[Seq[Node]] = dockerSingleton
-    .map(_.startNodes(nodeConfigs))
-    .memoize
-
-  override protected def nodes: Seq[Node] = nodesSingleton()
-
-  override protected def beforeAll(): Unit = {
-    nodesSingleton.run
-    super.beforeAll()
+  private val theNodes = Coeval.evalOnce {
+    Option(System.getProperty("waves.it.config.file")) match {
+      case None => nodesSingleton()
+      case Some(filePath) =>
+        val defaultConfig = ConfigFactory.load()
+        ConfigFactory
+          .parseFile(new File(filePath))
+          .getConfigList("nodes")
+          .asScala
+          .map(cfg => NodeImpl(cfg.withFallback(defaultConfig).resolve()))
+    }
   }
+  override protected def nodes: Seq[Node] = theNodes()
 }
