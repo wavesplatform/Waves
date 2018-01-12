@@ -16,7 +16,7 @@ import scala.concurrent.{Await, Future}
 
 trait IntegrationSuiteWithThreeAddresses extends BeforeAndAfterAll with Matchers with ScalaFutures
   with IntegrationPatience with RecoverMethods with RequestErrorAssert with IntegrationTestsScheme
-  with AsyncNodes with ScorexLogging {
+  with Nodes with ScorexLogging {
   this: Suite =>
 
   def notMiner: Node

@@ -1,5 +1,8 @@
 package com.wavesplatform.it.api
 
+import com.typesafe.config.Config
+import com.wavesplatform.it.NodeInfo
+import com.wavesplatform.settings.WavesSettings
 import org.asynchttpclient._
 import org.slf4j.LoggerFactory
 import play.api.libs.json._
@@ -9,6 +12,12 @@ import scorex.utils.{LoggerFacade, ScorexLogging}
 import scala.concurrent.duration._
 
 trait Node {
+
+  val config: Config
+
+  var nodeInfo: NodeInfo
+
+  def settings: WavesSettings
 
   def privateKey: String
 

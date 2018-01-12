@@ -1,8 +1,8 @@
 package com.wavesplatform.it.transactions
 
-import com.wavesplatform.it.{NodeImpl, TransferSending}
-import com.wavesplatform.it.util._
+import com.wavesplatform.it.TransferSending
 import com.wavesplatform.it.api.AsyncHttpApi._
+import com.wavesplatform.it.util._
 import org.scalatest.CancelAfterFailure
 import scorex.account.{AddressOrAlias, PrivateKeyAccount}
 import scorex.api.http.Mistiming

@@ -6,6 +6,7 @@ import com.wavesplatform.it.api.Node.{AssetBalance, MatcherStatusResponse, Order
 import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it._
 import com.wavesplatform.it.api.Node
+import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.state2.ByteStr
 import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
 import scorex.account.PrivateKeyAccount
@@ -19,7 +20,7 @@ import scala.concurrent.{Await, Future}
 import scala.util.Random
 
 class OrderExclusionTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with CancelAfterFailure
-  with ReportingTestName with OrderGenerator with AsyncNodes {
+  with ReportingTestName with OrderGenerator with NodesFromDocker {
 
   import OrderExclusionTestSuite._
 

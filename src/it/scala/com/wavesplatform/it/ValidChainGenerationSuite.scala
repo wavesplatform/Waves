@@ -2,7 +2,8 @@ package com.wavesplatform.it
 
 import com.typesafe.config.Config
 import com.wavesplatform.it.api._
-import com.wavesplatform.it.transactions.AsyncNodesFromDocker
+import com.wavesplatform.it.api.AsyncHttpApi._
+import com.wavesplatform.it.transactions.NodesFromDocker
 import org.scalatest._
 
 import scala.concurrent.Await.result
@@ -12,7 +13,7 @@ import scala.concurrent.duration._
 import scala.util.Random
 
 class ValidChainGenerationSuite extends FreeSpec with IntegrationNodesInitializationAndStopping
-  with TransferSending with AsyncNodesFromDocker with CancelAfterFailure {
+  with TransferSending with NodesFromDocker with CancelAfterFailure {
 
   override protected def nodeConfigs: Seq[Config] = NodeConfigs.newBuilder
     .overrideBase(_.quorum(3))

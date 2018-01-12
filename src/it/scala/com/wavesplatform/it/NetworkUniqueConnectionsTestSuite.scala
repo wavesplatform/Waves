@@ -2,6 +2,7 @@ package com.wavesplatform.it
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.NetworkUniqueConnectionsTestSuite._
+import com.wavesplatform.it.api.AsyncHttpApi._
 import org.scalatest.{FreeSpec, Matchers}
 
 import scala.concurrent.ExecutionContext.Implicits.global

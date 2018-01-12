@@ -2,8 +2,9 @@ package com.wavesplatform.it
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.RollbackSpecSuite._
-import com.wavesplatform.it.transactions.AsyncNodesFromDocker
+import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.util._
+import com.wavesplatform.it.api.AsyncHttpApi._
 import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
 import org.scalatest.{FreeSpec, Matchers}
 
@@ -15,7 +16,7 @@ import scala.concurrent.{Await, Future}
 import scala.util.Random
 
 class RollbackSpecSuite extends FreeSpec with ScalaFutures with IntegrationPatience
-  with Matchers with TransferSending with IntegrationNodesInitializationAndStopping with AsyncNodesFromDocker {
+  with Matchers with TransferSending with IntegrationNodesInitializationAndStopping with NodesFromDocker {
   // there are nodes with big and small balances to reduce the number of forks
   override protected def nodeConfigs: Seq[Config] = configs
 

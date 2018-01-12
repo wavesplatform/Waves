@@ -4,25 +4,24 @@ import java.nio.charset.StandardCharsets
 
 import com.typesafe.config.Config
 import com.wavesplatform.it._
-import com.wavesplatform.it.api.Node
+import com.wavesplatform.it.api.Node._
 import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.api.AsyncNetworkApi._
 import com.wavesplatform.it.api.Node.BlacklistedPeer
+import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.network.{RawBytes, TransactionSpec}
 import org.scalatest._
 import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
 import scorex.account.{Address, PrivateKeyAccount}
 import scorex.transaction.assets.TransferTransaction
 
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.language.postfixOps
 
-class SimpleTransactionsSuite extends FunSuite with Matchers with ScalaFutures
-  with IntegrationPatience with RecoverMethods with RequestErrorAssert with IntegrationNodesInitializationAndStopping
-  with IntegrationTestsScheme {
+class SimpleTransactionsSuite extends BaseTransactionSuite with Matchers with ScalaFutures
+  with IntegrationPatience with RecoverMethods with RequestErrorAssert {
 
   private val waitCompletion = 2.minutes
 
@@ -50,7 +49,7 @@ class SimpleTransactionsSuite extends FunSuite with Matchers with ScalaFutures
       _ <- traverse(nodes)(_.waitForHeight(height + 1))
       tx <- node.waitForTransaction(tx.id().base58)
     } yield {
-      tx shouldBe Node.Transaction(tx.`type`, tx.id, tx.fee, tx.timestamp)
+      tx shouldBe Transaction(tx.`type`, tx.id, tx.fee, tx.timestamp)
     }
     Await.result(f, waitCompletion)
   }

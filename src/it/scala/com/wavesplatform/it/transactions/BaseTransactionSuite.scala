@@ -8,7 +8,7 @@ import org.scalatest.{FunSuite, Suite}
 
 import scala.concurrent.ExecutionContext
 
-abstract class BaseTransactionSuite extends FunSuite with IntegrationNodesInitializationAndStopping
+class BaseTransactionSuite extends FunSuite with IntegrationNodesInitializationAndStopping
   with IntegrationSuiteWithThreeAddresses {
 
   protected implicit val ec: ExecutionContext = ExecutionContext.Implicits.global
@@ -20,16 +20,18 @@ abstract class BaseTransactionSuite extends FunSuite with IntegrationNodesInitia
     .buildNonConflicting()
 
   override def notMiner: Node = nodes.last
+
+  override protected def nodes: Seq[Node] = ??? // if(command ) else AsyncFromDocker
 }
 
-trait AsyncNodesFromDocker extends Suite with AsyncNodes with DockerBased {
+trait NodesFromDocker extends Suite with Nodes with DockerBased {
   protected def nodeConfigs: Seq[Config]
 
-  protected val nodesSingleton: Coeval[Seq[NodeImpl]] = dockerSingleton
+  protected val nodesSingleton: Coeval[Seq[Node]] = dockerSingleton
     .map(_.startNodes(nodeConfigs))
     .memoize
 
-  override protected def nodes: Seq[NodeImpl] = nodesSingleton()
+  override protected def nodes: Seq[Node] = nodesSingleton()
 
   override protected def beforeAll(): Unit = {
     nodesSingleton.run

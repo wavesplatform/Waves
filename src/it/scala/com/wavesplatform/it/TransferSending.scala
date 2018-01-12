@@ -2,6 +2,8 @@ package com.wavesplatform.it
 
 import com.wavesplatform.it.TransferSending.Req
 import com.wavesplatform.it.api.Node.Transaction
+import com.wavesplatform.it.api.AsyncHttpApi._
+import com.wavesplatform.it.api.Node
 import org.scalatest.Suite
 import scorex.account.{Address, AddressOrAlias, AddressScheme, PrivateKeyAccount}
 import scorex.api.http.assets.SignedTransferRequest
@@ -17,7 +19,7 @@ object TransferSending {
 }
 
 trait TransferSending extends ScorexLogging {
-  this: Suite with AsyncNodes =>
+  this: Suite with Nodes =>
 
   import scala.concurrent.ExecutionContext.Implicits.global
 

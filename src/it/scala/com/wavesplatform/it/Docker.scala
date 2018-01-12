@@ -13,6 +13,8 @@ import com.spotify.docker.client.messages.EndpointConfig.EndpointIpamConfig
 import com.spotify.docker.client.messages._
 import com.spotify.docker.client.{DefaultDockerClient, DockerClient}
 import com.typesafe.config.{Config, ConfigFactory, ConfigRenderOptions}
+import com.wavesplatform.it.api.Node
+import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.util.GlobalTimer.{instance => timer}
 import org.asynchttpclient.Dsl._
 import scorex.utils.ScorexLogging
@@ -100,7 +102,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
     attempt(5)
   }
 
-  def startNodes(nodeConfigs: Seq[Config]): Seq[NodeImpl] = {
+  def startNodes(nodeConfigs: Seq[Config]): Seq[Node] = {
     log.trace(s"Starting ${nodeConfigs.size} containers")
     val all = nodeConfigs.map(startNodeInternal)
     Await.result(
@@ -310,7 +312,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
 
   private def disconnectFromNetwork(containerId: String): Unit = client.disconnectFromNetwork(containerId, wavesNetwork.id())
 
-  def connectToNetwork(nodes: Seq[NodeImpl]): Unit = {
+  def connectToNetwork(nodes: Seq[Node]): Unit = {
     nodes.foreach(connectToNetwork)
     Await.result(Future.traverse(nodes)(connectToAll), 1.minute)
   }

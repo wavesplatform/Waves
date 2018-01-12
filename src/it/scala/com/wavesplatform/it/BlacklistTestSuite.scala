@@ -3,6 +3,8 @@ package com.wavesplatform.it
 import com.typesafe.config.Config
 import com.wavesplatform.it.api._
 import com.wavesplatform.it.api.Node.BlacklistedPeer
+import com.wavesplatform.it.api.AsyncHttpApi._
+import com.wavesplatform.it.transactions.NodesFromDocker
 import org.scalatest._
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -10,7 +12,7 @@ import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
 import scala.concurrent.Await
 
-class BlacklistTestSuite extends FreeSpec with Matchers with CancelAfterFailure with ReportingTestName with AsyncNodes {
+class BlacklistTestSuite extends FreeSpec with Matchers with CancelAfterFailure with ReportingTestName with NodesFromDocker {
 
   override protected def nodeConfigs: Seq[Config] = NodeConfigs.newBuilder
     .overrideBase(_.quorum(2))

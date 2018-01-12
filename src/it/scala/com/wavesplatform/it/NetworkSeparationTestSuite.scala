@@ -2,7 +2,8 @@ package com.wavesplatform.it
 
 import com.typesafe.config.Config
 import com.wavesplatform.it.api.AsyncHttpApi
-import com.wavesplatform.it.transactions.AsyncNodesFromDocker
+import com.wavesplatform.it.api.AsyncHttpApi._
+import com.wavesplatform.it.transactions.NodesFromDocker
 import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers}
 
 import scala.concurrent.Await
@@ -11,7 +12,7 @@ import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
 
 class NetworkSeparationTestSuite extends FreeSpec with Matchers with IntegrationNodesInitializationAndStopping
-  with CancelAfterFailure with ReportingTestName with AsyncNodesFromDocker {
+  with CancelAfterFailure with ReportingTestName with NodesFromDocker {
 
   override protected def nodeConfigs: Seq[Config] = NodeConfigs.newBuilder
     .overrideBase(_.quorum(3))

@@ -3,12 +3,12 @@ package com.wavesplatform.it
 import org.scalatest.{Args, Status, Suite, SuiteMixin}
 import scorex.utils.ScorexLogging
 import scorex.waves.http.DebugMessage
-
+import com.wavesplatform.it.api.AsyncHttpApi._
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
 trait ReportingTestName extends SuiteMixin with ScorexLogging {
-  th: Suite with AsyncNodes =>
+  th: Suite with Nodes =>
 
   abstract override protected def runTest(testName: String, args: Args): Status = {
     print(s"Test '$testName' started")

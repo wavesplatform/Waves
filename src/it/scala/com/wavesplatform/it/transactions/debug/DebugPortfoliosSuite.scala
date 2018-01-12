@@ -1,6 +1,7 @@
 package com.wavesplatform.it.transactions.debug
 
 import com.wavesplatform.it.api.AsyncHttpApi
+import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 

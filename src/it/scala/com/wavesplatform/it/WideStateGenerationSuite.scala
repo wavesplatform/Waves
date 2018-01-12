@@ -4,7 +4,8 @@ import java.util.concurrent.TimeoutException
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.api._
-import com.wavesplatform.it.transactions.AsyncNodesFromDocker
+import com.wavesplatform.it.api.AsyncHttpApi._
+import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.util._
 import org.scalatest._
 
@@ -14,7 +15,7 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
 class WideStateGenerationSuite extends FreeSpec with IntegrationNodesInitializationAndStopping
-  with Matchers with TransferSending with AsyncNodesFromDocker {
+  with Matchers with TransferSending with NodesFromDocker {
 
   override protected def createDocker: Docker = new Docker(
     suiteConfig = ConfigFactory.parseString(

@@ -2,10 +2,10 @@ package com.wavesplatform.it.activation
 
 import com.wavesplatform.features.BlockchainFeatureStatus
 import com.wavesplatform.features.api.{ActivationStatus, ActivationStatusFeature, NodeFeatureStatus}
-import com.wavesplatform.it.NodeImpl
-import org.scalatest.Matchers
-import com.wavesplatform.it.api.Node
 import com.wavesplatform.it.api.AsyncHttpApi._
+import com.wavesplatform.it.api.Node
+import org.scalatest.Matchers
+
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future}
 
@@ -16,7 +16,7 @@ trait ActivationStatusRequest extends Matchers {
     timeout
   )
 
-  def activationStatus(nodes: Seq[NodeImpl], height: Int, featureNum: Short, timeout: Duration)
+  def activationStatus(nodes: Seq[Node], height: Int, featureNum: Short, timeout: Duration)
                       (implicit ec: ExecutionContext): ActivationStatusFeature = {
     Await.result(
       Future

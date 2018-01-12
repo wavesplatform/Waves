@@ -9,7 +9,7 @@ import scala.concurrent.Future
 
 object AsyncNetworkApi {
 
-  implicit class NodeExt(n: Node) {
+  implicit class NodeExt2(n: Node) {
 
     import scala.concurrent.ExecutionContext.Implicits.global
 

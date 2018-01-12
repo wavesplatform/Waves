@@ -1,6 +1,7 @@
 package com.wavesplatform.it.transactions
 
 import com.wavesplatform.it.util._
+import com.wavesplatform.it.api.AsyncHttpApi._
 import org.scalatest.prop.TableDrivenPropertyChecks
 
 import scala.concurrent.Await

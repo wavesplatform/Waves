@@ -3,6 +3,7 @@ package com.wavesplatform.it
 import com.wavesplatform.it.api._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
+import com.wavesplatform.it.api.AsyncHttpApi._
 import org.asynchttpclient.util.HttpConstants
 import play.api.libs.json.{JsArray, JsObject, JsValue, Json}
 import scorex.crypto.encode.Base58

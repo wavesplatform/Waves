@@ -1,9 +1,10 @@
 package com.wavesplatform.it
 
 import com.typesafe.config.Config
-import com.wavesplatform.it.api.AsyncHttpApi
+import com.wavesplatform.it.api.{AsyncHttpApi, Node}
+import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.api.Node.{Block, BlockHeaders}
-import com.wavesplatform.it.transactions.AsyncNodesFromDocker
+import com.wavesplatform.it.transactions.NodesFromDocker
 
 import scala.concurrent.{Await, Future}
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -16,7 +17,7 @@ import scorex.utils.ScorexLogging
 import scala.util.Random
 
 class BlockHeadersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with CancelAfterFailure
-  with AsyncNodesFromDocker with ReportingTestName with ScorexLogging {
+  with NodesFromDocker with ReportingTestName with ScorexLogging {
 
   override protected def nodeConfigs: Seq[Config] = NodeConfigs.newBuilder
     .overrideBase(_.quorum(2))
