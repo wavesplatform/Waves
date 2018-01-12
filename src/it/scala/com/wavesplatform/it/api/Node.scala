@@ -3,11 +3,20 @@ package com.wavesplatform.it.api
 import org.asynchttpclient._
 import org.slf4j.LoggerFactory
 import play.api.libs.json._
+import scorex.transaction.TransactionParser.TransactionType
 import scorex.utils.{LoggerFacade, ScorexLogging}
 
 import scala.concurrent.duration._
 
 trait Node {
+
+  def privateKey: String
+
+  def publicKey: String
+
+  def address: String
+
+  def accountSeed: String
 
   def restAddress: String
 
@@ -23,9 +32,11 @@ trait Node {
 
   def blockDelay: FiniteDuration
 
-  protected def client: AsyncHttpClient
+  def client: AsyncHttpClient
 
-  protected val log: LoggerFacade = LoggerFacade(LoggerFactory.getLogger(s"${getClass.getName} $restAddress"))
+  def fee(txValue: TransactionType.Value, asset: String = "WAVES"): Long
+
+  val log: LoggerFacade = LoggerFacade(LoggerFactory.getLogger(s"${getClass.getName} $restAddress"))
 }
 
 object Node extends ScorexLogging {

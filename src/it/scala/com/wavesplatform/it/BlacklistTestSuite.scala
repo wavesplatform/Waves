@@ -10,7 +10,7 @@ import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
 import scala.concurrent.Await
 
-class BlacklistTestSuite extends FreeSpec with Matchers with CancelAfterFailure with ReportingTestName  with AsyncNodes {
+class BlacklistTestSuite extends FreeSpec with Matchers with CancelAfterFailure with ReportingTestName with AsyncNodes {
 
   override protected def nodeConfigs: Seq[Config] = NodeConfigs.newBuilder
     .overrideBase(_.quorum(2))
@@ -41,7 +41,7 @@ class BlacklistTestSuite extends FreeSpec with Matchers with CancelAfterFailure 
   "and sync again" in Await.result(
     for {
       baseHeight <- traverse(nodes)(_.height).map(_.max)
-      _ <- AsyncNodeHttpApi.waitForSameBlocksAt(nodes, 5.seconds, baseHeight + 5)
+      _ <- AsyncHttpApi.waitForSameBlocksAt(nodes, 5.seconds, baseHeight + 5)
     } yield (),
     5.minutes
   )

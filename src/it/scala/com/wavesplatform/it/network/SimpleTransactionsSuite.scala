@@ -5,6 +5,8 @@ import java.nio.charset.StandardCharsets
 import com.typesafe.config.Config
 import com.wavesplatform.it._
 import com.wavesplatform.it.api.Node
+import com.wavesplatform.it.api.AsyncHttpApi._
+import com.wavesplatform.it.api.AsyncNetworkApi._
 import com.wavesplatform.it.api.Node.BlacklistedPeer
 import com.wavesplatform.network.{RawBytes, TransactionSpec}
 import org.scalatest._

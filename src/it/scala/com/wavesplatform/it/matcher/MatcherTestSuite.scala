@@ -4,6 +4,8 @@ package matcher
 import com.google.common.primitives.Longs
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.api.Node.{AssetBalance, LevelResponse, MatcherStatusResponse, OrderBookResponse, Transaction}
+import com.wavesplatform.it.api.AsyncHttpApi._
+import com.wavesplatform.it.api.Node
 import com.wavesplatform.matcher.api.CancelOrderRequest
 import com.wavesplatform.state2.ByteStr
 import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
@@ -277,7 +279,7 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
     )
   }
 
-  private def issueAsset(node: AsyncNode, name: String, amount: Long): String = {
+  private def issueAsset(node: Node, name: String, amount: Long): String = {
     val description = "asset for integration tests of matcher"
     val fee = 100000000L
     val futureIssueTransaction: Future[Transaction] = for {
@@ -289,13 +291,13 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
     issueTransaction.id
   }
 
-  private def waitForAssetBalance(node: AsyncNode, asset: String, expectedBalance: Long): Unit =
+  private def waitForAssetBalance(node: Node, asset: String, expectedBalance: Long): Unit =
     Await.result(
       node.waitFor[AssetBalance](s"asset($asset) balance of ${node.address} >= $expectedBalance")(_.assetBalance(node.address, asset), _.balance >= expectedBalance, 5.seconds),
       3.minute
     )
 
-  private def getBalance(node: AsyncNode): (Long, Long) = {
+  private def getBalance(node: Node): (Long, Long) = {
     val initialHeight = Await.result(node.height, 1.minute)
     Await.result(node.waitForHeight(initialHeight + 2), 2.minute)
 
@@ -305,7 +307,7 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
     (balance, height)
   }
 
-  private def prepareOrder(node: AsyncNode, pair: AssetPair, orderType: OrderType, price: Long, amount: Long): Order = {
+  private def prepareOrder(node: Node, pair: AssetPair, orderType: OrderType, price: Long, amount: Long): Order = {
     val creationTime = System.currentTimeMillis()
     val timeToLive = creationTime + Order.MaxLiveTime - 1000
 
@@ -350,7 +352,7 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
     result
   }
 
-  private def matcherCancelOrder(node: AsyncNode, pair: AssetPair, orderId: String): String = {
+  private def matcherCancelOrder(node: Node, pair: AssetPair, orderId: String): String = {
     val privateKey = PrivateKeyAccount.fromSeed(node.accountSeed).right.get
     val publicKey = PublicKeyAccount(privateKey.publicKey)
     val request = CancelOrderRequest(publicKey, Base58.decode(orderId).get, Array.emptyByteArray)

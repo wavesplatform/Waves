@@ -10,8 +10,7 @@ import scorex.utils.LoggerFacade
 
 import scala.concurrent.duration.FiniteDuration
 
-class AsyncNode(val config: Config, var nodeInfo: NodeInfo, override val client: AsyncHttpClient)
-  extends Node with AsyncNodeHttpApi with AsyncNetworkNodeApi {
+class NodeImpl(val config: Config, var nodeInfo: NodeInfo, override val client: AsyncHttpClient) extends Node {
   val privateKey: String = config.getString("private-key")
   val publicKey: String = config.getString("public-key")
   val address: String = config.getString("address")
@@ -26,9 +25,8 @@ class AsyncNode(val config: Config, var nodeInfo: NodeInfo, override val client:
   override def nodeRestPort: Int = nodeInfo.hostRestApiPort
   override def matcherRestPort: Int = nodeInfo.hostMatcherApiPort
   override def networkPort: Int = nodeInfo.hostNetworkPort
-
   override val blockDelay: FiniteDuration = settings.blockchainSettings.genesisSettings.averageBlockDelay
 
-  def fee(txValue: TransactionType.Value, asset: String = "WAVES"): Long =
+  def fee(txValue: TransactionType.Value, asset: String): Long =
     settings.feesSettings.fees(txValue.id).find(_.asset == asset).get.fee
 }

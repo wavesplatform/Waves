@@ -57,7 +57,6 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
     Await.result(f, waitCompletion)
   }
 
-
   test("Not able to create aliases to other addresses") {
     val alias = "test_alias3"
 
@@ -104,7 +103,6 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
 
     Await.result(f, waitCompletion)
   }
-
 
   test("Able to get address by alias") {
     val alias = "test_alias_6"

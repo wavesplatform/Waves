@@ -4,6 +4,7 @@ import java.util.concurrent.TimeoutException
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.api._
+import com.wavesplatform.it.transactions.AsyncNodesFromDocker
 import com.wavesplatform.it.util._
 import org.scalatest._
 
@@ -13,7 +14,7 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
 class WideStateGenerationSuite extends FreeSpec with IntegrationNodesInitializationAndStopping
-  with Matchers with TransferSending with DockerBased {
+  with Matchers with TransferSending with AsyncNodesFromDocker {
 
   override protected def createDocker: Docker = new Docker(
     suiteConfig = ConfigFactory.parseString(
@@ -55,7 +56,7 @@ class WideStateGenerationSuite extends FreeSpec with IntegrationNodesInitializat
 
       _ <- {
         log.debug(s"waitForSameBlocksAt($height)")
-        Await.ready(AsyncNodeHttpApi.waitForSameBlocksAt(nodes, 5.seconds, height), 5.minutes)
+        Await.ready(AsyncHttpApi.waitForSameBlocksAt(nodes, 5.seconds, height), 5.minutes)
       }
     } yield ()
 
@@ -81,7 +82,7 @@ class WideStateGenerationSuite extends FreeSpec with IntegrationNodesInitializat
     r
   }
 
-  private def dumpBlockChain(node: AsyncNode): Future[String] = {
+  private def dumpBlockChain(node: Node): Future[String] = {
     val maxRequestSize = 100
 
     for {

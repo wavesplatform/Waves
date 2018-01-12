@@ -1,6 +1,6 @@
 package com.wavesplatform.it.transactions.debug
 
-import com.wavesplatform.it.api.AsyncNodeHttpApi
+import com.wavesplatform.it.api.AsyncHttpApi
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 
@@ -31,7 +31,7 @@ class DebugPortfoliosSuite extends BaseTransactionSuite {
   test("prepare for next test - wait all previous transactions are processed") {
     val f = for {
       height <- Future.traverse(nodes)(_.height).map(_.max)
-      _ <- AsyncNodeHttpApi.waitForSameBlocksAt(nodes, 5.seconds, height + 1)
+      _ <- AsyncHttpApi.waitForSameBlocksAt(nodes, 5.seconds, height + 1)
     } yield ()
 
     Await.result(f, waitCompletion)

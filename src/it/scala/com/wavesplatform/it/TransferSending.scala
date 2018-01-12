@@ -64,7 +64,7 @@ trait TransferSending extends ScorexLogging {
     requests
   }
 
-  def balanceForNode(n: AsyncNode): Future[(String, Long)] = n.balance(n.address).map(b => n.accountSeed -> b.balance)
+  def balanceForNode(n: Node): Future[(String, Long)] = n.balance(n.address).map(b => n.accountSeed -> b.balance)
 
   /**
     * @return Last transaction

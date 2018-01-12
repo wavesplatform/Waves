@@ -1,6 +1,7 @@
 package com.wavesplatform.it
 
-import com.wavesplatform.it.api.AsyncNodeHttpApi
+import com.wavesplatform.it.api.{AsyncHttpApi, Node}
+import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.api.Node.{AssetBalance, FullAssetInfo}
 import com.wavesplatform.it.util._
 import org.scalatest._
@@ -18,9 +19,9 @@ trait IntegrationSuiteWithThreeAddresses extends BeforeAndAfterAll with Matchers
   with AsyncNodes with ScorexLogging {
   this: Suite =>
 
-  def notMiner: AsyncNode
+  def notMiner: Node
 
-  protected def sender: AsyncNode = notMiner
+  protected def sender: Node = notMiner
 
   private def richAddress = sender.address
 
@@ -52,7 +53,7 @@ trait IntegrationSuiteWithThreeAddresses extends BeforeAndAfterAll with Matchers
     }
   }
 
-  protected def dumpBalances(node: AsyncNode, accounts: Seq[String], label: String): Future[Unit] = {
+  protected def dumpBalances(node: Node, accounts: Seq[String], label: String): Future[Unit] = {
     Future
       .traverse(accounts) { acc =>
         accountBalance(acc).zip(accountEffectiveBalance(acc)).map(acc -> _)
@@ -72,7 +73,7 @@ trait IntegrationSuiteWithThreeAddresses extends BeforeAndAfterAll with Matchers
   // so we await tx twice
   protected def waitForHeightAraiseAndTxPresent(transactionId: String, heightIncreaseOn: Integer): Future[Unit] = for {
     height <- traverse(nodes)(_.height).map(_.max)
-    _ <- AsyncNodeHttpApi.waitForSameBlocksAt(nodes, 2.seconds, height)
+    _ <- AsyncHttpApi.waitForSameBlocksAt(nodes, 2.seconds, height)
     _ <- traverse(nodes)(_.waitForTransaction(transactionId))
     _ <- traverse(nodes)(_.waitForHeight(height + heightIncreaseOn))
     _ <- traverse(nodes)(_.waitForTransaction(transactionId))

@@ -1,7 +1,8 @@
 package com.wavesplatform.it
 
 import com.typesafe.config.Config
-import com.wavesplatform.it.api.AsyncNodeHttpApi
+import com.wavesplatform.it.api.AsyncHttpApi
+import com.wavesplatform.it.transactions.AsyncNodesFromDocker
 import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers}
 
 import scala.concurrent.Await
@@ -10,7 +11,7 @@ import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
 
 class NetworkSeparationTestSuite extends FreeSpec with Matchers with IntegrationNodesInitializationAndStopping
-  with CancelAfterFailure with ReportingTestName with DockerBased {
+  with CancelAfterFailure with ReportingTestName with AsyncNodesFromDocker {
 
   override protected def nodeConfigs: Seq[Config] = NodeConfigs.newBuilder
     .overrideBase(_.quorum(3))
@@ -19,7 +20,7 @@ class NetworkSeparationTestSuite extends FreeSpec with Matchers with Integration
     .buildNonConflicting()
 
   "node should grow up to 10 blocks together and sync" in Await.result(
-    Await.ready(AsyncNodeHttpApi.waitForSameBlocksAt(nodes, 5.seconds, 10), 3.minutes),
+    Await.ready(AsyncHttpApi.waitForSameBlocksAt(nodes, 5.seconds, 10), 3.minutes),
     5.minutes
   )
 
@@ -39,7 +40,7 @@ class NetworkSeparationTestSuite extends FreeSpec with Matchers with Integration
     for {
       maxHeight <- traverse(nodes)(_.height).map(_.max)
       _ = log.debug(s"Max height is $maxHeight")
-      _ <- AsyncNodeHttpApi.waitForSameBlocksAt(nodes, 5.seconds, maxHeight + 5)
+      _ <- AsyncHttpApi.waitForSameBlocksAt(nodes, 5.seconds, maxHeight + 5)
     } yield (),
     6.minutes
   )

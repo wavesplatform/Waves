@@ -2,6 +2,7 @@ package com.wavesplatform.it
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.NodeConfigs.Default
+import com.wavesplatform.it.transactions.AsyncNodesFromDocker
 import com.wavesplatform.it.util._
 import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers}
 import scorex.utils.ScorexLogging
@@ -13,7 +14,7 @@ import scala.concurrent.{Await, Future}
 import scala.util.Random
 
 class MicroblocksFeeTestSuite extends FreeSpec with Matchers with CancelAfterFailure
-  with AsyncNodes with ScorexLogging {
+  with AsyncNodesFromDocker with ScorexLogging {
 
   private def notMiner = nodes.head
 
