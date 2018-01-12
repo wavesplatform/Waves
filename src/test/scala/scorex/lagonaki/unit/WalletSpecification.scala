@@ -67,4 +67,20 @@ class WalletSpecification extends FunSuite with Matchers {
     w2.nonce shouldBe w1nonce
     w2.nonce shouldBe accountsCount
   }
+
+  test("wallet account generation with the same seed") {
+    val f1 = Some(scorex.createTestTemporaryFile("wallet", ".dat"))
+    val f2 = Some(scorex.createTestTemporaryFile("wallet", ".dat"))
+    val seed = randomBytes(64)
+
+    val w1 = new WalletObsolete(f1, "cookies".toCharArray, Some(seed))
+    val a1 = w1.generateNewAccount().get.address
+    w1.close()
+
+    val w2 = Wallet(WalletSettings(f2, "cookies", Some(ByteStr(seed))))
+    val a2 =w2.generateNewAccount().get.address
+    w2.close()
+
+    a1 shouldEqual a2
+  }
 }
