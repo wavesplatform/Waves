@@ -112,12 +112,4 @@ package object network extends ScorexLogging {
       r
     }
   }
-
-  implicit class Tap[A](a: A) {
-    def tap(g: A => Unit): A = {
-      g(a)
-      a
-    }
-  }
-
 }
