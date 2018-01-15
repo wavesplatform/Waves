@@ -1,10 +1,11 @@
-package com.wavesplatform.it.transactions
+package scorex.transaction
 
 import com.wavesplatform.TransactionGen
-import org.scalatest.{Matchers, PropSpec}
 import org.scalatest.prop.PropertyChecks
+import org.scalatest.{Matchers, PropSpec}
 import scorex.transaction.Data.DataTransaction
 import scorex.transaction.TransactionParser.TransactionType
+
 import scala.util.Try
 
 class DataTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
@@ -15,9 +16,8 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
 
   property("Data serialization roundtrip") {
     forAll(dataGen) { data: DataTransaction =>
-      val recovered = parseBytes(data.bytes).get
+      val recovered = parseBytes(data.bytes()).get
       recovered.fee shouldEqual data.fee
     }
   }
-
 }
