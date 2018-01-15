@@ -33,7 +33,7 @@ object Dependencies {
     "com.spotify" % "docker-client" % "8.8.2" classifier "shaded",
     "com.fasterxml.jackson.dataformat" % "jackson-dataformat-properties" % "2.8.9",
     asyncHttpClient
-  )) map (_ % "it,test")
+  )) map (_ % "test")
 
   lazy val serialization = Seq(
     "com.google.guava" % "guava" % "21.0",
