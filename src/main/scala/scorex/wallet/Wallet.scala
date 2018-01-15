@@ -15,8 +15,9 @@ import scorex.utils.{ScorexLogging, randomBytes}
 
 import scala.collection.concurrent.TrieMap
 import scala.util.control.NonFatal
+import com.wavesplatform.utils._
 
-trait Wallet extends AutoCloseable{
+trait Wallet {
 
   def seed: Array[Byte]
 
@@ -31,8 +32,6 @@ trait Wallet extends AutoCloseable{
   def deleteAccount(account: PrivateKeyAccount): Boolean
 
   def privateKeyAccount(account: Address): Either[ValidationError, PrivateKeyAccount]
-
-  def close(): Unit
 
 }
 
@@ -101,29 +100,28 @@ object Wallet extends ScorexLogging {
 
     private def save(): Unit = file.foreach(f => JsonFileStorage.save(walletData, f.getCanonicalPath, Some(key)))
 
+    private def generateNewAccountWithoutSave(): Option[PrivateKeyAccount] = lock {
+      val nonce = getAndIncrementNonce()
+      val account = Wallet.generateNewAccount(seed, nonce)
+
+      val address = account.address
+      if (!accountsCache.contains(address)) {
+        accountsCache += account.address -> account
+        walletData = walletData.copy(accountSeeds = walletData.accountSeeds + ByteStr(account.seed))
+        log.info("Added account #" + privateKeyAccounts.size)
+        Some(account)
+      } else None
+    }
+
     override def seed: Array[Byte] = walletData.seed.arr
 
     override def privateKeyAccounts: List[PrivateKeyAccount] = accountsCache.values.toList
 
     override def generateNewAccounts(howMany: Int): Seq[PrivateKeyAccount] =
-      (1 to howMany).flatMap(_ => generateNewAccount())
+      (1 to howMany).flatMap(_ => generateNewAccountWithoutSave()).tap(_ => save())
 
     override def generateNewAccount(): Option[PrivateKeyAccount] = lock {
-      val nonce = getAndIncrementNonce()
-      val account = Wallet.generateNewAccount(seed, nonce)
-
-      val address = account.address
-      val created = if (!accountsCache.contains(address)) {
-        accountsCache += account.address -> account
-        walletData = walletData.copy(accountSeeds = walletData.accountSeeds + ByteStr(account.seed))
-        save()
-        true
-      } else false
-
-      if (created) {
-        log.info("Added account #" + privateKeyAccounts.size)
-        Some(account)
-      } else None
+      generateNewAccountWithoutSave().map(acc => {save(); acc})
     }
 
     override def deleteAccount(account: PrivateKeyAccount): Boolean = lock {
@@ -136,8 +134,6 @@ object Wallet extends ScorexLogging {
 
     override def privateKeyAccount(account: Address): Either[ValidationError, PrivateKeyAccount] =
       accountsCache.get(account.address).toRight[ValidationError](MissingSenderPrivateKey)
-
-    override def close(): Unit = save()
 
     override def nonce: Int = walletData.nonce
 

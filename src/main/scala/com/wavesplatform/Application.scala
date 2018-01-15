@@ -211,10 +211,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
       Try(Await.result(actorSystem.terminate(), stopActorsTimeout))
         .failed.map(e => log.error("Failed to terminate actor system", e))
-      log.debug("Closing storage")
-
-      log.debug("Closing wallet")
-      wallet.close()
 
       log.debug("Closing state")
       stateWriter.close()
