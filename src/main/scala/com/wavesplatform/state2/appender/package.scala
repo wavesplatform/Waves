@@ -11,11 +11,10 @@ import io.netty.channel.group.ChannelGroup
 import monix.eval.Task
 import scorex.block.Block
 import scorex.consensus.TransactionsOrdering
-import scorex.transaction.PoSCalc.{calcBaseTarget, calcGeneratorSignature, calcHit, calcTarget}
-import scorex.transaction._
+import scorex.transaction.PoSCalc.{calcBaseTarget, calcGeneratorSignature, calcHit, calcTarget, _}
 import scorex.transaction.ValidationError.{BlockFromFuture, GenericError}
+import scorex.transaction._
 import scorex.utils.{ScorexLogging, Time}
-import scorex.transaction.PoSCalc._
 
 import scala.util.{Left, Right}
 
@@ -32,7 +31,7 @@ package object appender extends ScorexLogging {
 
   private[appender] def processAndBlacklistOnFailure[A, B](ch: Channel, peerDatabase: PeerDatabase, miner: Miner, allChannels: ChannelGroup,
                                                            start: => String, success: => String, errorPrefix: String)(
-                                                              f: => Task[Either[B, Option[BigInt]]]): Task[Either[B, Option[BigInt]]] = {
+                                                            f: => Task[Either[B, Option[BigInt]]]): Task[Either[B, Option[BigInt]]] = {
 
     log.debug(start)
     f map {

@@ -7,10 +7,11 @@ import com.wavesplatform.db._
 import com.wavesplatform.utils._
 import org.iq80.leveldb.{DB, WriteBatch}
 import scorex.account.{Address, Alias}
+import scorex.utils.{NTP, Time}
 
 import scala.util.Try
 
-class StateStorage private(db: DB) extends SubStorage(db, "state") with PropertiesStorage with VersionedStorage {
+class StateStorage private(db: DB, time: Time) extends SubStorage(db, "state") with PropertiesStorage with VersionedStorage {
 
   import StateStorage._
 
@@ -36,9 +37,16 @@ class StateStorage private(db: DB) extends SubStorage(db, "state") with Properti
   private val MaxAddress = "max-address"
   private val LeasesCount = "leases-count"
 
+  private var heightTimestamp: Long = time.getTimestamp()
+
+  def debugInfo: HeightInfo = (getHeight, heightTimestamp)
+
   def getHeight: Int = get(makeKey(HeightPrefix, 0)).map(Ints.fromByteArray).getOrElse(0)
 
-  def setHeight(b: Option[WriteBatch], height: Int): Unit = put(makeKey(HeightPrefix, 0), Ints.toByteArray(height), b)
+  def setHeight(b: Option[WriteBatch], height: Int): Unit = {
+    put(makeKey(HeightPrefix, 0), Ints.toByteArray(height), b)
+    heightTimestamp = time.getTimestamp()
+  }
 
   def getTransaction(id: ByteStr): Option[(Int, Array[Byte])] =
     get(makeKey(TransactionsPrefix, id.arr)).map(TransactionsValueCodec.decode).map(_.explicitGet().value)
@@ -254,7 +262,7 @@ class StateStorage private(db: DB) extends SubStorage(db, "state") with Properti
 
 object StateStorage {
 
-  def apply(db: DB, dropExisting: Boolean): Try[StateStorage] = createWithVerification[StateStorage](new StateStorage(db))
+  def apply(db: DB, dropExisting: Boolean, time: Time = NTP): Try[StateStorage] = createWithVerification[StateStorage](new StateStorage(db, time))
 
   def accountIntKey(acc: Address, index: Int): Array[Byte] = Bytes.concat(acc.bytes.arr, Ints.toByteArray(index))
 

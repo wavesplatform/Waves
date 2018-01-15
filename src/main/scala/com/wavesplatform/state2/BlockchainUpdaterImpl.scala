@@ -66,10 +66,10 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
 
   // Store last block information in a cache
   historyReader.lastBlock.foreach { b =>
-    internalLastBlockInfo.onNext(LastBlockInfo(b.uniqueId, historyReader.height(), historyReader.score(), blockchainReady, System.currentTimeMillis))
+    internalLastBlockInfo.onNext(LastBlockInfo(b.uniqueId, historyReader.height(), historyReader.score(), blockchainReady))
   }
 
-  private[wavesplatform] def syncPersistedAndInMemory(): Unit = write { implicit l =>
+  private def syncPersistedAndInMemory(): Unit = write { implicit l =>
     log.info(heights("State rebuild started"))
 
     val notPersisted = historyWriter.height() - persisted.height
@@ -191,7 +191,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
           val height = historyWriter.height() + 1
           ngState.set(Some(new NgState(block, newBlockDiff, featuresApprovedWithBlock(block))))
           historyReader.lastBlockId().foreach(id =>
-            internalLastBlockInfo.onNext(LastBlockInfo(id, historyReader.height(), historyReader.score(), blockchainReady, System.currentTimeMillis)))
+            internalLastBlockInfo.onNext(LastBlockInfo(id, historyReader.height(), historyReader.score(), blockchainReady)))
           log.info(s"$block appended. New height: $height)")
           discarded
         }
@@ -243,7 +243,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
 
           val totalDiscardedBlocks: Seq[Block] = discardedHistoryBlocks ++ discardedNgBlock.toSeq
           if (totalDiscardedBlocks.nonEmpty) internalLastBlockInfo.onNext(
-            LastBlockInfo(blockId, historyReader.height(), historyReader.score(), blockchainReady, System.currentTimeMillis))
+            LastBlockInfo(blockId, historyReader.height(), historyReader.score(), blockchainReady))
           TxsInBlockchainStats.record(-totalDiscardedBlocks.size)
           Right(totalDiscardedBlocks)
       }
@@ -272,9 +272,8 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
                 historyWriter.lastBlock.map(_.timestamp), microBlock, ng.base.timestamp)
             } yield {
               log.info(s"$microBlock appended")
-              val now = System.currentTimeMillis
-              ng.append(microBlock, diff, now)
-              internalLastBlockInfo.onNext(LastBlockInfo(microBlock.totalResBlockSig, historyReader.height(), historyReader.score(), ready = true, now))
+              ng.append(microBlock, diff, System.currentTimeMillis)
+              internalLastBlockInfo.onNext(LastBlockInfo(microBlock.totalResBlockSig, historyReader.height(), historyReader.score(), ready = true))
             }
         }
     }
@@ -303,8 +302,11 @@ object BlockchainUpdaterImpl extends ScorexLogging {
             history: HistoryWriterImpl,
             settings: WavesSettings,
             time: scorex.utils.Time,
-            synchronizationToken: ReentrantReadWriteLock): BlockchainUpdaterImpl =
-    new BlockchainUpdaterImpl(persistedState, settings, time, history, history, synchronizationToken)
+            synchronizationToken: ReentrantReadWriteLock): BlockchainUpdaterImpl = {
+    val blockchainUpdater = new BlockchainUpdaterImpl(persistedState, settings, time, history, history, synchronizationToken)
+    blockchainUpdater.syncPersistedAndInMemory()
+    blockchainUpdater
+  }
 
   def areVersionsOfSameBlock(b1: Block, b2: Block): Boolean =
     b1.signerData.generator == b2.signerData.generator &&

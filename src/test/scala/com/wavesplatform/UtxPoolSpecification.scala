@@ -41,8 +41,8 @@ class UtxPoolSpecification extends FreeSpec
     val settings = WavesSettings.fromConfig(config).copy(blockchainSettings = BlockchainSettings('T', 5, 5, FunctionalitySettings.TESTNET, genesisSettings))
 
     val db = open()
-
-    val (history, _, state, bcu, _, _) = StorageFactory(db, settings).get
+    val (storage, _) = StorageFactory(db, settings).get
+    val (history, _, _, state, bcu, _) = storage()
 
     bcu.processBlock(Block.genesis(genesisSettings).right.get)
 

@@ -14,12 +14,12 @@ import scorex.block.{Block, BlockHeader}
 import scorex.transaction.History.BlockchainScore
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction._
-import scorex.utils.ScorexLogging
+import scorex.utils.{NTP, ScorexLogging, Time}
 
 import scala.util.Try
 
 class HistoryWriterImpl private(db: DB, val synchronizationToken: ReentrantReadWriteLock,
-                                functionalitySettings: FunctionalitySettings, featuresSettings: FeaturesSettings)
+                                functionalitySettings: FunctionalitySettings, featuresSettings: FeaturesSettings, time: Time)
   extends SubStorage(db, "history") with PropertiesStorage with VersionedStorage with History with FeatureProvider with ScorexLogging {
 
   override protected val Version: Int = 1
@@ -187,13 +187,17 @@ class HistoryWriterImpl private(db: DB, val synchronizationToken: ReentrantReadW
   override def blockHeaderAndSizeAt(height: Int): Option[(BlockHeader, Int)] =
     blockBytes(height).map(bytes => (BlockHeader.parseBytes(bytes).get._1, bytes.length))
 
+  private val heightInfo: (Int, Long) = (height(), time.getTimestamp())
+
+  override def debugInfo: HeightInfo = heightInfo
+
   private def getBlockSignature(height: Int): Option[ByteStr] = get(makeKey(SignatureAtHeightPrefix, height)).map(ByteStr.apply)
 }
 
 object HistoryWriterImpl extends ScorexLogging {
   def apply(db: DB, synchronizationToken: ReentrantReadWriteLock, functionalitySettings: FunctionalitySettings,
-            featuresSettings: FeaturesSettings): Try[HistoryWriterImpl] =
-    createWithVerification[HistoryWriterImpl](new HistoryWriterImpl(db, synchronizationToken, functionalitySettings, featuresSettings), h => h.isConsistent)
+            featuresSettings: FeaturesSettings, time: Time = NTP): Try[HistoryWriterImpl] =
+    createWithVerification[HistoryWriterImpl](new HistoryWriterImpl(db, synchronizationToken, functionalitySettings, featuresSettings, time), h => h.isConsistent)
 
   private val blockHeightStats = Kamon.metrics.histogram("block-height")
   private val blockSizeStats = Kamon.metrics.histogram("block-size-bytes")

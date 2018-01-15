@@ -3,18 +3,18 @@ package scorex.transaction
 import java.security.Permission
 import java.util.concurrent.{Semaphore, TimeUnit}
 
-import com.wavesplatform.features.BlockchainFeatureStatus
+import com.wavesplatform.features.{BlockchainFeatureStatus, FeatureProvider}
 import com.wavesplatform.history._
+import com.wavesplatform.state2._
 import com.wavesplatform.state2.diffs.produce
 import org.scalatest.words.ShouldVerb
-import com.wavesplatform.state2._
 import org.scalatest.{FunSuite, Matchers}
 import scorex.block.Block
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
-class BlockchainUpdaterTest extends FunSuite with Matchers with HistoryTest with ShouldVerb{
+class BlockchainUpdaterTest extends FunSuite with Matchers with HistoryTest with ShouldVerb {
 
   private val ApprovalPeriod = 100
 
@@ -28,10 +28,13 @@ class BlockchainUpdaterTest extends FunSuite with Matchers with HistoryTest with
     featuresSettings = DefaultWavesSettings.featuresSettings.copy(autoShutdownOnUnsupportedFeature = true)
   )
 
-  private def storageFactory() = StorageFactory(open(), WavesSettings).get
+  private def storageFactory(): (NgHistory with DebugNgHistory, FeatureProvider, StateWriter, StateReader, BlockchainUpdater, BlockchainDebugInfo) = {
+    val (storage, _) = StorageFactory(open(), WavesSettings).get
+    storage()
+  }
 
-  ignore ("concurrent access to lastBlock doesn't throw any exception") {
-    val (h, fp, _, bu, _, _) = storageFactory()
+  ignore("concurrent access to lastBlock doesn't throw any exception") {
+    val (h, _, _, _, bu, _) = storageFactory()
 
     bu.processBlock(genesisBlock)
 
@@ -57,7 +60,7 @@ class BlockchainUpdaterTest extends FunSuite with Matchers with HistoryTest with
 
   test("features approved and accepted as height grows") {
 
-    val (h, fp, _, bu, _, _) = storageFactory()
+    val (h, fp, _, _, bu, _) = storageFactory()
 
     bu.processBlock(genesisBlock)
 
@@ -94,7 +97,7 @@ class BlockchainUpdaterTest extends FunSuite with Matchers with HistoryTest with
   }
 
   test("features rollback with block rollback") {
-    val (h, fp, _, bu, _, _) = storageFactory()
+    val (h, fp, _, _, bu, _) = storageFactory()
 
     bu.processBlock(genesisBlock)
 
@@ -149,7 +152,7 @@ class BlockchainUpdaterTest extends FunSuite with Matchers with HistoryTest with
   }
 
   test("feature activation height is not overrided with further periods") {
-    val (h, fp, _, bu, _, _) = storageFactory()
+    val (h, fp, _, _, bu, _) = storageFactory()
 
     bu.processBlock(genesisBlock)
 
@@ -171,7 +174,7 @@ class BlockchainUpdaterTest extends FunSuite with Matchers with HistoryTest with
   }
 
   test("feature activated only by 90% of blocks") {
-    val (h, fp, _, bu, _, _) = storageFactory()
+    val (h, fp, _, _, bu, _) = storageFactory()
 
     bu.processBlock(genesisBlock)
 
@@ -194,7 +197,7 @@ class BlockchainUpdaterTest extends FunSuite with Matchers with HistoryTest with
   }
 
   test("features votes resets when voting window changes") {
-    val (h, fp, _, bu, _, _) = storageFactory()
+    val (h, fp, _, _, bu, _) = storageFactory()
 
     bu.processBlock(genesisBlock)
 
@@ -227,14 +230,14 @@ class BlockchainUpdaterTest extends FunSuite with Matchers with HistoryTest with
 
       override def checkExit(status: Int): Unit = signal.synchronized {
         super.checkExit(status)
-        if(status == 38)
+        if (status == 38)
           signal.release()
         throw new SecurityException("System exit not allowed")
       }
     })
 
 
-    val (h, fp, _, bu, _, _) = StorageFactory(open(), WavesSettings).get
+    val (h, _, _, _, bu, _) = storageFactory()
     bu.processBlock(genesisBlock)
 
     (1 to ApprovalPeriod * 2).foreach { i =>
@@ -249,7 +252,7 @@ class BlockchainUpdaterTest extends FunSuite with Matchers with HistoryTest with
   }
 
   test("sunny day test when known feature activated") {
-    val (h, fp, _, bu, _, _) = StorageFactory(open(), WavesSettings).get
+    val (h, fp, _, _, bu, _) = storageFactory()
     bu.processBlock(genesisBlock)
 
     (1 until ApprovalPeriod * 2 - 1).foreach { i =>

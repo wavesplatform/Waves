@@ -9,6 +9,7 @@ import scorex.block.Block.BlockId
 import scorex.block.{Block, BlockHeader, MicroBlock}
 import scorex.transaction.History.{BlockMinerInfo, BlockchainScore}
 import cats.implicits._
+import com.wavesplatform.utils.HeightInfo
 
 class NgHistoryReader(ngState: () => Option[NgState], inner: History with FeatureProvider, settings: FunctionalitySettings) extends History with NgHistory with DebugNgHistory with FeatureProvider {
 
@@ -102,4 +103,6 @@ class NgHistoryReader(ngState: () => Option[NgState], inner: History with Featur
     else
       inner.blockHeaderAndSizeAt(height)
   }
+
+  override def debugInfo: HeightInfo = inner.debugInfo
 }

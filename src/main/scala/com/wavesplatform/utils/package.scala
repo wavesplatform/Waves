@@ -11,6 +11,8 @@ import scala.util.Try
 
 package object utils extends ScorexLogging {
 
+  type HeightInfo = (Int, Long)
+
   private val BytesMaxValue = 256
   private val Base58MaxValue = 58
 

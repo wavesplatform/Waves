@@ -1,5 +1,6 @@
 package scorex.utils
 
+import com.google.common.util.concurrent.UncheckedExecutionException
 import monix.eval.Task
 import monix.execution.{CancelableFuture, Scheduler}
 import monix.reactive.Observable
@@ -68,6 +69,21 @@ trait ScorexLogging {
         log.error(s"Error executing task", ex)
         Task.raiseError[A](ex)
       })
+    }
+
+    def logErrDiscardNoSuchElementException: Task[A] = {
+      t.onErrorHandleWith(ex => {
+        ex match {
+          case gex: UncheckedExecutionException =>
+            Option(gex.getCause) match {
+              case Some(nseex: NoSuchElementException) =>
+              case _ => log.error(s"Error executing task", ex)
+            }
+          case _ => log.error(s"Error executing task", ex)
+        }
+        Task.raiseError[A](ex)
+      }
+      )
     }
   }
 

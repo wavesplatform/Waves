@@ -21,7 +21,6 @@ import com.wavesplatform.metrics.Metrics
 import com.wavesplatform.mining.{Miner, MinerImpl}
 import com.wavesplatform.network._
 import com.wavesplatform.settings._
-import com.wavesplatform.state2.StateWriter
 import com.wavesplatform.state2.appender.{BlockAppender, CheckpointAppender, ExtensionAppender, MicroblockAppender}
 import com.wavesplatform.utils.{SystemInformationReporter, forceStopApplication}
 import io.netty.channel.Channel
@@ -58,20 +57,19 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   // Start /node API right away
   private implicit val as: ActorSystem = actorSystem
   private implicit val materializer: ActorMaterializer = ActorMaterializer()
-
-  private val nodeApiLauncher = (bcu: BlockchainUpdater, state: StateWriter) =>
-    Option(settings.restAPISettings.enable).collect { case true =>
-      val tags = Seq(typeOf[NodeApiRoute])
-      val routes = Seq(NodeApiRoute(settings.restAPISettings, bcu, state, () => this.shutdown()))
-      val combinedRoute: Route = CompositeHttpService(actorSystem, tags, routes, settings.restAPISettings).compositeRoute
-      val httpFuture = Http().bindAndHandle(combinedRoute, settings.restAPISettings.bindAddress, settings.restAPISettings.port)
-      serverBinding = Await.result(httpFuture, 10.seconds)
-      log.info(s"Node REST API was bound on ${settings.restAPISettings.bindAddress}:${settings.restAPISettings.port}")
-      (tags, routes)
-    }
+  private val (storage, heights) = StorageFactory(db, settings).get
+  private val nodeApi = Option(settings.restAPISettings.enable).collect { case true =>
+    val tags = Seq(typeOf[NodeApiRoute])
+    val routes = Seq(NodeApiRoute(settings.restAPISettings, heights, () => this.shutdown()))
+    val combinedRoute: Route = CompositeHttpService(actorSystem, tags, routes, settings.restAPISettings).compositeRoute
+    val httpFuture = Http().bindAndHandle(combinedRoute, settings.restAPISettings.bindAddress, settings.restAPISettings.port)
+    serverBinding = Await.result(httpFuture, 10.seconds)
+    log.info(s"Node REST API was bound on ${settings.restAPISettings.bindAddress}:${settings.restAPISettings.port}")
+    (tags, routes)
+  }
 
   private val checkpointService = new CheckpointServiceImpl(db, settings.checkpointsSettings)
-  private val (history, featureProvider, stateReader, blockchainUpdater, blockchainDebugInfo, nodeApi) = StorageFactory(db, settings, nodeApiLauncher).get
+  private val (history, featureProvider, stateWriter, stateReader, blockchainUpdater, blockchainDebugInfo) = storage()
   private lazy val upnp = new UPnP(settings.networkSettings.uPnPSettings) // don't initialize unless enabled
   private val wallet: Wallet = Wallet(settings.walletSettings)
   private val peerDatabase = new PeerDatabaseImpl(settings.networkSettings)
@@ -213,16 +211,17 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         upnp.deletePort(addr.getPort)
       }
 
-      peerDatabase.close()
-
-      Try(Await.result(actorSystem.terminate(), stopActorsTimeout))
-        .failed.map(e => log.error("Failed to terminate actor system", e))
-
       log.debug("Closing storage")
       db.close()
 
       log.debug("Closing wallet")
       wallet.close()
+
+      log.debug("Closing peer database")
+      peerDatabase.close()
+
+      Try(Await.result(actorSystem.terminate(), stopActorsTimeout))
+        .failed.map(e => log.error("Failed to terminate actor system", e))
 
       log.info("Shutdown complete")
     }

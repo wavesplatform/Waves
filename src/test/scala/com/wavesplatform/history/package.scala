@@ -34,7 +34,8 @@ package object history extends TestDB {
   val DefaultWavesSettings: WavesSettings = settings.copy(blockchainSettings = DefaultBlockchainSettings)
 
   def domain(settings: WavesSettings): Domain = {
-    val (history, _, stateReader, blockchainUpdater, _, _) = StorageFactory(open(), settings).get
+    val (storage, _) = StorageFactory(open(), settings).get
+    val (history, _, _, stateReader, blockchainUpdater, _) = storage()
     Domain(history, stateReader, blockchainUpdater)
   }
 
