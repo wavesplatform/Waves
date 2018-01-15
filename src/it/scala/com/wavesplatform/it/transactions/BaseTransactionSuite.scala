@@ -11,7 +11,7 @@ import org.scalatest.FunSuite
 import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext
 
-abstract class BaseTransactionSuite extends FunSuite with IntegrationNodesInitializationAndStopping
+abstract class BaseTransactionSuite extends FunSuite with WaitForHeight2
   with IntegrationSuiteWithThreeAddresses with NodesFromDocker {
 
   protected implicit val ec: ExecutionContext = ExecutionContext.Implicits.global

@@ -14,7 +14,7 @@ import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
-class WideStateGenerationSuite extends FreeSpec with IntegrationNodesInitializationAndStopping
+class WideStateGenerationSuite extends FreeSpec with WaitForHeight2
   with Matchers with TransferSending with NodesFromDocker {
 
   override protected def createDocker: Docker = new Docker(

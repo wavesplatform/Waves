@@ -11,7 +11,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
 
-class NetworkSeparationTestSuite extends FreeSpec with Matchers with IntegrationNodesInitializationAndStopping
+class NetworkSeparationTestSuite extends FreeSpec with Matchers with WaitForHeight2
   with CancelAfterFailure with ReportingTestName with NodesFromDocker {
 
   override protected def nodeConfigs: Seq[Config] = NodeConfigs.newBuilder

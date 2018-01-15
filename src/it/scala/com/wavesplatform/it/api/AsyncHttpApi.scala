@@ -33,7 +33,7 @@ import scala.util.{Failure, Success, Try}
 
 object AsyncHttpApi {
 
-  implicit class NodeExt(n: Node) extends Assertions with Matchers {
+  implicit class NodeAsyncHttpApi(n: Node) extends Assertions with Matchers {
 
     import Node._
 
@@ -389,7 +389,7 @@ object AsyncHttpApi {
 
   }
 
-  implicit class NodesExt(nodes: Seq[Node]) {
+  implicit class NodesAsyncHttpApi(nodes: Seq[Node]) {
     // if we first await tx and then height + 1, it could be gone with height + 1
     // if we first await height + 1 and then tx, it could be gone with height + 2
     // so we await tx twice

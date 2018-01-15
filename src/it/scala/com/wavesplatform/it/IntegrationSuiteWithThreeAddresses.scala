@@ -83,10 +83,3 @@ trait IntegrationSuiteWithThreeAddresses extends BeforeAndAfterAll with Matchers
     }
   }
 }
-
-trait AsyncNodesUtils {
-  protected def sender: Node
-  protected def nodes: Seq[Node]
-
-
-}

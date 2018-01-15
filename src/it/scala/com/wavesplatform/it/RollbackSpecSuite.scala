@@ -16,7 +16,7 @@ import scala.concurrent.{Await, Future}
 import scala.util.Random
 
 class RollbackSpecSuite extends FreeSpec with ScalaFutures with IntegrationPatience
-  with Matchers with TransferSending with IntegrationNodesInitializationAndStopping with NodesFromDocker {
+  with Matchers with TransferSending with WaitForHeight2 with NodesFromDocker {
   // there are nodes with big and small balances to reduce the number of forks
   override protected def nodeConfigs: Seq[Config] = configs
 

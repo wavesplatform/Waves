@@ -12,7 +12,7 @@ import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
 import scala.util.Random
 
-class ValidChainGenerationSuite extends FreeSpec with IntegrationNodesInitializationAndStopping
+class ValidChainGenerationSuite extends FreeSpec with WaitForHeight2
   with TransferSending with NodesFromDocker with CancelAfterFailure {
 
   override protected def nodeConfigs: Seq[Config] = NodeConfigs.newBuilder
