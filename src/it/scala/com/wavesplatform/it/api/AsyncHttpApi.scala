@@ -12,6 +12,7 @@ import com.wavesplatform.state2.{ByteStr, Portfolio}
 import org.asynchttpclient.Dsl.{get => _get, post => _post}
 import org.asynchttpclient._
 import org.asynchttpclient.util.HttpConstants
+import org.scalatest.{Assertions, Matchers}
 import play.api.libs.json.Json.{parse, stringify, toJson}
 import play.api.libs.json._
 import scorex.api.http.PeersApiRoute.{ConnectReq, connectFormat}
@@ -25,13 +26,14 @@ import scorex.waves.http.{DebugMessage, RollbackParams}
 
 import scala.compat.java8.FutureConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future.traverse
 import scala.concurrent.{Future, Promise}
 import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 
 object AsyncHttpApi {
 
-  implicit class NodeExt(n: Node) {
+  implicit class NodeExt(n: Node) extends Assertions with Matchers {
 
     import Node._
 
@@ -354,9 +356,56 @@ object AsyncHttpApi {
 
     def debugStateAt(height: Long): Future[Map[String, Long]] = get(s"/debug/stateWaves/$height").as[Map[String, Long]]
 
-    def debugPortfoliosFor(address: String, considerUnspent: Boolean) = {
+    def debugPortfoliosFor(address: String, considerUnspent: Boolean): Future[Portfolio] = {
       getWithApiKey(s"/debug/portfolios/$address?considerUnspent=$considerUnspent")
     }.as[Portfolio]
+
+
+    def accountEffectiveBalance(acc: String): Future[Long] = n.effectiveBalance(acc).map(_.balance)
+
+    def accountBalance(acc: String): Future[Long] = n.balance(acc).map(_.balance)
+
+    def accountBalances(acc: String): Future[(Long, Long)] = {
+      n.balance(acc).map(_.balance).zip(n.effectiveBalance(acc).map(_.balance))
+    }
+
+    def assertBalances(acc: String, balance: Long, effectiveBalance: Long): Future[Unit] = {
+      for {
+        newBalance <- accountBalance(acc)
+        newEffectiveBalance <- accountEffectiveBalance(acc)
+      } yield {
+        withClue(s"effective balance of $acc") {
+          newEffectiveBalance shouldBe effectiveBalance
+        }
+        withClue(s"balance of $acc") {
+          newBalance shouldBe balance
+        }
+      }
+    }
+
+    def assertAssetBalance(acc: String, assetIdString: String, balance: Long): Future[Unit] = {
+      n.assetBalance(acc, assetIdString).map(_.balance shouldBe balance)
+    }
+
+  }
+
+  implicit class NodesExt(nodes: Seq[Node]) {
+    // if we first await tx and then height + 1, it could be gone with height + 1
+    // if we first await height + 1 and then tx, it could be gone with height + 2
+    // so we await tx twice
+    def waitForHeightAraiseAndTxPresent(transactionId: String): Future[Unit] = for {
+      height <- traverse(nodes)(_.height).map(_.max)
+      _ <- AsyncHttpApi.waitForSameBlocksAt(nodes, 2.seconds, height)
+      _ <- traverse(nodes)(_.waitForTransaction(transactionId))
+      _ <- traverse(nodes)(_.waitForHeight(height + 1))
+      _ <- traverse(nodes)(_.waitForTransaction(transactionId))
+    } yield ()
+
+    def waitForHeightAraise(): Future[Unit] = for {
+      height <- traverse(nodes)(_.height).map(_.max)
+      _ <- traverse(nodes)(_.waitForHeight(height + 1))
+    } yield ()
+
   }
 
   def waitFor[A](desc: String)(nodes: Iterable[Node], retryInterval: FiniteDuration)

@@ -14,13 +14,13 @@ class PaymentTransactionSuite extends BaseTransactionSuite {
 
   test("waves payment changes waves balances and eff.b.") {
     val f = for {
-      ((firstBalance, firstEffBalance), (secondBalance, secondEffBalance)) <- accountBalances(firstAddress)
-        .zip(accountBalances(secondAddress))
+      ((firstBalance, firstEffBalance), (secondBalance, secondEffBalance)) <- notMiner.accountBalances(firstAddress)
+        .zip(notMiner.accountBalances(secondAddress))
 
       transferId <- sender.payment(firstAddress, secondAddress, paymentAmount, defaulFee).map(_.id)
-      _ <- waitForHeightAraiseAndTxPresent(transferId)
-      _ <- assertBalances(firstAddress, firstBalance - paymentAmount - defaulFee, firstEffBalance - paymentAmount - defaulFee)
-        .zip(assertBalances(secondAddress, secondBalance + paymentAmount, secondEffBalance + paymentAmount))
+      _ <- nodes.waitForHeightAraiseAndTxPresent(transferId)
+      _ <- notMiner.assertBalances(firstAddress, firstBalance - paymentAmount - defaulFee, firstEffBalance - paymentAmount - defaulFee)
+        .zip(notMiner.assertBalances(secondAddress, secondBalance + paymentAmount, secondEffBalance + paymentAmount))
     } yield succeed
 
     Await.result(f, 2.minute)

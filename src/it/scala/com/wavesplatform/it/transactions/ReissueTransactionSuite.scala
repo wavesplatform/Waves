@@ -14,16 +14,16 @@ class ReissueTransactionSuite extends BaseTransactionSuite {
 
   test("asset reissue changes issuer's asset balance; issuer's waves balance is decreased by fee") {
     val f = for {
-      (balance, effectiveBalance) <- accountBalances(firstAddress)
+      (balance, effectiveBalance) <- notMiner.accountBalances(firstAddress)
 
       issuedAssetId <- sender.issue(firstAddress, "name2", "description2", defaultQuantity, decimals = 2, reissuable = true, fee = issueFee).map(_.id)
-      _ <- waitForHeightAraiseAndTxPresent(issuedAssetId)
-      _ <- assertBalances(firstAddress, balance - issueFee, effectiveBalance - issueFee) zip assertAssetBalance(firstAddress, issuedAssetId, defaultQuantity)
+      _ <- nodes.waitForHeightAraiseAndTxPresent(issuedAssetId)
+      _ <- notMiner.assertBalances(firstAddress, balance - issueFee, effectiveBalance - issueFee) zip notMiner.assertAssetBalance(firstAddress, issuedAssetId, defaultQuantity)
 
       reissueTxId <- sender.reissue(firstAddress, issuedAssetId, defaultQuantity, reissuable = true, fee = issueFee).map(_.id)
-      _ <- waitForHeightAraiseAndTxPresent(reissueTxId)
-      _ <- assertBalances(firstAddress, balance - 2 * issueFee, effectiveBalance - 2 * issueFee)
-        .zip(assertAssetBalance(firstAddress, issuedAssetId, 2 * defaultQuantity))
+      _ <- nodes.waitForHeightAraiseAndTxPresent(reissueTxId)
+      _ <- notMiner.assertBalances(firstAddress, balance - 2 * issueFee, effectiveBalance - 2 * issueFee)
+        .zip(notMiner.assertAssetBalance(firstAddress, issuedAssetId, 2 * defaultQuantity))
     } yield succeed
 
     Await.result(f, waitCompletion)
@@ -31,19 +31,19 @@ class ReissueTransactionSuite extends BaseTransactionSuite {
 
   test("can't reissue not reissuable asset") {
     val f = for {
-      (balance, effectiveBalance) <- accountBalances(firstAddress)
+      (balance, effectiveBalance) <- notMiner.accountBalances(firstAddress)
 
       issuedAssetId <- sender.issue(firstAddress, "name2", "description2", defaultQuantity, decimals = 2, reissuable = false, issueFee).map(_.id)
-      _ <- waitForHeightAraiseAndTxPresent(issuedAssetId)
-      _ <- assertBalances(firstAddress, balance - issueFee, effectiveBalance - issueFee)
-        .zip(assertAssetBalance(firstAddress, issuedAssetId, defaultQuantity))
+      _ <- nodes.waitForHeightAraiseAndTxPresent(issuedAssetId)
+      _ <- notMiner.assertBalances(firstAddress, balance - issueFee, effectiveBalance - issueFee)
+        .zip(notMiner.assertAssetBalance(firstAddress, issuedAssetId, defaultQuantity))
 
       _ <- assertBadRequestAndMessage(
         sender.reissue(firstAddress, issuedAssetId, defaultQuantity, reissuable = true, fee = issueFee), "Asset is not reissuable")
-      _ <- waitForHeightAraise()
+      _ <- nodes.waitForHeightAraise()
 
-      _ <- assertAssetBalance(firstAddress, issuedAssetId, defaultQuantity)
-        .zip(assertBalances(firstAddress, balance - issueFee, effectiveBalance - issueFee))
+      _ <- notMiner.assertAssetBalance(firstAddress, issuedAssetId, defaultQuantity)
+        .zip(notMiner.assertBalances(firstAddress, balance - issueFee, effectiveBalance - issueFee))
 
     } yield succeed
 
@@ -52,19 +52,19 @@ class ReissueTransactionSuite extends BaseTransactionSuite {
 
   test("not able to reissue if cannot pay fee - insufficient funds") {
     val f = for {
-      (balance, effectiveBalance) <- accountBalances(firstAddress)
+      (balance, effectiveBalance) <- notMiner.accountBalances(firstAddress)
       reissueFee = effectiveBalance + 1.waves
 
       issuedAssetId <- sender.issue(firstAddress, "name3", "description3", defaultQuantity, decimals = 2, reissuable = true, issueFee).map(_.id)
 
-      _ <- waitForHeightAraiseAndTxPresent(issuedAssetId)
+      _ <- nodes.waitForHeightAraiseAndTxPresent(issuedAssetId)
 
       _ <- assertBadRequestAndMessage(
         sender.reissue(firstAddress, issuedAssetId, defaultQuantity, reissuable = true, fee = reissueFee), "negative waves balance")
-      _ <- waitForHeightAraise()
+      _ <- nodes.waitForHeightAraise()
 
-      _ <- assertAssetBalance(firstAddress, issuedAssetId, defaultQuantity)
-        .zip(assertBalances(firstAddress, balance - issueFee, effectiveBalance - issueFee))
+      _ <- notMiner.assertAssetBalance(firstAddress, issuedAssetId, defaultQuantity)
+        .zip(notMiner.assertBalances(firstAddress, balance - issueFee, effectiveBalance - issueFee))
     } yield succeed
 
     Await.result(f, waitCompletion)

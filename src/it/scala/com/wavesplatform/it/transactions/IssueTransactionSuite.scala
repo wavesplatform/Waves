@@ -18,14 +18,14 @@ class IssueTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
     val assetDescription = "my asset description"
     val f = for {
 
-      (firstAddressBalance, firstAddressEffectiveBalance) <- accountBalance(firstAddress).zip(accountEffectiveBalance(firstAddress))
+      (firstAddressBalance, firstAddressEffectiveBalance) <- notMiner.accountBalance(firstAddress).zip(notMiner.accountEffectiveBalance(firstAddress))
 
       issuedAssetId <- sender.issue(firstAddress, assetName, assetDescription, defaultQuantity, 2, reissuable = true, assetFee).map(_.id)
 
-      _ <- waitForHeightAraiseAndTxPresent(issuedAssetId)
+      _ <- nodes.waitForHeightAraiseAndTxPresent(issuedAssetId)
 
-      _ <- assertBalances(firstAddress, firstAddressBalance - assetFee, firstAddressEffectiveBalance - assetFee)
-        .zip(assertAssetBalance(firstAddress, issuedAssetId, defaultQuantity))
+      _ <- notMiner.assertBalances(firstAddress, firstAddressBalance - assetFee, firstAddressEffectiveBalance - assetFee)
+        .zip(notMiner.assertAssetBalance(firstAddress, issuedAssetId, defaultQuantity))
     } yield succeed
 
     Await.result(f, waitCompletion)
@@ -36,17 +36,17 @@ class IssueTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
     val assetDescription = "my asset description"
     val f = for {
 
-      (firstAddressBalance, firstAddressEffectiveBalance) <- accountBalance(firstAddress).zip(accountEffectiveBalance(firstAddress))
+      (firstAddressBalance, firstAddressEffectiveBalance) <- notMiner.accountBalance(firstAddress).zip(notMiner.accountEffectiveBalance(firstAddress))
 
       issuedAssetId <- sender.issue(firstAddress, assetName, assetDescription, defaultQuantity, 2, reissuable = false, assetFee).map(_.id)
-      _ <- waitForHeightAraiseAndTxPresent(issuedAssetId)
+      _ <- nodes.waitForHeightAraiseAndTxPresent(issuedAssetId)
 
       issuedAssetId <- sender.issue(firstAddress, assetName, assetDescription, defaultQuantity, 2, reissuable = true, assetFee).map(_.id)
 
-      _ <- waitForHeightAraiseAndTxPresent(issuedAssetId)
+      _ <- nodes.waitForHeightAraiseAndTxPresent(issuedAssetId)
 
-      _ <- assertAssetBalance(firstAddress, issuedAssetId, defaultQuantity)
-        .zip(assertBalances(firstAddress, firstAddressBalance - 2 * assetFee, firstAddressEffectiveBalance - 2 * assetFee))
+      _ <- notMiner.assertAssetBalance(firstAddress, issuedAssetId, defaultQuantity)
+        .zip(notMiner.assertBalances(firstAddress, firstAddressBalance - 2 * assetFee, firstAddressEffectiveBalance - 2 * assetFee))
     } yield succeed
 
     Await.result(f, waitCompletion)
@@ -57,7 +57,7 @@ class IssueTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
     val assetDescription = "my asset description"
     val f = for {
 
-      firstAddressEffectiveBalance <- accountEffectiveBalance(firstAddress)
+      firstAddressEffectiveBalance <- notMiner.accountEffectiveBalance(firstAddress)
       bigAssetFee = firstAddressEffectiveBalance + 1.waves
 
       _ <- assertBadRequestAndMessage(sender.issue(firstAddress, assetName, assetDescription, defaultQuantity, 2, reissuable = false, bigAssetFee),
