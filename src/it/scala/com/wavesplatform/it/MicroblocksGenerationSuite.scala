@@ -1,8 +1,8 @@
 package com.wavesplatform.it
 
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.api.AsyncHttpApi._
+import com.wavesplatform.it.transactions.NodesFromDocker
 import org.scalatest._
 
 import scala.concurrent.Await.result

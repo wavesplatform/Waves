@@ -1,15 +1,17 @@
 package com.wavesplatform.it.api
 
-import com.wavesplatform.it.api.AsyncHttpApi.{NodeAsyncHttpApi => async, NodesAsyncHttpApi => asyncs}
 import com.wavesplatform.it.api.Node.Transaction
 import org.scalatest.{Assertions, Matchers}
-import scala.concurrent.Await
+
 import scala.concurrent.duration._
+import scala.concurrent.{Await, Future}
 
 object SyncHttpApi {
 
 
   implicit class NodeExtSync(n: Node) extends Assertions with Matchers {
+
+    import com.wavesplatform.it.api.AsyncHttpApi.{NodeAsyncHttpApi => async}
 
     private val RequestAwaitTime = 15.seconds
 
@@ -31,13 +33,23 @@ object SyncHttpApi {
 
   implicit class NodesExtSync(nodes: Seq[Node]) {
 
+    import com.wavesplatform.it.api.AsyncHttpApi.{NodesAsyncHttpApi => async}
+
+
     private val TxInBlockchainAwaitTime = 3 * nodes.head.blockDelay
+    private val ConditionAwaitTime = 5.minutes
 
     def waitForHeightAraiseAndTxPresent(transactionId: String): Unit =
-      Await.result(asyncs(nodes).waitForHeightAraiseAndTxPresent(transactionId), TxInBlockchainAwaitTime)
+      Await.result(async(nodes).waitForHeightAraiseAndTxPresent(transactionId), TxInBlockchainAwaitTime)
 
     def waitForHeightAraise(): Unit =
-      Await.result(asyncs(nodes).waitForHeightAraise(), TxInBlockchainAwaitTime)
+      Await.result(async(nodes).waitForHeightAraise(), TxInBlockchainAwaitTime)
+
+    def waitForSameBlocksAt(retryInterval: FiniteDuration, height: Int): Boolean =
+      Await.result(async(nodes).waitForSameBlocksAt(retryInterval, height), ConditionAwaitTime)
+
+    def waitFor[A](desc: String)(retryInterval: FiniteDuration)(request: Node => A, cond: Iterable[A] => Boolean): Boolean =
+      Await.result(async(nodes).waitFor(desc)(retryInterval)((n: Node) => Future(request(n))(scala.concurrent.ExecutionContext.Implicits.global), cond), ConditionAwaitTime)
   }
 
 }

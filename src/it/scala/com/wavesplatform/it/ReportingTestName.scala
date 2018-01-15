@@ -1,9 +1,10 @@
 package com.wavesplatform.it
 
+import com.wavesplatform.it.api.AsyncHttpApi._
 import org.scalatest.{Args, Status, Suite, SuiteMixin}
 import scorex.utils.ScorexLogging
 import scorex.waves.http.DebugMessage
-import com.wavesplatform.it.api.AsyncHttpApi._
+
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 

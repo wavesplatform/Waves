@@ -1,8 +1,9 @@
 package com.wavesplatform.it
 
+import com.wavesplatform.it.api.AsyncHttpApi._
 import org.scalatest._
 import scorex.utils.ScorexLogging
-import com.wavesplatform.it.api.AsyncHttpApi._
+
 import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future.traverse

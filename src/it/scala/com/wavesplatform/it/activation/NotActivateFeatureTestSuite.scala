@@ -2,9 +2,9 @@ package com.wavesplatform.it
 package activation
 
 import com.typesafe.config.Config
-import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.features.BlockchainFeatureStatus
 import com.wavesplatform.features.api.{ActivationStatusFeature, NodeFeatureStatus}
+import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.transactions.NodesFromDocker
 import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers}
 

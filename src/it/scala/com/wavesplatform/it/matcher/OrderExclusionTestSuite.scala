@@ -2,10 +2,10 @@ package com.wavesplatform.it.matcher
 
 import com.google.common.primitives.Longs
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.it.api.Node.{AssetBalance, MatcherStatusResponse, OrderBookResponse, Transaction}
-import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it._
+import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.api.Node
+import com.wavesplatform.it.api.Node.{AssetBalance, MatcherStatusResponse, OrderBookResponse, Transaction}
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.state2.ByteStr
 import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}

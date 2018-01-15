@@ -1,7 +1,7 @@
 package com.wavesplatform.it.transactions
 
-import com.wavesplatform.it.api.Node
 import com.wavesplatform.it.api.AsyncHttpApi._
+import com.wavesplatform.it.api.Node
 import com.wavesplatform.it.util._
 
 import scala.concurrent.Await

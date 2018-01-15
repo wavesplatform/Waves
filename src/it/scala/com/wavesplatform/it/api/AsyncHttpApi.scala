@@ -1,8 +1,8 @@
 package com.wavesplatform.it.api
 
 import java.io.IOException
-import java.util.{Timer, TimerTask}
 import java.util.concurrent.TimeoutException
+import java.util.{Timer, TimerTask}
 
 import com.wavesplatform.features.api.ActivationStatus
 import com.wavesplatform.it.util.GlobalTimer.{instance => timer}
@@ -27,8 +27,8 @@ import scorex.waves.http.{DebugMessage, RollbackParams}
 import scala.compat.java8.FutureConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future.traverse
-import scala.concurrent.{Future, Promise}
 import scala.concurrent.duration._
+import scala.concurrent.{Future, Promise}
 import scala.util.{Failure, Success, Try}
 
 object AsyncHttpApi {
@@ -395,7 +395,7 @@ object AsyncHttpApi {
     // so we await tx twice
     def waitForHeightAraiseAndTxPresent(transactionId: String): Future[Unit] = for {
       height <- traverse(nodes)(_.height).map(_.max)
-      _ <- AsyncHttpApi.waitForSameBlocksAt(nodes, 2.seconds, height)
+      _ <- waitForSameBlocksAt(2.seconds, height)
       _ <- traverse(nodes)(_.waitForTransaction(transactionId))
       _ <- traverse(nodes)(_.waitForHeight(height + 1))
       _ <- traverse(nodes)(_.waitForTransaction(transactionId))
@@ -406,36 +406,36 @@ object AsyncHttpApi {
       _ <- traverse(nodes)(_.waitForHeight(height + 1))
     } yield ()
 
-  }
+    def waitForSameBlocksAt(retryInterval: FiniteDuration, height: Int): Future[Boolean] = {
 
-  def waitFor[A](desc: String)(nodes: Iterable[Node], retryInterval: FiniteDuration)
-                (request: Node => Future[A], cond: Iterable[A] => Boolean): Future[Boolean] = {
-    def retry = sleep(retryInterval).flatMap { _ =>
-      waitFor(desc)(nodes, retryInterval)(request, cond)
+      def waitHeight = waitFor[Int](s"all heights >= $height")(retryInterval)(_.height, _.forall(_ >= height))
+
+      def waitSameBlocks = waitFor[Node.Block](s"same blocks at height = $height")(retryInterval)(_.blockAt(height), { blocks =>
+        val sig = blocks.map(_.signature)
+        sig.forall(_ == sig.head)
+      })
+
+      for {
+        _ <- waitHeight
+        r <- waitSameBlocks
+      } yield r
     }
 
-    Future.traverse(nodes)(request)
-      .map(cond)
-      .recover { case _ => false }
-      .flatMap {
-        case true => Future.successful(true)
-        case false => retry
+    def waitFor[A](desc: String)(retryInterval: FiniteDuration)
+                  (request: Node => Future[A], cond: Iterable[A] => Boolean): Future[Boolean] = {
+      def retry = sleep(retryInterval).flatMap { _ =>
+        waitFor(desc)(retryInterval)(request, cond)
       }
-  }
 
-  def waitForSameBlocksAt(nodes: Iterable[Node], retryInterval: FiniteDuration, height: Int): Future[Boolean] = {
+      Future.traverse(nodes)(request)
+        .map(cond)
+        .recover { case _ => false }
+        .flatMap {
+          case true => Future.successful(true)
+          case false => retry
+        }
+    }
 
-    def waitHeight = waitFor[Int](s"all heights >= $height")(nodes, retryInterval)(_.height, _.forall(_ >= height))
-
-    def waitSameBlocks = waitFor[Node.Block](s"same blocks at height = $height")(nodes, retryInterval)(_.blockAt(height), { blocks =>
-      val sig = blocks.map(_.signature)
-      sig.forall(_ == sig.head)
-    })
-
-    for {
-      _ <- waitHeight
-      r <- waitSameBlocks
-    } yield r
   }
 
   private val ttimer = new Timer("multiple-nodes-api", true)

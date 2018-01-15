@@ -2,8 +2,8 @@ package com.wavesplatform.it.api
 
 import java.net.InetSocketAddress
 
-import com.wavesplatform.network.client.NetworkSender
 import com.wavesplatform.network.RawBytes
+import com.wavesplatform.network.client.NetworkSender
 
 import scala.concurrent.Future
 

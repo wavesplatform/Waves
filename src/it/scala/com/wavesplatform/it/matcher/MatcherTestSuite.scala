@@ -3,9 +3,9 @@ package matcher
 
 import com.google.common.primitives.Longs
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.it.api.Node.{AssetBalance, LevelResponse, MatcherStatusResponse, OrderBookResponse, Transaction}
 import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.api.Node
+import com.wavesplatform.it.api.Node.{AssetBalance, LevelResponse, MatcherStatusResponse, OrderBookResponse, Transaction}
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.matcher.api.CancelOrderRequest
 import com.wavesplatform.state2.ByteStr

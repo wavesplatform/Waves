@@ -13,8 +13,8 @@ import com.spotify.docker.client.messages.EndpointConfig.EndpointIpamConfig
 import com.spotify.docker.client.messages._
 import com.spotify.docker.client.{DefaultDockerClient, DockerClient}
 import com.typesafe.config.{Config, ConfigFactory, ConfigRenderOptions}
-import com.wavesplatform.it.api.Node
 import com.wavesplatform.it.api.AsyncHttpApi._
+import com.wavesplatform.it.api.Node
 import com.wavesplatform.it.util.GlobalTimer.{instance => timer}
 import org.asynchttpclient.Dsl._
 import scorex.utils.ScorexLogging

@@ -1,19 +1,18 @@
 package com.wavesplatform.it
 
 import com.typesafe.config.Config
-import com.wavesplatform.it.api.{AsyncHttpApi, Node}
 import com.wavesplatform.it.api.AsyncHttpApi._
+import com.wavesplatform.it.api.Node
 import com.wavesplatform.it.api.Node.{Block, BlockHeaders}
 import com.wavesplatform.it.transactions.NodesFromDocker
-
-import scala.concurrent.{Await, Future}
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future.traverse
-import scala.concurrent.duration._
 import com.wavesplatform.it.util._
 import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
 import scorex.utils.ScorexLogging
 
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future.traverse
+import scala.concurrent.duration._
+import scala.concurrent.{Await, Future}
 import scala.util.Random
 
 class BlockHeadersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with CancelAfterFailure
@@ -88,7 +87,7 @@ class BlockHeadersTestSuite extends FreeSpec with Matchers with BeforeAndAfterAl
     val f = for {
       baseHeight <- traverse(nodes)(_.height).map(_.max)
       _ <- txRequestsGen(30, 2.waves)
-      _ <- AsyncHttpApi.waitForSameBlocksAt(nodes, 3.seconds, baseHeight + 3)
+      _ <- nodes.waitForSameBlocksAt(3.seconds, baseHeight + 3)
       blocks <- nodes.head.blockSeq(baseHeight + 1, baseHeight + 3)
       blockHeaders <- nodes.head.blockHeadersSeq(baseHeight + 1, baseHeight + 3)
     } yield {

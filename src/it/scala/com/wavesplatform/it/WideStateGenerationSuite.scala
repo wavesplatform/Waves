@@ -3,8 +3,8 @@ package com.wavesplatform.it
 import java.util.concurrent.TimeoutException
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.it.api._
 import com.wavesplatform.it.api.AsyncHttpApi._
+import com.wavesplatform.it.api._
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.util._
 import org.scalatest._
@@ -57,7 +57,7 @@ class WideStateGenerationSuite extends FreeSpec with WaitForHeight2
 
       _ <- {
         log.debug(s"waitForSameBlocksAt($height)")
-        Await.ready(AsyncHttpApi.waitForSameBlocksAt(nodes, 5.seconds, height), 5.minutes)
+        Await.ready(nodes.waitForSameBlocksAt(5.seconds, height), 5.minutes)
       }
     } yield ()
 

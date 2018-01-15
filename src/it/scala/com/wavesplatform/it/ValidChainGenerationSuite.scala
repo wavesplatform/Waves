@@ -1,7 +1,6 @@
 package com.wavesplatform.it
 
 import com.typesafe.config.Config
-import com.wavesplatform.it.api._
 import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.transactions.NodesFromDocker
 import org.scalatest._
@@ -32,7 +31,7 @@ class ValidChainGenerationSuite extends FreeSpec with WaitForHeight2
 
       rollbackNodes = Random.shuffle(nodes).take(n)
       _ <- traverse(rollbackNodes)(_.rollback(1))
-      _ <- AsyncHttpApi.waitForSameBlocksAt(nodes, 5.seconds, baseHeight)
+      _ <- nodes.waitForSameBlocksAt(5.seconds, baseHeight)
     } yield (), 7.minutes)
   }
 }

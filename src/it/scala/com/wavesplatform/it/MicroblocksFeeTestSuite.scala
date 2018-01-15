@@ -2,9 +2,9 @@ package com.wavesplatform.it
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.NodeConfigs.Default
+import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.util._
-import com.wavesplatform.it.api.AsyncHttpApi._
 import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers}
 import scorex.utils.ScorexLogging
 
