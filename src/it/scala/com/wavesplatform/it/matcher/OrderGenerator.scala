@@ -1,10 +1,11 @@
 package com.wavesplatform.it.matcher
 
-import com.wavesplatform.it.Node
+import com.wavesplatform.it.api.Node
 import com.wavesplatform.it.matcher.OrderExclusionTestSuite.MatcherFee
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
+
 import scala.concurrent.duration._
 
 

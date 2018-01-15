@@ -3,7 +3,7 @@ package com.wavesplatform.it
 import monix.eval.Coeval
 import org.scalatest.{BeforeAndAfterAll, Suite}
 
-trait HasDocker extends BeforeAndAfterAll {
+trait DockerBased extends BeforeAndAfterAll {
   this: Suite =>
   protected val dockerSingleton: Coeval[Docker] = Coeval.evalOnce(createDocker)
   protected final def docker: Docker = dockerSingleton()

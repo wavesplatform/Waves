@@ -3,7 +3,9 @@ package com.wavesplatform.it
 import java.util.concurrent.TimeoutException
 
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.api._
+import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.util._
 import org.scalatest._
 
@@ -12,8 +14,8 @@ import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
-class WideStateGenerationSuite extends FreeSpec with IntegrationNodesInitializationAndStopping
-  with Matchers with TransferSending with MultipleNodesApi {
+class WideStateGenerationSuite extends FreeSpec with WaitForHeight2
+  with Matchers with TransferSending with NodesFromDocker {
 
   override protected def createDocker: Docker = new Docker(
     suiteConfig = ConfigFactory.parseString(
@@ -55,7 +57,7 @@ class WideStateGenerationSuite extends FreeSpec with IntegrationNodesInitializat
 
       _ <- {
         log.debug(s"waitForSameBlocksAt($height)")
-        Await.ready(waitForSameBlocksAt(nodes, 5.seconds, height), 5.minutes)
+        Await.ready(nodes.waitForSameBlocksAt(5.seconds, height), 5.minutes)
       }
     } yield ()
 

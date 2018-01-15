@@ -1,7 +1,7 @@
 package com.wavesplatform.it
 
-import com.wavesplatform.it.api.MultipleNodesApi
-import com.wavesplatform.it.api.NodeApi.{AssetBalance, FullAssetInfo}
+import com.wavesplatform.it.api.AsyncHttpApi._
+import com.wavesplatform.it.api.Node
 import com.wavesplatform.it.util._
 import org.scalatest._
 import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
@@ -15,93 +15,37 @@ import scala.concurrent.{Await, Future}
 
 trait IntegrationSuiteWithThreeAddresses extends BeforeAndAfterAll with Matchers with ScalaFutures
   with IntegrationPatience with RecoverMethods with RequestErrorAssert with IntegrationTestsScheme
-  with MultipleNodesApi with HasNodes with ScorexLogging {
+  with Nodes with ScorexLogging {
   this: Suite =>
 
   def notMiner: Node
 
   protected def sender: Node = notMiner
 
-  private def richAddress = sender.address
-
-  protected val defaultBalance: Long = 100.waves
-
   protected lazy val firstAddress: String = Await.result(sender.createAddress, 2.minutes)
   protected lazy val secondAddress: String = Await.result(sender.createAddress, 2.minutes)
   protected lazy val thirdAddress: String = Await.result(sender.createAddress, 2.minutes)
 
-  protected def accountEffectiveBalance(acc: String): Future[Long] = sender.effectiveBalance(acc).map(_.balance)
-
-  protected def accountBalance(acc: String): Future[Long] = sender.balance(acc).map(_.balance)
-
-  protected def accountBalances(acc: String): Future[(Long, Long)] = {
-    sender.balance(acc).map(_.balance).zip(sender.effectiveBalance(acc).map(_.balance))
-  }
-
-  protected def assertBalances(acc: String, balance: Long, effectiveBalance: Long): Future[Unit] = {
-    for {
-      newBalance <- accountBalance(acc)
-      newEffectiveBalance <- accountEffectiveBalance(acc)
-    } yield {
-      withClue(s"effective balance of $acc") {
-        newEffectiveBalance shouldBe effectiveBalance
-      }
-      withClue(s"balance of $acc") {
-        newBalance shouldBe balance
-      }
-    }
-  }
-
-  protected def dumpBalances(node: Node, accounts: Seq[String], label: String): Future[Unit] = {
-    Future
-      .traverse(accounts) { acc =>
-        accountBalance(acc).zip(accountEffectiveBalance(acc)).map(acc -> _)
-      }
-      .map { info =>
-        val formatted = info
-          .map { case (account, (balance, effectiveBalance)) =>
-            f"$account: balance = $balance, effective = $effectiveBalance"
-          }
-          .mkString("\n")
-        log.debug(s"$label:\n$formatted")
-      }
-  }
-
-  // if we first await tx and then height + 1, it could be gone with height + 1
-  // if we first await height + 1 and then tx, it could be gone with height + 2
-  // so we await tx twice
-  protected def waitForHeightAraiseAndTxPresent(transactionId: String, heightIncreaseOn: Integer): Future[Unit] = for {
-    height <- traverse(nodes)(_.height).map(_.max)
-    _ <- waitForSameBlocksAt(nodes, 2.seconds, height)
-    _ <- traverse(nodes)(_.waitForTransaction(transactionId))
-    _ <- traverse(nodes)(_.waitForHeight(height + heightIncreaseOn))
-    _ <- traverse(nodes)(_.waitForTransaction(transactionId))
-  } yield ()
-
-  protected def waitForHeightAraise(heightIncreaseOn: Integer): Future[Unit] = for {
-    height <- traverse(nodes)(_.height).map(_.max)
-    _ <- traverse(nodes)(_.waitForHeight(height + heightIncreaseOn))
-  } yield ()
-
-
-  protected def assertAssetBalance(acc: String, assetIdString: String, balance: Long): Future[Unit] = {
-    assertAsset(acc, assetIdString)(_.balance shouldBe balance)
-  }
-
-  protected def assertAsset(acc: String, assetIdString: String)(assertion: AssetBalance => Unit): Future[Unit] = {
-    sender.assetBalance(acc, assetIdString).map(assertion)
-  }
-
-  protected def assertFullAssetInfo(acc: String, assetIdString: String)(assertion: FullAssetInfo => Unit): Future[Unit] = {
-    sender.assetsBalance(acc).map(fasi => {
-      val maybeAssetInfo = fasi.balances.find(_.assetId == assetIdString)
-      maybeAssetInfo.isEmpty shouldBe false
-      assertion(maybeAssetInfo.get)
-    })
-  }
-
-  abstract override def beforeAll(): Unit = {
+  abstract protected override def beforeAll(): Unit = {
     super.beforeAll()
+
+    val defaultBalance: Long = 100.waves
+
+    def dumpBalances(node: Node, accounts: Seq[String], label: String): Future[Unit] = {
+      Future
+        .traverse(accounts) { acc =>
+          notMiner.accountBalance(acc).zip(notMiner.accountEffectiveBalance(acc)).map(acc -> _)
+        }
+        .map { info =>
+          val formatted = info
+            .map { case (account, (balance, effectiveBalance)) =>
+              f"$account: balance = $balance, effective = $effectiveBalance"
+            }
+            .mkString("\n")
+          log.debug(s"$label:\n$formatted")
+        }
+    }
+
 
     def waitForTxsToReachAllNodes(txIds: Seq[String]): Future[_] = {
       val txNodePairs = for {
@@ -112,7 +56,7 @@ trait IntegrationSuiteWithThreeAddresses extends BeforeAndAfterAll with Matchers
     }
 
     def makeTransfers(accounts: Seq[String]): Future[Seq[String]] = traverse(accounts) { acc =>
-      sender.transfer(richAddress, acc, defaultBalance, sender.fee(TransactionType.TransferTransaction)).map(_.id)
+      sender.transfer(sender.address, acc, defaultBalance, sender.fee(TransactionType.TransferTransaction)).map(_.id)
     }
 
     val correctStartBalancesFuture = for {
@@ -131,7 +75,7 @@ trait IntegrationSuiteWithThreeAddresses extends BeforeAndAfterAll with Matchers
         Await.ready(waitForTxsToReachAllNodes(txs), 2.minute)
       }
       _ <- dumpBalances(sender, accounts, "after transfer")
-      _ <- traverse(accounts)(assertBalances(_, defaultBalance, defaultBalance))
+      _ <- traverse(accounts)(notMiner.assertBalances(_, defaultBalance, defaultBalance))
     } yield succeed
 
     withClue("beforeAll") {

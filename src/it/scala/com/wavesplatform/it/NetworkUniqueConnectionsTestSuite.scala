@@ -2,13 +2,14 @@ package com.wavesplatform.it
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.NetworkUniqueConnectionsTestSuite._
+import com.wavesplatform.it.api.AsyncHttpApi._
 import org.scalatest.{FreeSpec, Matchers}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent._
 import scala.concurrent.duration.DurationInt
 
-class NetworkUniqueConnectionsTestSuite extends FreeSpec with Matchers with HasDocker {
+class NetworkUniqueConnectionsTestSuite extends FreeSpec with Matchers with DockerBased {
 
   "nodes should up and connect with each other" in {
     val firstNode = docker.startNode(FirstNodeConfig)
