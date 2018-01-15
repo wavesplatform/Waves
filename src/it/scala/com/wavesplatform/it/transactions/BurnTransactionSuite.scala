@@ -18,13 +18,13 @@ class BurnTransactionSuite extends BaseTransactionSuite {
 
       issuedAssetId <- sender.issue(firstAddress, "name", "description", defaultQuantity, decimals, reissuable = false, fee = defaultFee).map(_.id)
 
-      _ <- waitForHeightAraiseAndTxPresent(issuedAssetId, 1)
+      _ <- waitForHeightAraiseAndTxPresent(issuedAssetId)
       _ <- assertBalances(firstAddress, balance - defaultFee, effectiveBalance - defaultFee)
         .zip(assertAssetBalance(firstAddress, issuedAssetId, defaultQuantity))
 
       burnId <- sender.burn(firstAddress, issuedAssetId, defaultQuantity / 2, fee = defaultFee).map(_.id)
 
-      _ <- waitForHeightAraiseAndTxPresent(burnId, 1)
+      _ <- waitForHeightAraiseAndTxPresent(burnId)
       _ <- assertBalances(firstAddress, balance - 2 * defaultFee, effectiveBalance - 2 * defaultFee)
         .zip(assertAssetBalance(firstAddress, issuedAssetId, defaultQuantity / 2))
 

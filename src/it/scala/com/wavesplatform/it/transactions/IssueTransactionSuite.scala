@@ -22,7 +22,7 @@ class IssueTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
 
       issuedAssetId <- sender.issue(firstAddress, assetName, assetDescription, defaultQuantity, 2, reissuable = true, assetFee).map(_.id)
 
-      _ <- waitForHeightAraiseAndTxPresent(issuedAssetId, 1)
+      _ <- waitForHeightAraiseAndTxPresent(issuedAssetId)
 
       _ <- assertBalances(firstAddress, firstAddressBalance - assetFee, firstAddressEffectiveBalance - assetFee)
         .zip(assertAssetBalance(firstAddress, issuedAssetId, defaultQuantity))
@@ -39,11 +39,11 @@ class IssueTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
       (firstAddressBalance, firstAddressEffectiveBalance) <- accountBalance(firstAddress).zip(accountEffectiveBalance(firstAddress))
 
       issuedAssetId <- sender.issue(firstAddress, assetName, assetDescription, defaultQuantity, 2, reissuable = false, assetFee).map(_.id)
-      _ <- waitForHeightAraiseAndTxPresent(issuedAssetId, 1)
+      _ <- waitForHeightAraiseAndTxPresent(issuedAssetId)
 
       issuedAssetId <- sender.issue(firstAddress, assetName, assetDescription, defaultQuantity, 2, reissuable = true, assetFee).map(_.id)
 
-      _ <- waitForHeightAraiseAndTxPresent(issuedAssetId, 1)
+      _ <- waitForHeightAraiseAndTxPresent(issuedAssetId)
 
       _ <- assertAssetBalance(firstAddress, issuedAssetId, defaultQuantity)
         .zip(assertBalances(firstAddress, firstAddressBalance - 2 * assetFee, firstAddressEffectiveBalance - 2 * assetFee))

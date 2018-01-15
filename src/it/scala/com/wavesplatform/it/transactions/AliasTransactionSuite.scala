@@ -23,14 +23,14 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
       aliasTxId <- sender.createAlias(firstAddress, alias, aliasFee).map(_.id)
 
 
-      _ <- waitForHeightAraiseAndTxPresent(aliasTxId, 1)
+      _ <- waitForHeightAraiseAndTxPresent(aliasTxId)
 
       _ <- assertBalances(firstAddress, balance - aliasFee, effectiveBalance - aliasFee)
       transferId <- sender.transfer(firstAddress
         , s"alias:${sender.settings.blockchainSettings.addressSchemeCharacter}:$alias"
         , transferAmount, transferFee).map(_.id)
 
-      _ <- waitForHeightAraiseAndTxPresent(transferId, 1)
+      _ <- waitForHeightAraiseAndTxPresent(transferId)
 
       _ <- assertBalances(firstAddress
         , balance - transferFee - aliasFee
@@ -46,7 +46,7 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
       (balance, effectiveBalance) <- accountBalances(firstAddress)
       aliasTxId <- sender.createAlias(firstAddress, alias, aliasFee).map(_.id)
 
-      _ <- waitForHeightAraiseAndTxPresent(aliasTxId, 1)
+      _ <- waitForHeightAraiseAndTxPresent(aliasTxId)
       newBalance = balance - aliasFee
       newEffectiveBalance = effectiveBalance - aliasFee
 
@@ -66,7 +66,7 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
 
       aliasTxId <- sender.createAlias(firstAddress, alias, aliasFee).map(_.id)
 
-      _ <- waitForHeightAraiseAndTxPresent(aliasTxId, 1)
+      _ <- waitForHeightAraiseAndTxPresent(aliasTxId)
       _ <- assertBadRequestAndMessage(sender.createAlias(secondAddress, alias, aliasFee), "already in the state")
       _ <- assertBalances(firstAddress, balance - aliasFee, effectiveBalance - aliasFee)
     } yield succeed
@@ -83,7 +83,7 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
       (balance, effectiveBalance) <- accountBalances(secondAddress)
 
       aliasFirstTxId <- sender.createAlias(secondAddress, firstAlias, aliasFee).map(_.id)
-      _ <- waitForHeightAraiseAndTxPresent(aliasFirstTxId, 1)
+      _ <- waitForHeightAraiseAndTxPresent(aliasFirstTxId)
 
       newBalance = balance - aliasFee
       newEffectiveBalance = effectiveBalance - aliasFee
@@ -92,7 +92,7 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
 
       aliasSecondTxId <- sender.createAlias(secondAddress, secondAlias, aliasFee).map(_.id)
 
-      _ <- waitForHeightAraiseAndTxPresent(aliasSecondTxId, 1)
+      _ <- waitForHeightAraiseAndTxPresent(aliasSecondTxId)
       _ <- assertBalances(secondAddress, newBalance - aliasFee, newEffectiveBalance - aliasFee)
 
       aliasesList <- sender.aliasByAddress(secondAddress)
@@ -110,7 +110,7 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
     val f = for {
       balance <- accountBalance(firstAddress)
       aliasFirstTxId <- sender.createAlias(firstAddress, alias, aliasFee).map(_.id)
-      _ <- waitForHeightAraiseAndTxPresent(aliasFirstTxId, 1)
+      _ <- waitForHeightAraiseAndTxPresent(aliasFirstTxId)
       addressByAlias <- sender.addressByAlias(alias).map(_.address)
     } yield {
       addressByAlias should be(firstAddress)
@@ -132,7 +132,7 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
       val f = for {
         (balance, effectiveBalance) <- accountBalances(secondAddress)
         aliasTxId <- sender.createAlias(secondAddress, alias, aliasFee).map(_.id)
-        _ <- waitForHeightAraiseAndTxPresent(aliasTxId, 1)
+        _ <- waitForHeightAraiseAndTxPresent(aliasTxId)
         _ <- assertBalances(secondAddress, balance - aliasFee, effectiveBalance - aliasFee)
 
       } yield succeed
@@ -171,13 +171,13 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
         .zip(accountBalances(thirdAddress))
 
       aliasTxId <- sender.createAlias(thirdAddress, thirdAddressAlias, aliasFee).map(_.id)
-      _ <- waitForHeightAraiseAndTxPresent(aliasTxId, 1)
+      _ <- waitForHeightAraiseAndTxPresent(aliasTxId)
 
       //lease maximum value, to pass next test
       leasingAmount = firstAddressBalance - leasingFee - 0.5.waves
 
       leasingTx <- sender.lease(firstAddress, buildedThirdAddressAlias, leasingAmount, leasingFee).map(_.id)
-      _ <- waitForHeightAraiseAndTxPresent(leasingTx, 1)
+      _ <- waitForHeightAraiseAndTxPresent(leasingTx)
 
       _ <- assertBalances(firstAddress, firstAddressBalance - leasingFee, firstAddressEffectiveBalance - leasingAmount - leasingFee)
         .zip(assertBalances(thirdAddress, thirdAddressBalance - aliasFee, thirdAddressEffectiveBalance - aliasFee + leasingAmount))

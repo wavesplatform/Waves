@@ -18,7 +18,7 @@ class TransactionsApiSuite extends BaseTransactionSuite {
   test("height should always be reported for transactions") {
     val f = for {
       txId <- sender.transfer(firstAddress, secondAddress, 1.waves, fee = 1.waves).map(_.id)
-      _ <- waitForHeightAraiseAndTxPresent(txId, 1)
+      _ <- waitForHeightAraiseAndTxPresent(txId)
 
       jsv1 <- sender.get(s"/transactions/info/$txId").as[JsValue]
       hasPositiveHeight1 = (jsv1 \ "height").asOpt[Int].map(_ > 0)
@@ -144,7 +144,7 @@ class TransactionsApiSuite extends BaseTransactionSuite {
       _ = assert(rb.getStatusCode == HttpConstants.ResponseStatusCodes.OK_200)
       id = (Json.parse(rb.getResponseBody) \ "id").as[String]
       _ = assert(id.nonEmpty)
-      _ <- waitForHeightAraiseAndTxPresent(id, 1)
+      _ <- waitForHeightAraiseAndTxPresent(id)
     } yield id
 
     Await.result(f, timeout)

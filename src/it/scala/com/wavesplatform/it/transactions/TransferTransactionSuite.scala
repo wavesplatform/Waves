@@ -28,12 +28,12 @@ class TransferTransactionSuite extends BaseTransactionSuite with TransferSending
         .zip(accountBalances(secondAddress))
 
       issuedAssetId <- sender.issue(firstAddress, "name", "description", defaultAssetQuantity, 2, reissuable = false, issueFee).map(_.id)
-      _ <- waitForHeightAraiseAndTxPresent(issuedAssetId, 1)
+      _ <- waitForHeightAraiseAndTxPresent(issuedAssetId)
       _ <- assertBalances(firstAddress, firstBalance - issueFee, firstEffBalance - issueFee)
         .zip(assertAssetBalance(firstAddress, issuedAssetId, defaultAssetQuantity))
 
       transferTransactionId <- sender.transfer(firstAddress, secondAddress, defaultAssetQuantity, transferFee, Some(issuedAssetId)).map(_.id)
-      _ <- waitForHeightAraiseAndTxPresent(transferTransactionId, 1)
+      _ <- waitForHeightAraiseAndTxPresent(transferTransactionId)
       _ <- assertBalances(firstAddress, firstBalance - transferFee - issueFee, firstEffBalance - transferFee - issueFee)
         .zip(assertBalances(secondAddress, secondBalance, secondEffBalance))
         .zip(assertAssetBalance(firstAddress, issuedAssetId, 0))
@@ -49,7 +49,7 @@ class TransferTransactionSuite extends BaseTransactionSuite with TransferSending
         .zip(accountBalances(secondAddress))
 
       transferId <- sender.transfer(firstAddress, secondAddress, transferAmount, transferFee).map(_.id)
-      _ <- waitForHeightAraiseAndTxPresent(transferId, 1)
+      _ <- waitForHeightAraiseAndTxPresent(transferId)
       _ <- assertBalances(firstAddress, firstBalance - transferAmount - transferFee, firstEffBalance - transferAmount - transferFee)
         .zip(assertBalances(secondAddress, secondBalance + transferAmount, secondEffBalance + transferAmount))
     } yield succeed
@@ -133,7 +133,7 @@ class TransferTransactionSuite extends BaseTransactionSuite with TransferSending
         .zip(accountBalances(secondAddress))
 
       createdLeaseTxId <- sender.lease(firstAddress, secondAddress, leasingAmount, leasingFee).map(_.id)
-      _ <- waitForHeightAraiseAndTxPresent(createdLeaseTxId, 1)
+      _ <- waitForHeightAraiseAndTxPresent(createdLeaseTxId)
 
       _ <- assertBalances(firstAddress, firstBalance - leasingFee, firstEffBalance - leasingAmount - leasingFee)
         .zip(assertBalances(secondAddress, secondBalance, secondEffBalance + leasingAmount))
@@ -158,7 +158,7 @@ class TransferTransactionSuite extends BaseTransactionSuite with TransferSending
 
       createdLeaseTxId <- sender.lease(firstAddress, secondAddress, leasingAmount, fee = leasingFee).map(_.id)
 
-      _ <- waitForHeightAraiseAndTxPresent(createdLeaseTxId, 1)
+      _ <- waitForHeightAraiseAndTxPresent(createdLeaseTxId)
 
       _ <- assertBalances(firstAddress, firstBalance - leasingFee, firstEffBalance - leasingAmount - leasingFee)
         .zip(assertBalances(secondAddress, secondBalance, secondEffBalance + leasingAmount))
@@ -184,7 +184,7 @@ class TransferTransactionSuite extends BaseTransactionSuite with TransferSending
 
       assetId <- sender.issue(firstAddress, "second asset", "description", defaultAssetQuantity, 0, reissuable = false, fee = issueFee).map(_.id)
 
-      _ <- waitForHeightAraiseAndTxPresent(assetId, 1)
+      _ <- waitForHeightAraiseAndTxPresent(assetId)
 
       _ <- assertBalances(firstAddress, firstBalance - issueFee, firstEffBalance - issueFee)
         .zip(assertAssetBalance(firstAddress, assetId, defaultAssetQuantity))

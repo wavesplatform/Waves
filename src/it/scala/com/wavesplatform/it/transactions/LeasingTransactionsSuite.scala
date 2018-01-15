@@ -24,7 +24,7 @@ class LeasingTransactionsSuite extends BaseTransactionSuite with CancelAfterFail
         .zip(accountBalances(secondAddress))
 
       createdLeaseTxId <- sender.lease(firstAddress, secondAddress, leasingAmount, fee = defaultFee).map(_.id)
-      _ <- waitForHeightAraiseAndTxPresent(createdLeaseTxId, 1)
+      _ <- waitForHeightAraiseAndTxPresent(createdLeaseTxId)
       _ <- assertBalances(firstAddress, firstBalance - defaultFee, firstEffBalance - leasingAmount - defaultFee)
         .zip(assertBalances(secondAddress, secondBalance, secondEffBalance + leasingAmount))
     } yield succeed
@@ -82,7 +82,7 @@ class LeasingTransactionsSuite extends BaseTransactionSuite with CancelAfterFail
 
       createdLeaseTxId <- sender.lease(firstAddress, secondAddress, leasingAmount, fee = defaultFee).map(_.id)
 
-      _ <- waitForHeightAraiseAndTxPresent(createdLeaseTxId, 1)
+      _ <- waitForHeightAraiseAndTxPresent(createdLeaseTxId)
       _ <- assertBalances(firstAddress, firstBalance - defaultFee, firstEffBalance - leasingAmount - defaultFee)
         .zip(assertBalances(secondAddress, secondBalance, secondEffBalance + leasingAmount))
 
@@ -90,7 +90,7 @@ class LeasingTransactionsSuite extends BaseTransactionSuite with CancelAfterFail
       _ = assert(status1 == Active)
 
       createdCancelLeaseTxId <- sender.cancelLease(firstAddress, createdLeaseTxId, fee = defaultFee).map(_.id)
-      _ <- waitForHeightAraiseAndTxPresent(createdCancelLeaseTxId, 1)
+      _ <- waitForHeightAraiseAndTxPresent(createdCancelLeaseTxId)
       _ <- assertBalances(firstAddress, firstBalance - 2 * defaultFee, firstEffBalance - 2 * defaultFee)
         .zip(assertBalances(secondAddress, secondBalance, secondEffBalance))
 
@@ -107,12 +107,12 @@ class LeasingTransactionsSuite extends BaseTransactionSuite with CancelAfterFail
         .zip(accountBalances(secondAddress))
 
       createdLeasingTxId <- sender.lease(firstAddress, secondAddress, leasingAmount, fee = defaultFee).map(_.id)
-      _ <- waitForHeightAraiseAndTxPresent(createdLeasingTxId, 1)
+      _ <- waitForHeightAraiseAndTxPresent(createdLeasingTxId)
       _ <- assertBalances(firstAddress, firstBalance - defaultFee, firstEffBalance - leasingAmount - defaultFee)
         .zip(assertBalances(secondAddress, secondBalance, secondEffBalance + leasingAmount))
 
       createdCancelLeaseTxId <- sender.cancelLease(firstAddress, createdLeasingTxId, fee = defaultFee).map(_.id)
-      _ <- waitForHeightAraiseAndTxPresent(createdCancelLeaseTxId, 1)
+      _ <- waitForHeightAraiseAndTxPresent(createdCancelLeaseTxId)
       _ <- assertBadRequest(sender.cancelLease(firstAddress, createdLeasingTxId, fee = defaultFee).map(_.id))
       _ <- assertBalances(firstAddress, firstBalance - 2 * defaultFee, firstEffBalance - 2 * defaultFee)
         .zip(assertBalances(secondAddress, secondBalance, secondEffBalance))

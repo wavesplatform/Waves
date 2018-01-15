@@ -18,7 +18,7 @@ class PaymentTransactionSuite extends BaseTransactionSuite {
         .zip(accountBalances(secondAddress))
 
       transferId <- sender.payment(firstAddress, secondAddress, paymentAmount, defaulFee).map(_.id)
-      _ <- waitForHeightAraiseAndTxPresent(transferId, 1)
+      _ <- waitForHeightAraiseAndTxPresent(transferId)
       _ <- assertBalances(firstAddress, firstBalance - paymentAmount - defaulFee, firstEffBalance - paymentAmount - defaulFee)
         .zip(assertBalances(secondAddress, secondBalance + paymentAmount, secondEffBalance + paymentAmount))
     } yield succeed
