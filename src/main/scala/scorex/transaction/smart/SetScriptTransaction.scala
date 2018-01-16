@@ -6,7 +6,6 @@ import monix.eval.Coeval
 import play.api.libs.json.Json
 import scorex.account._
 import scorex.crypto.encode.Base58
-import scorex.crypto.hash.FastCryptographicHash
 import scorex.serialization.{BytesSerializable, Deser}
 import scorex.transaction.TransactionParser.{KeyLength, TransactionType}
 import scorex.transaction.ValidationError.GenericError
@@ -19,15 +18,14 @@ case class SetScriptTransaction private(version: Byte,
                                         script: Script,
                                         fee: Long,
                                         timestamp: Long,
-                                        proof: ByteStr) extends Transaction with Proven {
+                                        proof: ByteStr) extends ProvenTransaction {
 
-  val toSign: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(version),
+  val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(version),
     sender.publicKey,
     BytesSerializable.arrayWithSize(script.bytes().arr),
     Longs.toByteArray(fee),
     Longs.toByteArray(timestamp)))
 
-  override val id = toSign.map(bytes => ByteStr(FastCryptographicHash(bytes)))
   override val transactionType = TransactionType.SetScriptTransaction
 
   override val assetFee = (None, fee)
@@ -41,7 +39,7 @@ case class SetScriptTransaction private(version: Byte,
     "proof" -> proof.base58)
   )
 
-  override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(transactionType.id.toByte), toSign(), BytesSerializable.arrayWithSize(proof.arr)))
+  override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(transactionType.id.toByte), bodyBytes(), BytesSerializable.arrayWithSize(proof.arr)))
 }
 
 object SetScriptTransaction {

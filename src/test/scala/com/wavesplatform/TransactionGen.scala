@@ -174,6 +174,12 @@ trait TransactionGen {
   } yield TransferTransaction.create(assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment).right.get)
     .label("transferTransaction")
 
+  val scriptTransferGen = (for {
+    (assetId, sender, recipient, amount, timestamp, _, feeAmount, attachment) <- transferParamGen
+    proof <- genBoundedBytes(0, 256)
+  } yield ScriptTransferTransaction.create(1, assetId, sender, recipient, amount, timestamp, feeAmount, attachment,ByteStr(proof)).right.get)
+  .label("scriptTransferTransaction")
+
   val transferWithWavesFeeGen = for {
     (assetId, sender, recipient, amount, timestamp, _, feeAmount, attachment) <- transferParamGen
   } yield TransferTransaction.create(assetId, sender, recipient, amount, timestamp, None, feeAmount, attachment).right.get

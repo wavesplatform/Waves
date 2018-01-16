@@ -8,6 +8,6 @@ object ScriptValidator {
   def verify[T <: Transaction](script: Script, transaction: T): Either[ValidationError, T] = Right(transaction)
 
   def verifyAsEllipticCurveSignature[TP <: ProvenTransaction](transaction: TP): Either[ValidationError, TP] = transaction match {
-    case sc: SetScriptTransaction => Either.cond(EllipticCurveImpl.verify(sc.proof.arr, sc.toSign(), sc.sender.publicKey), transaction, InvalidProof(sc))
+    case sc: SetScriptTransaction => Either.cond(EllipticCurveImpl.verify(sc.proof.arr, sc.bodyBytes(), sc.sender.publicKey), transaction, InvalidProof(sc))
   }
 }
