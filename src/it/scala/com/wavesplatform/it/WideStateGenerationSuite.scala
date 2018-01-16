@@ -35,22 +35,29 @@ class WideStateGenerationSuite extends FreeSpec with WaitForHeight2
     tag = getClass.getSimpleName
   )
 
-  override protected def nodeConfigs: Seq[Config] = NodeConfigs.newBuilder
+  override protected val nodeConfigs: Seq[Config] = NodeConfigs.newBuilder
     .overrideBase(_.quorum(3))
-    .withDefault(3)
-    .withSpecial(_.nonMiner)
+    .withDefault(2)
+    .withSpecial(2, _.nonMiner)
     .buildNonConflicting()
+
+  private val nodeAddresses = nodeConfigs.map(_.getString("address")).toSet
+  private val restAccounts = NodeConfigs.Default
+    .map(_.getString("address"))
+    .filterNot(x => nodeConfigs.exists(_.getString("address") == x))
+    .toSet
 
   private val requestsCount = 10000
 
   "Generate a lot of transactions and synchronise" in {
     val test = for {
       b <- dumpBalances()
-      lastTx <- processRequests(generateTransfersToRandomAddresses(requestsCount / 2, b) ++ generateTransfersBetweenAccounts(requestsCount / 2, b))
+      txs <- processRequests(generateTransfersToRandomAddresses(requestsCount / 2, nodeAddresses) ++
+        generateTransfersBetweenAccounts(requestsCount / 2, b))
 
       _ <- {
-        log.debug(s"Wait a transaction ${lastTx.get.id} is in blockchain")
-        Await.ready(traverse(nodes)(_.waitForTransaction(lastTx.get.id, retryInterval = 10.seconds)), 5.minutes)
+        log.debug(s"Wait a transaction ${txs.last.id} is in blockchain")
+        Await.ready(traverse(nodes)(_.waitForTransaction(txs.last.id, retryInterval = 10.seconds)), 5.minutes)
       }
 
       height <- traverse(nodes)(_.height).map(_.max)
@@ -76,11 +83,17 @@ class WideStateGenerationSuite extends FreeSpec with WaitForHeight2
     Await.result(testWithDumps, 16.minutes)
   }
 
-  private def dumpBalances(): Future[Map[String, Long]] = traverse(nodes)(balanceForNode).map(_.toMap).map { r =>
-    log.debug(
-      s"""Balances:
-         |${r.map { case (account, balance) => s"$account -> $balance" }.mkString("\n")}""".stripMargin)
-    r
+  private def dumpBalances(): Future[Map[Config, Long]] = {
+    traverse(nodeConfigs) { config =>
+      nodes.head.balance(config.getString("address")).map(x => (config, x.balance))
+    }
+      .map(_.toMap)
+      .map { r =>
+        log.debug(
+          s"""Balances:
+             |${r.map { case (config, balance) => s"${config.getString("address")} -> $balance" }.mkString("\n")}""".stripMargin)
+        r
+      }
   }
 
   private def dumpBlockChain(node: Node): Future[String] = {

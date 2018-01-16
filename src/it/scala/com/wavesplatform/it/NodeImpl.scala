@@ -45,6 +45,7 @@ object NodeImpl {
     ),
     Dsl.asyncHttpClient()
   ) {
-    override val restAddress: String = config.getString("hostname")
+    override val restAddress: String = Option(config.getString("hostname"))
+      .getOrElse(throw new IllegalArgumentException("hostname is not specified"))
   }
 }
