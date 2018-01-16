@@ -1,5 +1,6 @@
 package com.wavesplatform.it.transactions
 
+import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.util._
 import org.scalatest.CancelAfterFailure
 import play.api.libs.json.Json
@@ -19,13 +20,13 @@ class LeasingTransactionsSuite extends BaseTransactionSuite with CancelAfterFail
     val f = for {
       height <- traverse(nodes)(_.height).map(_.max)
       _ <- traverse(nodes)(_.waitForHeight(height + 1))
-      ((firstBalance, firstEffBalance), (secondBalance, secondEffBalance)) <- accountBalances(firstAddress)
-        .zip(accountBalances(secondAddress))
+      ((firstBalance, firstEffBalance), (secondBalance, secondEffBalance)) <- notMiner.accountBalances(firstAddress)
+        .zip(notMiner.accountBalances(secondAddress))
 
       createdLeaseTxId <- sender.lease(firstAddress, secondAddress, leasingAmount, fee = defaultFee).map(_.id)
-      _ <- waitForHeightAraiseAndTxPresent(createdLeaseTxId, 1)
-      _ <- assertBalances(firstAddress, firstBalance - defaultFee, firstEffBalance - leasingAmount - defaultFee)
-        .zip(assertBalances(secondAddress, secondBalance, secondEffBalance + leasingAmount))
+      _ <- nodes.waitForHeightAraiseAndTxPresent(createdLeaseTxId)
+      _ <- notMiner.assertBalances(firstAddress, firstBalance - defaultFee, firstEffBalance - leasingAmount - defaultFee)
+        .zip(notMiner.assertBalances(secondAddress, secondBalance, secondEffBalance + leasingAmount))
     } yield succeed
 
     Await.result(f, waitCompletion)
@@ -35,16 +36,16 @@ class LeasingTransactionsSuite extends BaseTransactionSuite with CancelAfterFail
     val f = for {
       fb <- traverse(nodes)(_.height).map(_.min)
 
-      ((firstBalance, firstEffBalance), (secondBalance, secondEffBalance)) <- accountBalances(firstAddress)
-        .zip(accountBalances(secondAddress))
+      ((firstBalance, firstEffBalance), (secondBalance, secondEffBalance)) <- notMiner.accountBalances(firstAddress)
+        .zip(notMiner.accountBalances(secondAddress))
 
       //secondAddress effective balance more than general balance
       leaseFailureAssertion <- assertBadRequest(sender.lease(secondAddress, firstAddress, secondBalance + 1.waves, defaultFee))
 
       _ <- traverse(nodes)(_.waitForHeight(fb + 2))
 
-      _ <- assertBalances(firstAddress, firstBalance, firstEffBalance)
-        .zip(assertBalances(secondAddress, secondBalance, secondEffBalance))
+      _ <- notMiner.assertBalances(firstAddress, firstBalance, firstEffBalance)
+        .zip(notMiner.assertBalances(secondAddress, secondBalance, secondEffBalance))
     } yield leaseFailureAssertion
 
     Await.result(f, waitCompletion)
@@ -54,15 +55,15 @@ class LeasingTransactionsSuite extends BaseTransactionSuite with CancelAfterFail
     val f = for {
       fb <- traverse(nodes)(_.height).map(_.min)
 
-      ((firstBalance, firstEffBalance), (secondBalance, secondEffBalance)) <- accountBalances(firstAddress)
-        .zip(accountBalances(secondAddress))
+      ((firstBalance, firstEffBalance), (secondBalance, secondEffBalance)) <- notMiner.accountBalances(firstAddress)
+        .zip(notMiner.accountBalances(secondAddress))
 
       transferFailureAssertion <- assertBadRequest(sender.lease(firstAddress, secondAddress, firstEffBalance, fee = defaultFee))
 
       _ <- traverse(nodes)(_.waitForHeight(fb + 2))
 
-      _ <- assertBalances(firstAddress, firstBalance, firstEffBalance)
-        .zip(assertBalances(secondAddress, secondBalance, secondEffBalance))
+      _ <- notMiner.assertBalances(firstAddress, firstBalance, firstEffBalance)
+        .zip(notMiner.assertBalances(secondAddress, secondBalance, secondEffBalance))
     } yield transferFailureAssertion
 
     Await.result(f, waitCompletion)
@@ -76,22 +77,22 @@ class LeasingTransactionsSuite extends BaseTransactionSuite with CancelAfterFail
     }
 
     val f = for {
-      ((firstBalance, firstEffBalance), (secondBalance, secondEffBalance)) <- accountBalances(firstAddress)
-        .zip(accountBalances(secondAddress))
+      ((firstBalance, firstEffBalance), (secondBalance, secondEffBalance)) <- notMiner.accountBalances(firstAddress)
+        .zip(notMiner.accountBalances(secondAddress))
 
       createdLeaseTxId <- sender.lease(firstAddress, secondAddress, leasingAmount, fee = defaultFee).map(_.id)
 
-      _ <- waitForHeightAraiseAndTxPresent(createdLeaseTxId, 1)
-      _ <- assertBalances(firstAddress, firstBalance - defaultFee, firstEffBalance - leasingAmount - defaultFee)
-        .zip(assertBalances(secondAddress, secondBalance, secondEffBalance + leasingAmount))
+      _ <- nodes.waitForHeightAraiseAndTxPresent(createdLeaseTxId)
+      _ <- notMiner.assertBalances(firstAddress, firstBalance - defaultFee, firstEffBalance - leasingAmount - defaultFee)
+        .zip(notMiner.assertBalances(secondAddress, secondBalance, secondEffBalance + leasingAmount))
 
       status1 <- status(createdLeaseTxId)
       _ = assert(status1 == Active)
 
       createdCancelLeaseTxId <- sender.cancelLease(firstAddress, createdLeaseTxId, fee = defaultFee).map(_.id)
-      _ <- waitForHeightAraiseAndTxPresent(createdCancelLeaseTxId, 1)
-      _ <- assertBalances(firstAddress, firstBalance - 2 * defaultFee, firstEffBalance - 2 * defaultFee)
-        .zip(assertBalances(secondAddress, secondBalance, secondEffBalance))
+      _ <- nodes.waitForHeightAraiseAndTxPresent(createdCancelLeaseTxId)
+      _ <- notMiner.assertBalances(firstAddress, firstBalance - 2 * defaultFee, firstEffBalance - 2 * defaultFee)
+        .zip(notMiner.assertBalances(secondAddress, secondBalance, secondEffBalance))
 
       status2 <- status(createdLeaseTxId)
       _ = assert(status2 == Canceled)
@@ -102,19 +103,19 @@ class LeasingTransactionsSuite extends BaseTransactionSuite with CancelAfterFail
 
   test("lease cancellation can be done only once") {
     val f = for {
-      ((firstBalance, firstEffBalance), (secondBalance, secondEffBalance)) <- accountBalances(firstAddress)
-        .zip(accountBalances(secondAddress))
+      ((firstBalance, firstEffBalance), (secondBalance, secondEffBalance)) <- notMiner.accountBalances(firstAddress)
+        .zip(notMiner.accountBalances(secondAddress))
 
       createdLeasingTxId <- sender.lease(firstAddress, secondAddress, leasingAmount, fee = defaultFee).map(_.id)
-      _ <- waitForHeightAraiseAndTxPresent(createdLeasingTxId, 1)
-      _ <- assertBalances(firstAddress, firstBalance - defaultFee, firstEffBalance - leasingAmount - defaultFee)
-        .zip(assertBalances(secondAddress, secondBalance, secondEffBalance + leasingAmount))
+      _ <- nodes.waitForHeightAraiseAndTxPresent(createdLeasingTxId)
+      _ <- notMiner.assertBalances(firstAddress, firstBalance - defaultFee, firstEffBalance - leasingAmount - defaultFee)
+        .zip(notMiner.assertBalances(secondAddress, secondBalance, secondEffBalance + leasingAmount))
 
       createdCancelLeaseTxId <- sender.cancelLease(firstAddress, createdLeasingTxId, fee = defaultFee).map(_.id)
-      _ <- waitForHeightAraiseAndTxPresent(createdCancelLeaseTxId, 1)
+      _ <- nodes.waitForHeightAraiseAndTxPresent(createdCancelLeaseTxId)
       _ <- assertBadRequest(sender.cancelLease(firstAddress, createdLeasingTxId, fee = defaultFee).map(_.id))
-      _ <- assertBalances(firstAddress, firstBalance - 2 * defaultFee, firstEffBalance - 2 * defaultFee)
-        .zip(assertBalances(secondAddress, secondBalance, secondEffBalance))
+      _ <- notMiner.assertBalances(firstAddress, firstBalance - 2 * defaultFee, firstEffBalance - 2 * defaultFee)
+        .zip(notMiner.assertBalances(secondAddress, secondBalance, secondEffBalance))
     } yield succeed
 
     Await.result(f, waitCompletion)
@@ -122,8 +123,8 @@ class LeasingTransactionsSuite extends BaseTransactionSuite with CancelAfterFail
 
   test("only sender can cancel lease transaction") {
     val f = for {
-      ((firstBalance, firstEffBalance), (secondBalance, secondEffBalance)) <- accountBalances(firstAddress)
-        .zip(accountBalances(secondAddress))
+      ((firstBalance, firstEffBalance), (secondBalance, secondEffBalance)) <- notMiner.accountBalances(firstAddress)
+        .zip(notMiner.accountBalances(secondAddress))
 
       createdLeaseTxId <- sender.lease(firstAddress, secondAddress, leasingAmount, fee = defaultFee).map(_.id)
 
@@ -131,8 +132,8 @@ class LeasingTransactionsSuite extends BaseTransactionSuite with CancelAfterFail
       _ <- traverse(nodes)(_.waitForHeight(height + 1))
       _ <- traverse(nodes)(_.waitForTransaction(createdLeaseTxId))
 
-      _ <- assertBalances(firstAddress, firstBalance - defaultFee, firstEffBalance - leasingAmount - defaultFee)
-        .zip(assertBalances(secondAddress, secondBalance, secondEffBalance + leasingAmount))
+      _ <- notMiner.assertBalances(firstAddress, firstBalance - defaultFee, firstEffBalance - leasingAmount - defaultFee)
+        .zip(notMiner.assertBalances(secondAddress, secondBalance, secondEffBalance + leasingAmount))
 
       _ <- assertBadRequest(sender.cancelLease(thirdAddress, createdLeaseTxId, fee = defaultFee))
     } yield succeed
@@ -144,10 +145,10 @@ class LeasingTransactionsSuite extends BaseTransactionSuite with CancelAfterFail
     val f = for {
       fb <- traverse(nodes)(_.height).map(_.min)
 
-      (firstBalance, firstEffBalance) <- accountBalances(firstAddress)
+      (firstBalance, firstEffBalance) <- notMiner.accountBalances(firstAddress)
       transferFailureAssertion <- assertBadRequest(sender.lease(firstAddress, firstAddress, firstBalance + 1.waves, fee = defaultFee))
       _ <- traverse(nodes)(_.waitForHeight(fb + 2))
-      _ <- assertBalances(firstAddress, firstBalance, firstEffBalance)
+      _ <- notMiner.assertBalances(firstAddress, firstBalance, firstEffBalance)
     } yield transferFailureAssertion
 
     Await.result(f, waitCompletion)

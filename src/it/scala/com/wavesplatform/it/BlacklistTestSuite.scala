@@ -1,17 +1,17 @@
 package com.wavesplatform.it
 
 import com.typesafe.config.Config
-import com.wavesplatform.it.api.MultipleNodesApi
-import com.wavesplatform.it.api.NodeApi.BlacklistedPeer
+import com.wavesplatform.it.api.AsyncHttpApi._
+import com.wavesplatform.it.api.Node.BlacklistedPeer
+import com.wavesplatform.it.transactions.NodesFromDocker
 import org.scalatest._
 
+import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
-import scala.concurrent.Await
 
-class BlacklistTestSuite extends FreeSpec with Matchers with CancelAfterFailure with ReportingTestName
-  with MultipleNodesApi {
+class BlacklistTestSuite extends FreeSpec with Matchers with CancelAfterFailure with ReportingTestName with NodesFromDocker {
 
   override protected def nodeConfigs: Seq[Config] = NodeConfigs.newBuilder
     .overrideBase(_.quorum(2))
@@ -29,7 +29,7 @@ class BlacklistTestSuite extends FreeSpec with Matchers with CancelAfterFailure 
     for {
       _ <- traverse(otherNodes) { n => primaryNode.blacklist(n.nodeInfo.networkIpAddress, n.nodeInfo.hostNetworkPort) }
       expectedBlacklistedPeers = nodes.size - 1
-      _ <- primaryNode.waitFor[Seq[BlacklistedPeer]](s"blacklistedPeers.size == $expectedBlacklistedPeers")(_.blacklistedPeers, _.size == expectedBlacklistedPeers, 1.second)
+      _ <- primaryNode.waitFor[Seq[BlacklistedPeer]](s"blacklistedPeers.size == $expectedBlacklistedPeers")(_.blacklistedPeers, _.lengthCompare(expectedBlacklistedPeers) == 0, 1.second)
     } yield (),
     1.minute
   )
@@ -42,7 +42,7 @@ class BlacklistTestSuite extends FreeSpec with Matchers with CancelAfterFailure 
   "and sync again" in Await.result(
     for {
       baseHeight <- traverse(nodes)(_.height).map(_.max)
-      _ <- waitForSameBlocksAt(nodes, 5.seconds, baseHeight + 5)
+      _ <- nodes.waitForSameBlocksAt(5.seconds, baseHeight + 5)
     } yield (),
     5.minutes
   )

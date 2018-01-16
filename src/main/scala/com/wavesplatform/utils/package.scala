@@ -63,4 +63,11 @@ package object utils extends ScorexLogging {
     val d = new Duration(duration)
     PeriodFormat.getDefault.print(d.toPeriod)
   }
+
+  implicit class Tap[A](a: A) {
+    def tap(g: A => Unit): A = {
+      g(a)
+      a
+    }
+  }
 }

@@ -1,5 +1,6 @@
 package com.wavesplatform.it.transactions
 
+import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.util._
 import org.scalatest.prop.TableDrivenPropertyChecks
 
@@ -18,20 +19,20 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
     val alias = "test_alias"
 
     val f = for {
-      (balance, effectiveBalance) <- accountBalances(firstAddress)
+      (balance, effectiveBalance) <- notMiner.accountBalances(firstAddress)
       aliasTxId <- sender.createAlias(firstAddress, alias, aliasFee).map(_.id)
 
 
-      _ <- waitForHeightAraiseAndTxPresent(aliasTxId, 1)
+      _ <- nodes.waitForHeightAraiseAndTxPresent(aliasTxId)
 
-      _ <- assertBalances(firstAddress, balance - aliasFee, effectiveBalance - aliasFee)
+      _ <- notMiner.assertBalances(firstAddress, balance - aliasFee, effectiveBalance - aliasFee)
       transferId <- sender.transfer(firstAddress
         , s"alias:${sender.settings.blockchainSettings.addressSchemeCharacter}:$alias"
         , transferAmount, transferFee).map(_.id)
 
-      _ <- waitForHeightAraiseAndTxPresent(transferId, 1)
+      _ <- nodes.waitForHeightAraiseAndTxPresent(transferId)
 
-      _ <- assertBalances(firstAddress
+      _ <- notMiner.assertBalances(firstAddress
         , balance - transferFee - aliasFee
         , effectiveBalance - transferFee - aliasFee)
     } yield succeed
@@ -42,33 +43,32 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
   test("Not able to create same aliases to same address") {
     val alias = "test_alias2"
     val f = for {
-      (balance, effectiveBalance) <- accountBalances(firstAddress)
+      (balance, effectiveBalance) <- notMiner.accountBalances(firstAddress)
       aliasTxId <- sender.createAlias(firstAddress, alias, aliasFee).map(_.id)
 
-      _ <- waitForHeightAraiseAndTxPresent(aliasTxId, 1)
+      _ <- nodes.waitForHeightAraiseAndTxPresent(aliasTxId)
       newBalance = balance - aliasFee
       newEffectiveBalance = effectiveBalance - aliasFee
 
-      _ <- assertBalances(firstAddress, newBalance, newEffectiveBalance)
+      _ <- notMiner.assertBalances(firstAddress, newBalance, newEffectiveBalance)
       _ <- assertBadRequest(sender.createAlias(firstAddress, alias, aliasFee))
-      _ <- assertBalances(firstAddress, newBalance, newEffectiveBalance)
+      _ <- notMiner.assertBalances(firstAddress, newBalance, newEffectiveBalance)
     } yield succeed
 
     Await.result(f, waitCompletion)
   }
 
-
   test("Not able to create aliases to other addresses") {
     val alias = "test_alias3"
 
     val f = for {
-      (balance, effectiveBalance) <- accountBalances(firstAddress)
+      (balance, effectiveBalance) <- notMiner.accountBalances(firstAddress)
 
       aliasTxId <- sender.createAlias(firstAddress, alias, aliasFee).map(_.id)
 
-      _ <- waitForHeightAraiseAndTxPresent(aliasTxId, 1)
+      _ <- nodes.waitForHeightAraiseAndTxPresent(aliasTxId)
       _ <- assertBadRequestAndMessage(sender.createAlias(secondAddress, alias, aliasFee), "already in the state")
-      _ <- assertBalances(firstAddress, balance - aliasFee, effectiveBalance - aliasFee)
+      _ <- notMiner.assertBalances(firstAddress, balance - aliasFee, effectiveBalance - aliasFee)
     } yield succeed
 
     Await.result(f, waitCompletion)
@@ -80,20 +80,20 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
 
     val f = for {
 
-      (balance, effectiveBalance) <- accountBalances(secondAddress)
+      (balance, effectiveBalance) <- notMiner.accountBalances(secondAddress)
 
       aliasFirstTxId <- sender.createAlias(secondAddress, firstAlias, aliasFee).map(_.id)
-      _ <- waitForHeightAraiseAndTxPresent(aliasFirstTxId, 1)
+      _ <- nodes.waitForHeightAraiseAndTxPresent(aliasFirstTxId)
 
       newBalance = balance - aliasFee
       newEffectiveBalance = effectiveBalance - aliasFee
 
-      _ <- assertBalances(secondAddress, newBalance, newEffectiveBalance)
+      _ <- notMiner.assertBalances(secondAddress, newBalance, newEffectiveBalance)
 
       aliasSecondTxId <- sender.createAlias(secondAddress, secondAlias, aliasFee).map(_.id)
 
-      _ <- waitForHeightAraiseAndTxPresent(aliasSecondTxId, 1)
-      _ <- assertBalances(secondAddress, newBalance - aliasFee, newEffectiveBalance - aliasFee)
+      _ <- nodes.waitForHeightAraiseAndTxPresent(aliasSecondTxId)
+      _ <- notMiner.assertBalances(secondAddress, newBalance - aliasFee, newEffectiveBalance - aliasFee)
 
       aliasesList <- sender.aliasByAddress(secondAddress)
 
@@ -105,13 +105,12 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
     Await.result(f, waitCompletion)
   }
 
-
   test("Able to get address by alias") {
     val alias = "test_alias_6"
     val f = for {
-      balance <- accountBalance(firstAddress)
+      balance <- notMiner.accountBalance(firstAddress)
       aliasFirstTxId <- sender.createAlias(firstAddress, alias, aliasFee).map(_.id)
-      _ <- waitForHeightAraiseAndTxPresent(aliasFirstTxId, 1)
+      _ <- nodes.waitForHeightAraiseAndTxPresent(aliasFirstTxId)
       addressByAlias <- sender.addressByAlias(alias).map(_.address)
     } yield {
       addressByAlias should be(firstAddress)
@@ -131,10 +130,10 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
   aliases_names.foreach { alias =>
     test(s"create alias named $alias") {
       val f = for {
-        (balance, effectiveBalance) <- accountBalances(secondAddress)
+        (balance, effectiveBalance) <- notMiner.accountBalances(secondAddress)
         aliasTxId <- sender.createAlias(secondAddress, alias, aliasFee).map(_.id)
-        _ <- waitForHeightAraiseAndTxPresent(aliasTxId, 1)
-        _ <- assertBalances(secondAddress, balance - aliasFee, effectiveBalance - aliasFee)
+        _ <- nodes.waitForHeightAraiseAndTxPresent(aliasTxId)
+        _ <- notMiner.assertBalances(secondAddress, balance - aliasFee, effectiveBalance - aliasFee)
 
       } yield succeed
 
@@ -168,20 +167,20 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
     val buildedThirdAddressAlias = s"alias:${sender.settings.blockchainSettings.addressSchemeCharacter}:$thirdAddressAlias"
 
     val f = for {
-      ((firstAddressBalance, firstAddressEffectiveBalance), (thirdAddressBalance, thirdAddressEffectiveBalance)) <- accountBalances(firstAddress)
-        .zip(accountBalances(thirdAddress))
+      ((firstAddressBalance, firstAddressEffectiveBalance), (thirdAddressBalance, thirdAddressEffectiveBalance)) <- notMiner.accountBalances(firstAddress)
+        .zip(notMiner.accountBalances(thirdAddress))
 
       aliasTxId <- sender.createAlias(thirdAddress, thirdAddressAlias, aliasFee).map(_.id)
-      _ <- waitForHeightAraiseAndTxPresent(aliasTxId, 1)
+      _ <- nodes.waitForHeightAraiseAndTxPresent(aliasTxId)
 
       //lease maximum value, to pass next test
       leasingAmount = firstAddressBalance - leasingFee - 0.5.waves
 
       leasingTx <- sender.lease(firstAddress, buildedThirdAddressAlias, leasingAmount, leasingFee).map(_.id)
-      _ <- waitForHeightAraiseAndTxPresent(leasingTx, 1)
+      _ <- nodes.waitForHeightAraiseAndTxPresent(leasingTx)
 
-      _ <- assertBalances(firstAddress, firstAddressBalance - leasingFee, firstAddressEffectiveBalance - leasingAmount - leasingFee)
-        .zip(assertBalances(thirdAddress, thirdAddressBalance - aliasFee, thirdAddressEffectiveBalance - aliasFee + leasingAmount))
+      _ <- notMiner.assertBalances(firstAddress, firstAddressBalance - leasingFee, firstAddressEffectiveBalance - leasingAmount - leasingFee)
+        .zip(notMiner.assertBalances(thirdAddress, thirdAddressBalance - aliasFee, thirdAddressEffectiveBalance - aliasFee + leasingAmount))
     } yield succeed
     Await.result(f, waitCompletion)
   }

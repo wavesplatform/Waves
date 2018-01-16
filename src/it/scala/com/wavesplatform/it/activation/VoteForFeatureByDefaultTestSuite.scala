@@ -4,13 +4,15 @@ package activation
 import com.typesafe.config.Config
 import com.wavesplatform.features.BlockchainFeatureStatus
 import com.wavesplatform.features.api.NodeFeatureStatus
+import com.wavesplatform.it.api.AsyncHttpApi._
+import com.wavesplatform.it.transactions.NodesFromDocker
 import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers}
 
 import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 
-class VoteForFeatureByDefaultTestSuite extends FreeSpec with Matchers with CancelAfterFailure
+class VoteForFeatureByDefaultTestSuite extends FreeSpec with Matchers with CancelAfterFailure with NodesFromDocker
   with ActivationStatusRequest with ReportingTestName {
 
   private val votingInterval = 25

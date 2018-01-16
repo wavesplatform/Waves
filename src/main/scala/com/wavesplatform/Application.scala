@@ -214,9 +214,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       log.debug("Closing storage")
       db.close()
 
-      log.debug("Closing wallet")
-      wallet.close()
-
       log.debug("Closing peer database")
       peerDatabase.close()
 

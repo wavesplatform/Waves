@@ -13,6 +13,8 @@ import com.spotify.docker.client.messages.EndpointConfig.EndpointIpamConfig
 import com.spotify.docker.client.messages._
 import com.spotify.docker.client.{DefaultDockerClient, DockerClient}
 import com.typesafe.config.{Config, ConfigFactory, ConfigRenderOptions}
+import com.wavesplatform.it.api.AsyncHttpApi._
+import com.wavesplatform.it.api.Node
 import com.wavesplatform.it.util.GlobalTimer.{instance => timer}
 import org.asynchttpclient.Dsl._
 import scorex.utils.ScorexLogging
@@ -48,7 +50,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
 
   private val client = DefaultDockerClient.fromEnv().build()
 
-  private val nodes = ConcurrentHashMap.newKeySet[Node]()
+  private val nodes = ConcurrentHashMap.newKeySet[NodeImpl]()
   private val isStopped = new AtomicBoolean(false)
 
   dumpContainers(client.listContainers())
@@ -203,7 +205,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
 
     client.startContainer(containerId)
 
-    val node = new Node(actualConfig, getNodeInfo(containerId, actualConfig), http)
+    val node = new NodeImpl(actualConfig, getNodeInfo(containerId, actualConfig), http)
     nodes.add(node)
     log.debug(s"Started $containerId -> ${node.settings.networkSettings.nodeName}: ${node.nodeInfo}")
     node

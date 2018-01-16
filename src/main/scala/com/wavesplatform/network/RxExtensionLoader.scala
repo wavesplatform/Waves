@@ -15,6 +15,7 @@ import scorex.transaction.History.BlockchainScore
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction.{NgHistory, ValidationError}
 import scorex.utils.ScorexLogging
+import com.wavesplatform.utils._
 
 import scala.concurrent.duration._
 
