@@ -42,30 +42,20 @@ class WideStateGenerationSuite extends FreeSpec with WaitForHeight2
     .buildNonConflicting()
 
   private val nodeAddresses = nodeConfigs.map(_.getString("address")).toSet
-  private val restAccounts = NodeConfigs.Default
-    .map(_.getString("address"))
-    .filterNot(x => nodeConfigs.exists(_.getString("address") == x))
-    .toSet
-
   private val requestsCount = 10000
 
   "Generate a lot of transactions and synchronise" in {
     val test = for {
       b <- dumpBalances()
-      txs <- processRequests(generateTransfersToRandomAddresses(requestsCount / 2, nodeAddresses) ++
+      uploadedTxs <- processRequests(generateTransfersToRandomAddresses(requestsCount / 2, nodeAddresses) ++
         generateTransfersBetweenAccounts(requestsCount / 2, b))
 
-      _ <- {
-        log.debug(s"Wait a transaction ${txs.last.id} is in blockchain")
-        Await.ready(traverse(nodes)(_.waitForTransaction(txs.last.id, retryInterval = 10.seconds)), 5.minutes)
-      }
+      _ <- Await.ready(traverse(nodes)(_.waitFor[Int]("UTX is empty")(_.utxSize, _ == 0, 5.seconds)), 5.minutes)
 
       height <- traverse(nodes)(_.height).map(_.max)
+      _ <- Await.ready(nodes.waitForSameBlocksAt(5.seconds, height + 1), 5.minutes)
 
-      _ <- {
-        log.debug(s"waitForSameBlocksAt($height)")
-        Await.ready(nodes.waitForSameBlocksAt(5.seconds, height), 5.minutes)
-      }
+      _ <- Await.ready(traverse(nodes)(assertHasTxs(_, uploadedTxs.map(_.id).toSet)), 5.minutes)
     } yield ()
 
     val limit = GlobalTimer.instance.schedule(Future.failed(new TimeoutException("Time is out for test")), 15.minutes)
@@ -81,6 +71,19 @@ class WideStateGenerationSuite extends FreeSpec with WaitForHeight2
     }
 
     Await.result(testWithDumps, 16.minutes)
+  }
+
+  private def assertHasTxs(node: Node, txIds: Set[String]): Future[Unit] = {
+    for {
+      height <- node.height
+      blocks <- node.blockSeq(1, height)
+    } yield {
+      val txsInBlockchain = blocks.flatMap(_.transactions.map(_.id))
+      val diff = txIds -- txsInBlockchain
+      withClue(s"all transactions in node") {
+        diff shouldBe empty
+      }
+    }
   }
 
   private def dumpBalances(): Future[Map[Config, Long]] = {
