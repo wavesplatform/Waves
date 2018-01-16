@@ -25,6 +25,8 @@ scalacOptions ++= Seq(
   "-Xlint")
 logBuffered := false
 
+resolvers += Resolver.bintrayRepo("ethereum", "maven")
+
 //assembly settings
 assemblyJarName in assembly := s"waves-all-${version.value}.jar"
 assemblyMergeStrategy in assembly := {

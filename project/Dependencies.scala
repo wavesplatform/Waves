@@ -3,10 +3,15 @@ import sbt._
 object Dependencies {
 
   def akkaModule(module: String) = "com.typesafe.akka" %% s"akka-$module" % "2.4.19"
+
   def swaggerModule(module: String) = "io.swagger" % s"swagger-$module" % "1.5.16"
+
   def akkaHttpModule(module: String) = "com.typesafe.akka" %% module % "10.0.9"
+
   def nettyModule(module: String) = "io.netty" % s"netty-$module" % "4.1.13.Final"
+
   def kamonModule(module: String) = "io.kamon" %% s"kamon-$module" % "0.6.7"
+
   val asyncHttpClient = "org.asynchttpclient" % "async-http-client" % "2.1.0-alpha22"
 
   lazy val network = Seq("handler", "buffer", "codec").map(nettyModule) ++ Seq(
@@ -26,7 +31,7 @@ object Dependencies {
     "org.mockito" % "mockito-all" % "1.10.19",
     "org.scalamock" %% "scalamock-scalatest-support" % "3.6.0",
     "org.iq80.leveldb" % "leveldb" % "0.9",
-      akkaHttpModule("akka-http-testkit")
+    akkaHttpModule("akka-http-testkit")
   )) map (_ % "test")
 
   lazy val itKit = (scalatest ++ Seq(
@@ -43,7 +48,7 @@ object Dependencies {
   lazy val akka = Seq("actor", "slf4j").map(akkaModule)
 
   lazy val db = Seq(
-    "org.fusesource.leveldbjni" % "leveldbjni-all" % "1.8"
+    "org.ethereum" % "leveldbjni-all" % "1.18.3"
   )
 
   lazy val logging = Seq(
@@ -62,7 +67,7 @@ object Dependencies {
   lazy val matcher = Seq(
     akkaModule("persistence"),
     "com.github.dnvriend" %% "akka-persistence-inmemory" % "2.4.18.1" % "test",
-    "org.fusesource.leveldbjni" % "leveldbjni-all" % "1.8"
+    "org.ethereum" % "leveldbjni-all" % "1.18.3"
   )
 
   lazy val metrics = Seq("core", "system-metrics").map(kamonModule) ++ Seq(
