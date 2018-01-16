@@ -2,6 +2,7 @@ package com.wavesplatform.it
 
 import com.typesafe.config.Config
 import com.wavesplatform.it.api._
+import com.wavesplatform.it.util.GlobalTimer
 import com.wavesplatform.settings.WavesSettings
 import org.asynchttpclient._
 import scorex.transaction.TransactionParser.TransactionType
@@ -16,10 +17,10 @@ class NodeImpl(val config: Config, var nodeInfo: NodeInfo, override val client: 
   val settings: WavesSettings = WavesSettings.fromConfig(config)
 
   val chainId: Char = 'I'
-  val nodeName: String = s"it-test-client-to-${nodeInfo.networkIpAddress}"
+  def name: String = settings.networkSettings.nodeName
   val restAddress: String = "localhost"
 
-  def nodeRestPort: Int = nodeInfo.hostRestApiPort
+  def restPort: Int = nodeInfo.hostRestApiPort
 
   def matcherRestPort: Int = nodeInfo.hostMatcherApiPort
 
@@ -43,9 +44,8 @@ object NodeImpl {
       "",
       config.getInt("matcher-api-port")
     ),
-    Dsl.asyncHttpClient()
+    Dsl.asyncHttpClient(Dsl.config().setNettyTimer(GlobalTimer.instance))
   ) {
-    override val restAddress: String = Option(config.getString("hostname"))
-      .getOrElse(throw new IllegalArgumentException("hostname is not specified"))
+    override val restAddress: String = config.getString("hostname")
   }
 }

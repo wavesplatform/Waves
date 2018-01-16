@@ -112,7 +112,7 @@ class WideStateGenerationSuite extends FreeSpec with WaitForHeight2
         .zipWithIndex
         .map { case (x, i) => s"$i: id=${x.signature.trim}, txsSize=${x.transactions.size}, txs=${x.transactions.map(_.id.trim).mkString(", ")}" }
 
-      s"""Dum of ${node.settings.networkSettings.nodeName}:
+      s"""Dump of ${node.name}:
          |UTX size: $utxSize
          |Total txs: ${blocks.map(_.transactions.size).sum}
          |Blocks:
