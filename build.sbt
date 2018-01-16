@@ -2,14 +2,20 @@ import com.typesafe.sbt.packager.archetypes.TemplateWriter
 import sbt.Keys._
 import sbt._
 
-enablePlugins(sbtdocker.DockerPlugin, JavaServerAppPackaging, JDebPackaging, SystemdPlugin, GitVersioning)
+enablePlugins(JavaServerAppPackaging, JDebPackaging, SystemdPlugin, GitVersioning)
+
+inThisBuild(Seq(
+  scalaVersion := "2.12.4",
+  organization := "com.wavesplatform",
+  crossPaths := false
+))
 
 name := "waves"
-organization := "com.wavesplatform"
+
 git.useGitDescribe := true
 git.uncommittedSignifier := Some("DIRTY")
-scalaVersion in ThisBuild := "2.12.4"
-crossPaths := false
+
+
 publishArtifact in (Compile, packageDoc) := false
 publishArtifact in (Compile, packageSrc) := false
 mainClass in Compile := Some("com.wavesplatform.Application")
@@ -36,8 +42,7 @@ libraryDependencies ++=
   Dependencies.http ++
   Dependencies.akka ++
   Dependencies.serialization ++
-  Dependencies.testKit ++
-  Dependencies.itKit ++
+  Dependencies.testKit.map(_ % "test") ++
   Dependencies.logging ++
   Dependencies.matcher ++
   Dependencies.metrics ++
@@ -68,23 +73,6 @@ inConfig(Test)(Seq(
   parallelExecution := false,
   testOptions += Tests.Argument("-oIDOF", "-u", "target/test-reports")
 ))
-
-dockerfile in docker := {
-  val configTemplate = sourceDirectory.value / "template.conf"
-  val startWaves = sourceDirectory.value / "container" / "start-waves.sh"
-
-  new Dockerfile {
-    from("anapsix/alpine-java:8_server-jre")
-    add(assembly.value, "/opt/waves/waves.jar")
-    add(Seq(configTemplate, startWaves), "/opt/waves/")
-    run("chmod", "+x", "/opt/waves/start-waves.sh")
-    entryPoint("/opt/waves/start-waves.sh")
-  }
-}
-
-buildOptions in docker := BuildOptions(
-  removeIntermediateContainers = BuildOptions.Remove.OnSuccess
-)
 
 commands += Command.command("packageAll") { state =>
   "clean" ::
@@ -159,9 +147,6 @@ lazy val discovery = project
 
 lazy val it = project
   .dependsOn(node)
-  .settings(
-    test in Test := ((test in Test) dependsOn (docker in node)).value
-  )
 
 lazy val generator = project
   .dependsOn(it)

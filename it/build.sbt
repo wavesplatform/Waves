@@ -12,10 +12,35 @@ concurrentRestrictions in Global := {
     Tags.limitAll(threadNumber)
   )
 }
+enablePlugins(sbtdocker.DockerPlugin)
 
-lazy val logDirectory = taskKey[File]("A directory for logs")
+inTask(docker)(Seq(
+  dockerfile := {
+    val configTemplate = (Compile / resourceDirectory).value / "template.conf"
+    val startWaves = sourceDirectory.value / "container" / "start-waves.sh"
 
-logDirectory := {
+    new Dockerfile {
+      from("anapsix/alpine-java:8_server-jre")
+      add((assembly in LocalProject("node")).value, "/opt/waves/waves.jar")
+      add(Seq(configTemplate, startWaves), "/opt/waves/")
+      run("chmod", "+x", "/opt/waves/start-waves.sh")
+      entryPoint("/opt/waves/start-waves.sh")
+    }
+  },
+
+  buildOptions := BuildOptions(removeIntermediateContainers = BuildOptions.Remove.OnSuccess)
+))
+
+libraryDependencies ++= Dependencies.testKit ++ Dependencies.itKit
+
+concurrentRestrictions in Global := Seq(
+  Tags.limit(Tags.CPU, 5),
+  Tags.limit(Tags.Network, 5),
+  Tags.limit(Tags.Test, 5),
+  Tags.limitAll(5)
+)
+
+val logDirectory = Def.task {
   val runId = Option(System.getenv("RUN_ID")).getOrElse {
     val formatter = DateTimeFormatter.ofPattern("MM-dd--HH_mm_ss")
     s"local-${formatter.format(LocalDateTime.now())}"
@@ -58,6 +83,7 @@ lazy val itTestsCommonSettings: Seq[Def.Setting[_]] = Seq(
 
 inConfig(Test)(
   Seq(
+    test := (test dependsOn docker).value,
     envVars in test += "CONTAINER_JAVA_OPTS" -> "-Xmx1500m",
     envVars in testOnly += "CONTAINER_JAVA_OPTS" -> "-Xmx512m"
   ) ++ inTask(test)(itTestsCommonSettings) ++ inTask(testOnly)(itTestsCommonSettings)

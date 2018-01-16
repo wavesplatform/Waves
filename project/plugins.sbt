@@ -15,5 +15,5 @@ Seq(
 ).map(addSbtPlugin)
 
 libraryDependencies ++= Seq(
-  "com.typesafe" % "config" % "1.3.0",
-  "org.vafer" % "jdeb" % "1.5" artifacts Artifact("jdeb", "jar", "jar"))
+  "org.vafer" % "jdeb" % "1.5" artifacts Artifact("jdeb", "jar", "jar")
+)
