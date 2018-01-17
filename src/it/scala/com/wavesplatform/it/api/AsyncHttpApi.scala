@@ -2,7 +2,6 @@ package com.wavesplatform.it.api
 
 import java.io.IOException
 import java.util.concurrent.TimeoutException
-import java.util.{Timer, TimerTask}
 
 import com.wavesplatform.features.api.ActivationStatus
 import com.wavesplatform.it.util.GlobalTimer.{instance => timer}
@@ -26,9 +25,9 @@ import scorex.waves.http.{DebugMessage, RollbackParams}
 
 import scala.compat.java8.FutureConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
-import scala.concurrent.{Future, Promise}
 import scala.util.{Failure, Success, Try}
 
 object AsyncHttpApi {
@@ -423,9 +422,7 @@ object AsyncHttpApi {
 
     def waitFor[A](desc: String)(retryInterval: FiniteDuration)
                   (request: Node => Future[A], cond: Iterable[A] => Boolean): Future[Boolean] = {
-      def retry = sleep(retryInterval).flatMap { _ =>
-        waitFor(desc)(retryInterval)(request, cond)
-      }
+      def retry = timer.schedule(waitFor(desc)(retryInterval)(request, cond), retryInterval)
 
       Future.traverse(nodes)(request)
         .map(cond)
@@ -436,17 +433,5 @@ object AsyncHttpApi {
         }
     }
 
-  }
-
-  private val ttimer = new Timer("multiple-nodes-api", true)
-
-  private def sleep(delay: FiniteDuration): Future[Unit] = {
-    val p = Promise[Unit]()
-    ttimer.schedule(
-      new TimerTask {
-        override def run(): Unit = p.success(())
-      },
-      delay.toMillis)
-    p.future
   }
 }
