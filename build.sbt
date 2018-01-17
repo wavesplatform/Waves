@@ -72,12 +72,15 @@ inConfig(Test)(Seq(
   testOptions += Tests.Argument("-oIDOF", "-u", "target/test-reports")
 ))
 
-concurrentRestrictions in Global := Seq(
-  Tags.limit(Tags.CPU, 5),
-  Tags.limit(Tags.Network, 5),
-  Tags.limit(Tags.Test, 5),
-  Tags.limitAll(5)
-)
+concurrentRestrictions in Global := {
+  val threadNumber = Option(System.getenv("SBT_THREAD_NUMBER")).fold(1)(_.toInt)
+  Seq(
+    Tags.limit(Tags.CPU, threadNumber),
+    Tags.limit(Tags.Network, threadNumber),
+    Tags.limit(Tags.Test, threadNumber),
+    Tags.limitAll(threadNumber)
+  )
+}
 
 Defaults.itSettings
 configs(IntegrationTest)
@@ -233,3 +236,4 @@ logDirectory := {
   IO.createDirectory(r)
   r
 }
+
