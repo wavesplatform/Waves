@@ -6,7 +6,7 @@ import com.wavesplatform.network.RxScoreObserver.{ChannelClosedAndSyncWith, Sync
 import io.netty.channel._
 import monix.eval.{Coeval, Task}
 import monix.execution.schedulers.SchedulerService
-import monix.execution.{CancelableFuture, Scheduler}
+import monix.execution.{CancelableFuture, ExecutionModel, Scheduler}
 import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
 import scorex.block.Block
@@ -15,7 +15,6 @@ import scorex.transaction.History.BlockchainScore
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction.{NgHistory, ValidationError}
 import scorex.utils.ScorexLogging
-import com.wavesplatform.utils._
 
 import scala.concurrent.duration._
 
@@ -31,8 +30,9 @@ object RxExtensionLoader extends ScorexLogging {
            )(extensionApplier: (Channel, ExtensionBlocks) => Task[Either[ValidationError, Option[BlockchainScore]]])
     : (Observable[(Channel, Block)], Coeval[State]) = {
 
-    implicit val scheduler: SchedulerService = Scheduler.singleThread("rx-extension-loader")
+    implicit val scheduler: SchedulerService = Scheduler.singleThread("rx-extension-loader", executionModel = ExecutionModel.SynchronousExecution)
 
+    val applyExtensions = ConcurrentSubject.publish[(ExtensionBlocks, Channel)]
     val simpleBlocks = ConcurrentSubject.publish[(Channel, Block)]
     @volatile var s: State = State(LoaderState.Idle, ApplierState.Idle)
     val lastSyncWith: Coeval[Option[SyncWith]] = lastObserved(syncWithChannelClosed.map(_.syncWith))
@@ -60,6 +60,7 @@ object RxExtensionLoader extends ScorexLogging {
               maybeKnownSigs match {
                 case Some((knownSigs, optimistic)) =>
                   val ch = best.channel
+                  // !!!!!!!!!!!!
                   log.debug(s"${id(ch)} Requesting extension signatures ${if (optimistic) "optimistically" else ""}, last ${knownSigs.length} are ${formatSignatures(knownSigs)}")
                   val blacklisting = scheduleBlacklist(ch, s"Timeout loading extension").runAsync
                   ch.writeAndFlush(GetSignatures(knownSigs))
@@ -108,7 +109,7 @@ object RxExtensionLoader extends ScorexLogging {
                 log.trace(s"${id(ch)} Received empty extension signatures list, sync with node complete")
                 state.withIdleLoader
               } else {
-                log.trace(s"${id(ch)} Requesting all required blocks(size=${unknown.size})")
+                log.trace(s"${id(ch)} Requesting ${unknown.size} blocks")
                 val blacklistingAsync = scheduleBlacklist(ch, "Timeout loading first requested block").runAsync
                 unknown.foreach(s => ch.write(GetBlock(s)))
                 ch.flush()
@@ -147,27 +148,15 @@ object RxExtensionLoader extends ScorexLogging {
     def extensionLoadingFinished(state: State, extension: ExtensionBlocks, ch: Channel): State = {
       state.applierState match {
         case ApplierState.Idle =>
-          applyExtension(extension, ch)
+          applyExtensions.onNext((extension, ch))
           syncNext(state.copy(applierState = ApplierState.Applying(None, extension)))
-        case ApplierState.Applying(None, applying) =>
-          log.trace(s"Caching received $extension until $applying is executed")
-          state.copy(applierState = ApplierState.Applying(Some(Buffer(ch, extension)), applying))
+        case s@ApplierState.Applying(None, applying) =>
+          log.trace(s"An optimistic extension was received: $extension, but applying $applying now")
+          state.copy(applierState = s.copy(buf = Some(Buffer(ch, extension))))
         case _ =>
           log.warn(s"Overflow, discarding $extension")
           state
       }
-    }
-
-    def applyExtension(extensionBlocks: ExtensionBlocks, ch: Channel): CancelableFuture[Unit] = {
-      extensionApplier(ch, extensionBlocks)
-        .asyncBoundary(scheduler)
-        .onErrorHandle(err => {
-          log.error("Error applying extension", err)
-          Left(GenericError(err))
-        })
-        .map { ar => s = onExtensionApplied(s, extensionBlocks, ch, ar) }
-        .logErr
-        .runAsync
     }
 
     def onExtensionApplied(state: State, extension: ExtensionBlocks, ch: Channel, applicationResult: Either[ValidationError, Option[BlockchainScore]]): State = {
@@ -185,19 +174,30 @@ object RxExtensionLoader extends ScorexLogging {
                 log.debug(s"Failed to apply $extension, discarding cached as well")
                 syncNext(state.copy(applierState = ApplierState.Idle))
               case Right(_) =>
-                log.trace(s"Successfully applied $extension, staring to apply cached")
-                applyExtension(nextExtension, nextChannel)
+                log.trace(s"Successfully applied $extension, starting to apply an optimistically loaded one: $nextExtension")
+                applyExtensions.onNext((nextExtension, nextChannel))
                 syncNext(state.copy(applierState = ApplierState.Applying(None, nextExtension)))
             }
           }
       }
-    } tap (ns => log.trace(s"State after application: $ns"))
+    }
 
     Observable
       .merge(
         signatures.observeOn(scheduler).map { case ((ch, sigs)) => s = onNewSignatures(s, ch, sigs) },
         blocks.observeOn(scheduler).map { case ((ch, block)) => s = onBlock(s, ch, block) },
-        syncWithChannelClosed.observeOn(scheduler).map { ch => s = onNewSyncWithChannelClosed(s, ch) }
+        syncWithChannelClosed.observeOn(scheduler).map { ch => s = onNewSyncWithChannelClosed(s, ch) },
+        applyExtensions
+          .mapTask[(ExtensionBlocks, Channel, Either[ValidationError, Option[BlockchainScore]])] { x =>
+            extensionApplier(x._2, x._1)
+              .asyncBoundary(scheduler)
+              .onErrorHandle { err =>
+                log.error("Error applying extension", err)
+                Left(GenericError(err))
+              }
+              .map((x._1, x._2, _))
+          }
+          .map { case ((extensionBlocks, ch, ar)) => s = onExtensionApplied(s, extensionBlocks, ch, ar) }
       )
       .map { _ => log.trace(s"Current state: $s") }
       .logErr
