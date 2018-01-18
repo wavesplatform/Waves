@@ -16,8 +16,8 @@ object AsyncNetworkApi {
     def nonce: Long = System.currentTimeMillis()
 
     def sendByNetwork(message: RawBytes*): Future[Unit] = {
-      val sender = new NetworkSender(n.chainId, s"it-test-client-to-${n.name}", nonce)
-      sender.connect(new InetSocketAddress(n.restAddress, n.networkPort)).map { ch =>
+      val sender = new NetworkSender(n.settings.blockchainSettings.addressSchemeCharacter, s"it-test-client-to-${n.name}", nonce)
+      sender.connect(new InetSocketAddress(n.nodeInfo.networkIpAddress, n.nodeInfo.hostNetworkPort)).map { ch =>
         if (ch.isActive) sender.send(ch, message: _*).map(_ => sender.close()) else sender.close()
       }
     }

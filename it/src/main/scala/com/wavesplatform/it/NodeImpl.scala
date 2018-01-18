@@ -16,13 +16,12 @@ class NodeImpl(val config: Config, var nodeInfo: NodeInfo, override val client: 
   val accountSeed: String = config.getString("account-seed")
   val settings: WavesSettings = WavesSettings.fromConfig(config)
 
-  val chainId: Char = 'I'
   def name: String = settings.networkSettings.nodeName
   val restAddress: String = "localhost"
 
-  def restPort: Int = nodeInfo.hostRestApiPort
+  override def restEndpoint = nodeInfo.restApi
 
-  def matcherRestPort: Int = nodeInfo.hostMatcherApiPort
+  override def matcherRestEndpoint = nodeInfo.matcherApi
 
   def networkPort: Int = nodeInfo.hostNetworkPort
 
@@ -36,13 +35,13 @@ object NodeImpl {
   def apply(config: Config): Node = new NodeImpl(
     config,
     NodeInfo(
-      config.getInt("rest-api-port"),
+      config.getString("rest-api"),
+      config.getString("matcher-api"),
       config.getInt("network-port"),
       config.getInt("network-port"),
-      config.getString("hostname"),
       config.getString("hostname"),
       "",
-      config.getInt("matcher-api-port")
+      config.getString("api-key")
     ),
     Dsl.asyncHttpClient(Dsl.config().setNettyTimer(GlobalTimer.instance))
   ) {

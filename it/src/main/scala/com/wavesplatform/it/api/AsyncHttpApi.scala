@@ -37,10 +37,10 @@ object AsyncHttpApi {
     import Node._
 
     def matcherGet(path: String, f: RequestBuilder => RequestBuilder = identity, statusCode: Int = HttpConstants.ResponseStatusCodes.OK_200): Future[Response] =
-      retrying(f(_get(s"http://${n.restAddress}:${n.matcherRestPort}$path")).build(), statusCode = statusCode)
+      retrying(f(_get(s"${n.nodeInfo.matcherApi}$path")).build(), statusCode = statusCode)
 
     def matcherGetWithSignature(path: String, ts: Long, signature: ByteStr, f: RequestBuilder => RequestBuilder = identity): Future[Response] = retrying {
-      _get(s"http://${n.restAddress}:${n.matcherRestPort}$path")
+      _get(s"${n.nodeInfo.matcherApi}$path")
         .setHeader("Timestamp", ts)
         .setHeader("Signature", signature)
         .build()
@@ -50,7 +50,7 @@ object AsyncHttpApi {
       matcherGet(path, statusCode = statusCode).as[MessageMatcherResponse]
 
     def matcherPost[A: Writes](path: String, body: A): Future[Response] =
-      post(s"http://${n.restAddress}", n.matcherRestPort, path,
+      post(s"${n.nodeInfo.matcherApi}$path",
         (rb: RequestBuilder) => rb.setHeader("Content-type", "application/json").setBody(stringify(toJson(body))))
 
     def getOrderStatus(asset: String, orderId: String): Future[MatcherStatusResponse] =
@@ -63,31 +63,29 @@ object AsyncHttpApi {
       matcherGetWithSignature(s"/matcher/orderbook/$publicKey", timestamp, signature).as[Seq[OrderbookHistory]]
 
     def get(path: String, f: RequestBuilder => RequestBuilder = identity): Future[Response] =
-      retrying(f(_get(s"http://${n.restAddress}:${n.restPort}$path")).build())
+      retrying(f(_get(s"${n.nodeInfo.restApi}$path")).build())
 
     def getWithApiKey(path: String, f: RequestBuilder => RequestBuilder = identity): Future[Response] = retrying {
-      _get(s"http://${n.restAddress}:${n.restPort}$path")
-        .setHeader("api_key", "integration-test-rest-api")
+      _get(s"${n.nodeInfo.restApi}$path")
+        .setHeader("api_key", n.nodeInfo.apiKey)
         .build()
     }
 
     def postJsonWithApiKey[A: Writes](path: String, body: A): Future[Response] = retrying {
-      _post(s"http://${n.restAddress}:${n.restPort}$path")
-        .setHeader("api_key", "integration-test-rest-api")
+      _post(s"${n.nodeInfo.restApi}$path")
+        .setHeader("api_key", n.nodeInfo.apiKey)
         .setHeader("Content-type", "application/json").setBody(stringify(toJson(body)))
         .build()
     }
 
-    def post(url: String, port: Int, path: String, f: RequestBuilder => RequestBuilder = identity): Future[Response] =
-      retrying(f(
-        _post(s"$url:$port$path").setHeader("api_key", "integration-test-rest-api")
-      ).build())
+    def post(url: String, f: RequestBuilder => RequestBuilder = identity): Future[Response] =
+      retrying(f(_post(url).setHeader("api_key", n.nodeInfo.apiKey)).build())
 
     def postJson[A: Writes](path: String, body: A): Future[Response] =
       post(path, stringify(toJson(body)))
 
     def post(path: String, body: String): Future[Response] =
-      post(s"http://${n.restAddress}", n.restPort, path,
+      post(s"${n.nodeInfo.restApi}$path",
         (rb: RequestBuilder) => rb.setHeader("Content-type", "application/json").setBody(body))
 
     def blacklist(networkIpAddress: String, hostNetworkPort: Int): Future[Unit] =
@@ -108,7 +106,7 @@ object AsyncHttpApi {
     def waitForStartup(): Future[Option[Response]] = {
       val timeout = 500
 
-      val request = _get(s"http://${n.restAddress}:${n.restPort}/blocks/height")
+      val request = _get(s"${n.nodeInfo.restApi}/blocks/height")
         .setReadTimeout(timeout)
         .setRequestTimeout(timeout)
         .build()
@@ -127,7 +125,7 @@ object AsyncHttpApi {
       waitFor("node is up")(_ => send(), cond, 1.second)
     }
 
-    def waitForPeers(targetPeersCount: Int): Future[Seq[Peer]] = waitFor[Seq[Peer]](s"connectedPeers.size >= $targetPeersCount")(_.connectedPeers, _.size >= targetPeersCount, 1.second)
+    def waitForPeers(targetPeersCount: Int): Future[Seq[Peer]] = waitFor[Seq[Peer]](s"connectedPeers.size >= $targetPeersCount")(_.connectedPeers, _.lengthCompare(targetPeersCount) >= 0, 1.second)
 
     def height: Future[Int] = get("/blocks/height").as[JsValue].map(v => (v \ "height").as[Int])
 
@@ -211,9 +209,9 @@ object AsyncHttpApi {
       postJson("/assets/broadcast/transfer", transfer).as[Transaction]
 
     def batchSignedTransfer(transfers: Seq[SignedTransferRequest], timeout: FiniteDuration = 1.minute): Future[Seq[Transaction]] = {
-      val request = _post(s"http://${n.restAddress}:${n.restPort}/assets/broadcast/batch-transfer")
+      val request = _post(s"${n.nodeInfo.restApi}/assets/broadcast/batch-transfer")
         .setHeader("Content-type", "application/json")
-        .setHeader("api_key", "integration-test-rest-api")
+        .setHeader("api_key", n.nodeInfo.apiKey)
         .setReadTimeout(timeout.toMillis.toInt)
         .setRequestTimeout(timeout.toMillis.toInt)
         .setBody(stringify(toJson(transfers)))
@@ -265,7 +263,7 @@ object AsyncHttpApi {
     }
 
     def createAddress: Future[String] =
-      post(s"http://${n.restAddress}", n.restPort, "/addresses").as[JsValue].map(v => (v \ "address").as[String])
+      post(s"${n.nodeInfo.restApi}/addresses").as[JsValue].map(v => (v \ "address").as[String])
 
     def waitForNextBlock: Future[Block] = for {
       currentBlock <- lastBlock

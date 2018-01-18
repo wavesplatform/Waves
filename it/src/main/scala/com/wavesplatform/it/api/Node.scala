@@ -27,15 +27,10 @@ trait Node {
 
   def accountSeed: String
 
-  def restAddress: String
-
-  def chainId: Char
-
   def name: String
 
-  def restPort: Int
-
-  def matcherRestPort: Int
+  def restEndpoint: String
+  def matcherRestEndpoint: String
 
   def networkPort: Int
 

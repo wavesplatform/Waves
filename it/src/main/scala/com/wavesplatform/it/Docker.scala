@@ -26,13 +26,13 @@ import scala.concurrent.{Await, Future, blocking}
 import scala.util.Random
 import scala.util.control.NonFatal
 
-case class NodeInfo(hostRestApiPort: Int,
+case class NodeInfo(restApi: String,
+                    matcherApi: String,
                     hostNetworkPort: Int,
                     containerNetworkPort: Int,
-                    apiIpAddress: String,
                     networkIpAddress: String,
                     containerId: String,
-                    hostMatcherApiPort: Int)
+                    apiKey: String)
 
 class Docker(suiteConfig: Config = ConfigFactory.empty,
              tag: String = "") extends AutoCloseable with ScorexLogging {
@@ -228,13 +228,14 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
     val ports = containerInfo.networkSettings().ports()
 
     NodeInfo(
-      extractHostPort(ports, restApiPort),
+      s"http://localhost:${extractHostPort(ports, restApiPort)}",
+      s"http://localhost:${extractHostPort(ports, matcherApiPort)}",
       extractHostPort(ports, networkPort),
       networkPort.toInt,
       containerInfo.networkSettings().ipAddress(),
-      containerInfo.networkSettings().networks().asScala(wavesNetwork.name()).ipAddress(),
       containerId,
-      extractHostPort(ports, matcherApiPort)
+      "integration-test-rest-api"
+
     )
   }
 
