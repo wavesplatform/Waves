@@ -7,6 +7,7 @@ import cats.implicits._
 import com.wavesplatform.state2._
 import scorex.account.{Address, Alias}
 import scorex.transaction.lease.LeaseTransaction
+import scorex.transaction.smart.Script
 import scorex.transaction.{Transaction, TransactionParser}
 
 import scala.collection.JavaConverters._
@@ -99,5 +100,11 @@ class StateReaderImpl(p: StateStorage, val synchronizationToken: ReentrantReadWr
       .map { case (v1, v2, v3) => (v1, LeaseInfo(v2, v3)) }
       .getOrElse((0L, LeaseInfo(0L, 0L)))
 
-  override def assetBalance(a: Address, asset: ByteStr): Long = p.assetBalance.get(a.bytes, asset).getOrElse(0L)
+
+  override def assetBalance(a: Address, asset: ByteStr): Long = read { _ =>
+    p.assetBalance.get(a.bytes, asset).getOrElse(0L) }
+
+  override def accountScript(address: Address): Option[Script] = read { _ =>
+    Option(p.scripts.get(address.bytes)).map(str => Script.fromBytes(str.arr).explicitGet())
+  }
 }

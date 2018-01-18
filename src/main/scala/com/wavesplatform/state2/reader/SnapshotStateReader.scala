@@ -50,7 +50,7 @@ trait SnapshotStateReader extends Synchronized {
 
   def filledVolumeAndFee(orderId: ByteStr): OrderFillInfo
 
-  def accountScript(address: Address): Option[Script] = None
+  def accountScript(address: Address): Option[Script]
 }
 
 object SnapshotStateReader {

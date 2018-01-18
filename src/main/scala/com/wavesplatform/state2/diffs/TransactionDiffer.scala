@@ -9,7 +9,7 @@ import scorex.transaction._
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import scorex.transaction.smart.ScriptValidator
+import scorex.transaction.smart.{ScriptValidator, SetScriptTransaction}
 
 object TransactionDiffer {
 
@@ -42,6 +42,8 @@ object TransactionDiffer {
         case ltx: LeaseCancelTransaction => LeaseTransactionsDiff.leaseCancel(s, settings, currentBlockTimestamp, currentBlockHeight)(ltx)
         case etx: ExchangeTransaction => ExchangeTransactionDiff(s, currentBlockHeight)(etx)
         case atx: CreateAliasTransaction => CreateAliasTransactionDiff(currentBlockHeight)(atx)
+        case sstx: SetScriptTransaction => SetScriptTransactionDiff(currentBlockHeight)(sstx)
+        case sttx: ScriptTransferTransaction => ScriptTransferTransactionDiff(s, currentBlockHeight)(sttx)
         case _ => Left(UnsupportedTransactionType)
       }
       positiveDiff <- BalanceDiffValidation(s, settings)(diff)
