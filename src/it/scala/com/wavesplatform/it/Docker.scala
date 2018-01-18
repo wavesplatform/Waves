@@ -143,7 +143,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
     }
 
     val seedAddresses = nodes.asScala
-      .filterNot(_.nodeName == node.nodeName)
+      .filterNot(_.name == node.name)
       .map { n => (n.nodeInfo.networkIpAddress, n.nodeInfo.containerNetworkPort) }
 
     if (seedAddresses.isEmpty) Future.successful(())
@@ -178,20 +178,21 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
       .portBindings(portBindings)
       .build()
 
-    val nodeNumber = actualConfig.getString("waves.network.node-name").replace("node", "").toInt
+    val nodeName = actualConfig.getString("waves.network.node-name")
+    val nodeNumber = nodeName.replace("node", "").toInt
     val ip = s"$networkPrefix.$nodeNumber"
     val containerConfig = ContainerConfig.builder()
       .image("com.wavesplatform/waves:latest")
       .exposedPorts(restApiPort, networkPort, matcherApiPort)
       .networkingConfig(ContainerConfig.NetworkingConfig.create(Map(
-        wavesNetwork.name() -> endpointConfigFor(actualConfig.getString("waves.network.node-name"))
+        wavesNetwork.name() -> endpointConfigFor(nodeName)
       ).asJava))
       .hostConfig(hostConfig)
       .env(s"WAVES_OPTS=$configOverrides", s"WAVES_NET_IP=$ip", s"WAVES_PORT=$networkPort")
       .build()
 
     val containerId = {
-      val containerName = s"${wavesNetwork.name()}-${actualConfig.getString("waves.network.node-name")}"
+      val containerName = s"${wavesNetwork.name()}-$nodeName"
       dumpContainers(
         client.listContainers(DockerClient.ListContainersParam.filter("name", containerName)),
         "Containers with same name"
@@ -207,7 +208,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
 
     val node = new NodeImpl(actualConfig, getNodeInfo(containerId, actualConfig), http)
     nodes.add(node)
-    log.debug(s"Started $containerId -> ${node.settings.networkSettings.nodeName}: ${node.nodeInfo}")
+    log.debug(s"Started $containerId -> ${node.name}: ${node.nodeInfo}")
     node
   } catch {
     case NonFatal(e) =>
@@ -257,7 +258,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
         saveLog(node)
         val containerInfo = client.inspectContainer(node.nodeInfo.containerId)
         log.debug(
-          s"""Container information for ${node.settings.networkSettings.nodeName}:
+          s"""Container information for ${node.name}:
              |Exit code: ${containerInfo.state().exitCode()}
              |Error: ${containerInfo.state().error()}
              |Status: ${containerInfo.state().status()}
@@ -290,7 +291,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
     Files.createDirectories(logDir)
     val containerId = node.nodeInfo.containerId
 
-    val logFile = logDir.resolve(s"${node.settings.networkSettings.nodeName}.log").toFile
+    val logFile = logDir.resolve(s"${node.name}.log").toFile
     log.info(s"Writing logs of $containerId to ${logFile.getAbsolutePath}")
 
     val fileStream = new FileOutputStream(logFile, false)
@@ -322,12 +323,12 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
       wavesNetwork.id(),
       NetworkConnection.builder()
         .containerId(node.nodeInfo.containerId)
-        .endpointConfig(endpointConfigFor(node.settings.networkSettings.nodeName))
+        .endpointConfig(endpointConfigFor(node.name))
         .build()
     )
 
     node.nodeInfo = getNodeInfo(node)
-    log.debug(s"New ${node.settings.networkSettings.nodeName} settings: ${node.nodeInfo}")
+    log.debug(s"New ${node.name} settings: ${node.nodeInfo}")
   }
 
   private def endpointConfigFor(nodeName: String): EndpointConfig = {

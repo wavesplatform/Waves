@@ -1,5 +1,6 @@
 package com.wavesplatform.it
 
+import com.typesafe.config.Config
 import com.wavesplatform.it.TransferSending.Req
 import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.api.Node
@@ -27,29 +28,40 @@ trait TransferSending extends ScorexLogging {
     override val chainId: Byte = 'I'.toByte
   }
 
-  def generateTransfersBetweenAccounts(n: Int, balances: Map[String, Long]): Seq[Req] = {
+  def generateTransfersBetweenAccounts(n: Int, balances: Map[Config, Long]): Seq[Req] = {
     val fee = 100000
-    val srcDest = nodes.map { x => (x.accountSeed, PrivateKeyAccount.fromSeed(x.accountSeed).right.get) }
+    val srcDest = balances
+      .toSeq
+      .map {
+        case (config, _) =>
+          val accountSeed = config.getString("account-seed")
+          (config, PrivateKeyAccount.fromSeed(accountSeed).right.get)
+      }
+
     val sourceAndDest = (1 to n).map { _ =>
-      val Seq((srcSeed, _), (_, destPrivateKey)) = Random.shuffle(srcDest).take(2)
-      (srcSeed, destPrivateKey.address)
+      val Seq((srcConfig, _), (_, destPrivateKey)) = Random.shuffle(srcDest).take(2)
+      (srcConfig, destPrivateKey.address)
     }
+
     val requests = sourceAndDest.foldLeft(List.empty[Req]) {
-      case (rs, (srcSeed, destAddr)) =>
+      case (rs, (srcConfig, destAddr)) =>
         val a = Random.nextDouble()
-        val b = balances(srcSeed)
+        val b = balances(srcConfig)
         val transferAmount = (1e-8 + a * 1e-9 * b).toLong
         if (transferAmount < 0) log.warn(s"Negative amount: (1e-8 + $a * 1e-8 * $b) = $transferAmount")
-        rs :+ Req(srcSeed, destAddr, Math.max(transferAmount, 1L), fee)
+        rs :+ Req(srcConfig.getString("account-seed"), destAddr, Math.max(transferAmount, 1L), fee)
     }
 
     requests
   }
 
-  def generateTransfersToRandomAddresses(n: Int, balances: Map[String, Long]): Seq[Req] = {
+  def generateTransfersToRandomAddresses(n: Int, excludeSrcAddresses: Set[String]): Seq[Req] = {
     val fee = 100000
     val seedSize = 32
-    val seeds = nodes.map(_.accountSeed)
+
+    val seeds = NodeConfigs.Default.collect {
+      case config if !excludeSrcAddresses.contains(config.getString("address")) => config.getString("account-seed")
+    }
 
     val sourceAndDest = (1 to n).map { _ =>
       val srcSeed = Random.shuffle(seeds).head
@@ -68,28 +80,31 @@ trait TransferSending extends ScorexLogging {
 
   def balanceForNode(n: Node): Future[(String, Long)] = n.balance(n.address).map(b => n.accountSeed -> b.balance)
 
-  /**
-    * @return Last transaction
-    */
-  def processRequests(requests: Seq[Req]): Future[Option[Transaction]] = {
+  def processRequests(requests: Seq[Req]): Future[Seq[Transaction]] = {
     val n = requests.size
     val start = System.currentTimeMillis() - n
-    val xs = requests.zipWithIndex.map { case (x, i) =>
-      createSignedTransferRequest(TransferTransaction
-        .create(
-          assetId = None,
-          sender = PrivateKeyAccount.fromSeed(x.senderSeed).right.get,
-          recipient = AddressOrAlias.fromString(x.targetAddress).right.get,
-          amount = x.amount,
-          timestamp = start + i,
-          feeAssetId = None,
-          feeAmount = x.fee,
-          attachment = Array.emptyByteArray
-        )
-        .right.get)
-    }
+    val requestGroups = requests
+      .zipWithIndex
+      .map { case (x, i) =>
+        createSignedTransferRequest(TransferTransaction
+          .create(
+            assetId = None,
+            sender = PrivateKeyAccount.fromSeed(x.senderSeed).right.get,
+            recipient = AddressOrAlias.fromString(x.targetAddress).right.get,
+            amount = x.amount,
+            timestamp = start + i,
+            feeAssetId = None,
+            feeAmount = x.fee,
+            attachment = Array.emptyByteArray
+          )
+          .right.get)
+      }
+      .grouped(requests.size / nodes.size)
+      .toSeq
 
-    nodes.head.batchSignedTransfer(xs).map(_.lastOption)
+    Future
+      .traverse(nodes.zip(requestGroups)) { case (node, request) => node.batchSignedTransfer(request) }
+      .map(_.flatten)
   }
 
   protected def createSignedTransferRequest(tx: TransferTransaction): SignedTransferRequest = {

@@ -2,7 +2,6 @@ package com.wavesplatform.it.api
 
 import java.io.IOException
 import java.util.concurrent.TimeoutException
-import java.util.{Timer, TimerTask}
 
 import com.wavesplatform.features.api.ActivationStatus
 import com.wavesplatform.it.util.GlobalTimer.{instance => timer}
@@ -26,9 +25,9 @@ import scorex.waves.http.{DebugMessage, RollbackParams}
 
 import scala.compat.java8.FutureConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
-import scala.concurrent.{Future, Promise}
 import scala.util.{Failure, Success, Try}
 
 object AsyncHttpApi {
@@ -64,16 +63,16 @@ object AsyncHttpApi {
       matcherGetWithSignature(s"/matcher/orderbook/$publicKey", timestamp, signature).as[Seq[OrderbookHistory]]
 
     def get(path: String, f: RequestBuilder => RequestBuilder = identity): Future[Response] =
-      retrying(f(_get(s"http://${n.restAddress}:${n.nodeRestPort}$path")).build())
+      retrying(f(_get(s"http://${n.restAddress}:${n.restPort}$path")).build())
 
     def getWithApiKey(path: String, f: RequestBuilder => RequestBuilder = identity): Future[Response] = retrying {
-      _get(s"http://${n.restAddress}:${n.nodeRestPort}$path")
+      _get(s"http://${n.restAddress}:${n.restPort}$path")
         .setHeader("api_key", "integration-test-rest-api")
         .build()
     }
 
     def postJsonWithApiKey[A: Writes](path: String, body: A): Future[Response] = retrying {
-      _post(s"http://${n.restAddress}:${n.nodeRestPort}$path")
+      _post(s"http://${n.restAddress}:${n.restPort}$path")
         .setHeader("api_key", "integration-test-rest-api")
         .setHeader("Content-type", "application/json").setBody(stringify(toJson(body)))
         .build()
@@ -88,7 +87,7 @@ object AsyncHttpApi {
       post(path, stringify(toJson(body)))
 
     def post(path: String, body: String): Future[Response] =
-      post(s"http://${n.restAddress}", n.nodeRestPort, path,
+      post(s"http://${n.restAddress}", n.restPort, path,
         (rb: RequestBuilder) => rb.setHeader("Content-type", "application/json").setBody(body))
 
     def blacklist(networkIpAddress: String, hostNetworkPort: Int): Future[Unit] =
@@ -109,7 +108,7 @@ object AsyncHttpApi {
     def waitForStartup(): Future[Option[Response]] = {
       val timeout = 500
 
-      val request = _get(s"http://${n.restAddress}:${n.nodeRestPort}/blocks/height")
+      val request = _get(s"http://${n.restAddress}:${n.restPort}/blocks/height")
         .setReadTimeout(timeout)
         .setRequestTimeout(timeout)
         .build()
@@ -212,7 +211,7 @@ object AsyncHttpApi {
       postJson("/assets/broadcast/transfer", transfer).as[Transaction]
 
     def batchSignedTransfer(transfers: Seq[SignedTransferRequest], timeout: FiniteDuration = 1.minute): Future[Seq[Transaction]] = {
-      val request = _post(s"http://${n.restAddress}:${n.nodeRestPort}/assets/broadcast/batch-transfer")
+      val request = _post(s"http://${n.restAddress}:${n.restPort}/assets/broadcast/batch-transfer")
         .setHeader("Content-type", "application/json")
         .setHeader("api_key", "integration-test-rest-api")
         .setReadTimeout(timeout.toMillis.toInt)
@@ -266,7 +265,7 @@ object AsyncHttpApi {
     }
 
     def createAddress: Future[String] =
-      post(s"http://${n.restAddress}", n.nodeRestPort, "/addresses").as[JsValue].map(v => (v \ "address").as[String])
+      post(s"http://${n.restAddress}", n.restPort, "/addresses").as[JsValue].map(v => (v \ "address").as[String])
 
     def waitForNextBlock: Future[Block] = for {
       currentBlock <- lastBlock
@@ -423,9 +422,7 @@ object AsyncHttpApi {
 
     def waitFor[A](desc: String)(retryInterval: FiniteDuration)
                   (request: Node => Future[A], cond: Iterable[A] => Boolean): Future[Boolean] = {
-      def retry = sleep(retryInterval).flatMap { _ =>
-        waitFor(desc)(retryInterval)(request, cond)
-      }
+      def retry = timer.schedule(waitFor(desc)(retryInterval)(request, cond), retryInterval)
 
       Future.traverse(nodes)(request)
         .map(cond)
@@ -436,17 +433,5 @@ object AsyncHttpApi {
         }
     }
 
-  }
-
-  private val ttimer = new Timer("multiple-nodes-api", true)
-
-  private def sleep(delay: FiniteDuration): Future[Unit] = {
-    val p = Promise[Unit]()
-    ttimer.schedule(
-      new TimerTask {
-        override def run(): Unit = p.success(())
-      },
-      delay.toMillis)
-    p.future
   }
 }
