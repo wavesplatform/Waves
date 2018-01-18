@@ -1,7 +1,6 @@
 package com.wavesplatform.it
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.it.RollbackSpecSuite._
 import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.util._
@@ -18,8 +17,14 @@ import scala.util.Random
 class RollbackSpecSuite extends FreeSpec with ScalaFutures with IntegrationPatience
   with Matchers with TransferSending with WaitForHeight2 with NodesFromDocker {
   // there are nodes with big and small balances to reduce the number of forks
-  override protected def nodeConfigs: Seq[Config] = configs
+  private val nonGeneratingNodesConfig = ConfigFactory.parseString("waves.miner.enable = no")
 
+  override protected val nodeConfigs: Seq[Config] = Seq(
+    NodeConfigs.Default.last,
+    nonGeneratingNodesConfig.withFallback(Random.shuffle(NodeConfigs.Default.init).head)
+  )
+
+  private val nodeAddresses = nodeConfigs.map(_.getString("address")).toSet
   private val transactionsCount = 190
 
   "Apply the same transfer transactions twice with return to UTX" in {
@@ -27,8 +32,7 @@ class RollbackSpecSuite extends FreeSpec with ScalaFutures with IntegrationPatie
     result(for {
       startHeight <- Future.traverse(nodes)(_.height).map(_.min)
 
-      b <- traverse(nodes)(balanceForNode).map(_.toMap)
-      _ <- processRequests(generateTransfersBetweenAccounts(transactionsCount, b))
+      _ <- processRequests(generateTransfersToRandomAddresses(transactionsCount, nodeAddresses))
 
       hashAfterFirstTry <- traverse(nodes)(_.waitForDebugInfoAt(startHeight + waitBlocks).map(_.stateHash)).map(infos => {
         all(infos) shouldEqual infos.head
@@ -55,17 +59,16 @@ class RollbackSpecSuite extends FreeSpec with ScalaFutures with IntegrationPatie
     result(for {
       startHeight <- Future.traverse(nodes)(_.height).map(_.min)
 
-      b <- traverse(nodes)(balanceForNode).map(_.toMap)
-      requests = generateTransfersBetweenAccounts(transactionsCount, b)
+      requests = generateTransfersToRandomAddresses(transactionsCount, nodeAddresses)
 
-      hashBeforeApply <- traverse(nodes)(_.waitForDebugInfoAt(startHeight + waitBlocks).map(_.stateHash)).map(infos => {
+      hashBeforeApply <- traverse(nodes)(_.waitForDebugInfoAt(startHeight + waitBlocks).map(_.stateHash)).map { infos =>
         all(infos) shouldEqual infos.head
         infos.head
-      })
+      }
       _ <- processRequests(requests)
       _ <- nodes.head.waitFor[Int]("empty utx")(_.utxSize, _ == 0, 1.second)
       _ <- traverse(nodes)(_.rollback(startHeight, returnToUTX = false))
-      _ <- nodes.head.utx.map( _ shouldBe 'empty )
+      _ <- nodes.head.utx.map(_ shouldBe 'empty)
 
       hashAfterApply <- nodes.head.waitForDebugInfoAt(startHeight + waitBlocks).map(_.stateHash)
     } yield {
@@ -89,13 +92,4 @@ class RollbackSpecSuite extends FreeSpec with ScalaFutures with IntegrationPatie
 
     Await.result(f, 1.minute)
   }
-}
-
-object RollbackSpecSuite {
-
-  import NodeConfigs.Default
-
-  private val nonGeneratingNodesConfig = ConfigFactory.parseString("waves.miner.enable = no")
-
-  val configs: Seq[Config] = Seq(Default.last, nonGeneratingNodesConfig.withFallback(Random.shuffle(Default.init).head))
 }

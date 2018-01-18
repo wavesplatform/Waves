@@ -87,7 +87,7 @@ class TransactionsApiSuite extends BaseTransactionSuite {
     Await.result(f, timeout)
   }
 
-  test("/transactions/sign should produce issue/reissue transactions that are good for /transactions/broadcast") {
+  test("/transactions/sign should produce issue/reissue/burn transactions that are good for /transactions/broadcast") {
     val issueId = signAndBroadcast(Json.obj(
       "type" -> 3,
       "name" -> "Gigacoin",
@@ -105,6 +105,13 @@ class TransactionsApiSuite extends BaseTransactionSuite {
       "sender" -> firstAddress,
       "reissuable" -> false,
       "fee" -> 1.waves))
+
+    signAndBroadcast(Json.obj(
+      "type" -> 6,
+      "quantity" -> 100.waves,
+      "assetId" -> issueId,
+      "sender" -> firstAddress,
+      "fee" -> 1.waves))
   }
 
   test("/transactions/sign should produce transfer transaction that is good for /transactions/broadcast") {
@@ -117,12 +124,18 @@ class TransactionsApiSuite extends BaseTransactionSuite {
       "attachment" -> Base58.encode("falafel".getBytes)))
   }
 
-  test("/transactions/sign should produce leasing transactions that are good for /transactions/broadcast") {
-    signAndBroadcast(Json.obj(
+  test("/transactions/sign should produce lease/cancel transactions that are good for /transactions/broadcast") {
+    val leaseId = signAndBroadcast(Json.obj(
       "type" -> 8,
       "sender" -> firstAddress,
       "amount" -> 1.waves,
       "recipient" -> secondAddress,
+      "fee" -> 100000))
+
+    signAndBroadcast(Json.obj(
+      "type" -> 9,
+      "sender" -> firstAddress,
+      "txId" -> leaseId,
       "fee" -> 100000))
   }
 

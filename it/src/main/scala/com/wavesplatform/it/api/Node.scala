@@ -31,9 +31,9 @@ trait Node {
 
   def chainId: Char
 
-  def nodeName: String
+  def name: String
 
-  def nodeRestPort: Int
+  def restPort: Int
 
   def matcherRestPort: Int
 
@@ -45,7 +45,7 @@ trait Node {
 
   def fee(txValue: TransactionType.Value, asset: String = "WAVES"): Long
 
-  val log: LoggerFacade = LoggerFacade(LoggerFactory.getLogger(s"${getClass.getName} $restAddress"))
+  lazy val log: LoggerFacade = LoggerFacade(LoggerFactory.getLogger(s"${getClass.getName} $name"))
 }
 
 object Node extends ScorexLogging {
