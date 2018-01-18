@@ -1,7 +1,8 @@
 package scorex.api.http.leasing
 
 import io.swagger.annotations.ApiModelProperty
-import play.api.libs.json.{Format, Json}
+import play.api.libs.functional.syntax._
+import play.api.libs.json._
 import scorex.account.PublicKeyAccount
 import scorex.api.http.BroadcastRequest
 import scorex.transaction.TransactionParser.SignatureStringLength
@@ -32,6 +33,14 @@ case class SignedLeaseCancelRequest(@ApiModelProperty(value = "Base58 encoded se
 }
 
 object SignedLeaseCancelRequest {
-  implicit val leaseCancelRequestFormat: Format[SignedLeaseCancelRequest] = Json.format
+  implicit val reads: Reads[SignedLeaseCancelRequest] = (
+      (JsPath \ "senderPublicKey").read[String] and
+      (JsPath \ "txId").read[String].orElse((JsPath \ "leaseId").read[String]) and
+      (JsPath \ "timestamp").read[Long] and
+      (JsPath \ "signature").read[String] and
+      (JsPath \ "fee").read[Long]
+    )(SignedLeaseCancelRequest.apply _)
+
+  implicit val writes: Writes[SignedLeaseCancelRequest] = Json.writes[SignedLeaseCancelRequest]
 }
 
