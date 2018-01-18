@@ -5,6 +5,7 @@ import com.wavesplatform.state2._
 import monix.eval.Coeval
 import play.api.libs.json.Json
 import scorex.account._
+import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.serialization.{BytesSerializable, Deser}
 import scorex.transaction.TransactionParser.{KeyLength, TransactionType}
@@ -69,4 +70,12 @@ object SetScriptTransaction {
     } else {
       Right(new SetScriptTransaction(1, sender, script, fee, timestamp, proof))
     }
+
+
+  def selfSigned(sender: PrivateKeyAccount,
+                 script: Script,
+                 fee: Long,
+                 timestamp: Long): Either[ValidationError, SetScriptTransaction] = create(sender, script, fee, timestamp, ByteStr.empty).right.map { unsigned =>
+    unsigned.copy(proof = ByteStr(EllipticCurveImpl.sign(sender, unsigned.bodyBytes())))
+  }
 }

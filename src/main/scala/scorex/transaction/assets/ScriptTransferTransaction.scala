@@ -4,7 +4,8 @@ import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.state2.ByteStr
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
-import scorex.account.{AddressOrAlias, PublicKeyAccount}
+import scorex.account.{AddressOrAlias, PrivateKeyAccount, PublicKeyAccount}
+import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.serialization.{BytesSerializable, Deser}
 import scorex.transaction.TransactionParser._
@@ -81,7 +82,7 @@ object ScriptTransferTransaction {
              timestamp: Long,
              feeAmount: Long,
              attachment: Array[Byte],
-             signature: ByteStr): Either[ValidationError, ScriptTransferTransaction] = {
+             proof: ByteStr): Either[ValidationError, ScriptTransferTransaction] = {
     if (attachment.length > TransferTransaction.MaxAttachmentSize) {
       Left(ValidationError.TooBigArray)
     } else if (amount <= 0) {
@@ -91,7 +92,20 @@ object ScriptTransferTransaction {
     } else if (feeAmount <= 0) {
       Left(ValidationError.InsufficientFee)
     } else {
-      Right(ScriptTransferTransaction(version,  sender, recipient, assetId, amount, timestamp, feeAmount, attachment, signature))
+      Right(ScriptTransferTransaction(version,  sender, recipient, assetId, amount, timestamp, feeAmount, attachment, proof))
+    }
+  }
+
+  def selfSigned(version: Byte,
+                 assetId: Option[AssetId],
+                 sender: PrivateKeyAccount,
+                 recipient: AddressOrAlias,
+                 amount: Long,
+                 timestamp: Long,
+                 feeAmount: Long,
+                 attachment: Array[Byte]): Either[ValidationError, ScriptTransferTransaction] = {
+    create(version,assetId,sender,recipient,amount,timestamp,feeAmount,attachment,ByteStr.empty).right.map { unsigned =>
+      unsigned.copy(proof = ByteStr(EllipticCurveImpl.sign(sender, unsigned.bodyBytes())))
     }
   }
 }

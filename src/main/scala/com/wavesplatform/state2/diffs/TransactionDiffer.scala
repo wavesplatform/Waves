@@ -4,7 +4,7 @@ package com.wavesplatform.state2.diffs
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2._
 import com.wavesplatform.state2.reader.SnapshotStateReader
-import scorex.transaction.ValidationError.UnsupportedTransactionType
+import scorex.transaction.ValidationError.{GenericError, UnsupportedTransactionType}
 import scorex.transaction._
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.ExchangeTransaction
@@ -19,10 +19,10 @@ object TransactionDiffer {
     for {
       t0 <- tx match {
         case at: AuthorizedTransaction => (at, s.accountScript(at.sender)) match {
-          case (stx: SignedTransaction, None) => stx.signaturesValid()
+          case (_, Some(script)) => ScriptValidator.verify(script, currentBlockHeight, tx)
           case (ptx: ProvenTransaction, None) => ScriptValidator.verifyAsEllipticCurveSignature(ptx)
-          case (_, Some(script)) => ScriptValidator.verify(script, tx)
-          case _ => ??? // workaround for 'match may not be exhaustive'
+          case (stx: SignedTransaction, None) => stx.signaturesValid()
+          case _ => Left(GenericError("Fix this proven-authorized-payment-genesis-signed mess")) // workaround for 'match may not be exhaustive'
         }
         case _: GenesisTransaction => Right(tx)
       }

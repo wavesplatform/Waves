@@ -120,6 +120,9 @@ class StateWriterImpl(p: StateStorage, storeTransactions: Boolean, synchronizati
     measureSizeLog("lease info")(blockDiff.txsDiff.leaseState)(
       _.foreach { case (id, isActive) => sp().leaseState.put(id, isActive) })
 
+    measureSizeLog("script")(blockDiff.txsDiff.scripts)(
+      _.foreach { case (acc, script) => sp().scripts.put(acc.bytes, script.bytes()) })
+
     setHeight(newHeight)
 
     val nextChunkOfBlocks = !sameQuotient(newHeight, oldHeight, 1000)
