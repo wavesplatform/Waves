@@ -1,7 +1,8 @@
 resolvers ++= Seq(
   "Typesafe repository" at "http://repo.typesafe.com/typesafe/releases/",
   "Artima Maven Repository" at "http://repo.artima.com/releases",
-  "JBoss" at "https://repository.jboss.org"
+  "JBoss" at "https://repository.jboss.org",
+  Resolver.sbtPluginRepo("releases")
 )
 
 Seq(
@@ -14,5 +15,5 @@ Seq(
 ).map(addSbtPlugin)
 
 libraryDependencies ++= Seq(
-  "com.typesafe" % "config" % "1.3.0",
-  "org.vafer" % "jdeb" % "1.5" artifacts Artifact("jdeb", "jar", "jar"))
+  "org.vafer" % "jdeb" % "1.5" artifacts Artifact("jdeb", "jar", "jar")
+)

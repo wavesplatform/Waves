@@ -182,7 +182,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty,
     val nodeNumber = nodeName.replace("node", "").toInt
     val ip = s"$networkPrefix.$nodeNumber"
     val containerConfig = ContainerConfig.builder()
-      .image("com.wavesplatform/waves:latest")
+      .image("com.wavesplatform/it:latest")
       .exposedPorts(restApiPort, networkPort, matcherApiPort)
       .networkingConfig(ContainerConfig.NetworkingConfig.create(Map(
         wavesNetwork.name() -> endpointConfigFor(nodeName)

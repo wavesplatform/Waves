@@ -1,18 +1,21 @@
-import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
-
 import com.typesafe.sbt.packager.archetypes.TemplateWriter
 import sbt.Keys._
 import sbt._
 
-enablePlugins(sbtdocker.DockerPlugin, JavaServerAppPackaging, JDebPackaging, SystemdPlugin, GitVersioning)
+enablePlugins(JavaServerAppPackaging, JDebPackaging, SystemdPlugin, GitVersioning)
+
+inThisBuild(Seq(
+  scalaVersion := "2.12.4",
+  organization := "com.wavesplatform",
+  crossPaths := false
+))
 
 name := "waves"
-organization := "com.wavesplatform"
+
 git.useGitDescribe := true
 git.uncommittedSignifier := Some("DIRTY")
-scalaVersion in ThisBuild := "2.12.4"
-crossPaths := false
+
+
 publishArtifact in (Compile, packageDoc) := false
 publishArtifact in (Compile, packageSrc) := false
 mainClass in Compile := Some("com.wavesplatform.Application")
@@ -39,8 +42,7 @@ libraryDependencies ++=
   Dependencies.http ++
   Dependencies.akka ++
   Dependencies.serialization ++
-  Dependencies.testKit ++
-  Dependencies.itKit ++
+  Dependencies.testKit.map(_ % "test") ++
   Dependencies.logging ++
   Dependencies.matcher ++
   Dependencies.metrics ++
@@ -72,82 +74,6 @@ inConfig(Test)(Seq(
   testOptions += Tests.Argument("-oIDOF", "-u", "target/test-reports")
 ))
 
-concurrentRestrictions in Global := {
-  val threadNumber = Option(System.getenv("SBT_THREAD_NUMBER")).fold(1)(_.toInt)
-  Seq(
-    Tags.limit(Tags.CPU, threadNumber),
-    Tags.limit(Tags.Network, threadNumber),
-    Tags.limit(Tags.Test, threadNumber),
-    Tags.limitAll(threadNumber)
-  )
-}
-
-Defaults.itSettings
-configs(IntegrationTest)
-
-lazy val itTestsCommonSettings: Seq[Def.Setting[_]] = Seq(
-  testOptions += Tests.Argument(TestFrameworks.ScalaTest, "-fW", (logDirectory.value / "summary.log").toString),
-  testGrouping := {
-    testGrouping.value.flatMap { group =>
-      group.tests.map { suite =>
-        val fileName = {
-          val parts = suite.name.split('.')
-          (parts.init.map(_.substring(0, 1)) :+ parts.last).mkString(".")
-        }
-
-        val forkOptions = ForkOptions(
-          bootJars = Nil,
-          javaHome = javaHome.value,
-          connectInput = connectInput.value,
-          outputStrategy = outputStrategy.value,
-          runJVMOptions = javaOptions.value ++ Seq(
-            "-Dwaves.it.logging.appender=FILE",
-            s"-Dwaves.it.logging.dir=${logDirectory.value / fileName}"
-          ),
-          workingDirectory = Some(baseDirectory.value),
-          envVars = envVars.value
-        )
-
-        group.copy(
-          name = suite.name,
-          runPolicy = Tests.SubProcess(forkOptions),
-          tests = Seq(suite)
-        )
-      }
-    }
-  }
-)
-
-inConfig(IntegrationTest)(
-  Seq(
-    test := (test dependsOn docker).value,
-    envVars in test += "CONTAINER_JAVA_OPTS" -> "-Xmx1500m",
-    envVars in testOnly += "CONTAINER_JAVA_OPTS" -> "-Xmx512m"
-  ) ++ inTask(test)(itTestsCommonSettings) ++ inTask(testOnly)(itTestsCommonSettings)
-)
-
-dockerfile in docker := {
-  val configTemplate = (resourceDirectory in IntegrationTest).value / "template.conf"
-  val startWaves = (sourceDirectory in IntegrationTest).value / "container" / "start-waves.sh"
-
-  new Dockerfile {
-    from("anapsix/alpine-java:8_server-jre")
-    add(assembly.value, "/opt/waves/waves.jar")
-    add(Seq(configTemplate, startWaves), "/opt/waves/")
-    run("chmod", "+x", "/opt/waves/start-waves.sh")
-    entryPoint("/opt/waves/start-waves.sh")
-  }
-}
-
-buildOptions in docker := BuildOptions(
-  removeIntermediateContainers = BuildOptions.Remove.OnSuccess
-)
-
-// packaging settings
-val upstartScript = TaskKey[File]("upstartScript")
-val packageSource = SettingKey[File]("packageSource")
-val network = SettingKey[Network]("network")
-
 commands += Command.command("packageAll") { state =>
   "clean" ::
   "assembly" ::
@@ -161,7 +87,7 @@ inConfig(Linux)(Seq(
   packageDescription := "Waves node"
 ))
 
-network := Network(sys.props.get("network"))
+val network = Def.setting { Network(sys.props.get("network")) }
 normalizedName := network.value.name
 
 javaOptions in Universal ++= Seq(
@@ -186,8 +112,8 @@ javaOptions in Universal ++= Seq(
   "-J-XX:+UseStringDeduplication")
 
 mappings in Universal += (baseDirectory.value / s"waves-${network.value}.conf" -> "doc/waves.conf.sample")
-packageSource := sourceDirectory.value / "package"
-upstartScript := {
+val packageSource = Def.setting { sourceDirectory.value / "package" }
+val upstartScript = Def.task {
   val src = packageSource.value / "upstart.conf"
   val dest = (target in Debian).value / "upstart" / s"${packageName.value}.conf"
   val result = TemplateWriter.generateScript(src.toURI.toURL, linuxScriptReplacements.value)
@@ -216,24 +142,17 @@ inConfig(Debian)(Seq(
 ))
 
 lazy val node = project.in(file("."))
-lazy val generator = project.in(file("generator"))
-  .dependsOn(node % "compile->it")
+
+lazy val discovery = project
+
+lazy val it = project
+  .dependsOn(node)
+
+lazy val generator = project
+  .dependsOn(it)
   .settings(
-    libraryDependencies ++=
-      Dependencies.fp ++
-      Seq(
-        "com.github.scopt" %% "scopt" % "3.6.0"
-      )
+    libraryDependencies += "com.github.scopt" %% "scopt" % "3.6.0"
   )
 
-lazy val logDirectory = taskKey[File]("A directory for logs")
-logDirectory := {
-  val runId = Option(System.getenv("RUN_ID")).getOrElse {
-    val formatter = DateTimeFormatter.ofPattern("MM-dd--HH_mm_ss")
-    s"local-${formatter.format(LocalDateTime.now())}"
-  }
-  val r = target.value / "logs" / runId
-  IO.createDirectory(r)
-  r
-}
+
 
