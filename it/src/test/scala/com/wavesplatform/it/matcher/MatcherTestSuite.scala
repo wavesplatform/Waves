@@ -66,7 +66,7 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
 
   "matcher should respond with Public key" in {
     Await.result(matcherNode.matcherGet("/matcher"), 1.minute)
-      .getResponseBody.stripPrefix("\"").stripSuffix("\"") shouldBe matcherNode.publicKey
+      .getResponseBody.stripPrefix("\"").stripSuffix("\"") shouldBe Base58.encode(matcherNode.publicKey.publicKey)
   }
 
   "sell order could be placed" in {
