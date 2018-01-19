@@ -55,9 +55,11 @@ if [ "$1" = upgrade ]; then
         mv /etc/${{app_name}}/waves.conf /etc/${{app_name}}/waves.conf.bak
     fi
 
-    if dpkg --compare-versions "$2" lt 0.8.8 ; then
-        rm -f /etc/init/${{app_name}}.conf
+    if dpkg --compare-versions "$2" lt 0.8.11 ; then
         rm -f /etc/${{app_name}}/upstart.conf
+        if [ -L /etc/init/${{app_name}}.conf ] ; then
+            rm -f /etc/init/${{app_name}}.conf
+        fi
         chmod -x /etc/${{app_name}}/application.ini
     fi
 fi

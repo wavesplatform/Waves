@@ -6,6 +6,7 @@ import cats._
 import cats.implicits._
 import com.google.common.cache.CacheBuilder
 import io.netty.channel._
+import monix.eval.Coeval
 import monix.execution.Scheduler
 import monix.reactive.Observable
 import scorex.transaction.History.BlockchainScore
@@ -20,16 +21,14 @@ object RxScoreObserver extends ScorexLogging {
     override def toString: String = s"BestChannel(${id(channel)},score: $score)"
   }
 
-  implicit val bestChannelEq = new Eq[BestChannel] {
-    override def eqv(x: BestChannel, y: BestChannel) = x.channel == y.channel && x.score == y.score
-  }
+  implicit val bestChannelEq: Eq[BestChannel] = { (x, y) => x.channel == y.channel && x.score == y.score }
 
   type SyncWith = Option[BestChannel]
 
   case class ChannelClosedAndSyncWith(closed: Option[Channel], syncWith: SyncWith)
 
-  implicit val channelClosedAndSyncWith = new Eq[ChannelClosedAndSyncWith] {
-    override def eqv(x: ChannelClosedAndSyncWith, y: ChannelClosedAndSyncWith) = x.closed == y.closed && x.syncWith == y.syncWith
+  implicit val channelClosedAndSyncWith: Eq[ChannelClosedAndSyncWith] = { (x, y) =>
+    x.closed == y.closed && x.syncWith == y.syncWith
   }
 
   private def calcSyncWith(bestChannel: Option[Channel], localScore: BlockchainScore, scoreMap: scala.collection.Map[Channel, BlockchainScore]): SyncWith = {
@@ -50,10 +49,11 @@ object RxScoreObserver extends ScorexLogging {
   }
 
   def apply(scoreTtl: FiniteDuration,
+            remoteScoreDebounce: FiniteDuration,
             initalLocalScore: BigInt,
             localScores: Observable[BlockchainScore],
             remoteScores: ChannelObservable[BlockchainScore],
-            channelClosed: Observable[Channel]): Observable[ChannelClosedAndSyncWith] = {
+            channelClosed: Observable[Channel]): (Observable[ChannelClosedAndSyncWith], Coeval[Stats]) = {
 
     val scheduler = Scheduler.singleThread("rx-score-observer")
 
@@ -62,6 +62,9 @@ object RxScoreObserver extends ScorexLogging {
     val scores = CacheBuilder.newBuilder()
       .expireAfterWrite(scoreTtl.toMillis, TimeUnit.MILLISECONDS)
       .build[Channel, BlockchainScore]()
+    val statsReporter = Coeval.eval {
+      Stats(localScore, currentBestChannel.toString, scores.size())
+    }
 
     def ls: Observable[Option[Channel]] = localScores
       .observeOn(scheduler)
@@ -77,6 +80,7 @@ object RxScoreObserver extends ScorexLogging {
       .observeOn(scheduler)
       .groupBy(_._1)
       .map(_.distinctUntilChanged)
+      .debounce(remoteScoreDebounce)
       .merge
       .map { case ((ch, score)) =>
         scores.put(ch, score)
@@ -95,7 +99,7 @@ object RxScoreObserver extends ScorexLogging {
         Option(ch)
       }
 
-    Observable
+    val observable = Observable
       .merge(ls, rs, cc)
       .map { maybeClosedChannel =>
         val sw = calcSyncWith(currentBestChannel, localScore, scores.asMap().asScala)
@@ -105,6 +109,9 @@ object RxScoreObserver extends ScorexLogging {
       .logErr
       .distinctUntilChanged
       .share(scheduler)
+
+    (observable, statsReporter)
   }
 
+  case class Stats(localScore: BlockchainScore, currentBestChannel: String, scoresCacheSize: Long)
 }

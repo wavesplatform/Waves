@@ -20,7 +20,6 @@ import com.wavesplatform.metrics.Metrics
 import com.wavesplatform.mining.{Miner, MinerImpl}
 import com.wavesplatform.network._
 import com.wavesplatform.settings._
-import com.wavesplatform.state2.StateWriter
 import com.wavesplatform.state2.appender.{BlockAppender, CheckpointAppender, ExtensionAppender, MicroblockAppender}
 import com.wavesplatform.utils.{SystemInformationReporter, forceStopApplication}
 import io.netty.channel.Channel
@@ -55,20 +54,19 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   // Start /node API right away
   private implicit val as: ActorSystem = actorSystem
   private implicit val materializer: ActorMaterializer = ActorMaterializer()
-
-  private val nodeApiLauncher = (bcu: BlockchainUpdater, state: StateWriter) =>
-    Option(settings.restAPISettings.enable).collect { case true =>
-      val tags = Seq(typeOf[NodeApiRoute])
-      val routes = Seq(NodeApiRoute(settings.restAPISettings, bcu, state, () => this.shutdown()))
-      val combinedRoute: Route = CompositeHttpService(actorSystem, tags, routes, settings.restAPISettings).compositeRoute
-      val httpFuture = Http().bindAndHandle(combinedRoute, settings.restAPISettings.bindAddress, settings.restAPISettings.port)
-      serverBinding = Await.result(httpFuture, 10.seconds)
-      log.info(s"Node REST API was bound on ${settings.restAPISettings.bindAddress}:${settings.restAPISettings.port}")
-      (tags, routes)
-    }
+  private val (storage, heights) = StorageFactory(settings).get
+  private val nodeApi = Option(settings.restAPISettings.enable).collect { case true =>
+    val tags = Seq(typeOf[NodeApiRoute])
+    val routes = Seq(NodeApiRoute(settings.restAPISettings, heights, () => this.shutdown()))
+    val combinedRoute: Route = CompositeHttpService(actorSystem, tags, routes, settings.restAPISettings).compositeRoute
+    val httpFuture = Http().bindAndHandle(combinedRoute, settings.restAPISettings.bindAddress, settings.restAPISettings.port)
+    serverBinding = Await.result(httpFuture, 10.seconds)
+    log.info(s"Node REST API was bound on ${settings.restAPISettings.bindAddress}:${settings.restAPISettings.port}")
+    (tags, routes)
+  }
 
   private val checkpointService = new CheckpointServiceImpl(settings.blockchainSettings.checkpointFile, settings.checkpointsSettings)
-  private val (history, featureProvider, stateWriter, stateReader, blockchainUpdater, blockchainDebugInfo, nodeApi) = StorageFactory(settings, nodeApiLauncher).get
+  private val (history, featureProvider, stateWriter, stateReader, blockchainUpdater, blockchainDebugInfo) = storage()
   private lazy val upnp = new UPnP(settings.networkSettings.uPnPSettings) // don't initialize unless enabled
   private val wallet: Wallet = Wallet(settings.walletSettings)
   private val peerDatabase = new PeerDatabaseImpl(settings.networkSettings)
@@ -99,19 +97,21 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     val lastScore = lastBlockInfo
       .map(_.score)
       .distinctUntilChanged
-      .debounce(LocalScoreBroadcastDebounce)
       .share(scheduler)
 
-    lastScore.foreach { x =>
-      allChannels.broadcast(LocalScoreChanged(x))
-    }(scheduler)
+    lastScore
+      .debounce(LocalScoreBroadcastDebounce)
+      .foreach { x =>
+        allChannels.broadcast(LocalScoreChanged(x))
+      }(scheduler)
 
-    val network = NetworkServer(settings, lastBlockInfo, history, utxStorage, peerDatabase, allChannels, establishedConnections)
+    val historyReplier = new HistoryReplier(history, settings.synchronizationSettings)
+    val network = NetworkServer(settings, lastBlockInfo, history, historyReplier, utxStorage, peerDatabase, allChannels, establishedConnections)
     val (signatures, blocks, blockchainScores, checkpoints, microblockInvs, microblockResponses, transactions) = network.messages
 
-    val syncWithChannelClosed = RxScoreObserver(settings.synchronizationSettings.scoreTTL, history.score(), lastScore, blockchainScores, network.closedChannels)
-    val microblockDatas = MicroBlockSynchronizer(settings.synchronizationSettings.microBlockSynchronizer, peerDatabase, lastBlockInfo.map(_.id), microblockInvs, microblockResponses)
-    val newBlocks = RxExtensionLoader(settings.synchronizationSettings.maxRollback, settings.synchronizationSettings.synchronizationTimeout,
+    val (syncWithChannelClosed, scoreStatsReporter) = RxScoreObserver(settings.synchronizationSettings.scoreTTL, 1.second, history.score(), lastScore, blockchainScores, network.closedChannels)
+    val (microblockDatas, mbSyncCacheSizes) = MicroBlockSynchronizer(settings.synchronizationSettings.microBlockSynchronizer, peerDatabase, lastBlockInfo.map(_.id), microblockInvs, microblockResponses)
+    val (newBlocks, extLoaderState) = RxExtensionLoader(settings.synchronizationSettings.maxRollback, settings.synchronizationSettings.synchronizationTimeout,
       history, peerDatabase, knownInvalidBlocks, blocks, signatures, syncWithChannelClosed) { case ((c, b)) => processFork(c, b.blocks) }
 
     val utxSink = UtxPoolSynchronizer(utxStorage, settings.synchronizationSettings.utxSynchronizerSettings, allChannels, transactions)
@@ -137,7 +137,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         UtilsApiRoute(settings.restAPISettings),
         PeersApiRoute(settings.restAPISettings, network.connect, peerDatabase, establishedConnections),
         AddressApiRoute(settings.restAPISettings, wallet, stateReader, settings.blockchainSettings.functionalitySettings),
-        DebugApiRoute(settings.restAPISettings, wallet, stateReader, history, peerDatabase, establishedConnections, blockchainUpdater, allChannels, utxStorage, blockchainDebugInfo, miner, configRoot),
+        DebugApiRoute(settings.restAPISettings, wallet, stateReader, history, peerDatabase, establishedConnections, blockchainUpdater, allChannels,
+          utxStorage, blockchainDebugInfo, miner, historyReplier, extLoaderState, mbSyncCacheSizes, scoreStatsReporter, configRoot),
         WavesApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, time),
         AssetsApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, stateReader, time),
         ActivationApiRoute(settings.restAPISettings, settings.blockchainSettings.functionalitySettings, settings.featuresSettings, history, featureProvider),
@@ -210,10 +211,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
       Try(Await.result(actorSystem.terminate(), stopActorsTimeout))
         .failed.map(e => log.error("Failed to terminate actor system", e))
-      log.debug("Closing storage")
-
-      log.debug("Closing wallet")
-      wallet.close()
 
       log.debug("Closing state")
       stateWriter.close()

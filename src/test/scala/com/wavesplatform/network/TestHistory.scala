@@ -3,6 +3,7 @@ package com.wavesplatform.network
 import java.util.concurrent.locks.ReentrantReadWriteLock
 
 import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.utils.HeightInfo
 import scorex.block.Block.BlockId
 import scorex.block.{Block, BlockHeader, MicroBlock}
 import scorex.transaction.History.BlockchainScore
@@ -40,4 +41,6 @@ class TestHistory extends NgHistory {
   override def synchronizationToken: ReentrantReadWriteLock = ???
 
   override def close(): Unit = ???
+
+  override def debugInfo: HeightInfo = ???
 }

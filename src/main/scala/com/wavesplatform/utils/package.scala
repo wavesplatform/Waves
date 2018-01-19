@@ -13,6 +13,8 @@ import scala.util.Try
 
 package object utils extends ScorexLogging {
 
+  type HeightInfo = (Int, Long)
+
   private val DefaultPageSplitSize = 4 * 1024
 
   def base58Length(byteArrayLength: Int): Int = math.ceil(math.log(256) / math.log(58) * byteArrayLength).toInt
@@ -86,5 +88,12 @@ package object utils extends ScorexLogging {
   def humanReadableDuration(duration: Long): String = {
     val d = new Duration(duration)
     PeriodFormat.getDefault.print(d.toPeriod)
+  }
+
+  implicit class Tap[A](a: A) {
+    def tap(g: A => Unit): A = {
+      g(a)
+      a
+    }
   }
 }

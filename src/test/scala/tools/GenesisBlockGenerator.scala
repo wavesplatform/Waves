@@ -1,9 +1,9 @@
 package tools
 
-import com.wavesplatform.TransactionGen
 import java.io.{File, FileNotFoundException}
 
 import com.typesafe.config.ConfigFactory
+import com.wavesplatform.TransactionGen
 import com.wavesplatform.settings.{GenesisSettings, GenesisTransactionSettings}
 import com.wavesplatform.state2._
 import net.ceedubs.ficus.Ficus._
@@ -102,13 +102,12 @@ object GenesisBlockGenerator extends App with TransactionGen {
 
   val signature = genesisBlock.signerData.signature
 
-    report(
+  report(
     addrInfos = shares.keysIterator,
     settings = GenesisSettings(settings.timestamp, genesisBlock.timestamp, settings.initialBalance, Some(signature),
-      genesisTxs.map{tx => GenesisTransactionSettings(tx.recipient.stringRepr, tx.amount)}, settings.baseTarget,
-      settings. averageBlockDelay
-
-  )
+      genesisTxs.map { tx => GenesisTransactionSettings(tx.recipient.stringRepr, tx.amount) }, settings.baseTarget,
+      settings.averageBlockDelay
+    )
   )
 
   private def report(addrInfos: Iterator[FullAddressInfo],
@@ -145,12 +144,8 @@ object GenesisBlockGenerator extends App with TransactionGen {
          |""".stripMargin
     )
 
-  output.append( s"""
-  |Don't forget to delete the data!
-         |""".stripMargin
-    )
-
+    output.append("\nDon't forget to delete the data!")
     System.out.print(output)
 
-}
+  }
 }

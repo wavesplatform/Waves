@@ -25,7 +25,7 @@ trait BlockchainDebugInfo {
 
 }
 
-case class LastBlockInfo(id: BlockId, height: Int, score: BlockchainScore, ready: Boolean, lastUpdated: Long)
+case class LastBlockInfo(id: BlockId, height: Int, score: BlockchainScore, ready: Boolean)
 
 case class HashInfo(height: Int, hash: Int)
 

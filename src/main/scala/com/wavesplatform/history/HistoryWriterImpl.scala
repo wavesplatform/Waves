@@ -8,17 +8,19 @@ import com.wavesplatform.settings.{FeaturesSettings, FunctionalitySettings}
 import com.wavesplatform.state2.{BlockDiff, ByteStr, DataTypes, VariablesStorage, VersionableStorage}
 import com.wavesplatform.utils._
 import kamon.Kamon
+import org.h2.mvstore.MVMap
 import scorex.block.{Block, BlockHeader}
 import scorex.transaction.History.BlockchainScore
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction._
-import scorex.utils.{LogMVMapBuilder, ScorexLogging}
+import scorex.utils.Synchronized.WriteLock
+import scorex.utils.{LogMVMapBuilder, NTP, ScorexLogging, Time}
 
 import scala.collection.JavaConverters._
 import scala.util.Try
 
 class HistoryWriterImpl private(file: Option[File], val synchronizationToken: ReentrantReadWriteLock,
-                                functionalitySettings: FunctionalitySettings, featuresSettings: FeaturesSettings)
+                                functionalitySettings: FunctionalitySettings, featuresSettings: FeaturesSettings, time: Time)
   extends VariablesStorage(createMVStore(file)) with VersionableStorage with History with FeatureProvider with ScorexLogging {
 
   override protected val Version: Int = 1
@@ -67,7 +69,7 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
         val score = (if (height() == 0) BigInt(0) else this.score()) + block.blockScore()
         blockBodyByHeight.mutate(_.put(h, block.bytes()))
         scoreByHeight.mutate(_.put(h, score))
-        blockIdByHeight.mutate(_.put(h, block.uniqueId))
+        mutateBlockIdByHeight(_.put(h, block.uniqueId))
         heightByBlockId.mutate(_.put(block.uniqueId, h))
         featuresState.mutate(_.putAll(acceptedFeatures.diff(featuresState().keySet.asScala).map(_ -> h).toMap.asJava))
         alterVotes(h, block.featureVotes, 1)
@@ -99,7 +101,7 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
       featuresState.mutate(fs => featuresToRemove.foreach(fs.remove))
     }
 
-    val vOpt = Option(blockIdByHeight.mutate(_.remove(h)))
+    val vOpt = Option(mutateBlockIdByHeight(_.remove(h)))
     vOpt.map(v => heightByBlockId.mutate(_.remove(v)))
     db.commit()
 
@@ -135,6 +137,16 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
 
   override def blockHeaderAndSizeAt(height: Int): Option[(BlockHeader, Int)] =
     blockBytes(height).map(bytes => (BlockHeader.parseBytes(bytes).get._1, bytes.length))
+
+  private var heightInfo: (Int, Long) = (height(), time.getTimestamp())
+
+  override def debugInfo: HeightInfo = heightInfo
+
+  private def mutateBlockIdByHeight[R](f: MVMap[Int, ByteStr] => R)(implicit readWriteLock: WriteLock): R = {
+    val result = blockIdByHeight.mutate(f)
+    heightInfo = (blockIdByHeight().size(), time.getTimestamp())
+    result
+  }
 }
 
 object HistoryWriterImpl extends ScorexLogging {
@@ -142,8 +154,8 @@ object HistoryWriterImpl extends ScorexLogging {
   private val CompactMemorySize = 10 * 1024 * 1024
 
   def apply(file: Option[File], synchronizationToken: ReentrantReadWriteLock, functionalitySettings: FunctionalitySettings,
-            featuresSettings: FeaturesSettings): Try[HistoryWriterImpl] =
-    createWithStore[HistoryWriterImpl](file, new HistoryWriterImpl(file, synchronizationToken, functionalitySettings, featuresSettings), h => h.isConsistent)
+            featuresSettings: FeaturesSettings, time: Time = NTP): Try[HistoryWriterImpl] =
+    createWithStore[HistoryWriterImpl](file, new HistoryWriterImpl(file, synchronizationToken, functionalitySettings, featuresSettings, time), h => h.isConsistent)
 
   private val blockHeightStats = Kamon.metrics.histogram("block-height")
   private val blockSizeStats = Kamon.metrics.histogram("block-size-bytes")

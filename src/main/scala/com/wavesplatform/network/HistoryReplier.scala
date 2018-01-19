@@ -11,6 +11,7 @@ import monix.execution.Scheduler
 import monix.execution.schedulers.SchedulerService
 import scorex.transaction.NgHistory
 import scorex.utils.ScorexLogging
+import HistoryReplier._
 
 @Sharable
 class HistoryReplier(history: NgHistory, settings: SynchronizationSettings) extends ChannelInboundHandlerAdapter with ScorexLogging {
@@ -40,7 +41,7 @@ class HistoryReplier(history: NgHistory, settings: SynchronizationSettings) exte
         case Some((parent, extension)) =>
           log.debug(s"${id(ctx)} Got GetSignatures with ${otherSigs.length}, found common parent $parent and sending ${extension.length} more signatures")
           ctx.writeAndFlush(Signatures(parent +: extension))
-        case None if otherSigs.length == 1 && otherSigs.head == history.lastBlock.get.uniqueId =>
+        case None if otherSigs.lengthCompare(1) == 0 && otherSigs.head == history.lastBlock.get.uniqueId =>
           // this is the special case when both nodes only have genesis block
           log.debug(s"${id(ctx)} Both local and remote nodes only have genesis block")
           ctx.writeAndFlush(Signatures(otherSigs))
@@ -51,13 +52,15 @@ class HistoryReplier(history: NgHistory, settings: SynchronizationSettings) exte
 
     case GetBlock(sig) => Task(knownBlocks.get(sig)).map(bytes =>
       ctx.writeAndFlush(RawBytes(BlockSpec.messageCode, bytes)))
-      .runAsyncLogErr
+      .logErrDiscardNoSuchElementException
+      .runAsync
 
     case mbr@MicroBlockRequest(totalResBlockSig) =>
       Task(knownMicroBlocks.get(totalResBlockSig)).map { bytes =>
         ctx.writeAndFlush(RawBytes(MicroBlockResponseSpec.messageCode, bytes))
         log.trace(id(ctx) + s"Sent MicroBlockResponse(total=${totalResBlockSig.trim})")
-      }.runAsyncLogErr
+      }.logErrDiscardNoSuchElementException
+        .runAsync
 
     case _: Handshake => Task {
       ctx.writeAndFlush(LocalScoreChanged(history.score()))
@@ -65,4 +68,10 @@ class HistoryReplier(history: NgHistory, settings: SynchronizationSettings) exte
 
     case _ => super.channelRead(ctx, msg)
   }
+
+  def cacheSizes: CacheSizes = CacheSizes(knownBlocks.size(), knownMicroBlocks.size())
+}
+
+object HistoryReplier {
+  case class CacheSizes(blocks: Long, microBlocks: Long)
 }

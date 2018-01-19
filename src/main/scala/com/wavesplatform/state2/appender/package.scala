@@ -11,11 +11,10 @@ import io.netty.channel.group.ChannelGroup
 import monix.eval.Task
 import scorex.block.Block
 import scorex.consensus.TransactionsOrdering
-import scorex.transaction.PoSCalc.{calcBaseTarget, calcGeneratorSignature, calcHit, calcTarget}
-import scorex.transaction._
+import scorex.transaction.PoSCalc.{calcBaseTarget, calcGeneratorSignature, calcHit, calcTarget, _}
 import scorex.transaction.ValidationError.{BlockFromFuture, GenericError}
+import scorex.transaction._
 import scorex.utils.{ScorexLogging, Time}
-import scorex.transaction.PoSCalc._
 
 import scala.util.{Left, Right}
 
@@ -23,11 +22,16 @@ package object appender extends ScorexLogging {
 
   private val MaxTimeDrift: Long = 100 // millis
 
+  private val correctBlockId1 = ByteStr.decodeBase58("2GNCYVy7k3kEPXzz12saMtRDeXFKr8cymVsG8Yxx3sZZ75eHj9csfXnGHuuJe7XawbcwjKdifUrV1uMq4ZNCWPf1").get
+  private val correctBlockId2 = ByteStr.decodeBase58("5uZoDnRKeWZV9Thu2nvJVZ5dBvPB7k2gvpzFD618FMXCbBVBMN2rRyvKBZBhAGnGdgeh2LXEeSr9bJqruJxngsE7").get
+  private val height1 = 812608
+  private val height2 = 813207
+
   private[appender] val scheduler = monix.execution.Scheduler.singleThread("appender")
 
   private[appender] def processAndBlacklistOnFailure[A, B](ch: Channel, peerDatabase: PeerDatabase, miner: Miner, allChannels: ChannelGroup,
                                                            start: => String, success: => String, errorPrefix: String)(
-                                                              f: => Task[Either[B, Option[BigInt]]]): Task[Either[B, Option[BigInt]]] = {
+                                                            f: => Task[Either[B, Option[BigInt]]]): Task[Either[B, Option[BigInt]]] = {
 
     log.debug(start)
     f map {
@@ -96,7 +100,8 @@ package object appender extends ScorexLogging {
       effectiveBalance <- genBalance(height).left.map(GenericError(_))
       hit = calcHit(prevBlockData, generator)
       target = calcTarget(parent.timestamp, parent.consensusData.baseTarget, blockTime, effectiveBalance)
-      _ <- Either.cond(hit < target, (), GenericError(s"calculated hit $hit >= calculated target $target"))
+      _ <- Either.cond(hit < target || (height == height1 && block.uniqueId == correctBlockId1) || (height == height2 && block.uniqueId == correctBlockId2),
+        (), GenericError(s"calculated hit $hit >= calculated target $target"))
     } yield ()
 
     r.left.map {

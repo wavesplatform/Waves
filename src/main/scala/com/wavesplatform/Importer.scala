@@ -33,7 +33,8 @@ object Importer extends ScorexLogging {
           case Success(inputStream) =>
             deleteFile(settings.blockchainSettings.blockchainFile)
             deleteFile(settings.blockchainSettings.stateFile)
-            val (history, _, stateWriter, _, blockchainUpdater, _, _) = StorageFactory(settings).get
+            val (storage, _) = StorageFactory(settings).get
+            val (history, _, stateWriter, _, blockchainUpdater, _) = storage()
             checkGenesis(history, settings, blockchainUpdater)
             val bis = new BufferedInputStream(inputStream)
             var quit = false
