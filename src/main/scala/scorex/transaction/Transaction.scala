@@ -63,7 +63,7 @@ trait Signed extends Authorized {
 }
 
 trait Proven extends Authorized {
-  def proof: ByteStr
+  def proofs: Seq[ByteStr]
 }
 
 object Signed {

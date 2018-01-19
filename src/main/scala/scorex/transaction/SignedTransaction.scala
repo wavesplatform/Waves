@@ -10,7 +10,7 @@ trait SignedTransaction extends ProvenTransaction with Signed {
 
   val signature: ByteStr
 
-  def proof : ByteStr = signature
+  def proofs : Seq[ByteStr]= Seq(signature)
 
   val signatureValid: Coeval[Boolean] = Coeval.evalOnce(EllipticCurveImpl.verify(signature.arr, bodyBytes(), sender.publicKey))
 }

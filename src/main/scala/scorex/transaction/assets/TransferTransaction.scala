@@ -8,7 +8,7 @@ import play.api.libs.json.{JsObject, Json}
 import scorex.account.{AddressOrAlias, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
-import scorex.serialization.{BytesSerializable, Deser}
+import scorex.serialization.Deser
 import scorex.transaction.TransactionParser._
 import scorex.transaction.{ValidationError, _}
 
@@ -43,7 +43,7 @@ case class TransferTransaction private(assetId: Option[AssetId],
       amountBytes,
       feeBytes,
       recipient.bytes.arr,
-      BytesSerializable.arrayWithSize(attachment))
+      Deser.serializeArray(attachment))
   }
 
   override val json: Coeval[JsObject] = Coeval.evalOnce(jsonBase() ++ Json.obj(

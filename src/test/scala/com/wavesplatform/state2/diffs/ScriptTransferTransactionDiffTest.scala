@@ -15,8 +15,10 @@ class ScriptTransferTransactionDiffTest extends PropSpec
   with PropertyChecks with Matchers with TransactionGen with NoShrink {
 
   val onlySend: BOOL = AND(
-    EQINT(Accessor(TX, Field.Type), CONST(4)),
-    SIGVERIFY(Accessor(TX, Field.BodyBytes), Accessor(TX, Field.Proof), Accessor(TX, Field.SenderPk))
+    OR(
+      EQINT(Accessor(TX, Field.Type), CONST(4)),
+      EQINT(Accessor(TX, Field.Type), CONST(11))),
+    SIGVERIFY(Accessor(TX, Field.BodyBytes), Accessor(TX, Field.Proof_0), Accessor(TX, Field.SenderPk))
   )
 
   val preconditionsAndTransfer: Gen[(GenesisTransaction, SetScriptTransaction, LeaseTransaction, TransferTransaction)] = for {

@@ -7,7 +7,7 @@ import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
-import scorex.serialization.{BytesSerializable, Deser}
+import scorex.serialization.Deser
 import scorex.transaction.TransactionParser._
 import scorex.transaction.{ValidationError, _}
 
@@ -30,8 +30,8 @@ case class IssueTransaction private(sender: PublicKeyAccount,
 
   val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(transactionType.id.toByte),
     sender.publicKey,
-    BytesSerializable.arrayWithSize(name),
-    BytesSerializable.arrayWithSize(description),
+    Deser.serializeArray(name),
+    Deser.serializeArray(description),
     Longs.toByteArray(quantity),
     Array(decimals),
     if (reissuable) Array(1: Byte) else Array(0: Byte),

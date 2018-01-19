@@ -25,6 +25,6 @@ object Verifier {
   }
 
   def verifyAsEllipticCurveSignature[T <: ProvenTransaction](pt: T): Either[ValidationError, T] =
-    Either.cond(EllipticCurveImpl.verify(pt.proof.arr, pt.bodyBytes(), pt.sender.publicKey), pt, GenericError(s"Script doesn't exist and proof doesn't validate as signature for $pt"))
+    Either.cond(EllipticCurveImpl.verify(pt.proofs(0).arr, pt.bodyBytes(), pt.sender.publicKey), pt, GenericError(s"Script doesn't exist and proof doesn't validate as signature for $pt"))
 
 }

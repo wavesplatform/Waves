@@ -6,7 +6,7 @@ import scorex.crypto.encode.Base58
 
 trait ProvenTransaction extends Transaction with Proven {
 
-  protected def proofFieldName = "proof"
+  protected def proofFieldName = "proofs"
 
   val bodyBytes: Coeval[Array[Byte]]
 
@@ -16,6 +16,6 @@ trait ProvenTransaction extends Transaction with Proven {
     "senderPublicKey" -> Base58.encode(sender.publicKey),
     "fee" -> assetFee._2,
     "timestamp" -> timestamp,
-     proofFieldName -> this.proof.base58
+     proofFieldName -> this.proofs.map(_.base58)
   )
 }

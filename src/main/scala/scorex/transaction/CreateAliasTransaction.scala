@@ -7,7 +7,7 @@ import play.api.libs.json.{JsObject, Json}
 import scorex.account._
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.hash.FastCryptographicHash
-import scorex.serialization.{BytesSerializable, Deser}
+import scorex.serialization.Deser
 import scorex.transaction.TransactionParser._
 
 import scala.util.{Failure, Success, Try}
@@ -27,7 +27,7 @@ case class CreateAliasTransaction private(sender: PublicKeyAccount,
   override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(
     Array(transactionType.id.toByte),
     sender.publicKey,
-    BytesSerializable.arrayWithSize(alias.bytes.arr),
+    Deser.serializeArray(alias.bytes.arr),
     Longs.toByteArray(fee),
     Longs.toByteArray(timestamp)))
 

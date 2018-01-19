@@ -7,7 +7,7 @@ import play.api.libs.json.{JsObject, Json}
 import scorex.account.{AddressOrAlias, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
-import scorex.serialization.{BytesSerializable, Deser}
+import scorex.serialization.Deser
 import scorex.transaction.TransactionParser._
 import scorex.transaction._
 
@@ -21,7 +21,7 @@ case class ScriptTransferTransaction private(version: Byte,
                                              timestamp: Long,
                                              fee: Long,
                                              attachment: Array[Byte],
-                                             proof: ByteStr)
+                                             proofs: Seq[ByteStr])
   extends ProvenTransaction with FastHashId {
   override val transactionType: TransactionType.Value = TransactionType.ScriptTransferTransaction
 
@@ -40,7 +40,7 @@ case class ScriptTransferTransaction private(version: Byte,
       amountBytes,
       feeBytes,
       recipient.bytes.arr,
-      BytesSerializable.arrayWithSize(attachment)))
+      Deser.serializeArray(attachment)))
   }
 
   override val json: Coeval[JsObject] = Coeval.evalOnce(jsonBase() ++ Json.obj(
@@ -51,7 +51,7 @@ case class ScriptTransferTransaction private(version: Byte,
     "attachment" -> Base58.encode(attachment)
   ))
 
-  override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(transactionType.id.toByte), bodyBytes(), BytesSerializable.arrayWithSize(proof.arr)))
+  override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(transactionType.id.toByte), bodyBytes(), Deser.serializeArrays(proofs.map(_.arr))))
 
 }
 
@@ -70,8 +70,8 @@ object ScriptTransferTransaction {
       recRes <- AddressOrAlias.fromBytes(bytes, s0 + 24)
       (recipient, recipientEnd) = recRes
       (attachment, attachEnd) = Deser.parseArraySize(bytes, recipientEnd)
-      (proofBytes, _) = Deser.parseArraySize(bytes, attachEnd)
-      tt <- ScriptTransferTransaction.create(version,assetIdOpt.map(ByteStr(_)), sender, recipient, amount, timestamp, feeAmount, attachment, ByteStr(proofBytes))
+      (proofBytes, _) = Deser.parseArrays(bytes, attachEnd)
+      tt <- ScriptTransferTransaction.create(version, assetIdOpt.map(ByteStr(_)), sender, recipient, amount, timestamp, feeAmount, attachment, proofBytes.map(ByteStr(_)))
     } yield tt).fold(left => Failure(new Exception(left.toString)), right => Success(right))
   }.flatten
 
@@ -83,7 +83,7 @@ object ScriptTransferTransaction {
              timestamp: Long,
              feeAmount: Long,
              attachment: Array[Byte],
-             proof: ByteStr): Either[ValidationError, ScriptTransferTransaction] = {
+             proofs: Seq[ByteStr]): Either[ValidationError, ScriptTransferTransaction] = {
     if (attachment.length > TransferTransaction.MaxAttachmentSize) {
       Left(ValidationError.TooBigArray)
     } else if (amount <= 0) {
@@ -93,7 +93,7 @@ object ScriptTransferTransaction {
     } else if (feeAmount <= 0) {
       Left(ValidationError.InsufficientFee)
     } else {
-      Right(ScriptTransferTransaction(version,  sender, recipient, assetId, amount, timestamp, feeAmount, attachment, proof))
+      Right(ScriptTransferTransaction(version, sender, recipient, assetId, amount, timestamp, feeAmount, attachment, proofs))
     }
   }
 
@@ -105,8 +105,8 @@ object ScriptTransferTransaction {
                  timestamp: Long,
                  feeAmount: Long,
                  attachment: Array[Byte]): Either[ValidationError, ScriptTransferTransaction] = {
-    create(version,assetId,sender,recipient,amount,timestamp,feeAmount,attachment,ByteStr.empty).right.map { unsigned =>
-      unsigned.copy(proof = ByteStr(EllipticCurveImpl.sign(sender, unsigned.bodyBytes())))
+    create(version, assetId, sender, recipient, amount, timestamp, feeAmount, attachment, Seq.empty).right.map { unsigned =>
+      unsigned.copy(proofs = Seq(ByteStr(EllipticCurveImpl.sign(sender, unsigned.bodyBytes()))))
     }
   }
 }
