@@ -24,7 +24,7 @@ case class CreateAliasTransaction private(sender: PublicKeyAccount,
 
   override val id: Coeval[AssetId] = Coeval.evalOnce(ByteStr(FastCryptographicHash(transactionType.id.toByte +: alias.bytes.arr)))
 
-  override val toSign: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(
+  override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(
     Array(transactionType.id.toByte),
     sender.publicKey,
     BytesSerializable.arrayWithSize(alias.bytes.arr),
@@ -38,7 +38,7 @@ case class CreateAliasTransaction private(sender: PublicKeyAccount,
   ))
 
   override val assetFee: (Option[AssetId], Long) = (None, fee)
-  override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(toSign(), signature.arr))
+  override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(bodyBytes(), signature.arr))
 
 }
 
@@ -73,7 +73,7 @@ object CreateAliasTransaction {
              fee: Long,
              timestamp: Long): Either[ValidationError, CreateAliasTransaction] = {
     create(sender, alias, fee, timestamp, ByteStr.empty).right.map { unsigned =>
-      unsigned.copy(signature = ByteStr(EllipticCurveImpl.sign(sender, unsigned.toSign())))
+      unsigned.copy(signature = ByteStr(EllipticCurveImpl.sign(sender, unsigned.bodyBytes())))
     }
   }
 }

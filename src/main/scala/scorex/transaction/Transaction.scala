@@ -63,7 +63,7 @@ trait Signed extends Authorized {
 }
 
 trait Proven extends Authorized {
-  val proof: ByteStr
+  def proof: ByteStr
 }
 
 object Signed {

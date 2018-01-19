@@ -17,11 +17,11 @@ case class BurnTransaction private(sender: PublicKeyAccount,
                                    fee: Long,
                                    timestamp: Long,
                                    signature: ByteStr)
-  extends SignedTransaction {
+  extends SignedTransaction with FastHashId {
 
   override val transactionType: TransactionType.Value = TransactionType.BurnTransaction
 
-  override val toSign: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(transactionType.id.toByte),
+  override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(transactionType.id.toByte),
     sender.publicKey,
     assetId.arr,
     Longs.toByteArray(amount),
@@ -38,7 +38,7 @@ case class BurnTransaction private(sender: PublicKeyAccount,
 
   override val assetFee: (Option[AssetId], Long) = (None, fee)
 
-  override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(toSign(), signature.arr))
+  override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(bodyBytes(), signature.arr))
 
 }
 
@@ -85,6 +85,6 @@ object BurnTransaction {
              fee: Long,
              timestamp: Long): Either[ValidationError, BurnTransaction] =
     create(sender, assetId, quantity, fee, timestamp, ByteStr.empty).right.map { unverified =>
-      unverified.copy(signature = ByteStr(EllipticCurveImpl.sign(sender, unverified.toSign())))
+      unverified.copy(signature = ByteStr(EllipticCurveImpl.sign(sender, unverified.bodyBytes())))
     }
 }

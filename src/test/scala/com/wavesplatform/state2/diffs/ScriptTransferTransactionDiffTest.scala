@@ -27,7 +27,7 @@ class ScriptTransferTransactionDiffTest extends PropSpec
     forAll(preconditionsAndTransfer) { case ((genesis, script, lease, transfer)) =>
       assertDiffAndState(Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(transfer))) { case (totalDiff, newState) => () }
       assertDiffEi(Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(lease)))(totalDiffEi =>
-        totalDiffEi should produce("because script"))
+        totalDiffEi should produce("TransactionNotAllowedByScript"))
     }
   }
 }

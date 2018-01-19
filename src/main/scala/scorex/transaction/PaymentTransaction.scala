@@ -6,12 +6,9 @@ import com.google.common.primitives.{Bytes, Ints, Longs}
 import com.wavesplatform.state2.ByteStr
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
-import scorex.account.PublicKeyAccount._
 import scorex.account.{Address, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
-import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash
-import scorex.transaction.PaymentTransaction.signatureData
 import scorex.transaction.TransactionParser._
 
 import scala.util.{Failure, Success, Try}
@@ -21,21 +18,14 @@ case class PaymentTransaction private(sender: PublicKeyAccount,
                                       amount: Long,
                                       fee: Long,
                                       timestamp: Long,
-                                      signature: ByteStr) extends Transaction with Signed {
+                                      signature: ByteStr) extends SignedTransaction {
   override val transactionType = TransactionType.PaymentTransaction
   override val assetFee: (Option[AssetId], Long) = (None, fee)
   override val id = Coeval.evalOnce(signature)
 
-  override val json: Coeval[JsObject] = Coeval.evalOnce(
-    Json.obj("type" -> transactionType.id,
-      "id" -> id().base58,
-      "fee" -> fee,
-      "timestamp" -> timestamp,
-      "signature" -> this.signature.base58,
-      "sender" -> sender.address,
-      "senderPublicKey" -> Base58.encode(sender.publicKey),
-      "recipient" -> recipient.address,
-      "amount" -> amount))
+  override val json: Coeval[JsObject] = Coeval.evalOnce(jsonBase() ++ Json.obj(
+    "recipient" -> recipient.address,
+    "amount" -> amount))
 
   private val hashBytes: Coeval[Array[Byte]] = Coeval.evalOnce {
     val timestampBytes = Longs.toByteArray(timestamp)
@@ -48,8 +38,15 @@ case class PaymentTransaction private(sender: PublicKeyAccount,
 
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(hashBytes(), signature.arr))
 
-  val signatureValid: Coeval[Boolean] = Coeval.evalOnce(EllipticCurveImpl.verify(signature.arr,
-    signatureData(sender, recipient, amount, fee, timestamp), sender.publicKey))
+  override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce {
+    val typeBytes = Ints.toByteArray(transactionType.id)
+    val timestampBytes = Longs.toByteArray(timestamp)
+    val amountBytes = Longs.toByteArray(amount)
+    val feeBytes = Longs.toByteArray(fee)
+
+    Bytes.concat(typeBytes, timestampBytes, sender.publicKey, recipient.bytes.arr, amountBytes, feeBytes)
+  }
+
 }
 
 object PaymentTransaction {

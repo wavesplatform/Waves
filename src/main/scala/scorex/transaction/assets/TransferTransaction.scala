@@ -23,12 +23,12 @@ case class TransferTransaction private(assetId: Option[AssetId],
                                        fee: Long,
                                        attachment: Array[Byte],
                                        signature: ByteStr)
-  extends SignedTransaction {
+  extends SignedTransaction with FastHashId {
   override val transactionType: TransactionType.Value = TransactionType.TransferTransaction
 
   override val assetFee: (Option[AssetId], Long) = (feeAssetId, fee)
 
-  val toSign: Coeval[Array[Byte]] = Coeval.evalOnce {
+  val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce {
     val timestampBytes = Longs.toByteArray(timestamp)
     val assetIdBytes = assetId.map(a => (1: Byte) +: a.arr).getOrElse(Array(0: Byte))
     val amountBytes = Longs.toByteArray(amount)
@@ -54,7 +54,7 @@ case class TransferTransaction private(assetId: Option[AssetId],
     "attachment" -> Base58.encode(attachment)
   ))
 
-  override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(transactionType.id.toByte), signature.arr, toSign()))
+  override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(transactionType.id.toByte), signature.arr, bodyBytes()))
 
 }
 
@@ -116,7 +116,7 @@ object TransferTransaction {
              feeAmount: Long,
              attachment: Array[Byte]): Either[ValidationError, TransferTransaction] = {
     create(assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment, ByteStr.empty).right.map { unsigned =>
-      unsigned.copy(signature = ByteStr(EllipticCurveImpl.sign(sender, unsigned.toSign())))
+      unsigned.copy(signature = ByteStr(EllipticCurveImpl.sign(sender, unsigned.bodyBytes())))
     }
   }
 }

@@ -4,12 +4,12 @@ package com.wavesplatform.state2.diffs
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2._
 import com.wavesplatform.state2.reader.SnapshotStateReader
-import scorex.transaction.ValidationError.{GenericError, UnsupportedTransactionType}
+import scorex.transaction.ValidationError.UnsupportedTransactionType
 import scorex.transaction._
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import scorex.transaction.smart.{ScriptValidator, SetScriptTransaction}
+import scorex.transaction.smart.{Verifier, SetScriptTransaction}
 
 object TransactionDiffer {
 
@@ -17,15 +17,7 @@ object TransactionDiffer {
 
   def apply(settings: FunctionalitySettings, prevBlockTimestamp: Option[Long], currentBlockTimestamp: Long, currentBlockHeight: Int)(s: SnapshotStateReader, tx: Transaction): Either[ValidationError, Diff] = {
     for {
-      t0 <- tx match {
-        case at: AuthorizedTransaction => (at, s.accountScript(at.sender)) match {
-          case (_, Some(script)) => ScriptValidator.verify(script, currentBlockHeight, tx)
-          case (ptx: ProvenTransaction, None) => ScriptValidator.verifyAsEllipticCurveSignature(ptx)
-          case (stx: SignedTransaction, None) => stx.signaturesValid()
-          case _ => Left(GenericError("Fix this proven-authorized-payment-genesis-signed mess")) // workaround for 'match may not be exhaustive'
-        }
-        case _: GenesisTransaction => Right(tx)
-      }
+      t0 <- Verifier(s, currentBlockHeight)(tx)
       t1 <- CommonValidation.disallowTxFromFuture(settings, currentBlockTimestamp, t0)
       t2 <- CommonValidation.disallowTxFromPast(prevBlockTimestamp, t1)
       t3 <- CommonValidation.disallowBeforeActivationTime(settings, t2)

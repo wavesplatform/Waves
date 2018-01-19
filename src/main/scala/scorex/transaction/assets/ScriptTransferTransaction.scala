@@ -22,7 +22,7 @@ case class ScriptTransferTransaction private(version: Byte,
                                              fee: Long,
                                              attachment: Array[Byte],
                                              proof: ByteStr)
-  extends ProvenTransaction {
+  extends ProvenTransaction with FastHashId {
   override val transactionType: TransactionType.Value = TransactionType.ScriptTransferTransaction
 
   override val assetFee: (Option[AssetId], Long) = (None, fee)
@@ -44,6 +44,7 @@ case class ScriptTransferTransaction private(version: Byte,
   }
 
   override val json: Coeval[JsObject] = Coeval.evalOnce(jsonBase() ++ Json.obj(
+    "version" -> version,
     "recipient" -> recipient.stringRepr,
     "assetId" -> assetId.map(_.base58),
     "amount" -> amount,

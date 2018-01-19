@@ -2,7 +2,7 @@ package scorex.transaction.smart.lang
 
 import com.wavesplatform.state2.ByteStr
 import scorex.crypto.signatures.Curve25519
-import scorex.transaction.{Authorized, ProvenTransaction, SignedTransaction}
+import scorex.transaction.ProvenTransaction
 import scorex.transaction.smart.lang.Terms.Field._
 
 object Terms {
@@ -41,9 +41,7 @@ object Terms {
   case class Accessor[T](tx: TX.type, f: Field[T]) extends Term[T]
 
 
-  case class Context(height: Int, tx: scorex.transaction.Transaction)
-
-  val s = Context(0, null)
+  case class Context(height: Int, tx: ProvenTransaction)
 
   type ExcecutionError = String
   type EitherExecResult[T] = Either[ExcecutionError,T]
@@ -64,20 +62,9 @@ object Terms {
     case Accessor(_, f) => f match {
       case Id => Right(ctx.tx.id().asInstanceOf[T])
       case Type => Right(ctx.tx.transactionType.id.asInstanceOf[T])
-      case SenderPk => ctx.tx match {
-        case a: Authorized => Right(ByteStr(a.sender.publicKey).asInstanceOf[T])
-        case _ => Left(s"No sender in ${ctx.tx}")
-      }
-      case Proof => ctx.tx match {
-        case a: SignedTransaction => Right(a.signature.asInstanceOf[T])
-        case a: ProvenTransaction => Right(a.proof.asInstanceOf[T])
-        case _ => Left(s"Tx ${ctx.tx} doesn't have any proof")
-      }
-      case Body => ctx.tx match {
-        case a: SignedTransaction => Right(ByteStr(a.toSign()).asInstanceOf[T])
-        case a: ProvenTransaction => Right(ByteStr(a.bodyBytes()).asInstanceOf[T])
-        case _ => Left(s"Tx ${ctx.tx} doesn't have body (Genesis?)")
-      }
+      case SenderPk => Right(ByteStr(ctx.tx.sender.publicKey).asInstanceOf[T])
+      case Proof =>  Right(ctx.tx.proof.asInstanceOf[T])
+      case Body => Right(ByteStr(ctx.tx.bodyBytes()).asInstanceOf[T])
     }
     case EQINT(it1, it2) => for {
       i1 <- eval(ctx, it1)

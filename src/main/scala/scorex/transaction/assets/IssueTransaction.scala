@@ -21,14 +21,14 @@ case class IssueTransaction private(sender: PublicKeyAccount,
                                     reissuable: Boolean,
                                     fee: Long,
                                     timestamp: Long,
-                                    signature: ByteStr) extends SignedTransaction {
+                                    signature: ByteStr) extends SignedTransaction with FastHashId {
 
   override val assetFee: (Option[AssetId], Long) = (None, fee)
   override val transactionType: TransactionType.Value = TransactionType.IssueTransaction
 
   val assetId = id
 
-  val toSign: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(transactionType.id.toByte),
+  val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(transactionType.id.toByte),
     sender.publicKey,
     BytesSerializable.arrayWithSize(name),
     BytesSerializable.arrayWithSize(description),
@@ -47,7 +47,7 @@ case class IssueTransaction private(sender: PublicKeyAccount,
     "reissuable" -> reissuable
   ))
 
-  override val bytes = Coeval.evalOnce(Bytes.concat(Array(transactionType.id.toByte), signature.arr, toSign()))
+  override val bytes = Coeval.evalOnce(Bytes.concat(Array(transactionType.id.toByte), signature.arr, bodyBytes()))
 
 }
 
@@ -109,6 +109,6 @@ object IssueTransaction {
              fee: Long,
              timestamp: Long): Either[ValidationError, IssueTransaction] =
     create(sender, name, description, quantity, decimals, reissuable, fee, timestamp, ByteStr.empty).right.map { unverified =>
-      unverified.copy(signature = ByteStr(EllipticCurveImpl.sign(sender, unverified.toSign())))
+      unverified.copy(signature = ByteStr(EllipticCurveImpl.sign(sender, unverified.bodyBytes())))
     }
 }
