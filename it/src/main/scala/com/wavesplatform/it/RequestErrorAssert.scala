@@ -4,7 +4,7 @@ import java.nio.charset.StandardCharsets
 
 import akka.http.scaladsl.model.StatusCodes
 import com.wavesplatform.it.RequestErrorAssert.ErrorMessage
-import com.wavesplatform.it.api.Node.UnexpectedStatusCodeException
+import com.wavesplatform.it.api.UnexpectedStatusCodeException
 import org.scalatest.{Assertion, Assertions}
 import play.api.libs.json.Json.parse
 import play.api.libs.json.{Format, Json}

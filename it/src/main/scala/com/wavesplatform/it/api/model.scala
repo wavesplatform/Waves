@@ -1,0 +1,117 @@
+package com.wavesplatform.it.api
+
+import org.asynchttpclient.{Request, Response}
+import play.api.libs.json.{Format, Json}
+
+
+case class UnexpectedStatusCodeException(request: Request, response: Response)
+  extends Exception(s"Request: ${request.getUrl}\n" +
+  s"Unexpected status code (${response.getStatusCode}): ${response.getResponseBody}")
+
+case class Status(blockchainHeight: Int, stateHeight: Int, updatedTimestamp: Long, updatedDate: String)
+object Status {
+  implicit val statusFormat: Format[Status] = Json.format
+}
+
+case class Peer(address: String, declaredAddress: String, peerName: String)
+object Peer {
+  implicit val peerFormat: Format[Peer] = Json.format
+}
+
+case class Address(address: String)
+object Address {
+  implicit val addressFormat: Format[Address] = Json.format
+}
+
+case class Balance(address: String, confirmations: Int, balance: Long)
+object Balance {
+  implicit val balanceFormat: Format[Balance] = Json.format
+}
+
+case class AssetBalance(address: String, assetId: String, balance: Long)
+object AssetBalance {
+  implicit val assetBalanceFormat: Format[AssetBalance] = Json.format
+}
+
+case class FullAssetInfo(assetId: String, balance: Long, reissuable: Boolean, quantity: Long)
+object FullAssetInfo {
+  implicit val fullAssetInfoFormat: Format[FullAssetInfo] = Json.format
+}
+
+case class FullAssetsInfo(address: String, balances: List[FullAssetInfo])
+object FullAssetsInfo {
+  implicit val fullAssetsInfoFormat: Format[FullAssetsInfo] = Json.format
+}
+
+case class Transaction(`type`: Int, id: String, fee: Long, timestamp: Long)
+object Transaction {
+  implicit val transactionFormat: Format[Transaction] = Json.format
+}
+
+case class Block(signature: String, height: Int, timestamp: Long, generator: String, transactions: Seq[Transaction],
+                 fee: Long, features: Option[Seq[Short]])
+object Block {
+  implicit val blockFormat: Format[Block] = Json.format
+}
+
+case class BlockHeaders(signature: String, height: Int, timestamp: Long, generator: String, transactionCount: Int, blocksize: Int)
+object BlockHeaders {
+  implicit val blockHeadersFormat: Format[BlockHeaders] = Json.format
+}
+
+case class MatcherMessage(id: String)
+object MatcherMessage {
+  implicit val matcherMessageFormat: Format[MatcherMessage] = Json.format
+}
+
+case class MatcherResponse(status: String, message: MatcherMessage)
+object MatcherResponse {
+  implicit val matcherResponseFormat: Format[MatcherResponse] = Json.format
+}
+
+case class MatcherStatusResponse(status: String)
+object MatcherStatusResponse {
+  implicit val matcherStatusResponseFormat: Format[MatcherStatusResponse] = Json.format
+}
+
+case class MessageMatcherResponse(message: String)
+object MessageMatcherResponse {
+  implicit val messageMatcherResponseFormat: Format[MessageMatcherResponse] = Json.format
+}
+
+case class OrderbookHistory(id: String, `type`: String, amount: Long, price: Long, timestamp: Long, filled: Int,
+                            status: String)
+object OrderbookHistory {
+  implicit val orderbookHistory: Format[OrderbookHistory] = Json.format
+}
+
+case class PairResponse(amountAsset: String, priceAsset: String)
+object PairResponse {
+  implicit val pairResponseFormat: Format[PairResponse] = Json.format
+}
+
+case class LevelResponse(price: Long, amount: Long)
+object LevelResponse {
+  implicit val levelResponseFormat: Format[LevelResponse] = Json.format
+}
+
+case class OrderBookResponse(timestamp: Long, pair: PairResponse, bids: List[LevelResponse], asks: List[LevelResponse])
+object OrderBookResponse {
+  implicit val orderBookResponseFormat: Format[OrderBookResponse] = Json.format
+}
+
+case class DebugInfo(stateHeight: Long, stateHash: Long)
+object DebugInfo {
+  implicit val debugInfoFormat: Format[DebugInfo] = Json.format
+}
+
+case class BlacklistedPeer(hostname: String, timestamp: Long, reason: String)
+object BlacklistedPeer {
+  implicit val blacklistedPeerFormat: Format[BlacklistedPeer] = Json.format
+}
+
+// Obsolete payment request
+case class PaymentRequest(amount: Long, fee: Long, sender: String, recipient: String)
+object PaymentRequest {
+  implicit val paymentFormat: Format[PaymentRequest] = Json.format
+}

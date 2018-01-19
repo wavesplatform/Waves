@@ -4,7 +4,6 @@ import java.io.File
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it._
-import com.wavesplatform.it.api.Node
 import monix.eval.Coeval
 import org.scalatest.{BeforeAndAfterAll, FunSuite}
 
@@ -25,16 +24,16 @@ abstract class BaseTransactionSuite extends FunSuite with WaitForHeight2
   override def notMiner: Node = nodes.last
 
   // protected because https://github.com/sbt/zinc/issues/292
-  protected val theNodes = Coeval.evalOnce {
+  protected val theNodes: Coeval[Seq[Node]] = Coeval.evalOnce {
     Option(System.getProperty("waves.it.config.file")) match {
-      case None => nodesSingleton()
+      case None => dockerNodes()
       case Some(filePath) =>
         val defaultConfig = ConfigFactory.load()
         ConfigFactory
           .parseFile(new File(filePath))
           .getConfigList("nodes")
           .asScala
-          .map(cfg => NodeImpl(cfg.withFallback(defaultConfig).resolve()))
+          .map(cfg => new ExternalNode(cfg.withFallback(defaultConfig).resolve()))
     }
   }
 

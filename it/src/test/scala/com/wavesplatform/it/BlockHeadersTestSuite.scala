@@ -2,8 +2,7 @@ package com.wavesplatform.it
 
 import com.typesafe.config.Config
 import com.wavesplatform.it.api.AsyncHttpApi._
-import com.wavesplatform.it.api.Node
-import com.wavesplatform.it.api.Node.{Block, BlockHeaders}
+import com.wavesplatform.it.api._
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.util._
 import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}

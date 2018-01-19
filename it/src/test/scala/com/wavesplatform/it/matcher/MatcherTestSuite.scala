@@ -4,15 +4,13 @@ package matcher
 import com.google.common.primitives.Longs
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.api.AsyncHttpApi._
-import com.wavesplatform.it.api.Node
-import com.wavesplatform.it.api.Node.{AssetBalance, LevelResponse, MatcherStatusResponse, OrderBookResponse, Transaction}
+import com.wavesplatform.it.api._
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.matcher.api.CancelOrderRequest
 import com.wavesplatform.state2.ByteStr
 import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
 import play.api.libs.json.Json.parse
 import play.api.libs.json.{JsArray, JsNumber, JsString}
-import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
@@ -88,7 +86,7 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
 
   "froze amount should be listed via matcherBalance REST endpoint" in {
     val ts = System.currentTimeMillis()
-    val privateKey = PrivateKeyAccount.fromSeed(aliceNode.accountSeed).right.get
+    val privateKey = aliceNode.privateKey
     val signature = Base58.encode(EllipticCurveImpl.sign(privateKey, privateKey.publicKey ++ Longs.toByteArray(ts)))
 
     val json = parse(Await.result(matcherNode.matcherGet(s"/matcher/matcherBalance/${aliceNode.publicKey}", _
@@ -100,7 +98,7 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
 
   "and should be listed by trader's publiс key via REST" in {
     val ts = System.currentTimeMillis()
-    val privateKey = PrivateKeyAccount.fromSeed(aliceNode.accountSeed).right.get
+    val privateKey = aliceNode.privateKey
     val signature = Base58.encode(EllipticCurveImpl.sign(privateKey, privateKey.publicKey ++ Longs.toByteArray(ts)))
 
     val json = parse(Await.result(matcherNode.matcherGet(s"/matcher/orderbook/${aliceNode.publicKey}", _
@@ -312,8 +310,8 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
     val creationTime = System.currentTimeMillis()
     val timeToLive = creationTime + Order.MaxLiveTime - 1000
 
-    val privateKey = PrivateKeyAccount.fromSeed(node.accountSeed).right.get
-    val matcherPublicKey = PublicKeyAccount(Base58.decode(matcherNode.publicKey).get)
+    val privateKey = node.privateKey
+    val matcherPublicKey = matcherNode.publicKey
 
     Order(privateKey, matcherPublicKey, pair, orderType, price, amount, creationTime, timeToLive, MatcherFee)
   }
@@ -354,8 +352,8 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
   }
 
   private def matcherCancelOrder(node: Node, pair: AssetPair, orderId: String): String = {
-    val privateKey = PrivateKeyAccount.fromSeed(node.accountSeed).right.get
-    val publicKey = PublicKeyAccount(privateKey.publicKey)
+    val privateKey = node.privateKey
+    val publicKey = node.publicKey
     val request = CancelOrderRequest(publicKey, Base58.decode(orderId).get, Array.emptyByteArray)
     val signedRequest = CancelOrderRequest.sign(request, privateKey)
     val futureResult = matcherNode.cancelOrder(pair.amountAssetStr, pair.priceAssetStr, signedRequest)

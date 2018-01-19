@@ -4,14 +4,11 @@ import com.google.common.primitives.Longs
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it._
 import com.wavesplatform.it.api.AsyncHttpApi._
-import com.wavesplatform.it.api.Node
-import com.wavesplatform.it.api.Node.{AssetBalance, MatcherStatusResponse, OrderBookResponse, Transaction}
+import com.wavesplatform.it.api._
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.state2.ByteStr
 import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
-import scorex.account.PrivateKeyAccount
 import scorex.crypto.EllipticCurveImpl
-import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -78,12 +75,12 @@ class OrderExclusionTestSuite extends FreeSpec with Matchers with BeforeAndAfter
 
   private def orderStatus(node: Node) = {
     val ts = System.currentTimeMillis()
-    val privateKey = PrivateKeyAccount.fromSeed(aliceNode.accountSeed).right.get
+    val privateKey = aliceNode.privateKey
 
-    val pk = Base58.decode(node.publicKey).get
+    val pk = node.publicKey.publicKey
     val signature = ByteStr(EllipticCurveImpl.sign(privateKey, pk ++ Longs.toByteArray(ts)))
 
-    val orderhistory = Await.result(matcherNode.getOrderbookByPublicKey(node.publicKey, ts, signature), 1.minute)
+    val orderhistory = Await.result(matcherNode.getOrderbookByPublicKey(node.publicKey.toString, ts, signature), 1.minute)
     orderhistory.seq(0).status
   }
 

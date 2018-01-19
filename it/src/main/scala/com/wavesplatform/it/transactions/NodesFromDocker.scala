@@ -1,14 +1,13 @@
 package com.wavesplatform.it.transactions
 
-import com.wavesplatform.it.api.Node
-import com.wavesplatform.it.{DockerBased, Nodes}
+import com.wavesplatform.it.{Docker, DockerBased, Node, Nodes}
 import monix.eval.Coeval
 import org.scalatest.Suite
 
 trait NodesFromDocker extends Nodes with DockerBased { _: Suite =>
-  protected val nodesSingleton: Coeval[Seq[Node]] = dockerSingleton
+  protected val dockerNodes: Coeval[Seq[Docker.DockerNode]] = dockerSingleton
     .map(_.startNodes(nodeConfigs))
     .memoize
 
-  override protected def nodes: Seq[Node] = nodesSingleton()
+  override protected def nodes: Seq[Node] = dockerNodes()
 }
