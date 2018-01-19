@@ -6,7 +6,7 @@ import com.typesafe.config.Config
 import com.wavesplatform.it._
 import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.api.AsyncNetworkApi._
-import com.wavesplatform.it.api.Node.{BlacklistedPeer, _}
+import com.wavesplatform.it.api.Node._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.network.{RawBytes, TransactionSpec}
 import org.scalatest._
@@ -14,9 +14,9 @@ import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
 import scorex.account.{Address, PrivateKeyAccount}
 import scorex.transaction.assets.TransferTransaction
 
+import scala.concurrent.Await
 import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
-import scala.concurrent.{Await, Future}
 import scala.language.postfixOps
 
 class SimpleTransactionsSuite extends BaseTransactionSuite with Matchers with ScalaFutures
@@ -42,10 +42,6 @@ class SimpleTransactionsSuite extends BaseTransactionSuite with Matchers with Sc
       Array()).right.get
     val f = for {
       _ <- node.sendByNetwork(RawBytes(TransactionSpec.messageCode, tx.bytes()))
-      _ <- Future.successful(Thread.sleep(2000))
-
-      height <- traverse(nodes)(_.height).map(_.max)
-      _ <- traverse(nodes)(_.waitForHeight(height + 1))
       tx <- node.waitForTransaction(tx.id().base58)
     } yield {
       tx shouldBe Transaction(tx.`type`, tx.id, tx.fee, tx.timestamp)
@@ -64,8 +60,9 @@ class SimpleTransactionsSuite extends BaseTransactionSuite with Matchers with Sc
       Array()).right.get
     val f = for {
       _ <- node.sendByNetwork(RawBytes(TransactionSpec.messageCode, tx.bytes()))
-      _ <- Future.successful(Thread.sleep(2000))
-      _ <- Future.sequence(nodes.map(_.ensureTxDoesntExist(tx.id().base58)))
+      maxHeight <- traverse(nodes)(_.height).map(_.max)
+      _ <- traverse(nodes)(_.waitForHeight(maxHeight + 1))
+      _ <- traverse(nodes)(_.ensureTxDoesntExist(tx.id().base58))
     } yield ()
     Await.result(f, waitCompletion)
   }
@@ -74,7 +71,7 @@ class SimpleTransactionsSuite extends BaseTransactionSuite with Matchers with Sc
     val f = for {
       blacklistBefore <- node.blacklistedPeers
       _ <- node.sendByNetwork(RawBytes(TransactionSpec.messageCode, "foobar".getBytes(StandardCharsets.UTF_8)))
-      _ <- node.waitFor[Seq[BlacklistedPeer]](s"blacklistedPeers > ${blacklistBefore.size}")(_.blacklistedPeers, _.size > blacklistBefore.size, 500.millis)
+      _ <- node.waitFor[Seq[BlacklistedPeer]](s"blacklistedPeers > ${blacklistBefore.size}")(_.blacklistedPeers, _.lengthCompare(blacklistBefore.size) > 0, 500.millis)
     } yield ()
     Await.result(f, waitCompletion)
   }
