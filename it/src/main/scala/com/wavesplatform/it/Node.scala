@@ -20,7 +20,8 @@ abstract class Node(config: Config) extends AutoCloseable {
     LoggerFacade(LoggerFactory.getLogger(s"${getClass.getCanonicalName}.${this.name}"))
 
   val settings: WavesSettings = WavesSettings.fromConfig(config)
-  val client: AsyncHttpClient = asyncHttpClient(clientConfig().setNettyTimer(GlobalTimer.instance))
+  val client: AsyncHttpClient = asyncHttpClient(clientConfig()
+      .setKeepAlive(false).setNettyTimer(GlobalTimer.instance))
 
   val privateKey: PrivateKeyAccount = PrivateKeyAccount(Base58.decode(config.getString("private-key")).get)
   val publicKey: PublicKeyAccount = PublicKeyAccount(Base58.decode(config.getString("public-key")).get)

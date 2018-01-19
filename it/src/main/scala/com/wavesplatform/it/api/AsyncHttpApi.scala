@@ -107,7 +107,7 @@ object AsyncHttpApi {
     def waitForStartup(): Future[Option[Response]] = {
       val timeout = 500
 
-      val request = _get(s"${n.nodeApiEndpoint}/blocks/height")
+      def request = _get(s"${n.nodeApiEndpoint}/blocks/height?${System.currentTimeMillis()}")
         .setReadTimeout(timeout)
         .setRequestTimeout(timeout)
         .build()
@@ -116,7 +116,7 @@ object AsyncHttpApi {
         .executeRequest(request).toCompletableFuture.toScala
         .map(Option(_))
         .recoverWith {
-          case e@(_: IOException | _: TimeoutException) => Future(None)
+          case (_: IOException | _: TimeoutException) => Future(None)
         }
 
       def cond(ropt: Option[Response]) = ropt.exists { r =>

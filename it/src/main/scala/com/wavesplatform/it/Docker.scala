@@ -52,7 +52,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty, tag: String = "") extend
     close()
   }
 
-  private val networkPrefix = s"172.${125 + Random.nextInt(75)}.${1 + Random.nextInt(125)}"
+  private val networkPrefix = s"172.${16 + Random.nextInt(16)}.${1 + Random.nextInt(125)}"
 
   private lazy val wavesNetwork: Network = {
     val networkName = s"waves-${hashCode().toLong.toHexString}"
@@ -219,11 +219,13 @@ class Docker(suiteConfig: Config = ConfigFactory.empty, tag: String = "") extend
     val containerInfo = inspectContainer(containerId)
     val ports = containerInfo.networkSettings().ports()
 
+    val wavesIpAddress = containerInfo.networkSettings().networks().get(wavesNetwork.name()).ipAddress()
+
     NodeInfo(
       new URL(s"http://localhost:${extractHostPort(ports, restApiPort)}"),
       new URL(s"http://localhost:${extractHostPort(ports, matcherApiPort)}"),
       new InetSocketAddress("localhost", extractHostPort(ports, networkPort)),
-      new InetSocketAddress(containerInfo.networkSettings().ipAddress(), networkPort))
+      new InetSocketAddress(wavesIpAddress, networkPort))
   }
 
   private def inspectContainer(containerId: String): ContainerInfo = {
