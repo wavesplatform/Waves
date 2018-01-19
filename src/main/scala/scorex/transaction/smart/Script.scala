@@ -16,8 +16,6 @@ object Script {
 
   def apply(): Script = new Script(sigVerify)
 
-  val sigVerify: BOOL = SIGVERIFY(Accessor(TX, Field.Body), Accessor(TX, Field.Proof), Accessor(TX, Field.SenderPk))
+  val sigVerify: BOOL = SIGVERIFY(Accessor(TX, Field.BodyBytes), Accessor(TX, Field.Proof), Accessor(TX, Field.SenderPk))
 
 }
-
-

@@ -33,7 +33,7 @@ object Terms {
     case object Id extends Field[ByteStr]
     case object Type extends Field[Int]
     case object SenderPk extends Field[ByteStr]
-    case object Body extends Field[ByteStr]
+    case object BodyBytes extends Field[ByteStr]
     case object Proof extends Field[ByteStr]
 
   }
@@ -64,7 +64,7 @@ object Terms {
       case Type => Right(ctx.tx.transactionType.id.asInstanceOf[T])
       case SenderPk => Right(ByteStr(ctx.tx.sender.publicKey).asInstanceOf[T])
       case Proof =>  Right(ctx.tx.proof.asInstanceOf[T])
-      case Body => Right(ByteStr(ctx.tx.bodyBytes()).asInstanceOf[T])
+      case BodyBytes => Right(ByteStr(ctx.tx.bodyBytes()).asInstanceOf[T])
     }
     case EQINT(it1, it2) => for {
       i1 <- eval(ctx, it1)
