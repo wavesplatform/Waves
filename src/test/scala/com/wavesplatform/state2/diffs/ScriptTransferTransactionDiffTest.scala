@@ -8,17 +8,23 @@ import scorex.lagonaki.mocks.TestBlock
 import scorex.transaction.GenesisTransaction
 import scorex.transaction.assets.TransferTransaction
 import scorex.transaction.lease.LeaseTransaction
-import scorex.transaction.smart.SetScriptTransaction
+import scorex.transaction.smart.{Script, SetScriptTransaction}
+import scorex.transaction.smart.lang.Terms._
 
 class ScriptTransferTransactionDiffTest extends PropSpec
   with PropertyChecks with Matchers with TransactionGen with NoShrink {
+
+  val onlySend: BOOL = AND(
+    EQINT(Accessor(TX, Field.Type), CONST(4)),
+    SIGVERIFY(Accessor(TX, Field.Body), Accessor(TX, Field.Proof), Accessor(TX, Field.SenderPk))
+  )
 
   val preconditionsAndTransfer: Gen[(GenesisTransaction, SetScriptTransaction, LeaseTransaction, TransferTransaction)] = for {
     master <- accountGen
     recepient <- accountGen
     ts <- positiveIntGen
     genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
-    setSctipt <- selfSignedSetScriptTransactionGenP(master)
+    setSctipt <- selfSignedSetScriptTransactionGenP(master, Script(onlySend))
     transfer <- transferGeneratorP(master, recepient.toAddress, None, None)
     lease <- leaseAndCancelGeneratorP(master, recepient.toAddress, master)
   } yield (genesis, setSctipt, lease._1, transfer)

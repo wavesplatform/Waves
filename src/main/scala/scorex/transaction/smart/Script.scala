@@ -14,12 +14,10 @@ case class Script(script: BOOL) {
 object Script {
   def fromBytes(arr: Array[Byte]): Either[ScriptParseError, Script] = Right(Script())
 
-  def apply(): Script = new Script(simpleSend)
+  def apply(): Script = new Script(sigVerify)
 
-  val simpleSend: BOOL = AND(
-    EQINT(Accessor(TX, Field.Type), CONST(4)),
-    SIGVERIFY(Accessor(TX, Field.Body), Accessor(TX, Field.Proof), Accessor(TX, Field.SenderPk))
-  )
+  val sigVerify: BOOL = SIGVERIFY(Accessor(TX, Field.Body), Accessor(TX, Field.Proof), Accessor(TX, Field.SenderPk))
+
 }
 
 

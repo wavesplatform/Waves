@@ -81,10 +81,10 @@ trait TransactionGen {
     proof <- genBoundedBytes(0, 256)
   } yield SetScriptTransaction.create(sender, Script(), fee, timestamp, ByteStr(proof)).right.get
 
-  def selfSignedSetScriptTransactionGenP(sender: PrivateKeyAccount): Gen[SetScriptTransaction] = for {
+  def selfSignedSetScriptTransactionGenP(sender: PrivateKeyAccount, s: Script): Gen[SetScriptTransaction] = for {
     fee <- smallFeeGen
     timestamp <- timestampGen
-  } yield SetScriptTransaction.selfSigned(sender, Script(), fee, timestamp).explicitGet()
+  } yield SetScriptTransaction.selfSigned(sender, s, fee, timestamp).explicitGet()
 
 
   val paymentGen: Gen[PaymentTransaction] = for {
