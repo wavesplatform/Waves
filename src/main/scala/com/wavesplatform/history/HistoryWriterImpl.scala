@@ -14,6 +14,7 @@ import scorex.block.{Block, BlockHeader}
 import scorex.transaction.History.BlockchainScore
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction._
+import scorex.utils.Synchronized.WriteLock
 import scorex.utils.{NTP, ScorexLogging, Time}
 
 import scala.util.Try
@@ -48,6 +49,8 @@ class HistoryWriterImpl private(db: DB, val synchronizationToken: ReentrantReadW
 
   private lazy val preAcceptedFeatures = functionalitySettings.preActivatedFeatures.mapValues(h => h - activationWindowSize)
 
+  private var heightInfo: (Int, Long) = (height(), time.getTimestamp())
+
   override def approvedFeatures(): Map[Short, Int] = read { implicit lock =>
     preAcceptedFeatures ++ getFeaturesState
   }
@@ -76,7 +79,7 @@ class HistoryWriterImpl private(db: DB, val synchronizationToken: ReentrantReadW
         put(makeKey(ScoreAtHeightPrefix, h), score.toByteArray)
         put(makeKey(SignatureAtHeightPrefix, h), block.uniqueId.arr)
         put(makeKey(HeightBySignaturePrefix, block.uniqueId.arr), Ints.toByteArray(h))
-        putIntProperty(HeightProperty, h)
+        setHeight(h)
 
         val presentFeatures = allFeatures().toSet
         val newFeatures = acceptedFeatures.diff(presentFeatures)
@@ -146,7 +149,7 @@ class HistoryWriterImpl private(db: DB, val synchronizationToken: ReentrantReadW
     get(signatureKey).foreach(b => delete(makeKey(HeightBySignaturePrefix, b)))
     delete(signatureKey)
 
-    putIntProperty(HeightProperty, h - 1)
+    setHeight(h - 1)
 
     maybeDiscardedBlock
   }
@@ -158,6 +161,11 @@ class HistoryWriterImpl private(db: DB, val synchronizationToken: ReentrantReadW
 
   override def height(): Int = read { implicit lock =>
     getIntProperty(HeightProperty).getOrElse(0)
+  }
+
+  private def setHeight(x: Int)(implicit lock: WriteLock): Unit = {
+    putIntProperty(HeightProperty, x)
+    heightInfo = (x, time.getTimestamp())
   }
 
   override def scoreOf(id: ByteStr): Option[BlockchainScore] = read { implicit lock =>
@@ -186,8 +194,6 @@ class HistoryWriterImpl private(db: DB, val synchronizationToken: ReentrantReadW
 
   override def blockHeaderAndSizeAt(height: Int): Option[(BlockHeader, Int)] =
     blockBytes(height).map(bytes => (BlockHeader.parseBytes(bytes).get._1, bytes.length))
-
-  private val heightInfo: (Int, Long) = (height(), time.getTimestamp())
 
   override def debugInfo: HeightInfo = heightInfo
 
