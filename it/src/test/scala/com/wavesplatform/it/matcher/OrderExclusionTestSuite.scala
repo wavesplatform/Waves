@@ -9,7 +9,6 @@ import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.state2.ByteStr
 import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
 import scorex.crypto.EllipticCurveImpl
-import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -18,7 +17,7 @@ import scala.concurrent.{Await, Future}
 import scala.util.Random
 
 class OrderExclusionTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with CancelAfterFailure
-  with ReportingTestName with OrderGenerator with NodesFromDocker {
+  with ReportingTestName with NodesFromDocker {
 
   import OrderExclusionTestSuite._
 
@@ -47,7 +46,7 @@ class OrderExclusionTestSuite extends FreeSpec with Matchers with BeforeAndAfter
 
   "matcher should respond with Public key" in {
     Await.result(matcherNode.matcherGet("/matcher"), 1.minute)
-      .getResponseBody.stripPrefix("\"").stripSuffix("\"") shouldBe Base58.encode(matcherNode.publicKey.publicKey)
+      .getResponseBody.stripPrefix("\"").stripSuffix("\"") shouldBe matcherNode.publicKeyStr
   }
 
   "sell order could be placed" in {
@@ -81,7 +80,7 @@ class OrderExclusionTestSuite extends FreeSpec with Matchers with BeforeAndAfter
     val pk = node.publicKey.publicKey
     val signature = ByteStr(EllipticCurveImpl.sign(privateKey, pk ++ Longs.toByteArray(ts)))
 
-    val orderhistory = Await.result(matcherNode.getOrderbookByPublicKey(node.publicKey.toString, ts, signature), 1.minute)
+    val orderhistory = Await.result(matcherNode.getOrderbookByPublicKey(node.publicKeyStr, ts, signature), 1.minute)
     orderhistory.seq(0).status
   }
 

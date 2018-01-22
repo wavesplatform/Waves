@@ -9,8 +9,8 @@ import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.matcher.api.CancelOrderRequest
 import com.wavesplatform.state2.ByteStr
 import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
+import play.api.libs.json.JsNumber
 import play.api.libs.json.Json.parse
-import play.api.libs.json.{JsArray, JsNumber, JsString}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
@@ -66,13 +66,13 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
 
   "matcher should respond with Public key" in {
     Await.result(matcherNode.matcherGet("/matcher"), 1.minute)
-      .getResponseBody.stripPrefix("\"").stripSuffix("\"") shouldBe Base58.encode(matcherNode.publicKey.publicKey)
+      .getResponseBody.stripPrefix("\"").stripSuffix("\"") shouldBe matcherNode.publicKeyStr
   }
 
   "sell order could be placed" in {
     // Alice places sell order
     val (id, status) = matcherPlaceOrder(
-      prepareOrder(aliceNode, aliceWavesPair, OrderType.SELL, 2 * Waves * Order.PriceConstant, aliceSellAmount))
+      prepareOrder(aliceNode, matcherNode, aliceWavesPair, OrderType.SELL, 2 * Waves * Order.PriceConstant, aliceSellAmount))
     status shouldBe "OrderAccepted"
     aliceSell1 = id
     // Alice checks that the order in order book
@@ -84,12 +84,12 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
     orders.asks.head.price shouldBe 2 * Waves * Order.PriceConstant
   }
 
-  "froze amount should be listed via matcherBalance REST endpoint" in {
+  "frozen amount should be listed via matcherBalance REST endpoint" in {
     val ts = System.currentTimeMillis()
     val privateKey = aliceNode.privateKey
-    val signature = Base58.encode(EllipticCurveImpl.sign(privateKey, privateKey.publicKey ++ Longs.toByteArray(ts)))
+    val signature = Base58.encode(EllipticCurveImpl.sign(privateKey, aliceNode.publicKey.publicKey ++ Longs.toByteArray(ts)))
 
-    val json = parse(Await.result(matcherNode.matcherGet(s"/matcher/matcherBalance/${aliceNode.publicKey}", _
+    val json = parse(Await.result(matcherNode.matcherGet(s"/matcher/matcherBalance/${aliceNode.publicKeyStr}", _
       .addHeader("Timestamp", ts)
       .addHeader("Signature", signature)), 1.minute).getResponseBody)
 
@@ -99,19 +99,17 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
   "and should be listed by trader's publiс key via REST" in {
     val ts = System.currentTimeMillis()
     val privateKey = aliceNode.privateKey
-    val signature = Base58.encode(EllipticCurveImpl.sign(privateKey, privateKey.publicKey ++ Longs.toByteArray(ts)))
+    val signature = ByteStr(EllipticCurveImpl.sign(privateKey, aliceNode.publicKey.publicKey ++ Longs.toByteArray(ts)))
+    val orderIds = Await.result(matcherNode.getOrderbookByPublicKey(aliceNode.publicKeyStr, ts, signature), 1.minute)
+      .map(_.id)
 
-    val json = parse(Await.result(matcherNode.matcherGet(s"/matcher/orderbook/${aliceNode.publicKey}", _
-      .addHeader("Timestamp", ts)
-      .addHeader("Signature", signature)), 1.minute).getResponseBody)
-
-    (json.as[JsArray].value.head \ "id").get shouldBe JsString(aliceSell1)
+    orderIds should contain(aliceSell1)
   }
 
   "and should match with buy order" in {
     // Bob places a buy order
     val (id, status) = matcherPlaceOrder(
-      prepareOrder(bobNode, aliceWavesPair, OrderType.BUY, 2 * Waves * Order.PriceConstant, 200))
+      prepareOrder(bobNode, matcherNode, aliceWavesPair, OrderType.BUY, 2 * Waves * Order.PriceConstant, 200))
     bobBuy1 = id
     status shouldBe "OrderAccepted"
 
@@ -149,12 +147,12 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
 
   "submitting sell orders should check availability of asset" in {
     // Bob trying to place order on more assets than he has - order rejected
-    val badOrder = prepareOrder(bobNode, aliceWavesPair, OrderType.SELL, (19.0 * Waves / 10.0 * Order.PriceConstant).toLong, 300)
+    val badOrder = prepareOrder(bobNode, matcherNode, aliceWavesPair, OrderType.SELL, (19.0 * Waves / 10.0 * Order.PriceConstant).toLong, 300)
     val error = matcherExpectOrderPlacementRejected(badOrder, 400, "OrderRejected")
     error should be(true)
 
     // Bob places order on available amount of assets - order accepted
-    val goodOrder = prepareOrder(bobNode, aliceWavesPair, OrderType.SELL, (19.0 * Waves / 10.0 * Order.PriceConstant).toLong, 150)
+    val goodOrder = prepareOrder(bobNode, matcherNode, aliceWavesPair, OrderType.SELL, (19.0 * Waves / 10.0 * Order.PriceConstant).toLong, 150)
     val (_, status) = matcherPlaceOrder(goodOrder)
     status should be("OrderAccepted")
 
@@ -165,7 +163,7 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
 
   "buy order should match on few price levels" in {
     // Alice places a buy order
-    val order = prepareOrder(aliceNode, aliceWavesPair, OrderType.BUY, (21.0 * Waves / 10.0 * Order.PriceConstant).toLong, 350)
+    val order = prepareOrder(aliceNode, matcherNode, aliceWavesPair, OrderType.BUY, (21.0 * Waves / 10.0 * Order.PriceConstant).toLong, 350)
     val (id, status) = matcherPlaceOrder(order)
     status should be("OrderAccepted")
 
@@ -200,7 +198,7 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
     orders1.bids.size should be(0)
 
     // Alice places a new sell order on 100
-    val order = prepareOrder(aliceNode, aliceWavesPair, OrderType.SELL, 2 * Waves * Order.PriceConstant, 100)
+    val order = prepareOrder(aliceNode, matcherNode, aliceWavesPair, OrderType.SELL, 2 * Waves * Order.PriceConstant, 100)
     val (id, status2) = matcherPlaceOrder(order)
     status2 should be("OrderAccepted")
 
@@ -211,7 +209,7 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
 
   "buy order should execute all open orders and put remaining in order book" in {
     // Bob places buy order on amount bigger then left in sell orders
-    val order = prepareOrder(bobNode, aliceWavesPair, OrderType.BUY, 2 * Waves * Order.PriceConstant, 130)
+    val order = prepareOrder(bobNode, matcherNode, aliceWavesPair, OrderType.BUY, 2 * Waves * Order.PriceConstant, 130)
     val (id, status) = matcherPlaceOrder(order)
     status should be("OrderAccepted")
 
@@ -262,12 +260,12 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
       priceAsset = None
     )
 
-    def bobOrder = prepareOrder(bobNode, bobWavesPair, OrderType.SELL, 1 * Waves * Order.PriceConstant, bobAssetQuantity)
+    def bobOrder = prepareOrder(bobNode, matcherNode, bobWavesPair, OrderType.SELL, 1 * Waves * Order.PriceConstant, bobAssetQuantity)
 
     matcherPlaceOrder(bobOrder)
 
     // Alice wants to buy all Bob's assets for 1 Wave
-    val (buyId, _) = matcherPlaceOrder(prepareOrder(aliceNode, bobWavesPair, OrderType.BUY, 1 * Waves * Order.PriceConstant, bobAssetQuantity))
+    val (buyId, _) = matcherPlaceOrder(prepareOrder(aliceNode, matcherNode, bobWavesPair, OrderType.BUY, 1 * Waves * Order.PriceConstant, bobAssetQuantity))
     waitForOrderStatus(aliceAsset, buyId, "Filled")
 
     // Bob tries to do the same operation, but at now he have no assets
@@ -304,16 +302,6 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
     val height = Await.result(node.height, 1.minute)
 
     (balance, height)
-  }
-
-  private def prepareOrder(node: Node, pair: AssetPair, orderType: OrderType, price: Long, amount: Long): Order = {
-    val creationTime = System.currentTimeMillis()
-    val timeToLive = creationTime + Order.MaxLiveTime - 1000
-
-    val privateKey = node.privateKey
-    val matcherPublicKey = matcherNode.publicKey
-
-    Order(privateKey, matcherPublicKey, pair, orderType, price, amount, creationTime, timeToLive, MatcherFee)
   }
 
   private def matcherPlaceOrder(order: Order): (String, String) = {
@@ -355,7 +343,8 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
     val privateKey = node.privateKey
     val publicKey = node.publicKey
     val request = CancelOrderRequest(publicKey, Base58.decode(orderId).get, Array.emptyByteArray)
-    val signedRequest = CancelOrderRequest.sign(request, privateKey)
+    val sig = EllipticCurveImpl.sign(privateKey, request.toSign)
+    val signedRequest = request.copy(signature = sig)
     val futureResult = matcherNode.cancelOrder(pair.amountAssetStr, pair.priceAssetStr, signedRequest)
 
     val result = Await.result(futureResult, 1.minute)

@@ -23,8 +23,8 @@ abstract class Node(config: Config) extends AutoCloseable {
   val client: AsyncHttpClient = asyncHttpClient(clientConfig()
       .setKeepAlive(false).setNettyTimer(GlobalTimer.instance))
 
-  val privateKey: PrivateKeyAccount = PrivateKeyAccount(Base58.decode(config.getString("private-key")).get)
-  val publicKey: PublicKeyAccount = PublicKeyAccount(Base58.decode(config.getString("public-key")).get)
+  val privateKey: PrivateKeyAccount = PrivateKeyAccount.fromSeed(config.getString("account-seed")).right.get
+  val publicKey: PublicKeyAccount = PublicKeyAccount.fromBase58String(config.getString("public-key")).right.get
   val address: String = config.getString("address")
 
   def nodeApiEndpoint: URL
@@ -40,6 +40,8 @@ abstract class Node(config: Config) extends AutoCloseable {
 object Node {
   implicit class NodeExt(val n: Node) extends AnyVal {
     def name: String = n.settings.networkSettings.nodeName
+
+    def publicKeyStr = Base58.encode(n.publicKey.publicKey)
 
     def fee(txValue: TransactionType.Value, asset: String = "WAVES"): Long
      = n.settings.feesSettings.fees(txValue.id).find(_.asset == asset).get.fee
