@@ -32,7 +32,7 @@ class ScriptTransferTransactionSpecification extends PropSpec with PropertyCheck
     first.amount shouldEqual second.amount
     first.recipient shouldEqual second.recipient
     first.version shouldEqual second.version
-    first.proof shouldEqual second.proof
+    first.proofs shouldEqual second.proofs
     first.bytes() shouldEqual second.bytes()
   }
 }

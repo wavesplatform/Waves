@@ -4,8 +4,8 @@ import com.wavesplatform.state2.reader.SnapshotStateReader
 import scorex.crypto.EllipticCurveImpl
 import scorex.transaction.ValidationError.{GenericError, TransactionNotAllowedByScript}
 import scorex.transaction._
-import scorex.transaction.smart.lang.Terms
-import scorex.transaction.smart.lang.Terms.Context
+import scorex.transaction.smart.lang.Evaluator
+import scorex.transaction.smart.lang.Evaluator.Context
 
 object Verifier {
 
@@ -18,7 +18,7 @@ object Verifier {
     }
   }
 
-  def verify[T <: ProvenTransaction](script: Script, height: Int, transaction: T): Either[ValidationError, T] = Terms.eval(Context(height, transaction), script.script) match {
+  def verify[T <: ProvenTransaction](script: Script, height: Int, transaction: T): Either[ValidationError, T] = Evaluator.apply(Context(height, transaction), script.script) match {
     case Left(execError) => Left(GenericError(s"Script execution error: $execError"))
     case Right(false) => Left(TransactionNotAllowedByScript(transaction))
     case Right(true) => Right(transaction)

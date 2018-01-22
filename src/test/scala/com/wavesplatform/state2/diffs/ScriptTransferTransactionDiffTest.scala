@@ -16,9 +16,9 @@ class ScriptTransferTransactionDiffTest extends PropSpec
 
   val onlySend: BOOL = AND(
     OR(
-      EQINT(Accessor(TX, Field.Type), CONST(4)),
-      EQINT(Accessor(TX, Field.Type), CONST(11))),
-    SIGVERIFY(Accessor(TX, Field.BodyBytes), Accessor(TX, Field.Proof_0), Accessor(TX, Field.SenderPk))
+      EQ_INT(Accessor(TX, Type), CONST_INT(4)),
+      EQ_INT(Accessor(TX, Type), CONST_INT(11))),
+    SIG_VERIFY(Accessor(TX, BodyBytes), Accessor(TX, Proof_0), Accessor(TX, SenderPk))
   )
 
   val preconditionsAndTransfer: Gen[(GenesisTransaction, SetScriptTransaction, LeaseTransaction, TransferTransaction)] = for {

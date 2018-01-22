@@ -1,0 +1,65 @@
+package scorex.transaction.smart.lang
+
+import com.wavesplatform.state2.ByteStr
+import scorex.crypto.signatures.Curve25519
+import scorex.transaction.ProvenTransaction
+import scorex.transaction.smart.lang.Terms._
+import scala.util.Try
+
+object Evaluator {
+
+  case class Context(height: Int, tx: ProvenTransaction)
+
+  type ExcecutionError = String
+  type EitherExecResult[T] = Either[ExcecutionError, T]
+
+  def proofVal[T](proofs: Seq[ByteStr], idx: Int): Either[ExcecutionError, T] =
+    Try(proofs(idx).asInstanceOf[T]).toEither.left.map(_.toString)
+
+  def apply[T](ctx: Context, t: Term[T]): EitherExecResult[T] = t match {
+    case CONST_INT(v) => Right(v)
+    case AND(t1, t2) =>
+      apply(ctx, t1) match {
+        case Left(err) => Left(err)
+        case Right(false) => Right(false.asInstanceOf[T])
+        case Right(true) => apply(ctx, t2) match {
+          case Left(err) => Left(err)
+          case Right(v) => Right(v.asInstanceOf[T])
+        }
+      }
+    case OR(t1, t2) =>
+      apply(ctx, t1) match {
+        case Left(err) => Left(err)
+        case Right(true) => Right(true.asInstanceOf[T])
+        case Right(false) => apply(ctx, t2) match {
+          case Left(err) => Left(err)
+          case Right(v) => Right(v.asInstanceOf[T])
+        }
+      }
+    case TX => Left("Nothing to do with TX")
+    case HEIGHT => Right(ctx.height.asInstanceOf[T])
+    case Accessor(_, f) => f match {
+      case Id => Right(ctx.tx.id().asInstanceOf[T])
+      case Type => Right(ctx.tx.transactionType.id.asInstanceOf[T])
+      case SenderPk => Right(ByteStr(ctx.tx.sender.publicKey).asInstanceOf[T])
+      case Proof_0 => proofVal(ctx.tx.proofs, 0)
+      case Proof_1 => proofVal(ctx.tx.proofs, 1)
+      case Proof_2 => proofVal(ctx.tx.proofs, 2)
+      case Proof_3 => proofVal(ctx.tx.proofs, 3)
+      case Proof_4 => proofVal(ctx.tx.proofs, 4)
+      case Proof_5 => proofVal(ctx.tx.proofs, 5)
+      case Proof_6 => proofVal(ctx.tx.proofs, 6)
+      case Proof_7 => proofVal(ctx.tx.proofs, 7)
+      case BodyBytes => Right(ByteStr(ctx.tx.bodyBytes()).asInstanceOf[T])
+    }
+    case EQ_INT(it1, it2) => for {
+      i1 <- apply(ctx, it1)
+      i2 <- apply(ctx, it2)
+    } yield (i1 == i2).asInstanceOf[T]
+    case SIG_VERIFY(msg, sig, pk) => for {
+      s <- apply(ctx, sig)
+      m <- apply(ctx, msg)
+      p <- apply(ctx, pk)
+    } yield Curve25519.verify(s.arr, m.arr, p.arr).asInstanceOf[T]
+  }
+}
