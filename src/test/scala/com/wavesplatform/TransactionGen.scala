@@ -80,7 +80,7 @@ trait TransactionGen {
     timestamp <- timestampGen
     proofsAmount <-Gen.chooseNum(0,7)
     proofs <- Gen.listOfN(proofsAmount,genBoundedBytes(0, 50))
-  } yield SetScriptTransaction.create(sender, Script(), fee, timestamp, proofs.map(ByteStr(_))).right.get
+  } yield SetScriptTransaction.create(sender, Script.sigVerify, fee, timestamp, proofs.map(ByteStr(_))).right.get
 
   def selfSignedSetScriptTransactionGenP(sender: PrivateKeyAccount, s: Script): Gen[SetScriptTransaction] = for {
     fee <- smallFeeGen
@@ -145,7 +145,7 @@ trait TransactionGen {
   val leaseGen: Gen[LeaseTransaction] = leaseAndCancelGen.map(_._1)
   val leaseCancelGen: Gen[LeaseCancelTransaction] = leaseAndCancelGen.map(_._2)
 
-  private val transferParamGen = for {
+  val transferParamGen = for {
     amount <- positiveLongGen
     feeAmount <- smallFeeGen
     assetId <- Gen.option(bytes32gen)

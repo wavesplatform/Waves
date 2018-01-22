@@ -1,29 +1,26 @@
 package scorex.transaction.smart
 
+import scodec.Attempt.{Failure, Successful}
 import com.wavesplatform.state2.ByteStr
 import monix.eval.Coeval
+import scodec.DecodeResult
 import scorex.transaction.ValidationError.ScriptParseError
 import scorex.transaction.smart.lang.Terms._
 
 case class Script(script: BOOL) {
-  val bytes: Coeval[ByteStr] = Coeval.evalOnce(ByteStr.empty)
+  val bytes: Coeval[ByteStr] = Coeval.evalOnce(ByteStr(scorex.transaction.smart.lang.Serde.codec.encode(script).require.toByteArray))
   val version = 1
   val text: String = script.toString
+
+  override def toString: String = s"Script($text, base58=${bytes()}"
 }
 
 object Script {
-  def fromBytes(arr: Array[Byte]): Either[ScriptParseError, Script] = Right(Script())
+  def fromBytes(arr: Array[Byte]): Either[ScriptParseError, Script] = scorex.transaction.smart.lang.Serde.codec.decode(scodec.bits.BitVector(arr)) match {
+    case Successful(value: DecodeResult[BOOL]) => Right(Script(value.value))
+    case Failure(cause) => Left(ScriptParseError(cause.toString))
+  }
 
-  def apply(): Script = new Script(sigVerify)
+  val sigVerify: Script = Script(SIG_VERIFY(TX_FIELD(BodyBytes), TX_FIELD(Proof_0), TX_FIELD(SenderPk)))
 
-  val sigVerify: BOOL = SIG_VERIFY(Accessor(BodyBytes), Accessor(Proof_0), Accessor(SenderPk))
-
-  val multisig2Of3 = EQ_INT(
-    SUM(
-      SUM(
-        IF(SIG_VERIFY(Accessor(BodyBytes), Accessor(Proof_0), ???), CONST_INT(1), CONST_INT(0)),
-        IF(SIG_VERIFY(Accessor(BodyBytes), Accessor(Proof_1), ???), CONST_INT(1), CONST_INT(0))
-      ),
-      IF(SIG_VERIFY(Accessor(BodyBytes), Accessor(Proof_2), ???), CONST_INT(1), CONST_INT(0))
-    ), CONST_INT(2))
 }

@@ -1,9 +1,10 @@
 package scorex.transaction.smart.lang
 
-import com.wavesplatform.state2.ByteStr
+import scodec.bits.ByteVector
 import scorex.crypto.signatures.Curve25519
 import scorex.transaction.ProvenTransaction
 import scorex.transaction.smart.lang.Terms._
+
 import scala.util.Try
 
 object Evaluator {
@@ -13,15 +14,26 @@ object Evaluator {
   type ExcecutionError = String
   type EitherExecResult[T] = Either[ExcecutionError, T]
 
-  def proofVal[T](proofs: Seq[ByteStr], idx: Int): Either[ExcecutionError, T] =
-    Try(proofs(idx).asInstanceOf[T]).toEither.left.map(_.toString)
+  def proofVal[T](proofs: Seq[com.wavesplatform.state2.ByteStr], idx: Int): Either[ExcecutionError, T] =
+    if (idx < proofs.size)
+      Try(ByteVector(proofs(idx).arr).asInstanceOf[T]).toEither.left.map(_.toString)
+    else Right(ByteVector.empty.asInstanceOf[T])
 
   def apply[T](ctx: Context, t: Term[T]): EitherExecResult[T] = t match {
     case CONST_INT(v) => Right(v.asInstanceOf[T])
+    case CONST_BYTEVECTOR(v) => Right(v.asInstanceOf[T])
     case SUM(t1, t2) => for {
       a1 <- apply(ctx, t1)
       a2 <- apply(ctx, t2)
     } yield (a1 + a2).asInstanceOf[T]
+    case GE(t1, t2) => for {
+      a1 <- apply(ctx, t1)
+      a2 <- apply(ctx, t2)
+    } yield (a1 >= a2).asInstanceOf[T]
+    case GT(t1, t2) => for {
+      a1 <- apply(ctx, t1)
+      a2 <- apply(ctx, t2)
+    } yield (a1 > a2).asInstanceOf[T]
     case IF(cond, t1, t2) => apply(ctx, cond) flatMap {
       case false => apply(ctx, t1)
       case true => apply(ctx, t2)
@@ -45,14 +57,14 @@ object Evaluator {
         }
       }
     case HEIGHT => Right(ctx.height.asInstanceOf[T])
-    case Accessor(f) => f match {
+    case TX_FIELD(f) => f match {
       case Id => Right(ctx.tx.id().asInstanceOf[T])
       case Type => Right(ctx.tx.transactionType.id.asInstanceOf[T])
-      case SenderPk => Right(ByteStr(ctx.tx.sender.publicKey).asInstanceOf[T])
+      case SenderPk => Right(ByteVector(ctx.tx.sender.publicKey).asInstanceOf[T])
       case Proof_0 => proofVal(ctx.tx.proofs, 0)
       case Proof_1 => proofVal(ctx.tx.proofs, 1)
       case Proof_2 => proofVal(ctx.tx.proofs, 2)
-      case BodyBytes => Right(ByteStr(ctx.tx.bodyBytes()).asInstanceOf[T])
+      case BodyBytes => Right(ByteVector(ctx.tx.bodyBytes()).asInstanceOf[T])
       case _ => ??? // match for  __satisfy_shapeless_0
     }
     case EQ_INT(it1, it2) => for {
@@ -63,6 +75,6 @@ object Evaluator {
       s <- apply(ctx, sig)
       m <- apply(ctx, msg)
       p <- apply(ctx, pk)
-    } yield Curve25519.verify(s.arr, m.arr, p.arr).asInstanceOf[T]
+    } yield Curve25519.verify(s.toArray, m.toArray, p.toArray).asInstanceOf[T]
   }
 }
