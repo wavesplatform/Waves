@@ -74,6 +74,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   private val wallet: Wallet = Wallet(settings.walletSettings)
   private val peerDatabase = new PeerDatabaseImpl(settings.networkSettings)
 
+  private var matcher: Option[Matcher] = None
+
   def run(): Unit = {
     checkGenesis(history, settings, blockchainUpdater)
 
@@ -186,11 +188,12 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       shutdown()
     }
 
-    if (settings.matcherSettings.enable) {
-      val matcher = new Matcher(actorSystem, wallet, utxStorage, allChannels, stateReader, history,
-        settings.blockchainSettings, settings.restAPISettings, settings.matcherSettings, db)
-      matcher.runMatcher()
-    }
+    matcher = if (settings.matcherSettings.enable) {
+      val m = new Matcher(actorSystem, wallet, utxStorage, allChannels, stateReader, history,
+        settings.blockchainSettings, settings.restAPISettings, settings.matcherSettings)
+      m.runMatcher()
+      Some(m)
+    } else None
   }
 
   @volatile var shutdownInProgress = false
@@ -210,6 +213,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       for (addr <- settings.networkSettings.declaredAddress if settings.networkSettings.uPnPSettings.enable) {
         upnp.deletePort(addr.getPort)
       }
+
+      matcher.foreach(_.shutdownMatcher())
 
       log.debug("Closing storage")
       db.close()

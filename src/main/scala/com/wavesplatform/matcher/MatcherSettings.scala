@@ -1,5 +1,7 @@
 package com.wavesplatform.matcher
 
+import java.io.File
+
 import com.typesafe.config.Config
 import net.ceedubs.ficus.Ficus._
 import scorex.transaction.assets.exchange.AssetPair
@@ -14,6 +16,8 @@ case class MatcherSettings(enable: Boolean,
                            port: Int,
                            minOrderFee: Long,
                            orderMatchTxFee: Long,
+                           dataDir: String,
+                           isMigrateToNewOrderHistoryStorage: Boolean,
                            journalDataDir: String,
                            snapshotsDataDir: String,
                            snapshotsInterval: FiniteDuration,
@@ -39,6 +43,7 @@ object MatcherSettings {
     val port = config.as[Int](s"$configPath.port")
     val minOrderFee = config.as[Long](s"$configPath.min-order-fee")
     val orderMatchTxFee = config.as[Long](s"$configPath.order-match-tx-fee")
+    val dataDirectory = config.as[String](s"$configPath.data-directory")
     val journalDirectory = config.as[String](s"$configPath.journal-directory")
     val snapshotsDirectory = config.as[String](s"$configPath.snapshots-directory")
     val snapshotsInterval = config.as[FiniteDuration](s"$configPath.snapshots-interval")
@@ -57,8 +62,12 @@ object MatcherSettings {
 
     val blacklistedAddresses = config.as[List[String]](s"$configPath.blacklisted-addresses")
 
-    MatcherSettings(enabled, account, bindAddress, port, minOrderFee, orderMatchTxFee, journalDirectory,
-      snapshotsDirectory, snapshotsInterval, orderCleanupInterval, orderHistoryCommitInterval, maxOpenOrders, baseAssets, basePairs, maxTimestampDiff,
-      blacklistedAssets.toSet, blacklistedNames, maxOrdersPerRequest, blacklistedAddresses.toSet)
+    val f = new File(dataDirectory)
+    val isMigrateToNewOrderHistoryStorage = f.exists() && f.isDirectory
+
+    MatcherSettings(enabled, account, bindAddress, port, minOrderFee, orderMatchTxFee, dataDirectory, isMigrateToNewOrderHistoryStorage,
+      journalDirectory, snapshotsDirectory, snapshotsInterval, orderCleanupInterval, orderHistoryCommitInterval,
+      maxOpenOrders, baseAssets, basePairs, maxTimestampDiff, blacklistedAssets.toSet, blacklistedNames,
+      maxOrdersPerRequest, blacklistedAddresses.toSet)
   }
 }

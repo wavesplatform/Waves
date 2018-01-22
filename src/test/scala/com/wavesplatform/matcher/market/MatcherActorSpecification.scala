@@ -39,7 +39,6 @@ with TestDB
   with ScorexLogging
   with PathMockFactory {
 
-  val db = open()
   val storedState: SnapshotStateReader = stub[SnapshotStateReader]
 
   val settings = matcherSettings.copy(account = MatcherAccount.address)

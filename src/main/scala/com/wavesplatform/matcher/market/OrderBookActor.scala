@@ -291,8 +291,7 @@ class OrderBookActor(assetPair: AssetPair,
 
   override def receiveCommand: Receive = fullCommands
 
-  // TODO: Add some logic to update data from snapshots
-  val isMigrateToNewOrderHistoryStorage = false
+  val isMigrateToNewOrderHistoryStorage = settings.isMigrateToNewOrderHistoryStorage
 
   override def receiveRecover: Receive = {
     case evt: Event =>
