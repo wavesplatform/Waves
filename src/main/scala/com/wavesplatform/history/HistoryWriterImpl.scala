@@ -52,7 +52,7 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
     featuresVotes().getOrDefault(FeatureProvider.votingWindowOpeningFromHeight(height, activationWindowSize), Map.empty)
   }
 
-  private def alterVotes(height: Int, votes: Set[Short], voteMod: Int): Unit = write { implicit lock =>
+  private def alterVotes(height: Int, votes: Set[Short], voteMod: Int): Unit = write("alterVotes") { implicit lock =>
     val votingWindowOpening = FeatureProvider.votingWindowOpeningFromHeight(height, activationWindowSize)
     val votesWithinWindow = featuresVotes().getOrDefault(votingWindowOpening, Map.empty[Short, Int])
     val newVotes = votes.foldLeft(votesWithinWindow)((v, feature) => v + (feature -> (v.getOrElse(feature, 0) + voteMod)))
@@ -60,7 +60,7 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
   }
 
   def appendBlock(block: Block, acceptedFeatures: Set[Short])(consensusValidation: => Either[ValidationError, BlockDiff]): Either[ValidationError, BlockDiff] =
-    write { implicit lock =>
+    write("appendBlock") { implicit lock =>
 
       assert(block.signaturesValid().isRight)
 
@@ -87,7 +87,7 @@ class HistoryWriterImpl private(file: Option[File], val synchronizationToken: Re
       }
     }
 
-  def discardBlock(): Option[Block] = write { implicit lock =>
+  def discardBlock(): Option[Block] = write("discardBlock") { implicit lock =>
     val h = height()
 
     alterVotes(h, blockAt(h).map(b => b.featureVotes).getOrElse(Set.empty), -1)

@@ -17,11 +17,11 @@ class SynchronizedTest extends FunSuite {
       mut()
     }
 
-    def write(): Int = write { implicit l =>
+    def write(): Int = write("write") { implicit l =>
       mut.set(1)
     }
 
-    def readWhileWrite(): Int = write { _ =>
+    def readWhileWrite(): Int = write("write") { _ =>
       read()
     }
 
@@ -30,13 +30,13 @@ class SynchronizedTest extends FunSuite {
       Thread.sleep(1500)
     }
 
-    def longWrite(): Unit = write { implicit l =>
+    def longWrite(): Unit = write("write") { implicit l =>
       mut.set(1)
       Thread.sleep(1500)
       mut.set(1)
     }
 
-    def nestedWrite(): Unit = write { _ =>
+    def nestedWrite(): Unit = write("write") { _ =>
       Thread.sleep(200)
       write()
       Thread.sleep(200)
