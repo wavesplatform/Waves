@@ -1,12 +1,11 @@
 package com.wavesplatform.it.api
 
-import org.asynchttpclient.{Request, Response}
 import play.api.libs.json.{Format, Json}
 
-
-case class UnexpectedStatusCodeException(request: Request, response: Response)
-  extends Exception(s"Request: ${request.getUrl}\n" +
-  s"Unexpected status code (${response.getStatusCode}): ${response.getResponseBody}")
+// USCE no longer contains references to non-seializable Request/Response objects
+// to work around https://github.com/scalatest/scalatest/issues/556
+case class UnexpectedStatusCodeException(requestUrl: String, statusCode: Int, responseBody: String)
+  extends Exception(s"Request: $requestUrl; Unexpected status code ($statusCode): $responseBody")
 
 case class Status(blockchainHeight: Int, stateHeight: Int, updatedTimestamp: Long, updatedDate: String)
 object Status {

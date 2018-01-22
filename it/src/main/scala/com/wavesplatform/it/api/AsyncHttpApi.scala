@@ -88,8 +88,8 @@ object AsyncHttpApi {
       post(s"${n.nodeApiEndpoint}$path",
         (rb: RequestBuilder) => rb.setHeader("Content-type", "application/json").setBody(body))
 
-    def blacklist(networkIpAddress: String, hostNetworkPort: Int): Future[Unit] =
-      post("/debug/blacklist", s"$networkIpAddress:$hostNetworkPort").map(_ => ())
+    def blacklist(address: InetSocketAddress): Future[Unit] =
+      post("/debug/blacklist", s"${address.getHostString}:${address.getPort}").map(_ => ())
 
     def printDebugMessage(db: DebugMessage): Future[Response] = postJsonWithApiKey("/debug/print", db)
 
@@ -154,13 +154,13 @@ object AsyncHttpApi {
 
     def findTransactionInfo(txId: String): Future[Option[Transaction]] = transactionInfo(txId).transform {
       case Success(tx) => Success(Some(tx))
-      case Failure(UnexpectedStatusCodeException(_, r)) if r.getStatusCode == 404 => Success(None)
+      case Failure(UnexpectedStatusCodeException(_, 404, _)) => Success(None)
       case Failure(ex) => Failure(ex)
     }
 
     def waitForTransaction(txId: String, retryInterval: FiniteDuration = 1.second): Future[Transaction] = waitFor[Option[Transaction]](s"transaction $txId")(_.transactionInfo(txId).transform {
       case Success(tx) => Success(Some(tx))
-      case Failure(UnexpectedStatusCodeException(_, r)) if r.getStatusCode == 404 => Success(None)
+      case Failure(UnexpectedStatusCodeException(_, 404, _)) => Success(None)
       case Failure(ex) => Failure(ex)
     }, tOpt => tOpt.exists(_.id == txId), retryInterval).map(_.get)
 
@@ -301,8 +301,8 @@ object AsyncHttpApi {
 
     def expectIncorrectOrderPlacement(order: Order, expectedStatusCode: Int, expectedStatus: String): Future[Boolean] =
       matcherPost("/matcher/orderbook", order.json()) transform {
-        case Failure(UnexpectedStatusCodeException(_, r)) if r.getStatusCode == expectedStatusCode =>
-          Try(parse(r.getResponseBody).as[MatcherStatusResponse]) match {
+        case Failure(UnexpectedStatusCodeException(_, `expectedStatusCode`, responseBody)) =>
+          Try(parse(responseBody).as[MatcherStatusResponse]) match {
             case Success(mr) if mr.status == expectedStatus => Success(true)
             case Failure(f) => Failure(new RuntimeException(s"Failed to parse response: $f"))
           }
@@ -319,11 +319,11 @@ object AsyncHttpApi {
         n.client.executeRequest(r, new AsyncCompletionHandler[Response] {
           override def onCompleted(response: Response): Response = {
             if (response.getStatusCode == statusCode) {
-              n.log.debug(s"Request: ${r.getUrl} \n Response: ${response.getResponseBody}")
+              n.log.debug(s"Request: ${r.getUrl}\nResponse: ${response.getResponseBody}")
               response
             } else {
-              n.log.debug(s"Request:  ${r.getUrl} \n Unexpected status code(${response.getStatusCode}): ${response.getResponseBody}")
-              throw UnexpectedStatusCodeException(r, response)
+              n.log.debug(s"Request: ${r.getUrl}\nUnexpected status code(${response.getStatusCode}): ${response.getResponseBody}")
+              throw UnexpectedStatusCodeException(r.getUrl, response.getStatusCode, response.getResponseBody)
             }
           }
         }).toCompletableFuture.toScala
