@@ -17,7 +17,15 @@ object Evaluator {
     Try(proofs(idx).asInstanceOf[T]).toEither.left.map(_.toString)
 
   def apply[T](ctx: Context, t: Term[T]): EitherExecResult[T] = t match {
-    case CONST_INT(v) => Right(v)
+    case CONST_INT(v) => Right(v.asInstanceOf[T])
+    case SUM(t1, t2) => for {
+      a1 <- apply(ctx, t1)
+      a2 <- apply(ctx, t2)
+    } yield (a1 + a2).asInstanceOf[T]
+    case IF(cond, t1, t2) => apply(ctx, cond) flatMap {
+      case false => apply(ctx, t1)
+      case true => apply(ctx, t2)
+    }
     case AND(t1, t2) =>
       apply(ctx, t1) match {
         case Left(err) => Left(err)
@@ -36,21 +44,16 @@ object Evaluator {
           case Right(v) => Right(v.asInstanceOf[T])
         }
       }
-    case TX => Left("Nothing to do with TX")
     case HEIGHT => Right(ctx.height.asInstanceOf[T])
-    case Accessor(_, f) => f match {
+    case Accessor(f) => f match {
       case Id => Right(ctx.tx.id().asInstanceOf[T])
       case Type => Right(ctx.tx.transactionType.id.asInstanceOf[T])
       case SenderPk => Right(ByteStr(ctx.tx.sender.publicKey).asInstanceOf[T])
       case Proof_0 => proofVal(ctx.tx.proofs, 0)
       case Proof_1 => proofVal(ctx.tx.proofs, 1)
       case Proof_2 => proofVal(ctx.tx.proofs, 2)
-      case Proof_3 => proofVal(ctx.tx.proofs, 3)
-      case Proof_4 => proofVal(ctx.tx.proofs, 4)
-      case Proof_5 => proofVal(ctx.tx.proofs, 5)
-      case Proof_6 => proofVal(ctx.tx.proofs, 6)
-      case Proof_7 => proofVal(ctx.tx.proofs, 7)
       case BodyBytes => Right(ByteStr(ctx.tx.bodyBytes()).asInstanceOf[T])
+      case _ => ??? // match for  __satisfy_shapeless_0
     }
     case EQ_INT(it1, it2) => for {
       i1 <- apply(ctx, it1)

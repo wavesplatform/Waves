@@ -16,14 +16,14 @@ object Script {
 
   def apply(): Script = new Script(sigVerify)
 
-  val sigVerify: BOOL = SIG_VERIFY(Accessor(TX, BodyBytes), Accessor(TX, Proof_0), Accessor(TX, SenderPk))
+  val sigVerify: BOOL = SIG_VERIFY(Accessor(BodyBytes), Accessor(Proof_0), Accessor(SenderPk))
 
   val multisig2Of3 = EQ_INT(
     SUM(
       SUM(
-        IF(SIG_VERIFY(Accessor(TX, BodyBytes), Accessor(TX, Proof_0), ???), CONST_INT(1), CONST_INT(0)),
-        IF(SIG_VERIFY(Accessor(TX, BodyBytes), Accessor(TX, Proof_1), ???), CONST_INT(1), CONST_INT(0))
+        IF(SIG_VERIFY(Accessor(BodyBytes), Accessor(Proof_0), ???), CONST_INT(1), CONST_INT(0)),
+        IF(SIG_VERIFY(Accessor(BodyBytes), Accessor(Proof_1), ???), CONST_INT(1), CONST_INT(0))
       ),
-      IF(SIG_VERIFY(Accessor(TX, BodyBytes), Accessor(TX, Proof_2), ???), CONST_INT(1), CONST_INT(0))
+      IF(SIG_VERIFY(Accessor(BodyBytes), Accessor(Proof_2), ???), CONST_INT(1), CONST_INT(0))
     ), CONST_INT(2))
 }
