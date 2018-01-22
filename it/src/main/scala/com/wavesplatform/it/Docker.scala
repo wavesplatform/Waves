@@ -1,15 +1,17 @@
 package com.wavesplatform.it
 
 import java.io.FileOutputStream
-import java.net.{InetSocketAddress, URL}
+import java.net.{InetAddress, InetSocketAddress, URL}
 import java.nio.file.{Files, Paths}
+import java.util.Collections._
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
-import java.util.{Collections, Properties, List => JList, Map => JMap}
+import java.util.{Properties, List => JList, Map => JMap}
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.dataformat.javaprop.JavaPropsMapper
 import com.google.common.collect.ImmutableMap
+import com.google.common.primitives.Ints._
 import com.spotify.docker.client.messages.EndpointConfig.EndpointIpamConfig
 import com.spotify.docker.client.messages._
 import com.spotify.docker.client.{DefaultDockerClient, DockerClient}
@@ -52,7 +54,12 @@ class Docker(suiteConfig: Config = ConfigFactory.empty, tag: String = "") extend
     close()
   }
 
-  private val networkPrefix = s"172.${16 + Random.nextInt(16)}.${1 + Random.nextInt(125)}"
+  // a random network in 10.x.x.x range
+  private val networkSeed = Random.nextInt(0x100000) << 4 | 0x0A000000
+  // 10.x.x.x/28 network will accommodate up to 13 nodes
+  private val networkPrefix = s"${InetAddress.getByAddress(toByteArray(networkSeed)).getHostAddress}/28"
+
+  private def ipForNode(nodeId: Int) = InetAddress.getByAddress(toByteArray(nodeId & 0xF | networkSeed)).getHostAddress
 
   private lazy val wavesNetwork: Network = {
     val networkName = s"waves-${hashCode().toLong.toHexString}"
@@ -78,7 +85,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty, tag: String = "") extend
             .ipam(
               Ipam.builder()
                 .driver("default")
-                .config(List(IpamConfig.create(s"$networkPrefix.0/24", s"$networkPrefix.0/24", s"$networkPrefix.254")).asJava)
+                .config(singletonList(IpamConfig.create(networkPrefix, networkPrefix, ipForNode(0xE))))
                 .build()
             )
             .checkDuplicate(true)
@@ -162,9 +169,9 @@ class Docker(suiteConfig: Config = ConfigFactory.empty, tag: String = "") extend
     val matcherApiPort = actualConfig.getString("waves.matcher.port")
 
     val portBindings = new ImmutableMap.Builder[String, java.util.List[PortBinding]]()
-      .put(restApiPort, Collections.singletonList(PortBinding.randomPort("0.0.0.0")))
-      .put(networkPort, Collections.singletonList(PortBinding.randomPort("0.0.0.0")))
-      .put(matcherApiPort, Collections.singletonList(PortBinding.randomPort("0.0.0.0")))
+      .put(restApiPort, singletonList(PortBinding.randomPort("0.0.0.0")))
+      .put(networkPort, singletonList(PortBinding.randomPort("0.0.0.0")))
+      .put(matcherApiPort, singletonList(PortBinding.randomPort("0.0.0.0")))
       .build()
 
     val hostConfig = HostConfig.builder()
@@ -173,7 +180,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty, tag: String = "") extend
 
     val nodeName = actualConfig.getString("waves.network.node-name")
     val nodeNumber = nodeName.replace("node", "").toInt
-    val ip = s"$networkPrefix.$nodeNumber"
+    val ip = ipForNode(nodeNumber)
     val containerConfig = ContainerConfig.builder()
       .image("com.wavesplatform/it:latest")
       .exposedPorts(restApiPort, networkPort, matcherApiPort)
@@ -323,7 +330,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty, tag: String = "") extend
 
   private def endpointConfigFor(nodeName: String): EndpointConfig = {
     val nodeNumber = nodeName.replace("node", "").toInt
-    val ip = s"$networkPrefix.$nodeNumber"
+    val ip = ipForNode(nodeNumber)
 
     EndpointConfig.builder()
       .ipAddress(ip)
