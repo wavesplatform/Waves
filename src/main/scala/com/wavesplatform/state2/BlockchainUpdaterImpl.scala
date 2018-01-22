@@ -69,7 +69,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
     internalLastBlockInfo.onNext(LastBlockInfo(b.uniqueId, historyReader.height(), historyReader.score(), blockchainReady))
   }
 
-  private def syncPersistedAndInMemory(): Unit = write { implicit l =>
+  private def syncPersistedAndInMemory(): Unit = write("syncPersistedAndInMemory") { implicit l =>
     log.info(heights("State rebuild started"))
 
     val notPersisted = historyWriter.height() - persisted.height
@@ -126,7 +126,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
     else Set.empty
   }
 
-  override def processBlock(block: Block): Either[ValidationError, Option[DiscardedTransactions]] = write { implicit l =>
+  override def processBlock(block: Block): Either[ValidationError, Option[DiscardedTransactions]] = write("processBlock") { implicit l =>
     val height = historyWriter.height()
     val notImplementedFeatures = featureProvider.activatedFeatures(height).diff(BlockchainFeatures.implemented)
 
@@ -198,7 +198,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
       })
   }
 
-  override def removeAfter(blockId: ByteStr): Either[ValidationError, Seq[Block]] = write { implicit l =>
+  override def removeAfter(blockId: ByteStr): Either[ValidationError, Seq[Block]] = write("removeAfter") { implicit l =>
     val ng = ngState()
     if (ng.exists(_.contains(blockId))) {
       log.trace("Resetting liquid block, no rollback is necessary")
@@ -250,7 +250,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
     }
   }
 
-  override def processMicroBlock(microBlock: MicroBlock): Either[ValidationError, Unit] = write { implicit l =>
+  override def processMicroBlock(microBlock: MicroBlock): Either[ValidationError, Unit] = write("processMicroBlock") { implicit l =>
     ngState.mutate {
       case None =>
         Left(MicroBlockAppendError("No base block exists", microBlock))

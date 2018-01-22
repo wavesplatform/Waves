@@ -24,7 +24,7 @@ class StateWriterImpl(p: StateStorage, storeTransactions: Boolean, synchronizati
 
   override def close(): Unit = p.close()
 
-  override def applyBlockDiff(blockDiff: BlockDiff): Unit = write { implicit l =>
+  override def applyBlockDiff(blockDiff: BlockDiff): Unit = write("applyBlockDiff") { implicit l =>
     val txsDiff = blockDiff.txsDiff
 
     val oldHeight = sp().getHeight
@@ -113,7 +113,7 @@ class StateWriterImpl(p: StateStorage, storeTransactions: Boolean, synchronizati
     log.info(s"BlockDiff commit complete. Persisted height = $newHeight")
   }
 
-  override def clear(): Unit = write { implicit l =>
+  override def clear(): Unit = write("clear") { implicit l =>
     sp().transactions.clear()
     sp().wavesBalance.clear()
     sp().assetBalance.clear()

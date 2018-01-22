@@ -26,7 +26,7 @@ object ExtensionAppender extends ScorexLogging with Instrumented {
             peerDatabase: PeerDatabase, miner: Miner, allChannels: ChannelGroup
            )(ch: Channel, extensionBlocks: Seq[Block]): Task[Either[ValidationError, Option[BigInt]]] = {
     def p(blocks: Seq[Block]): Task[Either[ValidationError, Option[BigInt]]] = Task(Signed.validateOrdered(blocks).flatMap { newBlocks =>
-      history.write { implicit l =>
+      history.write("apply") { implicit l =>
         val extension = newBlocks.dropWhile(history.contains)
 
         extension.headOption.map(_.reference) match {

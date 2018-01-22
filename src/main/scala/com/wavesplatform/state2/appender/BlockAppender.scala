@@ -25,7 +25,7 @@ object BlockAppender extends ScorexLogging with Instrumented {
   def apply(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater, time: Time,
             stateReader: StateReader, utxStorage: UtxPool, settings: BlockchainSettings,
             featureProvider: FeatureProvider)(newBlock: Block): Task[Either[ValidationError, Option[BlockchainScore]]] = Task {
-    measureSuccessful(blockProcessingTimeStats, history.write { implicit l =>
+    measureSuccessful(blockProcessingTimeStats, history.write("apply") { implicit l =>
       if (history.contains(newBlock)) Right(None)
       else for {
         _ <- Either.cond(history.heightOf(newBlock.reference).exists(_ >= history.height() - 1), (), BlockAppendError("Irrelevant block", newBlock))

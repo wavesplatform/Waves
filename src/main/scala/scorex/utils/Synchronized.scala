@@ -74,8 +74,15 @@ trait Synchronized extends ScorexLogging {
   def read[T](body: ReadLock => T): T =
     synchronizeOperation(instanceReadLock)(body)
 
-  def write[T](body: WriteLock => T): T =
-    synchronizeOperation(instanceReadWriteLock)(body)
+  def write[T](label: String)(body: WriteLock => T): T = {
+    val start = System.currentTimeMillis()
+    synchronizeOperation(instanceReadWriteLock) { l =>
+      val lockAcquired = System.currentTimeMillis()
+      val r = body(l)
+      log.trace(s"Lock acquire in $label: ${lockAcquired - start}ms, total: ${System.currentTimeMillis() - start}ms")
+      r
+    }
+  }
 
   protected def synchronizeOperation[T, L <: TypedLock](lock: L)(body: L => T): T = {
     lock.lock()
