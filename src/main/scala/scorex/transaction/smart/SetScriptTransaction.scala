@@ -1,6 +1,7 @@
 package scorex.transaction.smart
 
 import com.google.common.primitives.{Bytes, Longs}
+import com.wavesplatform.Proofs
 import com.wavesplatform.state2._
 import monix.eval.Coeval
 import play.api.libs.json.Json
@@ -18,7 +19,7 @@ case class SetScriptTransaction private(version: Byte,
                                         script: Script,
                                         fee: Long,
                                         timestamp: Long,
-                                        proofs: Seq[ByteStr]) extends ProvenTransaction with FastHashId {
+                                        proofs: Proofs) extends ProvenTransaction with FastHashId {
 
   val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(version),
     sender.publicKey,
@@ -34,7 +35,7 @@ case class SetScriptTransaction private(version: Byte,
     "script" -> script.text)
   )
 
-  override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(transactionType.id.toByte), bodyBytes(), Deser.serializeArrays(proofs.map(_.arr))))
+  override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(transactionType.id.toByte), bodyBytes(), proofs.bytes()))
 }
 
 object SetScriptTransaction {
@@ -48,8 +49,8 @@ object SetScriptTransaction {
     (for {
       _ <- Either.cond(version == 1, (), GenericError(s"Unsupported SetScriptTransaction version ${version.toInt}"))
       script <- Script.fromBytes(scriptBytes)
-      (proofBytes, _) = Deser.parseArrays(bytes, scriptEnd + 16)
-      tx <- create(sender, script, fee, timestamp, proofBytes.map(ByteStr(_)))
+      proofs <- Proofs.fromBytes(bytes.drop(scriptEnd + 15))
+      tx <- create(sender, script, fee, timestamp, proofs)
     } yield tx).fold(left => Failure(new Exception(left.toString)), right => Success(right))
   }.flatten
 
@@ -58,7 +59,7 @@ object SetScriptTransaction {
              script: Script,
              fee: Long,
              timestamp: Long,
-             proofs: Seq[ByteStr]): Either[ValidationError, SetScriptTransaction] =
+             proofs: Proofs): Either[ValidationError, SetScriptTransaction] =
     if (fee <= 0) {
       Left(ValidationError.InsufficientFee)
     } else {
@@ -69,7 +70,7 @@ object SetScriptTransaction {
   def selfSigned(sender: PrivateKeyAccount,
                  script: Script,
                  fee: Long,
-                 timestamp: Long): Either[ValidationError, SetScriptTransaction] = create(sender, script, fee, timestamp, Seq.empty).right.map { unsigned =>
-    unsigned.copy(proofs = Seq(ByteStr(EllipticCurveImpl.sign(sender, unsigned.bodyBytes()))))
+                 timestamp: Long): Either[ValidationError, SetScriptTransaction] = create(sender, script, fee, timestamp, Proofs(Seq.empty)).right.map { unsigned =>
+    unsigned.copy(proofs = Proofs(Seq(ByteStr(EllipticCurveImpl.sign(sender, unsigned.bodyBytes())))))
   }
 }

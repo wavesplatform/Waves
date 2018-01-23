@@ -16,6 +16,6 @@ trait ProvenTransaction extends Transaction with Proven {
     "senderPublicKey" -> Base58.encode(sender.publicKey),
     "fee" -> assetFee._2,
     "timestamp" -> timestamp,
-     proofFieldName -> this.proofs.map(_.base58)
+     proofFieldName -> this.proofs.proofs.map(_.base58)
   )
 }

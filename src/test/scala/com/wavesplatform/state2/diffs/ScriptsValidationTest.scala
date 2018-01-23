@@ -1,7 +1,7 @@
 package com.wavesplatform.state2.diffs
 
 import com.wavesplatform.state2._
-import com.wavesplatform.{NoShrink, TransactionGen}
+import com.wavesplatform.{NoShrink, Proofs, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
@@ -9,7 +9,7 @@ import scodec.bits.ByteVector
 import scorex.account.PublicKeyAccount
 import scorex.crypto.EllipticCurveImpl
 import scorex.lagonaki.mocks.TestBlock
-import scorex.transaction.GenesisTransaction
+import scorex.transaction.{GenesisTransaction}
 import scorex.transaction.assets.{ScriptTransferTransaction, TransferTransaction}
 import scorex.transaction.lease.LeaseTransaction
 import scorex.transaction.smart.{Script, SetScriptTransaction}
@@ -48,10 +48,12 @@ class ScriptsValidationTest extends PropSpec with PropertyChecks with Matchers w
         SUM(
           SUM(
             IF(SIG_VERIFY(TX_FIELD(BodyBytes), TX_FIELD(Proof_0), CONST_BYTEVECTOR(ByteVector(pk0.publicKey))), CONST_INT(1), CONST_INT(0)),
-              IF(SIG_VERIFY(TX_FIELD(BodyBytes), TX_FIELD(Proof_1), CONST_BYTEVECTOR(ByteVector(pk1.publicKey))), CONST_INT(1), CONST_INT(0))
-            ),
-            IF(SIG_VERIFY(TX_FIELD(BodyBytes), TX_FIELD(Proof_2), CONST_BYTEVECTOR(ByteVector(pk2.publicKey))), CONST_INT(1), CONST_INT(0))
-          ), CONST_INT(2))
+            IF(SIG_VERIFY(TX_FIELD(BodyBytes), TX_FIELD(Proof_1), CONST_BYTEVECTOR(ByteVector(pk1.publicKey))), CONST_INT(1), CONST_INT(0))
+          ),
+          IF(SIG_VERIFY(TX_FIELD(BodyBytes), TX_FIELD(Proof_2), CONST_BYTEVECTOR(ByteVector(pk2.publicKey))), CONST_INT(1), CONST_INT(0))
+        ),
+        CONST_INT(2)
+      )
 
     val preconditionsAndTransfer: Gen[(GenesisTransaction, SetScriptTransaction, ScriptTransferTransaction, Seq[ByteStr])] = for {
       master <- accountGen
@@ -67,7 +69,7 @@ class ScriptsValidationTest extends PropSpec with PropertyChecks with Matchers w
       timestamp <- timestampGen
     } yield {
       val unsigned =
-        ScriptTransferTransaction.create(1, None, master, recepient, amount, timestamp, fee, Array.emptyByteArray, proofs = Seq.empty).explicitGet()
+        ScriptTransferTransaction.create(1, None, master, recepient, amount, timestamp, fee, Array.emptyByteArray, proofs = Proofs.empty).explicitGet()
       val sig0 = ByteStr(EllipticCurveImpl.sign(s0, unsigned.bodyBytes()))
       val sig1 = ByteStr(EllipticCurveImpl.sign(s1, unsigned.bodyBytes()))
       val sig2 = ByteStr(EllipticCurveImpl.sign(s2, unsigned.bodyBytes()))
@@ -77,18 +79,20 @@ class ScriptsValidationTest extends PropSpec with PropertyChecks with Matchers w
     forAll(preconditionsAndTransfer) {
       case ((genesis, script, transfer, sigs)) =>
         val validProofs = Seq(
-          transfer.copy(proofs = Seq(sigs(0), sigs(1))),
-          transfer.copy(proofs = Seq(ByteStr.empty, sigs(1), sigs(2)))
+          transfer.copy(proofs = Proofs.create(Seq(sigs(0), sigs(1))).explicitGet()),
+          transfer.copy(proofs = Proofs.create(Seq(ByteStr.empty, sigs(1), sigs(2))).explicitGet())
         )
 
         val invalidProofs = Seq(
-          transfer.copy(proofs = Seq(sigs(0))),
-          transfer.copy(proofs = Seq(sigs(1))),
-          transfer.copy(proofs = Seq(sigs(1), sigs(0)))
+          transfer.copy(proofs = Proofs.create(Seq(sigs(0))).explicitGet()),
+          transfer.copy(proofs = Proofs.create(Seq(sigs(1))).explicitGet()),
+          transfer.copy(proofs = Proofs.create(Seq(sigs(1), sigs(0))).explicitGet())
         )
 
-        validProofs.foreach(tx => assertDiffAndState(Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(tx))) { case (totalDiff, newState) => () })
-        invalidProofs.foreach(tx => assertLeft(Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(tx)))("TransactionNotAllowedByScript"))
+        validProofs.foreach(tx =>
+          assertDiffAndState(Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(tx))) { case (totalDiff, newState) => () })
+        invalidProofs.foreach(tx =>
+          assertLeft(Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(tx)))("TransactionNotAllowedByScript"))
     }
   }
 }

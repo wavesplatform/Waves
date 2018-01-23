@@ -8,8 +8,6 @@ import scorex.transaction.ValidationError
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction.assets.ScriptTransferTransaction
 
-import scala.util.Right
-
 object ScriptTransferTransactionDiff {
   def apply(state: SnapshotStateReader, height: Int)(tx: ScriptTransferTransaction): Either[ValidationError, Diff] = {
     val sender = Address.fromPublicKey(tx.sender.publicKey)

@@ -74,13 +74,17 @@ trait TransactionGen {
       Gen.oneOf(Gen.const(None), a2bytesGen).map(a2 => AssetPair(a1, a2.map(ByteStr(_))))
   }
 
+  val proofsGen: Gen[Proofs] = for {
+    proofsAmount <- Gen.chooseNum(0, 7)
+    proofs <- Gen.listOfN(proofsAmount, genBoundedBytes(0, 50))
+  } yield Proofs.create(proofs.map(ByteStr(_))).explicitGet()
+
   val setScriptTransactionGen: Gen[SetScriptTransaction] = for {
     sender: PrivateKeyAccount <- accountGen
     fee <- smallFeeGen
     timestamp <- timestampGen
-    proofsAmount <-Gen.chooseNum(0,7)
-    proofs <- Gen.listOfN(proofsAmount,genBoundedBytes(0, 50))
-  } yield SetScriptTransaction.create(sender, Script.sigVerify, fee, timestamp, proofs.map(ByteStr(_))).right.get
+    proofs <- proofsGen
+  } yield SetScriptTransaction.create(sender, Script.sigVerify, fee, timestamp, proofs).explicitGet()
 
   def selfSignedSetScriptTransactionGenP(sender: PrivateKeyAccount, s: Script): Gen[SetScriptTransaction] = for {
     fee <- smallFeeGen
@@ -183,10 +187,9 @@ trait TransactionGen {
 
   val scriptTransferGen = (for {
     (assetId, sender, recipient, amount, timestamp, _, feeAmount, attachment) <- transferParamGen
-    proofsAmount <-Gen.chooseNum(0,7)
-    proofs <- Gen.listOfN(proofsAmount,genBoundedBytes(0, 50))
-  } yield ScriptTransferTransaction.create(1, assetId, sender, recipient, amount, timestamp, feeAmount, attachment,proofs.map(ByteStr(_))).right.get)
-  .label("scriptTransferTransaction")
+    proofs <- proofsGen
+  } yield ScriptTransferTransaction.create(1, assetId, sender, recipient, amount, timestamp, feeAmount, attachment, proofs).explicitGet())
+    .label("scriptTransferTransaction")
 
   val transferWithWavesFeeGen = for {
     (assetId, sender, recipient, amount, timestamp, _, feeAmount, attachment) <- transferParamGen

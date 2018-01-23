@@ -18,12 +18,13 @@ object Deser {
     } else (None, position + 1)
   }
 
-  def parseArrays(bytes: Array[Byte], position: Int): (Seq[Array[Byte]], Int) = {
-    val length = Shorts.fromByteArray(bytes.slice(position, position + 2))
-    (0 until length).foldLeft((Seq.empty[Array[Byte]], position + 2)) { case ((acc, pos), _) =>
+  def parseArrays(bytes: Array[Byte]) : Seq[Array[Byte]] = {
+    val length = Shorts.fromByteArray(bytes.slice(0, 2))
+    val r = (0 until length).foldLeft((Seq.empty[Array[Byte]], 2)) { case ((acc, pos), _) =>
       val (arr, nextPos) = parseArraySize(bytes, pos)
       (acc :+ arr, nextPos)
     }
+    r._1
   }
 
   def serializeArrays(bs: Seq[Array[Byte]]): Array[Byte] = Shorts.toByteArray(bs.length.toShort) ++ Bytes.concat(bs.map(serializeArray): _*)

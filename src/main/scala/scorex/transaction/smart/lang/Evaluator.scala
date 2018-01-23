@@ -1,5 +1,6 @@
 package scorex.transaction.smart.lang
 
+import com.wavesplatform.Proofs
 import scodec.bits.ByteVector
 import scorex.crypto.signatures.Curve25519
 import scorex.transaction.ProvenTransaction
@@ -14,12 +15,12 @@ object Evaluator {
   type ExcecutionError = String
   type EitherExecResult[T] = Either[ExcecutionError, T]
 
-  def proofVal[T](proofs: Seq[com.wavesplatform.state2.ByteStr], idx: Int): Either[ExcecutionError, T] =
-    if (idx < proofs.size)
-      Try(ByteVector(proofs(idx).arr).asInstanceOf[T]).toEither.left.map(_.toString)
+  def proofVal[T](proofs: Proofs, idx: Int): Either[ExcecutionError, T] =
+    if (idx < proofs.proofs.size)
+      Try(ByteVector(proofs.proofs(idx).arr).asInstanceOf[T]).toEither.left.map(_.toString)
     else Right(ByteVector.empty.asInstanceOf[T])
 
-  def apply[T](ctx: Context, t: Term[T]): EitherExecResult[T] = t match {
+  def  apply[T](ctx: Context, t: Term[T]): EitherExecResult[T] = t match {
     case CONST_INT(v) => Right(v.asInstanceOf[T])
     case CONST_BYTEVECTOR(v) => Right(v.asInstanceOf[T])
     case SUM(t1, t2) => for {
