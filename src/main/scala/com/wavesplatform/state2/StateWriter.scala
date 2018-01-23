@@ -16,7 +16,7 @@ trait StateWriter {
 class StateWriterImpl(p: StateStorage, synchronizationToken: ReentrantReadWriteLock)
   extends StateReaderImpl(p, synchronizationToken) with StateWriter with ScorexLogging with Instrumented {
 
-  override def applyBlockDiff(blockDiff: BlockDiff): Unit = write { implicit l =>
+  override def applyBlockDiff(blockDiff: BlockDiff): Unit = write("applyBlockDiff") { implicit l =>
     val oldHeight = sp().getHeight
     val newHeight = oldHeight + blockDiff.heightDiff
     log.debug(s"Starting persist from $oldHeight to $newHeight")
@@ -40,7 +40,7 @@ class StateWriterImpl(p: StateStorage, synchronizationToken: ReentrantReadWriteL
     log.info(s"BlockDiff commit complete. Persisted height = $newHeight")
   }
 
-  override def clear(): Unit = write { implicit l =>
+  override def clear(): Unit = write("clear") { implicit l =>
     val b = sp().createBatch()
     sp().removeEverything(b)
     sp().setHeight(b, 0)
