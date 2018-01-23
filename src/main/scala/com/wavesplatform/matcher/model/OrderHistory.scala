@@ -30,8 +30,6 @@ trait OrderHistory {
 
   def ordersByAddress(address: String): Set[String]
 
-  def getAllOrdersByAddress(address: String): Set[String]
-
   def fetchOrderHistoryByPair(assetPair: AssetPair, address: String): Seq[(String, OrderInfo, Option[Order])]
 
   def fetchAllOrderHistory(address: String): Seq[(String, OrderInfo, Option[Order])]
@@ -58,8 +56,6 @@ object OrderHistory {
 }
 
 case class OrderHistoryImpl(db: DB, settings: MatcherSettings) extends SubStorage(db: DB, "matcher") with OrderHistory with ScorexLogging {
-  val MaxOrdersPerAddress = 1000
-  val MaxOrdersPerRequest = 100
 
   private val OrdersPrefix = "orders".getBytes(Charset)
   private val OrdersInfoPrefix = "infos".getBytes(Charset)
@@ -158,10 +154,8 @@ case class OrderHistoryImpl(db: DB, settings: MatcherSettings) extends SubStorag
 
   override def ordersByAddress(address: String): Set[String] = {
     get(makeKey(AddressToOrdersPrefix, address)).map(OrderIdsCodec.decode).map(_.explicitGet().value)
-      .map(_.takeRight(MaxOrdersPerRequest).toSet).getOrElse(Set())
+      .map(_.takeRight(settings.maxOrdersPerRequest).toSet).getOrElse(Set())
   }
-
-  override def getAllOrdersByAddress(address: String): Set[String] = ordersByAddress(address)
 
   override def deleteOrder(address: String, orderId: String): Boolean = {
     orderStatus(orderId) match {
@@ -176,7 +170,7 @@ case class OrderHistoryImpl(db: DB, settings: MatcherSettings) extends SubStorag
   }
 
   override def fetchOrderHistoryByPair(assetPair: AssetPair, address: String): Seq[(String, OrderInfo, Option[Order])] = {
-    getAllOrdersByAddress(address)
+    ordersByAddress(address)
       .toSeq
       .map(id => (id, orderInfo(id), order(id)))
       .filter(_._3.exists(_.assetPair == assetPair))
@@ -186,7 +180,7 @@ case class OrderHistoryImpl(db: DB, settings: MatcherSettings) extends SubStorag
 
   override def fetchAllOrderHistory(address: String): Seq[(String, OrderInfo, Option[Order])] = {
     import OrderInfo.orderStatusOrdering
-    getAllOrdersByAddress(address)
+    ordersByAddress(address)
       .toSeq
       .map(id => (id, orderInfo(id)))
       .sortBy(_._2.status)
