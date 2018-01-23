@@ -79,8 +79,10 @@ object RxScoreObserver extends ScorexLogging {
     def rs: Observable[Option[Channel]] = remoteScores
       .observeOn(scheduler)
       .groupBy(_._1)
-      .map(_.distinctUntilChanged)
-      .debounce(remoteScoreDebounce)
+      .map(_
+        .distinctUntilChanged
+        .debounce(remoteScoreDebounce)
+      )
       .merge
       .map { case ((ch, score)) =>
         scores.put(ch, score)

@@ -173,7 +173,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         typeOf[AliasApiRoute],
         typeOf[AliasBroadcastApiRoute]
       )
-      val combinedRoute: Route = CompositeHttpService(actorSystem, apiTypes, apiRoutes, settings.restAPISettings).compositeRoute
+      val combinedRoute: Route = CompositeHttpService(actorSystem, apiTypes, apiRoutes, settings.restAPISettings).loggingCompositeRoute
       val httpFuture = serverBinding.unbind().flatMap { _ =>
         Http().bindAndHandle(combinedRoute, settings.restAPISettings.bindAddress, settings.restAPISettings.port)
       }
