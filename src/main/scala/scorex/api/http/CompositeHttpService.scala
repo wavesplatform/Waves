@@ -44,11 +44,12 @@ case class CompositeHttpService(system: ActorSystem, apiTypes: Seq[Type], routes
           `Access-Control-Allow-Methods`(OPTIONS, POST, PUT, GET, DELETE))(withCors(complete(StatusCodes.OK)))
       } ~ complete(StatusCodes.NotFound)
 
-  private def loggingRoute(route: Route, loggingLevel: LogLevel) = {
+  private def loggingRoute(route: Route) = {
     def logResponse(loggingAdapter: LoggingAdapter)(req: HttpRequest)(res: Any): Unit = {
       res match {
         case Complete(resp) =>
-          val entry = LogEntry(s"HTTP ${resp.status.value} from ${req.method.value} ${req.uri}", loggingLevel)
+          val level = if (resp.status == StatusCodes.OK) Logging.DebugLevel else Logging.WarningLevel
+          val entry = LogEntry(s"HTTP ${resp.status.value} from ${req.method.value} ${req.uri}", level)
           entry.logTo(loggingAdapter)
         case _ =>
       }
@@ -56,5 +57,5 @@ case class CompositeHttpService(system: ActorSystem, apiTypes: Seq[Type], routes
     DebuggingDirectives.logRequestResult(LoggingMagnet(logResponse))(route)
   }
 
-  val loggingCompositeRoute: Route = loggingRoute(compositeRoute, Logging.InfoLevel)
+  val loggingCompositeRoute: Route = loggingRoute(compositeRoute)
 }
