@@ -48,7 +48,7 @@ object SetScriptTransaction {
     (for {
       _ <- Either.cond(version == 1, (), GenericError(s"Unsupported SetScriptTransaction version ${version.toInt}"))
       script <- Script.fromBytes(scriptBytes)
-      proofs <- Proofs.fromBytes(bytes.drop(scriptEnd + 15))
+      proofs <- Proofs.fromBytes(bytes.drop(scriptEnd + 16))
       tx <- create(sender, script, fee, timestamp, proofs)
     } yield tx).fold(left => Failure(new Exception(left.toString)), right => Success(right))
   }.flatten

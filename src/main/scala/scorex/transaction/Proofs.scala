@@ -17,11 +17,11 @@ object Proofs {
   val MaxProofs = 8
   val MaxProofSize = 64
 
-  val empty = create(Seq.empty).explicitGet()
+  lazy val empty = create(Seq.empty).explicitGet()
 
   def create(proofs: Seq[ByteStr]): Either[ValidationError, Proofs] = for {
     _ <- Either.cond(proofs.lengthCompare(MaxProofs) <= 0, (), GenericError(s"Too many proofs, max $MaxProofs proofs"))
-    _ <- Either.cond(proofs.map(_.arr.length).max <= MaxProofSize, (), GenericError(s"Too large proof, must be max $MaxProofSize bytes"))
+    _ <- Either.cond(!proofs.map(_.arr.length).exists(_ > MaxProofSize), (), GenericError(s"Too large proof, must be max $MaxProofSize bytes"))
   } yield Proofs(proofs)
 
   def fromBytes(ab: Array[Byte]): Either[ValidationError, Proofs] = for {
