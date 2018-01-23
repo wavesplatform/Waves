@@ -1,7 +1,6 @@
 package scorex.api.http
 
 import akka.actor.ActorSystem
-import akka.event.Logging.LogLevel
 import akka.event.{Logging, LoggingAdapter}
 import akka.http.scaladsl.model.HttpMethods._
 import akka.http.scaladsl.model.{HttpRequest, StatusCodes}
