@@ -35,8 +35,8 @@ object Evaluator {
       a2 <- apply(ctx, t2)
     } yield (a1 > a2).asInstanceOf[T]
     case IF(cond, t1, t2) => apply(ctx, cond) flatMap {
-      case false => apply(ctx, t1)
-      case true => apply(ctx, t2)
+      case true => apply(ctx, t1)
+      case false => apply(ctx, t2)
     }
     case AND(t1, t2) =>
       apply(ctx, t1) match {

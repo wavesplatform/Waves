@@ -77,7 +77,8 @@ object CommonValidation {
       case _: LeaseCancelTransaction => Right(tx)
       case _: CreateAliasTransaction => Right(tx)
       case _: SetScriptTransaction => Right(tx)
-      case _ => Left(GenericError("Unknown transaction must be explicitly registered within ActivatedValidator"))
+      case _: ScriptTransferTransaction => Right(tx)
+      case _ => Left(GenericError("Unknown transaction must be explicitly activated"))
     }
 
   def disallowTxFromFuture[T <: Transaction](settings: FunctionalitySettings, time: Long, tx: T): Either[ValidationError, T] = {

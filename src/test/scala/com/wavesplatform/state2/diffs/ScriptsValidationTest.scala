@@ -15,7 +15,7 @@ import scorex.transaction.lease.LeaseTransaction
 import scorex.transaction.smart.{Script, SetScriptTransaction}
 import scorex.transaction.smart.lang.Terms._
 
-class ScriptTransferTransactionDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
+class ScriptsValidationTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
 
   property("transfer is allowed but lease is not due to predicate") {
 
