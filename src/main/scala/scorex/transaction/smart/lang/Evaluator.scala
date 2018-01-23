@@ -1,9 +1,8 @@
 package scorex.transaction.smart.lang
 
-import com.wavesplatform.Proofs
 import scodec.bits.ByteVector
 import scorex.crypto.signatures.Curve25519
-import scorex.transaction.ProvenTransaction
+import scorex.transaction.{Proofs, ProvenTransaction}
 import scorex.transaction.smart.lang.Terms._
 
 import scala.util.Try

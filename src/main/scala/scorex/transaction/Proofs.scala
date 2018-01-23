@@ -1,9 +1,8 @@
-package com.wavesplatform
+package scorex.transaction
 
 import com.wavesplatform.state2._
 import monix.eval.Coeval
 import scorex.serialization.Deser
-import scorex.transaction.ValidationError
 import scorex.transaction.ValidationError.GenericError
 
 import scala.util.Try
@@ -13,6 +12,7 @@ case class Proofs private(proofs: Seq[ByteStr]) {
 }
 
 object Proofs {
+
   val Version = 1: Byte
   val MaxProofs = 8
   val MaxProofSize = 64

@@ -1,7 +1,6 @@
 package scorex.transaction.smart
 
 import com.google.common.primitives.{Bytes, Longs}
-import com.wavesplatform.Proofs
 import com.wavesplatform.state2._
 import monix.eval.Coeval
 import play.api.libs.json.Json
@@ -70,7 +69,7 @@ object SetScriptTransaction {
   def selfSigned(sender: PrivateKeyAccount,
                  script: Script,
                  fee: Long,
-                 timestamp: Long): Either[ValidationError, SetScriptTransaction] = create(sender, script, fee, timestamp, Proofs(Seq.empty)).right.map { unsigned =>
-    unsigned.copy(proofs = Proofs(Seq(ByteStr(EllipticCurveImpl.sign(sender, unsigned.bodyBytes())))))
+                 timestamp: Long): Either[ValidationError, SetScriptTransaction] = create(sender, script, fee, timestamp, Proofs.empty).right.map { unsigned =>
+    unsigned.copy(proofs = Proofs.create(Seq(ByteStr(EllipticCurveImpl.sign(sender, unsigned.bodyBytes())))).explicitGet())
   }
 }

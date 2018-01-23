@@ -1,7 +1,7 @@
 package com.wavesplatform.state2.diffs
 
 import com.wavesplatform.state2._
-import com.wavesplatform.{NoShrink, Proofs, TransactionGen}
+import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
@@ -9,7 +9,7 @@ import scodec.bits.ByteVector
 import scorex.account.PublicKeyAccount
 import scorex.crypto.EllipticCurveImpl
 import scorex.lagonaki.mocks.TestBlock
-import scorex.transaction.{GenesisTransaction}
+import scorex.transaction.{GenesisTransaction, Proofs}
 import scorex.transaction.assets.{ScriptTransferTransaction, TransferTransaction}
 import scorex.transaction.lease.LeaseTransaction
 import scorex.transaction.smart.{Script, SetScriptTransaction}

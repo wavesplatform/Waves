@@ -1,8 +1,7 @@
 package scorex.transaction.assets
 
 import com.google.common.primitives.{Bytes, Longs}
-import com.wavesplatform.Proofs
-import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.state2._
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 import scorex.account.{AddressOrAlias, PrivateKeyAccount, PublicKeyAccount}
@@ -106,8 +105,8 @@ object ScriptTransferTransaction {
                  timestamp: Long,
                  feeAmount: Long,
                  attachment: Array[Byte]): Either[ValidationError, ScriptTransferTransaction] = {
-    create(version, assetId, sender, recipient, amount, timestamp, feeAmount, attachment, Proofs(Seq.empty)).right.map { unsigned =>
-      unsigned.copy(proofs = Proofs(Seq(ByteStr(EllipticCurveImpl.sign(sender, unsigned.bodyBytes())))))
+    create(version, assetId, sender, recipient, amount, timestamp, feeAmount, attachment, Proofs.empty).right.map { unsigned =>
+      unsigned.copy(proofs = Proofs.create(Seq(ByteStr(EllipticCurveImpl.sign(sender, unsigned.bodyBytes())))).explicitGet())
     }
   }
 }
