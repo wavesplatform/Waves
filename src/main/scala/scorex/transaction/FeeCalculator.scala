@@ -3,6 +3,7 @@ package scorex.transaction
 import com.wavesplatform.settings.FeesSettings
 import com.wavesplatform.state2.ByteStr
 import scorex.transaction.ValidationError.GenericError
+import scorex.transaction.assets.MassTransferTransaction
 
 /**
   * Class to check, that transaction contains enough fee to put it to UTX pool
@@ -24,10 +25,14 @@ class FeeCalculator(settings: FeesSettings) {
   def enoughFee[T <: Transaction](tx: T): Either[ValidationError, T] = {
     map.get(TransactionAssetFee(tx.transactionType.id, tx.assetFee._1).key) match {
       case Some(minimumFee) =>
-        if (minimumFee <= tx.assetFee._2) {
+        val min = tx match {
+          case _: MassTransferTransaction => minimumFee * tx.bytes().length
+          case _ => minimumFee
+        }
+        if (min <= tx.assetFee._2) {
           Right(tx)
         } else {
-          Left(GenericError(s"Fee in ${tx.assetFee._1.fold("WAVES")(_.toString)} for ${tx.transactionType} transaction does not exceed minimal value of $minimumFee"))
+          Left(GenericError(s"Fee in ${tx.assetFee._1.fold("WAVES")(_.toString)} for ${tx.transactionType} transaction does not exceed minimal value of $min"))
         }
       case None =>
         Left(GenericError(s"Minimum fee is not defined for ${TransactionAssetFee(tx.transactionType.id, tx.assetFee._1).key}"))

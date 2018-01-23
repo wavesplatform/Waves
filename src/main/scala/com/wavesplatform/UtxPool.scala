@@ -110,7 +110,7 @@ class UtxPoolImpl(time: Time,
       }
 
       val recipient: Option[String] = tx match {
-        case x: TransferTransaction => Some(x.recipient.stringRepr)
+        case x: TransferTransaction => Some(x.recipient.stringRepr)///ugh! recipients x blacklisted here
         case _ => None
       }
 

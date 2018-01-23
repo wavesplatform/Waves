@@ -178,6 +178,18 @@ trait TransactionGen {
     (assetId, sender, _, amount, timestamp, feeAssetId, feeAmount, attachment) <- transferParamGen
   } yield TransferTransaction.create(assetId, sender, sender, amount, timestamp, feeAssetId, feeAmount, attachment).right.get
 
+  val massTransferGen = (
+      for {
+        (assetId, sender, _, _, timestamp, _, feeAmount, attachment) <- transferParamGen
+        recipientCount <- Gen.choose(0, MassTransferTransaction.maxRecipientCount)///prefix with 0,1,max?
+        recipientGen = for {
+          recipient <- accountOrAliasGen
+          amount <- positiveLongGen
+        } yield (recipient, amount)
+        recipients <- Gen.listOfN[(AddressOrAlias, Long)](recipientCount, recipientGen)
+      } yield MassTransferTransaction.create(assetId, sender, recipients, timestamp, feeAmount, attachment).right.get
+    ).label("massTransferTransaction")
+
   val MinIssueFee = 100000000
 
   val createAliasGen: Gen[CreateAliasTransaction] = for {
