@@ -28,7 +28,7 @@ trait OrderHistory {
 
   def openVolumes(address: String): Option[Map[String, Long]]
 
-  def ordersByPairAndAddress(assetPair: AssetPair, address: String): Set[String]
+  def ordersByAddress(address: String): Set[String]
 
   def getAllOrdersByAddress(address: String): Set[String]
 
@@ -36,7 +36,7 @@ trait OrderHistory {
 
   def fetchAllOrderHistory(address: String): Seq[(String, OrderInfo, Option[Order])]
 
-  def deleteOrder(assetPair: AssetPair, address: String, orderId: String): Boolean
+  def deleteOrder(address: String, orderId: String): Boolean
 
   def order(id: String): Option[Order]
 
@@ -63,12 +63,11 @@ case class OrderHistoryImpl(db: DB, settings: MatcherSettings) extends SubStorag
 
   private val OrdersPrefix = "orders".getBytes(Charset)
   private val OrdersInfoPrefix = "infos".getBytes(Charset)
-  private val PairToOrdersPrefix = "pairs".getBytes(Charset)
+  private val AddressToOrdersPrefix = "addr-orders".getBytes(Charset)
   private val AddressPortfolioPrefix = "portfolios".getBytes(Charset)
 
-  def savePairAddress(assetPair: AssetPair, address: String, orderId: String): Unit = {
-    val pairAddress = assetPairAddressKey(assetPair, address)
-    get(makeKey(PairToOrdersPrefix, pairAddress)) match {
+  def savePairAddress(address: String, orderId: String): Unit = {
+    get(makeKey(AddressToOrdersPrefix, address)) match {
       case Some(valueBytes) =>
         val prev = OrderIdsCodec.decode(valueBytes).explicitGet().value
         var r = prev
@@ -76,9 +75,9 @@ case class OrderHistoryImpl(db: DB, settings: MatcherSettings) extends SubStorag
           val (p1, p2) = prev.span(!orderStatus(_).isInstanceOf[LimitOrder.Cancelled])
           r = if (p2.isEmpty) p1 else p1 ++ p2.tail
         }
-        put(makeKey(PairToOrdersPrefix, pairAddress), OrderIdsCodec.encode(r :+ orderId))
+        put(makeKey(AddressToOrdersPrefix, address), OrderIdsCodec.encode(r :+ orderId))
       case _ =>
-        put(makeKey(PairToOrdersPrefix, pairAddress), OrderIdsCodec.encode(Array(orderId)))
+        put(makeKey(AddressToOrdersPrefix, address), OrderIdsCodec.encode(Array(orderId)))
     }
   }
 
@@ -119,12 +118,12 @@ case class OrderHistoryImpl(db: DB, settings: MatcherSettings) extends SubStorag
     saveOrder(lo.order)
     saveOrderInfo(event)
     saveOpenPortfolio(event)
-    savePairAddress(lo.order.assetPair, lo.order.senderPublicKey.address, lo.order.idStr())
+    savePairAddress(lo.order.senderPublicKey.address, lo.order.idStr())
   }
 
   override def orderExecuted(event: OrderExecuted): Unit = {
     saveOrder(event.submitted.order)
-    savePairAddress(event.submitted.order.assetPair, event.submitted.order.senderPublicKey.address, event.submitted.order.idStr())
+    savePairAddress(event.submitted.order.senderPublicKey.address, event.submitted.order.idStr())
     saveOrderInfo(event)
     saveOpenPortfolio(OrderAdded(event.submittedExecuted))
     saveOpenPortfolio(event)
@@ -157,23 +156,19 @@ case class OrderHistoryImpl(db: DB, settings: MatcherSettings) extends SubStorag
     get(makeKey(AddressPortfolioPrefix, address)).map(PortfolioCodec.decode).map(_.explicitGet().value)
   }
 
-  override def ordersByPairAndAddress(assetPair: AssetPair, address: String): Set[String] = {
-    val pairAddressKey = assetPairAddressKey(assetPair, address)
-    get(makeKey(PairToOrdersPrefix, pairAddressKey)).map(OrderIdsCodec.decode).map(_.explicitGet().value)
+  override def ordersByAddress(address: String): Set[String] = {
+    get(makeKey(AddressToOrdersPrefix, address)).map(OrderIdsCodec.decode).map(_.explicitGet().value)
       .map(_.takeRight(MaxOrdersPerRequest).toSet).getOrElse(Set())
   }
 
-  override def getAllOrdersByAddress(address: String): Set[String] = {
-    // TODO: get rid of map
-    map(PairToOrdersPrefix).mapValues(OrderIdsCodec.decode).filter(_._1.endsWith(address)).values.flatMap(_.explicitGet().value).toSet
-  }
+  override def getAllOrdersByAddress(address: String): Set[String] = ordersByAddress(address)
 
-  override def deleteOrder(assetPair: AssetPair, address: String, orderId: String): Boolean = {
+  override def deleteOrder(address: String, orderId: String): Boolean = {
     orderStatus(orderId) match {
       case Filled | LimitOrder.Cancelled(_) =>
         deleteFromOrders(orderId)
         deleteFromOrdersInfo(orderId)
-        deleteFromPairAddress(assetPair, address, orderId)
+        deleteFromAddress(address, orderId)
         true
       case _ =>
         false
@@ -202,9 +197,8 @@ case class OrderHistoryImpl(db: DB, settings: MatcherSettings) extends SubStorag
 
   private def deleteFromOrdersInfo(orderId: String): Unit = delete(makeKey(OrdersInfoPrefix, orderId))
 
-  private def deleteFromPairAddress(assetPair: AssetPair, address: String, orderId: String): Unit = {
-    val pairAddress = assetPairAddressKey(assetPair, address)
-    val key = makeKey(PairToOrdersPrefix, pairAddress)
+  private def deleteFromAddress(address: String, orderId: String): Unit = {
+    val key = makeKey(AddressToOrdersPrefix, address)
     get(key) match {
       case Some(bytes) =>
         val prev = OrderIdsCodec.decode(bytes).explicitGet().value
@@ -212,7 +206,4 @@ case class OrderHistoryImpl(db: DB, settings: MatcherSettings) extends SubStorag
       case _ =>
     }
   }
-
-  private def assetPairAddressKey(assetPair: AssetPair, address: String): String = assetPair.key + address
-
 }

@@ -21,8 +21,6 @@ class EventJsonSpecification extends PropSpec
   with MatcherTestData
   with NoShrink {
 
-  val pair = AssetPair(Some(ByteStr("BTC".getBytes)), Some(ByteStr("WAVES".getBytes)))
-
   val buyLevelGen: Gen[Vector[BuyLimitOrder]] =
     Gen.containerOf[Vector, BuyLimitOrder](buyLimitOrderGenerator)
 
@@ -48,7 +46,6 @@ class EventJsonSpecification extends PropSpec
       res.get.ordering shouldBe q.ordering
     }
   }
-
 
   property("Write/Read OrderBook and Snapshot") {
     forAll(buyLevelGen, sellLevelGen) {(bs: Vector[BuyLimitOrder], ss: Vector[SellLimitOrder]) =>

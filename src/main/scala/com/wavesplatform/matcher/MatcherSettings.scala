@@ -62,8 +62,7 @@ object MatcherSettings {
 
     val blacklistedAddresses = config.as[List[String]](s"$configPath.blacklisted-addresses")
 
-    val f = new File(dataDirectory)
-    val isMigrateToNewOrderHistoryStorage = f.exists() && f.isDirectory
+    val isMigrateToNewOrderHistoryStorage = !new File(dataDirectory).exists()
 
     MatcherSettings(enabled, account, bindAddress, port, minOrderFee, orderMatchTxFee, dataDirectory, isMigrateToNewOrderHistoryStorage,
       journalDirectory, snapshotsDirectory, snapshotsInterval, orderCleanupInterval, orderHistoryCommitInterval,
