@@ -3,8 +3,7 @@ package com.wavesplatform.it
 import com.typesafe.config.Config
 import com.wavesplatform.it.TransferSending.Req
 import com.wavesplatform.it.api.AsyncHttpApi._
-import com.wavesplatform.it.api.Node
-import com.wavesplatform.it.api.Node.Transaction
+import com.wavesplatform.it.api.Transaction
 import org.scalatest.Suite
 import scorex.account.{Address, AddressOrAlias, AddressScheme, PrivateKeyAccount}
 import scorex.api.http.assets.SignedTransferRequest
@@ -78,7 +77,7 @@ trait TransferSending extends ScorexLogging {
     requests
   }
 
-  def balanceForNode(n: Node): Future[(String, Long)] = n.balance(n.address).map(b => n.accountSeed -> b.balance)
+  def balanceForNode(n: Node): Future[(String, Long)] = n.balance(n.address).map(b => n.address -> b.balance)
 
   def processRequests(requests: Seq[Req]): Future[Seq[Transaction]] = {
     val n = requests.size

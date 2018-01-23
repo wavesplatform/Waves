@@ -6,12 +6,12 @@ import com.typesafe.config.Config
 import com.wavesplatform.it._
 import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.api.AsyncNetworkApi._
-import com.wavesplatform.it.api.Node._
+import com.wavesplatform.it.api._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.network.{RawBytes, TransactionSpec}
 import org.scalatest._
 import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
-import scorex.account.{Address, PrivateKeyAccount}
+import scorex.account.Address
 import scorex.transaction.assets.TransferTransaction
 
 import scala.concurrent.Await
@@ -33,7 +33,7 @@ class SimpleTransactionsSuite extends BaseTransactionSuite with Matchers with Sc
 
   test("valid tx send by network to node should be in blockchain") {
     val tx = TransferTransaction.create(None,
-      PrivateKeyAccount.fromSeed(node.accountSeed).right.get,
+      node.privateKey,
       Address.fromString(node.address).right.get,
       1L,
       System.currentTimeMillis(),
@@ -51,7 +51,7 @@ class SimpleTransactionsSuite extends BaseTransactionSuite with Matchers with Sc
 
   test("invalid tx send by network to node should be not in UTX or blockchain") {
     val tx = TransferTransaction.create(None,
-      PrivateKeyAccount.fromSeed(node.accountSeed).right.get,
+      node.privateKey,
       Address.fromString(node.address).right.get,
       1L,
       System.currentTimeMillis() + (1 days).toMillis,

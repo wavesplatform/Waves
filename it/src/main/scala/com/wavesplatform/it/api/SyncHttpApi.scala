@@ -1,6 +1,6 @@
 package com.wavesplatform.it.api
 
-import com.wavesplatform.it.api.Node.Transaction
+import com.wavesplatform.it.Node
 import org.scalatest.{Assertions, Matchers}
 
 import scala.concurrent.duration._

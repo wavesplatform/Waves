@@ -2,7 +2,7 @@ package com.wavesplatform.it
 
 import com.typesafe.config.Config
 import com.wavesplatform.it.api.AsyncHttpApi._
-import com.wavesplatform.it.api.Node.BlacklistedPeer
+import com.wavesplatform.it.api._
 import com.wavesplatform.it.transactions.NodesFromDocker
 import org.scalatest._
 
@@ -19,15 +19,15 @@ class BlacklistTestSuite extends FreeSpec with Matchers with CancelAfterFailure 
     .withSpecial(_.quorum(0))
     .buildNonConflicting()
 
-  private def primaryNode = nodes.last
+  private def primaryNode = dockerNodes().last
 
-  private def otherNodes = nodes.init
+  private def otherNodes = dockerNodes().init
 
   "network should grow up to 10 blocks" in Await.result(primaryNode.waitForHeight(10), 3.minutes)
 
   "primary node should blacklist other nodes" in Await.result(
     for {
-      _ <- traverse(otherNodes) { n => primaryNode.blacklist(n.nodeInfo.networkIpAddress, n.nodeInfo.hostNetworkPort) }
+      _ <- traverse(otherNodes) { n => primaryNode.blacklist(n.containerNetworkAddress) }
       expectedBlacklistedPeers = nodes.size - 1
       _ <- primaryNode.waitFor[Seq[BlacklistedPeer]](s"blacklistedPeers.size == $expectedBlacklistedPeers")(_.blacklistedPeers, _.lengthCompare(expectedBlacklistedPeers) == 0, 1.second)
     } yield (),

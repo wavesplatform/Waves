@@ -29,9 +29,9 @@ class NetworkSeparationTestSuite extends FreeSpec with Matchers with WaitForHeig
     def maxHeight: Int = Await.result(traverse(nodes)(_.height).map(_.max), 12.seconds)
 
     val lastMaxHeight = maxHeight
-    nodes.foreach(docker.disconnectFromNetwork)
+    dockerNodes().foreach(docker.disconnectFromNetwork)
     Thread.sleep(80.seconds.toMillis) // >= 10 blocks, because a new block appears every 6 seconds
-    docker.connectToNetwork(nodes)
+    docker.connectToNetwork(dockerNodes())
 
     maxHeight shouldBe >=(lastMaxHeight + 6)
   }
