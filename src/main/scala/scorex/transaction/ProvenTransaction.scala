@@ -6,7 +6,7 @@ import scorex.crypto.encode.Base58
 
 trait ProvenTransaction extends Transaction with Proven {
 
-  protected def proofFieldName = "proofs"
+  protected def proofField:(String, Json.JsValueWrapper) = "proofs" -> this.proofs.proofs.map(_.base58)
 
   val bodyBytes: Coeval[Array[Byte]]
 
@@ -15,7 +15,5 @@ trait ProvenTransaction extends Transaction with Proven {
     "sender" -> sender.address,
     "senderPublicKey" -> Base58.encode(sender.publicKey),
     "fee" -> assetFee._2,
-    "timestamp" -> timestamp,
-     proofFieldName -> this.proofs.proofs.map(_.base58)
-  )
+    "timestamp" -> timestamp) ++ Json.obj(proofField)
 }

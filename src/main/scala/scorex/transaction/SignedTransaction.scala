@@ -6,7 +6,7 @@ import scorex.crypto.EllipticCurveImpl
 
 trait SignedTransaction extends ProvenTransaction with Signed {
 
-  protected override def proofFieldName = "signature"
+  protected override def proofField = "signature" -> this.signature.base58
 
   val signature: ByteStr
 
