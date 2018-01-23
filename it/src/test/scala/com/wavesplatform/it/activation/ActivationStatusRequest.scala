@@ -2,8 +2,8 @@ package com.wavesplatform.it.activation
 
 import com.wavesplatform.features.BlockchainFeatureStatus
 import com.wavesplatform.features.api.{ActivationStatus, ActivationStatusFeature, NodeFeatureStatus}
+import com.wavesplatform.it.Node
 import com.wavesplatform.it.api.AsyncHttpApi._
-import com.wavesplatform.it.api.Node
 import org.scalatest.Matchers
 
 import scala.concurrent.duration._

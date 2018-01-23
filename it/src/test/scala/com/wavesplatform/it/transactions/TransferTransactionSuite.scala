@@ -4,7 +4,7 @@ import com.wavesplatform.it.TransferSending
 import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.util._
 import org.scalatest.CancelAfterFailure
-import scorex.account.{AddressOrAlias, PrivateKeyAccount}
+import scorex.account.AddressOrAlias
 import scorex.api.http.Mistiming
 import scorex.transaction.assets.TransferTransaction
 
@@ -59,7 +59,7 @@ class TransferTransactionSuite extends BaseTransactionSuite with TransferSending
 
   test("invalid signed waves transfer should not be in UTX or blockchain") {
     def invalidByTsTx(ts: Long) = TransferTransaction.create(None,
-      PrivateKeyAccount.fromSeed(sender.accountSeed).right.get,
+      sender.privateKey,
       AddressOrAlias.fromString(sender.address).right.get,
       1,
       ts,

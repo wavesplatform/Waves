@@ -1,7 +1,7 @@
 package com.wavesplatform.it.transactions
 
 import com.wavesplatform.it.api.AsyncHttpApi._
-import com.wavesplatform.it.api.Node
+import com.wavesplatform.it.api.PaymentRequest
 import com.wavesplatform.it.util._
 
 import scala.concurrent.Await
@@ -27,7 +27,7 @@ class PaymentTransactionSuite extends BaseTransactionSuite {
   }
 
   test("obsolete endpoints respond with BadRequest") {
-    val payment = Node.PaymentRequest(5.waves, 1.waves, firstAddress, secondAddress)
+    val payment = PaymentRequest(5.waves, 1.waves, firstAddress, secondAddress)
     val errorMessage = "This API is no longer supported"
     val f = for {
       _ <- assertBadRequestAndMessage(sender.postJson("/waves/payment/signature", payment), errorMessage)

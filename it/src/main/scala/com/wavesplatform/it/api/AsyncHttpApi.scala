@@ -1,9 +1,11 @@
 package com.wavesplatform.it.api
 
 import java.io.IOException
+import java.net.InetSocketAddress
 import java.util.concurrent.TimeoutException
 
 import com.wavesplatform.features.api.ActivationStatus
+import com.wavesplatform.it.Node
 import com.wavesplatform.it.util.GlobalTimer.{instance => timer}
 import com.wavesplatform.it.util._
 import com.wavesplatform.matcher.api.CancelOrderRequest
@@ -34,13 +36,11 @@ object AsyncHttpApi {
 
   implicit class NodeAsyncHttpApi(n: Node) extends Assertions with Matchers {
 
-    import Node._
-
     def matcherGet(path: String, f: RequestBuilder => RequestBuilder = identity, statusCode: Int = HttpConstants.ResponseStatusCodes.OK_200): Future[Response] =
-      retrying(f(_get(s"http://${n.restAddress}:${n.matcherRestPort}$path")).build(), statusCode = statusCode)
+      retrying(f(_get(s"${n.matcherApiEndpoint}$path")).build(), statusCode = statusCode)
 
     def matcherGetWithSignature(path: String, ts: Long, signature: ByteStr, f: RequestBuilder => RequestBuilder = identity): Future[Response] = retrying {
-      _get(s"http://${n.restAddress}:${n.matcherRestPort}$path")
+      _get(s"${n.matcherApiEndpoint}$path")
         .setHeader("Timestamp", ts)
         .setHeader("Signature", signature)
         .build()
@@ -50,7 +50,7 @@ object AsyncHttpApi {
       matcherGet(path, statusCode = statusCode).as[MessageMatcherResponse]
 
     def matcherPost[A: Writes](path: String, body: A): Future[Response] =
-      post(s"http://${n.restAddress}", n.matcherRestPort, path,
+      post(s"${n.matcherApiEndpoint}$path",
         (rb: RequestBuilder) => rb.setHeader("Content-type", "application/json").setBody(stringify(toJson(body))))
 
     def getOrderStatus(asset: String, orderId: String): Future[MatcherStatusResponse] =
@@ -63,35 +63,33 @@ object AsyncHttpApi {
       matcherGetWithSignature(s"/matcher/orderbook/$publicKey", timestamp, signature).as[Seq[OrderbookHistory]]
 
     def get(path: String, f: RequestBuilder => RequestBuilder = identity): Future[Response] =
-      retrying(f(_get(s"http://${n.restAddress}:${n.restPort}$path")).build())
+      retrying(f(_get(s"${n.nodeApiEndpoint}$path")).build())
 
     def getWithApiKey(path: String, f: RequestBuilder => RequestBuilder = identity): Future[Response] = retrying {
-      _get(s"http://${n.restAddress}:${n.restPort}$path")
-        .setHeader("api_key", "integration-test-rest-api")
+      _get(s"${n.nodeApiEndpoint}$path")
+        .setHeader("api_key", n.apiKey)
         .build()
     }
 
     def postJsonWithApiKey[A: Writes](path: String, body: A): Future[Response] = retrying {
-      _post(s"http://${n.restAddress}:${n.restPort}$path")
-        .setHeader("api_key", "integration-test-rest-api")
+      _post(s"${n.nodeApiEndpoint}$path")
+        .setHeader("api_key", n.apiKey)
         .setHeader("Content-type", "application/json").setBody(stringify(toJson(body)))
         .build()
     }
 
-    def post(url: String, port: Int, path: String, f: RequestBuilder => RequestBuilder = identity): Future[Response] =
-      retrying(f(
-        _post(s"$url:$port$path").setHeader("api_key", "integration-test-rest-api")
-      ).build())
+    def post(url: String, f: RequestBuilder => RequestBuilder = identity): Future[Response] =
+      retrying(f(_post(url).setHeader("api_key", n.apiKey)).build())
 
     def postJson[A: Writes](path: String, body: A): Future[Response] =
       post(path, stringify(toJson(body)))
 
     def post(path: String, body: String): Future[Response] =
-      post(s"http://${n.restAddress}", n.restPort, path,
+      post(s"${n.nodeApiEndpoint}$path",
         (rb: RequestBuilder) => rb.setHeader("Content-type", "application/json").setBody(body))
 
-    def blacklist(networkIpAddress: String, hostNetworkPort: Int): Future[Unit] =
-      post("/debug/blacklist", s"$networkIpAddress:$hostNetworkPort").map(_ => ())
+    def blacklist(address: InetSocketAddress): Future[Unit] =
+      post("/debug/blacklist", s"${address.getHostString}:${address.getPort}").map(_ => ())
 
     def printDebugMessage(db: DebugMessage): Future[Response] = postJsonWithApiKey("/debug/print", db)
 
@@ -103,12 +101,13 @@ object AsyncHttpApi {
       Json.parse(r.getResponseBody).as[Seq[BlacklistedPeer]]
     }
 
-    def connect(host: String, port: Int): Future[Unit] = postJson("/peers/connect", ConnectReq(host, port)).map(_ => ())
+    def connect(address: InetSocketAddress): Future[Unit] =
+      postJson("/peers/connect", ConnectReq(address.getHostName, address.getPort)).map(_ => ())
 
     def waitForStartup(): Future[Option[Response]] = {
       val timeout = 500
 
-      val request = _get(s"http://${n.restAddress}:${n.restPort}/blocks/height")
+      def request = _get(s"${n.nodeApiEndpoint}/blocks/height?${System.currentTimeMillis()}")
         .setReadTimeout(timeout)
         .setRequestTimeout(timeout)
         .build()
@@ -117,7 +116,7 @@ object AsyncHttpApi {
         .executeRequest(request).toCompletableFuture.toScala
         .map(Option(_))
         .recoverWith {
-          case e@(_: IOException | _: TimeoutException) => Future(None)
+          case (_: IOException | _: TimeoutException) => Future(None)
         }
 
       def cond(ropt: Option[Response]) = ropt.exists { r =>
@@ -127,7 +126,7 @@ object AsyncHttpApi {
       waitFor("node is up")(_ => send(), cond, 1.second)
     }
 
-    def waitForPeers(targetPeersCount: Int): Future[Seq[Peer]] = waitFor[Seq[Peer]](s"connectedPeers.size >= $targetPeersCount")(_.connectedPeers, _.size >= targetPeersCount, 1.second)
+    def waitForPeers(targetPeersCount: Int): Future[Seq[Peer]] = waitFor[Seq[Peer]](s"connectedPeers.size >= $targetPeersCount")(_.connectedPeers, _.lengthCompare(targetPeersCount) >= 0, 1.second)
 
     def height: Future[Int] = get("/blocks/height").as[JsValue].map(v => (v \ "height").as[Int])
 
@@ -155,13 +154,13 @@ object AsyncHttpApi {
 
     def findTransactionInfo(txId: String): Future[Option[Transaction]] = transactionInfo(txId).transform {
       case Success(tx) => Success(Some(tx))
-      case Failure(UnexpectedStatusCodeException(_, r)) if r.getStatusCode == 404 => Success(None)
+      case Failure(UnexpectedStatusCodeException(_, 404, _)) => Success(None)
       case Failure(ex) => Failure(ex)
     }
 
     def waitForTransaction(txId: String, retryInterval: FiniteDuration = 1.second): Future[Transaction] = waitFor[Option[Transaction]](s"transaction $txId")(_.transactionInfo(txId).transform {
       case Success(tx) => Success(Some(tx))
-      case Failure(UnexpectedStatusCodeException(_, r)) if r.getStatusCode == 404 => Success(None)
+      case Failure(UnexpectedStatusCodeException(_, 404, _)) => Success(None)
       case Failure(ex) => Failure(ex)
     }, tOpt => tOpt.exists(_.id == txId), retryInterval).map(_.get)
 
@@ -211,9 +210,9 @@ object AsyncHttpApi {
       postJson("/assets/broadcast/transfer", transfer).as[Transaction]
 
     def batchSignedTransfer(transfers: Seq[SignedTransferRequest], timeout: FiniteDuration = 1.minute): Future[Seq[Transaction]] = {
-      val request = _post(s"http://${n.restAddress}:${n.restPort}/assets/broadcast/batch-transfer")
+      val request = _post(s"${n.nodeApiEndpoint}/assets/broadcast/batch-transfer")
         .setHeader("Content-type", "application/json")
-        .setHeader("api_key", "integration-test-rest-api")
+        .setHeader("api_key", n.apiKey)
         .setReadTimeout(timeout.toMillis.toInt)
         .setRequestTimeout(timeout.toMillis.toInt)
         .setBody(stringify(toJson(transfers)))
@@ -265,7 +264,7 @@ object AsyncHttpApi {
     }
 
     def createAddress: Future[String] =
-      post(s"http://${n.restAddress}", n.restPort, "/addresses").as[JsValue].map(v => (v \ "address").as[String])
+      post(s"${n.nodeApiEndpoint}/addresses").as[JsValue].map(v => (v \ "address").as[String])
 
     def waitForNextBlock: Future[Block] = for {
       currentBlock <- lastBlock
@@ -274,7 +273,7 @@ object AsyncHttpApi {
 
     def findBlock(cond: Block => Boolean, from: Int = 1, to: Int = Int.MaxValue): Future[Block] = {
       def load(_from: Int, _to: Int): Future[Block] = blockSeq(_from, _to).flatMap { blocks =>
-        blocks.find(cond).fold[Future[Node.Block]] {
+        blocks.find(cond).fold[Future[Block]] {
           val maybeLastBlock = blocks.lastOption
           if (maybeLastBlock.exists(_.height >= to)) {
             Future.failed(new NoSuchElementException)
@@ -282,7 +281,7 @@ object AsyncHttpApi {
             val newFrom = maybeLastBlock.fold(_from)(b => (b.height + 19).min(to))
             val newTo = newFrom + 19
             n.log.debug(s"Loaded ${blocks.length} blocks, no match found. Next range: [$newFrom, ${newFrom + 19}]")
-            timer.schedule(load(newFrom, newTo), n.blockDelay)
+            timer.schedule(load(newFrom, newTo), n.settings.blockchainSettings.genesisSettings.averageBlockDelay)
           }
         }(Future.successful)
       }
@@ -302,8 +301,8 @@ object AsyncHttpApi {
 
     def expectIncorrectOrderPlacement(order: Order, expectedStatusCode: Int, expectedStatus: String): Future[Boolean] =
       matcherPost("/matcher/orderbook", order.json()) transform {
-        case Failure(UnexpectedStatusCodeException(_, r)) if r.getStatusCode == expectedStatusCode =>
-          Try(parse(r.getResponseBody).as[MatcherStatusResponse]) match {
+        case Failure(UnexpectedStatusCodeException(_, `expectedStatusCode`, responseBody)) =>
+          Try(parse(responseBody).as[MatcherStatusResponse]) match {
             case Success(mr) if mr.status == expectedStatus => Success(true)
             case Failure(f) => Failure(new RuntimeException(s"Failed to parse response: $f"))
           }
@@ -320,11 +319,11 @@ object AsyncHttpApi {
         n.client.executeRequest(r, new AsyncCompletionHandler[Response] {
           override def onCompleted(response: Response): Response = {
             if (response.getStatusCode == statusCode) {
-              n.log.debug(s"Request: ${r.getUrl} \n Response: ${response.getResponseBody}")
+              n.log.debug(s"Request: ${r.getUrl}\nResponse: ${response.getResponseBody}")
               response
             } else {
-              n.log.debug(s"Request:  ${r.getUrl} \n Unexpected status code(${response.getStatusCode}): ${response.getResponseBody}")
-              throw UnexpectedStatusCodeException(r, response)
+              n.log.debug(s"Request: ${r.getUrl}\nUnexpected status code(${response.getStatusCode}): ${response.getResponseBody}")
+              throw UnexpectedStatusCodeException(r.getUrl, response.getStatusCode, response.getResponseBody)
             }
           }
         }).toCompletableFuture.toScala
@@ -409,7 +408,7 @@ object AsyncHttpApi {
 
       def waitHeight = waitFor[Int](s"all heights >= $height")(retryInterval)(_.height, _.forall(_ >= height))
 
-      def waitSameBlocks = waitFor[Node.Block](s"same blocks at height = $height")(retryInterval)(_.blockAt(height), { blocks =>
+      def waitSameBlocks = waitFor[Block](s"same blocks at height = $height")(retryInterval)(_.blockAt(height), { blocks =>
         val sig = blocks.map(_.signature)
         sig.forall(_ == sig.head)
       })

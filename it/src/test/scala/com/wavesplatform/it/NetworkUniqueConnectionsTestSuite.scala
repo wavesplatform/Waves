@@ -19,7 +19,7 @@ class NetworkUniqueConnectionsTestSuite extends FreeSpec with Matchers with Dock
         // Helps to do an incoming connection: second -> first (1)
         val peersConfig = ConfigFactory.parseString(
           s"""waves.network.known-peers = [
-             |  "${firstNode.nodeInfo.networkIpAddress}:${firstNode.nodeInfo.containerNetworkPort}"
+             |  "${firstNode.containerNetworkAddress.getHostName}:${firstNode.containerNetworkAddress.getPort}"
              |]""".stripMargin
         )
 
@@ -28,10 +28,7 @@ class NetworkUniqueConnectionsTestSuite extends FreeSpec with Matchers with Dock
       _ <- firstNode.waitForPeers(1)
 
       // Outgoing connection: first -> second (2)
-      connectionAttempt <- firstNode.connect(
-        secondNode.nodeInfo.networkIpAddress,
-        secondNode.nodeInfo.containerNetworkPort
-      )
+      _ <- firstNode.connect(secondNode.containerNetworkAddress)
     } yield ()
 
     Await.ready(prepare, 2.minute)
