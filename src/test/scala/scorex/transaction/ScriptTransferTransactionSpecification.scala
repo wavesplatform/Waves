@@ -1,6 +1,7 @@
 package scorex.transaction
 
 import com.wavesplatform.TransactionGen
+import com.wavesplatform.state2._
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 import scorex.transaction.TransactionParser.TransactionType
@@ -23,7 +24,13 @@ class ScriptTransferTransactionSpecification extends PropSpec with PropertyCheck
     }
   }
 
-  ignore("ScriptTransferTransaction id doesn't depend on proof") {}
+  property("ScriptTransferTransaction id doesn't depend on proof") {
+    forAll(accountGen, accountGen, proofsGen, proofsGen, bytes32gen) { case (acc1, acc2, proofs1, proofs2, attachment) =>
+      val tx1 = ScriptTransferTransaction.create(1, None, acc2, acc2.toAddress, 1, 1, 1, attachment, proofs1).explicitGet()
+      val tx2 = ScriptTransferTransaction.create(1, None, acc2, acc2.toAddress, 1, 1, 1, attachment, proofs2).explicitGet()
+      tx1.id() shouldBe tx2.id()
+    }
+  }
 
   private def assertTxs(first: ScriptTransferTransaction, second: ScriptTransferTransaction): Unit = {
     first.sender.address shouldEqual second.sender.address
