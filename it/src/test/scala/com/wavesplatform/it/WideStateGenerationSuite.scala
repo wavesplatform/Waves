@@ -33,7 +33,8 @@ class WideStateGenerationSuite extends FreeSpec with WaitForHeight2
         |  utx.cleanup-interval = 1m
         |}""".stripMargin
     ),
-    tag = getClass.getSimpleName
+    tag = getClass.getSimpleName,
+    enableProfiling = true
   )
 
   override protected val nodeConfigs: Seq[Config] = NodeConfigs.newBuilder
