@@ -19,62 +19,66 @@ object Evaluator {
       Try(ByteVector(proofs.proofs(idx).arr).asInstanceOf[T]).toEither.left.map(_.toString)
     else Right(ByteVector.empty.asInstanceOf[T])
 
-  def  apply[T](ctx: Context, t: Term[T]): EitherExecResult[T] = t match {
-    case CONST_INT(v) => Right(v.asInstanceOf[T])
-    case CONST_BYTEVECTOR(v) => Right(v.asInstanceOf[T])
-    case SUM(t1, t2) => for {
-      a1 <- apply(ctx, t1)
-      a2 <- apply(ctx, t2)
-    } yield (a1 + a2).asInstanceOf[T]
-    case GE(t1, t2) => for {
-      a1 <- apply(ctx, t1)
-      a2 <- apply(ctx, t2)
-    } yield (a1 >= a2).asInstanceOf[T]
-    case GT(t1, t2) => for {
-      a1 <- apply(ctx, t1)
-      a2 <- apply(ctx, t2)
-    } yield (a1 > a2).asInstanceOf[T]
-    case IF(cond, t1, t2) => apply(ctx, cond) flatMap {
-      case true => apply(ctx, t1)
-      case false => apply(ctx, t2)
-    }
-    case AND(t1, t2) =>
-      apply(ctx, t1) match {
-        case Left(err) => Left(err)
-        case Right(false) => Right(false.asInstanceOf[T])
-        case Right(true) => apply(ctx, t2) match {
-          case Left(err) => Left(err)
-          case Right(v) => Right(v.asInstanceOf[T])
-        }
+  def apply[A](ctx: Context, term: Term[A]): EitherExecResult[A] = {
+    def r[T](t: Term[T]): EitherExecResult[T] = (t match {
+      case CONST_INT(v) => Right(v)
+      case CONST_BYTEVECTOR(v) => Right(v)
+      case SUM(t1, t2) => for {
+        a1 <- r(t1)
+        a2 <- r(t2)
+      } yield a1 + a2
+      case GE(t1, t2) => for {
+        a1 <- r(t1)
+        a2 <- r(t2)
+      } yield a1 >= a2
+      case GT(t1, t2) => for {
+        a1 <- r(t1)
+        a2 <- r(t2)
+      } yield a1 > a2
+      case IF(cond, t1, t2) => r(cond) flatMap {
+        case true => r(t1)
+        case false => r(t2)
       }
-    case OR(t1, t2) =>
-      apply(ctx, t1) match {
-        case Left(err) => Left(err)
-        case Right(true) => Right(true.asInstanceOf[T])
-        case Right(false) => apply(ctx, t2) match {
+      case AND(t1, t2) =>
+        r(t1) match {
           case Left(err) => Left(err)
-          case Right(v) => Right(v.asInstanceOf[T])
+          case Right(false) => Right(false)
+          case Right(true) => r(t2) match {
+            case Left(err) => Left(err)
+            case Right(v) => Right(v)
+          }
         }
+      case OR(t1, t2) =>
+        r(t1) match {
+          case Left(err) => Left(err)
+          case Right(true) => Right(true)
+          case Right(false) => r(t2) match {
+            case Left(err) => Left(err)
+            case Right(v) => Right(v)
+          }
+        }
+      case HEIGHT => Right(ctx.height)
+      case TX_FIELD(f) => f match {
+        case Id => Right(ctx.tx.id())
+        case Type => Right(ctx.tx.transactionType.id)
+        case SenderPk => Right(ByteVector(ctx.tx.sender.publicKey))
+        case Proof_0 => proofVal(ctx.tx.proofs, 0)
+        case Proof_1 => proofVal(ctx.tx.proofs, 1)
+        case Proof_2 => proofVal(ctx.tx.proofs, 2)
+        case BodyBytes => Right(ByteVector(ctx.tx.bodyBytes()))
+        case _ => ??? // match for  __satisfy_shapeless_0
       }
-    case HEIGHT => Right(ctx.height.asInstanceOf[T])
-    case TX_FIELD(f) => f match {
-      case Id => Right(ctx.tx.id().asInstanceOf[T])
-      case Type => Right(ctx.tx.transactionType.id.asInstanceOf[T])
-      case SenderPk => Right(ByteVector(ctx.tx.sender.publicKey).asInstanceOf[T])
-      case Proof_0 => proofVal(ctx.tx.proofs, 0)
-      case Proof_1 => proofVal(ctx.tx.proofs, 1)
-      case Proof_2 => proofVal(ctx.tx.proofs, 2)
-      case BodyBytes => Right(ByteVector(ctx.tx.bodyBytes()).asInstanceOf[T])
-      case _ => ??? // match for  __satisfy_shapeless_0
-    }
-    case EQ_INT(it1, it2) => for {
-      i1 <- apply(ctx, it1)
-      i2 <- apply(ctx, it2)
-    } yield (i1 == i2).asInstanceOf[T]
-    case SIG_VERIFY(msg, sig, pk) => for {
-      s <- apply(ctx, sig)
-      m <- apply(ctx, msg)
-      p <- apply(ctx, pk)
-    } yield Curve25519.verify(s.toArray, m.toArray, p.toArray).asInstanceOf[T]
+      case EQ_INT(it1, it2) => for {
+        i1 <- r(it1)
+        i2 <- r(it2)
+      } yield i1 == i2
+      case SIG_VERIFY(msg, sig, pk) => for {
+        s <- r(sig)
+        m <- r(msg)
+        p <- r(pk)
+      } yield Curve25519.verify(s.toArray, m.toArray, p.toArray)
+    }).map(_.asInstanceOf[T])
+
+    r(term)
   }
 }
