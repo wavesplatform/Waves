@@ -13,7 +13,7 @@ import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.transaction.smart.{Script, SetScriptTransaction}
 import scorex.utils.NTP
 
-trait TransactionGen {
+trait TransactionGen extends ScriptGen {
 
   def byteArrayGen(length: Int): Gen[Array[Byte]] = Gen.containerOfN[Array, Byte](length, Arbitrary.arbitrary[Byte])
 
@@ -79,12 +79,15 @@ trait TransactionGen {
     proofs <- Gen.listOfN(proofsAmount, genBoundedBytes(0, 50))
   } yield Proofs.create(proofs.map(ByteStr(_))).explicitGet()
 
+  val scriptGen = BOOLgen(1000).map(Script(_))
+
   val setScriptTransactionGen: Gen[SetScriptTransaction] = for {
     sender: PrivateKeyAccount <- accountGen
     fee <- smallFeeGen
     timestamp <- timestampGen
     proofs <- proofsGen
-  } yield SetScriptTransaction.create(sender, Script.sigVerify, fee, timestamp, proofs).explicitGet()
+    script <- scriptGen
+  } yield SetScriptTransaction.create(sender, script, fee, timestamp, proofs).explicitGet()
 
   def selfSignedSetScriptTransactionGenP(sender: PrivateKeyAccount, s: Script): Gen[SetScriptTransaction] = for {
     fee <- smallFeeGen
