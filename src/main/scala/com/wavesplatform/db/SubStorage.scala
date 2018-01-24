@@ -21,6 +21,7 @@ class SubStorage(db: DB, name: String) extends Storage(db) {
       val key = it.next()
       if (key.startsWith(subPrefix)) delete(key, b)
     }
+    it.close()
   }
 
 }

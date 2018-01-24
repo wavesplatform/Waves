@@ -89,9 +89,11 @@ abstract class Storage(private val db: DB) extends ScorexLogging {
     override def hasNext: Boolean = it.hasNext
 
     override def next(): Array[Byte] = it.next().getKey
+
+    def close(): Unit = it.close()
   }
 
-  protected def allKeys: Iterator[Array[Byte]] = {
+  protected def allKeys: KeysIterator = {
     val it: DBIterator = db.iterator()
     it.seekToFirst()
     new KeysIterator(it)
