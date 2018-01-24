@@ -8,12 +8,12 @@ import scorex.transaction.TransactionParser.SignatureStringLength
 import scorex.transaction.assets.{MassTransferTransaction, TransferTransaction}
 import scorex.transaction.{AssetIdStringLength, ValidationError}
 
-object SignedMultiTransferRequest {
+object SignedMassTransferRequest {
   implicit val assetTransferRequestFormat: Format[SignedTransferRequest] = Json.format
 }
 
 @ApiModel(value = "Signed Asset transfer transaction")
-case class SignedMultiTransferRequest(@ApiModelProperty(value = "Base58 encoded sender public key", required = true)
+case class SignedMassTransferRequest(@ApiModelProperty(value = "Base58 encoded sender public key", required = true)
                                      senderPublicKey: String,
                                      @ApiModelProperty(value = "Base58 encoded Asset ID")
                                      assetId: Option[String],

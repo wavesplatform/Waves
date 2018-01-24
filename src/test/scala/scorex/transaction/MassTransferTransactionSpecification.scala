@@ -24,15 +24,13 @@ class MassTransferTransactionSpecification extends PropSpec with PropertyChecks 
       }
 
       recovered.bytes() shouldEqual tx.bytes()
-      println(s"p1 ${recovered.transfers.size}")///
     }
   }
 
-  property("Transfer serialization from TypedTransaction") {
+  property("MassTransfer serialization from TypedTransaction") {
     forAll(massTransferGen) { tx: MassTransferTransaction =>
       val recovered = TransactionParser.parseBytes(tx.bytes()).get
       recovered.bytes() shouldEqual tx.bytes()
-      println(s"p2 ${recovered.asInstanceOf[MassTransferTransaction].transfers.size}")///
     }
   }
 

@@ -9,8 +9,6 @@ import scorex.transaction.ValidationError
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction.assets.MassTransferTransaction
 
-import scala.util.Right
-
 object MassTransferTransactionDiff {
 
   def apply(state: SnapshotStateReader, s: FunctionalitySettings, blockTime: Long, height: Int)(tx: MassTransferTransaction): Either[ValidationError, Diff] = {
@@ -24,22 +22,23 @@ object MassTransferTransactionDiff {
       } yield (portfolio, amount)
     }
 
-    portfoliosEi match {///map
-      case Left(e) => Left(e)
-      case Right(list) =>
-        val sender = Address.fromPublicKey(tx.sender.publicKey)
-        val (recipientPortfolios, totalAmount) = list.reduceLeft((u, v) => (u._1 combine v._1, u._2 + v._2))
-        val portfolios = recipientPortfolios.combine(
-          Map(sender -> Portfolio(-(totalAmount + tx.fee), LeaseInfo.empty, Map.empty)))
-        val assetIssued = tx.assetId match {
-          case None => true
-          case Some(aid) => state.assetInfo(aid).isDefined
-        }
-        ///what to validate here?
-        val invalid = blockTime > s.allowUnissuedAssetsUntil && !assetIssued
-        Either.cond(!invalid,
-          Diff(height, tx, portfolios),
-          GenericError(s"Unissued assets are not allowed after allowUnissuedAssetsUntil=${s.allowUnissuedAssetsUntil}"))
+    portfoliosEi.flatMap { list: List[(Map[Address, Portfolio], Long)] =>
+      val sender = Address.fromPublicKey(tx.sender.publicKey)
+      val foldInit = (Map(sender -> Portfolio(-tx.fee, LeaseInfo.empty, Map.empty)), 0L)
+      val (recipientPortfolios, totalAmount) = list.fold(foldInit) { (u, v) => (u._1 combine v._1, u._2 + v._2) }
+      val completePortfolio = recipientPortfolios.combine(
+        tx.assetId match {
+          case None => Map(sender -> Portfolio(-totalAmount, LeaseInfo.empty, Map.empty))
+          case Some(aid) => Map(sender -> Portfolio(0, LeaseInfo.empty, Map(aid -> -totalAmount)))
+        })
+
+      val assetIssued = tx.assetId match {
+        case None => true
+        case Some(aid) => state.assetInfo(aid).isDefined
+      }
+      Either.cond(blockTime <= s.allowUnissuedAssetsUntil || assetIssued,
+        Diff(height, tx, completePortfolio),
+        GenericError(s"Unissued assets are not allowed after allowUnissuedAssetsUntil=${s.allowUnissuedAssetsUntil}"))
     }
   }
 }

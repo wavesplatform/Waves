@@ -157,6 +157,10 @@ trait TransactionGen {
   def wavesTransferGeneratorP(timestamp: Long, sender: PrivateKeyAccount, recipient: AddressOrAlias): Gen[TransferTransaction] =
     transferGeneratorP(timestamp, sender, recipient, None, None)
 
+  def massTransferGeneratorP(sender: PrivateKeyAccount, transfers: List[(AddressOrAlias, Long)], assetId: Option[AssetId]): Gen[MassTransferTransaction] = for {
+    (_, _, _, _, timestamp, _, feeAmount, attachment) <- transferParamGen
+  } yield MassTransferTransaction.create(assetId, sender, transfers, timestamp, feeAmount, attachment).right.get
+
   def createWavesTransfer(sender: PrivateKeyAccount, recipient: Address,
                           amount: Long, fee: Long, timestamp: Long): Either[ValidationError, TransferTransaction] =
     TransferTransaction.create(None, sender, recipient, amount, timestamp, None, fee, Array())
@@ -181,12 +185,12 @@ trait TransactionGen {
   val massTransferGen = (
       for {
         (assetId, sender, _, _, timestamp, _, feeAmount, attachment) <- transferParamGen
-        recipientCount <- Gen.choose(0, MassTransferTransaction.maxRecipientCount)///prefix with 0,1,max?
-        recipientGen = for {
+        transferCount <- Gen.choose(0, MassTransferTransaction.maxRecipientCount)
+        transferGen = for {
           recipient <- accountOrAliasGen
           amount <- positiveLongGen
         } yield (recipient, amount)
-        recipients <- Gen.listOfN[(AddressOrAlias, Long)](recipientCount, recipientGen)
+        recipients <- Gen.listOfN[(AddressOrAlias, Long)](transferCount, transferGen)
       } yield MassTransferTransaction.create(assetId, sender, recipients, timestamp, feeAmount, attachment).right.get
     ).label("massTransferTransaction")
 
