@@ -35,7 +35,7 @@ case class MassTransferTransaction private(assetId: Option[AssetId],
       .fold(Array())(_ ++ _)
 
     Bytes.concat(
-      Array(transactionType.id.toByte),
+      Array(transactionType.id.toByte),///needed?
       sender.publicKey,
       assetIdBytes,
       Shorts.toByteArray(transfers.size.toShort),
@@ -53,19 +53,16 @@ case class MassTransferTransaction private(assetId: Option[AssetId],
       "attachment" -> Base58.encode(attachment))
   }
 
-  override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(transactionType.id.toByte), signature.arr, toSign()))
+  override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(toSign(), signature.arr))
 }
 
 object MassTransferTransaction {
   val maxRecipientCount = 1000
 
   def parseTail(bytes: Array[Byte]): Try[MassTransferTransaction] = Try {
-    val signature = ByteStr(bytes.slice(0, SignatureLength))
-    val txId = bytes(SignatureLength)
-    require(txId == TransactionType.MassTransferTransaction.id.toByte, s"Signed tx id does not match")
-    val sender = PublicKeyAccount(bytes.slice(SignatureLength + 1, SignatureLength + KeyLength + 1))
-    val (assetIdOpt, s0) = Deser.parseOption(bytes, SignatureLength + KeyLength + 1, AssetIdLength)
-    val recipientCount = Shorts.fromByteArray(bytes.slice(s0, s0 + 2))///why slice?
+    val sender = PublicKeyAccount(bytes.slice(0, KeyLength))
+    val (assetIdOpt, s0) = Deser.parseOption(bytes, KeyLength, AssetIdLength)
+    val recipientCount = Shorts.fromByteArray(bytes.slice(s0, s0 + 2))
 
     def readRecipient(offset: Int): (Validation[(AddressOrAlias, Long)], Int) = {
       AddressOrAlias.fromBytes(bytes, offset) match {
@@ -79,12 +76,13 @@ object MassTransferTransaction {
       List.iterate(readRecipient(s0 + 2), recipientCount) { case (_, offset) => readRecipient(offset) }
     val recipientsEi: Validation[List[(AddressOrAlias, Long)]] = recipientsList.map { case (ei, _) => ei }.sequence
 
-    val s = recipientsList.lastOption.map(_._2).getOrElse(s0 + 2)
+    val s1 = recipientsList.lastOption.map(_._2).getOrElse(s0 + 2)
     val tx: Validation[MassTransferTransaction] = for {
       recipients <- recipientsEi
-      timestamp = Longs.fromByteArray(bytes.slice(s, s + 8))
-      feeAmount = Longs.fromByteArray(bytes.slice(s + 8, s + 16))
-      (attachment, _) = Deser.parseArraySize(bytes, s + 16)
+      timestamp = Longs.fromByteArray(bytes.slice(s1, s1 + 8))
+      feeAmount = Longs.fromByteArray(bytes.slice(s1 + 8, s1 + 16))
+      (attachment, s2) = Deser.parseArraySize(bytes, s1 + 16)
+      signature = ByteStr(bytes.slice(s2, s2 + SignatureLength))
       mtt <- MassTransferTransaction.create(assetIdOpt.map(ByteStr(_)), sender, recipients, timestamp, feeAmount, attachment, signature)
     } yield mtt
     tx.fold(left => Failure(new Exception(left.toString)), right => Success(right))
