@@ -17,6 +17,7 @@ case class MatcherSettings(enable: Boolean,
                            minOrderFee: Long,
                            orderMatchTxFee: Long,
                            dataDir: String,
+                           levelDbCacheSize: Long,
                            isMigrateToNewOrderHistoryStorage: Boolean,
                            journalDataDir: String,
                            snapshotsDataDir: String,
@@ -44,6 +45,7 @@ object MatcherSettings {
     val minOrderFee = config.as[Long](s"$configPath.min-order-fee")
     val orderMatchTxFee = config.as[Long](s"$configPath.order-match-tx-fee")
     val dataDirectory = config.as[String](s"$configPath.data-directory")
+    val levelDbCacheSize = config.getBytes(s"$configPath.leveldb-cache-size")
     val journalDirectory = config.as[String](s"$configPath.journal-directory")
     val snapshotsDirectory = config.as[String](s"$configPath.snapshots-directory")
     val snapshotsInterval = config.as[FiniteDuration](s"$configPath.snapshots-interval")
@@ -64,9 +66,9 @@ object MatcherSettings {
 
     val isMigrateToNewOrderHistoryStorage = !new File(dataDirectory).exists()
 
-    MatcherSettings(enabled, account, bindAddress, port, minOrderFee, orderMatchTxFee, dataDirectory, isMigrateToNewOrderHistoryStorage,
-      journalDirectory, snapshotsDirectory, snapshotsInterval, orderCleanupInterval, orderHistoryCommitInterval,
-      maxOpenOrders, baseAssets, basePairs, maxTimestampDiff, blacklistedAssets.toSet, blacklistedNames,
-      maxOrdersPerRequest, blacklistedAddresses.toSet)
+    MatcherSettings(enabled, account, bindAddress, port, minOrderFee, orderMatchTxFee, dataDirectory, levelDbCacheSize,
+      isMigrateToNewOrderHistoryStorage, journalDirectory, snapshotsDirectory, snapshotsInterval, orderCleanupInterval,
+      orderHistoryCommitInterval, maxOpenOrders, baseAssets, basePairs, maxTimestampDiff, blacklistedAssets.toSet,
+      blacklistedNames, maxOrdersPerRequest, blacklistedAddresses.toSet)
   }
 }

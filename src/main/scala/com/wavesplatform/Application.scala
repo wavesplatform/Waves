@@ -50,7 +50,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
   import monix.execution.Scheduler.Implicits.{global => scheduler}
 
-  private val db = openDB(settings.dataDirectory)
+  private val db = openDB(settings.dataDirectory, settings.levelDbCacheSize)
 
   private val LocalScoreBroadcastDebounce = 1.second
 

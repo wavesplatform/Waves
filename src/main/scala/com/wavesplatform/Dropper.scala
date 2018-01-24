@@ -25,7 +25,7 @@ object Dropper extends ScorexLogging {
       override val chainId: Byte = settings.blockchainSettings.addressSchemeCharacter.toByte
     }
 
-    Try(openDB(settings.dataDirectory)) match {
+    Try(openDB(settings.dataDirectory, settings.levelDbCacheSize)) match {
       case Success(db) =>
         log.info("Removing state entries")
         val storage = StateStorage(db, dropExisting = false).get

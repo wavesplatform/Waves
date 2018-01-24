@@ -35,7 +35,7 @@ object Importer extends ScorexLogging {
         createInputStream(filename) match {
           case Success(inputStream) =>
             val lock = new ReentrantReadWriteLock()
-            val db = openDB(settings.dataDirectory, recreate = true)
+            val db = openDB(settings.dataDirectory, settings.levelDbCacheSize, recreate = true)
             val storage = StateStorage(db, dropExisting = false).get
             val state = new StateWriterImpl(storage, lock)
             val history = HistoryWriterImpl(db, lock, settings.blockchainSettings.functionalitySettings, settings.featuresSettings).get

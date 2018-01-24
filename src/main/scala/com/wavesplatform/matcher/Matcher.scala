@@ -41,7 +41,7 @@ class Matcher(actorSystem: ActorSystem,
   lazy val matcher: ActorRef = actorSystem.actorOf(MatcherActor.props(orderHistory, stateReader, wallet, utx, allChannels,
     matcherSettings, history, blockchainSettings.functionalitySettings), MatcherActor.name)
 
-  lazy val db = openDB(matcherSettings.dataDir, false)
+  lazy val db = openDB(matcherSettings.dataDir, matcherSettings.levelDbCacheSize)
 
   lazy val orderHistory: ActorRef = actorSystem.actorOf(OrderHistoryActor.props(db, matcherSettings, utx, wallet),
     OrderHistoryActor.name)

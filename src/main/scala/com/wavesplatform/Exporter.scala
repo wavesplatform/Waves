@@ -32,7 +32,7 @@ object Exporter extends ScorexLogging {
       override val chainId: Byte = settings.blockchainSettings.addressSchemeCharacter.toByte
     }
 
-    Try(openDB(settings.dataDirectory)) match {
+    Try(openDB(settings.dataDirectory, settings.levelDbCacheSize)) match {
       case Success(db) =>
         val tryHistory = HistoryWriterImpl(db, new ReentrantReadWriteLock(true), settings.blockchainSettings.functionalitySettings, settings.featuresSettings)
         tryHistory match {
