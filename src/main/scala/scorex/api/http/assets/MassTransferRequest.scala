@@ -4,7 +4,7 @@ import play.api.libs.json.{Format, Json}
 
 case class MassTransferRequest(assetId: Option[String],
                                sender: String,
-                               recipients: Seq[(String, Long)],
+                               transfers: List[(String, Long)],
                                fee: Long,
                                attachment: Option[String],
                                timestamp: Option[Long] = None)

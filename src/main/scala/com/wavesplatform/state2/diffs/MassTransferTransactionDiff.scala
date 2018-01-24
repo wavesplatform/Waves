@@ -1,7 +1,6 @@
 package com.wavesplatform.state2.diffs
 
 import cats.implicits._
-import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2._
 import com.wavesplatform.state2.reader.SnapshotStateReader
 import scorex.account.Address
@@ -11,7 +10,7 @@ import scorex.transaction.assets.MassTransferTransaction
 
 object MassTransferTransactionDiff {
 
-  def apply(state: SnapshotStateReader, s: FunctionalitySettings, blockTime: Long, height: Int)(tx: MassTransferTransaction): Either[ValidationError, Diff] = {
+  def apply(state: SnapshotStateReader, blockTime: Long, height: Int)(tx: MassTransferTransaction): Either[ValidationError, Diff] = {
     val portfoliosEi = MassTransferTransaction.processRecipientsWith(tx.transfers) { (recipient, amount) =>
       for {
         recipientAddr <- state.resolveAliasEi(recipient)
@@ -36,9 +35,9 @@ object MassTransferTransactionDiff {
         case None => true
         case Some(aid) => state.assetInfo(aid).isDefined
       }
-      Either.cond(blockTime <= s.allowUnissuedAssetsUntil || assetIssued,
+      Either.cond(assetIssued,
         Diff(height, tx, completePortfolio),
-        GenericError(s"Unissued assets are not allowed after allowUnissuedAssetsUntil=${s.allowUnissuedAssetsUntil}"))
+        GenericError(s"Attempt to transfer a nonexistent asset"))
     }
   }
 }

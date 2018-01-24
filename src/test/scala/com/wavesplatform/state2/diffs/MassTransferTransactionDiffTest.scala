@@ -56,7 +56,7 @@ class MassTransferTransactionDiffTest extends PropSpec
     }
 
   property("MassTransfer preserves balance invariant") {
-    import MassTransferTransaction.{maxRecipientCount => Max}
+    import MassTransferTransaction.{MaxTransferCount => Max}
     Seq(0, 1, Max) foreach testDiff // test edge cases
     Gen.choose(2, Max - 1) map testDiff
   }

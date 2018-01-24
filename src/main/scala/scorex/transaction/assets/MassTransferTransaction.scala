@@ -35,7 +35,7 @@ case class MassTransferTransaction private(assetId: Option[AssetId],
       .fold(Array())(_ ++ _)
 
     Bytes.concat(
-      Array(transactionType.id.toByte),///needed?
+      Array(transactionType.id.toByte),
       sender.publicKey,
       assetIdBytes,
       Shorts.toByteArray(transfers.size.toShort),
@@ -57,7 +57,7 @@ case class MassTransferTransaction private(assetId: Option[AssetId],
 }
 
 object MassTransferTransaction {
-  val maxRecipientCount = 1000
+  val MaxTransferCount = 1000
 
   def parseTail(bytes: Array[Byte]): Try[MassTransferTransaction] = Try {
     val sender = PublicKeyAccount(bytes.slice(0, KeyLength))
@@ -95,22 +95,23 @@ object MassTransferTransaction {
              feeAmount: Long,
              attachment: Array[Byte],
              signature: ByteStr): Either[ValidationError, MassTransferTransaction] = {
-    val totalAmount = recipients.map(_._2).sum
-    if (attachment.length > TransferTransaction.MaxAttachmentSize) {
-      Left(ValidationError.TooBigArray)
-    } else if (recipients.lengthCompare(0) < 0) {
-      Left(ValidationError.GenericError("Number of recipients is negative"))
-    } else if (recipients.lengthCompare(maxRecipientCount) > 0) {
-      Left(ValidationError.GenericError(s"Number of recipients is greater than $maxRecipientCount"))
-    } else if (recipients.exists(_._2 <= 0)) {
-      Left(ValidationError.GenericError("One of the transfers has negative value"))
-    } else if (Try(Math.addExact(totalAmount, feeAmount)).isFailure) {
-      Left(ValidationError.OverflowError)
-    } else if (feeAmount <= 0) {
-      Left(ValidationError.InsufficientFee)
-    } else {
-      Right(MassTransferTransaction(assetId, sender, recipients, timestamp, feeAmount, attachment, signature))
-    }
+    Try { recipients.map(_._2).fold(0L)(Math.addExact) }.fold(
+      ex => Left(ValidationError.OverflowError),
+      totalAmount =>
+        if (Try(Math.addExact(totalAmount, feeAmount)).isFailure) {
+          Left(ValidationError.OverflowError)
+        } else if (recipients.lengthCompare(MaxTransferCount) > 0) {
+          Left(ValidationError.GenericError(s"Number of recipients is greater than $MaxTransferCount"))
+        } else if (recipients.exists(_._2 < 0)) {
+          Left(ValidationError.GenericError("One of the transfers has negative value"))
+        } else if (attachment.length > TransferTransaction.MaxAttachmentSize) {
+          Left(ValidationError.TooBigArray)
+        } else if (feeAmount <= 0) {
+          Left(ValidationError.InsufficientFee)
+        } else {
+          Right(MassTransferTransaction(assetId, sender, recipients, timestamp, feeAmount, attachment, signature))
+        }
+    )
   }
 
   def create(assetId: Option[AssetId],
