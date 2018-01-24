@@ -24,7 +24,7 @@ case class CompositeHttpService(system: ActorSystem, apiTypes: Seq[Type], routes
     respondWithHeader(`Access-Control-Allow-Origin`.*) else pass
 
   private val headers: scala.collection.immutable.Seq[String] = scala.collection.immutable.Seq("Authorization", "Content-Type", "X-Requested-With", "Timestamp", "Signature") ++
-    (if (settings.apiKeyDifferentHost) Seq("api_key") else Seq.empty[String])
+    (if (settings.apiKeyDifferentHost) Seq("api_key", "X-API-Key") else Seq.empty[String])
 
   val compositeRoute: Route =
     withCors(routes.map(_.route).reduce(_ ~ _)) ~
