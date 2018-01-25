@@ -44,7 +44,7 @@ class WideStateGenerationSuite extends FreeSpec with WaitForHeight2
     .buildNonConflicting()
 
   private val nodeAddresses = nodeConfigs.map(_.getString("address")).toSet
-  private val requestsCount = 10000
+  private val requestsCount = 6000
 
   "Generate a lot of transactions and synchronise" in {
     val test = for {
