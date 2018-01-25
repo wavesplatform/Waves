@@ -29,13 +29,11 @@ class SynchronizationSettingsSpecification extends FlatSpec with Matchers {
         |      max-block-cache-size = 2
         |    }
         |
-        |    # History replier caching settings
         |    utx-synchronizer {
-        |      # Max microblocks to cache
         |      network-tx-cache-size = 7000000
-        |
-        |      # Max blocks to cache
         |      network-tx-cache-time = 70s
+        |      max-buffer-size = 777
+        |      max-buffer-time = 999ms
         |    }
         |
         |    micro-block-synchronizer {
@@ -67,7 +65,7 @@ class SynchronizationSettingsSpecification extends FlatSpec with Matchers {
       maxBlockCacheSize = 2
     )
 
-    settings.utxSynchronizerSettings shouldBe UtxSynchronizerSettings(7000000, 70.seconds)
+    settings.utxSynchronizerSettings shouldBe UtxSynchronizerSettings(7000000, 70.seconds, 777, 999.millis)
 
   }
 }

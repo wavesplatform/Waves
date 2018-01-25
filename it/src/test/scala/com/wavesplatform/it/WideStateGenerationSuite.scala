@@ -31,6 +31,10 @@ class WideStateGenerationSuite extends FreeSpec with WaitForHeight2
         |  }
         |  miner.minimal-block-generation-offset = 10s
         |  utx.cleanup-interval = 1m
+        |  synchronization.utx-synchronizer {
+        |    max-buffer-size = 500
+        |    max-buffer-time = 100ms
+        |  }
         |}""".stripMargin
     ),
     tag = getClass.getSimpleName,

@@ -11,22 +11,20 @@ import io.netty.channel.group.{ChannelGroup, ChannelMatcher}
 import monix.execution.{CancelableFuture, Scheduler}
 import scorex.transaction.Transaction
 
-import scala.concurrent.duration._
-
 object UtxPoolSynchronizer {
-  def start(utx: UtxPool, utxSynchronizerSettings: UtxSynchronizerSettings, allChannels: ChannelGroup, txSource: ChannelObservable[Transaction]): CancelableFuture[Unit] = {
+  def start(utx: UtxPool, settings: UtxSynchronizerSettings, allChannels: ChannelGroup, txSource: ChannelObservable[Transaction]): CancelableFuture[Unit] = {
     implicit val scheduler: Scheduler = Scheduler.singleThread("utx-pool-sync")
 
     val dummy = new Object()
     val knownTransactions = CacheBuilder
       .newBuilder()
-      .maximumSize(utxSynchronizerSettings.networkTxCacheSize)
-      .expireAfterWrite(utxSynchronizerSettings.networkTxCacheTime.toMillis, TimeUnit.MILLISECONDS)
+      .maximumSize(settings.networkTxCacheSize)
+      .expireAfterWrite(settings.networkTxCacheTime.toMillis, TimeUnit.MILLISECONDS)
       .build[ByteStr, Object]
 
     txSource
       .observeOn(scheduler)
-      .bufferTimedAndCounted(100.millis, 500)
+      .bufferTimedAndCounted(settings.maxBufferTime, settings.maxBufferSize)
       .foreach { txBuffer =>
         val toAdd = txBuffer.filter {
           case (_, tx) =>
@@ -38,7 +36,7 @@ object UtxPoolSynchronizer {
         if (toAdd.nonEmpty) {
           utx.asInstanceOf[UtxPoolImpl].batched { ops =>
             toAdd
-              .groupBy(_._1)
+              .groupBy { case (channel, _) => channel }
               .foreach {
                 case (sender, xs) =>
                   val channelMatcher: ChannelMatcher = { (_: Channel) != sender }
