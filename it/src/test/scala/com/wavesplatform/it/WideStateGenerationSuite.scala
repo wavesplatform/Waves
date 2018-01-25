@@ -52,7 +52,7 @@ class WideStateGenerationSuite extends FreeSpec with WaitForHeight2
       uploadedTxs <- processRequests(generateTransfersToRandomAddresses(requestsCount / 2, nodeAddresses) ++
         generateTransfersBetweenAccounts(requestsCount / 2, b))
 
-      _ <- Await.ready(traverse(nodes)(_.waitFor[Int]("UTX is empty")(_.utxSize, _ == 0, 5.seconds)), 5.minutes)
+      _ <- Await.ready(traverse(nodes)(_.waitFor[Int]("UTX is empty")(_.utxSize, _ == 0, 5.seconds)), 10.minutes)
 
       height <- traverse(nodes)(_.height).map(_.max)
       _ <- Await.ready(nodes.waitForSameBlocksAt(5.seconds, height + 1), 5.minutes)
