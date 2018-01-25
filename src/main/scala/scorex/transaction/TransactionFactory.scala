@@ -29,7 +29,7 @@ object TransactionFactory {
           request.attachment.filter(_.nonEmpty).map(Base58.decode(_).get).getOrElse(Array.emptyByteArray))
     } yield tx
 
-  def massTransferAsset(request: MassTransferRequest, wallet: Wallet, time: Time): Either[ValidationError, MassTransferTransaction] = ///where used?
+  def massTransferAsset(request: MassTransferRequest, wallet: Wallet, time: Time): Either[ValidationError, MassTransferTransaction] =
     for {
       senderPrivateKey <- wallet.findWallet(request.sender)
       recipients <- MassTransferTransaction.processRecipientsWith(request.transfers) {

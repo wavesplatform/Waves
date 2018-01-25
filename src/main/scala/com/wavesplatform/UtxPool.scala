@@ -17,7 +17,7 @@ import scorex.account.Address
 import scorex.consensus.TransactionsOrdering
 import scorex.transaction.ValidationError.{GenericError, SenderIsBlacklisted}
 import scorex.transaction._
-import scorex.transaction.assets.TransferTransaction
+import scorex.transaction.assets.{MassTransferTransaction, TransferTransaction}
 import scorex.utils.{ScorexLogging, Time}
 
 import scala.collection.JavaConverters._
@@ -109,17 +109,18 @@ class UtxPoolImpl(time: Time,
         case _ => None
       }
 
-      val recipient: Option[String] = tx match {
-        case x: TransferTransaction => Some(x.recipient.stringRepr)///ugh! recipients x blacklisted here
-        case _ => None
-      }
-
       sender match {
-        case None => Right(())
-        case Some(addr) =>
-          val blacklist = utxSettings.blacklistSenderAddresses.contains(addr)
-          lazy val allowBlacklisted = recipient.exists(utxSettings.allowBlacklistedTransferTo.contains)
-          if (blacklist && !allowBlacklisted) Left(SenderIsBlacklisted(addr)) else Right(())
+        case Some(addr) if utxSettings.blacklistSenderAddresses.contains(addr) =>
+          val recipients = tx match {
+            case tt: TransferTransaction => Seq(tt.recipient)
+            case mtt: MassTransferTransaction => mtt.transfers.map(_._1)
+            case _ => Seq()
+          }
+          val allowed =
+            recipients.nonEmpty &&
+            recipients.forall(r => utxSettings.allowBlacklistedTransferTo.contains(r.stringRepr))
+          Either.cond(allowed, (), SenderIsBlacklisted(addr))
+        case _ => Right(())
       }
     }
   }

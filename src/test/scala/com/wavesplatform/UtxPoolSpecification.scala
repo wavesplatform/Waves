@@ -14,8 +14,9 @@ import org.scalatest.{FreeSpec, Matchers}
 import scorex.account.{Address, PrivateKeyAccount, PublicKeyAccount}
 import scorex.block.Block
 import scorex.settings.TestFunctionalitySettings
+import scorex.transaction.TransactionParser.TransactionType
 import scorex.transaction.ValidationError.SenderIsBlacklisted
-import scorex.transaction.assets.TransferTransaction
+import scorex.transaction.assets.{MassTransferTransaction, TransferTransaction}
 import scorex.transaction.{FeeCalculator, Transaction}
 import scorex.utils.Time
 
@@ -28,11 +29,12 @@ class UtxPoolSpecification extends FreeSpec
   with TransactionGen
   with NoShrink {
 
-  private val calculator = new FeeCalculator(FeesSettings(Map(
-    1 -> List(FeeSettings("", 0)),
-    2 -> List(FeeSettings("", 0)),
-    4 -> List(FeeSettings("", 0))
-  )))
+  private val calculator = new FeeCalculator(FeesSettings(Seq(
+    TransactionType.GenesisTransaction,
+    TransactionType.IssueTransaction,
+    TransactionType.TransferTransaction,
+    TransactionType.MassTransferTransaction
+  ).map(_.id -> List(FeeSettings("", 0))).toMap))
 
   private def mkState(senderAccount: Address, senderBalance: Long) = {
 
@@ -60,6 +62,15 @@ class UtxPoolSpecification extends FreeSpec
     fee <- chooseNum(1, (maxAmount * 0.1).toLong)
   } yield TransferTransaction.create(None, sender, recipient, amount, time.getTimestamp(), None, fee, Array.empty[Byte]).right.get)
     .label("transferWithRecipient")
+
+  private def massTransferWithRecipients(sender: PrivateKeyAccount, recipients: List[PublicKeyAccount], maxAmount: Long, time: Time) = {
+    val amount = maxAmount / (recipients.size + 1)
+    val transfers = recipients.map(r => (r.toAddress, amount))
+    val txs = for {
+      fee <- chooseNum(1, amount)
+    } yield MassTransferTransaction.create(None, sender, transfers, time.getTimestamp(), fee, Array.empty[Byte]).right.get
+    txs.label("transferWithRecipient")
+  }
 
   private val stateGen = for {
     sender <- accountGen.label("sender")
@@ -123,6 +134,19 @@ class UtxPoolSpecification extends FreeSpec
     val utxPool = new UtxPoolImpl(time, state, history, calculator, FunctionalitySettings.TESTNET, settings)
     (sender, utxPool, txs)
   }).label("withBlacklistedAndAllowedByRule")
+
+  private def massTransferWithBlacklisted(allowRecipients: Boolean) = (for {
+      (sender, senderBalance, state, history) <- stateGen
+      addressGen = Gen.listOf(accountGen).filter(list => if (allowRecipients) list.nonEmpty else true)
+      recipients <- addressGen
+      time = new TestTime()
+      txs <- Gen.nonEmptyListOf(massTransferWithRecipients(sender, recipients, senderBalance / 10, time))
+    } yield {
+      val whitelist: Set[String] = if (allowRecipients) recipients.map(_.address).toSet else Set.empty
+      val settings = UtxSettings(txs.length, 1.minute, Set(sender.address), whitelist, 5.minutes)
+      val utxPool = new UtxPoolImpl(time, state, history, calculator, FunctionalitySettings.TESTNET, settings)
+      (sender, utxPool, txs)
+    }).label("massTransferWithBlacklisted")
 
   private def utxTest(utxSettings: UtxSettings = UtxSettings(20, 5.seconds, Set.empty, Set.empty, 5.minutes), txCount: Int = 10)
                      (f: (Seq[TransferTransaction], UtxPool, TestTime) => Unit): Unit = forAll(
@@ -246,23 +270,29 @@ class UtxPoolSpecification extends FreeSpec
     }
 
     "blacklisting" - {
-      "prevent a transaction from specific addresses" in forAll(withBlacklisted) { case (sender: PrivateKeyAccount, utxPool: UtxPool, txs: Seq[Transaction]) =>
-        val r = txs.forall { tx =>
-          utxPool.putIfNew(tx) match {
-            case Left(SenderIsBlacklisted(x)) => true
-            case _ => false
+      "prevent a transfer transaction from specific addresses" in {
+        val transferGen = Gen.oneOf(withBlacklisted, massTransferWithBlacklisted(allowRecipients = false))
+        forAll(transferGen) { case (_, utxPool, txs) =>
+          val r = txs.forall { tx =>
+            utxPool.putIfNew(tx) match {
+              case Left(SenderIsBlacklisted(x)) => true
+              case _ => false
+            }
           }
-        }
 
-        r shouldBe true
-        utxPool.all.size shouldEqual 0
+          r shouldBe true
+          utxPool.all.size shouldEqual 0
+        }
       }
 
-      "allow a transfer transaction from blacklisted address to specific addresses" in forAll(withBlacklistedAndAllowedByRule) { case (sender: PrivateKeyAccount, utxPool: UtxPool, txs: Seq[Transaction]) =>
-        all(txs.map { t =>
-          utxPool.putIfNew(t)
-        }) shouldBe 'right
-        utxPool.all.size shouldEqual txs.size
+      "allow a transfer transaction from blacklisted address to specific addresses" in {
+        val transferGen = Gen.oneOf(withBlacklistedAndAllowedByRule, massTransferWithBlacklisted(allowRecipients = true))
+        forAll(transferGen) { case (_, utxPool, txs) =>
+          all(txs.map { t =>
+            utxPool.putIfNew(t)
+          }) shouldBe 'right
+          utxPool.all.size shouldEqual txs.size
+        }
       }
     }
   }

@@ -57,7 +57,7 @@ case class MassTransferTransaction private(assetId: Option[AssetId],
 }
 
 object MassTransferTransaction {
-  val MaxTransferCount = 1000
+  val MaxTransferCount = 100
 
   def parseTail(bytes: Array[Byte]): Try[MassTransferTransaction] = Try {
     val sender = PublicKeyAccount(bytes.slice(0, KeyLength))
@@ -95,12 +95,10 @@ object MassTransferTransaction {
              feeAmount: Long,
              attachment: Array[Byte],
              signature: ByteStr): Either[ValidationError, MassTransferTransaction] = {
-    Try { recipients.map(_._2).fold(0L)(Math.addExact) }.fold(
+    Try { recipients.map(_._2).fold(feeAmount)(Math.addExact) }.fold(
       ex => Left(ValidationError.OverflowError),
       totalAmount =>
-        if (Try(Math.addExact(totalAmount, feeAmount)).isFailure) {
-          Left(ValidationError.OverflowError)
-        } else if (recipients.lengthCompare(MaxTransferCount) > 0) {
+        if (recipients.lengthCompare(MaxTransferCount) > 0) {
           Left(ValidationError.GenericError(s"Number of recipients is greater than $MaxTransferCount"))
         } else if (recipients.exists(_._2 < 0)) {
           Left(ValidationError.GenericError("One of the transfers has negative value"))
