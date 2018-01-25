@@ -14,6 +14,8 @@ class WriteErrorHandler extends ChannelOutboundHandlerAdapter with ScorexLogging
         chf.cause() match {
           case _: ClosedChannelException =>
             log.trace(s"${id(ctx.channel())} Channel closed while writing (${msg.getClass.getCanonicalName})")
+          case _: java.io.IOException =>
+            log.trace(s"java.io.IOException on ${id(ctx.channel())} Write failed (${msg.getClass.getCanonicalName})")
           case other =>
             log.debug(s"${id(ctx.channel())} Write failed (${msg.getClass.getCanonicalName})", other)
         }
