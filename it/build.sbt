@@ -14,17 +14,22 @@ concurrentRestrictions in Global := {
 }
 enablePlugins(sbtdocker.DockerPlugin)
 
+val yourKitRedistDir = Def.setting(baseDirectory.value / ".." / "third-party" / "yourkit")
+
 inTask(docker)(Seq(
   dockerfile := {
     val configTemplate = (Compile / resourceDirectory).value / "template.conf"
     val startWaves = sourceDirectory.value / "container" / "start-waves.sh"
+    val profilerAgent = yourKitRedistDir.value / "libyjpagent.so"
 
     new Dockerfile {
       from("anapsix/alpine-java:8_server-jre")
       add((assembly in LocalProject("node")).value, "/opt/waves/waves.jar")
-      add(Seq(configTemplate, startWaves), "/opt/waves/")
+      add(Seq(configTemplate, startWaves, profilerAgent), "/opt/waves/")
+      add(profilerAgent, "/opt/waves/")
       run("chmod", "+x", "/opt/waves/start-waves.sh")
       entryPoint("/opt/waves/start-waves.sh")
+      expose(10001)
     }
   },
 
@@ -59,6 +64,7 @@ lazy val itTestsCommonSettings: Seq[Def.Setting[_]] = Seq(
     val logDirectoryValue = logDirectory.value
     val envVarsValue = envVars.value
     val javaOptionsValue = javaOptions.value
+    val yourKitRedistDirValue = yourKitRedistDir.value
 
     for {
       group <- testGrouping.value
@@ -73,7 +79,8 @@ lazy val itTestsCommonSettings: Seq[Def.Setting[_]] = Seq(
         workingDirectory = Option(baseDirectory.value),
         runJVMOptions = Vector(
           "-Dwaves.it.logging.appender=FILE",
-          s"-Dwaves.it.logging.dir=${logDirectoryValue / suite.name.replaceAll("""(\w)\w*\.""", "$1.")}"
+          s"-Dwaves.it.logging.dir=${logDirectoryValue / suite.name.replaceAll("""(\w)\w*\.""", "$1.")}",
+          s"-Dwaves.profiling.yourKitDir=$yourKitRedistDirValue"
         ) ++ javaOptionsValue,
         connectInput = false,
         envVars = envVarsValue
