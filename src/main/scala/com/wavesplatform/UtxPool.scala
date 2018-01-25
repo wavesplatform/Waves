@@ -41,6 +41,13 @@ trait UtxPool {
   def transactionById(transactionId: ByteStr): Option[Transaction]
 
   def packUnconfirmed(max: Int, sortInBlock: Boolean): Seq[Transaction]
+
+  def batched(f: UtxBatchOps => Unit): Unit
+
+}
+
+trait UtxBatchOps {
+  def putIfNew(tx: Transaction): Either[ValidationError, Boolean]
 }
 
 class UtxPoolImpl(time: Time,
@@ -165,10 +172,10 @@ class UtxPoolImpl(time: Time,
     else reversedValidTxs.reverse
   }
 
-  def batched(f: BatchOps => Unit): Unit = f(new BatchOps(stateReader()))
+  override def batched(f: UtxBatchOps => Unit): Unit = f(new BatchOpsImpl(stateReader()))
 
-  class BatchOps private[UtxPoolImpl](s: SnapshotStateReader) {
-    def putIfNew(tx: Transaction): Either[ValidationError, Boolean] = outer.putIfNew(s, tx)
+  private class BatchOpsImpl(s: SnapshotStateReader) extends UtxBatchOps {
+    override def putIfNew(tx: Transaction): Either[ValidationError, Boolean] = outer.putIfNew(s, tx)
   }
 
   private def putIfNew(s: SnapshotStateReader, tx: Transaction): Either[ValidationError, Boolean] = {

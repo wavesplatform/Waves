@@ -3,9 +3,9 @@ package com.wavesplatform.network
 import java.util.concurrent.TimeUnit
 
 import com.google.common.cache.CacheBuilder
+import com.wavesplatform.UtxPool
 import com.wavesplatform.settings.SynchronizationSettings.UtxSynchronizerSettings
 import com.wavesplatform.state2.ByteStr
-import com.wavesplatform.{UtxPool, UtxPoolImpl}
 import io.netty.channel.Channel
 import io.netty.channel.group.{ChannelGroup, ChannelMatcher}
 import monix.execution.{CancelableFuture, Scheduler}
@@ -34,7 +34,7 @@ object UtxPoolSynchronizer {
         }
 
         if (toAdd.nonEmpty) {
-          utx.asInstanceOf[UtxPoolImpl].batched { ops =>
+          utx.batched { ops =>
             toAdd
               .groupBy { case (channel, _) => channel }
               .foreach {
