@@ -78,6 +78,7 @@ class OrderBookActor(assetPair: AssetPair,
       saveSnapshot(Snapshot(orderBook))
     case SaveSnapshotSuccess(metadata) =>
       log.info(s"Snapshot saved with metadata $metadata")
+      deleteMessages(metadata.sequenceNr)
     case SaveSnapshotFailure(metadata, reason) =>
       log.error(s"Failed to save snapshot: $metadata, $reason.")
     case DeleteOrderBookRequest(pair) =>
@@ -87,6 +88,10 @@ class OrderBookActor(assetPair: AssetPair,
       deleteSnapshots(SnapshotSelectionCriteria.Latest)
       context.stop(self)
       sender() ! GetOrderBookResponse(pair, Seq(), Seq())
+    case DeleteMessagesSuccess(toSequenceNr) =>
+      log.info(s"$persistenceId DeleteMessagesSuccess up to $toSequenceNr")
+    case DeleteMessagesFailure(cause: Throwable, toSequenceNr: Long) =>
+      log.error(s"$persistenceId DeleteMessagesFailure up to $toSequenceNr, reason: $cause")
   }
 
   private def waitingValidation: Receive = readOnlyCommands orElse {
