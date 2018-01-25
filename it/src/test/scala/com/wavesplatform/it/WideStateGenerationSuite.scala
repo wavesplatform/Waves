@@ -52,7 +52,7 @@ class WideStateGenerationSuite extends FreeSpec with WaitForHeight2
       uploadedTxs <- processRequests(generateTransfersToRandomAddresses(requestsCount / 2, nodeAddresses) ++
         generateTransfersBetweenAccounts(requestsCount / 2, b))
 
-      _ <- Await.ready(traverse(nodes)(_.waitFor[Int]("UTX is empty")(_.utxSize, _ == 0, 5.seconds)), 5.minutes)
+      _ <- Await.ready(traverse(nodes)(_.waitFor[Int]("UTX is empty")(_.utxSize, _ == 0, 5.seconds)), 7.minutes)
 
       height <- traverse(nodes)(_.height).map(_.max)
       _ <- Await.ready(nodes.waitForSameBlocksAt(5.seconds, height + 1), 5.minutes)
@@ -60,7 +60,7 @@ class WideStateGenerationSuite extends FreeSpec with WaitForHeight2
       _ <- Await.ready(traverse(nodes)(assertHasTxs(_, uploadedTxs.map(_.id).toSet)), 5.minutes)
     } yield ()
 
-    val limit = GlobalTimer.instance.schedule(Future.failed(new TimeoutException("Time is out for test")), 15.minutes)
+    val limit = GlobalTimer.instance.schedule(Future.failed(new TimeoutException("Time is out for test")), 18.minutes)
     val testWithDumps = Future.firstCompletedOf(Seq(test, limit)).recoverWith {
       case e =>
         for {
@@ -72,7 +72,7 @@ class WideStateGenerationSuite extends FreeSpec with WaitForHeight2
         }
     }
 
-    Await.result(testWithDumps, 16.minutes)
+    Await.result(testWithDumps, 18.minutes)
   }
 
   private def assertHasTxs(node: Node, txIds: Set[String]): Future[Unit] = {

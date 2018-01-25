@@ -8,6 +8,7 @@ import com.wavesplatform.metrics.Instrumented
 import com.wavesplatform.settings.{FunctionalitySettings, UtxSettings}
 import com.wavesplatform.state2.diffs.TransactionDiffer
 import com.wavesplatform.state2.reader.CompositeStateReader.composite
+import com.wavesplatform.state2.reader.SnapshotStateReader
 import com.wavesplatform.state2.{ByteStr, Diff, Portfolio, StateReader}
 import kamon.Kamon
 import kamon.metric.instrument.{Time => KamonTime}
@@ -48,6 +49,7 @@ class UtxPoolImpl(time: Time,
                   feeCalculator: FeeCalculator,
                   fs: FunctionalitySettings,
                   utxSettings: UtxSettings) extends ScorexLogging with Instrumented with AutoCloseable with UtxPool {
+  outer =>
 
   private implicit val scheduler: Scheduler = Scheduler.singleThread("utx-pool-cleanup")
 
@@ -82,22 +84,7 @@ class UtxPoolImpl(time: Time,
       }
   }
 
-  override def putIfNew(tx: Transaction): Either[ValidationError, Boolean] = {
-    putRequestStats.increment()
-    measureSuccessful(processingTimeStats, {
-      val s = stateReader()
-      for {
-        _ <- Either.cond(transactions.size < utxSettings.maxSize, (), GenericError("Transaction pool size limit is reached"))
-        _ <- checkNotBlacklisted(tx)
-        _ <- feeCalculator.enoughFee(tx)
-        diff <- TransactionDiffer(fs, history.lastBlockTimestamp(), time.correctedTime(), s.height)(s, tx)
-      } yield {
-        utxPoolSizeStats.increment()
-        pessimisticPortfolios.add(tx.id(), diff)
-        Option(transactions.put(tx.id(), tx)).isEmpty
-      }
-    })
-  }
+  override def putIfNew(tx: Transaction): Either[ValidationError, Boolean] = putIfNew(stateReader(), tx)
 
   private def checkNotBlacklisted(tx: Transaction): Either[ValidationError, Unit] = {
     if (utxSettings.blacklistSenderAddresses.isEmpty) {
@@ -176,6 +163,28 @@ class UtxPoolImpl(time: Time,
     if (sortInBlock)
       reversedValidTxs.sorted(TransactionsOrdering.InBlock)
     else reversedValidTxs.reverse
+  }
+
+  def batched(f: BatchOps => Unit): Unit = f(new BatchOps(stateReader()))
+
+  class BatchOps private[UtxPoolImpl](s: SnapshotStateReader) {
+    def putIfNew(tx: Transaction): Either[ValidationError, Boolean] = outer.putIfNew(s, tx)
+  }
+
+  private def putIfNew(s: SnapshotStateReader, tx: Transaction): Either[ValidationError, Boolean] = {
+    putRequestStats.increment()
+    measureSuccessful(processingTimeStats, {
+      for {
+        _ <- Either.cond(transactions.size < utxSettings.maxSize, (), GenericError("Transaction pool size limit is reached"))
+        _ <- checkNotBlacklisted(tx)
+        _ <- feeCalculator.enoughFee(tx)
+        diff <- TransactionDiffer(fs, history.lastBlockTimestamp(), time.correctedTime(), s.height)(s, tx)
+      } yield {
+        utxPoolSizeStats.increment()
+        pessimisticPortfolios.add(tx.id(), diff)
+        Option(transactions.put(tx.id(), tx)).isEmpty
+      }
+    })
   }
 
 }
