@@ -23,13 +23,12 @@ package object utils extends ScorexLogging {
 
   def base58Length(byteArrayLength: Int): Int = math.ceil(BytesLog / BaseLog * byteArrayLength).toInt
 
-  def createWithVerification[A <: Storage with VersionedStorage](storage: => A, consistencyCheck: A => Boolean = (_: A) => true): Try[A] = Try {
-    if (storage.isVersionValid && consistencyCheck(storage)) storage else {
+  def createWithVerification[A <: Storage with VersionedStorage](storage: => A): Try[A] = Try {
+    if (storage.isVersionValid) storage else {
       log.info(s"Re-creating storage")
       val b = storage.createBatch()
       storage.removeEverything(b)
       storage.commit(b)
-      require(consistencyCheck(storage), "storage is inconsistent")
       storage
     }
   }

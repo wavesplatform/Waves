@@ -69,7 +69,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   }
 
   private val checkpointService = new CheckpointServiceImpl(db, settings.checkpointsSettings)
-  private val (history, featureProvider, stateWriter, stateReader, blockchainUpdater, blockchainDebugInfo) = storage()
+  private val (history, featureProvider, stateReader, blockchainUpdater, blockchainDebugInfo) = storage()
   private lazy val upnp = new UPnP(settings.networkSettings.uPnPSettings) // don't initialize unless enabled
   private val wallet: Wallet = Wallet(settings.walletSettings)
   private val peerDatabase = new PeerDatabaseImpl(settings.networkSettings)

@@ -15,7 +15,7 @@ import scala.util.{Success, Try}
 
 object StorageFactory {
 
-  type Storage = Coeval[(NgHistory with DebugNgHistory, FeatureProvider, StateWriter, StateReader, BlockchainUpdater, BlockchainDebugInfo)]
+  type Storage = Coeval[(NgHistory with DebugNgHistory, FeatureProvider, StateReader, BlockchainUpdater, BlockchainDebugInfo)]
   type HeightInfos = Coeval[(HeightInfo, HeightInfo)]
 
   private def createStateStorage(history: History with FeatureProvider, db: DB, time: Time): Try[StateStorage] =
@@ -35,7 +35,7 @@ object StorageFactory {
         val stateWriter = new StateWriterImpl(ss, lock)
         val bcu = BlockchainUpdaterImpl(stateWriter, historyWriter, settings, time, lock)
         val history: NgHistory with DebugNgHistory with FeatureProvider = bcu.historyReader
-        (history, history, stateWriter, bcu.bestLiquidState, bcu, bcu)
+        (history, history, bcu.bestLiquidState, bcu, bcu)
       },
       Coeval {
         (historyWriter.debugInfo, ss.debugInfo)

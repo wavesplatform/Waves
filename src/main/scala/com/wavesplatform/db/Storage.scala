@@ -99,28 +99,6 @@ abstract class Storage(private val db: DB) extends ScorexLogging {
     new KeysIterator(it)
   }
 
-  protected def map(prefix: Array[Byte], stripPrefix: Boolean = true): Map[Array[Byte], Array[Byte]] = {
-    val p = makePrefix(prefix)
-    val it = db.iterator()
-    var map = Map.empty[Array[Byte], Array[Byte]]
-
-    try {
-      it.seekToFirst()
-      while (it.hasNext) {
-        val e = it.peekNext()
-        if (e.getKey.startsWith(p)) {
-          val k = if (stripPrefix) e.getKey.drop(p.length) else e.getKey
-          map = map.updated(k, e.getValue)
-        }
-        it.next()
-      }
-    } finally {
-      it.close()
-    }
-
-    map
-  }
-
   def removeEverything(b: Option[WriteBatch]): Unit
 
   protected def makePrefix(prefix: Array[Byte]): Array[Byte] = Bytes.concat(prefix, Separator)

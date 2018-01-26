@@ -28,13 +28,13 @@ class BlockchainUpdaterTest extends FunSuite with Matchers with HistoryTest with
     featuresSettings = DefaultWavesSettings.featuresSettings.copy(autoShutdownOnUnsupportedFeature = true)
   )
 
-  private def storageFactory(): (NgHistory with DebugNgHistory, FeatureProvider, StateWriter, StateReader, BlockchainUpdater, BlockchainDebugInfo) = {
+  private def storageFactory(): (NgHistory with DebugNgHistory, FeatureProvider, StateReader, BlockchainUpdater, BlockchainDebugInfo) = {
     val (storage, _) = StorageFactory(open(), WavesSettings).get
     storage()
   }
 
   ignore("concurrent access to lastBlock doesn't throw any exception") {
-    val (h, _, _, _, bu, _) = storageFactory()
+    val (h, _, _, bu, _) = storageFactory()
 
     bu.processBlock(genesisBlock)
 
@@ -60,7 +60,7 @@ class BlockchainUpdaterTest extends FunSuite with Matchers with HistoryTest with
 
   test("features approved and accepted as height grows") {
 
-    val (h, fp, _, _, bu, _) = storageFactory()
+    val (h, fp, _, bu, _) = storageFactory()
 
     bu.processBlock(genesisBlock)
 
@@ -97,7 +97,7 @@ class BlockchainUpdaterTest extends FunSuite with Matchers with HistoryTest with
   }
 
   test("features rollback with block rollback") {
-    val (h, fp, _, _, bu, _) = storageFactory()
+    val (h, fp, _, bu, _) = storageFactory()
 
     bu.processBlock(genesisBlock)
 
@@ -152,7 +152,7 @@ class BlockchainUpdaterTest extends FunSuite with Matchers with HistoryTest with
   }
 
   test("feature activation height is not overrided with further periods") {
-    val (h, fp, _, _, bu, _) = storageFactory()
+    val (h, fp, _, bu, _) = storageFactory()
 
     bu.processBlock(genesisBlock)
 
@@ -174,7 +174,7 @@ class BlockchainUpdaterTest extends FunSuite with Matchers with HistoryTest with
   }
 
   test("feature activated only by 90% of blocks") {
-    val (h, fp, _, _, bu, _) = storageFactory()
+    val (h, fp, _, bu, _) = storageFactory()
 
     bu.processBlock(genesisBlock)
 
@@ -197,7 +197,7 @@ class BlockchainUpdaterTest extends FunSuite with Matchers with HistoryTest with
   }
 
   test("features votes resets when voting window changes") {
-    val (h, fp, _, _, bu, _) = storageFactory()
+    val (h, fp, _, bu, _) = storageFactory()
 
     bu.processBlock(genesisBlock)
 
@@ -237,7 +237,7 @@ class BlockchainUpdaterTest extends FunSuite with Matchers with HistoryTest with
     })
 
 
-    val (h, _, _, _, bu, _) = storageFactory()
+    val (h, _, _, bu, _) = storageFactory()
     bu.processBlock(genesisBlock)
 
     (1 to ApprovalPeriod * 2).foreach { i =>
@@ -252,7 +252,7 @@ class BlockchainUpdaterTest extends FunSuite with Matchers with HistoryTest with
   }
 
   test("sunny day test when known feature activated") {
-    val (h, fp, _, _, bu, _) = storageFactory()
+    val (h, fp, _, bu, _) = storageFactory()
     bu.processBlock(genesisBlock)
 
     (1 until ApprovalPeriod * 2 - 1).foreach { i =>

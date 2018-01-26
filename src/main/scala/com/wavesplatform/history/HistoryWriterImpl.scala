@@ -40,13 +40,6 @@ class HistoryWriterImpl private(db: DB, val synchronizationToken: ReentrantReadW
 
   private val HeightProperty = "history-height"
 
-  private[HistoryWriterImpl] def isConsistent: Boolean = read { implicit l =>
-    true
-    //TODO: replace with implementation
-    // check if all maps have same size
-    //    Set(blockBodyByHeight().size(), blockIdByHeight().size(), heightByBlockId().size(), scoreByHeight().size()).size == 1
-  }
-
   private lazy val preAcceptedFeatures = functionalitySettings.preActivatedFeatures.mapValues(h => h - activationWindowSize)
 
   private var heightInfo: (Int, Long) = (height(), time.getTimestamp())
@@ -203,7 +196,7 @@ class HistoryWriterImpl private(db: DB, val synchronizationToken: ReentrantReadW
 object HistoryWriterImpl extends ScorexLogging {
   def apply(db: DB, synchronizationToken: ReentrantReadWriteLock, functionalitySettings: FunctionalitySettings,
             featuresSettings: FeaturesSettings, time: Time = NTP): Try[HistoryWriterImpl] =
-    createWithVerification[HistoryWriterImpl](new HistoryWriterImpl(db, synchronizationToken, functionalitySettings, featuresSettings, time), h => h.isConsistent)
+    createWithVerification[HistoryWriterImpl](new HistoryWriterImpl(db, synchronizationToken, functionalitySettings, featuresSettings, time))
 
   private val blockHeightStats = Kamon.metrics.histogram("block-height")
   private val blockSizeStats = Kamon.metrics.histogram("block-size-bytes")
