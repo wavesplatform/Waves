@@ -119,12 +119,12 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     val (newBlocks, extLoaderState) = RxExtensionLoader(settings.synchronizationSettings.maxRollback, settings.synchronizationSettings.synchronizationTimeout,
       history, peerDatabase, knownInvalidBlocks, blocks, signatures, syncWithChannelClosed) { case ((c, b)) => processFork(c, b.blocks) }
 
-    val utxSink = UtxPoolSynchronizer(utxStorage, settings.synchronizationSettings.utxSynchronizerSettings, allChannels, transactions)
+    UtxPoolSynchronizer.start(utxStorage, settings.synchronizationSettings.utxSynchronizerSettings, allChannels, transactions)
     val microBlockSink = microblockDatas.mapTask(scala.Function.tupled(processMicroBlock))
     val blockSink = newBlocks.mapTask(scala.Function.tupled(processBlock))
     val checkpointSink = checkpoints.mapTask { case ((s, c)) => processCheckpoint(Some(s), c) }
 
-    Observable.merge(microBlockSink, blockSink, checkpointSink, utxSink).subscribe()(monix.execution.Scheduler.Implicits.global)
+    Observable.merge(microBlockSink, blockSink, checkpointSink).subscribe()(monix.execution.Scheduler.Implicits.global)
     miner.scheduleMining()
 
     for (addr <- settings.networkSettings.declaredAddress if settings.networkSettings.uPnPSettings.enable) {
