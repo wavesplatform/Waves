@@ -15,7 +15,6 @@ import scorex.transaction._
 
 import scala.util.{Either, Failure, Success, Try}
 
-///common parent w/ TransferTx?
 case class MassTransferTransaction private(assetId: Option[AssetId],
                                            sender: PublicKeyAccount,
                                            transfers: List[(AddressOrAlias, Long)],
@@ -23,7 +22,6 @@ case class MassTransferTransaction private(assetId: Option[AssetId],
                                            fee: Long,
                                            attachment: Array[Byte],
                                            signature: ByteStr) extends SignedTransaction {
-  ///amount field maybe?
   override val transactionType: TransactionType.Value = TransactionType.MassTransferTransaction
 
   override val assetFee: (Option[AssetId], Long) = (None, fee)

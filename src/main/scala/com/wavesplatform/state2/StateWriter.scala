@@ -7,7 +7,7 @@ import cats.implicits._
 import com.wavesplatform.metrics.Instrumented
 import com.wavesplatform.state2.reader.StateReaderImpl
 import scorex.transaction.PaymentTransaction
-import scorex.transaction.assets.TransferTransaction
+import scorex.transaction.assets.{MassTransferTransaction, TransferTransaction}
 import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.utils.ScorexLogging
 
@@ -33,7 +33,7 @@ class StateWriterImpl(p: StateStorage, storeTransactions: Boolean, synchronizati
 
     measureSizeLog("transactions")(txsDiff.transactions) { txs =>
       txs.toSeq.foreach {
-        case (id, (h, tx@(_: TransferTransaction | _: ExchangeTransaction | _: PaymentTransaction), _)) => ///?
+        case (id, (h, tx@(_: TransferTransaction | _: MassTransferTransaction | _: ExchangeTransaction | _: PaymentTransaction), _)) =>
           sp().transactions.put(id, (h, if (storeTransactions) tx.bytes() else Array.emptyByteArray))
         case (id, (h, tx, _)) => sp().transactions.put(id, (h, tx.bytes()))
       }

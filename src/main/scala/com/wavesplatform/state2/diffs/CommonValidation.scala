@@ -1,6 +1,7 @@
 package com.wavesplatform.state2.diffs
 
 import cats._
+import com.wavesplatform.features.{BlockchainFeatures, FeatureProvider}
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.reader.SnapshotStateReader
 import com.wavesplatform.state2.{Portfolio, _}
@@ -65,20 +66,22 @@ object CommonValidation {
       }
   }
 
-  def disallowBeforeActivationTime[T <: Transaction](settings: FunctionalitySettings, tx: T): Either[ValidationError, T] =
+  def disallowBeforeActivationTime[T <: Transaction](featureProvider: FeatureProvider, height: Int, tx: T): Either[ValidationError, T] =
     tx match {
       case _: BurnTransaction => Right(tx)
       case _: PaymentTransaction => Right(tx)
       case _: GenesisTransaction => Right(tx)
       case _: TransferTransaction => Right(tx)
-      case _: MassTransferTransaction => Right(tx)///lock by height?
       case _: IssueTransaction => Right(tx)
       case _: ReissueTransaction => Right(tx)
       case _: ExchangeTransaction => Right(tx)
       case _: LeaseTransaction => Right(tx)
       case _: LeaseCancelTransaction => Right(tx)
       case _: CreateAliasTransaction => Right(tx)
-      case _ => Left(GenericError("Unknown transaction must be explicitly registered within ActivatedValidator"))
+      case _: MassTransferTransaction =>
+        Either.cond(featureProvider.isFeatureActivated(BlockchainFeatures.MassTransfer, height),
+          tx, ValidationError.ActivationError("MassTransfer transaction has not been activated yet"))
+      case _ => Left(GenericError("Unknown transaction must be explicitly activated"))
     }
 
   def disallowTxFromFuture[T <: Transaction](settings: FunctionalitySettings, time: Long, tx: T): Either[ValidationError, T] = {

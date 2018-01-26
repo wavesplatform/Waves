@@ -4,6 +4,7 @@ import java.util.concurrent.ConcurrentHashMap
 
 import cats._
 import com.wavesplatform.UtxPoolImpl.PessimisticPortfolios
+import com.wavesplatform.features.FeatureProvider
 import com.wavesplatform.metrics.Instrumented
 import com.wavesplatform.settings.{FunctionalitySettings, UtxSettings}
 import com.wavesplatform.state2.diffs.TransactionDiffer
@@ -45,6 +46,7 @@ trait UtxPool {
 class UtxPoolImpl(time: Time,
                   stateReader: StateReader,
                   history: History,
+                  featureProvider: FeatureProvider,
                   feeCalculator: FeeCalculator,
                   fs: FunctionalitySettings,
                   utxSettings: UtxSettings) extends ScorexLogging with Instrumented with AutoCloseable with UtxPool {
@@ -90,7 +92,7 @@ class UtxPoolImpl(time: Time,
         _ <- Either.cond(transactions.size < utxSettings.maxSize, (), GenericError("Transaction pool size limit is reached"))
         _ <- checkNotBlacklisted(tx)
         _ <- feeCalculator.enoughFee(tx)
-        diff <- TransactionDiffer(fs, history.lastBlockTimestamp(), time.correctedTime(), s.height)(s, tx)
+        diff <- TransactionDiffer(fs, history.lastBlockTimestamp(), time.correctedTime(), s.height)(s, featureProvider, tx)
       } yield {
         utxPoolSizeStats.increment()
         pessimisticPortfolios.add(tx.id(), diff)
@@ -159,7 +161,7 @@ class UtxPoolImpl(time: Time,
       .sorted(TransactionsOrdering.InUTXPool)
       .foldLeft((Seq.empty[ByteStr], Seq.empty[Transaction], Monoid[Diff].empty)) {
         case ((invalid, valid, diff), tx) if valid.lengthCompare(max) <= 0 =>
-          differ(composite(diff.asBlockDiff, s), tx) match {
+          differ(composite(diff.asBlockDiff, s), featureProvider, tx) match {
             case Right(newDiff) if valid.lengthCompare(max) < 0 =>
               (invalid, tx +: valid, Monoid.combine(diff, newDiff))
             case Right(_) =>

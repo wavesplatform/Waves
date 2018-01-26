@@ -17,8 +17,8 @@ case class SignedMassTransferRequest(@ApiModelProperty(value = "Base58 encoded s
                                      senderPublicKey: String,
                                      @ApiModelProperty(value = "Base58 encoded Asset ID")
                                      assetId: Option[String],
-                                     @ApiModelProperty(value = "Recipient address", required = true)///doc
-                                     recipients: List[(String, Long)],
+                                     @ApiModelProperty(value = "List of (recipient, amount) pairs", required = true)
+                                     transfers: List[(String, Long)],
                                      @ApiModelProperty(required = true)
                                      fee: Long,
                                      @ApiModelProperty(required = true)
@@ -32,7 +32,7 @@ case class SignedMassTransferRequest(@ApiModelProperty(value = "Base58 encoded s
     _assetId <- parseBase58ToOption(assetId.filter(_.length > 0), "invalid.assetId", AssetIdStringLength)
     _signature <- parseBase58(signature, "invalid.signature", SignatureStringLength)
     _attachment <- parseBase58(attachment.filter(_.length > 0), "invalid.attachment", TransferTransaction.MaxAttachmentStringSize)
-    _recipients <- MassTransferTransaction.processRecipientsWith(recipients) { (recipient, amount) => AddressOrAlias.fromString(recipient).map((_, amount)) }
-    t <- MassTransferTransaction.create(_assetId, _sender, _recipients, timestamp, fee, _attachment.arr, _signature)
+    _transfers <- MassTransferTransaction.processRecipientsWith(transfers) { (recipient, amount) => AddressOrAlias.fromString(recipient).map((_, amount)) }
+    t <- MassTransferTransaction.create(_assetId, _sender, _transfers, timestamp, fee, _attachment.arr, _signature)
   } yield t
 }

@@ -81,7 +81,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     val time: Time = NTP
     val establishedConnections = new ConcurrentHashMap[Channel, PeerInfo]
     val allChannels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
-    val utxStorage = new UtxPoolImpl(time, stateReader, history, feeCalculator, settings.blockchainSettings.functionalitySettings, settings.utxSettings)
+    val utxStorage = new UtxPoolImpl(time, stateReader, history, featureProvider, feeCalculator, settings.blockchainSettings.functionalitySettings, settings.utxSettings)
     val knownInvalidBlocks = new InvalidBlockStorageImpl(settings.synchronizationSettings.invalidBlocksStorage)
     val miner = if (settings.minerSettings.enable)
       new MinerImpl(allChannels, blockchainUpdater, checkpointService, history, featureProvider, stateReader, settings, time, utxStorage, wallet)
