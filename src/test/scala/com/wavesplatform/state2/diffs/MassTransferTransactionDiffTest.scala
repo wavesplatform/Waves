@@ -2,7 +2,6 @@ package com.wavesplatform.state2.diffs
 
 import cats._
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.history.DomainScenarioDrivenPropertyCheck
 import com.wavesplatform.state2.{LeaseInfo, Portfolio}
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
@@ -16,8 +15,7 @@ import scorex.transaction.assets.{IssueTransaction, MassTransferTransaction}
 
 class MassTransferTransactionDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
 
-  val MassTransferActivatedSettings = TestFunctionalitySettings.Enabled.copy(
-    preActivatedFeatures = Map(BlockchainFeatures.MassTransfer.id -> 0))
+  val fs = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Map(BlockchainFeatures.MassTransfer.id -> 0))
 
   val baseSetup: Gen[(GenesisTransaction, PrivateKeyAccount, Long)] = for {
     master <- accountGen
@@ -40,7 +38,7 @@ class MassTransferTransactionDiffTest extends PropSpec with PropertyChecks with 
       } yield (genesis, assetIssue, transfer)
 
       forAll(setup) { case (genesis, issue, transfer) =>
-        assertDiffAndState(Seq(block(Seq(genesis, issue))), block(Seq(transfer)), MassTransferActivatedSettings) { case (totalDiff, newState) =>
+        assertDiffAndState(Seq(block(Seq(genesis, issue))), block(Seq(transfer)), fs) { case (totalDiff, newState) =>
           val totalPortfolioDiff = Monoid.combineAll(totalDiff.txsDiff.portfolios.values)
           totalPortfolioDiff.balance shouldBe 0
           totalPortfolioDiff.effectiveBalance shouldBe 0
@@ -80,7 +78,7 @@ class MassTransferTransactionDiffTest extends PropSpec with PropertyChecks with 
     } yield (genesis, transfer)
 
     forAll(setup) { case (genesis, transfer) =>
-      assertDiffEi(Seq(block(Seq(genesis))), block(Seq(transfer)), MassTransferActivatedSettings) { blockDiffEi =>
+      assertDiffEi(Seq(block(Seq(genesis))), block(Seq(transfer)), fs) { blockDiffEi =>
         blockDiffEi should produce("AliasNotExists")
       }
     }
@@ -96,7 +94,7 @@ class MassTransferTransactionDiffTest extends PropSpec with PropertyChecks with 
     } yield (genesis, transfer)
 
     forAll(setup) { case (genesis, transfer) =>
-      assertDiffEi(Seq(block(Seq(genesis))), block(Seq(transfer)), MassTransferActivatedSettings) { blockDiffEi =>
+      assertDiffEi(Seq(block(Seq(genesis))), block(Seq(transfer)), fs) { blockDiffEi =>
         blockDiffEi should produce("Attempt to transfer unavailable funds")
       }
     }
@@ -112,8 +110,22 @@ class MassTransferTransactionDiffTest extends PropSpec with PropertyChecks with 
     } yield (genesis, transfer)
 
     forAll(setup) { case (genesis, transfer) =>
-      assertDiffEi(Seq(block(Seq(genesis))), block(Seq(transfer)), MassTransferActivatedSettings) { blockDiffEi =>
+      assertDiffEi(Seq(block(Seq(genesis))), block(Seq(transfer)), fs) { blockDiffEi =>
         blockDiffEi should produce("Attempt to transfer unavailable funds")
+      }
+    }
+  }
+
+  property("validation fails prior to feature activation") {
+    val setup = for {
+      (genesis, master, ts) <- baseSetup
+      transfer <- massTransferGeneratorP(master, List(), None)
+    } yield (genesis, transfer)
+    val settings = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Map(BlockchainFeatures.MassTransfer.id -> 10))
+
+    forAll(setup) { case (genesis, transfer) =>
+      assertDiffEi(Seq(block(Seq(genesis))), block(Seq(transfer)), settings) { blockDiffEi =>
+        blockDiffEi should produce("MassTransfer transaction has not been activated yet")
       }
     }
   }
