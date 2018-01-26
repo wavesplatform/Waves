@@ -28,6 +28,8 @@ scalacOptions ++= Seq(
   "-Xlint")
 logBuffered := false
 
+resolvers += Resolver.bintrayRepo("ethereum", "maven")
+
 //assembly settings
 assemblyJarName in assembly := s"waves-all-${version.value}.jar"
 assemblyMergeStrategy in assembly := {
@@ -71,7 +73,8 @@ sourceGenerators in Compile += Def.task {
 inConfig(Test)(Seq(
   logBuffered := false,
   parallelExecution := false,
-  testOptions += Tests.Argument("-oIDOF", "-u", "target/test-reports")
+  testOptions += Tests.Argument("-oIDOF", "-u", "target/test-reports"),
+  testOptions += Tests.Setup(_ => sys.props("sbt-testing") = "true")
 ))
 
 commands += Command.command("packageAll") { state =>

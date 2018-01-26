@@ -1,12 +1,11 @@
 package com.wavesplatform.matcher.market
 
-import com.wavesplatform.UtxPool
+import com.wavesplatform.{TestDB, UtxPool}
 import com.wavesplatform.matcher.model._
 import com.wavesplatform.matcher.{MatcherSettings, MatcherTestData}
 import com.wavesplatform.settings.{Constants, WalletSettings}
 import com.wavesplatform.state2.reader.SnapshotStateReader
 import com.wavesplatform.state2.{AssetInfo, ByteStr, LeaseInfo, Portfolio}
-import org.h2.mvstore.MVStore
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
@@ -17,6 +16,7 @@ import scorex.transaction.assets.exchange.{AssetPair, Order}
 import scorex.wallet.Wallet
 
 class OrderValidatorSpecification extends WordSpec
+  with TestDB
   with PropertyChecks
   with Matchers
   with MatcherTestData
@@ -24,8 +24,8 @@ class OrderValidatorSpecification extends WordSpec
   with BeforeAndAfterEach
   with PathMockFactory {
 
-  var storage = new OrderHistoryStorage(new MVStore.Builder().open())
-  var oh = OrderHistoryImpl(storage, matcherSettings)
+  val db = open()
+  var oh = OrderHistoryImpl(db, matcherSettings)
 
   val utxPool: UtxPool = stub[UtxPool]
 
@@ -48,7 +48,6 @@ class OrderValidatorSpecification extends WordSpec
   }
 
   override protected def beforeEach(): Unit = {
-    storage = new OrderHistoryStorage(new MVStore.Builder().open())
     ov = new OrderValidator {
       override val orderHistory: OrderHistory = oh
       override val utxPool: UtxPool = stub[UtxPool]

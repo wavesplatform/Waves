@@ -4,7 +4,7 @@ import akka.actor.{Actor, ActorRef, ActorSystem, Props}
 import akka.http.scaladsl.model.StatusCodes
 import akka.persistence.inmemory.extension.{InMemoryJournalStorage, StorageExtension}
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
-import com.wavesplatform.UtxPool
+import com.wavesplatform.{TestDB, UtxPool}
 import com.wavesplatform.matcher.MatcherTestData
 import com.wavesplatform.matcher.api.StatusCodeMatcherResponse
 import com.wavesplatform.matcher.fixtures.RestartableActor
@@ -18,7 +18,6 @@ import com.wavesplatform.state2.reader.SnapshotStateReader
 import com.wavesplatform.state2.{AssetInfo, ByteStr, LeaseInfo, Portfolio}
 import io.netty.channel.group.ChannelGroup
 import monix.eval.Coeval
-import org.h2.mvstore.MVStore
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Matchers, WordSpecLike}
 import scorex.account.PrivateKeyAccount
@@ -30,6 +29,7 @@ import scorex.utils.{NTP, ScorexLogging}
 import scorex.wallet.Wallet
 
 class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest2"))
+with TestDB
   with WordSpecLike
   with Matchers
   with BeforeAndAfterAll
@@ -39,7 +39,6 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest2"
   with ScorexLogging
   with PathMockFactory {
 
-  val db = new MVStore.Builder().compress().open()
   val storedState: SnapshotStateReader = stub[SnapshotStateReader]
 
   val settings = matcherSettings.copy(account = MatcherAccount.address)

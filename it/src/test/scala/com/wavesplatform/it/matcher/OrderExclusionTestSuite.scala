@@ -56,6 +56,7 @@ class OrderExclusionTestSuite extends FreeSpec with Matchers with BeforeAndAfter
     status shouldBe "OrderAccepted"
     aliceSell1 = id
     // Alice checks that the order in order book
+    waitForOrderStatus(aliceAsset, id, "Accepted", 1.minute)
     matcherCheckOrderStatus(id) shouldBe "Accepted"
 
     // Alice check that order is correct

@@ -7,6 +7,7 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.Http.ServerBinding
 import akka.stream.ActorMaterializer
 import com.wavesplatform.UtxPool
+import com.wavesplatform.db._
 import com.wavesplatform.matcher.api.MatcherApiRoute
 import com.wavesplatform.matcher.market.{MatcherActor, MatcherTransactionWriter, OrderHistoryActor}
 import com.wavesplatform.settings.{BlockchainSettings, RestAPISettings}
@@ -40,15 +41,18 @@ class Matcher(actorSystem: ActorSystem,
   lazy val matcher: ActorRef = actorSystem.actorOf(MatcherActor.props(orderHistory, stateReader, wallet, utx, allChannels,
     matcherSettings, history, blockchainSettings.functionalitySettings), MatcherActor.name)
 
-  lazy val orderHistory: ActorRef = actorSystem.actorOf(OrderHistoryActor.props(matcherSettings, utx, wallet),
+  lazy val db = openDB(matcherSettings.dataDir, matcherSettings.levelDbCacheSize)
+
+  lazy val orderHistory: ActorRef = actorSystem.actorOf(OrderHistoryActor.props(db, matcherSettings, utx, wallet),
     OrderHistoryActor.name)
 
-  lazy val txWriter: ActorRef = actorSystem.actorOf(MatcherTransactionWriter.props(matcherSettings),
+  lazy val txWriter: ActorRef = actorSystem.actorOf(MatcherTransactionWriter.props(db, matcherSettings),
     MatcherTransactionWriter.name)
 
   @volatile var matcherServerBinding: ServerBinding = _
 
   def shutdownMatcher(): Unit = {
+    db.close()
     Await.result(matcherServerBinding.unbind(), 10.seconds)
   }
 
@@ -68,8 +72,8 @@ class Matcher(actorSystem: ActorSystem,
 
     log.info(s"Starting matcher on: ${matcherSettings.bindAddress}:${matcherSettings.port} ...")
 
-    implicit val as = actorSystem
-    implicit val materializer = ActorMaterializer()
+    implicit val as: ActorSystem = actorSystem
+    implicit val materializer: ActorMaterializer = ActorMaterializer()
 
     val combinedRoute = CompositeHttpService(actorSystem, matcherApiTypes, matcherApiRoutes, restAPISettings).compositeRoute
     matcherServerBinding = Await.result(Http().bindAndHandle(combinedRoute, matcherSettings.bindAddress,

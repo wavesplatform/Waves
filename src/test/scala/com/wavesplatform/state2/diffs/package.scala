@@ -2,6 +2,7 @@ package com.wavesplatform.state2
 
 import java.util.concurrent.locks.ReentrantReadWriteLock
 
+import com.wavesplatform.TestDB
 import com.wavesplatform.features.FeatureProvider
 import com.wavesplatform.history.HistoryWriterImpl
 import com.wavesplatform.settings.FunctionalitySettings
@@ -11,14 +12,14 @@ import scorex.block.Block
 import scorex.settings.TestFunctionalitySettings
 import scorex.transaction.{History, ValidationError}
 
-package object diffs {
+package object diffs extends TestDB {
 
   private val lock = new ReentrantReadWriteLock()
 
   def newState(storeTransactions: Boolean = true): StateWriterImpl =
-    new StateWriterImpl(StateStorage(None, dropExisting = false).get, storeTransactions, new ReentrantReadWriteLock())
+    new StateWriterImpl(StateStorage(open(), dropExisting = false).get, new ReentrantReadWriteLock())
 
-  def newHistory(): History with FeatureProvider = HistoryWriterImpl(None, lock, TestFunctionalitySettings.Enabled, TestFunctionalitySettings.EmptyFeaturesSettings).get
+  def newHistory(): History with FeatureProvider = HistoryWriterImpl(open(), lock, TestFunctionalitySettings.Enabled, TestFunctionalitySettings.EmptyFeaturesSettings).get
 
   val ENOUGH_AMT: Long = Long.MaxValue / 3
 

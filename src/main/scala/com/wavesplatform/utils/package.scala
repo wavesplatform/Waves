@@ -1,10 +1,8 @@
 package com.wavesplatform
 
-import java.io.File
-import java.nio.file.Files
-
-import com.wavesplatform.state2.VersionableStorage
-import org.h2.mvstore.MVStore
+import com.google.common.base.Throwables
+import com.wavesplatform.db.{Storage, VersionedStorage}
+import monix.execution.UncaughtExceptionReporter
 import org.joda.time.Duration
 import org.joda.time.format.PeriodFormat
 import scorex.utils.ScorexLogging
@@ -15,48 +13,23 @@ package object utils extends ScorexLogging {
 
   type HeightInfo = (Int, Long)
 
-  private val DefaultPageSplitSize = 4 * 1024
+  private val BytesMaxValue = 256
+  private val Base58MaxValue = 58
 
-  def base58Length(byteArrayLength: Int): Int = math.ceil(math.log(256) / math.log(58) * byteArrayLength).toInt
+  private val BytesLog = math.log(BytesMaxValue)
+  private val BaseLog = math.log(Base58MaxValue)
 
-  def createMVStore(file: Option[File], encryptionKey: Option[Array[Char]] = None, pageSplitSize: Int = DefaultPageSplitSize): MVStore = {
-    val builder = file.fold(new MVStore.Builder) { p =>
-      p.getParentFile.mkdirs()
+  val UncaughtExceptionsToLogReporter = UncaughtExceptionReporter(exc => log.error(Throwables.getStackTraceAsString(exc)))
 
-      new MVStore.Builder()
-        .fileName(p.getCanonicalPath)
-        .autoCommitDisabled()
-        .pageSplitSize(pageSplitSize)
-        .compress()
-    }
+  def base58Length(byteArrayLength: Int): Int = math.ceil(BytesLog / BaseLog * byteArrayLength).toInt
 
-    try {
-      val store = encryptionKey match {
-        case Some(key) => builder.encryptionKey(key).open()
-        case _ => builder.open()
-      }
-
-      store.rollback()
-      store
-    }
-    catch {
-      case e: IllegalStateException if e.getMessage.contains("corrupt") =>
-        throw new IllegalStateException("wallet.password is incorrect or " + e.getMessage)
-    }
-  }
-
-  def createWithStore[A <: AutoCloseable with VersionableStorage](storeFile: Option[File], f: => A, pred: A => Boolean = (_: A) => true, deleteExisting: Boolean = false): Try[A] = Try {
-    for (fileToDelete <- storeFile if deleteExisting) Files.delete(fileToDelete.toPath)
-    val a = f
-    if (a.isVersionValid && pred(a)) a else storeFile match {
-      case Some(file) =>
-        log.info(s"Re-creating file store at $file")
-        a.close()
-        Files.delete(file.toPath)
-        val newA = f
-        require(pred(newA), "store is inconsistent")
-        newA
-      case None => throw new IllegalArgumentException("in-memory store is corrupted")
+  def createWithVerification[A <: Storage with VersionedStorage](storage: => A): Try[A] = Try {
+    if (storage.isVersionValid) storage else {
+      log.info(s"Re-creating storage")
+      val b = storage.createBatch()
+      storage.removeEverything(b)
+      storage.commit(b)
+      storage
     }
   }
 

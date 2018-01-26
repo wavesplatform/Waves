@@ -16,6 +16,9 @@ case class MatcherSettings(enable: Boolean,
                            port: Int,
                            minOrderFee: Long,
                            orderMatchTxFee: Long,
+                           dataDir: String,
+                           levelDbCacheSize: Long,
+                           isMigrateToNewOrderHistoryStorage: Boolean,
                            journalDataDir: String,
                            snapshotsDataDir: String,
                            snapshotsInterval: FiniteDuration,
@@ -25,19 +28,14 @@ case class MatcherSettings(enable: Boolean,
                            priceAssets: Seq[String],
                            predefinedPairs: Seq[AssetPair],
                            maxTimestampDiff: FiniteDuration,
-                           orderHistoryFile: Option[File],
-                           isMigrateToNewOrderHistoryStorage: Boolean,
                            blacklistedAssets: Set[String],
                            blacklistedNames: Seq[Regex],
-                           txHistoryFile: Option[File],
                            maxOrdersPerRequest: Int,
-                           blacklistedAdresses: Set[String]
-                          )
+                           blacklistedAddresses: Set[String])
 
 
 object MatcherSettings {
   val configPath: String = "waves.matcher"
-  import com.wavesplatform.settings.fileReader
 
   def fromConfig(config: Config): MatcherSettings = {
     val enabled = config.as[Boolean](s"$configPath.enable")
@@ -46,6 +44,8 @@ object MatcherSettings {
     val port = config.as[Int](s"$configPath.port")
     val minOrderFee = config.as[Long](s"$configPath.min-order-fee")
     val orderMatchTxFee = config.as[Long](s"$configPath.order-match-tx-fee")
+    val dataDirectory = config.as[String](s"$configPath.data-directory")
+    val levelDbCacheSize = config.getBytes(s"$configPath.leveldb-cache-size")
     val journalDirectory = config.as[String](s"$configPath.journal-directory")
     val snapshotsDirectory = config.as[String](s"$configPath.snapshots-directory")
     val snapshotsInterval = config.as[FiniteDuration](s"$configPath.snapshots-interval")
@@ -59,19 +59,16 @@ object MatcherSettings {
     }
     val maxTimestampDiff = config.as[FiniteDuration](s"$configPath.max-timestamp-diff")
 
-    val orderHistoryFile = config.getAs[File](s"$configPath.order-history-file")
-    val txHistoryFile = config.getAs[File](s"$configPath.tx-history-file")
-
-    val isMigrateToNewOrderHistoryStorage = !orderHistoryFile.exists(_.exists())
-
     val blacklistedAssets = config.as[List[String]](s"$configPath.blacklisted-assets")
     val blacklistedNames = config.as[List[String]](s"$configPath.blacklisted-names").map(_.r)
 
     val blacklistedAddresses = config.as[List[String]](s"$configPath.blacklisted-addresses")
 
-    MatcherSettings(enabled, account, bindAddress, port, minOrderFee, orderMatchTxFee, journalDirectory,
-      snapshotsDirectory, snapshotsInterval, orderCleanupInterval, orderHistoryCommitInterval, maxOpenOrders, baseAssets, basePairs, maxTimestampDiff,
-      orderHistoryFile, isMigrateToNewOrderHistoryStorage, blacklistedAssets.toSet, blacklistedNames, txHistoryFile,
-      maxOrdersPerRequest, blacklistedAddresses.toSet)
+    val isMigrateToNewOrderHistoryStorage = !new File(dataDirectory).exists()
+
+    MatcherSettings(enabled, account, bindAddress, port, minOrderFee, orderMatchTxFee, dataDirectory, levelDbCacheSize,
+      isMigrateToNewOrderHistoryStorage, journalDirectory, snapshotsDirectory, snapshotsInterval, orderCleanupInterval,
+      orderHistoryCommitInterval, maxOpenOrders, baseAssets, basePairs, maxTimestampDiff, blacklistedAssets.toSet,
+      blacklistedNames, maxOrdersPerRequest, blacklistedAddresses.toSet)
   }
 }
