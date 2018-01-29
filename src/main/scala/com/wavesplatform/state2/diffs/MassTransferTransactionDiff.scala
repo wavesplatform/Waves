@@ -3,15 +3,15 @@ package com.wavesplatform.state2.diffs
 import cats.implicits._
 import com.wavesplatform.state2._
 import com.wavesplatform.state2.reader.SnapshotStateReader
-import scorex.account.Address
+import scorex.account.{Address, AddressOrAlias}
 import scorex.transaction.ValidationError
-import scorex.transaction.ValidationError.GenericError
+import scorex.transaction.ValidationError.{GenericError, Validation}
 import scorex.transaction.assets.MassTransferTransaction
 
 object MassTransferTransactionDiff {
 
   def apply(state: SnapshotStateReader, blockTime: Long, height: Int)(tx: MassTransferTransaction): Either[ValidationError, Diff] = {
-    val portfoliosEi = MassTransferTransaction.processRecipientsWith(tx.transfers) { (recipient, amount) =>
+    def parseTransfer(recipient: AddressOrAlias, amount: Long): Validation[(Map[Address, Portfolio], Long)] = {
       for {
         recipientAddr <- state.resolveAliasEi(recipient)
         portfolio = tx.assetId match {
@@ -20,6 +20,7 @@ object MassTransferTransactionDiff {
         }
       } yield (portfolio, amount)
     }
+    val portfoliosEi = tx.transfers.traverse(Function.tupled(parseTransfer _))
 
     portfoliosEi.flatMap { list: List[(Map[Address, Portfolio], Long)] =>
       val sender = Address.fromPublicKey(tx.sender.publicKey)

@@ -32,9 +32,7 @@ object TransactionFactory {
   def massTransferAsset(request: MassTransferRequest, wallet: Wallet, time: Time): Either[ValidationError, MassTransferTransaction] =
     for {
       senderPrivateKey <- wallet.findWallet(request.sender)
-      recipients <- MassTransferTransaction.processRecipientsWith(request.transfers) {
-        case (address, amount) => AddressOrAlias.fromString(address).map((_, amount))
-      }
+      recipients <- MassTransferTransaction.parseTransfersList(request.transfers)
       tx <- MassTransferTransaction.create(
         request.assetId.map(s => ByteStr.decodeBase58(s).get),
         senderPrivateKey,

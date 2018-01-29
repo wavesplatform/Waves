@@ -121,6 +121,8 @@ object MassTransferTransaction {
     }
   }
 
-  def processRecipientsWith[T, R](recipients: List[(T, Long)])(f: (T, Long) => Validation[R]): Validation[List[R]] =
-    recipients.map { case (value, amount) => f(value, amount) }.sequence
+  def parseTransfersList(transfers: List[(String, Long)]): Validation[List[(AddressOrAlias, Long)]] = {
+    def parseTransfer(address: String, amount: Long): Validation[(AddressOrAlias, Long)] = AddressOrAlias.fromString(address).map((_, amount))
+    transfers.traverse(Function.tupled(parseTransfer _))
+  }
 }

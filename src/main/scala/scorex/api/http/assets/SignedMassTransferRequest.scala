@@ -2,7 +2,7 @@ package scorex.api.http.assets
 
 import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import play.api.libs.json.{Format, Json}
-import scorex.account.{AddressOrAlias, PublicKeyAccount}
+import scorex.account.PublicKeyAccount
 import scorex.api.http.BroadcastRequest
 import scorex.transaction.TransactionParser.SignatureStringLength
 import scorex.transaction.assets.{MassTransferTransaction, TransferTransaction}
@@ -32,7 +32,7 @@ case class SignedMassTransferRequest(@ApiModelProperty(value = "Base58 encoded s
     _assetId <- parseBase58ToOption(assetId.filter(_.length > 0), "invalid.assetId", AssetIdStringLength)
     _signature <- parseBase58(signature, "invalid.signature", SignatureStringLength)
     _attachment <- parseBase58(attachment.filter(_.length > 0), "invalid.attachment", TransferTransaction.MaxAttachmentStringSize)
-    _transfers <- MassTransferTransaction.processRecipientsWith(transfers) { (recipient, amount) => AddressOrAlias.fromString(recipient).map((_, amount)) }
+    _transfers <- MassTransferTransaction.parseTransfersList(transfers)
     t <- MassTransferTransaction.create(_assetId, _sender, _transfers, timestamp, fee, _attachment.arr, _signature)
   } yield t
 }

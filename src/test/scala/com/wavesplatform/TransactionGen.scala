@@ -182,18 +182,18 @@ trait TransactionGen {
     (assetId, sender, _, amount, timestamp, feeAssetId, feeAmount, attachment) <- transferParamGen
   } yield TransferTransaction.create(assetId, sender, sender, amount, timestamp, feeAssetId, feeAmount, attachment).right.get
 
-  val massTransferGen = (
-      for {
-        (assetId, sender, _, _, timestamp, _, feeAmount, attachment) <- transferParamGen
-        maxTransfers = MassTransferTransaction.MaxTransferCount
-        transferCount <- Gen.choose(0, maxTransfers)
-        transferGen = for {
-          recipient <- accountOrAliasGen
-          amount <- Gen.choose(1L, Long.MaxValue / maxTransfers)
-        } yield (recipient, amount)
-        recipients <- Gen.listOfN[(AddressOrAlias, Long)](transferCount, transferGen)
-      } yield MassTransferTransaction.create(assetId, sender, recipients, timestamp, feeAmount, attachment).right.get
-    ).label("massTransferTransaction")
+  val massTransferGen = {
+    import MassTransferTransaction.MaxTransferCount
+    for {
+      (assetId, sender, _, _, timestamp, _, feeAmount, attachment) <- transferParamGen
+      transferCount <- Gen.choose(0, MaxTransferCount)
+      transferGen = for {
+        recipient <- accountOrAliasGen
+        amount <- Gen.choose(1L, Long.MaxValue / MaxTransferCount)
+      } yield (recipient, amount)
+      recipients <- Gen.listOfN[(AddressOrAlias, Long)](transferCount, transferGen)
+    } yield MassTransferTransaction.create(assetId, sender, recipients, timestamp, feeAmount, attachment).right.get
+  }.label("massTransferTransaction")
 
   val MinIssueFee = 100000000
 
