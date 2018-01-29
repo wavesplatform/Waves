@@ -26,6 +26,17 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
       )) shouldBe Right(3)
   }
 
+  property("successful on x = y") {
+    ev(
+      CExpr(Some(LET("x", CONST_INT(3))),
+        CExpr(
+          Some(LET("y", REF("x"))),
+          SUM(REF("x"), REF("y"))
+        ))) shouldBe Right(6)
+  }
+
+
+
   property("successful on simple get") {
     ev(simpleDeclarationAndUsage(3)) shouldBe Right(3)
   }
