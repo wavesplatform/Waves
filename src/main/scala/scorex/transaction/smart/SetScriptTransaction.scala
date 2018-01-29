@@ -10,6 +10,7 @@ import scorex.serialization.Deser
 import scorex.transaction.TransactionParser.{KeyLength, TransactionType}
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction._
+import scorex.account.AddressScheme
 
 import scala.util.{Failure, Success, Try}
 
@@ -20,7 +21,9 @@ case class SetScriptTransaction private(version: Byte,
                                         timestamp: Long,
                                         proofs: Proofs) extends ProvenTransaction with FastHashId {
 
-  val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(version),
+  val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(
+    Array(version),
+    Array(AddressScheme.current.chainId),
     sender.publicKey,
     Deser.serializeArray(script.bytes().arr),
     Longs.toByteArray(fee),
@@ -41,12 +44,14 @@ object SetScriptTransaction {
 
   def parseTail(bytes: Array[Byte]): Try[SetScriptTransaction] = Try {
     val version = bytes(0)
-    val sender = PublicKeyAccount(bytes.slice(1, KeyLength + 1))
-    val (scriptBytes, scriptEnd) = Deser.parseArraySize(bytes, KeyLength + 1)
+    val chainId = bytes(1)
+    val sender = PublicKeyAccount(bytes.slice(2, KeyLength + 2))
+    val (scriptBytes, scriptEnd) = Deser.parseArraySize(bytes, KeyLength + 2)
     val fee = Longs.fromByteArray(bytes.slice(scriptEnd, scriptEnd + 8))
     val timestamp = Longs.fromByteArray(bytes.slice(scriptEnd + 8, scriptEnd + 16))
     (for {
-      _ <- Either.cond(version == 1, (), GenericError(s"Unsupported SetScriptTransaction version ${version.toInt}"))
+      _ <- Either.cond(chainId == AddressScheme.current.chainId, (), GenericError(s"Wrong chainId: $chainId but expected: ${AddressScheme.current.chainId}"))
+      _ <- Either.cond(version == 1, (), GenericError(s"Unsupported SetScriptTransaction version: ${version.toInt}"))
       script <- Script.fromBytes(scriptBytes)
       proofs <- Proofs.fromBytes(bytes.drop(scriptEnd + 16))
       tx <- create(sender, script, fee, timestamp, proofs)
