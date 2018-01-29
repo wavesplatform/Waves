@@ -16,7 +16,7 @@ object Terms {
   case object Id                    extends Field { val tpe: Type = BYTEVECTOR         }
   case object Type                  extends Field { val tpe: Type = INT                }
   case object SenderPk              extends Field { val tpe: Type = BYTEVECTOR         }
-//  case object AssetId               extends Field { val tpe: Type = OPTION(BYTEVECTOR) }
+  case object AssetId               extends Field { val tpe: Type = OPTION(BYTEVECTOR) }
   case object BodyBytes             extends Field { val tpe: Type = BYTEVECTOR         }
   case object Proof_0               extends Field { val tpe: Type = BYTEVECTOR         }
   case object Proof_1               extends Field { val tpe: Type = BYTEVECTOR         }
