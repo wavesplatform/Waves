@@ -68,7 +68,7 @@ case class OrderHistoryImpl(db: DB, settings: MatcherSettings) extends SubStorag
         val prev = OrderIdsCodec.decode(valueBytes).explicitGet().value
         var r = prev
         if (prev.length >= settings.maxOrdersPerRequest) {
-          val (p1, p2) = prev.span(!orderStatus(_).isInstanceOf[LimitOrder.Cancelled])
+          val (p1, p2) = prev.span(!orderStatus(_).isFinal)
           r = if (p2.isEmpty) p1 else p1 ++ p2.tail
         }
         put(makeKey(AddressToOrdersPrefix, address), OrderIdsCodec.encode(r :+ orderId))
@@ -154,7 +154,7 @@ case class OrderHistoryImpl(db: DB, settings: MatcherSettings) extends SubStorag
 
   override def ordersByAddress(address: String): Set[String] = {
     get(makeKey(AddressToOrdersPrefix, address)).map(OrderIdsCodec.decode).map(_.explicitGet().value)
-      .map(_.takeRight(settings.maxOrdersPerRequest).toSet).getOrElse(Set())
+      .map(_.toSet).getOrElse(Set())
   }
 
   override def deleteOrder(address: String, orderId: String): Boolean = {
