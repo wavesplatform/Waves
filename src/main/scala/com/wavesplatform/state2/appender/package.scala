@@ -14,6 +14,7 @@ import scorex.consensus.TransactionsOrdering
 import scorex.transaction.PoSCalc.{calcBaseTarget, calcGeneratorSignature, calcHit, calcTarget, _}
 import scorex.transaction.ValidationError.{BlockFromFuture, GenericError}
 import scorex.transaction._
+import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.utils.{ScorexLogging, Time}
 
 import scala.util.{Left, Right}
@@ -21,6 +22,7 @@ import scala.util.{Left, Right}
 package object appender extends ScorexLogging {
 
   private val MaxTimeDrift: Long = 100 // millis
+  private val ComplexityLimit = 1000
 
   private val correctBlockId1 = ByteStr.decodeBase58("2GNCYVy7k3kEPXzz12saMtRDeXFKr8cymVsG8Yxx3sZZ75eHj9csfXnGHuuJe7XawbcwjKdifUrV1uMq4ZNCWPf1").get
   private val correctBlockId2 = ByteStr.decodeBase58("5uZoDnRKeWZV9Thu2nvJVZ5dBvPB7k2gvpzFD618FMXCbBVBMN2rRyvKBZBhAGnGdgeh2LXEeSr9bJqruJxngsE7").get
@@ -75,6 +77,8 @@ package object appender extends ScorexLogging {
     val blockTime = block.timestamp
     val generator = block.signerData.generator
 
+    lazy val txsComplexity = complexity(block.transactionData)
+    lazy val limitBlockSizeByBytes = fp.isFeatureActivated(BlockchainFeatures.MassTransfer, history.height())
     val r: Either[ValidationError, Unit] = for {
       height <- history.heightOf(block.reference).toRight(GenericError(s"history does not contain parent ${block.reference}"))
       _ <- Either.cond(height > fs.blockVersion3AfterHeight
@@ -82,6 +86,7 @@ package object appender extends ScorexLogging {
         || block.version == Block.PlainBlockVersion,
         (), GenericError(s"Block Version 3 can only appear at height greater than ${fs.blockVersion3AfterHeight}"))
       _ <- Either.cond(blockTime - currentTs < MaxTimeDrift, (), BlockFromFuture(blockTime))
+      _ <- Either.cond(!limitBlockSizeByBytes || txsComplexity <= ComplexityLimit, (), GenericError(s"Block is too complex: $txsComplexity, the limit is $ComplexityLimit"))
       _ <- Either.cond(blockTime < fs.requireSortedTransactionsAfter
         || height > fs.dontRequireSortedTransactionsAfter
         || block.transactionData.sorted(TransactionsOrdering.InBlock) == block.transactionData,
@@ -106,6 +111,26 @@ package object appender extends ScorexLogging {
       case GenericError(x) => GenericError(s"Block $block is invalid: $x")
       case x => x
     }
+  }
+
+  private def complexity(txs: Iterable[Transaction]): Int = {
+    import scorex.transaction.assets._
+    import scorex.transaction.lease._
+
+    def complexity(tx: Transaction): Int = tx match {
+      case _: BurnTransaction => 1
+      case _: CreateAliasTransaction => 1
+      case _: ExchangeTransaction => 3
+      case _: GenesisTransaction => 1
+      case _: IssueTransaction => 1
+      case _: LeaseCancelTransaction => 1
+      case _: LeaseTransaction => 1
+      case _: PaymentTransaction => 1
+      case _: ReissueTransaction => 1
+      case _: TransferTransaction => 1
+    }
+
+    txs.view.map(complexity).sum
   }
 
 }
