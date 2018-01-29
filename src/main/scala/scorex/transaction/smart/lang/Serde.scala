@@ -19,7 +19,7 @@ object Serde {
   implicit def fProof_2               = f[ByteVector].bind[Proof_2.type](6)
   implicit def f__satisfy_shapeless_0 = f[Boolean].bind[__satisfy_shapeless_0.type](999)
 
-  implicit def d[A]             = Discriminated[Term, Int](uint8)
+  implicit def d[A]             = Discriminated[Expr, Int](uint8)
   implicit def dConstInt        = d[Int].bind[CONST_INT](0)
   implicit def dConstByteVector = d[ByteVector].bind[CONST_BYTEVECTOR](1)
   implicit def dSum             = d[Int].bind[SUM](2)
@@ -34,8 +34,8 @@ object Serde {
   implicit def dField[A]        = d[A].bind[TX_FIELD](11)
 
   implicit def dLet[A]       = d[A].bind[LET](12)
-  implicit def dComposite[A] = d[A].bind[COMPOSITE](13)
-  implicit def dRef    = d.bind[REF](13)
+  implicit def dComposite[A] = d[A].bind[CExpr](13)
+  implicit def dRef    = d.bind[REF](14)
 
-  val codec = Codec[Term]
+  val codec = Codec[Expr]
 }

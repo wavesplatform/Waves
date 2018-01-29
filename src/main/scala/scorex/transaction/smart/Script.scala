@@ -7,7 +7,7 @@ import scodec.DecodeResult
 import scorex.transaction.ValidationError.ScriptParseError
 import scorex.transaction.smart.lang.Terms._
 
-case class Script(script: Term) {
+case class Script(script: Expr) {
   val bytes: Coeval[ByteStr] = Coeval.evalOnce(ByteStr(scorex.transaction.smart.lang.Serde.codec.encode(script).require.toByteArray))
   val version = 1
   val text: String = script.toString
@@ -17,7 +17,7 @@ case class Script(script: Term) {
 
 object Script {
   def fromBytes(arr: Array[Byte]): Either[ScriptParseError, Script] = scorex.transaction.smart.lang.Serde.codec.decode(scodec.bits.BitVector(arr)) match {
-    case Successful(value: DecodeResult[Term]) => Right(Script(value.value))
+    case Successful(value: DecodeResult[Expr]) => Right(Script(value.value))
     case Failure(cause) => Left(ScriptParseError(cause.toString))
   }
 

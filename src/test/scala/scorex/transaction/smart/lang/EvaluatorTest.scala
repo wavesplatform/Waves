@@ -9,43 +9,71 @@ import scorex.transaction.smart.lang.Terms._
 
 class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 
-  def ev(c: Term) = Evaluator.apply(Context(0, null, Map.empty), c)
+  private def ev(c: Expr) = {
+    val codec = Serde.codec
+    val c2 = codec.decode(codec.encode(c).require).require.value
+    Evaluator.apply(Context(0, null, Map.empty), c2)
+  }
 
-  property("simple let") {
+  property("successful on unused let") {
     ev(
-      COMPOSITE(
+      CExpr(
         Some(LET("x", CONST_INT(3))),
-        EQ_INT(REF("x"), CONST_INT(3))
-      )) shouldBe Right(true)
+        CONST_INT(3)
+      )) shouldBe Right(3)
+  }
 
+  property("successful on simple get") {
     ev(
-      COMPOSITE(
+      CExpr(
+        Some(LET("x", CONST_INT(3))),
+        REF("x")
+      )) shouldBe Right(3)
+
+  }
+  property("successful on get used further in expr") {
+    ev(
+      CExpr(
         Some(LET("x", CONST_INT(3))),
         EQ_INT(REF("x"), CONST_INT(2))
       )) shouldBe Right(false)
   }
 
-  property("multiple lets") {
+  property("successful on multiple lets") {
     ev(
-      COMPOSITE(
+      CExpr(
         Some(LET("x", CONST_INT(3))),
-        COMPOSITE(Some(LET("y", CONST_INT(3))), EQ_INT(REF("x"), REF("y")))
+        CExpr(Some(LET("y", CONST_INT(3))), EQ_INT(REF("x"), REF("y")))
       )) shouldBe Right(true)
   }
 
-  property("multiple lets with expression") {
+  property("successful on multiple lets with expression") {
     ev(
-      COMPOSITE(
+      CExpr(
         Some(LET("x", CONST_INT(3))),
-        COMPOSITE(Some(LET("y", SUM(CONST_INT(3), CONST_INT(0)))), EQ_INT(REF("x"), REF("y")))
+        CExpr(Some(LET("y", SUM(CONST_INT(3), CONST_INT(0)))), EQ_INT(REF("x"), REF("y")))
       )) shouldBe Right(true)
+  }
+
+  property("successful on same value names in different branches") {
+    ev(
+      IF(EQ_INT(CONST_INT(1), CONST_INT(2)), CExpr(Some(LET("x", CONST_INT(3))), CONST_INT(500)), CExpr(Some(LET("x", CONST_INT(3))), CONST_INT(501)))
+    ) shouldBe Right(501)
+  }
+
+  property("fails if override") {
+    ev(
+      CExpr(
+        Some(LET("x", CONST_INT(3))),
+        CExpr(Some(LET("x", SUM(CONST_INT(3), CONST_INT(0)))), EQ_INT(REF("x"), REF("y")))
+      )) should produce("already defined")
   }
 
   property("fails if types do not match") {
     ev(
-      COMPOSITE(
+      CExpr(
         Some(LET("x", CONST_INT(3))),
-        COMPOSITE(Some(LET("y", EQ_INT(CONST_INT(3), CONST_INT(0)))), EQ_INT(REF("x"), REF("y")))
+        CExpr(Some(LET("y", EQ_INT(CONST_INT(3), CONST_INT(0)))), EQ_INT(REF("x"), REF("y")))
       )) should produce("cannot be cast")
   }
 
