@@ -9,19 +9,36 @@ import scala.util.{Failure, Success, Try}
 
 object Evaluator {
 
-  case class Context(height: Int, tx: ProvenTransaction, defs: Map[String, (Type, Any)]) {
+  type Defs = Map[String, (Type, Any)]
 
-    private def typeof(t: Expr): Option[Type] = t match {
-      case ref: REF => defs.get(ref.key).map(_._1)
-      case x        => x.knownType
-    }
+  case class Context(height: Int, tx: ProvenTransaction, defs: Defs)
 
-    def resolveType(t: Expr): Either[ExcecutionError, Type] = typeof(t) match {
-      case None           => Left(s"Cannot resolve type of $t")
-      case Some(tt: Type) => Right(tt)
-    }
+  def resolveType(defs: Defs, t: Expr): Either[TypeResolutionError, Type] = t match {
+    case REF(key) => defs.get(key).map(_._1).toRight(s"Typecheck failed: Cannot resolve type of $key")
+    case CExpr(maybeLet, expr) =>
+      maybeLet match {
+        case Some(let) =>
+          for {
+            innerType <- resolveType(defs, let.value)
+            result    <- resolveType(defs + (let.name -> (innerType, null)), expr)
+          } yield result
+        case None => resolveType(defs, expr)
+      }
+    case IF(_, r, l) =>
+      for {
+        rType <- resolveType(defs, r)
+        lType <- resolveType(defs, l)
+        _     <- Either.cond(rType == lType, (), s"Typecheck failed: RType($rType) differs from LType($lType)")
+      } yield rType
+    case get: GET =>
+      resolveType(defs, get.t) flatMap {
+        case OPTION(in) => Right(in)
+        case x          => Left(s"Typecheck failed: GET called on $x, but only call on OPTION is allowed")
+      }
+    case x => Right(x.predefinedType.get)
   }
 
+  type TypeResolutionError = String
   type ExcecutionError     = String
   type EitherExecResult[T] = Either[ExcecutionError, T]
 
@@ -36,18 +53,18 @@ object Evaluator {
       (t match {
         case CExpr(maybelet, inner) =>
           maybelet match {
-            case None => ctx.resolveType(inner).flatMap(termType => r[termType.Underlying](ctx, inner))
+            case None => resolveType(ctx.defs, inner).flatMap(termType => r[termType.Underlying](ctx, inner))
             case Some(LET(newVarName: String, newVarExpr: CExpr)) =>
               for {
-                newVarType  <- ctx.resolveType(newVarExpr)
+                newVarType  <- resolveType(ctx.defs, newVarExpr)
                 newVarValue <- r[newVarType.Underlying](ctx, newVarExpr)
                 _           <- Either.cond(ctx.defs.get(newVarName).isEmpty, (), s"Value '$newVarName' already defined in the scope")
-                newCtx = ctx.copy(defs = ctx.defs + (newVarName -> (newVarType, newVarValue)))
-                termType <- newCtx.resolveType(inner)
-                res      <- r[termType.Underlying](newCtx, inner)
+                newDefs = ctx.defs + (newVarName -> (newVarType, newVarValue))
+                termType <- resolveType(newDefs, inner)
+                res      <- r[termType.Underlying](ctx.copy(defs = newDefs), inner)
               } yield res
           }
-        case LET(name, v) => ctx.resolveType(v).flatMap(rType => r[rType.Underlying](ctx, v))
+        case LET(name, v) => resolveType(ctx.defs, v).flatMap(rType => r[rType.Underlying](ctx, v))
         case REF(str) =>
           ctx.defs.get(str) match {
             case Some((x, y)) => Right(y.asInstanceOf[x.Underlying])
@@ -70,16 +87,13 @@ object Evaluator {
             a1 <- r[Int](ctx, t1)
             a2 <- r[Int](ctx, t2)
           } yield a1 > a2
-        case IF(cond, t1, t2) =>
-          for {
-            tt1 <- ctx.resolveType(t1)
-            tt2 <- ctx.resolveType(t2)
-            _   <- Either.cond(tt1 == tt2, (), "Type mismatch")
-            x <- r[Boolean](ctx, cond) flatMap {
-              case true  => ctx.resolveType(t1).flatMap(t1type => r[t1type.Underlying](ctx, t1))
-              case false => ctx.resolveType(t2).flatMap(t2type => r[t2type.Underlying](ctx, t2))
+        case i @ IF(cond, t1, t2) =>
+          resolveType(ctx.defs, i).flatMap { _ =>
+            r[Boolean](ctx, cond) flatMap {
+              case true  => r(ctx, t1)
+              case false => r(ctx, t2)
             }
-          } yield x
+          }
         case AND(t1, t2) =>
           r[Boolean](ctx, t1) match {
             case Left(err)    => Left(err)
@@ -126,10 +140,10 @@ object Evaluator {
       }).map(_.asInstanceOf[T])
 
     lazy val result = r[A](c, term)
-        Try(result) match {
-          case Failure(ex)  => Left(ex.toString)
-          case Success(res) => res
-        }
+    Try(result) match {
+      case Failure(ex)  => Left(ex.toString)
+      case Success(res) => res
+    }
 
   }
 }

@@ -4,6 +4,7 @@ import com.wavesplatform.{NoShrink, ScriptGen}
 import com.wavesplatform.state2.diffs._
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
+import scodec.bits.ByteVector
 import scorex.transaction.smart.lang.Evaluator.Context
 import scorex.transaction.smart.lang.Terms._
 
@@ -11,9 +12,11 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
 
   private def ev(c: Expr) = {
     val codec = Serde.codec
-    val c2 = codec.decode(codec.encode(c).require).require.value
+    val c2    = codec.decode(codec.encode(c).require).require.value
     Evaluator.apply(Context(0, null, Map.empty), c2)
   }
+
+  private def simpleDeclarationAndUsage(i: Int) = CExpr(Some(LET("x", CONST_INT(i))), REF("x"))
 
   property("successful on unused let") {
     ev(
@@ -24,13 +27,9 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
   }
 
   property("successful on simple get") {
-    ev(
-      CExpr(
-        Some(LET("x", CONST_INT(3))),
-        REF("x")
-      )) shouldBe Right(3)
-
+    ev(simpleDeclarationAndUsage(3)) shouldBe Right(3)
   }
+
   property("successful on get used further in expr") {
     ev(
       CExpr(
@@ -55,10 +54,16 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
       )) shouldBe Right(true)
   }
 
+  property("successful on deep type resolution") {
+    ev(
+      IF(EQ_INT(CONST_INT(1), CONST_INT(2)), simpleDeclarationAndUsage(3), CONST_INT(4))
+    ) shouldBe Right(4)
+  }
+
   property("successful on same value names in different branches") {
     ev(
-      IF(EQ_INT(CONST_INT(1), CONST_INT(2)), CExpr(Some(LET("x", CONST_INT(3))), CONST_INT(500)), CExpr(Some(LET("x", CONST_INT(3))), CONST_INT(501)))
-    ) shouldBe Right(501)
+      IF(EQ_INT(CONST_INT(1), CONST_INT(2)), simpleDeclarationAndUsage(3), simpleDeclarationAndUsage(4))
+    ) shouldBe Right(4)
   }
 
   property("fails if override") {
@@ -79,5 +84,11 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
 
   property("fails if definition not found") {
     ev(EQ_INT(REF("x"), CONST_INT(2))) should produce("Definition 'x' not found")
+  }
+
+  property("fails if 'IF' branches lead to different types") {
+    ev(
+      IF(EQ_INT(CONST_INT(1), CONST_INT(2)), CONST_INT(0), CONST_BYTEVECTOR(ByteVector.empty))
+    ) should produce("Typecheck failed: RType")
   }
 }

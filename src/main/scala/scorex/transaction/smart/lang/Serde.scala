@@ -32,10 +32,11 @@ object Serde {
   implicit def dSigVerify       = d[Boolean].bind[SIG_VERIFY](9)
   implicit def dHeight          = d[Int].bind[HEIGHT.type](10)
   implicit def dField[A]        = d[A].bind[TX_FIELD](11)
-
   implicit def dLet[A]       = d[A].bind[LET](12)
   implicit def dComposite[A] = d[A].bind[CExpr](13)
-  implicit def dRef    = d.bind[REF](14)
+  implicit def dRef          = d.bind[REF](14)
+  implicit def dGet[A]       = d[A].bind[GET](15)
+  implicit def dIsDefined    = d.bind[IS_DEFINED](16)
 
   val codec = Codec[Expr]
 }
