@@ -5,7 +5,7 @@ import scorex.transaction.smart.lang.Terms._
 object CostCalculator {
   val MaxCost = 1000
 
-  def apply(t: Term[_]): Int = t match {
+  def apply(t: Term): Int = t match {
     case CONST_INT(_)              => 1
     case HEIGHT                    => 1
     case CONST_BYTEVECTOR(_)       => 1

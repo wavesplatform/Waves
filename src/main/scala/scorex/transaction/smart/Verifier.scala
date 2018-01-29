@@ -18,7 +18,7 @@ object Verifier {
     }
   }
 
-  def verify[T <: ProvenTransaction](script: Script, height: Int, transaction: T): Either[ValidationError, T] = Evaluator.apply(Context(height, transaction), script.script) match {
+  def verify[T <: ProvenTransaction](script: Script, height: Int, transaction: T): Either[ValidationError, T] = Evaluator.apply[Boolean](Context(height, transaction), script.script) match {
     case Left(execError) => Left(GenericError(s"Script execution error: $execError"))
     case Right(false) => Left(TransactionNotAllowedByScript(transaction))
     case Right(true) => Right(transaction)

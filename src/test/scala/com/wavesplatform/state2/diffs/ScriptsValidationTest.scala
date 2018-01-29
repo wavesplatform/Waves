@@ -19,7 +19,7 @@ class ScriptsValidationTest extends PropSpec with PropertyChecks with Matchers w
 
   property("transfer is allowed but lease is not due to predicate") {
 
-    val onlySend: BOOL = AND(
+    val onlySend: Term = AND(
       OR(EQ_INT(TX_FIELD(Type), CONST_INT(4)), EQ_INT(TX_FIELD(Type), CONST_INT(11))),
       SIG_VERIFY(TX_FIELD(BodyBytes), TX_FIELD(Proof_0), TX_FIELD(SenderPk))
     )

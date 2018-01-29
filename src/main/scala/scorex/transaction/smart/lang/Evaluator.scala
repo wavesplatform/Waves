@@ -19,40 +19,41 @@ object Evaluator {
       Try(ByteVector(proofs.proofs(idx).arr).asInstanceOf[T]).toEither.left.map(_.toString)
     else Right(ByteVector.empty.asInstanceOf[T])
 
-  def apply[A](ctx: Context, term: Term[A]): EitherExecResult[A] = {
-    def r[T](t: Term[T]): EitherExecResult[T] = (t match {
+  def apply[A](ctx: Context, term: Term): EitherExecResult[A] = {
+    def r[T](t: Term): EitherExecResult[T] = (t match {
       case CONST_INT(v) => Right(v)
       case CONST_BYTEVECTOR(v) => Right(v)
       case SUM(t1, t2) => for {
-        a1 <- r(t1)
-        a2 <- r(t2)
+        a1 <- r[Int](t1)
+        a2 <- r[Int](t2)
       } yield a1 + a2
       case GE(t1, t2) => for {
-        a1 <- r(t1)
-        a2 <- r(t2)
+        a1 <- r[Int](t1)
+        a2 <- r[Int](t2)
       } yield a1 >= a2
       case GT(t1, t2) => for {
-        a1 <- r(t1)
-        a2 <- r(t2)
+        a1 <- r[Int](t1)
+        a2 <- r[Int](t2)
       } yield a1 > a2
-      case IF(cond, t1, t2) => r(cond) flatMap {
-        case true => r(t1)
-        case false => r(t2)
-      }
+      case IF(cond, t1, t2) => if (t1.tpe == t2.tpe)
+        r[Boolean](cond) flatMap {
+          case true => r(t1)
+          case false => r(t2)
+        } else Left("Bad types")
       case AND(t1, t2) =>
-        r(t1) match {
+        r[Boolean](t1) match {
           case Left(err) => Left(err)
           case Right(false) => Right(false)
-          case Right(true) => r(t2) match {
+          case Right(true) => r[Boolean](t2) match {
             case Left(err) => Left(err)
             case Right(v) => Right(v)
           }
         }
       case OR(t1, t2) =>
-        r(t1) match {
+        r[Boolean](t1) match {
           case Left(err) => Left(err)
           case Right(true) => Right(true)
-          case Right(false) => r(t2) match {
+          case Right(false) => r[Boolean](t2) match {
             case Left(err) => Left(err)
             case Right(v) => Right(v)
           }
@@ -69,16 +70,16 @@ object Evaluator {
         case _ => ??? // match for  __satisfy_shapeless_0
       }
       case EQ_INT(it1, it2) => for {
-        i1 <- r(it1)
-        i2 <- r(it2)
+        i1 <- r[Int](it1)
+        i2 <- r[Int](it2)
       } yield i1 == i2
       case SIG_VERIFY(msg, sig, pk) => for {
-        s <- r(sig)
-        m <- r(msg)
-        p <- r(pk)
+        s <- r[ByteVector](sig)
+        m <- r[ByteVector](msg)
+        p <- r[ByteVector](pk)
       } yield Curve25519.verify(s.toArray, m.toArray, p.toArray)
     }).map(_.asInstanceOf[T])
 
-    r(term)
+    r[A](term)
   }
 }
