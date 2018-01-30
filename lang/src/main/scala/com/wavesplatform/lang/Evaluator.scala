@@ -142,6 +142,8 @@ object Evaluator {
             case _ => Left("GET invoked on non-option type")
           }
         } yield res
+      case TRUE  => Right(true)
+      case FALSE => Right(false)
       // impure calls
       case HEIGHT => ctx.domain.height
       case TX_FIELD(f) =>

@@ -8,6 +8,7 @@ libraryDependencies ++= Seq(
   "io.monix" %% "monix" % "3.0.0-M3",
   "org.scodec" %% "scodec-core" % "1.10.3",
   "org.scalacheck" %% "scalacheck" % "1.13.5",
+  "com.lihaoyi" %% "fastparse" % "1.0.0",
   "io.github.amrhassan" %% "scalacheck-cats" % "0.4.0" % Test
 )
 

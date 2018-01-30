@@ -23,23 +23,24 @@ object Terms {
     val predefinedType: Option[Type]
   }
 
-  case class CONST_INT(t: Int)                                              extends Expr { val predefinedType: Option[Type]          = Some(INT)        }
-  case class CONST_BYTEVECTOR(bs: ByteVector)                               extends Expr { val predefinedType: Option[Type]          = Some(BYTEVECTOR) }
-  case class SUM(i1: CExpr, i2: CExpr)                                      extends Expr { val predefinedType: Option[Type]          = Some(INT)        }
-  case class AND(t1: CExpr, t2: CExpr)                                      extends Expr { val predefinedType: Option[Type]          = Some(BOOLEAN)    }
-  case class OR(t1: CExpr, t2: CExpr)                                       extends Expr { val predefinedType: Option[Type]          = Some(BOOLEAN)    }
-  case class EQ_INT(t1: Expr, t2: CExpr)                                    extends Expr { val predefinedType: Option[Type]          = Some(BOOLEAN)    }
-  case class GT(t1: CExpr, t2: CExpr)                                       extends Expr { val predefinedType: Option[Type]          = Some(BOOLEAN)    }
-  case class GE(t1: CExpr, t2: CExpr)                                       extends Expr { val predefinedType: Option[Type]          = Some(BOOLEAN)    }
-  case class SIG_VERIFY(message: CExpr, signature: CExpr, publicKey: CExpr) extends Expr { val predefinedType: Option[Type]          = Some(BOOLEAN)    }
-  case object HEIGHT                                                        extends Expr { val predefinedType: Option[Type]          = Some(INT)        }
-  case class TX_FIELD(field: Field)                                         extends Expr { val predefinedType: Option[Type]          = Some(field.tpe)  }
-  case class IS_DEFINED(t: CExpr)                                           extends Expr { override val predefinedType: Option[Type] = Some(BOOLEAN)    }
-  case class LET(name: String, value: CExpr)                                extends Expr { val predefinedType: Option[Type]          = Some(UNIT)       } // subtype of Expr mostly for serde
-  case class CExpr(let: Option[LET], t: Expr)                               extends Expr { val predefinedType: Option[Type]          = None             }
-  case class IF(cond: CExpr, ifTrue: CExpr, ifFalse: CExpr)                 extends Expr { val predefinedType: Option[Type]          = None             }
-  case class REF(key: String)                                               extends Expr { val predefinedType: Option[Type]          = None             }
-  case class GET(t: CExpr)                                                  extends Expr { override val predefinedType: Option[Type] = None             }
-
+  case class CONST_INT(t: Int)                                              extends Expr { val predefinedType: Option[Type] = Some(INT)        }
+  case class CONST_BYTEVECTOR(bs: ByteVector)                               extends Expr { val predefinedType: Option[Type] = Some(BYTEVECTOR) }
+  case class SUM(i1: CExpr, i2: CExpr)                                      extends Expr { val predefinedType: Option[Type] = Some(INT)        }
+  case class AND(t1: CExpr, t2: CExpr)                                      extends Expr { val predefinedType: Option[Type] = Some(BOOLEAN)    }
+  case class OR(t1: CExpr, t2: CExpr)                                       extends Expr { val predefinedType: Option[Type] = Some(BOOLEAN)    }
+  case class EQ_INT(t1: Expr, t2: CExpr)                                    extends Expr { val predefinedType: Option[Type] = Some(BOOLEAN)    }
+  case class GT(t1: CExpr, t2: CExpr)                                       extends Expr { val predefinedType: Option[Type] = Some(BOOLEAN)    }
+  case class GE(t1: CExpr, t2: CExpr)                                       extends Expr { val predefinedType: Option[Type] = Some(BOOLEAN)    }
+  case class SIG_VERIFY(message: CExpr, signature: CExpr, publicKey: CExpr) extends Expr { val predefinedType: Option[Type] = Some(BOOLEAN)    }
+  case object HEIGHT                                                        extends Expr { val predefinedType: Option[Type] = Some(INT)        }
+  case class TX_FIELD(field: Field)                                         extends Expr { val predefinedType: Option[Type] = Some(field.tpe)  }
+  case class IS_DEFINED(t: CExpr)                                           extends Expr { val predefinedType: Option[Type] = Some(BOOLEAN)    }
+  case class LET(name: String, value: CExpr)                                extends Expr { val predefinedType: Option[Type] = Some(UNIT)       } // subtype of Expr mostly for serde
+  case class CExpr(let: Option[LET], t: Expr)                               extends Expr { val predefinedType: Option[Type] = None             }
+  case class IF(cond: CExpr, ifTrue: CExpr, ifFalse: CExpr)                 extends Expr { val predefinedType: Option[Type] = None             }
+  case class REF(key: String)                                               extends Expr { val predefinedType: Option[Type] = None             }
+  case class GET(t: CExpr)                                                  extends Expr { val predefinedType: Option[Type] = None             }
+  case object TRUE                                                          extends Expr { val predefinedType               = Some(BOOLEAN)    }
+  case object FALSE                                                         extends Expr { val predefinedType               = Some(BOOLEAN)    }
   implicit def term2compoiste(t: Expr): CExpr = CExpr(None, t)
 }
