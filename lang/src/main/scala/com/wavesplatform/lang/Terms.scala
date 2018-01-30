@@ -1,5 +1,4 @@
-package scorex.transaction.smart.lang
-
+package com.wavesplatform.lang
 import scodec.bits.ByteVector
 
 object Terms {
@@ -45,5 +44,5 @@ object Terms {
   case class GET(t: CExpr)                                                  extends Expr { override val predefinedType: Option[Type] = None             }
 
   implicit def term2compoiste(t: Expr): CExpr = CExpr(None, t)
-
 }
+

@@ -141,7 +141,10 @@ inConfig(Debian)(Seq(
   maintainerScripts := maintainerScriptsFromDirectory(packageSource.value / "debian", Seq("preinst", "postinst", "postrm", "prerm"))
 ))
 
+lazy val lang = project
+
 lazy val node = project.in(file("."))
+    .dependsOn(lang)
 
 lazy val discovery = project
 

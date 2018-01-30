@@ -1,6 +1,5 @@
-package scorex.transaction.smart.lang
+package com.wavesplatform.lang
 
-import com.wavesplatform.{NoShrink, ScriptGen}
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import scodec.bits.BitVector

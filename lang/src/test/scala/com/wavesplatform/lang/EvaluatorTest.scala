@@ -1,19 +1,17 @@
-package scorex.transaction.smart.lang
+package com.wavesplatform.lang
 
-import com.wavesplatform.{NoShrink, ScriptGen}
-import com.wavesplatform.state2.diffs._
-import org.scalatest.prop.PropertyChecks
+import com.wavesplatform.lang.Evaluator.Context
+import com.wavesplatform.lang.Terms._
 import org.scalatest.{Matchers, PropSpec}
+import org.scalatest.prop.PropertyChecks
 import scodec.bits.ByteVector
-import scorex.transaction.smart.lang.Evaluator.Context
-import scorex.transaction.smart.lang.Terms._
 
 class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 
   private def ev(c: Expr) = {
     val codec = Serde.codec
     val c2    = codec.decode(codec.encode(c).require).require.value
-    Evaluator.apply(Context(0, null, Map.empty), c2)
+    Evaluator.apply(Context(new HeightDomain(1), Map.empty), c2)
   }
 
   private def simpleDeclarationAndUsage(i: Int) = CExpr(Some(LET("x", CONST_INT(i))), REF("x"))

@@ -13,7 +13,7 @@ import scorex.transaction.{GenesisTransaction, Proofs}
 import scorex.transaction.assets.{ScriptTransferTransaction, TransferTransaction}
 import scorex.transaction.lease.LeaseTransaction
 import scorex.transaction.smart.{Script, SetScriptTransaction}
-import scorex.transaction.smart.lang.Terms._
+import com.wavesplatform.lang.Terms._
 
 class ScriptsValidationTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
 

@@ -1,9 +1,9 @@
-package scorex.transaction.smart.lang
+package com.wavesplatform.lang
 
+import com.wavesplatform.lang.Terms._
 import scodec._
 import scodec.bits._
-import codecs._
-import scorex.transaction.smart.lang.Terms._
+import scodec.codecs._
 
 object Serde {
 

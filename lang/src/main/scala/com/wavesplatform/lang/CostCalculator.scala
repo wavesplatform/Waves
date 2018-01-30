@@ -1,6 +1,6 @@
-package scorex.transaction.smart.lang
+package com.wavesplatform.lang
 
-import scorex.transaction.smart.lang.Terms._
+import com.wavesplatform.lang.Terms._
 
 object CostCalculator {
   val MaxCost = 1000

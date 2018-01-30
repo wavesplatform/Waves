@@ -1,8 +1,8 @@
-package com.wavesplatform
+package com.wavesplatform.lang
 
-import org.scalacheck.{Arbitrary, Gen}
+import com.wavesplatform.lang.Terms._
 import scodec.bits.ByteVector
-import scorex.transaction.smart.lang.Terms._
+import org.scalacheck._
 
 trait ScriptGen {
 
