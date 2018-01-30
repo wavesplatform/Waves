@@ -10,11 +10,16 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
 
   private def ev(c: Expr) = {
     val codec = Serde.codec
-    val c2    = codec.decode(codec.encode(c).require).require.value
-    Evaluator.apply(Context(new HeightDomain(1), Map.empty), c2)
+    //val c2    = codec.decode(codec.encode(c).require).require.value
+    Evaluator.apply(Context(new HeightDomain(1), Map.empty), c)
   }
 
   private def simpleDeclarationAndUsage(i: Int) = CExpr(Some(LET("x", CONST_INT(i))), REF("x"))
+
+  property("successful on very deep expressions (stack overflow check)") {
+    val term = (1 to 100000).foldLeft[Terms.Expr](CONST_INT(0))((acc, _) => SUM(acc, CONST_INT(1)))
+    ev(term) shouldBe Right(100000)
+  }
 
   property("successful on unused let") {
     ev(
