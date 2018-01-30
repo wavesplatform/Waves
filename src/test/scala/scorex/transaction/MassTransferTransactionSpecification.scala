@@ -42,11 +42,11 @@ class MassTransferTransactionSpecification extends PropSpec with PropertyChecks 
       case MassTransferTransaction(assetId, sender, transfers, timestamp, fee, attachment, signature) =>
         val tooManyTransfers = List.fill(MaxTransferCount + 1)((sender.toAddress, 1L))
         val tooManyTransfersEi = create(assetId, sender, tooManyTransfers, timestamp, fee, attachment, signature)
-        tooManyTransfersEi shouldBe Left(GenericError(s"Number of recipients is greater than $MaxTransferCount"))
+        tooManyTransfersEi shouldBe Left(GenericError(s"Number of transfers is greater than $MaxTransferCount"))
 
         val negativeTransfer = List((sender.toAddress, -1L))
         val negativeTransferEi = create(assetId, sender, negativeTransfer, timestamp, fee, attachment, signature)
-        negativeTransferEi shouldBe Left(GenericError("One of the transfers has negative value"))
+        negativeTransferEi shouldBe Left(GenericError("One of the transfers has negative amount"))
 
         val oneHalf = Long.MaxValue / 2 + 1
         val overflow = List.fill(2)((sender.toAddress, oneHalf))

@@ -6,6 +6,7 @@ import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import org.asynchttpclient.util.HttpConstants
 import play.api.libs.json.{JsArray, JsObject, JsValue, Json}
+import scorex.api.http.assets.MassTransferRequest
 import scorex.crypto.encode.Base58
 
 import scala.concurrent.Await
@@ -124,6 +125,15 @@ class TransactionsApiSuite extends BaseTransactionSuite {
       "attachment" -> Base58.encode("falafel".getBytes)))
   }
 
+  test("/transactions/sign should produce mass transfer transaction that is good for /transactions/broadcast") {
+    signAndBroadcast(Json.obj(
+      "type" -> 11,
+      "sender" -> firstAddress,
+      "transfers" -> Json.toJson(Seq((secondAddress, 1.waves), (thirdAddress, 2.waves))),
+      "fee" -> 200000,
+      "attachment" -> Base58.encode("masspay".getBytes)))
+  }
+
   test("/transactions/sign should produce lease/cancel transactions that are good for /transactions/broadcast") {
     val leaseId = signAndBroadcast(Json.obj(
       "type" -> 8,
@@ -159,6 +169,30 @@ class TransactionsApiSuite extends BaseTransactionSuite {
       _ = assert(id.nonEmpty)
       _ <- nodes.waitForHeightAraiseAndTxPresent(id)
     } yield id
+
+    Await.result(f, timeout)
+  }
+
+  test("reporting MassTransfer transactions") {
+    val transfers = List((secondAddress, 2.waves), (thirdAddress, 3.waves))
+    val f = for {
+      txId <- sender.massTransfer(firstAddress, transfers, 200000).map(_.id)
+      _ <- nodes.waitForHeightAraiseAndTxPresent(txId)
+
+      // /transactions/txInfo should return complete list of transfers
+      txInfo <- sender.get(s"/transactions/info/$txId").as[MassTransferRequest]
+      _ = assert(txInfo.transfers.size == 2)
+
+      // /transactions/address should return complete transfers list for the sender...
+      txSender <- sender.get(s"/transactions/address/$firstAddress/limit/1").as[JsArray].map(_.apply(0)(0))
+      _ = assert(txSender.as[MassTransferRequest].transfers.size == 2)
+
+      // ...and compact list for recipients
+      txRecipient <- sender.get(s"/transactions/address/$secondAddress/limit/1").as[JsArray].map(_.apply(0)(0))
+      _ = assert(txRecipient.as[MassTransferRequest].transfers.size == 1)
+      _ = assert((txRecipient \ "transferCount").as[Int] == 2)
+      _ = assert((txRecipient \ "totalAmount").as[Long] == 5.waves)
+    } yield succeed
 
     Await.result(f, timeout)
   }

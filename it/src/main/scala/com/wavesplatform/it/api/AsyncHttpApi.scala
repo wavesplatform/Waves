@@ -180,6 +180,9 @@ object AsyncHttpApi {
     def transfer(sourceAddress: String, recipient: String, amount: Long, fee: Long, assetId: Option[String] = None): Future[Transaction] =
       postJson("/assets/transfer", TransferRequest(assetId, None, amount, fee, sourceAddress, None, recipient)).as[Transaction]
 
+    def massTransfer(sourceAddress: String, transfers: List[(String, Long)], fee: Long, assetId: Option[String] = None): Future[Transaction] =
+      postJson("/assets/masstransfer", MassTransferRequest(assetId, sourceAddress, transfers, fee, None)).as[Transaction]
+
     def payment(sourceAddress: String, recipient: String, amount: Long, fee: Long): Future[Transaction] =
       postJson("/waves/payment", PaymentRequest(amount, fee, sourceAddress, recipient)).as[Transaction]
 
@@ -209,6 +212,10 @@ object AsyncHttpApi {
 
     def signedTransfer(transfer: SignedTransferRequest): Future[Transaction] =
       postJson("/assets/broadcast/transfer", transfer).as[Transaction]
+
+    def signedMassTransfer(req: SignedMassTransferRequest): Future[Transaction] = {
+      postJson("/transactions/broadcast", req).as[Transaction]
+    }
 
     def batchSignedTransfer(transfers: Seq[SignedTransferRequest], timeout: FiniteDuration = 1.minute): Future[Seq[Transaction]] = {
       val request = _post(s"${n.nodeApiEndpoint}/assets/broadcast/batch-transfer")
