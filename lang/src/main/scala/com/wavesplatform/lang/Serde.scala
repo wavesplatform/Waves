@@ -14,10 +14,8 @@ object Serde {
   implicit def fType                  = f[Int].bind[Type.type](1)
   implicit def fSenderPk              = f[ByteVector].bind[SenderPk.type](2)
   implicit def fBodyBytes             = f[ByteVector].bind[BodyBytes.type](3)
-  implicit def fProof_0               = f[ByteVector].bind[Proof_0.type](4)
-  implicit def fProof_1               = f[ByteVector].bind[Proof_1.type](5)
-  implicit def fProof_2               = f[ByteVector].bind[Proof_2.type](6)
-  implicit def assetId                = f[Option[ByteVector]].bind[AssetId.type](7)
+  implicit def fProof                 = f[ByteVector].bind[Proof](4)
+  implicit def assetId                = f[Option[ByteVector]].bind[AssetId.type](5)
   implicit def f__satisfy_shapeless_0 = f[Boolean].bind[__satisfy_shapeless_0.type](999)
 
   implicit def d[A]             = Discriminated[Expr, Int](uint8)

@@ -17,9 +17,7 @@ object Terms {
   case object SenderPk              extends Field { val tpe: Type = BYTEVECTOR         }
   case object AssetId               extends Field { val tpe: Type = OPTION(BYTEVECTOR) }
   case object BodyBytes             extends Field { val tpe: Type = BYTEVECTOR         }
-  case object Proof_0               extends Field { val tpe: Type = BYTEVECTOR         }
-  case object Proof_1               extends Field { val tpe: Type = BYTEVECTOR         }
-  case object Proof_2               extends Field { val tpe: Type = BYTEVECTOR         }
+  case class Proof(i: Int)          extends Field { val tpe: Type = BYTEVECTOR         }
 
   sealed trait Expr {
     val predefinedType: Option[Type]
@@ -45,4 +43,3 @@ object Terms {
 
   implicit def term2compoiste(t: Expr): CExpr = CExpr(None, t)
 }
-

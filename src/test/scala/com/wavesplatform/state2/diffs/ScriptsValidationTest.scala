@@ -21,7 +21,7 @@ class ScriptsValidationTest extends PropSpec with PropertyChecks with Matchers w
 
     val onlySend: Expr = AND(
       OR(EQ_INT(TX_FIELD(Type), CONST_INT(4)), EQ_INT(TX_FIELD(Type), CONST_INT(11))),
-      SIG_VERIFY(TX_FIELD(BodyBytes), TX_FIELD(Proof_0), TX_FIELD(SenderPk))
+      SIG_VERIFY(TX_FIELD(BodyBytes), TX_FIELD(Proof(0)), TX_FIELD(SenderPk))
     )
 
     val preconditionsAndTransfer: Gen[(GenesisTransaction, SetScriptTransaction, LeaseTransaction, TransferTransaction)] = for {
@@ -47,10 +47,10 @@ class ScriptsValidationTest extends PropSpec with PropertyChecks with Matchers w
       GE(
         SUM(
           SUM(
-            IF(SIG_VERIFY(TX_FIELD(BodyBytes), TX_FIELD(Proof_0), CONST_BYTEVECTOR(ByteVector(pk0.publicKey))), CONST_INT(1), CONST_INT(0)),
-            IF(SIG_VERIFY(TX_FIELD(BodyBytes), TX_FIELD(Proof_1), CONST_BYTEVECTOR(ByteVector(pk1.publicKey))), CONST_INT(1), CONST_INT(0))
+            IF(SIG_VERIFY(TX_FIELD(BodyBytes), TX_FIELD(Proof(0)), CONST_BYTEVECTOR(ByteVector(pk0.publicKey))), CONST_INT(1), CONST_INT(0)),
+            IF(SIG_VERIFY(TX_FIELD(BodyBytes), TX_FIELD(Proof(1)), CONST_BYTEVECTOR(ByteVector(pk1.publicKey))), CONST_INT(1), CONST_INT(0))
           ),
-          IF(SIG_VERIFY(TX_FIELD(BodyBytes), TX_FIELD(Proof_2), CONST_BYTEVECTOR(ByteVector(pk2.publicKey))), CONST_INT(1), CONST_INT(0))
+          IF(SIG_VERIFY(TX_FIELD(BodyBytes), TX_FIELD(Proof(2)), CONST_BYTEVECTOR(ByteVector(pk2.publicKey))), CONST_INT(1), CONST_INT(0))
         ),
         CONST_INT(2)
       )

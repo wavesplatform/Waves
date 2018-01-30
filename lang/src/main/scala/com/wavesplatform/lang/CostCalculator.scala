@@ -18,5 +18,6 @@ object CostCalculator {
     case GE(t1, t2)                => 2 + apply(t1) + apply(t2)
     case IF(cond, ifTrue, ifFalse) => 2 + apply(cond) + Math.max(apply(ifTrue), apply(ifFalse))
     case SIG_VERIFY(_, _, _)       => 100
+    case _                         => ???
   }
 }

@@ -116,18 +116,41 @@ object Evaluator {
           m <- evR[ByteVector](ctx, msg)
           p <- evR[ByteVector](ctx, pk)
         } yield Curve25519.verify(s.toArray, m.toArray, p.toArray)
-
+      case IS_DEFINED(opt) =>
+        for {
+          optType <- resolveType(ctx.defs, opt)
+          optVal  <- evR[optType.Underlying](ctx, opt)
+          res <- optVal match {
+            case x: Option[_] =>
+              x match {
+                case Some(xx) => Right(true)
+                case None     => Right(false)
+              }
+            case _ => Left("GET invoked on non-option type")
+          }
+        } yield res
+      case GET(opt) =>
+        for {
+          optType <- resolveType(ctx.defs, opt)
+          optVal  <- evR[optType.Underlying](ctx, opt)
+          res <- optVal match {
+            case x: Option[_] =>
+              x match {
+                case Some(xx) => Right(x)
+                case None     => Left("None.get")
+              }
+            case _ => Left("GET invoked on non-option type")
+          }
+        } yield res
       // impure calls
-      case HEIGHT => ctx.domain.Height
+      case HEIGHT => ctx.domain.height
       case TX_FIELD(f) =>
         f match {
-          case Id        => ctx.domain.Id
-          case Type      => ctx.domain.Type
-          case SenderPk  => ctx.domain.SenderPk
-          case Proof_0   => ctx.domain.Proof_0
-          case Proof_1   => ctx.domain.Proof_1
-          case Proof_2   => ctx.domain.Proof_2
-          case BodyBytes => ctx.domain.BodyBytes
+          case Id        => ctx.domain.id
+          case Type      => ctx.domain.tpe
+          case SenderPk  => ctx.domain.senderPk
+          case Proof(i)  => ctx.domain.proof(i)
+          case BodyBytes => ctx.domain.bodyBytes
           case _         => ??? // match for  __satisfy_shapeless_0
         }
     }).map(_.asInstanceOf[T])

@@ -88,7 +88,7 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
       CExpr(
         Some(LET("x", CONST_INT(3))),
         CExpr(Some(LET("y", EQ_INT(CONST_INT(3), CONST_INT(0)))), EQ_INT(REF("x"), REF("y")))
-      )) should produce("cannot be cast")
+      )) should produce("Cast")
   }
 
   property("fails if definition not found") {

@@ -4,12 +4,10 @@ import com.wavesplatform.lang.Evaluator.ExecResult
 import scodec.bits.ByteVector
 
 trait Domain {
-  def Height: ExecResult[Int]
-  def Id: ExecResult[ByteVector]
-  def Type: ExecResult[Int]
-  def SenderPk: ExecResult[ByteVector]
-  def BodyBytes: ExecResult[ByteVector]
-  def Proof_0: ExecResult[ByteVector]
-  def Proof_1: ExecResult[ByteVector]
-  def Proof_2: ExecResult[ByteVector]
+  def height: ExecResult[Int]
+  def id: ExecResult[ByteVector]
+  def tpe: ExecResult[Int]
+  def senderPk: ExecResult[ByteVector]
+  def bodyBytes: ExecResult[ByteVector]
+  def proof(i:Int): ExecResult[ByteVector]
 }
