@@ -2,7 +2,7 @@ package com.wavesplatform.features
 
 trait FeatureProvider {
 
-  protected val activationWindowSize: Int
+  protected def activationWindowSize(height: Int): Int
 
   def approvedFeatures() : Map[Short, Int]
 
@@ -18,17 +18,17 @@ object FeatureProvider {
 
     def featureStatus(feature: Short, height: Int): BlockchainFeatureStatus = {
       featureApprovalHeight(feature).getOrElse(Int.MaxValue) match {
-        case x if x <= height - provider.activationWindowSize => BlockchainFeatureStatus.Activated
+        case x if x <= height - provider.activationWindowSize(height) => BlockchainFeatureStatus.Activated
         case x if x <= height => BlockchainFeatureStatus.Approved
         case _ => BlockchainFeatureStatus.Undefined
       }
     }
 
     def activatedFeatures(height: Int): Set[Short] = provider.approvedFeatures()
-      .filter { case (_, acceptedHeight) => acceptedHeight <= height - provider.activationWindowSize }.keySet
+      .filter { case (_, acceptedHeight) => acceptedHeight <= height - provider.activationWindowSize(height) }.keySet
 
     def featureActivationHeight(feature: Short): Option[Int] = {
-      featureApprovalHeight(feature).map(h => h + provider.activationWindowSize)
+      featureApprovalHeight(feature).map(h => h + provider.activationWindowSize(h))
     }
 
     def featureApprovalHeight(feature: Short): Option[Int] = provider.approvedFeatures().get(feature)

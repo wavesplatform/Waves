@@ -9,6 +9,4 @@ object BlockchainFeatures {
 
   val implemented: Set[Short] = Set(SmallerMinimalGeneratingBalance, NG).map(_.id)
 
-
-
 }

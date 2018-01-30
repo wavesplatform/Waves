@@ -14,10 +14,10 @@ import scorex.utils.ScorexLogging
 @Path("/activation")
 @Api(value = "activation")
 case class ActivationApiRoute(settings: RestAPISettings,
-                        functionalitySettings: FunctionalitySettings,
-                        featuresSettings: FeaturesSettings,
-                        history: History,
-                        featureProvider: FeatureProvider)
+                              functionalitySettings: FunctionalitySettings,
+                              featuresSettings: FeaturesSettings,
+                              history: History,
+                              featureProvider: FeatureProvider)
   extends ApiRoute with CommonApiFunctions with ScorexLogging {
 
   override lazy val route = pathPrefix("activation") {
@@ -32,12 +32,15 @@ case class ActivationApiRoute(settings: RestAPISettings,
   def status: Route = (get & path("status")) {
 
     val height = history.height()
-    val activationInterval = functionalitySettings.featureCheckBlocksPeriod
+    val activationInterval = if (height > functionalitySettings.doubleFeaturesPeriodsAfterHeight)
+      functionalitySettings.featureCheckBlocksPeriod * 2 else functionalitySettings.featureCheckBlocksPeriod
+    val blocksForFeatureActivation = if (height > functionalitySettings.doubleFeaturesPeriodsAfterHeight)
+      functionalitySettings.blocksForFeatureActivation * 2 else functionalitySettings.blocksForFeatureActivation
 
     complete(Json.toJson(
       ActivationStatus(height,
         activationInterval,
-        functionalitySettings.blocksForFeatureActivation,
+        blocksForFeatureActivation,
         (FeatureProvider.votingWindowOpeningFromHeight(height, activationInterval) + activationInterval) - 1,
         (featureProvider.featureVotesCountWithinActivationWindow(height).keySet ++
           featureProvider.approvedFeatures().keySet ++
@@ -51,7 +54,7 @@ case class ActivationApiRoute(settings: RestAPISettings,
               case _ => NodeFeatureStatus.Implemented
             },
             featureProvider.featureActivationHeight(id),
-            if(status == BlockchainFeatureStatus.Undefined) featureProvider.featureVotesCountWithinActivationWindow(height).get(id).orElse(Some(0)) else None
+            if (status == BlockchainFeatureStatus.Undefined) featureProvider.featureVotesCountWithinActivationWindow(height).get(id).orElse(Some(0)) else None
           )
         })))
     )

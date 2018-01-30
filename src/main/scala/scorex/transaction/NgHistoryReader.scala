@@ -13,7 +13,8 @@ import com.wavesplatform.utils.HeightInfo
 
 class NgHistoryReader(ngState: () => Option[NgState], inner: History with FeatureProvider, settings: FunctionalitySettings) extends History with NgHistory with DebugNgHistory with FeatureProvider {
 
-  override val activationWindowSize: Int = settings.featureCheckBlocksPeriod
+  override def activationWindowSize(h: Int): Int = if (h > settings.doubleFeaturesPeriodsAfterHeight)
+    settings.featureCheckBlocksPeriod * 2 else settings.featureCheckBlocksPeriod
 
   override def synchronizationToken: ReentrantReadWriteLock = inner.synchronizationToken
 

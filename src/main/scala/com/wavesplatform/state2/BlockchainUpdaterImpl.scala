@@ -92,11 +92,23 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
   private def featuresApprovedWithBlock(block: Block): Set[Short] = {
     val height = historyWriter.height() + 1
 
-    if (height % settings.blockchainSettings.functionalitySettings.featureCheckBlocksPeriod == 0) {
+    val featuresCheckPeriod =
+      if (height > settings.blockchainSettings.functionalitySettings.doubleFeaturesPeriodsAfterHeight)
+        settings.blockchainSettings.functionalitySettings.featureCheckBlocksPeriod * 2
+      else
+        settings.blockchainSettings.functionalitySettings.featureCheckBlocksPeriod
+
+    val blocksForFeatureActivation =
+      if (height > settings.blockchainSettings.functionalitySettings.doubleFeaturesPeriodsAfterHeight)
+        settings.blockchainSettings.functionalitySettings.blocksForFeatureActivation * 2
+      else
+        settings.blockchainSettings.functionalitySettings.blocksForFeatureActivation
+
+    if (height % featuresCheckPeriod == 0) {
 
       val approvedFeatures = historyWriter.featureVotesCountWithinActivationWindow(height)
         .map { case (feature, votes) => feature -> (if (block.featureVotes.contains(feature)) votes + 1 else votes) }
-        .filter { case (_, votes) => votes >= settings.blockchainSettings.functionalitySettings.blocksForFeatureActivation }
+        .filter { case (_, votes) => votes >= blocksForFeatureActivation }
         .keySet
 
       if (approvedFeatures.nonEmpty) log.info(s"${displayFeatures(approvedFeatures)} APPROVED ON BLOCKCHAIN")

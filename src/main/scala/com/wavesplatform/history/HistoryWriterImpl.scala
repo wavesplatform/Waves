@@ -27,9 +27,6 @@ class HistoryWriterImpl private(db: DB, val synchronizationToken: ReentrantReadW
 
   import HistoryWriterImpl._
 
-  override val activationWindowSize: Int = functionalitySettings.featureCheckBlocksPeriod
-  val MinVotesWithinWindowToActivateFeature: Int = functionalitySettings.blocksForFeatureActivation
-
   private val BlockAtHeightPrefix = "blocks".getBytes(Charset)
   private val SignatureAtHeightPrefix = "signatures".getBytes(Charset)
   private val HeightBySignaturePrefix = "heights".getBytes(Charset)
@@ -40,7 +37,13 @@ class HistoryWriterImpl private(db: DB, val synchronizationToken: ReentrantReadW
 
   private val HeightProperty = "history-height"
 
-  private lazy val preAcceptedFeatures = functionalitySettings.preActivatedFeatures.mapValues(h => h - activationWindowSize)
+  override def activationWindowSize(h: Int): Int = if (h > functionalitySettings.doubleFeaturesPeriodsAfterHeight)
+    functionalitySettings.featureCheckBlocksPeriod * 2 else functionalitySettings.featureCheckBlocksPeriod
+
+  def minVotesWithinWindowToActivateFeature(h: Int): Int = if (h > functionalitySettings.doubleFeaturesPeriodsAfterHeight)
+    functionalitySettings.blocksForFeatureActivation * 2 else functionalitySettings.blocksForFeatureActivation
+
+  private lazy val preAcceptedFeatures = functionalitySettings.preActivatedFeatures.mapValues(h => h - activationWindowSize(h))
 
   private var heightInfo: (Int, Long) = (height(), time.getTimestamp())
 
@@ -49,12 +52,12 @@ class HistoryWriterImpl private(db: DB, val synchronizationToken: ReentrantReadW
   }
 
   override def featureVotesCountWithinActivationWindow(height: Int): Map[Short, Int] = read { implicit lock =>
-    val votingWindowOpening = FeatureProvider.votingWindowOpeningFromHeight(height, activationWindowSize)
+    val votingWindowOpening = FeatureProvider.votingWindowOpeningFromHeight(height, activationWindowSize(height))
     get(makeKey(VotesAtHeightPrefix, votingWindowOpening)).map(VotesMapCodec.decode).map(_.explicitGet().value).getOrElse(Map.empty)
   }
 
   private def alterVotes(height: Int, votes: Set[Short], voteMod: Int): Unit = write("alterVotes") { implicit lock =>
-    val votingWindowOpening = FeatureProvider.votingWindowOpeningFromHeight(height, activationWindowSize)
+    val votingWindowOpening = FeatureProvider.votingWindowOpeningFromHeight(height, activationWindowSize(height))
     val votesWithinWindow = featureVotesCountWithinActivationWindow(height)
     val newVotes = votes.foldLeft(votesWithinWindow)((v, feature) => v + (feature -> (v.getOrElse(feature, 0) + voteMod)))
     put(makeKey(VotesAtHeightPrefix, votingWindowOpening), VotesMapCodec.encode(newVotes))
@@ -131,7 +134,7 @@ class HistoryWriterImpl private(db: DB, val synchronizationToken: ReentrantReadW
     delete(key)
     delete(makeKey(ScoreAtHeightPrefix, h))
 
-    if (h % activationWindowSize == 0) {
+    if (h % activationWindowSize(h) == 0) {
       allFeatures().foreach { f =>
         val featureHeight = getFeatureHeight(f)
         if (featureHeight.isDefined && featureHeight.get == h) deleteFeature(f)

@@ -22,7 +22,8 @@ case class FunctionalitySettings(featureCheckBlocksPeriod: Int,
                                  allowMultipleLeaseCancelTransactionUntilTimestamp: Long,
                                  resetEffectiveBalancesAtHeight: Int,
                                  blockVersion3AfterHeight: Int,
-                                 preActivatedFeatures: Map[Short, Int]) {
+                                 preActivatedFeatures: Map[Short, Int],
+                                 doubleFeaturesPeriodsAfterHeight: Int) {
   val dontRequireSortedTransactionsAfter = blockVersion3AfterHeight
   val allowLeasedBalanceTransferUntilHeight = blockVersion3AfterHeight
 
@@ -46,7 +47,8 @@ object FunctionalitySettings {
     allowMultipleLeaseCancelTransactionUntilTimestamp = 1492768800000L,
     resetEffectiveBalancesAtHeight = 462000,
     blockVersion3AfterHeight = 795000,
-    preActivatedFeatures = Map.empty)
+    preActivatedFeatures = Map.empty,
+    doubleFeaturesPeriodsAfterHeight = 810000)
 
   val TESTNET = apply(
     featureCheckBlocksPeriod = 3000,
@@ -63,7 +65,8 @@ object FunctionalitySettings {
     allowMultipleLeaseCancelTransactionUntilTimestamp = 1492560000000L,
     resetEffectiveBalancesAtHeight = 51500,
     blockVersion3AfterHeight = 161700,
-    preActivatedFeatures = Map.empty)
+    preActivatedFeatures = Map.empty,
+    doubleFeaturesPeriodsAfterHeight = Int.MaxValue)
 
   val configPath = "waves.blockchain.custom.functionality"
 }
