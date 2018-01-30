@@ -11,6 +11,8 @@ import scorex.transaction.assets._
 import scorex.transaction.assets.exchange._
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import scorex.utils.NTP
+import com.wavesplatform.state2._
+import scorex.transaction.Data.DataTransaction
 
 trait TransactionGen {
 
@@ -129,6 +131,25 @@ trait TransactionGen {
 
   val leaseGen: Gen[LeaseTransaction] = leaseAndCancelGen.map(_._1)
   val leaseCancelGen: Gen[LeaseCancelTransaction] = leaseAndCancelGen.map(_._2)
+
+
+
+  private val  dataParamGen = for {
+    sender    <- accountGen
+    data      <- genBoundedBytes(0, DataTransaction.MaxDataSize)
+    fee       <- smallFeeGen
+    timestamp <- timestampGen
+  } yield (sender, data, fee, timestamp)
+
+def dataGeneratorP(sender: PrivateKeyAccount): Gen[DataTransaction]= for {
+  (_,data, fee, timestamp) <- dataParamGen
+} yield DataTransaction.create(sender, data, fee, AddressScheme.current.chainId, timestamp).right.get
+
+  val dataGen =(for {
+    (sender, data, fee, timestamp) <- dataParamGen
+  } yield DataTransaction.create(sender, data, fee, AddressScheme.current.chainId, timestamp).right.get).label("dataTransaction")
+
+
 
   private val transferParamGen = for {
     amount <- positiveLongGen
