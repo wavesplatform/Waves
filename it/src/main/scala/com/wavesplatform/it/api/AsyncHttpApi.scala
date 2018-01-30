@@ -5,6 +5,7 @@ import java.net.InetSocketAddress
 import java.util.concurrent.TimeoutException
 
 import com.wavesplatform.features.api.ActivationStatus
+import com.wavesplatform.http.api_key
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.util.GlobalTimer.{instance => timer}
 import com.wavesplatform.it.util._
@@ -67,19 +68,19 @@ object AsyncHttpApi {
 
     def getWithApiKey(path: String, f: RequestBuilder => RequestBuilder = identity): Future[Response] = retrying {
       _get(s"${n.nodeApiEndpoint}$path")
-        .setHeader("api_key", n.apiKey)
+        .withApiKey(n.apiKey)
         .build()
     }
 
     def postJsonWithApiKey[A: Writes](path: String, body: A): Future[Response] = retrying {
       _post(s"${n.nodeApiEndpoint}$path")
-        .setHeader("api_key", n.apiKey)
+        .withApiKey(n.apiKey)
         .setHeader("Content-type", "application/json").setBody(stringify(toJson(body)))
         .build()
     }
 
     def post(url: String, f: RequestBuilder => RequestBuilder = identity): Future[Response] =
-      retrying(f(_post(url).setHeader("api_key", n.apiKey)).build())
+      retrying(f(_post(url).withApiKey(n.apiKey)).build())
 
     def postJson[A: Writes](path: String, body: A): Future[Response] =
       post(path, stringify(toJson(body)))
@@ -212,7 +213,7 @@ object AsyncHttpApi {
     def batchSignedTransfer(transfers: Seq[SignedTransferRequest], timeout: FiniteDuration = 1.minute): Future[Seq[Transaction]] = {
       val request = _post(s"${n.nodeApiEndpoint}/assets/broadcast/batch-transfer")
         .setHeader("Content-type", "application/json")
-        .setHeader("api_key", n.apiKey)
+        .withApiKey(n.apiKey)
         .setReadTimeout(timeout.toMillis.toInt)
         .setRequestTimeout(timeout.toMillis.toInt)
         .setBody(stringify(toJson(transfers)))
@@ -432,5 +433,9 @@ object AsyncHttpApi {
         }
     }
 
+  }
+
+  implicit class RequestBuilderOps(self: RequestBuilder) {
+    def withApiKey(x: String): RequestBuilder = self.setHeader(api_key.name, x)
   }
 }
