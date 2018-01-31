@@ -162,8 +162,8 @@ class UtxPoolImpl(time: Time,
           differ(composite(diff.asBlockDiff, s), featureProvider, tx) match {
             case Right(newDiff) =>
               val updatedLimit = restLimit - tx
-              if (updatedLimit.wasMet) (invalid, valid, diff, restLimit)
-              else (invalid, tx +: valid, Monoid.combine(diff, newDiff), restLimit)
+              if (updatedLimit.wasMet) (invalid, valid, diff, restLimit.meet)
+              else (invalid, tx +: valid, Monoid.combine(diff, newDiff), updatedLimit)
             case Left(_) =>
               (tx.id() +: invalid, valid, diff, restLimit)
           }

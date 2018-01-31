@@ -4,6 +4,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock
 
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.history.{HistoryWriterImpl, StorageFactory}
+import com.wavesplatform.mining.{CombinedMiningLimit, ComplexityMiningLimit, TxNumberMiningLimit}
 import com.wavesplatform.settings.{BlockchainSettings, FeeSettings, FeesSettings, FunctionalitySettings, UtxSettings, WavesSettings}
 import com.wavesplatform.state2.diffs._
 import org.scalacheck.Gen
@@ -194,41 +195,58 @@ class UtxPoolSpecification extends FreeSpec
     }
 
     "evicts expired transactions when removeAll is called" in forAll(dualTxGen) { case (utx, time, txs1, offset, txs2) =>
-      all(txs1.map { t =>
-        utx.putIfNew(t)
-      }) shouldBe 'right
+      all(txs1.map(utx.putIfNew)) shouldBe 'right
       utx.all.size shouldEqual txs1.size
 
       time.advance(offset)
       utx.removeAll(Seq.empty)
 
-      all(txs2.map { t =>
-        utx.putIfNew(t)
-      }) shouldBe 'right
+      all(txs2.map(utx.putIfNew)) shouldBe 'right
       utx.all.size shouldEqual txs2.size
     }
 
+    "packUnconfirmed result is limited by number of txs" in forAll(dualTxGen) { case (utx, time, txs, _, _) =>
+      all(txs.map(utx.putIfNew)) shouldBe 'right
+      utx.all.size shouldEqual txs.size
+
+      val maxNumber = utx.all.size / 2
+      val (packed, _) = utx.packUnconfirmed(limitByNumber(maxNumber), sortInBlock = false)
+
+      packed.lengthCompare(maxNumber) should be <= 0
+    }
+
+    "packUnconfirmed result is limited by complexity" in forAll(dualTxGen) { case (utx, time, txs, _, _) =>
+      all(txs.map(utx.putIfNew)) shouldBe 'right
+      utx.all.size shouldEqual txs.size
+
+      val totalComplexity = ComplexityMiningLimit(0).estimate(utx.all)
+      val maxComplexity = totalComplexity.copy(restValue = totalComplexity.restValue / 2)
+
+      val (packed, _) = utx.packUnconfirmed(CombinedMiningLimit(maxComplexity, maxComplexity), sortInBlock = false)
+      val packedComplexity = ComplexityMiningLimit(0).estimate(packed)
+
+      packedComplexity.restValue should be <= maxComplexity.restValue
+    }
+
     "evicts expired transactions when packUnconfirmed is called" in forAll(dualTxGen) { case (utx, time, txs, offset, _) =>
-      all(txs.map { t =>
-        utx.putIfNew(t)
-      }) shouldBe 'right
+      all(txs.map(utx.putIfNew)) shouldBe 'right
       utx.all.size shouldEqual txs.size
 
       time.advance(offset)
 
-      utx.packUnconfirmed(100, false) shouldBe 'empty
+      val (packed, _) = utx.packUnconfirmed(limitByNumber(100), sortInBlock = false)
+      packed shouldBe 'empty
       utx.all shouldBe 'empty
     }
 
     "evicts one of mutually invalid transactions when packUnconfirmed is called" in forAll(twoOutOfManyValidPayments) { case (utx, time, txs, offset) =>
-      all(txs.map { t =>
-        utx.putIfNew(t)
-      }) shouldBe 'right
+      all(txs.map(utx.putIfNew)) shouldBe 'right
       utx.all.size shouldEqual txs.size
 
       time.advance(offset)
 
-      utx.packUnconfirmed(100, false).size shouldBe 2
+      val (packed, _) = utx.packUnconfirmed(limitByNumber(100), sortInBlock = false)
+      packed.size shouldBe 2
       utx.all.size shouldBe 2
     }
 
@@ -262,7 +280,7 @@ class UtxPoolSpecification extends FreeSpec
         val poolSizeBefore = utxPool.size
 
         time.advance(settings.maxTransactionAge * 2)
-        utxPool.packUnconfirmed(100, false)
+        utxPool.packUnconfirmed(limitByNumber(100), sortInBlock = false)
 
         poolSizeBefore should be > utxPool.size
         val utxPortfolioAfter = utxPool.portfolio(sender)
@@ -302,5 +320,10 @@ class UtxPoolSpecification extends FreeSpec
         }
       }
     }
+  }
+
+  private def limitByNumber(n: Int): CombinedMiningLimit = {
+    val leaf = TxNumberMiningLimit(n)
+    CombinedMiningLimit(leaf, leaf)
   }
 }
