@@ -8,11 +8,7 @@ import scodec.bits.ByteVector
 
 class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 
-  private def ev(c: Expr) = {
-    val codec = Serde.codec
-    //val c2    = codec.decode(codec.encode(c).require).require.value
-    Evaluator.apply(Context(new HeightDomain(1), Map.empty), c)
-  }
+  private def ev(c: Expr): Either[_, _] = Evaluator.apply(Context(new HeightDomain(1), Map.empty), c)
 
   private def simpleDeclarationAndUsage(i: Int) = CExpr(Some(LET("x", CONST_INT(i))), REF("x"))
 
@@ -32,13 +28,11 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
   property("successful on x = y") {
     ev(
       CExpr(Some(LET("x", CONST_INT(3))),
-        CExpr(
-          Some(LET("y", REF("x"))),
-          SUM(REF("x"), REF("y"))
-        ))) shouldBe Right(6)
+            CExpr(
+              Some(LET("y", REF("x"))),
+              SUM(REF("x"), REF("y"))
+            ))) shouldBe Right(6)
   }
-
-
 
   property("successful on simple get") {
     ev(simpleDeclarationAndUsage(3)) shouldBe Right(3)

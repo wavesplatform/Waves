@@ -37,17 +37,51 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
       CONST_BYTEVECTOR(ByteVector(Base58.decode("222").get)),
       CONST_BYTEVECTOR(ByteVector(Base58.decode("111").get))
     )
+
+    parse("false || checkSig(base58'333', base58'222', base58'111')") shouldBe OR(FALSE,SIG_VERIFY(
+      CONST_BYTEVECTOR(ByteVector(Base58.decode("333").get)),
+      CONST_BYTEVECTOR(ByteVector(Base58.decode("222").get)),
+      CONST_BYTEVECTOR(ByteVector(Base58.decode("111").get)))
+    )
   }
 
   property("let constructs") {
-    parse("""let X = 10
+    parse("""let X = 10;
         |3 > 2
       """.stripMargin) shouldBe CExpr(Some(LET("X", CONST_INT(10))), GT(CONST_INT(3), CONST_INT(2)))
 
-    parse("""let X = 10
-            |let Y = 10
+    parse("""let X = 10;
+            |let Y = 10;
             |3 > 2
           """.stripMargin) shouldBe CExpr(Some(LET("X", CONST_INT(10))), CExpr(Some(LET("Y", CONST_INT(10))), GT(CONST_INT(3), CONST_INT(2))))
+  }
 
+  property("multiline") {
+    parse(
+      """
+        |
+        |false
+        |
+        |
+      """.stripMargin) shouldBe FALSE
+
+    parse("""let X = 10;
+        |
+        |true
+      """.stripMargin) shouldBe CExpr(Some(LET("X", CONST_INT(10))), TRUE)
+    parse("""let X = 11;
+        |true
+      """.stripMargin) shouldBe CExpr(Some(LET("X", CONST_INT(11))), TRUE)
+
+
+    parse("""
+        |
+        |let X = 12;
+        |
+        |3
+        | +
+        |  2
+        |
+      """.stripMargin) shouldBe CExpr(Some(LET("X", CONST_INT(12))), SUM(CONST_INT(3), CONST_INT(2)))
   }
 }

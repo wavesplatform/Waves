@@ -10,7 +10,7 @@ object Parser {
   private val Base58Chars = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
   private val White = WhitespaceApi.Wrapper {
     import fastparse.all._
-    NoTrace(CharIn(" ", "\t", "\r").rep)
+    NoTrace(CharIn(" ", "\t", "\r", "\n").rep)
   }
 
   import fastparse.noApi._
@@ -21,10 +21,9 @@ object Parser {
   private def falseP: P[FALSE.type]     = P("false").map(_ => FALSE)
   private def bracesP: P[Expr]          = P("(" ~ expr ~ ")")
   private def sigVerifyP: P[SIG_VERIFY] = P("checkSig" ~ "(" ~ expr ~ "," ~ expr ~ "," ~ expr ~ ")").map { case ((x, y, z)) => SIG_VERIFY(x, y, z) }
+  private def letP: P[LET]              = P("\n".rep ~ "let " ~ CharIn('A' to 'Z').! ~ "=" ~ expr ~ ";").map { case ((x, y)) => LET(x, y) }
   private def byteVectorP: P[CONST_BYTEVECTOR] =
     P("base58'" ~ CharsWhileIn(Base58Chars).! ~ "'").map(x => CONST_BYTEVECTOR(ByteVector(Base58.decode(x).get)))
-
-  private def letP: P[LET] = P("let" ~ CharIn('A' to 'Z').! ~ "=" ~ expr ~ "\n").map { case ((x, y)) => LET(x, y) }
 
   private def stmt: P[Expr] = P(letP.rep ~ expr).map {
     case ((Nil, y)) => y
@@ -47,10 +46,8 @@ object Parser {
                 case "&&" => AND(r2, y)
                 case "==" => EQ_INT(r2, y)
                 case ">=" => GE(r2, y)
-                case ">" =>
-                  GT(r2, y)
-                case "+" =>
-                  SUM(r2, y)
+                case ">"  => GT(r2, y)
+                case "+"  => SUM(r2, y)
               }
           }
 
@@ -59,7 +56,7 @@ object Parser {
 
   private def expr = P(binaryOp(priority) | atom)
 
-  private def atom = P(byteVectorP | numberP | trueP | falseP | sigVerifyP | bracesP)
+  private def atom = P(byteVectorP | numberP | trueP | falseP | bracesP | sigVerifyP)
 
   def apply(str: String): core.Parsed[Expr, Char, String] = stmt.parse(str)
 }
