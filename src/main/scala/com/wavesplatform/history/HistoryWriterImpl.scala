@@ -4,7 +4,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock
 
 import com.google.common.primitives.{Ints, Shorts}
 import com.wavesplatform.db._
-import com.wavesplatform.features.FeatureProvider
+import com.wavesplatform.features.{FeatureProvider, FeaturesProperties}
 import com.wavesplatform.settings.{FeaturesSettings, FunctionalitySettings}
 import com.wavesplatform.state2._
 import com.wavesplatform.utils._
@@ -37,11 +37,11 @@ class HistoryWriterImpl private(db: DB, val synchronizationToken: ReentrantReadW
 
   private val HeightProperty = "history-height"
 
-  override def activationWindowSize(h: Int): Int = if (h > functionalitySettings.doubleFeaturesPeriodsAfterHeight)
-    functionalitySettings.featureCheckBlocksPeriod * 2 else functionalitySettings.featureCheckBlocksPeriod
+  private val featuresProperties = FeaturesProperties(functionalitySettings)
 
-  def minVotesWithinWindowToActivateFeature(h: Int): Int = if (h > functionalitySettings.doubleFeaturesPeriodsAfterHeight)
-    functionalitySettings.blocksForFeatureActivation * 2 else functionalitySettings.blocksForFeatureActivation
+  override def activationWindowSize(h: Int): Int = featuresProperties.featureCheckBlocksPeriodAtHeight(h)
+
+  def minVotesWithinWindowToActivateFeature(h: Int): Int = featuresProperties.blocksForFeatureActivationAtHeight(h)
 
   private lazy val preAcceptedFeatures = functionalitySettings.preActivatedFeatures.mapValues(h => h - activationWindowSize(h))
 

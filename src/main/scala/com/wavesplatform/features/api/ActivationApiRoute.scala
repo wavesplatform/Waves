@@ -3,7 +3,7 @@ package com.wavesplatform.features.api
 import javax.ws.rs.Path
 
 import akka.http.scaladsl.server.Route
-import com.wavesplatform.features.{BlockchainFeatureStatus, BlockchainFeatures, FeatureProvider}
+import com.wavesplatform.features.{BlockchainFeatureStatus, BlockchainFeatures, FeatureProvider, FeaturesProperties}
 import com.wavesplatform.settings.{FeaturesSettings, FunctionalitySettings, RestAPISettings}
 import io.swagger.annotations._
 import play.api.libs.json._
@@ -20,7 +20,9 @@ case class ActivationApiRoute(settings: RestAPISettings,
                               featureProvider: FeatureProvider)
   extends ApiRoute with CommonApiFunctions with ScorexLogging {
 
-  override lazy val route = pathPrefix("activation") {
+  private val featuresProperties = FeaturesProperties(functionalitySettings)
+
+  override lazy val route: Route = pathPrefix("activation") {
     status
   }
 
@@ -32,10 +34,8 @@ case class ActivationApiRoute(settings: RestAPISettings,
   def status: Route = (get & path("status")) {
 
     val height = history.height()
-    val activationInterval = if (height > functionalitySettings.doubleFeaturesPeriodsAfterHeight)
-      functionalitySettings.featureCheckBlocksPeriod * 2 else functionalitySettings.featureCheckBlocksPeriod
-    val blocksForFeatureActivation = if (height > functionalitySettings.doubleFeaturesPeriodsAfterHeight)
-      functionalitySettings.blocksForFeatureActivation * 2 else functionalitySettings.blocksForFeatureActivation
+    val activationInterval = featuresProperties.featureCheckBlocksPeriodAtHeight(height)
+    val blocksForFeatureActivation = featuresProperties.blocksForFeatureActivationAtHeight(height)
 
     complete(Json.toJson(
       ActivationStatus(height,

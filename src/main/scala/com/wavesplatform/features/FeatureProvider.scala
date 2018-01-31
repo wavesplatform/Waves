@@ -1,12 +1,25 @@
 package com.wavesplatform.features
 
+import com.wavesplatform.settings.FunctionalitySettings
+
 trait FeatureProvider {
 
   protected def activationWindowSize(height: Int): Int
 
-  def approvedFeatures() : Map[Short, Int]
+  def approvedFeatures(): Map[Short, Int]
 
   def featureVotesCountWithinActivationWindow(height: Int): Map[Short, Int]
+}
+
+case class FeaturesProperties(functionalitySettings: FunctionalitySettings) {
+  def featureCheckBlocksPeriodAtHeight(height: Int): Int =
+    doubleValueAtHeight(height, functionalitySettings.featureCheckBlocksPeriod)
+
+  def blocksForFeatureActivationAtHeight(height: Int): Int =
+    doubleValueAtHeight(height, functionalitySettings.blocksForFeatureActivation)
+
+  private def doubleValueAtHeight(height: Int, value: Int): Int =
+    if (height > functionalitySettings.doubleFeaturesPeriodsAfterHeight) value * 2 else value
 }
 
 object FeatureProvider {
