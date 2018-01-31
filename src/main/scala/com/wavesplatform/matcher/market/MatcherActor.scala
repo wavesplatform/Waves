@@ -85,7 +85,7 @@ class MatcherActor(orderHistory: ActorRef, storedState: StateReader, wallet: Wal
   }
 
   def checkBlacklistedAddress(address: Address)(f: => Unit): Unit = {
-    val v =  !settings.blacklistedAdresses.contains(address.address) :| s"Invalid Address: ${address.address}"
+    val v =  !settings.blacklistedAddresses.contains(address.address) :| s"Invalid Address: ${address.address}"
     if (!v) {
       sender() ! StatusCodeMatcherResponse(StatusCodes.Forbidden, v.messages())
     } else {

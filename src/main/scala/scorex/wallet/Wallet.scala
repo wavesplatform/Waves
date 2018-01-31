@@ -68,7 +68,7 @@ object Wallet extends ScorexLogging {
     private def loadOrImport(f: File) = try {
       Some(JsonFileStorage.load[WalletData](f.getCanonicalPath, Some(key)))
     } catch {
-      case NonFatal(_) => importLegacyWallet()
+      case NonFatal(_) => None
     }
 
     private lazy val actualSeed = seedFromConfig.getOrElse {
@@ -78,16 +78,6 @@ object Wallet extends ScorexLogging {
     }
 
     private var walletData = file.flatMap(loadOrImport).getOrElse(WalletData(actualSeed, Set.empty, 0))
-
-    private def importLegacyWallet(): Option[WalletData] = file.map { _ =>
-      val oldWallet = new WalletObsolete(file, password.toCharArray, None)
-      val walletData = WalletData(
-        Option(oldWallet.seed).fold(actualSeed)(ByteStr(_)),
-        oldWallet.privateKeyAccounts().map(a => ByteStr(a.seed)).toSet,
-        oldWallet.nonce())
-      oldWallet.close()
-      walletData
-    }
 
     private val l = new Object
 

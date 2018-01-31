@@ -51,12 +51,14 @@ class OrderExclusionTestSuite extends FreeSpec with Matchers with BeforeAndAfter
 
   "sell order could be placed" in {
     // Alice places sell order
-    val (id, status) = matcherPlaceOrder(matcherNode, 
+    val (id, status) = matcherPlaceOrder(matcherNode,
       prepareOrder(aliceNode, matcherNode, aliceWavesPair, OrderType.SELL, 2 * Waves * Order.PriceConstant, 500, 70.seconds))
     status shouldBe "OrderAccepted"
     aliceSell1 = id
     // Alice checks that the order in order book
     matcherCheckOrderStatus(matcherNode, aliceAsset, id) shouldBe "Accepted"
+    waitForOrderStatus(aliceAsset, id, "Accepted", 1.minute)
+    matcherCheckOrderStatus(id) shouldBe "Accepted"
 
     // Alice check that order is correct
     val orders = matcherGetOrderBook(matcherNode, aliceAsset )

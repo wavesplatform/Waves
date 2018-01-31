@@ -39,6 +39,7 @@ class OrderBookActor(assetPair: AssetPair,
                      val functionalitySettings: FunctionalitySettings)
   extends PersistentActor with Stash with ScorexLogging with ExchangeTransactionCreator {
   override def persistenceId: String = OrderBookActor.name(assetPair)
+
   private val snapshotCancellable = context.system.scheduler.schedule(settings.snapshotsInterval, settings.snapshotsInterval, self, SaveSnapshot)
   private val cleanupCancellable = context.system.scheduler.schedule(settings.orderCleanupInterval, settings.orderCleanupInterval, self, OrderCleanup)
   private var orderBook = OrderBook.empty
@@ -295,17 +296,19 @@ class OrderBookActor(assetPair: AssetPair,
 
   override def receiveCommand: Receive = fullCommands
 
+  val isMigrateToNewOrderHistoryStorage = settings.isMigrateToNewOrderHistoryStorage
+
   override def receiveRecover: Receive = {
     case evt: Event =>
       log.debug("Event: {}", evt)
       applyEvent(evt)
-      if (settings.isMigrateToNewOrderHistoryStorage) {
+      if (isMigrateToNewOrderHistoryStorage) {
         orderHistory ! evt
       }
     case RecoveryCompleted => log.info(assetPair.toString() + " - Recovery completed!");
     case SnapshotOffer(_, snapshot: Snapshot) =>
       orderBook = snapshot.orderBook
-      if (settings.isMigrateToNewOrderHistoryStorage) {
+      if (isMigrateToNewOrderHistoryStorage) {
         orderHistory ! RecoverFromOrderBook(orderBook)
       }
       log.debug(s"Recovering OrderBook from snapshot: $snapshot for $persistenceId")

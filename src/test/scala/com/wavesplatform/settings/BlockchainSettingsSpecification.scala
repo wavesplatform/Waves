@@ -1,7 +1,5 @@
 package com.wavesplatform.settings
 
-import java.io.File
-
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.state2.ByteStr
 import org.scalatest.{FlatSpec, Matchers}
@@ -13,6 +11,7 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
     val config = loadConfig(ConfigFactory.parseString(
       """waves {
         |  directory = "/waves"
+        |  data-directory = "/waves/data"
         |  blockchain {
         |    max-transactions-per-block-diff = 201
         |    min-blocks-in-memory = 202
@@ -56,9 +55,6 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
         |}""".stripMargin))
     val settings = BlockchainSettings.fromConfig(config)
 
-    settings.blockchainFile should be(Some(new File("/waves/data/blockchain.dat")))
-    settings.stateFile should be(Some(new File("/waves/data/state.dat")))
-    settings.checkpointFile should be(Some(new File("/waves/data/checkpoint.dat")))
     settings.maxTransactionsPerBlockDiff should be(201)
     settings.minBlocksInMemory should be(202)
     settings.addressSchemeCharacter should be('C')
@@ -92,6 +88,7 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
     val config = loadConfig(ConfigFactory.parseString(
       """waves {
         |  directory = "/waves"
+        |  data-directory = "/waves/data"
         |  blockchain {
         |    max-transactions-per-block-diff = 202
         |    min-blocks-in-memory = 203
@@ -100,9 +97,6 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
         |}""".stripMargin))
     val settings = BlockchainSettings.fromConfig(config)
 
-    settings.blockchainFile should be(Some(new File("/waves/data/blockchain.dat")))
-    settings.stateFile should be(Some(new File("/waves/data/state.dat")))
-    settings.checkpointFile should be(Some(new File("/waves/data/checkpoint.dat")))
     settings.maxTransactionsPerBlockDiff should be(202)
     settings.minBlocksInMemory should be(203)
     settings.addressSchemeCharacter should be('T')
@@ -135,6 +129,7 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
     val config = loadConfig(ConfigFactory.parseString(
       """waves {
         |  directory = "/waves"
+        |  data-directory = "/waves/data"
         |  blockchain {
         |    max-transactions-per-block-diff = 203
         |    min-blocks-in-memory = 204
@@ -143,9 +138,6 @@ class BlockchainSettingsSpecification extends FlatSpec with Matchers {
         |}""".stripMargin))
     val settings = BlockchainSettings.fromConfig(config)
 
-    settings.blockchainFile should be(Some(new File("/waves/data/blockchain.dat")))
-    settings.stateFile should be(Some(new File("/waves/data/state.dat")))
-    settings.checkpointFile should be(Some(new File("/waves/data/checkpoint.dat")))
     settings.maxTransactionsPerBlockDiff should be(203)
     settings.minBlocksInMemory should be(204)
     settings.addressSchemeCharacter should be('W')

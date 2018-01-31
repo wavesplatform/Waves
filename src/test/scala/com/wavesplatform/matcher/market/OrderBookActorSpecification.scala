@@ -3,7 +3,7 @@ package com.wavesplatform.matcher.market
 import akka.actor.{Actor, ActorRef, ActorSystem, Props}
 import akka.persistence.inmemory.extension.{InMemoryJournalStorage, InMemorySnapshotStorage, StorageExtension}
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
-import com.wavesplatform.UtxPool
+import com.wavesplatform.{TestDB, UtxPool}
 import com.wavesplatform.matcher.MatcherTestData
 import com.wavesplatform.matcher.fixtures.RestartableActor
 import com.wavesplatform.matcher.fixtures.RestartableActor.RestartActor
@@ -16,7 +16,6 @@ import com.wavesplatform.state2.reader.SnapshotStateReader
 import com.wavesplatform.state2.{ByteStr, LeaseInfo, Portfolio}
 import io.netty.channel.group.ChannelGroup
 import monix.eval.Coeval
-import org.h2.mvstore.MVStore
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest._
 import scorex.account.PrivateKeyAccount
@@ -30,6 +29,7 @@ import scorex.wallet.Wallet
 import scala.concurrent.duration._
 
 class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
+  with TestDB
   with WordSpecLike
   with Matchers
   with BeforeAndAfterAll
@@ -46,7 +46,7 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
   var eventsProbe = TestProbe()
 
   val pair = AssetPair(Some(ByteStr("BTC".getBytes)), Some(ByteStr("WAVES".getBytes)))
-  val db = new MVStore.Builder().compress().open()
+  val db = open()
   val storedState: SnapshotStateReader = stub[SnapshotStateReader]
   val hugeAmount = Long.MaxValue / 2
   (storedState.accountPortfolio _).when(*).returns(Portfolio(hugeAmount, LeaseInfo.empty, Map(
@@ -349,7 +349,7 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
 
       actor ! GetAskOrdersRequest
       expectMsg(GetOrdersResponse(Seq(SellLimitOrder(1850 * Order.PriceConstant,
-        ((0.1 - (0.0100001 - 0.01))*Constants.UnitsInWave).toLong, ord1))))
+        ((0.1 - (0.0100001 - 0.01)) * Constants.UnitsInWave).toLong, ord1))))
     }
 
     "cancel expired orders after OrderCleanup command" in {

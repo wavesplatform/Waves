@@ -18,6 +18,7 @@ class InboundConnectionFilter(peerDatabase: PeerDatabase, maxInboundConnections:
 
   private def dec(remoteAddress: InetAddress) = {
     inboundConnectionCount.decrementAndGet()
+    log.trace(s"Number of inbound connections: ${inboundConnectionCount.get()}")
     perHostConnectionCount.compute(remoteAddress, (_, cnt) => cnt - 1)
     emptyChannelFuture
   }
