@@ -31,10 +31,23 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
     parse("1 >= 0 || 3 > 2") shouldBe OR(GE(CONST_INT(1), CONST_INT(0)), GT(CONST_INT(3), CONST_INT(2)))
   }
 
-  property ("bytestr expressions") {
+  property("bytestr expressions") {
     parse("checkSig(base58'333', base58'222', base58'111')") shouldBe SIG_VERIFY(
       CONST_BYTEVECTOR(ByteVector(Base58.decode("333").get)),
       CONST_BYTEVECTOR(ByteVector(Base58.decode("222").get)),
-      CONST_BYTEVECTOR(ByteVector(Base58.decode("111").get)))
+      CONST_BYTEVECTOR(ByteVector(Base58.decode("111").get))
+    )
+  }
+
+  property("let constructs") {
+    parse("""let X = 10
+        |3 > 2
+      """.stripMargin) shouldBe CExpr(Some(LET("X", CONST_INT(10))), GT(CONST_INT(3), CONST_INT(2)))
+
+    parse("""let X = 10
+            |let Y = 10
+            |3 > 2
+          """.stripMargin) shouldBe CExpr(Some(LET("X", CONST_INT(10))), CExpr(Some(LET("Y", CONST_INT(10))), GT(CONST_INT(3), CONST_INT(2))))
+
   }
 }

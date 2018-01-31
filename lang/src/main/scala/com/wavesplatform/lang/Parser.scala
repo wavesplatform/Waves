@@ -1,17 +1,16 @@
 package com.wavesplatform.lang
 
 import com.wavesplatform.lang.Terms._
-import fastparse.{WhitespaceApi, core}
+import fastparse.{WhitespaceApi, core, noApi}
 import scodec.bits.ByteVector
 import scorex.crypto.encode.Base58
 
 object Parser {
 
   private val Base58Chars = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
-
   private val White = WhitespaceApi.Wrapper {
     import fastparse.all._
-    NoTrace(CharIn(" ", "\t", "\n").rep)
+    NoTrace(CharIn(" ", "\t", "\r").rep)
   }
 
   import fastparse.noApi._
@@ -25,7 +24,13 @@ object Parser {
   private def byteVectorP: P[CONST_BYTEVECTOR] =
     P("base58'" ~ CharsWhileIn(Base58Chars).! ~ "'").map(x => CONST_BYTEVECTOR(ByteVector(Base58.decode(x).get)))
 
-  private def stmt = P(expr)
+  private def letP: P[LET] = P("let" ~ CharIn('A' to 'Z').! ~ "=" ~ expr ~ "\n").map { case ((x, y)) => LET(x, y) }
+
+  private def stmt: P[Expr] = P(letP.rep ~ expr).map {
+    case ((Nil, y)) => y
+    case ((all, y)) => all.foldRight(y) { case (r, curr) => CExpr(Some(r), curr) }
+
+  }
 
   private val priority = List("||", "&&", "==", ">=", ">", "+")
 
@@ -54,7 +59,7 @@ object Parser {
 
   private def expr = P(binaryOp(priority) | atom)
 
-  private def atom = P(byteVectorP | numberP | trueP | falseP | sigVerifyP| bracesP)
+  private def atom = P(byteVectorP | numberP | trueP | falseP | sigVerifyP | bracesP)
 
   def apply(str: String): core.Parsed[Expr, Char, String] = stmt.parse(str)
 }
