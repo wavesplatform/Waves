@@ -6,6 +6,7 @@ import cats._
 import com.wavesplatform.UtxPoolImpl.PessimisticPortfolios
 import com.wavesplatform.features.FeatureProvider
 import com.wavesplatform.metrics.Instrumented
+import com.wavesplatform.mining.CombinedMiningLimit
 import com.wavesplatform.settings.{FunctionalitySettings, UtxSettings}
 import com.wavesplatform.state2.diffs.TransactionDiffer
 import com.wavesplatform.state2.reader.CompositeStateReader.composite
@@ -41,7 +42,7 @@ trait UtxPool {
 
   def transactionById(transactionId: ByteStr): Option[Transaction]
 
-  def packUnconfirmed(max: Int, sortInBlock: Boolean): Seq[Transaction]
+  def packUnconfirmed(limit: CombinedMiningLimit, sortInBlock: Boolean): (Seq[Transaction], CombinedMiningLimit)
 
   def batched(f: UtxBatchOps => Unit): Unit
 
@@ -145,34 +146,36 @@ class UtxPoolImpl(time: Time,
 
   override def transactionById(transactionId: ByteStr): Option[Transaction] = Option(transactions.get(transactionId))
 
-  override def packUnconfirmed(max: Int, sortInBlock: Boolean): Seq[Transaction] = {
+  override def packUnconfirmed(limit: CombinedMiningLimit, sortInBlock: Boolean): (Seq[Transaction], CombinedMiningLimit) = {
+    import limit.estimate
+
     val currentTs = time.correctedTime()
     removeExpired(currentTs)
     val s = stateReader()
     val differ = TransactionDiffer(fs, history.lastBlockTimestamp(), currentTs, s.height) _
-    val (invalidTxs, reversedValidTxs, _) = transactions
+    val (invalidTxs, reversedValidTxs, _, updatedLimit) = transactions
       .values.asScala.toSeq
       .sorted(TransactionsOrdering.InUTXPool)
-      .foldLeft((Seq.empty[ByteStr], Seq.empty[Transaction], Monoid[Diff].empty)) {
-        case ((invalid, valid, diff), tx) if valid.lengthCompare(max) <= 0 =>
+      .foldLeft((Seq.empty[ByteStr], Seq.empty[Transaction], Monoid[Diff].empty, limit)) {
+        case (r, _) if r._4.wasMet => r
+        case ((invalid, valid, diff, restLimit), tx) =>
           differ(composite(diff.asBlockDiff, s), featureProvider, tx) match {
-            case Right(newDiff) if valid.lengthCompare(max) < 0 =>
-              (invalid, tx +: valid, Monoid.combine(diff, newDiff))
-            case Right(_) =>
-              (invalid, valid, diff)
+            case Right(newDiff) =>
+              val updatedLimit = restLimit - tx
+              if (updatedLimit.wasMet) (invalid, valid, diff, restLimit)
+              else (invalid, tx +: valid, Monoid.combine(diff, newDiff), restLimit)
             case Left(_) =>
-              (tx.id() +: invalid, valid, diff)
+              (tx.id() +: invalid, valid, diff, restLimit)
           }
-        case (r, _) => r
       }
 
     invalidTxs.foreach { itx =>
       transactions.remove(itx)
       pessimisticPortfolios.remove(itx)
     }
-    if (sortInBlock)
-      reversedValidTxs.sorted(TransactionsOrdering.InBlock)
-    else reversedValidTxs.reverse
+
+    val txs = if (sortInBlock) reversedValidTxs.sorted(TransactionsOrdering.InBlock) else reversedValidTxs.reverse
+    (txs, updatedLimit)
   }
 
   override def batched(f: UtxBatchOps => Unit): Unit = f(new BatchOpsImpl(stateReader()))
