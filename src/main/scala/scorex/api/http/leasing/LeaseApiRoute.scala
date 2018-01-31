@@ -5,23 +5,26 @@ import javax.ws.rs.Path
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.UtxPool
 import com.wavesplatform.settings.RestAPISettings
+import com.wavesplatform.state2.StateReader
 import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
 import scorex.BroadcastRoute
+import scorex.account.Address
 import scorex.api.http._
 import scorex.api.http.leasing.LeaseCancelRequest.leaseCancelRequestFormat
 import scorex.api.http.leasing.LeaseRequest.leaseCancelRequestFormat
 import scorex.transaction._
+import scorex.transaction.lease.LeaseTransaction
 import scorex.utils.Time
 import scorex.wallet.Wallet
 
 @Path("/leasing")
 @Api(value = "/leasing")
-case class LeaseApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPool, allChannels: ChannelGroup, time: Time)
+case class LeaseApiRoute(settings: RestAPISettings, wallet: Wallet, state: StateReader, utx: UtxPool, allChannels: ChannelGroup, time: Time)
   extends ApiRoute with BroadcastRoute {
 
   override val route = pathPrefix("leasing") {
-    lease ~ cancel
+    lease ~ cancel ~ active
   }
 
   @Path("/lease")
@@ -58,4 +61,22 @@ case class LeaseApiRoute(settings: RestAPISettings, wallet: Wallet, utx: UtxPool
     )
   ))
   def cancel: Route = processRequest("cancel", (t: LeaseCancelRequest) => doBroadcast(TransactionFactory.leaseCancel(t, wallet, time)))
+
+  @Path("/active/{address}")
+  @ApiOperation(value = "Get all active leases for an address", httpMethod = "GET")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(name = "address", value = "Wallet address ", required = true, dataType = "string", paramType = "path")
+  ))
+  def active: Route = (pathPrefix("active") & get) {
+    pathPrefix(Segment) { address => complete(
+      Address.fromString(address) match {
+        case Left(e) => ApiError.fromValidationError(e)
+        case Right(a) =>
+          state().activeLeases()
+            .flatMap(state().transactionInfo)
+            .flatMap(_._2)
+            .filter(_.asInstanceOf[LeaseTransaction].sender.address == address)
+      })
+    }
+  }
 }
