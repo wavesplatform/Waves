@@ -110,6 +110,7 @@ object Evaluator {
             r[Boolean](ctx, cond) flatMap {
               case Right(true) => r(ctx, t1)
               case Right(false) => r(ctx, t2)
+              case Left(err) => done(Left(err))
             }
           case Left(err) => done(Left(err))
         }
