@@ -5,28 +5,33 @@ import com.wavesplatform.state2.ByteStr
 import com.wavesplatform.{BlockGen, RxScheduler, TransactionGen}
 import io.netty.channel.Channel
 import io.netty.channel.embedded.EmbeddedChannel
-import monix.reactive.subjects.PublishSubject
-import org.scalamock.scalatest.MockFactory
+import monix.reactive.Observable
+import monix.reactive.subjects.{PublishSubject => PS}
 import org.scalatest._
 
 import scala.concurrent.duration._
 
-class MicroBlockSynchronizerSpec extends FreeSpec with Matchers with TransactionGen with RxScheduler with MockFactory with BlockGen {
+class MicroBlockSynchronizerSpec extends FreeSpec with Matchers with TransactionGen with RxScheduler with BlockGen {
+  override def testSchedulerName = "test-microblock-synchronizer"
 
   val defaultSettngs = MicroblockSynchronizerSettings(1.second, 1.minute, 1.minute)
 
-  def buildMs(ms: MicroblockSynchronizerSettings = defaultSettngs) = {
+  def withMs(f: (PS[ByteStr], PS[(Channel, MicroBlockInv)], PS[(Channel, MicroBlockResponse)], Observable[(Channel, MicroBlockSynchronizer.MicroblockData)]) => Any) = {
     val peers = PeerDatabase.NoOp
-    val lastBlockIds = PublishSubject[ByteStr]
-    val microInvs = PublishSubject[(Channel, MicroBlockInv)]
-    val microResponses = PublishSubject[(Channel, MicroBlockResponse)]
-    val (r, _) = MicroBlockSynchronizer(ms, peers, lastBlockIds, microInvs, microResponses)
-    (lastBlockIds, microInvs, microResponses, r)
+    val lastBlockIds = PS[ByteStr]
+    val microInvs = PS[(Channel, MicroBlockInv)]
+    val microResponses = PS[(Channel, MicroBlockResponse)]
+    val (r, _) = MicroBlockSynchronizer(defaultSettngs, peers, lastBlockIds, microInvs, microResponses, testScheduler)
+    try { f(lastBlockIds, microInvs, microResponses, r) }
+    finally {
+      lastBlockIds.onComplete()
+      microInvs.onComplete()
+      microResponses.onComplete()
+    }
   }
 
-  "should request and propogate next microblock" in {
-    val (lastBlockIds, microInvs, microResponses, r) = buildMs()
-    val microblockDatas = newItems(r)
+  "should request and propagate next microblock" in withMs { (lastBlockIds, microInvs, microResponses, r) =>
+    val microblockData = newItems(r)
     val ch = new EmbeddedChannel()
     test(
       for {
@@ -34,12 +39,11 @@ class MicroBlockSynchronizerSpec extends FreeSpec with Matchers with Transaction
         _ <- send(microInvs)((ch, MicroBlockInv(signer, byteStr(1), byteStr(0))))
         _ = ch.readOutbound[MicroBlockRequest] shouldBe MicroBlockRequest(byteStr(1))
         _ <- send(microResponses)((ch, MicroBlockResponse(microBlock(1, 0))))
-        _ = microblockDatas().size shouldBe 1
+        _ = microblockData().size shouldBe 1
       } yield ())
   }
 
-  "should re-request next block if a previous one failed" in {
-    val (lastBlockIds, microInvs, microResponses, r) = buildMs()
+  "should re-request next block if a previous one failed" in withMs { (lastBlockIds, microInvs, microResponses, r) =>
     val microblockDatas = newItems(r)
     val ch = new EmbeddedChannel()
     val ch2 = new EmbeddedChannel()
@@ -59,8 +63,7 @@ class MicroBlockSynchronizerSpec extends FreeSpec with Matchers with Transaction
       })
   }
 
-  "should not request the same micro if received before" in {
-    val (lastBlockIds, microInvs, microResponses, r) = buildMs()
+  "should not request the same micro if received before" in withMs { (lastBlockIds, microInvs, microResponses, _) =>
     val ch = new EmbeddedChannel()
     test(
       for {
@@ -73,8 +76,7 @@ class MicroBlockSynchronizerSpec extends FreeSpec with Matchers with Transaction
       } yield Option(ch.readOutbound[MicroBlockRequest]) shouldBe None)
   }
 
-  "should not request forked microblocks" in {
-    val (lastBlockIds, microInvs, microResponses, r) = buildMs()
+  "should not request forked microblocks" in withMs { (lastBlockIds, microInvs, _, _) =>
     val ch = new EmbeddedChannel()
     val ch2 = new EmbeddedChannel()
     test(
@@ -86,8 +88,7 @@ class MicroBlockSynchronizerSpec extends FreeSpec with Matchers with Transaction
       } yield Option(ch2.readOutbound[MicroBlockRequest]) shouldBe None)
   }
 
-  "should remember inv to make a request later" in {
-    val (lastBlockIds, microInvs, microResponses, r) = buildMs()
+  "should remember inv to make a request later" in withMs { (lastBlockIds, microInvs, microResponses, _) =>
     val ch = new EmbeddedChannel()
     val ch2 = new EmbeddedChannel()
     test(

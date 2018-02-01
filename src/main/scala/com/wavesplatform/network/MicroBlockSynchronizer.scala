@@ -23,9 +23,10 @@ object MicroBlockSynchronizer {
             peerDatabase: PeerDatabase,
             lastBlockIdEvents: Observable[ByteStr],
             microblockInvs: ChannelObservable[MicroBlockInv],
-            microblockResponses: ChannelObservable[MicroBlockResponse]): (Observable[(Channel, MicroblockData)], Coeval[CacheSizes]) = {
+            microblockResponses: ChannelObservable[MicroBlockResponse],
+            scheduler: SchedulerService = Scheduler.singleThread("microblock-synchronizer")): (Observable[(Channel, MicroblockData)], Coeval[CacheSizes]) = {
 
-    implicit val scheduler: SchedulerService = Scheduler.singleThread("microblock-synchronizer")
+    implicit val schdlr: SchedulerService = scheduler
 
     val microBlockOwners = cache[MicroBlockSignature, MSet[Channel]](settings.invCacheTimeout)
     val nextInvs = cache[MicroBlockSignature, MicroBlockInv](settings.invCacheTimeout)

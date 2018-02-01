@@ -28,11 +28,11 @@ object RxExtensionLoader extends ScorexLogging {
             invalidBlocks: InvalidBlockStorage,
             blocks: Observable[(Channel, Block)],
             signatures: Observable[(Channel, Signatures)],
-            syncWithChannelClosed: Observable[ChannelClosedAndSyncWith]
-           )(extensionApplier: (Channel, ExtensionBlocks) => Task[ApplyExtensionResult])
-  : (Observable[(Channel, Block)], Coeval[State]) = {
+            syncWithChannelClosed: Observable[ChannelClosedAndSyncWith],
+            scheduler: SchedulerService = Scheduler.singleThread("rx-extension-loader"))
+           (extensionApplier: (Channel, ExtensionBlocks) => Task[ApplyExtensionResult]): (Observable[(Channel, Block)], Coeval[State]) = {
 
-    implicit val scheduler: SchedulerService = Scheduler.singleThread("rx-extension-loader")
+    implicit val schdlr = scheduler
 
     val extensions = ConcurrentSubject.publish[(Channel, ExtensionBlocks)]
     val simpleBlocks = ConcurrentSubject.publish[(Channel, Block)]

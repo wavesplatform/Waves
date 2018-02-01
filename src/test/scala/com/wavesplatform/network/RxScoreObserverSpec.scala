@@ -1,29 +1,36 @@
 package com.wavesplatform.network
 
-import com.wavesplatform.network.RxScoreObserver.BestChannel
+import com.wavesplatform.network.RxScoreObserver.{BestChannel, SyncWith}
 import com.wavesplatform.{RxScheduler, TransactionGen}
 import io.netty.channel.Channel
 import io.netty.channel.local.LocalChannel
+import monix.eval.Coeval
 import monix.reactive.subjects.PublishSubject
 import org.scalatest.{FreeSpec, Matchers}
 import scorex.transaction.History.BlockchainScore
 
 import scala.concurrent.duration._
 
-class RxScoreObserverSpec extends FreeSpec with Matchers with TransactionGen with RxScheduler{
+class RxScoreObserverSpec extends FreeSpec with Matchers with TransactionGen with RxScheduler {
+  override def testSchedulerName = "test-rx-score-observer"
 
-  def buildObserver() = {
+  def withObserver(f: (Coeval[Seq[SyncWith]], PublishSubject[BlockchainScore], PublishSubject[(Channel, BlockchainScore)], PublishSubject[Channel]) => Any) = {
     val localScores = PublishSubject[BlockchainScore]
     val remoteScores = PublishSubject[(Channel, BlockchainScore)]
     val channelClosed = PublishSubject[Channel]
-    val (syncWith, _) = RxScoreObserver(1.minute, 0.seconds, 0, localScores, remoteScores, channelClosed)
 
-    (newItems(syncWith.map(_.syncWith)), localScores, remoteScores, channelClosed)
+    val (syncWith, _) = RxScoreObserver(1.minute, 0.seconds, 0, localScores, remoteScores, channelClosed, testScheduler)
+
+    try { f(newItems(syncWith.map(_.syncWith))(implicitScheduler), localScores, remoteScores, channelClosed) }
+    finally {
+      localScores.onComplete()
+      remoteScores.onComplete()
+      channelClosed.onComplete()
+    }
   }
 
   "should emit better channel" - {
-    "when a new channel has the better score than the local one" in {
-      val (newSyncWith, localScores, remoteScores, _) = buildObserver()
+    "when a new channel has the better score than the local one" in withObserver { (newSyncWith, localScores, remoteScores, _) =>
       val testChannel = new LocalChannel()
 
       test(
@@ -35,8 +42,7 @@ class RxScoreObserverSpec extends FreeSpec with Matchers with TransactionGen wit
         } yield ())
     }
 
-    "when the connection with the best one is closed" in {
-      val (newSyncWith, localScores, remoteScores, closed) = buildObserver()
+    "when the connection with the best one is closed" in withObserver { (newSyncWith, localScores, remoteScores, closed) =>
       val ch100 = new LocalChannel()
       val ch200 = new LocalChannel()
 
@@ -51,8 +57,7 @@ class RxScoreObserverSpec extends FreeSpec with Matchers with TransactionGen wit
         } yield ())
     }
 
-    "when the best channel upgrades score" in {
-      val (newSyncWith, localScores, remoteScores, _) = buildObserver()
+    "when the best channel upgrades score" in withObserver { (newSyncWith, localScores, remoteScores, _) =>
       val testChannel = new LocalChannel()
 
       test(
@@ -67,8 +72,7 @@ class RxScoreObserverSpec extends FreeSpec with Matchers with TransactionGen wit
     }
 
 
-    "when the best channel downgrades score" in {
-      val (newSyncWith, localScores, remoteScores, _) = buildObserver()
+    "when the best channel downgrades score" in withObserver { (newSyncWith, localScores, remoteScores, _) =>
       val testChannel = new LocalChannel()
 
       test(
@@ -81,12 +85,10 @@ class RxScoreObserverSpec extends FreeSpec with Matchers with TransactionGen wit
           _ = newSyncWith() shouldBe List(Some(BestChannel(testChannel, 2)))
         } yield ())
     }
-
-
   }
+
   "should emit None" - {
-    "stop when local score is as good as network's" in {
-      val (newSyncWith, localScores, remoteScores, closed) = buildObserver()
+    "stop when local score is as good as network's" in withObserver { (newSyncWith, localScores, remoteScores, _) =>
       val ch100 = new LocalChannel()
 
       test(for {
@@ -98,8 +100,7 @@ class RxScoreObserverSpec extends FreeSpec with Matchers with TransactionGen wit
       } yield ())
     }
 
-    "stop when local score is better than network's" in {
-      val (newSyncWith, localScores, remoteScores, closed) = buildObserver()
+    "stop when local score is better than network's" in withObserver { (newSyncWith, localScores, remoteScores, _) =>
       val ch100 = new LocalChannel()
 
       test(for {
@@ -115,8 +116,7 @@ class RxScoreObserverSpec extends FreeSpec with Matchers with TransactionGen wit
   "should not emit anything" - {
     "when current best channel is not changed and its score is not changed" - {
 
-      "directly" in {
-        val (newSyncWith, localScores, remoteScores, closed) = buildObserver()
+      "directly" in withObserver { (newSyncWith, localScores, remoteScores, _) =>
         val ch100 = new LocalChannel()
 
         test(for {
@@ -128,8 +128,7 @@ class RxScoreObserverSpec extends FreeSpec with Matchers with TransactionGen wit
         } yield ())
       }
 
-      "indirectly" in {
-        val (newSyncWith, localScores, remoteScores, closed) = buildObserver()
+      "indirectly"  in withObserver { (newSyncWith, localScores, remoteScores, _) =>
         val ch100 = new LocalChannel()
 
         test(for {
