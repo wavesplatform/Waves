@@ -99,4 +99,27 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
       IF(EQ(CONST_INT(1), CONST_INT(2)), CONST_INT(0), CONST_BYTEVECTOR(ByteVector.empty))
     ) should produce("Typecheck failed")
   }
+
+  property("Typechecking") {
+    ev(EQ(CONST_INT(2), CONST_INT(2))) shouldBe Right(true)
+  }
+
+  property("successful Typechecking Some") {
+    ev(EQ(SOME(CONST_INT(2)), SOME(CONST_INT(2)))) shouldBe Right(true)
+  }
+
+  property("successful Typechecking Option") {
+    ev(EQ(SOME(CONST_INT(2)), NONE)) shouldBe Right(false)
+    ev(EQ(NONE, SOME(CONST_INT(2)))) shouldBe Right(false)
+  }
+
+  property("successful nested Typechecking Option") {
+    ev(EQ(SOME(SOME(SOME(CONST_INT(2)))), NONE)) shouldBe Right(false)
+    ev(EQ(SOME(NONE), SOME(SOME(CONST_INT(2))))) shouldBe Right(false)
+  }
+
+  property("fails if nested Typechecking Option finds mismatch") {
+    ev(EQ(SOME(SOME(FALSE)), SOME(SOME(CONST_INT(2))))) should produce("Typecheck failed")
+  }
+
 }

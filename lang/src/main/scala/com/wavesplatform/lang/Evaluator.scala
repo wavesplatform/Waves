@@ -34,8 +34,8 @@ object Evaluator {
         lType <- resolveType(defs, l)
         rType <- resolveType(defs, r)
       } yield {
-        lType.flatMap(t1 => rType.map(t2 => t1 == t2))
-          .fold(fa => Left(fa), x => if (x) lType else Left(s"Typecheck failed for IF: RType($rType) differs from LType($lType)"))
+        lType.flatMap(t1 => rType.map(t2 => eqType(t1,t2)))
+          .fold(fa => Left(fa), x => if (x.isDefined) Right(x.get) else Left(s"Typecheck failed for IF: RType($rType) differs from LType($lType)"))
       }
     }
     case EQ(l,r) => tailcall {
@@ -43,7 +43,7 @@ object Evaluator {
         lType <- resolveType(defs, l)
         rType <- resolveType(defs, r)
       } yield {
-        rType.flatMap(t1 => lType.map(t2 => t1 == t2))
+        rType.flatMap(t1 => lType.map(t2 => eqType(t1,t2).isDefined))
           .fold(fa => Left(fa), x => if (x) Right(BOOLEAN) else Left(s"Typecheck failed for EQ: RType($rType) differs from LType($lType)"))
       }
     }
@@ -53,6 +53,12 @@ object Evaluator {
         case Right(OPTION(in)) => done(Right(in))
         case Right(x) => done(Left(s"Typecheck failed: GET called on $x, but only call on OPTION[_] is allowed"))
         case _ => done(Left(s"Typecheck failed"))
+      }
+    }
+    case SOME(b) => tailcall{
+      resolveType(defs, b) flatMap {
+        case Right(tpe) => done(Right(OPTION(tpe)))
+        case Left(err) => done(Left(s"Typecheck failed: $err"))
       }
     }
     case x => done(Right(x.predefinedType.get))
@@ -171,6 +177,27 @@ object Evaluator {
           }
         }))
       }
+
+      case GET(opt) => tailcall {
+        resolveType(ctx.defs, opt).flatMap(optType => optType.fold(fa => done(Left(fa)), t => {
+          r[t.Underlying](ctx, opt).map {
+            case Right(x: Option[_]) =>
+              x match {
+                case Some(xx) => Right(xx)
+                case None => Left("get(NONE)")
+              }
+            case Left(_) => Left("GET invoked on non-option type")
+            case _ => Left("GET expression error")
+          }
+        }))
+      }
+      case NONE => done(Right(None))
+      case SOME(b) =>tailcall {
+        resolveType(ctx.defs, b).flatMap {
+          case Right(tpe) => r[tpe.Underlying](ctx,b).map(_.map(x=>Some(x)))
+          case Left(err) => done(Left(err))
+        }
+      }
       case eq@EQ(it1, it2) => tailcall {
         resolveType(ctx.defs, eq).flatMap {
           case Right(tpe) =>
@@ -193,9 +220,10 @@ object Evaluator {
 
   def apply[A](c: Context, term: Expr): ExecResult[A] = {
     lazy val result = r[A](c, term).result
-    Try(result) match {
-      case Failure(ex) => Left(ex.toString)
-      case Success(res) => res
-    }
+//    Try(result) match {
+//      case Failure(ex) => Left(ex.toString)
+//      case Success(res) => res
+//    }
+    result
   }
 }

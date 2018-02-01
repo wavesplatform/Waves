@@ -38,6 +38,8 @@ object Serde {
   implicit def dIsDefined       = d.bind[IS_DEFINED](16)
   implicit def dTrue            = d.bind[TRUE.type](17)
   implicit def dFalse           = d.bind[FALSE.type](18)
+  implicit def dSome           = d.bind[SOME](19)
+  implicit def dNone           = d.bind[NONE.type](20)
 
   val codec = Codec[Expr]
 }
