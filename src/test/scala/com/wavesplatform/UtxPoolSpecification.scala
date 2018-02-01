@@ -4,7 +4,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock
 
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.history.{HistoryWriterImpl, StorageFactory}
-import com.wavesplatform.mining.{CombinedMiningLimit, ComplexityMiningLimit, TxNumberMiningLimit}
+import com.wavesplatform.mining.{ComplexityMiningConstraint, DefaultMiningConstraintUpdater, TxNumberMiningConstraint}
 import com.wavesplatform.settings.{BlockchainSettings, FeeSettings, FeesSettings, FunctionalitySettings, UtxSettings, WavesSettings}
 import com.wavesplatform.state2.diffs._
 import org.scalacheck.Gen
@@ -210,7 +210,7 @@ class UtxPoolSpecification extends FreeSpec
       utx.all.size shouldEqual txs.size
 
       val maxNumber = utx.all.size / 2
-      val (packed, _) = utx.packUnconfirmed(limitByNumber(maxNumber), sortInBlock = false)
+      val packed = utx.packUnconfirmed(limitByNumber(maxNumber), sortInBlock = false)
 
       packed.lengthCompare(maxNumber) should be <= 0
     }
@@ -219,11 +219,11 @@ class UtxPoolSpecification extends FreeSpec
       all(txs.map(utx.putIfNew)) shouldBe 'right
       utx.all.size shouldEqual txs.size
 
-      val totalComplexity = ComplexityMiningLimit(0).estimate(utx.all)
+      val totalComplexity = ComplexityMiningConstraint(0).estimate(utx.all)
       val maxComplexity = totalComplexity.copy(restValue = totalComplexity.restValue / 2)
 
-      val (packed, _) = utx.packUnconfirmed(CombinedMiningLimit(maxComplexity, maxComplexity), sortInBlock = false)
-      val packedComplexity = ComplexityMiningLimit(0).estimate(packed)
+      val packed = utx.packUnconfirmed(new DefaultMiningConstraintUpdater(maxComplexity, maxComplexity), sortInBlock = false)
+      val packedComplexity = ComplexityMiningConstraint(0).estimate(packed)
 
       packedComplexity.restValue should be <= maxComplexity.restValue
     }
@@ -234,7 +234,7 @@ class UtxPoolSpecification extends FreeSpec
 
       time.advance(offset)
 
-      val (packed, _) = utx.packUnconfirmed(limitByNumber(100), sortInBlock = false)
+      val packed = utx.packUnconfirmed(limitByNumber(100), sortInBlock = false)
       packed shouldBe 'empty
       utx.all shouldBe 'empty
     }
@@ -245,7 +245,7 @@ class UtxPoolSpecification extends FreeSpec
 
       time.advance(offset)
 
-      val (packed, _) = utx.packUnconfirmed(limitByNumber(100), sortInBlock = false)
+      val packed = utx.packUnconfirmed(limitByNumber(100), sortInBlock = false)
       packed.size shouldBe 2
       utx.all.size shouldBe 2
     }
@@ -322,8 +322,8 @@ class UtxPoolSpecification extends FreeSpec
     }
   }
 
-  private def limitByNumber(n: Int): CombinedMiningLimit = {
-    val leaf = TxNumberMiningLimit(n)
-    CombinedMiningLimit(leaf, leaf)
+  private def limitByNumber(n: Int): DefaultMiningConstraintUpdater = {
+    val leaf = TxNumberMiningConstraint(n)
+    new DefaultMiningConstraintUpdater(leaf, leaf)
   }
 }

@@ -2,7 +2,7 @@ package com.wavesplatform.state2
 
 import com.wavesplatform.UtxPool
 import com.wavesplatform.features.{BlockchainFeatures, FeatureProvider}
-import com.wavesplatform.mining.{CombinedMiningLimit, Miner, MiningLimit}
+import com.wavesplatform.mining._
 import com.wavesplatform.network._
 import com.wavesplatform.settings.{FunctionalitySettings, WavesSettings}
 import com.wavesplatform.state2.reader.SnapshotStateReader
@@ -84,10 +84,10 @@ package object appender extends ScorexLogging {
         (), GenericError(s"Block Version 3 can only appear at height greater than ${fs.blockVersion3AfterHeight}"))
       _ <- Either.cond(blockTime - currentTs < MaxTimeDrift, (), BlockFromFuture(blockTime))
       _ <- {
-        val totalLimit: MiningLimit = CombinedMiningLimit.total(settings.minerSettings, fp, height + 1)
-        val estimatedLimit: MiningLimit = totalLimit.estimate(block)
-        val diffLimit = totalLimit - estimatedLimit
-        Either.cond(!diffLimit.wasMet, (), GenericError("Block is too complex"))
+        val constraints = EntireMiningConstraints(settings.minerSettings, fp, height) // + 1 ?
+        val differ = OneMiningConstraintUpdater.full(constraints.total)
+        differ -= block
+        Either.cond(!differ.wasMet, (), GenericError("Block is too complex"))
       }
       _ <- Either.cond(blockTime < fs.requireSortedTransactionsAfter
         || height > fs.dontRequireSortedTransactionsAfter
