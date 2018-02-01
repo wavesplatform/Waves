@@ -52,7 +52,7 @@ object Evaluator {
       resolveType(defs, get.t) flatMap {
         case Right(OPTION(in)) => done(Right(in))
         case Right(x) => done(Left(s"Typecheck failed: GET called on $x, but only call on OPTION[_] is allowed"))
-        case _ => done(Left(s"Typecheck failed"))
+        case Left(err) => done(Left(s"Typecheck failed: $err"))
       }
     }
     case SOME(b) => tailcall{

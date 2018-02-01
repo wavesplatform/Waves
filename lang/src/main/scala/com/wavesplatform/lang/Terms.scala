@@ -17,7 +17,7 @@ object Terms {
     else if (t1 == t2) Some(t1)
     else
       (t1, t2) match {
-        case (OPTION(it1), OPTION(it2)) => eqType(it1, it2)
+        case (OPTION(it1), OPTION(it2)) => eqType(it1, it2).map(OPTION)
         case _                          => None
       }
 

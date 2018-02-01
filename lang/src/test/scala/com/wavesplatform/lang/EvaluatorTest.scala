@@ -122,4 +122,25 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
     ev(EQ(SOME(SOME(FALSE)), SOME(SOME(CONST_INT(2))))) should produce("Typecheck failed")
   }
 
+  property("successful GET/IS_DEFINED") {
+    ev(IS_DEFINED(NONE)) shouldBe Right(false)
+    ev(IS_DEFINED(SOME(CONST_INT(1)))) shouldBe Right(true)
+    ev(GET(SOME(CONST_INT(1)))) shouldBe Right(1)
+  }
+
+  property("resolveType") {
+    Evaluator.resolveType(Map.empty, SOME(CONST_INT(3))).result shouldBe Right(OPTION(INT))
+    Evaluator.resolveType(Map.empty, NONE).result shouldBe Right(OPTION(NOTHING))
+    Evaluator.resolveType(Map.empty, IF(TRUE, SOME(CONST_INT(3)), NONE)).result shouldBe Right(OPTION(INT))
+    Evaluator.resolveType(Map.empty, IF(TRUE, NONE, SOME(CONST_INT(3)))).result shouldBe Right(OPTION(INT))
+    Evaluator.resolveType(Map.empty, IF(TRUE, NONE, NONE)).result shouldBe Right(OPTION(NOTHING))
+    Evaluator.resolveType(Map.empty, IF(TRUE, SOME(FALSE), SOME(CONST_INT(3)))).result should produce("Typecheck")
+  }
+
+  property("successful resolve strongest type") {
+    ev(GET(IF(TRUE, SOME(CONST_INT(3)), SOME(CONST_INT(2))))) shouldBe Right(3)
+    ev(GET(IF(TRUE, SOME(CONST_INT(3)), NONE))) shouldBe Right(3)
+    ev(SUM(CONST_INT(1), GET(IF(TRUE, SOME(CONST_INT(3)), NONE)))) shouldBe Right(4)
+  }
+
 }
