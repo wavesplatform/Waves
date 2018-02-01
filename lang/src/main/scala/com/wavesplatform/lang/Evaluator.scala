@@ -20,7 +20,7 @@ object Evaluator {
 
   def resolveType(defs: Defs, t: Expr): TailRec[Either[TypeResolutionError, Type]] = t match {
     case REF(key) => done(defs.get(key).map(_._1).toRight(s"Typecheck failed: Cannot resolve type of $key"))
-    case CExpr(maybeLet, expr) => tailcall {
+    case Block(maybeLet, expr) => tailcall {
       maybeLet match {
         case Some(let) =>
           resolveType(defs, let.value)
@@ -50,12 +50,12 @@ object Evaluator {
 
   private def r[T](ctx: Context, t: Expr): TailRec[ExecResult[T]] = {
     (t match {
-      case CExpr(maybelet, inner) => tailcall {
+      case Block(maybelet, inner) => tailcall {
         maybelet match {
           case None => resolveType(ctx.defs, inner).flatMap(termType => {
             termType.fold(fa => done(Left(fa)), t => r[t.Underlying](ctx, inner))
           })
-          case Some(LET(newVarName: String, newVarExpr: CExpr)) => {
+          case Some(LET(newVarName: String, newVarExpr: Block)) => {
             resolveType(ctx.defs, newVarExpr).flatMap(newVarType => {
               Either.cond(ctx.defs.get(newVarName).isEmpty, (), s"Value '$newVarName' already defined in the scope").flatMap(_ => newVarType)
                 .fold(fa => done(Left(fa)), t => r[t.Underlying](ctx, newVarExpr)
@@ -156,8 +156,8 @@ object Evaluator {
                 case Some(xx) => Right(true)
                 case None => Right(false)
               }
-            case Left(_) => Left("GET invoked on non-option type")
-            case _ => Left("GET expression error")
+            case Left(_) => Left("IS_DEFINED invoked on non-option type")
+            case _ => Left("IS_DEFINED expression error")
           }
         }))
       }

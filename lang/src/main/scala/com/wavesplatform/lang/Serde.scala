@@ -32,7 +32,7 @@ object Serde {
   implicit def dHeight          = d[Int].bind[HEIGHT.type](10)
   implicit def dField           = d.bind[TX_FIELD](11)
   implicit def dLet             = d.bind[LET](12)
-  implicit def dComposite       = d.bind[CExpr](13)
+  implicit def dComposite       = d.bind[Block](13)
   implicit def dRef             = d.bind[REF](14)
   implicit def dGet             = d.bind[GET](15)
   implicit def dIsDefined       = d.bind[IS_DEFINED](16)

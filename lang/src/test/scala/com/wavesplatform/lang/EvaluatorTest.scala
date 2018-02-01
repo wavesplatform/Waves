@@ -10,7 +10,7 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
 
   private def ev(c: Expr): Either[_, _] = Evaluator.apply(Context(new HeightDomain(1), Map.empty), c)
 
-  private def simpleDeclarationAndUsage(i: Int) = CExpr(Some(LET("x", CONST_INT(i))), REF("x"))
+  private def simpleDeclarationAndUsage(i: Int) = Block(Some(LET("x", CONST_INT(i))), REF("x"))
 
   property("successful on very deep expressions (stack overflow check)") {
     val term = (1 to 100000).foldLeft[Terms.Expr](CONST_INT(0))((acc, _) => SUM(acc, CONST_INT(1)))
@@ -19,7 +19,7 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
 
   property("successful on unused let") {
     ev(
-      CExpr(
+      Block(
         Some(LET("x", CONST_INT(3))),
         CONST_INT(3)
       )) shouldBe Right(3)
@@ -27,8 +27,8 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
 
   property("successful on x = y") {
     ev(
-      CExpr(Some(LET("x", CONST_INT(3))),
-            CExpr(
+      Block(Some(LET("x", CONST_INT(3))),
+            Block(
               Some(LET("y", REF("x"))),
               SUM(REF("x"), REF("y"))
             ))) shouldBe Right(6)
@@ -40,7 +40,7 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
 
   property("successful on get used further in expr") {
     ev(
-      CExpr(
+      Block(
         Some(LET("x", CONST_INT(3))),
         EQ_INT(REF("x"), CONST_INT(2))
       )) shouldBe Right(false)
@@ -48,17 +48,17 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
 
   property("successful on multiple lets") {
     ev(
-      CExpr(
+      Block(
         Some(LET("x", CONST_INT(3))),
-        CExpr(Some(LET("y", CONST_INT(3))), EQ_INT(REF("x"), REF("y")))
+        Block(Some(LET("y", CONST_INT(3))), EQ_INT(REF("x"), REF("y")))
       )) shouldBe Right(true)
   }
 
   property("successful on multiple lets with expression") {
     ev(
-      CExpr(
+      Block(
         Some(LET("x", CONST_INT(3))),
-        CExpr(Some(LET("y", SUM(CONST_INT(3), CONST_INT(0)))), EQ_INT(REF("x"), REF("y")))
+        Block(Some(LET("y", SUM(CONST_INT(3), CONST_INT(0)))), EQ_INT(REF("x"), REF("y")))
       )) shouldBe Right(true)
   }
 
@@ -76,17 +76,17 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
 
   property("fails if override") {
     ev(
-      CExpr(
+      Block(
         Some(LET("x", CONST_INT(3))),
-        CExpr(Some(LET("x", SUM(CONST_INT(3), CONST_INT(0)))), EQ_INT(REF("x"), REF("y")))
+        Block(Some(LET("x", SUM(CONST_INT(3), CONST_INT(0)))), EQ_INT(REF("x"), REF("y")))
       )) should produce("already defined")
   }
 
   property("fails if types do not match") {
     ev(
-      CExpr(
+      Block(
         Some(LET("x", CONST_INT(3))),
-        CExpr(Some(LET("y", EQ_INT(CONST_INT(3), CONST_INT(0)))), EQ_INT(REF("x"), REF("y")))
+        Block(Some(LET("y", EQ_INT(CONST_INT(3), CONST_INT(0)))), EQ_INT(REF("x"), REF("y")))
       )) should produce("Cast")
   }
 

@@ -8,6 +8,7 @@ import scorex.crypto.encode.Base58
 object Parser {
 
   private val Base58Chars = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+
   private val White = WhitespaceApi.Wrapper {
     import fastparse.all._
     NoTrace(CharIn(" ", "\t", "\r", "\n").rep)
@@ -19,15 +20,18 @@ object Parser {
   private def numberP: P[CONST_INT]     = P(CharIn('0' to '9').rep(min = 1).!.map(t => CONST_INT(t.toInt)))
   private def trueP: P[TRUE.type]       = P("true").map(_ => TRUE)
   private def falseP: P[FALSE.type]     = P("false").map(_ => FALSE)
-  private def bracesP: P[Expr]          = P("(" ~ expr ~ ")")
-  private def sigVerifyP: P[SIG_VERIFY] = P("checkSig" ~ "(" ~ expr ~ "," ~ expr ~ "," ~ expr ~ ")").map { case ((x, y, z)) => SIG_VERIFY(x, y, z) }
-  private def letP: P[LET]              = P("\n".rep ~ "let " ~ CharIn('A' to 'Z').! ~ "=" ~ expr ~ ";").map { case ((x, y)) => LET(x, y) }
+  private def bracesP: P[Expr]          = P("(" ~ block ~ ")")
+  private def sigVerifyP: P[SIG_VERIFY] = P("checkSig" ~ "(" ~ block ~ "," ~ block ~ "," ~ block ~ ")").map { case ((x, y, z)) => SIG_VERIFY(x, y, z) }
+  private def letP: P[LET]              = P("let " ~ CharIn('A' to 'Z').! ~ "=" ~ block ~ ";").map { case ((x, y)) => LET(x, y) }
   private def byteVectorP: P[CONST_BYTEVECTOR] =
     P("base58'" ~ CharsWhileIn(Base58Chars).! ~ "'").map(x => CONST_BYTEVECTOR(ByteVector(Base58.decode(x).get)))
+  private def refP: P[REF] = P(CharIn('A' to 'Z').!.map(x => REF(x)))
 
-  private def stmt: P[Expr] = P(letP.rep ~ expr).map {
+  private def ifP: P[IF] = P("if" ~ "(" ~ block ~ ")" ~ "then" ~ block ~ "else" ~ block).map { case (x, y, z) => IF(x, y, z) }
+
+  private def block: P[Expr] = P("\n".rep ~ letP.rep ~ expr).map {
     case ((Nil, y)) => y
-    case ((all, y)) => all.foldRight(y) { case (r, curr) => CExpr(Some(r), curr) }
+    case ((all, y)) => all.foldRight(y) { case (r, curr) => Block(Some(r), curr) }
 
   }
 
@@ -56,7 +60,7 @@ object Parser {
 
   private def expr = P(binaryOp(priority) | atom)
 
-  private def atom = P(byteVectorP | numberP | trueP | falseP | bracesP | sigVerifyP)
+  private def atom = P(ifP | byteVectorP | numberP | trueP | falseP | bracesP | sigVerifyP | refP )
 
-  def apply(str: String): core.Parsed[Expr, Char, String] = stmt.parse(str)
+  def apply(str: String): core.Parsed[Expr, Char, String] = block.parse(str)
 }
