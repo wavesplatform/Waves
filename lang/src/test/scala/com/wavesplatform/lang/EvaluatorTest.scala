@@ -42,7 +42,7 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
     ev(
       Block(
         Some(LET("x", CONST_INT(3))),
-        EQ_INT(REF("x"), CONST_INT(2))
+        EQ(REF("x"), CONST_INT(2))
       )) shouldBe Right(false)
   }
 
@@ -50,7 +50,7 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
     ev(
       Block(
         Some(LET("x", CONST_INT(3))),
-        Block(Some(LET("y", CONST_INT(3))), EQ_INT(REF("x"), REF("y")))
+        Block(Some(LET("y", CONST_INT(3))), EQ(REF("x"), REF("y")))
       )) shouldBe Right(true)
   }
 
@@ -58,19 +58,19 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
     ev(
       Block(
         Some(LET("x", CONST_INT(3))),
-        Block(Some(LET("y", SUM(CONST_INT(3), CONST_INT(0)))), EQ_INT(REF("x"), REF("y")))
+        Block(Some(LET("y", SUM(CONST_INT(3), CONST_INT(0)))), EQ(REF("x"), REF("y")))
       )) shouldBe Right(true)
   }
 
   property("successful on deep type resolution") {
     ev(
-      IF(EQ_INT(CONST_INT(1), CONST_INT(2)), simpleDeclarationAndUsage(3), CONST_INT(4))
+      IF(EQ(CONST_INT(1), CONST_INT(2)), simpleDeclarationAndUsage(3), CONST_INT(4))
     ) shouldBe Right(4)
   }
 
   property("successful on same value names in different branches") {
     ev(
-      IF(EQ_INT(CONST_INT(1), CONST_INT(2)), simpleDeclarationAndUsage(3), simpleDeclarationAndUsage(4))
+      IF(EQ(CONST_INT(1), CONST_INT(2)), simpleDeclarationAndUsage(3), simpleDeclarationAndUsage(4))
     ) shouldBe Right(4)
   }
 
@@ -78,7 +78,7 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
     ev(
       Block(
         Some(LET("x", CONST_INT(3))),
-        Block(Some(LET("x", SUM(CONST_INT(3), CONST_INT(0)))), EQ_INT(REF("x"), REF("y")))
+        Block(Some(LET("x", SUM(CONST_INT(3), CONST_INT(0)))), EQ(REF("x"), CONST_INT(1)))
       )) should produce("already defined")
   }
 
@@ -86,17 +86,17 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
     ev(
       Block(
         Some(LET("x", CONST_INT(3))),
-        Block(Some(LET("y", EQ_INT(CONST_INT(3), CONST_INT(0)))), EQ_INT(REF("x"), REF("y")))
-      )) should produce("Cast")
+        Block(Some(LET("y", EQ(CONST_INT(3), CONST_INT(0)))), EQ(REF("x"), REF("y")))
+      )) should produce("Typecheck failed")
   }
 
   property("fails if definition not found") {
-    ev(EQ_INT(REF("x"), CONST_INT(2))) should produce("Definition 'x' not found")
+    ev(SUM(REF("x"), CONST_INT(2))) should produce("Cannot resolve type of x")
   }
 
   property("fails if 'IF' branches lead to different types") {
     ev(
-      IF(EQ_INT(CONST_INT(1), CONST_INT(2)), CONST_INT(0), CONST_BYTEVECTOR(ByteVector.empty))
-    ) should produce("Typecheck failed: RType")
+      IF(EQ(CONST_INT(1), CONST_INT(2)), CONST_INT(0), CONST_BYTEVECTOR(ByteVector.empty))
+    ) should produce("Typecheck failed")
   }
 }

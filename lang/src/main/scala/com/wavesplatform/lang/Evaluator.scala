@@ -29,15 +29,25 @@ object Evaluator {
         case None => resolveType(defs, expr)
       }
     }
-    case IF(_, r, l) => tailcall {
+    case IF(_, l, r) => tailcall {
       for {
-        rType <- resolveType(defs, r)
         lType <- resolveType(defs, l)
+        rType <- resolveType(defs, r)
       } yield {
-        rType.flatMap(t1 => lType.map(t2 => t1 == t2))
-          .fold(fa => Left(fa), x => if (x) rType else Left("Typecheck failed: RType($rType) differs from LType($lType)"))
+        lType.flatMap(t1 => rType.map(t2 => t1 == t2))
+          .fold(fa => Left(fa), x => if (x) lType else Left(s"Typecheck failed for IF: RType($rType) differs from LType($lType)"))
       }
     }
+    case EQ(l,r) => tailcall {
+      for {
+        lType <- resolveType(defs, l)
+        rType <- resolveType(defs, r)
+      } yield {
+        rType.flatMap(t1 => lType.map(t2 => t1 == t2))
+          .fold(fa => Left(fa), x => if (x) Right(BOOLEAN) else Left(s"Typecheck failed for EQ: RType($rType) differs from LType($lType)"))
+      }
+    }
+
     case get: GET => tailcall {
       resolveType(defs, get.t) flatMap {
         case Right(OPTION(in)) => done(Right(in))
@@ -126,7 +136,7 @@ object Evaluator {
             }
         }
       }
-      case OR(t1, t2) => tailcall {
+      case o@OR(t1, t2) => tailcall {
         r[Boolean](ctx, t1) flatMap {
           case Left(err) => done(Left(err))
           case Right(true) => done(Right(true))
@@ -161,11 +171,15 @@ object Evaluator {
           }
         }))
       }
-      case EQ_INT(it1, it2) => tailcall {
-        for {
-          i1 <- r[Int](ctx, it1)
-          i2 <- r[Int](ctx, it2)
-        } yield i1.flatMap(v1 => i2.map(v2 => v1 == v2))
+      case eq@EQ(it1, it2) => tailcall {
+        resolveType(ctx.defs, eq).flatMap {
+          case Right(tpe) =>
+            for {
+              i1 <- r[tpe.Underlying](ctx, it1)
+              i2 <- r[tpe.Underlying](ctx, it2)
+            } yield i1.flatMap(v1 => i2.map(v2 => v1 == v2))
+          case Left(err) => done(Left(err))
+        }
       }
       case SIG_VERIFY(msg, sig, pk) => tailcall {
         for {

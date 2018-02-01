@@ -28,10 +28,10 @@ trait ScriptGen {
     i2 <- INTGen((gas - 2) / 2)
   } yield GT(i1, i2)
 
-  private def EQ_INTgen(gas: Int): Gen[EQ_INT] = for {
+  private def EQ_INTgen(gas: Int): Gen[EQ] = for {
     i1 <- INTGen((gas - 2) / 2)
     i2 <- INTGen((gas - 2) / 2)
-  } yield EQ_INT(i1, i2)
+  } yield EQ(i1, i2)
 
   private def ANDgen(gas: Int): Gen[AND] = for {
     i1 <- BOOLgen((gas - 2) / 2)

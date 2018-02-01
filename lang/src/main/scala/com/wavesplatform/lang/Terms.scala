@@ -28,7 +28,7 @@ object Terms {
   case class SUM(i1: Block, i2: Block)                                      extends Expr { val predefinedType: Option[Type] = Some(INT)        }
   case class AND(t1: Block, t2: Block)                                      extends Expr { val predefinedType: Option[Type] = Some(BOOLEAN)    }
   case class OR(t1: Block, t2: Block)                                       extends Expr { val predefinedType: Option[Type] = Some(BOOLEAN)    }
-  case class EQ_INT(t1: Expr, t2: Block)                                    extends Expr { val predefinedType: Option[Type] = Some(BOOLEAN)    }
+  case class EQ(t1: Expr, t2: Block)                                        extends Expr { val predefinedType: Option[Type] = Some(BOOLEAN)    }
   case class GT(t1: Block, t2: Block)                                       extends Expr { val predefinedType: Option[Type] = Some(BOOLEAN)    }
   case class GE(t1: Block, t2: Block)                                       extends Expr { val predefinedType: Option[Type] = Some(BOOLEAN)    }
   case class SIG_VERIFY(message: Block, signature: Block, publicKey: Block) extends Expr { val predefinedType: Option[Type] = Some(BOOLEAN)    }

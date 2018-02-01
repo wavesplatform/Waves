@@ -17,23 +17,22 @@ object Parser {
   import fastparse.noApi._
   import White._
 
-  private def numberP: P[CONST_INT] = P(CharIn('0' to '9').rep(min = 1).!.map(t => CONST_INT(t.toInt)))
-  private def trueP: P[TRUE.type]   = P("true").map(_ => TRUE)
-  private def falseP: P[FALSE.type] = P("false").map(_ => FALSE)
-  private def bracesP: P[Expr]      = P("(" ~ block ~ ")")
-  private def curlyBracesP: P[Expr] = P("{" ~ block ~ "}")
+  private def numberP: P[CONST_INT]    = P(CharIn('0' to '9').rep(min = 1).!.map(t => CONST_INT(t.toInt)))
+  private def trueP: P[TRUE.type]      = P("true").map(_ => TRUE)
+  private def falseP: P[FALSE.type]    = P("false").map(_ => FALSE)
+  private def bracesP: P[Expr]         = P("(" ~ block ~ ")")
+  private def curlyBracesP: P[Expr]    = P("{" ~ block ~ "}")
+  private def letP: P[LET]             = P("let " ~ CharIn('A' to 'Z').! ~ "=" ~ block ~ ";").map { case ((x, y)) => LET(x, y) }
+  private def refP: P[REF]             = P(CharIn('A' to 'Z').!.map(x => REF(x)))
+  private def ifP: P[IF]               = P("if" ~ "(" ~ block ~ ")" ~ "then" ~ block ~ "else" ~ block).map { case (x, y, z) => IF(x, y, z) }
+  private def isDefined: P[IS_DEFINED] = P("isDefined" ~ "(" ~ block ~ ")").map(b => IS_DEFINED(b))
+  private def getP: P[GET]             = P("get" ~ "(" ~ block ~ ")").map(b => GET(b))
+
   private def sigVerifyP: P[SIG_VERIFY] = P("checkSig" ~ "(" ~ block ~ "," ~ block ~ "," ~ block ~ ")").map {
     case ((x, y, z)) => SIG_VERIFY(x, y, z)
   }
-  private def letP: P[LET] = P("let " ~ CharIn('A' to 'Z').! ~ "=" ~ block ~ ";").map { case ((x, y)) => LET(x, y) }
   private def byteVectorP: P[CONST_BYTEVECTOR] =
     P("base58'" ~ CharsWhileIn(Base58Chars).! ~ "'").map(x => CONST_BYTEVECTOR(ByteVector(Base58.decode(x).get)))
-
-  private def refP: P[REF] = P(CharIn('A' to 'Z').!.map(x => REF(x)))
-  private def ifP: P[IF] = P("if" ~ "(" ~ block ~ ")" ~ "then" ~ block ~ "else" ~ block).map { case (x, y, z) => IF(x, y, z) }
-
-  private def isDefined: P[IS_DEFINED]      = P("isDefined" ~ "(" ~ block ~ ")").map(b => IS_DEFINED(b))
-  private def getP: P[GET]      = P("get" ~ "(" ~ block ~ ")").map(b => GET(b))
 
   private def block: P[Expr] = P("\n".rep ~ letP.rep ~ expr).map {
     case ((Nil, y)) => y
@@ -54,7 +53,7 @@ object Parser {
               op match {
                 case "||" => OR(r2, y)
                 case "&&" => AND(r2, y)
-                case "==" => EQ_INT(r2, y)
+                case "==" => EQ(r2, y)
                 case ">=" => GE(r2, y)
                 case ">"  => GT(r2, y)
                 case "+"  => SUM(r2, y)

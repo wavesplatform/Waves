@@ -25,7 +25,7 @@ object Serde {
   implicit def dAnd             = d[Boolean].bind[AND](3)
   implicit def dIf              = d.bind[IF](4)
   implicit def dOr              = d[Boolean].bind[OR](5)
-  implicit def dEqInt           = d[Boolean].bind[EQ_INT](6)
+  implicit def dEqInt           = d[Boolean].bind[EQ](6)
   implicit def dGe              = d[Boolean].bind[GE](7)
   implicit def dGt              = d[Boolean].bind[GT](8)
   implicit def dSigVerify       = d[Boolean].bind[SIG_VERIFY](9)

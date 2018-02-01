@@ -17,7 +17,7 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
     parse("(10+11) + 12") shouldBe SUM(SUM(CONST_INT(10), CONST_INT(11)), CONST_INT(12))
     parse("10   + 11 + 12") shouldBe SUM(SUM(CONST_INT(10), CONST_INT(11)), CONST_INT(12))
     parse("1+2+3+4+5") shouldBe SUM(SUM(SUM(SUM(CONST_INT(1), CONST_INT(2)), CONST_INT(3)), CONST_INT(4)), CONST_INT(5))
-    parse("1==1") shouldBe EQ_INT(CONST_INT(1), CONST_INT(1))
+    parse("1==1") shouldBe EQ(CONST_INT(1), CONST_INT(1))
     parse("true && true") shouldBe AND(TRUE, TRUE)
     parse("true || false") shouldBe OR(TRUE, FALSE)
     parse("true || (true && false)") shouldBe OR(TRUE, AND(TRUE, FALSE))
@@ -26,7 +26,7 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
   }
 
   property("priority in binary expressions") {
-    parse("1 == 0 || 3 == 2") shouldBe OR(EQ_INT(CONST_INT(1), CONST_INT(0)), EQ_INT(CONST_INT(3), CONST_INT(2)))
+    parse("1 == 0 || 3 == 2") shouldBe OR(EQ(CONST_INT(1), CONST_INT(0)), EQ(CONST_INT(3), CONST_INT(2)))
     parse("3 + 2 > 2 + 1") shouldBe GT(SUM(CONST_INT(3), CONST_INT(2)), SUM(CONST_INT(2), CONST_INT(1)))
     parse("1 >= 0 || 3 > 2") shouldBe OR(GE(CONST_INT(1), CONST_INT(0)), GT(CONST_INT(3), CONST_INT(2)))
   }
@@ -97,15 +97,15 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
 
   property("if") {
     parse("if(true) then 1 else 2") shouldBe IF(TRUE, CONST_INT(1), CONST_INT(2))
-    parse("if(true) then 1 else if(X==Y) then 2 else 3") shouldBe IF(TRUE, CONST_INT(1), IF(EQ_INT(REF("X"), REF("Y")), CONST_INT(2), CONST_INT(3)))
+    parse("if(true) then 1 else if(X==Y) then 2 else 3") shouldBe IF(TRUE, CONST_INT(1), IF(EQ(REF("X"), REF("Y")), CONST_INT(2), CONST_INT(3)))
     parse(
       """if ( true )
         |then 1
         |else if(X== Y)
         |     then 2
-        |       else 3""".stripMargin) shouldBe IF(TRUE, CONST_INT(1), IF(EQ_INT(REF("X"), REF("Y")), CONST_INT(2), CONST_INT(3)))
+        |       else 3""".stripMargin) shouldBe IF(TRUE, CONST_INT(1), IF(EQ(REF("X"), REF("Y")), CONST_INT(2), CONST_INT(3)))
 
-    parse("if (true) then false else false==false") shouldBe IF(TRUE, FALSE, EQ_INT(FALSE, FALSE))
+    parse("if (true) then false else false==false") shouldBe IF(TRUE, FALSE, EQ(FALSE, FALSE))
 
     parse(
       """if
@@ -115,7 +115,7 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
         |  1
         |else if ( X == Y) then 2 else 3""".stripMargin) shouldBe IF(Block(None, TRUE),
       Block(None, Block(Some(LET("A", Block(None, CONST_INT(10)))), CONST_INT(1))),
-      Block(None, IF(Block(None, EQ_INT(REF("X"), Block(None, REF("Y")))), Block(None, CONST_INT(2)), Block(None, CONST_INT(3)))))
+      Block(None, IF(Block(None, EQ(REF("X"), Block(None, REF("Y")))), Block(None, CONST_INT(2)), Block(None, CONST_INT(3)))))
 
   }
 
