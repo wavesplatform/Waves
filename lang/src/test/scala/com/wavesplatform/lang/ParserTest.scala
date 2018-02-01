@@ -1,5 +1,6 @@
 package com.wavesplatform.lang
 
+import com.wavesplatform.lang.Evaluator.Context
 import com.wavesplatform.lang.Terms._
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatest.prop.PropertyChecks
@@ -49,42 +50,37 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
   }
 
   property("let/ref constructs") {
-    parse(
-      """let X = 10;
+    parse("""let X = 10;
         |3 > 2
       """.stripMargin) shouldBe Block(Some(LET("X", CONST_INT(10))), GT(CONST_INT(3), CONST_INT(2)))
 
     parse("(let X = 10; 3 > 2)") shouldBe Block(Some(LET("X", CONST_INT(10))), GT(CONST_INT(3), CONST_INT(2)))
+    parse("(let X = 3 + 2; 3 > 2)") shouldBe Block(Some(LET("X", SUM(CONST_INT(3),CONST_INT(2)))), GT(CONST_INT(3), CONST_INT(2)))
+    parse("(let X = if(true) then true else false; false)") shouldBe Block(Some(LET("X", IF(TRUE,TRUE,FALSE))), FALSE)
 
-
-    parse(
-      """let X = 10;
+    parse("""let X = 10;
         |let Y = 10;
         |X > Y
       """.stripMargin) shouldBe Block(Some(LET("X", CONST_INT(10))), Block(Some(LET("Y", CONST_INT(10))), GT(REF("X"), REF("Y"))))
   }
 
   property("multiline") {
-    parse(
-      """
+    parse("""
         |
         |false
         |
         |
       """.stripMargin) shouldBe FALSE
 
-    parse(
-      """let X = 10;
+    parse("""let X = 10;
         |
         |true
       """.stripMargin) shouldBe Block(Some(LET("X", CONST_INT(10))), TRUE)
-    parse(
-      """let X = 11;
+    parse("""let X = 11;
         |true
       """.stripMargin) shouldBe Block(Some(LET("X", CONST_INT(11))), TRUE)
 
-    parse(
-      """
+    parse("""
         |
         |let X = 12;
         |
@@ -98,8 +94,7 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
   property("if") {
     parse("if(true) then 1 else 2") shouldBe IF(TRUE, CONST_INT(1), CONST_INT(2))
     parse("if(true) then 1 else if(X==Y) then 2 else 3") shouldBe IF(TRUE, CONST_INT(1), IF(EQ(REF("X"), REF("Y")), CONST_INT(2), CONST_INT(3)))
-    parse(
-      """if ( true )
+    parse("""if ( true )
         |then 1
         |else if(X== Y)
         |     then 2
@@ -107,20 +102,64 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
 
     parse("if (true) then false else false==false") shouldBe IF(TRUE, FALSE, EQ(FALSE, FALSE))
 
-    parse(
-      """if
+    parse("""if
 
              (true)
         |then let A = 10;
         |  1
-        |else if ( X == Y) then 2 else 3""".stripMargin) shouldBe IF(Block(None, TRUE),
+        |else if ( X == Y) then 2 else 3""".stripMargin) shouldBe IF(
+      Block(None, TRUE),
       Block(None, Block(Some(LET("A", Block(None, CONST_INT(10)))), CONST_INT(1))),
-      Block(None, IF(Block(None, EQ(REF("X"), Block(None, REF("Y")))), Block(None, CONST_INT(2)), Block(None, CONST_INT(3)))))
+      Block(None, IF(Block(None, EQ(REF("X"), Block(None, REF("Y")))), Block(None, CONST_INT(2)), Block(None, CONST_INT(3))))
+    )
 
   }
 
   property("isDefined/get") {
     parse("isDefined(X)") shouldBe IS_DEFINED(REF("X"))
     parse("if(isDefined(X)) then get(X) else Y") shouldBe IF(IS_DEFINED(REF("X")), GET(REF("X")), REF("Y"))
+  }
+
+  ignore("let patmat") {
+    parse(
+      """
+        |
+        |let X = match(A) {
+        | case None => false
+        | case Some(B) => true
+        | };
+        |
+        |
+      """.stripMargin) shouldBe IS_DEFINED(REF("X"))
+  }
+
+  property("EVALUATE patmat") {
+    Evaluator.apply(
+      Context(new HeightDomain(1), Map.empty),
+      parse(
+        """
+          |
+          |let X = Some(10);
+          |
+          |match(X) {
+          |  case None => 0
+          |  case Some(V) => V + V + V + V
+          |}
+        """.stripMargin)
+    ) shouldBe Right(40)
+
+    Evaluator.apply(
+      Context(new HeightDomain(1), Map.empty),
+      parse(
+        """
+          |
+          |let X = Some(10);
+          |
+          |match(X) {
+          |  case Some(V) => V + V + V + V
+          |  case None => 0
+          |}
+        """.stripMargin)
+    ) shouldBe Right(40)
   }
 }
