@@ -4,7 +4,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock
 
 import cats.data.{NonEmptyList => NEL}
 import cats.implicits._
-import com.wavesplatform.features.{BlockchainFeatures, FeatureProvider}
+import com.wavesplatform.features.{BlockchainFeatures, FeatureProvider, FeaturesProperties}
 import com.wavesplatform.history.HistoryWriterImpl
 import com.wavesplatform.metrics.{Instrumented, TxsInBlockchainStats}
 import com.wavesplatform.settings.WavesSettings
@@ -46,6 +46,8 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
   lastBlockInfo.subscribe()(monix.execution.Scheduler.global) // Start caching
 
   private val unsafeDiffByRange = BlockDiffer.unsafeDiffByRange(settings.blockchainSettings.functionalitySettings, featureProvider, historyWriter, maxTransactionsPerChunk) _
+
+  private val featuresProperties = FeaturesProperties(settings.blockchainSettings.functionalitySettings)
 
   private def heights(prefix: String): String = read { implicit l =>
     s"$prefix, total persisted blocks: ${historyWriter.height()}, [ in-memory: ${inMemDiffs().toList.mkString(" | ")} ] + persisted: h=${persisted.height}"
@@ -92,11 +94,13 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
   private def featuresApprovedWithBlock(block: Block): Set[Short] = {
     val height = historyWriter.height() + 1
 
-    if (height % settings.blockchainSettings.functionalitySettings.featureCheckBlocksPeriod == 0) {
+    val featuresCheckPeriod = featuresProperties.featureCheckBlocksPeriodAtHeight(height)
+    val blocksForFeatureActivation = featuresProperties.blocksForFeatureActivationAtHeight(height)
 
+    if (height % featuresCheckPeriod == 0) {
       val approvedFeatures = historyWriter.featureVotesCountWithinActivationWindow(height)
         .map { case (feature, votes) => feature -> (if (block.featureVotes.contains(feature)) votes + 1 else votes) }
-        .filter { case (_, votes) => votes >= settings.blockchainSettings.functionalitySettings.blocksForFeatureActivation }
+        .filter { case (_, votes) => votes >= blocksForFeatureActivation }
         .keySet
 
       if (approvedFeatures.nonEmpty) log.info(s"${displayFeatures(approvedFeatures)} APPROVED ON BLOCKCHAIN")

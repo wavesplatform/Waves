@@ -14,7 +14,8 @@ object TestFunctionalitySettings {
     allowInvalidReissueInSameBlockUntilTimestamp = 0L,
     allowMultipleLeaseCancelTransactionUntilTimestamp = 0L, resetEffectiveBalancesAtHeight = 0,
     blockVersion3AfterHeight = 0,
-    preActivatedFeatures = Map.empty
+    preActivatedFeatures = Map.empty,
+    doubleFeaturesPeriodsAfterHeight = Int.MaxValue
   )
 
   val Stub: FunctionalitySettings = Enabled.copy(featureCheckBlocksPeriod = 100, blocksForFeatureActivation = 90)

@@ -115,7 +115,7 @@ class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen {
                         (assertion: (BlockDiff, SnapshotStateReader) => Unit): Unit = {
     val fp = new FeatureProvider {
 
-      override val activationWindowSize: Int = ngAtHeight
+      override def activationWindowSize(height: Int): Int = ngAtHeight
 
       override def featureVotesCountWithinActivationWindow(height: Int): Map[Short, Int] = ???
 
