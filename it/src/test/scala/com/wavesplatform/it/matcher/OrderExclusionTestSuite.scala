@@ -57,8 +57,8 @@ class OrderExclusionTestSuite extends FreeSpec with Matchers with BeforeAndAfter
     aliceSell1 = id
     // Alice checks that the order in order book
     matcherCheckOrderStatus(matcherNode, aliceAsset, id) shouldBe "Accepted"
-    waitForOrderStatus(aliceAsset, id, "Accepted", 1.minute)
-    matcherCheckOrderStatus(id) shouldBe "Accepted"
+    waitForOrderStatus(matcherNode, aliceAsset, id, "Accepted", 1.minute)
+    matcherCheckOrderStatus(matcherNode, aliceAsset, id) shouldBe "Accepted"
 
     // Alice check that order is correct
     val orders = matcherGetOrderBook(matcherNode, aliceAsset )
