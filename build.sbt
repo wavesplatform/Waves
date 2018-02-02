@@ -92,7 +92,9 @@ inConfig(Linux)(Seq(
   packageDescription := "Waves node"
 ))
 
-val network = Def.setting { Network(sys.props.get("network")) }
+val network = SettingKey[Network]("network")
+network := { Network(sys.props.get("network")) }
+
 normalizedName := network.value.name
 
 javaOptions in Universal ++= Seq(
