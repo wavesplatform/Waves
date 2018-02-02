@@ -159,9 +159,8 @@ class UtxPoolImpl(time: Time,
         case ((invalid, valid, diff), tx) =>
           differ(composite(diff.asBlockDiff, s), featureProvider, tx) match {
             case Right(newDiff) =>
-              gasTank -= tx
-              if (gasTank.isEmpty) (invalid, valid, diff)
-              else (invalid, tx +: valid, Monoid.combine(diff, newDiff))
+              if (gasTank.withdraw(tx)) (invalid, tx +: valid, Monoid.combine(diff, newDiff))
+              else (invalid, valid, diff)
             case Left(_) =>
               (tx.id() +: invalid, valid, diff)
           }

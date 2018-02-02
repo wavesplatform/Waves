@@ -7,8 +7,8 @@ import scorex.transaction.Transaction
 
 trait GasTank {
   def isEmpty: Boolean
-  def -=(x: Block): Unit
-  def -=(x: Transaction): Unit
+  def withdraw(x: Block): Boolean
+  def withdraw(x: Transaction): Boolean
   def copy(): GasTank
 }
 
@@ -16,12 +16,15 @@ class OneGasTank private(private var restGas: Long, private val constraint: GasE
   private var _isEmpty = restGas <= 0
   override def isEmpty: Boolean = _isEmpty
 
-  override def -=(x: Block): Unit = this -= constraint.estimate(x)
-  override def -=(x: Transaction): Unit = this -= constraint.estimate(x)
-  private def -=(x: Long): Unit = {
+  override def withdraw(x: Block): Boolean = withdraw(constraint.estimate(x))
+  override def withdraw(x: Transaction): Boolean = withdraw(constraint.estimate(x))
+  private def withdraw(x: Long): Boolean = {
     val updatedRestGas = restGas - x
     if (updatedRestGas <= 0) _isEmpty = true
-    if (updatedRestGas >= 0) restGas = updatedRestGas
+
+    val successfully = updatedRestGas >= 0
+    if (successfully) restGas = updatedRestGas
+    successfully
   }
 
   override def copy(): OneGasTank = new OneGasTank(restGas, constraint)
@@ -35,14 +38,16 @@ class DoubleGasTank(private val first: GasTank,
                     private val second: GasTank) extends GasTank {
   override def isEmpty: Boolean = first.isEmpty || second.isEmpty
 
-  override def -=(x: Block): Unit = {
-    first -= x
-    second -= x
+  override def withdraw(x: Block): Boolean = {
+    val firstSuccessfully = first withdraw x
+    val secondSuccessfully = second withdraw x
+    firstSuccessfully && secondSuccessfully
   }
 
-  override def -=(x: Transaction): Unit = {
-    first -= x
-    second -= x
+  override def withdraw(x: Transaction): Boolean = {
+    val firstSuccessfully = first withdraw x
+    val secondSuccessfully = second withdraw x
+    firstSuccessfully && secondSuccessfully
   }
 
   override def copy(): DoubleGasTank = new DoubleGasTank(first.copy(), second.copy())
@@ -100,8 +105,9 @@ object MiningEstimators {
   private val MaxComplexity = 6000
 
   def apply(minerSettings: MinerSettings, featureProvider: FeatureProvider, height: Int): MiningEstimators = {
-    def isNgEnabled: Boolean = featureProvider.featureActivationHeight(BlockchainFeatures.NG.id).exists(height > _ + 1)
-    def isMassTransferEnabled: Boolean = featureProvider.featureActivationHeight(BlockchainFeatures.MassTransfer.id).exists(height > _ + 1)
+    val activatedFeatures = featureProvider.activatedFeatures(height)
+    val isNgEnabled = activatedFeatures.contains(BlockchainFeatures.NG.id)
+    val isMassTransferEnabled = activatedFeatures.contains(BlockchainFeatures.MassTransfer.id)
 
     MiningEstimators(
       total = if (isMassTransferEnabled) ComplexityGasEstimator(MaxComplexity) else {
