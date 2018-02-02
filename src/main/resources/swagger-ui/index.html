@@ -84,9 +84,9 @@
       $('#input_apiKey').change(function() {
         var key = $('#input_apiKey')[0].value;
         if(key && key.trim() != "") {
-          swaggerUi.api.clientAuthorizations.add("api_key", new SwaggerClient.ApiKeyAuthorization("api_key", key, "header"));
+          swaggerUi.api.clientAuthorizations.add("X-API-Key", new SwaggerClient.ApiKeyAuthorization("X-API-Key", key, "header"));
         }
-      })
+      });
 
       // -------------------------------------------------------------------------------------
 

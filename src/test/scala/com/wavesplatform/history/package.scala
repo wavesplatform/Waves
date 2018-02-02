@@ -11,15 +11,11 @@ import scorex.lagonaki.mocks.TestBlock
 import scorex.settings.TestFunctionalitySettings
 import scorex.transaction.{Transaction, TransactionParser}
 
-package object history {
+package object history extends TestDB {
   val MaxTransactionsPerBlockDiff = 10
   val MaxBlocksInMemory = 5
   val DefaultBaseTarget = 1000L
   val DefaultBlockchainSettings = BlockchainSettings(
-    blockchainFile = None,
-    stateFile = None,
-    storeTransactionsInState = false,
-    checkpointFile = None,
     addressSchemeCharacter = 'N',
     maxTransactionsPerBlockDiff = MaxTransactionsPerBlockDiff,
     minBlocksInMemory = MaxBlocksInMemory,
@@ -38,8 +34,8 @@ package object history {
   val DefaultWavesSettings: WavesSettings = settings.copy(blockchainSettings = DefaultBlockchainSettings)
 
   def domain(settings: WavesSettings): Domain = {
-    val (storage, _) = StorageFactory(settings).get
-    val (history, _, _, stateReader, blockchainUpdater, _) = storage()
+    val (storage, _) = StorageFactory(open(), settings).get
+    val (history, _, stateReader, blockchainUpdater, _) = storage()
     Domain(history, stateReader, blockchainUpdater)
   }
 

@@ -35,17 +35,20 @@ class WavesSettingsSpecification extends FlatSpec with Matchers {
   testConfig("devnet")()
 
   "WavesSettings" should "resolve folders correctly" in {
-    val config = loadConfig(ConfigFactory.parseString("""waves.directory = "/xxx""""))
+    val config = loadConfig(ConfigFactory.parseString(
+      s"""waves {
+         |  directory = "/xxx"
+         |  data-directory = "/xxx/data"
+         |}""".stripMargin))
+
     val settings = WavesSettings.fromConfig(config.resolve())
 
     settings.directory should be("/xxx")
-    settings.networkSettings.file should be(Some(new File("/xxx/data/peers.dat")))
+    settings.dataDirectory should be("/xxx/data")
+    settings.networkSettings.file should be(Some(new File("/xxx/peers.dat")))
     settings.walletSettings.file should be(Some(new File("/xxx/wallet/wallet.dat")))
-    settings.blockchainSettings.blockchainFile should be(Some(new File("/xxx/data/blockchain.dat")))
-    settings.blockchainSettings.stateFile should be(Some(new File("/xxx/data/state.dat")))
-    settings.blockchainSettings.checkpointFile should be(Some(new File("/xxx/data/checkpoint.dat")))
-    settings.matcherSettings.journalDataDir should be ("/xxx/matcher/journal")
-    settings.matcherSettings.snapshotsDataDir should be ("/xxx/matcher/snapshots")
+    settings.matcherSettings.journalDataDir should be("/xxx/matcher/journal")
+    settings.matcherSettings.snapshotsDataDir should be("/xxx/matcher/snapshots")
   }
 
 }

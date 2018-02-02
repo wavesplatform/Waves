@@ -53,9 +53,8 @@ object RxScoreObserver extends ScorexLogging {
             initalLocalScore: BigInt,
             localScores: Observable[BlockchainScore],
             remoteScores: ChannelObservable[BlockchainScore],
-            channelClosed: Observable[Channel]): (Observable[ChannelClosedAndSyncWith], Coeval[Stats]) = {
-
-    val scheduler = Scheduler.singleThread("rx-score-observer")
+            channelClosed: Observable[Channel],
+            scheduler: Scheduler = Scheduler.singleThread("rx-score-observer")): (Observable[ChannelClosedAndSyncWith], Coeval[Stats]) = {
 
     var localScore: BlockchainScore = initalLocalScore
     var currentBestChannel: Option[Channel] = None

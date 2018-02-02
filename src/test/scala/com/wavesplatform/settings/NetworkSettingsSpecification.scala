@@ -1,6 +1,5 @@
 package com.wavesplatform.settings
 
-import java.io.File
 import java.net.InetSocketAddress
 
 import com.typesafe.config.ConfigFactory
@@ -14,7 +13,6 @@ class NetworkSettingsSpecification extends FlatSpec with Matchers {
   "NetworkSpecification" should "read values from config" in {
     val config = loadConfig(ConfigFactory.parseString(
       """waves.network {
-        |  file: /waves/peers.dat
         |  bind-address: "127.0.0.1"
         |  port: 6868
         |  node-name: "default-node-name"
@@ -44,7 +42,6 @@ class NetworkSettingsSpecification extends FlatSpec with Matchers {
         |}""".stripMargin))
     val networkSettings = config.as[NetworkSettings]("waves.network")
 
-    networkSettings.file should be(Some(new File("/waves/peers.dat")))
     networkSettings.bindAddress should be(new InetSocketAddress("127.0.0.1", 6868))
     networkSettings.nodeName should be("default-node-name")
     networkSettings.declaredAddress should be(Some(new InetSocketAddress("127.0.0.1", 6868)))

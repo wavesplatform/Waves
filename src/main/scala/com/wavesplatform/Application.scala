@@ -12,6 +12,7 @@ import akka.stream.ActorMaterializer
 import cats.instances.all._
 import com.typesafe.config._
 import com.wavesplatform.actor.RootActorSystem
+import com.wavesplatform.db.openDB
 import com.wavesplatform.features.api.ActivationApiRoute
 import com.wavesplatform.history.{CheckpointServiceImpl, StorageFactory}
 import com.wavesplatform.http.NodeApiRoute
@@ -49,12 +50,14 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
   import monix.execution.Scheduler.Implicits.{global => scheduler}
 
+  private val db = openDB(settings.dataDirectory, settings.levelDbCacheSize)
+
   private val LocalScoreBroadcastDebounce = 1.second
 
   // Start /node API right away
   private implicit val as: ActorSystem = actorSystem
   private implicit val materializer: ActorMaterializer = ActorMaterializer()
-  private val (storage, heights) = StorageFactory(settings).get
+  private val (storage, heights) = StorageFactory(db, settings).get
   private val nodeApi = Option(settings.restAPISettings.enable).collect { case true =>
     val tags = Seq(typeOf[NodeApiRoute])
     val routes = Seq(NodeApiRoute(settings.restAPISettings, heights, () => this.shutdown()))
@@ -65,11 +68,13 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     (tags, routes)
   }
 
-  private val checkpointService = new CheckpointServiceImpl(settings.blockchainSettings.checkpointFile, settings.checkpointsSettings)
-  private val (history, featureProvider, stateWriter, stateReader, blockchainUpdater, blockchainDebugInfo) = storage()
+  private val checkpointService = new CheckpointServiceImpl(db, settings.checkpointsSettings)
+  private val (history, featureProvider, stateReader, blockchainUpdater, blockchainDebugInfo) = storage()
   private lazy val upnp = new UPnP(settings.networkSettings.uPnPSettings) // don't initialize unless enabled
   private val wallet: Wallet = Wallet(settings.walletSettings)
   private val peerDatabase = new PeerDatabaseImpl(settings.networkSettings)
+
+  private var matcher: Option[Matcher] = None
 
   def run(): Unit = {
     checkGenesis(history, settings, blockchainUpdater)
@@ -114,12 +119,12 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     val (newBlocks, extLoaderState) = RxExtensionLoader(settings.synchronizationSettings.maxRollback, settings.synchronizationSettings.synchronizationTimeout,
       history, peerDatabase, knownInvalidBlocks, blocks, signatures, syncWithChannelClosed) { case ((c, b)) => processFork(c, b.blocks) }
 
-    val utxSink = UtxPoolSynchronizer(utxStorage, settings.synchronizationSettings.utxSynchronizerSettings, allChannels, transactions)
+    UtxPoolSynchronizer.start(utxStorage, settings.synchronizationSettings.utxSynchronizerSettings, allChannels, transactions)
     val microBlockSink = microblockDatas.mapTask(scala.Function.tupled(processMicroBlock))
     val blockSink = newBlocks.mapTask(scala.Function.tupled(processBlock))
     val checkpointSink = checkpoints.mapTask { case ((s, c)) => processCheckpoint(Some(s), c) }
 
-    Observable.merge(microBlockSink, blockSink, checkpointSink, utxSink).subscribe()(monix.execution.Scheduler.Implicits.global)
+    Observable.merge(microBlockSink, blockSink, checkpointSink).subscribe()(monix.execution.Scheduler.Implicits.global)
     miner.scheduleMining()
 
     for (addr <- settings.networkSettings.declaredAddress if settings.networkSettings.uPnPSettings.enable) {
@@ -143,7 +148,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         AssetsApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, stateReader, time),
         ActivationApiRoute(settings.restAPISettings, settings.blockchainSettings.functionalitySettings, settings.featuresSettings, history, featureProvider),
         AssetsBroadcastApiRoute(settings.restAPISettings, utxStorage, allChannels),
-        LeaseApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, time),
+        LeaseApiRoute(settings.restAPISettings, wallet, stateReader, utxStorage, allChannels, time),
         LeaseBroadcastApiRoute(settings.restAPISettings, utxStorage, allChannels),
         AliasApiRoute(settings.restAPISettings, wallet, utxStorage, allChannels, time, stateReader),
         AliasBroadcastApiRoute(settings.restAPISettings, utxStorage, allChannels)
@@ -183,10 +188,12 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       shutdown()
     }
 
-    if (settings.matcherSettings.enable) {
-      val matcher = new Matcher(actorSystem, wallet, utxStorage, allChannels, stateReader, history, settings.blockchainSettings, settings.restAPISettings, settings.matcherSettings)
-      matcher.runMatcher()
-    }
+    matcher = if (settings.matcherSettings.enable) {
+      val m = new Matcher(actorSystem, wallet, utxStorage, allChannels, stateReader, history,
+        settings.blockchainSettings, settings.restAPISettings, settings.matcherSettings)
+      m.runMatcher()
+      Some(m)
+    } else None
   }
 
   @volatile var shutdownInProgress = false
@@ -207,16 +214,16 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         upnp.deletePort(addr.getPort)
       }
 
+      matcher.foreach(_.shutdownMatcher())
+
+      log.debug("Closing storage")
+      db.close()
+
+      log.debug("Closing peer database")
       peerDatabase.close()
 
       Try(Await.result(actorSystem.terminate(), stopActorsTimeout))
         .failed.map(e => log.error("Failed to terminate actor system", e))
-
-      log.debug("Closing state")
-      stateWriter.close()
-
-      log.debug("Closing history")
-      history.close()
 
       log.info("Shutdown complete")
     }
