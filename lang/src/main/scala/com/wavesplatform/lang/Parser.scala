@@ -22,7 +22,7 @@ object Parser {
   private def falseP: P[FALSE.type]    = P("false").map(_ => FALSE)
   private def bracesP: P[Expr]         = P("(" ~ block ~ ")")
   private def curlyBracesP: P[Expr]    = P("{" ~ block ~ "}")
-  private def letP: P[LET]             = P("let " ~ CharIn('A' to 'Z').! ~ "=" ~ block ~ ";").map { case ((x, y)) => LET(x, y) }
+  private def letP: P[LET]             = P("let " ~ CharIn('A' to 'Z').! ~ "=" ~ block).map { case ((x, y)) => LET(x, y) }
   private def refP: P[REF]             = P(CharIn('A' to 'Z').!.map(x => REF(x)))
   private def ifP: P[IF]               = P("if" ~ "(" ~ block ~ ")" ~ "then" ~ block ~ "else" ~ block).map { case (x, y, z) => IF(x, y, z) }
   private def isDefined: P[IS_DEFINED] = P("isDefined" ~ "(" ~ block ~ ")").map(b => IS_DEFINED(b))
@@ -31,33 +31,24 @@ object Parser {
   private def someP: P[SOME]      = P("Some" ~ "(" ~ block ~ ")").map(x => SOME(x))
   private def noneP: P[NONE.type] = P("None").map(_ => NONE)
 
-  private def patmat1: P[Block] =
-    P("match" ~ "(" ~ block ~ ")" ~ "{" ~ "case" ~ "None" ~ "=>" ~ block ~ "case" ~ "Some" ~ "(" ~ CharIn('A' to 'Z').! ~ ")" ~ "=>" ~ block).map {
-      case ((exp, ifNone, ref, ifSome)) =>
-        Block(
-          Some(LET("$exp", exp)),
-          IF(IS_DEFINED(REF("$exp")),
-             Block(
-               Some(LET(ref, GET(REF("$exp")))),
-               ifSome
-             ),
-             ifNone)
-        )
-    }
+  private def patmat1P: P[Block] =
+    P("match" ~ "(" ~ block ~ ")" ~ "{" ~ "case" ~ "None" ~ "=>" ~ block ~ "case" ~ "Some" ~ "(" ~ CharIn('A' to 'Z').! ~ ")" ~ "=>" ~ block ~ "}")
+      .map { case ((exp, ifNone, ref, ifSome)) => patmat(exp, ref, ifSome, ifNone) }
 
-  private def patmat2: P[Block] =
-    P("match" ~ "(" ~ block ~ ")" ~ "{" ~ "case" ~ "Some" ~ "(" ~ CharIn('A' to 'Z').! ~ ")" ~ "=>" ~ block ~ "case" ~ "None" ~ "=>" ~ block).map {
-      case ((exp, ref, ifSome, ifNone)) =>
-        Block(
-          Some(LET("$exp", exp)),
-          IF(IS_DEFINED(REF("$exp")),
-             Block(
-               Some(LET(ref, GET(REF("$exp")))),
-               ifSome
-             ),
-             ifNone)
-        )
-    }
+  private def patmat2P: P[Block] =
+    P("match" ~ "(" ~ block ~ ")" ~ "{" ~ "case" ~ "Some" ~ "(" ~ CharIn('A' to 'Z').! ~ ")" ~ "=>" ~ block ~ "case" ~ "None" ~ "=>" ~ block ~ "}")
+      .map { case ((exp, ref, ifSome, ifNone)) => patmat(exp, ref, ifSome, ifNone) }
+
+  def patmat(exp: Block, ref: String, ifSome: Block, ifNone: Block): Block =
+    Block(
+      Some(LET("$exp", exp)),
+      IF(IS_DEFINED(REF("$exp")),
+         Block(
+           Some(LET(ref, GET(REF("$exp")))),
+           ifSome
+         ),
+         ifNone)
+    )
 
   private def sigVerifyP: P[SIG_VERIFY] = P("checkSig" ~ "(" ~ block ~ "," ~ block ~ "," ~ block ~ ")").map {
     case ((x, y, z)) => SIG_VERIFY(x, y, z)
@@ -65,7 +56,7 @@ object Parser {
   private def byteVectorP: P[CONST_BYTEVECTOR] =
     P("base58'" ~ CharsWhileIn(Base58Chars).! ~ "'").map(x => CONST_BYTEVECTOR(ByteVector(Base58.decode(x).get)))
 
-  private def block: P[Expr] = P("\n".rep ~ letP.rep ~ expr).map {
+  private def block: P[Expr] = P("\n".rep ~ letP.rep ~ expr ~ ";".rep).map {
     case ((Nil, y)) => y
     case ((all, y)) => all.foldRight(y) { case (r, curr) => Block(Some(r), curr) }
 
@@ -97,7 +88,7 @@ object Parser {
   private def expr = P(binaryOp(priority) | atom)
 
   private def atom =
-    P(ifP | patmat1 | patmat2 | byteVectorP | numberP | trueP | falseP | noneP | someP | bracesP | curlyBracesP | sigVerifyP | refP | isDefined | getP)
+    P(ifP | patmat1P | patmat2P | byteVectorP | numberP | trueP | falseP | noneP | someP | bracesP | curlyBracesP | sigVerifyP | refP | isDefined | getP)
 
   def apply(str: String): core.Parsed[Expr, Char, String] = block.parse(str)
 }

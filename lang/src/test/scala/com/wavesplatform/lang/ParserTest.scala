@@ -55,8 +55,8 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
       """.stripMargin) shouldBe Block(Some(LET("X", CONST_INT(10))), GT(CONST_INT(3), CONST_INT(2)))
 
     parse("(let X = 10; 3 > 2)") shouldBe Block(Some(LET("X", CONST_INT(10))), GT(CONST_INT(3), CONST_INT(2)))
-    parse("(let X = 3 + 2; 3 > 2)") shouldBe Block(Some(LET("X", SUM(CONST_INT(3),CONST_INT(2)))), GT(CONST_INT(3), CONST_INT(2)))
-    parse("(let X = if(true) then true else false; false)") shouldBe Block(Some(LET("X", IF(TRUE,TRUE,FALSE))), FALSE)
+    parse("(let X = 3 + 2; 3 > 2)") shouldBe Block(Some(LET("X", SUM(CONST_INT(3), CONST_INT(2)))), GT(CONST_INT(3), CONST_INT(2)))
+    parse("(let X = if(true) then true else false; false)") shouldBe Block(Some(LET("X", IF(TRUE, TRUE, FALSE))), FALSE)
 
     parse("""let X = 10;
         |let Y = 10;
@@ -120,24 +120,25 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
     parse("if(isDefined(X)) then get(X) else Y") shouldBe IF(IS_DEFINED(REF("X")), GET(REF("X")), REF("Y"))
   }
 
-  ignore("let patmat") {
-    parse(
-      """
-        |
-        |let X = match(A) {
-        | case None => false
-        | case Some(B) => true
-        | };
-        |
-        |
-      """.stripMargin) shouldBe IS_DEFINED(REF("X"))
-  }
-
   property("EVALUATE patmat") {
     Evaluator.apply(
       Context(new HeightDomain(1), Map.empty),
-      parse(
-        """
+      parse("""
+          |let A = Some(500)
+          |
+          |let X = match(A) {
+          | case None => 8
+          | case Some(B) => B + B
+          | }
+          |
+          | get(Some(X)) + 1
+          |
+      """.stripMargin)
+    ) shouldBe Right(1001)
+
+    Evaluator.apply(
+      Context(new HeightDomain(1), Map.empty),
+      parse("""
           |
           |let X = Some(10);
           |
@@ -150,8 +151,7 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
 
     Evaluator.apply(
       Context(new HeightDomain(1), Map.empty),
-      parse(
-        """
+      parse("""
           |
           |let X = Some(10);
           |
