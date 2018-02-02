@@ -19,6 +19,7 @@ import com.wavesplatform.http.NodeApiRoute
 import com.wavesplatform.matcher.Matcher
 import com.wavesplatform.metrics.Metrics
 import com.wavesplatform.mining.{Miner, MinerImpl}
+import com.wavesplatform.network.RxExtensionLoader.RxExtensionLoaderShutdownHook
 import com.wavesplatform.network._
 import com.wavesplatform.settings._
 import com.wavesplatform.state2.appender.{BlockAppender, CheckpointAppender, ExtensionAppender, MicroblockAppender}
@@ -27,6 +28,8 @@ import io.netty.channel.Channel
 import io.netty.channel.group.DefaultChannelGroup
 import io.netty.util.concurrent.GlobalEventExecutor
 import kamon.Kamon
+import monix.execution.Scheduler
+import monix.execution.Scheduler.global
 import monix.reactive.Observable
 import org.influxdb.dto.Point
 import org.slf4j.bridge.SLF4JBridgeHandler
@@ -74,7 +77,14 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   private val wallet: Wallet = Wallet(settings.walletSettings)
   private val peerDatabase = new PeerDatabaseImpl(settings.networkSettings)
 
+  private val extensionLoaderScheduler = Scheduler.singleThread("tx-extension-loader")
+  private val microblockSynchronizerScheduler = Scheduler.singleThread("microblock-synchronizer")
+  private val scoreObserverScheduler = Scheduler.singleThread("rx-score-observer")
+  private val appenderScheduler = Scheduler.singleThread("appender")
+
+
   private var matcher: Option[Matcher] = None
+  private var rxExtensionLoaderShutdown: Option[RxExtensionLoaderShutdownHook] = None
 
   def run(): Unit = {
     checkGenesis(history, settings, blockchainUpdater)
@@ -89,13 +99,17 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     val utxStorage = new UtxPoolImpl(time, stateReader, history, featureProvider, feeCalculator, settings.blockchainSettings.functionalitySettings, settings.utxSettings)
     val knownInvalidBlocks = new InvalidBlockStorageImpl(settings.synchronizationSettings.invalidBlocksStorage)
     val miner = if (settings.minerSettings.enable)
-      new MinerImpl(allChannels, blockchainUpdater, checkpointService, history, featureProvider, stateReader, settings, time, utxStorage, wallet)
+      new MinerImpl(allChannels, blockchainUpdater, checkpointService, history, featureProvider, stateReader, settings,
+        time, utxStorage, wallet, appenderScheduler)
     else Miner.Disabled
 
-    val processBlock = BlockAppender(checkpointService, history, blockchainUpdater, time, stateReader, utxStorage, settings.blockchainSettings, featureProvider, allChannels, peerDatabase, miner) _
-    val processCheckpoint = CheckpointAppender(checkpointService, history, blockchainUpdater, peerDatabase, miner, allChannels) _
-    val processFork = ExtensionAppender(checkpointService, history, blockchainUpdater, stateReader, utxStorage, time, settings, featureProvider, knownInvalidBlocks, peerDatabase, miner, allChannels) _
-    val processMicroBlock = MicroblockAppender(checkpointService, history, blockchainUpdater, utxStorage, allChannels, peerDatabase) _
+    val processBlock = BlockAppender(checkpointService, history, blockchainUpdater, time, stateReader, utxStorage,
+      settings.blockchainSettings, featureProvider, allChannels, peerDatabase, miner, appenderScheduler) _
+    val processCheckpoint = CheckpointAppender(checkpointService, history, blockchainUpdater, peerDatabase, miner,
+      allChannels, appenderScheduler) _
+    val processFork = ExtensionAppender(checkpointService, history, blockchainUpdater, stateReader, utxStorage, time,
+      settings, featureProvider, knownInvalidBlocks, peerDatabase, miner, allChannels, appenderScheduler) _
+    val processMicroBlock = MicroblockAppender(checkpointService, history, blockchainUpdater, utxStorage, allChannels, peerDatabase, appenderScheduler) _
 
     import blockchainUpdater.lastBlockInfo
 
@@ -114,10 +128,14 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     val network = NetworkServer(settings, lastBlockInfo, history, historyReplier, utxStorage, peerDatabase, allChannels, establishedConnections)
     val (signatures, blocks, blockchainScores, checkpoints, microblockInvs, microblockResponses, transactions) = network.messages
 
-    val (syncWithChannelClosed, scoreStatsReporter) = RxScoreObserver(settings.synchronizationSettings.scoreTTL, 1.second, history.score(), lastScore, blockchainScores, network.closedChannels)
-    val (microblockDatas, mbSyncCacheSizes) = MicroBlockSynchronizer(settings.synchronizationSettings.microBlockSynchronizer, peerDatabase, lastBlockInfo.map(_.id), microblockInvs, microblockResponses)
-    val (newBlocks, extLoaderState) = RxExtensionLoader(settings.synchronizationSettings.maxRollback, settings.synchronizationSettings.synchronizationTimeout,
-      history, peerDatabase, knownInvalidBlocks, blocks, signatures, syncWithChannelClosed) { case ((c, b)) => processFork(c, b.blocks) }
+    val (syncWithChannelClosed, scoreStatsReporter) = RxScoreObserver(settings.synchronizationSettings.scoreTTL, 1.second,
+      history.score(), lastScore, blockchainScores, network.closedChannels, scoreObserverScheduler)
+    val (microblockDatas, mbSyncCacheSizes) = MicroBlockSynchronizer(settings.synchronizationSettings.microBlockSynchronizer,
+      peerDatabase, lastBlockInfo.map(_.id), microblockInvs, microblockResponses, microblockSynchronizerScheduler)
+    val (newBlocks, extLoaderState, sh) = RxExtensionLoader(settings.synchronizationSettings.maxRollback, settings.synchronizationSettings.synchronizationTimeout,
+      history, peerDatabase, knownInvalidBlocks, blocks, signatures, syncWithChannelClosed, extensionLoaderScheduler) { case ((c, b)) => processFork(c, b.blocks) }
+
+    rxExtensionLoaderShutdown = Some(sh)
 
     UtxPoolSynchronizer.start(utxStorage, settings.synchronizationSettings.utxSynchronizerSettings, allChannels, transactions)
     val microBlockSink = microblockDatas.mapTask(scala.Function.tupled(processMicroBlock))
@@ -214,6 +232,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         upnp.deletePort(addr.getPort)
       }
 
+
       matcher.foreach(_.shutdownMatcher())
 
       log.debug("Closing peer database")
@@ -221,6 +240,29 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
       Try(Await.result(actorSystem.terminate(), stopActorsTimeout))
         .failed.map(e => log.error("Failed to terminate actor system", e))
+
+      blockchainUpdater.shutdown()
+      rxExtensionLoaderShutdown.foreach(_.shutdown())
+
+      microblockSynchronizerScheduler.shutdown()
+      Try(Await.result(microblockSynchronizerScheduler.awaitTermination(stopActorsTimeout, global), Duration.Inf))
+        .map(s => log.debug(s"Microblock synchronizer executor shutdown: $s"))
+        .failed.map(e => log.error("Failed to stop microblock synchronizer executor", e))
+
+      extensionLoaderScheduler.shutdown()
+      Try(Await.result(extensionLoaderScheduler.awaitTermination(stopActorsTimeout, global), Duration.Inf))
+        .map(s => log.debug(s"Extension loader executor shutdown: $s"))
+        .failed.map(e => log.error("Failed to stop extension loader executor", e))
+
+      appenderScheduler.shutdown()
+      Try(Await.result(appenderScheduler.awaitTermination(5.minutes, global), Duration.Inf))
+        .map(s => log.debug(s"Appender executor shutdown: $s"))
+        .failed.map(e => log.error("Failed to stop appender executor", e))
+
+//      scoreObserverScheduler.shutdown()
+//      Try(Await.result(scoreObserverScheduler.awaitTermination(stopActorsTimeout, global), Duration.Inf))
+//        .map(s => log.debug(s"Score observer executor shutdown: $s"))
+//        .failed.map(e => log.error("Failed to stop score observer executor", e))
 
       log.info("Closing storage")
       db.close()

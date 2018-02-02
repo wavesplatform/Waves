@@ -65,7 +65,7 @@ class HistoryWriterImpl private(db: DB, val synchronizationToken: ReentrantReadW
 
   def appendBlock(block: Block, acceptedFeatures: Set[Short])(consensusValidation: => Either[ValidationError, BlockDiff]): Either[ValidationError, BlockDiff] =
     write("appendBlock") { implicit lock =>
-      val b = Some(db.createWriteBatch())
+      val b = createBatch()
 
       assert(block.signaturesValid().isRight)
 
@@ -87,7 +87,7 @@ class HistoryWriterImpl private(db: DB, val synchronizationToken: ReentrantReadW
         blockSizeStats.record(block.bytes().length)
         transactionsInBlockStats.record(block.transactionData.size)
 
-        db.write(b.get)
+        commit(b)
         log.trace(s"Full Block $block(id=${block.uniqueId} persisted")
 
         blockDiff
@@ -126,7 +126,7 @@ class HistoryWriterImpl private(db: DB, val synchronizationToken: ReentrantReadW
   def discardBlock(): Option[Block] = write("discardBlock") { implicit lock =>
     val h = height()
 
-    val b = Some(db.createWriteBatch())
+    val b = createBatch()
 
     alterVotes(h, blockAt(h).map(b => b.featureVotes).getOrElse(Set.empty), -1, b)
 
@@ -152,7 +152,7 @@ class HistoryWriterImpl private(db: DB, val synchronizationToken: ReentrantReadW
 
     setHeight(h - 1, b)
 
-    db.write(b.get)
+    commit(b)
 
     maybeDiscardedBlock
   }
@@ -186,8 +186,6 @@ class HistoryWriterImpl private(db: DB, val synchronizationToken: ReentrantReadW
   override def blockBytes(height: Int): Option[Array[Byte]] = read { implicit lock =>
     get(makeKey(BlockAtHeightPrefix, height))
   }
-
-  override def close(): Unit = db.close()
 
   override def lastBlockTimestamp(): Option[Long] = this.lastBlock.map(_.timestamp)
 

@@ -4,8 +4,8 @@ import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel.{Channel, ChannelHandlerContext, ChannelInboundHandlerAdapter}
 import monix.reactive.subjects.ConcurrentSubject
 import scorex.block.Block
-import scorex.transaction.{History, Transaction}
 import scorex.transaction.History.BlockchainScore
+import scorex.transaction.{History, Transaction}
 import scorex.utils.ScorexLogging
 
 @Sharable
@@ -31,6 +31,16 @@ class MessageObserver extends ChannelInboundHandlerAdapter with ScorexLogging {
     case tx: Transaction => transactions.onNext((ctx.channel(), tx))
     case _ => super.channelRead(ctx, msg)
 
+  }
+
+  def shutdown(): Unit = {
+    signatures.onComplete()
+    blocks.onComplete()
+    checkpoints.onComplete()
+    blockchainScores.onComplete()
+    microblockInvs.onComplete()
+    microblockResponses.onComplete()
+    transactions.onComplete()
   }
 }
 

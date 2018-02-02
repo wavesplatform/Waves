@@ -34,28 +34,35 @@ trait Miner {
 
 trait MinerDebugInfo {
   def state: MinerDebugInfo.State
+
   def collectNextBlockGenerationTimes: List[(Address, Long)]
 }
 
 object MinerDebugInfo {
+
   sealed trait State
+
   case object MiningBlocks extends State
+
   case object MiningMicroblocks extends State
+
   case object Disabled extends State
+
   case class Error(error: String) extends State
+
 }
 
-class MinerImpl(
-                   allChannels: ChannelGroup,
-                   blockchainUpdater: BlockchainUpdater,
-                   checkpoint: CheckpointService,
-                   history: NgHistory,
-                   featureProvider: FeatureProvider,
-                   stateReader: StateReader,
-                   settings: WavesSettings,
-                   timeService: Time,
-                   utx: UtxPool,
-                   wallet: Wallet) extends Miner with MinerDebugInfo with ScorexLogging with Instrumented {
+class MinerImpl(allChannels: ChannelGroup,
+                blockchainUpdater: BlockchainUpdater,
+                checkpoint: CheckpointService,
+                history: NgHistory,
+                featureProvider: FeatureProvider,
+                stateReader: StateReader,
+                settings: WavesSettings,
+                timeService: Time,
+                utx: UtxPool,
+                wallet: Wallet,
+                val appenderScheduler: Scheduler) extends Miner with MinerDebugInfo with ScorexLogging with Instrumented {
 
   import Miner._
 
@@ -156,7 +163,7 @@ class MinerImpl(
         ))
         microBlock <- EitherT.fromEither[Task](MicroBlock.buildAndSign(account, unconfirmed, accumulatedBlock.signerData.signature, signedBlock.signerData.signature))
         _ = microBlockBuildTimeStats.safeRecord(System.currentTimeMillis() - start)
-        _ <- EitherT(MicroblockAppender(checkpoint, history, blockchainUpdater, utx)(microBlock))
+        _ <- EitherT(MicroblockAppender(checkpoint, history, blockchainUpdater, utx, appenderScheduler)(microBlock))
       } yield (microBlock, signedBlock)).value map {
         case Left(err) =>
           Error(err)
@@ -201,7 +208,8 @@ class MinerImpl(
         nextBlockGenerationTimes += account.toAddress -> (System.currentTimeMillis() + offset.toMillis)
         generateOneBlockTask(account, balance)(offset).flatMap {
           case Right(block) =>
-            BlockAppender(checkpoint, history, blockchainUpdater, timeService, stateReader, utx, settings.blockchainSettings, featureProvider)(block) map {
+            BlockAppender(checkpoint, history, blockchainUpdater, timeService, stateReader, utx,
+              settings.blockchainSettings, featureProvider, appenderScheduler)(block) map {
               case Left(err) => log.warn("Error mining Block: " + err.toString)
               case Right(Some(score)) =>
                 log.debug(s"Forged and applied $block by ${account.address} with cumulative score $score")
@@ -262,9 +270,13 @@ object Miner {
   }
 
   sealed trait MicroblockMiningResult
+
   case object Stop extends MicroblockMiningResult
+
   case object Retry extends MicroblockMiningResult
+
   case class Error(e: ValidationError) extends MicroblockMiningResult
+
   case class Success(b: Block) extends MicroblockMiningResult
 
 }
