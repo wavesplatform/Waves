@@ -9,7 +9,7 @@ import com.wavesplatform.settings.{FeaturesSettings, FunctionalitySettings}
 import com.wavesplatform.state2._
 import com.wavesplatform.utils._
 import kamon.Kamon
-import org.iq80.leveldb.DB
+import org.iq80.leveldb.{DB, WriteBatch}
 import scorex.block.{Block, BlockHeader}
 import scorex.transaction.History.BlockchainScore
 import scorex.transaction.ValidationError.GenericError
@@ -56,37 +56,40 @@ class HistoryWriterImpl private(db: DB, val synchronizationToken: ReentrantReadW
     get(makeKey(VotesAtHeightPrefix, votingWindowOpening)).map(VotesMapCodec.decode).map(_.explicitGet().value).getOrElse(Map.empty)
   }
 
-  private def alterVotes(height: Int, votes: Set[Short], voteMod: Int): Unit = write("alterVotes") { implicit lock =>
+  private def alterVotes(height: Int, votes: Set[Short], voteMod: Int, batch: Option[WriteBatch]): Unit = write("alterVotes") { implicit lock =>
     val votingWindowOpening = FeatureProvider.votingWindowOpeningFromHeight(height, activationWindowSize(height))
     val votesWithinWindow = featureVotesCountWithinActivationWindow(height)
     val newVotes = votes.foldLeft(votesWithinWindow)((v, feature) => v + (feature -> (v.getOrElse(feature, 0) + voteMod)))
-    put(makeKey(VotesAtHeightPrefix, votingWindowOpening), VotesMapCodec.encode(newVotes))
+    put(makeKey(VotesAtHeightPrefix, votingWindowOpening), VotesMapCodec.encode(newVotes), batch)
   }
 
   def appendBlock(block: Block, acceptedFeatures: Set[Short])(consensusValidation: => Either[ValidationError, BlockDiff]): Either[ValidationError, BlockDiff] =
     write("appendBlock") { implicit lock =>
+      val b = Some(db.createWriteBatch())
 
       assert(block.signaturesValid().isRight)
 
       if ((height() == 0) || (this.lastBlock.get.uniqueId == block.reference)) consensusValidation.map { blockDiff =>
         val h = height() + 1
         val score = (if (height() == 0) BigInt(0) else this.score()) + block.blockScore()
-        put(makeKey(BlockAtHeightPrefix, h), block.bytes())
-        put(makeKey(ScoreAtHeightPrefix, h), score.toByteArray)
-        put(makeKey(SignatureAtHeightPrefix, h), block.uniqueId.arr)
-        put(makeKey(HeightBySignaturePrefix, block.uniqueId.arr), Ints.toByteArray(h))
-        setHeight(h)
+        put(makeKey(BlockAtHeightPrefix, h), block.bytes(), b)
+        put(makeKey(ScoreAtHeightPrefix, h), score.toByteArray, b)
+        put(makeKey(SignatureAtHeightPrefix, h), block.uniqueId.arr, b)
+        put(makeKey(HeightBySignaturePrefix, block.uniqueId.arr), Ints.toByteArray(h), b)
+        setHeight(h, b)
 
         val presentFeatures = allFeatures().toSet
         val newFeatures = acceptedFeatures.diff(presentFeatures)
-        newFeatures.foreach(f => addFeature(f, h))
-        alterVotes(h, block.featureVotes, 1)
+        newFeatures.foreach(f => addFeature(f, h, b))
+        alterVotes(h, block.featureVotes, 1, b)
 
         blockHeightStats.record(h)
         blockSizeStats.record(block.bytes().length)
         transactionsInBlockStats.record(block.transactionData.size)
 
+        db.write(b.get)
         log.trace(s"Full Block $block(id=${block.uniqueId} persisted")
+
         blockDiff
       }
       else {
@@ -98,16 +101,16 @@ class HistoryWriterImpl private(db: DB, val synchronizationToken: ReentrantReadW
     get(FeaturesIndexKey).map(ShortSeqCodec.decode).map(_.explicitGet().value).getOrElse(Seq.empty[Short])
   }
 
-  private def addFeature(featureId: Short, height: Int): Unit = {
+  private def addFeature(featureId: Short, height: Int, batch: Option[WriteBatch]): Unit = {
     val features = (allFeatures() :+ featureId).distinct
-    put(makeKey(FeatureStatePrefix, Shorts.toByteArray(featureId)), Ints.toByteArray(height))
-    put(FeaturesIndexKey, ShortSeqCodec.encode(features))
+    put(makeKey(FeatureStatePrefix, Shorts.toByteArray(featureId)), Ints.toByteArray(height), batch)
+    put(FeaturesIndexKey, ShortSeqCodec.encode(features), batch)
   }
 
-  private def deleteFeature(featureId: Short): Unit = {
+  private def deleteFeature(featureId: Short, batch: Option[WriteBatch]): Unit = {
     val features = allFeatures().filterNot(f => f == featureId).distinct
-    delete(makeKey(FeatureStatePrefix, Shorts.toByteArray(featureId)))
-    put(FeaturesIndexKey, ShortSeqCodec.encode(features))
+    delete(makeKey(FeatureStatePrefix, Shorts.toByteArray(featureId)), batch)
+    put(FeaturesIndexKey, ShortSeqCodec.encode(features), batch)
   }
 
   private def getFeatureHeight(featureId: Short): Option[Int] =
@@ -123,7 +126,9 @@ class HistoryWriterImpl private(db: DB, val synchronizationToken: ReentrantReadW
   def discardBlock(): Option[Block] = write("discardBlock") { implicit lock =>
     val h = height()
 
-    alterVotes(h, blockAt(h).map(b => b.featureVotes).getOrElse(Set.empty), -1)
+    val b = Some(db.createWriteBatch())
+
+    alterVotes(h, blockAt(h).map(b => b.featureVotes).getOrElse(Set.empty), -1, b)
 
     val key = makeKey(BlockAtHeightPrefix, h)
     val maybeBlockBytes = get(key)
@@ -131,21 +136,23 @@ class HistoryWriterImpl private(db: DB, val synchronizationToken: ReentrantReadW
     val maybeDiscardedBlock = tryDiscardedBlock.flatMap(_.toOption)
 
 
-    delete(key)
-    delete(makeKey(ScoreAtHeightPrefix, h))
+    delete(key, b)
+    delete(makeKey(ScoreAtHeightPrefix, h), b)
 
     if (h % activationWindowSize(h) == 0) {
       allFeatures().foreach { f =>
         val featureHeight = getFeatureHeight(f)
-        if (featureHeight.isDefined && featureHeight.get == h) deleteFeature(f)
+        if (featureHeight.isDefined && featureHeight.get == h) deleteFeature(f, b)
       }
     }
 
     val signatureKey = makeKey(SignatureAtHeightPrefix, h)
-    get(signatureKey).foreach(b => delete(makeKey(HeightBySignaturePrefix, b)))
-    delete(signatureKey)
+    get(signatureKey).foreach(a => delete(makeKey(HeightBySignaturePrefix, a), b))
+    delete(signatureKey, b)
 
-    setHeight(h - 1)
+    setHeight(h - 1, b)
+
+    db.write(b.get)
 
     maybeDiscardedBlock
   }
@@ -159,8 +166,8 @@ class HistoryWriterImpl private(db: DB, val synchronizationToken: ReentrantReadW
     getIntProperty(HeightProperty).getOrElse(0)
   }
 
-  private def setHeight(x: Int)(implicit lock: WriteLock): Unit = {
-    putIntProperty(HeightProperty, x)
+  private def setHeight(x: Int, batch: Option[WriteBatch])(implicit lock: WriteLock): Unit = {
+    putIntProperty(HeightProperty, x, batch)
     heightInfo = (x, time.getTimestamp())
   }
 

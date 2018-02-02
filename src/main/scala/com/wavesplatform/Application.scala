@@ -216,14 +216,14 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
       matcher.foreach(_.shutdownMatcher())
 
-      log.debug("Closing storage")
-      db.close()
-
       log.debug("Closing peer database")
       peerDatabase.close()
 
       Try(Await.result(actorSystem.terminate(), stopActorsTimeout))
         .failed.map(e => log.error("Failed to terminate actor system", e))
+
+      log.info("Closing storage")
+      db.close()
 
       log.info("Shutdown complete")
     }

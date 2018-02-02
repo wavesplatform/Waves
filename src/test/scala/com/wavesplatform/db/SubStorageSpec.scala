@@ -15,7 +15,7 @@ class SubStorageSpec extends FreeSpec with Matchers with PropertyChecks with Wit
     val storage = new SubStorage(db, "test-a")
     val key = "key-1".getBytes(StandardCharsets.UTF_8)
     val v1 = "value 1".getBytes(StandardCharsets.UTF_8)
-    storage.put(key, v1)
+    storage.put(key, v1, None)
     val v2 = storage.get(key).getOrElse(Array.emptyByteArray)
     v2 should contain theSameElementsAs v1
   }
@@ -24,10 +24,10 @@ class SubStorageSpec extends FreeSpec with Matchers with PropertyChecks with Wit
     val storage = new SubStorage(db, "test-b")
     val key = "key".getBytes(StandardCharsets.UTF_8)
     val v1 = "value".getBytes(StandardCharsets.UTF_8)
-    storage.put(key, v1)
+    storage.put(key, v1, None)
     val v2 = storage.get(key)
     v2.isDefined should be(true)
-    storage.delete(key)
+    storage.delete(key, None)
     val v3 = storage.get(key)
     v3.isDefined should be(false)
   }
@@ -46,10 +46,10 @@ class SubStorageSpec extends FreeSpec with Matchers with PropertyChecks with Wit
       }
     }
 
-    storage.put(storage.key("aaa", 0), Ints.toByteArray(1))
-    storage.put(storage.key("aaa", 1), Ints.toByteArray(2))
-    storage.put(storage.key("bbb", 0), Ints.toByteArray(1))
-    storage.put(storage.key("bbb", 1), Ints.toByteArray(2))
+    storage.put(storage.key("aaa", 0), Ints.toByteArray(1), None)
+    storage.put(storage.key("aaa", 1), Ints.toByteArray(2), None)
+    storage.put(storage.key("bbb", 0), Ints.toByteArray(1), None)
+    storage.put(storage.key("bbb", 1), Ints.toByteArray(2), None)
 
     val keys = storage.keys()
     keys should contain(key("test:aaa", 0))
@@ -73,10 +73,10 @@ class SubStorageSpec extends FreeSpec with Matchers with PropertyChecks with Wit
       }
     }
 
-    storage.put(storage.key("aaa", 0), Ints.toByteArray(1))
-    storage.put(storage.key("aaa", 1), Ints.toByteArray(2))
-    storage.put(storage.key("bbb", 0), Ints.toByteArray(1))
-    storage.put(storage.key("bbb", 1), Ints.toByteArray(2))
+    storage.put(storage.key("aaa", 0), Ints.toByteArray(1), None)
+    storage.put(storage.key("aaa", 1), Ints.toByteArray(2), None)
+    storage.put(storage.key("bbb", 0), Ints.toByteArray(1), None)
+    storage.put(storage.key("bbb", 1), Ints.toByteArray(2), None)
 
     val keys = storage.keys("test:bbb".getBytes(StandardCharsets.UTF_8))
     keys should not contain key("test:aaa", 0)
@@ -88,10 +88,10 @@ class SubStorageSpec extends FreeSpec with Matchers with PropertyChecks with Wit
   "Removing everything should work" in {
 
     val storage = new SubStorage(db, "test")
-    storage.put(key("test:test", 0), Ints.toByteArray(1))
-    storage.put(key("test:test", 1), Ints.toByteArray(2))
-    storage.put(key("test:trash", 0), Ints.toByteArray(1))
-    storage.put(key("test:trash", 1), Ints.toByteArray(2))
+    storage.put(key("test:test", 0), Ints.toByteArray(1), None)
+    storage.put(key("test:test", 1), Ints.toByteArray(2), None)
+    storage.put(key("test:trash", 0), Ints.toByteArray(1), None)
+    storage.put(key("test:trash", 1), Ints.toByteArray(2), None)
 
     storage.get(key("test:test", 0)).isDefined should be(true)
     storage.get(key("test:test", 1)).isDefined should be(true)
@@ -121,10 +121,10 @@ class SubStorageSpec extends FreeSpec with Matchers with PropertyChecks with Wit
       }
     }
 
-    storage.put(storage.key("good", 0), Ints.toByteArray(1))
-    storage.put(storage.key("good", 1), Ints.toByteArray(2))
-    storage.put(storage.key("trash", 0), Ints.toByteArray(1))
-    storage.put(storage.key("trash", 1), Ints.toByteArray(2))
+    storage.put(storage.key("good", 0), Ints.toByteArray(1), None)
+    storage.put(storage.key("good", 1), Ints.toByteArray(2), None)
+    storage.put(storage.key("trash", 0), Ints.toByteArray(1), None)
+    storage.put(storage.key("trash", 1), Ints.toByteArray(2), None)
 
     val b = storage.createBatch()
     storage.keys("test:trash".getBytes(StandardCharsets.UTF_8)).foreach(k => storage.delete(k, b))

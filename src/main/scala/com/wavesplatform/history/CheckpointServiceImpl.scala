@@ -18,7 +18,7 @@ class CheckpointServiceImpl(db: DB, settings: CheckpointsSettings)
   override def set(cp: Checkpoint): Either[ValidationError, Unit] = for {
     _ <- Either.cond(!get.forall(_.signature sameElements cp.signature), (), GenericError("Checkpoint already applied"))
     _ <- Either.cond(EllipticCurveImpl.verify(cp.signature, cp.toSign, settings.publicKey.arr),
-      putProperty(CheckpointProperty, CheckpointCodec.encode(cp)),
+      putProperty(CheckpointProperty, CheckpointCodec.encode(cp), None),
       GenericError("Invalid checkpoint signature"))
   } yield ()
 
