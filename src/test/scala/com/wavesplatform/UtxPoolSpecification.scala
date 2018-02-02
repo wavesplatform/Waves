@@ -214,7 +214,7 @@ class UtxPoolSpecification extends FreeSpec
       val packed = utx.packUnconfirmed(constraint, sortInBlock = false)
 
       packed.lengthCompare(maxNumber) should be <= 0
-      constraint.wasMet shouldBe true
+      constraint.isEmpty shouldBe true
     }
 
     "evicts expired transactions when packUnconfirmed is called" in forAll(dualTxGen) { case (utx, time, txs, offset, _) =>
@@ -311,9 +311,9 @@ class UtxPoolSpecification extends FreeSpec
     }
   }
 
-  private def limitByNumber(n: Int): MiningConstraintUpdater = OneMiningConstraintUpdater.full(new CounterConstraint(n))
+  private def limitByNumber(n: Int): GasTank = OneGasTank.full(new CounterEstimator(n))
 
-  private class CounterConstraint(val max: Long) extends MiningConstraint {
+  private class CounterEstimator(val max: Long) extends GasEstimator {
     override implicit def estimate(x: Block): Long = x.transactionCount
     override implicit def estimate(x: Transaction): Long = 1
   }

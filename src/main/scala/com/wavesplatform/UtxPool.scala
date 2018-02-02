@@ -6,7 +6,7 @@ import cats._
 import com.wavesplatform.UtxPoolImpl.PessimisticPortfolios
 import com.wavesplatform.features.FeatureProvider
 import com.wavesplatform.metrics.Instrumented
-import com.wavesplatform.mining.MiningConstraintUpdater
+import com.wavesplatform.mining.GasTank
 import com.wavesplatform.settings.{FunctionalitySettings, UtxSettings}
 import com.wavesplatform.state2.diffs.TransactionDiffer
 import com.wavesplatform.state2.reader.CompositeStateReader.composite
@@ -42,7 +42,7 @@ trait UtxPool {
 
   def transactionById(transactionId: ByteStr): Option[Transaction]
 
-  def packUnconfirmed(limit: MiningConstraintUpdater, sortInBlock: Boolean): Seq[Transaction]
+  def packUnconfirmed(limit: GasTank, sortInBlock: Boolean): Seq[Transaction]
 
   def batched(f: UtxBatchOps => Unit): Unit
 
@@ -146,7 +146,7 @@ class UtxPoolImpl(time: Time,
 
   override def transactionById(transactionId: ByteStr): Option[Transaction] = Option(transactions.get(transactionId))
 
-  override def packUnconfirmed(limit: MiningConstraintUpdater, sortInBlock: Boolean): Seq[Transaction] = {
+  override def packUnconfirmed(gasTank: GasTank, sortInBlock: Boolean): Seq[Transaction] = {
     val currentTs = time.correctedTime()
     removeExpired(currentTs)
     val s = stateReader()
@@ -155,12 +155,12 @@ class UtxPoolImpl(time: Time,
       .values.asScala.toSeq
       .sorted(TransactionsOrdering.InUTXPool)
       .foldLeft((Seq.empty[ByteStr], Seq.empty[Transaction], Monoid[Diff].empty)) {
-        case (r, _) if limit.wasMet => r
+        case (r, _) if gasTank.isEmpty => r
         case ((invalid, valid, diff), tx) =>
           differ(composite(diff.asBlockDiff, s), featureProvider, tx) match {
             case Right(newDiff) =>
-              limit -= tx
-              if (limit.wasMet) (invalid, valid, diff)
+              gasTank -= tx
+              if (gasTank.isEmpty) (invalid, valid, diff)
               else (invalid, tx +: valid, Monoid.combine(diff, newDiff))
             case Left(_) =>
               (tx.id() +: invalid, valid, diff)
