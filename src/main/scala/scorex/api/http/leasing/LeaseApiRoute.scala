@@ -74,8 +74,7 @@ case class LeaseApiRoute(settings: RestAPISettings, wallet: Wallet, state: State
         case Right(a) =>
           state().activeLeases()
             .flatMap(state().transactionInfo)
-            .flatMap(_._2)
-            .filter(_.asInstanceOf[LeaseTransaction].sender.address == address)
+            .collect { case (_, Some(lt: LeaseTransaction)) if lt.sender.address == address => lt }
       })
     }
   }

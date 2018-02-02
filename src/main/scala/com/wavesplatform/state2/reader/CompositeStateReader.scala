@@ -60,9 +60,9 @@ class CompositeStateReader private(inner: SnapshotStateReader, blockDiff: BlockD
     blockDiff.txsDiff.leaseState.getOrElse(leaseTx.id(), inner.isLeaseActive(leaseTx))
 
   override def activeLeases(): Seq[ByteStr] = {
-    val leaseState = blockDiff.txsDiff.leaseState
-    leaseState.collect { case (id, isActive) if isActive => id }.toSeq ++
-      inner.activeLeases().filter(leaseState.getOrElse(_, true))
+    val newestLeaseState = blockDiff.txsDiff.leaseState
+    newestLeaseState.collect { case (id, true) => id }.toSeq ++
+      inner.activeLeases().filter(newestLeaseState.getOrElse(_, true))
   }
 
   override def lastUpdateHeight(acc: Address): Option[Int] = blockDiff.snapshots.get(acc).map(_.lastKey).orElse(inner.lastUpdateHeight(acc))
