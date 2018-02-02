@@ -2,7 +2,9 @@ package scorex.transaction
 
 import com.wavesplatform.settings.FeesSettings
 import com.wavesplatform.state2.ByteStr
+import scorex.transaction.TransactionParser.TransactionType
 import scorex.transaction.ValidationError.GenericError
+import scorex.transaction.assets.MassTransferTransaction
 
 /**
   * Class to check, that transaction contains enough fee to put it to UTX pool
@@ -22,7 +24,15 @@ class FeeCalculator(settings: FeesSettings) {
   }
 
   def enoughFee[T <: Transaction](tx: T): Either[ValidationError, T] = {
-    map.get(TransactionAssetFee(tx.transactionType.id, tx.assetFee._1).key) match {
+    val feeSpec = map.get(TransactionAssetFee(tx.transactionType.id, tx.assetFee._1).key)
+    val feeValue = tx match {
+      case mtt: MassTransferTransaction =>
+        val transferFeeSpec = map.get(TransactionAssetFee(TransactionType.TransferTransaction.id, tx.assetFee._1).key)
+        feeSpec.flatMap(mfee => transferFeeSpec.map(tfee => tfee + mfee * mtt.transfers.size))
+      case _ => feeSpec
+    }
+
+    feeValue match {
       case Some(minimumFee) =>
         if (minimumFee <= tx.assetFee._2) {
           Right(tx)

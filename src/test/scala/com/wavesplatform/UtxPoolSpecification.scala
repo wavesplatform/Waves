@@ -3,6 +3,7 @@ package com.wavesplatform
 import java.util.concurrent.locks.ReentrantReadWriteLock
 
 import com.typesafe.config.ConfigFactory
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.{HistoryWriterImpl, StorageFactory}
 import com.wavesplatform.settings.{BlockchainSettings, FeeSettings, FeesSettings, FunctionalitySettings, UtxSettings, WavesSettings}
 import com.wavesplatform.state2.diffs._
@@ -14,8 +15,9 @@ import org.scalatest.{FreeSpec, Matchers}
 import scorex.account.{Address, PrivateKeyAccount, PublicKeyAccount}
 import scorex.block.Block
 import scorex.settings.TestFunctionalitySettings
+import scorex.transaction.TransactionParser.TransactionType
 import scorex.transaction.ValidationError.SenderIsBlacklisted
-import scorex.transaction.assets.TransferTransaction
+import scorex.transaction.assets.{MassTransferTransaction, TransferTransaction}
 import scorex.transaction.{FeeCalculator, Transaction}
 import scorex.utils.Time
 
@@ -28,25 +30,29 @@ class UtxPoolSpecification extends FreeSpec
   with TransactionGen
   with NoShrink {
 
-  private val calculator = new FeeCalculator(FeesSettings(Map(
-    1 -> List(FeeSettings("", 0)),
-    2 -> List(FeeSettings("", 0)),
-    4 -> List(FeeSettings("", 0))
-  )))
+  private val calculator = new FeeCalculator(FeesSettings(Seq(
+    TransactionType.GenesisTransaction,
+    TransactionType.IssueTransaction,
+    TransactionType.TransferTransaction,
+    TransactionType.MassTransferTransaction
+  ).map(_.id -> List(FeeSettings("", 0))).toMap))
 
   private def mkState(senderAccount: Address, senderBalance: Long) = {
 
     val config = ConfigFactory.load()
     val genesisSettings = TestHelpers.genesisSettings(Map(senderAccount -> senderBalance))
-    val settings = WavesSettings.fromConfig(config).copy(blockchainSettings = BlockchainSettings('T', 5, 5, FunctionalitySettings.TESTNET, genesisSettings))
+    val settings = WavesSettings.fromConfig(config).copy(
+      blockchainSettings = BlockchainSettings('T', 5, 5,
+        FunctionalitySettings.TESTNET.copy(preActivatedFeatures = Map(BlockchainFeatures.MassTransfer.id -> 0)),
+        genesisSettings))
 
     val db = open()
     val (storage, _) = StorageFactory(db, settings).get
-    val (history, _, state, bcu, _) = storage()
+    val (history, featureProvider, state, bcu, _) = storage()
 
     bcu.processBlock(Block.genesis(genesisSettings).right.get)
 
-    (state, history)
+    (state, history, featureProvider)
   }
 
   private def transfer(sender: PrivateKeyAccount, maxAmount: Long, time: Time) = (for {
@@ -62,84 +68,106 @@ class UtxPoolSpecification extends FreeSpec
   } yield TransferTransaction.create(None, sender, recipient, amount, time.getTimestamp(), None, fee, Array.empty[Byte]).right.get)
     .label("transferWithRecipient")
 
+  private def massTransferWithRecipients(sender: PrivateKeyAccount, recipients: List[PublicKeyAccount], maxAmount: Long, time: Time) = {
+    val amount = maxAmount / (recipients.size + 1)
+    val transfers = recipients.map(r => (r.toAddress, amount))
+    val txs = for {
+      fee <- chooseNum(1, amount)
+    } yield MassTransferTransaction.create(None, sender, transfers, time.getTimestamp(), fee, Array.empty[Byte]).right.get
+    txs.label("transferWithRecipient")
+  }
+
   private val stateGen = for {
     sender <- accountGen.label("sender")
     senderBalance <- positiveLongGen.label("senderBalance")
   } yield {
-    val (state, history) = mkState(sender, senderBalance)
-    (sender, senderBalance, state, history)
+    val (state, history, featureProvider) = mkState(sender, senderBalance)
+    (sender, senderBalance, state, history, featureProvider)
   }
   private val twoOutOfManyValidPayments = (for {
-    (sender, senderBalance, state, history) <- stateGen
+    (sender, senderBalance, state, history, featureProvider) <- stateGen
     recipient <- accountGen
     n <- chooseNum(3, 10)
     fee <- chooseNum(1, (senderBalance * 0.01).toLong)
     offset <- chooseNum(1000L, 2000L)
   } yield {
     val time = new TestTime()
-    val utx = new UtxPoolImpl(time, state, history, calculator, FunctionalitySettings.TESTNET, UtxSettings(10, 10.minutes, Set.empty, Set.empty, 5.minutes))
+    val utx = new UtxPoolImpl(time, state, history, featureProvider, calculator, FunctionalitySettings.TESTNET, UtxSettings(10, 10.minutes, Set.empty, Set.empty, 5.minutes))
     val amountPart = (senderBalance - fee) / 2 - fee
     val txs = for (_ <- 1 to n) yield createWavesTransfer(sender, recipient, amountPart, fee, time.getTimestamp()).right.get
     (utx, time, txs, (offset + 1000).millis)
   }).label("twoOutOfManyValidPayments")
 
   private val emptyUtxPool = stateGen
-    .map { case (sender, senderBalance, state, history) =>
+    .map { case (sender, senderBalance, state, history, featureProvider) =>
       val time = new TestTime()
-      val utxPool = new UtxPoolImpl(time, state, history, calculator, FunctionalitySettings.TESTNET, UtxSettings(10, 1.minute, Set.empty, Set.empty, 5.minutes))
+      val utxPool = new UtxPoolImpl(time, state, history, featureProvider, calculator, FunctionalitySettings.TESTNET, UtxSettings(10, 1.minute, Set.empty, Set.empty, 5.minutes))
       (sender, state, utxPool)
     }
     .label("emptyUtxPool")
 
   private val withValidPayments = (for {
-    (sender, senderBalance, state, history) <- stateGen
+    (sender, senderBalance, state, history, featureProvider) <- stateGen
     recipient <- accountGen
     time = new TestTime()
     txs <- Gen.nonEmptyListOf(transferWithRecipient(sender, recipient, senderBalance / 10, time))
   } yield {
     val settings = UtxSettings(10, 1.minute, Set.empty, Set.empty, 5.minutes)
-    val utxPool = new UtxPoolImpl(time, state, history, calculator, FunctionalitySettings.TESTNET, settings)
+    val utxPool = new UtxPoolImpl(time, state, history, featureProvider, calculator, FunctionalitySettings.TESTNET, settings)
     txs.foreach(utxPool.putIfNew)
     (sender, state, utxPool, time, settings)
   }).label("withValidPayments")
 
   private val withBlacklisted = (for {
-    (sender, senderBalance, state, history) <- stateGen
+    (sender, senderBalance, state, history, featureProvider) <- stateGen
     recipient <- accountGen
     time = new TestTime()
     txs <- Gen.nonEmptyListOf(transferWithRecipient(sender, recipient, senderBalance / 10, time)) // @TODO: Random transactions
   } yield {
     val settings = UtxSettings(10, 1.minute, Set(sender.address), Set.empty, 5.minutes)
-    val utxPool = new UtxPoolImpl(time, state, history, calculator, FunctionalitySettings.TESTNET, settings)
+    val utxPool = new UtxPoolImpl(time, state, history, featureProvider, calculator, FunctionalitySettings.TESTNET, settings)
     (sender, utxPool, txs)
   }).label("withBlacklisted")
 
   private val withBlacklistedAndAllowedByRule = (for {
-    (sender, senderBalance, state, history) <- stateGen
+    (sender, senderBalance, state, history, featureProvider) <- stateGen
     recipient <- accountGen
     time = new TestTime()
     txs <- Gen.nonEmptyListOf(transferWithRecipient(sender, recipient, senderBalance / 10, time)) // @TODO: Random transactions
   } yield {
     val settings = UtxSettings(txs.length, 1.minute, Set(sender.address), Set(recipient.address), 5.minutes)
-    val utxPool = new UtxPoolImpl(time, state, history, calculator, FunctionalitySettings.TESTNET, settings)
+    val utxPool = new UtxPoolImpl(time, state, history, featureProvider, calculator, FunctionalitySettings.TESTNET, settings)
     (sender, utxPool, txs)
   }).label("withBlacklistedAndAllowedByRule")
+
+  private def massTransferWithBlacklisted(allowRecipients: Boolean) = (for {
+      (sender, senderBalance, state, history, featureProvider) <- stateGen
+      addressGen = Gen.listOf(accountGen).filter(list => if (allowRecipients) list.nonEmpty else true)
+      recipients <- addressGen
+      time = new TestTime()
+      txs <- Gen.nonEmptyListOf(massTransferWithRecipients(sender, recipients, senderBalance / 10, time))
+    } yield {
+      val whitelist: Set[String] = if (allowRecipients) recipients.map(_.address).toSet else Set.empty
+      val settings = UtxSettings(txs.length, 1.minute, Set(sender.address), whitelist, 5.minutes)
+      val utxPool = new UtxPoolImpl(time, state, history, featureProvider, calculator, FunctionalitySettings.TESTNET, settings)
+      (sender, utxPool, txs)
+    }).label("massTransferWithBlacklisted")
 
   private def utxTest(utxSettings: UtxSettings = UtxSettings(20, 5.seconds, Set.empty, Set.empty, 5.minutes), txCount: Int = 10)
                      (f: (Seq[TransferTransaction], UtxPool, TestTime) => Unit): Unit = forAll(
     stateGen,
-    chooseNum(2, txCount).label("txCount")) { case ((sender, senderBalance, state, history), count) =>
+    chooseNum(2, txCount).label("txCount")) { case ((sender, senderBalance, state, history, featureProvider), count) =>
     val time = new TestTime()
 
     forAll(listOfN(count, transfer(sender, senderBalance / 2, time))) { txs =>
-      val utx = new UtxPoolImpl(time, state, history, calculator, FunctionalitySettings.TESTNET, utxSettings)
+      val utx = new UtxPoolImpl(time, state, history, featureProvider, calculator, FunctionalitySettings.TESTNET, utxSettings)
       f(txs, utx, time)
     }
   }
 
   private val dualTxGen: Gen[(UtxPool, TestTime, Seq[Transaction], FiniteDuration, Seq[Transaction])] =
     for {
-      (sender, senderBalance, state, history) <- stateGen
+      (sender, senderBalance, state, history, featureProvider) <- stateGen
       ts = System.currentTimeMillis()
       count1 <- chooseNum(5, 10)
       tx1 <- listOfN(count1, transfer(sender, senderBalance / 2, new TestTime(ts)))
@@ -149,7 +177,8 @@ class UtxPoolSpecification extends FreeSpec
       val time = new TestTime()
       val history = HistoryWriterImpl(open(), new ReentrantReadWriteLock(), TestFunctionalitySettings.Stub,
         TestFunctionalitySettings.EmptyFeaturesSettings).get
-      val utx = new UtxPoolImpl(time, state, history, calculator, FunctionalitySettings.TESTNET, UtxSettings(10, offset.millis, Set.empty, Set.empty, 5.minutes))
+      val utx = new UtxPoolImpl(time, state, history, featureProvider, calculator, FunctionalitySettings.TESTNET,
+        UtxSettings(10, offset.millis, Set.empty, Set.empty, 5.minutes))
       (utx, time, tx1, (offset + 1000).millis, tx2)
     }
 
@@ -247,23 +276,29 @@ class UtxPoolSpecification extends FreeSpec
     }
 
     "blacklisting" - {
-      "prevent a transaction from specific addresses" in forAll(withBlacklisted) { case (sender: PrivateKeyAccount, utxPool: UtxPool, txs: Seq[Transaction]) =>
-        val r = txs.forall { tx =>
-          utxPool.putIfNew(tx) match {
-            case Left(SenderIsBlacklisted(x)) => true
-            case _ => false
+      "prevent a transfer transaction from specific addresses" in {
+        val transferGen = Gen.oneOf(withBlacklisted, massTransferWithBlacklisted(allowRecipients = false))
+        forAll(transferGen) { case (_, utxPool, txs) =>
+          val r = txs.forall { tx =>
+            utxPool.putIfNew(tx) match {
+              case Left(SenderIsBlacklisted(x)) => true
+              case _ => false
+            }
           }
-        }
 
-        r shouldBe true
-        utxPool.all.size shouldEqual 0
+          r shouldBe true
+          utxPool.all.size shouldEqual 0
+        }
       }
 
-      "allow a transfer transaction from blacklisted address to specific addresses" in forAll(withBlacklistedAndAllowedByRule) { case (sender: PrivateKeyAccount, utxPool: UtxPool, txs: Seq[Transaction]) =>
-        all(txs.map { t =>
-          utxPool.putIfNew(t)
-        }) shouldBe 'right
-        utxPool.all.size shouldEqual txs.size
+      "allow a transfer transaction from blacklisted address to specific addresses" in {
+        val transferGen = Gen.oneOf(withBlacklistedAndAllowedByRule, massTransferWithBlacklisted(allowRecipients = true))
+        forAll(transferGen) { case (_, utxPool, txs) =>
+          all(txs.map { t =>
+            utxPool.putIfNew(t)
+          }) shouldBe 'right
+          utxPool.all.size shouldEqual txs.size
+        }
       }
     }
   }
