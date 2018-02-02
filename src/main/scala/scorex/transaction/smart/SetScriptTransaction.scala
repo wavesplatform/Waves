@@ -10,11 +10,11 @@ import scorex.serialization.Deser
 import scorex.transaction.TransactionParser.{KeyLength, TransactionType}
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction._
-import scorex.account.AddressScheme
 
 import scala.util.{Failure, Success, Try}
 
 case class SetScriptTransaction private(version: Byte,
+                                        chainId: Byte,
                                         sender: PublicKeyAccount,
                                         script: Script,
                                         fee: Long,
@@ -23,7 +23,7 @@ case class SetScriptTransaction private(version: Byte,
 
   val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(
     Array(version),
-    Array(AddressScheme.current.chainId),
+    Array(chainId),
     sender.publicKey,
     Deser.serializeArray(script.bytes().arr),
     Longs.toByteArray(fee),
@@ -50,16 +50,16 @@ object SetScriptTransaction {
     val fee = Longs.fromByteArray(bytes.slice(scriptEnd, scriptEnd + 8))
     val timestamp = Longs.fromByteArray(bytes.slice(scriptEnd + 8, scriptEnd + 16))
     (for {
-      _ <- Either.cond(chainId == AddressScheme.current.chainId, (), GenericError(s"Wrong chainId: $chainId but expected: ${AddressScheme.current.chainId}"))
       _ <- Either.cond(version == 1, (), GenericError(s"Unsupported SetScriptTransaction version: ${version.toInt}"))
       script <- Script.fromBytes(scriptBytes)
       proofs <- Proofs.fromBytes(bytes.drop(scriptEnd + 16))
-      tx <- create(sender, script, fee, timestamp, proofs)
+      tx <- create(chainId, sender, script, fee, timestamp, proofs)
     } yield tx).fold(left => Failure(new Exception(left.toString)), right => Success(right))
   }.flatten
 
 
-  def create(sender: PublicKeyAccount,
+  def create(chainId: Byte,
+             sender: PublicKeyAccount,
              script: Script,
              fee: Long,
              timestamp: Long,
@@ -67,14 +67,15 @@ object SetScriptTransaction {
     if (fee <= 0) {
       Left(ValidationError.InsufficientFee)
     } else {
-      Right(new SetScriptTransaction(1, sender, script, fee, timestamp, proofs))
+      Right(new SetScriptTransaction(1, chainId, sender, script, fee, timestamp, proofs))
     }
 
 
-  def selfSigned(sender: PrivateKeyAccount,
+  def selfSigned(chainId: Byte,
+                 sender: PrivateKeyAccount,
                  script: Script,
                  fee: Long,
-                 timestamp: Long): Either[ValidationError, SetScriptTransaction] = create(sender, script, fee, timestamp, Proofs.empty).right.map { unsigned =>
+                 timestamp: Long): Either[ValidationError, SetScriptTransaction] = create(chainId, sender, script, fee, timestamp, Proofs.empty).right.map { unsigned =>
     unsigned.copy(proofs = Proofs.create(Seq(ByteStr(EllipticCurveImpl.sign(sender, unsigned.bodyBytes())))).explicitGet())
   }
 }
