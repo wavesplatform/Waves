@@ -12,12 +12,12 @@ trait GasTank {
   def copy(): GasTank
 }
 
-class OneGasTank private(private var restGas: Long, private val constraint: GasEstimator) extends GasTank {
+class OneGasTank private(private var restGas: Long, private val estimator: GasEstimator) extends GasTank {
   private var _isEmpty = restGas <= 0
   override def isEmpty: Boolean = _isEmpty
 
-  override def withdraw(x: Block): Boolean = withdraw(constraint.estimate(x))
-  override def withdraw(x: Transaction): Boolean = withdraw(constraint.estimate(x))
+  override def withdraw(x: Block): Boolean = withdraw(estimator.estimate(x))
+  override def withdraw(x: Transaction): Boolean = withdraw(estimator.estimate(x))
   private def withdraw(x: Long): Boolean = {
     val updatedRestGas = restGas - x
     if (updatedRestGas <= 0) _isEmpty = true
@@ -27,11 +27,11 @@ class OneGasTank private(private var restGas: Long, private val constraint: GasE
     successfully
   }
 
-  override def copy(): OneGasTank = new OneGasTank(restGas, constraint)
+  override def copy(): OneGasTank = new OneGasTank(restGas, estimator)
 }
 
 object OneGasTank {
-  def full(constraint: GasEstimator): GasTank = new OneGasTank(constraint.max, constraint)
+  def full(estimator: GasEstimator): GasTank = new OneGasTank(estimator.max, estimator)
 }
 
 class DoubleGasTank(private val first: GasTank,

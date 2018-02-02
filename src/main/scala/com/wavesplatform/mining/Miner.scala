@@ -117,8 +117,8 @@ class MinerImpl(allChannels: ChannelGroup,
           val sortInBlock = history.height() <= blockchainSettings.functionalitySettings.dontRequireSortedTransactionsAfter
 
           val totalGasTank = OneGasTank.full(estimators.total)
-          val gasTank = DoubleGasTank.partial(totalGasTank, OneGasTank.full(estimators.keyBlock))
-          val unconfirmed = utx.packUnconfirmed(gasTank, sortInBlock)
+          val combinedGasTank = DoubleGasTank.partial(totalGasTank, OneGasTank.full(estimators.keyBlock))
+          val unconfirmed = utx.packUnconfirmed(combinedGasTank, sortInBlock)
 
           val features = if (version > 2) settings.featuresSettings.supported
             .filter(featureProvider.featureStatus(_, height) == BlockchainFeatureStatus.Undefined)
@@ -135,10 +135,10 @@ class MinerImpl(allChannels: ChannelGroup,
   }.delayExecution(delay)
 
 
-  private def generateOneMicroBlockTask(account: PrivateKeyAccount, accumulatedBlock: Block, microGasEstimator: GasEstimator, totalGasTank: GasTank): Task[MicroblockMiningResult] = {
+  private def generateOneMicroBlockTask(account: PrivateKeyAccount, accumulatedBlock: Block, microEstimator: GasEstimator, totalGasTank: GasTank): Task[MicroblockMiningResult] = {
     log.trace(s"Generating microBlock for $account")
     val pc = allChannels.size()
-    val gasTank = DoubleGasTank.partial(totalGasTank, OneGasTank.full(microGasEstimator))
+    val gasTank = DoubleGasTank.partial(totalGasTank, OneGasTank.full(microEstimator))
     lazy val unconfirmed = measureLog("packing unconfirmed transactions for microblock") {
       utx.packUnconfirmed(gasTank, sortInBlock = false)
     }
@@ -178,15 +178,15 @@ class MinerImpl(allChannels: ChannelGroup,
     }
   }
 
-  private def generateMicroBlockSequence(account: PrivateKeyAccount, accumulatedBlock: Block, delay: FiniteDuration, microGasEstimator: GasEstimator, totalGasTank: GasTank): Task[Unit] = {
+  private def generateMicroBlockSequence(account: PrivateKeyAccount, accumulatedBlock: Block, delay: FiniteDuration, microEstimator: GasEstimator, totalGasTank: GasTank): Task[Unit] = {
     debugState = MinerDebugInfo.MiningMicroblocks
-    generateOneMicroBlockTask(account, accumulatedBlock, microGasEstimator, totalGasTank.copy()).delayExecution(delay).flatMap {
+    generateOneMicroBlockTask(account, accumulatedBlock, microEstimator, totalGasTank.copy()).delayExecution(delay).flatMap {
       case Error(e) => Task {
         debugState = MinerDebugInfo.Error(e.toString)
         log.warn("Error mining MicroBlock: " + e.toString)
       }
-      case Success(newTotal, updatedTotalGasTank) => generateMicroBlockSequence(account, newTotal, minerSettings.microBlockInterval, microGasEstimator, updatedTotalGasTank)
-      case Retry => generateMicroBlockSequence(account, accumulatedBlock, minerSettings.microBlockInterval, microGasEstimator, totalGasTank.copy())
+      case Success(newTotal, updatedTotalGasTank) => generateMicroBlockSequence(account, newTotal, minerSettings.microBlockInterval, microEstimator, updatedTotalGasTank)
+      case Retry => generateMicroBlockSequence(account, accumulatedBlock, minerSettings.microBlockInterval, microEstimator, totalGasTank.copy())
       case Stop => Task {
         debugState = MinerDebugInfo.MiningBlocks
         log.debug("MicroBlock mining completed, block is full")
@@ -239,9 +239,9 @@ class MinerImpl(allChannels: ChannelGroup,
     debugState = MinerDebugInfo.MiningBlocks
   }
 
-  private def startMicroBlockMining(account: PrivateKeyAccount, lastBlock: Block, microBlockConstraint: GasEstimator, totalBlockConstraint: GasTank): Unit = {
+  private def startMicroBlockMining(account: PrivateKeyAccount, lastBlock: Block, microEstimator: GasEstimator, totalGasTank: GasTank): Unit = {
     Miner.microMiningStarted.increment()
-    microBlockAttempt := generateMicroBlockSequence(account, lastBlock, Duration.Zero, microBlockConstraint, totalBlockConstraint.copy()).runAsyncLogErr
+    microBlockAttempt := generateMicroBlockSequence(account, lastBlock, Duration.Zero, microEstimator, totalGasTank.copy()).runAsyncLogErr
     log.trace(s"MicroBlock mining scheduled for $account")
   }
 
