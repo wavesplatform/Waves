@@ -65,7 +65,7 @@ trait MiningConstraint {
 }
 
 case class TxNumberMiningConstraint(max: Long) extends MiningConstraint {
-  override implicit def estimate(x: Block): Long = x.transactionData.size
+  override implicit def estimate(x: Block): Long = x.transactionCount
   override implicit def estimate(x: Transaction): Long = 1
 }
 

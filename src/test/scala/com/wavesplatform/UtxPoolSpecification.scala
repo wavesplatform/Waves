@@ -4,7 +4,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock
 
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.history.{HistoryWriterImpl, StorageFactory}
-import com.wavesplatform.mining.{ComplexityMiningConstraint, DefaultMiningConstraintUpdater, TxNumberMiningConstraint}
+import com.wavesplatform.mining._
 import com.wavesplatform.settings.{BlockchainSettings, FeeSettings, FeesSettings, FunctionalitySettings, UtxSettings, WavesSettings}
 import com.wavesplatform.state2.diffs._
 import org.scalacheck.Gen
@@ -205,27 +205,16 @@ class UtxPoolSpecification extends FreeSpec
       utx.all.size shouldEqual txs2.size
     }
 
-    "packUnconfirmed result is limited by number of txs" in forAll(dualTxGen) { case (utx, time, txs, _, _) =>
+    "packUnconfirmed result is limited by constraint" in forAll(dualTxGen) { case (utx, time, txs, _, _) =>
       all(txs.map(utx.putIfNew)) shouldBe 'right
       utx.all.size shouldEqual txs.size
 
       val maxNumber = utx.all.size / 2
-      val packed = utx.packUnconfirmed(limitByNumber(maxNumber), sortInBlock = false)
+      val constraint = limitByNumber(maxNumber)
+      val packed = utx.packUnconfirmed(constraint, sortInBlock = false)
 
       packed.lengthCompare(maxNumber) should be <= 0
-    }
-
-    "packUnconfirmed result is limited by complexity" in forAll(dualTxGen) { case (utx, time, txs, _, _) =>
-      all(txs.map(utx.putIfNew)) shouldBe 'right
-      utx.all.size shouldEqual txs.size
-
-      val totalComplexity = ComplexityMiningConstraint(0).estimate(utx.all)
-      val maxComplexity = totalComplexity.copy(restValue = totalComplexity.restValue / 2)
-
-      val packed = utx.packUnconfirmed(new DefaultMiningConstraintUpdater(maxComplexity, maxComplexity), sortInBlock = false)
-      val packedComplexity = ComplexityMiningConstraint(0).estimate(packed)
-
-      packedComplexity.restValue should be <= maxComplexity.restValue
+      constraint.wasMet shouldBe true
     }
 
     "evicts expired transactions when packUnconfirmed is called" in forAll(dualTxGen) { case (utx, time, txs, offset, _) =>
@@ -299,7 +288,7 @@ class UtxPoolSpecification extends FreeSpec
         forAll(transferGen) { case (_, utxPool, txs) =>
           val r = txs.forall { tx =>
             utxPool.putIfNew(tx) match {
-              case Left(SenderIsBlacklisted(x)) => true
+              case Left(SenderIsBlacklisted(_)) => true
               case _ => false
             }
           }
@@ -322,8 +311,10 @@ class UtxPoolSpecification extends FreeSpec
     }
   }
 
-  private def limitByNumber(n: Int): DefaultMiningConstraintUpdater = {
-    val leaf = TxNumberMiningConstraint(n)
-    new DefaultMiningConstraintUpdater(leaf, leaf)
+  private def limitByNumber(n: Int): MiningConstraintUpdater = OneMiningConstraintUpdater.full(new CounterConstraint(n))
+
+  private class CounterConstraint(val max: Long) extends MiningConstraint {
+    override implicit def estimate(x: Block): Long = x.transactionCount
+    override implicit def estimate(x: Transaction): Long = 1
   }
 }
