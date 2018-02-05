@@ -85,8 +85,8 @@ package object appender extends ScorexLogging {
       _ <- Either.cond(blockTime - currentTs < MaxTimeDrift, (), BlockFromFuture(blockTime))
       _ <- {
         val constraints = MiningEstimators(settings.minerSettings, fp, height)
-        val gasTank = OneGasTank.full(constraints.total)
-        Either.cond(gasTank.withdraw(block), (), GenericError("Block is full"))
+        val isFull = OneDimensionMiningSpace.full(constraints.total).put(block).fold(true)(_.isFull)
+        Either.cond(!isFull, (), GenericError("Block is full"))
       }
       _ <- Either.cond(blockTime < fs.requireSortedTransactionsAfter
         || height > fs.dontRequireSortedTransactionsAfter

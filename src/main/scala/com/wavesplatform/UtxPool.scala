@@ -6,7 +6,7 @@ import cats._
 import com.wavesplatform.UtxPoolImpl.PessimisticPortfolios
 import com.wavesplatform.features.FeatureProvider
 import com.wavesplatform.metrics.Instrumented
-import com.wavesplatform.mining.GasTank
+import com.wavesplatform.mining.TwoDimensionMiningSpace
 import com.wavesplatform.settings.{FunctionalitySettings, UtxSettings}
 import com.wavesplatform.state2.diffs.TransactionDiffer
 import com.wavesplatform.state2.reader.CompositeStateReader.composite
@@ -42,7 +42,7 @@ trait UtxPool {
 
   def transactionById(transactionId: ByteStr): Option[Transaction]
 
-  def packUnconfirmed(limit: GasTank, sortInBlock: Boolean): Seq[Transaction]
+  def packUnconfirmed(freeSpace: TwoDimensionMiningSpace, sortInBlock: Boolean): (Seq[Transaction], TwoDimensionMiningSpace)
 
   def batched(f: UtxBatchOps => Unit): Unit
 
@@ -115,7 +115,7 @@ class UtxPoolImpl(time: Time,
           }
           val allowed =
             recipients.nonEmpty &&
-            recipients.forall(r => utxSettings.allowBlacklistedTransferTo.contains(r.stringRepr))
+              recipients.forall(r => utxSettings.allowBlacklistedTransferTo.contains(r.stringRepr))
           Either.cond(allowed, (), SenderIsBlacklisted(addr))
         case _ => Right(())
       }
@@ -146,23 +146,26 @@ class UtxPoolImpl(time: Time,
 
   override def transactionById(transactionId: ByteStr): Option[Transaction] = Option(transactions.get(transactionId))
 
-  override def packUnconfirmed(gasTank: GasTank, sortInBlock: Boolean): Seq[Transaction] = {
+  override def packUnconfirmed(freeSpace: TwoDimensionMiningSpace, sortInBlock: Boolean): (Seq[Transaction], TwoDimensionMiningSpace) = {
     val currentTs = time.correctedTime()
     removeExpired(currentTs)
     val s = stateReader()
     val differ = TransactionDiffer(fs, history.lastBlockTimestamp(), currentTs, s.height) _
-    val (invalidTxs, reversedValidTxs, _) = transactions
+    val (invalidTxs, reversedValidTxs, _, finalSpace, _) = transactions
       .values.asScala.toSeq
       .sorted(TransactionsOrdering.InUTXPool)
-      .foldLeft((Seq.empty[ByteStr], Seq.empty[Transaction], Monoid[Diff].empty)) {
-        case (r, _) if gasTank.isEmpty => r
-        case ((invalid, valid, diff), tx) =>
+      .foldLeft((Seq.empty[ByteStr], Seq.empty[Transaction], Monoid[Diff].empty, freeSpace, false)) {
+        case (curr@(_, _, _, _, isFull), _) if isFull => curr
+        case ((invalid, valid, diff, restSpace, _), tx) =>
           differ(composite(diff.asBlockDiff, s), featureProvider, tx) match {
             case Right(newDiff) =>
-              if (gasTank.withdraw(tx)) (invalid, tx +: valid, Monoid.combine(diff, newDiff))
-              else (invalid, valid, diff)
+              restSpace.put(tx) match {
+                case None => (invalid, valid, diff, restSpace, true)
+                case Some(updatedRestSpace) =>
+                  (invalid, tx +: valid, Monoid.combine(diff, newDiff), updatedRestSpace, updatedRestSpace.isFull)
+              }
             case Left(_) =>
-              (tx.id() +: invalid, valid, diff)
+              (tx.id() +: invalid, valid, diff, restSpace, false)
           }
       }
 
@@ -170,9 +173,8 @@ class UtxPoolImpl(time: Time,
       transactions.remove(itx)
       pessimisticPortfolios.remove(itx)
     }
-    if (sortInBlock)
-      reversedValidTxs.sorted(TransactionsOrdering.InBlock)
-    else reversedValidTxs.reverse
+    val txs = if (sortInBlock) reversedValidTxs.sorted(TransactionsOrdering.InBlock) else reversedValidTxs.reverse
+    (txs, finalSpace)
   }
 
   override def batched(f: UtxBatchOps => Unit): Unit = f(new BatchOpsImpl(stateReader()))

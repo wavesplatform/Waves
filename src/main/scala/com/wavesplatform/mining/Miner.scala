@@ -92,7 +92,7 @@ class MinerImpl(allChannels: ChannelGroup,
 
   private def ngEnabled: Boolean = featureProvider.featureActivationHeight(BlockchainFeatures.NG.id).exists(history.height > _ + 1)
 
-  private def generateOneBlockTask(account: PrivateKeyAccount, estimators: MiningEstimators, balance: Long)(delay: FiniteDuration): Task[Either[String, (Block, GasTank)]] = Task {
+  private def generateOneBlockTask(account: PrivateKeyAccount, estimators: MiningEstimators, balance: Long)(delay: FiniteDuration): Task[Either[String, (Block, MiningSpace)]] = Task {
     history.read { implicit l =>
       // should take last block right at the time of mining since microblocks might have been added
       val height = history.height()
@@ -116,9 +116,8 @@ class MinerImpl(allChannels: ChannelGroup,
           val consensusData = NxtLikeConsensusBlockData(btg, ByteStr(gs))
           val sortInBlock = history.height() <= blockchainSettings.functionalitySettings.dontRequireSortedTransactionsAfter
 
-          val totalGasTank = OneGasTank.full(estimators.total)
-          val combinedGasTank = DoubleGasTank.partial(totalGasTank, OneGasTank.full(estimators.keyBlock))
-          val unconfirmed = utx.packUnconfirmed(combinedGasTank, sortInBlock)
+          val combinedSpace = TwoDimensionMiningSpace.partial(OneDimensionMiningSpace.full(estimators.total), OneDimensionMiningSpace.full(estimators.keyBlock))
+          val (unconfirmed, updatedCombinedSpace) = utx.packUnconfirmed(combinedSpace, sortInBlock)
 
           val features = if (version > 2) settings.featuresSettings.supported
             .filter(featureProvider.featureStatus(_, height) == BlockchainFeatureStatus.Undefined)
@@ -127,7 +126,7 @@ class MinerImpl(allChannels: ChannelGroup,
           log.debug(s"Adding ${unconfirmed.size} unconfirmed transaction(s) to new block")
           Block.buildAndSign(version.toByte, currentTime, referencedBlockInfo.blockId, consensusData, unconfirmed, account, features) match {
             case Left(e) => Left(e.err)
-            case Right(x) => Right((x, totalGasTank))
+            case Right(x) => Right((x, updatedCombinedSpace.first))
           }
         }
       } yield block)
@@ -135,14 +134,15 @@ class MinerImpl(allChannels: ChannelGroup,
   }.delayExecution(delay)
 
 
-  private def generateOneMicroBlockTask(account: PrivateKeyAccount, accumulatedBlock: Block, microEstimator: GasEstimator, totalGasTank: GasTank): Task[MicroblockMiningResult] = {
+  private def generateOneMicroBlockTask(account: PrivateKeyAccount, accumulatedBlock: Block, microEstimator: SpaceEstimator, totalSpace: MiningSpace): Task[MicroblockMiningResult] = {
     log.trace(s"Generating microBlock for $account")
     val pc = allChannels.size()
-    val gasTank = DoubleGasTank.partial(totalGasTank, OneGasTank.full(microEstimator))
-    lazy val unconfirmed = measureLog("packing unconfirmed transactions for microblock") {
-      utx.packUnconfirmed(gasTank, sortInBlock = false)
+    val (unconfirmed, updatedTotalSpace) = measureLog("packing unconfirmed transactions for microblock") {
+      val combinedSpace = TwoDimensionMiningSpace.partial(totalSpace, OneDimensionMiningSpace.full(microEstimator))
+      val (unconfirmed, updatedCombined) = utx.packUnconfirmed(combinedSpace, sortInBlock = false)
+      (unconfirmed, updatedCombined.first)
     }
-    if (totalGasTank.isEmpty) {
+    if (updatedTotalSpace.isFull) {
       log.trace(s"Stopping forging microBlocks, block is already full")
       Task.now(Stop)
     } else if (pc < minerSettings.quorum) {
@@ -173,20 +173,20 @@ class MinerImpl(allChannels: ChannelGroup,
           BlockStats.mined(microBlock)
           log.trace(s"$microBlock has been mined for $account}")
           allChannels.broadcast(MicroBlockInv(account, microBlock.totalResBlockSig, microBlock.prevResBlockSig))
-          Success(signedBlock, totalGasTank)
+          Success(signedBlock, updatedTotalSpace)
       }
     }
   }
 
-  private def generateMicroBlockSequence(account: PrivateKeyAccount, accumulatedBlock: Block, delay: FiniteDuration, microEstimator: GasEstimator, totalGasTank: GasTank): Task[Unit] = {
+  private def generateMicroBlockSequence(account: PrivateKeyAccount, accumulatedBlock: Block, delay: FiniteDuration, microEstimator: SpaceEstimator, totalSpace: MiningSpace): Task[Unit] = {
     debugState = MinerDebugInfo.MiningMicroblocks
-    generateOneMicroBlockTask(account, accumulatedBlock, microEstimator, totalGasTank.copy()).delayExecution(delay).flatMap {
+    generateOneMicroBlockTask(account, accumulatedBlock, microEstimator, totalSpace).delayExecution(delay).flatMap {
       case Error(e) => Task {
         debugState = MinerDebugInfo.Error(e.toString)
         log.warn("Error mining MicroBlock: " + e.toString)
       }
-      case Success(newTotal, updatedTotalGasTank) => generateMicroBlockSequence(account, newTotal, minerSettings.microBlockInterval, microEstimator, updatedTotalGasTank)
-      case Retry => generateMicroBlockSequence(account, accumulatedBlock, minerSettings.microBlockInterval, microEstimator, totalGasTank.copy())
+      case Success(newTotal, updatedTotalSpace) => generateMicroBlockSequence(account, newTotal, minerSettings.microBlockInterval, microEstimator, updatedTotalSpace)
+      case Retry => generateMicroBlockSequence(account, accumulatedBlock, minerSettings.microBlockInterval, microEstimator, totalSpace)
       case Stop => Task {
         debugState = MinerDebugInfo.MiningBlocks
         log.debug("MicroBlock mining completed, block is full")
@@ -209,7 +209,7 @@ class MinerImpl(allChannels: ChannelGroup,
         log.debug(s"Next attempt for acc=$account in $offset")
         nextBlockGenerationTimes += account.toAddress -> (System.currentTimeMillis() + offset.toMillis)
         generateOneBlockTask(account, estimators, balance)(offset).flatMap {
-          case Right((block, totalGasTank)) =>
+          case Right((block, totalSpace)) =>
             BlockAppender(checkpoint, history, blockchainUpdater, timeService, stateReader, utx,
               settings, featureProvider, appenderScheduler)(block).map {
               case Left(err) => log.warn("Error mining Block: " + err.toString)
@@ -218,7 +218,7 @@ class MinerImpl(allChannels: ChannelGroup,
                 BlockStats.mined(block, history.height())
                 allChannels.broadcast(BlockForged(block))
                 scheduleMining()
-                if (ngEnabled && !totalGasTank.isEmpty) startMicroBlockMining(account, block, estimators.micro, totalGasTank)
+                if (ngEnabled && !totalSpace.isFull) startMicroBlockMining(account, block, estimators.micro, totalSpace)
               case Right(None) => log.warn("Newly created block has already been appended, should not happen")
             }
           case Left(err) =>
@@ -239,9 +239,9 @@ class MinerImpl(allChannels: ChannelGroup,
     debugState = MinerDebugInfo.MiningBlocks
   }
 
-  private def startMicroBlockMining(account: PrivateKeyAccount, lastBlock: Block, microEstimator: GasEstimator, totalGasTank: GasTank): Unit = {
+  private def startMicroBlockMining(account: PrivateKeyAccount, lastBlock: Block, microEstimator: SpaceEstimator, totalSpace: MiningSpace): Unit = {
     Miner.microMiningStarted.increment()
-    microBlockAttempt := generateMicroBlockSequence(account, lastBlock, Duration.Zero, microEstimator, totalGasTank.copy()).runAsyncLogErr
+    microBlockAttempt := generateMicroBlockSequence(account, lastBlock, Duration.Zero, microEstimator, totalSpace).runAsyncLogErr
     log.trace(s"MicroBlock mining scheduled for $account")
   }
 
@@ -275,6 +275,6 @@ object Miner {
   case object Retry extends MicroblockMiningResult
 
   case class Error(e: ValidationError) extends MicroblockMiningResult
-  case class Success(b: Block, totalGasTank: GasTank) extends MicroblockMiningResult
+  case class Success(b: Block, totalSpace: MiningSpace) extends MicroblockMiningResult
 
 }

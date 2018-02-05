@@ -5,18 +5,18 @@ import com.wavesplatform.settings.MinerSettings
 import scorex.block.Block
 import scorex.transaction.Transaction
 
-trait GasEstimator {
+trait SpaceEstimator {
   def max: Long
   implicit def estimate(x: Block): Long
   implicit def estimate(x: Transaction): Long
 }
 
-case class TxNumberGasEstimator(max: Long) extends GasEstimator {
+case class TxNumberSpaceEstimator(max: Long) extends SpaceEstimator {
   override implicit def estimate(x: Block): Long = x.transactionCount
   override implicit def estimate(x: Transaction): Long = 1
 }
 
-case class ComplexityGasEstimator(max: Long) extends GasEstimator {
+case class ComplexitySpaceEstimator(max: Long) extends SpaceEstimator {
   implicit def estimate(xs: Seq[Transaction]): Long = xs.view.map(estimateTx).sum
   override implicit def estimate(x: Block): Long = estimate(x.transactionData)
   override implicit def estimate(x: Transaction): Long = estimateTx(x)
@@ -42,7 +42,7 @@ case class ComplexityGasEstimator(max: Long) extends GasEstimator {
   }
 }
 
-case class MiningEstimators(total: GasEstimator, keyBlock: GasEstimator, micro: GasEstimator)
+case class MiningEstimators(total: SpaceEstimator, keyBlock: SpaceEstimator, micro: SpaceEstimator)
 
 object MiningEstimators {
   private val ClassicAmountOfTxsInBlock = 100
@@ -54,16 +54,16 @@ object MiningEstimators {
     val isMassTransferEnabled = activatedFeatures.contains(BlockchainFeatures.MassTransfer.id)
 
     MiningEstimators(
-      total = if (isMassTransferEnabled) ComplexityGasEstimator(MaxComplexity) else {
+      total = if (isMassTransferEnabled) ComplexitySpaceEstimator(MaxComplexity) else {
         val maxTxs = if (isNgEnabled) Block.MaxTransactionsPerBlockVer3 else ClassicAmountOfTxsInBlock
-        TxNumberGasEstimator(maxTxs)
+        TxNumberSpaceEstimator(maxTxs)
       },
-      keyBlock = if (isMassTransferEnabled) ComplexityGasEstimator(0) else {
+      keyBlock = if (isMassTransferEnabled) ComplexitySpaceEstimator(0) else {
         val maxTxsForKeyBlock = if (isNgEnabled) minerSettings.maxTransactionsInKeyBlock else ClassicAmountOfTxsInBlock
-        TxNumberGasEstimator(maxTxsForKeyBlock)
+        TxNumberSpaceEstimator(maxTxsForKeyBlock)
       },
-      micro = if (isMassTransferEnabled) ComplexityGasEstimator(minerSettings.maxComplexityInMicroBlock)
-      else TxNumberGasEstimator(minerSettings.maxTransactionsInMicroBlock)
+      micro = if (isMassTransferEnabled) ComplexitySpaceEstimator(minerSettings.maxComplexityInMicroBlock)
+      else TxNumberSpaceEstimator(minerSettings.maxTransactionsInMicroBlock)
     )
   }
 }
