@@ -19,6 +19,7 @@ class MinerSettingsSpecification extends FlatSpec with Matchers {
         |    minimal-block-generation-offset: 500ms
         |    max-transactions-in-key-block: 300
         |    max-transactions-in-micro-block: 400
+        |    max-complexity-in-micro-block: 900
         |    min-micro-block-age: 3s
         |  }
         |}
@@ -32,6 +33,7 @@ class MinerSettingsSpecification extends FlatSpec with Matchers {
     settings.minimalBlockGenerationOffset should be(500.millis)
     settings.maxTransactionsInKeyBlock should be(300)
     settings.maxTransactionsInMicroBlock should be(400)
+    settings.maxComplexityInMicroBlock should be(900)
     settings.minMicroBlockAge should be(3.seconds)
   }
 }

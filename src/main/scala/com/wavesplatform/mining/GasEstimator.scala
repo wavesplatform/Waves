@@ -118,7 +118,8 @@ object MiningEstimators {
         val maxTxsForKeyBlock = if (isNgEnabled) minerSettings.maxTransactionsInKeyBlock else ClassicAmountOfTxsInBlock
         TxNumberGasEstimator(maxTxsForKeyBlock)
       },
-      micro = if (isMassTransferEnabled) ComplexityGasEstimator(0) else TxNumberGasEstimator(minerSettings.maxTransactionsInMicroBlock)
+      micro = if (isMassTransferEnabled) ComplexityGasEstimator(minerSettings.maxComplexityInMicroBlock)
+      else TxNumberGasEstimator(minerSettings.maxTransactionsInMicroBlock)
     )
   }
 }

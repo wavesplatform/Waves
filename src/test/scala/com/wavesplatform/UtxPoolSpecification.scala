@@ -209,12 +209,12 @@ class UtxPoolSpecification extends FreeSpec
       all(txs.map(utx.putIfNew)) shouldBe 'right
       utx.all.size shouldEqual txs.size
 
-      val maxNumber = utx.all.size / 2
+      val maxNumber = Math.max(utx.all.size / 2, 3)
       val constraint = limitByNumber(maxNumber)
       val packed = utx.packUnconfirmed(constraint, sortInBlock = false)
 
       packed.lengthCompare(maxNumber) should be <= 0
-      constraint.isEmpty shouldBe true
+      if (maxNumber <= utx.all.size) constraint.isEmpty shouldBe true
     }
 
     "evicts expired transactions when packUnconfirmed is called" in forAll(dualTxGen) { case (utx, time, txs, offset, _) =>
