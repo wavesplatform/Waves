@@ -214,7 +214,7 @@ class UtxPoolSpecification extends FreeSpec
       val (packed, updatedSpace) = utx.packUnconfirmed(space, sortInBlock = false)
 
       packed.lengthCompare(maxNumber) should be <= 0
-      if (maxNumber <= utx.all.size) updatedSpace.isFull shouldBe true
+      if (maxNumber <= utx.all.size) updatedSpace.isEmpty shouldBe true
     }
 
     "evicts expired transactions when packUnconfirmed is called" in forAll(dualTxGen) { case (utx, time, txs, offset, _) =>

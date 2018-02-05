@@ -142,7 +142,7 @@ class MinerImpl(allChannels: ChannelGroup,
       val (unconfirmed, updatedCombined) = utx.packUnconfirmed(combinedSpace, sortInBlock = false)
       (unconfirmed, updatedCombined.first)
     }
-    if (updatedTotalSpace.isFull) {
+    if (updatedTotalSpace.isEmpty) {
       log.trace(s"Stopping forging microBlocks, block is already full")
       Task.now(Stop)
     } else if (pc < minerSettings.quorum) {
@@ -218,7 +218,7 @@ class MinerImpl(allChannels: ChannelGroup,
                 BlockStats.mined(block, history.height())
                 allChannels.broadcast(BlockForged(block))
                 scheduleMining()
-                if (ngEnabled && !totalSpace.isFull) startMicroBlockMining(account, block, estimators.micro, totalSpace)
+                if (ngEnabled && !totalSpace.isEmpty) startMicroBlockMining(account, block, estimators.micro, totalSpace)
               case Right(None) => log.warn("Newly created block has already been appended, should not happen")
             }
           case Left(err) =>

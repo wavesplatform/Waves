@@ -162,7 +162,7 @@ class UtxPoolImpl(time: Time,
               restSpace.put(tx) match {
                 case None => (invalid, valid, diff, restSpace, true)
                 case Some(updatedRestSpace) =>
-                  (invalid, tx +: valid, Monoid.combine(diff, newDiff), updatedRestSpace, updatedRestSpace.isFull)
+                  (invalid, tx +: valid, Monoid.combine(diff, newDiff), updatedRestSpace, updatedRestSpace.isEmpty)
               }
             case Left(_) =>
               (tx.id() +: invalid, valid, diff, restSpace, false)
