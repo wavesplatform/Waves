@@ -2,7 +2,7 @@ package com.wavesplatform
 
 import java.io.File
 import java.security.Security
-import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent._
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
@@ -28,8 +28,9 @@ import io.netty.channel.Channel
 import io.netty.channel.group.DefaultChannelGroup
 import io.netty.util.concurrent.GlobalEventExecutor
 import kamon.Kamon
-import monix.execution.Scheduler
 import monix.execution.Scheduler.global
+import monix.execution.schedulers.SchedulerService
+import monix.execution.{Scheduler, UncaughtExceptionReporter}
 import monix.reactive.Observable
 import org.influxdb.dto.Point
 import org.slf4j.bridge.SLF4JBridgeHandler
@@ -63,7 +64,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   private val (storage, heights) = StorageFactory(db, settings).get
   private val nodeApi = Option(settings.restAPISettings.enable).collect { case true =>
     val tags = Seq(typeOf[NodeApiRoute])
-    val routes = Seq(NodeApiRoute(settings.restAPISettings, heights, () => this.shutdown()))
+    val routes = Seq(NodeApiRoute(settings.restAPISettings, heights, () => apiShutdown()))
     val combinedRoute: Route = CompositeHttpService(actorSystem, tags, routes, settings.restAPISettings).compositeRoute
     val httpFuture = Http().bindAndHandle(combinedRoute, settings.restAPISettings.bindAddress, settings.restAPISettings.port)
     serverBinding = Await.result(httpFuture, 10.seconds)
@@ -77,14 +78,25 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   private val wallet: Wallet = Wallet(settings.walletSettings)
   private val peerDatabase = new PeerDatabaseImpl(settings.networkSettings)
 
-  private val extensionLoaderScheduler = Scheduler.singleThread("tx-extension-loader")
-  private val microblockSynchronizerScheduler = Scheduler.singleThread("microblock-synchronizer")
-  private val scoreObserverScheduler = Scheduler.singleThread("rx-score-observer")
-  private val appenderScheduler = Scheduler.singleThread("appender")
+  private val extensionLoaderScheduler = Scheduler.singleThread("tx-extension-loader", reporter = UncaughtExceptionReporter { ex => log.error(s"ExtensionLoader: $ex") })
+  private val microblockSynchronizerScheduler = Scheduler.singleThread("microblock-synchronizer", reporter = UncaughtExceptionReporter { ex => log.error(s"MicroblockSynchronizer: $ex") })
+  private val scoreObserverScheduler = Scheduler.singleThread("rx-score-observer", reporter = UncaughtExceptionReporter { ex => log.error(s"ScoreObserver: $ex") })
+  private val appenderScheduler = Scheduler.singleThread("appender", reporter = UncaughtExceptionReporter { ex => log.error(s"Appender: $ex") })
+  private val historyRepliesScheduler = Scheduler.fixedPool(name = "history-replier", poolSize = 2, reporter = UncaughtExceptionReporter { ex => log.error(s"HistoryReplier: $ex") })
+  private val minerScheduler = Scheduler.fixedPool(name = "miner-pool", poolSize = 2, reporter = UncaughtExceptionReporter { ex => log.error(s"Miner: $ex") })
 
 
   private var matcher: Option[Matcher] = None
   private var rxExtensionLoaderShutdown: Option[RxExtensionLoaderShutdownHook] = None
+  private var maybeUtx: Option[UtxPoolImpl] = None
+  private var maybeNetwork: Option[NS] = None
+
+  def apiShutdown(): Unit = {
+    for {
+      u <- maybeUtx
+      n <- maybeNetwork
+    } yield shutdown(u, n)
+  }
 
   def run(): Unit = {
     checkGenesis(history, settings, blockchainUpdater)
@@ -97,10 +109,11 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     val establishedConnections = new ConcurrentHashMap[Channel, PeerInfo]
     val allChannels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
     val utxStorage = new UtxPoolImpl(time, stateReader, history, featureProvider, feeCalculator, settings.blockchainSettings.functionalitySettings, settings.utxSettings)
+    maybeUtx = Some(utxStorage)
     val knownInvalidBlocks = new InvalidBlockStorageImpl(settings.synchronizationSettings.invalidBlocksStorage)
     val miner = if (settings.minerSettings.enable)
       new MinerImpl(allChannels, blockchainUpdater, checkpointService, history, featureProvider, stateReader, settings,
-        time, utxStorage, wallet, appenderScheduler)
+        time, utxStorage, wallet, minerScheduler, appenderScheduler)
     else Miner.Disabled
 
     val processBlock = BlockAppender(checkpointService, history, blockchainUpdater, time, stateReader, utxStorage,
@@ -124,8 +137,9 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         allChannels.broadcast(LocalScoreChanged(x))
       }(scheduler)
 
-    val historyReplier = new HistoryReplier(history, settings.synchronizationSettings)
+    val historyReplier = new HistoryReplier(history, settings.synchronizationSettings, historyRepliesScheduler)
     val network = NetworkServer(settings, lastBlockInfo, history, historyReplier, utxStorage, peerDatabase, allChannels, establishedConnections)
+    maybeNetwork = Some(network)
     val (signatures, blocks, blockchainScores, checkpoints, microblockInvs, microblockResponses, transactions) = network.messages
 
     val (syncWithChannelClosed, scoreStatsReporter) = RxScoreObserver(settings.synchronizationSettings.scoreTTL, 1.second,
@@ -201,9 +215,9 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     //on unexpected shutdown
     sys.addShutdownHook {
-      utxStorage.close()
-      network.shutdown()
-      shutdown()
+      Kamon.shutdown()
+      Metrics.shutdown()
+      shutdown(utxStorage, network)
     }
 
     matcher = if (settings.matcherSettings.enable) {
@@ -217,58 +231,57 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   @volatile var shutdownInProgress = false
   @volatile var serverBinding: ServerBinding = _
 
-  def shutdown(): Unit = {
-    val unbindTimeout = 2.minutes
-    val stopActorsTimeout = 1.minute
-
+  def shutdown(utx: UtxPoolImpl, network: NS): Unit = {
     if (!shutdownInProgress) {
-      log.info("Stopping network services")
       shutdownInProgress = true
+
+      utx.close()
+
+      shutdownAndWait(historyRepliesScheduler, "HistoryReplier", 5.minutes)
+
+      log.info("Closing REST API")
       if (settings.restAPISettings.enable) {
-        Try(Await.ready(serverBinding.unbind(), unbindTimeout))
+        Try(Await.ready(serverBinding.unbind(), 2.minutes))
           .failed.map(e => log.error("Failed to unbind REST API port", e))
       }
       for (addr <- settings.networkSettings.declaredAddress if settings.networkSettings.uPnPSettings.enable) {
         upnp.deletePort(addr.getPort)
       }
 
-
       matcher.foreach(_.shutdownMatcher())
 
       log.debug("Closing peer database")
       peerDatabase.close()
 
-      Try(Await.result(actorSystem.terminate(), stopActorsTimeout))
+      Try(Await.result(actorSystem.terminate(), 2.minute))
         .failed.map(e => log.error("Failed to terminate actor system", e))
 
       blockchainUpdater.shutdown()
       rxExtensionLoaderShutdown.foreach(_.shutdown())
 
-      microblockSynchronizerScheduler.shutdown()
-      Try(Await.result(microblockSynchronizerScheduler.awaitTermination(stopActorsTimeout, global), Duration.Inf))
-        .map(s => log.debug(s"Microblock synchronizer executor shutdown: $s"))
-        .failed.map(e => log.error("Failed to stop microblock synchronizer executor", e))
+      log.info("Stopping network services")
+      network.shutdown()
 
-      extensionLoaderScheduler.shutdown()
-      Try(Await.result(extensionLoaderScheduler.awaitTermination(stopActorsTimeout, global), Duration.Inf))
-        .map(s => log.debug(s"Extension loader executor shutdown: $s"))
-        .failed.map(e => log.error("Failed to stop extension loader executor", e))
-
-      appenderScheduler.shutdown()
-      Try(Await.result(appenderScheduler.awaitTermination(5.minutes, global), Duration.Inf))
-        .map(s => log.debug(s"Appender executor shutdown: $s"))
-        .failed.map(e => log.error("Failed to stop appender executor", e))
-
-//      scoreObserverScheduler.shutdown()
-//      Try(Await.result(scoreObserverScheduler.awaitTermination(stopActorsTimeout, global), Duration.Inf))
-//        .map(s => log.debug(s"Score observer executor shutdown: $s"))
-//        .failed.map(e => log.error("Failed to stop score observer executor", e))
+      shutdownAndWait(minerScheduler, "Miner")
+      shutdownAndWait(microblockSynchronizerScheduler, "MicroblockSynchronizer")
+      shutdownAndWait(scoreObserverScheduler, "ScoreObserver")
+      shutdownAndWait(extensionLoaderScheduler, "ExtensionLoader")
+      shutdownAndWait(appenderScheduler, "Appender", 5.minutes)
 
       log.info("Closing storage")
       db.close()
 
       log.info("Shutdown complete")
     }
+  }
+
+  private def shutdownAndWait(scheduler: SchedulerService, name: String, timeout: FiniteDuration = 1.minute): Unit = {
+    scheduler.shutdown()
+    val r = Await.result(scheduler.awaitTermination(timeout, global), Duration.Inf)
+    if (r)
+      log.info(s"$name was shutdown successfully")
+    else
+      log.warn(s"Failed to shutdown $name properly during timeout")
   }
 
 }
@@ -353,13 +366,7 @@ object Application extends ScorexLogging {
 
       log.info(s"${Constants.AgentName} Blockchain Id: ${settings.blockchainSettings.addressSchemeCharacter}")
 
-      new Application(actorSystem, settings, config.root()) {
-        override def shutdown(): Unit = {
-          Kamon.shutdown()
-          Metrics.shutdown()
-          super.shutdown()
-        }
-      }.run()
+      new Application(actorSystem, settings, config.root()).run()
     }
   }
 }

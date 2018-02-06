@@ -12,7 +12,6 @@ import io.netty.channel.group.ChannelGroup
 import kamon.Kamon
 import kamon.metric.instrument
 import monix.eval.Task
-import monix.execution._
 import monix.execution.cancelables.{CompositeCancelable, SerialCancelable}
 import monix.execution.schedulers.SchedulerService
 import scorex.account.{Address, PrivateKeyAccount}
@@ -62,11 +61,12 @@ class MinerImpl(allChannels: ChannelGroup,
                 timeService: Time,
                 utx: UtxPool,
                 wallet: Wallet,
-                val appenderScheduler: Scheduler) extends Miner with MinerDebugInfo with ScorexLogging with Instrumented {
+                val scheduler: SchedulerService,
+                val appenderScheduler: SchedulerService) extends Miner with MinerDebugInfo with ScorexLogging with Instrumented {
 
   import Miner._
 
-  private implicit val scheduler: SchedulerService = Scheduler.fixedPool(name = "miner-pool", poolSize = 2)
+  private implicit val s: SchedulerService = scheduler
 
   private lazy val minerSettings = settings.minerSettings
   private lazy val minMicroBlockDurationMills = minerSettings.minMicroBlockAge.toMillis
