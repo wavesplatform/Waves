@@ -1,6 +1,7 @@
 package scorex.transaction
 
 import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.utils.HeightInfo
 import monix.reactive.Observable
 import scorex.block.Block.BlockId
 import scorex.block.{Block, MicroBlock}
@@ -23,6 +24,7 @@ trait BlockchainDebugInfo {
 
   def persistedAccountPortfoliosHash(): Int
 
+  def lockfreeStateHeight: HeightInfo
 }
 
 case class LastBlockInfo(id: BlockId, height: Int, score: BlockchainScore, ready: Boolean)
