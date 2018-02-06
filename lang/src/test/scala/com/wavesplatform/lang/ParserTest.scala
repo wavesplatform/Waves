@@ -123,6 +123,27 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
     parse("tx.proof(1)") shouldBe TX_FIELD(Proof(1))
   }
 
+  property("multisig sample") {
+    val script =
+      """
+        |
+        |let A = base58'PK1PK1PK1PK1PK1'
+        |let B = base58'PK2PK2PK2PK2PK2'
+        |let C = base58'PK3PK3PK3PK3PK3'
+        |
+        |let W = tx.bodyBytes
+        |let P = tx.proof(0)
+        |let V = checkSig(W,P,A)
+        |
+        |let AC = if(V) then 1 else 0
+        |let BC = if(checkSig(tx.bodyBytes,tx.proof(1),B)) then 1 else 0
+        |let CC = if(checkSig(tx.bodyBytes,tx.proof(2),C)) then 1 else 0
+        |
+        | AC + BC+ CC >= 2
+        |
+      """.stripMargin
+    parse(script)
+  }
 
   property("isDefined/get") {
     parse("isDefined(X)") shouldBe IS_DEFINED(REF("X"))

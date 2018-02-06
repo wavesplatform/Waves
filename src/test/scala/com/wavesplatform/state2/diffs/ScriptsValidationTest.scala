@@ -1,5 +1,6 @@
 package com.wavesplatform.state2.diffs
 
+import com.wavesplatform.lang.Parser
 import com.wavesplatform.state2._
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
@@ -43,7 +44,7 @@ class ScriptsValidationTest extends PropSpec with PropertyChecks with Matchers w
   }
 
   property("2 of 3 multisig") {
-    def multisig2Of3(pk0: PublicKeyAccount, pk1: PublicKeyAccount, pk2: PublicKeyAccount) =
+    def multisig2Of3(pk0: PublicKeyAccount, pk1: PublicKeyAccount, pk2: PublicKeyAccount): Expr =
       GE(
         SUM(
           SUM(
@@ -54,21 +55,23 @@ class ScriptsValidationTest extends PropSpec with PropertyChecks with Matchers w
         ),
         CONST_INT(2)
       )
-
-    val x =
-      """
-        |
-        |let a1 = base58'PK1PK1PK1PK1PK1'
-        |let a2 = base58'PK1PK1PK1PK1PK1'
-        |let a3 = base58'PK1PK1PK1PK1PK1'
-        |
-        |let a1correct = if(checkSig(tx.body,tx.proof(0),a1) then 1 else 0
-        |let a2correct = if(checkSig(tx.body,tx.proof(1),a1) then 2 else 0
-        |let a3correct = if(checkSig(tx.body,tx.proof(2),a1) then 1 else 0
-        |
-        | a1correct + a2correct + a3correct >= 2
-        |
+    def multisig2Of3Lang(pk0: PublicKeyAccount, pk1: PublicKeyAccount, pk2: PublicKeyAccount) : Expr = {
+      val script =
+        s"""
+          |
+          |let A = base58'${ByteStr(pk0.publicKey)}'
+          |let B = base58'${ByteStr(pk1.publicKey)}'
+          |let C = base58'${ByteStr(pk2.publicKey)}'
+          |
+          |let AC = if(checkSig(tx.bodyBytes,tx.proof(0),A)) then 1 else 0
+          |let BC = if(checkSig(tx.bodyBytes,tx.proof(1),B)) then 1 else 0
+          |let CC = if(checkSig(tx.bodyBytes,tx.proof(2),C)) then 1 else 0
+          |
+          | AC + BC+ CC >= 2
+          |
       """.stripMargin
+      Parser(script).get.value
+    }
 
     val preconditionsAndTransfer: Gen[(GenesisTransaction, SetScriptTransaction, ScriptTransferTransaction, Seq[ByteStr])] = for {
       master <- accountGen
@@ -78,7 +81,7 @@ class ScriptsValidationTest extends PropSpec with PropertyChecks with Matchers w
       recepient <- accountGen
       ts <- positiveIntGen
       genesis = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
-      setSctipt <- selfSignedSetScriptTransactionGenP(master, Script(multisig2Of3(s0, s1, s2)))
+      setSctipt <- selfSignedSetScriptTransactionGenP(master, Script(multisig2Of3Lang(s0, s1, s2)))
       amount <- positiveLongGen
       fee <- smallFeeGen
       timestamp <- timestampGen
