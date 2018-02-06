@@ -59,9 +59,9 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
     parse("(let X = if(true) then true else false; false)") shouldBe Block(Some(LET("X", IF(TRUE, TRUE, FALSE))), FALSE)
 
     parse("""let X = 10;
-        |let Y = 10;
+        |let Y = 11;
         |X > Y
-      """.stripMargin) shouldBe Block(Some(LET("X", CONST_INT(10))), Block(Some(LET("Y", CONST_INT(10))), GT(REF("X"), REF("Y"))))
+      """.stripMargin) shouldBe Block(Some(LET("X", CONST_INT(10))), Block(Some(LET("Y", CONST_INT(11))), GT(REF("X"), REF("Y"))))
   }
 
   property("multiline") {
@@ -115,6 +115,15 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
 
   }
 
+  property("tx fields") {
+    parse("tx.id") shouldBe TX_FIELD(Id)
+    parse("tx.senderPk") shouldBe TX_FIELD(SenderPk)
+    parse("tx.bodyBytes") shouldBe TX_FIELD(BodyBytes)
+    parse("tx.type + 1") shouldBe SUM(TX_FIELD(Type), CONST_INT(1))
+    parse("tx.proof(1)") shouldBe TX_FIELD(Proof(1))
+  }
+
+
   property("isDefined/get") {
     parse("isDefined(X)") shouldBe IS_DEFINED(REF("X"))
     parse("if(isDefined(X)) then get(X) else Y") shouldBe IF(IS_DEFINED(REF("X")), GET(REF("X")), REF("Y"))
@@ -124,14 +133,14 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
     Evaluator.apply(
       Context(new HeightDomain(1), Map.empty),
       parse("""
-          |let A = Some(500)
+          |let MULTICHARVARNAME = Some(500)
           |
-          |let X = match(A) {
+          |let Z = match(MULTICHARVARNAME) {
           | case None => 8
           | case Some(B) => B + B
           | }
           |
-          | get(Some(X)) + 1
+          | get(Some(Z)) + 1
           |
       """.stripMargin)
     ) shouldBe Right(1001)
@@ -140,7 +149,7 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
       Context(new HeightDomain(1), Map.empty),
       parse("""
           |
-          |let X = Some(10);
+          |let X = Some(10)
           |
           |match(X) {
           |  case None => 0
@@ -153,7 +162,7 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
       Context(new HeightDomain(1), Map.empty),
       parse("""
           |
-          |let X = Some(10);
+          |let X = Some(10)
           |
           |match(X) {
           |  case Some(V) => V + V + V + V

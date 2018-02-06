@@ -55,6 +55,21 @@ class ScriptsValidationTest extends PropSpec with PropertyChecks with Matchers w
         CONST_INT(2)
       )
 
+    val x =
+      """
+        |
+        |let a1 = base58'PK1PK1PK1PK1PK1'
+        |let a2 = base58'PK1PK1PK1PK1PK1'
+        |let a3 = base58'PK1PK1PK1PK1PK1'
+        |
+        |let a1correct = if(checkSig(tx.body,tx.proof(0),a1) then 1 else 0
+        |let a2correct = if(checkSig(tx.body,tx.proof(1),a1) then 2 else 0
+        |let a3correct = if(checkSig(tx.body,tx.proof(2),a1) then 1 else 0
+        |
+        | a1correct + a2correct + a3correct >= 2
+        |
+      """.stripMargin
+
     val preconditionsAndTransfer: Gen[(GenesisTransaction, SetScriptTransaction, ScriptTransferTransaction, Seq[ByteStr])] = for {
       master <- accountGen
       s0 <- accountGen

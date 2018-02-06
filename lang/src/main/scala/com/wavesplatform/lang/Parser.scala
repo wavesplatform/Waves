@@ -17,26 +17,37 @@ object Parser {
   import fastparse.noApi._
   import White._
 
+  val varName = CharIn('A' to 'Z').rep(1).!
+
   private def numberP: P[CONST_INT]    = P(CharIn('0' to '9').rep(min = 1).!.map(t => CONST_INT(t.toInt)))
   private def trueP: P[TRUE.type]      = P("true").map(_ => TRUE)
   private def falseP: P[FALSE.type]    = P("false").map(_ => FALSE)
   private def bracesP: P[Expr]         = P("(" ~ block ~ ")")
   private def curlyBracesP: P[Expr]    = P("{" ~ block ~ "}")
-  private def letP: P[LET]             = P("let " ~ CharIn('A' to 'Z').! ~ "=" ~ block).map { case ((x, y)) => LET(x, y) }
-  private def refP: P[REF]             = P(CharIn('A' to 'Z').!.map(x => REF(x)))
+  private def letP: P[LET]             = P("let " ~ varName ~ "=" ~ block).map { case ((x, y)) => LET(x, y) }
+  private def refP: P[REF]             = P(varName).map(x => REF(x))
   private def ifP: P[IF]               = P("if" ~ "(" ~ block ~ ")" ~ "then" ~ block ~ "else" ~ block).map { case (x, y, z) => IF(x, y, z) }
   private def isDefined: P[IS_DEFINED] = P("isDefined" ~ "(" ~ block ~ ")").map(b => IS_DEFINED(b))
   private def getP: P[GET]             = P("get" ~ "(" ~ block ~ ")").map(b => GET(b))
+  private def someP: P[SOME]           = P("Some" ~ "(" ~ block ~ ")").map(x => SOME(x))
+  private def noneP: P[NONE.type]      = P("None").map(_ => NONE)
+  private def heightP: P[HEIGHT.type]  = P("h").map(_ => HEIGHT)
 
-  private def someP: P[SOME]      = P("Some" ~ "(" ~ block ~ ")").map(x => SOME(x))
-  private def noneP: P[NONE.type] = P("None").map(_ => NONE)
+  private def fieldIdP: P[Field]        = P(".id").map(_ => Id)
+  private def fieldTypeP: P[Field]      = P(".type").map(_ => Type)
+  private def fieldSenderPkP: P[Field]  = P(".senderPk").map(_ => SenderPk)
+  private def fieldBodyBytesP: P[Field] = P(".bodyBytes").map(_ => BodyBytes)
+  private def fieldProofP: P[Field]     = P(".proof" ~ "(" ~ P(CharIn('0' to '9').rep(1).! ~ ")")).map(x => Proof(x.toInt))
+  private def fieldP: P[Field]          = P(fieldIdP | fieldTypeP | fieldSenderPkP | fieldBodyBytesP | fieldBodyBytesP | fieldProofP)
+
+  private def getFieldP: P[Expr]        = P("tx" ~ fieldP).map(x => TX_FIELD(x))
 
   private def patmat1P: P[Block] =
-    P("match" ~ "(" ~ block ~ ")" ~ "{" ~ "case" ~ "None" ~ "=>" ~ block ~ "case" ~ "Some" ~ "(" ~ CharIn('A' to 'Z').! ~ ")" ~ "=>" ~ block ~ "}")
+    P("match" ~ "(" ~ block ~ ")" ~ "{" ~ "case" ~ "None" ~ "=>" ~ block ~ "case" ~ "Some" ~ "(" ~ varName ~ ")" ~ "=>" ~ block ~ "}")
       .map { case ((exp, ifNone, ref, ifSome)) => patmat(exp, ref, ifSome, ifNone) }
 
   private def patmat2P: P[Block] =
-    P("match" ~ "(" ~ block ~ ")" ~ "{" ~ "case" ~ "Some" ~ "(" ~ CharIn('A' to 'Z').! ~ ")" ~ "=>" ~ block ~ "case" ~ "None" ~ "=>" ~ block ~ "}")
+    P("match" ~ "(" ~ block ~ ")" ~ "{" ~ "case" ~ "Some" ~ "(" ~ varName ~ ")" ~ "=>" ~ block ~ "case" ~ "None" ~ "=>" ~ block ~ "}")
       .map { case ((exp, ref, ifSome, ifNone)) => patmat(exp, ref, ifSome, ifNone) }
 
   def patmat(exp: Block, ref: String, ifSome: Block, ifNone: Block): Block =
@@ -62,7 +73,7 @@ object Parser {
 
   }
 
-  private val priority = List("||", "&&", "==", ">=", ">", "+")
+  private val priority = List("||", "&&", "==", ">=", ">", "+", "-", "*")
 
   private def binaryOp(rest: List[String]): P[Expr] = rest match {
     case Nil => atom
@@ -88,7 +99,7 @@ object Parser {
   private def expr = P(binaryOp(priority) | atom)
 
   private def atom =
-    P(ifP | patmat1P | patmat2P | byteVectorP | numberP | trueP | falseP | noneP | someP | bracesP | curlyBracesP | sigVerifyP | refP | isDefined | getP)
+    P(ifP | patmat1P | patmat2P | byteVectorP | numberP | trueP | falseP | noneP | someP | bracesP | curlyBracesP | sigVerifyP | refP | isDefined | getP | getFieldP)
 
   def apply(str: String): core.Parsed[Expr, Char, String] = block.parse(str)
 }
