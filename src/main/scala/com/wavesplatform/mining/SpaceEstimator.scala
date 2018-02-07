@@ -16,37 +16,19 @@ case class TxNumberSpaceEstimator(max: Long) extends SpaceEstimator {
   override implicit def estimate(x: Transaction): Long = 1
 }
 
-case class ComplexitySpaceEstimator(max: Long) extends SpaceEstimator {
-  implicit def estimate(xs: Seq[Transaction]): Long = xs.view.map(estimateTx).sum
-  override implicit def estimate(x: Block): Long = estimate(x.transactionData)
-  override implicit def estimate(x: Transaction): Long = estimateTx(x)
-
-  private def estimateTx(x: Transaction): Long = {
-    import scorex.transaction._
-    import scorex.transaction.assets._
-    import scorex.transaction.assets.exchange.ExchangeTransaction
-    import scorex.transaction.lease._
-
-    x match {
-      case _: BurnTransaction => 1
-      case _: CreateAliasTransaction => 1
-      case _: ExchangeTransaction => 3
-      case _: GenesisTransaction => 1
-      case _: IssueTransaction => 1
-      case _: LeaseCancelTransaction => 1
-      case _: LeaseTransaction => 1
-      case _: PaymentTransaction => 1
-      case _: ReissueTransaction => 1
-      case _: TransferTransaction => 1
-    }
-  }
+/**
+  * @param max in bytes
+  */
+case class SizeSpaceEstimator(max: Long) extends SpaceEstimator {
+  override implicit def estimate(x: Block): Long = x.transactionData.view.map(estimate).sum
+  override implicit def estimate(x: Transaction): Long = x.bytes().length // + headers
 }
 
 case class MiningEstimators(total: SpaceEstimator, keyBlock: SpaceEstimator, micro: SpaceEstimator)
 
 object MiningEstimators {
   private val ClassicAmountOfTxsInBlock = 100
-  private val MaxComplexity = 6000
+  private val MaxTxsSizeInBytes = 1 * 1024 * 1024 // 1 megabyte
 
   def apply(minerSettings: MinerSettings, featureProvider: FeatureProvider, height: Int): MiningEstimators = {
     val activatedFeatures = featureProvider.activatedFeatures(height)
@@ -54,16 +36,15 @@ object MiningEstimators {
     val isMassTransferEnabled = activatedFeatures.contains(BlockchainFeatures.MassTransfer.id)
 
     MiningEstimators(
-      total = if (isMassTransferEnabled) ComplexitySpaceEstimator(MaxComplexity) else {
+      total = if (isMassTransferEnabled) SizeSpaceEstimator(MaxTxsSizeInBytes) else {
         val maxTxs = if (isNgEnabled) Block.MaxTransactionsPerBlockVer3 else ClassicAmountOfTxsInBlock
         TxNumberSpaceEstimator(maxTxs)
       },
-      keyBlock = if (isMassTransferEnabled) ComplexitySpaceEstimator(0) else {
+      keyBlock = if (isMassTransferEnabled) TxNumberSpaceEstimator(0) else {
         val maxTxsForKeyBlock = if (isNgEnabled) minerSettings.maxTransactionsInKeyBlock else ClassicAmountOfTxsInBlock
         TxNumberSpaceEstimator(maxTxsForKeyBlock)
       },
-      micro = if (isMassTransferEnabled) ComplexitySpaceEstimator(minerSettings.maxComplexityInMicroBlock)
-      else TxNumberSpaceEstimator(minerSettings.maxTransactionsInMicroBlock)
+      micro = TxNumberSpaceEstimator(minerSettings.maxTransactionsInMicroBlock)
     )
   }
 }

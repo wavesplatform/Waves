@@ -53,7 +53,7 @@ object Block {
   implicit val blockFormat: Format[Block] = Json.format
 }
 
-case class BlockHeaders(signature: String, height: Int, timestamp: Long, generator: String, transactionCount: Int, blocksize: Int)
+case class BlockHeaders(signature: String, height: Int, timestamp: Long, generator: String, transactionCount: Int, blocksize: Int, features: Set[Short])
 object BlockHeaders {
   implicit val blockHeadersFormat: Format[BlockHeaders] = Json.format
 }

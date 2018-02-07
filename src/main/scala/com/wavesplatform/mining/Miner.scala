@@ -92,7 +92,7 @@ class MinerImpl(allChannels: ChannelGroup,
 
   private def ngEnabled: Boolean = featureProvider.featureActivationHeight(BlockchainFeatures.NG.id).exists(history.height > _ + 1)
 
-  private def generateOneBlockTask(account: PrivateKeyAccount, estimators: MiningEstimators, balance: Long)(delay: FiniteDuration): Task[Either[String, (Block, MiningSpace)]] = Task {
+  private def generateOneBlockTask(account: PrivateKeyAccount, balance: Long)(delay: FiniteDuration): Task[Either[String, (MiningEstimators, Block, MiningSpace)]] = Task {
     history.read { implicit l =>
       // should take last block right at the time of mining since microblocks might have been added
       val height = history.height()
@@ -116,8 +116,11 @@ class MinerImpl(allChannels: ChannelGroup,
           val consensusData = NxtLikeConsensusBlockData(btg, ByteStr(gs))
           val sortInBlock = history.height() <= blockchainSettings.functionalitySettings.dontRequireSortedTransactionsAfter
 
-          val combinedSpace = TwoDimensionMiningSpace.partial(OneDimensionMiningSpace.full(estimators.total), OneDimensionMiningSpace.full(estimators.keyBlock))
-          val (unconfirmed, updatedCombinedSpace) = utx.packUnconfirmed(combinedSpace, sortInBlock)
+          log.info(s"Activated features: ${featureProvider.activatedFeatures(history.height()).mkString(", ")}")
+          val estimators = MiningEstimators(minerSettings, featureProvider, height)
+          val combinedSpace = TwoDimensionMiningSpace.full(estimators.total, estimators.keyBlock)
+          val (unconfirmed, updatedCombinedSpace, isOverfilled) = utx.packUnconfirmed(combinedSpace, sortInBlock)
+          log.info(s"estimators: $estimators, combinedSpace: $combinedSpace, updatedCombinedSpace: $updatedCombinedSpace")
 
           val features = if (version > 2) settings.featuresSettings.supported
             .filter(featureProvider.featureStatus(_, height) == BlockchainFeatureStatus.Undefined)
@@ -126,7 +129,7 @@ class MinerImpl(allChannels: ChannelGroup,
           log.debug(s"Adding ${unconfirmed.size} unconfirmed transaction(s) to new block")
           Block.buildAndSign(version.toByte, currentTime, referencedBlockInfo.blockId, consensusData, unconfirmed, account, features) match {
             case Left(e) => Left(e.err)
-            case Right(x) => Right((x, updatedCombinedSpace.first))
+            case Right(x) => Right((estimators, x, updatedCombinedSpace.first))
           }
         }
       } yield block)
@@ -137,20 +140,24 @@ class MinerImpl(allChannels: ChannelGroup,
   private def generateOneMicroBlockTask(account: PrivateKeyAccount, accumulatedBlock: Block, microEstimator: SpaceEstimator, totalSpace: MiningSpace): Task[MicroblockMiningResult] = {
     log.trace(s"Generating microBlock for $account")
     val pc = allChannels.size()
-    val (unconfirmed, updatedTotalSpace) = measureLog("packing unconfirmed transactions for microblock") {
+    val (unconfirmed, updatedSpace, isOverfilled) = measureLog("packing unconfirmed transactions for microblock") {
       val combinedSpace = TwoDimensionMiningSpace.partial(totalSpace, OneDimensionMiningSpace.full(microEstimator))
-      val (unconfirmed, updatedCombined) = utx.packUnconfirmed(combinedSpace, sortInBlock = false)
-      (unconfirmed, updatedCombined.first)
+      val (unconfirmed, updatedCombined, isOverfilled) = utx.packUnconfirmed(combinedSpace, sortInBlock = false)
+      (unconfirmed, updatedCombined, isOverfilled)
     }
-    if (updatedTotalSpace.isEmpty) {
-      log.trace(s"Stopping forging microBlocks, block is already full")
-      Task.now(Stop)
-    } else if (pc < minerSettings.quorum) {
+    log.info(s"microEstimator=$microEstimator, (before) totalSpace=$totalSpace, (after) updatedSpace=$updatedSpace")
+    if (pc < minerSettings.quorum) {
       log.trace(s"Quorum not available ($pc/${minerSettings.quorum}, not forging microblock with ${account.address}")
       Task.now(Retry)
-    } else if (unconfirmed.isEmpty) {
+    } else if (utx.size == 0) {
       log.trace(s"Skipping microBlock because utx is empty")
       Task.now(Retry)
+    } else if (updatedSpace.first.isEmpty) {
+      log.trace(s"Stopping forging microBlocks, the block is full")
+      Task.now(Stop)
+    } else if (unconfirmed.isEmpty) {
+      log.trace(s"Stopping forging microBlocks, because all transactions are too big")
+      Task.now(Stop)
     } else {
       log.trace(s"Accumulated ${unconfirmed.size} txs for microblock")
       val start = System.currentTimeMillis()
@@ -173,7 +180,7 @@ class MinerImpl(allChannels: ChannelGroup,
           BlockStats.mined(microBlock)
           log.trace(s"$microBlock has been mined for $account}")
           allChannels.broadcast(MicroBlockInv(account, microBlock.totalResBlockSig, microBlock.prevResBlockSig))
-          Success(signedBlock, updatedTotalSpace)
+          Success(signedBlock, updatedSpace.first)
       }
     }
   }
@@ -203,13 +210,13 @@ class MinerImpl(allChannels: ChannelGroup,
         balanceAndTs <- nextBlockGenerationTime(height, stateReader, blockchainSettings.functionalitySettings, lastBlock, account, featureProvider)
         (balance, ts) = balanceAndTs
         offset = calcOffset(timeService, ts, minerSettings.minimalBlockGenerationOffset)
-      } yield (offset, balance, MiningEstimators(minerSettings, featureProvider, height))
+      } yield (offset, balance)
     } match {
-      case Right((offset, balance, estimators)) =>
+      case Right((offset, balance)) =>
         log.debug(s"Next attempt for acc=$account in $offset")
         nextBlockGenerationTimes += account.toAddress -> (System.currentTimeMillis() + offset.toMillis)
-        generateOneBlockTask(account, estimators, balance)(offset).flatMap {
-          case Right((block, totalSpace)) =>
+        generateOneBlockTask(account, balance)(offset).flatMap {
+          case Right((estimators, block, totalSpace)) =>
             BlockAppender(checkpoint, history, blockchainUpdater, timeService, stateReader, utx,
               settings, featureProvider, appenderScheduler)(block).map {
               case Left(err) => log.warn("Error mining Block: " + err.toString)
