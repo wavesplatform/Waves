@@ -14,8 +14,8 @@ import scorex.utils.ScorexLogging
 
 import scala.util.{Failure, Try}
 
-case class MicroBlock private(version: Byte, generator: PublicKeyAccount, transactionData: Seq[Transaction], prevResBlockSig: BlockId,
-                              totalResBlockSig: BlockId, signature: ByteStr) extends Signed {
+case class MicroBlock(version: Byte, generator: PublicKeyAccount, transactionData: Seq[Transaction], prevResBlockSig: BlockId,
+                      totalResBlockSig: BlockId, signature: ByteStr) extends Signed {
 
   private val versionField: ByteBlockField = ByteBlockField("version", version)
   private val prevResBlockSigField: BlockIdField = BlockIdField("prevResBlockSig", prevResBlockSig.arr)

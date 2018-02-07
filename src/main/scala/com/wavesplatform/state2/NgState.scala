@@ -93,8 +93,13 @@ class NgState(val base: Block, val baseBlockDiff: BlockDiff, val acceptedFeature
     BlockMinerInfo(base.consensusData, base.timestamp, blockId)
   }
 
-  def append(m: MicroBlock, diff: BlockDiff, timestamp: Long): Unit = {
-    microDiffs.put(m.totalResBlockSig, (diff, timestamp))
-    micros.prepend(m)
+  def append(m: MicroBlock, diff: BlockDiff, timestamp: Long): Boolean = {
+    val txsCount = base.transactionCount + micros.view.map(_.transactionData.size).sum + m.transactionData.size
+    val successful = Block.areTxsFitInBlock(base.version, txsCount)
+    if (successful) {
+      microDiffs.put(m.totalResBlockSig, (diff, timestamp))
+      micros.prepend(m)
+    }
+    successful
   }
 }
