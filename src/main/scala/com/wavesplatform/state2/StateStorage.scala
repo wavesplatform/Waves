@@ -37,15 +37,10 @@ class StateStorage private(db: DB, time: Time) extends SubStorage(db, "state") w
   private val MaxAddress = "max-address"
   private val LeasesCount = "leases-count"
 
-  private var heightTimestamp: Long = time.getTimestamp()
-
-  def debugInfo: HeightInfo = (getHeight, heightTimestamp)
-
   def getHeight: Int = get(makeKey(HeightPrefix, 0)).map(Ints.fromByteArray).getOrElse(0)
 
   def setHeight(b: Option[WriteBatch], height: Int): Unit = {
     put(makeKey(HeightPrefix, 0), Ints.toByteArray(height), b)
-    heightTimestamp = time.getTimestamp()
   }
 
   def getTransaction(id: ByteStr): Option[(Int, Array[Byte])] =

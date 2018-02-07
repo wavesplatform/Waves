@@ -45,7 +45,7 @@ class HistoryWriterImpl private(db: DB, val synchronizationToken: ReentrantReadW
 
   private lazy val preAcceptedFeatures = functionalitySettings.preActivatedFeatures.mapValues(h => h - activationWindowSize(h))
 
-  private var heightInfo: (Int, Long) = (height(), time.getTimestamp())
+  @volatile private var heightInfo: HeightInfo = (height(), time.getTimestamp())
 
   override def approvedFeatures(): Map[Short, Int] = read { implicit lock =>
     preAcceptedFeatures ++ getFeaturesState

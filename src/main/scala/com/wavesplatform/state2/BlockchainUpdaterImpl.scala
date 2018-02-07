@@ -11,7 +11,7 @@ import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state2.diffs.BlockDiffer
 import com.wavesplatform.state2.reader.CompositeStateReader.composite
 import com.wavesplatform.state2.reader.SnapshotStateReader
-import com.wavesplatform.utils.{UnsupportedFeature, forceStopApplication}
+import com.wavesplatform.utils.{HeightInfo, UnsupportedFeature, forceStopApplication}
 import kamon.Kamon
 import kamon.metric.instrument.Time
 import monix.eval.Coeval
@@ -40,6 +40,8 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
 
   private lazy val inMemDiffs: Synchronized[NEL[BlockDiff]] = Synchronized(NEL.one(BlockDiff.empty)) // fresh head
   private lazy val ngState: Synchronized[Option[NgState]] = Synchronized(Option.empty[NgState])
+
+  @volatile private var heightInfo: HeightInfo = (bestLiquidState().height, time.getTimestamp())
 
   private val internalLastBlockInfo = ConcurrentSubject.publish[LastBlockInfo](monix.execution.Scheduler.singleThread("last-block-info-publisher"))
   override val lastBlockInfo: Observable[LastBlockInfo] = internalLastBlockInfo.cache(1)
@@ -71,7 +73,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
     internalLastBlockInfo.onNext(LastBlockInfo(b.uniqueId, historyReader.height(), historyReader.score(), blockchainReady))
   }
 
-  private def syncPersistedAndInMemory(): Unit = write("syncPersistedAndInMemory") { implicit l =>
+  private[wavesplatform] def syncPersistedAndInMemory(): Unit = write("syncPersistedAndInMemory") { implicit l =>
     log.info(heights("State rebuild started"))
 
     val notPersisted = historyWriter.height() - persisted.height
@@ -83,9 +85,11 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
       val diffs = unsafeDiffByRange(persisted, last)
       log.debug(s"Diffs built for Range(${persisted.height + 1}, $last): $diffs")
       diffs.toList.reverse.foreach(persisted.applyBlockDiff)
+      updateHeightInfo()
     }
 
     inMemDiffs.set(unsafeDiffByRange(persisted, historyWriter.height() + 1))
+    updateHeightInfo()
     log.info(heights("State rebuild finished"))
   }
 
@@ -196,6 +200,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
           ngState.set(Some(new NgState(block, newBlockDiff, featuresApprovedWithBlock(block))))
           historyReader.lastBlockId().foreach(id =>
             internalLastBlockInfo.onNext(LastBlockInfo(id, historyReader.height(), historyReader.score(), blockchainReady)))
+          updateHeightInfo()
           log.info(s"$block appended. New height: $height)")
           discarded
         }
@@ -249,6 +254,7 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
           if (totalDiscardedBlocks.nonEmpty) internalLastBlockInfo.onNext(
             LastBlockInfo(blockId, historyReader.height(), historyReader.score(), blockchainReady))
           TxsInBlockchainStats.record(-totalDiscardedBlocks.size)
+          updateHeightInfo()
           Right(totalDiscardedBlocks)
       }
     }
@@ -283,6 +289,10 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
     }
   }
 
+  private def updateHeightInfo() {
+    heightInfo = (currentPersistedBlocksState().height, time.getTimestamp())
+  }
+
   override def debugInfo(): StateDebugInfo = read { implicit l =>
     StateDebugInfo(
       persisted = HashInfo(height = persisted.height, hash = persisted.accountPortfoliosHash),
@@ -292,6 +302,8 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
   }
 
   override def persistedAccountPortfoliosHash(): Int = Hash.accountPortfolios(currentPersistedBlocksState().accountPortfolios)
+
+  override def lockfreeStateHeight: HeightInfo = heightInfo
 
   def shutdown(): Unit = {
     internalLastBlockInfo.onComplete()
@@ -311,9 +323,7 @@ object BlockchainUpdaterImpl extends ScorexLogging {
             settings: WavesSettings,
             time: scorex.utils.Time,
             synchronizationToken: ReentrantReadWriteLock): BlockchainUpdaterImpl = {
-    val blockchainUpdater = new BlockchainUpdaterImpl(persistedState, settings, time, history, history, synchronizationToken)
-    blockchainUpdater.syncPersistedAndInMemory()
-    blockchainUpdater
+    new BlockchainUpdaterImpl(persistedState, settings, time, history, history, synchronizationToken)
   }
 
   def areVersionsOfSameBlock(b1: Block, b2: Block): Boolean =
