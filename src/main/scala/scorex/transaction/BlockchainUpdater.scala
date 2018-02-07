@@ -16,6 +16,8 @@ trait BlockchainUpdater extends Synchronized {
   def removeAfter(blockId: ByteStr): Either[ValidationError, DiscardedBlocks]
 
   def lastBlockInfo: Observable[LastBlockInfo]
+
+  def shutdown(): Unit
 }
 
 trait BlockchainDebugInfo {

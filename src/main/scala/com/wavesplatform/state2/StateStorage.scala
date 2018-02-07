@@ -53,7 +53,7 @@ class StateStorage private(db: DB, time: Time) extends SubStorage(db, "state") w
 
   def putTransactions(b: Option[WriteBatch], diff: Diff): Unit = {
     diff.transactions.foreach { case (id, (h, tx, _)) =>
-      put(makeKey(TransactionsPrefix, id.arr), TransactionsValueCodec.encode((h, tx.bytes())))
+      put(makeKey(TransactionsPrefix, id.arr), TransactionsValueCodec.encode((h, tx.bytes())), b)
     }
 
     putOrderFills(b, diff.orderFills)
@@ -175,7 +175,7 @@ class StateStorage private(db: DB, time: Time) extends SubStorage(db, "state") w
     val newAddresses = addresses.foldLeft(n) { (c, a) =>
       val key = makeKey(WavesBalancePrefix, a)
       if (get(key).isEmpty) {
-        put(makeKey(AddressesIndexPrefix, c), a)
+        put(makeKey(AddressesIndexPrefix, c), a, b)
         c + 1
       } else c
     }
@@ -199,7 +199,7 @@ class StateStorage private(db: DB, time: Time) extends SubStorage(db, "state") w
       val addressKey = makeKey(AddressAssetsPrefix, addressBytes)
       val existingAssets = get(addressKey).map(Id32SeqCodec.decode).map(_.explicitGet().value).getOrElse(Seq.empty[ByteStr])
       val updatedAssets = existingAssets ++ d.assets.keySet
-      put(addressKey, Id32SeqCodec.encode(updatedAssets.distinct))
+      put(addressKey, Id32SeqCodec.encode(updatedAssets.distinct), b)
 
       d.assets.foreach { case (as, df) =>
         val addressAssetKey = makeKey(AssetBalancePrefix, Bytes.concat(addressBytes, as.arr))
@@ -239,7 +239,7 @@ class StateStorage private(db: DB, time: Time) extends SubStorage(db, "state") w
       val key = makeKey(AddressToAliasPrefix, e._1.bytes.arr)
       val existing = get(key).map(AliasSeqCodec.decode).map(_.explicitGet().value).getOrElse(Seq.empty[Alias])
       val updated = existing ++ e._2
-      put(key, AliasSeqCodec.encode(updated.distinct))
+      put(key, AliasSeqCodec.encode(updated.distinct), b)
     }
   }
 

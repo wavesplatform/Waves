@@ -15,6 +15,10 @@ class ChannelClosedHandler private extends ChannelHandlerAdapter {
     ctx.channel().closeFuture().addListener((cf: ChannelFuture) => closedChannelsSubject.onNext(cf.channel()))
     super.handlerAdded(ctx)
   }
+
+  def shutdown(): Unit = {
+    closedChannelsSubject.onComplete()
+  }
 }
 
 object ChannelClosedHandler {

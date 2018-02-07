@@ -23,19 +23,23 @@ class RxExtensionLoaderSpec extends FreeSpec with Matchers with TransactionGen w
   type Applier = (Channel, ExtensionBlocks) => Task[Either[ValidationError, Option[BlockchainScore]]]
   val simpleApplier: Applier = (_, _) => Task(Right(Some(0)))
 
-  override def testSchedulerName = "test-rx-extension-loader"
+  override def testSchedulerName: String = "test-rx-extension-loader"
 
-  def withExtensionLoader(timeOut: FiniteDuration = 1.day, applier: Applier = simpleApplier)
-                         (f: (TestHistory, InMemoryInvalidBlockStorage, PublishSubject[(Channel, Block)], PublishSubject[(Channel, Signatures)], PublishSubject[ChannelClosedAndSyncWith], Observable[(Channel, Block)]) => Any) = {
+  private def withExtensionLoader(timeOut: FiniteDuration = 1.day, applier: Applier = simpleApplier)
+                                 (f: (TestHistory, InMemoryInvalidBlockStorage, PublishSubject[(Channel, Block)],
+                                   PublishSubject[(Channel, Signatures)], PublishSubject[ChannelClosedAndSyncWith],
+                                   Observable[(Channel, Block)]) => Any) = {
     val blocks = PublishSubject[(Channel, Block)]
     val sigs = PublishSubject[(Channel, Signatures)]
     val ccsw = PublishSubject[ChannelClosedAndSyncWith]
     val history = new TestHistory
     val op = PeerDatabase.NoOp
     val invBlockStorage = new InMemoryInvalidBlockStorage
-    val (singleBlocks, _) = RxExtensionLoader(MaxRollback, timeOut, history, op, invBlockStorage, blocks, sigs, ccsw, testScheduler)(applier)
+    val (singleBlocks, _, _) = RxExtensionLoader(MaxRollback, timeOut, history, op, invBlockStorage, blocks, sigs, ccsw, testScheduler)(applier)
 
-    try { f(history, invBlockStorage, blocks, sigs, ccsw, singleBlocks) }
+    try {
+      f(history, invBlockStorage, blocks, sigs, ccsw, singleBlocks)
+    }
     finally {
       blocks.onComplete()
       sigs.onComplete()
@@ -43,7 +47,7 @@ class RxExtensionLoaderSpec extends FreeSpec with Matchers with TransactionGen w
     }
   }
 
-  "should propogate unexpected block" in withExtensionLoader() { (_, _, blocks, _, _, singleBlocks) =>
+  "should propagate unexpected block" in withExtensionLoader() { (_, _, blocks, _, _, singleBlocks) =>
     val ch = new LocalChannel()
     val newSingleBlocks = newItems(singleBlocks)
     val block = randomSignerBlockGen.sample.get
