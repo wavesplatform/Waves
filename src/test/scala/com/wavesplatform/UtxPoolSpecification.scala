@@ -3,7 +3,6 @@ package com.wavesplatform
 import java.util.concurrent.locks.ReentrantReadWriteLock
 
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.{HistoryWriterImpl, StorageFactory}
 import com.wavesplatform.settings.{BlockchainSettings, FeeSettings, FeesSettings, FunctionalitySettings, UtxSettings, WavesSettings}
 import com.wavesplatform.state2.diffs._
@@ -44,7 +43,7 @@ class UtxPoolSpecification extends FreeSpec
     val settings = WavesSettings.fromConfig(config).copy(
       blockchainSettings = BlockchainSettings('T', 5, 5,
         FunctionalitySettings.TESTNET,
-// TODO: use this line then MassPayment activated       FunctionalitySettings.TESTNET.copy(preActivatedFeatures = Map(BlockchainFeatures.MassTransfer.id -> 0)),
+        // TODO: use this line then MassPayment activated       FunctionalitySettings.TESTNET.copy(preActivatedFeatures = Map(BlockchainFeatures.MassTransfer.id -> 0)),
         genesisSettings))
 
     val db = open()
