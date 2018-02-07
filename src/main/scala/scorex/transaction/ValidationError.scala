@@ -6,12 +6,9 @@ import scorex.account.{Address, Alias}
 import scorex.block.{Block, MicroBlock}
 import scorex.transaction.assets.exchange.Order
 
-import scala.util.Either
-
 trait ValidationError
 
 object ValidationError {
-  type Validation[T] = Either[ValidationError, T]
 
   case class InvalidAddress(reason: String) extends ValidationError
 

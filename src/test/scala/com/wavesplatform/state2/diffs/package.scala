@@ -19,13 +19,12 @@ package object diffs extends TestDB {
   def newState(storeTransactions: Boolean = true): StateWriterImpl =
     new StateWriterImpl(StateStorage(open(), dropExisting = false).get, new ReentrantReadWriteLock())
 
-  def newHistory(fs: FunctionalitySettings = TestFunctionalitySettings.Enabled): History with FeatureProvider =
-    HistoryWriterImpl(open(), lock, fs, TestFunctionalitySettings.EmptyFeaturesSettings).get
+  def newHistory(): History with FeatureProvider = HistoryWriterImpl(open(), lock, TestFunctionalitySettings.Enabled, TestFunctionalitySettings.EmptyFeaturesSettings).get
 
   val ENOUGH_AMT: Long = Long.MaxValue / 3
 
   def assertDiffEi(preconditions: Seq[Block], block: Block, fs: FunctionalitySettings = TestFunctionalitySettings.Enabled)(assertion: Either[ValidationError, BlockDiff] => Unit): Unit = {
-    val fp = newHistory(fs)
+    val fp = newHistory()
     val state = newState()
     val differ: (SnapshotStateReader, Block) => Either[ValidationError, BlockDiff] = (s, b) => BlockDiffer.fromBlock(fs, fp, s, None, b)
 
@@ -43,7 +42,7 @@ package object diffs extends TestDB {
   }
 
   def assertDiffAndState(preconditions: Seq[Block], block: Block, fs: FunctionalitySettings = TestFunctionalitySettings.Enabled)(assertion: (BlockDiff, SnapshotStateReader) => Unit): Unit = {
-    val fp = newHistory(fs)
+    val fp = newHistory()
     val state = newState()
 
     val differ: (SnapshotStateReader, Block) => Either[ValidationError, BlockDiff] = (s, b) => BlockDiffer.fromBlock(fs, fp, s, None, b)

@@ -4,7 +4,6 @@ import java.util.concurrent.ConcurrentHashMap
 
 import cats._
 import com.wavesplatform.UtxPoolImpl.PessimisticPortfolios
-import com.wavesplatform.features.FeatureProvider
 import com.wavesplatform.metrics.Instrumented
 import com.wavesplatform.settings.{FunctionalitySettings, UtxSettings}
 import com.wavesplatform.state2.diffs.TransactionDiffer
@@ -19,7 +18,7 @@ import scorex.account.Address
 import scorex.consensus.TransactionsOrdering
 import scorex.transaction.ValidationError.{GenericError, SenderIsBlacklisted}
 import scorex.transaction._
-import scorex.transaction.assets.{MassTransferTransaction, TransferTransaction}
+import scorex.transaction.assets.TransferTransaction
 import scorex.utils.{ScorexLogging, Time}
 
 import scala.collection.JavaConverters._
@@ -54,7 +53,6 @@ trait UtxBatchOps {
 class UtxPoolImpl(time: Time,
                   stateReader: StateReader,
                   history: History,
-                  featureProvider: FeatureProvider,
                   feeCalculator: FeeCalculator,
                   fs: FunctionalitySettings,
                   utxSettings: UtxSettings) extends ScorexLogging with Instrumented with AutoCloseable with UtxPool {
@@ -105,18 +103,17 @@ class UtxPoolImpl(time: Time,
         case _ => None
       }
 
+      val recipient: Option[String] = tx match {
+        case x: TransferTransaction => Some(x.recipient.stringRepr)
+        case _ => None
+      }
+
       sender match {
-        case Some(addr) if utxSettings.blacklistSenderAddresses.contains(addr) =>
-          val recipients = tx match {
-            case tt: TransferTransaction => Seq(tt.recipient)
-            case mtt: MassTransferTransaction => mtt.transfers.map(_._1)
-            case _ => Seq()
-          }
-          val allowed =
-            recipients.nonEmpty &&
-            recipients.forall(r => utxSettings.allowBlacklistedTransferTo.contains(r.stringRepr))
-          Either.cond(allowed, (), SenderIsBlacklisted(addr))
-        case _ => Right(())
+        case None => Right(())
+        case Some(addr) =>
+          val blacklist = utxSettings.blacklistSenderAddresses.contains(addr)
+          lazy val allowBlacklisted = recipient.exists(utxSettings.allowBlacklistedTransferTo.contains)
+          if (blacklist && !allowBlacklisted) Left(SenderIsBlacklisted(addr)) else Right(())
       }
     }
   }
@@ -155,7 +152,7 @@ class UtxPoolImpl(time: Time,
       .sorted(TransactionsOrdering.InUTXPool)
       .foldLeft((Seq.empty[ByteStr], Seq.empty[Transaction], Monoid[Diff].empty)) {
         case ((invalid, valid, diff), tx) if valid.lengthCompare(max) <= 0 =>
-          differ(composite(diff.asBlockDiff, s), featureProvider, tx) match {
+          differ(composite(diff.asBlockDiff, s), tx) match {
             case Right(newDiff) if valid.lengthCompare(max) < 0 =>
               (invalid, tx +: valid, Monoid.combine(diff, newDiff))
             case Right(_) =>
@@ -188,7 +185,7 @@ class UtxPoolImpl(time: Time,
         _ <- Either.cond(transactions.size < utxSettings.maxSize, (), GenericError("Transaction pool size limit is reached"))
         _ <- checkNotBlacklisted(tx)
         _ <- feeCalculator.enoughFee(tx)
-        diff <- TransactionDiffer(fs, history.lastBlockTimestamp(), time.correctedTime(), s.height)(s, featureProvider, tx)
+        diff <- TransactionDiffer(fs, history.lastBlockTimestamp(), time.correctedTime(), s.height)(s, tx)
       } yield {
         utxPoolSizeStats.increment()
         pessimisticPortfolios.add(tx.id(), diff)
