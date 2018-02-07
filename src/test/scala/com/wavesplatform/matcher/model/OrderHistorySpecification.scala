@@ -272,16 +272,16 @@ class OrderHistorySpecification extends PropSpec
     val ord1 = buy(pair, 0.0008, 110000000, Some(pk), Some(300000L), Some(1L)) // Filled
     val ord2 = buy(pair, 0.0006, 120000000, Some(pk), Some(300000L), Some(2L)) // Accepted
     val ord3 = buy(pair, 0.0005, 130000000, Some(pk), Some(300000L), Some(3L)) // Canceled
-    val ord4 = buy(pair, 0.0004, 130000000, Some(pk), Some(300000L), Some(3L)) // Accepted
-    val ord5 = sell(pair, 0.00079, 2100000000, Some(pk), Some(300000L), Some(4L)) // Partial
+    val ord4 = sell(pair, 0.00079, 2100000000, Some(pk), Some(300000L), Some(4L)) // Partial
+    val ord5 = buy(pair, 0.0004, 130000000, Some(pk), Some(300000L), Some(45)) // Accepted
 
     oh.orderAccepted(OrderAdded(LimitOrder(ord1)))
     oh.orderAccepted(OrderAdded(LimitOrder(ord2)))
     oh.orderAccepted(OrderAdded(LimitOrder(ord3)))
-    oh.orderExecuted(OrderExecuted(LimitOrder(ord5), LimitOrder(ord1)))
+    oh.orderExecuted(OrderExecuted(LimitOrder(ord4), LimitOrder(ord1)))
+    oh.orderAccepted(OrderAdded(LimitOrder.limitOrder(ord4.price, 1000000000, ord4)))
     oh.orderCanceled(OrderCanceled(LimitOrder(ord3)))
-    oh.orderAccepted(OrderAdded(LimitOrder(ord4)))
-    oh.orderAccepted(OrderAdded(LimitOrder.limitOrder(ord5.price, 1000000000, ord5)))
+    oh.orderAccepted(OrderAdded(LimitOrder(ord5)))
 
     oh.fetchAllOrderHistory(ord1.senderPublicKey.address).map(_._1) shouldBe
       Seq(ord5.idStr(), ord4.idStr(), ord2.idStr(), ord3.idStr(), ord1.idStr())
