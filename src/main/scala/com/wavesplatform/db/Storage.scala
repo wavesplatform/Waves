@@ -26,17 +26,6 @@ abstract class Storage(private val db: DB) extends ScorexLogging {
     }
   }
 
-  def put(key: Array[Byte], value: Array[Byte]): Unit = {
-    try {
-      db.put(key, value)
-    } catch {
-      case NonFatal(t) =>
-        log.error("LevelDB put error", t)
-        forceStopApplication()
-        throw t
-    }
-  }
-
   def createBatch(): Option[WriteBatch] = {
     try {
       Some(db.createWriteBatch())
@@ -48,7 +37,7 @@ abstract class Storage(private val db: DB) extends ScorexLogging {
     }
   }
 
-  def put(key: Array[Byte], value: Array[Byte], batch: Option[WriteBatch] = None): Unit = {
+  def put(key: Array[Byte], value: Array[Byte], batch: Option[WriteBatch]): Unit = {
     try {
       if (batch.isDefined) batch.get.put(key, value) else db.put(key, value)
     } catch {
@@ -59,7 +48,7 @@ abstract class Storage(private val db: DB) extends ScorexLogging {
     }
   }
 
-  def delete(key: Array[Byte], batch: Option[WriteBatch] = None): Unit = {
+  def delete(key: Array[Byte], batch: Option[WriteBatch]): Unit = {
     try {
       if (batch.isDefined) batch.get.delete(key) else db.delete(key)
     } catch {

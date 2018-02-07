@@ -7,12 +7,13 @@ import io.netty.channel.Channel
 import io.netty.channel.group.ChannelGroup
 import kamon.Kamon
 import monix.eval.Task
+import monix.execution.Scheduler
 import scorex.transaction.{BlockchainUpdater, CheckpointService, History, ValidationError}
 import scorex.utils.ScorexLogging
 
 object CheckpointAppender extends ScorexLogging {
   def apply(checkpointService: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater,
-            peerDatabase: PeerDatabase, miner: Miner, allChannels: ChannelGroup
+            peerDatabase: PeerDatabase, miner: Miner, allChannels: ChannelGroup, scheduler: Scheduler
            )(maybeChannel: Option[Channel], c: Checkpoint): Task[Either[ValidationError, Option[BigInt]]] = {
     val t = Task(checkpointService.set(c).map { _ =>
       log.info(s"Processing checkpoint $c")

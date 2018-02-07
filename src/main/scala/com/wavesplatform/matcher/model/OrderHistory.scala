@@ -71,15 +71,15 @@ case class OrderHistoryImpl(db: DB, settings: MatcherSettings) extends SubStorag
           val (p1, p2) = prev.span(!orderStatus(_).isFinal)
           r = if (p2.isEmpty) p1 else p1 ++ p2.tail
         }
-        put(makeKey(AddressToOrdersPrefix, address), OrderIdsCodec.encode(r :+ orderId))
+        put(makeKey(AddressToOrdersPrefix, address), OrderIdsCodec.encode(r :+ orderId), None)
       case _ =>
-        put(makeKey(AddressToOrdersPrefix, address), OrderIdsCodec.encode(Array(orderId)))
+        put(makeKey(AddressToOrdersPrefix, address), OrderIdsCodec.encode(Array(orderId)), None)
     }
   }
 
   def saveOrderInfo(event: Event): Unit = {
     Events.createOrderInfo(event).foreach { case (orderId, oi) =>
-      put(makeKey(OrdersInfoPrefix, orderId), orderInfo(orderId).combine(oi).jsonStr.getBytes(Charset))
+      put(makeKey(OrdersInfoPrefix, orderId), orderInfo(orderId).combine(oi).jsonStr.getBytes(Charset), None)
       log.debug(s"Changed OrderInfo for: $orderId -> " + orderInfo(orderId))
     }
   }
@@ -94,7 +94,7 @@ case class OrderHistoryImpl(db: DB, settings: MatcherSettings) extends SubStorag
       val key = makeKey(AddressPortfolioPrefix, address)
       val prev = get(key).map(PortfolioCodec.decode).map(_.explicitGet().value).map(OpenPortfolio.apply).getOrElse(OpenPortfolio.empty)
       val updatedPortfolios = prev.combine(op)
-      put(key, PortfolioCodec.encode(updatedPortfolios.orders))
+      put(key, PortfolioCodec.encode(updatedPortfolios.orders), None)
       log.debug(s"Changed OpenPortfolio for: $address -> " + updatedPortfolios.toString)
     }
   }
@@ -102,11 +102,11 @@ case class OrderHistoryImpl(db: DB, settings: MatcherSettings) extends SubStorag
   def saveOrder(order: Order): Unit = {
     val key = makeKey(OrdersPrefix, order.idStr())
     if (get(key).isEmpty)
-      put(key, order.jsonStr.getBytes(Charset))
+      put(key, order.jsonStr.getBytes(Charset), None)
   }
 
   def deleteFromOrders(orderId: String): Unit = {
-    delete(makeKey(OrdersPrefix, orderId))
+    delete(makeKey(OrdersPrefix, orderId), None)
   }
 
   override def orderAccepted(event: OrderAdded): Unit = {
@@ -189,14 +189,14 @@ case class OrderHistoryImpl(db: DB, settings: MatcherSettings) extends SubStorag
       .sorted(OrderHistoryOrdering)
   }
 
-  private def deleteFromOrdersInfo(orderId: String): Unit = delete(makeKey(OrdersInfoPrefix, orderId))
+  private def deleteFromOrdersInfo(orderId: String): Unit = delete(makeKey(OrdersInfoPrefix, orderId), None)
 
   private def deleteFromAddress(address: String, orderId: String): Unit = {
     val key = makeKey(AddressToOrdersPrefix, address)
     get(key) match {
       case Some(bytes) =>
         val prev = OrderIdsCodec.decode(bytes).explicitGet().value
-        if (prev.contains(orderId)) put(key, OrderIdsCodec.encode(prev.filterNot(_ == orderId)))
+        if (prev.contains(orderId)) put(key, OrderIdsCodec.encode(prev.filterNot(_ == orderId)), None)
       case _ =>
     }
   }

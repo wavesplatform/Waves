@@ -40,7 +40,5 @@ class TestHistory extends NgHistory {
 
   override def synchronizationToken: ReentrantReadWriteLock = ???
 
-  override def close(): Unit = ???
-
   override def debugInfo: HeightInfo = ???
 }

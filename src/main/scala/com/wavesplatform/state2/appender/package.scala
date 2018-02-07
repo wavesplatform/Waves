@@ -27,8 +27,6 @@ package object appender extends ScorexLogging {
   private val height1 = 812608
   private val height2 = 813207
 
-  private[appender] val scheduler = monix.execution.Scheduler.singleThread("appender")
-
   private[appender] def processAndBlacklistOnFailure[A, B](ch: Channel, peerDatabase: PeerDatabase, miner: Miner, allChannels: ChannelGroup,
                                                            start: => String, success: => String, errorPrefix: String)(
                                                             f: => Task[Either[B, Option[BigInt]]]): Task[Either[B, Option[BigInt]]] = {
