@@ -30,15 +30,16 @@ object StorageFactory {
     for {
       historyWriter <- HistoryWriterImpl(db, lock, settings.blockchainSettings.functionalitySettings, settings.featuresSettings)
       ss <- createStateStorage(historyWriter, db, time)
+      stateWriter = new StateWriterImpl(ss, lock)
+      bcu = BlockchainUpdaterImpl(stateWriter, historyWriter, settings, time, lock)
     } yield (
       Coeval {
-        val stateWriter = new StateWriterImpl(ss, lock)
-        val bcu = BlockchainUpdaterImpl(stateWriter, historyWriter, settings, time, lock)
+        bcu.syncPersistedAndInMemory()
         val history: NgHistory with DebugNgHistory with FeatureProvider = bcu.historyReader
         (history, history, bcu.bestLiquidState, bcu, bcu)
       },
       Coeval {
-        (historyWriter.debugInfo, ss.debugInfo)
+        (historyWriter.debugInfo, bcu.lockfreeStateHeight)
       }
     )
   }

@@ -59,8 +59,6 @@ class NgHistoryReader(ngState: () => Option[NgState], inner: History with Featur
     } yield mb
   }
 
-  override def close(): Unit = inner.close()
-
   override def lastBlockTimestamp(): Option[Long] = read { implicit l =>
     ngState().map(_.base.timestamp).orElse(inner.lastBlockTimestamp())
   }
