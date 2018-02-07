@@ -43,7 +43,7 @@ class UtxPoolSpecification extends FreeSpec
     val settings = WavesSettings.fromConfig(config).copy(
       blockchainSettings = BlockchainSettings('T', 5, 5,
         FunctionalitySettings.TESTNET,
-        // TODO: use this line then MassPayment activated       FunctionalitySettings.TESTNET.copy(preActivatedFeatures = Map(BlockchainFeatures.MassTransfer.id -> 0)),
+        // TODO: MassTransfer: use this line and delete former then activated       FunctionalitySettings.TESTNET.copy(preActivatedFeatures = Map(BlockchainFeatures.MassTransfer.id -> 0)),
         genesisSettings))
 
     val db = open()
@@ -291,7 +291,7 @@ class UtxPoolSpecification extends FreeSpec
         }
       }
 
-      //TODO: remove ignore then MassPayment activated
+      //TODO: MassTransfer: remove ignore then activated
       "allow a transfer transaction from blacklisted address to specific addresses" ignore {
         val transferGen = Gen.oneOf(withBlacklistedAndAllowedByRule, massTransferWithBlacklisted(allowRecipients = true))
         forAll(transferGen) { case (_, utxPool, txs) =>
