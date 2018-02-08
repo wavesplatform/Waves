@@ -8,6 +8,7 @@ import org.asynchttpclient.util.HttpConstants
 import play.api.libs.json.{JsArray, JsObject, JsValue, Json}
 import scorex.api.http.assets.MassTransferRequest
 import scorex.crypto.encode.Base58
+import scorex.transaction.assets.MassTransferTransaction.Transfer
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
@@ -171,8 +172,10 @@ class TransactionsApiSuite extends BaseTransactionSuite {
       rs <- sender.postJsonWithApiKey("/transactions/sign", json)
       _ = assert(rs.getStatusCode == HttpConstants.ResponseStatusCodes.OK_200)
       body = Json.parse(rs.getResponseBody)
+      _ = Console.err.println(rs.getResponseBody)
       _ = assert((body \ "signature").as[String].nonEmpty)
       rb <- sender.postJson("/transactions/broadcast", body)
+      _ = Console.err.println(rb.getResponseBody)
       _ = assert(rb.getStatusCode == HttpConstants.ResponseStatusCodes.OK_200)
       id = (Json.parse(rb.getResponseBody) \ "id").as[String]
       _ = assert(id.nonEmpty)
@@ -183,7 +186,7 @@ class TransactionsApiSuite extends BaseTransactionSuite {
   }
 
   test("reporting MassTransfer transactions") {
-    val transfers = List((secondAddress, 2.waves), (thirdAddress, 3.waves))
+    val transfers = List(Transfer(secondAddress, 2.waves), Transfer(thirdAddress, 3.waves))
     val f = for {
       txId <- sender.massTransfer(firstAddress, transfers, 200000).map(_.id)
       _ <- nodes.waitForHeightAraiseAndTxPresent(txId)

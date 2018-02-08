@@ -7,6 +7,7 @@ import scorex.account.AddressOrAlias
 import scorex.api.http.assets.SignedMassTransferRequest
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.MassTransferTransaction
+import scorex.transaction.assets.MassTransferTransaction.{ParsedTransfer, Transfer}
 import scorex.transaction.assets.TransferTransaction.MaxAttachmentSize
 
 import scala.concurrent.Await
@@ -32,7 +33,7 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
       assetId <- sender.issue(firstAddress, "name", "description", AssetQuantity, 8, reissuable = false, IssueFee).map(_.id)
       _ <- nodes.waitForHeightAraiseAndTxPresent(assetId)
 
-      transfers = List((secondAddress, TransferAmount), (thirdAddress, TransferAmount))
+      transfers = List(Transfer(secondAddress, TransferAmount), Transfer(thirdAddress, TransferAmount))
       transferId <- sender.massTransfer(firstAddress, transfers, TransferFee, Some(assetId)).map(_.id)
       _ <- nodes.waitForHeightAraiseAndTxPresent(transferId)
       _ <- notMiner.assertBalances(firstAddress, balance1 - TransferFee - IssueFee, eff1 - TransferFee - IssueFee)
@@ -52,7 +53,7 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
       (balance2, eff2) <- notMiner.accountBalances(secondAddress)
       (balance3, eff3) <- notMiner.accountBalances(thirdAddress)
 
-      transfers = List((secondAddress, TransferAmount), (thirdAddress, TransferAmount))
+      transfers = List(Transfer(secondAddress, TransferAmount), Transfer(thirdAddress, TransferAmount))
       transferId <- sender.massTransfer(firstAddress, transfers, TransferFee).map(_.id)
       _ <- nodes.waitForHeightAraiseAndTxPresent(transferId)
       _ <- notMiner.assertBalances(firstAddress,
@@ -69,12 +70,12 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
     val address2 = AddressOrAlias.fromString(secondAddress).right.get
     val valid = MassTransferTransaction.create(
       None, sender.privateKey,
-      List((address2, TransferAmount)),
+      List(ParsedTransfer(address2, TransferAmount)),
       System.currentTimeMillis,
       TransferFee, Array.emptyByteArray).right.get
     val fromFuture = valid.copy(timestamp = valid.timestamp + 1.day.toMillis)
-    val tooManyTransfers = valid.copy(transfers = List.fill(MaxTransferCount + 1)((address2, 1)))
-    val negativeTransfer = valid.copy(transfers = List((address2, -1)))
+    val tooManyTransfers = valid.copy(transfers = List.fill(MaxTransferCount + 1)(ParsedTransfer(address2, 1)))
+    val negativeTransfer = valid.copy(transfers = List(ParsedTransfer(address2, -1)))
     val negativeFee = valid.copy(fee = 0)
     val longAttachment = valid.copy(attachment = ("ab" * MaxAttachmentSize).getBytes)
 
@@ -98,7 +99,7 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
       (balance2, eff2) <- notMiner.accountBalances(secondAddress)
       (balance3, eff3) <- notMiner.accountBalances(thirdAddress)
 
-      transfers = List((secondAddress, balance1 / 2), (thirdAddress, balance1 / 2))
+      transfers = List(Transfer(secondAddress, balance1 / 2), Transfer(thirdAddress, balance1 / 2))
       transferFailureAssertion <- assertBadRequest(sender.massTransfer(firstAddress, transfers, TransferFee))
 
       _ <- traverse(nodes)(_.waitForHeight(fb + 2))
@@ -119,7 +120,7 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
       leaseTxId <- sender.lease(firstAddress, secondAddress, LeasingAmount, LeasingFee).map(_.id)
       _ <- nodes.waitForHeightAraiseAndTxPresent(leaseTxId)
 
-      transfers = List((secondAddress, balance1 - LeasingFee - TransferFee))
+      transfers = List(Transfer(secondAddress, balance1 - LeasingFee - TransferFee))
       transferFailureAssertion <- assertBadRequest(sender.massTransfer(firstAddress, transfers, TransferFee))
 
       _ <- traverse(nodes)(_.waitForHeight(fb + 2))
@@ -135,7 +136,7 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
     SignedMassTransferRequest(
       Base58.encode(tx.sender.publicKey),
       assetId.map(_.base58),
-      transfers.map { case (address, amount) => (address.stringRepr, amount) },
+      transfers.map { case ParsedTransfer(address, amount) => Transfer(address.stringRepr, amount) },
       fee,
       timestamp,
       attachment.headOption.map(_ => Base58.encode(attachment)),

@@ -16,6 +16,7 @@ import scorex.block.Block
 import scorex.settings.TestFunctionalitySettings
 import scorex.transaction.TransactionParser.TransactionType
 import scorex.transaction.ValidationError.SenderIsBlacklisted
+import scorex.transaction.assets.MassTransferTransaction.ParsedTransfer
 import scorex.transaction.assets.{MassTransferTransaction, TransferTransaction}
 import scorex.transaction.{FeeCalculator, Transaction}
 import scorex.utils.Time
@@ -70,7 +71,7 @@ class UtxPoolSpecification extends FreeSpec
 
   private def massTransferWithRecipients(sender: PrivateKeyAccount, recipients: List[PublicKeyAccount], maxAmount: Long, time: Time) = {
     val amount = maxAmount / (recipients.size + 1)
-    val transfers = recipients.map(r => (r.toAddress, amount))
+    val transfers = recipients.map(r => ParsedTransfer(r.toAddress, amount))
     val txs = for {
       fee <- chooseNum(1, amount)
     } yield MassTransferTransaction.create(None, sender, transfers, time.getTimestamp(), fee, Array.empty[Byte]).right.get

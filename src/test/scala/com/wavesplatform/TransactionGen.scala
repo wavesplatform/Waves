@@ -2,11 +2,12 @@ package com.wavesplatform
 
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.state2._
-import org.scalacheck.Gen.{alphaLowerChar, frequency, numChar, alphaUpperChar}
+import org.scalacheck.Gen.{alphaLowerChar, alphaUpperChar, frequency, numChar}
 import org.scalacheck.{Arbitrary, Gen}
 import scorex.account.PublicKeyAccount._
 import scorex.account._
 import scorex.transaction._
+import scorex.transaction.assets.MassTransferTransaction.ParsedTransfer
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange._
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
@@ -157,7 +158,7 @@ trait TransactionGen {
   def wavesTransferGeneratorP(timestamp: Long, sender: PrivateKeyAccount, recipient: AddressOrAlias): Gen[TransferTransaction] =
     transferGeneratorP(timestamp, sender, recipient, None, None)
 
-  def massTransferGeneratorP(sender: PrivateKeyAccount, transfers: List[(AddressOrAlias, Long)], assetId: Option[AssetId]): Gen[MassTransferTransaction] = for {
+  def massTransferGeneratorP(sender: PrivateKeyAccount, transfers: List[ParsedTransfer], assetId: Option[AssetId]): Gen[MassTransferTransaction] = for {
     (_, _, _, _, timestamp, _, feeAmount, attachment) <- transferParamGen
   } yield MassTransferTransaction.create(assetId, sender, transfers, timestamp, feeAmount, attachment).right.get
 
@@ -190,8 +191,8 @@ trait TransactionGen {
       transferGen = for {
         recipient <- accountOrAliasGen
         amount <- Gen.choose(1L, Long.MaxValue / MaxTransferCount)
-      } yield (recipient, amount)
-      recipients <- Gen.listOfN[(AddressOrAlias, Long)](transferCount, transferGen)
+      } yield ParsedTransfer(recipient, amount)
+      recipients <- Gen.listOfN(transferCount, transferGen)
     } yield MassTransferTransaction.create(assetId, sender, recipients, timestamp, feeAmount, attachment).right.get
   }.label("massTransferTransaction")
 
