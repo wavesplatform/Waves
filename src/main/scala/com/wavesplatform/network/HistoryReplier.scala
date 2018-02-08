@@ -1,23 +1,22 @@
 package com.wavesplatform.network
 
 import com.google.common.cache.{CacheBuilder, CacheLoader}
+import com.wavesplatform.network.HistoryReplier._
 import com.wavesplatform.network.MicroBlockSynchronizer.MicroBlockSignature
 import com.wavesplatform.settings.SynchronizationSettings
 import com.wavesplatform.state2.ByteStr
 import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel.{ChannelHandlerContext, ChannelInboundHandlerAdapter}
 import monix.eval.Task
-import monix.execution.Scheduler
 import monix.execution.schedulers.SchedulerService
 import scorex.transaction.NgHistory
 import scorex.utils.ScorexLogging
-import HistoryReplier._
 
 @Sharable
-class HistoryReplier(history: NgHistory, settings: SynchronizationSettings) extends ChannelInboundHandlerAdapter with ScorexLogging {
+class HistoryReplier(history: NgHistory, settings: SynchronizationSettings, scheduler: SchedulerService) extends ChannelInboundHandlerAdapter with ScorexLogging {
   private lazy val historyReplierSettings = settings.historyReplierSettings
 
-  private implicit val scheduler: SchedulerService = Scheduler.fixedPool(name = "history-replier", poolSize = 2)
+  private implicit val s: SchedulerService = scheduler
 
   private val knownMicroBlocks = CacheBuilder.newBuilder()
     .maximumSize(historyReplierSettings.maxMicroBlockCacheSize)
@@ -63,7 +62,8 @@ class HistoryReplier(history: NgHistory, settings: SynchronizationSettings) exte
         .runAsync
 
     case _: Handshake => Task {
-      ctx.writeAndFlush(LocalScoreChanged(history.score()))
+      if (ctx.channel().isOpen)
+        ctx.writeAndFlush(LocalScoreChanged(history.score()))
     }.runAsyncLogErr
 
     case _ => super.channelRead(ctx, msg)
@@ -73,5 +73,7 @@ class HistoryReplier(history: NgHistory, settings: SynchronizationSettings) exte
 }
 
 object HistoryReplier {
+
   case class CacheSizes(blocks: Long, microBlocks: Long)
+
 }

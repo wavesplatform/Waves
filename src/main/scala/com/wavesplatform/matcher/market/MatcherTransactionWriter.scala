@@ -44,14 +44,14 @@ class MatcherTransactionWriter(db: DB, val settings: MatcherSettings)
     get(key) match {
       case Some(bytes) =>
         val prev = OrderToTxIdsCodec.decode(bytes).explicitGet().value
-        put(key, OrderToTxIdsCodec.encode(prev + txId))
-      case _ => put(key, OrderToTxIdsCodec.encode(Set(txId)))
+        put(key, OrderToTxIdsCodec.encode(prev + txId), None)
+      case _ => put(key, OrderToTxIdsCodec.encode(Set(txId)), None)
     }
   }
 
   private def saveExchangeTx(tx: ExchangeTransaction): Unit = {
     val txId = tx.id.toString
-    put(makeKey(TransactionsPrefix, txId), tx.bytes())
+    put(makeKey(TransactionsPrefix, txId), tx.bytes(), None)
     saveOrder2TxId(tx.buyOrder.idStr(), txId)
     saveOrder2TxId(tx.sellOrder.idStr(), txId)
   }

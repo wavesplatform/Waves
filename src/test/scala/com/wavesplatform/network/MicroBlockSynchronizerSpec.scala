@@ -12,17 +12,19 @@ import org.scalatest._
 import scala.concurrent.duration._
 
 class MicroBlockSynchronizerSpec extends FreeSpec with Matchers with TransactionGen with RxScheduler with BlockGen {
-  override def testSchedulerName = "test-microblock-synchronizer"
+  override def testSchedulerName: String = "test-microblock-synchronizer"
 
-  val defaultSettngs = MicroblockSynchronizerSettings(1.second, 1.minute, 1.minute)
+  val defaultSettings = MicroblockSynchronizerSettings(1.second, 1.minute, 1.minute)
 
-  def withMs(f: (PS[ByteStr], PS[(Channel, MicroBlockInv)], PS[(Channel, MicroBlockResponse)], Observable[(Channel, MicroBlockSynchronizer.MicroblockData)]) => Any) = {
+  private def withMs(f: (PS[ByteStr], PS[(Channel, MicroBlockInv)], PS[(Channel, MicroBlockResponse)], Observable[(Channel, MicroBlockSynchronizer.MicroblockData)]) => Any) = {
     val peers = PeerDatabase.NoOp
     val lastBlockIds = PS[ByteStr]
     val microInvs = PS[(Channel, MicroBlockInv)]
     val microResponses = PS[(Channel, MicroBlockResponse)]
-    val (r, _) = MicroBlockSynchronizer(defaultSettngs, peers, lastBlockIds, microInvs, microResponses, testScheduler)
-    try { f(lastBlockIds, microInvs, microResponses, r) }
+    val (r, _) = MicroBlockSynchronizer(defaultSettings, peers, lastBlockIds, microInvs, microResponses, testScheduler)
+    try {
+      f(lastBlockIds, microInvs, microResponses, r)
+    }
     finally {
       lastBlockIds.onComplete()
       microInvs.onComplete()

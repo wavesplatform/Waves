@@ -7,11 +7,12 @@ import scorex.utils.ScorexLogging
 
 package object db extends ScorexLogging {
 
-  def openDB(path: String, cacheSizeBites: Long,  recreate: Boolean = false): DB = {
+  def openDB(path: String, cacheSizeBites: Long, recreate: Boolean = false): DB = {
     log.debug(s"Open DB at $path")
     val file = new File(path)
     val options = new Options()
       .createIfMissing(true)
+      .paranoidChecks(true)
       .cacheSize(cacheSizeBites)
 
     if (recreate) {
