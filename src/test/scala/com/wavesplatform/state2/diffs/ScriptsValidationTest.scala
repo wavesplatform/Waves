@@ -17,24 +17,23 @@ import com.wavesplatform.lang.Terms._
 
 class ScriptsValidationTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
 
+  def preconditionsTransferAndLease(s: Expr): Gen[(GenesisTransaction, SetScriptTransaction, LeaseTransaction, TransferTransaction)] = for {
+    master <- accountGen
+    recepient <- accountGen
+    ts <- positiveIntGen
+    genesis = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
+    setSctipt <- selfSignedSetScriptTransactionGenP(master, Script(s))
+    transfer <- transferGeneratorP(master, recepient.toAddress, None, None)
+    lease <- leaseAndCancelGeneratorP(master, recepient.toAddress, master)
+  } yield (genesis, setSctipt, lease._1, transfer)
+
   property("transfer is allowed but lease is not due to predicate") {
 
     val onlySend: Expr = AND(
       OR(EQ(GETTER(REF("TX"),"TYPE"), CONST_INT(4)), EQ(GETTER(REF("TX"),"TYPE"), CONST_INT(11))),
       SIG_VERIFY(GETTER(REF("TX"),"BODYBYTES"), GETTER(REF("TX"),"PROOFA"), GETTER(REF("TX"),"SENDERPK"))
     )
-
-    val preconditionsAndTransfer: Gen[(GenesisTransaction, SetScriptTransaction, LeaseTransaction, TransferTransaction)] = for {
-      master <- accountGen
-      recepient <- accountGen
-      ts <- positiveIntGen
-      genesis = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
-      setSctipt <- selfSignedSetScriptTransactionGenP(master, Script(onlySend))
-      transfer <- transferGeneratorP(master, recepient.toAddress, None, None)
-      lease <- leaseAndCancelGeneratorP(master, recepient.toAddress, master)
-    } yield (genesis, setSctipt, lease._1, transfer)
-
-    forAll(preconditionsAndTransfer) {
+    forAll(preconditionsTransferAndLease(onlySend)) {
       case ((genesis, script, lease, transfer)) =>
         assertDiffAndState(Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(transfer))) { case (totalDiff, newState) => () }
         assertDiffEi(Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(lease)))(totalDiffEi =>
@@ -101,5 +100,37 @@ class ScriptsValidationTest extends PropSpec with PropertyChecks with Matchers w
         invalidProofs.foreach(tx =>
           assertLeft(Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(tx)))("TransactionNotAllowedByScript"))
     }
+  }
+
+  property("accessing field of transaction without checking its type first results on exception") {
+
+    val goodScrpit =
+      """
+        |
+        | if (TX.TYPE == 4) then (TX.ASSETID == None) else false
+        |
+      """.stripMargin
+
+    val badScript =
+      """
+        |
+        | TX.ASSETID == None
+        |
+      """.stripMargin
+
+    forAll(preconditionsTransferAndLease(Parser(goodScrpit).get.value)) {
+      case ((genesis, script, lease, transfer)) =>
+        assertDiffAndState(Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(transfer))) { case (totalDiff, newState) => () }
+        assertDiffEi(Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(lease)))(totalDiffEi =>
+          totalDiffEi should produce("TransactionNotAllowedByScript"))
+    }
+
+    forAll(preconditionsTransferAndLease(Parser(badScript).get.value)) {
+      case ((genesis, script, lease, transfer)) =>
+        assertDiffAndState(Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(transfer))) { case (totalDiff, newState) => () }
+        assertDiffEi(Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(lease)))(totalDiffEi =>
+          totalDiffEi should produce("transactions is of another type"))
+    }
+
   }
 }

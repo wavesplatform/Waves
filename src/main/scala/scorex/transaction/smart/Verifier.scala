@@ -9,6 +9,7 @@ import scodec.bits.ByteVector
 import scorex.crypto.EllipticCurveImpl
 import scorex.transaction.ValidationError.{GenericError, TransactionNotAllowedByScript}
 import scorex.transaction._
+import scorex.transaction.assets.TransferTransaction
 
 object Verifier {
 
@@ -41,18 +42,23 @@ object Verifier {
       GenericError(s"Script doesn't exist and proof doesn't validate as signature for $pt")
     )
 
+  val optionByteVector = OPTION(BYTEVECTOR)
+
   val transactionType = CUSTOMTYPE(
     "Transaction",
-    List("TYPE"      -> INT,
-         "ID"        -> BYTEVECTOR,
-         "BODYBYTES" -> BYTEVECTOR,
-         "SENDERPK"  -> BYTEVECTOR,
-         "PROOFA" -> BYTEVECTOR,
-         "PROOFB" -> BYTEVECTOR,
-         "PROOFC" -> BYTEVECTOR)
+    List(
+      "TYPE"      -> INT,
+      "ID"        -> BYTEVECTOR,
+      "BODYBYTES" -> BYTEVECTOR,
+      "SENDERPK"  -> BYTEVECTOR,
+      "PROOFA"    -> BYTEVECTOR,
+      "PROOFB"    -> BYTEVECTOR,
+      "PROOFC"    -> BYTEVECTOR,
+      "ASSETID"   -> optionByteVector
+    )
   )
 
-  def thro: Nothing = throw new IllegalArgumentException("transactions is of another type")
+  val thro = Coeval(throw new IllegalArgumentException("transactions is of another type"))
 
   private def proofBinding(tx: Transaction, x: Int) =
     LazyVal(BYTEVECTOR)(tx match {
@@ -62,7 +68,7 @@ object Verifier {
             ByteVector.empty
           else ByteVector(pt.proofs.proofs(x).arr)
         Coeval.evalOnce(proof)
-      case _ => Coeval(thro)
+      case _ => thro
     })
 
   private def transactionObject(tx: Transaction) =
@@ -72,11 +78,15 @@ object Verifier {
         "ID"   -> LazyVal(BYTEVECTOR)(tx.id.map(_.arr).map(ByteVector(_))),
         "BODYBYTES" -> LazyVal(BYTEVECTOR)(tx match {
           case pt: ProvenTransaction => pt.bodyBytes.map(ByteVector(_))
-          case _                     => Coeval.evalOnce(thro)
+          case _                     => thro
         }),
         "SENDERPK" -> LazyVal(BYTEVECTOR)(tx match {
           case pt: Authorized => Coeval.evalOnce(ByteVector(pt.sender.publicKey))
-          case _              => Coeval.evalOnce(thro)
+          case _              => thro
+        }),
+        "ASSETID" -> LazyVal(optionByteVector)(tx match {
+          case tt: TransferTransaction => Coeval.evalOnce(tt.assetId.map(x => ByteVector(x.arr)).asInstanceOf[optionByteVector.Underlying])
+          case _                       => thro
         }),
         "PROOFA" -> proofBinding(tx, 0),
         "PROOFB" -> proofBinding(tx, 1),

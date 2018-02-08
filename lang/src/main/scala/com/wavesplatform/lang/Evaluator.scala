@@ -4,6 +4,8 @@ import com.wavesplatform.lang.Terms._
 import scodec.bits.ByteVector
 import scorex.crypto.signatures.Curve25519
 
+import scala.util.{Failure, Success, Try}
+
 object Evaluator {
 
   import scala.util.control.TailCalls.{TailRec, done, tailcall}
@@ -48,7 +50,6 @@ object Evaluator {
           .fold(fa => Left(fa), x => if (x) Right(BOOLEAN) else Left(s"Typecheck failed for EQ: RType($rType) differs from LType($lType)"))
       }
     }
-
     case get: GET => tailcall {
       resolveType(ctx, get.t) flatMap {
         case Right(OPTION(in)) => done(Right(in))
@@ -237,10 +238,10 @@ object Evaluator {
 
   def apply[A](c: Context, term: Expr): ExecResult[A] = {
     lazy val result = r[A](c, term).result
-//    Try(result) match {
-//      case Failure(ex) => Left(ex.toString)
-//      case Success(res) => res
-//    }
-    result
+    Try(result) match {
+      case Failure(ex) => Left(ex.toString)
+      case Success(res) => res
+    }
+//    result
   }
 }
