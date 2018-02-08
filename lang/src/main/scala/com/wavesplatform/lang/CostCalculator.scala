@@ -7,7 +7,6 @@ object CostCalculator {
 
   def apply(t: Expr): Int = t match {
     case CONST_INT(_)              => 1
-    case HEIGHT                    => 1
     case CONST_BYTEVECTOR(_)       => 1
     case SUM(i1, i2)               => 2 + apply(i1) + apply(i2)
     case AND(t1, t2)               => 2 + apply(t1) + apply(t2)

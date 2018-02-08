@@ -20,7 +20,6 @@ object Serde {
   implicit def dGe              = d[Boolean].bind[GE](7)
   implicit def dGt              = d[Boolean].bind[GT](8)
   implicit def dSigVerify       = d[Boolean].bind[SIG_VERIFY](9)
-  implicit def dHeight          = d[Int].bind[HEIGHT.type](10)
   implicit def dLet             = d.bind[LET](12)
   implicit def dComposite       = d.bind[Block](13)
   implicit def dRef             = d.bind[REF](14)

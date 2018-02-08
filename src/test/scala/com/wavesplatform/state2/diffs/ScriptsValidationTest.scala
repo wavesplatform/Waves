@@ -18,6 +18,7 @@ import com.wavesplatform.lang.Terms._
 
 class ScriptsValidationTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
 
+  /*
   property("transfer is allowed but lease is not due to predicate") {
 
     val onlySend: Expr = AND(
@@ -42,19 +43,9 @@ class ScriptsValidationTest extends PropSpec with PropertyChecks with Matchers w
           totalDiffEi should produce("TransactionNotAllowedByScript"))
     }
   }
+  */
 
   property("2 of 3 multisig") {
-    def multisig2Of3(pk0: PublicKeyAccount, pk1: PublicKeyAccount, pk2: PublicKeyAccount): Expr =
-      GE(
-        SUM(
-          SUM(
-            IF(SIG_VERIFY(TX_FIELD(BodyBytes), TX_FIELD(Proof(0)), CONST_BYTEVECTOR(ByteVector(pk0.publicKey))), CONST_INT(1), CONST_INT(0)),
-            IF(SIG_VERIFY(TX_FIELD(BodyBytes), TX_FIELD(Proof(1)), CONST_BYTEVECTOR(ByteVector(pk1.publicKey))), CONST_INT(1), CONST_INT(0))
-          ),
-          IF(SIG_VERIFY(TX_FIELD(BodyBytes), TX_FIELD(Proof(2)), CONST_BYTEVECTOR(ByteVector(pk2.publicKey))), CONST_INT(1), CONST_INT(0))
-        ),
-        CONST_INT(2)
-      )
     def multisig2Of3Lang(pk0: PublicKeyAccount, pk1: PublicKeyAccount, pk2: PublicKeyAccount) : Expr = {
       val script =
         s"""
@@ -63,9 +54,9 @@ class ScriptsValidationTest extends PropSpec with PropertyChecks with Matchers w
           |let B = base58'${ByteStr(pk1.publicKey)}'
           |let C = base58'${ByteStr(pk2.publicKey)}'
           |
-          |let AC = if(checkSig(tx.bodyBytes,tx.proof(0),A)) then 1 else 0
-          |let BC = if(checkSig(tx.bodyBytes,tx.proof(1),B)) then 1 else 0
-          |let CC = if(checkSig(tx.bodyBytes,tx.proof(2),C)) then 1 else 0
+          |let AC = if(checkSig(TX.BODYBYTES,TX.PROOFA,A)) then 1 else 0
+          |let BC = if(checkSig(TX.BODYBYTES,TX.PROOFB,B)) then 1 else 0
+          |let CC = if(checkSig(TX.BODYBYTES,TX.PROOFC,C)) then 1 else 0
           |
           | AC + BC+ CC >= 2
           |

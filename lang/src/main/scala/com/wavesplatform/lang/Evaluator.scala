@@ -12,7 +12,10 @@ object Evaluator {
 
   type Defs = Map[String, (Type, Any)]
 
-  case class Context(domain: Domain, defs: Defs, typeDefs: Map[String,CUSTOMTYPE] = Map.empty)
+  case class Context(typeDefs: Map[String,CUSTOMTYPE], defs: Defs)
+  object Context{
+    val empty = Context(Map.empty,Map.empty)
+  }
 
   type TypeResolutionError = String
   type ExcecutionError = String
@@ -165,7 +168,6 @@ object Evaluator {
             }
         }
       }
-      case HEIGHT => done(ctx.domain.height)
       case IS_DEFINED(opt) => tailcall {
         resolveType(ctx, opt).flatMap(optType => optType.fold(fa => done(Left(fa)), t => {
           r[t.Underlying](ctx, opt).map {

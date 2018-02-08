@@ -50,7 +50,8 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
   }
 
   property("let/ref constructs") {
-    parse("""let X = 10;
+    parse(
+      """let X = 10;
         |3 > 2
       """.stripMargin) shouldBe Block(Some(LET("X", CONST_INT(10))), GT(CONST_INT(3), CONST_INT(2)))
 
@@ -58,29 +59,36 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
     parse("(let X = 3 + 2; 3 > 2)") shouldBe Block(Some(LET("X", SUM(CONST_INT(3), CONST_INT(2)))), GT(CONST_INT(3), CONST_INT(2)))
     parse("(let X = if(true) then true else false; false)") shouldBe Block(Some(LET("X", IF(TRUE, TRUE, FALSE))), FALSE)
 
-    parse("""let X = 10;
-        |let Y = 11;
-        |X > Y
-      """.stripMargin) shouldBe Block(Some(LET("X", CONST_INT(10))), Block(Some(LET("Y", CONST_INT(11))), GT(REF("X"), REF("Y"))))
+    val expr = parse(
+      """let X = 10;
+let Y = 11;
+X > Y
+      """.stripMargin)
+
+    expr shouldBe Block(Some(LET("X", CONST_INT(10))), Block(Some(LET("Y", CONST_INT(11))), GT(REF("X"), REF("Y"))))
   }
 
   property("multiline") {
-    parse("""
+    parse(
+      """
         |
         |false
         |
         |
       """.stripMargin) shouldBe FALSE
 
-    parse("""let X = 10;
+    parse(
+      """let X = 10;
         |
         |true
       """.stripMargin) shouldBe Block(Some(LET("X", CONST_INT(10))), TRUE)
-    parse("""let X = 11;
+    parse(
+      """let X = 11;
         |true
       """.stripMargin) shouldBe Block(Some(LET("X", CONST_INT(11))), TRUE)
 
-    parse("""
+    parse(
+      """
         |
         |let X = 12;
         |
@@ -94,7 +102,8 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
   property("if") {
     parse("if(true) then 1 else 2") shouldBe IF(TRUE, CONST_INT(1), CONST_INT(2))
     parse("if(true) then 1 else if(X==Y) then 2 else 3") shouldBe IF(TRUE, CONST_INT(1), IF(EQ(REF("X"), REF("Y")), CONST_INT(2), CONST_INT(3)))
-    parse("""if ( true )
+    parse(
+      """if ( true )
         |then 1
         |else if(X== Y)
         |     then 2
@@ -102,7 +111,8 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
 
     parse("if (true) then false else false==false") shouldBe IF(TRUE, FALSE, EQ(FALSE, FALSE))
 
-    parse("""if
+    parse(
+      """if
 
              (true)
         |then let A = 10;
@@ -114,6 +124,14 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
     )
 
   }
+  property("get field of ref") {
+    parse("XXX.YYY") shouldBe GETTER(REF("XXX"), "YYY")
+    parse("""
+        |
+        | X.Y
+        |
+      """.stripMargin) shouldBe GETTER(REF("X"), "Y")
+  }
 
   property("multisig sample") {
     val script =
@@ -123,13 +141,13 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
         |let B = base58'PK2PK2PK2PK2PK2'
         |let C = base58'PK3PK3PK3PK3PK3'
         |
-        |let W = tx.bodyBytes
-        |let P = tx.proof(0)
+        |let W = TX.BODYBYTES
+        |let P = TX.PROOF
         |let V = checkSig(W,P,A)
         |
         |let AC = if(V) then 1 else 0
-        |let BC = if(checkSig(tx.bodyBytes,tx.proof(1),B)) then 1 else 0
-        |let CC = if(checkSig(tx.bodyBytes,tx.proof(2),C)) then 1 else 0
+        |let BC = if(checkSig(TX.BODYBYTES,TX.PROOF,B)) then 1 else 0
+        |let CC = if(checkSig(TX.BODYBYTES,TX.PROOF,C)) then 1 else 0
         |
         | AC + BC+ CC >= 2
         |
@@ -144,8 +162,9 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
 
   property("EVALUATE patmat") {
     Evaluator.apply(
-      Context(new HeightDomain(1), Map.empty),
-      parse("""
+      Context.empty,
+      parse(
+        """
           |let MULTICHARVARNAME = Some(500)
           |
           |let Z = match(MULTICHARVARNAME) {
@@ -159,8 +178,9 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
     ) shouldBe Right(1001)
 
     Evaluator.apply(
-      Context(new HeightDomain(1), Map.empty),
-      parse("""
+      Context.empty,
+      parse(
+        """
           |
           |let X = Some(10)
           |
@@ -172,8 +192,9 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
     ) shouldBe Right(40)
 
     Evaluator.apply(
-      Context(new HeightDomain(1), Map.empty),
-      parse("""
+      Context.empty,
+      parse(
+        """
           |
           |let X = Some(10)
           |

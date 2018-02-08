@@ -22,6 +22,6 @@ object Script {
     case Failure(cause) => Left(ScriptParseError(cause.toString))
   }
 
-  val sigVerify: Script = Script(SIG_VERIFY(TX_FIELD(BodyBytes), TX_FIELD(Proof(0)), TX_FIELD(SenderPk)))
+  val sigVerify: Script = null// Script(SIG_VERIFY(TX_FIELD(BodyBytes), TX_FIELD(Proof(0)), TX_FIELD(SenderPk)))
 
 }

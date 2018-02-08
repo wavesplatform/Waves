@@ -28,6 +28,7 @@ object Terms {
 
   case class OBJECT(fields: Map[String, LazyVal])
 
+
   def eqType(t1: Type, t2: Type): Option[Type] =
     if (t1 == NOTHING) Some(t2)
     else if (t2 == NOTHING) Some(t1)
@@ -52,7 +53,6 @@ object Terms {
   case class GT(t1: Block, t2: Block)                                       extends Expr { val predefinedType: Option[Type] = Some(BOOLEAN)         }
   case class GE(t1: Block, t2: Block)                                       extends Expr { val predefinedType: Option[Type] = Some(BOOLEAN)         }
   case class SIG_VERIFY(message: Block, signature: Block, publicKey: Block) extends Expr { val predefinedType: Option[Type] = Some(BOOLEAN)         }
-  case object HEIGHT                                                        extends Expr { val predefinedType: Option[Type] = Some(INT)             }
   case class IS_DEFINED(t: Block)                                           extends Expr { val predefinedType: Option[Type] = Some(BOOLEAN)         }
   case class LET(name: String, value: Block)                                extends Expr { val predefinedType: Option[Type] = Some(UNIT)            } // subtype of Expr mostly for serde
   case class Block(let: Option[LET], t: Expr)                               extends Expr { val predefinedType: Option[Type] = None                  }

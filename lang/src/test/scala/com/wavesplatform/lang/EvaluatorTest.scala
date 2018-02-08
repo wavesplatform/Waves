@@ -10,7 +10,7 @@ import scodec.bits.ByteVector
 class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 
   private def ev(predefTypes: Map[String, CUSTOMTYPE] = Map.empty, defs: Defs = Map.empty, expr: Expr): Either[_, _] =
-    Evaluator.apply(Context(new HeightDomain(1), defs, predefTypes), expr)
+    Evaluator.apply(Context(predefTypes, defs), expr)
 
   private def simpleDeclarationAndUsage(i: Int) = Block(Some(LET("x", CONST_INT(i))), REF("x"))
 
@@ -125,12 +125,12 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
   }
 
   property("resolveType") {
-    Evaluator.resolveType(Context(domain = null, defs = Map.empty), SOME(CONST_INT(3))).result shouldBe Right(OPTION(INT))
-    Evaluator.resolveType(Context(domain = null, defs = Map.empty), NONE).result shouldBe Right(OPTION(NOTHING))
-    Evaluator.resolveType(Context(domain = null, defs = Map.empty), IF(TRUE, SOME(CONST_INT(3)), NONE)).result shouldBe Right(OPTION(INT))
-    Evaluator.resolveType(Context(domain = null, defs = Map.empty), IF(TRUE, NONE, SOME(CONST_INT(3)))).result shouldBe Right(OPTION(INT))
-    Evaluator.resolveType(Context(domain = null, defs = Map.empty), IF(TRUE, NONE, NONE)).result shouldBe Right(OPTION(NOTHING))
-    Evaluator.resolveType(Context(domain = null, defs = Map.empty), IF(TRUE, SOME(FALSE), SOME(CONST_INT(3)))).result should produce("Typecheck")
+    Evaluator.resolveType(Context(Map.empty,Map.empty), SOME(CONST_INT(3))).result shouldBe Right(OPTION(INT))
+    Evaluator.resolveType(Context(Map.empty,Map.empty), NONE).result shouldBe Right(OPTION(NOTHING))
+    Evaluator.resolveType(Context(Map.empty,Map.empty), IF(TRUE, SOME(CONST_INT(3)), NONE)).result shouldBe Right(OPTION(INT))
+    Evaluator.resolveType(Context(Map.empty,Map.empty), IF(TRUE, NONE, SOME(CONST_INT(3)))).result shouldBe Right(OPTION(INT))
+    Evaluator.resolveType(Context(Map.empty,Map.empty), IF(TRUE, NONE, NONE)).result shouldBe Right(OPTION(NOTHING))
+    Evaluator.resolveType(Context(Map.empty,Map.empty), IF(TRUE, SOME(FALSE), SOME(CONST_INT(3)))).result should produce("Typecheck")
   }
 
   property("successful resolve strongest type") {
@@ -144,7 +144,9 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
     val pointInstance = OBJECT(Map("X" -> LazyVal(INT)(Coeval(3)), "Y" -> LazyVal(INT)(Coeval(4))))
     ev(
       predefTypes = Map(pointType.name -> pointType),
+
       defs = Map("p" -> (pointType, pointInstance)),
+
       expr = SUM(GETTER(REF("p"), "X"), CONST_INT(2))
     ) shouldBe Right(5)
 

@@ -8,14 +8,13 @@ trait ScriptGen {
 
   private def CONST_INTgen: Gen[Expr] = Gen.choose(Int.MinValue, Int.MaxValue).map(CONST_INT)
 
-  private def HEIGHTgen: Gen[Expr] = Gen.const(HEIGHT)
 
   private def SUMgen(gas: Int): Gen[Expr] = for {
     i1 <- INTGen((gas - 2) / 2)
     i2 <- INTGen((gas - 2) / 2)
   } yield SUM(i1, i2)
 
-  private def INTGen(gas: Int): Gen[Expr] = if (gas > 0) Gen.oneOf(HEIGHTgen, CONST_INTgen, SUMgen(gas - 1), IF_INTgen(gas - 1)) else Gen.oneOf(HEIGHTgen, CONST_INTgen)
+  private def INTGen(gas: Int): Gen[Expr] = if (gas > 0) Gen.oneOf(CONST_INTgen, SUMgen(gas - 1), IF_INTgen(gas - 1)) else CONST_INTgen
 
   private def GEgen(gas: Int): Gen[Expr] = for {
     i1 <- INTGen((gas - 2) / 2)

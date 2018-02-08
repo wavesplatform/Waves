@@ -9,6 +9,9 @@ object Parser {
 
   private val Base58Chars = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
 
+  private val FirstCharInVarField = "QWERTYUIOPASDFGHJKLZXCVBNM"
+  private val OtherCharInVarField = FirstCharInVarField + "1234567890[]"
+
   private val White = WhitespaceApi.Wrapper {
     import fastparse.all._
     NoTrace(CharIn(" ", "\t", "\r", "\n").rep)
@@ -31,7 +34,8 @@ object Parser {
   private def getP: P[GET]             = P("get" ~ "(" ~ block ~ ")").map(b => GET(b))
   private def someP: P[SOME]           = P("Some" ~ "(" ~ block ~ ")").map(x => SOME(x))
   private def noneP: P[NONE.type]      = P("None").map(_ => NONE)
-  private def heightP: P[HEIGHT.type]  = P("h").map(_ => HEIGHT)
+
+  private def getterP: P[GETTER] = P(refP ~ "." ~ varName).map { case ((b, f)) => GETTER(b, f) }
 
   private def patmat1P: P[Block] =
     P("match" ~ "(" ~ block ~ ")" ~ "{" ~ "case" ~ "None" ~ "=>" ~ block ~ "case" ~ "Some" ~ "(" ~ varName ~ ")" ~ "=>" ~ block ~ "}")
@@ -90,7 +94,7 @@ object Parser {
   private def expr = P(binaryOp(priority) | atom)
 
   private def atom =
-    P(ifP | patmat1P | patmat2P | byteVectorP | numberP | trueP | falseP | noneP | someP | bracesP | curlyBracesP | sigVerifyP | refP | isDefined | getP )
+    P(ifP | patmat1P | patmat2P | byteVectorP | numberP | trueP | falseP | noneP | someP | bracesP | curlyBracesP | sigVerifyP | getterP | refP | isDefined | getP )
 
   def apply(str: String): core.Parsed[Expr, Char, String] = block.parse(str)
 }
