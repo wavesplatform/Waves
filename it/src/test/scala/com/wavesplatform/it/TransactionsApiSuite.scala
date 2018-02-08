@@ -196,6 +196,8 @@ class TransactionsApiSuite extends BaseTransactionSuite {
       // /transactions/address should return complete transfers list for the sender...
       txSender <- sender.get(s"/transactions/address/$firstAddress/limit/1").as[JsArray].map(_.apply(0)(0))
       _ = assert(txSender.as[MassTransferRequest].transfers.size == 2)
+      _ = assert((txSender \ "transferCount").as[Int] == 2)
+      _ = assert((txSender \ "totalAmount").as[Long] == 5.waves)
 
       // ...and compact list for recipients
       txRecipient <- sender.get(s"/transactions/address/$secondAddress/limit/1").as[JsArray].map(_.apply(0)(0))

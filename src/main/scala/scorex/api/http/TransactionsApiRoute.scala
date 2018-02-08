@@ -211,7 +211,7 @@ case class TransactionsApiRoute(
   private def txToCompactJson(address: Address, tx: Transaction): JsObject = {
     import scorex.transaction.assets.MassTransferTransaction
     tx match {
-      case mtt: MassTransferTransaction if mtt.sender.toAddress != address => mtt.compactJson(address)()
+      case mtt: MassTransferTransaction if mtt.sender.toAddress != address => mtt.compactJson(address)
       case _ => txToExtendedJson(tx)
     }
   }

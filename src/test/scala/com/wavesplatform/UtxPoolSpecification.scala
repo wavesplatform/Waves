@@ -292,7 +292,7 @@ class UtxPoolSpecification extends FreeSpec
         }
       }
 
-      "allow a transfer transaction from blacklisted address to specific addresses" {
+      "allow a transfer transaction from blacklisted address to specific addresses" in {
         val transferGen = Gen.oneOf(withBlacklistedAndAllowedByRule, massTransferWithBlacklisted(allowRecipients = true))
         forAll(transferGen) { case (_, utxPool, txs) =>
           all(txs.map { t =>

@@ -47,19 +47,17 @@ case class MassTransferTransaction private(assetId: Option[AssetId],
 
   override def jsonBase(): JsObject = super.jsonBase() ++ Json.obj(
     "assetId" -> assetId.map(_.base58),
-    "attachment" -> Base58.encode(attachment))
+    "attachment" -> Base58.encode(attachment),
+    "transferCount" -> transfers.size,
+    "totalAmount" -> transfers.map(_.amount).sum)
+
 
   override val json: Coeval[JsObject] = Coeval.evalOnce {
-    jsonBase() ++ Json.obj(
-      "transfers" -> toJson(transfers))
+    jsonBase() ++ Json.obj("transfers" -> toJson(transfers))
   }
 
-  def compactJson(recipient: AddressOrAlias): Coeval[JsObject] = Coeval.evalOnce {
-    jsonBase() ++ Json.obj(
-      "transfers" -> toJson(transfers.filter(_.address == recipient)),
-      "transferCount" -> transfers.size,
-      "totalAmount" -> transfers.map(_.amount).sum)
-  }
+  def compactJson(recipient: AddressOrAlias): JsObject = jsonBase() ++ Json.obj(
+      "transfers" -> toJson(transfers.filter(_.address == recipient)))
 
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(toSign(), signature.arr))
 }
