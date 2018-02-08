@@ -6,7 +6,6 @@ import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
-import scodec.bits.ByteVector
 import scorex.account.PublicKeyAccount
 import scorex.crypto.EllipticCurveImpl
 import scorex.lagonaki.mocks.TestBlock
@@ -18,12 +17,11 @@ import com.wavesplatform.lang.Terms._
 
 class ScriptsValidationTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
 
-  /*
   property("transfer is allowed but lease is not due to predicate") {
 
     val onlySend: Expr = AND(
-      OR(EQ(TX_FIELD(Type), CONST_INT(4)), EQ(TX_FIELD(Type), CONST_INT(11))),
-      SIG_VERIFY(TX_FIELD(BodyBytes), TX_FIELD(Proof(0)), TX_FIELD(SenderPk))
+      OR(EQ(GETTER(REF("TX"),"TYPE"), CONST_INT(4)), EQ(GETTER(REF("TX"),"TYPE"), CONST_INT(11))),
+      SIG_VERIFY(GETTER(REF("TX"),"BODYBYTES"), GETTER(REF("TX"),"PROOFA"), GETTER(REF("TX"),"SENDERPK"))
     )
 
     val preconditionsAndTransfer: Gen[(GenesisTransaction, SetScriptTransaction, LeaseTransaction, TransferTransaction)] = for {
@@ -43,7 +41,7 @@ class ScriptsValidationTest extends PropSpec with PropertyChecks with Matchers w
           totalDiffEi should produce("TransactionNotAllowedByScript"))
     }
   }
-  */
+
 
   property("2 of 3 multisig") {
     def multisig2Of3Lang(pk0: PublicKeyAccount, pk1: PublicKeyAccount, pk2: PublicKeyAccount) : Expr = {

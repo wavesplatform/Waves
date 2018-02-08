@@ -13,7 +13,7 @@ case class Script(script: Expr) {
   val version = 1
   val text: String = script.toString
 
-  override def toString: String = s"Script($text, base58=${bytes()}"
+  override def toString: String = s"Script(base58=${bytes()}, $text"
 }
 
 object Script {
@@ -21,7 +21,5 @@ object Script {
     case Successful(value: DecodeResult[Expr]) => Right(Script(value.value))
     case Failure(cause) => Left(ScriptParseError(cause.toString))
   }
-
-  val sigVerify: Script = null// Script(SIG_VERIFY(TX_FIELD(BodyBytes), TX_FIELD(Proof(0)), TX_FIELD(SenderPk)))
 
 }
