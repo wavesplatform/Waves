@@ -4,8 +4,6 @@ import com.wavesplatform.lang.Terms._
 import scodec.bits.ByteVector
 import scorex.crypto.signatures.Curve25519
 
-import scala.util.{Failure, Success, Try}
-
 object Evaluator {
 
   import scala.util.control.TailCalls.{TailRec, done, tailcall}
@@ -67,10 +65,15 @@ object Evaluator {
 
     case GETTER(b:Block,f:String) => tailcall {
       resolveType(ctx,b) flatMap {
-        case Right(CUSTOMTYPE(name, fields)) => fields.find(_._1 == f) match {
-          case None => done(Left(s"Type $name doesn't contain field $f"))
-          case Some((_, tpe)) => done(Right(tpe))
-        }
+        case Right(TYPEREF(name)) =>
+          ctx.typeDefs.get(name) match {
+            case Some(CUSTOMTYPE(_, fields)) =>
+              fields.find(_._1 == f) match {
+                case None => done(Left(s"Type '$name' doesn't contain field '$f'"))
+                case Some((_, tpe)) => done(Right(tpe))
+              }
+            case None => done(Left(s"Unknown type '$name'"))
+          }
         case Right(x) => done(Left(s"Getter on non-object expresssion"))
         case Left(err) => done(Left(s"Typecheck failed: $err"))
       }
@@ -220,20 +223,12 @@ object Evaluator {
         } yield s.flatMap(ss => m.flatMap(mm => p.map(pp => Curve25519.verify(ss.toArray, mm.toArray, pp.toArray))))
       }
       case GETTER(expr, field) => tailcall {
-        val getterResult : TailRec[Either[ExcecutionError, Any]] = r[OBJECT](ctx, expr).flatMap { (x : Either[String,OBJECT]) =>
-          x match {
-            case Right(obj) => obj.fields.find(_._1 == field) match {
-              case Some((_, lzy)) =>
-                val value: Either[ExcecutionError, lzy.tpe.Underlying] = Right(lzy.value.apply())
-                done(value)
-              case None =>
-                val value: Either[ExcecutionError, Nothing] = Left("field not found")
-                done(value)
-            }
-            case Left(err) =>
-              val value: Either[ExcecutionError, Nothing] = Left(err)
-              done(value)
+        val getterResult : TailRec[Either[ExcecutionError, Any]] = r[OBJECT](ctx, expr).flatMap {
+          case Right(obj) => obj.fields.find(_._1 == field) match {
+            case Some((_, lzy)) => done(Right(lzy.value.apply()))
+            case None => done(Left("field not found"))
           }
+          case Left(err) => done(Left(err))
         }
         getterResult
       }
