@@ -10,140 +10,23 @@ import scorex.transaction.Transaction
 
 class OneDimensionMiningSpaceSuite extends FreeSpec with Matchers with PropertyChecks with TransactionGen with NoShrink {
   "OneDimensionMining" - {
-    "should be empty if the limit is 0" in {
+    "should be empty if the limit is 0, but not overfilled" in {
       val tank = OneDimensionMiningSpace.full(createConstSpaceEstimator(0))
       tank.isEmpty shouldBe true
+      tank.isOverfilled shouldBe false
     }
 
-    "put(block)" - {
-      "should return Some" - {
-        "when the limit is not reached" in {
-          val tank = OneDimensionMiningSpace.full(createConstSpaceEstimator(2, blockSize = 1))
-          tank.put(TestBlock.create(Seq(randomTransactionGen.sample.get))) shouldBe defined
-        }
-
-        "when the limit is reached softly" in {
-          val tank = OneDimensionMiningSpace.full(createConstSpaceEstimator(1, blockSize = 1))
-          tank.put(TestBlock.create(Seq(randomTransactionGen.sample.get))) shouldBe defined
-        }
-      }
-
-      "should return None when we try to fill more than the limit" in {
-        val tank = OneDimensionMiningSpace.full(createConstSpaceEstimator(1, blockSize = 2))
-        tank.put(TestBlock.create(Seq(randomTransactionGen.sample.get))) shouldBe empty
-      }
-
-      "should return empty space when it reaches the limit during put" in {
-        val space = OneDimensionMiningSpace.full(createConstSpaceEstimator(1, blockSize = 1))
-        val updatedSpace = space.put(TestBlock.create(Seq(randomTransactionGen.sample.get)))
-        updatedSpace shouldBe defined
-        updatedSpace.get.isEmpty shouldBe true
-      }
-
-      val dontReachLimitGen: Gen[(SpaceEstimator, Iterator[Block])] = for {
-        max <- Gen.chooseNum(1, Int.MaxValue)
-        maxTotalTxs <- Gen.chooseNum(0, max - 1)
-        txs <- Gen.listOfN(math.min(maxTotalTxs, 15), randomTransactionGen)
-      } yield (createConstSpaceEstimator(max, blockSize = 1), txs.grouped(3).map(TestBlock.create))
-
-      "multiple transactions don't reach the limit" in forAll(dontReachLimitGen) { case (estimator, blocks) =>
-        val space = OneDimensionMiningSpace.full(estimator)
-        val updatedSpace = blocks.foldLeft(Option(space)) {
-          case (None, _) => None
-          case (Some(r), x) => r.put(x)
-        }
-        updatedSpace shouldBe defined
-        updatedSpace.get.isEmpty shouldBe false
-      }
-
-      val reachLimitGen: Gen[(SpaceEstimator, List[Block])] = for {
-        max <- Gen.chooseNum(1, 10)
-        maxTotalTxs <- Gen.chooseNum(10, 20)
-        txs <- Gen.listOfN(maxTotalTxs, randomTransactionGen)
-      } yield (createConstSpaceEstimator(max, blockSize = 1), txs.map(x => TestBlock.create(Seq(x))))
-
-      "multiple transactions reach the limit" in forAll(reachLimitGen) { case (estimator, blocks) =>
-        val space = OneDimensionMiningSpace.full(estimator)
-        val updatedSpace = blocks.foldLeft(Option(space)) {
-          case (None, _) => None
-          case (Some(r), x) => r.put(x)
-        }
-
-        updatedSpace match {
-          case None =>
-          case Some(x) =>
-            x.isEmpty shouldBe true
-        }
-      }
+    "put(block)" - tests { (maxTxs, txs) =>
+      val estimator = createConstSpaceEstimator(maxTxs, blockSize = 1)
+      val blocks = txs.map(tx => TestBlock.create(Seq(tx)))
+      val space = OneDimensionMiningSpace.full(estimator)
+      blocks.foldLeft(space)(_.put(_))
     }
 
-    "put(transaction)" - {
-      "should return Some" - {
-        "when the limit is not reached" in {
-          val tank = OneDimensionMiningSpace.full(createConstSpaceEstimator(2, transactionSize = 1))
-          tank.put(randomTransactionGen.sample.get) shouldBe defined
-        }
-
-        "when the imit is reached softly" in {
-          val tank = OneDimensionMiningSpace.full(createConstSpaceEstimator(1, transactionSize = 1))
-          tank.put(randomTransactionGen.sample.get) shouldBe defined
-        }
-      }
-
-      "should return None when we try to fill more than the limit" in {
-        val tank = OneDimensionMiningSpace.full(createConstSpaceEstimator(1, transactionSize = 2))
-        tank.put(randomTransactionGen.sample.get) shouldBe empty
-      }
-
-      "should return empty space when it reaches the limit during put" in {
-        val space = OneDimensionMiningSpace.full(createConstSpaceEstimator(1, transactionSize = 1))
-        val updatedSpace = space.put(randomTransactionGen.sample.get)
-        updatedSpace shouldBe defined
-        updatedSpace.get.isEmpty shouldBe true
-      }
-
-      val dontReachLimitGen: Gen[(SpaceEstimator, List[Transaction])] = for {
-        max <- Gen.chooseNum(1, Int.MaxValue)
-        maxTotalTxs <- Gen.chooseNum(0, max - 1)
-        txs <- Gen.listOfN(math.min(maxTotalTxs, 15), randomTransactionGen)
-      } yield (createConstSpaceEstimator(max, transactionSize = 1), txs)
-
-      "multiple transactions don't reach the limit" in forAll(dontReachLimitGen) { case (estimator, blocks) =>
-        val space = OneDimensionMiningSpace.full(estimator)
-        val updatedSpace = blocks.foldLeft(Option(space)) {
-          case (None, _) => None
-          case (Some(r), x) => r.put(x)
-        }
-        updatedSpace shouldBe defined
-        updatedSpace.get.isEmpty shouldBe false
-      }
-
-      val reachLimitGen: Gen[(SpaceEstimator, List[Transaction])] = for {
-        max <- Gen.chooseNum(1, 10)
-        maxTotalTxs <- Gen.chooseNum(10, 20)
-        txs <- Gen.listOfN(maxTotalTxs, randomTransactionGen)
-      } yield (createConstSpaceEstimator(max, transactionSize = 1), txs)
-
-      "multiple transactions reach the limit" in forAll(reachLimitGen) { case (estimator, txs) =>
-        val space = OneDimensionMiningSpace.full(estimator)
-        val updatedSpace = txs.foldLeft(Option(space)) {
-          case (None, _) => None
-          case (Some(r), x) => r.put(x)
-        }
-
-        updatedSpace match {
-          case None =>
-          case Some(x) =>
-            x.isEmpty shouldBe true
-        }
-      }
-    }
-
-    "copied tank should not affect the original one" in {
-      val tank1 = OneDimensionMiningSpace.full(createConstSpaceEstimator(1, transactionSize = 1))
-      val tank2 = tank1.copy()
-      tank2.put(randomTransactionGen.sample.get)
-      tank1.isEmpty shouldBe false
+    "put(transaction)" - tests { (maxTxs, txs) =>
+      val estimator = createConstSpaceEstimator(maxTxs, transactionSize = 1)
+      val space = OneDimensionMiningSpace.full(estimator)
+      txs.foldLeft(space)(_.put(_))
     }
   }
 
@@ -151,5 +34,39 @@ class OneDimensionMiningSpaceSuite extends FreeSpec with Matchers with PropertyC
     override def max: Long = maxSize
     override implicit def estimate(x: Block): Long = blockSize
     override implicit def estimate(x: Transaction): Long = transactionSize
+  }
+
+  private def tests(toSpace: (Int, List[Transaction]) => MiningSpace): Unit = {
+    val dontReachLimitGen: Gen[MiningSpace] = for {
+      maxTxs <- Gen.chooseNum(1, Int.MaxValue)
+      txNumber <- Gen.chooseNum(0, maxTxs - 1)
+      txs <- Gen.listOfN(math.min(txNumber, 15), randomTransactionGen)
+    } yield toSpace(maxTxs, txs)
+
+    "multiple items don't reach the limit" in forAll(dontReachLimitGen) { updatedSpace =>
+      updatedSpace.isEmpty shouldBe false
+      updatedSpace.isOverfilled shouldBe false
+    }
+
+    val reachSoftLimitGen: Gen[MiningSpace] = for {
+      maxTxs <- Gen.chooseNum(1, 10)
+      txs <- Gen.listOfN(maxTxs, randomTransactionGen)
+    } yield toSpace(maxTxs, txs)
+
+    "multiple items reach the limit softly" in forAll(reachSoftLimitGen) { updatedSpace =>
+      updatedSpace.isEmpty shouldBe true
+      updatedSpace.isOverfilled shouldBe false
+    }
+
+    val reachHardLimitGen: Gen[MiningSpace] = for {
+      maxTxs <- Gen.chooseNum(1, 10)
+      txNumber <- Gen.chooseNum(maxTxs + 1, maxTxs + 10)
+      txs <- Gen.listOfN(txNumber, randomTransactionGen)
+    } yield toSpace(maxTxs, txs)
+
+    "multiple items reach the limit with gap" in forAll(reachHardLimitGen) { updatedSpace =>
+      updatedSpace.isEmpty shouldBe true
+      updatedSpace.isOverfilled shouldBe true
+    }
   }
 }

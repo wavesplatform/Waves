@@ -42,7 +42,7 @@ trait UtxPool {
 
   def transactionById(transactionId: ByteStr): Option[Transaction]
 
-  def packUnconfirmed(freeSpace: TwoDimensionMiningSpace, sortInBlock: Boolean): (Seq[Transaction], TwoDimensionMiningSpace, Boolean)
+  def packUnconfirmed(freeSpace: TwoDimensionMiningSpace, sortInBlock: Boolean): (Seq[Transaction], TwoDimensionMiningSpace)
 
   def batched(f: UtxBatchOps => Unit): Unit
 
@@ -146,21 +146,21 @@ class UtxPoolImpl(time: Time,
 
   override def transactionById(transactionId: ByteStr): Option[Transaction] = Option(transactions.get(transactionId))
 
-  override def packUnconfirmed(freeSpace: TwoDimensionMiningSpace, sortInBlock: Boolean): (Seq[Transaction], TwoDimensionMiningSpace, Boolean) = {
+  override def packUnconfirmed(freeSpace: TwoDimensionMiningSpace, sortInBlock: Boolean): (Seq[Transaction], TwoDimensionMiningSpace) = {
     val currentTs = time.correctedTime()
     removeExpired(currentTs)
     val s = stateReader()
     val differ = TransactionDiffer(fs, history.lastBlockTimestamp(), currentTs, s.height) _
-    val (invalidTxs, reversedValidTxs, _, finalSpace, stop) = transactions
+    val (invalidTxs, reversedValidTxs, _, finalSpace, _) = transactions
       .values.asScala.toSeq
       .sorted(TransactionsOrdering.InUTXPool)
       .foldLeft((Seq.empty[ByteStr], Seq.empty[Transaction], Monoid[Diff].empty, freeSpace, false)) {
-        case (curr@(_, _, _, _, stop), _) if stop => curr
+        case (curr@(_, _, _, _, skip), _) if skip => curr
         case ((invalid, valid, diff, restSpace, _), tx) =>
           differ(composite(diff.asBlockDiff, s), featureProvider, tx) match {
             case Right(newDiff) =>
               val updatedRestSpace = restSpace.put(tx)
-              if (updatedRestSpace.isOverfilled) (invalid, valid, diff, restSpace, updatedRestSpace.isEmpty) // restSpace ?
+              if (updatedRestSpace.isOverfilled) (invalid, valid, diff, restSpace, true)
               else (invalid, tx +: valid, Monoid.combine(diff, newDiff), updatedRestSpace, updatedRestSpace.isEmpty)
             case Left(_) =>
               (tx.id() +: invalid, valid, diff, restSpace, false)
@@ -172,7 +172,7 @@ class UtxPoolImpl(time: Time,
       pessimisticPortfolios.remove(itx)
     }
     val txs = if (sortInBlock) reversedValidTxs.sorted(TransactionsOrdering.InBlock) else reversedValidTxs.reverse
-    (txs, finalSpace, stop)
+    (txs, finalSpace)
   }
 
   override def batched(f: UtxBatchOps => Unit): Unit = f(new BatchOpsImpl(stateReader()))

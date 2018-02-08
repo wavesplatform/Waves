@@ -119,7 +119,7 @@ class MinerImpl(allChannels: ChannelGroup,
           log.info(s"Activated features: ${featureProvider.activatedFeatures(history.height()).mkString(", ")}")
           val estimators = MiningEstimators(minerSettings, featureProvider, height)
           val combinedSpace = TwoDimensionMiningSpace.full(estimators.total, estimators.keyBlock)
-          val (unconfirmed, updatedCombinedSpace, isOverfilled) = utx.packUnconfirmed(combinedSpace, sortInBlock)
+          val (unconfirmed, updatedCombinedSpace) = utx.packUnconfirmed(combinedSpace, sortInBlock)
           log.info(s"estimators: $estimators, combinedSpace: $combinedSpace, updatedCombinedSpace: $updatedCombinedSpace")
 
           val features = if (version > 2) settings.featuresSettings.supported
@@ -140,10 +140,10 @@ class MinerImpl(allChannels: ChannelGroup,
   private def generateOneMicroBlockTask(account: PrivateKeyAccount, accumulatedBlock: Block, microEstimator: SpaceEstimator, totalSpace: MiningSpace): Task[MicroblockMiningResult] = {
     log.trace(s"Generating microBlock for $account")
     val pc = allChannels.size()
-    val (unconfirmed, updatedSpace, isOverfilled) = measureLog("packing unconfirmed transactions for microblock") {
+    val (unconfirmed, updatedSpace) = measureLog("packing unconfirmed transactions for microblock") {
       val combinedSpace = TwoDimensionMiningSpace.partial(totalSpace, OneDimensionMiningSpace.full(microEstimator))
-      val (unconfirmed, updatedCombined, isOverfilled) = utx.packUnconfirmed(combinedSpace, sortInBlock = false)
-      (unconfirmed, updatedCombined, isOverfilled)
+      val (unconfirmed, updatedCombined) = utx.packUnconfirmed(combinedSpace, sortInBlock = false)
+      (unconfirmed, updatedCombined)
     }
     log.info(s"microEstimator=$microEstimator, (before) totalSpace=$totalSpace, (after) updatedSpace=$updatedSpace")
     if (pc < minerSettings.quorum) {
