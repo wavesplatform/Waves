@@ -12,27 +12,27 @@ object Evaluator {
 
   type Defs = Map[String, (Type, Any)]
 
-  case class Context(domain: Domain, defs: Defs)
+  case class Context(domain: Domain, defs: Defs, typeDefs: Map[String,CUSTOMTYPE] = Map.empty)
 
   type TypeResolutionError = String
   type ExcecutionError = String
   type ExecResult[T] = Either[ExcecutionError, T]
 
-  def resolveType(defs: Defs, t: Expr): TailRec[Either[TypeResolutionError, Type]] = t match {
-    case REF(key) => done(defs.get(key).map(_._1).toRight(s"Typecheck failed: Cannot resolve type of $key"))
+  def resolveType(ctx: Context, t: Expr): TailRec[Either[TypeResolutionError, Type]] = t match {
+    case REF(key) => done(ctx.defs.get(key).map(_._1).toRight(s"Typecheck failed: Cannot resolve type of $key"))
     case Block(maybeLet, expr) => tailcall {
       maybeLet match {
         case Some(let) =>
-          resolveType(defs, let.value)
+          resolveType(ctx, let.value)
             .flatMap(x => x.fold(fa => done(Left(fa)),
-              innerType => resolveType(defs + (let.name -> (innerType, null)), expr)))
-        case None => resolveType(defs, expr)
+              innerType => resolveType(ctx.copy(defs = ctx.defs + (let.name -> (innerType, null))), expr)))
+        case None => resolveType(ctx, expr)
       }
     }
     case IF(_, l, r) => tailcall {
       for {
-        lType <- resolveType(defs, l)
-        rType <- resolveType(defs, r)
+        lType <- resolveType(ctx, l)
+        rType <- resolveType(ctx, r)
       } yield {
         lType.flatMap(t1 => rType.map(t2 => eqType(t1,t2)))
           .fold(fa => Left(fa), x => if (x.isDefined) Right(x.get) else Left(s"Typecheck failed for IF: RType($rType) differs from LType($lType)"))
@@ -40,8 +40,8 @@ object Evaluator {
     }
     case EQ(l,r) => tailcall {
       for {
-        lType <- resolveType(defs, l)
-        rType <- resolveType(defs, r)
+        lType <- resolveType(ctx, l)
+        rType <- resolveType(ctx, r)
       } yield {
         rType.flatMap(t1 => lType.map(t2 => eqType(t1,t2).isDefined))
           .fold(fa => Left(fa), x => if (x) Right(BOOLEAN) else Left(s"Typecheck failed for EQ: RType($rType) differs from LType($lType)"))
@@ -49,18 +49,30 @@ object Evaluator {
     }
 
     case get: GET => tailcall {
-      resolveType(defs, get.t) flatMap {
+      resolveType(ctx, get.t) flatMap {
         case Right(OPTION(in)) => done(Right(in))
         case Right(x) => done(Left(s"Typecheck failed: GET called on $x, but only call on OPTION[_] is allowed"))
         case Left(err) => done(Left(s"Typecheck failed: $err"))
       }
     }
     case SOME(b) => tailcall{
-      resolveType(defs, b) flatMap {
+      resolveType(ctx, b) flatMap {
         case Right(tpe) => done(Right(OPTION(tpe)))
         case Left(err) => done(Left(s"Typecheck failed: $err"))
       }
     }
+
+    case GETTER(b:Block,f:String) => tailcall {
+      resolveType(ctx,b) flatMap {
+        case Right(CUSTOMTYPE(name, fields)) => fields.find(_._1 == f) match {
+          case None => done(Left(s"Type $name doesn't contain field $f"))
+          case Some((_, tpe)) => done(Right(tpe))
+        }
+        case Right(x) => done(Left(s"Getter on non-object expresssion"))
+        case Left(err) => done(Left(s"Typecheck failed: $err"))
+      }
+    }
+
     case x => done(Right(x.predefinedType.get))
   }
 
@@ -68,17 +80,17 @@ object Evaluator {
     (t match {
       case Block(maybelet, inner) => tailcall {
         maybelet match {
-          case None => resolveType(ctx.defs, inner).flatMap(termType => {
+          case None => resolveType(ctx, inner).flatMap(termType => {
             termType.fold(fa => done(Left(fa)), t => r[t.Underlying](ctx, inner))
           })
           case Some(LET(newVarName: String, newVarExpr: Block)) => {
-            resolveType(ctx.defs, newVarExpr).flatMap(newVarType => {
+            resolveType(ctx, newVarExpr).flatMap(newVarType => {
               Either.cond(ctx.defs.get(newVarName).isEmpty, (), s"Value '$newVarName' already defined in the scope").flatMap(_ => newVarType)
                 .fold(fa => done(Left(fa)), t => r[t.Underlying](ctx, newVarExpr)
                   .flatMap(newVarValue => {
                     newVarValue.fold(fa => done(Left(fa)), v => {
                       val newDefs = ctx.defs + (newVarName -> (t, v))
-                      resolveType(newDefs, inner).flatMap(termType => {
+                      resolveType(ctx.copy(defs = newDefs), inner).flatMap(termType => {
                         termType.fold(fa => done(Left(fa)), tt =>
                           r[tt.Underlying](ctx.copy(defs = newDefs), inner))
                       })
@@ -89,7 +101,7 @@ object Evaluator {
         }
       }
       case LET(name, v) => tailcall {
-        resolveType(ctx.defs, v).flatMap(rType =>
+        resolveType(ctx, v).flatMap(rType =>
           rType.fold(fa => done(Left(fa)), t => r[t.Underlying](ctx, v)))
       }
       case REF(str) => done {
@@ -121,7 +133,7 @@ object Evaluator {
         } yield a1.flatMap(v1 => a2.map(v2 => v1 > v2))
       }
       case i@IF(cond, t1, t2) => tailcall {
-        resolveType(ctx.defs, i).flatMap {
+        resolveType(ctx, i).flatMap {
           case Right(_) =>
             r[Boolean](ctx, cond) flatMap {
               case Right(true) => r(ctx, t1)
@@ -154,18 +166,8 @@ object Evaluator {
         }
       }
       case HEIGHT => done(ctx.domain.height)
-      case TX_FIELD(f) => done {
-        f match {
-          case Id => ctx.domain.id
-          case Type => ctx.domain.tpe
-          case SenderPk => ctx.domain.senderPk
-          case Proof(i) => ctx.domain.proof(i)
-          case BodyBytes => ctx.domain.bodyBytes
-          case _ => ??? // match for  __satisfy_shapeless_0
-        }
-      }
       case IS_DEFINED(opt) => tailcall {
-        resolveType(ctx.defs, opt).flatMap(optType => optType.fold(fa => done(Left(fa)), t => {
+        resolveType(ctx, opt).flatMap(optType => optType.fold(fa => done(Left(fa)), t => {
           r[t.Underlying](ctx, opt).map {
             case Right(x: Option[_]) =>
               x match {
@@ -179,7 +181,7 @@ object Evaluator {
       }
 
       case GET(opt) => tailcall {
-        resolveType(ctx.defs, opt).flatMap(optType => optType.fold(fa => done(Left(fa)), t => {
+        resolveType(ctx, opt).flatMap(optType => optType.fold(fa => done(Left(fa)), t => {
           r[t.Underlying](ctx, opt).map {
             case Right(x: Option[_]) =>
               x match {
@@ -193,13 +195,13 @@ object Evaluator {
       }
       case NONE => done(Right(None))
       case SOME(b) =>tailcall {
-        resolveType(ctx.defs, b).flatMap {
+        resolveType(ctx, b).flatMap {
           case Right(tpe) => r[tpe.Underlying](ctx,b).map(_.map(x=>Some(x)))
           case Left(err) => done(Left(err))
         }
       }
       case eq@EQ(it1, it2) => tailcall {
-        resolveType(ctx.defs, eq).flatMap {
+        resolveType(ctx, eq).flatMap {
           case Right(tpe) =>
             for {
               i1 <- r[tpe.Underlying](ctx, it1)
@@ -214,6 +216,24 @@ object Evaluator {
           m <- r[ByteVector](ctx, msg)
           p <- r[ByteVector](ctx, pk)
         } yield s.flatMap(ss => m.flatMap(mm => p.map(pp => Curve25519.verify(ss.toArray, mm.toArray, pp.toArray))))
+      }
+      case GETTER(expr, field) => tailcall {
+        val getterResult : TailRec[Either[ExcecutionError, Any]] = r[OBJECT](ctx, expr).flatMap { (x : Either[String,OBJECT]) =>
+          x match {
+            case Right(obj) => obj.fields.find(_._1 == field) match {
+              case Some((_, lzy)) =>
+                val value: Either[ExcecutionError, lzy.tpe.Underlying] = Right(lzy.value.apply())
+                done(value)
+              case None =>
+                val value: Either[ExcecutionError, Nothing] = Left("field not found")
+                done(value)
+            }
+            case Left(err) =>
+              val value: Either[ExcecutionError, Nothing] = Left(err)
+              done(value)
+          }
+        }
+        getterResult
       }
     }).map(x => x.map(_.asInstanceOf[T]))
   }

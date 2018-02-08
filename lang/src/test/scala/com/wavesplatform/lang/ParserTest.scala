@@ -115,14 +115,6 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
 
   }
 
-  property("tx fields") {
-    parse("tx.id") shouldBe TX_FIELD(Id)
-    parse("tx.senderPk") shouldBe TX_FIELD(SenderPk)
-    parse("tx.bodyBytes") shouldBe TX_FIELD(BodyBytes)
-    parse("tx.type + 1") shouldBe SUM(TX_FIELD(Type), CONST_INT(1))
-    parse("tx.proof(1)") shouldBe TX_FIELD(Proof(1))
-  }
-
   property("multisig sample") {
     val script =
       """

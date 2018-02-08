@@ -33,15 +33,6 @@ object Parser {
   private def noneP: P[NONE.type]      = P("None").map(_ => NONE)
   private def heightP: P[HEIGHT.type]  = P("h").map(_ => HEIGHT)
 
-  private def fieldIdP: P[Field]        = P(".id").map(_ => Id)
-  private def fieldTypeP: P[Field]      = P(".type").map(_ => Type)
-  private def fieldSenderPkP: P[Field]  = P(".senderPk").map(_ => SenderPk)
-  private def fieldBodyBytesP: P[Field] = P(".bodyBytes").map(_ => BodyBytes)
-  private def fieldProofP: P[Field]     = P(".proof" ~ "(" ~ P(CharIn('0' to '9').rep(1).! ~ ")")).map(x => Proof(x.toInt))
-  private def fieldP: P[Field]          = P(fieldIdP | fieldTypeP | fieldSenderPkP | fieldBodyBytesP | fieldBodyBytesP | fieldProofP)
-
-  private def getFieldP: P[Expr]        = P("tx" ~ fieldP).map(x => TX_FIELD(x))
-
   private def patmat1P: P[Block] =
     P("match" ~ "(" ~ block ~ ")" ~ "{" ~ "case" ~ "None" ~ "=>" ~ block ~ "case" ~ "Some" ~ "(" ~ varName ~ ")" ~ "=>" ~ block ~ "}")
       .map { case ((exp, ifNone, ref, ifSome)) => patmat(exp, ref, ifSome, ifNone) }
@@ -99,7 +90,7 @@ object Parser {
   private def expr = P(binaryOp(priority) | atom)
 
   private def atom =
-    P(ifP | patmat1P | patmat2P | byteVectorP | numberP | trueP | falseP | noneP | someP | bracesP | curlyBracesP | sigVerifyP | refP | isDefined | getP | getFieldP)
+    P(ifP | patmat1P | patmat2P | byteVectorP | numberP | trueP | falseP | noneP | someP | bracesP | curlyBracesP | sigVerifyP | refP | isDefined | getP )
 
   def apply(str: String): core.Parsed[Expr, Char, String] = block.parse(str)
 }
