@@ -3,6 +3,7 @@ package com.wavesplatform
 import java.util.concurrent.locks.ReentrantReadWriteLock
 
 import com.typesafe.config.ConfigFactory
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.{HistoryWriterImpl, StorageFactory}
 import com.wavesplatform.settings.{BlockchainSettings, FeeSettings, FeesSettings, FunctionalitySettings, UtxSettings, WavesSettings}
 import com.wavesplatform.state2.diffs._
@@ -43,8 +44,7 @@ class UtxPoolSpecification extends FreeSpec
     val genesisSettings = TestHelpers.genesisSettings(Map(senderAccount -> senderBalance))
     val settings = WavesSettings.fromConfig(config).copy(
       blockchainSettings = BlockchainSettings('T', 5, 5,
-        FunctionalitySettings.TESTNET,
-        // TODO: MassTransfer: use this line and delete former then activated       FunctionalitySettings.TESTNET.copy(preActivatedFeatures = Map(BlockchainFeatures.MassTransfer.id -> 0)),
+        FunctionalitySettings.TESTNET.copy(preActivatedFeatures = Map(BlockchainFeatures.MassTransfer.id -> 0)),
         genesisSettings))
 
     val db = open()
@@ -142,17 +142,17 @@ class UtxPoolSpecification extends FreeSpec
   }).label("withBlacklistedAndAllowedByRule")
 
   private def massTransferWithBlacklisted(allowRecipients: Boolean) = (for {
-    (sender, senderBalance, state, history, featureProvider) <- stateGen
-    addressGen = Gen.listOf(accountGen).filter(list => if (allowRecipients) list.nonEmpty else true)
-    recipients <- addressGen
-    time = new TestTime()
-    txs <- Gen.nonEmptyListOf(massTransferWithRecipients(sender, recipients, senderBalance / 10, time))
-  } yield {
-    val whitelist: Set[String] = if (allowRecipients) recipients.map(_.address).toSet else Set.empty
-    val settings = UtxSettings(txs.length, 1.minute, Set(sender.address), whitelist, 5.minutes)
-    val utxPool = new UtxPoolImpl(time, state, history, featureProvider, calculator, FunctionalitySettings.TESTNET, settings)
-    (sender, utxPool, txs)
-  }).label("massTransferWithBlacklisted")
+      (sender, senderBalance, state, history, featureProvider) <- stateGen
+      addressGen = Gen.listOf(accountGen).filter(list => if (allowRecipients) list.nonEmpty else true)
+      recipients <- addressGen
+      time = new TestTime()
+      txs <- Gen.nonEmptyListOf(massTransferWithRecipients(sender, recipients, senderBalance / 10, time))
+    } yield {
+      val whitelist: Set[String] = if (allowRecipients) recipients.map(_.address).toSet else Set.empty
+      val settings = UtxSettings(txs.length, 1.minute, Set(sender.address), whitelist, 5.minutes)
+      val utxPool = new UtxPoolImpl(time, state, history, featureProvider, calculator, FunctionalitySettings.TESTNET, settings)
+      (sender, utxPool, txs)
+    }).label("massTransferWithBlacklisted")
 
   private def utxTest(utxSettings: UtxSettings = UtxSettings(20, 5.seconds, Set.empty, Set.empty, 5.minutes), txCount: Int = 10)
                      (f: (Seq[TransferTransaction], UtxPool, TestTime) => Unit): Unit = forAll(
@@ -292,8 +292,7 @@ class UtxPoolSpecification extends FreeSpec
         }
       }
 
-      //TODO: MassTransfer: remove ignore then activated
-      "allow a transfer transaction from blacklisted address to specific addresses" ignore {
+      "allow a transfer transaction from blacklisted address to specific addresses" {
         val transferGen = Gen.oneOf(withBlacklistedAndAllowedByRule, massTransferWithBlacklisted(allowRecipients = true))
         forAll(transferGen) { case (_, utxPool, txs) =>
           all(txs.map { t =>

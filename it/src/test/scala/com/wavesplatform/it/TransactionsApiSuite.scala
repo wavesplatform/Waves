@@ -139,7 +139,7 @@ class TransactionsApiSuite extends BaseTransactionSuite {
     signAndBroadcast(Json.obj(
       "type" -> 11,
       "sender" -> firstAddress,
-      "transfers" -> Json.toJson(Seq((secondAddress, 1.waves), (thirdAddress, 2.waves))),
+      "transfers" -> Json.toJson(Seq(Transfer(secondAddress, 1.waves), Transfer(thirdAddress, 2.waves))),
       "fee" -> 200000,
       "attachment" -> Base58.encode("masspay".getBytes)))
   }
@@ -172,10 +172,8 @@ class TransactionsApiSuite extends BaseTransactionSuite {
       rs <- sender.postJsonWithApiKey("/transactions/sign", json)
       _ = assert(rs.getStatusCode == HttpConstants.ResponseStatusCodes.OK_200)
       body = Json.parse(rs.getResponseBody)
-      _ = Console.err.println(rs.getResponseBody)
       _ = assert((body \ "signature").as[String].nonEmpty)
       rb <- sender.postJson("/transactions/broadcast", body)
-      _ = Console.err.println(rb.getResponseBody)
       _ = assert(rb.getStatusCode == HttpConstants.ResponseStatusCodes.OK_200)
       id = (Json.parse(rb.getResponseBody) \ "id").as[String]
       _ = assert(id.nonEmpty)
