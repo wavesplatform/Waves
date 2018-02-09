@@ -125,12 +125,12 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
   }
 
   property("resolveType") {
-    Evaluator.resolveType(Context(Map.empty,Map.empty), SOME(CONST_INT(3))).result shouldBe Right(OPTION(INT))
-    Evaluator.resolveType(Context(Map.empty,Map.empty), NONE).result shouldBe Right(OPTION(NOTHING))
-    Evaluator.resolveType(Context(Map.empty,Map.empty), IF(TRUE, SOME(CONST_INT(3)), NONE)).result shouldBe Right(OPTION(INT))
-    Evaluator.resolveType(Context(Map.empty,Map.empty), IF(TRUE, NONE, SOME(CONST_INT(3)))).result shouldBe Right(OPTION(INT))
-    Evaluator.resolveType(Context(Map.empty,Map.empty), IF(TRUE, NONE, NONE)).result shouldBe Right(OPTION(NOTHING))
-    Evaluator.resolveType(Context(Map.empty,Map.empty), IF(TRUE, SOME(FALSE), SOME(CONST_INT(3)))).result should produce("Typecheck")
+    Evaluator.resolveType(Context(Map.empty, Map.empty), SOME(CONST_INT(3))).result shouldBe Right(OPTION(INT))
+    Evaluator.resolveType(Context(Map.empty, Map.empty), NONE).result shouldBe Right(OPTION(NOTHING))
+    Evaluator.resolveType(Context(Map.empty, Map.empty), IF(TRUE, SOME(CONST_INT(3)), NONE)).result shouldBe Right(OPTION(INT))
+    Evaluator.resolveType(Context(Map.empty, Map.empty), IF(TRUE, NONE, SOME(CONST_INT(3)))).result shouldBe Right(OPTION(INT))
+    Evaluator.resolveType(Context(Map.empty, Map.empty), IF(TRUE, NONE, NONE)).result shouldBe Right(OPTION(NOTHING))
+    Evaluator.resolveType(Context(Map.empty, Map.empty), IF(TRUE, SOME(FALSE), SOME(CONST_INT(3)))).result should produce("Typecheck")
   }
 
   property("successful resolve strongest type") {
@@ -140,13 +140,26 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
   }
 
   property("custom type field access") {
-    val pointType     = CUSTOMTYPE("Point", List("X" -> INT, "Y" -> INT))
-    val pointInstance = OBJECT(Map("X" -> LazyVal(INT)(Coeval(3)), "Y" -> LazyVal(INT)(Coeval(4))))
+    val pointType     = CUSTOMTYPE("Point", List("X" -> INT, "Y"                     -> INT))
+    val pointInstance = OBJECT(Map("X"               -> LazyVal(INT)(Coeval(3)), "Y" -> LazyVal(INT)(Coeval(4))))
     ev(
       predefTypes = Map(pointType.name -> pointType),
-      defs = Map("p" -> (TYPEREF("Point"), pointInstance)),
+      defs = Map("p"                   -> (TYPEREF("Point"), pointInstance)),
       expr = SUM(GETTER(REF("p"), "X"), CONST_INT(2))
     ) shouldBe Right(5)
 
   }
+
+  property("typecheck fails for objects of different types; no ducktyping") {
+    val pointType          = CUSTOMTYPE("Point", List("X"  -> INT, "Y"                     -> INT))
+    val pointInstance      = OBJECT(Map("X"                -> LazyVal(INT)(Coeval(3)), "Y" -> LazyVal(INT)(Coeval(4))))
+    val otherPointType     = CUSTOMTYPE("Point2", List("A" -> INT, "B"                     -> INT))
+    val otherPointInstance = OBJECT(Map("X"                -> LazyVal(INT)(Coeval(3)), "B" -> LazyVal(INT)(Coeval(4))))
+    ev(
+      predefTypes = Map(pointType.name -> pointType, otherPointType.name          -> otherPointType),
+      defs = Map("p"                   -> (TYPEREF("Point"), pointInstance), "p2" -> (TYPEREF("Point2"), otherPointInstance)),
+      expr = GETTER(IF(TRUE, REF("p"), REF("p2")), "X")
+    ) shouldBe produce("Typecheck failed")
+  }
+
 }
