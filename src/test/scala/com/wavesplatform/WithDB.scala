@@ -1,7 +1,7 @@
 package com.wavesplatform
 
 import java.io.File
-import java.nio.file.{Files, Path => JavaPath}
+import java.nio.file.Files
 
 import com.wavesplatform.db.LevelDBFactory
 import org.iq80.leveldb.{DB, Options}
@@ -41,14 +41,21 @@ trait WithDB extends BeforeAndAfterEach {
   }
 }
 
-trait TestDB {
+object DBExtensions {
 
-  def open(path: JavaPath): DB = {
-    val options = new Options()
-    options.createIfMissing(true)
-    val file = new File(path.toAbsolutePath.toString)
-    LevelDBFactory.factory.open(file, options)
+  implicit class ExtDB(val db: DB) extends AnyVal {
+    def clear(): Unit = {
+      val b = db.createWriteBatch()
+
+      val it = db.iterator()
+      it.seekToFirst()
+      while (it.hasNext) {
+        val key = it.next().getKey
+        b.delete(key)
+      }
+      it.close()
+      db.write(b)
+    }
   }
 
-  def open(): DB = open(Files.createTempDirectory("lvl"))
 }

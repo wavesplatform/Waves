@@ -2,17 +2,16 @@ package com.wavesplatform.state2.reader
 
 import java.util.concurrent.locks.ReentrantReadWriteLock
 
-import com.wavesplatform.TestDB
+import com.wavesplatform.WithDB
 import com.wavesplatform.state2.StateStorage
 import org.scalatest.{Matchers, Outcome, fixture}
 import scorex.account.Address
 
 
-class StateReaderEffectiveBalanceTest extends fixture.FunSuite with Matchers with TestDB {
+class StateReaderEffectiveBalanceTest extends fixture.FunSuite with Matchers with WithDB {
 
   val acc: Address = Address.fromPublicKey(Array.emptyByteArray)
   val stateHeight = 100
-  val db = open()
 
   override type FixtureParam = StateStorage
 

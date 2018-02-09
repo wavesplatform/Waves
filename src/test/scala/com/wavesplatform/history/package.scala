@@ -4,6 +4,7 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
 import com.wavesplatform.state2._
+import org.iq80.leveldb.DB
 import scorex.account.PrivateKeyAccount
 import scorex.block.{Block, MicroBlock}
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
@@ -11,7 +12,7 @@ import scorex.lagonaki.mocks.TestBlock
 import scorex.settings.TestFunctionalitySettings
 import scorex.transaction.{Transaction, TransactionParser}
 
-package object history extends TestDB {
+package object history {
   val MaxTransactionsPerBlockDiff = 10
   val MaxBlocksInMemory = 5
   val DefaultBaseTarget = 1000L
@@ -33,8 +34,10 @@ package object history extends TestDB {
 
   val DefaultWavesSettings: WavesSettings = settings.copy(blockchainSettings = DefaultBlockchainSettings)
 
-  def domain(settings: WavesSettings): Domain = {
-    val (storage, _) = StorageFactory(open(), settings).get
+  def domain(db: DB, settings: WavesSettings): Domain = {
+    import DBExtensions._
+    db.clear()
+    val (storage, _) = StorageFactory(db, settings).get
     val (history, _, stateReader, blockchainUpdater, _) = storage()
     Domain(history, stateReader, blockchainUpdater)
   }

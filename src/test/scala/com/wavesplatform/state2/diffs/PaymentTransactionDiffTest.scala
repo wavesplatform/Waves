@@ -2,7 +2,7 @@ package com.wavesplatform.state2.diffs
 
 import cats.Monoid
 import com.wavesplatform.state2._
-import com.wavesplatform.{NoShrink, TransactionGen}
+import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
@@ -11,7 +11,7 @@ import scorex.settings.TestFunctionalitySettings
 import scorex.transaction.{GenesisTransaction, PaymentTransaction}
 
 class PaymentTransactionDiffTest extends PropSpec
-  with PropertyChecks with Matchers with TransactionGen with NoShrink {
+  with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDB {
 
   val preconditionsAndPayments: Gen[(GenesisTransaction, PaymentTransaction, PaymentTransaction)] = for {
     master <- accountGen
@@ -26,7 +26,7 @@ class PaymentTransactionDiffTest extends PropSpec
 
   property("Diff doesn't break invariant before block version 3") {
     forAll(preconditionsAndPayments) { case ((genesis, paymentV2, paymentV3)) =>
-      assertDiffAndState(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(paymentV2)), settings) { (blockDiff, newState) =>
+      assertDiffAndState(db, Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(paymentV2)), settings) { (blockDiff, newState) =>
         val totalPortfolioDiff: Portfolio = Monoid.combineAll(blockDiff.txsDiff.portfolios.values)
         totalPortfolioDiff.balance shouldBe 0
         totalPortfolioDiff.effectiveBalance shouldBe 0
@@ -37,8 +37,8 @@ class PaymentTransactionDiffTest extends PropSpec
 
   property("Validation fails with block version 3") {
     forAll(preconditionsAndPayments) { case ((genesis, paymentV2, paymentV3)) =>
-      assertDiffEi(Seq(TestBlock.create(Seq(genesis)), TestBlock.create(Seq(paymentV2))), TestBlock.create(Seq(paymentV3)), settings) { blockDiffEi =>
-        blockDiffEi should produce (s"Payment transaction is deprecated after h=${settings.blockVersion3AfterHeight}")
+      assertDiffEi(db, Seq(TestBlock.create(Seq(genesis)), TestBlock.create(Seq(paymentV2))), TestBlock.create(Seq(paymentV3)), settings) { blockDiffEi =>
+        blockDiffEi should produce(s"Payment transaction is deprecated after h=${settings.blockVersion3AfterHeight}")
       }
     }
   }

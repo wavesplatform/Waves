@@ -1,6 +1,6 @@
 package com.wavesplatform.matcher.model
 
-import com.wavesplatform.TestDB
+import com.wavesplatform.WithDB
 import com.wavesplatform.matcher.MatcherTestData
 import com.wavesplatform.matcher.model.Events.{OrderAdded, OrderCanceled, OrderExecuted}
 import com.wavesplatform.state2.ByteStr
@@ -13,7 +13,7 @@ import scorex.transaction.assets.exchange.{AssetPair, Order}
 import scala.collection.mutable
 
 class OrderHistorySpecification extends PropSpec
-  with TestDB
+  with WithDB
   with PropertyChecks
   with Matchers
   with MatcherTestData
@@ -21,11 +21,11 @@ class OrderHistorySpecification extends PropSpec
   with BeforeAndAfterEach {
 
   val pair = AssetPair(Some(ByteStr("WCT".getBytes)), Some(ByteStr("BTC".getBytes)))
-  val db = open()
   var oh = OrderHistoryImpl(db, matcherSettings)
 
-  override protected def beforeEach(): Unit = {
-    oh = OrderHistoryImpl(open(), matcherSettings)
+  override def beforeEach(): Unit = {
+    super.beforeEach()
+    oh = OrderHistoryImpl(db, matcherSettings)
   }
 
   property("New buy order added") {

@@ -23,11 +23,7 @@ import scorex.utils.Time
 import scala.concurrent.duration._
 
 class UtxPoolSpecification extends FreeSpec
-  with Matchers
-  with MockFactory
-  with PropertyChecks
-  with TransactionGen
-  with NoShrink {
+  with Matchers with MockFactory with PropertyChecks with TransactionGen with NoShrink with WithDB {
 
   private val calculator = new FeeCalculator(FeesSettings(Seq(
     TransactionType.GenesisTransaction,
@@ -46,7 +42,6 @@ class UtxPoolSpecification extends FreeSpec
         // TODO: MassTransfer: use this line and delete former then activated       FunctionalitySettings.TESTNET.copy(preActivatedFeatures = Map(BlockchainFeatures.MassTransfer.id -> 0)),
         genesisSettings))
 
-    val db = open()
     val (storage, _) = StorageFactory(db, settings).get
     val (history, featureProvider, state, bcu, _) = storage()
 
@@ -175,7 +170,7 @@ class UtxPoolSpecification extends FreeSpec
       tx2 <- listOfN(count1, transfer(sender, senderBalance / 2, new TestTime(ts + offset + 1000)))
     } yield {
       val time = new TestTime()
-      val history = HistoryWriterImpl(open(), new ReentrantReadWriteLock(), TestFunctionalitySettings.Stub,
+      val history = HistoryWriterImpl(db, new ReentrantReadWriteLock(), TestFunctionalitySettings.Stub,
         TestFunctionalitySettings.EmptyFeaturesSettings).get
       val utx = new UtxPoolImpl(time, state, history, featureProvider, calculator, FunctionalitySettings.TESTNET,
         UtxSettings(10, offset.millis, Set.empty, Set.empty, 5.minutes))

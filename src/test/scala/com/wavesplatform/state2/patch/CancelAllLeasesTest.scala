@@ -2,7 +2,7 @@ package com.wavesplatform.state2.patch
 
 import com.wavesplatform.state2.LeaseInfo
 import com.wavesplatform.state2.diffs._
-import com.wavesplatform.{NoShrink, TransactionGen}
+import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
@@ -13,7 +13,7 @@ import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 
 
 class CancelAllLeasesTest extends PropSpec
-  with PropertyChecks with Matchers with TransactionGen with NoShrink {
+  with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDB {
 
   private val settings = TestFunctionalitySettings.Enabled.copy(
     resetEffectiveBalancesAtHeight = 5, allowMultipleLeaseCancelTransactionUntilTimestamp = Long.MaxValue / 2)
@@ -35,7 +35,7 @@ class CancelAllLeasesTest extends PropSpec
 
     forAll(setupAndLeaseInResetBlock, timestampGen retryUntil (_ < settings.allowMultipleLeaseCancelTransactionUntilTimestamp)) {
       case ((genesis, genesis2, lease, unleaseOther, lease2), blockTime) =>
-        assertDiffAndState(Seq(
+        assertDiffAndState(db, Seq(
           TestBlock.create(blockTime, Seq(genesis, genesis2, lease, unleaseOther)),
           TestBlock.create(Seq.empty),
           TestBlock.create(Seq.empty),
