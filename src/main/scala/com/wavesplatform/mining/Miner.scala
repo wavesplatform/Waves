@@ -116,11 +116,9 @@ class MinerImpl(allChannels: ChannelGroup,
           val consensusData = NxtLikeConsensusBlockData(btg, ByteStr(gs))
           val sortInBlock = history.height() <= blockchainSettings.functionalitySettings.dontRequireSortedTransactionsAfter
 
-          log.info(s"Activated features: ${featureProvider.activatedFeatures(history.height()).mkString(", ")}")
           val estimators = MiningEstimators(minerSettings, featureProvider, height)
           val combinedSpace = TwoDimensionMiningSpace.full(estimators.total, estimators.keyBlock)
           val (unconfirmed, updatedCombinedSpace) = utx.packUnconfirmed(combinedSpace, sortInBlock)
-          log.info(s"estimators: $estimators, combinedSpace: $combinedSpace, updatedCombinedSpace: $updatedCombinedSpace")
 
           val features = if (version > 2) settings.featuresSettings.supported
             .filter(featureProvider.featureStatus(_, height) == BlockchainFeatureStatus.Undefined)
@@ -140,47 +138,49 @@ class MinerImpl(allChannels: ChannelGroup,
   private def generateOneMicroBlockTask(account: PrivateKeyAccount, accumulatedBlock: Block, microEstimator: SpaceEstimator, totalSpace: MiningSpace): Task[MicroblockMiningResult] = {
     log.trace(s"Generating microBlock for $account")
     val pc = allChannels.size()
-    val (unconfirmed, updatedSpace) = measureLog("packing unconfirmed transactions for microblock") {
-      val combinedSpace = TwoDimensionMiningSpace.partial(totalSpace, OneDimensionMiningSpace.full(microEstimator))
-      val (unconfirmed, updatedCombined) = utx.packUnconfirmed(combinedSpace, sortInBlock = false)
-      (unconfirmed, updatedCombined)
-    }
-    log.info(s"microEstimator=$microEstimator, (before) totalSpace=$totalSpace, (after) updatedSpace=$updatedSpace")
     if (pc < minerSettings.quorum) {
       log.trace(s"Quorum not available ($pc/${minerSettings.quorum}, not forging microblock with ${account.address}")
       Task.now(Retry)
     } else if (utx.size == 0) {
       log.trace(s"Skipping microBlock because utx is empty")
       Task.now(Retry)
-    } else if (updatedSpace.first.isEmpty) {
-      log.trace(s"Stopping forging microBlocks, the block is full")
-      Task.now(Stop)
-    } else if (unconfirmed.isEmpty) {
-      log.trace(s"Stopping forging microBlocks, because all transactions are too big")
-      Task.now(Stop)
     } else {
-      log.trace(s"Accumulated ${unconfirmed.size} txs for microblock")
-      val start = System.currentTimeMillis()
-      (for {
-        signedBlock <- EitherT.fromEither[Task](Block.buildAndSign(
-          version = 3,
-          timestamp = accumulatedBlock.timestamp,
-          reference = accumulatedBlock.reference,
-          consensusData = accumulatedBlock.consensusData,
-          transactionData = accumulatedBlock.transactionData ++ unconfirmed,
-          signer = account,
-          featureVotes = accumulatedBlock.featureVotes
-        ))
-        microBlock <- EitherT.fromEither[Task](MicroBlock.buildAndSign(account, unconfirmed, accumulatedBlock.signerData.signature, signedBlock.signerData.signature))
-        _ = microBlockBuildTimeStats.safeRecord(System.currentTimeMillis() - start)
-        _ <- EitherT(MicroblockAppender(checkpoint, history, blockchainUpdater, utx, appenderScheduler)(microBlock))
-      } yield (microBlock, signedBlock)).value map {
-        case Left(err) => Error(err)
-        case Right((microBlock, signedBlock)) =>
-          BlockStats.mined(microBlock)
-          log.trace(s"$microBlock has been mined for $account}")
-          allChannels.broadcast(MicroBlockInv(account, microBlock.totalResBlockSig, microBlock.prevResBlockSig))
-          Success(signedBlock, updatedSpace.first)
+      val (unconfirmed, updatedTotalSpace) = measureLog("packing unconfirmed transactions for microblock") {
+        val combinedSpace = TwoDimensionMiningSpace.partial(totalSpace, OneDimensionMiningSpace.full(microEstimator))
+        val (unconfirmed, updatedCombined) = utx.packUnconfirmed(combinedSpace, sortInBlock = false)
+        (unconfirmed, updatedCombined.first)
+      }
+
+      if (updatedTotalSpace.isEmpty) {
+        log.trace(s"Stopping forging microBlocks, the block is full")
+        Task.now(Stop)
+      } else if (unconfirmed.isEmpty) {
+        log.trace(s"Stopping forging microBlocks, because all transactions are too big")
+        Task.now(Stop)
+      } else {
+        log.trace(s"Accumulated ${unconfirmed.size} txs for microblock")
+        val start = System.currentTimeMillis()
+        (for {
+          signedBlock <- EitherT.fromEither[Task](Block.buildAndSign(
+            version = 3,
+            timestamp = accumulatedBlock.timestamp,
+            reference = accumulatedBlock.reference,
+            consensusData = accumulatedBlock.consensusData,
+            transactionData = accumulatedBlock.transactionData ++ unconfirmed,
+            signer = account,
+            featureVotes = accumulatedBlock.featureVotes
+          ))
+          microBlock <- EitherT.fromEither[Task](MicroBlock.buildAndSign(account, unconfirmed, accumulatedBlock.signerData.signature, signedBlock.signerData.signature))
+          _ = microBlockBuildTimeStats.safeRecord(System.currentTimeMillis() - start)
+          _ <- EitherT(MicroblockAppender(checkpoint, history, blockchainUpdater, utx, appenderScheduler)(microBlock))
+        } yield (microBlock, signedBlock)).value map {
+          case Left(err) => Error(err)
+          case Right((microBlock, signedBlock)) =>
+            BlockStats.mined(microBlock)
+            log.trace(s"$microBlock has been mined for $account}")
+            allChannels.broadcast(MicroBlockInv(account, microBlock.totalResBlockSig, microBlock.prevResBlockSig))
+            Success(signedBlock, updatedTotalSpace)
+        }
       }
     }
   }
