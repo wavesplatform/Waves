@@ -2,12 +2,12 @@ package com.wavesplatform.state2.diffs
 
 import java.util.concurrent.ThreadLocalRandom
 
-import com.wavesplatform.BlockGen
 import com.wavesplatform.features.{BlockchainFeatures, FeatureProvider}
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state2.BlockDiff
 import com.wavesplatform.state2.reader.CompositeStateReader.composite
 import com.wavesplatform.state2.reader.SnapshotStateReader
+import com.wavesplatform.{BlockGen, WithDB}
 import org.scalatest.{FreeSpecLike, Matchers}
 import scorex.account.PrivateKeyAccount
 import scorex.block.Block
@@ -15,7 +15,7 @@ import scorex.lagonaki.mocks.TestBlock
 import scorex.settings.TestFunctionalitySettings
 import scorex.transaction.{GenesisTransaction, TransactionParser, ValidationError}
 
-class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen {
+class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen with WithDB {
 
   private val TransactionFee = 10
 
@@ -121,11 +121,11 @@ class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen {
 
       override def approvedFeatures() = Map(BlockchainFeatures.NG.id -> 0)
     }
-    assertDiffEiWithPrev(blocks.init, blocks.last,fp, fs)(assertion)
+    assertDiffEiWithPrev(blocks.init, blocks.last, fp, fs)(assertion)
   }
 
   private def assertDiffEiWithPrev(preconditions: Seq[Block], block: Block, fp: FeatureProvider, fs: FunctionalitySettings)(assertion: (BlockDiff, SnapshotStateReader) => Unit): Unit = {
-    val state = newState()
+    val state = newState(db)
 
     val differ: (SnapshotStateReader, (Option[Block], Block)) => Either[ValidationError, BlockDiff] = {
       case (s, (prev, b)) => BlockDiffer.fromBlock(fs, fp, s, prev, b)
@@ -139,8 +139,8 @@ class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen {
     state.applyBlockDiff(totalDiff1)
     assertion(totalDiff1, state)
 
-    val preconditionDiff = BlockDiffer.unsafeDiffMany(fs, fp, newState(), None, 5)(preconditions)
-    val compositeState = composite(preconditionDiff, newState())
+    val preconditionDiff = BlockDiffer.unsafeDiffMany(fs, fp, newState(db), None, 5)(preconditions)
+    val compositeState = composite(preconditionDiff, newState(db))
     val totalDiff2 = differ(compositeState, (preconditions.lastOption, block)).explicitGet()
     assertion(totalDiff2, composite(totalDiff2, compositeState))
 

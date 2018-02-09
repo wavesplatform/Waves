@@ -2,14 +2,14 @@ package com.wavesplatform.state2
 
 import java.util.concurrent.locks.ReentrantReadWriteLock
 
-import com.wavesplatform.TestDB
+import com.wavesplatform.WithDB
 import org.scalacheck.Gen
 import org.scalatest.prop.GeneratorDrivenPropertyChecks
 import org.scalatest.{FunSuite, Matchers}
 
-class StateWriterSpec extends FunSuite with TestDB with Matchers with GeneratorDrivenPropertyChecks {
+class StateWriterSpec extends FunSuite with WithDB with Matchers with GeneratorDrivenPropertyChecks {
   test("increase height when applying block diff") {
-    val storage = StateStorage(open(), dropExisting = false).get
+    val storage = StateStorage(db, dropExisting = false).get
     val writer = new StateWriterImpl(storage, new ReentrantReadWriteLock())
     forAll(Gen.choose(0, Int.MaxValue)) { heightDiff =>
       val h = writer.height

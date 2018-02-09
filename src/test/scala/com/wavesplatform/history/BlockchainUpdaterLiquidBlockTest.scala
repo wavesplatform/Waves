@@ -1,8 +1,8 @@
 package com.wavesplatform.history
 
-import com.wavesplatform.TransactionGen
 import com.wavesplatform.state2._
 import com.wavesplatform.state2.diffs.ENOUGH_AMT
+import com.wavesplatform.{TransactionGen, WithDB}
 import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
@@ -12,10 +12,11 @@ import scorex.consensus.nxt.NxtLikeConsensusBlockData
 import scorex.crypto.EllipticCurveImpl
 import scorex.lagonaki.mocks.TestBlock
 import scorex.transaction.ValidationError.MicroBlockAppendError
-import scorex.transaction.{GenesisTransaction, Transaction}
 import scorex.transaction.assets.TransferTransaction
+import scorex.transaction.{GenesisTransaction, Transaction}
 
-class BlockchainUpdaterLiquidBlockTest extends PropSpec with PropertyChecks with DomainScenarioDrivenPropertyCheck with Matchers with TransactionGen {
+class BlockchainUpdaterLiquidBlockTest extends PropSpec
+  with PropertyChecks with DomainScenarioDrivenPropertyCheck with Matchers with TransactionGen with WithDB {
 
   private val preconditionsAndPayments: Gen[(Block, Block, Seq[MicroBlock])] = for {
     richAccount <- accountGen
@@ -48,7 +49,7 @@ class BlockchainUpdaterLiquidBlockTest extends PropSpec with PropertyChecks with
 
   property("liquid block can't be overfilled") {
     val (prevBlock, keyBlock, microBlocks) = preconditionsAndPayments.sample.get
-    val d = domain(MicroblocksActivatedAt0WavesSettings)
+    val d = domain(db, MicroblocksActivatedAt0WavesSettings)
 
     val blocksApplied = for {
       _ <- d.blockchainUpdater.processBlock(prevBlock)
