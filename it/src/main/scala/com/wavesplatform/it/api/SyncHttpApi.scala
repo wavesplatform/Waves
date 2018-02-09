@@ -1,13 +1,21 @@
 package com.wavesplatform.it.api
 
+import akka.http.scaladsl.model.StatusCodes
 import com.wavesplatform.it.Node
-import org.scalatest.{Assertions, Matchers}
+import org.scalatest.{Assertion, Assertions, Matchers}
+import scorex.transaction.assets.MassTransferTransaction.Transfer
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
+import scala.util.{Failure, Try}
 
-object SyncHttpApi {
+object SyncHttpApi extends Assertions{
 
+  def assertBadRequest2[R](f: => R): Assertion = Try(f) match {
+    case Failure(UnexpectedStatusCodeException(_, statusCode, _)) => Assertions.assert(statusCode == StatusCodes.BadRequest.intValue)
+    case Failure(e) => Assertions.fail(e)
+    case _ => Assertions.fail(s"Expecting bad request")
+  }
 
   implicit class NodeExtSync(n: Node) extends Assertions with Matchers {
 
@@ -29,6 +37,18 @@ object SyncHttpApi {
 
     def burn(sourceAddress: String, assetId: String, quantity: Long, fee: Long): Transaction =
       Await.result(async(n).burn(sourceAddress, assetId, quantity, fee), RequestAwaitTime)
+
+    def createAlias(targetAddress: String, alias: String, fee: Long): Transaction =
+      Await.result(async(n).createAlias(targetAddress, alias, fee), RequestAwaitTime)
+
+    def transfer(sourceAddress: String, recipient: String, amount: Long, fee: Long, assetId: Option[String] = None): Transaction =
+      Await.result(async(n).transfer(sourceAddress, recipient, amount, fee, assetId), RequestAwaitTime)
+
+    def massTransfer(sourceAddress: String, transfers: List[Transfer], fee: Long, assetId: Option[String] = None): Transaction =
+      Await.result(async(n).massTransfer(sourceAddress, transfers, fee, assetId), RequestAwaitTime)
+
+    def lease(sourceAddress:String, recipient: String, leasingAmount: Long, leasingFee: Long): Transaction =
+      Await.result(async(n).lease(sourceAddress, recipient, leasingAmount, leasingFee), RequestAwaitTime)
   }
 
   implicit class NodesExtSync(nodes: Seq[Node]) {
