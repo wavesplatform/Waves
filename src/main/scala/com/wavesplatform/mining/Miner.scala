@@ -117,8 +117,8 @@ class MinerImpl(allChannels: ChannelGroup,
           val sortInBlock = history.height() <= blockchainSettings.functionalitySettings.dontRequireSortedTransactionsAfter
 
           val estimators = MiningEstimators(minerSettings, featureProvider, height)
-          val combinedSpace = TwoDimensionMiningSpace.full(estimators.total, estimators.keyBlock)
-          val (unconfirmed, updatedCombinedSpace) = utx.packUnconfirmed(combinedSpace, sortInBlock)
+          val mdSpace = TwoDimensionMiningSpace.full(estimators.total, estimators.keyBlock)
+          val (unconfirmed, updatedMdSpace) = utx.packUnconfirmed(mdSpace, sortInBlock)
 
           val features = if (version > 2) settings.featuresSettings.supported
             .filter(featureProvider.featureStatus(_, height) == BlockchainFeatureStatus.Undefined)
@@ -127,7 +127,7 @@ class MinerImpl(allChannels: ChannelGroup,
           log.debug(s"Adding ${unconfirmed.size} unconfirmed transaction(s) to new block")
           Block.buildAndSign(version.toByte, currentTime, referencedBlockInfo.blockId, consensusData, unconfirmed, account, features) match {
             case Left(e) => Left(e.err)
-            case Right(x) => Right((estimators, x, updatedCombinedSpace.first))
+            case Right(x) => Right((estimators, x, updatedMdSpace.first))
           }
         }
       } yield block)
@@ -146,9 +146,9 @@ class MinerImpl(allChannels: ChannelGroup,
       Task.now(Retry)
     } else {
       val (unconfirmed, updatedTotalSpace) = measureLog("packing unconfirmed transactions for microblock") {
-        val combinedSpace = TwoDimensionMiningSpace.partial(totalSpace, OneDimensionMiningSpace.full(microEstimator))
-        val (unconfirmed, updatedCombined) = utx.packUnconfirmed(combinedSpace, sortInBlock = false)
-        (unconfirmed, updatedCombined.first)
+        val mdSpace = TwoDimensionMiningSpace.partial(totalSpace, OneDimensionMiningSpace.full(microEstimator))
+        val (unconfirmed, updatedMdSpace) = utx.packUnconfirmed(mdSpace, sortInBlock = false)
+        (unconfirmed, updatedMdSpace.first)
       }
 
       if (updatedTotalSpace.isEmpty) {
