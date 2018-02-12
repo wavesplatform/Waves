@@ -39,7 +39,8 @@ object Gen {
     val transferCountGen = Iterator.continually(random.nextInt(MassTransferTransaction.MaxTransferCount + 1))
     senderGen.zip(transferCountGen).map { case (sender, count) =>
       val transfers = List.tabulate(count)(_ => ParsedTransfer(recipientGen.next(), amountGen.next()))
-      MassTransferTransaction.create(None, sender, transfers, System.currentTimeMillis, amountGen.next(), Array.emptyByteArray)
+      val fee = 100000 + count * 50000
+      MassTransferTransaction.create(None, sender, transfers, System.currentTimeMillis, fee, Array.emptyByteArray)
     }.collect { case Right(tx) => tx }
   }
 
