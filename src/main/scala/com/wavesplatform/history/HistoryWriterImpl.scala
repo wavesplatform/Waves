@@ -88,7 +88,7 @@ class HistoryWriterImpl private(db: DB, val synchronizationToken: ReentrantReadW
         transactionsInBlockStats.record(block.transactionData.size)
 
         commit(b)
-        log.trace(s"Full Block $block(id=${block.uniqueId} persisted")
+        log.trace(s"Full $block(id=${block.uniqueId} persisted")
 
         blockDiff
       }

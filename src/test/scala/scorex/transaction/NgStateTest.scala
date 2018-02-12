@@ -1,6 +1,7 @@
 package scorex.transaction
 
 import com.wavesplatform.history._
+import com.wavesplatform.mining.TxNumberEstimator
 import com.wavesplatform.state2.diffs._
 import com.wavesplatform.state2.{BlockDiff, NgState}
 import com.wavesplatform.{NoShrink, TransactionGen}
@@ -24,7 +25,7 @@ class NgStateTest extends PropSpec with PropertyChecks with Matchers with Transa
     forAll(preconditionsAndPayments(10)) { case (genesis, payments) =>
       val (block, microBlocks) = chainBaseAndMicro(randomSig, genesis, payments.map(t => Seq(t)))
 
-      val ng = new NgState(block, BlockDiff.empty, Set.empty[Short])
+      val ng = new NgState(block, BlockDiff.empty, Set.empty[Short], TxNumberEstimator(Int.MaxValue))
       microBlocks.foreach(m => ng.append(m, BlockDiff.empty, 0L))
 
       ng.totalDiffOf(microBlocks.last.totalResBlockSig)
@@ -43,12 +44,12 @@ class NgStateTest extends PropSpec with PropertyChecks with Matchers with Transa
     forAll(preconditionsAndPayments(5)) { case (genesis,payments) =>
       val (block, microBlocks) = chainBaseAndMicro(randomSig, genesis, payments.map(t => Seq(t)))
 
-      val ng = new NgState(block, BlockDiff.empty, Set.empty[Short])
+      val ng = new NgState(block, BlockDiff.empty, Set.empty[Short], TxNumberEstimator(Int.MaxValue))
       microBlocks.foreach(m => ng.append(m, BlockDiff.empty, 0L))
 
       ng.bestLiquidBlock.uniqueId shouldBe microBlocks.last.totalResBlockSig
 
-      new NgState(block, BlockDiff.empty, Set.empty[Short]).bestLiquidBlock.uniqueId shouldBe block.uniqueId
+      new NgState(block, BlockDiff.empty, Set.empty[Short], TxNumberEstimator(Int.MaxValue)).bestLiquidBlock.uniqueId shouldBe block.uniqueId
     }
   }
 
@@ -57,7 +58,7 @@ class NgStateTest extends PropSpec with PropertyChecks with Matchers with Transa
     forAll(preconditionsAndPayments(5)) { case (genesis,payments) =>
       val (block, microBlocks) = chainBaseAndMicro(randomSig, genesis, payments.map(t => Seq(t)))
 
-      val ng = new NgState(block, BlockDiff.empty, Set.empty[Short])
+      val ng = new NgState(block, BlockDiff.empty, Set.empty[Short], TxNumberEstimator(Int.MaxValue))
 
       microBlocks.foldLeft(1000) { case (thisTime, m) =>
         ng.append(m, BlockDiff.empty, thisTime)
@@ -69,7 +70,7 @@ class NgStateTest extends PropSpec with PropertyChecks with Matchers with Transa
       ng.bestLastBlockInfo(1051).blockId shouldBe microBlocks.tail.head.totalResBlockSig
       ng.bestLastBlockInfo(2000).blockId shouldBe microBlocks.last.totalResBlockSig
 
-      new NgState(block, BlockDiff.empty, Set.empty[Short]).bestLiquidBlock.uniqueId shouldBe block.uniqueId
+      new NgState(block, BlockDiff.empty, Set.empty[Short], TxNumberEstimator(Int.MaxValue)).bestLiquidBlock.uniqueId shouldBe block.uniqueId
     }
   }
 }

@@ -13,5 +13,5 @@ case class MinerSettings(
     maxTransactionsInKeyBlock: Int,
     maxTransactionsInMicroBlock: Int,
     minMicroBlockAge: FiniteDuration) {
-  require(maxTransactionsInMicroBlock < Miner.MaxTransactionsPerMicroblock)
+  require(maxTransactionsInMicroBlock <= Miner.MaxTransactionsPerMicroblock)
 }

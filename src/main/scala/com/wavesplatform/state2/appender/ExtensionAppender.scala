@@ -38,7 +38,7 @@ object ExtensionAppender extends ScorexLogging with Instrumented {
             val forkApplicationResultEi = Coeval {
               extension.view
                 .map { b =>
-                  b -> appendBlock(checkpoint, history, blockchainUpdater, stateReader(), utxStorage, time, settings.blockchainSettings, featureProvider)(b).right.map {
+                  b -> appendBlock(checkpoint, history, blockchainUpdater, stateReader(), utxStorage, time, settings, featureProvider)(b).right.map {
                     _.foreach(bh => BlockStats.applied(b, BlockStats.Source.Ext, bh))
                   }
                 }
