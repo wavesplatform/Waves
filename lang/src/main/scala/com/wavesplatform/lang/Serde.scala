@@ -31,5 +31,14 @@ object Serde {
   implicit def dNone            = d.bind[NONE.type](20)
   implicit def dGetter          = d.bind[GETTER](21)
 
+  implicit def td[A]            = Discriminated[Type, Int](uint8)
+  implicit def tdNothing        = td.bind[NOTHING.type](0)
+  implicit def tdUnit           = td.bind[UNIT.type](1)
+  implicit def tdInt            = td.bind[INT.type](2)
+  implicit def tdByteVector     = td.bind[BYTEVECTOR.type](3)
+  implicit def tdBoolean        = td.bind[BOOLEAN.type](4)
+  implicit def tdOption         = td.bind[OPTION](5)
+  implicit def tdTypeRef        = td.bind[TYPEREF](6)
+
   val codec = Codec[Expr]
 }
