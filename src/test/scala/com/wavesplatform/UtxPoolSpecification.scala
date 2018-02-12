@@ -210,11 +210,11 @@ class UtxPoolSpecification extends FreeSpec
       utx.all.size shouldEqual txs.size
 
       val maxNumber = Math.max(utx.all.size / 2, 3)
-      val space = limitByNumber(maxNumber)
-      val (packed, updatedSpace) = utx.packUnconfirmed(space, sortInBlock = false)
+      val rest = limitByNumber(maxNumber)
+      val (packed, restUpdated) = utx.packUnconfirmed(rest, sortInBlock = false)
 
       packed.lengthCompare(maxNumber) should be <= 0
-      if (maxNumber <= utx.all.size) updatedSpace.isEmpty shouldBe true
+      if (maxNumber <= utx.all.size) restUpdated.isEmpty shouldBe true
     }
 
     "evicts expired transactions when packUnconfirmed is called" in forAll(dualTxGen) { case (utx, time, txs, offset, _) =>
@@ -311,9 +311,9 @@ class UtxPoolSpecification extends FreeSpec
     }
   }
 
-  private def limitByNumber(n: Int): TwoDimensionMiningSpace = TwoDimensionMiningSpace.full(new CounterEstimator(n), new CounterEstimator(n))
+  private def limitByNumber(n: Int): TwoDimensionalMiningConstraint = TwoDimensionalMiningConstraint.full(new CounterEstimator(n), new CounterEstimator(n))
 
-  private class CounterEstimator(val max: Long) extends SpaceEstimator {
+  private class CounterEstimator(val max: Long) extends Estimator {
     override implicit def estimate(x: Block): Long = x.transactionCount
     override implicit def estimate(x: Transaction): Long = 1
   }

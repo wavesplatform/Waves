@@ -5,26 +5,26 @@ import com.wavesplatform.settings.MinerSettings
 import scorex.block.Block
 import scorex.transaction.Transaction
 
-trait SpaceEstimator {
+trait Estimator {
   def max: Long
-  implicit def estimate(x: Block): Long
-  implicit def estimate(x: Transaction): Long
+  def estimate(x: Block): Long
+  def estimate(x: Transaction): Long
 }
 
-case class TxNumberSpaceEstimator(max: Long) extends SpaceEstimator {
-  override implicit def estimate(x: Block): Long = x.transactionCount
-  override implicit def estimate(x: Transaction): Long = 1
+case class TxNumberEstimator(max: Long) extends Estimator {
+  override def estimate(x: Block): Long = x.transactionCount
+  override def estimate(x: Transaction): Long = 1
 }
 
 /**
   * @param max in bytes
   */
-case class SizeSpaceEstimator(max: Long) extends SpaceEstimator {
-  override implicit def estimate(x: Block): Long = x.transactionData.view.map(estimate).sum
-  override implicit def estimate(x: Transaction): Long = x.bytes().length // + headers
+case class SizeEstimator(max: Long) extends Estimator {
+  override def estimate(x: Block): Long = x.transactionData.view.map(estimate).sum
+  override def estimate(x: Transaction): Long = x.bytes().length // + headers
 }
 
-case class MiningEstimators(total: SpaceEstimator, keyBlock: SpaceEstimator, micro: SpaceEstimator)
+case class MiningEstimators(total: Estimator, keyBlock: Estimator, micro: Estimator)
 
 object MiningEstimators {
   private val ClassicAmountOfTxsInBlock = 100
@@ -36,15 +36,15 @@ object MiningEstimators {
     val isMassTransferEnabled = activatedFeatures.contains(BlockchainFeatures.MassTransfer.id)
 
     MiningEstimators(
-      total = if (isMassTransferEnabled) SizeSpaceEstimator(MaxTxsSizeInBytes) else {
+      total = if (isMassTransferEnabled) SizeEstimator(MaxTxsSizeInBytes) else {
         val maxTxs = if (isNgEnabled) Block.MaxTransactionsPerBlockVer3 else ClassicAmountOfTxsInBlock
-        TxNumberSpaceEstimator(maxTxs)
+        TxNumberEstimator(maxTxs)
       },
-      keyBlock = if (isMassTransferEnabled) TxNumberSpaceEstimator(0) else {
+      keyBlock = if (isMassTransferEnabled) TxNumberEstimator(0) else {
         val maxTxsForKeyBlock = if (isNgEnabled) minerSettings.maxTransactionsInKeyBlock else ClassicAmountOfTxsInBlock
-        TxNumberSpaceEstimator(maxTxsForKeyBlock)
+        TxNumberEstimator(maxTxsForKeyBlock)
       },
-      micro = TxNumberSpaceEstimator(minerSettings.maxTransactionsInMicroBlock)
+      micro = TxNumberEstimator(minerSettings.maxTransactionsInMicroBlock)
     )
   }
 }
