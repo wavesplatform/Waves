@@ -109,7 +109,7 @@ class UtxPoolImpl(time: Time,
         case Some(addr) if utxSettings.blacklistSenderAddresses.contains(addr) =>
           val recipients = tx match {
             case tt: TransferTransaction => Seq(tt.recipient)
-            case mtt: MassTransferTransaction => mtt.transfers.map(_._1)
+            case mtt: MassTransferTransaction => mtt.transfers.map(_.address)
             case _ => Seq()
           }
           val allowed =

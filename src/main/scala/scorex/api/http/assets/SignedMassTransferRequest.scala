@@ -5,11 +5,12 @@ import play.api.libs.json.{Format, Json}
 import scorex.account.PublicKeyAccount
 import scorex.api.http.BroadcastRequest
 import scorex.transaction.TransactionParser.SignatureStringLength
+import scorex.transaction.assets.MassTransferTransaction.Transfer
 import scorex.transaction.assets.{MassTransferTransaction, TransferTransaction}
 import scorex.transaction.{AssetIdStringLength, ValidationError}
 
 object SignedMassTransferRequest {
-  implicit val assetTransferRequestFormat: Format[SignedTransferRequest] = Json.format
+  implicit val jsonFormat: Format[SignedMassTransferRequest] = Json.format
 }
 
 @ApiModel(value = "Signed Asset transfer transaction")
@@ -18,7 +19,7 @@ case class SignedMassTransferRequest(@ApiModelProperty(value = "Base58 encoded s
                                      @ApiModelProperty(value = "Base58 encoded Asset ID")
                                      assetId: Option[String],
                                      @ApiModelProperty(value = "List of (recipient, amount) pairs", required = true)
-                                     transfers: List[(String, Long)],
+                                     transfers: List[Transfer],
                                      @ApiModelProperty(required = true)
                                      fee: Long,
                                      @ApiModelProperty(required = true)
