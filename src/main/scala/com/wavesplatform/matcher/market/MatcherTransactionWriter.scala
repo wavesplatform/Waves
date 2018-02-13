@@ -50,7 +50,7 @@ class MatcherTransactionWriter(db: DB, val settings: MatcherSettings)
   }
 
   private def saveExchangeTx(tx: ExchangeTransaction): Unit = {
-    val txId = tx.id.toString
+    val txId = tx.id().base58
     put(makeKey(TransactionsPrefix, txId), tx.bytes(), None)
     saveOrder2TxId(tx.buyOrder.idStr(), txId)
     saveOrder2TxId(tx.sellOrder.idStr(), txId)
