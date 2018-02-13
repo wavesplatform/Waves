@@ -245,9 +245,7 @@ object Block extends ScorexLogging {
             transactionData: Seq[Transaction],
             signerData: SignerData,
             featureVotes: Set[Short]): Either[GenericError, Block] = {
-    val txsCount = transactionData.size
     (for {
-      _ <- Either.cond(areTxsFitInBlock(version, txsCount), (), s"Too many transactions in Block version ${version.toInt}: $txsCount")
       _ <- Either.cond(reference.arr.length == SignatureLength, (), "Incorrect reference")
       _ <- Either.cond(consensusData.generationSignature.arr.length == GeneratorSignatureLength, (), "Incorrect consensusData.generationSignature")
       _ <- Either.cond(signerData.generator.publicKey.length == KeyLength, (), "Incorrect signer.publicKey")

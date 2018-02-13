@@ -3,6 +3,7 @@ package com.wavesplatform.it.api
 import akka.http.scaladsl.model.StatusCodes
 import com.wavesplatform.it.Node
 import org.scalatest.{Assertion, Assertions, Matchers}
+import scorex.api.http.assets.SignedMassTransferRequest
 import scorex.transaction.assets.MassTransferTransaction.Transfer
 
 import scala.concurrent.duration._
@@ -49,6 +50,12 @@ object SyncHttpApi extends Assertions{
 
     def lease(sourceAddress:String, recipient: String, leasingAmount: Long, leasingFee: Long): Transaction =
       Await.result(async(n).lease(sourceAddress, recipient, leasingAmount, leasingFee), RequestAwaitTime)
+
+    def signedMassTransfer(tx: SignedMassTransferRequest): Transaction =
+      Await.result(async(n).signedMassTransfer(tx), RequestAwaitTime)
+
+    def ensureTxDoesntExist(txId: String): Unit =
+      Await.result(async(n).ensureTxDoesntExist(txId), RequestAwaitTime)
   }
 
   implicit class NodesExtSync(nodes: Seq[Node]) {
@@ -58,6 +65,8 @@ object SyncHttpApi extends Assertions{
 
     private val TxInBlockchainAwaitTime = 2 * nodes.head.blockDelay
     private val ConditionAwaitTime = 5.minutes
+
+
 
     def waitForHeightAraiseAndTxPresent(transactionId: String): Unit =
       Await.result(async(nodes).waitForHeightAraiseAndTxPresent(transactionId), TxInBlockchainAwaitTime)

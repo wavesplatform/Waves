@@ -12,14 +12,14 @@ import scorex.transaction.assets.MassTransferTransaction.ParsedTransfer
 object MassTransferTransactionDiff {
 
   def apply(state: SnapshotStateReader, blockTime: Long, height: Int)(tx: MassTransferTransaction): Either[ValidationError, Diff] = {
-    val parseTransfer: ParsedTransfer => Validation[(Map[Address, Portfolio], Long)] = { case ParsedTransfer(address, amount) =>
+    def parseTransfer(xfer: ParsedTransfer): Validation[(Map[Address, Portfolio], Long)] = {
       for {
-        recipientAddr <- state.resolveAliasEi(address)
+        recipientAddr <- state.resolveAliasEi(xfer.address)
         portfolio = tx.assetId match {
-          case None => Map(recipientAddr -> Portfolio(amount, LeaseInfo.empty, Map.empty))
-          case Some(aid) => Map(recipientAddr -> Portfolio(0, LeaseInfo.empty, Map(aid -> amount)))
+          case None => Map(recipientAddr -> Portfolio(xfer.amount, LeaseInfo.empty, Map.empty))
+          case Some(aid) => Map(recipientAddr -> Portfolio(0, LeaseInfo.empty, Map(aid -> xfer.amount)))
         }
-      } yield (portfolio, amount)
+      } yield (portfolio, xfer.amount)
     }
     val portfoliosEi = tx.transfers.traverse(parseTransfer)
 

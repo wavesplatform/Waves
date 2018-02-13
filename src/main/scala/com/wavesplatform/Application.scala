@@ -117,7 +117,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     else Miner.Disabled
 
     val processBlock = BlockAppender(checkpointService, history, blockchainUpdater, time, stateReader, utxStorage,
-      settings.blockchainSettings, featureProvider, allChannels, peerDatabase, miner, appenderScheduler) _
+      settings, featureProvider, allChannels, peerDatabase, miner, appenderScheduler) _
     val processCheckpoint = CheckpointAppender(checkpointService, history, blockchainUpdater, peerDatabase, miner,
       allChannels, appenderScheduler) _
     val processFork = ExtensionAppender(checkpointService, history, blockchainUpdater, stateReader, utxStorage, time,

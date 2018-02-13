@@ -3,11 +3,16 @@ package com.wavesplatform.it.transactions
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.util._
 import scorex.account.AddressOrAlias
+import scorex.api.http.assets.SignedMassTransferRequest
+import scorex.crypto.encode.Base58
 import scorex.transaction.TransactionParser.TransactionType
 import scorex.transaction.assets.MassTransferTransaction
 import scorex.transaction.assets.MassTransferTransaction.{ParsedTransfer, Transfer}
 
+import scala.concurrent.Await
+import scala.concurrent.Future.sequence
 import scala.concurrent.duration._
+import scorex.transaction.assets.TransferTransaction.MaxAttachmentSize
 
 class MassTransferTransactionSuite extends BaseTransactionSuite {
 
@@ -21,26 +26,26 @@ class MassTransferTransactionSuite extends BaseTransactionSuite {
   private val massTransferFeePerTransfer = notMiner.settings.feesSettings.fees(TransactionType.MassTransferTransaction.id)(0).fee
 
 
-//  test("asset mass transfer changes asset balances and sender's.waves balance is decreased by fee.") {
-//
-//    val (balance1, eff1) = notMiner.accountBalances(firstAddress)
-//    val (balance2, eff2) = notMiner.accountBalances(secondAddress)
-//
-//    val transfers = List(Transfer(secondAddress, transferAmount))
-//    val assetId = sender.issue(firstAddress, "name", "description", assetQuantity, 8, reissuable = false, issueFee).id
-//    nodes.waitForHeightAraiseAndTxPresent(assetId)
-//
-//
-//    val massTransferTransactionFee = calcFee(transfers.size)
-//    val transferId = sender.massTransfer(firstAddress, transfers, massTransferTransactionFee, Some(assetId)).id
-//    nodes.waitForHeightAraiseAndTxPresent(transferId)
-//
-//
-//    notMiner.assertBalances(firstAddress, balance1 - massTransferTransactionFee - issueFee, eff1 - massTransferTransactionFee - issueFee)
-//    notMiner.assertAssetBalance(firstAddress, assetId, assetQuantity - transferAmount)
-//    notMiner.assertBalances(secondAddress, balance2, eff2)
-//    notMiner.assertAssetBalance(secondAddress, assetId, transferAmount)
-//  }
+  test("asset mass transfer changes asset balances and sender's.waves balance is decreased by fee.") {
+
+    val (balance1, eff1) = notMiner.accountBalances(firstAddress)
+    val (balance2, eff2) = notMiner.accountBalances(secondAddress)
+
+    val transfers = List(Transfer(secondAddress, transferAmount))
+    val assetId = sender.issue(firstAddress, "name", "description", assetQuantity, 8, reissuable = false, issueFee).id
+    nodes.waitForHeightAraiseAndTxPresent(assetId)
+
+
+    val massTransferTransactionFee = calcFee(transfers.size)
+    val transferId = sender.massTransfer(firstAddress, transfers, massTransferTransactionFee, Some(assetId)).id
+    nodes.waitForHeightAraiseAndTxPresent(transferId)
+
+
+    notMiner.assertBalances(firstAddress, balance1 - massTransferTransactionFee - issueFee, eff1 - massTransferTransactionFee - issueFee)
+    notMiner.assertAssetBalance(firstAddress, assetId, assetQuantity - transferAmount)
+    notMiner.assertBalances(secondAddress, balance2, eff2)
+    notMiner.assertAssetBalance(secondAddress, assetId, transferAmount)
+  }
 
   test("waves mass transfer changes waves balances") {
 
@@ -105,39 +110,49 @@ class MassTransferTransactionSuite extends BaseTransactionSuite {
       System.currentTimeMillis,
       calcFee(1), Array.emptyByteArray).right.get
     val fromFuture = valid.copy(timestamp = valid.timestamp + 1.day.toMillis)
-    val tooManyTransfers = valid.copy(transfers = List.fill(MaxTransferCount + 1)(ParsedTransfer(address2, 1)), fee = calcFee(2))
-//    val negativeTransfer = valid.copy(transfers = List(ParsedTransfer(address2, -1)))
-//    val negativeFee = valid.copy(fee = 0)
-//    val longAttachment = valid.copy(attachment = ("ab" * MaxAttachmentSize).getBytes)
-//
-//    val invalidTransfers = Seq(fromFuture, tooManyTransfers, negativeTransfer, negativeFee, longAttachment)
-//    for (tx <- invalidTransfers) {
-//      val id = tx.id()
-//      val req = createSignedMassTransferRequest(tx)
-//      val f = for {
-//        _ <- assertBadRequest(sender.signedMassTransfer(req))
-//        _ <- sequence(nodes.map(_.ensureTxDoesntExist(id.base58)))
-//      } yield succeed
-//
-//      Await.result(f, Timeout)
-//    }
+    val tooManyTransfers = valid.copy(transfers = List.fill(MaxTransferCount + 1)(ParsedTransfer(address2, 1)), fee = calcFee(MaxTransferCount + 1))
+    val negativeAmountTransfer = valid.copy(transfers = List(ParsedTransfer(address2, -1)))
+    val negativeFee = valid.copy(fee = -1)
+    val longAttachment = valid.copy(attachment = ("ab" * MaxAttachmentSize).getBytes)
+    val invalidTransfers = Seq(fromFuture, tooManyTransfers, negativeAmountTransfer, negativeFee, longAttachment)
+    for (tx <- invalidTransfers) {
+      val id = tx.id()
+      val req = createSignedMassTransferRequest(tx)
+      assertBadRequest2(sender.signedMassTransfer(req))
+      sequence(nodes.map(_.ensureTxDoesntExist(id.base58)))
+    }
+
+    //
+    //    val invalidTransfers = Seq(fromFuture, tooManyTransfers, negativeTransfer, negativeFee, longAttachment)
+    //    for (tx <- invalidTransfers) {
+    //      val id = tx.id()
+    //      val req = createSignedMassTransferRequest(tx)
+    //      val f = for {
+    //        _ <- assertBadRequest(sender.signedMassTransfer(req))
+    //        _ <- sequence(nodes.map(_.ensureTxDoesntExist(id.base58)))
+    //      } yield succeed
+    //
+    //      Await.result(f, Timeout)
+    //    }
   }
-//
+  //
+
+
   private def calcFee(numberOfRecipients: Int): Long = {
     transferFee + numberOfRecipients * massTransferFeePerTransfer
   }
 
-  //
-  //  private def createSignedMassTransferRequest(tx: MassTransferTransaction): SignedMassTransferRequest = {
-  //    import tx._
-  //    SignedMassTransferRequest(
-  //      Base58.encode(tx.sender.publicKey),
-  //      assetId.map(_.base58),
-  //      transfers.map { case ParsedTransfer(address, amount) => Transfer(address.stringRepr, amount) },
-  //      fee,
-  //      timestamp,
-  //      attachment.headOption.map(_ => Base58.encode(attachment)),
-  //      signature.base58
-  //    )
-  //  }
+
+  private def createSignedMassTransferRequest(tx: MassTransferTransaction): SignedMassTransferRequest = {
+    import tx._
+    SignedMassTransferRequest(
+      Base58.encode(tx.sender.publicKey),
+      assetId.map(_.base58),
+      transfers.map { case ParsedTransfer(address, amount) => Transfer(address.stringRepr, amount) },
+      fee,
+      timestamp,
+      attachment.headOption.map(_ => Base58.encode(attachment)),
+      signature.base58
+    )
+  }
 }

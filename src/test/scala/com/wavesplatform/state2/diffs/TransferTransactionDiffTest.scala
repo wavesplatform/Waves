@@ -2,7 +2,7 @@ package com.wavesplatform.state2.diffs
 
 import cats._
 import com.wavesplatform.state2._
-import com.wavesplatform.{NoShrink, TransactionGen}
+import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
@@ -12,7 +12,7 @@ import scorex.transaction.GenesisTransaction
 import scorex.transaction.assets.{IssueTransaction, TransferTransaction}
 
 class TransferTransactionDiffTest extends PropSpec
-  with PropertyChecks with Matchers with TransactionGen with NoShrink {
+  with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDB {
 
   val preconditionsAndTransfer: Gen[(GenesisTransaction, IssueTransaction, IssueTransaction, TransferTransaction)] = for {
     master <- accountGen
@@ -29,7 +29,7 @@ class TransferTransactionDiffTest extends PropSpec
 
   property("transfers assets to recipient preserving waves invariant") {
     forAll(preconditionsAndTransfer) { case ((genesis, issue1, issue2, transfer)) =>
-      assertDiffAndState(Seq(TestBlock.create(Seq(genesis, issue1, issue2))), TestBlock.create(Seq(transfer))) { case (totalDiff, newState) =>
+      assertDiffAndState(db, Seq(TestBlock.create(Seq(genesis, issue1, issue2))), TestBlock.create(Seq(transfer))) { case (totalDiff, newState) =>
         val totalPortfolioDiff = Monoid.combineAll(totalDiff.txsDiff.portfolios.values)
         totalPortfolioDiff.balance shouldBe 0
         totalPortfolioDiff.effectiveBalance shouldBe 0

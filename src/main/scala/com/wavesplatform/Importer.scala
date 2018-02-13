@@ -31,7 +31,7 @@ object Importer extends ScorexLogging {
 
     Try(args(1)) match {
       case Success(filename) =>
-        log.info(s"Loading file '$filename")
+        log.info(s"Loading file '$filename'")
         createInputStream(filename) match {
           case Success(inputStream) =>
             val lock = new ReentrantReadWriteLock()
@@ -66,7 +66,7 @@ object Importer extends ScorexLogging {
             val duration = System.currentTimeMillis() - start
             log.info(s"Imported in ${humanReadableDuration(duration)}")
             db.close()
-          case Failure(ex) => log.error(s"Failed to open file '$filename")
+          case Failure(ex) => log.error(s"Failed to open file '$filename'")
         }
       case Failure(ex) => log.error(s"Failed to get input filename from second parameter: $ex")
     }

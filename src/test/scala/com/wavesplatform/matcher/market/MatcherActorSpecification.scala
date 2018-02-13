@@ -4,7 +4,7 @@ import akka.actor.{Actor, ActorRef, ActorSystem, Props}
 import akka.http.scaladsl.model.StatusCodes
 import akka.persistence.inmemory.extension.{InMemoryJournalStorage, StorageExtension}
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
-import com.wavesplatform.{TestDB, UtxPool}
+import com.wavesplatform.UtxPool
 import com.wavesplatform.matcher.MatcherTestData
 import com.wavesplatform.matcher.api.StatusCodeMatcherResponse
 import com.wavesplatform.matcher.fixtures.RestartableActor
@@ -29,15 +29,8 @@ import scorex.utils.{NTP, ScorexLogging}
 import scorex.wallet.Wallet
 
 class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest2"))
-with TestDB
-  with WordSpecLike
-  with Matchers
-  with BeforeAndAfterAll
-  with ImplicitSender
-  with MatcherTestData
-  with BeforeAndAfterEach
-  with ScorexLogging
-  with PathMockFactory {
+  with WordSpecLike with Matchers with BeforeAndAfterAll with ImplicitSender with MatcherTestData
+  with BeforeAndAfterEach with ScorexLogging with PathMockFactory {
 
   val storedState: SnapshotStateReader = stub[SnapshotStateReader]
 
@@ -184,6 +177,7 @@ with TestDB
       expectMsg(StatusCodeMatcherResponse(StatusCodes.NotFound, "Invalid Asset ID: BLACKLST"))
 
       def fbdnNamePair = AssetPair(Some(i2.assetId()), ByteStr.decodeBase58("BASE1").toOption)
+
       actor ! GetOrderBookRequest(fbdnNamePair, None)
       expectMsg(StatusCodeMatcherResponse(StatusCodes.NotFound, "Invalid Asset Name: ForbiddenName"))
     }

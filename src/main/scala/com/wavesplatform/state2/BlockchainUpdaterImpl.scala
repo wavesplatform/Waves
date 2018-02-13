@@ -7,6 +7,7 @@ import cats.implicits._
 import com.wavesplatform.features.{BlockchainFeatures, FeatureProvider, FeaturesProperties}
 import com.wavesplatform.history.HistoryWriterImpl
 import com.wavesplatform.metrics.{Instrumented, TxsInBlockchainStats}
+import com.wavesplatform.mining.MiningEstimators
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state2.diffs.BlockDiffer
 import com.wavesplatform.state2.reader.CompositeStateReader.composite
@@ -197,7 +198,8 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
       }).map {
         _ map { case ((newBlockDiff, discarded)) =>
           val height = historyWriter.height() + 1
-          ngState.set(Some(new NgState(block, newBlockDiff, featuresApprovedWithBlock(block))))
+          val estimators = MiningEstimators(settings.minerSettings, featureProvider, historyWriter.height())
+          ngState.set(Some(new NgState(block, newBlockDiff, featuresApprovedWithBlock(block), estimators.total)))
           historyReader.lastBlockId().foreach(id =>
             internalLastBlockInfo.onNext(LastBlockInfo(id, historyReader.height(), historyReader.score(), blockchainReady)))
           updateHeightInfo()

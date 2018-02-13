@@ -2,7 +2,7 @@ package com.wavesplatform.state2.diffs
 
 import cats._
 import com.wavesplatform.state2._
-import com.wavesplatform.{NoShrink, TransactionGen}
+import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
@@ -11,7 +11,7 @@ import scorex.transaction.GenesisTransaction
 import scorex.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction}
 
 class AssetTransactionsDiffTest extends PropSpec
-  with PropertyChecks with Matchers with TransactionGen with NoShrink {
+  with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDB {
 
   def issueReissueBurnTxs(isReissuable: Boolean): Gen[((GenesisTransaction, IssueTransaction), (ReissueTransaction, BurnTransaction))] = for {
     master <- accountGen
@@ -26,7 +26,7 @@ class AssetTransactionsDiffTest extends PropSpec
 
   property("Issue+Reissue+Burn do not break waves invariant and updates state") {
     forAll(issueReissueBurnTxs(isReissuable = true)) { case (((gen, issue), (reissue, burn))) =>
-      assertDiffAndState(Seq(TestBlock.create(Seq(gen, issue))), TestBlock.create(Seq(reissue, burn))) { case (blockDiff, newState) =>
+      assertDiffAndState(db, Seq(TestBlock.create(Seq(gen, issue))), TestBlock.create(Seq(reissue, burn))) { case (blockDiff, newState) =>
         val totalPortfolioDiff = Monoid.combineAll(blockDiff.txsDiff.portfolios.values)
 
         totalPortfolioDiff.balance shouldBe 0
@@ -50,10 +50,10 @@ class AssetTransactionsDiffTest extends PropSpec
     } yield (genesis, reissue, burn)
 
     forAll(setup) { case ((gen, reissue, burn)) =>
-      assertDiffEi(Seq(TestBlock.create(Seq(gen))), TestBlock.create(Seq(reissue))) { blockDiffEi =>
-        blockDiffEi should produce ("Referenced assetId not found")
+      assertDiffEi(db, Seq(TestBlock.create(Seq(gen))), TestBlock.create(Seq(reissue))) { blockDiffEi =>
+        blockDiffEi should produce("Referenced assetId not found")
       }
-      assertDiffEi(Seq(TestBlock.create(Seq(gen))), TestBlock.create(Seq(burn))) { blockDiffEi =>
+      assertDiffEi(db, Seq(TestBlock.create(Seq(gen))), TestBlock.create(Seq(burn))) { blockDiffEi =>
         blockDiffEi should produce("Referenced assetId not found")
       }
     }
@@ -72,10 +72,10 @@ class AssetTransactionsDiffTest extends PropSpec
     } yield ((gen, issue), reissue, burn)
 
     forAll(setup) { case ((gen, issue), reissue, burn) =>
-      assertDiffEi(Seq(TestBlock.create(Seq(gen, issue))), TestBlock.create(Seq(reissue))) { blockDiffEi =>
+      assertDiffEi(db, Seq(TestBlock.create(Seq(gen, issue))), TestBlock.create(Seq(reissue))) { blockDiffEi =>
         blockDiffEi should produce("Asset was issued by other address")
       }
-      assertDiffEi(Seq(TestBlock.create(Seq(gen, issue))), TestBlock.create(Seq(burn))) { blockDiffEi =>
+      assertDiffEi(db, Seq(TestBlock.create(Seq(gen, issue))), TestBlock.create(Seq(burn))) { blockDiffEi =>
         blockDiffEi should produce("Asset was issued by other address")
       }
     }
@@ -83,7 +83,7 @@ class AssetTransactionsDiffTest extends PropSpec
 
   property("Cannot reissue non-reissuable alias") {
     forAll(issueReissueBurnTxs(isReissuable = false)) { case ((gen, issue), (reissue, _)) =>
-      assertDiffEi(Seq(TestBlock.create(Seq(gen, issue))), TestBlock.create(Seq(reissue))) { blockDiffEi =>
+      assertDiffEi(db, Seq(TestBlock.create(Seq(gen, issue))), TestBlock.create(Seq(reissue))) { blockDiffEi =>
         blockDiffEi should produce("Asset is not reissuable")
       }
     }

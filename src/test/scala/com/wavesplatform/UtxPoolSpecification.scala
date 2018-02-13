@@ -5,6 +5,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.{HistoryWriterImpl, StorageFactory}
+import com.wavesplatform.mining._
 import com.wavesplatform.settings.{BlockchainSettings, FeeSettings, FeesSettings, FunctionalitySettings, UtxSettings, WavesSettings}
 import com.wavesplatform.state2.diffs._
 import org.scalacheck.Gen
@@ -25,11 +26,7 @@ import scorex.utils.Time
 import scala.concurrent.duration._
 
 class UtxPoolSpecification extends FreeSpec
-  with Matchers
-  with MockFactory
-  with PropertyChecks
-  with TransactionGen
-  with NoShrink {
+  with Matchers with MockFactory with PropertyChecks with TransactionGen with NoShrink with WithDB {
 
   private val calculator = new FeeCalculator(FeesSettings(Seq(
     TransactionType.GenesisTransaction,
@@ -47,7 +44,6 @@ class UtxPoolSpecification extends FreeSpec
         FunctionalitySettings.TESTNET.copy(preActivatedFeatures = Map(BlockchainFeatures.MassTransfer.id -> 0)),
         genesisSettings))
 
-    val db = open()
     val (storage, _) = StorageFactory(db, settings).get
     val (history, featureProvider, state, bcu, _) = storage()
 
@@ -176,7 +172,7 @@ class UtxPoolSpecification extends FreeSpec
       tx2 <- listOfN(count1, transfer(sender, senderBalance / 2, new TestTime(ts + offset + 1000)))
     } yield {
       val time = new TestTime()
-      val history = HistoryWriterImpl(open(), new ReentrantReadWriteLock(), TestFunctionalitySettings.Stub,
+      val history = HistoryWriterImpl(db, new ReentrantReadWriteLock(), TestFunctionalitySettings.Stub,
         TestFunctionalitySettings.EmptyFeaturesSettings).get
       val utx = new UtxPoolImpl(time, state, history, featureProvider, calculator, FunctionalitySettings.TESTNET,
         UtxSettings(10, offset.millis, Set.empty, Set.empty, 5.minutes))
@@ -195,41 +191,47 @@ class UtxPoolSpecification extends FreeSpec
     }
 
     "evicts expired transactions when removeAll is called" in forAll(dualTxGen) { case (utx, time, txs1, offset, txs2) =>
-      all(txs1.map { t =>
-        utx.putIfNew(t)
-      }) shouldBe 'right
+      all(txs1.map(utx.putIfNew)) shouldBe 'right
       utx.all.size shouldEqual txs1.size
 
       time.advance(offset)
       utx.removeAll(Seq.empty)
 
-      all(txs2.map { t =>
-        utx.putIfNew(t)
-      }) shouldBe 'right
+      all(txs2.map(utx.putIfNew)) shouldBe 'right
       utx.all.size shouldEqual txs2.size
     }
 
+    "packUnconfirmed result is limited by constraint" in forAll(dualTxGen) { case (utx, time, txs, _, _) =>
+      all(txs.map(utx.putIfNew)) shouldBe 'right
+      utx.all.size shouldEqual txs.size
+
+      val maxNumber = Math.max(utx.all.size / 2, 3)
+      val rest = limitByNumber(maxNumber)
+      val (packed, restUpdated) = utx.packUnconfirmed(rest, sortInBlock = false)
+
+      packed.lengthCompare(maxNumber) should be <= 0
+      if (maxNumber <= utx.all.size) restUpdated.isEmpty shouldBe true
+    }
+
     "evicts expired transactions when packUnconfirmed is called" in forAll(dualTxGen) { case (utx, time, txs, offset, _) =>
-      all(txs.map { t =>
-        utx.putIfNew(t)
-      }) shouldBe 'right
+      all(txs.map(utx.putIfNew)) shouldBe 'right
       utx.all.size shouldEqual txs.size
 
       time.advance(offset)
 
-      utx.packUnconfirmed(100, false) shouldBe 'empty
+      val (packed, _) = utx.packUnconfirmed(limitByNumber(100), sortInBlock = false)
+      packed shouldBe 'empty
       utx.all shouldBe 'empty
     }
 
     "evicts one of mutually invalid transactions when packUnconfirmed is called" in forAll(twoOutOfManyValidPayments) { case (utx, time, txs, offset) =>
-      all(txs.map { t =>
-        utx.putIfNew(t)
-      }) shouldBe 'right
+      all(txs.map(utx.putIfNew)) shouldBe 'right
       utx.all.size shouldEqual txs.size
 
       time.advance(offset)
 
-      utx.packUnconfirmed(100, false).size shouldBe 2
+      val (packed, _) = utx.packUnconfirmed(limitByNumber(100), sortInBlock = false)
+      packed.size shouldBe 2
       utx.all.size shouldBe 2
     }
 
@@ -263,7 +265,7 @@ class UtxPoolSpecification extends FreeSpec
         val poolSizeBefore = utxPool.size
 
         time.advance(settings.maxTransactionAge * 2)
-        utxPool.packUnconfirmed(100, false)
+        utxPool.packUnconfirmed(limitByNumber(100), sortInBlock = false)
 
         poolSizeBefore should be > utxPool.size
         val utxPortfolioAfter = utxPool.portfolio(sender)
@@ -282,7 +284,7 @@ class UtxPoolSpecification extends FreeSpec
         forAll(transferGen) { case (_, utxPool, txs) =>
           val r = txs.forall { tx =>
             utxPool.putIfNew(tx) match {
-              case Left(SenderIsBlacklisted(x)) => true
+              case Left(SenderIsBlacklisted(_)) => true
               case _ => false
             }
           }
@@ -302,5 +304,12 @@ class UtxPoolSpecification extends FreeSpec
         }
       }
     }
+  }
+
+  private def limitByNumber(n: Int): TwoDimensionalMiningConstraint = TwoDimensionalMiningConstraint.full(new CounterEstimator(n), new CounterEstimator(n))
+
+  private class CounterEstimator(val max: Long) extends Estimator {
+    override implicit def estimate(x: Block): Long = x.transactionCount
+    override implicit def estimate(x: Transaction): Long = 1
   }
 }

@@ -6,7 +6,7 @@ import com.wavesplatform.features.FeatureProvider
 import com.wavesplatform.metrics._
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.network._
-import com.wavesplatform.settings.BlockchainSettings
+import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state2.StateReader
 import io.netty.channel.Channel
 import io.netty.channel.group.ChannelGroup
@@ -24,7 +24,7 @@ import scala.util.Right
 object BlockAppender extends ScorexLogging with Instrumented {
 
   def apply(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater, time: Time,
-            stateReader: StateReader, utxStorage: UtxPool, settings: BlockchainSettings,
+            stateReader: StateReader, utxStorage: UtxPool, settings: WavesSettings,
             featureProvider: FeatureProvider, scheduler: Scheduler)(newBlock: Block): Task[Either[ValidationError, Option[BlockchainScore]]] = Task {
     measureSuccessful(blockProcessingTimeStats, history.write("apply") { implicit l =>
       if (history.contains(newBlock)) Right(None)
@@ -36,7 +36,7 @@ object BlockAppender extends ScorexLogging with Instrumented {
   }.executeOn(scheduler)
 
   def apply(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater, time: Time,
-            stateReader: StateReader, utxStorage: UtxPool, settings: BlockchainSettings,
+            stateReader: StateReader, utxStorage: UtxPool, settings: WavesSettings,
             featureProvider: FeatureProvider, allChannels: ChannelGroup, peerDatabase: PeerDatabase, miner: Miner,
             scheduler: Scheduler)(ch: Channel, newBlock: Block): Task[Unit] = {
     BlockStats.received(newBlock, BlockStats.Source.Broadcast, ch)
