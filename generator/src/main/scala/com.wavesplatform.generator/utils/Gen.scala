@@ -19,7 +19,7 @@ object Gen {
     val feeGen = Iterator.continually(minFee + random.nextLong(maxFee - minFee))
     transfers(senderGen, recipientGen, feeGen)
       .zip(massTransfers(senderGen, recipientGen, feeGen))
-      .flatMap { case (tx1, tx2) => Iterator(tx1, tx2) }
+      .flatMap { case (tt, mtt) => Iterator(mtt, tt) }
   }
 
   def transfers(senderGen: Iterator[PrivateKeyAccount],
@@ -39,7 +39,8 @@ object Gen {
     val transferCountGen = Iterator.continually(random.nextInt(MassTransferTransaction.MaxTransferCount + 1))
     senderGen.zip(transferCountGen).map { case (sender, count) =>
       val transfers = List.tabulate(count)(_ => ParsedTransfer(recipientGen.next(), amountGen.next()))
-      MassTransferTransaction.create(None, sender, transfers, System.currentTimeMillis, amountGen.next(), Array.emptyByteArray)
+      val fee = 100000 + count * 50000
+      MassTransferTransaction.create(None, sender, transfers, System.currentTimeMillis, fee, Array.emptyByteArray)
     }.collect { case Right(tx) => tx }
   }
 

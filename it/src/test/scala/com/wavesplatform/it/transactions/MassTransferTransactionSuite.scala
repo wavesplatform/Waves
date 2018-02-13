@@ -7,7 +7,7 @@ import scorex.account.AddressOrAlias
 import scorex.api.http.assets.SignedMassTransferRequest
 import scorex.crypto.encode.Base58
 import scorex.transaction.assets.MassTransferTransaction
-import scorex.transaction.assets.MassTransferTransaction.{ParsedTransfer, Transfer}
+import scorex.transaction.assets.MassTransferTransaction.{MaxTransferCount, ParsedTransfer, Transfer}
 import scorex.transaction.assets.TransferTransaction.MaxAttachmentSize
 
 import scala.concurrent.Await
@@ -66,7 +66,6 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
   }
 
   test("invalid transfer should not be in UTX or blockchain") {
-    import MassTransferTransaction.MaxTransferCount
     val address2 = AddressOrAlias.fromString(secondAddress).right.get
     val valid = MassTransferTransaction.create(
       None, sender.privateKey,
@@ -127,6 +126,22 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
       _ <- notMiner.assertBalances(firstAddress, balance1 - LeasingFee, eff1 - LeasingAmount - LeasingFee)
       _ <- notMiner.assertBalances(secondAddress, balance2, eff2 + LeasingAmount)
     } yield transferFailureAssertion
+
+    Await.result(f, Timeout)
+  }
+
+  test("huuuge transactions are allowed") {
+    val f = for {
+      (balance1, eff1) <- notMiner.accountBalances(firstAddress)
+      fee = 10000000
+      amount = (balance1 - fee) / MaxTransferCount
+
+      transfers = List.fill(MaxTransferCount)(Transfer(firstAddress, amount))
+      transferId <- sender.massTransfer(firstAddress, transfers, fee).map(_.id)
+
+      _ <- nodes.waitForHeightAraiseAndTxPresent(transferId)
+      _ <- notMiner.assertBalances(firstAddress, balance1 - fee, eff1 - fee)
+    } yield succeed
 
     Await.result(f, Timeout)
   }
