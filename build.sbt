@@ -12,8 +12,6 @@ inThisBuild(Seq(
 
 name := "waves"
 
-val FallbackVersion = (0, 10, 0)
-
 git.useGitDescribe := true
 git.uncommittedSignifier := Some("DIRTY")
 
@@ -58,6 +56,12 @@ libraryDependencies ++=
     ("org.scorexfoundation" %% "scrypto" % "1.2.2").exclude("org.slf4j", "slf4j-api"),
     "commons-net" % "commons-net" % "3.+"
   )
+
+// WARNING!!!
+// Please, update the fallback version every major and minor releases.
+// This version is used then building from sources without Git repository
+// In case of not updating the version nodes build from headless sources will fail to connect to newer versions
+val FallbackVersion = (0, 10, 0)
 
 sourceGenerators in Compile += Def.task {
   val versionFile = (sourceManaged in Compile).value / "com" / "wavesplatform" / "Version.scala"
