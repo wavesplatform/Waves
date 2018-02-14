@@ -213,6 +213,7 @@ case class DebugApiRoute(settings: RestAPISettings,
   def info: Route = (path("info") & get & withAuth) {
     complete(Json.obj(
       "stateHeight" -> stateReader().height,
+      "stateHash" -> blockchainDebugInfo.persistedAccountPortfoliosHash,
       "blockchainDebugInfo" -> blockchainDebugInfo.debugInfo(),
       "extensionLoaderState" -> extLoaderStateReporter().toString,
       "historyReplierCacheSizes" -> Json.toJson(historyReplier.cacheSizes),
