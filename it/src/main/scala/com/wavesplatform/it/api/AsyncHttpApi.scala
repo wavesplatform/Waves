@@ -359,7 +359,7 @@ object AsyncHttpApi {
         .toScala
     }
 
-    def waitForDebugInfoAt(height: Long): Future[DebugInfo] = waitFor[DebugInfo](s"debug info at height >= $height")(_.get("/debug/info").as[DebugInfo], _.stateHeight >= height, 1.seconds)
+    def waitForDebugInfoAt(height: Long): Future[DebugInfo] = waitFor[DebugInfo](s"debug info at height >= $height")(_.getWithApiKey("/debug/info").as[DebugInfo], _.stateHeight >= height, 1.seconds)
 
     def debugStateAt(height: Long): Future[Map[String, Long]] = get(s"/debug/stateWaves/$height").as[Map[String, Long]]
 
