@@ -303,8 +303,6 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
     )
   }
 
-  override def persistedAccountPortfoliosHash(): Int = Hash.accountPortfolios(currentPersistedBlocksState().accountPortfolios)
-
   override def lockfreeStateHeight: HeightInfo = heightInfo
 
   def shutdown(): Unit = {

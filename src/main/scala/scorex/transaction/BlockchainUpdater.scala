@@ -24,8 +24,6 @@ trait BlockchainUpdater extends Synchronized {
 trait BlockchainDebugInfo {
   def debugInfo(): StateDebugInfo
 
-  def persistedAccountPortfoliosHash(): Int
-
   def lockfreeStateHeight: HeightInfo
 }
 
