@@ -31,13 +31,13 @@ object Terms {
 
   case class OBJECT(fields: Map[String, LazyVal])
 
-  def eqType(t1: Type, t2: Type): Option[Type] =
+  def findCommonType(t1: Type, t2: Type): Option[Type] =
     if (t1 == NOTHING) Some(t2)
     else if (t2 == NOTHING) Some(t1)
     else if (t1 == t2) Some(t1)
     else
       (t1, t2) match {
-        case (OPTION(it1), OPTION(it2)) => eqType(it1, it2).map(OPTION)
+        case (OPTION(it1), OPTION(it2)) => findCommonType(it1, it2).map(OPTION)
         case _                          => None
       }
 
@@ -62,5 +62,5 @@ object Terms {
   case object FALSE                                                         extends Expr { val exprType               = Some(BOOLEAN)         }
   case object NONE                                                          extends Expr { val exprType: Option[Type] = Some(OPTION(NOTHING)) }
   case class SOME(t: Block, exprType: Option[Type] = None)                  extends Expr
-  implicit def exprToBlock(t: Expr): Block = Block(None, t)
+  implicit def exprToBlock(t: Expr): Block = Block(None, t) // @WARN LEADS TO UNEXPECTED BEHAVIOUR!!!! SHOULD BE REMOVED
 }

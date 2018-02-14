@@ -124,15 +124,6 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
     ev(expr = GET(SOME(CONST_INT(1)))) shouldBe Right(1)
   }
 
-  property("resolveType") {
-    Evaluator.resolveType(Context(Map.empty,Map.empty), SOME(CONST_INT(3))).result shouldBe Right(OPTION(INT))
-    Evaluator.resolveType(Context(Map.empty,Map.empty), NONE).result shouldBe Right(OPTION(NOTHING))
-    Evaluator.resolveType(Context(Map.empty,Map.empty), IF(TRUE, SOME(CONST_INT(3)), NONE)).result shouldBe Right(OPTION(INT))
-    Evaluator.resolveType(Context(Map.empty,Map.empty), IF(TRUE, NONE, SOME(CONST_INT(3)))).result shouldBe Right(OPTION(INT))
-    Evaluator.resolveType(Context(Map.empty,Map.empty), IF(TRUE, NONE, NONE)).result shouldBe Right(OPTION(NOTHING))
-    Evaluator.resolveType(Context(Map.empty,Map.empty), IF(TRUE, SOME(FALSE), SOME(CONST_INT(3)))).result should produce("Typecheck")
-  }
-
   property("successful resolve strongest type") {
     ev(expr = GET(IF(TRUE, SOME(CONST_INT(3)), SOME(CONST_INT(2))))) shouldBe Right(3)
     ev(expr = GET(IF(TRUE, SOME(CONST_INT(3)), NONE))) shouldBe Right(3)
@@ -144,7 +135,7 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
     val pointInstance = OBJECT(Map("X" -> LazyVal(INT)(Coeval(3)), "Y" -> LazyVal(INT)(Coeval(4))))
     ev(
       predefTypes = Map(pointType.name -> pointType),
-      defs = Map(("p", (TYPEREF("Point"), pointInstance))),
+      defs = Map(("p", (TYPEREF(pointType.name), pointInstance))),
       expr = SUM(GETTER(REF("p"), "X"), CONST_INT(2))
     ) shouldBe Right(5)
 
