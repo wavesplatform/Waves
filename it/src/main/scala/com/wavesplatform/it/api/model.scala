@@ -2,7 +2,7 @@ package com.wavesplatform.it.api
 
 import play.api.libs.json.{Format, Json}
 
-// USCE no longer contains references to non-seializable Request/Response objects
+// USCE no longer contains references to non-serializable Request/Response objects
 // to work around https://github.com/scalatest/scalatest/issues/556
 case class UnexpectedStatusCodeException(requestUrl: String, statusCode: Int, responseBody: String)
   extends Exception(s"Request: $requestUrl; Unexpected status code ($statusCode): $responseBody")
