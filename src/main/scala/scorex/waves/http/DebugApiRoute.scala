@@ -80,6 +80,7 @@ case class DebugApiRoute(settings: RestAPISettings,
       }))
     }
   }
+
   @Path("/print")
   @ApiOperation(
     value = "Print",
@@ -108,7 +109,7 @@ case class DebugApiRoute(settings: RestAPISettings,
   @Path("/state")
   @ApiOperation(value = "State", notes = "Get current state", httpMethod = "GET")
   @ApiResponses(Array(new ApiResponse(code = 200, message = "Json state")))
-  def state: Route = (path("state") & get) {
+  def state: Route = (path("state") & get & withAuth) {
     complete(stateReader().accountPortfolios
       .map { case (k, v) =>
         k.address -> v.balance
@@ -209,7 +210,7 @@ case class DebugApiRoute(settings: RestAPISettings,
   @ApiResponses(Array(
     new ApiResponse(code = 200, message = "Json state")
   ))
-  def info: Route = (path("info") & get) {
+  def info: Route = (path("info") & get & withAuth) {
     complete(Json.obj(
       "stateHeight" -> stateReader().height,
       "stateHash" -> blockchainDebugInfo.persistedAccountPortfoliosHash,
@@ -357,7 +358,9 @@ object DebugApiRoute {
   implicit val scoreReporterStatsWrite: Writes[RxScoreObserver.Stats] = Json.writes[RxScoreObserver.Stats]
 
   implicit object MinerStateWrites extends Writes[MinerDebugInfo.State] {
+
     import MinerDebugInfo._
+
     def writes(state: MinerDebugInfo.State) = Json.toJson(
       state match {
         case MiningBlocks => "mining blocks"
@@ -367,4 +370,5 @@ object DebugApiRoute {
       }
     )
   }
+
 }
