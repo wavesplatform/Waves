@@ -12,6 +12,8 @@ inThisBuild(Seq(
 
 name := "waves"
 
+val FallbackVersion = (0, 10, 0)
+
 git.useGitDescribe := true
 git.uncommittedSignifier := Some("DIRTY")
 
@@ -60,13 +62,16 @@ libraryDependencies ++=
 sourceGenerators in Compile += Def.task {
   val versionFile = (sourceManaged in Compile).value / "com" / "wavesplatform" / "Version.scala"
   val versionExtractor = """(\d+)\.(\d+)\.(\d+).*""".r
-  val versionExtractor(major, minor, bugfix) = version.value
+  val (major, minor, patch) = version.value match {
+    case versionExtractor(ma, mi, pa) => (ma.toInt, mi.toInt, pa.toInt)
+    case _ => FallbackVersion
+  }
   IO.write(versionFile,
     s"""package com.wavesplatform
       |
       |object Version {
       |  val VersionString = "${version.value}"
-      |  val VersionTuple = ($major, $minor, $bugfix)
+      |  val VersionTuple = ($major, $minor, $patch)
       |}
       |""".stripMargin)
   Seq(versionFile)
