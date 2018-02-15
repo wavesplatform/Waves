@@ -90,7 +90,7 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
   }
 
   property("fails if definition not found") {
-    ev(expr = SUM(REF("x"), CONST_INT(2))) should produce("Cannot resolve type of x")
+    ev(expr = SUM(REF("x"), CONST_INT(2))) should produce("A definition of 'x' is not found")
   }
 
   property("fails if 'IF' branches lead to different types") {

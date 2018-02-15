@@ -23,7 +23,7 @@ object TypeChecker {
   private def passWith[T](x: T): OptionT[TypeCheckResult, T] = OptionT.some[TypeCheckResult](x)
   private def fail(msg: String): OptionT[TypeCheckResult, Nothing] = OptionT.liftF[TypeCheckResult, Nothing](Left(msg))
 
-  def setType(ctx: Context, t: Expr): Coeval[TypeCheckResult[Expr]] = Coeval.defer(t match {
+  private def setType(ctx: Context, t: Expr): Coeval[TypeCheckResult[Expr]] = Coeval.defer(t match {
     case _: CONST_INT | _: CONST_BYTEVECTOR | TRUE | FALSE | NONE => Coeval(Right(t))
 
     case getter: GETTER =>
@@ -48,7 +48,7 @@ object TypeChecker {
             }
 
           case Right(x) => Left(s"Getter on non-object expresssion: $x")
-          case Left(err) => Left(s"Typecheck failed: $err")
+          case x => x
         }
 
     case sum: SUM =>
@@ -70,7 +70,7 @@ object TypeChecker {
           }
 
           firstType <- OptionT.fromOption[TypeCheckResult](first.exprType)
-          _ <- if (firstType == INT) pass else fail(s"The first operand is expected to be INT, but got $firstType")
+          _ <- if (firstType == INT) pass else fail(s"The first operand is expected to be INT, but got $firstType, $second")
 
           secondType <- OptionT.fromOption[TypeCheckResult](second.exprType)
           _ <- if (secondType == INT) pass else fail(s"The second operand is expected to be INT, but got $secondType")
@@ -262,7 +262,7 @@ object TypeChecker {
         .map {
           case Right(value: Block) => Right(let.copy(value = value))
           case Right(x) => throw new IllegalStateException(s"Wrong processing of ${let.value}, got: $x")
-          case Left(err) => Left(s"Typecheck failed: $err")
+          case x => x
         }
 
     case block: Block =>
@@ -279,7 +279,7 @@ object TypeChecker {
             .flatMap {
               case Left(e) => Coeval(Left(e))
               case Right(letExpr: LET) =>
-                val updatedCtx = ctx.copy(varDefs = ctx.varDefs + (let.name -> letExpr.exprType.get))
+                val updatedCtx = ctx.copy(varDefs = ctx.varDefs + (let.name -> letExpr.value.exprType.get))
                 setType(updatedCtx, block.t)
                   .map {
                     case Left(e) => Left(e)
@@ -324,7 +324,7 @@ object TypeChecker {
           common <- OptionT.liftF[TypeCheckResult, Type] {
             findCommonType(trueBranchType, falseBranchType)
               .map(Right(_))
-              .getOrElse(Left(s"Typecheck failed for IF: RType($resolvedFalseBranch) differs from LType($resolvedTrueBranch)"))
+              .getOrElse(Left(s"Can't find common type for $trueBranchType and $falseBranchType"))
           }
         } yield ifExpr.copy(
           cond = condBlock,
@@ -343,7 +343,7 @@ object TypeChecker {
       ctx.varDefs
         .get(ref.key)
         .map { tpe => ref.copy(exprType = Some(tpe)) }
-        .toRight(s"Typecheck failed: a definition of '${ref.key}' is not found")
+        .toRight(s"A definition of '${ref.key}' is not found")
     }
 
     case get: GET =>
@@ -351,11 +351,11 @@ object TypeChecker {
         case Right(expr: Block) =>
           expr.exprType match {
             case Some(OPTION(in)) => Right(get.copy(t = expr, exprType = Some(in)))
-            case Some(x) => Left(s"Typecheck failed: GET called on $x, but only call on OPTION[_] is allowed")
+            case Some(x) => Left(s"GET called on $x, but only call on OPTION[_] is allowed")
             case None => Left(s"Can't resolve $expr")
           }
         case Right(expr) => throw new IllegalStateException(s"Wrong processing of ${get.t}, got: $expr")
-        case Left(err) => Left(s"Typecheck failed: $err")
+        case x => x
       }
 
     case some: SOME =>
@@ -363,12 +363,12 @@ object TypeChecker {
         .map {
           case Right(resolvedT: Block) => Right(some.copy(t = resolvedT, exprType = resolvedT.exprType.map(OPTION)))
           case Right(x) => throw new IllegalStateException(s"Wrong processing of ${some.t}, got: $x")
-          case Left(err) => Left(s"Typecheck failed: $err")
+          case x => x
         }
   })
 
   def apply(c: Context, expr: Expr): TypeCheckResult[Expr] = {
-    val result = setType(c, expr)()
+    val result = setType(c, expr)().left.map { e => s"Typecheck failed: $e" }
     Try(result) match {
       case Failure(ex) => Left(ex.toString)
       case Success(res) => res

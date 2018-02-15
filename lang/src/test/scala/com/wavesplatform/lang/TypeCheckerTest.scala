@@ -63,7 +63,24 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
       ),
       exprType = Some(NOTHING)
     ),
-    "SOME" -> SOME(Block(None, TRUE, Some(BOOLEAN)), Some(OPTION(BOOLEAN)))
+    "SOME" -> SOME(Block(None, TRUE, Some(BOOLEAN)), Some(OPTION(BOOLEAN))),
+
+    "BLOCK(LET(X), REF(y) = x)" -> Block(
+      let = Some(LET(
+        name = "x",
+        value = Block(
+          let = None,
+          t = CONST_INT(0),
+          exprType = Some(INT)
+        )
+      )),
+      t = Block(
+        let = None,
+        t = LET("y", Block(None, REF("x", Some(INT)), Some(INT))),
+        exprType = Some(UNIT)
+      ),
+      exprType = Some(UNIT)
+    )
   )
 
   treeTypeTest("GETTER")(
@@ -80,7 +97,14 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
     ))
   )
 
-  treeTypeTest("REF")(
+  treeTypeTest("REF(OBJECT)")(
+    predefTypes = Map(pointType.name -> pointType),
+    varDefs = Map("p" -> TYPEREF("Point")),
+    expr = REF("p"),
+    expectedResult = Right(REF("p", Some(TYPEREF("Point"))))
+  )
+
+  treeTypeTest("REF x = y")(
     predefTypes = Map(pointType.name -> pointType),
     varDefs = Map("p" -> TYPEREF("Point")),
     expr = REF("p"),
