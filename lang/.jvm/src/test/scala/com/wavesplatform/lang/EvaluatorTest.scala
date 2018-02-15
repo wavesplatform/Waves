@@ -6,6 +6,7 @@ import monix.eval.Coeval
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatest.prop.PropertyChecks
 import scodec.bits.ByteVector
+import Implicits._
 
 class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 

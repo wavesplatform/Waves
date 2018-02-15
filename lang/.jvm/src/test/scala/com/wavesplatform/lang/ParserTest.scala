@@ -6,6 +6,7 @@ import org.scalatest.{Matchers, PropSpec}
 import org.scalatest.prop.PropertyChecks
 import scodec.bits.ByteVector
 import scorex.crypto.encode.{Base58 => ScorexBase58}
+import Implicits._
 
 class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 

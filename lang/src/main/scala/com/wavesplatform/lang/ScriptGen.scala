@@ -3,6 +3,7 @@ package com.wavesplatform.lang
 import com.wavesplatform.lang.Terms._
 import scodec.bits.ByteVector
 import org.scalacheck._
+import Implicits._
 
 trait ScriptGen {
 

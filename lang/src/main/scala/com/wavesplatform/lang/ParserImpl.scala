@@ -4,6 +4,10 @@ import com.wavesplatform.lang.Terms._
 import com.wavesplatform.lang.traits.Base58
 import fastparse.{core, WhitespaceApi}
 import scodec.bits.ByteVector
+import scorex.crypto.encode.Base58
+import Implicits._
+
+object Parser {
 
 abstract class ParserImpl { this:Base58 =>
 

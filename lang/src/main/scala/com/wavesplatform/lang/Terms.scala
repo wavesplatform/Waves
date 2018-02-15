@@ -43,12 +43,12 @@ object Terms {
 
   sealed trait Expr { val exprType: Option[Type] }
   case class CONST_INT(t: Int)                                              extends Expr { val exprType: Option[Type] = Some(INT)             }
-  case class GETTER(i: Block, field: String, exprType: Option[Type] = None) extends Expr
+  case class GETTER(ref: Block, field: String, exprType: Option[Type] = None) extends Expr
   case class CONST_BYTEVECTOR(bs: ByteVector)                               extends Expr { val exprType: Option[Type] = Some(BYTEVECTOR)      }
   case class SUM(i1: Block, i2: Block)                                      extends Expr { val exprType: Option[Type] = Some(INT)             }
   case class AND(t1: Block, t2: Block)                                      extends Expr { val exprType: Option[Type] = Some(BOOLEAN)         }
   case class OR(t1: Block, t2: Block)                                       extends Expr { val exprType: Option[Type] = Some(BOOLEAN)         }
-  case class EQ(t1: Expr, t2: Block)                                        extends Expr { val exprType: Option[Type] = Some(BOOLEAN)         }
+  case class EQ(t1: Block, t2: Block)                                       extends Expr { val exprType: Option[Type] = Some(BOOLEAN)         }
   case class GT(t1: Block, t2: Block)                                       extends Expr { val exprType: Option[Type] = Some(BOOLEAN)         }
   case class GE(t1: Block, t2: Block)                                       extends Expr { val exprType: Option[Type] = Some(BOOLEAN)         }
   case class SIG_VERIFY(message: Block, signature: Block, publicKey: Block) extends Expr { val exprType: Option[Type] = Some(BOOLEAN)         }
@@ -62,5 +62,8 @@ object Terms {
   case object FALSE                                                         extends Expr { val exprType               = Some(BOOLEAN)         }
   case object NONE                                                          extends Expr { val exprType: Option[Type] = Some(OPTION(NOTHING)) }
   case class SOME(t: Block, exprType: Option[Type] = None)                  extends Expr
-  implicit def exprToBlock(t: Expr): Block = Block(None, t) // @WARN LEADS TO UNEXPECTED BEHAVIOUR!!!! SHOULD BE REMOVED
+
+  object Implicits {
+    implicit def exprToBlock(t: Expr): Block = Block(None, t) // @WARN LEADS TO UNEXPECTED BEHAVIOUR!!!! SHOULD BE REMOVED
+  }
 }

@@ -1,179 +1,182 @@
 package com.wavesplatform.lang
 
-import com.wavesplatform.lang.TypeChecker.{Context, Defs, TypeCheckResult}
 import com.wavesplatform.lang.Terms._
-import monix.eval.Coeval
-import org.scalacheck.Prop
+import com.wavesplatform.lang.TypeChecker.{Context, Defs, TypeCheckResult}
 import org.scalatest.prop.PropertyChecks
-import org.scalacheck.Prop.BooleanOperators
 import org.scalatest.{Matchers, PropSpec}
 import scodec.bits.ByteVector
+import scorex.crypto.encode.Base58
 
 class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 
-  private def propertyTest(propertyName: String)
+  // ERASURE!
+
+  private def rootTypeTest(propertyName: String)
                           (expr: Expr,
                            expectedResult: TypeCheckResult[Type],
-                           predefTypes: Map[String, CUSTOMTYPE] = Map.empty,
-                           defs: Defs = Map.empty): Unit = property(propertyName) {
-    val r: Prop = TypeChecker(Context(predefTypes, defs), expr).map(_.exprType) match {
-      case Right(None) => false :| "Type didn't resolved"
-      case Right(Some(x)) => (Right(x) == expectedResult) :| "Ok"
-      case e@Left(_) => (e == expectedResult) :| "Ok err"
+                           varDefs: Defs = Map.empty,
+                           predefTypes: Map[String, CUSTOMTYPE] = Map.empty): Unit = property(propertyName) {
+    TypeChecker(Context(predefTypes, varDefs), expr).map(_.exprType) match {
+      case Right(None) => fail("Type didn't resolved")
+      case Right(Some(x)) => Right(x) shouldBe expectedResult
+      case e@Left(_) => e shouldBe expectedResult
     }
-
-    r
   }
 
-  private def simpleDeclarationAndUsage(i: Int) = Block(Some(LET("x", CONST_INT(i))), REF("x"))
+  private def treeTypeTest(propertyName: String)
+                          (expr: Expr,
+                           expectedResult: TypeCheckResult[Expr],
+                           predefTypes: Map[String, CUSTOMTYPE] = Map.empty,
+                           varDefs: Defs = Map.empty): Unit = property(propertyName) {
+    TypeChecker(Context(predefTypes, varDefs), expr) shouldBe expectedResult
+  }
 
-  //  property("successful on very deep expressions (stack overflow check)") {
-  //    val term = (1 to 100000).foldLeft[Terms.Expr](CONST_INT(0))((acc, _) => SUM(acc, CONST_INT(1)))
-  //    test(expr = term) shouldBe Right(100000)
-  //  }
+  private def treeDidNotChangedTest(properties: (String, Expr)*): Unit = properties.foreach {
+    case (propertyName, expr) => treeTypeTest(propertyName)(expr = expr, expectedResult = Right(expr))
+  }
 
-  propertyTest("CONST_INT")(
-    expr = CONST_INT(0),
+  private val pointType = CUSTOMTYPE("Point", List("x" -> INT, "y" -> INT))
+
+  rootTypeTest("successful on very deep expressions (stack overflow check)")(
+    expr = (1 to 100000).foldLeft[Terms.Expr](CONST_INT(0))((acc, _) => SUM(Block(None, acc), Block(None, CONST_INT(1)))),
     expectedResult = Right(INT)
   )
 
-//  propertyTest("GETTER")(
-//
-//  )
-
-  propertyTest("LET")(
-    expr = LET("x", CONST_INT(0)),
-    expectedResult = Right(INT)
+  treeDidNotChangedTest(
+    "CONST_INT" -> CONST_INT(0),
+    "CONST_BYTEVECTOR" -> CONST_BYTEVECTOR(ByteVector(1, 2, 3)),
+    "TRUE" -> TRUE,
+    "FALSE" -> FALSE,
+    "NONE" -> NONE
   )
 
-  propertyTest("BLOCK")(
+  treeTypeTest("GETTER")(
+    predefTypes = Map(pointType.name -> pointType),
+    varDefs = Map("p" -> TYPEREF("Point")),
+    expr = GETTER(
+      ref = Block(None, REF("p")),
+      field = "x"
+    ),
+    expectedResult = Right(GETTER(
+      ref = Block(None, REF("p", Some(TYPEREF("Point"))), Some(TYPEREF("Point"))),
+      field = "x",
+      exprType = Some(INT)
+    ))
+  )
+
+  treeTypeTest("SUM")(
+    expr = SUM(Block(None, CONST_INT(0)), Block(None, CONST_INT(1))),
+    expectedResult = Right(SUM(Block(None, CONST_INT(0), Some(INT)), Block(None, CONST_INT(1), Some(INT))))
+  )
+
+  treeTypeTest("AND")(
+    expr = AND(Block(None, TRUE), Block(None, FALSE)),
+    expectedResult = Right(AND(Block(None, TRUE, Some(BOOLEAN)), Block(None, FALSE, Some(BOOLEAN))))
+  )
+
+  treeTypeTest("OR")(
+    expr = OR(Block(None, TRUE), Block(None, FALSE)),
+    expectedResult = Right(OR(Block(None, TRUE, Some(BOOLEAN)), Block(None, FALSE, Some(BOOLEAN))))
+  )
+
+  treeTypeTest("EQ")(
+    expr = EQ(Block(None, CONST_INT(0)), Block(None, CONST_INT(1))),
+    expectedResult = Right(EQ(Block(None, CONST_INT(0), Some(INT)), Block(None, CONST_INT(1), Some(INT))))
+  )
+
+  treeTypeTest("GT")(
+    expr = GT(Block(None, CONST_INT(0)), Block(None, CONST_INT(1))),
+    expectedResult = Right(GT(Block(None, CONST_INT(0), Some(INT)), Block(None, CONST_INT(1), Some(INT))))
+  )
+
+  treeTypeTest("GE")(
+    expr = GE(Block(None, CONST_INT(0)), Block(None, CONST_INT(1))),
+    expectedResult = Right(GE(Block(None, CONST_INT(0), Some(INT)), Block(None, CONST_INT(1), Some(INT))))
+  )
+
+  // SIG_VERIFY
+  treeTypeTest("SIG_VERIFY")(
+    expr = SIG_VERIFY(
+      message = Block(None, CONST_BYTEVECTOR(ByteVector(Base58.decode("333").get))),
+      signature = Block(None, CONST_BYTEVECTOR(ByteVector(Base58.decode("222").get))),
+      publicKey = Block(None, CONST_BYTEVECTOR(ByteVector(Base58.decode("111").get)))
+    ),
+    expectedResult = Right(SIG_VERIFY(
+      message = Block(None, CONST_BYTEVECTOR(ByteVector(Base58.decode("333").get)), Some(BYTEVECTOR)),
+      signature = Block(None, CONST_BYTEVECTOR(ByteVector(Base58.decode("222").get)), Some(BYTEVECTOR)),
+      publicKey = Block(None, CONST_BYTEVECTOR(ByteVector(Base58.decode("111").get)), Some(BYTEVECTOR))
+    ))
+  )
+
+  treeTypeTest("IS_DEFINED")(
+    expr = IS_DEFINED(Block(None, NONE)),
+    expectedResult = Right(IS_DEFINED(Block(None, NONE, Some(OPTION(NOTHING)))))
+  )
+
+  treeTypeTest("LET")(
+    expr = LET("x", Block(None, CONST_INT(0))),
+    expectedResult = Right(LET("x", Block(None, CONST_INT(0), Some(INT))))
+  )
+
+  treeTypeTest("BLOCK")(
     expr = Block(
       let = None,
       t = CONST_INT(0)
     ),
-    expectedResult = Right(INT)
+    expectedResult = Right(Block(
+      let = None,
+      t = CONST_INT(0),
+      exprType = Some(INT)
+    ))
   )
 
-  //  property("successful on x = y") {
-  //    test(
-  //      expr = Block(Some(LET("x", CONST_INT(3))),
-  //                   Block(
-  //                     Some(LET("y", REF("x"))),
-  //                     SUM(REF("x"), REF("y"))
-  //                   ))) shouldBe Right(6)
-  //  }
-  //
-  //  property("successful on simple get") {
-  //    test(expr = simpleDeclarationAndUsage(3)) shouldBe Right(3)
-  //  }
-  //
-  //  property("successful on get used further in expr") {
-  //    test(
-  //      expr = Block(
-  //        Some(LET("x", CONST_INT(3))),
-  //        EQ(REF("x"), CONST_INT(2))
-  //      )) shouldBe Right(false)
-  //  }
-  //
-  //  property("successful on multiple lets") {
-  //    test(
-  //      expr = Block(
-  //        Some(LET("x", CONST_INT(3))),
-  //        Block(Some(LET("y", CONST_INT(3))), EQ(REF("x"), REF("y")))
-  //      )) shouldBe Right(true)
-  //  }
-  //
-  //  property("successful on multiple lets with expression") {
-  //    test(
-  //      expr = Block(
-  //        Some(LET("x", CONST_INT(3))),
-  //        Block(Some(LET("y", SUM(CONST_INT(3), CONST_INT(0)))), EQ(REF("x"), REF("y")))
-  //      )) shouldBe Right(true)
-  //  }
-  //
-  //  property("successful on deep type resolution") {
-  //    test(expr = IF(EQ(CONST_INT(1), CONST_INT(2)), simpleDeclarationAndUsage(3), CONST_INT(4))) shouldBe Right(4)
-  //  }
-  //
-  //  property("successful on same value names in different branches") {
-  //    test(expr = IF(EQ(CONST_INT(1), CONST_INT(2)), simpleDeclarationAndUsage(3), simpleDeclarationAndUsage(4))) shouldBe Right(4)
-  //  }
-  //
-  //  property("fails if override") {
-  //    test(
-  //      expr = Block(
-  //        Some(LET("x", CONST_INT(3))),
-  //        Block(Some(LET("x", SUM(CONST_INT(3), CONST_INT(0)))), EQ(REF("x"), CONST_INT(1)))
-  //      )) should produce("already defined")
-  //  }
-  //
-  //  property("fails if types do not match") {
-  //    test(
-  //      expr = Block(
-  //        Some(LET("x", CONST_INT(3))),
-  //        Block(Some(LET("y", EQ(CONST_INT(3), CONST_INT(0)))), EQ(REF("x"), REF("y")))
-  //      )) should produce("Typecheck failed")
-  //  }
-  //
-  //  property("fails if definition not found") {
-  //    test(expr = SUM(REF("x"), CONST_INT(2))) should produce("Cannot resolve type of x")
-  //  }
-  //
-  //  property("fails if 'IF' branches lead to different types") {
-  //    test(expr = IF(EQ(CONST_INT(1), CONST_INT(2)), CONST_INT(0), CONST_BYTEVECTOR(ByteVector.empty))) should produce("Typecheck failed")
-  //  }
-  //
-  //  property("Typechecking") {
-  //    test(expr = EQ(CONST_INT(2), CONST_INT(2))) shouldBe Right(true)
-  //  }
-  //
-  //  property("successful Typechecking Some") {
-  //    test(expr = EQ(SOME(CONST_INT(2)), SOME(CONST_INT(2)))) shouldBe Right(true)
-  //  }
-  //
-  //  property("successful Typechecking Option") {
-  //    test(expr = EQ(SOME(CONST_INT(2)), NONE)) shouldBe Right(false)
-  //    test(expr = EQ(NONE, SOME(CONST_INT(2)))) shouldBe Right(false)
-  //  }
-  //
-  //  property("successful nested Typechecking Option") {
-  //    test(expr = EQ(SOME(SOME(SOME(CONST_INT(2)))), NONE)) shouldBe Right(false)
-  //    test(expr = EQ(SOME(NONE), SOME(SOME(CONST_INT(2))))) shouldBe Right(false)
-  //  }
-  //
-  //  property("fails if nested Typechecking Option finds mismatch") {
-  //    test(expr = EQ(SOME(SOME(FALSE)), SOME(SOME(CONST_INT(2))))) should produce("Typecheck failed")
-  //  }
-  //
-  //  property("successful GET/IS_DEFINED") {
-  //    test(expr = IS_DEFINED(NONE)) shouldBe Right(false)
-  //    test(expr = IS_DEFINED(SOME(CONST_INT(1)))) shouldBe Right(true)
-  //    test(expr = GET(SOME(CONST_INT(1)))) shouldBe Right(1)
-  //  }
-  //
-  //  property("resolveType") {
-  //    Evaluator.resolveType(Context(Map.empty,Map.empty), SOME(CONST_INT(3))).result shouldBe Right(OPTION(INT))
-  //    Evaluator.resolveType(Context(Map.empty,Map.empty), NONE).result shouldBe Right(OPTION(NOTHING))
-  //    Evaluator.resolveType(Context(Map.empty,Map.empty), IF(TRUE, SOME(CONST_INT(3)), NONE)).result shouldBe Right(OPTION(INT))
-  //    Evaluator.resolveType(Context(Map.empty,Map.empty), IF(TRUE, NONE, SOME(CONST_INT(3)))).result shouldBe Right(OPTION(INT))
-  //    Evaluator.resolveType(Context(Map.empty,Map.empty), IF(TRUE, NONE, NONE)).result shouldBe Right(OPTION(NOTHING))
-  //    Evaluator.resolveType(Context(Map.empty,Map.empty), IF(TRUE, SOME(FALSE), SOME(CONST_INT(3)))).result should produce("Typecheck")
-  //  }
-  //
-  //  property("successful resolve strongest type") {
-  //    test(expr = GET(IF(TRUE, SOME(CONST_INT(3)), SOME(CONST_INT(2))))) shouldBe Right(3)
-  //    test(expr = GET(IF(TRUE, SOME(CONST_INT(3)), NONE))) shouldBe Right(3)
-  //    test(expr = SUM(CONST_INT(1), GET(IF(TRUE, SOME(CONST_INT(3)), NONE)))) shouldBe Right(4)
-  //  }
-  //
-  //  property("custom type field access") {
-  //    val pointType     = CUSTOMTYPE("Point", List("X" -> INT, "Y" -> INT))
-  //    val pointInstance = OBJECT(Map("X" -> LazyVal(INT)(Coeval(3)), "Y" -> LazyVal(INT)(Coeval(4))))
-  //    test(
-  //      predefTypes = Map(pointType.name -> pointType),
-  //      defs = Map("p" -> (TYPEREF("Point"), pointInstance)),
-  //      expr = SUM(GETTER(REF("p"), "X"), CONST_INT(2))
-  //    ) shouldBe Right(5)
-  //
-  //  }
+  treeTypeTest("IF")(
+    expr = IF(
+      cond = Block(None, TRUE),
+      ifTrue = Block(None, SOME(Block(None, TRUE))),
+      ifFalse = Block(None, NONE),
+    ),
+    expectedResult = Right(IF(
+      cond = Block(None, TRUE, Some(BOOLEAN)),
+      ifTrue = Block(None, SOME(Block(None, TRUE, Some(BOOLEAN)), Some(OPTION(BOOLEAN))), Some(OPTION(BOOLEAN))),
+      ifFalse = Block(None, NONE, Some(OPTION(NOTHING))),
+      exprType = Some(OPTION(BOOLEAN))
+    ))
+  )
+
+  treeTypeTest("REF")(
+    predefTypes = Map(pointType.name -> pointType),
+    varDefs = Map("p" -> TYPEREF("Point")),
+    expr = REF("p"),
+    expectedResult = Right(REF("p", Some(TYPEREF("Point"))))
+  )
+
+  treeTypeTest("GET(SOME)")(
+    expr = GET(Block(None, SOME(Block(None, TRUE)))),
+    expectedResult = Right(GET(
+      t = Block(
+        let = None,
+        t = SOME(Block(None, TRUE, Some(BOOLEAN)), Some(OPTION(BOOLEAN))),
+        exprType = Some(OPTION(BOOLEAN))
+      ),
+      exprType = Some(BOOLEAN)
+    ))
+  )
+
+  treeTypeTest("GET(NONE)")(
+    expr = GET(Block(None, Block(None, NONE))),
+    expectedResult = Right(GET(
+      t = Block(
+        let = None,
+        t = Block(None, NONE, Some(OPTION(NOTHING))),
+        exprType = Some(OPTION(NOTHING))
+      ),
+      exprType = Some(NOTHING)
+    ))
+  )
+
+  treeTypeTest("SOME")(
+    expr = SOME(Block(None, TRUE)),
+    expectedResult = Right(SOME(Block(None, TRUE, Some(BOOLEAN)), Some(OPTION(BOOLEAN)))),
+  )
 }
