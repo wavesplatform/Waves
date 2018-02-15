@@ -144,7 +144,7 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
     val pointInstance = OBJECT(Map("X" -> LazyVal(INT)(Coeval(3)), "Y" -> LazyVal(INT)(Coeval(4))))
     ev(
       predefTypes = Map(pointType.name -> pointType),
-      defs = Map("p" -> (TYPEREF("Point"), pointInstance)),
+      defs = Map(("p", (TYPEREF("Point"), pointInstance))),
       expr = SUM(GETTER(REF("p"), "X"), CONST_INT(2))
     ) shouldBe Right(5)
 
