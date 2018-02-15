@@ -5,7 +5,7 @@ import com.wavesplatform.lang.Terms._
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatest.prop.PropertyChecks
 import scodec.bits.ByteVector
-import scorex.crypto.encode.Base58
+import scorex.crypto.encode.{Base58 => ScorexBase58}
 
 class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 
@@ -34,17 +34,17 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
 
   property("bytestr expressions") {
     parse("checkSig(base58'333', base58'222', base58'111')") shouldBe SIG_VERIFY(
-      CONST_BYTEVECTOR(ByteVector(Base58.decode("333").get)),
-      CONST_BYTEVECTOR(ByteVector(Base58.decode("222").get)),
-      CONST_BYTEVECTOR(ByteVector(Base58.decode("111").get))
+      CONST_BYTEVECTOR(ByteVector(ScorexBase58.decode("333").get)),
+      CONST_BYTEVECTOR(ByteVector(ScorexBase58.decode("222").get)),
+      CONST_BYTEVECTOR(ByteVector(ScorexBase58.decode("111").get))
     )
 
     parse("false || checkSig(base58'333', base58'222', base58'111')") shouldBe OR(
       FALSE,
       SIG_VERIFY(
-        CONST_BYTEVECTOR(ByteVector(Base58.decode("333").get)),
-        CONST_BYTEVECTOR(ByteVector(Base58.decode("222").get)),
-        CONST_BYTEVECTOR(ByteVector(Base58.decode("111").get))
+        CONST_BYTEVECTOR(ByteVector(ScorexBase58.decode("333").get)),
+        CONST_BYTEVECTOR(ByteVector(ScorexBase58.decode("222").get)),
+        CONST_BYTEVECTOR(ByteVector(ScorexBase58.decode("111").get))
       )
     )
   }
