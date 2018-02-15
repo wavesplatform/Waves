@@ -1,13 +1,11 @@
 package com.wavesplatform.lang
 
 import com.wavesplatform.lang.Terms._
-import fastparse.{WhitespaceApi, core, noApi}
+import com.wavesplatform.lang.traits.Base58
+import fastparse.{core, WhitespaceApi}
 import scodec.bits.ByteVector
-import scorex.crypto.encode.Base58
 
-object Parser {
-
-  private val Base58Chars = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+abstract class ParserImpl { this:Base58 =>
 
   private val FirstCharInVarField = "QWERTYUIOPASDFGHJKLZXCVBNM"
   private val OtherCharInVarField = FirstCharInVarField + "1234567890[]"
@@ -49,18 +47,18 @@ object Parser {
     Block(
       Some(LET("$exp", exp)),
       IF(IS_DEFINED(REF("$exp")),
-         Block(
-           Some(LET(ref, GET(REF("$exp")))),
-           ifSome
-         ),
-         ifNone)
+        Block(
+          Some(LET(ref, GET(REF("$exp")))),
+          ifSome
+        ),
+        ifNone)
     )
 
   private def sigVerifyP: P[SIG_VERIFY] = P("checkSig" ~ "(" ~ block ~ "," ~ block ~ "," ~ block ~ ")").map {
     case ((x, y, z)) => SIG_VERIFY(x, y, z)
   }
   private def byteVectorP: P[CONST_BYTEVECTOR] =
-    P("base58'" ~ CharsWhileIn(Base58Chars).! ~ "'").map(x => CONST_BYTEVECTOR(ByteVector(Base58.decode(x).get)))
+    P("base58'" ~ CharsWhileIn(Base58Chars).! ~ "'").map(x => CONST_BYTEVECTOR(ByteVector(base58Decode(x).get)))
 
   private def block: P[Expr] = P("\n".rep ~ letP.rep ~ expr ~ ";".rep).map {
     case ((Nil, y)) => y
@@ -98,3 +96,6 @@ object Parser {
 
   def apply(str: String): core.Parsed[Expr, Char, String] = block.parse(str)
 }
+
+
+
