@@ -7,9 +7,6 @@ import scodec.bits.ByteVector
 
 abstract class ParserImpl { this:Base58 =>
 
-  private val FirstCharInVarField = "QWERTYUIOPASDFGHJKLZXCVBNM"
-  private val OtherCharInVarField = FirstCharInVarField + "1234567890[]"
-
   private val White = WhitespaceApi.Wrapper {
     import fastparse.all._
     NoTrace(CharIn(" ", "\t", "\r", "\n").rep)
@@ -45,10 +42,10 @@ abstract class ParserImpl { this:Base58 =>
 
   def patmat(exp: Block, ref: String, ifSome: Block, ifNone: Block): Block =
     Block(
-      Some(LET("$exp", exp)),
-      IF(IS_DEFINED(REF("$exp")),
+      Some(LET(s"$exp", exp)),
+      IF(IS_DEFINED(REF(s"$exp")),
         Block(
-          Some(LET(ref, GET(REF("$exp")))),
+          Some(LET(ref, GET(REF(s"$exp")))),
           ifSome
         ),
         ifNone)

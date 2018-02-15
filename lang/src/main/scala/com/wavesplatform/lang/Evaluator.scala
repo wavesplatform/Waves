@@ -28,7 +28,7 @@ object Evaluator {
         case Some(let) =>
           resolveType(ctx, let.value)
             .flatMap(x => x.fold(fa => done(Left(fa)),
-              innerType => resolveType(ctx.copy(defs = ctx.defs + (let.name -> (innerType, null))), expr)))
+              innerType => resolveType(ctx.copy(defs = ctx.defs.updated(let.name, (innerType, null))), expr)))
         case None => resolveType(ctx, expr)
       }
     }
@@ -96,7 +96,7 @@ object Evaluator {
                 .fold(fa => done(Left(fa)), t => r[t.Underlying](ctx, newVarExpr)
                   .flatMap(newVarValue => {
                     newVarValue.fold(fa => done(Left(fa)), v => {
-                      val newDefs = ctx.defs + (newVarName -> (t, v))
+                      val newDefs = ctx.defs.updated(newVarName, (t, v))
                       resolveType(ctx.copy(defs = newDefs), inner).flatMap(termType => {
                         termType.fold(fa => done(Left(fa)), tt =>
                           r[tt.Underlying](ctx.copy(defs = newDefs), inner))
