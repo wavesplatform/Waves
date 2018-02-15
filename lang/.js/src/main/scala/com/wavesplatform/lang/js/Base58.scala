@@ -1,4 +1,6 @@
-package com.wavesplatform.lang
+package com.wavesplatform.lang.js
+
+import com.wavesplatform.lang.js
 
 import scala.scalajs.js
 import scala.scalajs.js.annotation.JSGlobalScope
