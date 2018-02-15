@@ -57,13 +57,14 @@ libraryDependencies ++=
     "commons-net" % "commons-net" % "3.+"
   )
 
-// WARNING!!!
-// Please, update the fallback version every major and minor releases.
-// This version is used then building from sources without Git repository
-// In case of not updating the version nodes build from headless sources will fail to connect to newer versions
-val FallbackVersion = (0, 10, 0)
-
 sourceGenerators in Compile += Def.task {
+
+  // WARNING!!!
+  // Please, update the fallback version every major and minor releases.
+  // This version is used then building from sources without Git repository
+  // In case of not updating the version nodes build from headless sources will fail to connect to newer versions
+  val FallbackVersion = (0, 10, 0)
+
   val versionFile = (sourceManaged in Compile).value / "com" / "wavesplatform" / "Version.scala"
   val versionExtractor = """(\d+)\.(\d+)\.(\d+).*""".r
   val (major, minor, patch) = version.value match {
