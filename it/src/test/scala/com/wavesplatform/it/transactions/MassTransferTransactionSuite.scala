@@ -119,23 +119,10 @@ class MassTransferTransactionSuite extends BaseTransactionSuite {
       val id = tx.id()
       val req = createSignedMassTransferRequest(tx)
       assertBadRequest2(sender.signedMassTransfer(req))
-      sequence(nodes.map(_.ensureTxDoesntExist(id.base58)))
+      nodes.foreach(_.ensureTxDoesntExist(id.base58))
     }
-
-    //
-    //    val invalidTransfers = Seq(fromFuture, tooManyTransfers, negativeTransfer, negativeFee, longAttachment)
-    //    for (tx <- invalidTransfers) {
-    //      val id = tx.id()
-    //      val req = createSignedMassTransferRequest(tx)
-    //      val f = for {
-    //        _ <- assertBadRequest(sender.signedMassTransfer(req))
-    //        _ <- sequence(nodes.map(_.ensureTxDoesntExist(id.base58)))
-    //      } yield succeed
-    //
-    //      Await.result(f, Timeout)
-    //    }
   }
-  //
+
 
 
   private def calcFee(numberOfRecipients: Int): Long = {
