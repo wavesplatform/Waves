@@ -56,7 +56,11 @@ libraryDependencies ++=
 sourceGenerators in Compile += Def.task {
   val versionFile = (sourceManaged in Compile).value / "com" / "wavesplatform" / "Version.scala"
   val versionExtractor = """(\d+)\.(\d+)\.(\d+).*""".r
+  println("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$")
+  println(s"${version.value}")
+  println(s"${name.value}")
   val versionExtractor(major, minor, bugfix) = version.value
+  println("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$")
   IO.write(versionFile,
     s"""package com.wavesplatform
       |
