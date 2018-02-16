@@ -4,7 +4,7 @@ import com.wavesplatform.TransactionGen
 import com.wavesplatform.state2._
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
-import scorex.account.PrivateKeyAccount
+import scorex.account.{DefaultAddressScheme, PrivateKeyAccount}
 import scorex.transaction.TransactionParser.TransactionType
 import scorex.transaction.smart.SetScriptTransaction
 
@@ -27,9 +27,10 @@ class SetScriptTransactionSpecification extends PropSpec with PropertyChecks wit
 
 
   property("SetScriptTransaction id doesn't depend on proof") {
+
     forAll(accountGen, byteArrayGen(10), byteArrayGen(15), proofsGen, proofsGen, scriptGen) { case (acc: PrivateKeyAccount, p1, p2, proofs1, proofs2, script) =>
-      val tx1 = SetScriptTransaction.create(acc, script, 1, 1, proofs1).explicitGet()
-      val tx2 = SetScriptTransaction.create(acc, script, 1, 1, proofs2).explicitGet()
+      val tx1 = SetScriptTransaction.create(DefaultAddressScheme.chainId, acc, script, 1, 1, proofs1).explicitGet()
+      val tx2 = SetScriptTransaction.create(DefaultAddressScheme.chainId, acc, script, 1, 1, proofs2).explicitGet()
       tx1.id() shouldBe tx2.id()
     }
   }

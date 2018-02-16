@@ -88,12 +88,12 @@ trait TransactionGen extends ScriptGen {
     timestamp <- timestampGen
     proofs <- proofsGen
     script <- scriptGen
-  } yield SetScriptTransaction.create(sender, script, fee, timestamp, proofs).explicitGet()
+  } yield SetScriptTransaction.create(DefaultAddressScheme.chainId, sender, script, fee, timestamp, proofs).explicitGet()
 
   def selfSignedSetScriptTransactionGenP(sender: PrivateKeyAccount, s: Script): Gen[SetScriptTransaction] = for {
     fee <- smallFeeGen
     timestamp <- timestampGen
-  } yield SetScriptTransaction.selfSigned(sender, s, fee, timestamp).explicitGet()
+  } yield SetScriptTransaction.selfSigned(DefaultAddressScheme.chainId, sender, s, fee, timestamp).explicitGet()
 
 
   val paymentGen: Gen[PaymentTransaction] = for {
