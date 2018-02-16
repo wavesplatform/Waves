@@ -155,21 +155,11 @@ object Evaluator {
     }).map(x => x.map(_.asInstanceOf[T]))
   }
 
-  def apply[A](c: Context, expr: Untyped.EXPR): ExecResult[A] = {
-    val tr = TypeChecker(
-      TypeChecker.Context(
-        predefTypes = c.typeDefs,
-        varDefs = c.defs.map { case (k, (t, v)) => k -> t }
-      ),
-      expr
-    )
-
-    tr.flatMap { expr =>
-      val result = r[A](c, expr).result
-      Try(result) match {
-        case Failure(ex) => Left(ex.toString)
-        case Success(res) => res
-      }
+  def apply[A](c: Context, expr: Typed.EXPR): ExecResult[A] = {
+    def result = r[A](c, expr).result
+    Try(result) match {
+      case Failure(ex) => Left(ex.toString)
+      case Success(res) => res
     }
   }
 }

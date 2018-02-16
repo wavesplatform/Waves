@@ -51,8 +51,7 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
   }
 
   property("let/ref constructs") {
-    parse(
-      """let X = 10;
+    parse("""let X = 10;
         |3 > 2
       """.stripMargin) shouldBe BLOCK(Some(LET("X", CONST_INT(10))), GT(CONST_INT(3), CONST_INT(2)))
 
@@ -60,8 +59,7 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
     parse("(let X = 3 + 2; 3 > 2)") shouldBe BLOCK(Some(LET("X", SUM(CONST_INT(3), CONST_INT(2)))), GT(CONST_INT(3), CONST_INT(2)))
     parse("(let X = if(true) then true else false; false)") shouldBe BLOCK(Some(LET("X", IF(TRUE, TRUE, FALSE))), FALSE)
 
-    val expr = parse(
-      """let X = 10;
+    val expr = parse("""let X = 10;
 let Y = 11;
 X > Y
       """.stripMargin)
@@ -70,26 +68,22 @@ X > Y
   }
 
   property("multiline") {
-    parse(
-      """
+    parse("""
         |
         |false
         |
         |
       """.stripMargin) shouldBe FALSE
 
-    parse(
-      """let X = 10;
+    parse("""let X = 10;
         |
         |true
       """.stripMargin) shouldBe BLOCK(Some(LET("X", CONST_INT(10))), TRUE)
-    parse(
-      """let X = 11;
+    parse("""let X = 11;
         |true
       """.stripMargin) shouldBe BLOCK(Some(LET("X", CONST_INT(11))), TRUE)
 
-    parse(
-      """
+    parse("""
         |
         |let X = 12;
         |
@@ -103,8 +97,7 @@ X > Y
   property("if") {
     parse("if(true) then 1 else 2") shouldBe IF(TRUE, CONST_INT(1), CONST_INT(2))
     parse("if(true) then 1 else if(X==Y) then 2 else 3") shouldBe IF(TRUE, CONST_INT(1), IF(EQ(REF("X"), REF("Y")), CONST_INT(2), CONST_INT(3)))
-    parse(
-      """if ( true )
+    parse("""if ( true )
         |then 1
         |else if(X== Y)
         |     then 2
@@ -112,8 +105,7 @@ X > Y
 
     parse("if (true) then false else false==false") shouldBe IF(TRUE, FALSE, EQ(FALSE, FALSE))
 
-    parse(
-      """if
+    parse("""if
 
              (true)
         |then let A = 10;
@@ -162,10 +154,7 @@ X > Y
   }
 
   property("EVALUATE patmat") {
-    Evaluator.apply(
-      Context.empty,
-      parse(
-        """
+    eval("""
           |let MULTICHARVARNAME = Some(500)
           |
           |let Z = match(MULTICHARVARNAME) {
@@ -175,13 +164,9 @@ X > Y
           |
           | get(Some(Z)) + 1
           |
-      """.stripMargin)
-    ) shouldBe Right(1001)
+      """.stripMargin) shouldBe Right(1001)
 
-    Evaluator.apply(
-      Context.empty,
-      parse(
-        """
+    eval("""
           |
           |let X = Some(10)
           |
@@ -189,13 +174,9 @@ X > Y
           |  case None => 0
           |  case Some(V) => V + V + V + V
           |}
-        """.stripMargin)
-    ) shouldBe Right(40)
+        """.stripMargin) shouldBe Right(40)
 
-    Evaluator.apply(
-      Context.empty,
-      parse(
-        """
+    eval("""
           |
           |let X = Some(10)
           |
@@ -203,7 +184,12 @@ X > Y
           |  case Some(V) => V + V + V + V
           |  case None => 0
           |}
-        """.stripMargin)
-    ) shouldBe Right(40)
+        """.stripMargin) shouldBe Right(40)
+  }
+
+  private def eval(code: String) = {
+    val untyped = parse(code)
+    val typed   = TypeChecker(TypeChecker.Context.empty, untyped)
+    typed.flatMap(Evaluator(Context.empty, _))
   }
 }

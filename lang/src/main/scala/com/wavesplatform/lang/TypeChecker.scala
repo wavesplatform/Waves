@@ -203,7 +203,7 @@ object TypeChecker {
   }
 
   def apply(c: Context, expr: Untyped.EXPR): TypeCheckResult[Typed.EXPR] = {
-    val result = setType(c, EitherT.pure(expr)).value().left.map { e => s"Typecheck failed: $e" }
+    def result = setType(c, EitherT.pure(expr)).value().left.map { e => s"Typecheck failed: $e" }
     Try(result) match {
       case Failure(ex) => Left(ex.toString)
       case Success(res) => res

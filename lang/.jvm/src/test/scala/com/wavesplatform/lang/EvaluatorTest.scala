@@ -11,8 +11,14 @@ import scodec.bits.ByteVector
 
 class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 
-  private def ev(predefTypes: Map[String, CUSTOMTYPE] = Map.empty, defs: Defs = Map.empty, expr: EXPR): Either[_, _] =
-    Evaluator.apply(Context(predefTypes, defs), expr)
+  private def ev(predefTypes: Map[String, CUSTOMTYPE] = Map.empty, defs: Defs = Map.empty, expr: EXPR): Either[_, _] = {
+    val tcContext = TypeChecker.Context(
+      predefTypes = predefTypes,
+      varDefs = defs.map { case (name, (tpe, _)) => name -> tpe }
+    )
+    val typed = TypeChecker(tcContext, expr)
+    typed.flatMap(Evaluator(Context(predefTypes, defs), _))
+  }
 
   private def simpleDeclarationAndUsage(i: Int) = BLOCK(Some(LET("x", CONST_INT(i))), REF("x"))
 
