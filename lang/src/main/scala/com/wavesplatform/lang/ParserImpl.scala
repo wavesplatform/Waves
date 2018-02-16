@@ -1,7 +1,7 @@
 package com.wavesplatform.lang
 
 import com.wavesplatform.lang.Terms.Implicits._
-import com.wavesplatform.lang.Terms._
+import com.wavesplatform.lang.Terms.Untyped._
 import com.wavesplatform.lang.traits.Base58
 import fastparse.{WhitespaceApi, core}
 import scodec.bits.ByteVector

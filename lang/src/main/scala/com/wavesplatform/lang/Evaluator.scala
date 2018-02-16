@@ -155,7 +155,7 @@ object Evaluator {
     }).map(x => x.map(_.asInstanceOf[T]))
   }
 
-  def apply[A](c: Context, expr: Expr): ExecResult[A] = {
+  def apply[A](c: Context, expr: Untyped.Expr): ExecResult[A] = {
     val tr = TypeChecker(
       TypeChecker.Context(
         predefTypes = c.typeDefs,

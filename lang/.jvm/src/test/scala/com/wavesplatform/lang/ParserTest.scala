@@ -1,12 +1,12 @@
 package com.wavesplatform.lang
 
 import com.wavesplatform.lang.Evaluator.Context
-import com.wavesplatform.lang.Terms._
-import org.scalatest.{Matchers, PropSpec}
+import com.wavesplatform.lang.Terms.Implicits._
+import com.wavesplatform.lang.Terms.Untyped._
 import org.scalatest.prop.PropertyChecks
+import org.scalatest.{Matchers, PropSpec}
 import scodec.bits.ByteVector
 import scorex.crypto.encode.{Base58 => ScorexBase58}
-import Implicits._
 
 class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 

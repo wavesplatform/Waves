@@ -13,12 +13,13 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
   private val pointType = CUSTOMTYPE("Point", List("x" -> INT, "y" -> INT))
 
   rootTypeTest("successful on very deep expressions (stack overflow check)")(
-    expr = (1 to 100000).foldLeft[Terms.Expr](CONST_INT(0))((acc, _) => SUM(Block(None, acc), Block(None, CONST_INT(1)))),
+    expr = (1 to 100000).foldLeft[Untyped.Expr](Untyped.CONST_INT(0))((acc, _) => Untyped.SUM(Untyped.Block(None, acc), Untyped.Block(None, Untyped.CONST_INT(1)))),
     expectedResult = Right(INT)
   )
 
   {
     import Typed._
+
     treeTypeErasureTest(
       "CONST_INT" -> CONST_INT(0),
       "CONST_BYTEVECTOR" -> CONST_BYTEVECTOR(ByteVector(1, 2, 3)),
@@ -89,8 +90,8 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
   treeTypeTest("GETTER")(
     predefTypes = Map(pointType.name -> pointType),
     varDefs = Map("p" -> TYPEREF("Point")),
-    expr = GETTER(
-      ref = Block(None, REF("p")),
+    expr = Untyped.GETTER(
+      ref = Untyped.Block(None, Untyped.REF("p")),
       field = "x"
     ),
     expectedResult = Right(Typed.GETTER(
@@ -103,19 +104,19 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
   treeTypeTest("REF(OBJECT)")(
     predefTypes = Map(pointType.name -> pointType),
     varDefs = Map("p" -> TYPEREF("Point")),
-    expr = REF("p"),
+    expr = Untyped.REF("p"),
     expectedResult = Right(Typed.REF("p", TYPEREF("Point")))
   )
 
   treeTypeTest("REF x = y")(
     predefTypes = Map(pointType.name -> pointType),
     varDefs = Map("p" -> TYPEREF("Point")),
-    expr = REF("p"),
+    expr = Untyped.REF("p"),
     expectedResult = Right(Typed.REF("p", TYPEREF("Point")))
   )
 
   private def rootTypeTest(propertyName: String)
-                          (expr: Expr,
+                          (expr: Untyped.Expr,
                            expectedResult: TypeCheckResult[Type],
                            varDefs: Defs = Map.empty,
                            predefTypes: Map[String, CUSTOMTYPE] = Map.empty): Unit = property(propertyName) {
@@ -126,7 +127,7 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
   }
 
   private def treeTypeTest(propertyName: String)
-                          (expr: Expr,
+                          (expr: Untyped.Expr,
                            expectedResult: TypeCheckResult[Typed.Expr],
                            predefTypes: Map[String, CUSTOMTYPE],
                            varDefs: Defs): Unit = property(propertyName) {
@@ -141,79 +142,79 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
       }
   }
 
-  private def erase(expr: Typed.Expr): Expr = {
+  private def erase(expr: Typed.Expr): Untyped.Expr = {
     import cats.syntax.apply._
 
-    def aux(root: Typed.Expr): Coeval[Expr] = Coeval.defer(root match {
-      case x: Typed.CONST_INT => Coeval(CONST_INT(x.t))
-      case x: Typed.CONST_BYTEVECTOR => Coeval(CONST_BYTEVECTOR(x.bs))
-      case Typed.TRUE => Coeval(TRUE)
-      case Typed.FALSE => Coeval(FALSE)
-      case Typed.NONE => Coeval(NONE)
+    def aux(root: Typed.Expr): Coeval[Untyped.Expr] = Coeval.defer(root match {
+      case x: Typed.CONST_INT => Coeval(Untyped.CONST_INT(x.t))
+      case x: Typed.CONST_BYTEVECTOR => Coeval(Untyped.CONST_BYTEVECTOR(x.bs))
+      case Typed.TRUE => Coeval(Untyped.TRUE)
+      case Typed.FALSE => Coeval(Untyped.FALSE)
+      case Typed.NONE => Coeval(Untyped.NONE)
 
       case getter: Typed.GETTER => aux(getter.ref).map {
-        case (ref: Block) => GETTER(field = getter.field, ref = ref, exprType = None)
+        case (ref: Untyped.Block) => Untyped.GETTER(field = getter.field, ref = ref)
         case _ => throw new IllegalStateException()
       }
       case sum: Typed.SUM => (aux(sum.i1), aux(sum.i2)).mapN {
-        case (first: Block, second: Block) => SUM(first, second)
+        case (first: Untyped.Block, second: Untyped.Block) => Untyped.SUM(first, second)
         case _ => throw new IllegalStateException()
       }
       case and: Typed.AND => (aux(and.t1), aux(and.t2)).mapN {
-        case (first: Block, second: Block) => AND(first, second)
+        case (first: Untyped.Block, second: Untyped.Block) => Untyped.AND(first, second)
         case _ => throw new IllegalStateException()
       }
       case or: Typed.OR => (aux(or.t1), aux(or.t2)).mapN {
-        case (first: Block, second: Block) => OR(first, second)
+        case (first: Untyped.Block, second: Untyped.Block) => Untyped.OR(first, second)
         case _ => throw new IllegalStateException()
       }
       case eq: Typed.EQ => (aux(eq.t1), aux(eq.t2)).mapN {
-        case (first: Block, second: Block) => EQ(first, second)
+        case (first: Untyped.Block, second: Untyped.Block) => Untyped.EQ(first, second)
         case _ => throw new IllegalStateException()
       }
       case gt: Typed.GT => (aux(gt.t1), aux(gt.t2)).mapN {
-        case (first: Block, second: Block) => GT(first, second)
+        case (first: Untyped.Block, second: Untyped.Block) => Untyped.GT(first, second)
         case _ => throw new IllegalStateException()
       }
       case ge: Typed.GE => (aux(ge.t1), aux(ge.t2)).mapN {
-        case (first: Block, second: Block) => GE(first, second)
+        case (first: Untyped.Block, second: Untyped.Block) => Untyped.GE(first, second)
         case _ => throw new IllegalStateException()
       }
       case sigVerify: Typed.SIG_VERIFY => (aux(sigVerify.message), aux(sigVerify.signature), aux(sigVerify.publicKey)).mapN {
-        case (message: Block, signature: Block, publicKey: Block) =>
-          SIG_VERIFY(message = message, signature = signature, publicKey = publicKey)
+        case (message: Untyped.Block, signature: Untyped.Block, publicKey: Untyped.Block) =>
+          Untyped.SIG_VERIFY(message = message, signature = signature, publicKey = publicKey)
         case _ => throw new IllegalStateException()
       }
       case isDefined: Typed.IS_DEFINED => aux(isDefined.t).map {
-        case (t: Block) => IS_DEFINED(t = t)
+        case (t: Untyped.Block) => Untyped.IS_DEFINED(t = t)
         case _ => throw new IllegalStateException()
       }
       case let: Typed.LET => aux(let.value).map {
-        case (value: Block) => LET(name = let.name, value = value)
+        case (value: Untyped.Block) => Untyped.LET(name = let.name, value = value)
         case _ => throw new IllegalStateException()
       }
       case block: Typed.Block => aux(block.t).flatMap { t =>
-        val x = Block(let = None, t = t, exprType = None)
+        val x = Untyped.Block(let = None, t = t)
         block.let match {
           case None => Coeval(x)
           case Some(let) => aux(let).map {
-            case let: LET => x.copy(let = Some(let))
+            case let: Untyped.LET => x.copy(let = Some(let))
             case _ => throw new IllegalStateException()
           }
         }
       }
       case ifExpr: Typed.IF => (aux(ifExpr.cond), aux(ifExpr.ifTrue), aux(ifExpr.ifFalse)).mapN {
-        case (cond: Block, ifTrue: Block, ifFalse: Block) =>
-          IF(cond = cond, ifTrue = ifTrue, ifFalse = ifFalse, exprType = None)
+        case (cond: Untyped.Block, ifTrue: Untyped.Block, ifFalse: Untyped.Block) =>
+          Untyped.IF(cond = cond, ifTrue = ifTrue, ifFalse = ifFalse)
         case _ => throw new IllegalStateException()
       }
-      case ref: Typed.REF => Coeval(REF(key = ref.key, exprType = None))
+      case ref: Typed.REF => Coeval(Untyped.REF(key = ref.key))
       case get: Typed.GET => aux(get.t).map {
-        case (t: Block) => GET(t = t, exprType = None)
+        case (t: Untyped.Block) => Untyped.GET(t = t)
         case _ => throw new IllegalStateException()
       }
       case some: Typed.SOME => aux(some.t).map {
-        case (t: Block) => SOME(t = t, exprType = None)
+        case (t: Untyped.Block) => Untyped.SOME(t = t)
         case _ => throw new IllegalStateException()
       }
     })

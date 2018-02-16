@@ -1,7 +1,7 @@
 package com.wavesplatform.lang
+
 import monix.eval.Coeval
 import scodec.bits.ByteVector
-import scala.language.implicitConversions
 
 object Terms {
 
@@ -41,27 +41,29 @@ object Terms {
         case _                          => None
       }
 
-  sealed trait Expr { val exprType: Option[Type] }
-  case class CONST_INT(t: Int)                                                             extends Expr { val exprType: Option[Type] = Some(INT) }
-  case class GETTER(ref: Block, field: String, exprType: Option[Type] = None)              extends Expr
-  case class CONST_BYTEVECTOR(bs: ByteVector)                                              extends Expr { val exprType: Option[Type] = Some(BYTEVECTOR) }
-  case class SUM(i1: Block, i2: Block)                                                     extends Expr { val exprType: Option[Type] = Some(INT) }
-  case class AND(t1: Block, t2: Block)                                                     extends Expr { val exprType: Option[Type] = Some(BOOLEAN) }
-  case class OR(t1: Block, t2: Block)                                                      extends Expr { val exprType: Option[Type] = Some(BOOLEAN) }
-  case class EQ(t1: Block, t2: Block)                                                      extends Expr { val exprType: Option[Type] = Some(BOOLEAN) }
-  case class GT(t1: Block, t2: Block)                                                      extends Expr { val exprType: Option[Type] = Some(BOOLEAN) }
-  case class GE(t1: Block, t2: Block)                                                      extends Expr { val exprType: Option[Type] = Some(BOOLEAN) }
-  case class SIG_VERIFY(message: Block, signature: Block, publicKey: Block)                extends Expr { val exprType: Option[Type] = Some(BOOLEAN) }
-  case class IS_DEFINED(t: Block)                                                          extends Expr { val exprType: Option[Type] = Some(BOOLEAN) }
-  case class LET(name: String, value: Block)                                               extends Expr { val exprType: Option[Type] = Some(UNIT) } // subtype of Expr mostly for serde
-  case class Block(let: Option[LET], t: Expr, exprType: Option[Type] = None)               extends Expr
-  case class IF(cond: Block, ifTrue: Block, ifFalse: Block, exprType: Option[Type] = None) extends Expr
-  case class REF(key: String, exprType: Option[Type] = None)                               extends Expr
-  case class GET(t: Block, exprType: Option[Type] = None)                                  extends Expr
-  case object TRUE                                                                         extends Expr { val exprType = Some(BOOLEAN) }
-  case object FALSE                                                                        extends Expr { val exprType = Some(BOOLEAN) }
-  case object NONE                                                                         extends Expr { val exprType: Option[Type] = Some(OPTION(NOTHING)) }
-  case class SOME(t: Block, exprType: Option[Type] = None)                                 extends Expr
+  object Untyped {
+    sealed trait Expr
+    case class CONST_INT(t: Int)                                              extends Expr
+    case class GETTER(ref: Block, field: String)                              extends Expr
+    case class CONST_BYTEVECTOR(bs: ByteVector)                               extends Expr
+    case class SUM(i1: Block, i2: Block)                                      extends Expr
+    case class AND(t1: Block, t2: Block)                                      extends Expr
+    case class OR(t1: Block, t2: Block)                                       extends Expr
+    case class EQ(t1: Block, t2: Block)                                       extends Expr
+    case class GT(t1: Block, t2: Block)                                       extends Expr
+    case class GE(t1: Block, t2: Block)                                       extends Expr
+    case class SIG_VERIFY(message: Block, signature: Block, publicKey: Block) extends Expr
+    case class IS_DEFINED(t: Block)                                           extends Expr
+    case class LET(name: String, value: Block)                                extends Expr
+    case class Block(let: Option[LET], t: Expr)                               extends Expr
+    case class IF(cond: Block, ifTrue: Block, ifFalse: Block)                 extends Expr
+    case class REF(key: String)                                               extends Expr
+    case class GET(t: Block)                                                  extends Expr
+    case object TRUE                                                          extends Expr
+    case object FALSE                                                         extends Expr
+    case object NONE                                                          extends Expr
+    case class SOME(t: Block)                                                 extends Expr
+  }
 
   object Typed {
     sealed trait Expr { val exprType: Type }
@@ -88,6 +90,6 @@ object Terms {
   }
 
   object Implicits {
-    implicit def exprToBlock(t: Expr): Block = Block(None, t) // @WARN LEADS TO UNEXPECTED BEHAVIOUR!!!! SHOULD BE REMOVED
+    implicit def exprToBlock(t: Untyped.Expr): Untyped.Block = Untyped.Block(None, t)
   }
 }

@@ -5,17 +5,17 @@ import com.wavesplatform.lang.Terms._
 object CostCalculator {
   val MaxCost = 1000
 
-  def apply(t: Expr): Int = t match {
-    case CONST_INT(_)              => 1
-    case CONST_BYTEVECTOR(_)       => 1
-    case SUM(i1, i2)               => 2 + apply(i1) + apply(i2)
-    case AND(t1, t2)               => 2 + apply(t1) + apply(t2)
-    case OR(t1, t2)                => 2 + apply(t1) + apply(t2)
-    case EQ(t1, t2)                => 2 + apply(t1) + apply(t2)
-    case GT(t1, t2)                => 2 + apply(t1) + apply(t2)
-    case GE(t1, t2)                => 2 + apply(t1) + apply(t2)
-    case IF(cond, ifTrue, ifFalse, _) => 2 + apply(cond) + Math.max(apply(ifTrue), apply(ifFalse))
-    case SIG_VERIFY(_, _, _)       => 100
-    case _                         => ???
+  def apply(t: Typed.Expr): Int = t match {
+    case Typed.CONST_INT(_)                 => 1
+    case Typed.CONST_BYTEVECTOR(_)          => 1
+    case Typed.SUM(i1, i2)                  => 2 + apply(i1) + apply(i2)
+    case Typed.AND(t1, t2)                  => 2 + apply(t1) + apply(t2)
+    case Typed.OR(t1, t2)                   => 2 + apply(t1) + apply(t2)
+    case Typed.EQ(t1, t2)                   => 2 + apply(t1) + apply(t2)
+    case Typed.GT(t1, t2)                   => 2 + apply(t1) + apply(t2)
+    case Typed.GE(t1, t2)                   => 2 + apply(t1) + apply(t2)
+    case Typed.IF(cond, ifTrue, ifFalse, _) => 2 + apply(cond) + Math.max(apply(ifTrue), apply(ifFalse))
+    case Typed.SIG_VERIFY(_, _, _)          => 100
+    case _                                  => ???
   }
 }

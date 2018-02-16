@@ -1,12 +1,13 @@
 package com.wavesplatform.lang
 
 import com.wavesplatform.lang.Evaluator.{Context, Defs}
+import com.wavesplatform.lang.Terms.Implicits._
+import com.wavesplatform.lang.Terms.Untyped._
 import com.wavesplatform.lang.Terms._
 import monix.eval.Coeval
-import org.scalatest.{Matchers, PropSpec}
 import org.scalatest.prop.PropertyChecks
+import org.scalatest.{Matchers, PropSpec}
 import scodec.bits.ByteVector
-import Implicits._
 
 class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 
@@ -16,7 +17,7 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
   private def simpleDeclarationAndUsage(i: Int) = Block(Some(LET("x", CONST_INT(i))), REF("x"))
 
   property("successful on very deep expressions (stack overflow check)") {
-    val term = (1 to 100000).foldLeft[Terms.Expr](CONST_INT(0))((acc, _) => SUM(acc, CONST_INT(1)))
+    val term = (1 to 100000).foldLeft[Expr](CONST_INT(0))((acc, _) => SUM(acc, CONST_INT(1)))
     ev(expr = term) shouldBe Right(100000)
   }
 
