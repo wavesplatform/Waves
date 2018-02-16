@@ -21,77 +21,68 @@ object Evaluator {
   type ExcecutionError = String
   type ExecResult[T] = Either[ExcecutionError, T]
 
-  private def r[T](ctx: Context, t: Expr): TailRec[ExecResult[T]] = {
+  private def r[T](ctx: Context, t: Typed.Expr): TailRec[ExecResult[T]] = {
     (t match {
-      case Block(mayBeLet, inner, blockTpe) => tailcall {
-        val tpe = blockTpe.get
+      case Typed.Block(mayBeLet, inner, blockTpe) => tailcall {
         mayBeLet match {
           case None =>
-            r[tpe.Underlying](ctx, inner)
+            r[blockTpe.Underlying](ctx, inner)
 
-          case Some(LET(newVarName, newVarBlock)) =>
+          case Some(Typed.LET(newVarName, newVarBlock)) =>
             ctx.defs.get(newVarName) match {
               case Some(_) => done(Left(s"Value '$newVarName' already defined in the scope"))
               case None =>
-                newVarBlock.exprType match {
-                  case None => done(Left(s"Unknown type"))
-                  case Some(varBlockTpe) =>
-                    r[varBlockTpe.Underlying](ctx, newVarBlock).flatMap {
-                      case Left(e) => done(Left(e))
-                      case Right(newVarValue) =>
-                        val updatedCtx = ctx.copy(defs = ctx.defs + (newVarName -> (varBlockTpe, newVarValue)))
-                        r[tpe.Underlying](updatedCtx, inner)
-                    }
-                }
+                val varBlockTpe = newVarBlock.exprType
+                  r[varBlockTpe.Underlying](ctx, newVarBlock).flatMap {
+                    case Left(e) => done(Left(e))
+                    case Right(newVarValue) =>
+                      val updatedCtx = ctx.copy(defs = ctx.defs + (newVarName -> (varBlockTpe, newVarValue)))
+                      r[blockTpe.Underlying](updatedCtx, inner)
+                  }
             }
         }
       }
 
-      case LET(_, v) =>
-        t.exprType match {
-          case None => done(Left(s"Unknown type"))
-          case Some(tpe) => tailcall(r[tpe.Underlying](ctx, v))
-        }
+      case let: Typed.LET => tailcall(r[let.exprType.Underlying](ctx, let.value))
 
-      case REF(str, _) => done {
+      case Typed.REF(str, _) => done {
         ctx.defs.get(str) match {
           case Some((x, y)) => Right(y.asInstanceOf[x.Underlying])
           case None => Left(s"Definition '$str' not found")
         }
       }
 
-      case CONST_INT(v) => done(Right(v))
-      case CONST_BYTEVECTOR(v) => done(Right(v))
-      case TRUE => done(Right(true))
-      case FALSE => done(Right(false))
-      case SUM(t1, t2) => tailcall {
+      case Typed.CONST_INT(v) => done(Right(v))
+      case Typed.CONST_BYTEVECTOR(v) => done(Right(v))
+      case Typed.TRUE => done(Right(true))
+      case Typed.FALSE => done(Right(false))
+      case Typed.SUM(t1, t2) => tailcall {
         for {
           a1 <- r[Int](ctx, t1)
           a2 <- r[Int](ctx, t2)
         } yield a1.flatMap(v1 => a2.map(v2 => v1 + v2))
       }
-      case GE(t1, t2) => tailcall {
+      case Typed.GE(t1, t2) => tailcall {
         for {
           a1 <- r[Int](ctx, t1)
           a2 <- r[Int](ctx, t2)
         } yield a1.flatMap(v1 => a2.map(v2 => v1 >= v2))
       }
-      case GT(t1, t2) => tailcall {
+      case Typed.GT(t1, t2) => tailcall {
         for {
           a1 <- r[Int](ctx, t1)
           a2 <- r[Int](ctx, t2)
         } yield a1.flatMap(v1 => a2.map(v2 => v1 > v2))
       }
 
-      case IF(cond, t1, t2, tpe) => tailcall {
-        val ifTpe = tpe.get
+      case Typed.IF(cond, t1, t2, tpe) => tailcall {
         r[Boolean](ctx, cond).flatMap {
-          case Right(true) => r[ifTpe.Underlying](ctx, t1)
-          case Right(false) => r[ifTpe.Underlying](ctx, t2)
+          case Right(true) => r[tpe.Underlying](ctx, t1)
+          case Right(false) => r[tpe.Underlying](ctx, t2)
           case Left(err) => done(Left(err))
         }
       }
-      case AND(t1, t2) => tailcall {
+      case Typed.AND(t1, t2) => tailcall {
         r[Boolean](ctx, t1) flatMap {
           case Left(err) => done(Left(err))
           case Right(false) => done(Right(false))
@@ -103,7 +94,7 @@ object Evaluator {
         }
       }
 
-      case o@OR(t1, t2) => tailcall {
+      case o@Typed.OR(t1, t2) => tailcall {
         r[Boolean](ctx, t1) flatMap {
           case Left(err) => done(Left(err))
           case Right(true) => done(Right(true))
@@ -115,47 +106,36 @@ object Evaluator {
         }
       }
 
-      case IS_DEFINED(opt) =>
-        opt.exprType match {
-          case None => done(Left("Unresolved type"))
-          case Some(tpe) => tailcall {
-            r[tpe.Underlying](ctx, opt).map {
-              case Right(x: Option[_]) => Right(x.isDefined)
-              case Right(_) => Left("IS_DEFINED invoked on non-option type")
-              case _ => Left("IS_DEFINED expression error")
-            }
+      case isDefined@Typed.IS_DEFINED(opt) =>
+        tailcall {
+          r[isDefined.exprType.Underlying](ctx, opt).map {
+            case Right(x: Option[_]) => Right(x.isDefined)
+            case Right(_) => Left("IS_DEFINED invoked on non-option type")
+            case _ => Left("IS_DEFINED expression error")
           }
         }
 
-      case GET(opt, optType) =>
-        optType match {
-          case None => done(Left("Unresolved type"))
-          case Some(tpe) => tailcall {
-            r[tpe.Underlying](ctx, opt).map {
-              case Right(Some(x)) => Right(x)
-              case Right(_) => Left("GET(NONE)")
-              case _ => Left("GET expression error")
-            }
-          }
+      case Typed.GET(opt, tpe) =>
+        r[tpe.Underlying](ctx, opt).map {
+          case Right(Some(x)) => Right(x)
+          case Right(_) => Left("GET(NONE)")
+          case _ => Left("GET expression error")
         }
 
-      case NONE => done(Right(None))
+      case Typed.NONE => done(Right(None))
 
-      case SOME(b, innerType) =>
-        innerType match {
-          case Some(tpe) => tailcall(r[tpe.Underlying](ctx, b).map(_.map(x => Some(x))))
-          case None => done(Left("Inner: NONE"))
-        }
+      case Typed.SOME(b, tpe) =>
+        tailcall(r[tpe.Underlying](ctx, b).map(_.map(x => Some(x))))
 
-      case eq@EQ(it1, it2) => tailcall {
-        val tpe = eq.exprType.get
+      case eq@Typed.EQ(it1, it2) => tailcall {
+        val tpe = eq.exprType
         for {
           i1 <- r[tpe.Underlying](ctx, it1)
           i2 <- r[tpe.Underlying](ctx, it2)
         } yield i1.flatMap(v1 => i2.map(v2 => v1 == v2))
       }
 
-      case SIG_VERIFY(msg, sig, pk) => tailcall {
+      case Typed.SIG_VERIFY(msg, sig, pk) => tailcall {
         for {
           s <- r[ByteVector](ctx, sig)
           m <- r[ByteVector](ctx, msg)
@@ -163,7 +143,7 @@ object Evaluator {
         } yield s.flatMap(ss => m.flatMap(mm => p.map(pp => Curve25519.verify(ss.toArray, mm.toArray, pp.toArray))))
       }
 
-      case GETTER(expr, field, _) => tailcall {
+      case Typed.GETTER(expr, field, _) => tailcall {
         r[OBJECT](ctx, expr).map {
           case Right(obj) => obj.fields.find(_._1 == field) match {
             case Some((_, lzy)) => Right(lzy.value())
@@ -191,6 +171,5 @@ object Evaluator {
         case Success(res) => res
       }
     }
-    //    result
   }
 }

@@ -20,17 +20,19 @@ object TypeChecker {
   type TypeCheckResult[T] = Either[TypeResolutionError, T]
   private type SetTypeResult[T] = EitherT[Coeval, String, T]
 
-  class TypeResolveException(ref: Expr) extends IllegalStateException(s"Type of $ref was not resolved")
-
-  private def setType(ctx: Context, t: SetTypeResult[Expr]): SetTypeResult[Expr] = t.flatMap {
-    case _: CONST_INT | _: CONST_BYTEVECTOR | TRUE | FALSE | NONE => t
+  private def setType(ctx: Context, t: SetTypeResult[Expr]): SetTypeResult[Typed.Expr] = t.flatMap {
+    case x: CONST_INT => EitherT.pure(Typed.CONST_INT(x.t))
+    case x: CONST_BYTEVECTOR => EitherT.pure(Typed.CONST_BYTEVECTOR(x.bs))
+    case TRUE => EitherT.pure(Typed.TRUE)
+    case FALSE => EitherT.pure(Typed.FALSE)
+    case NONE => EitherT.pure(Typed.NONE)
 
     case getter: GETTER =>
       setType(ctx, EitherT.pure(getter.ref))
-        .map(_.asInstanceOf[Block])
+        .map(_.asInstanceOf[Typed.Block])
         .subflatMap { ref =>
           ref.exprType match {
-            case Some(typeRef: TYPEREF) =>
+            case typeRef: TYPEREF =>
               val refTpe = ctx.predefTypes.get(typeRef.name).map(Right(_)).getOrElse(Left(s"Undefined type: ${typeRef.name}"))
               val fieldTpe = refTpe.flatMap { ct =>
                 val fieldTpe = ct.fields.collectFirst {
@@ -40,18 +42,17 @@ object TypeChecker {
                 fieldTpe.map(Right(_)).getOrElse(Left(s"Undefined field ${typeRef.name}.${getter.field}"))
               }
 
-              fieldTpe.right.map(tpe => getter.copy(ref = ref, exprType = Some(tpe)))
-            case Some(_) => Left(s"Can't access to '${getter.field}' of a primitive type")
-            case None => throw new TypeResolveException(ref)
+              fieldTpe.right.map(tpe => Typed.GETTER(ref = ref, field = getter.field, exprType = tpe))
+            case x => Left(s"Can't access to '${getter.field}' of a primitive type $x")
           }
         }
 
     case sum: SUM =>
       (setType(ctx, EitherT.pure(sum.i1)), setType(ctx, EitherT.pure(sum.i2)))
-        .mapN { (first, second) => sum.copy(i1 = first.asInstanceOf[Block], i2 = second.asInstanceOf[Block]) }
+        .mapN { (first, second) => Typed.SUM(i1 = first.asInstanceOf[Typed.Block], i2 = second.asInstanceOf[Typed.Block]) }
         .subflatMap { sum =>
-          val firstType = sum.i1.exprType.getOrElse(throw new TypeResolveException(sum.i1))
-          val secondType = sum.i2.exprType.getOrElse(throw new TypeResolveException(sum.i2))
+          val firstType = sum.i1.exprType
+          val secondType = sum.i2.exprType
 
           if (firstType != INT) Left(s"The first operand is expected to be INT, but got $firstType")
           else if (secondType != INT) Left(s"The second operand is expected to be INT, but got $secondType")
@@ -60,10 +61,10 @@ object TypeChecker {
 
     case and: AND =>
       (setType(ctx, EitherT.pure(and.t1)), setType(ctx, EitherT.pure(and.t2)))
-        .mapN { (first, second) => and.copy(t1 = first.asInstanceOf[Block], t2 = second.asInstanceOf[Block]) }
+        .mapN { (first, second) => Typed.AND(t1 = first.asInstanceOf[Typed.Block], t2 = second.asInstanceOf[Typed.Block]) }
         .subflatMap { and =>
-          val firstType = and.t1.exprType.getOrElse(throw new TypeResolveException(and.t1))
-          val secondType = and.t2.exprType.getOrElse(throw new TypeResolveException(and.t2))
+          val firstType = and.t1.exprType
+          val secondType = and.t2.exprType
 
           if (firstType != BOOLEAN) Left(s"The first operand is expected to be BOOLEAN, but got $firstType")
           else if (secondType != BOOLEAN) Left(s"The second operand is expected to be BOOLEAN, but got $secondType")
@@ -72,10 +73,10 @@ object TypeChecker {
 
     case or: OR =>
       (setType(ctx, EitherT.pure(or.t1)), setType(ctx, EitherT.pure(or.t2)))
-        .mapN { (first, second) => or.copy(t1 = first.asInstanceOf[Block], t2 = second.asInstanceOf[Block]) }
+        .mapN { (first, second) => Typed.OR(t1 = first.asInstanceOf[Typed.Block], t2 = second.asInstanceOf[Typed.Block]) }
         .subflatMap { or =>
-          val firstType = or.t1.exprType.getOrElse(throw new TypeResolveException(or.t1))
-          val secondType = or.t2.exprType.getOrElse(throw new TypeResolveException(or.t2))
+          val firstType = or.t1.exprType
+          val secondType = or.t2.exprType
 
           if (firstType != BOOLEAN) Left(s"The first operand is expected to be BOOLEAN, but got $firstType")
           else if (secondType != BOOLEAN) Left(s"The second operand is expected to be BOOLEAN, but got $secondType")
@@ -84,10 +85,10 @@ object TypeChecker {
 
     case eq: EQ =>
       (setType(ctx, EitherT.pure(eq.t1)), setType(ctx, EitherT.pure(eq.t2)))
-        .mapN { (first, second) => eq.copy(t1 = first.asInstanceOf[Block], t2 = second.asInstanceOf[Block]) }
+        .mapN { (first, second) => Typed.EQ(t1 = first.asInstanceOf[Typed.Block], t2 = second.asInstanceOf[Typed.Block]) }
         .subflatMap { eq =>
-          val firstType = eq.t1.exprType.getOrElse(throw new TypeResolveException(eq.t1))
-          val secondType = eq.t2.exprType.getOrElse(throw new TypeResolveException(eq.t2))
+          val firstType = eq.t1.exprType
+          val secondType = eq.t2.exprType
 
           findCommonType(firstType, secondType)
             .map(_ => Right(eq))
@@ -96,10 +97,10 @@ object TypeChecker {
 
     case gt: GT =>
       (setType(ctx, EitherT.pure(gt.t1)), setType(ctx, EitherT.pure(gt.t2)))
-        .mapN { (first, second) => gt.copy(t1 = first.asInstanceOf[Block], t2 = second.asInstanceOf[Block]) }
+        .mapN { (first, second) => Typed.GT(t1 = first.asInstanceOf[Typed.Block], t2 = second.asInstanceOf[Typed.Block]) }
         .subflatMap { gt =>
-          val firstType = gt.t1.exprType.getOrElse(throw new TypeResolveException(gt.t1))
-          val secondType = gt.t2.exprType.getOrElse(throw new TypeResolveException(gt.t2))
+          val firstType = gt.t1.exprType
+          val secondType = gt.t2.exprType
 
           if (firstType != INT) Left(s"The first operand is expected to be INT, but got $firstType")
           else if (secondType != INT) Left(s"The second operand is expected to be INT, but got $secondType")
@@ -108,10 +109,10 @@ object TypeChecker {
 
     case ge: GE =>
       (setType(ctx, EitherT.pure(ge.t1)), setType(ctx, EitherT.pure(ge.t2)))
-        .mapN { (first, second) => ge.copy(t1 = first.asInstanceOf[Block], t2 = second.asInstanceOf[Block]) }
+        .mapN { (first, second) => Typed.GE(t1 = first.asInstanceOf[Typed.Block], t2 = second.asInstanceOf[Typed.Block]) }
         .subflatMap { ge =>
-          val firstType = ge.t1.exprType.getOrElse(throw new TypeResolveException(ge.t1))
-          val secondType = ge.t2.exprType.getOrElse(throw new TypeResolveException(ge.t2))
+          val firstType = ge.t1.exprType
+          val secondType = ge.t2.exprType
 
           if (firstType != INT) Left(s"The first operand is expected to be INT, but got $firstType")
           else if (secondType != INT) Left(s"The second operand is expected to be INT, but got $secondType")
@@ -121,36 +122,36 @@ object TypeChecker {
     case sigVerify: SIG_VERIFY =>
       (setType(ctx, EitherT.pure(sigVerify.message)), setType(ctx, EitherT.pure(sigVerify.signature)), setType(ctx, EitherT.pure(sigVerify.publicKey)))
         .mapN { (resolvedMessage, resolvedSignature, resolvedPublicKey) =>
-          sigVerify.copy(
-            message = resolvedMessage.asInstanceOf[Block],
-            signature = resolvedSignature.asInstanceOf[Block],
-            publicKey = resolvedPublicKey.asInstanceOf[Block]
+          Typed.SIG_VERIFY(
+            message = resolvedMessage.asInstanceOf[Typed.Block],
+            signature = resolvedSignature.asInstanceOf[Typed.Block],
+            publicKey = resolvedPublicKey.asInstanceOf[Typed.Block]
           )
         }
 
     case isDefined: IS_DEFINED =>
       setType(ctx, EitherT.pure(isDefined.t))
-        .map(_.asInstanceOf[Block])
-        .map(of => isDefined.copy(t = of))
+        .map(_.asInstanceOf[Typed.Block])
+        .map(of => Typed.IS_DEFINED(of))
 
     case let: LET =>
       setType(ctx, EitherT.pure(let.value))
-        .map(_.asInstanceOf[Block])
-        .map(value => let.copy(value = value))
+        .map(_.asInstanceOf[Typed.Block])
+        .map(value => Typed.LET(name = let.name, value = value))
 
     case block: Block =>
       block.let match {
         case None =>
-          setType(ctx, EitherT.pure(block.t)).map { resolvedT => block.copy(t = resolvedT, exprType = resolvedT.exprType) }
+          setType(ctx, EitherT.pure(block.t)).map { resolvedT => Typed.Block(let = None, t = resolvedT, exprType = resolvedT.exprType) }
 
         case Some(let) =>
           setType(ctx, EitherT.pure(let))
             .flatMap {
-              case letExpr: LET =>
-                val updatedCtx = ctx.copy(varDefs = ctx.varDefs + (let.name -> letExpr.value.exprType.getOrElse(throw new TypeResolveException(letExpr.value))))
+              case letExpr: Typed.LET =>
+                val updatedCtx = ctx.copy(varDefs = ctx.varDefs + (let.name -> letExpr.value.exprType))
                 setType(updatedCtx, EitherT.pure(block.t))
                   .map { inExpr =>
-                    block.copy(
+                    Typed.Block(
                       let = Some(letExpr),
                       t = inExpr,
                       exprType = inExpr.exprType
@@ -162,46 +163,46 @@ object TypeChecker {
 
     case ifExpr: IF =>
       (setType(ctx, EitherT.pure(ifExpr.cond)), setType(ctx, EitherT.pure(ifExpr.ifTrue)), setType(ctx, EitherT.pure(ifExpr.ifFalse)))
-        .mapN { (resolvedCond, resolvedTrueBranch, resolvedFalseBranch) =>
-          ifExpr.copy(
-            cond = resolvedCond.asInstanceOf[Block],
-            ifTrue = resolvedTrueBranch.asInstanceOf[Block],
-            ifFalse = resolvedFalseBranch.asInstanceOf[Block]
-          )
-        }
-        .subflatMap { ifExpr =>
-          val ifTrueType = ifExpr.ifTrue.exprType.getOrElse(throw new TypeResolveException(ifExpr.ifTrue))
-          val ifFalseType = ifExpr.ifFalse.exprType.getOrElse(throw new TypeResolveException(ifExpr.ifFalse))
-          findCommonType(ifTrueType, ifFalseType)
-            .map(tpe => Right(ifExpr.copy(exprType = Some(tpe))))
-            .getOrElse(Left(s"Can't find common type for $ifTrueType and $ifFalseType"))
-        }
+        .tupled
+        .subflatMap[String, Typed.Expr] { case (resolvedCond, resolvedTrueBranch, resolvedFalseBranch) =>
+        val ifTrueType = resolvedTrueBranch.exprType
+        val ifFalseType = resolvedFalseBranch.exprType
+        findCommonType(ifTrueType, ifFalseType)
+          .map { tpe =>
+            Right(Typed.IF(
+              cond = resolvedCond.asInstanceOf[Typed.Block],
+              ifTrue = resolvedTrueBranch.asInstanceOf[Typed.Block],
+              ifFalse = resolvedFalseBranch.asInstanceOf[Typed.Block],
+              exprType = tpe
+            ))
+          }
+          .getOrElse(Left(s"Can't find common type for $ifTrueType and $ifFalseType"))
+      }
 
     case ref: REF => EitherT.fromEither {
       ctx.varDefs
         .get(ref.key)
-        .map { tpe => ref.copy(exprType = Some(tpe)) }
+        .map { tpe => Typed.REF(key = ref.key, exprType = tpe) }
         .toRight(s"A definition of '${ref.key}' is not found")
     }
 
     case get: GET =>
       setType(ctx, EitherT.pure(get.t))
-        .map(_.asInstanceOf[Block])
+        .map(_.asInstanceOf[Typed.Block])
         .subflatMap { expr =>
           expr.exprType match {
-            case Some(OPTION(in)) => Right(get.copy(t = expr, exprType = Some(in)))
-            case Some(x) => Left(s"GET called on $x, but only call on OPTION[_] is allowed")
-            case None => throw new TypeResolveException(expr)
+            case OPTION(in) => Right(Typed.GET(t = expr, exprType = in))
+            case x => Left(s"GET called on $x, but only call on OPTION[_] is allowed")
           }
         }
 
     case some: SOME =>
       setType(ctx, EitherT.pure(some.t))
-        .map(_.asInstanceOf[Block])
-        .map { t => some.copy(t = t, exprType = t.exprType.map(OPTION)) }
+        .map(_.asInstanceOf[Typed.Block])
+        .map { t => Typed.SOME(t = t, exprType = OPTION(t.exprType)) }
   }
 
-  def apply(c: Context, expr: Expr): TypeCheckResult[Expr] = {
+  def apply(c: Context, expr: Expr): TypeCheckResult[Typed.Expr] = {
     val result = setType(c, EitherT.pure(expr)).value().left.map { e => s"Typecheck failed: $e" }
     Try(result) match {
       case Failure(ex) => Left(ex.toString)

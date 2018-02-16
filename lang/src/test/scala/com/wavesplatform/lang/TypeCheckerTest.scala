@@ -17,71 +17,74 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
     expectedResult = Right(INT)
   )
 
-  treeTypeErasureTest(
-    "CONST_INT" -> CONST_INT(0),
-    "CONST_BYTEVECTOR" -> CONST_BYTEVECTOR(ByteVector(1, 2, 3)),
-    "TRUE" -> TRUE,
-    "FALSE" -> FALSE,
-    "NONE" -> NONE,
-    "SUM" -> SUM(Block(None, CONST_INT(0), Some(INT)), Block(None, CONST_INT(1), Some(INT))),
-    "AND" -> AND(Block(None, TRUE, Some(BOOLEAN)), Block(None, FALSE, Some(BOOLEAN))),
-    "OR" -> OR(Block(None, TRUE, Some(BOOLEAN)), Block(None, FALSE, Some(BOOLEAN))),
-    "EQ" -> EQ(Block(None, CONST_INT(0), Some(INT)), Block(None, CONST_INT(1), Some(INT))),
-    "GT" -> GT(Block(None, CONST_INT(0), Some(INT)), Block(None, CONST_INT(1), Some(INT))),
-    "GE" -> GE(Block(None, CONST_INT(0), Some(INT)), Block(None, CONST_INT(1), Some(INT))),
-    "SIG_VERIFY" -> SIG_VERIFY(
-      message = Block(None, CONST_BYTEVECTOR(ByteVector(Base58.decode("333").get)), Some(BYTEVECTOR)),
-      signature = Block(None, CONST_BYTEVECTOR(ByteVector(Base58.decode("222").get)), Some(BYTEVECTOR)),
-      publicKey = Block(None, CONST_BYTEVECTOR(ByteVector(Base58.decode("111").get)), Some(BYTEVECTOR))
-    ),
-    "IS_DEFINED" -> IS_DEFINED(Block(None, NONE, Some(OPTION(NOTHING)))),
-    "LET" -> LET("x", Block(None, CONST_INT(0), Some(INT))),
-    "BLOCK" -> Block(
-      let = None,
-      t = CONST_INT(0),
-      exprType = Some(INT)
-    ),
-    "IF" -> IF(
-      cond = Block(None, TRUE, Some(BOOLEAN)),
-      ifTrue = Block(None, SOME(Block(None, TRUE, Some(BOOLEAN)), Some(OPTION(BOOLEAN))), Some(OPTION(BOOLEAN))),
-      ifFalse = Block(None, NONE, Some(OPTION(NOTHING))),
-      exprType = Some(OPTION(BOOLEAN))
-    ),
-    "GET(SOME)" -> GET(
-      t = Block(
-        let = None,
-        t = SOME(Block(None, TRUE, Some(BOOLEAN)), Some(OPTION(BOOLEAN))),
-        exprType = Some(OPTION(BOOLEAN))
+  {
+    import Typed._
+    treeTypeErasureTest(
+      "CONST_INT" -> CONST_INT(0),
+      "CONST_BYTEVECTOR" -> CONST_BYTEVECTOR(ByteVector(1, 2, 3)),
+      "TRUE" -> TRUE,
+      "FALSE" -> FALSE,
+      "NONE" -> NONE,
+      "SUM" -> SUM(Block(None, CONST_INT(0), INT), Block(None, CONST_INT(1), INT)),
+      "AND" -> AND(Block(None, TRUE, BOOLEAN), Block(None, FALSE, BOOLEAN)),
+      "OR" -> OR(Block(None, TRUE, BOOLEAN), Block(None, FALSE, BOOLEAN)),
+      "EQ" -> EQ(Block(None, CONST_INT(0), INT), Block(None, CONST_INT(1), INT)),
+      "GT" -> GT(Block(None, CONST_INT(0), INT), Block(None, CONST_INT(1), INT)),
+      "GE" -> GE(Block(None, CONST_INT(0), INT), Block(None, CONST_INT(1), INT)),
+      "SIG_VERIFY" -> SIG_VERIFY(
+        message = Block(None, CONST_BYTEVECTOR(ByteVector(Base58.decode("333").get)), BYTEVECTOR),
+        signature = Block(None, CONST_BYTEVECTOR(ByteVector(Base58.decode("222").get)), BYTEVECTOR),
+        publicKey = Block(None, CONST_BYTEVECTOR(ByteVector(Base58.decode("111").get)), BYTEVECTOR)
       ),
-      exprType = Some(BOOLEAN)
-    ),
-    "GET(NONE)" -> GET(
-      t = Block(
+      "IS_DEFINED" -> IS_DEFINED(Block(None, NONE, OPTION(NOTHING))),
+      "LET" -> LET("x", Block(None, CONST_INT(0), INT)),
+      "BLOCK" -> Block(
         let = None,
-        t = Block(None, NONE, Some(OPTION(NOTHING))),
-        exprType = Some(OPTION(NOTHING))
+        t = CONST_INT(0),
+        exprType = INT
       ),
-      exprType = Some(NOTHING)
-    ),
-    "SOME" -> SOME(Block(None, TRUE, Some(BOOLEAN)), Some(OPTION(BOOLEAN))),
-
-    "BLOCK(LET(X), REF(y) = x)" -> Block(
-      let = Some(LET(
-        name = "x",
-        value = Block(
+      "IF" -> IF(
+        cond = Block(None, TRUE, BOOLEAN),
+        ifTrue = Block(None, SOME(Block(None, TRUE, BOOLEAN), OPTION(BOOLEAN)), OPTION(BOOLEAN)),
+        ifFalse = Block(None, NONE, OPTION(NOTHING)),
+        exprType = OPTION(BOOLEAN)
+      ),
+      "GET(SOME)" -> GET(
+        t = Block(
           let = None,
-          t = CONST_INT(0),
-          exprType = Some(INT)
-        )
-      )),
-      t = Block(
-        let = None,
-        t = LET("y", Block(None, REF("x", Some(INT)), Some(INT))),
-        exprType = Some(UNIT)
+          t = SOME(Block(None, TRUE, BOOLEAN), OPTION(BOOLEAN)),
+          exprType = OPTION(BOOLEAN)
+        ),
+        exprType = BOOLEAN
       ),
-      exprType = Some(UNIT)
+      "GET(NONE)" -> GET(
+        t = Block(
+          let = None,
+          t = Block(None, NONE, OPTION(NOTHING)),
+          exprType = OPTION(NOTHING)
+        ),
+        exprType = NOTHING
+      ),
+      "SOME" -> SOME(Block(None, TRUE, BOOLEAN), OPTION(BOOLEAN)),
+
+      "BLOCK(LET(X), REF(y) = x)" -> Block(
+        let = Some(LET(
+          name = "x",
+          value = Block(
+            let = None,
+            t = CONST_INT(0),
+            exprType = INT
+          )
+        )),
+        t = Block(
+          let = None,
+          t = LET("y", Block(None, REF("x", INT), INT)),
+          exprType = UNIT
+        ),
+        exprType = UNIT
+      )
     )
-  )
+  }
 
   treeTypeTest("GETTER")(
     predefTypes = Map(pointType.name -> pointType),
@@ -90,10 +93,10 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
       ref = Block(None, REF("p")),
       field = "x"
     ),
-    expectedResult = Right(GETTER(
-      ref = Block(None, REF("p", Some(TYPEREF("Point"))), Some(TYPEREF("Point"))),
+    expectedResult = Right(Typed.GETTER(
+      ref = Typed.Block(None, Typed.REF("p", TYPEREF("Point")), TYPEREF("Point")),
       field = "x",
-      exprType = Some(INT)
+      exprType = INT
     ))
   )
 
@@ -101,14 +104,14 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
     predefTypes = Map(pointType.name -> pointType),
     varDefs = Map("p" -> TYPEREF("Point")),
     expr = REF("p"),
-    expectedResult = Right(REF("p", Some(TYPEREF("Point"))))
+    expectedResult = Right(Typed.REF("p", TYPEREF("Point")))
   )
 
   treeTypeTest("REF x = y")(
     predefTypes = Map(pointType.name -> pointType),
     varDefs = Map("p" -> TYPEREF("Point")),
     expr = REF("p"),
-    expectedResult = Right(REF("p", Some(TYPEREF("Point"))))
+    expectedResult = Right(Typed.REF("p", TYPEREF("Point")))
   )
 
   private def rootTypeTest(propertyName: String)
@@ -117,21 +120,20 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
                            varDefs: Defs = Map.empty,
                            predefTypes: Map[String, CUSTOMTYPE] = Map.empty): Unit = property(propertyName) {
     TypeChecker(Context(predefTypes, varDefs), expr).map(_.exprType) match {
-      case Right(None) => fail("Type didn't resolved")
-      case Right(Some(x)) => Right(x) shouldBe expectedResult
+      case Right(x) => Right(x) shouldBe expectedResult
       case e@Left(_) => e shouldBe expectedResult
     }
   }
 
   private def treeTypeTest(propertyName: String)
                           (expr: Expr,
-                           expectedResult: TypeCheckResult[Expr],
+                           expectedResult: TypeCheckResult[Typed.Expr],
                            predefTypes: Map[String, CUSTOMTYPE] = Map.empty,
                            varDefs: Defs = Map.empty): Unit = property(propertyName) {
     TypeChecker(Context(predefTypes, varDefs), expr) shouldBe expectedResult
   }
 
-  private def treeTypeErasureTest(exprs: (String, Expr)*): Unit = exprs.foreach {
+  private def treeTypeErasureTest(exprs: (String, Typed.Expr)*): Unit = exprs.foreach {
     case (exprName, expected) =>
       property(exprName) {
         val erased = erase(expected)
@@ -139,53 +141,59 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
       }
   }
 
-  private def erase(expr: Expr): Expr = {
+  private def erase(expr: Typed.Expr): Expr = {
     import cats.syntax.apply._
 
-    def aux(root: Expr): Coeval[Expr] = Coeval.defer(root match {
-      case getter: GETTER => aux(getter.ref).map {
-        case (ref: Block) => getter.copy(ref = ref, exprType = None)
+    def aux(root: Typed.Expr): Coeval[Expr] = Coeval.defer(root match {
+      case x: Typed.CONST_INT => Coeval(CONST_INT(x.t))
+      case x: Typed.CONST_BYTEVECTOR => Coeval(CONST_BYTEVECTOR(x.bs))
+      case Typed.TRUE => Coeval(TRUE)
+      case Typed.FALSE => Coeval(FALSE)
+      case Typed.NONE => Coeval(NONE)
+
+      case getter: Typed.GETTER => aux(getter.ref).map {
+        case (ref: Block) => GETTER(field = getter.field, ref = ref, exprType = None)
         case _ => throw new IllegalStateException()
       }
-      case sum: SUM => (aux(sum.i1), aux(sum.i2)).mapN {
-        case (first: Block, second: Block) => sum.copy(first, second)
+      case sum: Typed.SUM => (aux(sum.i1), aux(sum.i2)).mapN {
+        case (first: Block, second: Block) => SUM(first, second)
         case _ => throw new IllegalStateException()
       }
-      case and: AND => (aux(and.t1), aux(and.t2)).mapN {
-        case (first: Block, second: Block) => and.copy(first, second)
+      case and: Typed.AND => (aux(and.t1), aux(and.t2)).mapN {
+        case (first: Block, second: Block) => AND(first, second)
         case _ => throw new IllegalStateException()
       }
-      case or: OR => (aux(or.t1), aux(or.t2)).mapN {
-        case (first: Block, second: Block) => or.copy(first, second)
+      case or: Typed.OR => (aux(or.t1), aux(or.t2)).mapN {
+        case (first: Block, second: Block) => OR(first, second)
         case _ => throw new IllegalStateException()
       }
-      case eq: EQ => (aux(eq.t1), aux(eq.t2)).mapN {
-        case (first: Block, second: Block) => eq.copy(first, second)
+      case eq: Typed.EQ => (aux(eq.t1), aux(eq.t2)).mapN {
+        case (first: Block, second: Block) => EQ(first, second)
         case _ => throw new IllegalStateException()
       }
-      case gt: GT => (aux(gt.t1), aux(gt.t2)).mapN {
-        case (first: Block, second: Block) => gt.copy(first, second)
+      case gt: Typed.GT => (aux(gt.t1), aux(gt.t2)).mapN {
+        case (first: Block, second: Block) => GT(first, second)
         case _ => throw new IllegalStateException()
       }
-      case ge: GE => (aux(ge.t1), aux(ge.t2)).mapN {
-        case (first: Block, second: Block) => ge.copy(first, second)
+      case ge: Typed.GE => (aux(ge.t1), aux(ge.t2)).mapN {
+        case (first: Block, second: Block) => GE(first, second)
         case _ => throw new IllegalStateException()
       }
-      case sigVerify: SIG_VERIFY => (aux(sigVerify.message), aux(sigVerify.signature), aux(sigVerify.publicKey)).mapN {
+      case sigVerify: Typed.SIG_VERIFY => (aux(sigVerify.message), aux(sigVerify.signature), aux(sigVerify.publicKey)).mapN {
         case (message: Block, signature: Block, publicKey: Block) =>
-          sigVerify.copy(message = message, signature = signature, publicKey = publicKey)
+          SIG_VERIFY(message = message, signature = signature, publicKey = publicKey)
         case _ => throw new IllegalStateException()
       }
-      case isDefined: IS_DEFINED => aux(isDefined.t).map {
-        case (t: Block) => isDefined.copy(t = t)
+      case isDefined: Typed.IS_DEFINED => aux(isDefined.t).map {
+        case (t: Block) => IS_DEFINED(t = t)
         case _ => throw new IllegalStateException()
       }
-      case let: LET => aux(let.value).map {
-        case (value: Block) => let.copy(value = value)
+      case let: Typed.LET => aux(let.value).map {
+        case (value: Block) => LET(name = let.name, value = value)
         case _ => throw new IllegalStateException()
       }
-      case block: Block => aux(block.t).flatMap { t =>
-        val x = block.copy(t = t, exprType = None)
+      case block: Typed.Block => aux(block.t).flatMap { t =>
+        val x = Block(let = None, t = t, exprType = None)
         block.let match {
           case None => Coeval(x)
           case Some(let) => aux(let).map {
@@ -194,21 +202,20 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
           }
         }
       }
-      case ifExpr: IF => (aux(ifExpr.cond), aux(ifExpr.ifTrue), aux(ifExpr.ifFalse)).mapN {
+      case ifExpr: Typed.IF => (aux(ifExpr.cond), aux(ifExpr.ifTrue), aux(ifExpr.ifFalse)).mapN {
         case (cond: Block, ifTrue: Block, ifFalse: Block) =>
-          ifExpr.copy(cond = cond, ifTrue = ifTrue, ifFalse = ifFalse, exprType = None)
+          IF(cond = cond, ifTrue = ifTrue, ifFalse = ifFalse, exprType = None)
         case _ => throw new IllegalStateException()
       }
-      case ref: REF => Coeval(ref.copy(exprType = None))
-      case get: GET => aux(get.t).map {
-        case (t: Block) => get.copy(t = t, exprType = None)
+      case ref: Typed.REF => Coeval(REF(key = ref.key, exprType = None))
+      case get: Typed.GET => aux(get.t).map {
+        case (t: Block) => GET(t = t, exprType = None)
         case _ => throw new IllegalStateException()
       }
-      case some: SOME => aux(some.t).map {
-        case (t: Block) => some.copy(t = t, exprType = None)
+      case some: Typed.SOME => aux(some.t).map {
+        case (t: Block) => SOME(t = t, exprType = None)
         case _ => throw new IllegalStateException()
       }
-      case x => Coeval(x)
     })
 
     aux(expr)()

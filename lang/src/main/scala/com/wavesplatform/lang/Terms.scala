@@ -42,26 +42,50 @@ object Terms {
       }
 
   sealed trait Expr { val exprType: Option[Type] }
-  case class CONST_INT(t: Int)                                              extends Expr { val exprType: Option[Type] = Some(INT)             }
-  case class GETTER(ref: Block, field: String, exprType: Option[Type] = None) extends Expr
-  case class CONST_BYTEVECTOR(bs: ByteVector)                               extends Expr { val exprType: Option[Type] = Some(BYTEVECTOR)      }
-  case class SUM(i1: Block, i2: Block)                                      extends Expr { val exprType: Option[Type] = Some(INT)             }
-  case class AND(t1: Block, t2: Block)                                      extends Expr { val exprType: Option[Type] = Some(BOOLEAN)         }
-  case class OR(t1: Block, t2: Block)                                       extends Expr { val exprType: Option[Type] = Some(BOOLEAN)         }
-  case class EQ(t1: Block, t2: Block)                                       extends Expr { val exprType: Option[Type] = Some(BOOLEAN)         }
-  case class GT(t1: Block, t2: Block)                                       extends Expr { val exprType: Option[Type] = Some(BOOLEAN)         }
-  case class GE(t1: Block, t2: Block)                                       extends Expr { val exprType: Option[Type] = Some(BOOLEAN)         }
-  case class SIG_VERIFY(message: Block, signature: Block, publicKey: Block) extends Expr { val exprType: Option[Type] = Some(BOOLEAN)         }
-  case class IS_DEFINED(t: Block)                                           extends Expr { val exprType: Option[Type] = Some(BOOLEAN)         }
-  case class LET(name: String, value: Block)                                extends Expr { val exprType: Option[Type] = Some(UNIT)            } // subtype of Expr mostly for serde
-  case class Block(let: Option[LET], t: Expr, exprType: Option[Type] = None)extends Expr
+  case class CONST_INT(t: Int)                                                             extends Expr { val exprType: Option[Type] = Some(INT) }
+  case class GETTER(ref: Block, field: String, exprType: Option[Type] = None)              extends Expr
+  case class CONST_BYTEVECTOR(bs: ByteVector)                                              extends Expr { val exprType: Option[Type] = Some(BYTEVECTOR) }
+  case class SUM(i1: Block, i2: Block)                                                     extends Expr { val exprType: Option[Type] = Some(INT) }
+  case class AND(t1: Block, t2: Block)                                                     extends Expr { val exprType: Option[Type] = Some(BOOLEAN) }
+  case class OR(t1: Block, t2: Block)                                                      extends Expr { val exprType: Option[Type] = Some(BOOLEAN) }
+  case class EQ(t1: Block, t2: Block)                                                      extends Expr { val exprType: Option[Type] = Some(BOOLEAN) }
+  case class GT(t1: Block, t2: Block)                                                      extends Expr { val exprType: Option[Type] = Some(BOOLEAN) }
+  case class GE(t1: Block, t2: Block)                                                      extends Expr { val exprType: Option[Type] = Some(BOOLEAN) }
+  case class SIG_VERIFY(message: Block, signature: Block, publicKey: Block)                extends Expr { val exprType: Option[Type] = Some(BOOLEAN) }
+  case class IS_DEFINED(t: Block)                                                          extends Expr { val exprType: Option[Type] = Some(BOOLEAN) }
+  case class LET(name: String, value: Block)                                               extends Expr { val exprType: Option[Type] = Some(UNIT) } // subtype of Expr mostly for serde
+  case class Block(let: Option[LET], t: Expr, exprType: Option[Type] = None)               extends Expr
   case class IF(cond: Block, ifTrue: Block, ifFalse: Block, exprType: Option[Type] = None) extends Expr
-  case class REF(key: String, exprType: Option[Type] = None)                extends Expr
-  case class GET(t: Block, exprType: Option[Type] = None)                   extends Expr
-  case object TRUE                                                          extends Expr { val exprType               = Some(BOOLEAN)         }
-  case object FALSE                                                         extends Expr { val exprType               = Some(BOOLEAN)         }
-  case object NONE                                                          extends Expr { val exprType: Option[Type] = Some(OPTION(NOTHING)) }
-  case class SOME(t: Block, exprType: Option[Type] = None)                  extends Expr
+  case class REF(key: String, exprType: Option[Type] = None)                               extends Expr
+  case class GET(t: Block, exprType: Option[Type] = None)                                  extends Expr
+  case object TRUE                                                                         extends Expr { val exprType = Some(BOOLEAN) }
+  case object FALSE                                                                        extends Expr { val exprType = Some(BOOLEAN) }
+  case object NONE                                                                         extends Expr { val exprType: Option[Type] = Some(OPTION(NOTHING)) }
+  case class SOME(t: Block, exprType: Option[Type] = None)                                 extends Expr
+
+  object Typed {
+    sealed trait Expr { val exprType: Type }
+    case class CONST_INT(t: Int)                                              extends Expr { val exprType: Type = INT }
+    case class GETTER(ref: Block, field: String, exprType: Type)              extends Expr
+    case class CONST_BYTEVECTOR(bs: ByteVector)                               extends Expr { val exprType: Type = BYTEVECTOR }
+    case class SUM(i1: Block, i2: Block)                                      extends Expr { val exprType: Type = INT }
+    case class AND(t1: Block, t2: Block)                                      extends Expr { val exprType: Type = BOOLEAN }
+    case class OR(t1: Block, t2: Block)                                       extends Expr { val exprType: Type = BOOLEAN }
+    case class EQ(t1: Block, t2: Block)                                       extends Expr { val exprType: Type = BOOLEAN }
+    case class GT(t1: Block, t2: Block)                                       extends Expr { val exprType: Type = BOOLEAN }
+    case class GE(t1: Block, t2: Block)                                       extends Expr { val exprType: Type = BOOLEAN }
+    case class SIG_VERIFY(message: Block, signature: Block, publicKey: Block) extends Expr { val exprType: Type = BOOLEAN }
+    case class IS_DEFINED(t: Block)                                           extends Expr { val exprType: Type = BOOLEAN }
+    case class LET(name: String, value: Block)                                extends Expr { val exprType: Type = UNIT } // subtype of Expr mostly for serde
+    case class Block(let: Option[LET], t: Expr, exprType: Type)               extends Expr
+    case class IF(cond: Block, ifTrue: Block, ifFalse: Block, exprType: Type) extends Expr
+    case class REF(key: String, exprType: Type)                               extends Expr
+    case class GET(t: Block, exprType: Type)                                  extends Expr
+    case object TRUE                                                          extends Expr { val exprType: Type = BOOLEAN }
+    case object FALSE                                                         extends Expr { val exprType: Type = BOOLEAN }
+    case object NONE                                                          extends Expr { val exprType: Type = OPTION(NOTHING) }
+    case class SOME(t: Block, exprType: Type)                                 extends Expr
+  }
 
   object Implicits {
     implicit def exprToBlock(t: Expr): Block = Block(None, t) // @WARN LEADS TO UNEXPECTED BEHAVIOUR!!!! SHOULD BE REMOVED
