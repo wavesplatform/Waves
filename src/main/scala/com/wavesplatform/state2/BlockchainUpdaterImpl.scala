@@ -295,16 +295,6 @@ class BlockchainUpdaterImpl private(persisted: StateWriter with SnapshotStateRea
     heightInfo = (currentPersistedBlocksState().height, time.getTimestamp())
   }
 
-  override def debugInfo(): StateDebugInfo = read { implicit l =>
-    StateDebugInfo(
-      persisted = HashInfo(height = persisted.height, hash = persisted.accountPortfoliosHash),
-      inMemory = inMemDiffs().toList.map(d => HashInfo(height = d.heightDiff, hash = Hash.accountPortfolios(d.txsDiff.portfolios))),
-      microBaseHash = ngState().map(ng => Hash.accountPortfolios(ng.baseBlockDiff.txsDiff.portfolios))
-    )
-  }
-
-  override def persistedAccountPortfoliosHash(): Int = Hash.accountPortfolios(currentPersistedBlocksState().accountPortfolios)
-
   override def lockfreeStateHeight: HeightInfo = heightInfo
 
   def shutdown(): Unit = {
