@@ -1,12 +1,11 @@
-
 import sbtcrossproject.CrossPlugin.autoImport.{crossProject, CrossType}
 
 lazy val lang =
   crossProject(JSPlatform, JVMPlatform)
     .withoutSuffixFor(JVMPlatform)
     .crossType(CrossType.Pure) // [Pure, Full, Dummy], default: CrossType.Full
-    .enablePlugins(GitVersioning)
     .settings(
+    version := "0.0.1",
     scalacOptions ++= Seq(
       "-feature",
       "-deprecation",

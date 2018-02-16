@@ -53,8 +53,6 @@ libraryDependencies ++=
     "commons-net" % "commons-net" % "3.+"
   )
 
-
-
 sourceGenerators in Compile += Def.task {
   // WARNING!!!
   // Please, update the fallback version every major and minor releases.
