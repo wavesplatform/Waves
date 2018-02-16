@@ -194,10 +194,6 @@ object SnapshotStateReader {
       loop(s.lastUpdateHeight(acc).getOrElse(0))
     }
 
-    def accountPortfoliosHash: Int = {
-      Hash.accountPortfolios(s.accountPortfolios)
-    }
-
     def partialPortfolio(a: Address, assets: Set[AssetId] = Set.empty): Portfolio = {
       val (w, l) = s.wavesBalance(a)
       Portfolio(w, l, assets.map(id => id -> s.assetBalance(a, id)).toMap)
