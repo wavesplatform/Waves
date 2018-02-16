@@ -5,7 +5,7 @@ import com.wavesplatform.lang.Terms._
 object CostCalculator {
   val MaxCost = 1000
 
-  def apply(t: Typed.Expr): Int = t match {
+  def apply(t: Typed.EXPR): Int = t match {
     case Typed.CONST_INT(_)                 => 1
     case Typed.CONST_BYTEVECTOR(_)          => 1
     case Typed.SUM(i1, i2)                  => 2 + apply(i1) + apply(i2)

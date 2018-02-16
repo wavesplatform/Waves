@@ -10,7 +10,7 @@ object Evaluator {
 
   import scala.util.control.TailCalls.{TailRec, done, tailcall}
 
-  type Defs = Map[String, (Type, Any)]
+  type Defs = Map[String, (TYPE, Any)]
 
   case class Context(typeDefs: Map[String, CUSTOMTYPE], defs: Defs)
   object Context {
@@ -21,9 +21,9 @@ object Evaluator {
   type ExcecutionError = String
   type ExecResult[T] = Either[ExcecutionError, T]
 
-  private def r[T](ctx: Context, t: Typed.Expr): TailRec[ExecResult[T]] = {
+  private def r[T](ctx: Context, t: Typed.EXPR): TailRec[ExecResult[T]] = {
     (t match {
-      case Typed.Block(mayBeLet, inner, blockTpe) => tailcall {
+      case Typed.BLOCK(mayBeLet, inner, blockTpe) => tailcall {
         mayBeLet match {
           case None =>
             r[blockTpe.Underlying](ctx, inner)
@@ -32,7 +32,7 @@ object Evaluator {
             ctx.defs.get(newVarName) match {
               case Some(_) => done(Left(s"Value '$newVarName' already defined in the scope"))
               case None =>
-                val varBlockTpe = newVarBlock.exprType
+                val varBlockTpe = newVarBlock.tpe
                   r[varBlockTpe.Underlying](ctx, newVarBlock).flatMap {
                     case Left(e) => done(Left(e))
                     case Right(newVarValue) =>
@@ -43,7 +43,7 @@ object Evaluator {
         }
       }
 
-      case let: Typed.LET => tailcall(r[let.exprType.Underlying](ctx, let.value))
+      case let: Typed.LET => tailcall(r[let.tpe.Underlying](ctx, let.value))
 
       case Typed.REF(str, _) => done {
         ctx.defs.get(str) match {
@@ -108,7 +108,7 @@ object Evaluator {
 
       case isDefined@Typed.IS_DEFINED(opt) =>
         tailcall {
-          r[isDefined.exprType.Underlying](ctx, opt).map {
+          r[isDefined.tpe.Underlying](ctx, opt).map {
             case Right(x: Option[_]) => Right(x.isDefined)
             case Right(_) => Left("IS_DEFINED invoked on non-option type")
             case _ => Left("IS_DEFINED expression error")
@@ -128,7 +128,7 @@ object Evaluator {
         tailcall(r[tpe.Underlying](ctx, b).map(_.map(x => Some(x))))
 
       case eq@Typed.EQ(it1, it2) => tailcall {
-        val tpe = eq.exprType
+        val tpe = eq.tpe
         for {
           i1 <- r[tpe.Underlying](ctx, it1)
           i2 <- r[tpe.Underlying](ctx, it2)
@@ -155,7 +155,7 @@ object Evaluator {
     }).map(x => x.map(_.asInstanceOf[T]))
   }
 
-  def apply[A](c: Context, expr: Untyped.Expr): ExecResult[A] = {
+  def apply[A](c: Context, expr: Untyped.EXPR): ExecResult[A] = {
     val tr = TypeChecker(
       TypeChecker.Context(
         predefTypes = c.typeDefs,

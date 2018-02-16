@@ -21,8 +21,8 @@ abstract class ParserImpl { this: Base58 =>
   private def numberP: P[CONST_INT]    = P(CharIn('0' to '9').rep(min = 1).!.map(t => CONST_INT(t.toInt)))
   private def trueP: P[TRUE.type]      = P("true").map(_ => TRUE)
   private def falseP: P[FALSE.type]    = P("false").map(_ => FALSE)
-  private def bracesP: P[Expr]         = P("(" ~ block ~ ")")
-  private def curlyBracesP: P[Expr]    = P("{" ~ block ~ "}")
+  private def bracesP: P[EXPR]         = P("(" ~ block ~ ")")
+  private def curlyBracesP: P[EXPR]    = P("{" ~ block ~ "}")
   private def letP: P[LET]             = P("let " ~ varName ~ "=" ~ block).map { case ((x, y)) => LET(x, y) }
   private def refP: P[REF]             = P(varName).map(x => REF(x))
   private def ifP: P[IF]               = P("if" ~ "(" ~ block ~ ")" ~ "then" ~ block ~ "else" ~ block).map { case (x, y, z) => IF(x, y, z) }
@@ -33,19 +33,19 @@ abstract class ParserImpl { this: Base58 =>
 
   private def getterP: P[GETTER] = P(refP ~ "." ~ varName).map { case ((b, f)) => GETTER(b, f) }
 
-  private def patmat1P: P[Block] =
+  private def patmat1P: P[BLOCK] =
     P("match" ~ "(" ~ block ~ ")" ~ "{" ~ "case" ~ "None" ~ "=>" ~ block ~ "case" ~ "Some" ~ "(" ~ varName ~ ")" ~ "=>" ~ block ~ "}")
       .map { case ((exp, ifNone, ref, ifSome)) => patmat(exp, ref, ifSome, ifNone) }
 
-  private def patmat2P: P[Block] =
+  private def patmat2P: P[BLOCK] =
     P("match" ~ "(" ~ block ~ ")" ~ "{" ~ "case" ~ "Some" ~ "(" ~ varName ~ ")" ~ "=>" ~ block ~ "case" ~ "None" ~ "=>" ~ block ~ "}")
       .map { case ((exp, ref, ifSome, ifNone)) => patmat(exp, ref, ifSome, ifNone) }
 
-  def patmat(exp: Block, ref: String, ifSome: Block, ifNone: Block): Block =
-    Block(
+  def patmat(exp: BLOCK, ref: String, ifSome: BLOCK, ifNone: BLOCK): BLOCK =
+    BLOCK(
       Some(LET(s"$exp", exp)),
       IF(IS_DEFINED(REF(s"$exp")),
-        Block(
+        BLOCK(
           Some(LET(ref, GET(REF(s"$exp")))),
           ifSome
         ),
@@ -58,20 +58,20 @@ abstract class ParserImpl { this: Base58 =>
   private def byteVectorP: P[CONST_BYTEVECTOR] =
     P("base58'" ~ CharsWhileIn(Base58Chars).! ~ "'").map(x => CONST_BYTEVECTOR(ByteVector(base58Decode(x).get)))
 
-  private def block: P[Expr] = P("\n".rep ~ letP.rep ~ expr ~ ";".rep).map {
+  private def block: P[EXPR] = P("\n".rep ~ letP.rep ~ expr ~ ";".rep).map {
     case ((Nil, y)) => y
-    case ((all, y)) => all.foldRight(y) { case (r, curr) => Block(Some(r), curr) }
+    case ((all, y)) => all.foldRight(y) { case (r, curr) => BLOCK(Some(r), curr) }
 
   }
 
   private val priority = List("||", "&&", "==", ">=", ">", "+", "-", "*")
 
-  private def binaryOp(rest: List[String]): P[Expr] = rest match {
+  private def binaryOp(rest: List[String]): P[EXPR] = rest match {
     case Nil => atom
     case lessPriorityOp :: restOps =>
       val operand = binaryOp(restOps)
       P(operand ~ (lessPriorityOp.! ~ operand).rep()).map {
-        case ((left: Expr, r: Seq[(String, Expr)])) =>
+        case ((left: EXPR, r: Seq[(String, EXPR)])) =>
           r.foldLeft(left) {
             case (r2, (op, y)) =>
               op match {
@@ -92,7 +92,7 @@ abstract class ParserImpl { this: Base58 =>
   private def atom =
     P(ifP | patmat1P | patmat2P | byteVectorP | numberP | trueP | falseP | noneP | someP | bracesP | curlyBracesP | sigVerifyP | getterP | refP | isDefined | getP )
 
-  def apply(str: String): core.Parsed[Expr, Char, String] = block.parse(str)
+  def apply(str: String): core.Parsed[EXPR, Char, String] = block.parse(str)
 }
 
 

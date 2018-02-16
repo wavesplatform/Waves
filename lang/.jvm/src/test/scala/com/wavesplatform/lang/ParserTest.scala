@@ -10,7 +10,7 @@ import scorex.crypto.encode.{Base58 => ScorexBase58}
 
 class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 
-  def parse(x: String): Expr = Parser(x).get.value
+  def parse(x: String): EXPR = Parser(x).get.value
 
   property("simple expressions") {
     parse("10") shouldBe CONST_INT(10)
@@ -54,11 +54,11 @@ class ParserTest extends PropSpec with PropertyChecks with Matchers with ScriptG
     parse(
       """let X = 10;
         |3 > 2
-      """.stripMargin) shouldBe Block(Some(LET("X", CONST_INT(10))), GT(CONST_INT(3), CONST_INT(2)))
+      """.stripMargin) shouldBe BLOCK(Some(LET("X", CONST_INT(10))), GT(CONST_INT(3), CONST_INT(2)))
 
-    parse("(let X = 10; 3 > 2)") shouldBe Block(Some(LET("X", CONST_INT(10))), GT(CONST_INT(3), CONST_INT(2)))
-    parse("(let X = 3 + 2; 3 > 2)") shouldBe Block(Some(LET("X", SUM(CONST_INT(3), CONST_INT(2)))), GT(CONST_INT(3), CONST_INT(2)))
-    parse("(let X = if(true) then true else false; false)") shouldBe Block(Some(LET("X", IF(TRUE, TRUE, FALSE))), FALSE)
+    parse("(let X = 10; 3 > 2)") shouldBe BLOCK(Some(LET("X", CONST_INT(10))), GT(CONST_INT(3), CONST_INT(2)))
+    parse("(let X = 3 + 2; 3 > 2)") shouldBe BLOCK(Some(LET("X", SUM(CONST_INT(3), CONST_INT(2)))), GT(CONST_INT(3), CONST_INT(2)))
+    parse("(let X = if(true) then true else false; false)") shouldBe BLOCK(Some(LET("X", IF(TRUE, TRUE, FALSE))), FALSE)
 
     val expr = parse(
       """let X = 10;
@@ -66,7 +66,7 @@ let Y = 11;
 X > Y
       """.stripMargin)
 
-    expr shouldBe Block(Some(LET("X", CONST_INT(10))), Block(Some(LET("Y", CONST_INT(11))), GT(REF("X"), REF("Y"))))
+    expr shouldBe BLOCK(Some(LET("X", CONST_INT(10))), BLOCK(Some(LET("Y", CONST_INT(11))), GT(REF("X"), REF("Y"))))
   }
 
   property("multiline") {
@@ -82,11 +82,11 @@ X > Y
       """let X = 10;
         |
         |true
-      """.stripMargin) shouldBe Block(Some(LET("X", CONST_INT(10))), TRUE)
+      """.stripMargin) shouldBe BLOCK(Some(LET("X", CONST_INT(10))), TRUE)
     parse(
       """let X = 11;
         |true
-      """.stripMargin) shouldBe Block(Some(LET("X", CONST_INT(11))), TRUE)
+      """.stripMargin) shouldBe BLOCK(Some(LET("X", CONST_INT(11))), TRUE)
 
     parse(
       """
@@ -97,7 +97,7 @@ X > Y
         | +
         |  2
         |
-      """.stripMargin) shouldBe Block(Some(LET("X", CONST_INT(12))), SUM(CONST_INT(3), CONST_INT(2)))
+      """.stripMargin) shouldBe BLOCK(Some(LET("X", CONST_INT(12))), SUM(CONST_INT(3), CONST_INT(2)))
   }
 
   property("if") {
@@ -119,9 +119,9 @@ X > Y
         |then let A = 10;
         |  1
         |else if ( X == Y) then 2 else 3""".stripMargin) shouldBe IF(
-      Block(None, TRUE),
-      Block(None, Block(Some(LET("A", Block(None, CONST_INT(10)))), CONST_INT(1))),
-      Block(None, IF(Block(None, EQ(REF("X"), Block(None, REF("Y")))), Block(None, CONST_INT(2)), Block(None, CONST_INT(3))))
+      BLOCK(None, TRUE),
+      BLOCK(None, BLOCK(Some(LET("A", BLOCK(None, CONST_INT(10)))), CONST_INT(1))),
+      BLOCK(None, IF(BLOCK(None, EQ(REF("X"), BLOCK(None, REF("Y")))), BLOCK(None, CONST_INT(2)), BLOCK(None, CONST_INT(3))))
     )
 
   }

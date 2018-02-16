@@ -9,7 +9,7 @@ object Serde {
 
   import codecs.implicits._
 
-  implicit def d[A]             = Discriminated[Typed.Expr, Int](uint8)
+  implicit def d[A]             = Discriminated[Typed.EXPR, Int](uint8)
   implicit def dConstInt        = d[Int].bind[Typed.CONST_INT](0)
   implicit def dConstByteVector = d[ByteVector].bind[Typed.CONST_BYTEVECTOR](1)
   implicit def dSum             = d[Int].bind[Typed.SUM](2)
@@ -21,7 +21,7 @@ object Serde {
   implicit def dGt              = d[Boolean].bind[Typed.GT](8)
   implicit def dSigVerify       = d[Boolean].bind[Typed.SIG_VERIFY](9)
   implicit def dLet             = d.bind[Typed.LET](12)
-  implicit def dComposite       = d.bind[Typed.Block](13)
+  implicit def dComposite       = d.bind[Typed.BLOCK](13)
   implicit def dRef             = d.bind[Typed.REF](14)
   implicit def dGet             = d.bind[Typed.GET](15)
   implicit def dIsDefined       = d.bind[Typed.IS_DEFINED](16)
@@ -31,7 +31,7 @@ object Serde {
   implicit def dNone            = d.bind[Typed.NONE.type](20)
   implicit def dGetter          = d.bind[Typed.GETTER](21)
 
-  implicit def td[A]            = Discriminated[Type, Int](uint8)
+  implicit def td[A]            = Discriminated[TYPE, Int](uint8)
   implicit def tdNothing        = td.bind[NOTHING.type](0)
   implicit def tdUnit           = td.bind[UNIT.type](1)
   implicit def tdInt            = td.bind[INT.type](2)
@@ -40,5 +40,5 @@ object Serde {
   implicit def tdOption         = td.bind[OPTION](5)
   implicit def tdTypeRef        = td.bind[TYPEREF](6)
 
-  val codec = Codec[Typed.Expr]
+  val codec = Codec[Typed.EXPR]
 }

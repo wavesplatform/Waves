@@ -11,19 +11,19 @@ import scodec.bits.ByteVector
 
 class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 
-  private def ev(predefTypes: Map[String, CUSTOMTYPE] = Map.empty, defs: Defs = Map.empty, expr: Expr): Either[_, _] =
+  private def ev(predefTypes: Map[String, CUSTOMTYPE] = Map.empty, defs: Defs = Map.empty, expr: EXPR): Either[_, _] =
     Evaluator.apply(Context(predefTypes, defs), expr)
 
-  private def simpleDeclarationAndUsage(i: Int) = Block(Some(LET("x", CONST_INT(i))), REF("x"))
+  private def simpleDeclarationAndUsage(i: Int) = BLOCK(Some(LET("x", CONST_INT(i))), REF("x"))
 
   property("successful on very deep expressions (stack overflow check)") {
-    val term = (1 to 100000).foldLeft[Expr](CONST_INT(0))((acc, _) => SUM(acc, CONST_INT(1)))
+    val term = (1 to 100000).foldLeft[EXPR](CONST_INT(0))((acc, _) => SUM(acc, CONST_INT(1)))
     ev(expr = term) shouldBe Right(100000)
   }
 
   property("successful on unused let") {
     ev(
-      expr = Block(
+      expr = BLOCK(
         Some(LET("x", CONST_INT(3))),
         CONST_INT(3)
       )) shouldBe Right(3)
@@ -31,8 +31,8 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
 
   property("successful on x = y") {
     ev(
-      expr = Block(Some(LET("x", CONST_INT(3))),
-                   Block(
+      expr = BLOCK(Some(LET("x", CONST_INT(3))),
+                   BLOCK(
                      Some(LET("y", REF("x"))),
                      SUM(REF("x"), REF("y"))
                    ))) shouldBe Right(6)
@@ -44,7 +44,7 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
 
   property("successful on get used further in expr") {
     ev(
-      expr = Block(
+      expr = BLOCK(
         Some(LET("x", CONST_INT(3))),
         EQ(REF("x"), CONST_INT(2))
       )) shouldBe Right(false)
@@ -52,17 +52,17 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
 
   property("successful on multiple lets") {
     ev(
-      expr = Block(
+      expr = BLOCK(
         Some(LET("x", CONST_INT(3))),
-        Block(Some(LET("y", CONST_INT(3))), EQ(REF("x"), REF("y")))
+        BLOCK(Some(LET("y", CONST_INT(3))), EQ(REF("x"), REF("y")))
       )) shouldBe Right(true)
   }
 
   property("successful on multiple lets with expression") {
     ev(
-      expr = Block(
+      expr = BLOCK(
         Some(LET("x", CONST_INT(3))),
-        Block(Some(LET("y", SUM(CONST_INT(3), CONST_INT(0)))), EQ(REF("x"), REF("y")))
+        BLOCK(Some(LET("y", SUM(CONST_INT(3), CONST_INT(0)))), EQ(REF("x"), REF("y")))
       )) shouldBe Right(true)
   }
 
@@ -76,17 +76,17 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
 
   property("fails if override") {
     ev(
-      expr = Block(
+      expr = BLOCK(
         Some(LET("x", CONST_INT(3))),
-        Block(Some(LET("x", SUM(CONST_INT(3), CONST_INT(0)))), EQ(REF("x"), CONST_INT(1)))
+        BLOCK(Some(LET("x", SUM(CONST_INT(3), CONST_INT(0)))), EQ(REF("x"), CONST_INT(1)))
       )) should produce("already defined")
   }
 
   property("fails if types do not match") {
     ev(
-      expr = Block(
+      expr = BLOCK(
         Some(LET("x", CONST_INT(3))),
-        Block(Some(LET("y", EQ(CONST_INT(3), CONST_INT(0)))), EQ(REF("x"), REF("y")))
+        BLOCK(Some(LET("y", EQ(CONST_INT(3), CONST_INT(0)))), EQ(REF("x"), REF("y")))
       )) should produce("Typecheck failed")
   }
 
