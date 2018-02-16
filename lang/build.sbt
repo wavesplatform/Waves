@@ -5,7 +5,7 @@ lazy val lang =
     .withoutSuffixFor(JVMPlatform)
     .crossType(CrossType.Pure) // [Pure, Full, Dummy], default: CrossType.Full
     .settings(
-    version := "0.1",
+    version := "0.0.1",
     scalacOptions ++= Seq(
       "-feature",
       "-deprecation",
