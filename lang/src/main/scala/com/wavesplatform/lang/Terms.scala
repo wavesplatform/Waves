@@ -1,6 +1,7 @@
 package com.wavesplatform.lang
 import monix.eval.Coeval
 import scodec.bits.ByteVector
+import scala.language.implicitConversions
 
 object Terms {
 
