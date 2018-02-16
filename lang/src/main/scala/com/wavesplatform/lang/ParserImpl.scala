@@ -1,23 +1,20 @@
 package com.wavesplatform.lang
 
+import com.wavesplatform.lang.Terms.Implicits._
 import com.wavesplatform.lang.Terms._
 import com.wavesplatform.lang.traits.Base58
-import fastparse.{core, WhitespaceApi}
+import fastparse.{WhitespaceApi, core}
 import scodec.bits.ByteVector
-import scorex.crypto.encode.Base58
-import Implicits._
 
-object Parser {
-
-abstract class ParserImpl { this:Base58 =>
+abstract class ParserImpl { this: Base58 =>
 
   private val White = WhitespaceApi.Wrapper {
     import fastparse.all._
     NoTrace(CharIn(" ", "\t", "\r", "\n").rep)
   }
 
-  import fastparse.noApi._
   import White._
+  import fastparse.noApi._
 
   val varName = CharIn('A' to 'Z').rep(1).!
 

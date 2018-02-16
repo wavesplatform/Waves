@@ -36,7 +36,7 @@ object Evaluator {
                   r[varBlockTpe.Underlying](ctx, newVarBlock).flatMap {
                     case Left(e) => done(Left(e))
                     case Right(newVarValue) =>
-                      val updatedCtx = ctx.copy(defs = ctx.defs + (newVarName -> (varBlockTpe, newVarValue)))
+                      val updatedCtx = ctx.copy(defs = ctx.defs.updated(newVarName, (varBlockTpe, newVarValue)))
                       r[blockTpe.Underlying](updatedCtx, inner)
                   }
             }

@@ -128,8 +128,8 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
   private def treeTypeTest(propertyName: String)
                           (expr: Expr,
                            expectedResult: TypeCheckResult[Typed.Expr],
-                           predefTypes: Map[String, CUSTOMTYPE] = Map.empty,
-                           varDefs: Defs = Map.empty): Unit = property(propertyName) {
+                           predefTypes: Map[String, CUSTOMTYPE],
+                           varDefs: Defs): Unit = property(propertyName) {
     TypeChecker(Context(predefTypes, varDefs), expr) shouldBe expectedResult
   }
 
