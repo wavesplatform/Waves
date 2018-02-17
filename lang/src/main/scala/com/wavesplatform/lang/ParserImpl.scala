@@ -1,6 +1,5 @@
 package com.wavesplatform.lang
 
-import com.wavesplatform.lang.Terms.Implicits._
 import com.wavesplatform.lang.Terms.Untyped._
 import com.wavesplatform.lang.traits.Base58
 import fastparse.{WhitespaceApi, core}
@@ -41,7 +40,7 @@ abstract class ParserImpl { this: Base58 =>
     P("match" ~ "(" ~ block ~ ")" ~ "{" ~ "case" ~ "Some" ~ "(" ~ varName ~ ")" ~ "=>" ~ block ~ "case" ~ "None" ~ "=>" ~ block ~ "}")
       .map { case ((exp, ref, ifSome, ifNone)) => patmat(exp, ref, ifSome, ifNone) }
 
-  def patmat(exp: BLOCK, ref: String, ifSome: BLOCK, ifNone: BLOCK): BLOCK =
+  def patmat(exp: EXPR, ref: String, ifSome: EXPR, ifNone: EXPR): BLOCK =
     BLOCK(
       Some(LET(s"$exp", exp)),
       IF(IS_DEFINED(REF(s"$exp")),

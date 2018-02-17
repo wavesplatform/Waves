@@ -1,7 +1,6 @@
 package com.wavesplatform.lang
 
 import com.wavesplatform.lang.Evaluator.Context
-import com.wavesplatform.lang.Terms.Implicits._
 import com.wavesplatform.lang.Terms.Untyped._
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
@@ -106,14 +105,14 @@ X > Y
     parse("if (true) then false else false==false") shouldBe IF(TRUE, FALSE, EQ(FALSE, FALSE))
 
     parse("""if
-
-             (true)
+        |
+        |     (true)
         |then let A = 10;
         |  1
         |else if ( X == Y) then 2 else 3""".stripMargin) shouldBe IF(
-      BLOCK(None, TRUE),
-      BLOCK(None, BLOCK(Some(LET("A", BLOCK(None, CONST_INT(10)))), CONST_INT(1))),
-      BLOCK(None, IF(BLOCK(None, EQ(REF("X"), BLOCK(None, REF("Y")))), BLOCK(None, CONST_INT(2)), BLOCK(None, CONST_INT(3))))
+      TRUE,
+      BLOCK(Some(LET("A", CONST_INT(10))), CONST_INT(1)),
+      IF(EQ(REF("X"), REF("Y")), CONST_INT(2), CONST_INT(3))
     )
 
   }
