@@ -1,27 +1,35 @@
 package com.wavesplatform.lang
 
 import com.wavesplatform.lang.Evaluator.{Context, Defs}
+import com.wavesplatform.lang.Terms.Implicits._
+import com.wavesplatform.lang.Terms.Untyped._
 import com.wavesplatform.lang.Terms._
 import monix.eval.Coeval
-import org.scalatest.{Matchers, PropSpec}
 import org.scalatest.prop.PropertyChecks
+import org.scalatest.{Matchers, PropSpec}
 import scodec.bits.ByteVector
 
 class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 
-  private def ev(predefTypes: Map[String, CUSTOMTYPE] = Map.empty, defs: Defs = Map.empty, expr: Expr): Either[_, _] =
-    Evaluator.apply(Context(predefTypes, defs), expr)
+  private def ev(predefTypes: Map[String, CUSTOMTYPE] = Map.empty, defs: Defs = Map.empty, expr: EXPR): Either[_, _] = {
+    val tcContext = TypeChecker.Context(
+      predefTypes = predefTypes,
+      varDefs = defs.map { case (name, (tpe, _)) => name -> tpe }
+    )
+    val typed = TypeChecker(tcContext, expr)
+    typed.flatMap(Evaluator(Context(predefTypes, defs), _))
+  }
 
-  private def simpleDeclarationAndUsage(i: Int) = Block(Some(LET("x", CONST_INT(i))), REF("x"))
+  private def simpleDeclarationAndUsage(i: Int) = BLOCK(Some(LET("x", CONST_INT(i))), REF("x"))
 
   property("successful on very deep expressions (stack overflow check)") {
-    val term = (1 to 100000).foldLeft[Terms.Expr](CONST_INT(0))((acc, _) => SUM(acc, CONST_INT(1)))
+    val term = (1 to 100000).foldLeft[EXPR](CONST_INT(0))((acc, _) => SUM(acc, CONST_INT(1)))
     ev(expr = term) shouldBe Right(100000)
   }
 
   property("successful on unused let") {
     ev(
-      expr = Block(
+      expr = BLOCK(
         Some(LET("x", CONST_INT(3))),
         CONST_INT(3)
       )) shouldBe Right(3)
@@ -29,8 +37,8 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
 
   property("successful on x = y") {
     ev(
-      expr = Block(Some(LET("x", CONST_INT(3))),
-                   Block(
+      expr = BLOCK(Some(LET("x", CONST_INT(3))),
+                   BLOCK(
                      Some(LET("y", REF("x"))),
                      SUM(REF("x"), REF("y"))
                    ))) shouldBe Right(6)
@@ -42,7 +50,7 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
 
   property("successful on get used further in expr") {
     ev(
-      expr = Block(
+      expr = BLOCK(
         Some(LET("x", CONST_INT(3))),
         EQ(REF("x"), CONST_INT(2))
       )) shouldBe Right(false)
@@ -50,17 +58,17 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
 
   property("successful on multiple lets") {
     ev(
-      expr = Block(
+      expr = BLOCK(
         Some(LET("x", CONST_INT(3))),
-        Block(Some(LET("y", CONST_INT(3))), EQ(REF("x"), REF("y")))
+        BLOCK(Some(LET("y", CONST_INT(3))), EQ(REF("x"), REF("y")))
       )) shouldBe Right(true)
   }
 
   property("successful on multiple lets with expression") {
     ev(
-      expr = Block(
+      expr = BLOCK(
         Some(LET("x", CONST_INT(3))),
-        Block(Some(LET("y", SUM(CONST_INT(3), CONST_INT(0)))), EQ(REF("x"), REF("y")))
+        BLOCK(Some(LET("y", SUM(CONST_INT(3), CONST_INT(0)))), EQ(REF("x"), REF("y")))
       )) shouldBe Right(true)
   }
 
@@ -74,22 +82,22 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
 
   property("fails if override") {
     ev(
-      expr = Block(
+      expr = BLOCK(
         Some(LET("x", CONST_INT(3))),
-        Block(Some(LET("x", SUM(CONST_INT(3), CONST_INT(0)))), EQ(REF("x"), CONST_INT(1)))
+        BLOCK(Some(LET("x", SUM(CONST_INT(3), CONST_INT(0)))), EQ(REF("x"), CONST_INT(1)))
       )) should produce("already defined")
   }
 
   property("fails if types do not match") {
     ev(
-      expr = Block(
+      expr = BLOCK(
         Some(LET("x", CONST_INT(3))),
-        Block(Some(LET("y", EQ(CONST_INT(3), CONST_INT(0)))), EQ(REF("x"), REF("y")))
+        BLOCK(Some(LET("y", EQ(CONST_INT(3), CONST_INT(0)))), EQ(REF("x"), REF("y")))
       )) should produce("Typecheck failed")
   }
 
   property("fails if definition not found") {
-    ev(expr = SUM(REF("x"), CONST_INT(2))) should produce("Cannot resolve type of x")
+    ev(expr = SUM(REF("x"), CONST_INT(2))) should produce("A definition of 'x' is not found")
   }
 
   property("fails if 'IF' branches lead to different types") {
@@ -124,15 +132,6 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
     ev(expr = GET(SOME(CONST_INT(1)))) shouldBe Right(1)
   }
 
-  property("resolveType") {
-    Evaluator.resolveType(Context(Map.empty,Map.empty), SOME(CONST_INT(3))).result shouldBe Right(OPTION(INT))
-    Evaluator.resolveType(Context(Map.empty,Map.empty), NONE).result shouldBe Right(OPTION(NOTHING))
-    Evaluator.resolveType(Context(Map.empty,Map.empty), IF(TRUE, SOME(CONST_INT(3)), NONE)).result shouldBe Right(OPTION(INT))
-    Evaluator.resolveType(Context(Map.empty,Map.empty), IF(TRUE, NONE, SOME(CONST_INT(3)))).result shouldBe Right(OPTION(INT))
-    Evaluator.resolveType(Context(Map.empty,Map.empty), IF(TRUE, NONE, NONE)).result shouldBe Right(OPTION(NOTHING))
-    Evaluator.resolveType(Context(Map.empty,Map.empty), IF(TRUE, SOME(FALSE), SOME(CONST_INT(3)))).result should produce("Typecheck")
-  }
-
   property("successful resolve strongest type") {
     ev(expr = GET(IF(TRUE, SOME(CONST_INT(3)), SOME(CONST_INT(2))))) shouldBe Right(3)
     ev(expr = GET(IF(TRUE, SOME(CONST_INT(3)), NONE))) shouldBe Right(3)
@@ -144,7 +143,7 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
     val pointInstance = OBJECT(Map("X" -> LazyVal(INT)(Coeval(3)), "Y" -> LazyVal(INT)(Coeval(4))))
     ev(
       predefTypes = Map(pointType.name -> pointType),
-      defs = Map(("p", (TYPEREF("Point"), pointInstance))),
+      defs = Map(("p", (TYPEREF(pointType.name), pointInstance))),
       expr = SUM(GETTER(REF("p"), "X"), CONST_INT(2))
     ) shouldBe Right(5)
 

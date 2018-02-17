@@ -1,22 +1,22 @@
 package com.wavesplatform.lang
 
-import com.wavesplatform.lang.Terms._
-import scodec.bits.ByteVector
+import com.wavesplatform.lang.Terms.Implicits._
+import com.wavesplatform.lang.Terms.Untyped._
 import org.scalacheck._
+import scodec.bits.ByteVector
 
 trait ScriptGen {
 
-  private def CONST_INTgen: Gen[Expr] = Gen.choose(Int.MinValue, Int.MaxValue).map(CONST_INT)
+  private def CONST_INTgen: Gen[EXPR] = Gen.choose(Int.MinValue, Int.MaxValue).map(CONST_INT)
 
-
-  private def SUMgen(gas: Int): Gen[Expr] = for {
+  private def SUMgen(gas: Int): Gen[EXPR] = for {
     i1 <- INTGen((gas - 2) / 2)
     i2 <- INTGen((gas - 2) / 2)
   } yield SUM(i1, i2)
 
-  private def INTGen(gas: Int): Gen[Expr] = if (gas > 0) Gen.oneOf(CONST_INTgen, SUMgen(gas - 1), IF_INTgen(gas - 1)) else CONST_INTgen
+  private def INTGen(gas: Int): Gen[EXPR] = if (gas > 0) Gen.oneOf(CONST_INTgen, SUMgen(gas - 1), IF_INTgen(gas - 1)) else CONST_INTgen
 
-  private def GEgen(gas: Int): Gen[Expr] = for {
+  private def GEgen(gas: Int): Gen[EXPR] = for {
     i1 <- INTGen((gas - 2) / 2)
     i2 <- INTGen((gas - 2) / 2)
   } yield GE(i1, i2)
@@ -49,17 +49,17 @@ trait ScriptGen {
     z <- CONST_BYTEVECTORgen
   } yield SIG_VERIFY(x, y, z)
 
-  def BOOLgen(gas: Int): Gen[Expr] = if (gas > 0) Gen.oneOf(GEgen(gas - 1), GTgen(gas - 1), EQ_INTgen(gas - 1), ANDgen(gas - 1), ORgen(gas - 1), IF_BOOLgen(gas - 1), SIG_VERIFYgen) else SIG_VERIFYgen
+  def BOOLgen(gas: Int): Gen[EXPR] = if (gas > 0) Gen.oneOf(GEgen(gas - 1), GTgen(gas - 1), EQ_INTgen(gas - 1), ANDgen(gas - 1), ORgen(gas - 1), IF_BOOLgen(gas - 1), SIG_VERIFYgen) else SIG_VERIFYgen
 
-  private  def CONST_BYTEVECTORgen: Gen[CONST_BYTEVECTOR] = Gen.choose(0, 100).flatMap(l => Gen.containerOfN[Array, Byte](l, Arbitrary.arbitrary[Byte])).map(bs => CONST_BYTEVECTOR(ByteVector(bs)))
+  private def CONST_BYTEVECTORgen: Gen[CONST_BYTEVECTOR] = Gen.choose(0, 100).flatMap(l => Gen.containerOfN[Array, Byte](l, Arbitrary.arbitrary[Byte])).map(bs => CONST_BYTEVECTOR(ByteVector(bs)))
 
-  private def IF_BOOLgen(gas: Int): Gen[Expr] = for {
+  private def IF_BOOLgen(gas: Int): Gen[EXPR] = for {
     cnd <- BOOLgen((gas - 3) / 3)
     t <- BOOLgen((gas - 3) / 3)
     f <- BOOLgen((gas - 3) / 3)
   } yield IF(cnd, t, f)
 
-  private def IF_INTgen(gas: Int): Gen[Expr] = for {
+  private def IF_INTgen(gas: Int): Gen[EXPR] = for {
     cnd <- BOOLgen((gas - 3) / 3)
     t <- INTGen((gas - 3) / 3)
     f <- INTGen((gas - 3) / 3)

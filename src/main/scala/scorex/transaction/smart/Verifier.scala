@@ -29,7 +29,7 @@ object Verifier {
                             ("H", (INT, height)),
                             ("TX", (TYPEREF("Transaction"), transactionObject(transaction)))
                           ))
-    Evaluator.apply[Boolean](context, script.script) match {
+    Evaluator[Boolean](context, script.script) match {
       case Left(execError) => Left(GenericError(s"Script execution error: $execError"))
       case Right(false)    => Left(TransactionNotAllowedByScript(transaction))
       case Right(true)     => Right(transaction)
