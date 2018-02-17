@@ -42,7 +42,6 @@ class ScriptsValidationTest extends PropSpec with PropertyChecks with Matchers w
     } yield (genesis, setScript, lease._1, transfer)
 
   property("transfer is allowed but lease is not due to predicate") {
-    import Implicits._
     import Untyped._
 
     val onlySend: EXPR = AND(

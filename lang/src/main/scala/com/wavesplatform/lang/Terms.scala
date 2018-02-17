@@ -43,26 +43,26 @@ object Terms {
 
   object Untyped {
     sealed trait EXPR
-    case class CONST_INT(t: Int)                                              extends EXPR
-    case class GETTER(ref: BLOCK, field: String)                              extends EXPR
-    case class CONST_BYTEVECTOR(bs: ByteVector)                               extends EXPR
-    case class SUM(a: BLOCK, b: BLOCK)                                        extends EXPR
-    case class AND(a: BLOCK, b: BLOCK)                                        extends EXPR
-    case class OR(a: BLOCK, b: BLOCK)                                         extends EXPR
-    case class EQ(a: BLOCK, b: BLOCK)                                         extends EXPR
-    case class GT(a: BLOCK, b: BLOCK)                                         extends EXPR
-    case class GE(a: BLOCK, b: BLOCK)                                         extends EXPR
-    case class SIG_VERIFY(message: BLOCK, signature: BLOCK, publicKey: BLOCK) extends EXPR
-    case class IS_DEFINED(opt: BLOCK)                                         extends EXPR
-    case class LET(name: String, value: BLOCK)                                extends EXPR
-    case class BLOCK(let: Option[LET], body: EXPR)                            extends EXPR
-    case class IF(cond: BLOCK, ifTrue: BLOCK, ifFalse: BLOCK)                 extends EXPR
-    case class REF(key: String)                                               extends EXPR
-    case class GET(opt: BLOCK)                                                extends EXPR
-    case object TRUE                                                          extends EXPR
-    case object FALSE                                                         extends EXPR
-    case object NONE                                                          extends EXPR
-    case class SOME(t: BLOCK)                                                 extends EXPR
+    case class CONST_INT(t: Int)                                           extends EXPR
+    case class GETTER(ref: EXPR, field: String)                            extends EXPR
+    case class CONST_BYTEVECTOR(bs: ByteVector)                            extends EXPR
+    case class SUM(a: EXPR, b: EXPR)                                       extends EXPR
+    case class AND(a: EXPR, b: EXPR)                                       extends EXPR
+    case class OR(a: EXPR, b: EXPR)                                        extends EXPR
+    case class EQ(a: EXPR, b: EXPR)                                        extends EXPR
+    case class GT(a: EXPR, b: EXPR)                                        extends EXPR
+    case class GE(a: EXPR, b: EXPR)                                        extends EXPR
+    case class SIG_VERIFY(message: EXPR, signature: EXPR, publicKey: EXPR) extends EXPR
+    case class IS_DEFINED(opt: EXPR)                                       extends EXPR
+    case class LET(name: String, value: EXPR)                              extends EXPR
+    case class BLOCK(let: Option[LET], body: EXPR)                         extends EXPR
+    case class IF(cond: EXPR, ifTrue: EXPR, ifFalse: EXPR)                 extends EXPR
+    case class REF(key: String)                                            extends EXPR
+    case class GET(opt: EXPR)                                              extends EXPR
+    case object TRUE                                                       extends EXPR
+    case object FALSE                                                      extends EXPR
+    case object NONE                                                       extends EXPR
+    case class SOME(t: EXPR)                                               extends EXPR
   }
 
   object Typed {
@@ -89,7 +89,4 @@ object Terms {
     case class SOME(t: EXPR, override val tpe: TYPE)                               extends EXPR(tpe)
   }
 
-  object Implicits {
-    implicit def exprToBlock(t: Untyped.EXPR): Untyped.BLOCK = Untyped.BLOCK(None, t)
-  }
 }

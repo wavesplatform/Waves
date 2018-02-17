@@ -1,7 +1,6 @@
 package com.wavesplatform.lang
 
 import com.wavesplatform.lang.Evaluator.{Context, Defs}
-import com.wavesplatform.lang.Terms.Implicits._
 import com.wavesplatform.lang.Terms.Untyped._
 import com.wavesplatform.lang.Terms._
 import monix.eval.Coeval

@@ -1,6 +1,5 @@
 package com.wavesplatform.lang
 
-import com.wavesplatform.lang.Terms.Implicits._
 import com.wavesplatform.lang.Terms.Untyped._
 import org.scalacheck._
 import scodec.bits.ByteVector
