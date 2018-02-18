@@ -13,15 +13,14 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
   private val pointType = CUSTOMTYPE("Point", List("x" -> INT, "y" -> INT))
 
   rootTypeTest("successful on very deep expressions (stack overflow check)")(
-    expr = (1 to 100000).foldLeft[Untyped.EXPR](Untyped.CONST_INT(0))((acc, _) =>
-      Untyped.BINARY_OP(Untyped.BLOCK(None, acc), SUM_OP, Untyped.BLOCK(None, Untyped.CONST_INT(1)))),
+    expr = (1 to 100000).foldLeft[Untyped.EXPR](Untyped.CONST_INT(0))((acc, _) => Untyped.BINARY_OP(acc, SUM_OP, Untyped.CONST_INT(1))),
     expectedResult = Right(INT)
   )
 
   {
     import Typed._
 
-    treeTypeErasureTest(
+    treeTypeErasureTests(
       "CONST_INT"        -> CONST_INT(0),
       "CONST_BYTEVECTOR" -> CONST_BYTEVECTOR(ByteVector(1, 2, 3)),
       "TRUE"             -> TRUE,
@@ -35,55 +34,30 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
       "GT"               -> BINARY_OP(CONST_INT(0), GT_OP, CONST_INT(1), BOOLEAN),
       "GE"               -> BINARY_OP(CONST_INT(0), GE_OP, CONST_INT(1), BOOLEAN),
       "SIG_VERIFY" -> SIG_VERIFY(
-        message = BLOCK(None, CONST_BYTEVECTOR(ByteVector(Base58.decode("333").get)), BYTEVECTOR),
-        signature = BLOCK(None, CONST_BYTEVECTOR(ByteVector(Base58.decode("222").get)), BYTEVECTOR),
-        publicKey = BLOCK(None, CONST_BYTEVECTOR(ByteVector(Base58.decode("111").get)), BYTEVECTOR)
+        message = CONST_BYTEVECTOR(ByteVector(Base58.decode("333").get)),
+        signature = CONST_BYTEVECTOR(ByteVector(Base58.decode("222").get)),
+        publicKey = CONST_BYTEVECTOR(ByteVector(Base58.decode("111").get))
       ),
-      "IS_DEFINED" -> IS_DEFINED(BLOCK(None, NONE, OPTION(NOTHING))),
-      "LET"        -> LET("x", BLOCK(None, CONST_INT(0), INT)),
+      "IS_DEFINED(NONE)" -> IS_DEFINED(NONE),
+      "IS_DEFINED(SOME)" -> IS_DEFINED(SOME(TRUE, OPTION(BOOLEAN))),
+      "LET"        -> LET("x", CONST_INT(0)),
       "BLOCK" -> BLOCK(
         let = None,
         body = CONST_INT(0),
         tpe = INT
       ),
       "IF" -> IF(
-        cond = BLOCK(None, TRUE, BOOLEAN),
-        ifTrue = BLOCK(None, SOME(BLOCK(None, TRUE, BOOLEAN), OPTION(BOOLEAN)), OPTION(BOOLEAN)),
-        ifFalse = BLOCK(None, NONE, OPTION(NOTHING)),
+        cond = TRUE,
+        ifTrue = SOME(TRUE, OPTION(BOOLEAN)),
+        ifFalse = NONE,
         tpe = OPTION(BOOLEAN)
       ),
-      "GET(SOME)" -> GET(
-        opt = BLOCK(
-          let = None,
-          body = SOME(BLOCK(None, TRUE, BOOLEAN), OPTION(BOOLEAN)),
-          tpe = OPTION(BOOLEAN)
-        ),
-        tpe = BOOLEAN
-      ),
-      "GET(NONE)" -> GET(
-        opt = BLOCK(
-          let = None,
-          body = BLOCK(None, NONE, OPTION(NOTHING)),
-          tpe = OPTION(NOTHING)
-        ),
-        tpe = NOTHING
-      ),
-      "SOME" -> SOME(BLOCK(None, TRUE, BOOLEAN), OPTION(BOOLEAN)),
+      "GET(SOME)" -> GET(SOME(TRUE, OPTION(BOOLEAN)), BOOLEAN),
+      "GET(NONE)" -> GET(NONE, NOTHING),
+      "SOME" -> SOME(TRUE, OPTION(BOOLEAN)),
       "BLOCK(LET(X), REF(y) = x)" -> BLOCK(
-        let = Some(
-          LET(
-            name = "x",
-            value = BLOCK(
-              let = None,
-              body = CONST_INT(0),
-              tpe = INT
-            )
-          )),
-        body = BLOCK(
-          let = None,
-          body = LET("y", BLOCK(None, REF("x", INT), INT)),
-          tpe = UNIT
-        ),
+        let = Some(LET("x", CONST_INT(0))),
+        body = LET("y", REF("x", INT)),
         tpe = UNIT
       )
     )
@@ -93,59 +67,16 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
     predefTypes = Map(pointType.name -> pointType),
     varDefs = Map("p"                -> TYPEREF("Point")),
     expr = Untyped.GETTER(
-      ref = Untyped.BLOCK(None, Untyped.REF("p")),
+      ref = Untyped.REF("p"),
       field = "x"
     ),
     expectedResult = Right(
       Typed.GETTER(
-        ref = Typed.BLOCK(None, Typed.REF("p", TYPEREF("Point")), TYPEREF("Point")),
+        ref = Typed.REF("p", TYPEREF("Point")),
         field = "x",
         tpe = INT
       ))
   )
-
-  // ==== cut
-
-  //  property("Typechecking") {
-  //    ev(expr = BINARY_OP(CONST_INT(2), EQ_OP, CONST_INT(2), INT)) shouldBe Right(true)
-  //  }
-  //
-  //  property("successful Typechecking Some") {
-  //    ev(expr = BINARY_OP(SOME(CONST_INT(2), OPTION(INT)), EQ_OP, SOME(CONST_INT(2), OPTION(INT)), BOOLEAN)) shouldBe Right(true)
-  //  }
-  //
-  //  property("successful Typechecking Option") {
-  //    ev(expr = BINARY_OP(SOME(CONST_INT(2), OPTION(INT)), EQ_OP, NONE, BOOLEAN)) shouldBe Right(false)
-  //    ev(expr = BINARY_OP(NONE, EQ_OP, SOME(CONST_INT(2), OPTION(INT)), BOOLEAN)) shouldBe Right(false)
-  //  }
-  //
-  //  property("successful nested Typechecking Option") {
-  //    ev(expr = BINARY_OP(SOME(SOME(SOME(CONST_INT(2), OPTION(INT)))), EQ_OP, NONE, BOOLEAN)) shouldBe Right(false)
-  //    ev(expr = BINARY_OP(SOME(NONE), EQ_OP, SOME(SOME(CONST_INT(2))), BOOLEAN)) shouldBe Right(false)
-  //  }
-  //
-  //  property("fails if nested Typechecking Option finds mismatch") {
-  //    ev(expr = BINARY_OP(SOME(SOME(FALSE)), EQ_OP, SOME(SOME(CONST_INT(2))), BOOLEAN)) should produce("Typecheck failed")
-  //  }
-  //
-  //  property("successful resolve strongest type") {
-  //    ev(expr = GET(IF(TRUE, SOME(CONST_INT(3)), SOME(CONST_INT(2)), OPTION(INT)))) shouldBe Right(3)
-  //    ev(expr = GET(IF(TRUE, SOME(CONST_INT(3)), NONE))) shouldBe Right(3)
-  //    ev(expr = BINARY_OP(CONST_INT(1), SUM_OP, GET(IF(TRUE, SOME(CONST_INT(3)), NONE)), BOOLEAN)) shouldBe Right(4)
-  //  }
-  //  property("fails if types do not match") {
-  //    ev(
-  //      expr = BLOCK(
-  //        Some(LET("x", CONST_INT(3))),
-  //        BLOCK(Some(LET("y", BINARY_OP(CONST_INT(3), EQ_OP, CONST_INT(0), INT))), BINARY_OP(REF("x", INT), EQ_OP, REF("y", INT), INT), INT),
-  //        INT
-  //      )) should produce("Typecheck failed")
-  //  }
-  // property("fails if 'IF' branches lead to different types") {
-  // ev(expr = IF(BINARY_OP(CONST_INT(1), EQ_OP, CONST_INT(2), INT), CONST_INT(0), CONST_BYTEVECTOR(ByteVector.empty), INT)) should produce("Typecheck failed")
-  //}
-
-  // ====
 
   treeTypeTest("REF(OBJECT)")(
     predefTypes = Map(pointType.name -> pointType),
@@ -161,6 +92,15 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
     expectedResult = Right(Typed.REF("p", TYPEREF("Point")))
   )
 
+  {
+    import Untyped._
+
+    errorTests(
+      "BINARY_OP wrong types" -> "The first operand is expected to be INT" -> BINARY_OP(TRUE, SUM_OP, CONST_INT(1)),
+      "IF con't find common" -> "Can't find common type" -> IF(TRUE, TRUE, CONST_INT(0))
+    )
+  }
+
   private def rootTypeTest(propertyName: String)(expr: Untyped.EXPR,
                                                  expectedResult: TypeCheckResult[TYPE],
                                                  varDefs: Defs = Map.empty,
@@ -171,6 +111,13 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
     }
   }
 
+  private def errorTests(exprs: ((String, String), Untyped.EXPR)*): Unit = exprs.foreach {
+    case ((label, error), input) =>
+      property(s"Error: $label") {
+        TypeChecker(Context.empty, input) should produce(error)
+      }
+  }
+
   private def treeTypeTest(propertyName: String)(expr: Untyped.EXPR,
                                                  expectedResult: TypeCheckResult[Typed.EXPR],
                                                  predefTypes: Map[String, CUSTOMTYPE],
@@ -178,7 +125,7 @@ class TypeCheckerTest extends PropSpec with PropertyChecks with Matchers with Sc
     TypeChecker(Context(predefTypes, varDefs), expr) shouldBe expectedResult
   }
 
-  private def treeTypeErasureTest(exprs: (String, Typed.EXPR)*): Unit = exprs.foreach {
+  private def treeTypeErasureTests(exprs: (String, Typed.EXPR)*): Unit = exprs.foreach {
     case (exprName, expected) =>
       property(exprName) {
         val erased = erase(expected)
