@@ -26,12 +26,12 @@ class ScriptsValidationTest extends PropSpec with PropertyChecks with Matchers w
 
   def preconditionsTransferAndLease(code: String): Gen[(GenesisTransaction, SetScriptTransaction, LeaseTransaction, TransferTransaction)] = {
     val untyped = Parser(code).get.value
-    preconditionsTransferAndLease(untyped)
+    val typed   = TypeChecker(context, untyped).right.get
+    preconditionsTransferAndLease(typed)
   }
 
-  def preconditionsTransferAndLease(untyped: Untyped.EXPR): Gen[(GenesisTransaction, SetScriptTransaction, LeaseTransaction, TransferTransaction)] =
+  def preconditionsTransferAndLease(typed: Typed.EXPR): Gen[(GenesisTransaction, SetScriptTransaction, LeaseTransaction, TransferTransaction)] =
     for {
-      typed     <- Gen.const(TypeChecker(context, untyped).right.get)
       master    <- accountGen
       recepient <- accountGen
       ts        <- positiveIntGen
@@ -42,11 +42,22 @@ class ScriptsValidationTest extends PropSpec with PropertyChecks with Matchers w
     } yield (genesis, setScript, lease._1, transfer)
 
   property("transfer is allowed but lease is not due to predicate") {
-    import Untyped._
+    import Typed._
 
-    val onlySend: EXPR = AND(
-      OR(EQ(GETTER(REF("TX"), "TYPE"), CONST_INT(4)), EQ(GETTER(REF("TX"), "TYPE"), CONST_INT(11))),
-      SIG_VERIFY(GETTER(REF("TX"), "BODYBYTES"), GETTER(REF("TX"), "PROOFA"), GETTER(REF("TX"), "SENDERPK"))
+    val onlySend: EXPR = BINARY_OP(
+      BINARY_OP(
+        BINARY_OP(GETTER(REF("TX", TYPEREF("Transaction")), "TYPE", INT), EQ_OP, CONST_INT(4), BOOLEAN),
+        OR_OP,
+        BINARY_OP(GETTER(REF("TX", TYPEREF("Transaction")), "TYPE", INT), EQ_OP, CONST_INT(11), BOOLEAN),
+        BOOLEAN
+      ),
+      AND_OP,
+      SIG_VERIFY(
+        GETTER(REF("TX", TYPEREF("Transaction")), "BODYBYTES", BYTEVECTOR),
+        GETTER(REF("TX", TYPEREF("Transaction")), "PROOFA", BYTEVECTOR),
+        GETTER(REF("TX", TYPEREF("Transaction")), "SENDERPK", BYTEVECTOR)
+      ),
+      BOOLEAN
     )
     forAll(preconditionsTransferAndLease(onlySend)) {
       case ((genesis, script, lease, transfer)) =>
