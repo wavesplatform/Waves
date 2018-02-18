@@ -46,89 +46,35 @@ object TypeChecker {
           }
         }
 
-    case sum: Untyped.SUM =>
-      (setType(ctx, EitherT.pure(sum.a)), setType(ctx, EitherT.pure(sum.b)))
-        .mapN { (first, second) =>
-          Typed.SUM(a = first, b = second)
-        }
-        .subflatMap { sum =>
-          val firstType  = sum.a.tpe
-          val secondType = sum.b.tpe
+    case expr@Untyped.BINARY_OP(a, op, b) =>
+      (setType(ctx, EitherT.pure(a)), setType(ctx, EitherT.pure(b))).tupled
+        .subflatMap { case operands@(a, b) =>
+          val aTpe = a.tpe
+          val bTpe = b.tpe
 
-          if (firstType != INT) Left(s"The first operand is expected to be INT, but got $firstType")
-          else if (secondType != INT) Left(s"The second operand is expected to be INT, but got $secondType")
-          else Right(sum)
-        }
+          op match {
+            case SUM_OP =>
+              if (aTpe != INT) Left(s"The first operand is expected to be INT, but got $aTpe: $a in $expr")
+              else if (bTpe != INT) Left(s"The second operand is expected to be INT, but got $bTpe: $b in $expr")
+              else Right(operands -> INT)
 
-    case and: Untyped.AND =>
-      (setType(ctx, EitherT.pure(and.a)), setType(ctx, EitherT.pure(and.b)))
-        .mapN { (first, second) =>
-          Typed.AND(a = first, b = second)
-        }
-        .subflatMap { and =>
-          val firstType  = and.a.tpe
-          val secondType = and.b.tpe
+            case GT_OP | GE_OP =>
+              if (aTpe != INT) Left(s"The first operand is expected to be INT, but got $aTpe: $a in $expr")
+              else if (bTpe != INT) Left(s"The second operand is expected to be INT, but got $bTpe: $b in $expr")
+              else Right(operands -> BOOLEAN)
 
-          if (firstType != BOOLEAN) Left(s"The first operand is expected to be BOOLEAN, but got $firstType")
-          else if (secondType != BOOLEAN) Left(s"The second operand is expected to be BOOLEAN, but got $secondType")
-          else Right(and)
-        }
+            case AND_OP | OR_OP =>
+              if (aTpe != BOOLEAN) Left(s"The first operand is expected to be BOOLEAN, but got $aTpe: $a in $expr")
+              else if (bTpe != BOOLEAN) Left(s"The second operand is expected to be BOOLEAN, but got $bTpe: $b in $expr")
+              else Right(operands -> BOOLEAN)
 
-    case or: Untyped.OR =>
-      (setType(ctx, EitherT.pure(or.a)), setType(ctx, EitherT.pure(or.b)))
-        .mapN { (first, second) =>
-          Typed.OR(a = first, b = second)
+            case EQ_OP =>
+              findCommonType(aTpe, bTpe)
+                .map(_ => Right(operands -> BOOLEAN))
+                .getOrElse(Left(s"Can't find common type for $aTpe and $bTpe: $a and $b in $expr"))
+          }
         }
-        .subflatMap { or =>
-          val firstType  = or.a.tpe
-          val secondType = or.b.tpe
-
-          if (firstType != BOOLEAN) Left(s"The first operand is expected to be BOOLEAN, but got $firstType")
-          else if (secondType != BOOLEAN) Left(s"The second operand is expected to be BOOLEAN, but got $secondType")
-          else Right(or)
-        }
-
-    case eq: Untyped.EQ =>
-      (setType(ctx, EitherT.pure(eq.a)), setType(ctx, EitherT.pure(eq.b)))
-        .mapN { (first, second) =>
-          Typed.EQ(a = first, b = second)
-        }
-        .subflatMap { eq =>
-          val firstType  = eq.a.tpe
-          val secondType = eq.b.tpe
-
-          findCommonType(firstType, secondType)
-            .map(_ => Right(eq))
-            .getOrElse(Left(s"Can't find common type for $firstType and $secondType"))
-        }
-
-    case gt: Untyped.GT =>
-      (setType(ctx, EitherT.pure(gt.a)), setType(ctx, EitherT.pure(gt.b)))
-        .mapN { (first, second) =>
-          Typed.GT(a = first, b = second)
-        }
-        .subflatMap { gt =>
-          val firstType  = gt.a.tpe
-          val secondType = gt.b.tpe
-
-          if (firstType != INT) Left(s"The first operand is expected to be INT, but got $firstType")
-          else if (secondType != INT) Left(s"The second operand is expected to be INT, but got $secondType")
-          else Right(gt)
-        }
-
-    case ge: Untyped.GE =>
-      (setType(ctx, EitherT.pure(ge.a)), setType(ctx, EitherT.pure(ge.b)))
-        .mapN { (first, second) =>
-          Typed.GE(a = first, b = second)
-        }
-        .subflatMap { ge =>
-          val firstType  = ge.a.tpe
-          val secondType = ge.b.tpe
-
-          if (firstType != INT) Left(s"The first operand is expected to be INT, but got $firstType")
-          else if (secondType != INT) Left(s"The second operand is expected to be INT, but got $secondType")
-          else Right(ge)
-        }
+        .map { case (operands, tpe) => Typed.BINARY_OP(operands._1, op, operands._2, tpe) }
 
     case sigVerify: Untyped.SIG_VERIFY =>
       (setType(ctx, EitherT.pure(sigVerify.message)),
@@ -169,19 +115,20 @@ object TypeChecker {
     case ifExpr: Untyped.IF =>
       (setType(ctx, EitherT.pure(ifExpr.cond)), setType(ctx, EitherT.pure(ifExpr.ifTrue)), setType(ctx, EitherT.pure(ifExpr.ifFalse))).tupled
         .subflatMap[String, Typed.EXPR] {
-          case (resolvedCond, resolvedTrueBranch, resolvedFalseBranch) =>
-            val ifTrueType  = resolvedTrueBranch.tpe
-            val ifFalseType = resolvedFalseBranch.tpe
-            findCommonType(ifTrueType, ifFalseType)
+          case (resolvedCond, resolvedIfTrue, resolvedIfFalse) =>
+            val ifTrueTpe  = resolvedIfTrue.tpe
+            val ifFalseTpe = resolvedIfFalse.tpe
+            findCommonType(ifTrueTpe, ifFalseTpe)
               .map { tpe =>
-                Right(Typed.IF(
-                  cond = resolvedCond,
-                  ifTrue = resolvedTrueBranch,
-                  ifFalse = resolvedFalseBranch,
-                  tpe = tpe
-                ))
+                Right(
+                  Typed.IF(
+                    cond = resolvedCond,
+                    ifTrue = resolvedIfTrue,
+                    ifFalse = resolvedIfFalse,
+                    tpe = tpe
+                  ))
               }
-              .getOrElse(Left(s"Can't find common type for $ifTrueType and $ifFalseType"))
+              .getOrElse(Left(s"Can't find common type for $ifTrueTpe and $ifFalseTpe"))
         }
 
     case ref: Untyped.REF =>

@@ -48,7 +48,7 @@ object Evaluator {
       case Typed.REF(str, _) => done {
         ctx.defs.get(str) match {
           case Some((x, y)) => Right(y.asInstanceOf[x.Underlying])
-          case None => Left(s"Definition '$str' not found")
+          case None => Left(s"A definition of '$str' is not found")
         }
       }
 
@@ -56,23 +56,19 @@ object Evaluator {
       case Typed.CONST_BYTEVECTOR(v) => done(Right(v))
       case Typed.TRUE => done(Right(true))
       case Typed.FALSE => done(Right(false))
-      case Typed.SUM(t1, t2) => tailcall {
+
+      case Typed.BINARY_OP(a, op@(SUM_OP | GE_OP | GT_OP), b, INT) => tailcall {
         for {
-          a1 <- r[Int](ctx, t1)
-          a2 <- r[Int](ctx, t2)
-        } yield a1.flatMap(v1 => a2.map(v2 => v1 + v2))
-      }
-      case Typed.GE(t1, t2) => tailcall {
-        for {
-          a1 <- r[Int](ctx, t1)
-          a2 <- r[Int](ctx, t2)
-        } yield a1.flatMap(v1 => a2.map(v2 => v1 >= v2))
-      }
-      case Typed.GT(t1, t2) => tailcall {
-        for {
-          a1 <- r[Int](ctx, t1)
-          a2 <- r[Int](ctx, t2)
-        } yield a1.flatMap(v1 => a2.map(v2 => v1 > v2))
+          evaluatedA <- r[Int](ctx, a)
+          evaluatedB <- r[Int](ctx, b)
+        } yield evaluatedA.flatMap(v1 => evaluatedB.map { v2 =>
+          op match {
+            case SUM_OP => v1 + v2
+            case GE_OP => v1 >= v2
+            case GT_OP => v1 > v2
+            case x => throw new IllegalStateException(s"$x")
+          }
+        })
       }
 
       case Typed.IF(cond, t1, t2, tpe) => tailcall {
@@ -82,7 +78,7 @@ object Evaluator {
           case Left(err) => done(Left(err))
         }
       }
-      case Typed.AND(t1, t2) => tailcall {
+      case Typed.BINARY_OP(t1, AND_OP, t2, BOOLEAN) => tailcall {
         r[Boolean](ctx, t1) flatMap {
           case Left(err) => done(Left(err))
           case Right(false) => done(Right(false))
@@ -94,7 +90,7 @@ object Evaluator {
         }
       }
 
-      case o@Typed.OR(t1, t2) => tailcall {
+      case o@Typed.BINARY_OP(t1, OR_OP, t2, BOOLEAN) => tailcall {
         r[Boolean](ctx, t1) flatMap {
           case Left(err) => done(Left(err))
           case Right(true) => done(Right(true))
@@ -104,6 +100,13 @@ object Evaluator {
               case Right(v) => Right(v)
             }
         }
+      }
+
+      case eq@Typed.BINARY_OP(it1, EQ_OP, it2, tpe) => tailcall {
+        for {
+          i1 <- r[tpe.Underlying](ctx, it1)
+          i2 <- r[tpe.Underlying](ctx, it2)
+        } yield i1.flatMap(v1 => i2.map(v2 => v1 == v2))
       }
 
       case isDefined@Typed.IS_DEFINED(opt) =>
@@ -127,14 +130,6 @@ object Evaluator {
       case Typed.SOME(b, tpe) =>
         tailcall(r[tpe.Underlying](ctx, b).map(_.map(x => Some(x))))
 
-      case eq@Typed.EQ(it1, it2) => tailcall {
-        val tpe = eq.tpe
-        for {
-          i1 <- r[tpe.Underlying](ctx, it1)
-          i2 <- r[tpe.Underlying](ctx, it2)
-        } yield i1.flatMap(v1 => i2.map(v2 => v1 == v2))
-      }
-
       case Typed.SIG_VERIFY(msg, sig, pk) => tailcall {
         for {
           s <- r[ByteVector](ctx, sig)
@@ -152,6 +147,9 @@ object Evaluator {
           case Left(err) => Left(err)
         }
       }
+
+      case Typed.BINARY_OP(_, SUM_OP | GE_OP | GT_OP, _, tpe) if tpe != INT => throw new IllegalArgumentException(s"Expected INT, but got $tpe: $t")
+      case Typed.BINARY_OP(_, AND_OP | OR_OP, _, tpe) if tpe != BOOLEAN => throw new IllegalArgumentException(s"Expected BOOLEAN, but got $tpe: $t")
     }).map(x => x.map(_.asInstanceOf[T]))
   }
 

@@ -1,28 +1,22 @@
 package com.wavesplatform.lang
 
 import com.wavesplatform.lang.Evaluator.{Context, Defs}
-import com.wavesplatform.lang.Terms.Untyped._
+import com.wavesplatform.lang.Terms.Typed._
 import com.wavesplatform.lang.Terms._
 import monix.eval.Coeval
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
-import scodec.bits.ByteVector
 
 class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 
   private def ev(predefTypes: Map[String, CUSTOMTYPE] = Map.empty, defs: Defs = Map.empty, expr: EXPR): Either[_, _] = {
-    val tcContext = TypeChecker.Context(
-      predefTypes = predefTypes,
-      varDefs = defs.map { case (name, (tpe, _)) => name -> tpe }
-    )
-    val typed = TypeChecker(tcContext, expr)
-    typed.flatMap(Evaluator(Context(predefTypes, defs), _))
+    Evaluator(Context(predefTypes, defs), expr)
   }
 
-  private def simpleDeclarationAndUsage(i: Int) = BLOCK(Some(LET("x", CONST_INT(i))), REF("x"))
+  private def simpleDeclarationAndUsage(i: Int) = BLOCK(Some(LET("x", CONST_INT(i))), REF("x", INT), INT)
 
   property("successful on very deep expressions (stack overflow check)") {
-    val term = (1 to 100000).foldLeft[EXPR](CONST_INT(0))((acc, _) => SUM(acc, CONST_INT(1)))
+    val term = (1 to 100000).foldLeft[EXPR](CONST_INT(0))((acc, _) => BINARY_OP(acc, SUM_OP, CONST_INT(1), INT))
     ev(expr = term) shouldBe Right(100000)
   }
 
@@ -30,17 +24,20 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
     ev(
       expr = BLOCK(
         Some(LET("x", CONST_INT(3))),
-        CONST_INT(3)
+        CONST_INT(3),
+        INT
       )) shouldBe Right(3)
   }
 
   property("successful on x = y") {
     ev(
       expr = BLOCK(Some(LET("x", CONST_INT(3))),
-                   BLOCK(
-                     Some(LET("y", REF("x"))),
-                     SUM(REF("x"), REF("y"))
-                   ))) shouldBe Right(6)
+        BLOCK(
+          Some(LET("y", REF("x", INT))),
+          BINARY_OP(REF("x", INT), SUM_OP, REF("y", INT), INT),
+          INT
+        ),
+        INT)) shouldBe Right(6)
   }
 
   property("successful on simple get") {
@@ -51,7 +48,8 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
     ev(
       expr = BLOCK(
         Some(LET("x", CONST_INT(3))),
-        EQ(REF("x"), CONST_INT(2))
+        BINARY_OP(REF("x", INT), EQ_OP, CONST_INT(2), INT),
+        INT
       )) shouldBe Right(false)
   }
 
@@ -59,7 +57,8 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
     ev(
       expr = BLOCK(
         Some(LET("x", CONST_INT(3))),
-        BLOCK(Some(LET("y", CONST_INT(3))), EQ(REF("x"), REF("y")))
+        BLOCK(Some(LET("y", CONST_INT(3))), BINARY_OP(REF("x", INT), EQ_OP, REF("y", INT), INT), INT),
+        INT
       )) shouldBe Right(true)
   }
 
@@ -67,83 +66,45 @@ class EvaluatorTest extends PropSpec with PropertyChecks with Matchers with Scri
     ev(
       expr = BLOCK(
         Some(LET("x", CONST_INT(3))),
-        BLOCK(Some(LET("y", SUM(CONST_INT(3), CONST_INT(0)))), EQ(REF("x"), REF("y")))
+        BLOCK(Some(LET("y", BINARY_OP(CONST_INT(3), SUM_OP, CONST_INT(0), INT))), BINARY_OP(REF("x", INT), EQ_OP, REF("y", INT), INT), INT),
+        INT
       )) shouldBe Right(true)
   }
 
   property("successful on deep type resolution") {
-    ev(expr = IF(EQ(CONST_INT(1), CONST_INT(2)), simpleDeclarationAndUsage(3), CONST_INT(4))) shouldBe Right(4)
+    ev(expr = IF(BINARY_OP(CONST_INT(1), EQ_OP, CONST_INT(2), INT), simpleDeclarationAndUsage(3), CONST_INT(4), INT)) shouldBe Right(4)
   }
 
   property("successful on same value names in different branches") {
-    ev(expr = IF(EQ(CONST_INT(1), CONST_INT(2)), simpleDeclarationAndUsage(3), simpleDeclarationAndUsage(4))) shouldBe Right(4)
+    ev(expr = IF(BINARY_OP(CONST_INT(1), EQ_OP, CONST_INT(2), INT), simpleDeclarationAndUsage(3), simpleDeclarationAndUsage(4), INT)) shouldBe Right(4)
   }
 
   property("fails if override") {
     ev(
       expr = BLOCK(
         Some(LET("x", CONST_INT(3))),
-        BLOCK(Some(LET("x", SUM(CONST_INT(3), CONST_INT(0)))), EQ(REF("x"), CONST_INT(1)))
+        BLOCK(Some(LET("x", BINARY_OP(CONST_INT(3), SUM_OP, CONST_INT(0), INT))), BINARY_OP(REF("x", INT), EQ_OP, CONST_INT(1), INT), INT),
+        INT
       )) should produce("already defined")
   }
 
-  property("fails if types do not match") {
-    ev(
-      expr = BLOCK(
-        Some(LET("x", CONST_INT(3))),
-        BLOCK(Some(LET("y", EQ(CONST_INT(3), CONST_INT(0)))), EQ(REF("x"), REF("y")))
-      )) should produce("Typecheck failed")
-  }
-
   property("fails if definition not found") {
-    ev(expr = SUM(REF("x"), CONST_INT(2))) should produce("A definition of 'x' is not found")
-  }
-
-  property("fails if 'IF' branches lead to different types") {
-    ev(expr = IF(EQ(CONST_INT(1), CONST_INT(2)), CONST_INT(0), CONST_BYTEVECTOR(ByteVector.empty))) should produce("Typecheck failed")
-  }
-
-  property("Typechecking") {
-    ev(expr = EQ(CONST_INT(2), CONST_INT(2))) shouldBe Right(true)
-  }
-
-  property("successful Typechecking Some") {
-    ev(expr = EQ(SOME(CONST_INT(2)), SOME(CONST_INT(2)))) shouldBe Right(true)
-  }
-
-  property("successful Typechecking Option") {
-    ev(expr = EQ(SOME(CONST_INT(2)), NONE)) shouldBe Right(false)
-    ev(expr = EQ(NONE, SOME(CONST_INT(2)))) shouldBe Right(false)
-  }
-
-  property("successful nested Typechecking Option") {
-    ev(expr = EQ(SOME(SOME(SOME(CONST_INT(2)))), NONE)) shouldBe Right(false)
-    ev(expr = EQ(SOME(NONE), SOME(SOME(CONST_INT(2))))) shouldBe Right(false)
-  }
-
-  property("fails if nested Typechecking Option finds mismatch") {
-    ev(expr = EQ(SOME(SOME(FALSE)), SOME(SOME(CONST_INT(2))))) should produce("Typecheck failed")
+    ev(expr = BINARY_OP(REF("x", INT), SUM_OP, CONST_INT(2), INT)) should produce("A definition of 'x' is not found")
   }
 
   property("successful GET/IS_DEFINED") {
     ev(expr = IS_DEFINED(NONE)) shouldBe Right(false)
-    ev(expr = IS_DEFINED(SOME(CONST_INT(1)))) shouldBe Right(true)
-    ev(expr = GET(SOME(CONST_INT(1)))) shouldBe Right(1)
-  }
-
-  property("successful resolve strongest type") {
-    ev(expr = GET(IF(TRUE, SOME(CONST_INT(3)), SOME(CONST_INT(2))))) shouldBe Right(3)
-    ev(expr = GET(IF(TRUE, SOME(CONST_INT(3)), NONE))) shouldBe Right(3)
-    ev(expr = SUM(CONST_INT(1), GET(IF(TRUE, SOME(CONST_INT(3)), NONE)))) shouldBe Right(4)
+    ev(expr = IS_DEFINED(SOME(CONST_INT(1), OPTION(INT)))) shouldBe Right(true)
+    ev(expr = GET(SOME(CONST_INT(1), OPTION(INT)), INT)) shouldBe Right(1)
   }
 
   property("custom type field access") {
-    val pointType     = CUSTOMTYPE("Point", List("X" -> INT, "Y" -> INT))
+    val pointType = CUSTOMTYPE("Point", List("X" -> INT, "Y" -> INT))
     val pointInstance = OBJECT(Map("X" -> LazyVal(INT)(Coeval(3)), "Y" -> LazyVal(INT)(Coeval(4))))
     ev(
       predefTypes = Map(pointType.name -> pointType),
       defs = Map(("p", (TYPEREF(pointType.name), pointInstance))),
-      expr = SUM(GETTER(REF("p"), "X"), CONST_INT(2))
+      expr = BINARY_OP(GETTER(REF("p", TYPEREF("Point")), "X", INT), SUM_OP, CONST_INT(2), INT)
     ) shouldBe Right(5)
 
   }

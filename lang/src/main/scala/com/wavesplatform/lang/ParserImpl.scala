@@ -1,5 +1,6 @@
 package com.wavesplatform.lang
 
+import com.wavesplatform.lang.Terms._
 import com.wavesplatform.lang.Terms.Untyped._
 import com.wavesplatform.lang.traits.Base58
 import fastparse.{WhitespaceApi, core}
@@ -63,30 +64,26 @@ abstract class ParserImpl { this: Base58 =>
 
   }
 
-  private val priority = List("||", "&&", "==", ">=", ">", "+", "-", "*")
+  private val opsByPriority = List[(String, BINARY_OP_KIND)](
+    "||" -> OR_OP,
+    "&&" -> AND_OP,
+    "==" -> EQ_OP,
+    ">=" -> GE_OP,
+    ">" -> GT_OP,
+    "+" -> SUM_OP
+  )
 
-  private def binaryOp(rest: List[String]): P[EXPR] = rest match {
+  private def binaryOp(rest: List[(String, BINARY_OP_KIND)]): P[EXPR] = rest match {
     case Nil => atom
-    case lessPriorityOp :: restOps =>
+    case (lessPriorityOp, kind) :: restOps =>
       val operand = binaryOp(restOps)
-      P(operand ~ (lessPriorityOp.! ~ operand).rep()).map {
-        case ((left: EXPR, r: Seq[(String, EXPR)])) =>
-          r.foldLeft(left) {
-            case (r2, (op, y)) =>
-              op match {
-                case "||" => OR(r2, y)
-                case "&&" => AND(r2, y)
-                case "==" => EQ(r2, y)
-                case ">=" => GE(r2, y)
-                case ">"  => GT(r2, y)
-                case "+"  => SUM(r2, y)
-              }
-          }
-
+      P(operand ~ (lessPriorityOp.!.map(_ => kind) ~ operand).rep()).map {
+        case ((left: EXPR, r: Seq[(BINARY_OP_KIND, EXPR)])) =>
+          r.foldLeft(left) { case (acc, (currKind, currOperand)) => BINARY_OP(acc, currKind, currOperand) }
       }
   }
 
-  private def expr = P(binaryOp(priority) | atom)
+  private def expr = P(binaryOp(opsByPriority) | atom)
 
   private def atom =
     P(ifP | patmat1P | patmat2P | byteVectorP | numberP | trueP | falseP | noneP | someP | bracesP | curlyBracesP | sigVerifyP | getterP | refP | isDefined | getP )
