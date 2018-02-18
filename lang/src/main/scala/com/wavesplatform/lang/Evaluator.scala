@@ -57,13 +57,19 @@ object Evaluator {
       case Typed.TRUE => done(Right(true))
       case Typed.FALSE => done(Right(false))
 
-      case Typed.BINARY_OP(a, op@(SUM_OP | GE_OP | GT_OP), b, INT) => tailcall {
+      case Typed.BINARY_OP(a, SUM_OP, b, INT) => tailcall {
+        for {
+          evaluatedA <- r[Int](ctx, a)
+          evaluatedB <- r[Int](ctx, b)
+        } yield evaluatedA.flatMap(v1 => evaluatedB.map { v2 => v1 + v2 })
+      }
+
+      case Typed.BINARY_OP(a, op@(GE_OP | GT_OP), b, BOOLEAN) => tailcall {
         for {
           evaluatedA <- r[Int](ctx, a)
           evaluatedB <- r[Int](ctx, b)
         } yield evaluatedA.flatMap(v1 => evaluatedB.map { v2 =>
           op match {
-            case SUM_OP => v1 + v2
             case GE_OP => v1 >= v2
             case GT_OP => v1 > v2
             case x => throw new IllegalStateException(s"$x")
@@ -91,7 +97,7 @@ object Evaluator {
       }
 
       case o@Typed.BINARY_OP(t1, OR_OP, t2, BOOLEAN) => tailcall {
-        r[Boolean](ctx, t1) flatMap {
+        r[Boolean](ctx, t1).flatMap {
           case Left(err) => done(Left(err))
           case Right(true) => done(Right(true))
           case Right(false) =>
@@ -148,7 +154,8 @@ object Evaluator {
         }
       }
 
-      case Typed.BINARY_OP(_, SUM_OP | GE_OP | GT_OP, _, tpe) if tpe != INT => throw new IllegalArgumentException(s"Expected INT, but got $tpe: $t")
+      case Typed.BINARY_OP(_, SUM_OP, _, tpe) if tpe != INT => throw new IllegalArgumentException(s"Expected INT, but got $tpe: $t")
+      case Typed.BINARY_OP(_, GE_OP | GT_OP, _, tpe) if tpe != BOOLEAN => throw new IllegalArgumentException(s"Expected INT, but got $tpe: $t")
       case Typed.BINARY_OP(_, AND_OP | OR_OP, _, tpe) if tpe != BOOLEAN => throw new IllegalArgumentException(s"Expected BOOLEAN, but got $tpe: $t")
     }).map(x => x.map(_.asInstanceOf[T]))
   }
