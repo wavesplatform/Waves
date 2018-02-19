@@ -22,7 +22,7 @@ class SetScriptTransactionDiffTest extends PropSpec
   property("setting script results in account state") {
     forAll(preconditionsAndSetScript) { case (genesis, setScript) =>
       assertDiffAndState(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(setScript))) { case (blockDiff, newState) =>
-        newState.accountScript(setScript.sender) shouldBe Some(setScript.script)
+        newState.accountScript(setScript.sender) shouldBe setScript.script
       }
     }
   }

@@ -103,9 +103,13 @@ class StateReaderImpl(p: StateStorage, val synchronizationToken: ReentrantReadWr
 
 
   override def assetBalance(a: Address, asset: ByteStr): Long = read { _ =>
-    p.assetBalance.get(a.bytes, asset).getOrElse(0L) }
+    p.assetBalance.get(a.bytes, asset).getOrElse(0L)
+  }
 
   override def accountScript(address: Address): Option[Script] = read { _ =>
-    Option(p.scripts.get(address.bytes)).flatMap(str => Deser.parseOption(str.arr,0)(x => Script.fromBytes(x).explicitGet())._1)
+    for {
+      array <- Option(p.scripts.get(address.bytes))
+      script <- Deser.parseOption(array.arr, 0)(x => Script.fromBytes(x).explicitGet())._1
+    } yield script
   }
 }
