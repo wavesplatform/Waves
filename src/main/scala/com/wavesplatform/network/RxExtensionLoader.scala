@@ -5,9 +5,9 @@ import com.wavesplatform.network.RxExtensionLoader.LoaderState.WithPeer
 import com.wavesplatform.network.RxScoreObserver.{ChannelClosedAndSyncWith, SyncWith}
 import io.netty.channel._
 import monix.eval.{Coeval, Task}
+import monix.execution.CancelableFuture
 import monix.execution.schedulers.SchedulerService
-import monix.execution.{CancelableFuture, Scheduler}
-import monix.reactive.Observable
+import monix.reactive.{Observable, Observer}
 import monix.reactive.subjects.ConcurrentSubject
 import scorex.block.Block
 import scorex.block.Block.BlockId
@@ -28,14 +28,14 @@ object RxExtensionLoader extends ScorexLogging {
             invalidBlocks: InvalidBlockStorage,
             blocks: Observable[(Channel, Block)],
             signatures: Observable[(Channel, Signatures)],
-            syncWithChannelClosed: Observable[ChannelClosedAndSyncWith]
-           )(extensionApplier: (Channel, ExtensionBlocks) => Task[ApplyExtensionResult])
-  : (Observable[(Channel, Block)], Coeval[State]) = {
+            syncWithChannelClosed: Observable[ChannelClosedAndSyncWith],
+            scheduler: SchedulerService)
+           (extensionApplier: (Channel, ExtensionBlocks) => Task[ApplyExtensionResult]): (Observable[(Channel, Block)], Coeval[State], RxExtensionLoaderShutdownHook) = {
 
-    implicit val scheduler: SchedulerService = Scheduler.singleThread("rx-extension-loader")
+    implicit val schdlr = scheduler
 
-    val extensions = ConcurrentSubject.publish[(Channel, ExtensionBlocks)]
-    val simpleBlocks = ConcurrentSubject.publish[(Channel, Block)]
+    val extensions: ConcurrentSubject[(Channel, ExtensionBlocks), (Channel, ExtensionBlocks)] = ConcurrentSubject.publish[(Channel, ExtensionBlocks)]
+    val simpleBlocks: ConcurrentSubject[(Channel, Block), (Channel, Block)] = ConcurrentSubject.publish[(Channel, Block)]
     @volatile var s: State = State(LoaderState.Idle, ApplierState.Idle)
     val lastSyncWith: Coeval[Option[SyncWith]] = lastObserved(syncWithChannelClosed.map(_.syncWith))
 
@@ -185,6 +185,7 @@ object RxExtensionLoader extends ScorexLogging {
 
     def appliedExtensions: Observable[(Channel, ExtensionBlocks, ApplyExtensionResult)] = {
       def apply(x: (Channel, ExtensionBlocks)): Task[ApplyExtensionResult] = Function.tupled(extensionApplier)(x)
+
       extensions.mapTask { x =>
         apply(x)
           .asyncBoundary(scheduler)
@@ -207,7 +208,7 @@ object RxExtensionLoader extends ScorexLogging {
       .logErr
       .subscribe()
 
-    (simpleBlocks, Coeval.eval(s))
+    (simpleBlocks, Coeval.eval(s), RxExtensionLoaderShutdownHook(extensions, simpleBlocks))
   }
 
   sealed trait LoaderState
@@ -234,6 +235,14 @@ object RxExtensionLoader extends ScorexLogging {
         s"received=${received.size}, expected=${if (expected.size == 1) expected.head.trim else expected.size})"
     }
 
+  }
+
+  case class RxExtensionLoaderShutdownHook(extensionChannel: Observer[(Channel, ExtensionBlocks)],
+                                           simpleBlocksChannel: Observer[(Channel, Block)]) {
+    def shutdown(): Unit = {
+      extensionChannel.onComplete()
+      simpleBlocksChannel.onComplete()
+    }
   }
 
   case class ExtensionBlocks(blocks: Seq[Block]) {

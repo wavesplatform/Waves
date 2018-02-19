@@ -39,6 +39,7 @@ class OrderBookActor(assetPair: AssetPair,
                      val functionalitySettings: FunctionalitySettings)
   extends PersistentActor with Stash with ScorexLogging with ExchangeTransactionCreator {
   override def persistenceId: String = OrderBookActor.name(assetPair)
+
   private val snapshotCancellable = context.system.scheduler.schedule(settings.snapshotsInterval, settings.snapshotsInterval, self, SaveSnapshot)
   private val cleanupCancellable = context.system.scheduler.schedule(settings.orderCleanupInterval, settings.orderCleanupInterval, self, OrderCleanup)
   private var orderBook = OrderBook.empty
@@ -77,6 +78,7 @@ class OrderBookActor(assetPair: AssetPair,
       saveSnapshot(Snapshot(orderBook))
     case SaveSnapshotSuccess(metadata) =>
       log.info(s"Snapshot saved with metadata $metadata")
+      deleteMessages(metadata.sequenceNr)
     case SaveSnapshotFailure(metadata, reason) =>
       log.error(s"Failed to save snapshot: $metadata, $reason.")
     case DeleteOrderBookRequest(pair) =>
@@ -86,6 +88,10 @@ class OrderBookActor(assetPair: AssetPair,
       deleteSnapshots(SnapshotSelectionCriteria.Latest)
       context.stop(self)
       sender() ! GetOrderBookResponse(pair, Seq(), Seq())
+    case DeleteMessagesSuccess(toSequenceNr) =>
+      log.info(s"$persistenceId DeleteMessagesSuccess up to $toSequenceNr")
+    case DeleteMessagesFailure(cause: Throwable, toSequenceNr: Long) =>
+      log.error(s"$persistenceId DeleteMessagesFailure up to $toSequenceNr, reason: $cause")
   }
 
   private def waitingValidation: Receive = readOnlyCommands orElse {
@@ -290,17 +296,19 @@ class OrderBookActor(assetPair: AssetPair,
 
   override def receiveCommand: Receive = fullCommands
 
+  val isMigrateToNewOrderHistoryStorage = settings.isMigrateToNewOrderHistoryStorage
+
   override def receiveRecover: Receive = {
     case evt: Event =>
       log.debug("Event: {}", evt)
       applyEvent(evt)
-      if (settings.isMigrateToNewOrderHistoryStorage) {
+      if (isMigrateToNewOrderHistoryStorage) {
         orderHistory ! evt
       }
     case RecoveryCompleted => log.info(assetPair.toString() + " - Recovery completed!");
     case SnapshotOffer(_, snapshot: Snapshot) =>
       orderBook = snapshot.orderBook
-      if (settings.isMigrateToNewOrderHistoryStorage) {
+      if (isMigrateToNewOrderHistoryStorage) {
         orderHistory ! RecoverFromOrderBook(orderBook)
       }
       log.debug(s"Recovering OrderBook from snapshot: $snapshot for $persistenceId")

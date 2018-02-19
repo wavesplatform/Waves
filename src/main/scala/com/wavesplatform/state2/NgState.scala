@@ -4,17 +4,20 @@ import java.util.concurrent.TimeUnit
 
 import cats.kernel.Monoid
 import com.google.common.cache.CacheBuilder
+import com.wavesplatform.mining.{OneDimensionalMiningConstraint, Estimator}
 import scorex.block.Block.BlockId
 import scorex.block.{Block, MicroBlock}
 import scorex.transaction.History.BlockMinerInfo
 import scorex.transaction.{DiscardedMicroBlocks, Transaction}
+import scorex.utils.ScorexLogging
 
 import scala.collection.mutable.{ListBuffer => MList, Map => MMap}
 
-class NgState(val base: Block, val baseBlockDiff: BlockDiff, val acceptedFeatures: Set[Short]) {
+class NgState(val base: Block, val baseBlockDiff: BlockDiff, val acceptedFeatures: Set[Short], totalBlockEstimator: Estimator) extends ScorexLogging {
 
   private val MaxTotalDiffs = 3
 
+  private var constraint = OneDimensionalMiningConstraint.full(totalBlockEstimator).put(base)
   private val microDiffs: MMap[BlockId, (BlockDiff, Long)] = MMap.empty
   private val micros: MList[MicroBlock] = MList.empty // fresh head
   private val totalBlockDiffCache = CacheBuilder.newBuilder()
@@ -93,8 +96,14 @@ class NgState(val base: Block, val baseBlockDiff: BlockDiff, val acceptedFeature
     BlockMinerInfo(base.consensusData, base.timestamp, blockId)
   }
 
-  def append(m: MicroBlock, diff: BlockDiff, timestamp: Long): Unit = {
-    microDiffs.put(m.totalResBlockSig, (diff, timestamp))
-    micros.prepend(m)
+  def append(m: MicroBlock, diff: BlockDiff, timestamp: Long): Boolean = {
+    val updatedConstraint = m.transactionData.foldLeft(constraint)(_.put(_))
+    val successful = !updatedConstraint.isOverfilled
+    if (successful) {
+      constraint = updatedConstraint
+      microDiffs.put(m.totalResBlockSig, (diff, timestamp))
+      micros.prepend(m)
+    }
+    successful
   }
 }

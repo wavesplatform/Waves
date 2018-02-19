@@ -89,7 +89,7 @@ object SnapshotStateReader {
 
 
     def getAccountBalance(account: Address): Map[AssetId, (Long, Boolean, Long, IssueTransaction)] = s.read { _ =>
-      s.accountPortfolio(account).assets.map { case (id, amt) =>
+      s.accountPortfolio(account).assets.collect { case (id, amt) if amt > 0 =>
         val assetInfo = s.assetInfo(id).get
         val issueTransaction = findTransaction[IssueTransaction](id).get
         id -> ((amt, assetInfo.isReissuable, assetInfo.volume, issueTransaction))
@@ -195,10 +195,6 @@ object SnapshotStateReader {
 
 
       loop(s.lastUpdateHeight(acc).getOrElse(0))
-    }
-
-    def accountPortfoliosHash: Int = {
-      Hash.accountPortfolios(s.accountPortfolios)
     }
 
     def partialPortfolio(a: Address, assets: Set[AssetId] = Set.empty): Portfolio = {

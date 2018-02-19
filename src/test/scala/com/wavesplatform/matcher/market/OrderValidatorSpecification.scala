@@ -1,12 +1,11 @@
 package com.wavesplatform.matcher.market
 
-import com.wavesplatform.UtxPool
 import com.wavesplatform.matcher.model._
 import com.wavesplatform.matcher.{MatcherSettings, MatcherTestData}
 import com.wavesplatform.settings.{Constants, WalletSettings}
 import com.wavesplatform.state2.reader.SnapshotStateReader
 import com.wavesplatform.state2.{AssetInfo, ByteStr, LeaseInfo, Portfolio}
-import org.h2.mvstore.MVStore
+import com.wavesplatform.{UtxPool, WithDB}
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
@@ -17,15 +16,13 @@ import scorex.transaction.assets.exchange.{AssetPair, Order}
 import scorex.wallet.Wallet
 
 class OrderValidatorSpecification extends WordSpec
+  with WithDB
   with PropertyChecks
   with Matchers
   with MatcherTestData
   with BeforeAndAfterAll
   with BeforeAndAfterEach
   with PathMockFactory {
-
-  var storage = new OrderHistoryStorage(new MVStore.Builder().open())
-  var oh = OrderHistoryImpl(storage, matcherSettings)
 
   val utxPool: UtxPool = stub[UtxPool]
 
@@ -41,16 +38,16 @@ class OrderValidatorSpecification extends WordSpec
   val matcherPubKey: PublicKeyAccount = w.findWallet(s.account).right.get
 
   private var ov = new OrderValidator {
-    override val orderHistory: OrderHistory = oh
+    override val orderHistory: OrderHistory = OrderHistoryImpl(db, matcherSettings)
     override val utxPool: UtxPool = stub[UtxPool]
     override val settings: MatcherSettings = s
     override val wallet: Wallet = w
   }
 
-  override protected def beforeEach(): Unit = {
-    storage = new OrderHistoryStorage(new MVStore.Builder().open())
+  override def beforeEach(): Unit = {
+    super.beforeEach()
     ov = new OrderValidator {
-      override val orderHistory: OrderHistory = oh
+      override val orderHistory: OrderHistory = OrderHistoryImpl(db, matcherSettings)
       override val utxPool: UtxPool = stub[UtxPool]
       override val settings: MatcherSettings = s
       override val wallet: Wallet = w

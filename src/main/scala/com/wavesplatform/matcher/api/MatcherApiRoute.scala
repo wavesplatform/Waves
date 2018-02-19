@@ -39,7 +39,8 @@ case class MatcherApiRoute(wallet: Wallet,
 
   override lazy val route: Route =
     pathPrefix("matcher") {
-      matcherPublicKey ~ orderBook ~ place ~ getAssetPairAndPublicKeyOrderHistory ~ getPublicKeyOrderHistory ~ getAllOrderHistory ~ getTradableBalance ~ getPublicKeyMatcherBalance ~ orderStatus ~
+      matcherPublicKey ~ orderBook ~ place ~ getAssetPairAndPublicKeyOrderHistory ~ getPublicKeyOrderHistory ~
+        getAllOrderHistory ~ getTradableBalance ~ getPublicKeyMatcherBalance ~ orderStatus ~
         historyDelete ~ cancel ~ orderbooks ~ orderBookDelete ~ getTransactionsByOrder ~ forceCancelOrder
     }
 
@@ -67,14 +68,15 @@ case class MatcherApiRoute(wallet: Wallet,
     new ApiImplicitParam(name = "depth", value = "Limit the number of bid/ask records returned", required = false, dataType = "integer", paramType = "query")
   ))
   def orderBook: Route = (path("orderbook" / Segment / Segment) & get) { (a1, a2) =>
-    withAssetPair(a1, a2) { pair =>
-
-      onComplete((matcher ? GetOrderBookRequest(pair, None)).mapTo[MatcherResponse]) {
-        case Success(resp) => resp.code match {
-          case StatusCodes.Found => redirect(Uri(s"/matcher/orderbook/$a2/$a1"), StatusCodes.Found)
-          case code => complete(code -> resp.json)
+    parameters('depth.as[Int].?) { depth =>
+      withAssetPair(a1, a2) { pair =>
+        onComplete((matcher ? GetOrderBookRequest(pair, depth)).mapTo[MatcherResponse]) {
+          case Success(resp) => resp.code match {
+            case StatusCodes.Found => redirect(Uri(s"/matcher/orderbook/$a2/$a1"), StatusCodes.Found)
+            case code => complete(code -> resp.json)
+          }
+          case Failure(ex) => complete(StatusCodes.InternalServerError -> s"An error occurred: ${ex.getMessage}")
         }
-        case Failure(ex)    => complete(StatusCodes.InternalServerError -> s"An error occurred: ${ex.getMessage}")
       }
     }
   }

@@ -1,6 +1,7 @@
 package scorex.transaction
 
 import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.utils.HeightInfo
 import monix.reactive.Observable
 import scorex.block.Block.BlockId
 import scorex.block.{Block, MicroBlock}
@@ -16,19 +17,12 @@ trait BlockchainUpdater extends Synchronized {
   def removeAfter(blockId: ByteStr): Either[ValidationError, DiscardedBlocks]
 
   def lastBlockInfo: Observable[LastBlockInfo]
+
+  def shutdown(): Unit
 }
 
 trait BlockchainDebugInfo {
-  def debugInfo(): StateDebugInfo
-
-  def persistedAccountPortfoliosHash(): Int
-
+  def lockfreeStateHeight: HeightInfo
 }
 
 case class LastBlockInfo(id: BlockId, height: Int, score: BlockchainScore, ready: Boolean)
-
-case class HashInfo(height: Int, hash: Int)
-
-case class StateDebugInfo(persisted: HashInfo,
-                          inMemory: Seq[HashInfo],
-                          microBaseHash: Option[Int])

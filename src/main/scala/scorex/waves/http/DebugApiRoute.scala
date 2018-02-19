@@ -73,13 +73,14 @@ case class DebugApiRoute(settings: RestAPISettings,
       paramType = "path")
   ))
   def blocks: Route = {
-    (path("blocks" / IntNumber) & get) { howMany =>
+    (path("blocks" / IntNumber) & get & withAuth) { howMany =>
       complete(JsArray(history.lastBlocks(howMany).map { block =>
         val bytes = block.bytes()
         Json.obj(bytes.length.toString -> Base58.encode(FastCryptographicHash(bytes)))
       }))
     }
   }
+
   @Path("/print")
   @ApiOperation(
     value = "Print",
@@ -108,7 +109,7 @@ case class DebugApiRoute(settings: RestAPISettings,
   @Path("/state")
   @ApiOperation(value = "State", notes = "Get current state", httpMethod = "GET")
   @ApiResponses(Array(new ApiResponse(code = 200, message = "Json state")))
-  def state: Route = (path("state") & get) {
+  def state: Route = (path("state") & get & withAuth) {
     complete(stateReader().accountPortfolios
       .map { case (k, v) =>
         k.address -> v.balance
@@ -141,7 +142,7 @@ case class DebugApiRoute(settings: RestAPISettings,
   ))
   @ApiResponses(Array(new ApiResponse(code = 200, message = "Json portfolio")))
   def portfolios: Route = path("portfolios" / Segment) { (rawAddress) =>
-    (get & parameter('considerUnspent.as[Boolean])) { (considerUnspent) =>
+    (get & withAuth & parameter('considerUnspent.as[Boolean])) { (considerUnspent) =>
       Address.fromString(rawAddress) match {
         case Left(_) => complete(InvalidAddress)
         case Right(address) =>
@@ -156,7 +157,7 @@ case class DebugApiRoute(settings: RestAPISettings,
   @ApiImplicitParams(Array(
     new ApiImplicitParam(name = "height", value = "height", required = true, dataType = "integer", paramType = "path")
   ))
-  def stateWaves: Route = (path("stateWaves" / IntNumber) & get) { height =>
+  def stateWaves: Route = (path("stateWaves" / IntNumber) & get & withAuth) { height =>
     val s = stateReader()
     val result = s.accountPortfolios.keys
       .map(acc => acc.stringRepr -> s.balanceAtHeight(acc, height))
@@ -209,11 +210,9 @@ case class DebugApiRoute(settings: RestAPISettings,
   @ApiResponses(Array(
     new ApiResponse(code = 200, message = "Json state")
   ))
-  def info: Route = (path("info") & get) {
+  def info: Route = (path("info") & get & withAuth) {
     complete(Json.obj(
       "stateHeight" -> stateReader().height,
-      "stateHash" -> blockchainDebugInfo.persistedAccountPortfoliosHash,
-      "blockchainDebugInfo" -> blockchainDebugInfo.debugInfo(),
       "extensionLoaderState" -> extLoaderStateReporter().toString,
       "historyReplierCacheSizes" -> Json.toJson(historyReplier.cacheSizes),
       "microBlockSynchronizerCacheSizes" -> Json.toJson(mbsCacheSizesReporter()),
@@ -338,9 +337,6 @@ object DebugApiRoute {
 
   implicit val accountMiningBalanceFormat: Format[AccountMiningInfo] = Json.format
 
-  implicit val hashInfoFormat: Format[HashInfo] = Json.format
-  implicit val stateDebugInfoFormat: Format[StateDebugInfo] = Json.format
-
   implicit val addressWrites: Format[Address] = new Format[Address] {
     override def writes(o: Address): JsValue = JsString(o.stringRepr)
 
@@ -357,7 +353,9 @@ object DebugApiRoute {
   implicit val scoreReporterStatsWrite: Writes[RxScoreObserver.Stats] = Json.writes[RxScoreObserver.Stats]
 
   implicit object MinerStateWrites extends Writes[MinerDebugInfo.State] {
+
     import MinerDebugInfo._
+
     def writes(state: MinerDebugInfo.State) = Json.toJson(
       state match {
         case MiningBlocks => "mining blocks"
@@ -367,4 +365,5 @@ object DebugApiRoute {
       }
     )
   }
+
 }

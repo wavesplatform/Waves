@@ -18,7 +18,6 @@ import com.wavesplatform.state2.reader.SnapshotStateReader
 import com.wavesplatform.state2.{AssetInfo, ByteStr, LeaseInfo, Portfolio}
 import io.netty.channel.group.ChannelGroup
 import monix.eval.Coeval
-import org.h2.mvstore.MVStore
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Matchers, WordSpecLike}
 import scorex.account.PrivateKeyAccount
@@ -30,16 +29,9 @@ import scorex.utils.{NTP, ScorexLogging}
 import scorex.wallet.Wallet
 
 class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest2"))
-  with WordSpecLike
-  with Matchers
-  with BeforeAndAfterAll
-  with ImplicitSender
-  with MatcherTestData
-  with BeforeAndAfterEach
-  with ScorexLogging
-  with PathMockFactory {
+  with WordSpecLike with Matchers with BeforeAndAfterAll with ImplicitSender with MatcherTestData
+  with BeforeAndAfterEach with ScorexLogging with PathMockFactory {
 
-  val db = new MVStore.Builder().compress().open()
   val storedState: SnapshotStateReader = stub[SnapshotStateReader]
 
   val settings = matcherSettings.copy(account = MatcherAccount.address)
@@ -185,6 +177,7 @@ class MatcherActorSpecification extends TestKit(ActorSystem.apply("MatcherTest2"
       expectMsg(StatusCodeMatcherResponse(StatusCodes.NotFound, "Invalid Asset ID: BLACKLST"))
 
       def fbdnNamePair = AssetPair(Some(i2.assetId()), ByteStr.decodeBase58("BASE1").toOption)
+
       actor ! GetOrderBookRequest(fbdnNamePair, None)
       expectMsg(StatusCodeMatcherResponse(StatusCodes.NotFound, "Invalid Asset Name: ForbiddenName"))
     }

@@ -8,8 +8,8 @@ import com.wavesplatform.settings.SynchronizationSettings.MicroblockSynchronizer
 import com.wavesplatform.state2.ByteStr
 import io.netty.channel._
 import monix.eval.{Coeval, Task}
+import monix.execution.CancelableFuture
 import monix.execution.schedulers.SchedulerService
-import monix.execution.{CancelableFuture, Scheduler}
 import monix.reactive.Observable
 import scorex.block.Block.BlockId
 import scorex.block.MicroBlock
@@ -23,9 +23,10 @@ object MicroBlockSynchronizer {
             peerDatabase: PeerDatabase,
             lastBlockIdEvents: Observable[ByteStr],
             microblockInvs: ChannelObservable[MicroBlockInv],
-            microblockResponses: ChannelObservable[MicroBlockResponse]): (Observable[(Channel, MicroblockData)], Coeval[CacheSizes]) = {
+            microblockResponses: ChannelObservable[MicroBlockResponse],
+            scheduler: SchedulerService): (Observable[(Channel, MicroblockData)], Coeval[CacheSizes]) = {
 
-    implicit val scheduler: SchedulerService = Scheduler.singleThread("microblock-synchronizer")
+    implicit val schdlr: SchedulerService = scheduler
 
     val microBlockOwners = cache[MicroBlockSignature, MSet[Channel]](settings.invCacheTimeout)
     val nextInvs = cache[MicroBlockSignature, MicroBlockInv](settings.invCacheTimeout)
@@ -100,6 +101,7 @@ object MicroBlockSynchronizer {
   }
 
   case class MicroblockData(invOpt: Option[MicroBlockInv], microBlock: MicroBlock, microblockOwners: Coeval[Set[Channel]])
+
   type MicroBlockSignature = ByteStr
 
   private val MicroBlockDownloadAttempts = 2

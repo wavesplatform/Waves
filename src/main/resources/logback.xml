@@ -2,7 +2,7 @@
 <configuration>
     <contextListener class="ch.qos.logback.classic.jul.LevelChangePropagator"/>
 
-    <property name="default.pattern" value="%date{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%.25thread] %logger{26} - %msg%n"/>
+    <property name="default.pattern" value="%date %-5level [%.25thread] %logger{26} - %msg%n"/>
     <property name="logback.file.final-directory" value="${logback.file.directory:-${waves.directory}/log}"/>
 
     <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
@@ -30,7 +30,7 @@
         </rollingPolicy>
 
         <encoder>
-            <pattern>${logback.pattern:-${default.pattern}}</pattern>
+            <pattern>${default.pattern}</pattern>
         </encoder>
     </appender>
 

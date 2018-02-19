@@ -5,6 +5,7 @@ import java.net.InetSocketAddress
 import java.util.concurrent.TimeoutException
 
 import com.wavesplatform.features.api.ActivationStatus
+import com.wavesplatform.http.api_key
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.util.GlobalTimer.{instance => timer}
 import com.wavesplatform.it.util._
@@ -20,6 +21,7 @@ import scorex.api.http.PeersApiRoute.{ConnectReq, connectFormat}
 import scorex.api.http.alias.CreateAliasRequest
 import scorex.api.http.assets._
 import scorex.api.http.leasing.{LeaseCancelRequest, LeaseRequest}
+import scorex.transaction.assets.MassTransferTransaction.Transfer
 import scorex.transaction.assets.exchange.Order
 import scorex.waves.http.DebugApiRoute._
 import scorex.waves.http.DebugMessage._
@@ -67,19 +69,19 @@ object AsyncHttpApi {
 
     def getWithApiKey(path: String, f: RequestBuilder => RequestBuilder = identity): Future[Response] = retrying {
       _get(s"${n.nodeApiEndpoint}$path")
-        .setHeader("api_key", n.apiKey)
+        .withApiKey(n.apiKey)
         .build()
     }
 
     def postJsonWithApiKey[A: Writes](path: String, body: A): Future[Response] = retrying {
       _post(s"${n.nodeApiEndpoint}$path")
-        .setHeader("api_key", n.apiKey)
+        .withApiKey(n.apiKey)
         .setHeader("Content-type", "application/json").setBody(stringify(toJson(body)))
         .build()
     }
 
     def post(url: String, f: RequestBuilder => RequestBuilder = identity): Future[Response] =
-      retrying(f(_post(url).setHeader("api_key", n.apiKey)).build())
+      retrying(f(_post(url).withApiKey(n.apiKey)).build())
 
     def postJson[A: Writes](path: String, body: A): Future[Response] =
       post(path, stringify(toJson(body)))
@@ -179,6 +181,9 @@ object AsyncHttpApi {
     def transfer(sourceAddress: String, recipient: String, amount: Long, fee: Long, assetId: Option[String] = None): Future[Transaction] =
       postJson("/assets/transfer", TransferRequest(assetId, None, amount, fee, sourceAddress, None, recipient)).as[Transaction]
 
+    def massTransfer(sourceAddress: String, transfers: List[Transfer], fee: Long, assetId: Option[String] = None): Future[Transaction] =
+      postJson("/assets/masstransfer", MassTransferRequest(assetId, sourceAddress, transfers, fee, None)).as[Transaction]
+
     def payment(sourceAddress: String, recipient: String, amount: Long, fee: Long): Future[Transaction] =
       postJson("/waves/payment", PaymentRequest(amount, fee, sourceAddress, recipient)).as[Transaction]
 
@@ -209,10 +214,14 @@ object AsyncHttpApi {
     def signedTransfer(transfer: SignedTransferRequest): Future[Transaction] =
       postJson("/assets/broadcast/transfer", transfer).as[Transaction]
 
+    def signedMassTransfer(req: SignedMassTransferRequest): Future[Transaction] = {
+      postJson("/transactions/broadcast", req).as[Transaction]
+    }
+
     def batchSignedTransfer(transfers: Seq[SignedTransferRequest], timeout: FiniteDuration = 1.minute): Future[Seq[Transaction]] = {
       val request = _post(s"${n.nodeApiEndpoint}/assets/broadcast/batch-transfer")
         .setHeader("Content-type", "application/json")
-        .setHeader("api_key", n.apiKey)
+        .withApiKey(n.apiKey)
         .setReadTimeout(timeout.toMillis.toInt)
         .setRequestTimeout(timeout.toMillis.toInt)
         .setBody(stringify(toJson(transfers)))
@@ -350,9 +359,7 @@ object AsyncHttpApi {
         .toScala
     }
 
-    def waitForDebugInfoAt(height: Long): Future[DebugInfo] = waitFor[DebugInfo](s"debug info at height >= $height")(_.get("/debug/info").as[DebugInfo], _.stateHeight >= height, 1.seconds)
-
-    def debugStateAt(height: Long): Future[Map[String, Long]] = get(s"/debug/stateWaves/$height").as[Map[String, Long]]
+    def debugStateAt(height: Long): Future[Map[String, Long]] = getWithApiKey(s"/debug/stateWaves/$height").as[Map[String, Long]]
 
     def debugPortfoliosFor(address: String, considerUnspent: Boolean): Future[Portfolio] = {
       getWithApiKey(s"/debug/portfolios/$address?considerUnspent=$considerUnspent")
@@ -432,5 +439,9 @@ object AsyncHttpApi {
         }
     }
 
+  }
+
+  implicit class RequestBuilderOps(self: RequestBuilder) {
+    def withApiKey(x: String): RequestBuilder = self.setHeader(api_key.name, x)
   }
 }

@@ -14,13 +14,13 @@ import scorex.utils.ScorexLogging
 
 import scala.util.{Failure, Try}
 
-case class MicroBlock private(version: Byte, sender: PublicKeyAccount, transactionData: Seq[Transaction], prevResBlockSig: BlockId,
-                              totalResBlockSig: BlockId, signature: ByteStr) extends Signed {
+case class MicroBlock(version: Byte, generator: PublicKeyAccount, transactionData: Seq[Transaction], prevResBlockSig: BlockId,
+                      totalResBlockSig: BlockId, signature: ByteStr) extends Signed {
 
   private val versionField: ByteBlockField = ByteBlockField("version", version)
   private val prevResBlockSigField: BlockIdField = BlockIdField("prevResBlockSig", prevResBlockSig.arr)
   private val totalResBlockSigField: BlockIdField = BlockIdField("totalResBlockSigField", totalResBlockSig.arr)
-  private val signerDataField: SignerDataBlockField = SignerDataBlockField("signature", SignerData(sender, signature))
+  private val signerDataField: SignerDataBlockField = SignerDataBlockField("signature", SignerData(generator, signature))
   private val transactionDataField = TransactionsBlockField(version.toInt, transactionData)
 
   val bytes: Coeval[Array[Byte]] = Coeval.evalOnce {
@@ -36,8 +36,8 @@ case class MicroBlock private(version: Byte, sender: PublicKeyAccount, transacti
 
   private val bytesWithoutSignature: Coeval[Array[Byte]] = Coeval.evalOnce(bytes().dropRight(SignatureLength))
 
-  override val signatureValid: Coeval[Boolean] = Coeval.evalOnce(EllipticCurveImpl.verify(signature.arr, bytesWithoutSignature(), sender.publicKey))
-  override val signedDescendants: Coeval[Seq[Signed]] = Coeval.evalOnce(transactionData.flatMap(_.cast[Signed]))
+  override val signatureValid: Coeval[Boolean] = Coeval.evalOnce(EllipticCurveImpl.verify(signature.arr, bytesWithoutSignature(), generator.publicKey))
+  override val signedDescendants: Coeval[Seq[Signed]] = Coeval.evalOnce(transactionData)
 
   override def toString: String = s"MicroBlock(${totalResBlockSig.trim} -> ${prevResBlockSig.trim}, txs=${transactionData.size})"
 }

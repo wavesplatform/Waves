@@ -1,8 +1,8 @@
 package com.wavesplatform.it
 
-import java.io.FileOutputStream
+import java.io.{File, FileOutputStream, IOException}
 import java.net.{InetAddress, InetSocketAddress, URL}
-import java.nio.file.{Files, Paths}
+import java.nio.file.{Files, Path, Paths}
 import java.util.Collections._
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
@@ -19,6 +19,10 @@ import com.typesafe.config.{Config, ConfigFactory, ConfigRenderOptions}
 import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.util.GlobalTimer.{instance => timer}
 import com.wavesplatform.settings.WavesSettings
+import monix.eval.Coeval
+import org.apache.commons.compress.archivers.ArchiveStreamFactory
+import org.apache.commons.compress.archivers.tar.TarArchiveEntry
+import org.apache.commons.io.IOUtils
 import org.asynchttpclient.Dsl._
 import scorex.utils.ScorexLogging
 
@@ -26,11 +30,13 @@ import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future, blocking}
-import scala.util.Random
+import scala.sys.process.Process
 import scala.util.control.NonFatal
+import scala.util.{Random, Try}
 
-
-class Docker(suiteConfig: Config = ConfigFactory.empty, tag: String = "") extends AutoCloseable with ScorexLogging {
+class Docker(suiteConfig: Config = ConfigFactory.empty,
+             tag: String = "",
+             enableProfiling: Boolean = false) extends AutoCloseable with ScorexLogging {
 
   import Docker._
 
@@ -58,6 +64,32 @@ class Docker(suiteConfig: Config = ConfigFactory.empty, tag: String = "") extend
   private val networkSeed = Random.nextInt(0x100000) << 4 | 0x0A000000
   // 10.x.x.x/28 network will accommodate up to 13 nodes
   private val networkPrefix = s"${InetAddress.getByAddress(toByteArray(networkSeed)).getHostAddress}/28"
+
+  private val logDir: Coeval[Path] = Coeval.evalOnce {
+    val r = Option(System.getProperty("waves.it.logging.dir"))
+      .map(Paths.get(_))
+      .getOrElse(Paths.get(System.getProperty("user.dir"), "target", "logs"))
+
+    Files.createDirectories(r)
+    r
+  }
+
+  private val profilerController: Coeval[Option[File]] = Coeval.evalOnce {
+    if (enableProfiling) {
+      Option(System.getProperty("waves.profiling.yourKitDir")) match {
+        case None =>
+          throw new IllegalStateException("Can't enable profiling, because there is no property 'waves.profiling.yourKitDir'!")
+
+        case Some(yourKitDir) =>
+          val controller = Paths.get(yourKitDir, "yjp-controller-api-redist.jar").toFile
+          if (controller.isFile) Some(controller)
+          else {
+            log.warn(s"Can't enable profiling, because '$controller' is not a file")
+            None
+          }
+      }
+    } else None
+  }
 
   private def ipForNode(nodeId: Int) = InetAddress.getByAddress(toByteArray(nodeId & 0xF | networkSeed)).getHostAddress
 
@@ -144,7 +176,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty, tag: String = "") extend
 
     val seedAddresses = nodes.asScala
       .filterNot(_.name == node.name)
-      .map { _.containerNetworkAddress }
+      .map(_.containerNetworkAddress)
 
     if (seedAddresses.isEmpty) Future.successful(())
     else Future
@@ -153,10 +185,6 @@ class Docker(suiteConfig: Config = ConfigFactory.empty, tag: String = "") extend
   }
 
   private def startNodeInternal(nodeConfig: Config): DockerNode = try {
-    val javaOptions = Option(System.getenv("CONTAINER_JAVA_OPTS")).getOrElse("")
-    val configOverrides = s"$javaOptions ${renderProperties(asProperties(nodeConfig.withFallback(suiteConfig)))} " +
-      s"-Dlogback.stdout.level=TRACE -Dlogback.file.level=OFF"
-
     val actualConfig = nodeConfig
       .withFallback(suiteConfig)
       .withFallback(NodeConfigs.DefaultConfigTemplate)
@@ -169,6 +197,7 @@ class Docker(suiteConfig: Config = ConfigFactory.empty, tag: String = "") extend
     val matcherApiPort = actualConfig.getString("waves.matcher.port")
 
     val portBindings = new ImmutableMap.Builder[String, java.util.List[PortBinding]]()
+      .put(s"$ProfilerPort", singletonList(PortBinding.randomPort("0.0.0.0")))
       .put(restApiPort, singletonList(PortBinding.randomPort("0.0.0.0")))
       .put(networkPort, singletonList(PortBinding.randomPort("0.0.0.0")))
       .put(matcherApiPort, singletonList(PortBinding.randomPort("0.0.0.0")))
@@ -181,14 +210,28 @@ class Docker(suiteConfig: Config = ConfigFactory.empty, tag: String = "") extend
     val nodeName = actualConfig.getString("waves.network.node-name")
     val nodeNumber = nodeName.replace("node", "").toInt
     val ip = ipForNode(nodeNumber)
+
+    val javaOptions = Option(System.getenv("CONTAINER_JAVA_OPTS")).getOrElse("")
+    val configOverrides = {
+      val common = s"$javaOptions ${renderProperties(asProperties(nodeConfig.withFallback(suiteConfig)))} " +
+        s"-Dlogback.stdout.level=TRACE -Dlogback.file.level=OFF -Dwaves.network.declared-address=$ip:$networkPort"
+
+      val additional = profilerController().fold("") { _ =>
+        s"-agentpath:$ContainerRoot/libyjpagent.so=listen=0.0.0.0:$ProfilerPort," +
+          s"sampling,monitors,sessionname=WavesNode,dir=$ContainerRoot/profiler,logdir=$ContainerRoot"
+      }
+
+      s"$common $additional"
+    }
+
     val containerConfig = ContainerConfig.builder()
       .image("com.wavesplatform/it:latest")
-      .exposedPorts(restApiPort, networkPort, matcherApiPort)
+      .exposedPorts(s"$ProfilerPort", restApiPort, networkPort, matcherApiPort)
       .networkingConfig(ContainerConfig.NetworkingConfig.create(Map(
         wavesNetwork.name() -> endpointConfigFor(nodeName)
       ).asJava))
       .hostConfig(hostConfig)
-      .env(s"WAVES_OPTS=$configOverrides", s"WAVES_NET_IP=$ip", s"WAVES_PORT=$networkPort")
+      .env(s"WAVES_OPTS=$configOverrides")
       .build()
 
     val containerId = {
@@ -250,8 +293,10 @@ class Docker(suiteConfig: Config = ConfigFactory.empty, tag: String = "") extend
       log.info("Stopping containers")
 
       nodes.asScala.foreach { node =>
+        takeProfileSnapshot(node)
         client.stopContainer(node.containerId, 0)
 
+        saveProfile(node)
         saveLog(node)
         val containerInfo = client.inspectContainer(node.containerId)
         log.debug(
@@ -282,13 +327,8 @@ class Docker(suiteConfig: Config = ConfigFactory.empty, tag: String = "") extend
   }
 
   private def saveLog(node: DockerNode): Unit = {
-    val logDir = Option(System.getProperty("waves.it.logging.dir")).map(Paths.get(_))
-      .getOrElse(Paths.get(System.getProperty("user.dir"), "target", "logs"))
-
-    Files.createDirectories(logDir)
     val containerId = node.containerId
-
-    val logFile = logDir.resolve(s"${node.name}.log").toFile
+    val logFile = logDir().resolve(s"${node.name}.log").toFile
     log.info(s"Writing logs of $containerId to ${logFile.getAbsolutePath}")
 
     val fileStream = new FileOutputStream(logFile, false)
@@ -303,6 +343,56 @@ class Docker(suiteConfig: Config = ConfigFactory.empty, tag: String = "") extend
         .attach(fileStream, fileStream)
     } finally {
       fileStream.close()
+    }
+  }
+
+  private def takeProfileSnapshot(node: DockerNode): Unit = profilerController().foreach { controller =>
+    val containerInfo = inspectContainer(node.containerId)
+    Option(containerInfo.networkSettings().ports()).foreach { ports =>
+      Process(Seq(
+        "java",
+        "-jar",
+        controller.toString,
+        "127.0.0.1",
+        extractHostPort(ports, ProfilerPort).toString,
+        "capture-performance-snapshot"
+      )).!!
+    }
+  }
+
+  private def saveProfile(node: DockerNode): Unit = profilerController().foreach { _ =>
+    try {
+      val profilerDirStream = client.archiveContainer(node.containerId, ContainerRoot.resolve("profiler").toString)
+
+      try {
+        val archiveStream = new ArchiveStreamFactory().createArchiveInputStream(ArchiveStreamFactory.TAR, profilerDirStream)
+        val snapshotFile = Iterator
+          .continually(Option(archiveStream.getNextEntry))
+          .takeWhile(_.nonEmpty)
+          .collectFirst {
+            case Some(entry: TarArchiveEntry) if entry.isFile && entry.getName.contains(".snapshot") => entry
+          }
+
+        snapshotFile.foreach { archiveFile =>
+          val output = new FileOutputStream(logDir().resolve(s"${node.name}.snapshot").toFile)
+          try {
+            IOUtils.copy(archiveStream, output)
+            log.info(s"The snapshot of ${node.name} was successfully saved")
+          } catch {
+            case e: Throwable => throw new IOException(s"Can't copy ${archiveFile.getName} of ${node.name} to local fs", e)
+          } finally {
+            output.close()
+          }
+        }
+      } catch {
+        case e: Throwable => throw new IOException(s"Can't read a profiler directory stream of ${node.name}", e)
+      } finally {
+        // Some kind of https://github.com/spotify/docker-client/issues/745
+        // But we have to close this stream, otherwise the thread will be blocked
+        Try(profilerDirStream.close())
+      }
+    } catch {
+      case e: Throwable => log.warn(s"Can't save profiler logs of ${node.name}", e)
     }
   }
 
@@ -348,6 +438,8 @@ class Docker(suiteConfig: Config = ConfigFactory.empty, tag: String = "") extend
 }
 
 object Docker {
+  private val ProfilerPort = 10001
+  private val ContainerRoot = Paths.get("/opt/waves")
   private val jsonMapper = new ObjectMapper
   private val propsMapper = new JavaPropsMapper
 
@@ -363,20 +455,19 @@ object Docker {
   private def extractHostPort(m: JMap[String, JList[PortBinding]], containerPort: Int) =
     m.get(s"$containerPort/tcp").get(0).hostPort().toInt
 
-  case class NodeInfo(
-     nodeApiEndpoint: URL,
-     matcherApiEndpoint: URL,
-     hostNetworkAddress: InetSocketAddress,
-     containerNetworkAddress: InetSocketAddress)
+  case class NodeInfo(nodeApiEndpoint: URL,
+                      matcherApiEndpoint: URL,
+                      hostNetworkAddress: InetSocketAddress,
+                      containerNetworkAddress: InetSocketAddress)
 
   class DockerNode(config: Config, val containerId: String, private[Docker] var nodeInfo: NodeInfo) extends Node(config) {
-    override def nodeApiEndpoint = nodeInfo.nodeApiEndpoint
+    override def nodeApiEndpoint: URL = nodeInfo.nodeApiEndpoint
 
-    override def matcherApiEndpoint = nodeInfo.matcherApiEndpoint
+    override def matcherApiEndpoint: URL = nodeInfo.matcherApiEndpoint
 
     override val apiKey = "integration-test-rest-api"
 
-    override def networkAddress = nodeInfo.hostNetworkAddress
+    override def networkAddress: InetSocketAddress = nodeInfo.hostNetworkAddress
 
     def containerNetworkAddress: InetSocketAddress = nodeInfo.containerNetworkAddress
   }

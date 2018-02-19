@@ -1,7 +1,7 @@
 package com.wavesplatform.state2.reader
 
 import com.wavesplatform.state2.diffs._
-import com.wavesplatform.{NoShrink, TransactionGen}
+import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
@@ -10,7 +10,7 @@ import scorex.transaction.assets.TransferTransaction
 import scorex.transaction.{GenesisTransaction, Transaction}
 
 class StateReaderLastTransactionsTest extends PropSpec
-  with PropertyChecks with Matchers with TransactionGen with NoShrink {
+  with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDB {
 
   val preconditionsAndPayment: Gen[(Seq[Transaction], TransferTransaction)] = for {
     master <- accountGen
@@ -27,7 +27,7 @@ class StateReaderLastTransactionsTest extends PropSpec
 
   property("accountTransactions sort results by 'fresh head' rule") {
     forAll(preconditionsAndPayment) { case ((pre, payment)) =>
-      assertDiffAndState(Seq(TestBlock.create(pre)), TestBlock.create(Seq(payment))) { (blockDiff, newState) =>
+      assertDiffAndState(db, Seq(TestBlock.create(pre)), TestBlock.create(Seq(payment))) { (_, newState) =>
 
         def transactions(count: Int) = newState.accountTransactions(payment.sender, count).map(_._2)
 

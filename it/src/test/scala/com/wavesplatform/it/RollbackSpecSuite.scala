@@ -34,23 +34,14 @@ class RollbackSpecSuite extends FreeSpec with ScalaFutures with IntegrationPatie
 
       _ <- processRequests(generateTransfersToRandomAddresses(transactionsCount, nodeAddresses))
 
-      hashAfterFirstTry <- traverse(nodes)(_.waitForDebugInfoAt(startHeight + waitBlocks).map(_.stateHash)).map(infos => {
-        all(infos) shouldEqual infos.head
-        infos.head
-      })
       stateAfterFirstTry <- nodes.head.debugStateAt(startHeight + waitBlocks)
 
       _ <- nodes.tail.head.rollback(1)
       _ <- nodes.head.rollback(startHeight)
 
-      hashAfterSecondTry <- traverse(nodes)(_.waitForDebugInfoAt(startHeight + waitBlocks).map(_.stateHash)).map(infos => {
-        all(infos) shouldEqual infos.head
-        infos.head
-      })
       stateAfterSecondTry <- nodes.head.debugStateAt(startHeight + waitBlocks)
     } yield {
       stateAfterFirstTry should contain theSameElementsAs stateAfterSecondTry
-      hashAfterFirstTry shouldBe hashAfterSecondTry
     }, 5.minutes)
   }
 
@@ -61,18 +52,17 @@ class RollbackSpecSuite extends FreeSpec with ScalaFutures with IntegrationPatie
 
       requests = generateTransfersToRandomAddresses(transactionsCount, nodeAddresses)
 
-      hashBeforeApply <- traverse(nodes)(_.waitForDebugInfoAt(startHeight + waitBlocks).map(_.stateHash)).map { infos =>
-        all(infos) shouldEqual infos.head
-        infos.head
-      }
+      stateBeforeApply <- nodes.head.debugStateAt(startHeight + waitBlocks)
+
       _ <- processRequests(requests)
       _ <- nodes.head.waitFor[Int]("empty utx")(_.utxSize, _ == 0, 1.second)
       _ <- traverse(nodes)(_.rollback(startHeight, returnToUTX = false))
       _ <- nodes.head.utx.map(_ shouldBe 'empty)
+      _ <- traverse(nodes)(_.waitForHeight(startHeight + 1))
 
-      hashAfterApply <- nodes.head.waitForDebugInfoAt(startHeight + waitBlocks).map(_.stateHash)
+      stateAfterApply <- nodes.head.debugStateAt(startHeight + waitBlocks)
     } yield {
-      hashBeforeApply shouldBe hashAfterApply
+      stateBeforeApply should contain theSameElementsAs stateAfterApply
     }, 5.minutes)
   }
 

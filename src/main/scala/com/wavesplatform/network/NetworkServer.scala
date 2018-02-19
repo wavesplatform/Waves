@@ -228,6 +228,8 @@ object NetworkServer extends ScorexLogging {
     } finally {
       workerGroup.shutdownGracefully().await()
       bossGroup.shutdownGracefully().await()
+      mesageObserver.shutdown()
+      channelClosedHandler.shutdown()
     }
 
     new NS {

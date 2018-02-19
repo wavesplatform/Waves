@@ -1,15 +1,16 @@
 package com.wavesplatform.history
 
-import com.wavesplatform.TransactionGen
 import com.wavesplatform.state2._
 import com.wavesplatform.state2.diffs._
+import com.wavesplatform.{TransactionGen, WithDB}
 import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 import scorex.transaction._
 import scorex.transaction.assets.TransferTransaction
 
-class BlockchainUpdaterInMemoryDiffTest extends PropSpec with PropertyChecks with DomainScenarioDrivenPropertyCheck with Matchers with TransactionGen {
+class BlockchainUpdaterInMemoryDiffTest extends PropSpec
+  with PropertyChecks with DomainScenarioDrivenPropertyCheck with Matchers with TransactionGen with WithDB {
   val preconditionsAndPayments: Gen[(GenesisTransaction, TransferTransaction, TransferTransaction)] = for {
     master <- accountGen
     recipient <- accountGen
@@ -21,7 +22,7 @@ class BlockchainUpdaterInMemoryDiffTest extends PropSpec with PropertyChecks wit
 
   property("compactification with liquid block doesn't make liquid block affect state once") {
 
-    scenario(preconditionsAndPayments) { case (domain, (genesis, payment1, payment2)) =>
+    scenario(preconditionsAndPayments, db) { case (domain, (genesis, payment1, payment2)) =>
       val blocksWithoutCompactification = chainBlocks(
         Seq(genesis) +:
           Seq.fill(MaxTransactionsPerBlockDiff * 2 - 1)(Seq.empty[Transaction]) :+
@@ -45,7 +46,7 @@ class BlockchainUpdaterInMemoryDiffTest extends PropSpec with PropertyChecks wit
     }
   }
   property("compactification without liquid block doesn't make liquid block affect state once") {
-    scenario(preconditionsAndPayments) { case (domain, (genesis, payment1, payment2)) =>
+    scenario(preconditionsAndPayments, db) { case (domain, (genesis, payment1, payment2)) =>
       val firstBlocks = chainBlocks(Seq(Seq(genesis)) ++ Seq.fill(MaxTransactionsPerBlockDiff * 2 - 2)(Seq.empty[Transaction]))
       val payment1Block = buildBlockOfTxs(firstBlocks.last.uniqueId, Seq(payment1))
       val emptyBlock = buildBlockOfTxs(payment1Block.uniqueId, Seq.empty)

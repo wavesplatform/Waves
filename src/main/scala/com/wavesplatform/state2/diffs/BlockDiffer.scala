@@ -52,16 +52,16 @@ object BlockDiffer extends ScorexLogging with Instrumented {
     val prevBlockTimestamp = maybePrevBlock.map(_.timestamp)
     for {
       _ <- block.signaturesValid()
-      r <- apply(settings, s, prevBlockTimestamp)(block.signerData.generator, prevBlockFeeDistr, currentBlockFeeDistr, block.timestamp, block.transactionData, 1)
+      r <- apply(settings, s, fp, prevBlockTimestamp)(block.signerData.generator, prevBlockFeeDistr, currentBlockFeeDistr, block.timestamp, block.transactionData, 1)
     } yield r
   }
 
-  def fromMicroBlock(settings: FunctionalitySettings, fp: FeatureProvider, s: SnapshotStateReader, pervBlockTimestamp: Option[Long], micro: MicroBlock, timestamp: Long): Either[ValidationError, BlockDiff] = {
+  def fromMicroBlock(settings: FunctionalitySettings, fp: FeatureProvider, s: SnapshotStateReader, prevBlockTimestamp: Option[Long], micro: MicroBlock, timestamp: Long): Either[ValidationError, BlockDiff] = {
     for {
       // microblocks are processed within block which is next after 40-only-block which goes on top of activated height
       _ <- Either.cond(fp.featureActivationHeight(BlockchainFeatures.NG.id).exists(s.height > _), (), ActivationError(s"MicroBlocks are not yet activated, current height=${s.height}"))
       _ <- micro.signaturesValid()
-      r <- apply(settings, s, pervBlockTimestamp)(micro.sender, None, None, timestamp, micro.transactionData, 0)
+      r <- apply(settings, s, fp, prevBlockTimestamp)(micro.generator, None, None, timestamp, micro.transactionData, 0)
     } yield r
   }
 
@@ -82,21 +82,21 @@ object BlockDiffer extends ScorexLogging with Instrumented {
     }
   }
 
-  private def apply(settings: FunctionalitySettings, s: SnapshotStateReader, pervBlockTimestamp: Option[Long])
+  private def apply(settings: FunctionalitySettings, s: SnapshotStateReader, fp: FeatureProvider, prevBlockTimestamp: Option[Long])
                    (blockGenerator: Address, prevBlockFeeDistr: Option[Diff], currentBlockFeeDistr: Option[Diff],
                     timestamp: Long, txs: Seq[Transaction], heightDiff: Int): Either[ValidationError, BlockDiff] = {
     val currentBlockHeight = s.height + heightDiff
-    val txDiffer = TransactionDiffer(settings, pervBlockTimestamp, timestamp, currentBlockHeight) _
+    val txDiffer = TransactionDiffer(settings, prevBlockTimestamp, timestamp, currentBlockHeight) _
 
     val txsDiffEi = currentBlockFeeDistr match {
       case Some(feedistr) =>
         txs.foldLeft(right(Monoid.combine(prevBlockFeeDistr.orEmpty, feedistr))) { case (ei, tx) => ei.flatMap(diff =>
-          txDiffer(composite(diff.asBlockDiff, s), tx)
+          txDiffer(composite(diff.asBlockDiff, s), fp, tx)
             .map(newDiff => diff.combine(newDiff)))
         }
       case None =>
         txs.foldLeft(right(prevBlockFeeDistr.orEmpty)) { case (ei, tx) => ei.flatMap(diff =>
-          txDiffer(composite(diff.asBlockDiff, s), tx)
+          txDiffer(composite(diff.asBlockDiff, s), fp, tx)
             .map(newDiff => diff.combine(newDiff.copy(portfolios = newDiff.portfolios.combine(Map(blockGenerator -> tx.feeDiff()).mapValues(_.multiply(Block.CurrentBlockFeePart)))))))
         }
     }

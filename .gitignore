@@ -7,6 +7,7 @@
 target
 *.tgz
 *.jar
+!third-party/yourkit/yjp-controller-api-redist.jar
 
 # vim
 *.*~
@@ -14,6 +15,7 @@ target
 # dotfiles
 .dockerignore
 .editorconfig
+.DS_Store
 
 # logs
 *.log

@@ -1,5 +1,7 @@
 package com.wavesplatform.it
 
+import java.util.concurrent.ThreadLocalRandom
+
 import com.typesafe.config.Config
 import com.wavesplatform.it.TransferSending.Req
 import com.wavesplatform.it.api.AsyncHttpApi._
@@ -79,7 +81,7 @@ trait TransferSending extends ScorexLogging {
 
   def balanceForNode(n: Node): Future[(String, Long)] = n.balance(n.address).map(b => n.address -> b.balance)
 
-  def processRequests(requests: Seq[Req]): Future[Seq[Transaction]] = {
+  def processRequests(requests: Seq[Req], includeAttachment: Boolean = false): Future[Seq[Transaction]] = {
     val n = requests.size
     val start = System.currentTimeMillis() - n
     val requestGroups = requests
@@ -94,7 +96,9 @@ trait TransferSending extends ScorexLogging {
             timestamp = start + i,
             feeAssetId = None,
             feeAmount = x.fee,
-            attachment = Array.emptyByteArray
+            attachment = if (includeAttachment) {
+              Array.fill(TransferTransaction.MaxAttachmentSize)(ThreadLocalRandom.current().nextInt().toByte)
+            } else Array.emptyByteArray
           )
           .right.get)
       }

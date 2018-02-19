@@ -28,6 +28,10 @@ scalacOptions ++= Seq(
   "-Xlint")
 logBuffered := false
 
+resolvers += Resolver.bintrayRepo("ethereum", "maven")
+
+fork in run := true
+
 //assembly settings
 assemblyJarName in assembly := s"waves-all-${version.value}.jar"
 assemblyMergeStrategy in assembly := {
@@ -54,15 +58,25 @@ libraryDependencies ++=
   )
 
 sourceGenerators in Compile += Def.task {
+
+  // WARNING!!!
+  // Please, update the fallback version every major and minor releases.
+  // This version is used then building from sources without Git repository
+  // In case of not updating the version nodes build from headless sources will fail to connect to newer versions
+  val FallbackVersion = (0, 10, 0)
+
   val versionFile = (sourceManaged in Compile).value / "com" / "wavesplatform" / "Version.scala"
   val versionExtractor = """(\d+)\.(\d+)\.(\d+).*""".r
-  val versionExtractor(major, minor, bugfix) = version.value
+  val (major, minor, patch) = version.value match {
+    case versionExtractor(ma, mi, pa) => (ma.toInt, mi.toInt, pa.toInt)
+    case _ => FallbackVersion
+  }
   IO.write(versionFile,
     s"""package com.wavesplatform
       |
       |object Version {
       |  val VersionString = "${version.value}"
-      |  val VersionTuple = ($major, $minor, $bugfix)
+      |  val VersionTuple = ($major, $minor, $patch)
       |}
       |""".stripMargin)
   Seq(versionFile)
@@ -71,7 +85,8 @@ sourceGenerators in Compile += Def.task {
 inConfig(Test)(Seq(
   logBuffered := false,
   parallelExecution := false,
-  testOptions += Tests.Argument("-oIDOF", "-u", "target/test-reports")
+  testOptions += Tests.Argument("-oIDOF", "-u", "target/test-reports"),
+  testOptions += Tests.Setup(_ => sys.props("sbt-testing") = "true")
 ))
 
 commands += Command.command("packageAll") { state =>
@@ -87,7 +102,9 @@ inConfig(Linux)(Seq(
   packageDescription := "Waves node"
 ))
 
-val network = Def.setting { Network(sys.props.get("network")) }
+val network = SettingKey[Network]("network")
+network := { Network(sys.props.get("network")) }
+
 normalizedName := network.value.name
 
 javaOptions in Universal ++= Seq(

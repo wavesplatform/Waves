@@ -10,6 +10,7 @@ import com.wavesplatform.state2._
 import io.netty.channel.Channel
 import io.netty.channel.group.ChannelGroup
 import monix.eval.{Coeval, Task}
+import monix.execution.Scheduler
 import org.influxdb.dto.Point
 import scorex.block.Block
 import scorex.transaction.ValidationError.GenericError
@@ -23,7 +24,7 @@ object ExtensionAppender extends ScorexLogging with Instrumented {
   def apply(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater,
             stateReader: StateReader, utxStorage: UtxPool, time: Time, settings: WavesSettings,
             featureProvider: FeatureProvider, invalidBlocks: InvalidBlockStorage,
-            peerDatabase: PeerDatabase, miner: Miner, allChannels: ChannelGroup
+            peerDatabase: PeerDatabase, miner: Miner, allChannels: ChannelGroup, scheduler: Scheduler
            )(ch: Channel, extensionBlocks: Seq[Block]): Task[Either[ValidationError, Option[BigInt]]] = {
     def p(blocks: Seq[Block]): Task[Either[ValidationError, Option[BigInt]]] = Task(Signed.validateOrdered(blocks).flatMap { newBlocks =>
       history.write("apply") { implicit l =>
@@ -37,7 +38,7 @@ object ExtensionAppender extends ScorexLogging with Instrumented {
             val forkApplicationResultEi = Coeval {
               extension.view
                 .map { b =>
-                  b -> appendBlock(checkpoint, history, blockchainUpdater, stateReader(), utxStorage, time, settings.blockchainSettings, featureProvider)(b).right.map {
+                  b -> appendBlock(checkpoint, history, blockchainUpdater, stateReader(), utxStorage, time, settings, featureProvider)(b).right.map {
                     _.foreach(bh => BlockStats.applied(b, BlockStats.Source.Ext, bh))
                   }
                 }

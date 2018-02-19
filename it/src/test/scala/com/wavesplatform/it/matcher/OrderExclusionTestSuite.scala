@@ -11,13 +11,13 @@ import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
 import scorex.crypto.EllipticCurveImpl
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
 
+import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.concurrent.{Await, Future}
 import scala.util.Random
 
 class OrderExclusionTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll with CancelAfterFailure
-  with ReportingTestName with NodesFromDocker {
+  with ReportingTestName with NodesFromDocker with MatcherUtils{
 
   import OrderExclusionTestSuite._
 
@@ -51,15 +51,17 @@ class OrderExclusionTestSuite extends FreeSpec with Matchers with BeforeAndAfter
 
   "sell order could be placed" in {
     // Alice places sell order
-    val (id, status) = matcherPlaceOrder(
+    val (id, status) = matcherPlaceOrder(matcherNode,
       prepareOrder(aliceNode, matcherNode, aliceWavesPair, OrderType.SELL, 2 * Waves * Order.PriceConstant, 500, 70.seconds))
     status shouldBe "OrderAccepted"
     aliceSell1 = id
     // Alice checks that the order in order book
-    matcherCheckOrderStatus(id) shouldBe "Accepted"
+    matcherCheckOrderStatus(matcherNode, aliceAsset, id) shouldBe "Accepted"
+    waitForOrderStatus(matcherNode, aliceAsset, id, "Accepted", 1.minute)
+    matcherCheckOrderStatus(matcherNode, aliceAsset, id) shouldBe "Accepted"
 
     // Alice check that order is correct
-    val orders = matcherGetOrderBook()
+    val orders = matcherGetOrderBook(matcherNode, aliceAsset )
     orders.asks.head.amount shouldBe 500
     orders.asks.head.price shouldBe 2 * Waves * Order.PriceConstant
   }
@@ -69,7 +71,7 @@ class OrderExclusionTestSuite extends FreeSpec with Matchers with BeforeAndAfter
   }
 
   "wait for expiration" in {
-    waitForOrderStatus(aliceAsset, aliceSell1, "Cancelled", 3.minutes)
+    waitForOrderStatus(matcherNode, aliceAsset, aliceSell1, "Cancelled", 3.minutes)
     orderStatus(aliceNode) shouldBe "Cancelled"
   }
 
@@ -84,57 +86,6 @@ class OrderExclusionTestSuite extends FreeSpec with Matchers with BeforeAndAfter
     orderhistory.seq(0).status
   }
 
-  private def waitForAssetBalance(node: Node, asset: String, expectedBalance: Long): Unit =
-    Await.result(
-      node.waitFor[AssetBalance](s"asset($asset) balance of ${node.address} >= $expectedBalance")
-        (_.assetBalance(node.address, asset),
-          _.balance >= expectedBalance, 5.seconds),
-      3.minute
-    )
-
-
-  private def matcherPlaceOrder(order: Order): (String, String) = {
-    val futureResult = matcherNode.placeOrder(order)
-
-    val result = Await.result(futureResult, 1.minute)
-
-    (result.message.id, result.status)
-  }
-
-  private def issueAsset(node: Node, name: String, amount: Long): String = {
-    val description = "asset for integration tests of matcher"
-    val fee = 100000000L
-    val futureIssueTransaction: Future[Transaction] = for {
-      a <- node.issueAsset(node.address, name, description, amount, 0, fee, reissuable = false)
-    } yield a
-
-    val issueTransaction = Await.result(futureIssueTransaction, 1.minute)
-
-    issueTransaction.id
-  }
-
-  def matcherCheckOrderStatus(id: String): String = {
-    val futureResult = matcherNode.getOrderStatus(aliceAsset, id)
-
-    val response = Await.result(futureResult, 1.minute)
-
-    response.status
-  }
-
-  def waitForOrderStatus(asset: String, orderId: String, expectedStatus: String, timeout: Duration): Unit = Await.result(
-    matcherNode.waitFor[MatcherStatusResponse](s"order(asset=$asset, orderId=$orderId) status == $expectedStatus")
-      (_.getOrderStatus(asset, orderId),
-        _.status == expectedStatus, 5.seconds),
-    timeout
-  )
-
-  def matcherGetOrderBook(): OrderBookResponse = {
-    val futureResult = matcherNode.getOrderBook(aliceAsset)
-
-    val result = Await.result(futureResult, 1.minute)
-
-    result
-  }
 
 }
 

@@ -4,7 +4,6 @@ import com.wavesplatform.utils.base58Length
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange.ExchangeTransaction
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import scorex.transaction.smart.SetScriptTransaction
 
 import scala.util.{Failure, Try}
 
@@ -21,8 +20,7 @@ object TransactionParser {
     val LeaseTransaction = Value(8)
     val LeaseCancelTransaction = Value(9)
     val CreateAliasTransaction = Value(10)
-    val SetScriptTransaction = Value(11)
-    val ScriptTransferTransaction = Value(12)
+    val MassTransferTransaction = Value(11)
   }
 
   val TimestampLength = 8
@@ -65,11 +63,8 @@ object TransactionParser {
       case txType: Byte if txType == TransactionType.CreateAliasTransaction.id =>
         CreateAliasTransaction.parseTail(data.tail)
 
-      case txType: Byte if txType == TransactionType.SetScriptTransaction.id =>
-        SetScriptTransaction.parseTail(data.tail)
-
-      case txType: Byte if txType == TransactionType.ScriptTransferTransaction.id =>
-        ScriptTransferTransaction.parseTail(data.tail)
+      case txType: Byte if txType == TransactionType.MassTransferTransaction.id =>
+        MassTransferTransaction.parseTail(data.tail)
 
       case txType => Failure(new Exception(s"Invalid transaction type: $txType"))
     }
