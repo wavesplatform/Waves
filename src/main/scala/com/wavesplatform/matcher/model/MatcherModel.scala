@@ -62,7 +62,7 @@ object LimitOrder {
     val name = "Accepted"
     def json: JsObject = Json.obj("status" -> name)
     val isFinal: Boolean = false
-    val ordering = 2
+    val ordering = 1
   }
   case object NotFound extends OrderStatus {
     val name = "NotFound"
@@ -86,7 +86,7 @@ object LimitOrder {
     val name = "Cancelled"
     def json = Json.obj("status" -> name, "filledAmount" -> filled)
     val isFinal: Boolean = true
-    val ordering = 4
+    val ordering = 3
   }
 
   def apply(o: Order): LimitOrder = o.orderType match {

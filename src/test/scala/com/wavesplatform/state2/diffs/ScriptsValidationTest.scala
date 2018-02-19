@@ -3,7 +3,7 @@ package com.wavesplatform.state2.diffs
 import com.wavesplatform.lang.Terms._
 import com.wavesplatform.lang._
 import com.wavesplatform.state2._
-import com.wavesplatform.{NoShrink, TransactionGen}
+import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
@@ -15,7 +15,7 @@ import scorex.transaction.assets.{ScriptTransferTransaction, TransferTransaction
 import scorex.transaction.lease.LeaseTransaction
 import scorex.transaction.smart.{Script, SetScriptTransaction, Verifier}
 
-class ScriptsValidationTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
+class ScriptsValidationTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDB {
 
   private val context = TypeChecker.Context(
     predefTypes = Map("Transaction" -> Verifier.transactionType),
@@ -61,8 +61,8 @@ class ScriptsValidationTest extends PropSpec with PropertyChecks with Matchers w
     )
     forAll(preconditionsTransferAndLease(onlySend)) {
       case ((genesis, script, lease, transfer)) =>
-        assertDiffAndState(Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(transfer))) { case _ => () }
-        assertDiffEi(Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(lease)))(totalDiffEi =>
+        assertDiffAndState(db, Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(transfer))) { case _ => () }
+        assertDiffEi(db, Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(lease)))(totalDiffEi =>
           totalDiffEi should produce("TransactionNotAllowedByScript"))
     }
   }
@@ -124,9 +124,9 @@ class ScriptsValidationTest extends PropSpec with PropertyChecks with Matchers w
           transfer.copy(proofs = Proofs.create(Seq(sigs(1), sigs(0))).explicitGet())
         )
 
-        validProofs.foreach(tx => assertDiffAndState(Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(tx))) { case _ => () })
+        validProofs.foreach(tx => assertDiffAndState(db, Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(tx))) { case _ => () })
         invalidProofs.foreach(tx =>
-          assertLeft(Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(tx)))("TransactionNotAllowedByScript"))
+          assertLeft(db, Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(tx)))("TransactionNotAllowedByScript"))
     }
   }
 
@@ -148,15 +148,15 @@ class ScriptsValidationTest extends PropSpec with PropertyChecks with Matchers w
 
     forAll(preconditionsTransferAndLease(goodScript)) {
       case ((genesis, script, lease, transfer)) =>
-        assertDiffAndState(Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(transfer))) { case _ => () }
-        assertDiffEi(Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(lease)))(totalDiffEi =>
+        assertDiffAndState(db, Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(transfer))) { case _ => () }
+        assertDiffEi(db, Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(lease)))(totalDiffEi =>
           totalDiffEi should produce("TransactionNotAllowedByScript"))
     }
 
     forAll(preconditionsTransferAndLease(badScript)) {
       case ((genesis, script, lease, transfer)) =>
-        assertDiffAndState(Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(transfer))) { case _ => () }
-        assertDiffEi(Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(lease))) { totalDiffEi =>
+        assertDiffAndState(db, Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(transfer))) { case _ => () }
+        assertDiffEi(db, Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(lease))) { totalDiffEi =>
           totalDiffEi should produce("transactions is of another type")
         }
     }

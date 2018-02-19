@@ -28,7 +28,9 @@ object SynchronizationSettings {
                                     maxBlockCacheSize: Int)
 
   case class UtxSynchronizerSettings(networkTxCacheSize: Int,
-                                     networkTxCacheTime: FiniteDuration)
+                                     networkTxCacheTime: FiniteDuration,
+                                     maxBufferSize: Int,
+                                     maxBufferTime: FiniteDuration)
 
   val configPath: String = "waves.synchronization"
 

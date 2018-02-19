@@ -1,31 +1,25 @@
 package com.wavesplatform.history
 
-import java.io.File
-
-import com.wavesplatform.network.{BlockCheckpoint, Checkpoint}
+import com.wavesplatform.db.{CheckpointCodec, PropertiesStorage, SubStorage}
+import com.wavesplatform.network.Checkpoint
 import com.wavesplatform.settings.CheckpointsSettings
-import com.wavesplatform.utils.createMVStore
+import org.iq80.leveldb.DB
 import scorex.crypto.EllipticCurveImpl
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction.{CheckpointService, ValidationError}
-import scorex.utils.LogMVMapBuilder
 
-class CheckpointServiceImpl(fileName: Option[File], settings: CheckpointsSettings) extends CheckpointService with AutoCloseable {
-  private val db = createMVStore(fileName)
-  private val checkpoint = db.openMap("checkpoint", new LogMVMapBuilder[Int, (Seq[(Int, Array[Byte])], Array[Byte])])
-  private val key = 0
+class CheckpointServiceImpl(db: DB, settings: CheckpointsSettings)
+  extends SubStorage(db, "checkpoints") with PropertiesStorage with CheckpointService {
 
-  override def get: Option[Checkpoint] =
-    Option(checkpoint.get(key))
-      .map { case (seq, sig) => Checkpoint(seq.map(BlockCheckpoint.tupled), sig) }
+  private val CheckpointProperty = "checkpoint"
+
+  override def get: Option[Checkpoint] = getProperty(CheckpointProperty).flatMap(b => CheckpointCodec.decode(b).toOption.map(r => r.value))
 
   override def set(cp: Checkpoint): Either[ValidationError, Unit] = for {
     _ <- Either.cond(!get.forall(_.signature sameElements cp.signature), (), GenericError("Checkpoint already applied"))
     _ <- Either.cond(EllipticCurveImpl.verify(cp.signature, cp.toSign, settings.publicKey.arr),
-      checkpoint.put(key, (cp.items.map(bcp => (bcp.height, bcp.signature)), cp.signature)),
+      putProperty(CheckpointProperty, CheckpointCodec.encode(cp), None),
       GenericError("Invalid checkpoint signature"))
-  } yield db.commit()
+  } yield ()
 
-
-  override def close(): Unit = db.close()
 }

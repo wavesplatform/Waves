@@ -235,6 +235,10 @@ object Block extends ScorexLogging {
         blockHeader.featureVotes).left.map(ve => new IllegalArgumentException(ve.toString)).toTry
     } yield block
 
+  def areTxsFitInBlock(blockVersion: Byte, txsCount: Int): Boolean = {
+    (blockVersion == 3 && txsCount <= MaxTransactionsPerBlockVer3) || (blockVersion <= 2 || txsCount <= MaxTransactionsPerBlockVer1Ver2)
+  }
+
   def build(version: Byte,
             timestamp: Long,
             reference: ByteStr,
@@ -242,10 +246,7 @@ object Block extends ScorexLogging {
             transactionData: Seq[Transaction],
             signerData: SignerData,
             featureVotes: Set[Short]): Either[GenericError, Block] = {
-    val txsCount = transactionData.size
     (for {
-      _ <- Either.cond((version == 3 && txsCount <= MaxTransactionsPerBlockVer3) || (version <= 2 || txsCount <= MaxTransactionsPerBlockVer1Ver2), (),
-        s"Too many transactions in Block version ${version.toInt}: $txsCount")
       _ <- Either.cond(reference.arr.length == SignatureLength, (), "Incorrect reference")
       _ <- Either.cond(consensusData.generationSignature.arr.length == GeneratorSignatureLength, (), "Incorrect consensusData.generationSignature")
       _ <- Either.cond(signerData.generator.publicKey.length == KeyLength, (), "Incorrect signer.publicKey")

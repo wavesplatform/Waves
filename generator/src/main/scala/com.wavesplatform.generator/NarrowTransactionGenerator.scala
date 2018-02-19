@@ -1,20 +1,20 @@
 package com.wavesplatform.generator
 
-import org.slf4j.LoggerFactory
-import scorex.account.{Alias, PrivateKeyAccount}
-import scorex.transaction.TransactionParser.TransactionType
-import scorex.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
-import scorex.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction, TransferTransaction}
-import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import scorex.transaction.{CreateAliasTransaction, PaymentTransaction, Transaction, ValidationError}
-import scorex.utils.LoggerFacade
-
-import scala.concurrent.duration._
 import java.util.concurrent.ThreadLocalRandom
 
 import cats.Show
 import com.wavesplatform.generator.NarrowTransactionGenerator.Settings
+import org.slf4j.LoggerFactory
+import scorex.account.{Alias, PrivateKeyAccount}
+import scorex.transaction.TransactionParser.TransactionType
+import scorex.transaction.assets.MassTransferTransaction.ParsedTransfer
+import scorex.transaction.assets._
+import scorex.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
+import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
+import scorex.transaction.{CreateAliasTransaction, Transaction, ValidationError}
+import scorex.utils.LoggerFacade
 
+import scala.concurrent.duration._
 import scala.util.Random
 
 class NarrowTransactionGenerator(settings: Settings,
@@ -65,10 +65,6 @@ class NarrowTransactionGenerator(settings: Settings,
         def ts = System.currentTimeMillis()
 
         val tx = txType match {
-          case TransactionType.PaymentTransaction =>
-            val sender = randomFrom(accounts).get
-            val recipient = accounts(new Random().nextInt(accounts.size))
-            Some(PaymentTransaction.create(sender, recipient, r.nextInt(500000), moreThatStandartFee, ts).right.get)
           case TransactionType.IssueTransaction =>
             val sender = randomFrom(accounts).get
             val name = new Array[Byte](10)
@@ -127,6 +123,26 @@ class NarrowTransactionGenerator(settings: Settings,
             val sender = randomFrom(accounts).get
             val aliasString = NarrowTransactionGenerator.generateAlias()
             logOption(CreateAliasTransaction.create(sender, Alias.buildWithCurrentNetworkByte(aliasString).right.get, 100000, ts))
+          case TransactionType.MassTransferTransaction =>
+            val transferCount = r.nextInt(MassTransferTransaction.MaxTransferCount)
+            val transfers = for (i <- 0 to transferCount) yield {
+              val useAlias = r.nextBoolean()
+              val recipient = if (useAlias && aliases.nonEmpty) randomFrom(aliases).map(_.alias).get else randomFrom(accounts).get.toAddress
+              val amount = r.nextLong(500000)
+              ParsedTransfer(recipient, amount)
+            }
+            val sendAsset = r.nextBoolean()
+            val senderAndAssetOpt = if (sendAsset) {
+              val asset = randomFrom(validIssueTxs)
+              asset.map(issue => {
+                val pk = accounts.find(_ == issue.sender).get
+                (pk, Some(issue.id()))
+              })
+            } else Some(randomFrom(accounts).get, None)
+            senderAndAssetOpt.flatMap { case (sender, asset) =>
+              logOption(MassTransferTransaction.create(asset, sender, transfers.toList, ts, moreThatStandartFee,
+                Array.fill(r.nextInt(100))(r.nextInt().toByte)))
+            }
         }
         (tx.map(tx => allTxsWithValid :+ tx).getOrElse(allTxsWithValid),
           tx match {

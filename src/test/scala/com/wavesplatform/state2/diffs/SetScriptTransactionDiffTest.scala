@@ -1,7 +1,7 @@
 package com.wavesplatform.state2.diffs
 
 import com.wavesplatform.state2._
-import com.wavesplatform.{NoShrink, TransactionGen}
+import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
@@ -10,7 +10,7 @@ import scorex.transaction.GenesisTransaction
 import scorex.transaction.smart.SetScriptTransaction
 
 class SetScriptTransactionDiffTest extends PropSpec
-  with PropertyChecks with Matchers with TransactionGen with NoShrink {
+  with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDB {
   val preconditionsAndSetScript: Gen[(GenesisTransaction, SetScriptTransaction)] = for {
     master <- accountGen
     ts <- timestampGen
@@ -21,7 +21,7 @@ class SetScriptTransactionDiffTest extends PropSpec
 
   property("setting script results in account state") {
     forAll(preconditionsAndSetScript) { case (genesis, setScript) =>
-      assertDiffAndState(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(setScript))) { case (blockDiff, newState) =>
+      assertDiffAndState(db, Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(setScript))) { case (blockDiff, newState) =>
         newState.accountScript(setScript.sender) shouldBe setScript.script
       }
     }

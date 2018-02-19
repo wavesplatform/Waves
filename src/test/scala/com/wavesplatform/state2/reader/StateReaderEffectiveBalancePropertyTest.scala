@@ -1,7 +1,7 @@
 package com.wavesplatform.state2.reader
 
 import com.wavesplatform.state2.diffs.{ENOUGH_AMT, assertDiffAndState}
-import com.wavesplatform.{NoShrink, TransactionGen}
+import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
@@ -10,7 +10,7 @@ import scorex.transaction.GenesisTransaction
 
 
 class StateReaderEffectiveBalancePropertyTest extends PropSpec
-  with PropertyChecks with Matchers with TransactionGen with NoShrink {
+  with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDB {
   val setup: Gen[(GenesisTransaction, Int, Int, Int)] = for {
     master <- accountGen
     ts <- positiveIntGen
@@ -25,7 +25,7 @@ class StateReaderEffectiveBalancePropertyTest extends PropSpec
     forAll(setup) { case ((genesis: GenesisTransaction, emptyBlocksAmt, atHeight, confirmations)) =>
       val genesisBlock = TestBlock.create(Seq(genesis))
       val nextBlocks = List.fill(emptyBlocksAmt - 1)(TestBlock.create(Seq.empty))
-      assertDiffAndState(genesisBlock +: nextBlocks, TestBlock.create(Seq.empty)) { (_, newState) =>
+      assertDiffAndState(db, genesisBlock +: nextBlocks, TestBlock.create(Seq.empty)) { (_, newState) =>
         newState.effectiveBalanceAtHeightWithConfirmations(genesis.recipient, atHeight, confirmations).get shouldBe genesis.amount
       }
     }

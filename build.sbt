@@ -10,29 +10,29 @@ val versionSource = Def.task {
   // Please, update the fallback version every major and minor releases.
   // This version is used then building from sources without Git repository
   // In case of not updating the version nodes build from headless sources will fail to connect to newer versions
-  val fallback = (0, 10, 0)
+  val FallbackVersion = (0, 10, 0)
+
   val versionFile = (sourceManaged in Compile).value / "com" / "wavesplatform" / "Version.scala"
   val versionExtractor = """(\d+)\.(\d+)\.(\d+).*""".r
   val (major, minor, patch) = version.value match {
     case versionExtractor(ma, mi, pa) => (ma.toInt, mi.toInt, pa.toInt)
-    case _ => fallback
+    case _ => FallbackVersion
   }
   IO.write(versionFile,
-    s"""
-       |package com.wavesplatform
+    s"""package com.wavesplatform
        |
-       |object Version {
+      |object Version {
        |  val VersionString = "${version.value}"
        |  val VersionTuple = ($major, $minor, $patch)
        |}
        |""".stripMargin)
   Seq(versionFile)
 }
-
-val network = Def.setting(Network(sys.props.get("network")))
-
-name := "waves"
+val network = SettingKey[Network]("network")
+network := { Network(sys.props.get("network")) }
 normalizedName := network.value.name
+name := "waves"
+
 git.useGitDescribe := true
 git.uncommittedSignifier := Some("DIRTY")
 logBuffered := false
@@ -49,6 +49,10 @@ inThisBuild(Seq(
     "-Ywarn-unused:-implicits",
     "-Xlint"),
 ))
+
+resolvers += Resolver.bintrayRepo("ethereum", "maven")
+
+fork in run := true
 
 inTask(assembly)(Seq(
   test := {},
@@ -69,7 +73,8 @@ inConfig(Compile)(Seq(
 inConfig(Test)(Seq(
   logBuffered := false,
   parallelExecution := false,
-  testOptions += Tests.Argument("-oIDOF", "-u", "target/test-reports")
+  testOptions += Tests.Argument("-oIDOF", "-u", "target/test-reports"),
+  testOptions += Tests.Setup(_ => sys.props("sbt-testing") = "true")
 ))
 
 inConfig(Linux)(Seq(

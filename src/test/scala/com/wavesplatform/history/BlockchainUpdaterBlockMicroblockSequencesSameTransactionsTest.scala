@@ -2,7 +2,7 @@ package com.wavesplatform.history
 
 import com.wavesplatform.state2._
 import com.wavesplatform.state2.diffs._
-import com.wavesplatform.{NoShrink, TransactionGen}
+import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
 import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatest.prop.PropertyChecks
@@ -11,24 +11,18 @@ import scorex.block.{Block, MicroBlock}
 import scorex.transaction._
 import scorex.transaction.assets.TransferTransaction
 
-class BlockchainUpdaterBlockMicroblockSequencesSameTransactionsTest
-  extends PropSpec
-    with PropertyChecks
-    with DomainScenarioDrivenPropertyCheck
-    with Matchers
-    with TransactionGen
-    with NoShrink {
+class BlockchainUpdaterBlockMicroblockSequencesSameTransactionsTest extends PropSpec
+  with PropertyChecks with DomainScenarioDrivenPropertyCheck with Matchers with TransactionGen with NoShrink with WithDB {
 
   import BlockchainUpdaterBlockMicroblockSequencesSameTransactionsTest._
 
   type Setup = (GenesisTransaction, TransferTransaction, TransferTransaction, TransferTransaction)
 
 
-
   property("resulting miner balance should not depend on tx distribution among blocks and microblocks") {
-    forAll(g(100,5)) { case ((gen, rest)) =>
+    forAll(g(100, 5)) { case ((gen, rest)) =>
       val finalMinerBalances = rest.map { case (a@(bmb: BlockAndMicroblockSequence, last: Block)) =>
-        val d = domain(MicroblocksActivatedAt0WavesSettings)
+        val d = domain(db, MicroblocksActivatedAt0WavesSettings)
         d.blockchainUpdater.processBlock(gen).explicitGet()
         bmb.foreach { case ((b, mbs)) =>
           d.blockchainUpdater.processBlock(b).explicitGet()
@@ -53,7 +47,7 @@ class BlockchainUpdaterBlockMicroblockSequencesSameTransactionsTest
       genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
       payment: TransferTransaction = createWavesTransfer(master, master, amt, fee, ts).explicitGet()
     } yield (miner, genesis, payment, ts)
-    scenario(preconditionsAndPayments, MicroblocksActivatedAt0WavesSettings) { case (domain, (miner, genesis, payment, ts)) =>
+    scenario(preconditionsAndPayments, db, MicroblocksActivatedAt0WavesSettings) { case (domain, (miner, genesis, payment, ts)) =>
       val genBlock = buildBlockOfTxs(randomSig, Seq(genesis))
       val (base, micros) = chainBaseAndMicro(genBlock.uniqueId, Seq.empty, Seq(Seq(payment)), miner, 3, ts)
       val emptyBlock = customBuildBlockOfTxs(micros.last.totalResBlockSig, Seq.empty, miner, 3, ts)

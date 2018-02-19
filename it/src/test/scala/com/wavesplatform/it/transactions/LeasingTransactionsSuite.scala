@@ -1,5 +1,6 @@
 package com.wavesplatform.it.transactions
 
+import com.wavesplatform.it.api._
 import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.util._
 import org.scalatest.CancelAfterFailure
@@ -75,6 +76,7 @@ class LeasingTransactionsSuite extends BaseTransactionSuite with CancelAfterFail
     def status(txId: String) = sender.get(s"/transactions/info/$txId").map { r =>
       (Json.parse(r.getResponseBody) \ "status").as[String]
     }
+    def activeLeases(address: String) = sender.get(s"/leasing/active/$address").as[Seq[Transaction]]
 
     val f = for {
       ((firstBalance, firstEffBalance), (secondBalance, secondEffBalance)) <- notMiner.accountBalances(firstAddress)
@@ -89,6 +91,12 @@ class LeasingTransactionsSuite extends BaseTransactionSuite with CancelAfterFail
       status1 <- status(createdLeaseTxId)
       _ = assert(status1 == Active)
 
+      leases0 <- activeLeases(secondAddress)
+      _ = assert(leases0.isEmpty)
+
+      leases1 <- activeLeases(firstAddress)
+      _ = assert(leases1.exists(_.id == createdLeaseTxId))
+
       createdCancelLeaseTxId <- sender.cancelLease(firstAddress, createdLeaseTxId, fee = defaultFee).map(_.id)
       _ <- nodes.waitForHeightAraiseAndTxPresent(createdCancelLeaseTxId)
       _ <- notMiner.assertBalances(firstAddress, firstBalance - 2 * defaultFee, firstEffBalance - 2 * defaultFee)
@@ -96,6 +104,10 @@ class LeasingTransactionsSuite extends BaseTransactionSuite with CancelAfterFail
 
       status2 <- status(createdLeaseTxId)
       _ = assert(status2 == Canceled)
+
+      leases2 <- activeLeases(firstAddress)
+      _ = assert(leases2.forall(_.id != createdLeaseTxId))
+      _ = assert(leases2.size == leases1.size - 1)
     } yield succeed
 
     Await.result(f, waitCompletion)

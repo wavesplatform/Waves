@@ -4,6 +4,7 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
 import com.wavesplatform.state2._
+import org.iq80.leveldb.DB
 import scorex.account.PrivateKeyAccount
 import scorex.block.{Block, MicroBlock}
 import scorex.consensus.nxt.NxtLikeConsensusBlockData
@@ -16,10 +17,6 @@ package object history {
   val MaxBlocksInMemory = 5
   val DefaultBaseTarget = 1000L
   val DefaultBlockchainSettings = BlockchainSettings(
-    blockchainFile = None,
-    stateFile = None,
-    storeTransactionsInState = false,
-    checkpointFile = None,
     addressSchemeCharacter = 'N',
     maxTransactionsPerBlockDiff = MaxTransactionsPerBlockDiff,
     minBlocksInMemory = MaxBlocksInMemory,
@@ -37,9 +34,11 @@ package object history {
 
   val DefaultWavesSettings: WavesSettings = settings.copy(blockchainSettings = DefaultBlockchainSettings)
 
-  def domain(settings: WavesSettings): Domain = {
-    val (storage, _) = StorageFactory(settings).get
-    val (history, _, _, stateReader, blockchainUpdater, _) = storage()
+  def domain(db: DB, settings: WavesSettings): Domain = {
+    import DBExtensions._
+    db.clear()
+    val (storage, _) = StorageFactory(db, settings).get
+    val (history, _, stateReader, blockchainUpdater, _) = storage()
     Domain(history, stateReader, blockchainUpdater)
   }
 

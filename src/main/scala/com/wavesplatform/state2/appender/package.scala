@@ -2,16 +2,16 @@ package com.wavesplatform.state2
 
 import com.wavesplatform.UtxPool
 import com.wavesplatform.features.{BlockchainFeatures, FeatureProvider}
-import com.wavesplatform.mining.Miner
+import com.wavesplatform.mining._
 import com.wavesplatform.network._
-import com.wavesplatform.settings.{BlockchainSettings, FunctionalitySettings}
+import com.wavesplatform.settings.{FunctionalitySettings, WavesSettings}
 import com.wavesplatform.state2.reader.SnapshotStateReader
 import io.netty.channel.Channel
 import io.netty.channel.group.ChannelGroup
 import monix.eval.Task
 import scorex.block.Block
 import scorex.consensus.TransactionsOrdering
-import scorex.transaction.PoSCalc.{calcBaseTarget, calcGeneratorSignature, calcHit, calcTarget, _}
+import scorex.transaction.PoSCalc._
 import scorex.transaction.ValidationError.{BlockFromFuture, GenericError}
 import scorex.transaction._
 import scorex.utils.{ScorexLogging, Time}
@@ -26,8 +26,6 @@ package object appender extends ScorexLogging {
   private val correctBlockId2 = ByteStr.decodeBase58("5uZoDnRKeWZV9Thu2nvJVZ5dBvPB7k2gvpzFD618FMXCbBVBMN2rRyvKBZBhAGnGdgeh2LXEeSr9bJqruJxngsE7").get
   private val height1 = 812608
   private val height2 = 813207
-
-  private[appender] val scheduler = monix.execution.Scheduler.singleThread("appender")
 
   private[appender] def processAndBlacklistOnFailure[A, B](ch: Channel, peerDatabase: PeerDatabase, miner: Miner, allChannels: ChannelGroup,
                                                            start: => String, success: => String, errorPrefix: String)(
@@ -54,13 +52,13 @@ package object appender extends ScorexLogging {
       s"generator's effective balance $effectiveBalance is less that required for generation")
 
   private[appender] def appendBlock(checkpoint: CheckpointService, history: History, blockchainUpdater: BlockchainUpdater,
-                                    stateReader: SnapshotStateReader, utxStorage: UtxPool, time: Time, settings: BlockchainSettings,
+                                    stateReader: SnapshotStateReader, utxStorage: UtxPool, time: Time, settings: WavesSettings,
                                     featureProvider: FeatureProvider)(block: Block): Either[ValidationError, Option[Int]] = for {
     _ <- Either.cond(checkpoint.isBlockValid(block.signerData.signature, history.height() + 1), (),
       GenericError(s"Block $block at height ${history.height() + 1} is not valid w.r.t. checkpoint"))
     _ <- blockConsensusValidation(history, featureProvider, settings, time.correctedTime(), block) { height =>
-      PoSCalc.generatingBalance(stateReader, settings.functionalitySettings, block.signerData.generator, height).toEither.left.map(_.toString)
-        .flatMap(validateEffectiveBalance(featureProvider, settings.functionalitySettings, block, height))
+      PoSCalc.generatingBalance(stateReader, settings.blockchainSettings.functionalitySettings, block.signerData.generator, height).toEither.left.map(_.toString)
+        .flatMap(validateEffectiveBalance(featureProvider, settings.blockchainSettings.functionalitySettings, block, height))
     }
     baseHeight = history.height()
     maybeDiscardedTxs <- blockchainUpdater.processBlock(block)
@@ -70,9 +68,10 @@ package object appender extends ScorexLogging {
     maybeDiscardedTxs.map(_ => baseHeight)
   }
 
-  private def blockConsensusValidation(history: History, fp: FeatureProvider, bcs: BlockchainSettings, currentTs: Long, block: Block)
+  private def blockConsensusValidation(history: History, fp: FeatureProvider, settings: WavesSettings, currentTs: Long, block: Block)
                                       (genBalance: Int => Either[String, Long]): Either[ValidationError, Unit] = history.read { _ =>
 
+    val bcs = settings.blockchainSettings
     val fs = bcs.functionalitySettings
     val blockTime = block.timestamp
     val generator = block.signerData.generator
@@ -84,6 +83,10 @@ package object appender extends ScorexLogging {
         || block.version == Block.PlainBlockVersion,
         (), GenericError(s"Block Version 3 can only appear at height greater than ${fs.blockVersion3AfterHeight}"))
       _ <- Either.cond(blockTime - currentTs < MaxTimeDrift, (), BlockFromFuture(blockTime))
+      _ <- {
+        val constraints = MiningEstimators(settings.minerSettings, fp, height)
+        Either.cond(!OneDimensionalMiningConstraint.full(constraints.total).put(block).isOverfilled, (), GenericError("Block is full"))
+      }
       _ <- Either.cond(blockTime < fs.requireSortedTransactionsAfter
         || height > fs.dontRequireSortedTransactionsAfter
         || block.transactionData.sorted(TransactionsOrdering.InBlock) == block.transactionData,

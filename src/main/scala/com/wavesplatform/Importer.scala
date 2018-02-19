@@ -1,16 +1,19 @@
 package com.wavesplatform
 
 import java.io._
+import java.util.concurrent.locks.ReentrantReadWriteLock
 
 import com.google.common.primitives.Ints
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.history.StorageFactory
+import com.wavesplatform.db._
+import com.wavesplatform.history.HistoryWriterImpl
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
+import com.wavesplatform.state2.{BlockchainUpdaterImpl, StateStorage, StateWriterImpl}
 import com.wavesplatform.utils._
 import org.slf4j.bridge.SLF4JBridgeHandler
 import scorex.account.AddressScheme
 import scorex.block.Block
-import scorex.utils.ScorexLogging
+import scorex.utils.{NTP, ScorexLogging}
 
 import scala.util.{Failure, Success, Try}
 
@@ -28,37 +31,42 @@ object Importer extends ScorexLogging {
 
     Try(args(1)) match {
       case Success(filename) =>
-        log.info(s"Loading file '$filename")
+        log.info(s"Loading file '$filename'")
         createInputStream(filename) match {
           case Success(inputStream) =>
-            deleteFile(settings.blockchainSettings.blockchainFile)
-            deleteFile(settings.blockchainSettings.stateFile)
-            val (storage, _) = StorageFactory(settings).get
-            val (history, _, stateWriter, _, blockchainUpdater, _) = storage()
+            val lock = new ReentrantReadWriteLock()
+            val db = openDB(settings.dataDirectory, settings.levelDbCacheSize, recreate = true)
+            val storage = StateStorage(db, dropExisting = false).get
+            val state = new StateWriterImpl(storage, lock)
+            val history = HistoryWriterImpl(db, lock, settings.blockchainSettings.functionalitySettings, settings.featuresSettings).get
+            val blockchainUpdater = BlockchainUpdaterImpl(state, history, settings, NTP, lock)
             checkGenesis(history, settings, blockchainUpdater)
             val bis = new BufferedInputStream(inputStream)
             var quit = false
             val lenBytes = new Array[Byte](Ints.BYTES)
             val start = System.currentTimeMillis()
             while (!quit) {
-              val red = bis.read(lenBytes)
-              if (red == Ints.BYTES) {
+              val s1 = bis.read(lenBytes)
+              if (s1 == Ints.BYTES) {
                 val len = Ints.fromByteArray(lenBytes)
                 val buffer = new Array[Byte](len)
                 val s2 = bis.read(buffer)
                 if (s2 == len) {
                   val block = Block.parseBytes(buffer).get
-                  blockchainUpdater.processBlock(block)
+                  val result = blockchainUpdater.processBlock(block)
+                  if (result.isLeft) {
+                    log.error(s"Error applying block: ${result.left}")
+                    quit = true
+                  }
                 } else quit = true
               } else quit = true
             }
             bis.close()
             inputStream.close()
-            stateWriter.close()
-            history.close()
             val duration = System.currentTimeMillis() - start
             log.info(s"Imported in ${humanReadableDuration(duration)}")
-          case Failure(ex) => log.error(s"Failed to open file '$filename")
+            db.close()
+          case Failure(ex) => log.error(s"Failed to open file '$filename'")
         }
       case Failure(ex) => log.error(s"Failed to get input filename from second parameter: $ex")
     }
@@ -69,7 +77,4 @@ object Importer extends ScorexLogging {
       new FileInputStream(filename)
     }
 
-  def deleteFile(maybeFile: Option[File]): Unit = maybeFile.foreach { f =>
-    f.delete()
-  }
 }

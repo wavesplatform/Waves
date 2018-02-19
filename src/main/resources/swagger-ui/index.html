@@ -2,6 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8">
+  <meta http-equiv="x-ua-compatible" content="IE=edge">
   <title>Swagger UI</title>
   <link rel="icon" type="image/png" href="images/favicon-32x32.png" sizes="32x32" />
   <link rel="icon" type="image/png" href="images/favicon-16x16.png" sizes="16x16" />
@@ -84,9 +85,9 @@
       $('#input_apiKey').change(function() {
         var key = $('#input_apiKey')[0].value;
         if(key && key.trim() != "") {
-          swaggerUi.api.clientAuthorizations.add("api_key", new SwaggerClient.ApiKeyAuthorization("api_key", key, "header"));
+          swaggerUi.api.clientAuthorizations.add("X-API-Key", new SwaggerClient.ApiKeyAuthorization("X-API-Key", key, "header"));
         }
-      })
+      });
 
       // -------------------------------------------------------------------------------------
 

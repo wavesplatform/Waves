@@ -26,6 +26,7 @@ object Dependencies {
     "org.scalacheck" %% "scalacheck" % "1.13.5",
     "org.mockito" % "mockito-all" % "1.10.19",
     "org.scalamock" %% "scalamock-scalatest-support" % "3.6.0",
+    "org.iq80.leveldb" % "leveldb" % "0.9",
     akkaHttpModule("akka-http-testkit")
   )
 
@@ -43,7 +44,7 @@ object Dependencies {
   lazy val akka = Seq("actor", "slf4j").map(akkaModule)
 
   lazy val db = Seq(
-    "com.h2database" % "h2-mvstore" % "1.4.196"
+    "org.ethereum" % "leveldbjni-all" % "1.18.3"
   )
 
   lazy val logging = Seq(
@@ -62,7 +63,7 @@ object Dependencies {
   lazy val matcher = Seq(
     akkaModule("persistence"),
     "com.github.dnvriend" %% "akka-persistence-inmemory" % "2.4.18.1" % "test",
-    "org.fusesource.leveldbjni" % "leveldbjni-all" % "1.8"
+    "org.ethereum" % "leveldbjni-all" % "1.18.3"
   )
 
   lazy val metrics = Seq("core", "system-metrics").map(kamonModule) ++ Seq(

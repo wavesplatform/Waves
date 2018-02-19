@@ -21,8 +21,10 @@ object TransactionParser {
     val LeaseTransaction = Value(8)
     val LeaseCancelTransaction = Value(9)
     val CreateAliasTransaction = Value(10)
-    val SetScriptTransaction = Value(11)
-    val ScriptTransferTransaction = Value(12)
+    val MassTransferTransaction = Value(11)
+    val SetScriptTransaction = Value(12)
+    val ScriptTransferTransaction = Value(13)
+
   }
 
   val TimestampLength = 8
@@ -64,6 +66,9 @@ object TransactionParser {
 
       case txType: Byte if txType == TransactionType.CreateAliasTransaction.id =>
         CreateAliasTransaction.parseTail(data.tail)
+
+      case txType: Byte if txType == TransactionType.MassTransferTransaction.id =>
+        MassTransferTransaction.parseTail(data.tail)
 
       case txType: Byte if txType == TransactionType.SetScriptTransaction.id =>
         SetScriptTransaction.parseTail(data.tail)

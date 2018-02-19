@@ -1,14 +1,14 @@
 package com.wavesplatform.state2.diffs
 
 import com.wavesplatform.state2._
-import com.wavesplatform.{NoShrink, TransactionGen}
+import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
 import org.scalacheck.Gen
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{Matchers, PropSpec}
 import scorex.settings.TestFunctionalitySettings
 
 class CommonValidationTimeTest extends PropSpec
-  with PropertyChecks with Matchers with TransactionGen with NoShrink {
+  with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDB {
 
   property("disallows too old transacions") {
     forAll(for {
@@ -21,7 +21,7 @@ class CommonValidationTimeTest extends PropSpec
       fee <- smallFeeGen
       transfer1 = createWavesTransfer(master, recipient, amount, fee, prevBlockTs - CommonValidation.MaxTimePrevBlockOverTransactionDiff.toMillis - 1).explicitGet()
     } yield (prevBlockTs, blockTs, height, transfer1)) { case (prevBlockTs, blockTs, height, transfer1) =>
-      TransactionDiffer(TestFunctionalitySettings.Enabled, Some(prevBlockTs), blockTs, height)(newState(), transfer1) should produce("too old")
+      TransactionDiffer(TestFunctionalitySettings.Enabled, Some(prevBlockTs), blockTs, height)(newState(db), newHistory(db), transfer1) should produce("too old")
     }
   }
 
@@ -37,7 +37,7 @@ class CommonValidationTimeTest extends PropSpec
       transfer1 = createWavesTransfer(master, recipient, amount, fee, blockTs + CommonValidation.MaxTimeTransactionOverBlockDiff.toMillis + 1).explicitGet()
     } yield (prevBlockTs, blockTs, height, transfer1)) { case (prevBlockTs, blockTs, height, transfer1) =>
       val functionalitySettings = TestFunctionalitySettings.Enabled.copy(allowTransactionsFromFutureUntil = blockTs - 1)
-      TransactionDiffer(functionalitySettings, Some(prevBlockTs), blockTs, height)(newState(), transfer1) should produce("far future")
+      TransactionDiffer(functionalitySettings, Some(prevBlockTs), blockTs, height)(newState(db), newHistory(db), transfer1) should produce("far future")
     }
   }
 }

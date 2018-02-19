@@ -2,19 +2,20 @@ package com.wavesplatform.matcher.market
 
 import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.testkit.{ImplicitSender, TestKit}
-import com.wavesplatform.UtxPool
 import com.wavesplatform.matcher.market.OrderHistoryActor.GetOrderHistory
 import com.wavesplatform.matcher.{MatcherSettings, MatcherTestData}
 import com.wavesplatform.settings.WalletSettings
 import com.wavesplatform.state2.ByteStr
+import com.wavesplatform.{UtxPool, WithDB}
 import org.scalamock.scalatest.PathMockFactory
-import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Matchers, WordSpecLike}
+import org.scalatest._
 import scorex.transaction.assets.exchange.AssetPair
 import scorex.utils.{NTP, ScorexLogging}
 import scorex.wallet.Wallet
 
 class OrderHistoryActorSpecification extends TestKit(ActorSystem("MatcherTest"))
   with WordSpecLike
+  with WithDB
   with Matchers
   with BeforeAndAfterAll
   with ImplicitSender
@@ -33,13 +34,14 @@ class OrderHistoryActorSpecification extends TestKit(ActorSystem("MatcherTest"))
   val wallet = Wallet(WalletSettings(None, "matcher", Some(WalletSeed)))
   wallet.generateNewAccount()
 
-  var actor: ActorRef = system.actorOf(Props(new OrderHistoryActor(settings, utxPool, wallet)))
+  var actor: ActorRef = system.actorOf(Props(new OrderHistoryActor(db, settings, utxPool, wallet)))
 
-  override protected def beforeEach(): Unit = {
+  override def beforeEach(): Unit = {
     super.beforeEach()
 
-    actor = system.actorOf(Props(new OrderHistoryActor(settings, utxPool, wallet)))
+    actor = system.actorOf(Props(new OrderHistoryActor(db, settings, utxPool, wallet)))
   }
+
   "OrderHistoryActor" should {
 
     "not process expirable messages" in {
