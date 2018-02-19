@@ -1,25 +1,24 @@
 import sbt._
-import sbt.Keys._
 import org.portablescala.sbtplatformdeps.PlatformDepsPlugin.autoImport.toPlatformDepsGroupID
 
 object Dependencies {
 
   def akkaModule(module: String) = "com.typesafe.akka" %% s"akka-$module" % "2.4.19"
+
   def swaggerModule(module: String) = "io.swagger" % s"swagger-$module" % "1.5.16"
+
   def akkaHttpModule(module: String) = "com.typesafe.akka" %% module % "10.0.9"
+
   def nettyModule(module: String) = "io.netty" % s"netty-$module" % "4.1.13.Final"
+
   def kamonModule(module: String) = "io.kamon" %% s"kamon-$module" % "0.6.7"
+
   val asyncHttpClient = "org.asynchttpclient" % "async-http-client" % "2.1.0-alpha22"
 
   lazy val network = Seq("handler", "buffer", "codec").map(nettyModule) ++ Seq(
     "org.bitlet" % "weupnp" % "0.1.4",
     // Solves an issue with kamon-influxdb
     asyncHttpClient
-  )
-
-  lazy val scalatest = Seq(
-    "org.scalatest" %% "scalatest" % "3.0.3",
-    "org.scalactic" %% "scalactic" % "3.0.3"
   )
 
   lazy val testKit = scalatest ++ Seq(
@@ -73,7 +72,6 @@ object Dependencies {
 
   lazy val fp = Seq(
     "org.typelevel" %% "cats-core" % "1.0.1",
-    "org.scodec" %% "scodec-core" % "1.10.3",
     "io.github.amrhassan" %% "scalacheck-cats" % "0.4.0" % Test
   )
   lazy val monix = Def.setting(Seq("io.monix" %%% "monix" % "3.0.0-M3"))
@@ -81,5 +79,12 @@ object Dependencies {
   lazy val fastparse = Def.setting(Seq("com.lihaoyi" %%% "fastparse" % "1.0.0"))
   lazy val ficus = Seq("com.iheart" %% "ficus" % "1.4.2")
   lazy val scorex = Seq(("org.scorexfoundation" %% "scrypto" % "1.2.2").exclude("org.slf4j", "slf4j-api"))
-  lazy val commons_net =  Seq("commons-net" % "commons-net" % "3.+")
+  lazy val commons_net = Seq("commons-net" % "commons-net" % "3.+")
+  lazy val scalatest = Seq("org.scalatest" %% "scalatest" % "3.0.3")
+  lazy val scalactic = Seq("org.scalactic" %% "scalactic" % "3.0.3")
+  lazy val cats = Seq("org.typelevel" %% "cats-core" % "1.0.1")
+  lazy val scalacheck = Seq(
+    "org.scalacheck" %% "scalacheck" % "1.13.5",
+    "io.github.amrhassan" %% "scalacheck-cats" % "0.4.0" % Test
+  )
 }
