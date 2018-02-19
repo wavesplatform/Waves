@@ -35,12 +35,12 @@ class SetScriptTransactionSpecification extends PropSpec with PropertyChecks wit
   }
 
   private def assertTxs(first: SetScriptTransaction, second: SetScriptTransaction): Unit = {
-    first.script shouldEqual second.script
     first.sender.address shouldEqual second.sender.address
     first.timestamp shouldEqual second.timestamp
     first.fee shouldEqual second.fee
     first.version shouldEqual second.version
     first.proofs shouldEqual second.proofs
     first.bytes() shouldEqual second.bytes()
+    first.script shouldEqual second.script
   }
 }
