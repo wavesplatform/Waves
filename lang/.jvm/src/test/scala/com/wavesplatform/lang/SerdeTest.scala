@@ -17,6 +17,10 @@ class SerdeTest extends PropSpec with PropertyChecks with Matchers with ScriptGe
   }
 
   property("Script roundtrip") {
-    forAll(BOOLgen(500)) { roundtrip(Serde.codec, _) }
+    forAll(BOOLgen(500)) { expr =>
+      val typed = TypeChecker(TypeChecker.Context.empty, expr)
+      typed shouldBe 'right
+      roundtrip(Serde.codec, typed.right.get)
+    }
   }
 }

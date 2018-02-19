@@ -1,6 +1,6 @@
 package com.wavesplatform
 
-import com.wavesplatform.lang.ScriptGen
+import com.wavesplatform.lang.{ScriptGen, TypeChecker}
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.state2._
 import org.scalacheck.Gen.{alphaLowerChar, alphaUpperChar, frequency, numChar}
@@ -80,7 +80,10 @@ trait TransactionGen extends ScriptGen {
     proofs <- Gen.listOfN(proofsAmount, genBoundedBytes(0, 50))
   } yield Proofs.create(proofs.map(ByteStr(_))).explicitGet()
 
-  val scriptGen = BOOLgen(1000).map(Script(_))
+  val scriptGen = BOOLgen(1000).map { expr =>
+    val typed = TypeChecker(TypeChecker.Context.empty, expr).right.get
+    Script(typed)
+  }
 
   val setScriptTransactionGen: Gen[SetScriptTransaction] = for {
     sender: PrivateKeyAccount <- accountGen
