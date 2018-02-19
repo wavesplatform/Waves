@@ -1,10 +1,10 @@
 package com.wavesplatform.state2.appender
 
 import cats.data.EitherT
-import com.wavesplatform.UtxPool
 import com.wavesplatform.metrics.{BlockStats, Instrumented}
 import com.wavesplatform.network.MicroBlockSynchronizer.MicroblockData
 import com.wavesplatform.network._
+import com.wavesplatform.utx.UtxPool
 import io.netty.channel.Channel
 import io.netty.channel.group.ChannelGroup
 import kamon.Kamon

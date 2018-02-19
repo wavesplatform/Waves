@@ -1,7 +1,8 @@
 package com.wavesplatform.http
 
 import com.wavesplatform.http.ApiMarshallers._
-import com.wavesplatform.{NoShrink, TestWallet, TransactionGen, UtxPool}
+import com.wavesplatform.utx.UtxPool
+import com.wavesplatform.{NoShrink, TestWallet, TransactionGen}
 import io.netty.channel.group.ChannelGroup
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.prop.PropertyChecks

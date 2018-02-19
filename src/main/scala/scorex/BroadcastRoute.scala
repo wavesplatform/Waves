@@ -1,7 +1,7 @@
 package scorex
 
-import com.wavesplatform.UtxPool
 import com.wavesplatform.network._
+import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import scorex.api.http.ApiError
 import scorex.transaction.{Transaction, ValidationError}
