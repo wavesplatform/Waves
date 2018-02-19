@@ -1,6 +1,5 @@
 package com.wavesplatform
 
-import com.wavesplatform.lang.Terms.Typed
 import com.wavesplatform.lang.{ScriptGen, TypeChecker}
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.state2._
