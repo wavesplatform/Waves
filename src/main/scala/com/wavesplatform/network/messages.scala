@@ -7,6 +7,7 @@ import monix.eval.Coeval
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.block.{Block, MicroBlock}
 import scorex.crypto.EllipticCurveImpl
+import scorex.crypto.signatures.{PublicKey, Signature}
 import scorex.transaction.{History, Signed}
 
 sealed trait Message
@@ -29,7 +30,7 @@ case class MicroBlockResponse(microblock: MicroBlock) extends Message
 
 case class MicroBlockInv(sender: PublicKeyAccount, totalBlockSig: ByteStr, prevBlockSig: ByteStr, signature: ByteStr) extends Message with Signed {
   override protected val signatureValid: Coeval[Boolean] = Coeval.evalOnce(
-    EllipticCurveImpl.verify(signature.arr, sender.toAddress.bytes.arr ++ totalBlockSig.arr ++ prevBlockSig.arr, sender.publicKey))
+    EllipticCurveImpl.verify(Signature(signature.arr), sender.toAddress.bytes.arr ++ totalBlockSig.arr ++ prevBlockSig.arr, PublicKey(sender.publicKey)))
   override def toString: String = s"MicroBlockInv(${totalBlockSig.trim} ~> ${prevBlockSig.trim})"
 }
 object MicroBlockInv{

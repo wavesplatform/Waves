@@ -7,6 +7,7 @@ import monix.eval.Coeval
 import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.block.Block.{BlockId, transParseBytes}
 import scorex.crypto.EllipticCurveImpl
+import scorex.crypto.signatures.{PublicKey, Signature}
 import scorex.transaction.TransactionParser.SignatureLength
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction._
@@ -36,7 +37,7 @@ case class MicroBlock(version: Byte, generator: PublicKeyAccount, transactionDat
 
   private val bytesWithoutSignature: Coeval[Array[Byte]] = Coeval.evalOnce(bytes().dropRight(SignatureLength))
 
-  override val signatureValid: Coeval[Boolean] = Coeval.evalOnce(EllipticCurveImpl.verify(signature.arr, bytesWithoutSignature(), generator.publicKey))
+  override val signatureValid: Coeval[Boolean] = Coeval.evalOnce(EllipticCurveImpl.verify(Signature(signature.arr), bytesWithoutSignature(), PublicKey(generator.publicKey)))
   override val signedDescendants: Coeval[Seq[Signed]] = Coeval.evalOnce(transactionData)
 
   override def toString: String = s"MicroBlock(${totalResBlockSig.trim} -> ${prevResBlockSig.trim}, txs=${transactionData.size})"

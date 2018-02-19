@@ -20,6 +20,7 @@ import scorex.account.PublicKeyAccount
 import scorex.api.http._
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
+import scorex.crypto.signatures.{PublicKey, Signature}
 import scorex.transaction.assets.exchange.OrderJson._
 import scorex.transaction.assets.exchange.{AssetPair, Order}
 import scorex.utils.NTP
@@ -171,7 +172,7 @@ case class MatcherApiRoute(wallet: Wallet,
       val sig = Base58.decode(signature).get
       val ts = timestamp.toLong
       require(math.abs(ts - NTP.correctedTime()).millis < matcherSettings.maxTimestampDiff, "Incorrect timestamp")
-      require(EllipticCurveImpl.verify(sig, pk ++ Longs.toByteArray(ts), pk), "Incorrect signature")
+      require(EllipticCurveImpl.verify(Signature(sig), pk ++ Longs.toByteArray(ts), PublicKey(pk)), "Incorrect signature")
       PublicKeyAccount(pk).address
     }
   }

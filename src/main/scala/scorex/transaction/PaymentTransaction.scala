@@ -10,7 +10,8 @@ import scorex.account.PublicKeyAccount._
 import scorex.account.{Address, PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
-import scorex.crypto.hash.FastCryptographicHash
+import scorex.crypto.hash.{Digest, FastCryptographicHash}
+import scorex.crypto.signatures.{PublicKey, Signature}
 import scorex.transaction.PaymentTransaction.signatureData
 import scorex.transaction.TransactionParser._
 
@@ -44,12 +45,12 @@ case class PaymentTransaction private(sender: PublicKeyAccount,
     Bytes.concat(Array(transactionType.id.toByte), timestampBytes, sender.publicKey, recipient.bytes.arr, amountBytes, feeBytes)
   }
 
-  val hash: Coeval[FastCryptographicHash.Digest] = Coeval.evalOnce(FastCryptographicHash(hashBytes()))
+  val hash: Coeval[Digest] = Coeval.evalOnce(FastCryptographicHash(hashBytes()))
 
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(hashBytes(), signature.arr))
 
-  val signatureValid: Coeval[Boolean] = Coeval.evalOnce(EllipticCurveImpl.verify(signature.arr,
-    signatureData(sender, recipient, amount, fee, timestamp), sender.publicKey))
+  val signatureValid: Coeval[Boolean] = Coeval.evalOnce(EllipticCurveImpl.verify(Signature(signature.arr),
+    signatureData(sender, recipient, amount, fee, timestamp), PublicKey(sender.publicKey)))
 }
 
 object PaymentTransaction {

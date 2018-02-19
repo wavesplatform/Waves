@@ -13,6 +13,7 @@ import scorex.block.fields.FeaturesBlockField
 import scorex.consensus.nxt.{NxtConsensusBlockField, NxtLikeConsensusBlockData}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.hash.FastCryptographicHash.DigestSize
+import scorex.crypto.signatures.{PublicKey, Signature}
 import scorex.transaction.TransactionParser._
 import scorex.transaction.ValidationError.GenericError
 import scorex.transaction._
@@ -169,7 +170,7 @@ case class Block private(override val timestamp: Long,
 
   val prevBlockFeePart: Coeval[Portfolio] = Coeval.evalOnce(Monoid[Portfolio].combineAll(transactionData.map(tx => tx.feeDiff().minus(tx.feeDiff().multiply(CurrentBlockFeePart)))))
 
-  protected val signatureValid: Coeval[Boolean] = Coeval.evalOnce(EllipticCurveImpl.verify(signerData.signature.arr, bytesWithoutSignature(), signerData.generator.publicKey))
+  protected val signatureValid: Coeval[Boolean] = Coeval.evalOnce(EllipticCurveImpl.verify(Signature(signerData.signature.arr), bytesWithoutSignature(), PublicKey(signerData.generator.publicKey)))
   protected override val signedDescendants: Coeval[Seq[Transaction]] = Coeval.evalOnce(transactionData)
 
   override def toString: String =
@@ -294,9 +295,9 @@ object Block extends ScorexLogging {
       txBytes ++
       genesisSigner.publicKey
 
-    val signature = genesisSettings.signature.fold(EllipticCurveImpl.sign(genesisSigner, toSign))(_.arr)
+    val signature = genesisSettings.signature.fold(EllipticCurveImpl.sign(genesisSigner, toSign))(x => Signature(x.arr))
 
-    if (EllipticCurveImpl.verify(signature, toSign, genesisSigner.publicKey))
+    if (EllipticCurveImpl.verify(signature, toSign, PublicKey(genesisSigner.publicKey)))
       Right(Block(timestamp = timestamp,
         version = GenesisBlockVersion,
         reference = ByteStr(reference),

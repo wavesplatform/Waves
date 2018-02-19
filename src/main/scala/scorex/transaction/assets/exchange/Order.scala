@@ -9,6 +9,7 @@ import scorex.account.{PrivateKeyAccount, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash
+import scorex.crypto.signatures.{PublicKey, Signature}
 import scorex.serialization.{BytesSerializable, Deser, JsonSerializable}
 import scorex.transaction.TransactionParser._
 import scorex.transaction.ValidationError.GenericError
@@ -72,7 +73,7 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
 
   import Order._
 
-  val signatureValid = Coeval.evalOnce(EllipticCurveImpl.verify(signature, toSign, senderPublicKey.publicKey))
+  val signatureValid = Coeval.evalOnce(EllipticCurveImpl.verify(Signature(signature), toSign, PublicKey(senderPublicKey.publicKey)))
 
   def isValid(atTime: Long): Validation = {
     isValidAmount(price, amount) &&

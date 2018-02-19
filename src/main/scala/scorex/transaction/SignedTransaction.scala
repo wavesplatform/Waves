@@ -7,6 +7,7 @@ import scorex.account.PublicKeyAccount
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.FastCryptographicHash
+import scorex.crypto.signatures.{PublicKey, Signature}
 
 trait SignedTransaction extends Transaction with Signed {
   val toSign: Coeval[Array[Byte]]
@@ -24,5 +25,5 @@ trait SignedTransaction extends Transaction with Signed {
     "signature" -> this.signature.base58
   )
 
-  val signatureValid: Coeval[Boolean] = Coeval.evalOnce(EllipticCurveImpl.verify(signature.arr, toSign(), sender.publicKey))
+  val signatureValid: Coeval[Boolean] = Coeval.evalOnce(EllipticCurveImpl.verify(Signature(signature.arr), toSign(), PublicKey(sender.publicKey)))
 }

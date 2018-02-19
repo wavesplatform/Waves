@@ -12,6 +12,7 @@ import play.api.libs.json._
 import scorex.api.http.{AddressApiRoute, ApiKeyNotValid, InvalidMessage}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
+import scorex.crypto.signatures.{PublicKey, Signature}
 import scorex.settings.TestFunctionalitySettings
 
 class AddressRouteSpec
@@ -98,7 +99,7 @@ class AddressRouteSpec
         (resp \ "message").as[String] shouldEqual (if (encode) Base58.encode(message.getBytes) else message)
         (resp \ "publicKey").as[String] shouldEqual Base58.encode(account.publicKey)
 
-        EllipticCurveImpl.verify(signature, message.getBytes, account.publicKey) shouldBe true
+        EllipticCurveImpl.verify(Signature(signature), message.getBytes, PublicKey(account.publicKey)) shouldBe true
       }
     }
 

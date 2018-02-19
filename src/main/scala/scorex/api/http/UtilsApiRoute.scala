@@ -10,6 +10,7 @@ import play.api.libs.json.Json
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
 import scorex.crypto.hash.{FastCryptographicHash, SecureCryptographicHash}
+import scorex.crypto.signatures.PrivateKey
 
 @Path("/utils")
 @Api(value = "/utils", description = "Useful functions", position = 3, produces = "application/json")
@@ -87,7 +88,7 @@ case class UtilsApiRoute(settings: RestAPISettings) extends ApiRoute {
   def sign: Route = (path("sign" / Segment) & post) {pk =>
     entity(as[String]) { message =>
       complete(Json.obj("message" -> message, "signature" ->
-        Base58.encode(EllipticCurveImpl.sign(Base58.decode(pk).get, Base58.decode(message).get))))
+        Base58.encode(EllipticCurveImpl.sign(PrivateKey(Base58.decode(pk).get), Base58.decode(message).get))))
     }
   }
 }

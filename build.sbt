@@ -53,7 +53,7 @@ libraryDependencies ++=
   Dependencies.fp ++
   Seq(
     "com.iheart" %% "ficus" % "1.4.2",
-    ("org.scorexfoundation" %% "scrypto" % "1.2.2").exclude("org.slf4j", "slf4j-api"),
+    ("org.scorexfoundation" %% "scrypto" % "2.0.4").exclude("org.slf4j", "slf4j-api"),
     "commons-net" % "commons-net" % "3.+"
   )
 

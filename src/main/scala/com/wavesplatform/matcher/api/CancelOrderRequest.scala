@@ -7,6 +7,7 @@ import play.api.libs.json.{JsObject, JsPath, Json, Reads}
 import scorex.account.PublicKeyAccount
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
+import scorex.crypto.signatures.{PublicKey, Signature}
 import scorex.transaction.assets.exchange.OrderJson._
 
 case class CancelOrderRequest(@ApiModelProperty(dataType = "java.lang.String") senderPublicKey: PublicKeyAccount,
@@ -16,7 +17,7 @@ case class CancelOrderRequest(@ApiModelProperty(dataType = "java.lang.String") s
   lazy val toSign: Array[Byte] = senderPublicKey.publicKey ++ orderId
 
   @ApiModelProperty(hidden = true)
-  def isSignatureValid = EllipticCurveImpl.verify(signature, toSign, senderPublicKey.publicKey)
+  def isSignatureValid = EllipticCurveImpl.verify(Signature(signature), toSign, PublicKey(senderPublicKey.publicKey))
 
   def json: JsObject = Json.obj(
     "sender" -> Base58.encode(senderPublicKey.publicKey),

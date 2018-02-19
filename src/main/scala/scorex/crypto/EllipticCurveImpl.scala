@@ -1,8 +1,7 @@
 package scorex.crypto
 
 import scorex.account.PrivateKeyAccount
-import scorex.crypto.signatures.Curve25519
-import scorex.crypto.signatures.SigningFunctions.{MessageToSign, PrivateKey, PublicKey, Signature}
+import scorex.crypto.signatures._
 
 /**
   * This implementation is being used from many places in the code. We consider easy switching from one
@@ -13,7 +12,7 @@ import scorex.crypto.signatures.SigningFunctions.{MessageToSign, PrivateKey, Pub
 object EllipticCurveImpl {
   def sign(privateKey: PrivateKey, message: MessageToSign): Signature = Curve25519.sign(privateKey, message)
 
-  def sign(account: PrivateKeyAccount, message: MessageToSign): Signature = sign(account.privateKey, message)
+  def sign(account: PrivateKeyAccount, message: MessageToSign): Signature = sign(PrivateKey(account.privateKey), message)
 
   def verify(signature: Signature, message: MessageToSign, publicKey: PublicKey): Boolean = Curve25519.verify(signature, message, publicKey)
 
