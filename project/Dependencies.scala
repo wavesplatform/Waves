@@ -1,4 +1,6 @@
 import sbt._
+import sbt.Keys._
+import org.portablescala.sbtplatformdeps.PlatformDepsPlugin.autoImport.toPlatformDepsGroupID
 
 object Dependencies {
 
@@ -71,8 +73,13 @@ object Dependencies {
 
   lazy val fp = Seq(
     "org.typelevel" %% "cats-core" % "1.0.1",
-    "io.monix" %% "monix" % "3.0.0-M3",
     "org.scodec" %% "scodec-core" % "1.10.3",
     "io.github.amrhassan" %% "scalacheck-cats" % "0.4.0" % Test
   )
+  lazy val monix = Def.setting(Seq("io.monix" %%% "monix" % "3.0.0-M3"))
+  lazy val scodec = Def.setting(Seq("org.scodec" %%% "scodec-core" % "1.10.3"))
+  lazy val fastparse = Def.setting(Seq("com.lihaoyi" %%% "fastparse" % "1.0.0"))
+  lazy val ficus = Seq("com.iheart" %% "ficus" % "1.4.2")
+  lazy val scorex = Seq(("org.scorexfoundation" %% "scrypto" % "1.2.2").exclude("org.slf4j", "slf4j-api"))
+  lazy val commons_net =  Seq("commons-net" % "commons-net" % "3.+")
 }

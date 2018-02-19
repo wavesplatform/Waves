@@ -1,8 +1,12 @@
+import sbtcrossproject.CrossPlugin.autoImport.{crossProject, CrossType}
 import com.typesafe.sbt.packager.archetypes.TemplateWriter
 import sbt.Keys._
 import sbt._
 
+
 enablePlugins(JavaServerAppPackaging, JDebPackaging, SystemdPlugin, GitVersioning)
+
+
 
 inThisBuild(Seq(
   scalaVersion := "2.12.4",
@@ -16,8 +20,8 @@ git.useGitDescribe := true
 git.uncommittedSignifier := Some("DIRTY")
 
 
-publishArtifact in (Compile, packageDoc) := false
-publishArtifact in (Compile, packageSrc) := false
+publishArtifact in(Compile, packageDoc) := false
+publishArtifact in(Compile, packageSrc) := false
 mainClass in Compile := Some("com.wavesplatform.Application")
 scalacOptions ++= Seq(
   "-feature",
@@ -35,23 +39,6 @@ assemblyMergeStrategy in assembly := {
   case other => (assemblyMergeStrategy in assembly).value(other)
 }
 test in assembly := {}
-
-libraryDependencies ++=
-  Dependencies.network ++
-  Dependencies.db ++
-  Dependencies.http ++
-  Dependencies.akka ++
-  Dependencies.serialization ++
-  Dependencies.testKit.map(_ % "test") ++
-  Dependencies.logging ++
-  Dependencies.matcher ++
-  Dependencies.metrics ++
-  Dependencies.fp ++
-  Seq(
-    "com.iheart" %% "ficus" % "1.4.2",
-    ("org.scorexfoundation" %% "scrypto" % "1.2.2").exclude("org.slf4j", "slf4j-api"),
-    "commons-net" % "commons-net" % "3.+"
-  )
 
 sourceGenerators in Compile += Def.task {
   // WARNING!!!
@@ -85,9 +72,9 @@ inConfig(Test)(Seq(
 
 commands += Command.command("packageAll") { state =>
   "clean" ::
-  "assembly" ::
-  "debian:packageBin" ::
-  state
+    "assembly" ::
+    "debian:packageBin" ::
+    state
 }
 
 inConfig(Linux)(Seq(
@@ -96,7 +83,9 @@ inConfig(Linux)(Seq(
   packageDescription := "Waves node"
 ))
 
-val network = Def.setting { Network(sys.props.get("network")) }
+val network = Def.setting {
+  Network(sys.props.get("network"))
+}
 normalizedName := network.value.name
 
 javaOptions in Universal ++= Seq(
@@ -121,7 +110,9 @@ javaOptions in Universal ++= Seq(
   "-J-XX:+UseStringDeduplication")
 
 mappings in Universal += (baseDirectory.value / s"waves-${network.value}.conf" -> "doc/waves.conf.sample")
-val packageSource = Def.setting { sourceDirectory.value / "package" }
+val packageSource = Def.setting {
+  sourceDirectory.value / "package"
+}
 val upstartScript = Def.task {
   val src = packageSource.value / "upstart.conf"
   val dest = (target in Debian).value / "upstart" / s"${packageName.value}.conf"
@@ -150,10 +141,64 @@ inConfig(Debian)(Seq(
   maintainerScripts := maintainerScriptsFromDirectory(packageSource.value / "debian", Seq("preinst", "postinst", "postrm", "prerm"))
 ))
 
-lazy val lang = project
+lazy val lang =
+  crossProject(JSPlatform, JVMPlatform)
+    .withoutSuffixFor(JVMPlatform)
+    .crossType(CrossType.Pure)
+    .settings(
+
+      version := "0.0.1",
+      scalacOptions ++= Seq(
+        "-feature",
+        "-deprecation",
+        "-language:higherKinds",
+        "-language:implicitConversions",
+        "-Ywarn-unused:-implicits",
+        "-Xlint"),
+      libraryDependencies ++= Seq(
+        "org.typelevel" %% "cats-core" % "1.0.1",
+        "org.scalacheck" %% "scalacheck" % "1.13.5",
+        "io.github.amrhassan" %% "scalacheck-cats" % "0.4.0" % Test
+      )
+        ++ Dependencies.monix.value
+        ++ Dependencies.scodec.value
+        ++ Dependencies.fastparse.value
+        ++ Seq(
+        "org.scalatest" %% "scalatest" % "3.0.3",
+        "org.scalactic" %% "scalactic" % "3.0.3"
+      ) ++ Seq(
+        ("org.scorexfoundation" %% "scrypto" % "1.2.2").exclude("org.slf4j", "slf4j-api")
+      ))
+    .jsSettings(
+      scalaJSLinkerConfig ~= {
+        _.withModuleKind(ModuleKind.CommonJSModule)
+      }
+    )
+    .jvmSettings(libraryDependencies += "org.scala-js" %% "scalajs-stubs" % "0.6.22" % "provided")
+
+lazy val langJS = lang.js
+lazy val langJVM = lang.jvm
 
 lazy val node = project.in(file("."))
-    .dependsOn(lang)
+  .settings(
+    libraryDependencies ++=
+      Dependencies.network ++
+        Dependencies.db ++
+        Dependencies.http ++
+        Dependencies.akka ++
+        Dependencies.serialization ++
+        Dependencies.testKit.map(_ % "test") ++
+        Dependencies.logging ++
+        Dependencies.matcher ++
+        Dependencies.metrics ++
+        Dependencies.fp ++
+        Dependencies.ficus ++
+        Dependencies.scorex ++
+        Dependencies.commons_net ++
+        Dependencies.monix.value
+  )
+  .aggregate(langJVM)
+  .dependsOn(langJVM)
 
 lazy val discovery = project
 
@@ -162,9 +207,4 @@ lazy val it = project
 
 lazy val generator = project
   .dependsOn(it)
-  .settings(
-    libraryDependencies += "com.github.scopt" %% "scopt" % "3.6.0"
-  )
-
-
-
+  .settings(libraryDependencies += "com.github.scopt" %% "scopt" % "3.6.0")
