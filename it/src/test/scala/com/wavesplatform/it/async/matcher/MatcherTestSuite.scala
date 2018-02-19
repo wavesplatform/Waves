@@ -259,7 +259,7 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
       priceAsset = None
     )
 
-    matcherNode.waitForNextBlock
+    Await.result(matcherNode.waitForHeightArise, 1.minute)
 
     def bobOrder = prepareOrder(bobNode, matcherNode, bobWavesPair, OrderType.SELL, 1 * Waves * Order.PriceConstant, bobAssetQuantity)
 
@@ -275,6 +275,37 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
       order = bobOrder,
       expectedStatusCode = 400,
       expectedStatus = "OrderRejected"
+    )
+  }
+
+  "should cancel a sell order if the owner moved its assets to another account" in {
+    // Bob issues new asset
+    val bobAssetQuantity = 10000
+    val bobAssetName = "NewBobCoin"
+    val bobAsset = issueAsset(bobNode, bobAssetName, bobAssetQuantity)
+    val bobAssetId = ByteStr.decodeBase58(bobAsset).get
+    waitForAssetBalance(bobNode, bobAsset, bobAssetQuantity)
+
+    // Bob wants to sell all own assets for 1 Wave
+    val bobWavesPair = AssetPair(
+      amountAsset = Some(bobAssetId),
+      priceAsset = None
+    )
+
+    Await.result(matcherNode.waitForHeightArise, 1.minute)
+
+    def bobOrder = prepareOrder(bobNode, matcherNode, bobWavesPair, OrderType.SELL, 1 * Waves * Order.PriceConstant, bobAssetQuantity)
+
+    val (sellId, _) = matcherPlaceOrder(matcherNode, bobOrder)
+    waitForOrderStatus(matcherNode, bobAsset, sellId, "Accepted")
+
+    // Bob moves all his tokens to Alice
+    Await.result(matcherNode.transfer(bobNode.address, aliceNode.address, bobAssetQuantity, 100000, Some(bobAsset)), 1.minute)
+
+    matcherExpectOrderPlacementRejected(
+      order = bobOrder,
+      expectedStatusCode = 400,
+      expectedStatus = "OrderCanceled"
     )
   }
 
@@ -312,7 +343,7 @@ object MatcherTestSuite {
        |  account="3Hm3LGoNPmw1VTZ3eRA2pAfeQPhnaBm6YFC"
        |  bind-address="0.0.0.0"
        |  order-match-tx-fee = 300000
-       |  blacklisted-assets = [$ForbiddenAssetId]
+       |  blacklisted-assets = ["$ForbiddenAssetId"]
        |}
        |waves.miner.enable=no
       """.stripMargin)

@@ -247,7 +247,7 @@ class OrderBookActorSpecification extends TestKit(ActorSystem("MatcherTest"))
 
     }
 
-    "place orders and restart without waiting for responce" in {
+    "place orders and restart without waiting for response" in {
       val ord1 = sell(pair, 100, 10 * Order.PriceConstant)
 
       (1 to 100).foreach({ i =>

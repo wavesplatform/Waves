@@ -22,6 +22,7 @@ trait OrderValidator {
   lazy val matcherPubKey: PublicKeyAccount = wallet.findWallet(settings.account).right.get
   val MinExpiration = 60 * 1000L
 
+  // !
   def isBalanceWithOpenOrdersEnough(order: Order): Validation = {
     val lo = LimitOrder(order)
 
