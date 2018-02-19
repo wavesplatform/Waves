@@ -5,7 +5,7 @@ import sbt._
 
 enablePlugins(JavaServerAppPackaging, JDebPackaging, SystemdPlugin, GitVersioning)
 
-val versionTask = Def.task {
+val versionSource = Def.task {
   // WARNING!!!
   // Please, update the fallback version every major and minor releases.
   // This version is used then building from sources without Git repository
@@ -63,7 +63,7 @@ inConfig(Compile)(Seq(
   mainClass := Some("com.wavesplatform.Application"),
   publishArtifact in packageDoc := false,
   publishArtifact in packageSrc := false,
-  sourceGenerators += versionTask
+  sourceGenerators += versionSource
 ))
 
 inConfig(Test)(Seq(
@@ -148,13 +148,13 @@ lazy val lang =
       version := "0.0.1",
       libraryDependencies ++=
         Dependencies.cats ++
-          Dependencies.scalacheck ++
-          Dependencies.scorex ++
-          Dependencies.scalatest ++
-          Dependencies.scalactic ++
-          Dependencies.monix.value ++
-          Dependencies.scodec.value ++
-          Dependencies.fastparse.value
+        Dependencies.scalacheck ++
+        Dependencies.scorex ++
+        Dependencies.scalatest ++
+        Dependencies.scalactic ++
+        Dependencies.monix.value ++
+        Dependencies.scodec.value ++
+        Dependencies.fastparse.value
     )
     .jsSettings(
       scalaJSLinkerConfig ~= {
@@ -170,19 +170,19 @@ lazy val node = project.in(file("."))
   .settings(
     libraryDependencies ++=
       Dependencies.network ++
-        Dependencies.db ++
-        Dependencies.http ++
-        Dependencies.akka ++
-        Dependencies.serialization ++
-        Dependencies.testKit.map(_ % "test") ++
-        Dependencies.logging ++
-        Dependencies.matcher ++
-        Dependencies.metrics ++
-        Dependencies.fp ++
-        Dependencies.ficus ++
-        Dependencies.scorex ++
-        Dependencies.commons_net ++
-        Dependencies.monix.value
+      Dependencies.db ++
+      Dependencies.http ++
+      Dependencies.akka ++
+      Dependencies.serialization ++
+      Dependencies.testKit.map(_ % "test") ++
+      Dependencies.logging ++
+      Dependencies.matcher ++
+      Dependencies.metrics ++
+      Dependencies.fp ++
+      Dependencies.ficus ++
+      Dependencies.scorex ++
+      Dependencies.commons_net ++
+      Dependencies.monix.value
   )
   .aggregate(langJVM)
   .dependsOn(langJVM)
