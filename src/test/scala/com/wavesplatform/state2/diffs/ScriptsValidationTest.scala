@@ -72,9 +72,6 @@ class ScriptsValidationTest extends PropSpec with PropertyChecks with Matchers w
       val script =
         s"""
           |
-          | let F = 1
-          | let BBB = base58'PK!PK!PK!PK!'
-          |
           |let A = base58'${ByteStr(pk0.publicKey)}'
           |let B = base58'${ByteStr(pk1.publicKey)}'
           |let C = base58'${ByteStr(pk2.publicKey)}'

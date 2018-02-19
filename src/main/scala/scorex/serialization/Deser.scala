@@ -20,8 +20,8 @@ object Deser {
 
   def parseOption[T](bytes: Array[Byte], position: Int)(deser: Array[Byte] => T): (Option[T], Int) = {
     if (bytes.slice(position, position + 1).head == (1: Byte)) {
-      val (arr, arrSize) = parseArraySize(bytes, position + 1)
-      (Some(deser(arr)), position + 1 + 2 + arrSize)
+      val (arr, arrPosEnd) = parseArraySize(bytes, position + 1)
+      (Some(deser(arr)), arrPosEnd)
     } else (None, position + 1)
   }
 
