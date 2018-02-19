@@ -12,7 +12,9 @@ import com.wavesplatform.state2.ByteStr
 import org.scalatest.{BeforeAndAfterAll, CancelAfterFailure, FreeSpec, Matchers}
 import play.api.libs.json.JsNumber
 import play.api.libs.json.Json.parse
+import scorex.api.http.assets.SignedTransferRequest
 import scorex.crypto.encode.Base58
+import scorex.transaction.assets.TransferTransaction
 import scorex.transaction.assets.exchange.{AssetPair, Order, OrderType}
 
 import scala.concurrent.Await
@@ -45,6 +47,10 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
+
+    scorex.account.AddressScheme.current = new scorex.account.AddressScheme {
+      override val chainId: Byte = 'I'
+    }
 
     // Store initial balances of participants
     matcherBalance = getBalance(matcherNode)
@@ -300,13 +306,21 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
     waitForOrderStatus(matcherNode, bobAsset, sellId, "Accepted")
 
     // Bob moves all his tokens to Alice
-    Await.result(matcherNode.transfer(bobNode.address, aliceNode.address, bobAssetQuantity, 100000, Some(bobAsset)), 1.minute)
+    val transferTx = TransferTransaction.create(
+      assetId = Some(bobAssetId),
+      sender = bobNode.privateKey,
+      recipient = scorex.account.Address.fromBytes(Base58.decode(aliceNode.address).get).right.get,
+      amount = bobAssetQuantity,
+      timestamp = System.currentTimeMillis(),
+      feeAssetId = None,
+      feeAmount = 100000,
+      attachment = Array.emptyByteArray
+    ).right.get
 
-    matcherExpectOrderPlacementRejected(
-      order = bobOrder,
-      expectedStatusCode = 400,
-      expectedStatus = "OrderCanceled"
-    )
+    Await.result(matcherNode.signedTransfer(createSignedTransferRequest(transferTx)), 1.minute)
+
+    val waitOrderCancelled = matcherNode.waitFor[MatcherStatusResponse]("Order is cancelled")(_.getOrderStatus(bobAssetName, sellId), _.status == "Cancelled", 1.second)
+    Await.result(waitOrderCancelled, 1.minute)
   }
 
   private def matcherExpectOrderPlacementRejected(order: Order, expectedStatusCode: Int, expectedStatus: String): Boolean = {
@@ -326,6 +340,21 @@ class MatcherTestSuite extends FreeSpec with Matchers with BeforeAndAfterAll wit
     val result = Await.result(futureResult, 1.minute)
 
     result.status
+  }
+
+  protected def createSignedTransferRequest(tx: TransferTransaction): SignedTransferRequest = {
+    import tx._
+    SignedTransferRequest(
+      Base58.encode(tx.sender.publicKey),
+      assetId.map(_.base58),
+      recipient.stringRepr,
+      amount,
+      fee,
+      feeAssetId.map(_.base58),
+      timestamp,
+      attachment.headOption.map(_ => Base58.encode(attachment)),
+      signature.base58
+    )
   }
 
 }
