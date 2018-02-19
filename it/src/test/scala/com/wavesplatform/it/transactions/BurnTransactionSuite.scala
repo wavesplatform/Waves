@@ -22,12 +22,22 @@ class BurnTransactionSuite extends BaseTransactionSuite {
       _ <- notMiner.assertBalances(firstAddress, balance - defaultFee, effectiveBalance - defaultFee)
         .zip(notMiner.assertAssetBalance(firstAddress, issuedAssetId, defaultQuantity))
 
+      // burn half of the coins and check balance
       burnId <- sender.burn(firstAddress, issuedAssetId, defaultQuantity / 2, fee = defaultFee).map(_.id)
 
       _ <- nodes.waitForHeightAraiseAndTxPresent(burnId)
       _ <- notMiner.assertBalances(firstAddress, balance - 2 * defaultFee, effectiveBalance - 2 * defaultFee)
         .zip(notMiner.assertAssetBalance(firstAddress, issuedAssetId, defaultQuantity / 2))
+      assetOpt <- notMiner.assetsBalance(firstAddress).map(_.balances.find(_.assetId == issuedAssetId))
+      _ = assert(assetOpt.exists(_.balance == defaultQuantity / 2))
 
+      // burn the rest and check again
+      burnId <- sender.burn(firstAddress, issuedAssetId, defaultQuantity / 2, fee = defaultFee).map(_.id)
+
+      _ <- nodes.waitForHeightAraiseAndTxPresent(burnId)
+      _ <- notMiner.assertAssetBalance(firstAddress, issuedAssetId, 0)
+      assetOpt <- notMiner.assetsBalance(firstAddress).map(_.balances.find(_.assetId == issuedAssetId))
+      _ = assert(assetOpt.isEmpty)
     } yield succeed
 
     Await.result(f, 2.minute)

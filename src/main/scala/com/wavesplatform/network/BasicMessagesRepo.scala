@@ -193,8 +193,8 @@ object CheckpointSpec extends MessageSpec[Checkpoint] {
 object TransactionSpec extends MessageSpec[Transaction] {
   override val messageCode: MessageCode = 25: Byte
 
-  // IssueTransaction is the biggest https://github.com/wavesplatform/Waves/wiki/Data-Structures#issue-transaction
-  override val maxLength: Int = 120 + 16 + 1000 + 8
+  // Modeled after MassTransferTransaction https://wavesplatform.atlassian.net/wiki/spaces/MAIN/pages/386171054/Mass+Transfer+Transaction
+  override val maxLength: Int = 5000
 
   override def deserializeData(bytes: Array[Byte]): Try[Transaction] =
     TransactionParser.parseBytes(bytes)

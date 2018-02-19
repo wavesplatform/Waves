@@ -7,6 +7,8 @@ import scorex.api.http.assets.SignedMassTransferRequest
 import scorex.crypto.encode.Base58
 import scorex.transaction.TransactionParser.TransactionType
 import scorex.transaction.assets.MassTransferTransaction
+import scorex.transaction.assets.MassTransferTransaction.{MaxTransferCount, ParsedTransfer, Transfer}
+import scorex.transaction.assets.TransferTransaction.MaxAttachmentSize
 import scorex.transaction.assets.MassTransferTransaction.{ParsedTransfer, Transfer}
 
 import scala.concurrent.Await
@@ -14,7 +16,7 @@ import scala.concurrent.Future.sequence
 import scala.concurrent.duration._
 import scorex.transaction.assets.TransferTransaction.MaxAttachmentSize
 
-class MassTransferTransactionSuite extends BaseTransactionSuite {
+class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfterFailure {
 
   private val Timeout = 2.minutes
   private val assetQuantity = 100.waves
@@ -129,6 +131,41 @@ class MassTransferTransactionSuite extends BaseTransactionSuite {
     transferFee + numberOfRecipients * massTransferFeePerTransfer
   }
 
+  test("can not make transfer without having enough of effective balance") {
+    val f = for {
+      fb <- traverse(nodes)(_.height).map(_.min)
+      (balance1, eff1) <- notMiner.accountBalances(firstAddress)
+      (balance2, eff2) <- notMiner.accountBalances(secondAddress)
+
+      leaseTxId <- sender.lease(firstAddress, secondAddress, LeasingAmount, LeasingFee).map(_.id)
+      _ <- nodes.waitForHeightAraiseAndTxPresent(leaseTxId)
+
+      transfers = List(Transfer(secondAddress, balance1 - LeasingFee - TransferFee))
+      transferFailureAssertion <- assertBadRequest(sender.massTransfer(firstAddress, transfers, TransferFee))
+
+      _ <- traverse(nodes)(_.waitForHeight(fb + 2))
+      _ <- notMiner.assertBalances(firstAddress, balance1 - LeasingFee, eff1 - LeasingAmount - LeasingFee)
+      _ <- notMiner.assertBalances(secondAddress, balance2, eff2 + LeasingAmount)
+    } yield transferFailureAssertion
+
+    Await.result(f, Timeout)
+  }
+
+  test("huuuge transactions are allowed") {
+    val f = for {
+      (balance1, eff1) <- notMiner.accountBalances(firstAddress)
+      fee = 10000000
+      amount = (balance1 - fee) / MaxTransferCount
+
+      transfers = List.fill(MaxTransferCount)(Transfer(firstAddress, amount))
+      transferId <- sender.massTransfer(firstAddress, transfers, fee).map(_.id)
+
+      _ <- nodes.waitForHeightAraiseAndTxPresent(transferId)
+      _ <- notMiner.assertBalances(firstAddress, balance1 - fee, eff1 - fee)
+    } yield succeed
+
+    Await.result(f, Timeout)
+  }
 
   private def createSignedMassTransferRequest(tx: MassTransferTransaction): SignedMassTransferRequest = {
     import tx._
