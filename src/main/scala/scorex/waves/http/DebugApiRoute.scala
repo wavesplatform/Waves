@@ -213,8 +213,6 @@ case class DebugApiRoute(settings: RestAPISettings,
   def info: Route = (path("info") & get & withAuth) {
     complete(Json.obj(
       "stateHeight" -> stateReader().height,
-      "stateHash" -> blockchainDebugInfo.persistedAccountPortfoliosHash,
-      "blockchainDebugInfo" -> blockchainDebugInfo.debugInfo(),
       "extensionLoaderState" -> extLoaderStateReporter().toString,
       "historyReplierCacheSizes" -> Json.toJson(historyReplier.cacheSizes),
       "microBlockSynchronizerCacheSizes" -> Json.toJson(mbsCacheSizesReporter()),
@@ -338,9 +336,6 @@ object DebugApiRoute {
   case class AccountMiningInfo(address: String, miningBalance: Long, timestamp: Long)
 
   implicit val accountMiningBalanceFormat: Format[AccountMiningInfo] = Json.format
-
-  implicit val hashInfoFormat: Format[HashInfo] = Json.format
-  implicit val stateDebugInfoFormat: Format[StateDebugInfo] = Json.format
 
   implicit val addressWrites: Format[Address] = new Format[Address] {
     override def writes(o: Address): JsValue = JsString(o.stringRepr)

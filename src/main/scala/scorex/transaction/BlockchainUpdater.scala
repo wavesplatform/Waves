@@ -22,17 +22,7 @@ trait BlockchainUpdater extends Synchronized {
 }
 
 trait BlockchainDebugInfo {
-  def debugInfo(): StateDebugInfo
-
-  def persistedAccountPortfoliosHash(): Int
-
   def lockfreeStateHeight: HeightInfo
 }
 
 case class LastBlockInfo(id: BlockId, height: Int, score: BlockchainScore, ready: Boolean)
-
-case class HashInfo(height: Int, hash: Int)
-
-case class StateDebugInfo(persisted: HashInfo,
-                          inMemory: Seq[HashInfo],
-                          microBaseHash: Option[Int])
