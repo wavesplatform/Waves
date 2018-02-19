@@ -35,7 +35,7 @@ class CompositeStateReader private(inner: SnapshotStateReader, blockDiff: BlockD
 
   override def accountTransactionIds(a: Address, limit: Int): Seq[ByteStr] = {
     val fromDiff = txDiff.accountTransactionIds.get(a).orEmpty
-    if (fromDiff.length >= limit) {
+    if (fromDiff.lengthCompare(limit) >= 0) {
       fromDiff.take(limit)
     } else {
       fromDiff ++ inner.accountTransactionIds(a, limit - fromDiff.size) // fresh head ++ stale tail
@@ -84,7 +84,11 @@ class CompositeStateReader private(inner: SnapshotStateReader, blockDiff: BlockD
   }
 
   override def accountScript(address: Address): Option[Script] = {
-    blockDiff.txsDiff.scripts.get(address).orElse(inner.accountScript(address))
+    blockDiff.txsDiff.scripts.get(address) match {
+      case None => inner.accountScript(address)
+      case Some(None) => None
+      case Some(Some(scr)) => Some(scr)
+    }
   }
 }
 

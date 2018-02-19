@@ -90,7 +90,7 @@ trait TransactionGen extends ScriptGen {
     fee <- smallFeeGen
     timestamp <- timestampGen
     proofs <- proofsGen
-    script <- scriptGen
+    script <- Gen.option(scriptGen)
   } yield SetScriptTransaction.create(sender, script, fee, timestamp, proofs).explicitGet()
 
   def selfSignedSetScriptTransactionGenP(sender: PrivateKeyAccount, s: Script): Gen[SetScriptTransaction] = for {

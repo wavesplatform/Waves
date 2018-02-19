@@ -6,6 +6,7 @@ import cats._
 import cats.implicits._
 import com.wavesplatform.state2._
 import scorex.account.{Address, Alias}
+import scorex.serialization.Deser
 import scorex.transaction.lease.LeaseTransaction
 import scorex.transaction.smart.Script
 import scorex.transaction.{Transaction, TransactionParser}
@@ -102,9 +103,13 @@ class StateReaderImpl(p: StateStorage, val synchronizationToken: ReentrantReadWr
 
 
   override def assetBalance(a: Address, asset: ByteStr): Long = read { _ =>
-    p.assetBalance.get(a.bytes, asset).getOrElse(0L) }
+    p.assetBalance.get(a.bytes, asset).getOrElse(0L)
+  }
 
   override def accountScript(address: Address): Option[Script] = read { _ =>
-    Option(p.scripts.get(address.bytes)).map(str => Script.fromBytes(str.arr).explicitGet())
+    for {
+      array <- Option(p.scripts.get(address.bytes))
+      script <- Deser.parseOption(array.arr, 0)(x => Script.fromBytes(x).explicitGet())._1
+    } yield script
   }
 }

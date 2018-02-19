@@ -1,7 +1,7 @@
 package com.wavesplatform.state2.diffs
 
 import com.wavesplatform.lang.Terms._
-import com.wavesplatform.lang.{Parser, TypeChecker}
+import com.wavesplatform.lang._
 import com.wavesplatform.state2._
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen

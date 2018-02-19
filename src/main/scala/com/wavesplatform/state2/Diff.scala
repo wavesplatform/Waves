@@ -47,7 +47,7 @@ case class Diff(transactions: Map[ByteStr, (Int, Transaction, Set[Address])],
                 paymentTransactionIdsByHashes: Map[ByteStr, ByteStr],
                 orderFills: Map[ByteStr, OrderFillInfo],
                 leaseState: Map[ByteStr, Boolean],
-                scripts: Map[Address,Script]) {
+                scripts: Map[Address,Option[Script]]) {
 
   lazy val accountTransactionIds: Map[Address, List[ByteStr]] = {
     val map: List[(Address, Set[(Int, Long, ByteStr)])] = transactions.toList
@@ -69,7 +69,7 @@ object Diff {
             orderFills: Map[ByteStr, OrderFillInfo] = Map.empty,
             paymentTransactionIdsByHashes: Map[ByteStr, ByteStr] = Map.empty,
             leaseState: Map[ByteStr, Boolean] = Map.empty,
-            scripts : Map[Address, Script] = Map.empty
+            scripts : Map[Address, Option[Script]] = Map.empty
            ): Diff = Diff(
     transactions = Map((tx.id(), (height, tx, portfolios.keys.toSet))),
     portfolios = portfolios,

@@ -28,19 +28,19 @@ class SetScriptTransactionSpecification extends PropSpec with PropertyChecks wit
 
   property("SetScriptTransaction id doesn't depend on proof") {
     forAll(accountGen, byteArrayGen(10), byteArrayGen(15), proofsGen, proofsGen, scriptGen) { case (acc: PrivateKeyAccount, p1, p2, proofs1, proofs2, script) =>
-      val tx1 = SetScriptTransaction.create(acc, script, 1, 1, proofs1).explicitGet()
-      val tx2 = SetScriptTransaction.create(acc, script, 1, 1, proofs2).explicitGet()
+      val tx1 = SetScriptTransaction.create(acc, Some(script), 1, 1, proofs1).explicitGet()
+      val tx2 = SetScriptTransaction.create(acc, Some(script), 1, 1, proofs2).explicitGet()
       tx1.id() shouldBe tx2.id()
     }
   }
 
   private def assertTxs(first: SetScriptTransaction, second: SetScriptTransaction): Unit = {
-    first.script shouldEqual second.script
     first.sender.address shouldEqual second.sender.address
     first.timestamp shouldEqual second.timestamp
     first.fee shouldEqual second.fee
     first.version shouldEqual second.version
     first.proofs shouldEqual second.proofs
     first.bytes() shouldEqual second.bytes()
+    first.script shouldEqual second.script
   }
 }
