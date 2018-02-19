@@ -5,7 +5,7 @@ import com.wavesplatform.crypto
 import com.wavesplatform.state2.ByteStr
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
-import scorex.account.Address
+import scorex.account.{Address, PublicKeyAccount}
 import scorex.transaction.TransactionParser._
 
 import scala.util.{Failure, Success, Try}
@@ -16,6 +16,7 @@ case class GenesisTransaction private(recipient: Address, amount: Long, timestam
 
   override val assetFee: (Option[AssetId], Long) = (None, 0)
   override val id: Coeval[AssetId] = Coeval.evalOnce(signature)
+  override def sender: PublicKeyAccount = PublicKeyAccount.empty
 
   val transactionType: TransactionParser.TransactionType.Value = TransactionType.GenesisTransaction
 

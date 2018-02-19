@@ -5,7 +5,7 @@ import com.wavesplatform.state2.{ByteStr, Portfolio}
 import scorex.account.Address
 import scorex.transaction._
 
-trait UtxPool {
+trait UtxPool extends AutoCloseable {
 
   def putIfNew(tx: Transaction): Either[ValidationError, Boolean]
 
@@ -21,7 +21,9 @@ trait UtxPool {
 
   def packUnconfirmed(rest: TwoDimensionalMiningConstraint, sortInBlock: Boolean): (Seq[Transaction], TwoDimensionalMiningConstraint)
 
-  def batched(f: UtxBatchOps => Unit): Unit
+  def batched(f: UtxBatchOps => Unit): Unit = f(createBatchOps)
+
+  def createBatchOps: UtxBatchOps
 
 }
 
