@@ -61,7 +61,7 @@ object ScriptTransferTransaction {
   def parseTail(bytes: Array[Byte]): Try[ScriptTransferTransaction] = Try {
     val version = bytes(0)
     val sender = PublicKeyAccount(bytes.slice(1, KeyLength + 1))
-    val (assetIdOpt, s0) = Deser.parseOption(bytes, KeyLength + 1, AssetIdLength)
+    val (assetIdOpt, s0) = Deser.parseByteArrayOption(bytes, KeyLength + 1, AssetIdLength)
     val timestamp = Longs.fromByteArray(bytes.slice(s0, s0 + 8))
     val amount = Longs.fromByteArray(bytes.slice(s0 + 8, s0 + 16))
     val feeAmount = Longs.fromByteArray(bytes.slice(s0 + 16, s0 + 24))

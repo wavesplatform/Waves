@@ -6,6 +6,7 @@ import cats.Monoid
 import cats.implicits._
 import com.wavesplatform.metrics.Instrumented
 import com.wavesplatform.state2.reader.StateReaderImpl
+import scorex.serialization.Deser
 import scorex.transaction.PaymentTransaction
 import scorex.transaction.assets.TransferTransaction
 import scorex.transaction.assets.exchange.ExchangeTransaction
@@ -107,7 +108,7 @@ class StateWriterImpl(p: StateStorage, storeTransactions: Boolean, synchronizati
       _.foreach { case (id, isActive) => sp().leaseState.put(id, isActive) })
 
     measureSizeLog("script")(blockDiff.txsDiff.scripts)(
-      _.foreach { case (acc, script) => sp().scripts.put(acc.bytes, script.bytes()) })
+      _.foreach { case (acc, script) => sp().scripts.put(acc.bytes, ByteStr(Deser.serializeOption(script)(_.bytes().arr))) })
 
     sp().setHeight(newHeight)
 

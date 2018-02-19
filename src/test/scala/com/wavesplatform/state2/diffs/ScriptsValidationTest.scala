@@ -1,7 +1,7 @@
 package com.wavesplatform.state2.diffs
 
 import com.wavesplatform.lang.Terms._
-import com.wavesplatform.lang.{Parser, TypeChecker}
+import com.wavesplatform.lang._
 import com.wavesplatform.state2._
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
@@ -71,6 +71,9 @@ class ScriptsValidationTest extends PropSpec with PropertyChecks with Matchers w
     def multisig2Of3Lang(pk0: PublicKeyAccount, pk1: PublicKeyAccount, pk2: PublicKeyAccount): Typed.EXPR = {
       val script =
         s"""
+          |
+          | let F = 1
+          | let BBB = base58'PK!PK!PK!PK!'
           |
           |let A = base58'${ByteStr(pk0.publicKey)}'
           |let B = base58'${ByteStr(pk1.publicKey)}'
