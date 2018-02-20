@@ -12,7 +12,6 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers
 import org.scalatest.prop.PropertyChecks
 import play.api.libs.json._
-import scorex.account.Address
 import scorex.api.http.{InvalidAddress, InvalidSignature, TooBigArrayAllocation, TransactionsApiRoute}
 import scorex.crypto.encode.Base58
 import scorex.transaction._
@@ -28,8 +27,6 @@ class TransactionsRouteSpec extends RouteSpec("/transactions")
   with NoShrink {
 
   import TransactionsApiRoute.MaxTransactionsPerRequest
-
-  private val transactionsCount = 10
 
   private val wallet = Wallet(WalletSettings(None, "qwerty", None))
   private val history = mock[History]
@@ -59,20 +56,6 @@ class TransactionsRouteSpec extends RouteSpec("/transactions")
       }
     }
 
-    "working properly otherwise" ignore {
-      forAll(
-        accountGen,
-        choose(1, MaxTransactionsPerRequest),
-        randomTransactionsGen(transactionsCount)) { case (account, limit, txs) =>
-        (state.accountTransactionIds _).expects(account: Address, limit).returning(txs.map(_.id())).once()
-        txs.foreach { tx =>
-          (state.transactionInfo _).expects(tx.id()).returning(Some((1, Some(tx)))).once()
-        }
-        Get(routePath(s"/address/${account.address}/limit/$limit")) ~> route ~> check {
-          responseAs[Seq[JsValue]].length shouldEqual txs.length.min(limit)
-        }
-      }
-    }
   }
 
   routePath("/info/{signature}") - {

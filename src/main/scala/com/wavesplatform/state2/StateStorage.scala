@@ -7,6 +7,8 @@ import com.wavesplatform.db._
 import com.wavesplatform.utils._
 import org.iq80.leveldb.{DB, WriteBatch}
 import scorex.account.{Address, Alias}
+import scorex.serialization.Deser
+import scorex.transaction.smart.Script
 import scorex.utils.{NTP, Time}
 
 import scala.util.Try
@@ -36,6 +38,15 @@ class StateStorage private(db: DB, time: Time) extends SubStorage(db, "state") w
   private val LeaseIndexPrefix = "lease-idx".getBytes(Charset)
   private val MaxAddress = "max-address"
   private val LeasesCount = "leases-count"
+  private val AddressScriptPrefix = "address-script".getBytes(Charset)
+
+  def getScript(addr: Address): Option[Script] = {
+    for {
+      bytes <- get(makeKey(AddressScriptPrefix, addr.bytes.arr))
+      script <- Deser.parseOption(bytes, 0)(x => Script.fromBytes(Deser.parseArraySize(x, 0)._1).explicitGet())._1
+    } yield script
+  }
+
 
   def getHeight: Int = get(makeKey(HeightPrefix, 0)).map(Ints.fromByteArray).getOrElse(0)
 
@@ -45,6 +56,7 @@ class StateStorage private(db: DB, time: Time) extends SubStorage(db, "state") w
 
   def getTransaction(id: ByteStr): Option[(Int, Array[Byte])] =
     get(makeKey(TransactionsPrefix, id.arr)).map(TransactionsValueCodec.decode).map(_.explicitGet().value)
+
 
   def putTransactions(b: Option[WriteBatch], diff: Diff): Unit = {
     diff.transactions.foreach { case (id, (h, tx, _)) =>
@@ -62,7 +74,7 @@ class StateStorage private(db: DB, time: Time) extends SubStorage(db, "state") w
 
     putAliases(b, diff.aliases)
     putLeases(b, diff.leaseState)
-
+    putScripts(b, diff.scripts)
   }
 
   def getWavesBalance(address: Address): Option[(Long, Long, Long)] =
@@ -155,6 +167,14 @@ class StateStorage private(db: DB, time: Time) extends SubStorage(db, "state") w
     putIntProperty(MaxAddress, 0, b)
     putIntProperty(LeasesCount, 0, b)
     super.removeEverything(b)
+  }
+
+  private def putScripts(b: Option[WriteBatch], scripts: Map[Address, Option[Script]]): Unit = {
+    scripts.foreach {
+      case (addr, maybeScript) =>
+        val bytes = Deser.serializeOption(maybeScript)(script => Deser.serializeArray(script.bytes().arr))
+        put(makeKey(AddressScriptPrefix, addr.bytes.arr), bytes, b)
+    }
   }
 
   private def putOrderFills(b: Option[WriteBatch], fills: Map[ByteStr, OrderFillInfo]): Unit =

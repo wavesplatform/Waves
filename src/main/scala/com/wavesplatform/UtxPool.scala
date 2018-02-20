@@ -101,8 +101,7 @@ class UtxPoolImpl(time: Time,
       Right(())
     } else {
       val sender: Option[String] = tx match {
-        case x: SignedTransaction => Some(x.sender.address)
-        case x: PaymentTransaction => Some(x.sender.address)
+        case x: Authorized => Some(x.sender.address)
         case _ => None
       }
 

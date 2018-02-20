@@ -71,6 +71,7 @@ case class Order(@ApiModelProperty(dataType = "java.lang.String") senderPublicKe
 
   import Order._
 
+  val sender = senderPublicKey
   val signatureValid = Coeval.evalOnce(crypto.verify(signature, toSign, senderPublicKey.publicKey))
 
   def isValid(atTime: Long): Validation = {
@@ -210,9 +211,9 @@ object Order {
     from += KeyLength
     val matcher = PublicKeyAccount(bytes.slice(from, from + KeyLength))
     from += KeyLength
-    val (amountAssetId, s0) = Deser.parseOption(bytes, from, AssetIdLength)
+    val (amountAssetId, s0) = Deser.parseByteArrayOption(bytes, from, AssetIdLength)
     from = s0
-    val (priceAssetId, s1) = Deser.parseOption(bytes, from, AssetIdLength)
+    val (priceAssetId, s1) = Deser.parseByteArrayOption(bytes, from, AssetIdLength)
     from = s1
     val orderType = bytes(from)
     from += 1

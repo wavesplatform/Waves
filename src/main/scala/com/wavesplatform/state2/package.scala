@@ -8,6 +8,7 @@ import scorex.transaction.ValidationError.GenericError
 import scorex.transaction.{Transaction, ValidationError}
 
 import scala.annotation.tailrec
+import scala.reflect.ClassTag
 import scala.util.{Left, Right, Try}
 
 package object state2 {
@@ -64,5 +65,15 @@ package object state2 {
 
 
   def sameQuotient(x: Int, y: Int, divisor: Int): Boolean = (x / divisor) == (y / divisor)
+
+
+  implicit class Cast[A](a: A) {
+    def cast[B: ClassTag]: Option[B] = {
+      a match {
+        case b: B => Some(b)
+        case _ => None
+      }
+    }
+  }
 
 }

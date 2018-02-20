@@ -1,5 +1,6 @@
 package com.wavesplatform
 
+import com.wavesplatform.lang.{ScriptGen, TypeChecker}
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.state2._
 import org.scalacheck.Gen.{alphaLowerChar, alphaUpperChar, frequency, numChar}
@@ -11,9 +12,10 @@ import scorex.transaction.assets.MassTransferTransaction.ParsedTransfer
 import scorex.transaction.assets._
 import scorex.transaction.assets.exchange._
 import scorex.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
+import scorex.transaction.smart.{Script, SetScriptTransaction}
 import scorex.utils.NTP
 
-trait TransactionGen {
+trait TransactionGen extends ScriptGen {
 
   def byteArrayGen(length: Int): Gen[Array[Byte]] = Gen.containerOfN[Array, Byte](length, Arbitrary.arbitrary[Byte])
 
@@ -33,7 +35,7 @@ trait TransactionGen {
 
   val accountGen: Gen[PrivateKeyAccount] = bytes32gen.map(seed => PrivateKeyAccount(seed))
 
-  val aliasSymbolChar: Gen[Char] = Gen.oneOf('.','@', '_', '-')
+  val aliasSymbolChar: Gen[Char] = Gen.oneOf('.', '@', '_', '-')
 
   val aliasAlphabetGen: Gen[Char] = frequency((1, numChar), (1, aliasSymbolChar), (9, alphaLowerChar))
 
@@ -73,6 +75,30 @@ trait TransactionGen {
       val a2bytesGen = byteArrayGen(31).map(a2bytes => Option((~a1bytes.arr(0)).toByte +: a2bytes))
       Gen.oneOf(Gen.const(None), a2bytesGen).map(a2 => AssetPair(a1, a2.map(ByteStr(_))))
   }
+
+  val proofsGen: Gen[Proofs] = for {
+    proofsAmount <- Gen.chooseNum(0, 7)
+    proofs <- Gen.listOfN(proofsAmount, genBoundedBytes(0, 50))
+  } yield Proofs.create(proofs.map(ByteStr(_))).explicitGet()
+
+  val scriptGen = BOOLgen(1000).map { expr =>
+    val typed = TypeChecker(TypeChecker.Context.empty, expr).right.get
+    Script(typed)
+  }
+
+  val setScriptTransactionGen: Gen[SetScriptTransaction] = for {
+    sender: PrivateKeyAccount <- accountGen
+    fee <- smallFeeGen
+    timestamp <- timestampGen
+    proofs <- proofsGen
+    script <- Gen.option(scriptGen)
+  } yield SetScriptTransaction.create(sender, script, fee, timestamp, proofs).explicitGet()
+
+  def selfSignedSetScriptTransactionGenP(sender: PrivateKeyAccount, s: Script): Gen[SetScriptTransaction] = for {
+    fee <- smallFeeGen
+    timestamp <- timestampGen
+  } yield SetScriptTransaction.selfSigned(sender, s, fee, timestamp).explicitGet()
+
 
   val paymentGen: Gen[PaymentTransaction] = for {
     sender: PrivateKeyAccount <- accountGen
@@ -131,7 +157,7 @@ trait TransactionGen {
   val leaseGen: Gen[LeaseTransaction] = leaseAndCancelGen.map(_._1)
   val leaseCancelGen: Gen[LeaseCancelTransaction] = leaseAndCancelGen.map(_._2)
 
-  private val transferParamGen = for {
+  val transferParamGen = for {
     amount <- positiveLongGen
     feeAmount <- smallFeeGen
     assetId <- Gen.option(bytes32gen)
@@ -148,7 +174,7 @@ trait TransactionGen {
   } yield TransferTransaction.create(assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment).right.get
 
   def transferGeneratorP(timestamp: Long, sender: PrivateKeyAccount, recipient: AddressOrAlias,
-                         assetId: Option[AssetId], feeAssetId: Option[AssetId]): Gen[TransferTransaction]  = for {
+                         assetId: Option[AssetId], feeAssetId: Option[AssetId]): Gen[TransferTransaction] = for {
     (_, _, _, amount, _, _, feeAmount, attachment) <- transferParamGen
   } yield TransferTransaction.create(assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment).right.get
 
@@ -170,6 +196,12 @@ trait TransactionGen {
     (assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment) <- transferParamGen
   } yield TransferTransaction.create(assetId, sender, recipient, amount, timestamp, feeAssetId, feeAmount, attachment).right.get)
     .label("transferTransaction")
+
+  val scriptTransferGen = (for {
+    (assetId, sender, recipient, amount, timestamp, _, feeAmount, attachment) <- transferParamGen
+    proofs <- proofsGen
+  } yield ScriptTransferTransaction.create(1, assetId, sender, recipient, amount, timestamp, feeAmount, attachment, proofs).explicitGet())
+    .label("scriptTransferTransaction")
 
   val transferWithWavesFeeGen = for {
     (assetId, sender, recipient, amount, timestamp, _, feeAmount, attachment) <- transferParamGen
@@ -249,7 +281,7 @@ trait TransactionGen {
   def issueGen(sender: PrivateKeyAccount, fixedQuantity: Option[Long] = None): Gen[IssueTransaction] = for {
     (_, assetName, description, quantity, decimals, _, iFee, timestamp) <- issueParamGen
   } yield {
-    IssueTransaction.create(sender, assetName, description, fixedQuantity.getOrElse(quantity), decimals, reissuable = false, 1*Constants.UnitsInWave, timestamp).right.get
+    IssueTransaction.create(sender, assetName, description, fixedQuantity.getOrElse(quantity), decimals, reissuable = false, 1 * Constants.UnitsInWave, timestamp).right.get
   }
 
   val issueGen: Gen[IssueTransaction] = issueReissueBurnGen.map(_._1)

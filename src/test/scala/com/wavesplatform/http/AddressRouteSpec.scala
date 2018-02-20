@@ -2,7 +2,6 @@ package com.wavesplatform.http
 
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.state2.reader.SnapshotStateReader
-import com.wavesplatform.state2.{LeaseInfo, Portfolio}
 import com.wavesplatform.{NoShrink, TestWallet, crypto}
 import monix.eval.Coeval
 import org.scalacheck.Gen
@@ -75,17 +74,6 @@ class AddressRouteSpec
     }
   }
 
-  routePath("/balance/{address}") ignore {
-    val state = stub[SnapshotStateReader]
-    (state.accountPortfolio _).when(*).returns(Portfolio(0, mock[LeaseInfo], Map.empty))
-    val route = AddressApiRoute(restAPISettings, testWallet, Coeval.now(state), TestFunctionalitySettings.Stub).route
-    Get(routePath(s"/balance/${allAddresses.head}")) ~> route ~> check {
-      val r = responseAs[AddressApiRoute.Balance]
-      r.balance shouldEqual 0
-      r.confirmations shouldEqual 0
-    }
-  }
-
   private def testSign(path: String, encode: Boolean): Unit =
     forAll(generatedMessages) { case (account, message) =>
       val uri = routePath(s"/$path/${account.address}")
@@ -141,6 +129,4 @@ class AddressRouteSpec
       (responseAs[JsObject] \ "deleted").as[Boolean] shouldBe true
     }
   }
-
-  routePath("/publicKey/{publicKey}") in pending
 }

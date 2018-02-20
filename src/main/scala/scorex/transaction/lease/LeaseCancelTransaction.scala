@@ -16,11 +16,11 @@ case class LeaseCancelTransaction private(sender: PublicKeyAccount,
                                           fee: Long,
                                           timestamp: Long,
                                           signature: ByteStr)
-  extends SignedTransaction {
+  extends SignedTransaction with FastHashId {
 
   override val transactionType: TransactionType.Value = TransactionType.LeaseCancelTransaction
 
-  val toSign: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(transactionType.id.toByte),
+  val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(transactionType.id.toByte),
     sender.publicKey,
     Longs.toByteArray(fee),
     Longs.toByteArray(timestamp),
@@ -33,7 +33,7 @@ case class LeaseCancelTransaction private(sender: PublicKeyAccount,
   ))
 
   override val assetFee: (Option[AssetId], Long) = (None, fee)
-  override val bytes = Coeval.evalOnce(Bytes.concat(toSign(), signature.arr))
+  override val bytes = Coeval.evalOnce(Bytes.concat(bodyBytes(), signature.arr))
 
 }
 
@@ -68,7 +68,7 @@ object LeaseCancelTransaction {
              fee: Long,
              timestamp: Long): Either[ValidationError, LeaseCancelTransaction] = {
     create(sender, leaseId, fee, timestamp, ByteStr.empty).right.map { unsigned =>
-      unsigned.copy(signature = ByteStr(crypto.sign(sender, unsigned.toSign())))
+      unsigned.copy(signature = ByteStr(crypto.sign(sender, unsigned.bodyBytes())))
     }
   }
 }
