@@ -1,5 +1,6 @@
 package com.wavesplatform.state2.diffs
 
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.Terms._
 import com.wavesplatform.lang._
 import com.wavesplatform.state2._
@@ -10,12 +11,15 @@ import org.scalatest.{Matchers, PropSpec}
 import scorex.account.PublicKeyAccount
 import scorex.crypto.EllipticCurveImpl
 import scorex.lagonaki.mocks.TestBlock
+import scorex.settings.TestFunctionalitySettings
 import scorex.transaction._
 import scorex.transaction.assets.{ScriptTransferTransaction, TransferTransaction}
 import scorex.transaction.lease.LeaseTransaction
 import scorex.transaction.smart.{Script, SetScriptTransaction, Verifier}
 
 class ScriptsValidationTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDB {
+
+  private val fs = TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Map(BlockchainFeatures.SmartAccounts.id -> 0))
 
   private val context = TypeChecker.Context(
     predefTypes = Map("Transaction" -> Verifier.transactionType),
@@ -61,8 +65,8 @@ class ScriptsValidationTest extends PropSpec with PropertyChecks with Matchers w
     )
     forAll(preconditionsTransferAndLease(onlySend)) {
       case ((genesis, script, lease, transfer)) =>
-        assertDiffAndState(db, Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(transfer))) { case _ => () }
-        assertDiffEi(db, Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(lease)))(totalDiffEi =>
+        assertDiffAndState(db, Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(transfer)),fs) { case _ => () }
+        assertDiffEi(db, Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(lease)),fs)(totalDiffEi =>
           totalDiffEi should produce("TransactionNotAllowedByScript"))
     }
   }
@@ -124,9 +128,9 @@ class ScriptsValidationTest extends PropSpec with PropertyChecks with Matchers w
           transfer.copy(proofs = Proofs.create(Seq(sigs(1), sigs(0))).explicitGet())
         )
 
-        validProofs.foreach(tx => assertDiffAndState(db, Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(tx))) { case _ => () })
+        validProofs.foreach(tx => assertDiffAndState(db, Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(tx)),fs) { case _ => () })
         invalidProofs.foreach(tx =>
-          assertLeft(db, Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(tx)))("TransactionNotAllowedByScript"))
+          assertLeft(db, Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(tx)),fs)("TransactionNotAllowedByScript"))
     }
   }
 
@@ -148,15 +152,15 @@ class ScriptsValidationTest extends PropSpec with PropertyChecks with Matchers w
 
     forAll(preconditionsTransferAndLease(goodScript)) {
       case ((genesis, script, lease, transfer)) =>
-        assertDiffAndState(db, Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(transfer))) { case _ => () }
-        assertDiffEi(db, Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(lease)))(totalDiffEi =>
+        assertDiffAndState(db, Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(transfer)),fs) { case _ => () }
+        assertDiffEi(db, Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(lease)),fs)(totalDiffEi =>
           totalDiffEi should produce("TransactionNotAllowedByScript"))
     }
 
     forAll(preconditionsTransferAndLease(badScript)) {
       case ((genesis, script, lease, transfer)) =>
-        assertDiffAndState(db, Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(transfer))) { case _ => () }
-        assertDiffEi(db, Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(lease))) { totalDiffEi =>
+        assertDiffAndState(db, Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(transfer)),fs) { case _ => () }
+        assertDiffEi(db, Seq(TestBlock.create(Seq(genesis, script))), TestBlock.create(Seq(lease)),fs) { totalDiffEi =>
           totalDiffEi should produce("transactions is of another type")
         }
     }
