@@ -17,11 +17,18 @@ class BurnTransactionSuite2 extends BaseTransactionSuite {
     notMiner.assertBalances(firstAddress, balance - defaultFee, effectiveBalance - defaultFee)
     notMiner.assertAssetBalance(firstAddress, issuedAssetId, defaultQuantity)
 
-    val burnId = sender.burn(firstAddress, issuedAssetId, defaultQuantity / 2, fee = defaultFee).id
+    // burn half of the coins and check balance
+    var burnId = sender.burn(firstAddress, issuedAssetId, defaultQuantity / 2, fee = defaultFee).id
 
     nodes.waitForHeightAraiseAndTxPresent(burnId)
     notMiner.assertBalances(firstAddress, balance - 2 * defaultFee, effectiveBalance - 2 * defaultFee)
     notMiner.assertAssetBalance(firstAddress, issuedAssetId, defaultQuantity / 2)
+
+    // burn the rest and check again
+    burnId = sender.burn(firstAddress, issuedAssetId, defaultQuantity / 2, fee = defaultFee).id
+
+    nodes.waitForHeightAraiseAndTxPresent(burnId)
+    notMiner.assertAssetBalance(firstAddress, issuedAssetId, 0)
 
   }
 }
