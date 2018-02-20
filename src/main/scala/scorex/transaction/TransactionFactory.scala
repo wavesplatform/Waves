@@ -3,6 +3,7 @@ package scorex.transaction
 import com.google.common.base.Charsets
 import com.wavesplatform.state2.ByteStr
 import scorex.account._
+import scorex.api.http.DataRequest
 import scorex.api.http.alias.CreateAliasRequest
 import scorex.api.http.assets._
 import scorex.api.http.leasing.{LeaseCancelRequest, LeaseRequest}
@@ -85,5 +86,11 @@ object TransactionFactory {
     pk <- wallet.findWallet(request.sender)
     timestamp = request.timestamp.getOrElse(time.getTimestamp())
     tx <- BurnTransaction.create(pk, ByteStr.decodeBase58(request.assetId).get, request.quantity, request.fee, timestamp)
+  } yield tx
+
+  def data(request: DataRequest, wallet: Wallet, time: Time): Either[ValidationError, DataTransaction] = for {///better name?
+    pk <- wallet.findWallet(request.sender)
+    timestamp = request.timestamp.getOrElse(time.getTimestamp())
+    tx <- DataTransaction.create(pk, request.data, request.fee, timestamp)
   } yield tx
 }

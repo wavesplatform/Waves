@@ -13,12 +13,8 @@ object CancelAllLeases {
         acc -> Portfolio(0, invertLeaseInfo(pf.leaseInfo), Map.empty)
       }
 
-    Diff(transactions = Map.empty,
+    Diff.empty.copy(
       portfolios = portfolioUpd,
-      issuedAssets = Map.empty,
-      aliases = Map.empty,
-      paymentTransactionIdsByHashes = Map.empty,
-      orderFills = Map.empty,
       leaseState = s.activeLeases().map(_ -> false).toMap)
   }
 

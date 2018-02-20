@@ -150,6 +150,9 @@ class StateStorage private(db: DB, time: Time) extends SubStorage(db, "state") w
     } else None
   }
 
+  def getAccountData(acc: Address): Map[String, String] = {
+    Map("SS stub" -> "ok", "CSR stub" -> "BROKEN", "parsed" -> "BROKEN")///
+  }
 
   override def removeEverything(b: Option[WriteBatch]): Unit = {
     putIntProperty(MaxAddress, 0, b)
@@ -253,6 +256,8 @@ class StateStorage private(db: DB, time: Time) extends SubStorage(db, "state") w
     }
     putIntProperty(LeasesCount, count, b)
   }
+
+
 }
 
 object StateStorage {

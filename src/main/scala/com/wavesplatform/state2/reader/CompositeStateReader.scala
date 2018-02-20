@@ -83,6 +83,9 @@ class CompositeStateReader private(inner: SnapshotStateReader, blockDiff: BlockD
     val diffed: Long = blockDiff.txsDiff.portfolios.get(a).orEmpty.assets.getOrElse(asset, 0)
     in + diffed
   }
+
+  override def accountData(acc: Address): Map[String, String] =
+    inner.accountData(acc) ++ blockDiff.txsDiff.accountData.get(acc).orEmpty
 }
 
 object CompositeStateReader {

@@ -48,6 +48,8 @@ trait SnapshotStateReader extends Synchronized {
   def snapshotAtHeight(acc: Address, h: Int): Option[Snapshot]
 
   def filledVolumeAndFee(orderId: ByteStr): OrderFillInfo
+
+  def accountData(acc: Address): Map[String, String]
 }
 
 object SnapshotStateReader {

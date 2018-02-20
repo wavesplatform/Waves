@@ -86,4 +86,8 @@ class StateReaderImpl(p: StateStorage, val synchronizationToken: ReentrantReadWr
   override def assetBalance(a: Address, asset: ByteStr): Long = read { implicit l =>
     sp().getAssetBalance(a, asset).getOrElse(0L)
   }
+
+  override def accountData(acc: Address): Map[String, String] = read { implicit l =>
+    sp().getAccountData(acc)
+  }
 }

@@ -5,21 +5,28 @@ import javax.ws.rs.Path
 
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server.Route
+import com.wavesplatform.UtxPool
 import com.wavesplatform.settings.{FunctionalitySettings, RestAPISettings}
 import com.wavesplatform.state2.StateReader
+import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
 import play.api.libs.json._
+import scorex.BroadcastRoute
 import scorex.account.{Address, PublicKeyAccount}
 import scorex.crypto.EllipticCurveImpl
 import scorex.crypto.encode.Base58
-import scorex.transaction.PoSCalc
+import scorex.transaction.{PoSCalc, TransactionFactory}
+import scorex.utils.Time
 import scorex.wallet.Wallet
 
 import scala.util.{Failure, Success, Try}
 
 @Path("/addresses")
 @Api(value = "/addresses/", description = "Info about wallet's accounts and other calls about addresses")
-case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: StateReader, functionalitySettings: FunctionalitySettings) extends ApiRoute {
+case class AddressApiRoute(settings: RestAPISettings, functionalitySettings: FunctionalitySettings,
+                           wallet: Wallet, utx: UtxPool, allChannels: ChannelGroup, time: Time, state: StateReader)
+  extends ApiRoute with BroadcastRoute {
+
   import AddressApiRoute._
 
   val MaxAddressesPerRequest = 1000
@@ -27,7 +34,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
   override lazy val route =
     pathPrefix("addresses") {
       validate ~ seed ~ balanceWithConfirmations ~ balanceDetails ~ balance ~ balanceWithConfirmations ~ verify ~ sign ~ deleteAddress ~ verifyText ~
-        signText ~ seq ~ publicKey ~ effectiveBalance ~ effectiveBalanceWithConfirmations
+        signText ~ seq ~ publicKey ~ effectiveBalance ~ effectiveBalanceWithConfirmations ~ getData ~ postData
     } ~ root ~ create
 
   @Path("/{address}")
@@ -195,6 +202,35 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
     complete(Validity(address, Address.fromString(address).isRight))
   }
 
+  @Path("/data")
+  @ApiOperation(value = "Posts data",///wording
+    httpMethod = "POST",
+    produces = "application/json",
+    consumes = "application/json")
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(
+      name = "body",
+      value = "Json with data",
+      required = true,
+      paramType = "body",
+      dataType = "scorex.api.http.DataRequest",
+      defaultValue = "{\n\t\"sender\": \"3Mx2afTZ2KbRrLNbytyzTtXukZvqEB8SkW7\",\n\t\"fee\": 100000,\n\t\"data\": {}\n}"
+    )
+  ))
+  @ApiResponses(Array(new ApiResponse(code = 200, message = "Json with response or error")))
+  def postData: Route = processRequest("data", (req: DataRequest) => doBroadcast(TransactionFactory.data(req, wallet, time)))
+
+  @Path("/data/{address}")
+  @ApiOperation(value = "Create", notes = "Create a new account in the wallet(if it exists)", httpMethod = "GET")///words
+  @ApiImplicitParams(Array(
+    new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
+  ))
+  def getData: Route = {
+    path("data" / Segment) { address =>
+      complete(accountData(address))
+    }
+  }
+
   @Path("/")
   @ApiOperation(value = "Addresses", notes = "Get wallet accounts addresses", httpMethod = "GET")
   def root: Route = (path("addresses") & get) {
@@ -267,6 +303,13 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, state: Sta
         confirmations,
         s.effectiveBalanceAtHeightWithConfirmations(acc, s.height, confirmations).get)))
         .getOrElse(InvalidAddress)
+    }
+  }
+
+  private def accountData(address: String): ToResponseMarshallable = {
+    val s = state()
+    s.read { _ =>
+      Address.fromString(address).map(acc => ToResponseMarshallable(s.accountData(acc))).getOrElse(InvalidAddress)
     }
   }
 

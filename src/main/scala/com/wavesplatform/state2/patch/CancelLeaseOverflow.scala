@@ -23,12 +23,8 @@ object CancelLeaseOverflow {
       }
     } yield (leaseId, false)
 
-    Diff(transactions = Map.empty,
+    Diff.empty.copy(
       portfolios = portfolioUpd,
-      issuedAssets = Map.empty,
-      aliases = Map.empty,
-      paymentTransactionIdsByHashes = Map.empty,
-      orderFills = Map.empty,
       leaseState = cancelledLeases.toMap)
   }
 }

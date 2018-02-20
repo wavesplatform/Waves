@@ -81,6 +81,9 @@ object CommonValidation {
       case _: MassTransferTransaction =>
         Either.cond(featureProvider.isFeatureActivated(BlockchainFeatures.MassTransfer, height),
           tx, ValidationError.ActivationError("MassTransfer transaction has not been activated yet"))
+      case _: DataTransaction => Right(tx) ///check activation
+//        Either.cond(featureProvider.isFeatureActivated(BlockchainFeatures.MassTransfer, height),
+//          tx, ValidationError.ActivationError("MassTransfer transaction has not been activated yet"))
       case _ => Left(GenericError("Unknown transaction must be explicitly activated"))
     }
 
