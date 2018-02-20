@@ -1,7 +1,6 @@
 package com.wavesplatform.state2.diffs
 
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.lang.Terms.Typed
 import com.wavesplatform.state2._
 import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
 import org.scalacheck.Gen
@@ -10,7 +9,7 @@ import org.scalatest.{Matchers, PropSpec}
 import scorex.lagonaki.mocks.TestBlock
 import scorex.settings.TestFunctionalitySettings
 import scorex.transaction.GenesisTransaction
-import scorex.transaction.smart.{Script, SetScriptTransaction}
+import scorex.transaction.smart.SetScriptTransaction
 
 class SetScriptTransactionDiffTest extends PropSpec
   with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDB {
