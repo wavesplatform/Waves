@@ -22,7 +22,7 @@ class SetScriptTransactionDiffTest extends PropSpec
     ts <- timestampGen
     genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).right.get
     fee <- smallFeeGen
-    script <- Gen.const(Script(Typed.FALSE))
+    script <- scriptGen
   } yield (genesis, SetScriptTransaction.selfSigned(master, script, fee, ts).explicitGet())
 
   property("setting script results in account state") {
