@@ -148,7 +148,6 @@ commands += Command.command("packageAll") { state =>
 lazy val lang =
   crossProject(JSPlatform, JVMPlatform)
     .withoutSuffixFor(JVMPlatform)
-    .crossType(CrossType.Pure)
     .settings(
       version := "0.0.1",
       libraryDependencies ++=
